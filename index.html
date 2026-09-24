@@ -52,11 +52,9 @@
 
   .info-bar {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
+    top: 0; left: 0; right: 0;
     z-index: 500;
-    padding: 18px 20px 18px 20px;
+    padding: 18px 20px;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     opacity: 0;
@@ -70,30 +68,18 @@
       0 1px 3px rgba(250, 247, 245, 0.95),
       0 0 10px rgba(250, 247, 245, 0.8);
   }
-  .info-bar.shown {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  /* Fade out when scrolling into the table / opening the receipt */
+  .info-bar.shown { opacity: 1; transform: translateY(0); }
   .info-bar.hidden {
-    opacity: 0;
-    transform: translateY(-14px);
-    transition:
-      opacity 0.6s ease,
-      transform 0.6s ease;
+    opacity: 0; transform: translateY(-14px);
+    transition: opacity 0.6s ease, transform 0.6s ease;
   }
 
   .info-line {
     display: inline-block;
-    font-size: 13px;
-    font-weight: 500;
-    color: #8a7a74;
-    letter-spacing: 1.5px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
+    font-size: 13px; font-weight: 500;
+    color: #8a7a74; letter-spacing: 1.5px;
+    white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; max-width: 100%;
   }
   .info-line .city { font-weight: 600; color: #b04a5a; letter-spacing: 2px; }
   .info-line .sep { color: #d8ccc8; margin: 0 8px; font-weight: 400; }
@@ -118,21 +104,18 @@
   html[data-weather="drizzle"] body:not(.warm-background) { background-color: #eae2e6; }
   html[data-weather="rain"] body.warm-background,
   html[data-weather="drizzle"] body.warm-background { background-color: #efe2e4; }
-
   html[data-weather="thunderstorm"] body:not(.warm-background) { background-color: #e2dae2; }
   html[data-weather="thunderstorm"] body.warm-background { background-color: #e6dee2; }
   html[data-weather="fog"] body:not(.warm-background) { background-color: #efe9e4; }
   html[data-weather="clouds"] body:not(.warm-background) { background-color: #f2eeec; }
   html[data-weather="snow"] body:not(.warm-background) { background-color: #eff0f2; }
   html[data-weather="clear"] body:not(.warm-background) { background-color: #fdf4ea; }
-
   html[data-time="evening"][data-weather="rain"] body:not(.warm-background),
   html[data-time="evening"][data-weather="drizzle"] body:not(.warm-background) { background-color: #ecddd8; }
-
   html[data-time="night"][data-weather="rain"] body:not(.warm-background),
   html[data-time="night"][data-weather="drizzle"] body:not(.warm-background) { background-color: #e2d5d5; }
 
-  /* ============ NAME ENTRY SCREEN ============ */
+  /* ============ NAME ENTRY ============ */
 
   .name-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -144,9 +127,7 @@
     overflow-y: auto; -webkit-overflow-scrolling: touch;
   }
   .name-screen.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
-
   .name-inner { max-width: 400px; width: 100%; padding: 20px 0; }
-
   .name-label { font-size: 14px; color: #b8a8a2; letter-spacing: 3px; margin-bottom: 20px; }
 
   .name-input {
@@ -201,7 +182,7 @@
   }
   .name-btn:active { background: #9a3e4d; transform: scale(0.97); }
 
-  /* ============ BLOSSOM START SCREEN ============ */
+  /* ============ BLOSSOM START ============ */
 
   .blossom-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -221,10 +202,22 @@
   }
   .start-btn:active { transform: scale(0.92); }
 
-  .blossom-svg { width: 120px; height: 120px; display: block; animation: blossomBreathe 4s ease-in-out infinite; }
+  /* Bigger, more dramatic pulse */
+  .blossom-svg {
+    width: 120px; height: 120px; display: block;
+    animation: blossomBreathe 2.8s ease-in-out infinite;
+    transform-origin: 50% 50%;
+    will-change: transform, filter;
+  }
   @keyframes blossomBreathe {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.06); }
+    0%, 100% {
+      transform: scale(1);
+      filter: drop-shadow(0 0 0px rgba(232, 180, 188, 0));
+    }
+    50% {
+      transform: scale(1.18);
+      filter: drop-shadow(0 6px 22px rgba(232, 180, 188, 0.55));
+    }
   }
 
   .petal { fill: #fbdfe3; stroke: #e8b4bc; stroke-width: 0.8; opacity: 0.95; }
@@ -247,7 +240,7 @@
     50% { opacity: 1; }
   }
 
-  /* ============ INTRO NAME ANIMATION ============ */
+  /* ============ INTRO ============ */
 
   .intro-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -257,7 +250,6 @@
     transition: opacity 0.8s ease, background-color 1.6s ease;
   }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
-
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
 
   .name-char {
@@ -287,20 +279,18 @@
     .name-column { gap: 8px; }
   }
 
-  /* ============ SWIPE CAROUSEL (MAIN) ============ */
+  /* ============ MAIN CAROUSEL ============ */
 
   .stage {
     position: relative; height: 100vh; width: 100%;
     overflow: hidden; touch-action: pan-y; perspective: 1200px;
   }
-
   .track {
     display: flex; width: 500%; height: 100%;
     transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
     will-change: transform;
   }
   .track.dragging { transition: none; }
-
   .panel {
     width: calc(100% / 5); height: 100%;
     display: flex; align-items: center; justify-content: center;
@@ -322,7 +312,6 @@
     transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
     transition-delay: 0s;
   }
-
   .panel-hint {
     opacity: 0; transform: translateX(20px);
     transition: opacity 0.7s ease, transform 0.7s ease;
@@ -383,7 +372,6 @@
     0%, 100% { transform: translateX(0); opacity: 0.6; }
     50% { transform: translateX(8px); opacity: 1; }
   }
-
   .scroll-down-hint {
     margin-top: 60px; font-size: 14px; color: #b8a8a2;
     letter-spacing: 4px; font-weight: 500;
@@ -396,7 +384,6 @@
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(8px); }
   }
-
   .dots {
     position: absolute; bottom: 40px; left: 0; right: 0;
     display: flex; justify-content: center; gap: 10px; z-index: 10;
@@ -407,7 +394,6 @@
     transition: background 0.3s, transform 0.3s;
   }
   .dot.active { background: #b04a5a; transform: scale(1.3); }
-
   .stage-spacer { height: 60px; }
 
   /* ============ TRANSITION LINE ============ */
@@ -541,7 +527,6 @@
   }
   .price-input:focus { outline: none; }
   .price-input::placeholder { color: #bdb2ae; font-weight: 400; }
-
   .yen { color: #a34a56; font-size: 14px; font-weight: 700; }
 
   .reject-row {
@@ -581,7 +566,6 @@
   .reject-row.selected .reject-box::after { opacity: 1; }
 
   .reject-content { flex: 1; min-width: 0; }
-
   .reject-text {
     color: #4a4542; font-size: 16px;
     line-height: 1.7; font-weight: 500;
@@ -599,7 +583,6 @@
     opacity: 1; max-height: 500px;
     margin-top: 18px; padding-top: 16px;
   }
-
   .reject-thanks-line {
     font-size: 16px; font-weight: 700; color: #b04a5a;
     letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px;
@@ -621,7 +604,7 @@
   }
   .reject-gift .gift-amount { font-size: 16px; font-weight: 700; color: #b04a5a; letter-spacing: 1px; }
 
-  /* ============ PETAL OVERLAY ============ */
+  /* ============ PETAL ============ */
 
   .petal-overlay {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -645,7 +628,7 @@
     100% { opacity: 0; transform: translateY(95vh) translateX(0) rotate(110deg); }
   }
 
-  /* ============ SUMMARY BAR ============ */
+  /* ============ SUMMARY ============ */
 
   .summary {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -658,7 +641,6 @@
     pointer-events: none; z-index: 50;
   }
   .summary.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
-
   .summary-inner {
     max-width: 560px; margin: 0 auto; width: 100%;
     display: flex; justify-content: space-between; align-items: center;
@@ -672,28 +654,19 @@
     font-size: 27px; font-weight: 700; color: #b04a5a;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
-
   .reset {
-    background: #faf3f1;
-    border: 1.5px solid #ead9d5;
-    color: #a34a56;
-    font-size: 14px; font-weight: 600;
+    background: #faf3f1; border: 1.5px solid #ead9d5;
+    color: #a34a56; font-size: 14px; font-weight: 600;
     padding: 11px 22px; border-radius: 20px;
-    font-family: inherit; cursor: pointer;
-    transition: all 0.2s;
+    font-family: inherit; cursor: pointer; transition: all 0.2s;
   }
   .reset:active { background: #f4e6e6; transform: scale(0.97); }
-
   .summary-actions { display: flex; align-items: center; gap: 8px; }
-
   .submit-btn {
-    background: #b04a5a;
-    border: 1.5px solid #b04a5a;
-    color: #ffffff;
-    font-size: 14px; font-weight: 600;
+    background: #b04a5a; border: 1.5px solid #b04a5a;
+    color: #ffffff; font-size: 14px; font-weight: 600;
     padding: 11px 22px; border-radius: 20px;
-    font-family: inherit; cursor: pointer;
-    transition: all 0.2s;
+    font-family: inherit; cursor: pointer; transition: all 0.2s;
     -webkit-appearance: none; appearance: none;
   }
   .submit-btn:active { background: #9a3e4d; transform: scale(0.97); }
@@ -702,7 +675,7 @@
     color: #ffffff; cursor: default; opacity: 0.6;
   }
 
-  /* ============ CONFIRMATION DIALOG ============ */
+  /* ============ CONFIRM DIALOG ============ */
 
   .confirm-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -716,7 +689,6 @@
     transition: opacity 0.5s ease;
   }
   .confirm-screen.visible { opacity: 1; pointer-events: auto; }
-
   .confirm-card {
     background: #ffffff; max-width: 360px; width: 100%;
     padding: 36px 28px 28px 28px;
@@ -729,24 +701,17 @@
     transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .confirm-screen.visible .confirm-card { transform: scale(1); }
-
   .confirm-title {
     font-size: 16px; font-weight: 600; color: #b04a5a;
-    line-height: 2; letter-spacing: 0.5px;
-    margin-bottom: 28px;
+    line-height: 2; letter-spacing: 0.5px; margin-bottom: 28px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-wrap: balance;
   }
-
   .confirm-actions { display: flex; justify-content: center; gap: 12px; }
-
   .confirm-btn {
-    flex: 1; min-width: 0;
-    border-radius: 24px;
-    padding: 14px 20px;
-    font-size: 15px; font-weight: 600;
-    font-family: inherit; letter-spacing: 2px;
-    cursor: pointer;
+    flex: 1; min-width: 0; border-radius: 24px;
+    padding: 14px 20px; font-size: 15px; font-weight: 600;
+    font-family: inherit; letter-spacing: 2px; cursor: pointer;
     -webkit-appearance: none; appearance: none;
     transition: background 0.2s, color 0.2s, transform 0.15s, border-color 0.2s;
   }
@@ -760,7 +725,7 @@
   }
   .confirm-yes:active { background: #9a3e4d; }
 
-  /* ============ RECEIPT SCREEN ============ */
+  /* ============ RECEIPT ============ */
 
   .receipt-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -773,7 +738,6 @@
   }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
   .receipt-screen.reopened { z-index: 370; }
-
   .receipt-paper {
     background: #ffffff;
     max-width: 380px; width: 100%;
@@ -792,7 +756,6 @@
     from { opacity: 0; transform: translateY(24px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
   .receipt-close {
     position: sticky; top: 0; float: right;
     margin: -8px -8px 0 0;
@@ -808,7 +771,6 @@
     padding: 0; z-index: 5;
   }
   .receipt-close:active { background: #f4f0ee; color: #8a807c; }
-
   .receipt-header { text-align: center; margin-bottom: 24px; clear: both; }
   .receipt-thanks {
     font-size: 17px; font-weight: 600; color: #b04a5a;
@@ -818,7 +780,6 @@
     font-size: 13px; font-weight: 400; color: #8a807c;
     line-height: 1.9; letter-spacing: 0.5px;
   }
-
   .receipt-to-row {
     display: flex; align-items: center; justify-content: center;
     gap: 14px; padding: 20px 8px; text-align: center;
@@ -830,20 +791,16 @@
     letter-spacing: 2px; line-height: 1.4;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-
   .receipt-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, #e2d5d0 20%, #e2d5d0 80%, transparent);
     margin: 22px 0;
   }
-
   .receipt-title {
     font-size: 12px; font-weight: 500; color: #b8a8a2;
     letter-spacing: 6px; text-align: center; margin-bottom: 20px;
   }
-
   .receipt-items { display: flex; flex-direction: column; gap: 14px; }
-
   .receipt-item {
     display: flex; justify-content: space-between; align-items: center;
     gap: 8px; padding-bottom: 10px;
@@ -855,13 +812,11 @@
     to { opacity: 1; transform: translateY(0); }
   }
   .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-
   .receipt-item-name {
     flex: 1; font-size: 14px; color: #3a3633;
     line-height: 1.5; letter-spacing: 0.3px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-
   .receipt-item-price-wrap {
     flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px;
     color: #b04a5a; font-weight: 600; font-size: 14px;
@@ -873,7 +828,6 @@
   }
   .receipt-item-price-wrap:focus-within { border-color: #b04a5a; background: #ffffff; }
   .receipt-item-price-wrap .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
-
   .receipt-price-input {
     background: transparent; border: none;
     color: #b04a5a; font-size: 14px; font-weight: 600;
@@ -883,12 +837,10 @@
     -webkit-appearance: none; appearance: none;
   }
   .receipt-price-input:focus { outline: none; }
-
   .receipt-item-remove {
     flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
     background: transparent; border: none;
-    color: #d4c4be;
-    font-size: 16px; font-weight: 400;
+    color: #d4c4be; font-size: 16px; font-weight: 400;
     font-family: inherit; line-height: 1;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -897,13 +849,11 @@
     -webkit-appearance: none; appearance: none;
   }
   .receipt-item-remove:active { background: #fbeef0; color: #b04a5a; }
-
   .receipt-item-price {
     flex-shrink: 0; font-size: 14px; font-weight: 600;
     color: #b04a5a; letter-spacing: 0.5px;
   }
   .receipt-item-price .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
-
   .receipt-total-row {
     display: flex; justify-content: space-between; align-items: baseline;
     padding-top: 4px;
@@ -917,14 +867,13 @@
     letter-spacing: 1px;
   }
   .receipt-total-value .yen-symbol { font-size: 15px; margin-right: 2px; opacity: 0.8; }
-
   .receipt-footer { text-align: center; margin-top: 28px; }
   .receipt-footer-mark { font-size: 14px; color: #e8b4bc; letter-spacing: 8px; }
 
   @media (min-width: 700px) {
     .receipt-paper { max-width: 480px; padding: 42px 42px 34px 42px; }
-    .receipt-thanks { font-size: 22px; line-height: 1.9; letter-spacing: 2px; margin-bottom: 18px; }
-    .receipt-subthanks { font-size: 15px; line-height: 2; letter-spacing: 1px; }
+    .receipt-thanks { font-size: 22px; letter-spacing: 2px; margin-bottom: 18px; }
+    .receipt-subthanks { font-size: 15px; letter-spacing: 1px; }
     .receipt-to-row { gap: 16px; padding: 22px 8px; }
     .receipt-to-mark { font-size: 15px; }
     .receipt-to-name { font-size: 22px; letter-spacing: 3px; }
@@ -968,20 +917,35 @@
     .receipt-total-value { font-size: 21px; }
   }
 
-  /* ============================================================
-     THANK-YOU SCREEN
-     ============================================================ */
+  /* ============ THANK-YOU SCREEN ============ */
 
   .thankyou-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: transparent;
+    background-color: #faf7f5;
     display: flex; align-items: center; justify-content: center;
     overflow: hidden;
     opacity: 0; pointer-events: none;
     z-index: 350;
-    transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: opacity 1.2s cubic-bezier(0.25, 0.46, 0.45, 0.94), background-color 2s ease;
   }
   .thankyou-screen.visible { opacity: 1; pointer-events: auto; }
+
+  html[data-time="morning"] .thankyou-screen { background-color: #fdf1e8; }
+  html[data-time="day"]     .thankyou-screen { background-color: #faf7f5; }
+  html[data-time="evening"] .thankyou-screen { background-color: #f8e6d8; }
+  html[data-time="night"]   .thankyou-screen { background-color: #ede2dc; }
+
+  html[data-weather="rain"] .thankyou-screen,
+  html[data-weather="drizzle"] .thankyou-screen { background-color: #eae2e6; }
+  html[data-weather="thunderstorm"] .thankyou-screen { background-color: #e2dae2; }
+  html[data-weather="fog"] .thankyou-screen { background-color: #efe9e4; }
+  html[data-weather="clouds"] .thankyou-screen { background-color: #f2eeec; }
+  html[data-weather="snow"] .thankyou-screen { background-color: #eff0f2; }
+  html[data-weather="clear"] .thankyou-screen { background-color: #fdf4ea; }
+  html[data-time="evening"][data-weather="rain"] .thankyou-screen,
+  html[data-time="evening"][data-weather="drizzle"] .thankyou-screen { background-color: #ecddd8; }
+  html[data-time="night"][data-weather="rain"] .thankyou-screen,
+  html[data-time="night"][data-weather="drizzle"] .thankyou-screen { background-color: #e2d5d5; }
 
   .ambient-bg {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -1077,7 +1041,6 @@
     transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
     transition-delay: 0s;
   }
-
   .ty-panel-hint {
     opacity: 0; transform: translateX(20px);
     transition: opacity 0.7s ease, transform 0.7s ease;
@@ -1086,7 +1049,6 @@
   .ty-panel.active .ty-panel-hint { opacity: 1; transform: translateX(0); }
 
   .ty-mark { font-size: 22px; color: #e8b4bc; letter-spacing: 10px; margin-bottom: 32px; }
-
   .ty-line {
     font-size: 18px; font-weight: 500; color: #2b2b2b;
     line-height: 2.3; letter-spacing: 0.6px; margin-bottom: 8px;
@@ -1094,7 +1056,6 @@
   }
   .ty-line.accent { color: #b04a5a; font-weight: 700; }
   .ty-line.spacer { margin-top: 24px; }
-
   .ty-rule { width: 44px; height: 1px; background: #ead9d5; margin: 30px auto; }
 
   .ty-swipe-hint {
@@ -1105,7 +1066,6 @@
     display: inline-block; margin-left: 8px; color: #b04a5a;
     animation: swipeArrow 2s ease-in-out infinite;
   }
-
   .ty-final-hint {
     margin-top: 44px; font-size: 13px; color: #b8a8a2;
     letter-spacing: 4px; font-weight: 500;
@@ -1122,7 +1082,6 @@
     z-index: 10; transition: opacity 0.6s ease;
   }
   .ty-dots.hidden { opacity: 0; pointer-events: none; }
-
   .ty-dot {
     width: 8px; height: 8px; border-radius: 50%;
     background: #e0d3ce;
@@ -1154,7 +1113,6 @@
     display: flex; justify-content: center; align-items: center;
     gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%;
   }
-
   .blossom-mark {
     display: inline-block; font-size: 13px; line-height: 1;
     color: #b04a5a;
@@ -1184,7 +1142,6 @@
     align-items: center; justify-content: center;
     width: 100%; padding: 0 8px;
   }
-
   .quote-line {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-size: 26px; font-weight: 500; color: #b04a5a;
@@ -1233,10 +1190,7 @@
     .info-line { font-size: 14px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px; }
-
-    .table-card, .reject-row, .divider {
-      max-width: 560px; margin-left: auto; margin-right: auto;
-    }
+    .table-card, .reject-row, .divider { max-width: 560px; margin-left: auto; margin-right: auto; }
     .divider { padding: 0 16px; }
     .panel-inner { max-width: 480px; }
     .panel { padding: 80px 32px 60px 32px; }
@@ -1247,7 +1201,6 @@
     .msg-4 { font-size: 18px; }
     .msg-emphasis { font-size: 18px; }
     .transition-line { font-size: 17px; max-width: 600px; }
-
     .ty-line { font-size: 21px; }
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
     .ty-line.spacer { margin-top: 28px; }
@@ -1262,10 +1215,8 @@
   @media (min-width: 1100px) {
     .info-line { font-size: 15px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px; }
-
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
     .transition-line { font-size: 18px; max-width: 660px; }
-
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
     .quote-line { font-size: 40px; letter-spacing: 5px; }
@@ -1278,10 +1229,8 @@
     .info-bar { padding: 12px 16px; }
     .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
-
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
-
     .panel { padding: 65px 20px 50px 20px; }
     .ty-panel { padding: 60px 20px 50px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
@@ -1302,10 +1251,8 @@
     .info-bar { padding: 8px 14px; }
     .info-line { font-size: 11px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
-
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
-
     .panel { padding: 55px 40px 40px 40px; }
     .panel-inner { max-width: 560px; }
     .greeting { font-size: 19px; line-height: 2; }
@@ -1320,7 +1267,6 @@
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
     .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
-
     .ty-panel { padding: 55px 40px 40px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
     .quote-line { font-size: 22px; letter-spacing: 3px; }
@@ -1346,7 +1292,7 @@
   </div>
 </div>
 
-<!-- ============ NAME ENTRY SCREEN ============ -->
+<!-- ============ NAME ENTRY ============ -->
 
 <div class="name-screen" id="nameScreen">
   <div class="name-inner">
@@ -1394,7 +1340,7 @@
   </div>
 </div>
 
-<!-- ============ BLOSSOM START SCREEN ============ -->
+<!-- ============ BLOSSOM START ============ -->
 
 <div class="blossom-screen" id="blossomScreen">
   <button type="button" class="start-btn" id="startBtn" aria-label="はじめる">
@@ -1413,13 +1359,13 @@
   <p class="start-hint">桜の花びらを<br>そっとタップしてください</p>
 </div>
 
-<!-- ============ INTRO NAME ANIMATION ============ -->
+<!-- ============ INTRO ============ -->
 
 <div class="intro-overlay" id="introOverlay">
   <div class="name-column" id="nameColumn"></div>
 </div>
 
-<!-- ============ SWIPE CAROUSEL ============ -->
+<!-- ============ MAIN CAROUSEL ============ -->
 
 <div class="stage" id="stage">
   <div class="track" id="track">
@@ -1551,7 +1497,6 @@
       <span class="yen">円</span>
     </div>
   </div>
-
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
@@ -1560,7 +1505,6 @@
       <span class="yen">円</span>
     </div>
   </div>
-
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
@@ -1569,7 +1513,6 @@
       <span class="yen">円</span>
     </div>
   </div>
-
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
@@ -1623,23 +1566,19 @@
       <div class="receipt-thanks">ご確認いただき<br>ありがとうございます。</div>
       <div class="receipt-subthanks">無理のない範囲でお選びいただき、<br>ありがとうございます。</div>
     </div>
-
     <div class="receipt-to-row">
       <span class="receipt-to-mark">❀</span>
       <span class="receipt-to-name" id="receiptToName">桜庭さんへ</span>
       <span class="receipt-to-mark">❀</span>
     </div>
-
     <div class="receipt-divider"></div>
     <div class="receipt-title">本日の内容</div>
     <div class="receipt-items" id="receiptItems"></div>
     <div class="receipt-divider"></div>
-
     <div class="receipt-total-row">
       <span class="receipt-total-label">合計</span>
       <span class="receipt-total-value" id="receiptTotal">¥0</span>
     </div>
-
     <div class="receipt-footer">
       <span class="receipt-footer-mark">❀</span>
     </div>
@@ -1747,9 +1686,7 @@
 </div>
 
 <script>
-  /* ============================================================
-     PRESETS — loaded from presets.json, with hardcoded fallback
-     ============================================================ */
+  /* ============ PRESETS ============ */
 
   var PRESET_TEXTS = [
     'ダミーテキスト1',
@@ -1772,14 +1709,10 @@
         }
         return PRESET_TEXTS;
       })
-      .catch(function() {
-        return PRESET_TEXTS;
-      });
+      .catch(function() { return PRESET_TEXTS; });
   }
 
-  /* ============================================================
-     AMBIENT QUOTES — loaded from quotes.json, with fallback
-     ============================================================ */
+  /* ============ QUOTES ============ */
 
   var AMBIENT_LINES = [
     '静かな時間も、また大切な時間です。',
@@ -1800,12 +1733,10 @@
         }
         return AMBIENT_LINES;
       })
-      .catch(function() {
-        return AMBIENT_LINES;
-      });
+      .catch(function() { return AMBIENT_LINES; });
   }
 
-  /* ============================================================ */
+  /* ============ DOM REFS ============ */
 
   var nameScreen = document.getElementById('nameScreen');
   var nameInput = document.getElementById('nameInput');
@@ -1876,13 +1807,7 @@
 
   var receiptOpenedFromThankyou = false;
 
-  var NAGOYA = {
-    lat: 35.1815,
-    lon: 136.9066,
-    tz: 'Asia/Tokyo',
-    name: '名古屋市'
-  };
-
+  var NAGOYA = { lat: 35.1815, lon: 136.9066, tz: 'Asia/Tokyo', name: '名古屋市' };
   var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
   window.addEventListener('resize', function() {
@@ -1895,9 +1820,7 @@
     tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
   });
 
-  /* ============================================================
-     MAIN CAROUSEL
-     ============================================================ */
+  /* ============ MAIN CAROUSEL ============ */
 
   function activatePanel(index) {
     for (var i = 0; i < panels.length; i++) {
@@ -1928,9 +1851,7 @@
     }
   }
 
-  /* ============================================================
-     TABLE / RECALC
-     ============================================================ */
+  /* ============ TABLE ============ */
 
   function getRows() { return tableCard.querySelectorAll('.row'); }
 
@@ -1959,8 +1880,7 @@
       var pi = rows[i].querySelector('.price-input');
       var val = pi ? (parseInt(pi.value, 10) || 0) : 0;
       if ((check && check.classList.contains('checked')) || val > 0) {
-        anyActive = true;
-        break;
+        anyActive = true; break;
       }
     }
     submitBtn.disabled = !(anyActive || rejected);
@@ -1992,17 +1912,15 @@
     for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
   }
 
-  /* ============ DELEGATED TABLE LISTENERS ============ */
+  /* ============ TABLE LISTENERS ============ */
 
   tableCard.addEventListener('click', function(e) {
     var box = e.target.closest('.row-check');
     if (!box) return;
     e.preventDefault(); e.stopPropagation();
     if (rejected) return;
-
     var row = box.closest('.row');
     if (!row) return;
-
     var priceField = row.querySelector('.price-input');
     var serviceText = row.querySelector('.service-input');
     var isCustomRow = !!serviceText;
@@ -2048,20 +1966,16 @@
     if (!input.classList.contains('price-input')) return;
     if (rejected) return;
     if (input.disabled) return;
-
     input.value = input.value.replace(/[^0-9]/g, '');
-
     var row = input.closest('.row');
     if (row) {
       var box = row.querySelector('.row-check');
       if (box) {
         if (input.value !== '') {
           box.setAttribute('data-saved-price', input.value);
-
           var serviceText = row.querySelector('.service-input');
           var serviceDisplay = row.querySelector('.service-display');
           var serviceConditionMet = false;
-
           if (serviceText) {
             var currentService = (serviceText.value || '').trim();
             var savedService = box.getAttribute('data-saved-service');
@@ -2070,7 +1984,6 @@
           } else if (serviceDisplay) {
             serviceConditionMet = (serviceDisplay.textContent || '').trim() !== '';
           }
-
           if (serviceConditionMet && !box.classList.contains('checked')) {
             box.classList.add('checked');
             box.setAttribute('aria-checked', 'true');
@@ -2096,10 +2009,8 @@
     var inp = e.target;
     if (!inp.classList.contains('service-input')) return;
     if (rejected) return;
-
     var row = inp.closest('.row');
     updateRowLock(row);
-
     if (row) {
       var box = row.querySelector('.row-check');
       if (box && inp.value.trim() !== '' && !box.classList.contains('checked')) {
@@ -2110,13 +2021,10 @@
     recalc();
   });
 
-  /* ============================================================
-     NAME CONFIRM
-     ============================================================ */
+  /* ============ NAME CONFIRM ============ */
 
   function confirmName() {
     if (nameConfirmed) return;
-
     var entered = (nameInput.value || '').trim();
     if (entered === '') {
       nameInput.focus();
@@ -2129,7 +2037,6 @@
       }, 1800);
       return;
     }
-
     nameConfirmed = true;
     therapistNameEl.textContent = entered;
 
@@ -2140,31 +2047,24 @@
     for (var i = 0; i < presetInputs.length; i++) {
       var val = (presetInputs[i].value || '').trim();
       if (val === '') continue;
-
       var rowDiv = document.createElement('div');
       rowDiv.className = 'row';
-
       var boxDiv = document.createElement('div');
       boxDiv.className = 'row-check';
       boxDiv.setAttribute('role', 'checkbox');
       boxDiv.setAttribute('aria-checked', 'false');
-
       var labelSpan = document.createElement('span');
       labelSpan.className = 'service-display';
       labelSpan.textContent = val;
-
       var priceWrap = document.createElement('div');
       priceWrap.className = 'price-wrap';
-
       var priceInput = document.createElement('input');
       priceInput.type = 'tel';
       priceInput.className = 'price-input';
       priceInput.placeholder = '0';
-
       var yenSpan = document.createElement('span');
       yenSpan.className = 'yen';
       yenSpan.textContent = '円';
-
       priceWrap.appendChild(priceInput);
       priceWrap.appendChild(yenSpan);
       rowDiv.appendChild(boxDiv);
@@ -2172,12 +2072,9 @@
       rowDiv.appendChild(priceWrap);
       dynamicRows.appendChild(rowDiv);
     }
-
     try { nameInput.blur(); } catch (err) {}
-
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
-
     updateAllRowLocks();
     recalc();
   }
@@ -2196,7 +2093,6 @@
       var priceInput = row.querySelector('.price-input');
       var serviceText = row.querySelector('.service-input');
       var box = row.querySelector('.row-check');
-
       if (box) {
         if (priceInput && priceInput.value !== '') box.setAttribute('data-saved-price', priceInput.value);
         if (serviceText && serviceText.value !== '') box.setAttribute('data-saved-service', serviceText.value);
@@ -2237,6 +2133,8 @@
     tyCarousel.classList.remove('hidden-out');
     tyDotsEl.classList.remove('hidden');
 
+    document.body.classList.remove('table-locked');
+
     receiptOpenedFromThankyou = false;
 
     tyCurrentPanel = 0;
@@ -2257,16 +2155,9 @@
     recalc();
   }
 
-  nameBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    confirmName();
-  });
-
+  nameBtn.addEventListener('click', function(e) { e.preventDefault(); confirmName(); });
   nameInput.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' || e.keyCode === 13) {
-      e.preventDefault();
-      confirmName();
-    }
+    if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); confirmName(); }
   });
 
   var clearButtons = document.querySelectorAll('.preset-clear');
@@ -2294,21 +2185,16 @@
   }
 
   window.addEventListener('load', function() {
-    /* Info bar — start immediately on load, always visible */
     startInfoUpdates();
 
     loadPresetsFromServer().then(function() {
       presetDefaults = PRESET_TEXTS.slice();
-
       var presetInputs = document.querySelectorAll('.preset-input');
       for (var i = 0; i < presetInputs.length; i++) {
         var idx = parseInt(presetInputs[i].getAttribute('data-preset'), 10);
         if (PRESET_TEXTS[idx] !== undefined) presetInputs[i].value = PRESET_TEXTS[idx];
       }
-
-      setTimeout(function() {
-        try { nameInput.focus(); } catch (err) {}
-      }, 300);
+      setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
     });
 
     loadQuotesFromServer();
@@ -2318,9 +2204,7 @@
     }
   });
 
-  /* ============================================================
-     START BUTTON / INTRO ANIMATION
-     ============================================================ */
+  /* ============ INTRO ============ */
 
   startBtn.addEventListener('click', function(e) {
     e.preventDefault();
@@ -2345,7 +2229,6 @@
       }
 
       introOverlay.classList.add('active');
-
       var arrivalTime = (totalChars * 220) + 1100;
       var holdTime = 1200;
 
@@ -2354,9 +2237,7 @@
         for (var f = 0; f < fadingChars.length; f++) {
           fadingChars[f].style.transitionDelay = (f * 0.18) + 's';
         }
-
         introOverlay.classList.add('finishing');
-
         blossomScreen.classList.remove('visible');
         blossomScreen.style.opacity = '';
         blossomScreen.style.transition = '';
@@ -2378,19 +2259,15 @@
     }, 700);
   });
 
-  /* ============================================================
-     RECEIPT BUILD
-     ============================================================ */
+  /* ============ RECEIPT ============ */
 
   function buildReceipt() {
     receiptItems.innerHTML = '';
-
     var receiptToName = document.getElementById('receiptToName');
     if (receiptToName) {
       var currentName = (therapistNameEl.textContent || '').trim() || '桜庭';
       receiptToName.textContent = currentName + 'さんへ';
     }
-
     var rows = getRows();
     var itemCount = 0;
 
@@ -2398,11 +2275,9 @@
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
       if (!priceInput) continue;
-
       var price = parseInt(priceInput.value, 10) || 0;
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
-
       if (!isChecked && price <= 0) continue;
 
       var display = row.querySelector('.service-display');
@@ -2422,16 +2297,13 @@
 
       var priceWrap = document.createElement('span');
       priceWrap.className = 'receipt-item-price-wrap';
-
       var yenSymbol = document.createElement('span');
       yenSymbol.className = 'yen-symbol';
       yenSymbol.textContent = '¥';
-
       var priceField = document.createElement('input');
       priceField.type = 'tel';
       priceField.className = 'receipt-price-input';
       priceField.value = price;
-
       priceWrap.appendChild(yenSymbol);
       priceWrap.appendChild(priceField);
 
@@ -2480,7 +2352,6 @@
         });
       })(receiptPriceInputs[i]);
     }
-
     var removeButtons = receiptItems.querySelectorAll('.receipt-item-remove');
     for (var r = 0; r < removeButtons.length; r++) {
       (function(btn) {
@@ -2488,7 +2359,6 @@
           e.preventDefault();
           var item = btn.closest('.receipt-item');
           if (!item) return;
-
           item.style.transition = 'opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease';
           item.style.overflow = 'hidden';
           item.style.maxHeight = item.offsetHeight + 'px';
@@ -2500,7 +2370,6 @@
           item.style.paddingBottom = '0';
           item.style.marginTop = '0';
           item.style.marginBottom = '0';
-
           setTimeout(function() {
             item.remove();
             updateReceiptTotal();
@@ -2520,10 +2389,6 @@
     receiptTotal.innerHTML = '<span class="yen-symbol">¥</span>' + sum.toLocaleString();
   }
 
-  /* ============================================================
-     SUBMIT / CONFIRM / RECEIPT
-     ============================================================ */
-
   submitBtn.addEventListener('click', function(e) {
     e.preventDefault();
     confirmScreen.classList.add('visible');
@@ -2533,7 +2398,6 @@
     e.preventDefault();
     confirmScreen.classList.remove('visible');
     buildReceipt();
-
     tableCard.classList.remove('active');
     rejectRow.classList.remove('active');
     divider.classList.remove('active');
@@ -2557,7 +2421,6 @@
 
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
-
       setTimeout(function() {
         receiptScreen.classList.remove('reopened');
         thankyouScreen.classList.add('visible');
@@ -2571,9 +2434,7 @@
     }
   });
 
-  /* ============================================================
-     MAIN CAROUSEL — DRAG FOLLOW SWIPE
-     ============================================================ */
+  /* ============ MAIN CAROUSEL SWIPE ============ */
 
   var startX = 0, startY = 0, currentX = 0;
   var dragging = false, decided = false, isHorizontal = false;
@@ -2603,13 +2464,10 @@
       currentX = x;
       var baseOffset = -currentPanel * stageWidth;
       var offset = baseOffset + deltaX;
-
       if (currentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
       if (currentPanel === totalPanels - 1 && deltaX < 0) offset = baseOffset + deltaX * 0.35;
-
       var pct = (offset / stageWidth) * (100 / totalPanels);
       track.style.transform = 'translateX(' + pct + '%)';
-
       var dragRatio = Math.min(1, Math.abs(deltaX) / (refWidth * 0.35));
 
       if (deltaX < 0) {
@@ -2657,13 +2515,10 @@
     if (!dragging) return;
     dragging = false;
     track.classList.remove('dragging');
-
     if (!isHorizontal) { clearInlineFades(); return; }
     clearInlineFades();
-
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
-
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
     else goToPanel(currentPanel);
@@ -2677,8 +2532,7 @@
   var mouseDown = false;
   stage.addEventListener('mousedown', function(e) {
     mouseDown = true;
-    startX = e.clientX;
-    currentX = e.clientX;
+    startX = e.clientX; currentX = e.clientX;
     track.classList.add('dragging');
   });
   window.addEventListener('mousemove', function(e) {
@@ -2718,9 +2572,7 @@
     if (!tableUnlocked && !isHorizontal) e.preventDefault();
   }, { passive: false });
 
-  /* ============================================================
-     INTERSECTION OBSERVER
-     ============================================================ */
+  /* ============ INTERSECTION OBSERVER ============ */
 
   if ('IntersectionObserver' in window) {
     var transitionObserver = new IntersectionObserver(function(entries) {
@@ -2746,8 +2598,6 @@
           rejectRow.classList.add('active');
           tableCard.classList.add('active');
           summaryBar.classList.add('visible');
-
-          /* Fade the info bar out while the table is in view */
           infoBar.classList.add('hidden');
         } else {
           summaryBar.classList.remove('visible');
@@ -2763,11 +2613,8 @@
               transitionLine.classList.add('active');
             }, 700);
             document.body.classList.remove('warm-background');
-
-            /* Bring the info bar back when the table scrolls out of view */
             infoBar.classList.remove('hidden');
           } else {
-            /* Any other reason the table isn't visible — keep bar visible */
             infoBar.classList.remove('hidden');
           }
         }
@@ -2785,15 +2632,12 @@
 
   updateAllRowLocks();
 
-  /* ============================================================
-     REJECT ROW
-     ============================================================ */
+  /* ============ REJECT ROW ============ */
 
   rejectRow.addEventListener('click', function() {
     rejected = !rejected;
     if (rejected) {
       rejectRow.classList.add('selected');
-
       var rows = getRows();
       for (var i = 0; i < rows.length; i++) {
         rows[i].classList.add('disabled');
@@ -2809,9 +2653,7 @@
         rows[i].classList.remove('filled');
       }
       totalEl.textContent = '¥0';
-
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
-
       petalOverlay.classList.remove('active');
       void petalOverlay.offsetWidth;
       petalOverlay.classList.add('active');
@@ -2819,7 +2661,6 @@
       rejectRow.classList.remove('selected');
       rejectThanks.classList.remove('shown');
       petalOverlay.classList.remove('active');
-
       var rows2 = getRows();
       for (var j = 0; j < rows2.length; j++) {
         rows2[j].classList.remove('disabled');
@@ -2831,9 +2672,7 @@
 
   recalc();
 
-  /* ============================================================
-     THEME — time of day + weather
-     ============================================================ */
+  /* ============ THEME ============ */
 
   function getTimeOfDayInNagoya() {
     var h;
@@ -2844,11 +2683,8 @@
       for (var i = 0; i < parts.length; i++) {
         if (parts[i].type === 'hour') { h = parseInt(parts[i].value, 10); break; }
       }
-    } catch (e) {
-      h = new Date().getHours();
-    }
+    } catch (e) { h = new Date().getHours(); }
     if (h === undefined) h = new Date().getHours();
-
     if (h >= 5 && h < 11) return 'morning';
     if (h >= 11 && h < 17) return 'day';
     if (h >= 17 && h < 21) return 'evening';
@@ -2884,9 +2720,7 @@
     return '—';
   }
 
-  /* ============================================================
-     NAGOYA INFO — date/time/temp/weather
-     ============================================================ */
+  /* ============ NAGOYA INFO ============ */
 
   function nagoyaDateParts() {
     var now = new Date();
@@ -2898,7 +2732,6 @@
         hour12: false,
         timeZone: NAGOYA.tz
       }).formatToParts(now);
-
       var result = { month: 0, day: 0, hour: 0, minute: 0, weekday: 0 };
       for (var i = 0; i < parts.length; i++) {
         var p = parts[i];
@@ -2915,10 +2748,8 @@
     } catch (e) {
       var d = new Date();
       return {
-        month: d.getMonth() + 1,
-        day: d.getDate(),
-        hour: d.getHours(),
-        minute: d.getMinutes(),
+        month: d.getMonth() + 1, day: d.getDate(),
+        hour: d.getHours(), minute: d.getMinutes(),
         weekday: d.getDay()
       };
     }
@@ -2928,7 +2759,6 @@
     var p = nagoyaDateParts();
     var mmPadded = (p.minute < 10) ? ('0' + p.minute) : String(p.minute);
     var wd = JP_WEEKDAYS[p.weekday];
-
     infoDate.textContent = p.month + '月' + p.day + '日(' + wd + ')';
     infoTime.textContent = p.hour + '時' + mmPadded + '分';
   }
@@ -2937,7 +2767,6 @@
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' +
               NAGOYA.lat + '&longitude=' + NAGOYA.lon +
               '&current=temperature_2m,weather_code&timezone=Asia%2FTokyo';
-
     fetch(url)
       .then(function(r) { return r.json(); })
       .then(function(data) {
@@ -2953,7 +2782,7 @@
           document.documentElement.setAttribute('data-weather', bucket);
         }
       })
-      .catch(function() { /* silent */ });
+      .catch(function() {});
   }
 
   var clockInterval = null;
@@ -2964,17 +2793,13 @@
     updateInfoDateTime();
     fetchNagoyaWeather();
     infoBar.classList.add('shown');
-
     if (clockInterval) clearInterval(clockInterval);
     clockInterval = setInterval(updateInfoDateTime, 30000);
-
     if (weatherInterval) clearInterval(weatherInterval);
     weatherInterval = setInterval(fetchNagoyaWeather, 5 * 60 * 1000);
   }
 
-  /* ============================================================
-     THANK-YOU CAROUSEL
-     ============================================================ */
+  /* ============ THANK-YOU CAROUSEL ============ */
 
   var TY_TOTAL_PANELS = 4;
   var tyCurrentPanel = 0;
@@ -2993,21 +2818,16 @@
   function goToTyPanel(index) {
     var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
     tyCurrentPanel = clamped;
-
-    tyTrack.style.transform = 'translateX(-' +
-      (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
-
+    tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
     for (var i = 0; i < tyDots.length; i++) {
       tyDots[i].classList.toggle('active', i === tyCurrentPanel);
     }
-
     activateTyPanel(tyCurrentPanel);
   }
 
   function exitTyToQuotes() {
     if (tyExited) return;
     tyExited = true;
-
     tyDotsEl.classList.add('hidden');
     tyCarousel.classList.add('hidden-out');
 
@@ -3015,10 +2835,7 @@
       tyAmbientStage.classList.add('shown');
       buildBlossomDivider();
       startQuoteCycle();
-
-      tyPushTimeout(function() {
-        tyReceiptBtn.classList.add('shown');
-      }, 5500);
+      /* Button is already visible from startThankyouSequence — no delay needed */
     }, 700);
   }
 
@@ -3052,13 +2869,10 @@
       tyCurrentX = x;
       var baseOffset = -tyCurrentPanel * tyStageWidth;
       var offset = baseOffset + deltaX;
-
       if (tyCurrentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
       if (tyCurrentPanel === TY_TOTAL_PANELS - 1 && deltaX < 0) offset = baseOffset + deltaX * 0.5;
-
       var pct = (offset / tyStageWidth) * (100 / TY_TOTAL_PANELS);
       tyTrack.style.transform = 'translateX(' + pct + '%)';
-
       var dragRatio = Math.min(1, Math.abs(deltaX) / (tyRefWidth * 0.35));
 
       if (deltaX < 0) {
@@ -3106,20 +2920,16 @@
     if (!tyDragging) return;
     tyDragging = false;
     tyTrack.classList.remove('dragging');
-
     if (!tyHorizontal) { clearTyInlineFades(); return; }
     clearTyInlineFades();
-
     var deltaX = tyCurrentX - tyStartX;
     var threshold = tyRefWidth * 0.12;
 
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
       if (deltaX < -threshold) { exitTyToQuotes(); return; }
       if (deltaX > threshold && tyCurrentPanel > 0) { goToTyPanel(tyCurrentPanel - 1); return; }
-      goToTyPanel(tyCurrentPanel);
-      return;
+      goToTyPanel(tyCurrentPanel); return;
     }
-
     if (deltaX < -threshold && tyCurrentPanel < TY_TOTAL_PANELS - 1) {
       goToTyPanel(tyCurrentPanel + 1);
     } else if (deltaX > threshold && tyCurrentPanel > 0) {
@@ -3137,8 +2947,7 @@
   tyCarousel.addEventListener('mousedown', function(e) {
     if (tyExited) return;
     tyMouseDown = true;
-    tyStartX = e.clientX;
-    tyCurrentX = e.clientX;
+    tyStartX = e.clientX; tyCurrentX = e.clientX;
     tyTrack.classList.add('dragging');
   });
   window.addEventListener('mousemove', function(e) {
@@ -3163,8 +2972,7 @@
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
       if (deltaX < -threshold) { exitTyToQuotes(); return; }
       if (deltaX > threshold && tyCurrentPanel > 0) { goToTyPanel(tyCurrentPanel - 1); return; }
-      goToTyPanel(tyCurrentPanel);
-      return;
+      goToTyPanel(tyCurrentPanel); return;
     }
     if (deltaX < -threshold && tyCurrentPanel < TY_TOTAL_PANELS - 1) {
       goToTyPanel(tyCurrentPanel + 1);
@@ -3175,9 +2983,7 @@
     }
   });
 
-  /* ============================================================
-     QUOTES + BLOSSOMS
-     ============================================================ */
+  /* ============ QUOTES + BLOSSOMS ============ */
 
   var BLOSSOM_COUNT = 10;
   var BLOSSOM_INTERVAL = 1000;
@@ -3225,9 +3031,7 @@
   function showQuote(index) {
     currentQuoteIndex = index;
     var text = AMBIENT_LINES[index % AMBIENT_LINES.length];
-
     buildBlossomDivider();
-
     quoteLine.textContent = text;
     quoteLine.classList.remove('shown', 'leaving');
     void quoteLine.offsetWidth;
@@ -3236,50 +3040,43 @@
     tyPushTimeout(function() {
       var els = blossomDivider.querySelectorAll('.blossom-mark');
       var current = 0;
-
       els[0].classList.add('appeared');
       current = 1;
-
       var interval = setInterval(function() {
         if (current < BLOSSOM_COUNT) {
           els[current].classList.add('appeared');
           current += 1;
         } else {
           clearInterval(interval);
-
           tyPushTimeout(function() {
             quoteLine.classList.remove('shown');
             quoteLine.classList.add('leaving');
-
             resetBlossomDivider();
-
             tyPushTimeout(function() {
               showQuote((index + 1) % AMBIENT_LINES.length);
             }, QUOTE_FADE);
           }, 1000);
         }
       }, BLOSSOM_INTERVAL);
-
       tyIntervals.push(interval);
     }, 400);
   }
 
-  /* ============================================================
-     THANK-YOU SEQUENCE
-     ============================================================ */
+  /* ============ THANK-YOU SEQUENCE ============ */
 
   function startThankyouSequence() {
     clearAllTyTimers();
-
+    document.body.classList.add('table-locked');
     tyExited = false;
-
     tyCarousel.classList.remove('hidden-out');
     tyDotsEl.classList.remove('hidden');
     tyAmbientStage.classList.remove('shown');
     quoteLine.classList.remove('shown', 'leaving');
     quoteLine.textContent = '';
     blossomDivider.innerHTML = '';
-    tyReceiptBtn.classList.remove('shown');
+
+    /* Receipt button visible immediately on the thank-you screen */
+    tyReceiptBtn.classList.add('shown');
 
     tyCurrentPanel = 0;
     tyTrack.style.transform = 'translateX(0%)';
@@ -3294,23 +3091,21 @@
   }
 
   function resumeThankyouSequence() {
+    /* Always ensure the receipt button is visible */
+    tyReceiptBtn.classList.add('shown');
+
     if (tyExited) {
       tyAmbientStage.classList.add('shown');
-      tyReceiptBtn.classList.add('shown');
       showQuote(currentQuoteIndex);
     }
     updateInfoDateTime();
   }
 
-  /* ============================================================
-     RECEIPT BUTTON (in thank-you screen)
-     ============================================================ */
+  /* ============ RECEIPT BUTTON (thank-you) ============ */
 
   tyReceiptBtn.addEventListener('click', function(e) {
     e.preventDefault();
-
     clearAllTyTimers();
-
     receiptOpenedFromThankyou = true;
     thankyouScreen.classList.remove('visible');
     receiptScreen.classList.add('reopened');
@@ -3321,9 +3116,7 @@
     }, 400);
   });
 
-  /* ============================================================
-     BOOTSTRAP
-     ============================================================ */
+  /* ============ BOOTSTRAP ============ */
 
   applyTimeTheme();
   setInterval(applyTimeTheme, 5 * 60 * 1000);
