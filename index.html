@@ -75,6 +75,15 @@
     transform: translateY(0);
   }
 
+  /* Fade out when scrolling into the table / opening the receipt */
+  .info-bar.hidden {
+    opacity: 0;
+    transform: translateY(-14px);
+    transition:
+      opacity 0.6s ease,
+      transform 0.6s ease;
+  }
+
   .info-line {
     display: inline-block;
     font-size: 13px;
@@ -2532,6 +2541,7 @@
 
     setTimeout(function() {
       receiptScreen.classList.add('visible');
+      infoBar.classList.add('hidden');
     }, 450);
   });
 
@@ -2543,6 +2553,7 @@
   receiptClose.addEventListener('click', function(e) {
     e.preventDefault();
     receiptScreen.classList.remove('visible');
+    infoBar.classList.remove('hidden');
 
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
@@ -2735,6 +2746,9 @@
           rejectRow.classList.add('active');
           tableCard.classList.add('active');
           summaryBar.classList.add('visible');
+
+          /* Fade the info bar out while the table is in view */
+          infoBar.classList.add('hidden');
         } else {
           summaryBar.classList.remove('visible');
           var rect = tableCard.getBoundingClientRect();
@@ -2749,6 +2763,12 @@
               transitionLine.classList.add('active');
             }, 700);
             document.body.classList.remove('warm-background');
+
+            /* Bring the info bar back when the table scrolls out of view */
+            infoBar.classList.remove('hidden');
+          } else {
+            /* Any other reason the table isn't visible — keep bar visible */
+            infoBar.classList.remove('hidden');
           }
         }
       });
@@ -3297,6 +3317,7 @@
 
     setTimeout(function() {
       receiptScreen.classList.add('visible');
+      infoBar.classList.add('hidden');
     }, 400);
   });
 
