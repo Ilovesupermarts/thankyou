@@ -340,8 +340,6 @@
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
 
-  /* ---- Standardised action hint (used on all panels) ---- */
-
   .action-hint {
     margin-top: 60px;
     display: inline-flex;
@@ -354,27 +352,22 @@
     font-weight: 500;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
-
   .action-hint .hint-arrow {
     display: inline-block;
     color: #b04a5a;
     font-size: 16px;
     line-height: 1;
   }
-
   .action-hint .hint-arrow.right {
     animation: swipeArrow 2s ease-in-out infinite;
   }
-
   .action-hint .hint-arrow.down {
     animation: gentleBounce 2s ease-in-out infinite;
   }
-
   @keyframes swipeArrow {
     0%, 100% { transform: translateX(0); opacity: 0.6; }
     50% { transform: translateX(8px); opacity: 1; }
   }
-
   @keyframes gentleBounce {
     0%, 100% { transform: translateY(0); }
     50% { transform: translateY(6px); }
@@ -502,13 +495,14 @@
     white-space: normal;
   }
 
+  /* Price field — sized to fit exactly 5 digits max */
   .price-wrap {
     flex-shrink: 0; display: flex; align-items: center; gap: 3px;
     background: #faf3f1; border-radius: 10px;
-    padding: 8px 12px;
+    padding: 8px 10px;
     border: 1.5px solid #ead9d5;
     transition: background 0.2s, border-color 0.2s, opacity 0.2s;
-    min-width: 118px;
+    min-width: 92px;
   }
   .row.filled .price-wrap { background: #ffffff; border-color: #b04a5a; }
   .row.locked .price-wrap { background: #f5f2ef; border-color: #ede4e0; opacity: 0.55; }
@@ -518,7 +512,7 @@
   .row.locked .row-check { opacity: 0.75; }
 
   .price-input {
-    flex: 1; min-width: 0;
+    width: 52px;
     background: transparent; border: none;
     color: #b04a5a; font-size: 15px; font-weight: 700;
     text-align: right; font-family: inherit; padding: 0;
@@ -598,7 +592,6 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
 
-  /* Gift divider — visually separates the ¥1,000 note from the rejection flow */
   .gift-divider {
     display: flex;
     align-items: center;
@@ -937,8 +930,6 @@
   }
   .receipt-item-price .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
 
-  /* --- Emphasised total block --- */
-
   .receipt-total-block {
     margin-top: 8px;
     padding: 20px 18px 18px 18px;
@@ -947,7 +938,6 @@
     border-radius: 14px;
     text-align: center;
   }
-
   .receipt-total-label {
     font-size: 12px;
     font-weight: 600;
@@ -956,7 +946,6 @@
     margin-bottom: 8px;
     text-transform: uppercase;
   }
-
   .receipt-total-value {
     font-size: 34px;
     font-weight: 700;
@@ -971,7 +960,6 @@
     opacity: 0.85;
     font-weight: 600;
   }
-
   .receipt-closing-line {
     margin-top: 26px;
     text-align: center;
@@ -983,7 +971,6 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-
   .receipt-footer {
     text-align: center;
     margin-top: 22px;
@@ -1110,7 +1097,6 @@
     0%, 100% { opacity: 0.7; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.04); }
   }
-
   html[data-weather="rain"] .ambient-gradient,
   html[data-weather="drizzle"] .ambient-gradient { filter: hue-rotate(-8deg) saturate(0.85) brightness(0.98); }
   html[data-weather="thunderstorm"] .ambient-gradient { filter: hue-rotate(-15deg) saturate(0.7) brightness(0.94); }
@@ -1362,7 +1348,7 @@
     .quote-line { font-size: 22px; line-height: 1.9; }
     .quote-wrap { min-height: 120px; }
     .ty-receipt-btn { bottom: 10px; padding: 10px 22px; font-size: 12px; }
-    .price-wrap { min-width: 108px; padding: 7px 10px; }
+    .price-wrap { min-width: 88px; padding: 7px 9px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
