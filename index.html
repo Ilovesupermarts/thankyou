@@ -396,11 +396,16 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
+  /* Therapist name: brush-stroke Yuji Syuku, deep rose, no underline */
   .greeting .therapist-name {
-    font-weight: 700;
-    border-bottom: 2px solid #e8b4bc;
-    padding-bottom: 2px;
+    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-weight: 500;
+    font-size: 1.18em;
+    color: #a34a56;
+    letter-spacing: 2px;
     font-style: normal;
+    text-shadow: 0 1px 8px rgba(232, 180, 188, 0.45);
+    padding: 0 2px;
   }
   .greeting .sender-name {
     font-style: italic;
@@ -470,10 +475,7 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Pinned swipe hint + dots group.
-         The hint sits above the dots with a tight gap, and the whole
-         cluster is pushed up so it sits right under the longest text
-         (panel 5's msg-3 + msg-emphasis). ---- */
+  /* ---- Pinned swipe hint + dots group ---- */
 
   .action-hint.global-hint {
     position: absolute;
@@ -486,6 +488,7 @@
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.7s ease;
+    min-height: 22px;
   }
   .action-hint.global-hint.shown {
     opacity: 1;
@@ -549,20 +552,22 @@
       0 2px 6px rgba(176, 74, 90, 0.25);
   }
 
-  /* ---- Spacer between the stage and the transition line ---- */
-  .stage-spacer { height: 40vh; }
+  /* ---- Tiny spacer between the stage and the transition line.
+         Reduced from 40vh to 2vh so the transition line sits
+         immediately below the dots. The fade-in is still visible
+         because the line's own opacity/transform transition plays
+         as it enters the viewport. ---- */
+  .stage-spacer { height: 2vh; }
 
   /* ============ TRANSITION LINE ============ */
-  /* The "それでは、本日のメニューをご覧ください。" text now sits
-     immediately below the stage (which is 100vh), so it enters the
-     viewport as soon as the user begins scrolling down. This makes
-     the fade-in transition clearly visible. */
 
   .transition-line {
-    text-align: center; padding: 0 32px 40px 32px;
+    text-align: center;
+    padding: 0 32px 40px 32px;
+    margin-top: 20px;
     font-size: 15px; font-weight: 500; color: #b04a5a;
     letter-spacing: 0.8px; line-height: 2;
-    max-width: 560px; margin: 0 auto;
+    max-width: 560px; margin-left: auto; margin-right: auto;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     opacity: 0; transform: translateY(-28px); filter: blur(6px);
@@ -589,10 +594,8 @@
       filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
-  /* ============ TABLE ============ */
+  /* ============ PRIVACY NOTE (above the table) ============ */
 
-  /* Privacy note: sits just above the table card, italic, quiet.
-     Fades in with the table section. */
   .privacy-note-inline {
     max-width: 560px;
     margin: 8px auto 20px auto;
@@ -600,9 +603,9 @@
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-style: italic;
-    font-size: 13px;
+    font-size: 15px;
     font-weight: 400;
-    color: #8a7a74;
+    color: #1f1f1f;
     letter-spacing: 0.4px;
     line-height: 2.1;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
@@ -610,6 +613,8 @@
     transition: opacity 0.9s ease, transform 0.9s ease;
   }
   .privacy-note-inline.active { opacity: 1; transform: translateY(0); }
+
+  /* ============ TABLE ============ */
 
   .divider {
     display: flex; align-items: center; gap: 12px;
@@ -1510,8 +1515,10 @@
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px; }
     .table-card, .reject-row, .divider, .privacy-note-inline { max-width: 560px; }
-    .table-card, .reject-row { margin-left: auto; margin-right: auto; }
-    .divider { padding: 0 16px; }
+    .table-card, .reject-row, .divider, .privacy-note-inline {
+      margin-left: auto;
+      margin-right: auto;
+    }
     .panel-inner { max-width: 480px; }
     .panel { padding: 80px 32px 260px 32px; }
     .greeting { font-size: 22px; }
@@ -1521,7 +1528,7 @@
     .msg-4 { font-size: 18px; }
     .msg-emphasis { font-size: 18px; }
     .transition-line { font-size: 17px; max-width: 600px; }
-    .privacy-note-inline { font-size: 14px; }
+    .privacy-note-inline { font-size: 16px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
     .action-hint.global-hint { bottom: 148px; }
     .ty-line { font-size: 21px; }
@@ -1545,7 +1552,7 @@
     .info-bar { padding: 24px 28px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .privacy-note-inline { max-width: 600px; }
     .transition-line { font-size: 18px; max-width: 660px; }
-    .privacy-note-inline { font-size: 15px; }
+    .privacy-note-inline { font-size: 17px; }
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
     .quote-line { font-size: 40px; letter-spacing: 5px; }
@@ -1589,8 +1596,8 @@
     .blossom-char { font-size: 72px; }
     .ty-dots { gap: 12px; }
     .ty-dot { width: 9px; height: 9px; }
-    .stage-spacer { height: 30vh; }
-    .privacy-note-inline { font-size: 12px; margin: 4px auto 14px auto; }
+    .stage-spacer { height: 1.5vh; }
+    .privacy-note-inline { font-size: 14px; margin: 4px auto 14px auto; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1615,14 +1622,14 @@
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
     .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
-    .privacy-note-inline { font-size: 11.5px; margin: 4px auto 12px auto; }
+    .privacy-note-inline { font-size: 13px; margin: 4px auto 12px auto; }
     .ty-panel { padding: 55px 40px 90px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
     .quote-line { font-size: 22px; letter-spacing: 3px; }
     .quote-wrap { min-height: 110px; }
     .ty-dots { bottom: 48px; }
     .ty-receipt-btn { bottom: 8px; padding: 8px 20px; font-size: 11px; }
-    .stage-spacer { height: 25vh; }
+    .stage-spacer { height: 1.5vh; }
   }
 </style>
 </head>
@@ -1785,8 +1792,8 @@
 
   <div class="action-hint global-hint" id="globalHint">
     <span class="hint-layer active" id="globalHintLayerSwipe">
-      <span id="globalHintText">スワイプ</span>
-      <span class="hint-arrow right" id="globalHintArrow">→</span>
+      <span>スワイプ</span>
+      <span class="hint-arrow right">→</span>
     </span>
     <span class="hint-layer" id="globalHintLayerScroll">
       <span class="hint-arrow down">↓</span>
@@ -1814,7 +1821,7 @@
   ありがとうございます。
 </div>
 
-<!-- ============ PRIVACY NOTE (above the table) ============ -->
+<!-- ============ PRIVACY NOTE (just above the table) ============ -->
 
 <div class="privacy-note-inline" id="privacyNote">
   また、こちらでお選びいただいた内容やご提示いただいた料金などが、<br>
@@ -2062,14 +2069,59 @@
 </div>
 
 <script>
-  /* ============ HAPTIC FEEDBACK ============ */
+  /* ============ HAPTIC FEEDBACK (with tablet audio fallback) ============ */
+
+  // Cached AudioContext, created lazily on first user tap.
+  var hapticAudioCtx = null;
+
+  function getHapticAudioCtx() {
+    if (hapticAudioCtx) return hapticAudioCtx;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (Ctx) hapticAudioCtx = new Ctx();
+    } catch (e) { hapticAudioCtx = null; }
+    return hapticAudioCtx;
+  }
+
+  function playSoftTick(strength) {
+    var ctx = getHapticAudioCtx();
+    if (!ctx) return;
+    try {
+      if (ctx.state === 'suspended') ctx.resume();
+      var t = ctx.currentTime;
+      var osc = ctx.createOscillator();
+      var gain = ctx.createGain();
+
+      var peak = Math.min(0.035, 0.012 + (strength || 8) * 0.002);
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1400, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.045);
+
+      gain.gain.setValueAtTime(0.0001, t);
+      gain.gain.exponentialRampToValueAtTime(peak, t + 0.006);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(t);
+      osc.stop(t + 0.07);
+    } catch (e) { /* silent */ }
+  }
 
   function haptic(ms) {
+    var strength = ms || 8;
+
+    // 1) Real vibration (phones).
     try {
       if (navigator.vibrate) {
-        navigator.vibrate(ms || 8);
+        var ok = navigator.vibrate(strength);
+        if (ok !== false) return;
       }
     } catch (e) { /* silent */ }
+
+    // 2) Fallback for tablets without a vibration motor: soft audio tick.
+    playSoftTick(strength);
   }
 
   /* ============ NUMBER FORMATTING ============ */
@@ -2252,9 +2304,6 @@
       return;
     }
 
-    // Cross-fade between the two hint layers, keeping the container
-    // in place. The transition is handled by the CSS opacity
-    // transition on .hint-layer.
     if (currentPanel === totalPanels - 1) {
       globalHintLayerSwipe.classList.remove('active');
       globalHintLayerScroll.classList.add('active');
