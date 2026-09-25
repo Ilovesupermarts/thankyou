@@ -534,7 +534,7 @@
     opacity: 0; transform: translateY(-28px); filter: blur(6px);
     transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease;
   }
-  .transition-line.returning { opacity: 0; transform: translateY(28px); filter: blur(6px); transition: none; }
+  .transition-line.returning { opacity: 0; transform: translateY(-28px); filter: blur(6px); transition: none; }
   .transition-line.returning.active {
     opacity: 1; transform: translateY(0); filter: blur(0);
     transition:
@@ -2172,6 +2172,7 @@
     if (currentPanel === totalPanels - 1) unlockTable();
     if (transitionLine && currentPanel !== totalPanels - 1) {
       transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
+      lineVisible = false;
     }
     if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
       setTimeout(scheduleEvaluation, 80);
@@ -2494,7 +2495,8 @@
     summaryBar.classList.add('visible');
 
     // Reset the transition-line state machine
-    lineState = 'hidden';
+    lineVisible = false;
+    hasEverScrolled = false;
     tableEnteredView = false;
     lastScrollY = 0;
     if (transitionLine) {
@@ -3014,23 +3016,31 @@
   /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 
   /*
-    State machine:
-      'hidden'   – line is invisible, table not yet reached
-      'visible'  – line has faded in, user is reading it
-      'exiting'  – line is fading out (table reached top)
-      'gone'     – line is gone for good (until resetAll)
+    Reversible state machine driven by the table card's position:
 
-    Rules:
-      - Fade IN when user first scrolls DOWN and the line enters view.
-      - Fade OUT only when the TABLE's top edge is near the top of the
-        viewport.
-      - Never fade back in once 'gone' — no flicker while scrolling up.
+      "line shown"  → table top is BELOW the trigger zone
+      "line hidden" → table top is ABOVE the trigger zone
+
+    Behaviour:
+      - On page load, line is hidden until the user actually scrolls.
+      - First scroll DOWN past a small threshold → fade the line IN.
+      - While table top is below the trigger → keep the line visible.
+      - When table top crosses above the trigger → fade the line OUT.
+      - If the user scrolls back UP and the table top drops back below
+        the trigger → fade the line IN again.
+      - Reversible in both directions; the only irreversible rule is
+        that the very first fade-in requires a downward scroll.
+
+    Threshold tuned for:
+      Samsung Galaxy Tab S8 Ultra — landscape viewport ~1800px,
+      portrait viewport ~2900px.  Also safe on phones.
   */
-  var lineState = 'hidden';
-  var tableEnteredView = false;
+  var lineVisible = false;         // is the transition line currently shown?
+  var hasEverScrolled = false;     // has the user scrolled at all yet?
+  var tableEnteredView = false;    // has the table section been revealed?
   var lastScrollY = 0;
 
-  function getFadeOutTriggerPx() {
+  function getFadeTriggerPx() {
     var h = window.innerHeight;
     var w = window.innerWidth;
     var isLandscape = w > h;
@@ -3060,43 +3070,43 @@
     summaryBar.classList.remove('visible');
   }
 
-  function showTransitionLine() {
-    if (lineState === 'hidden') {
-      lineState = 'visible';
-      transitionLine.classList.remove('fading', 'fading-up', 'returning');
+  function showTransitionLine(animate) {
+    if (lineVisible) return;
+    lineVisible = true;
+    transitionLine.classList.remove('fading', 'fading-up');
+    if (animate) {
+      // Reset to pre-animation state, then smoothly fade in.
+      transitionLine.classList.remove('active');
+      transitionLine.classList.add('returning');
+      void transitionLine.offsetWidth;
+      transitionLine.classList.remove('returning');
+      transitionLine.classList.add('active');
+    } else {
       transitionLine.classList.add('active');
     }
   }
 
   function hideTransitionLine() {
-    if (lineState === 'visible') {
-      lineState = 'exiting';
-      transitionLine.classList.remove('active', 'returning', 'fading-up');
-      transitionLine.classList.add('fading');
-      setTimeout(function() {
-        if (lineState === 'exiting') lineState = 'gone';
-      }, 750);
-    }
+    if (!lineVisible) return;
+    lineVisible = false;
+    transitionLine.classList.remove('active', 'returning', 'fading-up');
+    transitionLine.classList.add('fading');
   }
 
   function evaluateScrollState() {
     if (currentPanel !== totalPanels - 1) return;
-    if (lineState === 'gone' || lineState === 'exiting') return;
 
     var rect = tableCard.getBoundingClientRect();
-    var trigger = getFadeOutTriggerPx();
+    var trigger = getFadeTriggerPx();
 
     if (rect.top <= trigger) {
+      // Table top has crossed above the trigger line → fade the line out.
       revealTableSection();
       hideTransitionLine();
-      return;
-    }
-
-    if (rect.top < window.innerHeight - 40) {
-      revealTableSection();
-      showTransitionLine();
     } else {
-      hideTableChrome();
+      // Table top is still below the trigger → keep the line visible.
+      revealTableSection();
+      showTransitionLine(true);
     }
   }
 
@@ -3113,18 +3123,27 @@
   window.addEventListener('scroll', function() {
     var y = window.pageYOffset || document.documentElement.scrollTop;
     var goingDown = y > lastScrollY + 1;
+    var goingUp   = y < lastScrollY - 1;
     lastScrollY = y;
 
-    if (goingDown) {
-      if (currentPanel === totalPanels - 1 && lineState === 'hidden' && y > 20) {
+    // First ever downward scroll past a small threshold:
+    // fade the line in immediately, even if the table hasn't
+    // reached the viewport yet.
+    if (goingDown && !hasEverScrolled && y > 20) {
+      hasEverScrolled = true;
+      if (currentPanel === totalPanels - 1) {
         var rect = tableCard.getBoundingClientRect();
         if (rect.top < window.innerHeight + 200) {
-          showTransitionLine();
+          revealTableSection();
+          showTransitionLine(false);
         }
       }
     }
 
-    scheduleEvaluation();
+    // Any subsequent scroll — up or down — re-evaluates the state.
+    if (goingDown || goingUp) {
+      scheduleEvaluation();
+    }
   }, { passive: true });
 
   window.addEventListener('resize', scheduleEvaluation);
@@ -3132,6 +3151,8 @@
     setTimeout(scheduleEvaluation, 120);
   });
 
+  // Initial evaluation on load. lineVisible is false so nothing shows
+  // until the user scrolls.
   scheduleEvaluation();
 
   updateAllRowLocks();
