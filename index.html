@@ -472,30 +472,33 @@
     50% { transform: translateY(6px); }
   }
 
+  /* ---- Larger, more obvious dots ---- */
+
   .dots {
     position: absolute; bottom: 40px; left: 0; right: 0;
-    display: flex; justify-content: center; gap: 10px; z-index: 10;
-  }
-  .dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #e0d3ce;
-    transition: background 0.3s, transform 0.3s;
-  }
-  .dot.active { background: #b04a5a; transform: scale(1.3); }
-
-  .panel-progress {
-    position: absolute;
-    bottom: 43px;
-    left: 50%;
-    transform: translateX(54px);
+    display: flex; justify-content: center; align-items: center;
+    gap: 14px;
     z-index: 10;
-    font-size: 11px;
-    color: #b8a8a2;
-    letter-spacing: 1.5px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-weight: 500;
-    pointer-events: none;
-    white-space: nowrap;
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #d4c4be;
+    box-shadow: 0 1px 3px rgba(120, 90, 90, 0.08);
+    transition:
+      background 0.3s ease,
+      transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.3s ease;
+  }
+
+  .dot.active {
+    background: #b04a5a;
+    transform: scale(1.5);
+    box-shadow:
+      0 0 0 5px rgba(176, 74, 90, 0.14),
+      0 2px 6px rgba(176, 74, 90, 0.25);
   }
 
   .stage-spacer { height: 60px; }
@@ -1067,8 +1070,8 @@
     background: transparent; border: none;
     color: #b04a5a; font-size: 14px; font-weight: 600;
     font-family: inherit; text-align: right;
-    width: 60px; padding: 0;
-    letter-spacing: 0.5px;
+    width: 58px; padding: 0;
+    letter-spacing: 0.3px;
     -webkit-appearance: none; appearance: none;
   }
   .receipt-price-input:focus { outline: none; }
@@ -1179,7 +1182,7 @@
     .receipt-to-name { font-size: 22px; letter-spacing: 3px; }
     .receipt-title { font-size: 14px; letter-spacing: 9px; margin-bottom: 24px; }
     .receipt-item-name { font-size: 16px; }
-    .receipt-price-input { font-size: 16px; width: 70px; }
+    .receipt-price-input { font-size: 16px; width: 68px; }
     .receipt-item-price-wrap { font-size: 16px; padding: 5px 10px; }
     .receipt-item-price-wrap .yen-symbol { font-size: 12px; }
     .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
@@ -1200,7 +1203,7 @@
     .receipt-to-mark { font-size: 16px; }
     .receipt-title { font-size: 15px; letter-spacing: 11px; }
     .receipt-item-name { font-size: 17px; }
-    .receipt-price-input { font-size: 17px; width: 80px; }
+    .receipt-price-input { font-size: 17px; width: 76px; }
     .receipt-item-price-wrap { font-size: 17px; padding: 6px 12px; }
     .receipt-total-label { font-size: 26px; }
     .receipt-total-value { font-size: 26px; }
@@ -1298,16 +1301,29 @@
 
   .ty-dots {
     position: absolute; bottom: 68px; left: 0; right: 0;
-    display: flex; justify-content: center; gap: 10px;
+    display: flex; justify-content: center; align-items: center;
+    gap: 14px;
     z-index: 10; transition: opacity 0.6s ease;
   }
   .ty-dots.hidden { opacity: 0; pointer-events: none; }
   .ty-dot {
-    width: 8px; height: 8px; border-radius: 50%;
-    background: #e0d3ce;
-    transition: background 0.3s, transform 0.3s;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #d4c4be;
+    box-shadow: 0 1px 3px rgba(120, 90, 90, 0.08);
+    transition:
+      background 0.3s ease,
+      transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
+      box-shadow 0.3s ease;
   }
-  .ty-dot.active { background: #b04a5a; transform: scale(1.3); }
+  .ty-dot.active {
+    background: #b04a5a;
+    transform: scale(1.5);
+    box-shadow:
+      0 0 0 5px rgba(176, 74, 90, 0.14),
+      0 2px 6px rgba(176, 74, 90, 0.25);
+  }
 
   .ty-ambient-stage {
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
@@ -1444,7 +1460,8 @@
     .ty-dots { bottom: 74px; }
     .ty-receipt-btn { font-size: 14px; padding: 14px 32px; bottom: 16px; }
     .blossom-char { font-size: 100px; }
-    .panel-progress { font-size: 12px; }
+    .dot { width: 12px; height: 12px; }
+    .ty-dot { width: 12px; height: 12px; }
   }
 
   @media (min-width: 1100px) {
@@ -1461,7 +1478,8 @@
     .ty-dots { bottom: 80px; }
     .ty-receipt-btn { font-size: 15px; padding: 15px 36px; bottom: 20px; }
     .blossom-char { font-size: 108px; }
-    .panel-progress { font-size: 13px; }
+    .dot { width: 13px; height: 13px; }
+    .ty-dot { width: 13px; height: 13px; }
   }
 
   @media (max-height: 700px) {
@@ -1489,8 +1507,10 @@
     .summary-total { font-size: 19px; }
     .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
     .blossom-char { font-size: 72px; }
-    .panel-progress { bottom: 28px; }
-    .dots { bottom: 26px; }
+    .dots { bottom: 26px; gap: 12px; }
+    .dot { width: 9px; height: 9px; }
+    .ty-dots { gap: 12px; }
+    .ty-dot { width: 9px; height: 9px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1706,8 +1726,6 @@
     <div class="dot"></div>
     <div class="dot"></div>
   </div>
-
-  <div class="panel-progress" id="dotsProgress">1 / 5</div>
 </div>
 
 <div class="stage-spacer"></div>
@@ -1970,6 +1988,24 @@
     } catch (e) { /* silent */ }
   }
 
+  /* ============ NUMBER FORMATTING ============ */
+
+  /* Format integer with thousands separators: 10000 → "10,000" */
+  function formatWithComma(num) {
+    if (num === '' || num === null || typeof num === 'undefined') return '';
+    var n = parseInt(num, 10);
+    if (isNaN(n)) return '';
+    return n.toLocaleString();
+  }
+
+  /* Extract digits only and return as integer (handles commas) */
+  function parseFormatted(str) {
+    if (!str) return 0;
+    var digits = String(str).replace(/[^0-9]/g, '');
+    if (digits === '') return 0;
+    return parseInt(digits, 10) || 0;
+  }
+
   /* ============ PRESETS ============ */
 
   var PRESET_TEXTS = [
@@ -2031,7 +2067,6 @@
   var stage = document.getElementById('stage');
   var dots = document.querySelectorAll('.dot');
   var panels = document.querySelectorAll('.panel');
-  var dotsProgress = document.getElementById('dotsProgress');
 
   var divider = document.getElementById('divider');
   var tableCard = document.getElementById('tableCard');
@@ -2126,9 +2161,6 @@
     track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
     for (var i = 0; i < dots.length; i++) {
       dots[i].classList.toggle('active', i === currentPanel);
-    }
-    if (dotsProgress) {
-      dotsProgress.textContent = (currentPanel + 1) + ' / ' + totalPanels;
     }
     activatePanel(currentPanel);
     if (currentPanel === totalPanels - 1) unlockTable();
@@ -2361,11 +2393,9 @@
       dynamicRows.appendChild(rowDiv);
     }
 
-    /* Visual confirmation pulse */
     nameInput.classList.add('confirmed');
     haptic(14);
 
-    /* Wait for the pulse, then transition */
     setTimeout(function() {
       try { nameInput.blur(); } catch (err) {}
       nameScreen.classList.add('hidden');
@@ -2446,7 +2476,6 @@
     for (var p2 = 0; p2 < dots.length; p2++) {
       dots[p2].classList.toggle('active', p2 === 0);
     }
-    if (dotsProgress) dotsProgress.textContent = '1 / ' + totalPanels;
     activatePanel(0);
 
     tableCard.classList.add('active');
@@ -2558,7 +2587,6 @@
         for (var d = 0; d < dots.length; d++) {
           dots[d].classList.toggle('active', d === 0);
         }
-        if (dotsProgress) dotsProgress.textContent = '1 / ' + totalPanels;
         activatePanel(0);
 
         setTimeout(function() {
@@ -2598,7 +2626,6 @@
 
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
-      /* Cap the stagger delay at 0.4s regardless of item count */
       itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
 
       var nameSpan = document.createElement('span');
@@ -2613,7 +2640,8 @@
       var priceField = document.createElement('input');
       priceField.type = 'tel';
       priceField.className = 'receipt-price-input';
-      priceField.value = price;
+      /* Pre-format with commas: 10000 → "10,000" */
+      priceField.value = formatWithComma(price);
       priceWrap.appendChild(yenSymbol);
       priceWrap.appendChild(priceField);
 
@@ -2654,7 +2682,15 @@
     for (var i = 0; i < receiptPriceInputs.length; i++) {
       (function(input) {
         input.addEventListener('input', function() {
-          input.value = input.value.replace(/[^0-9]/g, '');
+          /* Extract digits, reformat with commas */
+          var digits = input.value.replace(/[^0-9]/g, '');
+          /* Cap at 5 digits */
+          if (digits.length > 5) digits = digits.slice(0, 5);
+          if (digits === '') {
+            input.value = '';
+          } else {
+            input.value = parseInt(digits, 10).toLocaleString();
+          }
           updateReceiptTotal();
         });
         input.addEventListener('focus', function() {
@@ -2694,7 +2730,7 @@
     var sum = 0;
     var receiptPriceInputs = receiptItems.querySelectorAll('.receipt-price-input');
     for (var i = 0; i < receiptPriceInputs.length; i++) {
-      var val = parseInt(receiptPriceInputs[i].value, 10) || 0;
+      var val = parseFormatted(receiptPriceInputs[i].value);
       sum += val;
     }
     receiptTotal.innerHTML = '<span class="yen-symbol">¥</span>' + sum.toLocaleString();
