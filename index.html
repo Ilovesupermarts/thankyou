@@ -84,10 +84,22 @@
     --box-border: rgba(232, 200, 200, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 90, 90, 0.06);
 
-    /* Active dot styling */
-    --dot-active-bg: #b04a5a;
-    --dot-active-ring: rgba(176, 74, 90, 0.14);
-    --dot-active-shadow: rgba(176, 74, 90, 0.25);
+    /* Summary bar tint (default: unchanged near-white) */
+    --summary-bg: rgba(255, 255, 255, 0.94);
+    --summary-border: #ece4e0;
+    --summary-shadow: rgba(0, 0, 0, 0.06);
+
+    /* Active dot styling — dark forest green */
+    --dot-active-bg: #2a3f1a;
+    --dot-active-ring: rgba(42, 63, 26, 0.28);
+    --dot-active-shadow: rgba(42, 63, 26, 0.4);
+
+    /* Thank-you carousel contrast (default unchanged) */
+    --ty-line-color: #1f1f1f;
+    --ty-line-shadow: none;
+    --ty-accent-color: #b04a5a;
+    --quote-color: #b04a5a;
+    --quote-shadow: 0 2px 24px #fbdfe3;
 
     /* Ambient background gradient stops (default pink) */
     --amb-1: rgba(251, 200, 210, 0.70);
@@ -138,8 +150,7 @@
     --soft-3: #f0e0b8;
     --soft-4: #fdf6e0;
 
-    /* Autumn contrast tokens: darker so muted text stays legible on the
-       saturated amber/orange gradient */
+    /* Autumn contrast tokens */
     --text-dark: #231304;
     --text-med: #3d2410;
     --text-soft: #2a1808;
@@ -156,10 +167,22 @@
     --box-border: rgba(216, 180, 120, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
 
-    /* Active dot styling — dark brown so it stands out on amber */
-    --dot-active-bg: #3d2410;
-    --dot-active-ring: rgba(61, 36, 16, 0.25);
-    --dot-active-shadow: rgba(61, 36, 16, 0.45);
+    /* Summary bar — softer warm amber tint */
+    --summary-bg: rgba(253, 240, 200, 0.72);
+    --summary-border: rgba(216, 180, 120, 0.35);
+    --summary-shadow: rgba(120, 70, 20, 0.08);
+
+    /* Active dot — dark forest green */
+    --dot-active-bg: #2a3f1a;
+    --dot-active-ring: rgba(42, 63, 26, 0.28);
+    --dot-active-shadow: rgba(42, 63, 26, 0.4);
+
+    /* Thank-you carousel contrast */
+    --ty-line-color: #231304;
+    --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6);
+    --ty-accent-color: #8f2f00;
+    --quote-color: #8f2f00;
+    --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
 
     /* Autumn palette — saturated orange/yellow/brown */
     --amb-1: rgba(247, 185, 60, 0.85);
@@ -328,9 +351,6 @@
     transition: opacity 0.6s ease, transform 0.6s ease;
   }
 
-  /* The inner wrapper sizes itself to the info line, and the ticker is
-     absolutely positioned inside it so the ticker is clipped to exactly
-     the info line's width, not the full viewport. */
   .info-inner {
     display: inline-block;
     position: relative;
@@ -352,8 +372,6 @@
   .info-line .time { color: var(--accent); font-weight: 600; }
   .info-line .temp { color: var(--accent); font-weight: 600; }
   .info-line .weather { color: var(--text-mute); }
-
-  /* ---- Weather ticker ---- */
 
   .ticker-wrap {
     position: absolute;
@@ -415,7 +433,7 @@
   html[data-time="night"][data-weather="rain"] body:not(.warm-background),
   html[data-time="night"][data-weather="drizzle"] body:not(.warm-background) { background-color: var(--bg-night-rain); }
 
-  /* ============ THEME TOGGLE (name screen only) ============ */
+  /* ============ THEME TOGGLE ============ */
 
   .theme-toggle {
     position: absolute;
@@ -1182,10 +1200,10 @@
 
   .summary {
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(255, 255, 255, 0.94);
-    border-top: 1px solid var(--border-3);
+    background: var(--summary-bg);
+    border-top: 1px solid var(--summary-border);
     padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
-    box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
+    box-shadow: 0 -4px 18px var(--summary-shadow);
     opacity: 0; transform: translateY(100%);
     transition: opacity 0.5s ease, transform 0.5s ease;
     pointer-events: none; z-index: 50;
@@ -1199,10 +1217,7 @@
     padding: 0 8px; gap: 10px;
     min-width: 0;
   }
-  .summary-total-wrap {
-    min-width: 0;
-    flex-shrink: 0;
-  }
+  .summary-total-wrap { min-width: 0; flex-shrink: 0; }
   .summary-label {
     font-size: 10px; color: var(--text-mute);
     letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0;
@@ -1257,11 +1272,7 @@
   @media (max-width: 380px) {
     .summary-inner { gap: 6px; padding: 0 2px; }
     .summary-total { font-size: 19px; }
-    .reset, .submit-btn {
-      padding: 9px 11px;
-      font-size: 11.5px;
-      letter-spacing: 0;
-    }
+    .reset, .submit-btn { padding: 9px 11px; font-size: 11.5px; letter-spacing: 0; }
     .submit-btn { gap: 3px; }
   }
 
@@ -1310,11 +1321,7 @@
     line-height: 2;
     text-wrap: balance;
   }
-  .confirm-actions {
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-  }
+  .confirm-actions { display: flex; justify-content: center; gap: 10px; }
   .confirm-btn {
     flex: 1; min-width: 0;
     border-radius: 22px;
@@ -1326,9 +1333,6 @@
     cursor: pointer;
     -webkit-appearance: none; appearance: none;
     transition: background 0.2s, color 0.2s, transform 0.15s, border-color 0.2s;
-    word-break: auto-phrase;
-    overflow-wrap: break-word;
-    line-break: strict;
     white-space: nowrap;
   }
   .confirm-btn:active { transform: scale(0.97); }
@@ -1500,58 +1504,37 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .receipt-total-label {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-mute);
-    letter-spacing: 4px;
-    line-height: 1.2;
+    font-size: 18px; font-weight: 600; color: var(--text-mute);
+    letter-spacing: 4px; line-height: 1.2;
   }
   .receipt-total-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 0.5px;
-    line-height: 1.2;
-    white-space: nowrap;
+    font-size: 18px; font-weight: 700; color: var(--accent);
+    letter-spacing: 0.5px; line-height: 1.2; white-space: nowrap;
   }
   .receipt-total-value .yen-symbol {
-    font-size: 13px;
-    margin-right: 1px;
-    opacity: 0.8;
-    font-weight: 700;
+    font-size: 13px; margin-right: 1px; opacity: 0.8; font-weight: 700;
   }
 
   .receipt-closing-line {
-    margin-top: 22px;
-    text-align: center;
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--accent);
-    letter-spacing: 0.8px;
-    line-height: 2;
+    margin-top: 22px; text-align: center;
+    font-size: 14px; font-weight: 500; color: var(--accent);
+    letter-spacing: 0.8px; line-height: 2;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
 
   .receipt-back-btn {
-    display: block;
-    width: 100%;
-    max-width: 260px;
+    display: block; width: 100%; max-width: 260px;
     margin: 26px auto 0 auto;
     background: #ffffff;
     border: 1.5px solid var(--border-1);
     color: var(--accent);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    padding: 12px 20px;
-    border-radius: 22px;
+    font-size: 13px; font-weight: 600; letter-spacing: 2px;
+    padding: 12px 20px; border-radius: 22px;
     cursor: pointer;
     transition: background 0.2s, border-color 0.2s, transform 0.15s;
-    -webkit-appearance: none;
-    appearance: none;
-    white-space: nowrap;
+    -webkit-appearance: none; appearance: none; white-space: nowrap;
   }
   .receipt-back-btn:active {
     background: var(--soft-2);
@@ -1559,15 +1542,8 @@
     transform: scale(0.97);
   }
 
-  .receipt-footer {
-    text-align: center;
-    margin-top: 22px;
-  }
-  .receipt-footer-mark {
-    font-size: 12px;
-    color: var(--glow);
-    letter-spacing: 10px;
-  }
+  .receipt-footer { text-align: center; margin-top: 22px; }
+  .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
   @media (min-width: 700px) {
     .receipt-paper { max-width: 480px; padding: 42px 42px 34px 42px; }
@@ -1687,11 +1663,13 @@
   .ty-panel.active .ty-panel-hint { opacity: 1; transform: translateX(0); }
   .ty-mark { font-size: 22px; color: var(--glow); letter-spacing: 10px; margin-bottom: 32px; }
   .ty-line {
-    font-size: 18px; font-weight: 500; color: var(--text-dark);
+    font-size: 18px; font-weight: 500;
+    color: var(--ty-line-color);
     line-height: 2.3; letter-spacing: 0.6px; margin-bottom: 8px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    text-shadow: var(--ty-line-shadow);
   }
-  .ty-line.accent { color: var(--accent); font-weight: 700; }
+  .ty-line.accent { color: var(--ty-accent-color); font-weight: 700; }
   .ty-line.spacer { margin-top: 24px; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
 
@@ -1773,7 +1751,8 @@
   }
   .quote-line {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 26px; font-weight: 500; color: var(--accent);
+    font-size: 26px; font-weight: 500;
+    color: var(--quote-color);
     line-height: 2.1; letter-spacing: 3px;
     opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px);
     transition:
@@ -1782,7 +1761,7 @@
       filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-wrap: balance;
-    text-shadow: 0 2px 24px var(--petal-soft);
+    text-shadow: var(--quote-shadow);
   }
   .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
@@ -1795,9 +1774,7 @@
     border: none;
     color: var(--text-mute);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 12px;
-    font-weight: 500;
-    letter-spacing: 2px;
+    font-size: 12px; font-weight: 500; letter-spacing: 2px;
     padding: 8px 12px;
     padding-left: calc(12px + env(safe-area-inset-left, 0px));
     border-radius: 16px;
@@ -1807,8 +1784,7 @@
       opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
       background 0.2s ease,
       color 0.2s ease;
-    -webkit-appearance: none;
-    appearance: none;
+    -webkit-appearance: none; appearance: none;
     white-space: nowrap;
     z-index: 30;
     pointer-events: none;
@@ -1816,25 +1792,18 @@
     align-items: center;
     gap: 6px;
   }
-  .ty-receipt-btn.shown {
-    opacity: 0.75;
-    pointer-events: auto;
-  }
+  .ty-receipt-btn.shown { opacity: 0.75; pointer-events: auto; }
   .ty-receipt-btn:active {
     opacity: 1;
     background: rgba(255, 255, 255, 0.5);
     color: var(--accent);
   }
   .ty-receipt-btn .btn-back-arrow {
-    display: inline-block;
-    font-size: 14px;
-    line-height: 1;
+    display: inline-block; font-size: 14px; line-height: 1;
     transform: translateX(0);
     transition: transform 0.2s ease;
   }
-  .ty-receipt-btn:active .btn-back-arrow {
-    transform: translateX(-3px);
-  }
+  .ty-receipt-btn:active .btn-back-arrow { transform: translateX(-3px); }
 
   /* ============ RESPONSIVE ============ */
 
@@ -1974,8 +1943,6 @@
 </head>
 <body>
 
-<!-- ============ GLOBAL INFO BAR + TICKER ============ -->
-
 <div class="info-bar" id="infoBar">
   <div class="info-inner">
     <div class="info-line" id="infoLine">
@@ -1994,8 +1961,6 @@
     </div>
   </div>
 </div>
-
-<!-- ============ NAME ENTRY ============ -->
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
@@ -2051,8 +2016,6 @@
   </div>
 </div>
 
-<!-- ============ BLOSSOM START ============ -->
-
 <div class="blossom-screen" id="blossomScreen">
   <button type="button" class="start-btn" id="startBtn" aria-label="はじめる">
     <span class="blossom-char" aria-hidden="true">❀</span>
@@ -2061,13 +2024,9 @@
   <p class="start-hint">お花を<br>そっとタップしてください</p>
 </div>
 
-<!-- ============ INTRO ============ -->
-
 <div class="intro-overlay" id="introOverlay">
   <div class="name-column" id="nameColumn"></div>
 </div>
-
-<!-- ============ MAIN CAROUSEL ============ -->
 
 <div class="stage" id="stage">
   <div class="track" id="track">
@@ -2138,8 +2097,6 @@
 </div>
 
 <div class="stage-spacer"></div>
-
-<!-- ============ TRANSITION LINE ============ -->
 
 <div class="transition-line" id="transitionLine">
   それでは、本日のメニューをご覧ください。<br><br>
@@ -2289,8 +2246,6 @@
     </div>
   </div>
 </div>
-
-<!-- ============ THANK-YOU SCREEN ============ -->
 
 <div class="thankyou-screen" id="thankyouScreen">
 
@@ -2663,23 +2618,30 @@
   });
 
   /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
+  /* Measures panel content relative to the stage, so the hint
+     stays in a fixed position regardless of page scroll. */
 
   function repositionHintGroup() {
-    if (!panels.length) return;
-    var maxBottom = 0;
+    if (!panels.length || !stage) return;
+    var stageRect = stage.getBoundingClientRect();
+    var stageHeight = stage.offsetHeight;
+    if (stageHeight <= 0) return;
+
+    var maxContentBottomRel = 0;
     for (var i = 0; i < panels.length; i++) {
       var content = panels[i].querySelector('.panel-content');
       if (!content) continue;
       var rect = content.getBoundingClientRect();
-      if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+      var bottomRel = rect.bottom - stageRect.top;
+      if (bottomRel > maxContentBottomRel) maxContentBottomRel = bottomRel;
     }
-    if (maxBottom <= 0) return;
+    if (maxContentBottomRel <= 0) return;
 
-    var vh = window.innerHeight;
-    var distanceFromBottom = vh - maxBottom;
+    // Distance from bottom of stage to bottom of tallest content
+    var distanceFromStageBottom = stageHeight - maxContentBottomRel;
 
-    var hintBottom = distanceFromBottom - 48;
-    var dotsBottom = distanceFromBottom - 48 - 38;
+    var hintBottom = distanceFromStageBottom - 48;
+    var dotsBottom = distanceFromStageBottom - 48 - 38;
 
     if (hintBottom < 40) hintBottom = 40;
     if (dotsBottom < 10) dotsBottom = 10;
@@ -2713,10 +2675,7 @@
 
   function updateGlobalHint() {
     if (!globalHint || !globalHintLayerSwipe || !globalHintLayerScroll) return;
-    if (!nameConfirmed) {
-      globalHint.classList.remove('shown');
-      return;
-    }
+    if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
     if (currentPanel === totalPanels - 1) {
       globalHintLayerSwipe.classList.remove('active');
       globalHintLayerScroll.classList.add('active');
@@ -2986,8 +2945,7 @@
       var changed = stepTip(delta);
       if (!changed) { stop(); return; }
       var elapsed = Date.now() - holdStart;
-      var nextRate = rateForElapsed(elapsed);
-      holdInterval = setTimeout(tick, nextRate);
+      holdInterval = setTimeout(tick, rateForElapsed(elapsed));
     }
     function start() {
       holdStart = Date.now();
@@ -3005,15 +2963,15 @@
       try { buttonEl.setPointerCapture(e.pointerId); } catch (err) {}
       start();
     });
-    buttonEl.addEventListener('pointerup', function(e) { stop(); });
-    buttonEl.addEventListener('pointercancel', function(e) { stop(); });
-    buttonEl.addEventListener('pointerleave', function(e) { stop(); });
+    buttonEl.addEventListener('pointerup', function() { stop(); });
+    buttonEl.addEventListener('pointercancel', function() { stop(); });
+    buttonEl.addEventListener('pointerleave', function() { stop(); });
     if (!window.PointerEvent) {
       buttonEl.addEventListener('touchstart', function(e) {
         e.preventDefault(); start();
       }, { passive: false });
-      buttonEl.addEventListener('touchend', function(e) { stop(); });
-      buttonEl.addEventListener('touchcancel', function(e) { stop(); });
+      buttonEl.addEventListener('touchend', function() { stop(); });
+      buttonEl.addEventListener('touchcancel', function() { stop(); });
     }
   }
 
@@ -3422,9 +3380,21 @@
   });
 
   /* ============ BACK TO TABLE ============ */
-  /* The flash fix: keep body.thankyou-active ON through the entire
-     receipt fade + smooth scroll, and only remove it once the scroll
-     has settled. */
+  /* Real fix for the panel 5 flash:
+     The previous version re-applied `table-locked` in
+     startThankyouSequence, which pinned the body to the top of the
+     document. Then in returnToTable, removing `table-locked`
+     restored the body to the top-of-document scroll position, and
+     scrollIntoView had to smooth-scroll across the ENTIRE page.
+     On a tall page, that scroll took longer than our hardcoded
+     delay, so the carousel briefly became visible mid-scroll.
+
+     Now:
+       - startThankyouSequence no longer applies table-locked, so the
+         body is never re-pinned to the top of the document.
+       - returnToTable keeps `thankyou-active` on until the scroll
+         actually finishes. We listen for `scrollend` when available
+         and fall back to a generous timeout otherwise. */
 
   function returnToTable() {
     clearAllTyTimers();
@@ -3437,8 +3407,6 @@
       finished = true;
       receiptScreen.removeEventListener('transitionend', onFade);
 
-      // Reset the thank-you state internally, but DO NOT remove
-      // thankyou-active yet.
       if (thankyouScreen.classList.contains('visible')) {
         thankyouScreen.classList.remove('visible');
         tyAmbientStage.classList.remove('shown');
@@ -3457,21 +3425,34 @@
         activateTyPanel(0);
       }
 
-      // Put the carousel on the last panel so it's ready when it
-      // becomes visible again (the user was on the table).
+      // Put the carousel on the last panel.
       currentPanel = totalPanels - 1;
       track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
       for (var j = 0; j < dots.length; j++) {
         dots[j].classList.toggle('active', j === currentPanel);
       }
       activatePanel(currentPanel);
-      if (typeof unlockTable === 'function') unlockTable();
+      unlockTable();
 
-      // Now trigger the smooth scroll while the carousel is still hidden.
       setTimeout(function() {
         tableCard.classList.add('active');
         rejectRow.classList.add('active');
         divider.classList.add('active');
+
+        var scrollSettled = false;
+        function onScrollEnd() {
+          if (scrollSettled) return;
+          scrollSettled = true;
+          window.removeEventListener('scrollend', onScrollEnd);
+          document.body.classList.remove('thankyou-active');
+          receiptOpenedFromThankyou = false;
+          if (typeof scheduleEvaluation === 'function') {
+            setTimeout(scheduleEvaluation, 400);
+          }
+        }
+        if ('onscrollend' in window) {
+          window.addEventListener('scrollend', onScrollEnd);
+        }
 
         setTimeout(function() {
           try {
@@ -3480,19 +3461,8 @@
             var y = tableCard.getBoundingClientRect().top + window.pageYOffset - 100;
             window.scrollTo(0, y);
           }
-
-          // Only after the smooth scroll has settled do we reveal the
-          // carousel and the rest of the page.
-          var scrollSettleMs = (window.innerHeight > 900) ? 900 : 700;
-          setTimeout(function() {
-            document.body.classList.remove('table-locked');
-            document.body.classList.remove('thankyou-active');
-            receiptOpenedFromThankyou = false;
-
-            if (typeof scheduleEvaluation === 'function') {
-              setTimeout(scheduleEvaluation, 400);
-            }
-          }, scrollSettleMs);
+          // Fallback in case scrollend doesn't fire
+          setTimeout(onScrollEnd, 1500);
         }, 150);
       }, 300);
     }
@@ -3684,10 +3654,7 @@
     var top = Math.min(tableRect.top, rejectRect.top);
     var bottom = Math.max(tableRect.bottom, rejectRect.bottom);
     var totalHeight = bottom - top;
-    if (totalHeight <= 0) {
-      summaryBar.classList.remove('visible');
-      return;
-    }
+    if (totalHeight <= 0) { summaryBar.classList.remove('visible'); return; }
     var visibleTop = Math.max(top, 0);
     var visibleBottom = Math.min(bottom, vh);
     var visibleHeight = Math.max(0, visibleBottom - visibleTop);
@@ -4289,10 +4256,14 @@
   }
 
   /* ============ THANK-YOU SEQUENCE ============ */
+  /* NOTE: table-locked is deliberately NOT applied here. The
+     thank-you screen is position: fixed and covers the viewport,
+     so scroll locking is not required. Keeping the body unlocked
+     preserves the current scroll position, which is essential for
+     the returnToTable smooth scroll to be short and fast. */
 
   function startThankyouSequence() {
     clearAllTyTimers();
-    document.body.classList.add('table-locked');
     document.body.classList.add('thankyou-active');
     tyExited = false;
     tyCarousel.classList.remove('hidden-out');
