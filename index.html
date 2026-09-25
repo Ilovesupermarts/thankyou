@@ -479,6 +479,13 @@
     display: flex; justify-content: center; align-items: center;
     gap: 14px;
     z-index: 10;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.8s ease;
+  }
+  .dots.visible {
+    opacity: 1;
+    pointer-events: auto;
   }
 
   .dot {
@@ -2065,6 +2072,7 @@
 
   var track = document.getElementById('track');
   var stage = document.getElementById('stage');
+  var dotsEl = document.getElementById('dots');
   var dots = document.querySelectorAll('.dot');
   var panels = document.querySelectorAll('.panel');
 
@@ -2476,6 +2484,7 @@
     for (var p2 = 0; p2 < dots.length; p2++) {
       dots[p2].classList.toggle('active', p2 === 0);
     }
+    dotsEl.classList.remove('visible');
     activatePanel(0);
 
     tableCard.classList.add('active');
@@ -2575,6 +2584,7 @@
           fadingChars[f].style.transitionDelay = (f * 0.18) + 's';
         }
         introOverlay.classList.add('finishing');
+        dotsEl.classList.add('visible');
         blossomScreen.classList.remove('visible');
         blossomScreen.style.opacity = '';
         blossomScreen.style.transition = '';
