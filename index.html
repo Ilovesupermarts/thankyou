@@ -249,6 +249,54 @@
   .preset-input::placeholder { color: #d4c4be; font-weight: 400; }
   .preset-input:focus { outline: none; border-color: #b04a5a; }
 
+  /* Rejection tip field on the first screen */
+  .tip-label {
+    margin-top: 28px;
+    font-size: 13px;
+    color: #b8a8a2;
+    letter-spacing: 3px;
+  }
+  .tip-field {
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: #ffffff;
+    border: 1.5px solid #ead9d5;
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 2px 10px rgba(120, 90, 90, 0.05);
+    transition: border-color 0.2s;
+  }
+  .tip-field:focus-within { border-color: #b04a5a; }
+  .tip-field .tip-field-input {
+    background: transparent;
+    border: none;
+    color: #b04a5a;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    text-align: right;
+    letter-spacing: 1px;
+    width: 100px;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .tip-field .tip-field-input:focus { outline: none; }
+  .tip-field .tip-field-input::placeholder {
+    color: #d4c4be;
+    font-weight: 400;
+    font-size: 13px;
+  }
+  .tip-field .tip-field-yen {
+    color: #b04a5a;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
   .name-btn {
     margin-top: 28px; background: #b04a5a; color: #ffffff;
     border: none; border-radius: 30px; padding: 16px 48px;
@@ -439,6 +487,20 @@
     line-height: 2.1; letter-spacing: 0.4px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
+
+  /* Panel 5 wrapper classes */
+  .panel-5-red {
+    color: #b04a5a;
+    font-weight: 500;
+    font-size: 17px;
+    line-height: 2.2;
+    letter-spacing: 0.3px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
+  .panel-5-gap {
+    height: 22px;
   }
 
   .action-hint {
@@ -820,49 +882,15 @@
     text-align: center;
   }
 
-  /* New inline tip input inside the reject-gift text */
-  .reject-gift-input {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    background: #fdf3f2;
-    border: 1.5px solid #e8b4bc;
-    border-radius: 8px;
-    padding: 4px 10px;
-    margin: 0 4px;
-    vertical-align: middle;
-    transition: border-color 0.2s, background 0.2s;
-  }
-  .reject-gift-input:focus-within {
-    border-color: #b04a5a;
-    background: #ffffff;
-  }
-  .reject-gift-input .tip-input {
-    background: transparent;
-    border: none;
-    color: #b04a5a;
+  /* Read-only display of the captured tip amount on the reject panel */
+  .reject-gift-amount {
+    display: inline-block;
     font-size: 18px;
     font-weight: 700;
-    font-family: inherit;
-    text-align: right;
-    letter-spacing: 1px;
-    width: 76px;
-    padding: 0;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  .reject-gift-input .tip-input:focus { outline: none; }
-  .reject-gift-input .tip-input::placeholder {
-    color: #c9b0b5;
-    font-weight: 400;
-    font-size: 12px;
-    letter-spacing: 0.3px;
-  }
-  .reject-gift-input .tip-yen {
     color: #b04a5a;
-    font-size: 16px;
-    font-weight: 700;
-    flex-shrink: 0;
+    letter-spacing: 1px;
+    margin: 0 2px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
 
   /* ============ PETAL ============ */
@@ -1548,6 +1576,7 @@
     .msg-3 { font-size: 18px; padding: 36px 32px; }
     .msg-4 { font-size: 18px; }
     .msg-emphasis { font-size: 18px; }
+    .panel-5-red { font-size: 18px; }
     .transition-line { font-size: 17px; max-width: 600px; }
     .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
@@ -1568,8 +1597,9 @@
     .ty-dot { width: 12px; height: 12px; }
     .gift-divider-label { font-size: 19px; letter-spacing: 6px; }
     .reject-gift { font-size: 15px; }
-    .reject-gift-input .tip-input { font-size: 20px; width: 88px; }
-    .reject-gift-input .tip-yen { font-size: 18px; }
+    .reject-gift-amount { font-size: 20px; }
+    .tip-field .tip-field-input { font-size: 20px; width: 120px; }
+    .tip-field .tip-field-yen { font-size: 18px; }
   }
 
   @media (min-width: 1100px) {
@@ -1591,8 +1621,9 @@
     .ty-dot { width: 13px; height: 13px; }
     .gift-divider-label { font-size: 21px; letter-spacing: 7px; }
     .reject-gift { font-size: 16px; }
-    .reject-gift-input .tip-input { font-size: 22px; width: 96px; }
-    .reject-gift-input .tip-yen { font-size: 20px; }
+    .reject-gift-amount { font-size: 22px; }
+    .tip-field .tip-field-input { font-size: 22px; width: 140px; }
+    .tip-field .tip-field-yen { font-size: 20px; }
   }
 
   @media (max-height: 700px) {
@@ -1629,8 +1660,9 @@
     .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
     .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
     .reject-gift { font-size: 12.5px; padding: 12px 14px; }
-    .reject-gift-input .tip-input { font-size: 16px; width: 68px; }
-    .reject-gift-input .tip-yen { font-size: 14px; }
+    .reject-gift-amount { font-size: 16px; }
+    .tip-field .tip-field-input { font-size: 16px; width: 90px; }
+    .tip-field .tip-field-yen { font-size: 14px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1647,6 +1679,7 @@
     .msg-3 { font-size: 16px; padding: 24px 26px; line-height: 2; }
     .msg-4 { font-size: 16px; line-height: 2; }
     .msg-emphasis { font-size: 16px; margin-top: 18px; padding-top: 16px; }
+    .panel-5-red { font-size: 16px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
     .dots { bottom: 66px; }
@@ -1665,8 +1698,9 @@
     .stage-spacer { height: 1.5vh; }
     .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
     .reject-gift { font-size: 12px; }
-    .reject-gift-input .tip-input { font-size: 15px; width: 60px; }
-    .reject-gift-input .tip-yen { font-size: 13px; }
+    .reject-gift-amount { font-size: 15px; }
+    .tip-field .tip-field-input { font-size: 15px; width: 80px; }
+    .tip-field .tip-field-yen { font-size: 13px; }
   }
 </style>
 </head>
@@ -1731,6 +1765,12 @@
       </div>
     </div>
 
+    <div class="tip-label">ささやかなお礼</div>
+    <div class="tip-field">
+      <input type="tel" class="tip-field-input" id="tipInput" value="1,500" placeholder="金額を入力">
+      <span class="tip-field-yen">円</span>
+    </div>
+
     <br>
     <button type="button" class="name-btn" id="nameBtn">決定</button>
   </div>
@@ -1757,70 +1797,54 @@
 <div class="stage" id="stage">
   <div class="track" id="track">
 
+    <!-- Panel 1: greeting is hardcoded, body is injected from panel-1.html -->
     <div class="panel" data-panel="0">
       <div class="panel-inner">
         <div class="panel-content">
           <div class="greeting">
             <span id="therapistName" class="therapist-name">桜庭</span>さん、初めまして。<br><br>
-            シンガポールから参りました<br>
-            <span class="sender-name">Eze（エズ）</span> と申します。<br><br>
-            お読みいただきたいメッセージを用意してまいりました。<br>
-            急ぎませんので、どうぞごゆっくりお読みになってください。<br><br>
-            本日はよろしくお願いいたします。
+            <span id="panel1Body"></span>
           </div>
         </div>
       </div>
     </div>
 
+    <!-- Panel 2: body injected from panel-2.html -->
     <div class="panel" data-panel="1">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-1">
-            今日は初めて担当していただくセラピストさんですが、<br>
-            とてもお綺麗で魅力的な方で、<br>
-            お会いできて嬉しく思っております。
-          </div>
+          <div class="msg-1"><span id="panel2Body"></span></div>
         </div>
       </div>
     </div>
 
+    <!-- Panel 3: body injected from panel-3.html -->
     <div class="panel" data-panel="2">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-2">
-            もしよろしければ、今回は少し特別なご相談がございます。<br><br>
-            こちらの表をご覧いただき、ご自身が無理なく対応できるものがございましたら、教えていただけますでしょうか。<br><br>
-            組み合わせでも構いません。料金につきましては、決まりましたらその場でお渡しいたします。
-          </div>
+          <div class="msg-2"><span id="panel3Body"></span></div>
         </div>
       </div>
     </div>
 
+    <!-- Panel 4: body injected from panel-4.html -->
     <div class="panel" data-panel="3">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-4">
-            どのような内容になりましても、セラピストさんのマッサージを受けられること自体を楽しみにしておりますので、どうぞお気になさらないでください。<br><br>
-            初めてお会いしますが、とても素敵で魅力的な方だと感じております。今日は素敵な時間を過ごせることを楽しみにしております。<br><br>
-            どうぞよろしくお願いいたします。
-          </div>
+          <div class="msg-4"><span id="panel4Body"></span></div>
         </div>
       </div>
     </div>
 
+    <!-- Panel 5: fully hardcoded -->
     <div class="panel" data-panel="4">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-3">
-            もちろん、ご不安なものやご対応が難しいものについては、<br>
-            <span class="accent">無理にお願いすることは一切ございません。</span><br>
-            ご自身が安心して対応できる範囲で、ご判断いただければと思っております。
-          </div>
-          <div class="msg-emphasis">
-            どれも無理のない範囲で。<br>
-            すべてスキップでも、<br>
-            いつもの施術を楽しみにしています。
-          </div>
+          <div class="panel-5-red">もちろん、ご不安なものやご対応が難しいものについては、</div>
+          <div class="panel-5-gap"></div>
+          <div class="msg-3">無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。</div>
+          <div class="panel-5-gap"></div>
+          <div class="panel-5-red">すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</div>
         </div>
       </div>
     </div>
@@ -1920,7 +1944,7 @@
       </div>
 
       <div class="reject-gift">
-        ささやかではございますが、日頃の感謝の気持ちを込めて、<span class="reject-gift-input"><input type="tel" class="tip-input" id="tipInput" placeholder="金額を入力"><span class="tip-yen">円</span></span>をお受け取りいただければ幸いです。
+        ささやかではございますが、日頃の感謝の気持ちを込めて、<span class="reject-gift-amount" id="rejectGiftAmount">1,500</span>円をお受け取りいただければ幸いです。
       </div>
     </div>
   </div>
@@ -2098,7 +2122,7 @@
 </div>
 
 <script>
-  /* ============ HAPTIC FEEDBACK ============ */
+  /* ============ HAPTIC FEEDBACK (with tablet audio fallback) ============ */
 
   var hapticAudioCtx = null;
 
@@ -2214,6 +2238,57 @@
       .catch(function() { return AMBIENT_LINES; });
   }
 
+  /* ============ PANEL LOADER (panels 1-4) ============ */
+  /* Each file is plain text with blank-line paragraphing.
+     Single newline  → <br>
+     Blank line      → <br><br>
+     Leading/trailing whitespace trimmed.
+     No fallback — if a fetch fails, the anchor stays empty. */
+
+  function convertPanelText(raw) {
+    if (!raw) return '';
+    // Normalise line endings
+    var text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // Trim leading/trailing blank lines and spaces
+    text = text.replace(/^\s+|\s+$/g, '');
+    if (text === '') return '';
+    // Split into paragraphs on blank lines
+    var paragraphs = text.split(/\n{2,}/);
+    var out = [];
+    for (var i = 0; i < paragraphs.length; i++) {
+      var para = paragraphs[i].trim();
+      if (para === '') continue;
+      // Within a paragraph, single newlines become <br>
+      para = para.split('\n').map(function(line) {
+        return line.trim();
+      }).join('<br>');
+      out.push(para);
+    }
+    return out.join('<br><br>');
+  }
+
+  function loadPanelInto(anchorId, url) {
+    return fetch(url + '?v=' + Date.now())
+      .then(function(r) {
+        if (!r.ok) throw new Error(url + ' not found');
+        return r.text();
+      })
+      .then(function(text) {
+        var anchor = document.getElementById(anchorId);
+        if (anchor) anchor.innerHTML = convertPanelText(text);
+      })
+      .catch(function() { /* silent */ });
+  }
+
+  function loadAllPanels() {
+    return Promise.all([
+      loadPanelInto('panel1Body', 'panel-1.html'),
+      loadPanelInto('panel2Body', 'panel-2.html'),
+      loadPanelInto('panel3Body', 'panel-3.html'),
+      loadPanelInto('panel4Body', 'panel-4.html')
+    ]);
+  }
+
   /* ============ DOM REFS ============ */
 
   var nameScreen = document.getElementById('nameScreen');
@@ -2232,6 +2307,7 @@
   var summaryBar = document.getElementById('summaryBar');
   var rejectRow = document.getElementById('rejectRow');
   var rejectThanks = document.getElementById('rejectThanks');
+  var rejectGiftAmountEl = document.getElementById('rejectGiftAmount');
   var tipInput = document.getElementById('tipInput');
   var petalOverlay = document.getElementById('petalOverlay');
   var transitionLine = document.getElementById('transitionLine');
@@ -2247,6 +2323,10 @@
   var currentPanel = 0;
   var totalPanels = 5;
   var rejected = false;
+
+  // The tip amount captured at 決定 time on the first screen.
+  // Fixed for the session, restored on reset.
+  var confirmedTipAmount = 1500;
 
   var stageWidth = window.innerWidth;
   var refWidth = Math.min(window.innerWidth, 600);
@@ -2302,7 +2382,41 @@
     tyStageWidth = window.innerWidth;
     tyRefWidth = Math.min(window.innerWidth, 600);
     tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
+
+    repositionHintGroup();
   });
+
+  /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
+  /* The swipe hint + dots sit 20px below the tallest panel content.
+     Re-measured on load, resize, orientationchange, and after intro. */
+
+  function repositionHintGroup() {
+    if (!panels.length) return;
+    var maxBottom = 0;
+    for (var i = 0; i < panels.length; i++) {
+      var content = panels[i].querySelector('.panel-content');
+      if (!content) continue;
+      var rect = content.getBoundingClientRect();
+      if (rect.bottom > maxBottom) maxBottom = rect.bottom;
+    }
+    if (maxBottom <= 0) return;
+
+    // Distance from bottom of viewport to bottom of tallest content
+    var vh = window.innerHeight;
+    var distanceFromBottom = vh - maxBottom;
+
+    // Hint sits 20px below the tallest content
+    var hintBottom = distanceFromBottom - 20;
+    // Dots sit a further 38px below the hint
+    var dotsBottom = distanceFromBottom - 20 - 38;
+
+    // Guard against negative values (content taller than viewport)
+    if (hintBottom < 40) hintBottom = 40;
+    if (dotsBottom < 10) dotsBottom = 10;
+
+    if (globalHint) globalHint.style.bottom = hintBottom + 'px';
+    if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
+  }
 
   /* ============ MAIN CAROUSEL ============ */
 
@@ -2374,6 +2488,8 @@
     }
 
     updateGlobalHint();
+    // Panel content may have just changed height; re-measure
+    setTimeout(repositionHintGroup, 30);
 
     if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
       setTimeout(scheduleEvaluation, 80);
@@ -2384,11 +2500,6 @@
 
   function getRows() { return tableCard.querySelectorAll('.row'); }
 
-  function getTipAmount() {
-    if (!tipInput) return 0;
-    return parseFormatted(tipInput.value);
-  }
-
   function recalc() {
     var rows = getRows();
     var sum = 0;
@@ -2396,16 +2507,14 @@
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
       if (!priceInput) continue;
-      var val = parseInt(priceInput.value, 10) || 0;
+      var val = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
       if (isChecked || val > 0) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
 
-    // When the reject row is selected, the tip amount becomes the total.
-    var displayTotal = rejected ? getTipAmount() : sum;
-
+    var displayTotal = rejected ? confirmedTipAmount : sum;
     totalEl.textContent = '¥' + displayTotal.toLocaleString();
     updateSubmitState();
   }
@@ -2416,15 +2525,12 @@
     for (var i = 0; i < rows.length; i++) {
       var check = rows[i].querySelector('.row-check');
       var pi = rows[i].querySelector('.price-input');
-      var val = pi ? (parseInt(pi.value, 10) || 0) : 0;
+      var val = pi ? parseFormatted(pi.value) : 0;
       if ((check && check.classList.contains('checked')) || val > 0) {
         anyActive = true; break;
       }
     }
-    // Reject row is valid either because it's selected, or because
-    // a tip amount is present.
-    var rejectValid = rejected || getTipAmount() > 0;
-    submitBtn.disabled = !(anyActive || rejectValid);
+    submitBtn.disabled = !(anyActive || rejected);
   }
 
   function updateRowLock(row) {
@@ -2509,13 +2615,19 @@
     if (!input.classList.contains('price-input')) return;
     if (rejected) return;
     if (input.disabled) return;
-    // Service price inputs: digits only, no comma formatting.
-    input.value = input.value.replace(/[^0-9]/g, '');
+    // Live commas for service price fields
+    var digits = input.value.replace(/[^0-9]/g, '');
+    if (digits.length > 5) digits = digits.slice(0, 5);
+    if (digits === '') {
+      input.value = '';
+    } else {
+      input.value = parseInt(digits, 10).toLocaleString();
+    }
     var row = input.closest('.row');
     if (row) {
       var box = row.querySelector('.row-check');
       if (box) {
-        if (input.value !== '') {
+        if (digits !== '') {
           box.setAttribute('data-saved-price', input.value);
           var serviceText = row.querySelector('.service-input');
           var serviceDisplay = row.querySelector('.service-display');
@@ -2565,8 +2677,14 @@
     recalc();
   });
 
-  /* ============ TIP INPUT (reject-gift amount) ============ */
-  /* Commas live as the user types, digits only, max 5 digits. */
+  tableCard.addEventListener('focusin', function(e) {
+    var input = e.target;
+    if (input && input.classList.contains('price-input')) {
+      setTimeout(function() { input.select(); }, 50);
+    }
+  });
+
+  /* ============ TIP INPUT (first screen) ============ */
 
   if (tipInput) {
     tipInput.addEventListener('input', function() {
@@ -2577,16 +2695,10 @@
       } else {
         tipInput.value = parseInt(digits, 10).toLocaleString();
       }
-      recalc();
     });
 
     tipInput.addEventListener('focus', function() {
       setTimeout(function() { tipInput.select(); }, 50);
-    });
-
-    // Don't let taps on the tip input toggle the reject row.
-    tipInput.addEventListener('click', function(e) {
-      e.stopPropagation();
     });
   }
 
@@ -2608,6 +2720,12 @@
     }
     nameConfirmed = true;
     therapistNameEl.textContent = entered;
+
+    // Capture the tip amount for the session.
+    confirmedTipAmount = parseFormatted(tipInput ? tipInput.value : '') || 0;
+    if (rejectGiftAmountEl) {
+      rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
+    }
 
     var presetInputs = document.querySelectorAll('.preset-input');
     var dynamicRows = document.getElementById('dynamicRows');
@@ -2655,9 +2773,6 @@
   }
 
   /* ============ RESET (clear the form only) ============ */
-  /* Leaves the current panel, scroll position, dots visibility,
-     transition line, and every other state untouched. The user
-     stays exactly where they were. */
 
   function resetAll() {
     rejected = false;
@@ -2688,13 +2803,15 @@
       presetInputs[p].value = PRESET_TEXTS[pidx] || '';
     }
 
-    // Clear the tip amount.
-    if (tipInput) tipInput.value = '';
+    // Tip reverts to the captured value; the reject panel mirror
+    // and the summary total both follow.
+    if (rejectGiftAmountEl) {
+      rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
+    }
 
     updateAllRowLocks();
     recalc();
 
-    // Summary bar visibility follows the current scroll position.
     if (typeof updateSummaryVisibility === 'function') {
       updateSummaryVisibility();
     }
@@ -2745,6 +2862,11 @@
     });
 
     loadQuotesFromServer();
+
+    // Load the four external panel bodies. No fallback.
+    loadAllPanels().then(function() {
+      repositionHintGroup();
+    });
 
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(function() {});
@@ -2804,6 +2926,8 @@
 
         setTimeout(function() {
           introOverlay.classList.remove('active', 'finishing');
+          // Fonts may have shifted; re-measure
+          repositionHintGroup();
         }, 1400);
       }, arrivalTime + holdTime);
     }, 700);
@@ -2825,7 +2949,7 @@
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
       if (!priceInput) continue;
-      var price = parseInt(priceInput.value, 10) || 0;
+      var price = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
       if (!isChecked && price <= 0) continue;
@@ -2871,10 +2995,7 @@
       itemCount++;
     }
 
-    // If the user rejected all services, show the tip amount as the
-    // receipt line item. The amount comes from whatever they typed.
     if (itemCount === 0 && rejected) {
-      var tipAmount = getTipAmount();
       var rejectDiv = document.createElement('div');
       rejectDiv.className = 'receipt-item';
 
@@ -2890,7 +3011,7 @@
       var rejectPriceField = document.createElement('input');
       rejectPriceField.type = 'tel';
       rejectPriceField.className = 'receipt-price-input';
-      rejectPriceField.value = formatWithComma(tipAmount);
+      rejectPriceField.value = formatWithComma(confirmedTipAmount);
       rejectPriceWrap.appendChild(rejectYen);
       rejectPriceWrap.appendChild(rejectPriceField);
 
@@ -3348,6 +3469,7 @@
   window.addEventListener('resize', scheduleEvaluation);
   window.addEventListener('orientationchange', function() {
     setTimeout(scheduleEvaluation, 120);
+    setTimeout(repositionHintGroup, 200);
   });
 
   scheduleEvaluation();
@@ -3375,6 +3497,10 @@
           ci.setAttribute('aria-checked', 'false');
         }
         rows[i].classList.remove('filled');
+      }
+      // Mirror the captured tip into the reject panel
+      if (rejectGiftAmountEl) {
+        rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
       }
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
       petalOverlay.classList.remove('active');
