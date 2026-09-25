@@ -46,7 +46,6 @@
   body.thankyou-active .stage,
   body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line,
-  body.thankyou-active .privacy-note-inline,
   body.thankyou-active .divider,
   body.thankyou-active .reject-row,
   body.thankyou-active .table-card,
@@ -475,7 +474,7 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Pinned swipe hint + dots group ---- */
+  /* ---- Pinned swipe hint ---- */
 
   .action-hint.global-hint {
     position: absolute;
@@ -495,9 +494,7 @@
     pointer-events: auto;
   }
 
-  /* Two stacked hint layers so the swap between "スワイプ →" and
-     "↓ 下へスクロールしてください" cross-fades smoothly instead of
-     snapping. The container stays put; the layers fade in/out. */
+  /* Two stacked hint layers, cross-fade between them. */
   .action-hint.global-hint .hint-layer {
     position: absolute;
     left: 0;
@@ -552,11 +549,7 @@
       0 2px 6px rgba(176, 74, 90, 0.25);
   }
 
-  /* ---- Tiny spacer between the stage and the transition line.
-         Reduced from 40vh to 2vh so the transition line sits
-         immediately below the dots. The fade-in is still visible
-         because the line's own opacity/transform transition plays
-         as it enters the viewport. ---- */
+  /* Small spacer between stage and transition line */
   .stage-spacer { height: 2vh; }
 
   /* ============ TRANSITION LINE ============ */
@@ -594,26 +587,6 @@
       filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
-  /* ============ PRIVACY NOTE (above the table) ============ */
-
-  .privacy-note-inline {
-    max-width: 560px;
-    margin: 8px auto 20px auto;
-    padding: 0 32px;
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-style: italic;
-    font-size: 15px;
-    font-weight: 400;
-    color: #1f1f1f;
-    letter-spacing: 0.4px;
-    line-height: 2.1;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-    opacity: 0; transform: translateY(20px);
-    transition: opacity 0.9s ease, transform 0.9s ease;
-  }
-  .privacy-note-inline.active { opacity: 1; transform: translateY(0); }
-
   /* ============ TABLE ============ */
 
   .divider {
@@ -639,6 +612,26 @@
     -webkit-backdrop-filter: blur(6px);
   }
   .table-card.active { opacity: 1; transform: translateY(0); }
+
+  /* Privacy note: now the header of the table card.
+     No <br>, flows naturally as one paragraph. */
+  .privacy-note-inline {
+    margin: 0;
+    padding: 16px 22px 18px 22px;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-style: italic;
+    font-size: 14px;
+    font-weight: 400;
+    color: #1f1f1f;
+    letter-spacing: 0.3px;
+    line-height: 1.9;
+    word-break: auto-phrase;
+    overflow-wrap: break-word;
+    line-break: strict;
+    border-bottom: 1px solid #f2ece9;
+    background: #fdf9f7;
+  }
 
   .row {
     display: flex; align-items: center; gap: 8px;
@@ -1514,8 +1507,8 @@
     .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px; }
-    .table-card, .reject-row, .divider, .privacy-note-inline { max-width: 560px; }
-    .table-card, .reject-row, .divider, .privacy-note-inline {
+    .table-card, .reject-row, .divider { max-width: 560px; }
+    .table-card, .reject-row, .divider {
       margin-left: auto;
       margin-right: auto;
     }
@@ -1528,7 +1521,7 @@
     .msg-4 { font-size: 18px; }
     .msg-emphasis { font-size: 18px; }
     .transition-line { font-size: 17px; max-width: 600px; }
-    .privacy-note-inline { font-size: 16px; }
+    .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
     .action-hint.global-hint { bottom: 148px; }
     .ty-line { font-size: 21px; }
@@ -1550,9 +1543,9 @@
   @media (min-width: 1100px) {
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px; }
-    .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .privacy-note-inline { max-width: 600px; }
+    .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
     .transition-line { font-size: 18px; max-width: 660px; }
-    .privacy-note-inline { font-size: 17px; }
+    .privacy-note-inline { font-size: 16px; }
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
     .quote-line { font-size: 40px; letter-spacing: 5px; }
@@ -1597,7 +1590,7 @@
     .ty-dots { gap: 12px; }
     .ty-dot { width: 9px; height: 9px; }
     .stage-spacer { height: 1.5vh; }
-    .privacy-note-inline { font-size: 14px; margin: 4px auto 14px auto; }
+    .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1622,7 +1615,7 @@
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
     .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
-    .privacy-note-inline { font-size: 13px; margin: 4px auto 12px auto; }
+    .privacy-note-inline { font-size: 12px; padding: 10px 16px 12px 16px; }
     .ty-panel { padding: 55px 40px 90px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
     .quote-line { font-size: 22px; letter-spacing: 3px; }
@@ -1821,18 +1814,13 @@
   ありがとうございます。
 </div>
 
-<!-- ============ PRIVACY NOTE (just above the table) ============ -->
-
-<div class="privacy-note-inline" id="privacyNote">
-  また、こちらでお選びいただいた内容やご提示いただいた料金などが、<br>
-  記録されたり、外部に送信されたりすることは一切ございません。<br>
-  あくまでも、その場でのやり取りを分かりやすくするためのものですので、<br>
-  どうぞご安心ください。
-</div>
-
 <div class="divider" id="divider"><span class="divider-text">❀</span></div>
 
 <div class="table-card" id="tableCard">
+  <div class="privacy-note-inline" id="privacyNote">
+    また、こちらでお選びいただいた内容やご提示いただいた料金などが、記録されたり、外部に送信されたりすることは一切ございません。あくまでも、その場でのやり取りを分かりやすくするためのものですので、どうぞご安心ください。
+  </div>
+
   <div id="dynamicRows"></div>
 
   <div class="row locked">
@@ -2210,7 +2198,6 @@
   var rejectThanks = document.getElementById('rejectThanks');
   var petalOverlay = document.getElementById('petalOverlay');
   var transitionLine = document.getElementById('transitionLine');
-  var privacyNote = document.getElementById('privacyNote');
 
   var globalHint = document.getElementById('globalHint');
   var globalHintLayerSwipe = document.getElementById('globalHintLayerSwipe');
@@ -2671,8 +2658,6 @@
     divider.classList.add('active');
     summaryBar.classList.remove('visible');
 
-    if (privacyNote) privacyNote.classList.remove('active');
-
     lineVisible = false;
     hasEverScrolled = false;
     tableEnteredView = false;
@@ -2950,7 +2935,6 @@
     tableCard.classList.remove('active');
     rejectRow.classList.remove('active');
     divider.classList.remove('active');
-    if (privacyNote) privacyNote.classList.remove('active');
     summaryBar.classList.remove('visible');
 
     setTimeout(function() {
@@ -3033,7 +3017,6 @@
       tableCard.classList.add('active');
       rejectRow.classList.add('active');
       divider.classList.add('active');
-      if (privacyNote) privacyNote.classList.add('active');
 
       setTimeout(function() {
         try {
@@ -3230,7 +3213,6 @@
       divider.classList.add('active');
       rejectRow.classList.add('active');
       tableCard.classList.add('active');
-      if (privacyNote) privacyNote.classList.add('active');
     }
   }
 
