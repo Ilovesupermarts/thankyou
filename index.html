@@ -472,7 +472,7 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Larger, more obvious dots ---- */
+  /* ---- Dots ---- */
 
   .dots {
     position: absolute; bottom: 40px; left: 0; right: 0;
@@ -2493,7 +2493,13 @@
     divider.classList.add('active');
     summaryBar.classList.add('visible');
 
-    if (transitionLine) transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
+    // Reset the transition-line state machine
+    lineState = 'hidden';
+    tableEnteredView = false;
+    lastScrollY = 0;
+    if (transitionLine) {
+      transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
+    }
     document.body.classList.remove('warm-background');
 
     recalc();
@@ -3007,28 +3013,39 @@
 
   /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 
+  /*
+    State machine:
+      'hidden'   – line is invisible, table not yet reached
+      'visible'  – line has faded in, user is reading it
+      'exiting'  – line is fading out (table reached top)
+      'gone'     – line is gone for good (until resetAll)
+
+    Rules:
+      - Fade IN when user first scrolls DOWN and the line enters view.
+      - Fade OUT only when the TABLE's top edge is near the top of the
+        viewport.
+      - Never fade back in once 'gone' — no flicker while scrolling up.
+  */
+  var lineState = 'hidden';
   var tableEnteredView = false;
   var lastScrollY = 0;
 
-  function fadeTransitionLineOut() {
-    transitionLine.classList.remove('active', 'returning', 'fading-up');
-    transitionLine.classList.add('fading');
-  }
-
-  function restoreTransitionLine() {
-    if (transitionLine.classList.contains('fading') ||
-        transitionLine.classList.contains('fading-up')) {
-      transitionLine.classList.remove('fading', 'fading-up', 'returning');
-      transitionLine.classList.add('returning');
-      void transitionLine.offsetWidth;
-      transitionLine.classList.add('active');
+  function getFadeOutTriggerPx() {
+    var h = window.innerHeight;
+    var w = window.innerWidth;
+    var isLandscape = w > h;
+    var px;
+    if (isLandscape) {
+      px = h * 0.12;   // ~216px on Tab S8 Ultra landscape
     } else {
-      transitionLine.classList.remove('fading', 'fading-up', 'returning');
-      transitionLine.classList.add('active');
+      px = h * 0.08;   // ~232px on Tab S8 Ultra portrait
     }
+    if (px < 130) px = 130;
+    if (px > 300) px = 300;
+    return px;
   }
 
-  function showTableSection() {
+  function revealTableSection() {
     if (!tableEnteredView) {
       tableEnteredView = true;
       document.body.classList.add('warm-background');
@@ -3039,53 +3056,47 @@
     summaryBar.classList.add('visible');
   }
 
-  function hideTableSection() {
+  function hideTableChrome() {
     summaryBar.classList.remove('visible');
   }
 
-  /*
-    Threshold logic tuned for the Samsung Galaxy Tab S8 Ultra (14.6"),
-    and safe on phones and smaller tablets.
-
-    Landscape (Tab S8 Ultra): viewport height ~1800px → trigger ~216px.
-    Portrait  (Tab S8 Ultra): viewport height ~2900px → trigger ~232px.
-    Phone landscape: viewport ~400px → clamped to 140px.
-    Phone portrait:  viewport ~800px → clamped to 140px.
-
-    In all cases the fade fires when the table card's TOP edge is
-    within roughly 140–320px of the top of the screen.
-  */
-  function getFadeTriggerPx() {
-    var h = window.innerHeight;
-    var w = window.innerWidth;
-    var isLandscape = w > h;
-
-    var px;
-    if (isLandscape) {
-      px = h * 0.12;
-      if (px < 140) px = 140;
-      if (px > 320) px = 320;
-    } else {
-      px = h * 0.08;
-      if (px < 140) px = 140;
-      if (px > 300) px = 300;
+  function showTransitionLine() {
+    if (lineState === 'hidden') {
+      lineState = 'visible';
+      transitionLine.classList.remove('fading', 'fading-up', 'returning');
+      transitionLine.classList.add('active');
     }
-    return px;
   }
 
-  function evaluateTransitionLine() {
+  function hideTransitionLine() {
+    if (lineState === 'visible') {
+      lineState = 'exiting';
+      transitionLine.classList.remove('active', 'returning', 'fading-up');
+      transitionLine.classList.add('fading');
+      setTimeout(function() {
+        if (lineState === 'exiting') lineState = 'gone';
+      }, 750);
+    }
+  }
+
+  function evaluateScrollState() {
     if (currentPanel !== totalPanels - 1) return;
+    if (lineState === 'gone' || lineState === 'exiting') return;
 
     var rect = tableCard.getBoundingClientRect();
-    var trigger = getFadeTriggerPx();
+    var trigger = getFadeOutTriggerPx();
 
     if (rect.top <= trigger) {
-      showTableSection();
-      fadeTransitionLineOut();
+      revealTableSection();
+      hideTransitionLine();
+      return;
+    }
+
+    if (rect.top < window.innerHeight - 40) {
+      revealTableSection();
+      showTransitionLine();
     } else {
-      hideTableSection();
-      document.body.classList.remove('warm-background');
-      restoreTransitionLine();
+      hideTableChrome();
     }
   }
 
@@ -3095,29 +3106,25 @@
     rafPending = true;
     requestAnimationFrame(function() {
       rafPending = false;
-      evaluateTransitionLine();
+      evaluateScrollState();
     });
   }
 
   window.addEventListener('scroll', function() {
     var y = window.pageYOffset || document.documentElement.scrollTop;
     var goingDown = y > lastScrollY + 1;
-    var goingUp   = y < lastScrollY - 1;
     lastScrollY = y;
 
     if (goingDown) {
-      var rect = tableCard.getBoundingClientRect();
-      if (rect.top < window.innerHeight - 20) {
-        showTableSection();
-        fadeTransitionLineOut();
-        return;
+      if (currentPanel === totalPanels - 1 && lineState === 'hidden' && y > 20) {
+        var rect = tableCard.getBoundingClientRect();
+        if (rect.top < window.innerHeight + 200) {
+          showTransitionLine();
+        }
       }
     }
-    if (goingUp) {
-      scheduleEvaluation();
-    } else {
-      scheduleEvaluation();
-    }
+
+    scheduleEvaluation();
   }, { passive: true });
 
   window.addEventListener('resize', scheduleEvaluation);
