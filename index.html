@@ -429,6 +429,14 @@
       transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94),
       filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transition-delay: 0.25s;
+    /* Universal panel text styling */
+    font-size: 18px;
+    font-weight: 500;
+    color: #1f1f1f;
+    line-height: 2.2;
+    letter-spacing: 0.4px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .panel.leaving .panel-content {
@@ -437,13 +445,17 @@
     transition-delay: 0s;
   }
 
-  .greeting {
-    font-size: 20px; font-weight: 500; color: #1f1f1f;
-    line-height: 2.3; letter-spacing: 0.5px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  /* Tight paragraph spacing for injected panel content */
+  .panel-content p {
+    margin: 0 0 0.4em 0;
+    padding: 0;
   }
-  .greeting .therapist-name {
+  .panel-content p:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Therapist name (hardcoded in panel 1) */
+  .panel-content .therapist-name {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-weight: 500;
     font-size: 1.18em;
@@ -453,54 +465,31 @@
     text-shadow: 0 1px 8px rgba(232, 180, 188, 0.45);
     padding: 0 2px;
   }
-  .greeting .sender-name {
+  /* Sender name italic in panel 1 (from external file, no span now,
+     but kept for the intro fallback line if needed) */
+  .panel-content .sender-name {
     font-style: italic;
   }
 
-  .msg-1 { font-size: 19px; font-weight: 500; color: #1f1f1f; line-height: 2.2; letter-spacing: 0.4px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  .msg-2 { font-size: 18px; font-weight: 500; color: #1f1f1f; line-height: 2.2; letter-spacing: 0.4px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  .msg-3 {
-    font-size: 17px; font-weight: 500; color: #3a3633;
-    line-height: 2.2; padding: 30px 26px;
+  /* Panel 5 red paragraphs */
+  .panel-content .panel-5-red {
+    color: #b04a5a;
+  }
+
+  /* Panel 5 boxed card */
+  .panel-content .msg-3 {
+    padding: 24px 22px;
     background: rgba(255, 255, 255, 0.92);
     border-radius: 20px;
     border: 1.5px solid #ead9d5;
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-    letter-spacing: 0.3px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
-  .msg-3 .accent { color: #b04a5a; font-weight: 700; font-size: 18px; }
-  .msg-4 { font-size: 17px; font-weight: 500; color: #1f1f1f; line-height: 2.2; letter-spacing: 0.3px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  .msg-emphasis {
-    margin-top: 26px; padding-top: 22px;
-    border-top: 1px solid #ead9d5;
-    font-size: 17px; font-weight: 700; color: #b04a5a;
-    line-height: 2.1; letter-spacing: 0.4px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-  }
 
-  /* Panel 5 wrapper classes */
-  .panel-5-red {
-    color: #b04a5a;
-    font-weight: 500;
-    font-size: 17px;
-    line-height: 2.2;
-    letter-spacing: 0.3px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-  }
-  .panel-5-gap {
-    height: 22px;
+  /* Small gap above/below the box on panel 5 */
+  .panel-content .panel-5-gap {
+    height: 18px;
   }
 
   .action-hint {
@@ -882,7 +871,6 @@
     text-align: center;
   }
 
-  /* Read-only display of the captured tip amount on the reject panel */
   .reject-gift-amount {
     display: inline-block;
     font-size: 18px;
@@ -1570,13 +1558,7 @@
     }
     .panel-inner { max-width: 480px; }
     .panel { padding: 80px 32px 260px 32px; }
-    .greeting { font-size: 22px; }
-    .msg-1 { font-size: 21px; }
-    .msg-2 { font-size: 20px; }
-    .msg-3 { font-size: 18px; padding: 36px 32px; }
-    .msg-4 { font-size: 18px; }
-    .msg-emphasis { font-size: 18px; }
-    .panel-5-red { font-size: 18px; }
+    .panel-content { font-size: 20px; }
     .transition-line { font-size: 17px; max-width: 600px; }
     .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
@@ -1606,6 +1588,7 @@
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
+    .panel-content { font-size: 22px; }
     .transition-line { font-size: 18px; max-width: 660px; }
     .privacy-note-inline { font-size: 16px; }
     .ty-line { font-size: 24px; }
@@ -1633,6 +1616,7 @@
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
     .panel { padding: 65px 20px 220px 20px; }
+    .panel-content { font-size: 17px; line-height: 2; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
     .ty-mark { font-size: 18px; margin-bottom: 20px; }
@@ -1673,13 +1657,7 @@
     .blossom-screen { padding: 48px 24px 20px 24px; }
     .panel { padding: 55px 40px 180px 40px; }
     .panel-inner { max-width: 560px; }
-    .greeting { font-size: 19px; line-height: 2; }
-    .msg-1 { font-size: 18px; line-height: 2; }
-    .msg-2 { font-size: 17px; line-height: 2; }
-    .msg-3 { font-size: 16px; padding: 24px 26px; line-height: 2; }
-    .msg-4 { font-size: 16px; line-height: 2; }
-    .msg-emphasis { font-size: 16px; margin-top: 18px; padding-top: 16px; }
-    .panel-5-red { font-size: 16px; }
+    .panel-content { font-size: 16px; line-height: 2; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
     .dots { bottom: 66px; }
@@ -1801,10 +1779,8 @@
     <div class="panel" data-panel="0">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="greeting">
-            <span id="therapistName" class="therapist-name">桜庭</span>さん、初めまして。<br><br>
-            <span id="panel1Body"></span>
-          </div>
+          <span id="therapistName" class="therapist-name">桜庭</span>さん、初めまして。
+          <div id="panel1Body"></div>
         </div>
       </div>
     </div>
@@ -1813,7 +1789,7 @@
     <div class="panel" data-panel="1">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-1"><span id="panel2Body"></span></div>
+          <div id="panel2Body"></div>
         </div>
       </div>
     </div>
@@ -1822,7 +1798,7 @@
     <div class="panel" data-panel="2">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-2"><span id="panel3Body"></span></div>
+          <div id="panel3Body"></div>
         </div>
       </div>
     </div>
@@ -1831,7 +1807,7 @@
     <div class="panel" data-panel="3">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="msg-4"><span id="panel4Body"></span></div>
+          <div id="panel4Body"></div>
         </div>
       </div>
     </div>
@@ -1840,11 +1816,9 @@
     <div class="panel" data-panel="4">
       <div class="panel-inner">
         <div class="panel-content">
-          <div class="panel-5-red">もちろん、ご不安なものやご対応が難しいものについては、</div>
-          <div class="panel-5-gap"></div>
-          <div class="msg-3">無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。</div>
-          <div class="panel-5-gap"></div>
-          <div class="panel-5-red">すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</div>
+          <p class="panel-5-red">もちろん、ご不安なものやご対応が難しいものについては、</p>
+          <p class="msg-3">無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。</p>
+          <p class="panel-5-red">すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
         </div>
       </div>
     </div>
@@ -2240,19 +2214,16 @@
 
   /* ============ PANEL LOADER (panels 1-4) ============ */
   /* Each file is plain text with blank-line paragraphing.
-     Single newline  → <br>
-     Blank line      → <br><br>
+     Single newline  → <br> (within a paragraph)
+     Blank line      → new <p> element
      Leading/trailing whitespace trimmed.
      No fallback — if a fetch fails, the anchor stays empty. */
 
   function convertPanelText(raw) {
     if (!raw) return '';
-    // Normalise line endings
     var text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    // Trim leading/trailing blank lines and spaces
     text = text.replace(/^\s+|\s+$/g, '');
     if (text === '') return '';
-    // Split into paragraphs on blank lines
     var paragraphs = text.split(/\n{2,}/);
     var out = [];
     for (var i = 0; i < paragraphs.length; i++) {
@@ -2262,9 +2233,9 @@
       para = para.split('\n').map(function(line) {
         return line.trim();
       }).join('<br>');
-      out.push(para);
+      out.push('<p>' + para + '</p>');
     }
-    return out.join('<br><br>');
+    return out.join('');
   }
 
   function loadPanelInto(anchorId, url) {
@@ -2325,7 +2296,6 @@
   var rejected = false;
 
   // The tip amount captured at 決定 time on the first screen.
-  // Fixed for the session, restored on reset.
   var confirmedTipAmount = 1500;
 
   var stageWidth = window.innerWidth;
@@ -2387,8 +2357,6 @@
   });
 
   /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
-  /* The swipe hint + dots sit 20px below the tallest panel content.
-     Re-measured on load, resize, orientationchange, and after intro. */
 
   function repositionHintGroup() {
     if (!panels.length) return;
@@ -2401,16 +2369,12 @@
     }
     if (maxBottom <= 0) return;
 
-    // Distance from bottom of viewport to bottom of tallest content
     var vh = window.innerHeight;
     var distanceFromBottom = vh - maxBottom;
 
-    // Hint sits 20px below the tallest content
     var hintBottom = distanceFromBottom - 20;
-    // Dots sit a further 38px below the hint
     var dotsBottom = distanceFromBottom - 20 - 38;
 
-    // Guard against negative values (content taller than viewport)
     if (hintBottom < 40) hintBottom = 40;
     if (dotsBottom < 10) dotsBottom = 10;
 
@@ -2488,7 +2452,6 @@
     }
 
     updateGlobalHint();
-    // Panel content may have just changed height; re-measure
     setTimeout(repositionHintGroup, 30);
 
     if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
@@ -2615,7 +2578,6 @@
     if (!input.classList.contains('price-input')) return;
     if (rejected) return;
     if (input.disabled) return;
-    // Live commas for service price fields
     var digits = input.value.replace(/[^0-9]/g, '');
     if (digits.length > 5) digits = digits.slice(0, 5);
     if (digits === '') {
@@ -2721,7 +2683,6 @@
     nameConfirmed = true;
     therapistNameEl.textContent = entered;
 
-    // Capture the tip amount for the session.
     confirmedTipAmount = parseFormatted(tipInput ? tipInput.value : '') || 0;
     if (rejectGiftAmountEl) {
       rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
@@ -2803,8 +2764,6 @@
       presetInputs[p].value = PRESET_TEXTS[pidx] || '';
     }
 
-    // Tip reverts to the captured value; the reject panel mirror
-    // and the summary total both follow.
     if (rejectGiftAmountEl) {
       rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
     }
@@ -2863,7 +2822,6 @@
 
     loadQuotesFromServer();
 
-    // Load the four external panel bodies. No fallback.
     loadAllPanels().then(function() {
       repositionHintGroup();
     });
@@ -2926,7 +2884,6 @@
 
         setTimeout(function() {
           introOverlay.classList.remove('active', 'finishing');
-          // Fonts may have shifted; re-measure
           repositionHintGroup();
         }, 1400);
       }, arrivalTime + holdTime);
@@ -3498,7 +3455,6 @@
         }
         rows[i].classList.remove('filled');
       }
-      // Mirror the captured tip into the reject panel
       if (rejectGiftAmountEl) {
         rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
       }
