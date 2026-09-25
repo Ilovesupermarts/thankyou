@@ -78,7 +78,7 @@
     --shadow-rose-2: rgba(120, 90, 90, 0.16);
     --shadow-accent: rgba(176, 74, 90, 0.25);
 
-    /* Ambient background gradient stops */
+    /* Ambient background gradient stops (default pink) */
     --amb-1: rgba(251, 200, 210, 0.70);
     --amb-2: rgba(247, 210, 195, 0.65);
     --amb-3: rgba(232, 160, 175, 0.45);
@@ -86,61 +86,63 @@
   }
 
   html[data-theme="autumn"] {
-    --bg-base: #faf3e8;
-    --bg-warm: #f2e0c8;
-    --bg-morning: #fdf0d8;
-    --bg-day: #faf3e8;
-    --bg-evening: #f3dcc0;
-    --bg-night: #e8d5b8;
-    --bg-warm-morning: #fbe8cc;
-    --bg-warm-day: #f2e0c8;
-    --bg-warm-evening: #ecd4b0;
-    --bg-warm-night: #e0c8a4;
-    --bg-rain: #e8d8c4;
-    --bg-rain-warm: #ecd8bc;
-    --bg-storm: #dcc8b0;
-    --bg-storm-warm: #e0ccb4;
-    --bg-fog: #efe3d0;
-    --bg-clouds: #f2e8d8;
-    --bg-snow: #f0e8dc;
-    --bg-clear: #fdf4e0;
-    --bg-evening-rain: #e8d0ac;
-    --bg-night-rain: #dcc4a0;
+    --bg-base: #fdf3d8;
+    --bg-warm: #f5d89a;
+    --bg-morning: #fdf0c4;
+    --bg-day: #fdf3d8;
+    --bg-evening: #f5d89a;
+    --bg-night: #e8c078;
+    --bg-warm-morning: #fbe8b0;
+    --bg-warm-day: #f5d89a;
+    --bg-warm-evening: #eac880;
+    --bg-warm-night: #d8b068;
+    --bg-rain: #e8d0a0;
+    --bg-rain-warm: #e0c88a;
+    --bg-storm: #d0b078;
+    --bg-storm-warm: #d8b880;
+    --bg-fog: #efe0b8;
+    --bg-clouds: #f0e0b0;
+    --bg-snow: #f0e8cc;
+    --bg-clear: #fdeeb8;
+    --bg-evening-rain: #d8b880;
+    --bg-night-rain: #c8a860;
 
-    --accent: #a85520;
-    --accent-2: #8f4719;
-    --accent-3: #7a3d15;
-    --glow: #e8c68a;
-    --petal: #e0a850;
-    --petal-soft: #fbe8c0;
+    --accent: #c9600a;
+    --accent-2: #8f3f12;
+    --accent-3: #7a3208;
+    --glow: #f7b93c;
+    --petal: #e88a1a;
+    --petal-soft: #fde8b8;
 
-    --border-1: #e8d5b8;
-    --border-2: #dcc9a4;
-    --border-3: #e8d5b0;
-    --border-4: #f0e0c4;
-    --border-5: #e0c8a0;
-    --border-6: #b8a482;
+    --border-1: #e8c88a;
+    --border-2: #d8b478;
+    --border-3: #f0d8a0;
+    --border-4: #f5e0b0;
+    --border-5: #e8c890;
+    --border-6: #b89860;
 
-    --soft-1: #fbf1dd;
-    --soft-2: #fdf0d8;
-    --soft-3: #f0e4c8;
-    --soft-4: #fdf6e8;
+    --soft-1: #fdf0c8;
+    --soft-2: #fdf5e0;
+    --soft-3: #f0e0b8;
+    --soft-4: #fdf6e0;
 
-    --text-dark: #2a1a0e;
-    --text-med: #4a3520;
-    --text-soft: #3a2814;
-    --text-mute: #8a7050;
-    --text-faint: #b8a080;
-    --text-placeholder: #d4c0a0;
+    --text-dark: #2e1a08;
+    --text-med: #5a3a1a;
+    --text-soft: #3a2410;
+    --text-mute: #8a6030;
+    --text-faint: #c0a070;
+    --text-placeholder: #d8c090;
 
-    --shadow-rose: rgba(120, 80, 40, 0.10);
-    --shadow-rose-2: rgba(120, 80, 40, 0.18);
-    --shadow-accent: rgba(168, 85, 32, 0.30);
+    --shadow-rose: rgba(120, 70, 20, 0.10);
+    --shadow-rose-2: rgba(120, 70, 20, 0.18);
+    --shadow-accent: rgba(201, 96, 10, 0.32);
 
-    --amb-1: rgba(240, 198, 140, 0.75);
-    --amb-2: rgba(226, 165, 106, 0.70);
-    --amb-3: rgba(200, 128, 84, 0.55);
-    --amb-4: rgba(138, 82, 56, 0.45);
+    /* Autumn palette — saturated orange/yellow/brown */
+    --amb-1: rgba(247, 185, 60, 0.85);   /* golden yellow */
+    --amb-2: rgba(240, 138, 30, 0.80);   /* warm orange */
+    --amb-3: rgba(217, 94, 26, 0.72);    /* deep orange */
+    --amb-4: rgba(143, 63, 18, 0.55);    /* rich brown */
+    --amb-5: rgba(107, 47, 14, 0.45);    /* dark brown */
   }
 
   /* ============ BASE ============ */
@@ -154,7 +156,7 @@
     font-size: 17px; line-height: 1.7;
     min-height: 100vh;
     overscroll-behavior-y: contain;
-    transition: background-color 2s ease, color 1s ease;
+    transition: background-color 1.2s ease, color 0.8s ease;
   }
 
   body { padding-bottom: 100px; background-color: var(--bg-base); }
@@ -183,7 +185,7 @@
     left: -25%;
     width: 150%;
     height: 150%;
-    z-index: -1;
+    z-index: -2;
     pointer-events: none;
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
@@ -192,6 +194,34 @@
       radial-gradient(circle at 15% 70%, var(--amb-4) 0%, transparent 42%);
     animation: ambientDrift 32s ease-in-out infinite;
     transition: filter 2s ease;
+    will-change: transform, filter;
+  }
+
+  /* Autumn: five independent drifting layers for a random, non-repeating feel */
+  html[data-theme="autumn"] body::before {
+    background:
+      radial-gradient(circle at 25% 30%, var(--amb-1) 0%, transparent 45%),
+      radial-gradient(circle at 75% 40%, var(--amb-2) 0%, transparent 48%),
+      radial-gradient(circle at 50% 70%, var(--amb-3) 0%, transparent 42%),
+      radial-gradient(circle at 20% 85%, var(--amb-4) 0%, transparent 40%),
+      radial-gradient(circle at 80% 90%, var(--amb-5) 0%, transparent 38%);
+    animation: autumnDrift1 14s ease-in-out infinite;
+  }
+  html[data-theme="autumn"] body::after {
+    content: '';
+    position: fixed;
+    top: -25%;
+    left: -25%;
+    width: 150%;
+    height: 150%;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(circle at 60% 20%, var(--amb-2) 0%, transparent 40%),
+      radial-gradient(circle at 40% 90%, var(--amb-3) 0%, transparent 45%);
+    animation: autumnDrift2 19s ease-in-out infinite;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
     will-change: transform, filter;
   }
 
@@ -225,7 +255,30 @@
     85% { transform: translate(-2%, -2%) scale(1.1); }
   }
 
-  /* ============ GLOBAL INFO BAR ============ */
+  /* Autumn drift — two-layer approach with irregular waypoints */
+  @keyframes autumnDrift1 {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
+    23%  { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
+    35%  { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
+    48%  { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
+    60%  { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
+    72%  { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
+    85%  { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+  @keyframes autumnDrift2 {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    13%  { transform: translate(-5%, 4%) scale(1.15) rotate(-2deg); }
+    27%  { transform: translate(4%, -6%) scale(0.92) rotate(3deg); }
+    41%  { transform: translate(-2%, 3%) scale(1.18) rotate(1deg); }
+    55%  { transform: translate(6%, -2%) scale(1.05) rotate(-3deg); }
+    68%  { transform: translate(-4%, 5%) scale(0.95) rotate(2deg); }
+    82%  { transform: translate(3%, -4%) scale(1.12) rotate(-1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* ============ GLOBAL INFO BAR + TICKER ============ */
 
   .info-bar {
     position: fixed; top: 0; left: 0; right: 0;
@@ -242,11 +295,24 @@
     text-shadow:
       0 1px 3px rgba(250, 247, 245, 0.95),
       0 0 10px rgba(250, 247, 245, 0.8);
+    display: none;
   }
   .info-bar.shown { opacity: 1; transform: translateY(0); }
   .info-bar.hidden {
     opacity: 0; transform: translateY(-14px);
     transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  body.info-visible .info-bar {
+    display: block;
+  }
+  body.info-visible .info-bar.shown {
+    opacity: 1;
+  }
+
+  .info-inner {
+    display: inline-block;
+    max-width: 100%;
+    text-align: center;
   }
 
   .info-line {
@@ -263,18 +329,18 @@
   .info-line .temp { color: var(--accent); font-weight: 600; }
   .info-line .weather { color: var(--text-mute); }
 
-  /* ============ WEATHER TICKER ============ */
+  /* ---- Weather ticker ---- */
 
   .ticker-wrap {
-    max-width: 100%;
+    width: 100%;
     margin: 8px auto 0 auto;
     overflow: hidden;
     white-space: nowrap;
     position: relative;
     opacity: 0;
     transition: opacity 1.4s ease;
-    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
-    mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
   }
   .ticker-wrap.shown { opacity: 0.85; }
 
@@ -292,7 +358,6 @@
   .ticker-track .tick-city { color: var(--accent); font-weight: 600; }
   .ticker-track .tick-sep { color: #d8ccc8; margin: 0 10px; font-weight: 400; }
   .ticker-track .tick-temp { color: var(--accent); font-weight: 600; }
-  .ticker-track .tick-hr { color: var(--text-mute); }
 
   @keyframes tickerScroll {
     from { transform: translateX(0); }
@@ -357,12 +422,6 @@
     transform: scale(0.92);
     background: rgba(255, 255, 255, 1);
     border-color: var(--accent);
-  }
-
-  /* On narrow mobile screens, push the info-bar down so the toggle
-     at top-left doesn't collide with the centered info text. */
-  @media (max-width: 500px) {
-    .info-bar { padding-top: 62px; }
   }
 
   /* ============ NAME ENTRY ============ */
@@ -438,7 +497,6 @@
   .preset-undo, .tip-plus { color: var(--text-mute); font-size: 16px; }
   .preset-undo:active, .tip-plus:active { background: var(--soft-3); border-color: var(--border-6); color: var(--text-med); }
 
-  /* Long-press suppression for the tip +/- buttons only */
   .tip-minus, .tip-plus {
     -webkit-touch-callout: none;
     -webkit-user-select: none;
@@ -569,7 +627,7 @@
     transition: opacity 0.8s ease;
   }
   html[data-theme="autumn"] .intro-overlay {
-    background: rgba(250, 243, 232, 0.88);
+    background: rgba(253, 243, 216, 0.88);
   }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
@@ -771,7 +829,7 @@
   }
   html[data-theme="autumn"] .dot.active {
     box-shadow:
-      0 0 0 5px rgba(168, 85, 32, 0.16),
+      0 0 0 5px rgba(201, 96, 10, 0.18),
       0 2px 6px var(--shadow-accent);
   }
 
@@ -975,12 +1033,12 @@
     -webkit-backdrop-filter: blur(4px);
   }
   html[data-theme="autumn"] .reject-row {
-    background: rgba(240, 228, 200, 0.94);
+    background: rgba(240, 224, 184, 0.94);
   }
   .reject-row.active { opacity: 1; transform: translateY(0); }
   .reject-row:active { transform: scale(0.99); }
   .reject-row.selected { background: rgba(253, 243, 242, 0.96); border: 1.5px solid var(--accent); }
-  html[data-theme="autumn"] .reject-row.selected { background: rgba(251, 241, 221, 0.96); }
+  html[data-theme="autumn"] .reject-row.selected { background: rgba(253, 240, 200, 0.96); }
 
   .reject-box {
     flex-shrink: 0; width: 26px; height: 26px;
@@ -1202,7 +1260,7 @@
     transition: opacity 0.5s ease;
   }
   html[data-theme="autumn"] .confirm-screen {
-    background: rgba(250, 243, 232, 0.92);
+    background: rgba(253, 243, 216, 0.92);
   }
   .confirm-screen.visible { opacity: 1; pointer-events: auto; }
   .confirm-card {
@@ -1287,7 +1345,7 @@
     transition: opacity 0.9s ease;
   }
   html[data-theme="autumn"] .receipt-screen {
-    background: rgba(250, 243, 232, 0.94);
+    background: rgba(253, 243, 216, 0.94);
   }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
   .receipt-screen.reopened { z-index: 380; }
@@ -1645,7 +1703,7 @@
   }
   html[data-theme="autumn"] .ty-dot.active {
     box-shadow:
-      0 0 0 5px rgba(168, 85, 32, 0.16),
+      0 0 0 5px rgba(201, 96, 10, 0.18),
       0 2px 6px var(--shadow-accent);
   }
 
@@ -1905,19 +1963,21 @@
 <!-- ============ GLOBAL INFO BAR + TICKER ============ -->
 
 <div class="info-bar" id="infoBar">
-  <div class="info-line" id="infoLine">
-    <span class="city" id="infoCity">名古屋市</span>
-    <span class="sep">·</span>
-    <span class="date" id="infoDate">—月—日(—)</span>
-    <span class="sep">·</span>
-    <span class="time" id="infoTime">—時—分</span>
-    <span class="sep">·</span>
-    <span class="temp" id="infoTemp">—°</span>
-    <span class="sep">·</span>
-    <span class="weather" id="infoWeather">—</span>
-  </div>
-  <div class="ticker-wrap" id="tickerWrap">
-    <div class="ticker-track" id="tickerTrack"></div>
+  <div class="info-inner">
+    <div class="info-line" id="infoLine">
+      <span class="city" id="infoCity">名古屋市</span>
+      <span class="sep">·</span>
+      <span class="date" id="infoDate">—月—日(—)</span>
+      <span class="sep">·</span>
+      <span class="time" id="infoTime">—時—分</span>
+      <span class="sep">·</span>
+      <span class="temp" id="infoTemp">—°</span>
+      <span class="sep">·</span>
+      <span class="weather" id="infoWeather">—</span>
+    </div>
+    <div class="ticker-wrap" id="tickerWrap">
+      <div class="ticker-track" id="tickerTrack"></div>
+    </div>
   </div>
 </div>
 
@@ -3202,6 +3262,10 @@
     introHasRun = true;
     haptic(12);
 
+    // Info bar becomes visible at this moment (option B)
+    document.body.classList.add('info-visible');
+    if (infoBar) infoBar.classList.add('shown');
+
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
 
@@ -3916,17 +3980,6 @@
     return 'clear';
   }
 
-  function weatherLabelJP(bucket) {
-    if (bucket === 'clear') return '晴れ';
-    if (bucket === 'clouds') return '曇り';
-    if (bucket === 'fog') return '霧';
-    if (bucket === 'drizzle') return '小雨';
-    if (bucket === 'rain') return '雨';
-    if (bucket === 'snow') return '雪';
-    if (bucket === 'thunderstorm') return '雷雨';
-    return '—';
-  }
-
   function weatherEmoji(bucket) {
     if (bucket === 'clear') return '☀';
     if (bucket === 'clouds') return '☁';
@@ -4010,13 +4063,8 @@
            '&longitude=' + lons +
            '&hourly=temperature_2m,weather_code' +
            '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
-           '&current_weather=false' +
            '&timezone=Asia%2FTokyo' +
            '&forecast_days=2';
-  }
-
-  function buildTickerSegment(inner) {
-    return inner;
   }
 
   function formatTemp(t) {
@@ -4028,22 +4076,15 @@
     if (!hourly || !hourly.time || !hourly.temperature_2m) return [];
     var times = hourly.time;
     var temps = hourly.temperature_2m;
-    var codes = hourly.weather_code || [];
     var out = [];
     for (var i = 0; i < times.length && out.length < 3; i++) {
       var h = parseInt(times[i].slice(11, 13), 10);
-      var d = times[i].slice(0, 10);
-      // We want the next 3 hours from now — but the API's first day includes
-      // past hours already. We look for the first index where the hour is
-      // >= nowHour and the date is today, then take that and the two after.
-      // The API response is ordered, so simply find the first match.
-      // Since we requested only 2 days, indices are safe.
       if (out.length === 0) {
         if (h >= nowHour) {
-          out.push({ h: h, t: temps[i], code: codes[i] });
+          out.push({ h: h, t: temps[i] });
         }
-      } else if (out.length < 3) {
-        out.push({ h: h, t: temps[i], code: codes[i] });
+      } else {
+        out.push({ h: h, t: temps[i] });
       }
     }
     return out;
@@ -4063,7 +4104,6 @@
     if (!responses || responses.length === 0) return '';
     var parts = [];
 
-    // Nagoya: hourly (next 3 hours) + tomorrow
     var nagoyaData = responses[0];
     if (nagoyaData) {
       var nowP = nagoyaDateParts();
@@ -4072,45 +4112,23 @@
         var hours = next3.map(function(x) { return formatTemp(x.t); }).join(' → ');
         parts.push('名古屋 3時間 ' + hours);
       }
-      var nagTomorrow = getTomorrowDaily(nagoyaData.daily);
-      if (nagTomorrow) {
-        var em = weatherEmoji(weatherBucket(nagTomorrow.code));
-        parts.push('名古屋 明日 ' + em + ' ' + formatTemp(nagTomorrow.high) + '/' + formatTemp(nagTomorrow.low));
-      }
     }
 
-    // Other 6 cities: tomorrow only
-    for (var i = 1; i < responses.length && i < TICKER_CITIES.length; i++) {
+    // Tomorrow group
+    var tomorrowParts = [];
+    for (var i = 0; i < responses.length && i < TICKER_CITIES.length; i++) {
       var data = responses[i];
       if (!data) continue;
       var t = getTomorrowDaily(data.daily);
       if (!t) continue;
       var e = weatherEmoji(weatherBucket(t.code));
-      var city = TICKER_CITIES[i].name;
-      parts.push(city + ' 明日 ' + e + ' ' + formatTemp(t.high) + '/' + formatTemp(t.low));
+      tomorrowParts.push(TICKER_CITIES[i].name + ' ' + e + ' ' + formatTemp(t.high) + '/' + formatTemp(t.low));
+    }
+    if (tomorrowParts.length > 0) {
+      parts.push('明日: ' + tomorrowParts.join(' ・ '));
     }
 
     return parts.join(' ・ ');
-  }
-
-  function renderTicker(text) {
-    if (!tickerTrack || !tickerWrap) return;
-    if (!text || text === '') {
-      tickerWrap.classList.remove('shown');
-      tickerTrack.textContent = '';
-      return;
-    }
-    // Duplicate the text so the marquee loops seamlessly.
-    // Each half is one span with the same content, separated by a
-    // trailing separator so the wrap looks natural.
-    var sep = ' ・ ';
-    var half = text + sep;
-    // Build the visible half with inner spans for coloured city names.
-    // Simplest approach: use plain text — the CSS already gives the ticker
-    // a muted colour and the whole thing reads cleanly.
-    var html = '<span>' + escapeHtml(half) + '</span><span>' + escapeHtml(half) + '</span>';
-    tickerTrack.innerHTML = html;
-    tickerWrap.classList.add('shown');
   }
 
   function escapeHtml(s) {
@@ -4120,12 +4138,25 @@
       .replace(/>/g, '&gt;');
   }
 
+  function renderTicker(text) {
+    if (!tickerTrack || !tickerWrap) return;
+    if (!text || text === '') {
+      tickerWrap.classList.remove('shown');
+      tickerTrack.textContent = '';
+      return;
+    }
+    var sep = ' ・ ';
+    var half = text + sep;
+    var html = '<span>' + escapeHtml(half) + '</span><span>' + escapeHtml(half) + '</span>';
+    tickerTrack.innerHTML = html;
+    tickerWrap.classList.add('shown');
+  }
+
   function fetchTickerData() {
     var url = buildTickerUrl();
     return fetch(url)
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        // If multiple coordinates are requested, the API returns an array.
         var responses;
         if (Array.isArray(data)) {
           responses = data;
@@ -4134,7 +4165,6 @@
         }
         var text = buildTickerText(responses);
         renderTicker(text);
-        // Reset animation so the loop restarts cleanly
         if (tickerTrack) {
           tickerTrack.style.animation = 'none';
           void tickerTrack.offsetWidth;
@@ -4153,7 +4183,6 @@
     updateInfoDateTime();
     fetchNagoyaWeather();
     fetchTickerData();
-    infoBar.classList.add('shown');
     if (clockInterval) clearInterval(clockInterval);
     clockInterval = setInterval(updateInfoDateTime, 30000);
     if (weatherInterval) clearInterval(weatherInterval);
