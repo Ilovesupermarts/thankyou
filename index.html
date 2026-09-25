@@ -663,6 +663,9 @@
   .intro-overlay.finishing .name-char { opacity: 0; transform: translateY(20px); filter: blur(3px); }
   .intro-overlay.finishing { opacity: 0; transition: opacity 0.9s ease; }
 
+  @media (max-height: 800px) { .name-char { font-size: 96px; } .name-column { gap: 14px; } }
+  @media (max-height: 600px) { .name-char { font-size: 68px; } .name-column { gap: 8px; } }
+
   /* ============ MAIN CAROUSEL ============ */
 
   .stage {
@@ -1255,6 +1258,13 @@
     transform: translateX(3px);
   }
 
+  @media (max-width: 380px) {
+    .summary-inner { gap: 6px; padding: 0 2px; }
+    .summary-total { font-size: 19px; }
+    .reset, .submit-btn { padding: 9px 11px; font-size: 11.5px; letter-spacing: 0; }
+    .submit-btn { gap: 3px; }
+  }
+
   /* ============ CONFIRM DIALOG ============ */
 
   .confirm-screen {
@@ -1328,6 +1338,11 @@
     box-shadow: 0 4px 14px var(--shadow-accent);
   }
   .confirm-yes:active { background: var(--accent-3); }
+
+  @media (min-width: 700px) {
+    .confirm-btn { font-size: 14.5px; padding: 15px 12px; }
+    .confirm-card { max-width: 420px; }
+  }
 
   /* ============ RECEIPT ============ */
 
@@ -1519,6 +1534,61 @@
   .receipt-footer { text-align: center; margin-top: 22px; }
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
+  @media (min-width: 700px) {
+    .receipt-paper { max-width: 480px; padding: 42px 42px 34px 42px; }
+    .receipt-thanks { font-size: 22px; letter-spacing: 2px; margin-bottom: 18px; }
+    .receipt-subthanks { font-size: 15px; letter-spacing: 1px; }
+    .receipt-to-row { gap: 16px; padding: 22px 8px 12px 8px; }
+    .receipt-to-mark { font-size: 15px; }
+    .receipt-to-name { font-size: 22px; letter-spacing: 3px; }
+    .receipt-title { font-size: 14px; letter-spacing: 9px; margin-bottom: 24px; }
+    .receipt-item-name { font-size: 16px; }
+    .receipt-price-input { font-size: 16px; width: 68px; }
+    .receipt-item-price-wrap { font-size: 16px; padding: 5px 10px; }
+    .receipt-item-price-wrap .yen-symbol { font-size: 12px; }
+    .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
+    .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
+    .receipt-total-value { font-size: 22px; }
+    .receipt-total-value .yen-symbol { font-size: 15px; }
+    .receipt-closing-line { font-size: 15px; margin-top: 26px; }
+    .receipt-back-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
+    .receipt-item-remove { width: 28px; height: 28px; font-size: 18px; }
+    .receipt-footer-mark { font-size: 14px; letter-spacing: 12px; }
+    .receipt-divider { margin: 26px 0; }
+  }
+  @media (min-width: 1100px) {
+    .receipt-paper { max-width: 540px; padding: 48px 48px 38px 48px; }
+    .receipt-thanks { font-size: 26px; }
+    .receipt-subthanks { font-size: 16px; }
+    .receipt-to-name { font-size: 26px; letter-spacing: 3px; }
+    .receipt-to-mark { font-size: 16px; }
+    .receipt-title { font-size: 15px; letter-spacing: 11px; }
+    .receipt-item-name { font-size: 17px; }
+    .receipt-price-input { font-size: 17px; width: 76px; }
+    .receipt-item-price-wrap { font-size: 17px; padding: 6px 12px; }
+    .receipt-total-label { font-size: 26px; }
+    .receipt-total-value { font-size: 26px; }
+    .receipt-total-value .yen-symbol { font-size: 17px; }
+    .receipt-back-btn { font-size: 15px; padding: 14px 28px; max-width: 340px; }
+  }
+  @media (max-height: 700px) {
+    .receipt-paper { padding: 28px 24px 22px 24px; }
+    .receipt-thanks { font-size: 15px; line-height: 1.8; margin-bottom: 12px; }
+    .receipt-subthanks { font-size: 12px; line-height: 1.8; }
+    .receipt-to-row { padding: 14px 8px 8px 8px; gap: 12px; }
+    .receipt-to-name { font-size: 16px; }
+    .receipt-divider { margin: 16px 0; }
+    .receipt-title { margin-bottom: 16px; }
+    .receipt-items { gap: 10px; }
+    .receipt-item { padding-bottom: 8px; }
+    .receipt-total-line { padding: 13px 4px; margin-top: 10px; }
+    .receipt-total-label { font-size: 16px; letter-spacing: 3px; }
+    .receipt-total-value { font-size: 16px; }
+    .receipt-total-value .yen-symbol { font-size: 12px; }
+    .receipt-closing-line { font-size: 13px; margin-top: 16px; }
+    .receipt-back-btn { margin-top: 18px; padding: 10px 18px; font-size: 12px; }
+  }
+
   /* ============ THANK-YOU SCREEN ============ */
 
   .thankyou-screen {
@@ -1586,7 +1656,6 @@
   .ty-line.spacer { margin-top: 24px; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
 
-  /* Swipe hint: single fixed element just above the TY dots */
   .action-hint.ty-swipe-hint {
     position: absolute;
     left: 0;
@@ -1732,6 +1801,141 @@
     transition: transform 0.2s ease;
   }
   .ty-receipt-btn:active .btn-back-arrow { transform: translateX(-3px); }
+
+  /* ============ RESPONSIVE ============ */
+
+  @media (min-width: 700px) {
+    .info-line { font-size: 15px; letter-spacing: 2px; }
+    .info-line .sep { margin: 0 10px; }
+    .info-bar { padding: 22px 24px 14px 24px; }
+    .ticker-track { font-size: 13px; }
+    .table-card, .reject-row, .divider { max-width: 560px; }
+    .table-card, .reject-row, .divider {
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .panel-inner { max-width: 480px; }
+    .panel { padding: 150px 32px 260px 32px; }
+    .panel-content { font-size: 20px; }
+    .transition-line { font-size: 17px; max-width: 600px; }
+    .privacy-note-inline { font-size: 15px; }
+    .action-hint { font-size: 15px; letter-spacing: 5px; }
+    .action-hint.global-hint { bottom: 148px; }
+    .ty-line { font-size: 21px; }
+    .ty-mark { font-size: 26px; letter-spacing: 12px; }
+    .ty-line.spacer { margin-top: 28px; }
+    .ty-panel { padding: 80px 32px 130px 32px; }
+    .ty-ambient-stage { padding: 100px 32px 130px 32px; }
+    .quote-line { font-size: 34px; letter-spacing: 4px; }
+    .quote-wrap { min-height: 220px; }
+    .blossom-mark { font-size: 16px; }
+    .blossom-divider { gap: 11px; margin-bottom: 42px; }
+    .ty-dots { bottom: 74px; }
+    .ty-receipt-btn { font-size: 13px; padding: 10px 14px; bottom: 22px; left: 24px; }
+    .blossom-char { font-size: 100px; }
+    .dot { width: 12px; height: 12px; }
+    .ty-dot { width: 12px; height: 12px; }
+    .gift-divider-label { font-size: 19px; letter-spacing: 6px; }
+    .reject-gift { font-size: 15px; }
+    .reject-gift-amount { font-size: 20px; }
+  }
+
+  @media (min-width: 1100px) {
+    .info-line { font-size: 16px; letter-spacing: 2.5px; }
+    .info-bar { padding: 24px 28px 16px 28px; }
+    .ticker-track { font-size: 13.5px; }
+    .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
+    .panel { padding: 160px 32px 260px 32px; }
+    .panel-content { font-size: 22px; }
+    .transition-line { font-size: 18px; max-width: 660px; }
+    .privacy-note-inline { font-size: 16px; }
+    .ty-line { font-size: 24px; }
+    .ty-mark { font-size: 30px; }
+    .quote-line { font-size: 40px; letter-spacing: 5px; }
+    .quote-wrap { min-height: 260px; }
+    .blossom-mark { font-size: 18px; }
+    .blossom-divider { gap: 14px; margin-bottom: 50px; }
+    .ty-dots { bottom: 80px; }
+    .ty-receipt-btn { font-size: 14px; padding: 10px 16px; bottom: 26px; left: 28px; }
+    .blossom-char { font-size: 108px; }
+    .dot { width: 13px; height: 13px; }
+    .ty-dot { width: 13px; height: 13px; }
+    .gift-divider-label { font-size: 21px; letter-spacing: 7px; }
+    .reject-gift { font-size: 16px; }
+    .reject-gift-amount { font-size: 22px; }
+  }
+
+  @media (max-height: 700px) {
+    .info-bar { padding: 12px 16px 10px 16px; }
+    .info-line { font-size: 12.5px; letter-spacing: 1px; }
+    .info-line .sep { margin: 0 6px; }
+    .ticker-track { font-size: 11.5px; }
+    .name-screen { padding: 55px 20px 30px 20px; }
+    .blossom-screen { padding: 55px 20px 30px 20px; }
+    .panel { padding: 100px 20px 220px 20px; }
+    .panel-content { font-size: 17px; line-height: 2; }
+    .ty-panel { padding: 60px 20px 100px 20px; }
+    .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
+    .ty-mark { font-size: 18px; margin-bottom: 20px; }
+    .ty-rule { margin: 18px auto; }
+    .ty-line.spacer { margin-top: 16px; }
+    .action-hint { margin-top: 0; font-size: 12px; letter-spacing: 3px; }
+    .action-hint.global-hint { bottom: 116px; }
+    .dots { bottom: 84px; gap: 12px; }
+    .dot { width: 9px; height: 9px; }
+    .ty-dots { bottom: 56px; }
+    .ty-ambient-stage { padding: 70px 20px 100px 20px; }
+    .blossom-divider { gap: 6px; margin-bottom: 18px; height: 18px; }
+    .blossom-mark { font-size: 11px; }
+    .quote-line { font-size: 22px; line-height: 1.9; }
+    .quote-wrap { min-height: 120px; }
+    .ty-receipt-btn { bottom: 12px; left: 14px; padding: 6px 10px; font-size: 11px; }
+    .price-wrap { min-width: 88px; padding: 7px 9px; }
+    .summary { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
+    .summary-total { font-size: 19px; }
+    .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
+    .blossom-char { font-size: 72px; }
+    .ty-dots { gap: 12px; }
+    .ty-dot { width: 9px; height: 9px; }
+    .stage-spacer { height: 1.5vh; }
+    .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
+    .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
+    .reject-gift { font-size: 12.5px; padding: 12px 14px; }
+    .reject-gift-amount { font-size: 16px; }
+    .theme-toggle { top: 12px; left: 12px; width: 38px; height: 38px; font-size: 17px; }
+  }
+
+  @media (max-height: 600px) and (orientation: landscape) {
+    .info-bar { padding: 8px 14px 6px 14px; }
+    .info-line { font-size: 11.5px; letter-spacing: 1px; }
+    .info-line .sep { margin: 0 5px; }
+    .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
+    .name-screen { padding: 48px 24px 20px 24px; }
+    .blossom-screen { padding: 48px 24px 20px 24px; }
+    .panel { padding: 90px 40px 180px 40px; }
+    .panel-inner { max-width: 560px; }
+    .panel-content { font-size: 16px; line-height: 2; }
+    .action-hint { margin-top: 0; }
+    .action-hint.global-hint { bottom: 96px; }
+    .dots { bottom: 66px; }
+    .name-inner { max-width: 480px; }
+    .blossom-char { font-size: 68px; }
+    .name-char { font-size: 48px; }
+    .name-column { gap: 4px; }
+    .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
+    .privacy-note-inline { font-size: 12px; padding: 10px 16px 12px 16px; }
+    .ty-panel { padding: 55px 40px 90px 40px; }
+    .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
+    .quote-line { font-size: 22px; letter-spacing: 3px; }
+    .quote-wrap { min-height: 110px; }
+    .ty-dots { bottom: 48px; }
+    .ty-receipt-btn { bottom: 8px; left: 12px; padding: 6px 10px; font-size: 10.5px; }
+    .stage-spacer { height: 1.5vh; }
+    .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
+    .reject-gift { font-size: 12px; }
+    .reject-gift-amount { font-size: 15px; }
+    .theme-toggle { top: 10px; left: 10px; width: 34px; height: 34px; font-size: 15px; }
+  }
 </style>
 </head>
 <body>
@@ -2047,15 +2251,7 @@
 
       <div class="ty-panel" data-ty-panel="0">
         <div class="ty-panel-inner">
-          <div class="ty-panel-content" id="tyPanel1Content">
-            <div class="ty-mark">❀</div>
-            <div class="ty-line">ありがとうございます。</div>
-            <div class="ty-line accent">それでは、シャワーを浴びてまいります。</div>
-            <div class="ty-line spacer">どうぞごゆっくりお待ちください。</div>
-            <div class="ty-line">本日はよろしくお願いいたします。</div>
-            <div class="ty-rule"></div>
-            <div class="ty-line">シャワーは10分ほどで済ませます。</div>
-          </div>
+          <div class="ty-panel-content" id="tyPanel1Content"></div>
         </div>
       </div>
 
@@ -2995,6 +3191,9 @@
     var rows = getRows();
     var itemCount = 0;
     var firstRowIncluded = false;
+    var presetInputs0 = document.querySelectorAll('.preset-input');
+    var preset0 = presetInputs0[0];
+    var preset0Val = preset0 ? (preset0.value || '').trim() : '';
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
@@ -3009,14 +3208,8 @@
       if (display) name = (display.textContent || '').trim();
       else if (textInput) name = (textInput.value || '').trim();
       if (!name) name = 'サービス ' + (i + 1);
-      if (itemCount === 0) {
-        // First receipt item: check whether it originates from preset slot 1 (data-preset="0")
-        var presetInputs = document.querySelectorAll('.preset-input');
-        var preset0 = presetInputs[0];
-        var preset0Val = preset0 ? (preset0.value || '').trim() : '';
-        if (preset0Val !== '' && name === preset0Val) {
-          firstRowIncluded = true;
-        }
+      if (itemCount === 0 && preset0Val !== '' && name === preset0Val) {
+        firstRowIncluded = true;
       }
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
@@ -3203,19 +3396,18 @@
       finished = true;
       receiptScreen.removeEventListener('transitionend', onFade);
 
-      if (thankyouScreen.classList.contains('visible')) {
-        thankyouScreen.classList.remove('visible');
-        tyAmbientStage.classList.remove('shown');
-        quoteLine.classList.remove('shown', 'leaving');
-        quoteLine.textContent = '';
-        blossomDivider.innerHTML = '';
-        tyReceiptBtn.classList.remove('shown');
-        // NOTE: carousel position is deliberately PRESERVED here.
-        // We do NOT reset tyCurrentPanel, tyTrack transform, tyExited,
-        // and we do NOT remove .hidden-out. Reopening the receipt later
-        // resumes exactly where the user left off, and the return path
-        // no longer flashes the shower panel.
-      }
+      // Start the fade-out, and clear the ambient/quote/button state.
+      // Deliberately do NOT touch any carousel positioning here — the
+      // carousel is a child of .thankyou-screen and stays painted during
+      // the 1.2s fade, so resetting its position mid-fade causes the
+      // "last panel → panel 1 → table" flash. startThankyouSequence()
+      // resets everything the next time the screen is shown.
+      thankyouScreen.classList.remove('visible');
+      tyAmbientStage.classList.remove('shown');
+      quoteLine.classList.remove('shown', 'leaving');
+      quoteLine.textContent = '';
+      blossomDivider.innerHTML = '';
+      tyReceiptBtn.classList.remove('shown');
 
       currentPanel = totalPanels - 1;
       track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
@@ -3296,10 +3488,21 @@
     if (isHorizontal) {
       e.preventDefault();
       currentX = x;
+      // Final panel: block rightward drag entirely; keep a small leftward
+      // rubber-band so the user still feels the edge of the carousel.
+      if (currentPanel === totalPanels - 1) {
+        if (deltaX > 0) {
+          return;
+        }
+        var baseOffsetEnd = -currentPanel * stageWidth;
+        var offsetEnd = baseOffsetEnd + deltaX * 0.35;
+        var pctEnd = (offsetEnd / stageWidth) * (100 / totalPanels);
+        track.style.transform = 'translateX(' + pctEnd + '%)';
+        return;
+      }
       var baseOffset = -currentPanel * stageWidth;
       var offset = baseOffset + deltaX;
       if (currentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
-      if (currentPanel === totalPanels - 1 && deltaX < 0) offset = baseOffset + deltaX * 0.35;
       var pct = (offset / stageWidth) * (100 / totalPanels);
       track.style.transform = 'translateX(' + pct + '%)';
       var dragRatio = Math.min(1, Math.abs(deltaX) / (refWidth * 0.35));
@@ -3348,6 +3551,10 @@
     track.classList.remove('dragging');
     if (!isHorizontal) { clearInlineFades(); return; }
     clearInlineFades();
+    if (currentPanel === totalPanels - 1) {
+      goToPanel(currentPanel);
+      return;
+    }
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
@@ -3369,10 +3576,17 @@
     if (!mouseDown) return;
     currentX = e.clientX;
     var deltaX = currentX - startX;
+    if (currentPanel === totalPanels - 1) {
+      if (deltaX > 0) return;
+      var baseOffsetEnd = -currentPanel * stageWidth;
+      var offsetEnd = baseOffsetEnd + deltaX * 0.35;
+      var pctEnd = (offsetEnd / stageWidth) * (100 / totalPanels);
+      track.style.transform = 'translateX(' + pctEnd + '%)';
+      return;
+    }
     var baseOffset = -currentPanel * stageWidth;
     var offset = baseOffset + deltaX;
     if (currentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
-    if (currentPanel === totalPanels - 1 && deltaX < 0) offset = baseOffset + deltaX * 0.35;
     var pct = (offset / stageWidth) * (100 / totalPanels);
     track.style.transform = 'translateX(' + pct + '%)';
   });
@@ -3381,6 +3595,10 @@
     mouseDown = false;
     track.classList.remove('dragging');
     clearInlineFades();
+    if (currentPanel === totalPanels - 1) {
+      goToPanel(currentPanel);
+      return;
+    }
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
@@ -3652,10 +3870,11 @@
 
   function updateInfoDateTime() {
     var p = nagoyaDateParts();
+    var hhPadded = (p.hour < 10) ? ('0' + p.hour) : String(p.hour);
     var mmPadded = (p.minute < 10) ? ('0' + p.minute) : String(p.minute);
     var wd = JP_WEEKDAYS[p.weekday];
     infoDate.textContent = p.month + '月' + p.day + '日(' + wd + ')';
-    infoTime.textContent = p.hour + '時' + mmPadded + '分';
+    infoTime.textContent = hhPadded + '時' + mmPadded + '分';
   }
 
   function fetchNagoyaWeather() {
