@@ -79,29 +79,24 @@
     --shadow-rose-2: rgba(120, 90, 90, 0.16);
     --shadow-accent: rgba(176, 74, 90, 0.25);
 
-    /* Box tint (panel 5 white box) */
     --box-bg: rgba(253, 240, 240, 0.55);
     --box-border: rgba(232, 200, 200, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 90, 90, 0.06);
 
-    /* Summary bar tint (default: unchanged near-white) */
     --summary-bg: rgba(255, 255, 255, 0.94);
     --summary-border: #ece4e0;
     --summary-shadow: rgba(0, 0, 0, 0.06);
 
-    /* Active dot styling — dark forest green */
     --dot-active-bg: #2a3f1a;
     --dot-active-ring: rgba(42, 63, 26, 0.28);
     --dot-active-shadow: rgba(42, 63, 26, 0.4);
 
-    /* Thank-you carousel contrast (default unchanged) */
     --ty-line-color: #1f1f1f;
     --ty-line-shadow: none;
-    --ty-accent-color: #b04a5a;
+    --ty-accent-color: #c0392b;
     --quote-color: #b04a5a;
     --quote-shadow: 0 2px 24px #fbdfe3;
 
-    /* Ambient background gradient stops (default pink) */
     --amb-1: rgba(251, 200, 210, 0.70);
     --amb-2: rgba(247, 210, 195, 0.65);
     --amb-3: rgba(232, 160, 175, 0.45);
@@ -150,7 +145,6 @@
     --soft-3: #f0e0b8;
     --soft-4: #fdf6e0;
 
-    /* Autumn contrast tokens */
     --text-dark: #231304;
     --text-med: #3d2410;
     --text-soft: #2a1808;
@@ -162,29 +156,24 @@
     --shadow-rose-2: rgba(120, 70, 20, 0.18);
     --shadow-accent: rgba(201, 96, 10, 0.32);
 
-    /* Box tint for panel 5 — warm amber, blends with theme */
     --box-bg: rgba(253, 240, 200, 0.55);
     --box-border: rgba(216, 180, 120, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
 
-    /* Summary bar — softer warm amber tint */
     --summary-bg: rgba(253, 240, 200, 0.72);
     --summary-border: rgba(216, 180, 120, 0.35);
     --summary-shadow: rgba(120, 70, 20, 0.08);
 
-    /* Active dot — dark forest green */
     --dot-active-bg: #2a3f1a;
     --dot-active-ring: rgba(42, 63, 26, 0.28);
     --dot-active-shadow: rgba(42, 63, 26, 0.4);
 
-    /* Thank-you carousel contrast */
     --ty-line-color: #231304;
     --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6);
-    --ty-accent-color: #8f2f00;
+    --ty-accent-color: #c0392b;
     --quote-color: #8f2f00;
     --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
 
-    /* Autumn palette — saturated orange/yellow/brown */
     --amb-1: rgba(247, 185, 60, 0.85);
     --amb-2: rgba(240, 138, 30, 0.80);
     --amb-3: rgba(217, 94, 26, 0.72);
@@ -630,13 +619,13 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .start-hint {
-    margin: 8px 0 0 0; font-size: 14px; font-weight: 400; color: var(--text-faint);
+    margin: 8px 0 0 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
     letter-spacing: 3px; line-height: 2;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     text-align: center; animation: hintBreathe 4s ease-in-out infinite;
   }
   @keyframes hintBreathe {
-    0%, 100% { opacity: 0.7; }
+    0%, 100% { opacity: 0.92; }
     50% { opacity: 1; }
   }
 
@@ -673,9 +662,6 @@
   }
   .intro-overlay.finishing .name-char { opacity: 0; transform: translateY(20px); filter: blur(3px); }
   .intro-overlay.finishing { opacity: 0; transition: opacity 0.9s ease; }
-
-  @media (max-height: 800px) { .name-char { font-size: 96px; } .name-column { gap: 14px; } }
-  @media (max-height: 600px) { .name-char { font-size: 68px; } .name-column { gap: 8px; } }
 
   /* ============ MAIN CAROUSEL ============ */
 
@@ -1269,13 +1255,6 @@
     transform: translateX(3px);
   }
 
-  @media (max-width: 380px) {
-    .summary-inner { gap: 6px; padding: 0 2px; }
-    .summary-total { font-size: 19px; }
-    .reset, .submit-btn { padding: 9px 11px; font-size: 11.5px; letter-spacing: 0; }
-    .submit-btn { gap: 3px; }
-  }
-
   /* ============ CONFIRM DIALOG ============ */
 
   .confirm-screen {
@@ -1349,11 +1328,6 @@
     box-shadow: 0 4px 14px var(--shadow-accent);
   }
   .confirm-yes:active { background: var(--accent-3); }
-
-  @media (min-width: 700px) {
-    .confirm-btn { font-size: 14.5px; padding: 15px 12px; }
-    .confirm-card { max-width: 420px; }
-  }
 
   /* ============ RECEIPT ============ */
 
@@ -1545,61 +1519,6 @@
   .receipt-footer { text-align: center; margin-top: 22px; }
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
-  @media (min-width: 700px) {
-    .receipt-paper { max-width: 480px; padding: 42px 42px 34px 42px; }
-    .receipt-thanks { font-size: 22px; letter-spacing: 2px; margin-bottom: 18px; }
-    .receipt-subthanks { font-size: 15px; letter-spacing: 1px; }
-    .receipt-to-row { gap: 16px; padding: 22px 8px 12px 8px; }
-    .receipt-to-mark { font-size: 15px; }
-    .receipt-to-name { font-size: 22px; letter-spacing: 3px; }
-    .receipt-title { font-size: 14px; letter-spacing: 9px; margin-bottom: 24px; }
-    .receipt-item-name { font-size: 16px; }
-    .receipt-price-input { font-size: 16px; width: 68px; }
-    .receipt-item-price-wrap { font-size: 16px; padding: 5px 10px; }
-    .receipt-item-price-wrap .yen-symbol { font-size: 12px; }
-    .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
-    .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
-    .receipt-total-value { font-size: 22px; }
-    .receipt-total-value .yen-symbol { font-size: 15px; }
-    .receipt-closing-line { font-size: 15px; margin-top: 26px; }
-    .receipt-back-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
-    .receipt-item-remove { width: 28px; height: 28px; font-size: 18px; }
-    .receipt-footer-mark { font-size: 14px; letter-spacing: 12px; }
-    .receipt-divider { margin: 26px 0; }
-  }
-  @media (min-width: 1100px) {
-    .receipt-paper { max-width: 540px; padding: 48px 48px 38px 48px; }
-    .receipt-thanks { font-size: 26px; }
-    .receipt-subthanks { font-size: 16px; }
-    .receipt-to-name { font-size: 26px; letter-spacing: 3px; }
-    .receipt-to-mark { font-size: 16px; }
-    .receipt-title { font-size: 15px; letter-spacing: 11px; }
-    .receipt-item-name { font-size: 17px; }
-    .receipt-price-input { font-size: 17px; width: 76px; }
-    .receipt-item-price-wrap { font-size: 17px; padding: 6px 12px; }
-    .receipt-total-label { font-size: 26px; }
-    .receipt-total-value { font-size: 26px; }
-    .receipt-total-value .yen-symbol { font-size: 17px; }
-    .receipt-back-btn { font-size: 15px; padding: 14px 28px; max-width: 340px; }
-  }
-  @media (max-height: 700px) {
-    .receipt-paper { padding: 28px 24px 22px 24px; }
-    .receipt-thanks { font-size: 15px; line-height: 1.8; margin-bottom: 12px; }
-    .receipt-subthanks { font-size: 12px; line-height: 1.8; }
-    .receipt-to-row { padding: 14px 8px 8px 8px; gap: 12px; }
-    .receipt-to-name { font-size: 16px; }
-    .receipt-divider { margin: 16px 0; }
-    .receipt-title { margin-bottom: 16px; }
-    .receipt-items { gap: 10px; }
-    .receipt-item { padding-bottom: 8px; }
-    .receipt-total-line { padding: 13px 4px; margin-top: 10px; }
-    .receipt-total-label { font-size: 16px; letter-spacing: 3px; }
-    .receipt-total-value { font-size: 16px; }
-    .receipt-total-value .yen-symbol { font-size: 12px; }
-    .receipt-closing-line { font-size: 13px; margin-top: 16px; }
-    .receipt-back-btn { margin-top: 18px; padding: 10px 18px; font-size: 12px; }
-  }
-
   /* ============ THANK-YOU SCREEN ============ */
 
   .thankyou-screen {
@@ -1655,12 +1574,6 @@
     transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease;
     transition-delay: 0s;
   }
-  .ty-panel-hint {
-    opacity: 0; transform: translateX(20px);
-    transition: opacity 0.7s ease, transform 0.7s ease;
-    transition-delay: 0.9s;
-  }
-  .ty-panel.active .ty-panel-hint { opacity: 1; transform: translateX(0); }
   .ty-mark { font-size: 22px; color: var(--glow); letter-spacing: 10px; margin-bottom: 32px; }
   .ty-line {
     font-size: 18px; font-weight: 500;
@@ -1672,6 +1585,21 @@
   .ty-line.accent { color: var(--ty-accent-color); font-weight: 700; }
   .ty-line.spacer { margin-top: 24px; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
+
+  /* Swipe hint: single fixed element just above the TY dots */
+  .action-hint.ty-swipe-hint {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 98px;
+    z-index: 11;
+    justify-content: center;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.7s ease;
+    min-height: 22px;
+  }
+  .action-hint.ty-swipe-hint.shown { opacity: 1; }
 
   .ty-dots {
     position: absolute; bottom: 68px; left: 0; right: 0;
@@ -1804,141 +1732,6 @@
     transition: transform 0.2s ease;
   }
   .ty-receipt-btn:active .btn-back-arrow { transform: translateX(-3px); }
-
-  /* ============ RESPONSIVE ============ */
-
-  @media (min-width: 700px) {
-    .info-line { font-size: 15px; letter-spacing: 2px; }
-    .info-line .sep { margin: 0 10px; }
-    .info-bar { padding: 22px 24px 14px 24px; }
-    .ticker-track { font-size: 13px; }
-    .table-card, .reject-row, .divider { max-width: 560px; }
-    .table-card, .reject-row, .divider {
-      margin-left: auto;
-      margin-right: auto;
-    }
-    .panel-inner { max-width: 480px; }
-    .panel { padding: 150px 32px 260px 32px; }
-    .panel-content { font-size: 20px; }
-    .transition-line { font-size: 17px; max-width: 600px; }
-    .privacy-note-inline { font-size: 15px; }
-    .action-hint { font-size: 15px; letter-spacing: 5px; }
-    .action-hint.global-hint { bottom: 148px; }
-    .ty-line { font-size: 21px; }
-    .ty-mark { font-size: 26px; letter-spacing: 12px; }
-    .ty-line.spacer { margin-top: 28px; }
-    .ty-panel { padding: 80px 32px 130px 32px; }
-    .ty-ambient-stage { padding: 100px 32px 130px 32px; }
-    .quote-line { font-size: 34px; letter-spacing: 4px; }
-    .quote-wrap { min-height: 220px; }
-    .blossom-mark { font-size: 16px; }
-    .blossom-divider { gap: 11px; margin-bottom: 42px; }
-    .ty-dots { bottom: 74px; }
-    .ty-receipt-btn { font-size: 13px; padding: 10px 14px; bottom: 22px; left: 24px; }
-    .blossom-char { font-size: 100px; }
-    .dot { width: 12px; height: 12px; }
-    .ty-dot { width: 12px; height: 12px; }
-    .gift-divider-label { font-size: 19px; letter-spacing: 6px; }
-    .reject-gift { font-size: 15px; }
-    .reject-gift-amount { font-size: 20px; }
-  }
-
-  @media (min-width: 1100px) {
-    .info-line { font-size: 16px; letter-spacing: 2.5px; }
-    .info-bar { padding: 24px 28px 16px 28px; }
-    .ticker-track { font-size: 13.5px; }
-    .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
-    .panel { padding: 160px 32px 260px 32px; }
-    .panel-content { font-size: 22px; }
-    .transition-line { font-size: 18px; max-width: 660px; }
-    .privacy-note-inline { font-size: 16px; }
-    .ty-line { font-size: 24px; }
-    .ty-mark { font-size: 30px; }
-    .quote-line { font-size: 40px; letter-spacing: 5px; }
-    .quote-wrap { min-height: 260px; }
-    .blossom-mark { font-size: 18px; }
-    .blossom-divider { gap: 14px; margin-bottom: 50px; }
-    .ty-dots { bottom: 80px; }
-    .ty-receipt-btn { font-size: 14px; padding: 10px 16px; bottom: 26px; left: 28px; }
-    .blossom-char { font-size: 108px; }
-    .dot { width: 13px; height: 13px; }
-    .ty-dot { width: 13px; height: 13px; }
-    .gift-divider-label { font-size: 21px; letter-spacing: 7px; }
-    .reject-gift { font-size: 16px; }
-    .reject-gift-amount { font-size: 22px; }
-  }
-
-  @media (max-height: 700px) {
-    .info-bar { padding: 12px 16px 10px 16px; }
-    .info-line { font-size: 12.5px; letter-spacing: 1px; }
-    .info-line .sep { margin: 0 6px; }
-    .ticker-track { font-size: 11.5px; }
-    .name-screen { padding: 55px 20px 30px 20px; }
-    .blossom-screen { padding: 55px 20px 30px 20px; }
-    .panel { padding: 100px 20px 220px 20px; }
-    .panel-content { font-size: 17px; line-height: 2; }
-    .ty-panel { padding: 60px 20px 100px 20px; }
-    .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
-    .ty-mark { font-size: 18px; margin-bottom: 20px; }
-    .ty-rule { margin: 18px auto; }
-    .ty-line.spacer { margin-top: 16px; }
-    .action-hint { margin-top: 0; font-size: 12px; letter-spacing: 3px; }
-    .action-hint.global-hint { bottom: 116px; }
-    .dots { bottom: 84px; gap: 12px; }
-    .dot { width: 9px; height: 9px; }
-    .ty-dots { bottom: 56px; }
-    .ty-ambient-stage { padding: 70px 20px 100px 20px; }
-    .blossom-divider { gap: 6px; margin-bottom: 18px; height: 18px; }
-    .blossom-mark { font-size: 11px; }
-    .quote-line { font-size: 22px; line-height: 1.9; }
-    .quote-wrap { min-height: 120px; }
-    .ty-receipt-btn { bottom: 12px; left: 14px; padding: 6px 10px; font-size: 11px; }
-    .price-wrap { min-width: 88px; padding: 7px 9px; }
-    .summary { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
-    .summary-total { font-size: 19px; }
-    .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
-    .blossom-char { font-size: 72px; }
-    .ty-dots { gap: 12px; }
-    .ty-dot { width: 9px; height: 9px; }
-    .stage-spacer { height: 1.5vh; }
-    .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
-    .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
-    .reject-gift { font-size: 12.5px; padding: 12px 14px; }
-    .reject-gift-amount { font-size: 16px; }
-    .theme-toggle { top: 12px; left: 12px; width: 38px; height: 38px; font-size: 17px; }
-  }
-
-  @media (max-height: 600px) and (orientation: landscape) {
-    .info-bar { padding: 8px 14px 6px 14px; }
-    .info-line { font-size: 11.5px; letter-spacing: 1px; }
-    .info-line .sep { margin: 0 5px; }
-    .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
-    .name-screen { padding: 48px 24px 20px 24px; }
-    .blossom-screen { padding: 48px 24px 20px 24px; }
-    .panel { padding: 90px 40px 180px 40px; }
-    .panel-inner { max-width: 560px; }
-    .panel-content { font-size: 16px; line-height: 2; }
-    .action-hint { margin-top: 0; }
-    .action-hint.global-hint { bottom: 96px; }
-    .dots { bottom: 66px; }
-    .name-inner { max-width: 480px; }
-    .blossom-char { font-size: 68px; }
-    .name-char { font-size: 48px; }
-    .name-column { gap: 4px; }
-    .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
-    .privacy-note-inline { font-size: 12px; padding: 10px 16px 12px 16px; }
-    .ty-panel { padding: 55px 40px 90px 40px; }
-    .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
-    .quote-line { font-size: 22px; letter-spacing: 3px; }
-    .quote-wrap { min-height: 110px; }
-    .ty-dots { bottom: 48px; }
-    .ty-receipt-btn { bottom: 8px; left: 12px; padding: 6px 10px; font-size: 10.5px; }
-    .stage-spacer { height: 1.5vh; }
-    .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
-    .reject-gift { font-size: 12px; }
-    .reject-gift-amount { font-size: 15px; }
-    .theme-toggle { top: 10px; left: 10px; width: 34px; height: 34px; font-size: 15px; }
-  }
 </style>
 </head>
 <body>
@@ -2254,7 +2047,7 @@
 
       <div class="ty-panel" data-ty-panel="0">
         <div class="ty-panel-inner">
-          <div class="ty-panel-content">
+          <div class="ty-panel-content" id="tyPanel1Content">
             <div class="ty-mark">❀</div>
             <div class="ty-line">ありがとうございます。</div>
             <div class="ty-line accent">それでは、シャワーを浴びてまいります。</div>
@@ -2262,10 +2055,6 @@
             <div class="ty-line">本日はよろしくお願いいたします。</div>
             <div class="ty-rule"></div>
             <div class="ty-line">シャワーは10分ほどで済ませます。</div>
-          </div>
-          <div class="action-hint ty-panel-hint">
-            <span>スワイプ</span>
-            <span class="hint-arrow right">→</span>
           </div>
         </div>
       </div>
@@ -2282,10 +2071,6 @@
             <div class="ty-line accent">どうぞ穏やかな時間を</div>
             <div class="ty-line accent">お過ごしください。</div>
           </div>
-          <div class="action-hint ty-panel-hint">
-            <span>スワイプ</span>
-            <span class="hint-arrow right">→</span>
-          </div>
         </div>
       </div>
 
@@ -2296,10 +2081,6 @@
             <div class="ty-line">画面に流れる言葉とともに、</div>
             <div class="ty-line spacer">どうぞご自宅のように、</div>
             <div class="ty-line accent">ゆっくりおくつろぎくださいませ。</div>
-          </div>
-          <div class="action-hint ty-panel-hint">
-            <span>スワイプ</span>
-            <span class="hint-arrow right">→</span>
           </div>
         </div>
       </div>
@@ -2313,13 +2094,14 @@
             <div class="ty-line accent">ゆっくりと言葉をお楽しみください。</div>
             <div class="ty-rule"></div>
           </div>
-          <div class="action-hint ty-panel-hint">
-            <span>もう一度スワイプ</span>
-            <span class="hint-arrow right">→</span>
-          </div>
         </div>
       </div>
 
+    </div>
+
+    <div class="action-hint ty-swipe-hint" id="tySwipeHint">
+      <span id="tySwipeHintLabel">スワイプ</span>
+      <span class="hint-arrow right">→</span>
     </div>
 
     <div class="ty-dots" id="tyDots">
@@ -2546,6 +2328,7 @@
   var rejected = false;
 
   var confirmedTipAmount = 1500;
+  var firstServiceInReceipt = false;
 
   var stageWidth = window.innerWidth;
   var refWidth = Math.min(window.innerWidth, 600);
@@ -2584,6 +2367,9 @@
   var tyPanels = document.querySelectorAll('.ty-panel');
   var tyDotsEl = document.getElementById('tyDots');
   var tyDots = document.querySelectorAll('.ty-dot');
+  var tySwipeHint = document.getElementById('tySwipeHint');
+  var tySwipeHintLabel = document.getElementById('tySwipeHintLabel');
+  var tyPanel1Content = document.getElementById('tyPanel1Content');
 
   var tyAmbientStage = document.getElementById('tyAmbientStage');
   var blossomDivider = document.getElementById('blossomDivider');
@@ -2597,13 +2383,30 @@
 
   var TICKER_CITIES = [
     { key: 'nagoya',   name: '名古屋市', lat: 35.1815, lon: 136.9066 },
-    { key: 'tokyo',    name: '東京市',   lat: 35.6762, lon: 139.6503 },
+    { key: 'tokyo',    name: '東京都',   lat: 35.6762, lon: 139.6503 },
     { key: 'osaka',    name: '大阪市',   lat: 34.6937, lon: 135.5023 },
     { key: 'kyoto',    name: '京都市',   lat: 35.0116, lon: 135.7681 },
     { key: 'okinawa',  name: '那覇市',   lat: 26.2124, lon: 127.6809 },
     { key: 'sendai',   name: '仙台市',   lat: 38.2682, lon: 140.8694 },
     { key: 'sapporo',  name: '札幌市',   lat: 43.0618, lon: 141.3545 }
   ];
+
+  /* Content for the conditional (マイクロビキニ) panel 1 */
+  var TY_PANEL1_DEFAULT_HTML =
+    '<div class="ty-mark">❀</div>' +
+    '<div class="ty-line">ありがとうございます。</div>' +
+    '<div class="ty-line accent">それでは、シャワーを浴びてまいります。</div>' +
+    '<div class="ty-line spacer">どうぞごゆっくりお待ちください。</div>' +
+    '<div class="ty-line">本日はよろしくお願いいたします。</div>' +
+    '<div class="ty-rule"></div>' +
+    '<div class="ty-line">シャワーは10分ほどで済ませます。</div>';
+
+  var TY_PANEL1_MICROBIKINI_HTML =
+    '<div class="ty-mark">❀</div>' +
+    '<div class="ty-line">ありがとうございます。</div>' +
+    '<div class="ty-line accent">それでは、シャワーを浴びてまいります。どうぞごゆっくりお待ちください。本日はよろしくお願いいたします。</div>' +
+    '<div class="ty-rule"></div>' +
+    '<div class="ty-line accent">シャワーは10分ほどで済ませます。マイクロビキニへのお着替えは、私がシャワーから戻ってきてからお願いできますでしょうか。</div>';
 
   window.addEventListener('resize', function() {
     stageWidth = window.innerWidth;
@@ -2618,8 +2421,6 @@
   });
 
   /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
-  /* Measures panel content relative to the stage, so the hint
-     stays in a fixed position regardless of page scroll. */
 
   function repositionHintGroup() {
     if (!panels.length || !stage) return;
@@ -2637,7 +2438,6 @@
     }
     if (maxContentBottomRel <= 0) return;
 
-    // Distance from bottom of stage to bottom of tallest content
     var distanceFromStageBottom = stageHeight - maxContentBottomRel;
 
     var hintBottom = distanceFromStageBottom - 48;
@@ -3194,6 +2994,7 @@
     }
     var rows = getRows();
     var itemCount = 0;
+    var firstRowIncluded = false;
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
@@ -3208,6 +3009,15 @@
       if (display) name = (display.textContent || '').trim();
       else if (textInput) name = (textInput.value || '').trim();
       if (!name) name = 'サービス ' + (i + 1);
+      if (itemCount === 0) {
+        // First receipt item: check whether it originates from preset slot 1 (data-preset="0")
+        var presetInputs = document.querySelectorAll('.preset-input');
+        var preset0 = presetInputs[0];
+        var preset0Val = preset0 ? (preset0.value || '').trim() : '';
+        if (preset0Val !== '' && name === preset0Val) {
+          firstRowIncluded = true;
+        }
+      }
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
       itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
@@ -3260,6 +3070,7 @@
     }
     bindReceiptItemListeners();
     updateReceiptTotal();
+    firstServiceInReceipt = firstRowIncluded;
   }
 
   function bindReceiptItemListeners() {
@@ -3380,21 +3191,6 @@
   });
 
   /* ============ BACK TO TABLE ============ */
-  /* Real fix for the panel 5 flash:
-     The previous version re-applied `table-locked` in
-     startThankyouSequence, which pinned the body to the top of the
-     document. Then in returnToTable, removing `table-locked`
-     restored the body to the top-of-document scroll position, and
-     scrollIntoView had to smooth-scroll across the ENTIRE page.
-     On a tall page, that scroll took longer than our hardcoded
-     delay, so the carousel briefly became visible mid-scroll.
-
-     Now:
-       - startThankyouSequence no longer applies table-locked, so the
-         body is never re-pinned to the top of the document.
-       - returnToTable keeps `thankyou-active` on until the scroll
-         actually finishes. We listen for `scrollend` when available
-         and fall back to a generous timeout otherwise. */
 
   function returnToTable() {
     clearAllTyTimers();
@@ -3413,19 +3209,14 @@
         quoteLine.classList.remove('shown', 'leaving');
         quoteLine.textContent = '';
         blossomDivider.innerHTML = '';
-        tyCarousel.classList.remove('hidden-out');
-        tyDotsEl.classList.remove('hidden');
         tyReceiptBtn.classList.remove('shown');
-        tyExited = false;
-        tyCurrentPanel = 0;
-        tyTrack.style.transform = 'translateX(0%)';
-        for (var i = 0; i < tyDots.length; i++) {
-          tyDots[i].classList.toggle('active', i === 0);
-        }
-        activateTyPanel(0);
+        // NOTE: carousel position is deliberately PRESERVED here.
+        // We do NOT reset tyCurrentPanel, tyTrack transform, tyExited,
+        // and we do NOT remove .hidden-out. Reopening the receipt later
+        // resumes exactly where the user left off, and the return path
+        // no longer flashes the shower panel.
       }
 
-      // Put the carousel on the last panel.
       currentPanel = totalPanels - 1;
       track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
       for (var j = 0; j < dots.length; j++) {
@@ -3461,7 +3252,6 @@
             var y = tableCard.getBoundingClientRect().top + window.pageYOffset - 100;
             window.scrollTo(0, y);
           }
-          // Fallback in case scrollend doesn't fire
           setTimeout(onScrollEnd, 1500);
         }, 150);
       }, 300);
@@ -3562,7 +3352,6 @@
     var threshold = refWidth * 0.12;
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
-    else goToPanel(currentPanel);
   }
 
   stage.addEventListener('touchstart', onTouchStart, { passive: true });
@@ -3596,7 +3385,6 @@
     var threshold = refWidth * 0.12;
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
-    else goToPanel(currentPanel);
   });
 
   document.addEventListener('keydown', function(e) {
@@ -3912,13 +3700,14 @@
     if (!hourly || !hourly.time || !hourly.temperature_2m) return [];
     var times = hourly.time;
     var temps = hourly.temperature_2m;
+    var codes = hourly.weather_code || [];
     var out = [];
     for (var i = 0; i < times.length && out.length < 3; i++) {
       var h = parseInt(times[i].slice(11, 13), 10);
       if (out.length === 0) {
-        if (h >= nowHour) out.push({ h: h, t: temps[i] });
+        if (h >= nowHour) out.push({ h: h, t: temps[i], c: codes[i] });
       } else {
-        out.push({ h: h, t: temps[i] });
+        out.push({ h: h, t: temps[i], c: codes[i] });
       }
     }
     return out;
@@ -3942,7 +3731,10 @@
       var nowP = nagoyaDateParts();
       var next3 = getNext3Hours(nagoyaData.hourly, nowP.hour);
       if (next3.length > 0) {
-        var hours = next3.map(function(x) { return formatTemp(x.t); }).join(' → ');
+        var hours = next3.map(function(x) {
+          var emoji = weatherEmoji(weatherBucket(x.c));
+          return emoji + formatTemp(x.t);
+        }).join(' → ');
         parts.push('名古屋市 3時間 ' + hours);
       }
     }
@@ -4019,6 +3811,29 @@
   var tyRefWidth = Math.min(window.innerWidth, 600);
   var tyExited = false;
 
+  function updateTySwipeHint() {
+    if (!tySwipeHint || !tySwipeHintLabel) return;
+    if (tyExited) {
+      tySwipeHint.classList.remove('shown');
+      return;
+    }
+    if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
+      tySwipeHintLabel.textContent = 'もう一度スワイプ';
+    } else {
+      tySwipeHintLabel.textContent = 'スワイプ';
+    }
+    tySwipeHint.classList.add('shown');
+  }
+
+  function applyTyPanel1Content() {
+    if (!tyPanel1Content) return;
+    if (firstServiceInReceipt) {
+      tyPanel1Content.innerHTML = TY_PANEL1_MICROBIKINI_HTML;
+    } else {
+      tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
+    }
+  }
+
   function activateTyPanel(index) {
     for (var i = 0; i < tyPanels.length; i++) {
       tyPanels[i].classList.remove('active', 'leaving');
@@ -4034,10 +3849,12 @@
       tyDots[i].classList.toggle('active', i === tyCurrentPanel);
     }
     activateTyPanel(tyCurrentPanel);
+    updateTySwipeHint();
   }
   function exitTyToQuotes() {
     if (tyExited) return;
     tyExited = true;
+    tySwipeHint.classList.remove('shown');
     tyDotsEl.classList.add('hidden');
     tyCarousel.classList.add('hidden-out');
     tyPushTimeout(function() {
@@ -4256,15 +4073,11 @@
   }
 
   /* ============ THANK-YOU SEQUENCE ============ */
-  /* NOTE: table-locked is deliberately NOT applied here. The
-     thank-you screen is position: fixed and covers the viewport,
-     so scroll locking is not required. Keeping the body unlocked
-     preserves the current scroll position, which is essential for
-     the returnToTable smooth scroll to be short and fast. */
 
   function startThankyouSequence() {
     clearAllTyTimers();
     document.body.classList.add('thankyou-active');
+    applyTyPanel1Content();
     tyExited = false;
     tyCarousel.classList.remove('hidden-out');
     tyDotsEl.classList.remove('hidden');
@@ -4279,6 +4092,7 @@
       tyDots[i].classList.toggle('active', i === 0);
     }
     activateTyPanel(0);
+    updateTySwipeHint();
   }
 
   function resumeThankyouSequence() {
@@ -4286,6 +4100,8 @@
     if (tyExited) {
       tyAmbientStage.classList.add('shown');
       showQuote(currentQuoteIndex);
+    } else {
+      updateTySwipeHint();
     }
     updateInfoDateTime();
   }
