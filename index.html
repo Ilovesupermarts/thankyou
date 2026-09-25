@@ -461,7 +461,7 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Pinned swipe hint, well above the dots ---- */
+  /* ---- Pinned swipe hint, above the dots ---- */
 
   .action-hint.global-hint {
     position: absolute;
@@ -480,10 +480,10 @@
     pointer-events: auto;
   }
 
-  /* ---- Dots ---- */
+  /* ---- Dots (raised to sit just below the hint) ---- */
 
   .dots {
-    position: absolute; bottom: 40px; left: 0; right: 0;
+    position: absolute; bottom: 60px; left: 0; right: 0;
     display: flex; justify-content: center; align-items: center;
     gap: 14px;
     z-index: 10;
@@ -515,6 +515,11 @@
       0 0 0 5px rgba(176, 74, 90, 0.14),
       0 2px 6px rgba(176, 74, 90, 0.25);
   }
+
+  /* ---- Spacer between the stage and the transition line.
+         Pushing this to 40vh gives the transition line plenty of
+         room to fade in from below the fold as the user scrolls. ---- */
+  .stage-spacer { height: 40vh; }
 
   /* ============ TRANSITION LINE ============ */
 
@@ -1522,10 +1527,11 @@
     .summary-total { font-size: 19px; }
     .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
     .blossom-char { font-size: 72px; }
-    .dots { bottom: 26px; gap: 12px; }
+    .dots { bottom: 46px; gap: 12px; }
     .dot { width: 9px; height: 9px; }
     .ty-dots { gap: 12px; }
     .ty-dot { width: 9px; height: 9px; }
+    .stage-spacer { height: 30vh; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1544,6 +1550,7 @@
     .msg-emphasis { font-size: 16px; margin-top: 18px; padding-top: 16px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 72px; }
+    .dots { bottom: 32px; }
     .name-inner { max-width: 480px; }
     .blossom-char { font-size: 68px; }
     .name-char { font-size: 48px; }
@@ -1555,6 +1562,7 @@
     .quote-wrap { min-height: 110px; }
     .ty-dots { bottom: 48px; }
     .ty-receipt-btn { bottom: 8px; padding: 8px 20px; font-size: 11px; }
+    .stage-spacer { height: 25vh; }
   }
 </style>
 </head>
@@ -2163,22 +2171,13 @@
   function updateGlobalHint() {
     if (!globalHint || !globalHintText || !globalHintArrow) return;
 
-    // The hint is part of the intro carousel only. Once the user has
-    // moved on to the table section, hide it for good.
-    if (tableEnteredView) {
-      globalHint.classList.remove('shown');
-      return;
-    }
-
-    // The hint is only visible once the intro is done (name screen hidden).
-    // Before the intro, it should stay hidden.
+    // Hidden until the user has confirmed their name.
     if (!nameConfirmed) {
       globalHint.classList.remove('shown');
       return;
     }
 
     if (currentPanel === totalPanels - 1) {
-      // Last panel: down arrow + scroll message
       globalHintText.textContent = '下へスクロールしてください';
       globalHintArrow.textContent = '↓';
       globalHintArrow.classList.remove('right');
@@ -2187,7 +2186,6 @@
         globalHint.insertBefore(globalHintArrow, globalHintText);
       }
     } else {
-      // Panels 1–4: right arrow + swipe message
       globalHintArrow.textContent = '→';
       globalHintArrow.classList.remove('down');
       globalHintArrow.classList.add('right');
@@ -2198,6 +2196,29 @@
     }
 
     globalHint.classList.add('shown');
+    updateIntroHintVisibility();
+  }
+
+  // Hint stays visible while the user is still on the last message
+  // panel. It only hides once the table card's top has clearly moved
+  // into the upper part of the viewport (above 60% height).
+  function updateIntroHintVisibility() {
+    if (!globalHint) return;
+    if (!nameConfirmed) {
+      globalHint.classList.remove('shown');
+      return;
+    }
+    if (!tableEnteredView) {
+      globalHint.classList.add('shown');
+      return;
+    }
+    var rect = tableCard.getBoundingClientRect();
+    var vh = window.innerHeight;
+    if (rect.top < vh * 0.6) {
+      globalHint.classList.remove('shown');
+    } else {
+      globalHint.classList.add('shown');
+    }
   }
 
   function goToPanel(index) {
@@ -2536,7 +2557,6 @@
     divider.classList.add('active');
     summaryBar.classList.remove('visible');
 
-    // Reset the transition-line state machine
     lineVisible = false;
     hasEverScrolled = false;
     tableEnteredView = false;
@@ -2546,7 +2566,6 @@
     }
     document.body.classList.remove('warm-background');
 
-    // Restore hint for the intro
     if (globalHint) globalHint.classList.remove('shown');
     updateGlobalHint();
 
@@ -3065,14 +3084,16 @@
   /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 
   /*
-    lineVisible is the reversible state for the transition line.
-    On load: hidden. On first downward scroll: shown (fades in). When
-    the table's top edge crosses above the fade-trigger line, the line
-    fades out. Scrolling back up brings it in again.
+    lineVisible is the reversible state of the transition line.
+    - On load: hidden.
+    - First downward scroll: fade in when the line approaches the
+      viewport bottom (this is what makes the fade-in visible).
+    - When the table card's top crosses above the fade trigger, the
+      line fades out.
+    - Scrolling back up brings it in again.
 
-    The summary bar (bottom white strip) is shown only while the table
-    card covers at least 50% of the viewport height. This is
-    independent of the transition line.
+    The summary bar is shown only while the table card covers at
+    least 50% of the viewport.
 
     Thresholds tuned for Tab S8 Ultra (landscape ~1800px, portrait
     ~2900px) and phones.
@@ -3104,7 +3125,6 @@
       divider.classList.add('active');
       rejectRow.classList.add('active');
       tableCard.classList.add('active');
-      if (globalHint) globalHint.classList.remove('shown');
     }
   }
 
@@ -3151,16 +3171,23 @@
 
     var rect = tableCard.getBoundingClientRect();
     var trigger = getFadeTriggerPx();
+    var lineRect = transitionLine.getBoundingClientRect();
+    var vh = window.innerHeight;
 
-    if (rect.top <= trigger) {
+    // Fade the transition line in as soon as its top edge enters the
+    // viewport (i.e. the user has scrolled past the stage + spacer).
+    // This ensures the fade-in is actually visible.
+    if (lineRect.top < vh - 20) {
       revealTableSection();
-      hideTransitionLine();
-    } else {
-      revealTableSection();
-      showTransitionLine(true);
+      if (rect.top <= trigger) {
+        hideTransitionLine();
+      } else {
+        showTransitionLine(true);
+      }
     }
 
     updateSummaryVisibility();
+    updateIntroHintVisibility();
   }
 
   var rafPending = false;
@@ -3179,17 +3206,14 @@
     var goingUp   = y < lastScrollY - 1;
     lastScrollY = y;
 
-    // First-ever downward scroll: fade the line in immediately.
-    // The line starts well below the viewport, so the user can
-    // actually see the fade-in transition.
     if (goingDown && !hasEverScrolled && y > 5) {
       hasEverScrolled = true;
-      if (currentPanel === totalPanels - 1) {
-        var rect = tableCard.getBoundingClientRect();
-        if (rect.top < window.innerHeight + 400) {
-          revealTableSection();
-          showTransitionLine(false);
-        }
+      // Do a synchronous check so the line appears as soon as its
+      // top edge is near the viewport bottom.
+      var lineRect = transitionLine.getBoundingClientRect();
+      if (currentPanel === totalPanels - 1 && lineRect.top < window.innerHeight + 100) {
+        revealTableSection();
+        showTransitionLine(true);
       }
     }
 
