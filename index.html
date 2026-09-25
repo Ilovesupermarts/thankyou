@@ -395,7 +395,6 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  /* Therapist name: brush-stroke Yuji Syuku, deep rose, no underline */
   .greeting .therapist-name {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-weight: 500;
@@ -474,8 +473,6 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Pinned swipe hint ---- */
-
   .action-hint.global-hint {
     position: absolute;
     left: 0;
@@ -494,7 +491,6 @@
     pointer-events: auto;
   }
 
-  /* Two stacked hint layers, cross-fade between them. */
   .action-hint.global-hint .hint-layer {
     position: absolute;
     left: 0;
@@ -512,8 +508,6 @@
   .action-hint.global-hint .hint-layer.active {
     opacity: 1;
   }
-
-  /* ---- Dots ---- */
 
   .dots {
     position: absolute; bottom: 100px; left: 0; right: 0;
@@ -549,7 +543,6 @@
       0 2px 6px rgba(176, 74, 90, 0.25);
   }
 
-  /* Small spacer between stage and transition line */
   .stage-spacer { height: 2vh; }
 
   /* ============ TRANSITION LINE ============ */
@@ -613,8 +606,6 @@
   }
   .table-card.active { opacity: 1; transform: translateY(0); }
 
-  /* Privacy note: now the header of the table card.
-     No <br>, flows naturally as one paragraph. */
   .privacy-note-inline {
     margin: 0;
     padding: 16px 22px 18px 22px;
@@ -810,12 +801,12 @@
   }
   .gift-divider-label {
     flex-shrink: 0;
-    font-size: 12px;
+    font-size: 17px;
     font-weight: 600;
     color: #b04a5a;
-    letter-spacing: 4px;
+    letter-spacing: 5px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    padding: 0 4px;
+    padding: 0 6px;
   }
 
   .reject-gift {
@@ -828,13 +819,50 @@
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-align: center;
   }
-  .reject-gift .gift-amount {
-    display: inline-block;
+
+  /* New inline tip input inside the reject-gift text */
+  .reject-gift-input {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #fdf3f2;
+    border: 1.5px solid #e8b4bc;
+    border-radius: 8px;
+    padding: 4px 10px;
+    margin: 0 4px;
+    vertical-align: middle;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .reject-gift-input:focus-within {
+    border-color: #b04a5a;
+    background: #ffffff;
+  }
+  .reject-gift-input .tip-input {
+    background: transparent;
+    border: none;
+    color: #b04a5a;
     font-size: 18px;
     font-weight: 700;
-    color: #b04a5a;
+    font-family: inherit;
+    text-align: right;
     letter-spacing: 1px;
-    margin: 2px 0;
+    width: 76px;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .reject-gift-input .tip-input:focus { outline: none; }
+  .reject-gift-input .tip-input::placeholder {
+    color: #c9b0b5;
+    font-weight: 400;
+    font-size: 12px;
+    letter-spacing: 0.3px;
+  }
+  .reject-gift-input .tip-yen {
+    color: #b04a5a;
+    font-size: 16px;
+    font-weight: 700;
+    flex-shrink: 0;
   }
 
   /* ============ PETAL ============ */
@@ -1538,6 +1566,10 @@
     .blossom-char { font-size: 100px; }
     .dot { width: 12px; height: 12px; }
     .ty-dot { width: 12px; height: 12px; }
+    .gift-divider-label { font-size: 19px; letter-spacing: 6px; }
+    .reject-gift { font-size: 15px; }
+    .reject-gift-input .tip-input { font-size: 20px; width: 88px; }
+    .reject-gift-input .tip-yen { font-size: 18px; }
   }
 
   @media (min-width: 1100px) {
@@ -1557,6 +1589,10 @@
     .blossom-char { font-size: 108px; }
     .dot { width: 13px; height: 13px; }
     .ty-dot { width: 13px; height: 13px; }
+    .gift-divider-label { font-size: 21px; letter-spacing: 7px; }
+    .reject-gift { font-size: 16px; }
+    .reject-gift-input .tip-input { font-size: 22px; width: 96px; }
+    .reject-gift-input .tip-yen { font-size: 20px; }
   }
 
   @media (max-height: 700px) {
@@ -1591,6 +1627,10 @@
     .ty-dot { width: 9px; height: 9px; }
     .stage-spacer { height: 1.5vh; }
     .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
+    .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
+    .reject-gift { font-size: 12.5px; padding: 12px 14px; }
+    .reject-gift-input .tip-input { font-size: 16px; width: 68px; }
+    .reject-gift-input .tip-yen { font-size: 14px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1623,6 +1663,10 @@
     .ty-dots { bottom: 48px; }
     .ty-receipt-btn { bottom: 8px; padding: 8px 20px; font-size: 11px; }
     .stage-spacer { height: 1.5vh; }
+    .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
+    .reject-gift { font-size: 12px; }
+    .reject-gift-input .tip-input { font-size: 15px; width: 60px; }
+    .reject-gift-input .tip-yen { font-size: 13px; }
   }
 </style>
 </head>
@@ -1876,10 +1920,7 @@
       </div>
 
       <div class="reject-gift">
-        ささやかではございますが、<br>
-        日頃の感謝の気持ちを込めて、<br>
-        <span class="gift-amount">1,000円</span> を<br>
-        お受け取りいただければ幸いです。
+        ささやかではございますが、日頃の感謝の気持ちを込めて、<span class="reject-gift-input"><input type="tel" class="tip-input" id="tipInput" placeholder="金額を入力"><span class="tip-yen">円</span></span>をお受け取りいただければ幸いです。
       </div>
     </div>
   </div>
@@ -2057,9 +2098,8 @@
 </div>
 
 <script>
-  /* ============ HAPTIC FEEDBACK (with tablet audio fallback) ============ */
+  /* ============ HAPTIC FEEDBACK ============ */
 
-  // Cached AudioContext, created lazily on first user tap.
   var hapticAudioCtx = null;
 
   function getHapticAudioCtx() {
@@ -2099,16 +2139,12 @@
 
   function haptic(ms) {
     var strength = ms || 8;
-
-    // 1) Real vibration (phones).
     try {
       if (navigator.vibrate) {
         var ok = navigator.vibrate(strength);
         if (ok !== false) return;
       }
     } catch (e) { /* silent */ }
-
-    // 2) Fallback for tablets without a vibration motor: soft audio tick.
     playSoftTick(strength);
   }
 
@@ -2196,6 +2232,7 @@
   var summaryBar = document.getElementById('summaryBar');
   var rejectRow = document.getElementById('rejectRow');
   var rejectThanks = document.getElementById('rejectThanks');
+  var tipInput = document.getElementById('tipInput');
   var petalOverlay = document.getElementById('petalOverlay');
   var transitionLine = document.getElementById('transitionLine');
 
@@ -2347,6 +2384,11 @@
 
   function getRows() { return tableCard.querySelectorAll('.row'); }
 
+  function getTipAmount() {
+    if (!tipInput) return 0;
+    return parseFormatted(tipInput.value);
+  }
+
   function recalc() {
     var rows = getRows();
     var sum = 0;
@@ -2360,7 +2402,11 @@
       if (isChecked || val > 0) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
-    totalEl.textContent = '¥' + sum.toLocaleString();
+
+    // When the reject row is selected, the tip amount becomes the total.
+    var displayTotal = rejected ? getTipAmount() : sum;
+
+    totalEl.textContent = '¥' + displayTotal.toLocaleString();
     updateSubmitState();
   }
 
@@ -2375,7 +2421,10 @@
         anyActive = true; break;
       }
     }
-    submitBtn.disabled = !(anyActive || rejected);
+    // Reject row is valid either because it's selected, or because
+    // a tip amount is present.
+    var rejectValid = rejected || getTipAmount() > 0;
+    submitBtn.disabled = !(anyActive || rejectValid);
   }
 
   function updateRowLock(row) {
@@ -2460,6 +2509,7 @@
     if (!input.classList.contains('price-input')) return;
     if (rejected) return;
     if (input.disabled) return;
+    // Service price inputs: digits only, no comma formatting.
     input.value = input.value.replace(/[^0-9]/g, '');
     var row = input.closest('.row');
     if (row) {
@@ -2514,6 +2564,31 @@
     }
     recalc();
   });
+
+  /* ============ TIP INPUT (reject-gift amount) ============ */
+  /* Commas live as the user types, digits only, max 5 digits. */
+
+  if (tipInput) {
+    tipInput.addEventListener('input', function() {
+      var digits = tipInput.value.replace(/[^0-9]/g, '');
+      if (digits.length > 5) digits = digits.slice(0, 5);
+      if (digits === '') {
+        tipInput.value = '';
+      } else {
+        tipInput.value = parseInt(digits, 10).toLocaleString();
+      }
+      recalc();
+    });
+
+    tipInput.addEventListener('focus', function() {
+      setTimeout(function() { tipInput.select(); }, 50);
+    });
+
+    // Don't let taps on the tip input toggle the reject row.
+    tipInput.addEventListener('click', function(e) {
+      e.stopPropagation();
+    });
+  }
 
   /* ============ NAME CONFIRM ============ */
 
@@ -2579,9 +2654,12 @@
     }, 420);
   }
 
-  function resetAll() {
-    clearAllTyTimers();
+  /* ============ RESET (clear the form only) ============ */
+  /* Leaves the current panel, scroll position, dots visibility,
+     transition line, and every other state untouched. The user
+     stays exactly where they were. */
 
+  function resetAll() {
     rejected = false;
     rejectRow.classList.remove('selected');
     rejectThanks.classList.remove('shown');
@@ -2594,15 +2672,13 @@
       var serviceText = row.querySelector('.service-input');
       var box = row.querySelector('.row-check');
       if (box) {
-        if (priceInput && priceInput.value !== '') box.setAttribute('data-saved-price', priceInput.value);
-        if (serviceText && serviceText.value !== '') box.setAttribute('data-saved-service', serviceText.value);
-      }
-      if (priceInput) priceInput.value = '';
-      if (serviceText) serviceText.value = '';
-      if (box) {
+        box.removeAttribute('data-saved-price');
+        box.removeAttribute('data-saved-service');
         box.classList.remove('checked');
         box.setAttribute('aria-checked', 'false');
       }
+      if (priceInput) priceInput.value = '';
+      if (serviceText) serviceText.value = '';
       row.classList.remove('disabled', 'filled');
     }
 
@@ -2612,67 +2688,16 @@
       presetInputs[p].value = PRESET_TEXTS[pidx] || '';
     }
 
+    // Clear the tip amount.
+    if (tipInput) tipInput.value = '';
+
     updateAllRowLocks();
-
-    introHasRun = false;
-    blossomScreen.classList.remove('visible');
-    blossomScreen.style.opacity = '';
-    blossomScreen.style.transition = '';
-    introOverlay.classList.remove('active', 'finishing');
-    nameColumn.innerHTML = '';
-    nameInput.classList.remove('confirmed');
-
-    receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
-    confirmScreen.classList.remove('visible');
-    thankyouScreen.classList.remove('visible');
-    tyAmbientStage.classList.remove('shown');
-    quoteLine.classList.remove('shown', 'leaving');
-    quoteLine.textContent = '';
-    blossomDivider.innerHTML = '';
-    tyReceiptBtn.classList.remove('shown');
-    tyCarousel.classList.remove('hidden-out');
-    tyDotsEl.classList.remove('hidden');
-
-    document.body.classList.remove('table-locked');
-    document.body.classList.remove('thankyou-active');
-
-    receiptOpenedFromThankyou = false;
-
-    tyCurrentPanel = 0;
-    tyTrack.style.transform = 'translateX(0%)';
-    for (var d = 0; d < tyDots.length; d++) {
-      tyDots[d].classList.toggle('active', d === 0);
-    }
-    activateTyPanel(0);
-
-    currentPanel = 0;
-    track.style.transform = 'translateX(0%)';
-    for (var p2 = 0; p2 < dots.length; p2++) {
-      dots[p2].classList.toggle('active', p2 === 0);
-    }
-    dotsEl.classList.remove('visible');
-    activatePanel(0);
-
-    tableCard.classList.add('active');
-    rejectRow.classList.add('active');
-    divider.classList.add('active');
-    summaryBar.classList.remove('visible');
-
-    lineVisible = false;
-    hasEverScrolled = false;
-    tableEnteredView = false;
-    lastScrollY = 0;
-    if (transitionLine) {
-      transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
-    }
-    document.body.classList.remove('warm-background');
-
-    if (globalHint) globalHint.classList.remove('shown');
-    if (globalHintLayerSwipe) globalHintLayerSwipe.classList.add('active');
-    if (globalHintLayerScroll) globalHintLayerScroll.classList.remove('active');
-    updateGlobalHint();
-
     recalc();
+
+    // Summary bar visibility follows the current scroll position.
+    if (typeof updateSummaryVisibility === 'function') {
+      updateSummaryVisibility();
+    }
   }
 
   nameBtn.addEventListener('click', function(e) { e.preventDefault(); confirmName(); });
@@ -2846,18 +2871,33 @@
       itemCount++;
     }
 
+    // If the user rejected all services, show the tip amount as the
+    // receipt line item. The amount comes from whatever they typed.
     if (itemCount === 0 && rejected) {
+      var tipAmount = getTipAmount();
       var rejectDiv = document.createElement('div');
       rejectDiv.className = 'receipt-item';
+
       var rejectName = document.createElement('span');
       rejectName.className = 'receipt-item-name';
-      rejectName.textContent = '今回はすべて見送り';
-      var rejectPrice = document.createElement('span');
-      rejectPrice.className = 'receipt-item-price';
-      rejectPrice.textContent = '—';
+      rejectName.textContent = 'ささやかなお礼';
+
+      var rejectPriceWrap = document.createElement('span');
+      rejectPriceWrap.className = 'receipt-item-price-wrap';
+      var rejectYen = document.createElement('span');
+      rejectYen.className = 'yen-symbol';
+      rejectYen.textContent = '¥';
+      var rejectPriceField = document.createElement('input');
+      rejectPriceField.type = 'tel';
+      rejectPriceField.className = 'receipt-price-input';
+      rejectPriceField.value = formatWithComma(tipAmount);
+      rejectPriceWrap.appendChild(rejectYen);
+      rejectPriceWrap.appendChild(rejectPriceField);
+
       rejectDiv.appendChild(rejectName);
-      rejectDiv.appendChild(rejectPrice);
+      rejectDiv.appendChild(rejectPriceWrap);
       receiptItems.appendChild(rejectDiv);
+      itemCount++;
     }
 
     bindReceiptItemListeners();
@@ -3336,7 +3376,6 @@
         }
         rows[i].classList.remove('filled');
       }
-      totalEl.textContent = '¥0';
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
       petalOverlay.classList.remove('active');
       void petalOverlay.offsetWidth;
@@ -3349,8 +3388,8 @@
       for (var j = 0; j < rows2.length; j++) {
         rows2[j].classList.remove('disabled');
       }
-      recalc();
     }
+    recalc();
     updateSubmitState();
   });
 
