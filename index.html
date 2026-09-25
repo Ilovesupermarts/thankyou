@@ -54,6 +54,7 @@
     --glow: #e8b4bc;
     --petal: #e8a8b0;
     --petal-soft: #fbdfe3;
+    --outstanding: #a34a56;
 
     --border-1: #ead9d5;
     --border-2: #e2d5d0;
@@ -77,6 +78,16 @@
     --shadow-rose: rgba(120, 90, 90, 0.08);
     --shadow-rose-2: rgba(120, 90, 90, 0.16);
     --shadow-accent: rgba(176, 74, 90, 0.25);
+
+    /* Box tint (panel 5 white box) */
+    --box-bg: rgba(253, 240, 240, 0.55);
+    --box-border: rgba(232, 200, 200, 0.4);
+    --box-shadow: 0 2px 12px rgba(120, 90, 90, 0.06);
+
+    /* Active dot styling */
+    --dot-active-bg: #b04a5a;
+    --dot-active-ring: rgba(176, 74, 90, 0.14);
+    --dot-active-shadow: rgba(176, 74, 90, 0.25);
 
     /* Ambient background gradient stops (default pink) */
     --amb-1: rgba(251, 200, 210, 0.70);
@@ -113,6 +124,7 @@
     --glow: #f7b93c;
     --petal: #e88a1a;
     --petal-soft: #fde8b8;
+    --outstanding: #8f2f00;
 
     --border-1: #e8c88a;
     --border-2: #d8b478;
@@ -126,23 +138,35 @@
     --soft-3: #f0e0b8;
     --soft-4: #fdf6e0;
 
-    --text-dark: #2e1a08;
-    --text-med: #5a3a1a;
-    --text-soft: #3a2410;
-    --text-mute: #8a6030;
-    --text-faint: #c0a070;
-    --text-placeholder: #d8c090;
+    /* Autumn contrast tokens: darker so muted text stays legible on the
+       saturated amber/orange gradient */
+    --text-dark: #231304;
+    --text-med: #3d2410;
+    --text-soft: #2a1808;
+    --text-mute: #5a3818;
+    --text-faint: #7a5028;
+    --text-placeholder: #a07a48;
 
     --shadow-rose: rgba(120, 70, 20, 0.10);
     --shadow-rose-2: rgba(120, 70, 20, 0.18);
     --shadow-accent: rgba(201, 96, 10, 0.32);
 
+    /* Box tint for panel 5 — warm amber, blends with theme */
+    --box-bg: rgba(253, 240, 200, 0.55);
+    --box-border: rgba(216, 180, 120, 0.4);
+    --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
+
+    /* Active dot styling — dark brown so it stands out on amber */
+    --dot-active-bg: #3d2410;
+    --dot-active-ring: rgba(61, 36, 16, 0.25);
+    --dot-active-shadow: rgba(61, 36, 16, 0.45);
+
     /* Autumn palette — saturated orange/yellow/brown */
-    --amb-1: rgba(247, 185, 60, 0.85);   /* golden yellow */
-    --amb-2: rgba(240, 138, 30, 0.80);   /* warm orange */
-    --amb-3: rgba(217, 94, 26, 0.72);    /* deep orange */
-    --amb-4: rgba(143, 63, 18, 0.55);    /* rich brown */
-    --amb-5: rgba(107, 47, 14, 0.45);    /* dark brown */
+    --amb-1: rgba(247, 185, 60, 0.85);
+    --amb-2: rgba(240, 138, 30, 0.80);
+    --amb-3: rgba(217, 94, 26, 0.72);
+    --amb-4: rgba(143, 63, 18, 0.55);
+    --amb-5: rgba(107, 47, 14, 0.45);
   }
 
   /* ============ BASE ============ */
@@ -197,7 +221,6 @@
     will-change: transform, filter;
   }
 
-  /* Autumn: five independent drifting layers for a random, non-repeating feel */
   html[data-theme="autumn"] body::before {
     background:
       radial-gradient(circle at 25% 30%, var(--amb-1) 0%, transparent 45%),
@@ -255,7 +278,6 @@
     85% { transform: translate(-2%, -2%) scale(1.1); }
   }
 
-  /* Autumn drift — two-layer approach with irregular waypoints */
   @keyframes autumnDrift1 {
     0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
     11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
@@ -297,22 +319,24 @@
       0 0 10px rgba(250, 247, 245, 0.8);
     display: none;
   }
+  body.info-visible .info-bar {
+    display: block;
+  }
   .info-bar.shown { opacity: 1; transform: translateY(0); }
   .info-bar.hidden {
     opacity: 0; transform: translateY(-14px);
     transition: opacity 0.6s ease, transform 0.6s ease;
   }
-  body.info-visible .info-bar {
-    display: block;
-  }
-  body.info-visible .info-bar.shown {
-    opacity: 1;
-  }
 
+  /* The inner wrapper sizes itself to the info line, and the ticker is
+     absolutely positioned inside it so the ticker is clipped to exactly
+     the info line's width, not the full viewport. */
   .info-inner {
     display: inline-block;
+    position: relative;
     max-width: 100%;
     text-align: center;
+    padding-bottom: 26px;
   }
 
   .info-line {
@@ -332,17 +356,19 @@
   /* ---- Weather ticker ---- */
 
   .ticker-wrap {
-    width: 100%;
-    margin: 8px auto 0 auto;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 22px;
     overflow: hidden;
     white-space: nowrap;
-    position: relative;
     opacity: 0;
     transition: opacity 1.4s ease;
     -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
     mask-image: linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%);
   }
-  .ticker-wrap.shown { opacity: 0.85; }
+  .ticker-wrap.shown { opacity: 0.9; }
 
   .ticker-track {
     display: inline-block;
@@ -354,10 +380,8 @@
     letter-spacing: 1.2px;
     animation: tickerScroll 60s linear infinite;
     will-change: transform;
+    line-height: 22px;
   }
-  .ticker-track .tick-city { color: var(--accent); font-weight: 600; }
-  .ticker-track .tick-sep { color: #d8ccc8; margin: 0 10px; font-weight: 400; }
-  .ticker-track .tick-temp { color: var(--accent); font-weight: 600; }
 
   @keyframes tickerScroll {
     from { transform: translateX(0); }
@@ -455,21 +479,9 @@
   .name-input:focus { outline: none; border-color: var(--accent); }
 
   @keyframes inputConfirm {
-    0% {
-      transform: scale(1);
-      box-shadow: 0 4px 18px var(--shadow-rose);
-      border-color: var(--border-1);
-    }
-    50% {
-      transform: scale(1.03);
-      box-shadow: 0 10px 32px var(--shadow-accent);
-      border-color: var(--accent);
-    }
-    100% {
-      transform: scale(1);
-      box-shadow: 0 4px 18px var(--shadow-rose);
-      border-color: var(--border-1);
-    }
+    0% { transform: scale(1); box-shadow: 0 4px 18px var(--shadow-rose); border-color: var(--border-1); }
+    50% { transform: scale(1.03); box-shadow: 0 10px 32px var(--shadow-accent); border-color: var(--accent); }
+    100% { transform: scale(1); box-shadow: 0 4px 18px var(--shadow-rose); border-color: var(--border-1); }
   }
 
   .name-input.confirmed {
@@ -590,14 +602,8 @@
     text-shadow: 0 4px 14px var(--petal-soft);
   }
   @keyframes blossomBreathe {
-    0%, 100% {
-      transform: scale(1);
-      filter: drop-shadow(0 0 0px transparent);
-    }
-    50% {
-      transform: scale(1.14);
-      filter: drop-shadow(0 4px 18px var(--petal-soft));
-    }
+    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
+    50% { transform: scale(1.14); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
   }
 
   .start-label {
@@ -668,7 +674,7 @@
   .panel {
     width: calc(100% / 5); height: 100%;
     display: flex; align-items: center; justify-content: center;
-    padding: 80px 20px 260px 20px; text-align: center;
+    padding: 140px 20px 260px 20px; text-align: center;
   }
   .panel-inner { max-width: 480px; width: 100%; }
   .panel-content {
@@ -705,25 +711,34 @@
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-weight: 500;
     font-size: 1.18em;
-    color: var(--accent-2);
+    color: var(--outstanding);
     letter-spacing: 2px;
     font-style: normal;
     text-shadow: 0 1px 8px var(--petal-soft);
     padding: 0 2px;
   }
+  html[data-theme="autumn"] .panel-content .therapist-name {
+    color: #8f2f00;
+    text-shadow:
+      0 1px 12px rgba(143, 47, 0, 0.35),
+      0 2px 20px rgba(253, 232, 184, 0.6);
+  }
 
   .panel-content .panel-5-red {
     color: var(--accent);
   }
+  html[data-theme="autumn"] .panel-content .panel-5-red {
+    color: #8f2f00;
+  }
 
   .panel-content .msg-3 {
     padding: 24px 22px;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--box-bg);
     border-radius: 20px;
-    border: 1.5px solid var(--border-1);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    border: 1px solid var(--box-border);
+    box-shadow: var(--box-shadow);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
   }
 
   .action-hint {
@@ -732,16 +747,22 @@
     justify-content: center;
     gap: 10px;
     font-size: 14px;
-    color: var(--text-faint);
+    color: var(--text-mute);
     letter-spacing: 4px;
     font-weight: 500;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  }
+  html[data-theme="autumn"] .action-hint {
+    color: #3d2410;
   }
   .action-hint .hint-arrow {
     display: inline-block;
     color: var(--accent);
     font-size: 16px;
     line-height: 1;
+  }
+  html[data-theme="autumn"] .action-hint .hint-arrow {
+    color: #8f2f00;
   }
   .action-hint .hint-arrow.right {
     animation: swipeArrow 2s ease-in-out infinite;
@@ -821,16 +842,11 @@
   }
 
   .dot.active {
-    background: var(--accent);
+    background: var(--dot-active-bg);
     transform: scale(1.5);
     box-shadow:
-      0 0 0 5px rgba(176, 74, 90, 0.14),
-      0 2px 6px var(--shadow-accent);
-  }
-  html[data-theme="autumn"] .dot.active {
-    box-shadow:
-      0 0 0 5px rgba(201, 96, 10, 0.18),
-      0 2px 6px var(--shadow-accent);
+      0 0 0 5px var(--dot-active-ring),
+      0 2px 6px var(--dot-active-shadow);
   }
 
   .stage-spacer { height: 2vh; }
@@ -851,6 +867,9 @@
       opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
       transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
       filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  html[data-theme="autumn"] .transition-line {
+    color: #8f2f00;
   }
   .transition-line.active { opacity: 1; transform: translateY(0); filter: blur(0); }
   .transition-line.fading {
@@ -973,7 +992,7 @@
     transition: border-color 0.2s;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  .service-input::placeholder { color: #a9a09c; font-weight: 400; }
+  .service-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
   .service-input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
 
   .service-display {
@@ -1010,7 +1029,7 @@
   }
   .price-input:focus { outline: none; }
   .price-input::placeholder {
-    color: #bdb2ae;
+    color: var(--text-placeholder);
     font-weight: 400;
     font-size: 11px;
     letter-spacing: 0.5px;
@@ -1695,16 +1714,11 @@
       box-shadow 0.3s ease;
   }
   .ty-dot.active {
-    background: var(--accent);
+    background: var(--dot-active-bg);
     transform: scale(1.5);
     box-shadow:
-      0 0 0 5px rgba(176, 74, 90, 0.14),
-      0 2px 6px var(--shadow-accent);
-  }
-  html[data-theme="autumn"] .ty-dot.active {
-    box-shadow:
-      0 0 0 5px rgba(201, 96, 10, 0.18),
-      0 2px 6px var(--shadow-accent);
+      0 0 0 5px var(--dot-active-ring),
+      0 2px 6px var(--dot-active-shadow);
   }
 
   .ty-ambient-stage {
@@ -1773,7 +1787,6 @@
   .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
 
-  /* View receipt button: subtle bottom-left back-button style */
   .ty-receipt-btn {
     position: absolute;
     bottom: 20px;
@@ -1804,7 +1817,7 @@
     gap: 6px;
   }
   .ty-receipt-btn.shown {
-    opacity: 0.7;
+    opacity: 0.75;
     pointer-events: auto;
   }
   .ty-receipt-btn:active {
@@ -1836,7 +1849,7 @@
       margin-right: auto;
     }
     .panel-inner { max-width: 480px; }
-    .panel { padding: 80px 32px 260px 32px; }
+    .panel { padding: 150px 32px 260px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 17px; max-width: 600px; }
     .privacy-note-inline { font-size: 15px; }
@@ -1866,6 +1879,7 @@
     .info-bar { padding: 24px 28px 16px 28px; }
     .ticker-track { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
+    .panel { padding: 160px 32px 260px 32px; }
     .panel-content { font-size: 22px; }
     .transition-line { font-size: 18px; max-width: 660px; }
     .privacy-note-inline { font-size: 16px; }
@@ -1892,7 +1906,7 @@
     .ticker-track { font-size: 11.5px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
-    .panel { padding: 65px 20px 220px 20px; }
+    .panel { padding: 100px 20px 220px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
@@ -1932,7 +1946,7 @@
     .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
-    .panel { padding: 55px 40px 180px 40px; }
+    .panel { padding: 90px 40px 180px 40px; }
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 2; }
     .action-hint { margin-top: 0; }
@@ -2421,17 +2435,13 @@
       var t = ctx.currentTime;
       var osc = ctx.createOscillator();
       var gain = ctx.createGain();
-
       var peak = Math.min(0.035, 0.012 + (strength || 8) * 0.002);
-
       osc.type = 'sine';
       osc.frequency.setValueAtTime(1400, t);
       osc.frequency.exponentialRampToValueAtTime(900, t + 0.045);
-
       gain.gain.setValueAtTime(0.0001, t);
       gain.gain.exponentialRampToValueAtTime(peak, t + 0.006);
       gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
-
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.start(t);
@@ -2469,20 +2479,13 @@
   /* ============ PRESETS ============ */
 
   var PRESET_TEXTS = [
-    'ダミーテキスト1',
-    'ダミーテキスト2',
-    'ダミーテキスト3',
-    'ダミーテキスト4',
-    'ダミーテキスト5',
-    'ダミーテキスト6'
+    'ダミーテキスト1', 'ダミーテキスト2', 'ダミーテキスト3',
+    'ダミーテキスト4', 'ダミーテキスト5', 'ダミーテキスト6'
   ];
 
   function loadPresetsFromServer() {
     return fetch('presets.json?v=' + Date.now())
-      .then(function(r) {
-        if (!r.ok) throw new Error('presets.json not found');
-        return r.json();
-      })
+      .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
       .then(function(data) {
         if (data && Array.isArray(data.presets) && data.presets.length > 0) {
           PRESET_TEXTS = data.presets.slice();
@@ -2503,10 +2506,7 @@
 
   function loadQuotesFromServer() {
     return fetch('quotes.json?v=' + Date.now())
-      .then(function(r) {
-        if (!r.ok) throw new Error('quotes.json not found');
-        return r.json();
-      })
+      .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
       .then(function(data) {
         if (data && Array.isArray(data.quotes) && data.quotes.length > 0) {
           AMBIENT_LINES = data.quotes.slice();
@@ -2516,7 +2516,7 @@
       .catch(function() { return AMBIENT_LINES; });
   }
 
-  /* ============ PANEL LOADER (panels 1-4) ============ */
+  /* ============ PANEL LOADER ============ */
 
   function convertPanelText(raw) {
     if (!raw) return '';
@@ -2528,9 +2528,7 @@
     for (var i = 0; i < paragraphs.length; i++) {
       var para = paragraphs[i].trim();
       if (para === '') continue;
-      para = para.split('\n').map(function(line) {
-        return line.trim();
-      }).join('<br>');
+      para = para.split('\n').map(function(line) { return line.trim(); }).join('<br>');
       out.push('<p>' + para + '</p>');
     }
     return out.join('');
@@ -2538,10 +2536,7 @@
 
   function loadPanelInto(anchorId, url) {
     return fetch(url + '?v=' + Date.now())
-      .then(function(r) {
-        if (!r.ok) throw new Error(url + ' not found');
-        return r.text();
-      })
+      .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
       .then(function(text) {
         var anchor = document.getElementById(anchorId);
         if (anchor) anchor.innerHTML = convertPanelText(text);
@@ -2646,13 +2641,13 @@
   var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
 
   var TICKER_CITIES = [
-    { key: 'nagoya',   name: '名古屋', lat: 35.1815, lon: 136.9066 },
-    { key: 'tokyo',    name: '東京',   lat: 35.6762, lon: 139.6503 },
-    { key: 'osaka',    name: '大阪',   lat: 34.6937, lon: 135.5023 },
-    { key: 'kyoto',    name: '京都',   lat: 35.0116, lon: 135.7681 },
-    { key: 'okinawa',  name: '沖縄',   lat: 26.2124, lon: 127.6809 },
-    { key: 'sendai',   name: '仙台',   lat: 38.2682, lon: 140.8694 },
-    { key: 'sapporo',  name: '札幌',   lat: 43.0618, lon: 141.3545 }
+    { key: 'nagoya',   name: '名古屋市', lat: 35.1815, lon: 136.9066 },
+    { key: 'tokyo',    name: '東京市',   lat: 35.6762, lon: 139.6503 },
+    { key: 'osaka',    name: '大阪市',   lat: 34.6937, lon: 135.5023 },
+    { key: 'kyoto',    name: '京都市',   lat: 35.0116, lon: 135.7681 },
+    { key: 'okinawa',  name: '那覇市',   lat: 26.2124, lon: 127.6809 },
+    { key: 'sendai',   name: '仙台市',   lat: 38.2682, lon: 140.8694 },
+    { key: 'sapporo',  name: '札幌市',   lat: 43.0618, lon: 141.3545 }
   ];
 
   window.addEventListener('resize', function() {
@@ -2695,9 +2690,7 @@
 
   function repositionHintGroupAfterLayout() {
     requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        repositionHintGroup();
-      });
+      requestAnimationFrame(function() { repositionHintGroup(); });
     });
     setTimeout(repositionHintGroup, 150);
   }
@@ -2720,12 +2713,10 @@
 
   function updateGlobalHint() {
     if (!globalHint || !globalHintLayerSwipe || !globalHintLayerScroll) return;
-
     if (!nameConfirmed) {
       globalHint.classList.remove('shown');
       return;
     }
-
     if (currentPanel === totalPanels - 1) {
       globalHintLayerSwipe.classList.remove('active');
       globalHintLayerScroll.classList.add('active');
@@ -2733,28 +2724,18 @@
       globalHintLayerScroll.classList.remove('active');
       globalHintLayerSwipe.classList.add('active');
     }
-
     globalHint.classList.add('shown');
     updateIntroHintVisibility();
   }
 
   function updateIntroHintVisibility() {
     if (!globalHint) return;
-    if (!nameConfirmed) {
-      globalHint.classList.remove('shown');
-      return;
-    }
-    if (!tableEnteredView) {
-      globalHint.classList.add('shown');
-      return;
-    }
+    if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
+    if (!tableEnteredView) { globalHint.classList.add('shown'); return; }
     var rect = tableCard.getBoundingClientRect();
     var vh = window.innerHeight;
-    if (rect.top < vh * 0.6) {
-      globalHint.classList.remove('shown');
-    } else {
-      globalHint.classList.add('shown');
-    }
+    if (rect.top < vh * 0.6) globalHint.classList.remove('shown');
+    else globalHint.classList.add('shown');
   }
 
   function goToPanel(index) {
@@ -2770,10 +2751,8 @@
       lineVisible = false;
       summaryBar.classList.remove('visible');
     }
-
     updateGlobalHint();
     setTimeout(repositionHintGroup, 30);
-
     if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
       setTimeout(scheduleEvaluation, 80);
     }
@@ -2796,7 +2775,6 @@
       if (isChecked || val > 0) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
-
     var displayTotal = rejected ? confirmedTipAmount : sum;
     totalEl.textContent = '¥' + displayTotal.toLocaleString();
     updateSubmitState();
@@ -2822,11 +2800,9 @@
     var serviceDisplay = row.querySelector('.service-display');
     var priceInput = row.querySelector('.price-input');
     if (!priceInput) return;
-
     var hasName = false;
     if (serviceText) hasName = (serviceText.value || '').trim() !== '';
     else if (serviceDisplay) hasName = (serviceDisplay.textContent || '').trim() !== '';
-
     if (hasName) {
       priceInput.disabled = false;
       row.classList.remove('locked');
@@ -2854,7 +2830,6 @@
     var priceField = row.querySelector('.price-input');
     var serviceText = row.querySelector('.service-input');
     var isCustomRow = !!serviceText;
-
     if (box.classList.contains('checked')) {
       haptic(6);
       if (priceField) {
@@ -2900,11 +2875,8 @@
     if (input.disabled) return;
     var digits = input.value.replace(/[^0-9]/g, '');
     if (digits.length > 5) digits = digits.slice(0, 5);
-    if (digits === '') {
-      input.value = '';
-    } else {
-      input.value = parseInt(digits, 10).toLocaleString();
-    }
+    if (digits === '') input.value = '';
+    else input.value = parseInt(digits, 10).toLocaleString();
     var row = input.closest('.row');
     if (row) {
       var box = row.querySelector('.row-check');
@@ -2972,13 +2944,9 @@
     tipInput.addEventListener('input', function() {
       var digits = tipInput.value.replace(/[^0-9]/g, '');
       if (digits.length > 5) digits = digits.slice(0, 5);
-      if (digits === '') {
-        tipInput.value = '';
-      } else {
-        tipInput.value = parseInt(digits, 10).toLocaleString();
-      }
+      if (digits === '') tipInput.value = '';
+      else tipInput.value = parseInt(digits, 10).toLocaleString();
     });
-
     tipInput.addEventListener('focus', function() {
       setTimeout(function() { tipInput.select(); }, 50);
     });
@@ -2987,16 +2955,11 @@
   function setTipValue(value) {
     if (!tipInput) return;
     var v = Math.max(0, Math.min(99999, value));
-    if (v === 0) {
-      tipInput.value = '';
-    } else {
-      tipInput.value = v.toLocaleString();
-    }
+    if (v === 0) tipInput.value = '';
+    else tipInput.value = v.toLocaleString();
   }
 
-  function getTipValue() {
-    return tipInput ? parseFormatted(tipInput.value) : 0;
-  }
+  function getTipValue() { return tipInput ? parseFormatted(tipInput.value) : 0; }
 
   function stepTip(delta) {
     var current = getTipValue();
@@ -3010,71 +2973,47 @@
 
   function attachHoldAcceleration(buttonEl, delta) {
     if (!buttonEl) return;
-
     var holdDelay = 400;
     var holdTimeout = null;
     var holdInterval = null;
     var holdStart = 0;
-
     function rateForElapsed(ms) {
       if (ms < 1500) return 200;
       if (ms < 3000) return 100;
       return 50;
     }
-
     function tick() {
       var changed = stepTip(delta);
-      if (!changed) {
-        stop();
-        return;
-      }
+      if (!changed) { stop(); return; }
       var elapsed = Date.now() - holdStart;
       var nextRate = rateForElapsed(elapsed);
       holdInterval = setTimeout(tick, nextRate);
     }
-
     function start() {
       holdStart = Date.now();
       stepTip(delta);
       haptic(10);
-      holdTimeout = setTimeout(function() {
-        tick();
-      }, holdDelay);
+      holdTimeout = setTimeout(function() { tick(); }, holdDelay);
     }
-
     function stop() {
       if (holdTimeout) { clearTimeout(holdTimeout); holdTimeout = null; }
       if (holdInterval) { clearTimeout(holdInterval); holdInterval = null; }
     }
-
     buttonEl.addEventListener('contextmenu', function(e) { e.preventDefault(); });
-
     buttonEl.addEventListener('pointerdown', function(e) {
       e.preventDefault();
       try { buttonEl.setPointerCapture(e.pointerId); } catch (err) {}
       start();
     });
-    buttonEl.addEventListener('pointerup', function(e) {
-      stop();
-    });
-    buttonEl.addEventListener('pointercancel', function(e) {
-      stop();
-    });
-    buttonEl.addEventListener('pointerleave', function(e) {
-      stop();
-    });
-
+    buttonEl.addEventListener('pointerup', function(e) { stop(); });
+    buttonEl.addEventListener('pointercancel', function(e) { stop(); });
+    buttonEl.addEventListener('pointerleave', function(e) { stop(); });
     if (!window.PointerEvent) {
       buttonEl.addEventListener('touchstart', function(e) {
-        e.preventDefault();
-        start();
+        e.preventDefault(); start();
       }, { passive: false });
-      buttonEl.addEventListener('touchend', function(e) {
-        stop();
-      });
-      buttonEl.addEventListener('touchcancel', function(e) {
-        stop();
-      });
+      buttonEl.addEventListener('touchend', function(e) { stop(); });
+      buttonEl.addEventListener('touchcancel', function(e) { stop(); });
     }
   }
 
@@ -3099,16 +3038,13 @@
     }
     nameConfirmed = true;
     therapistNameEl.textContent = entered;
-
     confirmedTipAmount = getTipValue();
     if (rejectGiftAmountEl) {
       rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
     }
-
     var presetInputs = document.querySelectorAll('.preset-input');
     var dynamicRows = document.getElementById('dynamicRows');
     dynamicRows.innerHTML = '';
-
     for (var i = 0; i < presetInputs.length; i++) {
       var val = (presetInputs[i].value || '').trim();
       if (val === '') continue;
@@ -3137,10 +3073,8 @@
       rowDiv.appendChild(priceWrap);
       dynamicRows.appendChild(rowDiv);
     }
-
     nameInput.classList.add('confirmed');
     haptic(14);
-
     setTimeout(function() {
       try { nameInput.blur(); } catch (err) {}
       nameScreen.classList.add('hidden');
@@ -3157,7 +3091,6 @@
     rejectRow.classList.remove('selected');
     rejectThanks.classList.remove('shown');
     petalOverlay.classList.remove('active');
-
     var rows = getRows();
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
@@ -3174,23 +3107,17 @@
       if (serviceText) serviceText.value = '';
       row.classList.remove('disabled', 'filled');
     }
-
     var presetInputs = document.querySelectorAll('.preset-input');
     for (var p = 0; p < presetInputs.length; p++) {
       var pidx = parseInt(presetInputs[p].getAttribute('data-preset'), 10);
       presetInputs[p].value = PRESET_TEXTS[pidx] || '';
     }
-
     if (rejectGiftAmountEl) {
       rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
     }
-
     updateAllRowLocks();
     recalc();
-
-    if (typeof updateSummaryVisibility === 'function') {
-      updateSummaryVisibility();
-    }
+    if (typeof updateSummaryVisibility === 'function') updateSummaryVisibility();
   }
 
   nameBtn.addEventListener('click', function(e) { e.preventDefault(); confirmName(); });
@@ -3226,7 +3153,6 @@
 
   window.addEventListener('load', function() {
     startInfoUpdates();
-
     loadPresetsFromServer().then(function() {
       presetDefaults = PRESET_TEXTS.slice();
       var presetInputs = document.querySelectorAll('.preset-input');
@@ -3236,19 +3162,11 @@
       }
       setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
     });
-
     loadQuotesFromServer();
-
-    loadAllPanels().then(function() {
-      repositionHintGroupAfterLayout();
-    });
-
+    loadAllPanels().then(function() { repositionHintGroupAfterLayout(); });
     if (document.fonts && document.fonts.ready) {
-      document.fonts.ready.then(function() {
-        repositionHintGroupAfterLayout();
-      });
+      document.fonts.ready.then(function() { repositionHintGroupAfterLayout(); });
     }
-
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(function() {});
     }
@@ -3261,20 +3179,15 @@
     if (introHasRun) return;
     introHasRun = true;
     haptic(12);
-
-    // Info bar becomes visible at this moment (option B)
     document.body.classList.add('info-visible');
     if (infoBar) infoBar.classList.add('shown');
-
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
-
     setTimeout(function() {
       var nameText = (therapistNameEl.textContent || '').trim() || '心';
       nameColumn.innerHTML = '';
       var chars = nameText.split('');
       var totalChars = chars.length;
-
       for (var i = 0; i < totalChars; i++) {
         var span = document.createElement('span');
         span.className = 'name-char';
@@ -3282,11 +3195,9 @@
         span.style.animationDelay = (i * 0.22) + 's';
         nameColumn.appendChild(span);
       }
-
       introOverlay.classList.add('active');
       var arrivalTime = (totalChars * 220) + 1100;
       var holdTime = 1200;
-
       setTimeout(function() {
         var fadingChars = nameColumn.querySelectorAll('.name-char');
         for (var f = 0; f < fadingChars.length; f++) {
@@ -3298,9 +3209,7 @@
         blossomScreen.classList.remove('visible');
         blossomScreen.style.opacity = '';
         blossomScreen.style.transition = '';
-
         document.body.classList.add('table-locked');
-
         window.scrollTo(0, 0);
         currentPanel = 0;
         track.style.transform = 'translateX(0%)';
@@ -3308,7 +3217,6 @@
           dots[d].classList.toggle('active', d === 0);
         }
         activatePanel(0);
-
         setTimeout(function() {
           introOverlay.classList.remove('active', 'finishing');
           repositionHintGroupAfterLayout();
@@ -3328,7 +3236,6 @@
     }
     var rows = getRows();
     var itemCount = 0;
-
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       var priceInput = row.querySelector('.price-input');
@@ -3337,22 +3244,18 @@
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
       if (!isChecked && price <= 0) continue;
-
       var display = row.querySelector('.service-display');
       var textInput = row.querySelector('.service-input');
       var name = '';
       if (display) name = (display.textContent || '').trim();
       else if (textInput) name = (textInput.value || '').trim();
       if (!name) name = 'サービス ' + (i + 1);
-
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
       itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
-
       var nameSpan = document.createElement('span');
       nameSpan.className = 'receipt-item-name';
       nameSpan.textContent = name;
-
       var priceWrap = document.createElement('span');
       priceWrap.className = 'receipt-item-price-wrap';
       var yenSymbol = document.createElement('span');
@@ -3364,29 +3267,23 @@
       priceField.value = formatWithComma(price);
       priceWrap.appendChild(yenSymbol);
       priceWrap.appendChild(priceField);
-
       var removeBtn = document.createElement('button');
       removeBtn.type = 'button';
       removeBtn.className = 'receipt-item-remove';
       removeBtn.setAttribute('aria-label', '削除');
       removeBtn.textContent = '×';
-
       itemDiv.appendChild(nameSpan);
       itemDiv.appendChild(priceWrap);
       itemDiv.appendChild(removeBtn);
-
       receiptItems.appendChild(itemDiv);
       itemCount++;
     }
-
     if (itemCount === 0 && rejected) {
       var rejectDiv = document.createElement('div');
       rejectDiv.className = 'receipt-item';
-
       var rejectName = document.createElement('span');
       rejectName.className = 'receipt-item-name';
       rejectName.textContent = 'ささやかなお礼';
-
       var rejectPriceWrap = document.createElement('span');
       rejectPriceWrap.className = 'receipt-item-price-wrap';
       var rejectYen = document.createElement('span');
@@ -3398,13 +3295,11 @@
       rejectPriceField.value = formatWithComma(confirmedTipAmount);
       rejectPriceWrap.appendChild(rejectYen);
       rejectPriceWrap.appendChild(rejectPriceField);
-
       rejectDiv.appendChild(rejectName);
       rejectDiv.appendChild(rejectPriceWrap);
       receiptItems.appendChild(rejectDiv);
       itemCount++;
     }
-
     bindReceiptItemListeners();
     updateReceiptTotal();
   }
@@ -3416,11 +3311,8 @@
         input.addEventListener('input', function() {
           var digits = input.value.replace(/[^0-9]/g, '');
           if (digits.length > 5) digits = digits.slice(0, 5);
-          if (digits === '') {
-            input.value = '';
-          } else {
-            input.value = parseInt(digits, 10).toLocaleString();
-          }
+          if (digits === '') input.value = '';
+          else input.value = parseInt(digits, 10).toLocaleString();
           updateReceiptTotal();
         });
         input.addEventListener('focus', function() {
@@ -3447,10 +3339,7 @@
           item.style.paddingBottom = '0';
           item.style.marginTop = '0';
           item.style.marginBottom = '0';
-          setTimeout(function() {
-            item.remove();
-            updateReceiptTotal();
-          }, 420);
+          setTimeout(function() { item.remove(); updateReceiptTotal(); }, 420);
         });
       })(removeButtons[r]);
     }
@@ -3460,8 +3349,7 @@
     var sum = 0;
     var receiptPriceInputs = receiptItems.querySelectorAll('.receipt-price-input');
     for (var i = 0; i < receiptPriceInputs.length; i++) {
-      var val = parseFormatted(receiptPriceInputs[i].value);
-      sum += val;
+      sum += parseFormatted(receiptPriceInputs[i].value);
     }
     receiptTotal.innerHTML = '<span class="yen-symbol">¥</span>' + sum.toLocaleString();
   }
@@ -3481,7 +3369,6 @@
     rejectRow.classList.remove('active');
     divider.classList.remove('active');
     summaryBar.classList.remove('visible');
-
     setTimeout(function() {
       receiptScreen.classList.add('visible');
       infoBar.classList.add('hidden');
@@ -3499,12 +3386,10 @@
   receiptClose.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(8);
-
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
       receiptScreen.classList.remove('visible', 'reopened');
       infoBar.classList.remove('hidden');
-
       var resumed = false;
       function finishResume() {
         if (resumed) return;
@@ -3521,27 +3406,25 @@
       setTimeout(finishResume, 1200);
       return;
     }
-
     receiptScreen.classList.add('above-thankyou');
-
     thankyouScreen.style.transition = 'none';
     thankyouScreen.classList.add('visible');
     void thankyouScreen.offsetWidth;
     thankyouScreen.style.transition = '';
-
     startThankyouSequence();
-
     requestAnimationFrame(function() {
       receiptScreen.classList.remove('visible');
       infoBar.classList.remove('hidden');
     });
-
     setTimeout(function() {
       receiptScreen.classList.remove('above-thankyou');
     }, 1100);
   });
 
   /* ============ BACK TO TABLE ============ */
+  /* The flash fix: keep body.thankyou-active ON through the entire
+     receipt fade + smooth scroll, and only remove it once the scroll
+     has settled. */
 
   function returnToTable() {
     clearAllTyTimers();
@@ -3554,6 +3437,8 @@
       finished = true;
       receiptScreen.removeEventListener('transitionend', onFade);
 
+      // Reset the thank-you state internally, but DO NOT remove
+      // thankyou-active yet.
       if (thankyouScreen.classList.contains('visible')) {
         thankyouScreen.classList.remove('visible');
         tyAmbientStage.classList.remove('shown');
@@ -3572,10 +3457,17 @@
         activateTyPanel(0);
       }
 
-      document.body.classList.remove('table-locked');
-      document.body.classList.remove('thankyou-active');
-      receiptOpenedFromThankyou = false;
+      // Put the carousel on the last panel so it's ready when it
+      // becomes visible again (the user was on the table).
+      currentPanel = totalPanels - 1;
+      track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
+      for (var j = 0; j < dots.length; j++) {
+        dots[j].classList.toggle('active', j === currentPanel);
+      }
+      activatePanel(currentPanel);
+      if (typeof unlockTable === 'function') unlockTable();
 
+      // Now trigger the smooth scroll while the carousel is still hidden.
       setTimeout(function() {
         tableCard.classList.add('active');
         rejectRow.classList.add('active');
@@ -3588,9 +3480,19 @@
             var y = tableCard.getBoundingClientRect().top + window.pageYOffset - 100;
             window.scrollTo(0, y);
           }
-          if (typeof scheduleEvaluation === 'function') {
-            setTimeout(scheduleEvaluation, 400);
-          }
+
+          // Only after the smooth scroll has settled do we reveal the
+          // carousel and the rest of the page.
+          var scrollSettleMs = (window.innerHeight > 900) ? 900 : 700;
+          setTimeout(function() {
+            document.body.classList.remove('table-locked');
+            document.body.classList.remove('thankyou-active');
+            receiptOpenedFromThankyou = false;
+
+            if (typeof scheduleEvaluation === 'function') {
+              setTimeout(scheduleEvaluation, 400);
+            }
+          }, scrollSettleMs);
         }, 150);
       }, 300);
     }
@@ -3620,12 +3522,10 @@
     currentX = startX;
     dragging = true; decided = false; isHorizontal = false;
   }
-
   function onTouchMove(e) {
     if (!dragging) return;
     var x = e.touches[0].clientX, y = e.touches[0].clientY;
     var deltaX = x - startX, deltaY = y - startY;
-
     if (!decided) {
       if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
         decided = true;
@@ -3633,7 +3533,6 @@
         if (isHorizontal) track.classList.add('dragging');
       }
     }
-
     if (isHorizontal) {
       e.preventDefault();
       currentX = x;
@@ -3644,7 +3543,6 @@
       var pct = (offset / stageWidth) * (100 / totalPanels);
       track.style.transform = 'translateX(' + pct + '%)';
       var dragRatio = Math.min(1, Math.abs(deltaX) / (refWidth * 0.35));
-
       if (deltaX < 0) {
         if (panels[currentPanel]) {
           var curC = panels[currentPanel].querySelector('.panel-content');
@@ -3674,7 +3572,6 @@
       }
     }
   }
-
   function clearInlineFades() {
     for (var c = 0; c < panels.length; c++) {
       var content = panels[c].querySelector('.panel-content');
@@ -3685,7 +3582,6 @@
       }
     }
   }
-
   function onTouchEnd() {
     if (!dragging) return;
     dragging = false;
@@ -3744,11 +3640,8 @@
       window.scrollTo(0, 0);
       return;
     }
-    if (window.scrollY > 30) {
-      infoBar.classList.add('hidden');
-    } else {
-      infoBar.classList.remove('hidden');
-    }
+    if (window.scrollY > 30) infoBar.classList.add('hidden');
+    else infoBar.classList.remove('hidden');
   }, { passive: true });
 
   document.addEventListener('touchmove', function(e) {
@@ -3767,11 +3660,8 @@
     var w = window.innerWidth;
     var isLandscape = w > h;
     var px;
-    if (isLandscape) {
-      px = h * 0.12;
-    } else {
-      px = h * 0.08;
-    }
+    if (isLandscape) px = h * 0.12;
+    else px = h * 0.08;
     if (px < 130) px = 130;
     if (px > 300) px = 300;
     return px;
@@ -3791,7 +3681,6 @@
     var tableRect = tableCard.getBoundingClientRect();
     var rejectRect = rejectRow.getBoundingClientRect();
     var vh = window.innerHeight;
-
     var top = Math.min(tableRect.top, rejectRect.top);
     var bottom = Math.max(tableRect.bottom, rejectRect.bottom);
     var totalHeight = bottom - top;
@@ -3799,19 +3688,13 @@
       summaryBar.classList.remove('visible');
       return;
     }
-
     var visibleTop = Math.max(top, 0);
     var visibleBottom = Math.min(bottom, vh);
     var visibleHeight = Math.max(0, visibleBottom - visibleTop);
     var ratio = visibleHeight / totalHeight;
-
     var spansViewport = (top <= 0 && bottom >= vh);
-
-    if (ratio >= 0.5 || spansViewport) {
-      summaryBar.classList.add('visible');
-    } else {
-      summaryBar.classList.remove('visible');
-    }
+    if (ratio >= 0.5 || spansViewport) summaryBar.classList.add('visible');
+    else summaryBar.classList.remove('visible');
   }
 
   function showTransitionLine(animate) {
@@ -3838,21 +3721,15 @@
 
   function evaluateScrollState() {
     if (currentPanel !== totalPanels - 1) return;
-
     var rect = tableCard.getBoundingClientRect();
     var trigger = getFadeTriggerPx();
     var lineRect = transitionLine.getBoundingClientRect();
     var vh = window.innerHeight;
-
     if (lineRect.top < vh - 20) {
       revealTableSection();
-      if (rect.top <= trigger) {
-        hideTransitionLine();
-      } else {
-        showTransitionLine(true);
-      }
+      if (rect.top <= trigger) hideTransitionLine();
+      else showTransitionLine(true);
     }
-
     updateSummaryVisibility();
     updateIntroHintVisibility();
   }
@@ -3872,7 +3749,6 @@
     var goingDown = y > lastScrollY + 1;
     var goingUp   = y < lastScrollY - 1;
     lastScrollY = y;
-
     if (goingDown && !hasEverScrolled && y > 5) {
       hasEverScrolled = true;
       var lineRect = transitionLine.getBoundingClientRect();
@@ -3881,10 +3757,7 @@
         showTransitionLine(true);
       }
     }
-
-    if (goingDown || goingUp) {
-      scheduleEvaluation();
-    }
+    if (goingDown || goingUp) scheduleEvaluation();
   }, { passive: true });
 
   window.addEventListener('resize', scheduleEvaluation);
@@ -3895,7 +3768,6 @@
 
   scheduleEvaluation();
   updateSummaryVisibility();
-
   updateAllRowLocks();
 
   /* ============ REJECT ROW ============ */
@@ -3943,7 +3815,7 @@
 
   recalc();
 
-  /* ============ THEME ============ */
+  /* ============ THEME / WEATHER ============ */
 
   function getTimeOfDayInNagoya() {
     var h;
@@ -3998,8 +3870,7 @@
         month: 'numeric', day: 'numeric',
         hour: 'numeric', minute: 'numeric',
         weekday: 'short',
-        hour12: false,
-        timeZone: NAGOYA.tz
+        hour12: false, timeZone: NAGOYA.tz
       }).formatToParts(now);
       var result = { month: 0, day: 0, hour: 0, minute: 0, weekday: 0 };
       for (var i = 0; i < parts.length; i++) {
@@ -4042,9 +3913,7 @@
         if (!data || !data.current) return;
         var temp = data.current.temperature_2m;
         var code = data.current.weather_code;
-        if (typeof temp === 'number') {
-          infoTemp.textContent = Math.round(temp) + '°';
-        }
+        if (typeof temp === 'number') infoTemp.textContent = Math.round(temp) + '°';
         if (typeof code === 'number') {
           var bucket = weatherBucket(code);
           infoWeather.textContent = weatherEmoji(bucket);
@@ -4080,9 +3949,7 @@
     for (var i = 0; i < times.length && out.length < 3; i++) {
       var h = parseInt(times[i].slice(11, 13), 10);
       if (out.length === 0) {
-        if (h >= nowHour) {
-          out.push({ h: h, t: temps[i] });
-        }
+        if (h >= nowHour) out.push({ h: h, t: temps[i] });
       } else {
         out.push({ h: h, t: temps[i] });
       }
@@ -4103,18 +3970,15 @@
   function buildTickerText(responses) {
     if (!responses || responses.length === 0) return '';
     var parts = [];
-
     var nagoyaData = responses[0];
     if (nagoyaData) {
       var nowP = nagoyaDateParts();
       var next3 = getNext3Hours(nagoyaData.hourly, nowP.hour);
       if (next3.length > 0) {
         var hours = next3.map(function(x) { return formatTemp(x.t); }).join(' → ');
-        parts.push('名古屋 3時間 ' + hours);
+        parts.push('名古屋市 3時間 ' + hours);
       }
     }
-
-    // Tomorrow group
     var tomorrowParts = [];
     for (var i = 0; i < responses.length && i < TICKER_CITIES.length; i++) {
       var data = responses[i];
@@ -4127,15 +3991,11 @@
     if (tomorrowParts.length > 0) {
       parts.push('明日: ' + tomorrowParts.join(' ・ '));
     }
-
     return parts.join(' ・ ');
   }
 
   function escapeHtml(s) {
-    return String(s)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;');
+    return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
   function renderTicker(text) {
@@ -4145,24 +4005,17 @@
       tickerTrack.textContent = '';
       return;
     }
-    var sep = ' ・ ';
-    var half = text + sep;
+    var half = text + ' ・ ';
     var html = '<span>' + escapeHtml(half) + '</span><span>' + escapeHtml(half) + '</span>';
     tickerTrack.innerHTML = html;
     tickerWrap.classList.add('shown');
   }
 
   function fetchTickerData() {
-    var url = buildTickerUrl();
-    return fetch(url)
+    fetch(buildTickerUrl())
       .then(function(r) { return r.json(); })
       .then(function(data) {
-        var responses;
-        if (Array.isArray(data)) {
-          responses = data;
-        } else {
-          responses = [data];
-        }
+        var responses = Array.isArray(data) ? data : [data];
         var text = buildTickerText(responses);
         renderTicker(text);
         if (tickerTrack) {
@@ -4171,7 +4024,7 @@
           tickerTrack.style.animation = '';
         }
       })
-      .catch(function() { /* silent */ });
+      .catch(function() {});
   }
 
   var clockInterval = null;
@@ -4206,7 +4059,6 @@
       else if (i < index) tyPanels[i].classList.add('leaving');
     }
   }
-
   function goToTyPanel(index) {
     var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
     tyCurrentPanel = clamped;
@@ -4216,13 +4068,11 @@
     }
     activateTyPanel(tyCurrentPanel);
   }
-
   function exitTyToQuotes() {
     if (tyExited) return;
     tyExited = true;
     tyDotsEl.classList.add('hidden');
     tyCarousel.classList.add('hidden-out');
-
     tyPushTimeout(function() {
       tyAmbientStage.classList.add('shown');
       buildBlossomDivider();
@@ -4241,12 +4091,10 @@
     tyCurrentX = tyStartX;
     tyDragging = true; tyDecided = false; tyHorizontal = false;
   }
-
   function tyTouchMove(e) {
     if (!tyDragging || tyExited) return;
     var x = e.touches[0].clientX, y = e.touches[0].clientY;
     var deltaX = x - tyStartX, deltaY = y - tyStartY;
-
     if (!tyDecided) {
       if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
         tyDecided = true;
@@ -4254,7 +4102,6 @@
         if (tyHorizontal) tyTrack.classList.add('dragging');
       }
     }
-
     if (tyHorizontal) {
       e.preventDefault();
       tyCurrentX = x;
@@ -4265,7 +4112,6 @@
       var pct = (offset / tyStageWidth) * (100 / TY_TOTAL_PANELS);
       tyTrack.style.transform = 'translateX(' + pct + '%)';
       var dragRatio = Math.min(1, Math.abs(deltaX) / (tyRefWidth * 0.35));
-
       if (deltaX < 0) {
         if (tyPanels[tyCurrentPanel]) {
           var curC = tyPanels[tyCurrentPanel].querySelector('.ty-panel-content');
@@ -4295,7 +4141,6 @@
       }
     }
   }
-
   function clearTyInlineFades() {
     for (var c = 0; c < tyPanels.length; c++) {
       var content = tyPanels[c].querySelector('.ty-panel-content');
@@ -4306,7 +4151,6 @@
       }
     }
   }
-
   function tyTouchEnd() {
     if (!tyDragging) return;
     tyDragging = false;
@@ -4315,7 +4159,6 @@
     clearTyInlineFades();
     var deltaX = tyCurrentX - tyStartX;
     var threshold = tyRefWidth * 0.12;
-
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
       if (deltaX < -threshold) { exitTyToQuotes(); return; }
       if (deltaX > threshold && tyCurrentPanel > 0) { goToTyPanel(tyCurrentPanel - 1); return; }
@@ -4390,13 +4233,11 @@
     tyTimers = [];
     tyIntervals = [];
   }
-
   function tyPushTimeout(fn, ms) {
     var id = setTimeout(fn, ms);
     tyTimers.push(id);
     return id;
   }
-
   function buildBlossomDivider() {
     blossomDivider.innerHTML = '';
     for (var b = 0; b < BLOSSOM_COUNT; b++) {
@@ -4406,7 +4247,6 @@
       blossomDivider.appendChild(mark);
     }
   }
-
   function resetBlossomDivider() {
     var els = blossomDivider.querySelectorAll('.blossom-mark');
     for (var i = 0; i < els.length; i++) {
@@ -4414,11 +4254,7 @@
       els[i].classList.add('resetting');
     }
   }
-
-  function startQuoteCycle() {
-    showQuote(0);
-  }
-
+  function startQuoteCycle() { showQuote(0); }
   function showQuote(index) {
     currentQuoteIndex = index;
     var text = AMBIENT_LINES[index % AMBIENT_LINES.length];
@@ -4427,7 +4263,6 @@
     quoteLine.classList.remove('shown', 'leaving');
     void quoteLine.offsetWidth;
     quoteLine.classList.add('shown');
-
     tyPushTimeout(function() {
       var els = blossomDivider.querySelectorAll('.blossom-mark');
       var current = 0;
@@ -4466,9 +4301,7 @@
     quoteLine.classList.remove('shown', 'leaving');
     quoteLine.textContent = '';
     blossomDivider.innerHTML = '';
-
     tyReceiptBtn.classList.add('shown');
-
     tyCurrentPanel = 0;
     tyTrack.style.transform = 'translateX(0%)';
     for (var i = 0; i < tyDots.length; i++) {
@@ -4492,7 +4325,6 @@
     clearAllTyTimers();
     receiptOpenedFromThankyou = true;
     receiptScreen.classList.add('reopened');
-
     setTimeout(function() {
       receiptScreen.classList.add('visible');
       infoBar.classList.add('hidden');
@@ -4503,7 +4335,6 @@
 
   applyTimeTheme();
   setInterval(applyTimeTheme, 5 * 60 * 1000);
-
   updateGlobalHint();
 
 </script>
