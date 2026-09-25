@@ -93,8 +93,7 @@
 
     --ty-line-color: #1f1f1f;
     --ty-line-shadow: none;
-    --ty-accent-color: #8f1f14;
-    --ty-accent-shadow: 0 1px 0 #ffffff, 0 0 8px rgba(255, 255, 255, 0.75);
+    --ty-accent-color: #6b1f2a;
     --quote-color: #b04a5a;
     --quote-shadow: 0 2px 24px #fbdfe3;
 
@@ -171,8 +170,7 @@
 
     --ty-line-color: #231304;
     --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6);
-    --ty-accent-color: #7a1a10;
-    --ty-accent-shadow: 0 1px 0 #ffffff, 0 0 8px rgba(255, 255, 255, 0.75);
+    --ty-accent-color: #6b1f2a;
     --quote-color: #8f2f00;
     --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
 
@@ -683,7 +681,7 @@
   .panel {
     width: calc(100% / 5); height: 100%;
     display: flex; align-items: center; justify-content: center;
-    padding: 200px 20px 200px 20px;
+    padding: 76px 20px 160px 20px;
     text-align: center;
   }
   .panel-inner { max-width: 480px; width: 100%; }
@@ -1658,7 +1656,6 @@
   .ty-line.accent {
     color: var(--ty-accent-color);
     font-weight: 700;
-    text-shadow: var(--ty-accent-shadow);
   }
   .ty-line.spacer { margin-top: 24px; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
@@ -1822,7 +1819,7 @@
       margin-right: auto;
     }
     .panel-inner { max-width: 480px; }
-    .panel { padding: 220px 32px 220px 32px; }
+    .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 20px; max-width: 600px; }
     .privacy-note-inline { font-size: 15px; }
@@ -1852,7 +1849,7 @@
     .info-bar { padding: 24px 28px 16px 28px; }
     .ticker-track { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
-    .panel { padding: 240px 32px 240px 32px; }
+    .panel { padding: 88px 32px 170px 32px; }
     .panel-content { font-size: 22px; }
     .transition-line { font-size: 22px; max-width: 660px; }
     .privacy-note-inline { font-size: 16px; }
@@ -1879,7 +1876,7 @@
     .ticker-track { font-size: 11.5px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
-    .panel { padding: 140px 20px 140px 20px; }
+    .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
     .transition-line { font-size: 17px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
@@ -1920,7 +1917,7 @@
     .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
-    .panel { padding: 120px 40px 120px 40px; }
+    .panel { padding: 56px 40px 118px 40px; }
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 2; }
     .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
@@ -3397,6 +3394,23 @@
 
   function returnToTable() {
     clearAllTyTimers();
+
+    // 1. Instantly hide the thank-you screen if it is open behind the receipt.
+    //    Disabling the transition momentarily makes the class removal
+    //    take effect with no fade, so the screen is gone the instant the
+    //    receipt starts fading out — no flash of the shower panel.
+    if (thankyouScreen.classList.contains('visible')) {
+      thankyouScreen.style.transition = 'none';
+      thankyouScreen.classList.remove('visible');
+      void thankyouScreen.offsetWidth;
+      thankyouScreen.style.transition = '';
+    }
+
+    // 2. Immediately restore the background layout elements. Without this,
+    //    body.thankyou-active keeps the table components visibility:hidden
+    //    for the full receipt fade.
+    document.body.classList.remove('thankyou-active');
+
     receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
     infoBar.classList.remove('hidden');
 
@@ -3406,13 +3420,6 @@
       finished = true;
       receiptScreen.removeEventListener('transitionend', onFade);
 
-      // Start the fade-out, and clear the ambient/quote/button state.
-      // Deliberately do NOT touch any carousel positioning here — the
-      // carousel is a child of .thankyou-screen and stays painted during
-      // the 1.2s fade, so resetting its position mid-fade causes the
-      // "last panel → panel 1 → table" flash. startThankyouSequence()
-      // resets everything the next time the screen is shown.
-      thankyouScreen.classList.remove('visible');
       tyAmbientStage.classList.remove('shown');
       quoteLine.classList.remove('shown', 'leaving');
       quoteLine.textContent = '';
@@ -3437,7 +3444,6 @@
           if (scrollSettled) return;
           scrollSettled = true;
           window.removeEventListener('scrollend', onScrollEnd);
-          document.body.classList.remove('thankyou-active');
           receiptOpenedFromThankyou = false;
           if (typeof scheduleEvaluation === 'function') {
             setTimeout(scheduleEvaluation, 400);
@@ -3458,6 +3464,7 @@
         }, 150);
       }, 300);
     }
+
     function onFade(ev) {
       if (ev.target === receiptScreen && ev.propertyName === 'opacity') {
         finishReturn();
