@@ -36,15 +36,13 @@
     transition: background-color 2s ease;
   }
 
-  body { padding-bottom: 130px; background-color: #faf7f5; }
+  body { padding-bottom: 100px; background-color: #faf7f5; }
   body.warm-background { background-color: #f7e9e3; }
   body.table-locked {
     overflow: hidden; height: 100vh; position: fixed;
     width: 100%; top: 0; left: 0; right: 0;
   }
 
-  /* Hide the main page content when the thank-you screen is active
-     so only the drifting gradient shows through the transparent overlay */
   body.thankyou-active .stage,
   body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line,
@@ -134,19 +132,19 @@
 
   .info-line {
     display: inline-block;
-    font-size: 13px; font-weight: 500;
-    color: #8a7a74; letter-spacing: 1.5px;
+    font-size: 14px; font-weight: 500;
+    color: #6a6460; letter-spacing: 1.5px;
     white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; max-width: 100%;
   }
   .info-line .city { font-weight: 600; color: #b04a5a; letter-spacing: 2px; }
   .info-line .sep { color: #d8ccc8; margin: 0 8px; font-weight: 400; }
-  .info-line .date { color: #8a7a74; }
+  .info-line .date { color: #6a6460; }
   .info-line .time { color: #b04a5a; font-weight: 600; }
   .info-line .temp { color: #b04a5a; font-weight: 600; }
-  .info-line .weather { color: #8a7a74; }
+  .info-line .weather { color: #6a6460; }
 
-  /* ============ AMBIENT THEMING (base colours) ============ */
+  /* ============ AMBIENT THEMING ============ */
 
   html[data-time="morning"] body:not(.warm-background) { background-color: #fdf1e8; }
   html[data-time="day"]     body:not(.warm-background) { background-color: #faf7f5; }
@@ -201,6 +199,28 @@
   }
   .name-input::placeholder { color: #d4c4be; font-weight: 400; }
   .name-input:focus { outline: none; border-color: #b04a5a; }
+
+  @keyframes inputConfirm {
+    0% {
+      transform: scale(1);
+      box-shadow: 0 4px 18px rgba(120, 90, 90, 0.08);
+      border-color: #ead9d5;
+    }
+    50% {
+      transform: scale(1.03);
+      box-shadow: 0 10px 32px rgba(176, 74, 90, 0.28);
+      border-color: #b04a5a;
+    }
+    100% {
+      transform: scale(1);
+      box-shadow: 0 4px 18px rgba(120, 90, 90, 0.08);
+      border-color: #ead9d5;
+    }
+  }
+
+  .name-input.confirmed {
+    animation: inputConfirm 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
 
   .preset-label { margin-top: 28px; font-size: 13px; color: #b8a8a2; letter-spacing: 3px; }
   .preset-grid { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
@@ -265,7 +285,6 @@
   }
   .start-btn:active { transform: scale(0.92); }
 
-  /* The blossom is now a ❀ character — slightly smaller, same pulse */
   .blossom-char {
     display: block;
     font-family: "Hiragino Mincho ProN", "Yu Mincho", "Shippori Mincho", serif;
@@ -463,6 +482,22 @@
     transition: background 0.3s, transform 0.3s;
   }
   .dot.active { background: #b04a5a; transform: scale(1.3); }
+
+  .panel-progress {
+    position: absolute;
+    bottom: 43px;
+    left: 50%;
+    transform: translateX(54px);
+    z-index: 10;
+    font-size: 11px;
+    color: #b8a8a2;
+    letter-spacing: 1.5px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-weight: 500;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
   .stage-spacer { height: 60px; }
 
   /* ============ TRANSITION LINE ============ */
@@ -552,10 +587,21 @@
     transition: opacity 0.25s, transform 0.25s, color 0.25s;
   }
   .row-check:active { transform: scale(0.92); }
-  .row-check.checked { background: #fdf3f2; border-color: #b04a5a; color: #b04a5a; }
+  .row-check.checked {
+    background: #fdf3f2;
+    border-color: #b04a5a;
+    color: #b04a5a;
+    animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
   .row-check.checked::after { opacity: 1; transform: scale(1); color: #b04a5a; }
   .row.filled .row-check { border-color: #b04a5a; }
   .row.filled .row-check::after { opacity: 1; color: #b04a5a; }
+
+  @keyframes checkPop {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.22); }
+    100% { transform: scale(1); }
+  }
 
   .service-input {
     flex: 1; min-width: 0; background: transparent; border: none;
@@ -596,8 +642,9 @@
   .price-input {
     width: 52px;
     background: transparent; border: none;
-    color: #b04a5a; font-size: 15px; font-weight: 700;
+    color: #b04a5a; font-size: 14px; font-weight: 800;
     text-align: right; font-family: inherit; padding: 0;
+    letter-spacing: 0.3px;
   }
   .price-input:focus { outline: none; }
   .price-input::placeholder {
@@ -610,7 +657,7 @@
   .yen { color: #a34a56; font-size: 14px; font-weight: 700; flex-shrink: 0; }
 
   .reject-row {
-    margin: 0 16px 8px 16px;
+    margin: 12px 16px 8px 16px;
     padding: 20px 16px;
     background: rgba(245, 242, 239, 0.94);
     border: 1.5px dashed #c9bfb8;
@@ -746,7 +793,7 @@
     position: fixed; bottom: 0; left: 0; right: 0;
     background: rgba(255, 255, 255, 0.94);
     border-top: 1px solid #ece4e0;
-    padding: 16px 22px calc(16px + env(safe-area-inset-bottom));
+    padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
     opacity: 0; transform: translateY(100%);
     transition: opacity 0.5s ease, transform 0.5s ease;
@@ -854,15 +901,15 @@
   }
   .confirm-screen.visible .confirm-card { transform: scale(1); }
   .confirm-title {
-    font-size: 16px; font-weight: 600; color: #b04a5a;
-    line-height: 2; letter-spacing: 0.5px; margin-bottom: 28px;
+    font-size: 18px; font-weight: 600; color: #b04a5a;
+    line-height: 1.9; letter-spacing: 0.5px; margin-bottom: 28px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-wrap: balance;
   }
   .confirm-title .confirm-sub {
     display: block;
     margin-top: 14px;
-    font-size: 14px;
+    font-size: 13px;
     font-weight: 500;
     color: #6a6460;
     letter-spacing: 0.4px;
@@ -1370,7 +1417,7 @@
   /* ============ RESPONSIVE ============ */
 
   @media (min-width: 700px) {
-    .info-line { font-size: 14px; letter-spacing: 2px; }
+    .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px; }
     .table-card, .reject-row, .divider { max-width: 560px; margin-left: auto; margin-right: auto; }
@@ -1397,10 +1444,11 @@
     .ty-dots { bottom: 74px; }
     .ty-receipt-btn { font-size: 14px; padding: 14px 32px; bottom: 16px; }
     .blossom-char { font-size: 100px; }
+    .panel-progress { font-size: 12px; }
   }
 
   @media (min-width: 1100px) {
-    .info-line { font-size: 15px; letter-spacing: 2.5px; }
+    .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
     .transition-line { font-size: 18px; max-width: 660px; }
@@ -1413,11 +1461,12 @@
     .ty-dots { bottom: 80px; }
     .ty-receipt-btn { font-size: 15px; padding: 15px 36px; bottom: 20px; }
     .blossom-char { font-size: 108px; }
+    .panel-progress { font-size: 13px; }
   }
 
   @media (max-height: 700px) {
     .info-bar { padding: 12px 16px; }
-    .info-line { font-size: 11.5px; letter-spacing: 1px; }
+    .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
@@ -1440,11 +1489,13 @@
     .summary-total { font-size: 19px; }
     .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
     .blossom-char { font-size: 72px; }
+    .panel-progress { bottom: 28px; }
+    .dots { bottom: 26px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
     .info-bar { padding: 8px 14px; }
-    .info-line { font-size: 11px; letter-spacing: 1px; }
+    .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
@@ -1544,7 +1595,7 @@
     <span class="blossom-char" aria-hidden="true">❀</span>
     <span class="start-label">はじめる</span>
   </button>
-  <p class="start-hint">桜の花びらを<br>そっとタップしてください</p>
+  <p class="start-hint">お花を<br>そっとタップしてください</p>
 </div>
 
 <!-- ============ INTRO ============ -->
@@ -1655,6 +1706,8 @@
     <div class="dot"></div>
     <div class="dot"></div>
   </div>
+
+  <div class="panel-progress" id="dotsProgress">1 / 5</div>
 </div>
 
 <div class="stage-spacer"></div>
@@ -1669,34 +1722,6 @@
 </div>
 
 <div class="divider" id="divider"><span class="divider-text">❀</span></div>
-
-<div class="reject-row" id="rejectRow">
-  <div class="reject-box"></div>
-  <div class="reject-content">
-    <div class="reject-text">
-      今回はすべて見送ります。<br>
-      いつものマッサージだけをお願いします。<br>
-      お気遣いありがとうございます。
-    </div>
-    <div class="reject-thanks" id="rejectThanks">
-      <div class="reject-thanks-line">かしこまりました。</div>
-      <div class="reject-thanks-sub">本日はどうぞゆっくりお過ごしください。</div>
-
-      <div class="gift-divider">
-        <span class="gift-divider-line"></span>
-        <span class="gift-divider-label">ささやかなお礼</span>
-        <span class="gift-divider-line"></span>
-      </div>
-
-      <div class="reject-gift">
-        ささやかではございますが、<br>
-        日頃の感謝の気持ちを込めて、<br>
-        <span class="gift-amount">1,000円</span> を<br>
-        お受け取りいただければ幸いです。
-      </div>
-    </div>
-  </div>
-</div>
 
 <div class="table-card" id="tableCard">
   <div id="dynamicRows"></div>
@@ -1731,6 +1756,34 @@
     <div class="price-wrap">
       <input type="tel" class="price-input" placeholder="料金を入力" disabled>
       <span class="yen">円</span>
+    </div>
+  </div>
+</div>
+
+<div class="reject-row" id="rejectRow">
+  <div class="reject-box"></div>
+  <div class="reject-content">
+    <div class="reject-text">
+      今回はすべて見送ります。<br>
+      いつものマッサージだけをお願いします。<br>
+      お気遣いありがとうございます。
+    </div>
+    <div class="reject-thanks" id="rejectThanks">
+      <div class="reject-thanks-line">かしこまりました。</div>
+      <div class="reject-thanks-sub">本日はどうぞゆっくりお過ごしください。</div>
+
+      <div class="gift-divider">
+        <span class="gift-divider-line"></span>
+        <span class="gift-divider-label">ささやかなお礼</span>
+        <span class="gift-divider-line"></span>
+      </div>
+
+      <div class="reject-gift">
+        ささやかではございますが、<br>
+        日頃の感謝の気持ちを込めて、<br>
+        <span class="gift-amount">1,000円</span> を<br>
+        お受け取りいただければ幸いです。
+      </div>
     </div>
   </div>
 </div>
@@ -1907,6 +1960,16 @@
 </div>
 
 <script>
+  /* ============ HAPTIC FEEDBACK ============ */
+
+  function haptic(ms) {
+    try {
+      if (navigator.vibrate) {
+        navigator.vibrate(ms || 8);
+      }
+    } catch (e) { /* silent */ }
+  }
+
   /* ============ PRESETS ============ */
 
   var PRESET_TEXTS = [
@@ -1968,6 +2031,7 @@
   var stage = document.getElementById('stage');
   var dots = document.querySelectorAll('.dot');
   var panels = document.querySelectorAll('.panel');
+  var dotsProgress = document.getElementById('dotsProgress');
 
   var divider = document.getElementById('divider');
   var tableCard = document.getElementById('tableCard');
@@ -2063,6 +2127,9 @@
     for (var i = 0; i < dots.length; i++) {
       dots[i].classList.toggle('active', i === currentPanel);
     }
+    if (dotsProgress) {
+      dotsProgress.textContent = (currentPanel + 1) + ' / ' + totalPanels;
+    }
     activatePanel(currentPanel);
     if (currentPanel === totalPanels - 1) unlockTable();
     if (transitionLine && currentPanel !== totalPanels - 1) {
@@ -2145,6 +2212,7 @@
     var isCustomRow = !!serviceText;
 
     if (box.classList.contains('checked')) {
+      haptic(6);
       if (priceField) {
         var currentVal = priceField.value;
         if (currentVal !== '') box.setAttribute('data-saved-price', currentVal);
@@ -2165,6 +2233,7 @@
         var hasSavedService = savedService !== null && savedService.trim() !== '';
         if (currentService === '' && !hasSavedService) return;
       }
+      haptic(10);
       if (priceField) {
         var saved = box.getAttribute('data-saved-price');
         if (saved !== null && saved !== '') priceField.value = saved;
@@ -2291,11 +2360,19 @@
       rowDiv.appendChild(priceWrap);
       dynamicRows.appendChild(rowDiv);
     }
-    try { nameInput.blur(); } catch (err) {}
-    nameScreen.classList.add('hidden');
-    blossomScreen.classList.add('visible');
-    updateAllRowLocks();
-    recalc();
+
+    /* Visual confirmation pulse */
+    nameInput.classList.add('confirmed');
+    haptic(14);
+
+    /* Wait for the pulse, then transition */
+    setTimeout(function() {
+      try { nameInput.blur(); } catch (err) {}
+      nameScreen.classList.add('hidden');
+      blossomScreen.classList.add('visible');
+      updateAllRowLocks();
+      recalc();
+    }, 420);
   }
 
   function resetAll() {
@@ -2339,6 +2416,7 @@
     blossomScreen.style.transition = '';
     introOverlay.classList.remove('active', 'finishing');
     nameColumn.innerHTML = '';
+    nameInput.classList.remove('confirmed');
 
     receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
     confirmScreen.classList.remove('visible');
@@ -2363,6 +2441,14 @@
     }
     activateTyPanel(0);
 
+    currentPanel = 0;
+    track.style.transform = 'translateX(0%)';
+    for (var p2 = 0; p2 < dots.length; p2++) {
+      dots[p2].classList.toggle('active', p2 === 0);
+    }
+    if (dotsProgress) dotsProgress.textContent = '1 / ' + totalPanels;
+    activatePanel(0);
+
     tableCard.classList.add('active');
     rejectRow.classList.add('active');
     divider.classList.add('active');
@@ -2384,6 +2470,7 @@
     (function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
+        haptic(6);
         var idx = btn.getAttribute('data-clear');
         var target = document.querySelector('.preset-input[data-preset="' + idx + '"]');
         if (target) target.value = '';
@@ -2396,6 +2483,7 @@
     (function(btn) {
       btn.addEventListener('click', function(e) {
         e.preventDefault();
+        haptic(6);
         var idx = parseInt(btn.getAttribute('data-undo'), 10);
         var target = document.querySelector('.preset-input[data-preset="' + idx + '"]');
         if (target && presetDefaults[idx] !== undefined) target.value = presetDefaults[idx];
@@ -2429,6 +2517,7 @@
     e.preventDefault();
     if (introHasRun) return;
     introHasRun = true;
+    haptic(12);
 
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
@@ -2469,6 +2558,7 @@
         for (var d = 0; d < dots.length; d++) {
           dots[d].classList.toggle('active', d === 0);
         }
+        if (dotsProgress) dotsProgress.textContent = '1 / ' + totalPanels;
         activatePanel(0);
 
         setTimeout(function() {
@@ -2508,7 +2598,8 @@
 
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
-      itemDiv.style.animationDelay = (itemCount * 0.08) + 's';
+      /* Cap the stagger delay at 0.4s regardless of item count */
+      itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
 
       var nameSpan = document.createElement('span');
       nameSpan.className = 'receipt-item-name';
@@ -2576,6 +2667,7 @@
       (function(btn) {
         btn.addEventListener('click', function(e) {
           e.preventDefault();
+          haptic(8);
           var item = btn.closest('.receipt-item');
           if (!item) return;
           item.style.transition = 'opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease';
@@ -2610,11 +2702,13 @@
 
   submitBtn.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(10);
     confirmScreen.classList.add('visible');
   });
 
   confirmYes.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(14);
     confirmScreen.classList.remove('visible');
     buildReceipt();
     tableCard.classList.remove('active');
@@ -2630,13 +2724,15 @@
 
   confirmNo.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(8);
     confirmScreen.classList.remove('visible');
   });
 
-  /* ============ RECEIPT CLOSE — no flash to main page ============ */
+  /* ============ RECEIPT CLOSE ============ */
 
   receiptClose.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(8);
 
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
@@ -2715,6 +2811,7 @@
 
   receiptBackBtn.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(10);
     returnToTable();
   });
 
@@ -2923,6 +3020,7 @@
   /* ============ REJECT ROW ============ */
 
   rejectRow.addEventListener('click', function() {
+    haptic(10);
     rejected = !rejected;
     if (rejected) {
       rejectRow.classList.add('selected');
@@ -3382,6 +3480,7 @@
 
   tyReceiptBtn.addEventListener('click', function(e) {
     e.preventDefault();
+    haptic(10);
     clearAllTyTimers();
     receiptOpenedFromThankyou = true;
     receiptScreen.classList.add('reopened');
