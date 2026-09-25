@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="default">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -24,20 +24,141 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
 
 <style>
+  /* ============ THEME VARIABLES ============ */
+
+  html[data-theme="default"] {
+    --bg-base: #faf7f5;
+    --bg-warm: #f7e9e3;
+    --bg-morning: #fdf1e8;
+    --bg-day: #faf7f5;
+    --bg-evening: #f8e6d8;
+    --bg-night: #ede2dc;
+    --bg-warm-morning: #fbeade;
+    --bg-warm-day: #f7e9e3;
+    --bg-warm-evening: #f5e0d8;
+    --bg-warm-night: #ecddd7;
+    --bg-rain: #eae2e6;
+    --bg-rain-warm: #efe2e4;
+    --bg-storm: #e2dae2;
+    --bg-storm-warm: #e6dee2;
+    --bg-fog: #efe9e4;
+    --bg-clouds: #f2eeec;
+    --bg-snow: #eff0f2;
+    --bg-clear: #fdf4ea;
+    --bg-evening-rain: #ecddd8;
+    --bg-night-rain: #e2d5d5;
+
+    --accent: #b04a5a;
+    --accent-2: #a34a56;
+    --accent-3: #9a3e4d;
+    --glow: #e8b4bc;
+    --petal: #e8a8b0;
+    --petal-soft: #fbdfe3;
+
+    --border-1: #ead9d5;
+    --border-2: #e2d5d0;
+    --border-3: #ece4e0;
+    --border-4: #f2ece9;
+    --border-5: #f0dada;
+    --border-6: #c9bfb8;
+
+    --soft-1: #faf3f1;
+    --soft-2: #fdf3f2;
+    --soft-3: #f5f2ef;
+    --soft-4: #fdf9f7;
+
+    --text-dark: #1f1f1f;
+    --text-med: #4a4542;
+    --text-soft: #3a3633;
+    --text-mute: #8a807c;
+    --text-faint: #b8a8a2;
+    --text-placeholder: #d4c4be;
+
+    --shadow-rose: rgba(120, 90, 90, 0.08);
+    --shadow-rose-2: rgba(120, 90, 90, 0.16);
+    --shadow-accent: rgba(176, 74, 90, 0.25);
+
+    /* Ambient background gradient stops */
+    --amb-1: rgba(251, 200, 210, 0.70);
+    --amb-2: rgba(247, 210, 195, 0.65);
+    --amb-3: rgba(232, 160, 175, 0.45);
+    --amb-4: rgba(250, 220, 205, 0.55);
+  }
+
+  html[data-theme="autumn"] {
+    --bg-base: #faf3e8;
+    --bg-warm: #f2e0c8;
+    --bg-morning: #fdf0d8;
+    --bg-day: #faf3e8;
+    --bg-evening: #f3dcc0;
+    --bg-night: #e8d5b8;
+    --bg-warm-morning: #fbe8cc;
+    --bg-warm-day: #f2e0c8;
+    --bg-warm-evening: #ecd4b0;
+    --bg-warm-night: #e0c8a4;
+    --bg-rain: #e8d8c4;
+    --bg-rain-warm: #ecd8bc;
+    --bg-storm: #dcc8b0;
+    --bg-storm-warm: #e0ccb4;
+    --bg-fog: #efe3d0;
+    --bg-clouds: #f2e8d8;
+    --bg-snow: #f0e8dc;
+    --bg-clear: #fdf4e0;
+    --bg-evening-rain: #e8d0ac;
+    --bg-night-rain: #dcc4a0;
+
+    --accent: #a85520;
+    --accent-2: #8f4719;
+    --accent-3: #7a3d15;
+    --glow: #e8c68a;
+    --petal: #e0a850;
+    --petal-soft: #fbe8c0;
+
+    --border-1: #e8d5b8;
+    --border-2: #dcc9a4;
+    --border-3: #e8d5b0;
+    --border-4: #f0e0c4;
+    --border-5: #e0c8a0;
+    --border-6: #b8a482;
+
+    --soft-1: #fbf1dd;
+    --soft-2: #fdf0d8;
+    --soft-3: #f0e4c8;
+    --soft-4: #fdf6e8;
+
+    --text-dark: #2a1a0e;
+    --text-med: #4a3520;
+    --text-soft: #3a2814;
+    --text-mute: #8a7050;
+    --text-faint: #b8a080;
+    --text-placeholder: #d4c0a0;
+
+    --shadow-rose: rgba(120, 80, 40, 0.10);
+    --shadow-rose-2: rgba(120, 80, 40, 0.18);
+    --shadow-accent: rgba(168, 85, 32, 0.30);
+
+    --amb-1: rgba(240, 198, 140, 0.75);
+    --amb-2: rgba(226, 165, 106, 0.70);
+    --amb-3: rgba(200, 128, 84, 0.55);
+    --amb-4: rgba(138, 82, 56, 0.45);
+  }
+
+  /* ============ BASE ============ */
+
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   html, body {
     margin: 0; padding: 0;
-    color: #2b2b2b;
+    color: var(--text-dark);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 17px; line-height: 1.7;
     min-height: 100vh;
     overscroll-behavior-y: contain;
-    transition: background-color 2s ease;
+    transition: background-color 2s ease, color 1s ease;
   }
 
-  body { padding-bottom: 100px; background-color: #faf7f5; }
-  body.warm-background { background-color: #f7e9e3; }
+  body { padding-bottom: 100px; background-color: var(--bg-base); }
+  body.warm-background { background-color: var(--bg-warm); }
   body.table-locked {
     overflow: hidden; height: 100vh; position: fixed;
     width: 100%; top: 0; left: 0; right: 0;
@@ -53,6 +174,8 @@
     visibility: hidden;
   }
 
+  /* ============ AMBIENT BACKGROUND ============ */
+
   body::before {
     content: '';
     position: fixed;
@@ -63,10 +186,10 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(circle at 28% 35%, rgba(251, 200, 210, 0.70) 0%, transparent 42%),
-      radial-gradient(circle at 72% 55%, rgba(247, 210, 195, 0.65) 0%, transparent 48%),
-      radial-gradient(circle at 50% 85%, rgba(232, 160, 175, 0.45) 0%, transparent 38%),
-      radial-gradient(circle at 15% 70%, rgba(250, 220, 205, 0.55) 0%, transparent 42%);
+      radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, var(--amb-2) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, var(--amb-3) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, var(--amb-4) 0%, transparent 42%);
     animation: ambientDrift 32s ease-in-out infinite;
     transition: filter 2s ease;
     will-change: transform, filter;
@@ -107,7 +230,7 @@
   .info-bar {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 500;
-    padding: 18px 20px;
+    padding: 18px 20px 12px 20px;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     opacity: 0; transform: translateY(-6px);
@@ -129,43 +252,118 @@
   .info-line {
     display: inline-block;
     font-size: 14px; font-weight: 500;
-    color: #6a6460; letter-spacing: 1.5px;
+    color: var(--text-mute); letter-spacing: 1.5px;
     white-space: nowrap; overflow: hidden;
     text-overflow: ellipsis; max-width: 100%;
   }
-  .info-line .city { font-weight: 600; color: #b04a5a; letter-spacing: 2px; }
+  .info-line .city { font-weight: 600; color: var(--accent); letter-spacing: 2px; }
   .info-line .sep { color: #d8ccc8; margin: 0 8px; font-weight: 400; }
-  .info-line .date { color: #6a6460; }
-  .info-line .time { color: #b04a5a; font-weight: 600; }
-  .info-line .temp { color: #b04a5a; font-weight: 600; }
-  .info-line .weather { color: #6a6460; }
+  .info-line .date { color: var(--text-mute); }
+  .info-line .time { color: var(--accent); font-weight: 600; }
+  .info-line .temp { color: var(--accent); font-weight: 600; }
+  .info-line .weather { color: var(--text-mute); }
+
+  /* ============ WEATHER TICKER ============ */
+
+  .ticker-wrap {
+    max-width: 100%;
+    margin: 8px auto 0 auto;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    opacity: 0;
+    transition: opacity 1.4s ease;
+    -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+    mask-image: linear-gradient(90deg, transparent 0%, #000 8%, #000 92%, transparent 100%);
+  }
+  .ticker-wrap.shown { opacity: 0.85; }
+
+  .ticker-track {
+    display: inline-block;
+    white-space: nowrap;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 1.2px;
+    animation: tickerScroll 60s linear infinite;
+    will-change: transform;
+  }
+  .ticker-track .tick-city { color: var(--accent); font-weight: 600; }
+  .ticker-track .tick-sep { color: #d8ccc8; margin: 0 10px; font-weight: 400; }
+  .ticker-track .tick-temp { color: var(--accent); font-weight: 600; }
+  .ticker-track .tick-hr { color: var(--text-mute); }
+
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
 
   /* ============ AMBIENT THEMING ============ */
 
-  html[data-time="morning"] body:not(.warm-background) { background-color: #fdf1e8; }
-  html[data-time="day"]     body:not(.warm-background) { background-color: #faf7f5; }
-  html[data-time="evening"] body:not(.warm-background) { background-color: #f8e6d8; }
-  html[data-time="night"]   body:not(.warm-background) { background-color: #ede2dc; }
+  html[data-time="morning"] body:not(.warm-background) { background-color: var(--bg-morning); }
+  html[data-time="day"]     body:not(.warm-background) { background-color: var(--bg-day); }
+  html[data-time="evening"] body:not(.warm-background) { background-color: var(--bg-evening); }
+  html[data-time="night"]   body:not(.warm-background) { background-color: var(--bg-night); }
 
-  html[data-time="morning"] body.warm-background { background-color: #fbeade; }
-  html[data-time="day"]     body.warm-background { background-color: #f7e9e3; }
-  html[data-time="evening"] body.warm-background { background-color: #f5e0d8; }
-  html[data-time="night"]   body.warm-background { background-color: #ecddd7; }
+  html[data-time="morning"] body.warm-background { background-color: var(--bg-warm-morning); }
+  html[data-time="day"]     body.warm-background { background-color: var(--bg-warm-day); }
+  html[data-time="evening"] body.warm-background { background-color: var(--bg-warm-evening); }
+  html[data-time="night"]   body.warm-background { background-color: var(--bg-warm-night); }
 
   html[data-weather="rain"] body:not(.warm-background),
-  html[data-weather="drizzle"] body:not(.warm-background) { background-color: #eae2e6; }
+  html[data-weather="drizzle"] body:not(.warm-background) { background-color: var(--bg-rain); }
   html[data-weather="rain"] body.warm-background,
-  html[data-weather="drizzle"] body.warm-background { background-color: #efe2e4; }
-  html[data-weather="thunderstorm"] body:not(.warm-background) { background-color: #e2dae2; }
-  html[data-weather="thunderstorm"] body.warm-background { background-color: #e6dee2; }
-  html[data-weather="fog"] body:not(.warm-background) { background-color: #efe9e4; }
-  html[data-weather="clouds"] body:not(.warm-background) { background-color: #f2eeec; }
-  html[data-weather="snow"] body:not(.warm-background) { background-color: #eff0f2; }
-  html[data-weather="clear"] body:not(.warm-background) { background-color: #fdf4ea; }
+  html[data-weather="drizzle"] body.warm-background { background-color: var(--bg-rain-warm); }
+  html[data-weather="thunderstorm"] body:not(.warm-background) { background-color: var(--bg-storm); }
+  html[data-weather="thunderstorm"] body.warm-background { background-color: var(--bg-storm-warm); }
+  html[data-weather="fog"] body:not(.warm-background) { background-color: var(--bg-fog); }
+  html[data-weather="clouds"] body:not(.warm-background) { background-color: var(--bg-clouds); }
+  html[data-weather="snow"] body:not(.warm-background) { background-color: var(--bg-snow); }
+  html[data-weather="clear"] body:not(.warm-background) { background-color: var(--bg-clear); }
   html[data-time="evening"][data-weather="rain"] body:not(.warm-background),
-  html[data-time="evening"][data-weather="drizzle"] body:not(.warm-background) { background-color: #ecddd8; }
+  html[data-time="evening"][data-weather="drizzle"] body:not(.warm-background) { background-color: var(--bg-evening-rain); }
   html[data-time="night"][data-weather="rain"] body:not(.warm-background),
-  html[data-time="night"][data-weather="drizzle"] body:not(.warm-background) { background-color: #e2d5d5; }
+  html[data-time="night"][data-weather="drizzle"] body:not(.warm-background) { background-color: var(--bg-night-rain); }
+
+  /* ============ THEME TOGGLE (name screen only) ============ */
+
+  .theme-toggle {
+    position: absolute;
+    top: 18px;
+    left: 18px;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-1);
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 4px 14px var(--shadow-rose);
+    cursor: pointer;
+    font-size: 20px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    -webkit-appearance: none;
+    appearance: none;
+    transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+    z-index: 10;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+  }
+  .theme-toggle:active {
+    transform: scale(0.92);
+    background: rgba(255, 255, 255, 1);
+    border-color: var(--accent);
+  }
+
+  /* On narrow mobile screens, push the info-bar down so the toggle
+     at top-left doesn't collide with the centered info text. */
+  @media (max-width: 500px) {
+    .info-bar { padding-top: 62px; }
+  }
 
   /* ============ NAME ENTRY ============ */
 
@@ -181,38 +379,37 @@
   }
   .name-screen.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
   .name-inner { max-width: 400px; width: 100%; padding: 20px 0; }
-  .name-label { font-size: 14px; color: #b8a8a2; letter-spacing: 3px; margin-bottom: 20px; }
+  .name-label { font-size: 14px; color: var(--text-faint); letter-spacing: 3px; margin-bottom: 20px; }
 
-  /* Smaller, tighter therapist name field */
   .name-input {
     width: 100%; background: #ffffff;
-    border: 2px solid #ead9d5; border-radius: 12px;
+    border: 2px solid var(--border-1); border-radius: 12px;
     padding: 12px 16px;
-    font-size: 17px; font-weight: 600; color: #1f1f1f;
+    font-size: 17px; font-weight: 600; color: var(--text-dark);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     text-align: center; letter-spacing: 1px;
     transition: border-color 0.2s;
     -webkit-appearance: none; appearance: none;
-    box-shadow: 0 4px 18px rgba(120, 90, 90, 0.08);
+    box-shadow: 0 4px 18px var(--shadow-rose);
   }
-  .name-input::placeholder { color: #d4c4be; font-weight: 400; }
-  .name-input:focus { outline: none; border-color: #b04a5a; }
+  .name-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
+  .name-input:focus { outline: none; border-color: var(--accent); }
 
   @keyframes inputConfirm {
     0% {
       transform: scale(1);
-      box-shadow: 0 4px 18px rgba(120, 90, 90, 0.08);
-      border-color: #ead9d5;
+      box-shadow: 0 4px 18px var(--shadow-rose);
+      border-color: var(--border-1);
     }
     50% {
       transform: scale(1.03);
-      box-shadow: 0 10px 32px rgba(176, 74, 90, 0.28);
-      border-color: #b04a5a;
+      box-shadow: 0 10px 32px var(--shadow-accent);
+      border-color: var(--accent);
     }
     100% {
       transform: scale(1);
-      box-shadow: 0 4px 18px rgba(120, 90, 90, 0.08);
-      border-color: #ead9d5;
+      box-shadow: 0 4px 18px var(--shadow-rose);
+      border-color: var(--border-1);
     }
   }
 
@@ -220,7 +417,7 @@
     animation: inputConfirm 0.42s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
 
-  .preset-label { margin-top: 28px; font-size: 13px; color: #b8a8a2; letter-spacing: 3px; }
+  .preset-label { margin-top: 28px; font-size: 13px; color: var(--text-faint); letter-spacing: 3px; }
   .preset-grid { margin-top: 14px; display: flex; flex-direction: column; gap: 10px; }
   .preset-row { display: flex; align-items: center; gap: 8px; }
   .preset-row .preset-input { flex: 1; min-width: 0; }
@@ -228,41 +425,46 @@
   .preset-clear, .preset-undo,
   .tip-minus, .tip-plus {
     flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
-    background: #ffffff; border: 1.5px solid #ead9d5;
+    background: #ffffff; border: 1.5px solid var(--border-1);
     font-size: 18px; font-weight: 600; font-family: inherit; line-height: 1;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
     transition: background 0.2s, border-color 0.2s, color 0.2s;
     -webkit-appearance: none; appearance: none; padding: 0;
-    box-shadow: 0 2px 8px rgba(120, 90, 90, 0.06);
+    box-shadow: 0 2px 8px var(--shadow-rose);
     user-select: none; -webkit-user-select: none;
   }
-  .preset-clear, .tip-minus { color: #b04a5a; }
-  .preset-clear:active, .tip-minus:active { background: #fbeef0; border-color: #b04a5a; }
-  .preset-undo, .tip-plus { color: #8a807c; font-size: 16px; }
-  .preset-undo:active, .tip-plus:active { background: #f4f0ee; border-color: #c9bfb8; color: #4a4542; }
+  .preset-clear, .tip-minus { color: var(--accent); }
+  .preset-clear:active, .tip-minus:active { background: var(--soft-1); border-color: var(--accent); }
+  .preset-undo, .tip-plus { color: var(--text-mute); font-size: 16px; }
+  .preset-undo:active, .tip-plus:active { background: var(--soft-3); border-color: var(--border-6); color: var(--text-med); }
+
+  /* Long-press suppression for the tip +/- buttons only */
+  .tip-minus, .tip-plus {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
 
   .preset-input,
   .tip-field-input {
     width: 100%; background: #ffffff;
-    border: 1.5px solid #ead9d5; border-radius: 12px;
+    border: 1.5px solid var(--border-1); border-radius: 12px;
     padding: 12px 14px; font-size: 15px; font-weight: 500; font-family: inherit;
-    color: #1f1f1f; transition: border-color 0.2s;
+    color: var(--text-dark); transition: border-color 0.2s;
     -webkit-appearance: none; appearance: none;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-    box-shadow: 0 2px 10px rgba(120, 90, 90, 0.05);
+    box-shadow: 0 2px 10px var(--shadow-rose);
   }
   .preset-input::placeholder,
-  .tip-field-input::placeholder { color: #d4c4be; font-weight: 400; }
+  .tip-field-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
   .preset-input:focus,
-  .tip-field-input:focus { outline: none; border-color: #b04a5a; }
+  .tip-field-input:focus { outline: none; border-color: var(--accent); }
 
-  /* Rejection tip row on the first screen.
-     Matches the service preset row layout: input on the left,
-     small circular buttons on the right. */
   .tip-label {
     margin-top: 28px;
     font-size: 13px;
-    color: #b8a8a2;
+    color: var(--text-faint);
     letter-spacing: 3px;
   }
   .tip-row {
@@ -275,7 +477,7 @@
     flex: 1;
     min-width: 0;
     text-align: right;
-    color: #b04a5a;
+    color: var(--accent);
     font-weight: 700;
     letter-spacing: 0.5px;
   }
@@ -284,15 +486,15 @@
   }
 
   .name-btn {
-    margin-top: 28px; background: #b04a5a; color: #ffffff;
+    margin-top: 28px; background: var(--accent); color: #ffffff;
     border: none; border-radius: 30px; padding: 16px 48px;
     font-size: 16px; font-weight: 600; font-family: inherit;
     letter-spacing: 2px; cursor: pointer;
     transition: background 0.2s, transform 0.15s;
-    box-shadow: 0 6px 18px rgba(176, 74, 90, 0.25);
+    box-shadow: 0 6px 18px var(--shadow-accent);
     -webkit-appearance: none; appearance: none;
   }
-  .name-btn:active { background: #9a3e4d; transform: scale(0.97); }
+  .name-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
   /* ============ BLOSSOM START ============ */
 
@@ -320,33 +522,33 @@
     font-family: "Hiragino Mincho ProN", "Yu Mincho", "Shippori Mincho", serif;
     font-size: 88px;
     line-height: 1;
-    color: #e8a8b0;
+    color: var(--petal);
     text-align: center;
     user-select: none;
     -webkit-user-select: none;
     animation: blossomBreathe 2.8s ease-in-out infinite;
     transform-origin: 50% 50%;
     will-change: transform, filter;
-    text-shadow: 0 4px 14px rgba(232, 180, 188, 0.4);
+    text-shadow: 0 4px 14px var(--petal-soft);
   }
   @keyframes blossomBreathe {
     0%, 100% {
       transform: scale(1);
-      filter: drop-shadow(0 0 0px rgba(232, 180, 188, 0));
+      filter: drop-shadow(0 0 0px transparent);
     }
     50% {
       transform: scale(1.14);
-      filter: drop-shadow(0 4px 18px rgba(232, 180, 188, 0.5));
+      filter: drop-shadow(0 4px 18px var(--petal-soft));
     }
   }
 
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px;
-    color: #b04a5a;
+    color: var(--accent);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .start-hint {
-    margin: 8px 0 0 0; font-size: 14px; font-weight: 400; color: #b8a8a2;
+    margin: 8px 0 0 0; font-size: 14px; font-weight: 400; color: var(--text-faint);
     letter-spacing: 3px; line-height: 2;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     text-align: center; animation: hintBreathe 4s ease-in-out infinite;
@@ -366,13 +568,16 @@
     opacity: 0; pointer-events: none;
     transition: opacity 0.8s ease;
   }
+  html[data-theme="autumn"] .intro-overlay {
+    background: rgba(250, 243, 232, 0.88);
+  }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
 
   .name-char {
     display: block;
     font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 120px; font-weight: 500; color: #b04a5a;
+    font-size: 120px; font-weight: 500; color: var(--accent);
     line-height: 1; letter-spacing: 0;
     opacity: 0; transform: translateY(-24px); filter: blur(3px);
     animation: charArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
@@ -417,7 +622,7 @@
     transition-delay: 0.25s;
     font-size: 18px;
     font-weight: 500;
-    color: #1f1f1f;
+    color: var(--text-dark);
     line-height: 2.2;
     letter-spacing: 0.4px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -430,7 +635,6 @@
     transition-delay: 0s;
   }
 
-  /* Tight paragraph spacing */
   .panel-content p {
     margin: 0 0 0.4em 0;
     padding: 0;
@@ -439,29 +643,26 @@
     margin-bottom: 0;
   }
 
-  /* Therapist name (hardcoded in panel 1) */
   .panel-content .therapist-name {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-weight: 500;
     font-size: 1.18em;
-    color: #a34a56;
+    color: var(--accent-2);
     letter-spacing: 2px;
     font-style: normal;
-    text-shadow: 0 1px 8px rgba(232, 180, 188, 0.45);
+    text-shadow: 0 1px 8px var(--petal-soft);
     padding: 0 2px;
   }
 
-  /* Panel 5 red paragraphs */
   .panel-content .panel-5-red {
-    color: #b04a5a;
+    color: var(--accent);
   }
 
-  /* Panel 5 boxed card */
   .panel-content .msg-3 {
     padding: 24px 22px;
     background: rgba(255, 255, 255, 0.92);
     border-radius: 20px;
-    border: 1.5px solid #ead9d5;
+    border: 1.5px solid var(--border-1);
     box-shadow: 0 6px 20px rgba(0, 0, 0, 0.06);
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
@@ -473,14 +674,14 @@
     justify-content: center;
     gap: 10px;
     font-size: 14px;
-    color: #b8a8a2;
+    color: var(--text-faint);
     letter-spacing: 4px;
     font-weight: 500;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .action-hint .hint-arrow {
     display: inline-block;
-    color: #b04a5a;
+    color: var(--accent);
     font-size: 16px;
     line-height: 1;
   }
@@ -553,8 +754,8 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #d4c4be;
-    box-shadow: 0 1px 3px rgba(120, 90, 90, 0.08);
+    background: var(--text-placeholder);
+    box-shadow: 0 1px 3px var(--shadow-rose);
     transition:
       background 0.3s ease,
       transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
@@ -562,11 +763,16 @@
   }
 
   .dot.active {
-    background: #b04a5a;
+    background: var(--accent);
     transform: scale(1.5);
     box-shadow:
       0 0 0 5px rgba(176, 74, 90, 0.14),
-      0 2px 6px rgba(176, 74, 90, 0.25);
+      0 2px 6px var(--shadow-accent);
+  }
+  html[data-theme="autumn"] .dot.active {
+    box-shadow:
+      0 0 0 5px rgba(168, 85, 32, 0.16),
+      0 2px 6px var(--shadow-accent);
   }
 
   .stage-spacer { height: 2vh; }
@@ -577,7 +783,7 @@
     text-align: center;
     padding: 0 32px 40px 32px;
     margin-top: 20px;
-    font-size: 15px; font-weight: 500; color: #b04a5a;
+    font-size: 15px; font-weight: 500; color: var(--accent);
     letter-spacing: 0.8px; line-height: 2;
     max-width: 560px; margin-left: auto; margin-right: auto;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -615,15 +821,15 @@
     transition: opacity 0.9s ease, transform 0.9s ease;
   }
   .divider.active { opacity: 1; transform: translateY(0); }
-  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #e2d5d0; }
-  .divider-text { font-size: 15px; color: #b04a5a; letter-spacing: 2px; }
+  .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border-2); }
+  .divider-text { font-size: 15px; color: var(--accent); letter-spacing: 2px; }
 
   .table-card {
     background: rgba(255, 255, 255, 0.94);
     border-radius: 18px;
     padding: 6px 0;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
-    border: 1px solid #ece4e0; overflow: hidden;
+    border: 1px solid var(--border-3); overflow: hidden;
     opacity: 0; transform: translateY(24px);
     transition: opacity 0.9s ease, transform 0.9s ease;
     margin: 0 16px;
@@ -632,7 +838,6 @@
   }
   .table-card.active { opacity: 1; transform: translateY(0); }
 
-  /* Privacy note: four paragraphs, italic, dark */
   .privacy-note-inline {
     margin: 0;
     padding: 16px 22px 18px 22px;
@@ -641,14 +846,14 @@
     font-style: italic;
     font-size: 14px;
     font-weight: 400;
-    color: #1f1f1f;
+    color: var(--text-dark);
     letter-spacing: 0.3px;
     line-height: 1.9;
     word-break: auto-phrase;
     overflow-wrap: break-word;
     line-break: strict;
-    border-bottom: 1px solid #f2ece9;
-    background: #fdf9f7;
+    border-bottom: 1px solid var(--border-4);
+    background: var(--soft-4);
   }
   .privacy-note-inline p {
     margin: 0 0 0.4em 0;
@@ -661,17 +866,17 @@
   .row {
     display: flex; align-items: center; gap: 8px;
     padding: 14px 14px 14px 12px;
-    border-bottom: 1px solid #f2ece9;
+    border-bottom: 1px solid var(--border-4);
     border-left: 3px solid transparent;
     transition: background 0.2s ease, border-left-color 0.2s ease, opacity 0.2s ease;
   }
   .row:last-child { border-bottom: none; }
-  .row.filled { background: #fdf3f2; border-left-color: #b04a5a; }
+  .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
   .row.disabled { opacity: 0.35; pointer-events: none; }
 
   .row-check {
     flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
-    background: #ffffff; border: 1.5px solid #ead9d5;
+    background: #ffffff; border: 1.5px solid var(--border-1);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
     transition: background 0.25s, border-color 0.25s, transform 0.15s, color 0.25s;
@@ -687,14 +892,14 @@
   }
   .row-check:active { transform: scale(0.92); }
   .row-check.checked {
-    background: #fdf3f2;
-    border-color: #b04a5a;
-    color: #b04a5a;
+    background: var(--soft-2);
+    border-color: var(--accent);
+    color: var(--accent);
     animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
-  .row-check.checked::after { opacity: 1; transform: scale(1); color: #b04a5a; }
-  .row.filled .row-check { border-color: #b04a5a; }
-  .row.filled .row-check::after { opacity: 1; color: #b04a5a; }
+  .row-check.checked::after { opacity: 1; transform: scale(1); color: var(--accent); }
+  .row.filled .row-check { border-color: var(--accent); }
+  .row.filled .row-check::after { opacity: 1; color: var(--accent); }
 
   @keyframes checkPop {
     0% { transform: scale(1); }
@@ -704,20 +909,20 @@
 
   .service-input {
     flex: 1; min-width: 0; background: transparent; border: none;
-    border-bottom: 1.5px dashed #d8ccc8;
-    color: #1f1f1f; font-size: 16px; font-weight: 500;
+    border-bottom: 1.5px dashed var(--border-2);
+    color: var(--text-dark); font-size: 16px; font-weight: 500;
     font-family: inherit; padding: 6px 2px;
     transition: border-color 0.2s;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .service-input::placeholder { color: #a9a09c; font-weight: 400; }
-  .service-input:focus { outline: none; border-bottom-color: #b04a5a; border-bottom-style: solid; }
+  .service-input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
 
   .service-display {
-    flex: 1; min-width: 0; color: #1f1f1f;
+    flex: 1; min-width: 0; color: var(--text-dark);
     font-size: 16px; font-weight: 500; font-family: inherit;
     padding: 6px 2px;
-    border-bottom: 1.5px dashed #d8ccc8;
+    border-bottom: 1.5px dashed var(--border-2);
     line-height: 1.4;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     white-space: normal;
@@ -725,23 +930,23 @@
 
   .price-wrap {
     flex-shrink: 0; display: flex; align-items: center; gap: 3px;
-    background: #faf3f1; border-radius: 10px;
+    background: var(--soft-1); border-radius: 10px;
     padding: 8px 10px;
-    border: 1.5px solid #ead9d5;
+    border: 1.5px solid var(--border-1);
     transition: background 0.2s, border-color 0.2s, opacity 0.2s;
     min-width: 92px;
   }
-  .row.filled .price-wrap { background: #ffffff; border-color: #b04a5a; }
-  .row.locked .price-wrap { background: #f5f2ef; border-color: #ede4e0; opacity: 0.55; }
+  .row.filled .price-wrap { background: #ffffff; border-color: var(--accent); }
+  .row.locked .price-wrap { background: var(--soft-3); border-color: var(--border-3); opacity: 0.55; }
   .row.locked .price-input { cursor: not-allowed; color: #b8ada6; }
-  .row.locked .price-input::placeholder { color: #d4c4be; }
+  .row.locked .price-input::placeholder { color: var(--text-placeholder); }
   .row.locked .yen { color: #b8ada6; }
   .row.locked .row-check { opacity: 0.75; }
 
   .price-input {
     width: 52px;
     background: transparent; border: none;
-    color: #b04a5a; font-size: 14px; font-weight: 800;
+    color: var(--accent); font-size: 14px; font-weight: 800;
     text-align: right; font-family: inherit; padding: 0;
     letter-spacing: 0.3px;
   }
@@ -753,13 +958,13 @@
     letter-spacing: 0.5px;
   }
 
-  .yen { color: #a34a56; font-size: 14px; font-weight: 700; flex-shrink: 0; }
+  .yen { color: var(--accent-2); font-size: 14px; font-weight: 700; flex-shrink: 0; }
 
   .reject-row {
     margin: 12px 16px 8px 16px;
     padding: 20px 16px;
     background: rgba(245, 242, 239, 0.94);
-    border: 1.5px dashed #c9bfb8;
+    border: 1.5px dashed var(--border-6);
     border-radius: 16px;
     display: flex; align-items: flex-start; gap: 14px;
     cursor: pointer;
@@ -769,9 +974,13 @@
     backdrop-filter: blur(4px);
     -webkit-backdrop-filter: blur(4px);
   }
+  html[data-theme="autumn"] .reject-row {
+    background: rgba(240, 228, 200, 0.94);
+  }
   .reject-row.active { opacity: 1; transform: translateY(0); }
   .reject-row:active { transform: scale(0.99); }
-  .reject-row.selected { background: rgba(253, 243, 242, 0.96); border: 1.5px solid #b04a5a; }
+  .reject-row.selected { background: rgba(253, 243, 242, 0.96); border: 1.5px solid var(--accent); }
+  html[data-theme="autumn"] .reject-row.selected { background: rgba(251, 241, 221, 0.96); }
 
   .reject-box {
     flex-shrink: 0; width: 26px; height: 26px;
@@ -782,7 +991,7 @@
     transition: all 0.2s;
     margin-top: 2px;
   }
-  .reject-row.selected .reject-box { background: #b04a5a; border-color: #b04a5a; }
+  .reject-row.selected .reject-box { background: var(--accent); border-color: var(--accent); }
   .reject-box::after {
     content: "";
     width: 7px; height: 13px;
@@ -795,15 +1004,15 @@
 
   .reject-content { flex: 1; min-width: 0; }
   .reject-text {
-    color: #4a4542; font-size: 16px;
+    color: var(--text-med); font-size: 16px;
     line-height: 1.7; font-weight: 500;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  .reject-row.selected .reject-text { color: #b04a5a; font-weight: 700; }
+  .reject-row.selected .reject-text { color: var(--accent); font-weight: 700; }
 
   .reject-thanks {
     margin-top: 0; padding-top: 0;
-    border-top: 1px solid #f0dada;
+    border-top: 1px solid var(--border-5);
     opacity: 0; max-height: 0; overflow: hidden;
     transition: opacity 0.9s ease, max-height 0.9s ease, margin-top 0.9s ease, padding-top 0.9s ease;
   }
@@ -812,12 +1021,12 @@
     margin-top: 18px; padding-top: 16px;
   }
   .reject-thanks-line {
-    font-size: 16px; font-weight: 700; color: #b04a5a;
+    font-size: 16px; font-weight: 700; color: var(--accent);
     letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .reject-thanks-sub {
-    font-size: 14px; font-weight: 500; color: #4a4542;
+    font-size: 14px; font-weight: 500; color: var(--text-med);
     letter-spacing: 0.5px; line-height: 1.8; margin-bottom: 14px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
@@ -831,23 +1040,23 @@
   .gift-divider-line {
     flex: 1;
     height: 1px;
-    background: linear-gradient(90deg, transparent, #e8b4bc 30%, #e8b4bc 70%, transparent);
+    background: linear-gradient(90deg, transparent, var(--glow) 30%, var(--glow) 70%, transparent);
   }
   .gift-divider-label {
     flex-shrink: 0;
     font-size: 17px;
     font-weight: 600;
-    color: #b04a5a;
+    color: var(--accent);
     letter-spacing: 5px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     padding: 0 6px;
   }
 
   .reject-gift {
-    font-size: 13.5px; font-weight: 500; color: #3a3633;
+    font-size: 13.5px; font-weight: 500; color: var(--text-soft);
     line-height: 2; letter-spacing: 0.3px;
     background: #ffffff;
-    border: 1px dashed #e8b4bc;
+    border: 1px dashed var(--glow);
     border-radius: 12px; padding: 16px 18px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
@@ -858,7 +1067,7 @@
     display: inline-block;
     font-size: 18px;
     font-weight: 700;
-    color: #b04a5a;
+    color: var(--accent);
     letter-spacing: 1px;
     margin: 0 2px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -874,6 +1083,10 @@
     position: absolute; top: 0; left: 50%;
     width: 42px; height: 56px; margin-left: -21px;
     opacity: 0; transform: translateY(-100px) rotate(0deg);
+  }
+  .petal-svg path {
+    fill: var(--petal-soft);
+    stroke: var(--glow);
   }
   .petal-overlay.active .petal-svg {
     animation: petalFall 3.4s cubic-bezier(0.35, 0.1, 0.5, 0.9) forwards;
@@ -893,7 +1106,7 @@
   .summary {
     position: fixed; bottom: 0; left: 0; right: 0;
     background: rgba(255, 255, 255, 0.94);
-    border-top: 1px solid #ece4e0;
+    border-top: 1px solid var(--border-3);
     padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.06);
     opacity: 0; transform: translateY(100%);
@@ -914,11 +1127,11 @@
     flex-shrink: 0;
   }
   .summary-label {
-    font-size: 10px; color: #8a807c;
+    font-size: 10px; color: var(--text-mute);
     letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0;
   }
   .summary-total {
-    font-size: 22px; font-weight: 700; color: #b04a5a;
+    font-size: 22px; font-weight: 700; color: var(--accent);
     letter-spacing: 0.5px;
     white-space: nowrap;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -928,16 +1141,16 @@
     flex-shrink: 0;
   }
   .reset {
-    background: #faf3f1; border: 1.5px solid #ead9d5;
-    color: #a34a56; font-size: 13px; font-weight: 600;
+    background: var(--soft-1); border: 1.5px solid var(--border-1);
+    color: var(--accent-2); font-size: 13px; font-weight: 600;
     padding: 10px 16px; border-radius: 20px;
     font-family: inherit; cursor: pointer; transition: all 0.2s;
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .reset:active { background: #f4e6e6; transform: scale(0.97); }
+  .reset:active { background: var(--soft-2); transform: scale(0.97); }
   .submit-btn {
-    background: #b04a5a; border: 1.5px solid #b04a5a;
+    background: var(--accent); border: 1.5px solid var(--accent);
     color: #ffffff; font-size: 13px; font-weight: 600;
     padding: 10px 16px; border-radius: 20px;
     font-family: inherit; cursor: pointer; transition: all 0.2s;
@@ -948,7 +1161,7 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .submit-btn:active { background: #9a3e4d; transform: scale(0.97); }
+  .submit-btn:active { background: var(--accent-3); transform: scale(0.97); }
   .submit-btn:disabled {
     background: #e0d3ce; border-color: #e0d3ce;
     color: #ffffff; cursor: default; opacity: 0.6;
@@ -988,13 +1201,16 @@
     opacity: 0; pointer-events: none;
     transition: opacity 0.5s ease;
   }
+  html[data-theme="autumn"] .confirm-screen {
+    background: rgba(250, 243, 232, 0.92);
+  }
   .confirm-screen.visible { opacity: 1; pointer-events: auto; }
   .confirm-card {
     background: #ffffff; max-width: 380px; width: 100%;
     padding: 36px 28px 28px 28px;
     border-radius: 20px;
-    box-shadow: 0 12px 40px rgba(120, 90, 90, 0.16);
-    border: 1px solid #f0e6e2;
+    box-shadow: 0 12px 40px var(--shadow-rose-2);
+    border: 1px solid var(--border-3);
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     transform: scale(0.94);
@@ -1002,7 +1218,7 @@
   }
   .confirm-screen.visible .confirm-card { transform: scale(1); }
   .confirm-title {
-    font-size: 18px; font-weight: 600; color: #b04a5a;
+    font-size: 18px; font-weight: 600; color: var(--accent);
     line-height: 1.9; letter-spacing: 0.5px; margin-bottom: 28px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-wrap: balance;
@@ -1012,7 +1228,7 @@
     margin-top: 14px;
     font-size: 13px;
     font-weight: 500;
-    color: #6a6460;
+    color: var(--text-mute);
     letter-spacing: 0.4px;
     line-height: 2;
     text-wrap: balance;
@@ -1041,17 +1257,17 @@
   .confirm-btn:active { transform: scale(0.97); }
   .confirm-no {
     background: #ffffff;
-    border: 1.5px solid #ead9d5;
-    color: #8a807c;
+    border: 1.5px solid var(--border-1);
+    color: var(--text-mute);
   }
-  .confirm-no:active { background: #f4f0ee; border-color: #c9bfb8; }
+  .confirm-no:active { background: var(--soft-3); border-color: var(--border-6); }
   .confirm-yes {
-    background: #b04a5a;
-    border: 1.5px solid #b04a5a;
+    background: var(--accent);
+    border: 1.5px solid var(--accent);
     color: #ffffff;
-    box-shadow: 0 4px 14px rgba(176, 74, 90, 0.2);
+    box-shadow: 0 4px 14px var(--shadow-accent);
   }
-  .confirm-yes:active { background: #9a3e4d; }
+  .confirm-yes:active { background: var(--accent-3); }
 
   @media (min-width: 700px) {
     .confirm-btn { font-size: 14.5px; padding: 15px 12px; }
@@ -1070,6 +1286,9 @@
     opacity: 0; pointer-events: none;
     transition: opacity 0.9s ease;
   }
+  html[data-theme="autumn"] .receipt-screen {
+    background: rgba(250, 243, 232, 0.94);
+  }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
@@ -1081,8 +1300,8 @@
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     padding: 36px 30px 28px 30px;
     border-radius: 4px;
-    box-shadow: 0 8px 32px rgba(120, 90, 90, 0.12);
-    border: 1px solid #f0e6e2;
+    box-shadow: 0 8px 32px var(--shadow-rose-2);
+    border: 1px solid var(--border-3);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     position: relative;
     animation: receiptArrive 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
@@ -1106,41 +1325,43 @@
     -webkit-appearance: none; appearance: none;
     padding: 0; z-index: 5;
   }
-  .receipt-close:active { background: #f4f0ee; color: #8a807c; }
+  .receipt-close:active { background: var(--soft-3); color: var(--text-mute); }
   .receipt-header { text-align: center; margin-bottom: 24px; clear: both; }
   .receipt-thanks {
-    font-size: 17px; font-weight: 600; color: #b04a5a;
+    font-size: 17px; font-weight: 600; color: var(--accent);
     line-height: 1.9; letter-spacing: 1px; margin-bottom: 16px;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .receipt-subthanks {
-    font-size: 13px; font-weight: 400; color: #8a807c;
+    font-size: 13px; font-weight: 400; color: var(--text-mute);
     line-height: 1.9; letter-spacing: 0.5px;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .receipt-to-row {
     display: flex; align-items: center; justify-content: center;
     gap: 14px; padding: 20px 8px 12px 8px; text-align: center;
   }
-  .receipt-to-mark { font-size: 13px; color: #e8b4bc; line-height: 1; flex-shrink: 0; }
+  .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; flex-shrink: 0; }
   .receipt-to-name {
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 18px; font-weight: 700; color: #b04a5a;
+    font-size: 18px; font-weight: 700; color: var(--accent);
     letter-spacing: 2px; line-height: 1.4;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .receipt-divider {
     height: 1px;
-    background: linear-gradient(90deg, transparent, #e2d5d0 20%, #e2d5d0 80%, transparent);
+    background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent);
     margin: 22px 0;
   }
   .receipt-title {
-    font-size: 12px; font-weight: 500; color: #b8a8a2;
+    font-size: 12px; font-weight: 500; color: var(--text-faint);
     letter-spacing: 6px; text-align: center; margin-bottom: 20px;
   }
   .receipt-items { display: flex; flex-direction: column; gap: 14px; }
   .receipt-item {
     display: flex; justify-content: space-between; align-items: center;
     gap: 8px; padding-bottom: 10px;
-    border-bottom: 1px dashed #ece4e0;
+    border-bottom: 1px dashed var(--border-3);
     opacity: 0; transform: translateY(8px);
     animation: receiptItemArrive 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   }
@@ -1149,24 +1370,24 @@
   }
   .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
   .receipt-item-name {
-    flex: 1; font-size: 14px; color: #3a3633;
+    flex: 1; font-size: 14px; color: var(--text-soft);
     line-height: 1.5; letter-spacing: 0.3px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .receipt-item-price-wrap {
     flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px;
-    color: #b04a5a; font-weight: 600; font-size: 14px;
+    color: var(--accent); font-weight: 600; font-size: 14px;
     letter-spacing: 0.5px;
     padding: 4px 8px; border-radius: 8px;
-    background: #fdf3f2;
-    border: 1px solid #f0dada;
+    background: var(--soft-2);
+    border: 1px solid var(--border-5);
     transition: border-color 0.2s, background 0.2s;
   }
-  .receipt-item-price-wrap:focus-within { border-color: #b04a5a; background: #ffffff; }
+  .receipt-item-price-wrap:focus-within { border-color: var(--accent); background: #ffffff; }
   .receipt-item-price-wrap .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
   .receipt-price-input {
     background: transparent; border: none;
-    color: #b04a5a; font-size: 14px; font-weight: 600;
+    color: var(--accent); font-size: 14px; font-weight: 600;
     font-family: inherit; text-align: right;
     width: 58px; padding: 0;
     letter-spacing: 0.3px;
@@ -1176,7 +1397,7 @@
   .receipt-item-remove {
     flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
     background: transparent; border: none;
-    color: #d4c4be; font-size: 16px; font-weight: 400;
+    color: var(--text-placeholder); font-size: 16px; font-weight: 400;
     font-family: inherit; line-height: 1;
     cursor: pointer;
     display: flex; align-items: center; justify-content: center;
@@ -1184,10 +1405,10 @@
     transition: background 0.2s, color 0.2s;
     -webkit-appearance: none; appearance: none;
   }
-  .receipt-item-remove:active { background: #fbeef0; color: #b04a5a; }
+  .receipt-item-remove:active { background: var(--soft-1); color: var(--accent); }
   .receipt-item-price {
     flex-shrink: 0; font-size: 14px; font-weight: 600;
-    color: #b04a5a; letter-spacing: 0.5px;
+    color: var(--accent); letter-spacing: 0.5px;
   }
   .receipt-item-price .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
 
@@ -1197,21 +1418,21 @@
     align-items: baseline;
     padding: 18px 4px;
     margin-top: 14px;
-    border-top: 1.5px solid #e8d5d5;
-    border-bottom: 1.5px solid #e8d5d5;
+    border-top: 1.5px solid var(--border-5);
+    border-bottom: 1.5px solid var(--border-5);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .receipt-total-label {
     font-size: 18px;
     font-weight: 600;
-    color: #8a7a74;
+    color: var(--text-mute);
     letter-spacing: 4px;
     line-height: 1.2;
   }
   .receipt-total-value {
     font-size: 18px;
     font-weight: 700;
-    color: #b04a5a;
+    color: var(--accent);
     letter-spacing: 0.5px;
     line-height: 1.2;
     white-space: nowrap;
@@ -1228,7 +1449,7 @@
     text-align: center;
     font-size: 14px;
     font-weight: 500;
-    color: #b04a5a;
+    color: var(--accent);
     letter-spacing: 0.8px;
     line-height: 2;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -1241,8 +1462,8 @@
     max-width: 260px;
     margin: 26px auto 0 auto;
     background: #ffffff;
-    border: 1.5px solid #ead9d5;
-    color: #b04a5a;
+    border: 1.5px solid var(--border-1);
+    color: var(--accent);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-size: 13px;
     font-weight: 600;
@@ -1256,8 +1477,8 @@
     white-space: nowrap;
   }
   .receipt-back-btn:active {
-    background: #fdf3f2;
-    border-color: #b04a5a;
+    background: var(--soft-2);
+    border-color: var(--accent);
     transform: scale(0.97);
   }
 
@@ -1267,7 +1488,7 @@
   }
   .receipt-footer-mark {
     font-size: 12px;
-    color: #e8b4bc;
+    color: var(--glow);
     letter-spacing: 10px;
   }
 
@@ -1387,15 +1608,15 @@
     transition-delay: 0.9s;
   }
   .ty-panel.active .ty-panel-hint { opacity: 1; transform: translateX(0); }
-  .ty-mark { font-size: 22px; color: #e8b4bc; letter-spacing: 10px; margin-bottom: 32px; }
+  .ty-mark { font-size: 22px; color: var(--glow); letter-spacing: 10px; margin-bottom: 32px; }
   .ty-line {
-    font-size: 18px; font-weight: 500; color: #2b2b2b;
+    font-size: 18px; font-weight: 500; color: var(--text-dark);
     line-height: 2.3; letter-spacing: 0.6px; margin-bottom: 8px;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  .ty-line.accent { color: #b04a5a; font-weight: 700; }
+  .ty-line.accent { color: var(--accent); font-weight: 700; }
   .ty-line.spacer { margin-top: 24px; }
-  .ty-rule { width: 44px; height: 1px; background: #ead9d5; margin: 30px auto; }
+  .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
 
   .ty-dots {
     position: absolute; bottom: 68px; left: 0; right: 0;
@@ -1408,19 +1629,24 @@
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background: #d4c4be;
-    box-shadow: 0 1px 3px rgba(120, 90, 90, 0.08);
+    background: var(--text-placeholder);
+    box-shadow: 0 1px 3px var(--shadow-rose);
     transition:
       background 0.3s ease,
       transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1),
       box-shadow 0.3s ease;
   }
   .ty-dot.active {
-    background: #b04a5a;
+    background: var(--accent);
     transform: scale(1.5);
     box-shadow:
       0 0 0 5px rgba(176, 74, 90, 0.14),
-      0 2px 6px rgba(176, 74, 90, 0.25);
+      0 2px 6px var(--shadow-accent);
+  }
+  html[data-theme="autumn"] .ty-dot.active {
+    box-shadow:
+      0 0 0 5px rgba(168, 85, 32, 0.16),
+      0 2px 6px var(--shadow-accent);
   }
 
   .ty-ambient-stage {
@@ -1447,7 +1673,7 @@
   }
   .blossom-mark {
     display: inline-block; font-size: 13px; line-height: 1;
-    color: #b04a5a;
+    color: var(--accent);
     opacity: 0; transform: scale(0.4); filter: blur(4px);
     transition:
       opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -1475,7 +1701,7 @@
   }
   .quote-line {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 26px; font-weight: 500; color: #b04a5a;
+    font-size: 26px; font-weight: 500; color: var(--accent);
     line-height: 2.1; letter-spacing: 3px;
     opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px);
     transition:
@@ -1484,48 +1710,59 @@
       filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-wrap: balance;
-    text-shadow: 0 2px 24px rgba(251, 223, 227, 0.6);
+    text-shadow: 0 2px 24px var(--petal-soft);
   }
   .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
 
+  /* View receipt button: subtle bottom-left back-button style */
   .ty-receipt-btn {
     position: absolute;
-    bottom: 14px;
-    left: 50%;
-    transform: translateX(-50%) translateY(20px);
-    background: #ffffff;
-    border: 1.5px solid #ead9d5;
-    color: #b04a5a;
+    bottom: 20px;
+    left: 20px;
+    background: transparent;
+    border: none;
+    color: var(--text-mute);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 3px;
-    padding: 12px 26px;
-    border-radius: 24px;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    padding: 8px 12px;
+    padding-left: calc(12px + env(safe-area-inset-left, 0px));
+    border-radius: 16px;
     cursor: pointer;
-    box-shadow: 0 4px 14px rgba(176, 74, 90, 0.12);
     opacity: 0;
     transition:
-      opacity 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-      transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+      opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94),
       background 0.2s ease,
-      border-color 0.2s ease;
+      color 0.2s ease;
     -webkit-appearance: none;
     appearance: none;
     white-space: nowrap;
     z-index: 30;
     pointer-events: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
   }
   .ty-receipt-btn.shown {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
+    opacity: 0.7;
     pointer-events: auto;
   }
   .ty-receipt-btn:active {
-    background: #fdf3f2;
-    border-color: #b04a5a;
-    transform: translateX(-50%) translateY(0) scale(0.97);
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.5);
+    color: var(--accent);
+  }
+  .ty-receipt-btn .btn-back-arrow {
+    display: inline-block;
+    font-size: 14px;
+    line-height: 1;
+    transform: translateX(0);
+    transition: transform 0.2s ease;
+  }
+  .ty-receipt-btn:active .btn-back-arrow {
+    transform: translateX(-3px);
   }
 
   /* ============ RESPONSIVE ============ */
@@ -1533,7 +1770,8 @@
   @media (min-width: 700px) {
     .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
-    .info-bar { padding: 22px 24px; }
+    .info-bar { padding: 22px 24px 14px 24px; }
+    .ticker-track { font-size: 13px; }
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider {
       margin-left: auto;
@@ -1556,7 +1794,7 @@
     .blossom-mark { font-size: 16px; }
     .blossom-divider { gap: 11px; margin-bottom: 42px; }
     .ty-dots { bottom: 74px; }
-    .ty-receipt-btn { font-size: 14px; padding: 14px 32px; bottom: 16px; }
+    .ty-receipt-btn { font-size: 13px; padding: 10px 14px; bottom: 22px; left: 24px; }
     .blossom-char { font-size: 100px; }
     .dot { width: 12px; height: 12px; }
     .ty-dot { width: 12px; height: 12px; }
@@ -1567,7 +1805,8 @@
 
   @media (min-width: 1100px) {
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
-    .info-bar { padding: 24px 28px; }
+    .info-bar { padding: 24px 28px 16px 28px; }
+    .ticker-track { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
     .panel-content { font-size: 22px; }
     .transition-line { font-size: 18px; max-width: 660px; }
@@ -1579,7 +1818,7 @@
     .blossom-mark { font-size: 18px; }
     .blossom-divider { gap: 14px; margin-bottom: 50px; }
     .ty-dots { bottom: 80px; }
-    .ty-receipt-btn { font-size: 15px; padding: 15px 36px; bottom: 20px; }
+    .ty-receipt-btn { font-size: 14px; padding: 10px 16px; bottom: 26px; left: 28px; }
     .blossom-char { font-size: 108px; }
     .dot { width: 13px; height: 13px; }
     .ty-dot { width: 13px; height: 13px; }
@@ -1589,9 +1828,10 @@
   }
 
   @media (max-height: 700px) {
-    .info-bar { padding: 12px 16px; }
+    .info-bar { padding: 12px 16px 10px 16px; }
     .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
+    .ticker-track { font-size: 11.5px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
     .panel { padding: 65px 20px 220px 20px; }
@@ -1611,7 +1851,7 @@
     .blossom-mark { font-size: 11px; }
     .quote-line { font-size: 22px; line-height: 1.9; }
     .quote-wrap { min-height: 120px; }
-    .ty-receipt-btn { bottom: 10px; padding: 10px 22px; font-size: 12px; }
+    .ty-receipt-btn { bottom: 12px; left: 14px; padding: 6px 10px; font-size: 11px; }
     .price-wrap { min-width: 88px; padding: 7px 9px; }
     .summary { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
     .summary-total { font-size: 19px; }
@@ -1624,12 +1864,14 @@
     .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
     .reject-gift { font-size: 12.5px; padding: 12px 14px; }
     .reject-gift-amount { font-size: 16px; }
+    .theme-toggle { top: 12px; left: 12px; width: 38px; height: 38px; font-size: 17px; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
-    .info-bar { padding: 8px 14px; }
+    .info-bar { padding: 8px 14px 6px 14px; }
     .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
+    .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
     .panel { padding: 55px 40px 180px 40px; }
@@ -1649,17 +1891,18 @@
     .quote-line { font-size: 22px; letter-spacing: 3px; }
     .quote-wrap { min-height: 110px; }
     .ty-dots { bottom: 48px; }
-    .ty-receipt-btn { bottom: 8px; padding: 8px 20px; font-size: 11px; }
+    .ty-receipt-btn { bottom: 8px; left: 12px; padding: 6px 10px; font-size: 10.5px; }
     .stage-spacer { height: 1.5vh; }
     .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
     .reject-gift { font-size: 12px; }
     .reject-gift-amount { font-size: 15px; }
+    .theme-toggle { top: 10px; left: 10px; width: 34px; height: 34px; font-size: 15px; }
   }
 </style>
 </head>
 <body>
 
-<!-- ============ GLOBAL INFO BAR ============ -->
+<!-- ============ GLOBAL INFO BAR + TICKER ============ -->
 
 <div class="info-bar" id="infoBar">
   <div class="info-line" id="infoLine">
@@ -1673,11 +1916,15 @@
     <span class="sep">·</span>
     <span class="weather" id="infoWeather">—</span>
   </div>
+  <div class="ticker-wrap" id="tickerWrap">
+    <div class="ticker-track" id="tickerTrack"></div>
+  </div>
 </div>
 
 <!-- ============ NAME ENTRY ============ -->
 
 <div class="name-screen" id="nameScreen">
+  <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
   <div class="name-inner">
     <div class="name-label">セラピストのお名前</div>
     <input type="text" class="name-input" id="nameInput" placeholder="お名前を入力"
@@ -1751,7 +1998,6 @@
 <div class="stage" id="stage">
   <div class="track" id="track">
 
-    <!-- Panel 1: greeting is hardcoded, body is injected from panel-1.html -->
     <div class="panel" data-panel="0">
       <div class="panel-inner">
         <div class="panel-content">
@@ -1761,7 +2007,6 @@
       </div>
     </div>
 
-    <!-- Panel 2: body injected from panel-2.html -->
     <div class="panel" data-panel="1">
       <div class="panel-inner">
         <div class="panel-content">
@@ -1770,7 +2015,6 @@
       </div>
     </div>
 
-    <!-- Panel 3: body injected from panel-3.html -->
     <div class="panel" data-panel="2">
       <div class="panel-inner">
         <div class="panel-content">
@@ -1779,7 +2023,6 @@
       </div>
     </div>
 
-    <!-- Panel 4: body injected from panel-4.html -->
     <div class="panel" data-panel="3">
       <div class="panel-inner">
         <div class="panel-content">
@@ -1788,7 +2031,6 @@
       </div>
     </div>
 
-    <!-- Panel 5: fully hardcoded -->
     <div class="panel" data-panel="4">
       <div class="panel-inner">
         <div class="panel-content">
@@ -1921,8 +2163,8 @@
 <div class="petal-overlay" id="petalOverlay">
   <svg class="petal-svg" viewBox="0 0 60 80" aria-hidden="true">
     <path d="M 30 5 Q 52 25, 48 50 Q 44 72, 30 75 Q 16 72, 12 50 Q 8 25, 30 5 Z"
-          fill="#fbdfe3" stroke="#e8b4bc" stroke-width="1.2"/>
-    <path d="M 30 12 Q 30 40, 30 68" stroke="#e8b4bc" stroke-width="0.6" fill="none" opacity="0.6"/>
+          stroke-width="1.2"/>
+    <path d="M 30 12 Q 30 40, 30 68" stroke-width="0.6" fill="none" opacity="0.6"/>
   </svg>
 </div>
 
@@ -1943,8 +2185,8 @@
   <div class="receipt-paper">
     <button type="button" class="receipt-close" id="receiptClose" aria-label="閉じる">×</button>
     <div class="receipt-header">
-      <div class="receipt-thanks">ご確認いただき<br>ありがとうございます。</div>
-      <div class="receipt-subthanks">無理のない範囲でお選びいただき、<br>ありがとうございます。</div>
+      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
     </div>
     <div class="receipt-to-row">
       <span class="receipt-to-mark">❀</span>
@@ -2069,12 +2311,35 @@
   </div>
 
   <button type="button" class="ty-receipt-btn" id="tyReceiptBtn">
-    内容を確認する
+    <span class="btn-back-arrow">←</span>
+    <span>内容を確認する</span>
   </button>
 
 </div>
 
 <script>
+  /* ============ THEME TOGGLE ============ */
+
+  var themeToggle = document.getElementById('themeToggle');
+  var currentTheme = 'default';
+
+  function applyTheme(theme) {
+    currentTheme = theme;
+    document.documentElement.setAttribute('data-theme', theme);
+    if (themeToggle) {
+      themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
+    }
+  }
+
+  if (themeToggle) {
+    themeToggle.addEventListener('click', function(e) {
+      e.preventDefault();
+      e.stopPropagation();
+      haptic(10);
+      applyTheme(currentTheme === 'autumn' ? 'default' : 'autumn');
+    });
+  }
+
   /* ============ HAPTIC FEEDBACK ============ */
 
   var hapticAudioCtx = null;
@@ -2301,6 +2566,8 @@
   var infoTime = document.getElementById('infoTime');
   var infoTemp = document.getElementById('infoTemp');
   var infoWeather = document.getElementById('infoWeather');
+  var tickerWrap = document.getElementById('tickerWrap');
+  var tickerTrack = document.getElementById('tickerTrack');
 
   var tyCarousel = document.getElementById('tyCarousel');
   var tyTrack = document.getElementById('tyTrack');
@@ -2317,6 +2584,16 @@
 
   var NAGOYA = { lat: 35.1815, lon: 136.9066, tz: 'Asia/Tokyo', name: '名古屋市' };
   var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
+
+  var TICKER_CITIES = [
+    { key: 'nagoya',   name: '名古屋', lat: 35.1815, lon: 136.9066 },
+    { key: 'tokyo',    name: '東京',   lat: 35.6762, lon: 139.6503 },
+    { key: 'osaka',    name: '大阪',   lat: 34.6937, lon: 135.5023 },
+    { key: 'kyoto',    name: '京都',   lat: 35.0116, lon: 135.7681 },
+    { key: 'okinawa',  name: '沖縄',   lat: 26.2124, lon: 127.6809 },
+    { key: 'sendai',   name: '仙台',   lat: 38.2682, lon: 140.8694 },
+    { key: 'sapporo',  name: '札幌',   lat: 43.0618, lon: 141.3545 }
+  ];
 
   window.addEventListener('resize', function() {
     stageWidth = window.innerWidth;
@@ -2346,8 +2623,8 @@
     var vh = window.innerHeight;
     var distanceFromBottom = vh - maxBottom;
 
-    var hintBottom = distanceFromBottom - 20;
-    var dotsBottom = distanceFromBottom - 20 - 38;
+    var hintBottom = distanceFromBottom - 48;
+    var dotsBottom = distanceFromBottom - 48 - 38;
 
     if (hintBottom < 40) hintBottom = 40;
     if (dotsBottom < 10) dotsBottom = 10;
@@ -2356,7 +2633,6 @@
     if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
   }
 
-  // rAF-based settle after DOM injection
   function repositionHintGroupAfterLayout() {
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
@@ -2651,7 +2927,7 @@
   function setTipValue(value) {
     if (!tipInput) return;
     var v = Math.max(0, Math.min(99999, value));
-    if (v === 0 && value === 0) {
+    if (v === 0) {
       tipInput.value = '';
     } else {
       tipInput.value = v.toLocaleString();
@@ -2672,9 +2948,6 @@
     return true;
   }
 
-  /* Press-and-hold acceleration for the tip +/- buttons.
-     Step is always 100; only the repeat rate accelerates. */
-
   function attachHoldAcceleration(buttonEl, delta) {
     if (!buttonEl) return;
 
@@ -2682,23 +2955,19 @@
     var holdTimeout = null;
     var holdInterval = null;
     var holdStart = 0;
-    var tickCount = 0;
 
     function rateForElapsed(ms) {
-      if (ms < 1500) return 200;   // slow
-      if (ms < 3000) return 100;   // medium
-      return 50;                    // fast
+      if (ms < 1500) return 200;
+      if (ms < 3000) return 100;
+      return 50;
     }
 
     function tick() {
       var changed = stepTip(delta);
       if (!changed) {
-        // At cap; stop the repeat
         stop();
         return;
       }
-      tickCount++;
-      // Schedule next tick with the current acceleration
       var elapsed = Date.now() - holdStart;
       var nextRate = rateForElapsed(elapsed);
       holdInterval = setTimeout(tick, nextRate);
@@ -2706,8 +2975,6 @@
 
     function start() {
       holdStart = Date.now();
-      tickCount = 0;
-      // Fire one immediate tick on press
       stepTip(delta);
       haptic(10);
       holdTimeout = setTimeout(function() {
@@ -2719,6 +2986,8 @@
       if (holdTimeout) { clearTimeout(holdTimeout); holdTimeout = null; }
       if (holdInterval) { clearTimeout(holdInterval); holdInterval = null; }
     }
+
+    buttonEl.addEventListener('contextmenu', function(e) { e.preventDefault(); });
 
     buttonEl.addEventListener('pointerdown', function(e) {
       e.preventDefault();
@@ -2735,7 +3004,6 @@
       stop();
     });
 
-    // Fallback for older touch devices without pointer events
     if (!window.PointerEvent) {
       buttonEl.addEventListener('touchstart', function(e) {
         e.preventDefault();
@@ -2760,11 +3028,11 @@
     var entered = (nameInput.value || '').trim();
     if (entered === '') {
       nameInput.focus();
-      nameInput.style.borderColor = '#b04a5a';
+      nameInput.style.borderColor = 'var(--accent)';
       var originalPlaceholder = nameInput.placeholder;
       nameInput.placeholder = 'お名前を入力してください';
       setTimeout(function() {
-        nameInput.style.borderColor = '#ead9d5';
+        nameInput.style.borderColor = '';
         nameInput.placeholder = originalPlaceholder;
       }, 1800);
       return;
@@ -2822,7 +3090,7 @@
     }, 420);
   }
 
-  /* ============ RESET (clear the form only) ============ */
+  /* ============ RESET ============ */
 
   function resetAll() {
     rejected = false;
@@ -2915,8 +3183,6 @@
       repositionHintGroupAfterLayout();
     });
 
-    // Re-measure once web fonts are fully loaded — Yuji Syuku and
-    // Shippori Mincho can change line counts after the initial paint.
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(function() {
         repositionHintGroupAfterLayout();
@@ -3174,9 +3440,21 @@
       receiptOpenedFromThankyou = false;
       receiptScreen.classList.remove('visible', 'reopened');
       infoBar.classList.remove('hidden');
-      setTimeout(function() {
+
+      var resumed = false;
+      function finishResume() {
+        if (resumed) return;
+        resumed = true;
+        receiptScreen.removeEventListener('transitionend', onFade);
         resumeThankyouSequence();
-      }, 500);
+      }
+      function onFade(ev) {
+        if (ev.target === receiptScreen && ev.propertyName === 'opacity') {
+          finishResume();
+        }
+      }
+      receiptScreen.addEventListener('transitionend', onFade);
+      setTimeout(finishResume, 1200);
       return;
     }
 
@@ -3206,45 +3484,59 @@
     receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
     infoBar.classList.remove('hidden');
 
-    if (thankyouScreen.classList.contains('visible')) {
-      thankyouScreen.classList.remove('visible');
-      tyAmbientStage.classList.remove('shown');
-      quoteLine.classList.remove('shown', 'leaving');
-      quoteLine.textContent = '';
-      blossomDivider.innerHTML = '';
-      tyCarousel.classList.remove('hidden-out');
-      tyDotsEl.classList.remove('hidden');
-      tyReceiptBtn.classList.remove('shown');
-      tyExited = false;
-      tyCurrentPanel = 0;
-      tyTrack.style.transform = 'translateX(0%)';
-      for (var i = 0; i < tyDots.length; i++) {
-        tyDots[i].classList.toggle('active', i === 0);
+    var finished = false;
+    function finishReturn() {
+      if (finished) return;
+      finished = true;
+      receiptScreen.removeEventListener('transitionend', onFade);
+
+      if (thankyouScreen.classList.contains('visible')) {
+        thankyouScreen.classList.remove('visible');
+        tyAmbientStage.classList.remove('shown');
+        quoteLine.classList.remove('shown', 'leaving');
+        quoteLine.textContent = '';
+        blossomDivider.innerHTML = '';
+        tyCarousel.classList.remove('hidden-out');
+        tyDotsEl.classList.remove('hidden');
+        tyReceiptBtn.classList.remove('shown');
+        tyExited = false;
+        tyCurrentPanel = 0;
+        tyTrack.style.transform = 'translateX(0%)';
+        for (var i = 0; i < tyDots.length; i++) {
+          tyDots[i].classList.toggle('active', i === 0);
+        }
+        activateTyPanel(0);
       }
-      activateTyPanel(0);
-    }
 
-    document.body.classList.remove('table-locked');
-    document.body.classList.remove('thankyou-active');
-    receiptOpenedFromThankyou = false;
-
-    setTimeout(function() {
-      tableCard.classList.add('active');
-      rejectRow.classList.add('active');
-      divider.classList.add('active');
+      document.body.classList.remove('table-locked');
+      document.body.classList.remove('thankyou-active');
+      receiptOpenedFromThankyou = false;
 
       setTimeout(function() {
-        try {
-          tableCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        } catch (err) {
-          var y = tableCard.getBoundingClientRect().top + window.pageYOffset - 100;
-          window.scrollTo(0, y);
-        }
-        if (typeof scheduleEvaluation === 'function') {
-          setTimeout(scheduleEvaluation, 400);
-        }
-      }, 150);
-    }, 500);
+        tableCard.classList.add('active');
+        rejectRow.classList.add('active');
+        divider.classList.add('active');
+
+        setTimeout(function() {
+          try {
+            tableCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch (err) {
+            var y = tableCard.getBoundingClientRect().top + window.pageYOffset - 100;
+            window.scrollTo(0, y);
+          }
+          if (typeof scheduleEvaluation === 'function') {
+            setTimeout(scheduleEvaluation, 400);
+          }
+        }, 150);
+      }, 300);
+    }
+    function onFade(ev) {
+      if (ev.target === receiptScreen && ev.propertyName === 'opacity') {
+        finishReturn();
+      }
+    }
+    receiptScreen.addEventListener('transitionend', onFade);
+    setTimeout(finishReturn, 1200);
   }
 
   receiptBackBtn.addEventListener('click', function(e) {
@@ -3431,9 +3723,6 @@
     }
   }
 
-  // Measures the union of the table card and the reject row so the
-  // summary bar stays visible when the user is looking at the table
-  // block (including the reject row) rather than just the card.
   function updateSummaryVisibility() {
     var tableRect = tableCard.getBoundingClientRect();
     var rejectRect = rejectRow.getBoundingClientRect();
@@ -3452,8 +3741,6 @@
     var visibleHeight = Math.max(0, visibleBottom - visibleTop);
     var ratio = visibleHeight / totalHeight;
 
-    // Show if at least 50% of the section is visible OR if the
-    // section spans the entire viewport (top above 0, bottom below vh).
     var spansViewport = (top <= 0 && bottom >= vh);
 
     if (ratio >= 0.5 || spansViewport) {
@@ -3586,7 +3873,6 @@
     }
     recalc();
     updateSubmitState();
-    // Re-measure summary visibility: reject-row state changes its height
     setTimeout(updateSummaryVisibility, 400);
     setTimeout(updateSummaryVisibility, 900);
   });
@@ -3638,6 +3924,17 @@
     if (bucket === 'rain') return '雨';
     if (bucket === 'snow') return '雪';
     if (bucket === 'thunderstorm') return '雷雨';
+    return '—';
+  }
+
+  function weatherEmoji(bucket) {
+    if (bucket === 'clear') return '☀';
+    if (bucket === 'clouds') return '☁';
+    if (bucket === 'fog') return '🌫';
+    if (bucket === 'drizzle') return '🌦';
+    if (bucket === 'rain') return '🌧';
+    if (bucket === 'snow') return '❄';
+    if (bucket === 'thunderstorm') return '⛈';
     return '—';
   }
 
@@ -3697,25 +3994,172 @@
         }
         if (typeof code === 'number') {
           var bucket = weatherBucket(code);
-          infoWeather.textContent = weatherLabelJP(bucket);
+          infoWeather.textContent = weatherEmoji(bucket);
           document.documentElement.setAttribute('data-weather', bucket);
         }
       })
       .catch(function() {});
   }
 
+  /* ============ TICKER ============ */
+
+  function buildTickerUrl() {
+    var lats = TICKER_CITIES.map(function(c) { return c.lat; }).join(',');
+    var lons = TICKER_CITIES.map(function(c) { return c.lon; }).join(',');
+    return 'https://api.open-meteo.com/v1/forecast?latitude=' + lats +
+           '&longitude=' + lons +
+           '&hourly=temperature_2m,weather_code' +
+           '&daily=temperature_2m_max,temperature_2m_min,weather_code' +
+           '&current_weather=false' +
+           '&timezone=Asia%2FTokyo' +
+           '&forecast_days=2';
+  }
+
+  function buildTickerSegment(inner) {
+    return inner;
+  }
+
+  function formatTemp(t) {
+    if (t === null || t === undefined) return '—';
+    return Math.round(t) + '°';
+  }
+
+  function getNext3Hours(hourly, nowHour) {
+    if (!hourly || !hourly.time || !hourly.temperature_2m) return [];
+    var times = hourly.time;
+    var temps = hourly.temperature_2m;
+    var codes = hourly.weather_code || [];
+    var out = [];
+    for (var i = 0; i < times.length && out.length < 3; i++) {
+      var h = parseInt(times[i].slice(11, 13), 10);
+      var d = times[i].slice(0, 10);
+      // We want the next 3 hours from now — but the API's first day includes
+      // past hours already. We look for the first index where the hour is
+      // >= nowHour and the date is today, then take that and the two after.
+      // The API response is ordered, so simply find the first match.
+      // Since we requested only 2 days, indices are safe.
+      if (out.length === 0) {
+        if (h >= nowHour) {
+          out.push({ h: h, t: temps[i], code: codes[i] });
+        }
+      } else if (out.length < 3) {
+        out.push({ h: h, t: temps[i], code: codes[i] });
+      }
+    }
+    return out;
+  }
+
+  function getTomorrowDaily(daily) {
+    if (!daily || !daily.time || daily.time.length < 2) return null;
+    return {
+      date: daily.time[1],
+      high: daily.temperature_2m_max[1],
+      low: daily.temperature_2m_min[1],
+      code: daily.weather_code[1]
+    };
+  }
+
+  function buildTickerText(responses) {
+    if (!responses || responses.length === 0) return '';
+    var parts = [];
+
+    // Nagoya: hourly (next 3 hours) + tomorrow
+    var nagoyaData = responses[0];
+    if (nagoyaData) {
+      var nowP = nagoyaDateParts();
+      var next3 = getNext3Hours(nagoyaData.hourly, nowP.hour);
+      if (next3.length > 0) {
+        var hours = next3.map(function(x) { return formatTemp(x.t); }).join(' → ');
+        parts.push('名古屋 3時間 ' + hours);
+      }
+      var nagTomorrow = getTomorrowDaily(nagoyaData.daily);
+      if (nagTomorrow) {
+        var em = weatherEmoji(weatherBucket(nagTomorrow.code));
+        parts.push('名古屋 明日 ' + em + ' ' + formatTemp(nagTomorrow.high) + '/' + formatTemp(nagTomorrow.low));
+      }
+    }
+
+    // Other 6 cities: tomorrow only
+    for (var i = 1; i < responses.length && i < TICKER_CITIES.length; i++) {
+      var data = responses[i];
+      if (!data) continue;
+      var t = getTomorrowDaily(data.daily);
+      if (!t) continue;
+      var e = weatherEmoji(weatherBucket(t.code));
+      var city = TICKER_CITIES[i].name;
+      parts.push(city + ' 明日 ' + e + ' ' + formatTemp(t.high) + '/' + formatTemp(t.low));
+    }
+
+    return parts.join(' ・ ');
+  }
+
+  function renderTicker(text) {
+    if (!tickerTrack || !tickerWrap) return;
+    if (!text || text === '') {
+      tickerWrap.classList.remove('shown');
+      tickerTrack.textContent = '';
+      return;
+    }
+    // Duplicate the text so the marquee loops seamlessly.
+    // Each half is one span with the same content, separated by a
+    // trailing separator so the wrap looks natural.
+    var sep = ' ・ ';
+    var half = text + sep;
+    // Build the visible half with inner spans for coloured city names.
+    // Simplest approach: use plain text — the CSS already gives the ticker
+    // a muted colour and the whole thing reads cleanly.
+    var html = '<span>' + escapeHtml(half) + '</span><span>' + escapeHtml(half) + '</span>';
+    tickerTrack.innerHTML = html;
+    tickerWrap.classList.add('shown');
+  }
+
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  function fetchTickerData() {
+    var url = buildTickerUrl();
+    return fetch(url)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        // If multiple coordinates are requested, the API returns an array.
+        var responses;
+        if (Array.isArray(data)) {
+          responses = data;
+        } else {
+          responses = [data];
+        }
+        var text = buildTickerText(responses);
+        renderTicker(text);
+        // Reset animation so the loop restarts cleanly
+        if (tickerTrack) {
+          tickerTrack.style.animation = 'none';
+          void tickerTrack.offsetWidth;
+          tickerTrack.style.animation = '';
+        }
+      })
+      .catch(function() { /* silent */ });
+  }
+
   var clockInterval = null;
   var weatherInterval = null;
+  var tickerInterval = null;
 
   function startInfoUpdates() {
     infoCity.textContent = NAGOYA.name;
     updateInfoDateTime();
     fetchNagoyaWeather();
+    fetchTickerData();
     infoBar.classList.add('shown');
     if (clockInterval) clearInterval(clockInterval);
     clockInterval = setInterval(updateInfoDateTime, 30000);
     if (weatherInterval) clearInterval(weatherInterval);
     weatherInterval = setInterval(fetchNagoyaWeather, 5 * 60 * 1000);
+    if (tickerInterval) clearInterval(tickerInterval);
+    tickerInterval = setInterval(fetchTickerData, 15 * 60 * 1000);
   }
 
   /* ============ THANK-YOU CAROUSEL ============ */
