@@ -93,7 +93,8 @@
 
     --ty-line-color: #1f1f1f;
     --ty-line-shadow: none;
-    --ty-accent-color: #c0392b;
+    --ty-accent-color: #8f1f14;
+    --ty-accent-shadow: 0 1px 0 #ffffff, 0 0 8px rgba(255, 255, 255, 0.75);
     --quote-color: #b04a5a;
     --quote-shadow: 0 2px 24px #fbdfe3;
 
@@ -170,7 +171,8 @@
 
     --ty-line-color: #231304;
     --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6);
-    --ty-accent-color: #c0392b;
+    --ty-accent-color: #7a1a10;
+    --ty-accent-shadow: 0 1px 0 #ffffff, 0 0 8px rgba(255, 255, 255, 0.75);
     --quote-color: #8f2f00;
     --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
 
@@ -681,7 +683,8 @@
   .panel {
     width: calc(100% / 5); height: 100%;
     display: flex; align-items: center; justify-content: center;
-    padding: 140px 20px 260px 20px; text-align: center;
+    padding: 200px 20px 200px 20px;
+    text-align: center;
   }
   .panel-inner { max-width: 480px; width: 100%; }
   .panel-content {
@@ -856,15 +859,15 @@
       0 2px 6px var(--dot-active-shadow);
   }
 
-  .stage-spacer { height: 2vh; }
+  .stage-spacer { height: 0.5vh; }
 
   /* ============ TRANSITION LINE ============ */
 
   .transition-line {
     text-align: center;
     padding: 0 32px 40px 32px;
-    margin-top: 20px;
-    font-size: 15px; font-weight: 500; color: var(--accent);
+    margin-top: 4px;
+    font-size: 18px; font-weight: 500; color: var(--accent);
     letter-spacing: 0.8px; line-height: 2;
     max-width: 560px; margin-left: auto; margin-right: auto;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -1652,7 +1655,11 @@
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-shadow: var(--ty-line-shadow);
   }
-  .ty-line.accent { color: var(--ty-accent-color); font-weight: 700; }
+  .ty-line.accent {
+    color: var(--ty-accent-color);
+    font-weight: 700;
+    text-shadow: var(--ty-accent-shadow);
+  }
   .ty-line.spacer { margin-top: 24px; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
 
@@ -1815,9 +1822,9 @@
       margin-right: auto;
     }
     .panel-inner { max-width: 480px; }
-    .panel { padding: 150px 32px 260px 32px; }
+    .panel { padding: 220px 32px 220px 32px; }
     .panel-content { font-size: 20px; }
-    .transition-line { font-size: 17px; max-width: 600px; }
+    .transition-line { font-size: 20px; max-width: 600px; }
     .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
     .action-hint.global-hint { bottom: 148px; }
@@ -1845,9 +1852,9 @@
     .info-bar { padding: 24px 28px 16px 28px; }
     .ticker-track { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
-    .panel { padding: 160px 32px 260px 32px; }
+    .panel { padding: 240px 32px 240px 32px; }
     .panel-content { font-size: 22px; }
-    .transition-line { font-size: 18px; max-width: 660px; }
+    .transition-line { font-size: 22px; max-width: 660px; }
     .privacy-note-inline { font-size: 16px; }
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
@@ -1872,8 +1879,9 @@
     .ticker-track { font-size: 11.5px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
-    .panel { padding: 100px 20px 220px 20px; }
+    .panel { padding: 140px 20px 140px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
+    .transition-line { font-size: 17px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
     .ty-mark { font-size: 18px; margin-bottom: 20px; }
@@ -1897,7 +1905,7 @@
     .blossom-char { font-size: 72px; }
     .ty-dots { gap: 12px; }
     .ty-dot { width: 9px; height: 9px; }
-    .stage-spacer { height: 1.5vh; }
+    .stage-spacer { height: 0.5vh; }
     .privacy-note-inline { font-size: 13px; padding: 12px 18px 14px 18px; }
     .gift-divider-label { font-size: 15px; letter-spacing: 4px; }
     .reject-gift { font-size: 12.5px; padding: 12px 14px; }
@@ -1912,9 +1920,10 @@
     .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
-    .panel { padding: 90px 40px 180px 40px; }
+    .panel { padding: 120px 40px 120px 40px; }
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 2; }
+    .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
     .dots { bottom: 66px; }
@@ -1922,7 +1931,6 @@
     .blossom-char { font-size: 68px; }
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
-    .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
     .privacy-note-inline { font-size: 12px; padding: 10px 16px 12px 16px; }
     .ty-panel { padding: 55px 40px 90px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
@@ -1930,7 +1938,7 @@
     .quote-wrap { min-height: 110px; }
     .ty-dots { bottom: 48px; }
     .ty-receipt-btn { bottom: 8px; left: 12px; padding: 6px 10px; font-size: 10.5px; }
-    .stage-spacer { height: 1.5vh; }
+    .stage-spacer { height: 0.5vh; }
     .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
     .reject-gift { font-size: 12px; }
     .reject-gift-amount { font-size: 15px; }
@@ -2587,7 +2595,9 @@
     { key: 'sapporo',  name: '札幌市',   lat: 43.0618, lon: 141.3545 }
   ];
 
-  /* Content for the conditional (マイクロビキニ) panel 1 */
+  /* Content for the conditional panel 1.
+     Change N: only the マイクロビキニ line is .accent; the middle
+     paragraph renders in the normal body color. */
   var TY_PANEL1_DEFAULT_HTML =
     '<div class="ty-mark">❀</div>' +
     '<div class="ty-line">ありがとうございます。</div>' +
@@ -2600,7 +2610,7 @@
   var TY_PANEL1_MICROBIKINI_HTML =
     '<div class="ty-mark">❀</div>' +
     '<div class="ty-line">ありがとうございます。</div>' +
-    '<div class="ty-line accent">それでは、シャワーを浴びてまいります。どうぞごゆっくりお待ちください。本日はよろしくお願いいたします。</div>' +
+    '<div class="ty-line">それでは、シャワーを浴びてまいります。どうぞごゆっくりお待ちください。本日はよろしくお願いいたします。</div>' +
     '<div class="ty-rule"></div>' +
     '<div class="ty-line accent">シャワーは10分ほどで済ませます。マイクロビキニへのお着替えは、私がシャワーから戻ってきてからお願いできますでしょうか。</div>';
 
@@ -3488,8 +3498,9 @@
     if (isHorizontal) {
       e.preventDefault();
       currentX = x;
-      // Final panel: block rightward drag entirely; keep a small leftward
-      // rubber-band so the user still feels the edge of the carousel.
+      // Final panel: leftward drag → small rubber-band only.
+      // Rightward drag → freeze the track (no visual follow), but still
+      // track the gesture so a deliberate rightward flick navigates back.
       if (currentPanel === totalPanels - 1) {
         if (deltaX > 0) {
           return;
@@ -3551,12 +3562,13 @@
     track.classList.remove('dragging');
     if (!isHorizontal) { clearInlineFades(); return; }
     clearInlineFades();
-    if (currentPanel === totalPanels - 1) {
-      goToPanel(currentPanel);
-      return;
-    }
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
+    if (currentPanel === totalPanels - 1) {
+      if (deltaX > threshold) goToPanel(currentPanel - 1);
+      else goToPanel(currentPanel);
+      return;
+    }
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
   }
@@ -3595,12 +3607,13 @@
     mouseDown = false;
     track.classList.remove('dragging');
     clearInlineFades();
-    if (currentPanel === totalPanels - 1) {
-      goToPanel(currentPanel);
-      return;
-    }
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
+    if (currentPanel === totalPanels - 1) {
+      if (deltaX > threshold) goToPanel(currentPanel - 1);
+      else goToPanel(currentPanel);
+      return;
+    }
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
   });
