@@ -46,6 +46,7 @@
   body.thankyou-active .stage,
   body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line,
+  body.thankyou-active .privacy-note-inline,
   body.thankyou-active .divider,
   body.thankyou-active .reject-row,
   body.thankyou-active .table-card,
@@ -371,7 +372,7 @@
   .panel {
     width: calc(100% / 5); height: 100%;
     display: flex; align-items: center; justify-content: center;
-    padding: 80px 20px 220px 20px; text-align: center;
+    padding: 80px 20px 260px 20px; text-align: center;
   }
   .panel-inner { max-width: 480px; width: 100%; }
   .panel-content {
@@ -395,7 +396,15 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  .greeting .accent { color: #b04a5a; font-weight: 700; }
+  .greeting .therapist-name {
+    font-weight: 700;
+    border-bottom: 2px solid #e8b4bc;
+    padding-bottom: 2px;
+    font-style: normal;
+  }
+  .greeting .sender-name {
+    font-style: italic;
+  }
 
   .msg-1 { font-size: 19px; font-weight: 500; color: #1f1f1f; line-height: 2.2; letter-spacing: 0.4px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -461,13 +470,16 @@
     50% { transform: translateY(6px); }
   }
 
-  /* ---- Pinned swipe hint, above the dots ---- */
+  /* ---- Pinned swipe hint + dots group.
+         The hint sits above the dots with a tight gap, and the whole
+         cluster is pushed up so it sits right under the longest text
+         (panel 5's msg-3 + msg-emphasis). ---- */
 
   .action-hint.global-hint {
     position: absolute;
     left: 0;
     right: 0;
-    bottom: 130px;
+    bottom: 138px;
     margin-top: 0;
     z-index: 9;
     justify-content: center;
@@ -480,10 +492,31 @@
     pointer-events: auto;
   }
 
-  /* ---- Dots (raised to sit just below the hint) ---- */
+  /* Two stacked hint layers so the swap between "スワイプ →" and
+     "↓ 下へスクロールしてください" cross-fades smoothly instead of
+     snapping. The container stays put; the layers fade in/out. */
+  .action-hint.global-hint .hint-layer {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.55s ease;
+    pointer-events: none;
+  }
+  .action-hint.global-hint .hint-layer.active {
+    opacity: 1;
+  }
+
+  /* ---- Dots ---- */
 
   .dots {
-    position: absolute; bottom: 60px; left: 0; right: 0;
+    position: absolute; bottom: 100px; left: 0; right: 0;
     display: flex; justify-content: center; align-items: center;
     gap: 14px;
     z-index: 10;
@@ -516,12 +549,14 @@
       0 2px 6px rgba(176, 74, 90, 0.25);
   }
 
-  /* ---- Spacer between the stage and the transition line.
-         Pushing this to 40vh gives the transition line plenty of
-         room to fade in from below the fold as the user scrolls. ---- */
+  /* ---- Spacer between the stage and the transition line ---- */
   .stage-spacer { height: 40vh; }
 
   /* ============ TRANSITION LINE ============ */
+  /* The "それでは、本日のメニューをご覧ください。" text now sits
+     immediately below the stage (which is 100vh), so it enters the
+     viewport as soon as the user begins scrolling down. This makes
+     the fade-in transition clearly visible. */
 
   .transition-line {
     text-align: center; padding: 0 32px 40px 32px;
@@ -555,6 +590,26 @@
   }
 
   /* ============ TABLE ============ */
+
+  /* Privacy note: sits just above the table card, italic, quiet.
+     Fades in with the table section. */
+  .privacy-note-inline {
+    max-width: 560px;
+    margin: 8px auto 20px auto;
+    padding: 0 32px;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-style: italic;
+    font-size: 13px;
+    font-weight: 400;
+    color: #8a7a74;
+    letter-spacing: 0.4px;
+    line-height: 2.1;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    opacity: 0; transform: translateY(20px);
+    transition: opacity 0.9s ease, transform 0.9s ease;
+  }
+  .privacy-note-inline.active { opacity: 1; transform: translateY(0); }
 
   .divider {
     display: flex; align-items: center; gap: 12px;
@@ -1454,10 +1509,11 @@
     .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px; }
-    .table-card, .reject-row, .divider { max-width: 560px; margin-left: auto; margin-right: auto; }
+    .table-card, .reject-row, .divider, .privacy-note-inline { max-width: 560px; }
+    .table-card, .reject-row { margin-left: auto; margin-right: auto; }
     .divider { padding: 0 16px; }
     .panel-inner { max-width: 480px; }
-    .panel { padding: 80px 32px 220px 32px; }
+    .panel { padding: 80px 32px 260px 32px; }
     .greeting { font-size: 22px; }
     .msg-1 { font-size: 21px; }
     .msg-2 { font-size: 20px; }
@@ -1465,8 +1521,9 @@
     .msg-4 { font-size: 18px; }
     .msg-emphasis { font-size: 18px; }
     .transition-line { font-size: 17px; max-width: 600px; }
+    .privacy-note-inline { font-size: 14px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
-    .action-hint.global-hint { bottom: 140px; }
+    .action-hint.global-hint { bottom: 148px; }
     .ty-line { font-size: 21px; }
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
     .ty-line.spacer { margin-top: 28px; }
@@ -1486,8 +1543,9 @@
   @media (min-width: 1100px) {
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px; }
-    .table-card, .reject-row, .divider, .panel-inner, .summary-inner { max-width: 600px; }
+    .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .privacy-note-inline { max-width: 600px; }
     .transition-line { font-size: 18px; max-width: 660px; }
+    .privacy-note-inline { font-size: 15px; }
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
     .quote-line { font-size: 40px; letter-spacing: 5px; }
@@ -1507,14 +1565,16 @@
     .info-line .sep { margin: 0 6px; }
     .name-screen { padding: 55px 20px 30px 20px; }
     .blossom-screen { padding: 55px 20px 30px 20px; }
-    .panel { padding: 65px 20px 190px 20px; }
+    .panel { padding: 65px 20px 220px 20px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
     .ty-mark { font-size: 18px; margin-bottom: 20px; }
     .ty-rule { margin: 18px auto; }
     .ty-line.spacer { margin-top: 16px; }
     .action-hint { margin-top: 0; font-size: 12px; letter-spacing: 3px; }
-    .action-hint.global-hint { bottom: 96px; }
+    .action-hint.global-hint { bottom: 116px; }
+    .dots { bottom: 84px; gap: 12px; }
+    .dot { width: 9px; height: 9px; }
     .ty-dots { bottom: 56px; }
     .ty-ambient-stage { padding: 70px 20px 100px 20px; }
     .blossom-divider { gap: 6px; margin-bottom: 18px; height: 18px; }
@@ -1527,11 +1587,10 @@
     .summary-total { font-size: 19px; }
     .reset, .submit-btn { padding: 9px 13px; font-size: 12px; }
     .blossom-char { font-size: 72px; }
-    .dots { bottom: 46px; gap: 12px; }
-    .dot { width: 9px; height: 9px; }
     .ty-dots { gap: 12px; }
     .ty-dot { width: 9px; height: 9px; }
     .stage-spacer { height: 30vh; }
+    .privacy-note-inline { font-size: 12px; margin: 4px auto 14px auto; }
   }
 
   @media (max-height: 600px) and (orientation: landscape) {
@@ -1540,7 +1599,7 @@
     .info-line .sep { margin: 0 5px; }
     .name-screen { padding: 48px 24px 20px 24px; }
     .blossom-screen { padding: 48px 24px 20px 24px; }
-    .panel { padding: 55px 40px 140px 40px; }
+    .panel { padding: 55px 40px 180px 40px; }
     .panel-inner { max-width: 560px; }
     .greeting { font-size: 19px; line-height: 2; }
     .msg-1 { font-size: 18px; line-height: 2; }
@@ -1549,13 +1608,14 @@
     .msg-4 { font-size: 16px; line-height: 2; }
     .msg-emphasis { font-size: 16px; margin-top: 18px; padding-top: 16px; }
     .action-hint { margin-top: 0; }
-    .action-hint.global-hint { bottom: 72px; }
-    .dots { bottom: 32px; }
+    .action-hint.global-hint { bottom: 96px; }
+    .dots { bottom: 66px; }
     .name-inner { max-width: 480px; }
     .blossom-char { font-size: 68px; }
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
     .transition-line { font-size: 13px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
+    .privacy-note-inline { font-size: 11.5px; margin: 4px auto 12px auto; }
     .ty-panel { padding: 55px 40px 90px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
     .quote-line { font-size: 22px; letter-spacing: 3px; }
@@ -1657,9 +1717,9 @@
       <div class="panel-inner">
         <div class="panel-content">
           <div class="greeting">
-            <span id="therapistName">桜庭</span>さん、初めまして。<br><br>
+            <span id="therapistName" class="therapist-name">桜庭</span>さん、初めまして。<br><br>
             シンガポールから参りました<br>
-            <span class="accent">Eze（エズ）</span> と申します。<br><br>
+            <span class="sender-name">Eze（エズ）</span> と申します。<br><br>
             お読みいただきたいメッセージを用意してまいりました。<br>
             急ぎませんので、どうぞごゆっくりお読みになってください。<br><br>
             本日はよろしくお願いいたします。
@@ -1724,8 +1784,14 @@
   </div>
 
   <div class="action-hint global-hint" id="globalHint">
-    <span id="globalHintText">スワイプ</span>
-    <span class="hint-arrow right" id="globalHintArrow">→</span>
+    <span class="hint-layer active" id="globalHintLayerSwipe">
+      <span id="globalHintText">スワイプ</span>
+      <span class="hint-arrow right" id="globalHintArrow">→</span>
+    </span>
+    <span class="hint-layer" id="globalHintLayerScroll">
+      <span class="hint-arrow down">↓</span>
+      <span>下へスクロールしてください</span>
+    </span>
   </div>
 
   <div class="dots" id="dots">
@@ -1746,6 +1812,15 @@
   ご無理のない範囲で、対応可能なものの横の○をタップし、料金をご入力ください。<br><br>
   一覧にないものも、下の欄にご記入いただけます。<br><br>
   ありがとうございます。
+</div>
+
+<!-- ============ PRIVACY NOTE (above the table) ============ -->
+
+<div class="privacy-note-inline" id="privacyNote">
+  また、こちらでお選びいただいた内容やご提示いただいた料金などが、<br>
+  記録されたり、外部に送信されたりすることは一切ございません。<br>
+  あくまでも、その場でのやり取りを分かりやすくするためのものですので、<br>
+  どうぞご安心ください。
 </div>
 
 <div class="divider" id="divider"><span class="divider-text">❀</span></div>
@@ -2083,10 +2158,11 @@
   var rejectThanks = document.getElementById('rejectThanks');
   var petalOverlay = document.getElementById('petalOverlay');
   var transitionLine = document.getElementById('transitionLine');
+  var privacyNote = document.getElementById('privacyNote');
 
   var globalHint = document.getElementById('globalHint');
-  var globalHintText = document.getElementById('globalHintText');
-  var globalHintArrow = document.getElementById('globalHintArrow');
+  var globalHintLayerSwipe = document.getElementById('globalHintLayerSwipe');
+  var globalHintLayerScroll = document.getElementById('globalHintLayerScroll');
 
   var totalEl = document.getElementById('total');
 
@@ -2169,39 +2245,28 @@
   }
 
   function updateGlobalHint() {
-    if (!globalHint || !globalHintText || !globalHintArrow) return;
+    if (!globalHint || !globalHintLayerSwipe || !globalHintLayerScroll) return;
 
-    // Hidden until the user has confirmed their name.
     if (!nameConfirmed) {
       globalHint.classList.remove('shown');
       return;
     }
 
+    // Cross-fade between the two hint layers, keeping the container
+    // in place. The transition is handled by the CSS opacity
+    // transition on .hint-layer.
     if (currentPanel === totalPanels - 1) {
-      globalHintText.textContent = '下へスクロールしてください';
-      globalHintArrow.textContent = '↓';
-      globalHintArrow.classList.remove('right');
-      globalHintArrow.classList.add('down');
-      if (globalHintArrow.nextSibling !== globalHintText) {
-        globalHint.insertBefore(globalHintArrow, globalHintText);
-      }
+      globalHintLayerSwipe.classList.remove('active');
+      globalHintLayerScroll.classList.add('active');
     } else {
-      globalHintArrow.textContent = '→';
-      globalHintArrow.classList.remove('down');
-      globalHintArrow.classList.add('right');
-      if (globalHintArrow.previousSibling !== globalHintText) {
-        globalHint.appendChild(globalHintArrow);
-      }
-      globalHintText.textContent = 'スワイプ';
+      globalHintLayerScroll.classList.remove('active');
+      globalHintLayerSwipe.classList.add('active');
     }
 
     globalHint.classList.add('shown');
     updateIntroHintVisibility();
   }
 
-  // Hint stays visible while the user is still on the last message
-  // panel. It only hides once the table card's top has clearly moved
-  // into the upper part of the viewport (above 60% height).
   function updateIntroHintVisibility() {
     if (!globalHint) return;
     if (!nameConfirmed) {
@@ -2557,6 +2622,8 @@
     divider.classList.add('active');
     summaryBar.classList.remove('visible');
 
+    if (privacyNote) privacyNote.classList.remove('active');
+
     lineVisible = false;
     hasEverScrolled = false;
     tableEnteredView = false;
@@ -2567,6 +2634,8 @@
     document.body.classList.remove('warm-background');
 
     if (globalHint) globalHint.classList.remove('shown');
+    if (globalHintLayerSwipe) globalHintLayerSwipe.classList.add('active');
+    if (globalHintLayerScroll) globalHintLayerScroll.classList.remove('active');
     updateGlobalHint();
 
     recalc();
@@ -2832,6 +2901,7 @@
     tableCard.classList.remove('active');
     rejectRow.classList.remove('active');
     divider.classList.remove('active');
+    if (privacyNote) privacyNote.classList.remove('active');
     summaryBar.classList.remove('visible');
 
     setTimeout(function() {
@@ -2914,6 +2984,7 @@
       tableCard.classList.add('active');
       rejectRow.classList.add('active');
       divider.classList.add('active');
+      if (privacyNote) privacyNote.classList.add('active');
 
       setTimeout(function() {
         try {
@@ -3083,21 +3154,6 @@
 
   /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 
-  /*
-    lineVisible is the reversible state of the transition line.
-    - On load: hidden.
-    - First downward scroll: fade in when the line approaches the
-      viewport bottom (this is what makes the fade-in visible).
-    - When the table card's top crosses above the fade trigger, the
-      line fades out.
-    - Scrolling back up brings it in again.
-
-    The summary bar is shown only while the table card covers at
-    least 50% of the viewport.
-
-    Thresholds tuned for Tab S8 Ultra (landscape ~1800px, portrait
-    ~2900px) and phones.
-  */
   var lineVisible = false;
   var hasEverScrolled = false;
   var tableEnteredView = false;
@@ -3125,6 +3181,7 @@
       divider.classList.add('active');
       rejectRow.classList.add('active');
       tableCard.classList.add('active');
+      if (privacyNote) privacyNote.classList.add('active');
     }
   }
 
@@ -3174,9 +3231,6 @@
     var lineRect = transitionLine.getBoundingClientRect();
     var vh = window.innerHeight;
 
-    // Fade the transition line in as soon as its top edge enters the
-    // viewport (i.e. the user has scrolled past the stage + spacer).
-    // This ensures the fade-in is actually visible.
     if (lineRect.top < vh - 20) {
       revealTableSection();
       if (rect.top <= trigger) {
@@ -3208,8 +3262,6 @@
 
     if (goingDown && !hasEverScrolled && y > 5) {
       hasEverScrolled = true;
-      // Do a synchronous check so the line appears as soon as its
-      // top edge is near the viewport bottom.
       var lineRect = transitionLine.getBoundingClientRect();
       if (currentPanel === totalPanels - 1 && lineRect.top < window.innerHeight + 100) {
         revealTableSection();
