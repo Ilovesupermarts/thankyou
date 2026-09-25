@@ -1997,7 +1997,6 @@
 
   /* ============ NUMBER FORMATTING ============ */
 
-  /* Format integer with thousands separators: 10000 → "10,000" */
   function formatWithComma(num) {
     if (num === '' || num === null || typeof num === 'undefined') return '';
     var n = parseInt(num, 10);
@@ -2005,7 +2004,6 @@
     return n.toLocaleString();
   }
 
-  /* Extract digits only and return as integer (handles commas) */
   function parseFormatted(str) {
     if (!str) return 0;
     var digits = String(str).replace(/[^0-9]/g, '');
@@ -2174,6 +2172,9 @@
     if (currentPanel === totalPanels - 1) unlockTable();
     if (transitionLine && currentPanel !== totalPanels - 1) {
       transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
+    }
+    if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
+      setTimeout(scheduleEvaluation, 80);
     }
   }
 
@@ -2650,7 +2651,6 @@
       var priceField = document.createElement('input');
       priceField.type = 'tel';
       priceField.className = 'receipt-price-input';
-      /* Pre-format with commas: 10000 → "10,000" */
       priceField.value = formatWithComma(price);
       priceWrap.appendChild(yenSymbol);
       priceWrap.appendChild(priceField);
@@ -2692,9 +2692,7 @@
     for (var i = 0; i < receiptPriceInputs.length; i++) {
       (function(input) {
         input.addEventListener('input', function() {
-          /* Extract digits, reformat with commas */
           var digits = input.value.replace(/[^0-9]/g, '');
-          /* Cap at 5 digits */
           if (digits.length > 5) digits = digits.slice(0, 5);
           if (digits === '') {
             input.value = '';
@@ -3007,59 +3005,127 @@
     if (!tableUnlocked && !isHorizontal) e.preventDefault();
   }, { passive: false });
 
-  /* ============ INTERSECTION OBSERVER ============ */
+  /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 
-  if ('IntersectionObserver' in window) {
-    var transitionObserver = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting && currentPanel === totalPanels - 1) {
-          if (!transitionLine.classList.contains('fading') &&
-              !transitionLine.classList.contains('fading-up') &&
-              !transitionLine.classList.contains('returning')) {
-            transitionLine.classList.add('active');
-          }
-        }
-      });
-    }, { threshold: 0.5 });
-    transitionObserver.observe(transitionLine);
+  var tableEnteredView = false;
+  var lastScrollY = 0;
 
-    var tableObserver = new IntersectionObserver(function(entries) {
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting) {
-          transitionLine.classList.remove('active', 'returning', 'fading-up');
-          transitionLine.classList.add('fading');
-          document.body.classList.add('warm-background');
-          divider.classList.add('active');
-          rejectRow.classList.add('active');
-          tableCard.classList.add('active');
-          summaryBar.classList.add('visible');
-        } else {
-          summaryBar.classList.remove('visible');
-          var rect = tableCard.getBoundingClientRect();
-          var scrolledUp = rect.top > 0;
-          if (scrolledUp && currentPanel === totalPanels - 1) {
-            transitionLine.classList.remove('active', 'fading', 'returning');
-            transitionLine.classList.add('fading-up');
-            setTimeout(function() {
-              transitionLine.classList.remove('fading-up');
-              transitionLine.classList.add('returning');
-              void transitionLine.offsetWidth;
-              transitionLine.classList.add('active');
-            }, 700);
-            document.body.classList.remove('warm-background');
-          }
-        }
-      });
-    }, { threshold: 0.15 });
-    tableObserver.observe(tableCard);
-  } else {
-    transitionLine.classList.add('active');
-    divider.classList.add('active');
-    rejectRow.classList.add('active');
-    tableCard.classList.add('active');
-    summaryBar.classList.add('visible');
-    document.body.classList.add('warm-background');
+  function fadeTransitionLineOut() {
+    transitionLine.classList.remove('active', 'returning', 'fading-up');
+    transitionLine.classList.add('fading');
   }
+
+  function restoreTransitionLine() {
+    if (transitionLine.classList.contains('fading') ||
+        transitionLine.classList.contains('fading-up')) {
+      transitionLine.classList.remove('fading', 'fading-up', 'returning');
+      transitionLine.classList.add('returning');
+      void transitionLine.offsetWidth;
+      transitionLine.classList.add('active');
+    } else {
+      transitionLine.classList.remove('fading', 'fading-up', 'returning');
+      transitionLine.classList.add('active');
+    }
+  }
+
+  function showTableSection() {
+    if (!tableEnteredView) {
+      tableEnteredView = true;
+      document.body.classList.add('warm-background');
+      divider.classList.add('active');
+      rejectRow.classList.add('active');
+      tableCard.classList.add('active');
+    }
+    summaryBar.classList.add('visible');
+  }
+
+  function hideTableSection() {
+    summaryBar.classList.remove('visible');
+  }
+
+  /*
+    Threshold logic tuned for the Samsung Galaxy Tab S8 Ultra (14.6"),
+    and safe on phones and smaller tablets.
+
+    Landscape (Tab S8 Ultra): viewport height ~1800px → trigger ~216px.
+    Portrait  (Tab S8 Ultra): viewport height ~2900px → trigger ~232px.
+    Phone landscape: viewport ~400px → clamped to 140px.
+    Phone portrait:  viewport ~800px → clamped to 140px.
+
+    In all cases the fade fires when the table card's TOP edge is
+    within roughly 140–320px of the top of the screen.
+  */
+  function getFadeTriggerPx() {
+    var h = window.innerHeight;
+    var w = window.innerWidth;
+    var isLandscape = w > h;
+
+    var px;
+    if (isLandscape) {
+      px = h * 0.12;
+      if (px < 140) px = 140;
+      if (px > 320) px = 320;
+    } else {
+      px = h * 0.08;
+      if (px < 140) px = 140;
+      if (px > 300) px = 300;
+    }
+    return px;
+  }
+
+  function evaluateTransitionLine() {
+    if (currentPanel !== totalPanels - 1) return;
+
+    var rect = tableCard.getBoundingClientRect();
+    var trigger = getFadeTriggerPx();
+
+    if (rect.top <= trigger) {
+      showTableSection();
+      fadeTransitionLineOut();
+    } else {
+      hideTableSection();
+      document.body.classList.remove('warm-background');
+      restoreTransitionLine();
+    }
+  }
+
+  var rafPending = false;
+  function scheduleEvaluation() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function() {
+      rafPending = false;
+      evaluateTransitionLine();
+    });
+  }
+
+  window.addEventListener('scroll', function() {
+    var y = window.pageYOffset || document.documentElement.scrollTop;
+    var goingDown = y > lastScrollY + 1;
+    var goingUp   = y < lastScrollY - 1;
+    lastScrollY = y;
+
+    if (goingDown) {
+      var rect = tableCard.getBoundingClientRect();
+      if (rect.top < window.innerHeight - 20) {
+        showTableSection();
+        fadeTransitionLineOut();
+        return;
+      }
+    }
+    if (goingUp) {
+      scheduleEvaluation();
+    } else {
+      scheduleEvaluation();
+    }
+  }, { passive: true });
+
+  window.addEventListener('resize', scheduleEvaluation);
+  window.addEventListener('orientationchange', function() {
+    setTimeout(scheduleEvaluation, 120);
+  });
+
+  scheduleEvaluation();
 
   updateAllRowLocks();
 
