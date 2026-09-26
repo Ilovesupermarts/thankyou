@@ -2592,9 +2592,7 @@
     { key: 'sapporo',  name: '札幌市',   lat: 43.0618, lon: 141.3545 }
   ];
 
-  /* Content for the conditional panel 1.
-     Change N: only the マイクロビキニ line is .accent; the middle
-     paragraph renders in the normal body color. */
+  /* Content for the conditional panel 1. */
   var TY_PANEL1_DEFAULT_HTML =
     '<div class="ty-mark">❀</div>' +
     '<div class="ty-line">ありがとうございます。</div>' +
@@ -2624,30 +2622,62 @@
   });
 
   /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
+  /* Measures the live DOM: tallest .panel-content, actual info bar
+     height, and the dots/hint block, then computes a mathematically
+     symmetrical gap. Overrides the CSS .panel padding inline. */
 
   function repositionHintGroup() {
     if (!panels.length || !stage) return;
-    var stageRect = stage.getBoundingClientRect();
     var stageHeight = stage.offsetHeight;
     if (stageHeight <= 0) return;
 
-    var maxContentBottomRel = 0;
+    // 1. Tallest text across all panels
+    var maxContentH = 0;
     for (var i = 0; i < panels.length; i++) {
       var content = panels[i].querySelector('.panel-content');
-      if (!content) continue;
-      var rect = content.getBoundingClientRect();
-      var bottomRel = rect.bottom - stageRect.top;
-      if (bottomRel > maxContentBottomRel) maxContentBottomRel = bottomRel;
+      if (content && content.offsetHeight > maxContentH) {
+        maxContentH = content.offsetHeight;
+      }
     }
-    if (maxContentBottomRel <= 0) return;
 
-    var distanceFromStageBottom = stageHeight - maxContentBottomRel;
+    // 2. Info bar height. Guard against the bar being display:none
+    //    before the intro runs (offsetHeight returns 0 in that state).
+    var infoBarEl = document.getElementById('infoBar');
+    var infoH = infoBarEl ? infoBarEl.offsetHeight : 0;
+    if (infoH < 40) infoH = 88;
+    var infoBottom = infoH + 10;
 
-    var hintBottom = distanceFromStageBottom - 48;
-    var dotsBottom = distanceFromStageBottom - 48 - 38;
+    // 3. Bottom dots + hint block
+    var hintH = 24;
+    var dotsH = 12;
+    var spaceBetween = 24;
+    var totalDotsBlockH = hintH + spaceBetween + dotsH;
 
-    if (hintBottom < 40) hintBottom = 40;
-    if (dotsBottom < 10) dotsBottom = 10;
+    // 4. Symmetrical gap
+    var minBottomMargin = 40;
+    var optimalDotsTop = stageHeight - minBottomMargin - totalDotsBlockH;
+    var totalGapSpace = optimalDotsTop - infoBottom - maxContentH;
+
+    var gap = totalGapSpace / 2;
+    if (gap < 30) gap = 30;
+
+    // 5. Apply paddings
+    var pTop = infoBottom + gap;
+    var pBottom = stageHeight - (infoBottom + gap + maxContentH);
+    if (pBottom < 0) pBottom = 0;
+
+    for (var j = 0; j < panels.length; j++) {
+      panels[j].style.paddingTop = pTop + 'px';
+      panels[j].style.paddingBottom = pBottom + 'px';
+    }
+
+    // 6. Position dots + hint from the same geometry
+    var textBottom = infoBottom + gap + maxContentH;
+    var actualDotsTop = textBottom + gap;
+    var actualDotsBottomFromStage = stageHeight - (actualDotsTop + totalDotsBlockH);
+
+    var hintBottom = actualDotsBottomFromStage + dotsH + spaceBetween;
+    var dotsBottom = actualDotsBottomFromStage;
 
     if (globalHint) globalHint.style.bottom = hintBottom + 'px';
     if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
@@ -3046,6 +3076,9 @@
   }
 
   /* ============ RESET ============ */
+  /* Clears the visible state but deliberately keeps the
+     data-saved-price / data-saved-service attributes so that
+     re-ticking a row restores the last entered values (in-session). */
 
   function resetAll() {
     rejected = false;
@@ -3059,8 +3092,6 @@
       var serviceText = row.querySelector('.service-input');
       var box = row.querySelector('.row-check');
       if (box) {
-        box.removeAttribute('data-saved-price');
-        box.removeAttribute('data-saved-service');
         box.classList.remove('checked');
         box.setAttribute('aria-checked', 'false');
       }
@@ -3142,6 +3173,8 @@
     haptic(12);
     document.body.classList.add('info-visible');
     if (infoBar) infoBar.classList.add('shown');
+    // Re-measure now that the info bar is display:block and has a real height.
+    repositionHintGroupAfterLayout();
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
     setTimeout(function() {
@@ -3396,9 +3429,6 @@
     clearAllTyTimers();
 
     // 1. Instantly hide the thank-you screen if it is open behind the receipt.
-    //    Disabling the transition momentarily makes the class removal
-    //    take effect with no fade, so the screen is gone the instant the
-    //    receipt starts fading out — no flash of the shower panel.
     if (thankyouScreen.classList.contains('visible')) {
       thankyouScreen.style.transition = 'none';
       thankyouScreen.classList.remove('visible');
@@ -3406,9 +3436,7 @@
       thankyouScreen.style.transition = '';
     }
 
-    // 2. Immediately restore the background layout elements. Without this,
-    //    body.thankyou-active keeps the table components visibility:hidden
-    //    for the full receipt fade.
+    // 2. Immediately restore the background layout elements.
     document.body.classList.remove('thankyou-active');
 
     receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
@@ -3505,22 +3533,29 @@
     if (isHorizontal) {
       e.preventDefault();
       currentX = x;
-      // Final panel: leftward drag → small rubber-band only.
-      // Rightward drag → freeze the track (no visual follow), but still
-      // track the gesture so a deliberate rightward flick navigates back.
+
+      // Change I: last panel — leftward rubber-band only, no visual
+      // follow on rightward drag (but still allow a right flick to go back).
       if (currentPanel === totalPanels - 1) {
-        if (deltaX > 0) {
-          return;
-        }
+        if (deltaX > 0) return;
         var baseOffsetEnd = -currentPanel * stageWidth;
         var offsetEnd = baseOffsetEnd + deltaX * 0.35;
         var pctEnd = (offsetEnd / stageWidth) * (100 / totalPanels);
         track.style.transform = 'translateX(' + pctEnd + '%)';
         return;
       }
+
+      // Change R: first panel — rightward rubber-band only; leftward is normal.
+      if (currentPanel === 0 && deltaX > 0) {
+        var baseOffsetStart = -currentPanel * stageWidth;
+        var offsetStart = baseOffsetStart + deltaX * 0.35;
+        var pctStart = (offsetStart / stageWidth) * (100 / totalPanels);
+        track.style.transform = 'translateX(' + pctStart + '%)';
+        return;
+      }
+
       var baseOffset = -currentPanel * stageWidth;
       var offset = baseOffset + deltaX;
-      if (currentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
       var pct = (offset / stageWidth) * (100 / totalPanels);
       track.style.transform = 'translateX(' + pct + '%)';
       var dragRatio = Math.min(1, Math.abs(deltaX) / (refWidth * 0.35));
@@ -3571,11 +3606,21 @@
     clearInlineFades();
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
+
+    // Change I: last panel — right flick goes back; otherwise snap.
     if (currentPanel === totalPanels - 1) {
       if (deltaX > threshold) goToPanel(currentPanel - 1);
       else goToPanel(currentPanel);
       return;
     }
+
+    // Change R: first panel — left flick advances; otherwise snap.
+    if (currentPanel === 0) {
+      if (deltaX < -threshold) goToPanel(currentPanel + 1);
+      else goToPanel(currentPanel);
+      return;
+    }
+
     if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
     else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
   }
@@ -3595,6 +3640,7 @@
     if (!mouseDown) return;
     currentX = e.clientX;
     var deltaX = currentX - startX;
+
     if (currentPanel === totalPanels - 1) {
       if (deltaX > 0) return;
       var baseOffsetEnd = -currentPanel * stageWidth;
@@ -3603,9 +3649,15 @@
       track.style.transform = 'translateX(' + pctEnd + '%)';
       return;
     }
+    if (currentPanel === 0 && deltaX > 0) {
+      var baseOffsetStart = -currentPanel * stageWidth;
+      var offsetStart = baseOffsetStart + deltaX * 0.35;
+      var pctStart = (offsetStart / stageWidth) * (100 / totalPanels);
+      track.style.transform = 'translateX(' + pctStart + '%)';
+      return;
+    }
     var baseOffset = -currentPanel * stageWidth;
     var offset = baseOffset + deltaX;
-    if (currentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
     var pct = (offset / stageWidth) * (100 / totalPanels);
     track.style.transform = 'translateX(' + pct + '%)';
   });
@@ -3618,6 +3670,11 @@
     var threshold = refWidth * 0.12;
     if (currentPanel === totalPanels - 1) {
       if (deltaX > threshold) goToPanel(currentPanel - 1);
+      else goToPanel(currentPanel);
+      return;
+    }
+    if (currentPanel === 0) {
+      if (deltaX < -threshold) goToPanel(currentPanel + 1);
       else goToPanel(currentPanel);
       return;
     }
