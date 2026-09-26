@@ -1070,6 +1070,17 @@
     animation: priceHintFlash 0.9s ease-out;
   }
 
+  @keyframes subtleShake {
+    0%, 100% { transform: translateX(0); }
+    25%      { transform: translateX(-4px); }
+    50%      { transform: translateX(4px); }
+    75%      { transform: translateX(-4px); }
+  }
+  .price-wrap.shake {
+    animation: subtleShake 0.35s ease-in-out;
+    border-color: var(--accent);
+  }
+
   .service-input {
     flex: 1; min-width: 0; background: transparent; border: none;
     border-bottom: 1.5px dashed var(--border-2);
@@ -2129,7 +2140,8 @@
   <div class="name-inner">
     <div class="name-label">セラピストのお名前</div>
     <input type="text" class="name-input" id="nameInput" placeholder="お名前を入力"
-      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      enterkeyhint="go">
 
     <div class="preset-label">サービスの選択</div>
 
@@ -2168,7 +2180,7 @@
 
     <div class="tip-label">ささやかなお礼</div>
     <div class="tip-row">
-      <input type="tel" class="tip-field-input" id="tipInput" value="1,500" placeholder="金額を入力">
+      <input type="tel" class="tip-field-input" id="tipInput" value="1,500" placeholder="金額を入力" enterkeyhint="done">
       <button type="button" class="tip-minus" id="tipMinus" aria-label="減らす">−</button>
       <button type="button" class="tip-plus" id="tipPlus" aria-label="増やす">＋</button>
     </div>
@@ -2290,7 +2302,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled>
+      <input type="tel" class="price-input" placeholder="料金を入力" disabled enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -2298,7 +2310,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled>
+      <input type="tel" class="price-input" placeholder="料金を入力" disabled enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -2306,7 +2318,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled>
+      <input type="tel" class="price-input" placeholder="料金を入力" disabled enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -2314,7 +2326,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled>
+      <input type="tel" class="price-input" placeholder="料金を入力" disabled enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -2664,6 +2676,60 @@
     ]);
   }
 
+  /* ============ ROLLING PRICE COUNTER (Change AI) ============ */
+
+  var currentDisplayedTotal = 0;
+  var rollAnimationId = null;
+
+  function updateSummaryTotal(targetAmount, isInstant) {
+    var totalEl = document.getElementById('total');
+    if (!totalEl) return;
+
+    // Instantly snap to the target
+    if (isInstant) {
+      if (rollAnimationId) {
+        window.cancelAnimationFrame(rollAnimationId);
+        rollAnimationId = null;
+      }
+      currentDisplayedTotal = targetAmount;
+      totalEl.textContent = '¥' + targetAmount.toLocaleString();
+      return;
+    }
+
+    // Do nothing if already at target
+    if (currentDisplayedTotal === targetAmount) return;
+
+    // Rolling Animation
+    var startAmount = currentDisplayedTotal;
+    var duration = 400;
+    var startTimestamp = null;
+
+    if (rollAnimationId) {
+      window.cancelAnimationFrame(rollAnimationId);
+    }
+
+    var step = function(timestamp) {
+      if (!startTimestamp) startTimestamp = timestamp;
+      var progress = Math.min((timestamp - startTimestamp) / duration, 1);
+
+      var ease = 1 - Math.pow(1 - progress, 4);
+      var currentVal = Math.floor(ease * (targetAmount - startAmount) + startAmount);
+
+      currentDisplayedTotal = currentVal;
+      totalEl.textContent = '¥' + currentVal.toLocaleString();
+
+      if (progress < 1) {
+        rollAnimationId = window.requestAnimationFrame(step);
+      } else {
+        currentDisplayedTotal = targetAmount;
+        totalEl.textContent = '¥' + targetAmount.toLocaleString();
+        rollAnimationId = null;
+      }
+    };
+
+    rollAnimationId = window.requestAnimationFrame(step);
+  }
+
   /* ============ DOM REFS ============ */
 
   var nameScreen = document.getElementById('nameScreen');
@@ -2920,7 +2986,7 @@
 
   function getRows() { return tableCard.querySelectorAll('.row'); }
 
-  function recalc() {
+  function recalc(isInstant) {
     var rows = getRows();
     var sum = 0;
     for (var i = 0; i < rows.length; i++) {
@@ -2933,8 +2999,12 @@
       if (isChecked || val > 0) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
+
     var displayTotal = rejected ? confirmedTipAmount : sum;
-    totalEl.textContent = '¥' + displayTotal.toLocaleString();
+
+    // Call the rolling engine instead of directly setting textContent
+    updateSummaryTotal(displayTotal, isInstant);
+
     updateSubmitState();
   }
 
@@ -3187,6 +3257,45 @@
     flashServiceInput(row);
   });
 
+  /* ============ CHANGE AH: smart keyboard flow + shake ============ */
+
+  tableCard.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      if (rejected) return;
+
+      // If pressing Enter on the service text, jump to the price box
+      if (e.target.classList.contains('service-input')) {
+        e.preventDefault();
+        var row = e.target.closest('.row');
+        var priceInput = row ? row.querySelector('.price-input') : null;
+        if (priceInput && !priceInput.disabled) {
+          priceInput.focus();
+        } else {
+          e.target.blur();
+        }
+      }
+      // If pressing Enter on the price box
+      else if (e.target.classList.contains('price-input')) {
+        if (e.target.disabled) return;
+        if (e.target.value.trim() === '') {
+          e.preventDefault(); // Keep the keyboard open
+
+          var wrap = e.target.closest('.price-wrap');
+          if (wrap) {
+            wrap.classList.remove('shake');
+            void wrap.offsetWidth; // reflow to restart animation
+            wrap.classList.add('shake');
+            setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+          }
+          haptic(15);
+        } else {
+          e.preventDefault();
+          e.target.blur(); // Price is valid, close the keyboard
+        }
+      }
+    }
+  });
+
   tableCard.addEventListener('focusin', function(e) {
     var input = e.target;
     if (input && input.classList.contains('price-input')) {
@@ -3318,6 +3427,7 @@
       priceInput.type = 'tel';
       priceInput.className = 'price-input';
       priceInput.placeholder = '料金を入力';
+      priceInput.setAttribute('enterkeyhint', 'done');
       var yenSpan = document.createElement('span');
       yenSpan.className = 'yen';
       yenSpan.textContent = '円';
@@ -3335,7 +3445,7 @@
       nameScreen.classList.add('hidden');
       blossomScreen.classList.add('visible');
       updateAllRowLocks();
-      recalc();
+      recalc(true);
     }, 420);
   }
 
@@ -3375,7 +3485,7 @@
       rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
     }
     updateAllRowLocks();
-    recalc();
+    recalc(true);
     if (typeof updateSummaryVisibility === 'function') updateSummaryVisibility();
   }
 
@@ -4172,13 +4282,13 @@
         rows2[j].classList.remove('disabled');
       }
     }
-    recalc();
+    recalc(true);
     updateSubmitState();
     setTimeout(updateSummaryVisibility, 400);
     setTimeout(updateSummaryVisibility, 900);
   });
 
-  recalc();
+  recalc(true);
 
   /* ============ THEME / WEATHER ============ */
 
