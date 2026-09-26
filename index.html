@@ -730,21 +730,21 @@
   .alert-btn { min-width: 160px; border-radius: 22px; padding: 12px 20px; font-size: 13.5px; font-weight: 600; font-family: inherit; letter-spacing: 0.5px; background: var(--accent); border: 1.5px solid var(--accent); color: #ffffff; box-shadow: 0 4px 14px var(--shadow-accent); cursor: pointer; -webkit-appearance: none; appearance: none; transition: background 0.2s, transform 0.15s; white-space: nowrap; }
   .alert-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
-  /* ============ NUMPAD (Change AJ) ============ */
+  /* ============ CUSTOM NUMPAD (OMOTENASHI REDESIGN) ============ */
   .numpad {
     position: fixed;
     top: 50%;
     transform: translateY(-50%);
-    width: 224px;
-    padding: 8px;
-    background: #ffffff;
-    border: 1px solid var(--border-3);
-    border-radius: 18px;
-    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07);
+    width: 240px;
+    padding: 16px;
+    background: var(--soft-4);
+    border: 1px solid var(--border-2);
+    border-radius: 22px;
+    box-shadow: 0 6px 20px var(--shadow-rose);
     z-index: 55;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 8px;
+    gap: 10px;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.5s ease;
@@ -759,9 +759,9 @@
   .numpad-btn {
     height: 60px;
     background: var(--soft-1);
-    border: 1.5px solid var(--border-1);
-    border-radius: 12px;
-    font-size: 22px;
+    border: 1px solid var(--border-1);
+    border-radius: 14px;
+    font-size: 20px;
     font-weight: 600;
     color: var(--text-dark);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
@@ -772,6 +772,7 @@
     padding: 0;
     -webkit-appearance: none;
     appearance: none;
+    box-shadow: 0 2px 6px var(--shadow-rose);
     transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
@@ -779,17 +780,19 @@
   .numpad-btn:active {
     background: var(--soft-2);
     border-color: var(--accent);
-    transform: scale(0.96);
+    transform: scale(0.95);
   }
   .numpad-btn.wide {
     grid-column: span 3;
-    height: 56px;
-    font-size: 16px;
-    letter-spacing: 6px;
+    height: 50px;
+    font-size: 15px;
+    letter-spacing: 5px;
+    text-indent: 5px;
     background: var(--accent);
     color: #ffffff;
     border-color: var(--accent);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    box-shadow: 0 4px 12px var(--shadow-accent);
+    border-radius: 25px;
   }
   .numpad-btn.wide:active {
     background: var(--accent-3);
@@ -1273,7 +1276,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
+      <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -1281,7 +1284,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
+      <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -1289,7 +1292,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
+      <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -1297,7 +1300,7 @@
     <div class="row-check" role="checkbox" aria-checked="false"></div>
     <input type="text" class="service-input" placeholder="サービスの種類">
     <div class="price-wrap">
-      <input type="tel" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
+      <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
     </div>
   </div>
@@ -1502,19 +1505,14 @@
   /* ============ THEME TOGGLE ============ */
   var themeToggle = document.getElementById('themeToggle');
   var currentTheme = 'default';
-
   function applyTheme(theme) {
     currentTheme = theme;
     document.documentElement.setAttribute('data-theme', theme);
-    if (themeToggle) {
-      themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
-    }
+    if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
   }
-
   if (themeToggle) {
     themeToggle.addEventListener('click', function(e) {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       haptic(10);
       applyTheme(currentTheme === 'autumn' ? 'default' : 'autumn');
     });
@@ -1583,9 +1581,7 @@
     return fetch('presets.json?v=' + Date.now())
       .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
       .then(function(data) {
-        if (data && Array.isArray(data.presets) && data.presets.length > 0) {
-          PRESET_TEXTS = data.presets.slice();
-        }
+        if (data && Array.isArray(data.presets) && data.presets.length > 0) PRESET_TEXTS = data.presets.slice();
         return PRESET_TEXTS;
       })
       .catch(function() { return PRESET_TEXTS; });
@@ -1602,9 +1598,7 @@
     return fetch('quotes.json?v=' + Date.now())
       .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
       .then(function(data) {
-        if (data && Array.isArray(data.quotes) && data.quotes.length > 0) {
-          AMBIENT_LINES = data.quotes.slice();
-        }
+        if (data && Array.isArray(data.quotes) && data.quotes.length > 0) AMBIENT_LINES = data.quotes.slice();
         return AMBIENT_LINES;
       })
       .catch(function() { return AMBIENT_LINES; });
@@ -1817,9 +1811,7 @@
     var infoH = infoBarEl ? infoBarEl.offsetHeight : 0;
     if (infoH < 40) infoH = 88;
     var infoBottom = infoH + 10;
-    var hintH = 24;
-    var dotsH = 12;
-    var spaceBetween = 24;
+    var hintH = 24, dotsH = 12, spaceBetween = 24;
     var totalDotsBlockH = hintH + spaceBetween + dotsH;
     var minBottomMargin = 40;
     var optimalDotsTop = stageHeight - minBottomMargin - totalDotsBlockH;
@@ -1855,24 +1847,18 @@
     if (!numpad || !tableCard) return;
     if (window.innerWidth <= 1250) return;
     var rect = tableCard.getBoundingClientRect();
-    var numpadWidth = numpad.offsetWidth || 224;
-    var gap = 24;
+    var numpadWidth = numpad.offsetWidth || 240;
+    var gap = 28;
     var left = rect.right + gap;
-    if (left + numpadWidth > window.innerWidth - 16) {
-      // Not enough room; leave it to the media query to hide
-      return;
-    }
+    if (left + numpadWidth > window.innerWidth - 16) return;
     numpad.style.left = left + 'px';
   }
 
   function getActivePriceInput() {
     var active = document.activeElement;
-    if (active && active.classList && active.classList.contains('price-input') && !active.disabled) {
-      return active;
-    }
+    if (active && active.classList && active.classList.contains('price-input') && !active.disabled) return active;
     return null;
   }
-
   function getFirstEnabledPriceInput() {
     var rows = getRows();
     for (var i = 0; i < rows.length; i++) {
@@ -1881,18 +1867,15 @@
     }
     return null;
   }
-
   function fireInputEvent(input) {
     var evt;
-    try {
-      evt = new Event('input', { bubbles: true });
-    } catch (e) {
+    try { evt = new Event('input', { bubbles: true }); }
+    catch (e) {
       evt = document.createEvent('Event');
       evt.initEvent('input', true, true);
     }
     input.dispatchEvent(evt);
   }
-
   function numpadAppend(input, digits) {
     if (!input) return;
     var cur = (input.value || '').replace(/[^0-9]/g, '');
@@ -1902,7 +1885,6 @@
     else input.value = parseInt(cur, 10).toLocaleString();
     fireInputEvent(input);
   }
-
   function numpadBackspace(input) {
     if (!input) return;
     var cur = (input.value || '').replace(/[^0-9]/g, '');
@@ -1911,7 +1893,6 @@
     else input.value = parseInt(cur, 10).toLocaleString();
     fireInputEvent(input);
   }
-
   function numpadShake(input) {
     var row = input.closest('.row');
     var wrap = row ? row.querySelector('.price-wrap') : null;
@@ -1923,10 +1904,8 @@
     }
     haptic(15);
   }
-
   function handleNumpadKey(key) {
     if (rejected) return;
-
     if (key === 'done') {
       var input = getActivePriceInput();
       if (!input) { haptic(8); return; }
@@ -1938,14 +1917,12 @@
       }
       return;
     }
-
     var target = getActivePriceInput();
     if (!target) {
       target = getFirstEnabledPriceInput();
       if (!target) return;
       try { target.focus(); } catch (e) {}
     }
-
     if (key === 'back') {
       numpadBackspace(target);
       haptic(8);
@@ -1954,7 +1931,6 @@
       haptic(8);
     }
   }
-
   for (var nb = 0; nb < numpadBtns.length; nb++) {
     (function(btn) {
       btn.addEventListener('pointerdown', function(e) {
@@ -1967,14 +1943,10 @@
       btn.addEventListener('contextmenu', function(e) { e.preventDefault(); });
     })(numpadBtns[nb]);
   }
-
   function updateNumpadVisibility() {
     if (!numpad) return;
     if (window.innerWidth <= 1250) return;
-    if (numpadSuppressed) {
-      numpad.classList.remove('visible');
-      return;
-    }
+    if (numpadSuppressed) { numpad.classList.remove('visible'); return; }
     if (summaryBar && summaryBar.classList.contains('visible')) {
       repositionNumpad();
       numpad.classList.add('visible');
@@ -1982,8 +1954,6 @@
       numpad.classList.remove('visible');
     }
   }
-
-  /* Suppress numpad while service-input has focus (S Pen handwriting window) */
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
@@ -2118,7 +2088,7 @@
     haptic(6);
   }
 
-  /* ============ CHANGE X: auto-copy at Confirm ============ */
+  /* ============ AUTO-COPY ============ */
   function fallbackCopyTextToClipboard(text) {
     var textArea = document.createElement("textarea");
     textArea.value = text;
@@ -2155,7 +2125,7 @@
     }
   }
 
-  /* ============ CHANGE AB: find unpriced services ============ */
+  /* ============ UNPRICED SERVICES ============ */
   function findUnpricedServices() {
     var rows = getRows();
     var missing = [];
@@ -2304,7 +2274,6 @@
     flashServiceInput(row);
   });
 
-  /* ============ SMART KEYBOARD FLOW + SHAKE ============ */
   tableCard.addEventListener('keydown', function(e) {
     if (e.key === 'Enter' || e.keyCode === 13) {
       if (rejected) return;
@@ -2377,9 +2346,7 @@
   function attachHoldAcceleration(buttonEl, delta) {
     if (!buttonEl) return;
     var holdDelay = 400;
-    var holdTimeout = null;
-    var holdInterval = null;
-    var holdStart = 0;
+    var holdTimeout = null, holdInterval = null, holdStart = 0;
     function rateForElapsed(ms) {
       if (ms < 1500) return 200;
       if (ms < 3000) return 100;
@@ -2456,7 +2423,7 @@
       var priceWrap = document.createElement('div');
       priceWrap.className = 'price-wrap';
       var priceInput = document.createElement('input');
-      priceInput.type = 'tel';
+      priceInput.type = 'text';
       priceInput.className = 'price-input';
       priceInput.placeholder = '料金を入力';
       priceInput.setAttribute('inputmode', 'none');
@@ -3130,8 +3097,6 @@
     }
   }
 
-  // Change AJ: hysteresis at 90% fade-in / 50% fade-out for both
-  // summary bar and numpad.
   function updateSummaryVisibility() {
     var tableRect = tableCard.getBoundingClientRect();
     var rejectRect = rejectRow.getBoundingClientRect();
@@ -3139,24 +3104,20 @@
     var top = Math.min(tableRect.top, rejectRect.top);
     var bottom = Math.max(tableRect.bottom, rejectRect.bottom);
     var totalHeight = bottom - top;
-
     if (totalHeight <= 0) {
       summaryBar.classList.remove('visible');
       if (numpad) numpad.classList.remove('visible');
       summaryHysteresisOn = false;
       return;
     }
-
     var visibleTop = Math.max(top, 0);
     var visibleBottom = Math.min(bottom, vh);
     var visibleHeight = Math.max(0, visibleBottom - visibleTop);
     var ratio = visibleHeight / totalHeight;
     var spansViewport = (top <= 0 && bottom >= vh);
     var effective = spansViewport ? 1 : ratio;
-
     if (!summaryHysteresisOn && effective >= 0.9) summaryHysteresisOn = true;
     else if (summaryHysteresisOn && effective < 0.5) summaryHysteresisOn = false;
-
     if (summaryHysteresisOn) {
       summaryBar.classList.add('visible');
       if (numpad) {
