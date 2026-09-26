@@ -1858,31 +1858,30 @@
 
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
+  var lastNumpadWinW = 0;
 
-  /* A-004: horizontal centering in right gutter + vertical anchoring to table center */
+  /* Horizontal position only; vertical is locked to 50% via CSS.
+     Early-return gate eliminates per-frame layout reads during scroll. */
   function repositionNumpad() {
     if (!numpad || !tableCard) return;
     if (window.innerWidth <= 1250) return;
 
+    // Early return: only recalculate if the viewport width actually changed
+    if (window.innerWidth === lastNumpadWinW) return;
+    lastNumpadWinW = window.innerWidth;
+
     var rect = tableCard.getBoundingClientRect();
 
-    // Horizontal — centered in the right gutter
-    var numpadWidth = numpad.offsetWidth || 232;
+    // Horizontal: perfectly centered in the right-hand empty space
+    var numpadWidth = 232; // Must match .numpad { width } in CSS
     var rightSpace = window.innerWidth - rect.right;
     var left = rect.right + (rightSpace - numpadWidth) / 2;
+
     if (left + numpadWidth > window.innerWidth - 16) {
       left = window.innerWidth - numpadWidth - 16;
     }
     numpad.style.left = left + 'px';
-
-    // Vertical — anchored to table center, clamped above summary bar
-    var tableCenter = rect.top + rect.height / 2;
-    var numpadH = numpad.offsetHeight || 374;
-    var minCenter = 60 + numpadH / 2;
-    var maxCenter = window.innerHeight - 100 - numpadH / 2;
-    var centerY = Math.min(Math.max(tableCenter, minCenter), maxCenter);
-    numpad.style.top = centerY + 'px';
-    // transform: translateY(-50%) remains in the CSS
+    numpad.style.top = '50%';
   }
 
   function getActivePriceInput() {
@@ -1975,10 +1974,31 @@
     })(numpadBtns[nb]);
   }
   function updateNumpadVisibility() {
-    if (!numpad) return;
+    if (!numpad || !tableCard) return;
     if (window.innerWidth <= 1250) return;
-    if (numpadSuppressed) { numpad.classList.remove('visible'); return; }
-    if (summaryBar && summaryBar.classList.contains('visible')) {
+
+    // 1. Hard suppression states
+    if (rejected || numpadSuppressed) {
+      numpad.classList.remove('visible');
+      return;
+    }
+
+    // 2. Check if ANY price row is visible on the screen
+    var rows = getRows();
+    var isRowVisible = false;
+    if (rows.length > 0) {
+      var firstRowTop = rows[0].getBoundingClientRect().top;
+      var lastRowBottom = rows[rows.length - 1].getBoundingClientRect().bottom;
+
+      isRowVisible = (firstRowTop < window.innerHeight && lastRowBottom > 0);
+    }
+
+    // 3. Safety check: is a price field actively focused?
+    var activeEl = document.activeElement;
+    var isPriceFocused = activeEl && activeEl.classList && activeEl.classList.contains('price-input');
+
+    // Show numpad if the rows are on screen OR a field is actively focused
+    if (isRowVisible || isPriceFocused) {
       repositionNumpad();
       numpad.classList.add('visible');
     } else {
@@ -3137,8 +3157,8 @@
     var totalHeight = bottom - top;
     if (totalHeight <= 0) {
       summaryBar.classList.remove('visible');
-      if (numpad) numpad.classList.remove('visible');
       summaryHysteresisOn = false;
+      updateNumpadVisibility();
       return;
     }
     var visibleTop = Math.max(top, 0);
@@ -3149,16 +3169,15 @@
     var effective = spansViewport ? 1 : ratio;
     if (!summaryHysteresisOn && effective >= 0.9) summaryHysteresisOn = true;
     else if (summaryHysteresisOn && effective < 0.5) summaryHysteresisOn = false;
+
     if (summaryHysteresisOn) {
       summaryBar.classList.add('visible');
-      if (numpad) {
-        repositionNumpad();
-        updateNumpadVisibility();
-      }
     } else {
       summaryBar.classList.remove('visible');
-      if (numpad) numpad.classList.remove('visible');
     }
+
+    // ALWAYS update the numpad based on its own independent row-visibility rules
+    updateNumpadVisibility();
   }
 
   function showTransitionLine(animate) {
