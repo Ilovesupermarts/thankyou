@@ -521,7 +521,7 @@
 
   .preset-clear, .preset-undo,
   .tip-minus, .tip-plus {
-    flex-shrink: 0; width: 34px; height: 34px; border-radius: 50%;
+    flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
     background: #ffffff; border: 1.5px solid var(--border-1);
     font-size: 18px; font-weight: 600; font-family: inherit; line-height: 1;
     cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -1007,6 +1007,8 @@
     border-bottom: 1px solid var(--border-4);
     border-left: 3px solid transparent;
     transition: background 0.2s ease, border-left-color 0.2s ease, opacity 0.2s ease;
+    scroll-margin-top: 100px;
+    scroll-margin-bottom: 100px;
   }
   .row:last-child { border-bottom: none; }
   .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
@@ -1055,6 +1057,17 @@
   .row.service-hint .service-input {
     animation: serviceHintFlash 0.9s ease-out;
     border-bottom-style: solid;
+  }
+
+  @keyframes priceHintFlash {
+    0%   { background: var(--soft-1); border-color: var(--border-1); }
+    25%  { background: #ffffff;       border-color: var(--accent); }
+    50%  { background: var(--soft-1); border-color: var(--border-1); }
+    75%  { background: #ffffff;       border-color: var(--accent); }
+    100% { background: var(--soft-1); border-color: var(--border-1); }
+  }
+  .row.price-hint .price-wrap {
+    animation: priceHintFlash 0.9s ease-out;
   }
 
   .service-input {
@@ -1410,7 +1423,7 @@
     .confirm-card { max-width: 420px; }
   }
 
-  /* ============ ALERT DIALOG (Change AB) ============ */
+  /* ============ ALERT DIALOG ============ */
 
   .alert-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
@@ -2370,7 +2383,7 @@
 
 <div class="alert-screen" id="alertScreen">
   <div class="alert-card">
-    <div class="alert-title">以下のサービスに料金が入力されていません。</div>
+    <div class="alert-title">以下のサービスの料金が入力されていません。</div>
     <div class="alert-sub">料金をご入力ください。</div>
     <ul class="alert-list" id="alertList"></ul>
     <div class="alert-actions">
@@ -3036,9 +3049,7 @@
       var isChecked = check && check.classList.contains('checked');
       var rawVal = (priceInput.value || '').trim();
       var hasPrice = rawVal !== '';
-      // Row will appear on the receipt?
       if (!isChecked && !hasPrice) continue;
-      // But its price is empty?
       if (!hasPrice) {
         var display = row.querySelector('.service-display');
         var textInput = row.querySelector('.service-input');
@@ -3637,6 +3648,43 @@
     e.preventDefault();
     haptic(8);
     alertScreen.classList.remove('visible');
+
+    // Wait for the alert fade animation (0.4s) to finish before moving the screen
+    setTimeout(function() {
+      var rows = getRows();
+      for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var check = row.querySelector('.row-check');
+        var priceInput = row.querySelector('.price-input');
+
+        // Guard against disabled inputs caused by empty custom rows
+        if (!priceInput || priceInput.disabled) continue;
+
+        var isChecked = check && check.classList.contains('checked');
+        var hasPrice = (priceInput.value || '').trim() !== '';
+
+        if (isChecked && !hasPrice) {
+          // Instant snap so the browser doesn't fight the focus event
+          row.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+
+          // Flash the price pill
+          row.classList.remove('price-hint');
+          void row.offsetWidth;
+          row.classList.add('price-hint');
+          setTimeout(function() { row.classList.remove('price-hint'); }, 1000);
+
+          priceInput.focus();
+          break;
+        }
+      }
+    }, 400);
+  });
+
+  alertScreen.addEventListener('click', function(e) {
+    // Only close if the user clicked the dark background, not the white card itself
+    if (e.target === alertScreen) {
+      alertOk.click();
+    }
   });
 
   confirmYes.addEventListener('click', function(e) {
