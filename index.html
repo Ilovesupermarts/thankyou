@@ -233,8 +233,6 @@
     will-change: transform, filter;
   }
 
-  /* Change V: colour-matched zero-alpha stops + extended falloff, so the
-     gradient has no visible edge. Motion keyframes untouched. */
   html[data-theme="autumn"] body::before {
     background:
       radial-gradient(circle at 25% 30%,
@@ -969,7 +967,6 @@
     margin-bottom: 0;
   }
 
-  /* Change Z: custom-section divider above the four custom rows */
   .custom-section-divider {
     display: flex;
     align-items: center;
@@ -1048,7 +1045,6 @@
     100% { transform: scale(1); }
   }
 
-  /* Change W: flash the service input when a locked row is tapped */
   @keyframes serviceHintFlash {
     0%   { border-bottom-color: var(--border-2); background: transparent; }
     25%  { border-bottom-color: var(--accent);   background: var(--soft-1); }
@@ -1413,6 +1409,82 @@
     .confirm-btn { font-size: 14.5px; padding: 15px 12px; }
     .confirm-card { max-width: 420px; }
   }
+
+  /* ============ ALERT DIALOG (Change AB) ============ */
+
+  .alert-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(250, 247, 245, 0.92);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 260;
+    display: flex; align-items: center; justify-content: center;
+    padding: 30px 24px;
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.4s ease;
+  }
+  html[data-theme="autumn"] .alert-screen {
+    background: rgba(253, 243, 216, 0.92);
+  }
+  .alert-screen.visible { opacity: 1; pointer-events: auto; }
+  .alert-card {
+    background: #ffffff;
+    width: auto;
+    max-width: 320px;
+    padding: 28px 26px 22px 26px;
+    border-radius: 18px;
+    box-shadow: 0 12px 40px var(--shadow-rose-2);
+    border: 1px solid var(--border-3);
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    transform: scale(0.94);
+    transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .alert-screen.visible .alert-card { transform: scale(1); }
+  .alert-title {
+    font-size: 15px; font-weight: 600; color: var(--accent);
+    line-height: 1.8; letter-spacing: 0.3px; margin-bottom: 6px;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
+  .alert-sub {
+    font-size: 13px; font-weight: 500; color: var(--text-mute);
+    letter-spacing: 0.4px; line-height: 1.8; margin-bottom: 14px;
+  }
+  .alert-list {
+    list-style: none; padding: 0; margin: 0 0 18px 0;
+    text-align: left;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .alert-list li {
+    font-size: 13.5px; font-weight: 500; color: var(--text-soft);
+    line-height: 1.8; padding: 2px 0 2px 16px; position: relative;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
+  .alert-list li::before {
+    content: "・";
+    position: absolute; left: 0;
+    color: var(--accent);
+  }
+  .alert-actions { display: flex; justify-content: center; }
+  .alert-btn {
+    min-width: 160px;
+    border-radius: 22px;
+    padding: 12px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    font-family: inherit;
+    letter-spacing: 0.5px;
+    background: var(--accent);
+    border: 1.5px solid var(--accent);
+    color: #ffffff;
+    box-shadow: 0 4px 14px var(--shadow-accent);
+    cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    transition: background 0.2s, transform 0.15s;
+    white-space: nowrap;
+  }
+  .alert-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
   /* ============ RECEIPT ============ */
 
@@ -2296,6 +2368,17 @@
   </div>
 </div>
 
+<div class="alert-screen" id="alertScreen">
+  <div class="alert-card">
+    <div class="alert-title">以下のサービスに料金が入力されていません。</div>
+    <div class="alert-sub">料金をご入力ください。</div>
+    <ul class="alert-list" id="alertList"></ul>
+    <div class="alert-actions">
+      <button type="button" class="alert-btn" id="alertOk">戻って入力する</button>
+    </div>
+  </div>
+</div>
+
 <div class="receipt-screen" id="receiptScreen">
   <div class="receipt-paper">
     <button type="button" class="receipt-close" id="receiptClose" aria-label="閉じる">×</button>
@@ -2599,6 +2682,10 @@
 
   var totalEl = document.getElementById('total');
 
+  var alertScreen = document.getElementById('alertScreen');
+  var alertList = document.getElementById('alertList');
+  var alertOk = document.getElementById('alertOk');
+
   var nameConfirmed = false;
   var tableUnlocked = false;
   var currentPanel = 0;
@@ -2669,7 +2756,6 @@
     { key: 'sapporo',  name: '札幌市',   lat: 43.0618, lon: 141.3545 }
   ];
 
-  /* Content for the conditional panel 1. */
   var TY_PANEL1_DEFAULT_HTML =
     '<div class="ty-mark">❀</div>' +
     '<div class="ty-line">ありがとうございます。</div>' +
@@ -2877,7 +2963,7 @@
     for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
   }
 
-  /* ============ CHANGE W: flash the service input on locked rows ============ */
+  /* ============ CHANGE W: flash service input ============ */
 
   function flashServiceInput(row) {
     if (!row) return;
@@ -2891,7 +2977,7 @@
     haptic(6);
   }
 
-  /* ============ CHANGE X: auto-copy confirmed custom services ============ */
+  /* ============ CHANGE X (revised): auto-copy at Confirm ============ */
 
   function fallbackCopyTextToClipboard(text) {
     var textArea = document.createElement("textarea");
@@ -2937,6 +3023,35 @@
     }
   }
 
+  /* ============ CHANGE AB: find unpriced services ============ */
+
+  function findUnpricedServices() {
+    var rows = getRows();
+    var missing = [];
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      var priceInput = row.querySelector('.price-input');
+      if (!priceInput) continue;
+      var check = row.querySelector('.row-check');
+      var isChecked = check && check.classList.contains('checked');
+      var rawVal = (priceInput.value || '').trim();
+      var hasPrice = rawVal !== '';
+      // Row will appear on the receipt?
+      if (!isChecked && !hasPrice) continue;
+      // But its price is empty?
+      if (!hasPrice) {
+        var display = row.querySelector('.service-display');
+        var textInput = row.querySelector('.service-input');
+        var name = '';
+        if (display) name = (display.textContent || '').trim();
+        else if (textInput) name = (textInput.value || '').trim();
+        if (!name) name = 'サービス ' + (i + 1);
+        missing.push(name);
+      }
+    }
+    return missing;
+  }
+
   /* ============ TABLE LISTENERS ============ */
 
   tableCard.addEventListener('click', function(e) {
@@ -2960,7 +3075,6 @@
         var currentService = serviceText.value;
         if (currentService !== '') box.setAttribute('data-saved-service', currentService);
         serviceText.value = '';
-        copyCustomServices();
       }
       box.classList.remove('checked');
       box.setAttribute('aria-checked', 'false');
@@ -3054,14 +3168,6 @@
     recalc();
   });
 
-  /* Change X: refresh clipboard when a custom service entry is finalised */
-  tableCard.addEventListener('change', function(e) {
-    if (e.target.classList.contains('service-input')) {
-      copyCustomServices();
-    }
-  });
-
-  /* Change W: flash the service input when tapping a locked price area */
   tableCard.addEventListener('click', function(e) {
     var row = e.target.closest('.row');
     if (!row) return;
@@ -3235,8 +3341,6 @@
       var priceInput = row.querySelector('.price-input');
       var serviceText = row.querySelector('.service-input');
       var box = row.querySelector('.row-check');
-      // Change CA: snapshot current values into the memory attributes
-      // before clearing, so re-ticking restores them.
       if (box) {
         if (priceInput && priceInput.value !== '') {
           box.setAttribute('data-saved-price', priceInput.value);
@@ -3262,8 +3366,6 @@
     updateAllRowLocks();
     recalc();
     if (typeof updateSummaryVisibility === 'function') updateSummaryVisibility();
-    // Change X: refresh clipboard after reset (list is now empty → clears it)
-    copyCustomServices();
   }
 
   nameBtn.addEventListener('click', function(e) { e.preventDefault(); confirmName(); });
@@ -3509,10 +3611,32 @@
     receiptTotal.innerHTML = '<span class="yen-symbol">¥</span>' + sum.toLocaleString();
   }
 
+  /* ============ SUBMIT (Change X + AB) ============ */
+
   submitBtn.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(10);
+
+    var missing = findUnpricedServices();
+    if (missing.length > 0) {
+      alertList.innerHTML = '';
+      for (var i = 0; i < missing.length; i++) {
+        var li = document.createElement('li');
+        li.textContent = missing[i];
+        alertList.appendChild(li);
+      }
+      alertScreen.classList.add('visible');
+      return;
+    }
+
+    copyCustomServices();
     confirmScreen.classList.add('visible');
+  });
+
+  alertOk.addEventListener('click', function(e) {
+    e.preventDefault();
+    haptic(8);
+    alertScreen.classList.remove('visible');
   });
 
   confirmYes.addEventListener('click', function(e) {
@@ -3685,8 +3809,6 @@
       e.preventDefault();
       currentX = x;
 
-      // Change I: last panel — leftward rubber-band only (edge cue).
-      // Rightward falls through to the normal drag-follow (Change T).
       if (currentPanel === totalPanels - 1 && deltaX < 0) {
         var baseOffsetEnd = -currentPanel * stageWidth;
         var offsetEnd = baseOffsetEnd + deltaX * 0.35;
@@ -3695,7 +3817,6 @@
         return;
       }
 
-      // Change R: first panel — rightward rubber-band only.
       if (currentPanel === 0 && deltaX > 0) {
         var baseOffsetStart = -currentPanel * stageWidth;
         var offsetStart = baseOffsetStart + deltaX * 0.35;
@@ -3916,8 +4037,6 @@
     transitionLine.classList.add('fading');
   }
 
-  // Change U: no early-return. Scroll events can't fire until table-locked
-  // is removed, so this is safe from any panel once unlocked.
   function evaluateScrollState() {
     var rect = tableCard.getBoundingClientRect();
     var trigger = getFadeTriggerPx();
@@ -3996,7 +4115,6 @@
       petalOverlay.classList.remove('active');
       void petalOverlay.offsetWidth;
       petalOverlay.classList.add('active');
-      copyCustomServices();
     } else {
       rejectRow.classList.remove('selected');
       rejectThanks.classList.remove('shown');
@@ -4005,7 +4123,6 @@
       for (var j = 0; j < rows2.length; j++) {
         rows2[j].classList.remove('disabled');
       }
-      copyCustomServices();
     }
     recalc();
     updateSubmitState();
