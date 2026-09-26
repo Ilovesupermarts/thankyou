@@ -233,13 +233,30 @@
     will-change: transform, filter;
   }
 
+  /* Change V: colour-matched zero-alpha stops + extended falloff, so the
+     gradient has no visible edge. Motion keyframes untouched. */
   html[data-theme="autumn"] body::before {
     background:
-      radial-gradient(circle at 25% 30%, var(--amb-1) 0%, transparent 45%),
-      radial-gradient(circle at 75% 40%, var(--amb-2) 0%, transparent 48%),
-      radial-gradient(circle at 50% 70%, var(--amb-3) 0%, transparent 42%),
-      radial-gradient(circle at 20% 85%, var(--amb-4) 0%, transparent 40%),
-      radial-gradient(circle at 80% 90%, var(--amb-5) 0%, transparent 38%);
+      radial-gradient(circle at 25% 30%,
+        rgba(247, 185, 60, 0.85) 0%,
+        rgba(247, 185, 60, 0.40) 30%,
+        rgba(247, 185, 60, 0) 60%),
+      radial-gradient(circle at 75% 40%,
+        rgba(240, 138, 30, 0.80) 0%,
+        rgba(240, 138, 30, 0.38) 32%,
+        rgba(240, 138, 30, 0) 62%),
+      radial-gradient(circle at 50% 70%,
+        rgba(217, 94, 26, 0.72) 0%,
+        rgba(217, 94, 26, 0.34) 28%,
+        rgba(217, 94, 26, 0) 58%),
+      radial-gradient(circle at 20% 85%,
+        rgba(143, 63, 18, 0.55) 0%,
+        rgba(143, 63, 18, 0.26) 26%,
+        rgba(143, 63, 18, 0) 56%),
+      radial-gradient(circle at 80% 90%,
+        rgba(107, 47, 14, 0.45) 0%,
+        rgba(107, 47, 14, 0.20) 25%,
+        rgba(107, 47, 14, 0) 54%);
     animation: autumnDrift1 14s ease-in-out infinite;
   }
   html[data-theme="autumn"] body::after {
@@ -252,8 +269,12 @@
     z-index: -1;
     pointer-events: none;
     background:
-      radial-gradient(circle at 60% 20%, var(--amb-2) 0%, transparent 40%),
-      radial-gradient(circle at 40% 90%, var(--amb-3) 0%, transparent 45%);
+      radial-gradient(circle at 60% 20%,
+        rgba(240, 138, 30, 0.80) 0%,
+        rgba(240, 138, 30, 0) 40%),
+      radial-gradient(circle at 40% 90%,
+        rgba(217, 94, 26, 0.72) 0%,
+        rgba(217, 94, 26, 0) 45%);
     animation: autumnDrift2 19s ease-in-out infinite;
     mix-blend-mode: multiply;
     opacity: 0.55;
@@ -928,7 +949,7 @@
     padding: 16px 22px 18px 22px;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-style: italic;
+    font-style: normal;
     font-size: 14px;
     font-weight: 400;
     color: var(--text-dark);
@@ -946,6 +967,41 @@
   }
   .privacy-note-inline p:last-child {
     margin-bottom: 0;
+  }
+
+  /* Change Z: custom-section divider above the four custom rows */
+  .custom-section-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    margin: 14px 14px 4px 14px;
+    padding: 6px 0 2px 0;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .custom-section-mark {
+    flex-shrink: 0;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 15px;
+    line-height: 1;
+    color: var(--accent);
+  }
+  .custom-section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-2);
+    min-width: 20px;
+  }
+  .custom-section-label {
+    flex-shrink: 0;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 4px;
+    line-height: 1.4;
+    white-space: nowrap;
   }
 
   .row {
@@ -992,6 +1048,19 @@
     100% { transform: scale(1); }
   }
 
+  /* Change W: flash the service input when a locked row is tapped */
+  @keyframes serviceHintFlash {
+    0%   { border-bottom-color: var(--border-2); background: transparent; }
+    25%  { border-bottom-color: var(--accent);   background: var(--soft-1); }
+    50%  { border-bottom-color: var(--border-2); background: transparent; }
+    75%  { border-bottom-color: var(--accent);   background: var(--soft-1); }
+    100% { border-bottom-color: var(--border-2); background: transparent; }
+  }
+  .row.service-hint .service-input {
+    animation: serviceHintFlash 0.9s ease-out;
+    border-bottom-style: solid;
+  }
+
   .service-input {
     flex: 1; min-width: 0; background: transparent; border: none;
     border-bottom: 1.5px dashed var(--border-2);
@@ -1023,7 +1092,7 @@
   }
   .row.filled .price-wrap { background: #ffffff; border-color: var(--accent); }
   .row.locked .price-wrap { background: var(--soft-3); border-color: var(--border-3); opacity: 0.55; }
-  .row.locked .price-input { cursor: not-allowed; color: #b8ada6; }
+  .row.locked .price-input { cursor: not-allowed; color: #b8ada6; pointer-events: none; }
   .row.locked .price-input::placeholder { color: var(--text-placeholder); }
   .row.locked .yen { color: #b8ada6; }
   .row.locked .row-check { opacity: 0.75; }
@@ -1842,6 +1911,9 @@
     .gift-divider-label { font-size: 19px; letter-spacing: 6px; }
     .reject-gift { font-size: 15px; }
     .reject-gift-amount { font-size: 20px; }
+    .custom-section-divider { gap: 12px; }
+    .custom-section-mark { font-size: 17px; }
+    .custom-section-label { font-size: 15px; letter-spacing: 5px; }
   }
 
   @media (min-width: 1100px) {
@@ -1867,6 +1939,9 @@
     .gift-divider-label { font-size: 21px; letter-spacing: 7px; }
     .reject-gift { font-size: 16px; }
     .reject-gift-amount { font-size: 22px; }
+    .custom-section-divider { gap: 12px; }
+    .custom-section-mark { font-size: 17px; }
+    .custom-section-label { font-size: 15px; letter-spacing: 5px; }
   }
 
   @media (max-height: 700px) {
@@ -2111,13 +2186,20 @@
 
 <div class="table-card" id="tableCard">
   <div class="privacy-note-inline" id="privacyNote">
-    <p>なお、これからご覧いただく内容や、こちらでのお選びいただいた内容が、記録されたり、外部に送信されたりすることは一切ございません。</p>
-    <p>あくまでも、その場でのやり取りを分かりやすくするためのものです。</p>
-    <p>本日のお話や内容についても、すべてお互いの間だけのこととして、大切に扱わせていただきます。</p>
+    <p>なお、これからご覧いただく内容や、こちらでお選びいただいた内容が、記録されたり、外部に送信されたりすることは一切ございません。</p>
+    <p>あくまでも、その場でのやり取りを分かりやすくするためのものです。本日のお話や内容についても、すべてお互いの間だけのこととして、大切に扱わせていただきます。</p>
     <p>どうぞご安心ください。</p>
   </div>
 
   <div id="dynamicRows"></div>
+
+  <div class="custom-section-divider">
+    <span class="custom-section-mark">❀</span>
+    <span class="custom-section-line"></span>
+    <span class="custom-section-label">その他</span>
+    <span class="custom-section-line"></span>
+    <span class="custom-section-mark">❀</span>
+  </div>
 
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
@@ -2264,13 +2346,9 @@
         <div class="ty-panel-inner">
           <div class="ty-panel-content">
             <div class="ty-mark">❀</div>
-            <div class="ty-line">その間、どうぞごゆっくり</div>
-            <div class="ty-line">お寛ぎくださいませ。</div>
-            <div class="ty-line spacer">ご用意させていただいた軽食を</div>
-            <div class="ty-line">お楽しみいただきながら、</div>
+            <div class="ty-line accent">その間、どうぞごゆっくりお寛ぎくださいませ。</div>
             <div class="ty-rule"></div>
-            <div class="ty-line accent">どうぞ穏やかな時間を</div>
-            <div class="ty-line accent">お過ごしください。</div>
+            <div class="ty-line">ご用意させていただいた軽食をお楽しみいただきながら、どうぞ穏やかな時間をお過ごしください。</div>
           </div>
         </div>
       </div>
@@ -2279,9 +2357,9 @@
         <div class="ty-panel-inner">
           <div class="ty-panel-content">
             <div class="ty-mark">❀</div>
-            <div class="ty-line">画面に流れる言葉とともに、</div>
-            <div class="ty-line spacer">どうぞご自宅のように、</div>
-            <div class="ty-line accent">ゆっくりおくつろぎくださいませ。</div>
+            <div class="ty-line">もしよろしければ、その間にマッサージの準備なども、どうぞごゆっくりお済ませくださいませ。</div>
+            <div class="ty-rule"></div>
+            <div class="ty-line accent">画面に流れる言葉とともに、どうぞご自宅のように、ゆっくりおくつろぎくださいませ。</div>
           </div>
         </div>
       </div>
@@ -2291,9 +2369,8 @@
           <div class="ty-panel-content">
             <div class="ty-mark">❀</div>
             <div class="ty-line">まもなく戻ります。</div>
-            <div class="ty-line spacer">それまでの間、</div>
-            <div class="ty-line accent">ゆっくりと言葉をお楽しみください。</div>
             <div class="ty-rule"></div>
+            <div class="ty-line accent">それまでの間、どうぞごゆっくり、言葉をお楽しみください。</div>
           </div>
         </div>
       </div>
@@ -2622,16 +2699,12 @@
   });
 
   /* ============ DYNAMIC HINT GROUP POSITIONING ============ */
-  /* Measures the live DOM: tallest .panel-content, actual info bar
-     height, and the dots/hint block, then computes a mathematically
-     symmetrical gap. Overrides the CSS .panel padding inline. */
 
   function repositionHintGroup() {
     if (!panels.length || !stage) return;
     var stageHeight = stage.offsetHeight;
     if (stageHeight <= 0) return;
 
-    // 1. Tallest text across all panels
     var maxContentH = 0;
     for (var i = 0; i < panels.length; i++) {
       var content = panels[i].querySelector('.panel-content');
@@ -2640,20 +2713,16 @@
       }
     }
 
-    // 2. Info bar height. Guard against the bar being display:none
-    //    before the intro runs (offsetHeight returns 0 in that state).
     var infoBarEl = document.getElementById('infoBar');
     var infoH = infoBarEl ? infoBarEl.offsetHeight : 0;
     if (infoH < 40) infoH = 88;
     var infoBottom = infoH + 10;
 
-    // 3. Bottom dots + hint block
     var hintH = 24;
     var dotsH = 12;
     var spaceBetween = 24;
     var totalDotsBlockH = hintH + spaceBetween + dotsH;
 
-    // 4. Symmetrical gap
     var minBottomMargin = 40;
     var optimalDotsTop = stageHeight - minBottomMargin - totalDotsBlockH;
     var totalGapSpace = optimalDotsTop - infoBottom - maxContentH;
@@ -2661,7 +2730,6 @@
     var gap = totalGapSpace / 2;
     if (gap < 30) gap = 30;
 
-    // 5. Apply paddings
     var pTop = infoBottom + gap;
     var pBottom = stageHeight - (infoBottom + gap + maxContentH);
     if (pBottom < 0) pBottom = 0;
@@ -2671,7 +2739,6 @@
       panels[j].style.paddingBottom = pBottom + 'px';
     }
 
-    // 6. Position dots + hint from the same geometry
     var textBottom = infoBottom + gap + maxContentH;
     var actualDotsTop = textBottom + gap;
     var actualDotsBottomFromStage = stageHeight - (actualDotsTop + totalDotsBlockH);
@@ -2810,6 +2877,66 @@
     for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
   }
 
+  /* ============ CHANGE W: flash the service input on locked rows ============ */
+
+  function flashServiceInput(row) {
+    if (!row) return;
+    var svc = row.querySelector('.service-input');
+    if (!svc) return;
+    row.classList.remove('service-hint');
+    void row.offsetWidth;
+    row.classList.add('service-hint');
+    setTimeout(function() { row.classList.remove('service-hint'); }, 1000);
+    try { svc.focus(); } catch (e) {}
+    haptic(6);
+  }
+
+  /* ============ CHANGE X: auto-copy confirmed custom services ============ */
+
+  function fallbackCopyTextToClipboard(text) {
+    var textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-9999px";
+    document.body.appendChild(textArea);
+    textArea.focus();
+    textArea.select();
+    try {
+      var successful = document.execCommand('copy');
+      if (successful) haptic(10);
+    } catch (err) { /* silent */ }
+    document.body.removeChild(textArea);
+  }
+
+  function copyCustomServices() {
+    var serviceInputs = document.querySelectorAll('.service-input');
+    var allServices = [];
+    for (var i = 0; i < serviceInputs.length; i++) {
+      var v = serviceInputs[i].value.trim();
+      if (v !== '') allServices.push(v);
+    }
+    var combined = allServices.join('\n');
+
+    if (combined === '') {
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText('');
+        }
+      } catch (e) { /* silent */ }
+      return;
+    }
+
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(combined).then(function() {
+        haptic(10);
+      }).catch(function() {
+        fallbackCopyTextToClipboard(combined);
+      });
+    } else {
+      fallbackCopyTextToClipboard(combined);
+    }
+  }
+
   /* ============ TABLE LISTENERS ============ */
 
   tableCard.addEventListener('click', function(e) {
@@ -2833,6 +2960,7 @@
         var currentService = serviceText.value;
         if (currentService !== '') box.setAttribute('data-saved-service', currentService);
         serviceText.value = '';
+        copyCustomServices();
       }
       box.classList.remove('checked');
       box.setAttribute('aria-checked', 'false');
@@ -2842,7 +2970,10 @@
         var currentService = serviceText ? (serviceText.value || '').trim() : '';
         var savedService = box.getAttribute('data-saved-service');
         var hasSavedService = savedService !== null && savedService.trim() !== '';
-        if (currentService === '' && !hasSavedService) return;
+        if (currentService === '' && !hasSavedService) {
+          flashServiceInput(row);
+          return;
+        }
       }
       haptic(10);
       if (priceField) {
@@ -2921,6 +3052,22 @@
       }
     }
     recalc();
+  });
+
+  /* Change X: refresh clipboard when a custom service entry is finalised */
+  tableCard.addEventListener('change', function(e) {
+    if (e.target.classList.contains('service-input')) {
+      copyCustomServices();
+    }
+  });
+
+  /* Change W: flash the service input when tapping a locked price area */
+  tableCard.addEventListener('click', function(e) {
+    var row = e.target.closest('.row');
+    if (!row) return;
+    if (!row.classList.contains('locked')) return;
+    if (!e.target.closest('.price-wrap')) return;
+    flashServiceInput(row);
   });
 
   tableCard.addEventListener('focusin', function(e) {
@@ -3076,9 +3223,6 @@
   }
 
   /* ============ RESET ============ */
-  /* Clears the visible state but deliberately keeps the
-     data-saved-price / data-saved-service attributes so that
-     re-ticking a row restores the last entered values (in-session). */
 
   function resetAll() {
     rejected = false;
@@ -3091,7 +3235,15 @@
       var priceInput = row.querySelector('.price-input');
       var serviceText = row.querySelector('.service-input');
       var box = row.querySelector('.row-check');
+      // Change CA: snapshot current values into the memory attributes
+      // before clearing, so re-ticking restores them.
       if (box) {
+        if (priceInput && priceInput.value !== '') {
+          box.setAttribute('data-saved-price', priceInput.value);
+        }
+        if (serviceText && serviceText.value.trim() !== '') {
+          box.setAttribute('data-saved-service', serviceText.value);
+        }
         box.classList.remove('checked');
         box.setAttribute('aria-checked', 'false');
       }
@@ -3110,6 +3262,8 @@
     updateAllRowLocks();
     recalc();
     if (typeof updateSummaryVisibility === 'function') updateSummaryVisibility();
+    // Change X: refresh clipboard after reset (list is now empty → clears it)
+    copyCustomServices();
   }
 
   nameBtn.addEventListener('click', function(e) { e.preventDefault(); confirmName(); });
@@ -3173,7 +3327,6 @@
     haptic(12);
     document.body.classList.add('info-visible');
     if (infoBar) infoBar.classList.add('shown');
-    // Re-measure now that the info bar is display:block and has a real height.
     repositionHintGroupAfterLayout();
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
@@ -3428,7 +3581,6 @@
   function returnToTable() {
     clearAllTyTimers();
 
-    // 1. Instantly hide the thank-you screen if it is open behind the receipt.
     if (thankyouScreen.classList.contains('visible')) {
       thankyouScreen.style.transition = 'none';
       thankyouScreen.classList.remove('visible');
@@ -3436,7 +3588,6 @@
       thankyouScreen.style.transition = '';
     }
 
-    // 2. Immediately restore the background layout elements.
     document.body.classList.remove('thankyou-active');
 
     receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
@@ -3534,10 +3685,9 @@
       e.preventDefault();
       currentX = x;
 
-      // Change I: last panel — leftward rubber-band only, no visual
-      // follow on rightward drag (but still allow a right flick to go back).
-      if (currentPanel === totalPanels - 1) {
-        if (deltaX > 0) return;
+      // Change I: last panel — leftward rubber-band only (edge cue).
+      // Rightward falls through to the normal drag-follow (Change T).
+      if (currentPanel === totalPanels - 1 && deltaX < 0) {
         var baseOffsetEnd = -currentPanel * stageWidth;
         var offsetEnd = baseOffsetEnd + deltaX * 0.35;
         var pctEnd = (offsetEnd / stageWidth) * (100 / totalPanels);
@@ -3545,7 +3695,7 @@
         return;
       }
 
-      // Change R: first panel — rightward rubber-band only; leftward is normal.
+      // Change R: first panel — rightward rubber-band only.
       if (currentPanel === 0 && deltaX > 0) {
         var baseOffsetStart = -currentPanel * stageWidth;
         var offsetStart = baseOffsetStart + deltaX * 0.35;
@@ -3607,14 +3757,12 @@
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
 
-    // Change I: last panel — right flick goes back; otherwise snap.
     if (currentPanel === totalPanels - 1) {
       if (deltaX > threshold) goToPanel(currentPanel - 1);
       else goToPanel(currentPanel);
       return;
     }
 
-    // Change R: first panel — left flick advances; otherwise snap.
     if (currentPanel === 0) {
       if (deltaX < -threshold) goToPanel(currentPanel + 1);
       else goToPanel(currentPanel);
@@ -3641,8 +3789,7 @@
     currentX = e.clientX;
     var deltaX = currentX - startX;
 
-    if (currentPanel === totalPanels - 1) {
-      if (deltaX > 0) return;
+    if (currentPanel === totalPanels - 1 && deltaX < 0) {
       var baseOffsetEnd = -currentPanel * stageWidth;
       var offsetEnd = baseOffsetEnd + deltaX * 0.35;
       var pctEnd = (offsetEnd / stageWidth) * (100 / totalPanels);
@@ -3769,8 +3916,9 @@
     transitionLine.classList.add('fading');
   }
 
+  // Change U: no early-return. Scroll events can't fire until table-locked
+  // is removed, so this is safe from any panel once unlocked.
   function evaluateScrollState() {
-    if (currentPanel !== totalPanels - 1) return;
     var rect = tableCard.getBoundingClientRect();
     var trigger = getFadeTriggerPx();
     var lineRect = transitionLine.getBoundingClientRect();
@@ -3848,6 +3996,7 @@
       petalOverlay.classList.remove('active');
       void petalOverlay.offsetWidth;
       petalOverlay.classList.add('active');
+      copyCustomServices();
     } else {
       rejectRow.classList.remove('selected');
       rejectThanks.classList.remove('shown');
@@ -3856,6 +4005,7 @@
       for (var j = 0; j < rows2.length; j++) {
         rows2[j].classList.remove('disabled');
       }
+      copyCustomServices();
     }
     recalc();
     updateSubmitState();
