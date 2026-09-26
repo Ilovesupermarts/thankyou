@@ -730,24 +730,23 @@
   .alert-btn { min-width: 160px; border-radius: 22px; padding: 12px 20px; font-size: 13.5px; font-weight: 600; font-family: inherit; letter-spacing: 0.5px; background: var(--accent); border: 1.5px solid var(--accent); color: #ffffff; box-shadow: 0 4px 14px var(--shadow-accent); cursor: pointer; -webkit-appearance: none; appearance: none; transition: background 0.2s, transform 0.15s; white-space: nowrap; }
   .alert-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
-  /* ============ CUSTOM NUMPAD (OMOTENASHI REDESIGN) ============ */
+  /* ============ CUSTOM NUMPAD (FLOATING MINIMALIST REDESIGN) ============ */
   .numpad {
     position: fixed;
     top: 50%;
     transform: translateY(-50%);
-    width: 240px;
-    padding: 16px;
-    background: var(--soft-4);
-    border: 1px solid var(--border-2);
-    border-radius: 22px;
-    box-shadow: 0 6px 20px var(--shadow-rose);
+    width: 232px; /* 3 columns of 64px + two 20px gaps = 232px */
+    padding: 0;
+    background: transparent; /* Completely removes the jarring background block */
+    border: none;
+    box-shadow: none;
     z-index: 55;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
+    gap: 16px 20px; /* Vertical and horizontal breathing room */
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.6s ease;
     user-select: none;
     -webkit-user-select: none;
     -webkit-touch-callout: none;
@@ -757,14 +756,17 @@
     pointer-events: auto;
   }
   .numpad-btn {
-    height: 60px;
-    background: var(--soft-1);
-    border: 1px solid var(--border-1);
-    border-radius: 14px;
-    font-size: 20px;
-    font-weight: 600;
+    width: 64px;
+    height: 64px;
+    background: #ffffff; /* Clean white floating pebble */
+    border: 1px solid var(--border-2);
+    border-radius: 50%; /* Perfect circles */
+    box-shadow: 0 4px 14px var(--shadow-rose); /* Soft individual drop shadow */
+    font-size: 26px;
+    font-weight: 300; /* Ultra-thin, elegant stroke */
     color: var(--text-dark);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    /* Thin, modern geometric sans-serif for numbers */
+    font-family: system-ui, sans-serif;
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -772,32 +774,45 @@
     padding: 0;
     -webkit-appearance: none;
     appearance: none;
-    box-shadow: 0 2px 6px var(--shadow-rose);
-    transition: background 0.15s ease, transform 0.1s ease, border-color 0.15s ease;
+    transition: background 0.2s ease, transform 0.15s ease, border-color 0.2s ease, color 0.2s ease;
     touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Make the backspace icon match the thin aesthetic */
+  .numpad-btn[data-key="back"] {
+    font-size: 20px;
+    color: var(--text-mute);
+  }
+
   .numpad-btn:active {
     background: var(--soft-2);
     border-color: var(--accent);
-    transform: scale(0.95);
+    color: var(--accent);
+    transform: scale(0.92);
   }
+
   .numpad-btn.wide {
     grid-column: span 3;
-    height: 50px;
+    width: 100%;
+    height: 54px;
+    border-radius: 27px; /* Elegant pill shape */
     font-size: 15px;
-    letter-spacing: 5px;
-    text-indent: 5px;
+    letter-spacing: 6px;
+    text-indent: 6px; /* perfectly centers the text with the letter spacing */
+    background: rgba(255, 255, 255, 0.6);
+    color: var(--accent);
+    border: 1px solid var(--accent); /* Delicate Hanko stamp outline */
+    box-shadow: 0 2px 8px var(--shadow-rose);
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; /* Keep traditional Japanese serif for text */
+    font-weight: 500;
+  }
+
+  .numpad-btn.wide:active {
     background: var(--accent);
     color: #ffffff;
-    border-color: var(--accent);
-    box-shadow: 0 4px 12px var(--shadow-accent);
-    border-radius: 25px;
   }
-  .numpad-btn.wide:active {
-    background: var(--accent-3);
-    border-color: var(--accent-3);
-  }
+
   @media (max-width: 1250px) {
     .numpad { display: none; }
   }
@@ -1795,6 +1810,7 @@
     tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
     repositionHintGroup();
     repositionNumpad();
+    updateNumpadVisibility();
   });
 
   /* ============ HINT GROUP POSITIONING ============ */
@@ -1843,15 +1859,30 @@
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
 
+  /* A-004: horizontal centering in right gutter + vertical anchoring to table center */
   function repositionNumpad() {
     if (!numpad || !tableCard) return;
     if (window.innerWidth <= 1250) return;
+
     var rect = tableCard.getBoundingClientRect();
-    var numpadWidth = numpad.offsetWidth || 240;
-    var gap = 28;
-    var left = rect.right + gap;
-    if (left + numpadWidth > window.innerWidth - 16) return;
+
+    // Horizontal — centered in the right gutter
+    var numpadWidth = numpad.offsetWidth || 232;
+    var rightSpace = window.innerWidth - rect.right;
+    var left = rect.right + (rightSpace - numpadWidth) / 2;
+    if (left + numpadWidth > window.innerWidth - 16) {
+      left = window.innerWidth - numpadWidth - 16;
+    }
     numpad.style.left = left + 'px';
+
+    // Vertical — anchored to table center, clamped above summary bar
+    var tableCenter = rect.top + rect.height / 2;
+    var numpadH = numpad.offsetHeight || 374;
+    var minCenter = 60 + numpadH / 2;
+    var maxCenter = window.innerHeight - 100 - numpadH / 2;
+    var centerY = Math.min(Math.max(tableCenter, minCenter), maxCenter);
+    numpad.style.top = centerY + 'px';
+    // transform: translateY(-50%) remains in the CSS
   }
 
   function getActivePriceInput() {
@@ -3196,6 +3227,7 @@
     setTimeout(scheduleEvaluation, 120);
     setTimeout(repositionHintGroup, 200);
     setTimeout(repositionNumpad, 200);
+    setTimeout(updateNumpadVisibility, 200);
   });
 
   scheduleEvaluation();
