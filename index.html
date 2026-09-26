@@ -2017,6 +2017,11 @@
     }
   });
 
+  document.addEventListener('focusout', function(e) {
+    // A 10ms delay allows the browser to switch focus before we check document.activeElement
+    setTimeout(updateNumpadVisibility, 10);
+  });
+
   /* ============ MAIN CAROUSEL ============ */
   function activatePanel(index) {
     for (var i = 0; i < panels.length; i++) {
