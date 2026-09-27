@@ -555,6 +555,7 @@
   }
   .service-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
   .service-input:focus { outline: none; border-bottom-color: var(--accent); border-bottom-style: solid; }
+  .service-input[readonly] { cursor: pointer; }
 
   .service-display {
     flex: 1; min-width: 0; color: var(--text-dark); font-size: 16px; font-weight: 500;
@@ -730,6 +731,66 @@
   .alert-actions { display: flex; justify-content: center; }
   .alert-btn { min-width: 160px; border-radius: 22px; padding: 12px 20px; font-size: 13.5px; font-weight: 600; font-family: inherit; letter-spacing: 0.5px; background: var(--accent); border: 1.5px solid var(--accent); color: #ffffff; box-shadow: 0 4px 14px var(--shadow-accent); cursor: pointer; -webkit-appearance: none; appearance: none; transition: background 0.2s, transform 0.15s; white-space: nowrap; }
   .alert-btn:active { background: var(--accent-3); transform: scale(0.97); }
+
+  /* ============ TANZAKU FOCUS MODAL ============ */
+  .tanzaku-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(250, 247, 245, 0.92);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    z-index: 280; display: flex; align-items: flex-start; justify-content: center;
+    padding: 8vh 24px 30px 24px;
+    opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
+    touch-action: none;
+  }
+  html[data-theme="autumn"] .tanzaku-screen { background: rgba(253, 243, 216, 0.92); }
+  .tanzaku-screen.visible { opacity: 1; pointer-events: auto; }
+  .tanzaku-card {
+    background: #ffffff; max-width: 480px; width: 100%;
+    padding: 32px 28px 24px 28px;
+    border-radius: 20px; box-shadow: 0 12px 40px var(--shadow-rose-2);
+    border: 1px solid var(--border-3); text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    transform: scale(0.94) translateY(-8px);
+    transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .tanzaku-screen.visible .tanzaku-card { transform: scale(1) translateY(0); }
+  .tanzaku-label {
+    font-size: 13px; font-weight: 500; color: var(--text-faint);
+    letter-spacing: 4px; margin-bottom: 16px;
+  }
+  .tanzaku-input {
+    width: 100%; background: #ffffff;
+    border: 1.5px solid var(--border-1); border-radius: 12px;
+    padding: 16px 18px; font-size: 24px; font-weight: 500;
+    color: var(--text-dark); font-family: inherit;
+    text-align: center; letter-spacing: 1px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    -webkit-appearance: none; appearance: none;
+    box-shadow: 0 2px 10px var(--shadow-rose);
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
+  .tanzaku-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
+  .tanzaku-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--shadow-accent); }
+  .tanzaku-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
+  .tanzaku-btn {
+    flex: 1; min-width: 0; border-radius: 22px;
+    padding: 14px 10px; font-size: 14px; font-weight: 600;
+    font-family: inherit; letter-spacing: 0.5px; cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    transition: background 0.2s, color 0.2s, transform 0.15s, border-color 0.2s;
+    white-space: nowrap;
+  }
+  .tanzaku-btn:active { transform: scale(0.97); }
+  .tanzaku-cancel { background: #ffffff; border: 1.5px solid var(--border-1); color: var(--text-mute); }
+  .tanzaku-cancel:active { background: var(--soft-3); border-color: var(--border-6); }
+  .tanzaku-confirm { background: var(--accent); border: 1.5px solid var(--accent); color: #ffffff; box-shadow: 0 4px 14px var(--shadow-accent); }
+  .tanzaku-confirm:active { background: var(--accent-3); }
+  @media (min-width: 700px) {
+    .tanzaku-card { padding: 40px 36px 28px 36px; }
+    .tanzaku-label { font-size: 14px; letter-spacing: 5px; }
+    .tanzaku-input { font-size: 28px; padding: 18px 20px; }
+    .tanzaku-btn { font-size: 15px; padding: 15px 12px; }
+  }
 
   /* ============ CUSTOM NUMPAD (FLOATING MINIMALIST REDESIGN) ============ */
   .numpad {
@@ -1322,7 +1383,7 @@
 
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
-    <input type="text" class="service-input" placeholder="サービスの種類">
+    <input type="text" class="service-input" placeholder="サービスの種類" readonly>
     <div class="price-wrap">
       <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
@@ -1330,7 +1391,7 @@
   </div>
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
-    <input type="text" class="service-input" placeholder="サービスの種類">
+    <input type="text" class="service-input" placeholder="サービスの種類" readonly>
     <div class="price-wrap">
       <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
@@ -1338,7 +1399,7 @@
   </div>
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
-    <input type="text" class="service-input" placeholder="サービスの種類">
+    <input type="text" class="service-input" placeholder="サービスの種類" readonly>
     <div class="price-wrap">
       <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
@@ -1346,7 +1407,7 @@
   </div>
   <div class="row locked">
     <div class="row-check" role="checkbox" aria-checked="false"></div>
-    <input type="text" class="service-input" placeholder="サービスの種類">
+    <input type="text" class="service-input" placeholder="サービスの種類" readonly>
     <div class="price-wrap">
       <input type="text" class="price-input" placeholder="料金を入力" disabled inputmode="none" enterkeyhint="done">
       <span class="yen">円</span>
@@ -1437,6 +1498,19 @@
     <ul class="alert-list" id="alertList"></ul>
     <div class="alert-actions">
       <button type="button" class="alert-btn" id="alertOk">戻って入力する</button>
+    </div>
+  </div>
+</div>
+
+<div class="tanzaku-screen" id="tanzakuScreen">
+  <div class="tanzaku-card">
+    <div class="tanzaku-label">サービスの種類</div>
+    <input type="text" class="tanzaku-input" id="tanzakuInput" placeholder="ご記入ください"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+      enterkeyhint="done">
+    <div class="tanzaku-actions">
+      <button type="button" class="tanzaku-btn tanzaku-cancel" id="tanzakuCancel">キャンセル</button>
+      <button type="button" class="tanzaku-btn tanzaku-confirm" id="tanzakuConfirm">決定</button>
     </div>
   </div>
 </div>
@@ -1752,6 +1826,12 @@
   var numpad = document.getElementById('numpad');
   var numpadBtns = numpad ? numpad.querySelectorAll('.numpad-btn') : [];
 
+  var tanzakuScreen = document.getElementById('tanzakuScreen');
+  var tanzakuInput = document.getElementById('tanzakuInput');
+  var tanzakuCancel = document.getElementById('tanzakuCancel');
+  var tanzakuConfirm = document.getElementById('tanzakuConfirm');
+  var tanzakuTargetRow = null;
+
   var nameConfirmed = false;
   var tableUnlocked = false;
   var currentPanel = 0;
@@ -2029,6 +2109,12 @@
   function updateNumpadVisibility() {
     if (!numpad) return;
 
+    // Tanzaku modal takes over — numpad hides
+    if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) {
+      numpad.classList.remove('visible');
+      return;
+    }
+
     // 1. Receipt Screen Override — always visible, anchored right of the receipt paper
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (isReceiptOpen) {
@@ -2073,7 +2159,7 @@
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
-    if (t.classList.contains('service-input')) {
+    if (t.classList.contains('service-input') || t.classList.contains('tanzaku-input')) {
       numpadSuppressed = true;
       if (numpad) numpad.classList.remove('visible');
     } else {
@@ -2085,6 +2171,61 @@
   document.addEventListener('focusout', function(e) {
     // A 10ms delay allows the browser to switch focus before we check document.activeElement
     setTimeout(updateNumpadVisibility, 10);
+  });
+
+  /* ============ TANZAKU FOCUS MODAL ============ */
+  function openTanzaku(row) {
+    if (!row) return;
+    var svcInput = row.querySelector('.service-input');
+    if (!svcInput) return;
+    tanzakuTargetRow = row;
+    tanzakuInput.value = svcInput.value || '';
+    tanzakuScreen.classList.add('visible');
+    setTimeout(function() {
+      try { tanzakuInput.focus(); } catch (e) {}
+      try {
+        var len = tanzakuInput.value.length;
+        tanzakuInput.setSelectionRange(len, len);
+      } catch (e) {}
+    }, 100);
+  }
+  function closeTanzaku() {
+    tanzakuScreen.classList.remove('visible');
+    try { tanzakuInput.blur(); } catch (e) {}
+    tanzakuTargetRow = null;
+    numpadSuppressed = false;
+    updateNumpadVisibility();
+  }
+  function confirmTanzaku() {
+    if (!tanzakuTargetRow) { closeTanzaku(); return; }
+    var svcInput = tanzakuTargetRow.querySelector('.service-input');
+    if (!svcInput) { closeTanzaku(); return; }
+    var val = (tanzakuInput.value || '').trim();
+    svcInput.value = val;
+    fireInputEvent(svcInput);
+    haptic(10);
+    closeTanzaku();
+  }
+  tanzakuCancel.addEventListener('click', function(e) {
+    e.preventDefault();
+    haptic(8);
+    closeTanzaku();
+  });
+  tanzakuConfirm.addEventListener('click', function(e) {
+    e.preventDefault();
+    confirmTanzaku();
+  });
+  tanzakuInput.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' || e.keyCode === 13) {
+      e.preventDefault();
+      confirmTanzaku();
+    } else if (e.key === 'Escape' || e.keyCode === 27) {
+      e.preventDefault();
+      closeTanzaku();
+    }
+  });
+  tanzakuScreen.addEventListener('click', function(e) {
+    if (e.target === tanzakuScreen) closeTanzaku();
   });
 
   /* ============ MAIN CAROUSEL ============ */
@@ -2205,8 +2346,8 @@
     void row.offsetWidth;
     row.classList.add('service-hint');
     setTimeout(function() { row.classList.remove('service-hint'); }, 1000);
-    try { svc.focus(); } catch (e) {}
     haptic(6);
+    openTanzaku(row);
   }
 
   /* ============ AUTO-COPY ============ */
@@ -2324,6 +2465,15 @@
     recalc();
   });
 
+  tableCard.addEventListener('click', function(e) {
+    var svcInput = e.target.closest('.service-input');
+    if (!svcInput) return;
+    if (rejected) return;
+    var row = svcInput.closest('.row');
+    if (!row) return;
+    openTanzaku(row);
+  });
+
   tableCard.addEventListener('input', function(e) {
     var input = e.target;
     if (!input.classList.contains('price-input')) return;
@@ -2401,9 +2551,7 @@
       if (e.target.classList.contains('service-input')) {
         e.preventDefault();
         var row = e.target.closest('.row');
-        var priceInput = row ? row.querySelector('.price-input') : null;
-        if (priceInput && !priceInput.disabled) priceInput.focus();
-        else e.target.blur();
+        if (row) openTanzaku(row);
       } else if (e.target.classList.contains('price-input')) {
         if (e.target.disabled) return;
         if (e.target.value.trim() === '') {
