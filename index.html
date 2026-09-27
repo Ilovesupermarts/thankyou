@@ -2320,7 +2320,6 @@
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
   var lastNumpadWinW = 0;
-  var lastFocusedPriceInput = null;
 
   function repositionNumpad() {
     if (!numpad) return;
@@ -2342,19 +2341,6 @@
     var active = document.activeElement;
     if (active && active.classList && (active.classList.contains('price-input') || active.classList.contains('receipt-price-input')) && !active.disabled) {
       return active;
-    }
-    return null;
-  }
-
-  function getFirstEnabledPriceInput() {
-    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
-    if (isReceiptOpen) {
-      return null;
-    }
-    var rows = getRows();
-    for (var i = 0; i < rows.length; i++) {
-      var pi = rows[i].querySelector('.price-input');
-      if (pi && !pi.disabled) return pi;
     }
     return null;
   }
@@ -2416,35 +2402,30 @@
     }
     haptic(15);
   }
+
   function handleNumpadKey(key) {
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (rejected && !isReceiptOpen) return;
+
+    // Fully inert when nothing is focused: no sound, no haptic, no state
+    // change. Only the CSS :active press animation plays, which matches
+    // native keyboard behavior — the key visibly depresses, but no input
+    // is registered and no audio confirms one.
+    var target = getActivePriceInput();
+    if (!target) return;
+
     playTock(key);
+
     if (key === 'done') {
-      var input = getActivePriceInput();
-      if (!input) { haptic(8); return; }
-      if ((input.value || '').trim() === '') {
-        numpadShake(input);
+      if ((target.value || '').trim() === '') {
+        numpadShake(target);
       } else {
         haptic(10);
-        try { input.blur(); } catch (e) {}
+        try { target.blur(); } catch (e) {}
       }
       return;
     }
-    var target = getActivePriceInput();
-    if (!target) {
-      var wantClass = isReceiptOpen ? 'receipt-price-input' : 'price-input';
-      if (lastFocusedPriceInput &&
-          lastFocusedPriceInput.isConnected &&
-          !lastFocusedPriceInput.disabled &&
-          lastFocusedPriceInput.classList.contains(wantClass)) {
-        target = lastFocusedPriceInput;
-      } else if (!isReceiptOpen) {
-        target = getFirstEnabledPriceInput();
-      }
-      if (!target) return;
-      try { target.focus(); } catch (e) {}
-    }
+
     if (key === 'back') {
       numpadBackspace(target);
       haptic(8);
@@ -2512,9 +2493,6 @@
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
-    if (t.classList.contains('price-input') || t.classList.contains('receipt-price-input')) {
-      lastFocusedPriceInput = t;
-    }
     if (t.classList.contains('service-input') || t.classList.contains('tanzaku-input')) {
       numpadSuppressed = true;
       if (numpad) numpad.classList.remove('visible');
@@ -2786,14 +2764,6 @@
   }
 
   /* ============ EMPTY-BLUR SHAKE + REFOCUS ============ */
-  /* When a checked row's price field is blurred while still empty, the row
-     stays checked — the user may still intend to come back and enter a
-     price. We shake the field (visual + haptic nudge) and refocus it so the
-     numpad re-arms on this row. The submit-time alert is the ultimate
-     safeguard if the price is never entered. Zero counts as a valid price,
-     so a value of '0' suppresses the shake. The short grace window lets a
-     same-row tap cancel the feedback before it fires, since focusout runs
-     before click. Applies to both preset and custom rows. */
   var pendingShakeRow = null;
   var pendingShakeTimeout = null;
 
@@ -2812,11 +2782,10 @@
       pendingShakeTimeout = null;
       pendingShakeRow = null;
       if (rejected) return;
-      if (document.activeElement === input) return;   // already refocused
-      if (!box.classList.contains('checked')) return; // user deselected in the interim
-      if ((input.value || '').trim() !== '') return;  // has value (incl. '0')
+      if (document.activeElement === input) return;
+      if (!box.classList.contains('checked')) return;
+      if ((input.value || '').trim() !== '') return;
 
-      // 1. Shake the field.
       var wrap = input.closest('.price-wrap');
       if (wrap) {
         wrap.classList.remove('shake');
@@ -2826,8 +2795,6 @@
       }
       haptic(6);
 
-      // 2. Refocus the field so the numpad re-arms on this row — unless the
-      //    user has already moved focus to a different input.
       var active = document.activeElement;
       var otherInputFocused = active && active.tagName === 'INPUT';
       if (!otherInputFocused) {
