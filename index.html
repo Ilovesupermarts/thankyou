@@ -1026,17 +1026,79 @@
   .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
   .receipt-title { font-size: 12px; font-weight: 500; color: var(--text-faint); letter-spacing: 6px; text-align: center; margin-bottom: 20px; }
   .receipt-items { display: flex; flex-direction: column; gap: 14px; }
-  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); opacity: 0; transform: translateY(8px); animation: receiptItemArrive 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
+  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); opacity: 0; transform: translateY(8px); animation: receiptItemArrive 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; position: relative; }
   @keyframes receiptItemArrive { to { opacity: 1; transform: translateY(0); } }
   .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .receipt-item-name { flex: 1; font-size: 14px; color: var(--text-soft); line-height: 1.5; letter-spacing: 0.3px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  .receipt-item-price-wrap { flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px; color: var(--accent); font-weight: 600; font-size: 14px; letter-spacing: 0.5px; padding: 4px 8px; border-radius: 8px; background: var(--soft-2); border: 1px solid var(--border-5); transition: border-color 0.2s, background 0.2s; }
+  .receipt-item-name { flex: 1; font-size: 14px; color: var(--text-soft); line-height: 1.5; letter-spacing: 0.3px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+  .receipt-item-price-wrap { flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px; color: var(--accent); font-weight: 600; font-size: 14px; letter-spacing: 0.5px; padding: 4px 8px; border-radius: 8px; background: var(--soft-2); border: 1px solid var(--border-5); transition: border-color 0.2s, background 0.2s, opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .receipt-item-price-wrap:focus-within { border-color: var(--accent); background: #ffffff; }
   .receipt-item-price-wrap .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
   .receipt-price-input { background: transparent; border: none; color: var(--accent); font-size: 14px; font-weight: 600; font-family: inherit; text-align: right; width: 58px; padding: 0; letter-spacing: 0.3px; -webkit-appearance: none; appearance: none; }
   .receipt-price-input:focus { outline: none; }
-  .receipt-item-remove { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: transparent; border: none; color: var(--text-placeholder); font-size: 16px; font-weight: 400; font-family: inherit; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.2s, color 0.2s; -webkit-appearance: none; appearance: none; }
+  .receipt-item-remove { flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%; background: transparent; border: none; color: var(--text-placeholder); font-size: 16px; font-weight: 400; font-family: inherit; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.2s, color 0.2s, opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); -webkit-appearance: none; appearance: none; }
   .receipt-item-remove:active { background: var(--soft-1); color: var(--accent); }
+
+  /* ============ RECEIPT ITEM SOFT-DELETE ============ */
+  /* Tapping × on a receipt item no longer removes it from the DOM. Instead
+     the item's content fades out and an undo button fades into the same
+     space. Tapping undo restores the content with the original price. The
+     item's data-removing flag excludes it from the total while soft-deleted.
+     Layout never shifts because the item element itself never leaves. */
+
+  .receipt-item.removing .receipt-item-name,
+  .receipt-item.removing .receipt-item-price-wrap,
+  .receipt-item.removing .receipt-item-remove {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .receipt-item-undo {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.96);
+    background: transparent;
+    border: 1.5px dashed var(--border-6);
+    border-radius: 10px;
+    padding: 6px 16px;
+    color: var(--text-mute);
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 12.5px;
+    font-weight: 500;
+    letter-spacing: 2px;
+    cursor: pointer;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                background 0.2s ease,
+                border-color 0.2s ease,
+                color 0.2s ease;
+    white-space: nowrap;
+    -webkit-appearance: none;
+    appearance: none;
+    z-index: 2;
+  }
+
+  .receipt-item.removing .receipt-item-undo {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  .receipt-item-undo:active {
+    background: var(--soft-2);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  @media (min-width: 700px) {
+    .receipt-item-undo { font-size: 13px; padding: 7px 18px; letter-spacing: 2.5px; }
+  }
+  @media (min-width: 1100px) {
+    .receipt-item-undo { font-size: 14px; padding: 8px 20px; }
+  }
+
   .receipt-total-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px; margin-top: 14px; border-top: 1.5px solid var(--border-5); border-bottom: 1.5px solid var(--border-5); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
   .receipt-total-label { font-size: 18px; font-weight: 600; color: var(--text-mute); letter-spacing: 4px; line-height: 1.2; }
   .receipt-total-value { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; line-height: 1.2; white-space: nowrap; }
@@ -2723,14 +2785,19 @@
     return missing;
   }
 
-  /* ============ EMPTY-BLUR SHAKE ============ */
-  /* When a checked row's price field is blurred while still empty, shake the
-     field as a reminder to enter a price. The row stays checked — the
-     submit-time alert handles the case where a price is never entered.
+  /* ============ EMPTY-BLUR SHAKE + UNCHECK ============ */
+  /* When a checked row's price field is blurred while still empty, the row
+     is in a "highlighted but unpriced" state the user has not committed to.
+     We: shake the field (visual + haptic nudge), uncheck the row (removing
+     the highlight — a highlight without a price is not a valid state), and
+     refocus the field so the numpad re-arms on the correct row. If the user
+     types after this, the existing input handler re-checks the row. If they
+     tap away again, the row is now unchecked, no shake fires, and focus
+     releases cleanly.
      Zero counts as a valid price, so a value of '0' suppresses the shake.
      The short grace window lets a same-row tap (checkbox or row body) cancel
-     the shake before it fires, since focusout runs before click. Applies to
-     both preset and custom rows. */
+     the feedback before it fires, since focusout runs before click.
+     Applies to both preset and custom rows. */
   var pendingShakeRow = null;
   var pendingShakeTimeout = null;
 
@@ -2749,11 +2816,12 @@
       pendingShakeTimeout = null;
       pendingShakeRow = null;
       if (rejected) return;
-      if (document.activeElement === input) return;   // refocused during grace window
-      if (!box.classList.contains('checked')) return; // user deselected in the interim
+      if (document.activeElement === input) return;   // already refocused
+      if (!box.classList.contains('checked')) return; // user already deselected
       if ((input.value || '').trim() !== '') return;  // has value (incl. '0')
 
-      var wrap = input.closest('.price-wrap') || input.closest('.receipt-item-price-wrap');
+      // 1. Shake the field.
+      var wrap = input.closest('.price-wrap');
       if (wrap) {
         wrap.classList.remove('shake');
         void wrap.offsetWidth;
@@ -2761,6 +2829,68 @@
         setTimeout(function() { wrap.classList.remove('shake'); }, 350);
       }
       haptic(6);
+
+      // 2. Uncheck the row — a highlight without a price is not a valid state.
+      box.classList.remove('checked');
+      box.setAttribute('aria-checked', 'false');
+      box.removeAttribute('data-saved-price');
+
+      // 3. Refocus the field so the numpad re-arms on this row — unless the
+      //    user has already moved focus to a different input.
+      var active = document.activeElement;
+      var otherInputFocused = active && active.tagName === 'INPUT';
+      if (!otherInputFocused) {
+        try { input.focus(); } catch (e) {}
+      }
+
+      recalc();
+    }, 150);
+  }
+
+  /* ============ RECEIPT EMPTY-BLUR SHAKE + REFOCUS ============ */
+  /* Same treatment as the table's price field: a receipt item's price input
+     that loses focus while empty shakes and refocuses, so the numpad
+     re-arms on the correct item. Receipt items have no checkbox — the item
+     stays present and is only removable via the × button — so there is no
+     uncheck step here. The pending shake is cancelled if the user taps the
+     item's × during the grace window, so no shake flashes on a disappearing
+     element. */
+  var pendingShakeReceiptItem = null;
+  var pendingShakeReceiptTimeout = null;
+
+  function cancelPendingReceiptShake() {
+    if (pendingShakeReceiptTimeout) {
+      clearTimeout(pendingShakeReceiptTimeout);
+      pendingShakeReceiptTimeout = null;
+    }
+    pendingShakeReceiptItem = null;
+  }
+
+  function scheduleReceiptEmptyBlurShake(item, input) {
+    cancelPendingReceiptShake();
+    pendingShakeReceiptItem = item;
+    pendingShakeReceiptTimeout = setTimeout(function() {
+      pendingShakeReceiptTimeout = null;
+      pendingShakeReceiptItem = null;
+      if (!item.isConnected) return;                          // item was removed
+      if (item.classList.contains('removing')) return;        // item was soft-deleted
+      if (document.activeElement === input) return;           // already refocused
+      if ((input.value || '').trim() !== '') return;          // has value (incl. '0')
+
+      var wrap = input.closest('.receipt-item-price-wrap');
+      if (wrap) {
+        wrap.classList.remove('shake');
+        void wrap.offsetWidth;
+        wrap.classList.add('shake');
+        setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+      }
+      haptic(6);
+
+      var active = document.activeElement;
+      var otherInputFocused = active && active.tagName === 'INPUT';
+      if (!otherInputFocused) {
+        try { input.focus(); } catch (e) {}
+      }
     }, 150);
   }
 
@@ -3010,7 +3140,7 @@
       box.setAttribute('aria-checked', 'false');
     } else {
       // Highlight + focus the price field. Provisional: if the user blurs
-      // without entering a price, the row shakes as a reminder.
+      // without entering a price, the row shakes and unchecks as a reminder.
       haptic(10);
       playCheck(true);
       if (priceInput) {
@@ -3026,10 +3156,8 @@
     recalc();
   });
 
-  /* Empty-blur on a checked row's price field: shake to signal the missing
-     price. Zero is a valid price, so only a truly empty field shakes. This
-     handler applies to BOTH preset and custom rows — custom rows keep their
-     checkmark but signal the missing price the same way. */
+  /* Empty-blur on a checked row's price field: shake, uncheck, refocus.
+     Applies to BOTH preset and custom rows. Zero is a valid price. */
   tableCard.addEventListener('focusout', function(e) {
     var input = e.target;
     if (!input || !input.classList || !input.classList.contains('price-input')) return;
@@ -3435,6 +3563,7 @@
 
   /* ============ RECEIPT ============ */
   function buildReceipt() {
+    cancelPendingReceiptShake();
     receiptItems.innerHTML = '';
     var receiptToName = document.getElementById('receiptToName');
     if (receiptToName) {
@@ -3485,9 +3614,15 @@
       removeBtn.className = 'receipt-item-remove';
       removeBtn.setAttribute('aria-label', '削除');
       removeBtn.textContent = '×';
+      var undoBtn = document.createElement('button');
+      undoBtn.type = 'button';
+      undoBtn.className = 'receipt-item-undo';
+      undoBtn.setAttribute('aria-label', '元に戻す');
+      undoBtn.textContent = '↺ 元に戻す';
       itemDiv.appendChild(nameSpan);
       itemDiv.appendChild(priceWrap);
       itemDiv.appendChild(removeBtn);
+      itemDiv.appendChild(undoBtn);
       receiptItems.appendChild(itemDiv);
       itemCount++;
     }
@@ -3533,32 +3668,48 @@
         input.addEventListener('focus', function() {
           setTimeout(function() { input.select(); }, 50);
         });
+        input.addEventListener('focusout', function() {
+          var item = input.closest('.receipt-item');
+          if (!item) return;
+          if (item.classList.contains('removing')) return;
+          if (item.getAttribute('data-removing') === 'true') return;
+          if ((input.value || '').trim() !== '') return; // has value (incl. '0')
+          scheduleReceiptEmptyBlurShake(item, input);
+        });
       })(receiptPriceInputs[i]);
     }
+
     var removeButtons = receiptItems.querySelectorAll('.receipt-item-remove');
     for (var r = 0; r < removeButtons.length; r++) {
       (function(btn) {
         btn.addEventListener('click', function(e) {
           e.preventDefault();
-          haptic(8);
           var item = btn.closest('.receipt-item');
           if (!item) return;
+          if (item.classList.contains('removing')) return;
+          haptic(8);
+          cancelPendingReceiptShake();
           item.setAttribute('data-removing', 'true');
+          item.classList.add('removing');
           updateReceiptTotal();
-          item.style.transition = 'opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease';
-          item.style.overflow = 'hidden';
-          item.style.maxHeight = item.offsetHeight + 'px';
-          void item.offsetHeight;
-          item.style.opacity = '0';
-          item.style.transform = 'translateX(-12px)';
-          item.style.maxHeight = '0px';
-          item.style.paddingTop = '0';
-          item.style.paddingBottom = '0';
-          item.style.marginTop = '0';
-          item.style.marginBottom = '0';
-          setTimeout(function() { item.remove(); }, 420);
         });
       })(removeButtons[r]);
+    }
+
+    var undoButtons = receiptItems.querySelectorAll('.receipt-item-undo');
+    for (var u = 0; u < undoButtons.length; u++) {
+      (function(btn) {
+        btn.addEventListener('click', function(e) {
+          e.preventDefault();
+          var item = btn.closest('.receipt-item');
+          if (!item) return;
+          if (!item.classList.contains('removing')) return;
+          haptic(10);
+          item.classList.remove('removing');
+          item.setAttribute('data-removing', 'false');
+          updateReceiptTotal();
+        });
+      })(undoButtons[u]);
     }
   }
 
@@ -3637,6 +3788,7 @@
   receiptClose.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(8);
+    cancelPendingReceiptShake();
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
       receiptScreen.classList.remove('visible', 'reopened');
@@ -3673,6 +3825,7 @@
   /* ============ BACK TO TABLE ============ */
   function returnToTable() {
     clearAllTyTimers();
+    cancelPendingReceiptShake();
     if (thankyouScreen.classList.contains('visible')) {
       thankyouScreen.style.transition = 'none';
       thankyouScreen.classList.remove('visible');
