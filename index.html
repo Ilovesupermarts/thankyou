@@ -2723,50 +2723,44 @@
     return missing;
   }
 
-  /* ============ PENDING AUTO-UNCHECK ============ */
-  /* A preset row whose price field is blurred while empty gets un-highlighted
-     after a short grace window. The window exists so a tap that lands on the
-     same row (checkbox or row body) can cancel the pending uncheck before it
-     fires — focusout runs before click, so without this the user's tap would
-     briefly uncheck and then re-check, ending in a flicker. We also shake the
-     price field to signal that a price is required. */
-  var pendingUncheckRow = null;
-  var pendingUncheckTimeout = null;
+  /* ============ EMPTY-BLUR SHAKE ============ */
+  /* When a checked row's price field is blurred while still empty, shake the
+     field as a reminder to enter a price. The row stays checked — the
+     submit-time alert handles the case where a price is never entered.
+     Zero counts as a valid price, so a value of '0' suppresses the shake.
+     The short grace window lets a same-row tap (checkbox or row body) cancel
+     the shake before it fires, since focusout runs before click. Applies to
+     both preset and custom rows. */
+  var pendingShakeRow = null;
+  var pendingShakeTimeout = null;
 
-  function cancelPendingUncheck() {
-    if (pendingUncheckTimeout) {
-      clearTimeout(pendingUncheckTimeout);
-      pendingUncheckTimeout = null;
+  function cancelPendingShake() {
+    if (pendingShakeTimeout) {
+      clearTimeout(pendingShakeTimeout);
+      pendingShakeTimeout = null;
     }
-    pendingUncheckRow = null;
+    pendingShakeRow = null;
   }
 
-  function schedulePendingUncheck(row, input, box) {
-    cancelPendingUncheck();
-    pendingUncheckRow = row;
-    pendingUncheckTimeout = setTimeout(function() {
-      pendingUncheckTimeout = null;
-      pendingUncheckRow = null;
+  function scheduleEmptyBlurShake(row, input, box) {
+    cancelPendingShake();
+    pendingShakeRow = row;
+    pendingShakeTimeout = setTimeout(function() {
+      pendingShakeTimeout = null;
+      pendingShakeRow = null;
       if (rejected) return;
       if (document.activeElement === input) return;   // refocused during grace window
-      if (!box.classList.contains('checked')) return;
-      if (parseFormatted(input.value) > 0) return;
+      if (!box.classList.contains('checked')) return; // user deselected in the interim
+      if ((input.value || '').trim() !== '') return;  // has value (incl. '0')
 
-      // Shake the price field to signal a price is required.
-      var wrap = input.closest('.price-wrap');
+      var wrap = input.closest('.price-wrap') || input.closest('.receipt-item-price-wrap');
       if (wrap) {
         wrap.classList.remove('shake');
         void wrap.offsetWidth;
         wrap.classList.add('shake');
         setTimeout(function() { wrap.classList.remove('shake'); }, 350);
       }
-
-      // Then un-highlight the row.
-      box.classList.remove('checked');
-      box.setAttribute('aria-checked', 'false');
-      box.removeAttribute('data-saved-price');
-      input.value = '';
-      recalc();
+      haptic(6);
     }, 150);
   }
 
@@ -2924,7 +2918,7 @@
     if (rejected) return;
     var row = box.closest('.row');
     if (!row) return;
-    if (pendingUncheckRow === row) cancelPendingUncheck();
+    if (pendingShakeRow === row) cancelPendingShake();
     var priceField = row.querySelector('.price-input');
     var serviceText = row.querySelector('.service-input');
     var isCustomRow = !!serviceText;
@@ -3004,7 +2998,7 @@
     if (box.classList.contains('checked')) {
       // Deselect. Cancel any pending empty-blur feedback for this row,
       // save the price for round-trip, then uncheck and blur.
-      if (pendingUncheckRow === row) cancelPendingUncheck();
+      if (pendingShakeRow === row) cancelPendingShake();
       haptic(6);
       playCheck(false);
       if (priceInput) {
@@ -3016,7 +3010,7 @@
       box.setAttribute('aria-checked', 'false');
     } else {
       // Highlight + focus the price field. Provisional: if the user blurs
-      // without entering a price, the row auto-unchecks and the field shakes.
+      // without entering a price, the row shakes as a reminder.
       haptic(10);
       playCheck(true);
       if (priceInput) {
@@ -3032,19 +3026,20 @@
     recalc();
   });
 
-  /* Auto-uncheck + shake on empty blur (preset rows only). */
+  /* Empty-blur on a checked row's price field: shake to signal the missing
+     price. Zero is a valid price, so only a truly empty field shakes. This
+     handler applies to BOTH preset and custom rows — custom rows keep their
+     checkmark but signal the missing price the same way. */
   tableCard.addEventListener('focusout', function(e) {
     var input = e.target;
     if (!input || !input.classList || !input.classList.contains('price-input')) return;
     if (rejected) return;
     var row = input.closest('.row');
     if (!row) return;
-    var display = row.querySelector('.service-display');
-    if (!display) return;
     var box = row.querySelector('.row-check');
     if (!box || !box.classList.contains('checked')) return;
-    if (parseFormatted(input.value) > 0) return;
-    schedulePendingUncheck(row, input, box);
+    if ((input.value || '').trim() !== '') return;   // has value (incl. '0')
+    scheduleEmptyBlurShake(row, input, box);
   });
 
   tableCard.addEventListener('input', function(e) {
@@ -3293,7 +3288,7 @@
 
   /* ============ RESET ============ */
   function resetAll() {
-    cancelPendingUncheck();
+    cancelPendingShake();
     resetWind();
     rejected = false;
     rejectRow.classList.remove('selected');
