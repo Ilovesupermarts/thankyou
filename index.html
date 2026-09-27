@@ -2158,6 +2158,7 @@
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
   var lastNumpadWinW = 0;
+  var lastFocusedPriceInput = null;
 
   /* Numpad is viewport-anchored, not card-anchored. The table card is
      always 600px wide when the numpad is active (>1250px viewport,
@@ -2192,10 +2193,7 @@
   function getFirstEnabledPriceInput() {
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (isReceiptOpen) {
-      var rInputs = receiptItems.querySelectorAll('.receipt-price-input');
-      for (var j = 0; j < rInputs.length; j++) {
-        if (!rInputs[j].disabled) return rInputs[j];
-      }
+      // On the receipt, only act on the explicitly focused field. No auto-target.
       return null;
     }
     var rows = getRows();
@@ -2230,8 +2228,12 @@
     var cur = inputHasSelection(input) ? '' : (input.value || '').replace(/[^0-9]/g, '');
     cur = cur + digits;
     if (cur.length > 5) cur = cur.slice(0, 5);
-    if (cur === '' || parseInt(cur, 10) === 0) input.value = '';
-    else input.value = parseInt(cur, 10).toLocaleString();
+    if (cur === '') {
+      input.value = '';
+    } else {
+      var parsed = parseInt(cur, 10);
+      input.value = parsed === 0 ? '0' : parsed.toLocaleString();
+    }
     fireInputEvent(input);
   }
 
@@ -2277,7 +2279,15 @@
     }
     var target = getActivePriceInput();
     if (!target) {
-      target = getFirstEnabledPriceInput();
+      var wantClass = isReceiptOpen ? 'receipt-price-input' : 'price-input';
+      if (lastFocusedPriceInput &&
+          lastFocusedPriceInput.isConnected &&
+          !lastFocusedPriceInput.disabled &&
+          lastFocusedPriceInput.classList.contains(wantClass)) {
+        target = lastFocusedPriceInput;
+      } else if (!isReceiptOpen) {
+        target = getFirstEnabledPriceInput();
+      }
       if (!target) return;
       try { target.focus(); } catch (e) {}
     }
@@ -2354,6 +2364,9 @@
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
+    if (t.classList.contains('price-input') || t.classList.contains('receipt-price-input')) {
+      lastFocusedPriceInput = t;
+    }
     if (t.classList.contains('service-input') || t.classList.contains('tanzaku-input')) {
       numpadSuppressed = true;
       if (numpad) numpad.classList.remove('visible');
