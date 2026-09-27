@@ -843,6 +843,7 @@
   }
   .tanzaku-input::placeholder { color: var(--text-placeholder); font-weight: 400; }
   .tanzaku-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--shadow-accent); }
+  .tanzaku-input.shake { animation: subtleShake 0.35s ease-in-out; border-color: var(--accent); }
   .tanzaku-actions { display: flex; justify-content: center; gap: 10px; margin-top: 20px; }
   .tanzaku-btn {
     flex: 1; min-width: 0; border-radius: 22px;
@@ -2493,6 +2494,13 @@
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
+    // Refuse focus landing on a different row's price field while a pending
+    // unpriced row exists. This closes the "tap directly on another row's
+    // price input" bypass that row-body and checkbox guards do not cover.
+    if (t.classList.contains('price-input')) {
+      var row = t.closest('.row');
+      if (row && refuseIfPending(row)) return;
+    }
     if (t.classList.contains('service-input') || t.classList.contains('tanzaku-input')) {
       numpadSuppressed = true;
       if (numpad) numpad.classList.remove('visible');
@@ -2537,6 +2545,19 @@
     if (!svcInput) { closeTanzaku(); return; }
 
     var val = (tanzakuInput.value || '').trim();
+
+    // Empty input cannot be committed — a service with no name is not a
+    // valid state. Shake the input to signal the miss and keep the modal
+    // open so the user can either type a name or tap キャンセル to back out.
+    if (val === '') {
+      tanzakuInput.classList.remove('shake');
+      void tanzakuInput.offsetWidth;
+      tanzakuInput.classList.add('shake');
+      setTimeout(function() { tanzakuInput.classList.remove('shake'); }, 350);
+      haptic(15);
+      return;
+    }
+
     svcInput.value = val;
     fireInputEvent(svcInput);
     haptic(10);
@@ -2803,6 +2824,53 @@
     }, 150);
   }
 
+  /* ============ PENDING-ROW LOCK ============ */
+  /* A "pending" row is one that is checked but has no price. While a pending
+     row exists, activating any other row is refused — the pending row's
+     price field shakes and re-focuses instead. This enforces the rule that a
+     row is either fully priced or explicitly deselected before the user can
+     move on. Zero counts as a valid price. The pending row's own checkbox,
+     own service name, and own service-input remain interactive so the user
+     can deselect or edit it. */
+  function findPendingUnpricedRow() {
+    var rows = getRows();
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      var box = r.querySelector('.row-check');
+      if (!box || !box.classList.contains('checked')) continue;
+      var pi = r.querySelector('.price-input');
+      if (!pi) continue;
+      if ((pi.value || '').trim() !== '') continue;
+      return r;
+    }
+    return null;
+  }
+
+  function shakeAndRefocusPending(row) {
+    if (!row) return;
+    var input = row.querySelector('.price-input');
+    if (!input || input.disabled) return;
+    if (pendingShakeRow === row) cancelPendingShake();
+    var wrap = input.closest('.price-wrap');
+    if (wrap) {
+      wrap.classList.remove('shake');
+      void wrap.offsetWidth;
+      wrap.classList.add('shake');
+      setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+    }
+    haptic(6);
+    try { input.focus(); } catch (e) {}
+  }
+
+  function refuseIfPending(row) {
+    var pending = findPendingUnpricedRow();
+    if (pending && pending !== row) {
+      shakeAndRefocusPending(pending);
+      return true;
+    }
+    return false;
+  }
+
   /* ============ RECEIPT EMPTY-BLUR SHAKE + REFOCUS ============ */
   var pendingShakeReceiptItem = null;
   var pendingShakeReceiptTimeout = null;
@@ -2997,6 +3065,7 @@
     if (rejected) return;
     var row = box.closest('.row');
     if (!row) return;
+    if (refuseIfPending(row)) return;
     if (pendingShakeRow === row) cancelPendingShake();
     var priceField = row.querySelector('.price-input');
     var serviceText = row.querySelector('.service-input');
@@ -3053,6 +3122,7 @@
     if (rejected) return;
     var row = svcInput.closest('.row');
     if (!row) return;
+    if (refuseIfPending(row)) return;
     openTanzaku(row);
   });
 
@@ -3068,6 +3138,7 @@
     if (!display) return;
     var box = row.querySelector('.row-check');
     if (!box) return;
+    if (refuseIfPending(row)) return;
     var priceInput = row.querySelector('.price-input');
 
     if (box.classList.contains('checked')) {
@@ -3177,6 +3248,7 @@
     if (!row) return;
     if (!row.classList.contains('locked')) return;
     if (!e.target.closest('.price-wrap')) return;
+    if (refuseIfPending(row)) return;
     flashServiceInput(row);
   });
 
