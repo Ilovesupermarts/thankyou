@@ -2672,6 +2672,10 @@
       if (isCustomRow) updateRowLock(row);
       box.classList.add('checked');
       box.setAttribute('aria-checked', 'true');
+      // Focus this row's price field so the numpad targets the correct row
+      if (priceField && !priceField.disabled) {
+        try { priceField.focus(); } catch (e) {}
+      }
     }
     recalc();
   });
