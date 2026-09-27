@@ -95,7 +95,8 @@
   body.thankyou-active .stage, body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line, body.thankyou-active .divider,
   body.thankyou-active .reject-row, body.thankyou-active .table-card,
-  body.thankyou-active .summary, body.thankyou-active .numpad { visibility: hidden; }
+  body.thankyou-active .summary { visibility: hidden; }
+  body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
   body::before {
     content: ''; position: fixed; top: -25%; left: -25%; width: 150%; height: 150%;
@@ -811,6 +812,38 @@
   .numpad-btn.wide:active {
     background: var(--accent);
     color: #ffffff;
+  }
+
+  /* ============ NUMPAD RECEIPT MODE ============ */
+  .numpad.receipt-mode {
+    z-index: 450; /* Floats above every receipt state (300 / 380 / 400) */
+  }
+  .numpad.receipt-mode .numpad-btn {
+    background: var(--bg-base); /* Matches the main page ambient background */
+    border-color: var(--border-3);
+    color: var(--accent); /* Warm red text for contrast against the warm pebble */
+  }
+  .numpad.receipt-mode .numpad-btn[data-key="back"] {
+    color: var(--text-mute);
+  }
+  .numpad.receipt-mode .numpad-btn:active {
+    background: var(--soft-1);
+    transform: scale(0.92);
+  }
+  .numpad.receipt-mode .numpad-btn.wide {
+    background: var(--bg-base);
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+  .numpad.receipt-mode .numpad-btn.wide:active {
+    background: var(--accent);
+    color: #ffffff;
+  }
+
+  /* Allow the shake animation to work on receipt items */
+  .receipt-item-price-wrap.shake {
+    animation: subtleShake 0.35s ease-in-out;
+    border-color: var(--accent);
   }
 
   @media (max-width: 1250px) {
@@ -1859,18 +1892,25 @@
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
   var lastNumpadWinW = 0;
+  var lastNumpadAnchor = null;
 
   /* Horizontal position only; vertical is locked to 50% via CSS.
-     Early-return gate eliminates per-frame layout reads during scroll. */
+     Early-return gate eliminates per-frame layout reads during scroll.
+     Anchor switches between tableCard (main table) and .receipt-paper (receipt). */
   function repositionNumpad() {
-    if (!numpad || !tableCard) return;
+    if (!numpad) return;
     if (window.innerWidth <= 1250) return;
 
-    // Early return: only recalculate if the viewport width actually changed
-    if (window.innerWidth === lastNumpadWinW) return;
-    lastNumpadWinW = window.innerWidth;
+    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
+    var anchorCard = isReceiptOpen ? document.querySelector('.receipt-paper') : tableCard;
+    if (!anchorCard) return;
 
-    var rect = tableCard.getBoundingClientRect();
+    // Recalculate if window width changes OR if the anchor switches
+    if (window.innerWidth === lastNumpadWinW && lastNumpadAnchor === anchorCard) return;
+    lastNumpadWinW = window.innerWidth;
+    lastNumpadAnchor = anchorCard;
+
+    var rect = anchorCard.getBoundingClientRect();
 
     // Horizontal: perfectly centered in the right-hand empty space
     var numpadWidth = 232; // Must match .numpad { width } in CSS
@@ -1886,10 +1926,21 @@
 
   function getActivePriceInput() {
     var active = document.activeElement;
-    if (active && active.classList && active.classList.contains('price-input') && !active.disabled) return active;
+    if (active && active.classList && (active.classList.contains('price-input') || active.classList.contains('receipt-price-input')) && !active.disabled) {
+      return active;
+    }
     return null;
   }
+
   function getFirstEnabledPriceInput() {
+    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
+    if (isReceiptOpen) {
+      var rInputs = receiptItems.querySelectorAll('.receipt-price-input');
+      for (var j = 0; j < rInputs.length; j++) {
+        if (!rInputs[j].disabled) return rInputs[j];
+      }
+      return null;
+    }
     var rows = getRows();
     for (var i = 0; i < rows.length; i++) {
       var pi = rows[i].querySelector('.price-input');
@@ -1897,6 +1948,7 @@
     }
     return null;
   }
+
   function fireInputEvent(input) {
     var evt;
     try { evt = new Event('input', { bubbles: true }); }
@@ -1924,8 +1976,8 @@
     fireInputEvent(input);
   }
   function numpadShake(input) {
-    var row = input.closest('.row');
-    var wrap = row ? row.querySelector('.price-wrap') : null;
+    // Works for both the main table and the receipt paper
+    var wrap = input.closest('.price-wrap') || input.closest('.receipt-item-price-wrap');
     if (wrap) {
       wrap.classList.remove('shake');
       void wrap.offsetWidth;
@@ -1935,7 +1987,8 @@
     haptic(15);
   }
   function handleNumpadKey(key) {
-    if (rejected) return;
+    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
+    if (rejected && !isReceiptOpen) return;
     if (key === 'done') {
       var input = getActivePriceInput();
       if (!input) { haptic(8); return; }
@@ -1974,28 +2027,40 @@
     })(numpadBtns[nb]);
   }
   function updateNumpadVisibility() {
-    if (!numpad || !tableCard) return;
+    if (!numpad) return;
+
+    // 1. Receipt Screen Override — always visible, anchored right of the receipt paper
+    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
+    if (isReceiptOpen) {
+      numpad.classList.add('receipt-mode');
+      numpad.classList.add('visible');
+      repositionNumpad(); // Keeps it perfectly aligned in the right gutter
+      return;
+    } else {
+      numpad.classList.remove('receipt-mode');
+    }
+
+    if (!tableCard) return;
     if (window.innerWidth <= 1250) return;
 
-    // 1. Hard suppression states
+    // 2. Hard suppression states
     if (rejected || numpadSuppressed) {
       numpad.classList.remove('visible');
       return;
     }
 
-    // 2. Check if ANY price row is visible on the screen
+    // 3. Check if ANY price row is visible on the screen
     var rows = getRows();
     var isRowVisible = false;
     if (rows.length > 0) {
       var firstRowTop = rows[0].getBoundingClientRect().top;
       var lastRowBottom = rows[rows.length - 1].getBoundingClientRect().bottom;
-
       isRowVisible = (firstRowTop < window.innerHeight && lastRowBottom > 0);
     }
 
-    // 3. Safety check: is a price field actively focused?
+    // 4. Safety check: is a price field actively focused?
     var activeEl = document.activeElement;
-    var isPriceFocused = activeEl && activeEl.classList && activeEl.classList.contains('price-input');
+    var isPriceFocused = activeEl && activeEl.classList && (activeEl.classList.contains('price-input') || activeEl.classList.contains('receipt-price-input'));
 
     // Show numpad if the rows are on screen OR a field is actively focused
     if (isRowVisible || isPriceFocused) {
@@ -2690,7 +2755,8 @@
       yenSymbol.className = 'yen-symbol';
       yenSymbol.textContent = '¥';
       var priceField = document.createElement('input');
-      priceField.type = 'tel';
+      priceField.type = 'text';
+      priceField.setAttribute('inputmode', 'none');
       priceField.className = 'receipt-price-input';
       priceField.value = formatWithComma(price);
       priceWrap.appendChild(yenSymbol);
@@ -2718,7 +2784,8 @@
       rejectYen.className = 'yen-symbol';
       rejectYen.textContent = '¥';
       var rejectPriceField = document.createElement('input');
-      rejectPriceField.type = 'tel';
+      rejectPriceField.type = 'text';
+      rejectPriceField.setAttribute('inputmode', 'none');
       rejectPriceField.className = 'receipt-price-input';
       rejectPriceField.value = formatWithComma(confirmedTipAmount);
       rejectPriceWrap.appendChild(rejectYen);
@@ -2839,10 +2906,10 @@
     rejectRow.classList.remove('active');
     divider.classList.remove('active');
     summaryBar.classList.remove('visible');
-    if (numpad) numpad.classList.remove('visible');
     setTimeout(function() {
       receiptScreen.classList.add('visible');
       infoBar.classList.add('hidden');
+      updateNumpadVisibility();
     }, 450);
   });
 
@@ -3723,7 +3790,7 @@
     for (var i = 0; i < tyDots.length; i++) tyDots[i].classList.toggle('active', i === 0);
     activateTyPanel(0);
     updateTySwipeHint();
-    if (numpad) numpad.classList.remove('visible');
+    if (numpad) numpad.classList.remove('visible', 'receipt-mode');
   }
   function resumeThankyouSequence() {
     tyReceiptBtn.classList.add('shown');
@@ -3744,6 +3811,7 @@
     setTimeout(function() {
       receiptScreen.classList.add('visible');
       infoBar.classList.add('hidden');
+      updateNumpadVisibility();
     }, 100);
   });
 
