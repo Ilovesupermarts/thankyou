@@ -1533,7 +1533,7 @@
 
     <div class="receipt-total-line">
       <span class="receipt-total-label">合計</span>
-      <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span>0</span>
+      <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span id="receiptTotalNumber">0</span></span>
     </div>
 
     <div class="receipt-closing-line">
@@ -1760,7 +1760,7 @@
     ]);
   }
 
-  /* ============ ROLLING PRICE COUNTER ============ */
+  /* ============ ROLLING PRICE COUNTER (SUMMARY BAR) ============ */
   var currentDisplayedTotal = 0;
   var rollAnimationId = null;
   function updateSummaryTotal(targetAmount, isInstant) {
@@ -1793,6 +1793,48 @@
       }
     };
     rollAnimationId = window.requestAnimationFrame(step);
+  }
+
+  /* ============ ROLLING PRICE COUNTER (RECEIPT TOTAL) ============ */
+  var currentReceiptTotal = 0;
+  var receiptRollAnimationId = null;
+  function updateReceiptTotal(isInstant) {
+    var numEl = document.getElementById('receiptTotalNumber');
+    if (!numEl) return;
+    var sum = 0;
+    var receiptPriceInputs = receiptItems.querySelectorAll('.receipt-price-input');
+    for (var i = 0; i < receiptPriceInputs.length; i++) {
+      var item = receiptPriceInputs[i].closest('.receipt-item');
+      if (item && item.getAttribute('data-removing') === 'true') continue;
+      sum += parseFormatted(receiptPriceInputs[i].value);
+    }
+    if (isInstant) {
+      if (receiptRollAnimationId) { window.cancelAnimationFrame(receiptRollAnimationId); receiptRollAnimationId = null; }
+      currentReceiptTotal = sum;
+      numEl.textContent = sum.toLocaleString();
+      return;
+    }
+    if (currentReceiptTotal === sum) return;
+    var startAmount = currentReceiptTotal;
+    var duration = 400;
+    var startTimestamp = null;
+    if (receiptRollAnimationId) window.cancelAnimationFrame(receiptRollAnimationId);
+    var step = function(timestamp) {
+      if (!startTimestamp) startTimestamp = timestamp;
+      var progress = Math.min((timestamp - startTimestamp) / duration, 1);
+      var ease = 1 - Math.pow(1 - progress, 4);
+      var currentVal = Math.floor(ease * (sum - startAmount) + startAmount);
+      currentReceiptTotal = currentVal;
+      numEl.textContent = currentVal.toLocaleString();
+      if (progress < 1) {
+        receiptRollAnimationId = window.requestAnimationFrame(step);
+      } else {
+        currentReceiptTotal = sum;
+        numEl.textContent = sum.toLocaleString();
+        receiptRollAnimationId = null;
+      }
+    };
+    receiptRollAnimationId = window.requestAnimationFrame(step);
   }
 
   /* ============ DOM REFS ============ */
@@ -1972,34 +2014,25 @@
   /* ============ NUMPAD ============ */
   var numpadSuppressed = false;
   var lastNumpadWinW = 0;
-  var lastNumpadAnchor = null;
 
-  /* Horizontal position only; vertical is locked to 50% via CSS.
-     Early-return gate eliminates per-frame layout reads during scroll.
-     Anchor switches between tableCard (main table) and .receipt-paper (receipt). */
+  /* Numpad is viewport-anchored, not card-anchored. The table card is
+     always 600px wide when the numpad is active (>1250px viewport,
+     which implies the >=1100px media query tier). Its static right edge
+     is therefore (window.innerWidth / 2) + 300. The numpad centers itself
+     in the remaining gutter. No DOM reads, no anchor tracking. */
   function repositionNumpad() {
     if (!numpad) return;
     if (window.innerWidth <= 1250) return;
 
-    var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
-    var anchorCard = isReceiptOpen ? document.querySelector('.receipt-paper') : tableCard;
-    if (!anchorCard) return;
-
-    // Recalculate if window width changes OR if the anchor switches
-    if (window.innerWidth === lastNumpadWinW && lastNumpadAnchor === anchorCard) return;
+    // Early return: position depends only on viewport width
+    if (window.innerWidth === lastNumpadWinW) return;
     lastNumpadWinW = window.innerWidth;
-    lastNumpadAnchor = anchorCard;
 
-    var rect = anchorCard.getBoundingClientRect();
-
-    // Horizontal: perfectly centered in the right-hand empty space
     var numpadWidth = 232; // Must match .numpad { width } in CSS
-    var rightSpace = window.innerWidth - rect.right;
-    var left = rect.right + (rightSpace - numpadWidth) / 2;
+    var theoreticalRightEdge = (window.innerWidth / 2) + 300; // Half of the 600px max-width card
+    var rightSpace = window.innerWidth - theoreticalRightEdge;
+    var left = theoreticalRightEdge + (rightSpace - numpadWidth) / 2;
 
-    if (left + numpadWidth > window.innerWidth - 16) {
-      left = window.innerWidth - numpadWidth - 16;
-    }
     numpad.style.left = left + 'px';
     numpad.style.top = '50%';
   }
@@ -2038,23 +2071,40 @@
     }
     input.dispatchEvent(evt);
   }
+
+  function inputHasSelection(input) {
+    try {
+      var s = input.selectionStart, e = input.selectionEnd;
+      return (s !== null && e !== null && s !== e);
+    } catch (err) {
+      return false;
+    }
+  }
+
   function numpadAppend(input, digits) {
     if (!input) return;
-    var cur = (input.value || '').replace(/[^0-9]/g, '');
+    var cur = inputHasSelection(input) ? '' : (input.value || '').replace(/[^0-9]/g, '');
     cur = cur + digits;
     if (cur.length > 5) cur = cur.slice(0, 5);
     if (cur === '' || parseInt(cur, 10) === 0) input.value = '';
     else input.value = parseInt(cur, 10).toLocaleString();
     fireInputEvent(input);
   }
+
   function numpadBackspace(input) {
     if (!input) return;
-    var cur = (input.value || '').replace(/[^0-9]/g, '');
-    cur = cur.slice(0, -1);
+    var cur;
+    if (inputHasSelection(input)) {
+      cur = '';
+    } else {
+      cur = (input.value || '').replace(/[^0-9]/g, '');
+      cur = cur.slice(0, -1);
+    }
     if (cur === '') input.value = '';
     else input.value = parseInt(cur, 10).toLocaleString();
     fireInputEvent(input);
   }
+
   function numpadShake(input) {
     // Works for both the main table and the receipt paper
     var wrap = input.closest('.price-wrap') || input.closest('.receipt-item-price-wrap');
@@ -2115,12 +2165,12 @@
       return;
     }
 
-    // 1. Receipt Screen Override — always visible, anchored right of the receipt paper
+    // 1. Receipt Screen Override — always visible, anchored in the right gutter
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (isReceiptOpen) {
       numpad.classList.add('receipt-mode');
       numpad.classList.add('visible');
-      repositionNumpad(); // Keeps it perfectly aligned in the right gutter
+      repositionNumpad();
       return;
     } else {
       numpad.classList.remove('receipt-mode');
@@ -2200,11 +2250,23 @@
     if (!tanzakuTargetRow) { closeTanzaku(); return; }
     var svcInput = tanzakuTargetRow.querySelector('.service-input');
     if (!svcInput) { closeTanzaku(); return; }
+
     var val = (tanzakuInput.value || '').trim();
     svcInput.value = val;
-    fireInputEvent(svcInput);
+    fireInputEvent(svcInput); // This automatically unlocks the price field
     haptic(10);
-    closeTanzaku();
+
+    // Grab the price input for this specific row BEFORE closing the modal
+    var priceFieldToFocus = tanzakuTargetRow.querySelector('.price-input');
+
+    closeTanzaku(); // Note: this sets tanzakuTargetRow to null, so we had to grab the field first
+
+    // Smoothly hand off focus to the price field
+    if (priceFieldToFocus && !priceFieldToFocus.disabled) {
+      setTimeout(function() {
+        try { priceFieldToFocus.focus(); } catch(e) {}
+      }, 50);
+    }
   }
   tanzakuCancel.addEventListener('click', function(e) {
     e.preventDefault();
@@ -2944,7 +3006,7 @@
       itemCount++;
     }
     bindReceiptItemListeners();
-    updateReceiptTotal();
+    updateReceiptTotal(true);
     firstServiceInReceipt = firstRowIncluded;
   }
 
@@ -2972,6 +3034,10 @@
           haptic(8);
           var item = btn.closest('.receipt-item');
           if (!item) return;
+          // Flag as removing so the total roll fires immediately and excludes this item
+          item.setAttribute('data-removing', 'true');
+          updateReceiptTotal();
+          // Then run the collapse animation
           item.style.transition = 'opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease';
           item.style.overflow = 'hidden';
           item.style.maxHeight = item.offsetHeight + 'px';
@@ -2983,17 +3049,10 @@
           item.style.paddingBottom = '0';
           item.style.marginTop = '0';
           item.style.marginBottom = '0';
-          setTimeout(function() { item.remove(); updateReceiptTotal(); }, 420);
+          setTimeout(function() { item.remove(); }, 420);
         });
       })(removeButtons[r]);
     }
-  }
-
-  function updateReceiptTotal() {
-    var sum = 0;
-    var receiptPriceInputs = receiptItems.querySelectorAll('.receipt-price-input');
-    for (var i = 0; i < receiptPriceInputs.length; i++) sum += parseFormatted(receiptPriceInputs[i].value);
-    receiptTotal.innerHTML = '<span class="yen-symbol">¥</span>' + sum.toLocaleString();
   }
 
   /* ============ SUBMIT ============ */
