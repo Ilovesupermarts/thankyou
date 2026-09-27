@@ -1640,45 +1640,189 @@
     });
   }
 
-  /* ============ HAPTIC FEEDBACK ============ */
-  var hapticAudioCtx = null;
-  function getHapticAudioCtx() {
-    if (hapticAudioCtx) return hapticAudioCtx;
-    try {
-      var Ctx = window.AudioContext || window.webkitAudioContext;
-      if (Ctx) hapticAudioCtx = new Ctx();
-    } catch (e) { hapticAudioCtx = null; }
-    return hapticAudioCtx;
-  }
-  function playSoftTick(strength) {
-    var ctx = getHapticAudioCtx();
-    if (!ctx) return;
-    try {
-      if (ctx.state === 'suspended') ctx.resume();
-      var t = ctx.currentTime;
-      var osc = ctx.createOscillator();
-      var gain = ctx.createGain();
-      var peak = Math.min(0.035, 0.012 + (strength || 8) * 0.002);
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1400, t);
-      osc.frequency.exponentialRampToValueAtTime(900, t + 0.045);
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(peak, t + 0.006);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.055);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(t); osc.stop(t + 0.07);
-    } catch (e) { /* silent */ }
-  }
+  /* ============ HAPTIC FEEDBACK (vibration only) ============ */
   function haptic(ms) {
     var strength = ms || 8;
     try {
-      if (navigator.vibrate) {
-        var ok = navigator.vibrate(strength);
-        if (ok !== false) return;
-      }
+      if (navigator.vibrate) navigator.vibrate(strength);
     } catch (e) { /* silent */ }
-    playSoftTick(strength);
   }
+
+  /* ============ ACOUSTIC ENGINE ============ */
+  /* Synthesized buffers, lazily built on first user gesture. */
+  var SOUND_ENABLED = true;         // hard kill switch
+  var soundAudioCtx = null;
+  var soundMasterGain = null;
+  var soundBuffers = {};            // { tock, check, paper }
+  var soundReady = false;
+
+  function initSound() {
+    if (soundAudioCtx) return;
+    try {
+      var Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      soundAudioCtx = new Ctx();
+      soundMasterGain = soundAudioCtx.createGain();
+      soundMasterGain.gain.value = 0.5;
+      soundMasterGain.connect(soundAudioCtx.destination);
+      if (soundAudioCtx.state === 'suspended') {
+        try { soundAudioCtx.resume(); } catch (e) {}
+      }
+      Promise.all([
+        synthesizeTock(),
+        synthesizeCheck(),
+        synthesizePaper()
+      ]).then(function(bufs) {
+        soundBuffers.tock = bufs[0];
+        soundBuffers.check = bufs[1];
+        soundBuffers.paper = bufs[2];
+        soundReady = true;
+      }).catch(function() { /* silent */ });
+    } catch (e) { /* silent */ }
+  }
+
+  function synthesizeTock() {
+    var sr = soundAudioCtx.sampleRate;
+    var length = Math.floor(sr * 0.10);
+    var offline = new OfflineAudioContext(1, length, sr);
+
+    // Noise transient (attack)
+    var noiseLen = Math.floor(sr * 0.08);
+    var noiseBuf = offline.createBuffer(1, noiseLen, sr);
+    var nd = noiseBuf.getChannelData(0);
+    for (var i = 0; i < noiseLen; i++) nd[i] = Math.random() * 2 - 1;
+    var noiseSrc = offline.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    var noiseFilter = offline.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 2500;
+    noiseFilter.Q.value = 1.5;
+    var noiseGain = offline.createGain();
+    noiseGain.gain.setValueAtTime(0.35, 0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, 0.020);
+    noiseSrc.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(offline.destination);
+    noiseSrc.start(0);
+    noiseSrc.stop(0.08);
+
+    // Resonant body
+    var osc = offline.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 1800;
+    var oscGain = offline.createGain();
+    oscGain.gain.setValueAtTime(0.65, 0);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, 0.060);
+    osc.connect(oscGain);
+    oscGain.connect(offline.destination);
+    osc.start(0);
+    osc.stop(0.10);
+
+    return offline.startRendering();
+  }
+
+  function synthesizeCheck() {
+    var sr = soundAudioCtx.sampleRate;
+    var length = Math.floor(sr * 0.08);
+    var offline = new OfflineAudioContext(1, length, sr);
+
+    var noiseLen = Math.floor(sr * 0.06);
+    var noiseBuf = offline.createBuffer(1, noiseLen, sr);
+    var nd = noiseBuf.getChannelData(0);
+    for (var i = 0; i < noiseLen; i++) nd[i] = Math.random() * 2 - 1;
+    var noiseSrc = offline.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+    var noiseFilter = offline.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.value = 2200;
+    noiseFilter.Q.value = 1.2;
+    var noiseGain = offline.createGain();
+    noiseGain.gain.setValueAtTime(0.45, 0);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, 0.015);
+    noiseSrc.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(offline.destination);
+    noiseSrc.start(0);
+    noiseSrc.stop(0.06);
+
+    var osc = offline.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.value = 1200;
+    var oscGain = offline.createGain();
+    oscGain.gain.setValueAtTime(0.55, 0);
+    oscGain.gain.exponentialRampToValueAtTime(0.0001, 0.045);
+    osc.connect(oscGain);
+    oscGain.connect(offline.destination);
+    osc.start(0);
+    osc.stop(0.08);
+
+    return offline.startRendering();
+  }
+
+  function synthesizePaper() {
+    var sr = soundAudioCtx.sampleRate;
+    var length = Math.floor(sr * 0.35);
+    var offline = new OfflineAudioContext(1, length, sr);
+
+    var noiseLen = Math.floor(sr * 0.32);
+    var noiseBuf = offline.createBuffer(1, noiseLen, sr);
+    var nd = noiseBuf.getChannelData(0);
+    for (var i = 0; i < noiseLen; i++) nd[i] = Math.random() * 2 - 1;
+    var noiseSrc = offline.createBufferSource();
+    noiseSrc.buffer = noiseBuf;
+
+    var bp = offline.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.2;
+    bp.frequency.setValueAtTime(1200, 0);
+    bp.frequency.exponentialRampToValueAtTime(400, 0.25);
+
+    var gain = offline.createGain();
+    gain.gain.setValueAtTime(0.0001, 0);
+    gain.gain.exponentialRampToValueAtTime(0.5, 0.005);
+    gain.gain.exponentialRampToValueAtTime(0.0001, 0.25);
+
+    noiseSrc.connect(bp);
+    bp.connect(gain);
+    gain.connect(offline.destination);
+    noiseSrc.start(0);
+    noiseSrc.stop(0.32);
+
+    return offline.startRendering();
+  }
+
+  function playSound(name, rate) {
+    if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
+    var buf = soundBuffers[name];
+    if (!buf) return;
+    try {
+      var src = soundAudioCtx.createBufferSource();
+      src.buffer = buf;
+      src.playbackRate.value = rate || 1.0;
+      var perPlay = soundAudioCtx.createGain();
+      perPlay.gain.value = 1.0;   // reserved for per-sound tweaking
+      src.connect(perPlay);
+      perPlay.connect(soundMasterGain);
+      src.start(0);
+    } catch (e) { /* silent */ }
+  }
+
+  function getKeyPlaybackRate(key) {
+    if (key && key.length === 1 && key >= '0' && key <= '9') {
+      return 0.96 + (parseInt(key, 10) / 9) * 0.08;  // 0→0.96, 9→1.04
+    }
+    if (key === '00') return 1.00;
+    if (key === 'back') return 0.97;
+    if (key === 'done') return 1.03;
+    return 1.0;
+  }
+
+  function playTock(key) { playSound('tock', getKeyPlaybackRate(key)); }
+  function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
+  function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
+
+  // Lazy init on first user gesture
+  document.addEventListener('pointerdown', initSound, { once: true });
 
   /* ============ NUMBER FORMATTING ============ */
   function formatWithComma(num) {
@@ -2119,6 +2263,7 @@
   function handleNumpadKey(key) {
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (rejected && !isReceiptOpen) return;
+    playTock(key);
     if (key === 'done') {
       var input = getActivePriceInput();
       if (!input) { haptic(8); return; }
@@ -2228,6 +2373,7 @@
     if (!row) return;
     var svcInput = row.querySelector('.service-input');
     if (!svcInput) return;
+    playPaper(true);
     tanzakuTargetRow = row;
     tanzakuInput.value = svcInput.value || '';
     tanzakuScreen.classList.add('visible');
@@ -2240,6 +2386,7 @@
     }, 100);
   }
   function closeTanzaku() {
+    playPaper(false);
     tanzakuScreen.classList.remove('visible');
     try { tanzakuInput.blur(); } catch (e) {}
     tanzakuTargetRow = null;
@@ -2488,6 +2635,7 @@
     var isCustomRow = !!serviceText;
     if (box.classList.contains('checked')) {
       haptic(6);
+      playCheck(false);
       if (priceField) {
         var currentVal = priceField.value;
         if (currentVal !== '') box.setAttribute('data-saved-price', currentVal);
@@ -2512,6 +2660,7 @@
         }
       }
       haptic(10);
+      playCheck(true);
       if (priceField) {
         var saved = box.getAttribute('data-saved-price');
         if (saved !== null && saved !== '') priceField.value = saved;
