@@ -98,19 +98,37 @@
   body.thankyou-active .summary { visibility: hidden; }
   body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
-  body::before {
-    content: ''; position: fixed; top: -25%; left: -25%; width: 150%; height: 150%;
-    z-index: -2; pointer-events: none;
+  /* ============ AMBIENT STAGE (swipe-reactive wind) ============ */
+  .ambient-stage {
+    position: fixed;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    z-index: -2;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(var(--wind-x, 0px), 0, 0);
+  }
+
+  .ambient-layer {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .ambient-primary {
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
       radial-gradient(circle at 72% 55%, var(--amb-2) 0%, transparent 48%),
       radial-gradient(circle at 50% 85%, var(--amb-3) 0%, transparent 38%),
       radial-gradient(circle at 15% 70%, var(--amb-4) 0%, transparent 42%);
     animation: ambientDrift 32s ease-in-out infinite;
-    transition: filter 2s ease; will-change: transform, filter;
+    transition: filter 2s ease;
+    will-change: transform;
   }
 
-  html[data-theme="autumn"] body::before {
+  .ambient-secondary { display: none; }
+
+  html[data-theme="autumn"] .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
       radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
@@ -119,26 +137,66 @@
       radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%);
     animation: autumnDrift1 14s ease-in-out infinite;
   }
-  html[data-theme="autumn"] body::after {
-    content: ''; position: fixed; top: -25%; left: -25%; width: 150%; height: 150%;
-    z-index: -1; pointer-events: none;
+
+  html[data-theme="autumn"] .ambient-secondary {
+    display: block;
     background:
       radial-gradient(circle at 60% 20%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0) 40%),
       radial-gradient(circle at 40% 90%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0) 45%);
     animation: autumnDrift2 19s ease-in-out infinite;
-    mix-blend-mode: multiply; opacity: 0.55; will-change: transform, filter;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    will-change: transform;
   }
 
-  html[data-time="morning"] body::before { filter: hue-rotate(-8deg) saturate(1.05); }
-  html[data-time="day"] body::before { filter: none; }
-  html[data-time="evening"] body::before { filter: hue-rotate(-18deg) saturate(1.15); }
-  html[data-time="night"] body::before { filter: hue-rotate(-28deg) saturate(0.65) brightness(0.92); }
-  html[data-weather="rain"] body::before, html[data-weather="drizzle"] body::before { filter: hue-rotate(-13deg) saturate(0.75); }
-  html[data-weather="thunderstorm"] body::before { filter: hue-rotate(-20deg) saturate(0.6) brightness(0.9); }
-  html[data-weather="fog"] body::before { filter: saturate(0.55) brightness(1.03); }
-  html[data-weather="clouds"] body::before { filter: saturate(0.8); }
-  html[data-weather="snow"] body::before { filter: hue-rotate(6deg) saturate(0.5) brightness(1.06); }
-  html[data-weather="clear"] body::before { filter: hue-rotate(4deg) saturate(1.1); }
+  /* Time-of-day filters */
+  html[data-time="morning"] .ambient-primary { filter: hue-rotate(-8deg) saturate(1.05); }
+  html[data-time="day"]     .ambient-primary { filter: none; }
+  html[data-time="evening"] .ambient-primary { filter: hue-rotate(-18deg) saturate(1.15); }
+  html[data-time="night"]   .ambient-primary { filter: hue-rotate(-28deg) saturate(0.65) brightness(0.92); }
+
+  /* Weather filters */
+  html[data-weather="rain"] .ambient-primary,
+  html[data-weather="drizzle"] .ambient-primary { filter: hue-rotate(-13deg) saturate(0.75); }
+  html[data-weather="thunderstorm"] .ambient-primary { filter: hue-rotate(-20deg) saturate(0.6) brightness(0.9); }
+  html[data-weather="fog"] .ambient-primary { filter: saturate(0.55) brightness(1.03); }
+  html[data-weather="clouds"] .ambient-primary { filter: saturate(0.8); }
+  html[data-weather="snow"] .ambient-primary { filter: hue-rotate(6deg) saturate(0.5) brightness(1.06); }
+  html[data-weather="clear"] .ambient-primary { filter: hue-rotate(4deg) saturate(1.1); }
+
+  /* ============ LIGHT MOTES ============ */
+  .mote-field {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    transform-style: preserve-3d;
+    transform: translate3d(var(--wind-x-extra, 0px), 0, 0);
+    will-change: transform;
+  }
+
+  .mote {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--glow) 0%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    animation: moteFloat var(--mote-dur, 22s) ease-in-out infinite;
+    animation-delay: var(--mote-delay, 0s);
+    will-change: transform, opacity;
+  }
+
+  @keyframes moteFloat {
+    0%, 100% { transform: translate3d(0, 0, 0); opacity: 0; }
+    20%      { transform: translate3d(var(--mote-ax, 14px), var(--mote-ay, -10px), 0); opacity: var(--mote-peak, 0.3); }
+    60%      { transform: translate3d(0, 0, 0); opacity: var(--mote-peak, 0.3); }
+    85%      { transform: translate3d(0, 0, 0); opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ambient-stage { transform: none !important; }
+    .mote-field    { transform: none !important; }
+    .mote          { animation: none !important; opacity: 0 !important; }
+  }
 
   @keyframes ambientDrift {
     0%, 100% { transform: translate(0, 0) scale(1); }
@@ -502,6 +560,11 @@
   .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
   .row.disabled { opacity: 0.35; pointer-events: none; }
 
+  /* Preset rows behave as a tappable label for their checkbox */
+  .row:not(.locked):not(.disabled) { cursor: pointer; }
+  .row:not(.locked):not(.disabled) .price-wrap { cursor: default; }
+  .row:not(.locked):not(.disabled) .price-input { cursor: text; }
+
   .row-check {
     flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%;
     background: #ffffff; border: 1.5px solid var(--border-1);
@@ -797,15 +860,15 @@
     position: fixed;
     top: 50%;
     transform: translateY(-50%);
-    width: 232px; /* 3 columns of 64px + two 20px gaps = 232px */
+    width: 232px;
     padding: 0;
-    background: transparent; /* Completely removes the jarring background block */
+    background: transparent;
     border: none;
     box-shadow: none;
     z-index: 55;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 16px 20px; /* Vertical and horizontal breathing room */
+    gap: 16px 20px;
     opacity: 0;
     pointer-events: none;
     transition: opacity 0.6s ease;
@@ -820,14 +883,13 @@
   .numpad-btn {
     width: 64px;
     height: 64px;
-    background: #ffffff; /* Clean white floating pebble */
+    background: #ffffff;
     border: 1px solid var(--border-2);
-    border-radius: 50%; /* Perfect circles */
-    box-shadow: 0 4px 14px var(--shadow-rose); /* Soft individual drop shadow */
+    border-radius: 50%;
+    box-shadow: 0 4px 14px var(--shadow-rose);
     font-size: 26px;
-    font-weight: 300; /* Ultra-thin, elegant stroke */
+    font-weight: 300;
     color: var(--text-dark);
-    /* Thin, modern geometric sans-serif for numbers */
     font-family: system-ui, sans-serif;
     cursor: pointer;
     display: flex;
@@ -841,7 +903,6 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  /* Make the backspace icon match the thin aesthetic */
   .numpad-btn[data-key="back"] {
     font-size: 20px;
     color: var(--text-mute);
@@ -858,15 +919,15 @@
     grid-column: span 3;
     width: 100%;
     height: 54px;
-    border-radius: 27px; /* Elegant pill shape */
+    border-radius: 27px;
     font-size: 15px;
     letter-spacing: 6px;
-    text-indent: 6px; /* perfectly centers the text with the letter spacing */
+    text-indent: 6px;
     background: rgba(255, 255, 255, 0.6);
     color: var(--accent);
-    border: 1px solid var(--accent); /* Delicate Hanko stamp outline */
+    border: 1px solid var(--accent);
     box-shadow: 0 2px 8px var(--shadow-rose);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; /* Keep traditional Japanese serif for text */
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-weight: 500;
   }
 
@@ -877,12 +938,12 @@
 
   /* ============ NUMPAD RECEIPT MODE ============ */
   .numpad.receipt-mode {
-    z-index: 450; /* Floats above every receipt state (300 / 380 / 400) */
+    z-index: 450;
   }
   .numpad.receipt-mode .numpad-btn {
-    background: var(--bg-base); /* Matches the main page ambient background */
+    background: var(--bg-base);
     border-color: var(--border-3);
-    color: var(--accent); /* Warm red text for contrast against the warm pebble */
+    color: var(--accent);
   }
   .numpad.receipt-mode .numpad-btn[data-key="back"] {
     color: var(--text-mute);
@@ -901,7 +962,6 @@
     color: #ffffff;
   }
 
-  /* Allow the shake animation to work on receipt items */
   .receipt-item-price-wrap.shake {
     animation: subtleShake 0.35s ease-in-out;
     border-color: var(--accent);
@@ -1198,6 +1258,12 @@
 </style>
 </head>
 <body>
+
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer ambient-secondary"></div>
+  <div class="mote-field" id="moteField"></div>
+</div>
 
 <div class="info-bar" id="infoBar">
   <div class="info-inner">
@@ -1649,11 +1715,10 @@
   }
 
   /* ============ ACOUSTIC ENGINE ============ */
-  /* Synthesized buffers, lazily built on first user gesture. */
-  var SOUND_ENABLED = true;         // hard kill switch
+  var SOUND_ENABLED = true;
   var soundAudioCtx = null;
   var soundMasterGain = null;
-  var soundBuffers = {};            // { tock, check, paper }
+  var soundBuffers = {};
   var soundReady = false;
 
   function initSound() {
@@ -1686,7 +1751,6 @@
     var length = Math.floor(sr * 0.10);
     var offline = new OfflineAudioContext(1, length, sr);
 
-    // Noise transient (attack)
     var noiseLen = Math.floor(sr * 0.08);
     var noiseBuf = offline.createBuffer(1, noiseLen, sr);
     var nd = noiseBuf.getChannelData(0);
@@ -1706,7 +1770,6 @@
     noiseSrc.start(0);
     noiseSrc.stop(0.08);
 
-    // Resonant body
     var osc = offline.createOscillator();
     osc.type = 'sine';
     osc.frequency.value = 1800;
@@ -1800,7 +1863,7 @@
       src.buffer = buf;
       src.playbackRate.value = rate || 1.0;
       var perPlay = soundAudioCtx.createGain();
-      perPlay.gain.value = 1.0;   // reserved for per-sound tweaking
+      perPlay.gain.value = 1.0;
       src.connect(perPlay);
       perPlay.connect(soundMasterGain);
       src.start(0);
@@ -1809,7 +1872,7 @@
 
   function getKeyPlaybackRate(key) {
     if (key && key.length === 1 && key >= '0' && key <= '9') {
-      return 0.96 + (parseInt(key, 10) / 9) * 0.08;  // 0→0.96, 9→1.04
+      return 0.96 + (parseInt(key, 10) / 9) * 0.08;
     }
     if (key === '00') return 1.00;
     if (key === 'back') return 0.97;
@@ -1821,7 +1884,6 @@
   function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
   function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
 
-  // Lazy init on first user gesture
   document.addEventListener('pointerdown', initSound, { once: true });
 
   /* ============ NUMBER FORMATTING ============ */
@@ -2160,21 +2222,15 @@
   var lastNumpadWinW = 0;
   var lastFocusedPriceInput = null;
 
-  /* Numpad is viewport-anchored, not card-anchored. The table card is
-     always 600px wide when the numpad is active (>1250px viewport,
-     which implies the >=1100px media query tier). Its static right edge
-     is therefore (window.innerWidth / 2) + 300. The numpad centers itself
-     in the remaining gutter. No DOM reads, no anchor tracking. */
   function repositionNumpad() {
     if (!numpad) return;
     if (window.innerWidth <= 1250) return;
 
-    // Early return: position depends only on viewport width
     if (window.innerWidth === lastNumpadWinW) return;
     lastNumpadWinW = window.innerWidth;
 
-    var numpadWidth = 232; // Must match .numpad { width } in CSS
-    var theoreticalRightEdge = (window.innerWidth / 2) + 300; // Half of the 600px max-width card
+    var numpadWidth = 232;
+    var theoreticalRightEdge = (window.innerWidth / 2) + 300;
     var rightSpace = window.innerWidth - theoreticalRightEdge;
     var left = theoreticalRightEdge + (rightSpace - numpadWidth) / 2;
 
@@ -2193,7 +2249,6 @@
   function getFirstEnabledPriceInput() {
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (isReceiptOpen) {
-      // On the receipt, only act on the explicitly focused field. No auto-target.
       return null;
     }
     var rows = getRows();
@@ -2252,7 +2307,6 @@
   }
 
   function numpadShake(input) {
-    // Works for both the main table and the receipt paper
     var wrap = input.closest('.price-wrap') || input.closest('.receipt-item-price-wrap');
     if (wrap) {
       wrap.classList.remove('shake');
@@ -2314,13 +2368,11 @@
   function updateNumpadVisibility() {
     if (!numpad) return;
 
-    // Tanzaku modal takes over — numpad hides
     if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) {
       numpad.classList.remove('visible');
       return;
     }
 
-    // 1. Receipt Screen Override — always visible, anchored in the right gutter
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (isReceiptOpen) {
       numpad.classList.add('receipt-mode');
@@ -2334,13 +2386,11 @@
     if (!tableCard) return;
     if (window.innerWidth <= 1250) return;
 
-    // 2. Hard suppression states
     if (rejected || numpadSuppressed) {
       numpad.classList.remove('visible');
       return;
     }
 
-    // 3. Check if ANY price row is visible on the screen
     var rows = getRows();
     var isRowVisible = false;
     if (rows.length > 0) {
@@ -2349,11 +2399,9 @@
       isRowVisible = (firstRowTop < window.innerHeight && lastRowBottom > 0);
     }
 
-    // 4. Safety check: is a price field actively focused?
     var activeEl = document.activeElement;
     var isPriceFocused = activeEl && activeEl.classList && (activeEl.classList.contains('price-input') || activeEl.classList.contains('receipt-price-input'));
 
-    // Show numpad if the rows are on screen OR a field is actively focused
     if (isRowVisible || isPriceFocused) {
       repositionNumpad();
       numpad.classList.add('visible');
@@ -2377,7 +2425,6 @@
   });
 
   document.addEventListener('focusout', function(e) {
-    // A 10ms delay allows the browser to switch focus before we check document.activeElement
     setTimeout(updateNumpadVisibility, 10);
   });
 
@@ -2413,15 +2460,13 @@
 
     var val = (tanzakuInput.value || '').trim();
     svcInput.value = val;
-    fireInputEvent(svcInput); // This automatically unlocks the price field
+    fireInputEvent(svcInput);
     haptic(10);
 
-    // Grab the price input for this specific row BEFORE closing the modal
     var priceFieldToFocus = tanzakuTargetRow.querySelector('.price-input');
 
-    closeTanzaku(); // Note: this sets tanzakuTargetRow to null, so we had to grab the field first
+    closeTanzaku();
 
-    // Smoothly hand off focus to the price field
     if (priceFieldToFocus && !priceFieldToFocus.disabled) {
       setTimeout(function() {
         try { priceFieldToFocus.focus(); } catch(e) {}
@@ -2485,8 +2530,13 @@
     if (rect.top < vh * 0.6) globalHint.classList.remove('shown');
     else globalHint.classList.add('shown');
   }
-  function goToPanel(index) {
-    currentPanel = Math.max(0, Math.min(totalPanels - 1, index));
+  function goToPanel(index, noGust) {
+    var newPanel = Math.max(0, Math.min(totalPanels - 1, index));
+    if (!noGust && newPanel !== currentPanel && windEnabled) {
+      var dir = newPanel > currentPanel ? -1 : 1;
+      gustWind(KEYBOARD_GUST * dir);
+    }
+    currentPanel = newPanel;
     track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
     for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
     activatePanel(currentPanel);
@@ -2635,6 +2685,187 @@
     return missing;
   }
 
+  /* ============ PENDING AUTO-UNCHECK ============ */
+  /* A preset row whose price field is blurred while empty gets un-highlighted
+     after a short grace window. The window exists so a tap that lands on the
+     same row (checkbox or row body) can cancel the pending uncheck before it
+     fires — focusout runs before click, so without this the user's tap would
+     briefly uncheck and then re-check, ending in a flicker. */
+  var pendingUncheckRow = null;
+  var pendingUncheckTimeout = null;
+
+  function cancelPendingUncheck() {
+    if (pendingUncheckTimeout) {
+      clearTimeout(pendingUncheckTimeout);
+      pendingUncheckTimeout = null;
+    }
+    pendingUncheckRow = null;
+  }
+
+  function schedulePendingUncheck(row, input, box) {
+    cancelPendingUncheck();
+    pendingUncheckRow = row;
+    pendingUncheckTimeout = setTimeout(function() {
+      pendingUncheckTimeout = null;
+      pendingUncheckRow = null;
+      if (rejected) return;
+      if (!box.classList.contains('checked')) return;
+      if (parseFormatted(input.value) > 0) return;
+      box.classList.remove('checked');
+      box.setAttribute('aria-checked', 'false');
+      box.removeAttribute('data-saved-price');
+      input.value = '';
+      recalc();
+    }, 150);
+  }
+
+  /* ============ WIND FIELD (swipe-reactive ambient) ============ */
+  var ambientStage = document.getElementById('ambientStage');
+  var moteField = document.getElementById('moteField');
+  var ambientStyle = ambientStage ? ambientStage.style : null;
+
+  var currentWindOffset = 0;
+  var currentWindVelocity = 0;
+  var windRafId = null;
+  var windEnabled = true;
+
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      windEnabled = false;
+    }
+  } catch (e) {}
+
+  var WIND_VELOCITY_SCALE   = 0.25;
+  var WIND_VELOCITY_CAP     = 14;
+  var WIND_STIFFNESS        = 0.10;
+  var WIND_DAMPING          = 0.82;
+  var WIND_OFFSET_CLAMP     = 120;
+  var WIND_SETTLE_VELOCITY  = 0.15;
+  var WIND_SETTLE_OFFSET    = 0.4;
+  var KEYBOARD_GUST         = 9;
+
+  var swipeSamples = [];
+
+  function startSwipeTracking() {
+    swipeSamples = [];
+  }
+  function recordSwipeSample(x) {
+    var now = performance.now();
+    swipeSamples.push({ x: x, t: now });
+    while (swipeSamples.length > 2 && now - swipeSamples[0].t > 120) {
+      swipeSamples.shift();
+    }
+    if (swipeSamples.length > 10) swipeSamples.shift();
+  }
+  function computeSwipeVelocity() {
+    if (swipeSamples.length < 2) return 0;
+    var oldest = swipeSamples[0];
+    var newest = swipeSamples[swipeSamples.length - 1];
+    var dt = newest.t - oldest.t;
+    if (dt <= 0) return 0;
+    return (newest.x - oldest.x) / dt;
+  }
+
+  function applyWind(x) {
+    if (!ambientStyle) return;
+    ambientStyle.setProperty('--wind-x', x + 'px');
+    ambientStyle.setProperty('--wind-x-extra', (x * 0.4) + 'px');
+  }
+
+  function windStep(now) {
+    var dt = 1;
+    if (windStep.lastTime) {
+      dt = Math.min(32, now - windStep.lastTime) / 16.67;
+      if (dt <= 0) dt = 1;
+    }
+    windStep.lastTime = now;
+
+    currentWindOffset += currentWindVelocity * dt;
+    currentWindVelocity -= currentWindOffset * WIND_STIFFNESS * dt;
+    currentWindVelocity *= Math.pow(WIND_DAMPING, dt);
+
+    if (currentWindOffset > WIND_OFFSET_CLAMP) {
+      currentWindOffset = WIND_OFFSET_CLAMP;
+      currentWindVelocity *= 0.5;
+    } else if (currentWindOffset < -WIND_OFFSET_CLAMP) {
+      currentWindOffset = -WIND_OFFSET_CLAMP;
+      currentWindVelocity *= 0.5;
+    }
+
+    applyWind(currentWindOffset);
+
+    if (Math.abs(currentWindVelocity) < WIND_SETTLE_VELOCITY &&
+        Math.abs(currentWindOffset) < WIND_SETTLE_OFFSET) {
+      currentWindOffset = 0;
+      currentWindVelocity = 0;
+      applyWind(0);
+      windRafId = null;
+      windStep.lastTime = 0;
+      return;
+    }
+
+    windRafId = requestAnimationFrame(windStep);
+  }
+
+  function gustWind(impulse) {
+    if (!windEnabled) return;
+    currentWindVelocity += impulse;
+    if (windRafId) cancelAnimationFrame(windRafId);
+    windStep.lastTime = 0;
+    windRafId = requestAnimationFrame(windStep);
+  }
+
+  function releaseSwipeGust() {
+    if (!windEnabled) return;
+    var velocityPxPerMs = computeSwipeVelocity();
+    var velocityPxPerFrame = velocityPxPerMs * 16.67;
+    var impulse = velocityPxPerFrame * WIND_VELOCITY_SCALE;
+    if (impulse > WIND_VELOCITY_CAP) impulse = WIND_VELOCITY_CAP;
+    if (impulse < -WIND_VELOCITY_CAP) impulse = -WIND_VELOCITY_CAP;
+    if (Math.abs(impulse) < 0.3) return;
+    gustWind(impulse);
+  }
+
+  function resetWind() {
+    if (windRafId) { cancelAnimationFrame(windRafId); windRafId = null; }
+    currentWindOffset = 0;
+    currentWindVelocity = 0;
+    swipeSamples = [];
+    windStep.lastTime = 0;
+    applyWind(0);
+  }
+
+  function buildMotes() {
+    if (!moteField) return;
+    moteField.innerHTML = '';
+    if (!windEnabled) return;
+    var count = 8;
+    for (var i = 0; i < count; i++) {
+      var m = document.createElement('div');
+      m.className = 'mote';
+      var size = 14 + Math.random() * 16;
+      m.style.width = size + 'px';
+      m.style.height = size + 'px';
+      m.style.left = (Math.random() * 100) + '%';
+      m.style.top  = (Math.random() * 100) + '%';
+      var dur = 18 + Math.random() * 20;
+      m.style.setProperty('--mote-dur', dur + 's');
+      m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
+      m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
+      m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
+      m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
+      moteField.appendChild(m);
+    }
+  }
+
+  window.addEventListener('resize', function() {
+    // Re-clamp in case a mid-gust offset is now out of bounds
+    if (Math.abs(currentWindOffset) > WIND_OFFSET_CLAMP) {
+      currentWindOffset = currentWindOffset > 0 ? WIND_OFFSET_CLAMP : -WIND_OFFSET_CLAMP;
+      applyWind(currentWindOffset);
+    }
+  });
+
   /* ============ TABLE LISTENERS ============ */
   tableCard.addEventListener('click', function(e) {
     var box = e.target.closest('.row-check');
@@ -2643,6 +2874,7 @@
     if (rejected) return;
     var row = box.closest('.row');
     if (!row) return;
+    if (pendingUncheckRow === row) cancelPendingUncheck();
     var priceField = row.querySelector('.price-input');
     var serviceText = row.querySelector('.service-input');
     var isCustomRow = !!serviceText;
@@ -2685,7 +2917,6 @@
       if (isCustomRow) updateRowLock(row);
       box.classList.add('checked');
       box.setAttribute('aria-checked', 'true');
-      // Focus this row's price field so the numpad targets the correct row
       if (priceField && !priceField.disabled) {
         try { priceField.focus(); } catch (e) {}
       }
@@ -2700,6 +2931,61 @@
     var row = svcInput.closest('.row');
     if (!row) return;
     openTanzaku(row);
+  });
+
+  /* Tapping a preset row's body toggles its highlight, mirroring the checkbox.
+     Custom rows are excluded — they keep their .service-input modal flow and
+     rely on the submit-time alert. */
+  tableCard.addEventListener('click', function(e) {
+    if (rejected) return;
+    if (e.target.closest('.row-check')) return;
+    if (e.target.closest('.price-wrap')) return;
+    if (e.target.closest('.service-input')) return;
+    var row = e.target.closest('.row');
+    if (!row) return;
+    if (row.classList.contains('locked')) return;
+    var display = row.querySelector('.service-display');
+    if (!display) return;
+    var box = row.querySelector('.row-check');
+    if (!box) return;
+    var priceInput = row.querySelector('.price-input');
+
+    if (box.classList.contains('checked')) {
+      if (pendingUncheckRow === row) cancelPendingUncheck();
+      haptic(6);
+      playCheck(false);
+      if (priceInput) {
+        if (priceInput.value !== '') box.setAttribute('data-saved-price', priceInput.value);
+        priceInput.value = '';
+      }
+      box.classList.remove('checked');
+      box.setAttribute('aria-checked', 'false');
+    } else {
+      haptic(10);
+      playCheck(true);
+      if (priceInput) {
+        var saved = box.getAttribute('data-saved-price');
+        if (saved !== null && saved !== '') priceInput.value = saved;
+      }
+      box.classList.add('checked');
+      box.setAttribute('aria-checked', 'true');
+    }
+    recalc();
+  });
+
+  /* Auto-uncheck on empty blur (preset rows only). */
+  tableCard.addEventListener('focusout', function(e) {
+    var input = e.target;
+    if (!input || !input.classList || !input.classList.contains('price-input')) return;
+    if (rejected) return;
+    var row = input.closest('.row');
+    if (!row) return;
+    var display = row.querySelector('.service-display');
+    if (!display) return;
+    var box = row.querySelector('.row-check');
+    if (!box || !box.classList.contains('checked')) return;
+    if (parseFormatted(input.value) > 0) return;
+    schedulePendingUncheck(row, input, box);
   });
 
   tableCard.addEventListener('input', function(e) {
@@ -2948,6 +3234,8 @@
 
   /* ============ RESET ============ */
   function resetAll() {
+    cancelPendingUncheck();
+    resetWind();
     rejected = false;
     rejectRow.classList.remove('selected');
     rejectThanks.classList.remove('shown');
@@ -3035,6 +3323,7 @@
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('sw.js').catch(function() {});
     }
+    buildMotes();
   });
 
   /* ============ INTRO ============ */
@@ -3200,10 +3489,8 @@
           haptic(8);
           var item = btn.closest('.receipt-item');
           if (!item) return;
-          // Flag as removing so the total roll fires immediately and excludes this item
           item.setAttribute('data-removing', 'true');
           updateReceiptTotal();
-          // Then run the collapse animation
           item.style.transition = 'opacity 0.4s ease, transform 0.4s ease, max-height 0.4s ease, padding 0.4s ease, margin 0.4s ease';
           item.style.overflow = 'hidden';
           item.style.maxHeight = item.offsetHeight + 'px';
@@ -3400,6 +3687,8 @@
     startY = e.touches[0].clientY;
     currentX = startX;
     dragging = true; decided = false; isHorizontal = false;
+    startSwipeTracking();
+    recordSwipeSample(startX);
   }
   function onTouchMove(e) {
     if (!dragging) return;
@@ -3415,6 +3704,7 @@
     if (isHorizontal) {
       e.preventDefault();
       currentX = x;
+      recordSwipeSample(x);
       if (currentPanel === totalPanels - 1 && deltaX < 0) {
         var baseOffsetEnd = -currentPanel * stageWidth;
         var offsetEnd = baseOffsetEnd + deltaX * 0.35;
@@ -3479,20 +3769,21 @@
     track.classList.remove('dragging');
     if (!isHorizontal) { clearInlineFades(); return; }
     clearInlineFades();
+    releaseSwipeGust();
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
     if (currentPanel === totalPanels - 1) {
-      if (deltaX > threshold) goToPanel(currentPanel - 1);
-      else goToPanel(currentPanel);
+      if (deltaX > threshold) goToPanel(currentPanel - 1, true);
+      else goToPanel(currentPanel, true);
       return;
     }
     if (currentPanel === 0) {
-      if (deltaX < -threshold) goToPanel(currentPanel + 1);
-      else goToPanel(currentPanel);
+      if (deltaX < -threshold) goToPanel(currentPanel + 1, true);
+      else goToPanel(currentPanel, true);
       return;
     }
-    if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
-    else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
+    if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1, true);
+    else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1, true);
   }
   stage.addEventListener('touchstart', onTouchStart, { passive: true });
   stage.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -3503,11 +3794,14 @@
   stage.addEventListener('mousedown', function(e) {
     mouseDown = true;
     startX = e.clientX; currentX = e.clientX;
+    startSwipeTracking();
+    recordSwipeSample(startX);
     track.classList.add('dragging');
   });
   window.addEventListener('mousemove', function(e) {
     if (!mouseDown) return;
     currentX = e.clientX;
+    recordSwipeSample(currentX);
     var deltaX = currentX - startX;
     if (currentPanel === totalPanels - 1 && deltaX < 0) {
       var baseOffsetEnd = -currentPanel * stageWidth;
@@ -3533,20 +3827,21 @@
     mouseDown = false;
     track.classList.remove('dragging');
     clearInlineFades();
+    releaseSwipeGust();
     var deltaX = currentX - startX;
     var threshold = refWidth * 0.12;
     if (currentPanel === totalPanels - 1) {
-      if (deltaX > threshold) goToPanel(currentPanel - 1);
-      else goToPanel(currentPanel);
+      if (deltaX > threshold) goToPanel(currentPanel - 1, true);
+      else goToPanel(currentPanel, true);
       return;
     }
     if (currentPanel === 0) {
-      if (deltaX < -threshold) goToPanel(currentPanel + 1);
-      else goToPanel(currentPanel);
+      if (deltaX < -threshold) goToPanel(currentPanel + 1, true);
+      else goToPanel(currentPanel, true);
       return;
     }
-    if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1);
-    else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1);
+    if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1, true);
+    else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1, true);
   });
 
   document.addEventListener('keydown', function(e) {
@@ -3621,7 +3916,6 @@
       summaryBar.classList.remove('visible');
     }
 
-    // ALWAYS update the numpad based on its own independent row-visibility rules
     updateNumpadVisibility();
   }
 
@@ -3966,6 +4260,8 @@
     tyStartY = e.touches[0].clientY;
     tyCurrentX = tyStartX;
     tyDragging = true; tyDecided = false; tyHorizontal = false;
+    startSwipeTracking();
+    recordSwipeSample(tyStartX);
   }
   function tyTouchMove(e) {
     if (!tyDragging || tyExited) return;
@@ -3981,6 +4277,7 @@
     if (tyHorizontal) {
       e.preventDefault();
       tyCurrentX = x;
+      recordSwipeSample(x);
       var baseOffset = -tyCurrentPanel * tyStageWidth;
       var offset = baseOffset + deltaX;
       if (tyCurrentPanel === 0 && deltaX > 0) offset = baseOffset + deltaX * 0.35;
@@ -4029,6 +4326,7 @@
     tyTrack.classList.remove('dragging');
     if (!tyHorizontal) { clearTyInlineFades(); return; }
     clearTyInlineFades();
+    releaseSwipeGust();
     var deltaX = tyCurrentX - tyStartX;
     var threshold = tyRefWidth * 0.12;
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
@@ -4048,11 +4346,14 @@
     if (tyExited) return;
     tyMouseDown = true;
     tyStartX = e.clientX; tyCurrentX = e.clientX;
+    startSwipeTracking();
+    recordSwipeSample(tyStartX);
     tyTrack.classList.add('dragging');
   });
   window.addEventListener('mousemove', function(e) {
     if (!tyMouseDown || tyExited) return;
     tyCurrentX = e.clientX;
+    recordSwipeSample(tyCurrentX);
     var deltaX = tyCurrentX - tyStartX;
     var baseOffset = -tyCurrentPanel * tyStageWidth;
     var offset = baseOffset + deltaX;
@@ -4067,6 +4368,7 @@
     if (tyExited) return;
     tyTrack.classList.remove('dragging');
     clearTyInlineFades();
+    releaseSwipeGust();
     var deltaX = tyCurrentX - tyStartX;
     var threshold = tyRefWidth * 0.12;
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
