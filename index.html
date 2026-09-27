@@ -86,6 +86,20 @@
     font-size: 17px; line-height: 1.7;
     min-height: 100vh; overscroll-behavior-y: contain;
     transition: background-color 1.2s ease, color 0.8s ease;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: pan-y;
+  }
+
+  /* Text inputs opt back in to selection + native long-press menu, so users
+     can still paste and select-all in the name and tanzaku fields. */
+  input, textarea, [contenteditable] {
+    -webkit-touch-callout: default;
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   body { padding-bottom: 100px; background-color: var(--bg-base); }
@@ -1714,6 +1728,30 @@
     } catch (e) { /* silent */ }
   }
 
+  /* ============ INPUT HYGIENE (no pinch, no long-press menu) ============ */
+  /* Pinch-zoom is closed off by three independent mechanisms: the viewport
+     meta tag, touch-action: pan-y on <body>, and the gesture-event handlers
+     below. The gesture handlers matter specifically for iOS Safari, which
+     has historically ignored user-scalable=no in the viewport meta, and for
+     older Android WebViews that only partially honor touch-action. */
+  ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(evt) {
+    document.addEventListener(evt, function(e) { e.preventDefault(); }, { passive: false });
+  });
+
+  /* Two-finger touch is never legitimate in this app — block at the source. */
+  document.addEventListener('touchstart', function(e) {
+    if (e.touches.length > 1) e.preventDefault();
+  }, { passive: false });
+
+  /* Long-press context menu (Chrome's "tap to search / share" popup, iOS
+     callout). Suppressed globally except on text inputs, where paste and
+     select-all remain useful. */
+  document.addEventListener('contextmenu', function(e) {
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    e.preventDefault();
+  });
+
   /* ============ ACOUSTIC ENGINE ============ */
   var SOUND_ENABLED = true;
   var soundAudioCtx = null;
@@ -2690,7 +2728,8 @@
      after a short grace window. The window exists so a tap that lands on the
      same row (checkbox or row body) can cancel the pending uncheck before it
      fires — focusout runs before click, so without this the user's tap would
-     briefly uncheck and then re-check, ending in a flicker. */
+     briefly uncheck and then re-check, ending in a flicker. We also shake the
+     price field to signal that a price is required. */
   var pendingUncheckRow = null;
   var pendingUncheckTimeout = null;
 
@@ -2709,8 +2748,20 @@
       pendingUncheckTimeout = null;
       pendingUncheckRow = null;
       if (rejected) return;
+      if (document.activeElement === input) return;   // refocused during grace window
       if (!box.classList.contains('checked')) return;
       if (parseFormatted(input.value) > 0) return;
+
+      // Shake the price field to signal a price is required.
+      var wrap = input.closest('.price-wrap');
+      if (wrap) {
+        wrap.classList.remove('shake');
+        void wrap.offsetWidth;
+        wrap.classList.add('shake');
+        setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+      }
+
+      // Then un-highlight the row.
       box.classList.remove('checked');
       box.setAttribute('aria-checked', 'false');
       box.removeAttribute('data-saved-price');
@@ -2859,7 +2910,6 @@
   }
 
   window.addEventListener('resize', function() {
-    // Re-clamp in case a mid-gust offset is now out of bounds
     if (Math.abs(currentWindOffset) > WIND_OFFSET_CLAMP) {
       currentWindOffset = currentWindOffset > 0 ? WIND_OFFSET_CLAMP : -WIND_OFFSET_CLAMP;
       applyWind(currentWindOffset);
@@ -2933,9 +2983,10 @@
     openTanzaku(row);
   });
 
-  /* Tapping a preset row's body toggles its highlight, mirroring the checkbox.
-     Custom rows are excluded — they keep their .service-input modal flow and
-     rely on the submit-time alert. */
+  /* Tapping a preset row's body highlights it AND focuses its price field,
+     so the numpad targets this row. Tapping again — or tapping the checkbox
+     — deselects, even while the field is focused. Custom rows are excluded;
+     they keep their .service-input modal flow. */
   tableCard.addEventListener('click', function(e) {
     if (rejected) return;
     if (e.target.closest('.row-check')) return;
@@ -2951,16 +3002,21 @@
     var priceInput = row.querySelector('.price-input');
 
     if (box.classList.contains('checked')) {
+      // Deselect. Cancel any pending empty-blur feedback for this row,
+      // save the price for round-trip, then uncheck and blur.
       if (pendingUncheckRow === row) cancelPendingUncheck();
       haptic(6);
       playCheck(false);
       if (priceInput) {
         if (priceInput.value !== '') box.setAttribute('data-saved-price', priceInput.value);
         priceInput.value = '';
+        try { priceInput.blur(); } catch (err) {}
       }
       box.classList.remove('checked');
       box.setAttribute('aria-checked', 'false');
     } else {
+      // Highlight + focus the price field. Provisional: if the user blurs
+      // without entering a price, the row auto-unchecks and the field shakes.
       haptic(10);
       playCheck(true);
       if (priceInput) {
@@ -2969,11 +3025,14 @@
       }
       box.classList.add('checked');
       box.setAttribute('aria-checked', 'true');
+      if (priceInput && !priceInput.disabled) {
+        try { priceInput.focus(); } catch (err) {}
+      }
     }
     recalc();
   });
 
-  /* Auto-uncheck on empty blur (preset rows only). */
+  /* Auto-uncheck + shake on empty blur (preset rows only). */
   tableCard.addEventListener('focusout', function(e) {
     var input = e.target;
     if (!input || !input.classList || !input.classList.contains('price-input')) return;
