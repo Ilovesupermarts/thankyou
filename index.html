@@ -94,8 +94,6 @@
     touch-action: pan-y;
   }
 
-  /* Text inputs opt back in to selection + native long-press menu, so users
-     can still paste and select-all in the name and tanzaku fields. */
   input, textarea, [contenteditable] {
     -webkit-touch-callout: default;
     -webkit-user-select: text;
@@ -163,13 +161,11 @@
     will-change: transform;
   }
 
-  /* Time-of-day filters */
   html[data-time="morning"] .ambient-primary { filter: hue-rotate(-8deg) saturate(1.05); }
   html[data-time="day"]     .ambient-primary { filter: none; }
   html[data-time="evening"] .ambient-primary { filter: hue-rotate(-18deg) saturate(1.15); }
   html[data-time="night"]   .ambient-primary { filter: hue-rotate(-28deg) saturate(0.65) brightness(0.92); }
 
-  /* Weather filters */
   html[data-weather="rain"] .ambient-primary,
   html[data-weather="drizzle"] .ambient-primary { filter: hue-rotate(-13deg) saturate(0.75); }
   html[data-weather="thunderstorm"] .ambient-primary { filter: hue-rotate(-20deg) saturate(0.6) brightness(0.9); }
@@ -574,7 +570,6 @@
   .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
   .row.disabled { opacity: 0.35; pointer-events: none; }
 
-  /* Preset rows behave as a tappable label for their checkbox */
   .row:not(.locked):not(.disabled) { cursor: pointer; }
   .row:not(.locked):not(.disabled) .price-wrap { cursor: default; }
   .row:not(.locked):not(.disabled) .price-input { cursor: text; }
@@ -1007,17 +1002,7 @@
     position: relative; animation: receiptArrive 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; margin: auto;
   }
   @keyframes receiptArrive { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-  .receipt-close {
-    position: sticky; top: 0; float: right; margin: -8px -8px 0 0;
-    width: 34px; height: 34px; border-radius: 50%;
-    background: rgba(255, 255, 255, 0.9); border: none; color: #c9bfb8;
-    font-size: 20px; font-weight: 400; font-family: inherit; line-height: 1;
-    cursor: pointer; display: flex; align-items: center; justify-content: center;
-    transition: background 0.2s, color 0.2s; -webkit-appearance: none; appearance: none;
-    padding: 0; z-index: 5;
-  }
-  .receipt-close:active { background: var(--soft-3); color: var(--text-mute); }
-  .receipt-header { text-align: center; margin-bottom: 24px; clear: both; }
+  .receipt-header { text-align: center; margin-bottom: 24px; }
   .receipt-thanks { font-size: 17px; font-weight: 600; color: var(--accent); line-height: 1.9; letter-spacing: 1px; margin-bottom: 16px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .receipt-subthanks { font-size: 13px; font-weight: 400; color: var(--text-mute); line-height: 1.9; letter-spacing: 0.5px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; text-align: center; }
@@ -1039,12 +1024,6 @@
   .receipt-item-remove:active { background: var(--soft-1); color: var(--accent); }
 
   /* ============ RECEIPT ITEM SOFT-DELETE ============ */
-  /* Tapping × on a receipt item no longer removes it from the DOM. Instead
-     the item's content fades out and an undo button fades into the same
-     space. Tapping undo restores the content with the original price. The
-     item's data-removing flag excludes it from the total while soft-deleted.
-     Layout never shifts because the item element itself never leaves. */
-
   .receipt-item.removing .receipt-item-name,
   .receipt-item.removing .receipt-item-price-wrap,
   .receipt-item.removing .receipt-item-remove {
@@ -1058,7 +1037,7 @@
     left: 50%;
     transform: translate(-50%, -50%) scale(0.96);
     background: transparent;
-    border: 1.5px dashed var(--border-6);
+    border: none;
     border-radius: 10px;
     padding: 6px 16px;
     color: var(--text-mute);
@@ -1072,7 +1051,6 @@
     transition: opacity 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 transform 0.45s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 background 0.2s ease,
-                border-color 0.2s ease,
                 color 0.2s ease;
     white-space: nowrap;
     -webkit-appearance: none;
@@ -1088,7 +1066,6 @@
 
   .receipt-item-undo:active {
     background: var(--soft-2);
-    border-color: var(--accent);
     color: var(--accent);
   }
 
@@ -1103,7 +1080,38 @@
   .receipt-total-label { font-size: 18px; font-weight: 600; color: var(--text-mute); letter-spacing: 4px; line-height: 1.2; }
   .receipt-total-value { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; line-height: 1.2; white-space: nowrap; }
   .receipt-total-value .yen-symbol { font-size: 13px; margin-right: 1px; opacity: 0.8; font-weight: 700; }
-  .receipt-closing-line { margin-top: 22px; text-align: center; font-size: 14px; font-weight: 500; color: var(--accent); letter-spacing: 0.8px; line-height: 2; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
+
+  .receipt-confirm-btn {
+    display: block;
+    width: 100%;
+    max-width: 260px;
+    margin: 26px auto 0 auto;
+    background: var(--accent);
+    border: 1.5px solid var(--accent);
+    color: #ffffff;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    padding: 12px 20px;
+    border-radius: 22px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.15s;
+    -webkit-appearance: none;
+    appearance: none;
+    white-space: nowrap;
+    box-shadow: 0 4px 14px var(--shadow-accent);
+  }
+  .receipt-confirm-btn:active {
+    background: var(--accent-3);
+    border-color: var(--accent-3);
+    transform: scale(0.97);
+  }
+
+  .receipt-confirm-btn + .receipt-back-btn {
+    margin-top: 12px;
+  }
+
   .receipt-back-btn { display: block; width: 100%; max-width: 260px; margin: 26px auto 0 auto; background: #ffffff; border: 1.5px solid var(--border-1); color: var(--accent); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 13px; font-weight: 600; letter-spacing: 2px; padding: 12px 20px; border-radius: 22px; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; -webkit-appearance: none; appearance: none; white-space: nowrap; }
   .receipt-back-btn:active { background: var(--soft-2); border-color: var(--accent); transform: scale(0.97); }
   .receipt-footer { text-align: center; margin-top: 22px; }
@@ -1125,7 +1133,8 @@
     .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
     .receipt-total-value { font-size: 22px; }
     .receipt-total-value .yen-symbol { font-size: 15px; }
-    .receipt-closing-line { font-size: 15px; margin-top: 26px; }
+    .receipt-confirm-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
+    .receipt-confirm-btn + .receipt-back-btn { margin-top: 14px; }
     .receipt-back-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
     .receipt-item-remove { width: 28px; height: 28px; font-size: 18px; }
     .receipt-footer-mark { font-size: 14px; letter-spacing: 12px; }
@@ -1144,6 +1153,7 @@
     .receipt-total-label { font-size: 26px; }
     .receipt-total-value { font-size: 26px; }
     .receipt-total-value .yen-symbol { font-size: 17px; }
+    .receipt-confirm-btn { font-size: 15px; padding: 14px 28px; max-width: 340px; }
     .receipt-back-btn { font-size: 15px; padding: 14px 28px; max-width: 340px; }
   }
 
@@ -1659,7 +1669,6 @@
 
 <div class="receipt-screen" id="receiptScreen">
   <div class="receipt-paper">
-    <button type="button" class="receipt-close" id="receiptClose" aria-label="閉じる">×</button>
     <div class="receipt-header">
       <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
       <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
@@ -1678,9 +1687,9 @@
       <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span id="receiptTotalNumber">0</span></span>
     </div>
 
-    <div class="receipt-closing-line">
+    <button type="button" class="receipt-confirm-btn" id="receiptConfirmBtn">
       こちらの内容でお願いいたします。
-    </div>
+    </button>
 
     <button type="button" class="receipt-back-btn" id="receiptBackBtn">
       サービスの選択に戻る
@@ -1791,23 +1800,14 @@
   }
 
   /* ============ INPUT HYGIENE (no pinch, no long-press menu) ============ */
-  /* Pinch-zoom is closed off by three independent mechanisms: the viewport
-     meta tag, touch-action: pan-y on <body>, and the gesture-event handlers
-     below. The gesture handlers matter specifically for iOS Safari, which
-     has historically ignored user-scalable=no in the viewport meta, and for
-     older Android WebViews that only partially honor touch-action. */
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(evt) {
     document.addEventListener(evt, function(e) { e.preventDefault(); }, { passive: false });
   });
 
-  /* Two-finger touch is never legitimate in this app — block at the source. */
   document.addEventListener('touchstart', function(e) {
     if (e.touches.length > 1) e.preventDefault();
   }, { passive: false });
 
-  /* Long-press context menu (Chrome's "tap to search / share" popup, iOS
-     callout). Suppressed globally except on text inputs, where paste and
-     select-all remain useful. */
   document.addEventListener('contextmenu', function(e) {
     var t = e.target;
     if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
@@ -2204,7 +2204,7 @@
   var receiptScreen = document.getElementById('receiptScreen');
   var receiptItems = document.getElementById('receiptItems');
   var receiptTotal = document.getElementById('receiptTotal');
-  var receiptClose = document.getElementById('receiptClose');
+  var receiptConfirmBtn = document.getElementById('receiptConfirmBtn');
   var receiptBackBtn = document.getElementById('receiptBackBtn');
 
   var thankyouScreen = document.getElementById('thankyouScreen');
@@ -2785,19 +2785,15 @@
     return missing;
   }
 
-  /* ============ EMPTY-BLUR SHAKE + UNCHECK ============ */
+  /* ============ EMPTY-BLUR SHAKE + REFOCUS ============ */
   /* When a checked row's price field is blurred while still empty, the row
-     is in a "highlighted but unpriced" state the user has not committed to.
-     We: shake the field (visual + haptic nudge), uncheck the row (removing
-     the highlight — a highlight without a price is not a valid state), and
-     refocus the field so the numpad re-arms on the correct row. If the user
-     types after this, the existing input handler re-checks the row. If they
-     tap away again, the row is now unchecked, no shake fires, and focus
-     releases cleanly.
-     Zero counts as a valid price, so a value of '0' suppresses the shake.
-     The short grace window lets a same-row tap (checkbox or row body) cancel
-     the feedback before it fires, since focusout runs before click.
-     Applies to both preset and custom rows. */
+     stays checked — the user may still intend to come back and enter a
+     price. We shake the field (visual + haptic nudge) and refocus it so the
+     numpad re-arms on this row. The submit-time alert is the ultimate
+     safeguard if the price is never entered. Zero counts as a valid price,
+     so a value of '0' suppresses the shake. The short grace window lets a
+     same-row tap cancel the feedback before it fires, since focusout runs
+     before click. Applies to both preset and custom rows. */
   var pendingShakeRow = null;
   var pendingShakeTimeout = null;
 
@@ -2817,7 +2813,7 @@
       pendingShakeRow = null;
       if (rejected) return;
       if (document.activeElement === input) return;   // already refocused
-      if (!box.classList.contains('checked')) return; // user already deselected
+      if (!box.classList.contains('checked')) return; // user deselected in the interim
       if ((input.value || '').trim() !== '') return;  // has value (incl. '0')
 
       // 1. Shake the field.
@@ -2830,31 +2826,17 @@
       }
       haptic(6);
 
-      // 2. Uncheck the row — a highlight without a price is not a valid state.
-      box.classList.remove('checked');
-      box.setAttribute('aria-checked', 'false');
-      box.removeAttribute('data-saved-price');
-
-      // 3. Refocus the field so the numpad re-arms on this row — unless the
+      // 2. Refocus the field so the numpad re-arms on this row — unless the
       //    user has already moved focus to a different input.
       var active = document.activeElement;
       var otherInputFocused = active && active.tagName === 'INPUT';
       if (!otherInputFocused) {
         try { input.focus(); } catch (e) {}
       }
-
-      recalc();
     }, 150);
   }
 
   /* ============ RECEIPT EMPTY-BLUR SHAKE + REFOCUS ============ */
-  /* Same treatment as the table's price field: a receipt item's price input
-     that loses focus while empty shakes and refocuses, so the numpad
-     re-arms on the correct item. Receipt items have no checkbox — the item
-     stays present and is only removable via the × button — so there is no
-     uncheck step here. The pending shake is cancelled if the user taps the
-     item's × during the grace window, so no shake flashes on a disappearing
-     element. */
   var pendingShakeReceiptItem = null;
   var pendingShakeReceiptTimeout = null;
 
@@ -2872,10 +2854,10 @@
     pendingShakeReceiptTimeout = setTimeout(function() {
       pendingShakeReceiptTimeout = null;
       pendingShakeReceiptItem = null;
-      if (!item.isConnected) return;                          // item was removed
-      if (item.classList.contains('removing')) return;        // item was soft-deleted
-      if (document.activeElement === input) return;           // already refocused
-      if ((input.value || '').trim() !== '') return;          // has value (incl. '0')
+      if (!item.isConnected) return;
+      if (item.classList.contains('removing')) return;
+      if (document.activeElement === input) return;
+      if ((input.value || '').trim() !== '') return;
 
       var wrap = input.closest('.receipt-item-price-wrap');
       if (wrap) {
@@ -3107,10 +3089,6 @@
     openTanzaku(row);
   });
 
-  /* Tapping a preset row's body highlights it AND focuses its price field,
-     so the numpad targets this row. Tapping again — or tapping the checkbox
-     — deselects, even while the field is focused. Custom rows are excluded;
-     they keep their .service-input modal flow. */
   tableCard.addEventListener('click', function(e) {
     if (rejected) return;
     if (e.target.closest('.row-check')) return;
@@ -3126,8 +3104,6 @@
     var priceInput = row.querySelector('.price-input');
 
     if (box.classList.contains('checked')) {
-      // Deselect. Cancel any pending empty-blur feedback for this row,
-      // save the price for round-trip, then uncheck and blur.
       if (pendingShakeRow === row) cancelPendingShake();
       haptic(6);
       playCheck(false);
@@ -3139,8 +3115,6 @@
       box.classList.remove('checked');
       box.setAttribute('aria-checked', 'false');
     } else {
-      // Highlight + focus the price field. Provisional: if the user blurs
-      // without entering a price, the row shakes and unchecks as a reminder.
       haptic(10);
       playCheck(true);
       if (priceInput) {
@@ -3156,8 +3130,6 @@
     recalc();
   });
 
-  /* Empty-blur on a checked row's price field: shake, uncheck, refocus.
-     Applies to BOTH preset and custom rows. Zero is a valid price. */
   tableCard.addEventListener('focusout', function(e) {
     var input = e.target;
     if (!input || !input.classList || !input.classList.contains('price-input')) return;
@@ -3166,7 +3138,7 @@
     if (!row) return;
     var box = row.querySelector('.row-check');
     if (!box || !box.classList.contains('checked')) return;
-    if ((input.value || '').trim() !== '') return;   // has value (incl. '0')
+    if ((input.value || '').trim() !== '') return;
     scheduleEmptyBlurShake(row, input, box);
   });
 
@@ -3673,7 +3645,7 @@
           if (!item) return;
           if (item.classList.contains('removing')) return;
           if (item.getAttribute('data-removing') === 'true') return;
-          if ((input.value || '').trim() !== '') return; // has value (incl. '0')
+          if ((input.value || '').trim() !== '') return;
           scheduleReceiptEmptyBlurShake(item, input);
         });
       })(receiptPriceInputs[i]);
@@ -3784,8 +3756,8 @@
     confirmScreen.classList.remove('visible');
   });
 
-  /* ============ RECEIPT CLOSE ============ */
-  receiptClose.addEventListener('click', function(e) {
+  /* ============ RECEIPT CONFIRM (was ×) ============ */
+  receiptConfirmBtn.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(8);
     cancelPendingReceiptShake();
