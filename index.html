@@ -4031,10 +4031,29 @@
     if (e.target === alertScreen) alertOk.click();
   });
 
+  /* ============ CONFIRM DIALOG ============ */
   confirmYes.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(14);
     confirmScreen.classList.remove('visible');
+
+    // FIX-005: Reject path — no services to itemize, skip the receipt
+    // entirely and go straight to the thank-you / shower sequence.
+    if (rejected) {
+      firstServiceInReceipt = false;
+      thankyouScreen.style.transition = 'none';
+      thankyouScreen.classList.add('visible');
+      void thankyouScreen.offsetWidth;
+      thankyouScreen.style.transition = '';
+      startThankyouSequence();
+      tableCard.classList.remove('active');
+      rejectRow.classList.remove('active');
+      divider.classList.remove('active');
+      summaryBar.classList.remove('visible');
+      infoBar.classList.remove('hidden');
+      return;
+    }
+
     buildReceipt();
     tableCard.classList.remove('active');
     rejectRow.classList.remove('active');
