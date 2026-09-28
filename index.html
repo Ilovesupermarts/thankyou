@@ -1809,9 +1809,22 @@
     if (e.touches.length > 1) e.preventDefault();
   }, { passive: false });
 
+  /* Long-press context menu suppression.
+     Price fields are numpad-driven (inputmode="none") and must never surface
+     the native paste / select-all tooltip — that breaks the contained,
+     native-feeling interaction model. Name, tanzaku, preset, and tip fields
+     legitimately benefit from paste, so they retain the native menu. */
   document.addEventListener('contextmenu', function(e) {
     var t = e.target;
-    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (!t) { e.preventDefault(); return; }
+    if (t.tagName === 'INPUT') {
+      if (t.classList.contains('price-input') || t.classList.contains('receipt-price-input')) {
+        e.preventDefault();
+        return;
+      }
+      return; // Allow paste-enabled fields (name, tanzaku, preset, tip)
+    }
+    if (t.tagName === 'TEXTAREA' || t.isContentEditable) return;
     e.preventDefault();
   });
 
@@ -2803,6 +2816,17 @@
       pendingShakeTimeout = null;
       pendingShakeRow = null;
       if (rejected) return;
+
+      // Modal-awareness guard: if any overlay holds the floor, background
+      // feedback must be fully suppressed — no shake, no haptic, no focus
+      // steal. This protects against stale timers firing behind a modal and
+      // janking the layout or locking the hardware keyboard layer on older
+      // Android WebViews.
+      if (alertScreen.classList.contains('visible')) return;
+      if (confirmScreen.classList.contains('visible')) return;
+      if (receiptScreen && receiptScreen.classList.contains('visible')) return;
+      if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) return;
+
       if (document.activeElement === input) return;
       if (!box.classList.contains('checked')) return;
       if ((input.value || '').trim() !== '') return;
@@ -2889,6 +2913,11 @@
     pendingShakeReceiptTimeout = setTimeout(function() {
       pendingShakeReceiptTimeout = null;
       pendingShakeReceiptItem = null;
+      // If the receipt is no longer the visible surface, abort entirely.
+      // Firing a shake or haptic on a hidden receipt during the thank-you
+      // transition would produce a phantom buzz and potentially steal focus
+      // to an off-screen input.
+      if (!receiptScreen.classList.contains('visible')) return;
       if (!item.isConnected) return;
       if (item.classList.contains('removing')) return;
       if (document.activeElement === input) return;
@@ -3605,6 +3634,10 @@
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
       itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
+      // Two-way sync: link this receipt item back to its source table row.
+      // All mutations on the receipt (× / ↺ / price edit) write through to
+      // the row so the table is the authoritative state.
+      itemDiv._srcRow = row;
       var nameSpan = document.createElement('span');
       nameSpan.className = 'receipt-item-name';
       nameSpan.textContent = name;
@@ -3674,6 +3707,21 @@
           if (digits.length > 5) digits = digits.slice(0, 5);
           if (digits === '') input.value = '';
           else input.value = parseInt(digits, 10).toLocaleString();
+          // Two-way sync: mirror the price edit to the source row, or to
+          // confirmedTipAmount for the reject-only tip item (which has no
+          // source row).
+          var item = input.closest('.receipt-item');
+          if (item && item._srcRow) {
+            var srcPriceInput = item._srcRow.querySelector('.price-input');
+            if (srcPriceInput) srcPriceInput.value = input.value;
+            recalc();
+          } else {
+            var newTip = parseFormatted(input.value);
+            confirmedTipAmount = newTip;
+            if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = newTip.toLocaleString();
+            setTipValue(newTip);
+            recalc();
+          }
           updateReceiptTotal();
         });
         input.addEventListener('focus', function() {
@@ -3700,6 +3748,24 @@
           if (item.classList.contains('removing')) return;
           haptic(8);
           cancelPendingReceiptShake();
+
+          // Two-way sync: reflect the removal on the source row so returning
+          // to the table shows it unchecked, and re-submitting excludes it.
+          if (item._srcRow) {
+            var srcBox = item._srcRow.querySelector('.row-check');
+            var srcPrice = item._srcRow.querySelector('.price-input');
+            var srcService = item._srcRow.querySelector('.service-input');
+            if (srcBox) {
+              if (srcPrice && srcPrice.value !== '') srcBox.setAttribute('data-saved-price', srcPrice.value);
+              if (srcService && srcService.value.trim() !== '') srcBox.setAttribute('data-saved-service', srcService.value);
+              srcBox.classList.remove('checked');
+              srcBox.setAttribute('aria-checked', 'false');
+            }
+            if (srcPrice) srcPrice.value = '';
+            if (srcService) srcService.value = '';
+            recalc();
+          }
+
           item.setAttribute('data-removing', 'true');
           item.classList.add('removing');
           updateReceiptTotal();
@@ -3716,6 +3782,27 @@
           if (!item) return;
           if (!item.classList.contains('removing')) return;
           haptic(10);
+
+          // Two-way sync: restore the source row to its pre-delete state.
+          if (item._srcRow) {
+            var srcBox = item._srcRow.querySelector('.row-check');
+            var srcPrice = item._srcRow.querySelector('.price-input');
+            var srcService = item._srcRow.querySelector('.service-input');
+            if (srcBox) {
+              srcBox.classList.add('checked');
+              srcBox.setAttribute('aria-checked', 'true');
+              var savedPrice = srcBox.getAttribute('data-saved-price');
+              if (savedPrice !== null && savedPrice !== '' && srcPrice) {
+                srcPrice.value = savedPrice;
+              }
+              var savedService = srcBox.getAttribute('data-saved-service');
+              if (savedService !== null && savedService !== '' && srcService) {
+                srcService.value = savedService;
+              }
+            }
+            recalc();
+          }
+
           item.classList.remove('removing');
           item.setAttribute('data-removing', 'false');
           updateReceiptTotal();
@@ -3728,6 +3815,10 @@
   submitBtn.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(10);
+    // Flush any pending empty-blur shake so it can't fire behind the modal
+    // that this Submit is about to open. The timer's own modal-awareness
+    // guard catches paths that omit this flush, but explicit is better.
+    cancelPendingShake();
     var missing = findUnpricedServices();
     if (missing.length > 0) {
       alertList.innerHTML = '';
