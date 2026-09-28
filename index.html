@@ -721,6 +721,29 @@
   .reject-thanks-line { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
   .reject-thanks-sub { font-size: 14px; font-weight: 500; color: var(--text-med); letter-spacing: 0.5px; line-height: 1.8; margin-bottom: 14px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
 
+  /* AMEND-002: zero-tip variant of the reject message — larger text, no gift section */
+  .reject-thanks.no-tip .reject-thanks-line {
+    font-size: 20px;
+    line-height: 2;
+  }
+  .reject-thanks.no-tip .reject-thanks-sub {
+    font-size: 16px;
+    line-height: 2;
+    margin-bottom: 0;
+  }
+  .reject-thanks.no-tip .gift-divider,
+  .reject-thanks.no-tip .reject-gift {
+    display: none;
+  }
+  @media (min-width: 700px) {
+    .reject-thanks.no-tip .reject-thanks-line { font-size: 22px; }
+    .reject-thanks.no-tip .reject-thanks-sub  { font-size: 17px; }
+  }
+  @media (min-width: 1100px) {
+    .reject-thanks.no-tip .reject-thanks-line { font-size: 24px; }
+    .reject-thanks.no-tip .reject-thanks-sub  { font-size: 18px; }
+  }
+
   .gift-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px 0; }
   .gift-divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--glow) 30%, var(--glow) 70%, transparent); }
   .gift-divider-label { flex-shrink: 0; font-size: 17px; font-weight: 600; color: var(--accent); letter-spacing: 5px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; padding: 0 6px; }
@@ -1337,6 +1360,9 @@
     .reject-gift { font-size: 12.5px; padding: 12px 14px; }
     .reject-gift-amount { font-size: 16px; }
     .theme-toggle { top: 12px; left: 12px; width: 38px; height: 38px; font-size: 17px; }
+    /* AMEND-002: no-tip variant also shrinks on short screens */
+    .reject-thanks.no-tip .reject-thanks-line { font-size: 17px; }
+    .reject-thanks.no-tip .reject-thanks-sub  { font-size: 14px; }
   }
   @media (max-height: 600px) and (orientation: landscape) {
     .info-bar { padding: 8px 14px 6px 14px; }
@@ -1368,6 +1394,9 @@
     .reject-gift { font-size: 12px; }
     .reject-gift-amount { font-size: 15px; }
     .theme-toggle { top: 10px; left: 10px; width: 34px; height: 34px; font-size: 15px; }
+    /* AMEND-002: no-tip variant on very short landscape */
+    .reject-thanks.no-tip .reject-thanks-line { font-size: 15px; }
+    .reject-thanks.no-tip .reject-thanks-sub  { font-size: 12.5px; }
   }
 </style>
 </head>
@@ -1579,8 +1608,8 @@
       お気遣いありがとうございます。
     </div>
     <div class="reject-thanks" id="rejectThanks">
-      <div class="reject-thanks-line">かしこまりました。</div>
-      <div class="reject-thanks-sub">本日はどうぞゆっくりお過ごしください。</div>
+      <div class="reject-thanks-line" id="rejectThanksLine">かしこまりました。</div>
+      <div class="reject-thanks-sub" id="rejectThanksSub">本日もどうぞよろしくお願いいたします。</div>
 
       <div class="gift-divider">
         <span class="gift-divider-line"></span>
@@ -1589,7 +1618,7 @@
       </div>
 
       <div class="reject-gift">
-        ささやかではございますが、日頃の感謝の気持ちを込めて、<span class="reject-gift-amount" id="rejectGiftAmount">1,500</span>円をお受け取りいただければ幸いです。
+        ささやかではございますが、感謝の気持ちを込めて、<span class="reject-gift-amount" id="rejectGiftAmount">1,500</span>円をお受け取りいただければ幸いです。
       </div>
     </div>
   </div>
@@ -2203,6 +2232,8 @@
   var rejectRow = document.getElementById('rejectRow');
   var rejectThanks = document.getElementById('rejectThanks');
   var rejectGiftAmountEl = document.getElementById('rejectGiftAmount');
+  var rejectThanksLine = document.getElementById('rejectThanksLine');
+  var rejectThanksSub  = document.getElementById('rejectThanksSub');
   var tipInput = document.getElementById('tipInput');
   var tipMinus = document.getElementById('tipMinus');
   var tipPlus = document.getElementById('tipPlus');
@@ -3517,6 +3548,24 @@
   attachHoldAcceleration(tipMinus, -100);
   attachHoldAcceleration(tipPlus, 100);
 
+  /* ============ AMEND-002: REJECT THANKS CONTENT VARIANTS ============ */
+  /* Swaps the reject-thanks block between the standard message (tip > 0)
+     and the zero-tip variant (larger text, no gift section). Called from
+     the reject-row select path and the receipt tip-edit path. */
+  function updateRejectThanksContent() {
+    var noTip = (confirmedTipAmount === 0);
+    if (noTip) {
+      if (rejectThanksLine) rejectThanksLine.textContent = 'どうぞお気になさらないでください。';
+      if (rejectThanksSub) rejectThanksSub.innerHTML = 'マッサージを楽しみにしています。<br>本日はお部屋まで来ていただき、ありがとうございます。';
+      rejectThanks.classList.add('no-tip');
+    } else {
+      if (rejectThanksLine) rejectThanksLine.textContent = 'かしこまりました。';
+      if (rejectThanksSub) rejectThanksSub.textContent = '本日もどうぞよろしくお願いいたします。';
+      rejectThanks.classList.remove('no-tip');
+      if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
+    }
+  }
+
   /* ============ NAME CONFIRM ============ */
   function confirmName() {
     if (nameConfirmed) return;
@@ -3814,10 +3863,12 @@
             if (srcPriceInput) srcPriceInput.value = input.value;
             recalc();
           } else {
+            // AMEND-002: reject-tip edit — sync confirmedTipAmount + tipInput
+            // and refresh the reject-thanks block so the variant stays current.
             var newTip = parseFormatted(input.value);
             confirmedTipAmount = newTip;
-            if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = newTip.toLocaleString();
             setTipValue(newTip);
+            updateRejectThanksContent();
             recalc();
           }
           updateReceiptTotal();
@@ -4464,24 +4515,33 @@
         row.classList.remove('filled');
         updateRowLock(row);
       }
-      if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
+      // AMEND-002: pick standard or zero-tip variant based on current tip.
+      updateRejectThanksContent();
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
       petalOverlay.classList.remove('active');
       void petalOverlay.offsetWidth;
       petalOverlay.classList.add('active');
       if (numpad) numpad.classList.remove('visible');
 
-      // FIX-003: after the reject-thanks expansion animation completes
-      // (350ms delay + 900ms max-height transition ≈ 1250ms), scroll the
-      // reject row into view if its bottom overflows the viewport. Fires
-      // only on select, not un-select. Timer is cleared on rapid re-taps.
+      // FIX-003 (revised): after the reject-thanks expansion animation
+      // completes (350ms delay + 900ms max-height transition ≈ 1250ms),
+      // scroll the reject row into view if its bottom overflows the
+      // viewport. Reserves space for the fixed summary bar so the bottom
+      // of the reject content is not obscured. Fires only on select, not
+      // un-select. Timer is cleared on rapid re-taps.
       if (rejectScrollTimer) { clearTimeout(rejectScrollTimer); rejectScrollTimer = null; }
       rejectScrollTimer = setTimeout(function() {
         rejectScrollTimer = null;
         var rect = rejectRow.getBoundingClientRect();
         var vh = window.innerHeight;
-        var bottomMargin = 40;
-        var overflow = rect.bottom - (vh - bottomMargin);
+        var summaryH = 0;
+        if (summaryBar) {
+          var sr = summaryBar.getBoundingClientRect();
+          if (sr.height > 0) summaryH = sr.height;
+        }
+        if (summaryH < 60) summaryH = 80; // conservative fallback
+        var bottomSafe = summaryH + 40;
+        var overflow = rect.bottom - (vh - bottomSafe);
         if (overflow > 0) {
           try { window.scrollBy({ top: overflow, behavior: 'smooth' }); }
           catch (e) { window.scrollBy(0, overflow); }
