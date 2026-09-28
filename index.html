@@ -2235,6 +2235,8 @@
   var firstServiceInReceipt = false;
   var stageWidth = window.innerWidth;
   var refWidth = Math.min(window.innerWidth, 600);
+  // FIX-003: timer handle for reject-row auto-scroll after expansion
+  var rejectScrollTimer = null;
 
   var startBtn = document.getElementById('startBtn');
   var blossomScreen = document.getElementById('blossomScreen');
@@ -2742,16 +2744,69 @@
     for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
   }
 
-  function flashServiceInput(row) {
-    if (!row) return;
+  /* ============ FIX-002: SEQUENTIAL CUSTOM ROW GATING ============ */
+  /* Custom rows must be filled top-to-bottom. Only the first row without a
+     service name may be opened; earlier empty rows block later ones. */
+  function getCustomRows() {
+    var all = tableCard.querySelectorAll('.row');
+    var out = [];
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].querySelector('.service-input')) out.push(all[i]);
+    }
+    return out;
+  }
+  function customRowHasName(row) {
     var svc = row.querySelector('.service-input');
-    if (!svc) return;
+    return !!(svc && (svc.value || '').trim() !== '');
+  }
+  function firstUnnamedCustomRow() {
+    var rows = getCustomRows();
+    for (var i = 0; i < rows.length; i++) {
+      if (!customRowHasName(rows[i])) return rows[i];
+    }
+    return null;
+  }
+  function isAllowedCustomRow(row) {
+    var rows = getCustomRows();
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i] === row) return true;
+      if (!customRowHasName(rows[i])) return false;
+    }
+    return false;
+  }
+  function flashCustomRowHint(row) {
+    if (!row) return;
     row.classList.remove('service-hint');
     void row.offsetWidth;
     row.classList.add('service-hint');
     setTimeout(function() { row.classList.remove('service-hint'); }, 1000);
-    haptic(6);
+    try { row.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e) {}
+  }
+  function tryOpenCustomService(row, withHint) {
+    if (!row) return;
+    if (!isAllowedCustomRow(row)) {
+      var first = firstUnnamedCustomRow();
+      if (first) {
+        flashCustomRowHint(first);
+        haptic(15);
+      }
+      return;
+    }
+    if (withHint) {
+      row.classList.remove('service-hint');
+      void row.offsetWidth;
+      row.classList.add('service-hint');
+      setTimeout(function() { row.classList.remove('service-hint'); }, 1000);
+      haptic(6);
+    }
     openTanzaku(row);
+  }
+
+  function flashServiceInput(row) {
+    if (!row) return;
+    var svc = row.querySelector('.service-input');
+    if (!svc) return;
+    tryOpenCustomService(row, true);
   }
 
   /* ============ AUTO-COPY ============ */
@@ -3263,7 +3318,8 @@
     var row = svcInput.closest('.row');
     if (!row) return;
     if (refuseIfPending(row)) return;
-    openTanzaku(row);
+    // FIX-002: gate through sequential custom-row ordering.
+    tryOpenCustomService(row, false);
   });
 
   tableCard.addEventListener('click', function(e) {
@@ -3356,7 +3412,10 @@
       if (e.target.classList.contains('service-input')) {
         e.preventDefault();
         var row = e.target.closest('.row');
-        if (row) openTanzaku(row);
+        if (row) {
+          // FIX-002: sequential gate also on Enter key path.
+          tryOpenCustomService(row, false);
+        }
       } else if (e.target.classList.contains('price-input')) {
         if (e.target.disabled) return;
         if (e.target.value.trim() === '') {
@@ -3478,14 +3537,17 @@
     confirmedTipAmount = getTipValue();
     if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-    // Transfer ALL name-screen preset rows — checked or not — with prices
-    // prefilled. The checkbox is the commit signal on the main table, so
-    // rows arrive unchecked, unfilled, and without data-saved-price.
+    // FIX-001: Transfer ONLY checked name-screen preset rows. The therapist
+    // sees only the services the client actually offered. Rows arrive with
+    // prices prefilled but unchecked — the checkbox remains the sole commit
+    // signal on the main table. Unchecked rows are not transferred at all.
     var dynamicRows = document.getElementById('dynamicRows');
     dynamicRows.innerHTML = '';
     var nameRows = nameScreenRows.querySelectorAll('.row');
     for (var i = 0; i < nameRows.length; i++) {
       var row = nameRows[i];
+      var box = row.querySelector('.row-check');
+      if (!box || !box.classList.contains('checked')) continue;
       var display = row.querySelector('.service-display');
       var priceInput = row.querySelector('.price-input');
       var nameVal = display ? (display.textContent || '').trim() : '';
@@ -4408,7 +4470,25 @@
       void petalOverlay.offsetWidth;
       petalOverlay.classList.add('active');
       if (numpad) numpad.classList.remove('visible');
+
+      // FIX-003: after the reject-thanks expansion animation completes
+      // (350ms delay + 900ms max-height transition ≈ 1250ms), scroll the
+      // reject row into view if its bottom overflows the viewport. Fires
+      // only on select, not un-select. Timer is cleared on rapid re-taps.
+      if (rejectScrollTimer) { clearTimeout(rejectScrollTimer); rejectScrollTimer = null; }
+      rejectScrollTimer = setTimeout(function() {
+        rejectScrollTimer = null;
+        var rect = rejectRow.getBoundingClientRect();
+        var vh = window.innerHeight;
+        var bottomMargin = 40;
+        var overflow = rect.bottom - (vh - bottomMargin);
+        if (overflow > 0) {
+          try { window.scrollBy({ top: overflow, behavior: 'smooth' }); }
+          catch (e) { window.scrollBy(0, overflow); }
+        }
+      }, 1300);
     } else {
+      if (rejectScrollTimer) { clearTimeout(rejectScrollTimer); rejectScrollTimer = null; }
       rejectRow.classList.remove('selected');
       rejectThanks.classList.remove('shown');
       petalOverlay.classList.remove('active');
