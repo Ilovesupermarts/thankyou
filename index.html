@@ -334,8 +334,34 @@
 
   .preset-label { margin-top: 28px; font-size: 13px; color: var(--text-faint); letter-spacing: 3px; }
 
-  /* Name screen preset table (reuses .table-card / .row styling) */
+  /* Name screen preset table */
   #nameScreenTable { margin-top: 14px; }
+  /* Left-align preset service names on the name screen */
+  #nameScreenRows .service-display { text-align: left; }
+
+  /* Name screen total row */
+  .name-total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 14px 14px 14px 15px;
+    border-top: 1.5px solid var(--border-2);
+    background: var(--soft-1);
+  }
+  .name-total-label {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 2px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  }
+  .name-total-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  }
 
   .tip-minus, .tip-plus {
     flex-shrink: 0; width: 42px; height: 42px; border-radius: 50%;
@@ -1384,6 +1410,10 @@
 
     <div class="table-card active" id="nameScreenTable">
       <div id="nameScreenRows"></div>
+      <div class="name-total-row">
+        <span class="name-total-label">合計</span>
+        <span class="name-total-value" id="nameScreenTotalValue">¥0</span>
+      </div>
     </div>
 
     <div class="tip-label">ささやかなお礼</div>
@@ -1618,8 +1648,8 @@
 
 <div class="alert-screen" id="alertScreen">
   <div class="alert-card">
-    <div class="alert-title">以下のサービスの料金が入力されていません。</div>
-    <div class="alert-sub">料金をご入力ください。</div>
+    <div class="alert-title" id="alertTitle">以下のサービスの料金が入力されていません。</div>
+    <div class="alert-sub" id="alertSub">料金をご入力ください。</div>
     <ul class="alert-list" id="alertList"></ul>
     <div class="alert-actions">
       <button type="button" class="alert-btn" id="alertOk">戻って入力する</button>
@@ -1781,11 +1811,6 @@
     if (e.touches.length > 1) e.preventDefault();
   }, { passive: false });
 
-  /* Long-press context menu suppression.
-     Price fields are numpad-driven (inputmode="none") and must never surface
-     the native paste / select-all tooltip — that breaks the contained,
-     native-feeling interaction model. Name, tanzaku, preset, and tip fields
-     legitimately benefit from paste, so they retain the native menu. */
   document.addEventListener('contextmenu', function(e) {
     var t = e.target;
     if (!t) { e.preventDefault(); return; }
@@ -1794,7 +1819,7 @@
         e.preventDefault();
         return;
       }
-      return; // Allow paste-enabled fields (name, tanzaku, tip)
+      return;
     }
     if (t.tagName === 'TEXTAREA' || t.isContentEditable) return;
     e.preventDefault();
@@ -1987,10 +2012,6 @@
   }
 
   /* ============ PRESETS ============ */
-  /* PRESETS is an array of { name, price } objects loaded from presets.json.
-     Legacy format {"presets": ["名前1", "名前2"]} is upgraded to
-     {name: <string>, price: 0}. A preset missing a price renders with an
-     empty price input on the name screen. */
   var PRESETS = [
     { name: 'ダミーテキスト1', price: 0 },
     { name: 'ダミーテキスト2', price: 0 },
@@ -2169,6 +2190,7 @@
   var nameBtn = document.getElementById('nameBtn');
   var nameScreenRows = document.getElementById('nameScreenRows');
   var nameScreenTable = document.getElementById('nameScreenTable');
+  var nameScreenTotalValue = document.getElementById('nameScreenTotalValue');
   var therapistNameEl = document.getElementById('therapistName');
   var track = document.getElementById('track');
   var stage = document.getElementById('stage');
@@ -2192,6 +2214,8 @@
   var totalEl = document.getElementById('total');
   var alertScreen = document.getElementById('alertScreen');
   var alertList = document.getElementById('alertList');
+  var alertTitle = document.getElementById('alertTitle');
+  var alertSub = document.getElementById('alertSub');
   var alertOk = document.getElementById('alertOk');
   var numpad = document.getElementById('numpad');
   var numpadBtns = numpad ? numpad.querySelectorAll('.numpad-btn') : [];
@@ -2428,9 +2452,6 @@
     var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
     if (rejected && !isReceiptOpen) return;
 
-    // Fully inert when nothing is focused: no sound, no haptic, no state
-    // change. Only the CSS :active press animation plays, which matches
-    // native keyboard behavior.
     var target = getActivePriceInput();
     if (!target) return;
 
@@ -2513,12 +2534,9 @@
   document.addEventListener('focusin', function(e) {
     var t = e.target;
     if (!t || !t.classList) return;
-    // Refuse focus landing on a different row's price field while a pending
-    // unpriced row exists. This closes the "tap directly on another row's
-    // price input" bypass that row-body and checkbox guards do not cover.
     if (t.classList.contains('price-input')) {
       var row = t.closest('.row');
-      if (row && refuseIfPending(row)) return;
+      if (row && row.closest('#tableCard') && refuseIfPending(row)) return;
     }
     if (t.classList.contains('service-input') || t.classList.contains('tanzaku-input')) {
       numpadSuppressed = true;
@@ -2565,9 +2583,6 @@
 
     var val = (tanzakuInput.value || '').trim();
 
-    // Empty input cannot be committed — a service with no name is not a
-    // valid state. Shake the input to signal the miss and keep the modal
-    // open so the user can either type a name or tap キャンセル to back out.
     if (val === '') {
       tanzakuInput.classList.remove('shake');
       void tanzakuInput.offsetWidth;
@@ -2685,7 +2700,8 @@
       var val = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
-      if (isChecked || val > 0) { row.classList.add('filled'); sum += val; }
+      // Checkbox is the sole commit signal — price alone does not fill or count.
+      if (isChecked) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
     var displayTotal = rejected ? confirmedTipAmount : sum;
@@ -2698,9 +2714,7 @@
     var anyActive = false;
     for (var i = 0; i < rows.length; i++) {
       var check = rows[i].querySelector('.row-check');
-      var pi = rows[i].querySelector('.price-input');
-      var val = pi ? parseFormatted(pi.value) : 0;
-      if ((check && check.classList.contains('checked')) || val > 0) { anyActive = true; break; }
+      if (check && check.classList.contains('checked')) { anyActive = true; break; }
     }
     submitBtn.disabled = !(anyActive || rejected);
   }
@@ -2789,7 +2803,7 @@
       var isChecked = check && check.classList.contains('checked');
       var rawVal = (priceInput.value || '').trim();
       var hasPrice = rawVal !== '';
-      if (!isChecked && !hasPrice) continue;
+      if (!isChecked) continue;
       if (!hasPrice) {
         var display = row.querySelector('.service-display');
         var textInput = row.querySelector('.service-input');
@@ -2823,9 +2837,6 @@
       pendingShakeRow = null;
       if (rejected) return;
 
-      // Modal-awareness guard: if any overlay holds the floor, background
-      // feedback must be fully suppressed — no shake, no haptic, no focus
-      // steal.
       if (alertScreen.classList.contains('visible')) return;
       if (confirmScreen.classList.contains('visible')) return;
       if (receiptScreen && receiptScreen.classList.contains('visible')) return;
@@ -2910,7 +2921,6 @@
     pendingShakeReceiptTimeout = setTimeout(function() {
       pendingShakeReceiptTimeout = null;
       pendingShakeReceiptItem = null;
-      // If the receipt is no longer the visible surface, abort entirely.
       if (!receiptScreen.classList.contains('visible')) return;
       if (!item.isConnected) return;
       if (item.classList.contains('removing')) return;
@@ -3081,9 +3091,6 @@
   });
 
   /* ============ NAME SCREEN PRESET TABLE ============ */
-  /* Builds one .row per preset inside #nameScreenRows. Each row mirrors the
-     main table's structure: checkbox, read-only service name, editable price.
-     Names are read-only on this screen — they come from presets.json. */
   function buildNameScreenRows() {
     if (!nameScreenRows) return;
     nameScreenRows.innerHTML = '';
@@ -3119,12 +3126,23 @@
       rowDiv.appendChild(priceWrap);
       nameScreenRows.appendChild(rowDiv);
     }
+    updateNameScreenTotal();
   }
 
-  /* Toggle a name-screen row. Fires on checkbox OR row-body tap.
-     No pending-row lock, no shake, no auto-focus on check. Price stays
-     visible regardless of checkbox state — the checkbox is the sole
-     inclusion control. */
+  function updateNameScreenTotal() {
+    if (!nameScreenRows || !nameScreenTotalValue) return;
+    var sum = 0;
+    var rows = nameScreenRows.querySelectorAll('.row');
+    for (var i = 0; i < rows.length; i++) {
+      var box = rows[i].querySelector('.row-check');
+      if (!box || !box.classList.contains('checked')) continue;
+      var pi = rows[i].querySelector('.price-input');
+      if (pi) sum += parseFormatted(pi.value);
+    }
+    nameScreenTotalValue.textContent = '¥' + sum.toLocaleString();
+  }
+
+  /* Name screen row toggle — no pending lock, no shake, no auto-focus. */
   nameScreenRows.addEventListener('click', function(e) {
     if (e.target.closest('.price-wrap')) return;
     var row = e.target.closest('.row');
@@ -3144,9 +3162,9 @@
       playCheck(true);
     }
     haptic(6);
+    updateNameScreenTotal();
   });
 
-  /* Digit formatting for name-screen price fields. */
   nameScreenRows.addEventListener('input', function(e) {
     var input = e.target;
     if (!input.classList.contains('price-input')) return;
@@ -3154,26 +3172,20 @@
     if (digits.length > 5) digits = digits.slice(0, 5);
     if (digits === '') input.value = '';
     else input.value = parseInt(digits, 10).toLocaleString();
+    updateNameScreenTotal();
   });
 
-  /* Caret-to-end on focus, parity with main table. */
+  /* Select-all on focus (name screen). */
   nameScreenRows.addEventListener('focusin', function(e) {
     var input = e.target;
     if (input && input.classList.contains('price-input')) {
       setTimeout(function() {
-        try {
-          var len = input.value.length;
-          input.setSelectionRange(len, len);
-        } catch (err) {}
+        try { input.select(); } catch (err) {}
       }, 50);
     }
   });
 
   /* ============ TABLE LISTENERS ============ */
-  /* Unified click handler for checking/unchecking a row.
-     Fires whether the user taps the explicit checkbox OR the row body.
-     Custom rows: only the checkbox activates them. Locked rows: only the
-     checkbox activates them (opens tanzaku to enter a service name). */
   tableCard.addEventListener('click', function(e) {
     if (rejected) return;
 
@@ -3189,7 +3201,6 @@
     var tappedCheckbox = !!e.target.closest('.row-check');
     var isCustomRow = !!row.querySelector('.service-input');
 
-    // Locked rows and custom rows are only activated by their checkbox.
     if (row.classList.contains('locked') && !tappedCheckbox) return;
     if (isCustomRow && !tappedCheckbox) return;
 
@@ -3200,7 +3211,6 @@
     var serviceText = row.querySelector('.service-input');
 
     if (box.classList.contains('checked')) {
-      // Deselect
       haptic(6);
       playCheck(false);
       if (priceInput) {
@@ -3217,7 +3227,6 @@
       box.setAttribute('aria-checked', 'false');
       if (isCustomRow) updateRowLock(row);
     } else {
-      // Select
       if (isCustomRow) {
         var currentService2 = serviceText ? (serviceText.value || '').trim() : '';
         var savedService = box.getAttribute('data-saved-service');
@@ -3247,7 +3256,6 @@
     recalc();
   });
 
-  /* Open Tanzaku modal on Custom Row service tap */
   tableCard.addEventListener('click', function(e) {
     var svcInput = e.target.closest('.service-input');
     if (!svcInput) return;
@@ -3258,7 +3266,6 @@
     openTanzaku(row);
   });
 
-  /* Locked-row price-wrap tap → open tanzaku to enter a service name */
   tableCard.addEventListener('click', function(e) {
     var row = e.target.closest('.row');
     if (!row) return;
@@ -3370,14 +3377,12 @@
     }
   });
 
+  /* Select-all on focus (main table) — parity with name screen. */
   tableCard.addEventListener('focusin', function(e) {
     var input = e.target;
     if (input && input.classList.contains('price-input')) {
       setTimeout(function() {
-        try {
-          var len = input.value.length;
-          input.setSelectionRange(len, len);
-        } catch (err) {}
+        try { input.select(); } catch (err) {}
       }, 50);
     }
   });
@@ -3473,14 +3478,14 @@
     confirmedTipAmount = getTipValue();
     if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-    // Copy checked name-screen rows into #dynamicRows on the main table.
+    // Transfer ALL name-screen preset rows — checked or not — with prices
+    // prefilled. The checkbox is the commit signal on the main table, so
+    // rows arrive unchecked, unfilled, and without data-saved-price.
     var dynamicRows = document.getElementById('dynamicRows');
     dynamicRows.innerHTML = '';
     var nameRows = nameScreenRows.querySelectorAll('.row');
     for (var i = 0; i < nameRows.length; i++) {
       var row = nameRows[i];
-      var box = row.querySelector('.row-check');
-      if (!box || !box.classList.contains('checked')) continue;
       var display = row.querySelector('.service-display');
       var priceInput = row.querySelector('.price-input');
       var nameVal = display ? (display.textContent || '').trim() : '';
@@ -3488,12 +3493,11 @@
       var priceVal = priceInput ? (priceInput.value || '').trim() : '';
 
       var rowDiv = document.createElement('div');
-      rowDiv.className = 'row filled';
+      rowDiv.className = 'row';
       var boxDiv = document.createElement('div');
-      boxDiv.className = 'row-check checked';
+      boxDiv.className = 'row-check';
       boxDiv.setAttribute('role', 'checkbox');
-      boxDiv.setAttribute('aria-checked', 'true');
-      if (priceVal !== '') boxDiv.setAttribute('data-saved-price', priceVal);
+      boxDiv.setAttribute('aria-checked', 'false');
       var labelSpan = document.createElement('span');
       labelSpan.className = 'service-display';
       labelSpan.textContent = nameVal;
@@ -3659,7 +3663,9 @@
       var price = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
-      if (!isChecked && price <= 0) continue;
+      // Checkbox is the sole commit signal — unchecked rows are excluded
+      // regardless of any residual price value.
+      if (!isChecked) continue;
       var display = row.querySelector('.service-display');
       var textInput = row.querySelector('.service-input');
       var name = '';
@@ -3670,7 +3676,6 @@
       var itemDiv = document.createElement('div');
       itemDiv.className = 'receipt-item';
       itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
-      // Two-way sync: link this receipt item back to its source table row.
       itemDiv._srcRow = row;
       var nameSpan = document.createElement('span');
       nameSpan.className = 'receipt-item-name';
@@ -3741,8 +3746,6 @@
           if (digits.length > 5) digits = digits.slice(0, 5);
           if (digits === '') input.value = '';
           else input.value = parseInt(digits, 10).toLocaleString();
-          // Two-way sync: mirror the price edit to the source row, or to
-          // confirmedTipAmount for the reject-only tip item.
           var item = input.closest('.receipt-item');
           if (item && item._srcRow) {
             var srcPriceInput = item._srcRow.querySelector('.price-input');
@@ -3782,7 +3785,6 @@
           haptic(8);
           cancelPendingReceiptShake();
 
-          // Two-way sync: reflect the removal on the source row.
           if (item._srcRow) {
             var srcBox = item._srcRow.querySelector('.row-check');
             var srcPrice = item._srcRow.querySelector('.price-input');
@@ -3795,6 +3797,7 @@
             }
             if (srcPrice) srcPrice.value = '';
             if (srcService) srcService.value = '';
+            updateRowLock(item._srcRow);
             recalc();
           }
 
@@ -3815,7 +3818,6 @@
           if (!item.classList.contains('removing')) return;
           haptic(10);
 
-          // Two-way sync: restore the source row.
           if (item._srcRow) {
             var srcBox = item._srcRow.querySelector('.row-check');
             var srcPrice = item._srcRow.querySelector('.price-input');
@@ -3832,6 +3834,7 @@
                 srcService.value = savedService;
               }
             }
+            updateRowLock(item._srcRow);
             recalc();
           }
 
@@ -3843,32 +3846,24 @@
     }
   }
 
-  /* ============ SUBMIT ============ */
-  submitBtn.addEventListener('click', function(e) {
-    e.preventDefault();
-    haptic(10);
-    // Flush any pending empty-blur shake so it can't fire behind the modal
-    // that this Submit is about to open.
-    cancelPendingShake();
-    var missing = findUnpricedServices();
-    if (missing.length > 0) {
-      alertList.innerHTML = '';
-      for (var i = 0; i < missing.length; i++) {
+  /* ============ ALERT HELPER ============ */
+  var alertOkCallback = null;
+  function showAlert(title, sub, items, onOk) {
+    if (alertTitle) alertTitle.textContent = title;
+    if (alertSub) alertSub.textContent = sub;
+    alertList.innerHTML = '';
+    if (items && items.length > 0) {
+      for (var i = 0; i < items.length; i++) {
         var li = document.createElement('li');
-        li.textContent = missing[i];
+        li.textContent = items[i];
         alertList.appendChild(li);
       }
-      alertScreen.classList.add('visible');
-      return;
     }
-    copyCustomServices();
-    confirmScreen.classList.add('visible');
-  });
+    alertOkCallback = onOk || null;
+    alertScreen.classList.add('visible');
+  }
 
-  alertOk.addEventListener('click', function(e) {
-    e.preventDefault();
-    haptic(8);
-    alertScreen.classList.remove('visible');
+  function scrollToFirstUnpricedRow() {
     setTimeout(function() {
       var rows = getRows();
       for (var i = 0; i < rows.length; i++) {
@@ -3889,6 +3884,34 @@
         }
       }
     }, 400);
+  }
+
+  /* ============ SUBMIT ============ */
+  submitBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+    haptic(10);
+    cancelPendingShake();
+    var missing = findUnpricedServices();
+    if (missing.length > 0) {
+      showAlert(
+        '以下のサービスの料金が入力されていません。',
+        '料金をご入力ください。',
+        missing,
+        scrollToFirstUnpricedRow
+      );
+      return;
+    }
+    copyCustomServices();
+    confirmScreen.classList.add('visible');
+  });
+
+  alertOk.addEventListener('click', function(e) {
+    e.preventDefault();
+    haptic(8);
+    alertScreen.classList.remove('visible');
+    var cb = alertOkCallback;
+    alertOkCallback = null;
+    if (typeof cb === 'function') cb();
   });
 
   alertScreen.addEventListener('click', function(e) {
@@ -3917,11 +3940,31 @@
     confirmScreen.classList.remove('visible');
   });
 
-  /* ============ RECEIPT CONFIRM (was ×) ============ */
+  /* ============ RECEIPT CONFIRM ============ */
   receiptConfirmBtn.addEventListener('click', function(e) {
     e.preventDefault();
     haptic(8);
     cancelPendingReceiptShake();
+
+    // Empty-cart guard: if every item has been soft-deleted, pause the flow
+    // and explain — never proceed to the thank-you carousel with a ¥0 receipt.
+    var activeItems = 0;
+    var receiptItemEls = receiptItems.querySelectorAll('.receipt-item');
+    for (var i = 0; i < receiptItemEls.length; i++) {
+      if (receiptItemEls[i].getAttribute('data-removing') === 'true') continue;
+      if (receiptItemEls[i].classList.contains('removing')) continue;
+      activeItems++;
+    }
+    if (activeItems === 0) {
+      showAlert(
+        'すべての項目が削除されています。',
+        '内容をご確認のうえ、もう一度お試しください。',
+        null,
+        null
+      );
+      return;
+    }
+
     if (receiptOpenedFromThankyou) {
       receiptOpenedFromThankyou = false;
       receiptScreen.classList.remove('visible', 'reopened');
@@ -4340,14 +4383,24 @@
       rejectRow.classList.add('selected');
       var rows = getRows();
       for (var i = 0; i < rows.length; i++) {
-        rows[i].classList.add('disabled');
-        var pi = rows[i].querySelector('.price-input');
+        var row = rows[i];
+        row.classList.add('disabled');
+        var ci = row.querySelector('.row-check');
+        var pi = row.querySelector('.price-input');
+        var ti = row.querySelector('.service-input');
+        if (ci) {
+          ci.setAttribute('data-reject-checked', ci.classList.contains('checked') ? '1' : '0');
+          if (pi && pi.value !== '') ci.setAttribute('data-reject-price', pi.value);
+          else ci.removeAttribute('data-reject-price');
+          if (ti && ti.value.trim() !== '') ci.setAttribute('data-reject-service', ti.value);
+          else ci.removeAttribute('data-reject-service');
+          ci.classList.remove('checked');
+          ci.setAttribute('aria-checked', 'false');
+        }
         if (pi) pi.value = '';
-        var ti = rows[i].querySelector('.service-input');
         if (ti) ti.value = '';
-        var ci = rows[i].querySelector('.row-check');
-        if (ci) { ci.classList.remove('checked'); ci.setAttribute('aria-checked', 'false'); }
-        rows[i].classList.remove('filled');
+        row.classList.remove('filled');
+        updateRowLock(row);
       }
       if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
@@ -4360,7 +4413,37 @@
       rejectThanks.classList.remove('shown');
       petalOverlay.classList.remove('active');
       var rows2 = getRows();
-      for (var j = 0; j < rows2.length; j++) rows2[j].classList.remove('disabled');
+      for (var j = 0; j < rows2.length; j++) {
+        var row2 = rows2[j];
+        row2.classList.remove('disabled');
+        var ci2 = row2.querySelector('.row-check');
+        var pi2 = row2.querySelector('.price-input');
+        var ti2 = row2.querySelector('.service-input');
+        if (ci2) {
+          var wasChecked = ci2.getAttribute('data-reject-checked') === '1';
+          var savedPrice = ci2.getAttribute('data-reject-price');
+          var savedService = ci2.getAttribute('data-reject-service');
+          if (savedService !== null && savedService !== '' && ti2) {
+            ti2.value = savedService;
+          }
+          if (savedPrice !== null && savedPrice !== '' && pi2) {
+            pi2.value = savedPrice;
+          }
+          if (wasChecked) {
+            ci2.classList.add('checked');
+            ci2.setAttribute('aria-checked', 'true');
+            row2.classList.add('filled');
+          } else {
+            ci2.classList.remove('checked');
+            ci2.setAttribute('aria-checked', 'false');
+            row2.classList.remove('filled');
+          }
+          ci2.removeAttribute('data-reject-checked');
+          ci2.removeAttribute('data-reject-price');
+          ci2.removeAttribute('data-reject-service');
+        }
+        updateRowLock(row2);
+      }
     }
     recalc(true);
     updateSubmitState();
