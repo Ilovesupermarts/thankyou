@@ -129,20 +129,29 @@
     pointer-events: none;
   }
 
-  /* Base setup: Clean render, no multiply math */
+  /* Base setup: clean render, video hidden until the intro fade-in */
   .ambient-image {
-    background-size: cover;
-    background-position: center;
     opacity: 0;
     pointer-events: none;
     transition: opacity 1.2s ease;
     will-change: opacity;
   }
 
-  /* Autumn override: Reveal the image with enough strength to punch through */
+  /* The video fills the layer, crops to cover, and is softly blurred */
+  .ambient-video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+    filter: blur(8px);
+    transform: scale(1.06);
+  }
+
+  /* Autumn steady-state: layer visible (video is revealed by JS at intro) */
   html[data-theme="autumn"] .ambient-image {
-    background-image: url('icons/1790682335311.jpg');
-    /* Boosted from 0.15. Adjust between 0.5 and 0.8 to taste */
     opacity: 0.8;
   }
 
@@ -1516,7 +1525,12 @@
 <body>
 
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
-  <div class="ambient-layer ambient-image"></div>
+  <div class="ambient-layer ambient-image">
+    <video class="ambient-video" id="ambientVideo"
+           autoplay muted loop playsinline preload="auto">
+      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
+    </video>
+  </div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
   <div class="mote-field" id="moteField"></div>
@@ -1543,7 +1557,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.06</div>
+  <div class="app-version" aria-hidden="true">v1.07</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -1944,6 +1958,16 @@
     currentTheme = theme;
     document.documentElement.setAttribute('data-theme', theme);
     if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
+    /* Video playback: play in autumn, pause in spring (src stays loaded). */
+    var av = document.getElementById('ambientVideo');
+    if (av) {
+      if (theme === 'autumn') {
+        var p = av.play();
+        if (p && typeof p.catch === 'function') p.catch(function() {});
+      } else {
+        try { av.pause(); } catch (e) {}
+      }
+    }
   }
   if (themeToggle) {
     themeToggle.addEventListener('click', function(e) {
@@ -3827,6 +3851,31 @@
 
   window.addEventListener('load', function() {
     startInfoUpdates();
+    /* Autoplay recovery + visibility handling (Android). */
+    var ambientVideo = document.getElementById('ambientVideo');
+    if (ambientVideo) {
+      if (ambientVideo.paused && currentTheme === 'autumn') {
+        var p = ambientVideo.play();
+        if (p && typeof p.catch === 'function') p.catch(function() {});
+      }
+      var kickOnce = function() {
+        if (ambientVideo.paused && currentTheme === 'autumn') {
+          var pp = ambientVideo.play();
+          if (pp && typeof pp.catch === 'function') pp.catch(function() {});
+        }
+        document.removeEventListener('pointerdown', kickOnce);
+      };
+      document.addEventListener('pointerdown', kickOnce, { once: true });
+
+      document.addEventListener('visibilitychange', function() {
+        if (document.hidden) {
+          try { ambientVideo.pause(); } catch (e) {}
+        } else if (currentTheme === 'autumn') {
+          var rp = ambientVideo.play();
+          if (rp && typeof rp.catch === 'function') rp.catch(function() {});
+        }
+      });
+    }
     loadPresetsFromServer().then(function() {
       buildNameScreenRows();
       setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
@@ -3872,6 +3921,10 @@
         span.style.animationDelay = (i * 0.22) + 's';
         nameColumn.appendChild(span);
       }
+      /* Reveal the ambient video for the intro sequence. The video has been
+         playing silently since page load; we're just fading it in. */
+      var ambientImage = document.querySelector('.ambient-image');
+      if (ambientImage) ambientImage.style.opacity = '0.8';
       introOverlay.classList.add('active');
       var arrivalTime = (totalChars * 220) + 1100;
       var holdTime = 1200;
@@ -3894,6 +3947,13 @@
         activatePanel(0);
         setTimeout(function() {
           introOverlay.classList.remove('active', 'finishing');
+          /* If we ended up on spring, fade the video back out. In autumn,
+             leave it visible. */
+          var ambientImage2 = document.querySelector('.ambient-image');
+          if (ambientImage2) {
+            if (currentTheme === 'autumn') ambientImage2.style.opacity = '';
+            else ambientImage2.style.opacity = '0';
+          }
           repositionHintGroupAfterLayout();
           repositionNumpad();
         }, 1400);
