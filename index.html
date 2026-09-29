@@ -595,10 +595,32 @@
     transition: opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
-  .transition-line-head {
-    display: inline-block;
+  /* AMEND-005: title rendered as a flex divider matching the その他 marker style */
+  .transition-line-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 0 20px 0;
+  }
+  .transition-line-mark {
+    flex-shrink: 0;
+    font-size: 1.1em;
+    line-height: 1;
+    color: var(--transition-head-color);
+  }
+  .transition-line-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--transition-head-color);
+    min-width: 24px;
+  }
+  .transition-line-title {
+    flex-shrink: 0;
     font-size: 1.1em;
     color: var(--transition-head-color);
+    letter-spacing: 5px;
+    white-space: nowrap;
   }
   .transition-line.active { opacity: 1; transform: translateY(0); filter: blur(0); }
   .transition-line.fading { opacity: 0; transform: translateY(28px); filter: blur(6px); transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
@@ -1602,10 +1624,16 @@
 <div class="stage-spacer"></div>
 
 <div class="transition-line" id="transitionLine">
-  <span class="transition-line-head">❀ - - - 大切なお知らせ--- ❀</span><br>
+  <div class="transition-line-divider">
+    <span class="transition-line-mark">❀</span>
+    <span class="transition-line-rule"></span>
+    <span class="transition-line-title">大切なお知らせ</span>
+    <span class="transition-line-rule"></span>
+    <span class="transition-line-mark">❀</span>
+  </div>
   それでは、本日の癒しのオプションをご覧ください。<br><br>
   ご無理のない範囲で、ご対応いただけるものがございましたら、 横の○をタップしてお選びください。<br>
-  表に表示されている料金は、必要に応じて変更していただいて構いません。 また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。 すべて見送っていただいても大丈夫です。<br><br>
+  表に表示されている料金は、必要に応じて変更していただいても構いません。 また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。 すべて見送っていただいても大丈夫です。<br><br>
   一覧にないものでも、もしご自身からご提案いただけるものがございましたら、 下の欄にご記入ください。<br><br>
   ありがとうございます。
 </div>
@@ -2610,18 +2638,17 @@
       return;
     }
 
-    var rows = getRows();
-    var isRowVisible = false;
-    if (rows.length > 0) {
-      var firstRowTop = rows[0].getBoundingClientRect().top;
-      var lastRowBottom = rows[rows.length - 1].getBoundingClientRect().bottom;
-      isRowVisible = (firstRowTop < window.innerHeight && lastRowBottom > 0);
-    }
-
+    /* NUMPAD-001: show only when a price field is focused.
+       The former isRowVisible clause is removed — scrolling alone no
+       longer reveals the numpad. On the main table, tapping a checkbox
+       or the service name auto-focuses the price field, which is what
+       makes the numpad appear in those cases. */
     var activeEl = document.activeElement;
-    var isPriceFocused = activeEl && activeEl.classList && (activeEl.classList.contains('price-input') || activeEl.classList.contains('receipt-price-input'));
+    var isPriceFocused = activeEl && activeEl.classList &&
+      (activeEl.classList.contains('price-input') ||
+       activeEl.classList.contains('receipt-price-input'));
 
-    if (isRowVisible || isPriceFocused) {
+    if (isPriceFocused) {
       repositionNumpad();
       numpad.classList.add('visible');
     } else {
