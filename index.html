@@ -306,15 +306,43 @@
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
 
-  /* ============ NAME ENTRY ============ */
+  /* ============ NAME ENTRY (FLEX COLUMN: pinned header / scrollable body / pinned footer) ============ */
   .name-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
-    z-index: 100; display: flex; align-items: center; justify-content: center;
-    padding: 70px 28px 40px 28px; text-align: center; transition: opacity 0.5s ease;
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    z-index: 100;
+    display: flex; align-items: stretch; justify-content: center;
+    padding: 70px 0 0 0;
+    text-align: center;
+    transition: opacity 0.5s ease;
+    overflow: hidden;
   }
   .name-screen.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
-  .name-inner { max-width: 560px; width: 100%; padding: 20px 0; }
+  .name-inner {
+    max-width: 560px; width: 100%;
+    display: flex; flex-direction: column;
+    min-height: 0;
+    padding: 0 28px;
+  }
+  .name-header {
+    flex-shrink: 0;
+    padding-top: 20px;
+    padding-bottom: 12px;
+  }
+  .name-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+  }
+  .name-footer {
+    flex-shrink: 0;
+    padding-top: 32px;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom));
+    display: flex;
+    justify-content: center;
+  }
+
   .name-label { font-size: 14px; color: var(--text-faint); letter-spacing: 3px; margin-bottom: 20px; }
   .name-input {
     width: 100%; background: #ffffff; border: 2px solid var(--border-1); border-radius: 12px;
@@ -396,7 +424,7 @@
   .tip-field-input::placeholder { text-align: right; }
 
   .name-btn {
-    margin-top: 28px; background: var(--accent); color: #ffffff;
+    background: var(--accent); color: #ffffff;
     border: none; border-radius: 30px; padding: 16px 48px;
     font-size: 16px; font-weight: 600; font-family: inherit; letter-spacing: 2px;
     cursor: pointer; transition: background 0.2s, transform 0.15s;
@@ -1263,9 +1291,9 @@
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px 14px 24px; }
     .ticker-track { font-size: 13px; }
-    .table-card, .reject-row, .divider, .name-inner { max-width: 560px; }
+    .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
-    .name-inner { margin-left: auto; margin-right: auto; }
+    .name-inner { max-width: 560px; }
     .panel-inner { max-width: 480px; }
     .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
@@ -1326,7 +1354,10 @@
     .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
     .ticker-track { font-size: 11.5px; }
-    .name-screen { padding: 55px 20px 30px 20px; }
+    .name-screen { padding: 55px 0 0 0; }
+    .name-inner { padding: 0 20px; }
+    .name-header { padding-top: 12px; padding-bottom: 8px; }
+    .name-footer { padding-top: 24px; padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
     .blossom-screen { padding: 55px 20px 30px 20px; }
     .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
@@ -1369,7 +1400,10 @@
     .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
     .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
-    .name-screen { padding: 48px 24px 20px 24px; }
+    .name-screen { padding: 48px 0 0 0; }
+    .name-inner { padding: 0 24px; max-width: 480px; }
+    .name-header { padding-top: 8px; padding-bottom: 6px; }
+    .name-footer { padding-top: 20px; padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
     .blossom-screen { padding: 48px 24px 20px 24px; }
     .panel { padding: 56px 40px 118px 40px; }
     .panel-inner { max-width: 560px; }
@@ -1378,7 +1412,6 @@
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
     .dots { bottom: 66px; }
-    .name-inner { max-width: 480px; }
     .blossom-char { font-size: 68px; }
     .name-char { font-size: 48px; }
     .name-column { gap: 4px; }
@@ -1430,30 +1463,35 @@
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
   <div class="name-inner">
-    <div class="name-label">セラピストのお名前</div>
-    <input type="text" class="name-input" id="nameInput" placeholder="お名前を入力"
-      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
-      enterkeyhint="go">
+    <div class="name-header">
+      <div class="name-label">セラピストのお名前</div>
+      <input type="text" class="name-input" id="nameInput" placeholder="お名前を入力"
+        autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+        enterkeyhint="go">
+    </div>
 
-    <div class="preset-label">サービスの選択</div>
+    <div class="name-scroll">
+      <div class="preset-label">サービスの選択</div>
 
-    <div class="table-card active" id="nameScreenTable">
-      <div id="nameScreenRows"></div>
-      <div class="name-total-row">
-        <span class="name-total-label">合計</span>
-        <span class="name-total-value" id="nameScreenTotalValue">¥0</span>
+      <div class="table-card active" id="nameScreenTable">
+        <div id="nameScreenRows"></div>
+        <div class="name-total-row">
+          <span class="name-total-label">合計</span>
+          <span class="name-total-value" id="nameScreenTotalValue">¥0</span>
+        </div>
+      </div>
+
+      <div class="tip-label">ささやかなお礼</div>
+      <div class="tip-row">
+        <input type="tel" class="tip-field-input" id="tipInput" value="1,500" placeholder="金額を入力" enterkeyhint="done">
+        <button type="button" class="tip-minus" id="tipMinus" aria-label="減らす">−</button>
+        <button type="button" class="tip-plus" id="tipPlus" aria-label="増やす">＋</button>
       </div>
     </div>
 
-    <div class="tip-label">ささやかなお礼</div>
-    <div class="tip-row">
-      <input type="tel" class="tip-field-input" id="tipInput" value="1,500" placeholder="金額を入力" enterkeyhint="done">
-      <button type="button" class="tip-minus" id="tipMinus" aria-label="減らす">−</button>
-      <button type="button" class="tip-plus" id="tipPlus" aria-label="増やす">＋</button>
+    <div class="name-footer">
+      <button type="button" class="name-btn" id="nameBtn">決定</button>
     </div>
-
-    <br>
-    <button type="button" class="name-btn" id="nameBtn">決定</button>
   </div>
 </div>
 
