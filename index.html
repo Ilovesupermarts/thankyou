@@ -308,7 +308,26 @@
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
 
-  /* ============ NAME ENTRY ============ */
+  /* ============ APP VERSION BADGE (VERSION-001) ============ */
+  .app-version {
+    position: absolute;
+    bottom: 4px;
+    left: 8px;
+    padding-left: env(safe-area-inset-left, 0px);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    line-height: 1;
+    color: var(--text-faint);
+    opacity: 0.55;
+    pointer-events: none;
+    z-index: 10;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ============ NAME ENTRY (FLEX COLUMN: pinned header / scrollable body / pinned footer) ============ */
   .name-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
     z-index: 100;
@@ -1498,6 +1517,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
+  <div class="app-version" aria-hidden="true">v1.01</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -2627,7 +2647,6 @@
       return;
     }
 
-    /* NUMPAD-001: show only when a price field is focused. */
     var activeEl = document.activeElement;
     var isPriceFocused = activeEl && activeEl.classList &&
       (activeEl.classList.contains('price-input') ||
@@ -4467,20 +4486,22 @@
     var rows = getRows();
     var vh = window.innerHeight;
 
-    /* SUMMARY-001: after the bar has been shown once this session, switch
-       from percentage-based hysteresis to direction-sensitive row-based
-       triggers. On scroll down, show when the 2nd row enters the viewport.
-       On scroll up, hide when the last row drops off the bottom edge. */
+    /* SUMMARY-001 + SUMMARY-002: after the bar has been shown once this
+       session, switch from percentage-based hysteresis to direction-
+       sensitive row-based triggers.
+       - Scroll down → show when row 2 enters the viewport.
+       - Scroll up  → hide when the topmost row's top edge drops below
+                      the viewport bottom (i.e. entire table off-screen). */
     if (summaryEverShown && rows.length >= 2) {
       var secondRect = rows[1].getBoundingClientRect();
-      var lastRect = rows[rows.length - 1].getBoundingClientRect();
-      var secondVisible = (secondRect.top < vh && secondRect.bottom > 0);
-      var lastOffBottom = (lastRect.top >= vh);
+      var firstRect  = rows[0].getBoundingClientRect();
+      var secondVisible  = (secondRect.top < vh && secondRect.bottom > 0);
+      var firstOffBottom = (firstRect.top >= vh);
 
       if (lastScrollDirection === 'down' && secondVisible) {
         summaryHysteresisOn = true;
         summaryBar.classList.add('visible');
-      } else if (lastScrollDirection === 'up' && lastOffBottom) {
+      } else if (lastScrollDirection === 'up' && firstOffBottom) {
         summaryHysteresisOn = false;
         summaryBar.classList.remove('visible');
       }
