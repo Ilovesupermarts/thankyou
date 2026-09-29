@@ -951,7 +951,15 @@
   html[data-theme="autumn"] .tanzaku-screen { background: rgba(253, 243, 216, 0.92); }
   .tanzaku-screen.visible { opacity: 1; pointer-events: auto; }
   .tanzaku-card {
-    background: #ffffff; max-width: 480px; width: 100%;
+    /* Fallback color and image layer */
+    background-color: #fcfbf9;
+    background-image: url('icons/1790678998862.jpg');
+    background-size: cover;
+    background-position: bottom right;
+    background-repeat: no-repeat;
+
+    /* Existing properties remain untouched */
+    max-width: 480px; width: 100%;
     padding: 32px 28px 24px 28px;
     border-radius: 20px; box-shadow: 0 12px 40px var(--shadow-rose-2);
     border: 1px solid var(--border-3); text-align: center;
@@ -1517,7 +1525,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.02</div>
+  <div class="app-version" aria-hidden="true">v1.03</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
