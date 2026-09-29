@@ -308,7 +308,7 @@
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
 
-  /* ============ NAME ENTRY (FLEX COLUMN: pinned header / scrollable body / pinned footer) ============ */
+  /* ============ NAME ENTRY ============ */
   .name-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
     z-index: 100;
@@ -333,19 +333,16 @@
   .name-scroll {
     flex: 1 1 auto;
     min-height: 0;
-    margin-top: 16px;         /* LAYOUT-005: optical breathing room above the top fade */
+    margin-top: 16px;
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
     overscroll-behavior: contain;
 
-    /* LAYOUT-002: hide scrollbar, keep scroll */
-    scrollbar-width: none;          /* Firefox */
-    -ms-overflow-style: none;       /* legacy Edge / IE */
+    scrollbar-width: none;
+    -ms-overflow-style: none;
 
-    /* LAYOUT-003: padding matched to fade distance → no fade-at-rest */
     padding: 24px 4px 24px 4px;
 
-    /* LAYOUT-003: soft fade at top and bottom edges */
     -webkit-mask-image: linear-gradient(to bottom,
       transparent 0%, #000 24px, #000 calc(100% - 24px), transparent 100%);
     mask-image: linear-gradient(to bottom,
@@ -378,12 +375,9 @@
 
   .preset-label { font-size: 13px; color: var(--text-faint); letter-spacing: 3px; }
 
-  /* Name screen preset table */
   #nameScreenTable { margin-top: 14px; }
-  /* Left-align preset service names on the name screen */
   #nameScreenRows .service-display { text-align: left; }
 
-  /* Name screen total row */
   .name-total-row {
     display: flex;
     justify-content: space-between;
@@ -595,7 +589,6 @@
     transition: opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
-  /* AMEND-005: title rendered as a flex divider matching the その他 marker style */
   .transition-line-divider {
     display: flex;
     align-items: center;
@@ -794,7 +787,6 @@
   .reject-thanks-line { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
   .reject-thanks-sub { font-size: 14px; font-weight: 500; color: var(--text-med); letter-spacing: 0.5px; line-height: 1.8; margin-bottom: 14px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
 
-  /* AMEND-002: zero-tip variant of the reject message — larger text, no gift section */
   .reject-thanks.no-tip .reject-thanks-line {
     font-size: 20px;
     line-height: 2;
@@ -1437,7 +1429,6 @@
     .reject-gift { font-size: 12.5px; padding: 12px 14px; }
     .reject-gift-amount { font-size: 16px; }
     .theme-toggle { top: 12px; left: 12px; width: 38px; height: 38px; font-size: 17px; }
-    /* AMEND-002: no-tip variant also shrinks on short screens */
     .reject-thanks.no-tip .reject-thanks-line { font-size: 17px; }
     .reject-thanks.no-tip .reject-thanks-sub  { font-size: 14px; }
   }
@@ -1473,7 +1464,6 @@
     .reject-gift { font-size: 12px; }
     .reject-gift-amount { font-size: 15px; }
     .theme-toggle { top: 10px; left: 10px; width: 34px; height: 34px; font-size: 15px; }
-    /* AMEND-002: no-tip variant on very short landscape */
     .reject-thanks.no-tip .reject-thanks-line { font-size: 15px; }
     .reject-thanks.no-tip .reject-thanks-sub  { font-size: 12.5px; }
   }
@@ -2358,7 +2348,6 @@
   var firstServiceInReceipt = false;
   var stageWidth = window.innerWidth;
   var refWidth = Math.min(window.innerWidth, 600);
-  // FIX-003: timer handle for reject-row auto-scroll after expansion
   var rejectScrollTimer = null;
 
   var startBtn = document.getElementById('startBtn');
@@ -2638,11 +2627,7 @@
       return;
     }
 
-    /* NUMPAD-001: show only when a price field is focused.
-       The former isRowVisible clause is removed — scrolling alone no
-       longer reveals the numpad. On the main table, tapping a checkbox
-       or the service name auto-focuses the price field, which is what
-       makes the numpad appear in those cases. */
+    /* NUMPAD-001: show only when a price field is focused. */
     var activeEl = document.activeElement;
     var isPriceFocused = activeEl && activeEl.classList &&
       (activeEl.classList.contains('price-input') ||
@@ -2824,7 +2809,6 @@
       var val = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
-      // Checkbox is the sole commit signal — price alone does not fill or count.
       if (isChecked) { row.classList.add('filled'); sum += val; }
       else { row.classList.remove('filled'); }
     }
@@ -2867,8 +2851,6 @@
   }
 
   /* ============ FIX-002: SEQUENTIAL CUSTOM ROW GATING ============ */
-  /* Custom rows must be filled top-to-bottom. Only the first row without a
-     service name may be opened; earlier empty rows block later ones. */
   function getCustomRows() {
     var all = tableCard.querySelectorAll('.row');
     var out = [];
@@ -3319,7 +3301,6 @@
     nameScreenTotalValue.textContent = '¥' + sum.toLocaleString();
   }
 
-  /* Name screen row toggle — no pending lock, no shake, no auto-focus. */
   nameScreenRows.addEventListener('click', function(e) {
     if (e.target.closest('.price-wrap')) return;
     var row = e.target.closest('.row');
@@ -3352,7 +3333,6 @@
     updateNameScreenTotal();
   });
 
-  /* Select-all on focus (name screen). */
   nameScreenRows.addEventListener('focusin', function(e) {
     var input = e.target;
     if (input && input.classList.contains('price-input')) {
@@ -3440,7 +3420,6 @@
     var row = svcInput.closest('.row');
     if (!row) return;
     if (refuseIfPending(row)) return;
-    // FIX-002: gate through sequential custom-row ordering.
     tryOpenCustomService(row, false);
   });
 
@@ -3535,7 +3514,6 @@
         e.preventDefault();
         var row = e.target.closest('.row');
         if (row) {
-          // FIX-002: sequential gate also on Enter key path.
           tryOpenCustomService(row, false);
         }
       } else if (e.target.classList.contains('price-input')) {
@@ -3558,7 +3536,6 @@
     }
   });
 
-  /* Select-all on focus (main table) — parity with name screen. */
   tableCard.addEventListener('focusin', function(e) {
     var input = e.target;
     if (input && input.classList.contains('price-input')) {
@@ -3640,9 +3617,6 @@
   attachHoldAcceleration(tipPlus, 100);
 
   /* ============ AMEND-002: REJECT THANKS CONTENT VARIANTS ============ */
-  /* Swaps the reject-thanks block between the standard message (tip > 0)
-     and the zero-tip variant (larger text, no gift section). Called from
-     the reject-row select path and the receipt tip-edit path. */
   function updateRejectThanksContent() {
     var noTip = (confirmedTipAmount === 0);
     if (noTip) {
@@ -3677,10 +3651,6 @@
     confirmedTipAmount = getTipValue();
     if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-    // FIX-001: Transfer ONLY checked name-screen preset rows. The therapist
-    // sees only the services the client actually offered. Rows arrive with
-    // prices prefilled but unchecked — the checkbox remains the sole commit
-    // signal on the main table. Unchecked rows are not transferred at all.
     var dynamicRows = document.getElementById('dynamicRows');
     dynamicRows.innerHTML = '';
     var nameRows = nameScreenRows.querySelectorAll('.row');
@@ -3865,8 +3835,6 @@
       var price = parseFormatted(priceInput.value);
       var check = row.querySelector('.row-check');
       var isChecked = check && check.classList.contains('checked');
-      // Checkbox is the sole commit signal — unchecked rows are excluded
-      // regardless of any residual price value.
       if (!isChecked) continue;
       var display = row.querySelector('.service-display');
       var textInput = row.querySelector('.service-input');
@@ -3954,8 +3922,6 @@
             if (srcPriceInput) srcPriceInput.value = input.value;
             recalc();
           } else {
-            // AMEND-002: reject-tip edit — sync confirmedTipAmount + tipInput
-            // and refresh the reject-thanks block so the variant stays current.
             var newTip = parseFormatted(input.value);
             confirmedTipAmount = newTip;
             setTipValue(newTip);
@@ -4128,8 +4094,6 @@
     haptic(14);
     confirmScreen.classList.remove('visible');
 
-    // FIX-005: Reject path — no services to itemize, skip the receipt
-    // entirely and go straight to the thank-you / shower sequence.
     if (rejected) {
       firstServiceInReceipt = false;
       thankyouScreen.style.transition = 'none';
@@ -4169,8 +4133,6 @@
     haptic(8);
     cancelPendingReceiptShake();
 
-    // Empty-cart guard: if every item has been soft-deleted, pause the flow
-    // and explain — never proceed to the thank-you carousel with a ¥0 receipt.
     var activeItems = 0;
     var receiptItemEls = receiptItems.querySelectorAll('.receipt-item');
     for (var i = 0; i < receiptItemEls.length; i++) {
@@ -4463,13 +4425,9 @@
   }, { passive: true });
 
   /* ============ FIX-006: touchmove gating ============ */
-  /* Blanket preventDefault would otherwise kill native scrolling inside
-     the name-entry screen's scroll container. Exempt #nameScreen so its
-     .name-scroll area can scroll freely. */
   document.addEventListener('touchmove', function(e) {
     if (tableUnlocked) return;
     if (isHorizontal) return;
-    // Exempt the name-entry screen so its internal .name-scroll works.
     if (e.target && e.target.closest && e.target.closest('#nameScreen')) return;
     e.preventDefault();
   }, { passive: false });
@@ -4480,6 +4438,9 @@
   var tableEnteredView = false;
   var lastScrollY = 0;
   var summaryHysteresisOn = false;
+  /* SUMMARY-001: post-first-run triggers */
+  var summaryEverShown = false;
+  var lastScrollDirection = null;
 
   function getFadeTriggerPx() {
     var h = window.innerHeight, w = window.innerWidth;
@@ -4503,9 +4464,34 @@
   }
 
   function updateSummaryVisibility() {
+    var rows = getRows();
+    var vh = window.innerHeight;
+
+    /* SUMMARY-001: after the bar has been shown once this session, switch
+       from percentage-based hysteresis to direction-sensitive row-based
+       triggers. On scroll down, show when the 2nd row enters the viewport.
+       On scroll up, hide when the last row drops off the bottom edge. */
+    if (summaryEverShown && rows.length >= 2) {
+      var secondRect = rows[1].getBoundingClientRect();
+      var lastRect = rows[rows.length - 1].getBoundingClientRect();
+      var secondVisible = (secondRect.top < vh && secondRect.bottom > 0);
+      var lastOffBottom = (lastRect.top >= vh);
+
+      if (lastScrollDirection === 'down' && secondVisible) {
+        summaryHysteresisOn = true;
+        summaryBar.classList.add('visible');
+      } else if (lastScrollDirection === 'up' && lastOffBottom) {
+        summaryHysteresisOn = false;
+        summaryBar.classList.remove('visible');
+      }
+      /* otherwise: leave current state unchanged */
+      updateNumpadVisibility();
+      return;
+    }
+
+    /* First run (or degenerate table): original percentage-based hysteresis. */
     var tableRect = tableCard.getBoundingClientRect();
     var rejectRect = rejectRow.getBoundingClientRect();
-    var vh = window.innerHeight;
     var top = Math.min(tableRect.top, rejectRect.top);
     var bottom = Math.max(tableRect.bottom, rejectRect.bottom);
     var totalHeight = bottom - top;
@@ -4526,6 +4512,7 @@
 
     if (summaryHysteresisOn) {
       summaryBar.classList.add('visible');
+      summaryEverShown = true;
     } else {
       summaryBar.classList.remove('visible');
     }
@@ -4583,6 +4570,9 @@
     var goingDown = y > lastScrollY + 1;
     var goingUp = y < lastScrollY - 1;
     lastScrollY = y;
+    /* SUMMARY-001: record scroll direction for row-based summary triggers */
+    if (goingDown) lastScrollDirection = 'down';
+    else if (goingUp) lastScrollDirection = 'up';
     if (goingDown && !hasEverScrolled && y > 5) {
       hasEverScrolled = true;
       var lineRect = transitionLine.getBoundingClientRect();
@@ -4633,7 +4623,6 @@
         row.classList.remove('filled');
         updateRowLock(row);
       }
-      // AMEND-002: pick standard or zero-tip variant based on current tip.
       updateRejectThanksContent();
       setTimeout(function() { rejectThanks.classList.add('shown'); }, 350);
       petalOverlay.classList.remove('active');
@@ -4641,12 +4630,6 @@
       petalOverlay.classList.add('active');
       if (numpad) numpad.classList.remove('visible');
 
-      // FIX-003 (revised): after the reject-thanks expansion animation
-      // completes (350ms delay + 900ms max-height transition ≈ 1250ms),
-      // scroll the reject row into view if its bottom overflows the
-      // viewport. Reserves space for the fixed summary bar so the bottom
-      // of the reject content is not obscured. Fires only on select, not
-      // un-select. Timer is cleared on rapid re-taps.
       if (rejectScrollTimer) { clearTimeout(rejectScrollTimer); rejectScrollTimer = null; }
       rejectScrollTimer = setTimeout(function() {
         rejectScrollTimer = null;
@@ -4657,7 +4640,7 @@
           var sr = summaryBar.getBoundingClientRect();
           if (sr.height > 0) summaryH = sr.height;
         }
-        if (summaryH < 60) summaryH = 80; // conservative fallback
+        if (summaryH < 60) summaryH = 80;
         var bottomSafe = summaryH + 40;
         var overflow = rect.bottom - (vh - bottomSafe);
         if (overflow > 0) {
