@@ -308,7 +308,7 @@
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
 
-  /* ============ APP VERSION BADGE (VERSION-001) ============ */
+  /* ============ APP VERSION BADGE ============ */
   .app-version {
     position: absolute;
     bottom: 4px;
@@ -327,7 +327,7 @@
     -webkit-user-select: none;
   }
 
-  /* ============ NAME ENTRY (FLEX COLUMN: pinned header / scrollable body / pinned footer) ============ */
+  /* ============ NAME ENTRY ============ */
   .name-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
     z-index: 100;
@@ -1517,7 +1517,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.01</div>
+  <div class="app-version" aria-hidden="true">v1.02</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -1641,11 +1641,13 @@
     <span class="transition-line-rule"></span>
     <span class="transition-line-mark">❀</span>
   </div>
-  それでは、本日の癒しのオプションをご覧ください。<br><br>
-  ご無理のない範囲で、ご対応いただけるものがございましたら、 横の○をタップしてお選びください。<br>
-  表に表示されている料金は、必要に応じて変更していただいても構いません。 また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。 すべて見送っていただいても大丈夫です。<br><br>
-  一覧にないものでも、もしご自身からご提案いただけるものがございましたら、 下の欄にご記入ください。<br><br>
-  ありがとうございます。
+  <div class="transition-line-body" id="transitionLineBody">
+    それでは、本日の癒しのオプションをご覧ください。<br><br>
+    ご無理のない範囲で、ご対応いただけるものがございましたら、 横の○をタップしてお選びください。<br>
+    表に表示されている料金は、必要に応じて変更していただいても構いません。 また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。 すべて見送っていただいても大丈夫です。<br><br>
+    一覧にないものでも、もしご自身からご提案いただけるものがございましたら、 下の欄にご記入ください。<br><br>
+    ありがとうございます。
+  </div>
 </div>
 
 <div class="divider" id="divider"><span class="divider-text">❀</span></div>
@@ -1925,7 +1927,7 @@
     });
   }
 
-  /* ============ HAPTIC FEEDBACK (vibration only) ============ */
+  /* ============ HAPTIC FEEDBACK ============ */
   function haptic(ms) {
     var strength = ms || 8;
     try {
@@ -1933,7 +1935,7 @@
     } catch (e) { /* silent */ }
   }
 
-  /* ============ INPUT HYGIENE (no pinch, no long-press menu) ============ */
+  /* ============ INPUT HYGIENE ============ */
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(evt) {
     document.addEventListener(evt, function(e) { e.preventDefault(); }, { passive: false });
   });
@@ -2205,6 +2207,18 @@
   }
 
   /* ============ PANEL LOADER ============ */
+  /* CONDITIONAL-001: panel 3 and the transition-line body have two variants.
+     Both are fetched and stored as strings at load; the correct one is
+     injected in confirmName() once we know if any preset was selected. */
+  var panel3DefaultHtml = '';
+  var panel3NoHtml = '';
+  var transitionBodyDefault = '';
+  var transitionBodyNoPresets =
+    'それでは、本日は少し特別な癒しのオプションについてご相談がございます。<br><br>' +
+    'もし、ご自身からご提案いただけるサービスなどがございましたら、下の空欄にご自由にご記入いただき、ご希望の料金をご入力ください。<br><br>' +
+    'もちろん、もしご提案が難しい場合は、無理にご提案いただかなくても大丈夫です。すべて見送っていただいても構いません。<br><br>' +
+    'ありがとうございます。';
+
   function convertPanelText(raw) {
     if (!raw) return '';
     var text = raw.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -2229,11 +2243,18 @@
       })
       .catch(function() { /* silent */ });
   }
+  function loadPanelHtml(url) {
+    return fetch(url + '?v=' + Date.now())
+      .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+      .then(function(text) { return convertPanelText(text); })
+      .catch(function() { return ''; });   /* empty fallback per CONDITIONAL-001 decision */
+  }
   function loadAllPanels() {
     return Promise.all([
       loadPanelInto('panel1Body', 'panel-1.html'),
       loadPanelInto('panel2Body', 'panel-2.html'),
-      loadPanelInto('panel3Body', 'panel-3.html'),
+      loadPanelHtml('panel-3.html').then(function(html) { panel3DefaultHtml = html; }),
+      loadPanelHtml('panel-3-no.html').then(function(html) { panel3NoHtml = html; }),
       loadPanelInto('panel4Body', 'panel-4.html')
     ]);
   }
@@ -3122,7 +3143,7 @@
     }, 150);
   }
 
-  /* ============ WIND FIELD (swipe-reactive ambient) ============ */
+  /* ============ WIND FIELD ============ */
   var ambientStage = document.getElementById('ambientStage');
   var moteField = document.getElementById('moteField');
   var ambientStyle = ambientStage ? ambientStage.style : null;
@@ -3635,7 +3656,7 @@
   attachHoldAcceleration(tipMinus, -100);
   attachHoldAcceleration(tipPlus, 100);
 
-  /* ============ AMEND-002: REJECT THANKS CONTENT VARIANTS ============ */
+  /* ============ REJECT THANKS CONTENT VARIANTS ============ */
   function updateRejectThanksContent() {
     var noTip = (confirmedTipAmount === 0);
     if (noTip) {
@@ -3670,9 +3691,11 @@
     confirmedTipAmount = getTipValue();
     if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
+    /* FIX-001: Transfer ONLY checked name-screen preset rows. */
     var dynamicRows = document.getElementById('dynamicRows');
     dynamicRows.innerHTML = '';
     var nameRows = nameScreenRows.querySelectorAll('.row');
+    var anyPresetSelected = false;
     for (var i = 0; i < nameRows.length; i++) {
       var row = nameRows[i];
       var box = row.querySelector('.row-check');
@@ -3710,6 +3733,24 @@
       rowDiv.appendChild(labelSpan);
       rowDiv.appendChild(priceWrap);
       dynamicRows.appendChild(rowDiv);
+      anyPresetSelected = true;
+    }
+
+    /* CONDITIONAL-001: swap panel 3 content based on preset selection. */
+    var panel3Anchor = document.getElementById('panel3Body');
+    if (panel3Anchor) {
+      panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
+    }
+
+    /* CONDITIONAL-002: swap transition-line body based on preset selection.
+       Capture the default from the DOM the first time we get here. */
+    if (transitionBodyDefault === '') {
+      var tlBodyCapture = document.getElementById('transitionLineBody');
+      if (tlBodyCapture) transitionBodyDefault = tlBodyCapture.innerHTML;
+    }
+    var tlBody = document.getElementById('transitionLineBody');
+    if (tlBody) {
+      tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
     }
 
     nameInput.classList.add('confirmed');
@@ -4443,7 +4484,6 @@
     else infoBar.classList.remove('hidden');
   }, { passive: true });
 
-  /* ============ FIX-006: touchmove gating ============ */
   document.addEventListener('touchmove', function(e) {
     if (tableUnlocked) return;
     if (isHorizontal) return;
@@ -4457,7 +4497,6 @@
   var tableEnteredView = false;
   var lastScrollY = 0;
   var summaryHysteresisOn = false;
-  /* SUMMARY-001: post-first-run triggers */
   var summaryEverShown = false;
   var lastScrollDirection = null;
 
@@ -4486,12 +4525,6 @@
     var rows = getRows();
     var vh = window.innerHeight;
 
-    /* SUMMARY-001 + SUMMARY-002: after the bar has been shown once this
-       session, switch from percentage-based hysteresis to direction-
-       sensitive row-based triggers.
-       - Scroll down → show when row 2 enters the viewport.
-       - Scroll up  → hide when the topmost row's top edge drops below
-                      the viewport bottom (i.e. entire table off-screen). */
     if (summaryEverShown && rows.length >= 2) {
       var secondRect = rows[1].getBoundingClientRect();
       var firstRect  = rows[0].getBoundingClientRect();
@@ -4505,12 +4538,10 @@
         summaryHysteresisOn = false;
         summaryBar.classList.remove('visible');
       }
-      /* otherwise: leave current state unchanged */
       updateNumpadVisibility();
       return;
     }
 
-    /* First run (or degenerate table): original percentage-based hysteresis. */
     var tableRect = tableCard.getBoundingClientRect();
     var rejectRect = rejectRow.getBoundingClientRect();
     var top = Math.min(tableRect.top, rejectRect.top);
@@ -4591,7 +4622,6 @@
     var goingDown = y > lastScrollY + 1;
     var goingUp = y < lastScrollY - 1;
     lastScrollY = y;
-    /* SUMMARY-001: record scroll direction for row-based summary triggers */
     if (goingDown) lastScrollDirection = 'down';
     else if (goingUp) lastScrollDirection = 'up';
     if (goingDown && !hasEverScrolled && y > 5) {
