@@ -49,6 +49,7 @@
     --quote-color: #b04a5a; --quote-shadow: 0 2px 24px #fbdfe3;
     --amb-1: rgba(251, 200, 210, 0.70); --amb-2: rgba(247, 210, 195, 0.65);
     --amb-3: rgba(232, 160, 175, 0.45); --amb-4: rgba(250, 220, 205, 0.55);
+    --transition-head-color: #fce6dc;
   }
 
   html[data-theme="autumn"] {
@@ -75,6 +76,7 @@
     --quote-color: #8f2f00; --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
     --amb-1: rgba(247, 185, 60, 0.85); --amb-2: rgba(240, 138, 30, 0.80);
     --amb-3: rgba(217, 94, 26, 0.72); --amb-4: rgba(143, 63, 18, 0.55); --amb-5: rgba(107, 47, 14, 0.45);
+    --transition-head-color: #fdf0c8;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -241,7 +243,7 @@
   .info-bar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 500;
     padding: 18px 20px 12px 20px; text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     opacity: 0; transform: translateY(-6px);
     transition: opacity 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     pointer-events: none; line-height: 1.4;
@@ -268,7 +270,7 @@
   .ticker-wrap.shown { opacity: 0.9; }
   .ticker-track {
     display: inline-block; white-space: nowrap;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 12.5px; font-weight: 500; color: var(--text-mute); letter-spacing: 1.2px;
     animation: tickerScroll 60s linear infinite; will-change: transform; line-height: 22px;
   }
@@ -361,7 +363,7 @@
   .name-input {
     width: 100%; background: #ffffff; border: 2px solid var(--border-1); border-radius: 12px;
     padding: 12px 16px; font-size: 17px; font-weight: 600; color: var(--text-dark);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     text-align: center; letter-spacing: 1px; transition: border-color 0.2s;
     -webkit-appearance: none; appearance: none; box-shadow: 0 4px 18px var(--shadow-rose);
   }
@@ -395,14 +397,14 @@
     font-weight: 500;
     color: var(--text-mute);
     letter-spacing: 2px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
   .name-total-value {
     font-size: 18px;
     font-weight: 700;
     color: var(--accent);
     letter-spacing: 0.5px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
 
   .tip-minus, .tip-plus {
@@ -462,7 +464,7 @@
   }
   .start-btn:active { transform: scale(0.92); }
   .blossom-char {
-    display: block; font-family: "Hiragino Mincho ProN", "Yu Mincho", "Shippori Mincho", serif;
+    display: block; font-family: "Hiragino Mincho ProN", "Yu Mincho", "Shippori Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 88px; line-height: 1; color: var(--petal); text-align: center;
     user-select: none; -webkit-user-select: none;
     animation: blossomBreathe 2.8s ease-in-out infinite;
@@ -475,12 +477,12 @@
   }
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--accent);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
   .start-hint {
     margin: 8px 0 0 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
     letter-spacing: 3px; line-height: 2;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     text-align: center; animation: hintBreathe 4s ease-in-out infinite;
   }
   @keyframes hintBreathe { 0%, 100% { opacity: 0.92; } 50% { opacity: 1; } }
@@ -496,7 +498,7 @@
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
   .name-char {
-    display: block; font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    display: block; font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 120px; font-weight: 500; color: var(--accent); line-height: 1; letter-spacing: 0;
     opacity: 0; transform: translateY(-24px); filter: blur(3px);
     animation: charArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
@@ -522,7 +524,7 @@
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transition-delay: 0.25s; font-size: 18px; font-weight: 500; color: var(--text-dark);
     line-height: 2.2; letter-spacing: 0.4px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
@@ -530,7 +532,7 @@
   .panel-content p { margin: 0 0 0.4em 0; padding: 0; }
   .panel-content p:last-child { margin-bottom: 0; }
   .panel-content .therapist-name {
-    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-weight: 500; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
@@ -546,7 +548,7 @@
   .action-hint {
     display: inline-flex; align-items: center; justify-content: center; gap: 10px;
     font-size: 14px; color: var(--text-mute); letter-spacing: 4px; font-weight: 500;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
   html[data-theme="autumn"] .action-hint { color: #3d2410; }
   .action-hint .hint-arrow { display: inline-block; color: var(--accent); font-size: 16px; line-height: 1; }
@@ -587,12 +589,17 @@
     text-align: center; padding: 0 32px 40px 32px; margin-top: 4px;
     font-size: 18px; font-weight: 500; color: var(--accent);
     letter-spacing: 0.8px; line-height: 2; max-width: 560px; margin-left: auto; margin-right: auto;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     opacity: 0; transform: translateY(-28px); filter: blur(6px);
     transition: opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
+  .transition-line-head {
+    display: inline-block;
+    font-size: 1.1em;
+    color: var(--transition-head-color);
+  }
   .transition-line.active { opacity: 1; transform: translateY(0); filter: blur(0); }
   .transition-line.fading { opacity: 0; transform: translateY(28px); filter: blur(6px); transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
   .transition-line.fading-up { opacity: 0; transform: translateY(-28px); filter: blur(6px); transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
@@ -616,7 +623,7 @@
 
   .privacy-note-inline {
     margin: 0; padding: 16px 22px 18px 22px; text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-style: normal; font-size: 14px; font-weight: 400; color: var(--text-dark);
     letter-spacing: 0.3px; line-height: 1.9;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
@@ -626,9 +633,9 @@
   .privacy-note-inline p:last-child { margin-bottom: 0; }
 
   .custom-section-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 14px 4px 14px; padding: 6px 0 2px 0; user-select: none; -webkit-user-select: none; }
-  .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 15px; line-height: 1; color: var(--accent); }
+  .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 15px; line-height: 1; color: var(--accent); }
   .custom-section-line { flex: 1; height: 1px; background: var(--border-2); min-width: 20px; }
-  .custom-section-label { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 4px; line-height: 1.4; white-space: nowrap; }
+  .custom-section-label { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 4px; line-height: 1.4; white-space: nowrap; }
 
   .row {
     display: flex; align-items: center; gap: 8px; padding: 14px 14px 14px 12px;
@@ -651,7 +658,7 @@
     transition: background 0.25s, border-color 0.25s, transform 0.15s, color 0.25s;
     -webkit-tap-highlight-color: transparent; position: relative;
     color: #e0d3ce; font-size: 15px; line-height: 1;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     user-select: none; -webkit-user-select: none;
   }
   .row-check::after { content: "❀"; display: block; opacity: 0.35; transform: scale(0.9); transition: opacity 0.25s, transform 0.25s, color 0.25s; }
@@ -762,8 +769,8 @@
 
   .reject-thanks { margin-top: 0; padding-top: 0; border-top: 1px solid var(--border-5); opacity: 0; max-height: 0; overflow: hidden; transition: opacity 0.9s ease, max-height 0.9s ease, margin-top 0.9s ease, padding-top 0.9s ease; }
   .reject-thanks.shown { opacity: 1; max-height: 800px; margin-top: 18px; padding-top: 16px; }
-  .reject-thanks-line { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
-  .reject-thanks-sub { font-size: 14px; font-weight: 500; color: var(--text-med); letter-spacing: 0.5px; line-height: 1.8; margin-bottom: 14px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .reject-thanks-line { font-size: 16px; font-weight: 700; color: var(--accent); letter-spacing: 1px; line-height: 1.8; margin-bottom: 4px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
+  .reject-thanks-sub { font-size: 14px; font-weight: 500; color: var(--text-med); letter-spacing: 0.5px; line-height: 1.8; margin-bottom: 14px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
 
   /* AMEND-002: zero-tip variant of the reject message — larger text, no gift section */
   .reject-thanks.no-tip .reject-thanks-line {
@@ -790,9 +797,10 @@
 
   .gift-divider { display: flex; align-items: center; gap: 12px; margin: 22px 0 16px 0; }
   .gift-divider-line { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--glow) 30%, var(--glow) 70%, transparent); }
-  .gift-divider-label { flex-shrink: 0; font-size: 17px; font-weight: 600; color: var(--accent); letter-spacing: 5px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; padding: 0 6px; }
-  .reject-gift { font-size: 13.5px; font-weight: 500; color: var(--text-soft); line-height: 2; letter-spacing: 0.3px; background: #ffffff; border: 1px dashed var(--glow); border-radius: 12px; padding: 16px 18px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-align: center; }
-  .reject-gift-amount { display: inline-block; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin: 0 2px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .gift-divider-label { flex-shrink: 0; font-size: 17px; font-weight: 600; color: var(--accent); letter-spacing: 5px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; padding: 0 6px; }
+  .reject-gift { font-size: 13.5px; font-weight: 500; color: var(--text-soft); line-height: 2; letter-spacing: 0.3px; background: #ffffff; border: 1px dashed var(--glow); border-radius: 12px; padding: 16px 18px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-align: center; }
+  .reject-gift-amount { display: inline-block; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 1px; margin: 0 2px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
+  .reject-gift-unit { white-space: nowrap; }
 
   /* ============ PETAL ============ */
   .petal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 240; pointer-events: none; overflow: hidden; }
@@ -824,7 +832,7 @@
   .summary-inner { max-width: 560px; margin: 0 auto; width: 100%; display: flex; justify-content: space-between; align-items: center; padding: 0 8px; gap: 10px; min-width: 0; }
   .summary-total-wrap { min-width: 0; flex-shrink: 0; }
   .summary-label { font-size: 10px; color: var(--text-mute); letter-spacing: 2px; text-transform: uppercase; margin-bottom: 0; }
-  .summary-total { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; white-space: nowrap; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .summary-total { font-size: 22px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; white-space: nowrap; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
   .summary-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
   .reset { background: var(--soft-1); border: 1.5px solid var(--border-1); color: var(--accent-2); font-size: 13px; font-weight: 600; padding: 10px 16px; border-radius: 20px; font-family: inherit; cursor: pointer; transition: all 0.2s; white-space: nowrap; flex-shrink: 0; }
   .reset:active { background: var(--soft-2); transform: scale(0.97); }
@@ -855,7 +863,7 @@
     background: #ffffff; max-width: 380px; width: 100%; padding: 36px 28px 28px 28px;
     border-radius: 20px; box-shadow: 0 12px 40px var(--shadow-rose-2);
     border: 1px solid var(--border-3); text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     transform: scale(0.94); transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .confirm-screen.visible .confirm-card { transform: scale(1); }
@@ -884,7 +892,7 @@
     background: #ffffff; width: auto; max-width: 320px; padding: 28px 26px 22px 26px;
     border-radius: 18px; box-shadow: 0 12px 40px var(--shadow-rose-2);
     border: 1px solid var(--border-3); text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     transform: scale(0.94); transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .alert-screen.visible .alert-card { transform: scale(1); }
@@ -914,7 +922,7 @@
     padding: 32px 28px 24px 28px;
     border-radius: 20px; box-shadow: 0 12px 40px var(--shadow-rose-2);
     border: 1px solid var(--border-3); text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     transform: scale(0.94) translateY(-8px);
     transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
@@ -1030,7 +1038,7 @@
     color: var(--accent);
     border: 1px solid var(--accent);
     box-shadow: 0 2px 8px var(--shadow-rose);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-weight: 500;
   }
 
@@ -1092,7 +1100,7 @@
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     padding: 36px 30px 28px 30px; border-radius: 4px;
     box-shadow: 0 8px 32px var(--shadow-rose-2); border: 1px solid var(--border-3);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     position: relative; animation: receiptArrive 1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; margin: auto;
   }
   @keyframes receiptArrive { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
@@ -1101,7 +1109,7 @@
   .receipt-subthanks { font-size: 13px; font-weight: 400; color: var(--text-mute); line-height: 1.9; letter-spacing: 0.5px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; text-align: center; }
   .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; flex-shrink: 0; }
-  .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
+  .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
   .receipt-title { font-size: 12px; font-weight: 500; color: var(--text-faint); letter-spacing: 6px; text-align: center; margin-bottom: 20px; }
   .receipt-items { display: flex; flex-direction: column; gap: 14px; }
@@ -1135,7 +1143,7 @@
     border-radius: 10px;
     padding: 6px 16px;
     color: var(--text-mute);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 12.5px;
     font-weight: 500;
     letter-spacing: 2px;
@@ -1170,7 +1178,7 @@
     .receipt-item-undo { font-size: 14px; padding: 8px 20px; }
   }
 
-  .receipt-total-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px; margin-top: 14px; border-top: 1.5px solid var(--border-5); border-bottom: 1.5px solid var(--border-5); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .receipt-total-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px; margin-top: 14px; border-top: 1.5px solid var(--border-5); border-bottom: 1.5px solid var(--border-5); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
   .receipt-total-label { font-size: 18px; font-weight: 600; color: var(--text-mute); letter-spacing: 4px; line-height: 1.2; }
   .receipt-total-value { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; line-height: 1.2; white-space: nowrap; }
   .receipt-total-value .yen-symbol { font-size: 13px; margin-right: 1px; opacity: 0.8; font-weight: 700; }
@@ -1183,7 +1191,7 @@
     background: var(--accent);
     border: 1.5px solid var(--accent);
     color: #ffffff;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 2px;
@@ -1206,7 +1214,7 @@
     margin-top: 12px;
   }
 
-  .receipt-back-btn { display: block; width: 100%; max-width: 260px; margin: 26px auto 0 auto; background: #ffffff; border: 1.5px solid var(--border-1); color: var(--accent); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 13px; font-weight: 600; letter-spacing: 2px; padding: 12px 20px; border-radius: 22px; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; -webkit-appearance: none; appearance: none; white-space: nowrap; }
+  .receipt-back-btn { display: block; width: 100%; max-width: 260px; margin: 26px auto 0 auto; background: #ffffff; border: 1.5px solid var(--border-1); color: var(--accent); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 13px; font-weight: 600; letter-spacing: 2px; padding: 12px 20px; border-radius: 22px; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; -webkit-appearance: none; appearance: none; white-space: nowrap; }
   .receipt-back-btn:active { background: var(--soft-2); border-color: var(--accent); transform: scale(0.97); }
   .receipt-footer { text-align: center; margin-top: 22px; }
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
@@ -1268,7 +1276,7 @@
   .ty-track { display: flex; width: 400%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .ty-track.dragging { transition: none; }
   .ty-panel { width: calc(100% / 4); height: 100%; display: flex; align-items: center; justify-content: center; padding: 80px 24px 120px 24px; text-align: center; }
-  .ty-panel-inner { width: 100%; max-width: 560px; margin: auto; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; }
+  .ty-panel-inner { width: 100%; max-width: 560px; margin: auto; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; }
   .ty-panel-content { opacity: 0; transform: translateX(40px); filter: blur(4px); transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94); transition-delay: 0.25s; }
   .ty-panel.active .ty-panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .ty-panel.leaving .ty-panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
@@ -1285,17 +1293,17 @@
   .ty-dot.active { background: var(--dot-active-bg); transform: scale(1.5); box-shadow: 0 0 0 5px var(--dot-active-ring), 0 2px 6px var(--dot-active-shadow); }
   .ty-ambient-stage { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 28px 120px 28px; overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .ty-ambient-stage.shown { opacity: 1; pointer-events: auto; }
-  .ty-ambient-inner { width: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; padding: 20px 0; }
+  .ty-ambient-inner { width: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; padding: 20px 0; }
   .blossom-divider { display: flex; justify-content: center; align-items: center; gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%; }
   .blossom-mark { display: inline-block; font-size: 13px; line-height: 1; color: var(--accent); opacity: 0; transform: scale(0.4); filter: blur(4px); transition: opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
   @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
   .blossom-mark.resetting { opacity: 0; transform: scale(0.4); filter: blur(4px); animation: none; transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
   .quote-wrap { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0 8px; }
-  .quote-line { font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 26px; font-weight: 500; color: var(--quote-color); line-height: 2.1; letter-spacing: 3px; opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px); transition: opacity 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; text-shadow: var(--quote-shadow); }
+  .quote-line { font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 26px; font-weight: 500; color: var(--quote-color); line-height: 2.1; letter-spacing: 3px; opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px); transition: opacity 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; text-shadow: var(--quote-shadow); }
   .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
-  .ty-receipt-btn { position: absolute; bottom: 20px; left: 20px; background: transparent; border: none; color: var(--text-mute); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif; font-size: 12px; font-weight: 500; letter-spacing: 2px; padding: 8px 12px; padding-left: calc(12px + env(safe-area-inset-left, 0px)); border-radius: 16px; cursor: pointer; opacity: 0; transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.2s ease, color 0.2s ease; -webkit-appearance: none; appearance: none; white-space: nowrap; z-index: 30; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; }
+  .ty-receipt-btn { position: absolute; bottom: 20px; left: 20px; background: transparent; border: none; color: var(--text-mute); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 12px; font-weight: 500; letter-spacing: 2px; padding: 8px 12px; padding-left: calc(12px + env(safe-area-inset-left, 0px)); border-radius: 16px; cursor: pointer; opacity: 0; transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.2s ease, color 0.2s ease; -webkit-appearance: none; appearance: none; white-space: nowrap; z-index: 30; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; }
   .ty-receipt-btn.shown { opacity: 0.75; pointer-events: auto; }
   .ty-receipt-btn:active { opacity: 1; background: rgba(255, 255, 255, 0.5); color: var(--accent); }
   .ty-receipt-btn .btn-back-arrow { display: inline-block; font-size: 14px; line-height: 1; transform: translateX(0); transition: transform 0.2s ease; }
@@ -1594,9 +1602,11 @@
 <div class="stage-spacer"></div>
 
 <div class="transition-line" id="transitionLine">
-  それでは、本日のメニューをご覧ください。<br><br>
-  ご無理のない範囲で、対応可能なものの横の○をタップし、料金をご入力ください。<br><br>
-  一覧にないものも、下の欄にご記入いただけます。<br><br>
+  <span class="transition-line-head">❀ - - - 大切なお知らせ--- ❀</span><br>
+  それでは、本日の癒しのオプションをご覧ください。<br><br>
+  ご無理のない範囲で、ご対応いただけるものがございましたら、 横の○をタップしてお選びください。<br>
+  表に表示されている料金は、必要に応じて変更していただいて構いません。 また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。 すべて見送っていただいても大丈夫です。<br><br>
+  一覧にないものでも、もしご自身からご提案いただけるものがございましたら、 下の欄にご記入ください。<br><br>
   ありがとうございます。
 </div>
 
@@ -1672,7 +1682,7 @@
       </div>
 
       <div class="reject-gift">
-        ささやかではございますが、感謝の気持ちを込めて、<span class="reject-gift-amount" id="rejectGiftAmount">1,500</span>円をお受け取りいただければ幸いです。
+        ささやかではございますが、感謝の気持ちを込めて、<span class="reject-gift-unit"><span class="reject-gift-amount" id="rejectGiftAmount">1,500</span>円</span>をお受け取りいただければ幸いです。
       </div>
     </div>
   </div>
