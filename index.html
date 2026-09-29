@@ -129,6 +129,23 @@
     pointer-events: none;
   }
 
+  /* Base setup: Hidden by default for the standard theme */
+  .ambient-image {
+    background-size: cover;
+    background-position: center;
+    mix-blend-mode: multiply;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 1.2s ease;
+    will-change: opacity;
+  }
+
+  /* Autumn override: Reveal the image and set the source */
+  html[data-theme="autumn"] .ambient-image {
+    background-image: url('icons/1790682335311.jpg');
+    opacity: 0.15;
+  }
+
   .ambient-primary {
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
@@ -1499,6 +1516,7 @@
 <body>
 
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-image"></div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
   <div class="mote-field" id="moteField"></div>
@@ -1525,7 +1543,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.03</div>
+  <div class="app-version" aria-hidden="true">v1.04</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
