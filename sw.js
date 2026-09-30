@@ -1,12 +1,12 @@
-const CACHE = 'thankyou-v4';
+const CACHE = 'thankyou-v5';
 
 const ASSETS = [
   './',
   './index.html',
+  './main.css',
   './manifest.json',
   './presets.json',
   './quotes.json',
-  './start-button.css',
   './panel-1.html',
   './panel-2.html',
   './panel-3.html',
@@ -58,11 +58,12 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* HTML and CSS — network-first, fall back to cache when offline.
-     This is the dev-friendly branch: your latest saved files always win
-     as long as there's a network connection. */
+  /* HTML, CSS, and JS — network-first, fall back to cache when offline.
+     The .js branch is prepped for Stage 2 (app.js extraction), and even
+     with nothing to catch today it's harmless. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
+      url.pathname.endsWith('.js') ||
       url.pathname.endsWith('/')) {
     e.respondWith(
       fetch(e.request)
@@ -85,9 +86,7 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* Everything else (images, video, fonts) — cache-first.
-     Stays fast and works offline indefinitely. To update these you still
-     bump CACHE, which is rare. */
+  /* Everything else (images, video, icons, fonts) — cache-first. */
   e.respondWith(
     caches.match(e.request).then(function(r) {
       return r || fetch(e.request);
