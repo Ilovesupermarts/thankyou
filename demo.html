@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Koi Water Ripple Button - Autumn</title>
+<title>Zen Koi Water Ripple - Autumn</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
 
@@ -30,29 +30,33 @@
     flex-direction: column; 
     align-items: center; 
     justify-content: center;
+    gap: 30px; /* Ensures clean spacing between button and text */
   }
 
   .start-btn {
-    background: none; border: none; padding: 20px; 
+    background: none; border: none; padding: 0; 
     display: flex; flex-direction: column;
-    align-items: center; gap: 16px; cursor: pointer; 
+    align-items: center; cursor: pointer; 
     -webkit-appearance: none; appearance: none;
-    transition: transform 0.25s ease;
+    transition: transform 0.4s ease;
   }
   
   .start-btn:active { 
     transform: scale(0.94); 
   }
 
+  /* Compact wrapper to preserve layout while SVG floats behind */
   .icon-wrapper {
     position: relative;
-    width: 260px;
-    height: 260px;
+    width: 100px;
+    height: 100px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 16px;
   }
 
+  /* Breathing Animation (Scales the fish) */
   .blossom-char {
     position: relative;
     z-index: 2;
@@ -61,15 +65,15 @@
     height: 100px; 
     user-select: none; -webkit-user-select: none;
     animation: blossomBreathe 3.6s ease-in-out infinite; 
-    transform-origin: 50% 50%; 
     will-change: transform, filter;
   }
 
   @keyframes blossomBreathe {
     0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
-    50% { transform: scale(1.14); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
+    50% { transform: scale(1.12); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
   }
 
+  /* Gentle Water Current Sway */
   .koi-image {
     width: 100%;
     height: 100%;
@@ -80,15 +84,19 @@
 
   @keyframes idleSway {
     0%, 82%, 100% { transform: rotate(0deg); }
-    86% { transform: rotate(-6deg); }
-    92% { transform: rotate(4deg); }
+    86% { transform: rotate(-5deg); }
+    92% { transform: rotate(3deg); }
     96% { transform: rotate(-2deg); }
   }
 
+  /* 
+   * Massive 360x360 SVG canvas placed absolutely 
+   * so ripples never clip at the edges. 
+   */
   .rings-svg {
     position: absolute;
-    width: 260px; 
-    height: 260px;
+    width: 360px; 
+    height: 360px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
@@ -103,37 +111,46 @@
     filter: drop-shadow(0 0 16px var(--petal));
   }
 
-  /* Base styling for all ripples */
+  /* Slow, Zen Water Ripples */
   .pulse-ring {
     stroke: var(--petal);
     fill: none;
-    transform-origin: 130px 130px;
-    animation: ringPulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+    transform-origin: 180px 180px;
+    /* 9-second slow linear travel */
+    animation: ringPulse 9s linear infinite; 
   }
 
-  /* Staggering the animation delays to create continuous waves */
+  /* Perfectly staggered spacing */
   .ripple-1 { animation-delay: 0s; }
-  .ripple-2 { animation-delay: 1s; }
-  .ripple-3 { animation-delay: 2s; }
+  .ripple-2 { animation-delay: 3s; }
+  .ripple-3 { animation-delay: 6s; }
 
-  /* Expanded ripple radius and thinner fade-out */
   @keyframes ringPulse {
-    0% { transform: scale(0.95); opacity: 0.8; stroke-width: 3px; }
-    100% { transform: scale(1.6); opacity: 0; stroke-width: 0px; }
+    0% { 
+      transform: scale(0.95); 
+      opacity: 0.6; 
+      stroke-width: 2px; 
+    }
+    100% { 
+      transform: scale(1.9); 
+      opacity: 0; 
+      stroke-width: 0px; 
+    }
   }
 
+  /* Typography */
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--accent);
   }
   
   .start-hint {
-    margin: 8px 0 0 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
+    margin: 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
     letter-spacing: 3px; line-height: 2; text-align: center; 
     animation: hintBreathe 4s ease-in-out infinite;
   }
   
   @keyframes hintBreathe { 
-    0%, 100% { opacity: 0.92; } 
+    0%, 100% { opacity: 0.85; } 
     50% { opacity: 1; } 
   }
 </style>
@@ -144,14 +161,15 @@
     <button type="button" class="start-btn" aria-label="はじめる">
       
       <div class="icon-wrapper">
-        <svg class="rings-svg" viewBox="0 0 260 260" aria-hidden="true">
-          <!-- The 3 Continuous Water Ripples -->
-          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-1" />
-          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-2" />
-          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-3" />
+        <!-- 360x360 SVG Canvas (Center is 180) -->
+        <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+          <!-- The 3 Slow Staggered Water Ripples -->
+          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
           
-          <!-- The Static Glowing Band (Rendered last so it sits on top of the ripples) -->
-          <circle cx="130" cy="130" r="90" class="gold-band" />
+          <!-- The Static Gold Band -->
+          <circle cx="180" cy="180" r="90" class="gold-band" />
         </svg>
 
         <!-- Foreground Koi Image -->
