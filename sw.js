@@ -1,9 +1,10 @@
-const CACHE = 'thankyou-v5';
+const CACHE = 'thankyou-v6';
 
 const ASSETS = [
   './',
   './index.html',
   './main.css',
+  './app.js',
   './manifest.json',
   './presets.json',
   './quotes.json',
@@ -58,9 +59,7 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* HTML, CSS, and JS — network-first, fall back to cache when offline.
-     The .js branch is prepped for Stage 2 (app.js extraction), and even
-     with nothing to catch today it's harmless. */
+  /* HTML, CSS, and JS — network-first, fall back to cache when offline. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
@@ -75,8 +74,6 @@ self.addEventListener('fetch', function(e) {
         .catch(function() {
           return caches.match(e.request).then(function(r) {
             if (r) return r;
-            /* If offline and the URL itself isn't cached, fall back to
-               the app shell for navigation requests. */
             if (e.request.mode === 'navigate') {
               return caches.match('./index.html');
             }
