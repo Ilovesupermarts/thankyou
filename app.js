@@ -77,11 +77,13 @@ function initSound() {
     Promise.all([
       synthesizeTock(),
       synthesizeCheck(),
-      synthesizePaper()
+      synthesizePaper(),
+      synthesizeDrop()
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
       soundBuffers.paper = bufs[2];
+      soundBuffers.drop = bufs[3];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
@@ -195,6 +197,71 @@ function synthesizePaper() {
   return offline.startRendering();
 }
 
+/* Water-drop: three layers (surface break, body bloop, wet harmonic)
+   plus a short room echo of the body via a DelayNode. */
+function synthesizeDrop() {
+  var sr = soundAudioCtx.sampleRate;
+  var length = Math.floor(sr * 0.45);
+  var offline = new OfflineAudioContext(1, length, sr);
+
+  /* ---- Layer 1: surface break "tk" ---- */
+  var contactLen = Math.floor(sr * 0.03);
+  var contactBuf = offline.createBuffer(1, contactLen, sr);
+  var cd = contactBuf.getChannelData(0);
+  for (var ci = 0; ci < contactLen; ci++) cd[ci] = Math.random() * 2 - 1;
+  var contactSrc = offline.createBufferSource();
+  contactSrc.buffer = contactBuf;
+  var contactFilter = offline.createBiquadFilter();
+  contactFilter.type = 'bandpass';
+  contactFilter.frequency.value = 3200;
+  contactFilter.Q.value = 6.0;
+  var contactGain = offline.createGain();
+  contactGain.gain.setValueAtTime(0.30, 0);
+  contactGain.gain.exponentialRampToValueAtTime(0.0001, 0.014);
+  contactSrc.connect(contactFilter);
+  contactFilter.connect(contactGain);
+  contactGain.connect(offline.destination);
+  contactSrc.start(0);
+  contactSrc.stop(0.03);
+
+  /* ---- Layer 2: body bloop (fast descending sweep) ---- */
+  var body = offline.createOscillator();
+  body.type = 'sine';
+  body.frequency.setValueAtTime(1400, 0);
+  body.frequency.exponentialRampToValueAtTime(260, 0.14);
+  var bodyGain = offline.createGain();
+  bodyGain.gain.setValueAtTime(0.0001, 0);
+  bodyGain.gain.exponentialRampToValueAtTime(0.60, 0.008);
+  bodyGain.gain.exponentialRampToValueAtTime(0.0001, 0.24);
+  body.connect(bodyGain);
+  bodyGain.connect(offline.destination);
+  body.start(0);
+  body.stop(0.26);
+
+  /* ---- Layer 3: upper "wet" harmonic ---- */
+  var upper = offline.createOscillator();
+  upper.type = 'sine';
+  upper.frequency.value = 2800;
+  var upperGain = offline.createGain();
+  upperGain.gain.setValueAtTime(0.15, 0);
+  upperGain.gain.exponentialRampToValueAtTime(0.0001, 0.06);
+  upper.connect(upperGain);
+  upperGain.connect(offline.destination);
+  upper.start(0);
+  upper.stop(0.08);
+
+  /* ---- Layer 4: room echo of the body via a 90ms delay ---- */
+  var delay = offline.createDelay(0.5);
+  delay.delayTime.value = 0.09;
+  var echoGain = offline.createGain();
+  echoGain.gain.value = 0.22;
+  bodyGain.connect(delay);
+  delay.connect(echoGain);
+  echoGain.connect(offline.destination);
+
+  return offline.startRendering();
+}
+
 function playSound(name, rate) {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
   var buf = soundBuffers[name];
@@ -224,6 +291,7 @@ function getKeyPlaybackRate(key) {
 function playTock(key) { playSound('tock', getKeyPlaybackRate(key)); }
 function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
 function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
+function playDrop() { playSound('drop', 1.0); }
 
 document.addEventListener('pointerdown', initSound, { once: true });
 
@@ -1954,6 +2022,7 @@ startBtn.addEventListener('click', function(e) {
   e.preventDefault();
   if (introHasRun) return;
   introHasRun = true;
+  playDrop();
   haptic(12);
   document.body.classList.add('info-visible');
   if (infoBar) infoBar.classList.add('shown');
