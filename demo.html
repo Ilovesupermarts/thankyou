@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inverted Zen Koi Button - Autumn</title>
+<title>Swimming Koi Pond Button</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
 
@@ -55,6 +55,7 @@
     margin-bottom: 16px;
   }
 
+  /* 1. The Diving Animation (Fades opacity and shrinks slightly to mimic depth) */
   .blossom-char {
     position: relative;
     z-index: 2;
@@ -62,30 +63,39 @@
     width: 100px; 
     height: 100px; 
     user-select: none; -webkit-user-select: none;
-    animation: blossomBreathe 3.6s ease-in-out infinite; 
-    will-change: transform, filter;
+    animation: koiDive 5s ease-in-out infinite; 
+    will-change: transform, opacity, filter;
   }
 
-  @keyframes blossomBreathe {
-    0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
-    50% { transform: scale(1.12); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25)); }
+  @keyframes koiDive {
+    0%, 100% { 
+      opacity: 1; 
+      transform: scale(1); 
+      filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25)); 
+    }
+    50% { 
+      opacity: 0.3; /* Remains visible but submerged */
+      transform: scale(0.92); /* Shrinks slightly to look deeper */
+      filter: drop-shadow(0 0 0px transparent); 
+    }
   }
 
+  /* 2. The Swimming Animation (Continuous 360-degree rotation) */
   .koi-image {
     width: 100%;
     height: 100%;
     object-fit: contain;
     transform-origin: center center;
-    animation: idleSway 5s ease-in-out infinite;
+    /* 14 seconds gives them a relaxed, slow swimming speed */
+    animation: swimCircle 14s linear infinite; 
   }
 
-  @keyframes idleSway {
-    0%, 82%, 100% { transform: rotate(0deg); }
-    86% { transform: rotate(-5deg); }
-    92% { transform: rotate(3deg); }
-    96% { transform: rotate(-2deg); }
+  @keyframes swimCircle {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
   }
 
+  /* Background Ripples */
   .rings-svg {
     position: absolute;
     width: 360px; 
@@ -128,6 +138,7 @@
     }
   }
 
+  /* Typography */
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--bg-base);
   }
@@ -162,7 +173,6 @@
 
         <!-- Foreground Koi Image -->
         <div class="blossom-char">
-          <!-- Replace this PNG name with your actual file name if it differs -->
           <img src="44173_0c6eff.png" class="koi-image" alt="Koi Start">
         </div>
       </div>
