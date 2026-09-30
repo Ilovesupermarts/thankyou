@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Koi Start Button Demo</title>
+<title>Glowing Koi Start Button - Autumn</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
 
@@ -15,6 +15,7 @@
     --text-dark: #231304;
   }
 
+  /* Simulating your Autumn Washi background */
   body {
     margin: 0;
     height: 100vh;
@@ -41,26 +42,26 @@
   }
   
   .start-btn:active { 
-    transform: scale(0.92); 
+    transform: scale(0.94); 
   }
 
   /* 
-   * A new wrapper to perfectly center the expanding rings 
-   * behind the koi image without affecting layout flow.
+   * Expanded wrapper: 260x260 gives the rings 
+   * plenty of room to expand without clipping.
    */
   .icon-wrapper {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 260px;
+    height: 260px;
     display: flex;
     align-items: center;
     justify-content: center;
   }
 
-  /* 1. Breathing Animation (Scales the whole koi container in and out) */
+  /* 1. Koi Container Breathing (Scales the fish in and out) */
   .blossom-char {
     position: relative;
-    z-index: 1;
+    z-index: 2;
     display: block; 
     width: 100px; 
     height: 100px; 
@@ -75,7 +76,7 @@
     50% { transform: scale(1.14); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
   }
 
-  /* 2. Gentle Breeze Sway (Applied directly to the image) */
+  /* 2. Gentle Water Current Sway (Applied directly to the Koi PNG) */
   .koi-image {
     width: 100%;
     height: 100%;
@@ -91,26 +92,37 @@
     96% { transform: rotate(-2deg); }
   }
 
-  /* 3. Sonar Pulse Ring (SVG placed absolutely behind the image) */
+  /* 3. The SVG Rings (Pushed to the background) */
   .rings-svg {
     position: absolute;
-    width: 150px; 
-    height: 150px;
+    width: 260px; 
+    height: 260px;
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
     pointer-events: none;
-    color: var(--petal);
+    z-index: 1;
   }
 
+  /* Thick, glowing gold band */
+  .gold-band {
+    stroke: var(--accent);
+    stroke-width: 6px;
+    fill: none;
+    filter: drop-shadow(0 0 16px var(--petal));
+  }
+
+  /* Expanding Sonar Pulse */
   .pulse-ring {
-    transform-origin: 50px 50px;
-    animation: ringPulse 2.4s cubic-bezier(0.21, 0.53, 0.3, 1) infinite;
+    stroke: var(--petal);
+    fill: none;
+    transform-origin: 130px 130px; /* Centered in the 260x260 viewBox */
+    animation: ringPulse 2.8s cubic-bezier(0.21, 0.53, 0.3, 1) infinite;
   }
 
   @keyframes ringPulse {
-    0% { transform: scale(0.98); opacity: 0.9; stroke-width: 1.2px; }
-    100% { transform: scale(1.45); opacity: 0; stroke-width: 0.3px; }
+    0% { transform: scale(0.95); opacity: 0.9; stroke-width: 4px; }
+    100% { transform: scale(1.45); opacity: 0; stroke-width: 0.5px; }
   }
 
   /* Typography */
@@ -136,12 +148,12 @@
     <button type="button" class="start-btn" aria-label="はじめる">
       
       <div class="icon-wrapper">
-        <!-- Background Rings -->
-        <svg class="rings-svg" viewBox="-25 -25 150 150" aria-hidden="true">
-          <g stroke="currentColor" stroke-width="1.2" fill="none">
-            <circle cx="50" cy="50" r="66" opacity="0.4" />
-            <circle cx="50" cy="50" r="66" class="pulse-ring" />
-          </g>
+        <!-- Background Rings (Radius set to 90px to create ample breathing space) -->
+        <svg class="rings-svg" viewBox="0 0 260 260" aria-hidden="true">
+          <!-- The Static Glowing Band -->
+          <circle cx="130" cy="130" r="90" class="gold-band" />
+          <!-- The Expanding Pulse -->
+          <circle cx="130" cy="130" r="90" class="pulse-ring" />
         </svg>
 
         <!-- Foreground Koi Image -->
@@ -153,7 +165,6 @@
       <span class="start-label">はじめる</span>
     </button>
     
-    <!-- Updated the text to remove the specific word for 'crane' -->
     <p class="start-hint">そっとタップしてください</p>
   </div>
 
