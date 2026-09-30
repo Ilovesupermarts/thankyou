@@ -60,7 +60,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.09</div>
+  <div class="app-version" aria-hidden="true">v1.10</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -1369,6 +1369,10 @@
   function updateIntroHintVisibility() {
     if (!globalHint) return;
     if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
+    if (blossomScreen.classList.contains('visible')) {
+      globalHint.classList.remove('shown');
+      return;
+    }
     if (!tableEnteredView) { globalHint.classList.add('shown'); return; }
     var rect = tableCard.getBoundingClientRect();
     var vh = window.innerHeight;
@@ -2448,10 +2452,10 @@
         }
         introOverlay.classList.add('finishing');
         dotsEl.classList.add('visible');
-        updateGlobalHint();
         blossomScreen.classList.remove('visible');
         blossomScreen.style.opacity = '';
         blossomScreen.style.transition = '';
+        updateGlobalHint();
         document.body.classList.add('table-locked');
         window.scrollTo(0, 0);
         currentPanel = 0;
