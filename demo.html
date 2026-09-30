@@ -55,13 +55,16 @@
     margin-bottom: 16px;
   }
 
-  /* 1. The Diving Animation (Fades opacity and shrinks slightly to mimic depth) */
+  /* 
+   * Increased the base size to 145px to fill out the circle.
+   * The dive animation will now scale proportionally from this new size.
+   */
   .blossom-char {
     position: relative;
     z-index: 2;
     display: block; 
-    width: 100px; 
-    height: 100px; 
+    width: 145px; 
+    height: 145px; 
     user-select: none; -webkit-user-select: none;
     animation: koiDive 5s ease-in-out infinite; 
     will-change: transform, opacity, filter;
@@ -74,20 +77,21 @@
       filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25)); 
     }
     50% { 
-      opacity: 0.3; /* Remains visible but submerged */
-      transform: scale(0.92); /* Shrinks slightly to look deeper */
+      opacity: 0.3; 
+      transform: scale(0.92); 
       filter: drop-shadow(0 0 0px transparent); 
     }
   }
 
-  /* 2. The Swimming Animation (Continuous 360-degree rotation) */
+  /* 
+   * Slowed the rotation to 30 seconds for a truly calm, zen pace.
+   */
   .koi-image {
     width: 100%;
     height: 100%;
     object-fit: contain;
     transform-origin: center center;
-    /* 14 seconds gives them a relaxed, slow swimming speed */
-    animation: swimCircle 14s linear infinite; 
+    animation: swimCircle 30s linear infinite; 
   }
 
   @keyframes swimCircle {
@@ -95,7 +99,6 @@
     100% { transform: rotate(360deg); }
   }
 
-  /* Background Ripples */
   .rings-svg {
     position: absolute;
     width: 360px; 
@@ -138,7 +141,6 @@
     }
   }
 
-  /* Typography */
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--bg-base);
   }
@@ -162,16 +164,12 @@
       
       <div class="icon-wrapper">
         <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-          <!-- The 3 Slow Staggered Water Ripples -->
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-          
-          <!-- The Static Glowing Band -->
           <circle cx="180" cy="180" r="90" class="gold-band" />
         </svg>
 
-        <!-- Foreground Koi Image -->
         <div class="blossom-char">
           <img src="44173_0c6eff.png" class="koi-image" alt="Koi Start">
         </div>
