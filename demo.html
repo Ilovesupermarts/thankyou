@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Glowing Koi Start Button - Autumn</title>
+<title>Koi Water Ripple Button - Autumn</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
 
@@ -15,7 +15,6 @@
     --text-dark: #231304;
   }
 
-  /* Simulating your Autumn Washi background */
   body {
     margin: 0;
     height: 100vh;
@@ -45,10 +44,6 @@
     transform: scale(0.94); 
   }
 
-  /* 
-   * Expanded wrapper: 260x260 gives the rings 
-   * plenty of room to expand without clipping.
-   */
   .icon-wrapper {
     position: relative;
     width: 260px;
@@ -58,7 +53,6 @@
     justify-content: center;
   }
 
-  /* 1. Koi Container Breathing (Scales the fish in and out) */
   .blossom-char {
     position: relative;
     z-index: 2;
@@ -76,7 +70,6 @@
     50% { transform: scale(1.14); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
   }
 
-  /* 2. Gentle Water Current Sway (Applied directly to the Koi PNG) */
   .koi-image {
     width: 100%;
     height: 100%;
@@ -92,7 +85,6 @@
     96% { transform: rotate(-2deg); }
   }
 
-  /* 3. The SVG Rings (Pushed to the background) */
   .rings-svg {
     position: absolute;
     width: 260px; 
@@ -104,7 +96,6 @@
     z-index: 1;
   }
 
-  /* Thick, glowing gold band */
   .gold-band {
     stroke: var(--accent);
     stroke-width: 6px;
@@ -112,20 +103,25 @@
     filter: drop-shadow(0 0 16px var(--petal));
   }
 
-  /* Expanding Sonar Pulse */
+  /* Base styling for all ripples */
   .pulse-ring {
     stroke: var(--petal);
     fill: none;
-    transform-origin: 130px 130px; /* Centered in the 260x260 viewBox */
-    animation: ringPulse 2.8s cubic-bezier(0.21, 0.53, 0.3, 1) infinite;
+    transform-origin: 130px 130px;
+    animation: ringPulse 3s cubic-bezier(0.16, 1, 0.3, 1) infinite;
   }
 
+  /* Staggering the animation delays to create continuous waves */
+  .ripple-1 { animation-delay: 0s; }
+  .ripple-2 { animation-delay: 1s; }
+  .ripple-3 { animation-delay: 2s; }
+
+  /* Expanded ripple radius and thinner fade-out */
   @keyframes ringPulse {
-    0% { transform: scale(0.95); opacity: 0.9; stroke-width: 4px; }
-    100% { transform: scale(1.45); opacity: 0; stroke-width: 0.5px; }
+    0% { transform: scale(0.95); opacity: 0.8; stroke-width: 3px; }
+    100% { transform: scale(1.6); opacity: 0; stroke-width: 0px; }
   }
 
-  /* Typography */
   .start-label {
     font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--accent);
   }
@@ -148,12 +144,14 @@
     <button type="button" class="start-btn" aria-label="はじめる">
       
       <div class="icon-wrapper">
-        <!-- Background Rings (Radius set to 90px to create ample breathing space) -->
         <svg class="rings-svg" viewBox="0 0 260 260" aria-hidden="true">
-          <!-- The Static Glowing Band -->
+          <!-- The 3 Continuous Water Ripples -->
+          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-1" />
+          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-2" />
+          <circle cx="130" cy="130" r="90" class="pulse-ring ripple-3" />
+          
+          <!-- The Static Glowing Band (Rendered last so it sits on top of the ripples) -->
           <circle cx="130" cy="130" r="90" class="gold-band" />
-          <!-- The Expanding Pulse -->
-          <circle cx="130" cy="130" r="90" class="pulse-ring" />
         </svg>
 
         <!-- Foreground Koi Image -->
