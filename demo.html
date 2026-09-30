@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zen Koi Water Ripple - Autumn</title>
+<title>Inverted Zen Koi Button - Autumn</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
 
@@ -18,7 +18,7 @@
   body {
     margin: 0;
     height: 100vh;
-    background-color: var(--bg-base);
+    background-color: var(--accent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -30,7 +30,7 @@
     flex-direction: column; 
     align-items: center; 
     justify-content: center;
-    gap: 30px; /* Ensures clean spacing between button and text */
+    gap: 30px; 
   }
 
   .start-btn {
@@ -45,18 +45,16 @@
     transform: scale(0.94); 
   }
 
-  /* Compact wrapper to preserve layout while SVG floats behind */
   .icon-wrapper {
     position: relative;
-    width: 100px;
-    height: 100px;
+    width: 200px;
+    height: 200px;
     display: flex;
     align-items: center;
     justify-content: center;
     margin-bottom: 16px;
   }
 
-  /* Breathing Animation (Scales the fish) */
   .blossom-char {
     position: relative;
     z-index: 2;
@@ -70,10 +68,9 @@
 
   @keyframes blossomBreathe {
     0%, 100% { transform: scale(1); filter: drop-shadow(0 0 0px transparent); }
-    50% { transform: scale(1.12); filter: drop-shadow(0 4px 18px var(--petal-soft)); }
+    50% { transform: scale(1.12); filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25)); }
   }
 
-  /* Gentle Water Current Sway */
   .koi-image {
     width: 100%;
     height: 100%;
@@ -89,10 +86,6 @@
     96% { transform: rotate(-2deg); }
   }
 
-  /* 
-   * Massive 360x360 SVG canvas placed absolutely 
-   * so ripples never clip at the edges. 
-   */
   .rings-svg {
     position: absolute;
     width: 360px; 
@@ -105,30 +98,27 @@
   }
 
   .gold-band {
-    stroke: var(--accent);
+    stroke: var(--bg-base);
     stroke-width: 6px;
     fill: none;
-    filter: drop-shadow(0 0 16px var(--petal));
+    filter: drop-shadow(0 0 16px var(--petal-soft));
   }
 
-  /* Slow, Zen Water Ripples */
   .pulse-ring {
-    stroke: var(--petal);
+    stroke: var(--bg-base);
     fill: none;
     transform-origin: 180px 180px;
-    /* 9-second slow linear travel */
     animation: ringPulse 9s linear infinite; 
   }
 
-  /* Perfectly staggered spacing */
   .ripple-1 { animation-delay: 0s; }
   .ripple-2 { animation-delay: 3s; }
   .ripple-3 { animation-delay: 6s; }
 
   @keyframes ringPulse {
     0% { 
-      transform: scale(0.95); 
-      opacity: 0.6; 
+      transform: scale(1); 
+      opacity: 0.7; 
       stroke-width: 2px; 
     }
     100% { 
@@ -138,13 +128,12 @@
     }
   }
 
-  /* Typography */
   .start-label {
-    font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--accent);
+    font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--bg-base);
   }
   
   .start-hint {
-    margin: 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
+    margin: 0; font-size: 20px; font-weight: 500; color: var(--petal-soft);
     letter-spacing: 3px; line-height: 2; text-align: center; 
     animation: hintBreathe 4s ease-in-out infinite;
   }
@@ -161,19 +150,19 @@
     <button type="button" class="start-btn" aria-label="はじめる">
       
       <div class="icon-wrapper">
-        <!-- 360x360 SVG Canvas (Center is 180) -->
         <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
           <!-- The 3 Slow Staggered Water Ripples -->
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
           <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
           
-          <!-- The Static Gold Band -->
+          <!-- The Static Glowing Band -->
           <circle cx="180" cy="180" r="90" class="gold-band" />
         </svg>
 
         <!-- Foreground Koi Image -->
         <div class="blossom-char">
+          <!-- Replace this PNG name with your actual file name if it differs -->
           <img src="44173_0c6eff.png" class="koi-image" alt="Koi Start">
         </div>
       </div>
