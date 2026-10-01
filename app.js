@@ -1,3 +1,29 @@
+/* ============================================================
+   app.js — v1.13
+   ------------------------------------------------------------
+   Changelog:
+     v1.13
+       - Water-drop synth sound on koi tap (playDrop()); layered
+         contact / body / upper harmonic + short room echo.
+       - Washi paper JPG (icons/1790835034553.jpg) applied to
+         #tableCard and .receipt-paper only. #nameScreenTable
+         intentionally left clean. Interior softening at
+         rgba(255,255,255,0.6) on the privacy note, checked rows,
+         and receipt chips. .table-card backdrop-filter removed.
+       - Reject state: Thank-You screen's tyReceiptBtn now returns
+         to the service table instead of opening a receipt. No
+         receipt is built on the reject path.
+       - tyReceiptBtn label toggles: "サービス選択に戻る" when
+         rejected, "内容を確認する" otherwise.
+       - Reject-flow Thank-You screen does NOT re-surface the tip
+         amount. (Intentional; do not add without revisiting.)
+       - returnToTable() skips the 1200 ms fade wait when no
+         receipt is on screen.
+       - Ghost-checkbox symmetric fix: emptying the .service-input
+         silently unchecks the row, no data-saved-* preservation.
+         Manual uncheck keeps its preservation behaviour.
+   ============================================================ */
+
 /* ============ THEME TOGGLE ============ */
 var themeToggle = document.getElementById('themeToggle');
 var currentTheme = 'default';
@@ -412,7 +438,7 @@ function loadPanelHtml(url) {
   return fetch(url + '?v=' + Date.now())
     .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
     .then(function(text) { return convertPanelText(text); })
-    .catch(function() { return ''; });   /* empty fallback per CONDITIONAL-001 decision */
+    .catch(function() { return ''; });
 }
 function loadAllPanels() {
   return Promise.all([
@@ -595,6 +621,7 @@ var tyAmbientStage = document.getElementById('tyAmbientStage');
 var blossomDivider = document.getElementById('blossomDivider');
 var quoteLine = document.getElementById('quoteLine');
 var tyReceiptBtn = document.getElementById('tyReceiptBtn');
+var tyReceiptBtnLabel = document.getElementById('tyReceiptBtnLabel');
 
 var receiptOpenedFromThankyou = false;
 
@@ -1708,9 +1735,23 @@ tableCard.addEventListener('input', function(e) {
   updateRowLock(row);
   if (row) {
     var box = row.querySelector('.row-check');
-    if (box && inp.value.trim() !== '' && !box.classList.contains('checked')) {
-      box.classList.add('checked');
-      box.setAttribute('aria-checked', 'true');
+    if (box) {
+      if (inp.value.trim() !== '') {
+        if (!box.classList.contains('checked')) {
+          box.classList.add('checked');
+          box.setAttribute('aria-checked', 'true');
+        }
+      } else {
+        /* Ghost-checkbox symmetric fix (v1.13):
+           Emptying the .service-input silently unchecks the row.
+           No playCheck() / no haptic — deletion-driven, not a
+           deliberate tap. Does NOT preserve data-saved-price /
+           data-saved-service (that preservation is exclusive to
+           the manual uncheck path). updateRowLock() above has
+           already blanked the price and added .locked. */
+        box.classList.remove('checked');
+        box.setAttribute('aria-checked', 'false');
+      }
     }
   }
   recalc();
@@ -2147,6 +2188,9 @@ function buildReceipt() {
     itemCount++;
   }
   if (itemCount === 0 && rejected) {
+    /* Defensive: the reject path in tyReceiptBtn / confirmYes now routes
+       away from the receipt entirely, so this branch is unreachable. Left
+       in place in case a future flow re-introduces a reject receipt. */
     var rejectDiv = document.createElement('div');
     rejectDiv.className = 'receipt-item';
     var rejectName = document.createElement('span');
@@ -2362,6 +2406,8 @@ confirmYes.addEventListener('click', function(e) {
   confirmScreen.classList.remove('visible');
 
   if (rejected) {
+    /* Reject flow: no receipt. Hand straight to the thank-you carousel;
+       its tyReceiptBtn will route back to the table. */
     firstServiceInReceipt = false;
     thankyouScreen.style.transition = 'none';
     thankyouScreen.classList.add('visible');
@@ -2454,6 +2500,10 @@ receiptConfirmBtn.addEventListener('click', function(e) {
 function returnToTable() {
   clearAllTyTimers();
   cancelPendingReceiptShake();
+  /* v1.13: capture whether a receipt was actually on screen. If not
+     (the reject path), the fade-out wait below is pointless and would
+     leave the screen blank for 1.2 s. */
+  var receiptWasVisible = receiptScreen.classList.contains('visible');
   if (thankyouScreen.classList.contains('visible')) {
     thankyouScreen.style.transition = 'none';
     thankyouScreen.classList.remove('visible');
@@ -2505,8 +2555,13 @@ function returnToTable() {
   function onFade(ev) {
     if (ev.target === receiptScreen && ev.propertyName === 'opacity') finishReturn();
   }
-  receiptScreen.addEventListener('transitionend', onFade);
-  setTimeout(finishReturn, 1200);
+  if (receiptWasVisible) {
+    receiptScreen.addEventListener('transitionend', onFade);
+    setTimeout(finishReturn, 1200);
+  } else {
+    /* Nothing to fade — restore immediately. */
+    finishReturn();
+  }
 }
 receiptBackBtn.addEventListener('click', function(e) {
   e.preventDefault();
@@ -3373,6 +3428,13 @@ function showQuote(index) {
 function startThankyouSequence() {
   clearAllTyTimers();
   document.body.classList.add('thankyou-active');
+
+  /* v1.13: label toggles on the reject path — the button walks back to
+     the table rather than opening a receipt, so it should read as such. */
+  if (tyReceiptBtnLabel) {
+    tyReceiptBtnLabel.textContent = rejected ? 'サービス選択に戻る' : '内容を確認する';
+  }
+
   applyTyPanel1Content();
   tyExited = false;
   tyCarousel.classList.remove('hidden-out');
@@ -3402,7 +3464,20 @@ function resumeThankyouSequence() {
 tyReceiptBtn.addEventListener('click', function(e) {
   e.preventDefault();
   haptic(10);
+
+  /* v1.13: Reject path has no receipt — walk back to the table instead.
+     The reject-flow tip amount is intentionally not re-surfaced on the
+     Thank-You screen (see changelog at top of file). */
+  if (rejected) {
+    clearAllTyTimers();
+    returnToTable();
+    return;
+  }
+
   clearAllTyTimers();
+  /* Option B safety net: rebuild the receipt fresh each time it's opened,
+     so any table state drift since the first build is reflected. */
+  buildReceipt();
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
