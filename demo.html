@@ -1,181 +1,440 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Swimming Koi Pond Button</title>
+<title>Washi JPG — Crop Test Harness</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap');
-
   :root {
-    --bg-base: #fdf3d8; 
-    --accent: #c9600a; 
-    --petal: #e88a1a; 
-    --petal-soft: #fde8b8; 
+    --bg-page:   #f5d89a;
+    --bg-card:   #fdf3d8;
+    --accent:    #c9600a;
     --text-dark: #231304;
+    --text-med:  #3d2410;
+    --text-mute: #5a3818;
+    --border:    #e8c88a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: var(--text-dark);
+    background: var(--bg-page);
+  }
+  .page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px 24px; }
+
+  h1 { font-size: 17px; letter-spacing: 4px; color: var(--accent); font-weight: 600; margin: 0 0 6px 0; }
+  .sub { font-size: 12px; letter-spacing: 2px; color: var(--text-mute); margin: 0 0 28px 0; }
+
+  /* ---- Control panel ---- */
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 18px 26px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin-bottom: 32px;
+    font-family: -apple-system, sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.4px;
+    color: var(--text-med);
+  }
+  .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .ctrl-group label { color: var(--text-mute); letter-spacing: 1.5px; font-weight: 600; }
+  .ctrl-group button {
+    font-family: inherit; font-size: 12px;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text-med);
+    border-radius: 14px;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s, border-color 0.15s;
+  }
+  .ctrl-group button:hover { border-color: var(--accent); }
+  .ctrl-group button.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+  .ctrl-group input[type="range"] { width: 140px; }
+  .ctrl-group .readout {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px; color: var(--text-mute);
+    min-width: 66px; display: inline-block;
   }
 
-  body {
-    margin: 0;
-    height: 100vh;
-    background-color: var(--accent);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+  /* ---- Cards ---- */
+  .samples {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 34px;
+  }
+  @media (min-width: 820px) {
+    .samples { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
   }
 
-  .blossom-screen {
-    display: flex; 
-    flex-direction: column; 
-    align-items: center; 
-    justify-content: center;
-    gap: 30px; 
+  .label {
+    font-size: 11px; letter-spacing: 3px; color: var(--text-mute);
+    margin: 0 0 6px 0;
+    font-family: -apple-system, sans-serif;
+  }
+  .hint {
+    font-size: 11px; letter-spacing: 1px; color: var(--text-mute);
+    margin: 0 0 12px 0; opacity: 0.75;
+    font-family: -apple-system, sans-serif;
   }
 
-  .start-btn {
-    background: none; border: none; padding: 0; 
-    display: flex; flex-direction: column;
-    align-items: center; cursor: pointer; 
-    -webkit-appearance: none; appearance: none;
-    transition: transform 0.4s ease;
-  }
-  
-  .start-btn:active { 
-    transform: scale(0.94); 
-  }
+  .card {
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 18px rgba(120, 70, 20, 0.08);
+    overflow: hidden;
+    background-color: var(--bg-card);
 
-  .icon-wrapper {
+    /* The JPG under test */
+    background-image: url('icons/1790835034553.jpg');
+
+    /* Defaults — overwritten by the control panel */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center center;
+
     position: relative;
-    width: 200px;
-    height: 200px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px;
   }
 
-  /* 
-   * Adjusted to 125px for the perfect balance of detail and breathing space.
-   */
-  .blossom-char {
-    position: relative;
-    z-index: 2;
-    display: block; 
-    width: 125px; 
-    height: 125px; 
-    user-select: none; -webkit-user-select: none;
-    animation: koiDive 5s ease-in-out infinite; 
-    will-change: transform, opacity, filter;
-  }
+  /* Wide card — mimics #tableCard aspect */
+  .card-wide { padding: 18px 20px; }
 
-  @keyframes koiDive {
-    0%, 100% { 
-      opacity: 1; 
-      transform: scale(1); 
-      filter: drop-shadow(0 4px 18px rgba(0, 0, 0, 0.25)); 
-    }
-    50% { 
-      opacity: 0.3; 
-      transform: scale(0.92); 
-      filter: drop-shadow(0 0 0px transparent); 
-    }
-  }
+  /* Tall card — mimics .receipt-paper */
+  .card-tall { padding: 32px 26px 24px 26px; border-radius: 6px; }
 
-  .koi-image {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-    transform-origin: center center;
-    animation: swimCircle 30s linear infinite; 
-  }
-
-  @keyframes swimCircle {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  .rings-svg {
+  /* Edge-guide overlay — shows where the source image boundary falls */
+  .edge-guide::after {
+    content: "";
     position: absolute;
-    width: 360px; 
-    height: 360px;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
+    inset: 0;
+    border: 1px dashed rgba(201, 96, 10, 0.75);
     pointer-events: none;
-    z-index: 1;
+    z-index: 5;
   }
 
-  .gold-band {
-    stroke: var(--bg-base);
-    stroke-width: 6px;
-    fill: none;
-    filter: drop-shadow(0 0 16px var(--petal-soft));
+  /* ---- Rows & content ---- */
+  .privacy {
+    margin: 0 0 14px 0;
+    padding: 12px 14px;
+    background: var(--privacy-bg, rgba(255, 255, 255, 0.6));
+    border-radius: 10px;
+    font-size: 12px;
+    line-height: 1.85;
+    color: var(--text-med);
   }
 
-  .pulse-ring {
-    stroke: var(--bg-base);
-    fill: none;
-    transform-origin: 180px 180px;
-    animation: ringPulse 9s linear infinite; 
+  .row {
+    display: flex; align-items: center; gap: 12px;
+    padding: 11px 10px;
+    border-bottom: 1px solid rgba(232, 200, 138, 0.55);
+  }
+  .row:last-child { border-bottom: none; }
+  .row.filled {
+    background: var(--filled-bg, rgba(255, 255, 255, 0.6));
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
   }
 
-  .ripple-1 { animation-delay: 0s; }
-  .ripple-2 { animation-delay: 3s; }
-  .ripple-3 { animation-delay: 6s; }
-
-  @keyframes ringPulse {
-    0% { 
-      transform: scale(1); 
-      opacity: 0.7; 
-      stroke-width: 2px; 
-    }
-    100% { 
-      transform: scale(1.9); 
-      opacity: 0; 
-      stroke-width: 0px; 
-    }
+  .check {
+    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
+    border: 1.5px solid var(--border);
+    background: rgba(255, 255, 255, 0.7);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--accent); font-size: 13px;
+  }
+  .check.on { border-color: var(--accent); }
+  .name { flex: 1; font-size: 14.5px; letter-spacing: 0.3px; }
+  .price {
+    flex-shrink: 0; padding: 5px 9px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border);
+    color: var(--accent); font-weight: 700; font-size: 13.5px;
+    letter-spacing: 0.4px;
   }
 
-  .start-label {
-    font-size: 17px; font-weight: 600; letter-spacing: 5px; color: var(--bg-base);
+  /* Receipt */
+  .receipt-header { text-align: center; margin-bottom: 18px; }
+  .receipt-title { font-size: 15px; font-weight: 600; color: var(--accent); letter-spacing: 1.5px; margin-bottom: 5px; }
+  .receipt-sub { font-size: 11.5px; color: var(--text-mute); letter-spacing: 0.5px; }
+  .receipt-to { text-align: center; font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 2px; padding: 14px 0 4px 0; }
+  .receipt-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+    margin: 18px 0;
   }
-  
-  .start-hint {
-    margin: 0; font-size: 20px; font-weight: 500; color: var(--petal-soft);
-    letter-spacing: 3px; line-height: 2; text-align: center; 
-    animation: hintBreathe 4s ease-in-out infinite;
+  .receipt-items { display: flex; flex-direction: column; gap: 10px; }
+  .receipt-item {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding-bottom: 9px;
+    border-bottom: 1px dashed rgba(232, 200, 138, 0.7);
   }
-  
-  @keyframes hintBreathe { 
-    0%, 100% { opacity: 0.85; } 
-    50% { opacity: 1; } 
+  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .receipt-item-name { font-size: 13px; color: var(--text-med); }
+  .receipt-item-price {
+    flex-shrink: 0; padding: 4px 9px; border-radius: 8px;
+    background: var(--chip-bg, rgba(255, 255, 255, 0.6));
+    border: 1px solid var(--border);
+    color: var(--accent); font-weight: 700; font-size: 13px;
+    letter-spacing: 0.4px;
   }
+  .receipt-total {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 4px; margin-top: 12px;
+    border-top: 1.5px solid var(--border);
+    border-bottom: 1.5px solid var(--border);
+  }
+  .receipt-total-label { font-size: 15px; color: var(--text-mute); letter-spacing: 4px; }
+  .receipt-total-value { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+
+  /* When softening is toggled OFF, revert children to their current
+     solid app values so the "stickers on canvas" look is visible. */
+  body.no-softening {
+    --privacy-bg: #fdf5e0;
+    --filled-bg:  #fdf5e0;
+    --chip-bg:    #fdf5e0;
+  }
+
+  .demo-badge {
+    position: fixed; bottom: 6px; left: 10px;
+    font-family: -apple-system, sans-serif;
+    font-size: 10px; font-weight: 500; letter-spacing: 1px;
+    color: var(--text-mute); opacity: 0.55;
+    pointer-events: none; user-select: none;
+  }
+
+  .diag {
+    margin-top: 40px;
+    padding: 16px 18px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11.5px;
+    line-height: 1.8;
+    color: var(--text-med);
+  }
+  .diag b { color: var(--accent); }
 </style>
 </head>
 <body>
 
-  <div class="blossom-screen">
-    <button type="button" class="start-btn" aria-label="はじめる">
-      
-      <div class="icon-wrapper">
-        <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
-          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
-          <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-          <circle cx="180" cy="180" r="90" class="gold-band" />
-        </svg>
+<div class="page">
 
-        <div class="blossom-char">
-          <img src="44173_0c6eff.png" class="koi-image" alt="Koi Start">
+  <h1>WASHI JPG · CROP TEST</h1>
+  <p class="sub">icons/1790835034553.jpg · 1024×1024</p>
+
+  <div class="controls">
+    <div class="ctrl-group">
+      <label>SIZE</label>
+      <button data-size="cover" class="active">cover</button>
+      <button data-size="contain">contain</button>
+      <button data-size="px">fixed px</button>
+    </div>
+    <div class="ctrl-group">
+      <label>POS</label>
+      <button data-pos="center center" class="active">center</button>
+      <button data-pos="bottom right">bottom right</button>
+      <button data-pos="top left">top left</button>
+    </div>
+    <div class="ctrl-group">
+      <label>REPEAT</label>
+      <button data-repeat="no-repeat" class="active">no-repeat</button>
+      <button data-repeat="repeat">repeat</button>
+    </div>
+    <div class="ctrl-group">
+      <label>PX</label>
+      <input type="range" id="pxSlider" min="150" max="1400" step="10" value="500">
+      <span class="readout" id="pxReadout">500 × 500</span>
+    </div>
+    <div class="ctrl-group">
+      <label>OVERLAYS</label>
+      <button id="softToggle" class="active">softened</button>
+      <button id="edgeToggle">edge guides</button>
+    </div>
+  </div>
+
+  <div class="samples">
+
+    <!-- Wide card -->
+    <div>
+      <div class="label">WIDE · like #tableCard</div>
+      <div class="hint">~3:1 aspect</div>
+      <div class="card card-wide" id="cardWide">
+        <div class="privacy">
+          なお、これからご覧いただく内容が、記録されたり、外部に送信されたりすることは一切ございません。どうぞご安心ください。
+        </div>
+        <div class="row filled"><div class="check on">❀</div><div class="name">ダミーテキスト1</div><div class="price">¥3,000</div></div>
+        <div class="row"><div class="check">❀</div><div class="name">ダミーテキスト2</div><div class="price">¥0</div></div>
+        <div class="row filled"><div class="check on">❀</div><div class="name">ダミーテキスト3</div><div class="price">¥5,000</div></div>
+        <div class="row"><div class="check">❀</div><div class="name">ダミーテキスト4</div><div class="price">¥0</div></div>
+      </div>
+    </div>
+
+    <!-- Tall card -->
+    <div>
+      <div class="label">TALL · like .receipt-paper</div>
+      <div class="hint">~0.63:1 aspect</div>
+      <div class="card card-tall" id="cardTall">
+        <div class="receipt-header">
+          <div class="receipt-title">ご確認ありがとうございます</div>
+          <div class="receipt-sub">無理のない範囲でお選びいただき、ありがとうございます</div>
+        </div>
+        <div class="receipt-to">❀ 桜庭さんへ ❀</div>
+        <div class="receipt-divider"></div>
+        <div class="receipt-items">
+          <div class="receipt-item">
+            <span class="receipt-item-name">ダミーテキスト1</span>
+            <span class="receipt-item-price">¥3,000</span>
+          </div>
+          <div class="receipt-item">
+            <span class="receipt-item-name">ダミーテキスト3</span>
+            <span class="receipt-item-price">¥5,000</span>
+          </div>
+        </div>
+        <div class="receipt-total">
+          <span class="receipt-total-label">合計</span>
+          <span class="receipt-total-value">¥8,000</span>
         </div>
       </div>
-      
-      <span class="start-label">はじめる</span>
-    </button>
-    
-    <p class="start-hint">そっとタップしてください</p>
+    </div>
+
   </div>
+
+  <div class="diag" id="diag">
+    <b>source:</b> 1024 × 1024 (1:1)<br>
+    <b>mode:</b> <span id="dMode">cover</span> · <b>position:</b> <span id="dPos">center center</span> · <b>repeat:</b> <span id="dRepeat">no-repeat</span><br>
+    <b>wide card:</b> <span id="dWide">—</span><br>
+    <b>tall card:</b> <span id="dTall">—</span>
+  </div>
+
+</div>
+
+<div class="demo-badge">washi crop test · v1</div>
+
+<script>
+  var state = {
+    size: 'cover',
+    px: 500,
+    pos: 'center center',
+    repeat: 'no-repeat',
+    softened: true,
+    edges: false
+  };
+
+  var cardWide = document.getElementById('cardWide');
+  var cardTall = document.getElementById('cardTall');
+  var cards = [cardWide, cardTall];
+
+  var pxSlider   = document.getElementById('pxSlider');
+  var pxReadout  = document.getElementById('pxReadout');
+  var softToggle = document.getElementById('softToggle');
+  var edgeToggle = document.getElementById('edgeToggle');
+  var dMode      = document.getElementById('dMode');
+  var dPos       = document.getElementById('dPos');
+  var dRepeat    = document.getElementById('dRepeat');
+  var dWide      = document.getElementById('dWide');
+  var dTall      = document.getElementById('dTall');
+
+  function applyStyles() {
+    cards.forEach(function(c) {
+      if (state.size === 'px') {
+        c.style.backgroundSize = state.px + 'px ' + state.px + 'px';
+      } else {
+        c.style.backgroundSize = state.size;
+      }
+      c.style.backgroundPosition = state.pos;
+      c.style.backgroundRepeat   = state.repeat;
+    });
+    dMode.textContent   = (state.size === 'px') ? ('fixed ' + state.px + 'px') : state.size;
+    dPos.textContent    = state.pos;
+    dRepeat.textContent = state.repeat;
+    document.body.classList.toggle('no-softening', !state.softened);
+    cards.forEach(function(c) {
+      c.classList.toggle('edge-guide', state.edges);
+    });
+    updateDiag();
+  }
+
+  function updateDiag() {
+    // Report the effective source scale implied by each card's current size.
+    // cover scale = max(cardW/1024, cardH/1024)
+    // contain scale = min(cardW/1024, cardH/1024)
+    // px scale = px / 1024
+    [ [cardWide, dWide], [cardTall, dTall] ].forEach(function(pair) {
+      var el = pair[0];
+      var out = pair[1];
+      var w = el.clientWidth;
+      var h = el.clientHeight;
+      var scale;
+      if (state.size === 'cover')        scale = Math.max(w / 1024, h / 1024);
+      else if (state.size === 'contain') scale = Math.min(w / 1024, h / 1024);
+      else                               scale = state.px / 1024;
+
+      var drawnW = 1024 * scale;
+      var drawnH = 1024 * scale;
+      out.textContent =
+        'card ' + w + '×' + h +
+        ' · drawn ' + Math.round(drawnW) + '×' + Math.round(drawnH) +
+        ' · scale ' + scale.toFixed(2) + '×';
+    });
+  }
+
+  // Bind size buttons
+  document.querySelectorAll('[data-size]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-size]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.size = btn.getAttribute('data-size');
+      applyStyles();
+    });
+  });
+  document.querySelectorAll('[data-pos]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-pos]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.pos = btn.getAttribute('data-pos');
+      applyStyles();
+    });
+  });
+  document.querySelectorAll('[data-repeat]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-repeat]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.repeat = btn.getAttribute('data-repeat');
+      applyStyles();
+    });
+  });
+
+  pxSlider.addEventListener('input', function() {
+    state.px = parseInt(pxSlider.value, 10);
+    pxReadout.textContent = state.px + ' × ' + state.px;
+    if (state.size === 'px') applyStyles();
+    else updateDiag();
+  });
+
+  softToggle.addEventListener('click', function() {
+    state.softened = !state.softened;
+    softToggle.classList.toggle('active', state.softened);
+    softToggle.textContent = state.softened ? 'softened' : 'solid';
+    applyStyles();
+  });
+
+  edgeToggle.addEventListener('click', function() {
+    state.edges = !state.edges;
+    edgeToggle.classList.toggle('active', state.edges);
+    applyStyles();
+  });
+
+  // Recompute the diagnostic when the viewport changes
+  window.addEventListener('resize', updateDiag);
+
+  applyStyles();
+</script>
 
 </body>
 </html>
