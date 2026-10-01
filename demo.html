@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scroll Hint Positioning — Demo</title>
+<title>Scroll Hint Positioning — Demo v2</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
@@ -28,9 +28,6 @@
     overflow: hidden;
   }
 
-  /* ============================================================
-     Control panel
-     ============================================================ */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
@@ -83,20 +80,17 @@
   }
   .ctrl.actions button:hover { border-color: var(--accent); }
 
-  /* ============================================================
-     Receipt screen + paper
-     ============================================================ */
   .receipt-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(253, 243, 216, 0.94);
     display: flex; align-items: center; justify-content: center;
-    padding: 130px 20px 40px 20px;
+    padding: 150px 20px 40px 20px;
     overflow: hidden;
   }
 
   .receipt-paper {
     max-width: 400px; width: 100%;
-    max-height: calc(100vh - 180px);
+    max-height: calc(100vh - 200px);
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     padding: 32px 30px 26px 30px;
     border-radius: 4px;
@@ -200,9 +194,6 @@
     border-radius: 22px; cursor: pointer;
   }
 
-  /* ============================================================
-     Scroll hints
-     ============================================================ */
   .scroll-hint {
     width: 34px; height: 34px;
     border-radius: 50%;
@@ -232,14 +223,12 @@
 
   .scroll-hint.hidden { opacity: 0; pointer-events: none; }
 
-  /* Sticky mode: fixed-positioned outside the paper */
   .scroll-hint.sticky-mode {
     position: fixed;
     top: auto;
   }
   body.mode-scroll .scroll-hint.sticky-mode { display: none; }
 
-  /* Scroll mode: absolute-positioned inside actions-row */
   .scroll-hint.scroll-mode {
     position: absolute;
     top: auto;
@@ -249,13 +238,14 @@
   .readout-bar {
     position: fixed; bottom: 8px; left: 12px; right: 12px;
     z-index: 100;
-    display: flex; justify-content: center; gap: 24px;
+    display: flex; justify-content: center; gap: 20px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 11px; color: var(--text-mute);
     background: rgba(253, 243, 216, 0.9);
     padding: 6px 14px; border-radius: 20px;
     pointer-events: none; user-select: none;
-    max-width: 700px; margin: 0 auto;
+    max-width: 800px; margin: 0 auto;
+    flex-wrap: wrap;
   }
   .readout-bar b { color: var(--accent); font-weight: 700; }
 </style>
@@ -282,9 +272,15 @@
     </div>
 
     <div class="ctrl">
-      <label>X fixed</label>
-      <input type="range" id="xFixed" min="8" max="80" step="2" value="40">
+      <label>X</label>
+      <input type="range" id="xFixed" min="0" max="120" step="2" value="40">
       <span class="readout" id="xFixedV">40 px</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Y</label>
+      <input type="range" id="yFixed" min="0" max="120" step="2" value="40">
+      <span class="readout" id="yFixedV">40 px</span>
     </div>
 
     <div class="ctrl">
@@ -334,7 +330,6 @@
     </div>
 
     <div class="receipt-actions-row" id="actionsRow">
-      <!-- Scroll-mode hints: sit inside the row, absolute-positioned -->
       <button class="scroll-hint scroll-mode hidden" id="scrollHintL" aria-label="下へスクロール">
         <span class="hint-arrow">↓</span>
       </button>
@@ -352,7 +347,6 @@
 
   </div>
 
-  <!-- Sticky-mode hints: fixed-positioned in the receipt-screen -->
   <button class="scroll-hint sticky-mode hidden" id="stickyHintL" aria-label="下へスクロール">
     <span class="hint-arrow">↓</span>
   </button>
@@ -363,6 +357,7 @@
 
 <div class="readout-bar">
   <span>X applied: <b id="xReadout">—</b></span>
+  <span>Y applied: <b id="yReadout">—</b></span>
   <span>scrollable: <b id="scrollableReadout">—</b></span>
   <span>at bottom: <b id="atBottomReadout">—</b></span>
 </div>
@@ -385,16 +380,20 @@
   var posModeEl    = document.getElementById('posMode');
   var xMethodEl    = document.getElementById('xMethod');
   var xFixedEl     = document.getElementById('xFixed');
+  var yFixedEl     = document.getElementById('yFixed');
   var tapModeEl    = document.getElementById('tapMode');
   var itemCountEl  = document.getElementById('itemCount');
 
   var xFixedV      = document.getElementById('xFixedV');
+  var yFixedV      = document.getElementById('yFixedV');
   var itemCountV   = document.getElementById('itemCountV');
   var xReadout     = document.getElementById('xReadout');
+  var yReadout     = document.getElementById('yReadout');
   var scrollableRO = document.getElementById('scrollableReadout');
   var atBottomRO   = document.getElementById('atBottomReadout');
 
   var HINT_W = 34;
+  var HINT_H = 34;
 
   /* ============================================================
      Items
@@ -431,49 +430,56 @@
   }
 
   /* ============================================================
-     Position the hints
+     Compute X and Y
      ============================================================ */
   function computeX() {
     if (xMethodEl.value === 'fixed') {
       return parseInt(xFixedEl.value, 10);
     }
-    /* Computed: half the gap between paper edge and button edge */
     var paperRect  = paper.getBoundingClientRect();
     var buttonRect = primaryBtn.getBoundingClientRect();
     var gap = (paperRect.width - buttonRect.width) / 2;
-    return Math.max(8, Math.round(gap / 2));
+    return Math.max(0, Math.round(gap / 2));
   }
 
+  function computeY() {
+    return parseInt(yFixedEl.value, 10);
+  }
+
+  /* ============================================================
+     Position the hints
+     ============================================================ */
   function positionHints() {
     var paperRect  = paper.getBoundingClientRect();
-    var buttonRect = primaryBtn.getBoundingClientRect();
     var rowRect    = actionsRow.getBoundingClientRect();
     var X = computeX();
+    var Y = computeY();
     xReadout.textContent = X + ' px';
+    yReadout.textContent = Y + ' px';
 
-    /* --- Sticky mode (viewport-relative, fixed positioning) --- */
-    /* Horizontal: centre of indicator at paperEdge + X */
-    var stickyLX = paperRect.left + X - HINT_W / 2;
-    var stickyRX = paperRect.right - X - HINT_W / 2;
-    stickyL.style.left = stickyLX + 'px';
-    stickyR.style.left = stickyRX + 'px';
+    /* --- Sticky mode (viewport-relative) ---
+       Left hint's centre: paperRect.left + X
+       Right hint's centre: paperRect.right - X
+       Both hints' bottoms: paperRect.bottom + Y (i.e. Y above viewport bottom) */
+    var stickyLleft = paperRect.left + X - HINT_W / 2;
+    var stickyRleft = paperRect.right - X - HINT_W / 2;
+    stickyL.style.left = stickyLleft + 'px';
+    stickyR.style.left = stickyRleft + 'px';
 
-    /* Vertical: indicator's bottom X above paper's bottom */
-    var stickyB = (window.innerHeight - paperRect.bottom) + X;
-    stickyL.style.bottom = stickyB + 'px';
-    stickyR.style.bottom = stickyB + 'px';
+    var viewportBottomToHintBottom = (window.innerHeight - paperRect.bottom) + Y;
+    stickyL.style.bottom = viewportBottomToHintBottom + 'px';
+    stickyR.style.bottom = viewportBottomToHintBottom + 'px';
 
-    /* --- Scroll mode (row-relative, absolute positioning) --- */
-    /* Horizontally, we want the same viewport-space position as sticky;
-       convert to be relative to the actions row. */
-    var scrollLX = (paperRect.left + X) - rowRect.left - HINT_W / 2;
-    var scrollRX = (paperRect.right - X) - rowRect.left - HINT_W / 2;
-    scrollL.style.left = scrollLX + 'px';
-    scrollR.style.left = scrollRX + 'px';
+    /* --- Scroll mode (row-relative) ---
+       Same visual position as sticky when the row is on-screen, but
+       positioned relative to the actions row. */
+    var scrollLleft = (paperRect.left + X) - rowRect.left - HINT_W / 2;
+    var scrollRleft = (paperRect.right - X) - rowRect.left - HINT_W / 2;
+    scrollL.style.left = scrollLleft + 'px';
+    scrollR.style.left = scrollRleft + 'px';
 
-    /* Vertically, anchor X from the row's bottom */
-    scrollL.style.bottom = X + 'px';
-    scrollR.style.bottom = X + 'px';
+    scrollL.style.bottom = Y + 'px';
+    scrollR.style.bottom = Y + 'px';
   }
 
   /* ============================================================
@@ -518,11 +524,7 @@
   /* ============================================================
      Event wiring
      ============================================================ */
-  paper.addEventListener('scroll', function() {
-    updateVisibility();
-    /* Scroll-mode hints stay anchored to the row; no reposition needed. */
-  }, { passive: true });
-
+  paper.addEventListener('scroll', updateVisibility, { passive: true });
   window.addEventListener('resize', updateAll);
 
   posModeEl.addEventListener('change', function() {
@@ -538,6 +540,11 @@
     updateAll();
   });
 
+  yFixedEl.addEventListener('input', function() {
+    yFixedV.textContent = yFixedEl.value + ' px';
+    updateAll();
+  });
+
   itemCountEl.addEventListener('input', function() {
     itemCountV.textContent = itemCountEl.value;
     renderItems(parseInt(itemCountEl.value, 10));
@@ -549,7 +556,6 @@
     updateAll();
   });
 
-  /* Re-evaluate position whenever the row's size changes */
   if (window.ResizeObserver) {
     var ro = new ResizeObserver(updateAll);
     ro.observe(paper);
@@ -561,9 +567,9 @@
      ============================================================ */
   renderItems(parseInt(itemCountEl.value, 10));
   xFixedV.textContent = xFixedEl.value + ' px';
+  yFixedV.textContent = yFixedEl.value + ' px';
   itemCountV.textContent = itemCountEl.value;
 
-  /* Give layout a tick to settle before measuring */
   requestAnimationFrame(function() {
     requestAnimationFrame(updateAll);
   });
