@@ -1,27 +1,31 @@
 /* ============================================================
-   app.js — v1.13
+   app.js — v1.14
    ------------------------------------------------------------
    Changelog:
+     v1.14
+       - Odometer replaces the number-ticker on the summary bar
+         total and the receipt total. Fixed 6-column layout,
+         leading columns expand/collapse via width transition,
+         comma tracks the ¥1,000 threshold.
+         Summary: 400ms roll, 45ms stagger, 260ms snap window.
+         Receipt: 800ms roll, 80ms stagger, always rolls.
+       - Receipt landing animation on first arrival only
+         (receiptHasLanded session flag). 1000ms paperLand
+         keyframe, small overshoot at 70%.
+       - Koi tap sound is now the real MP3 asset
+         (Sound/cave-water-drop-echo-a053fcdf.mp3). The
+         synthesised drop (synthesizeDrop) has been removed.
      v1.13
-       - Water-drop synth sound on koi tap (playDrop()); layered
-         contact / body / upper harmonic + short room echo.
+       - Water-drop synth sound on koi tap (superseded in v1.14).
        - Washi paper JPG (icons/1790835034553.jpg) applied to
-         #tableCard and .receipt-paper only. #nameScreenTable
-         intentionally left clean. Interior softening at
-         rgba(255,255,255,0.6) on the privacy note, checked rows,
-         and receipt chips. .table-card backdrop-filter removed.
+         #tableCard and .receipt-paper only.
        - Reject state: Thank-You screen's tyReceiptBtn now returns
-         to the service table instead of opening a receipt. No
-         receipt is built on the reject path.
-       - tyReceiptBtn label toggles: "サービス選択に戻る" when
-         rejected, "内容を確認する" otherwise.
-       - Reject-flow Thank-You screen does NOT re-surface the tip
-         amount. (Intentional; do not add without revisiting.)
+         to the service table instead of opening a receipt.
+       - tyReceiptBtn label toggles with rejected state.
+       - Reject-flow Thank-You screen does NOT re-surface the tip.
        - returnToTable() skips the 1200 ms fade wait when no
          receipt is on screen.
-       - Ghost-checkbox symmetric fix: emptying the .service-input
-         silently unchecks the row, no data-saved-* preservation.
-         Manual uncheck keeps its preservation behaviour.
+       - Ghost-checkbox symmetric fix.
    ============================================================ */
 
 /* ============ THEME TOGGLE ============ */
@@ -31,7 +35,6 @@ function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
-  /* Video playback: play in autumn, pause in spring (src stays loaded). */
   var av = document.getElementById('ambientVideo');
   if (av) {
     if (theme === 'autumn') {
@@ -88,6 +91,8 @@ var soundMasterGain = null;
 var soundBuffers = {};
 var soundReady = false;
 
+var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
+
 function initSound() {
   if (soundAudioCtx) return;
   try {
@@ -104,15 +109,30 @@ function initSound() {
       synthesizeTock(),
       synthesizeCheck(),
       synthesizePaper(),
-      synthesizeDrop()
+      loadDropBuffer()
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
       soundBuffers.paper = bufs[2];
-      soundBuffers.drop = bufs[3];
+      if (bufs[3]) soundBuffers.drop = bufs[3];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
+}
+
+function loadDropBuffer() {
+  return fetch(DROP_SOUND_URL)
+    .then(function(r) {
+      if (!r.ok) throw new Error('drop fetch failed');
+      return r.arrayBuffer();
+    })
+    .then(function(ab) {
+      return new Promise(function(resolve, reject) {
+        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
+        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
+      });
+    })
+    .catch(function() { return null; });
 }
 
 function synthesizeTock() {
@@ -219,71 +239,6 @@ function synthesizePaper() {
   gain.connect(offline.destination);
   noiseSrc.start(0);
   noiseSrc.stop(0.32);
-
-  return offline.startRendering();
-}
-
-/* Water-drop: three layers (surface break, body bloop, wet harmonic)
-   plus a short room echo of the body via a DelayNode. */
-function synthesizeDrop() {
-  var sr = soundAudioCtx.sampleRate;
-  var length = Math.floor(sr * 0.45);
-  var offline = new OfflineAudioContext(1, length, sr);
-
-  /* ---- Layer 1: surface break "tk" ---- */
-  var contactLen = Math.floor(sr * 0.03);
-  var contactBuf = offline.createBuffer(1, contactLen, sr);
-  var cd = contactBuf.getChannelData(0);
-  for (var ci = 0; ci < contactLen; ci++) cd[ci] = Math.random() * 2 - 1;
-  var contactSrc = offline.createBufferSource();
-  contactSrc.buffer = contactBuf;
-  var contactFilter = offline.createBiquadFilter();
-  contactFilter.type = 'bandpass';
-  contactFilter.frequency.value = 3200;
-  contactFilter.Q.value = 6.0;
-  var contactGain = offline.createGain();
-  contactGain.gain.setValueAtTime(0.30, 0);
-  contactGain.gain.exponentialRampToValueAtTime(0.0001, 0.014);
-  contactSrc.connect(contactFilter);
-  contactFilter.connect(contactGain);
-  contactGain.connect(offline.destination);
-  contactSrc.start(0);
-  contactSrc.stop(0.03);
-
-  /* ---- Layer 2: body bloop (fast descending sweep) ---- */
-  var body = offline.createOscillator();
-  body.type = 'sine';
-  body.frequency.setValueAtTime(1400, 0);
-  body.frequency.exponentialRampToValueAtTime(260, 0.14);
-  var bodyGain = offline.createGain();
-  bodyGain.gain.setValueAtTime(0.0001, 0);
-  bodyGain.gain.exponentialRampToValueAtTime(0.60, 0.008);
-  bodyGain.gain.exponentialRampToValueAtTime(0.0001, 0.24);
-  body.connect(bodyGain);
-  bodyGain.connect(offline.destination);
-  body.start(0);
-  body.stop(0.26);
-
-  /* ---- Layer 3: upper "wet" harmonic ---- */
-  var upper = offline.createOscillator();
-  upper.type = 'sine';
-  upper.frequency.value = 2800;
-  var upperGain = offline.createGain();
-  upperGain.gain.setValueAtTime(0.15, 0);
-  upperGain.gain.exponentialRampToValueAtTime(0.0001, 0.06);
-  upper.connect(upperGain);
-  upperGain.connect(offline.destination);
-  upper.start(0);
-  upper.stop(0.08);
-
-  /* ---- Layer 4: room echo of the body via a 90ms delay ---- */
-  var delay = offline.createDelay(0.5);
-  delay.delayTime.value = 0.09;
-  var echoGain = offline.createGain();
-  echoGain.gain.value = 0.22;
-  bodyGain.connect(delay);
-  delay.connect(echoGain);
-  echoGain.connect(offline.destination);
 
   return offline.startRendering();
 }
@@ -398,9 +353,6 @@ function loadQuotesFromServer() {
 }
 
 /* ============ PANEL LOADER ============ */
-/* CONDITIONAL-001: panel 3 and the transition-line body have two variants.
-   Both are fetched and stored as strings at load; the correct one is
-   injected in confirmName() once we know if any preset was selected. */
 var panel3DefaultHtml = '';
 var panel3NoHtml = '';
 var transitionBodyDefault = '';
@@ -450,47 +402,128 @@ function loadAllPanels() {
   ]);
 }
 
-/* ============ ROLLING PRICE COUNTER (SUMMARY BAR) ============ */
-var currentDisplayedTotal = 0;
-var rollAnimationId = null;
-function updateSummaryTotal(targetAmount, isInstant) {
-  var totalEl = document.getElementById('total');
-  if (!totalEl) return;
-  if (isInstant) {
-    if (rollAnimationId) { window.cancelAnimationFrame(rollAnimationId); rollAnimationId = null; }
-    currentDisplayedTotal = targetAmount;
-    totalEl.textContent = '¥' + targetAmount.toLocaleString();
-    return;
-  }
-  if (currentDisplayedTotal === targetAmount) return;
-  var startAmount = currentDisplayedTotal;
-  var duration = 400;
-  var startTimestamp = null;
-  if (rollAnimationId) window.cancelAnimationFrame(rollAnimationId);
-  var step = function(timestamp) {
-    if (!startTimestamp) startTimestamp = timestamp;
-    var progress = Math.min((timestamp - startTimestamp) / duration, 1);
-    var ease = 1 - Math.pow(1 - progress, 4);
-    var currentVal = Math.floor(ease * (targetAmount - startAmount) + startAmount);
-    currentDisplayedTotal = currentVal;
-    totalEl.textContent = '¥' + currentVal.toLocaleString();
-    if (progress < 1) {
-      rollAnimationId = window.requestAnimationFrame(step);
-    } else {
-      currentDisplayedTotal = targetAmount;
-      totalEl.textContent = '¥' + targetAmount.toLocaleString();
-      rollAnimationId = null;
-    }
-  };
-  rollAnimationId = window.requestAnimationFrame(step);
+/* ============================================================
+   ODOMETER ENGINE (v1.14)
+   ------------------------------------------------------------
+   Six-digit fixed column layout. Leading columns expand and
+   collapse via width transition. A comma static sits after
+   column index 2 and appears when the value crosses 1000.
+   ============================================================ */
+var NUM_COLS = 6;
+var COMMA_AFTER = 2;   /* comma sits after col 2 (0-indexed) */
+var SNAP_WINDOW_MS = 260;
+
+function isColVisible(value, colIndex) {
+  if (value === 0) return colIndex === NUM_COLS - 1;
+  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+  return value >= placeValue;
 }
 
-/* ============ ROLLING PRICE COUNTER (RECEIPT TOTAL) ============ */
-var currentReceiptTotal = 0;
-var receiptRollAnimationId = null;
-function updateReceiptTotal(isInstant) {
-  var numEl = document.getElementById('receiptTotalNumber');
-  if (!numEl) return;
+function getDigitAt(value, colIndex) {
+  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+  return Math.floor(value / placeValue) % 10;
+}
+
+function buildDigitColumns(container, initialValue) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (var i = 0; i < NUM_COLS; i++) {
+    var col = document.createElement('span');
+    col.className = 'digit-col hidden';
+    col.setAttribute('data-digit', '0');
+    var strip = document.createElement('span');
+    strip.className = 'digit-strip';
+    for (var d = 0; d <= 9; d++) {
+      var de = document.createElement('span');
+      de.className = 'digit';
+      de.textContent = d;
+      strip.appendChild(de);
+    }
+    strip.style.transform = 'translateY(0)';
+    col.appendChild(strip);
+    container.appendChild(col);
+
+    if (i === COMMA_AFTER) {
+      var comma = document.createElement('span');
+      comma.className = 'digit-static hidden';
+      comma.setAttribute('data-comma', '1');
+      comma.textContent = ',';
+      container.appendChild(comma);
+    }
+  }
+  container.classList.add('no-transition');
+  applyDigitValue(container, initialValue, { instant: true, stagger: 0 });
+  void container.offsetWidth;
+  container.classList.remove('no-transition');
+}
+
+function applyDigitValue(container, value, opts) {
+  if (!container) return;
+  opts = opts || {};
+  var instant = !!opts.instant;
+  var stagger = opts.stagger != null ? opts.stagger : 45;
+
+  if (instant) {
+    container.classList.add('no-transition');
+  }
+
+  var cols = container.querySelectorAll('.digit-col');
+  var comma = container.querySelector('.digit-static[data-comma]');
+
+  for (var i = 0; i < cols.length; i++) {
+    var col = cols[i];
+    var strip = col.querySelector('.digit-strip');
+    var visible = isColVisible(value, i);
+    var newDigit = getDigitAt(value, i);
+    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
+
+    /* Rightmost (ones place) rolls first; moving left, each delay grows. */
+    var fromRight = NUM_COLS - 1 - i;
+    var delay = instant ? 0 : fromRight * stagger;
+
+    if (instant) {
+      strip.style.transitionDelay = '0ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    } else if (newDigit !== oldDigit) {
+      strip.style.transitionDelay = delay + 'ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    }
+
+    col.classList.toggle('hidden', !visible);
+    col.setAttribute('data-digit', newDigit);
+  }
+
+  if (comma) {
+    comma.classList.toggle('hidden', value < 1000);
+  }
+
+  if (instant) {
+    void container.offsetWidth;
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        container.classList.remove('no-transition');
+      });
+    });
+  }
+}
+
+/* ============ SUMMARY TOTAL (odometer) ============ */
+var lastSummaryUpdate = 0;
+
+function updateSummaryTotal(targetAmount) {
+  var container = document.getElementById('summaryDigits');
+  if (!container) return;
+  var now = performance.now();
+  var elapsed = now - lastSummaryUpdate;
+  var shouldSnap = lastSummaryUpdate > 0 && elapsed < SNAP_WINDOW_MS;
+  lastSummaryUpdate = now;
+  applyDigitValue(container, targetAmount, { instant: shouldSnap, stagger: 45 });
+}
+
+/* ============ RECEIPT TOTAL (odometer) ============ */
+function updateReceiptTotal() {
+  var container = document.getElementById('receiptTotalNumber');
+  if (!container) return;
   var sum = 0;
   var receiptPriceInputs = receiptItems.querySelectorAll('.receipt-price-input');
   for (var i = 0; i < receiptPriceInputs.length; i++) {
@@ -498,33 +531,7 @@ function updateReceiptTotal(isInstant) {
     if (item && item.getAttribute('data-removing') === 'true') continue;
     sum += parseFormatted(receiptPriceInputs[i].value);
   }
-  if (isInstant) {
-    if (receiptRollAnimationId) { window.cancelAnimationFrame(receiptRollAnimationId); receiptRollAnimationId = null; }
-    currentReceiptTotal = sum;
-    numEl.textContent = sum.toLocaleString();
-    return;
-  }
-  if (currentReceiptTotal === sum) return;
-  var startAmount = currentReceiptTotal;
-  var duration = 400;
-  var startTimestamp = null;
-  if (receiptRollAnimationId) window.cancelAnimationFrame(receiptRollAnimationId);
-  var step = function(timestamp) {
-    if (!startTimestamp) startTimestamp = timestamp;
-    var progress = Math.min((timestamp - startTimestamp) / duration, 1);
-    var ease = 1 - Math.pow(1 - progress, 4);
-    var currentVal = Math.floor(ease * (sum - startAmount) + startAmount);
-    currentReceiptTotal = currentVal;
-    numEl.textContent = currentVal.toLocaleString();
-    if (progress < 1) {
-      receiptRollAnimationId = window.requestAnimationFrame(step);
-    } else {
-      currentReceiptTotal = sum;
-      numEl.textContent = sum.toLocaleString();
-      receiptRollAnimationId = null;
-    }
-  };
-  receiptRollAnimationId = window.requestAnimationFrame(step);
+  applyDigitValue(container, sum, { instant: false, stagger: 80 });
 }
 
 /* ============ DOM REFS ============ */
@@ -556,7 +563,6 @@ var transitionLine = document.getElementById('transitionLine');
 var globalHint = document.getElementById('globalHint');
 var globalHintLayerSwipe = document.getElementById('globalHintLayerSwipe');
 var globalHintLayerScroll = document.getElementById('globalHintLayerScroll');
-var totalEl = document.getElementById('total');
 var alertScreen = document.getElementById('alertScreen');
 var alertList = document.getElementById('alertList');
 var alertTitle = document.getElementById('alertTitle');
@@ -624,6 +630,7 @@ var tyReceiptBtn = document.getElementById('tyReceiptBtn');
 var tyReceiptBtnLabel = document.getElementById('tyReceiptBtnLabel');
 
 var receiptOpenedFromThankyou = false;
+var receiptHasLanded = false;
 
 var NAGOYA = { lat: 35.1815, lon: 136.9066, tz: 'Asia/Tokyo', name: '名古屋市' };
 var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -1035,7 +1042,7 @@ function goToPanel(index, noGust) {
 /* ============ TABLE ============ */
 function getRows() { return tableCard.querySelectorAll('.row'); }
 
-function recalc(isInstant) {
+function recalc() {
   var rows = getRows();
   var sum = 0;
   for (var i = 0; i < rows.length; i++) {
@@ -1049,7 +1056,7 @@ function recalc(isInstant) {
     else { row.classList.remove('filled'); }
   }
   var displayTotal = rejected ? confirmedTipAmount : sum;
-  updateSummaryTotal(displayTotal, isInstant);
+  updateSummaryTotal(displayTotal);
   updateSubmitState();
 }
 
@@ -1970,7 +1977,7 @@ function confirmName() {
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
     updateAllRowLocks();
-    recalc(true);
+    recalc();
   }, 420);
 }
 
@@ -2000,7 +2007,7 @@ function resetAll() {
   }
   if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
   updateAllRowLocks();
-  recalc(true);
+  recalc();
   if (typeof updateSummaryVisibility === 'function') updateSummaryVisibility();
 }
 
@@ -2056,6 +2063,10 @@ window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js').catch(function() {});
   }
   buildMotes();
+
+  /* v1.14: build odometer columns once at boot. */
+  buildDigitColumns(document.getElementById('summaryDigits'), 0);
+  buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
 });
 
 /* ============ INTRO ============ */
@@ -2083,8 +2094,6 @@ startBtn.addEventListener('click', function(e) {
       span.style.animationDelay = (i * 0.22) + 's';
       nameColumn.appendChild(span);
     }
-    /* Reveal the ambient video for the intro sequence. The video has been
-       playing silently since page load; we're just fading it in. */
     var ambientImage = document.querySelector('.ambient-image');
     if (ambientImage) ambientImage.style.opacity = '0.8';
     introOverlay.classList.add('active');
@@ -2109,8 +2118,6 @@ startBtn.addEventListener('click', function(e) {
       activatePanel(0);
       setTimeout(function() {
         introOverlay.classList.remove('active', 'finishing');
-        /* If we ended up on spring, fade the video back out. In autumn,
-           leave it visible. */
         var ambientImage2 = document.querySelector('.ambient-image');
         if (ambientImage2) {
           if (currentTheme === 'autumn') ambientImage2.style.opacity = '';
@@ -2188,9 +2195,7 @@ function buildReceipt() {
     itemCount++;
   }
   if (itemCount === 0 && rejected) {
-    /* Defensive: the reject path in tyReceiptBtn / confirmYes now routes
-       away from the receipt entirely, so this branch is unreachable. Left
-       in place in case a future flow re-introduces a reject receipt. */
+    /* Defensive branch — reject path no longer routes here (v1.13+). */
     var rejectDiv = document.createElement('div');
     rejectDiv.className = 'receipt-item';
     var rejectName = document.createElement('span');
@@ -2214,7 +2219,7 @@ function buildReceipt() {
     itemCount++;
   }
   bindReceiptItemListeners();
-  updateReceiptTotal(true);
+  updateReceiptTotal();
   firstServiceInReceipt = firstRowIncluded;
 }
 
@@ -2431,6 +2436,21 @@ confirmYes.addEventListener('click', function(e) {
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
+
+    /* v1.14: Receipt landing animation — first arrival only. */
+    if (!receiptHasLanded) {
+      receiptHasLanded = true;
+      var paper = receiptScreen.querySelector('.receipt-paper');
+      if (paper) {
+        paper.classList.remove('landing');
+        void paper.offsetWidth;
+        paper.classList.add('landing');
+        paper.addEventListener('animationend', function onLandingEnd() {
+          paper.classList.remove('landing');
+          paper.removeEventListener('animationend', onLandingEnd);
+        });
+      }
+    }
   }, 450);
 });
 
@@ -2559,7 +2579,6 @@ function returnToTable() {
     receiptScreen.addEventListener('transitionend', onFade);
     setTimeout(finishReturn, 1200);
   } else {
-    /* Nothing to fade — restore immediately. */
     finishReturn();
   }
 }
@@ -2999,13 +3018,13 @@ rejectRow.addEventListener('click', function() {
       updateRowLock(row2);
     }
   }
-  recalc(true);
+  recalc();
   updateSubmitState();
   setTimeout(updateSummaryVisibility, 400);
   setTimeout(updateSummaryVisibility, 900);
 });
 
-recalc(true);
+recalc();
 
 /* ============ THEME / WEATHER ============ */
 function getTimeOfDayInNagoya() {
@@ -3429,8 +3448,6 @@ function startThankyouSequence() {
   clearAllTyTimers();
   document.body.classList.add('thankyou-active');
 
-  /* v1.13: label toggles on the reject path — the button walks back to
-     the table rather than opening a receipt, so it should read as such. */
   if (tyReceiptBtnLabel) {
     tyReceiptBtnLabel.textContent = rejected ? 'サービス選択に戻る' : '内容を確認する';
   }
@@ -3465,9 +3482,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
   e.preventDefault();
   haptic(10);
 
-  /* v1.13: Reject path has no receipt — walk back to the table instead.
-     The reject-flow tip amount is intentionally not re-surfaced on the
-     Thank-You screen (see changelog at top of file). */
   if (rejected) {
     clearAllTyTimers();
     returnToTable();
@@ -3475,8 +3489,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
   }
 
   clearAllTyTimers();
-  /* Option B safety net: rebuild the receipt fresh each time it's opened,
-     so any table state drift since the first build is reflected. */
   buildReceipt();
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');
