@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blur + Vertical Scale — Demo v2</title>
+<title>Blur + Horizontal Scale — Demo v3</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
@@ -151,7 +151,7 @@
       <span class="readout" id="maxBlurV">6.0 px</span>
     </div>
     <div class="ctrl">
-      <label>Max scaleY</label>
+      <label>Max scaleX</label>
       <input type="range" id="maxScale" min="1.00" max="1.40" step="0.01" value="1.10">
       <span class="readout" id="maxScaleV">1.10</span>
     </div>
@@ -159,8 +159,8 @@
       <label>Origin</label>
       <select id="origin">
         <option value="50% 50%" selected>center</option>
-        <option value="50% 100%">bottom</option>
-        <option value="50% 0%">top</option>
+        <option value="0% 50%">left</option>
+        <option value="100% 50%">right</option>
       </select>
     </div>
     <div class="ctrl">
@@ -174,7 +174,7 @@
   </div>
 </div>
 
-<div class="ref-line mid" data-label="pivot · 0% blur · max scaleY"></div>
+<div class="ref-line mid" data-label="pivot · 0% blur · max scaleX"></div>
 
 <div class="demo">
   <div class="spacer-note">↓ SCROLL — TEXT SHRINKS AND BLURS ↓</div>
@@ -212,7 +212,7 @@
 <div class="readout-bar">
   <span>blur <b id="roBlur">0.0</b> px</span>
   <span class="divider">·</span>
-  <span>scaleY <b id="roScale">1.00</b></span>
+  <span>scaleX <b id="roScale">1.00</b></span>
   <span class="divider">·</span>
   <span>progress <b id="roProg">0%</b></span>
   <span class="divider">·</span>
@@ -277,16 +277,17 @@
       state = 'above pivot';
     }
 
-    /* Blur: 0 at pivot, ramps to max at the far end (linear) */
+    /* Blur: 0 at pivot, ramps to max at the far end (progress = 1) */
     var blurVal = maxBlur * progress;
 
-    /* Scale: inverse of blur — 1.00 at far end, maxScale at pivot */
+    /* Scale: starts at 1.00 when blur is at max (progress = 1),
+       grows to maxScale as blur reaches 0 (progress = 0). */
     var eased = ease(progress);
     var scaleVal = maxScale - (maxScale - 1) * eased;
 
     bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
     bodyEl.style.transformOrigin = originEl.value;
-    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleY(' + scaleVal.toFixed(4) + ')' : '';
+    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
 
     roBlur.textContent  = blurVal.toFixed(1);
     roScale.textContent = scaleVal.toFixed(3);
