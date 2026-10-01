@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blur + Horizontal Scale — Demo v3</title>
+<title>Blur + ScaleX with Dead Zone — Demo v4</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
@@ -33,7 +33,7 @@
   }
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
     gap: 8px 16px;
     max-width: 1100px; margin: 0 auto;
   }
@@ -135,10 +135,11 @@
     background: rgba(253, 243, 216, 0.94);
     padding: 7px 16px; border-radius: 20px;
     pointer-events: none; user-select: none;
-    max-width: 780px; margin: 0 auto;
+    max-width: 800px; margin: 0 auto;
   }
   .readout-bar b { color: var(--accent); font-weight: 700; }
   .readout-bar .divider { color: rgba(90, 56, 24, 0.35); }
+  .readout-bar .dead { color: rgba(90, 56, 24, 0.5); font-style: italic; }
 </style>
 </head>
 <body>
@@ -147,13 +148,18 @@
   <div class="controls-grid">
     <div class="ctrl">
       <label>Max blur</label>
-      <input type="range" id="maxBlur" min="0" max="20" step="0.5" value="6">
+      <input type="range" id="maxBlur" min="1" max="20" step="0.5" value="6">
       <span class="readout" id="maxBlurV">6.0 px</span>
     </div>
     <div class="ctrl">
       <label>Max scaleX</label>
       <input type="range" id="maxScale" min="1.00" max="1.40" step="0.01" value="1.10">
       <span class="readout" id="maxScaleV">1.10</span>
+    </div>
+    <div class="ctrl">
+      <label>Scale starts at blur</label>
+      <input type="range" id="threshold" min="0" max="10" step="0.5" value="1">
+      <span class="readout" id="thresholdV">1.0 px</span>
     </div>
     <div class="ctrl">
       <label>Origin</label>
@@ -163,21 +169,13 @@
         <option value="100% 50%">right</option>
       </select>
     </div>
-    <div class="ctrl">
-      <label>Scale easing</label>
-      <select id="scaleEase">
-        <option value="linear" selected>linear (matches blur)</option>
-        <option value="easeOut">ease-out</option>
-        <option value="easeIn">ease-in</option>
-      </select>
-    </div>
   </div>
 </div>
 
-<div class="ref-line mid" data-label="pivot · 0% blur · max scaleX"></div>
+<div class="ref-line mid" data-label="pivot · 0 blur · max scaleX"></div>
 
 <div class="demo">
-  <div class="spacer-note">↓ SCROLL — TEXT SHRINKS AND BLURS ↓</div>
+  <div class="spacer-note">↓ SCROLL — BLUR RISES, SCALE FALLS TO 1.0 ↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
@@ -212,11 +210,11 @@
 <div class="readout-bar">
   <span>blur <b id="roBlur">0.0</b> px</span>
   <span class="divider">·</span>
-  <span>scaleX <b id="roScale">1.00</b></span>
+  <span>scaleX <b id="roScale">1.000</b></span>
+  <span class="divider">·</span>
+  <span id="roPhase" class="dead">—</span>
   <span class="divider">·</span>
   <span>progress <b id="roProg">0%</b></span>
-  <span class="divider">·</span>
-  <span>state <b id="roState">—</b></span>
 </div>
 
 <script>
@@ -229,15 +227,17 @@
 
   var maxBlurEl   = document.getElementById('maxBlur');
   var maxScaleEl  = document.getElementById('maxScale');
+  var thresholdEl = document.getElementById('threshold');
   var originEl    = document.getElementById('origin');
-  var scaleEaseEl = document.getElementById('scaleEase');
+
   var maxBlurV    = document.getElementById('maxBlurV');
   var maxScaleV   = document.getElementById('maxScaleV');
+  var thresholdV  = document.getElementById('thresholdV');
 
   var roBlur  = document.getElementById('roBlur');
   var roScale = document.getElementById('roScale');
+  var roPhase = document.getElementById('roPhase');
   var roProg  = document.getElementById('roProg');
-  var roState = document.getElementById('roState');
 
   var downMaxDistance = 1;
   var upMaxDistance = 1;
@@ -250,17 +250,10 @@
     upMaxDistance = Math.max(40, vh / 2 + offset - bodyH / 2);
   }
 
-  function ease(t) {
-    var mode = scaleEaseEl.value;
-    if (mode === 'linear') return t;
-    if (mode === 'easeOut') return 1 - Math.pow(1 - t, 2);
-    if (mode === 'easeIn') return t * t;
-    return t;
-  }
-
   function update() {
-    var maxBlur = parseFloat(maxBlurEl.value);
-    var maxScale = parseFloat(maxScaleEl.value);
+    var maxBlur    = parseFloat(maxBlurEl.value);
+    var maxScale   = parseFloat(maxScaleEl.value);
+    var threshold  = parseFloat(thresholdEl.value);   /* px */
     var vh = window.innerHeight;
     var vc = vh / 2;
 
@@ -268,22 +261,29 @@
     var bodyCentre = rect.top + rect.height / 2;
     var d = bodyCentre - vc;
 
-    var progress, state;
+    var progress;
     if (d >= 0) {
       progress = Math.min(1, d / downMaxDistance);
-      state = 'below pivot';
     } else {
       progress = Math.min(1, -d / upMaxDistance);
-      state = 'above pivot';
     }
 
-    /* Blur: 0 at pivot, ramps to max at the far end (progress = 1) */
+    /* Blur: 0 at pivot, ramps linearly to maxBlur at the far end */
     var blurVal = maxBlur * progress;
 
-    /* Scale: starts at 1.00 when blur is at max (progress = 1),
-       grows to maxScale as blur reaches 0 (progress = 0). */
-    var eased = ease(progress);
-    var scaleVal = maxScale - (maxScale - 1) * eased;
+    /* Scale: dead zone above the threshold.
+       - blurVal >= threshold: scale = 1.00 (no scaling)
+       - blurVal <  threshold: ramp from 1.00 at threshold to maxScale at blur = 0 */
+    var scaleVal;
+    var phase;
+    if (threshold <= 0 || blurVal >= threshold) {
+      scaleVal = 1.0;
+      phase = 'dead zone (no scaling)';
+    } else {
+      var t = 1 - (blurVal / threshold);   /* 0 at threshold, 1 at blur=0 */
+      scaleVal = 1.0 + (maxScale - 1.0) * t;
+      phase = 'scaling';
+    }
 
     bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
     bodyEl.style.transformOrigin = originEl.value;
@@ -291,8 +291,9 @@
 
     roBlur.textContent  = blurVal.toFixed(1);
     roScale.textContent = scaleVal.toFixed(3);
+    roPhase.textContent = phase;
+    roPhase.className   = phase === 'scaling' ? '' : 'dead';
     roProg.textContent  = Math.round(progress * 100) + '%';
-    roState.textContent = state;
   }
 
   var rafPending = false;
@@ -313,8 +314,11 @@
     maxScaleV.textContent = parseFloat(maxScaleEl.value).toFixed(2);
     schedule();
   });
+  thresholdEl.addEventListener('input', function() {
+    thresholdV.textContent = parseFloat(thresholdEl.value).toFixed(1) + ' px';
+    schedule();
+  });
   originEl.addEventListener('change', schedule);
-  scaleEaseEl.addEventListener('change', schedule);
 
   measure();
   update();
