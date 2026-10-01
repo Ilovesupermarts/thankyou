@@ -61,7 +61,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.13</div>
+  <div class="app-version" aria-hidden="true">v1.14</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -288,7 +288,7 @@
   <div class="summary-inner">
     <div class="summary-total-wrap">
       <div class="summary-label">合計</div>
-      <div class="summary-total" id="total">¥0</div>
+      <div class="summary-total" id="total"><span class="yen-symbol">¥</span><span class="digit-roll summary-digit-roll" id="summaryDigits"></span></div>
     </div>
     <div class="summary-actions">
       <button type="button" class="reset" id="resetBtn">リセット</button>
@@ -374,7 +374,7 @@
 
     <div class="receipt-total-line">
       <span class="receipt-total-label">合計</span>
-      <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span id="receiptTotalNumber">0</span></span>
+      <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span></span>
     </div>
 
     <button type="button" class="receipt-confirm-btn" id="receiptConfirmBtn">
