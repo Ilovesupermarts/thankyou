@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v7';
+const CACHE = 'thankyou-v8';
 
 const ASSETS = [
   './',
@@ -18,6 +18,7 @@ const ASSETS = [
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
   './icons/1790678998862.jpg',
+  './icons/1790835034553.jpg',
   './icons/44173_0c6eff.png',
   './icons/VID-20260929-WA0002.mp4'
 ];
@@ -44,7 +45,7 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   var url = new URL(e.request.url);
 
-  /* presets.json / quotes.json — network-first (unchanged from before) */
+  /* presets.json / quotes.json — network-first */
   if (url.pathname.endsWith('/presets.json') ||
       url.pathname.endsWith('/quotes.json')) {
     e.respondWith(
@@ -59,7 +60,7 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* HTML, CSS, and JS — network-first, fall back to cache when offline. */
+  /* HTML, CSS, JS — network-first, fall back to cache when offline. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
@@ -83,7 +84,7 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
-  /* Everything else (images, video, icons, fonts) — cache-first. */
+  /* Everything else — cache-first. */
   e.respondWith(
     caches.match(e.request).then(function(r) {
       return r || fetch(e.request);
