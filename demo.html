@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scroll Hint Positioning — Demo v2</title>
+<title>Blur Tuning — Demo</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
@@ -13,11 +13,8 @@
     --text-dark:     #231304;
     --text-med:      #3d2410;
     --text-mute:     #5a3818;
-    --text-faint:    #7a5028;
     --border:        #e8c88a;
-    --border-soft:   #f0d8a0;
-    --shadow-warm:   rgba(120, 70, 20, 0.14);
-    --glow:          #f7b93c;
+    --transition-head-color: #fdf0c8;
   }
   * { box-sizing: border-box; }
   html, body {
@@ -25,40 +22,33 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     color: var(--text-dark);
     background: var(--bg-page);
-    overflow: hidden;
   }
 
+  /* Controls */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
     background: rgba(253, 243, 216, 0.94);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    padding: 10px 16px 10px 16px;
+    padding: 10px 16px;
     font-family: -apple-system, sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.3px;
-    color: var(--text-med);
+    font-size: 11px; color: var(--text-med);
   }
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 6px 14px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 6px 16px;
     max-width: 1100px;
     margin: 0 auto;
   }
-  .ctrl { display: flex; align-items: center; gap: 6px; }
+  .ctrl { display: flex; align-items: center; gap: 8px; }
   .ctrl label {
     flex: 1; color: var(--text-mute);
     letter-spacing: 1px; font-weight: 600;
     white-space: nowrap; font-size: 10px;
   }
   .ctrl input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
-  .ctrl .readout {
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 10px; color: var(--text-mute);
-    min-width: 52px; text-align: right;
-  }
   .ctrl select {
     flex: 1; font-family: inherit; font-size: 10.5px;
     padding: 3px 5px;
@@ -66,513 +56,362 @@
     background: #fff; color: var(--text-med);
     border-radius: 5px;
   }
-  .ctrl.actions {
+  .ctrl .readout {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 10px; color: var(--text-mute);
+    min-width: 48px; text-align: right;
+  }
+  .ctrl.toggle {
+    justify-content: center;
     grid-column: 1 / -1;
-    justify-content: center; gap: 10px;
     padding-top: 2px;
   }
-  .ctrl.actions button {
-    font-family: inherit; font-size: 10.5px;
-    letter-spacing: 1px; padding: 4px 12px;
-    border: 1px solid var(--border);
-    background: #fff; color: var(--text-med);
-    border-radius: 12px; cursor: pointer;
-  }
-  .ctrl.actions button:hover { border-color: var(--accent); }
+  .ctrl.toggle input { accent-color: var(--accent); }
 
-  .receipt-screen {
-    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-    background: rgba(253, 243, 216, 0.94);
-    display: flex; align-items: center; justify-content: center;
-    padding: 150px 20px 40px 20px;
-    overflow: hidden;
+  /* Demo body */
+  .demo {
+    padding: 180px 20px 120px 20px;
+    max-width: 620px;
+    margin: 0 auto;
   }
 
-  .receipt-paper {
-    max-width: 400px; width: 100%;
-    max-height: calc(100vh - 200px);
-    overflow-y: auto; -webkit-overflow-scrolling: touch;
-    padding: 32px 30px 26px 30px;
-    border-radius: 4px;
-    box-shadow: 0 8px 32px rgba(120, 70, 20, 0.18);
-    border: 1px solid var(--border-soft);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    position: relative;
-    scroll-behavior: auto;
-
-    background-color: var(--bg-base);
-    background-image: url('icons/1790835034553.jpg');
-    background-size: cover;
-    background-position: center center;
-    background-repeat: no-repeat;
-  }
-
-  .receipt-header { text-align: center; margin-bottom: 20px; }
-  .receipt-thanks {
-    font-size: 16px; font-weight: 600; color: var(--accent);
-    line-height: 1.9; letter-spacing: 1px; margin-bottom: 12px;
-  }
-  .receipt-subthanks {
-    font-size: 12px; color: var(--text-mute);
-    line-height: 1.9; letter-spacing: 0.5px;
-  }
-  .receipt-to-row {
-    display: flex; align-items: center; justify-content: center;
-    gap: 12px; padding: 14px 8px 10px 8px;
-  }
-  .receipt-to-mark { font-size: 12px; color: var(--glow); }
-  .receipt-to-name {
-    font-size: 17px; font-weight: 700; color: var(--accent);
+  .spacer-note {
+    text-align: center;
+    font-family: -apple-system, sans-serif;
+    font-size: 11px;
     letter-spacing: 2px;
-  }
-  .receipt-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
-    margin: 18px 0;
-  }
-  .receipt-title {
-    font-size: 11px; color: var(--text-faint);
-    letter-spacing: 6px; text-align: center; margin-bottom: 18px;
-  }
-  .receipt-items {
-    display: flex; flex-direction: column; gap: 11px;
-    margin-bottom: 8px;
-  }
-  .receipt-item {
-    display: flex; justify-content: space-between; align-items: center;
-    gap: 8px; padding-bottom: 8px;
-    border-bottom: 1px dashed var(--border-soft);
-  }
-  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .receipt-item-name {
-    flex: 1; font-size: 13px; color: var(--text-med);
-  }
-  .receipt-item-price-wrap {
-    flex-shrink: 0; padding: 3px 9px; border-radius: 8px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border-soft);
-    color: var(--accent); font-weight: 600; font-size: 13px;
+    color: var(--text-mute);
+    opacity: 0.55;
+    margin: 60px 0;
   }
 
-  .receipt-total-line {
-    display: flex; justify-content: space-between; align-items: baseline;
-    padding: 14px 4px; margin-top: 10px;
-    border-top: 1.5px solid var(--border);
-    border-bottom: 1.5px solid var(--border);
-  }
-  .receipt-total-label {
-    font-size: 15px; font-weight: 600; color: var(--text-mute);
-    letter-spacing: 4px;
-  }
-  .receipt-total-value {
-    font-size: 18px; font-weight: 700; color: var(--accent);
-    letter-spacing: 0.5px;
-  }
-
-  .receipt-actions-row {
-    position: relative;
-    margin-top: 22px;
-    display: flex; flex-direction: column;
-    align-items: center; gap: 8px;
-    min-height: 90px;
-  }
-  .receipt-confirm-btn {
-    display: block; width: 100%; max-width: 260px;
-    background: var(--accent);
-    border: 1.5px solid var(--accent);
-    color: #fff; font-family: inherit;
-    font-size: 12px; font-weight: 600;
-    letter-spacing: 2px; padding: 11px 20px;
-    border-radius: 22px; cursor: pointer;
-  }
-  .receipt-back-btn {
-    display: block; width: 100%; max-width: 260px;
-    background: #fff; border: 1.5px solid var(--border);
-    color: var(--accent); font-family: inherit;
-    font-size: 12px; font-weight: 600;
-    letter-spacing: 2px; padding: 11px 20px;
-    border-radius: 22px; cursor: pointer;
+  /* The transition line */
+  .transition-line {
+    text-align: center;
+    padding: 0 32px 40px 32px;
+    margin: 0 auto 60px auto;
+    max-width: 560px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #8f2f00;
+    letter-spacing: 0.8px;
+    line-height: 2;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
 
-  .scroll-hint {
-    width: 34px; height: 34px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid var(--border);
-    color: var(--accent);
-    font-size: 16px; line-height: 1;
-    display: flex; align-items: center; justify-content: center;
-    padding: 0;
-    cursor: pointer;
-    -webkit-appearance: none; appearance: none;
-    transition: opacity 0.35s ease, background 0.2s ease;
-    z-index: 20;
+  .transition-line-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 0 20px 0;
   }
-  .scroll-hint:active { background: rgba(255, 255, 255, 0.95); }
-  .scroll-hint .hint-arrow {
-    display: inline-block;
-    animation: hintBounce 2s ease-in-out infinite;
+  .transition-line-mark {
+    flex-shrink: 0; font-size: 1.1em; line-height: 1;
+    color: var(--transition-head-color);
   }
-  @keyframes hintBounce {
-    0%, 100% { transform: translateY(0); }
-    50%      { transform: translateY(4px); }
+  .transition-line-rule {
+    flex: 1; height: 1px;
+    background: var(--transition-head-color);
+    min-width: 24px;
   }
-  @media (prefers-reduced-motion: reduce) {
-    .scroll-hint .hint-arrow { animation: none; }
+  .transition-line-title {
+    flex-shrink: 0; font-size: 1.1em;
+    color: var(--transition-head-color);
+    letter-spacing: 5px; white-space: nowrap;
   }
 
-  .scroll-hint.hidden { opacity: 0; pointer-events: none; }
-
-  .scroll-hint.sticky-mode {
-    position: fixed;
-    top: auto;
+  .transition-line-body {
+    will-change: filter;
   }
-  body.mode-scroll .scroll-hint.sticky-mode { display: none; }
+  .transition-line-body p {
+    margin: 0 0 0.9em 0;
+  }
+  .transition-line-body p:last-child { margin-bottom: 0; }
 
-  .scroll-hint.scroll-mode {
+  /* Reference lines */
+  .ref-line {
+    position: fixed; left: 0; right: 0;
+    height: 0;
+    border-top: 1px dashed rgba(201, 96, 10, 0.55);
+    pointer-events: none;
+    z-index: 90;
+  }
+  .ref-line::after {
+    content: attr(data-label);
     position: absolute;
-    top: auto;
+    right: 8px;
+    top: 3px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 10px;
+    color: var(--accent);
+    background: rgba(253, 243, 216, 0.9);
+    padding: 1px 5px;
+    border-radius: 4px;
   }
-  body.mode-sticky .scroll-hint.scroll-mode { display: none; }
+  .ref-line.mid { top: 50vh; }
+  .ref-line.top { top: 0; }
 
+  /* Live readout */
   .readout-bar {
     position: fixed; bottom: 8px; left: 12px; right: 12px;
     z-index: 100;
-    display: flex; justify-content: center; gap: 20px;
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 20px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 11px; color: var(--text-mute);
-    background: rgba(253, 243, 216, 0.9);
-    padding: 6px 14px; border-radius: 20px;
+    background: rgba(253, 243, 216, 0.94);
+    padding: 7px 16px; border-radius: 20px;
     pointer-events: none; user-select: none;
-    max-width: 800px; margin: 0 auto;
-    flex-wrap: wrap;
+    max-width: 780px; margin: 0 auto;
   }
   .readout-bar b { color: var(--accent); font-weight: 700; }
+
+  /* Blur progress meter */
+  .meter {
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .meter .bar {
+    width: 60px; height: 6px;
+    background: rgba(201, 96, 10, 0.15);
+    border-radius: 3px;
+    overflow: hidden;
+    display: inline-block;
+  }
+  .meter .bar > span {
+    display: block; height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.05s linear;
+  }
 </style>
 </head>
-<body class="mode-sticky">
+<body>
 
 <div class="controls">
   <div class="controls-grid">
-
     <div class="ctrl">
-      <label>Position mode</label>
-      <select id="posMode">
-        <option value="sticky" selected>sticky (visible on open)</option>
-        <option value="scroll">scroll with buttons</option>
+      <label>Max blur</label>
+      <input type="range" id="maxBlur" min="0" max="20" step="0.5" value="6">
+      <span class="readout" id="maxBlurV">6.0 px</span>
+    </div>
+    <div class="ctrl">
+      <label>Easing</label>
+      <select id="easing">
+        <option value="linear" selected>linear</option>
+        <option value="easeOut">ease-out (fast then slow)</option>
+        <option value="easeIn">ease-in (slow then fast)</option>
+        <option value="smooth">smooth (sine)</option>
       </select>
     </div>
-
-    <div class="ctrl">
-      <label>X method</label>
-      <select id="xMethod">
-        <option value="computed" selected>computed (gap / 2)</option>
-        <option value="fixed">fixed</option>
-      </select>
+    <div class="ctrl toggle">
+      <label style="flex:0; letter-spacing:0;">
+        <input type="checkbox" id="showRefs" checked>
+        Show reference lines (pivot · top trigger)
+      </label>
     </div>
-
-    <div class="ctrl">
-      <label>X</label>
-      <input type="range" id="xFixed" min="0" max="120" step="2" value="40">
-      <span class="readout" id="xFixedV">40 px</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Y</label>
-      <input type="range" id="yFixed" min="0" max="120" step="2" value="40">
-      <span class="readout" id="yFixedV">40 px</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Tap behaviour</label>
-      <select id="tapMode">
-        <option value="page" selected>70% of visible height</option>
-        <option value="bottom">straight to bottom</option>
-        <option value="fixed">fixed 300 px</option>
-      </select>
-    </div>
-
-    <div class="ctrl">
-      <label>Item count</label>
-      <input type="range" id="itemCount" min="2" max="20" step="1" value="14">
-      <span class="readout" id="itemCountV">14</span>
-    </div>
-
-    <div class="ctrl actions">
-      <button id="resetBtn">Reset scroll</button>
-    </div>
-
   </div>
 </div>
 
-<div class="receipt-screen">
-  <div class="receipt-paper" id="receiptPaper">
+<div class="ref-line mid" id="refMid" data-label="pivot (0% blur)"></div>
+<div class="ref-line top" id="refTop" data-label="top trigger (100% blur)"></div>
 
-    <div class="receipt-header">
-      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
-      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+<div class="demo">
+
+  <div class="spacer-note">↓ SCROLL DOWN TO SEE THE BLOCK ARRIVE ↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+
+  <div class="transition-line" id="transitionLine">
+    <div class="transition-line-divider">
+      <span class="transition-line-mark">❀</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-title">大切なお知らせ</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-mark">❀</span>
     </div>
-
-    <div class="receipt-to-row">
-      <span class="receipt-to-mark">❀</span>
-      <span class="receipt-to-name">桜庭さんへ</span>
-      <span class="receipt-to-mark">❀</span>
+    <div class="transition-line-body" id="transitionLineBody">
+      <p>それでは、本日の癒しのオプションをご覧ください。</p>
+      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+      <p>ありがとうございます。</p>
     </div>
-
-    <div class="receipt-divider"></div>
-    <div class="receipt-title">本日の内容</div>
-
-    <div class="receipt-items" id="receiptItems"></div>
-
-    <div class="receipt-total-line">
-      <span class="receipt-total-label">合計</span>
-      <span class="receipt-total-value" id="receiptTotal">¥0</span>
-    </div>
-
-    <div class="receipt-actions-row" id="actionsRow">
-      <button class="scroll-hint scroll-mode hidden" id="scrollHintL" aria-label="下へスクロール">
-        <span class="hint-arrow">↓</span>
-      </button>
-      <button class="scroll-hint scroll-mode hidden" id="scrollHintR" aria-label="下へスクロール">
-        <span class="hint-arrow">↓</span>
-      </button>
-
-      <button type="button" class="receipt-confirm-btn" id="primaryBtn">
-        こちらの内容でお願いいたします。
-      </button>
-      <button type="button" class="receipt-back-btn">
-        サービスの選択に戻る
-      </button>
-    </div>
-
   </div>
 
-  <button class="scroll-hint sticky-mode hidden" id="stickyHintL" aria-label="下へスクロール">
-    <span class="hint-arrow">↓</span>
-  </button>
-  <button class="scroll-hint sticky-mode hidden" id="stickyHintR" aria-label="下へスクロール">
-    <span class="hint-arrow">↓</span>
-  </button>
+  <div class="spacer-note">↓ KEEP SCROLLING PAST THE BLOCK ↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↑ SCROLL BACK UP TO REVERSE ↑</div>
+
 </div>
 
 <div class="readout-bar">
-  <span>X applied: <b id="xReadout">—</b></span>
-  <span>Y applied: <b id="yReadout">—</b></span>
-  <span>scrollable: <b id="scrollableReadout">—</b></span>
-  <span>at bottom: <b id="atBottomReadout">—</b></span>
+  <span>blur: <b id="roBlur">0.0</b> px</span>
+  <span class="meter">down <span class="bar"><span id="roDownBar"></span></span> <b id="roDown">0%</b></span>
+  <span class="meter">up <span class="bar"><span id="roUpBar"></span></span> <b id="roUp">0%</b></span>
+  <span>state: <b id="roState">—</b></span>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  var paper      = document.getElementById('receiptPaper');
-  var actionsRow = document.getElementById('actionsRow');
-  var itemsEl    = document.getElementById('receiptItems');
-  var totalEl    = document.getElementById('receiptTotal');
-  var primaryBtn = document.getElementById('primaryBtn');
+  var bodyEl = document.getElementById('transitionLineBody');
+  var paragraphs = bodyEl.querySelectorAll('p');
+  var secondLastP = paragraphs[paragraphs.length - 2];
 
-  var stickyL = document.getElementById('stickyHintL');
-  var stickyR = document.getElementById('stickyHintR');
-  var scrollL = document.getElementById('scrollHintL');
-  var scrollR = document.getElementById('scrollHintR');
+  var maxBlurEl = document.getElementById('maxBlur');
+  var easingEl  = document.getElementById('easing');
+  var showRefsEl = document.getElementById('showRefs');
+  var maxBlurV  = document.getElementById('maxBlurV');
 
-  var posModeEl    = document.getElementById('posMode');
-  var xMethodEl    = document.getElementById('xMethod');
-  var xFixedEl     = document.getElementById('xFixed');
-  var yFixedEl     = document.getElementById('yFixed');
-  var tapModeEl    = document.getElementById('tapMode');
-  var itemCountEl  = document.getElementById('itemCount');
+  var refMid = document.getElementById('refMid');
+  var refTop = document.getElementById('refTop');
 
-  var xFixedV      = document.getElementById('xFixedV');
-  var yFixedV      = document.getElementById('yFixedV');
-  var itemCountV   = document.getElementById('itemCountV');
-  var xReadout     = document.getElementById('xReadout');
-  var yReadout     = document.getElementById('yReadout');
-  var scrollableRO = document.getElementById('scrollableReadout');
-  var atBottomRO   = document.getElementById('atBottomReadout');
+  var roBlur = document.getElementById('roBlur');
+  var roDown = document.getElementById('roDown');
+  var roUp   = document.getElementById('roUp');
+  var roDownBar = document.getElementById('roDownBar');
+  var roUpBar   = document.getElementById('roUpBar');
+  var roState = document.getElementById('roState');
 
-  var HINT_W = 34;
-  var HINT_H = 34;
+  /* Distances captured once at load and on resize */
+  var downMaxDistance = 1;
+  var upMaxDistance = 1;
+  var pivotCache = { down: 0, up: 0 };
 
-  /* ============================================================
-     Items
-     ============================================================ */
-  var SAMPLE_NAMES = [
-    'ダミーテキスト1','ダミーテキスト2','ダミーテキスト3',
-    'ダミーテキスト4','ダミーテキスト5','ダミーテキスト6',
-    'ダミーテキスト7','ダミーテキスト8','ダミーテキスト9',
-    'ダミーテキスト10','ダミーテキスト11','ダミーテキスト12',
-    'ダミーテキスト13','ダミーテキスト14','ダミーテキスト15',
-    'ダミーテキスト16','ダミーテキスト17','ダミーテキスト18',
-    'ダミーテキスト19','ダミーテキスト20'
-  ];
+  function measure() {
+    /* Down max: block centre at viewport bottom + half block height.
+       Equivalent to: block top = viewport bottom → block centre
+       distance from viewport centre. */
+    var vh = window.innerHeight;
+    var bodyH = bodyEl.offsetHeight;
+    downMaxDistance = vh / 2 + bodyH / 2;
 
-  function renderItems(n) {
-    itemsEl.innerHTML = '';
-    var total = 0;
-    for (var i = 0; i < n; i++) {
-      var price = 1000 + (i * 500);
-      total += price;
-      var div = document.createElement('div');
-      div.className = 'receipt-item';
-      var nm = document.createElement('span');
-      nm.className = 'receipt-item-name';
-      nm.textContent = SAMPLE_NAMES[i] || ('サービス' + (i + 1));
-      var pr = document.createElement('span');
-      pr.className = 'receipt-item-price-wrap';
-      pr.textContent = '¥' + price.toLocaleString();
-      div.appendChild(nm);
-      div.appendChild(pr);
-      itemsEl.appendChild(div);
+    /* Up max: block centre distance from viewport centre at the moment
+       the 2nd-last paragraph's top crosses the viewport top.
+       At that instant:
+         secondLastP.getBoundingClientRect().top === 0
+       and blockCentre lies at:
+         (blockTop + bodyH/2)
+       where blockTop = -(secondLastP offset within bodyEl)
+       so distance from viewport centre =
+         viewportCentre - blockCentre = vh/2 + offset - bodyH/2 */
+    var secondLastOffset = 0;
+    var n = secondLastP;
+    while (n && n !== bodyEl) {
+      secondLastOffset += n.offsetTop;
+      n = n.offsetParent;
+      if (!n) break;
+      if (n === bodyEl) break;
     }
-    totalEl.textContent = '¥' + total.toLocaleString();
+    /* Simpler: use DOM offsets directly */
+    var offset = secondLastP.offsetTop;
+    upMaxDistance = vh / 2 + offset - bodyH / 2;
+    if (upMaxDistance < 40) upMaxDistance = 40;   /* safety floor */
   }
 
-  /* ============================================================
-     Compute X and Y
-     ============================================================ */
-  function computeX() {
-    if (xMethodEl.value === 'fixed') {
-      return parseInt(xFixedEl.value, 10);
+  function applyEasing(t) {
+    /* t is 0..1 */
+    var mode = easingEl.value;
+    if (mode === 'linear') return t;
+    if (mode === 'easeOut') return 1 - Math.pow(1 - t, 2);
+    if (mode === 'easeIn')  return t * t;
+    if (mode === 'smooth')  return 0.5 - 0.5 * Math.cos(Math.PI * t);
+    return t;
+  }
+
+  function update() {
+    var maxBlur = parseFloat(maxBlurEl.value);
+    var vh = window.innerHeight;
+    var vc = vh / 2;
+
+    var rect = bodyEl.getBoundingClientRect();
+    var bodyCentre = rect.top + rect.height / 2;
+
+    var d = bodyCentre - vc;   /* positive = below pivot, negative = above */
+    var progress, state;
+
+    if (d >= 0) {
+      /* Below pivot — blur ramps up as block descends */
+      progress = Math.min(1, d / downMaxDistance);
+      state = 'below pivot';
+      var blur = maxBlur * applyEasing(progress);
+      bodyEl.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
+      roBlur.textContent = blur.toFixed(1);
+      roDown.textContent = Math.round(progress * 100) + '%';
+      roUp.textContent = '0%';
+      roDownBar.style.width = (progress * 100) + '%';
+      roUpBar.style.width = '0%';
+    } else {
+      /* Above pivot — blur ramps up as block rises */
+      progress = Math.min(1, -d / upMaxDistance);
+      state = 'above pivot';
+      var blur2 = maxBlur * applyEasing(progress);
+      bodyEl.style.filter = blur2 > 0.05 ? 'blur(' + blur2.toFixed(2) + 'px)' : 'none';
+      roBlur.textContent = blur2.toFixed(1);
+      roDown.textContent = '0%';
+      roUp.textContent = Math.round(progress * 100) + '%';
+      roDownBar.style.width = '0%';
+      roUpBar.style.width = (progress * 100) + '%';
     }
-    var paperRect  = paper.getBoundingClientRect();
-    var buttonRect = primaryBtn.getBoundingClientRect();
-    var gap = (paperRect.width - buttonRect.width) / 2;
-    return Math.max(0, Math.round(gap / 2));
+
+    roState.textContent = state;
+
+    /* Live-update the top reference line — align it to the current
+       viewport-top position, so it stays meaningful as the block moves.
+       The dashed line itself stays at y=0; its label just says "top". */
   }
 
-  function computeY() {
-    return parseInt(yFixedEl.value, 10);
-  }
-
-  /* ============================================================
-     Position the hints
-     ============================================================ */
-  function positionHints() {
-    var paperRect  = paper.getBoundingClientRect();
-    var rowRect    = actionsRow.getBoundingClientRect();
-    var X = computeX();
-    var Y = computeY();
-    xReadout.textContent = X + ' px';
-    yReadout.textContent = Y + ' px';
-
-    /* --- Sticky mode (viewport-relative) ---
-       Left hint's centre: paperRect.left + X
-       Right hint's centre: paperRect.right - X
-       Both hints' bottoms: paperRect.bottom + Y (i.e. Y above viewport bottom) */
-    var stickyLleft = paperRect.left + X - HINT_W / 2;
-    var stickyRleft = paperRect.right - X - HINT_W / 2;
-    stickyL.style.left = stickyLleft + 'px';
-    stickyR.style.left = stickyRleft + 'px';
-
-    var viewportBottomToHintBottom = (window.innerHeight - paperRect.bottom) + Y;
-    stickyL.style.bottom = viewportBottomToHintBottom + 'px';
-    stickyR.style.bottom = viewportBottomToHintBottom + 'px';
-
-    /* --- Scroll mode (row-relative) ---
-       Same visual position as sticky when the row is on-screen, but
-       positioned relative to the actions row. */
-    var scrollLleft = (paperRect.left + X) - rowRect.left - HINT_W / 2;
-    var scrollRleft = (paperRect.right - X) - rowRect.left - HINT_W / 2;
-    scrollL.style.left = scrollLleft + 'px';
-    scrollR.style.left = scrollRleft + 'px';
-
-    scrollL.style.bottom = Y + 'px';
-    scrollR.style.bottom = Y + 'px';
-  }
-
-  /* ============================================================
-     Visibility
-     ============================================================ */
-  function updateVisibility() {
-    var scrollable = paper.scrollHeight > paper.clientHeight + 4;
-    var atBottom   = paper.scrollTop + paper.clientHeight >= paper.scrollHeight - 4;
-    var show       = scrollable && !atBottom;
-
-    scrollableRO.textContent = scrollable ? 'yes' : 'no';
-    atBottomRO.textContent   = atBottom ? 'yes' : 'no';
-
-    [stickyL, stickyR, scrollL, scrollR].forEach(function(el) {
-      el.classList.toggle('hidden', !show);
+  var rafPending = false;
+  function scheduleUpdate() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function() {
+      rafPending = false;
+      update();
     });
   }
 
-  function updateAll() {
-    positionHints();
-    updateVisibility();
+  window.addEventListener('scroll', scheduleUpdate, { passive: true });
+  window.addEventListener('resize', function() {
+    measure();
+    scheduleUpdate();
+  });
+
+  maxBlurEl.addEventListener('input', function() {
+    maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
+    scheduleUpdate();
+  });
+
+  easingEl.addEventListener('change', scheduleUpdate);
+
+  showRefsEl.addEventListener('change', function() {
+    var show = showRefsEl.checked;
+    refMid.style.display = show ? '' : 'none';
+    refTop.style.display = show ? '' : 'none';
+  });
+
+  /* Boot */
+  measure();
+  update();
+  /* Re-measure once fonts/layout settle */
+  window.addEventListener('load', function() {
+    measure();
+    scheduleUpdate();
+  });
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function() {
+      measure();
+      scheduleUpdate();
+    });
   }
-
-  /* ============================================================
-     Tap behaviour
-     ============================================================ */
-  function handleHintTap() {
-    var mode = tapModeEl.value;
-    if (mode === 'page') {
-      paper.scrollBy({ top: paper.clientHeight * 0.7, behavior: 'smooth' });
-    } else if (mode === 'bottom') {
-      paper.scrollTo({ top: paper.scrollHeight, behavior: 'smooth' });
-    } else {
-      paper.scrollBy({ top: 300, behavior: 'smooth' });
-    }
-  }
-
-  [stickyL, stickyR, scrollL, scrollR].forEach(function(el) {
-    el.addEventListener('click', handleHintTap);
-  });
-
-  /* ============================================================
-     Event wiring
-     ============================================================ */
-  paper.addEventListener('scroll', updateVisibility, { passive: true });
-  window.addEventListener('resize', updateAll);
-
-  posModeEl.addEventListener('change', function() {
-    document.body.classList.toggle('mode-sticky', posModeEl.value === 'sticky');
-    document.body.classList.toggle('mode-scroll', posModeEl.value === 'scroll');
-    updateAll();
-  });
-
-  xMethodEl.addEventListener('change', updateAll);
-
-  xFixedEl.addEventListener('input', function() {
-    xFixedV.textContent = xFixedEl.value + ' px';
-    updateAll();
-  });
-
-  yFixedEl.addEventListener('input', function() {
-    yFixedV.textContent = yFixedEl.value + ' px';
-    updateAll();
-  });
-
-  itemCountEl.addEventListener('input', function() {
-    itemCountV.textContent = itemCountEl.value;
-    renderItems(parseInt(itemCountEl.value, 10));
-    requestAnimationFrame(updateAll);
-  });
-
-  document.getElementById('resetBtn').addEventListener('click', function() {
-    paper.scrollTop = 0;
-    updateAll();
-  });
-
-  if (window.ResizeObserver) {
-    var ro = new ResizeObserver(updateAll);
-    ro.observe(paper);
-    ro.observe(actionsRow);
-  }
-
-  /* ============================================================
-     Boot
-     ============================================================ */
-  renderItems(parseInt(itemCountEl.value, 10));
-  xFixedV.textContent = xFixedEl.value + ' px';
-  yFixedV.textContent = yFixedEl.value + ' px';
-  itemCountV.textContent = itemCountEl.value;
-
-  requestAnimationFrame(function() {
-    requestAnimationFrame(updateAll);
-  });
 
 })();
 </script>
