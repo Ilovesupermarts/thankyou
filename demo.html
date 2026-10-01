@@ -3,486 +3,379 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Receipt Landing + Digit Roll — Mockup</title>
+<title>Sound Test — cave-water-drop-echo</title>
 <style>
   :root {
-    --bg-page:       #f5d89a;
-    --bg-card:       #fdf3d8;
-    --accent:        #c9600a;
-    --accent-2:      #8f3f12;
-    --accent-3:      #7a3208;
-    --text-dark:     #231304;
-    --text-med:      #3d2410;
-    --text-mute:     #5a3818;
-    --text-faint:    #7a5028;
-    --border:        #e8c88a;
-    --border-soft:   #f0d8a0;
-    --shadow-warm:   rgba(120, 70, 20, 0.14);
-    --shadow-warm-2: rgba(120, 70, 20, 0.28);
-    --glow:          #f7b93c;
-    --digit-h:       56px;
+    --bg-page:     #f5d89a;
+    --bg-card:     #fdf3d8;
+    --accent:      #c9600a;
+    --text-dark:   #231304;
+    --text-med:    #3d2410;
+    --text-mute:   #5a3818;
+    --text-faint:  #7a5028;
+    --border:      #e8c88a;
+    --border-soft: #f0d8a0;
+    --shadow-warm: rgba(120, 70, 20, 0.14);
   }
-
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; min-height: 100vh;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     color: var(--text-dark);
     background: var(--bg-page);
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 32px;
+    padding: 40px 20px;
   }
 
-  .stage {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    padding: 32px 20px 80px 20px;
-    perspective: 1400px;
-    perspective-origin: 50% 60%;
+  .title {
+    font-size: 13px; letter-spacing: 3px; color: var(--accent);
+    text-align: center; margin: 0;
+  }
+  .subtitle {
+    font-size: 11px; letter-spacing: 1.5px; color: var(--text-mute);
+    text-align: center; margin: 0; font-family: -apple-system, sans-serif;
   }
 
-  /* ---------- Controls ---------- */
+  .koi-btn {
+    width: 160px; height: 160px;
+    border-radius: 50%;
+    border: 6px solid var(--border-soft);
+    background: radial-gradient(circle at 40% 35%,
+      rgba(253, 243, 216, 1) 0%,
+      rgba(253, 232, 184, 0.9) 60%,
+      rgba(240, 200, 130, 0.95) 100%);
+    box-shadow:
+      0 0 0 12px rgba(253, 243, 216, 0.35),
+      0 8px 32px var(--shadow-warm);
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    -webkit-appearance: none; appearance: none;
+    transition: transform 0.12s ease, box-shadow 0.2s ease;
+    position: relative;
+  }
+  .koi-btn:active {
+    transform: scale(0.94);
+    box-shadow:
+      0 0 0 18px rgba(253, 243, 216, 0.5),
+      0 4px 14px var(--shadow-warm);
+  }
+  .koi-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .koi-glyph {
+    font-size: 64px; line-height: 1;
+    color: var(--accent);
+    text-shadow: 0 2px 12px rgba(253, 232, 184, 0.8);
+  }
+
   .controls {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 40px;
+    display: flex; gap: 10px; flex-wrap: wrap;
+    justify-content: center;
     font-family: -apple-system, sans-serif;
   }
   .controls button {
-    font-family: inherit;
-    font-size: 12px;
-    letter-spacing: 1px;
-    padding: 9px 16px;
-    border: 1px solid var(--border);
-    background: rgba(255, 255, 255, 0.75);
-    color: var(--text-med);
-    border-radius: 20px;
-    cursor: pointer;
+    font-family: inherit; font-size: 12px; letter-spacing: 1px;
+    padding: 8px 16px; border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.7); color: var(--text-med);
+    border-radius: 18px; cursor: pointer;
     transition: background 0.15s, border-color 0.15s, transform 0.1s;
   }
   .controls button:hover { border-color: var(--accent); }
   .controls button:active { transform: scale(0.97); background: #fff; }
-
-  /* ---------- Receipt ---------- */
-  .receipt-paper {
-    width: 100%;
-    max-width: 400px;
-    padding: 36px 30px 28px 30px;
-    border-radius: 6px;
-
-    /* Washi surface — same recipe as the app */
-    background-color: var(--bg-card);
-    background-image: url('icons/1790835034553.jpg');
-    background-size: cover;
-    background-position: center center;
-    background-repeat: no-repeat;
-
-    border: 1px solid var(--border-soft);
-
-    /* Resting state: flat, tight shadow */
-    transform: rotateX(0deg) translateY(0) scale(1);
-    transform-origin: 50% 100%;
-    box-shadow:
-      0 12px 28px var(--shadow-warm),
-      0 4px 10px rgba(120, 70, 20, 0.08);
-
-    /* The landing animation runs when .landing is present.
-       Without it, the element sits in its resting state. */
+  .controls button.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
   }
 
-  .receipt-paper.landing {
-    animation: paperLand 1000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
-  }
-
-  @keyframes paperLand {
-    0% {
-      opacity: 0;
-      transform: rotateX(14deg) translateY(-22px) scale(0.96);
-      box-shadow:
-        0 40px 80px var(--shadow-warm-2),
-        0 16px 32px rgba(120, 70, 20, 0.16);
-      filter: blur(1.5px);
-    }
-    25% {
-      opacity: 1;
-      filter: blur(0.4px);
-    }
-    70% {
-      transform: rotateX(-1.5deg) translateY(2px) scale(1.004);
-      box-shadow:
-        0 18px 36px rgba(120, 70, 20, 0.18),
-        0 6px 14px rgba(120, 70, 20, 0.10);
-      filter: blur(0);
-    }
-    100% {
-      opacity: 1;
-      transform: rotateX(0deg) translateY(0) scale(1);
-      box-shadow:
-        0 12px 28px var(--shadow-warm),
-        0 4px 10px rgba(120, 70, 20, 0.08);
-      filter: blur(0);
-    }
-  }
-
-  /* ---------- Receipt content ---------- */
-  .receipt-header { text-align: center; margin-bottom: 22px; }
-  .receipt-thanks {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--accent);
-    line-height: 1.9;
-    letter-spacing: 1px;
-    margin-bottom: 14px;
-  }
-  .receipt-subthanks {
-    font-size: 13px;
-    color: var(--text-mute);
-    line-height: 1.9;
-    letter-spacing: 0.5px;
-  }
-  .receipt-to-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    padding: 18px 8px 12px 8px;
-  }
-  .receipt-to-mark { font-size: 13px; color: var(--glow); }
-  .receipt-to-name {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 2px;
-  }
-  .receipt-divider {
-    height: 1px;
-    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
-    margin: 22px 0;
-  }
-  .receipt-title {
-    font-size: 12px;
-    color: var(--text-faint);
-    letter-spacing: 6px;
-    text-align: center;
-    margin-bottom: 20px;
-  }
-  .receipt-items {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-  .receipt-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 8px;
-    padding-bottom: 10px;
-    border-bottom: 1px dashed var(--border-soft);
-  }
-  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .receipt-item-name {
-    flex: 1;
-    font-size: 14px;
+  .info {
+    max-width: 480px; width: 100%;
+    padding: 16px 20px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 12px; line-height: 1.9;
     color: var(--text-med);
   }
-  .receipt-item-price-wrap {
-    flex-shrink: 0;
-    padding: 4px 10px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border-soft);
-    color: var(--accent);
-    font-weight: 600;
-    font-size: 14px;
-    letter-spacing: 0.5px;
-  }
+  .info b { color: var(--accent); font-weight: 600; }
+  .info .status-ok { color: #4a7a2a; font-weight: 600; }
+  .info .status-err { color: #b03030; font-weight: 600; }
+  .info .status-pending { color: var(--text-mute); font-style: italic; }
 
-  /* ---------- Total line with digit roll ---------- */
-  .receipt-total-line {
-    display: flex;
-    justify-content: space-between;
-    align-items: baseline;
-    padding: 18px 4px;
-    margin-top: 14px;
-    border-top: 1.5px solid var(--border);
-    border-bottom: 1.5px solid var(--border);
-  }
-  .receipt-total-label {
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--text-mute);
-    letter-spacing: 4px;
-    line-height: 1.2;
-  }
-  .receipt-total-value {
-    display: inline-flex;
-    align-items: baseline;
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 0.5px;
-    line-height: 1.2;
-    white-space: nowrap;
-    height: calc(var(--digit-h) * 0.6);
-    overflow: visible;
-  }
-  .receipt-total-value .yen-symbol {
-    font-size: 13px;
-    margin-right: 2px;
-    opacity: 0.8;
-    font-weight: 700;
-    line-height: var(--digit-h);
-    align-self: flex-start;
-    height: var(--digit-h);
-    display: inline-block;
-  }
-
-  /* The digit-roll container */
-  .digit-roll {
-    display: inline-flex;
-    align-items: flex-start;
-    height: var(--digit-h);
-    font-size: 22px;
-    line-height: var(--digit-h);
-    overflow: hidden;
-  }
-
-  /* A single digit column */
-  .digit-col {
-    position: relative;
-    display: inline-block;
-    width: 0.62em;
-    height: var(--digit-h);
-    overflow: hidden;
-    vertical-align: top;
-  }
-
-  /* The vertical strip inside a column */
-  .digit-strip {
-    display: flex;
-    flex-direction: column;
-    transform: translateY(0);
-    transition: transform 750ms cubic-bezier(0.34, 1.15, 0.64, 1);
-    will-change: transform;
-  }
-
-  .digit {
-    display: block;
-    height: var(--digit-h);
-    line-height: var(--digit-h);
-    text-align: center;
-    font-weight: 700;
-    font-size: 22px;
-  }
-
-  /* Static separator (comma) between digit groups */
-  .digit-static {
-    display: inline-block;
-    height: var(--digit-h);
-    line-height: var(--digit-h);
-    width: 0.32em;
-    text-align: center;
-    font-weight: 700;
-    font-size: 22px;
-    vertical-align: top;
+  .hint {
+    font-family: -apple-system, sans-serif;
+    font-size: 11px; color: var(--text-mute);
+    text-align: center; max-width: 400px;
+    line-height: 1.7; opacity: 0.75;
+    margin: 0;
   }
 
   .demo-badge {
-    position: fixed;
-    bottom: 8px;
-    left: 12px;
+    position: fixed; bottom: 6px; right: 10px;
     font-family: -apple-system, sans-serif;
-    font-size: 10px;
-    letter-spacing: 1px;
-    color: var(--text-mute);
-    opacity: 0.55;
-    pointer-events: none;
-    user-select: none;
-  }
-
-  @media (min-width: 700px) {
-    :root { --digit-h: 62px; }
-    .receipt-paper { max-width: 460px; padding: 42px 42px 34px 42px; }
-    .receipt-thanks { font-size: 22px; }
-    .receipt-subthanks { font-size: 15px; }
-    .receipt-to-name { font-size: 22px; }
-    .receipt-title { font-size: 14px; letter-spacing: 9px; }
-    .receipt-item-name { font-size: 16px; }
-    .receipt-item-price-wrap { font-size: 16px; }
-    .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
-    .receipt-total-value { font-size: 26px; }
-    .receipt-total-value .yen-symbol { font-size: 15px; }
-    .digit-roll { font-size: 26px; }
-    .digit { font-size: 26px; }
-    .digit-static { font-size: 26px; }
+    font-size: 10px; letter-spacing: 1px;
+    color: var(--text-mute); opacity: 0.5;
+    pointer-events: none; user-select: none;
   }
 </style>
 </head>
 <body>
 
-<div class="stage">
+  <h1 class="title">SOUND TEST</h1>
+  <p class="subtitle">cave-water-drop-echo-a053fcdf.mp3</p>
+
+  <button class="koi-btn" id="koiBtn" disabled>
+    <span class="koi-glyph">❀</span>
+  </button>
 
   <div class="controls">
-    <button id="replayLanding">Replay landing</button>
-    <button id="changeTotal">Change total</button>
+    <button id="gainToggle">gain: 0.5 (app)</button>
+    <button id="synthBtn">synth fallback</button>
+    <button id="replayBtn">replay</button>
   </div>
 
-  <div class="receipt-paper" id="paper">
-
-    <div class="receipt-header">
-      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
-      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
-    </div>
-
-    <div class="receipt-to-row">
-      <span class="receipt-to-mark">❀</span>
-      <span class="receipt-to-name">桜庭さんへ</span>
-      <span class="receipt-to-mark">❀</span>
-    </div>
-
-    <div class="receipt-divider"></div>
-
-    <div class="receipt-title">本日の内容</div>
-
-    <div class="receipt-items">
-      <div class="receipt-item">
-        <span class="receipt-item-name">ダミーテキスト1</span>
-        <span class="receipt-item-price-wrap">¥3,000</span>
-      </div>
-      <div class="receipt-item">
-        <span class="receipt-item-name">ダミーテキスト3</span>
-        <span class="receipt-item-price-wrap">¥5,000</span>
-      </div>
-    </div>
-
-    <div class="receipt-total-line">
-      <span class="receipt-total-label">合計</span>
-      <span class="receipt-total-value">
-        <span class="yen-symbol">¥</span>
-        <span class="digit-roll" id="totalRoll"></span>
-      </span>
-    </div>
-
+  <div class="info" id="info">
+    <b>status:</b> <span id="stStatus" class="status-pending">loading…</span><br>
+    <b>file size:</b> <span id="stSize">—</span><br>
+    <b>decode:</b> <span id="stDecode">—</span><br>
+    <b>duration:</b> <span id="stDuration">—</span><br>
+    <b>sample rate:</b> <span id="stRate">—</span><br>
+    <b>channels:</b> <span id="stChannels">—</span><br>
+    <b>playback gain:</b> <span id="stGain">—</span>
   </div>
 
-</div>
+  <p class="hint">
+    The koi plays the MP3 through a gain node at 0.5 — matching the app's
+    soundMasterGain — so this is what you'd actually hear in production.
+    Toggle gain to 1.0 to hear the source at full level.
+  </p>
 
-<div class="demo-badge">receipt mockup · landing + digit roll</div>
+<div class="demo-badge">sound test · v1</div>
 
 <script>
-  /* ============================================================
-     Landing animation
-     ============================================================ */
-  var paper = document.getElementById('paper');
+(function() {
+  'use strict';
 
-  function replayLanding() {
-    paper.classList.remove('landing');
-    /* Force reflow so the animation restarts cleanly */
-    void paper.offsetWidth;
-    paper.classList.add('landing');
+  var FILE_URL = 'sound/cave-water-drop-echo-a053fcdf.mp3';
+
+  var koiBtn       = document.getElementById('koiBtn');
+  var gainToggle   = document.getElementById('gainToggle');
+  var synthBtn     = document.getElementById('synthBtn');
+  var replayBtn    = document.getElementById('replayBtn');
+  var stStatus     = document.getElementById('stStatus');
+  var stSize       = document.getElementById('stSize');
+  var stDecode     = document.getElementById('stDecode');
+  var stDuration   = document.getElementById('stDuration');
+  var stRate       = document.getElementById('stRate');
+  var stChannels   = document.getElementById('stChannels');
+  var stGain       = document.getElementById('stGain');
+
+  var audioCtx = null;
+  var masterGain = null;
+  var dropBuffer = null;
+  var synthBuffer = null;
+  var currentGain = 0.5;
+
+  function fmtBytes(n) {
+    if (n < 1024) return n + ' B';
+    if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+    return (n / (1024 * 1024)).toFixed(2) + ' MB';
   }
 
-  document.getElementById('replayLanding').addEventListener('click', replayLanding);
+  function setStatus(text, kind) {
+    stStatus.textContent = text;
+    stStatus.className = kind ? 'status-' + kind : '';
+  }
 
-  /* ============================================================
-     Digit roll
-     ------------------------------------------------------------
-     Builds the columns for a given value, then on updates
-     animates each column's strip to the new digit. Staggered
-     right-to-left so the ones place lands first.
-     ============================================================ */
-  var totalRollEl = document.getElementById('totalRoll');
-  var currentValue = 8000;
+  function updateGainReadout() {
+    stGain.textContent = currentGain.toFixed(1) +
+      (currentGain === 0.5 ? ' (app default)' : ' (raw)');
+  }
 
-  function buildDigitColumns(value) {
-    totalRollEl.innerHTML = '';
-    var str = value.toLocaleString();
-    for (var i = 0; i < str.length; i++) {
-      var ch = str.charAt(i);
-      if (ch === ',' || ch === '.') {
-        var sep = document.createElement('span');
-        sep.className = 'digit-static';
-        sep.textContent = ch;
-        totalRollEl.appendChild(sep);
-        continue;
-      }
-      var col = document.createElement('span');
-      col.className = 'digit-col';
-      col.setAttribute('data-digit', ch);
-      var strip = document.createElement('span');
-      strip.className = 'digit-strip';
-      for (var d = 0; d <= 9; d++) {
-        var digitEl = document.createElement('span');
-        digitEl.className = 'digit';
-        digitEl.textContent = d;
-        strip.appendChild(digitEl);
-      }
-      strip.style.transition = 'none';
-      strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-parseInt(ch, 10)) + '))';
-      col.appendChild(strip);
-      totalRollEl.appendChild(col);
-      /* Force reflow, then re-enable transitions */
-      void strip.offsetWidth;
-      strip.style.transition = '';
+  /* ---- Init AudioContext on first user gesture ---- */
+  function ensureCtx() {
+    if (audioCtx) return;
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = currentGain;
+    masterGain.connect(audioCtx.destination);
+    if (audioCtx.state === 'suspended') {
+      try { audioCtx.resume(); } catch (e) {}
     }
   }
 
-  function updateTotal(newValue) {
-    var oldStr = currentValue.toLocaleString();
-    var newStr = newValue.toLocaleString();
+  /* ---- Load MP3 ---- */
+  function loadMp3() {
+    var t0 = performance.now();
+    fetch(FILE_URL)
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+        var len = r.headers.get('content-length');
+        if (len) stSize.textContent = fmtBytes(parseInt(len, 10));
+        return r.arrayBuffer();
+      })
+      .then(function(ab) {
+        if (!stSize.textContent || stSize.textContent === '—') {
+          stSize.textContent = fmtBytes(ab.byteLength);
+        }
+        return new Promise(function(resolve, reject) {
+          /* decodeAudioData callback form for older Safari */
+          var prom = audioCtx.decodeAudioData(ab, resolve, reject);
+          if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
+        });
+      })
+      .then(function(buffer) {
+        var t1 = performance.now();
+        dropBuffer = buffer;
+        stDecode.textContent = Math.round(t1 - t0) + ' ms';
+        stDuration.textContent = buffer.duration.toFixed(3) + ' s';
+        stRate.textContent = buffer.sampleRate + ' Hz';
+        stChannels.textContent = buffer.numberOfChannels +
+          (buffer.numberOfChannels === 1 ? ' (mono)' : ' (stereo)');
+        setStatus('ready', 'ok');
+        koiBtn.disabled = false;
+      })
+      .catch(function(err) {
+        setStatus('failed — ' + err.message, 'err');
+        koiBtn.disabled = true;
+      });
+  }
 
-    if (oldStr.length !== newStr.length) {
-      /* Digit count changed — rebuild from scratch.
-         Simpler than juggling columns; matches app behaviour when
-         the number of digits flips (e.g., crossing 10,000). */
-      currentValue = newValue;
-      buildDigitColumns(newValue);
+  /* ---- Play the loaded MP3 ---- */
+  function playDrop() {
+    if (!dropBuffer || !audioCtx) return;
+    try {
+      var src = audioCtx.createBufferSource();
+      src.buffer = dropBuffer;
+      src.connect(masterGain);
+      src.start(0);
+    } catch (e) {
+      /* silent */
+    }
+  }
+
+  /* ---- Synthesise the current app drop for A/B ---- */
+  function synthesizeSynthDrop() {
+    var sr = audioCtx.sampleRate;
+    var length = Math.floor(sr * 0.45);
+    var offline = new OfflineAudioContext(1, length, sr);
+
+    /* Layer 1: contact */
+    var contactLen = Math.floor(sr * 0.03);
+    var contactBuf = offline.createBuffer(1, contactLen, sr);
+    var cd = contactBuf.getChannelData(0);
+    for (var ci = 0; ci < contactLen; ci++) cd[ci] = Math.random() * 2 - 1;
+    var contactSrc = offline.createBufferSource();
+    contactSrc.buffer = contactBuf;
+    var contactFilter = offline.createBiquadFilter();
+    contactFilter.type = 'bandpass';
+    contactFilter.frequency.value = 3200;
+    contactFilter.Q.value = 6.0;
+    var contactGain = offline.createGain();
+    contactGain.gain.setValueAtTime(0.30, 0);
+    contactGain.gain.exponentialRampToValueAtTime(0.0001, 0.014);
+    contactSrc.connect(contactFilter);
+    contactFilter.connect(contactGain);
+    contactGain.connect(offline.destination);
+    contactSrc.start(0);
+    contactSrc.stop(0.03);
+
+    /* Layer 2: body */
+    var body = offline.createOscillator();
+    body.type = 'sine';
+    body.frequency.setValueAtTime(1400, 0);
+    body.frequency.exponentialRampToValueAtTime(260, 0.14);
+    var bodyGain = offline.createGain();
+    bodyGain.gain.setValueAtTime(0.0001, 0);
+    bodyGain.gain.exponentialRampToValueAtTime(0.60, 0.008);
+    bodyGain.gain.exponentialRampToValueAtTime(0.0001, 0.24);
+    body.connect(bodyGain);
+    bodyGain.connect(offline.destination);
+    body.start(0);
+    body.stop(0.26);
+
+    /* Layer 3: upper harmonic */
+    var upper = offline.createOscillator();
+    upper.type = 'sine';
+    upper.frequency.value = 2800;
+    var upperGain = offline.createGain();
+    upperGain.gain.setValueAtTime(0.15, 0);
+    upperGain.gain.exponentialRampToValueAtTime(0.0001, 0.06);
+    upper.connect(upperGain);
+    upperGain.connect(offline.destination);
+    upper.start(0);
+    upper.stop(0.08);
+
+    /* Layer 4: room echo */
+    var delay = offline.createDelay(0.5);
+    delay.delayTime.value = 0.09;
+    var echoGain = offline.createGain();
+    echoGain.gain.value = 0.22;
+    bodyGain.connect(delay);
+    delay.connect(echoGain);
+    echoGain.connect(offline.destination);
+
+    return offline.startRendering();
+  }
+
+  function playSynth() {
+    if (!audioCtx) return;
+    if (synthBuffer) {
+      var src = audioCtx.createBufferSource();
+      src.buffer = synthBuffer;
+      src.connect(masterGain);
+      src.start(0);
       return;
     }
-
-    var cols = totalRollEl.querySelectorAll('.digit-col');
-    var colIndex = 0;
-    var digitCount = 0;
-    /* Count digits for stagger calculation */
-    for (var i = 0; i < newStr.length; i++) {
-      if (newStr.charAt(i) !== ',' && newStr.charAt(i) !== '.') digitCount++;
-    }
-    for (var j = 0; j < newStr.length; j++) {
-      var ch = newStr.charAt(j);
-      if (ch === ',' || ch === '.') continue;
-      var col = cols[colIndex];
-      if (!col) { colIndex++; continue; }
-      var strip = col.querySelector('.digit-strip');
-      var oldDigit = parseInt(col.getAttribute('data-digit'), 10);
-      var newDigit = parseInt(ch, 10);
-      if (oldDigit !== newDigit) {
-        /* Stagger: ones place moves first, leftmost last.
-           Position from right: rightmost = 0 → 0ms, next = 1 → 80ms, etc. */
-        var fromRight = digitCount - 1 - colIndex;
-        strip.style.transitionDelay = (fromRight * 80) + 'ms';
-        strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-newDigit) + '))';
-      }
-      col.setAttribute('data-digit', ch);
-      colIndex++;
-    }
-    currentValue = newValue;
+    synthesizeSynthDrop().then(function(buf) {
+      synthBuffer = buf;
+      var src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(masterGain);
+      src.start(0);
+    }).catch(function() {});
   }
 
-  document.getElementById('changeTotal').addEventListener('click', function() {
-    /* Generate a random value in the ¥1,200 – ¥48,500 range,
-       rounded to hundreds, so digits visually differ each press. */
-    var next = 1200 + Math.floor(Math.random() * 47) * 100;
-    if (next === currentValue) next += 100;
-    updateTotal(next);
+  /* ---- Wire controls ---- */
+  koiBtn.addEventListener('pointerdown', function(e) {
+    e.preventDefault();
+    ensureCtx();
+    playDrop();
   });
 
-  /* ============================================================
-     Bootstrap
-     ============================================================ */
-  buildDigitColumns(currentValue);
-  /* Trigger the landing animation on load */
-  replayLanding();
+  gainToggle.addEventListener('click', function() {
+    ensureCtx();
+    currentGain = currentGain === 0.5 ? 1.0 : 0.5;
+    if (masterGain) {
+      masterGain.gain.setValueAtTime(currentGain, audioCtx.currentTime);
+    }
+    gainToggle.textContent = 'gain: ' + currentGain.toFixed(1) +
+      (currentGain === 0.5 ? ' (app)' : ' (raw)');
+    updateGainReadout();
+  });
+
+  synthBtn.addEventListener('click', function() {
+    ensureCtx();
+    playSynth();
+  });
+
+  replayBtn.addEventListener('click', function() {
+    ensureCtx();
+    playDrop();
+  });
+
+  /* ---- Boot ---- */
+  updateGainReadout();
+
+  /* AudioContext needs a gesture before it will run.
+     Prime it on the first tap anywhere, then load the MP3. */
+  document.addEventListener('pointerdown', function prime() {
+    ensureCtx();
+    document.removeEventListener('pointerdown', prime);
+    loadMp3();
+  }, { once: false });
+
+})();
 </script>
 
 </body>
