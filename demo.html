@@ -1,673 +1,488 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Odometer Demo v2 — Fixed Columns</title>
+<title>Receipt Landing + Digit Roll — Mockup</title>
 <style>
-:root {
-  --bg-page:       #f5d89a;
-  --bg-card:       #fdf3d8;
-  --accent:        #c9600a;
-  --accent-2:      #8f3f12;
-  --text-dark:     #231304;
-  --text-med:      #3d2410;
-  --text-mute:     #5a3818;
-  --text-faint:    #7a5028;
-  --border:        #e8c88a;
-  --border-soft:   #f0d8a0;
-  --shadow-warm:   rgba(120, 70, 20, 0.14);
-  --glow:          #f7b93c;
-  --summary-digit-h: 30px;
-  --receipt-digit-h: 44px;
-}
-
-* { box-sizing: border-box; }
-html, body {
-  margin: 0; padding: 0; min-height: 100vh;
-  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-  color: var(--text-dark);
-  background: var(--bg-page);
-  padding-bottom: 140px;
-}
-
-.page { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px 20px; }
-
-.title {
-  font-size: 15px; letter-spacing: 4px; color: var(--accent);
-  font-weight: 600; margin: 0 0 6px 0; text-align: center;
-}
-.subtitle {
-  font-size: 11.5px; letter-spacing: 1.5px; color: var(--text-mute);
-  margin: 0 0 8px 0; text-align: center;
-}
-.note {
-  font-size: 11px; color: var(--text-mute); text-align: center;
-  margin: 0 auto 24px auto; max-width: 560px; line-height: 1.75;
-  font-family: -apple-system, sans-serif; opacity: 0.85;
-}
-
-.controls {
-  display: flex; justify-content: center; gap: 10px;
-  margin-bottom: 24px; flex-wrap: wrap;
-  font-family: -apple-system, sans-serif;
-}
-.controls button {
-  font-family: inherit; font-size: 12px; letter-spacing: 1px;
-  padding: 8px 16px; border: 1px solid var(--border);
-  background: rgba(255, 255, 255, 0.75); color: var(--text-med);
-  border-radius: 18px; cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, transform 0.1s;
-}
-.controls button:hover { border-color: var(--accent); }
-.controls button:active { transform: scale(0.97); background: #fff; }
-
-.table-card {
-  border-radius: 16px;
-  border: 1px solid var(--border-soft);
-  overflow: hidden;
-  box-shadow: 0 4px 18px var(--shadow-warm);
-  margin-bottom: 36px;
-  background-color: var(--bg-card);
-  background-image: url('icons/1790835034553.jpg');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-}
-
-.row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(232, 200, 138, 0.55);
-  cursor: pointer; user-select: none; -webkit-user-select: none;
-  transition: background 0.2s, border-left-color 0.2s;
-  border-left: 3px solid transparent;
-}
-.row:last-child { border-bottom: none; }
-.row.filled {
-  background: rgba(255, 255, 255, 0.6);
-  border-left-color: var(--accent);
-}
-
-.row-check {
-  flex-shrink: 0; width: 26px; height: 26px; border-radius: 50%;
-  background: rgba(255, 255, 255, 0.7);
-  border: 1.5px solid var(--border);
-  display: flex; align-items: center; justify-content: center;
-  color: #e0d3ce; font-size: 14px; line-height: 1;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
-}
-.row-check::after {
-  content: "❀"; opacity: 0.35; transform: scale(0.9);
-  transition: opacity 0.2s, transform 0.2s, color 0.2s;
-}
-.row-check.checked {
-  border-color: var(--accent); color: var(--accent);
-  animation: checkPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-.row-check.checked::after {
-  opacity: 1; transform: scale(1); color: var(--accent);
-}
-@keyframes checkPop {
-  0% { transform: scale(1); }
-  40% { transform: scale(1.22); }
-  100% { transform: scale(1); }
-}
-
-.row-name { flex: 1; font-size: 15px; letter-spacing: 0.3px; }
-
-.row-price {
-  flex-shrink: 0; padding: 6px 11px; border-radius: 8px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--border);
-  color: var(--accent); font-weight: 700; font-size: 14px;
-  letter-spacing: 0.4px;
-}
-
-.section-label {
-  font-family: -apple-system, sans-serif;
-  font-size: 10.5px; letter-spacing: 2.5px;
-  color: var(--text-mute); text-align: center;
-  margin: 0 0 12px 0; opacity: 0.8;
-}
-
-/* Receipt */
-.receipt-paper {
-  max-width: 420px; margin: 0 auto;
-  padding: 32px 28px 26px 28px; border-radius: 6px;
-  background-color: var(--bg-card);
-  background-image: url('icons/1790835034553.jpg');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  border: 1px solid var(--border-soft);
-  box-shadow: 0 10px 26px var(--shadow-warm);
-}
-.receipt-header { text-align: center; margin-bottom: 20px; }
-.receipt-thanks {
-  font-size: 16px; font-weight: 600; color: var(--accent);
-  line-height: 1.9; letter-spacing: 1px; margin-bottom: 12px;
-}
-.receipt-subthanks {
-  font-size: 12px; color: var(--text-mute);
-  line-height: 1.9; letter-spacing: 0.5px;
-}
-.receipt-to-row {
-  display: flex; align-items: center; justify-content: center;
-  gap: 12px; padding: 14px 8px 10px 8px;
-}
-.receipt-to-mark { font-size: 12px; color: var(--glow); }
-.receipt-to-name {
-  font-size: 17px; font-weight: 700; color: var(--accent);
-  letter-spacing: 2px;
-}
-.receipt-divider {
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
-  margin: 18px 0;
-}
-.receipt-title {
-  font-size: 11px; color: var(--text-faint);
-  letter-spacing: 6px; text-align: center; margin-bottom: 18px;
-}
-.receipt-items {
-  display: flex; flex-direction: column; gap: 12px;
-  min-height: 20px;
-}
-.receipt-item {
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 8px; padding-bottom: 9px;
-  border-bottom: 1px dashed var(--border-soft);
-}
-.receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-.receipt-item-name { flex: 1; font-size: 13.5px; color: var(--text-med); }
-.receipt-item-price-wrap {
-  flex-shrink: 0; padding: 4px 10px; border-radius: 8px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid var(--border-soft);
-  color: var(--accent); font-weight: 600; font-size: 13.5px;
-}
-.receipt-empty {
-  text-align: center; font-size: 12px; color: var(--text-faint);
-  padding: 12px 0; letter-spacing: 2px;
-}
-.receipt-total-line {
-  display: flex; justify-content: space-between; align-items: baseline;
-  padding: 16px 4px; margin-top: 12px;
-  border-top: 1.5px solid var(--border);
-  border-bottom: 1.5px solid var(--border);
-}
-.receipt-total-label {
-  font-size: 16px; font-weight: 600; color: var(--text-mute);
-  letter-spacing: 4px;
-}
-.receipt-total-value {
-  display: inline-flex; align-items: baseline;
-  font-size: 20px; font-weight: 700; color: var(--accent);
-  letter-spacing: 0.5px; white-space: nowrap;
-}
-.receipt-total-value .yen-symbol {
-  font-size: 12px; margin-right: 2px; opacity: 0.8; font-weight: 700;
-}
-
-/* Summary bar */
-.summary {
-  position: fixed; bottom: 0; left: 0; right: 0;
-  background: rgba(253, 240, 200, 0.94);
-  border-top: 1px solid rgba(216, 180, 120, 0.5);
-  padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
-  box-shadow: 0 -4px 18px rgba(120, 70, 20, 0.08);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  z-index: 50;
-}
-.summary-inner {
-  max-width: 560px; margin: 0 auto;
-  display: flex; justify-content: space-between; align-items: center;
-  gap: 10px;
-}
-.summary-label {
-  font-size: 10px; color: var(--text-mute);
-  letter-spacing: 2px; text-transform: uppercase;
-}
-.summary-total-value {
-  display: inline-flex; align-items: baseline;
-  font-size: 22px; font-weight: 700; color: var(--accent);
-  letter-spacing: 0.5px; white-space: nowrap;
-}
-.summary-total-value .yen-symbol {
-  font-size: 13px; margin-right: 2px; opacity: 0.85; font-weight: 700;
-}
-
-/* ============================================================
-   Digit roll engine — fixed 6-column layout
-   ============================================================ */
-.digit-roll {
-  display: inline-flex;
-  align-items: flex-start;
-  height: var(--digit-h, 30px);
-  overflow: visible;
-  font-size: inherit;
-  line-height: 1;
-  vertical-align: baseline;
-}
-
-.digit-col {
-  position: relative;
-  display: inline-block;
-  width: 0.62em;
-  height: var(--digit-h, 30px);
-  overflow: hidden;
-  vertical-align: top;
-  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
-              opacity 200ms ease;
-}
-.digit-col.hidden {
-  width: 0;
-  opacity: 0;
-}
-
-.digit-strip {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  height: 1000%;
-  transform: translateY(0);
-  will-change: transform;
-  transition: transform 400ms cubic-bezier(0.34, 1.15, 0.64, 1);
-}
-
-.digit {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 10%;
-  flex-shrink: 0;
-  font-weight: 700;
-  font-size: inherit;
-  line-height: 1;
-  color: inherit;
-  letter-spacing: 0.5px;
-}
-
-.digit-static {
-  display: inline-block;
-  height: var(--digit-h, 30px);
-  width: 0.32em;
-  text-align: center;
-  font-weight: 700;
-  font-size: inherit;
-  line-height: var(--digit-h, 30px);
-  vertical-align: top;
-  color: inherit;
-  overflow: hidden;
-  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
-              opacity 200ms ease;
-}
-.digit-static.hidden {
-  width: 0;
-  opacity: 0;
-}
-
-/* Suppress all transitions — used for instant updates */
-.digit-roll.no-transition,
-.digit-roll.no-transition .digit-col,
-.digit-roll.no-transition .digit-strip,
-.digit-roll.no-transition .digit-static {
-  transition: none !important;
-}
-
-/* Summary: fast roll */
-.summary-digit-roll { --digit-h: var(--summary-digit-h); }
-.summary-digit-roll .digit-strip {
-  transition: transform 400ms cubic-bezier(0.34, 1.15, 0.64, 1);
-}
-.summary-digit-roll .digit-col,
-.summary-digit-roll .digit-static {
-  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
-              opacity 200ms ease;
-}
-
-/* Receipt: slow roll */
-.receipt-digit-roll { --digit-h: var(--receipt-digit-h); }
-.receipt-digit-roll .digit-strip {
-  transition: transform 800ms cubic-bezier(0.34, 1.15, 0.64, 1);
-}
-.receipt-digit-roll .digit-col,
-.receipt-digit-roll .digit-static {
-  transition: width 700ms cubic-bezier(0.34, 1.15, 0.64, 1),
-              opacity 400ms ease;
-}
-
-.demo-badge {
-  position: fixed; bottom: 6px; right: 10px;
-  font-family: -apple-system, sans-serif;
-  font-size: 10px; letter-spacing: 1px;
-  color: var(--text-mute); opacity: 0.5;
-  pointer-events: none; user-select: none; z-index: 60;
-}
-
-@media (min-width: 700px) {
   :root {
-    --summary-digit-h: 32px;
-    --receipt-digit-h: 50px;
+    --bg-page:       #f5d89a;
+    --bg-card:       #fdf3d8;
+    --accent:        #c9600a;
+    --accent-2:      #8f3f12;
+    --accent-3:      #7a3208;
+    --text-dark:     #231304;
+    --text-med:      #3d2410;
+    --text-mute:     #5a3818;
+    --text-faint:    #7a5028;
+    --border:        #e8c88a;
+    --border-soft:   #f0d8a0;
+    --shadow-warm:   rgba(120, 70, 20, 0.14);
+    --shadow-warm-2: rgba(120, 70, 20, 0.28);
+    --glow:          #f7b93c;
+    --digit-h:       56px;
   }
-  .receipt-paper { max-width: 480px; padding: 38px 36px 30px 36px; }
-  .receipt-thanks { font-size: 20px; }
-  .receipt-subthanks { font-size: 13px; }
-  .receipt-to-name { font-size: 20px; }
-  .receipt-title { font-size: 13px; letter-spacing: 8px; }
-  .receipt-item-name { font-size: 15px; }
-  .receipt-item-price-wrap { font-size: 15px; }
-  .receipt-total-label { font-size: 20px; }
-  .receipt-total-value { font-size: 24px; }
-  .receipt-total-value .yen-symbol { font-size: 14px; }
-  .summary-total-value { font-size: 24px; }
-}
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: var(--text-dark);
+    background: var(--bg-page);
+  }
+
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 32px 20px 80px 20px;
+    perspective: 1400px;
+    perspective-origin: 50% 60%;
+  }
+
+  /* ---------- Controls ---------- */
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 40px;
+    font-family: -apple-system, sans-serif;
+  }
+  .controls button {
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 9px 16px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.75);
+    color: var(--text-med);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .controls button:hover { border-color: var(--accent); }
+  .controls button:active { transform: scale(0.97); background: #fff; }
+
+  /* ---------- Receipt ---------- */
+  .receipt-paper {
+    width: 100%;
+    max-width: 400px;
+    padding: 36px 30px 28px 30px;
+    border-radius: 6px;
+
+    /* Washi surface — same recipe as the app */
+    background-color: var(--bg-card);
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+
+    border: 1px solid var(--border-soft);
+
+    /* Resting state: flat, tight shadow */
+    transform: rotateX(0deg) translateY(0) scale(1);
+    transform-origin: 50% 100%;
+    box-shadow:
+      0 12px 28px var(--shadow-warm),
+      0 4px 10px rgba(120, 70, 20, 0.08);
+
+    /* The landing animation runs when .landing is present.
+       Without it, the element sits in its resting state. */
+  }
+
+  .receipt-paper.landing {
+    animation: paperLand 1000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes paperLand {
+    0% {
+      opacity: 0;
+      transform: rotateX(14deg) translateY(-22px) scale(0.96);
+      box-shadow:
+        0 40px 80px var(--shadow-warm-2),
+        0 16px 32px rgba(120, 70, 20, 0.16);
+      filter: blur(1.5px);
+    }
+    25% {
+      opacity: 1;
+      filter: blur(0.4px);
+    }
+    70% {
+      transform: rotateX(-1.5deg) translateY(2px) scale(1.004);
+      box-shadow:
+        0 18px 36px rgba(120, 70, 20, 0.18),
+        0 6px 14px rgba(120, 70, 20, 0.10);
+      filter: blur(0);
+    }
+    100% {
+      opacity: 1;
+      transform: rotateX(0deg) translateY(0) scale(1);
+      box-shadow:
+        0 12px 28px var(--shadow-warm),
+        0 4px 10px rgba(120, 70, 20, 0.08);
+      filter: blur(0);
+    }
+  }
+
+  /* ---------- Receipt content ---------- */
+  .receipt-header { text-align: center; margin-bottom: 22px; }
+  .receipt-thanks {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1.9;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .receipt-subthanks {
+    font-size: 13px;
+    color: var(--text-mute);
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+  }
+  .receipt-to-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 18px 8px 12px 8px;
+  }
+  .receipt-to-mark { font-size: 13px; color: var(--glow); }
+  .receipt-to-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+  .receipt-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+    margin: 22px 0;
+  }
+  .receipt-title {
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 6px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .receipt-items {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .receipt-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .receipt-item-name {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-med);
+  }
+  .receipt-item-price-wrap {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border-soft);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ---------- Total line with digit roll ---------- */
+  .receipt-total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 18px 4px;
+    margin-top: 14px;
+    border-top: 1.5px solid var(--border);
+    border-bottom: 1.5px solid var(--border);
+  }
+  .receipt-total-label {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-mute);
+    letter-spacing: 4px;
+    line-height: 1.2;
+  }
+  .receipt-total-value {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+    height: calc(var(--digit-h) * 0.6);
+    overflow: visible;
+  }
+  .receipt-total-value .yen-symbol {
+    font-size: 13px;
+    margin-right: 2px;
+    opacity: 0.8;
+    font-weight: 700;
+    line-height: var(--digit-h);
+    align-self: flex-start;
+    height: var(--digit-h);
+    display: inline-block;
+  }
+
+  /* The digit-roll container */
+  .digit-roll {
+    display: inline-flex;
+    align-items: flex-start;
+    height: var(--digit-h);
+    font-size: 22px;
+    line-height: var(--digit-h);
+    overflow: hidden;
+  }
+
+  /* A single digit column */
+  .digit-col {
+    position: relative;
+    display: inline-block;
+    width: 0.62em;
+    height: var(--digit-h);
+    overflow: hidden;
+    vertical-align: top;
+  }
+
+  /* The vertical strip inside a column */
+  .digit-strip {
+    display: flex;
+    flex-direction: column;
+    transform: translateY(0);
+    transition: transform 750ms cubic-bezier(0.34, 1.15, 0.64, 1);
+    will-change: transform;
+  }
+
+  .digit {
+    display: block;
+    height: var(--digit-h);
+    line-height: var(--digit-h);
+    text-align: center;
+    font-weight: 700;
+    font-size: 22px;
+  }
+
+  /* Static separator (comma) between digit groups */
+  .digit-static {
+    display: inline-block;
+    height: var(--digit-h);
+    line-height: var(--digit-h);
+    width: 0.32em;
+    text-align: center;
+    font-weight: 700;
+    font-size: 22px;
+    vertical-align: top;
+  }
+
+  .demo-badge {
+    position: fixed;
+    bottom: 8px;
+    left: 12px;
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-mute);
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  @media (min-width: 700px) {
+    :root { --digit-h: 62px; }
+    .receipt-paper { max-width: 460px; padding: 42px 42px 34px 42px; }
+    .receipt-thanks { font-size: 22px; }
+    .receipt-subthanks { font-size: 15px; }
+    .receipt-to-name { font-size: 22px; }
+    .receipt-title { font-size: 14px; letter-spacing: 9px; }
+    .receipt-item-name { font-size: 16px; }
+    .receipt-item-price-wrap { font-size: 16px; }
+    .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
+    .receipt-total-value { font-size: 26px; }
+    .receipt-total-value .yen-symbol { font-size: 15px; }
+    .digit-roll { font-size: 26px; }
+    .digit { font-size: 26px; }
+    .digit-static { font-size: 26px; }
+  }
 </style>
 </head>
 <body>
 
-<div class="page">
-
-  <h1 class="title">ODOMETER DEMO · v2</h1>
-  <p class="subtitle">fixed 6-column layout · every change animates</p>
-  <p class="note">
-    Tapping rows updates both totals. Summary: 400ms roll, 45ms stagger, snaps on taps
-    within 260ms of each other. Receipt: 800ms roll, 80ms stagger, always rolls fully.
-    Leading columns expand/collapse instead of rebuilding.
-  </p>
+<div class="stage">
 
   <div class="controls">
-    <button id="btnRandom">Randomize</button>
-    <button id="btnAll">Check all</button>
-    <button id="btnNone">Clear all</button>
+    <button id="replayLanding">Replay landing</button>
+    <button id="changeTotal">Change total</button>
   </div>
 
-  <div class="section-label">SERVICE TABLE</div>
-  <div class="table-card" id="tableCard"></div>
+  <div class="receipt-paper" id="paper">
 
-  <div class="section-label" style="margin-top:36px;">RECEIPT</div>
-  <div class="receipt-paper">
     <div class="receipt-header">
       <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
       <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
     </div>
+
     <div class="receipt-to-row">
       <span class="receipt-to-mark">❀</span>
       <span class="receipt-to-name">桜庭さんへ</span>
       <span class="receipt-to-mark">❀</span>
     </div>
+
     <div class="receipt-divider"></div>
+
     <div class="receipt-title">本日の内容</div>
-    <div class="receipt-items" id="receiptItems"></div>
+
+    <div class="receipt-items">
+      <div class="receipt-item">
+        <span class="receipt-item-name">ダミーテキスト1</span>
+        <span class="receipt-item-price-wrap">¥3,000</span>
+      </div>
+      <div class="receipt-item">
+        <span class="receipt-item-name">ダミーテキスト3</span>
+        <span class="receipt-item-price-wrap">¥5,000</span>
+      </div>
+    </div>
+
     <div class="receipt-total-line">
       <span class="receipt-total-label">合計</span>
       <span class="receipt-total-value">
         <span class="yen-symbol">¥</span>
-        <span class="digit-roll receipt-digit-roll" id="receiptTotal"></span>
+        <span class="digit-roll" id="totalRoll"></span>
       </span>
     </div>
+
   </div>
 
 </div>
 
-<div class="summary">
-  <div class="summary-inner">
-    <div class="summary-label">合計</div>
-    <span class="summary-total-value">
-      <span class="yen-symbol">¥</span>
-      <span class="digit-roll summary-digit-roll" id="summaryTotal"></span>
-    </span>
-  </div>
-</div>
-
-<div class="demo-badge">odometer demo v2</div>
+<div class="demo-badge">receipt mockup · landing + digit roll</div>
 
 <script>
-(function() {
-  'use strict';
+  /* ============================================================
+     Landing animation
+     ============================================================ */
+  var paper = document.getElementById('paper');
 
-  var ROWS = [
-    { name: 'ダミーテキスト1', price: 3000 },
-    { name: 'ダミーテキスト2', price: 5000 },
-    { name: 'ダミーテキスト3', price: 8000 },
-    { name: 'ダミーテキスト4', price: 12000 }
-  ];
+  function replayLanding() {
+    paper.classList.remove('landing');
+    /* Force reflow so the animation restarts cleanly */
+    void paper.offsetWidth;
+    paper.classList.add('landing');
+  }
 
-  var checked = [false, false, false, false];
-
-  var tableCard    = document.getElementById('tableCard');
-  var receiptItems = document.getElementById('receiptItems');
-  var summaryRoll  = document.getElementById('summaryTotal');
-  var receiptRoll  = document.getElementById('receiptTotal');
+  document.getElementById('replayLanding').addEventListener('click', replayLanding);
 
   /* ============================================================
-     Digit roll engine (fixed 6-column layout)
+     Digit roll
+     ------------------------------------------------------------
+     Builds the columns for a given value, then on updates
+     animates each column's strip to the new digit. Staggered
+     right-to-left so the ones place lands first.
      ============================================================ */
-  var NUM_COLS   = 6;
-  var COMMA_AFTER = 2; /* 0-indexed: comma sits after col 2 */
+  var totalRollEl = document.getElementById('totalRoll');
+  var currentValue = 8000;
 
-  function isColVisible(value, colIndex) {
-    /* A column is visible iff value is >= that column's place value.
-       Special case: value 0 → only rightmost column visible. */
-    if (value === 0) return colIndex === NUM_COLS - 1;
-    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
-    return value >= placeValue;
-  }
-
-  function getDigitAt(value, colIndex) {
-    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
-    return Math.floor(value / placeValue) % 10;
-  }
-
-  function buildColumns(container, initialValue) {
-    container.innerHTML = '';
-    for (var i = 0; i < NUM_COLS; i++) {
+  function buildDigitColumns(value) {
+    totalRollEl.innerHTML = '';
+    var str = value.toLocaleString();
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charAt(i);
+      if (ch === ',' || ch === '.') {
+        var sep = document.createElement('span');
+        sep.className = 'digit-static';
+        sep.textContent = ch;
+        totalRollEl.appendChild(sep);
+        continue;
+      }
       var col = document.createElement('span');
-      col.className = 'digit-col hidden';
-      col.setAttribute('data-digit', '0');
+      col.className = 'digit-col';
+      col.setAttribute('data-digit', ch);
       var strip = document.createElement('span');
       strip.className = 'digit-strip';
       for (var d = 0; d <= 9; d++) {
-        var de = document.createElement('span');
-        de.className = 'digit';
-        de.textContent = d;
-        strip.appendChild(de);
+        var digitEl = document.createElement('span');
+        digitEl.className = 'digit';
+        digitEl.textContent = d;
+        strip.appendChild(digitEl);
       }
-      strip.style.transform = 'translateY(0)';
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-parseInt(ch, 10)) + '))';
       col.appendChild(strip);
-      container.appendChild(col);
-
-      if (i === COMMA_AFTER) {
-        var comma = document.createElement('span');
-        comma.className = 'digit-static hidden';
-        comma.setAttribute('data-comma', '1');
-        comma.textContent = ',';
-        container.appendChild(comma);
-      }
+      totalRollEl.appendChild(col);
+      /* Force reflow, then re-enable transitions */
+      void strip.offsetWidth;
+      strip.style.transition = '';
     }
-    /* Apply initial state without transitions */
-    container.classList.add('no-transition');
-    applyValue(container, initialValue, { instant: true, stagger: 0 });
-    void container.offsetWidth;
-    container.classList.remove('no-transition');
   }
 
-  function applyValue(container, value, opts) {
-    opts = opts || {};
-    var instant = !!opts.instant;
-    var stagger = opts.stagger != null ? opts.stagger : 45;
+  function updateTotal(newValue) {
+    var oldStr = currentValue.toLocaleString();
+    var newStr = newValue.toLocaleString();
 
-    if (instant) {
-      container.classList.add('no-transition');
+    if (oldStr.length !== newStr.length) {
+      /* Digit count changed — rebuild from scratch.
+         Simpler than juggling columns; matches app behaviour when
+         the number of digits flips (e.g., crossing 10,000). */
+      currentValue = newValue;
+      buildDigitColumns(newValue);
+      return;
     }
 
-    var cols = container.querySelectorAll('.digit-col');
-    var comma = container.querySelector('.digit-static[data-comma]');
-
-    for (var i = 0; i < cols.length; i++) {
-      var col = cols[i];
+    var cols = totalRollEl.querySelectorAll('.digit-col');
+    var colIndex = 0;
+    var digitCount = 0;
+    /* Count digits for stagger calculation */
+    for (var i = 0; i < newStr.length; i++) {
+      if (newStr.charAt(i) !== ',' && newStr.charAt(i) !== '.') digitCount++;
+    }
+    for (var j = 0; j < newStr.length; j++) {
+      var ch = newStr.charAt(j);
+      if (ch === ',' || ch === '.') continue;
+      var col = cols[colIndex];
+      if (!col) { colIndex++; continue; }
       var strip = col.querySelector('.digit-strip');
-      var visible = isColVisible(value, i);
-      var newDigit = getDigitAt(value, i);
-      var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
-
-      /* Stagger: rightmost (ones) place first, moving leftward */
-      var fromRight = NUM_COLS - 1 - i;
-      var delay = instant ? 0 : fromRight * stagger;
-
-      if (instant) {
-        strip.style.transitionDelay = '0ms';
-        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-      } else if (newDigit !== oldDigit) {
-        strip.style.transitionDelay = delay + 'ms';
-        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+      var oldDigit = parseInt(col.getAttribute('data-digit'), 10);
+      var newDigit = parseInt(ch, 10);
+      if (oldDigit !== newDigit) {
+        /* Stagger: ones place moves first, leftmost last.
+           Position from right: rightmost = 0 → 0ms, next = 1 → 80ms, etc. */
+        var fromRight = digitCount - 1 - colIndex;
+        strip.style.transitionDelay = (fromRight * 80) + 'ms';
+        strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-newDigit) + '))';
       }
-
-      col.classList.toggle('hidden', !visible);
-      col.setAttribute('data-digit', newDigit);
+      col.setAttribute('data-digit', ch);
+      colIndex++;
     }
-
-    if (comma) {
-      comma.classList.toggle('hidden', value < 1000);
-    }
-
-    if (instant) {
-      void container.offsetWidth;
-      requestAnimationFrame(function() {
-        requestAnimationFrame(function() {
-          container.classList.remove('no-transition');
-        });
-      });
-    }
+    currentValue = newValue;
   }
 
-  /* ============================================================
-     State
-     ============================================================ */
-  var lastSummaryUpdate = 0;
-  var SNAP_WINDOW_MS = 260;
-
-  function computeTotal() {
-    var sum = 0;
-    for (var i = 0; i < ROWS.length; i++) {
-      if (checked[i]) sum += ROWS[i].price;
-    }
-    return sum;
-  }
-
-  function updateSummary(value) {
-    var now = performance.now();
-    var elapsed = now - lastSummaryUpdate;
-    var shouldSnap = lastSummaryUpdate > 0 && elapsed < SNAP_WINDOW_MS;
-    lastSummaryUpdate = now;
-    applyValue(summaryRoll, value, { instant: shouldSnap, stagger: 45 });
-  }
-
-  function updateReceipt(value) {
-    applyValue(receiptRoll, value, { instant: false, stagger: 80 });
-  }
-
-  function renderReceiptItems() {
-    receiptItems.innerHTML = '';
-    var any = false;
-    for (var i = 0; i < ROWS.length; i++) {
-      if (!checked[i]) continue;
-      any = true;
-      var item = document.createElement('div');
-      item.className = 'receipt-item';
-      var nm = document.createElement('span');
-      nm.className = 'receipt-item-name';
-      nm.textContent = ROWS[i].name;
-      var pr = document.createElement('span');
-      pr.className = 'receipt-item-price-wrap';
-      pr.textContent = '¥' + ROWS[i].price.toLocaleString();
-      item.appendChild(nm);
-      item.appendChild(pr);
-      receiptItems.appendChild(item);
-    }
-    if (!any) {
-      var empty = document.createElement('div');
-      empty.className = 'receipt-empty';
-      empty.textContent = '— 項目がありません —';
-      receiptItems.appendChild(empty);
-    }
-  }
-
-  function recalc() {
-    var total = computeTotal();
-    updateSummary(total);
-    updateReceipt(total);
-    renderReceiptItems();
-  }
-
-  /* ============================================================
-     Table
-     ============================================================ */
-  function buildTable() {
-    tableCard.innerHTML = '';
-    for (var i = 0; i < ROWS.length; i++) {
-      (function(idx) {
-        var row = document.createElement('div');
-        row.className = 'row';
-        var box = document.createElement('div');
-        box.className = 'row-check';
-        var nm = document.createElement('div');
-        nm.className = 'row-name';
-        nm.textContent = ROWS[idx].name;
-        var pr = document.createElement('div');
-        pr.className = 'row-price';
-        pr.textContent = '¥' + ROWS[idx].price.toLocaleString();
-        row.appendChild(box);
-        row.appendChild(nm);
-        row.appendChild(pr);
-        row.addEventListener('click', function() {
-          checked[idx] = !checked[idx];
-          row.classList.toggle('filled', checked[idx]);
-          box.classList.toggle('checked', checked[idx]);
-          recalc();
-        });
-        tableCard.appendChild(row);
-      })(i);
-    }
-  }
-
-  function syncTable() {
-    var rows = tableCard.querySelectorAll('.row');
-    for (var i = 0; i < rows.length; i++) {
-      rows[i].classList.toggle('filled', checked[i]);
-      var box = rows[i].querySelector('.row-check');
-      if (box) box.classList.toggle('checked', checked[i]);
-    }
-  }
-
-  /* ============================================================
-     Controls
-     ============================================================ */
-  document.getElementById('btnRandom').addEventListener('click', function() {
-    for (var i = 0; i < ROWS.length; i++) checked[i] = Math.random() < 0.5;
-    syncTable(); recalc();
-  });
-  document.getElementById('btnAll').addEventListener('click', function() {
-    for (var i = 0; i < ROWS.length; i++) checked[i] = true;
-    syncTable(); recalc();
-  });
-  document.getElementById('btnNone').addEventListener('click', function() {
-    for (var i = 0; i < ROWS.length; i++) checked[i] = false;
-    syncTable(); recalc();
+  document.getElementById('changeTotal').addEventListener('click', function() {
+    /* Generate a random value in the ¥1,200 – ¥48,500 range,
+       rounded to hundreds, so digits visually differ each press. */
+    var next = 1200 + Math.floor(Math.random() * 47) * 100;
+    if (next === currentValue) next += 100;
+    updateTotal(next);
   });
 
   /* ============================================================
-     Boot
+     Bootstrap
      ============================================================ */
-  buildTable();
-  buildColumns(summaryRoll, 0);
-  buildColumns(receiptRoll, 0);
-  renderReceiptItems();
-
-})();
+  buildDigitColumns(currentValue);
+  /* Trigger the landing animation on load */
+  replayLanding();
 </script>
 
 </body>
