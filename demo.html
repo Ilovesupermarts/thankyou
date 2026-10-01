@@ -3,16 +3,16 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blur Tuning — Demo</title>
+<title>Reveal + Blur — Combined Demo</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
     --bg-base:       #fdf3d8;
     --accent:        #c9600a;
-    --accent-3:      #7a3208;
     --text-dark:     #231304;
     --text-med:      #3d2410;
     --text-mute:     #5a3818;
+    --text-faint:    #7a5028;
     --border:        #e8c88a;
     --transition-head-color: #fdf0c8;
   }
@@ -24,7 +24,9 @@
     background: var(--bg-page);
   }
 
-  /* Controls */
+  /* ============================================================
+     Controls
+     ============================================================ */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
@@ -34,15 +36,28 @@
     padding: 10px 16px;
     font-family: -apple-system, sans-serif;
     font-size: 11px; color: var(--text-med);
+    max-height: 42vh;
+    overflow-y: auto;
   }
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 6px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 6px 14px;
     max-width: 1100px;
     margin: 0 auto;
   }
-  .ctrl { display: flex; align-items: center; gap: 8px; }
+  .section-label {
+    grid-column: 1 / -1;
+    font-family: -apple-system, sans-serif;
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: var(--accent);
+    font-weight: 700;
+    margin-top: 4px;
+    margin-bottom: -2px;
+    opacity: 0.85;
+  }
+  .ctrl { display: flex; align-items: center; gap: 6px; }
   .ctrl label {
     flex: 1; color: var(--text-mute);
     letter-spacing: 1px; font-weight: 600;
@@ -61,16 +76,25 @@
     font-size: 10px; color: var(--text-mute);
     min-width: 48px; text-align: right;
   }
-  .ctrl.toggle {
-    justify-content: center;
+  .ctrl.actions {
     grid-column: 1 / -1;
+    justify-content: center;
     padding-top: 2px;
   }
-  .ctrl.toggle input { accent-color: var(--accent); }
+  .ctrl.actions button {
+    font-family: inherit; font-size: 10.5px;
+    letter-spacing: 1px; padding: 4px 12px;
+    border: 1px solid var(--border);
+    background: #fff; color: var(--text-med);
+    border-radius: 12px; cursor: pointer;
+  }
+  .ctrl.actions button:hover { border-color: var(--accent); }
 
-  /* Demo body */
+  /* ============================================================
+     Demo body
+     ============================================================ */
   .demo {
-    padding: 180px 20px 120px 20px;
+    padding: 400px 20px 160px 20px;
     max-width: 620px;
     margin: 0 auto;
   }
@@ -85,7 +109,6 @@
     margin: 60px 0;
   }
 
-  /* The transition line */
   .transition-line {
     text-align: center;
     padding: 0 32px 40px 32px;
@@ -122,13 +145,36 @@
     letter-spacing: 5px; white-space: nowrap;
   }
 
+  /* Blur target */
   .transition-line-body {
+    position: relative;
     will-change: filter;
   }
+
+  /* Per-paragraph reveal */
   .transition-line-body p {
     margin: 0 0 0.9em 0;
+    opacity: 0;
+    transform: translateY(var(--rise, 30px));
+    transition-property: opacity, transform;
+    transition-duration: var(--reveal-dur, 750ms), var(--reveal-dur, 750ms);
+    transition-timing-function: ease, var(--reveal-ease, cubic-bezier(0.34, 1.56, 0.64, 1));
+    will-change: opacity, transform;
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
+  .transition-line-body p.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .transition-line-body p {
+      opacity: 1;
+      transform: none;
+      transition: none;
+    }
+    .transition-line-body { filter: none !important; }
+  }
 
   /* Reference lines */
   .ref-line {
@@ -153,26 +199,29 @@
   .ref-line.mid { top: 50vh; }
   .ref-line.top { top: 0; }
 
-  /* Live readout */
+  /* ============================================================
+     Readout bar
+     ============================================================ */
   .readout-bar {
     position: fixed; bottom: 8px; left: 12px; right: 12px;
     z-index: 100;
-    display: flex; justify-content: center; flex-wrap: wrap; gap: 20px;
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 16px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 11px; color: var(--text-mute);
     background: rgba(253, 243, 216, 0.94);
     padding: 7px 16px; border-radius: 20px;
     pointer-events: none; user-select: none;
-    max-width: 780px; margin: 0 auto;
+    max-width: 840px; margin: 0 auto;
   }
   .readout-bar b { color: var(--accent); font-weight: 700; }
-
-  /* Blur progress meter */
+  .readout-bar .divider {
+    color: rgba(90, 56, 24, 0.35);
+  }
   .meter {
     display: inline-flex; align-items: center; gap: 6px;
   }
   .meter .bar {
-    width: 60px; height: 6px;
+    width: 50px; height: 6px;
     background: rgba(201, 96, 10, 0.15);
     border-radius: 3px;
     overflow: hidden;
@@ -190,26 +239,68 @@
 
 <div class="controls">
   <div class="controls-grid">
+
+    <div class="section-label">PARAGRAPH REVEAL</div>
+
+    <div class="ctrl">
+      <label>Stagger</label>
+      <input type="range" id="stagger" min="0" max="400" step="10" value="200">
+      <span class="readout" id="staggerV">200 ms</span>
+    </div>
+    <div class="ctrl">
+      <label>Duration</label>
+      <input type="range" id="duration" min="200" max="2000" step="50" value="750">
+      <span class="readout" id="durationV">750 ms</span>
+    </div>
+    <div class="ctrl">
+      <label>Rise</label>
+      <input type="range" id="rise" min="0" max="80" step="2" value="30">
+      <span class="readout" id="riseV">30 px</span>
+    </div>
+    <div class="ctrl">
+      <label>Threshold</label>
+      <input type="range" id="threshold" min="0" max="80" step="5" value="20">
+      <span class="readout" id="thresholdV">20 %</span>
+    </div>
+    <div class="ctrl">
+      <label>Bottom margin</label>
+      <input type="range" id="rootMargin" min="-40" max="0" step="2" value="-8">
+      <span class="readout" id="rootMarginV">-8 %</span>
+    </div>
+    <div class="ctrl">
+      <label>Reveal easing</label>
+      <select id="revealEase">
+        <option value="cubic-bezier(0.34, 1.56, 0.64, 1)" selected>overshoot</option>
+        <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out (no bounce)</option>
+        <option value="ease-out">linear ease-out</option>
+      </select>
+    </div>
+
+    <div class="section-label">BLUR</div>
+
     <div class="ctrl">
       <label>Max blur</label>
       <input type="range" id="maxBlur" min="0" max="20" step="0.5" value="6">
       <span class="readout" id="maxBlurV">6.0 px</span>
     </div>
     <div class="ctrl">
-      <label>Easing</label>
-      <select id="easing">
+      <label>Blur easing</label>
+      <select id="blurEase">
         <option value="linear" selected>linear</option>
         <option value="easeOut">ease-out (fast then slow)</option>
         <option value="easeIn">ease-in (slow then fast)</option>
         <option value="smooth">smooth (sine)</option>
       </select>
     </div>
-    <div class="ctrl toggle">
-      <label style="flex:0; letter-spacing:0;">
-        <input type="checkbox" id="showRefs" checked>
-        Show reference lines (pivot · top trigger)
+
+    <div class="ctrl actions">
+      <button id="resetBtn">Reset scroll + reveal</button>
+      <label style="flex:0; letter-spacing:0; padding-left:10px;">
+        <input type="checkbox" id="showRefs" checked style="accent-color:var(--accent);">
+        Reference lines
       </label>
     </div>
+
   </div>
 </div>
 
@@ -218,7 +309,8 @@
 
 <div class="demo">
 
-  <div class="spacer-note">↓ SCROLL DOWN TO SEE THE BLOCK ARRIVE ↓</div>
+  <div class="spacer-note">↓ SCROLL DOWN — WATCH BOTH EFFECTS ↓</div>
+  <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
@@ -241,156 +333,251 @@
     </div>
   </div>
 
-  <div class="spacer-note">↓ KEEP SCROLLING PAST THE BLOCK ↓</div>
+  <div class="spacer-note">↓ KEEP SCROLLING — BLOCK BLURS AS IT RISES ↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
-  <div class="spacer-note">↑ SCROLL BACK UP TO REVERSE ↑</div>
+  <div class="spacer-note">↑ SCROLL BACK UP — BLUR REVERSES, REVEAL STAYS ↑</div>
 
 </div>
 
 <div class="readout-bar">
-  <span>blur: <b id="roBlur">0.0</b> px</span>
+  <span>revealed <b id="roRevealed">0</b>/<b id="roTotal">5</b></span>
+  <span class="divider">·</span>
+  <span>blur <b id="roBlur">0.0</b> px</span>
+  <span class="divider">·</span>
   <span class="meter">down <span class="bar"><span id="roDownBar"></span></span> <b id="roDown">0%</b></span>
   <span class="meter">up <span class="bar"><span id="roUpBar"></span></span> <b id="roUp">0%</b></span>
-  <span>state: <b id="roState">—</b></span>
+  <span class="divider">·</span>
+  <span>state <b id="roState">—</b></span>
 </div>
 
 <script>
 (function() {
   'use strict';
 
+  /* ============================================================
+     DOM refs
+     ============================================================ */
   var bodyEl = document.getElementById('transitionLineBody');
-  var paragraphs = bodyEl.querySelectorAll('p');
+  var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
   var secondLastP = paragraphs[paragraphs.length - 2];
 
-  var maxBlurEl = document.getElementById('maxBlur');
-  var easingEl  = document.getElementById('easing');
+  /* Reveal controls */
+  var staggerEl    = document.getElementById('stagger');
+  var durationEl   = document.getElementById('duration');
+  var riseEl       = document.getElementById('rise');
+  var thresholdEl  = document.getElementById('threshold');
+  var rootMarginEl = document.getElementById('rootMargin');
+  var revealEaseEl = document.getElementById('revealEase');
+  var staggerV     = document.getElementById('staggerV');
+  var durationV    = document.getElementById('durationV');
+  var riseV        = document.getElementById('riseV');
+  var thresholdV   = document.getElementById('thresholdV');
+  var rootMarginV  = document.getElementById('rootMarginV');
+
+  /* Blur controls */
+  var maxBlurEl  = document.getElementById('maxBlur');
+  var blurEaseEl = document.getElementById('blurEase');
+  var maxBlurV   = document.getElementById('maxBlurV');
+
+  /* Shared */
   var showRefsEl = document.getElementById('showRefs');
-  var maxBlurV  = document.getElementById('maxBlurV');
+  var resetBtn   = document.getElementById('resetBtn');
+  var refMid     = document.getElementById('refMid');
+  var refTop     = document.getElementById('refTop');
 
-  var refMid = document.getElementById('refMid');
-  var refTop = document.getElementById('refTop');
+  /* Readout */
+  var roRevealed = document.getElementById('roRevealed');
+  var roTotal    = document.getElementById('roTotal');
+  var roBlur     = document.getElementById('roBlur');
+  var roDown     = document.getElementById('roDown');
+  var roUp       = document.getElementById('roUp');
+  var roDownBar  = document.getElementById('roDownBar');
+  var roUpBar    = document.getElementById('roUpBar');
+  var roState    = document.getElementById('roState');
 
-  var roBlur = document.getElementById('roBlur');
-  var roDown = document.getElementById('roDown');
-  var roUp   = document.getElementById('roUp');
-  var roDownBar = document.getElementById('roDownBar');
-  var roUpBar   = document.getElementById('roUpBar');
-  var roState = document.getElementById('roState');
+  roTotal.textContent = paragraphs.length;
 
-  /* Distances captured once at load and on resize */
-  var downMaxDistance = 1;
-  var upMaxDistance = 1;
-  var pivotCache = { down: 0, up: 0 };
+  /* ============================================================
+     Paragraph reveal (IntersectionObserver)
+     ============================================================ */
+  var revealObserver = null;
+  var pendingRevealTimers = [];
 
-  function measure() {
-    /* Down max: block centre at viewport bottom + half block height.
-       Equivalent to: block top = viewport bottom → block centre
-       distance from viewport centre. */
-    var vh = window.innerHeight;
-    var bodyH = bodyEl.offsetHeight;
-    downMaxDistance = vh / 2 + bodyH / 2;
-
-    /* Up max: block centre distance from viewport centre at the moment
-       the 2nd-last paragraph's top crosses the viewport top.
-       At that instant:
-         secondLastP.getBoundingClientRect().top === 0
-       and blockCentre lies at:
-         (blockTop + bodyH/2)
-       where blockTop = -(secondLastP offset within bodyEl)
-       so distance from viewport centre =
-         viewportCentre - blockCentre = vh/2 + offset - bodyH/2 */
-    var secondLastOffset = 0;
-    var n = secondLastP;
-    while (n && n !== bodyEl) {
-      secondLastOffset += n.offsetTop;
-      n = n.offsetParent;
-      if (!n) break;
-      if (n === bodyEl) break;
-    }
-    /* Simpler: use DOM offsets directly */
-    var offset = secondLastP.offsetTop;
-    upMaxDistance = vh / 2 + offset - bodyH / 2;
-    if (upMaxDistance < 40) upMaxDistance = 40;   /* safety floor */
+  function readRevealSettings() {
+    return {
+      stagger:    parseInt(staggerEl.value, 10),
+      duration:   parseInt(durationEl.value, 10),
+      rise:       parseInt(riseEl.value, 10),
+      threshold:  parseInt(thresholdEl.value, 10) / 100,
+      rootMargin: rootMarginEl.value + '%',
+      easing:     revealEaseEl.value
+    };
   }
 
-  function applyEasing(t) {
-    /* t is 0..1 */
-    var mode = easingEl.value;
+  function applyRevealCSS(s) {
+    bodyEl.style.setProperty('--reveal-dur', s.duration + 'ms');
+    bodyEl.style.setProperty('--rise', s.rise + 'px');
+    bodyEl.style.setProperty('--reveal-ease', s.easing);
+  }
+
+  function buildRevealObserver(s) {
+    if (revealObserver) revealObserver.disconnect();
+    revealObserver = new IntersectionObserver(function(entries) {
+      var entering = [];
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting && !entry.target.classList.contains('revealed')) {
+          entering.push(entry.target);
+        }
+      });
+      entering.sort(function(a, b) {
+        return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+      entering.forEach(function(el, i) {
+        if (s.stagger > 0 && entering.length > 1) {
+          var id = setTimeout(function() { el.classList.add('revealed'); }, i * s.stagger);
+          pendingRevealTimers.push(id);
+        } else {
+          el.classList.add('revealed');
+        }
+      });
+    }, {
+      threshold: s.threshold,
+      rootMargin: '0px 0px ' + s.rootMargin + ' 0px'
+    });
+    paragraphs.forEach(function(p) { revealObserver.observe(p); });
+  }
+
+  function resetReveal() {
+    pendingRevealTimers.forEach(function(id) { clearTimeout(id); });
+    pendingRevealTimers = [];
+    paragraphs.forEach(function(p) { p.classList.remove('revealed'); });
+    buildRevealObserver(readRevealSettings());
+  }
+
+  /* ============================================================
+     Blur (scroll-driven, whole-block filter)
+     ============================================================ */
+  var downMaxDistance = 1;
+  var upMaxDistance = 1;
+
+  function measureBlurDistances() {
+    var vh = window.innerHeight;
+    var bodyH = bodyEl.offsetHeight;
+
+    /* Down: block top at viewport bottom → block centre distance from pivot */
+    downMaxDistance = Math.max(40, vh / 2 + bodyH / 2);
+
+    /* Up: 2nd-last paragraph top at viewport top.
+       bodyEl is position:relative → secondLastP.offsetTop is measured
+       from bodyEl's top edge. */
+    var offset = secondLastP.offsetTop;
+    upMaxDistance = Math.max(40, vh / 2 + offset - bodyH / 2);
+  }
+
+  function applyBlurEasing(t) {
+    var mode = blurEaseEl.value;
     if (mode === 'linear') return t;
     if (mode === 'easeOut') return 1 - Math.pow(1 - t, 2);
-    if (mode === 'easeIn')  return t * t;
-    if (mode === 'smooth')  return 0.5 - 0.5 * Math.cos(Math.PI * t);
+    if (mode === 'easeIn') return t * t;
+    if (mode === 'smooth') return 0.5 - 0.5 * Math.cos(Math.PI * t);
     return t;
   }
 
-  function update() {
+  function updateBlur() {
     var maxBlur = parseFloat(maxBlurEl.value);
     var vh = window.innerHeight;
     var vc = vh / 2;
 
     var rect = bodyEl.getBoundingClientRect();
     var bodyCentre = rect.top + rect.height / 2;
+    var d = bodyCentre - vc;
 
-    var d = bodyCentre - vc;   /* positive = below pivot, negative = above */
-    var progress, state;
+    var blurVal, progress, state;
 
     if (d >= 0) {
-      /* Below pivot — blur ramps up as block descends */
       progress = Math.min(1, d / downMaxDistance);
+      blurVal = maxBlur * applyBlurEasing(progress);
       state = 'below pivot';
-      var blur = maxBlur * applyEasing(progress);
-      bodyEl.style.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
-      roBlur.textContent = blur.toFixed(1);
       roDown.textContent = Math.round(progress * 100) + '%';
       roUp.textContent = '0%';
       roDownBar.style.width = (progress * 100) + '%';
       roUpBar.style.width = '0%';
     } else {
-      /* Above pivot — blur ramps up as block rises */
       progress = Math.min(1, -d / upMaxDistance);
+      blurVal = maxBlur * applyBlurEasing(progress);
       state = 'above pivot';
-      var blur2 = maxBlur * applyEasing(progress);
-      bodyEl.style.filter = blur2 > 0.05 ? 'blur(' + blur2.toFixed(2) + 'px)' : 'none';
-      roBlur.textContent = blur2.toFixed(1);
       roDown.textContent = '0%';
       roUp.textContent = Math.round(progress * 100) + '%';
       roDownBar.style.width = '0%';
       roUpBar.style.width = (progress * 100) + '%';
     }
 
+    bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
+    roBlur.textContent = blurVal.toFixed(1);
     roState.textContent = state;
-
-    /* Live-update the top reference line — align it to the current
-       viewport-top position, so it stays meaningful as the block moves.
-       The dashed line itself stays at y=0; its label just says "top". */
   }
 
+  /* ============================================================
+     Scroll orchestration
+     ============================================================ */
   var rafPending = false;
   function scheduleUpdate() {
     if (rafPending) return;
     rafPending = true;
     requestAnimationFrame(function() {
       rafPending = false;
-      update();
+      updateBlur();
+      updateRevealCount();
     });
   }
 
-  window.addEventListener('scroll', scheduleUpdate, { passive: true });
-  window.addEventListener('resize', function() {
-    measure();
-    scheduleUpdate();
+  function updateRevealCount() {
+    var n = 0;
+    paragraphs.forEach(function(p) {
+      if (p.classList.contains('revealed')) n++;
+    });
+    roRevealed.textContent = n;
+  }
+
+  /* ============================================================
+     Wiring — reveal controls
+     ============================================================ */
+  function updateRevealReadouts() {
+    staggerV.textContent    = staggerEl.value + ' ms';
+    durationV.textContent   = durationEl.value + ' ms';
+    riseV.textContent       = riseEl.value + ' px';
+    thresholdV.textContent  = thresholdEl.value + ' %';
+    rootMarginV.textContent = rootMarginEl.value + ' %';
+  }
+
+  [staggerEl, durationEl, riseEl, thresholdEl, rootMarginEl].forEach(function(el) {
+    el.addEventListener('input', function() {
+      updateRevealReadouts();
+      applyRevealCSS(readRevealSettings());
+    });
+    el.addEventListener('change', function() {
+      /* Rebuild observer on release so we don't thrash while dragging */
+      buildRevealObserver(readRevealSettings());
+    });
   });
 
+  revealEaseEl.addEventListener('change', function() {
+    applyRevealCSS(readRevealSettings());
+  });
+
+  /* ============================================================
+     Wiring — blur controls
+     ============================================================ */
   maxBlurEl.addEventListener('input', function() {
     maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
     scheduleUpdate();
   });
 
-  easingEl.addEventListener('change', scheduleUpdate);
+  blurEaseEl.addEventListener('change', scheduleUpdate);
 
   showRefsEl.addEventListener('change', function() {
     var show = showRefsEl.checked;
@@ -398,17 +585,50 @@
     refTop.style.display = show ? '' : 'none';
   });
 
-  /* Boot */
-  measure();
-  update();
-  /* Re-measure once fonts/layout settle */
+  resetBtn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    resetReveal();
+    requestAnimationFrame(function() {
+      measureBlurDistances();
+      scheduleUpdate();
+    });
+  });
+
+  /* ============================================================
+     Global listeners
+     ============================================================ */
+  window.addEventListener('scroll', scheduleUpdate, { passive: true });
+
+  window.addEventListener('resize', function() {
+    measureBlurDistances();
+    scheduleUpdate();
+  });
+
+  /* ============================================================
+     Boot
+     ============================================================ */
+  updateRevealReadouts();
+  maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
+
+  applyRevealCSS(readRevealSettings());
+  buildRevealObserver(readRevealSettings());
+
+  /* Measure after layout settles */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      measureBlurDistances();
+      updateBlur();
+      updateRevealCount();
+    });
+  });
+
   window.addEventListener('load', function() {
-    measure();
+    measureBlurDistances();
     scheduleUpdate();
   });
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function() {
-      measure();
+      measureBlurDistances();
       scheduleUpdate();
     });
   }
