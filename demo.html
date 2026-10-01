@@ -3,16 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reveal + Blur — Combined Demo</title>
+<title>Blur + Vertical Scale — Demo</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
-    --bg-base:       #fdf3d8;
     --accent:        #c9600a;
     --text-dark:     #231304;
-    --text-med:      #3d2410;
     --text-mute:     #5a3818;
-    --text-faint:    #7a5028;
     --border:        #e8c88a;
     --transition-head-color: #fdf0c8;
   }
@@ -24,9 +21,7 @@
     background: var(--bg-page);
   }
 
-  /* ============================================================
-     Controls
-     ============================================================ */
+  /* Controls */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
@@ -35,29 +30,15 @@
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
     padding: 10px 16px;
     font-family: -apple-system, sans-serif;
-    font-size: 11px; color: var(--text-med);
-    max-height: 42vh;
-    overflow-y: auto;
+    font-size: 11px; color: var(--text-dark);
   }
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-    gap: 6px 14px;
-    max-width: 1100px;
-    margin: 0 auto;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px 16px;
+    max-width: 1100px; margin: 0 auto;
   }
-  .section-label {
-    grid-column: 1 / -1;
-    font-family: -apple-system, sans-serif;
-    font-size: 10px;
-    letter-spacing: 3px;
-    color: var(--accent);
-    font-weight: 700;
-    margin-top: 4px;
-    margin-bottom: -2px;
-    opacity: 0.85;
-  }
-  .ctrl { display: flex; align-items: center; gap: 6px; }
+  .ctrl { display: flex; align-items: center; gap: 8px; }
   .ctrl label {
     flex: 1; color: var(--text-mute);
     letter-spacing: 1px; font-weight: 600;
@@ -68,44 +49,25 @@
     flex: 1; font-family: inherit; font-size: 10.5px;
     padding: 3px 5px;
     border: 1px solid var(--border);
-    background: #fff; color: var(--text-med);
+    background: #fff; color: var(--text-dark);
     border-radius: 5px;
   }
   .ctrl .readout {
     font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 10px; color: var(--text-mute);
-    min-width: 48px; text-align: right;
+    min-width: 52px; text-align: right;
   }
-  .ctrl.actions {
-    grid-column: 1 / -1;
-    justify-content: center;
-    padding-top: 2px;
-  }
-  .ctrl.actions button {
-    font-family: inherit; font-size: 10.5px;
-    letter-spacing: 1px; padding: 4px 12px;
-    border: 1px solid var(--border);
-    background: #fff; color: var(--text-med);
-    border-radius: 12px; cursor: pointer;
-  }
-  .ctrl.actions button:hover { border-color: var(--accent); }
 
-  /* ============================================================
-     Demo body
-     ============================================================ */
+  /* Demo body */
   .demo {
-    padding: 400px 20px 160px 20px;
-    max-width: 620px;
-    margin: 0 auto;
+    padding: 500px 20px 160px 20px;
+    max-width: 620px; margin: 0 auto;
   }
-
   .spacer-note {
     text-align: center;
     font-family: -apple-system, sans-serif;
-    font-size: 11px;
-    letter-spacing: 2px;
-    color: var(--text-mute);
-    opacity: 0.55;
+    font-size: 11px; letter-spacing: 2px;
+    color: var(--text-mute); opacity: 0.55;
     margin: 60px 0;
   }
 
@@ -122,13 +84,9 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-
   .transition-line-divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 0 0 20px 0;
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; margin: 0 0 20px 0;
   }
   .transition-line-mark {
     flex-shrink: 0; font-size: 1.1em; line-height: 1;
@@ -145,178 +103,93 @@
     letter-spacing: 5px; white-space: nowrap;
   }
 
-  /* Blur target */
+  /* Blur + vertical scale target */
   .transition-line-body {
     position: relative;
-    will-change: filter;
+    will-change: filter, transform;
   }
-
-  /* Per-paragraph reveal */
   .transition-line-body p {
     margin: 0 0 0.9em 0;
-    opacity: 0;
-    transform: translateY(var(--rise, 30px));
-    transition-property: opacity, transform;
-    transition-duration: var(--reveal-dur, 750ms), var(--reveal-dur, 750ms);
-    transition-timing-function: ease, var(--reveal-ease, cubic-bezier(0.34, 1.56, 0.64, 1));
-    will-change: opacity, transform;
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
-  .transition-line-body p.revealed {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .transition-line-body p {
-      opacity: 1;
-      transform: none;
-      transition: none;
-    }
-    .transition-line-body { filter: none !important; }
-  }
 
   /* Reference lines */
   .ref-line {
     position: fixed; left: 0; right: 0;
     height: 0;
     border-top: 1px dashed rgba(201, 96, 10, 0.55);
-    pointer-events: none;
-    z-index: 90;
+    pointer-events: none; z-index: 90;
   }
   .ref-line::after {
     content: attr(data-label);
-    position: absolute;
-    right: 8px;
-    top: 3px;
+    position: absolute; right: 8px; top: 3px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 10px;
-    color: var(--accent);
+    font-size: 10px; color: var(--accent);
     background: rgba(253, 243, 216, 0.9);
-    padding: 1px 5px;
-    border-radius: 4px;
+    padding: 1px 5px; border-radius: 4px;
   }
   .ref-line.mid { top: 50vh; }
-  .ref-line.top { top: 0; }
 
-  /* ============================================================
-     Readout bar
-     ============================================================ */
+  /* Readout */
   .readout-bar {
     position: fixed; bottom: 8px; left: 12px; right: 12px;
     z-index: 100;
-    display: flex; justify-content: center; flex-wrap: wrap; gap: 16px;
+    display: flex; justify-content: center; flex-wrap: wrap; gap: 14px;
     font-family: ui-monospace, Menlo, Consolas, monospace;
     font-size: 11px; color: var(--text-mute);
     background: rgba(253, 243, 216, 0.94);
     padding: 7px 16px; border-radius: 20px;
     pointer-events: none; user-select: none;
-    max-width: 840px; margin: 0 auto;
+    max-width: 780px; margin: 0 auto;
   }
   .readout-bar b { color: var(--accent); font-weight: 700; }
-  .readout-bar .divider {
-    color: rgba(90, 56, 24, 0.35);
-  }
-  .meter {
-    display: inline-flex; align-items: center; gap: 6px;
-  }
-  .meter .bar {
-    width: 50px; height: 6px;
-    background: rgba(201, 96, 10, 0.15);
-    border-radius: 3px;
-    overflow: hidden;
-    display: inline-block;
-  }
-  .meter .bar > span {
-    display: block; height: 100%;
-    background: var(--accent);
-    width: 0%;
-    transition: width 0.05s linear;
-  }
+  .readout-bar .divider { color: rgba(90, 56, 24, 0.35); }
 </style>
 </head>
 <body>
 
 <div class="controls">
   <div class="controls-grid">
-
-    <div class="section-label">PARAGRAPH REVEAL</div>
-
-    <div class="ctrl">
-      <label>Stagger</label>
-      <input type="range" id="stagger" min="0" max="400" step="10" value="200">
-      <span class="readout" id="staggerV">200 ms</span>
-    </div>
-    <div class="ctrl">
-      <label>Duration</label>
-      <input type="range" id="duration" min="200" max="2000" step="50" value="750">
-      <span class="readout" id="durationV">750 ms</span>
-    </div>
-    <div class="ctrl">
-      <label>Rise</label>
-      <input type="range" id="rise" min="0" max="80" step="2" value="30">
-      <span class="readout" id="riseV">30 px</span>
-    </div>
-    <div class="ctrl">
-      <label>Threshold</label>
-      <input type="range" id="threshold" min="0" max="80" step="5" value="20">
-      <span class="readout" id="thresholdV">20 %</span>
-    </div>
-    <div class="ctrl">
-      <label>Bottom margin</label>
-      <input type="range" id="rootMargin" min="-40" max="0" step="2" value="-8">
-      <span class="readout" id="rootMarginV">-8 %</span>
-    </div>
-    <div class="ctrl">
-      <label>Reveal easing</label>
-      <select id="revealEase">
-        <option value="cubic-bezier(0.34, 1.56, 0.64, 1)" selected>overshoot</option>
-        <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out (no bounce)</option>
-        <option value="ease-out">linear ease-out</option>
-      </select>
-    </div>
-
-    <div class="section-label">BLUR</div>
-
     <div class="ctrl">
       <label>Max blur</label>
       <input type="range" id="maxBlur" min="0" max="20" step="0.5" value="6">
       <span class="readout" id="maxBlurV">6.0 px</span>
     </div>
     <div class="ctrl">
-      <label>Blur easing</label>
-      <select id="blurEase">
-        <option value="linear" selected>linear</option>
-        <option value="easeOut">ease-out (fast then slow)</option>
-        <option value="easeIn">ease-in (slow then fast)</option>
-        <option value="smooth">smooth (sine)</option>
+      <label>Max scaleY</label>
+      <input type="range" id="maxScale" min="1.00" max="1.40" step="0.01" value="1.10">
+      <span class="readout" id="maxScaleV">1.10</span>
+    </div>
+    <div class="ctrl">
+      <label>Origin</label>
+      <select id="origin">
+        <option value="50% 50%" selected>center</option>
+        <option value="50% 100%">bottom</option>
+        <option value="50% 0%">top</option>
       </select>
     </div>
-
-    <div class="ctrl actions">
-      <button id="resetBtn">Reset scroll + reveal</button>
-      <label style="flex:0; letter-spacing:0; padding-left:10px;">
-        <input type="checkbox" id="showRefs" checked style="accent-color:var(--accent);">
-        Reference lines
-      </label>
+    <div class="ctrl">
+      <label>Scale easing</label>
+      <select id="scaleEase">
+        <option value="linear" selected>linear (matches blur)</option>
+        <option value="easeOut">ease-out</option>
+        <option value="easeIn">ease-in</option>
+      </select>
     </div>
-
   </div>
 </div>
 
-<div class="ref-line mid" id="refMid" data-label="pivot (0% blur)"></div>
-<div class="ref-line top" id="refTop" data-label="top trigger (100% blur)"></div>
+<div class="ref-line mid" data-label="pivot · 0% blur · max scaleY"></div>
 
 <div class="demo">
-
-  <div class="spacer-note">↓ SCROLL DOWN — WATCH BOTH EFFECTS ↓</div>
+  <div class="spacer-note">↓ SCROLL — TEXT SHRINKS AND BLURS ↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
 
-  <div class="transition-line" id="transitionLine">
+  <div class="transition-line">
     <div class="transition-line-divider">
       <span class="transition-line-mark">❀</span>
       <span class="transition-line-rule"></span>
@@ -333,23 +206,20 @@
     </div>
   </div>
 
-  <div class="spacer-note">↓ KEEP SCROLLING — BLOCK BLURS AS IT RISES ↓</div>
+  <div class="spacer-note">↓ KEEP SCROLLING ↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
   <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↑ SCROLL BACK UP — BLUR REVERSES, REVEAL STAYS ↑</div>
-
+  <div class="spacer-note">↑ SCROLL BACK UP TO REVERSE ↑</div>
 </div>
 
 <div class="readout-bar">
-  <span>revealed <b id="roRevealed">0</b>/<b id="roTotal">5</b></span>
-  <span class="divider">·</span>
   <span>blur <b id="roBlur">0.0</b> px</span>
   <span class="divider">·</span>
-  <span class="meter">down <span class="bar"><span id="roDownBar"></span></span> <b id="roDown">0%</b></span>
-  <span class="meter">up <span class="bar"><span id="roUpBar"></span></span> <b id="roUp">0%</b></span>
+  <span>scaleY <b id="roScale">1.00</b></span>
+  <span class="divider">·</span>
+  <span>progress <b id="roProg">0%</b></span>
   <span class="divider">·</span>
   <span>state <b id="roState">—</b></span>
 </div>
@@ -358,137 +228,44 @@
 (function() {
   'use strict';
 
-  /* ============================================================
-     DOM refs
-     ============================================================ */
   var bodyEl = document.getElementById('transitionLineBody');
-  var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
+  var paragraphs = bodyEl.querySelectorAll('p');
   var secondLastP = paragraphs[paragraphs.length - 2];
 
-  /* Reveal controls */
-  var staggerEl    = document.getElementById('stagger');
-  var durationEl   = document.getElementById('duration');
-  var riseEl       = document.getElementById('rise');
-  var thresholdEl  = document.getElementById('threshold');
-  var rootMarginEl = document.getElementById('rootMargin');
-  var revealEaseEl = document.getElementById('revealEase');
-  var staggerV     = document.getElementById('staggerV');
-  var durationV    = document.getElementById('durationV');
-  var riseV        = document.getElementById('riseV');
-  var thresholdV   = document.getElementById('thresholdV');
-  var rootMarginV  = document.getElementById('rootMarginV');
+  var maxBlurEl   = document.getElementById('maxBlur');
+  var maxScaleEl  = document.getElementById('maxScale');
+  var originEl    = document.getElementById('origin');
+  var scaleEaseEl = document.getElementById('scaleEase');
+  var maxBlurV    = document.getElementById('maxBlurV');
+  var maxScaleV   = document.getElementById('maxScaleV');
 
-  /* Blur controls */
-  var maxBlurEl  = document.getElementById('maxBlur');
-  var blurEaseEl = document.getElementById('blurEase');
-  var maxBlurV   = document.getElementById('maxBlurV');
+  var roBlur  = document.getElementById('roBlur');
+  var roScale = document.getElementById('roScale');
+  var roProg  = document.getElementById('roProg');
+  var roState = document.getElementById('roState');
 
-  /* Shared */
-  var showRefsEl = document.getElementById('showRefs');
-  var resetBtn   = document.getElementById('resetBtn');
-  var refMid     = document.getElementById('refMid');
-  var refTop     = document.getElementById('refTop');
-
-  /* Readout */
-  var roRevealed = document.getElementById('roRevealed');
-  var roTotal    = document.getElementById('roTotal');
-  var roBlur     = document.getElementById('roBlur');
-  var roDown     = document.getElementById('roDown');
-  var roUp       = document.getElementById('roUp');
-  var roDownBar  = document.getElementById('roDownBar');
-  var roUpBar    = document.getElementById('roUpBar');
-  var roState    = document.getElementById('roState');
-
-  roTotal.textContent = paragraphs.length;
-
-  /* ============================================================
-     Paragraph reveal (IntersectionObserver)
-     ============================================================ */
-  var revealObserver = null;
-  var pendingRevealTimers = [];
-
-  function readRevealSettings() {
-    return {
-      stagger:    parseInt(staggerEl.value, 10),
-      duration:   parseInt(durationEl.value, 10),
-      rise:       parseInt(riseEl.value, 10),
-      threshold:  parseInt(thresholdEl.value, 10) / 100,
-      rootMargin: rootMarginEl.value + '%',
-      easing:     revealEaseEl.value
-    };
-  }
-
-  function applyRevealCSS(s) {
-    bodyEl.style.setProperty('--reveal-dur', s.duration + 'ms');
-    bodyEl.style.setProperty('--rise', s.rise + 'px');
-    bodyEl.style.setProperty('--reveal-ease', s.easing);
-  }
-
-  function buildRevealObserver(s) {
-    if (revealObserver) revealObserver.disconnect();
-    revealObserver = new IntersectionObserver(function(entries) {
-      var entering = [];
-      entries.forEach(function(entry) {
-        if (entry.isIntersecting && !entry.target.classList.contains('revealed')) {
-          entering.push(entry.target);
-        }
-      });
-      entering.sort(function(a, b) {
-        return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-      });
-      entering.forEach(function(el, i) {
-        if (s.stagger > 0 && entering.length > 1) {
-          var id = setTimeout(function() { el.classList.add('revealed'); }, i * s.stagger);
-          pendingRevealTimers.push(id);
-        } else {
-          el.classList.add('revealed');
-        }
-      });
-    }, {
-      threshold: s.threshold,
-      rootMargin: '0px 0px ' + s.rootMargin + ' 0px'
-    });
-    paragraphs.forEach(function(p) { revealObserver.observe(p); });
-  }
-
-  function resetReveal() {
-    pendingRevealTimers.forEach(function(id) { clearTimeout(id); });
-    pendingRevealTimers = [];
-    paragraphs.forEach(function(p) { p.classList.remove('revealed'); });
-    buildRevealObserver(readRevealSettings());
-  }
-
-  /* ============================================================
-     Blur (scroll-driven, whole-block filter)
-     ============================================================ */
   var downMaxDistance = 1;
   var upMaxDistance = 1;
 
-  function measureBlurDistances() {
+  function measure() {
     var vh = window.innerHeight;
     var bodyH = bodyEl.offsetHeight;
-
-    /* Down: block top at viewport bottom → block centre distance from pivot */
     downMaxDistance = Math.max(40, vh / 2 + bodyH / 2);
-
-    /* Up: 2nd-last paragraph top at viewport top.
-       bodyEl is position:relative → secondLastP.offsetTop is measured
-       from bodyEl's top edge. */
     var offset = secondLastP.offsetTop;
     upMaxDistance = Math.max(40, vh / 2 + offset - bodyH / 2);
   }
 
-  function applyBlurEasing(t) {
-    var mode = blurEaseEl.value;
+  function ease(t) {
+    var mode = scaleEaseEl.value;
     if (mode === 'linear') return t;
     if (mode === 'easeOut') return 1 - Math.pow(1 - t, 2);
     if (mode === 'easeIn') return t * t;
-    if (mode === 'smooth') return 0.5 - 0.5 * Math.cos(Math.PI * t);
     return t;
   }
 
-  function updateBlur() {
+  function update() {
     var maxBlur = parseFloat(maxBlurEl.value);
+    var maxScale = parseFloat(maxScaleEl.value);
     var vh = window.innerHeight;
     var vc = vh / 2;
 
@@ -496,141 +273,59 @@
     var bodyCentre = rect.top + rect.height / 2;
     var d = bodyCentre - vc;
 
-    var blurVal, progress, state;
-
+    var progress, state;
     if (d >= 0) {
       progress = Math.min(1, d / downMaxDistance);
-      blurVal = maxBlur * applyBlurEasing(progress);
       state = 'below pivot';
-      roDown.textContent = Math.round(progress * 100) + '%';
-      roUp.textContent = '0%';
-      roDownBar.style.width = (progress * 100) + '%';
-      roUpBar.style.width = '0%';
     } else {
       progress = Math.min(1, -d / upMaxDistance);
-      blurVal = maxBlur * applyBlurEasing(progress);
       state = 'above pivot';
-      roDown.textContent = '0%';
-      roUp.textContent = Math.round(progress * 100) + '%';
-      roDownBar.style.width = '0%';
-      roUpBar.style.width = (progress * 100) + '%';
     }
 
+    /* Blur: 0 at pivot, ramps to max at the far end (linear per your choice) */
+    var blurVal = maxBlur * progress;
+
+    /* Scale: inverse of blur — 1.00 at far end (max blur),
+       maxScale at pivot (0 blur). Uses the chosen scale easing. */
+    var eased = ease(progress);
+    var scaleVal = maxScale - (maxScale - 1) * eased;
+
     bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
-    roBlur.textContent = blurVal.toFixed(1);
+    bodyEl.style.transformOrigin = originEl.value;
+    bodyEl.style.transform = scaleVal < 0.999 ? 'scaleY(' + scaleVal.toFixed(4) + ')' : '';
+
+    roBlur.textContent  = blurVal.toFixed(1);
+    roScale.textContent = scaleVal.toFixed(3);
+    roProg.textContent  = Math.round(progress * 100) + '%';
     roState.textContent = state;
   }
 
-  /* ============================================================
-     Scroll orchestration
-     ============================================================ */
   var rafPending = false;
-  function scheduleUpdate() {
+  function schedule() {
     if (rafPending) return;
     rafPending = true;
-    requestAnimationFrame(function() {
-      rafPending = false;
-      updateBlur();
-      updateRevealCount();
-    });
+    requestAnimationFrame(function() { rafPending = false; update(); });
   }
 
-  function updateRevealCount() {
-    var n = 0;
-    paragraphs.forEach(function(p) {
-      if (p.classList.contains('revealed')) n++;
-    });
-    roRevealed.textContent = n;
-  }
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', function() { measure(); schedule(); });
 
-  /* ============================================================
-     Wiring — reveal controls
-     ============================================================ */
-  function updateRevealReadouts() {
-    staggerV.textContent    = staggerEl.value + ' ms';
-    durationV.textContent   = durationEl.value + ' ms';
-    riseV.textContent       = riseEl.value + ' px';
-    thresholdV.textContent  = thresholdEl.value + ' %';
-    rootMarginV.textContent = rootMarginEl.value + ' %';
-  }
-
-  [staggerEl, durationEl, riseEl, thresholdEl, rootMarginEl].forEach(function(el) {
-    el.addEventListener('input', function() {
-      updateRevealReadouts();
-      applyRevealCSS(readRevealSettings());
-    });
-    el.addEventListener('change', function() {
-      /* Rebuild observer on release so we don't thrash while dragging */
-      buildRevealObserver(readRevealSettings());
-    });
-  });
-
-  revealEaseEl.addEventListener('change', function() {
-    applyRevealCSS(readRevealSettings());
-  });
-
-  /* ============================================================
-     Wiring — blur controls
-     ============================================================ */
   maxBlurEl.addEventListener('input', function() {
     maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
-    scheduleUpdate();
+    schedule();
   });
-
-  blurEaseEl.addEventListener('change', scheduleUpdate);
-
-  showRefsEl.addEventListener('change', function() {
-    var show = showRefsEl.checked;
-    refMid.style.display = show ? '' : 'none';
-    refTop.style.display = show ? '' : 'none';
+  maxScaleEl.addEventListener('input', function() {
+    maxScaleV.textContent = parseFloat(maxScaleEl.value).toFixed(2);
+    schedule();
   });
+  originEl.addEventListener('change', schedule);
+  scaleEaseEl.addEventListener('change', schedule);
 
-  resetBtn.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    resetReveal();
-    requestAnimationFrame(function() {
-      measureBlurDistances();
-      scheduleUpdate();
-    });
-  });
-
-  /* ============================================================
-     Global listeners
-     ============================================================ */
-  window.addEventListener('scroll', scheduleUpdate, { passive: true });
-
-  window.addEventListener('resize', function() {
-    measureBlurDistances();
-    scheduleUpdate();
-  });
-
-  /* ============================================================
-     Boot
-     ============================================================ */
-  updateRevealReadouts();
-  maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
-
-  applyRevealCSS(readRevealSettings());
-  buildRevealObserver(readRevealSettings());
-
-  /* Measure after layout settles */
-  requestAnimationFrame(function() {
-    requestAnimationFrame(function() {
-      measureBlurDistances();
-      updateBlur();
-      updateRevealCount();
-    });
-  });
-
-  window.addEventListener('load', function() {
-    measureBlurDistances();
-    scheduleUpdate();
-  });
+  measure();
+  update();
+  window.addEventListener('load', function() { measure(); schedule(); });
   if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function() {
-      measureBlurDistances();
-      scheduleUpdate();
-    });
+    document.fonts.ready.then(function() { measure(); schedule(); });
   }
 
 })();
