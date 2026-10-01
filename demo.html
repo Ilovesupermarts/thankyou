@@ -3,17 +3,26 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Washi JPG — Crop Test Harness</title>
+<title>Receipt Landing + Digit Roll — Mockup</title>
 <style>
   :root {
-    --bg-page:   #f5d89a;
-    --bg-card:   #fdf3d8;
-    --accent:    #c9600a;
-    --text-dark: #231304;
-    --text-med:  #3d2410;
-    --text-mute: #5a3818;
-    --border:    #e8c88a;
+    --bg-page:       #f5d89a;
+    --bg-card:       #fdf3d8;
+    --accent:        #c9600a;
+    --accent-2:      #8f3f12;
+    --accent-3:      #7a3208;
+    --text-dark:     #231304;
+    --text-med:      #3d2410;
+    --text-mute:     #5a3818;
+    --text-faint:    #7a5028;
+    --border:        #e8c88a;
+    --border-soft:   #f0d8a0;
+    --shadow-warm:   rgba(120, 70, 20, 0.14);
+    --shadow-warm-2: rgba(120, 70, 20, 0.28);
+    --glow:          #f7b93c;
+    --digit-h:       56px;
   }
+
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; min-height: 100vh;
@@ -21,419 +30,459 @@
     color: var(--text-dark);
     background: var(--bg-page);
   }
-  .page { max-width: 1180px; margin: 0 auto; padding: 32px 24px 96px 24px; }
 
-  h1 { font-size: 17px; letter-spacing: 4px; color: var(--accent); font-weight: 600; margin: 0 0 6px 0; }
-  .sub { font-size: 12px; letter-spacing: 2px; color: var(--text-mute); margin: 0 0 28px 0; }
+  .stage {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    padding: 32px 20px 80px 20px;
+    perspective: 1400px;
+    perspective-origin: 50% 60%;
+  }
 
-  /* ---- Control panel ---- */
+  /* ---------- Controls ---------- */
   .controls {
-    display: flex; flex-wrap: wrap; gap: 18px 26px;
-    padding: 16px 18px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    margin-bottom: 32px;
+    display: flex;
+    gap: 10px;
+    margin-bottom: 40px;
     font-family: -apple-system, sans-serif;
-    font-size: 12px;
-    letter-spacing: 0.4px;
-    color: var(--text-med);
   }
-  .ctrl-group { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .ctrl-group label { color: var(--text-mute); letter-spacing: 1.5px; font-weight: 600; }
-  .ctrl-group button {
-    font-family: inherit; font-size: 12px;
-    padding: 6px 12px;
+  .controls button {
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 1px;
+    padding: 9px 16px;
     border: 1px solid var(--border);
-    background: #fff;
+    background: rgba(255, 255, 255, 0.75);
     color: var(--text-med);
-    border-radius: 14px;
+    border-radius: 20px;
     cursor: pointer;
-    transition: background 0.15s, color 0.15s, border-color 0.15s;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
   }
-  .ctrl-group button:hover { border-color: var(--accent); }
-  .ctrl-group button.active {
-    background: var(--accent); color: #fff; border-color: var(--accent);
-  }
-  .ctrl-group input[type="range"] { width: 140px; }
-  .ctrl-group .readout {
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 11px; color: var(--text-mute);
-    min-width: 66px; display: inline-block;
-  }
+  .controls button:hover { border-color: var(--accent); }
+  .controls button:active { transform: scale(0.97); background: #fff; }
 
-  /* ---- Cards ---- */
-  .samples {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 34px;
-  }
-  @media (min-width: 820px) {
-    .samples { grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); align-items: start; }
-  }
-
-  .label {
-    font-size: 11px; letter-spacing: 3px; color: var(--text-mute);
-    margin: 0 0 6px 0;
-    font-family: -apple-system, sans-serif;
-  }
-  .hint {
-    font-size: 11px; letter-spacing: 1px; color: var(--text-mute);
-    margin: 0 0 12px 0; opacity: 0.75;
-    font-family: -apple-system, sans-serif;
-  }
-
-  .card {
-    border-radius: 16px;
-    border: 1px solid var(--border);
-    box-shadow: 0 4px 18px rgba(120, 70, 20, 0.08);
-    overflow: hidden;
-    background-color: var(--bg-card);
-
-    /* The JPG under test */
-    background-image: url('icons/1790835034553.jpg');
-
-    /* Defaults — overwritten by the control panel */
-    background-size: cover;
-    background-repeat: no-repeat;
-    background-position: center center;
-
-    position: relative;
-  }
-
-  /* Wide card — mimics #tableCard aspect */
-  .card-wide { padding: 18px 20px; }
-
-  /* Tall card — mimics .receipt-paper */
-  .card-tall { padding: 32px 26px 24px 26px; border-radius: 6px; }
-
-  /* Edge-guide overlay — shows where the source image boundary falls */
-  .edge-guide::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    border: 1px dashed rgba(201, 96, 10, 0.75);
-    pointer-events: none;
-    z-index: 5;
-  }
-
-  /* ---- Rows & content ---- */
-  .privacy {
-    margin: 0 0 14px 0;
-    padding: 12px 14px;
-    background: var(--privacy-bg, rgba(255, 255, 255, 0.6));
-    border-radius: 10px;
-    font-size: 12px;
-    line-height: 1.85;
-    color: var(--text-med);
-  }
-
-  .row {
-    display: flex; align-items: center; gap: 12px;
-    padding: 11px 10px;
-    border-bottom: 1px solid rgba(232, 200, 138, 0.55);
-  }
-  .row:last-child { border-bottom: none; }
-  .row.filled {
-    background: var(--filled-bg, rgba(255, 255, 255, 0.6));
-    border-left: 3px solid var(--accent);
+  /* ---------- Receipt ---------- */
+  .receipt-paper {
+    width: 100%;
+    max-width: 400px;
+    padding: 36px 30px 28px 30px;
     border-radius: 6px;
+
+    /* Washi surface — same recipe as the app */
+    background-color: var(--bg-card);
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+
+    border: 1px solid var(--border-soft);
+
+    /* Resting state: flat, tight shadow */
+    transform: rotateX(0deg) translateY(0) scale(1);
+    transform-origin: 50% 100%;
+    box-shadow:
+      0 12px 28px var(--shadow-warm),
+      0 4px 10px rgba(120, 70, 20, 0.08);
+
+    /* The landing animation runs when .landing is present.
+       Without it, the element sits in its resting state. */
   }
 
-  .check {
-    flex-shrink: 0; width: 24px; height: 24px; border-radius: 50%;
-    border: 1.5px solid var(--border);
-    background: rgba(255, 255, 255, 0.7);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--accent); font-size: 13px;
-  }
-  .check.on { border-color: var(--accent); }
-  .name { flex: 1; font-size: 14.5px; letter-spacing: 0.3px; }
-  .price {
-    flex-shrink: 0; padding: 5px 9px; border-radius: 8px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border);
-    color: var(--accent); font-weight: 700; font-size: 13.5px;
-    letter-spacing: 0.4px;
+  .receipt-paper.landing {
+    animation: paperLand 1000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
-  /* Receipt */
-  .receipt-header { text-align: center; margin-bottom: 18px; }
-  .receipt-title { font-size: 15px; font-weight: 600; color: var(--accent); letter-spacing: 1.5px; margin-bottom: 5px; }
-  .receipt-sub { font-size: 11.5px; color: var(--text-mute); letter-spacing: 0.5px; }
-  .receipt-to { text-align: center; font-size: 14px; font-weight: 700; color: var(--accent); letter-spacing: 2px; padding: 14px 0 4px 0; }
+  @keyframes paperLand {
+    0% {
+      opacity: 0;
+      transform: rotateX(14deg) translateY(-22px) scale(0.96);
+      box-shadow:
+        0 40px 80px var(--shadow-warm-2),
+        0 16px 32px rgba(120, 70, 20, 0.16);
+      filter: blur(1.5px);
+    }
+    25% {
+      opacity: 1;
+      filter: blur(0.4px);
+    }
+    70% {
+      transform: rotateX(-1.5deg) translateY(2px) scale(1.004);
+      box-shadow:
+        0 18px 36px rgba(120, 70, 20, 0.18),
+        0 6px 14px rgba(120, 70, 20, 0.10);
+      filter: blur(0);
+    }
+    100% {
+      opacity: 1;
+      transform: rotateX(0deg) translateY(0) scale(1);
+      box-shadow:
+        0 12px 28px var(--shadow-warm),
+        0 4px 10px rgba(120, 70, 20, 0.08);
+      filter: blur(0);
+    }
+  }
+
+  /* ---------- Receipt content ---------- */
+  .receipt-header { text-align: center; margin-bottom: 22px; }
+  .receipt-thanks {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--accent);
+    line-height: 1.9;
+    letter-spacing: 1px;
+    margin-bottom: 14px;
+  }
+  .receipt-subthanks {
+    font-size: 13px;
+    color: var(--text-mute);
+    line-height: 1.9;
+    letter-spacing: 0.5px;
+  }
+  .receipt-to-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 18px 8px 12px 8px;
+  }
+  .receipt-to-mark { font-size: 13px; color: var(--glow); }
+  .receipt-to-name {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
   .receipt-divider {
     height: 1px;
     background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
-    margin: 18px 0;
+    margin: 22px 0;
   }
-  .receipt-items { display: flex; flex-direction: column; gap: 10px; }
+  .receipt-title {
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 6px;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  .receipt-items {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
   .receipt-item {
-    display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    padding-bottom: 9px;
-    border-bottom: 1px dashed rgba(232, 200, 138, 0.7);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--border-soft);
   }
   .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .receipt-item-name { font-size: 13px; color: var(--text-med); }
-  .receipt-item-price {
-    flex-shrink: 0; padding: 4px 9px; border-radius: 8px;
-    background: var(--chip-bg, rgba(255, 255, 255, 0.6));
-    border: 1px solid var(--border);
-    color: var(--accent); font-weight: 700; font-size: 13px;
-    letter-spacing: 0.4px;
+  .receipt-item-name {
+    flex: 1;
+    font-size: 14px;
+    color: var(--text-med);
   }
-  .receipt-total {
-    display: flex; justify-content: space-between; align-items: baseline;
-    padding: 14px 4px; margin-top: 12px;
+  .receipt-item-price-wrap {
+    flex-shrink: 0;
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border-soft);
+    color: var(--accent);
+    font-weight: 600;
+    font-size: 14px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ---------- Total line with digit roll ---------- */
+  .receipt-total-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 18px 4px;
+    margin-top: 14px;
     border-top: 1.5px solid var(--border);
     border-bottom: 1.5px solid var(--border);
   }
-  .receipt-total-label { font-size: 15px; color: var(--text-mute); letter-spacing: 4px; }
-  .receipt-total-value { font-size: 17px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+  .receipt-total-label {
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-mute);
+    letter-spacing: 4px;
+    line-height: 1.2;
+  }
+  .receipt-total-value {
+    display: inline-flex;
+    align-items: baseline;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+    line-height: 1.2;
+    white-space: nowrap;
+    height: calc(var(--digit-h) * 0.6);
+    overflow: visible;
+  }
+  .receipt-total-value .yen-symbol {
+    font-size: 13px;
+    margin-right: 2px;
+    opacity: 0.8;
+    font-weight: 700;
+    line-height: var(--digit-h);
+    align-self: flex-start;
+    height: var(--digit-h);
+    display: inline-block;
+  }
 
-  /* When softening is toggled OFF, revert children to their current
-     solid app values so the "stickers on canvas" look is visible. */
-  body.no-softening {
-    --privacy-bg: #fdf5e0;
-    --filled-bg:  #fdf5e0;
-    --chip-bg:    #fdf5e0;
+  /* The digit-roll container */
+  .digit-roll {
+    display: inline-flex;
+    align-items: flex-start;
+    height: var(--digit-h);
+    font-size: 22px;
+    line-height: var(--digit-h);
+    overflow: hidden;
+  }
+
+  /* A single digit column */
+  .digit-col {
+    position: relative;
+    display: inline-block;
+    width: 0.62em;
+    height: var(--digit-h);
+    overflow: hidden;
+    vertical-align: top;
+  }
+
+  /* The vertical strip inside a column */
+  .digit-strip {
+    display: flex;
+    flex-direction: column;
+    transform: translateY(0);
+    transition: transform 750ms cubic-bezier(0.34, 1.15, 0.64, 1);
+    will-change: transform;
+  }
+
+  .digit {
+    display: block;
+    height: var(--digit-h);
+    line-height: var(--digit-h);
+    text-align: center;
+    font-weight: 700;
+    font-size: 22px;
+  }
+
+  /* Static separator (comma) between digit groups */
+  .digit-static {
+    display: inline-block;
+    height: var(--digit-h);
+    line-height: var(--digit-h);
+    width: 0.32em;
+    text-align: center;
+    font-weight: 700;
+    font-size: 22px;
+    vertical-align: top;
   }
 
   .demo-badge {
-    position: fixed; bottom: 6px; left: 10px;
+    position: fixed;
+    bottom: 8px;
+    left: 12px;
     font-family: -apple-system, sans-serif;
-    font-size: 10px; font-weight: 500; letter-spacing: 1px;
-    color: var(--text-mute); opacity: 0.55;
-    pointer-events: none; user-select: none;
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: var(--text-mute);
+    opacity: 0.55;
+    pointer-events: none;
+    user-select: none;
   }
 
-  .diag {
-    margin-top: 40px;
-    padding: 16px 18px;
-    background: rgba(255, 255, 255, 0.6);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 11.5px;
-    line-height: 1.8;
-    color: var(--text-med);
+  @media (min-width: 700px) {
+    :root { --digit-h: 62px; }
+    .receipt-paper { max-width: 460px; padding: 42px 42px 34px 42px; }
+    .receipt-thanks { font-size: 22px; }
+    .receipt-subthanks { font-size: 15px; }
+    .receipt-to-name { font-size: 22px; }
+    .receipt-title { font-size: 14px; letter-spacing: 9px; }
+    .receipt-item-name { font-size: 16px; }
+    .receipt-item-price-wrap { font-size: 16px; }
+    .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
+    .receipt-total-value { font-size: 26px; }
+    .receipt-total-value .yen-symbol { font-size: 15px; }
+    .digit-roll { font-size: 26px; }
+    .digit { font-size: 26px; }
+    .digit-static { font-size: 26px; }
   }
-  .diag b { color: var(--accent); }
 </style>
 </head>
 <body>
 
-<div class="page">
-
-  <h1>WASHI JPG · CROP TEST</h1>
-  <p class="sub">icons/1790835034553.jpg · 1024×1024</p>
+<div class="stage">
 
   <div class="controls">
-    <div class="ctrl-group">
-      <label>SIZE</label>
-      <button data-size="cover" class="active">cover</button>
-      <button data-size="contain">contain</button>
-      <button data-size="px">fixed px</button>
-    </div>
-    <div class="ctrl-group">
-      <label>POS</label>
-      <button data-pos="center center" class="active">center</button>
-      <button data-pos="bottom right">bottom right</button>
-      <button data-pos="top left">top left</button>
-    </div>
-    <div class="ctrl-group">
-      <label>REPEAT</label>
-      <button data-repeat="no-repeat" class="active">no-repeat</button>
-      <button data-repeat="repeat">repeat</button>
-    </div>
-    <div class="ctrl-group">
-      <label>PX</label>
-      <input type="range" id="pxSlider" min="150" max="1400" step="10" value="500">
-      <span class="readout" id="pxReadout">500 × 500</span>
-    </div>
-    <div class="ctrl-group">
-      <label>OVERLAYS</label>
-      <button id="softToggle" class="active">softened</button>
-      <button id="edgeToggle">edge guides</button>
-    </div>
+    <button id="replayLanding">Replay landing</button>
+    <button id="changeTotal">Change total</button>
   </div>
 
-  <div class="samples">
+  <div class="receipt-paper" id="paper">
 
-    <!-- Wide card -->
-    <div>
-      <div class="label">WIDE · like #tableCard</div>
-      <div class="hint">~3:1 aspect</div>
-      <div class="card card-wide" id="cardWide">
-        <div class="privacy">
-          なお、これからご覧いただく内容が、記録されたり、外部に送信されたりすることは一切ございません。どうぞご安心ください。
-        </div>
-        <div class="row filled"><div class="check on">❀</div><div class="name">ダミーテキスト1</div><div class="price">¥3,000</div></div>
-        <div class="row"><div class="check">❀</div><div class="name">ダミーテキスト2</div><div class="price">¥0</div></div>
-        <div class="row filled"><div class="check on">❀</div><div class="name">ダミーテキスト3</div><div class="price">¥5,000</div></div>
-        <div class="row"><div class="check">❀</div><div class="name">ダミーテキスト4</div><div class="price">¥0</div></div>
+    <div class="receipt-header">
+      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+    </div>
+
+    <div class="receipt-to-row">
+      <span class="receipt-to-mark">❀</span>
+      <span class="receipt-to-name">桜庭さんへ</span>
+      <span class="receipt-to-mark">❀</span>
+    </div>
+
+    <div class="receipt-divider"></div>
+
+    <div class="receipt-title">本日の内容</div>
+
+    <div class="receipt-items">
+      <div class="receipt-item">
+        <span class="receipt-item-name">ダミーテキスト1</span>
+        <span class="receipt-item-price-wrap">¥3,000</span>
+      </div>
+      <div class="receipt-item">
+        <span class="receipt-item-name">ダミーテキスト3</span>
+        <span class="receipt-item-price-wrap">¥5,000</span>
       </div>
     </div>
 
-    <!-- Tall card -->
-    <div>
-      <div class="label">TALL · like .receipt-paper</div>
-      <div class="hint">~0.63:1 aspect</div>
-      <div class="card card-tall" id="cardTall">
-        <div class="receipt-header">
-          <div class="receipt-title">ご確認ありがとうございます</div>
-          <div class="receipt-sub">無理のない範囲でお選びいただき、ありがとうございます</div>
-        </div>
-        <div class="receipt-to">❀ 桜庭さんへ ❀</div>
-        <div class="receipt-divider"></div>
-        <div class="receipt-items">
-          <div class="receipt-item">
-            <span class="receipt-item-name">ダミーテキスト1</span>
-            <span class="receipt-item-price">¥3,000</span>
-          </div>
-          <div class="receipt-item">
-            <span class="receipt-item-name">ダミーテキスト3</span>
-            <span class="receipt-item-price">¥5,000</span>
-          </div>
-        </div>
-        <div class="receipt-total">
-          <span class="receipt-total-label">合計</span>
-          <span class="receipt-total-value">¥8,000</span>
-        </div>
-      </div>
+    <div class="receipt-total-line">
+      <span class="receipt-total-label">合計</span>
+      <span class="receipt-total-value">
+        <span class="yen-symbol">¥</span>
+        <span class="digit-roll" id="totalRoll"></span>
+      </span>
     </div>
 
-  </div>
-
-  <div class="diag" id="diag">
-    <b>source:</b> 1024 × 1024 (1:1)<br>
-    <b>mode:</b> <span id="dMode">cover</span> · <b>position:</b> <span id="dPos">center center</span> · <b>repeat:</b> <span id="dRepeat">no-repeat</span><br>
-    <b>wide card:</b> <span id="dWide">—</span><br>
-    <b>tall card:</b> <span id="dTall">—</span>
   </div>
 
 </div>
 
-<div class="demo-badge">washi crop test · v1</div>
+<div class="demo-badge">receipt mockup · landing + digit roll</div>
 
 <script>
-  var state = {
-    size: 'cover',
-    px: 500,
-    pos: 'center center',
-    repeat: 'no-repeat',
-    softened: true,
-    edges: false
-  };
+  /* ============================================================
+     Landing animation
+     ============================================================ */
+  var paper = document.getElementById('paper');
 
-  var cardWide = document.getElementById('cardWide');
-  var cardTall = document.getElementById('cardTall');
-  var cards = [cardWide, cardTall];
+  function replayLanding() {
+    paper.classList.remove('landing');
+    /* Force reflow so the animation restarts cleanly */
+    void paper.offsetWidth;
+    paper.classList.add('landing');
+  }
 
-  var pxSlider   = document.getElementById('pxSlider');
-  var pxReadout  = document.getElementById('pxReadout');
-  var softToggle = document.getElementById('softToggle');
-  var edgeToggle = document.getElementById('edgeToggle');
-  var dMode      = document.getElementById('dMode');
-  var dPos       = document.getElementById('dPos');
-  var dRepeat    = document.getElementById('dRepeat');
-  var dWide      = document.getElementById('dWide');
-  var dTall      = document.getElementById('dTall');
+  document.getElementById('replayLanding').addEventListener('click', replayLanding);
 
-  function applyStyles() {
-    cards.forEach(function(c) {
-      if (state.size === 'px') {
-        c.style.backgroundSize = state.px + 'px ' + state.px + 'px';
-      } else {
-        c.style.backgroundSize = state.size;
+  /* ============================================================
+     Digit roll
+     ------------------------------------------------------------
+     Builds the columns for a given value, then on updates
+     animates each column's strip to the new digit. Staggered
+     right-to-left so the ones place lands first.
+     ============================================================ */
+  var totalRollEl = document.getElementById('totalRoll');
+  var currentValue = 8000;
+
+  function buildDigitColumns(value) {
+    totalRollEl.innerHTML = '';
+    var str = value.toLocaleString();
+    for (var i = 0; i < str.length; i++) {
+      var ch = str.charAt(i);
+      if (ch === ',' || ch === '.') {
+        var sep = document.createElement('span');
+        sep.className = 'digit-static';
+        sep.textContent = ch;
+        totalRollEl.appendChild(sep);
+        continue;
       }
-      c.style.backgroundPosition = state.pos;
-      c.style.backgroundRepeat   = state.repeat;
-    });
-    dMode.textContent   = (state.size === 'px') ? ('fixed ' + state.px + 'px') : state.size;
-    dPos.textContent    = state.pos;
-    dRepeat.textContent = state.repeat;
-    document.body.classList.toggle('no-softening', !state.softened);
-    cards.forEach(function(c) {
-      c.classList.toggle('edge-guide', state.edges);
-    });
-    updateDiag();
+      var col = document.createElement('span');
+      col.className = 'digit-col';
+      col.setAttribute('data-digit', ch);
+      var strip = document.createElement('span');
+      strip.className = 'digit-strip';
+      for (var d = 0; d <= 9; d++) {
+        var digitEl = document.createElement('span');
+        digitEl.className = 'digit';
+        digitEl.textContent = d;
+        strip.appendChild(digitEl);
+      }
+      strip.style.transition = 'none';
+      strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-parseInt(ch, 10)) + '))';
+      col.appendChild(strip);
+      totalRollEl.appendChild(col);
+      /* Force reflow, then re-enable transitions */
+      void strip.offsetWidth;
+      strip.style.transition = '';
+    }
   }
 
-  function updateDiag() {
-    // Report the effective source scale implied by each card's current size.
-    // cover scale = max(cardW/1024, cardH/1024)
-    // contain scale = min(cardW/1024, cardH/1024)
-    // px scale = px / 1024
-    [ [cardWide, dWide], [cardTall, dTall] ].forEach(function(pair) {
-      var el = pair[0];
-      var out = pair[1];
-      var w = el.clientWidth;
-      var h = el.clientHeight;
-      var scale;
-      if (state.size === 'cover')        scale = Math.max(w / 1024, h / 1024);
-      else if (state.size === 'contain') scale = Math.min(w / 1024, h / 1024);
-      else                               scale = state.px / 1024;
+  function updateTotal(newValue) {
+    var oldStr = currentValue.toLocaleString();
+    var newStr = newValue.toLocaleString();
 
-      var drawnW = 1024 * scale;
-      var drawnH = 1024 * scale;
-      out.textContent =
-        'card ' + w + '×' + h +
-        ' · drawn ' + Math.round(drawnW) + '×' + Math.round(drawnH) +
-        ' · scale ' + scale.toFixed(2) + '×';
-    });
+    if (oldStr.length !== newStr.length) {
+      /* Digit count changed — rebuild from scratch.
+         Simpler than juggling columns; matches app behaviour when
+         the number of digits flips (e.g., crossing 10,000). */
+      currentValue = newValue;
+      buildDigitColumns(newValue);
+      return;
+    }
+
+    var cols = totalRollEl.querySelectorAll('.digit-col');
+    var colIndex = 0;
+    var digitCount = 0;
+    /* Count digits for stagger calculation */
+    for (var i = 0; i < newStr.length; i++) {
+      if (newStr.charAt(i) !== ',' && newStr.charAt(i) !== '.') digitCount++;
+    }
+    for (var j = 0; j < newStr.length; j++) {
+      var ch = newStr.charAt(j);
+      if (ch === ',' || ch === '.') continue;
+      var col = cols[colIndex];
+      if (!col) { colIndex++; continue; }
+      var strip = col.querySelector('.digit-strip');
+      var oldDigit = parseInt(col.getAttribute('data-digit'), 10);
+      var newDigit = parseInt(ch, 10);
+      if (oldDigit !== newDigit) {
+        /* Stagger: ones place moves first, leftmost last.
+           Position from right: rightmost = 0 → 0ms, next = 1 → 80ms, etc. */
+        var fromRight = digitCount - 1 - colIndex;
+        strip.style.transitionDelay = (fromRight * 80) + 'ms';
+        strip.style.transform = 'translateY(calc(var(--digit-h) * ' + (-newDigit) + '))';
+      }
+      col.setAttribute('data-digit', ch);
+      colIndex++;
+    }
+    currentValue = newValue;
   }
 
-  // Bind size buttons
-  document.querySelectorAll('[data-size]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('[data-size]').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      state.size = btn.getAttribute('data-size');
-      applyStyles();
-    });
-  });
-  document.querySelectorAll('[data-pos]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('[data-pos]').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      state.pos = btn.getAttribute('data-pos');
-      applyStyles();
-    });
-  });
-  document.querySelectorAll('[data-repeat]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      document.querySelectorAll('[data-repeat]').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      state.repeat = btn.getAttribute('data-repeat');
-      applyStyles();
-    });
+  document.getElementById('changeTotal').addEventListener('click', function() {
+    /* Generate a random value in the ¥1,200 – ¥48,500 range,
+       rounded to hundreds, so digits visually differ each press. */
+    var next = 1200 + Math.floor(Math.random() * 47) * 100;
+    if (next === currentValue) next += 100;
+    updateTotal(next);
   });
 
-  pxSlider.addEventListener('input', function() {
-    state.px = parseInt(pxSlider.value, 10);
-    pxReadout.textContent = state.px + ' × ' + state.px;
-    if (state.size === 'px') applyStyles();
-    else updateDiag();
-  });
-
-  softToggle.addEventListener('click', function() {
-    state.softened = !state.softened;
-    softToggle.classList.toggle('active', state.softened);
-    softToggle.textContent = state.softened ? 'softened' : 'solid';
-    applyStyles();
-  });
-
-  edgeToggle.addEventListener('click', function() {
-    state.edges = !state.edges;
-    edgeToggle.classList.toggle('active', state.edges);
-    applyStyles();
-  });
-
-  // Recompute the diagnostic when the viewport changes
-  window.addEventListener('resize', updateDiag);
-
-  applyStyles();
+  /* ============================================================
+     Bootstrap
+     ============================================================ */
+  buildDigitColumns(currentValue);
+  /* Trigger the landing animation on load */
+  replayLanding();
 </script>
 
 </body>
