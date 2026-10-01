@@ -3,445 +3,570 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Transition Reveal — Demo</title>
+<title>Scroll Hint Positioning — Demo</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
     --bg-base:       #fdf3d8;
-    --bg-warm:       #f5d89a;
     --accent:        #c9600a;
-    --accent-2:      #8f3f12;
+    --accent-3:      #7a3208;
     --text-dark:     #231304;
     --text-med:      #3d2410;
     --text-mute:     #5a3818;
+    --text-faint:    #7a5028;
     --border:        #e8c88a;
-    --transition-head-color: #fdf0c8;
+    --border-soft:   #f0d8a0;
+    --shadow-warm:   rgba(120, 70, 20, 0.14);
+    --glow:          #f7b93c;
   }
-
   * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0; min-height: 100vh;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     color: var(--text-dark);
     background: var(--bg-page);
-    -webkit-text-size-adjust: 100%;
+    overflow: hidden;
   }
 
+  /* ============================================================
+     Control panel
+     ============================================================ */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
-    z-index: 10;
-    background: rgba(253, 243, 216, 0.92);
+    z-index: 100;
+    background: rgba(253, 243, 216, 0.94);
     border-bottom: 1px solid var(--border);
     backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-    padding: 14px 16px 12px 16px;
+    padding: 10px 16px 10px 16px;
     font-family: -apple-system, sans-serif;
-    font-size: 11.5px;
+    font-size: 11px;
     letter-spacing: 0.3px;
     color: var(--text-med);
   }
-
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 8px 16px;
-    max-width: 900px;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 6px 14px;
+    max-width: 1100px;
     margin: 0 auto;
   }
-
-  .ctrl {
-    display: flex; align-items: center; gap: 8px;
-  }
+  .ctrl { display: flex; align-items: center; gap: 6px; }
   .ctrl label {
     flex: 1; color: var(--text-mute);
     letter-spacing: 1px; font-weight: 600;
-    white-space: nowrap;
-    font-size: 10.5px;
+    white-space: nowrap; font-size: 10px;
   }
-  .ctrl input[type="range"] {
-    flex: 1; min-width: 0; width: 100%;
-    accent-color: var(--accent);
-  }
+  .ctrl input[type="range"] { flex: 1; min-width: 0; accent-color: var(--accent); }
   .ctrl .readout {
     font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 10.5px; color: var(--text-mute);
-    min-width: 62px; text-align: right;
+    font-size: 10px; color: var(--text-mute);
+    min-width: 52px; text-align: right;
   }
   .ctrl select {
-    flex: 1;
-    font-family: inherit; font-size: 11px;
-    padding: 4px 6px;
+    flex: 1; font-family: inherit; font-size: 10.5px;
+    padding: 3px 5px;
     border: 1px solid var(--border);
     background: #fff; color: var(--text-med);
-    border-radius: 6px;
+    border-radius: 5px;
   }
-
   .ctrl.actions {
     grid-column: 1 / -1;
-    justify-content: center;
-    gap: 10px;
-    padding-top: 4px;
+    justify-content: center; gap: 10px;
+    padding-top: 2px;
   }
   .ctrl.actions button {
-    font-family: inherit; font-size: 11px;
-    letter-spacing: 1px;
-    padding: 6px 14px;
+    font-family: inherit; font-size: 10.5px;
+    letter-spacing: 1px; padding: 4px 12px;
     border: 1px solid var(--border);
     background: #fff; color: var(--text-med);
-    border-radius: 14px; cursor: pointer;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    border-radius: 12px; cursor: pointer;
   }
   .ctrl.actions button:hover { border-color: var(--accent); }
-  .ctrl.actions button:active { transform: scale(0.97); }
-
-  .ctrl.checkbox-row {
-    grid-column: 1 / -1;
-    justify-content: center;
-  }
-  .ctrl.checkbox-row input { accent-color: var(--accent); }
 
   /* ============================================================
-     Demo body
+     Receipt screen + paper
      ============================================================ */
-  .demo-body {
-    padding: 200px 20px 120px 20px;
-    max-width: 560px;
-    margin: 0 auto;
+  .receipt-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(253, 243, 216, 0.94);
+    display: flex; align-items: center; justify-content: center;
+    padding: 130px 20px 40px 20px;
+    overflow: hidden;
   }
 
-  .section-heading {
-    text-align: center;
-    font-size: 12px;
-    color: var(--text-mute);
-    letter-spacing: 3px;
-    margin: 40px 0 28px 0;
-    font-family: -apple-system, sans-serif;
-  }
-
-  /* The transition line — autumn palette */
-  .transition-line {
-    text-align: center;
-    padding: 0 32px 40px 32px;
-    margin: 0 auto 60px auto;
-    max-width: 560px;
-    font-size: 18px;
-    font-weight: 500;
-    color: #8f2f00;
-    letter-spacing: 0.8px;
-    line-height: 2;
+  .receipt-paper {
+    max-width: 400px; width: 100%;
+    max-height: calc(100vh - 180px);
+    overflow-y: auto; -webkit-overflow-scrolling: touch;
+    padding: 32px 30px 26px 30px;
+    border-radius: 4px;
+    box-shadow: 0 8px 32px rgba(120, 70, 20, 0.18);
+    border: 1px solid var(--border-soft);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    position: relative;
+    scroll-behavior: auto;
+
+    background-color: var(--bg-base);
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
   }
 
-  .transition-line-divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 0 0 20px 0;
+  .receipt-header { text-align: center; margin-bottom: 20px; }
+  .receipt-thanks {
+    font-size: 16px; font-weight: 600; color: var(--accent);
+    line-height: 1.9; letter-spacing: 1px; margin-bottom: 12px;
   }
-  .transition-line-mark {
-    flex-shrink: 0; font-size: 1.1em; line-height: 1;
-    color: var(--transition-head-color);
+  .receipt-subthanks {
+    font-size: 12px; color: var(--text-mute);
+    line-height: 1.9; letter-spacing: 0.5px;
   }
-  .transition-line-rule {
-    flex: 1; height: 1px;
-    background: var(--transition-head-color);
-    min-width: 24px;
+  .receipt-to-row {
+    display: flex; align-items: center; justify-content: center;
+    gap: 12px; padding: 14px 8px 10px 8px;
   }
-  .transition-line-title {
-    flex-shrink: 0; font-size: 1.1em;
-    color: var(--transition-head-color);
-    letter-spacing: 5px; white-space: nowrap;
+  .receipt-to-mark { font-size: 12px; color: var(--glow); }
+  .receipt-to-name {
+    font-size: 17px; font-weight: 700; color: var(--accent);
+    letter-spacing: 2px;
+  }
+  .receipt-divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border) 20%, var(--border) 80%, transparent);
+    margin: 18px 0;
+  }
+  .receipt-title {
+    font-size: 11px; color: var(--text-faint);
+    letter-spacing: 6px; text-align: center; margin-bottom: 18px;
+  }
+  .receipt-items {
+    display: flex; flex-direction: column; gap: 11px;
+    margin-bottom: 8px;
+  }
+  .receipt-item {
+    display: flex; justify-content: space-between; align-items: center;
+    gap: 8px; padding-bottom: 8px;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .receipt-item-name {
+    flex: 1; font-size: 13px; color: var(--text-med);
+  }
+  .receipt-item-price-wrap {
+    flex-shrink: 0; padding: 3px 9px; border-radius: 8px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 1px solid var(--border-soft);
+    color: var(--accent); font-weight: 600; font-size: 13px;
   }
 
-  /* Each paragraph revealed via JS */
-  .transition-line-body p {
-    margin: 0 0 0.9em 0;
-    opacity: 0;
-    transform: translateY(var(--rise, 16px));
-    transition-property: opacity, transform;
-    transition-duration: var(--dur, 750ms), var(--dur, 750ms);
-    transition-timing-function: ease, var(--ease, cubic-bezier(0.34, 1.56, 0.64, 1));
-    will-change: opacity, transform;
+  .receipt-total-line {
+    display: flex; justify-content: space-between; align-items: baseline;
+    padding: 14px 4px; margin-top: 10px;
+    border-top: 1.5px solid var(--border);
+    border-bottom: 1.5px solid var(--border);
   }
-  .transition-line-body p:last-child { margin-bottom: 0; }
-  .transition-line-body p.revealed {
-    opacity: 1;
-    transform: translateY(0);
+  .receipt-total-label {
+    font-size: 15px; font-weight: 600; color: var(--text-mute);
+    letter-spacing: 4px;
+  }
+  .receipt-total-value {
+    font-size: 18px; font-weight: 700; color: var(--accent);
+    letter-spacing: 0.5px;
   }
 
+  .receipt-actions-row {
+    position: relative;
+    margin-top: 22px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 8px;
+    min-height: 90px;
+  }
+  .receipt-confirm-btn {
+    display: block; width: 100%; max-width: 260px;
+    background: var(--accent);
+    border: 1.5px solid var(--accent);
+    color: #fff; font-family: inherit;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 2px; padding: 11px 20px;
+    border-radius: 22px; cursor: pointer;
+  }
+  .receipt-back-btn {
+    display: block; width: 100%; max-width: 260px;
+    background: #fff; border: 1.5px solid var(--border);
+    color: var(--accent); font-family: inherit;
+    font-size: 12px; font-weight: 600;
+    letter-spacing: 2px; padding: 11px 20px;
+    border-radius: 22px; cursor: pointer;
+  }
+
+  /* ============================================================
+     Scroll hints
+     ============================================================ */
+  .scroll-hint {
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 16px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    cursor: pointer;
+    -webkit-appearance: none; appearance: none;
+    transition: opacity 0.35s ease, background 0.2s ease;
+    z-index: 20;
+  }
+  .scroll-hint:active { background: rgba(255, 255, 255, 0.95); }
+  .scroll-hint .hint-arrow {
+    display: inline-block;
+    animation: hintBounce 2s ease-in-out infinite;
+  }
+  @keyframes hintBounce {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(4px); }
+  }
   @media (prefers-reduced-motion: reduce) {
-    .transition-line-body p {
-      opacity: 1;
-      transform: none;
-      transition: none;
-    }
+    .scroll-hint .hint-arrow { animation: none; }
   }
 
-  .spacer-note {
-    text-align: center;
-    font-family: -apple-system, sans-serif;
-    font-size: 11px;
-    letter-spacing: 1.5px;
-    color: var(--text-mute);
-    opacity: 0.6;
-    margin: 60px 0;
-  }
+  .scroll-hint.hidden { opacity: 0; pointer-events: none; }
 
-  /* Static reference copy for comparison */
-  .static-reference {
-    opacity: 0.55;
-    font-size: 15px;
+  /* Sticky mode: fixed-positioned outside the paper */
+  .scroll-hint.sticky-mode {
+    position: fixed;
+    top: auto;
   }
-  .static-reference p { margin: 0 0 0.9em 0; }
+  body.mode-scroll .scroll-hint.sticky-mode { display: none; }
+
+  /* Scroll mode: absolute-positioned inside actions-row */
+  .scroll-hint.scroll-mode {
+    position: absolute;
+    top: auto;
+  }
+  body.mode-sticky .scroll-hint.scroll-mode { display: none; }
+
+  .readout-bar {
+    position: fixed; bottom: 8px; left: 12px; right: 12px;
+    z-index: 100;
+    display: flex; justify-content: center; gap: 24px;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 11px; color: var(--text-mute);
+    background: rgba(253, 243, 216, 0.9);
+    padding: 6px 14px; border-radius: 20px;
+    pointer-events: none; user-select: none;
+    max-width: 700px; margin: 0 auto;
+  }
+  .readout-bar b { color: var(--accent); font-weight: 700; }
 </style>
 </head>
-<body>
+<body class="mode-sticky">
 
 <div class="controls">
   <div class="controls-grid">
 
     <div class="ctrl">
-      <label>Stagger</label>
-      <input type="range" id="stagger" min="0" max="300" step="10" value="100">
-      <span class="readout" id="staggerV">100 ms</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Duration</label>
-      <input type="range" id="duration" min="200" max="2000" step="50" value="750">
-      <span class="readout" id="durationV">750 ms</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Rise</label>
-      <input type="range" id="rise" min="0" max="60" step="2" value="16">
-      <span class="readout" id="riseV">16 px</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Threshold</label>
-      <input type="range" id="threshold" min="0" max="80" step="5" value="15">
-      <span class="readout" id="thresholdV">15 %</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Bottom margin</label>
-      <input type="range" id="rootMargin" min="-40" max="0" step="2" value="-8">
-      <span class="readout" id="rootMarginV">-8 %</span>
-    </div>
-
-    <div class="ctrl">
-      <label>Easing</label>
-      <select id="easing">
-        <option value="cubic-bezier(0.34, 1.56, 0.64, 1)" selected>overshoot (recommended)</option>
-        <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out (no bounce)</option>
-        <option value="ease-out">linear ease-out</option>
+      <label>Position mode</label>
+      <select id="posMode">
+        <option value="sticky" selected>sticky (visible on open)</option>
+        <option value="scroll">scroll with buttons</option>
       </select>
     </div>
 
-    <div class="ctrl checkbox-row">
-      <label style="flex:0; letter-spacing:0;">
-        <input type="checkbox" id="reReveal">
-        Re-reveal on scroll up
-      </label>
+    <div class="ctrl">
+      <label>X method</label>
+      <select id="xMethod">
+        <option value="computed" selected>computed (gap / 2)</option>
+        <option value="fixed">fixed</option>
+      </select>
+    </div>
+
+    <div class="ctrl">
+      <label>X fixed</label>
+      <input type="range" id="xFixed" min="8" max="80" step="2" value="40">
+      <span class="readout" id="xFixedV">40 px</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Tap behaviour</label>
+      <select id="tapMode">
+        <option value="page" selected>70% of visible height</option>
+        <option value="bottom">straight to bottom</option>
+        <option value="fixed">fixed 300 px</option>
+      </select>
+    </div>
+
+    <div class="ctrl">
+      <label>Item count</label>
+      <input type="range" id="itemCount" min="2" max="20" step="1" value="14">
+      <span class="readout" id="itemCountV">14</span>
     </div>
 
     <div class="ctrl actions">
-      <button id="resetBtn">Reset scroll + state</button>
+      <button id="resetBtn">Reset scroll</button>
     </div>
 
   </div>
 </div>
 
-<div class="demo-body">
+<div class="receipt-screen">
+  <div class="receipt-paper" id="receiptPaper">
 
-  <div class="spacer-note">↓ SCROLL DOWN ↓</div>
+    <div class="receipt-header">
+      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+    </div>
 
-  <div class="transition-line" id="transitionLine">
-    <div class="transition-line-divider">
-      <span class="transition-line-mark">❀</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-title">大切なお知らせ</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-mark">❀</span>
+    <div class="receipt-to-row">
+      <span class="receipt-to-mark">❀</span>
+      <span class="receipt-to-name">桜庭さんへ</span>
+      <span class="receipt-to-mark">❀</span>
     </div>
-    <div class="transition-line-body" id="transitionLineBody">
-      <p>それでは、本日の癒しのオプションをご覧ください。</p>
-      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-      <p>ありがとうございます。</p>
+
+    <div class="receipt-divider"></div>
+    <div class="receipt-title">本日の内容</div>
+
+    <div class="receipt-items" id="receiptItems"></div>
+
+    <div class="receipt-total-line">
+      <span class="receipt-total-label">合計</span>
+      <span class="receipt-total-value" id="receiptTotal">¥0</span>
     </div>
+
+    <div class="receipt-actions-row" id="actionsRow">
+      <!-- Scroll-mode hints: sit inside the row, absolute-positioned -->
+      <button class="scroll-hint scroll-mode hidden" id="scrollHintL" aria-label="下へスクロール">
+        <span class="hint-arrow">↓</span>
+      </button>
+      <button class="scroll-hint scroll-mode hidden" id="scrollHintR" aria-label="下へスクロール">
+        <span class="hint-arrow">↓</span>
+      </button>
+
+      <button type="button" class="receipt-confirm-btn" id="primaryBtn">
+        こちらの内容でお願いいたします。
+      </button>
+      <button type="button" class="receipt-back-btn">
+        サービスの選択に戻る
+      </button>
+    </div>
+
   </div>
 
-  <div class="spacer-note">↓ KEEP SCROLLING ↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
+  <!-- Sticky-mode hints: fixed-positioned in the receipt-screen -->
+  <button class="scroll-hint sticky-mode hidden" id="stickyHintL" aria-label="下へスクロール">
+    <span class="hint-arrow">↓</span>
+  </button>
+  <button class="scroll-hint sticky-mode hidden" id="stickyHintR" aria-label="下へスクロール">
+    <span class="hint-arrow">↓</span>
+  </button>
+</div>
 
-  <div class="section-heading">STATIC REFERENCE · how it looks without animation</div>
-  <div class="transition-line static-reference">
-    <div class="transition-line-body">
-      <p>それでは、本日の癒しのオプションをご覧ください。</p>
-      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-      <p>ありがとうございます。</p>
-    </div>
-  </div>
-
+<div class="readout-bar">
+  <span>X applied: <b id="xReadout">—</b></span>
+  <span>scrollable: <b id="scrollableReadout">—</b></span>
+  <span>at bottom: <b id="atBottomReadout">—</b></span>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  var body = document.getElementById('transitionLineBody');
-  var paragraphs = body.querySelectorAll('p');
+  var paper      = document.getElementById('receiptPaper');
+  var actionsRow = document.getElementById('actionsRow');
+  var itemsEl    = document.getElementById('receiptItems');
+  var totalEl    = document.getElementById('receiptTotal');
+  var primaryBtn = document.getElementById('primaryBtn');
 
-  var staggerEl    = document.getElementById('stagger');
-  var durationEl   = document.getElementById('duration');
-  var riseEl       = document.getElementById('rise');
-  var thresholdEl  = document.getElementById('threshold');
-  var rootMarginEl = document.getElementById('rootMargin');
-  var easingEl     = document.getElementById('easing');
-  var reRevealEl   = document.getElementById('reReveal');
-  var resetBtn     = document.getElementById('resetBtn');
+  var stickyL = document.getElementById('stickyHintL');
+  var stickyR = document.getElementById('stickyHintR');
+  var scrollL = document.getElementById('scrollHintL');
+  var scrollR = document.getElementById('scrollHintR');
 
-  var staggerV    = document.getElementById('staggerV');
-  var durationV   = document.getElementById('durationV');
-  var riseV       = document.getElementById('riseV');
-  var thresholdV  = document.getElementById('thresholdV');
-  var rootMarginV = document.getElementById('rootMarginV');
+  var posModeEl    = document.getElementById('posMode');
+  var xMethodEl    = document.getElementById('xMethod');
+  var xFixedEl     = document.getElementById('xFixed');
+  var tapModeEl    = document.getElementById('tapMode');
+  var itemCountEl  = document.getElementById('itemCount');
 
-  var observer = null;
-  var pendingTimers = [];
+  var xFixedV      = document.getElementById('xFixedV');
+  var itemCountV   = document.getElementById('itemCountV');
+  var xReadout     = document.getElementById('xReadout');
+  var scrollableRO = document.getElementById('scrollableReadout');
+  var atBottomRO   = document.getElementById('atBottomReadout');
 
-  /* ------------------------------------------------------------
-     Read current settings from the controls
-     ------------------------------------------------------------ */
-  function readSettings() {
-    return {
-      stagger:    parseInt(staggerEl.value, 10),
-      duration:   parseInt(durationEl.value, 10),
-      rise:       parseInt(riseEl.value, 10),
-      threshold:  parseInt(thresholdEl.value, 10) / 100,
-      rootMargin: rootMarginEl.value + '%',
-      easing:     easingEl.value,
-      reReveal:   reRevealEl.checked
-    };
+  var HINT_W = 34;
+
+  /* ============================================================
+     Items
+     ============================================================ */
+  var SAMPLE_NAMES = [
+    'ダミーテキスト1','ダミーテキスト2','ダミーテキスト3',
+    'ダミーテキスト4','ダミーテキスト5','ダミーテキスト6',
+    'ダミーテキスト7','ダミーテキスト8','ダミーテキスト9',
+    'ダミーテキスト10','ダミーテキスト11','ダミーテキスト12',
+    'ダミーテキスト13','ダミーテキスト14','ダミーテキスト15',
+    'ダミーテキスト16','ダミーテキスト17','ダミーテキスト18',
+    'ダミーテキスト19','ダミーテキスト20'
+  ];
+
+  function renderItems(n) {
+    itemsEl.innerHTML = '';
+    var total = 0;
+    for (var i = 0; i < n; i++) {
+      var price = 1000 + (i * 500);
+      total += price;
+      var div = document.createElement('div');
+      div.className = 'receipt-item';
+      var nm = document.createElement('span');
+      nm.className = 'receipt-item-name';
+      nm.textContent = SAMPLE_NAMES[i] || ('サービス' + (i + 1));
+      var pr = document.createElement('span');
+      pr.className = 'receipt-item-price-wrap';
+      pr.textContent = '¥' + price.toLocaleString();
+      div.appendChild(nm);
+      div.appendChild(pr);
+      itemsEl.appendChild(div);
+    }
+    totalEl.textContent = '¥' + total.toLocaleString();
   }
 
-  /* ------------------------------------------------------------
-     Apply visual CSS vars (rise, duration, easing)
-     ------------------------------------------------------------ */
-  function applyCSS(settings) {
-    body.style.setProperty('--rise', settings.rise + 'px');
-    body.style.setProperty('--dur', settings.duration + 'ms');
-    body.style.setProperty('--ease', settings.easing);
+  /* ============================================================
+     Position the hints
+     ============================================================ */
+  function computeX() {
+    if (xMethodEl.value === 'fixed') {
+      return parseInt(xFixedEl.value, 10);
+    }
+    /* Computed: half the gap between paper edge and button edge */
+    var paperRect  = paper.getBoundingClientRect();
+    var buttonRect = primaryBtn.getBoundingClientRect();
+    var gap = (paperRect.width - buttonRect.width) / 2;
+    return Math.max(8, Math.round(gap / 2));
   }
 
-  /* ------------------------------------------------------------
-     Build the IntersectionObserver from current settings
-     ------------------------------------------------------------ */
-  function buildObserver(settings) {
-    if (observer) observer.disconnect();
-    observer = new IntersectionObserver(function(entries) {
-      /* Group entries that are entering at the same tick, so we can
-         stagger them in DOM order rather than in arrival order. */
-      var entering = [];
-      entries.forEach(function(entry) {
-        var el = entry.target;
-        if (entry.isIntersecting) {
-          if (!el.classList.contains('revealed')) {
-            entering.push(el);
-          }
-        } else if (settings.reReveal) {
-          el.classList.remove('revealed');
-        }
-      });
+  function positionHints() {
+    var paperRect  = paper.getBoundingClientRect();
+    var buttonRect = primaryBtn.getBoundingClientRect();
+    var rowRect    = actionsRow.getBoundingClientRect();
+    var X = computeX();
+    xReadout.textContent = X + ' px';
 
-      /* Sort by document order so stagger reads left-to-right/top-to-bottom */
-      entering.sort(function(a, b) {
-        return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-      });
+    /* --- Sticky mode (viewport-relative, fixed positioning) --- */
+    /* Horizontal: centre of indicator at paperEdge + X */
+    var stickyLX = paperRect.left + X - HINT_W / 2;
+    var stickyRX = paperRect.right - X - HINT_W / 2;
+    stickyL.style.left = stickyLX + 'px';
+    stickyR.style.left = stickyRX + 'px';
 
-      entering.forEach(function(el, i) {
-        if (settings.stagger > 0 && entering.length > 1) {
-          var id = setTimeout(function() {
-            el.classList.add('revealed');
-          }, i * settings.stagger);
-          pendingTimers.push(id);
-        } else {
-          el.classList.add('revealed');
-        }
-      });
-    }, {
-      threshold: settings.threshold,
-      rootMargin: '0px 0px ' + settings.rootMargin + ' 0px'
+    /* Vertical: indicator's bottom X above paper's bottom */
+    var stickyB = (window.innerHeight - paperRect.bottom) + X;
+    stickyL.style.bottom = stickyB + 'px';
+    stickyR.style.bottom = stickyB + 'px';
+
+    /* --- Scroll mode (row-relative, absolute positioning) --- */
+    /* Horizontally, we want the same viewport-space position as sticky;
+       convert to be relative to the actions row. */
+    var scrollLX = (paperRect.left + X) - rowRect.left - HINT_W / 2;
+    var scrollRX = (paperRect.right - X) - rowRect.left - HINT_W / 2;
+    scrollL.style.left = scrollLX + 'px';
+    scrollR.style.left = scrollRX + 'px';
+
+    /* Vertically, anchor X from the row's bottom */
+    scrollL.style.bottom = X + 'px';
+    scrollR.style.bottom = X + 'px';
+  }
+
+  /* ============================================================
+     Visibility
+     ============================================================ */
+  function updateVisibility() {
+    var scrollable = paper.scrollHeight > paper.clientHeight + 4;
+    var atBottom   = paper.scrollTop + paper.clientHeight >= paper.scrollHeight - 4;
+    var show       = scrollable && !atBottom;
+
+    scrollableRO.textContent = scrollable ? 'yes' : 'no';
+    atBottomRO.textContent   = atBottom ? 'yes' : 'no';
+
+    [stickyL, stickyR, scrollL, scrollR].forEach(function(el) {
+      el.classList.toggle('hidden', !show);
     });
-
-    paragraphs.forEach(function(p) { observer.observe(p); });
   }
 
-  /* ------------------------------------------------------------
-     Full rebuild — resets everything
-     ------------------------------------------------------------ */
-  function rebuild() {
-    pendingTimers.forEach(function(id) { clearTimeout(id); });
-    pendingTimers = [];
-
-    var settings = readSettings();
-    applyCSS(settings);
-
-    paragraphs.forEach(function(p) { p.classList.remove('revealed'); });
-
-    buildObserver(settings);
+  function updateAll() {
+    positionHints();
+    updateVisibility();
   }
 
-  /* ------------------------------------------------------------
-     Wire controls
-     ------------------------------------------------------------ */
-  function updateReadouts() {
-    staggerV.textContent    = staggerEl.value + ' ms';
-    durationV.textContent   = durationEl.value + ' ms';
-    riseV.textContent       = riseEl.value + ' px';
-    thresholdV.textContent  = thresholdEl.value + ' %';
-    rootMarginV.textContent = rootMarginEl.value + ' %';
+  /* ============================================================
+     Tap behaviour
+     ============================================================ */
+  function handleHintTap() {
+    var mode = tapModeEl.value;
+    if (mode === 'page') {
+      paper.scrollBy({ top: paper.clientHeight * 0.7, behavior: 'smooth' });
+    } else if (mode === 'bottom') {
+      paper.scrollTo({ top: paper.scrollHeight, behavior: 'smooth' });
+    } else {
+      paper.scrollBy({ top: 300, behavior: 'smooth' });
+    }
   }
 
-  [staggerEl, durationEl, riseEl, thresholdEl, rootMarginEl].forEach(function(el) {
-    el.addEventListener('input', function() {
-      updateReadouts();
-      /* CSS vars update live so existing paragraphs in-flight feel the change */
-      var s = readSettings();
-      applyCSS(s);
-    });
-    /* Rebuild the observer on release (so we don't thrash while dragging) */
-    el.addEventListener('change', function() {
-      rebuild();
-    });
+  [stickyL, stickyR, scrollL, scrollR].forEach(function(el) {
+    el.addEventListener('click', handleHintTap);
   });
 
-  easingEl.addEventListener('change', function() {
-    var s = readSettings();
-    applyCSS(s);
+  /* ============================================================
+     Event wiring
+     ============================================================ */
+  paper.addEventListener('scroll', function() {
+    updateVisibility();
+    /* Scroll-mode hints stay anchored to the row; no reposition needed. */
+  }, { passive: true });
+
+  window.addEventListener('resize', updateAll);
+
+  posModeEl.addEventListener('change', function() {
+    document.body.classList.toggle('mode-sticky', posModeEl.value === 'sticky');
+    document.body.classList.toggle('mode-scroll', posModeEl.value === 'scroll');
+    updateAll();
   });
 
-  reRevealEl.addEventListener('change', rebuild);
+  xMethodEl.addEventListener('change', updateAll);
 
-  resetBtn.addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'auto' });
-    rebuild();
+  xFixedEl.addEventListener('input', function() {
+    xFixedV.textContent = xFixedEl.value + ' px';
+    updateAll();
   });
 
-  /* ------------------------------------------------------------
+  itemCountEl.addEventListener('input', function() {
+    itemCountV.textContent = itemCountEl.value;
+    renderItems(parseInt(itemCountEl.value, 10));
+    requestAnimationFrame(updateAll);
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', function() {
+    paper.scrollTop = 0;
+    updateAll();
+  });
+
+  /* Re-evaluate position whenever the row's size changes */
+  if (window.ResizeObserver) {
+    var ro = new ResizeObserver(updateAll);
+    ro.observe(paper);
+    ro.observe(actionsRow);
+  }
+
+  /* ============================================================
      Boot
-     ------------------------------------------------------------ */
-  updateReadouts();
-  rebuild();
+     ============================================================ */
+  renderItems(parseInt(itemCountEl.value, 10));
+  xFixedV.textContent = xFixedEl.value + ' px';
+  itemCountV.textContent = itemCountEl.value;
+
+  /* Give layout a tick to settle before measuring */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(updateAll);
+  });
 
 })();
 </script>
