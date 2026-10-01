@@ -1,151 +1,450 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Calligraphy Reveal Demo</title>
-  <style>
-    /* Pulls in your specific brush font */
-    @import url('https://fonts.googleapis.com/css2?family=Yuji+Syuku&display=swap');
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Transition Reveal — Demo</title>
+<style>
+  :root {
+    --bg-page:       #f5d89a;
+    --bg-base:       #fdf3d8;
+    --bg-warm:       #f5d89a;
+    --accent:        #c9600a;
+    --accent-2:      #8f3f12;
+    --text-dark:     #231304;
+    --text-med:      #3d2410;
+    --text-mute:     #5a3818;
+    --border:        #e8c88a;
+    --transition-head-color: #fdf0c8;
+  }
 
-    body {
-      margin: 0;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #fdf3d8; /* Autumn base */
-      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100vh;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: var(--text-dark);
+    background: var(--bg-page);
+    -webkit-text-size-adjust: 100%;
+  }
 
-    .controls {
-      margin-bottom: 40px;
-      display: flex;
-      gap: 12px;
-      z-index: 10;
-    }
+  .controls {
+    position: fixed; top: 0; left: 0; right: 0;
+    z-index: 10;
+    background: rgba(253, 243, 216, 0.92);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    padding: 14px 16px 12px 16px;
+    font-family: -apple-system, sans-serif;
+    font-size: 11.5px;
+    letter-spacing: 0.3px;
+    color: var(--text-med);
+  }
 
-    input {
-      padding: 12px 16px;
-      font-size: 18px;
-      border: 2px solid #d8b478;
-      border-radius: 8px;
-      background: #fff;
-      font-family: "Yuji Syuku", serif;
-      text-align: center;
-      outline: none;
-      width: 140px;
-    }
-    
-    input:focus {
-      border-color: #c9600a;
-    }
+  .controls-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 8px 16px;
+    max-width: 900px;
+    margin: 0 auto;
+  }
 
-    button {
-      padding: 0 24px;
-      font-size: 16px;
-      font-weight: 600;
-      background: #c9600a;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: transform 0.15s, background 0.2s;
-    }
+  .ctrl {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .ctrl label {
+    flex: 1; color: var(--text-mute);
+    letter-spacing: 1px; font-weight: 600;
+    white-space: nowrap;
+    font-size: 10.5px;
+  }
+  .ctrl input[type="range"] {
+    flex: 1; min-width: 0; width: 100%;
+    accent-color: var(--accent);
+  }
+  .ctrl .readout {
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 10.5px; color: var(--text-mute);
+    min-width: 62px; text-align: right;
+  }
+  .ctrl select {
+    flex: 1;
+    font-family: inherit; font-size: 11px;
+    padding: 4px 6px;
+    border: 1px solid var(--border);
+    background: #fff; color: var(--text-med);
+    border-radius: 6px;
+  }
 
-    button:active {
-      transform: scale(0.96);
-      background: #8f3f12;
-    }
+  .ctrl.actions {
+    grid-column: 1 / -1;
+    justify-content: center;
+    gap: 10px;
+    padding-top: 4px;
+  }
+  .ctrl.actions button {
+    font-family: inherit; font-size: 11px;
+    letter-spacing: 1px;
+    padding: 6px 14px;
+    border: 1px solid var(--border);
+    background: #fff; color: var(--text-med);
+    border-radius: 14px; cursor: pointer;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+  }
+  .ctrl.actions button:hover { border-color: var(--accent); }
+  .ctrl.actions button:active { transform: scale(0.97); }
 
-    .stage {
-      width: 100%;
-      height: 300px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+  .ctrl.checkbox-row {
+    grid-column: 1 / -1;
+    justify-content: center;
+  }
+  .ctrl.checkbox-row input { accent-color: var(--accent); }
 
-    svg {
-      width: 100%;
-      height: 100%;
-      overflow: visible;
-    }
+  /* ============================================================
+     Demo body
+     ============================================================ */
+  .demo-body {
+    padding: 200px 20px 120px 20px;
+    max-width: 560px;
+    margin: 0 auto;
+  }
 
-    .ink-text {
-      font-family: "Yuji Syuku", serif;
-      font-size: 140px;
-      fill: transparent;
-      stroke: #8f2f00; /* Deep autumn accent */
-      stroke-width: 1.5px;
-      
-      /* 
-         Setting a massive dasharray ensures it covers the total perimeter of any character.
-         We animate the offset from this max value down to 0 to "draw" it. 
-      */
-      stroke-dasharray: 2000;
-      stroke-dashoffset: 2000;
-      
-      /* Applies the wet ink bleed effect */
-      filter: url(#ink-bleed);
-    }
+  .section-heading {
+    text-align: center;
+    font-size: 12px;
+    color: var(--text-mute);
+    letter-spacing: 3px;
+    margin: 40px 0 28px 0;
+    font-family: -apple-system, sans-serif;
+  }
 
-    .animate .ink-text {
-      /* 1. Trace the outline over 2.5s */
-      /* 2. Fade in the solid ink starting at 1.2s */
-      animation: 
-        drawOutline 2.5s cubic-bezier(0.34, 1.15, 0.64, 1) forwards,
-        fillInk 1.2s 1.2s ease-in-out forwards;
-    }
+  /* The transition line — autumn palette */
+  .transition-line {
+    text-align: center;
+    padding: 0 32px 40px 32px;
+    margin: 0 auto 60px auto;
+    max-width: 560px;
+    font-size: 18px;
+    font-weight: 500;
+    color: #8f2f00;
+    letter-spacing: 0.8px;
+    line-height: 2;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+  }
 
-    @keyframes drawOutline {
-      to { stroke-dashoffset: 0; }
-    }
+  .transition-line-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 0 20px 0;
+  }
+  .transition-line-mark {
+    flex-shrink: 0; font-size: 1.1em; line-height: 1;
+    color: var(--transition-head-color);
+  }
+  .transition-line-rule {
+    flex: 1; height: 1px;
+    background: var(--transition-head-color);
+    min-width: 24px;
+  }
+  .transition-line-title {
+    flex-shrink: 0; font-size: 1.1em;
+    color: var(--transition-head-color);
+    letter-spacing: 5px; white-space: nowrap;
+  }
 
-    @keyframes fillInk {
-      to { fill: #8f2f00; stroke-width: 0; }
+  /* Each paragraph revealed via JS */
+  .transition-line-body p {
+    margin: 0 0 0.9em 0;
+    opacity: 0;
+    transform: translateY(var(--rise, 16px));
+    transition-property: opacity, transform;
+    transition-duration: var(--dur, 750ms), var(--dur, 750ms);
+    transition-timing-function: ease, var(--ease, cubic-bezier(0.34, 1.56, 0.64, 1));
+    will-change: opacity, transform;
+  }
+  .transition-line-body p:last-child { margin-bottom: 0; }
+  .transition-line-body p.revealed {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .transition-line-body p {
+      opacity: 1;
+      transform: none;
+      transition: none;
     }
-  </style>
+  }
+
+  .spacer-note {
+    text-align: center;
+    font-family: -apple-system, sans-serif;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    color: var(--text-mute);
+    opacity: 0.6;
+    margin: 60px 0;
+  }
+
+  /* Static reference copy for comparison */
+  .static-reference {
+    opacity: 0.55;
+    font-size: 15px;
+  }
+  .static-reference p { margin: 0 0 0.9em 0; }
+</style>
 </head>
 <body>
 
-  <div class="controls">
-    <input type="text" id="nameInput" value="桜庭" maxlength="6">
-    <button onclick="playReveal()">描く</button>
+<div class="controls">
+  <div class="controls-grid">
+
+    <div class="ctrl">
+      <label>Stagger</label>
+      <input type="range" id="stagger" min="0" max="300" step="10" value="100">
+      <span class="readout" id="staggerV">100 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Duration</label>
+      <input type="range" id="duration" min="200" max="2000" step="50" value="750">
+      <span class="readout" id="durationV">750 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Rise</label>
+      <input type="range" id="rise" min="0" max="60" step="2" value="16">
+      <span class="readout" id="riseV">16 px</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Threshold</label>
+      <input type="range" id="threshold" min="0" max="80" step="5" value="15">
+      <span class="readout" id="thresholdV">15 %</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Bottom margin</label>
+      <input type="range" id="rootMargin" min="-40" max="0" step="2" value="-8">
+      <span class="readout" id="rootMarginV">-8 %</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Easing</label>
+      <select id="easing">
+        <option value="cubic-bezier(0.34, 1.56, 0.64, 1)" selected>overshoot (recommended)</option>
+        <option value="cubic-bezier(0.22, 1, 0.36, 1)">ease-out (no bounce)</option>
+        <option value="ease-out">linear ease-out</option>
+      </select>
+    </div>
+
+    <div class="ctrl checkbox-row">
+      <label style="flex:0; letter-spacing:0;">
+        <input type="checkbox" id="reReveal">
+        Re-reveal on scroll up
+      </label>
+    </div>
+
+    <div class="ctrl actions">
+      <button id="resetBtn">Reset scroll + state</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="demo-body">
+
+  <div class="spacer-note">↓ SCROLL DOWN ↓</div>
+
+  <div class="transition-line" id="transitionLine">
+    <div class="transition-line-divider">
+      <span class="transition-line-mark">❀</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-title">大切なお知らせ</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-mark">❀</span>
+    </div>
+    <div class="transition-line-body" id="transitionLineBody">
+      <p>それでは、本日の癒しのオプションをご覧ください。</p>
+      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+      <p>ありがとうございます。</p>
+    </div>
   </div>
 
-  <div class="stage" id="stage">
-    <svg>
-      <defs>
-        <!-- Simulates the rough edge of wet ink bleeding into paper -->
-        <filter id="ink-bleed">
-          <feTurbulence type="fractalNoise" baseFrequency="0.12" numOctaves="3" result="noise" />
-          <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G" />
-        </filter>
-      </defs>
-      <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" class="ink-text" id="svgText">桜庭</text>
-    </svg>
+  <div class="spacer-note">↓ KEEP SCROLLING ↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+  <div class="spacer-note">↓</div>
+
+  <div class="section-heading">STATIC REFERENCE · how it looks without animation</div>
+  <div class="transition-line static-reference">
+    <div class="transition-line-body">
+      <p>それでは、本日の癒しのオプションをご覧ください。</p>
+      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+      <p>ありがとうございます。</p>
+    </div>
   </div>
 
-  <script>
-    function playReveal() {
-      const stage = document.getElementById('stage');
-      const svgText = document.getElementById('svgText');
-      const input = document.getElementById('nameInput');
-      
-      if (!input.value.trim()) return;
+</div>
 
-      svgText.textContent = input.value.trim();
-      
-      // Remove the class, force a browser reflow, then re-add to instantly restart the animation
-      stage.classList.remove('animate');
-      void stage.offsetWidth;
-      stage.classList.add('animate');
-    }
+<script>
+(function() {
+  'use strict';
 
-    // Run once on load
-    window.onload = () => playReveal();
-  </script>
+  var body = document.getElementById('transitionLineBody');
+  var paragraphs = body.querySelectorAll('p');
+
+  var staggerEl    = document.getElementById('stagger');
+  var durationEl   = document.getElementById('duration');
+  var riseEl       = document.getElementById('rise');
+  var thresholdEl  = document.getElementById('threshold');
+  var rootMarginEl = document.getElementById('rootMargin');
+  var easingEl     = document.getElementById('easing');
+  var reRevealEl   = document.getElementById('reReveal');
+  var resetBtn     = document.getElementById('resetBtn');
+
+  var staggerV    = document.getElementById('staggerV');
+  var durationV   = document.getElementById('durationV');
+  var riseV       = document.getElementById('riseV');
+  var thresholdV  = document.getElementById('thresholdV');
+  var rootMarginV = document.getElementById('rootMarginV');
+
+  var observer = null;
+  var pendingTimers = [];
+
+  /* ------------------------------------------------------------
+     Read current settings from the controls
+     ------------------------------------------------------------ */
+  function readSettings() {
+    return {
+      stagger:    parseInt(staggerEl.value, 10),
+      duration:   parseInt(durationEl.value, 10),
+      rise:       parseInt(riseEl.value, 10),
+      threshold:  parseInt(thresholdEl.value, 10) / 100,
+      rootMargin: rootMarginEl.value + '%',
+      easing:     easingEl.value,
+      reReveal:   reRevealEl.checked
+    };
+  }
+
+  /* ------------------------------------------------------------
+     Apply visual CSS vars (rise, duration, easing)
+     ------------------------------------------------------------ */
+  function applyCSS(settings) {
+    body.style.setProperty('--rise', settings.rise + 'px');
+    body.style.setProperty('--dur', settings.duration + 'ms');
+    body.style.setProperty('--ease', settings.easing);
+  }
+
+  /* ------------------------------------------------------------
+     Build the IntersectionObserver from current settings
+     ------------------------------------------------------------ */
+  function buildObserver(settings) {
+    if (observer) observer.disconnect();
+    observer = new IntersectionObserver(function(entries) {
+      /* Group entries that are entering at the same tick, so we can
+         stagger them in DOM order rather than in arrival order. */
+      var entering = [];
+      entries.forEach(function(entry) {
+        var el = entry.target;
+        if (entry.isIntersecting) {
+          if (!el.classList.contains('revealed')) {
+            entering.push(el);
+          }
+        } else if (settings.reReveal) {
+          el.classList.remove('revealed');
+        }
+      });
+
+      /* Sort by document order so stagger reads left-to-right/top-to-bottom */
+      entering.sort(function(a, b) {
+        return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+      });
+
+      entering.forEach(function(el, i) {
+        if (settings.stagger > 0 && entering.length > 1) {
+          var id = setTimeout(function() {
+            el.classList.add('revealed');
+          }, i * settings.stagger);
+          pendingTimers.push(id);
+        } else {
+          el.classList.add('revealed');
+        }
+      });
+    }, {
+      threshold: settings.threshold,
+      rootMargin: '0px 0px ' + settings.rootMargin + ' 0px'
+    });
+
+    paragraphs.forEach(function(p) { observer.observe(p); });
+  }
+
+  /* ------------------------------------------------------------
+     Full rebuild — resets everything
+     ------------------------------------------------------------ */
+  function rebuild() {
+    pendingTimers.forEach(function(id) { clearTimeout(id); });
+    pendingTimers = [];
+
+    var settings = readSettings();
+    applyCSS(settings);
+
+    paragraphs.forEach(function(p) { p.classList.remove('revealed'); });
+
+    buildObserver(settings);
+  }
+
+  /* ------------------------------------------------------------
+     Wire controls
+     ------------------------------------------------------------ */
+  function updateReadouts() {
+    staggerV.textContent    = staggerEl.value + ' ms';
+    durationV.textContent   = durationEl.value + ' ms';
+    riseV.textContent       = riseEl.value + ' px';
+    thresholdV.textContent  = thresholdEl.value + ' %';
+    rootMarginV.textContent = rootMarginEl.value + ' %';
+  }
+
+  [staggerEl, durationEl, riseEl, thresholdEl, rootMarginEl].forEach(function(el) {
+    el.addEventListener('input', function() {
+      updateReadouts();
+      /* CSS vars update live so existing paragraphs in-flight feel the change */
+      var s = readSettings();
+      applyCSS(s);
+    });
+    /* Rebuild the observer on release (so we don't thrash while dragging) */
+    el.addEventListener('change', function() {
+      rebuild();
+    });
+  });
+
+  easingEl.addEventListener('change', function() {
+    var s = readSettings();
+    applyCSS(s);
+  });
+
+  reRevealEl.addEventListener('change', rebuild);
+
+  resetBtn.addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+    rebuild();
+  });
+
+  /* ------------------------------------------------------------
+     Boot
+     ------------------------------------------------------------ */
+  updateReadouts();
+  rebuild();
+
+})();
+</script>
+
 </body>
 </html>
