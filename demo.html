@@ -3,14 +3,13 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Odometer Demo — Summary vs Receipt</title>
+<title>Odometer Demo v2 — Fixed Columns</title>
 <style>
 :root {
   --bg-page:       #f5d89a;
   --bg-card:       #fdf3d8;
   --accent:        #c9600a;
   --accent-2:      #8f3f12;
-  --accent-3:      #7a3208;
   --text-dark:     #231304;
   --text-med:      #3d2410;
   --text-mute:     #5a3818;
@@ -32,11 +31,7 @@ html, body {
   padding-bottom: 140px;
 }
 
-.page {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 24px 20px 60px 20px;
-}
+.page { max-width: 720px; margin: 0 auto; padding: 24px 20px 60px 20px; }
 
 .title {
   font-size: 15px; letter-spacing: 4px; color: var(--accent);
@@ -48,7 +43,7 @@ html, body {
 }
 .note {
   font-size: 11px; color: var(--text-mute); text-align: center;
-  margin: 0 auto 24px auto; max-width: 540px; line-height: 1.7;
+  margin: 0 auto 24px auto; max-width: 560px; line-height: 1.75;
   font-family: -apple-system, sans-serif; opacity: 0.85;
 }
 
@@ -67,7 +62,6 @@ html, body {
 .controls button:hover { border-color: var(--accent); }
 .controls button:active { transform: scale(0.97); background: #fff; }
 
-/* Table */
 .table-card {
   border-radius: 16px;
   border: 1px solid var(--border-soft);
@@ -130,7 +124,6 @@ html, body {
   letter-spacing: 0.4px;
 }
 
-/* Section labels */
 .section-label {
   font-family: -apple-system, sans-serif;
   font-size: 10.5px; letter-spacing: 2.5px;
@@ -150,7 +143,6 @@ html, body {
   border: 1px solid var(--border-soft);
   box-shadow: 0 10px 26px var(--shadow-warm);
 }
-
 .receipt-header { text-align: center; margin-bottom: 20px; }
 .receipt-thanks {
   font-size: 16px; font-weight: 600; color: var(--accent);
@@ -188,9 +180,7 @@ html, body {
   border-bottom: 1px dashed var(--border-soft);
 }
 .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-.receipt-item-name {
-  flex: 1; font-size: 13.5px; color: var(--text-med);
-}
+.receipt-item-name { flex: 1; font-size: 13.5px; color: var(--text-med); }
 .receipt-item-price-wrap {
   flex-shrink: 0; padding: 4px 10px; border-radius: 8px;
   background: rgba(255, 255, 255, 0.6);
@@ -201,7 +191,6 @@ html, body {
   text-align: center; font-size: 12px; color: var(--text-faint);
   padding: 12px 0; letter-spacing: 2px;
 }
-
 .receipt-total-line {
   display: flex; justify-content: space-between; align-items: baseline;
   padding: 16px 4px; margin-top: 12px;
@@ -250,47 +239,105 @@ html, body {
   font-size: 13px; margin-right: 2px; opacity: 0.85; font-weight: 700;
 }
 
-/* Digit roll */
+/* ============================================================
+   Digit roll engine — fixed 6-column layout
+   ============================================================ */
 .digit-roll {
-  display: inline-flex; align-items: flex-start;
+  display: inline-flex;
+  align-items: flex-start;
   height: var(--digit-h, 30px);
   overflow: visible;
-  font-size: inherit; line-height: 1;
+  font-size: inherit;
+  line-height: 1;
   vertical-align: baseline;
 }
+
 .digit-col {
-  position: relative; display: inline-block;
-  width: 0.62em; height: var(--digit-h, 30px);
-  overflow: hidden; vertical-align: top;
+  position: relative;
+  display: inline-block;
+  width: 0.62em;
+  height: var(--digit-h, 30px);
+  overflow: hidden;
+  vertical-align: top;
+  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
+              opacity 200ms ease;
 }
+.digit-col.hidden {
+  width: 0;
+  opacity: 0;
+}
+
 .digit-strip {
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
   height: 1000%;
   transform: translateY(0);
   will-change: transform;
-}
-.digit {
-  display: flex; align-items: center; justify-content: center;
-  height: 10%; flex-shrink: 0;
-  font-weight: 700; font-size: inherit; line-height: 1;
-  color: inherit; letter-spacing: 0.5px;
-}
-.digit-static {
-  display: inline-block; height: var(--digit-h, 30px);
-  width: 0.32em; text-align: center;
-  font-weight: 700; font-size: inherit;
-  line-height: var(--digit-h, 30px);
-  vertical-align: top; color: inherit;
+  transition: transform 400ms cubic-bezier(0.34, 1.15, 0.64, 1);
 }
 
+.digit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 10%;
+  flex-shrink: 0;
+  font-weight: 700;
+  font-size: inherit;
+  line-height: 1;
+  color: inherit;
+  letter-spacing: 0.5px;
+}
+
+.digit-static {
+  display: inline-block;
+  height: var(--digit-h, 30px);
+  width: 0.32em;
+  text-align: center;
+  font-weight: 700;
+  font-size: inherit;
+  line-height: var(--digit-h, 30px);
+  vertical-align: top;
+  color: inherit;
+  overflow: hidden;
+  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
+              opacity 200ms ease;
+}
+.digit-static.hidden {
+  width: 0;
+  opacity: 0;
+}
+
+/* Suppress all transitions — used for instant updates */
+.digit-roll.no-transition,
+.digit-roll.no-transition .digit-col,
+.digit-roll.no-transition .digit-strip,
+.digit-roll.no-transition .digit-static {
+  transition: none !important;
+}
+
+/* Summary: fast roll */
 .summary-digit-roll { --digit-h: var(--summary-digit-h); }
 .summary-digit-roll .digit-strip {
   transition: transform 400ms cubic-bezier(0.34, 1.15, 0.64, 1);
 }
+.summary-digit-roll .digit-col,
+.summary-digit-roll .digit-static {
+  transition: width 350ms cubic-bezier(0.34, 1.15, 0.64, 1),
+              opacity 200ms ease;
+}
 
+/* Receipt: slow roll */
 .receipt-digit-roll { --digit-h: var(--receipt-digit-h); }
 .receipt-digit-roll .digit-strip {
   transition: transform 800ms cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+.receipt-digit-roll .digit-col,
+.receipt-digit-roll .digit-static {
+  transition: width 700ms cubic-bezier(0.34, 1.15, 0.64, 1),
+              opacity 400ms ease;
 }
 
 .demo-badge {
@@ -324,12 +371,12 @@ html, body {
 
 <div class="page">
 
-  <h1 class="title">ODOMETER DEMO</h1>
-  <p class="subtitle">summary bar (fast) · receipt (slow)</p>
+  <h1 class="title">ODOMETER DEMO · v2</h1>
+  <p class="subtitle">fixed 6-column layout · every change animates</p>
   <p class="note">
-    Tap rows rapidly to test the response. Summary: 400ms roll, 45ms stagger,
-    snaps when taps come within 150ms of each other. Receipt: 800ms roll, 80ms stagger,
-    always animates fully.
+    Tapping rows updates both totals. Summary: 400ms roll, 45ms stagger, snaps on taps
+    within 260ms of each other. Receipt: 800ms roll, 80ms stagger, always rolls fully.
+    Leading columns expand/collapse instead of rebuilding.
   </p>
 
   <div class="controls">
@@ -376,7 +423,7 @@ html, body {
   </div>
 </div>
 
-<div class="demo-badge">odometer demo</div>
+<div class="demo-badge">odometer demo v2</div>
 
 <script>
 (function() {
@@ -397,95 +444,111 @@ html, body {
   var receiptRoll  = document.getElementById('receiptTotal');
 
   /* ============================================================
-     Digit roll engine
+     Digit roll engine (fixed 6-column layout)
      ============================================================ */
+  var NUM_COLS   = 6;
+  var COMMA_AFTER = 2; /* 0-indexed: comma sits after col 2 */
 
-  function buildColumns(container, value) {
+  function isColVisible(value, colIndex) {
+    /* A column is visible iff value is >= that column's place value.
+       Special case: value 0 → only rightmost column visible. */
+    if (value === 0) return colIndex === NUM_COLS - 1;
+    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+    return value >= placeValue;
+  }
+
+  function getDigitAt(value, colIndex) {
+    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+    return Math.floor(value / placeValue) % 10;
+  }
+
+  function buildColumns(container, initialValue) {
     container.innerHTML = '';
-    var str = value.toLocaleString();
-    for (var i = 0; i < str.length; i++) {
-      var ch = str[i];
-      if (ch === ',' || ch === '.') {
-        var sep = document.createElement('span');
-        sep.className = 'digit-static';
-        sep.textContent = ch;
-        container.appendChild(sep);
-        continue;
-      }
+    for (var i = 0; i < NUM_COLS; i++) {
       var col = document.createElement('span');
-      col.className = 'digit-col';
-      col.setAttribute('data-digit', ch);
+      col.className = 'digit-col hidden';
+      col.setAttribute('data-digit', '0');
       var strip = document.createElement('span');
       strip.className = 'digit-strip';
-      strip.style.transition = 'none';
       for (var d = 0; d <= 9; d++) {
         var de = document.createElement('span');
         de.className = 'digit';
         de.textContent = d;
         strip.appendChild(de);
       }
-      strip.style.transform = 'translateY(' + (-parseInt(ch, 10) * 10) + '%)';
+      strip.style.transform = 'translateY(0)';
       col.appendChild(strip);
       container.appendChild(col);
-      void strip.offsetWidth;
-      strip.style.transition = '';
+
+      if (i === COMMA_AFTER) {
+        var comma = document.createElement('span');
+        comma.className = 'digit-static hidden';
+        comma.setAttribute('data-comma', '1');
+        comma.textContent = ',';
+        container.appendChild(comma);
+      }
     }
-    container.setAttribute('data-current', str);
+    /* Apply initial state without transitions */
+    container.classList.add('no-transition');
+    applyValue(container, initialValue, { instant: true, stagger: 0 });
+    void container.offsetWidth;
+    container.classList.remove('no-transition');
   }
 
-  function setRollValue(container, value, opts) {
+  function applyValue(container, value, opts) {
     opts = opts || {};
     var instant = !!opts.instant;
     var stagger = opts.stagger != null ? opts.stagger : 45;
 
-    var str = value.toLocaleString();
-    var existing = container.querySelectorAll('.digit-col');
-    var existingStr = container.getAttribute('data-current') || '';
-    var digitCount = (str.match(/\d/g) || []).length;
-    var oldDigitCount = (existingStr.match(/\d/g) || []).length;
-
-    if (digitCount !== oldDigitCount || existing.length === 0) {
-      buildColumns(container, value);
-      return;
+    if (instant) {
+      container.classList.add('no-transition');
     }
 
-    var colIndex = 0;
-    for (var i = 0; i < str.length; i++) {
-      var ch = str[i];
-      if (ch === ',' || ch === '.') continue;
-      var col = existing[colIndex];
-      if (!col) { colIndex++; continue; }
+    var cols = container.querySelectorAll('.digit-col');
+    var comma = container.querySelector('.digit-static[data-comma]');
+
+    for (var i = 0; i < cols.length; i++) {
+      var col = cols[i];
       var strip = col.querySelector('.digit-strip');
-      var newDigit = parseInt(ch, 10);
-      var oldDigit = parseInt(col.getAttribute('data-digit'), 10);
+      var visible = isColVisible(value, i);
+      var newDigit = getDigitAt(value, i);
+      var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
 
-      if (oldDigit !== newDigit) {
-        var fromRight = digitCount - 1 - colIndex;
-        var delay = instant ? 0 : fromRight * stagger;
+      /* Stagger: rightmost (ones) place first, moving leftward */
+      var fromRight = NUM_COLS - 1 - i;
+      var delay = instant ? 0 : fromRight * stagger;
 
-        if (instant) {
-          strip.style.transition = 'none';
-          strip.style.transitionDelay = '0ms';
-          strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-          void strip.offsetWidth;
-          strip.style.transition = '';
-          strip.style.transitionDelay = '';
-        } else {
-          strip.style.transitionDelay = delay + 'ms';
-          strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-        }
+      if (instant) {
+        strip.style.transitionDelay = '0ms';
+        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+      } else if (newDigit !== oldDigit) {
+        strip.style.transitionDelay = delay + 'ms';
+        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
       }
-      col.setAttribute('data-digit', ch);
-      colIndex++;
+
+      col.classList.toggle('hidden', !visible);
+      col.setAttribute('data-digit', newDigit);
     }
-    container.setAttribute('data-current', str);
+
+    if (comma) {
+      comma.classList.toggle('hidden', value < 1000);
+    }
+
+    if (instant) {
+      void container.offsetWidth;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          container.classList.remove('no-transition');
+        });
+      });
+    }
   }
 
   /* ============================================================
      State
      ============================================================ */
-
   var lastSummaryUpdate = 0;
+  var SNAP_WINDOW_MS = 260;
 
   function computeTotal() {
     var sum = 0;
@@ -498,13 +561,13 @@ html, body {
   function updateSummary(value) {
     var now = performance.now();
     var elapsed = now - lastSummaryUpdate;
-    var shouldSnap = lastSummaryUpdate > 0 && elapsed < 150;
+    var shouldSnap = lastSummaryUpdate > 0 && elapsed < SNAP_WINDOW_MS;
     lastSummaryUpdate = now;
-    setRollValue(summaryRoll, value, { instant: shouldSnap, stagger: 45 });
+    applyValue(summaryRoll, value, { instant: shouldSnap, stagger: 45 });
   }
 
   function updateReceipt(value) {
-    setRollValue(receiptRoll, value, { instant: false, stagger: 80 });
+    applyValue(receiptRoll, value, { instant: false, stagger: 80 });
   }
 
   function renderReceiptItems() {
@@ -543,7 +606,6 @@ html, body {
   /* ============================================================
      Table
      ============================================================ */
-
   function buildTable() {
     tableCard.innerHTML = '';
     for (var i = 0; i < ROWS.length; i++) {
@@ -584,17 +646,14 @@ html, body {
   /* ============================================================
      Controls
      ============================================================ */
-
   document.getElementById('btnRandom').addEventListener('click', function() {
     for (var i = 0; i < ROWS.length; i++) checked[i] = Math.random() < 0.5;
     syncTable(); recalc();
   });
-
   document.getElementById('btnAll').addEventListener('click', function() {
     for (var i = 0; i < ROWS.length; i++) checked[i] = true;
     syncTable(); recalc();
   });
-
   document.getElementById('btnNone').addEventListener('click', function() {
     for (var i = 0; i < ROWS.length; i++) checked[i] = false;
     syncTable(); recalc();
@@ -603,7 +662,6 @@ html, body {
   /* ============================================================
      Boot
      ============================================================ */
-
   buildTable();
   buildColumns(summaryRoll, 0);
   buildColumns(receiptRoll, 0);
