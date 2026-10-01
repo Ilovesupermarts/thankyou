@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blur + Vertical Scale — Demo</title>
+<title>Blur + Vertical Scale — Demo v2</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
@@ -21,7 +21,6 @@
     background: var(--bg-page);
   }
 
-  /* Controls */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
@@ -58,7 +57,6 @@
     min-width: 52px; text-align: right;
   }
 
-  /* Demo body */
   .demo {
     padding: 500px 20px 160px 20px;
     max-width: 620px; margin: 0 auto;
@@ -103,7 +101,6 @@
     letter-spacing: 5px; white-space: nowrap;
   }
 
-  /* Blur + vertical scale target */
   .transition-line-body {
     position: relative;
     will-change: filter, transform;
@@ -113,7 +110,6 @@
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
 
-  /* Reference lines */
   .ref-line {
     position: fixed; left: 0; right: 0;
     height: 0;
@@ -130,7 +126,6 @@
   }
   .ref-line.mid { top: 50vh; }
 
-  /* Readout */
   .readout-bar {
     position: fixed; bottom: 8px; left: 12px; right: 12px;
     z-index: 100;
@@ -282,17 +277,16 @@
       state = 'above pivot';
     }
 
-    /* Blur: 0 at pivot, ramps to max at the far end (linear per your choice) */
+    /* Blur: 0 at pivot, ramps to max at the far end (linear) */
     var blurVal = maxBlur * progress;
 
-    /* Scale: inverse of blur — 1.00 at far end (max blur),
-       maxScale at pivot (0 blur). Uses the chosen scale easing. */
+    /* Scale: inverse of blur — 1.00 at far end, maxScale at pivot */
     var eased = ease(progress);
     var scaleVal = maxScale - (maxScale - 1) * eased;
 
     bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
     bodyEl.style.transformOrigin = originEl.value;
-    bodyEl.style.transform = scaleVal < 0.999 ? 'scaleY(' + scaleVal.toFixed(4) + ')' : '';
+    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleY(' + scaleVal.toFixed(4) + ')' : '';
 
     roBlur.textContent  = blurVal.toFixed(1);
     roScale.textContent = scaleVal.toFixed(3);
