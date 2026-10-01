@@ -132,7 +132,6 @@
     pointer-events: none;
   }
 
-  /* Base setup: clean render, video hidden until the intro fade-in */
   .ambient-image {
     opacity: 0;
     pointer-events: none;
@@ -140,7 +139,6 @@
     will-change: opacity;
   }
 
-  /* The video fills the layer, crops to cover, and is softly blurred */
   .ambient-video {
     position: absolute;
     inset: 0;
@@ -153,7 +151,6 @@
     transform: scale(1.06);
   }
 
-  /* Autumn steady-state: layer visible (video is revealed by JS at intro) */
   html[data-theme="autumn"] .ambient-image {
     opacity: 0.8;
   }
@@ -493,7 +490,6 @@
   .name-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
   /* ============ BLOSSOM START ============ */
-  /* Visuals for the start button live at the bottom of this file. */
   .blossom-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
     z-index: 150; display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -652,9 +648,35 @@
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07); border: 1px solid var(--border-3);
     overflow: hidden; opacity: 0; transform: translateY(24px);
     transition: opacity 0.9s ease, transform 0.9s ease;
-    margin: 0 16px; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    margin: 0 16px;
   }
   .table-card.active { opacity: 1; transform: translateY(0); }
+
+  /* ============ WASHI PAPER SURFACES (v1.13) ============
+     Washi JPG applied to the main service table and the receipt only.
+     #nameScreenTable is intentionally left clean — it's an administrative
+     setup surface, not part of the guest-facing experience.
+     Interior softening (below) lets the paper read through checked rows,
+     the privacy block, and the receipt chips instead of them sitting on
+     top as opaque stickers. */
+  #tableCard,
+  .receipt-paper {
+    background-color: #fdf3d8;
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+  }
+
+  /* Interior softening — scoped to the two paper surfaces only. */
+  #tableCard .privacy-note-inline,
+  #tableCard .row.filled,
+  .receipt-paper .receipt-item-price-wrap {
+    background: rgba(255, 255, 255, 0.6);
+  }
+  .receipt-paper .receipt-item-price-wrap:focus-within {
+    background: rgba(255, 255, 255, 0.78);
+  }
 
   .privacy-note-inline {
     margin: 0; padding: 16px 22px 18px 22px; text-align: center;
@@ -1137,7 +1159,7 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .receipt-screen.reopened { z-index: 380; }
 .receipt-screen.above-thankyou { z-index: 400; }
 .receipt-paper {
-  background: #ffffff; max-width: 380px; width: 100%; max-height: calc(100vh - 140px);
+  max-width: 380px; width: 100%; max-height: calc(100vh - 140px);
   overflow-y: auto; -webkit-overflow-scrolling: touch;
   padding: 36px 30px 28px 30px; border-radius: 4px;
   box-shadow: 0 8px 32px var(--shadow-rose-2); border: 1px solid var(--border-3);
