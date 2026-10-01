@@ -1,30 +1,27 @@
 /* ============================================================
-   app.js — v1.14
+   app.js — v1.15
    ------------------------------------------------------------
    Changelog:
+     v1.15
+       - Receipt opens at the top (scroll reset before reveal).
+       - Decorative scroll indicator on the receipt, right side
+         only, X=26 / Y=10 from the paper's edge, sticky, non-
+         interactive (pointer-events: none, aria-hidden).
+       - Transition-line paragraph reveal: each <p> wraps and
+         fades/rises in as it enters the viewport (200ms stagger,
+         750ms duration, 30px rise, 20% threshold, -8% margin,
+         overshoot easing). Once per session; both body variants.
+       - Transition-line scroll-driven blur (max 6px, linear) and
+         horizontal scale (max 1.07, dead zone above blur=1.0,
+         ramps 1.00 -> 1.07 as blur 1.0 -> 0.0, origin center).
      v1.14
-       - Odometer replaces the number-ticker on the summary bar
-         total and the receipt total. Fixed 6-column layout,
-         leading columns expand/collapse via width transition,
-         comma tracks the ¥1,000 threshold.
-         Summary: 400ms roll, 45ms stagger, 260ms snap window.
-         Receipt: 800ms roll, 80ms stagger, always rolls.
-       - Receipt landing animation on first arrival only
-         (receiptHasLanded session flag). 1000ms paperLand
-         keyframe, small overshoot at 70%.
-       - Koi tap sound is now the real MP3 asset
-         (Sound/cave-water-drop-echo-a053fcdf.mp3). The
-         synthesised drop (synthesizeDrop) has been removed.
+       - Odometer on summary + receipt totals.
+       - Receipt landing animation (first arrival only).
+       - Koi tap sound is Sound/cave-water-drop-echo-a053fcdf.mp3;
+         synthesizeDrop removed.
      v1.13
-       - Water-drop synth sound on koi tap (superseded in v1.14).
-       - Washi paper JPG (icons/1790835034553.jpg) applied to
-         #tableCard and .receipt-paper only.
-       - Reject state: Thank-You screen's tyReceiptBtn now returns
-         to the service table instead of opening a receipt.
-       - tyReceiptBtn label toggles with rejected state.
-       - Reject-flow Thank-You screen does NOT re-surface the tip.
-       - returnToTable() skips the 1200 ms fade wait when no
-         receipt is on screen.
+       - Washi paper on #tableCard and .receipt-paper.
+       - Reject state: Thank-You screen returns to the table.
        - Ghost-checkbox symmetric fix.
    ============================================================ */
 
@@ -403,14 +400,10 @@ function loadAllPanels() {
 }
 
 /* ============================================================
-   ODOMETER ENGINE (v1.14)
-   ------------------------------------------------------------
-   Six-digit fixed column layout. Leading columns expand and
-   collapse via width transition. A comma static sits after
-   column index 2 and appears when the value crosses 1000.
+   ODOMETER ENGINE
    ============================================================ */
 var NUM_COLS = 6;
-var COMMA_AFTER = 2;   /* comma sits after col 2 (0-indexed) */
+var COMMA_AFTER = 2;
 var SNAP_WINDOW_MS = 260;
 
 function isColVisible(value, colIndex) {
@@ -418,12 +411,10 @@ function isColVisible(value, colIndex) {
   var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
   return value >= placeValue;
 }
-
 function getDigitAt(value, colIndex) {
   var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
   return Math.floor(value / placeValue) % 10;
 }
-
 function buildDigitColumns(container, initialValue) {
   if (!container) return;
   container.innerHTML = '';
@@ -442,7 +433,6 @@ function buildDigitColumns(container, initialValue) {
     strip.style.transform = 'translateY(0)';
     col.appendChild(strip);
     container.appendChild(col);
-
     if (i === COMMA_AFTER) {
       var comma = document.createElement('span');
       comma.className = 'digit-static hidden';
@@ -456,31 +446,22 @@ function buildDigitColumns(container, initialValue) {
   void container.offsetWidth;
   container.classList.remove('no-transition');
 }
-
 function applyDigitValue(container, value, opts) {
   if (!container) return;
   opts = opts || {};
   var instant = !!opts.instant;
   var stagger = opts.stagger != null ? opts.stagger : 45;
-
-  if (instant) {
-    container.classList.add('no-transition');
-  }
-
+  if (instant) container.classList.add('no-transition');
   var cols = container.querySelectorAll('.digit-col');
   var comma = container.querySelector('.digit-static[data-comma]');
-
   for (var i = 0; i < cols.length; i++) {
     var col = cols[i];
     var strip = col.querySelector('.digit-strip');
     var visible = isColVisible(value, i);
     var newDigit = getDigitAt(value, i);
     var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
-
-    /* Rightmost (ones place) rolls first; moving left, each delay grows. */
     var fromRight = NUM_COLS - 1 - i;
     var delay = instant ? 0 : fromRight * stagger;
-
     if (instant) {
       strip.style.transitionDelay = '0ms';
       strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
@@ -488,15 +469,10 @@ function applyDigitValue(container, value, opts) {
       strip.style.transitionDelay = delay + 'ms';
       strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
     }
-
     col.classList.toggle('hidden', !visible);
     col.setAttribute('data-digit', newDigit);
   }
-
-  if (comma) {
-    comma.classList.toggle('hidden', value < 1000);
-  }
-
+  if (comma) comma.classList.toggle('hidden', value < 1000);
   if (instant) {
     void container.offsetWidth;
     requestAnimationFrame(function() {
@@ -506,10 +482,7 @@ function applyDigitValue(container, value, opts) {
     });
   }
 }
-
-/* ============ SUMMARY TOTAL (odometer) ============ */
 var lastSummaryUpdate = 0;
-
 function updateSummaryTotal(targetAmount) {
   var container = document.getElementById('summaryDigits');
   if (!container) return;
@@ -519,8 +492,6 @@ function updateSummaryTotal(targetAmount) {
   lastSummaryUpdate = now;
   applyDigitValue(container, targetAmount, { instant: shouldSnap, stagger: 45 });
 }
-
-/* ============ RECEIPT TOTAL (odometer) ============ */
 function updateReceiptTotal() {
   var container = document.getElementById('receiptTotalNumber');
   if (!container) return;
@@ -631,6 +602,7 @@ var tyReceiptBtnLabel = document.getElementById('tyReceiptBtnLabel');
 
 var receiptOpenedFromThankyou = false;
 var receiptHasLanded = false;
+var receiptScrollIndicatorEl = null;
 
 var NAGOYA = { lat: 35.1815, lon: 136.9066, tz: 'Asia/Tokyo', name: '名古屋市' };
 var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -723,15 +695,12 @@ var lastNumpadWinW = 0;
 function repositionNumpad() {
   if (!numpad) return;
   if (window.innerWidth <= 1250) return;
-
   if (window.innerWidth === lastNumpadWinW) return;
   lastNumpadWinW = window.innerWidth;
-
   var numpadWidth = 232;
   var theoreticalRightEdge = (window.innerWidth / 2) + 300;
   var rightSpace = window.innerWidth - theoreticalRightEdge;
   var left = theoreticalRightEdge + (rightSpace - numpadWidth) / 2;
-
   numpad.style.left = left + 'px';
   numpad.style.top = '50%';
 }
@@ -758,9 +727,7 @@ function inputHasSelection(input) {
   try {
     var s = input.selectionStart, e = input.selectionEnd;
     return (s !== null && e !== null && s !== e);
-  } catch (err) {
-    return false;
-  }
+  } catch (err) { return false; }
 }
 
 function numpadAppend(input, digits) {
@@ -768,9 +735,8 @@ function numpadAppend(input, digits) {
   var cur = inputHasSelection(input) ? '' : (input.value || '').replace(/[^0-9]/g, '');
   cur = cur + digits;
   if (cur.length > 5) cur = cur.slice(0, 5);
-  if (cur === '') {
-    input.value = '';
-  } else {
+  if (cur === '') { input.value = ''; }
+  else {
     var parsed = parseInt(cur, 10);
     input.value = parsed === 0 ? '0' : parsed.toLocaleString();
   }
@@ -780,9 +746,8 @@ function numpadAppend(input, digits) {
 function numpadBackspace(input) {
   if (!input) return;
   var cur;
-  if (inputHasSelection(input)) {
-    cur = '';
-  } else {
+  if (inputHasSelection(input)) { cur = ''; }
+  else {
     cur = (input.value || '').replace(/[^0-9]/g, '');
     cur = cur.slice(0, -1);
   }
@@ -805,29 +770,16 @@ function numpadShake(input) {
 function handleNumpadKey(key) {
   var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
   if (rejected && !isReceiptOpen) return;
-
   var target = getActivePriceInput();
   if (!target) return;
-
   playTock(key);
-
   if (key === 'done') {
-    if ((target.value || '').trim() === '') {
-      numpadShake(target);
-    } else {
-      haptic(10);
-      try { target.blur(); } catch (e) {}
-    }
+    if ((target.value || '').trim() === '') { numpadShake(target); }
+    else { haptic(10); try { target.blur(); } catch (e) {} }
     return;
   }
-
-  if (key === 'back') {
-    numpadBackspace(target);
-    haptic(8);
-  } else {
-    numpadAppend(target, key);
-    haptic(8);
-  }
+  if (key === 'back') { numpadBackspace(target); haptic(8); }
+  else { numpadAppend(target, key); haptic(8); }
 }
 for (var nb = 0; nb < numpadBtns.length; nb++) {
   (function(btn) {
@@ -843,12 +795,10 @@ for (var nb = 0; nb < numpadBtns.length; nb++) {
 }
 function updateNumpadVisibility() {
   if (!numpad) return;
-
   if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) {
     numpad.classList.remove('visible');
     return;
   }
-
   var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
   if (isReceiptOpen) {
     numpad.classList.add('receipt-mode');
@@ -858,20 +808,16 @@ function updateNumpadVisibility() {
   } else {
     numpad.classList.remove('receipt-mode');
   }
-
   if (!tableCard) return;
   if (window.innerWidth <= 1250) return;
-
   if (rejected || numpadSuppressed) {
     numpad.classList.remove('visible');
     return;
   }
-
   var activeEl = document.activeElement;
   var isPriceFocused = activeEl && activeEl.classList &&
     (activeEl.classList.contains('price-input') ||
      activeEl.classList.contains('receipt-price-input'));
-
   if (isPriceFocused) {
     repositionNumpad();
     numpad.classList.add('visible');
@@ -894,7 +840,6 @@ document.addEventListener('focusin', function(e) {
     updateNumpadVisibility();
   }
 });
-
 document.addEventListener('focusout', function(e) {
   setTimeout(updateNumpadVisibility, 10);
 });
@@ -928,9 +873,7 @@ function confirmTanzaku() {
   if (!tanzakuTargetRow) { closeTanzaku(); return; }
   var svcInput = tanzakuTargetRow.querySelector('.service-input');
   if (!svcInput) { closeTanzaku(); return; }
-
   var val = (tanzakuInput.value || '').trim();
-
   if (val === '') {
     tanzakuInput.classList.remove('shake');
     void tanzakuInput.offsetWidth;
@@ -939,38 +882,22 @@ function confirmTanzaku() {
     haptic(15);
     return;
   }
-
   svcInput.value = val;
   fireInputEvent(svcInput);
   haptic(10);
-
   var priceFieldToFocus = tanzakuTargetRow.querySelector('.price-input');
-
   closeTanzaku();
-
   if (priceFieldToFocus && !priceFieldToFocus.disabled) {
     setTimeout(function() {
       try { priceFieldToFocus.focus(); } catch(e) {}
     }, 50);
   }
 }
-tanzakuCancel.addEventListener('click', function(e) {
-  e.preventDefault();
-  haptic(8);
-  closeTanzaku();
-});
-tanzakuConfirm.addEventListener('click', function(e) {
-  e.preventDefault();
-  confirmTanzaku();
-});
+tanzakuCancel.addEventListener('click', function(e) { e.preventDefault(); haptic(8); closeTanzaku(); });
+tanzakuConfirm.addEventListener('click', function(e) { e.preventDefault(); confirmTanzaku(); });
 tanzakuInput.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' || e.keyCode === 13) {
-    e.preventDefault();
-    confirmTanzaku();
-  } else if (e.key === 'Escape' || e.keyCode === 27) {
-    e.preventDefault();
-    closeTanzaku();
-  }
+  if (e.key === 'Enter' || e.keyCode === 13) { e.preventDefault(); confirmTanzaku(); }
+  else if (e.key === 'Escape' || e.keyCode === 27) { e.preventDefault(); closeTanzaku(); }
 });
 tanzakuScreen.addEventListener('click', function(e) {
   if (e.target === tanzakuScreen) closeTanzaku();
@@ -1093,7 +1020,7 @@ function updateAllRowLocks() {
   for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
 }
 
-/* ============ FIX-002: SEQUENTIAL CUSTOM ROW GATING ============ */
+/* ============ FIX-002 ============ */
 function getCustomRows() {
   var all = tableCard.querySelectorAll('.row');
   var out = [];
@@ -1133,10 +1060,7 @@ function tryOpenCustomService(row, withHint) {
   if (!row) return;
   if (!isAllowedCustomRow(row)) {
     var first = firstUnnamedCustomRow();
-    if (first) {
-      flashCustomRowHint(first);
-      haptic(15);
-    }
+    if (first) { flashCustomRowHint(first); haptic(15); }
     return;
   }
   if (withHint) {
@@ -1148,7 +1072,6 @@ function tryOpenCustomService(row, withHint) {
   }
   openTanzaku(row);
 }
-
 function flashServiceInput(row) {
   if (!row) return;
   var svc = row.querySelector('.service-input');
@@ -1238,16 +1161,13 @@ function scheduleEmptyBlurShake(row, input, box) {
     pendingShakeTimeout = null;
     pendingShakeRow = null;
     if (rejected) return;
-
     if (alertScreen.classList.contains('visible')) return;
     if (confirmScreen.classList.contains('visible')) return;
     if (receiptScreen && receiptScreen.classList.contains('visible')) return;
     if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) return;
-
     if (document.activeElement === input) return;
     if (!box.classList.contains('checked')) return;
     if ((input.value || '').trim() !== '') return;
-
     var wrap = input.closest('.price-wrap');
     if (wrap) {
       wrap.classList.remove('shake');
@@ -1256,12 +1176,9 @@ function scheduleEmptyBlurShake(row, input, box) {
       setTimeout(function() { wrap.classList.remove('shake'); }, 350);
     }
     haptic(6);
-
     var active = document.activeElement;
     var otherInputFocused = active && active.tagName === 'INPUT';
-    if (!otherInputFocused) {
-      try { input.focus(); } catch (e) {}
-    }
+    if (!otherInputFocused) { try { input.focus(); } catch (e) {} }
   }, 150);
 }
 
@@ -1279,7 +1196,6 @@ function findPendingUnpricedRow() {
   }
   return null;
 }
-
 function shakeAndRefocusPending(row) {
   if (!row) return;
   var input = row.querySelector('.price-input');
@@ -1295,7 +1211,6 @@ function shakeAndRefocusPending(row) {
   haptic(6);
   try { input.focus(); } catch (e) {}
 }
-
 function refuseIfPending(row) {
   var pending = findPendingUnpricedRow();
   if (pending && pending !== row) {
@@ -1316,7 +1231,6 @@ function cancelPendingReceiptShake() {
   }
   pendingShakeReceiptItem = null;
 }
-
 function scheduleReceiptEmptyBlurShake(item, input) {
   cancelPendingReceiptShake();
   pendingShakeReceiptItem = item;
@@ -1328,7 +1242,6 @@ function scheduleReceiptEmptyBlurShake(item, input) {
     if (item.classList.contains('removing')) return;
     if (document.activeElement === input) return;
     if ((input.value || '').trim() !== '') return;
-
     var wrap = input.closest('.receipt-item-price-wrap');
     if (wrap) {
       wrap.classList.remove('shake');
@@ -1337,12 +1250,9 @@ function scheduleReceiptEmptyBlurShake(item, input) {
       setTimeout(function() { wrap.classList.remove('shake'); }, 350);
     }
     haptic(6);
-
     var active = document.activeElement;
     var otherInputFocused = active && active.tagName === 'INPUT';
-    if (!otherInputFocused) {
-      try { input.focus(); } catch (e) {}
-    }
+    if (!otherInputFocused) { try { input.focus(); } catch (e) {} }
   }, 150);
 }
 
@@ -1373,9 +1283,7 @@ var KEYBOARD_GUST         = 9;
 
 var swipeSamples = [];
 
-function startSwipeTracking() {
-  swipeSamples = [];
-}
+function startSwipeTracking() { swipeSamples = []; }
 function recordSwipeSample(x) {
   var now = performance.now();
   swipeSamples.push({ x: x, t: now });
@@ -1392,13 +1300,11 @@ function computeSwipeVelocity() {
   if (dt <= 0) return 0;
   return (newest.x - oldest.x) / dt;
 }
-
 function applyWind(x) {
   if (!ambientStyle) return;
   ambientStyle.setProperty('--wind-x', x + 'px');
   ambientStyle.setProperty('--wind-x-extra', (x * 0.4) + 'px');
 }
-
 function windStep(now) {
   var dt = 1;
   if (windStep.lastTime) {
@@ -1406,11 +1312,9 @@ function windStep(now) {
     if (dt <= 0) dt = 1;
   }
   windStep.lastTime = now;
-
   currentWindOffset += currentWindVelocity * dt;
   currentWindVelocity -= currentWindOffset * WIND_STIFFNESS * dt;
   currentWindVelocity *= Math.pow(WIND_DAMPING, dt);
-
   if (currentWindOffset > WIND_OFFSET_CLAMP) {
     currentWindOffset = WIND_OFFSET_CLAMP;
     currentWindVelocity *= 0.5;
@@ -1418,9 +1322,7 @@ function windStep(now) {
     currentWindOffset = -WIND_OFFSET_CLAMP;
     currentWindVelocity *= 0.5;
   }
-
   applyWind(currentWindOffset);
-
   if (Math.abs(currentWindVelocity) < WIND_SETTLE_VELOCITY &&
       Math.abs(currentWindOffset) < WIND_SETTLE_OFFSET) {
     currentWindOffset = 0;
@@ -1430,10 +1332,8 @@ function windStep(now) {
     windStep.lastTime = 0;
     return;
   }
-
   windRafId = requestAnimationFrame(windStep);
 }
-
 function gustWind(impulse) {
   if (!windEnabled) return;
   currentWindVelocity += impulse;
@@ -1441,7 +1341,6 @@ function gustWind(impulse) {
   windStep.lastTime = 0;
   windRafId = requestAnimationFrame(windStep);
 }
-
 function releaseSwipeGust() {
   if (!windEnabled) return;
   var velocityPxPerMs = computeSwipeVelocity();
@@ -1452,7 +1351,6 @@ function releaseSwipeGust() {
   if (Math.abs(impulse) < 0.3) return;
   gustWind(impulse);
 }
-
 function resetWind() {
   if (windRafId) { cancelAnimationFrame(windRafId); windRafId = null; }
   currentWindOffset = 0;
@@ -1461,7 +1359,6 @@ function resetWind() {
   windStep.lastTime = 0;
   applyWind(0);
 }
-
 function buildMotes() {
   if (!moteField) return;
   moteField.innerHTML = '';
@@ -1484,7 +1381,6 @@ function buildMotes() {
     moteField.appendChild(m);
   }
 }
-
 window.addEventListener('resize', function() {
   if (Math.abs(currentWindOffset) > WIND_OFFSET_CLAMP) {
     currentWindOffset = currentWindOffset > 0 ? WIND_OFFSET_CLAMP : -WIND_OFFSET_CLAMP;
@@ -1515,9 +1411,7 @@ function buildNameScreenRows() {
     priceInput.placeholder = '料金を入力';
     priceInput.setAttribute('inputmode', 'none');
     priceInput.setAttribute('enterkeyhint', 'done');
-    if (preset.price && preset.price > 0) {
-      priceInput.value = preset.price.toLocaleString();
-    }
+    if (preset.price && preset.price > 0) priceInput.value = preset.price.toLocaleString();
     var yenSpan = document.createElement('span');
     yenSpan.className = 'yen';
     yenSpan.textContent = '円';
@@ -1530,7 +1424,6 @@ function buildNameScreenRows() {
   }
   updateNameScreenTotal();
 }
-
 function updateNameScreenTotal() {
   if (!nameScreenRows || !nameScreenTotalValue) return;
   var sum = 0;
@@ -1543,7 +1436,6 @@ function updateNameScreenTotal() {
   }
   nameScreenTotalValue.textContent = '¥' + sum.toLocaleString();
 }
-
 nameScreenRows.addEventListener('click', function(e) {
   if (e.target.closest('.price-wrap')) return;
   var row = e.target.closest('.row');
@@ -1565,7 +1457,6 @@ nameScreenRows.addEventListener('click', function(e) {
   haptic(6);
   updateNameScreenTotal();
 });
-
 nameScreenRows.addEventListener('input', function(e) {
   var input = e.target;
   if (!input.classList.contains('price-input')) return;
@@ -1575,41 +1466,30 @@ nameScreenRows.addEventListener('input', function(e) {
   else input.value = parseInt(digits, 10).toLocaleString();
   updateNameScreenTotal();
 });
-
 nameScreenRows.addEventListener('focusin', function(e) {
   var input = e.target;
   if (input && input.classList.contains('price-input')) {
-    setTimeout(function() {
-      try { input.select(); } catch (err) {}
-    }, 50);
+    setTimeout(function() { try { input.select(); } catch (err) {} }, 50);
   }
 });
 
 /* ============ TABLE LISTENERS ============ */
 tableCard.addEventListener('click', function(e) {
   if (rejected) return;
-
   if (e.target.closest('.price-wrap')) return;
   if (e.target.closest('.service-input')) return;
-
   var row = e.target.closest('.row');
   if (!row) return;
-
   var box = row.querySelector('.row-check');
   if (!box) return;
-
   var tappedCheckbox = !!e.target.closest('.row-check');
   var isCustomRow = !!row.querySelector('.service-input');
-
   if (row.classList.contains('locked') && !tappedCheckbox) return;
   if (isCustomRow && !tappedCheckbox) return;
-
   if (refuseIfPending(row)) return;
   if (pendingShakeRow === row) cancelPendingShake();
-
   var priceInput = row.querySelector('.price-input');
   var serviceText = row.querySelector('.service-input');
-
   if (box.classList.contains('checked')) {
     haptic(6);
     playCheck(false);
@@ -1655,7 +1535,6 @@ tableCard.addEventListener('click', function(e) {
   }
   recalc();
 });
-
 tableCard.addEventListener('click', function(e) {
   var svcInput = e.target.closest('.service-input');
   if (!svcInput) return;
@@ -1665,7 +1544,6 @@ tableCard.addEventListener('click', function(e) {
   if (refuseIfPending(row)) return;
   tryOpenCustomService(row, false);
 });
-
 tableCard.addEventListener('click', function(e) {
   var row = e.target.closest('.row');
   if (!row) return;
@@ -1674,7 +1552,6 @@ tableCard.addEventListener('click', function(e) {
   if (refuseIfPending(row)) return;
   flashServiceInput(row);
 });
-
 tableCard.addEventListener('focusout', function(e) {
   var input = e.target;
   if (!input || !input.classList || !input.classList.contains('price-input')) return;
@@ -1686,7 +1563,6 @@ tableCard.addEventListener('focusout', function(e) {
   if ((input.value || '').trim() !== '') return;
   scheduleEmptyBlurShake(row, input, box);
 });
-
 tableCard.addEventListener('input', function(e) {
   var input = e.target;
   if (!input.classList.contains('price-input')) return;
@@ -1733,7 +1609,6 @@ tableCard.addEventListener('input', function(e) {
   }
   recalc();
 });
-
 tableCard.addEventListener('input', function(e) {
   var inp = e.target;
   if (!inp.classList.contains('service-input')) return;
@@ -1749,13 +1624,6 @@ tableCard.addEventListener('input', function(e) {
           box.setAttribute('aria-checked', 'true');
         }
       } else {
-        /* Ghost-checkbox symmetric fix (v1.13):
-           Emptying the .service-input silently unchecks the row.
-           No playCheck() / no haptic — deletion-driven, not a
-           deliberate tap. Does NOT preserve data-saved-price /
-           data-saved-service (that preservation is exclusive to
-           the manual uncheck path). updateRowLock() above has
-           already blanked the price and added .locked. */
         box.classList.remove('checked');
         box.setAttribute('aria-checked', 'false');
       }
@@ -1763,16 +1631,13 @@ tableCard.addEventListener('input', function(e) {
   }
   recalc();
 });
-
 tableCard.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' || e.keyCode === 13) {
     if (rejected) return;
     if (e.target.classList.contains('service-input')) {
       e.preventDefault();
       var row = e.target.closest('.row');
-      if (row) {
-        tryOpenCustomService(row, false);
-      }
+      if (row) tryOpenCustomService(row, false);
     } else if (e.target.classList.contains('price-input')) {
       if (e.target.disabled) return;
       if (e.target.value.trim() === '') {
@@ -1792,13 +1657,10 @@ tableCard.addEventListener('keydown', function(e) {
     }
   }
 });
-
 tableCard.addEventListener('focusin', function(e) {
   var input = e.target;
   if (input && input.classList.contains('price-input')) {
-    setTimeout(function() {
-      try { input.select(); } catch (err) {}
-    }, 50);
+    setTimeout(function() { try { input.select(); } catch (err) {} }, 50);
   }
 });
 
@@ -1888,6 +1750,188 @@ function updateRejectThanksContent() {
   }
 }
 
+/* ============================================================
+   TRANSITION-LINE PARAGRAPH REVEAL (v1.15)
+   ============================================================ */
+var transitionRevealObserver = null;
+var transitionRevealTimers = [];
+var TRANSITION_REVEAL_STAGGER = 200;
+var TRANSITION_REVEAL_THRESHOLD = 0.20;
+var TRANSITION_REVEAL_ROOT_MARGIN = '0px 0px -8% 0px';
+
+function wrapTransitionBody() {
+  var bodyEl = document.getElementById('transitionLineBody');
+  if (!bodyEl) return;
+  if (bodyEl.querySelector('p')) return;
+  var html = bodyEl.innerHTML;
+  var parts = html.split(/<br\s*\/?>\s*<br\s*\/?>/i);
+  var out = [];
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i].trim();
+    if (p === '') continue;
+    out.push('<p>' + p + '</p>');
+  }
+  bodyEl.innerHTML = out.join('');
+}
+
+function setupTransitionReveal() {
+  var bodyEl = document.getElementById('transitionLineBody');
+  if (!bodyEl) return;
+  var paragraphs = bodyEl.querySelectorAll('p');
+  if (paragraphs.length === 0) return;
+  if (transitionRevealObserver) transitionRevealObserver.disconnect();
+
+  transitionRevealObserver = new IntersectionObserver(function(entries) {
+    var entering = [];
+    entries.forEach(function(entry) {
+      if (entry.isIntersecting && !entry.target.classList.contains('revealed')) {
+        entering.push(entry.target);
+      }
+    });
+    entering.sort(function(a, b) {
+      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+    });
+    entering.forEach(function(el, i) {
+      var delay = (entering.length > 1 && TRANSITION_REVEAL_STAGGER > 0)
+        ? i * TRANSITION_REVEAL_STAGGER
+        : 0;
+      if (delay > 0) {
+        var id = setTimeout(function() { el.classList.add('revealed'); }, delay);
+        transitionRevealTimers.push(id);
+      } else {
+        el.classList.add('revealed');
+      }
+    });
+  }, {
+    threshold: TRANSITION_REVEAL_THRESHOLD,
+    rootMargin: TRANSITION_REVEAL_ROOT_MARGIN
+  });
+
+  paragraphs.forEach(function(p) { transitionRevealObserver.observe(p); });
+}
+
+/* ============================================================
+   TRANSITION-LINE BLUR + SCALE (v1.15)
+   Blur: 0 at pivot (block centre = viewport centre), ramps to
+   TB_MAX_BLUR linearly in both directions.
+   Scale: dead zone while blur >= TB_SCALE_TRIGGER_BLUR. Below
+   that, ramps linearly from 1.00 at trigger to TB_MAX_SCALE at
+   blur = 0. Symmetric on both sides.
+   ============================================================ */
+var tbMetrics = {
+  bodyEl: null,
+  secondLastP: null,
+  downMax: 1,
+  upMax: 1,
+  valid: false
+};
+var TB_MAX_BLUR = 6;
+var TB_SCALE_TRIGGER_BLUR = 1.0;
+var TB_MAX_SCALE = 1.07;
+
+function measureTransitionBody() {
+  var bodyEl = document.getElementById('transitionLineBody');
+  if (!bodyEl) { tbMetrics.valid = false; return; }
+  var paragraphs = bodyEl.querySelectorAll('p');
+  if (paragraphs.length < 2) { tbMetrics.valid = false; return; }
+  var secondLastP = paragraphs[paragraphs.length - 2];
+  var vh = window.innerHeight;
+  var bodyH = bodyEl.offsetHeight;
+  tbMetrics.bodyEl = bodyEl;
+  tbMetrics.secondLastP = secondLastP;
+  tbMetrics.downMax = Math.max(40, vh / 2 + bodyH / 2);
+  tbMetrics.upMax = Math.max(40, vh / 2 + secondLastP.offsetTop - bodyH / 2);
+  tbMetrics.valid = true;
+}
+
+function updateTransitionBodyEffects() {
+  if (!tbMetrics.valid || !tbMetrics.bodyEl) return;
+  var vh = window.innerHeight;
+  var vc = vh / 2;
+  var rect = tbMetrics.bodyEl.getBoundingClientRect();
+  var bodyCentre = rect.top + rect.height / 2;
+  var d = bodyCentre - vc;
+
+  var progress;
+  if (d >= 0) progress = Math.min(1, d / tbMetrics.downMax);
+  else progress = Math.min(1, -d / tbMetrics.upMax);
+
+  var blurVal = TB_MAX_BLUR * progress;
+  var scaleVal = 1.0;
+  if (blurVal < TB_SCALE_TRIGGER_BLUR) {
+    scaleVal = 1.0 + (TB_MAX_SCALE - 1.0) * (1 - blurVal / TB_SCALE_TRIGGER_BLUR);
+  }
+
+  tbMetrics.bodyEl.style.filter = blurVal > 0.05
+    ? 'blur(' + blurVal.toFixed(2) + 'px)'
+    : 'none';
+  tbMetrics.bodyEl.style.transform = scaleVal > 1.001
+    ? 'scaleX(' + scaleVal.toFixed(4) + ')'
+    : '';
+}
+
+var tbRafPending = false;
+function scheduleTransitionBodyUpdate() {
+  if (tbRafPending) return;
+  tbRafPending = true;
+  requestAnimationFrame(function() {
+    tbRafPending = false;
+    updateTransitionBodyEffects();
+  });
+}
+
+/* ============================================================
+   RECEIPT SCROLL RESET + INDICATOR (v1.15)
+   ============================================================ */
+var RECEIPT_IND_X = 26;
+var RECEIPT_IND_Y = 10;
+var RECEIPT_IND_SIZE = 34;
+
+function resetReceiptScroll() {
+  try {
+    if (document.activeElement && document.activeElement.blur) {
+      document.activeElement.blur();
+    }
+  } catch (e) { /* silent */ }
+  if (receiptScreen) receiptScreen.scrollTop = 0;
+  if (receiptScreen) {
+    var paper = receiptScreen.querySelector('.receipt-paper');
+    if (paper) paper.scrollTop = 0;
+  }
+}
+
+function updateReceiptScrollIndicator() {
+  if (!receiptScrollIndicatorEl) {
+    receiptScrollIndicatorEl = document.getElementById('receiptScrollIndicator');
+  }
+  if (!receiptScrollIndicatorEl || !receiptScreen) return;
+
+  if (!receiptScreen.classList.contains('visible')) {
+    receiptScrollIndicatorEl.classList.remove('shown');
+    return;
+  }
+
+  var paper = receiptScreen.querySelector('.receipt-paper');
+  if (!paper) {
+    receiptScrollIndicatorEl.classList.remove('shown');
+    return;
+  }
+
+  var scrollable = paper.scrollHeight > paper.clientHeight + 4;
+  var atBottom = paper.scrollTop + paper.clientHeight >= paper.scrollHeight - 4;
+  if (!scrollable || atBottom) {
+    receiptScrollIndicatorEl.classList.remove('shown');
+    return;
+  }
+
+  var rect = paper.getBoundingClientRect();
+  var left = rect.right - RECEIPT_IND_X - RECEIPT_IND_SIZE / 2;
+  var bottom = (window.innerHeight - rect.bottom) + RECEIPT_IND_Y;
+  receiptScrollIndicatorEl.style.left = left + 'px';
+  receiptScrollIndicatorEl.style.bottom = bottom + 'px';
+  receiptScrollIndicatorEl.classList.add('shown');
+}
+
 /* ============ NAME CONFIRM ============ */
 function confirmName() {
   if (nameConfirmed) return;
@@ -1953,14 +1997,13 @@ function confirmName() {
     anyPresetSelected = true;
   }
 
-  /* CONDITIONAL-001: swap panel 3 content based on preset selection. */
+  /* CONDITIONAL-001 */
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
     panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
   }
 
-  /* CONDITIONAL-002: swap transition-line body based on preset selection.
-     Capture the default from the DOM the first time we get here. */
+  /* CONDITIONAL-002 — capture default the first time, then swap */
   if (transitionBodyDefault === '') {
     var tlBodyCapture = document.getElementById('transitionLineBody');
     if (tlBodyCapture) transitionBodyDefault = tlBodyCapture.innerHTML;
@@ -1968,6 +2011,13 @@ function confirmName() {
   var tlBody = document.getElementById('transitionLineBody');
   if (tlBody) {
     tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
+    /* v1.15: wrap into <p> elements, wire reveal observer, measure. */
+    wrapTransitionBody();
+    setupTransitionReveal();
+    requestAnimationFrame(function() {
+      measureTransitionBody();
+      updateTransitionBodyEffects();
+    });
   }
 
   nameInput.classList.add('confirmed');
@@ -2019,7 +2069,6 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 
 window.addEventListener('load', function() {
   startInfoUpdates();
-  /* Autoplay recovery + visibility handling (Android). */
   var ambientVideo = document.getElementById('ambientVideo');
   if (ambientVideo) {
     if (ambientVideo.paused && currentTheme === 'autumn') {
@@ -2064,9 +2113,24 @@ window.addEventListener('load', function() {
   }
   buildMotes();
 
-  /* v1.14: build odometer columns once at boot. */
+  /* v1.14: build odometer columns at boot. */
   buildDigitColumns(document.getElementById('summaryDigits'), 0);
   buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
+
+  /* v1.15: receipt scroll listeners + ResizeObserver. */
+  var receiptPaperEl = receiptScreen ? receiptScreen.querySelector('.receipt-paper') : null;
+  if (receiptPaperEl) {
+    receiptPaperEl.addEventListener('scroll', updateReceiptScrollIndicator, { passive: true });
+  }
+  if (receiptScreen) {
+    receiptScreen.addEventListener('scroll', updateReceiptScrollIndicator, { passive: true });
+  }
+  if (window.ResizeObserver && receiptItems) {
+    var ro = new ResizeObserver(function() {
+      updateReceiptScrollIndicator();
+    });
+    ro.observe(receiptItems);
+  }
 });
 
 /* ============ INTRO ============ */
@@ -2195,7 +2259,6 @@ function buildReceipt() {
     itemCount++;
   }
   if (itemCount === 0 && rejected) {
-    /* Defensive branch — reject path no longer routes here (v1.13+). */
     var rejectDiv = document.createElement('div');
     rejectDiv.className = 'receipt-item';
     var rejectName = document.createElement('span');
@@ -2270,7 +2333,6 @@ function bindReceiptItemListeners() {
         if (item.classList.contains('removing')) return;
         haptic(8);
         cancelPendingReceiptShake();
-
         if (item._srcRow) {
           var srcBox = item._srcRow.querySelector('.row-check');
           var srcPrice = item._srcRow.querySelector('.price-input');
@@ -2286,10 +2348,10 @@ function bindReceiptItemListeners() {
           updateRowLock(item._srcRow);
           recalc();
         }
-
         item.setAttribute('data-removing', 'true');
         item.classList.add('removing');
         updateReceiptTotal();
+        updateReceiptScrollIndicator();
       });
     })(removeButtons[r]);
   }
@@ -2303,7 +2365,6 @@ function bindReceiptItemListeners() {
         if (!item) return;
         if (!item.classList.contains('removing')) return;
         haptic(10);
-
         if (item._srcRow) {
           var srcBox = item._srcRow.querySelector('.row-check');
           var srcPrice = item._srcRow.querySelector('.price-input');
@@ -2312,21 +2373,17 @@ function bindReceiptItemListeners() {
             srcBox.classList.add('checked');
             srcBox.setAttribute('aria-checked', 'true');
             var savedPrice = srcBox.getAttribute('data-saved-price');
-            if (savedPrice !== null && savedPrice !== '' && srcPrice) {
-              srcPrice.value = savedPrice;
-            }
+            if (savedPrice !== null && savedPrice !== '' && srcPrice) srcPrice.value = savedPrice;
             var savedService = srcBox.getAttribute('data-saved-service');
-            if (savedService !== null && savedService !== '' && srcService) {
-              srcService.value = savedService;
-            }
+            if (savedService !== null && savedService !== '' && srcService) srcService.value = savedService;
           }
           updateRowLock(item._srcRow);
           recalc();
         }
-
         item.classList.remove('removing');
         item.setAttribute('data-removing', 'false');
         updateReceiptTotal();
+        updateReceiptScrollIndicator();
       });
     })(undoButtons[u]);
   }
@@ -2399,7 +2456,6 @@ alertOk.addEventListener('click', function(e) {
   alertOkCallback = null;
   if (typeof cb === 'function') cb();
 });
-
 alertScreen.addEventListener('click', function(e) {
   if (e.target === alertScreen) alertOk.click();
 });
@@ -2411,8 +2467,6 @@ confirmYes.addEventListener('click', function(e) {
   confirmScreen.classList.remove('visible');
 
   if (rejected) {
-    /* Reject flow: no receipt. Hand straight to the thank-you carousel;
-       its tyReceiptBtn will route back to the table. */
     firstServiceInReceipt = false;
     thankyouScreen.style.transition = 'none';
     thankyouScreen.classList.add('visible');
@@ -2433,6 +2487,8 @@ confirmYes.addEventListener('click', function(e) {
   divider.classList.remove('active');
   summaryBar.classList.remove('visible');
   setTimeout(function() {
+    /* v1.15: reset scroll so the receipt opens at the top. */
+    resetReceiptScroll();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
@@ -2451,6 +2507,11 @@ confirmYes.addEventListener('click', function(e) {
         });
       }
     }
+
+    /* v1.15: indicator visibility after layout settles. */
+    requestAnimationFrame(updateReceiptScrollIndicator);
+    setTimeout(updateReceiptScrollIndicator, 100);
+    setTimeout(updateReceiptScrollIndicator, 1000);
   }, 450);
 });
 
@@ -2520,9 +2581,6 @@ receiptConfirmBtn.addEventListener('click', function(e) {
 function returnToTable() {
   clearAllTyTimers();
   cancelPendingReceiptShake();
-  /* v1.13: capture whether a receipt was actually on screen. If not
-     (the reject path), the fade-out wait below is pointless and would
-     leave the screen blank for 1.2 s. */
   var receiptWasVisible = receiptScreen.classList.contains('visible');
   if (thankyouScreen.classList.contains('visible')) {
     thankyouScreen.style.transition = 'none';
@@ -2811,7 +2869,6 @@ function updateSummaryVisibility() {
     var firstRect  = rows[0].getBoundingClientRect();
     var secondVisible  = (secondRect.top < vh && secondRect.bottom > 0);
     var firstOffBottom = (firstRect.top >= vh);
-
     if (lastScrollDirection === 'down' && secondVisible) {
       summaryHysteresisOn = true;
       summaryBar.classList.add('visible');
@@ -2842,14 +2899,12 @@ function updateSummaryVisibility() {
   var effective = spansViewport ? 1 : ratio;
   if (!summaryHysteresisOn && effective >= 0.9) summaryHysteresisOn = true;
   else if (summaryHysteresisOn && effective < 0.5) summaryHysteresisOn = false;
-
   if (summaryHysteresisOn) {
     summaryBar.classList.add('visible');
     summaryEverShown = true;
   } else {
     summaryBar.classList.remove('visible');
   }
-
   updateNumpadVisibility();
 }
 
@@ -2866,6 +2921,7 @@ function showTransitionLine(animate) {
   } else {
     transitionLine.classList.add('active');
   }
+  scheduleTransitionBodyUpdate();
 }
 function hideTransitionLine() {
   if (!lineVisible) return;
@@ -2913,15 +2969,28 @@ window.addEventListener('scroll', function() {
       showTransitionLine(true);
     }
   }
-  if (goingDown || goingUp) scheduleEvaluation();
+  if (goingDown || goingUp) {
+    scheduleEvaluation();
+    scheduleTransitionBodyUpdate();
+  }
 }, { passive: true });
 
-window.addEventListener('resize', scheduleEvaluation);
+window.addEventListener('resize', function() {
+  scheduleEvaluation();
+  scheduleTransitionBodyUpdate();
+  measureTransitionBody();
+  updateReceiptScrollIndicator();
+});
 window.addEventListener('orientationchange', function() {
   setTimeout(scheduleEvaluation, 120);
   setTimeout(repositionHintGroup, 200);
   setTimeout(repositionNumpad, 200);
   setTimeout(updateNumpadVisibility, 200);
+  setTimeout(function() {
+    measureTransitionBody();
+    scheduleTransitionBodyUpdate();
+    updateReceiptScrollIndicator();
+  }, 300);
 });
 
 scheduleEvaluation();
@@ -2996,12 +3065,8 @@ rejectRow.addEventListener('click', function() {
         var wasChecked = ci2.getAttribute('data-reject-checked') === '1';
         var savedPrice = ci2.getAttribute('data-reject-price');
         var savedService = ci2.getAttribute('data-reject-service');
-        if (savedService !== null && savedService !== '' && ti2) {
-          ti2.value = savedService;
-        }
-        if (savedPrice !== null && savedPrice !== '' && pi2) {
-          pi2.value = savedPrice;
-        }
+        if (savedService !== null && savedService !== '' && ti2) ti2.value = savedService;
+        if (savedPrice !== null && savedPrice !== '' && pi2) pi2.value = savedPrice;
         if (wasChecked) {
           ci2.classList.add('checked');
           ci2.setAttribute('aria-checked', 'true');
@@ -3447,11 +3512,9 @@ function showQuote(index) {
 function startThankyouSequence() {
   clearAllTyTimers();
   document.body.classList.add('thankyou-active');
-
   if (tyReceiptBtnLabel) {
     tyReceiptBtnLabel.textContent = rejected ? 'サービス選択に戻る' : '内容を確認する';
   }
-
   applyTyPanel1Content();
   tyExited = false;
   tyCarousel.classList.remove('hidden-out');
@@ -3481,21 +3544,24 @@ function resumeThankyouSequence() {
 tyReceiptBtn.addEventListener('click', function(e) {
   e.preventDefault();
   haptic(10);
-
   if (rejected) {
     clearAllTyTimers();
     returnToTable();
     return;
   }
-
   clearAllTyTimers();
   buildReceipt();
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
+    /* v1.15: reset scroll on reopen too. */
+    resetReceiptScroll();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
+    requestAnimationFrame(updateReceiptScrollIndicator);
+    setTimeout(updateReceiptScrollIndicator, 100);
+    setTimeout(updateReceiptScrollIndicator, 500);
   }, 100);
 });
 
