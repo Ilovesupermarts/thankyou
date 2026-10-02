@@ -1,68 +1,154 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn">
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Strict Symmetrical Snap Demo</title>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+<title>Transition-Line Effect Tuning</title>
 <style>
   :root {
-    --bg-base: #fdf3d8; 
-    --text-dark: #231304; 
-    --accent: #8f2f00; 
-    --transition-head-color: #fdf0c8;
+    --accent: #b04a5a;
+    --bg: #faf7f5;
+    --border: #ead9d5;
+    --text: #1f1f1f;
+  }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 17px;
+    line-height: 1.7;
+    -webkit-text-size-adjust: 100%;
   }
 
-  body {
-    margin: 0;
-    padding: 0;
-    background-color: var(--bg-base);
-    color: var(--text-dark);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
-    height: 300vh; /* Forces a long scrollable page */
+  /* Control panel */
+  #controls {
+    position: fixed;
+    top: 0; right: 0;
+    width: 360px;
+    height: 100vh;
+    overflow-y: auto;
+    background: rgba(255,255,255,0.98);
+    border-left: 1px solid var(--border);
+    padding: 16px 18px 40px 18px;
+    box-sizing: border-box;
+    z-index: 100;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: -4px 0 16px rgba(0,0,0,0.05);
+  }
+  #controls h1 {
+    font-size: 13px;
+    margin: 0 0 16px 0;
+    letter-spacing: 1.5px;
+    color: var(--accent);
+    text-transform: uppercase;
+  }
+  #controls .group {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f0e8e4;
+  }
+  #controls .group:last-child { border-bottom: none; }
+  #controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #4a4542;
+    letter-spacing: 0.3px;
+  }
+  #controls .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  #controls input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+  }
+  #controls select {
+    width: 100%;
+    padding: 6px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+  }
+  #controls .val {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--accent);
+    min-width: 54px;
+    text-align: right;
+    font-weight: 600;
+  }
+  #controls .hint {
+    font-size: 11px;
+    color: #8a807c;
+    line-height: 1.45;
+    margin-top: 4px;
+  }
+  #controls button {
+    padding: 6px 11px;
+    border: 1px solid #ddd;
+    background: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    color: #333;
+  }
+  #controls button:active { background: #f5f5f5; }
+  #controls .presets {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 12px;
+    left: 12px;
+    padding: 10px 14px;
+    background: rgba(0,0,0,0.82);
+    color: #e0e0e0;
+    border-radius: 8px;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.65;
+    z-index: 100;
+    pointer-events: none;
+    min-width: 190px;
+  }
+  #hud .k { color: #999; }
+  #hud .v { color: #b8ffce; }
+  #hud .on { color: #ffd166; font-weight: 700; }
+  #hud .off { color: #666; }
+
+  /* Scrollable content */
+  #scroller {
+    margin-right: 360px;
     overflow-x: hidden;
   }
-
-  /* Fixed layout indicator to visualize the highly restricted ±15px zone */
-  .center-guide {
-    position: fixed;
-    top: calc(50% - 15px);
-    left: 0;
-    right: 0;
-    height: 30px;
-    border-top: 1px dashed rgba(143, 47, 0, 0.25);
-    border-bottom: 1px dashed rgba(143, 47, 0, 0.25);
-    background: rgba(143, 47, 0, 0.04);
-    pointer-events: none;
-    z-index: 100;
+  .spacer {
+    height: 70vh;
   }
-
-  .guide-label {
-    position: absolute;
-    top: -24px;
-    left: 20px;
-    font-family: sans-serif;
-    font-size: 11px;
-    color: rgba(143, 47, 0, 0.6);
-    letter-spacing: 2px;
-  }
-
-  /* Replicating the Transition Line CSS */
   .transition-line {
     text-align: center;
-    padding: 0 32px;
-    margin-top: 100vh; /* Pushes the text to the middle of the scroll area */
-    font-size: 20px;
+    padding: 40px 32px 40px 32px;
+    margin: 0 auto;
+    max-width: 660px;
+    font-size: 18px;
     font-weight: 500;
     color: var(--accent);
     letter-spacing: 0.8px;
-    line-height: 2.2;
-    max-width: 600px;
-    margin-left: auto;
-    margin-right: auto;
-    word-break: auto-phrase;
+    line-height: 2;
   }
-
   .transition-line-divider {
     display: flex;
     align-items: center;
@@ -70,144 +156,358 @@
     gap: 12px;
     margin: 0 0 20px 0;
   }
-
   .transition-line-mark {
     flex-shrink: 0;
     font-size: 1.1em;
     line-height: 1;
-    color: var(--transition-head-color);
+    color: #fce6dc;
   }
-
   .transition-line-rule {
     flex: 1;
     height: 1px;
-    background: var(--transition-head-color);
+    background: #fce6dc;
     min-width: 24px;
   }
-
   .transition-line-title {
     flex-shrink: 0;
     font-size: 1.1em;
-    color: var(--transition-head-color);
+    color: #fce6dc;
     letter-spacing: 5px;
     white-space: nowrap;
-    text-shadow: 0 1px 4px rgba(143, 47, 0, 0.2);
   }
-
   .transition-line-body {
     position: relative;
-    will-change: filter, transform, text-shadow;
     transform-origin: 50% 50%;
+    will-change: filter, transform;
   }
+  .transition-line-body p { margin: 0 0 0.9em 0; }
+  .transition-line-body p:last-child { margin-bottom: 0; }
 
-  .transition-line-body p {
-    margin: 0 0 0.9em 0;
-  }
+  .demo-fontweight-bold { font-weight: 700; }
 
-  .transition-line-body p:last-child {
-    margin-bottom: 0;
-  }
-
-  .hint {
-    position: fixed;
-    bottom: 40px;
-    width: 100%;
-    text-align: center;
-    font-family: sans-serif;
-    color: #a07a48;
-    font-size: 14px;
-    letter-spacing: 2px;
-    pointer-events: none;
+  @media (max-width: 860px) {
+    #controls {
+      position: relative;
+      width: 100%;
+      height: auto;
+      border-left: none;
+      border-top: 1px solid var(--border);
+      box-shadow: none;
+    }
+    #scroller { margin-right: 0; }
+    body { display: flex; flex-direction: column; }
   }
 </style>
 </head>
 <body>
 
-<div class="center-guide">
-  <div class="guide-label">STRICT SNAP ZONE (±15px)</div>
+<div id="hud">
+  <div><span class="k">d (px):</span>  <span class="v" id="hud-d">0</span></div>
+  <div><span class="k">blur:</span>   <span class="v" id="hud-blur">0.00</span></div>
+  <div><span class="k">scale:</span>  <span class="v" id="hud-scale">1.000</span></div>
+  <div><span class="k">snap:</span>   <span id="hud-snap" class="off">OFF</span></div>
 </div>
 
-<div class="transition-line" id="transitionLine">
-  <div class="transition-line-divider">
-    <span class="transition-line-mark">❀</span>
-    <span class="transition-line-rule"></span>
-    <span class="transition-line-title">大切なお知らせ</span>
-    <span class="transition-line-rule"></span>
-    <span class="transition-line-mark">❀</span>
+<div id="scroller">
+  <div class="spacer"></div>
+  <div class="transition-line">
+    <div class="transition-line-divider">
+      <span class="transition-line-mark">❀</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-title">大切なお知らせ</span>
+      <span class="transition-line-rule"></span>
+      <span class="transition-line-mark">❀</span>
+    </div>
+    <div class="transition-line-body" id="transitionLineBody">
+      <p>それでは、本日の癒しのオプションをご覧ください。</p>
+      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+      <p>ありがとうございます。</p>
+    </div>
   </div>
-  <div class="transition-line-body" id="transitionLineBody">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
-  </div>
+  <div class="spacer"></div>
 </div>
 
-<div class="hint">↓ スクロールして効果を確認 ↓</div>
+<div id="controls">
+  <h1>Effect Tuning</h1>
+
+  <div class="group">
+    <label>Blur max (px)</label>
+    <div class="row">
+      <input type="range" id="r-blur" min="0" max="20" step="0.5" value="6">
+      <span class="val" id="v-blur">6.0</span>
+    </div>
+    <div class="hint">Peak blur when body is off-centre.</div>
+  </div>
+
+  <div class="group">
+    <label>Scale trigger blur</label>
+    <div class="row">
+      <input type="range" id="r-stb" min="0" max="6" step="0.1" value="1.0">
+      <span class="val" id="v-stb">1.0</span>
+    </div>
+    <div class="hint">Blur threshold below which scaleX grows toward max.</div>
+  </div>
+
+  <div class="group">
+    <label>Scale max</label>
+    <div class="row">
+      <input type="range" id="r-scale" min="1" max="1.2" step="0.005" value="1.07">
+      <span class="val" id="v-scale">1.070</span>
+    </div>
+    <div class="hint">Horizontal stretch at perfect focus.</div>
+  </div>
+
+  <div class="group">
+    <label>Snap window (± px)</label>
+    <div class="row">
+      <input type="range" id="r-window" min="1" max="100" step="1" value="15">
+      <span class="val" id="v-window">15</span>
+    </div>
+    <div class="hint">Symmetrical distance from viewport centre where snap fires.</div>
+  </div>
+
+  <div class="group">
+    <label>Snap mode</label>
+    <select id="s-mode">
+      <option value="shadow-blur" selected>text-shadow (soft glow)</option>
+      <option value="shadow-offset">text-shadow (4-way crisp)</option>
+      <option value="text-stroke">-webkit-text-stroke</option>
+      <option value="font-weight">font-weight (jitter demo)</option>
+      <option value="none">none (control)</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label>Snap intensity (px)</label>
+    <div class="row">
+      <input type="range" id="r-int" min="0.1" max="3" step="0.05" value="0.8">
+      <span class="val" id="v-int">0.80</span>
+    </div>
+    <div class="hint">Blur radius / stroke width / offset amount depending on mode.</div>
+  </div>
+
+  <div class="group">
+    <label>Snap colour</label>
+    <select id="s-color">
+      <option value="currentColor" selected>currentColor (accent)</option>
+      <option value="#000000">black</option>
+      <option value="#8f2f00">autumn accent</option>
+      <option value="#b04a5a">default accent</option>
+    </select>
+  </div>
+
+  <div class="group">
+    <label>Presets</label>
+    <div class="presets">
+      <button data-preset="default">default</button>
+      <button data-preset="subtle">subtle glow</button>
+      <button data-preset="crisp">crisp stroke</button>
+      <button data-preset="strong">strong</button>
+    </div>
+  </div>
+
+  <div class="group">
+    <label>Scroll helpers</label>
+    <div class="presets">
+      <button id="b-scroll">→ centre</button>
+      <button id="b-top">→ top</button>
+      <button id="b-bottom">→ bottom</button>
+    </div>
+  </div>
+
+  <div class="hint" style="margin-top:8px;">
+    Scroll the content area. Watch the HUD. Tune until it feels right, then copy the values into <code>app.js</code>.
+  </div>
+</div>
 
 <script>
-  var bodyEl = document.getElementById('transitionLineBody');
-  var tbMetrics = {
-    downMax: window.innerHeight / 1.5,
-    upMax: window.innerHeight / 1.5
+(function() {
+  'use strict';
+
+  var TB = {
+    MAX_BLUR: 6,
+    SCALE_TRIGGER_BLUR: 1.0,
+    MAX_SCALE: 1.07,
+    SNAP_WINDOW_PX: 15,
+    SNAP_MODE: 'shadow-blur',
+    SNAP_INTENSITY: 0.8,
+    SNAP_COLOR: 'currentColor'
   };
 
-  var TB_MAX_BLUR = 6;
-  var TB_SCALE_TRIGGER_BLUR = 1.0;
-  var TB_MAX_SCALE = 1.07;
+  var bodyEl = document.getElementById('transitionLineBody');
+  var hudD = document.getElementById('hud-d');
+  var hudBlur = document.getElementById('hud-blur');
+  var hudScale = document.getElementById('hud-scale');
+  var hudSnap = document.getElementById('hud-snap');
 
-  function updateEffects() {
+  function bindRange(id, valId, key, fmt) {
+    var el = document.getElementById(id);
+    var vEl = document.getElementById(valId);
+    function update() {
+      var v = parseFloat(el.value);
+      TB[key] = v;
+      vEl.textContent = fmt ? fmt(v) : String(v);
+      applyEffects();
+    }
+    el.addEventListener('input', update);
+    update();
+  }
+  bindRange('r-blur', 'v-blur', 'MAX_BLUR', function(v){ return v.toFixed(1); });
+  bindRange('r-stb', 'v-stb', 'SCALE_TRIGGER_BLUR', function(v){ return v.toFixed(1); });
+  bindRange('r-scale', 'v-scale', 'MAX_SCALE', function(v){ return v.toFixed(3); });
+  bindRange('r-window', 'v-window', 'SNAP_WINDOW_PX', function(v){ return String(Math.round(v)); });
+  bindRange('r-int', 'v-int', 'SNAP_INTENSITY', function(v){ return v.toFixed(2); });
+
+  var sMode = document.getElementById('s-mode');
+  sMode.addEventListener('change', function() { TB.SNAP_MODE = sMode.value; applyEffects(); });
+  var sColor = document.getElementById('s-color');
+  sColor.addEventListener('change', function() { TB.SNAP_COLOR = sColor.value; applyEffects(); });
+
+  var metrics = { downMax: 1, upMax: 1, valid: false };
+
+  function measure() {
+    var paragraphs = bodyEl.querySelectorAll('p');
+    if (paragraphs.length < 2) { metrics.valid = false; return; }
+    var secondLastP = paragraphs[paragraphs.length - 2];
+    var vh = window.innerHeight;
+    var bodyH = bodyEl.offsetHeight;
+    metrics.downMax = Math.max(40, vh / 2 + bodyH / 2);
+    metrics.upMax = Math.max(40, vh / 2 + secondLastP.offsetTop - bodyH / 2);
+    metrics.valid = true;
+  }
+
+  function clearSnap() {
+    bodyEl.style.textShadow = '';
+    bodyEl.style.webkitTextStroke = '';
+    bodyEl.classList.remove('demo-fontweight-bold');
+  }
+
+  function applySnap(isOn) {
+    clearSnap();
+    if (!isOn) return;
+    var color = TB.SNAP_COLOR;
+    var i = TB.SNAP_INTENSITY;
+    switch (TB.SNAP_MODE) {
+      case 'shadow-blur':
+        bodyEl.style.textShadow = '0 0 ' + i + 'px ' + color;
+        break;
+      case 'shadow-offset':
+        var o = i;
+        bodyEl.style.textShadow =
+          '-' + o + 'px 0 0 ' + color + ',' +
+          o + 'px 0 0 ' + color + ',' +
+          '0 -' + o + 'px 0 ' + color + ',' +
+          '0 ' + o + 'px 0 ' + color;
+        break;
+      case 'text-stroke':
+        bodyEl.style.webkitTextStroke = i + 'px ' + color;
+        break;
+      case 'font-weight':
+        bodyEl.classList.add('demo-fontweight-bold');
+        break;
+      case 'none':
+      default:
+        break;
+    }
+  }
+
+  function applyEffects() {
+    if (!metrics.valid) return;
     var vh = window.innerHeight;
     var vc = vh / 2;
     var rect = bodyEl.getBoundingClientRect();
-    
-    // Find the exact vertical center of the text block
     var bodyCentre = rect.top + rect.height / 2;
-    
-    // 'd' is exactly how many pixels the center of the text is from the center of the screen
     var d = bodyCentre - vc;
 
     var progress;
-    if (d >= 0) progress = Math.min(1, d / tbMetrics.downMax);
-    else progress = Math.min(1, -d / tbMetrics.upMax);
+    if (d >= 0) progress = Math.min(1, d / metrics.downMax);
+    else progress = Math.min(1, -d / metrics.upMax);
 
-    var blurVal = TB_MAX_BLUR * progress;
+    var blurVal = TB.MAX_BLUR * progress;
     var scaleVal = 1.0;
-    if (blurVal < TB_SCALE_TRIGGER_BLUR) {
-      scaleVal = 1.0 + (TB_MAX_SCALE - 1.0) * (1 - blurVal / TB_SCALE_TRIGGER_BLUR);
+    if (blurVal < TB.SCALE_TRIGGER_BLUR) {
+      scaleVal = 1.0 + (TB.MAX_SCALE - 1.0) * (1 - blurVal / TB.SCALE_TRIGGER_BLUR);
     }
 
     bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
     bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
-    
-    // --- TIGHTENED STRICT SNAP ---
-    // If the center of the text block is within 15 pixels of the center of the screen
-    if (Math.abs(d) <= 15) {
-      bodyEl.style.textShadow = '0 0 0.8px currentColor';
+
+    var snapOn = Math.abs(d) <= TB.SNAP_WINDOW_PX;
+    applySnap(snapOn);
+
+    hudD.textContent = d.toFixed(1);
+    hudBlur.textContent = blurVal.toFixed(2);
+    hudScale.textContent = scaleVal.toFixed(3);
+    if (snapOn) {
+      hudSnap.textContent = 'ON';
+      hudSnap.className = 'on';
     } else {
-      bodyEl.style.textShadow = 'none';
+      hudSnap.textContent = 'OFF';
+      hudSnap.className = 'off';
     }
   }
 
   var rafPending = false;
-  window.addEventListener('scroll', function() {
+  function schedule() {
     if (rafPending) return;
     rafPending = true;
     requestAnimationFrame(function() {
       rafPending = false;
-      updateEffects();
+      applyEffects();
     });
-  }, { passive: true });
+  }
 
-  window.addEventListener('resize', function() {
-    tbMetrics.downMax = window.innerHeight / 1.5;
-    tbMetrics.upMax = window.innerHeight / 1.5;
-    updateEffects();
+  window.addEventListener('scroll', schedule, { passive: true });
+  window.addEventListener('resize', function() { measure(); schedule(); });
+
+  var presets = {
+    'default': { MAX_BLUR: 6, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.07, SNAP_WINDOW_PX: 15, SNAP_MODE: 'shadow-blur', SNAP_INTENSITY: 0.8, SNAP_COLOR: 'currentColor' },
+    'subtle':  { MAX_BLUR: 4, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.04, SNAP_WINDOW_PX: 20, SNAP_MODE: 'shadow-blur', SNAP_INTENSITY: 0.6, SNAP_COLOR: 'currentColor' },
+    'crisp':   { MAX_BLUR: 6, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.07, SNAP_WINDOW_PX: 25, SNAP_MODE: 'text-stroke', SNAP_INTENSITY: 0.35, SNAP_COLOR: 'currentColor' },
+    'strong':  { MAX_BLUR: 8, SCALE_TRIGGER_BLUR: 1.5, MAX_SCALE: 1.10, SNAP_WINDOW_PX: 30, SNAP_MODE: 'shadow-offset', SNAP_INTENSITY: 0.6, SNAP_COLOR: 'currentColor' }
+  };
+  document.querySelectorAll('[data-preset]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var p = presets[btn.getAttribute('data-preset')];
+      if (!p) return;
+      Object.assign(TB, p);
+      document.getElementById('r-blur').value = TB.MAX_BLUR;
+      document.getElementById('v-blur').textContent = TB.MAX_BLUR.toFixed(1);
+      document.getElementById('r-stb').value = TB.SCALE_TRIGGER_BLUR;
+      document.getElementById('v-stb').textContent = TB.SCALE_TRIGGER_BLUR.toFixed(1);
+      document.getElementById('r-scale').value = TB.MAX_SCALE;
+      document.getElementById('v-scale').textContent = TB.MAX_SCALE.toFixed(3);
+      document.getElementById('r-window').value = TB.SNAP_WINDOW_PX;
+      document.getElementById('v-window').textContent = String(TB.SNAP_WINDOW_PX);
+      document.getElementById('s-mode').value = TB.SNAP_MODE;
+      document.getElementById('r-int').value = TB.SNAP_INTENSITY;
+      document.getElementById('v-int').textContent = TB.SNAP_INTENSITY.toFixed(2);
+      document.getElementById('s-color').value = TB.SNAP_COLOR;
+      applyEffects();
+    });
   });
 
-  // Initial trigger
-  updateEffects();
+  document.getElementById('b-scroll').addEventListener('click', function() {
+    var rect = bodyEl.getBoundingClientRect();
+    var target = window.pageYOffset + rect.top + rect.height / 2 - window.innerHeight / 2;
+    window.scrollTo({ top: target, behavior: 'smooth' });
+  });
+  document.getElementById('b-top').addEventListener('click', function() {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+  document.getElementById('b-bottom').addEventListener('click', function() {
+    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
+  });
+
+  measure();
+  applyEffects();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(function() { measure(); applyEffects(); });
+  }
+  window.addEventListener('load', function() { measure(); applyEffects(); });
+})();
 </script>
+
 </body>
 </html>
