@@ -1,15 +1,29 @@
 /* ============================================================
-   app.js — v1.16
+   app.js — v1.17
    ------------------------------------------------------------
    Changelog:
+     v1.17
+       - Panel-1 opening line becomes a fixed two-beat sequence:
+         "桜庭さん" fades+slides in, then "、初めまして。" the
+         instant the first beat completes, then a 500ms pause
+         before the panel-1 body begins its phrase reveal.
+         Replays on every revisit to panel 1.
+       - chunkPanelText: minimum-chunk absorption (a final chunk
+         shorter than the minimum is merged into the previous
+         chunk); trailing Japanese punctuation (、。！？) is
+         pulled back into the preceding chunk so no chunk begins
+         with punctuation.
+       - wrapPanelPhrases replaced with a recursive text-node
+         walker: every non-empty text node under .panel-content
+         is wrapped in .panel-phrase chunks. Idempotent.
+         Preserves inline elements. Skips the therapist-name
+         span and its trailing greeting text node on panel 1
+         (handled by the special sequence instead).
      v1.16
        - Panel messages: phrase-level reveal on every panel
-         activation. Each paragraph is split into random 5-10
-         character chunks; each chunk fades + slides in from a
-         random left/right direction. Replays every time a panel
-         becomes .active, including on swipe-back. Values:
-         chunk 5-10 chars, rise 30px, duration 500ms, stagger
-         up to 600ms, ease-out, base delay 300ms, coexist mode.
+         activation. Values: chunk 5-10 chars, rise 30px,
+         duration 500ms, stagger up to 600ms, ease-out, base
+         delay 300ms, coexist mode.
      v1.15
        - Receipt opens at the top (scroll reset before reveal).
        - Decorative scroll indicator on the receipt.
@@ -903,7 +917,7 @@ tanzakuScreen.addEventListener('click', function(e) {
 });
 
 /* ============================================================
-   PANEL PHRASE REVEAL (v1.16)
+   PANEL PHRASE REVEAL
    ============================================================ */
 var PANEL_PHRASE_MIN = 5;
 var PANEL_PHRASE_MAX = 10;
@@ -912,6 +926,12 @@ var PANEL_PHRASE_DURATION = 500;
 var PANEL_PHRASE_STAGGER_MAX = 600;
 var PANEL_PHRASE_DELAY = 300;
 var PANEL_PHRASE_MODE = 'coexist';
+
+/* Panel 1 opening line: fixed two-beat sequence. */
+var PANEL_1_BEAT1_TEXT = '桜庭さん';
+var PANEL_1_BEAT2_TEXT = '、初めまして。';
+var PANEL_1_POST_BEAT_DELAY = 500;
+
 var panelPhraseTimers = [];
 
 function escapeHtmlForPhrase(s) {
@@ -921,103 +941,336 @@ function escapeHtmlForPhrase(s) {
     .replace(/>/g, '&gt;');
 }
 
+/* ============================================================
+   CHUNKER
+   ------------------------------------------------------------
+   Splits a string into 5-10 char chunks with two refinements:
+     1. A final chunk below the minimum is merged into the
+        preceding chunk (no stubs).
+     2. Any chunk that would begin with 、。！？ is trimmed by
+        pulling that punctuation back into the previous chunk.
+   ============================================================ */
+function isJapanesePunctuation(ch) {
+  return ch === '、' || ch === '。' || ch === '！' || ch === '？';
+}
+
 function chunkPanelText(text) {
-  var clean = text.replace(/\s+/g, '');
-  var out = [];
+  var clean = String(text).replace(/\s+/g, '');
+  if (clean === '') return [];
+
+  /* Pass 1: greedy random-length split. */
+  var raw = [];
   var i = 0;
   while (i < clean.length) {
     var len = PANEL_PHRASE_MIN + Math.floor(Math.random() * (PANEL_PHRASE_MAX - PANEL_PHRASE_MIN + 1));
     if (i + len > clean.length) len = clean.length - i;
-    out.push(clean.substr(i, len));
+    raw.push(clean.substr(i, len));
     i += len;
   }
+
+  /* Pass 2: absorb a stub-final chunk into its predecessor. */
+  if (raw.length >= 2) {
+    var lastIdx = raw.length - 1;
+    if (raw[lastIdx].length < PANEL_PHRASE_MIN) {
+      raw[lastIdx - 1] = raw[lastIdx - 1] + raw[lastIdx];
+      raw.pop();
+    }
+  }
+
+  /* Pass 3: punctuation never leads a chunk.
+     If a chunk starts with punctuation, move that leading run of
+     punctuation back onto the previous chunk. If the previous
+     chunk would grow beyond MAX + 5, allow it anyway — reading
+     flow beats strict size discipline. */
+  var out = [];
+  for (var k = 0; k < raw.length; k++) {
+    var piece = raw[k];
+    if (k === 0 || !isJapanesePunctuation(piece.charAt(0))) {
+      out.push(piece);
+      continue;
+    }
+    var lead = '';
+    var p = 0;
+    while (p < piece.length && isJapanesePunctuation(piece.charAt(p))) {
+      lead += piece.charAt(p);
+      p++;
+    }
+    var rest = piece.substr(p);
+    if (out.length > 0) {
+      out[out.length - 1] = out[out.length - 1] + lead;
+    }
+    if (rest !== '') out.push(rest);
+  }
+
+  /* Pass 4: if the re-shuffle has produced a fresh stub-final
+     chunk, absorb it once more. */
+  if (out.length >= 2) {
+    var li = out.length - 1;
+    if (out[li].length < PANEL_PHRASE_MIN) {
+      out[li - 1] = out[li - 1] + out[li];
+      out.pop();
+    }
+  }
+
   return out;
 }
 
-function wrapPhrasesInElement(el) {
-  if (!el) return;
-  var paragraphs = el.querySelectorAll('p');
-  if (paragraphs.length === 0) {
-    var rawText = el.textContent || '';
-    if (rawText.trim() === '') return;
-    var chunks = chunkPanelText(rawText);
-    var html = '';
-    for (var c = 0; c < chunks.length; c++) {
-      html += '<span class="panel-phrase">' + escapeHtmlForPhrase(chunks[c]) + '</span>';
+/* ============================================================
+   RECURSIVE TEXT-NODE WALKER
+   ------------------------------------------------------------
+   Wraps every non-empty text node under root in .panel-phrase
+   spans, preserving any inline elements (<br>, nested spans).
+   Idempotent — skips nodes that are already inside a
+   .panel-phrase wrapper.
+   ============================================================ */
+function shouldSkipTextNode(node) {
+  /* Skip if already inside a .panel-phrase or a therapist-name. */
+  var parent = node.parentNode;
+  while (parent && parent.nodeType === 1) {
+    if (parent.classList) {
+      if (parent.classList.contains('panel-phrase')) return true;
+      if (parent.classList.contains('therapist-name')) return true;
     }
-    el.innerHTML = '<p>' + html + '</p>';
-    return;
+    parent = parent.parentNode;
   }
-  for (var i = 0; i < paragraphs.length; i++) {
-    var p = paragraphs[i];
-    if (p.querySelector('.panel-phrase')) continue;
-    var text = p.textContent || '';
-    if (text.trim() === '') continue;
-    var parts = chunkPanelText(text);
-    var out = '';
-    for (var j = 0; j < parts.length; j++) {
-      out += '<span class="panel-phrase">' + escapeHtmlForPhrase(parts[j]) + '</span>';
-    }
-    p.innerHTML = out;
+  return false;
+}
+
+function wrapTextNodeInPhrases(textNode) {
+  if (shouldSkipTextNode(textNode)) return;
+  var raw = textNode.nodeValue || '';
+  if (raw.trim() === '') return;
+  var chunks = chunkPanelText(raw);
+  if (chunks.length === 0) return;
+
+  var frag = document.createDocumentFragment();
+  for (var c = 0; c < chunks.length; c++) {
+    var sp = document.createElement('span');
+    sp.className = 'panel-phrase';
+    sp.textContent = chunks[c];
+    frag.appendChild(sp);
+  }
+  textNode.parentNode.replaceChild(frag, textNode);
+}
+
+function wrapPhrasesRecursively(root) {
+  if (!root) return;
+  /* Collect text nodes first so we don't mutate during traversal. */
+  var walker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        if (shouldSkipTextNode(node)) return NodeFilter.FILTER_REJECT;
+        if ((node.nodeValue || '').trim() === '') return NodeFilter.FILTER_REJECT;
+        return NodeFilter.FILTER_ACCEPT;
+      }
+    },
+    false
+  );
+
+  var collected = [];
+  var n;
+  while ((n = walker.nextNode())) collected.push(n);
+
+  for (var i = 0; i < collected.length; i++) {
+    wrapTextNodeInPhrases(collected[i]);
   }
 }
 
-function wrapPanelPhrases(panelEl) {
+/* ============================================================
+   PANEL-1 SPECIAL SEQUENCE
+   ------------------------------------------------------------
+   The opening line "桜庭さん、初めまして。" is not chunked. It is
+   presented as two fixed beats with the same slide motion the
+   general chunks use:
+     Beat 1: 桜庭さん
+     Beat 2: 、初めまして。
+   Beat 2 starts the instant beat 1 completes. Then a 500 ms
+   pause before #panel1Body begins its normal phrase reveal.
+   ============================================================ */
+function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
   var contentEl = panelEl.querySelector('.panel-content');
   if (!contentEl) return;
 
-  /* Panels 1-4 have dedicated body containers. */
-  var containers = contentEl.querySelectorAll('#panel1Body, #panel2Body, #panel3Body, #panel4Body');
-  if (containers.length > 0) {
-    for (var i = 0; i < containers.length; i++) {
-      wrapPhrasesInElement(containers[i]);
-    }
-    /* Panel 1 also has a leading <span class="therapist-name"> plus
-       inline text "さん、初めまして。" — wrap only the plain text nodes
-       that follow the therapist-name span, without touching the span. */
-    var therapistSpan = contentEl.querySelector('.therapist-name');
-    if (therapistSpan && therapistSpan.parentNode === contentEl) {
-      /* Walk the child nodes immediately after the span. */
-      var node = therapistSpan.nextSibling;
-      while (node) {
-        var next = node.nextSibling;
-        if (node.nodeType === 3) {
-          var raw = node.nodeValue || '';
-          if (raw.trim() !== '') {
-            var chunks = chunkPanelText(raw);
-            var frag = document.createDocumentFragment();
-            for (var c = 0; c < chunks.length; c++) {
-              var sp = document.createElement('span');
-              sp.className = 'panel-phrase';
-              sp.textContent = chunks[c];
-              frag.appendChild(sp);
-            }
-            contentEl.replaceChild(frag, node);
-          }
-        }
-        node = next;
-      }
-    }
-    return;
+  /* Remove any existing beat wrappers (idempotent). */
+  var existing = contentEl.querySelectorAll('.panel-1-beat');
+  for (var e = 0; e < existing.length; e++) {
+    var ex = existing[e];
+    if (ex.parentNode) ex.parentNode.removeChild(ex);
   }
 
-  /* Panel 5 and any other direct-content panels. */
-  var ownParagraphs = contentEl.querySelectorAll(':scope > p');
-  for (var k = 0; k < ownParagraphs.length; k++) {
-    var p = ownParagraphs[k];
-    if (p.querySelector('.panel-phrase')) continue;
-    var text = p.textContent || '';
-    if (text.trim() === '') continue;
-    var parts = chunkPanelText(text);
-    var out = '';
-    for (var j = 0; j < parts.length; j++) {
-      out += '<span class="panel-phrase">' + escapeHtmlForPhrase(parts[j]) + '</span>';
+  /* Find the therapist-name span. Everything from that span up to
+     (but not including) #panel1Body becomes the fixed opening. */
+  var span = contentEl.querySelector('.therapist-name');
+  if (!span) return;
+  var body = contentEl.querySelector('#panel1Body');
+
+  /* Collect all nodes between span and body (or end of content). */
+  var nodes = [];
+  var cur = span;
+  while (cur) {
+    nodes.push(cur);
+    if (cur === body) { nodes.pop(); break; }
+    cur = cur.nextSibling;
+    if (!cur && !body) break;
+  }
+
+  /* Replace that range with two beat spans. */
+  var beat1 = document.createElement('span');
+  beat1.className = 'panel-phrase panel-1-beat';
+  beat1.setAttribute('data-beat', '1');
+
+  var beat2 = document.createElement('span');
+  beat2.className = 'panel-phrase panel-1-beat';
+  beat2.setAttribute('data-beat', '2');
+
+  /* Build the two beats from the collected text content. */
+  var textBuf = '';
+  for (var i = 0; i < nodes.length; i++) {
+    var nd = nodes[i];
+    if (nd.nodeType === 3) textBuf += nd.nodeValue || '';
+    else if (nd.nodeType === 1) textBuf += nd.textContent || '';
+  }
+  textBuf = textBuf.replace(/\s+/g, '');
+
+  /* Prefer the configured beats if the source matches; otherwise
+     fall back to whatever the source text is. */
+  var beat1Text = PANEL_1_BEAT1_TEXT;
+  var beat2Text = PANEL_1_BEAT2_TEXT;
+  if (textBuf.indexOf(PANEL_1_BEAT1_TEXT) !== 0) {
+    /* Source changed — split what's there at a sensible boundary. */
+    var full = textBuf;
+    if (full.length >= PANEL_1_BEAT1_TEXT.length) {
+      beat1Text = full.substr(0, PANEL_1_BEAT1_TEXT.length);
+      beat2Text = full.substr(PANEL_1_BEAT1_TEXT.length);
+    } else {
+      beat1Text = full;
+      beat2Text = '';
     }
-    p.innerHTML = out;
+  }
+  beat1.textContent = beat1Text;
+  beat2.textContent = beat2Text;
+
+  /* Insert the two beats in place of the original range. */
+  var insertBefore = (nodes.length > 0) ? nodes[0] : body;
+  var parent = insertBefore ? insertBefore.parentNode : contentEl;
+  for (var r = nodes.length - 1; r >= 0; r--) {
+    if (nodes[r].parentNode) nodes[r].parentNode.removeChild(nodes[r]);
+  }
+  if (parent) {
+    parent.insertBefore(beat1, insertBefore && insertBefore.parentNode === parent ? insertBefore : null);
+    parent.insertBefore(beat2, beat1.nextSibling);
   }
 }
 
+function resetPanel1Beats(panelEl) {
+  if (!panelEl) return;
+  var beats = panelEl.querySelectorAll('.panel-1-beat');
+  for (var i = 0; i < beats.length; i++) {
+    beats[i].classList.remove('shown');
+    beats[i].style.transitionDelay = '0ms';
+    beats[i].style.removeProperty('--phrase-start-x');
+  }
+}
+
+function playPanel1SpecialSequence(panelEl) {
+  if (!panelEl) return;
+  var contentEl = panelEl.querySelector('.panel-content');
+  if (!contentEl) return;
+
+  var beat1 = contentEl.querySelector('.panel-1-beat[data-beat="1"]');
+  var beat2 = contentEl.querySelector('.panel-1-beat[data-beat="2"]');
+  var body = contentEl.querySelector('#panel1Body');
+
+  /* Body phrases hidden until the pause ends. */
+  if (body) {
+    var bodyPhrases = body.querySelectorAll('.panel-phrase');
+    for (var j = 0; j < bodyPhrases.length; j++) {
+      bodyPhrases[j].classList.remove('shown');
+      bodyPhrases[j].style.transitionDelay = '0ms';
+      bodyPhrases[j].style.removeProperty('--phrase-start-x');
+    }
+  }
+
+  function fireBeat(el) {
+    if (!el) return;
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    el.style.setProperty('--phrase-start-x', (dir * PANEL_PHRASE_RISE) + 'px');
+    el.classList.add('shown');
+  }
+
+  /* Beat 1 fires immediately. */
+  fireBeat(beat1);
+
+  /* Beat 2 fires the instant beat 1's transition completes. */
+  if (beat1 && beat2) {
+    var onBeat1End = function() {
+      beat1.removeEventListener('transitionend', onBeat1End);
+      fireBeat(beat2);
+    };
+    beat1.addEventListener('transitionend', onBeat1End);
+    /* Fallback: if transitionend doesn't fire, use the known duration. */
+    var fb = setTimeout(function() {
+      beat1.removeEventListener('transitionend', onBeat1End);
+      if (!beat2.classList.contains('shown')) fireBeat(beat2);
+    }, PANEL_PHRASE_DURATION + 100);
+    panelPhraseTimers.push(fb);
+  }
+
+  /* After beat 2 completes, wait PANEL_1_POST_BEAT_DELAY, then
+     start the body phrase reveal. */
+  function startBodyReveal() {
+    if (!body) return;
+    var phrases = body.querySelectorAll('.panel-phrase');
+    if (!phrases.length) return;
+    var baseDelay = PANEL_PHRASE_MODE === 'sequence'
+      ? PANEL_PHRASE_DELAY
+      : Math.max(0, PANEL_PHRASE_DELAY - 300);
+    /* Force reflow so .shown triggers the transition. */
+    void body.offsetWidth;
+    for (var k = 0; k < phrases.length; k++) {
+      (function(el) {
+        var d = Math.random() < 0.5 ? -1 : 1;
+        el.style.setProperty('--phrase-start-x', (d * PANEL_PHRASE_RISE) + 'px');
+        var stagger = PANEL_PHRASE_STAGGER_MAX > 0
+          ? Math.random() * PANEL_PHRASE_STAGGER_MAX
+          : 0;
+        var total = baseDelay + stagger;
+        if (total > 0) {
+          var id = setTimeout(function() { el.classList.add('shown'); }, total);
+          panelPhraseTimers.push(id);
+        } else {
+          el.classList.add('shown');
+        }
+      })(phrases[k]);
+    }
+  }
+
+  if (beat2) {
+    var onBeat2End = function() {
+      beat2.removeEventListener('transitionend', onBeat2End);
+      var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
+      panelPhraseTimers.push(tid);
+    };
+    beat2.addEventListener('transitionend', onBeat2End);
+    var fb2 = setTimeout(function() {
+      beat2.removeEventListener('transitionend', onBeat2End);
+      var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
+      panelPhraseTimers.push(tid);
+    }, PANEL_PHRASE_DURATION + 100);
+    panelPhraseTimers.push(fb2);
+  } else {
+    /* No beat 2 — jump straight to body after the delay. */
+    var tid2 = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
+    panelPhraseTimers.push(tid2);
+  }
+}
+
+/* ============================================================
+   PANEL PHRASE REVEAL (general)
+   ============================================================ */
 function clearPanelPhraseTimers() {
   for (var i = 0; i < panelPhraseTimers.length; i++) clearTimeout(panelPhraseTimers[i]);
   panelPhraseTimers = [];
@@ -1060,6 +1313,28 @@ function playPanelPhraseReveal(panelEl) {
   }
 }
 
+/* ============ PANEL WRAPPING (post-load) ============ */
+function preparePanel(panelEl) {
+  if (!panelEl) return;
+  var contentEl = panelEl.querySelector('.panel-content');
+  if (!contentEl) return;
+
+  /* Panels 1 (index 0) get the special opening-line treatment. */
+  var isPanel1 = panelEl.getAttribute('data-panel') === '0';
+
+  if (isPanel1) {
+    /* Rewrite the opening line into two fixed beats, then walk
+       only the body container for the general chunker. */
+    buildPanel1OpeningBeats(panelEl);
+    var body = contentEl.querySelector('#panel1Body');
+    if (body) wrapPhrasesRecursively(body);
+    return;
+  }
+
+  /* Panels 2-5: walk the entire .panel-content. */
+  wrapPhrasesRecursively(contentEl);
+}
+
 /* ============ MAIN CAROUSEL ============ */
 function activatePanel(index) {
   for (var i = 0; i < panels.length; i++) {
@@ -1068,10 +1343,27 @@ function activatePanel(index) {
     else if (i < index) panels[i].classList.add('leaving');
   }
 
-  /* v1.16: phrase reveal resets + replays on every activation. */
   clearPanelPhraseTimers();
   var targetPanel = panels[index];
-  if (targetPanel) {
+  if (!targetPanel) return;
+
+  var isPanel1 = targetPanel.getAttribute('data-panel') === '0';
+
+  if (isPanel1) {
+    /* Reset beats + body phrases, then run the special sequence. */
+    resetPanel1Beats(targetPanel);
+    var body = targetPanel.querySelector('#panel1Body');
+    if (body) {
+      var bodyPhrases = body.querySelectorAll('.panel-phrase');
+      for (var p = 0; p < bodyPhrases.length; p++) {
+        bodyPhrases[p].classList.remove('shown');
+        bodyPhrases[p].style.transitionDelay = '0ms';
+        bodyPhrases[p].style.removeProperty('--phrase-start-x');
+      }
+    }
+    void targetPanel.offsetWidth;
+    playPanel1SpecialSequence(targetPanel);
+  } else {
     resetPanelPhrases(targetPanel);
     void targetPanel.offsetWidth;
     playPanelPhraseReveal(targetPanel);
@@ -1917,7 +2209,7 @@ function updateRejectThanksContent() {
 }
 
 /* ============================================================
-   TRANSITION-LINE PARAGRAPH REVEAL (v1.15)
+   TRANSITION-LINE PARAGRAPH REVEAL
    ============================================================ */
 var transitionRevealObserver = null;
 var transitionRevealTimers = [];
@@ -1977,7 +2269,7 @@ function setupTransitionReveal() {
 }
 
 /* ============================================================
-   TRANSITION-LINE BLUR + SCALE (v1.15)
+   TRANSITION-LINE BLUR + SCALE
    ============================================================ */
 var tbMetrics = {
   bodyEl: null,
@@ -2042,7 +2334,7 @@ function scheduleTransitionBodyUpdate() {
 }
 
 /* ============================================================
-   RECEIPT SCROLL RESET + INDICATOR (v1.15)
+   RECEIPT SCROLL RESET + INDICATOR
    ============================================================ */
 var RECEIPT_IND_X = 26;
 var RECEIPT_IND_Y = 10;
@@ -2113,7 +2405,6 @@ function confirmName() {
   confirmedTipAmount = getTipValue();
   if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-  /* FIX-001: Transfer ONLY checked name-screen preset rows. */
   var dynamicRows = document.getElementById('dynamicRows');
   dynamicRows.innerHTML = '';
   var nameRows = nameScreenRows.querySelectorAll('.row');
@@ -2158,16 +2449,13 @@ function confirmName() {
     anyPresetSelected = true;
   }
 
-  /* CONDITIONAL-001 */
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
     panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
-    /* v1.16: wrap phrase spans on panel 3 after the conditional swap. */
     var p3Panel = document.querySelector('.panel[data-panel="2"]');
-    if (p3Panel) wrapPanelPhrases(p3Panel);
+    if (p3Panel) preparePanel(p3Panel);
   }
 
-  /* CONDITIONAL-002 */
   if (transitionBodyDefault === '') {
     var tlBodyCapture = document.getElementById('transitionLineBody');
     if (tlBodyCapture) transitionBodyDefault = tlBodyCapture.innerHTML;
@@ -2264,9 +2552,8 @@ window.addEventListener('load', function() {
   loadAllPanels().then(function() {
     repositionHintGroupAfterLayout();
     repositionNumpad();
-    /* v1.16: wrap phrase spans now that panel bodies are populated. */
     for (var i = 0; i < panels.length; i++) {
-      wrapPanelPhrases(panels[i]);
+      preparePanel(panels[i]);
     }
   });
   if (document.fonts && document.fonts.ready) {
