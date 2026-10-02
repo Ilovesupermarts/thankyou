@@ -21,7 +21,6 @@
     -webkit-text-size-adjust: 100%;
   }
 
-  /* Control panel */
   #controls {
     position: fixed;
     top: 0; right: 0;
@@ -109,7 +108,6 @@
     flex-wrap: wrap;
   }
 
-  /* HUD */
   #hud {
     position: fixed;
     top: 12px;
@@ -130,7 +128,6 @@
   #hud .on { color: #ffd166; font-weight: 700; }
   #hud .off { color: #666; }
 
-  /* Scrollable content */
   #scroller {
     margin-right: 360px;
     overflow-x: hidden;
@@ -341,6 +338,9 @@
   var hudScale = document.getElementById('hud-scale');
   var hudSnap = document.getElementById('hud-snap');
 
+  /* Declared BEFORE bindRange() calls so applyEffects() sees it. */
+  var metrics = { downMax: 1, upMax: 1, valid: false };
+
   function bindRange(id, valId, key, fmt) {
     var el = document.getElementById(id);
     var vEl = document.getElementById(valId);
@@ -363,8 +363,6 @@
   sMode.addEventListener('change', function() { TB.SNAP_MODE = sMode.value; applyEffects(); });
   var sColor = document.getElementById('s-color');
   sColor.addEventListener('change', function() { TB.SNAP_COLOR = sColor.value; applyEffects(); });
-
-  var metrics = { downMax: 1, upMax: 1, valid: false };
 
   function measure() {
     var paragraphs = bodyEl.querySelectorAll('p');
@@ -413,7 +411,7 @@
   }
 
   function applyEffects() {
-    if (!metrics.valid) return;
+    if (!metrics || !metrics.valid) return;
     var vh = window.innerHeight;
     var vc = vh / 2;
     var rect = bodyEl.getBoundingClientRect();
