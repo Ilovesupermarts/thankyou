@@ -1,24 +1,23 @@
 /* ============================================================
-   app.js — v1.15
+   app.js — v1.16
    ------------------------------------------------------------
    Changelog:
+     v1.16
+       - Panel messages: phrase-level reveal on every panel
+         activation. Each paragraph is split into random 5-10
+         character chunks; each chunk fades + slides in from a
+         random left/right direction. Replays every time a panel
+         becomes .active, including on swipe-back. Values:
+         chunk 5-10 chars, rise 30px, duration 500ms, stagger
+         up to 600ms, ease-out, base delay 300ms, coexist mode.
      v1.15
        - Receipt opens at the top (scroll reset before reveal).
-       - Decorative scroll indicator on the receipt, right side
-         only, X=26 / Y=10 from the paper's edge, sticky, non-
-         interactive (pointer-events: none, aria-hidden).
-       - Transition-line paragraph reveal: each <p> wraps and
-         fades/rises in as it enters the viewport (200ms stagger,
-         750ms duration, 30px rise, 20% threshold, -8% margin,
-         overshoot easing). Once per session; both body variants.
-       - Transition-line scroll-driven blur (max 6px, linear) and
-         horizontal scale (max 1.07, dead zone above blur=1.0,
-         ramps 1.00 -> 1.07 as blur 1.0 -> 0.0, origin center).
+       - Decorative scroll indicator on the receipt.
+       - Transition-line paragraph reveal + scroll-driven blur + scaleX.
      v1.14
        - Odometer on summary + receipt totals.
-       - Receipt landing animation (first arrival only).
-       - Koi tap sound is Sound/cave-water-drop-echo-a053fcdf.mp3;
-         synthesizeDrop removed.
+       - Receipt landing animation.
+       - Koi tap sound is Sound/cave-water-drop-echo-a053fcdf.mp3.
      v1.13
        - Washi paper on #tableCard and .receipt-paper.
        - Reject state: Thank-You screen returns to the table.
@@ -903,12 +902,179 @@ tanzakuScreen.addEventListener('click', function(e) {
   if (e.target === tanzakuScreen) closeTanzaku();
 });
 
+/* ============================================================
+   PANEL PHRASE REVEAL (v1.16)
+   ============================================================ */
+var PANEL_PHRASE_MIN = 5;
+var PANEL_PHRASE_MAX = 10;
+var PANEL_PHRASE_RISE = 30;
+var PANEL_PHRASE_DURATION = 500;
+var PANEL_PHRASE_STAGGER_MAX = 600;
+var PANEL_PHRASE_DELAY = 300;
+var PANEL_PHRASE_MODE = 'coexist';
+var panelPhraseTimers = [];
+
+function escapeHtmlForPhrase(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function chunkPanelText(text) {
+  var clean = text.replace(/\s+/g, '');
+  var out = [];
+  var i = 0;
+  while (i < clean.length) {
+    var len = PANEL_PHRASE_MIN + Math.floor(Math.random() * (PANEL_PHRASE_MAX - PANEL_PHRASE_MIN + 1));
+    if (i + len > clean.length) len = clean.length - i;
+    out.push(clean.substr(i, len));
+    i += len;
+  }
+  return out;
+}
+
+function wrapPhrasesInElement(el) {
+  if (!el) return;
+  var paragraphs = el.querySelectorAll('p');
+  if (paragraphs.length === 0) {
+    var rawText = el.textContent || '';
+    if (rawText.trim() === '') return;
+    var chunks = chunkPanelText(rawText);
+    var html = '';
+    for (var c = 0; c < chunks.length; c++) {
+      html += '<span class="panel-phrase">' + escapeHtmlForPhrase(chunks[c]) + '</span>';
+    }
+    el.innerHTML = '<p>' + html + '</p>';
+    return;
+  }
+  for (var i = 0; i < paragraphs.length; i++) {
+    var p = paragraphs[i];
+    if (p.querySelector('.panel-phrase')) continue;
+    var text = p.textContent || '';
+    if (text.trim() === '') continue;
+    var parts = chunkPanelText(text);
+    var out = '';
+    for (var j = 0; j < parts.length; j++) {
+      out += '<span class="panel-phrase">' + escapeHtmlForPhrase(parts[j]) + '</span>';
+    }
+    p.innerHTML = out;
+  }
+}
+
+function wrapPanelPhrases(panelEl) {
+  if (!panelEl) return;
+  var contentEl = panelEl.querySelector('.panel-content');
+  if (!contentEl) return;
+
+  /* Panels 1-4 have dedicated body containers. */
+  var containers = contentEl.querySelectorAll('#panel1Body, #panel2Body, #panel3Body, #panel4Body');
+  if (containers.length > 0) {
+    for (var i = 0; i < containers.length; i++) {
+      wrapPhrasesInElement(containers[i]);
+    }
+    /* Panel 1 also has a leading <span class="therapist-name"> plus
+       inline text "さん、初めまして。" — wrap only the plain text nodes
+       that follow the therapist-name span, without touching the span. */
+    var therapistSpan = contentEl.querySelector('.therapist-name');
+    if (therapistSpan && therapistSpan.parentNode === contentEl) {
+      /* Walk the child nodes immediately after the span. */
+      var node = therapistSpan.nextSibling;
+      while (node) {
+        var next = node.nextSibling;
+        if (node.nodeType === 3) {
+          var raw = node.nodeValue || '';
+          if (raw.trim() !== '') {
+            var chunks = chunkPanelText(raw);
+            var frag = document.createDocumentFragment();
+            for (var c = 0; c < chunks.length; c++) {
+              var sp = document.createElement('span');
+              sp.className = 'panel-phrase';
+              sp.textContent = chunks[c];
+              frag.appendChild(sp);
+            }
+            contentEl.replaceChild(frag, node);
+          }
+        }
+        node = next;
+      }
+    }
+    return;
+  }
+
+  /* Panel 5 and any other direct-content panels. */
+  var ownParagraphs = contentEl.querySelectorAll(':scope > p');
+  for (var k = 0; k < ownParagraphs.length; k++) {
+    var p = ownParagraphs[k];
+    if (p.querySelector('.panel-phrase')) continue;
+    var text = p.textContent || '';
+    if (text.trim() === '') continue;
+    var parts = chunkPanelText(text);
+    var out = '';
+    for (var j = 0; j < parts.length; j++) {
+      out += '<span class="panel-phrase">' + escapeHtmlForPhrase(parts[j]) + '</span>';
+    }
+    p.innerHTML = out;
+  }
+}
+
+function clearPanelPhraseTimers() {
+  for (var i = 0; i < panelPhraseTimers.length; i++) clearTimeout(panelPhraseTimers[i]);
+  panelPhraseTimers = [];
+}
+
+function resetPanelPhrases(panelEl) {
+  var phrases = panelEl.querySelectorAll('.panel-phrase');
+  for (var i = 0; i < phrases.length; i++) {
+    phrases[i].classList.remove('shown');
+    phrases[i].style.transitionDelay = '0ms';
+    phrases[i].style.removeProperty('--phrase-start-x');
+  }
+}
+
+function playPanelPhraseReveal(panelEl) {
+  var phrases = panelEl.querySelectorAll('.panel-phrase');
+  if (!phrases.length) return;
+
+  var baseDelay = PANEL_PHRASE_MODE === 'sequence'
+    ? PANEL_PHRASE_DELAY
+    : Math.max(0, PANEL_PHRASE_DELAY - 300);
+
+  void panelEl.offsetWidth;
+
+  for (var i = 0; i < phrases.length; i++) {
+    (function(el) {
+      var dir = Math.random() < 0.5 ? -1 : 1;
+      el.style.setProperty('--phrase-start-x', (dir * PANEL_PHRASE_RISE) + 'px');
+      var stagger = PANEL_PHRASE_STAGGER_MAX > 0
+        ? Math.random() * PANEL_PHRASE_STAGGER_MAX
+        : 0;
+      var total = baseDelay + stagger;
+      if (total > 0) {
+        var id = setTimeout(function() { el.classList.add('shown'); }, total);
+        panelPhraseTimers.push(id);
+      } else {
+        el.classList.add('shown');
+      }
+    })(phrases[i]);
+  }
+}
+
 /* ============ MAIN CAROUSEL ============ */
 function activatePanel(index) {
   for (var i = 0; i < panels.length; i++) {
     panels[i].classList.remove('active', 'leaving');
     if (i === index) panels[i].classList.add('active');
     else if (i < index) panels[i].classList.add('leaving');
+  }
+
+  /* v1.16: phrase reveal resets + replays on every activation. */
+  clearPanelPhraseTimers();
+  var targetPanel = panels[index];
+  if (targetPanel) {
+    resetPanelPhrases(targetPanel);
+    void targetPanel.offsetWidth;
+    playPanelPhraseReveal(targetPanel);
   }
 }
 function unlockTable() {
@@ -1812,11 +1978,6 @@ function setupTransitionReveal() {
 
 /* ============================================================
    TRANSITION-LINE BLUR + SCALE (v1.15)
-   Blur: 0 at pivot (block centre = viewport centre), ramps to
-   TB_MAX_BLUR linearly in both directions.
-   Scale: dead zone while blur >= TB_SCALE_TRIGGER_BLUR. Below
-   that, ramps linearly from 1.00 at trigger to TB_MAX_SCALE at
-   blur = 0. Symmetric on both sides.
    ============================================================ */
 var tbMetrics = {
   bodyEl: null,
@@ -2001,9 +2162,12 @@ function confirmName() {
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
     panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
+    /* v1.16: wrap phrase spans on panel 3 after the conditional swap. */
+    var p3Panel = document.querySelector('.panel[data-panel="2"]');
+    if (p3Panel) wrapPanelPhrases(p3Panel);
   }
 
-  /* CONDITIONAL-002 — capture default the first time, then swap */
+  /* CONDITIONAL-002 */
   if (transitionBodyDefault === '') {
     var tlBodyCapture = document.getElementById('transitionLineBody');
     if (tlBodyCapture) transitionBodyDefault = tlBodyCapture.innerHTML;
@@ -2011,7 +2175,6 @@ function confirmName() {
   var tlBody = document.getElementById('transitionLineBody');
   if (tlBody) {
     tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
-    /* v1.15: wrap into <p> elements, wire reveal observer, measure. */
     wrapTransitionBody();
     setupTransitionReveal();
     requestAnimationFrame(function() {
@@ -2101,6 +2264,10 @@ window.addEventListener('load', function() {
   loadAllPanels().then(function() {
     repositionHintGroupAfterLayout();
     repositionNumpad();
+    /* v1.16: wrap phrase spans now that panel bodies are populated. */
+    for (var i = 0; i < panels.length; i++) {
+      wrapPanelPhrases(panels[i]);
+    }
   });
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function() {
@@ -2113,11 +2280,9 @@ window.addEventListener('load', function() {
   }
   buildMotes();
 
-  /* v1.14: build odometer columns at boot. */
   buildDigitColumns(document.getElementById('summaryDigits'), 0);
   buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
 
-  /* v1.15: receipt scroll listeners + ResizeObserver. */
   var receiptPaperEl = receiptScreen ? receiptScreen.querySelector('.receipt-paper') : null;
   if (receiptPaperEl) {
     receiptPaperEl.addEventListener('scroll', updateReceiptScrollIndicator, { passive: true });
@@ -2487,13 +2652,11 @@ confirmYes.addEventListener('click', function(e) {
   divider.classList.remove('active');
   summaryBar.classList.remove('visible');
   setTimeout(function() {
-    /* v1.15: reset scroll so the receipt opens at the top. */
     resetReceiptScroll();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
 
-    /* v1.14: Receipt landing animation — first arrival only. */
     if (!receiptHasLanded) {
       receiptHasLanded = true;
       var paper = receiptScreen.querySelector('.receipt-paper');
@@ -2508,7 +2671,6 @@ confirmYes.addEventListener('click', function(e) {
       }
     }
 
-    /* v1.15: indicator visibility after layout settles. */
     requestAnimationFrame(updateReceiptScrollIndicator);
     setTimeout(updateReceiptScrollIndicator, 100);
     setTimeout(updateReceiptScrollIndicator, 1000);
@@ -3554,7 +3716,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
-    /* v1.15: reset scroll on reopen too. */
     resetReceiptScroll();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
