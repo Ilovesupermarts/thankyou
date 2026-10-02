@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Scroll Focus Demo</title>
+<title>Strict Symmetrical Snap Demo</title>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
@@ -23,30 +23,28 @@
     overflow-x: hidden;
   }
 
-  /* Fixed Control Panel for Demo Purposes */
-  .demo-controls {
+  /* Fixed layout indicator to visualize the highly restricted ±15px zone */
+  .center-guide {
     position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(255,255,255,0.9);
-    padding: 12px 24px;
-    border-radius: 30px;
-    box-shadow: 0 4px 14px rgba(120, 70, 20, 0.15);
-    z-index: 1000;
-    display: flex;
-    gap: 16px;
-    font-family: sans-serif;
-    font-size: 14px;
-    font-weight: bold;
-    color: #8f3f12;
+    top: calc(50% - 15px);
+    left: 0;
+    right: 0;
+    height: 30px;
+    border-top: 1px dashed rgba(143, 47, 0, 0.25);
+    border-bottom: 1px dashed rgba(143, 47, 0, 0.25);
+    background: rgba(143, 47, 0, 0.04);
+    pointer-events: none;
+    z-index: 100;
   }
 
-  .demo-controls label {
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+  .guide-label {
+    position: absolute;
+    top: -24px;
+    left: 20px;
+    font-family: sans-serif;
+    font-size: 11px;
+    color: rgba(143, 47, 0, 0.6);
+    letter-spacing: 2px;
   }
 
   /* Replicating the Transition Line CSS */
@@ -125,15 +123,8 @@
 </head>
 <body>
 
-<div class="demo-controls">
-  <label>
-    <input type="radio" name="effectType" value="cinematic" checked>
-    Cinematic (Smooth Swell)
-  </label>
-  <label>
-    <input type="radio" name="effectType" value="snap">
-    Layout-Safe Snap (Click-in)
-  </label>
+<div class="center-guide">
+  <div class="guide-label">STRICT SNAP ZONE (±15px)</div>
 </div>
 
 <div class="transition-line" id="transitionLine">
@@ -156,7 +147,6 @@
 <div class="hint">↓ スクロールして効果を確認 ↓</div>
 
 <script>
-  // Simplified metrics gatherer for the demo
   var bodyEl = document.getElementById('transitionLineBody');
   var tbMetrics = {
     downMax: window.innerHeight / 1.5,
@@ -171,48 +161,35 @@
     var vh = window.innerHeight;
     var vc = vh / 2;
     var rect = bodyEl.getBoundingClientRect();
+    
+    // Find the exact vertical center of the text block
     var bodyCentre = rect.top + rect.height / 2;
+    
+    // 'd' is exactly how many pixels the center of the text is from the center of the screen
     var d = bodyCentre - vc;
 
-    var rawProgress;
-    if (d >= 0) rawProgress = Math.min(1, d / tbMetrics.downMax);
-    else rawProgress = Math.min(1, -d / tbMetrics.upMax);
+    var progress;
+    if (d >= 0) progress = Math.min(1, d / tbMetrics.downMax);
+    else progress = Math.min(1, -d / tbMetrics.upMax);
 
-    // Read the selected radio button
-    var effectType = document.querySelector('input[name="effectType"]:checked').value;
+    var blurVal = TB_MAX_BLUR * progress;
+    var scaleVal = 1.0;
+    if (blurVal < TB_SCALE_TRIGGER_BLUR) {
+      scaleVal = 1.0 + (TB_MAX_SCALE - 1.0) * (1 - blurVal / TB_SCALE_TRIGGER_BLUR);
+    }
 
-    if (effectType === 'cinematic') {
-      // --- CINEMATIC MATH ---
-      var focusCurve = Math.pow(rawProgress, 2.5); // Sweet spot curve
-      var blurVal = TB_MAX_BLUR * focusCurve;
-      var scaleVal = 1.0 + (0.04 * (1 - focusCurve));
-      var bloomVal = 1 - focusCurve;
-
-      bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
-      bodyEl.style.transform = 'scale(' + scaleVal.toFixed(4) + ')';
-      bodyEl.style.textShadow = '0 0 ' + (bloomVal * 0.8).toFixed(2) + 'px currentColor';
-      
+    bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
+    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
+    
+    // --- TIGHTENED STRICT SNAP ---
+    // If the center of the text block is within 15 pixels of the center of the screen
+    if (Math.abs(d) <= 15) {
+      bodyEl.style.textShadow = '0 0 0.8px currentColor';
     } else {
-      // --- SNAP MATH ---
-      var blurVal = TB_MAX_BLUR * rawProgress;
-      var scaleVal = 1.0;
-      if (blurVal < TB_SCALE_TRIGGER_BLUR) {
-        scaleVal = 1.0 + (TB_MAX_SCALE - 1.0) * (1 - blurVal / TB_SCALE_TRIGGER_BLUR);
-      }
-
-      bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
-      bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
-      
-      // Widened threshold so smooth scrolling catches it, using text-shadow to avoid layout jumping
-      if (blurVal <= 0.4) {
-        bodyEl.style.textShadow = '0 0 0.8px currentColor';
-      } else {
-        bodyEl.style.textShadow = 'none';
-      }
+      bodyEl.style.textShadow = 'none';
     }
   }
 
-  // Bind to scroll
   var rafPending = false;
   window.addEventListener('scroll', function() {
     if (rafPending) return;
@@ -222,6 +199,12 @@
       updateEffects();
     });
   }, { passive: true });
+
+  window.addEventListener('resize', function() {
+    tbMetrics.downMax = window.innerHeight / 1.5;
+    tbMetrics.upMax = window.innerHeight / 1.5;
+    updateEffects();
+  });
 
   // Initial trigger
   updateEffects();
