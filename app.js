@@ -8,9 +8,15 @@
          rebuilt from them so the greeting survives confirmName().
          therapistGreeting is captured once from the authored DOM
          on the first buildPanel1OpeningBeats() call and reused
-         thereafter. The rebuilt span preserves id="therapistName".
-       - Snap-bold trigger widened to TB_SCALE_TRIGGER_BLUR so it
-         fires in lockstep with max scaleX at blur <= 1.0.
+         thereafter. Beats are ALWAYS inserted immediately before
+         #panel1Body; stale beats and stray text nodes before the
+         body are cleared first. The rebuilt span preserves
+         id="therapistName".
+       - Snap-bold trigger widened via TB_BOLD_TRIGGER_BLUR
+         (0.6 * TB_MAX_BLUR) so the bold state is perceptible
+         during normal reading of the transition-line body. The
+         earlier TB_SCALE_TRIGGER_BLUR window was too narrow for
+         a body whose first paragraphs sit above its centre.
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
@@ -1052,39 +1058,41 @@ function wrapPhrasesRecursively(root) {
   while ((n = walker.nextNode())) collected.push(n);
 
   for (var i = 0; i < collected.length; i++) {
-    wrapTextNodeInPhrases(collected[i]);
+    wrapTextNodeInPhrase(collected[i]);
   }
+}
+
+function wrapTextNodeInPhrase(textNode) {
+  wrapTextNodeInPhrases(textNode);
 }
 
 /* ============================================================
    PANEL-1 SPECIAL SEQUENCE — v1.17.2
    ------------------------------------------------------------
    The opening line "<name>さん、初めまして。" is presented as two
-   fixed beats. Beat boundary is at the first "、":
+   beats. Beat boundary is at the first "、":
      Beat 1: everything up to and including the comma
      Beat 2: the remainder
    Beat 2 starts the instant beat 1 completes. Then a 500 ms
    pause before #panel1Body begins its normal phrase reveal.
 
-   Called from preparePanel(panel-1) AND from confirmName() (so
-   the beats reflect the entered name, not the boot placeholder).
+   Name comes from therapistDisplayName. Greeting ("、初めまして。")
+   is captured ONCE from the authored DOM on the first call into
+   therapistGreeting, and reused thereafter.
 
-   v1.17.2: the name comes from therapistDisplayName; the greeting
-   ("、初めまして。") is captured ONCE from the authored DOM into
-   therapistGreeting on the first call, and reused thereafter.
-   Re-reading the greeting from the DOM on the second call would
-   return the beat-rebuild, not the authored text.
+   Insertion anchor is ALWAYS #panel1Body. #panel1Body is a direct
+   child of .panel-content and is never removed, so it is a stable
+   reference. All existing .panel-1-beat elements and stray text
+   nodes before #panel1Body are cleared first.
 
-   The rebuilt span preserves id="therapistName" so any other
-   getElementById('therapistName') caller keeps resolving.
+   The rebuilt span preserves id="therapistName".
    ============================================================ */
 function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
   var contentEl = panelEl.querySelector('.panel-content');
   if (!contentEl) return;
-
   var body = contentEl.querySelector('#panel1Body');
-  var existingSpan = contentEl.querySelector('.therapist-name');
+  if (!body) return;
 
   /* First call: capture the greeting from the authored DOM before we
      rewrite anything. Everything between the name span and #panel1Body,
@@ -1092,8 +1100,9 @@ function buildPanel1OpeningBeats(panelEl) {
      reuse the cached value. */
   if (therapistGreeting === null) {
     var captured = '';
-    if (existingSpan) {
-      var cur = existingSpan.nextSibling;
+    var srcSpan = contentEl.querySelector('.therapist-name');
+    if (srcSpan) {
+      var cur = srcSpan.nextSibling;
       while (cur && cur !== body) {
         if (cur.nodeType === 3) captured += cur.nodeValue || '';
         else if (cur.nodeType === 1) captured += cur.textContent || '';
@@ -1101,23 +1110,29 @@ function buildPanel1OpeningBeats(panelEl) {
       }
     }
     captured = captured.replace(/\s+/g, '');
-    var firstComma = captured.indexOf('、');
-    therapistGreeting = (firstComma >= 0) ? captured.substring(firstComma) : captured;
+    var fc = captured.indexOf('、');
+    therapistGreeting = (fc >= 0) ? captured.substring(fc) : captured;
     if (therapistGreeting === '') therapistGreeting = '、初めまして。';
   }
 
-  /* Anchor captured before any removal. */
-  var anchor = existingSpan ? existingSpan.nextSibling : (body || null);
-  var parent = existingSpan ? existingSpan.parentNode : contentEl;
-  if (!parent) return;
+  /* Clear any existing beat wrappers anywhere in .panel-content. */
+  var staleBeats = contentEl.querySelectorAll('.panel-1-beat');
+  for (var s = 0; s < staleBeats.length; s++) {
+    if (staleBeats[s].parentNode) staleBeats[s].parentNode.removeChild(staleBeats[s]);
+  }
 
-  /* Collect the range we are replacing: the span plus everything
-     between it and #panel1Body (exclusive of body). */
-  var nodes = [];
-  var walk = existingSpan;
-  while (walk && walk !== body) {
-    nodes.push(walk);
-    walk = walk.nextSibling;
+  /* Clear any stray direct-child text nodes between contentEl start
+     and #panel1Body. Element children before body (shouldn't exist
+     after a clean build) are also removed for safety. */
+  var child = contentEl.firstChild;
+  while (child && child !== body) {
+    var nextChild = child.nextSibling;
+    if (child.nodeType === 3) {
+      contentEl.removeChild(child);
+    } else if (child.nodeType === 1 && child !== body) {
+      contentEl.removeChild(child);
+    }
+    child = nextChild;
   }
 
   /* Compose and split. */
@@ -1131,44 +1146,29 @@ function buildPanel1OpeningBeats(panelEl) {
     beat1Text = full;
     beat2Text = '';
   }
-
   var nameOnly = beat1Text.replace(/、$/, '').replace(/さん$/, '');
   if (nameOnly === '') nameOnly = beat1Text.replace(/、$/, '');
 
-  /* Beat 1: styled span + plain comma. */
+  /* Build beat 1 = [styled span][、]. */
   var beat1 = document.createElement('span');
   beat1.className = 'panel-phrase panel-1-beat';
   beat1.setAttribute('data-beat', '1');
-
   var nameSpan = document.createElement('span');
   nameSpan.id = 'therapistName';
   nameSpan.className = 'therapist-name';
   nameSpan.textContent = nameOnly + 'さん';
   beat1.appendChild(nameSpan);
+  if (commaIdx >= 0) beat1.appendChild(document.createTextNode('、'));
 
-  if (commaIdx >= 0) {
-    beat1.appendChild(document.createTextNode('、'));
-  }
-
-  /* Beat 2: remainder. */
+  /* Build beat 2 = remainder. */
   var beat2 = document.createElement('span');
   beat2.className = 'panel-phrase panel-1-beat';
   beat2.setAttribute('data-beat', '2');
   beat2.textContent = beat2Text;
 
-  /* Remove the old range. */
-  for (var r = 0; r < nodes.length; r++) {
-    if (nodes[r].parentNode) nodes[r].parentNode.removeChild(nodes[r]);
-  }
-
-  /* Insert beat1 → beat2 → anchor. */
-  if (anchor && anchor.parentNode === parent) {
-    parent.insertBefore(beat2, anchor);
-    parent.insertBefore(beat1, beat2);
-  } else {
-    parent.appendChild(beat1);
-    parent.appendChild(beat2);
-  }
+  /* Insert both beats immediately before #panel1Body. */
+  contentEl.insertBefore(beat1, body);
+  contentEl.insertBefore(beat2, body);
 
   therapistNameEl = nameSpan;
 }
@@ -1243,7 +1243,6 @@ function playPanel1SpecialSequence(panelEl) {
       started = true;
       beat1.removeEventListener('transitionend', onBeat2Start);
       fireBeat(beat2);
-      /* After beat 2 completes, wait, then reveal the body. */
       var bodyFired = false;
       function onBeat2End() {
         if (bodyFired) return;
@@ -1326,13 +1325,8 @@ function preparePanel(panelEl) {
   var isPanel1 = panelEl.getAttribute('data-panel') === '0';
 
   if (isPanel1) {
-    /* Panel 1's beats get rebuilt inside confirmName(), after the
-       user has entered their name. At boot we only wrap the body. */
     var body = contentEl.querySelector('#panel1Body');
     if (body) wrapPhrasesRecursively(body);
-    /* Also do an initial beat build so a first-load without any
-       interaction still has something in the DOM. It will be
-       rebuilt in confirmName() once the real name is available. */
     buildPanel1OpeningBeats(panelEl);
     return;
   }
@@ -2285,6 +2279,9 @@ var tbMetrics = {
 var TB_MAX_BLUR = 6;
 var TB_SCALE_TRIGGER_BLUR = 1.0;
 var TB_MAX_SCALE = 1.07;
+/* v1.17.2: bold trigger is wider than the scale trigger so the bold
+   state is perceptible while reading the body's first paragraphs. */
+var TB_BOLD_TRIGGER_BLUR = TB_MAX_BLUR * 0.6;
 
 function measureTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
@@ -2326,8 +2323,9 @@ function updateTransitionBodyEffects() {
     ? 'scaleX(' + scaleVal.toFixed(4) + ')'
     : '';
 
-  /* v1.17.2: snap-bold fires in lockstep with max scaleX. */
-  if (blurVal <= TB_SCALE_TRIGGER_BLUR) {
+  /* v1.17.2: snap-bold fires across a wider window so it is visible
+     while reading the body, not only at perfect centre. */
+  if (blurVal <= TB_BOLD_TRIGGER_BLUR) {
     tbMetrics.bodyEl.classList.add('snap-bold');
   } else {
     tbMetrics.bodyEl.classList.remove('snap-bold');
@@ -2671,7 +2669,6 @@ function buildReceipt() {
   receiptItems.innerHTML = '';
   var receiptToName = document.getElementById('receiptToName');
   if (receiptToName) {
-    /* v1.17.2: therapistDisplayName already includes さん. */
     var currentName = therapistDisplayName || '桜庭さん';
     receiptToName.textContent = currentName + 'へ';
   }
