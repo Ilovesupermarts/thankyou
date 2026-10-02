@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Blur + ScaleX with Dead Zone — Demo v4</title>
+<title>Phrase Reveal — Demo</title>
 <style>
   :root {
     --bg-page:       #f5d89a;
     --accent:        #c9600a;
+    --accent-3:      #7a3208;
     --text-dark:     #231304;
     --text-mute:     #5a3818;
     --border:        #e8c88a;
@@ -19,8 +20,10 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     color: var(--text-dark);
     background: var(--bg-page);
+    overflow: hidden;
   }
 
+  /* ---------- Controls ---------- */
   .controls {
     position: fixed; top: 0; left: 0; right: 0;
     z-index: 100;
@@ -30,14 +33,16 @@
     padding: 10px 16px;
     font-family: -apple-system, sans-serif;
     font-size: 11px; color: var(--text-dark);
+    max-height: 46vh;
+    overflow-y: auto;
   }
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-    gap: 8px 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 6px 14px;
     max-width: 1100px; margin: 0 auto;
   }
-  .ctrl { display: flex; align-items: center; gap: 8px; }
+  .ctrl { display: flex; align-items: center; gap: 6px; }
   .ctrl label {
     flex: 1; color: var(--text-mute);
     letter-spacing: 1px; font-weight: 600;
@@ -56,276 +61,470 @@
     font-size: 10px; color: var(--text-mute);
     min-width: 52px; text-align: right;
   }
-
-  .demo {
-    padding: 500px 20px 160px 20px;
-    max-width: 620px; margin: 0 auto;
+  .ctrl.actions {
+    grid-column: 1 / -1;
+    justify-content: center; gap: 10px;
+    padding-top: 4px;
   }
-  .spacer-note {
-    text-align: center;
-    font-family: -apple-system, sans-serif;
-    font-size: 11px; letter-spacing: 2px;
-    color: var(--text-mute); opacity: 0.55;
-    margin: 60px 0;
+  .ctrl.actions button {
+    font-family: inherit; font-size: 10.5px;
+    letter-spacing: 1px; padding: 5px 14px;
+    border: 1px solid var(--border);
+    background: #fff; color: var(--text-dark);
+    border-radius: 14px; cursor: pointer;
   }
+  .ctrl.actions button:hover { border-color: var(--accent); }
+  .ctrl.actions button:active { transform: scale(0.97); }
 
-  .transition-line {
+  /* ---------- Stage ---------- */
+  .stage {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    padding: 220px 20px 100px 20px;
+    overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    perspective: 1200px;
+  }
+  .track {
+    display: flex;
+    width: 500%;
+    height: 100%;
+    transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1);
+    will-change: transform;
+  }
+  .panel {
+    width: 20%;
+    height: 100%;
+    display: flex; align-items: center; justify-content: center;
     text-align: center;
-    padding: 0 32px 40px 32px;
-    margin: 0 auto 60px auto;
+  }
+  .panel-inner {
     max-width: 560px;
+    width: 100%;
+  }
+  .panel-content {
     font-size: 18px;
     font-weight: 500;
     color: #8f2f00;
+    line-height: 2.2;
     letter-spacing: 0.8px;
-    line-height: 2;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    word-break: auto-phrase;
+    overflow-wrap: break-word;
+    line-break: strict;
   }
-  .transition-line-divider {
-    display: flex; align-items: center; justify-content: center;
-    gap: 12px; margin: 0 0 20px 0;
-  }
-  .transition-line-mark {
-    flex-shrink: 0; font-size: 1.1em; line-height: 1;
-    color: var(--transition-head-color);
-  }
-  .transition-line-rule {
-    flex: 1; height: 1px;
-    background: var(--transition-head-color);
-    min-width: 24px;
-  }
-  .transition-line-title {
-    flex-shrink: 0; font-size: 1.1em;
-    color: var(--transition-head-color);
-    letter-spacing: 5px; white-space: nowrap;
-  }
-
-  .transition-line-body {
-    position: relative;
-    will-change: filter, transform;
-  }
-  .transition-line-body p {
+  .panel-content p {
     margin: 0 0 0.9em 0;
   }
-  .transition-line-body p:last-child { margin-bottom: 0; }
+  .panel-content p:last-child { margin-bottom: 0; }
 
-  .ref-line {
-    position: fixed; left: 0; right: 0;
-    height: 0;
-    border-top: 1px dashed rgba(201, 96, 10, 0.55);
-    pointer-events: none; z-index: 90;
+  /* Panel-level fade/blur — mirrors the app's existing .panel-content */
+  .panel-content {
+    opacity: 0;
+    transform: translateX(40px);
+    filter: blur(4px);
+    transition: opacity var(--panel-dur, 850ms) cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform var(--panel-dur, 850ms) cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                filter var(--panel-dur, 850ms) cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition-delay: 0.1s;
   }
-  .ref-line::after {
-    content: attr(data-label);
-    position: absolute; right: 8px; top: 3px;
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 10px; color: var(--accent);
-    background: rgba(253, 243, 216, 0.9);
-    padding: 1px 5px; border-radius: 4px;
+  .panel.active .panel-content {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
   }
-  .ref-line.mid { top: 50vh; }
 
-  .readout-bar {
-    position: fixed; bottom: 8px; left: 12px; right: 12px;
-    z-index: 100;
-    display: flex; justify-content: center; flex-wrap: wrap; gap: 14px;
-    font-family: ui-monospace, Menlo, Consolas, monospace;
-    font-size: 11px; color: var(--text-mute);
-    background: rgba(253, 243, 216, 0.94);
-    padding: 7px 16px; border-radius: 20px;
-    pointer-events: none; user-select: none;
-    max-width: 800px; margin: 0 auto;
+  /* Phrase spans */
+  .phrase {
+    display: inline-block;
+    opacity: 0;
+    transform: translateX(var(--start-x, 20px));
+    transition: opacity var(--chunk-dur, 500ms) var(--chunk-ease, ease-out),
+                transform var(--chunk-dur, 500ms) var(--chunk-ease, ease-out);
+    will-change: opacity, transform;
   }
-  .readout-bar b { color: var(--accent); font-weight: 700; }
-  .readout-bar .divider { color: rgba(90, 56, 24, 0.35); }
-  .readout-bar .dead { color: rgba(90, 56, 24, 0.5); font-style: italic; }
+  .phrase.shown {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .phrase {
+      opacity: 1 !important;
+      transform: none !important;
+      transition: none !important;
+    }
+  }
+
+  /* ---------- Indicator ---------- */
+  .step-indicator {
+    position: fixed; bottom: 14px; left: 0; right: 0;
+    display: flex; justify-content: center; gap: 12px;
+    z-index: 90;
+    pointer-events: none;
+  }
+  .step-dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: rgba(201, 96, 10, 0.25);
+    transition: background 0.3s, transform 0.3s;
+  }
+  .step-dot.active {
+    background: var(--accent);
+    transform: scale(1.4);
+  }
 </style>
 </head>
 <body>
 
 <div class="controls">
   <div class="controls-grid">
+
     <div class="ctrl">
-      <label>Max blur</label>
-      <input type="range" id="maxBlur" min="1" max="20" step="0.5" value="6">
-      <span class="readout" id="maxBlurV">6.0 px</span>
+      <label>Chunk min</label>
+      <input type="range" id="chunkMin" min="1" max="20" step="1" value="5">
+      <span class="readout" id="chunkMinV">5</span>
     </div>
+
     <div class="ctrl">
-      <label>Max scaleX</label>
-      <input type="range" id="maxScale" min="1.00" max="1.40" step="0.01" value="1.10">
-      <span class="readout" id="maxScaleV">1.10</span>
+      <label>Chunk max</label>
+      <input type="range" id="chunkMax" min="1" max="30" step="1" value="10">
+      <span class="readout" id="chunkMaxV">10</span>
     </div>
+
     <div class="ctrl">
-      <label>Scale starts at blur</label>
-      <input type="range" id="threshold" min="0" max="10" step="0.5" value="1">
-      <span class="readout" id="thresholdV">1.0 px</span>
+      <label>Rise distance</label>
+      <input type="range" id="rise" min="0" max="80" step="2" value="20">
+      <span class="readout" id="riseV">20 px</span>
     </div>
+
     <div class="ctrl">
-      <label>Origin</label>
-      <select id="origin">
-        <option value="50% 50%" selected>center</option>
-        <option value="0% 50%">left</option>
-        <option value="100% 50%">right</option>
+      <label>Chunk duration</label>
+      <input type="range" id="chunkDur" min="100" max="1500" step="50" value="500">
+      <span class="readout" id="chunkDurV">500 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Stagger max</label>
+      <input type="range" id="staggerMax" min="0" max="1500" step="50" value="600">
+      <span class="readout" id="staggerMaxV">600 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Chunk easing</label>
+      <select id="chunkEase">
+        <option value="ease-out" selected>ease-out</option>
+        <option value="cubic-bezier(0.34, 1.56, 0.64, 1)">overshoot</option>
+        <option value="ease-in-out">ease-in-out</option>
+        <option value="linear">linear</option>
       </select>
     </div>
+
+    <div class="ctrl">
+      <label>Panel duration</label>
+      <input type="range" id="panelDur" min="0" max="2000" step="50" value="850">
+      <span class="readout" id="panelDurV">850 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Chunk delay</label>
+      <input type="range" id="chunkDelay" min="0" max="1200" step="50" value="300">
+      <span class="readout" id="chunkDelayV">300 ms</span>
+    </div>
+
+    <div class="ctrl">
+      <label>Mode</label>
+      <select id="mode">
+        <option value="sequence" selected>sequence (chunks after panel starts)</option>
+        <option value="coexist">coexist (chunks during panel fade)</option>
+      </select>
+    </div>
+
+    <div class="ctrl actions">
+      <button id="replayBtn">Replay current panel</button>
+      <button id="prevBtn">← Prev</button>
+      <button id="nextBtn">Next →</button>
+    </div>
+
   </div>
 </div>
 
-<div class="ref-line mid" data-label="pivot · 0 blur · max scaleX"></div>
-
-<div class="demo">
-  <div class="spacer-note">↓ SCROLL — BLUR RISES, SCALE FALLS TO 1.0 ↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-
-  <div class="transition-line">
-    <div class="transition-line-divider">
-      <span class="transition-line-mark">❀</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-title">大切なお知らせ</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-mark">❀</span>
+<div class="stage">
+  <div class="track" id="track">
+    <div class="panel" data-panel="0">
+      <div class="panel-inner">
+        <div class="panel-content" data-text="桜庭さん、初めまして。本日はお会いできて嬉しいです。どうぞよろしくお願いいたします。"></div>
+      </div>
     </div>
-    <div class="transition-line-body" id="transitionLineBody">
-      <p>それでは、本日の癒しのオプションをご覧ください。</p>
-      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-      <p>ありがとうございます。</p>
+    <div class="panel" data-panel="1">
+      <div class="panel-inner">
+        <div class="panel-content" data-text="それでは、本日の癒しのオプションをご覧ください。ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="2">
+      <div class="panel-inner">
+        <div class="panel-content" data-text="表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="3">
+      <div class="panel-inner">
+        <div class="panel-content" data-text="一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。ありがとうございます。"></div>
+      </div>
+    </div>
+    <div class="panel" data-panel="4">
+      <div class="panel-inner">
+        <div class="panel-content" data-text="もちろん、ご不安なものやご対応が難しいものについては、無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。"></div>
+      </div>
     </div>
   </div>
-
-  <div class="spacer-note">↓ KEEP SCROLLING ↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↓</div>
-  <div class="spacer-note">↑ SCROLL BACK UP TO REVERSE ↑</div>
 </div>
 
-<div class="readout-bar">
-  <span>blur <b id="roBlur">0.0</b> px</span>
-  <span class="divider">·</span>
-  <span>scaleX <b id="roScale">1.000</b></span>
-  <span class="divider">·</span>
-  <span id="roPhase" class="dead">—</span>
-  <span class="divider">·</span>
-  <span>progress <b id="roProg">0%</b></span>
+<div class="step-indicator" id="stepIndicator">
+  <span class="step-dot active"></span>
+  <span class="step-dot"></span>
+  <span class="step-dot"></span>
+  <span class="step-dot"></span>
+  <span class="step-dot"></span>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  var bodyEl = document.getElementById('transitionLineBody');
-  var paragraphs = bodyEl.querySelectorAll('p');
-  var secondLastP = paragraphs[paragraphs.length - 2];
+  var TOTAL_PANELS = 5;
 
-  var maxBlurEl   = document.getElementById('maxBlur');
-  var maxScaleEl  = document.getElementById('maxScale');
-  var thresholdEl = document.getElementById('threshold');
-  var originEl    = document.getElementById('origin');
+  /* ---------- DOM refs ---------- */
+  var track        = document.getElementById('track');
+  var panels       = document.querySelectorAll('.panel');
+  var stepDots     = document.querySelectorAll('.step-dot');
 
-  var maxBlurV    = document.getElementById('maxBlurV');
-  var maxScaleV   = document.getElementById('maxScaleV');
-  var thresholdV  = document.getElementById('thresholdV');
+  var chunkMinEl   = document.getElementById('chunkMin');
+  var chunkMaxEl   = document.getElementById('chunkMax');
+  var riseEl       = document.getElementById('rise');
+  var chunkDurEl   = document.getElementById('chunkDur');
+  var staggerMaxEl = document.getElementById('staggerMax');
+  var chunkEaseEl  = document.getElementById('chunkEase');
+  var panelDurEl   = document.getElementById('panelDur');
+  var chunkDelayEl = document.getElementById('chunkDelay');
+  var modeEl       = document.getElementById('mode');
 
-  var roBlur  = document.getElementById('roBlur');
-  var roScale = document.getElementById('roScale');
-  var roPhase = document.getElementById('roPhase');
-  var roProg  = document.getElementById('roProg');
+  var chunkMinV    = document.getElementById('chunkMinV');
+  var chunkMaxV    = document.getElementById('chunkMaxV');
+  var riseV        = document.getElementById('riseV');
+  var chunkDurV    = document.getElementById('chunkDurV');
+  var staggerMaxV  = document.getElementById('staggerMaxV');
+  var panelDurV    = document.getElementById('panelDurV');
+  var chunkDelayV  = document.getElementById('chunkDelayV');
 
-  var downMaxDistance = 1;
-  var upMaxDistance = 1;
+  var replayBtn    = document.getElementById('replayBtn');
+  var prevBtn      = document.getElementById('prevBtn');
+  var nextBtn      = document.getElementById('nextBtn');
 
-  function measure() {
-    var vh = window.innerHeight;
-    var bodyH = bodyEl.offsetHeight;
-    downMaxDistance = Math.max(40, vh / 2 + bodyH / 2);
-    var offset = secondLastP.offsetTop;
-    upMaxDistance = Math.max(40, vh / 2 + offset - bodyH / 2);
+  /* ---------- State ---------- */
+  var currentPanel = 0;
+  var phraseTimers = [];
+
+  /* ---------- Text splitting ---------- */
+  function chunkText(text) {
+    /* Strip whitespace runs — we chunk purely on character count. */
+    var clean = text.replace(/\s+/g, '');
+    var min = parseInt(chunkMinEl.value, 10);
+    var max = parseInt(chunkMaxEl.value, 10);
+    if (min > max) { var t = min; min = max; max = t; }
+    if (min < 1) min = 1;
+    if (max < min) max = min;
+
+    var chunks = [];
+    var i = 0;
+    while (i < clean.length) {
+      var len = min + Math.floor(Math.random() * (max - min + 1));
+      if (i + len > clean.length) len = clean.length - i;
+      chunks.push(clean.substr(i, len));
+      i += len;
+    }
+    return chunks;
   }
 
-  function update() {
-    var maxBlur    = parseFloat(maxBlurEl.value);
-    var maxScale   = parseFloat(maxScaleEl.value);
-    var threshold  = parseFloat(thresholdEl.value);   /* px */
-    var vh = window.innerHeight;
-    var vc = vh / 2;
+  /* ---------- Build phrase spans for a paragraph text ---------- */
+  function buildPhraseMarkup(text) {
+    var chunks = chunkText(text);
+    var out = '';
+    for (var i = 0; i < chunks.length; i++) {
+      out += '<span class="phrase" data-chunk="' + i + '">' + escapeHtml(chunks[i]) + '</span>';
+    }
+    return out;
+  }
 
-    var rect = bodyEl.getBoundingClientRect();
-    var bodyCentre = rect.top + rect.height / 2;
-    var d = bodyCentre - vc;
+  function escapeHtml(s) {
+    return String(s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
 
-    var progress;
-    if (d >= 0) {
-      progress = Math.min(1, d / downMaxDistance);
-    } else {
-      progress = Math.min(1, -d / upMaxDistance);
+  /* ---------- Render each panel once at boot ---------- */
+  function renderPanels() {
+    for (var i = 0; i < panels.length; i++) {
+      var contentEl = panels[i].querySelector('.panel-content');
+      var text = contentEl.getAttribute('data-text') || '';
+      contentEl.innerHTML = '<p>' + buildPhraseMarkup(text) + '</p>';
+    }
+  }
+
+  /* ---------- CSS var application ---------- */
+  function applyCSSVars() {
+    var rise = riseEl.value + 'px';
+    var chunkDur = chunkDurEl.value + 'ms';
+    var chunkEase = chunkEaseEl.value;
+    var panelDur = panelDurEl.value + 'ms';
+
+    document.documentElement.style.setProperty('--rise', rise);
+    document.documentElement.style.setProperty('--chunk-dur', chunkDur);
+    document.documentElement.style.setProperty('--chunk-ease', chunkEase);
+    document.documentElement.style.setProperty('--panel-dur', panelDur);
+
+    for (var i = 0; i < panels.length; i++) {
+      panels[i].querySelector('.panel-content').style.setProperty('--panel-dur', panelDur);
+    }
+  }
+
+  /* ---------- Phrase reveal for a given panel ---------- */
+  function clearPhraseTimers() {
+    for (var i = 0; i < phraseTimers.length; i++) clearTimeout(phraseTimers[i]);
+    phraseTimers = [];
+  }
+
+  function resetPhrases(panelEl) {
+    var phrases = panelEl.querySelectorAll('.phrase');
+    for (var i = 0; i < phrases.length; i++) {
+      phrases[i].classList.remove('shown');
+      phrases[i].style.transitionDelay = '0ms';
+      phrases[i].style.removeProperty('--start-x');
+    }
+  }
+
+  function playPhraseReveal(panelEl) {
+    var phrases = panelEl.querySelectorAll('.phrase');
+    if (!phrases.length) return;
+
+    var rise = parseFloat(riseEl.value) || 0;
+    var staggerMax = parseFloat(staggerMaxEl.value) || 0;
+    var delay = parseInt(chunkDelayEl.value, 10) || 0;
+    var mode = modeEl.value;
+
+    /* In "coexist" mode we start phrases right away.
+       In "sequence" mode we delay until the panel fade is mostly in. */
+    var baseDelay = (mode === 'sequence') ? delay : Math.max(0, delay - 300);
+
+    /* Force reflow so a fresh .shown class add triggers the transition. */
+    void panelEl.offsetWidth;
+
+    for (var i = 0; i < phrases.length; i++) {
+      (function(el, idx) {
+        /* Random direction */
+        var dir = Math.random() < 0.5 ? -1 : 1;
+        el.style.setProperty('--start-x', (dir * rise) + 'px');
+
+        /* Random per-chunk stagger */
+        var stagger = staggerMax > 0 ? Math.random() * staggerMax : 0;
+        var total = baseDelay + stagger;
+
+        if (total > 0) {
+          var id = setTimeout(function() { el.classList.add('shown'); }, total);
+          phraseTimers.push(id);
+        } else {
+          el.classList.add('shown');
+        }
+      })(phrases[i], i);
+    }
+  }
+
+  /* ---------- Panel activation ---------- */
+  function activatePanel(index) {
+    currentPanel = index;
+    track.style.transform = 'translateX(-' + (index * 20) + '%)';
+
+    for (var i = 0; i < panels.length; i++) {
+      panels[i].classList.toggle('active', i === index);
+      stepDots[i].classList.toggle('active', i === index);
     }
 
-    /* Blur: 0 at pivot, ramps linearly to maxBlur at the far end */
-    var blurVal = maxBlur * progress;
+    /* Full reset then replay — matches your "every time" requirement. */
+    clearPhraseTimers();
+    var target = panels[index];
+    resetPhrases(target);
 
-    /* Scale: dead zone above the threshold.
-       - blurVal >= threshold: scale = 1.00 (no scaling)
-       - blurVal <  threshold: ramp from 1.00 at threshold to maxScale at blur = 0 */
-    var scaleVal;
-    var phase;
-    if (threshold <= 0 || blurVal >= threshold) {
-      scaleVal = 1.0;
-      phase = 'dead zone (no scaling)';
-    } else {
-      var t = 1 - (blurVal / threshold);   /* 0 at threshold, 1 at blur=0 */
-      scaleVal = 1.0 + (maxScale - 1.0) * t;
-      phase = 'scaling';
-    }
+    /* Force a reflow after reset before re-adding */
+    void target.offsetWidth;
 
-    bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
-    bodyEl.style.transformOrigin = originEl.value;
-    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
-
-    roBlur.textContent  = blurVal.toFixed(1);
-    roScale.textContent = scaleVal.toFixed(3);
-    roPhase.textContent = phase;
-    roPhase.className   = phase === 'scaling' ? '' : 'dead';
-    roProg.textContent  = Math.round(progress * 100) + '%';
+    playPhraseReveal(target);
   }
 
-  var rafPending = false;
-  function schedule() {
-    if (rafPending) return;
-    rafPending = true;
-    requestAnimationFrame(function() { rafPending = false; update(); });
+  /* ---------- Wiring controls ---------- */
+  function updateReadouts() {
+    chunkMinV.textContent = chunkMinEl.value;
+    chunkMaxV.textContent = chunkMaxEl.value;
+    riseV.textContent = riseEl.value + ' px';
+    chunkDurV.textContent = chunkDurEl.value + ' ms';
+    staggerMaxV.textContent = staggerMaxEl.value + ' ms';
+    panelDurV.textContent = panelDurEl.value + ' ms';
+    chunkDelayV.textContent = chunkDelayEl.value + ' ms';
   }
 
-  window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', function() { measure(); schedule(); });
+  [chunkMinEl, chunkMaxEl, riseEl, chunkDurEl, staggerMaxEl, panelDurEl, chunkDelayEl].forEach(function(el) {
+    el.addEventListener('input', function() {
+      updateReadouts();
+      applyCSSVars();
+    });
+  });
 
-  maxBlurEl.addEventListener('input', function() {
-    maxBlurV.textContent = parseFloat(maxBlurEl.value).toFixed(1) + ' px';
-    schedule();
-  });
-  maxScaleEl.addEventListener('input', function() {
-    maxScaleV.textContent = parseFloat(maxScaleEl.value).toFixed(2);
-    schedule();
-  });
-  thresholdEl.addEventListener('input', function() {
-    thresholdV.textContent = parseFloat(thresholdEl.value).toFixed(1) + ' px';
-    schedule();
-  });
-  originEl.addEventListener('change', schedule);
+  chunkEaseEl.addEventListener('change', applyCSSVars);
 
-  measure();
-  update();
-  window.addEventListener('load', function() { measure(); schedule(); });
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function() { measure(); schedule(); });
-  }
+  /* Chunk min/max affect the split itself, so a rebuild is needed. */
+  [chunkMinEl, chunkMaxEl].forEach(function(el) {
+    el.addEventListener('change', function() {
+      renderPanels();
+      activatePanel(currentPanel);
+    });
+  });
+
+  replayBtn.addEventListener('click', function() {
+    activatePanel(currentPanel);
+  });
+  prevBtn.addEventListener('click', function() {
+    activatePanel((currentPanel - 1 + TOTAL_PANELS) % TOTAL_PANELS);
+  });
+  nextBtn.addEventListener('click', function() {
+    activatePanel((currentPanel + 1) % TOTAL_PANELS);
+  });
+
+  /* Swipe support — minimal, one-way */
+  var startX = 0, currentX = 0, dragging = false;
+  document.addEventListener('touchstart', function(e) {
+    startX = e.touches[0].clientX;
+    currentX = startX;
+    dragging = true;
+  }, { passive: true });
+  document.addEventListener('touchmove', function(e) {
+    if (!dragging) return;
+    currentX = e.touches[0].clientX;
+  }, { passive: true });
+  document.addEventListener('touchend', function() {
+    if (!dragging) return;
+    dragging = false;
+    var dx = currentX - startX;
+    var threshold = window.innerWidth * 0.12;
+    if (dx < -threshold) activatePanel(Math.min(TOTAL_PANELS - 1, currentPanel + 1));
+    else if (dx > threshold) activatePanel(Math.max(0, currentPanel - 1));
+  }, { passive: true });
+
+  /* ---------- Boot ---------- */
+  renderPanels();
+  updateReadouts();
+  applyCSSVars();
+  /* Small delay so layout settles before the first replay */
+  requestAnimationFrame(function() {
+    requestAnimationFrame(function() {
+      activatePanel(0);
+    });
+  });
 
 })();
 </script>
