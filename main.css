@@ -1,6 +1,5 @@
 /* ============================================================
-   main.css
-   Merged application stylesheet.
+   main.css — v1.17.1
    ============================================================ */
 
   /* ============ THEME VARIABLES ============ */
@@ -481,9 +480,11 @@
   .panel.leaving .panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
   .panel-content p { margin: 0 0 0.4em 0; padding: 0; }
   .panel-content p:last-child { margin-bottom: 0; }
+
+  /* v1.17.1: therapist name wrapped with さん, weight bumped to 600. */
   .panel-content .therapist-name {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-weight: 500; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
+    font-weight: 600; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
   html[data-theme="autumn"] .panel-content .therapist-name { color: #8f2f00; text-shadow: 0 1px 12px rgba(143, 47, 0, 0.35), 0 2px 20px rgba(253, 232, 184, 0.6); }
@@ -495,9 +496,7 @@
     backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
   }
 
-  /* ============ PANEL PHRASE REVEAL (v1.16) ============
-     Each phrase chunk fades + slides in from a random left/right
-     direction as the panel becomes active. Resets fully each time. */
+  /* ============ PANEL PHRASE REVEAL ============ */
   .panel-phrase {
     display: inline-block;
     opacity: 0;
@@ -618,6 +617,15 @@
     opacity: 1;
     transform: translateY(0);
   }
+
+  /* v1.17.1: snap-bold at blur 0.
+     Applied via the class toggled by JS in updateTransitionBodyEffects().
+     Instant weight switch — no transition — so the text "snaps" into
+     place at the exact moment the block reaches perfect focus. */
+  .transition-line-body.snap-bold {
+    font-weight: 600;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .transition-line-body p {
       opacity: 1;
