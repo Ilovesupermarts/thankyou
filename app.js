@@ -12,11 +12,13 @@
          #panel1Body; stale beats and stray text nodes before the
          body are cleared first. The rebuilt span preserves
          id="therapistName".
-       - Snap-bold trigger widened via TB_BOLD_TRIGGER_BLUR
-         (0.6 * TB_MAX_BLUR) so the bold state is perceptible
-         during normal reading of the transition-line body. The
-         earlier TB_SCALE_TRIGGER_BLUR window was too narrow for
-         a body whose first paragraphs sit above its centre.
+       - Snap-bold fires only at perfect focus (blurVal <= 0.001).
+         Paired with main.css weight 700 for perceptibility.
+       - Carousel edge and under-swipe: bounceToCurrentPanel()
+         snaps the track back to the current panel without
+         replaying the phrase reveal. Applied to all four edge
+         cases (first/last panel, either direction) and to the
+         middle-panel under-swipe case.
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
@@ -1058,12 +1060,8 @@ function wrapPhrasesRecursively(root) {
   while ((n = walker.nextNode())) collected.push(n);
 
   for (var i = 0; i < collected.length; i++) {
-    wrapTextNodeInPhrase(collected[i]);
+    wrapTextNodeInPhrases(collected[i]);
   }
-}
-
-function wrapTextNodeInPhrase(textNode) {
-  wrapTextNodeInPhrases(textNode);
 }
 
 /* ============================================================
@@ -1420,6 +1418,10 @@ function goToPanel(index, noGust) {
   if (currentPanel === totalPanels - 1 && typeof scheduleEvaluation === 'function') {
     setTimeout(scheduleEvaluation, 80);
   }
+}
+function bounceToCurrentPanel() {
+  track.classList.remove('dragging');
+  track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
 }
 
 /* ============ TABLE ============ */
@@ -2279,9 +2281,6 @@ var tbMetrics = {
 var TB_MAX_BLUR = 6;
 var TB_SCALE_TRIGGER_BLUR = 1.0;
 var TB_MAX_SCALE = 1.07;
-/* v1.17.2: bold trigger is wider than the scale trigger so the bold
-   state is perceptible while reading the body's first paragraphs. */
-var TB_BOLD_TRIGGER_BLUR = TB_MAX_BLUR * 0.6;
 
 function measureTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
@@ -2323,9 +2322,8 @@ function updateTransitionBodyEffects() {
     ? 'scaleX(' + scaleVal.toFixed(4) + ')'
     : '';
 
-  /* v1.17.2: snap-bold fires across a wider window so it is visible
-     while reading the body, not only at perfect centre. */
-  if (blurVal <= TB_BOLD_TRIGGER_BLUR) {
+  /* v1.17.2: snap-bold fires only at perfect focus. */
+  if (blurVal <= 0.001) {
     tbMetrics.bodyEl.classList.add('snap-bold');
   } else {
     tbMetrics.bodyEl.classList.remove('snap-bold');
@@ -2411,13 +2409,10 @@ function confirmName() {
   }
   nameConfirmed = true;
 
-  /* v1.17.2: name lives in therapistDisplayName; the beats rebuild
-     below re-establishes therapistNameEl. */
   therapistDisplayName = entered + 'さん';
   confirmedTipAmount = getTipValue();
   if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-  /* Rebuild panel-1 beats now that the real name is known. */
   var p1Panel = document.querySelector('.panel[data-panel="0"]');
   if (p1Panel) buildPanel1OpeningBeats(p1Panel);
 
@@ -2615,7 +2610,6 @@ startBtn.addEventListener('click', function(e) {
   blossomScreen.style.transition = 'opacity 0.6s ease';
   blossomScreen.style.opacity = '0';
   setTimeout(function() {
-    /* v1.17.2: read the name from therapistDisplayName, strip さん. */
     var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
     nameColumn.innerHTML = '';
     var chars = nameText.split('');
@@ -3207,16 +3201,17 @@ function onTouchEnd() {
   var threshold = refWidth * 0.12;
   if (currentPanel === totalPanels - 1) {
     if (deltaX > threshold) goToPanel(currentPanel - 1, true);
-    else goToPanel(currentPanel, true);
+    else bounceToCurrentPanel();
     return;
   }
   if (currentPanel === 0) {
     if (deltaX < -threshold) goToPanel(currentPanel + 1, true);
-    else goToPanel(currentPanel, true);
+    else bounceToCurrentPanel();
     return;
   }
   if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1, true);
   else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1, true);
+  else bounceToCurrentPanel();
 }
 stage.addEventListener('touchstart', onTouchStart, { passive: true });
 stage.addEventListener('touchmove', onTouchMove, { passive: false });
@@ -3265,16 +3260,17 @@ window.addEventListener('mouseup', function() {
   var threshold = refWidth * 0.12;
   if (currentPanel === totalPanels - 1) {
     if (deltaX > threshold) goToPanel(currentPanel - 1, true);
-    else goToPanel(currentPanel, true);
+    else bounceToCurrentPanel();
     return;
   }
   if (currentPanel === 0) {
     if (deltaX < -threshold) goToPanel(currentPanel + 1, true);
-    else goToPanel(currentPanel, true);
+    else bounceToCurrentPanel();
     return;
   }
   if (deltaX < -threshold && currentPanel < totalPanels - 1) goToPanel(currentPanel + 1, true);
   else if (deltaX > threshold && currentPanel > 0) goToPanel(currentPanel - 1, true);
+  else bounceToCurrentPanel();
 });
 
 document.addEventListener('keydown', function(e) {
