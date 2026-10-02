@@ -1,5 +1,5 @@
 /* ============================================================
-   main.css — v1.17.1
+   main.css — v1.17.2
    ============================================================ */
 
   /* ============ THEME VARIABLES ============ */
@@ -481,7 +481,6 @@
   .panel-content p { margin: 0 0 0.4em 0; padding: 0; }
   .panel-content p:last-child { margin-bottom: 0; }
 
-  /* v1.17.1: therapist name wrapped with さん, weight bumped to 600. */
   .panel-content .therapist-name {
     font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-weight: 600; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
@@ -618,13 +617,9 @@
     transform: translateY(0);
   }
 
-  /* v1.17.1: snap-bold at blur 0.
-     Applied via the class toggled by JS in updateTransitionBodyEffects().
-     Instant weight switch — no transition — so the text "snaps" into
-     place at the exact moment the block reaches perfect focus. */
-  .transition-line-body.snap-bold {
-    font-weight: 700;
-  }
+  /* v1.17.2: .snap-bold class removed. The focus snap now uses an
+     inline text-shadow (paint-only) applied from app.js, gated on a
+     strictly symmetrical |d| <= TB_SNAP_WINDOW_PX window. */
 
   @media (prefers-reduced-motion: reduce) {
     .transition-line-body p {
