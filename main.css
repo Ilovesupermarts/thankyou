@@ -623,7 +623,7 @@
      Instant weight switch — no transition — so the text "snaps" into
      place at the exact moment the block reaches perfect focus. */
   .transition-line-body.snap-bold {
-    font-weight: 600;
+    font-weight: 700;
   }
 
   @media (prefers-reduced-motion: reduce) {
