@@ -1,41 +1,33 @@
 /* ============================================================
-   app.js — v1.17
+   app.js — v1.17.1
    ------------------------------------------------------------
    Changelog:
+     v1.17.1
+       - Panel-1 opening line: correct insertion anchor (beats
+         now sit before #panel1Body, not after it).
+       - Panel-1 beats derive their split dynamically from the
+         actual text at the first "、" so any entered name works
+         (2-char, 3-char, English, etc.).
+       - Panel-1 beats are rebuilt after confirmName() runs, so
+         they reflect the entered name rather than the boot-time
+         placeholder.
+       - Therapist-name span now contains "name + さん", font
+         weight 600 (CSS change).
+       - Transition-line body gets .snap-bold (font-weight 600)
+         whenever blur is exactly 0; snaps back the instant blur
+         rises above 0. Instant switch, no transition.
      v1.17
-       - Panel-1 opening line becomes a fixed two-beat sequence:
-         "桜庭さん" fades+slides in, then "、初めまして。" the
-         instant the first beat completes, then a 500ms pause
-         before the panel-1 body begins its phrase reveal.
-         Replays on every revisit to panel 1.
-       - chunkPanelText: minimum-chunk absorption (a final chunk
-         shorter than the minimum is merged into the previous
-         chunk); trailing Japanese punctuation (、。！？) is
-         pulled back into the preceding chunk so no chunk begins
-         with punctuation.
-       - wrapPanelPhrases replaced with a recursive text-node
-         walker: every non-empty text node under .panel-content
-         is wrapped in .panel-phrase chunks. Idempotent.
-         Preserves inline elements. Skips the therapist-name
-         span and its trailing greeting text node on panel 1
-         (handled by the special sequence instead).
+       - Panel phrase reveal: min-chunk absorption + comma-aware
+         split; recursive text-node walker wrapper.
      v1.16
-       - Panel messages: phrase-level reveal on every panel
-         activation. Values: chunk 5-10 chars, rise 30px,
-         duration 500ms, stagger up to 600ms, ease-out, base
-         delay 300ms, coexist mode.
+       - Panel messages phrase reveal on every panel activation.
      v1.15
-       - Receipt opens at the top (scroll reset before reveal).
-       - Decorative scroll indicator on the receipt.
-       - Transition-line paragraph reveal + scroll-driven blur + scaleX.
+       - Receipt scroll reset + indicator; transition-line reveal,
+         blur, scaleX.
      v1.14
-       - Odometer on summary + receipt totals.
-       - Receipt landing animation.
-       - Koi tap sound is Sound/cave-water-drop-echo-a053fcdf.mp3.
+       - Odometer, receipt landing, MP3 koi sound.
      v1.13
-       - Washi paper on #tableCard and .receipt-paper.
-       - Reject state: Thank-You screen returns to the table.
-       - Ghost-checkbox symmetric fix.
+       - Washi paper, reject state fixes, ghost-checkbox fix.
    ============================================================ */
 
 /* ============ THEME TOGGLE ============ */
@@ -927,9 +919,6 @@ var PANEL_PHRASE_STAGGER_MAX = 600;
 var PANEL_PHRASE_DELAY = 300;
 var PANEL_PHRASE_MODE = 'coexist';
 
-/* Panel 1 opening line: fixed two-beat sequence. */
-var PANEL_1_BEAT1_TEXT = '桜庭さん';
-var PANEL_1_BEAT2_TEXT = '、初めまして。';
 var PANEL_1_POST_BEAT_DELAY = 500;
 
 var panelPhraseTimers = [];
@@ -943,12 +932,6 @@ function escapeHtmlForPhrase(s) {
 
 /* ============================================================
    CHUNKER
-   ------------------------------------------------------------
-   Splits a string into 5-10 char chunks with two refinements:
-     1. A final chunk below the minimum is merged into the
-        preceding chunk (no stubs).
-     2. Any chunk that would begin with 、。！？ is trimmed by
-        pulling that punctuation back into the previous chunk.
    ============================================================ */
 function isJapanesePunctuation(ch) {
   return ch === '、' || ch === '。' || ch === '！' || ch === '？';
@@ -958,7 +941,6 @@ function chunkPanelText(text) {
   var clean = String(text).replace(/\s+/g, '');
   if (clean === '') return [];
 
-  /* Pass 1: greedy random-length split. */
   var raw = [];
   var i = 0;
   while (i < clean.length) {
@@ -968,7 +950,6 @@ function chunkPanelText(text) {
     i += len;
   }
 
-  /* Pass 2: absorb a stub-final chunk into its predecessor. */
   if (raw.length >= 2) {
     var lastIdx = raw.length - 1;
     if (raw[lastIdx].length < PANEL_PHRASE_MIN) {
@@ -977,11 +958,6 @@ function chunkPanelText(text) {
     }
   }
 
-  /* Pass 3: punctuation never leads a chunk.
-     If a chunk starts with punctuation, move that leading run of
-     punctuation back onto the previous chunk. If the previous
-     chunk would grow beyond MAX + 5, allow it anyway — reading
-     flow beats strict size discipline. */
   var out = [];
   for (var k = 0; k < raw.length; k++) {
     var piece = raw[k];
@@ -1002,8 +978,6 @@ function chunkPanelText(text) {
     if (rest !== '') out.push(rest);
   }
 
-  /* Pass 4: if the re-shuffle has produced a fresh stub-final
-     chunk, absorb it once more. */
   if (out.length >= 2) {
     var li = out.length - 1;
     if (out[li].length < PANEL_PHRASE_MIN) {
@@ -1017,14 +991,8 @@ function chunkPanelText(text) {
 
 /* ============================================================
    RECURSIVE TEXT-NODE WALKER
-   ------------------------------------------------------------
-   Wraps every non-empty text node under root in .panel-phrase
-   spans, preserving any inline elements (<br>, nested spans).
-   Idempotent — skips nodes that are already inside a
-   .panel-phrase wrapper.
    ============================================================ */
 function shouldSkipTextNode(node) {
-  /* Skip if already inside a .panel-phrase or a therapist-name. */
   var parent = node.parentNode;
   while (parent && parent.nodeType === 1) {
     if (parent.classList) {
@@ -1055,7 +1023,6 @@ function wrapTextNodeInPhrases(textNode) {
 
 function wrapPhrasesRecursively(root) {
   if (!root) return;
-  /* Collect text nodes first so we don't mutate during traversal. */
   var walker = document.createTreeWalker(
     root,
     NodeFilter.SHOW_TEXT,
@@ -1079,15 +1046,17 @@ function wrapPhrasesRecursively(root) {
 }
 
 /* ============================================================
-   PANEL-1 SPECIAL SEQUENCE
+   PANEL-1 SPECIAL SEQUENCE — v1.17.1
    ------------------------------------------------------------
-   The opening line "桜庭さん、初めまして。" is not chunked. It is
-   presented as two fixed beats with the same slide motion the
-   general chunks use:
-     Beat 1: 桜庭さん
-     Beat 2: 、初めまして。
+   The opening line "桜庭さん、初めまして。" is presented as two
+   fixed beats. Beat boundary is at the first "、":
+     Beat 1: everything up to and including the comma
+     Beat 2: the remainder
    Beat 2 starts the instant beat 1 completes. Then a 500 ms
    pause before #panel1Body begins its normal phrase reveal.
+
+   Called from preparePanel(panel-1) AND from confirmName() (so
+   the beats reflect the entered name, not the boot placeholder).
    ============================================================ */
 function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
@@ -1101,68 +1070,92 @@ function buildPanel1OpeningBeats(panelEl) {
     if (ex.parentNode) ex.parentNode.removeChild(ex);
   }
 
-  /* Find the therapist-name span. Everything from that span up to
-     (but not including) #panel1Body becomes the fixed opening. */
+  /* Find the therapist-name span and #panel1Body. */
   var span = contentEl.querySelector('.therapist-name');
   if (!span) return;
   var body = contentEl.querySelector('#panel1Body');
 
-  /* Collect all nodes between span and body (or end of content). */
+  /* Capture anchor — the node we insert our beats BEFORE.
+     This is the span's nextSibling, which in practice is #panel1Body.
+     Captured BEFORE any removal so the reference stays valid. */
+  var anchor = span.nextSibling;
+  var parent = span.parentNode;
+  if (!parent) return;
+
+  /* Collect the nodes we're replacing: the span, and everything
+     between it and #panel1Body (exclusive of body). */
   var nodes = [];
   var cur = span;
-  while (cur) {
+  while (cur && cur !== body) {
     nodes.push(cur);
-    if (cur === body) { nodes.pop(); break; }
     cur = cur.nextSibling;
-    if (!cur && !body) break;
   }
 
-  /* Replace that range with two beat spans. */
+  /* Build the two beat texts from the accumulated text content,
+     split at the first "、". */
+  var buf = '';
+  for (var i = 0; i < nodes.length; i++) {
+    var nd = nodes[i];
+    if (nd.nodeType === 3) buf += nd.nodeValue || '';
+    else if (nd.nodeType === 1) buf += nd.textContent || '';
+  }
+  buf = buf.replace(/\s+/g, '');
+
+  var beat1Text = buf;
+  var beat2Text = '';
+  var commaIdx = buf.indexOf('、');
+  if (commaIdx >= 0) {
+    beat1Text = buf.substring(0, commaIdx + 1);
+    beat2Text = buf.substring(commaIdx + 1);
+  }
+
+  /* The styled therapist-name gets re-wrapped around name+さん.
+     Extract just the name portion (strip trailing さん if present). */
+  var nameOnly = beat1Text.replace(/、$/, '');      /* drop trailing comma */
+  nameOnly = nameOnly.replace(/さん$/, '');          /* drop trailing さん */
+  if (nameOnly === '') nameOnly = beat1Text.replace(/、$/, '');
+
+  /* Build DOM: beat1 = [span.therapist-name(nameOnly+さん)][plain "、"]
+               beat2 = [plain beat2Text]
+     Both get class .panel-phrase.panel-1-beat for the reveal anim. */
   var beat1 = document.createElement('span');
   beat1.className = 'panel-phrase panel-1-beat';
   beat1.setAttribute('data-beat', '1');
 
+  var nameSpan = document.createElement('span');
+  nameSpan.id = 'therapistName';
+  nameSpan.className = 'therapist-name';
+  nameSpan.textContent = nameOnly + 'さん';
+  beat1.appendChild(nameSpan);
+
+  /* comma sits as plain text after the styled name */
+  if (commaIdx >= 0) {
+    beat1.appendChild(document.createTextNode('、'));
+  }
+
   var beat2 = document.createElement('span');
   beat2.className = 'panel-phrase panel-1-beat';
   beat2.setAttribute('data-beat', '2');
-
-  /* Build the two beats from the collected text content. */
-  var textBuf = '';
-  for (var i = 0; i < nodes.length; i++) {
-    var nd = nodes[i];
-    if (nd.nodeType === 3) textBuf += nd.nodeValue || '';
-    else if (nd.nodeType === 1) textBuf += nd.textContent || '';
-  }
-  textBuf = textBuf.replace(/\s+/g, '');
-
-  /* Prefer the configured beats if the source matches; otherwise
-     fall back to whatever the source text is. */
-  var beat1Text = PANEL_1_BEAT1_TEXT;
-  var beat2Text = PANEL_1_BEAT2_TEXT;
-  if (textBuf.indexOf(PANEL_1_BEAT1_TEXT) !== 0) {
-    /* Source changed — split what's there at a sensible boundary. */
-    var full = textBuf;
-    if (full.length >= PANEL_1_BEAT1_TEXT.length) {
-      beat1Text = full.substr(0, PANEL_1_BEAT1_TEXT.length);
-      beat2Text = full.substr(PANEL_1_BEAT1_TEXT.length);
-    } else {
-      beat1Text = full;
-      beat2Text = '';
-    }
-  }
-  beat1.textContent = beat1Text;
   beat2.textContent = beat2Text;
 
-  /* Insert the two beats in place of the original range. */
-  var insertBefore = (nodes.length > 0) ? nodes[0] : body;
-  var parent = insertBefore ? insertBefore.parentNode : contentEl;
-  for (var r = nodes.length - 1; r >= 0; r--) {
+  /* Remove the old range. */
+  for (var r = 0; r < nodes.length; r++) {
     if (nodes[r].parentNode) nodes[r].parentNode.removeChild(nodes[r]);
   }
-  if (parent) {
-    parent.insertBefore(beat1, insertBefore && insertBefore.parentNode === parent ? insertBefore : null);
-    parent.insertBefore(beat2, beat1.nextSibling);
+
+  /* Insert both beats before the captured anchor.
+     Insert beat2 first, then beat1, so final order is beat1 → beat2 → anchor. */
+  if (anchor && anchor.parentNode === parent) {
+    parent.insertBefore(beat2, anchor);
+    parent.insertBefore(beat1, beat2);
+  } else {
+    /* Fallback — append at parent end. */
+    parent.appendChild(beat1);
+    parent.appendChild(beat2);
   }
+
+  /* Re-bind therapistNameEl to the fresh span. */
+  therapistNameEl = nameSpan;
 }
 
 function resetPanel1Beats(panelEl) {
@@ -1184,7 +1177,6 @@ function playPanel1SpecialSequence(panelEl) {
   var beat2 = contentEl.querySelector('.panel-1-beat[data-beat="2"]');
   var body = contentEl.querySelector('#panel1Body');
 
-  /* Body phrases hidden until the pause ends. */
   if (body) {
     var bodyPhrases = body.querySelectorAll('.panel-phrase');
     for (var j = 0; j < bodyPhrases.length; j++) {
@@ -1201,26 +1193,8 @@ function playPanel1SpecialSequence(panelEl) {
     el.classList.add('shown');
   }
 
-  /* Beat 1 fires immediately. */
   fireBeat(beat1);
 
-  /* Beat 2 fires the instant beat 1's transition completes. */
-  if (beat1 && beat2) {
-    var onBeat1End = function() {
-      beat1.removeEventListener('transitionend', onBeat1End);
-      fireBeat(beat2);
-    };
-    beat1.addEventListener('transitionend', onBeat1End);
-    /* Fallback: if transitionend doesn't fire, use the known duration. */
-    var fb = setTimeout(function() {
-      beat1.removeEventListener('transitionend', onBeat1End);
-      if (!beat2.classList.contains('shown')) fireBeat(beat2);
-    }, PANEL_PHRASE_DURATION + 100);
-    panelPhraseTimers.push(fb);
-  }
-
-  /* After beat 2 completes, wait PANEL_1_POST_BEAT_DELAY, then
-     start the body phrase reveal. */
   function startBodyReveal() {
     if (!body) return;
     var phrases = body.querySelectorAll('.panel-phrase');
@@ -1228,7 +1202,6 @@ function playPanel1SpecialSequence(panelEl) {
     var baseDelay = PANEL_PHRASE_MODE === 'sequence'
       ? PANEL_PHRASE_DELAY
       : Math.max(0, PANEL_PHRASE_DELAY - 300);
-    /* Force reflow so .shown triggers the transition. */
     void body.offsetWidth;
     for (var k = 0; k < phrases.length; k++) {
       (function(el) {
@@ -1248,23 +1221,39 @@ function playPanel1SpecialSequence(panelEl) {
     }
   }
 
-  if (beat2) {
-    var onBeat2End = function() {
-      beat2.removeEventListener('transitionend', onBeat2End);
-      var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
-      panelPhraseTimers.push(tid);
-    };
-    beat2.addEventListener('transitionend', onBeat2End);
-    var fb2 = setTimeout(function() {
-      beat2.removeEventListener('transitionend', onBeat2End);
-      var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
-      panelPhraseTimers.push(tid);
+  if (beat2 && beat2.textContent !== '') {
+    var started = false;
+    function onBeat2Start() {
+      if (started) return;
+      started = true;
+      beat1.removeEventListener('transitionend', onBeat2Start);
+      fireBeat(beat2);
+      /* After beat 2 completes, wait, then reveal the body. */
+      var bodyFired = false;
+      function onBeat2End() {
+        if (bodyFired) return;
+        bodyFired = true;
+        beat2.removeEventListener('transitionend', onBeat2End);
+        var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
+        panelPhraseTimers.push(tid);
+      }
+      beat2.addEventListener('transitionend', onBeat2End);
+      var fb2 = setTimeout(function() {
+        beat2.removeEventListener('transitionend', onBeat2End);
+        var tid = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
+        panelPhraseTimers.push(tid);
+      }, PANEL_PHRASE_DURATION + 100);
+      panelPhraseTimers.push(fb2);
+    }
+    beat1.addEventListener('transitionend', onBeat2Start);
+    var fb1 = setTimeout(function() {
+      beat1.removeEventListener('transitionend', onBeat2Start);
+      onBeat2Start();
     }, PANEL_PHRASE_DURATION + 100);
-    panelPhraseTimers.push(fb2);
+    panelPhraseTimers.push(fb1);
   } else {
-    /* No beat 2 — jump straight to body after the delay. */
-    var tid2 = setTimeout(startBodyReveal, PANEL_1_POST_BEAT_DELAY);
-    panelPhraseTimers.push(tid2);
+    var tid0 = setTimeout(startBodyReveal, PANEL_PHRASE_DURATION + PANEL_1_POST_BEAT_DELAY);
+    panelPhraseTimers.push(tid0);
   }
 }
 
@@ -1319,19 +1308,20 @@ function preparePanel(panelEl) {
   var contentEl = panelEl.querySelector('.panel-content');
   if (!contentEl) return;
 
-  /* Panels 1 (index 0) get the special opening-line treatment. */
   var isPanel1 = panelEl.getAttribute('data-panel') === '0';
 
   if (isPanel1) {
-    /* Rewrite the opening line into two fixed beats, then walk
-       only the body container for the general chunker. */
-    buildPanel1OpeningBeats(panelEl);
+    /* Panel 1's beats get rebuilt inside confirmName(), after the
+       user has entered their name. At boot we only wrap the body. */
     var body = contentEl.querySelector('#panel1Body');
     if (body) wrapPhrasesRecursively(body);
+    /* Also do an initial beat build so a first-load without any
+       interaction still has something in the DOM. It will be
+       rebuilt in confirmName() once the real name is available. */
+    buildPanel1OpeningBeats(panelEl);
     return;
   }
 
-  /* Panels 2-5: walk the entire .panel-content. */
   wrapPhrasesRecursively(contentEl);
 }
 
@@ -1350,7 +1340,6 @@ function activatePanel(index) {
   var isPanel1 = targetPanel.getAttribute('data-panel') === '0';
 
   if (isPanel1) {
-    /* Reset beats + body phrases, then run the special sequence. */
     resetPanel1Beats(targetPanel);
     var body = targetPanel.querySelector('#panel1Body');
     if (body) {
@@ -2269,7 +2258,7 @@ function setupTransitionReveal() {
 }
 
 /* ============================================================
-   TRANSITION-LINE BLUR + SCALE
+   TRANSITION-LINE BLUR + SCALE + SNAP-BOLD
    ============================================================ */
 var tbMetrics = {
   bodyEl: null,
@@ -2321,6 +2310,13 @@ function updateTransitionBodyEffects() {
   tbMetrics.bodyEl.style.transform = scaleVal > 1.001
     ? 'scaleX(' + scaleVal.toFixed(4) + ')'
     : '';
+
+  /* v1.17.1: snap-bold at blur 0. */
+  if (blurVal <= 0.001) {
+    tbMetrics.bodyEl.classList.add('snap-bold');
+  } else {
+    tbMetrics.bodyEl.classList.remove('snap-bold');
+  }
 }
 
 var tbRafPending = false;
@@ -2401,9 +2397,18 @@ function confirmName() {
     return;
   }
   nameConfirmed = true;
-  therapistNameEl.textContent = entered;
+
+  /* Write entered + さん into the therapist-name span. */
+  therapistNameEl.textContent = entered + 'さん';
   confirmedTipAmount = getTipValue();
   if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
+
+  /* v1.17.1: rebuild panel-1 beats now that the real name is in
+     the DOM. preparePanel() only wrapped the body; this call
+     regenerates the beats from the current content so any name
+     (2-char, 3-char, English, etc.) works. */
+  var p1Panel = document.querySelector('.panel[data-panel="0"]');
+  if (p1Panel) buildPanel1OpeningBeats(p1Panel);
 
   var dynamicRows = document.getElementById('dynamicRows');
   dynamicRows.innerHTML = '';
@@ -2600,6 +2605,8 @@ startBtn.addEventListener('click', function(e) {
   blossomScreen.style.opacity = '0';
   setTimeout(function() {
     var nameText = (therapistNameEl.textContent || '').trim() || '心';
+    /* Strip the trailing さん for the intro animation. */
+    nameText = nameText.replace(/さん$/, '');
     nameColumn.innerHTML = '';
     var chars = nameText.split('');
     var totalChars = chars.length;
@@ -2652,8 +2659,8 @@ function buildReceipt() {
   receiptItems.innerHTML = '';
   var receiptToName = document.getElementById('receiptToName');
   if (receiptToName) {
-    var currentName = (therapistNameEl.textContent || '').trim() || '桜庭';
-    receiptToName.textContent = currentName + 'さんへ';
+    var currentName = (therapistNameEl.textContent || '').trim() || '桜庭さん';
+    receiptToName.textContent = currentName + 'へ';
   }
   var rows = getRows();
   var itemCount = 0;
