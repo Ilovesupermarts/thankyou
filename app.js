@@ -12,8 +12,12 @@
          #panel1Body; stale beats and stray text nodes before the
          body are cleared first. The rebuilt span preserves
          id="therapistName".
-       - Snap-bold fires only at perfect focus (blurVal <= 0.001).
-         Paired with main.css weight 700 for perceptibility.
+       - Transition-line focus snap: replaced the font-weight
+         .snap-bold class (which caused horizontal layout jitter)
+         with a sub-pixel text-shadow glow driven by a strictly
+         symmetrical |d| <= TB_SNAP_WINDOW_PX gate. Layout-safe,
+         direction-symmetric, instantaneous on/off. The CSS class
+         is removed from main.css.
        - Carousel edge and under-swipe: bounceToCurrentPanel()
          snaps the track back to the current panel without
          replaying the phrase reveal. Applied to all four edge
@@ -2269,7 +2273,16 @@ function setupTransitionReveal() {
 }
 
 /* ============================================================
-   TRANSITION-LINE BLUR + SCALE + SNAP-BOLD
+   TRANSITION-LINE BLUR + SCALE + FOCUS SNAP
+   ============================================================
+   v1.17.2: the snap effect was previously toggled via a
+   .snap-bold CSS class that changed font-weight. That caused
+   horizontal layout jitter during the scroll because changing
+   font-weight reflows glyph advance widths. This version uses
+   a sub-pixel text-shadow glow instead — a paint-only property
+   that does not affect layout — and gates it on a strictly
+   symmetrical |d| <= TB_SNAP_WINDOW_PX window so entry and
+   exit thresholds are identical regardless of scroll direction.
    ============================================================ */
 var tbMetrics = {
   bodyEl: null,
@@ -2280,7 +2293,9 @@ var tbMetrics = {
 };
 var TB_MAX_BLUR = 6;
 var TB_SCALE_TRIGGER_BLUR = 1.0;
-var TB_MAX_SCALE = 1.07;
+var TB_MAX_SCALE = 1.08;
+var TB_SNAP_WINDOW_PX = 15;
+var TB_SNAP_INTENSITY = 1.65;
 
 function measureTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
@@ -2303,6 +2318,8 @@ function updateTransitionBodyEffects() {
   var vc = vh / 2;
   var rect = tbMetrics.bodyEl.getBoundingClientRect();
   var bodyCentre = rect.top + rect.height / 2;
+
+  /* 'd' is the exact pixel distance from the absolute center of the screen */
   var d = bodyCentre - vc;
 
   var progress;
@@ -2322,11 +2339,14 @@ function updateTransitionBodyEffects() {
     ? 'scaleX(' + scaleVal.toFixed(4) + ')'
     : '';
 
-  /* v1.17.2: snap-bold fires only at perfect focus. */
-  if (blurVal <= 0.001) {
-    tbMetrics.bodyEl.classList.add('snap-bold');
+  /* Symmetrical strict snap (±TB_SNAP_WINDOW_PX) using text-shadow
+     for layout safety. Paint-only: no reflow, no jitter, and the
+     window fires and releases at the same |d| in both directions. */
+  if (Math.abs(d) <= TB_SNAP_WINDOW_PX) {
+    tbMetrics.bodyEl.style.textShadow =
+      '0 0 ' + TB_SNAP_INTENSITY + 'px currentColor';
   } else {
-    tbMetrics.bodyEl.classList.remove('snap-bold');
+    tbMetrics.bodyEl.style.textShadow = 'none';
   }
 }
 
