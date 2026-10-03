@@ -37,8 +37,12 @@
   </div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
+  <div class="ambient-layer caustics caustics-1"></div>
+  <div class="ambient-layer caustics caustics-2"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
+
+<div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 
 <div class="info-bar" id="infoBar">
   <div class="info-inner">
@@ -61,7 +65,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.20</div>
+  <div class="app-version" aria-hidden="true">v1.17.2</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -96,7 +100,7 @@
 </div>
 
 <div class="blossom-screen" id="blossomScreen">
-  <button type="button" class="start-btn" id="startBtn" aria-label="はじめる">
+  <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
       <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
@@ -104,13 +108,15 @@
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
-      <div class="blossom-char">
-        <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+      <div class="koi-dive-wrap" id="koiDiveWrap">
+        <div class="blossom-char">
+          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+        </div>
       </div>
     </div>
     <span class="start-label">はじめる</span>
   </button>
-  <p class="start-hint">水面の鯉を、そっとタップしてください。</p>
+  <p class="start-hint" id="startHint">水面を、そっと上へなぞってください。</p>
 </div>
 
 <div class="intro-overlay" id="introOverlay">
@@ -358,35 +364,40 @@
 </div>
 
 <div class="receipt-screen" id="receiptScreen">
-  <div class="receipt-paper">
-    <div class="receipt-header">
-      <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
-      <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
-    </div>
-    <div class="receipt-to-row">
-      <span class="receipt-to-mark">❀</span>
-      <span class="receipt-to-name" id="receiptToName">桜庭さんへ</span>
-      <span class="receipt-to-mark">❀</span>
-    </div>
-    <div class="receipt-divider"></div>
-    <div class="receipt-title">本日の内容</div>
-    <div class="receipt-items" id="receiptItems"></div>
+  <div class="receipt-paper-wrap">
+    <div class="receipt-paper">
+      <div class="receipt-header">
+        <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+        <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+      </div>
+      <div class="receipt-to-row">
+        <span class="receipt-to-mark">❀</span>
+        <span class="receipt-to-name" id="receiptToName">桜庭さんへ</span>
+        <span class="receipt-to-mark">❀</span>
+      </div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-title">
+        <span>本日の内容</span>
+        <span class="item-count" id="itemCount">0 項目</span>
+      </div>
+      <div class="receipt-items" id="receiptItems"></div>
 
-    <div class="receipt-total-line">
-      <span class="receipt-total-label">合計</span>
-      <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span></span>
-    </div>
+      <div class="receipt-total-line">
+        <span class="receipt-total-label">合計</span>
+        <span class="receipt-total-value" id="receiptTotal"><span class="yen-symbol">¥</span><span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span></span>
+      </div>
 
-    <button type="button" class="receipt-confirm-btn" id="receiptConfirmBtn">
-      こちらの内容でお願いいたします。
-    </button>
+      <button type="button" class="receipt-confirm-btn" id="receiptConfirmBtn">
+        こちらの内容でお願いいたします。
+      </button>
 
-    <button type="button" class="receipt-back-btn" id="receiptBackBtn">
-      サービスの選択に戻る
-    </button>
+      <button type="button" class="receipt-back-btn" id="receiptBackBtn">
+        サービスの選択に戻る
+      </button>
 
-    <div class="receipt-footer">
-      <span class="receipt-footer-mark">❀</span>
+      <div class="receipt-footer">
+        <span class="receipt-footer-mark">❀</span>
+      </div>
     </div>
   </div>
 
