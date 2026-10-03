@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Receipt Landing — Diagnostic Demo</title>
+<title>Receipt Landing — Diagnostic Demo v2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,15 +13,11 @@
 
 <style>
   /* ============================================================
-     DEMO-ONLY OVERRIDES
-     Everything below is scoped to this page. Nothing here is
-     meant for production.
+     DEMO-ONLY CHROME (controls). Not for production.
      ============================================================ */
-
-  /* Control bar sits above the receipt screen (which is z-index 300). */
   .demo-controls {
     position: fixed;
-    top: 12px;
+    top: 10px;
     left: 50%;
     transform: translateX(-50%);
     z-index: 9999;
@@ -41,18 +37,24 @@
   .demo-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     flex-wrap: wrap;
     justify-content: center;
   }
+  .demo-label {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    margin-right: 4px;
+  }
   .demo-controls button {
-    border-radius: 18px;
+    border-radius: 16px;
     border: 1.5px solid var(--border-1);
     background: #fff;
     color: var(--text-dark);
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
-    padding: 8px 12px;
+    padding: 7px 10px;
     cursor: pointer;
     font-family: inherit;
     -webkit-appearance: none;
@@ -65,75 +67,83 @@
     background: var(--soft-1);
     border-color: var(--accent);
   }
-  .demo-controls button.primary {
+  .demo-controls button.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #fff;
   }
-  .demo-controls button.primary:active {
-    background: var(--accent-3);
+  .demo-controls button.run {
+    background: var(--text-dark);
+    border-color: var(--text-dark);
+    color: #fff;
   }
+  .demo-controls button.run:active { background: #000; }
   .demo-readout {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 11px;
     color: var(--text-mute);
     letter-spacing: 0;
-    min-width: 220px;
     text-align: center;
+    line-height: 1.5;
   }
-  .demo-readout strong {
-    color: var(--accent);
-    font-weight: 700;
-  }
-  .demo-status {
-    font-size: 11px;
-    color: var(--text-faint);
-    letter-spacing: 1px;
-    text-align: center;
-  }
-
-  /* ============================================================
-     TEST CLASSES — each isolates one suspect.
-     Applied to <body> by JS when the corresponding button is
-     pressed.
-     ============================================================ */
-
-  /* Test A: kill overflow-y on the paper. */
-  body.test-no-scroll-paper .receipt-paper {
-    overflow: hidden !important;
-  }
-
-  /* Test B: kill overflow-y on the screen. */
-  body.test-no-scroll-screen .receipt-screen {
-    overflow: hidden !important;
-  }
-
-  /* Test C: kill the SVG mask on the paper. */
-  body.test-no-mask .receipt-paper {
-    -webkit-mask-image: none !important;
-    mask-image: none !important;
-  }
-
-  /* Test D: kill the wrapper's filter entirely (baseline). */
-  body.test-no-filter .receipt-paper-wrap {
-    filter: none !important;
-  }
+  .demo-readout strong { color: var(--accent); font-weight: 700; }
+  .demo-readout strong.smooth { color: #2a7a3a; }
+  .demo-readout strong.stutter { color: #b03030; }
 </style>
 </head>
 <body>
 
 <div class="demo-controls">
   <div class="demo-row">
-    <button type="button" class="primary" data-test="baseline">Baseline (no test)</button>
-    <button type="button" data-test="no-scroll-paper">A · no paper scroll</button>
-    <button type="button" data-test="no-scroll-screen">B · no screen scroll</button>
-    <button type="button" data-test="no-mask">C · no SVG mask</button>
-    <button type="button" data-test="no-filter">D · no filter</button>
+    <span class="demo-label">AMBIENT:</span>
+    <button type="button" class="amb" data-amb="video">Video</button>
+    <button type="button" class="amb" data-amb="gradient">Gradient</button>
+    <button type="button" class="amb" data-amb="caustics">Caustics</button>
+    <button type="button" class="amb" data-amb="motes">Motes</button>
+    <button type="button" class="amb" data-amb="track">Carousel track</button>
   </div>
-  <div class="demo-readout" id="readout">Tap a button to run the landing animation.</div>
-  <div class="demo-status" id="status">ready</div>
+  <div class="demo-row">
+    <span class="demo-label">ACTION:</span>
+    <button type="button" class="run" id="runBtn">Run landing</button>
+    <button type="button" id="clearBtn">Clear all ambient</button>
+  </div>
+  <div class="demo-readout" id="readout">Toggle ambient layers, then Run. Baseline first.</div>
 </div>
 
+<!-- ============================================================
+     AMBIENT STAGE — mirrors the real app exactly.
+     Hidden until the corresponding toggle is enabled.
+     ============================================================ -->
+<div class="ambient-stage" id="ambientStage" aria-hidden="true" style="display:none;">
+  <div class="ambient-layer ambient-image" id="ambientImage">
+    <video class="ambient-video" id="ambientVideo"
+           autoplay muted loop playsinline preload="auto">
+      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="ambient-layer ambient-primary" id="ambientPrimary"></div>
+  <div class="ambient-layer ambient-secondary"></div>
+  <div class="ambient-layer caustics caustics-1" id="caustic1"></div>
+  <div class="ambient-layer caustics caustics-2" id="caustic2"></div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<!-- Fake carousel track: matches the real app's 500%-wide will-change
+     layer, so we can test whether the persistent promoted layer is
+     what eats GPU budget. -->
+<div class="stage" id="fakeStage" style="display:none; position:fixed; top:0; left:0; width:100%; height:100vh; z-index:-1; pointer-events:none;">
+  <div class="track" id="fakeTrack">
+    <div class="panel" data-panel="0"></div>
+    <div class="panel" data-panel="1"></div>
+    <div class="panel" data-panel="2"></div>
+    <div class="panel" data-panel="3"></div>
+    <div class="panel" data-panel="4"></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     RECEIPT — same as the real app.
+     ============================================================ -->
 <div class="receipt-screen visible" id="receiptScreen">
   <div class="receipt-paper-wrap" id="paperWrap">
     <div class="receipt-paper">
@@ -173,7 +183,7 @@
 
 <script>
 /* ============================================================
-   ITEMS
+   SAMPLE ITEMS
    ============================================================ */
 var SAMPLE_ITEMS = [
   { name: 'ダミーテキスト1', price: 5000 },
@@ -207,13 +217,87 @@ function renderItems() {
 }
 
 /* ============================================================
+   AMBIENT STATE
+   ============================================================ */
+var ambient = {
+  video: false,
+  gradient: false,
+  caustics: false,
+  motes: false,
+  track: false
+};
+
+function buildMotes() {
+  var field = document.getElementById('moteField');
+  if (!field) return;
+  field.innerHTML = '';
+  var count = 8;
+  for (var i = 0; i < count; i++) {
+    var m = document.createElement('div');
+    m.className = 'mote';
+    var size = 14 + Math.random() * 16;
+    m.style.width = size + 'px';
+    m.style.height = size + 'px';
+    m.style.left = (Math.random() * 100) + '%';
+    m.style.top  = (Math.random() * 100) + '%';
+    var dur = 18 + Math.random() * 20;
+    m.style.setProperty('--mote-dur', dur + 's');
+    m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
+    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
+    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
+    m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
+    field.appendChild(m);
+  }
+}
+
+function applyAmbient() {
+  var stage = document.getElementById('ambientStage');
+  var img = document.getElementById('ambientImage');
+  var primary = document.getElementById('ambientPrimary');
+  var c1 = document.getElementById('caustic1');
+  var c2 = document.getElementById('caustic2');
+  var moteField = document.getElementById('moteField');
+  var fakeStage = document.getElementById('fakeStage');
+
+  var anyAmbient = ambient.video || ambient.gradient || ambient.caustics || ambient.motes;
+  stage.style.display = anyAmbient ? '' : 'none';
+
+  /* Video */
+  img.style.display = ambient.video ? '' : 'none';
+  var video = document.getElementById('ambientVideo');
+  if (video) {
+    if (ambient.video) {
+      var p = video.play();
+      if (p && typeof p.catch === 'function') p.catch(function() {});
+      /* Force the autumn theme to show the video (same as real app). */
+      document.documentElement.setAttribute('data-theme', 'autumn');
+    } else {
+      try { video.pause(); } catch (e) {}
+    }
+  }
+
+  /* Gradient */
+  primary.style.display = ambient.gradient ? '' : 'none';
+
+  /* Caustics */
+  c1.style.display = ambient.caustics ? '' : 'none';
+  c2.style.display = ambient.caustics ? '' : 'none';
+
+  /* Motes */
+  if (ambient.motes) {
+    buildMotes();
+    moteField.style.display = '';
+  } else {
+    moteField.innerHTML = '';
+    moteField.style.display = 'none';
+  }
+
+  /* Carousel track */
+  fakeStage.style.display = ambient.track ? '' : 'none';
+}
+
+/* ============================================================
    FRAME COUNTER
-   ------------------------------------------------------------
-   Measures actual inter-frame intervals during the animation.
-   Reports average FPS and worst single frame. If the fall is
-   smooth, worst frame should be close to avg frame (~16.7ms at
-   60Hz, ~8.3ms at 120Hz). A worst frame of 40ms+ means a
-   dropped frame — that is the stutter you are seeing.
    ============================================================ */
 var frameRafId = null;
 var frameDeltas = [];
@@ -235,19 +319,13 @@ function stopFrameCount() {
   if (frameRafId) cancelAnimationFrame(frameRafId);
   frameRafId = null;
   if (frameDeltas.length < 2) return null;
-  var sum = 0;
-  var worst = 0;
-  var worstIdx = -1;
+  var sum = 0, worst = 0;
   for (var i = 1; i < frameDeltas.length; i++) {
     sum += frameDeltas[i];
-    if (frameDeltas[i] > worst) {
-      worst = frameDeltas[i];
-      worstIdx = i;
-    }
+    if (frameDeltas[i] > worst) worst = frameDeltas[i];
   }
   var avgMs = sum / (frameDeltas.length - 1);
-  var over20 = 0;
-  var over33 = 0;
+  var over20 = 0, over33 = 0;
   for (var j = 1; j < frameDeltas.length; j++) {
     if (frameDeltas[j] > 20) over20++;
     if (frameDeltas[j] > 33) over33++;
@@ -263,46 +341,27 @@ function stopFrameCount() {
 }
 
 /* ============================================================
-   RUN THE LANDING ANIMATION WITH A GIVEN TEST CLASS
+   RUN LANDING WITH CURRENT AMBIENT STATE
    ============================================================ */
-var TEST_CLASSES = [
-  'test-no-scroll-paper',
-  'test-no-scroll-screen',
-  'test-no-mask',
-  'test-no-filter'
-];
-
-function clearTestClasses() {
-  for (var i = 0; i < TEST_CLASSES.length; i++) {
-    document.body.classList.remove(TEST_CLASSES[i]);
-  }
-}
-
-function runLanding(testName) {
+function runLanding() {
   var paperWrap = document.getElementById('paperWrap');
   var readout = document.getElementById('readout');
-  var status = document.getElementById('status');
   if (!paperWrap) return;
 
-  /* Clear any in-flight animation and test class. */
   paperWrap.classList.remove('landing');
   void paperWrap.offsetWidth;
-  clearTestClasses();
 
-  /* Apply the selected test class (if any). */
-  var applied = '(baseline)';
-  if (testName && testName !== 'baseline') {
-    document.body.classList.add('test-' + testName);
-    applied = 'test-' + testName;
-  }
+  var active = [];
+  if (ambient.video) active.push('video');
+  if (ambient.gradient) active.push('gradient');
+  if (ambient.caustics) active.push('caustics');
+  if (ambient.motes) active.push('motes');
+  if (ambient.track) active.push('track');
+  var label = active.length ? active.join('+') : 'baseline';
 
-  status.textContent = 'running: ' + applied;
-  readout.textContent = 'measuring frames…';
+  readout.textContent = 'running: ' + label + ' — measuring…';
 
-  /* Start the frame counter just before the animation. */
   startFrameCount();
-
-  /* Kick off the landing. */
   void paperWrap.offsetWidth;
   paperWrap.classList.add('landing');
 
@@ -313,50 +372,61 @@ function runLanding(testName) {
     paperWrap.removeEventListener('animationend', finish);
     paperWrap.classList.remove('landing');
 
-    /* Let one more frame settle, then stop the counter. */
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         var r = stopFrameCount();
-        if (!r) {
-          readout.textContent = 'no frames captured';
-          return;
-        }
-        var verdict;
-        if (r.over33 === 0 && r.avgMs < 22) verdict = 'smooth';
-        else if (r.over33 > 3) verdict = 'stutter';
-        else verdict = 'borderline';
+        if (!r) { readout.textContent = 'no frames captured'; return; }
+
+        var verdict, cls;
+        if (r.over33 === 0 && r.avgMs < 22) { verdict = 'SMOOTH'; cls = 'smooth'; }
+        else if (r.over33 > 3) { verdict = 'STUTTER'; cls = 'stutter'; }
+        else { verdict = 'borderline'; cls = ''; }
 
         readout.innerHTML =
-          'test: <strong>' + applied + '</strong>' +
+          '<strong>' + label + '</strong>' +
           ' · avg <strong>' + r.avgFps.toFixed(1) + '</strong> fps' +
-          ' · avg frame <strong>' + r.avgMs.toFixed(1) + '</strong> ms' +
+          ' · frame <strong>' + r.avgMs.toFixed(1) + '</strong> ms' +
           ' · worst <strong>' + r.worstMs.toFixed(1) + '</strong> ms' +
           ' · &gt;20ms: <strong>' + r.over20 + '</strong>' +
           ' · &gt;33ms: <strong>' + r.over33 + '</strong>' +
-          ' · verdict: <strong>' + verdict + '</strong>';
-
-        status.textContent = 'done — ' + r.frames + ' frames captured';
+          ' · <strong class="' + cls + '">' + verdict + '</strong>';
       });
     });
   }
 
   paperWrap.addEventListener('animationend', finish);
-  /* Fallback in case animationend does not fire (some embedded
-     webviews). Duration is 2400ms; cut off at 2600ms. */
   setTimeout(finish, 2600);
 }
 
 /* ============================================================
    WIRING
    ============================================================ */
-document.querySelector('.demo-controls').addEventListener('click', function(e) {
-  var btn = e.target.closest('button[data-test]');
-  if (!btn) return;
-  runLanding(btn.getAttribute('data-test'));
+document.querySelectorAll('.amb[data-amb]').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var key = btn.getAttribute('data-amb');
+    ambient[key] = !ambient[key];
+    btn.classList.toggle('active', ambient[key]);
+    applyAmbient();
+  });
+});
+
+document.getElementById('runBtn').addEventListener('click', runLanding);
+
+document.getElementById('clearBtn').addEventListener('click', function() {
+  ambient.video = false;
+  ambient.gradient = false;
+  ambient.caustics = false;
+  ambient.motes = false;
+  ambient.track = false;
+  document.querySelectorAll('.amb[data-amb]').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  applyAmbient();
 });
 
 window.addEventListener('load', function() {
   renderItems();
+  applyAmbient();
 });
 </script>
 
