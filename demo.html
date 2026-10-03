@@ -1,509 +1,420 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Transition-Line Effect Tuning</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#fdf3d8">
+<title>Koi Water — Demo (real assets)</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- ============================================================
+     REAL APP STYLESHEET — same file the app loads
+     ============================================================ -->
+<link rel="stylesheet" href="main.css">
+
+<!-- ============================================================
+     DEMO-ONLY ADDITIONS
+     Everything below is new. Nothing overrides main.css's
+     start-button block; the koi, rings, label, hint keep their
+     authored styling. These rules only ADD the water effects.
+     ============================================================ -->
 <style>
-  :root {
-    --accent: #b04a5a;
-    --bg: #faf7f5;
-    --border: #ead9d5;
-    --text: #1f1f1f;
-  }
-  html, body { margin: 0; padding: 0; }
-  body {
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    background: var(--bg);
-    color: var(--text);
-    font-size: 17px;
-    line-height: 1.7;
-    -webkit-text-size-adjust: 100%;
-  }
-
-  #controls {
-    position: fixed;
-    top: 0; right: 0;
-    width: 360px;
-    height: 100vh;
-    overflow-y: auto;
-    background: rgba(255,255,255,0.98);
-    border-left: 1px solid var(--border);
-    padding: 16px 18px 40px 18px;
-    box-sizing: border-box;
-    z-index: 100;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    box-shadow: -4px 0 16px rgba(0,0,0,0.05);
-  }
-  #controls h1 {
-    font-size: 13px;
-    margin: 0 0 16px 0;
-    letter-spacing: 1.5px;
-    color: var(--accent);
-    text-transform: uppercase;
-  }
-  #controls .group {
-    margin-bottom: 16px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #f0e8e4;
-  }
-  #controls .group:last-child { border-bottom: none; }
-  #controls label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 600;
-    color: #4a4542;
-    letter-spacing: 0.3px;
-  }
-  #controls .row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 6px;
-  }
-  #controls input[type="range"] {
-    flex: 1;
-    min-width: 0;
-    accent-color: var(--accent);
-  }
-  #controls select {
-    width: 100%;
-    padding: 6px;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    font-size: 13px;
-    font-family: inherit;
-    background: #fff;
-  }
-  #controls .val {
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
-    font-size: 11.5px;
-    color: var(--accent);
-    min-width: 54px;
-    text-align: right;
-    font-weight: 600;
-  }
-  #controls .hint {
-    font-size: 11px;
-    color: #8a807c;
-    line-height: 1.45;
-    margin-top: 4px;
-  }
-  #controls button {
-    padding: 6px 11px;
-    border: 1px solid #ddd;
-    background: #fff;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-    color: #333;
-  }
-  #controls button:active { background: #f5f5f5; }
-  #controls .presets {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-  }
-
-  #hud {
-    position: fixed;
-    top: 12px;
-    left: 12px;
-    padding: 10px 14px;
-    background: rgba(0,0,0,0.82);
-    color: #e0e0e0;
-    border-radius: 8px;
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
-    font-size: 12px;
-    line-height: 1.65;
-    z-index: 100;
+  /* ---------- CAUSTICS ----------
+     Two screen-blended drifting pools. Appended as extra
+     ambient-layer divs inside .ambient-stage, so they inherit
+     the wind transform the app already drives. */
+  .caustics {
+    mix-blend-mode: screen;
     pointer-events: none;
-    min-width: 190px;
+    will-change: transform;
   }
-  #hud .k { color: #999; }
-  #hud .v { color: #b8ffce; }
-  #hud .on { color: #ffd166; font-weight: 700; }
-  #hud .off { color: #666; }
+  .caustics-1 {
+    opacity: 0.36;
+    background:
+      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
+      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
+    animation: caustic1 48s ease-in-out infinite;
+  }
+  .caustics-2 {
+    opacity: 0.28;
+    background:
+      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
+      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
+    animation: caustic2 62s ease-in-out infinite;
+  }
+  @keyframes caustic1 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
+    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
+  }
+  @keyframes caustic2 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
+  }
 
-  #scroller {
-    margin-right: 360px;
-    overflow-x: hidden;
+  /* ---------- RIPPLES ----------
+     Fixed overlay above the ambient stage, below the koi button. */
+  .ripple-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
   }
-  .spacer {
-    height: 70vh;
+  .ripple {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1.6px solid currentColor;
+    box-shadow: 0 0 14px currentColor, inset 0 0 10px currentColor;
+    transform: translate(-50%, -50%) scale(0.25);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: rippleExpand 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   }
-  .transition-line {
-    text-align: center;
-    padding: 40px 32px 40px 32px;
-    margin: 0 auto;
-    max-width: 660px;
-    font-size: 18px;
-    font-weight: 500;
-    color: var(--accent);
-    letter-spacing: 0.8px;
-    line-height: 2;
+  @keyframes rippleExpand {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.95; }
+    60%  { opacity: 0.55; }
+    100% { transform: translate(-50%, -50%) scale(5.2); opacity: 0; }
   }
-  .transition-line-divider {
+
+  /* ---------- KOI DIVE WRAPPER ----------
+     Wraps .blossom-char so the koi's existing koiDive keyframe
+     and swimCircle rotation are untouched. The wrapper carries
+     the dive transform. */
+  .koi-dive-wrap {
+    position: relative;
+    z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    margin: 0 0 20px 0;
+    transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
+                opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
+    will-change: transform, opacity;
   }
-  .transition-line-mark {
-    flex-shrink: 0;
-    font-size: 1.1em;
+  .start-btn.diving .koi-dive-wrap {
+    transform: translateY(260px) scale(0.75);
+    opacity: 0;
+  }
+
+  /* ---------- KOI STARTLE ----------
+     Brief fast spin on tap, replacing swimCircle for 200ms.
+     Preserves the koi's own koiDive breath animation on
+     .blossom-char — we only override the inner <img>. */
+  .start-btn.startling .koi-image {
+    animation: koiStartleSpin 200ms cubic-bezier(0.34, 1.15, 0.64, 1);
+  }
+  @keyframes koiStartleSpin {
+    0%   { transform: rotate(0deg) scale(1); }
+    55%  { transform: rotate(200deg) scale(1.1); }
+    100% { transform: rotate(360deg) scale(1); }
+  }
+
+  /* ---------- DIVE COMPANIONS ----------
+     The rings and label fade out as the koi leaves the surface. */
+  .start-btn.diving .rings-svg {
+    opacity: 0;
+    transition: opacity 700ms ease;
+  }
+  .start-btn.diving .start-label {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 500ms ease, transform 500ms ease;
+  }
+  .blossom-screen.diving .start-hint {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 500ms ease, transform 500ms ease;
+  }
+
+  /* ---------- RESET BUTTON (demo chrome only) ---------- */
+  .demo-reset {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    z-index: 500;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1.5px solid var(--border-1);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 18px;
     line-height: 1;
-    color: #fce6dc;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px var(--shadow-rose);
+    -webkit-appearance: none;
+    appearance: none;
+    transition: transform 0.2s ease, background 0.2s ease;
+    opacity: 0.55;
   }
-  .transition-line-rule {
-    flex: 1;
-    height: 1px;
-    background: #fce6dc;
-    min-width: 24px;
+  .demo-reset:hover { opacity: 0.9; }
+  .demo-reset:active {
+    transform: scale(0.92);
+    background: #fff;
+    border-color: var(--accent);
   }
-  .transition-line-title {
-    flex-shrink: 0;
-    font-size: 1.1em;
-    color: #fce6dc;
-    letter-spacing: 5px;
-    white-space: nowrap;
-  }
-  .transition-line-body {
-    position: relative;
-    transform-origin: 50% 50%;
-    will-change: filter, transform;
-  }
-  .transition-line-body p { margin: 0 0 0.9em 0; }
-  .transition-line-body p:last-child { margin-bottom: 0; }
 
-  .demo-fontweight-bold { font-weight: 700; }
+  /* ---------- DEMO HUD ---------- */
+  .demo-hud {
+    position: fixed;
+    top: 14px;
+    left: 16px;
+    z-index: 500;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+    color: var(--accent-2);
+    opacity: 0.55;
+    pointer-events: none;
+    line-height: 1.6;
+  }
+  .demo-hud strong { font-weight: 600; color: var(--accent); }
 
-  @media (max-width: 860px) {
-    #controls {
-      position: relative;
-      width: 100%;
-      height: auto;
-      border-left: none;
-      border-top: 1px solid var(--border);
-      box-shadow: none;
-    }
-    #scroller { margin-right: 0; }
-    body { display: flex; flex-direction: column; }
+  /* ---------- ACCESSIBILITY ---------- */
+  @media (prefers-reduced-motion: reduce) {
+    .caustics-1, .caustics-2 { animation: none; }
+    .ripple { animation-duration: 300ms; }
   }
 </style>
 </head>
 <body>
 
-<div id="hud">
-  <div><span class="k">d (px):</span>  <span class="v" id="hud-d">0</span></div>
-  <div><span class="k">blur:</span>   <span class="v" id="hud-blur">0.00</span></div>
-  <div><span class="k">scale:</span>  <span class="v" id="hud-scale">1.000</span></div>
-  <div><span class="k">snap:</span>   <span id="hud-snap" class="off">OFF</span></div>
+<!-- ============================================================
+     AMBIENT STAGE — same structure as the real app,
+     with the two caustics layers appended after ambient-
+     secondary so they sit above the gradient and below motes.
+     ============================================================ -->
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-image">
+    <video class="ambient-video" id="ambientVideo"
+           autoplay muted loop playsinline preload="auto">
+      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer ambient-secondary"></div>
+  <div class="ambient-layer caustics caustics-1"></div>
+  <div class="ambient-layer caustics caustics-2"></div>
+  <div class="mote-field" id="moteField"></div>
 </div>
 
-<div id="scroller">
-  <div class="spacer"></div>
-  <div class="transition-line">
-    <div class="transition-line-divider">
-      <span class="transition-line-mark">❀</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-title">大切なお知らせ</span>
-      <span class="transition-line-rule"></span>
-      <span class="transition-line-mark">❀</span>
+<!-- RIPPLE LAYER — sits above the ambient stage, below the koi -->
+<div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
+
+<!-- ============================================================
+     BLOSSOM SCREEN — the real markup from index.html, with
+     .blossom-char wrapped in .koi-dive-wrap for the dive
+     transition. main.css styles .start-btn, .icon-wrapper,
+     .rings-svg, .blossom-char, .koi-image, .start-label,
+     .start-hint exactly as in production.
+     ============================================================ -->
+<div class="blossom-screen" id="blossomScreen">
+  <button type="button" class="start-btn" id="startBtn" aria-label="はじめる">
+    <div class="icon-wrapper">
+      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+        <circle cx="180" cy="180" r="90" class="gold-band" />
+      </svg>
+      <div class="koi-dive-wrap">
+        <div class="blossom-char">
+          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+        </div>
+      </div>
     </div>
-    <div class="transition-line-body" id="transitionLineBody">
-      <p>それでは、本日の癒しのオプションをご覧ください。</p>
-      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-      <p>ありがとうございます。</p>
-    </div>
-  </div>
-  <div class="spacer"></div>
+    <span class="start-label">はじめる</span>
+  </button>
+  <p class="start-hint" id="startHint">水面の鯉を、そっとタップしてください。</p>
 </div>
 
-<div id="controls">
-  <h1>Effect Tuning</h1>
+<!-- ============================================================
+     INTRO OVERLAY — real structure from index.html.
+     The .name-column is populated with .name-char spans at
+     dive time, exactly as confirmName() does in the app.
+     ============================================================ -->
+<div class="intro-overlay" id="introOverlay">
+  <div class="name-column" id="nameColumn"></div>
+</div>
 
-  <div class="group">
-    <label>Blur max (px)</label>
-    <div class="row">
-      <input type="range" id="r-blur" min="0" max="20" step="0.5" value="6">
-      <span class="val" id="v-blur">6.0</span>
-    </div>
-    <div class="hint">Peak blur when body is off-centre.</div>
-  </div>
-
-  <div class="group">
-    <label>Scale trigger blur</label>
-    <div class="row">
-      <input type="range" id="r-stb" min="0" max="6" step="0.1" value="1.0">
-      <span class="val" id="v-stb">1.0</span>
-    </div>
-    <div class="hint">Blur threshold below which scaleX grows toward max.</div>
-  </div>
-
-  <div class="group">
-    <label>Scale max</label>
-    <div class="row">
-      <input type="range" id="r-scale" min="1" max="1.2" step="0.005" value="1.07">
-      <span class="val" id="v-scale">1.070</span>
-    </div>
-    <div class="hint">Horizontal stretch at perfect focus.</div>
-  </div>
-
-  <div class="group">
-    <label>Snap window (± px)</label>
-    <div class="row">
-      <input type="range" id="r-window" min="1" max="100" step="1" value="15">
-      <span class="val" id="v-window">15</span>
-    </div>
-    <div class="hint">Symmetrical distance from viewport centre where snap fires.</div>
-  </div>
-
-  <div class="group">
-    <label>Snap mode</label>
-    <select id="s-mode">
-      <option value="shadow-blur" selected>text-shadow (soft glow)</option>
-      <option value="shadow-offset">text-shadow (4-way crisp)</option>
-      <option value="text-stroke">-webkit-text-stroke</option>
-      <option value="font-weight">font-weight (jitter demo)</option>
-      <option value="none">none (control)</option>
-    </select>
-  </div>
-
-  <div class="group">
-    <label>Snap intensity (px)</label>
-    <div class="row">
-      <input type="range" id="r-int" min="0.1" max="3" step="0.05" value="0.8">
-      <span class="val" id="v-int">0.80</span>
-    </div>
-    <div class="hint">Blur radius / stroke width / offset amount depending on mode.</div>
-  </div>
-
-  <div class="group">
-    <label>Snap colour</label>
-    <select id="s-color">
-      <option value="currentColor" selected>currentColor (accent)</option>
-      <option value="#000000">black</option>
-      <option value="#8f2f00">autumn accent</option>
-      <option value="#b04a5a">default accent</option>
-    </select>
-  </div>
-
-  <div class="group">
-    <label>Presets</label>
-    <div class="presets">
-      <button data-preset="default">default</button>
-      <button data-preset="subtle">subtle glow</button>
-      <button data-preset="crisp">crisp stroke</button>
-      <button data-preset="strong">strong</button>
-    </div>
-  </div>
-
-  <div class="group">
-    <label>Scroll helpers</label>
-    <div class="presets">
-      <button id="b-scroll">→ centre</button>
-      <button id="b-top">→ top</button>
-      <button id="b-bottom">→ bottom</button>
-    </div>
-  </div>
-
-  <div class="hint" style="margin-top:8px;">
-    Scroll the content area. Watch the HUD. Tune until it feels right, then copy the values into <code>app.js</code>.
-  </div>
+<!-- Demo chrome -->
+<button type="button" class="demo-reset" id="resetBtn" aria-label="リセット">↺</button>
+<div class="demo-hud">
+  <div>state: <strong id="hudState">idle</strong></div>
+  <div>ripples: <strong id="hudRipples">0</strong></div>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  var TB = {
-    MAX_BLUR: 6,
-    SCALE_TRIGGER_BLUR: 1.0,
-    MAX_SCALE: 1.07,
-    SNAP_WINDOW_PX: 15,
-    SNAP_MODE: 'shadow-blur',
-    SNAP_INTENSITY: 0.8,
-    SNAP_COLOR: 'currentColor'
-  };
+  var startBtn       = document.getElementById('startBtn');
+  var blossomScreen  = document.getElementById('blossomScreen');
+  var startHint      = document.getElementById('startHint');
+  var introOverlay   = document.getElementById('introOverlay');
+  var nameColumn     = document.getElementById('nameColumn');
+  var rippleLayer    = document.getElementById('rippleLayer');
+  var resetBtn       = document.getElementById('resetBtn');
+  var hudState       = document.getElementById('hudState');
+  var hudRipples     = document.getElementById('hudRipples');
+  var ambientVideo   = document.getElementById('ambientVideo');
 
-  var bodyEl = document.getElementById('transitionLineBody');
-  var hudD = document.getElementById('hud-d');
-  var hudBlur = document.getElementById('hud-blur');
-  var hudScale = document.getElementById('hud-scale');
-  var hudSnap = document.getElementById('hud-snap');
+  var state = 'idle';       /* idle | startling | diving | done */
+  var rippleCount = 0;
+  var activeTimers = [];
 
-  /* Declared BEFORE bindRange() calls so applyEffects() sees it. */
-  var metrics = { downMax: 1, upMax: 1, valid: false };
+  var RIPPLE_COLOURS = [
+    'rgba(253, 243, 216, 0.95)',
+    'rgba(247, 185, 60, 0.85)',
+    'rgba(255, 240, 200, 0.70)'
+  ];
 
-  function bindRange(id, valId, key, fmt) {
-    var el = document.getElementById(id);
-    var vEl = document.getElementById(valId);
-    function update() {
-      var v = parseFloat(el.value);
-      TB[key] = v;
-      vEl.textContent = fmt ? fmt(v) : String(v);
-      applyEffects();
+  function pushTimer(id) { activeTimers.push(id); return id; }
+  function clearTimers() {
+    for (var i = 0; i < activeTimers.length; i++) clearTimeout(activeTimers[i]);
+    activeTimers = [];
+  }
+  function setState(s) { state = s; hudState.textContent = s; }
+  function bumpRippleCount(n) {
+    rippleCount += n;
+    hudRipples.textContent = rippleCount;
+  }
+
+  /* ----------------------------------------------------------
+     Ripples — 3 concentric rings, small per-ring jitter so the
+     pattern reads as a natural disturbance rather than a stack
+     of perfect circles.
+     ---------------------------------------------------------- */
+  function spawnRipples(clientX, clientY) {
+    for (var i = 0; i < 3; i++) {
+      (function(idx) {
+        var r = document.createElement('div');
+        r.className = 'ripple';
+        var jitterX = (idx - 1) * 3 + (Math.random() * 4 - 2);
+        var jitterY = (idx - 1) * 3 + (Math.random() * 4 - 2);
+        r.style.left = (clientX + jitterX) + 'px';
+        r.style.top  = (clientY + jitterY) + 'px';
+        r.style.color = RIPPLE_COLOURS[idx];
+        r.style.animationDelay = (idx * 90) + 'ms';
+        r.style.width  = (30 + idx * 6) + 'px';
+        r.style.height = (30 + idx * 6) + 'px';
+        rippleLayer.appendChild(r);
+        pushTimer(setTimeout(function() {
+          if (r.parentNode) r.parentNode.removeChild(r);
+        }, 900 + idx * 90));
+      })(i);
     }
-    el.addEventListener('input', update);
-    update();
-  }
-  bindRange('r-blur', 'v-blur', 'MAX_BLUR', function(v){ return v.toFixed(1); });
-  bindRange('r-stb', 'v-stb', 'SCALE_TRIGGER_BLUR', function(v){ return v.toFixed(1); });
-  bindRange('r-scale', 'v-scale', 'MAX_SCALE', function(v){ return v.toFixed(3); });
-  bindRange('r-window', 'v-window', 'SNAP_WINDOW_PX', function(v){ return String(Math.round(v)); });
-  bindRange('r-int', 'v-int', 'SNAP_INTENSITY', function(v){ return v.toFixed(2); });
-
-  var sMode = document.getElementById('s-mode');
-  sMode.addEventListener('change', function() { TB.SNAP_MODE = sMode.value; applyEffects(); });
-  var sColor = document.getElementById('s-color');
-  sColor.addEventListener('change', function() { TB.SNAP_COLOR = sColor.value; applyEffects(); });
-
-  function measure() {
-    var paragraphs = bodyEl.querySelectorAll('p');
-    if (paragraphs.length < 2) { metrics.valid = false; return; }
-    var secondLastP = paragraphs[paragraphs.length - 2];
-    var vh = window.innerHeight;
-    var bodyH = bodyEl.offsetHeight;
-    metrics.downMax = Math.max(40, vh / 2 + bodyH / 2);
-    metrics.upMax = Math.max(40, vh / 2 + secondLastP.offsetTop - bodyH / 2);
-    metrics.valid = true;
+    bumpRippleCount(3);
   }
 
-  function clearSnap() {
-    bodyEl.style.textShadow = '';
-    bodyEl.style.webkitTextStroke = '';
-    bodyEl.classList.remove('demo-fontweight-bold');
-  }
-
-  function applySnap(isOn) {
-    clearSnap();
-    if (!isOn) return;
-    var color = TB.SNAP_COLOR;
-    var i = TB.SNAP_INTENSITY;
-    switch (TB.SNAP_MODE) {
-      case 'shadow-blur':
-        bodyEl.style.textShadow = '0 0 ' + i + 'px ' + color;
-        break;
-      case 'shadow-offset':
-        var o = i;
-        bodyEl.style.textShadow =
-          '-' + o + 'px 0 0 ' + color + ',' +
-          o + 'px 0 0 ' + color + ',' +
-          '0 -' + o + 'px 0 ' + color + ',' +
-          '0 ' + o + 'px 0 ' + color;
-        break;
-      case 'text-stroke':
-        bodyEl.style.webkitTextStroke = i + 'px ' + color;
-        break;
-      case 'font-weight':
-        bodyEl.classList.add('demo-fontweight-bold');
-        break;
-      case 'none':
-      default:
-        break;
+  /* ----------------------------------------------------------
+     Intro glyph — same pattern as confirmName(): clear
+     .name-column, spawn .name-char spans with staggered
+     animation-delay. main.css handles the arrival keyframe.
+     ---------------------------------------------------------- */
+  function renderIntroGlyph(text) {
+    nameColumn.innerHTML = '';
+    var chars = (text || '桜').split('');
+    for (var i = 0; i < chars.length; i++) {
+      var span = document.createElement('span');
+      span.className = 'name-char';
+      span.textContent = chars[i];
+      span.style.animationDelay = (i * 0.22) + 's';
+      nameColumn.appendChild(span);
     }
   }
 
-  function applyEffects() {
-    if (!metrics || !metrics.valid) return;
-    var vh = window.innerHeight;
-    var vc = vh / 2;
-    var rect = bodyEl.getBoundingClientRect();
-    var bodyCentre = rect.top + rect.height / 2;
-    var d = bodyCentre - vc;
+  /* ----------------------------------------------------------
+     Start flow:
+       idle -> startling (200ms fast spin)
+            -> diving    (900ms koi descends; rings + label fade;
+                          intro glyph appears at 420ms)
+            -> done
+     ---------------------------------------------------------- */
+  function handleStart(e) {
+    if (state !== 'idle') return;
 
-    var progress;
-    if (d >= 0) progress = Math.min(1, d / metrics.downMax);
-    else progress = Math.min(1, -d / metrics.upMax);
+    var x, y;
+    if (e && e.touches && e.touches[0]) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
+    else if (e && typeof e.clientX === 'number' && (e.clientX || e.clientY)) { x = e.clientX; y = e.clientY; }
+    else { var r = startBtn.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
 
-    var blurVal = TB.MAX_BLUR * progress;
-    var scaleVal = 1.0;
-    if (blurVal < TB.SCALE_TRIGGER_BLUR) {
-      scaleVal = 1.0 + (TB.MAX_SCALE - 1.0) * (1 - blurVal / TB.SCALE_TRIGGER_BLUR);
+    spawnRipples(x, y);
+
+    setState('startling');
+    startBtn.classList.add('startling');
+
+    pushTimer(setTimeout(function() {
+      startBtn.classList.remove('startling');
+      startBtn.classList.add('diving');
+      blossomScreen.classList.add('diving');
+      setState('diving');
+
+      /* Intro glyph appears mid-dive, timing matched to the app's
+         charArrive onset after the overlay starts fading in. */
+      pushTimer(setTimeout(function() {
+        renderIntroGlyph('桜');
+        introOverlay.classList.add('active');
+      }, 420));
+
+      pushTimer(setTimeout(function() {
+        startBtn.classList.add('done');
+        setState('done');
+      }, 950));
+    }, 200));
+  }
+
+  /* ----------------------------------------------------------
+     Reset — clear state so the demo replays cleanly.
+     ---------------------------------------------------------- */
+  function reset() {
+    clearTimers();
+    startBtn.classList.remove('startling', 'diving', 'done');
+    blossomScreen.classList.remove('diving');
+    introOverlay.classList.remove('active');
+    nameColumn.innerHTML = '';
+    rippleLayer.innerHTML = '';
+    void startBtn.offsetWidth;   /* reflow so transitions restart cleanly */
+    setState('idle');
+  }
+
+  /* ----------------------------------------------------------
+     Wiring
+     ---------------------------------------------------------- */
+  startBtn.addEventListener('click', handleStart);
+  resetBtn.addEventListener('click', reset);
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === ' ' || e.key === 'Enter') {
+      e.preventDefault();
+      if (state === 'idle') handleStart({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
+      else if (state === 'done') reset();
     }
+    if (e.key === 'r' || e.key === 'R') reset();
+  });
 
-    bodyEl.style.filter = blurVal > 0.05 ? 'blur(' + blurVal.toFixed(2) + 'px)' : 'none';
-    bodyEl.style.transform = scaleVal > 1.001 ? 'scaleX(' + scaleVal.toFixed(4) + ')' : '';
+  /* ----------------------------------------------------------
+     Boot — show blossom screen, ensure ambient video plays.
+     main.css hides .blossom-screen until .visible is present.
+     ---------------------------------------------------------- */
+  blossomScreen.classList.add('visible');
+  setState('idle');
+  hudRipples.textContent = '0';
 
-    var snapOn = Math.abs(d) <= TB.SNAP_WINDOW_PX;
-    applySnap(snapOn);
-
-    hudD.textContent = d.toFixed(1);
-    hudBlur.textContent = blurVal.toFixed(2);
-    hudScale.textContent = scaleVal.toFixed(3);
-    if (snapOn) {
-      hudSnap.textContent = 'ON';
-      hudSnap.className = 'on';
-    } else {
-      hudSnap.textContent = 'OFF';
-      hudSnap.className = 'off';
-    }
+  if (ambientVideo) {
+    var p = ambientVideo.play();
+    if (p && typeof p.catch === 'function') p.catch(function() { /* autoplay blocked; first frame shows */ });
   }
-
-  var rafPending = false;
-  function schedule() {
-    if (rafPending) return;
-    rafPending = true;
-    requestAnimationFrame(function() {
-      rafPending = false;
-      applyEffects();
-    });
-  }
-
-  window.addEventListener('scroll', schedule, { passive: true });
-  window.addEventListener('resize', function() { measure(); schedule(); });
-
-  var presets = {
-    'default': { MAX_BLUR: 6, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.07, SNAP_WINDOW_PX: 15, SNAP_MODE: 'shadow-blur', SNAP_INTENSITY: 0.8, SNAP_COLOR: 'currentColor' },
-    'subtle':  { MAX_BLUR: 4, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.04, SNAP_WINDOW_PX: 20, SNAP_MODE: 'shadow-blur', SNAP_INTENSITY: 0.6, SNAP_COLOR: 'currentColor' },
-    'crisp':   { MAX_BLUR: 6, SCALE_TRIGGER_BLUR: 1.0, MAX_SCALE: 1.07, SNAP_WINDOW_PX: 25, SNAP_MODE: 'text-stroke', SNAP_INTENSITY: 0.35, SNAP_COLOR: 'currentColor' },
-    'strong':  { MAX_BLUR: 8, SCALE_TRIGGER_BLUR: 1.5, MAX_SCALE: 1.10, SNAP_WINDOW_PX: 30, SNAP_MODE: 'shadow-offset', SNAP_INTENSITY: 0.6, SNAP_COLOR: 'currentColor' }
-  };
-  document.querySelectorAll('[data-preset]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var p = presets[btn.getAttribute('data-preset')];
-      if (!p) return;
-      Object.assign(TB, p);
-      document.getElementById('r-blur').value = TB.MAX_BLUR;
-      document.getElementById('v-blur').textContent = TB.MAX_BLUR.toFixed(1);
-      document.getElementById('r-stb').value = TB.SCALE_TRIGGER_BLUR;
-      document.getElementById('v-stb').textContent = TB.SCALE_TRIGGER_BLUR.toFixed(1);
-      document.getElementById('r-scale').value = TB.MAX_SCALE;
-      document.getElementById('v-scale').textContent = TB.MAX_SCALE.toFixed(3);
-      document.getElementById('r-window').value = TB.SNAP_WINDOW_PX;
-      document.getElementById('v-window').textContent = String(TB.SNAP_WINDOW_PX);
-      document.getElementById('s-mode').value = TB.SNAP_MODE;
-      document.getElementById('r-int').value = TB.SNAP_INTENSITY;
-      document.getElementById('v-int').textContent = TB.SNAP_INTENSITY.toFixed(2);
-      document.getElementById('s-color').value = TB.SNAP_COLOR;
-      applyEffects();
-    });
-  });
-
-  document.getElementById('b-scroll').addEventListener('click', function() {
-    var rect = bodyEl.getBoundingClientRect();
-    var target = window.pageYOffset + rect.top + rect.height / 2 - window.innerHeight / 2;
-    window.scrollTo({ top: target, behavior: 'smooth' });
-  });
-  document.getElementById('b-top').addEventListener('click', function() {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  });
-  document.getElementById('b-bottom').addEventListener('click', function() {
-    window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
-  });
-
-  measure();
-  applyEffects();
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(function() { measure(); applyEffects(); });
-  }
-  window.addEventListener('load', function() { measure(); applyEffects(); });
 })();
 </script>
 
