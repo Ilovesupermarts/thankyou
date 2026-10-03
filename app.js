@@ -12,12 +12,13 @@
          blossom screen is interactive, a burst of 1-5 subtle
          ripples spawns at random screen positions every
          2.5-5.0 seconds. Stopped first thing in triggerKoiStart.
-       - Receipt landing: the animation now runs on
-         .receipt-paper-wrap, not on the masked .receipt-paper.
-         Keyframes are opacity + translateY only — no scale, no
-         filter — so the compositor never re-rasterises. The
-         drop-shadow lives permanently on .receipt-paper and is
-         baked into the wrapper's layer.
+       - Receipt landing serialization: the six item arrival
+         animations no longer run concurrently with the wrapper's
+         paperLand animation. buildReceipt() accepts a deferItems
+         option; when the landing will play, items are built hidden
+         and revealed by revealReceiptItems() after animationend.
+         Concurrency between the wrapper transform and the item
+         arrivals was the cause of the stutter.
        - Receipt close now restores the previous scroll position:
          lockBodyForReceipt / unlockBodyForReceipt replace the
          CSS-only body lock, saving window.scrollY on open and
@@ -3189,7 +3190,29 @@ window.addEventListener('load', function() {
 });
 
 /* ============ RECEIPT ============ */
-function buildReceipt() {
+/* Serialize the item arrival animation: the wrapper's landing
+   animation runs alone, then revealReceiptItems() is called to
+   bring the items in. Running both at once was the cause of the
+   receipt landing stutter. */
+function revealReceiptItems(staggerMs) {
+  var items = receiptItems.querySelectorAll('.receipt-item');
+  if (!items.length) return;
+  var stagger = staggerMs == null ? 80 : staggerMs;
+  for (var i = 0; i < items.length; i++) {
+    (function(item, idx) {
+      if (stagger <= 0) {
+        item.classList.add('revealed');
+      } else {
+        setTimeout(function() { item.classList.add('revealed'); }, idx * stagger);
+      }
+    })(items[i], i);
+  }
+}
+
+function buildReceipt(opts) {
+  opts = opts || {};
+  var deferItems = !!opts.deferItems;
+
   cancelPendingReceiptShake();
   receiptItems.innerHTML = '';
   var receiptToName = document.getElementById('receiptToName');
@@ -3218,7 +3241,6 @@ function buildReceipt() {
     if (itemCount === 0 && preset0Val !== '' && name === preset0Val) firstRowIncluded = true;
     var itemDiv = document.createElement('div');
     itemDiv.className = 'receipt-item';
-    itemDiv.style.animationDelay = Math.min(itemCount * 0.08, 0.4) + 's';
     itemDiv._srcRow = row;
     var nameSpan = document.createElement('span');
     nameSpan.className = 'receipt-item-name';
@@ -3283,6 +3305,11 @@ function buildReceipt() {
   bindReceiptItemListeners();
   updateReceiptTotal();
   firstServiceInReceipt = firstRowIncluded;
+
+  /* If no landing animation is going to play (reopen from thank-you),
+     reveal items right away. If the landing will play, leave them
+     hidden and let confirmYes trigger the reveal after it ends. */
+  if (!deferItems) revealReceiptItems(80);
 }
 
 function bindReceiptItemListeners() {
@@ -3482,7 +3509,7 @@ confirmYes.addEventListener('click', function(e) {
     return;
   }
 
-  buildReceipt();
+  buildReceipt({ deferItems: true });
   tableCard.classList.remove('active');
   rejectRow.classList.remove('active');
   divider.classList.remove('active');
@@ -3519,6 +3546,7 @@ confirmYes.addEventListener('click', function(e) {
         paperWrap.addEventListener('animationend', function onLandingEnd() {
           paperWrap.classList.remove('landing');
           paperWrap.removeEventListener('animationend', onLandingEnd);
+          revealReceiptItems(80);
         });
       }
     }
