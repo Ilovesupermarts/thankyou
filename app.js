@@ -4,23 +4,20 @@
    ------------------------------------------------------------
    Changelog:
      v1.3
-       - Koi tap flinch: a short tap (< 8px travel, < 250ms) on
-         the start button triggers a 1000ms randomised flinch on
-         .koi-dive-wrap (rotation, scale, dart). No haptic, no
-         sound. Guarded by koiFlinchActive; second tap during a
-         flinch is ignored.
+       - Koi tap flinch: gated on the tap landing on the koi PNG
+         (.koi-image) only. Background taps on the blossom screen
+         still produce the strong ripple but do not trigger the
+         flinch.
        - Ambient subtle ripples on the koi screen: while the
          blossom screen is interactive, a burst of 1-5 subtle
          ripples spawns at random screen positions every
          2.5-5.0 seconds. Stopped first thing in triggerKoiStart.
        - Receipt landing: the animation now runs on
          .receipt-paper-wrap, not on the masked .receipt-paper.
-         The wrapper has no SVG mask, so the browser can take a
-         single cached snapshot of the torn-edge silhouette and
-         transform that flat image on the GPU. The prior
-         .landing-active drop-shadow suppression is gone; the
-         shadow is restored inside the tail of @keyframes
-         paperLand instead.
+         Keyframes are opacity + translateY only — no scale, no
+         filter — so the compositor never re-rasterises. The
+         drop-shadow lives permanently on .receipt-paper and is
+         baked into the wrapper's layer.
        - Receipt close now restores the previous scroll position:
          lockBodyForReceipt / unlockBodyForReceipt replace the
          CSS-only body lock, saving window.scrollY on open and
@@ -2600,10 +2597,10 @@ function updateReceiptScrollIndicator() {
    KOI WATER EFFECTS — v1.17.2 / v1.3
    ------------------------------------------------------------
    Tap ripples, swipe-up to begin, koi startle spin, koi dive,
-   koi flinch on short tap, ambient subtle ripples while the
-   blossom screen is interactive. Gesture handler is gated on
-   .blossom-screen.visible so it does not interfere with the
-   main carousel or the table.
+   koi flinch on short tap on the koi PNG, ambient subtle ripples
+   while the blossom screen is interactive. Gesture handler is
+   gated on .blossom-screen.visible so it does not interfere with
+   the main carousel or the table.
    ============================================================ */
 var RIPPLE_COLOURS_STRONG = [
   'rgba(253, 243, 216, 0.95)',
@@ -2636,6 +2633,7 @@ var koiFlinchActive = false;
 var koiTapStartX = 0;
 var koiTapStartY = 0;
 var koiTapStartTime = 0;
+var koiTapOnKoi = false;
 
 /* v1.3 — ambient subtle ripples */
 var ambientRippleTimer = null;
@@ -2754,12 +2752,18 @@ function scheduleAmbientRipple() {
 /* ============================================================
    KOI FLINCH — v1.3
    ------------------------------------------------------------
-   A short tap on the start button (travel < 8px, duration < 250ms)
-   triggers a 1000ms randomised flinch on .koi-dive-wrap. The
-   animation reads its parameters from four CSS custom properties
-   written here on every tap, so each tap produces a different
-   dart / rotation / scale. Guarded by koiFlinchActive so a second
-   tap during an active flinch is ignored.
+   A short tap on the koi PNG itself (travel < 8px, duration
+   < 250ms, pointer down on .koi-image) triggers a 1000ms
+   randomised flinch on .koi-dive-wrap. The animation reads its
+   parameters from four CSS custom properties written here on
+   every tap, so each tap produces a different dart / rotation /
+   scale. Guarded by koiFlinchActive so a second tap during an
+   active flinch is ignored.
+
+   The hit test is on .koi-image — the <img> element itself —
+   so taps on the button label, the ring SVG, the hint, or the
+   background do NOT trigger the flinch. They still produce the
+   strong ripple via the pointerdown handler.
    ============================================================ */
 function triggerKoiFlinch() {
   if (!koiDiveWrap) return;
@@ -2804,6 +2808,10 @@ function onKoiPointerDown(e) {
   koiTapStartX = e.clientX;
   koiTapStartY = e.clientY;
   koiTapStartTime = Date.now();
+  /* Hit test for the flinch: did the pointer down land on the koi
+     PNG itself? Anything else on the blossom screen still gets the
+     strong ripple below, but does not flinch the koi. */
+  koiTapOnKoi = !!(e.target && e.target.closest && e.target.closest('.koi-image'));
 
   /* Every tap on the koi screen produces the same prominent ripple.
      The 'subtle' palette is now used only by the ambient scheduler. */
@@ -2864,7 +2872,10 @@ function onKoiPointerUp(e) {
     if (koiDiveWrap) koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
     if (startBtn) startBtn.classList.remove('ready');
     koiGestureState = 'idle';
-    triggerKoiFlinch();
+    /* Flinch only when the gesture actually began on the koi PNG.
+       Background taps still produce the strong ripple (by design)
+       but must not make the koi react. */
+    if (koiTapOnKoi) triggerKoiFlinch();
     return;
   }
 
