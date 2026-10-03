@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Receipt Demo — 本日の内容 counter</title>
+<title>Receipt Landing — Diagnostic Demo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,172 +14,109 @@
 <style>
   /* ============================================================
      DEMO-ONLY OVERRIDES
-     These reproduce the proposed changes to the 本日の内容 line.
-     Not part of main.css. Scoped to this page.
+     Everything below is scoped to this page. Nothing here is
+     meant for production.
      ============================================================ */
 
-  /* 1. Label and counter sit flush — no flex gap. */
-  .receipt-title { gap: 0; }
-
-  /* 2. Counter loses every piece of badge chrome. Inherits
-        everything (colour, size, family, letter-spacing) from
-        .receipt-title. */
-  .receipt-title .item-count {
-    display: inline-flex;
-    align-items: center;
-    background: none;
-    border: none;
-    border-radius: 0;
-    padding: 0;
-    color: inherit;
-    font-size: inherit;
-    font-weight: inherit;
-    font-family: inherit;
-    letter-spacing: inherit;
-  }
-
-  /* 3. Digit cell height tracks the label's font-size, and the
-        whole counter pulls left by --counter-pull. The value of
-        --counter-pull is driven live by the slider in the demo
-        control bar. */
-  .counter-digit-roll {
-    --digit-h: 1.4em;
-    margin-left: var(--counter-pull, 0px);
-  }
-
-  /* 4. Column width comes from a CSS variable measured at runtime
-        (one digit advance + one letter-space). Fallback is a
-        generous guess used only before JS measures. */
-  .counter-digit-roll .digit-col {
-    width: var(--counter-cell-w, 1.4em);
-    transition: width 300ms cubic-bezier(0.34, 1.15, 0.64, 1),
-                opacity 200ms ease;
-  }
-  .counter-digit-roll .digit-strip {
-    transition: transform 500ms cubic-bezier(0.34, 1.15, 0.64, 1);
-  }
-
-  /* 5. The digit inherits letter-spacing like every other character. */
-  .counter-digit-roll .digit {
-    font-weight: 600;
-    letter-spacing: inherit;
-  }
-
-  /* ============================================================
-     DEMO CHROME (controls, stage). Not relevant to the change.
-     ============================================================ */
-  .demo-stage {
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 180px 20px 80px 20px;
-  }
+  /* Control bar sits above the receipt screen (which is z-index 300). */
   .demo-controls {
     position: fixed;
-    top: 20px;
+    top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(255, 255, 255, 0.94);
+    z-index: 9999;
+    background: rgba(255, 255, 255, 0.96);
     border: 1px solid var(--border-2);
-    border-radius: 16px;
-    padding: 12px 16px;
+    border-radius: 14px;
+    padding: 10px 12px;
     box-shadow: 0 6px 24px var(--shadow-rose-2);
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    font-size: 14px;
+    gap: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-size: 13px;
     color: var(--text-dark);
-    z-index: 100;
-    max-width: 92vw;
+    max-width: 96vw;
   }
   .demo-row {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
   }
   .demo-controls button {
-    width: 38px; height: 38px;
-    border-radius: 50%;
+    border-radius: 18px;
     border: 1.5px solid var(--border-1);
     background: #fff;
-    color: var(--accent);
-    font-size: 18px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    padding: 0;
-    -webkit-appearance: none; appearance: none;
-    transition: transform 0.15s, background 0.2s, border-color 0.2s;
-    flex-shrink: 0;
-  }
-  .demo-controls button:active { transform: scale(0.92); background: var(--soft-1); border-color: var(--accent); }
-  .demo-controls input[type="number"] {
-    width: 56px;
-    text-align: center;
-    font-family: inherit;
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent);
-    background: #fff;
-    border: 1.5px solid var(--border-1);
-    border-radius: 10px;
-    padding: 6px 4px;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  .demo-controls input[type="number"]::-webkit-outer-spin-button,
-  .demo-controls input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none; margin: 0;
-  }
-  .demo-controls input[type="number"]:focus { outline: none; border-color: var(--accent); }
-  .demo-label {
+    color: var(--text-dark);
     font-size: 12px;
-    color: var(--text-mute);
-    letter-spacing: 2px;
-    flex-shrink: 0;
-  }
-  .demo-slider {
-    flex: 1;
-    min-width: 200px;
+    font-weight: 600;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-family: inherit;
     -webkit-appearance: none;
     appearance: none;
-    height: 4px;
-    background: var(--border-2);
-    border-radius: 2px;
-    outline: none;
-    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    white-space: nowrap;
   }
-  .demo-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid #fff;
-    box-shadow: 0 2px 6px var(--shadow-accent);
-    cursor: pointer;
+  .demo-controls button:active {
+    transform: scale(0.96);
+    background: var(--soft-1);
+    border-color: var(--accent);
   }
-  .demo-slider::-moz-range-thumb {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
+  .demo-controls button.primary {
     background: var(--accent);
-    border: 2px solid #fff;
-    box-shadow: 0 2px 6px var(--shadow-accent);
-    cursor: pointer;
+    border-color: var(--accent);
+    color: #fff;
+  }
+  .demo-controls button.primary:active {
+    background: var(--accent-3);
   }
   .demo-readout {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--accent);
-    min-width: 60px;
-    text-align: right;
+    font-size: 11px;
+    color: var(--text-mute);
     letter-spacing: 0;
-    flex-shrink: 0;
+    min-width: 220px;
+    text-align: center;
+  }
+  .demo-readout strong {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .demo-status {
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    text-align: center;
+  }
+
+  /* ============================================================
+     TEST CLASSES — each isolates one suspect.
+     Applied to <body> by JS when the corresponding button is
+     pressed.
+     ============================================================ */
+
+  /* Test A: kill overflow-y on the paper. */
+  body.test-no-scroll-paper .receipt-paper {
+    overflow: hidden !important;
+  }
+
+  /* Test B: kill overflow-y on the screen. */
+  body.test-no-scroll-screen .receipt-screen {
+    overflow: hidden !important;
+  }
+
+  /* Test C: kill the SVG mask on the paper. */
+  body.test-no-mask .receipt-paper {
+    -webkit-mask-image: none !important;
+    mask-image: none !important;
+  }
+
+  /* Test D: kill the wrapper's filter entirely (baseline). */
+  body.test-no-filter .receipt-paper-wrap {
+    filter: none !important;
   }
 </style>
 </head>
@@ -187,20 +124,18 @@
 
 <div class="demo-controls">
   <div class="demo-row">
-    <button type="button" id="decBtn" aria-label="減らす">−</button>
-    <input type="number" id="countInput" value="3" min="0" max="20" step="1" aria-label="件数">
-    <button type="button" id="incBtn" aria-label="増やす">＋</button>
-    <span class="demo-label">項目</span>
+    <button type="button" class="primary" data-test="baseline">Baseline (no test)</button>
+    <button type="button" data-test="no-scroll-paper">A · no paper scroll</button>
+    <button type="button" data-test="no-scroll-screen">B · no screen scroll</button>
+    <button type="button" data-test="no-mask">C · no SVG mask</button>
+    <button type="button" data-test="no-filter">D · no filter</button>
   </div>
-  <div class="demo-row">
-    <span class="demo-label">PULL</span>
-    <input type="range" id="pullSlider" class="demo-slider" min="-20" max="4" step="0.5" value="-12">
-    <span class="demo-readout" id="pullReadout">-12.0px</span>
-  </div>
+  <div class="demo-readout" id="readout">Tap a button to run the landing animation.</div>
+  <div class="demo-status" id="status">ready</div>
 </div>
 
-<div class="demo-stage">
-  <div class="receipt-paper-wrap">
+<div class="receipt-screen visible" id="receiptScreen">
+  <div class="receipt-paper-wrap" id="paperWrap">
     <div class="receipt-paper">
       <div class="receipt-header">
         <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
@@ -214,16 +149,16 @@
       <div class="receipt-divider"></div>
       <div class="receipt-title">
         <span>本日の内容：</span>
-        <span class="item-count" id="itemCount">
-          <span class="digit-roll counter-digit-roll" id="itemCountDigits"></span>
-          <span class="item-count-unit">項目</span>
-        </span>
+        <span class="item-count">6 項目</span>
       </div>
       <div class="receipt-items" id="receiptItems"></div>
 
       <div class="receipt-total-line">
         <span class="receipt-total-label">合計</span>
-        <span class="receipt-total-value"><span class="yen-symbol">¥</span><span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span></span>
+        <span class="receipt-total-value">
+          <span class="yen-symbol">¥</span>
+          <span id="receiptTotalText">31,500</span>
+        </span>
       </div>
 
       <button type="button" class="receipt-confirm-btn">こちらの内容でお願いいたします。</button>
@@ -238,284 +173,190 @@
 
 <script>
 /* ============================================================
-   RUNTIME DIGIT ADVANCE MEASUREMENT
+   ITEMS
    ============================================================ */
-function measureDigitAdvance() {
-  var titleEl = document.querySelector('.receipt-title');
-  if (!titleEl) return null;
-  var cs = window.getComputedStyle(titleEl);
-
-  var probe = document.createElement('span');
-  probe.textContent = '0000000000';
-  probe.style.position = 'absolute';
-  probe.style.visibility = 'hidden';
-  probe.style.pointerEvents = 'none';
-  probe.style.whiteSpace = 'nowrap';
-  probe.style.fontFamily = cs.fontFamily;
-  probe.style.fontSize = cs.fontSize;
-  probe.style.fontWeight = cs.fontWeight;
-  probe.style.fontStyle = cs.fontStyle;
-  probe.style.letterSpacing = cs.letterSpacing;
-  probe.style.lineHeight = '1';
-  document.body.appendChild(probe);
-
-  var w = probe.getBoundingClientRect().width;
-  document.body.removeChild(probe);
-
-  if (!w || w <= 0) return null;
-  return w / 10;
-}
-
-function applyCounterCellWidth() {
-  var advance = measureDigitAdvance();
-  if (!advance) return;
-  var container = document.getElementById('itemCountDigits');
-  if (!container) return;
-  container.style.setProperty('--counter-cell-w', advance.toFixed(3) + 'px');
-}
-
-/* ============================================================
-   COUNTER ODOMETER
-   ============================================================ */
-var COUNTER_COLS = 2;
-
-function counterIsColVisible(value, colIndex) {
-  if (value === 0) return colIndex === COUNTER_COLS - 1;
-  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
-  return value >= placeValue;
-}
-function counterGetDigitAt(value, colIndex) {
-  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
-  return Math.floor(value / placeValue) % 10;
-}
-function buildCounterColumns(container, initialValue) {
-  if (!container) return;
-  container.innerHTML = '';
-  for (var i = 0; i < COUNTER_COLS; i++) {
-    var col = document.createElement('span');
-    col.className = 'digit-col hidden';
-    col.setAttribute('data-digit', '0');
-    var strip = document.createElement('span');
-    strip.className = 'digit-strip';
-    for (var d = 0; d <= 9; d++) {
-      var de = document.createElement('span');
-      de.className = 'digit';
-      de.textContent = d;
-      strip.appendChild(de);
-    }
-    strip.style.transform = 'translateY(0)';
-    col.appendChild(strip);
-    container.appendChild(col);
-  }
-  container.classList.add('no-transition');
-  applyCounterValue(container, initialValue, { instant: true });
-  void container.offsetWidth;
-  container.classList.remove('no-transition');
-}
-function applyCounterValue(container, value, opts) {
-  if (!container) return;
-  opts = opts || {};
-  var instant = !!opts.instant;
-  if (instant) container.classList.add('no-transition');
-  var cols = container.querySelectorAll('.digit-col');
-  for (var i = 0; i < cols.length; i++) {
-    var col = cols[i];
-    var strip = col.querySelector('.digit-strip');
-    var visible = counterIsColVisible(value, i);
-    var newDigit = counterGetDigitAt(value, i);
-    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
-    var delay = instant ? 0 : (COUNTER_COLS - 1 - i) * 40;
-    if (instant) {
-      strip.style.transitionDelay = '0ms';
-      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-    } else if (newDigit !== oldDigit) {
-      strip.style.transitionDelay = delay + 'ms';
-      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-    }
-    col.classList.toggle('hidden', !visible);
-    col.setAttribute('data-digit', newDigit);
-  }
-  if (instant) {
-    void container.offsetWidth;
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        container.classList.remove('no-transition');
-      });
-    });
-  }
-}
-
-/* ============================================================
-   MONEY ODOMETER
-   ============================================================ */
-var NUM_COLS = 6;
-var COMMA_AFTER = 2;
-
-function isColVisible(value, colIndex) {
-  if (value === 0) return colIndex === NUM_COLS - 1;
-  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
-  return value >= placeValue;
-}
-function getDigitAt(value, colIndex) {
-  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
-  return Math.floor(value / placeValue) % 10;
-}
-function buildDigitColumns(container, initialValue) {
-  if (!container) return;
-  container.innerHTML = '';
-  for (var i = 0; i < NUM_COLS; i++) {
-    var col = document.createElement('span');
-    col.className = 'digit-col hidden';
-    col.setAttribute('data-digit', '0');
-    var strip = document.createElement('span');
-    strip.className = 'digit-strip';
-    for (var d = 0; d <= 9; d++) {
-      var de = document.createElement('span');
-      de.className = 'digit';
-      de.textContent = d;
-      strip.appendChild(de);
-    }
-    strip.style.transform = 'translateY(0)';
-    col.appendChild(strip);
-    container.appendChild(col);
-    if (i === COMMA_AFTER) {
-      var comma = document.createElement('span');
-      comma.className = 'digit-static hidden';
-      comma.setAttribute('data-comma', '1');
-      comma.textContent = ',';
-      container.appendChild(comma);
-    }
-  }
-  container.classList.add('no-transition');
-  applyDigitValue(container, initialValue, { instant: true, stagger: 0 });
-  void container.offsetWidth;
-  container.classList.remove('no-transition');
-}
-function applyDigitValue(container, value, opts) {
-  if (!container) return;
-  opts = opts || {};
-  var instant = !!opts.instant;
-  var stagger = opts.stagger != null ? opts.stagger : 45;
-  if (instant) container.classList.add('no-transition');
-  var cols = container.querySelectorAll('.digit-col');
-  var comma = container.querySelector('.digit-static[data-comma]');
-  for (var i = 0; i < cols.length; i++) {
-    var col = cols[i];
-    var strip = col.querySelector('.digit-strip');
-    var visible = isColVisible(value, i);
-    var newDigit = getDigitAt(value, i);
-    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
-    var fromRight = NUM_COLS - 1 - i;
-    var delay = instant ? 0 : fromRight * stagger;
-    if (instant) {
-      strip.style.transitionDelay = '0ms';
-      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-    } else if (newDigit !== oldDigit) {
-      strip.style.transitionDelay = delay + 'ms';
-      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
-    }
-    col.classList.toggle('hidden', !visible);
-    col.setAttribute('data-digit', newDigit);
-  }
-  if (comma) comma.classList.toggle('hidden', value < 1000);
-  if (instant) {
-    void container.offsetWidth;
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        container.classList.remove('no-transition');
-      });
-    });
-  }
-}
-
-/* ============================================================
-   DEMO STATE
-   ============================================================ */
-var MAX_COUNT = 20;
-var currentCount = 3;
-
 var SAMPLE_ITEMS = [
-  'ダミーテキスト1', 'ダミーテキスト2', 'ダミーテキスト3',
-  'ダミーテキスト4', 'ダミーテキスト5', 'ダミーテキスト6',
-  'ダミーテキスト7', 'ダミーテキスト8', 'ダミーテキスト9',
-  'ダミーテキスト10', 'ダミーテキスト11', 'ダミーテキスト12',
-  'ダミーテキスト13', 'ダミーテキスト14', 'ダミーテキスト15',
-  'ダミーテキスト16', 'ダミーテキスト17', 'ダミーテキスト18',
-  'ダミーテキスト19', 'ダミーテキスト20'
+  { name: 'ダミーテキスト1', price: 5000 },
+  { name: 'ダミーテキスト2', price: 5500 },
+  { name: 'ダミーテキスト3', price: 6000 },
+  { name: 'ダミーテキスト4', price: 4500 },
+  { name: 'ダミーテキスト5', price: 5000 },
+  { name: 'ダミーテキスト6', price: 5500 }
 ];
-var SAMPLE_PRICES = [1500, 2000, 3000, 4500, 5000,
-                     1500, 2000, 3000, 4500, 5000,
-                     1500, 2000, 3000, 4500, 5000,
-                     1500, 2000, 3000, 4500, 5000];
 
-function renderItems(n) {
+function renderItems() {
   var wrap = document.getElementById('receiptItems');
   wrap.innerHTML = '';
   var total = 0;
-  for (var i = 0; i < n; i++) {
-    var price = SAMPLE_PRICES[i % SAMPLE_PRICES.length];
-    total += price;
-    var item = document.createElement('div');
-    item.className = 'receipt-item';
-    item.style.animationDelay = Math.min(i * 0.06, 0.4) + 's';
-    item.innerHTML =
-      '<span class="receipt-item-name">' + SAMPLE_ITEMS[i] + '</span>' +
+  for (var i = 0; i < SAMPLE_ITEMS.length; i++) {
+    var it = SAMPLE_ITEMS[i];
+    total += it.price;
+    var div = document.createElement('div');
+    div.className = 'receipt-item';
+    div.style.animationDelay = Math.min(i * 0.08, 0.4) + 's';
+    div.innerHTML =
+      '<span class="receipt-item-name">' + it.name + '</span>' +
       '<span class="receipt-item-price-wrap">' +
         '<span class="yen-symbol">¥</span>' +
-        '<input type="text" class="receipt-price-input" value="' + price.toLocaleString() + '" readonly tabindex="-1">' +
-      '</span>' +
-      '<button type="button" class="receipt-item-remove" aria-label="削除">×</button>' +
-      '<button type="button" class="receipt-item-undo" aria-label="元に戻す">↺ 元に戻す</button>';
-    wrap.appendChild(item);
+        '<input type="text" class="receipt-price-input" value="' + it.price.toLocaleString() + '" readonly tabindex="-1">' +
+      '</span>';
+    wrap.appendChild(div);
   }
-  applyDigitValue(document.getElementById('receiptTotalNumber'), total, { instant: false, stagger: 80 });
+  var totalEl = document.getElementById('receiptTotalText');
+  if (totalEl) totalEl.textContent = total.toLocaleString();
 }
 
-function setCount(n) {
-  n = Math.max(0, Math.min(MAX_COUNT, Math.floor(n)));
-  if (n === currentCount) return;
-  currentCount = n;
-  applyCounterValue(document.getElementById('itemCountDigits'), n, { instant: false });
-  renderItems(n);
-  document.getElementById('countInput').value = n;
-}
+/* ============================================================
+   FRAME COUNTER
+   ------------------------------------------------------------
+   Measures actual inter-frame intervals during the animation.
+   Reports average FPS and worst single frame. If the fall is
+   smooth, worst frame should be close to avg frame (~16.7ms at
+   60Hz, ~8.3ms at 120Hz). A worst frame of 40ms+ means a
+   dropped frame — that is the stutter you are seeing.
+   ============================================================ */
+var frameRafId = null;
+var frameDeltas = [];
+var frameStartTime = 0;
 
-function setPull(px) {
-  var container = document.getElementById('itemCountDigits');
-  if (!container) return;
-  container.style.setProperty('--counter-pull', px.toFixed(1) + 'px');
-  var readout = document.getElementById('pullReadout');
-  if (readout) readout.textContent = (px > 0 ? '+' : '') + px.toFixed(1) + 'px';
-}
-
-window.addEventListener('load', function() {
-  buildCounterColumns(document.getElementById('itemCountDigits'), currentCount);
-  buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
-  renderItems(currentCount);
-
-  applyCounterCellWidth();
-  if (document.fonts && document.fonts.ready) {
-    document.fonts.ready.then(applyCounterCellWidth);
+function startFrameCount() {
+  frameDeltas = [];
+  frameStartTime = performance.now();
+  var last = frameStartTime;
+  function tick(now) {
+    frameDeltas.push(now - last);
+    last = now;
+    frameRafId = requestAnimationFrame(tick);
   }
-  window.addEventListener('resize', applyCounterCellWidth);
+  frameRafId = requestAnimationFrame(tick);
+}
 
-  document.getElementById('incBtn').addEventListener('click', function() {
-    setCount(currentCount + 1);
-  });
-  document.getElementById('decBtn').addEventListener('click', function() {
-    setCount(currentCount - 1);
-  });
-  document.getElementById('countInput').addEventListener('change', function(e) {
-    setCount(parseInt(e.target.value, 10) || 0);
-  });
+function stopFrameCount() {
+  if (frameRafId) cancelAnimationFrame(frameRafId);
+  frameRafId = null;
+  if (frameDeltas.length < 2) return null;
+  var sum = 0;
+  var worst = 0;
+  var worstIdx = -1;
+  for (var i = 1; i < frameDeltas.length; i++) {
+    sum += frameDeltas[i];
+    if (frameDeltas[i] > worst) {
+      worst = frameDeltas[i];
+      worstIdx = i;
+    }
+  }
+  var avgMs = sum / (frameDeltas.length - 1);
+  var over20 = 0;
+  var over33 = 0;
+  for (var j = 1; j < frameDeltas.length; j++) {
+    if (frameDeltas[j] > 20) over20++;
+    if (frameDeltas[j] > 33) over33++;
+  }
+  return {
+    frames: frameDeltas.length - 1,
+    avgMs: avgMs,
+    avgFps: 1000 / avgMs,
+    worstMs: worst,
+    over20: over20,
+    over33: over33
+  };
+}
 
-  var slider = document.getElementById('pullSlider');
-  if (slider) {
-    setPull(parseFloat(slider.value));
-    slider.addEventListener('input', function() {
-      setPull(parseFloat(slider.value));
+/* ============================================================
+   RUN THE LANDING ANIMATION WITH A GIVEN TEST CLASS
+   ============================================================ */
+var TEST_CLASSES = [
+  'test-no-scroll-paper',
+  'test-no-scroll-screen',
+  'test-no-mask',
+  'test-no-filter'
+];
+
+function clearTestClasses() {
+  for (var i = 0; i < TEST_CLASSES.length; i++) {
+    document.body.classList.remove(TEST_CLASSES[i]);
+  }
+}
+
+function runLanding(testName) {
+  var paperWrap = document.getElementById('paperWrap');
+  var readout = document.getElementById('readout');
+  var status = document.getElementById('status');
+  if (!paperWrap) return;
+
+  /* Clear any in-flight animation and test class. */
+  paperWrap.classList.remove('landing');
+  void paperWrap.offsetWidth;
+  clearTestClasses();
+
+  /* Apply the selected test class (if any). */
+  var applied = '(baseline)';
+  if (testName && testName !== 'baseline') {
+    document.body.classList.add('test-' + testName);
+    applied = 'test-' + testName;
+  }
+
+  status.textContent = 'running: ' + applied;
+  readout.textContent = 'measuring frames…';
+
+  /* Start the frame counter just before the animation. */
+  startFrameCount();
+
+  /* Kick off the landing. */
+  void paperWrap.offsetWidth;
+  paperWrap.classList.add('landing');
+
+  var done = false;
+  function finish() {
+    if (done) return;
+    done = true;
+    paperWrap.removeEventListener('animationend', finish);
+    paperWrap.classList.remove('landing');
+
+    /* Let one more frame settle, then stop the counter. */
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        var r = stopFrameCount();
+        if (!r) {
+          readout.textContent = 'no frames captured';
+          return;
+        }
+        var verdict;
+        if (r.over33 === 0 && r.avgMs < 22) verdict = 'smooth';
+        else if (r.over33 > 3) verdict = 'stutter';
+        else verdict = 'borderline';
+
+        readout.innerHTML =
+          'test: <strong>' + applied + '</strong>' +
+          ' · avg <strong>' + r.avgFps.toFixed(1) + '</strong> fps' +
+          ' · avg frame <strong>' + r.avgMs.toFixed(1) + '</strong> ms' +
+          ' · worst <strong>' + r.worstMs.toFixed(1) + '</strong> ms' +
+          ' · &gt;20ms: <strong>' + r.over20 + '</strong>' +
+          ' · &gt;33ms: <strong>' + r.over33 + '</strong>' +
+          ' · verdict: <strong>' + verdict + '</strong>';
+
+        status.textContent = 'done — ' + r.frames + ' frames captured';
+      });
     });
   }
+
+  paperWrap.addEventListener('animationend', finish);
+  /* Fallback in case animationend does not fire (some embedded
+     webviews). Duration is 2400ms; cut off at 2600ms. */
+  setTimeout(finish, 2600);
+}
+
+/* ============================================================
+   WIRING
+   ============================================================ */
+document.querySelector('.demo-controls').addEventListener('click', function(e) {
+  var btn = e.target.closest('button[data-test]');
+  if (!btn) return;
+  runLanding(btn.getAttribute('data-test'));
+});
+
+window.addEventListener('load', function() {
+  renderItems();
 });
 </script>
 
