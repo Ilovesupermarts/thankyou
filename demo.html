@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Receipt Landing — Diagnostic Demo v2</title>
+<title>Receipt Landing — Diagnostic Demo v3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,16 +12,14 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============================================================
-     DEMO-ONLY CHROME (controls). Not for production.
-     ============================================================ */
+  /* ---------- Demo chrome ---------- */
   .demo-controls {
     position: fixed;
     top: 10px;
     left: 50%;
     transform: translateX(-50%);
-    z-index: 9999;
-    background: rgba(255, 255, 255, 0.96);
+    z-index: 99999;
+    background: rgba(255, 255, 255, 0.97);
     border: 1px solid var(--border-2);
     border-radius: 14px;
     padding: 10px 12px;
@@ -41,12 +39,7 @@
     flex-wrap: wrap;
     justify-content: center;
   }
-  .demo-label {
-    font-size: 11px;
-    color: var(--text-faint);
-    letter-spacing: 1px;
-    margin-right: 4px;
-  }
+  .demo-label { font-size: 11px; color: var(--text-faint); letter-spacing: 1px; margin-right: 4px; }
   .demo-controls button {
     border-radius: 16px;
     border: 1.5px solid var(--border-1);
@@ -59,24 +52,12 @@
     font-family: inherit;
     -webkit-appearance: none;
     appearance: none;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s;
+    transition: background 0.2s, border-color 0.2s, transform 0.1s, color 0.2s;
     white-space: nowrap;
   }
-  .demo-controls button:active {
-    transform: scale(0.96);
-    background: var(--soft-1);
-    border-color: var(--accent);
-  }
-  .demo-controls button.active {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
-  }
-  .demo-controls button.run {
-    background: var(--text-dark);
-    border-color: var(--text-dark);
-    color: #fff;
-  }
+  .demo-controls button:active { transform: scale(0.96); background: var(--soft-1); border-color: var(--accent); }
+  .demo-controls button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .demo-controls button.run { background: var(--text-dark); border-color: var(--text-dark); color: #fff; }
   .demo-controls button.run:active { background: #000; }
   .demo-readout {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -89,61 +70,76 @@
   .demo-readout strong { color: var(--accent); font-weight: 700; }
   .demo-readout strong.smooth { color: #2a7a3a; }
   .demo-readout strong.stutter { color: #b03030; }
+
+  /* ---------- Injection root ---------- */
+  /* Sits below the receipt screen, above the ambient stage. Holds the
+     cloned real-app DOM so its compositing cost is present. */
+  #fakeAppRoot {
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  #fakeAppRoot.hide-under { visibility: hidden; }
+
+  /* Force off the injected info-bar's own visibility so its ticker can
+     be enabled / disabled by a toggle rather than by the real app's
+     body class. */
+  #fakeAppRoot .info-bar { display: none; }
+  body.ticker-on #fakeAppRoot .info-bar { display: block; }
+  body.ticker-on #fakeAppRoot .info-bar.shown { opacity: 1; transform: translateY(0); }
+
+  /* Hide the injected name screen and blossom screen that would
+     otherwise paint over things — those are in the "closed" state
+     during the real app's receipt view. */
+  #fakeAppRoot .name-screen { opacity: 0; visibility: hidden; }
+  #fakeAppRoot .blossom-screen { opacity: 0; visibility: hidden; }
+  #fakeAppRoot .intro-overlay { opacity: 0; visibility: hidden; }
+  #fakeAppRoot .thankyou-screen { opacity: 0; visibility: hidden; }
+
+  /* Injected ambient-stage: not used here — we have our own. */
+  #fakeAppRoot #ambientStage { display: none !important; }
+
+  /* ---------- Opaque receipt toggle ---------- */
+  body.receipt-opaque .receipt-screen { background: #faf7f5 !important; }
+  html[data-theme="autumn"] body.receipt-opaque .receipt-screen { background: #fdf3d8 !important; }
 </style>
 </head>
 <body>
 
 <div class="demo-controls">
   <div class="demo-row">
-    <span class="demo-label">AMBIENT:</span>
-    <button type="button" class="amb" data-amb="video">Video</button>
-    <button type="button" class="amb" data-amb="gradient">Gradient</button>
-    <button type="button" class="amb" data-amb="caustics">Caustics</button>
-    <button type="button" class="amb" data-amb="motes">Motes</button>
-    <button type="button" class="amb" data-amb="track">Carousel track</button>
+    <span class="demo-label">STACK:</span>
+    <button type="button" id="btnRealApp">Real app DOM</button>
+    <button type="button" id="btnHideUnder">Hide under</button>
+    <button type="button" id="btnAmbient">Ambient stage</button>
+    <button type="button" id="btnTicker">Info bar ticker</button>
+    <button type="button" id="btnOpaque">Opaque receipt</button>
   </div>
   <div class="demo-row">
     <span class="demo-label">ACTION:</span>
     <button type="button" class="run" id="runBtn">Run landing</button>
-    <button type="button" id="clearBtn">Clear all ambient</button>
+    <button type="button" id="clearBtn">Reset all</button>
   </div>
-  <div class="demo-readout" id="readout">Toggle ambient layers, then Run. Baseline first.</div>
+  <div class="demo-readout" id="readout">Start with nothing on. Then add layers one at a time and re-run.</div>
 </div>
 
-<!-- ============================================================
-     AMBIENT STAGE — mirrors the real app exactly.
-     Hidden until the corresponding toggle is enabled.
-     ============================================================ -->
-<div class="ambient-stage" id="ambientStage" aria-hidden="true" style="display:none;">
-  <div class="ambient-layer ambient-image" id="ambientImage">
-    <video class="ambient-video" id="ambientVideo"
-           autoplay muted loop playsinline preload="auto">
+<div id="fakeAppRoot"></div>
+
+<div class="ambient-stage" id="ambientStage" style="display:none;">
+  <div class="ambient-layer ambient-image">
+    <video class="ambient-video" id="ambientVideo" muted loop playsinline preload="auto">
       <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
     </video>
   </div>
-  <div class="ambient-layer ambient-primary" id="ambientPrimary"></div>
+  <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
-  <div class="ambient-layer caustics caustics-1" id="caustic1"></div>
-  <div class="ambient-layer caustics caustics-2" id="caustic2"></div>
+  <div class="ambient-layer caustics caustics-1"></div>
+  <div class="ambient-layer caustics caustics-2"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- Fake carousel track: matches the real app's 500%-wide will-change
-     layer, so we can test whether the persistent promoted layer is
-     what eats GPU budget. -->
-<div class="stage" id="fakeStage" style="display:none; position:fixed; top:0; left:0; width:100%; height:100vh; z-index:-1; pointer-events:none;">
-  <div class="track" id="fakeTrack">
-    <div class="panel" data-panel="0"></div>
-    <div class="panel" data-panel="1"></div>
-    <div class="panel" data-panel="2"></div>
-    <div class="panel" data-panel="3"></div>
-    <div class="panel" data-panel="4"></div>
-  </div>
-</div>
-
-<!-- ============================================================
-     RECEIPT — same as the real app.
-     ============================================================ -->
 <div class="receipt-screen visible" id="receiptScreen">
   <div class="receipt-paper-wrap" id="paperWrap">
     <div class="receipt-paper">
@@ -182,9 +178,7 @@
 </div>
 
 <script>
-/* ============================================================
-   SAMPLE ITEMS
-   ============================================================ */
+/* ============ SAMPLE ITEMS ============ */
 var SAMPLE_ITEMS = [
   { name: 'ダミーテキスト1', price: 5000 },
   { name: 'ダミーテキスト2', price: 5500 },
@@ -193,7 +187,6 @@ var SAMPLE_ITEMS = [
   { name: 'ダミーテキスト5', price: 5000 },
   { name: 'ダミーテキスト6', price: 5500 }
 ];
-
 function renderItems() {
   var wrap = document.getElementById('receiptItems');
   wrap.innerHTML = '';
@@ -212,32 +205,20 @@ function renderItems() {
       '</span>';
     wrap.appendChild(div);
   }
-  var totalEl = document.getElementById('receiptTotalText');
-  if (totalEl) totalEl.textContent = total.toLocaleString();
+  var el = document.getElementById('receiptTotalText');
+  if (el) el.textContent = total.toLocaleString();
 }
 
-/* ============================================================
-   AMBIENT STATE
-   ============================================================ */
-var ambient = {
-  video: false,
-  gradient: false,
-  caustics: false,
-  motes: false,
-  track: false
-};
-
+/* ============ AMBIENT ============ */
 function buildMotes() {
   var field = document.getElementById('moteField');
   if (!field) return;
   field.innerHTML = '';
-  var count = 8;
-  for (var i = 0; i < count; i++) {
+  for (var i = 0; i < 8; i++) {
     var m = document.createElement('div');
     m.className = 'mote';
     var size = 14 + Math.random() * 16;
-    m.style.width = size + 'px';
-    m.style.height = size + 'px';
+    m.style.width = size + 'px'; m.style.height = size + 'px';
     m.style.left = (Math.random() * 100) + '%';
     m.style.top  = (Math.random() * 100) + '%';
     var dur = 18 + Math.random() * 20;
@@ -250,63 +231,35 @@ function buildMotes() {
   }
 }
 
-function applyAmbient() {
-  var stage = document.getElementById('ambientStage');
-  var img = document.getElementById('ambientImage');
-  var primary = document.getElementById('ambientPrimary');
-  var c1 = document.getElementById('caustic1');
-  var c2 = document.getElementById('caustic2');
-  var moteField = document.getElementById('moteField');
-  var fakeStage = document.getElementById('fakeStage');
-
-  var anyAmbient = ambient.video || ambient.gradient || ambient.caustics || ambient.motes;
-  stage.style.display = anyAmbient ? '' : 'none';
-
-  /* Video */
-  img.style.display = ambient.video ? '' : 'none';
-  var video = document.getElementById('ambientVideo');
-  if (video) {
-    if (ambient.video) {
-      var p = video.play();
-      if (p && typeof p.catch === 'function') p.catch(function() {});
-      /* Force the autumn theme to show the video (same as real app). */
-      document.documentElement.setAttribute('data-theme', 'autumn');
-    } else {
-      try { video.pause(); } catch (e) {}
-    }
-  }
-
-  /* Gradient */
-  primary.style.display = ambient.gradient ? '' : 'none';
-
-  /* Caustics */
-  c1.style.display = ambient.caustics ? '' : 'none';
-  c2.style.display = ambient.caustics ? '' : 'none';
-
-  /* Motes */
-  if (ambient.motes) {
-    buildMotes();
-    moteField.style.display = '';
-  } else {
-    moteField.innerHTML = '';
-    moteField.style.display = 'none';
-  }
-
-  /* Carousel track */
-  fakeStage.style.display = ambient.track ? '' : 'none';
+/* ============ REAL APP DOM INJECTION ============ */
+var realAppLoaded = false;
+function loadRealAppDom() {
+  if (realAppLoaded) return Promise.resolve();
+  return fetch('index.html?v=' + Date.now())
+    .then(function(r) { return r.text(); })
+    .then(function(html) {
+      var parser = new DOMParser();
+      var doc = parser.parseFromString(html, 'text/html');
+      var root = document.getElementById('fakeAppRoot');
+      var children = Array.prototype.slice.call(doc.body.children);
+      children.forEach(function(el) {
+        if (el.id === 'receiptScreen') return;
+        if (el.id === 'ambientStage') return;
+        if (el.id === 'rippleLayer') return;
+        if (el.classList && el.classList.contains('demo-controls')) return;
+        root.appendChild(document.importNode(el, true));
+      });
+      realAppLoaded = true;
+    });
 }
 
-/* ============================================================
-   FRAME COUNTER
-   ============================================================ */
+/* ============ FRAME COUNTER ============ */
 var frameRafId = null;
 var frameDeltas = [];
-var frameStartTime = 0;
 
 function startFrameCount() {
   frameDeltas = [];
-  frameStartTime = performance.now();
-  var last = frameStartTime;
+  var last = performance.now();
   function tick(now) {
     frameDeltas.push(now - last);
     last = now;
@@ -340,9 +293,7 @@ function stopFrameCount() {
   };
 }
 
-/* ============================================================
-   RUN LANDING WITH CURRENT AMBIENT STATE
-   ============================================================ */
+/* ============ RUN LANDING ============ */
 function runLanding() {
   var paperWrap = document.getElementById('paperWrap');
   var readout = document.getElementById('readout');
@@ -351,13 +302,14 @@ function runLanding() {
   paperWrap.classList.remove('landing');
   void paperWrap.offsetWidth;
 
-  var active = [];
-  if (ambient.video) active.push('video');
-  if (ambient.gradient) active.push('gradient');
-  if (ambient.caustics) active.push('caustics');
-  if (ambient.motes) active.push('motes');
-  if (ambient.track) active.push('track');
-  var label = active.length ? active.join('+') : 'baseline';
+  var layers = [];
+  if (document.getElementById('btnRealApp').classList.contains('on')) {
+    layers.push(document.getElementById('btnHideUnder').classList.contains('on') ? 'realapp(hidden)' : 'realapp');
+  }
+  if (document.getElementById('btnAmbient').classList.contains('on')) layers.push('ambient');
+  if (document.getElementById('btnTicker').classList.contains('on')) layers.push('ticker');
+  if (document.getElementById('btnOpaque').classList.contains('on')) layers.push('opaque');
+  var label = layers.length ? layers.join('+') : 'baseline';
 
   readout.textContent = 'running: ' + label + ' — measuring…';
 
@@ -371,17 +323,14 @@ function runLanding() {
     done = true;
     paperWrap.removeEventListener('animationend', finish);
     paperWrap.classList.remove('landing');
-
     requestAnimationFrame(function() {
       requestAnimationFrame(function() {
         var r = stopFrameCount();
         if (!r) { readout.textContent = 'no frames captured'; return; }
-
         var verdict, cls;
         if (r.over33 === 0 && r.avgMs < 22) { verdict = 'SMOOTH'; cls = 'smooth'; }
         else if (r.over33 > 3) { verdict = 'STUTTER'; cls = 'stutter'; }
         else { verdict = 'borderline'; cls = ''; }
-
         readout.innerHTML =
           '<strong>' + label + '</strong>' +
           ' · avg <strong>' + r.avgFps.toFixed(1) + '</strong> fps' +
@@ -393,40 +342,69 @@ function runLanding() {
       });
     });
   }
-
   paperWrap.addEventListener('animationend', finish);
   setTimeout(finish, 2600);
 }
 
-/* ============================================================
-   WIRING
-   ============================================================ */
-document.querySelectorAll('.amb[data-amb]').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var key = btn.getAttribute('data-amb');
-    ambient[key] = !ambient[key];
-    btn.classList.toggle('active', ambient[key]);
-    applyAmbient();
-  });
+/* ============ TOGGLE WIRING ============ */
+function toggle(btn) { btn.classList.toggle('on'); }
+
+document.getElementById('btnRealApp').addEventListener('click', function() {
+  var b = this;
+  toggle(b);
+  if (b.classList.contains('on')) {
+    loadRealAppDom().then(function() {
+      document.getElementById('fakeAppRoot').classList.toggle(
+        'hide-under',
+        document.getElementById('btnHideUnder').classList.contains('on')
+      );
+    });
+  } else {
+    // Turning off: empty the root.
+    document.getElementById('fakeAppRoot').innerHTML = '';
+    realAppLoaded = false;
+  }
+});
+
+document.getElementById('btnHideUnder').addEventListener('click', function() {
+  toggle(this);
+  document.getElementById('fakeAppRoot').classList.toggle('hide-under', this.classList.contains('on'));
+});
+
+document.getElementById('btnAmbient').addEventListener('click', function() {
+  toggle(this);
+  var on = this.classList.contains('on');
+  var stage = document.getElementById('ambientStage');
+  stage.style.display = on ? '' : 'none';
+  var v = document.getElementById('ambientVideo');
+  if (v) {
+    if (on) { var p = v.play(); if (p && p.catch) p.catch(function(){}); }
+    else { try { v.pause(); } catch(e) {} }
+  }
+  if (on) buildMotes();
+});
+
+document.getElementById('btnTicker').addEventListener('click', function() {
+  toggle(this);
+  document.body.classList.toggle('ticker-on', this.classList.contains('on'));
+});
+
+document.getElementById('btnOpaque').addEventListener('click', function() {
+  toggle(this);
+  document.body.classList.toggle('receipt-opaque', this.classList.contains('on'));
 });
 
 document.getElementById('runBtn').addEventListener('click', runLanding);
 
 document.getElementById('clearBtn').addEventListener('click', function() {
-  ambient.video = false;
-  ambient.gradient = false;
-  ambient.caustics = false;
-  ambient.motes = false;
-  ambient.track = false;
-  document.querySelectorAll('.amb[data-amb]').forEach(function(b) {
-    b.classList.remove('active');
+  ['btnRealApp','btnHideUnder','btnAmbient','btnTicker','btnOpaque'].forEach(function(id) {
+    var b = document.getElementById(id);
+    if (b && b.classList.contains('on')) b.click();
   });
-  applyAmbient();
 });
 
 window.addEventListener('load', function() {
   renderItems();
-  applyAmbient();
 });
 </script>
 
