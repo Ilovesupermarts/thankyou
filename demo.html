@@ -25,6 +25,12 @@
     background: #fdf3d8;
     transition: background 300ms ease;
   }
+  /* Matches html[data-theme="autumn"] .receipt-screen in main.css */
+  .demo-bg[data-bg="receipt"] {
+    background: rgba(253, 243, 216, 0.94);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
   .demo-bg[data-bg="washi"] {
     background-color: #fdf3d8;
     background-image: url('icons/1790835034553.jpg');
@@ -54,18 +60,8 @@
 
   /* ============================================================
      SHADOW HOST — outer wrapper carrying the drop-shadow
-     ------------------------------------------------------------
-     Structure:
-       .rp-shadow-host          (drop-shadow filter — follows mask)
-         └ .receipt-paper-wrap  (resting tilt — from main.css)
-             └ .receipt-paper   (torn-edge mask + landing animation)
-
-     The shadow host's filter sees the masked, transformed child,
-     so the drop-shadow follows the torn silhouette exactly.
      ============================================================ */
   .rp-shadow-host {
-    /* --sh1-* and --sh2-* are set live by the demo controls.
-       Two layers: a crisp edge + a soft ambient. */
     filter:
       drop-shadow(
         var(--sh1-x, 0px)
@@ -81,15 +77,12 @@
       );
   }
 
-  /* Reset the paper's own shadow (main.css has one) so the demo's
-     shadow host owns the shadow. Only the animation blur remains. */
+  /* Reset the paper's own shadow so the demo's shadow host owns it. */
   .rp-shadow-host .receipt-paper {
     filter: none;
   }
 
-  /* The demo's own landing animation — replaces main.css's
-     .receipt-paper.landing. Uses CSS custom properties so every
-     parameter is tunable live. */
+  /* Demo landing animation */
   .receipt-paper.landing-demo {
     animation: paperLandDemo var(--land-dur, 1500ms) var(--land-ease, cubic-bezier(0.16, 1, 0.3, 1)) forwards;
   }
@@ -162,9 +155,7 @@
     border-bottom: 1px solid #f0e8e4;
     padding-bottom: 6px;
   }
-  .demo-controls .grp {
-    margin-bottom: 14px;
-  }
+  .demo-controls .grp { margin-bottom: 14px; }
   .demo-controls label {
     display: block;
     margin-bottom: 6px;
@@ -203,14 +194,6 @@
     background: #fff;
     color: #4a4542;
   }
-  .demo-controls input[type="color"] {
-    width: 40px;
-    height: 26px;
-    padding: 0;
-    border: 1px solid var(--border-1);
-    border-radius: 6px;
-    cursor: pointer;
-  }
   .demo-controls .row-3 {
     display: flex;
     align-items: center;
@@ -247,8 +230,6 @@
     color: #fff;
   }
   .demo-controls button.primary:hover { background: var(--accent-3); color: #fff; }
-
-  /* Preset buttons row */
   .demo-controls .presets {
     display: flex;
     gap: 4px;
@@ -298,10 +279,8 @@
 </head>
 <body>
 
-<!-- Background test layer -->
-<div class="demo-bg" id="demoBg" data-bg="washi" aria-hidden="true"></div>
+<div class="demo-bg" id="demoBg" data-bg="receipt" aria-hidden="true"></div>
 
-<!-- Stage -->
 <div class="demo-stage">
   <div class="rp-shadow-host" id="rpShadowHost">
     <div class="receipt-paper-wrap" id="rpWrap" style="--rest-rotate: 1.65deg;">
@@ -364,7 +343,6 @@
   </div>
 </div>
 
-<!-- Controls -->
 <div class="demo-controls">
   <h1>Receipt Landing</h1>
 
@@ -501,8 +479,9 @@
   <h2>Background</h2>
   <div class="grp">
     <select id="s-bg">
-      <option value="washi" selected>washi (default)</option>
-      <option value="cream">cream</option>
+      <option value="receipt" selected>receipt screen (cream)</option>
+      <option value="washi">washi texture</option>
+      <option value="cream">cream (flat)</option>
       <option value="mid">mid gray</option>
       <option value="dark">dark</option>
       <option value="checker">checkerboard</option>
@@ -537,9 +516,6 @@
   var totalDisplay = document.getElementById('totalDisplay');
   var hudDur       = document.getElementById('hud-dur');
 
-  /* ============================================================
-     Tunable params — mirrored to CSS custom properties
-     ============================================================ */
   var params = {
     dur:   1500,
     ease:  'cubic-bezier(0.16, 1, 0.3, 1)',
@@ -555,24 +531,16 @@
   };
 
   function applyParams() {
-    /* Timing */
     receiptPaper.style.setProperty('--land-dur', params.dur + 'ms');
     receiptPaper.style.setProperty('--land-ease', params.ease);
-
-    /* Start pose */
     receiptPaper.style.setProperty('--land-rx0', params.rx0 + 'deg');
     receiptPaper.style.setProperty('--land-ty0', params.ty0 + 'px');
     receiptPaper.style.setProperty('--land-s0', params.s0);
     receiptPaper.style.setProperty('--land-blur0', params.blur0 + 'px');
-
-    /* Settle */
     receiptPaper.style.setProperty('--land-os', params.os);
     receiptPaper.style.setProperty('--land-us', params.us);
-
-    /* Resting tilt on wrapper */
     rpWrap.style.setProperty('--rest-rotate', params.tilt + 'deg');
 
-    /* Drop shadows on host */
     rpShadowHost.style.setProperty('--sh1-x', params.sh1x + 'px');
     rpShadowHost.style.setProperty('--sh1-y', params.sh1y + 'px');
     rpShadowHost.style.setProperty('--sh1-blur', params.sh1blur + 'px');
@@ -585,9 +553,6 @@
     hudDur.textContent = params.dur + 'ms';
   }
 
-  /* ============================================================
-     Landing — remove class, force reflow, re-add.
-     ============================================================ */
   function replayLanding() {
     receiptPaper.classList.remove('landing-demo');
     void receiptPaper.offsetWidth;
@@ -599,11 +564,6 @@
     }
   });
 
-  /* ============================================================
-     Bind sliders and selects.
-     Each change updates params, applies CSS vars, and re-triggers
-     the landing so the effect is immediately visible.
-     ============================================================ */
   function bindRange(id, valId, key, fmt, replay) {
     var el = document.getElementById(id);
     var vEl = document.getElementById(valId);
@@ -627,7 +587,6 @@
   bindRange('r-us',     'v-us',     'us',     function(v) { return v.toFixed(3); });
   bindRange('r-tilt',   'v-tilt',   'tilt',   function(v) { return v.toFixed(2); });
 
-  /* Shadow sliders — no replay needed, they apply live. */
   bindRange('r-sh1-x',    'v-sh1-x',    'sh1x',    function(v) { return v.toFixed(1); }, false);
   bindRange('r-sh1-y',    'v-sh1-y',    'sh1y',    function(v) { return v.toFixed(1); }, false);
   bindRange('r-sh1-blur', 'v-sh1-blur', 'sh1blur', function(v) { return v.toFixed(1); }, false);
@@ -637,7 +596,6 @@
   bindRange('r-sh2-blur', 'v-sh2-blur', 'sh2blur', function(v) { return String(Math.round(v)); }, false);
   bindRange('r-sh2-a',    'v-sh2-a',    'sh2a',    function(v) { return v.toFixed(2); }, false);
 
-  /* Easing dropdown */
   var sEase = document.getElementById('s-ease');
   sEase.addEventListener('change', function() {
     params.ease = sEase.value;
@@ -645,15 +603,11 @@
     replayLanding();
   });
 
-  /* Background dropdown */
   var sBg = document.getElementById('s-bg');
   sBg.addEventListener('change', function() {
     demoBg.setAttribute('data-bg', sBg.value);
   });
 
-  /* ============================================================
-     Preset shapes
-     ============================================================ */
   var presets = {
     current: { dur:1500, ease:'cubic-bezier(0.22, 1, 0.36, 1)',
                rx0:38, ty0:-110, s0:0.82, blur0:4, os:1.025, us:0.995 },
@@ -670,7 +624,6 @@
     if (!p) return;
     Object.assign(params, p);
 
-    /* Reflect back to sliders */
     document.getElementById('r-dur').value = p.dur;
     document.getElementById('v-dur').textContent = String(p.dur);
     document.getElementById('s-ease').value = p.ease;
@@ -697,11 +650,7 @@
     });
   });
 
-  /* ============================================================
-     Actions
-     ============================================================ */
   document.getElementById('b-roll').addEventListener('click', function() {
-    /* Random total roll + landing */
     var base = 6000 + Math.floor(Math.random() * 20) * 500;
     totalDisplay.textContent = base.toLocaleString();
     replayLanding();
@@ -709,7 +658,6 @@
   document.getElementById('b-replay').addEventListener('click', replayLanding);
   document.getElementById('b-reset').addEventListener('click', function() {
     applyPreset('elegant');
-    /* Reset shadow + tilt to defaults */
     params.tilt = 1.65;
     params.sh1x = 0; params.sh1y = 1; params.sh1blur = 2; params.sh1a = 0.22;
     params.sh2x = 0; params.sh2y = 14; params.sh2blur = 34; params.sh2a = 0.16;
@@ -734,9 +682,6 @@
     applyParams();
   });
 
-  /* ============================================================
-     Boot
-     ============================================================ */
   applyParams();
   setTimeout(replayLanding, 200);
 })();
