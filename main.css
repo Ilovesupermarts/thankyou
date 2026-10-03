@@ -150,6 +150,74 @@
   html[data-weather="snow"] .ambient-primary { filter: hue-rotate(6deg) saturate(0.5) brightness(1.06); }
   html[data-weather="clear"] .ambient-primary { filter: hue-rotate(4deg) saturate(1.1); }
 
+  /* ============ CAUSTICS (v1.17.2) ============ */
+  .caustics {
+    mix-blend-mode: screen;
+    pointer-events: none;
+    will-change: transform;
+  }
+  .caustics-1 {
+    opacity: 0.36;
+    background:
+      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
+      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
+    animation: caustic1 48s ease-in-out infinite;
+  }
+  .caustics-2 {
+    opacity: 0.28;
+    background:
+      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
+      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
+    animation: caustic2 62s ease-in-out infinite;
+  }
+  @keyframes caustic1 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
+    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
+  }
+  @keyframes caustic2 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
+  }
+
+  /* ============ RIPPLE LAYER (v1.17.2) ============ */
+  .ripple-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 1;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  .ripple {
+    position: absolute;
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    border: 1.6px solid currentColor;
+    box-shadow: 0 0 14px currentColor, inset 0 0 10px currentColor;
+    transform: translate(-50%, -50%) scale(0.25);
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+    animation: rippleExpand 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  }
+  .ripple.subtle { animation-name: rippleExpandSubtle; }
+  .ripple.trail  { animation-name: rippleExpandTrail; }
+  @keyframes rippleExpand {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.95; }
+    60%  { opacity: 0.55; }
+    100% { transform: translate(-50%, -50%) scale(5.2); opacity: 0; }
+  }
+  @keyframes rippleExpandSubtle {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.55; }
+    55%  { opacity: 0.30; }
+    100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; }
+  }
+  @keyframes rippleExpandTrail {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.45; }
+    100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  }
+
   .mote-field {
     position: absolute; inset: 0; pointer-events: none;
     transform-style: preserve-3d;
@@ -174,6 +242,8 @@
     .ambient-stage { transform: none !important; }
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
+    .caustics-1, .caustics-2 { animation: none; }
+    .ripple { animation-duration: 300ms; }
   }
   @keyframes ambientDrift {
     0%, 100% { transform: translate(0, 0) scale(1); }
@@ -617,9 +687,10 @@
     transform: translateY(0);
   }
 
-  /* v1.17.2: .snap-bold class removed. The focus snap now uses an
-     inline text-shadow (paint-only) applied from app.js, gated on a
-     strictly symmetrical |d| <= TB_SNAP_WINDOW_PX window. */
+  /* v1.17.2: .snap-bold class removed.
+     The focus snap now uses an inline text-shadow applied from
+     app.js, gated on a strictly symmetrical |d| <= TB_SNAP_WINDOW_PX
+     window. See updateTransitionBodyEffects() for the current logic. */
 
   @media (prefers-reduced-motion: reduce) {
     .transition-line-body p {
@@ -1118,38 +1189,106 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .receipt-screen.reopened { z-index: 380; }
 .receipt-screen.above-thankyou { z-index: 400; }
 
+/* v1.17.2: wrapper carries resting tilt and perspective context. */
+.receipt-paper-wrap {
+  display: inline-flex;
+  margin: auto;
+  perspective: 1400px;
+  transform: rotate(var(--rest-rotate, 1.65deg));
+  transition: transform 400ms ease;
+}
+
 .receipt-paper {
+  --tear-w: 12px;
+  --tear-h: 6px;
+
   max-width: 380px; width: 100%; max-height: calc(100vh - 140px);
   overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 36px 30px 28px 30px; border-radius: 4px;
-  box-shadow: 0 8px 32px var(--shadow-rose-2); border: 1px solid var(--border-3);
+  padding: 36px 30px 28px 30px;
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   position: relative; margin: auto;
   transform-origin: 50% 100%;
   scroll-behavior: auto;
+
+  /* Torn edges via mask; shadow follows the silhouette via filter. */
+  border: none;
+  box-shadow: none;
+  filter: blur(0) drop-shadow(0 8px 24px var(--shadow-rose-2))
+                  drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
+
+  -webkit-mask-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+    linear-gradient(#000, #000);
+  -webkit-mask-size:
+    var(--tear-w) var(--tear-h),
+    var(--tear-w) var(--tear-h),
+    100% calc(100% - var(--tear-h) * 2);
+  -webkit-mask-position:
+    0 0,
+    0 100%,
+    0 var(--tear-h);
+  -webkit-mask-repeat:
+    repeat-x,
+    repeat-x,
+    no-repeat;
+  -webkit-mask-composite: source-over;
+
+  mask-image:
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+    linear-gradient(#000, #000);
+  mask-size:
+    var(--tear-w) var(--tear-h),
+    var(--tear-w) var(--tear-h),
+    100% calc(100% - var(--tear-h) * 2);
+  mask-position:
+    0 0,
+    0 100%,
+    0 var(--tear-h);
+  mask-repeat:
+    repeat-x,
+    repeat-x,
+    no-repeat;
+  mask-composite: add;
 }
 
+/* v1.17.2: more dramatic landing. */
 .receipt-paper.landing {
-  animation: paperLand 1000ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: paperLand 1400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 @keyframes paperLand {
   0% {
     opacity: 0;
-    transform: rotateX(14deg) translateY(-22px) scale(0.96);
-    box-shadow: 0 40px 80px rgba(120, 70, 20, 0.28);
-    filter: blur(1.5px);
+    transform: rotateX(38deg) translateY(-110px) scale(0.82);
+    filter: blur(4px) drop-shadow(0 80px 120px rgba(120, 70, 20, 0.42))
+                       drop-shadow(0 30px 60px rgba(120, 70, 20, 0));
   }
-  25% { opacity: 1; filter: blur(0.4px); }
-  70% {
-    transform: rotateX(-1.5deg) translateY(2px) scale(1.004);
-    box-shadow: 0 18px 36px rgba(120, 70, 20, 0.20);
-    filter: blur(0);
+  25% {
+    opacity: 1;
+    filter: blur(2px) drop-shadow(0 60px 90px rgba(120, 70, 20, 0.34))
+                       drop-shadow(0 20px 40px rgba(120, 70, 20, 0));
+  }
+  45% {
+    transform: rotateX(10deg) translateY(-24px) scale(0.96);
+    filter: blur(0.6px) drop-shadow(0 30px 55px rgba(120, 70, 20, 0.26))
+                         drop-shadow(0 10px 24px rgba(120, 70, 20, 0.04));
+  }
+  68% {
+    transform: rotateX(-6deg) translateY(8px) scale(1.025);
+    filter: blur(0) drop-shadow(0 10px 22px rgba(120, 70, 20, 0.16))
+                    drop-shadow(0 3px 8px rgba(120, 70, 20, 0.08));
+  }
+  85% {
+    transform: rotateX(2.5deg) translateY(-3px) scale(0.995);
+    filter: blur(0) drop-shadow(0 12px 26px rgba(120, 70, 20, 0.18))
+                    drop-shadow(0 3px 8px rgba(120, 70, 20, 0.10));
   }
   100% {
     opacity: 1;
     transform: rotateX(0deg) translateY(0) scale(1);
-    box-shadow: 0 8px 32px var(--shadow-rose-2);
-    filter: blur(0);
+    filter: blur(0) drop-shadow(0 8px 24px var(--shadow-rose-2))
+                    drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
   }
 }
 
@@ -1188,7 +1327,38 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; flex-shrink: 0; }
 .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
 .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
-.receipt-title { font-size: 12px; font-weight: 500; color: var(--text-faint); letter-spacing: 6px; text-align: center; margin-bottom: 20px; }
+
+/* v1.17.2: item counter badge. */
+.receipt-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-faint);
+  letter-spacing: 6px;
+  text-align: center;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+.receipt-title .item-count {
+  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1px;
+  color: var(--accent);
+  background: rgba(201, 96, 10, 0.12);
+  border: 1px solid rgba(201, 96, 10, 0.28);
+  border-radius: 10px;
+  padding: 1px 8px 2px 8px;
+  line-height: 1.4;
+}
+html[data-theme="default"] .receipt-title .item-count {
+  background: rgba(176, 74, 90, 0.10);
+  border-color: rgba(176, 74, 90, 0.24);
+}
+
 .receipt-items { display: flex; flex-direction: column; gap: 14px; }
 .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); opacity: 0; transform: translateY(8px); animation: receiptItemArrive 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; position: relative; }
 @keyframes receiptItemArrive { to { opacity: 1; transform: translateY(0); } }
@@ -1631,7 +1801,8 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   -webkit-appearance: none; appearance: none;
   transition: transform 0.4s ease;
 }
-.start-btn:active { transform: scale(0.92); }
+.start-btn:active:not(.diving):not(.done) { transform: scale(0.94); }
+.start-btn.diving, .start-btn.done { pointer-events: none; cursor: default; }
 .icon-wrapper {
   position: relative;
   width: 200px;
@@ -1641,9 +1812,29 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   justify-content: center;
   margin-bottom: 80px;
 }
-.blossom-char {
+
+/* v1.17.2: koi dive wrapper */
+.koi-dive-wrap {
   position: relative;
   z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(var(--koi-rise-y, 0px));
+  transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+              opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
+  will-change: transform, opacity;
+}
+.koi-dive-wrap.dragging { transition: none; }
+.start-btn.diving .koi-dive-wrap {
+  transform: translateY(260px) scale(0.75);
+  opacity: 0;
+  transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
+              opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
+}
+
+.blossom-char {
+  position: relative;
   display: block;
   width: 125px;
   height: 125px;
@@ -1662,6 +1853,17 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   animation: swimCircle 30s linear infinite;
 }
 @keyframes swimCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+/* v1.17.2: koi startle spin on tap/swipe begin */
+.start-btn.startling .koi-image {
+  animation: koiStartleSpin 200ms cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+@keyframes koiStartleSpin {
+  0%   { transform: rotate(0deg) scale(1); }
+  55%  { transform: rotate(200deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
 .rings-svg {
   position: absolute;
   width: 360px; height: 360px;
@@ -1669,13 +1871,22 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   transform: translate(-50%, -50%);
   pointer-events: none;
   z-index: 1;
+  transition: opacity 700ms ease;
 }
+.start-btn.diving .rings-svg { opacity: 0; }
+
 .gold-band {
   stroke: #fdf3d8;
   stroke-width: 6px;
   fill: none;
   filter: drop-shadow(0 0 16px rgba(253, 243, 216, 0.6));
+  transition: filter 250ms ease;
 }
+/* v1.17.2: ready glow when swipe crosses threshold */
+.start-btn.ready .gold-band {
+  filter: drop-shadow(0 0 28px rgba(253, 240, 200, 1));
+}
+
 .pulse-ring {
   stroke: #fdf3d8;
   fill: none;
@@ -1692,11 +1903,25 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .start-label {
   font-size: 17px; font-weight: 600; letter-spacing: 5px; color: #fdf3d8;
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  transition: color 250ms ease, text-shadow 250ms ease, opacity 500ms ease, transform 500ms ease;
+}
+.start-btn.ready .start-label {
+  color: #ffffff;
+  text-shadow: 0 0 16px rgba(253, 240, 200, 1);
+}
+.start-btn.diving .start-label {
+  opacity: 0;
+  transform: translateY(6px);
 }
 .start-hint {
   margin: 8px 0 0 0; font-size: 20px; font-weight: 500; color: var(--text-dark);
   letter-spacing: 3px; line-height: 2;
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   text-align: center; animation: hintBreathe 4s ease-in-out infinite;
+  transition: opacity 500ms ease, transform 500ms ease;
+}
+.blossom-screen.diving .start-hint {
+  opacity: 0;
+  transform: translateY(6px);
 }
 @keyframes hintBreathe { 0%, 100% { opacity: 0.92; } 50% { opacity: 1; } }
