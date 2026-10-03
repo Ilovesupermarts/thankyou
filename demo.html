@@ -41,8 +41,7 @@
   /* 3. Digit cell height tracks the label's font-size, and the
         whole counter pulls left by --counter-pull. The value of
         --counter-pull is driven live by the slider in the demo
-        control bar — drag it to find the value that reads right,
-        then hardcode that px value here. */
+        control bar. */
   .counter-digit-roll {
     --digit-h: 1.4em;
     margin-left: var(--counter-pull, 0px);
@@ -143,7 +142,7 @@
   }
   .demo-slider {
     flex: 1;
-    min-width: 160px;
+    min-width: 200px;
     -webkit-appearance: none;
     appearance: none;
     height: 4px;
@@ -177,7 +176,7 @@
     font-size: 12px;
     font-weight: 600;
     color: var(--accent);
-    min-width: 52px;
+    min-width: 60px;
     text-align: right;
     letter-spacing: 0;
     flex-shrink: 0;
@@ -195,8 +194,8 @@
   </div>
   <div class="demo-row">
     <span class="demo-label">PULL</span>
-    <input type="range" id="pullSlider" class="demo-slider" min="-8" max="4" step="0.5" value="-3">
-    <span class="demo-readout" id="pullReadout">-3.0px</span>
+    <input type="range" id="pullSlider" class="demo-slider" min="-20" max="4" step="0.5" value="-12">
+    <span class="demo-readout" id="pullReadout">-12.0px</span>
   </div>
 </div>
 
@@ -240,11 +239,6 @@
 <script>
 /* ============================================================
    RUNTIME DIGIT ADVANCE MEASUREMENT
-   Measures one digit slot's width — glyph advance plus one
-   letter-space — using a hidden probe carrying the same font,
-   size, and tracking as .receipt-title. Writes the result to
-   --counter-cell-w on the counter container, which CSS uses
-   as the digit-col width.
    ============================================================ */
 function measureDigitAdvance() {
   var titleEl = document.querySelector('.receipt-title');
@@ -352,7 +346,7 @@ function applyCounterValue(container, value, opts) {
 }
 
 /* ============================================================
-   MONEY ODOMETER (for the total line)
+   MONEY ODOMETER
    ============================================================ */
 var NUM_COLS = 6;
 var COMMA_AFTER = 2;
@@ -515,7 +509,6 @@ window.addEventListener('load', function() {
     setCount(parseInt(e.target.value, 10) || 0);
   });
 
-  /* Live PULL slider — drag to find the value that reads right. */
   var slider = document.getElementById('pullSlider');
   if (slider) {
     setPull(parseFloat(slider.value));
