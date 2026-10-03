@@ -13,11 +13,14 @@
          blossom screen is interactive, a burst of 1-5 subtle
          ripples spawns at random screen positions every
          2.5-5.0 seconds. Stopped first thing in triggerKoiStart.
-       - Receipt landing: the wrapper's drop-shadow is disabled
-         for the duration of paperLand via a .landing-active class,
-         eliminating the per-frame drop-shadow recompute that was
-         the second main source of jank. Keyframe itself was
-         rewritten in CSS to 2D transforms only.
+       - Receipt landing: the animation now runs on
+         .receipt-paper-wrap, not on the masked .receipt-paper.
+         The wrapper has no SVG mask, so the browser can take a
+         single cached snapshot of the torn-edge silhouette and
+         transform that flat image on the GPU. The prior
+         .landing-active drop-shadow suppression is gone; the
+         shadow is restored inside the tail of @keyframes
+         paperLand instead.
        - Receipt close now restores the previous scroll position:
          lockBodyForReceipt / unlockBodyForReceipt replace the
          CSS-only body lock, saving window.scrollY on open and
@@ -3495,19 +3498,16 @@ confirmYes.addEventListener('click', function(e) {
 
     if (!receiptHasLanded) {
       receiptHasLanded = true;
-      var paper = receiptScreen.querySelector('.receipt-paper');
       var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
-      if (paper) {
-        paper.classList.remove('landing');
-        void paper.offsetWidth;
-        /* v1.3: disable the wrapper's drop-shadow during the landing
-           animation so the mask+shadow don't recompute every frame. */
-        if (paperWrap) paperWrap.classList.add('landing-active');
-        paper.classList.add('landing');
-        paper.addEventListener('animationend', function onLandingEnd() {
-          paper.classList.remove('landing');
-          if (paperWrap) paperWrap.classList.remove('landing-active');
-          paper.removeEventListener('animationend', onLandingEnd);
+
+      if (paperWrap) {
+        paperWrap.classList.remove('landing');
+        void paperWrap.offsetWidth;   /* force reflow */
+
+        paperWrap.classList.add('landing');
+        paperWrap.addEventListener('animationend', function onLandingEnd() {
+          paperWrap.classList.remove('landing');
+          paperWrap.removeEventListener('animationend', onLandingEnd);
         });
       }
     }
