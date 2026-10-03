@@ -499,13 +499,13 @@
   .name-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
   /* ============ BLOSSOM START ============ */
-.blossom-screen {
-  position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
-  z-index: 150; display: flex; flex-direction: column; align-items: center; justify-content: center;
-  padding: 70px 28px 40px 28px; opacity: 0; pointer-events: none; transition: opacity 0.7s ease;
-  touch-action: none;
-}
-.blossom-screen.visible { opacity: 1; pointer-events: auto; }
+  .blossom-screen {
+    position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: transparent;
+    z-index: 150; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    padding: 70px 28px 40px 28px; opacity: 0; pointer-events: none; transition: opacity 0.7s ease;
+    touch-action: none;
+  }
+  .blossom-screen.visible { opacity: 1; pointer-events: auto; }
 
   /* ============ INTRO ============ */
   .intro-overlay {
@@ -1190,13 +1190,19 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .receipt-screen.reopened { z-index: 380; }
 .receipt-screen.above-thankyou { z-index: 400; }
 
-/* v1.17.2: wrapper carries resting tilt and perspective context. */
+/* v1.17.2: wrapper carries resting tilt, perspective context, and
+   the two-layer drop-shadow. The filter sits here (not on the paper)
+   so the drop-shadow follows the torn-edge silhouette produced by
+   the mask on .receipt-paper. */
 .receipt-paper-wrap {
   display: inline-flex;
   margin: auto;
   perspective: 1400px;
   transform: rotate(var(--rest-rotate, 1.65deg));
   transition: transform 400ms ease;
+  filter:
+    drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+    drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
 }
 
 .receipt-paper {
@@ -1211,11 +1217,11 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   transform-origin: 50% 100%;
   scroll-behavior: auto;
 
-  /* Torn edges via mask; shadow follows the silhouette via filter. */
+  /* Torn edges via mask. Shadow moved to wrapper (.receipt-paper-wrap)
+     so it follows the masked silhouette rather than painting a
+     rectangle. No border, no box-shadow, no filter here. */
   border: none;
   box-shadow: none;
-  filter: blur(0) drop-shadow(0 8px 24px var(--shadow-rose-2))
-                  drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
 
   -webkit-mask-image:
     url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
@@ -1254,42 +1260,35 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   mask-composite: add;
 }
 
-/* v1.17.2: more dramatic landing. */
+/* v1.17.2: tuned landing animation.
+   3000ms ease-in-out. Start pose 22deg / -70px / scale 1.000 / blur 2.5px.
+   Overshoot 1.016, undershoot 1.000. Shadow decoupled (lives on the
+   wrapper) so this keyframe only drives transform and blur. */
 .receipt-paper.landing {
-  animation: paperLand 1400ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  animation: paperLand 3000ms cubic-bezier(0.5, 0, 0.5, 1) forwards;
 }
 @keyframes paperLand {
   0% {
     opacity: 0;
-    transform: rotateX(38deg) translateY(-110px) scale(0.82);
-    filter: blur(4px) drop-shadow(0 80px 120px rgba(120, 70, 20, 0.42))
-                       drop-shadow(0 30px 60px rgba(120, 70, 20, 0));
+    transform: rotateX(22deg) translateY(-70px) scale(1);
+    filter: blur(2.5px);
   }
   25% {
     opacity: 1;
-    filter: blur(2px) drop-shadow(0 60px 90px rgba(120, 70, 20, 0.34))
-                       drop-shadow(0 20px 40px rgba(120, 70, 20, 0));
+    filter: blur(0);
   }
-  45% {
-    transform: rotateX(10deg) translateY(-24px) scale(0.96);
-    filter: blur(0.6px) drop-shadow(0 30px 55px rgba(120, 70, 20, 0.26))
-                         drop-shadow(0 10px 24px rgba(120, 70, 20, 0.04));
+  40% {
+    transform: rotateX(5deg) translateY(-6px) scale(1.016);
+    filter: blur(0);
   }
-  68% {
-    transform: rotateX(-6deg) translateY(8px) scale(1.025);
-    filter: blur(0) drop-shadow(0 10px 22px rgba(120, 70, 20, 0.16))
-                    drop-shadow(0 3px 8px rgba(120, 70, 20, 0.08));
-  }
-  85% {
-    transform: rotateX(2.5deg) translateY(-3px) scale(0.995);
-    filter: blur(0) drop-shadow(0 12px 26px rgba(120, 70, 20, 0.18))
-                    drop-shadow(0 3px 8px rgba(120, 70, 20, 0.10));
+  72% {
+    transform: rotateX(-1.2deg) translateY(1px) scale(1);
+    filter: blur(0);
   }
   100% {
     opacity: 1;
     transform: rotateX(0deg) translateY(0) scale(1);
-    filter: blur(0) drop-shadow(0 8px 24px var(--shadow-rose-2))
-                    drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
+    filter: blur(0);
   }
 }
 
@@ -1329,7 +1328,7 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
 .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
 .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
 
-/* v1.17.2: item counter badge. */
+/* v1.17.2: item counter badge — now hosts a digit-roll odometer. */
 .receipt-title {
   font-size: 12px;
   font-weight: 500;
@@ -1354,10 +1353,33 @@ html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94
   border-radius: 10px;
   padding: 1px 8px 2px 8px;
   line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
 }
 html[data-theme="default"] .receipt-title .item-count {
   background: rgba(176, 74, 90, 0.10);
   border-color: rgba(176, 74, 90, 0.24);
+}
+.item-count-unit { /* inherits from .item-count */ }
+
+/* v1.17.2: compact 2-column odometer for the receipt item counter.
+   Shorter timings than the money odometer so a 1 -> 12 change reads
+   as a quick tick rather than a full money roll. */
+.counter-digit-roll {
+  --digit-h: 13px;
+}
+.counter-digit-roll .digit-col {
+  width: 0.55em;
+  transition: width 300ms cubic-bezier(0.34, 1.15, 0.64, 1),
+              opacity 200ms ease;
+}
+.counter-digit-roll .digit-strip {
+  transition: transform 500ms cubic-bezier(0.34, 1.15, 0.64, 1);
+}
+.counter-digit-roll .digit {
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .receipt-items { display: flex; flex-direction: column; gap: 14px; }
