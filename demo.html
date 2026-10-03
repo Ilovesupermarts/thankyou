@@ -23,8 +23,7 @@
 
   /* 2. Counter loses every piece of badge chrome. Inherits
         everything (colour, size, family, letter-spacing) from
-        .receipt-title. Only inline-flex + vertical centering stay,
-        so the digit-roll and 項目 lay out on one line. */
+        .receipt-title. */
   .receipt-title .item-count {
     display: inline-flex;
     align-items: center;
@@ -39,23 +38,17 @@
     letter-spacing: inherit;
   }
 
-  /* 3. Digit cell height tracks the label's font-size.
-        font-variant-numeric: tabular-nums forces every digit to the
-        same advance width, which makes 1ch an exact per-digit
-        measurement instead of just the advance of "0". */
+  /* 3. Digit cell height tracks the label's font-size. */
   .counter-digit-roll {
     --digit-h: 1.4em;
-    font-variant-numeric: tabular-nums;
-    font-feature-settings: "tnum";
   }
 
-  /* 4. Column width = one tabular digit advance (1ch) + one
-        letter-space (6px, matching .receipt-title's tracking), plus
-        a small 5% safety margin so subpixel rounding cannot clip
-        the glyph. This is the single slot a text character occupies
-        on the line. */
+  /* 4. Column width comes from a CSS variable measured at runtime
+        (one digit advance + one letter-space, i.e. exactly what a
+        normal character slot occupies on the line). Fallback is a
+        generous guess used only before JS measures. */
   .counter-digit-roll .digit-col {
-    width: calc(1.05ch + 6px);
+    width: var(--counter-cell-w, 1.4em);
     transition: width 300ms cubic-bezier(0.34, 1.15, 0.64, 1),
                 opacity 200ms ease;
   }
@@ -63,8 +56,7 @@
     transition: transform 500ms cubic-bezier(0.34, 1.15, 0.64, 1);
   }
 
-  /* 5. The digit inherits letter-spacing like every other character.
-        The former letter-spacing: 0 override is removed — no exception. */
+  /* 5. The digit inherits letter-spacing like every other character. */
   .counter-digit-roll .digit {
     font-weight: 600;
     letter-spacing: inherit;
@@ -186,6 +178,52 @@
 </div>
 
 <script>
+/* ============================================================
+   RUNTIME DIGIT ADVANCE MEASUREMENT
+   Measures one digit slot's width — glyph advance plus one
+   letter-space — using a hidden probe carrying the same font,
+   size, and tracking as .receipt-title. Writes the result to
+   --counter-cell-w on the counter container, which CSS uses
+   as the digit-col width.
+
+   Why not 1ch: 1ch is the advance of "0". If a font's "3" is
+   wider than its "0", the column undersizes and flexbox clips
+   the glyph. Measuring once at runtime sidesteps the guesswork.
+   ============================================================ */
+function measureDigitAdvance() {
+  var titleEl = document.querySelector('.receipt-title');
+  if (!titleEl) return null;
+  var cs = window.getComputedStyle(titleEl);
+
+  var probe = document.createElement('span');
+  probe.textContent = '0000000000';   /* 10 digits for accuracy */
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  probe.style.whiteSpace = 'nowrap';
+  probe.style.fontFamily = cs.fontFamily;
+  probe.style.fontSize = cs.fontSize;
+  probe.style.fontWeight = cs.fontWeight;
+  probe.style.fontStyle = cs.fontStyle;
+  probe.style.letterSpacing = cs.letterSpacing;
+  probe.style.lineHeight = '1';
+  document.body.appendChild(probe);
+
+  var w = probe.getBoundingClientRect().width;
+  document.body.removeChild(probe);
+
+  if (!w || w <= 0) return null;
+  return w / 10;
+}
+
+function applyCounterCellWidth() {
+  var advance = measureDigitAdvance();
+  if (!advance) return;
+  var container = document.getElementById('itemCountDigits');
+  if (!container) return;
+  container.style.setProperty('--counter-cell-w', advance.toFixed(3) + 'px');
+}
+
 /* ============================================================
    COUNTER ODOMETER
    Mirrors app.js. Two columns, 500 ms roll.
@@ -397,6 +435,14 @@ window.addEventListener('load', function() {
   buildCounterColumns(document.getElementById('itemCountDigits'), currentCount);
   buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
   renderItems(currentCount);
+
+  /* Measure now (fallback font), then re-measure once the real
+     webfont has loaded and report the exact advance. */
+  applyCounterCellWidth();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(applyCounterCellWidth);
+  }
+  window.addEventListener('resize', applyCounterCellWidth);
 
   document.getElementById('incBtn').addEventListener('click', function() {
     setCount(currentCount + 1);
