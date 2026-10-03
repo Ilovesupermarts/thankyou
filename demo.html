@@ -4,517 +4,672 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#fdf3d8">
-<title>Koi Water — Demo (swipe up)</title>
+<title>Receipt as Physical Object — Demo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<!-- Real app stylesheet -->
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* Demo override — no scrolling, all touches captured by our gesture layer */
-  body { touch-action: none; }
+  /* ============================================================
+     DEMO-ONLY ADDITIONS
+     ============================================================ */
 
-  /* ---------- CAUSTICS ---------- */
-  .caustics {
-    mix-blend-mode: screen;
-    pointer-events: none;
-    will-change: transform;
-  }
-  .caustics-1 {
-    opacity: 0.36;
-    background:
-      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
-      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
-    animation: caustic1 48s ease-in-out infinite;
-  }
-  .caustics-2 {
-    opacity: 0.28;
-    background:
-      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
-      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
-    animation: caustic2 62s ease-in-out infinite;
-  }
-  @keyframes caustic1 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
-    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
-  }
-  @keyframes caustic2 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
-  }
+  body { overflow: hidden; }
 
-  /* ---------- RIPPLES ---------- */
-  .ripple-layer {
+  /* ---------- AMBIENT BACKGROUND (from main.css vars) ---------- */
+  .demo-stage {
     position: fixed;
     inset: 0;
-    z-index: 1;
-    pointer-events: none;
-    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 40px 80px 40px;
+    overflow-y: auto;
+    z-index: 5;
+    box-sizing: border-box;
   }
-  .ripple {
-    position: absolute;
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 1.6px solid currentColor;
-    box-shadow: 0 0 14px currentColor, inset 0 0 10px currentColor;
-    transform: translate(-50%, -50%) scale(0.25);
-    opacity: 0;
-    pointer-events: none;
-    will-change: transform, opacity;
-    animation: rippleExpand 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  }
-  .ripple.subtle { animation-name: rippleExpandSubtle; }
-  .ripple.trail  { animation-name: rippleExpandTrail; }
-  @keyframes rippleExpand {
-    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.95; }
-    60%  { opacity: 0.55; }
-    100% { transform: translate(-50%, -50%) scale(5.2); opacity: 0; }
-  }
-  @keyframes rippleExpandSubtle {
-    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.55; }
-    55%  { opacity: 0.30; }
-    100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; }
-  }
-  @keyframes rippleExpandTrail {
-    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.45; }
-    100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  .demo-stage::-webkit-scrollbar { display: none; }
+  .demo-stage { scrollbar-width: none; }
+
+  /* ---------- RECEIPT PAPER WRAPPER ----------
+     Holds the resting rotation and a shape-following drop-shadow
+     (box-shadow would be rectangular and ignore the mask). */
+  .receipt-paper-wrap {
+    display: inline-flex;
+    /* JS sets --rest-rotate */
+    transform: rotate(var(--rest-rotate, 0.3deg));
+    filter: drop-shadow(0 10px 26px rgba(120, 70, 20, 0.18))
+            drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
+    transition: transform 400ms ease;
   }
 
-  /* ---------- KOI DIVE / RISE WRAPPER ---------- */
-  .koi-dive-wrap {
+  /* ---------- RECEIPT PAPER: TORN EDGES ----------
+     mask-image with SVG data-URIs producing triangular notches
+     along top and bottom. Three mask layers composited by add:
+       1. top teeth strip (repeating-x)
+       2. bottom teeth strip (repeating-x)
+       3. solid body between the two strips
+     --tear-w and --tear-h are set live by the demo controls. */
+  .receipt-paper {
+    --tear-w: 12px;
+    --tear-h: 6px;
+
+    border: none !important;
+    box-shadow: none !important;
+
+    -webkit-mask-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+      linear-gradient(#000, #000);
+    -webkit-mask-size:
+      var(--tear-w) var(--tear-h),
+      var(--tear-w) var(--tear-h),
+      100% calc(100% - var(--tear-h) * 2);
+    -webkit-mask-position:
+      0 0,
+      0 100%,
+      0 var(--tear-h);
+    -webkit-mask-repeat:
+      repeat-x,
+      repeat-x,
+      no-repeat;
+    -webkit-mask-composite: source-over;
+
+    mask-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+      linear-gradient(#000, #000);
+    mask-size:
+      var(--tear-w) var(--tear-h),
+      var(--tear-w) var(--tear-h),
+      100% calc(100% - var(--tear-h) * 2);
+    mask-position:
+      0 0,
+      0 100%,
+      0 var(--tear-h);
+    mask-repeat:
+      repeat-x,
+      repeat-x,
+      no-repeat;
+    mask-composite: add;
+
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .receipt-paper::-webkit-scrollbar { display: none; }
+
+  /* ---------- STAMP EFFECT ----------
+     Two animations fire together:
+       stampPulse — scale bounce 1.00 -> 1.06 -> 1.00
+       stampGlow  — red-tinted text-shadow fades in then out
+     Triggered by JS adding .stamped. Removed on animationend. */
+  .receipt-total-value {
     position: relative;
-    z-index: 2;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    /* --koi-rise-y is set by JS during a swipe; defaults to 0 */
-    transform: translateY(var(--koi-rise-y, 0px));
-    transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
-                opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
-    will-change: transform, opacity;
+    /* JS drives --stamp-intensity via style */
   }
-  .koi-dive-wrap.dragging {
-    transition: none;
+  .receipt-total-value.stamped {
+    animation:
+      stampPulse 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      stampGlow 900ms ease-out;
   }
-  .start-btn.diving .koi-dive-wrap {
-    transform: translateY(260px) scale(0.75);
-    opacity: 0;
-    transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
-                opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
+  @keyframes stampPulse {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.06); }
+    100% { transform: scale(1); }
   }
-
-  /* ---------- KOI STARTLE ---------- */
-  .start-btn.startling .koi-image {
-    animation: koiStartleSpin 200ms cubic-bezier(0.34, 1.15, 0.64, 1);
-  }
-  @keyframes koiStartleSpin {
-    0%   { transform: rotate(0deg) scale(1); }
-    55%  { transform: rotate(200deg) scale(1.1); }
-    100% { transform: rotate(360deg) scale(1); }
-  }
-
-  /* ---------- DIVE COMPANIONS ---------- */
-  .start-btn.diving .rings-svg {
-    opacity: 0;
-    transition: opacity 700ms ease;
-  }
-  .start-btn.diving .start-label {
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 500ms ease, transform 500ms ease;
-  }
-  .blossom-screen.diving .start-hint {
-    opacity: 0;
-    transform: translateY(6px);
-    transition: opacity 500ms ease, transform 500ms ease;
+  @keyframes stampGlow {
+    0% {
+      text-shadow:
+        0 0 0 transparent,
+        0 0 0 transparent;
+    }
+    25% {
+      text-shadow:
+        0 0 calc(10px * var(--stamp-intensity, 1)) rgba(176, 74, 90, calc(0.65 * var(--stamp-intensity, 1))),
+        0 0 calc(24px * var(--stamp-intensity, 1)) rgba(176, 74, 90, calc(0.30 * var(--stamp-intensity, 1)));
+    }
+    100% {
+      text-shadow:
+        0 0 0 transparent,
+        0 0 0 transparent;
+    }
   }
 
-  /* ---------- READY FEEDBACK ----------
-     Fires once the swipe crosses the release threshold. */
-  .start-btn .gold-band {
-    transition: filter 250ms ease;
-  }
-  .start-btn.ready .gold-band {
-    filter: drop-shadow(0 0 28px rgba(253, 240, 200, 1));
-  }
-  .start-btn.ready .start-label {
-    color: #ffffff;
-    text-shadow: 0 0 16px rgba(253, 240, 200, 1);
-    transition: color 250ms ease, text-shadow 250ms ease;
-  }
-
-  /* ---------- DEMO CHROME ---------- */
-  .demo-reset {
+  /* ---------- CONTROLS PANEL ---------- */
+  .demo-controls {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
-    z-index: 500;
-    width: 42px;
-    height: 42px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1.5px solid var(--border-1);
+    top: 0;
+    right: 0;
+    width: 320px;
+    height: 100vh;
+    overflow-y: auto;
+    background: rgba(255, 255, 255, 0.97);
+    border-left: 1px solid var(--border-1);
+    padding: 18px 20px 40px 20px;
+    box-sizing: border-box;
+    z-index: 200;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    box-shadow: -4px 0 16px rgba(120, 70, 20, 0.06);
+  }
+  .demo-controls h1 {
+    font-size: 12px;
+    margin: 0 0 18px 0;
+    letter-spacing: 1.5px;
     color: var(--accent);
-    font-family: inherit;
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+  .demo-controls .grp {
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #f0e8e4;
+  }
+  .demo-controls .grp:last-child { border-bottom: none; }
+  .demo-controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+    color: #4a4542;
+    letter-spacing: 0.3px;
+  }
+  .demo-controls .row {
     display: flex;
     align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 14px var(--shadow-rose);
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .demo-controls input[type="range"] {
+    flex: 1;
+    min-width: 0;
+    accent-color: var(--accent);
+  }
+  .demo-controls .val {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11.5px;
+    color: var(--accent);
+    min-width: 50px;
+    text-align: right;
+    font-weight: 600;
+  }
+  .demo-controls .hint {
+    font-size: 11px;
+    color: #8a807c;
+    line-height: 1.45;
+    margin-top: 3px;
+  }
+  .demo-controls .btns {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .demo-controls button {
+    padding: 8px 12px;
+    border: 1px solid var(--border-1);
+    background: #fff;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    color: #4a4542;
+    font-weight: 500;
+    flex: 1;
+    min-width: 0;
+    white-space: nowrap;
     -webkit-appearance: none;
     appearance: none;
-    transition: transform 0.2s ease, background 0.2s ease;
-    opacity: 0.55;
-    touch-action: manipulation;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
   }
-  .demo-reset:hover { opacity: 0.9; }
-  .demo-reset:active {
-    transform: scale(0.92);
-    background: #fff;
+  .demo-controls button:hover { border-color: var(--accent); color: var(--accent); }
+  .demo-controls button:active { transform: scale(0.97); background: var(--soft-1); }
+  .demo-controls button.primary {
+    background: var(--accent);
     border-color: var(--accent);
+    color: #fff;
   }
+  .demo-controls button.primary:hover { background: var(--accent-3); }
 
+  /* ---------- HUD ---------- */
   .demo-hud {
     position: fixed;
-    top: 14px;
-    left: 16px;
-    z-index: 500;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 11px;
-    letter-spacing: 0.5px;
+    bottom: 18px;
+    left: 18px;
+    z-index: 200;
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 11.5px;
     color: var(--accent-2);
-    opacity: 0.55;
+    opacity: 0.7;
     pointer-events: none;
-    line-height: 1.6;
+    line-height: 1.65;
+    background: rgba(255, 255, 255, 0.65);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border-1);
   }
-  .demo-hud strong { font-weight: 600; color: var(--accent); }
+  .demo-hud strong { font-weight: 700; color: var(--accent); }
 
-  @media (prefers-reduced-motion: reduce) {
-    .caustics-1, .caustics-2 { animation: none; }
-    .ripple { animation-duration: 300ms; }
+  @media (max-width: 900px) {
+    .demo-controls {
+      position: fixed;
+      top: auto;
+      bottom: 0;
+      right: 0;
+      left: 0;
+      width: 100%;
+      height: auto;
+      max-height: 45vh;
+      border-left: none;
+      border-top: 1px solid var(--border-1);
+      border-radius: 16px 16px 0 0;
+    }
+    .demo-stage { padding: 40px 20px 46vh 20px; }
   }
 </style>
 </head>
 <body>
 
-<div class="ambient-stage" id="ambientStage" aria-hidden="true">
-  <div class="ambient-layer ambient-image">
-    <video class="ambient-video" id="ambientVideo"
-           autoplay muted loop playsinline preload="auto">
-      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
-    </video>
-  </div>
+<!-- Ambient background, same structure as the app -->
+<div class="ambient-stage" aria-hidden="true">
   <div class="ambient-layer ambient-primary"></div>
-  <div class="ambient-layer ambient-secondary"></div>
-  <div class="ambient-layer caustics caustics-1"></div>
-  <div class="ambient-layer caustics caustics-2"></div>
-  <div class="mote-field" id="moteField"></div>
 </div>
 
-<div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
+<!-- Receipt centered on stage -->
+<div class="demo-stage">
+  <div class="receipt-paper-wrap" id="receiptWrap">
+    <div class="receipt-paper" id="receiptPaper">
+      <div class="receipt-header">
+        <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+        <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+      </div>
 
-<div class="blossom-screen" id="blossomScreen">
-  <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
-    <div class="icon-wrapper">
-      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-        <circle cx="180" cy="180" r="90" class="gold-band" />
-      </svg>
-      <div class="koi-dive-wrap" id="koiDiveWrap">
-        <div class="blossom-char">
-          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
-        </div>
+      <div class="receipt-to-row">
+        <span class="receipt-to-mark">❀</span>
+        <span class="receipt-to-name">桜庭さんへ</span>
+        <span class="receipt-to-mark">❀</span>
+      </div>
+
+      <div class="receipt-divider"></div>
+
+      <div class="receipt-title">本日の内容</div>
+
+      <div class="receipt-items" id="receiptItems"></div>
+
+      <div class="receipt-total-line">
+        <span class="receipt-total-label">合計</span>
+        <span class="receipt-total-value" id="receiptTotalValue">
+          <span class="yen-symbol">¥</span>
+          <span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span>
+        </span>
+      </div>
+
+      <div class="receipt-footer">
+        <span class="receipt-footer-mark">❀</span>
       </div>
     </div>
-    <span class="start-label">はじめる</span>
-  </button>
-  <p class="start-hint" id="startHint">水面を、そっと上へなぞってください。</p>
+  </div>
 </div>
 
-<div class="intro-overlay" id="introOverlay">
-  <div class="name-column" id="nameColumn"></div>
+<!-- Controls -->
+<div class="demo-controls">
+  <h1>Receipt Tuning</h1>
+
+  <div class="grp">
+    <label>Service items</label>
+    <div class="row">
+      <input type="range" id="r-count" min="1" max="12" step="1" value="4">
+      <span class="val" id="v-count">4</span>
+    </div>
+    <div class="hint">Changes the number of line items and rolls a fresh total.</div>
+  </div>
+
+  <div class="grp">
+    <label>Teeth depth</label>
+    <div class="row">
+      <input type="range" id="r-tearh" min="0" max="14" step="0.5" value="6">
+      <span class="val" id="v-tearh">6.0</span>
+    </div>
+    <div class="hint">Vertical depth of the torn edges. 0 disables them.</div>
+  </div>
+
+  <div class="grp">
+    <label>Teeth width</label>
+    <div class="row">
+      <input type="range" id="r-tearw" min="6" max="30" step="1" value="12">
+      <span class="val" id="v-tearw">12</span>
+    </div>
+    <div class="hint">Horizontal spacing of the teeth.</div>
+  </div>
+
+  <div class="grp">
+    <label>Resting tilt</label>
+    <div class="row">
+      <input type="range" id="r-rotate" min="0" max="2" step="0.05" value="0.3">
+      <span class="val" id="v-rotate">0.30</span>
+    </div>
+    <div class="hint">Slight off-square rotation. 0 = perfectly square.</div>
+  </div>
+
+  <div class="grp">
+    <label>Stamp intensity</label>
+    <div class="row">
+      <input type="range" id="r-stamp" min="0" max="2" step="0.05" value="1">
+      <span class="val" id="v-stamp">1.00</span>
+    </div>
+    <div class="hint">Glow strength when the total settles.</div>
+  </div>
+
+  <div class="grp">
+    <label>Actions</label>
+    <div class="btns">
+      <button id="b-roll" class="primary">Roll total + stamp</button>
+      <button id="b-rebuild">Rebuild receipt</button>
+      <button id="b-land">Replay landing</button>
+    </div>
+  </div>
+
+  <div class="hint" style="margin-top:10px;">
+    Tuning constants map to <code>--tear-w</code>, <code>--tear-h</code>, <code>--rest-rotate</code>, <code>--stamp-intensity</code>.
+  </div>
 </div>
 
-<button type="button" class="demo-reset" id="resetBtn" aria-label="リセット">↺</button>
 <div class="demo-hud">
-  <div>state: <strong id="hudState">idle</strong></div>
-  <div>swipe: <strong id="hudSwipe">0 px</strong></div>
-  <div>ripples: <strong id="hudRipples">0</strong></div>
+  <div>total: <strong id="hud-total">¥0</strong></div>
+  <div>stamps: <strong id="hud-stamps">0</strong></div>
 </div>
 
 <script>
 (function() {
   'use strict';
 
-  var startBtn      = document.getElementById('startBtn');
-  var blossomScreen = document.getElementById('blossomScreen');
-  var introOverlay  = document.getElementById('introOverlay');
-  var nameColumn    = document.getElementById('nameColumn');
-  var koiDiveWrap   = document.getElementById('koiDiveWrap');
-  var rippleLayer   = document.getElementById('rippleLayer');
-  var resetBtn      = document.getElementById('resetBtn');
-  var hudState      = document.getElementById('hudState');
-  var hudSwipe      = document.getElementById('hudSwipe');
-  var hudRipples    = document.getElementById('hudRipples');
-  var ambientVideo  = document.getElementById('ambientVideo');
+  var receiptPaper       = document.getElementById('receiptPaper');
+  var receiptWrap        = document.getElementById('receiptWrap');
+  var receiptItems       = document.getElementById('receiptItems');
+  var receiptTotalNumber = document.getElementById('receiptTotalNumber');
+  var receiptTotalValue  = document.getElementById('receiptTotalValue');
+  var hudTotal           = document.getElementById('hud-total');
+  var hudStamps          = document.getElementById('hud-stamps');
 
-  var state = 'idle';            /* idle | swiping | startling | diving | done */
-  var rippleCount = 0;
-  var activeTimers = [];
+  var stampCount = 0;
+  var currentTotal = 0;
 
-  var activePointerId = null;
-  var startX = 0, startY = 0;
-  var currentX = 0, currentY = 0;
-  var riseY = 0;                 /* negative when koi is lifted */
-  var lastTrailRippleAt = 0;
+  /* ============================================================
+     ODOMETER — same as app.js
+     ============================================================ */
+  var NUM_COLS = 6;
+  var COMMA_AFTER = 2;
 
-  /* Tuning knobs */
-  var RISE_MAX = 40;             /* maximum koi lift, px */
-  var RISE_FACTOR = 0.35;        /* koi lift / finger travel */
-  var SWIPE_THRESHOLD = 60;      /* upward px to arm the release */
-  var TRAIL_RIPPLE_INTERVAL = 90; /* ms between trail ripples */
-  var TRAIL_RIPPLE_MIN_TRAVEL = 18; /* px before a trail ripple may fire */
-
-  /* Ripple palettes */
-  var PALETTE_STRONG = ['rgba(253, 243, 216, 0.95)', 'rgba(247, 185, 60, 0.85)', 'rgba(255, 240, 200, 0.70)'];
-  var PALETTE_SUBTLE = ['rgba(247, 185, 60, 0.55)',  'rgba(255, 240, 200, 0.40)'];
-  var PALETTE_TRAIL  = ['rgba(247, 185, 60, 0.40)'];
-
-  function pushTimer(id) { activeTimers.push(id); return id; }
-  function clearTimers() {
-    for (var i = 0; i < activeTimers.length; i++) clearTimeout(activeTimers[i]);
-    activeTimers = [];
+  function isColVisible(value, colIndex) {
+    if (value === 0) return colIndex === NUM_COLS - 1;
+    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+    return value >= placeValue;
   }
-  function setState(s) { state = s; hudState.textContent = s; }
-  function bumpRippleCount(n) {
-    rippleCount += n;
-    hudRipples.textContent = rippleCount;
+  function getDigitAt(value, colIndex) {
+    var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+    return Math.floor(value / placeValue) % 10;
   }
-
-  /* ----------------------------------------------------------
-     Ripples — intensity is 'strong' | 'subtle' | 'trail'.
-     ---------------------------------------------------------- */
-  function spawnRipples(clientX, clientY, intensity) {
-    var palette, cls, baseSize;
-    if (intensity === 'strong') {
-      palette = PALETTE_STRONG;
-      cls = '';
-      baseSize = 30;
-    } else if (intensity === 'trail') {
-      palette = PALETTE_TRAIL;
-      cls = ' trail';
-      baseSize = 22;
-    } else {
-      palette = PALETTE_SUBTLE;
-      cls = ' subtle';
-      baseSize = 26;
-    }
-
-    for (var i = 0; i < palette.length; i++) {
-      (function(idx) {
-        var r = document.createElement('div');
-        r.className = 'ripple' + cls;
-        var jitterX = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
-        var jitterY = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
-        r.style.left = (clientX + jitterX) + 'px';
-        r.style.top  = (clientY + jitterY) + 'px';
-        r.style.color = palette[idx];
-        r.style.animationDelay = (idx * 80) + 'ms';
-        r.style.width  = (baseSize + idx * 6) + 'px';
-        r.style.height = (baseSize + idx * 6) + 'px';
-        rippleLayer.appendChild(r);
-        pushTimer(setTimeout(function() {
-          if (r.parentNode) r.parentNode.removeChild(r);
-        }, 900 + idx * 80));
-      })(i);
-    }
-    bumpRippleCount(palette.length);
-  }
-
-  /* ----------------------------------------------------------
-     Intro glyph — matches the app's confirmName() pattern.
-     ---------------------------------------------------------- */
-  function renderIntroGlyph(text) {
-    nameColumn.innerHTML = '';
-    var chars = (text || '桜').split('');
-    for (var i = 0; i < chars.length; i++) {
-      var span = document.createElement('span');
-      span.className = 'name-char';
-      span.textContent = chars[i];
-      span.style.animationDelay = (i * 0.22) + 's';
-      nameColumn.appendChild(span);
-    }
-  }
-
-  /* ----------------------------------------------------------
-     Gesture layer — listens on document, works from anywhere
-     on screen.
-     ---------------------------------------------------------- */
-  function onPointerDown(e) {
-    if (state !== 'idle') return;
-    if (activePointerId !== null) return;
-    if (e.target.closest && e.target.closest('.demo-reset')) return;
-
-    activePointerId = e.pointerId;
-    startX = currentX = e.clientX;
-    startY = currentY = e.clientY;
-    riseY = 0;
-    lastTrailRippleAt = Date.now();
-
-    var onButton = !!(e.target.closest && e.target.closest('.start-btn'));
-    spawnRipples(e.clientX, e.clientY, onButton ? 'strong' : 'subtle');
-
-    koiDiveWrap.classList.add('dragging');
-    koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
-    setState('swiping');
-  }
-
-  function onPointerMove(e) {
-    if (e.pointerId !== activePointerId) return;
-    if (state !== 'swiping') return;
-
-    currentX = e.clientX;
-    currentY = e.clientY;
-
-    var deltaY = currentY - startY;
-    var upward = Math.max(0, -deltaY);
-
-    /* Lift koi proportional to upward travel */
-    riseY = -Math.min(RISE_MAX, upward * RISE_FACTOR);
-    koiDiveWrap.style.setProperty('--koi-rise-y', riseY + 'px');
-
-    /* Arm the release feedback past threshold */
-    if (upward >= SWIPE_THRESHOLD) {
-      startBtn.classList.add('ready');
-    } else {
-      startBtn.classList.remove('ready');
-    }
-
-    /* Trail ripples behind a moving finger */
-    var now = Date.now();
-    if (upward > TRAIL_RIPPLE_MIN_TRAVEL &&
-        (now - lastTrailRippleAt) > TRAIL_RIPPLE_INTERVAL) {
-      lastTrailRippleAt = now;
-      spawnRipples(currentX, currentY, 'trail');
-    }
-
-    hudSwipe.textContent = Math.round(upward) + ' px';
-  }
-
-  function onPointerUp(e) {
-    if (e.pointerId !== activePointerId) return;
-    activePointerId = null;
-
-    if (state !== 'swiping') {
-      /* e.g. pointercancel after we already moved on */
-      koiDiveWrap.classList.remove('dragging');
-      return;
-    }
-
-    var deltaY = currentY - startY;
-    var upward = Math.max(0, -deltaY);
-
-    koiDiveWrap.classList.remove('dragging');
-
-    if (upward >= SWIPE_THRESHOLD) {
-      startBtn.classList.remove('ready');
-      triggerStart();
-    } else {
-      /* Spring back, stay in idle */
-      koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
-      startBtn.classList.remove('ready');
-      setState('idle');
-      hudSwipe.textContent = '0 px';
-    }
-  }
-
-  /* ----------------------------------------------------------
-     Start sequence — startle, dive, intro glyph.
-     ---------------------------------------------------------- */
-  function triggerStart() {
-    setState('startling');
-    startBtn.classList.add('startling');
-
-    pushTimer(setTimeout(function() {
-      startBtn.classList.remove('startling');
-      startBtn.classList.add('diving');
-      blossomScreen.classList.add('diving');
-      setState('diving');
-
-      pushTimer(setTimeout(function() {
-        renderIntroGlyph('桜');
-        introOverlay.classList.add('active');
-      }, 420));
-
-      pushTimer(setTimeout(function() {
-        startBtn.classList.add('done');
-        setState('done');
-      }, 950));
-    }, 200));
-  }
-
-  /* ----------------------------------------------------------
-     Reset
-     ---------------------------------------------------------- */
-  function reset() {
-    clearTimers();
-    activePointerId = null;
-    startBtn.classList.remove('startling', 'diving', 'done', 'ready');
-    blossomScreen.classList.remove('diving');
-    introOverlay.classList.remove('active');
-    nameColumn.innerHTML = '';
-    rippleLayer.innerHTML = '';
-    koiDiveWrap.classList.remove('dragging');
-    koiDiveWrap.style.removeProperty('--koi-rise-y');
-    riseY = 0;
-    hudSwipe.textContent = '0 px';
-    void startBtn.offsetWidth;
-    setState('idle');
-  }
-
-  /* ----------------------------------------------------------
-     Wiring
-     ---------------------------------------------------------- */
-  document.addEventListener('pointerdown', onPointerDown, { passive: true });
-  document.addEventListener('pointermove', onPointerMove, { passive: true });
-  document.addEventListener('pointerup', onPointerUp, { passive: true });
-  document.addEventListener('pointercancel', onPointerUp, { passive: true });
-  resetBtn.addEventListener('click', reset);
-
-  /* Keyboard — desktop / accessibility path */
-  document.addEventListener('keydown', function(e) {
-    if (e.key === ' ' || e.key === 'Enter') {
-      e.preventDefault();
-      if (state === 'idle') {
-        spawnRipples(window.innerWidth / 2, window.innerHeight / 2, 'strong');
-        triggerStart();
-      } else if (state === 'done') {
-        reset();
+  function buildDigitColumns(container, initialValue) {
+    container.innerHTML = '';
+    for (var i = 0; i < NUM_COLS; i++) {
+      var col = document.createElement('span');
+      col.className = 'digit-col hidden';
+      col.setAttribute('data-digit', '0');
+      var strip = document.createElement('span');
+      strip.className = 'digit-strip';
+      for (var d = 0; d <= 9; d++) {
+        var de = document.createElement('span');
+        de.className = 'digit';
+        de.textContent = d;
+        strip.appendChild(de);
+      }
+      strip.style.transform = 'translateY(0)';
+      col.appendChild(strip);
+      container.appendChild(col);
+      if (i === COMMA_AFTER) {
+        var comma = document.createElement('span');
+        comma.className = 'digit-static hidden';
+        comma.setAttribute('data-comma', '1');
+        comma.textContent = ',';
+        container.appendChild(comma);
       }
     }
-    if (e.key === 'r' || e.key === 'R') reset();
+    container.classList.add('no-transition');
+    applyDigitValue(container, initialValue, { instant: true, stagger: 0 });
+    void container.offsetWidth;
+    container.classList.remove('no-transition');
+  }
+  function applyDigitValue(container, value, opts) {
+    opts = opts || {};
+    var instant = !!opts.instant;
+    var stagger = opts.stagger != null ? opts.stagger : 45;
+    if (instant) container.classList.add('no-transition');
+    var cols = container.querySelectorAll('.digit-col');
+    var comma = container.querySelector('.digit-static[data-comma]');
+    for (var i = 0; i < cols.length; i++) {
+      var col = cols[i];
+      var strip = col.querySelector('.digit-strip');
+      var visible = isColVisible(value, i);
+      var newDigit = getDigitAt(value, i);
+      var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
+      var fromRight = NUM_COLS - 1 - i;
+      var delay = instant ? 0 : fromRight * stagger;
+      if (instant) {
+        strip.style.transitionDelay = '0ms';
+        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+      } else if (newDigit !== oldDigit) {
+        strip.style.transitionDelay = delay + 'ms';
+        strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+      }
+      col.classList.toggle('hidden', !visible);
+      col.setAttribute('data-digit', newDigit);
+    }
+    if (comma) comma.classList.toggle('hidden', value < 1000);
+    if (instant) {
+      void container.offsetWidth;
+      requestAnimationFrame(function() {
+        requestAnimationFrame(function() {
+          container.classList.remove('no-transition');
+        });
+      });
+    }
+  }
+
+  /* ============================================================
+     STAMP TRIGGER
+     Fires after the odometer settles. Longest animating strip
+     has transitionDelay = 5*stagger and duration 800ms, so the
+     settle time is stagger*5 + 800. We use a small margin.
+     ============================================================ */
+  var ROLL_STAGGER = 80;
+  var STAMP_SETTLE_MS = ROLL_STAGGER * 5 + 900;
+
+  function triggerStamp() {
+    receiptTotalValue.classList.remove('stamped');
+    void receiptTotalValue.offsetWidth;
+    receiptTotalValue.classList.add('stamped');
+    stampCount += 1;
+    hudStamps.textContent = stampCount;
+  }
+  receiptTotalValue.addEventListener('animationend', function(e) {
+    if (e.animationName === 'stampGlow') {
+      receiptTotalValue.classList.remove('stamped');
+    }
   });
 
-  /* ----------------------------------------------------------
-     Boot
-     ---------------------------------------------------------- */
-  blossomScreen.classList.add('visible');
-  setState('idle');
-  hudSwipe.textContent = '0 px';
-  hudRipples.textContent = '0';
+  /* ============================================================
+     RECEIPT CONTENT
+     ============================================================ */
+  var DEMO_NAMES = [
+    'オイルマッサージ 60分',
+    'ヘッドスパ 30分',
+    'アロマトリートメント',
+    '足つぼ 20分',
+    'ハンドリフレ',
+    '全身リンパドレナージュ',
+    'ホットストーン',
+    'フェイシャル 45分',
+    '肩首集中ケア',
+    'ストレッチ整体',
+    'アイホットタオル',
+    'アロマ足浴'
+  ];
+  var DEMO_PRICES = [3000, 4500, 5000, 6000, 7500, 8000, 9000, 10000, 12000, 15000];
 
-  if (ambientVideo) {
-    var p = ambientVideo.play();
-    if (p && typeof p.catch === 'function') p.catch(function() { /* autoplay blocked; first frame shows */ });
+  function randomItem(i) {
+    var name = DEMO_NAMES[i % DEMO_NAMES.length];
+    var price = DEMO_PRICES[Math.floor(Math.random() * DEMO_PRICES.length)];
+    return { name: name, price: price };
   }
+
+  function buildItems(count) {
+    receiptItems.innerHTML = '';
+    var items = [];
+    for (var i = 0; i < count; i++) {
+      items.push(randomItem(i));
+    }
+    for (var j = 0; j < items.length; j++) {
+      var item = items[j];
+      var div = document.createElement('div');
+      div.className = 'receipt-item';
+      div.style.animationDelay = Math.min(j * 0.06, 0.35) + 's';
+
+      var nameSpan = document.createElement('span');
+      nameSpan.className = 'receipt-item-name';
+      nameSpan.textContent = item.name;
+
+      var priceWrap = document.createElement('span');
+      priceWrap.className = 'receipt-item-price-wrap';
+      var yen = document.createElement('span');
+      yen.className = 'yen-symbol';
+      yen.textContent = '¥';
+      var priceField = document.createElement('span');
+      priceField.className = 'receipt-price-input';
+      priceField.style.display = 'inline-block';
+      priceField.style.width = 'auto';
+      priceField.textContent = item.price.toLocaleString();
+      priceWrap.appendChild(yen);
+      priceWrap.appendChild(priceField);
+
+      div.appendChild(nameSpan);
+      div.appendChild(priceWrap);
+      receiptItems.appendChild(div);
+    }
+    return items;
+  }
+
+  function sumOf(items) {
+    var t = 0;
+    for (var i = 0; i < items.length; i++) t += items[i].price;
+    return t;
+  }
+
+  /* ============================================================
+     BUILD + ROLL
+     ============================================================ */
+  function rebuildReceipt(opts) {
+    opts = opts || {};
+    var count = parseInt(document.getElementById('r-count').value, 10);
+    var items = buildItems(count);
+    var total = sumOf(items);
+    currentTotal = total;
+    hudTotal.textContent = '¥' + total.toLocaleString();
+
+    if (opts.instant !== false) {
+      /* Instant build (no roll) — reset the odometer */
+      buildDigitColumns(receiptTotalNumber, total);
+    } else {
+      /* Roll to the new value, then stamp */
+      applyDigitValue(receiptTotalNumber, total, { instant: false, stagger: ROLL_STAGGER });
+      setTimeout(triggerStamp, STAMP_SETTLE_MS);
+    }
+
+    if (opts.replayLanding) replayLanding();
+  }
+
+  function rollNewTotal() {
+    /* Pick a fresh random total independent of item prices */
+    var n = 2 + Math.floor(Math.random() * 7);
+    var sum = 0;
+    for (var i = 0; i < n; i++) sum += DEMO_PRICES[Math.floor(Math.random() * DEMO_PRICES.length)];
+    currentTotal = sum;
+    hudTotal.textContent = '¥' + sum.toLocaleString();
+    applyDigitValue(receiptTotalNumber, sum, { instant: false, stagger: ROLL_STAGGER });
+    setTimeout(triggerStamp, STAMP_SETTLE_MS);
+  }
+
+  function replayLanding() {
+    receiptPaper.classList.remove('landing');
+    void receiptPaper.offsetWidth;
+    receiptPaper.classList.add('landing');
+  }
+  receiptPaper.addEventListener('animationend', function(e) {
+    if (e.animationName === 'paperLand') {
+      receiptPaper.classList.remove('landing');
+    }
+  });
+
+  /* ============================================================
+     CONTROL WIRING
+     ============================================================ */
+  function bindRange(id, valId, apply, fmt) {
+    var el = document.getElementById(id);
+    var vEl = document.getElementById(valId);
+    function update() {
+      var v = parseFloat(el.value);
+      vEl.textContent = fmt ? fmt(v) : String(v);
+      apply(v);
+    }
+    el.addEventListener('input', update);
+    update();
+  }
+
+  bindRange('r-count', 'v-count',
+    function(v) { rebuildReceipt({ instant: true }); },
+    function(v) { return String(Math.round(v)); });
+
+  bindRange('r-tearh', 'v-tearh',
+    function(v) { receiptPaper.style.setProperty('--tear-h', v + 'px'); },
+    function(v) { return v.toFixed(1); });
+
+  bindRange('r-tearw', 'v-tearw',
+    function(v) { receiptPaper.style.setProperty('--tear-w', v + 'px'); },
+    function(v) { return String(Math.round(v)); });
+
+  bindRange('r-rotate', 'v-rotate',
+    function(v) { receiptWrap.style.setProperty('--rest-rotate', v + 'deg'); },
+    function(v) { return v.toFixed(2); });
+
+  bindRange('r-stamp', 'v-stamp',
+    function(v) { receiptTotalValue.style.setProperty('--stamp-intensity', v); },
+    function(v) { return v.toFixed(2); });
+
+  document.getElementById('b-roll').addEventListener('click', function() {
+    rollNewTotal();
+  });
+  document.getElementById('b-rebuild').addEventListener('click', function() {
+    rebuildReceipt({ instant: false, replayLanding: false });
+  });
+  document.getElementById('b-land').addEventListener('click', function() {
+    replayLanding();
+  });
+
+  /* ============================================================
+     BOOT
+     ============================================================ */
+  rebuildReceipt({ instant: true });
+  hudStamps.textContent = '0';
+
+  /* Play the landing animation once on load */
+  setTimeout(replayLanding, 150);
+
+  /* Reflow the mask when the paper resizes (viewport changes) */
+  window.addEventListener('resize', function() {
+    void receiptPaper.offsetWidth;
+  });
 })();
 </script>
 
