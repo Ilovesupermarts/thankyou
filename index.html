@@ -65,7 +65,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.19</div>
+  <div class="app-version" aria-hidden="true">v1.2</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -378,7 +378,10 @@
       <div class="receipt-divider"></div>
       <div class="receipt-title">
         <span>本日の内容</span>
-        <span class="item-count" id="itemCount">0 項目</span>
+        <span class="item-count" id="itemCount">
+          <span class="digit-roll counter-digit-roll" id="itemCountDigits"></span>
+          <span class="item-count-unit">項目</span>
+        </span>
       </div>
       <div class="receipt-items" id="receiptItems"></div>
 
