@@ -1,8 +1,27 @@
 /* ============================================================
-   app.js — v1.2
+   app.js — v1.3
 
    ------------------------------------------------------------
    Changelog:
+     v1.3
+       - Koi tap flinch: a short tap (< 8px travel, < 250ms) on
+         the start button triggers a 1000ms randomised flinch on
+         .koi-dive-wrap (rotation, scale, dart). No haptic, no
+         sound. Guarded by koiFlinchActive; second tap during a
+         flinch is ignored.
+       - Ambient subtle ripples on the koi screen: while the
+         blossom screen is interactive, a burst of 1-5 subtle
+         ripples spawns at random screen positions every
+         2.5-5.0 seconds. Stopped first thing in triggerKoiStart.
+       - Receipt landing: the wrapper's drop-shadow is disabled
+         for the duration of paperLand via a .landing-active class,
+         eliminating the per-frame drop-shadow recompute that was
+         the second main source of jank. Keyframe itself was
+         rewritten in CSS to 2D transforms only.
+       - Receipt close now restores the previous scroll position:
+         lockBodyForReceipt / unlockBodyForReceipt replace the
+         CSS-only body lock, saving window.scrollY on open and
+         restoring it on close.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -32,10 +51,6 @@
          badge chrome removed, colon moved into the label span,
          tracking inherited, digit column width measured at runtime
          (measureDigitAdvance / applyCounterCellWidth).
-       - Receipt landing: screen snaps in instead of fading so the
-         paper's paperLand animation is visible on entry.
-       - Body is locked while the receipt overlay is visible so
-         scrolls do not leak to the page underneath.
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
@@ -786,6 +801,7 @@ var tyReceiptBtnLabel = document.getElementById('tyReceiptBtnLabel');
 var receiptOpenedFromThankyou = false;
 var receiptHasLanded = false;
 var receiptScrollIndicatorEl = null;
+var receiptScrollY = 0;
 
 var NAGOYA = { lat: 35.1815, lon: 136.9066, tz: 'Asia/Tokyo', name: '名古屋市' };
 var JP_WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土'];
@@ -1874,6 +1890,23 @@ function scheduleReceiptEmptyBlurShake(item, input) {
   }, 150);
 }
 
+/* ============ RECEIPT BODY LOCK ============ */
+/* Saves window.scrollY on open and restores it on close. The CSS
+   rule `body.receipt-locked` pins the body with position: fixed and
+   overflow: hidden; the inline `top` offset keeps the page visually
+   in place while the lock is active. */
+function lockBodyForReceipt() {
+  receiptScrollY = window.scrollY || window.pageYOffset || 0;
+  document.body.style.top = (-receiptScrollY) + 'px';
+  document.body.classList.add('receipt-locked');
+}
+function unlockBodyForReceipt() {
+  if (!document.body.classList.contains('receipt-locked')) return;
+  document.body.classList.remove('receipt-locked');
+  document.body.style.top = '';
+  window.scrollTo(0, receiptScrollY);
+}
+
 /* ============ WIND FIELD ============ */
 var ambientStage = document.getElementById('ambientStage');
 var moteField = document.getElementById('moteField');
@@ -2561,11 +2594,13 @@ function updateReceiptScrollIndicator() {
 }
 
 /* ============================================================
-   KOI WATER EFFECTS — v1.17.2
+   KOI WATER EFFECTS — v1.17.2 / v1.3
    ------------------------------------------------------------
-   Tap ripples, swipe-up gesture, koi startle spin, koi dive.
-   Gesture handler is gated on .blossom-screen.visible so it does
-   not interfere with the main carousel or the table.
+   Tap ripples, swipe-up to begin, koi startle spin, koi dive,
+   koi flinch on short tap, ambient subtle ripples while the
+   blossom screen is interactive. Gesture handler is gated on
+   .blossom-screen.visible so it does not interfere with the
+   main carousel or the table.
    ============================================================ */
 var RIPPLE_COLOURS_STRONG = [
   'rgba(253, 243, 216, 0.95)',
@@ -2583,6 +2618,8 @@ var KOI_RISE_FACTOR = 0.35;
 var KOI_SWIPE_THRESHOLD = 60;
 var KOI_TRAIL_INTERVAL = 90;
 var KOI_TRAIL_MIN_TRAVEL = 18;
+var KOI_TAP_MAX_TRAVEL = 8;
+var KOI_TAP_MAX_MS = 250;
 
 var koiGestureState = 'idle';   /* idle | swiping | startling | diving | done */
 var koiActivePointerId = null;
@@ -2590,6 +2627,15 @@ var koiStartY = 0;
 var koiCurrentY = 0;
 var koiLastTrailAt = 0;
 var koiTimers = [];
+
+/* v1.3 — tap-to-flinch */
+var koiFlinchActive = false;
+var koiTapStartX = 0;
+var koiTapStartY = 0;
+var koiTapStartTime = 0;
+
+/* v1.3 — ambient subtle ripples */
+var ambientRippleTimer = null;
 
 function koiPushTimer(id) { koiTimers.push(id); return id; }
 function clearKoiTimers() {
@@ -2627,9 +2673,12 @@ function spawnRipples(clientX, clientY, intensity) {
       r.style.width  = (baseSize + idx * 6) + 'px';
       r.style.height = (baseSize + idx * 6) + 'px';
       rippleLayer.appendChild(r);
+      /* Removal delay has to exceed animation-delay + animation-duration
+         for the last ripple in the palette, or the tail of the wave
+         gets cut. 975ms duration + up to 160ms delay + 50ms buffer. */
       setTimeout(function() {
         if (r.parentNode) r.parentNode.removeChild(r);
-      }, 900 + idx * 80);
+      }, 1185 + idx * 80);
     })(i);
   }
 }
@@ -2651,6 +2700,94 @@ function isBlossomInteractive() {
   return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun;
 }
 
+/* ============================================================
+   AMBIENT SUBTLE RIPPLES — v1.3
+   ------------------------------------------------------------
+   While the blossom screen is interactive, spawn a burst of
+   1-5 subtle ripples at random viewport positions every
+   2.5-5.0 seconds. Interval is biased to the calmer end. Each
+   ripple in a burst is staggered ~80ms from the previous so the
+   burst reads as a scatter rather than a stamp.
+   ============================================================ */
+function stopAmbientRipple() {
+  if (ambientRippleTimer) {
+    clearTimeout(ambientRippleTimer);
+    ambientRippleTimer = null;
+  }
+}
+
+function spawnAmbientBurst() {
+  if (!rippleLayer) return;
+  var count = 1 + Math.floor(Math.random() * 5);   /* 1-5 */
+  var inset = 40;
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  for (var i = 0; i < count; i++) {
+    (function(idx) {
+      var delay = idx * 80;
+      setTimeout(function() {
+        if (!isBlossomInteractive()) return;
+        var x = inset + Math.random() * Math.max(1, vw - inset * 2);
+        var y = inset + Math.random() * Math.max(1, vh - inset * 2);
+        spawnRipples(x, y, 'subtle');
+      }, delay);
+    })(i);
+  }
+}
+
+function scheduleAmbientRipple() {
+  stopAmbientRipple();
+  /* 2500-5000ms, biased to the calmer end. */
+  var interval = 2500 + Math.random() * 2500;
+  ambientRippleTimer = setTimeout(function() {
+    ambientRippleTimer = null;
+    if (isBlossomInteractive()) {
+      spawnAmbientBurst();
+      scheduleAmbientRipple();
+    }
+  }, interval);
+}
+
+/* ============================================================
+   KOI FLINCH — v1.3
+   ------------------------------------------------------------
+   A short tap on the start button (travel < 8px, duration < 250ms)
+   triggers a 1000ms randomised flinch on .koi-dive-wrap. The
+   animation reads its parameters from four CSS custom properties
+   written here on every tap, so each tap produces a different
+   dart / rotation / scale. Guarded by koiFlinchActive so a second
+   tap during an active flinch is ignored.
+   ============================================================ */
+function triggerKoiFlinch() {
+  if (!koiDiveWrap) return;
+  if (koiFlinchActive) return;
+  if (!isBlossomInteractive()) return;
+  if (koiGestureState !== 'idle') return;
+
+  koiFlinchActive = true;
+
+  var dir = Math.random() < 0.5 ? -1 : 1;
+  var rot = (22 + Math.random() * 12) * dir;    /* 22-34 degrees */
+  var scale = 1.14 + Math.random() * 0.08;      /* 1.14-1.22 */
+  var xMag = 10 + Math.random() * 10;           /* 10-20px */
+  var yMag = -(6 + Math.random() * 8);          /* -6 to -14px */
+
+  koiDiveWrap.style.setProperty('--flinch-rot', rot.toFixed(2) + 'deg');
+  koiDiveWrap.style.setProperty('--flinch-scale', scale.toFixed(3));
+  koiDiveWrap.style.setProperty('--flinch-x', (xMag * dir).toFixed(2) + 'px');
+  koiDiveWrap.style.setProperty('--flinch-y', yMag.toFixed(2) + 'px');
+
+  koiDiveWrap.classList.remove('flinching');
+  void koiDiveWrap.offsetWidth;
+  koiDiveWrap.classList.add('flinching');
+
+  koiDiveWrap.addEventListener('animationend', function onFlinchEnd() {
+    koiDiveWrap.classList.remove('flinching');
+    koiDiveWrap.removeEventListener('animationend', onFlinchEnd);
+    koiFlinchActive = false;
+  });
+}
+
 function onKoiPointerDown(e) {
   if (!isBlossomInteractive()) return;
   if (koiGestureState !== 'idle') return;
@@ -2661,9 +2798,13 @@ function onKoiPointerDown(e) {
   koiStartY = e.clientY;
   koiCurrentY = e.clientY;
   koiLastTrailAt = Date.now();
+  koiTapStartX = e.clientX;
+  koiTapStartY = e.clientY;
+  koiTapStartTime = Date.now();
 
-  var onButton = !!(e.target && e.target.closest && e.target.closest('.start-btn'));
-  spawnRipples(e.clientX, e.clientY, onButton ? 'strong' : 'subtle');
+  /* Every tap on the koi screen produces the same prominent ripple.
+     The 'subtle' palette is now used only by the ambient scheduler. */
+  spawnRipples(e.clientX, e.clientY, 'strong');
 
   if (koiDiveWrap) {
     koiDiveWrap.classList.add('dragging');
@@ -2706,10 +2847,26 @@ function onKoiPointerUp(e) {
     return;
   }
 
+  if (koiDiveWrap) koiDiveWrap.classList.remove('dragging');
+
+  /* Tap detection — short travel, short duration. */
+  var upX = (e.clientX != null) ? e.clientX : koiTapStartX;
+  var upY = (e.clientY != null) ? e.clientY : koiTapStartY;
+  var dx = upX - koiTapStartX;
+  var dy = upY - koiTapStartY;
+  var travel = Math.sqrt(dx * dx + dy * dy);
+  var elapsed = Date.now() - koiTapStartTime;
+
+  if (travel < KOI_TAP_MAX_TRAVEL && elapsed < KOI_TAP_MAX_MS) {
+    if (koiDiveWrap) koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
+    if (startBtn) startBtn.classList.remove('ready');
+    koiGestureState = 'idle';
+    triggerKoiFlinch();
+    return;
+  }
+
   var deltaY = koiCurrentY - koiStartY;
   var upward = Math.max(0, -deltaY);
-
-  if (koiDiveWrap) koiDiveWrap.classList.remove('dragging');
 
   if (upward >= KOI_SWIPE_THRESHOLD) {
     if (startBtn) startBtn.classList.remove('ready');
@@ -2722,6 +2879,7 @@ function onKoiPointerUp(e) {
 }
 
 function triggerKoiStart() {
+  stopAmbientRipple();
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
   introHasRun = true;
@@ -2896,6 +3054,10 @@ function confirmName() {
     blossomScreen.classList.add('visible');
     updateAllRowLocks();
     recalc();
+    /* Start the ambient subtle-ripple scheduler once the blossom
+       screen is actually visible. It self-checks interactivity on
+       each tick, so no need to stop it here if the user idles. */
+    scheduleAmbientRipple();
   }, 420);
 }
 
@@ -3314,6 +3476,10 @@ confirmYes.addEventListener('click', function(e) {
   setTimeout(function() {
     resetReceiptScroll();
 
+    /* v1.3: lock the body and remember where the user was before the
+       overlay takes over, so we can put them back there on close. */
+    lockBodyForReceipt();
+
     /* Snap the screen in — no opacity fade on entry — so the paper's
        landing animation is the only motion on screen and is not
        masked by the overlay's own 0.9s fade. The transition is
@@ -3330,12 +3496,17 @@ confirmYes.addEventListener('click', function(e) {
     if (!receiptHasLanded) {
       receiptHasLanded = true;
       var paper = receiptScreen.querySelector('.receipt-paper');
+      var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
       if (paper) {
         paper.classList.remove('landing');
         void paper.offsetWidth;
+        /* v1.3: disable the wrapper's drop-shadow during the landing
+           animation so the mask+shadow don't recompute every frame. */
+        if (paperWrap) paperWrap.classList.add('landing-active');
         paper.classList.add('landing');
         paper.addEventListener('animationend', function onLandingEnd() {
           paper.classList.remove('landing');
+          if (paperWrap) paperWrap.classList.remove('landing-active');
           paper.removeEventListener('animationend', onLandingEnd);
         });
       }
@@ -3378,6 +3549,8 @@ receiptConfirmBtn.addEventListener('click', function(e) {
 
   if (receiptOpenedFromThankyou) {
     receiptOpenedFromThankyou = false;
+    /* v1.3: unlock the body and restore scroll before fading out. */
+    unlockBodyForReceipt();
     receiptScreen.classList.remove('visible', 'reopened');
     infoBar.classList.remove('hidden');
     var resumed = false;
@@ -3400,6 +3573,8 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   void thankyouScreen.offsetWidth;
   thankyouScreen.style.transition = '';
   startThankyouSequence();
+  /* v1.3: unlock body before fading into the thank-you carousel. */
+  unlockBodyForReceipt();
   requestAnimationFrame(function() {
     receiptScreen.classList.remove('visible');
     infoBar.classList.remove('hidden');
@@ -3421,6 +3596,8 @@ function returnToTable() {
     thankyouScreen.style.transition = '';
   }
   document.body.classList.remove('thankyou-active');
+  /* v1.3: unlock body and restore scroll position. */
+  unlockBodyForReceipt();
   receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
   infoBar.classList.remove('hidden');
   var finished = false;
@@ -4390,6 +4567,9 @@ tyReceiptBtn.addEventListener('click', function(e) {
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
     resetReceiptScroll();
+    /* v1.3: lock body and remember scroll before the reopened
+       receipt takes over. */
+    lockBodyForReceipt();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
