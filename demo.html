@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Receipt Landing — Tuning Demo</title>
+<title>Receipt Demo — 本日の内容 counter</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,678 +13,394 @@
 
 <style>
   /* ============================================================
-     DEMO LAYOUT
+     DEMO-ONLY OVERRIDES
+     These reproduce the proposed changes to the 本日の内容 line.
+     Not part of main.css. Scoped to this page.
      ============================================================ */
-  body { overflow: hidden; }
 
-  /* ---------- BACKGROUND TEST MODES ---------- */
-  .demo-bg {
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    background: #fdf3d8;
-    transition: background 300ms ease;
-  }
-  /* Matches html[data-theme="autumn"] .receipt-screen in main.css */
-  .demo-bg[data-bg="receipt"] {
-    background: rgba(253, 243, 216, 0.94);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-  }
-  .demo-bg[data-bg="washi"] {
-    background-color: #fdf3d8;
-    background-image: url('icons/1790835034553.jpg');
-    background-size: cover;
-    background-position: center;
-  }
-  .demo-bg[data-bg="cream"]  { background: #fdf3d8; }
-  .demo-bg[data-bg="mid"]    { background: #c9bfb8; }
-  .demo-bg[data-bg="dark"]   { background: #1f1a14; }
-  .demo-bg[data-bg="checker"] {
-    background:
-      repeating-conic-gradient(#e8ded0 0% 25%, #b9a894 0% 50%) 50% / 40px 40px;
+  /* 1. Label and counter sit flush — no flex gap. */
+  .receipt-title { gap: 0; }
+
+  /* 2. Counter loses every piece of badge chrome. Inherits
+        everything (colour, size, family, letter-spacing) from
+        .receipt-title. Only inline-flex + vertical centering stay,
+        so the digit-roll and 項目 lay out on one line. */
+  .receipt-title .item-count {
+    display: inline-flex;
+    align-items: center;
+    background: none;
+    border: none;
+    border-radius: 0;
+    padding: 0;
+    color: inherit;
+    font-size: inherit;
+    font-weight: inherit;
+    font-family: inherit;
+    letter-spacing: inherit;
   }
 
-  /* ---------- STAGE ---------- */
+  /* 3. Digit cell height tracks the label's font-size. */
+  .counter-digit-roll {
+    --digit-h: 1.4em;
+  }
+
+  /* 4. Column width = one digit advance (1ch) + one letter-space
+        (6px, matching .receipt-title's tracking). This is the
+        single slot a text character would occupy on the line. */
+  .counter-digit-roll .digit-col {
+    width: calc(1ch + 6px);
+    transition: width 300ms cubic-bezier(0.34, 1.15, 0.64, 1),
+                opacity 200ms ease;
+  }
+  .counter-digit-roll .digit-strip {
+    transition: transform 500ms cubic-bezier(0.34, 1.15, 0.64, 1);
+  }
+
+  /* 5. The digit inherits letter-spacing like every other character.
+        The former letter-spacing: 0 override is removed — no exception. */
+  .counter-digit-roll .digit {
+    font-weight: 600;
+    letter-spacing: inherit;
+  }
+
+  /* ============================================================
+     DEMO CHROME (controls, stage). Not relevant to the change.
+     ============================================================ */
   .demo-stage {
-    position: fixed;
-    top: 0; left: 0; right: 320px; bottom: 0;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px 24px;
-    z-index: 5;
-    box-sizing: border-box;
-    overflow: hidden;
+    padding: 110px 20px 80px 20px;
   }
-
-  /* ============================================================
-     SHADOW HOST — outer wrapper carrying the drop-shadow
-     ============================================================ */
-  .rp-shadow-host {
-    filter:
-      drop-shadow(
-        var(--sh1-x, 0px)
-        var(--sh1-y, 1px)
-        var(--sh1-blur, 2px)
-        rgba(var(--sh1-rgb, 60 30 10) / var(--sh1-a, 0.22))
-      )
-      drop-shadow(
-        var(--sh2-x, 0px)
-        var(--sh2-y, 14px)
-        var(--sh2-blur, 34px)
-        rgba(var(--sh2-rgb, 120 70 20) / var(--sh2-a, 0.16))
-      );
-  }
-
-  /* Reset the paper's own shadow so the demo's shadow host owns it. */
-  .rp-shadow-host .receipt-paper {
-    filter: none;
-  }
-
-  /* Demo landing animation */
-  .receipt-paper.landing-demo {
-    animation: paperLandDemo var(--land-dur, 1500ms) var(--land-ease, cubic-bezier(0.16, 1, 0.3, 1)) forwards;
-  }
-
-  @keyframes paperLandDemo {
-    0% {
-      opacity: 0;
-      transform:
-        rotateX(var(--land-rx0, 22deg))
-        translateY(var(--land-ty0, -70px))
-        scale(var(--land-s0, 0.90));
-      filter: blur(var(--land-blur0, 2.5px));
-    }
-    40% {
-      opacity: 1;
-      transform:
-        rotateX(var(--land-rx1, 5deg))
-        translateY(var(--land-ty1, -6px))
-        scale(var(--land-s1, var(--land-os, 1.012)));
-      filter: blur(0);
-    }
-    72% {
-      transform:
-        rotateX(var(--land-rx2, -1.2deg))
-        translateY(var(--land-ty2, 1px))
-        scale(var(--land-s2, var(--land-us, 0.998)));
-      filter: blur(0);
-    }
-    100% {
-      opacity: 1;
-      transform: rotateX(0deg) translateY(0) scale(1);
-      filter: blur(0);
-    }
-  }
-
-  /* ============================================================
-     CONTROLS
-     ============================================================ */
   .demo-controls {
     position: fixed;
-    top: 0; right: 0;
-    width: 320px;
-    height: 100vh;
-    overflow-y: auto;
-    background: rgba(255, 255, 255, 0.97);
-    border-left: 1px solid var(--border-1);
-    padding: 18px 20px 60px 20px;
-    box-sizing: border-box;
-    z-index: 200;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-size: 13px;
-    line-height: 1.5;
-    box-shadow: -4px 0 16px rgba(120, 70, 20, 0.06);
-  }
-  .demo-controls h1 {
-    font-size: 12px;
-    margin: 0 0 16px 0;
-    letter-spacing: 1.5px;
-    color: var(--accent);
-    text-transform: uppercase;
-    font-weight: 600;
-  }
-  .demo-controls h2 {
-    font-size: 10px;
-    margin: 20px 0 10px 0;
-    letter-spacing: 1.2px;
-    color: #8a807c;
-    text-transform: uppercase;
-    font-weight: 600;
-    border-bottom: 1px solid #f0e8e4;
-    padding-bottom: 6px;
-  }
-  .demo-controls .grp { margin-bottom: 14px; }
-  .demo-controls label {
-    display: block;
-    margin-bottom: 6px;
-    font-weight: 500;
-    color: #4a4542;
-    letter-spacing: 0.2px;
-    font-size: 12px;
-  }
-  .demo-controls .row {
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    padding: 10px 14px;
+    box-shadow: 0 6px 24px var(--shadow-rose-2);
     display: flex;
     align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-  }
-  .demo-controls input[type="range"] {
-    flex: 1;
-    min-width: 0;
-    accent-color: var(--accent);
-    height: 4px;
-  }
-  .demo-controls .val {
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
-    font-size: 11px;
-    color: var(--accent);
-    min-width: 52px;
-    text-align: right;
-    font-weight: 600;
-  }
-  .demo-controls select {
-    width: 100%;
-    padding: 6px 8px;
-    border: 1px solid var(--border-1);
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: inherit;
-    background: #fff;
-    color: #4a4542;
-  }
-  .demo-controls .row-3 {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-  .demo-controls .row-3 input[type="range"] { flex: 1; }
-  .demo-controls .btns {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 8px;
+    gap: 10px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 14px;
+    color: var(--text-dark);
+    z-index: 100;
   }
   .demo-controls button {
-    padding: 8px 12px;
-    border: 1px solid var(--border-1);
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-1);
     background: #fff;
-    border-radius: 8px;
+    color: var(--accent);
+    font-size: 18px;
+    font-weight: 600;
     cursor: pointer;
-    font-size: 12px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0;
+    -webkit-appearance: none; appearance: none;
+    transition: transform 0.15s, background 0.2s, border-color 0.2s;
+  }
+  .demo-controls button:active { transform: scale(0.92); background: var(--soft-1); border-color: var(--accent); }
+  .demo-controls input[type="number"] {
+    width: 56px;
+    text-align: center;
     font-family: inherit;
-    color: #4a4542;
-    font-weight: 500;
-    flex: 1;
-    min-width: 0;
-    white-space: nowrap;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    background: #fff;
+    border: 1.5px solid var(--border-1);
+    border-radius: 10px;
+    padding: 6px 4px;
+    -webkit-appearance: none;
+    appearance: none;
   }
-  .demo-controls button:hover { border-color: var(--accent); color: var(--accent); }
-  .demo-controls button:active { transform: scale(0.97); background: var(--soft-1); }
-  .demo-controls button.primary {
-    background: var(--accent);
-    border-color: var(--accent);
-    color: #fff;
+  .demo-controls input[type="number"]::-webkit-outer-spin-button,
+  .demo-controls input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
   }
-  .demo-controls button.primary:hover { background: var(--accent-3); color: #fff; }
-  .demo-controls .presets {
-    display: flex;
-    gap: 4px;
-    flex-wrap: wrap;
-  }
-  .demo-controls .presets button {
-    font-size: 11px;
-    padding: 6px 10px;
-    flex: 0 1 auto;
-  }
-
-  /* ============================================================
-     HUD
-     ============================================================ */
-  .demo-hud {
-    position: fixed;
-    bottom: 18px;
-    left: 18px;
-    z-index: 200;
-    font-family: ui-monospace, "SF Mono", Consolas, monospace;
-    font-size: 11px;
-    color: var(--accent-2);
-    opacity: 0.8;
-    pointer-events: none;
-    line-height: 1.6;
-    background: rgba(255, 255, 255, 0.72);
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border-1);
-  }
-  .demo-hud strong { font-weight: 700; color: var(--accent); }
-
-  @media (max-width: 900px) {
-    .demo-stage { right: 0; padding-bottom: 46vh; }
-    .demo-controls {
-      position: fixed;
-      top: auto; bottom: 0; right: 0; left: 0;
-      width: 100%;
-      height: auto;
-      max-height: 46vh;
-      border-left: none;
-      border-top: 1px solid var(--border-1);
-      border-radius: 16px 16px 0 0;
-    }
+  .demo-controls input[type="number"]:focus { outline: none; border-color: var(--accent); }
+  .demo-label {
+    font-size: 12px;
+    color: var(--text-mute);
+    letter-spacing: 2px;
   }
 </style>
 </head>
 <body>
 
-<div class="demo-bg" id="demoBg" data-bg="receipt" aria-hidden="true"></div>
+<div class="demo-controls">
+  <button type="button" id="decBtn" aria-label="減らす">−</button>
+  <input type="number" id="countInput" value="3" min="0" max="20" step="1" aria-label="件数">
+  <button type="button" id="incBtn" aria-label="増やす">＋</button>
+  <span class="demo-label">項目</span>
+</div>
 
 <div class="demo-stage">
-  <div class="rp-shadow-host" id="rpShadowHost">
-    <div class="receipt-paper-wrap" id="rpWrap" style="--rest-rotate: 1.65deg;">
-      <div class="receipt-paper" id="receiptPaper">
-        <div class="receipt-header">
-          <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
-          <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
-        </div>
+  <div class="receipt-paper-wrap">
+    <div class="receipt-paper">
+      <div class="receipt-header">
+        <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
+        <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
+      </div>
+      <div class="receipt-to-row">
+        <span class="receipt-to-mark">❀</span>
+        <span class="receipt-to-name">桜庭さんへ</span>
+        <span class="receipt-to-mark">❀</span>
+      </div>
+      <div class="receipt-divider"></div>
+      <div class="receipt-title">
+        <span>本日の内容：</span>
+        <span class="item-count" id="itemCount">
+          <span class="digit-roll counter-digit-roll" id="itemCountDigits"></span>
+          <span class="item-count-unit">項目</span>
+        </span>
+      </div>
+      <div class="receipt-items" id="receiptItems"></div>
 
-        <div class="receipt-to-row">
-          <span class="receipt-to-mark">❀</span>
-          <span class="receipt-to-name">桜庭さんへ</span>
-          <span class="receipt-to-mark">❀</span>
-        </div>
+      <div class="receipt-total-line">
+        <span class="receipt-total-label">合計</span>
+        <span class="receipt-total-value"><span class="yen-symbol">¥</span><span class="digit-roll receipt-digit-roll" id="receiptTotalNumber"></span></span>
+      </div>
 
-        <div class="receipt-divider"></div>
+      <button type="button" class="receipt-confirm-btn">こちらの内容でお願いいたします。</button>
+      <button type="button" class="receipt-back-btn">サービスの選択に戻る</button>
 
-        <div class="receipt-title">
-          <span>本日の内容</span>
-          <span class="item-count">3 項目</span>
-        </div>
-
-        <div class="receipt-items">
-          <div class="receipt-item">
-            <span class="receipt-item-name">オイルマッサージ 60分</span>
-            <span class="receipt-item-price-wrap">
-              <span class="yen-symbol">¥</span>
-              <span class="receipt-price-input" style="display:inline-block;width:auto;">7,500</span>
-            </span>
-          </div>
-          <div class="receipt-item">
-            <span class="receipt-item-name">ヘッドスパ 30分</span>
-            <span class="receipt-item-price-wrap">
-              <span class="yen-symbol">¥</span>
-              <span class="receipt-price-input" style="display:inline-block;width:auto;">4,500</span>
-            </span>
-          </div>
-          <div class="receipt-item">
-            <span class="receipt-item-name">アロマトリートメント</span>
-            <span class="receipt-item-price-wrap">
-              <span class="yen-symbol">¥</span>
-              <span class="receipt-price-input" style="display:inline-block;width:auto;">6,000</span>
-            </span>
-          </div>
-        </div>
-
-        <div class="receipt-total-line">
-          <span class="receipt-total-label">合計</span>
-          <span class="receipt-total-value">
-            <span class="yen-symbol">¥</span>
-            <span id="totalDisplay">18,000</span>
-          </span>
-        </div>
-
-        <div class="receipt-footer">
-          <span class="receipt-footer-mark">❀</span>
-        </div>
+      <div class="receipt-footer">
+        <span class="receipt-footer-mark">❀</span>
       </div>
     </div>
   </div>
 </div>
 
-<div class="demo-controls">
-  <h1>Receipt Landing</h1>
-
-  <h2>Presets</h2>
-  <div class="presets">
-    <button data-preset="current">current</button>
-    <button data-preset="elegant">elegant</button>
-    <button data-preset="heavy">heavy</button>
-    <button data-preset="quick">quick</button>
-  </div>
-
-  <h2>Timing</h2>
-  <div class="grp">
-    <label>Duration</label>
-    <div class="row">
-      <input type="range" id="r-dur" min="400" max="3000" step="50" value="1500">
-      <span class="val" id="v-dur">1500</span>
-    </div>
-  </div>
-  <div class="grp">
-    <label>Easing</label>
-    <select id="s-ease">
-      <option value="cubic-bezier(0.16, 1, 0.3, 1)" selected>expo-out</option>
-      <option value="cubic-bezier(0.34, 1.56, 0.64, 1)">back-out</option>
-      <option value="cubic-bezier(0.22, 1, 0.36, 1)">quint-out</option>
-      <option value="cubic-bezier(0.33, 1, 0.68, 1)">cubic-out</option>
-      <option value="cubic-bezier(0.5, 0, 0.5, 1)">ease-in-out</option>
-    </select>
-  </div>
-
-  <h2>Start Pose</h2>
-  <div class="grp">
-    <label>rotateX (°)</label>
-    <div class="row">
-      <input type="range" id="r-rx0" min="0" max="60" step="1" value="22">
-      <span class="val" id="v-rx0">22</span>
-    </div>
-  </div>
-  <div class="grp">
-    <label>translateY (px)</label>
-    <div class="row">
-      <input type="range" id="r-ty0" min="-200" max="0" step="2" value="-70">
-      <span class="val" id="v-ty0">-70</span>
-    </div>
-  </div>
-  <div class="grp">
-    <label>scale</label>
-    <div class="row">
-      <input type="range" id="r-s0" min="0.6" max="1" step="0.005" value="0.90">
-      <span class="val" id="v-s0">0.900</span>
-    </div>
-  </div>
-  <div class="grp">
-    <label>Blur (px)</label>
-    <div class="row">
-      <input type="range" id="r-blur0" min="0" max="12" step="0.25" value="2.5">
-      <span class="val" id="v-blur0">2.50</span>
-    </div>
-  </div>
-
-  <h2>Settle</h2>
-  <div class="grp">
-    <label>Overshoot scale</label>
-    <div class="row">
-      <input type="range" id="r-os" min="1" max="1.06" step="0.001" value="1.012">
-      <span class="val" id="v-os">1.012</span>
-    </div>
-  </div>
-  <div class="grp">
-    <label>Undershoot scale</label>
-    <div class="row">
-      <input type="range" id="r-us" min="0.985" max="1" step="0.001" value="0.998">
-      <span class="val" id="v-us">0.998</span>
-    </div>
-  </div>
-
-  <h2>Resting Pose</h2>
-  <div class="grp">
-    <label>Resting tilt (°)</label>
-    <div class="row">
-      <input type="range" id="r-tilt" min="-3" max="3" step="0.05" value="1.65">
-      <span class="val" id="v-tilt">1.65</span>
-    </div>
-  </div>
-
-  <h2>Drop Shadow — Layer 1 (edge)</h2>
-  <div class="grp">
-    <div class="row-3">
-      <label style="flex:1;">X</label>
-      <input type="range" id="r-sh1-x" min="-10" max="10" step="0.5" value="0">
-      <span class="val" id="v-sh1-x">0.0</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Y</label>
-      <input type="range" id="r-sh1-y" min="0" max="20" step="0.5" value="1">
-      <span class="val" id="v-sh1-y">1.0</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Blur</label>
-      <input type="range" id="r-sh1-blur" min="0" max="20" step="0.5" value="2">
-      <span class="val" id="v-sh1-blur">2.0</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Alpha</label>
-      <input type="range" id="r-sh1-a" min="0" max="1" step="0.01" value="0.22">
-      <span class="val" id="v-sh1-a">0.22</span>
-    </div>
-  </div>
-
-  <h2>Drop Shadow — Layer 2 (ambient)</h2>
-  <div class="grp">
-    <div class="row-3">
-      <label style="flex:1;">X</label>
-      <input type="range" id="r-sh2-x" min="-40" max="40" step="1" value="0">
-      <span class="val" id="v-sh2-x">0</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Y</label>
-      <input type="range" id="r-sh2-y" min="0" max="60" step="1" value="14">
-      <span class="val" id="v-sh2-y">14</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Blur</label>
-      <input type="range" id="r-sh2-blur" min="0" max="120" step="2" value="34">
-      <span class="val" id="v-sh2-blur">34</span>
-    </div>
-    <div class="row-3">
-      <label style="flex:1;">Alpha</label>
-      <input type="range" id="r-sh2-a" min="0" max="1" step="0.01" value="0.16">
-      <span class="val" id="v-sh2-a">0.16</span>
-    </div>
-  </div>
-
-  <h2>Background</h2>
-  <div class="grp">
-    <select id="s-bg">
-      <option value="receipt" selected>receipt screen (cream)</option>
-      <option value="washi">washi texture</option>
-      <option value="cream">cream (flat)</option>
-      <option value="mid">mid gray</option>
-      <option value="dark">dark</option>
-      <option value="checker">checkerboard</option>
-    </select>
-  </div>
-
-  <h2>Actions</h2>
-  <div class="btns">
-    <button id="b-roll" class="primary">Roll + land</button>
-    <button id="b-replay">Replay landing</button>
-    <button id="b-reset">Reset all</button>
-  </div>
-
-  <div style="font-size:11px; color:#8a807c; margin-top:12px; line-height:1.45;">
-    Changing any slider auto-replays the landing so you see the new value immediately.
-  </div>
-</div>
-
-<div class="demo-hud">
-  <div>duration: <strong id="hud-dur">1500ms</strong></div>
-  <div>shadow: <strong id="hud-shadow">2 layers</strong></div>
-</div>
-
 <script>
-(function() {
-  'use strict';
+/* ============================================================
+   COUNTER ODOMETER
+   Mirrors app.js. Two columns, 500 ms roll.
+   ============================================================ */
+var COUNTER_COLS = 2;
 
-  var rpShadowHost = document.getElementById('rpShadowHost');
-  var rpWrap       = document.getElementById('rpWrap');
-  var receiptPaper = document.getElementById('receiptPaper');
-  var demoBg       = document.getElementById('demoBg');
-  var totalDisplay = document.getElementById('totalDisplay');
-  var hudDur       = document.getElementById('hud-dur');
-
-  var params = {
-    dur:   1500,
-    ease:  'cubic-bezier(0.16, 1, 0.3, 1)',
-    rx0:   22,
-    ty0:   -70,
-    s0:    0.90,
-    blur0: 2.5,
-    os:    1.012,
-    us:    0.998,
-    tilt:  1.65,
-    sh1x:  0, sh1y: 1, sh1blur: 2, sh1a: 0.22,
-    sh2x:  0, sh2y: 14, sh2blur: 34, sh2a: 0.16
-  };
-
-  function applyParams() {
-    receiptPaper.style.setProperty('--land-dur', params.dur + 'ms');
-    receiptPaper.style.setProperty('--land-ease', params.ease);
-    receiptPaper.style.setProperty('--land-rx0', params.rx0 + 'deg');
-    receiptPaper.style.setProperty('--land-ty0', params.ty0 + 'px');
-    receiptPaper.style.setProperty('--land-s0', params.s0);
-    receiptPaper.style.setProperty('--land-blur0', params.blur0 + 'px');
-    receiptPaper.style.setProperty('--land-os', params.os);
-    receiptPaper.style.setProperty('--land-us', params.us);
-    rpWrap.style.setProperty('--rest-rotate', params.tilt + 'deg');
-
-    rpShadowHost.style.setProperty('--sh1-x', params.sh1x + 'px');
-    rpShadowHost.style.setProperty('--sh1-y', params.sh1y + 'px');
-    rpShadowHost.style.setProperty('--sh1-blur', params.sh1blur + 'px');
-    rpShadowHost.style.setProperty('--sh1-a', params.sh1a);
-    rpShadowHost.style.setProperty('--sh2-x', params.sh2x + 'px');
-    rpShadowHost.style.setProperty('--sh2-y', params.sh2y + 'px');
-    rpShadowHost.style.setProperty('--sh2-blur', params.sh2blur + 'px');
-    rpShadowHost.style.setProperty('--sh2-a', params.sh2a);
-
-    hudDur.textContent = params.dur + 'ms';
-  }
-
-  function replayLanding() {
-    receiptPaper.classList.remove('landing-demo');
-    void receiptPaper.offsetWidth;
-    receiptPaper.classList.add('landing-demo');
-  }
-  receiptPaper.addEventListener('animationend', function(e) {
-    if (e.animationName === 'paperLandDemo') {
-      receiptPaper.classList.remove('landing-demo');
+function counterIsColVisible(value, colIndex) {
+  if (value === 0) return colIndex === COUNTER_COLS - 1;
+  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
+  return value >= placeValue;
+}
+function counterGetDigitAt(value, colIndex) {
+  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
+  return Math.floor(value / placeValue) % 10;
+}
+function buildCounterColumns(container, initialValue) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (var i = 0; i < COUNTER_COLS; i++) {
+    var col = document.createElement('span');
+    col.className = 'digit-col hidden';
+    col.setAttribute('data-digit', '0');
+    var strip = document.createElement('span');
+    strip.className = 'digit-strip';
+    for (var d = 0; d <= 9; d++) {
+      var de = document.createElement('span');
+      de.className = 'digit';
+      de.textContent = d;
+      strip.appendChild(de);
     }
-  });
-
-  function bindRange(id, valId, key, fmt, replay) {
-    var el = document.getElementById(id);
-    var vEl = document.getElementById(valId);
-    function update() {
-      var v = parseFloat(el.value);
-      params[key] = v;
-      vEl.textContent = fmt ? fmt(v) : String(v);
-      applyParams();
-      if (replay !== false) replayLanding();
+    strip.style.transform = 'translateY(0)';
+    col.appendChild(strip);
+    container.appendChild(col);
+  }
+  container.classList.add('no-transition');
+  applyCounterValue(container, initialValue, { instant: true });
+  void container.offsetWidth;
+  container.classList.remove('no-transition');
+}
+function applyCounterValue(container, value, opts) {
+  if (!container) return;
+  opts = opts || {};
+  var instant = !!opts.instant;
+  if (instant) container.classList.add('no-transition');
+  var cols = container.querySelectorAll('.digit-col');
+  for (var i = 0; i < cols.length; i++) {
+    var col = cols[i];
+    var strip = col.querySelector('.digit-strip');
+    var visible = counterIsColVisible(value, i);
+    var newDigit = counterGetDigitAt(value, i);
+    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
+    var delay = instant ? 0 : (COUNTER_COLS - 1 - i) * 40;
+    if (instant) {
+      strip.style.transitionDelay = '0ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    } else if (newDigit !== oldDigit) {
+      strip.style.transitionDelay = delay + 'ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
     }
-    el.addEventListener('input', update);
-    vEl.textContent = fmt ? fmt(params[key]) : String(params[key]);
+    col.classList.toggle('hidden', !visible);
+    col.setAttribute('data-digit', newDigit);
   }
-
-  bindRange('r-dur',    'v-dur',    'dur',    function(v) { return String(Math.round(v)); });
-  bindRange('r-rx0',    'v-rx0',    'rx0',    function(v) { return String(Math.round(v)); });
-  bindRange('r-ty0',    'v-ty0',    'ty0',    function(v) { return String(Math.round(v)); });
-  bindRange('r-s0',     'v-s0',     's0',     function(v) { return v.toFixed(3); });
-  bindRange('r-blur0',  'v-blur0',  'blur0',  function(v) { return v.toFixed(2); });
-  bindRange('r-os',     'v-os',     'os',     function(v) { return v.toFixed(3); });
-  bindRange('r-us',     'v-us',     'us',     function(v) { return v.toFixed(3); });
-  bindRange('r-tilt',   'v-tilt',   'tilt',   function(v) { return v.toFixed(2); });
-
-  bindRange('r-sh1-x',    'v-sh1-x',    'sh1x',    function(v) { return v.toFixed(1); }, false);
-  bindRange('r-sh1-y',    'v-sh1-y',    'sh1y',    function(v) { return v.toFixed(1); }, false);
-  bindRange('r-sh1-blur', 'v-sh1-blur', 'sh1blur', function(v) { return v.toFixed(1); }, false);
-  bindRange('r-sh1-a',    'v-sh1-a',    'sh1a',    function(v) { return v.toFixed(2); }, false);
-  bindRange('r-sh2-x',    'v-sh2-x',    'sh2x',    function(v) { return String(Math.round(v)); }, false);
-  bindRange('r-sh2-y',    'v-sh2-y',    'sh2y',    function(v) { return String(Math.round(v)); }, false);
-  bindRange('r-sh2-blur', 'v-sh2-blur', 'sh2blur', function(v) { return String(Math.round(v)); }, false);
-  bindRange('r-sh2-a',    'v-sh2-a',    'sh2a',    function(v) { return v.toFixed(2); }, false);
-
-  var sEase = document.getElementById('s-ease');
-  sEase.addEventListener('change', function() {
-    params.ease = sEase.value;
-    applyParams();
-    replayLanding();
-  });
-
-  var sBg = document.getElementById('s-bg');
-  sBg.addEventListener('change', function() {
-    demoBg.setAttribute('data-bg', sBg.value);
-  });
-
-  var presets = {
-    current: { dur:1500, ease:'cubic-bezier(0.22, 1, 0.36, 1)',
-               rx0:38, ty0:-110, s0:0.82, blur0:4, os:1.025, us:0.995 },
-    elegant: { dur:1700, ease:'cubic-bezier(0.16, 1, 0.3, 1)',
-               rx0:22, ty0:-70, s0:0.90, blur0:2.5, os:1.012, us:0.998 },
-    heavy:   { dur:2400, ease:'cubic-bezier(0.16, 1, 0.3, 1)',
-               rx0:32, ty0:-140, s0:0.86, blur0:5, os:1.020, us:0.996 },
-    quick:   { dur:900,  ease:'cubic-bezier(0.33, 1, 0.68, 1)',
-               rx0:14, ty0:-40, s0:0.94, blur0:1.5, os:1.008, us:0.999 }
-  };
-
-  function applyPreset(key) {
-    var p = presets[key];
-    if (!p) return;
-    Object.assign(params, p);
-
-    document.getElementById('r-dur').value = p.dur;
-    document.getElementById('v-dur').textContent = String(p.dur);
-    document.getElementById('s-ease').value = p.ease;
-    document.getElementById('r-rx0').value = p.rx0;
-    document.getElementById('v-rx0').textContent = String(p.rx0);
-    document.getElementById('r-ty0').value = p.ty0;
-    document.getElementById('v-ty0').textContent = String(p.ty0);
-    document.getElementById('r-s0').value = p.s0;
-    document.getElementById('v-s0').textContent = p.s0.toFixed(3);
-    document.getElementById('r-blur0').value = p.blur0;
-    document.getElementById('v-blur0').textContent = p.blur0.toFixed(2);
-    document.getElementById('r-os').value = p.os;
-    document.getElementById('v-os').textContent = p.os.toFixed(3);
-    document.getElementById('r-us').value = p.us;
-    document.getElementById('v-us').textContent = p.us.toFixed(3);
-
-    applyParams();
-    replayLanding();
-  }
-
-  document.querySelectorAll('[data-preset]').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      applyPreset(btn.getAttribute('data-preset'));
+  if (instant) {
+    void container.offsetWidth;
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        container.classList.remove('no-transition');
+      });
     });
-  });
+  }
+}
 
-  document.getElementById('b-roll').addEventListener('click', function() {
-    var base = 6000 + Math.floor(Math.random() * 20) * 500;
-    totalDisplay.textContent = base.toLocaleString();
-    replayLanding();
-  });
-  document.getElementById('b-replay').addEventListener('click', replayLanding);
-  document.getElementById('b-reset').addEventListener('click', function() {
-    applyPreset('elegant');
-    params.tilt = 1.65;
-    params.sh1x = 0; params.sh1y = 1; params.sh1blur = 2; params.sh1a = 0.22;
-    params.sh2x = 0; params.sh2y = 14; params.sh2blur = 34; params.sh2a = 0.16;
-    document.getElementById('r-tilt').value = params.tilt;
-    document.getElementById('v-tilt').textContent = params.tilt.toFixed(2);
-    document.getElementById('r-sh1-x').value = params.sh1x;
-    document.getElementById('v-sh1-x').textContent = params.sh1x.toFixed(1);
-    document.getElementById('r-sh1-y').value = params.sh1y;
-    document.getElementById('v-sh1-y').textContent = params.sh1y.toFixed(1);
-    document.getElementById('r-sh1-blur').value = params.sh1blur;
-    document.getElementById('v-sh1-blur').textContent = params.sh1blur.toFixed(1);
-    document.getElementById('r-sh1-a').value = params.sh1a;
-    document.getElementById('v-sh1-a').textContent = params.sh1a.toFixed(2);
-    document.getElementById('r-sh2-x').value = params.sh2x;
-    document.getElementById('v-sh2-x').textContent = String(params.sh2x);
-    document.getElementById('r-sh2-y').value = params.sh2y;
-    document.getElementById('v-sh2-y').textContent = String(params.sh2y);
-    document.getElementById('r-sh2-blur').value = params.sh2blur;
-    document.getElementById('v-sh2-blur').textContent = String(params.sh2blur);
-    document.getElementById('r-sh2-a').value = params.sh2a;
-    document.getElementById('v-sh2-a').textContent = params.sh2a.toFixed(2);
-    applyParams();
-  });
+/* ============================================================
+   MONEY ODOMETER (for the total line)
+   ============================================================ */
+var NUM_COLS = 6;
+var COMMA_AFTER = 2;
 
-  applyParams();
-  setTimeout(replayLanding, 200);
-})();
+function isColVisible(value, colIndex) {
+  if (value === 0) return colIndex === NUM_COLS - 1;
+  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+  return value >= placeValue;
+}
+function getDigitAt(value, colIndex) {
+  var placeValue = Math.pow(10, NUM_COLS - 1 - colIndex);
+  return Math.floor(value / placeValue) % 10;
+}
+function buildDigitColumns(container, initialValue) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (var i = 0; i < NUM_COLS; i++) {
+    var col = document.createElement('span');
+    col.className = 'digit-col hidden';
+    col.setAttribute('data-digit', '0');
+    var strip = document.createElement('span');
+    strip.className = 'digit-strip';
+    for (var d = 0; d <= 9; d++) {
+      var de = document.createElement('span');
+      de.className = 'digit';
+      de.textContent = d;
+      strip.appendChild(de);
+    }
+    strip.style.transform = 'translateY(0)';
+    col.appendChild(strip);
+    container.appendChild(col);
+    if (i === COMMA_AFTER) {
+      var comma = document.createElement('span');
+      comma.className = 'digit-static hidden';
+      comma.setAttribute('data-comma', '1');
+      comma.textContent = ',';
+      container.appendChild(comma);
+    }
+  }
+  container.classList.add('no-transition');
+  applyDigitValue(container, initialValue, { instant: true, stagger: 0 });
+  void container.offsetWidth;
+  container.classList.remove('no-transition');
+}
+function applyDigitValue(container, value, opts) {
+  if (!container) return;
+  opts = opts || {};
+  var instant = !!opts.instant;
+  var stagger = opts.stagger != null ? opts.stagger : 45;
+  if (instant) container.classList.add('no-transition');
+  var cols = container.querySelectorAll('.digit-col');
+  var comma = container.querySelector('.digit-static[data-comma]');
+  for (var i = 0; i < cols.length; i++) {
+    var col = cols[i];
+    var strip = col.querySelector('.digit-strip');
+    var visible = isColVisible(value, i);
+    var newDigit = getDigitAt(value, i);
+    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
+    var fromRight = NUM_COLS - 1 - i;
+    var delay = instant ? 0 : fromRight * stagger;
+    if (instant) {
+      strip.style.transitionDelay = '0ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    } else if (newDigit !== oldDigit) {
+      strip.style.transitionDelay = delay + 'ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    }
+    col.classList.toggle('hidden', !visible);
+    col.setAttribute('data-digit', newDigit);
+  }
+  if (comma) comma.classList.toggle('hidden', value < 1000);
+  if (instant) {
+    void container.offsetWidth;
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        container.classList.remove('no-transition');
+      });
+    });
+  }
+}
+
+/* ============================================================
+   DEMO STATE
+   ============================================================ */
+var MAX_COUNT = 20;
+var currentCount = 3;
+
+var SAMPLE_ITEMS = [
+  'ダミーテキスト1', 'ダミーテキスト2', 'ダミーテキスト3',
+  'ダミーテキスト4', 'ダミーテキスト5', 'ダミーテキスト6',
+  'ダミーテキスト7', 'ダミーテキスト8', 'ダミーテキスト9',
+  'ダミーテキスト10', 'ダミーテキスト11', 'ダミーテキスト12',
+  'ダミーテキスト13', 'ダミーテキスト14', 'ダミーテキスト15',
+  'ダミーテキスト16', 'ダミーテキスト17', 'ダミーテキスト18',
+  'ダミーテキスト19', 'ダミーテキスト20'
+];
+var SAMPLE_PRICES = [1500, 2000, 3000, 4500, 5000,
+                     1500, 2000, 3000, 4500, 5000,
+                     1500, 2000, 3000, 4500, 5000,
+                     1500, 2000, 3000, 4500, 5000];
+
+function renderItems(n) {
+  var wrap = document.getElementById('receiptItems');
+  wrap.innerHTML = '';
+  var total = 0;
+  for (var i = 0; i < n; i++) {
+    var price = SAMPLE_PRICES[i % SAMPLE_PRICES.length];
+    total += price;
+    var item = document.createElement('div');
+    item.className = 'receipt-item';
+    item.style.animationDelay = Math.min(i * 0.06, 0.4) + 's';
+    item.innerHTML =
+      '<span class="receipt-item-name">' + SAMPLE_ITEMS[i] + '</span>' +
+      '<span class="receipt-item-price-wrap">' +
+        '<span class="yen-symbol">¥</span>' +
+        '<input type="text" class="receipt-price-input" value="' + price.toLocaleString() + '" readonly tabindex="-1">' +
+      '</span>' +
+      '<button type="button" class="receipt-item-remove" aria-label="削除">×</button>' +
+      '<button type="button" class="receipt-item-undo" aria-label="元に戻す">↺ 元に戻す</button>';
+    wrap.appendChild(item);
+  }
+  applyDigitValue(document.getElementById('receiptTotalNumber'), total, { instant: false, stagger: 80 });
+}
+
+function setCount(n) {
+  n = Math.max(0, Math.min(MAX_COUNT, Math.floor(n)));
+  if (n === currentCount) return;
+  currentCount = n;
+  applyCounterValue(document.getElementById('itemCountDigits'), n, { instant: false });
+  renderItems(n);
+  document.getElementById('countInput').value = n;
+}
+
+window.addEventListener('load', function() {
+  buildCounterColumns(document.getElementById('itemCountDigits'), currentCount);
+  buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
+  renderItems(currentCount);
+
+  document.getElementById('incBtn').addEventListener('click', function() {
+    setCount(currentCount + 1);
+  });
+  document.getElementById('decBtn').addEventListener('click', function() {
+    setCount(currentCount - 1);
+  });
+  document.getElementById('countInput').addEventListener('change', function(e) {
+    setCount(parseInt(e.target.value, 10) || 0);
+  });
+});
 </script>
 
 </body>
