@@ -1197,10 +1197,10 @@
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
 
-  /* v1.17.2: wrapper carries resting tilt, perspective context, and
-     the two-layer drop-shadow. The filter sits here (not on the paper)
-     so the drop-shadow follows the torn-edge silhouette produced by
-     the mask on .receipt-paper. */
+  /* v1.17.2: wrapper carries resting tilt and the two-layer
+     drop-shadow. The filter sits here (not on the paper) so the
+     drop-shadow follows the torn-edge silhouette produced by the
+     mask on .receipt-paper. */
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
@@ -1210,15 +1210,51 @@
       drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
       drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
   }
-  /* During the landing animation the wrapper's drop-shadow is disabled.
-     It recomputes per frame against the animating paper — the second
-     biggest source of jank after filter: blur() on the paper itself.
-     Same number of drop-shadow() functions, colour transparent, so
-     the transition interpolates cleanly instead of popping. */
-  .receipt-paper-wrap.landing-active {
-    filter:
-      drop-shadow(0px 1px 2px rgba(0, 0, 0, 0))
-      drop-shadow(7px 22px 18px rgba(0, 0, 0, 0));
+
+  /* v1.3: animation lives on the wrapper, not the masked paper. The
+     wrapper has no mask, so the browser can take a single cached
+     snapshot of the child (with its torn edges already rasterised)
+     and transform that flat image on the GPU. transform-origin at
+     the bottom edge preserves the original "slap onto the table"
+     hinge — the top tips back rather than the whole shape zooming.
+
+     Note: filter is animated inside this same keyframe block, which
+     Chromium may treat as a signal to run the entire animation on
+     the main thread rather than the compositor. If the S8 Ultra
+     still hitches after this, the fallback is a static shadow-caster
+     behind the wrapper and filter removed from the keyframes
+     entirely. */
+  .receipt-paper-wrap.landing {
+    animation: paperLand 3000ms cubic-bezier(0.5, 0, 0.5, 1) forwards;
+    will-change: transform, opacity;
+    transform-origin: 50% 100%;
+  }
+
+  @keyframes paperLand {
+    0% {
+      opacity: 0;
+      transform: translateY(-70px) scale(1, 0.9) rotate(var(--rest-rotate, 1.65deg));
+      filter: none;
+    }
+    25% {
+      opacity: 1;
+    }
+    40% {
+      transform: translateY(-6px) scale(1.014, 1.015) rotate(var(--rest-rotate, 1.65deg));
+      filter: none;
+    }
+    /* Shadow fades back in as the violent scaling stops. */
+    72% {
+      transform: translateY(1px) scale(1, 1) rotate(var(--rest-rotate, 1.65deg));
+      filter: drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.10))
+              drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.10));
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0) scale(1, 1) rotate(var(--rest-rotate, 1.65deg));
+      filter: drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+              drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
+    }
   }
 
   .receipt-paper {
@@ -1274,38 +1310,6 @@
       repeat-x,
       no-repeat;
     mask-composite: add;
-  }
-
-  /* v1.17.2: tuned landing animation. 2D transforms only. The previous
-     version animated filter: blur() on the masked paper, forcing the
-     whole masked surface to re-rasterize every frame — the main source
-     of the jerk. rotateX was also a visual no-op because the wrapper's
-     filter flattened the 3D context; the same vertical squash is
-     achieved with scaleY, which composites on the GPU for free. */
-  .receipt-paper.landing {
-    animation: paperLand 3000ms cubic-bezier(0.5, 0, 0.5, 1) forwards;
-    will-change: transform, opacity;
-    backface-visibility: hidden;
-    -webkit-backface-visibility: hidden;
-  }
-  @keyframes paperLand {
-    0% {
-      opacity: 0;
-      transform: translateY(-70px) scale(1, 0.9);
-    }
-    25% {
-      opacity: 1;
-    }
-    40% {
-      transform: translateY(-6px) scale(1.014, 1.015);
-    }
-    72% {
-      transform: translateY(1px) scale(1, 1);
-    }
-    100% {
-      opacity: 1;
-      transform: translateY(0) scale(1, 1);
-    }
   }
 
   .receipt-scroll-indicator {
