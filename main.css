@@ -1197,42 +1197,46 @@
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
 
-  /* v1.3: wrapper carries only the resting tilt. The drop-shadow has
-     moved to .receipt-paper — the masked element — so it follows the
-     torn-edge silhouette, and it is now static during the landing
-     animation. No filter on the wrapper means no filter recompute
-     while the wrapper's transform animates. */
+  /* v1.3: wrapper carries the resting tilt and the two-layer
+     drop-shadow. The filter sits here — on the wrapper, above the
+     masked paper — so it follows the paper's torn-edge silhouette.
+     It stays static: only the wrapper's transform animates during
+     the landing, and translateY does not change the paper's size, so
+     the shadow is computed once and carried with the layer. */
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
     transform: rotate(var(--rest-rotate, 1.65deg));
     transition: transform 400ms ease;
+    filter:
+      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
   }
 
   /* v1.3: landing animation is opacity + translateY only. No scale,
      no filter, no rotate that changes mid-animation. Those three
-     properties can force the compositor to re-rasterise the layer
-     (which contains an SVG-masked element and a two-layer drop-shadow
-     filter), so keeping them out of the keyframes guarantees the
-     compositor drives the entire animation without ever touching the
-     main thread. The resting tilt is baked into every keyframe so the
-     paper is at its final angle throughout the fall. */
+     properties force the compositor to re-rasterise the layer, which
+     is what caused the stutter. The resting tilt is baked into every
+     keyframe so the paper is at its final angle throughout the fall.
+     1400ms / 100px travel so the motion is actually visible. `both`
+     holds the 0% state before the animation starts, avoiding a flash
+     of the un-animated paper. */
   .receipt-paper-wrap.landing {
-    animation: paperLand 900ms cubic-bezier(0.34, 1.15, 0.64, 1) forwards;
+    animation: paperLand 1400ms cubic-bezier(0.22, 1, 0.36, 1) both;
     will-change: transform, opacity;
   }
 
   @keyframes paperLand {
     0% {
       opacity: 0;
-      transform: translateY(-40px) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-100px) rotate(var(--rest-rotate, 1.65deg));
     }
-    60% {
+    55% {
       opacity: 1;
-      transform: translateY(4px) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(6px) rotate(var(--rest-rotate, 1.65deg));
     }
-    80% {
-      transform: translateY(-2px) rotate(var(--rest-rotate, 1.65deg));
+    78% {
+      transform: translateY(-3px) rotate(var(--rest-rotate, 1.65deg));
     }
     100% {
       opacity: 1;
@@ -1252,16 +1256,10 @@
     transform-origin: 50% 100%;
     scroll-behavior: auto;
 
-    /* Torn edges via mask. The drop-shadow sits on the masked element
-       itself so it follows the torn-edge silhouette. The paper is
-       static during the landing — only the wrapper animates — so this
-       filter is computed once and baked into the wrapper's layer. No
-       border, no box-shadow. */
+    /* Torn edges via mask. Drop-shadow lives on the wrapper
+       (.receipt-paper-wrap). No border, no box-shadow, no filter. */
     border: none;
     box-shadow: none;
-    filter:
-      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
-      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
 
     -webkit-mask-image:
       url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
