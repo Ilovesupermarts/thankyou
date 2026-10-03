@@ -89,7 +89,7 @@
      previous scroll position can be saved and restored. The inline
      top offset (-scrollY) is set by JS and keeps the page visually
      in place while the lock is active. */
-  body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; left: 0; right: 0; }
+body.receipt-locked { overflow: hidden; }
 
   body.thankyou-active .stage, body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line, body.thankyou-active .divider,
