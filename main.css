@@ -1197,63 +1197,46 @@
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
 
-  /* v1.17.2: wrapper carries resting tilt and the two-layer
-     drop-shadow. The filter sits here (not on the paper) so the
-     drop-shadow follows the torn-edge silhouette produced by the
-     mask on .receipt-paper. */
+  /* v1.3: wrapper carries only the resting tilt. The drop-shadow has
+     moved to .receipt-paper — the masked element — so it follows the
+     torn-edge silhouette, and it is now static during the landing
+     animation. No filter on the wrapper means no filter recompute
+     while the wrapper's transform animates. */
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
     transform: rotate(var(--rest-rotate, 1.65deg));
-    transition: transform 400ms ease, filter 200ms ease;
-    filter:
-      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
-      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
+    transition: transform 400ms ease;
   }
 
-  /* v1.3: animation lives on the wrapper, not the masked paper. The
-     wrapper has no mask, so the browser can take a single cached
-     snapshot of the child (with its torn edges already rasterised)
-     and transform that flat image on the GPU. transform-origin at
-     the bottom edge preserves the original "slap onto the table"
-     hinge — the top tips back rather than the whole shape zooming.
-
-     Note: filter is animated inside this same keyframe block, which
-     Chromium may treat as a signal to run the entire animation on
-     the main thread rather than the compositor. If the S8 Ultra
-     still hitches after this, the fallback is a static shadow-caster
-     behind the wrapper and filter removed from the keyframes
-     entirely. */
+  /* v1.3: landing animation is opacity + translateY only. No scale,
+     no filter, no rotate that changes mid-animation. Those three
+     properties can force the compositor to re-rasterise the layer
+     (which contains an SVG-masked element and a two-layer drop-shadow
+     filter), so keeping them out of the keyframes guarantees the
+     compositor drives the entire animation without ever touching the
+     main thread. The resting tilt is baked into every keyframe so the
+     paper is at its final angle throughout the fall. */
   .receipt-paper-wrap.landing {
-    animation: paperLand 3000ms cubic-bezier(0.5, 0, 0.5, 1) forwards;
+    animation: paperLand 900ms cubic-bezier(0.34, 1.15, 0.64, 1) forwards;
     will-change: transform, opacity;
-    transform-origin: 50% 100%;
   }
 
   @keyframes paperLand {
     0% {
       opacity: 0;
-      transform: translateY(-70px) scale(1, 0.9) rotate(var(--rest-rotate, 1.65deg));
-      filter: none;
+      transform: translateY(-40px) rotate(var(--rest-rotate, 1.65deg));
     }
-    25% {
+    60% {
       opacity: 1;
+      transform: translateY(4px) rotate(var(--rest-rotate, 1.65deg));
     }
-    40% {
-      transform: translateY(-6px) scale(1.014, 1.015) rotate(var(--rest-rotate, 1.65deg));
-      filter: none;
-    }
-    /* Shadow fades back in as the violent scaling stops. */
-    72% {
-      transform: translateY(1px) scale(1, 1) rotate(var(--rest-rotate, 1.65deg));
-      filter: drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.10))
-              drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.10));
+    80% {
+      transform: translateY(-2px) rotate(var(--rest-rotate, 1.65deg));
     }
     100% {
       opacity: 1;
-      transform: translateY(0) scale(1, 1) rotate(var(--rest-rotate, 1.65deg));
-      filter: drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
-              drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
+      transform: translateY(0) rotate(var(--rest-rotate, 1.65deg));
     }
   }
 
@@ -1269,11 +1252,16 @@
     transform-origin: 50% 100%;
     scroll-behavior: auto;
 
-    /* Torn edges via mask. Shadow moved to wrapper (.receipt-paper-wrap)
-       so it follows the masked silhouette rather than painting a
-       rectangle. No border, no box-shadow, no filter here. */
+    /* Torn edges via mask. The drop-shadow sits on the masked element
+       itself so it follows the torn-edge silhouette. The paper is
+       static during the landing — only the wrapper animates — so this
+       filter is computed once and baked into the wrapper's layer. No
+       border, no box-shadow. */
     border: none;
     box-shadow: none;
+    filter:
+      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
 
     -webkit-mask-image:
       url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
@@ -1869,8 +1857,8 @@
   }
 
   /* v1.3: koi tap flinch. One-shot 1000ms animation triggered by a
-     short tap (< 8px travel, < 250ms) on the start button. Random
-     per tap via CSS custom properties written by JS:
+     short tap that began on the koi PNG itself. Random per tap via
+     CSS custom properties written by JS:
        --flinch-rot    peak rotation (deg)
        --flinch-scale  peak scale
        --flinch-x      horizontal dart (px, signed)
