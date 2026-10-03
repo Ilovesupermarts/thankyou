@@ -13,30 +13,25 @@
          body are cleared first. The rebuilt span preserves
          id="therapistName".
        - Transition-line focus snap: replaced the font-weight
-         .snap-bold class (which caused horizontal layout jitter)
-         with a sub-pixel text-shadow glow driven by a strictly
-         symmetrical |d| <= TB_SNAP_WINDOW_PX gate. Layout-safe,
-         direction-symmetric, instantaneous on/off. The CSS class
-         is removed from main.css.
+         .snap-bold class with a sub-pixel text-shadow glow driven
+         by a strictly symmetrical |d| <= TB_SNAP_WINDOW_PX gate.
+         TB_MAX_SCALE bumped to 1.08, TB_SNAP_INTENSITY = 1.65.
        - Carousel edge and under-swipe: bounceToCurrentPanel()
          snaps the track back to the current panel without
          replaying the phrase reveal. Applied to all four edge
-         cases (first/last panel, either direction) and to the
-         middle-panel under-swipe case.
+         cases and to the middle-panel under-swipe case.
+       - Custom-row sequential lockout fix: a row that already has
+         content is always editable regardless of gaps above it.
+       - Koi screen water effects: caustics (CSS), tap ripples,
+         swipe-up to begin, koi startle spin, koi dive.
+       - Receipt item counter badge updated in buildReceipt().
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
        - Panel-1 beats derive their split dynamically from the
-         actual text at the first "、" so any entered name works
-         (2-char, 3-char, English, etc.).
-       - Panel-1 beats are rebuilt after confirmName() runs, so
-         they reflect the entered name rather than the boot-time
-         placeholder.
-       - Therapist-name span now contains "name + さん", font
-         weight 600 (CSS change).
-       - Transition-line body gets .snap-bold (font-weight 600)
-         whenever blur is exactly 0; snaps back the instant blur
-         rises above 0. Instant switch, no transition.
+         actual text at the first "、" so any entered name works.
+       - Panel-1 beats are rebuilt after confirmName() runs.
+       - Therapist-name span contains "name + さん", font weight 600.
      v1.17
        - Panel phrase reveal: min-chunk absorption + comma-aware
          split; recursive text-node walker wrapper.
@@ -593,6 +588,10 @@ var introOverlay = document.getElementById('introOverlay');
 var nameColumn = document.getElementById('nameColumn');
 var introHasRun = false;
 
+/* Koi water effect DOM refs */
+var koiDiveWrap = document.getElementById('koiDiveWrap');
+var rippleLayer = document.getElementById('rippleLayer');
+
 var submitBtn = document.getElementById('submitBtn');
 var confirmScreen = document.getElementById('confirmScreen');
 var confirmYes = document.getElementById('confirmYes');
@@ -1097,9 +1096,7 @@ function buildPanel1OpeningBeats(panelEl) {
   if (!body) return;
 
   /* First call: capture the greeting from the authored DOM before we
-     rewrite anything. Everything between the name span and #panel1Body,
-     minus the name portion itself, is the greeting. Subsequent calls
-     reuse the cached value. */
+     rewrite anything. */
   if (therapistGreeting === null) {
     var captured = '';
     var srcSpan = contentEl.querySelector('.therapist-name');
@@ -1123,9 +1120,8 @@ function buildPanel1OpeningBeats(panelEl) {
     if (staleBeats[s].parentNode) staleBeats[s].parentNode.removeChild(staleBeats[s]);
   }
 
-  /* Clear any stray direct-child text nodes between contentEl start
-     and #panel1Body. Element children before body (shouldn't exist
-     after a clean build) are also removed for safety. */
+  /* Clear any stray direct-child nodes between contentEl start and
+     #panel1Body. */
   var child = contentEl.firstChild;
   while (child && child !== body) {
     var nextChild = child.nextSibling;
@@ -1503,6 +1499,10 @@ function firstUnnamedCustomRow() {
   return null;
 }
 function isAllowedCustomRow(row) {
+  /* v1.17.2: escape hatch — a row that already has content is always
+     editable, regardless of any empty rows above it. */
+  if (customRowHasName(row)) return true;
+
   var rows = getCustomRows();
   for (var i = 0; i < rows.length; i++) {
     if (rows[i] === row) return true;
@@ -2275,14 +2275,10 @@ function setupTransitionReveal() {
 /* ============================================================
    TRANSITION-LINE BLUR + SCALE + FOCUS SNAP
    ============================================================
-   v1.17.2: the snap effect was previously toggled via a
-   .snap-bold CSS class that changed font-weight. That caused
-   horizontal layout jitter during the scroll because changing
-   font-weight reflows glyph advance widths. This version uses
-   a sub-pixel text-shadow glow instead — a paint-only property
-   that does not affect layout — and gates it on a strictly
-   symmetrical |d| <= TB_SNAP_WINDOW_PX window so entry and
-   exit thresholds are identical regardless of scroll direction.
+   v1.17.2: the snap effect uses a sub-pixel text-shadow glow
+   (paint-only, no layout impact) gated on a strictly symmetrical
+   |d| <= TB_SNAP_WINDOW_PX window. Entry and exit thresholds are
+   identical regardless of scroll direction.
    ============================================================ */
 var tbMetrics = {
   bodyEl: null,
@@ -2318,8 +2314,6 @@ function updateTransitionBodyEffects() {
   var vc = vh / 2;
   var rect = tbMetrics.bodyEl.getBoundingClientRect();
   var bodyCentre = rect.top + rect.height / 2;
-
-  /* 'd' is the exact pixel distance from the absolute center of the screen */
   var d = bodyCentre - vc;
 
   var progress;
@@ -2339,9 +2333,7 @@ function updateTransitionBodyEffects() {
     ? 'scaleX(' + scaleVal.toFixed(4) + ')'
     : '';
 
-  /* Symmetrical strict snap (±TB_SNAP_WINDOW_PX) using text-shadow
-     for layout safety. Paint-only: no reflow, no jitter, and the
-     window fires and releases at the same |d| in both directions. */
+  /* Symmetrical focus snap via text-shadow (paint-only). */
   if (Math.abs(d) <= TB_SNAP_WINDOW_PX) {
     tbMetrics.bodyEl.style.textShadow =
       '0 0 ' + TB_SNAP_INTENSITY + 'px currentColor';
@@ -2411,6 +2403,243 @@ function updateReceiptScrollIndicator() {
   receiptScrollIndicatorEl.style.bottom = bottom + 'px';
   receiptScrollIndicatorEl.classList.add('shown');
 }
+
+/* ============================================================
+   KOI WATER EFFECTS — v1.17.2
+   ------------------------------------------------------------
+   Tap ripples, swipe-up gesture, koi startle spin, koi dive.
+   Gesture handler is gated on .blossom-screen.visible so it does
+   not interfere with the main carousel or the table.
+   ============================================================ */
+var RIPPLE_COLOURS_STRONG = [
+  'rgba(253, 243, 216, 0.95)',
+  'rgba(247, 185, 60, 0.85)',
+  'rgba(255, 240, 200, 0.70)'
+];
+var RIPPLE_COLOURS_SUBTLE = [
+  'rgba(247, 185, 60, 0.55)',
+  'rgba(255, 240, 200, 0.40)'
+];
+var RIPPLE_COLOURS_TRAIL  = ['rgba(247, 185, 60, 0.40)'];
+
+var KOI_RISE_MAX = 40;
+var KOI_RISE_FACTOR = 0.35;
+var KOI_SWIPE_THRESHOLD = 60;
+var KOI_TRAIL_INTERVAL = 90;
+var KOI_TRAIL_MIN_TRAVEL = 18;
+
+var koiGestureState = 'idle';   /* idle | swiping | startling | diving | done */
+var koiActivePointerId = null;
+var koiStartY = 0;
+var koiCurrentY = 0;
+var koiLastTrailAt = 0;
+var koiTimers = [];
+
+function koiPushTimer(id) { koiTimers.push(id); return id; }
+function clearKoiTimers() {
+  for (var i = 0; i < koiTimers.length; i++) clearTimeout(koiTimers[i]);
+  koiTimers = [];
+}
+
+function spawnRipples(clientX, clientY, intensity) {
+  if (!rippleLayer) return;
+  var palette, cls, baseSize;
+  if (intensity === 'strong') {
+    palette = RIPPLE_COLOURS_STRONG;
+    cls = '';
+    baseSize = 30;
+  } else if (intensity === 'trail') {
+    palette = RIPPLE_COLOURS_TRAIL;
+    cls = ' trail';
+    baseSize = 22;
+  } else {
+    palette = RIPPLE_COLOURS_SUBTLE;
+    cls = ' subtle';
+    baseSize = 26;
+  }
+
+  for (var i = 0; i < palette.length; i++) {
+    (function(idx) {
+      var r = document.createElement('div');
+      r.className = 'ripple' + cls;
+      var jitterX = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+      var jitterY = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+      r.style.left = (clientX + jitterX) + 'px';
+      r.style.top  = (clientY + jitterY) + 'px';
+      r.style.color = palette[idx];
+      r.style.animationDelay = (idx * 80) + 'ms';
+      r.style.width  = (baseSize + idx * 6) + 'px';
+      r.style.height = (baseSize + idx * 6) + 'px';
+      rippleLayer.appendChild(r);
+      setTimeout(function() {
+        if (r.parentNode) r.parentNode.removeChild(r);
+      }, 900 + idx * 80);
+    })(i);
+  }
+}
+
+function renderIntroGlyph(text) {
+  if (!nameColumn) return;
+  nameColumn.innerHTML = '';
+  var chars = (text || '心').split('');
+  for (var i = 0; i < chars.length; i++) {
+    var span = document.createElement('span');
+    span.className = 'name-char';
+    span.textContent = chars[i];
+    span.style.animationDelay = (i * 0.22) + 's';
+    nameColumn.appendChild(span);
+  }
+}
+
+function isBlossomInteractive() {
+  return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun;
+}
+
+function onKoiPointerDown(e) {
+  if (!isBlossomInteractive()) return;
+  if (koiGestureState !== 'idle') return;
+  if (koiActivePointerId !== null) return;
+  if (e.target && e.target.closest && e.target.closest('.theme-toggle')) return;
+
+  koiActivePointerId = e.pointerId;
+  koiStartY = e.clientY;
+  koiCurrentY = e.clientY;
+  koiLastTrailAt = Date.now();
+
+  var onButton = !!(e.target && e.target.closest && e.target.closest('.start-btn'));
+  spawnRipples(e.clientX, e.clientY, onButton ? 'strong' : 'subtle');
+
+  if (koiDiveWrap) {
+    koiDiveWrap.classList.add('dragging');
+    koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
+  }
+  koiGestureState = 'swiping';
+}
+
+function onKoiPointerMove(e) {
+  if (e.pointerId !== koiActivePointerId) return;
+  if (koiGestureState !== 'swiping') return;
+
+  koiCurrentY = e.clientY;
+  var deltaY = koiCurrentY - koiStartY;
+  var upward = Math.max(0, -deltaY);
+
+  if (koiDiveWrap) {
+    var riseY = -Math.min(KOI_RISE_MAX, upward * KOI_RISE_FACTOR);
+    koiDiveWrap.style.setProperty('--koi-rise-y', riseY + 'px');
+  }
+
+  if (startBtn) {
+    if (upward >= KOI_SWIPE_THRESHOLD) startBtn.classList.add('ready');
+    else startBtn.classList.remove('ready');
+  }
+
+  var now = Date.now();
+  if (upward > KOI_TRAIL_MIN_TRAVEL && (now - koiLastTrailAt) > KOI_TRAIL_INTERVAL) {
+    koiLastTrailAt = now;
+    spawnRipples(e.clientX, koiCurrentY, 'trail');
+  }
+}
+
+function onKoiPointerUp(e) {
+  if (e.pointerId !== koiActivePointerId) return;
+  koiActivePointerId = null;
+
+  if (koiGestureState !== 'swiping') {
+    if (koiDiveWrap) koiDiveWrap.classList.remove('dragging');
+    return;
+  }
+
+  var deltaY = koiCurrentY - koiStartY;
+  var upward = Math.max(0, -deltaY);
+
+  if (koiDiveWrap) koiDiveWrap.classList.remove('dragging');
+
+  if (upward >= KOI_SWIPE_THRESHOLD) {
+    if (startBtn) startBtn.classList.remove('ready');
+    triggerKoiStart();
+  } else {
+    if (koiDiveWrap) koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
+    if (startBtn) startBtn.classList.remove('ready');
+    koiGestureState = 'idle';
+  }
+}
+
+function triggerKoiStart() {
+  if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
+  koiGestureState = 'startling';
+
+  playDrop();
+  haptic(12);
+  document.body.classList.add('info-visible');
+  if (infoBar) infoBar.classList.add('shown');
+  repositionHintGroupAfterLayout();
+  repositionNumpad();
+
+  if (startBtn) startBtn.classList.add('startling');
+
+  koiPushTimer(setTimeout(function() {
+    if (startBtn) {
+      startBtn.classList.remove('startling');
+      startBtn.classList.add('diving');
+    }
+    if (blossomScreen) blossomScreen.classList.add('diving');
+    koiGestureState = 'diving';
+
+    blossomScreen.style.transition = 'opacity 0.6s ease';
+    blossomScreen.style.opacity = '0';
+
+    koiPushTimer(setTimeout(function() {
+      var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
+      renderIntroGlyph(nameText);
+      var ambientImage = document.querySelector('.ambient-image');
+      if (ambientImage) ambientImage.style.opacity = '0.8';
+      if (introOverlay) introOverlay.classList.add('active');
+
+      var totalChars = nameText.length;
+      var arrivalTime = (totalChars * 220) + 1100;
+      var holdTime = 1200;
+
+      koiPushTimer(setTimeout(function() {
+        var fadingChars = nameColumn ? nameColumn.querySelectorAll('.name-char') : [];
+        for (var f = 0; f < fadingChars.length; f++) {
+          fadingChars[f].style.transitionDelay = (f * 0.18) + 's';
+        }
+        if (introOverlay) introOverlay.classList.add('finishing');
+        if (dotsEl) dotsEl.classList.add('visible');
+        if (blossomScreen) {
+          blossomScreen.classList.remove('visible');
+          blossomScreen.style.opacity = '';
+          blossomScreen.style.transition = '';
+        }
+        updateGlobalHint();
+        document.body.classList.add('table-locked');
+        window.scrollTo(0, 0);
+        currentPanel = 0;
+        track.style.transform = 'translateX(0%)';
+        for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
+        activatePanel(0);
+
+        koiPushTimer(setTimeout(function() {
+          if (introOverlay) introOverlay.classList.remove('active', 'finishing');
+          var ambientImage2 = document.querySelector('.ambient-image');
+          if (ambientImage2) {
+            if (currentTheme === 'autumn') ambientImage2.style.opacity = '';
+            else ambientImage2.style.opacity = '0';
+          }
+          repositionHintGroupAfterLayout();
+          repositionNumpad();
+          koiGestureState = 'done';
+        }, 1400));
+      }, arrivalTime + holdTime));
+    }, 420));
+  }, 200));
+}
+
+document.addEventListener('pointerdown', onKoiPointerDown, { passive: true });
+document.addEventListener('pointermove', onKoiPointerMove, { passive: true });
+document.addEventListener('pointerup', onKoiPointerUp, { passive: true });
+document.addEventListener('pointercancel', onKoiPointerUp, { passive: true });
 
 /* ============ NAME CONFIRM ============ */
 function confirmName() {
@@ -2616,67 +2845,6 @@ window.addEventListener('load', function() {
   }
 });
 
-/* ============ INTRO ============ */
-startBtn.addEventListener('click', function(e) {
-  e.preventDefault();
-  if (introHasRun) return;
-  introHasRun = true;
-  playDrop();
-  haptic(12);
-  document.body.classList.add('info-visible');
-  if (infoBar) infoBar.classList.add('shown');
-  repositionHintGroupAfterLayout();
-  repositionNumpad();
-  blossomScreen.style.transition = 'opacity 0.6s ease';
-  blossomScreen.style.opacity = '0';
-  setTimeout(function() {
-    var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
-    nameColumn.innerHTML = '';
-    var chars = nameText.split('');
-    var totalChars = chars.length;
-    for (var i = 0; i < totalChars; i++) {
-      var span = document.createElement('span');
-      span.className = 'name-char';
-      span.textContent = chars[i];
-      span.style.animationDelay = (i * 0.22) + 's';
-      nameColumn.appendChild(span);
-    }
-    var ambientImage = document.querySelector('.ambient-image');
-    if (ambientImage) ambientImage.style.opacity = '0.8';
-    introOverlay.classList.add('active');
-    var arrivalTime = (totalChars * 220) + 1100;
-    var holdTime = 1200;
-    setTimeout(function() {
-      var fadingChars = nameColumn.querySelectorAll('.name-char');
-      for (var f = 0; f < fadingChars.length; f++) {
-        fadingChars[f].style.transitionDelay = (f * 0.18) + 's';
-      }
-      introOverlay.classList.add('finishing');
-      dotsEl.classList.add('visible');
-      blossomScreen.classList.remove('visible');
-      blossomScreen.style.opacity = '';
-      blossomScreen.style.transition = '';
-      updateGlobalHint();
-      document.body.classList.add('table-locked');
-      window.scrollTo(0, 0);
-      currentPanel = 0;
-      track.style.transform = 'translateX(0%)';
-      for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
-      activatePanel(0);
-      setTimeout(function() {
-        introOverlay.classList.remove('active', 'finishing');
-        var ambientImage2 = document.querySelector('.ambient-image');
-        if (ambientImage2) {
-          if (currentTheme === 'autumn') ambientImage2.style.opacity = '';
-          else ambientImage2.style.opacity = '0';
-        }
-        repositionHintGroupAfterLayout();
-        repositionNumpad();
-      }, 1400);
-    }, arrivalTime + holdTime);
-  }, 700);
-});
-
 /* ============ RECEIPT ============ */
 function buildReceipt() {
   cancelPendingReceiptShake();
@@ -2764,6 +2932,11 @@ function buildReceipt() {
     receiptItems.appendChild(rejectDiv);
     itemCount++;
   }
+
+  /* v1.17.2: item counter badge. */
+  var itemCountEl = document.getElementById('itemCount');
+  if (itemCountEl) itemCountEl.textContent = itemCount + ' 項目';
+
   bindReceiptItemListeners();
   updateReceiptTotal();
   firstServiceInReceipt = firstRowIncluded;
