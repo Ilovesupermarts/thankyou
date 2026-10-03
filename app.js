@@ -28,6 +28,14 @@
        - Receipt item counter badge now uses a compact 2-column
          digit-roll odometer (see COUNTER ODOMETER section) and is
          re-rolled on every remove / undo via updateReceiptItemCount().
+       - Receipt 本日の内容 counter styled to match the label:
+         badge chrome removed, colon moved into the label span,
+         tracking inherited, digit column width measured at runtime
+         (measureDigitAdvance / applyCounterCellWidth).
+       - Receipt landing: screen snaps in instead of fading so the
+         paper's paperLand animation is visible on entry.
+       - Body is locked while the receipt overlay is visible so
+         scrolls do not leak to the page underneath.
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
@@ -538,6 +546,11 @@ function updateReceiptTotal() {
    rather than a full money roll. Re-rolled from the remove and
    undo handlers in bindReceiptItemListeners() via
    updateReceiptItemCount().
+
+   The digit column width is set at runtime to the exact digit
+   advance plus one letter-space (see measureDigitAdvance below),
+   which makes the counter read with the same tracking as the
+   surrounding text of the 本日の内容 label.
    ============================================================ */
 var COUNTER_COLS = 2;
 
@@ -620,6 +633,53 @@ function updateReceiptItemCount() {
     activeItems++;
   }
   applyCounterValue(container, activeItems, { instant: false });
+}
+
+/* ============================================================
+   RUNTIME DIGIT ADVANCE MEASUREMENT
+   ------------------------------------------------------------
+   Measures one digit slot's width — glyph advance plus one
+   letter-space — using a hidden probe carrying the same font,
+   size, and tracking as .receipt-title. Writes the result to
+   --counter-cell-w on the counter container, which CSS uses as
+   the digit-col width.
+
+   Why not 1ch: 1ch is the advance of "0". If a font's "3" is
+   wider than its "0", the column undersizes and flexbox clips
+   the glyph. Measuring once at runtime sidesteps the guesswork.
+   ============================================================ */
+function measureDigitAdvance() {
+  var titleEl = document.querySelector('.receipt-title');
+  if (!titleEl) return null;
+  var cs = window.getComputedStyle(titleEl);
+
+  var probe = document.createElement('span');
+  probe.textContent = '0000000000';   /* 10 digits for accuracy */
+  probe.style.position = 'absolute';
+  probe.style.visibility = 'hidden';
+  probe.style.pointerEvents = 'none';
+  probe.style.whiteSpace = 'nowrap';
+  probe.style.fontFamily = cs.fontFamily;
+  probe.style.fontSize = cs.fontSize;
+  probe.style.fontWeight = cs.fontWeight;
+  probe.style.fontStyle = cs.fontStyle;
+  probe.style.letterSpacing = cs.letterSpacing;
+  probe.style.lineHeight = '1';
+  document.body.appendChild(probe);
+
+  var w = probe.getBoundingClientRect().width;
+  document.body.removeChild(probe);
+
+  if (!w || w <= 0) return null;
+  return w / 10;
+}
+
+function applyCounterCellWidth() {
+  var advance = measureDigitAdvance();
+  if (!advance) return;
+  var container = document.getElementById('itemCountDigits');
+  if (!container) return;
+  container.style.setProperty('--counter-cell-w', advance.toFixed(3) + 'px');
 }
 
 /* ============ DOM REFS ============ */
@@ -2926,6 +2986,16 @@ window.addEventListener('load', function() {
 
   buildDigitColumns(document.getElementById('summaryDigits'), 0);
   buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
+  buildCounterColumns(document.getElementById('itemCountDigits'), 3);
+
+  /* Measure digit advance now (fallback font), then re-measure once
+     the real webfont has loaded so the counter column width matches
+     Shippori Mincho's actual digit advance. */
+  applyCounterCellWidth();
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(applyCounterCellWidth);
+  }
+  window.addEventListener('resize', applyCounterCellWidth);
 
   var receiptPaperEl = receiptScreen ? receiptScreen.querySelector('.receipt-paper') : null;
   if (receiptPaperEl) {
@@ -3030,7 +3100,7 @@ function buildReceipt() {
     itemCount++;
   }
 
-  /* v1.17.2: item counter badge — odometer-style. */
+  /* v1.17.2: item counter — odometer-style, styled to match the label. */
   var itemCountDigits = document.getElementById('itemCountDigits');
   if (itemCountDigits) buildCounterColumns(itemCountDigits, itemCount);
 
@@ -3243,7 +3313,17 @@ confirmYes.addEventListener('click', function(e) {
   summaryBar.classList.remove('visible');
   setTimeout(function() {
     resetReceiptScroll();
+
+    /* Snap the screen in — no opacity fade on entry — so the paper's
+       landing animation is the only motion on screen and is not
+       masked by the overlay's own 0.9s fade. The transition is
+       cleared immediately after the reflow so the screen still
+       fades out normally on close. */
+    receiptScreen.style.transition = 'none';
     receiptScreen.classList.add('visible');
+    void receiptScreen.offsetWidth;
+    receiptScreen.style.transition = '';
+
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
 
@@ -3573,6 +3653,7 @@ document.addEventListener('keydown', function(e) {
 
 window.addEventListener('scroll', function() {
   if (!tableUnlocked && window.scrollY > 0) { window.scrollTo(0, 0); return; }
+  if (receiptScreen && receiptScreen.classList.contains('visible')) return;
   if (window.scrollY > 30) infoBar.classList.add('hidden');
   else infoBar.classList.remove('hidden');
 }, { passive: true });
