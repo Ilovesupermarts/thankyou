@@ -4,28 +4,19 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#fdf3d8">
-<title>Koi Water — Demo (real assets)</title>
+<title>Koi Water — Demo (swipe up)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- ============================================================
-     REAL APP STYLESHEET — same file the app loads
-     ============================================================ -->
 <link rel="stylesheet" href="main.css">
 
-<!-- ============================================================
-     DEMO-ONLY ADDITIONS
-     Everything below is new. Nothing overrides main.css's
-     start-button block; the koi, rings, label, hint keep their
-     authored styling. These rules only ADD the water effects.
-     ============================================================ -->
 <style>
-  /* ---------- CAUSTICS ----------
-     Two screen-blended drifting pools. Appended as extra
-     ambient-layer divs inside .ambient-stage, so they inherit
-     the wind transform the app already drives. */
+  /* Demo override — no scrolling, all touches captured by our gesture layer */
+  body { touch-action: none; }
+
+  /* ---------- CAUSTICS ---------- */
   .caustics {
     mix-blend-mode: screen;
     pointer-events: none;
@@ -55,8 +46,7 @@
     50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
   }
 
-  /* ---------- RIPPLES ----------
-     Fixed overlay above the ambient stage, below the koi button. */
+  /* ---------- RIPPLES ---------- */
   .ripple-layer {
     position: fixed;
     inset: 0;
@@ -77,35 +67,47 @@
     will-change: transform, opacity;
     animation: rippleExpand 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   }
+  .ripple.subtle { animation-name: rippleExpandSubtle; }
+  .ripple.trail  { animation-name: rippleExpandTrail; }
   @keyframes rippleExpand {
     0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.95; }
     60%  { opacity: 0.55; }
     100% { transform: translate(-50%, -50%) scale(5.2); opacity: 0; }
   }
+  @keyframes rippleExpandSubtle {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.55; }
+    55%  { opacity: 0.30; }
+    100% { transform: translate(-50%, -50%) scale(3.4); opacity: 0; }
+  }
+  @keyframes rippleExpandTrail {
+    0%   { transform: translate(-50%, -50%) scale(0.25); opacity: 0.45; }
+    100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
+  }
 
-  /* ---------- KOI DIVE WRAPPER ----------
-     Wraps .blossom-char so the koi's existing koiDive keyframe
-     and swimCircle rotation are untouched. The wrapper carries
-     the dive transform. */
+  /* ---------- KOI DIVE / RISE WRAPPER ---------- */
   .koi-dive-wrap {
     position: relative;
     z-index: 2;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
+    /* --koi-rise-y is set by JS during a swipe; defaults to 0 */
+    transform: translateY(var(--koi-rise-y, 0px));
+    transition: transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
                 opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
     will-change: transform, opacity;
+  }
+  .koi-dive-wrap.dragging {
+    transition: none;
   }
   .start-btn.diving .koi-dive-wrap {
     transform: translateY(260px) scale(0.75);
     opacity: 0;
+    transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
+                opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
   }
 
-  /* ---------- KOI STARTLE ----------
-     Brief fast spin on tap, replacing swimCircle for 200ms.
-     Preserves the koi's own koiDive breath animation on
-     .blossom-char — we only override the inner <img>. */
+  /* ---------- KOI STARTLE ---------- */
   .start-btn.startling .koi-image {
     animation: koiStartleSpin 200ms cubic-bezier(0.34, 1.15, 0.64, 1);
   }
@@ -115,8 +117,7 @@
     100% { transform: rotate(360deg) scale(1); }
   }
 
-  /* ---------- DIVE COMPANIONS ----------
-     The rings and label fade out as the koi leaves the surface. */
+  /* ---------- DIVE COMPANIONS ---------- */
   .start-btn.diving .rings-svg {
     opacity: 0;
     transition: opacity 700ms ease;
@@ -132,7 +133,21 @@
     transition: opacity 500ms ease, transform 500ms ease;
   }
 
-  /* ---------- RESET BUTTON (demo chrome only) ---------- */
+  /* ---------- READY FEEDBACK ----------
+     Fires once the swipe crosses the release threshold. */
+  .start-btn .gold-band {
+    transition: filter 250ms ease;
+  }
+  .start-btn.ready .gold-band {
+    filter: drop-shadow(0 0 28px rgba(253, 240, 200, 1));
+  }
+  .start-btn.ready .start-label {
+    color: #ffffff;
+    text-shadow: 0 0 16px rgba(253, 240, 200, 1);
+    transition: color 250ms ease, text-shadow 250ms ease;
+  }
+
+  /* ---------- DEMO CHROME ---------- */
   .demo-reset {
     position: fixed;
     bottom: 20px;
@@ -156,6 +171,7 @@
     appearance: none;
     transition: transform 0.2s ease, background 0.2s ease;
     opacity: 0.55;
+    touch-action: manipulation;
   }
   .demo-reset:hover { opacity: 0.9; }
   .demo-reset:active {
@@ -164,7 +180,6 @@
     border-color: var(--accent);
   }
 
-  /* ---------- DEMO HUD ---------- */
   .demo-hud {
     position: fixed;
     top: 14px;
@@ -180,7 +195,6 @@
   }
   .demo-hud strong { font-weight: 600; color: var(--accent); }
 
-  /* ---------- ACCESSIBILITY ---------- */
   @media (prefers-reduced-motion: reduce) {
     .caustics-1, .caustics-2 { animation: none; }
     .ripple { animation-duration: 300ms; }
@@ -189,11 +203,6 @@
 </head>
 <body>
 
-<!-- ============================================================
-     AMBIENT STAGE — same structure as the real app,
-     with the two caustics layers appended after ambient-
-     secondary so they sit above the gradient and below motes.
-     ============================================================ -->
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-image">
     <video class="ambient-video" id="ambientVideo"
@@ -208,18 +217,10 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- RIPPLE LAYER — sits above the ambient stage, below the koi -->
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 
-<!-- ============================================================
-     BLOSSOM SCREEN — the real markup from index.html, with
-     .blossom-char wrapped in .koi-dive-wrap for the dive
-     transition. main.css styles .start-btn, .icon-wrapper,
-     .rings-svg, .blossom-char, .koi-image, .start-label,
-     .start-hint exactly as in production.
-     ============================================================ -->
 <div class="blossom-screen" id="blossomScreen">
-  <button type="button" class="start-btn" id="startBtn" aria-label="はじめる">
+  <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
       <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
@@ -227,7 +228,7 @@
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
-      <div class="koi-dive-wrap">
+      <div class="koi-dive-wrap" id="koiDiveWrap">
         <div class="blossom-char">
           <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
         </div>
@@ -235,22 +236,17 @@
     </div>
     <span class="start-label">はじめる</span>
   </button>
-  <p class="start-hint" id="startHint">水面の鯉を、そっとタップしてください。</p>
+  <p class="start-hint" id="startHint">水面を、そっと上へなぞってください。</p>
 </div>
 
-<!-- ============================================================
-     INTRO OVERLAY — real structure from index.html.
-     The .name-column is populated with .name-char spans at
-     dive time, exactly as confirmName() does in the app.
-     ============================================================ -->
 <div class="intro-overlay" id="introOverlay">
   <div class="name-column" id="nameColumn"></div>
 </div>
 
-<!-- Demo chrome -->
 <button type="button" class="demo-reset" id="resetBtn" aria-label="リセット">↺</button>
 <div class="demo-hud">
   <div>state: <strong id="hudState">idle</strong></div>
+  <div>swipe: <strong id="hudSwipe">0 px</strong></div>
   <div>ripples: <strong id="hudRipples">0</strong></div>
 </div>
 
@@ -258,26 +254,39 @@
 (function() {
   'use strict';
 
-  var startBtn       = document.getElementById('startBtn');
-  var blossomScreen  = document.getElementById('blossomScreen');
-  var startHint      = document.getElementById('startHint');
-  var introOverlay   = document.getElementById('introOverlay');
-  var nameColumn     = document.getElementById('nameColumn');
-  var rippleLayer    = document.getElementById('rippleLayer');
-  var resetBtn       = document.getElementById('resetBtn');
-  var hudState       = document.getElementById('hudState');
-  var hudRipples     = document.getElementById('hudRipples');
-  var ambientVideo   = document.getElementById('ambientVideo');
+  var startBtn      = document.getElementById('startBtn');
+  var blossomScreen = document.getElementById('blossomScreen');
+  var introOverlay  = document.getElementById('introOverlay');
+  var nameColumn    = document.getElementById('nameColumn');
+  var koiDiveWrap   = document.getElementById('koiDiveWrap');
+  var rippleLayer   = document.getElementById('rippleLayer');
+  var resetBtn      = document.getElementById('resetBtn');
+  var hudState      = document.getElementById('hudState');
+  var hudSwipe      = document.getElementById('hudSwipe');
+  var hudRipples    = document.getElementById('hudRipples');
+  var ambientVideo  = document.getElementById('ambientVideo');
 
-  var state = 'idle';       /* idle | startling | diving | done */
+  var state = 'idle';            /* idle | swiping | startling | diving | done */
   var rippleCount = 0;
   var activeTimers = [];
 
-  var RIPPLE_COLOURS = [
-    'rgba(253, 243, 216, 0.95)',
-    'rgba(247, 185, 60, 0.85)',
-    'rgba(255, 240, 200, 0.70)'
-  ];
+  var activePointerId = null;
+  var startX = 0, startY = 0;
+  var currentX = 0, currentY = 0;
+  var riseY = 0;                 /* negative when koi is lifted */
+  var lastTrailRippleAt = 0;
+
+  /* Tuning knobs */
+  var RISE_MAX = 40;             /* maximum koi lift, px */
+  var RISE_FACTOR = 0.35;        /* koi lift / finger travel */
+  var SWIPE_THRESHOLD = 60;      /* upward px to arm the release */
+  var TRAIL_RIPPLE_INTERVAL = 90; /* ms between trail ripples */
+  var TRAIL_RIPPLE_MIN_TRAVEL = 18; /* px before a trail ripple may fire */
+
+  /* Ripple palettes */
+  var PALETTE_STRONG = ['rgba(253, 243, 216, 0.95)', 'rgba(247, 185, 60, 0.85)', 'rgba(255, 240, 200, 0.70)'];
+  var PALETTE_SUBTLE = ['rgba(247, 185, 60, 0.55)',  'rgba(255, 240, 200, 0.40)'];
+  var PALETTE_TRAIL  = ['rgba(247, 185, 60, 0.40)'];
 
   function pushTimer(id) { activeTimers.push(id); return id; }
   function clearTimers() {
@@ -291,36 +300,47 @@
   }
 
   /* ----------------------------------------------------------
-     Ripples — 3 concentric rings, small per-ring jitter so the
-     pattern reads as a natural disturbance rather than a stack
-     of perfect circles.
+     Ripples — intensity is 'strong' | 'subtle' | 'trail'.
      ---------------------------------------------------------- */
-  function spawnRipples(clientX, clientY) {
-    for (var i = 0; i < 3; i++) {
+  function spawnRipples(clientX, clientY, intensity) {
+    var palette, cls, baseSize;
+    if (intensity === 'strong') {
+      palette = PALETTE_STRONG;
+      cls = '';
+      baseSize = 30;
+    } else if (intensity === 'trail') {
+      palette = PALETTE_TRAIL;
+      cls = ' trail';
+      baseSize = 22;
+    } else {
+      palette = PALETTE_SUBTLE;
+      cls = ' subtle';
+      baseSize = 26;
+    }
+
+    for (var i = 0; i < palette.length; i++) {
       (function(idx) {
         var r = document.createElement('div');
-        r.className = 'ripple';
-        var jitterX = (idx - 1) * 3 + (Math.random() * 4 - 2);
-        var jitterY = (idx - 1) * 3 + (Math.random() * 4 - 2);
+        r.className = 'ripple' + cls;
+        var jitterX = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+        var jitterY = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
         r.style.left = (clientX + jitterX) + 'px';
         r.style.top  = (clientY + jitterY) + 'px';
-        r.style.color = RIPPLE_COLOURS[idx];
-        r.style.animationDelay = (idx * 90) + 'ms';
-        r.style.width  = (30 + idx * 6) + 'px';
-        r.style.height = (30 + idx * 6) + 'px';
+        r.style.color = palette[idx];
+        r.style.animationDelay = (idx * 80) + 'ms';
+        r.style.width  = (baseSize + idx * 6) + 'px';
+        r.style.height = (baseSize + idx * 6) + 'px';
         rippleLayer.appendChild(r);
         pushTimer(setTimeout(function() {
           if (r.parentNode) r.parentNode.removeChild(r);
-        }, 900 + idx * 90));
+        }, 900 + idx * 80));
       })(i);
     }
-    bumpRippleCount(3);
+    bumpRippleCount(palette.length);
   }
 
   /* ----------------------------------------------------------
-     Intro glyph — same pattern as confirmName(): clear
-     .name-column, spawn .name-char spans with staggered
-     animation-delay. main.css handles the arrival keyframe.
+     Intro glyph — matches the app's confirmName() pattern.
      ---------------------------------------------------------- */
   function renderIntroGlyph(text) {
     nameColumn.innerHTML = '';
@@ -335,22 +355,91 @@
   }
 
   /* ----------------------------------------------------------
-     Start flow:
-       idle -> startling (200ms fast spin)
-            -> diving    (900ms koi descends; rings + label fade;
-                          intro glyph appears at 420ms)
-            -> done
+     Gesture layer — listens on document, works from anywhere
+     on screen.
      ---------------------------------------------------------- */
-  function handleStart(e) {
+  function onPointerDown(e) {
     if (state !== 'idle') return;
+    if (activePointerId !== null) return;
+    if (e.target.closest && e.target.closest('.demo-reset')) return;
 
-    var x, y;
-    if (e && e.touches && e.touches[0]) { x = e.touches[0].clientX; y = e.touches[0].clientY; }
-    else if (e && typeof e.clientX === 'number' && (e.clientX || e.clientY)) { x = e.clientX; y = e.clientY; }
-    else { var r = startBtn.getBoundingClientRect(); x = r.left + r.width / 2; y = r.top + r.height / 2; }
+    activePointerId = e.pointerId;
+    startX = currentX = e.clientX;
+    startY = currentY = e.clientY;
+    riseY = 0;
+    lastTrailRippleAt = Date.now();
 
-    spawnRipples(x, y);
+    var onButton = !!(e.target.closest && e.target.closest('.start-btn'));
+    spawnRipples(e.clientX, e.clientY, onButton ? 'strong' : 'subtle');
 
+    koiDiveWrap.classList.add('dragging');
+    koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
+    setState('swiping');
+  }
+
+  function onPointerMove(e) {
+    if (e.pointerId !== activePointerId) return;
+    if (state !== 'swiping') return;
+
+    currentX = e.clientX;
+    currentY = e.clientY;
+
+    var deltaY = currentY - startY;
+    var upward = Math.max(0, -deltaY);
+
+    /* Lift koi proportional to upward travel */
+    riseY = -Math.min(RISE_MAX, upward * RISE_FACTOR);
+    koiDiveWrap.style.setProperty('--koi-rise-y', riseY + 'px');
+
+    /* Arm the release feedback past threshold */
+    if (upward >= SWIPE_THRESHOLD) {
+      startBtn.classList.add('ready');
+    } else {
+      startBtn.classList.remove('ready');
+    }
+
+    /* Trail ripples behind a moving finger */
+    var now = Date.now();
+    if (upward > TRAIL_RIPPLE_MIN_TRAVEL &&
+        (now - lastTrailRippleAt) > TRAIL_RIPPLE_INTERVAL) {
+      lastTrailRippleAt = now;
+      spawnRipples(currentX, currentY, 'trail');
+    }
+
+    hudSwipe.textContent = Math.round(upward) + ' px';
+  }
+
+  function onPointerUp(e) {
+    if (e.pointerId !== activePointerId) return;
+    activePointerId = null;
+
+    if (state !== 'swiping') {
+      /* e.g. pointercancel after we already moved on */
+      koiDiveWrap.classList.remove('dragging');
+      return;
+    }
+
+    var deltaY = currentY - startY;
+    var upward = Math.max(0, -deltaY);
+
+    koiDiveWrap.classList.remove('dragging');
+
+    if (upward >= SWIPE_THRESHOLD) {
+      startBtn.classList.remove('ready');
+      triggerStart();
+    } else {
+      /* Spring back, stay in idle */
+      koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
+      startBtn.classList.remove('ready');
+      setState('idle');
+      hudSwipe.textContent = '0 px';
+    }
+  }
+
+  /* ----------------------------------------------------------
+     Start sequence — startle, dive, intro glyph.
+     ---------------------------------------------------------- */
+  function triggerStart() {
     setState('startling');
     startBtn.classList.add('startling');
 
@@ -360,8 +449,6 @@
       blossomScreen.classList.add('diving');
       setState('diving');
 
-      /* Intro glyph appears mid-dive, timing matched to the app's
-         charArrive onset after the overlay starts fading in. */
       pushTimer(setTimeout(function() {
         renderIntroGlyph('桜');
         introOverlay.classList.add('active');
@@ -375,40 +462,53 @@
   }
 
   /* ----------------------------------------------------------
-     Reset — clear state so the demo replays cleanly.
+     Reset
      ---------------------------------------------------------- */
   function reset() {
     clearTimers();
-    startBtn.classList.remove('startling', 'diving', 'done');
+    activePointerId = null;
+    startBtn.classList.remove('startling', 'diving', 'done', 'ready');
     blossomScreen.classList.remove('diving');
     introOverlay.classList.remove('active');
     nameColumn.innerHTML = '';
     rippleLayer.innerHTML = '';
-    void startBtn.offsetWidth;   /* reflow so transitions restart cleanly */
+    koiDiveWrap.classList.remove('dragging');
+    koiDiveWrap.style.removeProperty('--koi-rise-y');
+    riseY = 0;
+    hudSwipe.textContent = '0 px';
+    void startBtn.offsetWidth;
     setState('idle');
   }
 
   /* ----------------------------------------------------------
      Wiring
      ---------------------------------------------------------- */
-  startBtn.addEventListener('click', handleStart);
+  document.addEventListener('pointerdown', onPointerDown, { passive: true });
+  document.addEventListener('pointermove', onPointerMove, { passive: true });
+  document.addEventListener('pointerup', onPointerUp, { passive: true });
+  document.addEventListener('pointercancel', onPointerUp, { passive: true });
   resetBtn.addEventListener('click', reset);
 
+  /* Keyboard — desktop / accessibility path */
   document.addEventListener('keydown', function(e) {
     if (e.key === ' ' || e.key === 'Enter') {
       e.preventDefault();
-      if (state === 'idle') handleStart({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 });
-      else if (state === 'done') reset();
+      if (state === 'idle') {
+        spawnRipples(window.innerWidth / 2, window.innerHeight / 2, 'strong');
+        triggerStart();
+      } else if (state === 'done') {
+        reset();
+      }
     }
     if (e.key === 'r' || e.key === 'R') reset();
   });
 
   /* ----------------------------------------------------------
-     Boot — show blossom screen, ensure ambient video plays.
-     main.css hides .blossom-screen until .visible is present.
+     Boot
      ---------------------------------------------------------- */
   blossomScreen.classList.add('visible');
   setState('idle');
+  hudSwipe.textContent = '0 px';
   hudRipples.textContent = '0';
 
   if (ambientVideo) {
