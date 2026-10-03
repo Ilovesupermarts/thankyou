@@ -89,7 +89,7 @@
      previous scroll position can be saved and restored. The inline
      top offset (-scrollY) is set by JS and keeps the page visually
      in place while the lock is active. */
-body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; left: 0; right: 0; }
+  body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; left: 0; right: 0; }
 
   body.thankyou-active .stage, body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line, body.thankyou-active .divider,
@@ -1397,7 +1397,8 @@ body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 1
   }
 
   .receipt-items { display: flex; flex-direction: column; gap: 14px; }
-  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); position: relative; }
+  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); position: relative; opacity: 0; transform: translateY(8px); }
+  .receipt-item.revealed { animation: receiptItemArrive 0.7s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards; }
   @keyframes receiptItemArrive { to { opacity: 1; transform: translateY(0); } }
   .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
   .receipt-item-name { flex: 1; font-size: 14px; color: var(--text-soft); line-height: 1.5; letter-spacing: 0.3px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; transition: opacity 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
