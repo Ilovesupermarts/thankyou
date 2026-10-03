@@ -38,14 +38,18 @@
     letter-spacing: inherit;
   }
 
-  /* 3. Digit cell height tracks the label's font-size. */
+  /* 3. Digit cell height tracks the label's font-size, and the
+        whole counter pulls left by --counter-pull so the digit sits
+        closer to the preceding ：. Tune --counter-pull if the gap
+        still reads wrong. */
   .counter-digit-roll {
     --digit-h: 1.4em;
+    --counter-pull: -3px;
+    margin-left: var(--counter-pull);
   }
 
   /* 4. Column width comes from a CSS variable measured at runtime
-        (one digit advance + one letter-space, i.e. exactly what a
-        normal character slot occupies on the line). Fallback is a
+        (one digit advance + one letter-space). Fallback is a
         generous guess used only before JS measures. */
   .counter-digit-roll .digit-col {
     width: var(--counter-cell-w, 1.4em);
@@ -185,10 +189,6 @@
    size, and tracking as .receipt-title. Writes the result to
    --counter-cell-w on the counter container, which CSS uses
    as the digit-col width.
-
-   Why not 1ch: 1ch is the advance of "0". If a font's "3" is
-   wider than its "0", the column undersizes and flexbox clips
-   the glyph. Measuring once at runtime sidesteps the guesswork.
    ============================================================ */
 function measureDigitAdvance() {
   var titleEl = document.querySelector('.receipt-title');
@@ -437,7 +437,7 @@ window.addEventListener('load', function() {
   renderItems(currentCount);
 
   /* Measure now (fallback font), then re-measure once the real
-     webfont has loaded and report the exact advance. */
+     webfont has loaded. */
   applyCounterCellWidth();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(applyCounterCellWidth);
