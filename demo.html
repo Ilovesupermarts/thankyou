@@ -4,56 +4,55 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#fdf3d8">
-<title>Receipt as Physical Object — Demo</title>
+<title>Receipt as Physical Object — Demo v2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Real app stylesheet -->
 <link rel="stylesheet" href="main.css">
 
 <style>
   /* ============================================================
      DEMO-ONLY ADDITIONS
      ============================================================ */
-
   body { overflow: hidden; }
 
-  /* ---------- AMBIENT BACKGROUND (from main.css vars) ---------- */
+  /* ---------- STAGE ---------- */
   .demo-stage {
     position: fixed;
     inset: 0;
+    right: 320px;              /* leave room for control panel */
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: center;
-    padding: 60px 40px 80px 40px;
+    padding: 60px 24px 80px 24px;
     overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     z-index: 5;
     box-sizing: border-box;
   }
-  .demo-stage::-webkit-scrollbar { display: none; }
+  .demo-stage::-webkit-scrollbar { width: 0; height: 0; }
   .demo-stage { scrollbar-width: none; }
 
-  /* ---------- RECEIPT PAPER WRAPPER ----------
-     Holds the resting rotation and a shape-following drop-shadow
-     (box-shadow would be rectangular and ignore the mask). */
+  /* ---------- PAPER: LET IT GROW ----------
+     Override main.css's max-height / internal scroll so items
+     below ~4 are still visible. The stage scrolls instead. */
+  .receipt-paper {
+    max-height: none !important;
+    overflow-y: visible !important;
+  }
+
+  /* ---------- PAPER WRAPPER: TILT + DROP SHADOW ---------- */
   .receipt-paper-wrap {
     display: inline-flex;
-    /* JS sets --rest-rotate */
     transform: rotate(var(--rest-rotate, 0.3deg));
     filter: drop-shadow(0 10px 26px rgba(120, 70, 20, 0.18))
             drop-shadow(0 2px 6px rgba(120, 70, 20, 0.10));
     transition: transform 400ms ease;
   }
 
-  /* ---------- RECEIPT PAPER: TORN EDGES ----------
-     mask-image with SVG data-URIs producing triangular notches
-     along top and bottom. Three mask layers composited by add:
-       1. top teeth strip (repeating-x)
-       2. bottom teeth strip (repeating-x)
-       3. solid body between the two strips
-     --tear-w and --tear-h are set live by the demo controls. */
+  /* ---------- TORN EDGES ---------- */
   .receipt-paper {
     --tear-w: 12px;
     --tear-h: 6px;
@@ -96,54 +95,91 @@
       repeat-x,
       no-repeat;
     mask-composite: add;
-
-    overflow-y: auto;
-    scrollbar-width: none;
   }
-  .receipt-paper::-webkit-scrollbar { display: none; }
 
-  /* ---------- STAMP EFFECT ----------
-     Two animations fire together:
-       stampPulse — scale bounce 1.00 -> 1.06 -> 1.00
-       stampGlow  — red-tinted text-shadow fades in then out
-     Triggered by JS adding .stamped. Removed on animationend. */
+  /* ---------- STAMP: DRAMATIC INTENSITY ----------
+     --stamp-i is a plain number set on the element. The keyframes
+     reference it directly; no calc() wrapping, no nested var().
+     At i=0 the stamp is invisible; at i=3 it is a hard flash. */
   .receipt-total-value {
-    position: relative;
-    /* JS drives --stamp-intensity via style */
+    --stamp-i: 1;
+    transform-origin: 50% 50%;
+    display: inline-flex;
+    align-items: baseline;
+    transition: none;
   }
   .receipt-total-value.stamped {
     animation:
-      stampPulse 500ms cubic-bezier(0.34, 1.56, 0.64, 1),
+      stampPulse 480ms cubic-bezier(0.34, 1.56, 0.64, 1),
       stampGlow 900ms ease-out;
   }
   @keyframes stampPulse {
     0%   { transform: scale(1); }
-    30%  { transform: scale(1.06); }
+    28%  { transform: scale(var(--stamp-peak, 1.06)); }
     100% { transform: scale(1); }
   }
   @keyframes stampGlow {
     0% {
       text-shadow:
         0 0 0 transparent,
+        0 0 0 transparent,
         0 0 0 transparent;
     }
-    25% {
+    22% {
       text-shadow:
-        0 0 calc(10px * var(--stamp-intensity, 1)) rgba(176, 74, 90, calc(0.65 * var(--stamp-intensity, 1))),
-        0 0 calc(24px * var(--stamp-intensity, 1)) rgba(176, 74, 90, calc(0.30 * var(--stamp-intensity, 1)));
+        0 0 var(--stamp-glow-1, 8px)  rgba(176, 74, 90, var(--stamp-a-1, 0.85)),
+        0 0 var(--stamp-glow-2, 22px) rgba(176, 74, 90, var(--stamp-a-2, 0.50)),
+        0 0 var(--stamp-glow-3, 46px) rgba(176, 74, 90, var(--stamp-a-3, 0.22));
     }
     100% {
       text-shadow:
+        0 0 0 transparent,
         0 0 0 transparent,
         0 0 0 transparent;
     }
   }
 
-  /* ---------- CONTROLS PANEL ---------- */
+  /* ---------- ITEM COUNT HEADER ---------- */
+  .receipt-title {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    white-space: nowrap;
+  }
+  .receipt-title .item-count {
+    font-family: "Shippori Mincho", serif;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1px;
+    color: var(--accent);
+    background: rgba(201, 96, 10, 0.12);
+    border: 1px solid rgba(201, 96, 10, 0.28);
+    border-radius: 10px;
+    padding: 1px 8px 2px 8px;
+    line-height: 1.4;
+    transition: background 200ms ease, color 200ms ease;
+  }
+  .receipt-title .item-count.flash {
+    background: rgba(201, 96, 10, 0.32);
+    color: #fff;
+  }
+
+  /* ---------- FLASH ON REBUILD ----------
+     Applied to the items list whenever the count changes, so the
+     rebuild is unmistakable. */
+  .receipt-items.flash {
+    animation: itemsFlash 600ms ease-out;
+  }
+  @keyframes itemsFlash {
+    0%   { background: rgba(201, 96, 10, 0.10); }
+    100% { background: transparent; }
+  }
+
+  /* ---------- CONTROLS ---------- */
   .demo-controls {
     position: fixed;
-    top: 0;
-    right: 0;
+    top: 0; right: 0;
     width: 320px;
     height: 100vh;
     overflow-y: auto;
@@ -232,7 +268,7 @@
     border-color: var(--accent);
     color: #fff;
   }
-  .demo-controls button.primary:hover { background: var(--accent-3); }
+  .demo-controls button.primary:hover { background: var(--accent-3); color: #fff; }
 
   /* ---------- HUD ---------- */
   .demo-hud {
@@ -243,10 +279,10 @@
     font-family: ui-monospace, "SF Mono", Consolas, monospace;
     font-size: 11.5px;
     color: var(--accent-2);
-    opacity: 0.7;
+    opacity: 0.75;
     pointer-events: none;
     line-height: 1.65;
-    background: rgba(255, 255, 255, 0.65);
+    background: rgba(255, 255, 255, 0.72);
     padding: 8px 12px;
     border-radius: 8px;
     border: 1px solid var(--border-1);
@@ -254,12 +290,10 @@
   .demo-hud strong { font-weight: 700; color: var(--accent); }
 
   @media (max-width: 900px) {
+    .demo-stage { right: 0; padding-bottom: 46vh; }
     .demo-controls {
       position: fixed;
-      top: auto;
-      bottom: 0;
-      right: 0;
-      left: 0;
+      top: auto; bottom: 0; right: 0; left: 0;
       width: 100%;
       height: auto;
       max-height: 45vh;
@@ -267,18 +301,15 @@
       border-top: 1px solid var(--border-1);
       border-radius: 16px 16px 0 0;
     }
-    .demo-stage { padding: 40px 20px 46vh 20px; }
   }
 </style>
 </head>
 <body>
 
-<!-- Ambient background, same structure as the app -->
 <div class="ambient-stage" aria-hidden="true">
   <div class="ambient-layer ambient-primary"></div>
 </div>
 
-<!-- Receipt centered on stage -->
 <div class="demo-stage">
   <div class="receipt-paper-wrap" id="receiptWrap">
     <div class="receipt-paper" id="receiptPaper">
@@ -295,7 +326,10 @@
 
       <div class="receipt-divider"></div>
 
-      <div class="receipt-title">本日の内容</div>
+      <div class="receipt-title" id="receiptTitle">
+        <span>本日の内容</span>
+        <span class="item-count" id="itemCount">4 項目</span>
+      </div>
 
       <div class="receipt-items" id="receiptItems"></div>
 
@@ -314,7 +348,6 @@
   </div>
 </div>
 
-<!-- Controls -->
 <div class="demo-controls">
   <h1>Receipt Tuning</h1>
 
@@ -324,7 +357,7 @@
       <input type="range" id="r-count" min="1" max="12" step="1" value="4">
       <span class="val" id="v-count">4</span>
     </div>
-    <div class="hint">Changes the number of line items and rolls a fresh total.</div>
+    <div class="hint">Changing the count rebuilds the list with a roll and a fresh stamp.</div>
   </div>
 
   <div class="grp">
@@ -333,7 +366,6 @@
       <input type="range" id="r-tearh" min="0" max="14" step="0.5" value="6">
       <span class="val" id="v-tearh">6.0</span>
     </div>
-    <div class="hint">Vertical depth of the torn edges. 0 disables them.</div>
   </div>
 
   <div class="grp">
@@ -342,7 +374,6 @@
       <input type="range" id="r-tearw" min="6" max="30" step="1" value="12">
       <span class="val" id="v-tearw">12</span>
     </div>
-    <div class="hint">Horizontal spacing of the teeth.</div>
   </div>
 
   <div class="grp">
@@ -351,16 +382,15 @@
       <input type="range" id="r-rotate" min="0" max="2" step="0.05" value="0.3">
       <span class="val" id="v-rotate">0.30</span>
     </div>
-    <div class="hint">Slight off-square rotation. 0 = perfectly square.</div>
   </div>
 
   <div class="grp">
     <label>Stamp intensity</label>
     <div class="row">
-      <input type="range" id="r-stamp" min="0" max="2" step="0.05" value="1">
+      <input type="range" id="r-stamp" min="0" max="3" step="0.05" value="1">
       <span class="val" id="v-stamp">1.00</span>
     </div>
-    <div class="hint">Glow strength when the total settles.</div>
+    <div class="hint">Fires a preview stamp as you drag, so the effect is immediate.</div>
   </div>
 
   <div class="grp">
@@ -373,11 +403,12 @@
   </div>
 
   <div class="hint" style="margin-top:10px;">
-    Tuning constants map to <code>--tear-w</code>, <code>--tear-h</code>, <code>--rest-rotate</code>, <code>--stamp-intensity</code>.
+    Constants: <code>--tear-w</code> · <code>--tear-h</code> · <code>--rest-rotate</code> · <code>--stamp-i</code>
   </div>
 </div>
 
 <div class="demo-hud">
+  <div>items: <strong id="hud-items">4</strong></div>
   <div>total: <strong id="hud-total">¥0</strong></div>
   <div>stamps: <strong id="hud-stamps">0</strong></div>
 </div>
@@ -391,14 +422,15 @@
   var receiptItems       = document.getElementById('receiptItems');
   var receiptTotalNumber = document.getElementById('receiptTotalNumber');
   var receiptTotalValue  = document.getElementById('receiptTotalValue');
+  var itemCountEl        = document.getElementById('itemCount');
+  var hudItems           = document.getElementById('hud-items');
   var hudTotal           = document.getElementById('hud-total');
   var hudStamps          = document.getElementById('hud-stamps');
 
   var stampCount = 0;
-  var currentTotal = 0;
 
   /* ============================================================
-     ODOMETER — same as app.js
+     ODOMETER (matches app.js)
      ============================================================ */
   var NUM_COLS = 6;
   var COMMA_AFTER = 2;
@@ -479,13 +511,30 @@
   }
 
   /* ============================================================
-     STAMP TRIGGER
-     Fires after the odometer settles. Longest animating strip
-     has transitionDelay = 5*stagger and duration 800ms, so the
-     settle time is stagger*5 + 800. We use a small margin.
+     STAMP — intensity mapped to CSS vars, then fired.
      ============================================================ */
   var ROLL_STAGGER = 80;
   var STAMP_SETTLE_MS = ROLL_STAGGER * 5 + 900;
+
+  function applyStampVars(intensity) {
+    /* intensity 0..3 */
+    var i = intensity;
+    receiptTotalValue.style.setProperty('--stamp-i', i);
+    receiptTotalValue.style.setProperty('--stamp-peak',
+      (1 + 0.06 * i).toFixed(4));                    /* scale 1.00 → 1.18 */
+    receiptTotalValue.style.setProperty('--stamp-glow-1',
+      (8 * i).toFixed(1) + 'px');
+    receiptTotalValue.style.setProperty('--stamp-glow-2',
+      (22 * i).toFixed(1) + 'px');
+    receiptTotalValue.style.setProperty('--stamp-glow-3',
+      (46 * i).toFixed(1) + 'px');
+    receiptTotalValue.style.setProperty('--stamp-a-1',
+      Math.min(1, 0.85 * i).toFixed(3));
+    receiptTotalValue.style.setProperty('--stamp-a-2',
+      Math.min(1, 0.50 * i).toFixed(3));
+    receiptTotalValue.style.setProperty('--stamp-a-3',
+      Math.min(1, 0.22 * i).toFixed(3));
+  }
 
   function triggerStamp() {
     receiptTotalValue.classList.remove('stamped');
@@ -501,7 +550,7 @@
   });
 
   /* ============================================================
-     RECEIPT CONTENT
+     ITEMS
      ============================================================ */
   var DEMO_NAMES = [
     'オイルマッサージ 60分',
@@ -519,18 +568,17 @@
   ];
   var DEMO_PRICES = [3000, 4500, 5000, 6000, 7500, 8000, 9000, 10000, 12000, 15000];
 
-  function randomItem(i) {
-    var name = DEMO_NAMES[i % DEMO_NAMES.length];
-    var price = DEMO_PRICES[Math.floor(Math.random() * DEMO_PRICES.length)];
-    return { name: name, price: price };
+  function pickItem(i) {
+    return {
+      name: DEMO_NAMES[i % DEMO_NAMES.length],
+      price: DEMO_PRICES[Math.floor(Math.random() * DEMO_PRICES.length)]
+    };
   }
 
   function buildItems(count) {
     receiptItems.innerHTML = '';
     var items = [];
-    for (var i = 0; i < count; i++) {
-      items.push(randomItem(i));
-    }
+    for (var i = 0; i < count; i++) items.push(pickItem(i));
     for (var j = 0; j < items.length; j++) {
       var item = items[j];
       var div = document.createElement('div');
@@ -567,22 +615,40 @@
     return t;
   }
 
+  function setCountLabel(n, flash) {
+    itemCountEl.textContent = n + ' 項目';
+    hudItems.textContent = n;
+    if (flash) {
+      itemCountEl.classList.remove('flash');
+      void itemCountEl.offsetWidth;
+      itemCountEl.classList.add('flash');
+      setTimeout(function() { itemCountEl.classList.remove('flash'); }, 600);
+    }
+  }
+
+  function flashItems() {
+    receiptItems.classList.remove('flash');
+    void receiptItems.offsetWidth;
+    receiptItems.classList.add('flash');
+    setTimeout(function() { receiptItems.classList.remove('flash'); }, 620);
+  }
+
   /* ============================================================
-     BUILD + ROLL
+     REBUILD / ROLL
      ============================================================ */
   function rebuildReceipt(opts) {
     opts = opts || {};
     var count = parseInt(document.getElementById('r-count').value, 10);
     var items = buildItems(count);
     var total = sumOf(items);
-    currentTotal = total;
+
+    setCountLabel(count, true);
+    flashItems();
     hudTotal.textContent = '¥' + total.toLocaleString();
 
-    if (opts.instant !== false) {
-      /* Instant build (no roll) — reset the odometer */
+    if (opts.instant) {
       buildDigitColumns(receiptTotalNumber, total);
     } else {
-      /* Roll to the new value, then stamp */
       applyDigitValue(receiptTotalNumber, total, { instant: false, stagger: ROLL_STAGGER });
       setTimeout(triggerStamp, STAMP_SETTLE_MS);
     }
@@ -591,11 +657,9 @@
   }
 
   function rollNewTotal() {
-    /* Pick a fresh random total independent of item prices */
     var n = 2 + Math.floor(Math.random() * 7);
     var sum = 0;
     for (var i = 0; i < n; i++) sum += DEMO_PRICES[Math.floor(Math.random() * DEMO_PRICES.length)];
-    currentTotal = sum;
     hudTotal.textContent = '¥' + sum.toLocaleString();
     applyDigitValue(receiptTotalNumber, sum, { instant: false, stagger: ROLL_STAGGER });
     setTimeout(triggerStamp, STAMP_SETTLE_MS);
@@ -607,28 +671,34 @@
     receiptPaper.classList.add('landing');
   }
   receiptPaper.addEventListener('animationend', function(e) {
-    if (e.animationName === 'paperLand') {
-      receiptPaper.classList.remove('landing');
-    }
+    if (e.animationName === 'paperLand') receiptPaper.classList.remove('landing');
   });
 
   /* ============================================================
-     CONTROL WIRING
+     CONTROLS
      ============================================================ */
-  function bindRange(id, valId, apply, fmt) {
+  function bindRange(id, valId, apply, fmt, immediate) {
     var el = document.getElementById(id);
     var vEl = document.getElementById(valId);
     function update() {
       var v = parseFloat(el.value);
       vEl.textContent = fmt ? fmt(v) : String(v);
       apply(v);
+      if (immediate) immediate(v);
     }
     el.addEventListener('input', update);
     update();
   }
 
+  /* Item count — on change, roll + stamp so the effect is visible. */
+  var countDebounce = null;
   bindRange('r-count', 'v-count',
-    function(v) { rebuildReceipt({ instant: true }); },
+    function() {
+      clearTimeout(countDebounce);
+      countDebounce = setTimeout(function() {
+        rebuildReceipt({ instant: false });
+      }, 120);
+    },
     function(v) { return String(Math.round(v)); });
 
   bindRange('r-tearh', 'v-tearh',
@@ -643,33 +713,29 @@
     function(v) { receiptWrap.style.setProperty('--rest-rotate', v + 'deg'); },
     function(v) { return v.toFixed(2); });
 
+  /* Stamp intensity — apply vars, then fire a preview stamp on drag. */
+  var stampDebounce = null;
   bindRange('r-stamp', 'v-stamp',
-    function(v) { receiptTotalValue.style.setProperty('--stamp-intensity', v); },
+    function(v) {
+      applyStampVars(v);
+      clearTimeout(stampDebounce);
+      stampDebounce = setTimeout(function() { triggerStamp(); }, 80);
+    },
     function(v) { return v.toFixed(2); });
 
-  document.getElementById('b-roll').addEventListener('click', function() {
-    rollNewTotal();
-  });
+  document.getElementById('b-roll').addEventListener('click', rollNewTotal);
   document.getElementById('b-rebuild').addEventListener('click', function() {
-    rebuildReceipt({ instant: false, replayLanding: false });
+    rebuildReceipt({ instant: false });
   });
-  document.getElementById('b-land').addEventListener('click', function() {
-    replayLanding();
-  });
+  document.getElementById('b-land').addEventListener('click', replayLanding);
 
   /* ============================================================
      BOOT
      ============================================================ */
+  applyStampVars(1);
   rebuildReceipt({ instant: true });
   hudStamps.textContent = '0';
-
-  /* Play the landing animation once on load */
   setTimeout(replayLanding, 150);
-
-  /* Reflow the mask when the paper resizes (viewport changes) */
-  window.addEventListener('resize', function() {
-    void receiptPaper.offsetWidth;
-  });
 })();
 </script>
 
