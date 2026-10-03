@@ -39,16 +39,23 @@
     letter-spacing: inherit;
   }
 
-  /* 3. Digit cell height tracks the label's font-size. */
+  /* 3. Digit cell height tracks the label's font-size.
+        font-variant-numeric: tabular-nums forces every digit to the
+        same advance width, which makes 1ch an exact per-digit
+        measurement instead of just the advance of "0". */
   .counter-digit-roll {
     --digit-h: 1.4em;
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
   }
 
-  /* 4. Column width = one digit advance (1ch) + one letter-space
-        (6px, matching .receipt-title's tracking). This is the
-        single slot a text character would occupy on the line. */
+  /* 4. Column width = one tabular digit advance (1ch) + one
+        letter-space (6px, matching .receipt-title's tracking), plus
+        a small 5% safety margin so subpixel rounding cannot clip
+        the glyph. This is the single slot a text character occupies
+        on the line. */
   .counter-digit-roll .digit-col {
-    width: calc(1ch + 6px);
+    width: calc(1.05ch + 6px);
     transition: width 300ms cubic-bezier(0.34, 1.15, 0.64, 1),
                 opacity 200ms ease;
   }
