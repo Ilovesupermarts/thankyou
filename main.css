@@ -1,5 +1,5 @@
 /* ============================================================
-   main.css — v1.2
+   main.css — v1.3
    ============================================================ */
 
   /* ============ THEME VARIABLES ============ */
@@ -84,11 +84,12 @@
   body.warm-background { background-color: var(--bg-warm); }
   body.table-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; top: 0; left: 0; right: 0; }
 
-  /* Lock the body while the receipt overlay is up so scrolls and
-     drags over the overlay cannot propagate to the page underneath.
-     The receipt screen and paper each have their own overflow-y: auto
-     and are unaffected — they are separate scroll containers. */
-  body:has(.receipt-screen.visible) { overflow: hidden; height: 100vh; position: fixed; width: 100%; top: 0; left: 0; right: 0; }
+  /* Body lock while the receipt overlay is up. Applied and removed by
+     JS (lockBodyForReceipt / unlockBodyForReceipt in app.js) so the
+     previous scroll position can be saved and restored. The inline
+     top offset (-scrollY) is set by JS and keeps the page visually
+     in place while the lock is active. */
+  body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; left: 0; right: 0; }
 
   body.thankyou-active .stage, body.thankyou-active .stage-spacer,
   body.thankyou-active .transition-line, body.thankyou-active .divider,
@@ -205,7 +206,7 @@
     opacity: 0;
     pointer-events: none;
     will-change: transform, opacity;
-    animation: rippleExpand 750ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    animation: rippleExpand 975ms cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
   }
   .ripple.subtle { animation-name: rippleExpandSubtle; }
   .ripple.trail  { animation-name: rippleExpandTrail; }
@@ -1203,12 +1204,21 @@
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
-    perspective: 1400px;
     transform: rotate(var(--rest-rotate, 1.65deg));
-    transition: transform 400ms ease;
+    transition: transform 400ms ease, filter 200ms ease;
     filter:
       drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
       drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
+  }
+  /* During the landing animation the wrapper's drop-shadow is disabled.
+     It recomputes per frame against the animating paper — the second
+     biggest source of jank after filter: blur() on the paper itself.
+     Same number of drop-shadow() functions, colour transparent, so
+     the transition interpolates cleanly instead of popping. */
+  .receipt-paper-wrap.landing-active {
+    filter:
+      drop-shadow(0px 1px 2px rgba(0, 0, 0, 0))
+      drop-shadow(7px 22px 18px rgba(0, 0, 0, 0));
   }
 
   .receipt-paper {
@@ -1266,35 +1276,35 @@
     mask-composite: add;
   }
 
-  /* v1.17.2: tuned landing animation.
-     3000ms ease-in-out. Start pose 22deg / -70px / scale 1.000 / blur 2.5px.
-     Overshoot 1.016, undershoot 1.000. Shadow decoupled (lives on the
-     wrapper) so this keyframe only drives transform and blur. */
+  /* v1.17.2: tuned landing animation. 2D transforms only. The previous
+     version animated filter: blur() on the masked paper, forcing the
+     whole masked surface to re-rasterize every frame — the main source
+     of the jerk. rotateX was also a visual no-op because the wrapper's
+     filter flattened the 3D context; the same vertical squash is
+     achieved with scaleY, which composites on the GPU for free. */
   .receipt-paper.landing {
     animation: paperLand 3000ms cubic-bezier(0.5, 0, 0.5, 1) forwards;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
   @keyframes paperLand {
     0% {
       opacity: 0;
-      transform: rotateX(22deg) translateY(-70px) scale(1);
-      filter: blur(2.5px);
+      transform: translateY(-70px) scale(1, 0.9);
     }
     25% {
       opacity: 1;
-      filter: blur(0);
     }
     40% {
-      transform: rotateX(5deg) translateY(-6px) scale(1.016);
-      filter: blur(0);
+      transform: translateY(-6px) scale(1.014, 1.015);
     }
     72% {
-      transform: rotateX(-1.2deg) translateY(1px) scale(1);
-      filter: blur(0);
+      transform: translateY(1px) scale(1, 1);
     }
     100% {
       opacity: 1;
-      transform: rotateX(0deg) translateY(0) scale(1);
-      filter: blur(0);
+      transform: translateY(0) scale(1, 1);
     }
   }
 
@@ -1852,6 +1862,58 @@
     opacity: 0;
     transition: transform 900ms cubic-bezier(0.5, 0, 0.5, 1),
                 opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
+  }
+
+  /* v1.3: koi tap flinch. One-shot 1000ms animation triggered by a
+     short tap (< 8px travel, < 250ms) on the start button. Random
+     per tap via CSS custom properties written by JS:
+       --flinch-rot    peak rotation (deg)
+       --flinch-scale  peak scale
+       --flinch-x      horizontal dart (px, signed)
+       --flinch-y      vertical dart (px, negative = upward)
+     Resting transform matches the base rule's translateY so the
+     animation blends in and out cleanly with the swipe lift. */
+  @keyframes koiFlinch {
+    0% {
+      transform: translateY(var(--koi-rise-y, 0px)) translateX(0) rotate(0deg) scale(1);
+    }
+    12% {
+      transform:
+        translateY(calc(var(--koi-rise-y, 0px) + var(--flinch-y, -10px)))
+        translateX(var(--flinch-x, 0px))
+        rotate(var(--flinch-rot, 28deg))
+        scale(var(--flinch-scale, 1.18));
+    }
+    30% {
+      transform:
+        translateY(calc(var(--koi-rise-y, 0px) - var(--flinch-y, -10px) * 0.35))
+        translateX(calc(var(--flinch-x, 0px) * -0.5))
+        rotate(calc(var(--flinch-rot, 28deg) * -0.5))
+        scale(0.96);
+    }
+    55% {
+      transform:
+        translateY(calc(var(--koi-rise-y, 0px) + var(--flinch-y, -10px) * 0.15))
+        translateX(calc(var(--flinch-x, 0px) * 0.25))
+        rotate(calc(var(--flinch-rot, 28deg) * 0.2))
+        scale(1.03);
+    }
+    80% {
+      transform:
+        translateY(calc(var(--koi-rise-y, 0px) - var(--flinch-y, -10px) * 0.05))
+        translateX(0)
+        rotate(calc(var(--flinch-rot, 28deg) * -0.08))
+        scale(0.995);
+    }
+    100% {
+      transform: translateY(var(--koi-rise-y, 0px)) translateX(0) rotate(0deg) scale(1);
+    }
+  }
+  .koi-dive-wrap.flinching {
+    animation: koiFlinch 1000ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .koi-dive-wrap.flinching { animation: none; }
   }
 
   .blossom-char {
