@@ -24,7 +24,9 @@
          content is always editable regardless of gaps above it.
        - Koi screen water effects: caustics (CSS), tap ripples,
          swipe-up to begin, koi startle spin, koi dive.
-       - Receipt item counter badge updated in buildReceipt().
+       - Receipt item counter badge now uses a compact 2-column
+         digit-roll odometer (see COUNTER ODOMETER section) and is
+         re-rolled on every remove / undo via updateReceiptItemCount().
      v1.17.1
        - Panel-1 opening line: correct insertion anchor (beats
          now sit before #panel1Body, not after it).
@@ -524,6 +526,99 @@ function updateReceiptTotal() {
     sum += parseFormatted(receiptPriceInputs[i].value);
   }
   applyDigitValue(container, sum, { instant: false, stagger: 80 });
+}
+
+/* ============================================================
+   COUNTER ODOMETER — v1.17.2
+   ------------------------------------------------------------
+   A compact 2-column digit-roll for the receipt item count.
+   Parallel to the money odometer but with its own column count
+   and shorter timings so a 1 -> 12 change reads as a quick tick
+   rather than a full money roll. Re-rolled from the remove and
+   undo handlers in bindReceiptItemListeners() via
+   updateReceiptItemCount().
+   ============================================================ */
+var COUNTER_COLS = 2;
+
+function counterIsColVisible(value, colIndex) {
+  if (value === 0) return colIndex === COUNTER_COLS - 1;
+  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
+  return value >= placeValue;
+}
+function counterGetDigitAt(value, colIndex) {
+  var placeValue = Math.pow(10, COUNTER_COLS - 1 - colIndex);
+  return Math.floor(value / placeValue) % 10;
+}
+function buildCounterColumns(container, initialValue) {
+  if (!container) return;
+  container.innerHTML = '';
+  for (var i = 0; i < COUNTER_COLS; i++) {
+    var col = document.createElement('span');
+    col.className = 'digit-col hidden';
+    col.setAttribute('data-digit', '0');
+    var strip = document.createElement('span');
+    strip.className = 'digit-strip';
+    for (var d = 0; d <= 9; d++) {
+      var de = document.createElement('span');
+      de.className = 'digit';
+      de.textContent = d;
+      strip.appendChild(de);
+    }
+    strip.style.transform = 'translateY(0)';
+    col.appendChild(strip);
+    container.appendChild(col);
+  }
+  container.classList.add('no-transition');
+  applyCounterValue(container, initialValue, { instant: true });
+  void container.offsetWidth;
+  container.classList.remove('no-transition');
+}
+function applyCounterValue(container, value, opts) {
+  if (!container) return;
+  opts = opts || {};
+  var instant = !!opts.instant;
+  if (instant) container.classList.add('no-transition');
+  var cols = container.querySelectorAll('.digit-col');
+  for (var i = 0; i < cols.length; i++) {
+    var col = cols[i];
+    var strip = col.querySelector('.digit-strip');
+    var visible = counterIsColVisible(value, i);
+    var newDigit = counterGetDigitAt(value, i);
+    var oldDigit = parseInt(col.getAttribute('data-digit') || '0', 10);
+    var delay = instant ? 0 : (COUNTER_COLS - 1 - i) * 40;
+    if (instant) {
+      strip.style.transitionDelay = '0ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    } else if (newDigit !== oldDigit) {
+      strip.style.transitionDelay = delay + 'ms';
+      strip.style.transform = 'translateY(' + (-newDigit * 10) + '%)';
+    }
+    col.classList.toggle('hidden', !visible);
+    col.setAttribute('data-digit', newDigit);
+  }
+  if (instant) {
+    void container.offsetWidth;
+    requestAnimationFrame(function() {
+      requestAnimationFrame(function() {
+        container.classList.remove('no-transition');
+      });
+    });
+  }
+}
+
+/* Counts only items that are still active (not removing) and rolls
+   the counter to that value. Called from remove / undo handlers. */
+function updateReceiptItemCount() {
+  var container = document.getElementById('itemCountDigits');
+  if (!container) return;
+  var activeItems = 0;
+  var receiptItemEls = receiptItems.querySelectorAll('.receipt-item');
+  for (var i = 0; i < receiptItemEls.length; i++) {
+    if (receiptItemEls[i].getAttribute('data-removing') === 'true') continue;
+    if (receiptItemEls[i].classList.contains('removing')) continue;
+    activeItems++;
+  }
+  applyCounterValue(container, activeItems, { instant: false });
 }
 
 /* ============ DOM REFS ============ */
@@ -2568,6 +2663,7 @@ function onKoiPointerUp(e) {
 function triggerKoiStart() {
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
+  introHasRun = true;
 
   playDrop();
   haptic(12);
@@ -2933,9 +3029,9 @@ function buildReceipt() {
     itemCount++;
   }
 
-  /* v1.17.2: item counter badge. */
-  var itemCountEl = document.getElementById('itemCount');
-  if (itemCountEl) itemCountEl.textContent = itemCount + ' 項目';
+  /* v1.17.2: item counter badge — odometer-style. */
+  var itemCountDigits = document.getElementById('itemCountDigits');
+  if (itemCountDigits) buildCounterColumns(itemCountDigits, itemCount);
 
   bindReceiptItemListeners();
   updateReceiptTotal();
@@ -3006,6 +3102,7 @@ function bindReceiptItemListeners() {
         }
         item.setAttribute('data-removing', 'true');
         item.classList.add('removing');
+        updateReceiptItemCount();
         updateReceiptTotal();
         updateReceiptScrollIndicator();
       });
@@ -3038,6 +3135,7 @@ function bindReceiptItemListeners() {
         }
         item.classList.remove('removing');
         item.setAttribute('data-removing', 'false');
+        updateReceiptItemCount();
         updateReceiptTotal();
         updateReceiptScrollIndicator();
       });
