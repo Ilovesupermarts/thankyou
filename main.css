@@ -1191,6 +1191,7 @@
     padding: 70px 20px 60px 20px;
     overflow-y: auto; -webkit-overflow-scrolling: touch;
     opacity: 0; pointer-events: none; transition: opacity 0.9s ease;
+    perspective: 1200px;
   }
   html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94); }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
@@ -1212,12 +1213,11 @@
       drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
   }
 
-  /* v1.3: landing animation is opacity + translateY only. No scale,
-     no filter, no rotate that changes mid-animation. The resting tilt
-     is baked into every keyframe so the paper is at its final angle
-     throughout the fall. 2400ms / 140px travel. Fade-in completes at
-     55%, bounce contacts at 72%, settles at 100%. `both` holds the
-     0% state before the animation starts.
+  /* v1.3: landing animation. Stops: 0% (opacity 0, pre-fall pose),
+     40% (opacity 1, tilt peak), 72% (contact bounce), 86% (rebound),
+     100% (settle). Duration 2400ms, travel 140px, cubic-bezier
+     (0.25, 0.1, 0.25, 1), fill-mode both so the 0% pose holds
+     before playback.
 
      filter: none on .landing is critical — it removes the wrapper's
      drop-shadow entirely for the duration of the fall. Without it,
@@ -1229,17 +1229,21 @@
      transition: none on .landing is equally critical — without it the
      base rule's filter transition fires on entry, animating the
      filter from full shadow to none across the first 400ms of the
-     fall. That would put us back on the same per-frame filter path.
-     The shadow transitions back in only on the exit side, when
+     fall. The shadow transitions back in only on the exit side, when
      .landing is removed at animationend and the base rule resumes.
 
-     v1.3 Step 1 (this change): scale restored as a two-axis
-     scale(x, y). Horizontal axis stays near 1 (1 → 1 → 1.016 →
-     0.996 → 1); vertical axis compresses on entry (0.94), approaches
-     full height through the fall (0.98), overshoots on contact
-     (1.014), rebounds (0.997), settles (1). The two-value form is
-     deliberate — a uniform scale() would squash the width too and
-     read as a zoom rather than a sheet bending under its own weight. */
+     Step 1 restored scale as a two-axis scale(x, y). Horizontal axis
+     stays near 1 (1 → 1 → 1.016 → 0.996 → 1); vertical axis
+     compresses on entry (0.94), approaches full height (0.98),
+     overshoots on contact (1.014), rebounds (0.997), settles (1).
+
+     Step 2 restored rotateX as a tilt-back. Peak 12deg at 40%,
+     unwinding to 1.8deg at the contact bounce (contact factor 0.15)
+     and fully flat by 86%. `.receipt-screen` carries
+     perspective: 1200px so the rotateX renders as a 3D lean rather
+     than a Y-compression. Transform order in every stop is
+     translateY → scale → rotateX → rotate(rest), so the resting
+     tilt is applied last and the composition reads as expected. */
   .receipt-paper-wrap.landing {
     animation: paperLand 2400ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
     will-change: transform, opacity;
@@ -1250,21 +1254,21 @@
   @keyframes paperLand {
     0% {
       opacity: 0;
-      transform: translateY(-140px) scale(1, 0.94) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-140px) scale(1, 0.94) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
     }
-    55% {
+    40% {
       opacity: 1;
-      transform: translateY(-30px) scale(1, 0.98) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-30px) scale(1, 0.98) rotateX(12deg) rotate(var(--rest-rotate, 1.65deg));
     }
     72% {
-      transform: translateY(12px) scale(1.016, 1.014) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(12px) scale(1.016, 1.014) rotateX(1.8deg) rotate(var(--rest-rotate, 1.65deg));
     }
     86% {
-      transform: translateY(-6px) scale(0.996, 0.997) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-6px) scale(0.996, 0.997) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
     }
     100% {
       opacity: 1;
-      transform: translateY(0) scale(1, 1) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(0) scale(1, 1) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
     }
   }
 
