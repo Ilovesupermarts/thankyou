@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Paper Landing — Tilt Tuning</title>
+<title>Transition Scroll Effects — Tuning</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,9 +11,7 @@
 
 <style>
   /* ============================================================
-     Theme variables — copied verbatim from main.css so the demo
-     sits in the same colour world. Only the autumn block is needed
-     here; the paper's background texture is the same asset.
+     Autumn theme variables — copied verbatim from main.css.
      ============================================================ */
   :root {
     --bg-base: #fdf3d8; --bg-warm: #f5d89a;
@@ -26,6 +24,10 @@
     --text-mute: #5a3818; --text-faint: #7a5028; --text-placeholder: #a07a48;
     --shadow-rose: rgba(120, 70, 20, 0.10); --shadow-rose-2: rgba(120, 70, 20, 0.18);
     --shadow-accent: rgba(201, 96, 10, 0.32);
+    --amb-1: rgba(247, 185, 60, 0.85); --amb-2: rgba(240, 138, 30, 0.80);
+    --amb-3: rgba(217, 94, 26, 0.72); --amb-4: rgba(143, 63, 18, 0.55); --amb-5: rgba(107, 47, 14, 0.45);
+    --transition-head-color: #fdf0c8;
+    --transition-glow-bg: rgba(143, 47, 0, 0.10);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -35,176 +37,202 @@
     color: var(--text-dark);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 17px; line-height: 1.7;
-    min-height: 100vh;
-    background-color: #e8c078;
-    overflow-x: hidden;
+    background-color: var(--bg-warm);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
   /* ============================================================
-     The demo stage — full-screen, holds the receipt paper in
-     its resting pose. The bottom padding accounts for the
-     collapsed control bar so the paper has the whole screen
-     when the expanded panel is closed.
+     AMBIENT STAGE — copied verbatim from main.css
      ============================================================ */
-  .demo-stage {
+  .ambient-stage {
     position: fixed;
-    inset: 0;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    z-index: -2;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(var(--wind-x, 0px), 0, 0);
+  }
+  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
+  .ambient-image { opacity: 0.8; pointer-events: none; transition: opacity 1.2s ease; will-change: opacity; }
+  .ambient-video {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; display: block; pointer-events: none;
+    filter: blur(8px); transform: scale(1.06);
+  }
+  .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%);
+    animation: autumnDrift1 14s ease-in-out infinite;
+    transition: filter 2s ease;
+    will-change: transform;
+  }
+  .ambient-secondary {
+    display: block;
+    background:
+      radial-gradient(circle at 60% 20%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0) 40%),
+      radial-gradient(circle at 40% 90%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0) 45%);
+    animation: autumnDrift2 19s ease-in-out infinite;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    will-change: transform;
+  }
+  .caustics { mix-blend-mode: screen; pointer-events: none; will-change: transform; }
+  .caustics-1 {
+    opacity: 0.36;
+    background:
+      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
+      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
+    animation: caustic1 48s ease-in-out infinite;
+  }
+  .caustics-2 {
+    opacity: 0.28;
+    background:
+      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
+      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
+    animation: caustic2 62s ease-in-out infinite;
+  }
+  @keyframes autumnDrift1 {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    11% { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
+    23% { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
+    35% { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
+    48% { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
+    60% { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
+    72% { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
+    85% { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+  @keyframes autumnDrift2 {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    13% { transform: translate(-5%, 4%) scale(1.15) rotate(-2deg); }
+    27% { transform: translate(4%, -6%) scale(0.92) rotate(3deg); }
+    41% { transform: translate(-2%, 3%) scale(1.18) rotate(1deg); }
+    55% { transform: translate(6%, -2%) scale(1.05) rotate(-3deg); }
+    68% { transform: translate(-4%, 5%) scale(0.95) rotate(2deg); }
+    82% { transform: translate(3%, -4%) scale(1.12) rotate(-1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+  @keyframes caustic1 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
+    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
+  }
+  @keyframes caustic2 {
+    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
+  }
+
+  /* ============================================================
+     Spacers — give scroll room above and below the transition
+     line so the body can pass through the full viewport.
+     ============================================================ */
+  .spacer-top, .spacer-bottom {
+    min-height: 120vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px 20px 68px 20px;
-    overflow: hidden;
-    pointer-events: none;
-  }
-  .demo-stage .receipt-paper-wrap {
-    pointer-events: auto;
+    color: rgba(90, 56, 24, 0.35);
+    font-family: "Shippori Mincho", serif;
+    font-size: 14px;
+    letter-spacing: 4px;
   }
 
   /* ============================================================
-     Wrapper — copied from main.css. --rest-rotate is set from
-     TUNING.restRotateDeg by JS on load and on every change.
+     TRANSITION LINE — copied from main.css
      ============================================================ */
-  .receipt-paper-wrap {
-    display: inline-flex;
-    margin: auto;
-    transform: rotate(var(--rest-rotate, 1.65deg));
-    transition: transform 400ms ease, filter 400ms ease;
-    filter:
-      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
-      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
-  }
-
-  /* When the demo applies perspective to the wrapper's parent,
-     we set .perspective-on on the stage. The wrapper itself
-     keeps its base transform. This is the switch that decides
-     whether the rotateX reads as a real tilt or a Y-squash. */
-  .demo-stage.perspective-on {
-    perspective: var(--demo-perspective, 1200px);
-  }
-  .demo-stage.perspective-on .receipt-paper-wrap {
-    transform-style: preserve-3d;
-  }
-
-  /* Landing state — filter: none and transition: none are load-
-     bearing, same as in main.css. They remove the drop-shadow
-     for the duration of the fall and prevent the base rule's
-     filter transition from firing on entry. */
-  .receipt-paper-wrap.landing {
-    animation-duration: var(--demo-duration, 2400ms);
-    animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
-    animation-fill-mode: both;
-    animation-name: paperLandTilt;
-    will-change: transform, opacity;
-    filter: none;
-    transition: none;
-  }
-  /* When scaleOn is true, swap the animation-name so the second
-     keyframe set (with Step 1's scale) plays instead. */
-  .receipt-paper-wrap.landing.with-scale {
-    animation-name: paperLandTiltScale;
-  }
-
-  /* Freeze: pause the animation at a set progress using a
-     negative animation-delay. Handled entirely via inline
-     custom properties set by JS. */
-  .receipt-paper-wrap.landing.frozen {
-    animation-play-state: paused;
-    animation-delay: calc(var(--demo-duration, 2400ms) * var(--demo-freeze-frac, 0) * -1);
-  }
-
-  /* ============================================================
-     The paper itself — copied from main.css including the
-     torn-edge SVG mask. Texture asset is the same washi file.
-     ============================================================ */
-  .receipt-paper {
-    --tear-w: 12px;
-    --tear-h: 6px;
-
-    max-width: 380px; width: 100%;
-    max-height: calc(100vh - 128px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-
-    padding: 36px 30px 28px 30px;
+  .transition-line {
+    text-align: center; padding: 0 32px 40px 32px; margin-top: 4px;
+    font-size: 18px; font-weight: 500; color: var(--accent);
+    letter-spacing: 0.8px; line-height: 2; max-width: 560px; margin-left: auto; margin-right: auto;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    position: relative;
-    transform-origin: 50% 100%;
-
-    background-color: #fdf3d8;
-    background-image: url('icons/1790835034553.jpg');
-    background-size: cover;
-    background-position: center center;
-    background-repeat: no-repeat;
-
-    border: none;
-    box-shadow: none;
-
-    -webkit-mask-image:
-      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
-      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
-      linear-gradient(#000, #000);
-    -webkit-mask-size:
-      var(--tear-w) var(--tear-h),
-      var(--tear-w) var(--tear-h),
-      100% calc(100% - var(--tear-h) * 2);
-    -webkit-mask-position:
-      0 0,
-      0 100%,
-      0 var(--tear-h);
-    -webkit-mask-repeat:
-      repeat-x,
-      repeat-x,
-      no-repeat;
-    -webkit-mask-composite: source-over;
-
-    mask-image:
-      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
-      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
-      linear-gradient(#000, #000);
-    mask-size:
-      var(--tear-w) var(--tear-h),
-      var(--tear-w) var(--tear-h),
-      100% calc(100% - var(--tear-h) * 2);
-    mask-position:
-      0 0,
-      0 100%,
-      0 var(--tear-h);
-    mask-repeat:
-      repeat-x,
-      repeat-x,
-      no-repeat;
-    mask-composite: add;
+    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    opacity: 1; transform: translateY(0); filter: none;
+  }
+  .transition-line-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 0 0 20px 0;
+  }
+  .transition-line-mark {
+    flex-shrink: 0;
+    font-size: 1.1em;
+    line-height: 1;
+    color: var(--transition-head-color);
+  }
+  .transition-line-rule {
+    flex: 1;
+    height: 1px;
+    background: var(--transition-head-color);
+    min-width: 24px;
+  }
+  .transition-line-title {
+    flex-shrink: 0;
+    font-size: 1.1em;
+    color: var(--transition-head-color);
+    letter-spacing: 5px;
+    white-space: nowrap;
   }
 
-  .receipt-header { text-align: center; margin-bottom: 24px; }
-  .receipt-thanks { font-size: 17px; font-weight: 600; color: var(--accent); line-height: 1.9; letter-spacing: 1px; margin-bottom: 16px; }
-  .receipt-subthanks { font-size: 13px; font-weight: 400; color: var(--text-mute); line-height: 1.9; letter-spacing: 0.5px; }
-  .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; }
-  .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; }
-  .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; }
-  .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
-  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); }
-  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
-  .receipt-item-name { flex: 1; font-size: 14px; color: var(--text-soft); line-height: 1.5; }
-  .receipt-item-price-wrap { flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px; color: var(--accent); font-weight: 600; font-size: 14px; padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); border: 1px solid var(--border-5); }
-  .receipt-item-price-wrap .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
-  .receipt-total-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px; margin-top: 14px; border-top: 1.5px solid var(--border-5); border-bottom: 1.5px solid var(--border-5); }
-  .receipt-total-label { font-size: 18px; font-weight: 600; color: var(--text-mute); letter-spacing: 4px; }
-  .receipt-total-value { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
-  .receipt-total-value .yen-symbol { font-size: 13px; margin-right: 1px; opacity: 0.8; }
-  .receipt-footer { text-align: center; margin-top: 22px; }
-  .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
+  .transition-line-body {
+    position: relative;
+    will-change: transform;
+    transform-origin: 50% 50%;
+  }
+  .transition-line-body::before {
+    content: "";
+    position: absolute;
+    inset: var(--demo-glow-inset-y, -50px) var(--demo-glow-inset-x, -40px);
+    background: radial-gradient(ellipse at center,
+      var(--transition-glow-bg), transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--demo-glow-out, 600ms) ease;
+  }
+  .transition-line-body.centered::before {
+    opacity: 1;
+    transition: opacity var(--demo-glow-in, 300ms) ease;
+  }
+  .transition-line-body p {
+    margin: 0 0 0.9em 0;
+    opacity: 1;
+    transform: none;
+  }
+  .transition-line-body p:last-child { margin-bottom: 0; }
+
+  /* Viewport centre line — debug aid */
+  .centre-line {
+    position: fixed;
+    left: 0; right: 0;
+    top: 50%;
+    height: 1px;
+    background: rgba(200, 60, 60, 0.5);
+    pointer-events: none;
+    z-index: 5;
+    display: none;
+  }
+  .centre-line.shown { display: block; }
+  .centre-line::before,
+  .centre-line::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: rgba(200, 60, 60, 0.7);
+  }
+  .centre-line::before { left: 8px; }
+  .centre-line::after { right: 8px; }
 
   /* ============================================================
-     Control bar — two states.
-
-     Collapsed (default): a slim strip at the bottom of the
-     screen with the play button and three toggles plus an
-     expand chevron. Leaves the stage almost entirely visible.
-
-     Expanded: a full-screen overlay with the sliders and the
-     readout. The stage behind it is dimmed. Collapsing returns
-     the stage to full height.
+     Controls — collapsed bar + expandable overlay
      ============================================================ */
   .controls {
     position: fixed;
@@ -215,9 +243,8 @@
     box-shadow: 0 -4px 18px rgba(120, 70, 20, 0.10);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     z-index: 100;
-    transition: opacity 0.3s ease;
   }
   .controls-inner {
     max-width: 720px;
@@ -242,12 +269,6 @@
     appearance: none;
     white-space: nowrap;
   }
-  .ctrl-btn-sm.primary {
-    border-color: var(--accent);
-    background: var(--accent);
-    color: #ffffff;
-  }
-  .ctrl-btn-sm.primary:active { background: var(--accent-3); }
   .ctrl-btn-sm.on {
     border-color: var(--accent);
     background: var(--soft-2);
@@ -274,7 +295,6 @@
   }
   .ctrl-chevron.up { transform: rotate(180deg); }
 
-  /* Expanded overlay */
   .controls-expanded {
     position: fixed;
     inset: 0;
@@ -297,19 +317,14 @@
     background: rgba(253, 240, 200, 0.98);
     border-top: 1px solid var(--border-2);
     padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
-    max-height: 70vh;
+    max-height: 80vh;
     overflow-y: auto;
     box-shadow: 0 -8px 32px rgba(120, 70, 20, 0.18);
     transform: translateY(12px);
     transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
-  .controls-expanded.open .controls-panel {
-    transform: translateY(0);
-  }
-  .controls-panel-inner {
-    max-width: 720px;
-    margin: 0 auto;
-  }
+  .controls-expanded.open .controls-panel { transform: translateY(0); }
+  .controls-panel-inner { max-width: 720px; margin: 0 auto; }
   .ctrl-row {
     display: flex;
     align-items: center;
@@ -318,7 +333,7 @@
   }
   .ctrl-label {
     flex-shrink: 0;
-    min-width: 130px;
+    min-width: 140px;
     font-size: 12px;
     font-weight: 600;
     color: var(--text-med);
@@ -327,31 +342,47 @@
   .ctrl-slider { flex: 1; min-width: 0; }
   .ctrl-value {
     flex-shrink: 0;
-    min-width: 68px;
+    min-width: 72px;
     text-align: right;
     font-size: 12px;
     font-weight: 700;
     color: var(--accent);
     font-family: "SF Mono", Menlo, Consolas, monospace;
   }
-  .ctrl-toggle {
-    flex-shrink: 0;
-    padding: 8px 16px;
-    font-size: 12px;
+  .readout {
+    margin: 8px 0 16px 0;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.65);
+    border-radius: 10px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-med);
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .preset-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .preset-btn {
+    padding: 6px 14px;
+    font-size: 11px;
     font-weight: 600;
-    letter-spacing: 1px;
-    border-radius: 14px;
+    border-radius: 12px;
     border: 1.5px solid var(--border-2);
     background: #ffffff;
-    color: var(--text-mute);
+    color: var(--text-med);
     cursor: pointer;
     -webkit-appearance: none;
     appearance: none;
   }
-  .ctrl-toggle.on {
-    background: var(--accent);
+  .preset-btn.on {
     border-color: var(--accent);
-    color: #ffffff;
+    background: var(--soft-2);
+    color: var(--accent);
   }
   .ctrl-btn {
     padding: 10px 20px;
@@ -366,61 +397,49 @@
     -webkit-appearance: none;
     appearance: none;
   }
-  .ctrl-btn:active { background: var(--accent-3); }
-  .readout {
-    margin: 8px 0 16px 0;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.65);
-    border-radius: 10px;
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px;
-    line-height: 1.6;
-    color: var(--text-med);
-    white-space: pre;
-    overflow-x: auto;
-  }
 </style>
 </head>
 <body>
 
-<div class="demo-stage" id="demoStage">
-  <div class="receipt-paper-wrap" id="paperWrap">
-    <div class="receipt-paper">
-      <div class="receipt-header">
-        <div class="receipt-thanks">ご確認いただきありがとうございます。</div>
-        <div class="receipt-subthanks">無理のない範囲でお選びいただき、ありがとうございます。</div>
-      </div>
-      <div class="receipt-to-row">
-        <span class="receipt-to-mark">❀</span>
-        <span class="receipt-to-name">桜庭さんへ</span>
-        <span class="receipt-to-mark">❀</span>
-      </div>
-      <div class="receipt-divider"></div>
-      <div class="receipt-item">
-        <span class="receipt-item-name">サンプル項目 一</span>
-        <span class="receipt-item-price-wrap"><span class="yen-symbol">¥</span>5,000</span>
-      </div>
-      <div class="receipt-item">
-        <span class="receipt-item-name">サンプル項目 二</span>
-        <span class="receipt-item-price-wrap"><span class="yen-symbol">¥</span>3,000</span>
-      </div>
-      <div class="receipt-total-line">
-        <span class="receipt-total-label">合計</span>
-        <span class="receipt-total-value"><span class="yen-symbol">¥</span>8,000</span>
-      </div>
-      <div class="receipt-footer">
-        <span class="receipt-footer-mark">❀</span>
-      </div>
-    </div>
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-image">
+    <video class="ambient-video" id="ambientVideo"
+           autoplay muted loop playsinline preload="auto">
+      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
+    </video>
+  </div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer ambient-secondary"></div>
+  <div class="ambient-layer caustics caustics-1"></div>
+  <div class="ambient-layer caustics caustics-2"></div>
+</div>
+
+<div class="centre-line" id="centreLine"></div>
+
+<div class="spacer-top">↓ 上へスクロールしてください ↓</div>
+
+<div class="transition-line active" id="transitionLine">
+  <div class="transition-line-divider">
+    <span class="transition-line-mark">❀</span>
+    <span class="transition-line-rule"></span>
+    <span class="transition-line-title">大切なお知らせ</span>
+    <span class="transition-line-rule"></span>
+    <span class="transition-line-mark">❀</span>
+  </div>
+  <div class="transition-line-body" id="transitionLineBody">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。<br>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
   </div>
 </div>
 
+<div class="spacer-bottom">↓ 下へスクロールしてください ↓</div>
+
 <div class="controls" id="controlsBar">
   <div class="controls-inner">
-    <button type="button" class="ctrl-btn-sm primary" id="playBtn">▶ Play</button>
-    <button type="button" class="ctrl-btn-sm" id="perspectiveBtn">Persp</button>
-    <button type="button" class="ctrl-btn-sm" id="scaleBtn">Scale</button>
-    <button type="button" class="ctrl-btn-sm" id="freezeBtn">Freeze</button>
+    <button type="button" class="ctrl-btn-sm" id="forceGlowBtn">Force glow</button>
+    <button type="button" class="ctrl-btn-sm" id="centreLineBtn">Centre line</button>
     <button type="button" class="ctrl-chevron" id="chevronBtn" aria-label="Expand controls">▾</button>
   </div>
 </div>
@@ -431,33 +450,43 @@
       <pre class="readout" id="readout">—</pre>
 
       <div class="ctrl-row">
-        <span class="ctrl-label">Tilt (deg)</span>
-        <input type="range" class="ctrl-slider" id="tiltDeg" min="0" max="20" step="0.5">
-        <span class="ctrl-value" id="tiltDegVal">—</span>
+        <span class="ctrl-label">Drift factor</span>
+        <input type="range" class="ctrl-slider" id="driftFactor" min="0" max="0.20" step="0.005">
+        <span class="ctrl-value" id="driftFactorVal">—</span>
       </div>
 
       <div class="ctrl-row">
-        <span class="ctrl-label">Peak %</span>
-        <input type="range" class="ctrl-slider" id="tiltPeakPct" min="10" max="80" step="1">
-        <span class="ctrl-value" id="tiltPeakPctVal">—</span>
+        <span class="ctrl-label">Glow window (px)</span>
+        <input type="range" class="ctrl-slider" id="glowWindow" min="20" max="400" step="10">
+        <span class="ctrl-value" id="glowWindowVal">—</span>
       </div>
 
       <div class="ctrl-row">
-        <span class="ctrl-label">Settle %</span>
-        <input type="range" class="ctrl-slider" id="tiltSettlePct" min="60" max="98" step="1">
-        <span class="ctrl-value" id="tiltSettlePctVal">—</span>
+        <span class="ctrl-label">Glow alpha</span>
+        <input type="range" class="ctrl-slider" id="glowAlpha" min="0" max="0.60" step="0.01">
+        <span class="ctrl-value" id="glowAlphaVal">—</span>
       </div>
 
       <div class="ctrl-row">
-        <span class="ctrl-label">Contact factor</span>
-        <input type="range" class="ctrl-slider" id="tiltContactFactor" min="0" max="1" step="0.05">
-        <span class="ctrl-value" id="tiltContactFactorVal">—</span>
+        <span class="ctrl-label">Glow in (ms)</span>
+        <input type="range" class="ctrl-slider" id="glowIn" min="100" max="1000" step="50">
+        <span class="ctrl-value" id="glowInVal">—</span>
       </div>
 
       <div class="ctrl-row">
-        <span class="ctrl-label">Freeze %</span>
-        <input type="range" class="ctrl-slider" id="freezePct" min="0" max="100" step="1">
-        <span class="ctrl-value" id="freezePctVal">—</span>
+        <span class="ctrl-label">Glow out (ms)</span>
+        <input type="range" class="ctrl-slider" id="glowOut" min="100" max="1500" step="50">
+        <span class="ctrl-value" id="glowOutVal">—</span>
+      </div>
+
+      <div class="ctrl-row" style="align-items: flex-start;">
+        <span class="ctrl-label">Colour</span>
+        <div class="preset-row" id="colourPresets" style="flex:1; margin-bottom:0;">
+          <button type="button" class="preset-btn" data-rgb="143,47,0">Rust</button>
+          <button type="button" class="preset-btn" data-rgb="150,40,40">Deep red</button>
+          <button type="button" class="preset-btn" data-rgb="200,130,40">Amber</button>
+          <button type="button" class="preset-btn" data-rgb="230,210,170">Cream</button>
+        </div>
       </div>
 
       <div class="ctrl-row" style="justify-content: flex-end; margin-top: 16px;">
@@ -470,363 +499,200 @@
 <script>
 /* ============================================================
    TUNING — edit here, reload the page.
-   The on-screen controls mirror these and write back into them,
-   but the values below are what the page starts with.
+   The on-screen controls mirror these and write back into them.
    ============================================================ */
 const TUNING = {
-  // Peak tilt in degrees. 0 = no tilt. Try 4, 8, 12, 16, 20.
-  tiltDeg: 12,
+  /* Parallax drift factor. Negative effect: at 0.07 the body
+     moves at ~93% of the page's scroll rate. d peaks around
+     ±650px on the tablet in landscape, so drift tops out near
+     ±45px. */
+  driftFactor: 0.07,
 
-  // Where in the animation the tilt peaks, as a percentage (0-100).
-  // The tilt is 0 at 0%, rises to tiltDeg at tiltPeakPct, and is
-  // fully unwound by tiltSettlePct.
-  tiltPeakPct: 40,
-  tiltSettlePct: 86,
+  /* Viewport-centre window (px) within which the glow is on. */
+  glowWindow: 150,
 
-  // Residual tilt at the contact bounce (72%). 0 = fully flat on
-  // contact, 1 = same as peak. Fractional values allowed.
-  tiltContactFactor: 0.15,
+  /* Glow colour as [R, G, B]. Alpha is separate. */
+  glowRgb: [143, 47, 0],   // autumn rust — matches main.css
+  glowAlpha: 0.10,
 
-  // Perspective state. When true, the wrapper's parent gets
-  // perspective and the wrapper gets preserve-3d, matching the
-  // 3D context the app's carousel sets up. When false, no
-  // perspective — a plain 2D rotateX, which will render as a
-  // Y-axis squash.
-  perspectiveOn: false,
-  perspectivePx: 1200,
+  /* Glow pulse timing. In is the entry transition (when the
+     .centered class is added), out is the exit. */
+  glowIn: 300,
+  glowOut: 600,
 
-  // Resting tilt carried through every keyframe. Matches the
-  // app's --rest-rotate. Do not change unless you want to test
-  // a different resting angle.
-  restRotateDeg: 1.65,
+  /* How far the ::before ellipse extends beyond the text bounds.
+     Negative values push outward. */
+  glowInsetY: -50,
+  glowInsetX: -40,
 
-  // Mid-fall inspection. When true, the animation is paused at
-  // the percentage below. Use this to stare at the peak pose.
-  freezeOn: false,
-  freezePct: 40,
-
-  // Duration and travel. Match the app so the demo is honest.
-  durationMs: 2400,
-  travelPx: 140,
-
-  // Step 1's scale. Off by default so tilt is tested in
-  // isolation. Turn on to see whether tilt + scale together
-  // still feels smooth.
-  scaleOn: false
+  /* Preview helpers. */
+  forceGlow: false,
+  showCentreLine: false
 };
 
 /* ============================================================
    DOM refs
    ============================================================ */
-const paperWrap = document.getElementById('paperWrap');
-const demoStage = document.getElementById('demoStage');
+const bodyEl = document.getElementById('transitionLineBody');
 const readout = document.getElementById('readout');
-const playBtn = document.getElementById('playBtn');
-const perspectiveBtn = document.getElementById('perspectiveBtn');
-const scaleBtn = document.getElementById('scaleBtn');
-const freezeBtn = document.getElementById('freezeBtn');
+const centreLine = document.getElementById('centreLine');
+const forceGlowBtn = document.getElementById('forceGlowBtn');
+const centreLineBtn = document.getElementById('centreLineBtn');
+const chevronBtn = document.getElementById('chevronBtn');
+const controlsExpanded = document.getElementById('controlsExpanded');
+const closeExpandedBtn = document.getElementById('closeExpandedBtn');
+const colourPresets = document.getElementById('colourPresets');
 
 /* ============================================================
-   Dynamic keyframe injection.
-
-   @keyframes selectors cannot use var() for the percentage stop
-   positions — the spec requires a literal <percentage>. So the
-   two keyframe blocks are regenerated as text from TUNING on
-   every change and injected into a dedicated <style> element.
-   That makes tiltPeakPct and tiltSettlePct genuinely live.
-   ============================================================ */
-const kfStyle = document.createElement('style');
-document.head.appendChild(kfStyle);
-
-function buildKeyframes() {
-  const peak = TUNING.tiltPeakPct;
-  const settle = TUNING.tiltSettlePct;
-  const contact = 72;
-  const downTravel = TUNING.travelPx;
-
-  // Fraction-of-travel constants kept from the current main.css.
-  // 0% -> -1.0 of travel, peak -> -0.21, 72% -> +0.086, settle
-  // -> -0.043, 100% -> 0. These are ratio-equivalent to the
-  // deployed 140 / -30 / +12 / -6 / 0 mapping.
-  const travelAt = {
-    start:  -1.000,
-    peak:   -0.214,
-    contact: 0.086,
-    settle: -0.043,
-    end:     0.000
-  };
-
-  // Tilt magnitude at each stop, as a fraction of tiltDeg.
-  const tiltAt = {
-    start:   0,
-    peak:    1,
-    contact: TUNING.tiltContactFactor,
-    settle:  0,
-    end:     0
-  };
-
-  // Two blocks: tilt-only, and tilt + Step 1's scale. Same stop
-  // positions, different transform composition.
-  const tiltOnly = `
-@keyframes paperLandTilt {
-  0% {
-    opacity: 0;
-    transform:
-      translateY(${(travelAt.start * downTravel).toFixed(2)}px)
-      rotateX(${(tiltAt.start * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${peak}% {
-    opacity: 1;
-    transform:
-      translateY(${(travelAt.peak * downTravel).toFixed(2)}px)
-      rotateX(${(tiltAt.peak * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${contact}% {
-    transform:
-      translateY(${(travelAt.contact * downTravel).toFixed(2)}px)
-      rotateX(${(tiltAt.contact * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${settle}% {
-    transform:
-      translateY(${(travelAt.settle * downTravel).toFixed(2)}px)
-      rotateX(${(tiltAt.settle * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  100% {
-    opacity: 1;
-    transform:
-      translateY(${(travelAt.end * downTravel).toFixed(2)}px)
-      rotateX(${(tiltAt.end * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-}
-`;
-
-  // Tilt + Step 1's two-axis scale. The scale values are the
-  // deployed ones: (1, 0.94), (1, 0.98), (1.016, 1.014),
-  // (0.996, 0.997), (1, 1).
-  const scalePairs = {
-    start:   'scale(1, 0.94)',
-    peak:    'scale(1, 0.98)',
-    contact: 'scale(1.016, 1.014)',
-    settle:  'scale(0.996, 0.997)',
-    end:     'scale(1, 1)'
-  };
-
-  const tiltAndScale = `
-@keyframes paperLandTiltScale {
-  0% {
-    opacity: 0;
-    transform:
-      translateY(${(travelAt.start * downTravel).toFixed(2)}px)
-      ${scalePairs.start}
-      rotateX(${(tiltAt.start * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${peak}% {
-    opacity: 1;
-    transform:
-      translateY(${(travelAt.peak * downTravel).toFixed(2)}px)
-      ${scalePairs.peak}
-      rotateX(${(tiltAt.peak * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${contact}% {
-    transform:
-      translateY(${(travelAt.contact * downTravel).toFixed(2)}px)
-      ${scalePairs.contact}
-      rotateX(${(tiltAt.contact * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  ${settle}% {
-    transform:
-      translateY(${(travelAt.settle * downTravel).toFixed(2)}px)
-      ${scalePairs.settle}
-      rotateX(${(tiltAt.settle * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-  100% {
-    opacity: 1;
-    transform:
-      translateY(${(travelAt.end * downTravel).toFixed(2)}px)
-      ${scalePairs.end}
-      rotateX(${(tiltAt.end * TUNING.tiltDeg).toFixed(3)}deg)
-      rotate(${TUNING.restRotateDeg}deg);
-  }
-}
-`;
-
-  kfStyle.textContent = tiltOnly + '\n' + tiltAndScale;
-}
-
-/* ============================================================
-   Apply TUNING to the DOM. Called on load and on every change.
+   Apply TUNING to the DOM.
    ============================================================ */
 function applyTuning() {
-  buildKeyframes();
+  const rgba = 'rgba(' + TUNING.glowRgb[0] + ', ' + TUNING.glowRgb[1] + ', ' + TUNING.glowRgb[2] + ', ' + TUNING.glowAlpha + ')';
+  bodyEl.style.setProperty('--transition-glow-bg', rgba);
+  bodyEl.style.setProperty('--demo-glow-in', TUNING.glowIn + 'ms');
+  bodyEl.style.setProperty('--demo-glow-out', TUNING.glowOut + 'ms');
+  bodyEl.style.setProperty('--demo-glow-inset-y', TUNING.glowInsetY + 'px');
+  bodyEl.style.setProperty('--demo-glow-inset-x', TUNING.glowInsetX + 'px');
 
-  // Resting rotate + duration + perspective on the wrapper.
-  paperWrap.style.setProperty('--rest-rotate', TUNING.restRotateDeg + 'deg');
-  paperWrap.style.setProperty('--demo-duration', TUNING.durationMs + 'ms');
+  centreLine.classList.toggle('shown', TUNING.showCentreLine);
 
-  // Perspective switch. The CSS rule .demo-stage.perspective-on
-  // sets perspective on the stage and preserve-3d on the wrapper.
-  if (TUNING.perspectiveOn) {
-    demoStage.classList.add('perspective-on');
-    demoStage.style.setProperty('--demo-perspective', TUNING.perspectivePx + 'px');
-  } else {
-    demoStage.classList.remove('perspective-on');
-    demoStage.style.removeProperty('--demo-perspective');
-  }
+  forceGlowBtn.classList.toggle('on', TUNING.forceGlow);
+  centreLineBtn.classList.toggle('on', TUNING.showCentreLine);
 
-  // Scale swap.
-  paperWrap.classList.toggle('with-scale', TUNING.scaleOn);
+  // Colour preset active state.
+  const rgbStr = TUNING.glowRgb.join(',');
+  colourPresets.querySelectorAll('.preset-btn').forEach(function(b) {
+    b.classList.toggle('on', b.getAttribute('data-rgb') === rgbStr);
+  });
 
-  // Freeze.
-  if (TUNING.freezeOn) {
-    paperWrap.classList.add('landing', 'frozen');
-    paperWrap.style.setProperty('--demo-freeze-frac', (TUNING.freezePct / 100).toString());
-    // Ensure the animation-name is present even when paused.
-    void paperWrap.offsetWidth;
-  } else {
-    paperWrap.classList.remove('frozen');
-    paperWrap.style.removeProperty('--demo-freeze-frac');
-  }
-
-  // Sync the on-screen controls.
   syncControls();
-
-  // Readout.
   updateReadout();
 }
 
 /* ============================================================
-   Replay — remove .landing, reflow, re-add. Restarts the
-   animation from frame 0. When frozen, re-adding also re-applies
-   the paused state via applyTuning's class list.
+   The scroll effect — identical math to updateTransitionBodyEffects()
+   in app.js, but with TUNING values.
    ============================================================ */
-function replay() {
-  paperWrap.classList.remove('landing');
-  void paperWrap.offsetWidth;
-  paperWrap.classList.add('landing');
-  if (TUNING.freezeOn) {
-    paperWrap.classList.add('frozen');
-    paperWrap.style.setProperty('--demo-freeze-frac', (TUNING.freezePct / 100).toString());
+let lastD = 0;
+let lastDrift = 0;
+
+function updateEffects() {
+  const vh = window.innerHeight;
+  const vc = vh / 2;
+  const rect = bodyEl.getBoundingClientRect();
+  const bodyCentre = rect.top + rect.height / 2;
+  const d = bodyCentre - vc;
+
+  const driftY = -d * TUNING.driftFactor;
+  bodyEl.style.transform =
+    (driftY > 0.05 || driftY < -0.05)
+      ? 'translateY(' + driftY.toFixed(2) + 'px)'
+      : '';
+
+  if (TUNING.forceGlow || Math.abs(d) <= TUNING.glowWindow) {
+    bodyEl.classList.add('centered');
+  } else {
+    bodyEl.classList.remove('centered');
   }
+
+  lastD = d;
+  lastDrift = driftY;
+  updateReadout();
 }
 
+let rafPending = false;
+function scheduleUpdate() {
+  if (rafPending) return;
+  rafPending = true;
+  requestAnimationFrame(function() {
+    rafPending = false;
+    updateEffects();
+  });
+}
+
+window.addEventListener('scroll', scheduleUpdate, { passive: true });
+window.addEventListener('resize', scheduleUpdate);
+
 /* ============================================================
-   Controls — every input writes back into TUNING and re-applies.
+   Controls
    ============================================================ */
 const ctrls = {
-  tiltDeg:            document.getElementById('tiltDeg'),
-  tiltPeakPct:        document.getElementById('tiltPeakPct'),
-  tiltSettlePct:      document.getElementById('tiltSettlePct'),
-  tiltContactFactor:  document.getElementById('tiltContactFactor'),
-  freezePct:          document.getElementById('freezePct')
+  driftFactor:  document.getElementById('driftFactor'),
+  glowWindow:   document.getElementById('glowWindow'),
+  glowAlpha:    document.getElementById('glowAlpha'),
+  glowIn:       document.getElementById('glowIn'),
+  glowOut:      document.getElementById('glowOut')
 };
 const valEls = {
-  tiltDeg:            document.getElementById('tiltDegVal'),
-  tiltPeakPct:        document.getElementById('tiltPeakPctVal'),
-  tiltSettlePct:      document.getElementById('tiltSettlePctVal'),
-  tiltContactFactor:  document.getElementById('tiltContactFactorVal'),
-  freezePct:          document.getElementById('freezePctVal')
+  driftFactor:  document.getElementById('driftFactorVal'),
+  glowWindow:   document.getElementById('glowWindowVal'),
+  glowAlpha:    document.getElementById('glowAlphaVal'),
+  glowIn:       document.getElementById('glowInVal'),
+  glowOut:      document.getElementById('glowOutVal')
 };
 
 function syncControls() {
-  ctrls.tiltDeg.value = TUNING.tiltDeg;
-  ctrls.tiltPeakPct.value = TUNING.tiltPeakPct;
-  ctrls.tiltSettlePct.value = TUNING.tiltSettlePct;
-  ctrls.tiltContactFactor.value = TUNING.tiltContactFactor;
-  ctrls.freezePct.value = TUNING.freezePct;
+  ctrls.driftFactor.value = TUNING.driftFactor;
+  ctrls.glowWindow.value = TUNING.glowWindow;
+  ctrls.glowAlpha.value = TUNING.glowAlpha;
+  ctrls.glowIn.value = TUNING.glowIn;
+  ctrls.glowOut.value = TUNING.glowOut;
 
-  valEls.tiltDeg.textContent = TUNING.tiltDeg.toFixed(1) + '°';
-  valEls.tiltPeakPct.textContent = TUNING.tiltPeakPct + '%';
-  valEls.tiltSettlePct.textContent = TUNING.tiltSettlePct + '%';
-  valEls.tiltContactFactor.textContent = TUNING.tiltContactFactor.toFixed(2);
-  valEls.freezePct.textContent = TUNING.freezePct + '%';
-
-  perspectiveBtn.textContent = 'Perspective ' + (TUNING.perspectiveOn ? 'ON' : 'OFF');
-  perspectiveBtn.classList.toggle('on', TUNING.perspectiveOn);
-
-  scaleBtn.textContent = 'Scale ' + (TUNING.scaleOn ? 'ON' : 'OFF');
-  scaleBtn.classList.toggle('on', TUNING.scaleOn);
-
-  freezeBtn.textContent = 'Freeze ' + (TUNING.freezeOn ? 'ON' : 'OFF');
-  freezeBtn.classList.toggle('on', TUNING.freezeOn);
+  valEls.driftFactor.textContent = TUNING.driftFactor.toFixed(3);
+  valEls.glowWindow.textContent = TUNING.glowWindow + 'px';
+  valEls.glowAlpha.textContent = TUNING.glowAlpha.toFixed(2);
+  valEls.glowIn.textContent = TUNING.glowIn + 'ms';
+  valEls.glowOut.textContent = TUNING.glowOut + 'ms';
 }
 
 function updateReadout() {
+  const inWindow = Math.abs(lastD) <= TUNING.glowWindow;
+  const glowState = TUNING.forceGlow ? 'FORCED' : (inWindow ? 'ON' : 'off');
   const lines = [
-    'tiltDeg:            ' + TUNING.tiltDeg.toFixed(1),
-    'tiltPeakPct:        ' + TUNING.tiltPeakPct,
-    'tiltSettlePct:      ' + TUNING.tiltSettlePct,
-    'tiltContactFactor:  ' + TUNING.tiltContactFactor.toFixed(2),
-    'perspectiveOn:      ' + TUNING.perspectiveOn,
-    'perspectivePx:      ' + TUNING.perspectivePx,
-    'scaleOn:            ' + TUNING.scaleOn,
-    'freezeOn:           ' + TUNING.freezeOn,
-    'freezePct:          ' + TUNING.freezePct,
-    'durationMs:         ' + TUNING.durationMs,
-    'travelPx:           ' + TUNING.travelPx,
-    'restRotateDeg:      ' + TUNING.restRotateDeg
+    'd (body centre - viewport centre):  ' + lastD.toFixed(0) + 'px',
+    'drift (inline translateY):          ' + lastDrift.toFixed(2) + 'px',
+    'glow window:                        ±' + TUNING.glowWindow + 'px',
+    'glow state:                         ' + glowState,
+    'driftFactor:                        ' + TUNING.driftFactor.toFixed(3),
+    'glowRgb:                            ' + TUNING.glowRgb.join(', '),
+    'glowAlpha:                          ' + TUNING.glowAlpha.toFixed(2),
+    'glowIn / glowOut:                   ' + TUNING.glowIn + ' / ' + TUNING.glowOut + 'ms'
   ];
   readout.textContent = lines.join('\n');
 }
 
-// Slider bindings.
 Object.keys(ctrls).forEach(function(key) {
   ctrls[key].addEventListener('input', function() {
     TUNING[key] = parseFloat(ctrls[key].value);
     applyTuning();
-    if (!TUNING.freezeOn) replay();
+    updateEffects();
   });
 });
 
-// Toggle bindings.
-perspectiveBtn.addEventListener('click', function() {
-  TUNING.perspectiveOn = !TUNING.perspectiveOn;
-  applyTuning();
-  replay();
-});
-scaleBtn.addEventListener('click', function() {
-  TUNING.scaleOn = !TUNING.scaleOn;
-  applyTuning();
-  replay();
-});
-freezeBtn.addEventListener('click', function() {
-  TUNING.freezeOn = !TUNING.freezeOn;
-  applyTuning();
-  if (!TUNING.freezeOn) replay();
-});
-
-// Play button.
-playBtn.addEventListener('click', function() {
-  if (TUNING.freezeOn) {
-    TUNING.freezeOn = false;
+colourPresets.querySelectorAll('.preset-btn').forEach(function(b) {
+  b.addEventListener('click', function() {
+    const parts = b.getAttribute('data-rgb').split(',').map(function(s) {
+      return parseInt(s, 10);
+    });
+    TUNING.glowRgb = parts;
     applyTuning();
-  }
-  replay();
+  });
 });
 
-/* ============================================================
-   Expanded panel toggle. The chevron flips the overlay, and
-   tapping the backdrop (outside the panel) closes it too. The
-   chevron button is duplicated visually as a state indicator on
-   the collapsed bar — it rotates 180° when the panel is open so
-   a glance is enough to know the state.
-   ============================================================ */
-const chevronBtn = document.getElementById('chevronBtn');
-const controlsExpanded = document.getElementById('controlsExpanded');
-const closeExpandedBtn = document.getElementById('closeExpandedBtn');
+forceGlowBtn.addEventListener('click', function() {
+  TUNING.forceGlow = !TUNING.forceGlow;
+  applyTuning();
+  updateEffects();
+});
+
+centreLineBtn.addEventListener('click', function() {
+  TUNING.showCentreLine = !TUNING.showCentreLine;
+  applyTuning();
+});
 
 function setExpanded(open) {
   controlsExpanded.classList.toggle('open', open);
   chevronBtn.classList.toggle('up', open);
-  chevronBtn.setAttribute('aria-label', open ? 'Collapse controls' : 'Expand controls');
 }
 chevronBtn.addEventListener('click', function() {
   setExpanded(!controlsExpanded.classList.contains('open'));
@@ -842,9 +708,9 @@ controlsExpanded.addEventListener('click', function(e) {
    Boot
    ============================================================ */
 applyTuning();
-// Kick off the first run so the paper isn't sitting in its
-// pre-animation state when the page opens.
-requestAnimationFrame(function() { replay(); });
+// Kick the effect once so the drift is applied at page open,
+// not only after the first scroll.
+requestAnimationFrame(function() { updateEffects(); });
 </script>
 
 </body>
