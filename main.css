@@ -1215,22 +1215,30 @@
 
   /* v1.3: landing animation. Stops: 0% (opacity 0, pre-fall pose),
      40% (opacity 1, tilt peak), 72% (contact bounce), 86% (rebound),
-     100% (settle). Duration 2400ms, travel 140px, cubic-bezier
+     100% (settle). Duration 1400ms, travel 100px, cubic-bezier
      (0.25, 0.1, 0.25, 1), fill-mode both so the 0% pose holds
      before playback.
 
-     filter: none on .landing is critical — it removes the wrapper's
-     drop-shadow entirely for the duration of the fall. Without it,
-     Chromium refuses to trust the cached alpha mask on the SVG-masked
-     child while the parent translates, invalidates the GPU layer
-     every frame, and recomputes the mask-shadow intersection on the
-     main thread. That recompute is the stutter.
+     Step 3 shortened duration 2400 → 1400ms and travel 140 → 100px.
+     The original 2400/140 was a compensation for dropped frames that
+     turned out to be caused by concurrent .receipt-item arrivals,
+     not by the landing animation itself. With those serialized
+     (deferItems + revealReceiptItems), the tighter timing reads
+     correctly on the device.
 
-     transition: none on .landing is equally critical — without it the
-     base rule's filter transition fires on entry, animating the
-     filter from full shadow to none across the first 400ms of the
-     fall. The shadow transitions back in only on the exit side, when
-     .landing is removed at animationend and the base rule resumes.
+     Step 4 restored the drop-shadow fade inside the keyframes. Filter
+     was previously held at `none` on .landing for the duration of the
+     fall. That precaution is no longer needed — the animation now
+     interpolates its own two-layer drop-shadow from alpha 0 at 0% to
+     the base-rule values at 100%, with a slight overshoot at the
+     contact bounce (72%) and a relaxed value at the rebound (86%).
+     The 100% values match the base rule exactly, so there is no pop
+     when the animation ends and the base filter takes over.
+
+     transition: none on .landing is still load-bearing — it prevents
+     the base rule's 400ms filter transition from firing on entry,
+     which would fight the keyframe's own filter interpolation during
+     the first frames of the fall.
 
      Step 1 restored scale as a two-axis scale(x, y). Horizontal axis
      stays near 1 (1 → 1 → 1.016 → 0.996 → 1); vertical axis
@@ -1245,30 +1253,44 @@
      translateY → scale → rotateX → rotate(rest), so the resting
      tilt is applied last and the composition reads as expected. */
   .receipt-paper-wrap.landing {
-    animation: paperLand 2400ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+    animation: paperLand 1400ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
     will-change: transform, opacity;
-    filter: none;
     transition: none;
   }
 
   @keyframes paperLand {
     0% {
       opacity: 0;
-      transform: translateY(-140px) scale(1, 0.94) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-100px) scale(1, 0.94) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
+      filter:
+        drop-shadow(0px 1px 2px rgba(60, 30, 10, 0))
+        drop-shadow(7px 22px 18px rgba(120, 70, 20, 0));
     }
     40% {
       opacity: 1;
-      transform: translateY(-30px) scale(1, 0.98) rotateX(12deg) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-21px) scale(1, 0.98) rotateX(12deg) rotate(var(--rest-rotate, 1.65deg));
+      filter:
+        drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.12))
+        drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.08));
     }
     72% {
-      transform: translateY(12px) scale(1.016, 1.014) rotateX(1.8deg) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(9px) scale(1.016, 1.014) rotateX(1.8deg) rotate(var(--rest-rotate, 1.65deg));
+      filter:
+        drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.26))
+        drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.25));
     }
     86% {
-      transform: translateY(-6px) scale(0.996, 0.997) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
+      transform: translateY(-4px) scale(0.996, 0.997) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
+      filter:
+        drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.20))
+        drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.19));
     }
     100% {
       opacity: 1;
       transform: translateY(0) scale(1, 1) rotateX(0deg) rotate(var(--rest-rotate, 1.65deg));
+      filter:
+        drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+        drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
     }
   }
 
