@@ -37,7 +37,8 @@
     color: var(--text-dark);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 17px; line-height: 1.7;
-    background-color: var(--bg-warm);
+    /* Base cream, same as the main page at rest. */
+    background-color: #fdf3d8;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -129,8 +130,7 @@
   }
 
   /* ============================================================
-     Spacers — give scroll room above and below the transition
-     line so the body can pass through the full viewport.
+     Spacers
      ============================================================ */
   .spacer-top, .spacer-bottom {
     min-height: 120vh;
@@ -181,31 +181,38 @@
     white-space: nowrap;
   }
 
+  /* Body holds the paragraphs. No transform on the body itself —
+     each paragraph drifts independently. */
   .transition-line-body {
     position: relative;
-    will-change: transform;
-    transform-origin: 50% 50%;
   }
-  .transition-line-body::before {
+
+  /* Each paragraph gets its own glow pseudo-element and its own
+     inline translateY, both set from JS from its own centre delta. */
+  .transition-line-body p {
+    position: relative;
+    margin: 0 0 0.9em 0;
+    opacity: 1;
+    transform: none;
+    will-change: transform;
+    transition: transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .transition-line-body p:last-child { margin-bottom: 0; }
+
+  .transition-line-body p::before {
     content: "";
     position: absolute;
-    inset: var(--demo-glow-inset-y, -50px) var(--demo-glow-inset-x, -40px);
+    inset: var(--demo-glow-inset-y, -30px) var(--demo-glow-inset-x, -30px);
     background: radial-gradient(ellipse at center,
       var(--transition-glow-bg), transparent 70%);
     opacity: 0;
     pointer-events: none;
     transition: opacity var(--demo-glow-out, 600ms) ease;
   }
-  .transition-line-body.centered::before {
+  .transition-line-body p.centered::before {
     opacity: 1;
     transition: opacity var(--demo-glow-in, 300ms) ease;
   }
-  .transition-line-body p {
-    margin: 0 0 0.9em 0;
-    opacity: 1;
-    transform: none;
-  }
-  .transition-line-body p:last-child { margin-bottom: 0; }
 
   /* Viewport centre line — debug aid */
   .centre-line {
@@ -232,7 +239,7 @@
   .centre-line::after { right: 8px; }
 
   /* ============================================================
-     Controls — collapsed bar + expandable overlay
+     Controls
      ============================================================ */
   .controls {
     position: fixed;
@@ -499,33 +506,16 @@
 <script>
 /* ============================================================
    TUNING — edit here, reload the page.
-   The on-screen controls mirror these and write back into them.
    ============================================================ */
 const TUNING = {
-  /* Parallax drift factor. Negative effect: at 0.07 the body
-     moves at ~93% of the page's scroll rate. d peaks around
-     ±650px on the tablet in landscape, so drift tops out near
-     ±45px. */
   driftFactor: 0.07,
-
-  /* Viewport-centre window (px) within which the glow is on. */
   glowWindow: 150,
-
-  /* Glow colour as [R, G, B]. Alpha is separate. */
-  glowRgb: [143, 47, 0],   // autumn rust — matches main.css
+  glowRgb: [143, 47, 0],
   glowAlpha: 0.10,
-
-  /* Glow pulse timing. In is the entry transition (when the
-     .centered class is added), out is the exit. */
   glowIn: 300,
   glowOut: 600,
-
-  /* How far the ::before ellipse extends beyond the text bounds.
-     Negative values push outward. */
-  glowInsetY: -50,
-  glowInsetX: -40,
-
-  /* Preview helpers. */
+  glowInsetY: -30,
+  glowInsetX: -30,
   forceGlow: false,
   showCentreLine: false
 };
@@ -559,7 +549,6 @@ function applyTuning() {
   forceGlowBtn.classList.toggle('on', TUNING.forceGlow);
   centreLineBtn.classList.toggle('on', TUNING.showCentreLine);
 
-  // Colour preset active state.
   const rgbStr = TUNING.glowRgb.join(',');
   colourPresets.querySelectorAll('.preset-btn').forEach(function(b) {
     b.classList.toggle('on', b.getAttribute('data-rgb') === rgbStr);
@@ -570,33 +559,56 @@ function applyTuning() {
 }
 
 /* ============================================================
-   The scroll effect — identical math to updateTransitionBodyEffects()
-   in app.js, but with TUNING values.
+   Per-paragraph scroll effect.
+
+   Each <p> computes its own centre delta d and gets its own
+   inline translateY. Each <p> toggles its own .centered class
+   which drives its own ::before glow. The readout shows the
+   paragraph currently closest to the viewport centre.
    ============================================================ */
 let lastD = 0;
 let lastDrift = 0;
+let lastParaIdx = 1;
+let lastInWindow = false;
 
 function updateEffects() {
   const vh = window.innerHeight;
   const vc = vh / 2;
-  const rect = bodyEl.getBoundingClientRect();
-  const bodyCentre = rect.top + rect.height / 2;
-  const d = bodyCentre - vc;
+  const ps = bodyEl.querySelectorAll('p');
 
-  const driftY = -d * TUNING.driftFactor;
-  bodyEl.style.transform =
-    (driftY > 0.05 || driftY < -0.05)
-      ? 'translateY(' + driftY.toFixed(2) + 'px)'
-      : '';
+  let bestAbsD = Infinity;
+  let bestD = 0;
+  let bestIdx = 0;
+  let bestInWindow = false;
 
-  if (TUNING.forceGlow || Math.abs(d) <= TUNING.glowWindow) {
-    bodyEl.classList.add('centered');
-  } else {
-    bodyEl.classList.remove('centered');
-  }
+  ps.forEach(function(p, i) {
+    const rect = p.getBoundingClientRect();
+    const centre = rect.top + rect.height / 2;
+    const d = centre - vc;
+    const driftY = -d * TUNING.driftFactor;
 
-  lastD = d;
-  lastDrift = driftY;
+    p.style.transform =
+      (driftY > 0.05 || driftY < -0.05)
+        ? 'translateY(' + driftY.toFixed(2) + 'px)'
+        : '';
+
+    const inWindow = TUNING.forceGlow || Math.abs(d) <= TUNING.glowWindow;
+    if (inWindow) p.classList.add('centered');
+    else p.classList.remove('centered');
+
+    const absD = Math.abs(d);
+    if (absD < bestAbsD) {
+      bestAbsD = absD;
+      bestD = d;
+      bestIdx = i;
+      bestInWindow = inWindow;
+    }
+  });
+
+  lastD = bestD;
+  lastDrift = -bestD * TUNING.driftFactor;
+  lastParaIdx = bestIdx + 1;
+  lastInWindow = bestInWindow;
   updateReadout();
 }
 
@@ -646,13 +658,14 @@ function syncControls() {
 }
 
 function updateReadout() {
-  const inWindow = Math.abs(lastD) <= TUNING.glowWindow;
-  const glowState = TUNING.forceGlow ? 'FORCED' : (inWindow ? 'ON' : 'off');
+  const glowState = TUNING.forceGlow ? 'FORCED' : (lastInWindow ? 'ON' : 'off');
   const lines = [
-    'd (body centre - viewport centre):  ' + lastD.toFixed(0) + 'px',
-    'drift (inline translateY):          ' + lastDrift.toFixed(2) + 'px',
+    'nearest para:                       p' + lastParaIdx + ' of 4',
+    'd (its centre - viewport centre):   ' + lastD.toFixed(0) + 'px',
+    'its drift (inline translateY):      ' + lastDrift.toFixed(2) + 'px',
     'glow window:                        ±' + TUNING.glowWindow + 'px',
-    'glow state:                         ' + glowState,
+    'glow state (nearest para):          ' + glowState,
+    '---',
     'driftFactor:                        ' + TUNING.driftFactor.toFixed(3),
     'glowRgb:                            ' + TUNING.glowRgb.join(', '),
     'glowAlpha:                          ' + TUNING.glowAlpha.toFixed(2),
@@ -708,8 +721,6 @@ controlsExpanded.addEventListener('click', function(e) {
    Boot
    ============================================================ */
 applyTuning();
-// Kick the effect once so the drift is applied at page open,
-// not only after the first scroll.
 requestAnimationFrame(function() { updateEffects(); });
 </script>
 
