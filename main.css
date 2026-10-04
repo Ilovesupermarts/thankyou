@@ -28,6 +28,7 @@
     --amb-1: rgba(251, 200, 210, 0.70); --amb-2: rgba(247, 210, 195, 0.65);
     --amb-3: rgba(232, 160, 175, 0.45); --amb-4: rgba(250, 220, 205, 0.55);
     --transition-head-color: #fce6dc;
+    --transition-glow-bg: rgba(176, 74, 90, 0.09);
   }
 
   html[data-theme="autumn"] {
@@ -55,6 +56,7 @@
     --amb-1: rgba(247, 185, 60, 0.85); --amb-2: rgba(240, 138, 30, 0.80);
     --amb-3: rgba(217, 94, 26, 0.72); --amb-4: rgba(143, 63, 18, 0.55); --amb-5: rgba(107, 47, 14, 0.45);
     --transition-head-color: #fdf0c8;
+    --transition-glow-bg: rgba(143, 47, 0, 0.10);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -349,6 +351,23 @@
     z-index: 10; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
+
+  /* v1.3: invisible reset hot-spot. Tap the top-left corner to
+     return to the blossom start screen, preserving all entered
+     values, and re-run the koi intro. Sized for finger contact;
+     z-index 8 sits below the theme toggle (z-index 10) so a tap
+     on the toggle still switches themes. */
+  .reset-hotspot {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 80px;
+    height: 80px;
+    z-index: 8;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
 
   /* ============ APP VERSION BADGE ============ */
   .app-version {
@@ -678,8 +697,28 @@
 
   .transition-line-body {
     position: relative;
-    will-change: filter, transform;
+    will-change: transform;
     transform-origin: 50% 50%;
+  }
+
+  /* v1.3: warm radial glow behind the body when JS adds .centered.
+     In-transition 300ms, out-transition 600ms — the transition
+     declared on the .centered rule governs entry, the base rule
+     governs exit. The ::before is a soft ellipse that extends
+     beyond the text bounds so it reads as warmth rather than a box. */
+  .transition-line-body::before {
+    content: "";
+    position: absolute;
+    inset: -50px -40px;
+    background: radial-gradient(ellipse at center,
+      var(--transition-glow-bg), transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 600ms ease;
+  }
+  .transition-line-body.centered::before {
+    opacity: 1;
+    transition: opacity 300ms ease;
   }
   .transition-line-body p {
     margin: 0 0 0.9em 0;
@@ -695,10 +734,13 @@
     transform: translateY(0);
   }
 
-  /* v1.17.2: .snap-bold class removed.
-     The focus snap now uses an inline text-shadow applied from
-     app.js, gated on a strictly symmetrical |d| <= TB_SNAP_WINDOW_PX
-     window. See updateTransitionBodyEffects() for the current logic. */
+  /* v1.3: scroll-linked effects on the body are now:
+       - parallax drift: JS sets an inline translateY from the
+         body-centre-to-viewport-centre delta (factor 0.07).
+       - warm radial glow: the .centered class toggled by JS
+         drives the ::before pseudo-element's opacity.
+     Blur, scaleX, and the focus-snap text-shadow have been
+     removed. See updateTransitionBodyEffects() in app.js. */
 
   @media (prefers-reduced-motion: reduce) {
     .transition-line-body p {
@@ -707,8 +749,11 @@
       transition: none;
     }
     .transition-line-body {
-      filter: none !important;
       transform: none !important;
+    }
+    .transition-line-body::before {
+      opacity: 0 !important;
+      transition: none !important;
     }
   }
 
