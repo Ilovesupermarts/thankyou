@@ -42,8 +42,9 @@
 
   /* ============================================================
      The demo stage — full-screen, holds the receipt paper in
-     its resting pose. No receipt-screen background colour; the
-     body colour stands in for the ambient background.
+     its resting pose. The bottom padding accounts for the
+     collapsed control bar so the paper has the whole screen
+     when the expanded panel is closed.
      ============================================================ */
   .demo-stage {
     position: fixed;
@@ -51,7 +52,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 60px 20px 320px 20px;
+    padding: 40px 20px 68px 20px;
     overflow: hidden;
     pointer-events: none;
   }
@@ -120,6 +121,10 @@
     --tear-h: 6px;
 
     max-width: 380px; width: 100%;
+    max-height: calc(100vh - 128px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+
     padding: 36px 30px 28px 30px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     position: relative;
@@ -191,33 +196,189 @@
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
   /* ============================================================
-     Control panel — fixed at the bottom, non-scrolling. Styled
-     in the app's palette so it doesn't feel alien.
+     Control bar — two states.
+
+     Collapsed (default): a slim strip at the bottom of the
+     screen with the play button and three toggles plus an
+     expand chevron. Leaves the stage almost entirely visible.
+
+     Expanded: a full-screen overlay with the sliders and the
+     readout. The stage behind it is dimmed. Collapsing returns
+     the stage to full height.
      ============================================================ */
   .controls {
     position: fixed;
     bottom: 0; left: 0; right: 0;
-    background: rgba(253, 240, 200, 0.94);
+    background: rgba(253, 240, 200, 0.96);
     border-top: 1px solid var(--border-2);
-    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 18px rgba(120, 70, 20, 0.10);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     z-index: 100;
-    max-height: 320px;
-    overflow-y: auto;
+    transition: opacity 0.3s ease;
   }
-  .controls-inner { max-width: 640px; margin: 0 auto; }
-  .ctrl-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
-  .ctrl-label { flex-shrink: 0; min-width: 130px; font-size: 12px; font-weight: 600; color: var(--text-med); letter-spacing: 1px; }
+  .controls-inner {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: nowrap;
+  }
+  .ctrl-btn-sm {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border-2);
+    background: #ffffff;
+    color: var(--text-mute);
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    white-space: nowrap;
+  }
+  .ctrl-btn-sm.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #ffffff;
+  }
+  .ctrl-btn-sm.primary:active { background: var(--accent-3); }
+  .ctrl-btn-sm.on {
+    border-color: var(--accent);
+    background: var(--soft-2);
+    color: var(--accent);
+  }
+  .ctrl-chevron {
+    margin-left: auto;
+    flex-shrink: 0;
+    width: 36px; height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    border: 1.5px solid var(--border-2);
+    background: #ffffff;
+    color: var(--text-med);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.3s ease;
+  }
+  .ctrl-chevron.up { transform: rotate(180deg); }
+
+  /* Expanded overlay */
+  .controls-expanded {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(232, 192, 120, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+  .controls-expanded.open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  .controls-panel {
+    background: rgba(253, 240, 200, 0.98);
+    border-top: 1px solid var(--border-2);
+    padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
+    max-height: 70vh;
+    overflow-y: auto;
+    box-shadow: 0 -8px 32px rgba(120, 70, 20, 0.18);
+    transform: translateY(12px);
+    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .controls-expanded.open .controls-panel {
+    transform: translateY(0);
+  }
+  .controls-panel-inner {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .ctrl-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+  }
+  .ctrl-label {
+    flex-shrink: 0;
+    min-width: 130px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-med);
+    letter-spacing: 1px;
+  }
   .ctrl-slider { flex: 1; min-width: 0; }
-  .ctrl-value { flex-shrink: 0; min-width: 68px; text-align: right; font-size: 12px; font-weight: 700; color: var(--accent); font-family: "SF Mono", Menlo, Consolas, monospace; }
-  .ctrl-toggle { flex-shrink: 0; padding: 6px 14px; font-size: 11px; font-weight: 600; letter-spacing: 1px; border-radius: 12px; border: 1.5px solid var(--border-2); background: #ffffff; color: var(--text-mute); cursor: pointer; -webkit-appearance: none; appearance: none; }
-  .ctrl-toggle.on { background: var(--accent); border-color: var(--accent); color: #ffffff; }
-  .ctrl-btn { padding: 8px 18px; font-size: 12px; font-weight: 600; letter-spacing: 1px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--accent); color: #ffffff; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .ctrl-value {
+    flex-shrink: 0;
+    min-width: 68px;
+    text-align: right;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+  }
+  .ctrl-toggle {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 14px;
+    border: 1.5px solid var(--border-2);
+    background: #ffffff;
+    color: var(--text-mute);
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .ctrl-toggle.on {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+  }
+  .ctrl-btn {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    border-radius: 16px;
+    border: 1.5px solid var(--accent);
+    background: var(--accent);
+    color: #ffffff;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
   .ctrl-btn:active { background: var(--accent-3); }
-  .readout { margin: 6px 0 4px 0; padding: 8px 12px; background: rgba(255, 255, 255, 0.6); border-radius: 8px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; line-height: 1.6; color: var(--text-med); white-space: pre; overflow-x: auto; }
+  .readout {
+    margin: 8px 0 16px 0;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.65);
+    border-radius: 10px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 11px;
+    line-height: 1.6;
+    color: var(--text-med);
+    white-space: pre;
+    overflow-x: auto;
+  }
 </style>
 </head>
 <body>
@@ -254,45 +415,54 @@
   </div>
 </div>
 
-<div class="controls">
+<div class="controls" id="controlsBar">
   <div class="controls-inner">
-    <pre class="readout" id="readout">—</pre>
+    <button type="button" class="ctrl-btn-sm primary" id="playBtn">▶ Play</button>
+    <button type="button" class="ctrl-btn-sm" id="perspectiveBtn">Persp</button>
+    <button type="button" class="ctrl-btn-sm" id="scaleBtn">Scale</button>
+    <button type="button" class="ctrl-btn-sm" id="freezeBtn">Freeze</button>
+    <button type="button" class="ctrl-chevron" id="chevronBtn" aria-label="Expand controls">▾</button>
+  </div>
+</div>
 
-    <div class="ctrl-row">
-      <span class="ctrl-label">Tilt (deg)</span>
-      <input type="range" class="ctrl-slider" id="tiltDeg" min="0" max="20" step="0.5">
-      <span class="ctrl-value" id="tiltDegVal">—</span>
-    </div>
+<div class="controls-expanded" id="controlsExpanded">
+  <div class="controls-panel">
+    <div class="controls-panel-inner">
+      <pre class="readout" id="readout">—</pre>
 
-    <div class="ctrl-row">
-      <span class="ctrl-label">Peak %</span>
-      <input type="range" class="ctrl-slider" id="tiltPeakPct" min="10" max="80" step="1">
-      <span class="ctrl-value" id="tiltPeakPctVal">—</span>
-    </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Tilt (deg)</span>
+        <input type="range" class="ctrl-slider" id="tiltDeg" min="0" max="20" step="0.5">
+        <span class="ctrl-value" id="tiltDegVal">—</span>
+      </div>
 
-    <div class="ctrl-row">
-      <span class="ctrl-label">Settle %</span>
-      <input type="range" class="ctrl-slider" id="tiltSettlePct" min="60" max="98" step="1">
-      <span class="ctrl-value" id="tiltSettlePctVal">—</span>
-    </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Peak %</span>
+        <input type="range" class="ctrl-slider" id="tiltPeakPct" min="10" max="80" step="1">
+        <span class="ctrl-value" id="tiltPeakPctVal">—</span>
+      </div>
 
-    <div class="ctrl-row">
-      <span class="ctrl-label">Contact factor</span>
-      <input type="range" class="ctrl-slider" id="tiltContactFactor" min="0" max="1" step="0.05">
-      <span class="ctrl-value" id="tiltContactFactorVal">—</span>
-    </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Settle %</span>
+        <input type="range" class="ctrl-slider" id="tiltSettlePct" min="60" max="98" step="1">
+        <span class="ctrl-value" id="tiltSettlePctVal">—</span>
+      </div>
 
-    <div class="ctrl-row">
-      <span class="ctrl-label">Freeze %</span>
-      <input type="range" class="ctrl-slider" id="freezePct" min="0" max="100" step="1">
-      <span class="ctrl-value" id="freezePctVal">—</span>
-    </div>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Contact factor</span>
+        <input type="range" class="ctrl-slider" id="tiltContactFactor" min="0" max="1" step="0.05">
+        <span class="ctrl-value" id="tiltContactFactorVal">—</span>
+      </div>
 
-    <div class="ctrl-row">
-      <button type="button" class="ctrl-toggle" id="perspectiveBtn">Perspective OFF</button>
-      <button type="button" class="ctrl-toggle" id="scaleBtn">Scale OFF</button>
-      <button type="button" class="ctrl-toggle" id="freezeBtn">Freeze OFF</button>
-      <button type="button" class="ctrl-btn" id="playBtn">▶ Play landing</button>
+      <div class="ctrl-row">
+        <span class="ctrl-label">Freeze %</span>
+        <input type="range" class="ctrl-slider" id="freezePct" min="0" max="100" step="1">
+        <span class="ctrl-value" id="freezePctVal">—</span>
+      </div>
+
+      <div class="ctrl-row" style="justify-content: flex-end; margin-top: 16px;">
+        <button type="button" class="ctrl-btn" id="closeExpandedBtn">閉じる</button>
+      </div>
     </div>
   </div>
 </div>
@@ -640,6 +810,32 @@ playBtn.addEventListener('click', function() {
     applyTuning();
   }
   replay();
+});
+
+/* ============================================================
+   Expanded panel toggle. The chevron flips the overlay, and
+   tapping the backdrop (outside the panel) closes it too. The
+   chevron button is duplicated visually as a state indicator on
+   the collapsed bar — it rotates 180° when the panel is open so
+   a glance is enough to know the state.
+   ============================================================ */
+const chevronBtn = document.getElementById('chevronBtn');
+const controlsExpanded = document.getElementById('controlsExpanded');
+const closeExpandedBtn = document.getElementById('closeExpandedBtn');
+
+function setExpanded(open) {
+  controlsExpanded.classList.toggle('open', open);
+  chevronBtn.classList.toggle('up', open);
+  chevronBtn.setAttribute('aria-label', open ? 'Collapse controls' : 'Expand controls');
+}
+chevronBtn.addEventListener('click', function() {
+  setExpanded(!controlsExpanded.classList.contains('open'));
+});
+closeExpandedBtn.addEventListener('click', function() {
+  setExpanded(false);
+});
+controlsExpanded.addEventListener('click', function(e) {
+  if (e.target === controlsExpanded) setExpanded(false);
 });
 
 /* ============================================================
