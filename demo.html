@@ -10,41 +10,43 @@
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  /* ============================================================
-     Autumn theme variables — copied verbatim from main.css.
-     ============================================================ */
   :root {
-    --bg-base: #fdf3d8; --bg-warm: #f5d89a;
     --accent: #c9600a; --accent-2: #8f3f12; --accent-3: #7a3208;
-    --glow: #f7b93c; --petal: #e88a1a; --petal-soft: #fde8b8; --outstanding: #8f2f00;
-    --border-1: #e8c88a; --border-2: #d8b478; --border-3: #f0d8a0;
-    --border-4: #f5e0b0; --border-5: #e8c890; --border-6: #b89860;
-    --soft-1: #fdf0c8; --soft-2: #fdf5e0; --soft-3: #f0e0b8; --soft-4: #fdf6e0;
-    --text-dark: #231304; --text-med: #3d2410; --text-soft: #2a1808;
-    --text-mute: #5a3818; --text-faint: #7a5028; --text-placeholder: #a07a48;
-    --shadow-rose: rgba(120, 70, 20, 0.10); --shadow-rose-2: rgba(120, 70, 20, 0.18);
-    --shadow-accent: rgba(201, 96, 10, 0.32);
-    --amb-1: rgba(247, 185, 60, 0.85); --amb-2: rgba(240, 138, 30, 0.80);
-    --amb-3: rgba(217, 94, 26, 0.72); --amb-4: rgba(143, 63, 18, 0.55); --amb-5: rgba(107, 47, 14, 0.45);
+    --glow: #f7b93c; --outstanding: #8f2f00;
+    --border-1: #e8c88a; --border-2: #d8b478;
+    --soft-1: #fdf0c8; --soft-2: #fdf5e0; --soft-3: #f0e0b8;
+    --text-dark: #231304; --text-med: #3d2410;
+    --text-mute: #5a3818;
     --transition-head-color: #fdf0c8;
     --transition-glow-bg: rgba(143, 47, 0, 0.10);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-  html, body {
+  /* ============================================================
+     IMPORTANT — html gets NO background.
+
+     If html has its own background-color, body's background stops
+     propagating to the canvas. Body then paints its own background
+     as part of its normal flow, which happens AFTER any negative
+     z-index children. The ambient-stage at z-index: -2 gets covered.
+     This is the exact difference from main.css.
+     ============================================================ */
+
+  body {
     margin: 0; padding: 0;
     color: var(--text-dark);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 17px; line-height: 1.7;
-    /* Base cream, same as the main page at rest. */
-    background-color: #fdf3d8;
+    /* Only body carries the background. This propagates to the
+       canvas and paints underneath everything. */
+    background-color: #f5d89a;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
 
   /* ============================================================
-     AMBIENT STAGE — copied verbatim from main.css
+     AMBIENT STAGE — verbatim from main.css
      ============================================================ */
   .ambient-stage {
     position: fixed;
@@ -129,9 +131,6 @@
     50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
   }
 
-  /* ============================================================
-     Spacers
-     ============================================================ */
   .spacer-top, .spacer-bottom {
     min-height: 120vh;
     display: flex;
@@ -143,16 +142,12 @@
     letter-spacing: 4px;
   }
 
-  /* ============================================================
-     TRANSITION LINE — copied from main.css
-     ============================================================ */
   .transition-line {
     text-align: center; padding: 0 32px 40px 32px; margin-top: 4px;
     font-size: 18px; font-weight: 500; color: var(--accent);
     letter-spacing: 0.8px; line-height: 2; max-width: 560px; margin-left: auto; margin-right: auto;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-    opacity: 1; transform: translateY(0); filter: none;
   }
   .transition-line-divider {
     display: flex;
@@ -181,21 +176,17 @@
     white-space: nowrap;
   }
 
-  /* Body holds the paragraphs. No transform on the body itself —
-     each paragraph drifts independently. */
   .transition-line-body {
     position: relative;
   }
 
-  /* Each paragraph gets its own glow pseudo-element and its own
-     inline translateY, both set from JS from its own centre delta. */
+  /* Each paragraph drifts independently. No transform transition —
+     parallax must track scroll frame-for-frame. */
   .transition-line-body p {
     position: relative;
     margin: 0 0 0.9em 0;
     opacity: 1;
-    transform: none;
     will-change: transform;
-    transition: transform 400ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
 
@@ -214,7 +205,6 @@
     transition: opacity var(--demo-glow-in, 300ms) ease;
   }
 
-  /* Viewport centre line — debug aid */
   .centre-line {
     position: fixed;
     left: 0; right: 0;
@@ -238,9 +228,6 @@
   .centre-line::before { left: 8px; }
   .centre-line::after { right: 8px; }
 
-  /* ============================================================
-     Controls
-     ============================================================ */
   .controls {
     position: fixed;
     bottom: 0; left: 0; right: 0;
@@ -458,7 +445,7 @@
 
       <div class="ctrl-row">
         <span class="ctrl-label">Drift factor</span>
-        <input type="range" class="ctrl-slider" id="driftFactor" min="0" max="0.20" step="0.005">
+        <input type="range" class="ctrl-slider" id="driftFactor" min="0" max="0.40" step="0.01">
         <span class="ctrl-value" id="driftFactorVal">—</span>
       </div>
 
@@ -504,11 +491,8 @@
 </div>
 
 <script>
-/* ============================================================
-   TUNING — edit here, reload the page.
-   ============================================================ */
 const TUNING = {
-  driftFactor: 0.07,
+  driftFactor: 0.15,
   glowWindow: 150,
   glowRgb: [143, 47, 0],
   glowAlpha: 0.10,
@@ -520,9 +504,6 @@ const TUNING = {
   showCentreLine: false
 };
 
-/* ============================================================
-   DOM refs
-   ============================================================ */
 const bodyEl = document.getElementById('transitionLineBody');
 const readout = document.getElementById('readout');
 const centreLine = document.getElementById('centreLine');
@@ -532,10 +513,42 @@ const chevronBtn = document.getElementById('chevronBtn');
 const controlsExpanded = document.getElementById('controlsExpanded');
 const closeExpandedBtn = document.getElementById('closeExpandedBtn');
 const colourPresets = document.getElementById('colourPresets');
+const ambientVideo = document.getElementById('ambientVideo');
 
-/* ============================================================
-   Apply TUNING to the DOM.
-   ============================================================ */
+/* Video force-play. Muted autoplay usually works, but if the
+   browser blocks it (data saver, power saving, policy), the first
+   tap anywhere starts it. */
+let videoState = 'init';
+function updateVideoState() {
+  if (!ambientVideo) { videoState = 'no-el'; return; }
+  if (ambientVideo.error) { videoState = 'error ' + (ambientVideo.error.code || '?'); return; }
+  if (ambientVideo.readyState === 0) { videoState = 'no-data'; return; }
+  if (ambientVideo.paused) { videoState = 'paused'; return; }
+  videoState = 'playing';
+}
+function tryPlayVideo() {
+  if (!ambientVideo) return;
+  const p = ambientVideo.play();
+  if (p && typeof p.catch === 'function') {
+    p.catch(function() {
+      /* Autoplay blocked. Play on first user gesture. */
+      const kick = function() {
+        ambientVideo.play().catch(function() {});
+        document.removeEventListener('pointerdown', kick);
+      };
+      document.addEventListener('pointerdown', kick, { once: true });
+    });
+  }
+}
+if (ambientVideo) {
+  ambientVideo.addEventListener('playing', updateVideoState);
+  ambientVideo.addEventListener('pause', updateVideoState);
+  ambientVideo.addEventListener('error', updateVideoState);
+  ambientVideo.addEventListener('loadeddata', updateVideoState);
+  tryPlayVideo();
+  updateVideoState();
+}
+
 function applyTuning() {
   const rgba = 'rgba(' + TUNING.glowRgb[0] + ', ' + TUNING.glowRgb[1] + ', ' + TUNING.glowRgb[2] + ', ' + TUNING.glowAlpha + ')';
   bodyEl.style.setProperty('--transition-glow-bg', rgba);
@@ -545,7 +558,6 @@ function applyTuning() {
   bodyEl.style.setProperty('--demo-glow-inset-x', TUNING.glowInsetX + 'px');
 
   centreLine.classList.toggle('shown', TUNING.showCentreLine);
-
   forceGlowBtn.classList.toggle('on', TUNING.forceGlow);
   centreLineBtn.classList.toggle('on', TUNING.showCentreLine);
 
@@ -558,14 +570,6 @@ function applyTuning() {
   updateReadout();
 }
 
-/* ============================================================
-   Per-paragraph scroll effect.
-
-   Each <p> computes its own centre delta d and gets its own
-   inline translateY. Each <p> toggles its own .centered class
-   which drives its own ::before glow. The readout shows the
-   paragraph currently closest to the viewport centre.
-   ============================================================ */
 let lastD = 0;
 let lastDrift = 0;
 let lastParaIdx = 1;
@@ -625,9 +629,6 @@ function scheduleUpdate() {
 window.addEventListener('scroll', scheduleUpdate, { passive: true });
 window.addEventListener('resize', scheduleUpdate);
 
-/* ============================================================
-   Controls
-   ============================================================ */
 const ctrls = {
   driftFactor:  document.getElementById('driftFactor'),
   glowWindow:   document.getElementById('glowWindow'),
@@ -650,7 +651,7 @@ function syncControls() {
   ctrls.glowIn.value = TUNING.glowIn;
   ctrls.glowOut.value = TUNING.glowOut;
 
-  valEls.driftFactor.textContent = TUNING.driftFactor.toFixed(3);
+  valEls.driftFactor.textContent = TUNING.driftFactor.toFixed(2);
   valEls.glowWindow.textContent = TUNING.glowWindow + 'px';
   valEls.glowAlpha.textContent = TUNING.glowAlpha.toFixed(2);
   valEls.glowIn.textContent = TUNING.glowIn + 'ms';
@@ -658,15 +659,20 @@ function syncControls() {
 }
 
 function updateReadout() {
+  updateVideoState();
   const glowState = TUNING.forceGlow ? 'FORCED' : (lastInWindow ? 'ON' : 'off');
   const lines = [
+    'video:                              ' + videoState,
+    'html bg:                            (none)',
+    'body bg:                            #f5d89a',
+    '---',
     'nearest para:                       p' + lastParaIdx + ' of 4',
     'd (its centre - viewport centre):   ' + lastD.toFixed(0) + 'px',
     'its drift (inline translateY):      ' + lastDrift.toFixed(2) + 'px',
     'glow window:                        ±' + TUNING.glowWindow + 'px',
     'glow state (nearest para):          ' + glowState,
     '---',
-    'driftFactor:                        ' + TUNING.driftFactor.toFixed(3),
+    'driftFactor:                        ' + TUNING.driftFactor.toFixed(2),
     'glowRgb:                            ' + TUNING.glowRgb.join(', '),
     'glowAlpha:                          ' + TUNING.glowAlpha.toFixed(2),
     'glowIn / glowOut:                   ' + TUNING.glowIn + ' / ' + TUNING.glowOut + 'ms'
@@ -717,9 +723,6 @@ controlsExpanded.addEventListener('click', function(e) {
   if (e.target === controlsExpanded) setExpanded(false);
 });
 
-/* ============================================================
-   Boot
-   ============================================================ */
 applyTuning();
 requestAnimationFrame(function() { updateEffects(); });
 </script>
