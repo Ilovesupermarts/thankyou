@@ -3,144 +3,226 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Receipt Landing — Diagnostic Demo v3</title>
+<title>Paper Landing — Tilt Tuning</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="main.css">
-
 <style>
-  /* ---------- Demo chrome ---------- */
-  .demo-controls {
-    position: fixed;
-    top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    z-index: 99999;
-    background: rgba(255, 255, 255, 0.97);
-    border: 1px solid var(--border-2);
-    border-radius: 14px;
-    padding: 10px 12px;
-    box-shadow: 0 6px 24px var(--shadow-rose-2);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-    font-size: 13px;
-    color: var(--text-dark);
-    max-width: 96vw;
+  /* ============================================================
+     Theme variables — copied verbatim from main.css so the demo
+     sits in the same colour world. Only the autumn block is needed
+     here; the paper's background texture is the same asset.
+     ============================================================ */
+  :root {
+    --bg-base: #fdf3d8; --bg-warm: #f5d89a;
+    --accent: #c9600a; --accent-2: #8f3f12; --accent-3: #7a3208;
+    --glow: #f7b93c; --petal: #e88a1a; --petal-soft: #fde8b8; --outstanding: #8f2f00;
+    --border-1: #e8c88a; --border-2: #d8b478; --border-3: #f0d8a0;
+    --border-4: #f5e0b0; --border-5: #e8c890; --border-6: #b89860;
+    --soft-1: #fdf0c8; --soft-2: #fdf5e0; --soft-3: #f0e0b8; --soft-4: #fdf6e0;
+    --text-dark: #231304; --text-med: #3d2410; --text-soft: #2a1808;
+    --text-mute: #5a3818; --text-faint: #7a5028; --text-placeholder: #a07a48;
+    --shadow-rose: rgba(120, 70, 20, 0.10); --shadow-rose-2: rgba(120, 70, 20, 0.18);
+    --shadow-accent: rgba(201, 96, 10, 0.32);
   }
-  .demo-row {
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0;
+    color: var(--text-dark);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-size: 17px; line-height: 1.7;
+    min-height: 100vh;
+    background-color: #e8c078;
+    overflow-x: hidden;
+  }
+
+  /* ============================================================
+     The demo stage — full-screen, holds the receipt paper in
+     its resting pose. No receipt-screen background colour; the
+     body colour stands in for the ambient background.
+     ============================================================ */
+  .demo-stage {
+    position: fixed;
+    inset: 0;
     display: flex;
     align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
     justify-content: center;
-  }
-  .demo-label { font-size: 11px; color: var(--text-faint); letter-spacing: 1px; margin-right: 4px; }
-  .demo-controls button {
-    border-radius: 16px;
-    border: 1.5px solid var(--border-1);
-    background: #fff;
-    color: var(--text-dark);
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 7px 10px;
-    cursor: pointer;
-    font-family: inherit;
-    -webkit-appearance: none;
-    appearance: none;
-    transition: background 0.2s, border-color 0.2s, transform 0.1s, color 0.2s;
-    white-space: nowrap;
-  }
-  .demo-controls button:active { transform: scale(0.96); background: var(--soft-1); border-color: var(--accent); }
-  .demo-controls button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .demo-controls button.run { background: var(--text-dark); border-color: var(--text-dark); color: #fff; }
-  .demo-controls button.run:active { background: #000; }
-  .demo-readout {
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-    color: var(--text-mute);
-    letter-spacing: 0;
-    text-align: center;
-    line-height: 1.5;
-  }
-  .demo-readout strong { color: var(--accent); font-weight: 700; }
-  .demo-readout strong.smooth { color: #2a7a3a; }
-  .demo-readout strong.stutter { color: #b03030; }
-
-  /* ---------- Injection root ---------- */
-  /* Sits below the receipt screen, above the ambient stage. Holds the
-     cloned real-app DOM so its compositing cost is present. */
-  #fakeAppRoot {
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    z-index: 0;
-    pointer-events: none;
+    padding: 60px 20px 320px 20px;
     overflow: hidden;
+    pointer-events: none;
   }
-  #fakeAppRoot.hide-under { visibility: hidden; }
+  .demo-stage .receipt-paper-wrap {
+    pointer-events: auto;
+  }
 
-  /* Force off the injected info-bar's own visibility so its ticker can
-     be enabled / disabled by a toggle rather than by the real app's
-     body class. */
-  #fakeAppRoot .info-bar { display: none; }
-  body.ticker-on #fakeAppRoot .info-bar { display: block; }
-  body.ticker-on #fakeAppRoot .info-bar.shown { opacity: 1; transform: translateY(0); }
+  /* ============================================================
+     Wrapper — copied from main.css. --rest-rotate is set from
+     TUNING.restRotateDeg by JS on load and on every change.
+     ============================================================ */
+  .receipt-paper-wrap {
+    display: inline-flex;
+    margin: auto;
+    transform: rotate(var(--rest-rotate, 1.65deg));
+    transition: transform 400ms ease, filter 400ms ease;
+    filter:
+      drop-shadow(0px 1px 2px rgba(60, 30, 10, 0.22))
+      drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
+  }
 
-  /* Hide the injected name screen and blossom screen that would
-     otherwise paint over things — those are in the "closed" state
-     during the real app's receipt view. */
-  #fakeAppRoot .name-screen { opacity: 0; visibility: hidden; }
-  #fakeAppRoot .blossom-screen { opacity: 0; visibility: hidden; }
-  #fakeAppRoot .intro-overlay { opacity: 0; visibility: hidden; }
-  #fakeAppRoot .thankyou-screen { opacity: 0; visibility: hidden; }
+  /* When the demo applies perspective to the wrapper's parent,
+     we set .perspective-on on the stage. The wrapper itself
+     keeps its base transform. This is the switch that decides
+     whether the rotateX reads as a real tilt or a Y-squash. */
+  .demo-stage.perspective-on {
+    perspective: var(--demo-perspective, 1200px);
+  }
+  .demo-stage.perspective-on .receipt-paper-wrap {
+    transform-style: preserve-3d;
+  }
 
-  /* Injected ambient-stage: not used here — we have our own. */
-  #fakeAppRoot #ambientStage { display: none !important; }
+  /* Landing state — filter: none and transition: none are load-
+     bearing, same as in main.css. They remove the drop-shadow
+     for the duration of the fall and prevent the base rule's
+     filter transition from firing on entry. */
+  .receipt-paper-wrap.landing {
+    animation-duration: var(--demo-duration, 2400ms);
+    animation-timing-function: cubic-bezier(0.25, 0.1, 0.25, 1);
+    animation-fill-mode: both;
+    animation-name: paperLandTilt;
+    will-change: transform, opacity;
+    filter: none;
+    transition: none;
+  }
+  /* When scaleOn is true, swap the animation-name so the second
+     keyframe set (with Step 1's scale) plays instead. */
+  .receipt-paper-wrap.landing.with-scale {
+    animation-name: paperLandTiltScale;
+  }
 
-  /* ---------- Opaque receipt toggle ---------- */
-  body.receipt-opaque .receipt-screen { background: #faf7f5 !important; }
-  html[data-theme="autumn"] body.receipt-opaque .receipt-screen { background: #fdf3d8 !important; }
+  /* Freeze: pause the animation at a set progress using a
+     negative animation-delay. Handled entirely via inline
+     custom properties set by JS. */
+  .receipt-paper-wrap.landing.frozen {
+    animation-play-state: paused;
+    animation-delay: calc(var(--demo-duration, 2400ms) * var(--demo-freeze-frac, 0) * -1);
+  }
+
+  /* ============================================================
+     The paper itself — copied from main.css including the
+     torn-edge SVG mask. Texture asset is the same washi file.
+     ============================================================ */
+  .receipt-paper {
+    --tear-w: 12px;
+    --tear-h: 6px;
+
+    max-width: 380px; width: 100%;
+    padding: 36px 30px 28px 30px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    position: relative;
+    transform-origin: 50% 100%;
+
+    background-color: #fdf3d8;
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+
+    border: none;
+    box-shadow: none;
+
+    -webkit-mask-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+      linear-gradient(#000, #000);
+    -webkit-mask-size:
+      var(--tear-w) var(--tear-h),
+      var(--tear-w) var(--tear-h),
+      100% calc(100% - var(--tear-h) * 2);
+    -webkit-mask-position:
+      0 0,
+      0 100%,
+      0 var(--tear-h);
+    -webkit-mask-repeat:
+      repeat-x,
+      repeat-x,
+      no-repeat;
+    -webkit-mask-composite: source-over;
+
+    mask-image:
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,6L0,0L6,6L12,0L12,6Z'%20fill='white'/%3E%3C/svg%3E"),
+      url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2012%206'%20preserveAspectRatio='none'%3E%3Cpath%20d='M0,0L0,6L6,0L12,6L12,0Z'%20fill='white'/%3E%3C/svg%3E"),
+      linear-gradient(#000, #000);
+    mask-size:
+      var(--tear-w) var(--tear-h),
+      var(--tear-w) var(--tear-h),
+      100% calc(100% - var(--tear-h) * 2);
+    mask-position:
+      0 0,
+      0 100%,
+      0 var(--tear-h);
+    mask-repeat:
+      repeat-x,
+      repeat-x,
+      no-repeat;
+    mask-composite: add;
+  }
+
+  .receipt-header { text-align: center; margin-bottom: 24px; }
+  .receipt-thanks { font-size: 17px; font-weight: 600; color: var(--accent); line-height: 1.9; letter-spacing: 1px; margin-bottom: 16px; }
+  .receipt-subthanks { font-size: 13px; font-weight: 400; color: var(--text-mute); line-height: 1.9; letter-spacing: 0.5px; }
+  .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; }
+  .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; }
+  .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; }
+  .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
+  .receipt-item { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding-bottom: 10px; border-bottom: 1px dashed var(--border-3); }
+  .receipt-item:last-child { border-bottom: none; padding-bottom: 0; }
+  .receipt-item-name { flex: 1; font-size: 14px; color: var(--text-soft); line-height: 1.5; }
+  .receipt-item-price-wrap { flex-shrink: 0; display: inline-flex; align-items: center; gap: 1px; color: var(--accent); font-weight: 600; font-size: 14px; padding: 4px 8px; border-radius: 8px; background: rgba(255, 255, 255, 0.6); border: 1px solid var(--border-5); }
+  .receipt-item-price-wrap .yen-symbol { font-size: 11px; margin-right: 1px; opacity: 0.7; }
+  .receipt-total-line { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 4px; margin-top: 14px; border-top: 1.5px solid var(--border-5); border-bottom: 1.5px solid var(--border-5); }
+  .receipt-total-label { font-size: 18px; font-weight: 600; color: var(--text-mute); letter-spacing: 4px; }
+  .receipt-total-value { font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 0.5px; }
+  .receipt-total-value .yen-symbol { font-size: 13px; margin-right: 1px; opacity: 0.8; }
+  .receipt-footer { text-align: center; margin-top: 22px; }
+  .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
+
+  /* ============================================================
+     Control panel — fixed at the bottom, non-scrolling. Styled
+     in the app's palette so it doesn't feel alien.
+     ============================================================ */
+  .controls {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(253, 240, 200, 0.94);
+    border-top: 1px solid var(--border-2);
+    padding: 14px 20px calc(14px + env(safe-area-inset-bottom));
+    box-shadow: 0 -4px 18px rgba(120, 70, 20, 0.10);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    z-index: 100;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .controls-inner { max-width: 640px; margin: 0 auto; }
+  .ctrl-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .ctrl-label { flex-shrink: 0; min-width: 130px; font-size: 12px; font-weight: 600; color: var(--text-med); letter-spacing: 1px; }
+  .ctrl-slider { flex: 1; min-width: 0; }
+  .ctrl-value { flex-shrink: 0; min-width: 68px; text-align: right; font-size: 12px; font-weight: 700; color: var(--accent); font-family: "SF Mono", Menlo, Consolas, monospace; }
+  .ctrl-toggle { flex-shrink: 0; padding: 6px 14px; font-size: 11px; font-weight: 600; letter-spacing: 1px; border-radius: 12px; border: 1.5px solid var(--border-2); background: #ffffff; color: var(--text-mute); cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .ctrl-toggle.on { background: var(--accent); border-color: var(--accent); color: #ffffff; }
+  .ctrl-btn { padding: 8px 18px; font-size: 12px; font-weight: 600; letter-spacing: 1px; border-radius: 14px; border: 1.5px solid var(--accent); background: var(--accent); color: #ffffff; cursor: pointer; -webkit-appearance: none; appearance: none; }
+  .ctrl-btn:active { background: var(--accent-3); }
+  .readout { margin: 6px 0 4px 0; padding: 8px 12px; background: rgba(255, 255, 255, 0.6); border-radius: 8px; font-family: "SF Mono", Menlo, Consolas, monospace; font-size: 11px; line-height: 1.6; color: var(--text-med); white-space: pre; overflow-x: auto; }
 </style>
 </head>
 <body>
 
-<div class="demo-controls">
-  <div class="demo-row">
-    <span class="demo-label">STACK:</span>
-    <button type="button" id="btnRealApp">Real app DOM</button>
-    <button type="button" id="btnHideUnder">Hide under</button>
-    <button type="button" id="btnAmbient">Ambient stage</button>
-    <button type="button" id="btnTicker">Info bar ticker</button>
-    <button type="button" id="btnOpaque">Opaque receipt</button>
-  </div>
-  <div class="demo-row">
-    <span class="demo-label">ACTION:</span>
-    <button type="button" class="run" id="runBtn">Run landing</button>
-    <button type="button" id="clearBtn">Reset all</button>
-  </div>
-  <div class="demo-readout" id="readout">Start with nothing on. Then add layers one at a time and re-run.</div>
-</div>
-
-<div id="fakeAppRoot"></div>
-
-<div class="ambient-stage" id="ambientStage" style="display:none;">
-  <div class="ambient-layer ambient-image">
-    <video class="ambient-video" id="ambientVideo" muted loop playsinline preload="auto">
-      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
-    </video>
-  </div>
-  <div class="ambient-layer ambient-primary"></div>
-  <div class="ambient-layer ambient-secondary"></div>
-  <div class="ambient-layer caustics caustics-1"></div>
-  <div class="ambient-layer caustics caustics-2"></div>
-  <div class="mote-field" id="moteField"></div>
-</div>
-
-<div class="receipt-screen visible" id="receiptScreen">
+<div class="demo-stage" id="demoStage">
   <div class="receipt-paper-wrap" id="paperWrap">
     <div class="receipt-paper">
       <div class="receipt-header">
@@ -153,23 +235,18 @@
         <span class="receipt-to-mark">❀</span>
       </div>
       <div class="receipt-divider"></div>
-      <div class="receipt-title">
-        <span>本日の内容：</span>
-        <span class="item-count">6 項目</span>
+      <div class="receipt-item">
+        <span class="receipt-item-name">サンプル項目 一</span>
+        <span class="receipt-item-price-wrap"><span class="yen-symbol">¥</span>5,000</span>
       </div>
-      <div class="receipt-items" id="receiptItems"></div>
-
+      <div class="receipt-item">
+        <span class="receipt-item-name">サンプル項目 二</span>
+        <span class="receipt-item-price-wrap"><span class="yen-symbol">¥</span>3,000</span>
+      </div>
       <div class="receipt-total-line">
         <span class="receipt-total-label">合計</span>
-        <span class="receipt-total-value">
-          <span class="yen-symbol">¥</span>
-          <span id="receiptTotalText">31,500</span>
-        </span>
+        <span class="receipt-total-value"><span class="yen-symbol">¥</span>8,000</span>
       </div>
-
-      <button type="button" class="receipt-confirm-btn">こちらの内容でお願いいたします。</button>
-      <button type="button" class="receipt-back-btn">サービスの選択に戻る</button>
-
       <div class="receipt-footer">
         <span class="receipt-footer-mark">❀</span>
       </div>
@@ -177,235 +254,401 @@
   </div>
 </div>
 
+<div class="controls">
+  <div class="controls-inner">
+    <pre class="readout" id="readout">—</pre>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">Tilt (deg)</span>
+      <input type="range" class="ctrl-slider" id="tiltDeg" min="0" max="20" step="0.5">
+      <span class="ctrl-value" id="tiltDegVal">—</span>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">Peak %</span>
+      <input type="range" class="ctrl-slider" id="tiltPeakPct" min="10" max="80" step="1">
+      <span class="ctrl-value" id="tiltPeakPctVal">—</span>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">Settle %</span>
+      <input type="range" class="ctrl-slider" id="tiltSettlePct" min="60" max="98" step="1">
+      <span class="ctrl-value" id="tiltSettlePctVal">—</span>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">Contact factor</span>
+      <input type="range" class="ctrl-slider" id="tiltContactFactor" min="0" max="1" step="0.05">
+      <span class="ctrl-value" id="tiltContactFactorVal">—</span>
+    </div>
+
+    <div class="ctrl-row">
+      <span class="ctrl-label">Freeze %</span>
+      <input type="range" class="ctrl-slider" id="freezePct" min="0" max="100" step="1">
+      <span class="ctrl-value" id="freezePctVal">—</span>
+    </div>
+
+    <div class="ctrl-row">
+      <button type="button" class="ctrl-toggle" id="perspectiveBtn">Perspective OFF</button>
+      <button type="button" class="ctrl-toggle" id="scaleBtn">Scale OFF</button>
+      <button type="button" class="ctrl-toggle" id="freezeBtn">Freeze OFF</button>
+      <button type="button" class="ctrl-btn" id="playBtn">▶ Play landing</button>
+    </div>
+  </div>
+</div>
+
 <script>
-/* ============ SAMPLE ITEMS ============ */
-var SAMPLE_ITEMS = [
-  { name: 'ダミーテキスト1', price: 5000 },
-  { name: 'ダミーテキスト2', price: 5500 },
-  { name: 'ダミーテキスト3', price: 6000 },
-  { name: 'ダミーテキスト4', price: 4500 },
-  { name: 'ダミーテキスト5', price: 5000 },
-  { name: 'ダミーテキスト6', price: 5500 }
-];
-function renderItems() {
-  var wrap = document.getElementById('receiptItems');
-  wrap.innerHTML = '';
-  var total = 0;
-  for (var i = 0; i < SAMPLE_ITEMS.length; i++) {
-    var it = SAMPLE_ITEMS[i];
-    total += it.price;
-    var div = document.createElement('div');
-    div.className = 'receipt-item';
-    div.style.animationDelay = Math.min(i * 0.08, 0.4) + 's';
-    div.innerHTML =
-      '<span class="receipt-item-name">' + it.name + '</span>' +
-      '<span class="receipt-item-price-wrap">' +
-        '<span class="yen-symbol">¥</span>' +
-        '<input type="text" class="receipt-price-input" value="' + it.price.toLocaleString() + '" readonly tabindex="-1">' +
-      '</span>';
-    wrap.appendChild(div);
-  }
-  var el = document.getElementById('receiptTotalText');
-  if (el) el.textContent = total.toLocaleString();
-}
+/* ============================================================
+   TUNING — edit here, reload the page.
+   The on-screen controls mirror these and write back into them,
+   but the values below are what the page starts with.
+   ============================================================ */
+const TUNING = {
+  // Peak tilt in degrees. 0 = no tilt. Try 4, 8, 12, 16, 20.
+  tiltDeg: 12,
 
-/* ============ AMBIENT ============ */
-function buildMotes() {
-  var field = document.getElementById('moteField');
-  if (!field) return;
-  field.innerHTML = '';
-  for (var i = 0; i < 8; i++) {
-    var m = document.createElement('div');
-    m.className = 'mote';
-    var size = 14 + Math.random() * 16;
-    m.style.width = size + 'px'; m.style.height = size + 'px';
-    m.style.left = (Math.random() * 100) + '%';
-    m.style.top  = (Math.random() * 100) + '%';
-    var dur = 18 + Math.random() * 20;
-    m.style.setProperty('--mote-dur', dur + 's');
-    m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
-    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
-    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
-    m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
-    field.appendChild(m);
-  }
-}
+  // Where in the animation the tilt peaks, as a percentage (0-100).
+  // The tilt is 0 at 0%, rises to tiltDeg at tiltPeakPct, and is
+  // fully unwound by tiltSettlePct.
+  tiltPeakPct: 40,
+  tiltSettlePct: 86,
 
-/* ============ REAL APP DOM INJECTION ============ */
-var realAppLoaded = false;
-function loadRealAppDom() {
-  if (realAppLoaded) return Promise.resolve();
-  return fetch('index.html?v=' + Date.now())
-    .then(function(r) { return r.text(); })
-    .then(function(html) {
-      var parser = new DOMParser();
-      var doc = parser.parseFromString(html, 'text/html');
-      var root = document.getElementById('fakeAppRoot');
-      var children = Array.prototype.slice.call(doc.body.children);
-      children.forEach(function(el) {
-        if (el.id === 'receiptScreen') return;
-        if (el.id === 'ambientStage') return;
-        if (el.id === 'rippleLayer') return;
-        if (el.classList && el.classList.contains('demo-controls')) return;
-        root.appendChild(document.importNode(el, true));
-      });
-      realAppLoaded = true;
-    });
-}
+  // Residual tilt at the contact bounce (72%). 0 = fully flat on
+  // contact, 1 = same as peak. Fractional values allowed.
+  tiltContactFactor: 0.15,
 
-/* ============ FRAME COUNTER ============ */
-var frameRafId = null;
-var frameDeltas = [];
+  // Perspective state. When true, the wrapper's parent gets
+  // perspective and the wrapper gets preserve-3d, matching the
+  // 3D context the app's carousel sets up. When false, no
+  // perspective — a plain 2D rotateX, which will render as a
+  // Y-axis squash.
+  perspectiveOn: false,
+  perspectivePx: 1200,
 
-function startFrameCount() {
-  frameDeltas = [];
-  var last = performance.now();
-  function tick(now) {
-    frameDeltas.push(now - last);
-    last = now;
-    frameRafId = requestAnimationFrame(tick);
-  }
-  frameRafId = requestAnimationFrame(tick);
-}
+  // Resting tilt carried through every keyframe. Matches the
+  // app's --rest-rotate. Do not change unless you want to test
+  // a different resting angle.
+  restRotateDeg: 1.65,
 
-function stopFrameCount() {
-  if (frameRafId) cancelAnimationFrame(frameRafId);
-  frameRafId = null;
-  if (frameDeltas.length < 2) return null;
-  var sum = 0, worst = 0;
-  for (var i = 1; i < frameDeltas.length; i++) {
-    sum += frameDeltas[i];
-    if (frameDeltas[i] > worst) worst = frameDeltas[i];
-  }
-  var avgMs = sum / (frameDeltas.length - 1);
-  var over20 = 0, over33 = 0;
-  for (var j = 1; j < frameDeltas.length; j++) {
-    if (frameDeltas[j] > 20) over20++;
-    if (frameDeltas[j] > 33) over33++;
-  }
-  return {
-    frames: frameDeltas.length - 1,
-    avgMs: avgMs,
-    avgFps: 1000 / avgMs,
-    worstMs: worst,
-    over20: over20,
-    over33: over33
+  // Mid-fall inspection. When true, the animation is paused at
+  // the percentage below. Use this to stare at the peak pose.
+  freezeOn: false,
+  freezePct: 40,
+
+  // Duration and travel. Match the app so the demo is honest.
+  durationMs: 2400,
+  travelPx: 140,
+
+  // Step 1's scale. Off by default so tilt is tested in
+  // isolation. Turn on to see whether tilt + scale together
+  // still feels smooth.
+  scaleOn: false
+};
+
+/* ============================================================
+   DOM refs
+   ============================================================ */
+const paperWrap = document.getElementById('paperWrap');
+const demoStage = document.getElementById('demoStage');
+const readout = document.getElementById('readout');
+const playBtn = document.getElementById('playBtn');
+const perspectiveBtn = document.getElementById('perspectiveBtn');
+const scaleBtn = document.getElementById('scaleBtn');
+const freezeBtn = document.getElementById('freezeBtn');
+
+/* ============================================================
+   Dynamic keyframe injection.
+
+   @keyframes selectors cannot use var() for the percentage stop
+   positions — the spec requires a literal <percentage>. So the
+   two keyframe blocks are regenerated as text from TUNING on
+   every change and injected into a dedicated <style> element.
+   That makes tiltPeakPct and tiltSettlePct genuinely live.
+   ============================================================ */
+const kfStyle = document.createElement('style');
+document.head.appendChild(kfStyle);
+
+function buildKeyframes() {
+  const peak = TUNING.tiltPeakPct;
+  const settle = TUNING.tiltSettlePct;
+  const contact = 72;
+  const downTravel = TUNING.travelPx;
+
+  // Fraction-of-travel constants kept from the current main.css.
+  // 0% -> -1.0 of travel, peak -> -0.21, 72% -> +0.086, settle
+  // -> -0.043, 100% -> 0. These are ratio-equivalent to the
+  // deployed 140 / -30 / +12 / -6 / 0 mapping.
+  const travelAt = {
+    start:  -1.000,
+    peak:   -0.214,
+    contact: 0.086,
+    settle: -0.043,
+    end:     0.000
   };
+
+  // Tilt magnitude at each stop, as a fraction of tiltDeg.
+  const tiltAt = {
+    start:   0,
+    peak:    1,
+    contact: TUNING.tiltContactFactor,
+    settle:  0,
+    end:     0
+  };
+
+  // Two blocks: tilt-only, and tilt + Step 1's scale. Same stop
+  // positions, different transform composition.
+  const tiltOnly = `
+@keyframes paperLandTilt {
+  0% {
+    opacity: 0;
+    transform:
+      translateY(${(travelAt.start * downTravel).toFixed(2)}px)
+      rotateX(${(tiltAt.start * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${peak}% {
+    opacity: 1;
+    transform:
+      translateY(${(travelAt.peak * downTravel).toFixed(2)}px)
+      rotateX(${(tiltAt.peak * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${contact}% {
+    transform:
+      translateY(${(travelAt.contact * downTravel).toFixed(2)}px)
+      rotateX(${(tiltAt.contact * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${settle}% {
+    transform:
+      translateY(${(travelAt.settle * downTravel).toFixed(2)}px)
+      rotateX(${(tiltAt.settle * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  100% {
+    opacity: 1;
+    transform:
+      translateY(${(travelAt.end * downTravel).toFixed(2)}px)
+      rotateX(${(tiltAt.end * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+}
+`;
+
+  // Tilt + Step 1's two-axis scale. The scale values are the
+  // deployed ones: (1, 0.94), (1, 0.98), (1.016, 1.014),
+  // (0.996, 0.997), (1, 1).
+  const scalePairs = {
+    start:   'scale(1, 0.94)',
+    peak:    'scale(1, 0.98)',
+    contact: 'scale(1.016, 1.014)',
+    settle:  'scale(0.996, 0.997)',
+    end:     'scale(1, 1)'
+  };
+
+  const tiltAndScale = `
+@keyframes paperLandTiltScale {
+  0% {
+    opacity: 0;
+    transform:
+      translateY(${(travelAt.start * downTravel).toFixed(2)}px)
+      ${scalePairs.start}
+      rotateX(${(tiltAt.start * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${peak}% {
+    opacity: 1;
+    transform:
+      translateY(${(travelAt.peak * downTravel).toFixed(2)}px)
+      ${scalePairs.peak}
+      rotateX(${(tiltAt.peak * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${contact}% {
+    transform:
+      translateY(${(travelAt.contact * downTravel).toFixed(2)}px)
+      ${scalePairs.contact}
+      rotateX(${(tiltAt.contact * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  ${settle}% {
+    transform:
+      translateY(${(travelAt.settle * downTravel).toFixed(2)}px)
+      ${scalePairs.settle}
+      rotateX(${(tiltAt.settle * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+  100% {
+    opacity: 1;
+    transform:
+      translateY(${(travelAt.end * downTravel).toFixed(2)}px)
+      ${scalePairs.end}
+      rotateX(${(tiltAt.end * TUNING.tiltDeg).toFixed(3)}deg)
+      rotate(${TUNING.restRotateDeg}deg);
+  }
+}
+`;
+
+  kfStyle.textContent = tiltOnly + '\n' + tiltAndScale;
 }
 
-/* ============ RUN LANDING ============ */
-function runLanding() {
-  var paperWrap = document.getElementById('paperWrap');
-  var readout = document.getElementById('readout');
-  if (!paperWrap) return;
+/* ============================================================
+   Apply TUNING to the DOM. Called on load and on every change.
+   ============================================================ */
+function applyTuning() {
+  buildKeyframes();
 
+  // Resting rotate + duration + perspective on the wrapper.
+  paperWrap.style.setProperty('--rest-rotate', TUNING.restRotateDeg + 'deg');
+  paperWrap.style.setProperty('--demo-duration', TUNING.durationMs + 'ms');
+
+  // Perspective switch. The CSS rule .demo-stage.perspective-on
+  // sets perspective on the stage and preserve-3d on the wrapper.
+  if (TUNING.perspectiveOn) {
+    demoStage.classList.add('perspective-on');
+    demoStage.style.setProperty('--demo-perspective', TUNING.perspectivePx + 'px');
+  } else {
+    demoStage.classList.remove('perspective-on');
+    demoStage.style.removeProperty('--demo-perspective');
+  }
+
+  // Scale swap.
+  paperWrap.classList.toggle('with-scale', TUNING.scaleOn);
+
+  // Freeze.
+  if (TUNING.freezeOn) {
+    paperWrap.classList.add('landing', 'frozen');
+    paperWrap.style.setProperty('--demo-freeze-frac', (TUNING.freezePct / 100).toString());
+    // Ensure the animation-name is present even when paused.
+    void paperWrap.offsetWidth;
+  } else {
+    paperWrap.classList.remove('frozen');
+    paperWrap.style.removeProperty('--demo-freeze-frac');
+  }
+
+  // Sync the on-screen controls.
+  syncControls();
+
+  // Readout.
+  updateReadout();
+}
+
+/* ============================================================
+   Replay — remove .landing, reflow, re-add. Restarts the
+   animation from frame 0. When frozen, re-adding also re-applies
+   the paused state via applyTuning's class list.
+   ============================================================ */
+function replay() {
   paperWrap.classList.remove('landing');
   void paperWrap.offsetWidth;
-
-  var layers = [];
-  if (document.getElementById('btnRealApp').classList.contains('on')) {
-    layers.push(document.getElementById('btnHideUnder').classList.contains('on') ? 'realapp(hidden)' : 'realapp');
-  }
-  if (document.getElementById('btnAmbient').classList.contains('on')) layers.push('ambient');
-  if (document.getElementById('btnTicker').classList.contains('on')) layers.push('ticker');
-  if (document.getElementById('btnOpaque').classList.contains('on')) layers.push('opaque');
-  var label = layers.length ? layers.join('+') : 'baseline';
-
-  readout.textContent = 'running: ' + label + ' — measuring…';
-
-  startFrameCount();
-  void paperWrap.offsetWidth;
   paperWrap.classList.add('landing');
-
-  var done = false;
-  function finish() {
-    if (done) return;
-    done = true;
-    paperWrap.removeEventListener('animationend', finish);
-    paperWrap.classList.remove('landing');
-    requestAnimationFrame(function() {
-      requestAnimationFrame(function() {
-        var r = stopFrameCount();
-        if (!r) { readout.textContent = 'no frames captured'; return; }
-        var verdict, cls;
-        if (r.over33 === 0 && r.avgMs < 22) { verdict = 'SMOOTH'; cls = 'smooth'; }
-        else if (r.over33 > 3) { verdict = 'STUTTER'; cls = 'stutter'; }
-        else { verdict = 'borderline'; cls = ''; }
-        readout.innerHTML =
-          '<strong>' + label + '</strong>' +
-          ' · avg <strong>' + r.avgFps.toFixed(1) + '</strong> fps' +
-          ' · frame <strong>' + r.avgMs.toFixed(1) + '</strong> ms' +
-          ' · worst <strong>' + r.worstMs.toFixed(1) + '</strong> ms' +
-          ' · &gt;20ms: <strong>' + r.over20 + '</strong>' +
-          ' · &gt;33ms: <strong>' + r.over33 + '</strong>' +
-          ' · <strong class="' + cls + '">' + verdict + '</strong>';
-      });
-    });
+  if (TUNING.freezeOn) {
+    paperWrap.classList.add('frozen');
+    paperWrap.style.setProperty('--demo-freeze-frac', (TUNING.freezePct / 100).toString());
   }
-  paperWrap.addEventListener('animationend', finish);
-  setTimeout(finish, 2600);
 }
 
-/* ============ TOGGLE WIRING ============ */
-function toggle(btn) { btn.classList.toggle('on'); }
+/* ============================================================
+   Controls — every input writes back into TUNING and re-applies.
+   ============================================================ */
+const ctrls = {
+  tiltDeg:            document.getElementById('tiltDeg'),
+  tiltPeakPct:        document.getElementById('tiltPeakPct'),
+  tiltSettlePct:      document.getElementById('tiltSettlePct'),
+  tiltContactFactor:  document.getElementById('tiltContactFactor'),
+  freezePct:          document.getElementById('freezePct')
+};
+const valEls = {
+  tiltDeg:            document.getElementById('tiltDegVal'),
+  tiltPeakPct:        document.getElementById('tiltPeakPctVal'),
+  tiltSettlePct:      document.getElementById('tiltSettlePctVal'),
+  tiltContactFactor:  document.getElementById('tiltContactFactorVal'),
+  freezePct:          document.getElementById('freezePctVal')
+};
 
-document.getElementById('btnRealApp').addEventListener('click', function() {
-  var b = this;
-  toggle(b);
-  if (b.classList.contains('on')) {
-    loadRealAppDom().then(function() {
-      document.getElementById('fakeAppRoot').classList.toggle(
-        'hide-under',
-        document.getElementById('btnHideUnder').classList.contains('on')
-      );
-    });
-  } else {
-    // Turning off: empty the root.
-    document.getElementById('fakeAppRoot').innerHTML = '';
-    realAppLoaded = false;
-  }
-});
+function syncControls() {
+  ctrls.tiltDeg.value = TUNING.tiltDeg;
+  ctrls.tiltPeakPct.value = TUNING.tiltPeakPct;
+  ctrls.tiltSettlePct.value = TUNING.tiltSettlePct;
+  ctrls.tiltContactFactor.value = TUNING.tiltContactFactor;
+  ctrls.freezePct.value = TUNING.freezePct;
 
-document.getElementById('btnHideUnder').addEventListener('click', function() {
-  toggle(this);
-  document.getElementById('fakeAppRoot').classList.toggle('hide-under', this.classList.contains('on'));
-});
+  valEls.tiltDeg.textContent = TUNING.tiltDeg.toFixed(1) + '°';
+  valEls.tiltPeakPct.textContent = TUNING.tiltPeakPct + '%';
+  valEls.tiltSettlePct.textContent = TUNING.tiltSettlePct + '%';
+  valEls.tiltContactFactor.textContent = TUNING.tiltContactFactor.toFixed(2);
+  valEls.freezePct.textContent = TUNING.freezePct + '%';
 
-document.getElementById('btnAmbient').addEventListener('click', function() {
-  toggle(this);
-  var on = this.classList.contains('on');
-  var stage = document.getElementById('ambientStage');
-  stage.style.display = on ? '' : 'none';
-  var v = document.getElementById('ambientVideo');
-  if (v) {
-    if (on) { var p = v.play(); if (p && p.catch) p.catch(function(){}); }
-    else { try { v.pause(); } catch(e) {} }
-  }
-  if (on) buildMotes();
-});
+  perspectiveBtn.textContent = 'Perspective ' + (TUNING.perspectiveOn ? 'ON' : 'OFF');
+  perspectiveBtn.classList.toggle('on', TUNING.perspectiveOn);
 
-document.getElementById('btnTicker').addEventListener('click', function() {
-  toggle(this);
-  document.body.classList.toggle('ticker-on', this.classList.contains('on'));
-});
+  scaleBtn.textContent = 'Scale ' + (TUNING.scaleOn ? 'ON' : 'OFF');
+  scaleBtn.classList.toggle('on', TUNING.scaleOn);
 
-document.getElementById('btnOpaque').addEventListener('click', function() {
-  toggle(this);
-  document.body.classList.toggle('receipt-opaque', this.classList.contains('on'));
-});
+  freezeBtn.textContent = 'Freeze ' + (TUNING.freezeOn ? 'ON' : 'OFF');
+  freezeBtn.classList.toggle('on', TUNING.freezeOn);
+}
 
-document.getElementById('runBtn').addEventListener('click', runLanding);
+function updateReadout() {
+  const lines = [
+    'tiltDeg:            ' + TUNING.tiltDeg.toFixed(1),
+    'tiltPeakPct:        ' + TUNING.tiltPeakPct,
+    'tiltSettlePct:      ' + TUNING.tiltSettlePct,
+    'tiltContactFactor:  ' + TUNING.tiltContactFactor.toFixed(2),
+    'perspectiveOn:      ' + TUNING.perspectiveOn,
+    'perspectivePx:      ' + TUNING.perspectivePx,
+    'scaleOn:            ' + TUNING.scaleOn,
+    'freezeOn:           ' + TUNING.freezeOn,
+    'freezePct:          ' + TUNING.freezePct,
+    'durationMs:         ' + TUNING.durationMs,
+    'travelPx:           ' + TUNING.travelPx,
+    'restRotateDeg:      ' + TUNING.restRotateDeg
+  ];
+  readout.textContent = lines.join('\n');
+}
 
-document.getElementById('clearBtn').addEventListener('click', function() {
-  ['btnRealApp','btnHideUnder','btnAmbient','btnTicker','btnOpaque'].forEach(function(id) {
-    var b = document.getElementById(id);
-    if (b && b.classList.contains('on')) b.click();
+// Slider bindings.
+Object.keys(ctrls).forEach(function(key) {
+  ctrls[key].addEventListener('input', function() {
+    TUNING[key] = parseFloat(ctrls[key].value);
+    applyTuning();
+    if (!TUNING.freezeOn) replay();
   });
 });
 
-window.addEventListener('load', function() {
-  renderItems();
+// Toggle bindings.
+perspectiveBtn.addEventListener('click', function() {
+  TUNING.perspectiveOn = !TUNING.perspectiveOn;
+  applyTuning();
+  replay();
 });
+scaleBtn.addEventListener('click', function() {
+  TUNING.scaleOn = !TUNING.scaleOn;
+  applyTuning();
+  replay();
+});
+freezeBtn.addEventListener('click', function() {
+  TUNING.freezeOn = !TUNING.freezeOn;
+  applyTuning();
+  if (!TUNING.freezeOn) replay();
+});
+
+// Play button.
+playBtn.addEventListener('click', function() {
+  if (TUNING.freezeOn) {
+    TUNING.freezeOn = false;
+    applyTuning();
+  }
+  replay();
+});
+
+/* ============================================================
+   Boot
+   ============================================================ */
+applyTuning();
+// Kick off the first run so the paper isn't sitting in its
+// pre-animation state when the page opens.
+requestAnimationFrame(function() { replay(); });
 </script>
 
 </body>
