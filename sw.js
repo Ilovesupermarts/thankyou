@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v32';
+const CACHE = 'thankyou-v33';
 
 const ASSETS = [
   './',
