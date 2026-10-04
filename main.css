@@ -1202,10 +1202,20 @@
      drop-shadow. The filter sits here — on the wrapper, above the
      masked paper — so it follows the paper's torn-edge silhouette.
      The filter transition here is what fades the shadow back in on
-     the exit side, when .landing is removed at animationend. */
+     the exit side, when .landing is removed at animationend.
+
+     Step 5 restored transform-origin: 50% 100%. The pivot now sits
+     on the bottom edge, matching the original authored behaviour:
+     the resting rotate(1.65deg) swings the top edge further than a
+     centre pivot would, and the landing rotateX(12deg) hinges at
+     the base so the top leans back rather than the bottom dropping
+     forward. The child .receipt-paper still carries the same
+     transform-origin value, which is dead code — the child never
+     transforms — and is left in place to keep this change isolated. */
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
+    transform-origin: 50% 100%;
     transform: rotate(var(--rest-rotate, 1.65deg));
     transition: transform 400ms ease, filter 400ms ease;
     filter:
