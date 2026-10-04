@@ -23,6 +23,18 @@
          lockBodyForReceipt / unlockBodyForReceipt replace the
          CSS-only body lock, saving window.scrollY on open and
          restoring it on close.
+       - Panel-1 post-beat delay lengthened 500 → 1000ms.
+       - Scroll gate: body scroll is only unlocked at the last
+         panel AND only stays unlocked once the user has actually
+         scrolled the table into view. Swiping back to earlier
+         panels re-locks unless the table has been visited.
+       - Transition-line scroll effects rewritten. Blur, scaleX,
+         and the text-shadow focus-snap removed. Replaced with a
+         subtle parallax drift and a warm radial glow that fades
+         in/out when the body is near the viewport centre.
+       - Reset hot-spot: invisible top-left tap target that
+         returns to the blossom start screen without losing any
+         entered values, re-running the koi intro and panels.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -95,6 +107,21 @@ if (themeToggle) {
     e.preventDefault(); e.stopPropagation();
     haptic(10);
     applyTheme(currentTheme === 'autumn' ? 'default' : 'autumn');
+  });
+}
+
+/* v1.3: reset hot-spot. Invisible, fixed top-left tap target.
+   Returns to the blossom start screen without losing any entered
+   values. Guarded inside returnToStartScreen() so it is a no-op
+   on the name screen, during the receipt, and during the
+   thank-you flow. */
+var resetHotspot = document.getElementById('resetHotspot');
+if (resetHotspot) {
+  resetHotspot.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    haptic(14);
+    returnToStartScreen();
   });
 }
 
@@ -745,6 +772,7 @@ var nameConfirmed = false;
 var therapistDisplayName = '桜庭さん';
 var therapistGreeting = null;
 var tableUnlocked = false;
+var tableVisited = false;
 var currentPanel = 0;
 var totalPanels = 5;
 var rejected = false;
@@ -1114,7 +1142,10 @@ var PANEL_PHRASE_STAGGER_MAX = 600;
 var PANEL_PHRASE_DELAY = 300;
 var PANEL_PHRASE_MODE = 'coexist';
 
-var PANEL_1_POST_BEAT_DELAY = 500;
+/* v1.3: lengthened 500 → 1000ms. Gives the first-swipe background
+   elements (ambient layers, video compositor) an extra half-second
+   to settle before the user is likely to swipe away from panel 1. */
+var PANEL_1_POST_BEAT_DELAY = 1000;
 
 var panelPhraseTimers = [];
 
@@ -1543,6 +1574,111 @@ function unlockTable() {
   tableUnlocked = true;
   document.body.classList.remove('table-locked');
 }
+function relockTable() {
+  if (!tableUnlocked) return;
+  tableUnlocked = false;
+  window.scrollTo(0, 0);
+  document.body.classList.add('table-locked');
+}
+
+/* v1.3: return to the blossom start screen without losing any
+   entered values. Preserves nameConfirmed, therapistDisplayName,
+   all input fields, the dynamicRows table, and the tip. Resets
+   only the transient UI state so the koi intro and panel sequence
+   can be re-run. Guarded so it cannot fire during the receipt or
+   thank-you flows, where the blossom screen would be occluded. */
+function returnToStartScreen() {
+  if (!nameConfirmed) return;
+  if (receiptScreen && receiptScreen.classList.contains('visible')) return;
+  if (thankyouScreen && thankyouScreen.classList.contains('visible')) return;
+
+  /* Stop ambient ripples and any in-flight koi timers. */
+  stopAmbientRipple();
+  clearKoiTimers();
+  resetWind();
+
+  /* Reset koi gesture state so the swipe-up gesture works again. */
+  koiGestureState = 'idle';
+  koiActivePointerId = null;
+  koiFlinchActive = false;
+  introHasRun = false;
+
+  /* Reset koi visual state. */
+  if (koiDiveWrap) {
+    koiDiveWrap.classList.remove('dragging', 'flinching');
+    koiDiveWrap.style.removeProperty('--koi-rise-y');
+    koiDiveWrap.style.removeProperty('--flinch-rot');
+    koiDiveWrap.style.removeProperty('--flinch-scale');
+    koiDiveWrap.style.removeProperty('--flinch-x');
+    koiDiveWrap.style.removeProperty('--flinch-y');
+  }
+  if (startBtn) {
+    startBtn.classList.remove('ready', 'startling', 'diving', 'done');
+  }
+  if (blossomScreen) {
+    blossomScreen.classList.remove('diving');
+    blossomScreen.style.removeProperty('opacity');
+    blossomScreen.style.removeProperty('transition');
+  }
+  if (introOverlay) {
+    introOverlay.classList.remove('active', 'finishing');
+  }
+  if (nameColumn) {
+    nameColumn.innerHTML = '';
+  }
+  var ambientImage = document.querySelector('.ambient-image');
+  if (ambientImage) {
+    ambientImage.style.removeProperty('opacity');
+  }
+
+  /* Cancel any in-flight panel phrase reveals and reset all
+     panels to a neutral state. activatePanel(0) will be called
+     by triggerKoiStart() after the intro, so we do not activate
+     anything here. */
+  clearPanelPhraseTimers();
+  for (var p = 0; p < panels.length; p++) {
+    panels[p].classList.remove('active', 'leaving');
+  }
+  currentPanel = 0;
+  track.style.transform = 'translateX(0%)';
+  for (var d = 0; d < dots.length; d++) {
+    dots[d].classList.toggle('active', d === 0);
+  }
+  if (dotsEl) dotsEl.classList.remove('visible');
+
+  /* Reset scroll gate and force to top. */
+  tableVisited = false;
+  if (tableUnlocked) {
+    tableUnlocked = false;
+    document.body.classList.add('table-locked');
+  }
+  window.scrollTo(0, 0);
+
+  /* Hide the info bar and hint. */
+  document.body.classList.remove('info-visible');
+  if (infoBar) {
+    infoBar.classList.remove('shown');
+    infoBar.classList.remove('hidden');
+  }
+  if (globalHint) globalHint.classList.remove('shown');
+
+  /* Reset table / transition-line / summary visibility. */
+  if (summaryBar) summaryBar.classList.remove('visible');
+  if (numpad) numpad.classList.remove('visible');
+  if (transitionLine) {
+    transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
+    lineVisible = false;
+  }
+  if (divider) divider.classList.remove('active');
+  if (tableCard) tableCard.classList.remove('active');
+  if (rejectRow) rejectRow.classList.remove('active');
+  document.body.classList.remove('warm-background');
+
+  /* Show the blossom screen and restart the ambient scheduler. */
+  if (blossomScreen) blossomScreen.classList.add('visible');
+  scheduleAmbientRipple();
+}
+
 function updateGlobalHint() {
   if (!globalHint || !globalHintLayerSwipe || !globalHintLayerScroll) return;
   if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
@@ -1579,7 +1715,15 @@ function goToPanel(index, noGust) {
   track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
   for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
   activatePanel(currentPanel);
-  if (currentPanel === totalPanels - 1) unlockTable();
+  /* v1.3: only unlock at the last panel, and only re-lock when
+     returning to earlier panels if the user has not yet visited
+     the table. Once the table has been scrolled into view, the
+     earlier panels stay scrollable. */
+  if (currentPanel === totalPanels - 1) {
+    unlockTable();
+  } else if (!tableVisited) {
+    relockTable();
+  }
   if (transitionLine && currentPanel !== totalPanels - 1) {
     transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
     lineVisible = false;
@@ -2463,25 +2607,23 @@ function setupTransitionReveal() {
 }
 
 /* ============================================================
-   TRANSITION-LINE BLUR + SCALE + FOCUS SNAP
+   TRANSITION-LINE PARALLAX DRIFT + GLOW — v1.3
    ============================================================
-   v1.17.2: the snap effect uses a sub-pixel text-shadow glow
-   (paint-only, no layout impact) gated on a strictly symmetrical
-   |d| <= TB_SNAP_WINDOW_PX window. Entry and exit thresholds are
-   identical regardless of scroll direction.
+   Blur, scaleX, and the text-shadow focus-snap have been removed.
+   Two effects remain, both driven from updateTransitionBodyEffects():
+
+     - Parallax drift: an inline translateY computed from the
+       body-centre-to-viewport-centre delta d. Negative sign so the
+       body's apparent scroll rate is slightly slower than the page.
+       In landscape on the S8 Ultra, d peaks around ±650px, giving
+       roughly ±45px of drift.
+
+     - Warm radial glow: the .centered class toggled when |d| is
+       within TB_GLOW_WINDOW_PX, driving a CSS ::before pseudo-
+       element's opacity. The in/out pulse timing lives in CSS.
    ============================================================ */
-var tbMetrics = {
-  bodyEl: null,
-  secondLastP: null,
-  downMax: 1,
-  upMax: 1,
-  valid: false
-};
-var TB_MAX_BLUR = 6;
-var TB_SCALE_TRIGGER_BLUR = 1.0;
-var TB_MAX_SCALE = 1.08;
-var TB_SNAP_WINDOW_PX = 15;
-var TB_SNAP_INTENSITY = 1.65;
+var TB_DRIFT_FACTOR = 0.07;
+var TB_GLOW_WINDOW_PX = 150;
 
 function measureTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
@@ -2506,29 +2648,19 @@ function updateTransitionBodyEffects() {
   var bodyCentre = rect.top + rect.height / 2;
   var d = bodyCentre - vc;
 
-  var progress;
-  if (d >= 0) progress = Math.min(1, d / tbMetrics.downMax);
-  else progress = Math.min(1, -d / tbMetrics.upMax);
+  /* v1.3: parallax drift. Negative sign so the body's apparent
+     scroll rate is slightly slower than the page. */
+  var driftY = -d * TB_DRIFT_FACTOR;
+  tbMetrics.bodyEl.style.transform =
+    (driftY > 0.05 || driftY < -0.05)
+      ? 'translateY(' + driftY.toFixed(2) + 'px)'
+      : '';
 
-  var blurVal = TB_MAX_BLUR * progress;
-  var scaleVal = 1.0;
-  if (blurVal < TB_SCALE_TRIGGER_BLUR) {
-    scaleVal = 1.0 + (TB_MAX_SCALE - 1.0) * (1 - blurVal / TB_SCALE_TRIGGER_BLUR);
-  }
-
-  tbMetrics.bodyEl.style.filter = blurVal > 0.05
-    ? 'blur(' + blurVal.toFixed(2) + 'px)'
-    : 'none';
-  tbMetrics.bodyEl.style.transform = scaleVal > 1.001
-    ? 'scaleX(' + scaleVal.toFixed(4) + ')'
-    : '';
-
-  /* Symmetrical focus snap via text-shadow (paint-only). */
-  if (Math.abs(d) <= TB_SNAP_WINDOW_PX) {
-    tbMetrics.bodyEl.style.textShadow =
-      '0 0 ' + TB_SNAP_INTENSITY + 'px currentColor';
+  /* v1.3: warm radial glow toggled via the .centered class. */
+  if (Math.abs(d) <= TB_GLOW_WINDOW_PX) {
+    tbMetrics.bodyEl.classList.add('centered');
   } else {
-    tbMetrics.bodyEl.style.textShadow = 'none';
+    tbMetrics.bodyEl.classList.remove('centered');
   }
 }
 
@@ -4023,6 +4155,15 @@ window.addEventListener('scroll', function() {
   if (goingDown || goingUp) {
     scheduleEvaluation();
     scheduleTransitionBodyUpdate();
+  }
+  /* v1.3: once the table has been scrolled into view, mark it
+     visited. From that point on, swiping back to earlier panels
+     keeps scrolling enabled. */
+  if (!tableVisited && tableCard) {
+    var tcRect = tableCard.getBoundingClientRect();
+    if (tcRect.top < window.innerHeight && tcRect.bottom > 0) {
+      tableVisited = true;
+    }
   }
 }, { passive: true });
 
