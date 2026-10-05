@@ -29,15 +29,17 @@
 <body>
 
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
-  <div class="ambient-layer ambient-image">
-    <!-- v1.3: autoplay removed, preload dropped to metadata. The video
-         is started by app.js on the first user pointerdown, which
-         means the name-entry screen paints before any video decode
-         work begins. Same autumn look, deferred cost. -->
-    <video class="ambient-video" id="ambientVideo"
-           muted loop playsinline preload="metadata">
-      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
-    </video>
+  <!-- v1.3: pre-feathered CSS light mesh replaces the ambient video.
+       Each .light-orb is a radial-gradient that fades to transparent
+       over its own radius — visually a blurred orb of light, with
+       zero GPU convolution passes. Motion is transform-only, so the
+       compositor drives it without layout or repaint cost.
+       The mesh is gated to the autumn theme in main.css; the default
+       (sakura) theme keeps its watercolor gradient stack uncluttered. -->
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
   </div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
@@ -487,6 +489,36 @@
 </div>
 
 <div class="reset-hotspot" id="resetHotspot" aria-hidden="true"></div>
+
+<!-- v1.3: ambient falling maple leaves. Continuous overlay running
+     the full life of the app once activated — visible above the
+     stage and table (z-index 230), occluded by the opaque backdrops
+     of every modal and the receipt, and visible again through the
+     transparent .thankyou-screen. Gated to autumn in main.css. -->
+<div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
+  <!-- 7 Palmate Japanese Momiji Leaves with Staggered Drifts -->
+  <svg class="maple-leaf leaf-1" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 100 100">
+    <path d="M50 92 C49 84 48 76 50 70 C42 73 34 80 26 77 C27 71 33 66 38 63 C29 61 17 56 12 47 C20 45 30 48 37 51 C30 42 20 28 23 20 C29 25 33 34 38 41 C36 30 35 17 42 11 C46 18 47 27 49 37 C51 26 53 14 57 8 C61 15 60 27 59 37 C63 27 65 18 70 12 C74 19 71 30 68 41 C74 34 78 25 84 20 C87 28 77 42 70 51 C77 48 87 45 95 47 C90 56 78 61 69 63 C74 66 80 71 81 77 C73 80 65 73 57 70 C59 76 58 84 57 92 Z"/>
+  </svg>
+</div>
 
 </body>
 </html>
