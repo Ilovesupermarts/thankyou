@@ -32,28 +32,24 @@
          returns to the blossom start screen without losing any
          entered values, re-running the koi intro and panels.
        - Transition-line accordion drift, final v1.3 pass:
-           * Reveal engine removed entirely (observer, timers,
-             constants, setupTransitionReveal, .revealed CSS, the
-             paragraph reduced-motion guard). Text renders
+           * Reveal engine removed entirely. Text renders
              immediately alongside the header.
            * Math.abs(d) for relativeSeparation so items fan
              outward on both sides of centre and never collide.
-           * PROXIMITY_WINDOW_PX dropped. Gate is now scrollY-based
-             (scrollEnter = clamp(scrollY / 120, 0, 1)). At
-             scrollY = 0 the transform collapses to nothing, so the
-             block cannot leak into the blossom screen or the
-             panels. Full amplitude is available once past the
-             ramp.
            * HORIZONTAL_SWAY_PX softened 25 → 10.
-           * scheduleTransitionBodyUpdate() now fires on every
-             scroll event, rAF-debounced via tbRafPending.
-             scheduleEvaluation() stays behind the 1px
-             goingDown/goingUp threshold, so layout reads do not
-             land on the same task as transform writes.
+           * scheduleTransitionBodyUpdate() fires on every scroll
+             event, rAF-debounced via tbRafPending.
+             scheduleEvaluation() stays behind the 1px threshold.
            * returnToStartScreen() clears inline drift transforms
-             synchronously and resets tableEnteredView, so the
-             service table re-reveals correctly after a hot-spot
-             rerun.
+             synchronously and resets tableEnteredView.
+           * Gate is a flat-top envelope. Full-strength linear
+             drift inside |d| <= CORE_ZONE_PX (200). Smoothstep
+             ease-out to zero across CORE_ZONE_PX < |d| <
+             MAX_ZONE_PX (460). Zero drift beyond MAX_ZONE_PX and
+             at scrollY = 0. Prevents the header from intruding
+             on Panel 4's scroll hint on approach from below, and
+             prevents paragraph 4 from overlapping the service
+             table on exit above.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -2593,7 +2589,7 @@ function wrapTransitionBody() {
 }
 
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Full Amplitude)
+   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Flat-Top Envelope)
    ============================================================
    Divider (Item 0) plus each paragraph in the body form a single
    drift array. Each item receives an inline translate() computed
@@ -2607,21 +2603,36 @@ function wrapTransitionBody() {
                           outward, never inverted.
      swayX              — small alternating horizontal zig.
 
-   All three are scaled by scrollEnter, a linear ramp from 0 at
-   scrollY = 0 to 1 at scrollY = 120. At scrollY = 0 the block
-   cannot leak into the blossom screen, the koi intro, or any
-   carousel panel. Once past the ramp, transforms persist as the
-   block scrolls (including exit and re-entry), matching the
-   behaviour of the tuning bench.
+   All three are scaled by a flat-top envelope over |d|:
+
+     |d| <= CORE_ZONE_PX (200)   : envelope = 1.0. Full-strength
+                                    linear drift, no direction
+                                    reversal, no squashed amplitude.
+     CORE_ZONE_PX < |d| <
+       MAX_ZONE_PX (460)         : envelope = smoothstep(t), where
+                                    t = (MAX - |d|) / (MAX - CORE).
+                                    Eases transforms to zero at the
+                                    boundary with matching slopes
+                                    (3t^2 - 2t^3).
+     |d| >= MAX_ZONE_PX          : transforms are cleared to
+                                    natural layout.
+
+   Under this envelope, the total displacement of any item is capped
+   near 48px at the core boundary. This bounds the header's upward
+   travel (so it cannot intrude on Panel 4's scroll hint on
+   approach) and paragraph 4's downward travel (so it cannot
+   overlap the service table on exit).
 
    Transform is written via JS only. main.css carries no
    transform transition on these elements, so motion tracks
    scroll frame-for-frame instead of easing toward a target. */
 var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.05,
-  MAX_LINE_SPREAD_PX: 55,
+  MAX_LINE_SPREAD_PX: 55,       /* defensive clamp — not reached under envelope */
   GLOBAL_DRIFT_FACTOR: 0.14,
-  HORIZONTAL_SWAY_PX: 10
+  HORIZONTAL_SWAY_PX: 10,
+  CORE_ZONE_PX: 200,            /* Full 100% linear drift zone around center */
+  MAX_ZONE_PX: 460              /* Boundary where drift eases cleanly to 0 */
 };
 
 function updateTransitionBodyEffects() {
@@ -2639,19 +2650,7 @@ function updateTransitionBodyEffects() {
   var totalItems = driftItems.length;
   var centerIdx = (totalItems - 1) / 2;
 
-  /* Gate by scroll position: at scrollY = 0 the transforms collapse
-     to nothing, so nothing can leak into the blossom screen or the
-     carousel panels. */
   var scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
-  var scrollEnter = Math.min(1, Math.max(0, scrollY / 120));
-
-  if (scrollEnter <= 0) {
-    for (var k = 0; k < totalItems; k++) {
-      driftItems[k].style.transform = '';
-    }
-    return;
-  }
-
   var vh = window.innerHeight;
   var vc = vh / 2;
   var rect = lineWrapper.getBoundingClientRect();
@@ -2659,7 +2658,25 @@ function updateTransitionBodyEffects() {
   var d = blockCenter - vc;
   var absDist = Math.abs(d);
 
-  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * scrollEnter;
+  /* Outside the reading envelope: clear transforms and let the
+     block sit at its natural position. scrollY = 0 is included so
+     nothing can leak into the blossom screen or the panels. */
+  if (scrollY <= 0 || absDist >= DRIFT_CONFIG.MAX_ZONE_PX) {
+    for (var k = 0; k < totalItems; k++) {
+      driftItems[k].style.transform = '';
+    }
+    return;
+  }
+
+  /* Flat-top envelope: 1.0 inside CORE_ZONE_PX, smoothstep ease-out
+     to zero across the boundary band. */
+  var envelope = 1.0;
+  if (absDist > DRIFT_CONFIG.CORE_ZONE_PX) {
+    var t = (DRIFT_CONFIG.MAX_ZONE_PX - absDist) / (DRIFT_CONFIG.MAX_ZONE_PX - DRIFT_CONFIG.CORE_ZONE_PX);
+    envelope = t * t * (3 - 2 * t);
+  }
+
+  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * envelope;
   var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
   for (var i = 0; i < totalItems; i++) {
@@ -2671,13 +2688,13 @@ function updateTransitionBodyEffects() {
        items from overtaking outer ones. */
     var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
     var rawSpread = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
-    var relativeSeparation = Math.max(-itemMaxSpread, Math.min(itemMaxSpread, rawSpread)) * scrollEnter;
+    var relativeSeparation = Math.max(-itemMaxSpread, Math.min(itemMaxSpread, rawSpread)) * envelope;
 
     var totalY = globalShift + relativeSeparation;
 
     var swayMultiplier = (dividerEl && i === 0) ? 0.35 : 1.0;
     var swayDir = (i % 2 === 0) ? 1 : -1;
-    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * scrollEnter;
+    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * envelope;
 
     item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
   }
