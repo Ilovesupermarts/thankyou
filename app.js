@@ -4,6 +4,25 @@
    ------------------------------------------------------------
    Changelog:
      v1.3
+       - Default theme switched to autumn. index.html ships
+         data-theme="autumn" and currentTheme boots as 'autumn'.
+         The ambient video no longer autoplays: <video> lost the
+         autoplay attribute, preload dropped auto → metadata, and
+         play() is deferred to the first user pointerdown (see the
+         kickOnce listener in the window.load handler). The
+         name-entry screen paints before any video decode work
+         begins; the video fades in the moment the user first
+         touches the screen.
+       - Backdrop-filters removed in main.css on .summary, .msg-3,
+         .reject-row, .confirm-screen, .alert-screen, .tanzaku-screen.
+         Alpha fills bumped 4-6% to hold the visual. The 6px blurs
+         were re-compositing per frame over the animating ambient
+         stage; on the full-viewport dialogs this was the worst
+         compositor case in the app.
+       - will-change: opacity, transform removed from .panel-phrase.
+         It was a permanent promotion hint on 150-300 spans across
+         the five panels; the 500ms transition auto-promotes and
+         demotes cleanly without it.
        - Koi tap flinch: gated on the tap landing on the koi PNG
          (.koi-image) only. Background taps on the blossom screen
          still produce the strong ripple but do not trigger the
@@ -107,7 +126,11 @@
 
 /* ============ THEME TOGGLE ============ */
 var themeToggle = document.getElementById('themeToggle');
-var currentTheme = 'default';
+/* v1.3: default theme switched to autumn. index.html ships
+   data-theme="autumn" and the toggle button renders 🍁 at boot.
+   currentTheme tracks the active theme so applyTheme() can flip
+   between the two. */
+var currentTheme = 'autumn';
 function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
@@ -3304,12 +3327,15 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 
 window.addEventListener('load', function() {
   startInfoUpdates();
+  /* v1.3: the ambient video no longer starts at boot. With the
+     default theme now autumn, the video WOULD want to play — but
+     starting it here would put decode + blur compositing on the
+     first paint of the name-entry screen. Instead we defer play()
+     to the first user pointerdown via kickOnce below. The autumn
+     gradient layers are visible immediately; the video fades in
+     the moment the user first touches the screen. */
   var ambientVideo = document.getElementById('ambientVideo');
   if (ambientVideo) {
-    if (ambientVideo.paused && currentTheme === 'autumn') {
-      var p = ambientVideo.play();
-      if (p && typeof p.catch === 'function') p.catch(function() {});
-    }
     var kickOnce = function() {
       if (ambientVideo.paused && currentTheme === 'autumn') {
         var pp = ambientVideo.play();
