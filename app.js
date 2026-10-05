@@ -1660,12 +1660,13 @@ function returnToStartScreen() {
   if (dotsEl) dotsEl.classList.remove('visible');
 
   /* Reset scroll gate and force to top. */
-  tableVisited = false;
-  if (tableUnlocked) {
-    tableUnlocked = false;
-    document.body.classList.add('table-locked');
-  }
-  window.scrollTo(0, 0);
+tableVisited = false;
+tableEnteredView = false;
+if (tableUnlocked) {
+  tableUnlocked = false;
+  document.body.classList.add('table-locked');
+}
+window.scrollTo(0, 0);
 
   /* v1.3: clear any lingering accordion transforms synchronously.
      window.scrollTo dispatches its scroll event on the next task
