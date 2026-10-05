@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v43';
+const CACHE = 'thankyou-v44';
 
 const ASSETS = [
   './',
@@ -20,7 +20,6 @@ const ASSETS = [
   './icons/1790678998862.jpg',
   './icons/1790835034553.jpg',
   './icons/44173_0c6eff.png',
-  './icons/VID-20260929-WA0002.mp4',
   './Sound/cave-water-drop-echo-a053fcdf.mp3'
 ];
 
