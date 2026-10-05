@@ -36,22 +36,25 @@
              immediately alongside the header.
            * Math.abs(d) for relativeSeparation so items fan
              outward on both sides of centre and never collide.
-           * HORIZONTAL_SWAY_PX softened 25 → 10 → 22.
+           * HORIZONTAL_SWAY_PX softened 25 → 10 → 22 → 20.
            * scheduleTransitionBodyUpdate() fires on every scroll
              event, rAF-debounced via tbRafPending.
              scheduleEvaluation() stays behind the 1px threshold.
            * returnToStartScreen() clears inline drift transforms
              synchronously and resets tableEnteredView.
            * Gate is a flat-top envelope. Full-strength linear
-             drift inside |d| <= CORE_ZONE_PX (200). Smoothstep
-             ease-out to zero across CORE_ZONE_PX < |d| <
-             MAX_ZONE_PX (460). Zero drift beyond MAX_ZONE_PX and
-             at scrollY = 0.
+             drift inside |d| <= CORE_ZONE_PX. Smoothstep ease-out
+             to zero across CORE_ZONE_PX < |d| < MAX_ZONE_PX.
+             Zero drift beyond MAX_ZONE_PX and at scrollY = 0.
            * Resting gaps tightened in main.css (paragraph 0.9em
              → 0.35em, divider 19px → 10px). LINE_SPREAD_FACTOR
-             doubled 0.05 → 0.10 and GLOBAL_DRIFT_FACTOR eased
-             0.14 → 0.10 so the fan reads as the dominant motion
-             at the same total travel.
+             set to 0.075 and GLOBAL_DRIFT_FACTOR to 0.08 so the
+             fan reads as the dominant motion. Physical runways
+             widened in main.css (.stage-spacer 75px base /
+             50px @700h / 40px @600h-landscape; .transition-line
+             bottom padding 85px; .divider margin-top 20px) so
+             the outermost items' full travel resolves without
+             contacting adjacent sections.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -2607,11 +2610,11 @@ function wrapTransitionBody() {
 
    All three are scaled by a flat-top envelope over |d|:
 
-     |d| <= CORE_ZONE_PX (200)   : envelope = 1.0. Full-strength
+     |d| <= CORE_ZONE_PX (180)   : envelope = 1.0. Full-strength
                                     linear drift, no direction
                                     reversal, no squashed amplitude.
      CORE_ZONE_PX < |d| <
-       MAX_ZONE_PX (460)         : envelope = smoothstep(t), where
+       MAX_ZONE_PX (420)         : envelope = smoothstep(t), where
                                     t = (MAX - |d|) / (MAX - CORE).
                                     Eases transforms to zero at the
                                     boundary with matching slopes
@@ -2621,30 +2624,37 @@ function wrapTransitionBody() {
 
    v1.3: the resting gaps in main.css were tightened (paragraph
    0.9em → 0.35em, divider 19px → 10px) so the fan opens from a
-   closer rest. The fan was doubled (LINE_SPREAD_FACTOR 0.05 →
-   0.10) and GLOBAL_DRIFT_FACTOR eased 0.14 → 0.10 to hold total
-   travel near 70px — still well clear of the ~120px the
-   unconditional linear drift produced before the envelope existed.
-   That bounds the header's upward travel (so it cannot intrude on
-   Panel 4's scroll hint on approach) and paragraph 4's downward
-   travel (so it cannot overlap the service table on exit).
+   closer rest. The physical runways were widened at the same time
+   (.stage-spacer 75px base / 50px @700h / 40px @600h-landscape;
+   .transition-line bottom padding 85px; .divider top margin 20px)
+   so the outermost items' full travel resolves without contacting
+   the panel dots above or the table divider below. These values
+   are calibrated together with the DRIFT_CONFIG numbers below —
+   changing one without the other can reintroduce overlap.
 
-   At the core boundary with these values: adjacent-gap delta ~20px,
-   outermost relativeSeparation ~±50px, globalShift ~20px. The
-   paragraph gap reads ~7px at rest and ~27px at peak — the fan is
-   now the dominant visible motion, where previously the authored
-   gap dominated.
+   At |d| = CORE_ZONE_PX with these values:
+     Divider (item 0, lineDist -2.5): rawSpread -33.75px, clamped
+       by MAX_LINE_SPREAD_PX at -38px effective. globalShift
+       -14.4px. Total ~-48.15px on approach. Absorbed by the
+       75px stage-spacer, keeping the divider clear of the dots.
+     Last paragraph (lineDist +2.5): +33.75px separation, +14.4px
+       global on exit, total ~+48.15px. Absorbed by the 105px of
+       clearance below (85px padding + 20px margin), keeping it
+       clear of .divider and #tableCard.
+     Mid paragraphs: adjacent-gap delta ~13.5px, so the resting
+       ~6.3px gap opens to ~19.8px at peak — a ~3× contrast that
+       reads as the accordion spring without any collision.
 
    Transform is written via JS only. main.css carries no
    transform transition on these elements, so motion tracks
    scroll frame-for-frame instead of easing toward a target. */
 var DRIFT_CONFIG = {
-  LINE_SPREAD_FACTOR: 0.10,     /* v1.3: doubled from 0.05 for prominent fanning. */
-  MAX_LINE_SPREAD_PX: 80,       /* v1.3: 55 → 80, keeps the clamp clear of the envelope's working band. */
-  GLOBAL_DRIFT_FACTOR: 0.10,    /* v1.3: 0.14 → 0.10. Shifts the motion ratio toward fan-over-block. */
-  HORIZONTAL_SWAY_PX: 22,
-  CORE_ZONE_PX: 200,            /* Full 100% linear drift zone around center */
-  MAX_ZONE_PX: 460              /* Boundary where drift eases cleanly to 0 */
+  LINE_SPREAD_FACTOR: 0.075,    /* Prominent fanning: ~13.5px extra gap per adjacent pair at |d| = CORE_ZONE_PX. */
+  MAX_LINE_SPREAD_PX: 38,       /* Defensive outer clamp — never fires at these envelope values, but bounds the fan if CORE_ZONE_PX or LINE_SPREAD_FACTOR are raised later. */
+  GLOBAL_DRIFT_FACTOR: 0.08,    /* Parallax base kept below the fan so the accordion breathing, not the block's rigid slide, is the dominant motion the eye tracks. */
+  HORIZONTAL_SWAY_PX: 20,
+  CORE_ZONE_PX: 180,            /* Full-strength linear drift zone around centre. */
+  MAX_ZONE_PX: 420              /* Boundary where drift eases cleanly to 0. */
 };
 
 function updateTransitionBodyEffects() {
