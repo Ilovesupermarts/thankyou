@@ -3,22 +3,22 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Transition Line Drift Demo</title>
+<title>Transition Line & Header Drift Demo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- Uses your project's main.css directly -->
+<!-- Links directly to your project's stylesheet -->
 <link rel="stylesheet" href="main.css">
 
 <style>
   body {
-    height: 320vh; /* Canvas height to allow scrolling */
+    height: 340vh; /* Extended canvas for fling-scroll testing */
     overflow-x: hidden;
   }
 
-  /* Center guide line */
+  /* Fixed Viewport Center Reference Line */
   .center-guide {
     position: fixed;
     top: 50%;
@@ -30,7 +30,7 @@
     z-index: 100;
   }
   .center-guide::after {
-    content: "SCREEN CENTER";
+    content: "VIEWPORT CENTER";
     position: absolute;
     right: 20px;
     top: -18px;
@@ -40,20 +40,26 @@
     font-family: sans-serif;
   }
 
-  /* Position transition line for scroll testing */
+  /* Force container active and positioned for test scroll */
   .transition-line {
-    margin-top: 120vh;
+    margin-top: 125vh;
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
   }
 
-  /* Each paragraph has hardware acceleration and its own floating origin */
+  /* 
+     FIXES FOR FLING SCROLL JANK & VANISHING:
+     1. transition: none !important kills the 750ms elastic transition fighting the RAF loop.
+     2. opacity: 1 !important prevents IntersectionObserver race-conditions from leaving lines hidden.
+     3. No will-change on children prevents Chromium tile-budget exhaust on 14.6" screens.
+  */
+  .transition-line-divider,
   .transition-line-body p {
-    will-change: transform, opacity;
-    transform-origin: 50% 50%;
     opacity: 1 !important;
     transform: none;
+    transition: none !important;
+    transform-origin: 50% 50%;
   }
 
   /* Interactive Tuning HUD (Collapsible) */
@@ -125,13 +131,16 @@
 <div class="center-guide"></div>
 
 <div class="transition-line" id="transitionLine">
-  <div class="transition-line-divider">
+  <!-- Item 0 in the drift sequence -->
+  <div class="transition-line-divider" id="transitionLineDivider">
     <span class="transition-line-mark">❀</span>
     <span class="transition-line-rule"></span>
     <span class="transition-line-title">大切なお知らせ</span>
     <span class="transition-line-rule"></span>
     <span class="transition-line-mark">❀</span>
   </div>
+
+  <!-- Items 1 to 5 in the drift sequence -->
   <div class="transition-line-body" id="transitionLineBody">
     <p>それでは、本日の癒しのオプションをご覧ください。</p>
     <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
@@ -141,35 +150,35 @@
   </div>
 </div>
 
-<!-- Interactive Tuning Controls for Tablet Testing -->
+<!-- Interactive Tuning Controls -->
 <div class="tuning-hud" id="tuningHud">
   <h3>
-    <span>Line Drift Tuner</span>
+    <span>Full Accordion Tuner</span>
     <span id="hudToggle" style="cursor:pointer; font-weight:normal;">[最小化]</span>
   </h3>
   <div id="hudBody">
     <div class="tuning-row">
-      <label>Line Accordion Spread: <span id="valSpread">0.18</span></label>
-      <input type="range" id="inputSpread" min="0.0" max="0.5" step="0.01" value="0.18">
+      <label>Accordion Spread: <span id="valSpread">0.14</span></label>
+      <input type="range" id="inputSpread" min="0.0" max="0.4" step="0.01" value="0.14">
     </div>
 
     <div class="tuning-row">
-      <label>Max Line Spread: <span id="valMaxSpread">45px</span></label>
-      <input type="range" id="inputMaxSpread" min="10" max="100" step="1" value="45">
+      <label>Max Outer Spread: <span id="valMaxSpread">55px</span></label>
+      <input type="range" id="inputMaxSpread" min="10" max="120" step="1" value="55">
     </div>
 
     <div class="tuning-row">
       <label>Global Block Drift: <span id="valGlobal">0.08</span></label>
-      <input type="range" id="inputGlobal" min="0.0" max="0.3" step="0.01" value="0.08">
+      <input type="range" id="inputGlobal" min="0.0" max="0.25" step="0.01" value="0.08">
     </div>
 
     <div class="tuning-row">
-      <label>Horizontal Organic Sway: <span id="valSway">16px</span></label>
-      <input type="range" id="inputSway" min="0" max="40" step="1" value="16">
+      <label>Horizontal Sway: <span id="valSway">14px</span></label>
+      <input type="range" id="inputSway" min="0" max="40" step="1" value="14">
     </div>
 
     <div class="tuning-stats">
-      Offset from Center: <span id="statDelta">0px</span><br>
+      Delta from Center: <span id="statDelta">0px</span><br>
       Focal State: <span id="statFocal">Resting</span>
     </div>
   </div>
@@ -177,25 +186,42 @@
 
 <script>
   var DRIFT_CONFIG = {
-    LINE_SPREAD_FACTOR: 0.18,
-    MAX_LINE_SPREAD_PX: 45,
+    // Rate of accordion expansion per unit of scroll offset
+    LINE_SPREAD_FACTOR: 0.14,
+
+    // Maximum distance the outermost items (Header & Paragraph 5) can drift
+    MAX_LINE_SPREAD_PX: 55,
+
+    // Parallax translation of the entire block counter to scroll direction
     GLOBAL_DRIFT_FACTOR: 0.08,
-    HORIZONTAL_SWAY_PX: 16,
+
+    // Alternating horizontal wave displacement (sway is damped on the header)
+    HORIZONTAL_SWAY_PX: 14,
+
+    // Distance window (±px) where lines contract tightly and glow illuminates
     FOCAL_ZONE_PX: 140
   };
 
+  var lineWrapper = document.getElementById('transitionLine');
+  var dividerEl = document.getElementById('transitionLineDivider');
   var bodyEl = document.getElementById('transitionLineBody');
-  var paragraphs = bodyEl.querySelectorAll('p');
-  var numLines = paragraphs.length;
-  var centerIdx = (numLines - 1) / 2;
+  var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
+
+  // The Header (Item 0) + 5 Paragraphs = 6 unified drift items
+  var driftItems = [dividerEl].concat(paragraphs);
+  var totalItems = driftItems.length; // 6
+  var centerIdx = (totalItems - 1) / 2; // Exact geometric center: 2.5
 
   function updateDriftEffects() {
     var vh = window.innerHeight;
     var vc = vh / 2;
-    var rect = bodyEl.getBoundingClientRect();
-    var bodyCentre = rect.top + rect.height / 2;
-    var d = bodyCentre - vc;
+    var rect = lineWrapper.getBoundingClientRect();
+    var blockCenter = rect.top + rect.height / 2;
 
+    // 'd' is the signed pixel distance from the center of the viewport
+    var d = blockCenter - vc;
+
+    // Toggle warm radial glow
     if (Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX) {
       bodyEl.classList.add('centered');
     } else {
@@ -203,30 +229,48 @@
     }
 
     var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR;
+    var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
-    for (var i = 0; i < numLines; i++) {
-      var p = paragraphs[i];
+    for (var i = 0; i < totalItems; i++) {
+      var item = driftItems[i];
+
+      // lineDistFromCenter:
+      // i = 0 (Divider):   -2.5
+      // i = 1 (Para 1):    -1.5
+      // i = 2 (Para 2):    -0.5
+      // i = 3 (Para 3):    +0.5
+      // i = 4 (Para 4):    +1.5
+      // i = 5 (Para 5):    +2.5
       var lineDistFromCenter = i - centerIdx;
+
+      // Uniform relative expansion: every line expands with identical delta
       var relativeSeparation = lineDistFromCenter * (d * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
 
-      if (relativeSeparation > DRIFT_CONFIG.MAX_LINE_SPREAD_PX) {
-        relativeSeparation = DRIFT_CONFIG.MAX_LINE_SPREAD_PX;
-      } else if (relativeSeparation < -DRIFT_CONFIG.MAX_LINE_SPREAD_PX) {
-        relativeSeparation = -DRIFT_CONFIG.MAX_LINE_SPREAD_PX;
+      // Proportional clamping: prevents inner lines from bunching into outer lines
+      var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
+      if (relativeSeparation > itemMaxSpread) {
+        relativeSeparation = itemMaxSpread;
+      } else if (relativeSeparation < -itemMaxSpread) {
+        relativeSeparation = -itemMaxSpread;
       }
 
-      var totalLineY = globalShift + relativeSeparation;
-      var swayDir = (i % 2 === 0) ? 1 : -1;
-      var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
-      var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX;
+      var totalY = globalShift + relativeSeparation;
 
-      p.style.transform = 'translate3d(' + swayX.toFixed(2) + 'px, ' + totalLineY.toFixed(2) + 'px, 0)';
+      // Horizontal sway (halved for the header to keep the ornamental bar stable)
+      var swayMultiplier = (i === 0) ? 0.35 : 1.0;
+      var swayDir = (i % 2 === 0) ? 1 : -1;
+      var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier;
+
+      // 2D translate avoids triggering Chromium GPU tile-culling on rapid flings
+      item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
     }
 
+    // Update HUD Stats
     document.getElementById('statDelta').textContent = Math.round(d) + 'px';
     document.getElementById('statFocal').textContent = Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX ? 'Centered (❀ In Focus)' : 'Floating (Drifting)';
   }
 
+  // RAF loop for smooth 120Hz sync
   var rafPending = false;
   window.addEventListener('scroll', function() {
     if (rafPending) return;
@@ -240,6 +284,7 @@
   window.addEventListener('resize', updateDriftEffects);
   updateDriftEffects();
 
+  // HUD bindings
   function bindInput(id, valId, configKey, unit) {
     var input = document.getElementById(id);
     var label = document.getElementById(valId);
