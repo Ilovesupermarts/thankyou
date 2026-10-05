@@ -2630,7 +2630,7 @@ var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.05,
   MAX_LINE_SPREAD_PX: 55,       /* defensive clamp — not reached under envelope */
   GLOBAL_DRIFT_FACTOR: 0.14,
-  HORIZONTAL_SWAY_PX: 10,
+  HORIZONTAL_SWAY_PX: 22,
   CORE_ZONE_PX: 200,            /* Full 100% linear drift zone around center */
   MAX_ZONE_PX: 460              /* Boundary where drift eases cleanly to 0 */
 };
