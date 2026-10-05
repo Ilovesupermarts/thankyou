@@ -655,7 +655,8 @@
      text. The only scroll-linked effect is the accordion drift,
      which is applied per-item (divider + each paragraph) as an
      inline transform from updateTransitionBodyEffects() in app.js.
-     No entrance animation, no directional fades, no glow. */
+     No entrance animation, no directional fades, no reveal, no
+     glow. Text renders at full opacity alongside the header. */
   .transition-line {
     text-align: center; padding: 0 32px 40px 32px; margin-top: 4px;
     font-size: 18px; font-weight: 500; color: var(--accent);
@@ -691,30 +692,19 @@
     white-space: nowrap;
   }
 
-  /* Paragraph base. Opacity-only reveal via .revealed (set by the
-     IntersectionObserver in app.js). Transform is driven
-     exclusively by JS — the accordion drift writes an inline
-     translate() on each item. No CSS transition on transform, or
-     rapid scrolls would fling paragraphs off-screen. */
+  /* v1.3: paragraphs render immediately alongside the header.
+     No opacity transition, no .revealed class, no IntersectionObserver.
+     Transform is written exclusively by JS (accordion drift) and the
+     CSS rule carries no transform transition so the motion tracks
+     scroll frame-for-frame. */
   .transition-line-body p {
     margin: 0 0 0.9em 0;
-    opacity: 0;
+    opacity: 1;
     transform: none;
-    transition: opacity 750ms ease;
     transform-origin: 50% 50%;
     will-change: transform;
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
-  .transition-line-body p.revealed {
-    opacity: 1;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .transition-line-body p {
-      opacity: 1;
-      transition: none;
-    }
-  }
 
   /* ============ TABLE ============ */
   .divider { display: flex; align-items: center; gap: 12px; margin: 0 32px 16px 32px; opacity: 0; transform: translateY(24px); transition: opacity 0.9s ease, transform 0.9s ease; }
