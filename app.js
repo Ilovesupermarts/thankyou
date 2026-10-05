@@ -47,6 +47,11 @@
              ease-out to zero across CORE_ZONE_PX < |d| <
              MAX_ZONE_PX (460). Zero drift beyond MAX_ZONE_PX and
              at scrollY = 0.
+           * Resting gaps tightened in main.css (paragraph 0.9em
+             → 0.35em, divider 19px → 10px). LINE_SPREAD_FACTOR
+             doubled 0.05 → 0.10 and GLOBAL_DRIFT_FACTOR eased
+             0.14 → 0.10 so the fan reads as the dominant motion
+             at the same total travel.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -2614,19 +2619,29 @@ function wrapTransitionBody() {
      |d| >= MAX_ZONE_PX          : transforms are cleared to
                                     natural layout.
 
-   Under this envelope, the total displacement of any item is capped
-   near 48px at the core boundary. This bounds the header's upward
-   travel (so it cannot intrude on Panel 4's scroll hint on
-   approach) and paragraph 4's downward travel (so it cannot
-   overlap the service table on exit).
+   v1.3: the resting gaps in main.css were tightened (paragraph
+   0.9em → 0.35em, divider 19px → 10px) so the fan opens from a
+   closer rest. The fan was doubled (LINE_SPREAD_FACTOR 0.05 →
+   0.10) and GLOBAL_DRIFT_FACTOR eased 0.14 → 0.10 to hold total
+   travel near 70px — still well clear of the ~120px the
+   unconditional linear drift produced before the envelope existed.
+   That bounds the header's upward travel (so it cannot intrude on
+   Panel 4's scroll hint on approach) and paragraph 4's downward
+   travel (so it cannot overlap the service table on exit).
+
+   At the core boundary with these values: adjacent-gap delta ~20px,
+   outermost relativeSeparation ~±50px, globalShift ~20px. The
+   paragraph gap reads ~7px at rest and ~27px at peak — the fan is
+   now the dominant visible motion, where previously the authored
+   gap dominated.
 
    Transform is written via JS only. main.css carries no
    transform transition on these elements, so motion tracks
    scroll frame-for-frame instead of easing toward a target. */
 var DRIFT_CONFIG = {
-  LINE_SPREAD_FACTOR: 0.05,
-  MAX_LINE_SPREAD_PX: 55,       /* defensive clamp — not reached under envelope */
-  GLOBAL_DRIFT_FACTOR: 0.14,
+  LINE_SPREAD_FACTOR: 0.10,     /* v1.3: doubled from 0.05 for prominent fanning. */
+  MAX_LINE_SPREAD_PX: 80,       /* v1.3: 55 → 80, keeps the clamp clear of the envelope's working band. */
+  GLOBAL_DRIFT_FACTOR: 0.10,    /* v1.3: 0.14 → 0.10. Shifts the motion ratio toward fan-over-block. */
   HORIZONTAL_SWAY_PX: 22,
   CORE_ZONE_PX: 200,            /* Full 100% linear drift zone around center */
   MAX_ZONE_PX: 460              /* Boundary where drift eases cleanly to 0 */
