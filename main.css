@@ -665,12 +665,15 @@
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
+  /* v1.3: divider resting margin tightened 19 → 10px so the
+     accordion fan opens from a closer rest and the fanning reads
+     as the dominant motion. */
   .transition-line-divider {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin: 0 0 19px 0; /* Tuned resting gap */
+  margin: 0 0 10px 0; /* Tightened from 19px */
   will-change: transform;
 }
   .transition-line-mark {
@@ -697,9 +700,14 @@
      No opacity transition, no .revealed class, no IntersectionObserver.
      Transform is written exclusively by JS (accordion drift) and the
      CSS rule carries no transform transition so the motion tracks
-     scroll frame-for-frame. */
+     scroll frame-for-frame.
+
+     Resting margin tightened 0.9em → 0.35em: at 18px this is a
+     ~6.3px gap at rest, which the doubled fan (LINE_SPREAD_FACTOR
+     0.10) opens to ~27px at the core-zone boundary. The fan, not
+     the authored gap, now supplies the separation. */
   .transition-line-body p {
-    margin: 0 0 0.9em 0;
+    margin: 0 0 0.35em 0; /* Tightened from 0.9em */
     opacity: 1;
     transform: none;
     transform-origin: 50% 50%;
