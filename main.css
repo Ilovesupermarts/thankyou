@@ -666,12 +666,13 @@
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
   .transition-line-divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 0 0 19px 0; /* Tuned resting gap */
-  }
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0 0 19px 0; /* Tuned resting gap */
+  will-change: transform;
+}
   .transition-line-mark {
     flex-shrink: 0;
     font-size: 1.1em;
