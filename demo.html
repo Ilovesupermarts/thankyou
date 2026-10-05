@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#fdf3d8">
-<title>Ambient Demo — Orbs &amp; Leaves</title>
+<title>Washi Watermark Demo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,59 +12,43 @@
 
 <style>
 /* ============================================================
-   DEMO — standalone ambient tuner, v2
+   WASHI WATERMARK DEMO — v1
    ------------------------------------------------------------
-   v2 fix: the previous version used rgba(var(--rgb-triplet),
-   var(--alpha)) inside the orb gradients. That pattern relies on
-   the browser splicing a comma-separated variable into an rgba()
-   call — supported on recent Chrome, unreliable on Samsung
-   Internet and other Chromium forks. When it fails, the whole
-   background declaration is dropped and the orbs render with no
-   background at all, leaving only the flat html/body fill.
+   Exact same ambient stage, ambient mesh, and falling leaves as
+   the real app. Adds the giant stroke-only maple watermark as a
+   new layer. Every tunable value is exposed as a slider or a
+   dropdown at the right.
 
-   v2 stores the complete rgba() string in each variable and
-   writes new complete strings from JS when sliders change. No
-   comma splicing anywhere. Works in every browser.
-
-   Also fixes the layering: html carries the cream fallback, body
-   is transparent, and the ambient stage sits above both.
+   When you land on a look you like, tap Copy CSS. The readout
+   contains the exact values to paste into main.css.
    ============================================================ */
 
   :root {
-    /* Tunable mesh-wide values */
-    --mesh-opacity: 0.55;
-    --travel-scale: 1;
-    --scale-amp: 1;
-    --speed-scale: 1;
+    /* ---- Ambient mesh (matches current main.css) ---- */
+    --mesh-opacity: 0.43;
 
-    /* Orb 1 — complete rgba() strings, rewritten by JS */
-    --orb1-core: rgba(247, 185, 60, 0.50);
-    --orb1-halo: rgba(247, 185, 60, 0.18);
-    --orb1-halo-stop: 42%;
-    --orb1-fade-stop: 70%;
-
-    --orb2-core: rgba(224, 115, 25, 0.42);
-    --orb2-halo: rgba(217, 94, 26, 0.14);
-    --orb2-halo-stop: 48%;
-    --orb2-fade-stop: 72%;
-
-    --orb3-core: rgba(255, 214, 130, 0.40);
-    --orb3-halo: rgba(253, 240, 200, 0.12);
-    --orb3-halo-stop: 40%;
-    --orb3-fade-stop: 68%;
-
-    /* Leaf tunables */
+    /* ---- Falling leaves (matches current main.css) ---- */
     --leaf-size-scale: 1;
     --leaf-duration-scale: 1;
     --leaf-drift-scale: 1;
-    --leaf-opacity: 0.95;
+    --leaf-opacity: 0.30;
+
+    /* ---- Washi watermark tunables ---- */
+    --washi-size: 140;          /* in vw */
+    --washi-offset-x: 30;       /* in vw, positive = further off right edge */
+    --washi-offset-y: 30;       /* in vh, positive = further off bottom edge */
+    --washi-opacity: 0.06;
+    --washi-stroke-width: 1.5;  /* in CSS px, non-scaling */
+    --washi-rotate-start: -1;   /* degrees */
+    --washi-rotate-end: 1;      /* degrees */
+    --washi-scale-end: 1.05;    /* scale at end of breathe */
+    --washi-duration: 24;       /* seconds */
+    --washi-color: rgba(201, 86, 27, 1);
+    --washi-corner: bottom-right; /* controlled by dropdown, not CSS var directly */
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-  /* html carries the fallback cream; body is transparent so the
-     fixed ambient stage (z-index -2) is not occluded by body's own
-     background paint. */
   html {
     background-color: #fdf3d8;
     -webkit-text-size-adjust: 100%;
@@ -80,18 +64,17 @@
     overscroll-behavior: none;
   }
 
-  /* ============ AMBIENT STAGE ============ */
+  /* ============ AMBIENT STAGE — copied from main.css ============ */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
     width: 150%; height: 150%;
-    z-index: -1;
+    z-index: -2;
     pointer-events: none;
     overflow: hidden;
   }
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
 
-  /* Primary warm wash — matches main.css autumn theme */
   .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
@@ -141,78 +124,101 @@
     pointer-events: none;
     opacity: var(--mesh-opacity);
   }
-
   .light-orb {
     position: absolute;
     border-radius: 50%;
     pointer-events: none;
     will-change: transform;
   }
-
   .orb-1 {
     width: 70vw; height: 70vw;
     max-width: 900px; max-height: 900px;
     top: 10%; left: 15%;
-    background: radial-gradient(circle,
-      var(--orb1-core) 0%,
-      var(--orb1-halo) var(--orb1-halo-stop),
-      transparent var(--orb1-fade-stop));
-    animation: orbDrift1 calc(22s / var(--speed-scale)) ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
+    animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
   .orb-2 {
     width: 80vw; height: 80vw;
     max-width: 1050px; max-height: 1050px;
     top: 35%; right: 5%;
-    background: radial-gradient(circle,
-      var(--orb2-core) 0%,
-      var(--orb2-halo) var(--orb2-halo-stop),
-      transparent var(--orb2-fade-stop));
-    animation: orbDrift2 calc(29s / var(--speed-scale)) ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
+    animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
   .orb-3 {
     width: 55vw; height: 55vw;
     max-width: 700px; max-height: 700px;
     bottom: 10%; left: 30%;
-    background: radial-gradient(circle,
-      var(--orb3-core) 0%,
-      var(--orb3-halo) var(--orb3-halo-stop),
-      transparent var(--orb3-fade-stop));
-    animation: orbDrift3 calc(19s / var(--speed-scale)) ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
+    animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
-
   @keyframes orbDrift1 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform:
-             translate3d(calc(8% * var(--travel-scale)), calc(-6% * var(--travel-scale)), 0)
-             scale(calc(1 + 0.12 * var(--scale-amp)))
-             rotate(4deg); }
-    100% { transform:
-             translate3d(calc(-5% * var(--travel-scale)), calc(8% * var(--travel-scale)), 0)
-             scale(calc(1 - 0.06 * var(--scale-amp)))
-             rotate(-3deg); }
+    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
+    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
   }
   @keyframes orbDrift2 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform:
-             translate3d(calc(-9% * var(--travel-scale)), calc(7% * var(--travel-scale)), 0)
-             scale(calc(1 + 0.08 * var(--scale-amp)))
-             rotate(-5deg); }
-    100% { transform:
-             translate3d(calc(6% * var(--travel-scale)), calc(-8% * var(--travel-scale)), 0)
-             scale(calc(1 - 0.04 * var(--scale-amp)))
-             rotate(3deg); }
+    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
+    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
   }
   @keyframes orbDrift3 {
     0%   { transform: translate3d(0, 0, 0) scale(1); }
-    50%  { transform:
-             translate3d(calc(6% * var(--travel-scale)), calc(5% * var(--travel-scale)), 0)
-             scale(calc(1 + 0.15 * var(--scale-amp))); }
-    100% { transform:
-             translate3d(calc(-7% * var(--travel-scale)), calc(-4% * var(--travel-scale)), 0)
-             scale(calc(1 - 0.08 * var(--scale-amp))); }
+    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
+    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
   }
 
-  /* ============ MAPLE LEAVES ============ */
+  /* ============ WASHI WATERMARK ============
+     A single giant stroke-only outline of the maple leaf, anchored
+     off one corner so only 3-4 lobes bleed into the viewport. Sits
+     at z-index -1 — above the ambient stage (-2), below every
+     piece of content. Gated to autumn. Pulses very slowly. */
+  .washi-watermark {
+    position: fixed;
+    z-index: -1;
+    pointer-events: none;
+    width: calc(var(--washi-size) * 1vw);
+    max-width: 1600px;
+    height: auto;
+    opacity: var(--washi-opacity);
+    animation: washiBreathe calc(var(--washi-duration) * 1s) ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  .washi-watermark svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .washi-watermark path {
+    fill: none;
+    stroke: var(--washi-color);
+    stroke-width: var(--washi-stroke-width);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  /* Corner anchoring — controlled by data-corner attribute set by JS. */
+  .washi-watermark[data-corner="bottom-right"] {
+    bottom: calc(var(--washi-offset-y) * -1vh);
+    right: calc(var(--washi-offset-x) * -1vw);
+  }
+  .washi-watermark[data-corner="bottom-left"] {
+    bottom: calc(var(--washi-offset-y) * -1vh);
+    left: calc(var(--washi-offset-x) * -1vw);
+  }
+  .washi-watermark[data-corner="top-right"] {
+    top: calc(var(--washi-offset-y) * -1vh);
+    right: calc(var(--washi-offset-x) * -1vw);
+  }
+  .washi-watermark[data-corner="top-left"] {
+    top: calc(var(--washi-offset-y) * -1vh);
+    left: calc(var(--washi-offset-x) * -1vw);
+  }
+  @keyframes washiBreathe {
+    0%   { transform: scale(1) rotate(calc(var(--washi-rotate-start) * 1deg)); }
+    100% { transform: scale(var(--washi-scale-end)) rotate(calc(var(--washi-rotate-end) * 1deg)); }
+  }
+
+  /* ============ MAPLE LEAVES — matches main.css ============ */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
@@ -229,17 +235,17 @@
     top: -60px;
     pointer-events: none;
     will-change: transform;
-    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.22));
+    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.07));
     opacity: var(--leaf-opacity);
   }
 
-  .leaf-1 { width: calc(34px * var(--leaf-size-scale)); height: calc(34px * var(--leaf-size-scale)); fill: #b83b1d; left: 8%;   animation: mapleDriftA calc(11s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
-  .leaf-2 { width: calc(42px * var(--leaf-size-scale)); height: calc(42px * var(--leaf-size-scale)); fill: #d46a15; left: 24%;  animation: mapleDriftB calc(14s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
-  .leaf-3 { width: calc(30px * var(--leaf-size-scale)); height: calc(30px * var(--leaf-size-scale)); fill: #e59b24; left: 42%;  animation: mapleDriftC calc(10s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-4 { width: calc(44px * var(--leaf-size-scale)); height: calc(44px * var(--leaf-size-scale)); fill: #8f2229; left: 58%;  animation: mapleDriftA calc(13s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
-  .leaf-5 { width: calc(36px * var(--leaf-size-scale)); height: calc(36px * var(--leaf-size-scale)); fill: #c9561b; left: 74%;  animation: mapleDriftB calc(12s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
-  .leaf-6 { width: calc(28px * var(--leaf-size-scale)); height: calc(28px * var(--leaf-size-scale)); fill: #dd8418; left: 88%;  animation: mapleDriftC calc(9.5s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
-  .leaf-7 { width: calc(38px * var(--leaf-size-scale)); height: calc(38px * var(--leaf-size-scale)); fill: #a32e18; left: 35%;  animation: mapleDriftA calc(15s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+  .leaf-1 { width: calc(51px * var(--leaf-size-scale)); height: calc(51px * var(--leaf-size-scale)); fill: #b83b1d; left: 8%;   animation: mapleDriftA calc(11s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: calc(63px * var(--leaf-size-scale)); height: calc(63px * var(--leaf-size-scale)); fill: #d46a15; left: 24%;  animation: mapleDriftB calc(14s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: calc(45px * var(--leaf-size-scale)); height: calc(45px * var(--leaf-size-scale)); fill: #e59b24; left: 42%;  animation: mapleDriftC calc(10s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-4 { width: calc(66px * var(--leaf-size-scale)); height: calc(66px * var(--leaf-size-scale)); fill: #8f2229; left: 58%;  animation: mapleDriftA calc(13s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
+  .leaf-5 { width: calc(54px * var(--leaf-size-scale)); height: calc(54px * var(--leaf-size-scale)); fill: #c9561b; left: 74%;  animation: mapleDriftB calc(12s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-6 { width: calc(42px * var(--leaf-size-scale)); height: calc(42px * var(--leaf-size-scale)); fill: #dd8418; left: 88%;  animation: mapleDriftC calc(9.5s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-7 { width: calc(57px * var(--leaf-size-scale)); height: calc(57px * var(--leaf-size-scale)); fill: #a32e18; left: 35%;  animation: mapleDriftA calc(15s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
 
   @keyframes mapleDriftA {
     0%   { transform: translate3d(0, -60px, 0) rotate(-15deg); opacity: 0; }
@@ -264,6 +270,68 @@
     50%  { transform: translate3d(calc(-20px * var(--leaf-drift-scale)), 54vh, 0) rotate(-22deg); }
     72%  { transform: translate3d(calc(28px * var(--leaf-drift-scale)), 80vh, 0) rotate(44deg); opacity: 0.95; }
     100% { transform: translate3d(calc(-10px * var(--leaf-drift-scale)), 115vh, 0) rotate(85deg); opacity: 0; }
+  }
+
+  /* ============ PREVIEW MOCK TEXT ============ */
+  .preview-text {
+    position: fixed;
+    top: 50%; left: 25%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    max-width: 45vw;
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+    color: #231304;
+    font-size: 18px;
+    line-height: 2.2;
+    letter-spacing: 0.4px;
+    font-weight: 500;
+    text-shadow: 0 1px 12px rgba(253, 240, 200, 0.6);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .preview-text.shown { opacity: 1; }
+  .preview-text .name {
+    font-weight: 600;
+    font-size: 1.18em;
+    color: #8f2f00;
+    letter-spacing: 2px;
+  }
+
+  .preview-toolbar {
+    position: fixed;
+    top: 18px; left: 18px;
+    z-index: 400;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: calc(100vw - 440px);
+  }
+  .toolbar-btn {
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 20px;
+    border: 1.5px solid rgba(216, 180, 120, 0.8);
+    background-color: rgba(253, 245, 224, 0.95);
+    color: #8f3f12;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-appearance: none;
+    appearance: none;
+    box-shadow: 0 2px 8px rgba(120, 70, 20, 0.12);
+  }
+  .toolbar-btn:active { transform: scale(0.96); }
+  .toolbar-btn.active {
+    background-color: #c9600a;
+    color: #ffffff;
+    border-color: #c9600a;
+  }
+  .toolbar-btn.reset {
+    color: #7a5028;
+    border-color: rgba(216, 180, 120, 0.5);
   }
 
   /* ============ CONTROL PANEL ============ */
@@ -348,6 +416,17 @@
     background-position: right 6px center;
     background-size: 8px 6px;
   }
+  input[type="color"] {
+    width: 100%;
+    height: 30px;
+    border: 1px solid rgba(216, 180, 120, 0.8);
+    border-radius: 6px;
+    background: #fdf5e0;
+    padding: 2px;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
 
   .divider {
     height: 1px;
@@ -368,7 +447,7 @@
     margin-top: 12px;
     user-select: text;
     -webkit-user-select: text;
-    max-height: 320px;
+    max-height: 340px;
     overflow-y: auto;
   }
   .readout-actions {
@@ -408,65 +487,6 @@
   }
   .status.shown { opacity: 1; }
 
-  .preview-text {
-    position: fixed;
-    top: 50%; left: 25%;
-    transform: translate(-50%, -50%);
-    width: 480px;
-    max-width: 45vw;
-    text-align: center;
-    z-index: 100;
-    pointer-events: none;
-    color: #231304;
-    font-size: 18px;
-    line-height: 2.2;
-    letter-spacing: 0.4px;
-    font-weight: 500;
-    text-shadow: 0 1px 12px rgba(253, 240, 200, 0.6);
-    opacity: 0;
-    transition: opacity 0.4s ease;
-  }
-  .preview-text.shown { opacity: 1; }
-  .preview-text .name {
-    font-weight: 600;
-    font-size: 1.18em;
-    color: #8f2f00;
-    letter-spacing: 2px;
-  }
-
-  .preview-toolbar {
-    position: fixed;
-    top: 18px; left: 18px;
-    z-index: 400;
-    display: flex;
-    gap: 8px;
-  }
-  .toolbar-btn {
-    font-family: inherit;
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 8px 12px;
-    border-radius: 20px;
-    border: 1.5px solid rgba(216, 180, 120, 0.8);
-    background-color: rgba(253, 245, 224, 0.95);
-    color: #8f3f12;
-    cursor: pointer;
-    letter-spacing: 1px;
-    -webkit-appearance: none;
-    appearance: none;
-    box-shadow: 0 2px 8px rgba(120, 70, 20, 0.12);
-  }
-  .toolbar-btn:active { transform: scale(0.96); }
-  .toolbar-btn.active {
-    background-color: #c9600a;
-    color: #ffffff;
-    border-color: #c9600a;
-  }
-  .toolbar-btn.reset {
-    color: #7a5028;
-    border-color: rgba(216, 180, 120, 0.5);
-  }
-
   @media (max-height: 700px) {
     .panel { width: 340px; padding: 16px 18px 40px 18px; font-size: 12px; }
     .row { grid-template-columns: 100px 1fr 48px; margin-bottom: 8px; }
@@ -487,6 +507,13 @@
   </div>
 </div>
 
+<!-- ============ WASHI WATERMARK ============ -->
+<div class="washi-watermark" id="washiWatermark" data-corner="bottom-right" aria-hidden="true">
+  <svg viewBox="0 0 900 1000" preserveAspectRatio="xMidYMid meet">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+</div>
+
 <!-- ============ MAPLE LEAVES ============ -->
 <div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
@@ -498,7 +525,7 @@
   <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
 </div>
 
-<!-- ============ PREVIEW MOCK PANEL TEXT ============ -->
+<!-- ============ PREVIEW TEXT ============ -->
 <div class="preview-text" id="previewText">
   <span class="name">桜庭さん</span>、初めまして。<br>
   本日はお忙しい中、<br>
@@ -510,191 +537,84 @@
 <div class="preview-toolbar">
   <button type="button" class="toolbar-btn" id="togglePreview">見本テキスト</button>
   <button type="button" class="toolbar-btn active" id="toggleLeaves">落ち葉 ON</button>
+  <button type="button" class="toolbar-btn active" id="toggleWashi">透かし ON</button>
   <button type="button" class="toolbar-btn reset" id="resetAll">リセット</button>
 </div>
 
 <!-- ============ CONTROL PANEL ============ -->
 <div class="panel">
-  <h1>Ambient Demo</h1>
-  <p class="subtitle">触って決めてください。数値は下の枠からコピーできます。</p>
+  <h1>Washi Watermark</h1>
+  <p class="subtitle">透かしの見え方を調整してください。数値は下の枠からコピーできます。</p>
 
   <div class="section">
-    <div class="section-title">Mesh</div>
+    <div class="section-title">Position</div>
+    <div class="row">
+      <label>Corner</label>
+      <select id="washiCorner">
+        <option value="bottom-right" selected>bottom-right</option>
+        <option value="bottom-left">bottom-left</option>
+        <option value="top-right">top-right</option>
+        <option value="top-left">top-left</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Size (vw)</label>
+      <input type="range" id="washiSize" min="80" max="220" step="5" value="140">
+      <span class="val" id="washiSizeVal">140</span>
+    </div>
+    <div class="row">
+      <label>Offset X (vw)</label>
+      <input type="range" id="washiOffsetX" min="-10" max="60" step="1" value="30">
+      <span class="val" id="washiOffsetXVal">30</span>
+    </div>
+    <div class="row">
+      <label>Offset Y (vh)</label>
+      <input type="range" id="washiOffsetY" min="-10" max="60" step="1" value="30">
+      <span class="val" id="washiOffsetYVal">30</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Style</div>
     <div class="row">
       <label>Opacity</label>
-      <input type="range" id="meshOpacity" min="0.2" max="0.9" step="0.01" value="0.55">
-      <span class="val" id="meshOpacityVal">0.55</span>
+      <input type="range" id="washiOpacity" min="0.01" max="0.20" step="0.005" value="0.06">
+      <span class="val" id="washiOpacityVal">0.060</span>
     </div>
     <div class="row">
-      <label>Travel</label>
-      <input type="range" id="travelScale" min="0.5" max="3.0" step="0.05" value="1.00">
-      <span class="val" id="travelScaleVal">1.00</span>
+      <label>Stroke (px)</label>
+      <input type="range" id="washiStrokeWidth" min="0.5" max="4.0" step="0.1" value="1.5">
+      <span class="val" id="washiStrokeWidthVal">1.5</span>
     </div>
     <div class="row">
-      <label>Scale amp</label>
-      <input type="range" id="scaleAmp" min="1.0" max="2.5" step="0.05" value="1.00">
-      <span class="val" id="scaleAmpVal">1.00</span>
-    </div>
-    <div class="row">
-      <label>Speed</label>
-      <input type="range" id="speedScale" min="0.5" max="2.5" step="0.05" value="1.00">
-      <span class="val" id="speedScaleVal">1.00</span>
+      <label>Colour</label>
+      <input type="color" id="washiColor" value="#c9561b">
+      <span class="val"></span>
     </div>
   </div>
 
   <div class="section">
-    <div class="section-title">Orb 1</div>
+    <div class="section-title">Breathing</div>
     <div class="row">
-      <label>Core</label>
-      <select id="orb1Core">
-        <option value="247,185,60" selected>247,185,60 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
+      <label>Duration (s)</label>
+      <input type="range" id="washiDuration" min="8" max="60" step="1" value="24">
+      <span class="val" id="washiDurationVal">24</span>
     </div>
     <div class="row">
-      <label>Core α</label>
-      <input type="range" id="orb1CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.50">
-      <span class="val" id="orb1CoreAlphaVal">0.50</span>
+      <label>Start rot (°)</label>
+      <input type="range" id="washiRotateStart" min="-4" max="4" step="0.5" value="-1">
+      <span class="val" id="washiRotateStartVal">-1.0</span>
     </div>
     <div class="row">
-      <label>Halo</label>
-      <select id="orb1Halo">
-        <option value="247,185,60" selected>247,185,60 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
+      <label>End rot (°)</label>
+      <input type="range" id="washiRotateEnd" min="-4" max="4" step="0.5" value="1">
+      <span class="val" id="washiRotateEndVal">1.0</span>
     </div>
     <div class="row">
-      <label>Halo α</label>
-      <input type="range" id="orb1HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.18">
-      <span class="val" id="orb1HaloAlphaVal">0.18</span>
-    </div>
-    <div class="row">
-      <label>Halo stop</label>
-      <input type="range" id="orb1HaloStop" min="20" max="70" step="1" value="42">
-      <span class="val" id="orb1HaloStopVal">42%</span>
-    </div>
-    <div class="row">
-      <label>Fade stop</label>
-      <input type="range" id="orb1FadeStop" min="50" max="95" step="1" value="70">
-      <span class="val" id="orb1FadeStopVal">70%</span>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Orb 2</div>
-    <div class="row">
-      <label>Core</label>
-      <select id="orb2Core">
-        <option value="224,115,25" selected>224,115,25 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
-    </div>
-    <div class="row">
-      <label>Core α</label>
-      <input type="range" id="orb2CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.42">
-      <span class="val" id="orb2CoreAlphaVal">0.42</span>
-    </div>
-    <div class="row">
-      <label>Halo</label>
-      <select id="orb2Halo">
-        <option value="217,94,26" selected>217,94,26 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
-    </div>
-    <div class="row">
-      <label>Halo α</label>
-      <input type="range" id="orb2HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.14">
-      <span class="val" id="orb2HaloAlphaVal">0.14</span>
-    </div>
-    <div class="row">
-      <label>Halo stop</label>
-      <input type="range" id="orb2HaloStop" min="20" max="70" step="1" value="48">
-      <span class="val" id="orb2HaloStopVal">48%</span>
-    </div>
-    <div class="row">
-      <label>Fade stop</label>
-      <input type="range" id="orb2FadeStop" min="50" max="95" step="1" value="72">
-      <span class="val" id="orb2FadeStopVal">72%</span>
-    </div>
-  </div>
-
-  <div class="section">
-    <div class="section-title">Orb 3</div>
-    <div class="row">
-      <label>Core</label>
-      <select id="orb3Core">
-        <option value="255,214,130" selected>255,214,130 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
-    </div>
-    <div class="row">
-      <label>Core α</label>
-      <input type="range" id="orb3CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.40">
-      <span class="val" id="orb3CoreAlphaVal">0.40</span>
-    </div>
-    <div class="row">
-      <label>Halo</label>
-      <select id="orb3Halo">
-        <option value="253,240,200" selected>253,240,200 (現行)</option>
-        <option value="143,34,41">143,34,41 #8f2229</option>
-        <option value="163,46,24">163,46,24 #a32e18</option>
-        <option value="184,59,29">184,59,29 #b83b1d</option>
-        <option value="201,86,27">201,86,27 #c9561b</option>
-        <option value="212,106,21">212,106,21 #d46a15</option>
-        <option value="221,132,24">221,132,24 #dd8418</option>
-        <option value="229,155,36">229,155,36 #e59b24</option>
-      </select>
-      <span class="val"></span>
-    </div>
-    <div class="row">
-      <label>Halo α</label>
-      <input type="range" id="orb3HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.12">
-      <span class="val" id="orb3HaloAlphaVal">0.12</span>
-    </div>
-    <div class="row">
-      <label>Halo stop</label>
-      <input type="range" id="orb3HaloStop" min="20" max="70" step="1" value="40">
-      <span class="val" id="orb3HaloStopVal">40%</span>
-    </div>
-    <div class="row">
-      <label>Fade stop</label>
-      <input type="range" id="orb3FadeStop" min="50" max="95" step="1" value="68">
-      <span class="val" id="orb3FadeStopVal">68%</span>
+      <label>End scale</label>
+      <input type="range" id="washiScaleEnd" min="1.00" max="1.15" step="0.005" value="1.05">
+      <span class="val" id="washiScaleEndVal">1.050</span>
     </div>
   </div>
 
@@ -717,8 +637,17 @@
     </div>
     <div class="row">
       <label>Opacity</label>
-      <input type="range" id="leafOpacity" min="0.30" max="1.00" step="0.01" value="0.95">
-      <span class="val" id="leafOpacityVal">0.95</span>
+      <input type="range" id="leafOpacity" min="0.10" max="1.00" step="0.01" value="0.30">
+      <span class="val" id="leafOpacityVal">0.30</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Mesh</div>
+    <div class="row">
+      <label>Opacity</label>
+      <input type="range" id="meshOpacity" min="0.20" max="0.90" step="0.01" value="0.43">
+      <span class="val" id="meshOpacityVal">0.43</span>
     </div>
   </div>
 
@@ -733,272 +662,178 @@
 </div>
 
 <script>
-/* ============================================================
-   DEMO SCRIPT — v2
-   ------------------------------------------------------------
-   Each orb's core and halo are written as complete rgba() strings
-   into CSS custom properties. When a colour dropdown or alpha
-   slider changes, JS rebuilds the full rgba() string and writes
-   it via setProperty. No comma splicing at the CSS level, so the
-   gradient remains valid on every browser.
-   ============================================================ */
 (function() {
   'use strict';
 
   var root = document.documentElement;
-
-  /* ---------------- Palette (leaf colours + current orb colours) ------ */
-  var COLOURS = {
-    '247,185,60': { rgb: '247,185,60' },   /* current orb 1 core */
-    '224,115,25': { rgb: '224,115,25' },   /* current orb 2 core */
-    '217,94,26':  { rgb: '217,94,26'  },   /* current orb 2 halo */
-    '255,214,130':{ rgb: '255,214,130'},   /* current orb 3 core */
-    '253,240,200':{ rgb: '253,240,200'},   /* current orb 3 halo */
-    '143,34,41':  { rgb: '143,34,41'  },
-    '163,46,24':  { rgb: '163,46,24'  },
-    '184,59,29':  { rgb: '184,59,29'  },
-    '201,86,27':  { rgb: '201,86,27'  },
-    '212,106,21': { rgb: '212,106,21' },
-    '221,132,24': { rgb: '221,132,24' },
-    '229,155,36': { rgb: '229,155,36' }
-  };
-
-  /* ---------------- Cached DOM refs -------------------------------- */
   function $(id) { return document.getElementById(id); }
 
-  var els = {
-    meshOpacity:    $('meshOpacity'),
-    travelScale:    $('travelScale'),
-    scaleAmp:       $('scaleAmp'),
-    speedScale:     $('speedScale'),
+  var washiEl = $('washiWatermark');
 
-    orb1Core:       $('orb1Core'),
-    orb1CoreAlpha:  $('orb1CoreAlpha'),
-    orb1Halo:       $('orb1Halo'),
-    orb1HaloAlpha:  $('orb1HaloAlpha'),
-    orb1HaloStop:   $('orb1HaloStop'),
-    orb1FadeStop:   $('orb1FadeStop'),
-
-    orb2Core:       $('orb2Core'),
-    orb2CoreAlpha:  $('orb2CoreAlpha'),
-    orb2Halo:       $('orb2Halo'),
-    orb2HaloAlpha:  $('orb2HaloAlpha'),
-    orb2HaloStop:   $('orb2HaloStop'),
-    orb2FadeStop:   $('orb2FadeStop'),
-
-    orb3Core:       $('orb3Core'),
-    orb3CoreAlpha:  $('orb3CoreAlpha'),
-    orb3Halo:       $('orb3Halo'),
-    orb3HaloAlpha:  $('orb3HaloAlpha'),
-    orb3HaloStop:   $('orb3HaloStop'),
-    orb3FadeStop:   $('orb3FadeStop'),
-
-    leafSize:       $('leafSize'),
-    leafDuration:   $('leafDuration'),
-    leafDrift:      $('leafDrift'),
-    leafOpacity:    $('leafOpacity')
-  };
-
-  var readoutEl = $('readout');
-  var statusEl = $('status');
-  var previewText = $('previewText');
-  var leavesOverlay = $('mapleLeaves');
-
-  /* ---------------- Compose a full rgba() string -------------------- */
-  function rgba(rgbTriplet, alpha) {
-    return 'rgba(' + rgbTriplet + ', ' + alpha.toFixed(2) + ')';
+  /* ---------------- Colour helper ---------------------------------- */
+  function hexToRgb(hex) {
+    var m = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    if (!m) return '201, 86, 27';
+    return parseInt(m[1], 16) + ', ' + parseInt(m[2], 16) + ', ' + parseInt(m[3], 16);
   }
 
-  /* ---------------- Write current values to :root and to readout --- */
+  /* ---------------- Apply everything -------------------------------- */
   function applyAll() {
-    var v = {
-      meshOpacity:    parseFloat(els.meshOpacity.value),
-      travelScale:    parseFloat(els.travelScale.value),
-      scaleAmp:       parseFloat(els.scaleAmp.value),
-      speedScale:     parseFloat(els.speedScale.value),
+    /* Washi watermark */
+    var size        = parseFloat($('washiSize').value);
+    var offsetX     = parseFloat($('washiOffsetX').value);
+    var offsetY     = parseFloat($('washiOffsetY').value);
+    var opacity     = parseFloat($('washiOpacity').value);
+    var strokeW     = parseFloat($('washiStrokeWidth').value);
+    var hexColour   = $('washiColor').value;
+    var rgbColour   = hexToRgb(hexColour);
+    var rotateStart = parseFloat($('washiRotateStart').value);
+    var rotateEnd   = parseFloat($('washiRotateEnd').value);
+    var scaleEnd    = parseFloat($('washiScaleEnd').value);
+    var duration    = parseFloat($('washiDuration').value);
+    var corner      = $('washiCorner').value;
 
-      orb1Core:       els.orb1Core.value,
-      orb1CoreAlpha:  parseFloat(els.orb1CoreAlpha.value),
-      orb1Halo:       els.orb1Halo.value,
-      orb1HaloAlpha:  parseFloat(els.orb1HaloAlpha.value),
-      orb1HaloStop:   parseInt(els.orb1HaloStop.value, 10),
-      orb1FadeStop:   parseInt(els.orb1FadeStop.value, 10),
-
-      orb2Core:       els.orb2Core.value,
-      orb2CoreAlpha:  parseFloat(els.orb2CoreAlpha.value),
-      orb2Halo:       els.orb2Halo.value,
-      orb2HaloAlpha:  parseFloat(els.orb2HaloAlpha.value),
-      orb2HaloStop:   parseInt(els.orb2HaloStop.value, 10),
-      orb2FadeStop:   parseInt(els.orb2FadeStop.value, 10),
-
-      orb3Core:       els.orb3Core.value,
-      orb3CoreAlpha:  parseFloat(els.orb3CoreAlpha.value),
-      orb3Halo:       els.orb3Halo.value,
-      orb3HaloAlpha:  parseFloat(els.orb3HaloAlpha.value),
-      orb3HaloStop:   parseInt(els.orb3HaloStop.value, 10),
-      orb3FadeStop:   parseInt(els.orb3FadeStop.value, 10),
-
-      leafSize:       parseFloat(els.leafSize.value),
-      leafDuration:   parseFloat(els.leafDuration.value),
-      leafDrift:      parseFloat(els.leafDrift.value),
-      leafOpacity:    parseFloat(els.leafOpacity.value)
-    };
-
-    /* Mesh-wide */
-    root.style.setProperty('--mesh-opacity', v.meshOpacity.toFixed(2));
-    root.style.setProperty('--travel-scale', v.travelScale.toFixed(2));
-    root.style.setProperty('--scale-amp', v.scaleAmp.toFixed(2));
-    root.style.setProperty('--speed-scale', v.speedScale.toFixed(2));
-
-    /* Orb 1 — full rgba() strings */
-    root.style.setProperty('--orb1-core', rgba(v.orb1Core, v.orb1CoreAlpha));
-    root.style.setProperty('--orb1-halo', rgba(v.orb1Halo, v.orb1HaloAlpha));
-    root.style.setProperty('--orb1-halo-stop', v.orb1HaloStop + '%');
-    root.style.setProperty('--orb1-fade-stop', v.orb1FadeStop + '%');
-
-    /* Orb 2 */
-    root.style.setProperty('--orb2-core', rgba(v.orb2Core, v.orb2CoreAlpha));
-    root.style.setProperty('--orb2-halo', rgba(v.orb2Halo, v.orb2HaloAlpha));
-    root.style.setProperty('--orb2-halo-stop', v.orb2HaloStop + '%');
-    root.style.setProperty('--orb2-fade-stop', v.orb2FadeStop + '%');
-
-    /* Orb 3 */
-    root.style.setProperty('--orb3-core', rgba(v.orb3Core, v.orb3CoreAlpha));
-    root.style.setProperty('--orb3-halo', rgba(v.orb3Halo, v.orb3HaloAlpha));
-    root.style.setProperty('--orb3-halo-stop', v.orb3HaloStop + '%');
-    root.style.setProperty('--orb3-fade-stop', v.orb3FadeStop + '%');
+    root.style.setProperty('--washi-size', size);
+    root.style.setProperty('--washi-offset-x', offsetX);
+    root.style.setProperty('--washi-offset-y', offsetY);
+    root.style.setProperty('--washi-opacity', opacity.toFixed(3));
+    root.style.setProperty('--washi-stroke-width', strokeW.toFixed(1));
+    root.style.setProperty('--washi-color', 'rgba(' + rgbColour + ', 1)');
+    root.style.setProperty('--washi-rotate-start', rotateStart);
+    root.style.setProperty('--washi-rotate-end', rotateEnd);
+    root.style.setProperty('--washi-scale-end', scaleEnd.toFixed(3));
+    root.style.setProperty('--washi-duration', duration);
+    if (washiEl) washiEl.setAttribute('data-corner', corner);
 
     /* Leaves */
-    root.style.setProperty('--leaf-size-scale', v.leafSize.toFixed(2));
-    root.style.setProperty('--leaf-duration-scale', v.leafDuration.toFixed(2));
-    root.style.setProperty('--leaf-drift-scale', v.leafDrift.toFixed(2));
-    root.style.setProperty('--leaf-opacity', v.leafOpacity.toFixed(2));
+    var leafSize     = parseFloat($('leafSize').value);
+    var leafDuration = parseFloat($('leafDuration').value);
+    var leafDrift    = parseFloat($('leafDrift').value);
+    var leafOpacity  = parseFloat($('leafOpacity').value);
+
+    root.style.setProperty('--leaf-size-scale', leafSize.toFixed(2));
+    root.style.setProperty('--leaf-duration-scale', leafDuration.toFixed(2));
+    root.style.setProperty('--leaf-drift-scale', leafDrift.toFixed(2));
+    root.style.setProperty('--leaf-opacity', leafOpacity.toFixed(2));
+
+    /* Mesh */
+    var meshOpacity = parseFloat($('meshOpacity').value);
+    root.style.setProperty('--mesh-opacity', meshOpacity.toFixed(2));
 
     /* Value labels */
-    $('meshOpacityVal').textContent    = v.meshOpacity.toFixed(2);
-    $('travelScaleVal').textContent    = v.travelScale.toFixed(2);
-    $('scaleAmpVal').textContent       = v.scaleAmp.toFixed(2);
-    $('speedScaleVal').textContent     = v.speedScale.toFixed(2);
+    $('washiSizeVal').textContent        = size.toFixed(0);
+    $('washiOffsetXVal').textContent     = offsetX.toFixed(0);
+    $('washiOffsetYVal').textContent     = offsetY.toFixed(0);
+    $('washiOpacityVal').textContent     = opacity.toFixed(3);
+    $('washiStrokeWidthVal').textContent = strokeW.toFixed(1);
+    $('washiRotateStartVal').textContent = rotateStart.toFixed(1);
+    $('washiRotateEndVal').textContent   = rotateEnd.toFixed(1);
+    $('washiScaleEndVal').textContent    = scaleEnd.toFixed(3);
+    $('washiDurationVal').textContent    = duration.toFixed(0);
+    $('leafSizeVal').textContent         = leafSize.toFixed(2);
+    $('leafDurationVal').textContent     = leafDuration.toFixed(2);
+    $('leafDriftVal').textContent        = leafDrift.toFixed(2);
+    $('leafOpacityVal').textContent      = leafOpacity.toFixed(2);
+    $('meshOpacityVal').textContent      = meshOpacity.toFixed(2);
 
-    $('orb1CoreAlphaVal').textContent  = v.orb1CoreAlpha.toFixed(2);
-    $('orb1HaloAlphaVal').textContent  = v.orb1HaloAlpha.toFixed(2);
-    $('orb1HaloStopVal').textContent   = v.orb1HaloStop + '%';
-    $('orb1FadeStopVal').textContent   = v.orb1FadeStop + '%';
-
-    $('orb2CoreAlphaVal').textContent  = v.orb2CoreAlpha.toFixed(2);
-    $('orb2HaloAlphaVal').textContent  = v.orb2HaloAlpha.toFixed(2);
-    $('orb2HaloStopVal').textContent   = v.orb2HaloStop + '%';
-    $('orb2FadeStopVal').textContent   = v.orb2FadeStop + '%';
-
-    $('orb3CoreAlphaVal').textContent  = v.orb3CoreAlpha.toFixed(2);
-    $('orb3HaloAlphaVal').textContent  = v.orb3HaloAlpha.toFixed(2);
-    $('orb3HaloStopVal').textContent   = v.orb3HaloStop + '%';
-    $('orb3FadeStopVal').textContent   = v.orb3FadeStop + '%';
-
-    $('leafSizeVal').textContent       = v.leafSize.toFixed(2);
-    $('leafDurationVal').textContent   = v.leafDuration.toFixed(2);
-    $('leafDriftVal').textContent      = v.leafDrift.toFixed(2);
-    $('leafOpacityVal').textContent    = v.leafOpacity.toFixed(2);
-
-    updateReadout(v);
+    updateReadout({
+      size: size, offsetX: offsetX, offsetY: offsetY,
+      opacity: opacity, strokeW: strokeW, hexColour: hexColour,
+      rotateStart: rotateStart, rotateEnd: rotateEnd, scaleEnd: scaleEnd,
+      duration: duration, corner: corner
+    });
   }
 
-  /* ---------------- Compose the paste-ready CSS readout ------------ */
+  /* ---------------- Compose paste-ready CSS ------------------------ */
   function updateReadout(v) {
-    var durationOrb1 = (22 / v.speedScale).toFixed(2);
-    var durationOrb2 = (29 / v.speedScale).toFixed(2);
-    var durationOrb3 = (19 / v.speedScale).toFixed(2);
-
     var lines = [
       '/* ============================================================',
-      '   Ambient values — paste into main.css',
-      '   Generated by mesh-demo.html',
+      '   Washi watermark values — paste into main.css',
+      '   Generated by washi-demo.html',
       '   ============================================================ */',
       '',
-      '/* Ambient mesh */',
-      '.ambient-mesh {',
-      '  opacity: ' + v.meshOpacity.toFixed(2) + ';',
+      '.washi-watermark {',
+      '  position: fixed;',
+      '  ' + v.corner.split('-').map(function(p, i) {
+        return (i === 0 ? '' : '  ') + p + ': calc(var(--washi-offset-' + (p === 'top' || p === 'bottom' ? 'y' : 'x') + ') * -1' + (p === 'top' || p === 'bottom' ? 'vh' : 'vw') + ');';
+      }).join('\n  '),
+      '  width: calc(' + v.size.toFixed(0) + ' * 1vw);',
+      '  max-width: 1600px;',
+      '  height: auto;',
+      '  pointer-events: none;',
+      '  z-index: -1;',
+      '  opacity: ' + v.opacity.toFixed(3) + ';',
+      '  animation: washiBreathe ' + v.duration.toFixed(0) + 's ease-in-out infinite alternate;',
+      '  will-change: transform;',
       '}',
-      '',
-      '/* Orb 1 — animation duration: ' + durationOrb1 + 's */',
-      '.orb-1 {',
-      '  background: radial-gradient(circle,',
-      '    ' + rgba(v.orb1Core, v.orb1CoreAlpha) + ' 0%,',
-      '    ' + rgba(v.orb1Halo, v.orb1HaloAlpha) + ' ' + v.orb1HaloStop + '%,',
-      '    transparent ' + v.orb1FadeStop + '%);',
+      '.washi-watermark svg { width: 100%; height: auto; display: block; }',
+      '.washi-watermark path {',
+      '  fill: none;',
+      '  stroke: ' + v.hexColour + ';',
+      '  stroke-width: ' + v.strokeW.toFixed(1) + ';',
+      '  stroke-linejoin: round;',
+      '  stroke-linecap: round;',
+      '  vector-effect: non-scaling-stroke;',
       '}',
-      '',
-      '/* Orb 2 — animation duration: ' + durationOrb2 + 's */',
-      '.orb-2 {',
-      '  background: radial-gradient(circle,',
-      '    ' + rgba(v.orb2Core, v.orb2CoreAlpha) + ' 0%,',
-      '    ' + rgba(v.orb2Halo, v.orb2HaloAlpha) + ' ' + v.orb2HaloStop + '%,',
-      '    transparent ' + v.orb2FadeStop + '%);',
+      '@keyframes washiBreathe {',
+      '  0%   { transform: scale(1) rotate(' + v.rotateStart.toFixed(1) + 'deg); }',
+      '  100% { transform: scale(' + v.scaleEnd.toFixed(3) + ') rotate(' + v.rotateEnd.toFixed(1) + 'deg); }',
       '}',
+      'html[data-theme="default"] .washi-watermark { display: none; }',
       '',
-      '/* Orb 3 — animation duration: ' + durationOrb3 + 's */',
-      '.orb-3 {',
-      '  background: radial-gradient(circle,',
-      '    ' + rgba(v.orb3Core, v.orb3CoreAlpha) + ' 0%,',
-      '    ' + rgba(v.orb3Halo, v.orb3HaloAlpha) + ' ' + v.orb3HaloStop + '%,',
-      '    transparent ' + v.orb3FadeStop + '%);',
-      '}',
-      '',
-      '/* Travel multiplier: ' + v.travelScale.toFixed(2) +
-        '  ·  scale amp multiplier: ' + v.scaleAmp.toFixed(2) + ' */',
-      '/* Bake these into the translate3d percentages and scale deltas',
-      '   in the orbDrift1/2/3 keyframes. */',
-      '',
-      '/* Leaves */',
-      '/* size multiplier: ' + v.leafSize.toFixed(2) +
-        '  ·  fall speed multiplier: ' + v.leafDuration.toFixed(2) + ' */',
-      '/* drift multiplier: ' + v.leafDrift.toFixed(2) +
-        '  ·  opacity: ' + v.leafOpacity.toFixed(2) + ' */'
+      '/* Corner: ' + v.corner + ' */'
     ];
-    readoutEl.textContent = lines.join('\n');
+    $('readout').textContent = lines.join('\n');
   }
 
   /* ---------------- Attach listeners ------------------------------- */
-  var controlIds = [
-    'meshOpacity','travelScale','scaleAmp','speedScale',
-    'orb1Core','orb1CoreAlpha','orb1Halo','orb1HaloAlpha','orb1HaloStop','orb1FadeStop',
-    'orb2Core','orb2CoreAlpha','orb2Halo','orb2HaloAlpha','orb2HaloStop','orb2FadeStop',
-    'orb3Core','orb3CoreAlpha','orb3Halo','orb3HaloAlpha','orb3HaloStop','orb3FadeStop',
-    'leafSize','leafDuration','leafDrift','leafOpacity'
+  var ids = [
+    'washiSize', 'washiOffsetX', 'washiOffsetY',
+    'washiOpacity', 'washiStrokeWidth', 'washiColor',
+    'washiDuration', 'washiRotateStart', 'washiRotateEnd', 'washiScaleEnd',
+    'washiCorner',
+    'leafSize', 'leafDuration', 'leafDrift', 'leafOpacity',
+    'meshOpacity'
   ];
-  for (var i = 0; i < controlIds.length; i++) {
-    var el = $(controlIds[i]);
+  for (var i = 0; i < ids.length; i++) {
+    var el = $(ids[i]);
     if (el) {
       el.addEventListener('input', applyAll);
       el.addEventListener('change', applyAll);
     }
   }
 
-  /* ---------------- Toolbar ---------------------------------------- */
+  /* ---------------- Toolbar toggles -------------------------------- */
   $('togglePreview').addEventListener('click', function() {
-    previewText.classList.toggle('shown');
+    $('previewText').classList.toggle('shown');
     this.classList.toggle('active');
   });
 
   var leavesOn = true;
   $('toggleLeaves').addEventListener('click', function() {
     leavesOn = !leavesOn;
-    leavesOverlay.classList.toggle('active', leavesOn);
+    $('mapleLeaves').classList.toggle('active', leavesOn);
     this.textContent = leavesOn ? '落ち葉 ON' : '落ち葉 OFF';
     this.classList.toggle('active', leavesOn);
   });
 
-  var DEFAULTS = {
-    meshOpacity: '0.55', travelScale: '1.00', scaleAmp: '1.00', speedScale: '1.00',
-    orb1Core: '247,185,60', orb1CoreAlpha: '0.50', orb1Halo: '247,185,60',
-    orb1HaloAlpha: '0.18', orb1HaloStop: '42', orb1FadeStop: '70',
-    orb2Core: '224,115,25', orb2CoreAlpha: '0.42', orb2Halo: '217,94,26',
-    orb2HaloAlpha: '0.14', orb2HaloStop: '48', orb2FadeStop: '72',
-    orb3Core: '255,214,130', orb3CoreAlpha: '0.40', orb3Halo: '253,240,200',
-    orb3HaloAlpha: '0.12', orb3HaloStop: '40', orb3FadeStop: '68',
-    leafSize: '1.00', leafDuration: '1.00', leafDrift: '1.00', leafOpacity: '0.95'
-  };
+  var washiOn = true;
+  $('toggleWashi').addEventListener('click', function() {
+    washiOn = !washiOn;
+    washiEl.style.display = washiOn ? '' : 'none';
+    this.textContent = washiOn ? '透かし ON' : '透かし OFF';
+    this.classList.toggle('active', washiOn);
+  });
 
+  /* ---------------- Reset ------------------------------------------ */
+  var DEFAULTS = {
+    washiSize: '140', washiOffsetX: '30', washiOffsetY: '30',
+    washiOpacity: '0.06', washiStrokeWidth: '1.5', washiColor: '#c9561b',
+    washiDuration: '24', washiRotateStart: '-1', washiRotateEnd: '1', washiScaleEnd: '1.05',
+    washiCorner: 'bottom-right',
+    leafSize: '1.00', leafDuration: '1.00', leafDrift: '1.00', leafOpacity: '0.30',
+    meshOpacity: '0.43'
+  };
   $('resetAll').addEventListener('click', function() {
     for (var k in DEFAULTS) {
       if (!DEFAULTS.hasOwnProperty(k)) continue;
@@ -1006,11 +841,12 @@
       if (el) el.value = DEFAULTS[k];
     }
     applyAll();
-    flashStatus('Reset to current main.css values');
+    flashStatus('Reset to default values');
   });
 
+  /* ---------------- Copy / regenerate ------------------------------ */
   $('copyBtn').addEventListener('click', function() {
-    var text = readoutEl.textContent || '';
+    var text = $('readout').textContent || '';
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(text).then(function() {
         flashStatus('Copied to clipboard');
@@ -1019,7 +855,6 @@
       fallbackCopy(text);
     }
   });
-
   function fallbackCopy(text) {
     var ta = document.createElement('textarea');
     ta.value = text;
@@ -1035,7 +870,6 @@
     }
     document.body.removeChild(ta);
   }
-
   $('regenBtn').addEventListener('click', function() {
     applyAll();
     flashStatus('Readout regenerated');
@@ -1043,12 +877,11 @@
 
   var statusTimer = null;
   function flashStatus(msg) {
-    statusEl.textContent = msg;
-    statusEl.classList.add('shown');
+    var s = $('status');
+    s.textContent = msg;
+    s.classList.add('shown');
     if (statusTimer) clearTimeout(statusTimer);
-    statusTimer = setTimeout(function() {
-      statusEl.classList.remove('shown');
-    }, 1800);
+    statusTimer = setTimeout(function() { s.classList.remove('shown'); }, 1800);
   }
 
   /* ---------------- Init ------------------------------------------- */
