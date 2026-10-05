@@ -31,23 +31,29 @@
        - Reset hot-spot: invisible top-left tap target that
          returns to the blossom start screen without losing any
          entered values, re-running the koi intro and panels.
-       - Transition-line accordion drift, unified v1.3 pass:
+       - Transition-line accordion drift, final v1.3 pass:
            * Reveal engine removed entirely (observer, timers,
              constants, setupTransitionReveal, .revealed CSS, the
              paragraph reduced-motion guard). Text renders
              immediately alongside the header.
            * Math.abs(d) for relativeSeparation so items fan
              outward on both sides of centre and never collide.
-           * Proximity gate (PROXIMITY_WINDOW_PX = 550) scales
-             the whole drift to zero outside the active reading
-             zone. Fixes the frozen-pre-scroll state and the
-             block appearing on the blossom screen after a
-             hot-spot reset.
-           * HORIZONTAL_SWAY_PX softened 25 → 10 to eliminate
-             the 50px adjacent-line zigzag.
+           * PROXIMITY_WINDOW_PX dropped. Gate is now scrollY-based
+             (scrollEnter = clamp(scrollY / 120, 0, 1)). At
+             scrollY = 0 the transform collapses to nothing, so the
+             block cannot leak into the blossom screen or the
+             panels. Full amplitude is available once past the
+             ramp.
+           * HORIZONTAL_SWAY_PX softened 25 → 10.
+           * scheduleTransitionBodyUpdate() now fires on every
+             scroll event, rAF-debounced via tbRafPending.
+             scheduleEvaluation() stays behind the 1px
+             goingDown/goingUp threshold, so layout reads do not
+             land on the same task as transform writes.
            * returnToStartScreen() clears inline drift transforms
-             synchronously to prevent a single-frame layout ghost
-             before the next scroll event tick.
+             synchronously and resets tableEnteredView, so the
+             service table re-reveals correctly after a hot-spot
+             rerun.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -1660,13 +1666,13 @@ function returnToStartScreen() {
   if (dotsEl) dotsEl.classList.remove('visible');
 
   /* Reset scroll gate and force to top. */
-tableVisited = false;
-tableEnteredView = false;
-if (tableUnlocked) {
-  tableUnlocked = false;
-  document.body.classList.add('table-locked');
-}
-window.scrollTo(0, 0);
+  tableVisited = false;
+  tableEnteredView = false;
+  if (tableUnlocked) {
+    tableUnlocked = false;
+    document.body.classList.add('table-locked');
+  }
+  window.scrollTo(0, 0);
 
   /* v1.3: clear any lingering accordion transforms synchronously.
      window.scrollTo dispatches its scroll event on the next task
@@ -2587,7 +2593,7 @@ function wrapTransitionBody() {
 }
 
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Unified)
+   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Full Amplitude)
    ============================================================
    Divider (Item 0) plus each paragraph in the body form a single
    drift array. Each item receives an inline translate() computed
@@ -2601,10 +2607,12 @@ function wrapTransitionBody() {
                           outward, never inverted.
      swayX              — small alternating horizontal zig.
 
-   All three are scaled by a proximity gate so that when the
-   block is outside the active reading zone (e.g. scrollY = 0,
-   or after a hot-spot reset), every transform collapses to
-   nothing and the block sits at its natural position.
+   All three are scaled by scrollEnter, a linear ramp from 0 at
+   scrollY = 0 to 1 at scrollY = 120. At scrollY = 0 the block
+   cannot leak into the blossom screen, the koi intro, or any
+   carousel panel. Once past the ramp, transforms persist as the
+   block scrolls (including exit and re-entry), matching the
+   behaviour of the tuning bench.
 
    Transform is written via JS only. main.css carries no
    transform transition on these elements, so motion tracks
@@ -2613,8 +2621,7 @@ var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.05,
   MAX_LINE_SPREAD_PX: 55,
   GLOBAL_DRIFT_FACTOR: 0.14,
-  HORIZONTAL_SWAY_PX: 10,       /* softened from 25 to eliminate the 50px zigzag */
-  PROXIMITY_WINDOW_PX: 550      /* 0 drift outside this distance from viewport centre */
+  HORIZONTAL_SWAY_PX: 10
 };
 
 function updateTransitionBodyEffects() {
@@ -2632,6 +2639,19 @@ function updateTransitionBodyEffects() {
   var totalItems = driftItems.length;
   var centerIdx = (totalItems - 1) / 2;
 
+  /* Gate by scroll position: at scrollY = 0 the transforms collapse
+     to nothing, so nothing can leak into the blossom screen or the
+     carousel panels. */
+  var scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+  var scrollEnter = Math.min(1, Math.max(0, scrollY / 120));
+
+  if (scrollEnter <= 0) {
+    for (var k = 0; k < totalItems; k++) {
+      driftItems[k].style.transform = '';
+    }
+    return;
+  }
+
   var vh = window.innerHeight;
   var vc = vh / 2;
   var rect = lineWrapper.getBoundingClientRect();
@@ -2639,20 +2659,7 @@ function updateTransitionBodyEffects() {
   var d = blockCenter - vc;
   var absDist = Math.abs(d);
 
-  /* Proximity gate: 1.0 at viewport centre, tapering smoothly to 0
-     at the window edge. */
-  var proximity = Math.max(0, 1 - (absDist / DRIFT_CONFIG.PROXIMITY_WINDOW_PX));
-
-  /* Outside the reading zone: clear transforms and exit so the
-     block sits at its natural position (no pre-scroll ghost). */
-  if (proximity <= 0) {
-    for (var k = 0; k < totalItems; k++) {
-      driftItems[k].style.transform = '';
-    }
-    return;
-  }
-
-  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * proximity;
+  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * scrollEnter;
   var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
   for (var i = 0; i < totalItems; i++) {
@@ -2660,21 +2667,17 @@ function updateTransitionBodyEffects() {
     var lineDistFromCenter = i - centerIdx;
 
     /* Math.abs(d) — items fan outward on both sides of centre and
-       never crash inward on exit. */
-    var relativeSeparation = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR) * proximity;
-
+       never crash inward on exit. Proportional clamp keeps inner
+       items from overtaking outer ones. */
     var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
-    if (relativeSeparation > itemMaxSpread) {
-      relativeSeparation = itemMaxSpread;
-    } else if (relativeSeparation < -itemMaxSpread) {
-      relativeSeparation = -itemMaxSpread;
-    }
+    var rawSpread = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
+    var relativeSeparation = Math.max(-itemMaxSpread, Math.min(itemMaxSpread, rawSpread)) * scrollEnter;
 
     var totalY = globalShift + relativeSeparation;
 
     var swayMultiplier = (dividerEl && i === 0) ? 0.35 : 1.0;
     var swayDir = (i % 2 === 0) ? 1 : -1;
-    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * proximity;
+    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * scrollEnter;
 
     item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
   }
@@ -4119,10 +4122,16 @@ window.addEventListener('scroll', function() {
   lastScrollY = y;
   if (goingDown) lastScrollDirection = 'down';
   else if (goingUp) lastScrollDirection = 'up';
+
+  /* v1.3: drift update on every scroll event, rAF-debounced.
+     scheduleEvaluation stays behind the 1px threshold so its layout
+     reads do not land on the same task as the transform writes. */
+  scheduleTransitionBodyUpdate();
+
   if (goingDown || goingUp) {
     scheduleEvaluation();
-    scheduleTransitionBodyUpdate();
   }
+
   /* v1.3: once the table has been scrolled into view, mark it
      visited. From that point on, swiping back to earlier panels
      keeps scrolling enabled. */
