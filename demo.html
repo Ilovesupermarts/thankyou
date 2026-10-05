@@ -3,299 +3,965 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Transition Line & Header Drift Demo</title>
+<meta name="theme-color" content="#fdf3d8">
+<title>Ambient Demo — Orbs &amp; Leaves</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-<link rel="stylesheet" href="main.css">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  body {
-    height: 340vh;
-    overflow-x: hidden;
+/* ============================================================
+   DEMO — standalone ambient tuner
+   Self-contained. Does not load main.css or app.js. All ambient
+   layers rebuilt inline so slider changes can write to CSS custom
+   properties and be seen immediately. When you land on a look you
+   like, tap "Copy CSS" — the readout contains the exact values to
+   paste into main.css.
+   ============================================================ */
+
+  :root {
+    /* Tunable ambient-mesh values (driven by sliders) */
+    --mesh-opacity: 0.55;
+    --travel-scale: 1;
+    --scale-amp: 1;
+    --speed-scale: 1;
+
+    /* Orb 1 — core, halo, transparent stops + alphas */
+    --orb1-core-color: 247, 185, 60;
+    --orb1-core-alpha: 0.50;
+    --orb1-halo-color: 247, 185, 60;
+    --orb1-halo-alpha: 0.18;
+    --orb1-halo-stop: 42%;
+    --orb1-fade-stop: 70%;
+
+    /* Orb 2 */
+    --orb2-core-color: 224, 115, 25;
+    --orb2-core-alpha: 0.42;
+    --orb2-halo-color: 217, 94, 26;
+    --orb2-halo-alpha: 0.14;
+    --orb2-halo-stop: 48%;
+    --orb2-fade-stop: 72%;
+
+    /* Orb 3 */
+    --orb3-core-color: 255, 214, 130;
+    --orb3-core-alpha: 0.40;
+    --orb3-halo-color: 253, 240, 200;
+    --orb3-halo-alpha: 0.12;
+    --orb3-halo-stop: 40%;
+    --orb3-fade-stop: 68%;
+
+    /* Leaf tunables */
+    --leaf-size-scale: 1;
+    --leaf-duration-scale: 1;
+    --leaf-drift-scale: 1;
+    --leaf-opacity: 0.95;
   }
 
-  /* Fixed Viewport Center Reference Line */
-  .center-guide {
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  html, body {
+    margin: 0; padding: 0;
+    min-height: 100vh;
+    background-color: #fdf3d8;
+    color: #231304;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 15px; line-height: 1.7;
+    overscroll-behavior: none;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* ============ AMBIENT STAGE — copied from main.css ============ */
+  .ambient-stage {
     position: fixed;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    border-top: 1px dashed rgba(143, 47, 0, 0.25);
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    z-index: -2;
     pointer-events: none;
-    z-index: 100;
+    overflow: hidden;
   }
-  .center-guide::after {
-    content: "VIEWPORT CENTER";
+  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
+
+  /* Primary warm wash (matches main.css autumn theme) */
+  .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%);
+    animation: ambientDrift 14s ease-in-out infinite;
+    will-change: transform;
+  }
+  .ambient-secondary {
+    background:
+      radial-gradient(circle at 60% 20%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0) 40%),
+      radial-gradient(circle at 40% 90%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0) 45%);
+    animation: ambientDrift2 19s ease-in-out infinite;
+    mix-blend-mode: multiply;
+    opacity: 0.55;
+    will-change: transform;
+  }
+  @keyframes ambientDrift {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    11% { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
+    23% { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
+    35% { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
+    48% { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
+    60% { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
+    72% { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
+    85% { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+  @keyframes ambientDrift2 {
+    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    13% { transform: translate(-5%, 4%) scale(1.15) rotate(-2deg); }
+    27% { transform: translate(4%, -6%) scale(0.92) rotate(3deg); }
+    41% { transform: translate(-2%, 3%) scale(1.18) rotate(1deg); }
+    55% { transform: translate(6%, -2%) scale(1.05) rotate(-3deg); }
+    68% { transform: translate(-4%, 5%) scale(0.95) rotate(2deg); }
+    82% { transform: translate(3%, -4%) scale(1.12) rotate(-1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* ============ AMBIENT LIGHT MESH — live, CSS-variable driven ============ */
+  .ambient-mesh {
     position: absolute;
-    right: 20px;
-    top: -18px;
-    font-size: 10px;
-    color: rgba(143, 47, 0, 0.45);
-    letter-spacing: 2px;
-    font-family: sans-serif;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: var(--mesh-opacity);
   }
 
-  .transition-line {
-    margin-top: 125vh;
-    opacity: 1 !important;
-    transform: none !important;
-    filter: none !important;
+  .light-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform;
   }
 
-  /* 
-     TIGHTENED RESTING GAP:
-     Reduced bottom margin on the divider from 20px to 8px so the header 
-     sits close to Line 1 in the neutral/centered state.
-  */
-  .transition-line-divider {
-    margin: 0 0 8px 0 !important;
+  .orb-1 {
+    width: 70vw; height: 70vw;
+    max-width: 900px; max-height: 900px;
+    top: 10%; left: 15%;
+    background: radial-gradient(circle,
+      rgba(var(--orb1-core-color), var(--orb1-core-alpha)) 0%,
+      rgba(var(--orb1-halo-color), var(--orb1-halo-alpha)) var(--orb1-halo-stop),
+      transparent var(--orb1-fade-stop));
+    animation: orbDrift1 calc(22s / var(--speed-scale)) ease-in-out infinite alternate;
+  }
+  .orb-2 {
+    width: 80vw; height: 80vw;
+    max-width: 1050px; max-height: 1050px;
+    top: 35%; right: 5%;
+    background: radial-gradient(circle,
+      rgba(var(--orb2-core-color), var(--orb2-core-alpha)) 0%,
+      rgba(var(--orb2-halo-color), var(--orb2-halo-alpha)) var(--orb2-halo-stop),
+      transparent var(--orb2-fade-stop));
+    animation: orbDrift2 calc(29s / var(--speed-scale)) ease-in-out infinite alternate;
+  }
+  .orb-3 {
+    width: 55vw; height: 55vw;
+    max-width: 700px; max-height: 700px;
+    bottom: 10%; left: 30%;
+    background: radial-gradient(circle,
+      rgba(var(--orb3-core-color), var(--orb3-core-alpha)) 0%,
+      rgba(var(--orb3-halo-color), var(--orb3-halo-alpha)) var(--orb3-halo-stop),
+      transparent var(--orb3-fade-stop));
+    animation: orbDrift3 calc(19s / var(--speed-scale)) ease-in-out infinite alternate;
   }
 
-  .transition-line-divider,
-  .transition-line-body p {
-    opacity: 1 !important;
-    transform: none;
-    transition: none !important;
-    transform-origin: 50% 50%;
+  /* Travel and scale ranges are multiplied at the keyframe level via
+     a stacked set of --travel-scale and --scale-amp factors. Both
+     default to 1, and scale together, so the baseline matches the
+     current main.css motion exactly. */
+  @keyframes orbDrift1 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform:
+             translate3d(calc(8% * var(--travel-scale)), calc(-6% * var(--travel-scale)), 0)
+             scale(calc(1 + 0.12 * var(--scale-amp)))
+             rotate(4deg); }
+    100% { transform:
+             translate3d(calc(-5% * var(--travel-scale)), calc(8% * var(--travel-scale)), 0)
+             scale(calc(1 - 0.06 * var(--scale-amp)))
+             rotate(-3deg); }
+  }
+  @keyframes orbDrift2 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform:
+             translate3d(calc(-9% * var(--travel-scale)), calc(7% * var(--travel-scale)), 0)
+             scale(calc(1 + 0.08 * var(--scale-amp)))
+             rotate(-5deg); }
+    100% { transform:
+             translate3d(calc(6% * var(--travel-scale)), calc(-8% * var(--travel-scale)), 0)
+             scale(calc(1 - 0.04 * var(--scale-amp)))
+             rotate(3deg); }
+  }
+  @keyframes orbDrift3 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    50%  { transform:
+             translate3d(calc(6% * var(--travel-scale)), calc(5% * var(--travel-scale)), 0)
+             scale(calc(1 + 0.15 * var(--scale-amp))); }
+    100% { transform:
+             translate3d(calc(-7% * var(--travel-scale)), calc(-4% * var(--travel-scale)), 0)
+             scale(calc(1 - 0.08 * var(--scale-amp))); }
   }
 
-  /* Interactive Tuning HUD (Collapsible) */
-  .tuning-hud {
+  /* ============ MAPLE LEAVES — same shape, same keyframes ============ */
+  .maple-leaves-overlay {
     position: fixed;
-    top: 16px;
-    right: 16px;
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid var(--border-2);
-    border-radius: 12px;
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
-    backdrop-filter: blur(8px);
-    width: 320px;
-    z-index: 1000;
-    padding: 16px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    font-size: 12px;
-    color: #333;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 230;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+  }
+  .maple-leaves-overlay.active { opacity: 1; }
+
+  .maple-leaf {
+    position: absolute;
+    top: -60px;
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.22));
+    opacity: var(--leaf-opacity);
   }
 
-  .tuning-hud h3 {
-    margin: 0 0 12px 0;
+  .leaf-1 { width: calc(34px * var(--leaf-size-scale)); height: calc(34px * var(--leaf-size-scale)); fill: #b83b1d; left: 8%;   animation: mapleDriftA calc(11s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: calc(42px * var(--leaf-size-scale)); height: calc(42px * var(--leaf-size-scale)); fill: #d46a15; left: 24%;  animation: mapleDriftB calc(14s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: calc(30px * var(--leaf-size-scale)); height: calc(30px * var(--leaf-size-scale)); fill: #e59b24; left: 42%;  animation: mapleDriftC calc(10s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-4 { width: calc(44px * var(--leaf-size-scale)); height: calc(44px * var(--leaf-size-scale)); fill: #8f2229; left: 58%;  animation: mapleDriftA calc(13s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
+  .leaf-5 { width: calc(36px * var(--leaf-size-scale)); height: calc(36px * var(--leaf-size-scale)); fill: #c9561b; left: 74%;  animation: mapleDriftB calc(12s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-6 { width: calc(28px * var(--leaf-size-scale)); height: calc(28px * var(--leaf-size-scale)); fill: #dd8418; left: 88%;  animation: mapleDriftC calc(9.5s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-7 { width: calc(38px * var(--leaf-size-scale)); height: calc(38px * var(--leaf-size-scale)); fill: #a32e18; left: 35%;  animation: mapleDriftA calc(15s / var(--leaf-duration-scale)) cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+
+  @keyframes mapleDriftA {
+    0%   { transform: translate3d(0, -60px, 0) rotate(-15deg); opacity: 0; }
+    10%  { opacity: 0.95; }
+    28%  { transform: translate3d(calc(38px * var(--leaf-drift-scale)), 30vh, 0) rotate(42deg); }
+    54%  { transform: translate3d(calc(-32px * var(--leaf-drift-scale)), 62vh, 0) rotate(-28deg); }
+    78%  { transform: translate3d(calc(44px * var(--leaf-drift-scale)), 88vh, 0) rotate(55deg); opacity: 0.95; }
+    100% { transform: translate3d(calc(-18px * var(--leaf-drift-scale)), 115vh, 0) rotate(105deg); opacity: 0; }
+  }
+  @keyframes mapleDriftB {
+    0%   { transform: translate3d(0, -60px, 0) rotate(25deg); opacity: 0; }
+    10%  { opacity: 0.95; }
+    32%  { transform: translate3d(calc(-42px * var(--leaf-drift-scale)), 34vh, 0) rotate(-48deg); }
+    58%  { transform: translate3d(calc(36px * var(--leaf-drift-scale)), 66vh, 0) rotate(32deg); }
+    80%  { transform: translate3d(calc(-26px * var(--leaf-drift-scale)), 92vh, 0) rotate(-40deg); opacity: 0.95; }
+    100% { transform: translate3d(calc(22px * var(--leaf-drift-scale)), 115vh, 0) rotate(95deg); opacity: 0; }
+  }
+  @keyframes mapleDriftC {
+    0%   { transform: translate3d(0, -60px, 0) rotate(-35deg); opacity: 0; }
+    12%  { opacity: 0.95; }
+    25%  { transform: translate3d(calc(24px * var(--leaf-drift-scale)), 26vh, 0) rotate(20deg); }
+    50%  { transform: translate3d(calc(-20px * var(--leaf-drift-scale)), 54vh, 0) rotate(-22deg); }
+    72%  { transform: translate3d(calc(28px * var(--leaf-drift-scale)), 80vh, 0) rotate(44deg); opacity: 0.95; }
+    100% { transform: translate3d(calc(-10px * var(--leaf-drift-scale)), 115vh, 0) rotate(85deg); opacity: 0; }
+  }
+
+  /* ============ CONTROL PANEL ============ */
+  .panel {
+    position: fixed;
+    top: 0; right: 0; bottom: 0;
+    width: 400px;
+    background: rgba(253, 243, 216, 0.98);
+    border-left: 1px solid rgba(216, 180, 120, 0.5);
+    box-shadow: -8px 0 24px rgba(120, 70, 20, 0.12);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 20px 22px 60px 22px;
+    z-index: 400;
     font-size: 13px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--accent);
   }
-
-  .tuning-row {
+  .panel h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 4px 0;
+    color: #8f2f00;
+    letter-spacing: 1px;
+  }
+  .panel .subtitle {
+    font-size: 11.5px;
+    color: #7a5028;
+    margin: 0 0 20px 0;
+    letter-spacing: 0.5px;
+  }
+  .section {
+    border-top: 1px solid rgba(216, 180, 120, 0.55);
+    padding: 16px 0 8px 0;
+    margin-top: 8px;
+  }
+  .section:first-of-type { border-top: none; padding-top: 4px; }
+  .section-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    color: #8f2f00;
+    text-transform: uppercase;
     margin-bottom: 12px;
   }
 
-  .tuning-row label {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 4px;
+  .row {
+    display: grid;
+    grid-template-columns: 110px 1fr 52px;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .row label {
+    font-size: 11.5px;
+    color: #3d2410;
+    letter-spacing: 0.3px;
+  }
+  .row .val {
+    font-size: 11px;
+    color: #8f2f00;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
     font-weight: 600;
   }
-
-  .tuning-row input[type="range"] {
+  input[type="range"] {
     width: 100%;
+    accent-color: #c9600a;
     margin: 0;
   }
+  select {
+    width: 100%;
+    font-family: inherit;
+    font-size: 11.5px;
+    padding: 5px 6px;
+    border: 1px solid rgba(216, 180, 120, 0.8);
+    border-radius: 6px;
+    background: #fdf5e0;
+    color: #3d2410;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath fill='%238f3f12' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 6px center;
+    background-size: 8px 6px;
+  }
+  .swatch-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .swatch {
+    width: 14px; height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    border: 1px solid rgba(0,0,0,0.12);
+  }
 
-  .tuning-stats {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px dashed #ddd;
-    color: #666;
-    font-family: monospace;
+  .divider {
+    height: 1px;
+    background: rgba(216, 180, 120, 0.55);
+    margin: 14px 0;
+  }
+
+  .readout {
+    background: #231304;
+    color: #fdf0c8;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 10.5px;
+    line-height: 1.55;
+    padding: 14px 14px;
+    border-radius: 8px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 12px;
+    user-select: text;
+    -webkit-user-select: text;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+  .readout-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .btn {
+    flex: 1;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid #c9600a;
+    background: #c9600a;
+    color: #ffffff;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-secondary {
+    background: #fdf5e0;
+    color: #8f3f12;
+    border-color: rgba(216, 180, 120, 0.8);
+  }
+  .status {
     font-size: 11px;
+    color: #8f3f12;
+    text-align: center;
+    margin-top: 8px;
+    min-height: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .status.shown { opacity: 1; }
+
+  /* Ambient preview overlay — mock panel text at true scale */
+  .preview-text {
+    position: fixed;
+    top: 50%; left: 25%;
+    transform: translate(-50%, -50%);
+    width: 480px;
+    max-width: 45vw;
+    text-align: center;
+    z-index: 100;
+    pointer-events: none;
+    color: #231304;
+    font-size: 18px;
+    line-height: 2.2;
+    letter-spacing: 0.4px;
+    font-weight: 500;
+    text-shadow: 0 1px 12px rgba(253, 240, 200, 0.6);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .preview-text.shown { opacity: 1; }
+  .preview-text .name {
+    font-weight: 600;
+    font-size: 1.18em;
+    color: #8f2f00;
+    letter-spacing: 2px;
+  }
+  .preview-toolbar {
+    position: fixed;
+    top: 18px; left: 18px;
+    z-index: 400;
+    display: flex;
+    gap: 8px;
+  }
+  .toolbar-btn {
+    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 8px 12px;
+    border-radius: 20px;
+    border: 1.5px solid rgba(216, 180, 120, 0.8);
+    background: rgba(253, 245, 224, 0.95);
+    color: #8f3f12;
+    cursor: pointer;
+    letter-spacing: 1px;
+    -webkit-appearance: none;
+    appearance: none;
+    box-shadow: 0 2px 8px rgba(120, 70, 20, 0.12);
+  }
+  .toolbar-btn:active { transform: scale(0.96); }
+  .toolbar-btn.active {
+    background: #c9600a;
+    color: #ffffff;
+    border-color: #c9600a;
+  }
+  .toolbar-btn.reset {
+    color: #7a5028;
+    border-color: rgba(216, 180, 120, 0.5);
+  }
+
+  @media (max-height: 700px) {
+    .panel { width: 340px; padding: 16px 18px 40px 18px; font-size: 12px; }
+    .row { grid-template-columns: 100px 1fr 48px; margin-bottom: 8px; }
+    .section { padding: 12px 0 6px 0; }
   }
 </style>
 </head>
 <body>
 
-<div class="ambient-stage" id="ambientStage" aria-hidden="true">
-  <div class="ambient-layer ambient-image">
-    <video class="ambient-video" id="ambientVideo" autoplay muted loop playsinline preload="auto">
-      <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
-    </video>
-  </div>
+<!-- ============ AMBIENT STAGE ============ -->
+<div class="ambient-stage" aria-hidden="true">
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
-</div>
-
-<div class="center-guide"></div>
-
-<div class="transition-line" id="transitionLine">
-  <!-- Item 0 in drift sequence -->
-  <div class="transition-line-divider" id="transitionLineDivider">
-    <span class="transition-line-mark">❀</span>
-    <span class="transition-line-rule"></span>
-    <span class="transition-line-title">大切なお知らせ</span>
-    <span class="transition-line-rule"></span>
-    <span class="transition-line-mark">❀</span>
-  </div>
-
-  <!-- Items 1 to 5 in drift sequence -->
-  <div class="transition-line-body" id="transitionLineBody">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
   </div>
 </div>
 
-<div class="tuning-hud" id="tuningHud">
-  <h3>
-    <span>Full Accordion Tuner</span>
-    <span id="hudToggle" style="cursor:pointer; font-weight:normal;">[最小化]</span>
-  </h3>
-  <div id="hudBody">
-    <div class="tuning-row">
-      <label>Header Resting Gap: <span id="valHeaderGap">8px</span></label>
-      <input type="range" id="inputHeaderGap" min="0" max="28" step="1" value="8">
-    </div>
+<!-- ============ MAPLE LEAVES ============ -->
+<div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+</div>
 
-    <div class="tuning-row">
-      <label>Accordion Spread: <span id="valSpread">0.14</span></label>
-      <input type="range" id="inputSpread" min="0.0" max="0.4" step="0.01" value="0.14">
-    </div>
+<!-- ============ PREVIEW MOCK PANEL TEXT ============ -->
+<div class="preview-text" id="previewText">
+  <span class="name">桜庭さん</span>、初めまして。<br>
+  本日はお忙しい中、<br>
+  お時間をいただきありがとうございます。<br>
+  どうぞ、心穏やかな時間をお過ごしください。
+</div>
 
-    <div class="tuning-row">
-      <label>Max Outer Spread: <span id="valMaxSpread">55px</span></label>
-      <input type="range" id="inputMaxSpread" min="10" max="120" step="1" value="55">
-    </div>
+<!-- ============ TOOLBAR ============ -->
+<div class="preview-toolbar">
+  <button type="button" class="toolbar-btn" id="togglePreview">見本テキスト</button>
+  <button type="button" class="toolbar-btn" id="toggleLeaves">落ち葉 ON</button>
+  <button type="button" class="toolbar-btn reset" id="resetAll">リセット</button>
+</div>
 
-    <div class="tuning-row">
-      <label>Global Block Drift: <span id="valGlobal">0.08</span></label>
-      <input type="range" id="inputGlobal" min="0.0" max="0.25" step="0.01" value="0.08">
-    </div>
+<!-- ============ CONTROL PANEL ============ -->
+<div class="panel">
+  <h1>Ambient Demo</h1>
+  <p class="subtitle">触って決めてください。数値は下の枠からコピーできます。</p>
 
-    <div class="tuning-row">
-      <label>Horizontal Sway: <span id="valSway">14px</span></label>
-      <input type="range" id="inputSway" min="0" max="40" step="1" value="14">
+  <div class="section">
+    <div class="section-title">Mesh</div>
+    <div class="row">
+      <label>Opacity</label>
+      <input type="range" id="meshOpacity" min="0.2" max="0.9" step="0.01" value="0.55">
+      <span class="val" id="meshOpacityVal">0.55</span>
     </div>
-
-    <div class="tuning-stats">
-      Delta from Center: <span id="statDelta">0px</span><br>
-      Focal State: <span id="statFocal">Resting</span>
+    <div class="row">
+      <label>Travel</label>
+      <input type="range" id="travelScale" min="0.5" max="3.0" step="0.05" value="1.00">
+      <span class="val" id="travelScaleVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Scale amp</label>
+      <input type="range" id="scaleAmp" min="1.0" max="2.5" step="0.05" value="1.00">
+      <span class="val" id="scaleAmpVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Speed</label>
+      <input type="range" id="speedScale" min="0.5" max="2.5" step="0.05" value="1.00">
+      <span class="val" id="speedScaleVal">1.00</span>
     </div>
   </div>
+
+  <div class="section">
+    <div class="section-title">Orb 1</div>
+    <div class="row">
+      <label>Core</label>
+      <select id="orb1Core">
+        <option value="247,185,60" selected>247,185,60 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Core α</label>
+      <input type="range" id="orb1CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.50">
+      <span class="val" id="orb1CoreAlphaVal">0.50</span>
+    </div>
+    <div class="row">
+      <label>Halo</label>
+      <select id="orb1Halo">
+        <option value="247,185,60" selected>247,185,60 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Halo α</label>
+      <input type="range" id="orb1HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.18">
+      <span class="val" id="orb1HaloAlphaVal">0.18</span>
+    </div>
+    <div class="row">
+      <label>Halo stop</label>
+      <input type="range" id="orb1HaloStop" min="20" max="70" step="1" value="42">
+      <span class="val" id="orb1HaloStopVal">42%</span>
+    </div>
+    <div class="row">
+      <label>Fade stop</label>
+      <input type="range" id="orb1FadeStop" min="50" max="95" step="1" value="70">
+      <span class="val" id="orb1FadeStopVal">70%</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Orb 2</div>
+    <div class="row">
+      <label>Core</label>
+      <select id="orb2Core">
+        <option value="224,115,25" selected>224,115,25 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Core α</label>
+      <input type="range" id="orb2CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.42">
+      <span class="val" id="orb2CoreAlphaVal">0.42</span>
+    </div>
+    <div class="row">
+      <label>Halo</label>
+      <select id="orb2Halo">
+        <option value="217,94,26" selected>217,94,26 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Halo α</label>
+      <input type="range" id="orb2HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.14">
+      <span class="val" id="orb2HaloAlphaVal">0.14</span>
+    </div>
+    <div class="row">
+      <label>Halo stop</label>
+      <input type="range" id="orb2HaloStop" min="20" max="70" step="1" value="48">
+      <span class="val" id="orb2HaloStopVal">48%</span>
+    </div>
+    <div class="row">
+      <label>Fade stop</label>
+      <input type="range" id="orb2FadeStop" min="50" max="95" step="1" value="72">
+      <span class="val" id="orb2FadeStopVal">72%</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Orb 3</div>
+    <div class="row">
+      <label>Core</label>
+      <select id="orb3Core">
+        <option value="255,214,130" selected>255,214,130 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Core α</label>
+      <input type="range" id="orb3CoreAlpha" min="0.10" max="0.90" step="0.01" value="0.40">
+      <span class="val" id="orb3CoreAlphaVal">0.40</span>
+    </div>
+    <div class="row">
+      <label>Halo</label>
+      <select id="orb3Halo">
+        <option value="253,240,200" selected>253,240,200 (現行)</option>
+        <option value="143,34,41">143,34,41 #8f2229</option>
+        <option value="163,46,24">163,46,24 #a32e18</option>
+        <option value="184,59,29">184,59,29 #b83b1d</option>
+        <option value="201,86,27">201,86,27 #c9561b</option>
+        <option value="212,106,21">212,106,21 #d46a15</option>
+        <option value="221,132,24">221,132,24 #dd8418</option>
+        <option value="229,155,36">229,155,36 #e59b24</option>
+      </select>
+      <span class="val"></span>
+    </div>
+    <div class="row">
+      <label>Halo α</label>
+      <input type="range" id="orb3HaloAlpha" min="0.02" max="0.50" step="0.01" value="0.12">
+      <span class="val" id="orb3HaloAlphaVal">0.12</span>
+    </div>
+    <div class="row">
+      <label>Halo stop</label>
+      <input type="range" id="orb3HaloStop" min="20" max="70" step="1" value="40">
+      <span class="val" id="orb3HaloStopVal">40%</span>
+    </div>
+    <div class="row">
+      <label>Fade stop</label>
+      <input type="range" id="orb3FadeStop" min="50" max="95" step="1" value="68">
+      <span class="val" id="orb3FadeStopVal">68%</span>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Leaves</div>
+    <div class="row">
+      <label>Size</label>
+      <input type="range" id="leafSize" min="0.5" max="2.0" step="0.05" value="1.00">
+      <span class="val" id="leafSizeVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Fall speed</label>
+      <input type="range" id="leafDuration" min="0.5" max="2.5" step="0.05" value="1.00">
+      <span class="val" id="leafDurationVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Drift amp</label>
+      <input type="range" id="leafDrift" min="0.5" max="3.0" step="0.05" value="1.00">
+      <span class="val" id="leafDriftVal">1.00</span>
+    </div>
+    <div class="row">
+      <label>Opacity</label>
+      <input type="range" id="leafOpacity" min="0.30" max="1.00" step="0.01" value="0.95">
+      <span class="val" id="leafOpacityVal">0.95</span>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <div class="readout" id="readout">Loading…</div>
+  <div class="readout-actions">
+    <button type="button" class="btn" id="copyBtn">Copy CSS</button>
+    <button type="button" class="btn btn-secondary" id="regenBtn">Regenerate</button>
+  </div>
+  <div class="status" id="status"></div>
 </div>
 
 <script>
-  var DRIFT_CONFIG = {
-    LINE_SPREAD_FACTOR: 0.14,
-    MAX_LINE_SPREAD_PX: 55,
-    GLOBAL_DRIFT_FACTOR: 0.08,
-    HORIZONTAL_SWAY_PX: 14,
-    FOCAL_ZONE_PX: 140
+/* ============================================================
+   DEMO SCRIPT
+   Reads every slider, writes it to the matching CSS custom
+   property on document.documentElement, updates the readout text
+   with the effective values. All work happens on :root, so the
+   running animation is recomputed by the compositor without any
+   layout pass.
+   ============================================================ */
+(function() {
+  'use strict';
+
+  var root = document.documentElement;
+
+  /* Map of control id -> { cssVar, format } */
+  var CONTROLS = {
+    meshOpacity:      { cssVar: '--mesh-opacity',       format: function(v) { return v.toFixed(2); } },
+    travelScale:      { cssVar: '--travel-scale',       format: function(v) { return v.toFixed(2); } },
+    scaleAmp:         { cssVar: '--scale-amp',          format: function(v) { return v.toFixed(2); } },
+    speedScale:       { cssVar: '--speed-scale',        format: function(v) { return v.toFixed(2); } },
+
+    orb1Core:         { cssVar: '--orb1-core-color',    format: function(v) { return v; } },
+    orb1CoreAlpha:    { cssVar: '--orb1-core-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb1Halo:         { cssVar: '--orb1-halo-color',    format: function(v) { return v; } },
+    orb1HaloAlpha:    { cssVar: '--orb1-halo-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb1HaloStop:     { cssVar: '--orb1-halo-stop',     format: function(v) { return v + '%'; } },
+    orb1FadeStop:     { cssVar: '--orb1-fade-stop',     format: function(v) { return v + '%'; } },
+
+    orb2Core:         { cssVar: '--orb2-core-color',    format: function(v) { return v; } },
+    orb2CoreAlpha:    { cssVar: '--orb2-core-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb2Halo:         { cssVar: '--orb2-halo-color',    format: function(v) { return v; } },
+    orb2HaloAlpha:    { cssVar: '--orb2-halo-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb2HaloStop:     { cssVar: '--orb2-halo-stop',     format: function(v) { return v + '%'; } },
+    orb2FadeStop:     { cssVar: '--orb2-fade-stop',     format: function(v) { return v + '%'; } },
+
+    orb3Core:         { cssVar: '--orb3-core-color',    format: function(v) { return v; } },
+    orb3CoreAlpha:    { cssVar: '--orb3-core-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb3Halo:         { cssVar: '--orb3-halo-color',    format: function(v) { return v; } },
+    orb3HaloAlpha:    { cssVar: '--orb3-halo-alpha',    format: function(v) { return v.toFixed(2); } },
+    orb3HaloStop:     { cssVar: '--orb3-halo-stop',     format: function(v) { return v + '%'; } },
+    orb3FadeStop:     { cssVar: '--orb3-fade-stop',     format: function(v) { return v + '%'; } },
+
+    leafSize:         { cssVar: '--leaf-size-scale',    format: function(v) { return v.toFixed(2); } },
+    leafDuration:     { cssVar: '--leaf-duration-scale',format: function(v) { return v.toFixed(2); } },
+    leafDrift:        { cssVar: '--leaf-drift-scale',   format: function(v) { return v.toFixed(2); } },
+    leafOpacity:      { cssVar: '--leaf-opacity',       format: function(v) { return v.toFixed(2); } }
   };
 
-  var lineWrapper = document.getElementById('transitionLine');
-  var dividerEl = document.getElementById('transitionLineDivider');
-  var bodyEl = document.getElementById('transitionLineBody');
-  var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
+  /* Readout needs the raw number to print, and the CSS variable for the
+     preview. Both are recomputed on any change. */
+  var ids = Object.keys(CONTROLS);
+  var readoutEl = document.getElementById('readout');
+  var statusEl = document.getElementById('status');
+  var currentValues = {};
 
-  var driftItems = [dividerEl].concat(paragraphs);
-  var totalItems = driftItems.length; // 6 items
-  var centerIdx = (totalItems - 1) / 2; // 2.5
-
-  function updateDriftEffects() {
-    var vh = window.innerHeight;
-    var vc = vh / 2;
-    var rect = lineWrapper.getBoundingClientRect();
-    var blockCenter = rect.top + rect.height / 2;
-    var d = blockCenter - vc;
-
-    if (Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX) {
-      bodyEl.classList.add('centered');
-    } else {
-      bodyEl.classList.remove('centered');
+  function applyAll() {
+    for (var i = 0; i < ids.length; i++) {
+      var id = ids[i];
+      var el = document.getElementById(id);
+      if (!el) continue;
+      var raw = el.value;
+      var num = parseFloat(raw);
+      var cfg = CONTROLS[id];
+      var out = cfg.format(isNaN(num) && el.tagName === 'SELECT' ? raw : num);
+      currentValues[id] = isNaN(num) && el.tagName === 'SELECT' ? raw : num;
+      root.style.setProperty(cfg.cssVar, out);
+      var label = document.getElementById(id + 'Val');
+      if (label) label.textContent = out;
     }
-
-    var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR;
-    var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
-
-    for (var i = 0; i < totalItems; i++) {
-      var item = driftItems[i];
-      var lineDistFromCenter = i - centerIdx;
-      var relativeSeparation = lineDistFromCenter * (d * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
-
-      var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
-      if (relativeSeparation > itemMaxSpread) {
-        relativeSeparation = itemMaxSpread;
-      } else if (relativeSeparation < -itemMaxSpread) {
-        relativeSeparation = -itemMaxSpread;
-      }
-
-      var totalY = globalShift + relativeSeparation;
-      var swayMultiplier = (i === 0) ? 0.35 : 1.0;
-      var swayDir = (i % 2 === 0) ? 1 : -1;
-      var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier;
-
-      item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
-    }
-
-    document.getElementById('statDelta').textContent = Math.round(d) + 'px';
-    document.getElementById('statFocal').textContent = Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX ? 'Centered (❀ In Focus)' : 'Floating (Drifting)';
+    updateReadout();
   }
 
-  var rafPending = false;
-  window.addEventListener('scroll', function() {
-    if (rafPending) return;
-    rafPending = true;
-    requestAnimationFrame(function() {
-      rafPending = false;
-      updateDriftEffects();
-    });
-  }, { passive: true });
-
-  window.addEventListener('resize', updateDriftEffects);
-  updateDriftEffects();
-
-  function bindInput(id, valId, configKey, unit) {
-    var input = document.getElementById(id);
-    var label = document.getElementById(valId);
-    input.addEventListener('input', function() {
-      var val = parseFloat(input.value);
-      DRIFT_CONFIG[configKey] = val;
-      label.textContent = val + (unit || '');
-      updateDriftEffects();
-    });
+  function updateReadout() {
+    var v = currentValues;
+    var lines = [
+      '/* ============================================================',
+      '   Ambient values — paste into main.css',
+      '   ============================================================ */',
+      '',
+      '/* Ambient mesh */',
+      '.ambient-mesh {',
+      '  opacity: ' + v.meshOpacity.toFixed(2) + ';',
+      '}',
+      '',
+      '/* Orb 1 — animation duration: ' + (22 / v.speedScale).toFixed(2) + 's */',
+      '.orb-1 {',
+      '  background: radial-gradient(circle,',
+      '    rgba(' + v.orb1Core + ', ' + v.orb1CoreAlpha.toFixed(2) + ') 0%,',
+      '    rgba(' + v.orb1Halo + ', ' + v.orb1HaloAlpha.toFixed(2) + ') ' + v.orb1HaloStop + '%,',
+      '    transparent ' + v.orb1FadeStop + '%);',
+      '}',
+      '',
+      '/* Orb 2 — animation duration: ' + (29 / v.speedScale).toFixed(2) + 's */',
+      '.orb-2 {',
+      '  background: radial-gradient(circle,',
+      '    rgba(' + v.orb2Core + ', ' + v.orb2CoreAlpha.toFixed(2) + ') 0%,',
+      '    rgba(' + v.orb2Halo + ', ' + v.orb2HaloAlpha.toFixed(2) + ') ' + v.orb2HaloStop + '%,',
+      '    transparent ' + v.orb2FadeStop + '%);',
+      '}',
+      '',
+      '/* Orb 3 — animation duration: ' + (19 / v.speedScale).toFixed(2) + 's */',
+      '.orb-3 {',
+      '  background: radial-gradient(circle,',
+      '    rgba(' + v.orb3Core + ', ' + v.orb3CoreAlpha.toFixed(2) + ') 0%,',
+      '    rgba(' + v.orb3Halo + ', ' + v.orb3HaloAlpha.toFixed(2) + ') ' + v.orb3HaloStop + '%,',
+      '    transparent ' + v.orb3FadeStop + '%);',
+      '}',
+      '',
+      '/* Travel multiplier: ' + v.travelScale.toFixed(2) + '  ·  scale amp multiplier: ' + v.scaleAmp.toFixed(2) + ' */',
+      '/* Apply travelScale to every translate3d percentage in orbDrift1/2/3.',
+      '   Apply scaleAmp to every scale delta from 1.0. */',
+      '',
+      '/* Leaves — size multiplier: ' + v.leafSize.toFixed(2) +
+        '  ·  fall speed multiplier: ' + v.leafDuration.toFixed(2) +
+        '  ·  drift multiplier: ' + v.leafDrift.toFixed(2) +
+        '  ·  opacity: ' + v.leafOpacity.toFixed(2) + ' */',
+      '/* Apply multipliers to .leaf-1 … .leaf-7 width/height (size),',
+      '   animation duration (fall), and the horizontal translate3d',
+      '   percentages in mapleDriftA/B/C (drift). */'
+    ];
+    readoutEl.textContent = lines.join('\n');
   }
 
-  // Header Resting Gap Slider (Controls margin-bottom directly)
-  var gapInput = document.getElementById('inputHeaderGap');
-  var gapVal = document.getElementById('valHeaderGap');
-  gapInput.addEventListener('input', function() {
-    var val = gapInput.value + 'px';
-    dividerEl.style.setProperty('margin-bottom', val, 'important');
-    gapVal.textContent = val;
-    updateDriftEffects();
+  /* Attach listeners */
+  for (var i = 0; i < ids.length; i++) {
+    var id = ids[i];
+    var el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('input', applyAll);
+      el.addEventListener('change', applyAll);
+    }
+  }
+
+  /* Toolbar buttons */
+  var previewText = document.getElementById('previewText');
+  var togglePreviewBtn = document.getElementById('togglePreview');
+  var toggleLeavesBtn = document.getElementById('toggleLeaves');
+  var resetAllBtn = document.getElementById('resetAll');
+
+  togglePreviewBtn.addEventListener('click', function() {
+    previewText.classList.toggle('shown');
+    togglePreviewBtn.classList.toggle('active');
   });
 
-  bindInput('inputSpread', 'valSpread', 'LINE_SPREAD_FACTOR');
-  bindInput('inputMaxSpread', 'valMaxSpread', 'MAX_LINE_SPREAD_PX', 'px');
-  bindInput('inputGlobal', 'valGlobal', 'GLOBAL_DRIFT_FACTOR');
-  bindInput('inputSway', 'valSway', 'HORIZONTAL_SWAY_PX', 'px');
+  var leavesOverlay = document.getElementById('mapleLeaves');
+  var leavesOn = true;
+  toggleLeavesBtn.addEventListener('click', function() {
+    leavesOn = !leavesOn;
+    leavesOverlay.classList.toggle('active', leavesOn);
+    toggleLeavesBtn.textContent = leavesOn ? '落ち葉 ON' : '落ち葉 OFF';
+    toggleLeavesBtn.classList.toggle('active', leavesOn);
+  });
+  toggleLeavesBtn.classList.add('active');
 
-  var hudToggle = document.getElementById('hudToggle');
-  var hudBody = document.getElementById('hudBody');
-  hudToggle.addEventListener('click', function() {
-    if (hudBody.style.display === 'none') {
-      hudBody.style.display = 'block';
-      hudToggle.textContent = '[最小化]';
+  var DEFAULTS = {
+    meshOpacity: '0.55', travelScale: '1.00', scaleAmp: '1.00', speedScale: '1.00',
+    orb1Core: '247,185,60', orb1CoreAlpha: '0.50', orb1Halo: '247,185,60',
+    orb1HaloAlpha: '0.18', orb1HaloStop: '42', orb1FadeStop: '70',
+    orb2Core: '224,115,25', orb2CoreAlpha: '0.42', orb2Halo: '217,94,26',
+    orb2HaloAlpha: '0.14', orb2HaloStop: '48', orb2FadeStop: '72',
+    orb3Core: '255,214,130', orb3CoreAlpha: '0.40', orb3Halo: '253,240,200',
+    orb3HaloAlpha: '0.12', orb3HaloStop: '40', orb3FadeStop: '68',
+    leafSize: '1.00', leafDuration: '1.00', leafDrift: '1.00', leafOpacity: '0.95'
+  };
+
+  resetAllBtn.addEventListener('click', function() {
+    for (var k in DEFAULTS) {
+      if (!DEFAULTS.hasOwnProperty(k)) continue;
+      var el = document.getElementById(k);
+      if (el) el.value = DEFAULTS[k];
+    }
+    applyAll();
+    flashStatus('Reset to current main.css values');
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', function() {
+    var text = readoutEl.textContent || '';
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function() {
+        flashStatus('Copied to clipboard');
+      }).catch(function() {
+        fallbackCopy(text);
+      });
     } else {
-      hudBody.style.display = 'none';
-      hudToggle.textContent = '[展開]';
+      fallbackCopy(text);
     }
   });
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      var ok = document.execCommand('copy');
+      flashStatus(ok ? 'Copied to clipboard' : 'Copy failed — select text manually');
+    } catch (e) {
+      flashStatus('Copy failed — select text manually');
+    }
+    document.body.removeChild(ta);
+  }
+
+  document.getElementById('regenBtn').addEventListener('click', function() {
+    updateReadout();
+    flashStatus('Readout regenerated');
+  });
+
+  var statusTimer = null;
+  function flashStatus(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add('shown');
+    if (statusTimer) clearTimeout(statusTimer);
+    statusTimer = setTimeout(function() {
+      statusEl.classList.remove('shown');
+    }, 1800);
+  }
+
+  /* Init */
+  applyAll();
+})();
 </script>
+
 </body>
 </html>
