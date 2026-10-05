@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="default">
+<html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -30,8 +30,12 @@
 
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-image">
+    <!-- v1.3: autoplay removed, preload dropped to metadata. The video
+         is started by app.js on the first user pointerdown, which
+         means the name-entry screen paints before any video decode
+         work begins. Same autumn look, deferred cost. -->
     <video class="ambient-video" id="ambientVideo"
-           autoplay muted loop playsinline preload="auto">
+           muted loop playsinline preload="metadata">
       <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
     </video>
   </div>
@@ -64,8 +68,8 @@
 </div>
 
 <div class="name-screen" id="nameScreen">
-  <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🌸</button>
-  <div class="app-version" aria-hidden="true">v1.7.8</div>
+  <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
+  <div class="app-version" aria-hidden="true">v1.7.6</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
