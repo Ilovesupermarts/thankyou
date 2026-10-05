@@ -3,410 +3,128 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Transition Scroll Effects — Tuning</title>
+<title>Transition Line Drift Demo</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<!-- Uses your project's main.css directly -->
+<link rel="stylesheet" href="main.css">
+
 <style>
-  :root {
-    --accent: #c9600a; --accent-2: #8f3f12; --accent-3: #7a3208;
-    --glow: #f7b93c; --outstanding: #8f2f00;
-    --border-1: #e8c88a; --border-2: #d8b478;
-    --soft-1: #fdf0c8; --soft-2: #fdf5e0; --soft-3: #f0e0b8;
-    --text-dark: #231304; --text-med: #3d2410;
-    --text-mute: #5a3818;
-    --transition-head-color: #fdf0c8;
-    --transition-glow-bg: rgba(255, 240, 200, 0.22);
-  }
-
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-  /* ============================================================
-     IMPORTANT — html gets NO background.
-     If html has its own background-color, body's background stops
-     propagating to the canvas. Body then paints its own background
-     as part of its normal flow, which happens AFTER any negative
-     z-index children. The ambient-stage at z-index: -2 gets covered.
-     ============================================================ */
-
   body {
-    margin: 0; padding: 0;
-    color: var(--text-dark);
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-    font-size: 17px; line-height: 1.7;
-    background-color: #f5d89a;
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
+    height: 320vh; /* Canvas height to allow scrolling */
+    overflow-x: hidden;
   }
 
-  /* ============================================================
-     AMBIENT STAGE — verbatim from main.css
-     ============================================================ */
-  .ambient-stage {
+  /* Center guide line */
+  .center-guide {
     position: fixed;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
-    z-index: -2;
-    pointer-events: none;
-    will-change: transform;
-    transform: translate3d(var(--wind-x, 0px), 0, 0);
-  }
-  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
-  .ambient-image { opacity: 0.8; pointer-events: none; transition: opacity 1.2s ease; will-change: opacity; }
-  .ambient-video {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    object-fit: cover; display: block; pointer-events: none;
-    filter: blur(8px); transform: scale(1.06);
-  }
-  .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%);
-    animation: autumnDrift1 14s ease-in-out infinite;
-    transition: filter 2s ease;
-    will-change: transform;
-  }
-  .ambient-secondary {
-    display: block;
-    background:
-      radial-gradient(circle at 60% 20%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0) 40%),
-      radial-gradient(circle at 40% 90%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0) 45%);
-    animation: autumnDrift2 19s ease-in-out infinite;
-    mix-blend-mode: multiply;
-    opacity: 0.55;
-    will-change: transform;
-  }
-  .caustics { mix-blend-mode: screen; pointer-events: none; will-change: transform; }
-  .caustics-1 {
-    opacity: 0.36;
-    background:
-      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
-      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
-    animation: caustic1 48s ease-in-out infinite;
-  }
-  .caustics-2 {
-    opacity: 0.28;
-    background:
-      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
-      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
-    animation: caustic2 62s ease-in-out infinite;
-  }
-  @keyframes autumnDrift1 {
-    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    11% { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
-    23% { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
-    35% { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
-    48% { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
-    60% { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
-    72% { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
-    85% { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  }
-  @keyframes autumnDrift2 {
-    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    13% { transform: translate(-5%, 4%) scale(1.15) rotate(-2deg); }
-    27% { transform: translate(4%, -6%) scale(0.92) rotate(3deg); }
-    41% { transform: translate(-2%, 3%) scale(1.18) rotate(1deg); }
-    55% { transform: translate(6%, -2%) scale(1.05) rotate(-3deg); }
-    68% { transform: translate(-4%, 5%) scale(0.95) rotate(2deg); }
-    82% { transform: translate(3%, -4%) scale(1.12) rotate(-1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  }
-  @keyframes caustic1 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
-    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
-  }
-  @keyframes caustic2 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
-  }
-
-  .spacer-top, .spacer-bottom {
-    min-height: 120vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: rgba(90, 56, 24, 0.35);
-    font-family: "Shippori Mincho", serif;
-    font-size: 14px;
-    letter-spacing: 4px;
-  }
-
-  .transition-line {
-    text-align: center; padding: 0 32px 40px 32px; margin-top: 4px;
-    font-size: 18px; font-weight: 500; color: var(--accent);
-    letter-spacing: 0.8px; line-height: 2; max-width: 560px; margin-left: auto; margin-right: auto;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
-  }
-  .transition-line-divider {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    margin: 0 0 20px 0;
-  }
-  .transition-line-mark {
-    flex-shrink: 0;
-    font-size: 1.1em;
-    line-height: 1;
-    color: var(--transition-head-color);
-  }
-  .transition-line-rule {
-    flex: 1;
-    height: 1px;
-    background: var(--transition-head-color);
-    min-width: 24px;
-  }
-  .transition-line-title {
-    flex-shrink: 0;
-    font-size: 1.1em;
-    color: var(--transition-head-color);
-    letter-spacing: 5px;
-    white-space: nowrap;
-  }
-
-  .transition-line-body {
-    position: relative;
-  }
-
-  .transition-line-body p {
-    position: relative;
-    margin: 0 0 0.9em 0;
-    opacity: 1;
-    will-change: transform;
-  }
-  .transition-line-body p:last-child { margin-bottom: 0; }
-
-  .transition-line-body p::before {
-    content: "";
-    position: absolute;
-    inset: var(--demo-glow-inset-y, -30px) var(--demo-glow-inset-x, -30px);
-    background: radial-gradient(ellipse at center,
-      var(--transition-glow-bg), transparent 70%);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity var(--demo-glow-out, 600ms) ease;
-  }
-  .transition-line-body p.centered::before {
-    opacity: 1;
-    transition: opacity var(--demo-glow-in, 300ms) ease;
-  }
-
-  .centre-line {
-    position: fixed;
-    left: 0; right: 0;
     top: 50%;
+    left: 0;
+    right: 0;
     height: 1px;
-    background: rgba(200, 60, 60, 0.5);
+    border-top: 1px dashed rgba(143, 47, 0, 0.25);
     pointer-events: none;
-    z-index: 5;
-    display: none;
-  }
-  .centre-line.shown { display: block; }
-  .centre-line::before,
-  .centre-line::after {
-    content: "";
-    position: absolute;
-    top: -3px;
-    width: 6px; height: 6px;
-    border-radius: 50%;
-    background: rgba(200, 60, 60, 0.7);
-  }
-  .centre-line::before { left: 8px; }
-  .centre-line::after { right: 8px; }
-
-  .controls {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    background: rgba(253, 240, 200, 0.96);
-    border-top: 1px solid var(--border-2);
-    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
-    box-shadow: 0 -4px 18px rgba(120, 70, 20, 0.10);
-    backdrop-filter: blur(8px);
-    -webkit-backdrop-filter: blur(8px);
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     z-index: 100;
   }
-  .controls-inner {
-    max-width: 720px;
-    margin: 0 auto;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: nowrap;
+  .center-guide::after {
+    content: "SCREEN CENTER";
+    position: absolute;
+    right: 20px;
+    top: -18px;
+    font-size: 10px;
+    color: rgba(143, 47, 0, 0.45);
+    letter-spacing: 2px;
+    font-family: sans-serif;
   }
-  .ctrl-btn-sm {
-    flex-shrink: 0;
-    padding: 8px 14px;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    border-radius: 14px;
-    border: 1.5px solid var(--border-2);
-    background: #ffffff;
-    color: var(--text-mute);
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-    white-space: nowrap;
-  }
-  .ctrl-btn-sm.on {
-    border-color: var(--accent);
-    background: var(--soft-2);
-    color: var(--accent);
-  }
-  .ctrl-chevron {
-    margin-left: auto;
-    flex-shrink: 0;
-    width: 36px; height: 36px;
-    padding: 0;
-    border-radius: 50%;
-    border: 1.5px solid var(--border-2);
-    background: #ffffff;
-    color: var(--text-med);
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: transform 0.3s ease;
-  }
-  .ctrl-chevron.up { transform: rotate(180deg); }
 
-  .controls-expanded {
+  /* Position transition line for scroll testing */
+  .transition-line {
+    margin-top: 120vh;
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+  }
+
+  /* Each paragraph has hardware acceleration and its own floating origin */
+  .transition-line-body p {
+    will-change: transform, opacity;
+    transform-origin: 50% 50%;
+    opacity: 1 !important;
+    transform: none;
+  }
+
+  /* Interactive Tuning HUD (Collapsible) */
+  .tuning-hud {
     position: fixed;
-    inset: 0;
-    z-index: 200;
-    background: rgba(232, 192, 120, 0.55);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    top: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.94);
+    border: 1px solid var(--border-2);
+    border-radius: 12px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    backdrop-filter: blur(8px);
+    width: 320px;
+    z-index: 1000;
+    padding: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 12px;
+    color: #333;
+  }
+
+  .tuning-hud h3 {
+    margin: 0 0 12px 0;
+    font-size: 13px;
     display: flex;
-    flex-direction: column;
-    justify-content: flex-end;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
-  }
-  .controls-expanded.open {
-    opacity: 1;
-    pointer-events: auto;
-  }
-  .controls-panel {
-    background: rgba(253, 240, 200, 0.98);
-    border-top: 1px solid var(--border-2);
-    padding: 20px 24px calc(20px + env(safe-area-inset-bottom));
-    max-height: 80vh;
-    overflow-y: auto;
-    box-shadow: 0 -8px 32px rgba(120, 70, 20, 0.18);
-    transform: translateY(12px);
-    transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-  .controls-expanded.open .controls-panel { transform: translateY(0); }
-  .controls-panel-inner { max-width: 720px; margin: 0 auto; }
-  .ctrl-row {
-    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    margin-bottom: 10px;
-  }
-  .ctrl-label {
-    flex-shrink: 0;
-    min-width: 140px;
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text-med);
-    letter-spacing: 1px;
-  }
-  .ctrl-slider { flex: 1; min-width: 0; }
-  .ctrl-value {
-    flex-shrink: 0;
-    min-width: 72px;
-    text-align: right;
-    font-size: 12px;
-    font-weight: 700;
     color: var(--accent);
-    font-family: "SF Mono", Menlo, Consolas, monospace;
   }
-  .readout {
-    margin: 8px 0 16px 0;
-    padding: 10px 14px;
-    background: rgba(255, 255, 255, 0.65);
-    border-radius: 10px;
-    font-family: "SF Mono", Menlo, Consolas, monospace;
-    font-size: 11px;
-    line-height: 1.6;
-    color: var(--text-med);
-    white-space: pre;
-    overflow-x: auto;
-  }
-  .preset-row {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
+
+  .tuning-row {
     margin-bottom: 12px;
   }
-  .preset-btn {
-    padding: 6px 14px;
+
+  .tuning-row label {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-weight: 600;
+  }
+
+  .tuning-row input[type="range"] {
+    width: 100%;
+    margin: 0;
+  }
+
+  .tuning-stats {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #ddd;
+    color: #666;
+    font-family: monospace;
     font-size: 11px;
-    font-weight: 600;
-    border-radius: 12px;
-    border: 1.5px solid var(--border-2);
-    background: #ffffff;
-    color: var(--text-med);
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-  .preset-btn.on {
-    border-color: var(--accent);
-    background: var(--soft-2);
-    color: var(--accent);
-  }
-  .ctrl-btn {
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    border-radius: 16px;
-    border: 1.5px solid var(--accent);
-    background: var(--accent);
-    color: #ffffff;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
   }
 </style>
 </head>
 <body>
 
+<!-- Ambient background from your project -->
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-image">
-    <video class="ambient-video" id="ambientVideo"
-           autoplay muted loop playsinline preload="auto">
+    <video class="ambient-video" id="ambientVideo" autoplay muted loop playsinline preload="auto">
       <source src="icons/VID-20260929-WA0002.mp4" type="video/mp4">
     </video>
   </div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="ambient-layer ambient-secondary"></div>
-  <div class="ambient-layer caustics caustics-1"></div>
-  <div class="ambient-layer caustics caustics-2"></div>
 </div>
 
-<div class="centre-line" id="centreLine"></div>
+<div class="center-guide"></div>
 
-<div class="spacer-top">↓ 上へスクロールしてください ↓</div>
-
-<div class="transition-line active" id="transitionLine">
+<div class="transition-line" id="transitionLine">
   <div class="transition-line-divider">
     <span class="transition-line-mark">❀</span>
     <span class="transition-line-rule"></span>
@@ -416,307 +134,139 @@
   </div>
   <div class="transition-line-body" id="transitionLineBody">
     <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。<br>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
     <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
     <p>ありがとうございます。</p>
   </div>
 </div>
 
-<div class="spacer-bottom">↓ 下へスクロールしてください ↓</div>
+<!-- Interactive Tuning Controls for Tablet Testing -->
+<div class="tuning-hud" id="tuningHud">
+  <h3>
+    <span>Line Drift Tuner</span>
+    <span id="hudToggle" style="cursor:pointer; font-weight:normal;">[最小化]</span>
+  </h3>
+  <div id="hudBody">
+    <div class="tuning-row">
+      <label>Line Accordion Spread: <span id="valSpread">0.18</span></label>
+      <input type="range" id="inputSpread" min="0.0" max="0.5" step="0.01" value="0.18">
+    </div>
 
-<div class="controls" id="controlsBar">
-  <div class="controls-inner">
-    <button type="button" class="ctrl-btn-sm" id="forceGlowBtn">Force glow</button>
-    <button type="button" class="ctrl-btn-sm" id="centreLineBtn">Centre line</button>
-    <button type="button" class="ctrl-chevron" id="chevronBtn" aria-label="Expand controls">▾</button>
-  </div>
-</div>
+    <div class="tuning-row">
+      <label>Max Line Spread: <span id="valMaxSpread">45px</span></label>
+      <input type="range" id="inputMaxSpread" min="10" max="100" step="1" value="45">
+    </div>
 
-<div class="controls-expanded" id="controlsExpanded">
-  <div class="controls-panel">
-    <div class="controls-panel-inner">
-      <pre class="readout" id="readout">—</pre>
+    <div class="tuning-row">
+      <label>Global Block Drift: <span id="valGlobal">0.08</span></label>
+      <input type="range" id="inputGlobal" min="0.0" max="0.3" step="0.01" value="0.08">
+    </div>
 
-      <div class="ctrl-row">
-        <span class="ctrl-label">Drift factor</span>
-        <input type="range" class="ctrl-slider" id="driftFactor" min="0" max="0.40" step="0.01">
-        <span class="ctrl-value" id="driftFactorVal">—</span>
-      </div>
+    <div class="tuning-row">
+      <label>Horizontal Organic Sway: <span id="valSway">16px</span></label>
+      <input type="range" id="inputSway" min="0" max="40" step="1" value="16">
+    </div>
 
-      <div class="ctrl-row">
-        <span class="ctrl-label">Glow window (px)</span>
-        <input type="range" class="ctrl-slider" id="glowWindow" min="20" max="400" step="10">
-        <span class="ctrl-value" id="glowWindowVal">—</span>
-      </div>
-
-      <div class="ctrl-row">
-        <span class="ctrl-label">Glow alpha</span>
-        <input type="range" class="ctrl-slider" id="glowAlpha" min="0" max="0.60" step="0.01">
-        <span class="ctrl-value" id="glowAlphaVal">—</span>
-      </div>
-
-      <div class="ctrl-row">
-        <span class="ctrl-label">Glow in (ms)</span>
-        <input type="range" class="ctrl-slider" id="glowIn" min="100" max="1000" step="50">
-        <span class="ctrl-value" id="glowInVal">—</span>
-      </div>
-
-      <div class="ctrl-row">
-        <span class="ctrl-label">Glow out (ms)</span>
-        <input type="range" class="ctrl-slider" id="glowOut" min="100" max="1500" step="50">
-        <span class="ctrl-value" id="glowOutVal">—</span>
-      </div>
-
-      <div class="ctrl-row" style="align-items: flex-start;">
-        <span class="ctrl-label">Colour (lighter = glow)</span>
-        <div class="preset-row" id="colourPresets" style="flex:1; margin-bottom:0;">
-          <button type="button" class="preset-btn" data-rgb="255, 240, 200">Cream</button>
-          <button type="button" class="preset-btn" data-rgb="255, 220, 150">Pale amber</button>
-          <button type="button" class="preset-btn" data-rgb="247, 200, 120">Light gold</button>
-          <button type="button" class="preset-btn" data-rgb="255, 250, 235">Warm white</button>
-        </div>
-      </div>
-
-      <div class="ctrl-row" style="justify-content: flex-end; margin-top: 16px;">
-        <button type="button" class="ctrl-btn" id="closeExpandedBtn">閉じる</button>
-      </div>
+    <div class="tuning-stats">
+      Offset from Center: <span id="statDelta">0px</span><br>
+      Focal State: <span id="statFocal">Resting</span>
     </div>
   </div>
 </div>
 
 <script>
-const TUNING = {
-  driftFactor: 0.15,
-  glowWindow: 150,
-  /* Warm cream — lighter than the deep orange autumn background,
-     so it reads as light behind the words rather than a stain. */
-  glowRgb: [255, 240, 200],
-  glowAlpha: 0.22,
-  glowIn: 300,
-  glowOut: 600,
-  glowInsetY: -30,
-  glowInsetX: -30,
-  forceGlow: false,
-  showCentreLine: false
-};
+  var DRIFT_CONFIG = {
+    LINE_SPREAD_FACTOR: 0.18,
+    MAX_LINE_SPREAD_PX: 45,
+    GLOBAL_DRIFT_FACTOR: 0.08,
+    HORIZONTAL_SWAY_PX: 16,
+    FOCAL_ZONE_PX: 140
+  };
 
-const bodyEl = document.getElementById('transitionLineBody');
-const readout = document.getElementById('readout');
-const centreLine = document.getElementById('centreLine');
-const forceGlowBtn = document.getElementById('forceGlowBtn');
-const centreLineBtn = document.getElementById('centreLineBtn');
-const chevronBtn = document.getElementById('chevronBtn');
-const controlsExpanded = document.getElementById('controlsExpanded');
-const closeExpandedBtn = document.getElementById('closeExpandedBtn');
-const colourPresets = document.getElementById('colourPresets');
-const ambientVideo = document.getElementById('ambientVideo');
+  var bodyEl = document.getElementById('transitionLineBody');
+  var paragraphs = bodyEl.querySelectorAll('p');
+  var numLines = paragraphs.length;
+  var centerIdx = (numLines - 1) / 2;
 
-let videoState = 'init';
-function updateVideoState() {
-  if (!ambientVideo) { videoState = 'no-el'; return; }
-  if (ambientVideo.error) { videoState = 'error ' + (ambientVideo.error.code || '?'); return; }
-  if (ambientVideo.readyState === 0) { videoState = 'no-data'; return; }
-  if (ambientVideo.paused) { videoState = 'paused'; return; }
-  videoState = 'playing';
-}
-function tryPlayVideo() {
-  if (!ambientVideo) return;
-  const p = ambientVideo.play();
-  if (p && typeof p.catch === 'function') {
-    p.catch(function() {
-      const kick = function() {
-        ambientVideo.play().catch(function() {});
-        document.removeEventListener('pointerdown', kick);
-      };
-      document.addEventListener('pointerdown', kick, { once: true });
+  function updateDriftEffects() {
+    var vh = window.innerHeight;
+    var vc = vh / 2;
+    var rect = bodyEl.getBoundingClientRect();
+    var bodyCentre = rect.top + rect.height / 2;
+    var d = bodyCentre - vc;
+
+    if (Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX) {
+      bodyEl.classList.add('centered');
+    } else {
+      bodyEl.classList.remove('centered');
+    }
+
+    var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR;
+
+    for (var i = 0; i < numLines; i++) {
+      var p = paragraphs[i];
+      var lineDistFromCenter = i - centerIdx;
+      var relativeSeparation = lineDistFromCenter * (d * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
+
+      if (relativeSeparation > DRIFT_CONFIG.MAX_LINE_SPREAD_PX) {
+        relativeSeparation = DRIFT_CONFIG.MAX_LINE_SPREAD_PX;
+      } else if (relativeSeparation < -DRIFT_CONFIG.MAX_LINE_SPREAD_PX) {
+        relativeSeparation = -DRIFT_CONFIG.MAX_LINE_SPREAD_PX;
+      }
+
+      var totalLineY = globalShift + relativeSeparation;
+      var swayDir = (i % 2 === 0) ? 1 : -1;
+      var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
+      var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX;
+
+      p.style.transform = 'translate3d(' + swayX.toFixed(2) + 'px, ' + totalLineY.toFixed(2) + 'px, 0)';
+    }
+
+    document.getElementById('statDelta').textContent = Math.round(d) + 'px';
+    document.getElementById('statFocal').textContent = Math.abs(d) <= DRIFT_CONFIG.FOCAL_ZONE_PX ? 'Centered (❀ In Focus)' : 'Floating (Drifting)';
+  }
+
+  var rafPending = false;
+  window.addEventListener('scroll', function() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(function() {
+      rafPending = false;
+      updateDriftEffects();
+    });
+  }, { passive: true });
+
+  window.addEventListener('resize', updateDriftEffects);
+  updateDriftEffects();
+
+  function bindInput(id, valId, configKey, unit) {
+    var input = document.getElementById(id);
+    var label = document.getElementById(valId);
+    input.addEventListener('input', function() {
+      var val = parseFloat(input.value);
+      DRIFT_CONFIG[configKey] = val;
+      label.textContent = val + (unit || '');
+      updateDriftEffects();
     });
   }
-}
-if (ambientVideo) {
-  ambientVideo.addEventListener('playing', updateVideoState);
-  ambientVideo.addEventListener('pause', updateVideoState);
-  ambientVideo.addEventListener('error', updateVideoState);
-  ambientVideo.addEventListener('loadeddata', updateVideoState);
-  tryPlayVideo();
-  updateVideoState();
-}
 
-function applyTuning() {
-  const rgba = 'rgba(' + TUNING.glowRgb[0] + ', ' + TUNING.glowRgb[1] + ', ' + TUNING.glowRgb[2] + ', ' + TUNING.glowAlpha + ')';
-  bodyEl.style.setProperty('--transition-glow-bg', rgba);
-  bodyEl.style.setProperty('--demo-glow-in', TUNING.glowIn + 'ms');
-  bodyEl.style.setProperty('--demo-glow-out', TUNING.glowOut + 'ms');
-  bodyEl.style.setProperty('--demo-glow-inset-y', TUNING.glowInsetY + 'px');
-  bodyEl.style.setProperty('--demo-glow-inset-x', TUNING.glowInsetX + 'px');
+  bindInput('inputSpread', 'valSpread', 'LINE_SPREAD_FACTOR');
+  bindInput('inputMaxSpread', 'valMaxSpread', 'MAX_LINE_SPREAD_PX', 'px');
+  bindInput('inputGlobal', 'valGlobal', 'GLOBAL_DRIFT_FACTOR');
+  bindInput('inputSway', 'valSway', 'HORIZONTAL_SWAY_PX', 'px');
 
-  centreLine.classList.toggle('shown', TUNING.showCentreLine);
-  forceGlowBtn.classList.toggle('on', TUNING.forceGlow);
-  centreLineBtn.classList.toggle('on', TUNING.showCentreLine);
-
-  const rgbStr = TUNING.glowRgb.join(',');
-  colourPresets.querySelectorAll('.preset-btn').forEach(function(b) {
-    b.classList.toggle('on', b.getAttribute('data-rgb') === rgbStr);
-  });
-
-  syncControls();
-  updateReadout();
-}
-
-let lastD = 0;
-let lastDrift = 0;
-let lastParaIdx = 1;
-let lastInWindow = false;
-
-function updateEffects() {
-  const vh = window.innerHeight;
-  const vc = vh / 2;
-  const ps = bodyEl.querySelectorAll('p');
-
-  let bestAbsD = Infinity;
-  let bestD = 0;
-  let bestIdx = 0;
-  let bestInWindow = false;
-
-  ps.forEach(function(p, i) {
-    const rect = p.getBoundingClientRect();
-    const centre = rect.top + rect.height / 2;
-    const d = centre - vc;
-    const driftY = -d * TUNING.driftFactor;
-
-    p.style.transform =
-      (driftY > 0.05 || driftY < -0.05)
-        ? 'translateY(' + driftY.toFixed(2) + 'px)'
-        : '';
-
-    const inWindow = TUNING.forceGlow || Math.abs(d) <= TUNING.glowWindow;
-    if (inWindow) p.classList.add('centered');
-    else p.classList.remove('centered');
-
-    const absD = Math.abs(d);
-    if (absD < bestAbsD) {
-      bestAbsD = absD;
-      bestD = d;
-      bestIdx = i;
-      bestInWindow = inWindow;
+  var hudToggle = document.getElementById('hudToggle');
+  var hudBody = document.getElementById('hudBody');
+  hudToggle.addEventListener('click', function() {
+    if (hudBody.style.display === 'none') {
+      hudBody.style.display = 'block';
+      hudToggle.textContent = '[最小化]';
+    } else {
+      hudBody.style.display = 'none';
+      hudToggle.textContent = '[展開]';
     }
   });
-
-  lastD = bestD;
-  lastDrift = -bestD * TUNING.driftFactor;
-  lastParaIdx = bestIdx + 1;
-  lastInWindow = bestInWindow;
-  updateReadout();
-}
-
-let rafPending = false;
-function scheduleUpdate() {
-  if (rafPending) return;
-  rafPending = true;
-  requestAnimationFrame(function() {
-    rafPending = false;
-    updateEffects();
-  });
-}
-
-window.addEventListener('scroll', scheduleUpdate, { passive: true });
-window.addEventListener('resize', scheduleUpdate);
-
-const ctrls = {
-  driftFactor:  document.getElementById('driftFactor'),
-  glowWindow:   document.getElementById('glowWindow'),
-  glowAlpha:    document.getElementById('glowAlpha'),
-  glowIn:       document.getElementById('glowIn'),
-  glowOut:      document.getElementById('glowOut')
-};
-const valEls = {
-  driftFactor:  document.getElementById('driftFactorVal'),
-  glowWindow:   document.getElementById('glowWindowVal'),
-  glowAlpha:    document.getElementById('glowAlphaVal'),
-  glowIn:       document.getElementById('glowInVal'),
-  glowOut:      document.getElementById('glowOutVal')
-};
-
-function syncControls() {
-  ctrls.driftFactor.value = TUNING.driftFactor;
-  ctrls.glowWindow.value = TUNING.glowWindow;
-  ctrls.glowAlpha.value = TUNING.glowAlpha;
-  ctrls.glowIn.value = TUNING.glowIn;
-  ctrls.glowOut.value = TUNING.glowOut;
-
-  valEls.driftFactor.textContent = TUNING.driftFactor.toFixed(2);
-  valEls.glowWindow.textContent = TUNING.glowWindow + 'px';
-  valEls.glowAlpha.textContent = TUNING.glowAlpha.toFixed(2);
-  valEls.glowIn.textContent = TUNING.glowIn + 'ms';
-  valEls.glowOut.textContent = TUNING.glowOut + 'ms';
-}
-
-function updateReadout() {
-  updateVideoState();
-  const glowState = TUNING.forceGlow ? 'FORCED' : (lastInWindow ? 'ON' : 'off');
-  const lines = [
-    'video:                              ' + videoState,
-    'bg:                                 #f5d89a + ambient stack',
-    '---',
-    'nearest para:                       p' + lastParaIdx + ' of 4',
-    'd (its centre - viewport centre):   ' + lastD.toFixed(0) + 'px',
-    'its drift (inline translateY):      ' + lastDrift.toFixed(2) + 'px',
-    'glow window:                        ±' + TUNING.glowWindow + 'px',
-    'glow state (nearest para):          ' + glowState,
-    '---',
-    'driftFactor:                        ' + TUNING.driftFactor.toFixed(2),
-    'glowRgb:                            ' + TUNING.glowRgb.join(', '),
-    'glowAlpha:                          ' + TUNING.glowAlpha.toFixed(2),
-    'glowIn / glowOut:                   ' + TUNING.glowIn + ' / ' + TUNING.glowOut + 'ms'
-  ];
-  readout.textContent = lines.join('\n');
-}
-
-Object.keys(ctrls).forEach(function(key) {
-  ctrls[key].addEventListener('input', function() {
-    TUNING[key] = parseFloat(ctrls[key].value);
-    applyTuning();
-    updateEffects();
-  });
-});
-
-colourPresets.querySelectorAll('.preset-btn').forEach(function(b) {
-  b.addEventListener('click', function() {
-    const parts = b.getAttribute('data-rgb').split(',').map(function(s) {
-      return parseInt(s, 10);
-    });
-    TUNING.glowRgb = parts;
-    applyTuning();
-  });
-});
-
-forceGlowBtn.addEventListener('click', function() {
-  TUNING.forceGlow = !TUNING.forceGlow;
-  applyTuning();
-  updateEffects();
-});
-
-centreLineBtn.addEventListener('click', function() {
-  TUNING.showCentreLine = !TUNING.showCentreLine;
-  applyTuning();
-});
-
-function setExpanded(open) {
-  controlsExpanded.classList.toggle('open', open);
-  chevronBtn.classList.toggle('up', open);
-}
-chevronBtn.addEventListener('click', function() {
-  setExpanded(!controlsExpanded.classList.contains('open'));
-});
-closeExpandedBtn.addEventListener('click', function() {
-  setExpanded(false);
-});
-controlsExpanded.addEventListener('click', function(e) {
-  if (e.target === controlsExpanded) setExpanded(false);
-});
-
-applyTuning();
-requestAnimationFrame(function() { updateEffects(); });
 </script>
-
 </body>
 </html>
