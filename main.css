@@ -21,7 +21,9 @@
     --shadow-accent: rgba(176, 74, 90, 0.25);
     --box-bg: rgba(253, 240, 240, 0.55); --box-border: rgba(232, 200, 200, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 90, 90, 0.06);
-    --summary-bg: rgba(255, 255, 255, 0.94); --summary-border: #ece4e0; --summary-shadow: rgba(0, 0, 0, 0.06);
+    /* v1.3: alpha raised 0.94 → 0.98 to hold the visual after the
+       backdrop-filter blur was removed from .summary. */
+    --summary-bg: rgba(255, 255, 255, 0.98); --summary-border: #ece4e0; --summary-shadow: rgba(0, 0, 0, 0.06);
     --dot-active-bg: #2a3f1a; --dot-active-ring: rgba(42, 63, 26, 0.28); --dot-active-shadow: rgba(42, 63, 26, 0.4);
     --ty-line-color: #1f1f1f; --ty-line-shadow: none; --ty-accent-color: #6b1f2a;
     --quote-color: #b04a5a; --quote-shadow: 0 2px 24px #fbdfe3;
@@ -48,7 +50,13 @@
     --shadow-accent: rgba(201, 96, 10, 0.32);
     --box-bg: rgba(253, 240, 200, 0.55); --box-border: rgba(216, 180, 120, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
-    --summary-bg: rgba(253, 240, 200, 0.72); --summary-border: rgba(216, 180, 120, 0.35); --summary-shadow: rgba(120, 70, 20, 0.08);
+    /* v1.3: alpha raised 0.72 → 0.96 to hold the visual after the
+       backdrop-filter blur was removed from .summary. The warm cream
+       hue is preserved; only the transparency changed. This variable
+       was previously being bypassed by a hardcoded white in the
+       .summary rule — that regression is corrected in the rule
+       itself so the theme variable governs again. */
+    --summary-bg: rgba(253, 240, 200, 0.96); --summary-border: rgba(216, 180, 120, 0.35); --summary-shadow: rgba(120, 70, 20, 0.08);
     --dot-active-bg: #2a3f1a; --dot-active-ring: rgba(42, 63, 26, 0.28); --dot-active-shadow: rgba(42, 63, 26, 0.4);
     --ty-line-color: #231304; --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6); --ty-accent-color: #6b1f2a;
     --quote-color: #8f2f00; --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
@@ -108,13 +116,85 @@
     transform: translate3d(var(--wind-x, 0px), 0, 0);
   }
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
-  .ambient-image { opacity: 0; pointer-events: none; transition: opacity 1.2s ease; will-change: opacity; }
-  .ambient-video {
-    position: absolute; inset: 0; width: 100%; height: 100%;
-    object-fit: cover; display: block; pointer-events: none;
-    filter: blur(8px); transform: scale(1.06);
+
+  /* ============ AMBIENT LIGHT MESH (v1.3 — video replacement) ============
+     Pre-feathered CSS light orbs replacing the ambient video. Each orb
+     is a radial-gradient that fades to transparent over its own radius,
+     producing the visual of a blurred orb of light with zero GPU
+     convolution passes. Motion is transform-only, so the compositor
+     moves the layer without layout or repaint cost. Gated to the
+     autumn theme below; the default (sakura) theme keeps its
+     watercolor gradient stack uncluttered. */
+  .ambient-mesh {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.55;
   }
-  html[data-theme="autumn"] .ambient-image { opacity: 0.8; }
+  html[data-theme="default"] .ambient-mesh { display: none; }
+
+  .light-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  /* Warm golden sunbeam pool */
+  .orb-1 {
+    width: 70vw;
+    height: 70vw;
+    max-width: 900px;
+    max-height: 900px;
+    top: 10%;
+    left: 15%;
+    background: radial-gradient(circle, rgba(247, 185, 60, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
+    animation: orbDrift1 22s ease-in-out infinite alternate;
+  }
+
+  /* Deep amber/autumn accent bloom */
+  .orb-2 {
+    width: 80vw;
+    height: 80vw;
+    max-width: 1050px;
+    max-height: 1050px;
+    top: 35%;
+    right: 5%;
+    background: radial-gradient(circle, rgba(224, 115, 25, 0.42) 0%, rgba(217, 94, 26, 0.14) 48%, transparent 72%);
+    animation: orbDrift2 29s ease-in-out infinite alternate;
+  }
+
+  /* Subtle focal highlight */
+  .orb-3 {
+    width: 55vw;
+    height: 55vw;
+    max-width: 700px;
+    max-height: 700px;
+    bottom: 10%;
+    left: 30%;
+    background: radial-gradient(circle, rgba(255, 214, 130, 0.40) 0%, rgba(253, 240, 200, 0.12) 40%, transparent 68%);
+    animation: orbDrift3 19s ease-in-out infinite alternate;
+  }
+
+  @keyframes orbDrift1 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(8%, -6%, 0) scale(1.12) rotate(4deg); }
+    100% { transform: translate3d(-5%, 8%, 0) scale(0.94) rotate(-3deg); }
+  }
+
+  @keyframes orbDrift2 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(-9%, 7%, 0) scale(1.08) rotate(-5deg); }
+    100% { transform: translate3d(6%, -8%, 0) scale(0.96) rotate(3deg); }
+  }
+
+  @keyframes orbDrift3 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    50%  { transform: translate3d(6%, 5%, 0) scale(1.15); }
+    100% { transform: translate3d(-7%, -4%, 0) scale(0.92); }
+  }
+
   .ambient-primary {
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
@@ -225,6 +305,97 @@
     100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
   }
 
+  /* ============ AMBIENT MAPLE LEAVES (v1.3) ============
+     Continuous overlay running the full life of the app once
+     activated by triggerKoiStart(). Sits at z-index 230 — above
+     the stage and table (no explicit z-index, effectively 0-10),
+     below every modal (confirm 250, alert 260, tanzaku 280,
+     receipt 300/380) whose opaque backdrops occlude the leaves,
+     and visible again through the transparent .thankyou-screen
+     (350). Gated to autumn below; the default (sakura) theme
+     hides the whole layer. */
+  .maple-leaves-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: 230;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+  }
+
+  .maple-leaves-overlay.active {
+    opacity: 1;
+  }
+
+  /* Hide autumn leaves when toggled to the sakura (default) theme */
+  html[data-theme="default"] .maple-leaves-overlay {
+    display: none;
+  }
+
+  .maple-leaf {
+    position: absolute;
+    top: -60px;
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.22));
+  }
+
+  /* Color palettes, sizes, positions & negative delay offsets */
+  .leaf-1 { width: 34px; height: 34px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 42px; height: 42px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: 30px; height: 30px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-4 { width: 44px; height: 44px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
+  .leaf-5 { width: 36px; height: 36px; fill: #c9561b; left: 74%;  animation: mapleDriftB 12s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-6 { width: 28px; height: 28px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-7 { width: 38px; height: 38px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+
+  /* 3 Non-identical sway patterns with distinct initial angles */
+  @keyframes mapleDriftA {
+    0% {
+      transform: translate3d(0, -60px, 0) rotate(-15deg);
+      opacity: 0;
+    }
+    10% { opacity: 0.95; }
+    28% { transform: translate3d(38px, 30vh, 0) rotate(42deg); }
+    54% { transform: translate3d(-32px, 62vh, 0) rotate(-28deg); }
+    78% { transform: translate3d(44px, 88vh, 0) rotate(55deg); opacity: 0.95; }
+    100% {
+      transform: translate3d(-18px, 115vh, 0) rotate(105deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes mapleDriftB {
+    0% {
+      transform: translate3d(0, -60px, 0) rotate(25deg);
+      opacity: 0;
+    }
+    10% { opacity: 0.95; }
+    32% { transform: translate3d(-42px, 34vh, 0) rotate(-48deg); }
+    58% { transform: translate3d(36px, 66vh, 0) rotate(32deg); }
+    80% { transform: translate3d(-26px, 92vh, 0) rotate(-40deg); opacity: 0.95; }
+    100% {
+      transform: translate3d(22px, 115vh, 0) rotate(95deg);
+      opacity: 0;
+    }
+  }
+
+  @keyframes mapleDriftC {
+    0% {
+      transform: translate3d(0, -60px, 0) rotate(-35deg);
+      opacity: 0;
+    }
+    12% { opacity: 0.95; }
+    25% { transform: translate3d(24px, 26vh, 0) rotate(20deg); }
+    50% { transform: translate3d(-20px, 54vh, 0) rotate(-22deg); }
+    72% { transform: translate3d(28px, 80vh, 0) rotate(44deg); opacity: 0.95; }
+    100% {
+      transform: translate3d(-10px, 115vh, 0) rotate(85deg);
+      opacity: 0;
+    }
+  }
+
   .mote-field {
     position: absolute; inset: 0; pointer-events: none;
     transform-style: preserve-3d;
@@ -250,6 +421,8 @@
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
     .caustics-1, .caustics-2 { animation: none; }
+    .light-orb { animation: none !important; }
+    .maple-leaf { animation: none !important; }
     .ripple { animation-duration: 300ms; }
   }
   @keyframes ambientDrift {
@@ -981,11 +1154,18 @@
   /* ============ SUMMARY BAR ============ */
   /* v1.3: backdrop-filter removed. The summary bar sits over the
      animated ambient stage during table scroll. The 8px blur was
-     re-composited per frame; the fill was bumped 0.94 → 0.98 so
-     the visual reads identically with no per-frame cost. */
+     re-composited per frame. The fill is now governed by the
+     --summary-bg theme variable again (a prior compile had
+     hardcoded white here, which incorrectly overrode the autumn
+     warm-cream fill). Both theme values were raised in alpha to
+     compensate for the removed blur:
+       default: 0.94 → 0.98
+       autumn:  0.72 → 0.96
+     The warm cream hue is preserved in autumn; only the transparency
+     changed. */
   .summary {
     position: fixed; bottom: 0; left: 0; right: 0;
-    background: rgba(255, 255, 255, 0.98);
+    background: var(--summary-bg);
     border-top: 1px solid var(--summary-border);
     padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 18px var(--summary-shadow);
