@@ -21,8 +21,6 @@
     --shadow-accent: rgba(176, 74, 90, 0.25);
     --box-bg: rgba(253, 240, 240, 0.55); --box-border: rgba(232, 200, 200, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 90, 90, 0.06);
-    /* v1.3: alpha raised 0.94 → 0.98 to hold the visual after the
-       backdrop-filter blur was removed from .summary. */
     --summary-bg: rgba(255, 255, 255, 0.98); --summary-border: #ece4e0; --summary-shadow: rgba(0, 0, 0, 0.06);
     --dot-active-bg: #2a3f1a; --dot-active-ring: rgba(42, 63, 26, 0.28); --dot-active-shadow: rgba(42, 63, 26, 0.4);
     --ty-line-color: #1f1f1f; --ty-line-shadow: none; --ty-accent-color: #6b1f2a;
@@ -50,12 +48,6 @@
     --shadow-accent: rgba(201, 96, 10, 0.32);
     --box-bg: rgba(253, 240, 200, 0.55); --box-border: rgba(216, 180, 120, 0.4);
     --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
-    /* v1.3: alpha raised 0.72 → 0.96 to hold the visual after the
-       backdrop-filter blur was removed from .summary. The warm cream
-       hue is preserved; only the transparency changed. This variable
-       was previously being bypassed by a hardcoded white in the
-       .summary rule — that regression is corrected in the rule
-       itself so the theme variable governs again. */
     --summary-bg: rgba(253, 240, 200, 0.96); --summary-border: rgba(216, 180, 120, 0.35); --summary-shadow: rgba(120, 70, 20, 0.08);
     --dot-active-bg: #2a3f1a; --dot-active-ring: rgba(42, 63, 26, 0.28); --dot-active-shadow: rgba(42, 63, 26, 0.4);
     --ty-line-color: #231304; --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6); --ty-accent-color: #6b1f2a;
@@ -124,13 +116,21 @@
      convolution passes. Motion is transform-only, so the compositor
      moves the layer without layout or repaint cost. Gated to the
      autumn theme below; the default (sakura) theme keeps its
-     watercolor gradient stack uncluttered. */
+     watercolor gradient stack uncluttered.
+
+     v1.3 (tuning pass): mesh opacity 0.55 → 0.43, orb durations
+     roughly halved (22/29/19s → 11.58/15.26/10.00s), travel amounts
+     multiplied by 2.75, scale range multiplied by 1.20. Gradient
+     cores and halos now use the leaf palette — rust reds (#c9561b,
+     #d46a15) as cores, warm ambers (#f7b93c, #d95e1a, #dd8418) as
+     halos — so the light mesh reads from the same colour family as
+     the falling maple leaves. */
   .ambient-mesh {
     position: absolute;
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    opacity: 0.55;
+    opacity: 0.43;
   }
   html[data-theme="default"] .ambient-mesh { display: none; }
 
@@ -149,8 +149,8 @@
     max-height: 900px;
     top: 10%;
     left: 15%;
-    background: radial-gradient(circle, rgba(247, 185, 60, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
-    animation: orbDrift1 22s ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
+    animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
 
   /* Deep amber/autumn accent bloom */
@@ -161,8 +161,8 @@
     max-height: 1050px;
     top: 35%;
     right: 5%;
-    background: radial-gradient(circle, rgba(224, 115, 25, 0.42) 0%, rgba(217, 94, 26, 0.14) 48%, transparent 72%);
-    animation: orbDrift2 29s ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
+    animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
 
   /* Subtle focal highlight */
@@ -173,26 +173,29 @@
     max-height: 700px;
     bottom: 10%;
     left: 30%;
-    background: radial-gradient(circle, rgba(255, 214, 130, 0.40) 0%, rgba(253, 240, 200, 0.12) 40%, transparent 68%);
-    animation: orbDrift3 19s ease-in-out infinite alternate;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
+    animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
+  /* v1.3: travel amounts multiplied by 2.75 and scale range by 1.20
+     from the pre-tuning baseline (8/-6/-5/8, 0.12/0.06 deltas, etc.).
+     The core multipliers chosen from the mesh-demo page. */
   @keyframes orbDrift1 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(8%, -6%, 0) scale(1.12) rotate(4deg); }
-    100% { transform: translate3d(-5%, 8%, 0) scale(0.94) rotate(-3deg); }
+    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
+    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
   }
 
   @keyframes orbDrift2 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(-9%, 7%, 0) scale(1.08) rotate(-5deg); }
-    100% { transform: translate3d(6%, -8%, 0) scale(0.96) rotate(3deg); }
+    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
+    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
   }
 
   @keyframes orbDrift3 {
     0%   { transform: translate3d(0, 0, 0) scale(1); }
-    50%  { transform: translate3d(6%, 5%, 0) scale(1.15); }
-    100% { transform: translate3d(-7%, -4%, 0) scale(0.92); }
+    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
+    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
   }
 
   .ambient-primary {
@@ -307,19 +310,25 @@
 
   /* ============ AMBIENT MAPLE LEAVES (v1.3) ============
      Continuous overlay running the full life of the app once
-     activated by triggerKoiStart(). Sits at z-index 230 — above
-     the stage and table (no explicit z-index, effectively 0-10),
-     below every modal (confirm 250, alert 260, tanzaku 280,
-     receipt 300/380) whose opaque backdrops occlude the leaves,
-     and visible again through the transparent .thankyou-screen
-     (350). Gated to autumn below; the default (sakura) theme
-     hides the whole layer. */
+     activated by triggerKoiStart(). Sits at z-index 30 — above the
+     ambient stage (z-index -2) and below every piece of content
+     (panels, transition, table, summary, dialogs, receipt, thank-you
+     text), so the leaves pass behind what the user reads. This
+     matches the demo view against which the leaf values were tuned.
+     Gated to autumn below; the default (sakura) theme hides the
+     whole layer.
+
+     v1.3 (tuning pass): leaf size multiplied by 1.50, leaf opacity
+     dropped 0.95 → 0.30, drop-shadow alpha scaled down from 0.22
+     to 0.07 to match the lower leaf opacity. Colours and drift
+     timings unchanged. The leaf shape itself was swapped to the
+     larger palmate maple path in index.html (viewBox 900×1000). */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
-    z-index: 230;
+    z-index: 30;
     opacity: 0;
     transition: opacity 1.8s ease;
   }
@@ -338,17 +347,20 @@
     top: -60px;
     pointer-events: none;
     will-change: transform;
-    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.22));
+    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.07));
+    opacity: 0.30;
   }
 
-  /* Color palettes, sizes, positions & negative delay offsets */
-  .leaf-1 { width: 34px; height: 34px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
-  .leaf-2 { width: 42px; height: 42px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
-  .leaf-3 { width: 30px; height: 30px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-4 { width: 44px; height: 44px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
-  .leaf-5 { width: 36px; height: 36px; fill: #c9561b; left: 74%;  animation: mapleDriftB 12s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
-  .leaf-6 { width: 28px; height: 28px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
-  .leaf-7 { width: 38px; height: 38px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+  /* Color palettes, sizes, positions & negative delay offsets.
+     Sizes are 1.5× the previous baseline: 34→51, 42→63, 30→45,
+     44→66, 36→54, 28→42, 38→57. */
+  .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-4 { width: 66px; height: 66px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
+  .leaf-5 { width: 54px; height: 54px; fill: #c9561b; left: 74%;  animation: mapleDriftB 12s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-7 { width: 57px; height: 57px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
 
   /* 3 Non-identical sway patterns with distinct initial angles */
   @keyframes mapleDriftA {
@@ -1154,11 +1166,9 @@
   /* ============ SUMMARY BAR ============ */
   /* v1.3: backdrop-filter removed. The summary bar sits over the
      animated ambient stage during table scroll. The 8px blur was
-     re-composited per frame. The fill is now governed by the
-     --summary-bg theme variable again (a prior compile had
-     hardcoded white here, which incorrectly overrode the autumn
-     warm-cream fill). Both theme values were raised in alpha to
-     compensate for the removed blur:
+     re-composited per frame. The fill is governed by the
+     --summary-bg theme variable; both theme values were raised in
+     alpha to compensate for the removed blur:
        default: 0.94 → 0.98
        autumn:  0.72 → 0.96
      The warm cream hue is preserved in autumn; only the transparency
