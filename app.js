@@ -36,7 +36,7 @@
              immediately alongside the header.
            * Math.abs(d) for relativeSeparation so items fan
              outward on both sides of centre and never collide.
-           * HORIZONTAL_SWAY_PX softened 25 → 10.
+           * HORIZONTAL_SWAY_PX softened 25 → 10 → 22.
            * scheduleTransitionBodyUpdate() fires on every scroll
              event, rAF-debounced via tbRafPending.
              scheduleEvaluation() stays behind the 1px threshold.
@@ -46,10 +46,7 @@
              drift inside |d| <= CORE_ZONE_PX (200). Smoothstep
              ease-out to zero across CORE_ZONE_PX < |d| <
              MAX_ZONE_PX (460). Zero drift beyond MAX_ZONE_PX and
-             at scrollY = 0. Prevents the header from intruding
-             on Panel 4's scroll hint on approach from below, and
-             prevents paragraph 4 from overlapping the service
-             table on exit above.
+             at scrollY = 0.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -2644,8 +2641,10 @@ function updateTransitionBodyEffects() {
   var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
   if (!paragraphs.length) return;
 
-  /* Divider (Item 0) + 4 Paragraphs = 5 items total; axis = 2.0.
-     Generic to any count: axis derived from driftItems.length. */
+  /* Divider (Item 0) + paragraphs, axis derived from length.
+     On index.html default text: 5 paragraphs + divider = 6 items,
+     axis 2.5. On the no-presets variant: 4 paragraphs + divider
+     = 5 items, axis 2.0. Both handled by the generic form below. */
   var driftItems = dividerEl ? [dividerEl].concat(paragraphs) : paragraphs;
   var totalItems = driftItems.length;
   var centerIdx = (totalItems - 1) / 2;
