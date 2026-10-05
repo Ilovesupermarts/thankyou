@@ -18,19 +18,17 @@
     --text-dark: #231304; --text-med: #3d2410;
     --text-mute: #5a3818;
     --transition-head-color: #fdf0c8;
-    --transition-glow-bg: rgba(143, 47, 0, 0.10);
+    --transition-glow-bg: rgba(255, 240, 200, 0.22);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   /* ============================================================
      IMPORTANT — html gets NO background.
-
      If html has its own background-color, body's background stops
      propagating to the canvas. Body then paints its own background
      as part of its normal flow, which happens AFTER any negative
      z-index children. The ambient-stage at z-index: -2 gets covered.
-     This is the exact difference from main.css.
      ============================================================ */
 
   body {
@@ -38,8 +36,6 @@
     color: var(--text-dark);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 17px; line-height: 1.7;
-    /* Only body carries the background. This propagates to the
-       canvas and paints underneath everything. */
     background-color: #f5d89a;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
@@ -180,8 +176,6 @@
     position: relative;
   }
 
-  /* Each paragraph drifts independently. No transform transition —
-     parallax must track scroll frame-for-frame. */
   .transition-line-body p {
     position: relative;
     margin: 0 0 0.9em 0;
@@ -474,12 +468,12 @@
       </div>
 
       <div class="ctrl-row" style="align-items: flex-start;">
-        <span class="ctrl-label">Colour</span>
+        <span class="ctrl-label">Colour (lighter = glow)</span>
         <div class="preset-row" id="colourPresets" style="flex:1; margin-bottom:0;">
-          <button type="button" class="preset-btn" data-rgb="143,47,0">Rust</button>
-          <button type="button" class="preset-btn" data-rgb="150,40,40">Deep red</button>
-          <button type="button" class="preset-btn" data-rgb="200,130,40">Amber</button>
-          <button type="button" class="preset-btn" data-rgb="230,210,170">Cream</button>
+          <button type="button" class="preset-btn" data-rgb="255, 240, 200">Cream</button>
+          <button type="button" class="preset-btn" data-rgb="255, 220, 150">Pale amber</button>
+          <button type="button" class="preset-btn" data-rgb="247, 200, 120">Light gold</button>
+          <button type="button" class="preset-btn" data-rgb="255, 250, 235">Warm white</button>
         </div>
       </div>
 
@@ -494,8 +488,10 @@
 const TUNING = {
   driftFactor: 0.15,
   glowWindow: 150,
-  glowRgb: [143, 47, 0],
-  glowAlpha: 0.10,
+  /* Warm cream — lighter than the deep orange autumn background,
+     so it reads as light behind the words rather than a stain. */
+  glowRgb: [255, 240, 200],
+  glowAlpha: 0.22,
   glowIn: 300,
   glowOut: 600,
   glowInsetY: -30,
@@ -515,9 +511,6 @@ const closeExpandedBtn = document.getElementById('closeExpandedBtn');
 const colourPresets = document.getElementById('colourPresets');
 const ambientVideo = document.getElementById('ambientVideo');
 
-/* Video force-play. Muted autoplay usually works, but if the
-   browser blocks it (data saver, power saving, policy), the first
-   tap anywhere starts it. */
 let videoState = 'init';
 function updateVideoState() {
   if (!ambientVideo) { videoState = 'no-el'; return; }
@@ -531,7 +524,6 @@ function tryPlayVideo() {
   const p = ambientVideo.play();
   if (p && typeof p.catch === 'function') {
     p.catch(function() {
-      /* Autoplay blocked. Play on first user gesture. */
       const kick = function() {
         ambientVideo.play().catch(function() {});
         document.removeEventListener('pointerdown', kick);
@@ -663,8 +655,7 @@ function updateReadout() {
   const glowState = TUNING.forceGlow ? 'FORCED' : (lastInWindow ? 'ON' : 'off');
   const lines = [
     'video:                              ' + videoState,
-    'html bg:                            (none)',
-    'body bg:                            #f5d89a',
+    'bg:                                 #f5d89a + ambient stack',
     '---',
     'nearest para:                       p' + lastParaIdx + ' of 4',
     'd (its centre - viewport centre):   ' + lastD.toFixed(0) + 'px',
