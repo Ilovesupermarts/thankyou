@@ -31,17 +31,23 @@
        - Reset hot-spot: invisible top-left tap target that
          returns to the blossom start screen without losing any
          entered values, re-running the koi intro and panels.
-       - Transition-line rework. All previous scroll effects
-         (blur, scaleX, text-shadow snap, entrance animation,
-         directional fades, glow) removed. Replaced with an
-         accordion drift: the divider (Item 0) and every paragraph
-         receive an individual inline translate() driven from the
-         block's distance from the viewport centre. Config lives
-         in DRIFT_CONFIG. Paragraph opacity reveal is retained
-         (opacity-only transition). Dead code swept: tbMetrics,
-         measureTransitionBody, TB_DRIFT_FACTOR, TB_GLOW_WINDOW_PX,
-         showTransitionLine, hideTransitionLine, lineVisible,
-         hasEverScrolled, getFadeTriggerPx.
+       - Transition-line accordion drift, unified v1.3 pass:
+           * Reveal engine removed entirely (observer, timers,
+             constants, setupTransitionReveal, .revealed CSS, the
+             paragraph reduced-motion guard). Text renders
+             immediately alongside the header.
+           * Math.abs(d) for relativeSeparation so items fan
+             outward on both sides of centre and never collide.
+           * Proximity gate (PROXIMITY_WINDOW_PX = 550) scales
+             the whole drift to zero outside the active reading
+             zone. Fixes the frozen-pre-scroll state and the
+             block appearing on the blossom screen after a
+             hot-spot reset.
+           * HORIZONTAL_SWAY_PX softened 25 → 10 to eliminate
+             the 50px adjacent-line zigzag.
+           * returnToStartScreen() clears inline drift transforms
+             synchronously to prevent a single-frame layout ghost
+             before the next scroll event tick.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -1661,6 +1667,17 @@ function returnToStartScreen() {
   }
   window.scrollTo(0, 0);
 
+  /* v1.3: clear any lingering accordion transforms synchronously.
+     window.scrollTo dispatches its scroll event on the next task
+     tick; without this the drift items can ghost in view for a
+     single frame. */
+  if (transitionLine) {
+    var existingDriftItems = transitionLine.querySelectorAll('.transition-line-divider, .transition-line-body p');
+    for (var t = 0; t < existingDriftItems.length; t++) {
+      existingDriftItems[t].style.transform = '';
+    }
+  }
+
   /* Hide the info bar and hint. */
   document.body.classList.remove('info-visible');
   if (infoBar) {
@@ -2548,14 +2565,11 @@ function updateRejectThanksContent() {
 }
 
 /* ============================================================
-   TRANSITION-LINE PARAGRAPH REVEAL
-   ============================================================ */
-var transitionRevealObserver = null;
-var transitionRevealTimers = [];
-var TRANSITION_REVEAL_STAGGER = 200;
-var TRANSITION_REVEAL_THRESHOLD = 0.20;
-var TRANSITION_REVEAL_ROOT_MARGIN = '0px 0px -8% 0px';
-
+   TRANSITION-LINE BODY WRAPPER
+   ============================================================
+   Splits the authored <br><br> blocks into <p> elements so the
+   accordion drift has discrete items to operate on. Retained
+   from the earlier reveal-engine build. */
 function wrapTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
   if (!bodyEl) return;
@@ -2571,73 +2585,35 @@ function wrapTransitionBody() {
   bodyEl.innerHTML = out.join('');
 }
 
-function setupTransitionReveal() {
-  var bodyEl = document.getElementById('transitionLineBody');
-  if (!bodyEl) return;
-  var paragraphs = bodyEl.querySelectorAll('p');
-  if (paragraphs.length === 0) return;
-  if (transitionRevealObserver) transitionRevealObserver.disconnect();
-
-  transitionRevealObserver = new IntersectionObserver(function(entries) {
-    var entering = [];
-    entries.forEach(function(entry) {
-      if (entry.isIntersecting && !entry.target.classList.contains('revealed')) {
-        entering.push(entry.target);
-      }
-    });
-    entering.sort(function(a, b) {
-      return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
-    });
-    entering.forEach(function(el, i) {
-      var delay = (entering.length > 1 && TRANSITION_REVEAL_STAGGER > 0)
-        ? i * TRANSITION_REVEAL_STAGGER
-        : 0;
-      if (delay > 0) {
-        var id = setTimeout(function() { el.classList.add('revealed'); }, delay);
-        transitionRevealTimers.push(id);
-      } else {
-        el.classList.add('revealed');
-      }
-    });
-  }, {
-    threshold: TRANSITION_REVEAL_THRESHOLD,
-    rootMargin: TRANSITION_REVEAL_ROOT_MARGIN
-  });
-
-  paragraphs.forEach(function(p) { transitionRevealObserver.observe(p); });
-}
-
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT — v1.3
+   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Unified)
    ============================================================
-   Every item in the transition block — the divider as Item 0,
-   followed by each paragraph — receives its own inline translate()
-   driven from the block's distance from the viewport centre.
+   Divider (Item 0) plus each paragraph in the body form a single
+   drift array. Each item receives an inline translate() computed
+   from three composed motions:
 
-   On production the block is 5 items (divider + 4 paragraphs), so
-   the geometric axis sits at index 2.0. The two-axis structure is
-   generic: the axis is derived from driftItems.length, and the
-   clamp scales with |distance-from-axis| / axis. Nothing is
-   hard-coded to a specific count.
-
-   Two motions compose:
      globalShift        — whole block moves slower than the page.
-     relativeSeparation — items fan out from the axis as the block
-                          approaches centre, compress as it leaves.
-                          Capped proportionally per item so inner
-                          items never collapse past outer ones.
+     relativeSeparation — items fan out from the geometric axis,
+                          expanding on approach and collapsing to
+                          the resting gaps near centre. Uses
+                          Math.abs(d) so the fan is always
+                          outward, never inverted.
+     swayX              — small alternating horizontal zig.
 
-   Plus a small alternating horizontal sway for a hand-tuned feel.
+   All three are scaled by a proximity gate so that when the
+   block is outside the active reading zone (e.g. scrollY = 0,
+   or after a hot-spot reset), every transform collapses to
+   nothing and the block sits at its natural position.
 
-   Transform is applied via JS only. The CSS rule for
-   .transition-line-body p carries no transform transition, so the
-   motion tracks scroll frame-for-frame instead of easing toward
-   its target. */
+   Transform is written via JS only. main.css carries no
+   transform transition on these elements, so motion tracks
+   scroll frame-for-frame instead of easing toward a target. */
 var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.05,
   MAX_LINE_SPREAD_PX: 55,
   GLOBAL_DRIFT_FACTOR: 0.14,
-  HORIZONTAL_SWAY_PX: 25
+  HORIZONTAL_SWAY_PX: 10,       /* softened from 25 to eliminate the 50px zigzag */
+  PROXIMITY_WINDOW_PX: 550      /* 0 drift outside this distance from viewport centre */
 };
 
 function updateTransitionBodyEffects() {
@@ -2649,8 +2625,8 @@ function updateTransitionBodyEffects() {
   var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
   if (!paragraphs.length) return;
 
-  /* Divider is Item 0. The rest are paragraphs. 5 items total
-     on production, geometric axis at index 2.0. */
+  /* Divider (Item 0) + 4 Paragraphs = 5 items total; axis = 2.0.
+     Generic to any count: axis derived from driftItems.length. */
   var driftItems = dividerEl ? [dividerEl].concat(paragraphs) : paragraphs;
   var totalItems = driftItems.length;
   var centerIdx = (totalItems - 1) / 2;
@@ -2660,20 +2636,32 @@ function updateTransitionBodyEffects() {
   var rect = lineWrapper.getBoundingClientRect();
   var blockCenter = rect.top + rect.height / 2;
   var d = blockCenter - vc;
+  var absDist = Math.abs(d);
 
-  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR;
+  /* Proximity gate: 1.0 at viewport centre, tapering smoothly to 0
+     at the window edge. */
+  var proximity = Math.max(0, 1 - (absDist / DRIFT_CONFIG.PROXIMITY_WINDOW_PX));
+
+  /* Outside the reading zone: clear transforms and exit so the
+     block sits at its natural position (no pre-scroll ghost). */
+  if (proximity <= 0) {
+    for (var k = 0; k < totalItems; k++) {
+      driftItems[k].style.transform = '';
+    }
+    return;
+  }
+
+  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * proximity;
   var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
   for (var i = 0; i < totalItems; i++) {
     var item = driftItems[i];
     var lineDistFromCenter = i - centerIdx;
-    var relativeSeparation = lineDistFromCenter * (d * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
 
-    /* Proportional clamp prevents inner items from collapsing into
-       outer ones. For an item exactly at the axis the divisor is
-       non-zero (centerIdx ≥ 0.5 whenever there are at least two
-       items), and for the degenerate single-item case the
-       comparison against NaN is false so the separation stays 0. */
+    /* Math.abs(d) — items fan outward on both sides of centre and
+       never crash inward on exit. */
+    var relativeSeparation = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR) * proximity;
+
     var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
     if (relativeSeparation > itemMaxSpread) {
       relativeSeparation = itemMaxSpread;
@@ -2683,14 +2671,10 @@ function updateTransitionBodyEffects() {
 
     var totalY = globalShift + relativeSeparation;
 
-    /* Horizontal sway, halved for the header so the ornamental bar
-       stays grounded. Alternating sign per item for a subtle zig. */
     var swayMultiplier = (dividerEl && i === 0) ? 0.35 : 1.0;
     var swayDir = (i % 2 === 0) ? 1 : -1;
-    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier;
+    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * proximity;
 
-    /* 2D translate() rather than translate3d to avoid Chromium GPU
-       tile-culling on rapid scroll flings. */
     item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
   }
 }
@@ -3217,7 +3201,6 @@ function confirmName() {
   if (tlBody) {
     tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
     wrapTransitionBody();
-    setupTransitionReveal();
     requestAnimationFrame(function() {
       updateTransitionBodyEffects();
     });
