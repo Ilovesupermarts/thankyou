@@ -4,15 +4,29 @@
    ------------------------------------------------------------
    Changelog:
      v1.3
+       - Ambient video removed. Replaced by a pre-feathered CSS
+         light mesh (.ambient-mesh, three radial-gradient orbs)
+         in index.html / main.css. Three references to the old
+         .ambient-image element in this file have been removed
+         (returnToStartScreen, and two in triggerKoiStart). The
+         ambientVideo handlers in applyTheme() and the window.load
+         boot block have also been removed. The intro reveal no
+         longer fades a video layer up or down — the calligraphic
+         kanji arrival carries the moment on its own.
+       - Ambient falling maple leaves added. A single fixed overlay
+         (.maple-leaves-overlay) with seven palmate SVG leaves and
+         three drift keyframes; activated once when the main panel
+         carousel begins and deactivated on return to the koi start
+         screen. z-index 230 — above the stage and table, occluded
+         by every modal backdrop, visible again through the
+         transparent thank-you screen. Gated to autumn in CSS.
        - Default theme switched to autumn. index.html ships
          data-theme="autumn" and currentTheme boots as 'autumn'.
          The ambient video no longer autoplays: <video> lost the
          autoplay attribute, preload dropped auto → metadata, and
-         play() is deferred to the first user pointerdown (see the
-         kickOnce listener in the window.load handler). The
-         name-entry screen paints before any video decode work
-         begins; the video fades in the moment the user first
-         touches the screen.
+         play() is deferred to the first user pointerdown. (The
+         video itself has now been removed entirely in favour of
+         the CSS mesh; the deferral note is retained for context.)
        - Backdrop-filters removed in main.css on .summary, .msg-3,
          .reject-row, .confirm-screen, .alert-screen, .tanzaku-screen.
          Alpha fills bumped 4-6% to hold the visual. The 6px blurs
@@ -135,15 +149,9 @@ function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
-  var av = document.getElementById('ambientVideo');
-  if (av) {
-    if (theme === 'autumn') {
-      var p = av.play();
-      if (p && typeof p.catch === 'function') p.catch(function() {});
-    } else {
-      try { av.pause(); } catch (e) {}
-    }
-  }
+  /* v1.3: the ambient video has been removed entirely. The video
+     play/pause block that used to live here was dead once the
+     <video> element left index.html, so it has been deleted. */
 }
 if (themeToggle) {
   themeToggle.addEventListener('click', function(e) {
@@ -834,6 +842,12 @@ var introHasRun = false;
 /* Koi water effect DOM refs */
 var koiDiveWrap = document.getElementById('koiDiveWrap');
 var rippleLayer = document.getElementById('rippleLayer');
+
+/* v1.3: maple leaf overlay — activated once the panel carousel
+   begins, deactivated on return to the koi start screen. The
+   leaves themselves are pure CSS; the only JS involvement is the
+   .active toggle on the container. */
+var mapleLeaves = document.getElementById('mapleLeaves');
 
 var submitBtn = document.getElementById('submitBtn');
 var confirmScreen = document.getElementById('confirmScreen');
@@ -1640,6 +1654,10 @@ function returnToStartScreen() {
   clearKoiTimers();
   resetWind();
 
+  /* v1.3: hide the ambient maple leaves. They will be re-activated
+     when triggerKoiStart() reaches activatePanel(0). */
+  if (mapleLeaves) mapleLeaves.classList.remove('active');
+
   /* Reset koi gesture state so the swipe-up gesture works again. */
   koiGestureState = 'idle';
   koiActivePointerId = null;
@@ -1669,10 +1687,9 @@ function returnToStartScreen() {
   if (nameColumn) {
     nameColumn.innerHTML = '';
   }
-  var ambientImage = document.querySelector('.ambient-image');
-  if (ambientImage) {
-    ambientImage.style.removeProperty('opacity');
-  }
+  /* v1.3: the .ambient-image element was removed with the video
+     replacement. The three lines that used to reset its opacity
+     here have been deleted. */
 
   /* Cancel any in-flight panel phrase reveals and reset all
      panels to a neutral state. activatePanel(0) will be called
@@ -3137,8 +3154,10 @@ function triggerKoiStart() {
     koiPushTimer(setTimeout(function() {
       var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
       renderIntroGlyph(nameText);
-      var ambientImage = document.querySelector('.ambient-image');
-      if (ambientImage) ambientImage.style.opacity = '0.8';
+      /* v1.3: the ambient-image opacity reveal was removed along
+         with the video. The intro overlay and its calligraphic
+         kanji animation carry the moment; the ambient stage stays
+         at its resting state throughout. */
       if (introOverlay) introOverlay.classList.add('active');
 
       var totalChars = nameText.length;
@@ -3165,13 +3184,18 @@ function triggerKoiStart() {
         for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
         activatePanel(0);
 
+        /* v1.3: activate the ambient maple leaves now that the main
+           panel carousel is visible. The 1.8s opacity transition on
+           .maple-leaves-overlay handles the fade-in; the negative
+           animation delays on the individual leaves mean they are
+           already scattered at different heights the moment the
+           container becomes visible, so no burst-in is perceived. */
+        if (mapleLeaves) mapleLeaves.classList.add('active');
+
         koiPushTimer(setTimeout(function() {
           if (introOverlay) introOverlay.classList.remove('active', 'finishing');
-          var ambientImage2 = document.querySelector('.ambient-image');
-          if (ambientImage2) {
-            if (currentTheme === 'autumn') ambientImage2.style.opacity = '';
-            else ambientImage2.style.opacity = '0';
-          }
+          /* v1.3: the ambient-image opacity restore was removed along
+             with the video. Nothing to restore here now. */
           repositionHintGroupAfterLayout();
           repositionNumpad();
           koiGestureState = 'done';
@@ -3327,33 +3351,10 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 
 window.addEventListener('load', function() {
   startInfoUpdates();
-  /* v1.3: the ambient video no longer starts at boot. With the
-     default theme now autumn, the video WOULD want to play — but
-     starting it here would put decode + blur compositing on the
-     first paint of the name-entry screen. Instead we defer play()
-     to the first user pointerdown via kickOnce below. The autumn
-     gradient layers are visible immediately; the video fades in
-     the moment the user first touches the screen. */
-  var ambientVideo = document.getElementById('ambientVideo');
-  if (ambientVideo) {
-    var kickOnce = function() {
-      if (ambientVideo.paused && currentTheme === 'autumn') {
-        var pp = ambientVideo.play();
-        if (pp && typeof pp.catch === 'function') pp.catch(function() {});
-      }
-      document.removeEventListener('pointerdown', kickOnce);
-    };
-    document.addEventListener('pointerdown', kickOnce, { once: true });
-
-    document.addEventListener('visibilitychange', function() {
-      if (document.hidden) {
-        try { ambientVideo.pause(); } catch (e) {}
-      } else if (currentTheme === 'autumn') {
-        var rp = ambientVideo.play();
-        if (rp && typeof rp.catch === 'function') rp.catch(function() {});
-      }
-    });
-  }
+  /* v1.3: the ambient video has been removed entirely. The block
+     that used to kick the video into playback on the first user
+     pointerdown, and the accompanying visibilitychange resume, are
+     both deleted. The ambient stage is now pure CSS. */
   loadPresetsFromServer().then(function() {
     buildNameScreenRows();
     setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
