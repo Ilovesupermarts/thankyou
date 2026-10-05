@@ -28,13 +28,20 @@
          panel AND only stays unlocked once the user has actually
          scrolled the table into view. Swiping back to earlier
          panels re-locks unless the table has been visited.
-       - Transition-line scroll effects rewritten. Blur, scaleX,
-         and the text-shadow focus-snap removed. Replaced with a
-         subtle parallax drift and a warm radial glow that fades
-         in/out when the body is near the viewport centre.
        - Reset hot-spot: invisible top-left tap target that
          returns to the blossom start screen without losing any
          entered values, re-running the koi intro and panels.
+       - Transition-line rework. All previous scroll effects
+         (blur, scaleX, text-shadow snap, entrance animation,
+         directional fades, glow) removed. Replaced with an
+         accordion drift: the divider (Item 0) and every paragraph
+         receive an individual inline translate() driven from the
+         block's distance from the viewport centre. Config lives
+         in DRIFT_CONFIG. Paragraph opacity reveal is retained
+         (opacity-only transition). Dead code swept: tbMetrics,
+         measureTransitionBody, TB_DRIFT_FACTOR, TB_GLOW_WINDOW_PX,
+         showTransitionLine, hideTransitionLine, lineVisible,
+         hasEverScrolled, getFadeTriggerPx.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
          therapistGreeting are the source of truth; beats are
@@ -1278,7 +1285,7 @@ function wrapPhrasesRecursively(root) {
    beats. Beat boundary is at the first "、":
      Beat 1: everything up to and including the comma
      Beat 2: the remainder
-   Beat 2 starts the instant beat 1 completes. Then a 500 ms
+   Beat 2 starts the instant beat 1 completes. Then a 1000 ms
    pause before #panel1Body begins its normal phrase reveal.
 
    Name comes from therapistDisplayName. Greeting ("、初めまして。")
@@ -1662,13 +1669,9 @@ function returnToStartScreen() {
   }
   if (globalHint) globalHint.classList.remove('shown');
 
-  /* Reset table / transition-line / summary visibility. */
+  /* Reset table / summary visibility. */
   if (summaryBar) summaryBar.classList.remove('visible');
   if (numpad) numpad.classList.remove('visible');
-  if (transitionLine) {
-    transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
-    lineVisible = false;
-  }
   if (divider) divider.classList.remove('active');
   if (tableCard) tableCard.classList.remove('active');
   if (rejectRow) rejectRow.classList.remove('active');
@@ -1725,8 +1728,6 @@ function goToPanel(index, noGust) {
     relockTable();
   }
   if (transitionLine && currentPanel !== totalPanels - 1) {
-    transitionLine.classList.remove('active', 'fading', 'fading-up', 'returning');
-    lineVisible = false;
     summaryBar.classList.remove('visible');
     if (numpad) numpad.classList.remove('visible');
   }
@@ -2607,60 +2608,90 @@ function setupTransitionReveal() {
 }
 
 /* ============================================================
-   TRANSITION-LINE PARALLAX DRIFT + GLOW — v1.3
+   TRANSITION-LINE ACCORDION DRIFT — v1.3
    ============================================================
-   Blur, scaleX, and the text-shadow focus-snap have been removed.
-   Two effects remain, both driven from updateTransitionBodyEffects():
+   Every item in the transition block — the divider as Item 0,
+   followed by each paragraph — receives its own inline translate()
+   driven from the block's distance from the viewport centre.
 
-     - Parallax drift: an inline translateY computed from the
-       body-centre-to-viewport-centre delta d. Negative sign so the
-       body's apparent scroll rate is slightly slower than the page.
-       In landscape on the S8 Ultra, d peaks around ±650px, giving
-       roughly ±45px of drift.
+   On production the block is 5 items (divider + 4 paragraphs), so
+   the geometric axis sits at index 2.0. The two-axis structure is
+   generic: the axis is derived from driftItems.length, and the
+   clamp scales with |distance-from-axis| / axis. Nothing is
+   hard-coded to a specific count.
 
-     - Warm radial glow: the .centered class toggled when |d| is
-       within TB_GLOW_WINDOW_PX, driving a CSS ::before pseudo-
-       element's opacity. The in/out pulse timing lives in CSS.
-   ============================================================ */
-var TB_DRIFT_FACTOR = 0.07;
-var TB_GLOW_WINDOW_PX = 150;
+   Two motions compose:
+     globalShift        — whole block moves slower than the page.
+     relativeSeparation — items fan out from the axis as the block
+                          approaches centre, compress as it leaves.
+                          Capped proportionally per item so inner
+                          items never collapse past outer ones.
 
-function measureTransitionBody() {
-  var bodyEl = document.getElementById('transitionLineBody');
-  if (!bodyEl) { tbMetrics.valid = false; return; }
-  var paragraphs = bodyEl.querySelectorAll('p');
-  if (paragraphs.length < 2) { tbMetrics.valid = false; return; }
-  var secondLastP = paragraphs[paragraphs.length - 2];
-  var vh = window.innerHeight;
-  var bodyH = bodyEl.offsetHeight;
-  tbMetrics.bodyEl = bodyEl;
-  tbMetrics.secondLastP = secondLastP;
-  tbMetrics.downMax = Math.max(40, vh / 2 + bodyH / 2);
-  tbMetrics.upMax = Math.max(40, vh / 2 + secondLastP.offsetTop - bodyH / 2);
-  tbMetrics.valid = true;
-}
+   Plus a small alternating horizontal sway for a hand-tuned feel.
+
+   Transform is applied via JS only. The CSS rule for
+   .transition-line-body p carries no transform transition, so the
+   motion tracks scroll frame-for-frame instead of easing toward
+   its target. */
+var DRIFT_CONFIG = {
+  LINE_SPREAD_FACTOR: 0.05,
+  MAX_LINE_SPREAD_PX: 55,
+  GLOBAL_DRIFT_FACTOR: 0.14,
+  HORIZONTAL_SWAY_PX: 25
+};
 
 function updateTransitionBodyEffects() {
-  if (!tbMetrics.valid || !tbMetrics.bodyEl) return;
+  var lineWrapper = document.getElementById('transitionLine');
+  var bodyEl = document.getElementById('transitionLineBody');
+  if (!lineWrapper || !bodyEl) return;
+
+  var dividerEl = lineWrapper.querySelector('.transition-line-divider');
+  var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
+  if (!paragraphs.length) return;
+
+  /* Divider is Item 0. The rest are paragraphs. 5 items total
+     on production, geometric axis at index 2.0. */
+  var driftItems = dividerEl ? [dividerEl].concat(paragraphs) : paragraphs;
+  var totalItems = driftItems.length;
+  var centerIdx = (totalItems - 1) / 2;
+
   var vh = window.innerHeight;
   var vc = vh / 2;
-  var rect = tbMetrics.bodyEl.getBoundingClientRect();
-  var bodyCentre = rect.top + rect.height / 2;
-  var d = bodyCentre - vc;
+  var rect = lineWrapper.getBoundingClientRect();
+  var blockCenter = rect.top + rect.height / 2;
+  var d = blockCenter - vc;
 
-  /* v1.3: parallax drift. Negative sign so the body's apparent
-     scroll rate is slightly slower than the page. */
-  var driftY = -d * TB_DRIFT_FACTOR;
-  tbMetrics.bodyEl.style.transform =
-    (driftY > 0.05 || driftY < -0.05)
-      ? 'translateY(' + driftY.toFixed(2) + 'px)'
-      : '';
+  var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR;
+  var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
-  /* v1.3: warm radial glow toggled via the .centered class. */
-  if (Math.abs(d) <= TB_GLOW_WINDOW_PX) {
-    tbMetrics.bodyEl.classList.add('centered');
-  } else {
-    tbMetrics.bodyEl.classList.remove('centered');
+  for (var i = 0; i < totalItems; i++) {
+    var item = driftItems[i];
+    var lineDistFromCenter = i - centerIdx;
+    var relativeSeparation = lineDistFromCenter * (d * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
+
+    /* Proportional clamp prevents inner items from collapsing into
+       outer ones. For an item exactly at the axis the divisor is
+       non-zero (centerIdx ≥ 0.5 whenever there are at least two
+       items), and for the degenerate single-item case the
+       comparison against NaN is false so the separation stays 0. */
+    var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
+    if (relativeSeparation > itemMaxSpread) {
+      relativeSeparation = itemMaxSpread;
+    } else if (relativeSeparation < -itemMaxSpread) {
+      relativeSeparation = -itemMaxSpread;
+    }
+
+    var totalY = globalShift + relativeSeparation;
+
+    /* Horizontal sway, halved for the header so the ornamental bar
+       stays grounded. Alternating sign per item for a subtle zig. */
+    var swayMultiplier = (dividerEl && i === 0) ? 0.35 : 1.0;
+    var swayDir = (i % 2 === 0) ? 1 : -1;
+    var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier;
+
+    /* 2D translate() rather than translate3d to avoid Chromium GPU
+       tile-culling on rapid scroll flings. */
+    item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
   }
 }
 
@@ -3188,7 +3219,6 @@ function confirmName() {
     wrapTransitionBody();
     setupTransitionReveal();
     requestAnimationFrame(function() {
-      measureTransitionBody();
       updateTransitionBodyEffects();
     });
   }
@@ -4014,24 +4044,11 @@ document.addEventListener('touchmove', function(e) {
 }, { passive: false });
 
 /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
-var lineVisible = false;
-var hasEverScrolled = false;
 var tableEnteredView = false;
 var lastScrollY = 0;
 var summaryHysteresisOn = false;
 var summaryEverShown = false;
 var lastScrollDirection = null;
-
-function getFadeTriggerPx() {
-  var h = window.innerHeight, w = window.innerWidth;
-  var isLandscape = w > h;
-  var px;
-  if (isLandscape) px = h * 0.12;
-  else px = h * 0.08;
-  if (px < 130) px = 130;
-  if (px > 300) px = 300;
-  return px;
-}
 
 function revealTableSection() {
   if (!tableEnteredView) {
@@ -4091,37 +4108,11 @@ function updateSummaryVisibility() {
   updateNumpadVisibility();
 }
 
-function showTransitionLine(animate) {
-  if (lineVisible) return;
-  lineVisible = true;
-  transitionLine.classList.remove('fading', 'fading-up');
-  if (animate) {
-    transitionLine.classList.remove('active');
-    transitionLine.classList.add('returning');
-    void transitionLine.offsetWidth;
-    transitionLine.classList.remove('returning');
-    transitionLine.classList.add('active');
-  } else {
-    transitionLine.classList.add('active');
-  }
-  scheduleTransitionBodyUpdate();
-}
-function hideTransitionLine() {
-  if (!lineVisible) return;
-  lineVisible = false;
-  transitionLine.classList.remove('active', 'returning', 'fading-up');
-  transitionLine.classList.add('fading');
-}
-
 function evaluateScrollState() {
-  var rect = tableCard.getBoundingClientRect();
-  var trigger = getFadeTriggerPx();
   var lineRect = transitionLine.getBoundingClientRect();
   var vh = window.innerHeight;
   if (lineRect.top < vh - 20) {
     revealTableSection();
-    if (rect.top <= trigger) hideTransitionLine();
-    else showTransitionLine(true);
   }
   updateSummaryVisibility();
   updateIntroHintVisibility();
@@ -4144,14 +4135,6 @@ window.addEventListener('scroll', function() {
   lastScrollY = y;
   if (goingDown) lastScrollDirection = 'down';
   else if (goingUp) lastScrollDirection = 'up';
-  if (goingDown && !hasEverScrolled && y > 5) {
-    hasEverScrolled = true;
-    var lineRect = transitionLine.getBoundingClientRect();
-    if (currentPanel === totalPanels - 1 && lineRect.top < window.innerHeight + 100) {
-      revealTableSection();
-      showTransitionLine(true);
-    }
-  }
   if (goingDown || goingUp) {
     scheduleEvaluation();
     scheduleTransitionBodyUpdate();
@@ -4170,7 +4153,6 @@ window.addEventListener('scroll', function() {
 window.addEventListener('resize', function() {
   scheduleEvaluation();
   scheduleTransitionBodyUpdate();
-  measureTransitionBody();
   updateReceiptScrollIndicator();
 });
 window.addEventListener('orientationchange', function() {
@@ -4179,7 +4161,6 @@ window.addEventListener('orientationchange', function() {
   setTimeout(repositionNumpad, 200);
   setTimeout(updateNumpadVisibility, 200);
   setTimeout(function() {
-    measureTransitionBody();
     scheduleTransitionBodyUpdate();
     updateReceiptScrollIndicator();
   }, 300);
