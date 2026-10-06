@@ -28,6 +28,20 @@
 </head>
 <body>
 
+<!-- ============ WASHI WATERMARK ============
+     A single giant stroke-only outline of the maple leaf, anchored
+     at the viewport's bottom-left corner. The lower-left lobes of the
+     leaf are visible in the corner; the rest bleeds off-screen to the
+     top-right. Sits at z-index -1 — above the ambient stage (-2),
+     below every piece of content. Gated to autumn in main.css.
+     The slow breathe animation (8s, alternate) gives it the faint
+     movement of light through washi paper. -->
+<div class="washi-watermark" aria-hidden="true">
+  <svg viewBox="0 0 900 1000" preserveAspectRatio="xMidYMid meet">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+</div>
+
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <!-- v1.3: pre-feathered CSS light mesh replaces the ambient video.
        Each .light-orb is a radial-gradient that fades to transparent
@@ -71,7 +85,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v1.8.2</div>
+  <div class="app-version" aria-hidden="true">v1.7.6</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
