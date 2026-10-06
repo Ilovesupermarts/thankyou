@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v54';
+const CACHE = 'thankyou-v55';
 
 const ASSETS = [
   './',
@@ -20,7 +20,8 @@ const ASSETS = [
   './icons/1790678998862.jpg',
   './icons/1790835034553.jpg',
   './icons/44173_0c6eff.png',
-  './Sound/cave-water-drop-echo-a053fcdf.mp3'
+  './Sound/cave-water-drop-echo-a053fcdf.mp3',
+  './Sound/freesound_community-wind-chimes-32150.mp3'
 ];
 
 self.addEventListener('install', function(e) {
