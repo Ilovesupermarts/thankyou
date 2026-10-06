@@ -104,12 +104,24 @@
      the top-right. Sits at z-index -1 — above the ambient stage
      (-2) and below every piece of content (panels, table, dialogs
      etc). Gated to autumn. Breathes very slowly (8s, alternate)
-     between scale(1) rotate(-4deg) and scale(1.115) rotate(4deg).
+     between rotation and opacity.
 
-     The stroke uses vector-effect: non-scaling-stroke so the 4px
-     hairline holds its width at any rendered size — without it the
-     stroke would be multiplied by the viewBox-to-CSS-pixel ratio
-     and become a fat band on a leaf this large. */
+     v1.3 (tile-artifact fix): removed vector-effect: non-scaling-
+     stroke and the scale() term from the breathe keyframe. Both
+     properties forced Skia to re-rasterize the SVG path into fresh
+     GPU tiles on every animation frame. On mobile Chromium (esp.
+     Adreno GPUs) that per-frame tile churn was leaking dirty-rect
+     alpha at tile boundaries — visible as sharp rectangular
+     patches and a delayed bottom tile during the table entrance.
+     Removing both lets the browser rasterize the path once and
+     cache it as a static texture, which the compositor can then
+     rotate and alpha-blend with zero per-frame rasterization.
+
+     stroke-width is now set in viewBox units (2.4) rather than as
+     a non-scaling 4px stroke. At 80vw on the tablet the viewBox
+     scale factor is ~1.33, so 2.4 units renders at ~3.2px on
+     screen — near enough to the previous 4px to be invisible on
+     a hairline. */
   .washi-watermark {
     position: fixed;
     bottom: 0;
@@ -131,15 +143,14 @@
   .washi-watermark path {
     fill: none;
     stroke: #b0390e;
-    stroke-width: 4.0;
+    stroke-width: 2.4;
     stroke-linejoin: round;
     stroke-linecap: round;
-    vector-effect: non-scaling-stroke;
   }
   html[data-theme="default"] .washi-watermark { display: none; }
   @keyframes washiBreathe {
-    0%   { transform: scale(1) rotate(-4deg); }
-    100% { transform: scale(1.115) rotate(4deg); }
+    0%   { transform: rotate(-4deg); opacity: 0.16; }
+    100% { transform: rotate(3deg);  opacity: 0.24; }
   }
   @media (prefers-reduced-motion: reduce) {
     .washi-watermark { animation: none !important; }
@@ -358,11 +369,16 @@
 
   /* ============ AMBIENT MAPLE LEAVES (v1.3) ============
      Continuous overlay running the full life of the app once
-     activated by triggerKoiStart(). Sits at z-index 30 — above the
-     ambient stage (z-index -2) and below every piece of content
-     (panels, transition, table, summary, dialogs, receipt, thank-you
-     text), so the leaves pass behind what the user reads. This
-     matches the demo view against which the leaf values were tuned.
+     activated by triggerKoiStart(). Sits at z-index -1 — above the
+     ambient stage (-2) and below every piece of content (panels,
+     transition, table, summary, dialogs, receipt, thank-you text),
+     so the leaves pass behind what the user reads.
+
+     Document order in index.html puts .washi-watermark before this
+     element, so where they overlap the leaves paint on top of the
+     watermark — leaves are the moving foreground, watermark is the
+     paper underneath. Both sit behind content.
+
      Gated to autumn below; the default (sakura) theme hides the
      whole layer.
 
@@ -370,13 +386,17 @@
      dropped 0.95 → 0.30, drop-shadow alpha scaled down from 0.22
      to 0.07 to match the lower leaf opacity. Colours and drift
      timings unchanged. The leaf shape itself was swapped to the
-     larger palmate maple path in index.html (viewBox 900×1000). */
+     larger palmate maple path in index.html (viewBox 900×1000).
+
+     v1.3 (z-index fix): was 30 — which put the leaves above the
+     panels and table. Moved to -1 so they sit with the watermark,
+     behind all content. */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
-    z-index: 30;
+    z-index: -1;
     opacity: 0;
     transition: opacity 1.8s ease;
   }
