@@ -28,20 +28,6 @@
 </head>
 <body>
 
-<!-- ============ WASHI WATERMARK ============
-     A single giant stroke-only outline of the maple leaf, anchored
-     at the viewport's bottom-left corner. The lower-left lobes of the
-     leaf are visible in the corner; the rest bleeds off-screen to the
-     top-right. Sits at z-index -1 — above the ambient stage (-2),
-     below every piece of content. Gated to autumn in main.css.
-     The slow breathe animation (8s, alternate) gives it the faint
-     movement of light through washi paper. -->
-<div class="washi-watermark" aria-hidden="true">
-  <svg viewBox="0 0 900 1000" preserveAspectRatio="xMidYMid meet">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-</div>
-
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <!-- v1.3: pre-feathered CSS light mesh replaces the ambient video.
        Each .light-orb is a radial-gradient that fades to transparent
@@ -60,6 +46,43 @@
   <div class="ambient-layer caustics caustics-1"></div>
   <div class="ambient-layer caustics caustics-2"></div>
   <div class="mote-field" id="moteField"></div>
+</div>
+
+<!-- ============ AMBIENT SHIPPO MOSAIC BACKGROUND ============
+     Static tiled pattern — a repeating Japanese Shippō (七宝)
+     motif of overlapping circles. Drawn once by the browser at
+     page load, then never touched again — zero per-frame cost.
+     Gated to autumn in main.css. -->
+<svg class="ambient-mosaic" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+  <defs>
+    <pattern id="pat-shippo" width="60" height="60" patternUnits="userSpaceOnUse">
+      <g stroke="#8f2f00" stroke-width="1.7" fill="none">
+        <circle cx="0" cy="0" r="30" />
+        <circle cx="60" cy="0" r="30" />
+        <circle cx="0" cy="60" r="30" />
+        <circle cx="60" cy="60" r="30" />
+        <circle cx="30" cy="30" r="30" />
+      </g>
+    </pattern>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#pat-shippo)" />
+</svg>
+
+<!-- ============ AMBIENT CIRCLE TRACER POOL ============
+     Three reusable tracer nodes. The app.js controller picks one,
+     snaps it to a Shippō tile vertex (grid parity enforced), and
+     plays a 2.5s "drawing" animation. Gated to autumn and to the
+     active carousel state. -->
+<div class="tracer-layer" id="tracerLayer" aria-hidden="true">
+  <div class="shippo-tracer" id="shippoTracer0">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
+  <div class="shippo-tracer" id="shippoTracer1">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
+  <div class="shippo-tracer" id="shippoTracer2">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
 </div>
 
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
@@ -85,7 +108,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v1.8.4</div>
+  <div class="app-version" aria-hidden="true">v1.8.5</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -506,11 +529,12 @@
 
 <!-- v1.3: ambient falling maple leaves. Continuous overlay running
      the full life of the app once activated — visible above the
-     stage and table, occluded by the opaque backdrops of every modal
-     and the receipt, and visible again through the transparent
-     .thankyou-screen. Gated to autumn in CSS. The seven leaves share
-     the same palmate Japanese maple path; per-leaf colour, size, and
-     drift timing come from the .leaf-N classes in main.css. -->
+     ambient stage and below every piece of content, occluded by
+     the opaque backdrops of every modal and the receipt, and
+     visible again through the transparent .thankyou-screen. Gated
+     to autumn in CSS. The seven leaves share the same palmate
+     Japanese maple path; per-leaf colour, size, and drift timing
+     come from the .leaf-N classes in main.css. -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
   <!-- 7 Palmate Japanese Momiji Leaves with Staggered Drifts -->
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000">
