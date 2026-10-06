@@ -97,6 +97,54 @@
   body.thankyou-active .summary { visibility: hidden; }
   body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
+  /* ============ WASHI WATERMARK (v1.3) ============
+     A single giant stroke-only outline of the maple leaf, anchored
+     at the viewport's bottom-left corner. The lower-left lobes of
+     the leaf spill into the corner; the rest bleeds off-screen to
+     the top-right. Sits at z-index -1 — above the ambient stage
+     (-2) and below every piece of content (panels, table, dialogs
+     etc). Gated to autumn. Breathes very slowly (8s, alternate)
+     between scale(1) rotate(-4deg) and scale(1.115) rotate(4deg).
+
+     The stroke uses vector-effect: non-scaling-stroke so the 4px
+     hairline holds its width at any rendered size — without it the
+     stroke would be multiplied by the viewBox-to-CSS-pixel ratio
+     and become a fat band on a leaf this large. */
+  .washi-watermark {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 80vw;
+    max-width: 1600px;
+    height: auto;
+    pointer-events: none;
+    z-index: -1;
+    opacity: 0.20;
+    animation: washiBreathe 8s ease-in-out infinite alternate;
+    will-change: transform;
+  }
+  .washi-watermark svg {
+    width: 100%;
+    height: auto;
+    display: block;
+  }
+  .washi-watermark path {
+    fill: none;
+    stroke: #b0390e;
+    stroke-width: 4.0;
+    stroke-linejoin: round;
+    stroke-linecap: round;
+    vector-effect: non-scaling-stroke;
+  }
+  html[data-theme="default"] .washi-watermark { display: none; }
+  @keyframes washiBreathe {
+    0%   { transform: scale(1) rotate(-4deg); }
+    100% { transform: scale(1.115) rotate(4deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .washi-watermark { animation: none !important; }
+  }
+
   /* ============ AMBIENT STAGE ============ */
   .ambient-stage {
     position: fixed;
@@ -118,19 +166,19 @@
      autumn theme below; the default (sakura) theme keeps its
      watercolor gradient stack uncluttered.
 
-     v1.3 (tuning pass): mesh opacity 0.55 → 0.43, orb durations
-     roughly halved (22/29/19s → 11.58/15.26/10.00s), travel amounts
-     multiplied by 2.75, scale range multiplied by 1.20. Gradient
-     cores and halos now use the leaf palette — rust reds (#c9561b,
-     #d46a15) as cores, warm ambers (#f7b93c, #d95e1a, #dd8418) as
-     halos — so the light mesh reads from the same colour family as
-     the falling maple leaves. */
+     v1.3 (tuning pass): mesh opacity raised to 0.90 per the demo.
+     Orb durations roughly halved (22/29/19s → 11.58/15.26/10.00s),
+     travel amounts multiplied by 2.75, scale range multiplied by
+     1.20. Gradient cores and halos now use the leaf palette — rust
+     reds (#c9561b, #d46a15) as cores, warm ambers (#f7b93c, #d95e1a,
+     #dd8418) as halos — so the light mesh reads from the same colour
+     family as the falling maple leaves. */
   .ambient-mesh {
     position: absolute;
     inset: 0;
     overflow: hidden;
     pointer-events: none;
-    opacity: 0.43;
+    opacity: 0.90;
   }
   html[data-theme="default"] .ambient-mesh { display: none; }
 
@@ -328,7 +376,7 @@
     inset: 0;
     pointer-events: none;
     overflow: hidden;
-    z-index: -1;
+    z-index: 30;
     opacity: 0;
     transition: opacity 1.8s ease;
   }
@@ -435,6 +483,7 @@
     .caustics-1, .caustics-2 { animation: none; }
     .light-orb { animation: none !important; }
     .maple-leaf { animation: none !important; }
+    .washi-watermark { animation: none !important; }
     .ripple { animation-duration: 300ms; }
   }
   @keyframes ambientDrift {
