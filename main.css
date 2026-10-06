@@ -102,7 +102,19 @@
      layers sit above the drifting light orbs but below every piece
      of content. The stage remains a promoted compositor layer for
      the wind gust animation; the mosaic and tracers are static
-     against it. */
+     against it.
+
+     The mix-blend-mode layers (.ambient-secondary multiply,
+     .caustics-1/.caustics-2 screen) that used to live inside this
+     container were removed in the checkerboard-tile-dropout fix.
+     Each one forced Chromium to open a separate offscreen
+     RenderPass on the stage's isolated FBO and read back the
+     backdrop before compositing, which on Adreno TBDR hardware
+     exhausted tile memory at 120Hz and produced axis-aligned tile
+     dropouts. Their depth contribution is now provided by an
+     additional source-over gradient stop inside .ambient-primary,
+     which blends in fixed-function hardware on the tile with zero
+     extra framebuffers. */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
@@ -130,10 +142,9 @@
      every raster pass. At 120Hz on the S8 Ultra's viewport, worker
      threads routinely missed the 8.3ms frame deadline, producing tile-
      checkerboard dropouts: crisp 512/1024px seams and rectangular
-     transparent regions (documented in the operator's screenshots).
-     A CSS background-image data-URI rasterizes the tile once into a
-     small texture which the compositor samples directly, eliminating
-     that failure mode entirely.
+     transparent regions. A CSS background-image data-URI rasterizes
+     the tile once into a small texture which the compositor samples
+     directly, eliminating that failure mode entirely.
 
      Data-URI is fully percent-encoded (spaces as %20, # as %23) so
      CSSNano / PostCSS / any url()-unquoting minifier cannot corrupt it.
@@ -188,11 +199,15 @@
      is not clipped to the 68x68 viewBox — without it the drop-shadow
      would terminate at a hard rectangular edge.
 
-     The tracerFade envelope peaks at 0.55 rather than 0.85: the
-     double drop-shadow has a much higher optical density than a
-     bare stroke, and at 0.85 the glow backlights the panel text.
-     0.55 reads as light filtering through washi fibres — visible
-     and tactile but strictly background. */
+     The tracerFade envelope peaks at 0.68 and holds a 0.55 plateau:
+     the double drop-shadow has a much higher optical density than a
+     bare stroke, so the envelope is tuned for text hierarchy against
+     the 18–22px Shippori Mincho body copy that sits above it. The
+     0.68/0.55 ratio preserves the shape of the original 0.55/0.45
+     envelope (≈ 0.81 plateau-to-peak in both). Raising either number
+     is a text-contrast decision, not a fill-rate one — opacity does
+     not change the raster cost of the drop-shadow passes, which are
+     driven by the stroke-dashoffset geometry mutation. */
   .tracer-layer {
     position: fixed;
     inset: 0;
@@ -250,8 +265,8 @@
 
   @keyframes tracerFade {
     0%   { opacity: 0; }
-    18%  { opacity: 0.55; }
-    75%  { opacity: 0.45; }
+    18%  { opacity: 0.68; }
+    75%  { opacity: 0.55; }
     100% { opacity: 0; }
   }
 
@@ -358,25 +373,26 @@
     transition: filter 2s ease;
     will-change: transform;
   }
-  .ambient-secondary { display: none; }
   html[data-theme="autumn"] .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
       radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
       radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
       radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%);
+      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%),
+      /* Restored amber depth via source-over hardware blend. The
+         .ambient-secondary multiply pass that previously darkened the
+         inter-orb valleys was removed in the checkerboard-dropout fix;
+         this stop substitutes for it using fixed-function alpha
+         blending on the tile. It sits at the BOTTOM of the background
+         list (painted first, under everything else) so the upper
+         radials' bright cores keep their peak luminance while the rust
+         depth bleeds through only where the upper gradients taper into
+         transparency. Hoisting this line to index 0 converts it from
+         an underpainting into a top-layer veil if the in-situ read
+         comes back too flat. */
+      radial-gradient(circle at 65% 25%, rgba(143, 47, 0, 0.30) 0%, rgba(107, 47, 14, 0.16) 35%, rgba(107, 47, 14, 0) 65%);
     animation: autumnDrift1 14s ease-in-out infinite;
-  }
-  html[data-theme="autumn"] .ambient-secondary {
-    display: block;
-    background:
-      radial-gradient(circle at 60% 20%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0) 40%),
-      radial-gradient(circle at 40% 90%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0) 45%);
-    animation: autumnDrift2 19s ease-in-out infinite;
-    mix-blend-mode: multiply;
-    opacity: 0.55;
-    will-change: transform;
   }
   html[data-time="morning"] .ambient-primary { filter: hue-rotate(-8deg) saturate(1.05); }
   html[data-time="day"]     .ambient-primary { filter: none; }
@@ -389,36 +405,6 @@
   html[data-weather="clouds"] .ambient-primary { filter: saturate(0.8); }
   html[data-weather="snow"] .ambient-primary { filter: hue-rotate(6deg) saturate(0.5) brightness(1.06); }
   html[data-weather="clear"] .ambient-primary { filter: hue-rotate(4deg) saturate(1.1); }
-
-  /* ============ CAUSTICS (v1.17.2) ============ */
-  .caustics {
-    mix-blend-mode: screen;
-    pointer-events: none;
-    will-change: transform;
-  }
-  .caustics-1 {
-    opacity: 0.36;
-    background:
-      radial-gradient(ellipse 42% 32% at 28% 42%, rgba(255, 232, 160, 0.75) 0%, rgba(255, 232, 160, 0.20) 40%, transparent 72%),
-      radial-gradient(ellipse 30% 40% at 72% 58%, rgba(255, 198, 100, 0.65) 0%, rgba(255, 198, 100, 0.15) 42%, transparent 72%);
-    animation: caustic1 48s ease-in-out infinite;
-  }
-  .caustics-2 {
-    opacity: 0.28;
-    background:
-      radial-gradient(ellipse 36% 28% at 62% 32%, rgba(255, 244, 214, 0.55) 0%, transparent 70%),
-      radial-gradient(ellipse 28% 36% at 38% 68%, rgba(255, 214, 130, 0.55) 0%, transparent 70%);
-    animation: caustic2 62s ease-in-out infinite;
-  }
-  @keyframes caustic1 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    33%      { transform: translate(3.5%, -2%) scale(1.08) rotate(2deg); }
-    66%      { transform: translate(-2.5%, 3%) scale(0.95) rotate(-1.5deg); }
-  }
-  @keyframes caustic2 {
-    0%, 100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    50%      { transform: translate(-4%, 3.5%) scale(1.12) rotate(-3deg); }
-  }
 
   /* ============ RIPPLE LAYER (v1.17.2) ============ */
   .ripple-layer {
@@ -585,7 +571,6 @@
     .ambient-stage { transform: none !important; }
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
-    .caustics-1, .caustics-2 { animation: none; }
     .light-orb { animation: none !important; }
     .maple-leaf { animation: none !important; }
     .ripple { animation-duration: 300ms; }
@@ -606,16 +591,6 @@
     60% { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
     72% { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
     85% { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  }
-  @keyframes autumnDrift2 {
-    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    13% { transform: translate(-5%, 4%) scale(1.15) rotate(-2deg); }
-    27% { transform: translate(4%, -6%) scale(0.92) rotate(3deg); }
-    41% { transform: translate(-2%, 3%) scale(1.18) rotate(1deg); }
-    55% { transform: translate(6%, -2%) scale(1.05) rotate(-3deg); }
-    68% { transform: translate(-4%, 5%) scale(0.95) rotate(2deg); }
-    82% { transform: translate(3%, -4%) scale(1.12) rotate(-1deg); }
     100% { transform: translate(0, 0) scale(1) rotate(0deg); }
   }
 
