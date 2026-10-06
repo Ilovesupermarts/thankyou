@@ -35,16 +35,24 @@
        zero GPU convolution passes. Motion is transform-only, so the
        compositor drives it without layout or repaint cost.
        The mesh is gated to the autumn theme in main.css; the default
-       (sakura) theme keeps its watercolor gradient stack uncluttered. -->
+       (sakura) theme keeps its watercolor gradient stack uncluttered.
+
+       v1.3 (raster fix, step 1): the mix-blend-mode layers
+       .ambient-secondary (multiply), .caustics-1 (screen) and
+       .caustics-2 (screen) have been removed from the DOM. Each one
+       forced Chromium to open a separate offscreen render pass on the
+       stage's isolated FBO and read back the backdrop before
+       compositing, which on Adreno TBDR hardware exhausted tile
+       memory at 120Hz and produced the axis-aligned tile dropouts
+       observed on the tablet. The CSS rules for these selectors are
+       deliberately left in main.css as dead code so step 2/3 can be
+       applied if the artifacts persist without re-authoring anything. -->
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
     <div class="light-orb orb-3"></div>
   </div>
   <div class="ambient-layer ambient-primary"></div>
-  <div class="ambient-layer ambient-secondary"></div>
-  <div class="ambient-layer caustics caustics-1"></div>
-  <div class="ambient-layer caustics caustics-2"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
 
@@ -101,7 +109,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v1.8.7</div>
+  <div class="app-version" aria-hidden="true">v1.8.8</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
