@@ -4,60 +4,56 @@
    ------------------------------------------------------------
    Changelog:
      v1.3
+       - Shippo tracer fix: scheduleShippoTracer() no longer calls
+         stopShippoTracer() at its head. The previous version added
+         .drawing inside triggerShippoCircle() and then removed it
+         synchronously in the recursive scheduleShippoTracer() call
+         on the very next line, all within the same JS task — so
+         the browser never rendered a single frame of the stroke-
+         dashoffset animation and the tracers were invisible.
+         Now split into two functions: clearShippoDrawings() only
+         strips the class, stopShippoTracer() cancels the timer and
+         clears drawings (used by lifecycle hooks), and
+         scheduleShippoTracer() only cancels a pending timer tick.
        - Ambient Shippo mosaic + circle tracer added. Replaces the
          washi watermark (removed in index.html and main.css). The
          mosaic is a static tiled SVG pattern at z-index -2; the
          tracer pool is three 68x68 SVG circles that snap to tile
          vertices and play a 2.5s stroke-dashoffset draw animation.
-         Controller lives below, before BOOTSTRAP. Gated to autumn
-         and to the active carousel state (mapleLeaves.classList
-         .contains('active')) so the name screen, the koi pond, and
-         the intro stay clean.
+         Gated to autumn and to the active carousel state
+         (mapleLeaves.classList.contains('active')) so the name
+         screen, the koi pond, and the intro stay clean.
        - Ambient video removed. Replaced by a pre-feathered CSS
-         light mesh (.ambient-mesh, three radial-gradient orbs) in
-         index.html / main.css. Three references to the old
-         .ambient-image element in this file have been removed
-         (returnToStartScreen, and two in triggerKoiStart). The
-         ambientVideo handlers in applyTheme() and the window.load
-         boot block have also been removed.
-       - Default theme switched to autumn. index.html ships
-         data-theme="autumn" and currentTheme boots as 'autumn'.
+         light mesh (.ambient-mesh, three radial-gradient orbs).
+       - Default theme switched to autumn.
        - Backdrop-filters removed in main.css on .summary, .msg-3,
          .reject-row, .confirm-screen, .alert-screen, .tanzaku-screen.
        - will-change: opacity, transform removed from .panel-phrase.
        - Koi tap flinch: gated on the tap landing on the koi PNG.
        - Ambient subtle ripples on the koi screen.
-       - Receipt landing serialization (deferItems / revealReceiptItems).
+       - Receipt landing serialization.
        - Receipt close restores previous scroll position.
        - Panel-1 post-beat delay lengthened 500 → 1000ms.
-       - Scroll gate: body scroll only unlocked at last panel and
-         only stays unlocked once the table has been visited.
-       - Reset hot-spot: invisible top-left tap target.
-       - Transition-line accordion drift (flat-top envelope,
-         LINE_SPREAD_FACTOR 0.075, GLOBAL_DRIFT_FACTOR 0.08).
-       - Maple leaf overlay: falling SVG leaves, z-index -1, seven
-         palmate Momiji with staggered drifts, gated to autumn.
+       - Scroll gate: body scroll only unlocked at last panel.
+       - Reset hot-spot.
+       - Transition-line accordion drift.
+       - Maple leaf overlay: z-index -1, seven Momiji.
      v1.17.2
-       - Panel-1 opening line: therapistDisplayName + cached
-         therapistGreeting; beats rebuilt from them.
-       - Transition-line focus snap via text-shadow glow.
-       - Carousel edge and under-swipe: bounceToCurrentPanel().
+       - Panel-1 opening line source of truth.
+       - Transition-line focus snap.
+       - Carousel edge and under-swipe.
        - Custom-row sequential lockout fix.
        - Koi screen water effects.
-       - Receipt item counter: compact 2-column odometer.
-       - Receipt 本日の内容 counter styled to match the label.
+       - Receipt item counter odometer.
      v1.17.1
        - Panel-1 opening line: correct insertion anchor.
-       - Panel-1 beats derive split dynamically at first "、".
        - Panel-1 beats rebuilt after confirmName() runs.
-       - Therapist-name span contains "name + さん", font weight 600.
      v1.17
-       - Panel phrase reveal: min-chunk absorption + comma-aware
-         split; recursive text-node walker wrapper.
+       - Panel phrase reveal.
      v1.16
        - Panel messages phrase reveal on every panel activation.
      v1.15
-       - Receipt scroll reset + indicator; transition-line reveal.
+       - Receipt scroll reset + indicator.
      v1.14
        - Odometer, receipt landing, MP3 koi sound.
      v1.13
@@ -66,10 +62,6 @@
 
 /* ============ THEME TOGGLE ============ */
 var themeToggle = document.getElementById('themeToggle');
-/* v1.3: default theme switched to autumn. index.html ships
-   data-theme="autumn" and the toggle button renders 🍁 at boot.
-   currentTheme tracks the active theme so applyTheme() can flip
-   between the two. */
 var currentTheme = 'autumn';
 function applyTheme(theme) {
   currentTheme = theme;
@@ -80,9 +72,7 @@ function applyTheme(theme) {
      leaves overlay — it is added the moment Panel 0 mounts inside
      triggerKoiStart() and removed synchronously in
      returnToStartScreen(). Gating on that instead of introHasRun
-     closes the mid-intro race: if the user toggles the theme
-     while the calligraphy intro is still playing, the leaves are
-     not yet .active, so the tracer does not start early. */
+     closes the mid-intro race. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (theme === 'autumn' && isCarouselRunning) {
     scheduleShippoTracer();
@@ -98,11 +88,7 @@ if (themeToggle) {
   });
 }
 
-/* v1.3: reset hot-spot. Invisible, fixed top-left tap target.
-   Returns to the blossom start screen without losing any entered
-   values. Guarded inside returnToStartScreen() so it is a no-op
-   on the name screen, during the receipt, and during the
-   thank-you flow. */
+/* v1.3: reset hot-spot. */
 var resetHotspot = document.getElementById('resetHotspot');
 if (resetHotspot) {
   resetHotspot.addEventListener('click', function(e) {
@@ -569,7 +555,7 @@ function updateReceiptTotal() {
 }
 
 /* ============================================================
-   COUNTER ODOMETER — v1.17.2
+   COUNTER ODOMETER
    ============================================================ */
 var COUNTER_COLS = 2;
 
@@ -756,10 +742,7 @@ var introHasRun = false;
 var koiDiveWrap = document.getElementById('koiDiveWrap');
 var rippleLayer = document.getElementById('rippleLayer');
 
-/* v1.3: maple leaf overlay — activated once the panel carousel
-   begins, deactivated on return to the koi start screen. The
-   leaves themselves are pure CSS; the only JS involvement is the
-   .active toggle on the container. */
+/* v1.3: maple leaf overlay. */
 var mapleLeaves = document.getElementById('mapleLeaves');
 
 /* v1.3: Shippo mosaic circle tracer pool — three reusable nodes. */
@@ -1530,29 +1513,19 @@ function relockTable() {
   document.body.classList.add('table-locked');
 }
 
-/* v1.3: return to the blossom start screen without losing any
-   entered values. Preserves nameConfirmed, therapistDisplayName,
-   all input fields, the dynamicRows table, and the tip. Resets
-   only the transient UI state so the koi intro and panel sequence
-   can be re-run. Guarded so it cannot fire during the receipt or
-   thank-you flows, where the blossom screen would be occluded. */
+/* v1.3: return to the blossom start screen. */
 function returnToStartScreen() {
   if (!nameConfirmed) return;
   if (receiptScreen && receiptScreen.classList.contains('visible')) return;
   if (thankyouScreen && thankyouScreen.classList.contains('visible')) return;
 
-  /* Stop ambient ripples and any in-flight koi timers. */
   stopAmbientRipple();
   clearKoiTimers();
   resetWind();
 
-  /* v1.3: hide the ambient maple leaves and stop the Shippo
-     tracer. Both are re-activated when triggerKoiStart() reaches
-     activatePanel(0). */
   if (mapleLeaves) mapleLeaves.classList.remove('active');
   stopShippoTracer();
 
-  /* Reset koi gesture state so the swipe-up gesture works again. */
   koiGestureState = 'idle';
   koiActivePointerId = null;
   koiFlinchActive = false;
@@ -2499,25 +2472,8 @@ function wrapTransitionBody() {
 }
 
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT — v1.3 (Flat-Top Envelope)
-   ============================================================
-   Divider (Item 0) plus each paragraph in the body form a single
-   drift array. Each item receives an inline translate() computed
-   from three composed motions:
-
-     globalShift        — whole block moves slower than the page.
-     relativeSeparation — items fan out from the geometric axis.
-     swayX              — small alternating horizontal zig.
-
-   All three are scaled by a flat-top envelope over |d|:
-
-     |d| <= CORE_ZONE_PX (180)   : envelope = 1.0.
-     CORE_ZONE_PX < |d| <
-       MAX_ZONE_PX (420)         : envelope = smoothstep ease-out.
-     |d| >= MAX_ZONE_PX          : transforms cleared.
-
-   v1.3: resting gaps tightened in main.css, physical runways
-   widened, LINE_SPREAD_FACTOR 0.075, GLOBAL_DRIFT_FACTOR 0.08. */
+   TRANSITION-LINE ACCORDION DRIFT
+   ============================================================ */
 var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.075,
   MAX_LINE_SPREAD_PX: 38,
@@ -2645,7 +2601,7 @@ function updateReceiptScrollIndicator() {
 }
 
 /* ============================================================
-   KOI WATER EFFECTS — v1.17.2 / v1.3
+   KOI WATER EFFECTS
    ============================================================ */
 var RIPPLE_COLOURS_STRONG = [
   'rgba(253, 243, 216, 0.95)',
@@ -2741,9 +2697,6 @@ function isBlossomInteractive() {
   return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun;
 }
 
-/* ============================================================
-   AMBIENT SUBTLE RIPPLES — v1.3
-   ============================================================ */
 function stopAmbientRipple() {
   if (ambientRippleTimer) {
     clearTimeout(ambientRippleTimer);
@@ -2783,7 +2736,7 @@ function scheduleAmbientRipple() {
 }
 
 /* ============================================================
-   KOI FLINCH — v1.3
+   KOI FLINCH
    ============================================================ */
 function triggerKoiFlinch() {
   if (!koiDiveWrap) return;
@@ -4542,6 +4495,20 @@ tyReceiptBtn.addEventListener('click', function(e) {
    (j * 30px, k * 30px) where (j + k) is even.
    SVG center offset is 34px (from 68x68 viewbox), so the
    translate is (j*30 - 34, k*30 - 34).
+
+   v1.3 fix: scheduleShippoTracer() no longer calls
+   stopShippoTracer() at its head. The previous version added
+   .drawing inside triggerShippoCircle() and then removed it
+   synchronously in the recursive scheduleShippoTracer() call on
+   the very next line, all within the same JS task — so the
+   browser never rendered a single frame of the stroke-dashoffset
+   animation and the tracers were invisible.
+
+   Now split into three functions:
+     clearShippoDrawings()  strips .drawing from all three nodes
+     stopShippoTracer()     cancels the timer AND clears drawings
+                            (used by lifecycle hooks)
+     scheduleShippoTracer() only cancels a pending timer tick
    ============================================================ */
 function triggerShippoCircle() {
   if (currentTheme !== 'autumn') return;
@@ -4571,20 +4538,28 @@ function triggerShippoCircle() {
   tracer.classList.add('drawing');
 }
 
-function stopShippoTracer() {
-  if (shippoTimer) {
-    clearTimeout(shippoTimer);
-    shippoTimer = null;
-  }
-  /* Clear any in-flight drawings so a reset does not leave a ring
-     mid-animation on screen. */
+function clearShippoDrawings() {
   for (var i = 0; i < shippoTracers.length; i++) {
     if (shippoTracers[i]) shippoTracers[i].classList.remove('drawing');
   }
 }
 
+function stopShippoTracer() {
+  if (shippoTimer) {
+    clearTimeout(shippoTimer);
+    shippoTimer = null;
+  }
+  clearShippoDrawings();
+}
+
 function scheduleShippoTracer() {
-  stopShippoTracer();
+  /* Only clear a pending timer tick — do NOT remove .drawing from
+     active tracers, or the animation gets cancelled in the same
+     task it was started in. */
+  if (shippoTimer) {
+    clearTimeout(shippoTimer);
+    shippoTimer = null;
+  }
   if (currentTheme !== 'autumn') return;
 
   /* Average 1.0s cadence (0.75s to 1.25s organic jitter). */
