@@ -4,125 +4,52 @@
    ------------------------------------------------------------
    Changelog:
      v1.3
+       - Ambient Shippo mosaic + circle tracer added. Replaces the
+         washi watermark (removed in index.html and main.css). The
+         mosaic is a static tiled SVG pattern at z-index -2; the
+         tracer pool is three 68x68 SVG circles that snap to tile
+         vertices and play a 2.5s stroke-dashoffset draw animation.
+         Controller lives below, before BOOTSTRAP. Gated to autumn
+         and to the active carousel state (mapleLeaves.classList
+         .contains('active')) so the name screen, the koi pond, and
+         the intro stay clean.
        - Ambient video removed. Replaced by a pre-feathered CSS
-         light mesh (.ambient-mesh, three radial-gradient orbs)
-         in index.html / main.css. Three references to the old
+         light mesh (.ambient-mesh, three radial-gradient orbs) in
+         index.html / main.css. Three references to the old
          .ambient-image element in this file have been removed
          (returnToStartScreen, and two in triggerKoiStart). The
          ambientVideo handlers in applyTheme() and the window.load
-         boot block have also been removed. The intro reveal no
-         longer fades a video layer up or down — the calligraphic
-         kanji arrival carries the moment on its own.
-       - Ambient falling maple leaves added. A single fixed overlay
-         (.maple-leaves-overlay) with seven palmate SVG leaves and
-         three drift keyframes; activated once when the main panel
-         carousel begins and deactivated on return to the koi start
-         screen. z-index 230 — above the stage and table, occluded
-         by every modal backdrop, visible again through the
-         transparent thank-you screen. Gated to autumn in CSS.
+         boot block have also been removed.
        - Default theme switched to autumn. index.html ships
          data-theme="autumn" and currentTheme boots as 'autumn'.
-         The ambient video no longer autoplays: <video> lost the
-         autoplay attribute, preload dropped auto → metadata, and
-         play() is deferred to the first user pointerdown. (The
-         video itself has now been removed entirely in favour of
-         the CSS mesh; the deferral note is retained for context.)
        - Backdrop-filters removed in main.css on .summary, .msg-3,
          .reject-row, .confirm-screen, .alert-screen, .tanzaku-screen.
-         Alpha fills bumped 4-6% to hold the visual. The 6px blurs
-         were re-compositing per frame over the animating ambient
-         stage; on the full-viewport dialogs this was the worst
-         compositor case in the app.
        - will-change: opacity, transform removed from .panel-phrase.
-         It was a permanent promotion hint on 150-300 spans across
-         the five panels; the 500ms transition auto-promotes and
-         demotes cleanly without it.
-       - Koi tap flinch: gated on the tap landing on the koi PNG
-         (.koi-image) only. Background taps on the blossom screen
-         still produce the strong ripple but do not trigger the
-         flinch.
-       - Ambient subtle ripples on the koi screen: while the
-         blossom screen is interactive, a burst of 1-5 subtle
-         ripples spawns at random screen positions every
-         2.5-5.0 seconds. Stopped first thing in triggerKoiStart.
-       - Receipt landing serialization: the six item arrival
-         animations no longer run concurrently with the wrapper's
-         paperLand animation. buildReceipt() accepts a deferItems
-         option; when the landing will play, items are built hidden
-         and revealed by revealReceiptItems() after animationend.
-         Concurrency between the wrapper transform and the item
-         arrivals was the cause of the stutter.
-       - Receipt close now restores the previous scroll position:
-         lockBodyForReceipt / unlockBodyForReceipt replace the
-         CSS-only body lock, saving window.scrollY on open and
-         restoring it on close.
+       - Koi tap flinch: gated on the tap landing on the koi PNG.
+       - Ambient subtle ripples on the koi screen.
+       - Receipt landing serialization (deferItems / revealReceiptItems).
+       - Receipt close restores previous scroll position.
        - Panel-1 post-beat delay lengthened 500 → 1000ms.
-       - Scroll gate: body scroll is only unlocked at the last
-         panel AND only stays unlocked once the user has actually
-         scrolled the table into view. Swiping back to earlier
-         panels re-locks unless the table has been visited.
-       - Reset hot-spot: invisible top-left tap target that
-         returns to the blossom start screen without losing any
-         entered values, re-running the koi intro and panels.
-       - Transition-line accordion drift, final v1.3 pass:
-           * Reveal engine removed entirely. Text renders
-             immediately alongside the header.
-           * Math.abs(d) for relativeSeparation so items fan
-             outward on both sides of centre and never collide.
-           * HORIZONTAL_SWAY_PX softened 25 → 10 → 22 → 20.
-           * scheduleTransitionBodyUpdate() fires on every scroll
-             event, rAF-debounced via tbRafPending.
-             scheduleEvaluation() stays behind the 1px threshold.
-           * returnToStartScreen() clears inline drift transforms
-             synchronously and resets tableEnteredView.
-           * Gate is a flat-top envelope. Full-strength linear
-             drift inside |d| <= CORE_ZONE_PX. Smoothstep ease-out
-             to zero across CORE_ZONE_PX < |d| < MAX_ZONE_PX.
-             Zero drift beyond MAX_ZONE_PX and at scrollY = 0.
-           * Resting gaps tightened in main.css (paragraph 0.9em
-             → 0.35em, divider 19px → 10px). LINE_SPREAD_FACTOR
-             set to 0.075 and GLOBAL_DRIFT_FACTOR to 0.08 so the
-             fan reads as the dominant motion. Physical runways
-             widened in main.css (.stage-spacer 75px base /
-             50px @700h / 40px @600h-landscape; .transition-line
-             bottom padding 85px; .divider margin-top 20px) so
-             the outermost items' full travel resolves without
-             contacting adjacent sections.
+       - Scroll gate: body scroll only unlocked at last panel and
+         only stays unlocked once the table has been visited.
+       - Reset hot-spot: invisible top-left tap target.
+       - Transition-line accordion drift (flat-top envelope,
+         LINE_SPREAD_FACTOR 0.075, GLOBAL_DRIFT_FACTOR 0.08).
+       - Maple leaf overlay: falling SVG leaves, z-index -1, seven
+         palmate Momiji with staggered drifts, gated to autumn.
      v1.17.2
        - Panel-1 opening line: therapistDisplayName + cached
-         therapistGreeting are the source of truth; beats are
-         rebuilt from them so the greeting survives confirmName().
-         therapistGreeting is captured once from the authored DOM
-         on the first buildPanel1OpeningBeats() call and reused
-         thereafter. Beats are ALWAYS inserted immediately before
-         #panel1Body; stale beats and stray text nodes before the
-         body are cleared first. The rebuilt span preserves
-         id="therapistName".
-       - Transition-line focus snap: replaced the font-weight
-         .snap-bold class with a sub-pixel text-shadow glow driven
-         by a strictly symmetrical |d| <= TB_SNAP_WINDOW_PX gate.
-         TB_MAX_SCALE bumped to 1.08, TB_SNAP_INTENSITY = 1.65.
-       - Carousel edge and under-swipe: bounceToCurrentPanel()
-         snaps the track back to the current panel without
-         replaying the phrase reveal. Applied to all four edge
-         cases and to the middle-panel under-swipe case.
-       - Custom-row sequential lockout fix: a row that already has
-         content is always editable regardless of gaps above it.
-       - Koi screen water effects: caustics (CSS), tap ripples,
-         swipe-up to begin, koi startle spin, koi dive.
-       - Receipt item counter badge now uses a compact 2-column
-         digit-roll odometer (see COUNTER ODOMETER section) and is
-         re-rolled on every remove / undo via updateReceiptItemCount().
-       - Receipt 本日の内容 counter styled to match the label:
-         badge chrome removed, colon moved into the label span,
-         tracking inherited, digit column width measured at runtime
-         (measureDigitAdvance / applyCounterCellWidth).
+         therapistGreeting; beats rebuilt from them.
+       - Transition-line focus snap via text-shadow glow.
+       - Carousel edge and under-swipe: bounceToCurrentPanel().
+       - Custom-row sequential lockout fix.
+       - Koi screen water effects.
+       - Receipt item counter: compact 2-column odometer.
+       - Receipt 本日の内容 counter styled to match the label.
      v1.17.1
-       - Panel-1 opening line: correct insertion anchor (beats
-         now sit before #panel1Body, not after it).
-       - Panel-1 beats derive their split dynamically from the
-         actual text at the first "、" so any entered name works.
-       - Panel-1 beats are rebuilt after confirmName() runs.
+       - Panel-1 opening line: correct insertion anchor.
+       - Panel-1 beats derive split dynamically at first "、".
+       - Panel-1 beats rebuilt after confirmName() runs.
        - Therapist-name span contains "name + さん", font weight 600.
      v1.17
        - Panel phrase reveal: min-chunk absorption + comma-aware
@@ -130,8 +57,7 @@
      v1.16
        - Panel messages phrase reveal on every panel activation.
      v1.15
-       - Receipt scroll reset + indicator; transition-line reveal,
-         blur, scaleX.
+       - Receipt scroll reset + indicator; transition-line reveal.
      v1.14
        - Odometer, receipt landing, MP3 koi sound.
      v1.13
@@ -149,9 +75,20 @@ function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
-  /* v1.3: the ambient video has been removed entirely. The video
-     play/pause block that used to live here was dead once the
-     <video> element left index.html, so it has been deleted. */
+  /* v1.3: tracer lifecycle. The single source of truth for "is
+     the app past the intro?" is the .active class on the maple
+     leaves overlay — it is added the moment Panel 0 mounts inside
+     triggerKoiStart() and removed synchronously in
+     returnToStartScreen(). Gating on that instead of introHasRun
+     closes the mid-intro race: if the user toggles the theme
+     while the calligraphy intro is still playing, the leaves are
+     not yet .active, so the tracer does not start early. */
+  var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
+  if (theme === 'autumn' && isCarouselRunning) {
+    scheduleShippoTracer();
+  } else {
+    stopShippoTracer();
+  }
 }
 if (themeToggle) {
   themeToggle.addEventListener('click', function(e) {
@@ -633,18 +570,6 @@ function updateReceiptTotal() {
 
 /* ============================================================
    COUNTER ODOMETER — v1.17.2
-   ------------------------------------------------------------
-   A compact 2-column digit-roll for the receipt item count.
-   Parallel to the money odometer but with its own column count
-   and shorter timings so a 1 -> 12 change reads as a quick tick
-   rather than a full money roll. Re-rolled from the remove and
-   undo handlers in bindReceiptItemListeners() via
-   updateReceiptItemCount().
-
-   The digit column width is set at runtime to the exact digit
-   advance plus one letter-space (see measureDigitAdvance below),
-   which makes the counter read with the same tracking as the
-   surrounding text of the 本日の内容 label.
    ============================================================ */
 var COUNTER_COLS = 2;
 
@@ -714,8 +639,6 @@ function applyCounterValue(container, value, opts) {
   }
 }
 
-/* Counts only items that are still active (not removing) and rolls
-   the counter to that value. Called from remove / undo handlers. */
 function updateReceiptItemCount() {
   var container = document.getElementById('itemCountDigits');
   if (!container) return;
@@ -731,16 +654,6 @@ function updateReceiptItemCount() {
 
 /* ============================================================
    RUNTIME DIGIT ADVANCE MEASUREMENT
-   ------------------------------------------------------------
-   Measures one digit slot's width — glyph advance plus one
-   letter-space — using a hidden probe carrying the same font,
-   size, and tracking as .receipt-title. Writes the result to
-   --counter-cell-w on the counter container, which CSS uses as
-   the digit-col width.
-
-   Why not 1ch: 1ch is the advance of "0". If a font's "3" is
-   wider than its "0", the column undersizes and flexbox clips
-   the glyph. Measuring once at runtime sidesteps the guesswork.
    ============================================================ */
 function measureDigitAdvance() {
   var titleEl = document.querySelector('.receipt-title');
@@ -748,7 +661,7 @@ function measureDigitAdvance() {
   var cs = window.getComputedStyle(titleEl);
 
   var probe = document.createElement('span');
-  probe.textContent = '0000000000';   /* 10 digits for accuracy */
+  probe.textContent = '0000000000';
   probe.style.position = 'absolute';
   probe.style.visibility = 'hidden';
   probe.style.pointerEvents = 'none';
@@ -848,6 +761,15 @@ var rippleLayer = document.getElementById('rippleLayer');
    leaves themselves are pure CSS; the only JS involvement is the
    .active toggle on the container. */
 var mapleLeaves = document.getElementById('mapleLeaves');
+
+/* v1.3: Shippo mosaic circle tracer pool — three reusable nodes. */
+var shippoTracers = [
+  document.getElementById('shippoTracer0'),
+  document.getElementById('shippoTracer1'),
+  document.getElementById('shippoTracer2')
+];
+var shippoTracerIndex = 0;
+var shippoTimer = null;
 
 var submitBtn = document.getElementById('submitBtn');
 var confirmScreen = document.getElementById('confirmScreen');
@@ -1199,9 +1121,6 @@ var PANEL_PHRASE_STAGGER_MAX = 600;
 var PANEL_PHRASE_DELAY = 300;
 var PANEL_PHRASE_MODE = 'coexist';
 
-/* v1.3: lengthened 500 → 1000ms. Gives the first-swipe background
-   elements (ambient layers, video compositor) an extra half-second
-   to settle before the user is likely to swipe away from panel 1. */
 var PANEL_1_POST_BEAT_DELAY = 1000;
 
 var panelPhraseTimers = [];
@@ -1329,25 +1248,7 @@ function wrapPhrasesRecursively(root) {
 }
 
 /* ============================================================
-   PANEL-1 SPECIAL SEQUENCE — v1.17.2
-   ------------------------------------------------------------
-   The opening line "<name>さん、初めまして。" is presented as two
-   beats. Beat boundary is at the first "、":
-     Beat 1: everything up to and including the comma
-     Beat 2: the remainder
-   Beat 2 starts the instant beat 1 completes. Then a 1000 ms
-   pause before #panel1Body begins its normal phrase reveal.
-
-   Name comes from therapistDisplayName. Greeting ("、初めまして。")
-   is captured ONCE from the authored DOM on the first call into
-   therapistGreeting, and reused thereafter.
-
-   Insertion anchor is ALWAYS #panel1Body. #panel1Body is a direct
-   child of .panel-content and is never removed, so it is a stable
-   reference. All existing .panel-1-beat elements and stray text
-   nodes before #panel1Body are cleared first.
-
-   The rebuilt span preserves id="therapistName".
+   PANEL-1 SPECIAL SEQUENCE
    ============================================================ */
 function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
@@ -1356,8 +1257,6 @@ function buildPanel1OpeningBeats(panelEl) {
   var body = contentEl.querySelector('#panel1Body');
   if (!body) return;
 
-  /* First call: capture the greeting from the authored DOM before we
-     rewrite anything. */
   if (therapistGreeting === null) {
     var captured = '';
     var srcSpan = contentEl.querySelector('.therapist-name');
@@ -1375,14 +1274,11 @@ function buildPanel1OpeningBeats(panelEl) {
     if (therapistGreeting === '') therapistGreeting = '、初めまして。';
   }
 
-  /* Clear any existing beat wrappers anywhere in .panel-content. */
   var staleBeats = contentEl.querySelectorAll('.panel-1-beat');
   for (var s = 0; s < staleBeats.length; s++) {
     if (staleBeats[s].parentNode) staleBeats[s].parentNode.removeChild(staleBeats[s]);
   }
 
-  /* Clear any stray direct-child nodes between contentEl start and
-     #panel1Body. */
   var child = contentEl.firstChild;
   while (child && child !== body) {
     var nextChild = child.nextSibling;
@@ -1394,7 +1290,6 @@ function buildPanel1OpeningBeats(panelEl) {
     child = nextChild;
   }
 
-  /* Compose and split. */
   var full = therapistDisplayName + therapistGreeting;
   var commaIdx = full.indexOf('、');
   var beat1Text, beat2Text;
@@ -1408,7 +1303,6 @@ function buildPanel1OpeningBeats(panelEl) {
   var nameOnly = beat1Text.replace(/、$/, '').replace(/さん$/, '');
   if (nameOnly === '') nameOnly = beat1Text.replace(/、$/, '');
 
-  /* Build beat 1 = [styled span][、]. */
   var beat1 = document.createElement('span');
   beat1.className = 'panel-phrase panel-1-beat';
   beat1.setAttribute('data-beat', '1');
@@ -1419,13 +1313,11 @@ function buildPanel1OpeningBeats(panelEl) {
   beat1.appendChild(nameSpan);
   if (commaIdx >= 0) beat1.appendChild(document.createTextNode('、'));
 
-  /* Build beat 2 = remainder. */
   var beat2 = document.createElement('span');
   beat2.className = 'panel-phrase panel-1-beat';
   beat2.setAttribute('data-beat', '2');
   beat2.textContent = beat2Text;
 
-  /* Insert both beats immediately before #panel1Body. */
   contentEl.insertBefore(beat1, body);
   contentEl.insertBefore(beat2, body);
 
@@ -1654,9 +1546,11 @@ function returnToStartScreen() {
   clearKoiTimers();
   resetWind();
 
-  /* v1.3: hide the ambient maple leaves. They will be re-activated
-     when triggerKoiStart() reaches activatePanel(0). */
+  /* v1.3: hide the ambient maple leaves and stop the Shippo
+     tracer. Both are re-activated when triggerKoiStart() reaches
+     activatePanel(0). */
   if (mapleLeaves) mapleLeaves.classList.remove('active');
+  stopShippoTracer();
 
   /* Reset koi gesture state so the swipe-up gesture works again. */
   koiGestureState = 'idle';
@@ -1664,7 +1558,6 @@ function returnToStartScreen() {
   koiFlinchActive = false;
   introHasRun = false;
 
-  /* Reset koi visual state. */
   if (koiDiveWrap) {
     koiDiveWrap.classList.remove('dragging', 'flinching');
     koiDiveWrap.style.removeProperty('--koi-rise-y');
@@ -1687,14 +1580,7 @@ function returnToStartScreen() {
   if (nameColumn) {
     nameColumn.innerHTML = '';
   }
-  /* v1.3: the .ambient-image element was removed with the video
-     replacement. The three lines that used to reset its opacity
-     here have been deleted. */
 
-  /* Cancel any in-flight panel phrase reveals and reset all
-     panels to a neutral state. activatePanel(0) will be called
-     by triggerKoiStart() after the intro, so we do not activate
-     anything here. */
   clearPanelPhraseTimers();
   for (var p = 0; p < panels.length; p++) {
     panels[p].classList.remove('active', 'leaving');
@@ -1706,7 +1592,6 @@ function returnToStartScreen() {
   }
   if (dotsEl) dotsEl.classList.remove('visible');
 
-  /* Reset scroll gate and force to top. */
   tableVisited = false;
   tableEnteredView = false;
   if (tableUnlocked) {
@@ -1715,10 +1600,6 @@ function returnToStartScreen() {
   }
   window.scrollTo(0, 0);
 
-  /* v1.3: clear any lingering accordion transforms synchronously.
-     window.scrollTo dispatches its scroll event on the next task
-     tick; without this the drift items can ghost in view for a
-     single frame. */
   if (transitionLine) {
     var existingDriftItems = transitionLine.querySelectorAll('.transition-line-divider, .transition-line-body p');
     for (var t = 0; t < existingDriftItems.length; t++) {
@@ -1726,7 +1607,6 @@ function returnToStartScreen() {
     }
   }
 
-  /* Hide the info bar and hint. */
   document.body.classList.remove('info-visible');
   if (infoBar) {
     infoBar.classList.remove('shown');
@@ -1734,7 +1614,6 @@ function returnToStartScreen() {
   }
   if (globalHint) globalHint.classList.remove('shown');
 
-  /* Reset table / summary visibility. */
   if (summaryBar) summaryBar.classList.remove('visible');
   if (numpad) numpad.classList.remove('visible');
   if (divider) divider.classList.remove('active');
@@ -1742,7 +1621,6 @@ function returnToStartScreen() {
   if (rejectRow) rejectRow.classList.remove('active');
   document.body.classList.remove('warm-background');
 
-  /* Show the blossom screen and restart the ambient scheduler. */
   if (blossomScreen) blossomScreen.classList.add('visible');
   scheduleAmbientRipple();
 }
@@ -1783,10 +1661,6 @@ function goToPanel(index, noGust) {
   track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
   for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
   activatePanel(currentPanel);
-  /* v1.3: only unlock at the last panel, and only re-lock when
-     returning to earlier panels if the user has not yet visited
-     the table. Once the table has been scrolled into view, the
-     earlier panels stay scrollable. */
   if (currentPanel === totalPanels - 1) {
     unlockTable();
   } else if (!tableVisited) {
@@ -1882,8 +1756,6 @@ function firstUnnamedCustomRow() {
   return null;
 }
 function isAllowedCustomRow(row) {
-  /* v1.17.2: escape hatch — a row that already has content is always
-     editable, regardless of any empty rows above it. */
   if (customRowHasName(row)) return true;
 
   var rows = getCustomRows();
@@ -2102,10 +1974,6 @@ function scheduleReceiptEmptyBlurShake(item, input) {
 }
 
 /* ============ RECEIPT BODY LOCK ============ */
-/* Saves window.scrollY on open and restores it on close. The CSS
-   rule `body.receipt-locked` pins the body with position: fixed and
-   overflow: hidden; the inline `top` offset keeps the page visually
-   in place while the lock is active. */
 function lockBodyForReceipt() {
   receiptScrollY = window.scrollY || window.pageYOffset || 0;
   document.body.style.top = (-receiptScrollY) + 'px';
@@ -2614,10 +2482,7 @@ function updateRejectThanksContent() {
 
 /* ============================================================
    TRANSITION-LINE BODY WRAPPER
-   ============================================================
-   Splits the authored <br><br> blocks into <p> elements so the
-   accordion drift has discrete items to operate on. Retained
-   from the earlier reveal-engine build. */
+   ============================================================ */
 function wrapTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
   if (!bodyEl) return;
@@ -2641,60 +2506,25 @@ function wrapTransitionBody() {
    from three composed motions:
 
      globalShift        — whole block moves slower than the page.
-     relativeSeparation — items fan out from the geometric axis,
-                          expanding on approach and collapsing to
-                          the resting gaps near centre. Uses
-                          Math.abs(d) so the fan is always
-                          outward, never inverted.
+     relativeSeparation — items fan out from the geometric axis.
      swayX              — small alternating horizontal zig.
 
    All three are scaled by a flat-top envelope over |d|:
 
-     |d| <= CORE_ZONE_PX (180)   : envelope = 1.0. Full-strength
-                                    linear drift, no direction
-                                    reversal, no squashed amplitude.
+     |d| <= CORE_ZONE_PX (180)   : envelope = 1.0.
      CORE_ZONE_PX < |d| <
-       MAX_ZONE_PX (420)         : envelope = smoothstep(t), where
-                                    t = (MAX - |d|) / (MAX - CORE).
-                                    Eases transforms to zero at the
-                                    boundary with matching slopes
-                                    (3t^2 - 2t^3).
-     |d| >= MAX_ZONE_PX          : transforms are cleared to
-                                    natural layout.
+       MAX_ZONE_PX (420)         : envelope = smoothstep ease-out.
+     |d| >= MAX_ZONE_PX          : transforms cleared.
 
-   v1.3: the resting gaps in main.css were tightened (paragraph
-   0.9em → 0.35em, divider 19px → 10px) so the fan opens from a
-   closer rest. The physical runways were widened at the same time
-   (.stage-spacer 75px base / 50px @700h / 40px @600h-landscape;
-   .transition-line bottom padding 85px; .divider top margin 20px)
-   so the outermost items' full travel resolves without contacting
-   the panel dots above or the table divider below. These values
-   are calibrated together with the DRIFT_CONFIG numbers below —
-   changing one without the other can reintroduce overlap.
-
-   At |d| = CORE_ZONE_PX with these values:
-     Divider (item 0, lineDist -2.5): rawSpread -33.75px, clamped
-       by MAX_LINE_SPREAD_PX at -38px effective. globalShift
-       -14.4px. Total ~-48.15px on approach. Absorbed by the
-       75px stage-spacer, keeping the divider clear of the dots.
-     Last paragraph (lineDist +2.5): +33.75px separation, +14.4px
-       global on exit, total ~+48.15px. Absorbed by the 105px of
-       clearance below (85px padding + 20px margin), keeping it
-       clear of .divider and #tableCard.
-     Mid paragraphs: adjacent-gap delta ~13.5px, so the resting
-       ~6.3px gap opens to ~19.8px at peak — a ~3× contrast that
-       reads as the accordion spring without any collision.
-
-   Transform is written via JS only. main.css carries no
-   transform transition on these elements, so motion tracks
-   scroll frame-for-frame instead of easing toward a target. */
+   v1.3: resting gaps tightened in main.css, physical runways
+   widened, LINE_SPREAD_FACTOR 0.075, GLOBAL_DRIFT_FACTOR 0.08. */
 var DRIFT_CONFIG = {
-  LINE_SPREAD_FACTOR: 0.075,    /* Prominent fanning: ~13.5px extra gap per adjacent pair at |d| = CORE_ZONE_PX. */
-  MAX_LINE_SPREAD_PX: 38,       /* Defensive outer clamp — never fires at these envelope values, but bounds the fan if CORE_ZONE_PX or LINE_SPREAD_FACTOR are raised later. */
-  GLOBAL_DRIFT_FACTOR: 0.08,    /* Parallax base kept below the fan so the accordion breathing, not the block's rigid slide, is the dominant motion the eye tracks. */
+  LINE_SPREAD_FACTOR: 0.075,
+  MAX_LINE_SPREAD_PX: 38,
+  GLOBAL_DRIFT_FACTOR: 0.08,
   HORIZONTAL_SWAY_PX: 20,
-  CORE_ZONE_PX: 180,            /* Full-strength linear drift zone around centre. */
-  MAX_ZONE_PX: 420              /* Boundary where drift eases cleanly to 0. */
+  CORE_ZONE_PX: 180,
+  MAX_ZONE_PX: 420
 };
 
 function updateTransitionBodyEffects() {
@@ -2706,10 +2536,6 @@ function updateTransitionBodyEffects() {
   var paragraphs = Array.prototype.slice.call(bodyEl.querySelectorAll('p'));
   if (!paragraphs.length) return;
 
-  /* Divider (Item 0) + paragraphs, axis derived from length.
-     On index.html default text: 5 paragraphs + divider = 6 items,
-     axis 2.5. On the no-presets variant: 4 paragraphs + divider
-     = 5 items, axis 2.0. Both handled by the generic form below. */
   var driftItems = dividerEl ? [dividerEl].concat(paragraphs) : paragraphs;
   var totalItems = driftItems.length;
   var centerIdx = (totalItems - 1) / 2;
@@ -2722,9 +2548,6 @@ function updateTransitionBodyEffects() {
   var d = blockCenter - vc;
   var absDist = Math.abs(d);
 
-  /* Outside the reading envelope: clear transforms and let the
-     block sit at its natural position. scrollY = 0 is included so
-     nothing can leak into the blossom screen or the panels. */
   if (scrollY <= 0 || absDist >= DRIFT_CONFIG.MAX_ZONE_PX) {
     for (var k = 0; k < totalItems; k++) {
       driftItems[k].style.transform = '';
@@ -2732,8 +2555,6 @@ function updateTransitionBodyEffects() {
     return;
   }
 
-  /* Flat-top envelope: 1.0 inside CORE_ZONE_PX, smoothstep ease-out
-     to zero across the boundary band. */
   var envelope = 1.0;
   if (absDist > DRIFT_CONFIG.CORE_ZONE_PX) {
     var t = (DRIFT_CONFIG.MAX_ZONE_PX - absDist) / (DRIFT_CONFIG.MAX_ZONE_PX - DRIFT_CONFIG.CORE_ZONE_PX);
@@ -2747,9 +2568,6 @@ function updateTransitionBodyEffects() {
     var item = driftItems[i];
     var lineDistFromCenter = i - centerIdx;
 
-    /* Math.abs(d) — items fan outward on both sides of centre and
-       never crash inward on exit. Proportional clamp keeps inner
-       items from overtaking outer ones. */
     var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
     var rawSpread = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
     var relativeSeparation = Math.max(-itemMaxSpread, Math.min(itemMaxSpread, rawSpread)) * envelope;
@@ -2828,12 +2646,6 @@ function updateReceiptScrollIndicator() {
 
 /* ============================================================
    KOI WATER EFFECTS — v1.17.2 / v1.3
-   ------------------------------------------------------------
-   Tap ripples, swipe-up to begin, koi startle spin, koi dive,
-   koi flinch on short tap on the koi PNG, ambient subtle ripples
-   while the blossom screen is interactive. Gesture handler is
-   gated on .blossom-screen.visible so it does not interfere with
-   the main carousel or the table.
    ============================================================ */
 var RIPPLE_COLOURS_STRONG = [
   'rgba(253, 243, 216, 0.95)',
@@ -2854,21 +2666,19 @@ var KOI_TRAIL_MIN_TRAVEL = 18;
 var KOI_TAP_MAX_TRAVEL = 8;
 var KOI_TAP_MAX_MS = 250;
 
-var koiGestureState = 'idle';   /* idle | swiping | startling | diving | done */
+var koiGestureState = 'idle';
 var koiActivePointerId = null;
 var koiStartY = 0;
 var koiCurrentY = 0;
 var koiLastTrailAt = 0;
 var koiTimers = [];
 
-/* v1.3 — tap-to-flinch */
 var koiFlinchActive = false;
 var koiTapStartX = 0;
 var koiTapStartY = 0;
 var koiTapStartTime = 0;
 var koiTapOnKoi = false;
 
-/* v1.3 — ambient subtle ripples */
 var ambientRippleTimer = null;
 
 function koiPushTimer(id) { koiTimers.push(id); return id; }
@@ -2907,9 +2717,6 @@ function spawnRipples(clientX, clientY, intensity) {
       r.style.width  = (baseSize + idx * 6) + 'px';
       r.style.height = (baseSize + idx * 6) + 'px';
       rippleLayer.appendChild(r);
-      /* Removal delay has to exceed animation-delay + animation-duration
-         for the last ripple in the palette, or the tail of the wave
-         gets cut. 975ms duration + up to 160ms delay + 50ms buffer. */
       setTimeout(function() {
         if (r.parentNode) r.parentNode.removeChild(r);
       }, 1185 + idx * 80);
@@ -2936,12 +2743,6 @@ function isBlossomInteractive() {
 
 /* ============================================================
    AMBIENT SUBTLE RIPPLES — v1.3
-   ------------------------------------------------------------
-   While the blossom screen is interactive, spawn a burst of
-   1-5 subtle ripples at random viewport positions every
-   2.5-5.0 seconds. Interval is biased to the calmer end. Each
-   ripple in a burst is staggered ~80ms from the previous so the
-   burst reads as a scatter rather than a stamp.
    ============================================================ */
 function stopAmbientRipple() {
   if (ambientRippleTimer) {
@@ -2952,7 +2753,7 @@ function stopAmbientRipple() {
 
 function spawnAmbientBurst() {
   if (!rippleLayer) return;
-  var count = 1 + Math.floor(Math.random() * 5);   /* 1-5 */
+  var count = 1 + Math.floor(Math.random() * 5);
   var inset = 40;
   var vw = window.innerWidth;
   var vh = window.innerHeight;
@@ -2971,7 +2772,6 @@ function spawnAmbientBurst() {
 
 function scheduleAmbientRipple() {
   stopAmbientRipple();
-  /* 2500-5000ms, biased to the calmer end. */
   var interval = 2500 + Math.random() * 2500;
   ambientRippleTimer = setTimeout(function() {
     ambientRippleTimer = null;
@@ -2984,19 +2784,6 @@ function scheduleAmbientRipple() {
 
 /* ============================================================
    KOI FLINCH — v1.3
-   ------------------------------------------------------------
-   A short tap on the koi PNG itself (travel < 8px, duration
-   < 250ms, pointer down on .koi-image) triggers a 1000ms
-   randomised flinch on .koi-dive-wrap. The animation reads its
-   parameters from four CSS custom properties written here on
-   every tap, so each tap produces a different dart / rotation /
-   scale. Guarded by koiFlinchActive so a second tap during an
-   active flinch is ignored.
-
-   The hit test is on .koi-image — the <img> element itself —
-   so taps on the button label, the ring SVG, the hint, or the
-   background do NOT trigger the flinch. They still produce the
-   strong ripple via the pointerdown handler.
    ============================================================ */
 function triggerKoiFlinch() {
   if (!koiDiveWrap) return;
@@ -3007,10 +2794,10 @@ function triggerKoiFlinch() {
   koiFlinchActive = true;
 
   var dir = Math.random() < 0.5 ? -1 : 1;
-  var rot = (22 + Math.random() * 12) * dir;    /* 22-34 degrees */
-  var scale = 1.14 + Math.random() * 0.08;      /* 1.14-1.22 */
-  var xMag = 10 + Math.random() * 10;           /* 10-20px */
-  var yMag = -(6 + Math.random() * 8);          /* -6 to -14px */
+  var rot = (22 + Math.random() * 12) * dir;
+  var scale = 1.14 + Math.random() * 0.08;
+  var xMag = 10 + Math.random() * 10;
+  var yMag = -(6 + Math.random() * 8);
 
   koiDiveWrap.style.setProperty('--flinch-rot', rot.toFixed(2) + 'deg');
   koiDiveWrap.style.setProperty('--flinch-scale', scale.toFixed(3));
@@ -3041,13 +2828,8 @@ function onKoiPointerDown(e) {
   koiTapStartX = e.clientX;
   koiTapStartY = e.clientY;
   koiTapStartTime = Date.now();
-  /* Hit test for the flinch: did the pointer down land on the koi
-     PNG itself? Anything else on the blossom screen still gets the
-     strong ripple below, but does not flinch the koi. */
   koiTapOnKoi = !!(e.target && e.target.closest && e.target.closest('.koi-image'));
 
-  /* Every tap on the koi screen produces the same prominent ripple.
-     The 'subtle' palette is now used only by the ambient scheduler. */
   spawnRipples(e.clientX, e.clientY, 'strong');
 
   if (koiDiveWrap) {
@@ -3093,7 +2875,6 @@ function onKoiPointerUp(e) {
 
   if (koiDiveWrap) koiDiveWrap.classList.remove('dragging');
 
-  /* Tap detection — short travel, short duration. */
   var upX = (e.clientX != null) ? e.clientX : koiTapStartX;
   var upY = (e.clientY != null) ? e.clientY : koiTapStartY;
   var dx = upX - koiTapStartX;
@@ -3105,9 +2886,6 @@ function onKoiPointerUp(e) {
     if (koiDiveWrap) koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
     if (startBtn) startBtn.classList.remove('ready');
     koiGestureState = 'idle';
-    /* Flinch only when the gesture actually began on the koi PNG.
-       Background taps still produce the strong ripple (by design)
-       but must not make the koi react. */
     if (koiTapOnKoi) triggerKoiFlinch();
     return;
   }
@@ -3154,10 +2932,6 @@ function triggerKoiStart() {
     koiPushTimer(setTimeout(function() {
       var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
       renderIntroGlyph(nameText);
-      /* v1.3: the ambient-image opacity reveal was removed along
-         with the video. The intro overlay and its calligraphic
-         kanji animation carry the moment; the ambient stage stays
-         at its resting state throughout. */
       if (introOverlay) introOverlay.classList.add('active');
 
       var totalChars = nameText.length;
@@ -3184,18 +2958,14 @@ function triggerKoiStart() {
         for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
         activatePanel(0);
 
-        /* v1.3: activate the ambient maple leaves now that the main
-           panel carousel is visible. The 1.8s opacity transition on
-           .maple-leaves-overlay handles the fade-in; the negative
-           animation delays on the individual leaves mean they are
-           already scattered at different heights the moment the
-           container becomes visible, so no burst-in is perceived. */
+        /* v1.3: activate the ambient maple leaves and start the
+           Shippo tracer. Both are gated to the active carousel
+           state, which begins right here. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
+        scheduleShippoTracer();
 
         koiPushTimer(setTimeout(function() {
           if (introOverlay) introOverlay.classList.remove('active', 'finishing');
-          /* v1.3: the ambient-image opacity restore was removed along
-             with the video. Nothing to restore here now. */
           repositionHintGroupAfterLayout();
           repositionNumpad();
           koiGestureState = 'done';
@@ -3306,9 +3076,6 @@ function confirmName() {
     blossomScreen.classList.add('visible');
     updateAllRowLocks();
     recalc();
-    /* Start the ambient subtle-ripple scheduler once the blossom
-       screen is actually visible. It self-checks interactivity on
-       each tick, so no need to stop it here if the user idles. */
     scheduleAmbientRipple();
   }, 420);
 }
@@ -3351,10 +3118,6 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 
 window.addEventListener('load', function() {
   startInfoUpdates();
-  /* v1.3: the ambient video has been removed entirely. The block
-     that used to kick the video into playback on the first user
-     pointerdown, and the accompanying visibilitychange resume, are
-     both deleted. The ambient stage is now pure CSS. */
   loadPresetsFromServer().then(function() {
     buildNameScreenRows();
     setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
@@ -3382,9 +3145,6 @@ window.addEventListener('load', function() {
   buildDigitColumns(document.getElementById('receiptTotalNumber'), 0);
   buildCounterColumns(document.getElementById('itemCountDigits'), 3);
 
-  /* Measure digit advance now (fallback font), then re-measure once
-     the real webfont has loaded so the counter column width matches
-     Shippori Mincho's actual digit advance. */
   applyCounterCellWidth();
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(applyCounterCellWidth);
@@ -3407,10 +3167,6 @@ window.addEventListener('load', function() {
 });
 
 /* ============ RECEIPT ============ */
-/* Serialize the item arrival animation: the wrapper's landing
-   animation runs alone, then revealReceiptItems() is called to
-   bring the items in. Running both at once was the cause of the
-   receipt landing stutter. */
 function revealReceiptItems(staggerMs) {
   var items = receiptItems.querySelectorAll('.receipt-item');
   if (!items.length) return;
@@ -3515,7 +3271,6 @@ function buildReceipt(opts) {
     itemCount++;
   }
 
-  /* v1.17.2: item counter — odometer-style, styled to match the label. */
   var itemCountDigits = document.getElementById('itemCountDigits');
   if (itemCountDigits) buildCounterColumns(itemCountDigits, itemCount);
 
@@ -3523,9 +3278,6 @@ function buildReceipt(opts) {
   updateReceiptTotal();
   firstServiceInReceipt = firstRowIncluded;
 
-  /* If no landing animation is going to play (reopen from thank-you),
-     reveal items right away. If the landing will play, leave them
-     hidden and let confirmYes trigger the reveal after it ends. */
   if (!deferItems) revealReceiptItems(80);
 }
 
@@ -3733,16 +3485,8 @@ confirmYes.addEventListener('click', function(e) {
   summaryBar.classList.remove('visible');
   setTimeout(function() {
     resetReceiptScroll();
-
-    /* v1.3: lock the body and remember where the user was before the
-       overlay takes over, so we can put them back there on close. */
     lockBodyForReceipt();
 
-    /* Snap the screen in — no opacity fade on entry — so the paper's
-       landing animation is the only motion on screen and is not
-       masked by the overlay's own 0.9s fade. The transition is
-       cleared immediately after the reflow so the screen still
-       fades out normally on close. */
     receiptScreen.style.transition = 'none';
     receiptScreen.classList.add('visible');
     void receiptScreen.offsetWidth;
@@ -3757,7 +3501,7 @@ confirmYes.addEventListener('click', function(e) {
 
       if (paperWrap) {
         paperWrap.classList.remove('landing');
-        void paperWrap.offsetWidth;   /* force reflow */
+        void paperWrap.offsetWidth;
 
         paperWrap.classList.add('landing');
         paperWrap.addEventListener('animationend', function onLandingEnd() {
@@ -3805,7 +3549,6 @@ receiptConfirmBtn.addEventListener('click', function(e) {
 
   if (receiptOpenedFromThankyou) {
     receiptOpenedFromThankyou = false;
-    /* v1.3: unlock the body and restore scroll before fading out. */
     unlockBodyForReceipt();
     receiptScreen.classList.remove('visible', 'reopened');
     infoBar.classList.remove('hidden');
@@ -3829,7 +3572,6 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   void thankyouScreen.offsetWidth;
   thankyouScreen.style.transition = '';
   startThankyouSequence();
-  /* v1.3: unlock body before fading into the thank-you carousel. */
   unlockBodyForReceipt();
   requestAnimationFrame(function() {
     receiptScreen.classList.remove('visible');
@@ -3852,7 +3594,6 @@ function returnToTable() {
     thankyouScreen.style.transition = '';
   }
   document.body.classList.remove('thankyou-active');
-  /* v1.3: unlock body and restore scroll position. */
   unlockBodyForReceipt();
   receiptScreen.classList.remove('visible', 'reopened', 'above-thankyou');
   infoBar.classList.remove('hidden');
@@ -4191,18 +3932,12 @@ window.addEventListener('scroll', function() {
   if (goingDown) lastScrollDirection = 'down';
   else if (goingUp) lastScrollDirection = 'up';
 
-  /* v1.3: drift update on every scroll event, rAF-debounced.
-     scheduleEvaluation stays behind the 1px threshold so its layout
-     reads do not land on the same task as the transform writes. */
   scheduleTransitionBodyUpdate();
 
   if (goingDown || goingUp) {
     scheduleEvaluation();
   }
 
-  /* v1.3: once the table has been scrolled into view, mark it
-     visited. From that point on, swiping back to earlier panels
-     keeps scrolling enabled. */
   if (!tableVisited && tableCard) {
     var tcRect = tableCard.getBoundingClientRect();
     if (tcRect.top < window.innerHeight && tcRect.bottom > 0) {
@@ -4789,8 +4524,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
     resetReceiptScroll();
-    /* v1.3: lock body and remember scroll before the reopened
-       receipt takes over. */
     lockBodyForReceipt();
     receiptScreen.classList.add('visible');
     infoBar.classList.add('hidden');
@@ -4800,6 +4533,67 @@ tyReceiptBtn.addEventListener('click', function(e) {
     setTimeout(updateReceiptScrollIndicator, 500);
   }, 100);
 });
+
+/* ============================================================
+   SHIPPO MOSAIC RANDOM CIRCLE TRACER
+   ------------------------------------------------------------
+   Mathematical snap:
+   In Shippo (60x60 tile, r=30), circle centers occur at
+   (j * 30px, k * 30px) where (j + k) is even.
+   SVG center offset is 34px (from 68x68 viewbox), so the
+   translate is (j*30 - 34, k*30 - 34).
+   ============================================================ */
+function triggerShippoCircle() {
+  if (currentTheme !== 'autumn') return;
+  var tracer = shippoTracers[shippoTracerIndex];
+  if (!tracer) return;
+  shippoTracerIndex = (shippoTracerIndex + 1) % shippoTracers.length;
+
+  var vw = window.innerWidth;
+  var vh = window.innerHeight;
+  var maxCols = Math.floor(vw / 30);
+  var maxRows = Math.floor(vh / 30);
+
+  var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
+  var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
+
+  /* Enforce Shippo geometric parity — circles only sit at even
+     (j + k) intersections of the 60px grid. */
+  if ((j + k) % 2 !== 0) j += 1;
+
+  var x = (j * 30) - 34;
+  var y = (k * 30) - 34;
+  var startAngle = Math.floor(Math.random() * 4) * 90;
+
+  tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startAngle + 'deg)';
+  tracer.classList.remove('drawing');
+  void tracer.offsetWidth; /* force reflow so the animation restarts */
+  tracer.classList.add('drawing');
+}
+
+function stopShippoTracer() {
+  if (shippoTimer) {
+    clearTimeout(shippoTimer);
+    shippoTimer = null;
+  }
+  /* Clear any in-flight drawings so a reset does not leave a ring
+     mid-animation on screen. */
+  for (var i = 0; i < shippoTracers.length; i++) {
+    if (shippoTracers[i]) shippoTracers[i].classList.remove('drawing');
+  }
+}
+
+function scheduleShippoTracer() {
+  stopShippoTracer();
+  if (currentTheme !== 'autumn') return;
+
+  /* Average 1.0s cadence (0.75s to 1.25s organic jitter). */
+  var delay = 750 + Math.random() * 500;
+  shippoTimer = setTimeout(function() {
+    triggerShippoCircle();
+    scheduleShippoTracer();
+  }, delay);
+}
 
 /* ============ BOOTSTRAP ============ */
 applyTimeTheme();
