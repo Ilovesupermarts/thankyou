@@ -2369,3 +2369,6 @@
     transform: translateY(6px);
   }
   @keyframes hintBreathe { 0%, 100% { opacity: 0.92; } 50% { opacity: 1; } }
+
+/* TEMPORARY TEST — remove after diagnosing. */
+html[data-theme="autumn"] .washi-watermark { display: none !important; }
