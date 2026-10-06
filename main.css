@@ -97,76 +97,131 @@
   body.thankyou-active .summary { visibility: hidden; }
   body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
-  /* ============ WASHI WATERMARK (v1.3) ============
-     A single giant stroke-only outline of the maple leaf, anchored
-     at the viewport's bottom-left corner. The lower-left lobes of
-     the leaf spill into the corner; the rest bleeds off-screen to
-     the top-right. Sits at z-index -1 — above the ambient stage
-     (-2) and below every piece of content (panels, table, dialogs
-     etc). Gated to autumn. Breathes very slowly (8s, alternate)
-     between rotation and opacity.
-
-     v1.3 (tile-artifact fix): removed vector-effect: non-scaling-
-     stroke and the scale() term from the breathe keyframe. Both
-     properties forced Skia to re-rasterize the SVG path into fresh
-     GPU tiles on every animation frame. On mobile Chromium (esp.
-     Adreno GPUs) that per-frame tile churn was leaking dirty-rect
-     alpha at tile boundaries — visible as sharp rectangular
-     patches and a delayed bottom tile during the table entrance.
-     Removing both lets the browser rasterize the path once and
-     cache it as a static texture, which the compositor can then
-     rotate and alpha-blend with zero per-frame rasterization.
-
-     stroke-width is now set in viewBox units (2.4) rather than as
-     a non-scaling 4px stroke. At 80vw on the tablet the viewBox
-     scale factor is ~1.33, so 2.4 units renders at ~3.2px on
-     screen — near enough to the previous 4px to be invisible on
-     a hairline. */
-  .washi-watermark {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 80vw;
-    max-width: 1600px;
-    height: auto;
-    pointer-events: none;
-    z-index: -1;
-    opacity: 0.20;
-    animation: washiBreathe 8s ease-in-out infinite alternate;
-    will-change: transform;
-  }
-  .washi-watermark svg {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-  .washi-watermark path {
-    fill: none;
-    stroke: #b0390e;
-    stroke-width: 2.4;
-    stroke-linejoin: round;
-    stroke-linecap: round;
-  }
-  html[data-theme="default"] .washi-watermark { display: none; }
-  @keyframes washiBreathe {
-    0%   { transform: rotate(-4deg); opacity: 0.16; }
-    100% { transform: rotate(3deg);  opacity: 0.24; }
-  }
-  @media (prefers-reduced-motion: reduce) {
-    .washi-watermark { animation: none !important; }
-  }
-
-  /* ============ AMBIENT STAGE ============ */
+  /* ============ AMBIENT STAGE (v1.3) ============
+     z-index moved from -2 to -3 so the Shippo mosaic and tracer
+     layers sit above the drifting light orbs but below every piece
+     of content. The stage remains a promoted compositor layer for
+     the wind gust animation; the mosaic and tracers are static
+     against it. */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
     width: 150%; height: 150%;
-    z-index: -2;
+    z-index: -3;
     pointer-events: none;
     will-change: transform;
     transform: translate3d(var(--wind-x, 0px), 0, 0);
   }
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
+
+  /* ============ AMBIENT SHIPPO MOSAIC (v1.3) ============
+     Static tiled pattern — a repeating Japanese Shippō (七宝)
+     motif of overlapping circles drawn on a 60px grid. The <pattern>
+     is rasterized once by the browser at page load and never touched
+     again, so this layer has zero per-frame cost regardless of size.
+     This is the property that makes it safe where the previous
+     washi watermark was not: there is no animation on the SVG
+     geometry, so no per-frame re-rasterization, so no tile churn.
+
+     Opacity 0.13 rather than 0.08: the tracers rely on the grid
+     being faintly legible so a glowing ring that snaps to a tile
+     vertex reads as tracing the pattern rather than as a random
+     floating circle. Below about 0.10 the grid disappears under
+     the tablet's backlight and the tracer loses its anchor.
+
+     Gated to autumn; hidden entirely in default (sakura) theme. */
+  .ambient-mosaic {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    opacity: 0.13;
+  }
+  html[data-theme="default"] .ambient-mosaic {
+    display: none;
+  }
+
+  /* ============ SHIPPO CIRCLE TRACERS (v1.3) ============
+     Three reusable tracer nodes, positioned by JS to snap to Shippō
+     tile vertices. Each plays a 2.5s "drawing" animation: the SVG
+     circle's stroke-dashoffset animates from full (invisible) to
+     zero (fully drawn), which reads as a hand tracing the outline.
+     The glow comes from two stacked drop-shadows on the stroke.
+
+     The svg element carries overflow: visible so the outer 8px glow
+     is not clipped to the 68x68 viewBox — without it the drop-shadow
+     would terminate at a hard rectangular edge.
+
+     The tracerFade envelope peaks at 0.55 rather than 0.85: the
+     double drop-shadow has a much higher optical density than a
+     bare stroke, and at 0.85 the glow backlights the panel text.
+     0.55 reads as light filtering through washi fibres — visible
+     and tactile but strictly background. */
+  .tracer-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+  }
+  html[data-theme="default"] .tracer-layer {
+    display: none;
+  }
+
+  .shippo-tracer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 68px;
+    height: 68px;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  /* Critical: prevents SVG boundary clipping on the outer glow */
+  .shippo-tracer svg {
+    overflow: visible;
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .tracer-circle {
+    fill: none;
+    stroke: #c9600a;
+    stroke-width: 2.2px;
+    stroke-linecap: round;
+    stroke-dasharray: 189;
+    stroke-dashoffset: 189;
+    filter:
+      drop-shadow(0 0 2px #c9600a)
+      drop-shadow(0 0 8px rgba(143, 47, 0, 0.95));
+  }
+
+  .shippo-tracer.drawing {
+    animation: tracerFade 2.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
+  .shippo-tracer.drawing .tracer-circle {
+    animation: drawStroke 1.5s cubic-bezier(0.35, 0, 0.25, 1) forwards;
+  }
+
+  @keyframes drawStroke {
+    0%   { stroke-dashoffset: 189; }
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes tracerFade {
+    0%   { opacity: 0; }
+    18%  { opacity: 0.55; }
+    75%  { opacity: 0.45; }
+    100% { opacity: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .tracer-layer { display: none !important; }
+  }
 
   /* ============ AMBIENT LIGHT MESH (v1.3 — video replacement) ============
      Pre-feathered CSS light orbs replacing the ambient video. Each orb
@@ -370,17 +425,11 @@
   /* ============ AMBIENT MAPLE LEAVES (v1.3) ============
      Continuous overlay running the full life of the app once
      activated by triggerKoiStart(). Sits at z-index -1 — above the
-     ambient stage (-2) and below every piece of content (panels,
-     transition, table, summary, dialogs, receipt, thank-you text),
-     so the leaves pass behind what the user reads.
-
-     Document order in index.html puts .washi-watermark before this
-     element, so where they overlap the leaves paint on top of the
-     watermark — leaves are the moving foreground, watermark is the
-     paper underneath. Both sit behind content.
-
-     Gated to autumn below; the default (sakura) theme hides the
-     whole layer.
+     ambient stage (-3), the Shippo mosaic and tracer layers (-2),
+     and below every piece of content (panels, transition, table,
+     summary, dialogs, receipt, thank-you text), so the leaves pass
+     behind what the user reads. Gated to autumn below; the default
+     (sakura) theme hides the whole layer.
 
      v1.3 (tuning pass): leaf size multiplied by 1.50, leaf opacity
      dropped 0.95 → 0.30, drop-shadow alpha scaled down from 0.22
@@ -389,8 +438,8 @@
      larger palmate maple path in index.html (viewBox 900×1000).
 
      v1.3 (z-index fix): was 30 — which put the leaves above the
-     panels and table. Moved to -1 so they sit with the watermark,
-     behind all content. */
+     panels and table. Moved to -1 so they sit above the ambient
+     stack and below all content. */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
@@ -503,7 +552,6 @@
     .caustics-1, .caustics-2 { animation: none; }
     .light-orb { animation: none !important; }
     .maple-leaf { animation: none !important; }
-    .washi-watermark { animation: none !important; }
     .ripple { animation-duration: 300ms; }
   }
   @keyframes ambientDrift {
@@ -2369,6 +2417,3 @@
     transform: translateY(6px);
   }
   @keyframes hintBreathe { 0%, 100% { opacity: 0.92; } 50% { opacity: 1; } }
-
-/* TEMPORARY TEST — remove after diagnosing. */
-html[data-theme="autumn"] .washi-watermark { display: none !important; }
