@@ -3,51 +3,43 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>和柄・日本の幾何学模様モザイク（秋テーマ）</title>
+<title>七宝文様・ランダム輪郭線アニメーション検証</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
 <style>
-  /* ============ EXACT AUTUMN PALETTE FROM MAIN.CSS ============ */
+  /* ============ EXACT AUTUMN PALETTE ============ */
   :root {
     --bg-base: #fdf3d8;
     --bg-warm: #f5d89a;
     --accent: #c9600a;
     --accent-2: #8f3f12;
-    --accent-3: #7a3208;
-    --glow: #f7b93c;
+    --border-1: #e8c88a;
+    --border-3: #f0d8a0;
     --text-dark: #231304;
-    --text-med: #3d2410;
     --text-mute: #5a3818;
     --text-faint: #7a5028;
-    --border-1: #e8c88a;
-    --border-2: #d8b478;
-    --border-3: #f0d8a0;
-    --soft-1: #fdf0c8;
-    --soft-2: #fdf5e0;
 
-    /* Live Pattern Variables */
-    --pat-color: #8f2f00;
-    --pat-stroke-width: 1.2px;
-    --pat-opacity: 0.08;
-    --pat-scale: 64px;
+    /* Tracer Live Variables */
+    --tracer-color: #c9600a;
+    --tracer-stroke-width: 2.2px;
+    --tracer-peak-opacity: 0.65;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
   body {
-    margin: 0;
-    padding: 0;
+    margin: 0; padding: 0;
     min-height: 100vh;
     background-color: var(--bg-base);
     color: var(--text-dark);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
     overflow-x: hidden;
   }
 
-  /* ============ AMBIENT LIGHT MESH & GRADIENTS ============ */
+  /* ============ AMBIENT LIGHT MESH ============ */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
@@ -88,18 +80,9 @@
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
-  @keyframes orbDrift1 {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928); }
-  }
-  @keyframes orbDrift2 {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952); }
-  }
-  @keyframes orbDrift3 {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
-  }
+  @keyframes orbDrift1 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-13.75%, 22%, 0); } }
+  @keyframes orbDrift2 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(16.5%, -22%, 0); } }
+  @keyframes orbDrift3 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-19.25%, -11%, 0); } }
 
   .ambient-primary {
     position: absolute; inset: 0;
@@ -109,22 +92,71 @@
       radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, transparent 58%);
   }
 
-  /* ============ FULLSCREEN MOSAIC CANVAS ============ */
-  .mosaic-overlay {
+  /* ============ SHIPPO STATIC BACKGROUND ============ */
+  .ambient-mosaic {
     position: fixed;
     inset: 0;
-    width: 100%;
-    height: 100%;
-    z-index: -2;
     pointer-events: none;
-    opacity: var(--pat-opacity);
-    transition: opacity 0.2s ease;
+    z-index: -2;
+    opacity: 0.08; /* User chosen opacity */
   }
 
-  /* ============ DEMO CONTENT & PREVIEW CARDS ============ */
+  /* ============ TRACER OVERLAYS (Fixed Pool of 3) ============ */
+  .tracer-layer {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+  }
+
+  .shippo-tracer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 68px;
+    height: 68px;
+    opacity: 0;
+    pointer-events: none;
+    will-change: transform, opacity;
+  }
+
+  .tracer-circle {
+    fill: none;
+    stroke: var(--tracer-color);
+    stroke-width: var(--tracer-stroke-width);
+    stroke-linecap: round;
+    /* Circumference = 2 * PI * 30 ≈ 188.5 */
+    stroke-dasharray: 189;
+    stroke-dashoffset: 189;
+    filter: drop-shadow(0 0 5px rgba(247, 185, 60, 0.5));
+  }
+
+  /* Animation state */
+  .shippo-tracer.drawing {
+    animation: tracerFade 2.4s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
+  .shippo-tracer.drawing .tracer-circle {
+    animation: drawStroke 1.5s cubic-bezier(0.35, 0, 0.25, 1) forwards;
+  }
+
+  @keyframes drawStroke {
+    0%   { stroke-dashoffset: 189; }
+    100% { stroke-dashoffset: 0; }
+  }
+
+  @keyframes tracerFade {
+    0%   { opacity: 0; }
+    18%  { opacity: var(--tracer-peak-opacity); }
+    75%  { opacity: calc(var(--tracer-peak-opacity) * 0.8); }
+    100% { opacity: 0; }
+  }
+
+  /* ============ PREVIEW CARD ============ */
   .content-container {
-    max-width: 600px;
-    margin: 40px auto 320px auto;
+    max-width: 580px;
+    margin: 40px auto 360px auto;
     padding: 0 20px;
     position: relative;
     z-index: 1;
@@ -132,25 +164,21 @@
 
   .header-box {
     text-align: center;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
-
   .header-box h1 {
-    font-size: 24px;
-    font-weight: 600;
+    font-size: 22px;
     letter-spacing: 4px;
     color: var(--accent);
-    margin: 0 0 10px 0;
+    margin: 0 0 8px 0;
   }
-
   .header-box p {
-    font-size: 14px;
+    font-size: 13.5px;
     color: var(--text-mute);
     line-height: 1.8;
     margin: 0;
   }
 
-  /* Table Card Preview from Main App */
   .preview-card {
     background-color: #fdf3d8;
     background-image: url('icons/1790835034553.jpg');
@@ -160,16 +188,6 @@
     padding: 6px 0;
     box-shadow: 0 8px 30px rgba(120, 70, 20, 0.12);
     border: 1px solid var(--border-3);
-    overflow: hidden;
-  }
-
-  .preview-note {
-    padding: 16px 20px;
-    text-align: center;
-    font-size: 13.5px;
-    line-height: 1.8;
-    background: rgba(255, 255, 255, 0.6);
-    border-bottom: 1px solid rgba(216, 180, 120, 0.4);
   }
 
   .preview-row {
@@ -179,34 +197,14 @@
     padding: 14px 18px;
     border-bottom: 1px solid rgba(216, 180, 120, 0.3);
   }
-
   .preview-row:last-child { border-bottom: none; }
-
-  .preview-row-check {
-    width: 26px; height: 26px;
-    border-radius: 50%;
-    border: 1.5px solid var(--border-1);
-    background: #fff;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--accent);
-    font-size: 14px;
-  }
-
-  .preview-row-title {
-    flex: 1;
-    margin: 0 12px;
-    font-size: 15px;
-    font-weight: 500;
-  }
-
   .preview-price {
-    background: rgba(255, 255, 255, 0.7);
-    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.75);
+    padding: 5px 12px;
     border-radius: 8px;
     border: 1px solid var(--border-1);
     color: var(--accent);
     font-weight: 700;
-    font-size: 14px;
   }
 
   /* ============ FLOATING CONTROL PANEL ============ */
@@ -218,9 +216,9 @@
     width: min(720px, calc(100vw - 32px));
     max-height: 80vh;
     overflow-y: auto;
-    background: rgba(253, 243, 216, 0.94);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    background: rgba(253, 243, 216, 0.95);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
     border: 1.5px solid var(--border-1);
     border-radius: 22px;
     padding: 18px 22px;
@@ -231,53 +229,45 @@
     gap: 14px;
   }
 
+  .panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
   .section-label {
-    font-size: 11.5px;
+    font-size: 12px;
     letter-spacing: 2.5px;
     color: var(--text-faint);
     text-transform: uppercase;
     font-weight: 600;
-    margin-bottom: 6px;
   }
 
-  .pattern-buttons {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-    gap: 8px;
-  }
-
-  .btn-choice {
-    background: #fff;
-    border: 1.5px solid var(--border-1);
-    border-radius: 12px;
-    padding: 9px 8px;
-    font-family: inherit;
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--text-dark);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .btn-choice:hover { background: var(--soft-1); }
-
-  .btn-choice.active {
+  .btn-trigger {
     background: var(--accent);
     color: #fff;
-    border-color: var(--accent);
-    box-shadow: 0 3px 10px rgba(201, 96, 10, 0.3);
+    border: none;
+    border-radius: 20px;
+    padding: 7px 16px;
+    font-size: 13px;
+    font-family: inherit;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(201, 96, 10, 0.25);
+    transition: transform 0.15s ease, background 0.2s ease;
   }
+  .btn-trigger:active { transform: scale(0.95); background: var(--accent-2); }
 
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
-    gap: 12px;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 14px;
   }
 
   .control-field {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 5px;
   }
 
   .control-field label {
@@ -294,8 +284,8 @@
   }
 
   .color-dot {
-    width: 24px;
-    height: 24px;
+    width: 22px;
+    height: 22px;
     border-radius: 50%;
     border: 2px solid #fff;
     box-shadow: 0 1px 4px rgba(0,0,0,0.2);
@@ -304,7 +294,7 @@
 
   input[type="color"] {
     width: 32px;
-    height: 28px;
+    height: 26px;
     padding: 0;
     border: none;
     border-radius: 6px;
@@ -318,12 +308,12 @@
   }
 
   .code-output {
-    background: rgba(35, 19, 4, 0.90);
+    background: rgba(35, 19, 4, 0.92);
     color: #fdf3d8;
     border-radius: 10px;
     padding: 10px 14px;
     font-family: Consolas, monospace;
-    font-size: 11.5px;
+    font-size: 11px;
     line-height: 1.5;
     overflow-x: auto;
     white-space: pre-wrap;
@@ -334,7 +324,7 @@
 </head>
 <body>
 
-<!-- EXACT AMBIENT LIGHT MESH FROM MAIN APP -->
+<!-- EXACT AMBIENT LIGHT MESH FROM APP -->
 <div class="ambient-stage" aria-hidden="true">
   <div class="ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -344,21 +334,11 @@
   <div class="ambient-primary"></div>
 </div>
 
-<!-- MOSAIC SVG BACKDROP -->
-<svg class="mosaic-overlay" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+<!-- CHOSEN SHIPPO MOSAIC BACKGROUND (#8f2f00, 1.7px, opacity 0.08) -->
+<svg class="ambient-mosaic" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
-    <!-- 1. ASANOHA (麻の葉 - Hemp Leaf Crystal Mosaic) -->
-    <pattern id="pat-asanoha" width="60" height="104" patternUnits="userSpaceOnUse">
-      <g stroke="var(--pat-color)" stroke-width="var(--pat-stroke-width)" fill="none" stroke-linejoin="round">
-        <path d="M30 0 L60 17.32 L60 52 L30 69.28 L0 52 L0 17.32 Z M30 104 L60 86.68 L60 52 L30 34.72 L0 52 L0 86.68 Z" />
-        <path d="M30 0 L30 104 M0 17.32 L60 86.68 M0 86.68 L60 17.32 M0 52 L60 52" />
-        <path d="M0 17.32 L30 52 L60 17.32 M0 86.68 L30 52 L60 86.68" />
-      </g>
-    </pattern>
-
-    <!-- 2. SHIPPO (七宝 - Seven Treasures Petal/Star Mosaic) -->
     <pattern id="pat-shippo" width="60" height="60" patternUnits="userSpaceOnUse">
-      <g stroke="var(--pat-color)" stroke-width="var(--pat-stroke-width)" fill="none">
+      <g stroke="#8f2f00" stroke-width="1.7" fill="none">
         <circle cx="0" cy="0" r="30" />
         <circle cx="60" cy="0" r="30" />
         <circle cx="0" cy="60" r="30" />
@@ -366,80 +346,44 @@
         <circle cx="30" cy="30" r="30" />
       </g>
     </pattern>
-
-    <!-- 3. KIKKO (亀甲 - Tortoise Shell Honeycomb Mosaic) -->
-    <pattern id="pat-kikko" width="60" height="104" patternUnits="userSpaceOnUse">
-      <g stroke="var(--pat-color)" stroke-width="var(--pat-stroke-width)" fill="none">
-        <path d="M30 0 L60 17.32 L60 52 L30 69.28 L0 52 L0 17.32 Z M30 104 L60 86.68 L60 52 L30 34.72 L0 52 L0 86.68 Z" />
-        <!-- Nested inner honeycomb ring for luxury Karakami finish -->
-        <path d="M30 8 L54 21.8 L54 48 L30 61.8 L6 48 L6 21.8 Z M30 96 L54 82.2 L54 56 L30 42.2 L6 56 L6 82.2 Z" opacity="0.6"/>
-      </g>
-    </pattern>
-
-    <!-- 4. UROKO (鱗 - Sacred Triangle Scale Mosaic) -->
-    <pattern id="pat-uroko" width="60" height="52" patternUnits="userSpaceOnUse">
-      <g stroke="var(--pat-color)" stroke-width="var(--pat-stroke-width)" fill="none">
-        <polygon points="30,0 60,52 0,52" />
-        <polygon points="0,0 30,52 -30,52" />
-        <polygon points="60,0 90,52 30,52" />
-      </g>
-    </pattern>
-
-    <!-- 5. SEIGAIHA (青海波 - Overlapping Sacred Wave Mosaic) -->
-    <pattern id="pat-seigaiha" width="80" height="40" patternUnits="userSpaceOnUse">
-      <g stroke="var(--pat-color)" stroke-width="var(--pat-stroke-width)" fill="none">
-        <circle cx="40" cy="40" r="38" />
-        <circle cx="40" cy="40" r="28" />
-        <circle cx="40" cy="40" r="18" />
-        <circle cx="40" cy="40" r="8" />
-
-        <circle cx="0" cy="0" r="38" />
-        <circle cx="0" cy="0" r="28" />
-        <circle cx="0" cy="0" r="18" />
-        <circle cx="0" cy="0" r="8" />
-
-        <circle cx="80" cy="0" r="38" />
-        <circle cx="80" cy="0" r="28" />
-        <circle cx="80" cy="0" r="18" />
-        <circle cx="80" cy="0" r="8" />
-      </g>
-    </pattern>
-
-    <!-- 6. ICHIMATSU (市松 - Classic Checkered Tile Mosaic) -->
-    <pattern id="pat-ichimatsu" width="40" height="40" patternUnits="userSpaceOnUse">
-      <rect x="0" y="0" width="20" height="20" fill="var(--pat-color)" />
-      <rect x="20" y="20" width="20" height="20" fill="var(--pat-color)" />
-    </pattern>
   </defs>
-
-  <rect id="mosaicSurface" width="100%" height="100%" fill="url(#pat-asanoha)" />
+  <rect width="100%" height="100%" fill="url(#pat-shippo)" />
 </svg>
 
-<!-- SAMPLE PAGE CONTENT TO TEST READABILITY -->
+<!-- TRACER POOL (3 reusable nodes so quick intervals don't cut off previous animations) -->
+<div class="tracer-layer" id="tracerLayer" aria-hidden="true">
+  <div class="shippo-tracer" id="tracer0">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
+  <div class="shippo-tracer" id="tracer1">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
+  <div class="shippo-tracer" id="tracer2">
+    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
+  </div>
+</div>
+
+<!-- PREVIEW CONTENT -->
 <div class="content-container">
   <div class="header-box">
-    <h1>和柄モザイクの選定</h1>
-    <p>背景の文様と文字の視認性をご確認ください。<br>下のコントロールバーで柄、色、線幅を調整できます。</p>
+    <h1>七宝・手描きサークル効果</h1>
+    <p>背景の七宝グリッドの交点に呼応して、<br>ランダムな円が一筆書きのように浮かび上がります。</p>
   </div>
 
   <div class="preview-card">
-    <div class="preview-note">
-      <p style="margin:0 0 6px 0; font-weight:600; color:var(--accent);">大切なお知らせ</p>
-      お部屋の光加減と調和する、自然で控えめな質感をお確かめいただけます。
+    <div style="padding:14px 18px; text-align:center; font-size:13.5px; border-bottom:1px solid rgba(216,180,120,0.3); background:rgba(255,255,255,0.5);">
+      背景の輪郭線がコンテンツ背後で自然に調和するか確認できます
     </div>
     <div class="preview-row">
-      <div class="preview-row-check">❀</div>
-      <div class="preview-row-title">ダミーテキスト1</div>
+      <div style="font-size:15px;">ダミーテキスト1</div>
       <div class="preview-price">1,000 円</div>
     </div>
     <div class="preview-row">
-      <div class="preview-row-check">❀</div>
-      <div class="preview-row-title">ダミーテキスト2</div>
+      <div style="font-size:15px;">ダミーテキスト2</div>
       <div class="preview-price">2,000 円</div>
     </div>
     <div class="preview-row">
-      <div class="preview-row-check">❀</div>
-      <div class="preview-row-title">ダミーテキスト3</div>
+      <div style="font-size:15px;">ダミーテキスト3</div>
       <div class="preview-price">5,000 円</div>
     </div>
   </div>
@@ -447,112 +391,166 @@
 
 <!-- FLOATING CONTROLS -->
 <div class="control-panel">
-  <div>
-    <div class="section-label">和柄パターンを選択</div>
-    <div class="pattern-buttons">
-      <button type="button" class="btn-choice active" data-pattern="asanoha">麻の葉 (Asanoha)</button>
-      <button type="button" class="btn-choice" data-pattern="shippo">七宝 (Shippō)</button>
-      <button type="button" class="btn-choice" data-pattern="kikko">亀甲 (Kikkō)</button>
-      <button type="button" class="btn-choice" data-pattern="uroko">鱗 (Uroko)</button>
-      <button type="button" class="btn-choice" data-pattern="seigaiha">青海波 (Seigaiha)</button>
-      <button type="button" class="btn-choice" data-pattern="ichimatsu">市松 (Ichimatsu)</button>
-    </div>
+  <div class="panel-header">
+    <span class="section-label">アニメーション設定</span>
+    <button type="button" class="btn-trigger" id="manualTriggerBtn">今すぐ描画 (Trigger Now)</button>
   </div>
 
   <div class="controls-grid">
     <div class="control-field">
-      <label>線の色 (Stroke Color)</label>
+      <label>描画間隔: <span id="freqVal">4.5 秒</span></label>
+      <input type="range" id="freqSlider" min="1.0" max="10.0" step="0.5" value="4.5">
+    </div>
+
+    <div class="control-field">
+      <label>輪郭線の色 (Stroke Color)</label>
       <div class="color-presets">
-        <input type="color" id="colorPicker" value="#8f2f00">
-        <span class="color-dot" style="background:#8f2f00;" data-color="#8f2f00" title="紅鳶 (Deep Rust)"></span>
+        <input type="color" id="colorPicker" value="#c9600a">
         <span class="color-dot" style="background:#c9600a;" data-color="#c9600a" title="柿色 (Amber Accent)"></span>
-        <span class="color-dot" style="background:#5a3818;" data-color="#5a3818" title="焦茶 (Sepia)"></span>
-        <span class="color-dot" style="background:#231304;" data-color="#231304" title="漆黒 (Ink Dark)"></span>
-        <span class="color-dot" style="background:#ffffff;" data-color="#ffffff" title="胡粉 (Washi White)"></span>
+        <span class="color-dot" style="background:#8f2f00;" data-color="#8f2f00" title="紅鳶 (Deep Rust)"></span>
+        <span class="color-dot" style="background:#f7b93c;" data-color="#f7b93c" title="黄金 (Gold Glow)"></span>
+        <span class="color-dot" style="background:#ffffff;" data-color="#ffffff" title="白磁 (Washi White)"></span>
       </div>
     </div>
 
     <div class="control-field">
-      <label>線の太さ: <span id="strokeVal">1.2px</span></label>
-      <input type="range" id="strokeSlider" min="0.4" max="3.0" step="0.1" value="1.2">
+      <label>最大透明度: <span id="opacityVal">0.65</span></label>
+      <input type="range" id="opacitySlider" min="0.15" max="1.0" step="0.05" value="0.65">
     </div>
 
     <div class="control-field">
-      <label>透明度 (Opacity): <span id="opacityVal">0.08</span></label>
-      <input type="range" id="opacitySlider" min="0.02" max="0.30" step="0.01" value="0.08">
+      <label>線の太さ: <span id="strokeVal">2.2px</span></label>
+      <input type="range" id="strokeSlider" min="1.0" max="4.0" step="0.2" value="2.2">
     </div>
   </div>
 
   <div>
-    <div class="section-label">書き出し用 CSS コード (クリックして全選択)</div>
-    <div class="code-output" id="cssSnippet"></div>
+    <div class="section-label" style="margin-bottom:6px;">生成されたコード (クリックで全選択)</div>
+    <div class="code-output" id="codeSnippet"></div>
   </div>
 </div>
 
 <script>
   var root = document.documentElement;
-  var surface = document.getElementById('mosaicSurface');
+  var freqSlider = document.getElementById('freqSlider');
   var colorPicker = document.getElementById('colorPicker');
-  var strokeSlider = document.getElementById('strokeSlider');
   var opacitySlider = document.getElementById('opacitySlider');
-  var strokeVal = document.getElementById('strokeVal');
+  var strokeSlider = document.getElementById('strokeSlider');
+  var freqVal = document.getElementById('freqVal');
   var opacityVal = document.getElementById('opacityVal');
-  var cssSnippet = document.getElementById('cssSnippet');
-  var patternBtns = document.querySelectorAll('.btn-choice');
+  var strokeVal = document.getElementById('strokeVal');
+  var codeSnippet = document.getElementById('codeSnippet');
+  var manualBtn = document.getElementById('manualTriggerBtn');
   var colorDots = document.querySelectorAll('.color-dot');
 
-  var currentPattern = 'asanoha';
+  var tracers = [
+    document.getElementById('tracer0'),
+    document.getElementById('tracer1'),
+    document.getElementById('tracer2')
+  ];
+  var tracerIndex = 0;
+  var timerId = null;
 
-  function updateOutput() {
-    var c = colorPicker.value;
-    var s = strokeSlider.value + 'px';
-    var o = opacitySlider.value;
+  /* ============ MATHEMATICAL SNAP ENGINE ============ */
+  function triggerShippoCircle() {
+    var tracer = tracers[tracerIndex];
+    tracerIndex = (tracerIndex + 1) % tracers.length;
 
-    root.style.setProperty('--pat-color', c);
-    root.style.setProperty('--pat-stroke-width', s);
-    root.style.setProperty('--pat-opacity', o);
+    var vw = window.innerWidth;
+    var vh = window.innerHeight;
 
-    strokeVal.textContent = s;
-    opacityVal.textContent = o;
+    // Grid interval is 30px
+    var maxCols = Math.floor(vw / 30);
+    var maxRows = Math.floor(vh / 30);
 
-    surface.setAttribute('fill', 'url(#pat-' + currentPattern + ')');
+    var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
+    var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
 
-    // Generate cleanly encoded CSS data-uri string for easy transfer into main.css
-    cssSnippet.textContent =
-      '/* main.css にそのまま貼り付け可能な設定 */\n' +
-      '.ambient-mosaic {\n' +
-      '  position: fixed;\n' +
-      '  inset: 0;\n' +
-      '  pointer-events: none;\n' +
-      '  z-index: -2;\n' +
-      '  opacity: ' + o + ';\n' +
-      '  /* 選択中: ' + currentPattern + ' | 線色: ' + c + ' | 線幅: ' + s + ' */\n' +
-      '}\n' +
-      'html[data-theme="default"] .ambient-mosaic { display: none; }';
+    // Shippo center constraint: (j + k) must be even
+    if ((j + k) % 2 !== 0) {
+      j += 1;
+    }
+
+    // Exact tile center = (j * 30, k * 30). Offset by 34px radius center
+    var x = (j * 30) - 34;
+    var y = (k * 30) - 34;
+    var startAngle = Math.floor(Math.random() * 4) * 90;
+
+    tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startAngle + 'deg)';
+
+    // Trigger keyframe
+    tracer.classList.remove('drawing');
+    void tracer.offsetWidth; // Force reflow
+    tracer.classList.add('drawing');
   }
 
-  patternBtns.forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      patternBtns.forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      currentPattern = btn.getAttribute('data-pattern');
-      updateOutput();
-    });
+  function scheduleNext() {
+    if (timerId) clearTimeout(timerId);
+    var baseSec = parseFloat(freqSlider.value);
+    // Add ±25% natural organic jitter
+    var jitter = (Math.random() * 0.5 - 0.25) * baseSec;
+    var ms = Math.max(800, (baseSec + jitter) * 1000);
+
+    timerId = setTimeout(function() {
+      triggerShippoCircle();
+      scheduleNext();
+    }, ms);
+  }
+
+  function updateSettings() {
+    var c = colorPicker.value;
+    var o = opacitySlider.value;
+    var s = strokeSlider.value + 'px';
+    var f = freqSlider.value + ' 秒';
+
+    root.style.setProperty('--tracer-color', c);
+    root.style.setProperty('--tracer-peak-opacity', o);
+    root.style.setProperty('--tracer-stroke-width', s);
+
+    freqVal.textContent = f;
+    opacityVal.textContent = o;
+    strokeVal.textContent = s;
+
+    codeSnippet.textContent =
+      '/* main.css 設定値 */\n' +
+      '.tracer-circle {\n' +
+      '  stroke: ' + c + ';\n' +
+      '  stroke-width: ' + s + ';\n' +
+      '}\n' +
+      '@keyframes tracerFade {\n' +
+      '  0%   { opacity: 0; }\n' +
+      '  18%  { opacity: ' + o + '; }\n' +
+      '  75%  { opacity: ' + (o * 0.8).toFixed(2) + '; }\n' +
+      '  100% { opacity: 0; }\n' +
+      '}\n' +
+      '/* app.js 間隔設定: 平均 ' + freqSlider.value + ' 秒 */';
+  }
+
+  freqSlider.addEventListener('input', function() {
+    updateSettings();
+    scheduleNext();
   });
+
+  colorPicker.addEventListener('input', updateSettings);
+  opacitySlider.addEventListener('input', updateSettings);
+  strokeSlider.addEventListener('input', updateSettings);
 
   colorDots.forEach(function(dot) {
     dot.addEventListener('click', function() {
-      var col = dot.getAttribute('data-color');
-      colorPicker.value = col;
-      updateOutput();
+      colorPicker.value = dot.getAttribute('data-color');
+      updateSettings();
     });
   });
 
-  colorPicker.addEventListener('input', updateOutput);
-  strokeSlider.addEventListener('input', updateOutput);
-  opacitySlider.addEventListener('input', updateOutput);
+  manualBtn.addEventListener('click', function() {
+    triggerShippoCircle();
+  });
 
-  updateOutput();
+  // Init
+  updateSettings();
+  scheduleNext();
+  // Fire once at start after a short delay
+  setTimeout(triggerShippoCircle, 600);
 </script>
 </body>
 </html>
