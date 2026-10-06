@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>七宝文様・ランダム輪郭線アニメーション検証</title>
+<title>七宝文様・ランダム輪郭線アニメーション検証（光彩調整付き）</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,6 +26,8 @@
     --tracer-color: #c9600a;
     --tracer-stroke-width: 2.2px;
     --tracer-peak-opacity: 0.65;
+    --tracer-glow-radius: 6px;
+    --tracer-glow-color: rgba(247, 185, 60, 0.7);
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -98,10 +100,10 @@
     inset: 0;
     pointer-events: none;
     z-index: -2;
-    opacity: 0.08; /* User chosen opacity */
+    opacity: 0.08;
   }
 
-  /* ============ TRACER OVERLAYS (Fixed Pool of 3) ============ */
+  /* ============ TRACER OVERLAYS ============ */
   .tracer-layer {
     position: fixed;
     inset: 0;
@@ -126,13 +128,11 @@
     stroke: var(--tracer-color);
     stroke-width: var(--tracer-stroke-width);
     stroke-linecap: round;
-    /* Circumference = 2 * PI * 30 ≈ 188.5 */
     stroke-dasharray: 189;
     stroke-dashoffset: 189;
-    filter: drop-shadow(0 0 5px rgba(247, 185, 60, 0.5));
+    filter: drop-shadow(0 0 var(--tracer-glow-radius) var(--tracer-glow-color));
   }
 
-  /* Animation state */
   .shippo-tracer.drawing {
     animation: tracerFade 2.4s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   }
@@ -156,7 +156,7 @@
   /* ============ PREVIEW CARD ============ */
   .content-container {
     max-width: 580px;
-    margin: 40px auto 360px auto;
+    margin: 40px auto 400px auto;
     padding: 0 20px;
     position: relative;
     z-index: 1;
@@ -213,7 +213,7 @@
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    width: min(720px, calc(100vw - 32px));
+    width: min(740px, calc(100vw - 32px));
     max-height: 80vh;
     overflow-y: auto;
     background: rgba(253, 243, 216, 0.95);
@@ -260,7 +260,7 @@
 
   .controls-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
     gap: 14px;
   }
 
@@ -324,7 +324,6 @@
 </head>
 <body>
 
-<!-- EXACT AMBIENT LIGHT MESH FROM APP -->
 <div class="ambient-stage" aria-hidden="true">
   <div class="ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -334,7 +333,6 @@
   <div class="ambient-primary"></div>
 </div>
 
-<!-- CHOSEN SHIPPO MOSAIC BACKGROUND (#8f2f00, 1.7px, opacity 0.08) -->
 <svg class="ambient-mosaic" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
   <defs>
     <pattern id="pat-shippo" width="60" height="60" patternUnits="userSpaceOnUse">
@@ -350,7 +348,6 @@
   <rect width="100%" height="100%" fill="url(#pat-shippo)" />
 </svg>
 
-<!-- TRACER POOL (3 reusable nodes so quick intervals don't cut off previous animations) -->
 <div class="tracer-layer" id="tracerLayer" aria-hidden="true">
   <div class="shippo-tracer" id="tracer0">
     <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
@@ -363,16 +360,15 @@
   </div>
 </div>
 
-<!-- PREVIEW CONTENT -->
 <div class="content-container">
   <div class="header-box">
     <h1>七宝・手描きサークル効果</h1>
-    <p>背景の七宝グリッドの交点に呼応して、<br>ランダムな円が一筆書きのように浮かび上がります。</p>
+    <p>線の太さ・色・透明度に加え、<br>光彩（ソフトグロー）の広がりと色味をリアルタイムで微調整できます。</p>
   </div>
 
   <div class="preview-card">
     <div style="padding:14px 18px; text-align:center; font-size:13.5px; border-bottom:1px solid rgba(216,180,120,0.3); background:rgba(255,255,255,0.5);">
-      背景の輪郭線がコンテンツ背後で自然に調和するか確認できます
+      背景のグローが強すぎて文字を邪魔しないか確認できます
     </div>
     <div class="preview-row">
       <div style="font-size:15px;">ダミーテキスト1</div>
@@ -389,7 +385,6 @@
   </div>
 </div>
 
-<!-- FLOATING CONTROLS -->
 <div class="control-panel">
   <div class="panel-header">
     <span class="section-label">アニメーション設定</span>
@@ -422,6 +417,23 @@
       <label>線の太さ: <span id="strokeVal">2.2px</span></label>
       <input type="range" id="strokeSlider" min="1.0" max="4.0" step="0.2" value="2.2">
     </div>
+
+    <!-- NEW SOFT GLOW CONTROLS -->
+    <div class="control-field">
+      <label>光彩の広がり (Glow Radius): <span id="glowRadVal">6px</span></label>
+      <input type="range" id="glowRadSlider" min="0" max="20" step="1" value="6">
+    </div>
+
+    <div class="control-field">
+      <label>光彩の色 (Glow Color)</label>
+      <div class="color-presets">
+        <input type="color" id="glowColorPicker" value="#f7b93c">
+        <span class="color-dot" style="background:#f7b93c;" data-glow-color="#f7b93c" title="黄金 (Golden Amber)"></span>
+        <span class="color-dot" style="background:#c9600a;" data-glow-color="#c9600a" title="柿色 (Warm Orange)"></span>
+        <span class="color-dot" style="background:#ffffff;" data-glow-color="#ffffff" title="純白 (White Glow)"></span>
+        <span class="color-dot" style="background:#8f2f00;" data-glow-color="#8f2f00" title="深紅 (Dark Ember)"></span>
+      </div>
+    </div>
   </div>
 
   <div>
@@ -436,12 +448,18 @@
   var colorPicker = document.getElementById('colorPicker');
   var opacitySlider = document.getElementById('opacitySlider');
   var strokeSlider = document.getElementById('strokeSlider');
+  var glowRadSlider = document.getElementById('glowRadSlider');
+  var glowColorPicker = document.getElementById('glowColorPicker');
+
   var freqVal = document.getElementById('freqVal');
   var opacityVal = document.getElementById('opacityVal');
   var strokeVal = document.getElementById('strokeVal');
+  var glowRadVal = document.getElementById('glowRadVal');
+
   var codeSnippet = document.getElementById('codeSnippet');
   var manualBtn = document.getElementById('manualTriggerBtn');
-  var colorDots = document.querySelectorAll('.color-dot');
+  var colorDots = document.querySelectorAll('.color-dot[data-color]');
+  var glowDots = document.querySelectorAll('.color-dot[data-glow-color]');
 
   var tracers = [
     document.getElementById('tracer0'),
@@ -451,7 +469,15 @@
   var tracerIndex = 0;
   var timerId = null;
 
-  /* ============ MATHEMATICAL SNAP ENGINE ============ */
+  function hexToRgba(hex, alpha) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) hex = hex[0]+hex[0] + hex[1]+hex[1] + hex[2]+hex[2];
+    var r = parseInt(hex.substring(0, 2), 16);
+    var g = parseInt(hex.substring(2, 4), 16);
+    var b = parseInt(hex.substring(4, 6), 16);
+    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+  }
+
   function triggerShippoCircle() {
     var tracer = tracers[tracerIndex];
     tracerIndex = (tracerIndex + 1) % tracers.length;
@@ -459,35 +485,30 @@
     var vw = window.innerWidth;
     var vh = window.innerHeight;
 
-    // Grid interval is 30px
     var maxCols = Math.floor(vw / 30);
     var maxRows = Math.floor(vh / 30);
 
     var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
     var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
 
-    // Shippo center constraint: (j + k) must be even
     if ((j + k) % 2 !== 0) {
       j += 1;
     }
 
-    // Exact tile center = (j * 30, k * 30). Offset by 34px radius center
     var x = (j * 30) - 34;
     var y = (k * 30) - 34;
     var startAngle = Math.floor(Math.random() * 4) * 90;
 
     tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startAngle + 'deg)';
 
-    // Trigger keyframe
     tracer.classList.remove('drawing');
-    void tracer.offsetWidth; // Force reflow
+    void tracer.offsetWidth;
     tracer.classList.add('drawing');
   }
 
   function scheduleNext() {
     if (timerId) clearTimeout(timerId);
     var baseSec = parseFloat(freqSlider.value);
-    // Add ±25% natural organic jitter
     var jitter = (Math.random() * 0.5 - 0.25) * baseSec;
     var ms = Math.max(800, (baseSec + jitter) * 1000);
 
@@ -502,20 +523,30 @@
     var o = opacitySlider.value;
     var s = strokeSlider.value + 'px';
     var f = freqSlider.value + ' 秒';
+    var gr = glowRadSlider.value + 'px';
+    var gc = hexToRgba(glowColorPicker.value, 0.7);
 
     root.style.setProperty('--tracer-color', c);
     root.style.setProperty('--tracer-peak-opacity', o);
     root.style.setProperty('--tracer-stroke-width', s);
+    root.style.setProperty('--tracer-glow-radius', gr);
+    root.style.setProperty('--tracer-glow-color', gc);
 
     freqVal.textContent = f;
     opacityVal.textContent = o;
     strokeVal.textContent = s;
+    glowRadVal.textContent = gr;
+
+    var filterDeclaration = parseInt(glowRadSlider.value, 10) === 0
+      ? '  filter: none;'
+      : '  filter: drop-shadow(0 0 ' + gr + ' ' + gc + ');';
 
     codeSnippet.textContent =
       '/* main.css 設定値 */\n' +
       '.tracer-circle {\n' +
       '  stroke: ' + c + ';\n' +
       '  stroke-width: ' + s + ';\n' +
+      filterDeclaration + '\n' +
       '}\n' +
       '@keyframes tracerFade {\n' +
       '  0%   { opacity: 0; }\n' +
@@ -534,6 +565,8 @@
   colorPicker.addEventListener('input', updateSettings);
   opacitySlider.addEventListener('input', updateSettings);
   strokeSlider.addEventListener('input', updateSettings);
+  glowRadSlider.addEventListener('input', updateSettings);
+  glowColorPicker.addEventListener('input', updateSettings);
 
   colorDots.forEach(function(dot) {
     dot.addEventListener('click', function() {
@@ -542,14 +575,19 @@
     });
   });
 
+  glowDots.forEach(function(dot) {
+    dot.addEventListener('click', function() {
+      glowColorPicker.value = dot.getAttribute('data-glow-color');
+      updateSettings();
+    });
+  });
+
   manualBtn.addEventListener('click', function() {
     triggerShippoCircle();
   });
 
-  // Init
   updateSettings();
   scheduleNext();
-  // Fire once at start after a short delay
   setTimeout(triggerShippoCircle, 600);
 </script>
 </body>
