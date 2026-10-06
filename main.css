@@ -115,13 +115,34 @@
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
 
   /* ============ AMBIENT SHIPPO MOSAIC (v1.3) ============
-     Static tiled pattern — a repeating Japanese Shippō (七宝)
-     motif of overlapping circles drawn on a 60px grid. The <pattern>
-     is rasterized once by the browser at page load and never touched
-     again, so this layer has zero per-frame cost regardless of size.
-     This is the property that makes it safe where the previous
-     washi watermark was not: there is no animation on the SVG
-     geometry, so no per-frame re-rasterization, so no tile churn.
+     Hardware-tiled background. The SVG is a 60×60 tile containing five
+     r=30 circles at (0,0), (60,0), (0,60), (60,60), and (30,30) — the
+     same geometry the previous <pattern> element drew. Rasterized once
+     by the compositor into a small texture, then repeated via the
+     hardware sampler. Zero per-frame Skia cost regardless of viewport
+     size or scroll.
+
+     Why this replaced the inline DOM SVG:
+     The previous implementation was a full-viewport <svg> whose <rect>
+     was filled with a <pattern>. Chromium retained that as a live
+     vector scene graph and re-evaluated the pattern's five <circle>
+     children for every compositor tile that intersected the element on
+     every raster pass. At 120Hz on the S8 Ultra's viewport, worker
+     threads routinely missed the 8.3ms frame deadline, producing tile-
+     checkerboard dropouts: crisp 512/1024px seams and rectangular
+     transparent regions (documented in the operator's screenshots).
+     A CSS background-image data-URI rasterizes the tile once into a
+     small texture which the compositor samples directly, eliminating
+     that failure mode entirely.
+
+     Data-URI is fully percent-encoded (spaces as %20, # as %23) so
+     CSSNano / PostCSS / any url()-unquoting minifier cannot corrupt it.
+
+     Explicitly scoped under [data-theme="autumn"] so the decoded
+     bitmap is never instantiated under the sakura theme — Chromium
+     decodes the data URI lazily on first paint, and display: none on
+     the default theme means it never paints, so the texture never
+     enters GPU memory.
 
      Opacity 0.13 rather than 0.08: the tracers rely on the grid
      being faintly legible so a glowing ring that snaps to a tile
@@ -129,14 +150,29 @@
      floating circle. Below about 0.10 the grid disappears under
      the tablet's backlight and the tracer loses its anchor.
 
-     Gated to autumn; hidden entirely in default (sakura) theme. */
+     Tracer alignment: triggerShippoCircle() in app.js computes
+     x = j*30 - 34, y = k*30 - 34 with (j + k) even, snapping the
+     68×68 tracer SVG (circle at cx=34, cy=34) so the traced ring
+     lands on grid vertex (j*30, k*30). The element's top-left is at
+     viewport (0,0) via position: fixed; inset: 0, and default
+     background-position: 0 0 places the tile grid origin at the same
+     point the SVG user-space origin sat at, so the mathematical snap
+     aligns at sub-pixel precision across every Shippō ring. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -2;
     opacity: 0.13;
+    background-repeat: repeat;
+    background-size: 60px 60px;
+    background-position: 0 0;
   }
+
+  html[data-theme="autumn"] .ambient-mosaic {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
   html[data-theme="default"] .ambient-mosaic {
     display: none;
   }
