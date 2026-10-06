@@ -38,6 +38,10 @@
        - Reset hot-spot.
        - Transition-line accordion drift.
        - Maple leaf overlay: z-index -1, seven Momiji.
+       - Ambient sound rotation: wind chime and nature recording
+         alternate at random intervals, random offset and duration
+         per play, with per-play fade envelopes. Silence between
+         plays is intentional and expected.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -74,16 +78,16 @@ function applyTheme(theme) {
      returnToStartScreen(). Gating on that instead of introHasRun
      closes the mid-intro race.
 
-     The wind chime shares this exact lifecycle: it starts and
-     stops in lockstep with the tracer so a mid-run theme toggle
-     cannot leave the chime playing alone against a sakura theme. */
+     The ambient sound rotation shares this exact lifecycle: it
+     starts and stops in lockstep with the tracer so a mid-run theme
+     toggle cannot leave sound playing alone against a sakura theme. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (theme === 'autumn' && isCarouselRunning) {
     scheduleShippoTracer();
-    startWindChime();
+    startAmbient();
   } else {
     stopShippoTracer();
-    stopWindChime();
+    stopAmbient();
   }
 }
 if (themeToggle) {
@@ -144,7 +148,18 @@ var soundBuffers = {};
 var soundReady = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
-var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
+
+/* Ambient rotation pool. Each entry: { name, url, peak }. peak is the
+   per-play maximum gain relative to the master gain (0.5), before the
+   per-play random variance of 0.75–1.25× applied in playAmbientSound().
+   The wind chime can sit higher than the nature recording because its
+   energy is sparse and time-localised (isolated chimes with long
+   decays); a continuous birds-forest-river bed at the same peak reads
+   as more intrusive. */
+var AMBIENT_SOUNDS = [
+  { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.22 },
+  { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.18 }
+];
 
 function initSound() {
   if (soundAudioCtx) return;
@@ -163,22 +178,24 @@ function initSound() {
       synthesizeCheck(),
       synthesizePaper(),
       loadDropBuffer(),
-      loadWindChimeBuffer()
+      loadAudioBuffer(AMBIENT_SOUNDS[0].url),
+      loadAudioBuffer(AMBIENT_SOUNDS[1].url)
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
       soundBuffers.paper = bufs[2];
       if (bufs[3]) soundBuffers.drop = bufs[3];
-      if (bufs[4]) soundBuffers.windChime = bufs[4];
+      if (bufs[4]) soundBuffers[AMBIENT_SOUNDS[0].name] = bufs[4];
+      if (bufs[5]) soundBuffers[AMBIENT_SOUNDS[1].name] = bufs[5];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
 }
 
-function loadDropBuffer() {
-  return fetch(DROP_SOUND_URL)
+function loadAudioBuffer(url) {
+  return fetch(url)
     .then(function(r) {
-      if (!r.ok) throw new Error('drop fetch failed');
+      if (!r.ok) throw new Error('audio fetch failed: ' + url);
       return r.arrayBuffer();
     })
     .then(function(ab) {
@@ -190,10 +207,10 @@ function loadDropBuffer() {
     .catch(function() { return null; });
 }
 
-function loadWindChimeBuffer() {
-  return fetch(WIND_CHIME_URL)
+function loadDropBuffer() {
+  return fetch(DROP_SOUND_URL)
     .then(function(r) {
-      if (!r.ok) throw new Error('wind chime fetch failed');
+      if (!r.ok) throw new Error('drop fetch failed');
       return r.arrayBuffer();
     })
     .then(function(ab) {
@@ -344,99 +361,112 @@ function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
 function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
 function playDrop() { playSound('drop', 1.0); }
 
-/* ============ WIND CHIME AMBIENT ============
-   Randomly-scheduled ambient wind chime. Plays a random 6–14s window
-   from the 19s source at a random offset, with linear fade-in / fade-
-   out envelopes so no play ever clicks at the head or tail.
+/* ============ AMBIENT SOUND ROTATION ============
+   Two ambient nature recordings alternate at random intervals. Each
+   play picks a random 6–14s window from the source buffer at a random
+   offset, with linear fade-in / fade-out envelopes so no play ever
+   clicks at the head or tail.
+
+   Scheduling: the gap is measured start-to-start. A play of 6–14s
+   followed by a 30–45s gap yields roughly 16–39 seconds of silence
+   between sounds. Silence between plays is intentional; there is no
+   requirement that one of the two be playing at any given moment.
 
    Lifecycle is shared with the Shippō tracer and maple leaves via the
    .active class on #mapleLeaves. That means:
-     - triggerKoiStart() calls startWindChime() alongside
+     - triggerKoiStart() calls startAmbient() alongside
        scheduleShippoTracer() the moment Panel 0 mounts.
-     - returnToStartScreen() calls stopWindChime() alongside
+     - returnToStartScreen() calls stopAmbient() alongside
        stopShippoTracer().
      - applyTheme() toggles both in lockstep so a mid-run theme
-       switch cannot leave the chime playing alone.
+       switch cannot leave sound playing alone.
 
-   The buffer is loaded once, on the first pointerdown, well before
-   the koi screen completes. If the load failed (offline, decode
-   error, file missing), playWindChime() exits silently and the
-   scheduler continues unaffected — the next chime is tried normally. */
-var WIND_CHIME_FIRST_MIN  = 0;      // first chime: immediate
-var WIND_CHIME_FIRST_MAX  = 0;      // (kept as a range so retuning
-                                    //  is a one-line edit — set MAX
-                                    //  above MIN for a jittered first)
-var WIND_CHIME_GAP_MIN    = 30000;  // subsequent: 30s
-var WIND_CHIME_GAP_MAX    = 45000;  // subsequent: 45s
-var WIND_CHIME_PLAY_MIN   = 6000;   // min play duration (6s)
-var WIND_CHIME_PLAY_MAX   = 14000;  // max play duration (14s)
-var WIND_CHIME_FADE_IN    = 2000;   // nominal fade-in
-var WIND_CHIME_FADE_OUT   = 3000;   // nominal fade-out
-var WIND_CHIME_PEAK       = 0.22;   // peak relative to master gain
+   Buffers are loaded once, on the first pointerdown, well before the
+   koi screen completes. If a load failed (offline, decode error, file
+   missing), playAmbientSound() skips that entry silently and the
+   rotation continues — the next entry is tried normally. */
+var AMBIENT_FIRST_MIN  = 0;      // first sound: immediate
+var AMBIENT_FIRST_MAX  = 0;      // (set MAX above MIN for jitter)
+var AMBIENT_GAP_MIN    = 30000;  // start-to-start gap between plays
+var AMBIENT_GAP_MAX    = 45000;
+var AMBIENT_PLAY_MIN   = 6000;   // min play duration (6s)
+var AMBIENT_PLAY_MAX   = 14000;  // max play duration (14s)
+var AMBIENT_FADE_IN    = 2000;   // nominal fade-in
+var AMBIENT_FADE_OUT   = 3000;   // nominal fade-out
 
-var windChimeTimer = null;
-var windChimeSource = null;
-var windChimeGain = null;
+var ambientTimer = null;
+var ambientSource = null;
+var ambientGain = null;
+var ambientIndex = 0;
 
-function startWindChime() {
-  stopWindChime();
-  var firstGap = WIND_CHIME_FIRST_MIN +
-    Math.random() * (WIND_CHIME_FIRST_MAX - WIND_CHIME_FIRST_MIN);
-  windChimeTimer = setTimeout(function() {
-    windChimeTimer = null;
-    playWindChime();
-    scheduleNextWindChime();
+function startAmbient() {
+  stopAmbient();
+  ambientIndex = 0;
+  var firstGap = AMBIENT_FIRST_MIN +
+    Math.random() * (AMBIENT_FIRST_MAX - AMBIENT_FIRST_MIN);
+  ambientTimer = setTimeout(function() {
+    ambientTimer = null;
+    playAmbientSound();
+    scheduleNextAmbient();
   }, firstGap);
 }
 
-function scheduleNextWindChime() {
-  var gap = WIND_CHIME_GAP_MIN +
-    Math.random() * (WIND_CHIME_GAP_MAX - WIND_CHIME_GAP_MIN);
-  windChimeTimer = setTimeout(function() {
-    windChimeTimer = null;
-    playWindChime();
-    scheduleNextWindChime();
+function scheduleNextAmbient() {
+  var gap = AMBIENT_GAP_MIN +
+    Math.random() * (AMBIENT_GAP_MAX - AMBIENT_GAP_MIN);
+  ambientTimer = setTimeout(function() {
+    ambientTimer = null;
+    playAmbientSound();
+    scheduleNextAmbient();
   }, gap);
 }
 
-function stopWindChime() {
-  if (windChimeTimer) {
-    clearTimeout(windChimeTimer);
-    windChimeTimer = null;
+function stopAmbient() {
+  if (ambientTimer) {
+    clearTimeout(ambientTimer);
+    ambientTimer = null;
   }
-  if (windChimeSource && windChimeGain && soundAudioCtx) {
+  if (ambientSource && ambientGain && soundAudioCtx) {
     try {
       var now = soundAudioCtx.currentTime;
-      windChimeGain.gain.cancelScheduledValues(now);
-      windChimeGain.gain.setTargetAtTime(0, now, 0.1);
-      windChimeSource.stop(now + 0.5);
+      ambientGain.gain.cancelScheduledValues(now);
+      ambientGain.gain.setTargetAtTime(0, now, 0.1);
+      ambientSource.stop(now + 0.5);
     } catch (e) {
-      try { windChimeSource.stop(); } catch (e2) {}
+      try { ambientSource.stop(); } catch (e2) {}
     }
   }
-  windChimeSource = null;
-  windChimeGain = null;
+  ambientSource = null;
+  ambientGain = null;
 }
 
-function playWindChime() {
+function playAmbientSound() {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
-  if (!soundBuffers.windChime) return;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return;
+  if (!AMBIENT_SOUNDS.length) return;
 
-  var buffer = soundBuffers.windChime;
+  /* Advance the rotation first, so a failed play (missing buffer)
+     still consumes its slot and the next tick tries the other sound. */
+  var entry = AMBIENT_SOUNDS[ambientIndex];
+  ambientIndex = (ambientIndex + 1) % AMBIENT_SOUNDS.length;
+
+  var buffer = soundBuffers[entry.name];
+  if (!buffer) return;
+
   var bufferDur = buffer.duration;
-  var playDur = WIND_CHIME_PLAY_MIN +
-    Math.random() * (WIND_CHIME_PLAY_MAX - WIND_CHIME_PLAY_MIN);
+  var playDur = AMBIENT_PLAY_MIN +
+    Math.random() * (AMBIENT_PLAY_MAX - AMBIENT_PLAY_MIN);
   if (playDur > bufferDur - 1) playDur = bufferDur - 1;
+  if (playDur <= 0) return;
 
   var maxStart = Math.max(0, bufferDur - playDur - 0.5);
   var startOffset = Math.random() * maxStart;
 
   /* Cap the fades against the play duration so a short play still has
      a sustain region rather than a pure triangle envelope. */
-  var fadeIn = Math.min(WIND_CHIME_FADE_IN, playDur * 0.25);
-  var fadeOut = Math.min(WIND_CHIME_FADE_OUT, playDur * 0.35);
-  var peak = WIND_CHIME_PEAK * (0.75 + Math.random() * 0.5);
+  var fadeIn = Math.min(AMBIENT_FADE_IN, playDur * 0.25);
+  var fadeOut = Math.min(AMBIENT_FADE_OUT, playDur * 0.35);
+  var peak = entry.peak * (0.75 + Math.random() * 0.5);
 
   var now = soundAudioCtx.currentTime;
   var src = soundAudioCtx.createBufferSource();
@@ -452,12 +482,12 @@ function playWindChime() {
   src.start(now, startOffset, playDur + 0.1);
   src.stop(now + playDur + 0.15);
 
-  windChimeSource = src;
-  windChimeGain = gain;
+  ambientSource = src;
+  ambientGain = gain;
 
   src.onended = function() {
-    if (windChimeSource === src) windChimeSource = null;
-    if (windChimeGain === gain) windChimeGain = null;
+    if (ambientSource === src) ambientSource = null;
+    if (ambientGain === gain) ambientGain = null;
     try { gain.disconnect(); } catch (e) {}
   };
 }
@@ -1667,7 +1697,7 @@ function returnToStartScreen() {
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
   stopShippoTracer();
-  stopWindChime();
+  stopAmbient();
 
   koiGestureState = 'idle';
   koiActivePointerId = null;
@@ -3055,12 +3085,13 @@ function triggerKoiStart() {
         activatePanel(0);
 
         /* v1.3: activate the ambient maple leaves, start the
-           Shippo tracer, and start the wind chime. All three share
-           the same .active gate on #mapleLeaves, which is the single
-           source of truth for "past the intro, carousel running". */
+           Shippo tracer, and start the ambient sound rotation.
+           All three share the same .active gate on #mapleLeaves,
+           which is the single source of truth for "past the intro,
+           carousel running". */
         if (mapleLeaves) mapleLeaves.classList.add('active');
         scheduleShippoTracer();
-        startWindChime();
+        startAmbient();
 
         koiPushTimer(setTimeout(function() {
           if (introOverlay) introOverlay.classList.remove('active', 'finishing');
