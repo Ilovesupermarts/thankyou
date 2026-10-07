@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>鈴虫 (Suzumushi) 音響デモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-base: #1b120c;
+    --bg-card: rgba(38, 26, 18, 0.75);
+    --border: rgba(216, 160, 90, 0.3);
+    --gold: #e8a848;
+    --gold-glow: rgba(232, 168, 72, 0.25);
+    --text-main: #fdf3d8;
+    --text-dim: #a0846c;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 35%, #2a1b12 0%, var(--bg-base) 100%);
+    font-family: "Shippori Mincho", serif;
+    color: var(--text-main);
+    padding: 24px;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .card {
+    width: 100%;
+    max-width: 440px;
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 36px 30px;
+    text-align: center;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(10px);
+  }
+
+  .title-mark {
+    font-size: 20px;
+    color: var(--gold);
+    letter-spacing: 6px;
+    margin-bottom: 8px;
+  }
+
+  h1 {
+    margin: 0 0 6px 0;
+    font-size: 24px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    color: var(--text-main);
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    margin-bottom: 28px;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    height: 90px;
+    background: rgba(18, 11, 7, 0.6);
+    border: 1px solid rgba(216, 160, 90, 0.15);
+    border-radius: 12px;
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+
+  .status-line {
+    font-size: 13px;
+    color: var(--gold);
+    letter-spacing: 1.5px;
+    min-height: 20px;
+    margin-bottom: 22px;
+    transition: opacity 0.3s ease;
+  }
+
+  .controls {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .btn {
+    appearance: none;
+    background: #c9600a;
+    border: 1.5px solid rgba(255, 230, 180, 0.4);
+    color: #ffffff;
+    padding: 14px 20px;
+    border-radius: 30px;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    cursor: pointer;
+    box-shadow: 0 4px 18px rgba(201, 96, 10, 0.35);
+    transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .btn:active {
+    transform: scale(0.97);
+    background: #a34805;
+  }
+
+  .btn.secondary {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    box-shadow: none;
+  }
+
+  .btn.secondary.active {
+    background: rgba(232, 168, 72, 0.15);
+    border-color: var(--gold);
+    color: var(--gold);
+  }
+
+  .slider-row {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+  }
+
+  input[type="range"] {
+    flex: 1;
+    margin-left: 14px;
+    accent-color: var(--gold);
+  }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="title-mark">❀</div>
+  <h1>秋夜の静寂</h1>
+  <div class="subtitle">鈴虫（Suzumushi）プロシージャル合成</div>
+
+  <div class="canvas-wrap">
+    <canvas id="scopeCanvas" width="400" height="90"></canvas>
+  </div>
+
+  <div class="status-line" id="statusLabel">待機中</div>
+
+  <div class="controls">
+    <button type="button" class="btn" id="playBtn">一回再生する</button>
+    <button type="button" class="btn secondary" id="loopBtn">環境ループ (間隔をあけて巡回): OFF</button>
+  </div>
+
+  <div class="slider-row">
+    <span>音量</span>
+    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.7">
+  </div>
+</div>
+
+<script>
+var audioCtx = null;
+var masterGain = null;
+var suzumushiBuffer = null;
+var isRendering = false;
+var loopTimer = null;
+var loopActive = false;
+var activeSource = null;
+
+var statusLabel = document.getElementById('statusLabel');
+var playBtn = document.getElementById('playBtn');
+var loopBtn = document.getElementById('loopBtn');
+var volSlider = document.getElementById('volSlider');
+var canvas = document.getElementById('scopeCanvas');
+var ctx2d = canvas.getContext('2d');
+var analyser = null;
+
+function ensureAudioContext() {
+  if (!audioCtx) {
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    audioCtx = new Ctx();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = parseFloat(volSlider.value);
+    
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;
+    masterGain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    drawVisualizer();
+  }
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+}
+
+function synthesizeSuzumushi() {
+  var sr = audioCtx.sampleRate || 44100;
+  var duration = 7.2;
+  var length = Math.floor(sr * duration);
+  var offline = new OfflineAudioContext(1, length, sr);
+
+  // 1. Nocturnal Air Bed (Filtered Pink Noise)
+  var noiseBuf = offline.createBuffer(1, length, sr);
+  var nd = noiseBuf.getChannelData(0);
+  var b0 = 0, b1 = 0, b2 = 0;
+  for (var i = 0; i < length; i++) {
+    var white = Math.random() * 2 - 1;
+    b0 = 0.99886 * b0 + white * 0.0555179;
+    b1 = 0.99332 * b1 + white * 0.0750759;
+    b2 = 0.96900 * b2 + white * 0.1538520;
+    nd[i] = (b0 + b1 + b2 + white * 0.5362) * 0.08;
+  }
+
+  var airSrc = offline.createBufferSource();
+  airSrc.buffer = noiseBuf;
+
+  var airFilter = offline.createBiquadFilter();
+  airFilter.type = 'lowpass';
+  airFilter.frequency.value = 580;
+
+  var airGain = offline.createGain();
+  airGain.gain.setValueAtTime(0.0001, 0);
+  airGain.gain.exponentialRampToValueAtTime(0.018, 0.8);
+  airGain.gain.setValueAtTime(0.018, duration - 1.0);
+  airGain.gain.exponentialRampToValueAtTime(0.0001, duration);
+
+  airSrc.connect(airFilter);
+  airFilter.connect(airGain);
+  airGain.connect(offline.destination);
+  airSrc.start(0);
+
+  // 2. Bell Carrier & Flutter Engine
+  var carrier1 = offline.createOscillator();
+  carrier1.type = 'sine';
+  carrier1.frequency.value = 4460;
+
+  var carrier2 = offline.createOscillator();
+  carrier2.type = 'sine';
+  carrier2.frequency.value = 4492;
+
+  var carrier2Gain = offline.createGain();
+  carrier2Gain.gain.value = 0.35;
+
+  var amMod = offline.createOscillator();
+  amMod.type = 'sine';
+  amMod.frequency.value = 26;
+
+  var amDepth = offline.createGain();
+  amDepth.gain.value = 0.40;
+
+  var amBase = offline.createGain();
+  amBase.gain.value = 0.60;
+
+  amMod.connect(amDepth);
+  amDepth.connect(amBase.gain);
+
+  carrier1.connect(amBase);
+  carrier2.connect(carrier2Gain);
+  carrier2Gain.connect(amBase);
+
+  var cricketFilter = offline.createBiquadFilter();
+  cricketFilter.type = 'bandpass';
+  cricketFilter.frequency.value = 4480;
+  cricketFilter.Q.value = 2.0;
+
+  var phraseGain = offline.createGain();
+  phraseGain.gain.setValueAtTime(0.0001, 0);
+
+  amBase.connect(cricketFilter);
+  cricketFilter.connect(phraseGain);
+  phraseGain.connect(offline.destination);
+
+  // 3. Cadence Timing
+  function scheduleChirp(start, attack, sustain, decay, peak) {
+    var aEnd = start + attack;
+    var sEnd = aEnd + sustain;
+    var dEnd = sEnd + decay;
+    phraseGain.gain.setValueAtTime(0.0001, start);
+    phraseGain.gain.exponentialRampToValueAtTime(peak, aEnd);
+    if (sustain > 0) phraseGain.gain.linearRampToValueAtTime(peak * 0.72, sEnd);
+    phraseGain.gain.exponentialRampToValueAtTime(0.0001, dEnd);
+  }
+
+  // Phrase 1 (0.6s - 2.3s)
+  scheduleChirp(0.60, 0.015, 0.010, 0.035, 0.12);
+  scheduleChirp(0.74, 0.015, 0.010, 0.035, 0.18);
+  scheduleChirp(0.90, 0.080, 0.700, 0.550, 0.38);
+
+  // Phrase 2 (3.8s - 5.7s)
+  scheduleChirp(3.82, 0.015, 0.010, 0.035, 0.15);
+  scheduleChirp(3.98, 0.090, 0.820, 0.650, 0.42);
+
+  carrier1.start(0);
+  carrier2.start(0);
+  amMod.start(0);
+  carrier1.stop(duration);
+  carrier2.stop(duration);
+  amMod.stop(duration);
+
+  return offline.startRendering();
+}
+
+function playBuffer(buf, onComplete) {
+  if (!buf || !audioCtx) return;
+  var src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  src.connect(masterGain);
+  src.start(0);
+  activeSource = src;
+  statusLabel.textContent = '鈴虫が鳴いています…';
+
+  src.onended = function() {
+    activeSource = null;
+    statusLabel.textContent = loopActive ? '静寂（次の鳴き声まで待機）' : '完了';
+    if (onComplete) onComplete();
+  };
+}
+
+playBtn.addEventListener('click', function() {
+  ensureAudioContext();
+  if (isRendering) return;
+
+  if (!suzumushiBuffer) {
+    statusLabel.textContent = '合成中 (約10ms)...';
+    isRendering = true;
+    var t0 = performance.now();
+    synthesizeSuzumushi().then(function(rendered) {
+      suzumushiBuffer = rendered;
+      isRendering = false;
+      var elapsed = Math.round(performance.now() - t0);
+      statusLabel.textContent = '合成完了 (' + elapsed + 'ms)';
+      playBuffer(suzumushiBuffer);
+    });
+  } else {
+    playBuffer(suzumushiBuffer);
+  }
+});
+
+function scheduleLoopStep() {
+  if (!loopActive) return;
+  playBuffer(suzumushiBuffer, function() {
+    if (!loopActive) return;
+    // 4 to 8 seconds of authentic silence between calls
+    var silence = 4000 + Math.random() * 4000;
+    loopTimer = setTimeout(scheduleLoopStep, silence);
+  });
+}
+
+loopBtn.addEventListener('click', function() {
+  ensureAudioContext();
+  loopActive = !loopActive;
+
+  if (loopActive) {
+    loopBtn.classList.add('active');
+    loopBtn.textContent = '環境ループ: ON (間隔あり巡回)';
+    if (!suzumushiBuffer) {
+      statusLabel.textContent = '合成中...';
+      synthesizeSuzumushi().then(function(rendered) {
+        suzumushiBuffer = rendered;
+        scheduleLoopStep();
+      });
+    } else {
+      scheduleLoopStep();
+    }
+  } else {
+    loopBtn.classList.remove('active');
+    loopBtn.textContent = '環境ループ (間隔をあけて巡回): OFF';
+    if (loopTimer) clearTimeout(loopTimer);
+    if (activeSource) {
+      try { activeSource.stop(); } catch (e) {}
+    }
+    statusLabel.textContent = '待機中';
+  }
+});
+
+volSlider.addEventListener('input', function() {
+  if (masterGain) masterGain.gain.value = parseFloat(volSlider.value);
+});
+
+function drawVisualizer() {
+  requestAnimationFrame(drawVisualizer);
+  if (!analyser) return;
+
+  var bufferLength = analyser.frequencyBinCount;
+  var dataArray = new Uint8Array(bufferLength);
+  analyser.getByteTimeDomainData(dataArray);
+
+  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
+  ctx2d.lineWidth = 1.5;
+  ctx2d.strokeStyle = 'rgba(232, 168, 72, 0.85)';
+  ctx2d.beginPath();
+
+  var sliceWidth = canvas.width / bufferLength;
+  var x = 0;
+
+  for (var i = 0; i < bufferLength; i++) {
+    var v = dataArray[i] / 128.0;
+    var y = (v * canvas.height) / 2;
+    if (i === 0) ctx2d.moveTo(x, y);
+    else ctx2d.lineTo(x, y);
+    x += sliceWidth;
+  }
+
+  ctx2d.lineTo(canvas.width, canvas.height / 2);
+  ctx2d.stroke();
+}
+</script>
+
+</body>
+</html>
