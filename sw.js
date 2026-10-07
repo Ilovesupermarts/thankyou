@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v58';
+const CACHE = 'thankyou-v59';
 
 const ASSETS = [
   './',
@@ -22,7 +22,8 @@ const ASSETS = [
   './icons/44173_0c6eff.png',
   './Sound/cave-water-drop-echo-a053fcdf.mp3',
   './Sound/freesound_community-wind-chimes-32150.mp3',
-  './Sound/baranova_n-birds-forest-river-409229.mp3'
+  './Sound/baranova_n-birds-forest-river-409229.mp3',
+  './Sound/alex_jauk-calm-zen-river-flowing-228223.mp3'
 ];
 
 self.addEventListener('install', function(e) {
