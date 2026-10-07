@@ -84,11 +84,6 @@
   body.warm-background { background-color: var(--bg-warm); }
   body.table-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; top: 0; left: 0; right: 0; }
 
-  /* Body lock while the receipt overlay is up. Applied and removed by
-     JS (lockBodyForReceipt / unlockBodyForReceipt in app.js) so the
-     previous scroll position can be saved and restored. The inline
-     top offset (-scrollY) is set by JS and keeps the page visually
-     in place while the lock is active. */
   body.receipt-locked { overflow: hidden; height: 100vh; position: fixed; width: 100%; left: 0; right: 0; }
 
   body.thankyou-active .stage, body.thankyou-active .stage-spacer,
@@ -97,24 +92,6 @@
   body.thankyou-active .summary { visibility: hidden; }
   body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
-  /* ============ AMBIENT STAGE (v1.3) ============
-     z-index moved from -2 to -3 so the Shippo mosaic and tracer
-     layers sit above the drifting light orbs but below every piece
-     of content. The stage remains a promoted compositor layer for
-     the wind gust animation; the mosaic and tracers are static
-     against it.
-
-     The mix-blend-mode layers (.ambient-secondary multiply,
-     .caustics-1/.caustics-2 screen) that used to live inside this
-     container were removed in the checkerboard-tile-dropout fix.
-     Each one forced Chromium to open a separate offscreen
-     RenderPass on the stage's isolated FBO and read back the
-     backdrop before compositing, which on Adreno TBDR hardware
-     exhausted tile memory at 120Hz and produced axis-aligned tile
-     dropouts. Their depth contribution is now provided by an
-     additional source-over gradient stop inside .ambient-primary,
-     which blends in fixed-function hardware on the tile with zero
-     extra framebuffers. */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
@@ -134,52 +111,10 @@
      hardware sampler. Zero per-frame Skia cost regardless of viewport
      size or scroll.
 
-     Why this replaced the inline DOM SVG:
-     The previous implementation was a full-viewport <svg> whose <rect>
-     was filled with a <pattern>. Chromium retained that as a live
-     vector scene graph and re-evaluated the pattern's five <circle>
-     children for every compositor tile that intersected the element on
-     every raster pass. At 120Hz on the S8 Ultra's viewport, worker
-     threads routinely missed the 8.3ms frame deadline, producing tile-
-     checkerboard dropouts: crisp 512/1024px seams and rectangular
-     transparent regions. A CSS background-image data-URI rasterizes
-     the tile once into a small texture which the compositor samples
-     directly, eliminating that failure mode entirely.
-
-     Data-URI is fully percent-encoded (spaces as %20, # as %23) so
-     CSSNano / PostCSS / any url()-unquoting minifier cannot corrupt it.
-
-     Explicitly scoped under [data-theme="autumn"] so the decoded
-     bitmap is never instantiated under the sakura theme — Chromium
-     decodes the data URI lazily on first paint, and display: none on
-     the default theme means it never paints, so the texture never
-     enters GPU memory.
-
-     Opacity 0.13 rather than 0.08: the tracers rely on the grid
-     being faintly legible so a glowing ring that snaps to a tile
-     vertex reads as tracing the pattern rather than as a random
-     floating circle. Below about 0.10 the grid disappears under
-     the tablet's backlight and the tracer loses its anchor.
-
-     v1.3 (pond mask): a radial-gradient mask fades the pattern to
-     fully transparent at the viewport centre and ramps it up to the
-     element's full 0.13 opacity by roughly 460px radius. The koi
-     sits at the viewport centre on the blossom screen, so the fade
-     reads as a natural pond clearing around it — and on every other
-     screen it doubles as a soft vignette that keeps the pattern out
-     of the centre where panel text sits.
-
-     Inner radius 180px: the outermost pulse-ring peaks at 171px
-     from centre (r=90 × scale 1.9), plus the 6px stroke and the
-     drop-shadow glow. 180px leaves the mask fully transparent at
-     the exact pixel where that outermost ripple's glow has just
-     finished dying, so no ring ever overlaps visible pattern.
-     Outer radius 460px: ~2.7× the inner, giving a clear pond of
-     ~920×920 px before the pattern reaches full strength.
-
-     The mask is on the mosaic element only — it does not touch the
-     tracer layer's grid, so triggerShippoCircle()'s vertex-snap
-     math is unaffected. */
+     v1.3 (pond mask scoping): the mask is NOT on this base rule. It
+     is applied only when the blossom screen is visible, via the
+     html:has(.blossom-screen.visible) rule immediately below. On
+     every other screen the mosaic paints uniformly. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
@@ -189,10 +124,29 @@
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 180px, black 460px);
+  }
+
+  /* v1.3: pond mask, scoped to the blossom screen only. A radial-
+     gradient mask fades the pattern to transparent at the viewport
+     centre and ramps it up to full 0.13 opacity by 210px radius, so
+     the koi reads as sitting in a clear pond rather than on a grid.
+
+     Inner 178px: the outermost .pulse-ring peaks at 171px from centre
+     (r=90 × scale 1.9) plus its 6px stroke and glow. 178px leaves the
+     mask fully transparent at the exact pixel where that ripple's
+     glow has just finished dying, so no ring ever overlaps visible
+     pattern. Outer 210px: a 32px feather, tight enough that the pond
+     reads as a disc around the button rather than a wide clearing.
+
+     The :has() selector reacts to the same .visible class the blossom
+     screen already toggles, so the mask appears on name → blossom,
+     disappears on dive → panels, and reappears on reset → blossom,
+     with no JS involved. */
+  html:has(.blossom-screen.visible) .ambient-mosaic {
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-size: 100% 100%;
-    mask-image: radial-gradient(circle at 50% 50%, transparent 180px, black 460px);
+    mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
     mask-repeat: no-repeat;
     mask-size: 100% 100%;
   }
@@ -205,26 +159,7 @@
     display: none;
   }
 
-  /* ============ SHIPPO CIRCLE TRACERS (v1.3) ============
-     Three reusable tracer nodes, positioned by JS to snap to Shippō
-     tile vertices. Each plays a 2.5s "drawing" animation: the SVG
-     circle's stroke-dashoffset animates from full (invisible) to
-     zero (fully drawn), which reads as a hand tracing the outline.
-     The glow comes from two stacked drop-shadows on the stroke.
-
-     The svg element carries overflow: visible so the outer 8px glow
-     is not clipped to the 68x68 viewBox — without it the drop-shadow
-     would terminate at a hard rectangular edge.
-
-     The tracerFade envelope peaks at 0.68 and holds a 0.55 plateau:
-     the double drop-shadow has a much higher optical density than a
-     bare stroke, so the envelope is tuned for text hierarchy against
-     the 18–22px Shippori Mincho body copy that sits above it. The
-     0.68/0.55 ratio preserves the shape of the original 0.55/0.45
-     envelope (≈ 0.81 plateau-to-peak in both). Raising either number
-     is a text-contrast decision, not a fill-rate one — opacity does
-     not change the raster cost of the drop-shadow passes, which are
-     driven by the stroke-dashoffset geometry mutation. */
+  /* ============ SHIPPO CIRCLE TRACERS (v1.3) ============ */
   .tracer-layer {
     position: fixed;
     inset: 0;
@@ -247,7 +182,6 @@
     will-change: transform, opacity;
   }
 
-  /* Critical: prevents SVG boundary clipping on the outer glow */
   .shippo-tracer svg {
     overflow: visible;
     width: 100%;
@@ -291,22 +225,7 @@
     .tracer-layer { display: none !important; }
   }
 
-  /* ============ AMBIENT LIGHT MESH (v1.3 — video replacement) ============
-     Pre-feathered CSS light orbs replacing the ambient video. Each orb
-     is a radial-gradient that fades to transparent over its own radius,
-     producing the visual of a blurred orb of light with zero GPU
-     convolution passes. Motion is transform-only, so the compositor
-     moves the layer without layout or repaint cost. Gated to the
-     autumn theme below; the default (sakura) theme keeps its
-     watercolor gradient stack uncluttered.
-
-     v1.3 (tuning pass): mesh opacity raised to 0.90 per the demo.
-     Orb durations roughly halved (22/29/19s → 11.58/15.26/10.00s),
-     travel amounts multiplied by 2.75, scale range multiplied by
-     1.20. Gradient cores and halos now use the leaf palette — rust
-     reds (#c9561b, #d46a15) as cores, warm ambers (#f7b93c, #d95e1a,
-     #dd8418) as halos — so the light mesh reads from the same colour
-     family as the falling maple leaves. */
+  /* ============ AMBIENT LIGHT MESH (v1.3) ============ */
   .ambient-mesh {
     position: absolute;
     inset: 0;
@@ -323,7 +242,6 @@
     will-change: transform;
   }
 
-  /* Warm golden sunbeam pool */
   .orb-1 {
     width: 70vw;
     height: 70vw;
@@ -335,7 +253,6 @@
     animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
 
-  /* Deep amber/autumn accent bloom */
   .orb-2 {
     width: 80vw;
     height: 80vw;
@@ -347,7 +264,6 @@
     animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
 
-  /* Subtle focal highlight */
   .orb-3 {
     width: 55vw;
     height: 55vw;
@@ -359,9 +275,6 @@
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
-  /* v1.3: travel amounts multiplied by 2.75 and scale range by 1.20
-     from the pre-tuning baseline (8/-6/-5/8, 0.12/0.06 deltas, etc.).
-     The core multipliers chosen from the mesh-demo page. */
   @keyframes orbDrift1 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
     50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
@@ -397,17 +310,6 @@
       radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
       radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
       radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%),
-      /* Restored amber depth via source-over hardware blend. The
-         .ambient-secondary multiply pass that previously darkened the
-         inter-orb valleys was removed in the checkerboard-dropout fix;
-         this stop substitutes for it using fixed-function alpha
-         blending on the tile. It sits at the BOTTOM of the background
-         list (painted first, under everything else) so the upper
-         radials' bright cores keep their peak luminance while the rust
-         depth bleeds through only where the upper gradients taper into
-         transparency. Hoisting this line to index 0 converts it from
-         an underpainting into a top-layer veil if the in-situ read
-         comes back too flat. */
       radial-gradient(circle at 65% 25%, rgba(143, 47, 0, 0.30) 0%, rgba(107, 47, 14, 0.16) 35%, rgba(107, 47, 14, 0) 65%);
     animation: autumnDrift1 14s ease-in-out infinite;
   }
@@ -461,24 +363,7 @@
     100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
   }
 
-  /* ============ AMBIENT MAPLE LEAVES (v1.3) ============
-     Continuous overlay running the full life of the app once
-     activated by triggerKoiStart(). Sits at z-index -1 — above the
-     ambient stage (-3), the Shippo mosaic and tracer layers (-2),
-     and below every piece of content (panels, transition, table,
-     summary, dialogs, receipt, thank-you text), so the leaves pass
-     behind what the user reads. Gated to autumn below; the default
-     (sakura) theme hides the whole layer.
-
-     v1.3 (tuning pass): leaf size multiplied by 1.50, leaf opacity
-     dropped 0.95 → 0.30, drop-shadow alpha scaled down from 0.22
-     to 0.07 to match the lower leaf opacity. Colours and drift
-     timings unchanged. The leaf shape itself was swapped to the
-     larger palmate maple path in index.html (viewBox 900×1000).
-
-     v1.3 (z-index fix): was 30 — which put the leaves above the
-     panels and table. Moved to -1 so they sit above the ambient
-     stack and below all content. */
+  /* ============ AMBIENT MAPLE LEAVES (v1.3) ============ */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
@@ -493,7 +378,6 @@
     opacity: 1;
   }
 
-  /* Hide autumn leaves when toggled to the sakura (default) theme */
   html[data-theme="default"] .maple-leaves-overlay {
     display: none;
   }
@@ -507,9 +391,6 @@
     opacity: 0.30;
   }
 
-  /* Color palettes, sizes, positions & negative delay offsets.
-     Sizes are 1.5× the previous baseline: 34→51, 42→63, 30→45,
-     44→66, 36→54, 28→42, 38→57. */
   .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
   .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
   .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
@@ -518,7 +399,6 @@
   .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
   .leaf-7 { width: 57px; height: 57px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
 
-  /* 3 Non-identical sway patterns with distinct initial angles */
   @keyframes mapleDriftA {
     0% {
       transform: translate3d(0, -60px, 0) rotate(-15deg);
@@ -593,7 +473,10 @@
     .ripple { animation-duration: 300ms; }
     .gold-band {
       animation: none !important;
-      filter: drop-shadow(0 0 16px rgba(253, 243, 216, 0.7));
+      opacity: 1;
+      filter:
+        drop-shadow(0 0 10px rgba(255, 250, 220, 0.8))
+        drop-shadow(0 0 24px rgba(255, 215, 110, 0.5));
     }
   }
   @keyframes ambientDrift {
@@ -684,11 +567,6 @@
   }
   .theme-toggle:active { transform: scale(0.92); background: rgba(255, 255, 255, 1); border-color: var(--accent); }
 
-  /* v1.3: invisible reset hot-spot. Tap the top-left corner to
-     return to the blossom start screen, preserving all entered
-     values, and re-run the koi intro. Sized for finger contact;
-     z-index 8 sits below the theme toggle (z-index 10) so a tap
-     on the toggle still switches themes. */
   .reset-hotspot {
     position: fixed;
     top: 0;
@@ -865,11 +743,6 @@
   }
   .blossom-screen.visible { opacity: 1; pointer-events: auto; }
 
-  /* v1.3: time greeting + therapist name on the blossom screen.
-     Two stacked lines — the greeting in Shippori Mincho, the name
-     below it in Yuji Syuku with the same autumn colour override
-     used on the panel-0 name span. Populated by
-     updateBlossomGreeting() in app.js on every screen show. */
   .blossom-greeting {
     text-align: center;
     margin-bottom: 40px;
@@ -929,10 +802,6 @@
   .intro-overlay.finishing { opacity: 0; transition: opacity 0.9s ease; }
 
   /* ============ MAIN CAROUSEL ============ */
-  /* v1.3: 6-panel carousel. Panel 0 is the dynamic weather/time
-     welcome. Panels 1-4 host the panel-N.html bodies. Panel 5 is the
-     hardcoded zero-pressure gate. Track is 600% wide; each panel is
-     1/6th of the track, so its rendered width equals the viewport. */
   .stage { position: relative; height: 100vh; width: 100%; overflow: hidden; touch-action: pan-y; perspective: 1200px; }
   .track { display: flex; width: 600%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .track.dragging { transition: none; }
@@ -959,22 +828,12 @@
   html[data-theme="autumn"] .panel-content .therapist-name { color: #8f2f00; text-shadow: 0 1px 12px rgba(143, 47, 0, 0.35), 0 2px 20px rgba(253, 232, 184, 0.6); }
   .panel-content .panel-5-red { color: var(--accent); }
   html[data-theme="autumn"] .panel-content .panel-5-red { color: #8f2f00; }
-  /* v1.3: backdrop-filter removed. The .msg-3 box sits over the
-     animating ambient stage; the 6px blur re-composited per frame.
-     --box-bg is already a filled tint at 0.55 alpha, so dropping
-     the blur produces the same look at zero per-frame cost. */
   .panel-content .msg-3 {
     padding: 24px 22px; background: var(--box-bg); border-radius: 20px;
     border: 1px solid var(--box-border); box-shadow: var(--box-shadow);
   }
 
   /* ============ PANEL PHRASE REVEAL ============ */
-  /* v1.3: will-change: opacity, transform removed. It was a permanent
-     compositor-promotion hint on every phrase — 150-300 layers across
-     the panels, held for the life of the page whether or not the
-     phrases were animating. The 500ms transition is short enough that
-     the browser promotes on-demand during the transition and demotes
-     after, which reads identically on device. */
   .panel-phrase {
     display: inline-block;
     opacity: 0;
@@ -1031,25 +890,12 @@
     background: var(--dot-active-bg); transform: scale(1.5);
     box-shadow: 0 0 0 5px var(--dot-active-ring), 0 2px 6px var(--dot-active-shadow);
   }
-  /* v1.3: flat-pixel runway. The accordion drift writes its
-     transforms in absolute pixels (~48px peak outer travel), so the
-     runway that has to absorb that travel is also specified in
-     absolute pixels rather than vh. On the S8 Ultra landscape at
-     ~1000px tall, 0.5vh was ~5px — far short of the travel. 75px
-     guarantees the divider's rise is absorbed before it can reach
-     the .dots row above. */
   .stage-spacer { height: 75px; }
 
   /* ============ TRANSITION LINE ============ */
-  /* v1.3: the transition block scrolls with the page like normal
-     text. The only scroll-linked effect is the accordion drift,
-     which is applied per-item (divider + each paragraph) as an
-     inline transform from updateTransitionBodyEffects() in app.js.
-     No entrance animation, no directional fades, no reveal, no
-     glow. Text renders at full opacity alongside the header. */
   .transition-line {
     text-align: center;
-    padding: 0 32px 85px 32px; /* v1.3: bottom padding 40 → 85px, giving the last paragraph a fixed-pixel runway to drift down into without slipping behind the table divider. */
+    padding: 0 32px 85px 32px;
     margin-top: 4px;
     font-size: 18px; font-weight: 500; color: var(--accent);
     letter-spacing: 0.8px; line-height: 2; max-width: 560px; margin-left: auto; margin-right: auto;
@@ -1057,15 +903,12 @@
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
   html[data-theme="autumn"] .transition-line { color: #8f2f00; }
-  /* v1.3: divider resting margin tightened 19 → 10px so the
-     accordion fan opens from a closer rest and the fanning reads
-     as the dominant motion. */
   .transition-line-divider {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  margin: 0 0 10px 0; /* Tightened from 19px */
+  margin: 0 0 10px 0;
   will-change: transform;
 }
   .transition-line-mark {
@@ -1088,21 +931,8 @@
     white-space: nowrap;
   }
 
-  /* v1.3: paragraphs render immediately alongside the header.
-     No opacity transition, no .revealed class, no IntersectionObserver.
-     Transform is written exclusively by JS (accordion drift) and the
-     CSS rule carries no transform transition so the motion tracks
-     scroll frame-for-frame.
-
-     Resting margin tightened 0.9em → 0.35em: at 18px this is a
-     ~6.3px gap at rest, which the fan (LINE_SPREAD_FACTOR 0.075)
-     opens to ~20px at the core-zone boundary. The fan, not the
-     authored gap, now supplies the separation. line-height stays
-     at 2.0 so multi-line paragraphs (notably paragraph 3) remain
-     comfortably set — the tightening is on inter-paragraph gaps,
-     not intra-paragraph leading. */
   .transition-line-body p {
-    margin: 0 0 0.35em 0; /* Tightened from 0.9em */
+    margin: 0 0 0.35em 0;
     opacity: 1;
     transform: none;
     transform-origin: 50% 50%;
@@ -1111,10 +941,6 @@
   .transition-line-body p:last-child { margin-bottom: 0; }
 
   /* ============ TABLE ============ */
-  /* v1.3: +20px top margin. Together with .transition-line's 85px
-     bottom padding, gives 105px of fixed-pixel clearance below the
-     last paragraph — enough for its downward drift peak of ~48px
-     to resolve without touching this divider or the table. */
   .divider {
     display: flex;
     align-items: center;
@@ -1272,10 +1098,6 @@
 
   .yen { color: var(--accent-2); font-size: 14px; font-weight: 700; flex-shrink: 0; }
 
-  /* v1.3: backdrop-filter removed. The reject row sits over the
-     animated ambient stage during table scroll; the 4px blur was
-     re-composited per frame. The fill at 0.94 alpha is opaque
-     enough that the blur was doing almost nothing visually. */
   .reject-row {
     margin: 12px 16px 8px 16px; padding: 20px 16px;
     background: rgba(245, 242, 239, 0.94); border: 1.5px dashed var(--border-6);
@@ -1354,15 +1176,6 @@
   }
 
   /* ============ SUMMARY BAR ============ */
-  /* v1.3: backdrop-filter removed. The summary bar sits over the
-     animated ambient stage during table scroll. The 8px blur was
-     re-composited per frame. The fill is governed by the
-     --summary-bg theme variable; both theme values were raised in
-     alpha to compensate for the removed blur:
-       default: 0.94 → 0.98
-       autumn:  0.72 → 0.96
-     The warm cream hue is preserved in autumn; only the transparency
-     changed. */
   .summary {
     position: fixed; bottom: 0; left: 0; right: 0;
     background: var(--summary-bg);
@@ -1404,13 +1217,6 @@
   .submit-btn:not(:disabled):hover .btn-arrow, .submit-btn:not(:disabled):active .btn-arrow { transform: translateX(3px); }
 
   /* ============ CONFIRM DIALOG ============ */
-  /* v1.3: backdrop-filter removed. The dialog covers the full viewport
-     and appears while the panel content behind it is still settling.
-     The 6px blur was the worst compositor case in the app — a
-     full-screen re-blur over the animating ambient stage on the exact
-     frames the user was most likely to notice jank. Fill bumped
-     0.92 → 0.96; on a pastel background the difference is not
-     visible. */
   .confirm-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(250, 247, 245, 0.96);
@@ -1439,7 +1245,6 @@
   @media (min-width: 700px) { .confirm-btn { font-size: 14.5px; padding: 15px 12px; } .confirm-card { max-width: 420px; } }
 
   /* ============ ALERT DIALOG ============ */
-  /* v1.3: backdrop-filter removed, fill bumped 0.92 → 0.96. */
   .alert-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(250, 247, 245, 0.96);
@@ -1466,7 +1271,6 @@
   .alert-btn:active { background: var(--accent-3); transform: scale(0.97); }
 
   /* ============ TANZAKU FOCUS MODAL ============ */
-  /* v1.3: backdrop-filter removed, fill bumped 0.92 → 0.96. */
   .tanzaku-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(250, 247, 245, 0.96);
@@ -1626,20 +1430,6 @@
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
 
-  /* v1.3: wrapper carries the resting tilt and the two-layer
-     drop-shadow. The filter sits here — on the wrapper, above the
-     masked paper — so it follows the paper's torn-edge silhouette.
-     The filter transition here is what fades the shadow back in on
-     the exit side, when .landing is removed at animationend.
-
-     Step 5 restored transform-origin: 50% 100%. The pivot now sits
-     on the bottom edge, matching the original authored behaviour:
-     the resting rotate(1.65deg) swings the top edge further than a
-     centre pivot would, and the landing rotateX(12deg) hinges at
-     the base so the top leans back rather than the bottom dropping
-     forward. The child .receipt-paper still carries the same
-     transform-origin value, which is dead code — the child never
-     transforms — and is left in place to keep this change isolated. */
   .receipt-paper-wrap {
     display: inline-flex;
     margin: auto;
@@ -1651,45 +1441,6 @@
       drop-shadow(7px 22px 18px rgba(120, 70, 20, 0.21));
   }
 
-  /* v1.3: landing animation. Stops: 0% (opacity 0, pre-fall pose),
-     40% (opacity 1, tilt peak), 72% (contact bounce), 86% (rebound),
-     100% (settle). Duration 1400ms, travel 100px, cubic-bezier
-     (0.25, 0.1, 0.25, 1), fill-mode both so the 0% pose holds
-     before playback.
-
-     Step 3 shortened duration 2400 → 1400ms and travel 140 → 100px.
-     The original 2400/140 was a compensation for dropped frames that
-     turned out to be caused by concurrent .receipt-item arrivals,
-     not by the landing animation itself. With those serialized
-     (deferItems + revealReceiptItems), the tighter timing reads
-     correctly on the device.
-
-     Step 4 restored the drop-shadow fade inside the keyframes. Filter
-     was previously held at `none` on .landing for the duration of the
-     fall. That precaution is no longer needed — the animation now
-     interpolates its own two-layer drop-shadow from alpha 0 at 0% to
-     the base-rule values at 100%, with a slight overshoot at the
-     contact bounce (72%) and a relaxed value at the rebound (86%).
-     The 100% values match the base rule exactly, so there is no pop
-     when the animation ends and the base filter takes over.
-
-     transition: none on .landing is still load-bearing — it prevents
-     the base rule's 400ms filter transition from firing on entry,
-     which would fight the keyframe's own filter interpolation during
-     the first frames of the fall.
-
-     Step 1 restored scale as a two-axis scale(x, y). Horizontal axis
-     stays near 1 (1 → 1 → 1.016 → 0.996 → 1); vertical axis
-     compresses on entry (0.94), approaches full height (0.98),
-     overshoots on contact (1.014), rebounds (0.997), settles (1).
-
-     Step 2 restored rotateX as a tilt-back. Peak 12deg at 40%,
-     unwinding to 1.8deg at the contact bounce (contact factor 0.15)
-     and fully flat by 86%. `.receipt-screen` carries
-     perspective: 1200px so the rotateX renders as a 3D lean rather
-     than a Y-compression. Transform order in every stop is
-     translateY → scale → rotateX → rotate(rest), so the resting
-     tilt is applied last and the composition reads as expected. */
   .receipt-paper-wrap.landing {
     animation: paperLand 1400ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
     will-change: transform, opacity;
@@ -1744,8 +1495,6 @@
     transform-origin: 50% 100%;
     scroll-behavior: auto;
 
-    /* Torn edges via mask. Drop-shadow lives on the wrapper
-       (.receipt-paper-wrap). No border, no box-shadow, no filter. */
     border: none;
     box-shadow: none;
 
@@ -1822,10 +1571,6 @@
   .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
 
-  /* v1.17.2: item counter — matches the 本日の内容 label style.
-     No badge chrome; inherits colour, size, weight, family, and
-     letter-spacing from .receipt-title so the whole line reads as
-     one phrase. The digit-roll odometer sits inline. */
   .receipt-title {
     font-size: 12px;
     font-weight: 500;
@@ -1845,11 +1590,6 @@
   }
   .item-count-unit { /* inherits from .item-count */ }
 
-  /* v1.17.2: compact 2-column odometer for the receipt item counter.
-     The column width is set at runtime to the exact digit advance
-     plus one letter-space via --counter-cell-w. The pull brings the
-     digit's ink closer to the preceding colon so the line reads with
-     uniform tracking. See app.js measureDigitAdvance(). */
   .counter-digit-roll {
     --digit-h: 1.4em;
     --counter-pull: -12px;
@@ -2156,8 +1896,6 @@
     .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
     .transition-line { font-size: 17px; }
-    /* v1.3: shrink the top runway proportionally on short viewports.
-       50px still absorbs the ~48px outer travel. */
     .stage-spacer { height: 50px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 15px; line-height: 2; margin-bottom: 5px; }
@@ -2209,7 +1947,6 @@
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 2; }
     .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
-    /* v1.3: floor the top runway at 40px on very short landscape. */
     .stage-spacer { height: 40px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
@@ -2350,7 +2087,6 @@
     margin-bottom: 32px;
   }
 
-  /* v1.17.2: koi dive wrapper */
   .koi-dive-wrap {
     position: relative;
     z-index: 2;
@@ -2370,15 +2106,6 @@
                 opacity 800ms cubic-bezier(0.4, 0, 0.6, 1);
   }
 
-  /* v1.3: koi tap flinch. One-shot 1000ms animation triggered by a
-     short tap that began on the koi PNG itself. Random per tap via
-     CSS custom properties written by JS:
-       --flinch-rot    peak rotation (deg)
-       --flinch-scale  peak scale
-       --flinch-x      horizontal dart (px, signed)
-       --flinch-y      vertical dart (px, negative = upward)
-     Resting transform matches the base rule's translateY so the
-     animation blends in and out cleanly with the swipe lift. */
   @keyframes koiFlinch {
     0% {
       transform: translateY(var(--koi-rise-y, 0px)) translateX(0) rotate(0deg) scale(1);
@@ -2443,7 +2170,6 @@
   }
   @keyframes swimCircle { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-  /* v1.17.2: koi startle spin on tap/swipe begin */
   .start-btn.startling .koi-image {
     animation: koiStartleSpin 200ms cubic-bezier(0.34, 1.15, 0.64, 1);
   }
@@ -2465,68 +2191,79 @@
   .start-btn.diving .rings-svg { opacity: 0; }
 
   /* v1.3: gold band as a slow breathing pulse.
-     Previously a static 6px stroke at #fdf3d8 with a static 16px
-     drop-shadow glow, and a .start-btn.ready override that swapped
-     the filter to a brighter 28px glow. The static version read as
-     a hard ring rather than a living membrane; the ready state was
-     a discrete filter swap rather than a brightness step.
+     The ring breathes through four independent channels at once:
+     it grows by 12%, its stroke thickens by 1.5px, its own opacity
+     rises from 0.7 to 1.0, and its glow deepens from a single tight
+     4px/10px pair to a three-layer 10/28/56px bloom. Any one of
+     those on its own would be lost against the warm autumn
+     background; together they read as unmistakably alive. Duration
+     shortened from 4s to 2.8s so the cycle is perceptible without
+     staring.
 
-     Now the ring breathes on a 4s ease-in-out cycle. Two properties
-     animate together:
-       - filter drop-shadow radius and alpha — the halo swells and
-         recedes
-       - stroke-width — the ring itself thickens and thins by ~1px,
-         which reads as the ring flexing rather than just glowing
-
-     Both are driven through CSS custom properties so the .ready
-     state can brighten the whole envelope by scaling the same six
-     values, rather than swapping the animation. Changing a custom
-     property mid-animation updates the keyframe values on the next
-     frame without restarting the animation, so the transition from
-     resting to ready state is a brightness step, not a jump.
-
-     Chromium resolves custom properties inside keyframes at
-     animation time, so this works on the Samsung Internet build the
-     tablet runs. will-change promotes the SVG's raster; the layer
-     is only ~420×420 px, well within the Adreno's per-frame budget
-     at 120Hz — the tile dropouts we fixed earlier were specific to
-     full-viewport raster, not to a localised filter. */
+     transform-box: view-box makes the 180px 180px origin resolve
+     in the SVG's viewBox coordinate system, which is where the
+     circle's centre sits. Default in Chromium, but explicit is
+     safer across the Adreno stack. */
   .gold-band {
-    --gold-glow-min: 10px;
-    --gold-glow-max: 24px;
-    --gold-alpha-min: 0.55;
-    --gold-alpha-max: 0.9;
-    --gold-stroke-min: 5.4px;
-    --gold-stroke-max: 6.4px;
-
     stroke: #fdf3d8;
     stroke-width: 6px;
     fill: none;
-    animation: goldBreath 4s ease-in-out infinite;
-    will-change: filter, stroke-width;
+    transform-box: view-box;
+    transform-origin: 180px 180px;
+    animation: goldBreath 2.8s ease-in-out infinite;
+    will-change: transform, opacity;
   }
 
   @keyframes goldBreath {
     0%, 100% {
-      filter: drop-shadow(0 0 var(--gold-glow-min) rgba(253, 243, 216, var(--gold-alpha-min)));
-      stroke-width: var(--gold-stroke-min);
+      transform: scale(1);
+      opacity: 0.7;
+      stroke-width: 5.5px;
+      filter:
+        drop-shadow(0 0 4px rgba(255, 240, 200, 0.4))
+        drop-shadow(0 0 10px rgba(255, 200, 90, 0.25));
     }
     50% {
-      filter: drop-shadow(0 0 var(--gold-glow-max) rgba(253, 240, 200, var(--gold-alpha-max)));
-      stroke-width: var(--gold-stroke-max);
+      transform: scale(1.12);
+      opacity: 1;
+      stroke-width: 7px;
+      filter:
+        drop-shadow(0 0 10px rgba(255, 250, 220, 0.95))
+        drop-shadow(0 0 28px rgba(255, 215, 110, 0.7))
+        drop-shadow(0 0 56px rgba(255, 195, 70, 0.4));
     }
   }
 
-  /* Ready state brightens the whole envelope — the ring is already
-     on its way to peak when the swipe crosses threshold. No
-     animation-duration change, no filter swap, no layer churn. */
+  /* Ready state: a fully distinct animation rather than a custom-
+     property override. Custom properties inside keyframes do not
+     re-resolve mid-animation in Chromium, which is why the earlier
+     attempt to intensify via --gold-* variables had no visible
+     effect on the running pulse. A separate @keyframes sidesteps
+     that entirely and lets the ready state be as loud as it wants
+     without fighting the resting animation. */
   .start-btn.ready .gold-band {
-    --gold-glow-min: 18px;
-    --gold-glow-max: 36px;
-    --gold-alpha-min: 0.85;
-    --gold-alpha-max: 1;
-    --gold-stroke-min: 6px;
-    --gold-stroke-max: 7.4px;
+    stroke: #ffffff;
+    animation: goldBreathReady 1.4s ease-in-out infinite;
+  }
+
+  @keyframes goldBreathReady {
+    0%, 100% {
+      transform: scale(1.02);
+      opacity: 0.9;
+      stroke-width: 6px;
+      filter:
+        drop-shadow(0 0 8px rgba(255, 245, 200, 0.7))
+        drop-shadow(0 0 20px rgba(255, 200, 90, 0.5));
+    }
+    50% {
+      transform: scale(1.14);
+      opacity: 1;
+      stroke-width: 7.5px;
+      filter:
+        drop-shadow(0 0 14px rgba(255, 255, 235, 1))
+        drop-shadow(0 0 32px rgba(255, 220, 130, 0.9))
+        drop-shadow(0 0 60px rgba(255, 200, 80, 0.55));
+    }
   }
 
   .pulse-ring {
@@ -2543,15 +2280,7 @@
     100% { transform: scale(1.9); opacity: 0; stroke-width: 0px; }
   }
 
-  /* v1.3: three poetic interaction hints below the start button.
-     Each line arrives on a 0.9 / 1.5 / 2.1s stagger the moment the
-     screen becomes visible, so the block reads as a small poem
-     rather than a wall of instructions. The whole block fades out
-     together on the dive that triggers the koi start.
-     The animation is gated on .blossom-screen.visible so it re-fires
-     every time the screen is re-shown via the reset hot-spot, rather
-     than completing once on page load behind the still-hidden
-     screen. */
+  /* v1.3: three poetic interaction hints below the start button. */
   .start-hints {
     margin: 24px 0 0 0;
     text-align: center;
