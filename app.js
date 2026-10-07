@@ -40,16 +40,28 @@
          makeSeamlessLoop().
        - Greeting set revised: warmer, more observational phrasing
          across all 17 branches.
-       - Greeting structure refactored. getGreetingTier() walks the
-         priority ladder and returns a tier identifier;
-         GREETING_TEXTS maps tier → greeting text; BURDEN_TIERS
-         marks tiers whose greeting frames the journey as
-         physically demanding. Closing line now varies by tier —
-         どうぞご無理なさらず、おくつろぎください。 for burden
-         tiers, どうぞ肩の力を抜いて、おくつろぎください。 for the
-         rest. C2 (肌寒い) is deliberately on the lighter closing:
-         the greeting drops 誠に to match its own mildness, so the
-         closing follows.
+       - Greeting engine consolidated. GREETING_TABLE is a single
+         dictionary mapping each tier to { text, burden };
+         getGreetingTier() walks the priority ladder and returns
+         the tier identifier; updateGreetingPanel() resolves the
+         entry once and derives the closing line from its burden
+         flag. Binding text and burden into atomic entries prevents
+         pairing drift, and calling getGreetingTier() exactly once
+         eliminates the microsecond boundary race where separate
+         calls at a bucket transition could pair one tier's greeting
+         with another tier's closing.
+       - Editorial rule for burden: a tier is a burden when the
+         outside environment imposed a meaningful tax on the
+         therapist — a tax on comfort, focus, or safety — before
+         she crossed the threshold. Physical discomfort (bitter
+         cold, stifling heat, driving rain) and cognitive vigilance
+         (navigating thick fog) both qualify. C2 (肌寒い) does not:
+         the greeting drops 誠に to match its own mildness, and the
+         lighter closing follows. D1–D4 acknowledge lateness or
+         earliness in the greeting but do not by themselves warrant
+         the protective closing. B4 (fog) omits お部屋まで
+         intentionally — the defining event is safe transit through
+         poor visibility, not the destination.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -4512,72 +4524,56 @@ function updateInfoDateTime() {
   infoTime.textContent = hhPadded + '時' + mmPadded + '分';
 }
 
-/* ============ DYNAMIC GREETING (Panel 0) ============
-   Compound weather/time greeting for the Panel 0 welcome body.
-   Evaluated in strict hierarchical order:
+/* ============================================================
+   DYNAMIC GREETING (Panel 0)
+   ------------------------------------------------------------
+   getGreetingTier() walks the priority ladder and returns a tier
+   identifier ('A1', 'B2', etc.). GREETING_TABLE maps each tier to
+   its greeting text and a burden flag.
 
-     A. Compound hardships (adverse weather AND time-of-day)
-     B. Single adverse weather
-     C. Single temperature extremes (only when we have a reading)
-     D. Single time of day (only when we have a reading — otherwise
-        the offline/loading state would fabricate "mild weather")
-     E. Offline / loading fallback
-
-   The greeting is regenerated on every weather fetch until
-   greetingFinalized flips true, then frozen for the session.
-
-   Structure: getGreetingTier() walks the ladder and returns a
-   tier identifier ('A1', 'B2', etc.). GREETING_TEXTS maps each
-   tier to its greeting text. BURDEN_TIERS marks the tiers whose
-   greeting frames the journey as physically demanding, and those
-   tiers receive the more protective closing line in
-   getClosingLine(). Keeping the ladder separate from the text
-   lookup means edits to wording never touch the priority logic,
-   and edits to priority never touch the strings.
+   Editorial Principle (Environmental Imposition):
+   A tier is marked `burden: true` when the outside environment
+   imposed a meaningful tax on the therapist (chill, heat, rain,
+   or the cognitive vigilance of poor visibility) before crossing
+   the threshold.
+     - burden === true  → 「どうぞご無理なさらず、おくつろぎください。」
+     - burden === false → 「どうぞ肩の力を抜いて、おくつろぎください。」
 
    Design note on phrasing: the variations across branches
    (朝早くから, 夜遅いお時間にもかかわらず, 無事に, 足元の悪い中,
    肌寒い中) are deliberate. Do not normalise them to a single
    template — the variation is what makes the screen read as
    having noticed the circumstances rather than retrieved a
-   category.
+   category. B4 (fog) intentionally omits お部屋まで: because fog
+   dissolves routes and visual anchors, safe transit through poor
+   visibility is the defining event, not the room destination. */
+var GREETING_TABLE = {
+  // A. Compound Hardships (Adverse Weather + Time of Day)
+  A1: { text: '雪の降る夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  A2: { text: '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  A3: { text: '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  A4: { text: '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  A5: { text: '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
 
-   Design note on the closing line: the split between the two
-   closings is not "did she experience discomfort" but "did the
-   greeting frame her journey as requiring particular
-   consideration". C2 (肌寒い) is the important judgment call —
-   it acknowledges mild chill, and the greeting itself drops 誠に
-   to match, so it deliberately takes the lighter closing. Night
-   and early morning on their own also take the lighter closing;
-   lateness is worth acknowledging in the greeting but does not
-   by itself imply the therapist had to endure hardship. */
-var GREETING_TEXTS = {
-  A1: '雪の降る夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。',
-  A2: '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。',
-  A3: '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。',
-  A4: '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。',
-  A5: '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。',
-  B1: 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。',
-  B2: '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。',
-  B3: '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。',
-  B4: '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。',
-  C1: '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。',
-  C2: '肌寒い中、お部屋までお越しいただき、ありがとうございます。',
-  C3: '暑い中、お部屋までお越しいただき、誠にありがとうございます。',
-  D1: '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。',
-  D2: '朝早くからお部屋までお越しいただき、誠にありがとうございます。',
-  D3: '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。',
-  D4: '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。',
-  E1: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。'
-};
+  // B. Single Adverse Weather
+  B1: { text: 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  B2: { text: '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  B3: { text: '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  B4: { text: '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。', burden: true }, // Destination omitted intentionally
 
-var BURDEN_TIERS = {
-  A1: true, A2: true, A3: true, A4: true, A5: true,
-  B1: true, B2: true, B3: true, B4: true,
-  C1: true,
-  C3: true
-  /* C2, D1-D4 and E1 are intentionally absent. They receive the
-     lighter closing line. C2 is deliberate — see the comment above. */
+  // C. Temperature Extremes
+  C1: { text: '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
+  C2: { text: '肌寒い中、お部屋までお越しいただき、ありがとうございます。', burden: false },
+  C3: { text: '暑い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
+
+  // D. Single Time of Day (Mild conditions: 15°C - 27°C)
+  D1: { text: '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
+  D2: { text: '朝早くからお部屋までお越しいただき、誠にありがとうございます。', burden: false },
+  D3: { text: '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
+  D4: { text: '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
+
+  // E. Offline / Loading Fallback
+  E1: { text: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。', burden: false }
 };
 
 function getGreetingTier() {
@@ -4590,21 +4586,25 @@ function getGreetingTier() {
   var isNight = (time === 'night');
   var isMorning = (time === 'morning');
 
+  // A. Compound
   if (weather === 'snow' && isNight) return 'A1';
   if (isRain && isNight) return 'A2';
   if (isCold && isNight) return 'A3';
   if (isRain && isMorning) return 'A4';
   if (isCold && isMorning) return 'A5';
 
+  // B. Single Adverse Weather
   if (weather === 'thunderstorm') return 'B1';
   if (isRain) return 'B2';
   if (weather === 'snow') return 'B3';
   if (weather === 'fog') return 'B4';
 
+  // C. Single Temperature Extremes
   if (isCold) return 'C1';
   if (temp !== null && temp <= 14) return 'C2';
   if (temp !== null && temp >= 28) return 'C3';
 
+  // D. Single Time of Day (gated to valid temp reading)
   if (temp !== null) {
     if (isNight) return 'D1';
     if (isMorning) return 'D2';
@@ -4612,25 +4612,26 @@ function getGreetingTier() {
     if (time === 'day') return 'D4';
   }
 
+  // E. Fallback
   return 'E1';
-}
-
-function getDynamicGreeting() {
-  var tier = getGreetingTier();
-  return GREETING_TEXTS[tier] || GREETING_TEXTS.E1;
-}
-
-function getClosingLine() {
-  var tier = getGreetingTier();
-  return BURDEN_TIERS[tier]
-    ? 'どうぞご無理なさらず、おくつろぎください。'
-    : 'どうぞ肩の力を抜いて、おくつろぎください。';
 }
 
 function updateGreetingPanel() {
   var el = document.getElementById('panelGreetingBody');
   if (!el) return;
-  el.innerHTML = '<p>' + getDynamicGreeting() + '</p><p>' + getClosingLine() + '</p>';
+
+  var tier = getGreetingTier();
+  if (!GREETING_TABLE[tier]) {
+    console.warn('Unmapped greeting tier:', tier);
+  }
+  var entry = GREETING_TABLE[tier] || GREETING_TABLE.E1;
+
+  var closing = entry.burden
+    ? 'どうぞご無理なさらず、おくつろぎください。'
+    : 'どうぞ肩の力を抜いて、おくつろぎください。';
+
+  el.innerHTML = '<p>' + entry.text + '</p><p>' + closing + '</p>';
+
   var p0 = document.querySelector('.panel[data-panel="0"]');
   if (p0) preparePanel(p0);
 }
