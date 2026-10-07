@@ -20,7 +20,13 @@
        - Transition-line accordion drift.
        - Maple leaf overlay: z-index -1, seven Momiji.
        - Ambient sound rotation: wind chime and nature recording
-         alternate. Silence measured from play END (3–5s).
+         alternate. Silence measured from play END (0.5–2s).
+       - Night mode: between 19:00 and 04:59 Nagoya time, the day
+         rotation is bypassed and Sound/Night.mp3 plays on a fixed
+         65s cycle (2s fade-in, 54s sustain, 4s fade-out, 5s
+         silence). The hour check runs at play time, so a day clip
+         mid-flight at the boundary finishes naturally and the next
+         scheduled play sees the new mode.
        - 6-panel carousel expansion: Panel 0 is now a dynamic
          personal welcome with a compound weather/time greeting
          evaluated from the Nagoya forecast. Panels 1–4 host the
@@ -148,14 +154,16 @@ var soundReady = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
+var NIGHT_SOUND_URL = 'Sound/Night.mp3';
 
-/* Ambient rotation pool. Each entry: { name, url, peak }. peak is the
-   per-play maximum gain relative to the master gain (0.5), before the
-   per-play random variance of 0.75–1.25× applied in playAmbientSound().
-   The wind chime sits higher than the nature recording because its
-   energy is sparse and time-localised; a continuous birds-forest-river
-   bed at the same peak reads as more intrusive. Both peaks were scaled
-   1.2× from the pre-tuning baseline (0.22 → 0.264, 0.18 → 0.216). */
+/* Ambient rotation pool for daytime playback. Each entry:
+   { name, url, peak }. peak is the per-play maximum gain relative to
+   the master gain (0.5), before the per-play random variance of
+   0.75–1.25× applied in playAmbientSound(). The wind chime sits
+   higher than the nature recording because its energy is sparse and
+   time-localised; a continuous birds-forest-river bed at the same
+   peak reads as more intrusive. Both peaks were scaled 1.2× from
+   the pre-tuning baseline (0.22 → 0.264, 0.18 → 0.216). */
 var AMBIENT_SOUNDS = [
   { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.264 },
   { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.216 }
@@ -180,7 +188,8 @@ function initSound() {
       loadDropBuffer(),
       loadAudioBuffer(AMBIENT_SOUNDS[0].url),
       loadAudioBuffer(AMBIENT_SOUNDS[1].url),
-      loadAudioBuffer(STREAM_SOUND_URL)
+      loadAudioBuffer(STREAM_SOUND_URL),
+      loadAudioBuffer(NIGHT_SOUND_URL)
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
@@ -195,6 +204,7 @@ function initSound() {
          — same sample rate, same channel count, same duration minus
          the crossfade tail. */
       if (bufs[6]) soundBuffers.stream = makeSeamlessLoop(bufs[6], 1.5);
+      if (bufs[7]) soundBuffers.night = bufs[7];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
@@ -510,33 +520,62 @@ function stopBlossomStream() {
 }
 
 /* ============ AMBIENT SOUND ROTATION ============
-   Two ambient nature recordings alternate. Each play picks a random
-   6–14s window from the source buffer at a random offset, with linear
-   fade-in / fade-out envelopes so no play ever clicks at the head or
-   tail.
+   Two ambient nature recordings alternate during the day. Each play
+   picks a random 6–14s window from the source buffer at a random
+   offset, with linear fade-in / fade-out envelopes so no play ever
+   clicks at the head or tail.
 
-   Scheduling: the silence gap is measured from the END of the previous
-   play, not from its start. playAmbientSound() returns the play
-   duration in ms; the caller arms the next setTimeout for
+   Scheduling: the silence gap is measured from the END of the
+   previous play, not from its start. playAmbientSound() returns the
+   play duration in ms; the caller arms the next setTimeout for
    playDur + silenceGap, so the audible quiet interval is bounded at
-   AMBIENT_SILENCE_MIN–MAX regardless of which sound plays or how long
-   it runs.
+   AMBIENT_SILENCE_MIN–MAX regardless of which sound plays or how
+   long it runs.
 
-   Lifecycle is shared with the Shippō tracer and maple leaves via the
-   .active class on #mapleLeaves. */
+   Night mode (19:00–04:59 Nagoya time): the day rotation is bypassed
+   entirely and Sound/Night.mp3 plays from start to finish on a fixed
+   cycle instead — 2s fade-in, ~54s sustain, 4s fade-out, 5s silence.
+   No random window, no random offset; the entire point of night mode
+   is a single consistent sound. The hour check runs at play time,
+   not at schedule time, so a day clip that is mid-flight at the
+   boundary finishes naturally and the next scheduled play sees the
+   new mode. Symmetrically, a night clip that is mid-flight at 05:00
+   finishes and the next play resumes the day rotation.
+
+   Lifecycle is shared with the Shippō tracer and maple leaves via
+   the .active class on #mapleLeaves. */
 var AMBIENT_FIRST_MIN   = 0;
 var AMBIENT_FIRST_MAX   = 0;
-var AMBIENT_SILENCE_MIN = 3000;
-var AMBIENT_SILENCE_MAX = 5000;
+var AMBIENT_SILENCE_MIN = 500;
+var AMBIENT_SILENCE_MAX = 2000;
 var AMBIENT_PLAY_MIN    = 6000;
 var AMBIENT_PLAY_MAX    = 14000;
 var AMBIENT_FADE_IN     = 2000;
 var AMBIENT_FADE_OUT    = 3000;
 
+/* Night-mode constants. NIGHT_SILENCE is the fixed gap between the
+   end of one night clip and the start of the next. Fades are in
+   seconds, silence in milliseconds. Peak sits at the wind-chime
+   level; drop to 0.18 if the night recording reads as dense. */
+var NIGHT_PEAK     = 0.22;
+var NIGHT_FADE_IN  = 2.0;
+var NIGHT_FADE_OUT = 4.0;
+var NIGHT_SILENCE  = 5000;
+
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
 var ambientIndex = 0;
+
+/* Returns true when the current Nagoya hour falls in the night
+   window 19:00–04:59. Uses the canonical Nagoya time source
+   (nagoyaDateParts) so the mode agrees with the info bar. Function
+   declarations hoist, so referencing nagoyaDateParts here — even
+   though it is declared later in the file — is safe at runtime. */
+function isNightAmbientHours() {
+  var p = nagoyaDateParts();
+  return (p.hour >= 19 || p.hour < 5);
+}
 
 function startAmbient() {
   stopAmbient();
@@ -551,8 +590,13 @@ function startAmbient() {
 }
 
 function scheduleNextAmbient(prevPlayMs) {
-  var silenceGap = AMBIENT_SILENCE_MIN +
-    Math.random() * (AMBIENT_SILENCE_MAX - AMBIENT_SILENCE_MIN);
+  var silenceGap;
+  if (isNightAmbientHours()) {
+    silenceGap = NIGHT_SILENCE;
+  } else {
+    silenceGap = AMBIENT_SILENCE_MIN +
+      Math.random() * (AMBIENT_SILENCE_MAX - AMBIENT_SILENCE_MIN);
+  }
   var delay = (prevPlayMs || 0) + silenceGap;
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
@@ -580,9 +624,62 @@ function stopAmbient() {
   ambientGain = null;
 }
 
+/* Night-mode play. Plays the full Night.mp3 from offset 0 with a
+   fixed 2s fade-in and 4s fade-out, and returns the play duration
+   in ms so the caller can arm the fixed 5s silence that follows. */
+function playNightSound() {
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
+  var buffer = soundBuffers.night;
+  if (!buffer) return 0;
+
+  var playDur = buffer.duration;
+  if (playDur <= 0) return 0;
+
+  /* Cap the fades against the play duration so a truncated or
+     unusually short night clip still has a sustain region. For the
+     1-minute clip, both caps are inert: fadeIn stays 2.0s and
+     fadeOut stays 4.0s. */
+  var fadeIn = Math.min(NIGHT_FADE_IN, playDur * 0.25);
+  var fadeOut = Math.min(NIGHT_FADE_OUT, playDur * 0.35);
+  var peak = NIGHT_PEAK * (0.9 + Math.random() * 0.2);
+
+  var now = soundAudioCtx.currentTime;
+  var src = soundAudioCtx.createBufferSource();
+  src.buffer = buffer;
+  var gain = soundAudioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + fadeIn);
+  gain.gain.setValueAtTime(peak, now + playDur - fadeOut);
+  gain.gain.linearRampToValueAtTime(0, now + playDur);
+
+  src.connect(gain);
+  gain.connect(soundMasterGain);
+  src.start(now, 0, playDur + 0.1);
+  src.stop(now + playDur + 0.15);
+
+  ambientSource = src;
+  ambientGain = gain;
+
+  src.onended = function() {
+    if (ambientSource === src) ambientSource = null;
+    if (ambientGain === gain) ambientGain = null;
+    try { gain.disconnect(); } catch (e) {}
+  };
+
+  return playDur * 1000;
+}
+
 function playAmbientSound() {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
+
+  /* Night mode: bypass the day rotation entirely. No index advance,
+     no random window — the day rotation index stays where it was and
+     resumes cleanly when the hour turns. */
+  if (isNightAmbientHours()) {
+    return playNightSound();
+  }
+
   if (!AMBIENT_SOUNDS.length) return 0;
 
   var entry = AMBIENT_SOUNDS[ambientIndex];
