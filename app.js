@@ -41,7 +41,9 @@
        - Ambient sound rotation: wind chime and nature recording
          alternate at random intervals, random offset and duration
          per play, with per-play fade envelopes. Silence between
-         plays is intentional and expected.
+         plays is measured from play END (3–5s), not from play
+         start, so the audible quiet interval is bounded regardless
+         of play duration.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -152,13 +154,14 @@ var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 /* Ambient rotation pool. Each entry: { name, url, peak }. peak is the
    per-play maximum gain relative to the master gain (0.5), before the
    per-play random variance of 0.75–1.25× applied in playAmbientSound().
-   The wind chime can sit higher than the nature recording because its
+   The wind chime sits higher than the nature recording because its
    energy is sparse and time-localised (isolated chimes with long
    decays); a continuous birds-forest-river bed at the same peak reads
-   as more intrusive. */
+   as more intrusive. Both peaks were scaled 1.2× from the pre-tuning
+   baseline (0.22 → 0.264, 0.18 → 0.216) per the volume pass. */
 var AMBIENT_SOUNDS = [
-  { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.22 },
-  { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.18 }
+  { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.264 },
+  { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.216 }
 ];
 
 function initSound() {
@@ -362,15 +365,19 @@ function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
 function playDrop() { playSound('drop', 1.0); }
 
 /* ============ AMBIENT SOUND ROTATION ============
-   Two ambient nature recordings alternate at random intervals. Each
-   play picks a random 6–14s window from the source buffer at a random
-   offset, with linear fade-in / fade-out envelopes so no play ever
-   clicks at the head or tail.
+   Two ambient nature recordings alternate. Each play picks a random
+   6–14s window from the source buffer at a random offset, with linear
+   fade-in / fade-out envelopes so no play ever clicks at the head or
+   tail.
 
-   Scheduling: the gap is measured start-to-start. A play of 6–14s
-   followed by a 30–45s gap yields roughly 16–39 seconds of silence
-   between sounds. Silence between plays is intentional; there is no
-   requirement that one of the two be playing at any given moment.
+   Scheduling: the silence gap is measured from the END of the previous
+   play, not from its start. playAmbientSound() returns the play
+   duration in ms; the caller arms the next setTimeout for
+   playDur + silenceGap, so the audible quiet interval is bounded at
+   AMBIENT_SILENCE_MIN–MAX regardless of which sound plays or how long
+   it runs. (The previous model measured the gap start-to-start, which
+   produced 16–39s of silence between plays at the old 30–45s gap
+   constants — too sparse.)
 
    Lifecycle is shared with the Shippō tracer and maple leaves via the
    .active class on #mapleLeaves. That means:
@@ -383,16 +390,17 @@ function playDrop() { playSound('drop', 1.0); }
 
    Buffers are loaded once, on the first pointerdown, well before the
    koi screen completes. If a load failed (offline, decode error, file
-   missing), playAmbientSound() skips that entry silently and the
-   rotation continues — the next entry is tried normally. */
-var AMBIENT_FIRST_MIN  = 0;      // first sound: immediate
-var AMBIENT_FIRST_MAX  = 0;      // (set MAX above MIN for jitter)
-var AMBIENT_GAP_MIN    = 30000;  // start-to-start gap between plays
-var AMBIENT_GAP_MAX    = 45000;
-var AMBIENT_PLAY_MIN   = 6000;   // min play duration (6s)
-var AMBIENT_PLAY_MAX   = 14000;  // max play duration (14s)
-var AMBIENT_FADE_IN    = 2000;   // nominal fade-in
-var AMBIENT_FADE_OUT   = 3000;   // nominal fade-out
+   missing), playAmbientSound() returns 0 and the caller still arms the
+   next tick after just the silence gap — the rotation continues and
+   the other entry is tried next. */
+var AMBIENT_FIRST_MIN   = 0;      // first sound: immediate
+var AMBIENT_FIRST_MAX   = 0;      // (set MAX above MIN for jitter)
+var AMBIENT_SILENCE_MIN = 3000;   // silence between plays: 3s
+var AMBIENT_SILENCE_MAX = 5000;   // 5s
+var AMBIENT_PLAY_MIN    = 6000;   // min play duration (6s)
+var AMBIENT_PLAY_MAX    = 14000;  // max play duration (14s)
+var AMBIENT_FADE_IN     = 2000;   // nominal fade-in
+var AMBIENT_FADE_OUT    = 3000;   // nominal fade-out
 
 var ambientTimer = null;
 var ambientSource = null;
@@ -406,19 +414,20 @@ function startAmbient() {
     Math.random() * (AMBIENT_FIRST_MAX - AMBIENT_FIRST_MIN);
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
-    playAmbientSound();
-    scheduleNextAmbient();
+    var playMs = playAmbientSound();
+    scheduleNextAmbient(playMs);
   }, firstGap);
 }
 
-function scheduleNextAmbient() {
-  var gap = AMBIENT_GAP_MIN +
-    Math.random() * (AMBIENT_GAP_MAX - AMBIENT_GAP_MIN);
+function scheduleNextAmbient(prevPlayMs) {
+  var silenceGap = AMBIENT_SILENCE_MIN +
+    Math.random() * (AMBIENT_SILENCE_MAX - AMBIENT_SILENCE_MIN);
+  var delay = (prevPlayMs || 0) + silenceGap;
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
-    playAmbientSound();
-    scheduleNextAmbient();
-  }, gap);
+    var playMs = playAmbientSound();
+    scheduleNextAmbient(playMs);
+  }, delay);
 }
 
 function stopAmbient() {
@@ -440,10 +449,13 @@ function stopAmbient() {
   ambientGain = null;
 }
 
+/* Returns the play duration in milliseconds, or 0 if nothing played.
+   The caller uses this to arm the next tick so that the silence gap
+   is measured from the end of the just-finished play, not its start. */
 function playAmbientSound() {
-  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
-  if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return;
-  if (!AMBIENT_SOUNDS.length) return;
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
+  if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
+  if (!AMBIENT_SOUNDS.length) return 0;
 
   /* Advance the rotation first, so a failed play (missing buffer)
      still consumes its slot and the next tick tries the other sound. */
@@ -451,13 +463,13 @@ function playAmbientSound() {
   ambientIndex = (ambientIndex + 1) % AMBIENT_SOUNDS.length;
 
   var buffer = soundBuffers[entry.name];
-  if (!buffer) return;
+  if (!buffer) return 0;
 
   var bufferDur = buffer.duration;
   var playDur = AMBIENT_PLAY_MIN +
     Math.random() * (AMBIENT_PLAY_MAX - AMBIENT_PLAY_MIN);
   if (playDur > bufferDur - 1) playDur = bufferDur - 1;
-  if (playDur <= 0) return;
+  if (playDur <= 0) return 0;
 
   var maxStart = Math.max(0, bufferDur - playDur - 0.5);
   var startOffset = Math.random() * maxStart;
@@ -490,6 +502,8 @@ function playAmbientSound() {
     if (ambientGain === gain) ambientGain = null;
     try { gain.disconnect(); } catch (e) {}
   };
+
+  return playDur * 1000;
 }
 
 document.addEventListener('pointerdown', initSound, { once: true });
