@@ -28,6 +28,11 @@
          gate. The greeting is frozen on first mount via
          greetingFinalized so late network arrivals cannot mutate
          the DOM while the therapist is reading.
+       - Blossom screen: time greeting (おはようございます /
+         こんにちは / こんばんは) with the therapist's name below,
+         plus three poetic interaction hints. A looping flowing-
+         stream ambient track fades in on the screen and fades out
+         on the swipe-up that dives the koi.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -134,6 +139,7 @@ var soundBuffers = {};
 var soundReady = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
+var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 
 /* Ambient rotation pool. Each entry: { name, url, peak }. peak is the
    per-play maximum gain relative to the master gain (0.5), before the
@@ -165,7 +171,8 @@ function initSound() {
       synthesizePaper(),
       loadDropBuffer(),
       loadAudioBuffer(AMBIENT_SOUNDS[0].url),
-      loadAudioBuffer(AMBIENT_SOUNDS[1].url)
+      loadAudioBuffer(AMBIENT_SOUNDS[1].url),
+      loadAudioBuffer(STREAM_SOUND_URL)
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
@@ -173,6 +180,7 @@ function initSound() {
       if (bufs[3]) soundBuffers.drop = bufs[3];
       if (bufs[4]) soundBuffers[AMBIENT_SOUNDS[0].name] = bufs[4];
       if (bufs[5]) soundBuffers[AMBIENT_SOUNDS[1].name] = bufs[5];
+      if (bufs[6]) soundBuffers.stream = bufs[6];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
@@ -346,6 +354,75 @@ function playTock(key) { playSound('tock', getKeyPlaybackRate(key)); }
 function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
 function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
 function playDrop() { playSound('drop', 1.0); }
+
+/* ============ BLOSSOM STREAM AMBIENT ============
+   A looping flowing-stream bed that plays for the life of the
+   blossom screen. Fades in over 2.2s on screen appear; fades out
+   over 1.4s on the swipe-up that dives the koi. Peak 0.20 relative
+   to master gain — matched to the nature ambient, slightly under
+   the wind chime.
+
+   startBlossomStream() is idempotent: if a source already exists,
+   it no-ops. stopBlossomStream() nulls the reference immediately
+   so a subsequent start does not false-positive against a still-
+   fading source.
+
+   Buffer is loaded once on the first pointerdown, alongside the
+   other three MP3s. On the tablet the decode completes long before
+   the therapist finishes the name form, so the stream is ready by
+   the time the blossom screen appears. */
+var BLOSSOM_STREAM_PEAK = 0.20;
+var BLOSSOM_STREAM_FADE_IN = 2.2;
+var BLOSSOM_STREAM_FADE_OUT = 1.4;
+
+var blossomStreamSource = null;
+var blossomStreamGain = null;
+
+function startBlossomStream() {
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
+  if (!soundBuffers.stream) return;
+  if (blossomStreamSource) return;
+
+  var buffer = soundBuffers.stream;
+  var now = soundAudioCtx.currentTime;
+
+  var src = soundAudioCtx.createBufferSource();
+  src.buffer = buffer;
+  src.loop = true;
+
+  var gain = soundAudioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(BLOSSOM_STREAM_PEAK, now + BLOSSOM_STREAM_FADE_IN);
+
+  src.connect(gain);
+  gain.connect(soundMasterGain);
+  src.start(now);
+
+  blossomStreamSource = src;
+  blossomStreamGain = gain;
+}
+
+function stopBlossomStream() {
+  if (!blossomStreamSource || !blossomStreamGain || !soundAudioCtx) {
+    blossomStreamSource = null;
+    blossomStreamGain = null;
+    return;
+  }
+  try {
+    var now = soundAudioCtx.currentTime;
+    var src = blossomStreamSource;
+    var gain = blossomStreamGain;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + BLOSSOM_STREAM_FADE_OUT);
+    src.stop(now + BLOSSOM_STREAM_FADE_OUT + 0.1);
+    setTimeout(function() {
+      try { gain.disconnect(); } catch (e) {}
+    }, (BLOSSOM_STREAM_FADE_OUT + 0.3) * 1000);
+  } catch (e) { /* silent */ }
+  blossomStreamSource = null;
+  blossomStreamGain = null;
+}
 
 /* ============ AMBIENT SOUND ROTATION ============
    Two ambient nature recordings alternate. Each play picks a random
@@ -895,6 +972,11 @@ var blossomScreen = document.getElementById('blossomScreen');
 var introOverlay = document.getElementById('introOverlay');
 var nameColumn = document.getElementById('nameColumn');
 var introHasRun = false;
+
+/* Blossom greeting block (time greeting + name). Populated by
+   updateBlossomGreeting() each time the blossom screen is shown. */
+var blossomGreetingTimeEl = document.getElementById('blossomGreetingTime');
+var blossomGreetingNameEl = document.getElementById('blossomGreetingName');
 
 /* Koi water effect DOM refs */
 var koiDiveWrap = document.getElementById('koiDiveWrap');
@@ -1722,6 +1804,10 @@ function returnToStartScreen() {
   document.body.classList.remove('warm-background');
 
   if (blossomScreen) blossomScreen.classList.add('visible');
+  /* Refresh the greeting in case the time-of-day bucket has rolled
+     over since the last visit, and restart the stream bed. */
+  updateBlossomGreeting();
+  startBlossomStream();
   scheduleAmbientRipple();
 }
 
@@ -2985,6 +3071,10 @@ function onKoiPointerUp(e) {
 
 function triggerKoiStart() {
   stopAmbientRipple();
+  /* Fade the flowing-stream bed out as the koi dives. The drop sound
+     plays over the 1.4s tail, which reads as the water giving way to
+     the koi rather than the two effects fighting each other. */
+  stopBlossomStream();
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
   introHasRun = true;
@@ -3162,6 +3252,10 @@ function confirmName() {
     try { nameInput.blur(); } catch (err) {}
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
+    /* Populate the greeting with the just-confirmed name and the
+       current time bucket, and fade in the flowing-stream bed. */
+    updateBlossomGreeting();
+    startBlossomStream();
     updateAllRowLocks();
     recalc();
     scheduleAmbientRipple();
@@ -4320,6 +4414,34 @@ function updateGreetingPanel() {
   el.innerHTML = '<p>' + greeting + '</p><p>どうぞ肩の力を抜いて、おくつろぎください。</p>';
   var p0 = document.querySelector('.panel[data-panel="0"]');
   if (p0) preparePanel(p0);
+}
+
+/* ============ BLOSSOM TIME GREETING ============
+   Two stacked lines on the koi screen: the time greeting in Shippori
+   Mincho, the therapist's name below it in Yuji Syuku.
+
+     morning (05–10)  → おはようございます
+     day     (11–16)  → こんにちは
+     evening / night  → こんばんは
+
+   Night folds into evening here because the Panel 0 hardship line
+   already carries 夜遅い; a greeting that also acknowledged the hour
+   would stammer against it. Uses the Nagoya clock rather than the
+   device clock so the greeting agrees with the info bar. */
+function getTimeGreeting() {
+  var t = getTimeOfDayInNagoya();
+  if (t === 'morning') return 'おはようございます';
+  if (t === 'day') return 'こんにちは';
+  return 'こんばんは';
+}
+
+function updateBlossomGreeting() {
+  if (blossomGreetingTimeEl) {
+    blossomGreetingTimeEl.textContent = getTimeGreeting();
+  }
+  if (blossomGreetingNameEl) {
+    blossomGreetingNameEl.textContent = therapistDisplayName || '桜庭さん';
+  }
 }
 
 function fetchNagoyaWeather() {
