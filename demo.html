@@ -3,611 +3,665 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>七宝文様・ランダム輪郭線アニメーション検証（ソフトグロー完全版）</title>
+<title>Panel 0 Greeting Preview</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============ EXACT AUTUMN PALETTE ============ */
-  :root {
-    --bg-base: #fdf3d8;
-    --bg-warm: #f5d89a;
-    --accent: #c9600a;
-    --accent-2: #8f3f12;
-    --border-1: #e8c88a;
-    --border-3: #f0d8a0;
-    --text-dark: #231304;
-    --text-mute: #5a3818;
-    --text-faint: #7a5028;
+  /* ── Demo-only chrome. Does not touch any .panel or ambient class. ── */
 
-    /* Live Tracer CSS Variables */
-    --tracer-color: #c9600a;
-    --tracer-stroke-width: 2.2px;
-    --tracer-peak-opacity: 0.85;
-    --tracer-glow-radius: 8px;
-    --tracer-glow-color: rgba(224, 101, 18, 0.95);
-  }
+  /* Kill the ticker's reserved padding so the info bar sits vertically
+     centred without an empty strip below it. */
+  body.demo-page .info-inner { padding-bottom: 0; }
 
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
-  body {
-    margin: 0; padding: 0;
-    min-height: 100vh;
-    background-color: var(--bg-base);
-    color: var(--text-dark);
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
-    overflow-x: hidden;
-  }
-
-  /* ============ AMBIENT LIGHT MESH ============ */
-  .ambient-stage {
+  /* Container: pins the demo aside top-right, out of the way of the
+     centred panel content. */
+  .demo-aside {
     position: fixed;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
-    z-index: -3;
-    pointer-events: none;
-  }
-
-  .ambient-mesh {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    opacity: 0.90;
-  }
-
-  .light-orb {
-    position: absolute;
-    border-radius: 50%;
-    will-change: transform;
-  }
-
-  .orb-1 {
-    width: 70vw; height: 70vw; max-width: 900px; max-height: 900px;
-    top: 10%; left: 15%;
-    background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
-    animation: orbDrift1 11.58s ease-in-out infinite alternate;
-  }
-  .orb-2 {
-    width: 80vw; height: 80vw; max-width: 1050px; max-height: 1050px;
-    top: 35%; right: 5%;
-    background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
-    animation: orbDrift2 15.26s ease-in-out infinite alternate;
-  }
-  .orb-3 {
-    width: 55vw; height: 55vw; max-width: 700px; max-height: 700px;
-    bottom: 10%; left: 30%;
-    background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
-    animation: orbDrift3 10.00s ease-in-out infinite alternate;
-  }
-
-  @keyframes orbDrift1 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-13.75%, 22%, 0); } }
-  @keyframes orbDrift2 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(16.5%, -22%, 0); } }
-  @keyframes orbDrift3 { 0% { transform: translate3d(0, 0, 0); } 100% { transform: translate3d(-19.25%, -11%, 0); } }
-
-  .ambient-primary {
-    position: absolute; inset: 0;
-    background:
-      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, transparent 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, transparent 62%),
-      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, transparent 58%);
-  }
-
-  /* ============ SHIPPO STATIC BACKGROUND ============ */
-  .ambient-mosaic {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
-    opacity: 0.08;
-  }
-
-  /* ============ TRACER OVERLAYS ============ */
-  .tracer-layer {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
-    overflow: hidden;
-  }
-
-  .shippo-tracer {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 68px;
-    height: 68px;
-    opacity: 0;
-    pointer-events: none;
-    will-change: transform, opacity;
-  }
-
-  /* Crucial: Allows the drop-shadow glow to expand past the 68px viewBox without clipping */
-  .shippo-tracer svg {
-    overflow: visible;
-    width: 100%;
-    height: 100%;
-    display: block;
-  }
-
-  .tracer-circle {
-    fill: none;
-    stroke: var(--tracer-color);
-    stroke-width: var(--tracer-stroke-width);
-    stroke-linecap: round;
-    /* Circumference = 2 * PI * 30 ≈ 188.5 */
-    stroke-dasharray: 189;
-    stroke-dashoffset: 189;
-
-    /* Dual-layer drop-shadow: Tight vivid core halo + wide atmospheric bloom */
-    filter:
-      drop-shadow(0 0 2px var(--tracer-color))
-      drop-shadow(0 0 var(--tracer-glow-radius) var(--tracer-glow-color));
-  }
-
-  /* Animation state */
-  .shippo-tracer.drawing {
-    animation: tracerFade 2.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
-  }
-
-  .shippo-tracer.drawing .tracer-circle {
-    animation: drawStroke 1.5s cubic-bezier(0.35, 0, 0.25, 1) forwards;
-  }
-
-  @keyframes drawStroke {
-    0%   { stroke-dashoffset: 189; }
-    100% { stroke-dashoffset: 0; }
-  }
-
-  @keyframes tracerFade {
-    0%   { opacity: 0; }
-    18%  { opacity: var(--tracer-peak-opacity); }
-    75%  { opacity: calc(var(--tracer-peak-opacity) * 0.85); }
-    100% { opacity: 0; }
-  }
-
-  /* ============ PREVIEW CONTENT ============ */
-  .content-container {
-    max-width: 580px;
-    margin: 40px auto 440px auto;
-    padding: 0 20px;
-    position: relative;
-    z-index: 1;
-  }
-
-  .header-box {
-    text-align: center;
-    margin-bottom: 24px;
-  }
-  .header-box h1 {
-    font-size: 22px;
-    letter-spacing: 4px;
-    color: var(--accent);
-    margin: 0 0 8px 0;
-  }
-  .header-box p {
-    font-size: 13.5px;
-    color: var(--text-mute);
-    line-height: 1.8;
-    margin: 0;
-  }
-
-  .preview-card {
-    background-color: #fdf3d8;
-    background-image: url('icons/1790835034553.jpg');
-    background-size: cover;
-    background-position: center;
-    border-radius: 18px;
-    padding: 6px 0;
-    box-shadow: 0 8px 30px rgba(120, 70, 20, 0.12);
-    border: 1px solid var(--border-3);
-  }
-
-  .preview-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px;
-    border-bottom: 1px solid rgba(216, 180, 120, 0.3);
-  }
-  .preview-row:last-child { border-bottom: none; }
-  .preview-price {
-    background: rgba(255, 255, 255, 0.75);
-    padding: 5px 12px;
-    border-radius: 8px;
-    border: 1px solid var(--border-1);
-    color: var(--accent);
-    font-weight: 700;
-  }
-
-  /* ============ FLOATING CONTROL PANEL ============ */
-  .control-panel {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: min(740px, calc(100vw - 32px));
-    max-height: 80vh;
+    top: 14px;
+    right: 14px;
+    z-index: 9000;
+    width: 320px;
+    max-height: calc(100vh - 28px);
     overflow-y: auto;
-    background: rgba(253, 243, 216, 0.95);
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    border: 1.5px solid var(--border-1);
-    border-radius: 22px;
-    padding: 18px 22px;
-    box-shadow: 0 10px 35px rgba(80, 40, 10, 0.22);
-    z-index: 100;
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-  }
-
-  .section-label {
-    font-size: 12px;
-    letter-spacing: 2.5px;
-    color: var(--text-faint);
-    text-transform: uppercase;
-    font-weight: 600;
-  }
-
-  .btn-trigger {
-    background: var(--accent);
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    padding: 7px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
     font-size: 13px;
-    font-family: inherit;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 3px 10px rgba(201, 96, 10, 0.25);
-    transition: transform 0.15s ease, background 0.2s ease;
-  }
-  .btn-trigger:active { transform: scale(0.95); background: var(--accent-2); }
-
-  .controls-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-    gap: 14px;
-  }
-
-  .control-field {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-  }
-
-  .control-field label {
-    font-size: 12px;
-    color: var(--text-mute);
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .color-presets {
-    display: flex;
-    gap: 6px;
-    align-items: center;
-  }
-
-  .color-dot {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    border: 2px solid #fff;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
-    cursor: pointer;
-  }
-
-  input[type="color"] {
-    width: 32px;
-    height: 26px;
-    padding: 0;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    background: none;
-  }
-
-  input[type="range"] {
-    accent-color: var(--accent);
-    cursor: pointer;
-  }
-
-  .code-output {
-    background: rgba(35, 19, 4, 0.92);
-    color: #fdf3d8;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-family: Consolas, monospace;
-    font-size: 11px;
     line-height: 1.5;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-    user-select: all;
+    color: #231304;
+    background: rgba(253, 250, 242, 0.96);
+    border: 1px solid #d8b478;
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(60, 30, 10, 0.18);
+    padding: 12px 14px 14px 14px;
+    backdrop-filter: blur(6px);
+  }
+  .demo-aside.collapsed { width: auto; padding: 8px 12px; }
+  .demo-aside.collapsed .demo-body { display: none; }
+  .demo-aside.collapsed .demo-collapse-label { display: none; }
+
+  .demo-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .demo-title {
+    font-family: "Shippori Mincho", serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 1.5px;
+    color: #8f2f00;
+  }
+  .demo-collapse-btn {
+    background: transparent;
+    border: 1px solid #d8b478;
+    color: #5a3818;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 3px 8px;
+    border-radius: 10px;
+    cursor: pointer;
+  }
+  .demo-collapse-btn:hover { background: #fdf0c8; }
+
+  .demo-body { display: block; }
+
+  .demo-row {
+    display: grid;
+    grid-template-columns: 78px 1fr;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .demo-row label {
+    font-size: 12px;
+    color: #5a3818;
+    letter-spacing: 0.4px;
+  }
+  .demo-row input[type="text"],
+  .demo-row input[type="number"],
+  .demo-row select {
+    width: 100%;
+    font: inherit;
+    font-size: 12.5px;
+    color: #231304;
+    background: #ffffff;
+    border: 1px solid #e8c88a;
+    border-radius: 8px;
+    padding: 5px 8px;
+    box-sizing: border-box;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .demo-row input[type="number"] { width: 100%; }
+  .demo-row select { background-image: none; }
+
+  .demo-check {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #5a3818;
+    margin: 0 0 10px 0;
+    user-select: none;
+  }
+  .demo-check input { margin: 0; }
+
+  .demo-replay {
+    width: 100%;
+    font: inherit;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    color: #ffffff;
+    background: #c9600a;
+    border: 1px solid #c9600a;
+    border-radius: 10px;
+    padding: 7px 0;
+    cursor: pointer;
+    margin-bottom: 10px;
+  }
+  .demo-replay:active { background: #7a3208; }
+
+  .demo-raw {
+    font-family: "Shippori Mincho", serif;
+    font-size: 12px;
+    line-height: 1.7;
+    color: #3d2410;
+    background: #fdf5e0;
+    border: 1px dashed #e8c88a;
+    border-radius: 10px;
+    padding: 8px 10px;
+    word-break: break-word;
+  }
+  .demo-raw-label {
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: #7a5028;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .demo-raw + .demo-raw { margin-top: 8px; }
+  .demo-raw-sub { color: #5a3818; }
+
+  /* Force the panel content into view for the demo — normally driven
+     by carousel activation. */
+  body.demo-page .panel { }
+  body.demo-page .panel .panel-content {
+    opacity: 1;
+    transform: translateX(0);
+    filter: blur(0);
+  }
+
+  /* Hide the theme toggle and version badge — they belong to the name
+     screen and would be noise here. */
+  body.demo-page .theme-toggle,
+  body.demo-page .app-version { display: none; }
+
+  /* Collapse on narrow viewports so the panel isn't squashed. */
+  @media (max-width: 900px) {
+    .demo-aside { width: 260px; font-size: 12px; }
   }
 </style>
 </head>
-<body>
+<body class="demo-page info-visible">
 
-<div class="ambient-stage" aria-hidden="true">
-  <div class="ambient-mesh">
+<!-- ============ AMBIENT STAGE (mirrors index.html) ============ -->
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
     <div class="light-orb orb-3"></div>
   </div>
-  <div class="ambient-primary"></div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="mote-field" id="moteField"></div>
 </div>
 
-<svg class="ambient-mosaic" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-  <defs>
-    <pattern id="pat-shippo" width="60" height="60" patternUnits="userSpaceOnUse">
-      <g stroke="#8f2f00" stroke-width="1.7" fill="none">
-        <circle cx="0" cy="0" r="30" />
-        <circle cx="60" cy="0" r="30" />
-        <circle cx="0" cy="60" r="30" />
-        <circle cx="60" cy="60" r="30" />
-        <circle cx="30" cy="30" r="30" />
-      </g>
-    </pattern>
-  </defs>
-  <rect width="100%" height="100%" fill="url(#pat-shippo)" />
-</svg>
+<div class="ambient-mosaic" aria-hidden="true"></div>
 
-<div class="tracer-layer" id="tracerLayer" aria-hidden="true">
-  <div class="shippo-tracer" id="tracer0">
-    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
-  </div>
-  <div class="shippo-tracer" id="tracer1">
-    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
-  </div>
-  <div class="shippo-tracer" id="tracer2">
-    <svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="30" class="tracer-circle" /></svg>
-  </div>
-</div>
-
-<div class="content-container">
-  <div class="header-box">
-    <h1>七宝・手描きサークル効果</h1>
-    <p>線の太さ・色・透明度に加え、<br>光彩（ソフトグロー）の広がりと色味をリアルタイムで微調整できます。</p>
-  </div>
-
-  <div class="preview-card">
-    <div style="padding:14px 18px; text-align:center; font-size:13.5px; border-bottom:1px solid rgba(216,180,120,0.3); background:rgba(255,255,255,0.5);">
-      背景のグローが強すぎて文字を邪魔しないか確認できます
-    </div>
-    <div class="preview-row">
-      <div style="font-size:15px;">ダミーテキスト1</div>
-      <div class="preview-price">1,000 円</div>
-    </div>
-    <div class="preview-row">
-      <div style="font-size:15px;">ダミーテキスト2</div>
-      <div class="preview-price">2,000 円</div>
-    </div>
-    <div class="preview-row">
-      <div style="font-size:15px;">ダミーテキスト3</div>
-      <div class="preview-price">5,000 円</div>
+<!-- ============ INFO BAR (frozen with demo values) ============ -->
+<div class="info-bar shown" id="infoBar">
+  <div class="info-inner">
+    <div class="info-line" id="infoLine">
+      <span class="city" id="infoCity">名古屋市</span>
+      <span class="sep">·</span>
+      <span class="date" id="infoDate">—月—日(—)</span>
+      <span class="sep">·</span>
+      <span class="time" id="infoTime">—時—分</span>
+      <span class="sep">·</span>
+      <span class="temp" id="infoTemp">—°</span>
+      <span class="sep">·</span>
+      <span class="weather" id="infoWeather">—</span>
     </div>
   </div>
 </div>
 
-<div class="control-panel">
-  <div class="panel-header">
-    <span class="section-label">アニメーション設定</span>
-    <button type="button" class="btn-trigger" id="manualTriggerBtn">今すぐ描画 (Trigger Now)</button>
-  </div>
+<!-- ============ PANEL 0 (copied from index.html) ============ -->
+<div class="stage" id="stage">
+  <div class="track" id="track">
 
-  <div class="controls-grid">
-    <div class="control-field">
-      <label>描画間隔: <span id="freqVal">4.5 秒</span></label>
-      <input type="range" id="freqSlider" min="1.0" max="10.0" step="0.5" value="4.5">
-    </div>
-
-    <div class="control-field">
-      <label>輪郭線の色 (Stroke Color)</label>
-      <div class="color-presets">
-        <input type="color" id="colorPicker" value="#c9600a">
-        <span class="color-dot" style="background:#c9600a;" data-color="#c9600a" title="柿色 (Amber Accent)"></span>
-        <span class="color-dot" style="background:#8f2f00;" data-color="#8f2f00" title="紅鳶 (Deep Rust)"></span>
-        <span class="color-dot" style="background:#f7b93c;" data-color="#f7b93c" title="黄金 (Gold Glow)"></span>
-        <span class="color-dot" style="background:#ffffff;" data-color="#ffffff" title="白磁 (Washi White)"></span>
+    <div class="panel active" data-panel="0">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <span id="therapistName" class="therapist-name">桜庭さん</span>、初めまして。
+          <div id="panelGreetingBody"></div>
+        </div>
       </div>
     </div>
 
-    <div class="control-field">
-      <label>最大透明度: <span id="opacityVal">0.85</span></label>
-      <input type="range" id="opacitySlider" min="0.20" max="1.0" step="0.05" value="0.85">
-    </div>
-
-    <div class="control-field">
-      <label>線の太さ: <span id="strokeVal">2.2px</span></label>
-      <input type="range" id="strokeSlider" min="1.0" max="4.0" step="0.2" value="2.2">
-    </div>
-
-    <div class="control-field">
-      <label>光彩の広がり (Glow Radius): <span id="glowRadVal">8px</span></label>
-      <input type="range" id="glowRadSlider" min="0" max="25" step="1" value="8">
-    </div>
-
-    <div class="control-field">
-      <label>光彩の色 (Glow Color)</label>
-      <div class="color-presets">
-        <input type="color" id="glowColorPicker" value="#e06512">
-        <span class="color-dot" style="background:#e06512;" data-glow-color="#e06512" title="緋色 (Rich Vermilion)"></span>
-        <span class="color-dot" style="background:#f7941d;" data-glow-color="#f7941d" title="山吹 (Amber Gold)"></span>
-        <span class="color-dot" style="background:#8f2f00;" data-glow-color="#8f2f00" title="紅鳶 (Dark Rust)"></span>
-        <span class="color-dot" style="background:#ffffff;" data-glow-color="#ffffff" title="純白 (White Glow)"></span>
-      </div>
-    </div>
-  </div>
-
-  <div>
-    <div class="section-label" style="margin-bottom:6px;">生成されたコード (クリックで全選択)</div>
-    <div class="code-output" id="codeSnippet"></div>
   </div>
 </div>
+
+<!-- ============ MAPLE LEAVES OVERLAY (activated for demo) ============ -->
+<div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+</div>
+
+<!-- ============ DEMO CONTROL PANEL ============ -->
+<aside class="demo-aside" id="demoAside">
+  <div class="demo-head">
+    <span class="demo-title">GREETING PREVIEW</span>
+    <button type="button" class="demo-collapse-btn" id="demoCollapse">
+      <span class="demo-collapse-label">Hide</span>
+      <span id="demoCollapseIcon">▾</span>
+    </button>
+  </div>
+
+  <div class="demo-body" id="demoBody">
+
+    <div class="demo-row">
+      <label for="demoName">Name</label>
+      <input type="text" id="demoName" value="桜庭さん" autocomplete="off">
+    </div>
+
+    <div class="demo-row">
+      <label for="demoTime">Time</label>
+      <select id="demoTime">
+        <option value="morning">Morning (05–10)</option>
+        <option value="day" selected>Day (11–16)</option>
+        <option value="evening">Evening (17–20)</option>
+        <option value="night">Night (21–04)</option>
+      </select>
+    </div>
+
+    <div class="demo-row">
+      <label for="demoTemp">Temp °C</label>
+      <input type="number" id="demoTemp" value="22" min="-20" max="45" step="1">
+    </div>
+
+    <label class="demo-check">
+      <input type="checkbox" id="demoTempNull">
+      Temp unknown (null) — triggers fallback
+    </label>
+
+    <div class="demo-row">
+      <label for="demoWeather">Weather</label>
+      <select id="demoWeather">
+        <option value="clear" selected>Clear</option>
+        <option value="clouds">Clouds</option>
+        <option value="fog">Fog</option>
+        <option value="drizzle">Drizzle</option>
+        <option value="rain">Rain</option>
+        <option value="snow">Snow</option>
+        <option value="thunderstorm">Thunderstorm</option>
+      </select>
+    </div>
+
+    <button type="button" class="demo-replay" id="demoReplay">Replay animation</button>
+
+    <div class="demo-raw">
+      <div class="demo-raw-label">Rendered greeting</div>
+      <div id="demoGreetingOut">—</div>
+    </div>
+
+    <div class="demo-raw">
+      <div class="demo-raw-label">Classification</div>
+      <div class="demo-raw-sub" id="demoClassOut">—</div>
+    </div>
+
+  </div>
+</aside>
 
 <script>
-  var root = document.documentElement;
-  var freqSlider = document.getElementById('freqSlider');
-  var colorPicker = document.getElementById('colorPicker');
-  var opacitySlider = document.getElementById('opacitySlider');
-  var strokeSlider = document.getElementById('strokeSlider');
-  var glowRadSlider = document.getElementById('glowRadSlider');
-  var glowColorPicker = document.getElementById('glowColorPicker');
+/* ============================================================
+   Greeting demo
+   ------------------------------------------------------------
+   Uses the exact getDynamicGreeting() priority ladder from
+   app.js, driven by the demo controls instead of the network
+   and the Nagoya clock. Renders into the same #panelGreetingBody
+   target and plays the same two-beat + staggered-body reveal.
+   ============================================================ */
 
-  var freqVal = document.getElementById('freqVal');
-  var opacityVal = document.getElementById('opacityVal');
-  var strokeVal = document.getElementById('strokeVal');
-  var glowRadVal = document.getElementById('glowRadVal');
+/* ---- State driven by the controls ---- */
+var demoName = '桜庭さん';
+var demoTime = 'day';
+var demoTemp = 22;
+var demoWeather = 'clear';
+var demoTempIsNull = false;
 
-  var codeSnippet = document.getElementById('codeSnippet');
-  var manualBtn = document.getElementById('manualTriggerBtn');
-  var colorDots = document.querySelectorAll('.color-dot[data-color]');
-  var glowDots = document.querySelectorAll('.color-dot[data-glow-color]');
+/* ---- Timing constants (mirrored from app.js) ---- */
+var PANEL_PHRASE_MIN = 5;
+var PANEL_PHRASE_MAX = 10;
+var PANEL_PHRASE_DURATION = 500;
+var PANEL_PHRASE_STAGGER_MAX = 600;
+var PANEL_PHRASE_DELAY = 300;
+var PANEL_1_POST_BEAT_DELAY = 1000;
 
-  var tracers = [
-    document.getElementById('tracer0'),
-    document.getElementById('tracer1'),
-    document.getElementById('tracer2')
-  ];
-  var tracerIndex = 0;
-  var timerId = null;
+var panelPhraseTimers = [];
+function clearPanelPhraseTimers() {
+  for (var i = 0; i < panelPhraseTimers.length; i++) clearTimeout(panelPhraseTimers[i]);
+  panelPhraseTimers = [];
+}
 
-  function hexToRgba(hex, alpha) {
-    hex = hex.replace('#', '');
-    if (hex.length === 3) hex = hex[0]+hex[0] + hex[1]+hex[1] + hex[2]+hex[2];
-    var r = parseInt(hex.substring(0, 2), 16);
-    var g = parseInt(hex.substring(2, 4), 16);
-    var b = parseInt(hex.substring(4, 6), 16);
-    return 'rgba(' + r + ', ' + g + ', ' + b + ', ' + alpha + ')';
+/* ---- The exact production greeting ladder ---- */
+function getDynamicGreeting() {
+  var time = demoTime;
+  var weather = demoWeather;
+  var temp = demoTempIsNull ? null : demoTemp;
+
+  var isRain = (weather === 'rain' || weather === 'drizzle');
+  var isCold = (temp !== null && temp <= 9);
+  var isNight = (time === 'night');
+  var isMorning = (time === 'morning');
+
+  if (weather === 'snow' && isNight) {
+    return '雪の降る夜遅いお時間に、お部屋まで足を運んでいただき心より感謝申し上げます。';
   }
-
-  function triggerShippoCircle() {
-    var tracer = tracers[tracerIndex];
-    tracerIndex = (tracerIndex + 1) % tracers.length;
-
-    var vw = window.innerWidth;
-    var vh = window.innerHeight;
-
-    var maxCols = Math.floor(vw / 30);
-    var maxRows = Math.floor(vh / 30);
-
-    var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
-    var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
-
-    // Shippo center constraint: (j + k) must be even
-    if ((j + k) % 2 !== 0) {
-      j += 1;
+  if (isRain && isNight) {
+    return '雨で足元の悪い夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isCold && isNight) {
+    return '冷え込みの厳しい夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isRain && isMorning) {
+    return '雨の降る朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isCold && isMorning) {
+    return '朝の冷え込みが厳しい中、お部屋まで足を運んでいただき誠にありがとうございます。';
+  }
+  if (weather === 'thunderstorm') {
+    return 'あいにくのお天気の中、無事にお部屋までお越しいただき心より感謝申し上げます。';
+  }
+  if (isRain) {
+    return '雨で足元の悪い中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (weather === 'snow') {
+    return '雪の降る大変寒い中、お部屋まで足を運んでいただき誠にありがとうございます。';
+  }
+  if (weather === 'fog') {
+    return 'お足元の見えにくい中、無事にお越しいただきありがとうございます。';
+  }
+  if (isCold) {
+    return '冷え込みの厳しい中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (temp !== null && temp <= 14) {
+    return '風の冷たい中、お部屋まで足を運んでいただきありがとうございます。';
+  }
+  if (temp !== null && temp >= 28) {
+    return '日差しの強い暑い中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (temp !== null) {
+    if (isNight) {
+      return '夜遅いお時間にもかかわらず、お部屋までお越しいただき誠にありがとうございます。';
     }
+    if (isMorning) {
+      return '朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+    }
+    if (time === 'evening') {
+      return '夕暮れ時のお忙しいお時間に、お越しいただき誠にありがとうございます。';
+    }
+    if (time === 'day') {
+      return '穏やかなお天気の中、お部屋までお越しいただき誠にありがとうございます。';
+    }
+  }
+  return '秋風の心地よい中、お部屋までお越しいただき誠にありがとうございます。';
+}
 
-    // Exact tile center = (j * 30, k * 30). Offset by 34px radius center
-    var x = (j * 30) - 34;
-    var y = (k * 30) - 34;
-    var startAngle = Math.floor(Math.random() * 4) * 90;
+/* ---- Human-readable classification label for the controls ---- */
+function classify() {
+  var weather = demoWeather;
+  var temp = demoTempIsNull ? null : demoTemp;
+  var isRain = (weather === 'rain' || weather === 'drizzle');
+  var isCold = (temp !== null && temp <= 9);
+  var isNight = (demoTime === 'night');
+  var isMorning = (demoTime === 'morning');
 
-    tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startAngle + 'deg)';
+  if (weather === 'snow' && isNight) return 'A · Compound (snow + night)';
+  if (isRain && isNight)           return 'A · Compound (rain + night)';
+  if (isCold && isNight)           return 'A · Compound (cold + night)';
+  if (isRain && isMorning)         return 'A · Compound (rain + morning)';
+  if (isCold && isMorning)         return 'A · Compound (cold + morning)';
+  if (weather === 'thunderstorm')  return 'B · Single weather (thunderstorm)';
+  if (isRain)                      return 'B · Single weather (rain/drizzle)';
+  if (weather === 'snow')          return 'B · Single weather (snow)';
+  if (weather === 'fog')           return 'B · Single weather (fog)';
+  if (isCold)                      return 'C · Single temp (cold ≤ 9°C)';
+  if (temp !== null && temp <= 14) return 'C · Single temp (chilly 10–14°C)';
+  if (temp !== null && temp >= 28) return 'C · Single temp (hot ≥ 28°C)';
+  if (temp !== null)               return 'D · Single time of day';
+  return 'E · Offline / loading fallback';
+}
 
-    tracer.classList.remove('drawing');
-    void tracer.offsetWidth; // Force reflow
-    tracer.classList.add('drawing');
+/* ---- Chunker (simplified from app.js) ---- */
+function isJapanesePunctuation(ch) {
+  return ch === '、' || ch === '。' || ch === '！' || ch === '？';
+}
+function chunkPanelText(text) {
+  var clean = String(text).replace(/\s+/g, '');
+  if (clean === '') return [];
+  var raw = [];
+  var i = 0;
+  while (i < clean.length) {
+    var len = PANEL_PHRASE_MIN + Math.floor(Math.random() * (PANEL_PHRASE_MAX - PANEL_PHRASE_MIN + 1));
+    if (i + len > clean.length) len = clean.length - i;
+    raw.push(clean.substr(i, len));
+    i += len;
+  }
+  if (raw.length >= 2) {
+    var lastIdx = raw.length - 1;
+    if (raw[lastIdx].length < PANEL_PHRASE_MIN) {
+      raw[lastIdx - 1] = raw[lastIdx - 1] + raw[lastIdx];
+      raw.pop();
+    }
+  }
+  var out = [];
+  for (var k = 0; k < raw.length; k++) {
+    var piece = raw[k];
+    if (k === 0 || !isJapanesePunctuation(piece.charAt(0))) {
+      out.push(piece);
+      continue;
+    }
+    var lead = '';
+    var p = 0;
+    while (p < piece.length && isJapanesePunctuation(piece.charAt(p))) {
+      lead += piece.charAt(p);
+      p++;
+    }
+    var rest = piece.substr(p);
+    if (out.length > 0) out[out.length - 1] = out[out.length - 1] + lead;
+    if (rest !== '') out.push(rest);
+  }
+  if (out.length >= 2) {
+    var li = out.length - 1;
+    if (out[li].length < PANEL_PHRASE_MIN) {
+      out[li - 1] = out[li - 1] + out[li];
+      out.pop();
+    }
+  }
+  return out;
+}
+
+/* ---- Wrap a paragraph's text into .panel-phrase spans ---- */
+function phraseWrapInto(el, text) {
+  el.innerHTML = '';
+  var chunks = chunkPanelText(text);
+  for (var i = 0; i < chunks.length; i++) {
+    var sp = document.createElement('span');
+    sp.className = 'panel-phrase';
+    sp.textContent = chunks[i];
+    el.appendChild(sp);
+  }
+}
+
+/* ---- Rebuild beats + body for the current greeting ---- */
+function buildPanel() {
+  clearPanelPhraseTimers();
+
+  var contentEl = document.querySelector('.panel[data-panel="0"] .panel-content');
+  var body = document.getElementById('panelGreetingBody');
+  if (!contentEl || !body) return;
+
+  /* Strip every sibling before #panelGreetingBody so this is idempotent. */
+  var child = contentEl.firstChild;
+  while (child && child !== body) {
+    var nextChild = child.nextSibling;
+    contentEl.removeChild(child);
+    child = nextChild;
   }
 
-  function scheduleNext() {
-    if (timerId) clearTimeout(timerId);
-    var baseSec = parseFloat(freqSlider.value);
-    var jitter = (Math.random() * 0.5 - 0.25) * baseSec;
-    var ms = Math.max(800, (baseSec + jitter) * 1000);
+  /* Beat 1: [Name]さん、 */
+  var beat1 = document.createElement('span');
+  beat1.className = 'panel-phrase panel-1-beat';
+  beat1.setAttribute('data-beat', '1');
+  var nameSpan = document.createElement('span');
+  nameSpan.id = 'therapistName';
+  nameSpan.className = 'therapist-name';
+  nameSpan.textContent = demoName;
+  beat1.appendChild(nameSpan);
+  beat1.appendChild(document.createTextNode('、'));
 
-    timerId = setTimeout(function() {
-      triggerShippoCircle();
-      scheduleNext();
-    }, ms);
+  /* Beat 2: 初めまして。 */
+  var beat2 = document.createElement('span');
+  beat2.className = 'panel-phrase panel-1-beat';
+  beat2.setAttribute('data-beat', '2');
+  beat2.textContent = '初めまして。';
+
+  contentEl.insertBefore(beat1, body);
+  contentEl.insertBefore(beat2, body);
+
+  /* Body: greeting + closing line */
+  body.innerHTML = '';
+  var p1 = document.createElement('p');
+  var p2 = document.createElement('p');
+  var greeting = getDynamicGreeting();
+  phraseWrapInto(p1, greeting);
+  phraseWrapInto(p2, 'どうぞ肩の力を抜いて、おくつろぎください。');
+  body.appendChild(p1);
+  body.appendChild(p2);
+
+  /* Update raw text previews in the control panel */
+  document.getElementById('demoGreetingOut').textContent = greeting;
+  document.getElementById('demoClassOut').textContent = classify();
+}
+
+/* ---- Play the two-beat + staggered-body reveal ---- */
+function playSequence() {
+  clearPanelPhraseTimers();
+  var contentEl = document.querySelector('.panel[data-panel="0"] .panel-content');
+  if (!contentEl) return;
+  var beat1 = contentEl.querySelector('.panel-1-beat[data-beat="1"]');
+  var beat2 = contentEl.querySelector('.panel-1-beat[data-beat="2"]');
+  var body = document.getElementById('panelGreetingBody');
+
+  /* Reset visibility on everything */
+  var allPhrases = contentEl.querySelectorAll('.panel-phrase');
+  for (var i = 0; i < allPhrases.length; i++) {
+    allPhrases[i].classList.remove('shown');
+    allPhrases[i].style.transitionDelay = '0ms';
+    allPhrases[i].style.removeProperty('--phrase-start-x');
   }
 
-  function updateSettings() {
-    var c = colorPicker.value;
-    var o = opacitySlider.value;
-    var s = strokeSlider.value + 'px';
-    var f = freqSlider.value + ' 秒';
-    var grInt = parseInt(glowRadSlider.value, 10);
-    var gr = grInt + 'px';
-    var gc = hexToRgba(glowColorPicker.value, 0.95);
-
-    root.style.setProperty('--tracer-color', c);
-    root.style.setProperty('--tracer-peak-opacity', o);
-    root.style.setProperty('--tracer-stroke-width', s);
-    root.style.setProperty('--tracer-glow-radius', gr);
-    root.style.setProperty('--tracer-glow-color', gc);
-
-    freqVal.textContent = f;
-    opacityVal.textContent = o;
-    strokeVal.textContent = s;
-    glowRadVal.textContent = gr;
-
-    var filterCSS = grInt === 0
-      ? '  filter: none;'
-      : '  filter:\n    drop-shadow(0 0 2px ' + c + ')\n    drop-shadow(0 0 ' + gr + ' ' + gc + ');';
-
-    codeSnippet.textContent =
-      '/* main.css 設定値 */\n' +
-      '.shippo-tracer svg {\n' +
-      '  overflow: visible; /* 必須: 光彩の四角いクリッピングを防ぐ */\n' +
-      '}\n' +
-      '.tracer-circle {\n' +
-      '  stroke: ' + c + ';\n' +
-      '  stroke-width: ' + s + ';\n' +
-      filterCSS + '\n' +
-      '}\n' +
-      '@keyframes tracerFade {\n' +
-      '  0%   { opacity: 0; }\n' +
-      '  18%  { opacity: ' + o + '; }\n' +
-      '  75%  { opacity: ' + (o * 0.85).toFixed(2) + '; }\n' +
-      '  100% { opacity: 0; }\n' +
-      '}\n' +
-      '/* app.js 間隔設定: 平均 ' + freqSlider.value + ' 秒 */';
+  function fireBeat(el) {
+    if (!el) return;
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    el.style.setProperty('--phrase-start-x', (dir * 30) + 'px');
+    el.classList.add('shown');
   }
 
-  freqSlider.addEventListener('input', function() {
-    updateSettings();
-    scheduleNext();
-  });
+  function startBodyReveal() {
+    if (!body) return;
+    var phrases = body.querySelectorAll('.panel-phrase');
+    for (var k = 0; k < phrases.length; k++) {
+      (function(el) {
+        var d = Math.random() < 0.5 ? -1 : 1;
+        el.style.setProperty('--phrase-start-x', (d * 30) + 'px');
+        var stagger = Math.random() * PANEL_PHRASE_STAGGER_MAX;
+        var id = setTimeout(function() { el.classList.add('shown'); }, stagger);
+        panelPhraseTimers.push(id);
+      })(phrases[k]);
+    }
+  }
 
-  colorPicker.addEventListener('input', updateSettings);
-  opacitySlider.addEventListener('input', updateSettings);
-  strokeSlider.addEventListener('input', updateSettings);
-  glowRadSlider.addEventListener('input', updateSettings);
-  glowColorPicker.addEventListener('input', updateSettings);
+  /* Beat 1 shown immediately */
+  fireBeat(beat1);
 
-  colorDots.forEach(function(dot) {
-    dot.addEventListener('click', function() {
-      colorPicker.value = dot.getAttribute('data-color');
-      updateSettings();
-    });
-  });
+  /* Beat 2 after the beat-1 transition completes */
+  var t1 = setTimeout(function() {
+    fireBeat(beat2);
+    /* Body after beat-2 transition + POST_BEAT_DELAY */
+    var t2 = setTimeout(startBodyReveal, PANEL_PHRASE_DURATION + PANEL_1_POST_BEAT_DELAY);
+    panelPhraseTimers.push(t2);
+  }, PANEL_PHRASE_DURATION);
+  panelPhraseTimers.push(t1);
+}
 
-  glowDots.forEach(function(dot) {
-    dot.addEventListener('click', function() {
-      glowColorPicker.value = dot.getAttribute('data-glow-color');
-      updateSettings();
-    });
-  });
+/* ---- Update the info bar to match the demo state ---- */
+function updateInfoBar() {
+  var wd = ['日', '月', '火', '水', '木', '金', '土'];
+  var now = new Date();
+  document.getElementById('infoDate').textContent =
+    (now.getMonth() + 1) + '月' + now.getDate() + '日(' + wd[now.getDay()] + ')';
 
-  manualBtn.addEventListener('click', function() {
-    triggerShippoCircle();
-  });
+  var hh = String(now.getHours()).padStart(2, '0');
+  var mm = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('infoTime').textContent = hh + '時' + mm + '分';
 
-  updateSettings();
-  scheduleNext();
-  setTimeout(triggerShippoCircle, 600);
+  if (demoTempIsNull) {
+    document.getElementById('infoTemp').textContent = '—°';
+  } else {
+    document.getElementById('infoTemp').textContent = demoTemp + '°';
+  }
+
+  var emoji = {
+    clear: '☀',
+    clouds: '☁',
+    fog: '🌫',
+    drizzle: '🌦',
+    rain: '🌧',
+    snow: '❄',
+    thunderstorm: '⛈'
+  };
+  document.getElementById('infoWeather').textContent = emoji[demoWeather] || '—';
+  document.documentElement.setAttribute('data-weather', demoWeather);
+}
+
+/* ---- Wire the controls ---- */
+function refresh() {
+  buildPanel();
+  updateInfoBar();
+  playSequence();
+}
+
+document.getElementById('demoName').addEventListener('input', function(e) {
+  demoName = e.target.value || '桜庭さん';
+  buildPanel();
+  playSequence();
+});
+document.getElementById('demoTime').addEventListener('change', function(e) {
+  demoTime = e.target.value;
+  refresh();
+});
+document.getElementById('demoTemp').addEventListener('input', function(e) {
+  var v = parseInt(e.target.value, 10);
+  demoTemp = isNaN(v) ? 0 : v;
+  refresh();
+});
+document.getElementById('demoTempNull').addEventListener('change', function(e) {
+  demoTempIsNull = e.target.checked;
+  document.getElementById('demoTemp').disabled = demoTempIsNull;
+  refresh();
+});
+document.getElementById('demoWeather').addEventListener('change', function(e) {
+  demoWeather = e.target.value;
+  refresh();
+});
+document.getElementById('demoReplay').addEventListener('click', playSequence);
+
+/* Collapse / expand the aside */
+var aside = document.getElementById('demoAside');
+document.getElementById('demoCollapse').addEventListener('click', function() {
+  var collapsed = aside.classList.toggle('collapsed');
+  document.getElementById('demoCollapseIcon').textContent = collapsed ? '▸' : '▾';
+});
+
+/* ---- Boot ---- */
+refresh();
 </script>
+
 </body>
 </html>
