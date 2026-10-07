@@ -5,31 +5,12 @@
    Changelog:
      v1.3
        - Shippo tracer fix: scheduleShippoTracer() no longer calls
-         stopShippoTracer() at its head. The previous version added
-         .drawing inside triggerShippoCircle() and then removed it
-         synchronously in the recursive scheduleShippoTracer() call
-         on the very next line, all within the same JS task — so
-         the browser never rendered a single frame of the stroke-
-         dashoffset animation and the tracers were invisible.
-         Now split into two functions: clearShippoDrawings() only
-         strips the class, stopShippoTracer() cancels the timer and
-         clears drawings (used by lifecycle hooks), and
-         scheduleShippoTracer() only cancels a pending timer tick.
-       - Ambient Shippo mosaic + circle tracer added. Replaces the
-         washi watermark (removed in index.html and main.css). The
-         mosaic is a static tiled SVG pattern at z-index -2; the
-         tracer pool is three 68x68 SVG circles that snap to tile
-         vertices and play a 2.5s stroke-dashoffset draw animation.
-         Gated to autumn and to the active carousel state
-         (mapleLeaves.classList.contains('active')) so the name
-         screen, the koi pond, and the intro stay clean.
-       - Ambient video removed. Replaced by a pre-feathered CSS
-         light mesh (.ambient-mesh, three radial-gradient orbs).
+         stopShippoTracer() at its head.
+       - Ambient Shippo mosaic + circle tracer.
+       - Ambient video removed, replaced by CSS light mesh.
        - Default theme switched to autumn.
-       - Backdrop-filters removed in main.css on .summary, .msg-3,
-         .reject-row, .confirm-screen, .alert-screen, .tanzaku-screen.
-       - will-change: opacity, transform removed from .panel-phrase.
-       - Koi tap flinch: gated on the tap landing on the koi PNG.
+       - Backdrop-filters removed on overlays.
+       - Koi tap flinch gated on the koi PNG.
        - Ambient subtle ripples on the koi screen.
        - Receipt landing serialization.
        - Receipt close restores previous scroll position.
@@ -39,11 +20,14 @@
        - Transition-line accordion drift.
        - Maple leaf overlay: z-index -1, seven Momiji.
        - Ambient sound rotation: wind chime and nature recording
-         alternate at random intervals, random offset and duration
-         per play, with per-play fade envelopes. Silence between
-         plays is measured from play END (3–5s), not from play
-         start, so the audible quiet interval is bounded regardless
-         of play duration.
+         alternate. Silence measured from play END (3–5s).
+       - 6-panel carousel expansion: Panel 0 is now a dynamic
+         personal welcome with a compound weather/time greeting
+         evaluated from the Nagoya forecast. Panels 1–4 host the
+         panel-N.html files. Panel 5 is the hardcoded zero-pressure
+         gate. The greeting is frozen on first mount via
+         greetingFinalized so late network arrivals cannot mutate
+         the DOM while the therapist is reading.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -155,10 +139,9 @@ var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
    per-play maximum gain relative to the master gain (0.5), before the
    per-play random variance of 0.75–1.25× applied in playAmbientSound().
    The wind chime sits higher than the nature recording because its
-   energy is sparse and time-localised (isolated chimes with long
-   decays); a continuous birds-forest-river bed at the same peak reads
-   as more intrusive. Both peaks were scaled 1.2× from the pre-tuning
-   baseline (0.22 → 0.264, 0.18 → 0.216) per the volume pass. */
+   energy is sparse and time-localised; a continuous birds-forest-river
+   bed at the same peak reads as more intrusive. Both peaks were scaled
+   1.2× from the pre-tuning baseline (0.22 → 0.264, 0.18 → 0.216). */
 var AMBIENT_SOUNDS = [
   { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.264 },
   { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.216 }
@@ -375,32 +358,18 @@ function playDrop() { playSound('drop', 1.0); }
    duration in ms; the caller arms the next setTimeout for
    playDur + silenceGap, so the audible quiet interval is bounded at
    AMBIENT_SILENCE_MIN–MAX regardless of which sound plays or how long
-   it runs. (The previous model measured the gap start-to-start, which
-   produced 16–39s of silence between plays at the old 30–45s gap
-   constants — too sparse.)
+   it runs.
 
    Lifecycle is shared with the Shippō tracer and maple leaves via the
-   .active class on #mapleLeaves. That means:
-     - triggerKoiStart() calls startAmbient() alongside
-       scheduleShippoTracer() the moment Panel 0 mounts.
-     - returnToStartScreen() calls stopAmbient() alongside
-       stopShippoTracer().
-     - applyTheme() toggles both in lockstep so a mid-run theme
-       switch cannot leave sound playing alone.
-
-   Buffers are loaded once, on the first pointerdown, well before the
-   koi screen completes. If a load failed (offline, decode error, file
-   missing), playAmbientSound() returns 0 and the caller still arms the
-   next tick after just the silence gap — the rotation continues and
-   the other entry is tried next. */
-var AMBIENT_FIRST_MIN   = 0;      // first sound: immediate
-var AMBIENT_FIRST_MAX   = 0;      // (set MAX above MIN for jitter)
-var AMBIENT_SILENCE_MIN = 3000;   // silence between plays: 3s
-var AMBIENT_SILENCE_MAX = 5000;   // 5s
-var AMBIENT_PLAY_MIN    = 6000;   // min play duration (6s)
-var AMBIENT_PLAY_MAX    = 14000;  // max play duration (14s)
-var AMBIENT_FADE_IN     = 2000;   // nominal fade-in
-var AMBIENT_FADE_OUT    = 3000;   // nominal fade-out
+   .active class on #mapleLeaves. */
+var AMBIENT_FIRST_MIN   = 0;
+var AMBIENT_FIRST_MAX   = 0;
+var AMBIENT_SILENCE_MIN = 3000;
+var AMBIENT_SILENCE_MAX = 5000;
+var AMBIENT_PLAY_MIN    = 6000;
+var AMBIENT_PLAY_MAX    = 14000;
+var AMBIENT_FADE_IN     = 2000;
+var AMBIENT_FADE_OUT    = 3000;
 
 var ambientTimer = null;
 var ambientSource = null;
@@ -449,16 +418,11 @@ function stopAmbient() {
   ambientGain = null;
 }
 
-/* Returns the play duration in milliseconds, or 0 if nothing played.
-   The caller uses this to arm the next tick so that the silence gap
-   is measured from the end of the just-finished play, not its start. */
 function playAmbientSound() {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
   if (!AMBIENT_SOUNDS.length) return 0;
 
-  /* Advance the rotation first, so a failed play (missing buffer)
-     still consumes its slot and the next tick tries the other sound. */
   var entry = AMBIENT_SOUNDS[ambientIndex];
   ambientIndex = (ambientIndex + 1) % AMBIENT_SOUNDS.length;
 
@@ -474,8 +438,6 @@ function playAmbientSound() {
   var maxStart = Math.max(0, bufferDur - playDur - 0.5);
   var startOffset = Math.random() * maxStart;
 
-  /* Cap the fades against the play duration so a short play still has
-     a sustain region rather than a pure triangle envelope. */
   var fadeIn = Math.min(AMBIENT_FADE_IN, playDur * 0.25);
   var fadeOut = Math.min(AMBIENT_FADE_OUT, playDur * 0.35);
   var peak = entry.peak * (0.75 + Math.random() * 0.5);
@@ -906,17 +868,27 @@ var tanzakuTargetRow = null;
 
 var nameConfirmed = false;
 var therapistDisplayName = '桜庭さん';
-var therapistGreeting = null;
 var tableUnlocked = false;
 var tableVisited = false;
 var currentPanel = 0;
-var totalPanels = 5;
+var totalPanels = 6;
 var rejected = false;
 var confirmedTipAmount = 1500;
 var firstServiceInReceipt = false;
 var stageWidth = window.innerWidth;
 var refWidth = Math.min(window.innerWidth, 600);
 var rejectScrollTimer = null;
+
+/* v1.3: cached weather/time context for the Panel 0 compound greeting.
+   currentTemp is the rounded Celsius value from the last successful
+   Nagoya fetch, or null if no fetch has yet resolved. currentWeatherBucket
+   is the weatherBucket() string of the last successful fetch, or 'clear'
+   as a neutral seed. greetingFinalized flips to true the moment Panel 0
+   mounts inside triggerKoiStart(), freezing the greeting permanently so
+   late network arrivals cannot mutate the DOM while the therapist reads. */
+var currentTemp = null;
+var currentWeatherBucket = 'clear';
+var greetingFinalized = false;
 
 var startBtn = document.getElementById('startBtn');
 var blossomScreen = document.getElementById('blossomScreen');
@@ -1417,60 +1389,28 @@ function wrapPhrasesRecursively(root) {
 }
 
 /* ============================================================
-   PANEL-1 SPECIAL SEQUENCE
+   PANEL-0 SPECIAL SEQUENCE
+   Two-beat opening: the name greeting arrives first, the fixed
+   初めまして。 line arrives second, then the greeting body (either
+   the compound weather/time text or the offline autumn fallback)
+   reveals phrase by phrase.
    ============================================================ */
 function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
   var contentEl = panelEl.querySelector('.panel-content');
   if (!contentEl) return;
-  var body = contentEl.querySelector('#panel1Body');
+  var body = contentEl.querySelector('#panelGreetingBody');
   if (!body) return;
 
-  if (therapistGreeting === null) {
-    var captured = '';
-    var srcSpan = contentEl.querySelector('.therapist-name');
-    if (srcSpan) {
-      var cur = srcSpan.nextSibling;
-      while (cur && cur !== body) {
-        if (cur.nodeType === 3) captured += cur.nodeValue || '';
-        else if (cur.nodeType === 1) captured += cur.textContent || '';
-        cur = cur.nextSibling;
-      }
-    }
-    captured = captured.replace(/\s+/g, '');
-    var fc = captured.indexOf('、');
-    therapistGreeting = (fc >= 0) ? captured.substring(fc) : captured;
-    if (therapistGreeting === '') therapistGreeting = '、初めまして。';
-  }
-
-  var staleBeats = contentEl.querySelectorAll('.panel-1-beat');
-  for (var s = 0; s < staleBeats.length; s++) {
-    if (staleBeats[s].parentNode) staleBeats[s].parentNode.removeChild(staleBeats[s]);
-  }
-
+  /* Strip every sibling before #panelGreetingBody — static markup,
+     previously injected .panel-1-beat elements, and any stray text
+     nodes. Idempotent across calls. */
   var child = contentEl.firstChild;
   while (child && child !== body) {
     var nextChild = child.nextSibling;
-    if (child.nodeType === 3) {
-      contentEl.removeChild(child);
-    } else if (child.nodeType === 1 && child !== body) {
-      contentEl.removeChild(child);
-    }
+    contentEl.removeChild(child);
     child = nextChild;
   }
-
-  var full = therapistDisplayName + therapistGreeting;
-  var commaIdx = full.indexOf('、');
-  var beat1Text, beat2Text;
-  if (commaIdx >= 0) {
-    beat1Text = full.substring(0, commaIdx + 1);
-    beat2Text = full.substring(commaIdx + 1);
-  } else {
-    beat1Text = full;
-    beat2Text = '';
-  }
-  var nameOnly = beat1Text.replace(/、$/, '').replace(/さん$/, '');
-  if (nameOnly === '') nameOnly = beat1Text.replace(/、$/, '');
 
   var beat1 = document.createElement('span');
   beat1.className = 'panel-phrase panel-1-beat';
@@ -1478,14 +1418,14 @@ function buildPanel1OpeningBeats(panelEl) {
   var nameSpan = document.createElement('span');
   nameSpan.id = 'therapistName';
   nameSpan.className = 'therapist-name';
-  nameSpan.textContent = nameOnly + 'さん';
+  nameSpan.textContent = therapistDisplayName;
   beat1.appendChild(nameSpan);
-  if (commaIdx >= 0) beat1.appendChild(document.createTextNode('、'));
+  beat1.appendChild(document.createTextNode('、'));
 
   var beat2 = document.createElement('span');
   beat2.className = 'panel-phrase panel-1-beat';
   beat2.setAttribute('data-beat', '2');
-  beat2.textContent = beat2Text;
+  beat2.textContent = '初めまして。';
 
   contentEl.insertBefore(beat1, body);
   contentEl.insertBefore(beat2, body);
@@ -1510,7 +1450,7 @@ function playPanel1SpecialSequence(panelEl) {
 
   var beat1 = contentEl.querySelector('.panel-1-beat[data-beat="1"]');
   var beat2 = contentEl.querySelector('.panel-1-beat[data-beat="2"]');
-  var body = contentEl.querySelector('#panel1Body');
+  var body = contentEl.querySelector('#panelGreetingBody');
 
   if (body) {
     var bodyPhrases = body.querySelectorAll('.panel-phrase');
@@ -1642,10 +1582,10 @@ function preparePanel(panelEl) {
   var contentEl = panelEl.querySelector('.panel-content');
   if (!contentEl) return;
 
-  var isPanel1 = panelEl.getAttribute('data-panel') === '0';
+  var isPanel0 = panelEl.getAttribute('data-panel') === '0';
 
-  if (isPanel1) {
-    var body = contentEl.querySelector('#panel1Body');
+  if (isPanel0) {
+    var body = contentEl.querySelector('#panelGreetingBody');
     if (body) wrapPhrasesRecursively(body);
     buildPanel1OpeningBeats(panelEl);
     return;
@@ -1666,11 +1606,11 @@ function activatePanel(index) {
   var targetPanel = panels[index];
   if (!targetPanel) return;
 
-  var isPanel1 = targetPanel.getAttribute('data-panel') === '0';
+  var isPanel0 = targetPanel.getAttribute('data-panel') === '0';
 
-  if (isPanel1) {
+  if (isPanel0) {
     resetPanel1Beats(targetPanel);
-    var body = targetPanel.querySelector('#panel1Body');
+    var body = targetPanel.querySelector('#panelGreetingBody');
     if (body) {
       var bodyPhrases = body.querySelectorAll('.panel-phrase');
       for (var p = 0; p < bodyPhrases.length; p++) {
@@ -3096,13 +3036,18 @@ function triggerKoiStart() {
         currentPanel = 0;
         track.style.transform = 'translateX(0%)';
         for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
+
+        /* Freeze the greeting the moment Panel 0 is about to mount.
+           Any weather fetch resolving before this point upgrades the
+           greeting silently behind the intro overlay; any fetch after
+           is ignored. See updateGreetingPanel() and fetchNagoyaWeather(). */
+        greetingFinalized = true;
+
         activatePanel(0);
 
         /* v1.3: activate the ambient maple leaves, start the
            Shippo tracer, and start the ambient sound rotation.
-           All three share the same .active gate on #mapleLeaves,
-           which is the single source of truth for "past the intro,
-           carousel running". */
+           All three share the same .active gate on #mapleLeaves. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
         scheduleShippoTracer();
         startAmbient();
@@ -3144,8 +3089,8 @@ function confirmName() {
   confirmedTipAmount = getTipValue();
   if (rejectGiftAmountEl) rejectGiftAmountEl.textContent = confirmedTipAmount.toLocaleString();
 
-  var p1Panel = document.querySelector('.panel[data-panel="0"]');
-  if (p1Panel) buildPanel1OpeningBeats(p1Panel);
+  var p0Panel = document.querySelector('.panel[data-panel="0"]');
+  if (p0Panel) buildPanel1OpeningBeats(p0Panel);
 
   var dynamicRows = document.getElementById('dynamicRows');
   dynamicRows.innerHTML = '';
@@ -3194,7 +3139,7 @@ function confirmName() {
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
     panel3Anchor.innerHTML = anyPresetSelected ? panel3DefaultHtml : panel3NoHtml;
-    var p3Panel = document.querySelector('.panel[data-panel="2"]');
+    var p3Panel = document.querySelector('.panel[data-panel="3"]');
     if (p3Panel) preparePanel(p3Panel);
   }
 
@@ -3269,7 +3214,12 @@ window.addEventListener('load', function() {
   loadAllPanels().then(function() {
     repositionHintGroupAfterLayout();
     repositionNumpad();
-    for (var i = 0; i < panels.length; i++) {
+    /* Seed the Panel 0 greeting with the offline autumn baseline and
+       prepare it before any network fetch resolves. Panel 0 is skipped
+       in the prep loop that follows — updateGreetingPanel() already
+       called preparePanel() on it. */
+    updateGreetingPanel();
+    for (var i = 1; i < panels.length; i++) {
       preparePanel(panels[i]);
     }
   });
@@ -4274,6 +4224,104 @@ function updateInfoDateTime() {
   infoDate.textContent = p.month + '月' + p.day + '日(' + wd + ')';
   infoTime.textContent = hhPadded + '時' + mmPadded + '分';
 }
+
+/* ============ DYNAMIC GREETING (Panel 0) ============
+   Compound weather/time greeting for the Panel 0 welcome body.
+   Evaluated in strict hierarchical order:
+
+     A. Compound hardships (adverse weather AND time-of-day)
+     B. Single adverse weather
+     C. Single temperature extremes (only when we have a reading)
+     D. Single time of day (only when we have a reading — otherwise
+        the offline/loading state would fabricate "mild weather")
+     E. Offline / loading fallback
+
+   The greeting is regenerated on every weather fetch until
+   greetingFinalized flips true, then frozen for the session. */
+function getDynamicGreeting() {
+  var time = getTimeOfDayInNagoya();
+  var weather = currentWeatherBucket;
+  var temp = currentTemp;
+
+  var isRain = (weather === 'rain' || weather === 'drizzle');
+  var isCold = (temp !== null && temp <= 9);
+  var isNight = (time === 'night');
+  var isMorning = (time === 'morning');
+
+  /* A. Compound hardships. Precipitation trumps temperature in every
+     compound slot — snow already implies cold, and acknowledging the
+     snowfall directly is more evocative than commenting on the chill. */
+  if (weather === 'snow' && isNight) {
+    return '雪の降る夜遅いお時間に、お部屋まで足を運んでいただき心より感謝申し上げます。';
+  }
+  if (isRain && isNight) {
+    return '雨で足元の悪い夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isCold && isNight) {
+    return '冷え込みの厳しい夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isRain && isMorning) {
+    return '雨の降る朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (isCold && isMorning) {
+    return '朝の冷え込みが厳しい中、お部屋まで足を運んでいただき誠にありがとうございます。';
+  }
+
+  /* B. Single adverse weather. */
+  if (weather === 'thunderstorm') {
+    return 'あいにくのお天気の中、無事にお部屋までお越しいただき心より感謝申し上げます。';
+  }
+  if (isRain) {
+    return '雨で足元の悪い中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (weather === 'snow') {
+    return '雪の降る大変寒い中、お部屋まで足を運んでいただき誠にありがとうございます。';
+  }
+  if (weather === 'fog') {
+    return 'お足元の見えにくい中、無事にお越しいただきありがとうございます。';
+  }
+
+  /* C. Single temperature extremes. */
+  if (isCold) {
+    return '冷え込みの厳しい中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+  if (temp !== null && temp <= 14) {
+    return '風の冷たい中、お部屋まで足を運んでいただきありがとうございます。';
+  }
+  if (temp !== null && temp >= 28) {
+    return '日差しの強い暑い中、お部屋までお越しいただき誠にありがとうございます。';
+  }
+
+  /* D. Single time of day — only when we have a temperature reading.
+     An offline tablet must not claim 穏やかなお天気 without knowing. */
+  if (temp !== null) {
+    if (isNight) {
+      return '夜遅いお時間にもかかわらず、お部屋までお越しいただき誠にありがとうございます。';
+    }
+    if (isMorning) {
+      return '朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+    }
+    if (time === 'evening') {
+      return '夕暮れ時のお忙しいお時間に、お越しいただき誠にありがとうございます。';
+    }
+    if (time === 'day') {
+      return '穏やかなお天気の中、お部屋までお越しいただき誠にありがとうございます。';
+    }
+  }
+
+  /* E. Offline / loading fallback. */
+  return '秋風の心地よい中、お部屋までお越しいただき誠にありがとうございます。';
+}
+
+function updateGreetingPanel() {
+  var el = document.getElementById('panelGreetingBody');
+  if (!el) return;
+  var greeting = getDynamicGreeting();
+  el.innerHTML = '<p>' + greeting + '</p><p>どうぞ肩の力を抜いて、おくつろぎください。</p>';
+  var p0 = document.querySelector('.panel[data-panel="0"]');
+  if (p0) preparePanel(p0);
+}
+
 function fetchNagoyaWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
             '&current=temperature_2m,weather_code&timezone=Asia%2FTokyo';
@@ -4281,13 +4329,27 @@ function fetchNagoyaWeather() {
     if (!data || !data.current) return;
     var temp = data.current.temperature_2m;
     var code = data.current.weather_code;
-    if (typeof temp === 'number') infoTemp.textContent = Math.round(temp) + '°';
-    if (typeof code === 'number') {
-      var bucket = weatherBucket(code);
-      infoWeather.textContent = weatherEmoji(bucket);
-      document.documentElement.setAttribute('data-weather', bucket);
+    if (typeof temp === 'number') {
+      currentTemp = Math.round(temp);
+      infoTemp.textContent = currentTemp + '°';
     }
-  }).catch(function() {});
+    if (typeof code === 'number') {
+      currentWeatherBucket = weatherBucket(code);
+      infoWeather.textContent = weatherEmoji(currentWeatherBucket);
+      document.documentElement.setAttribute('data-weather', currentWeatherBucket);
+    }
+    /* Only regenerate the greeting body while it is still unfrozen.
+       Once Panel 0 has mounted, further polls update the info bar
+       and cache only — the welcome is a snapshot of arrival
+       conditions. */
+    if (!greetingFinalized) {
+      updateGreetingPanel();
+    }
+  }).catch(function() {
+    if (!greetingFinalized) {
+      updateGreetingPanel();
+    }
+  });
 }
 
 /* ============ TICKER ============ */
@@ -4679,26 +4741,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
 
 /* ============================================================
    SHIPPO MOSAIC RANDOM CIRCLE TRACER
-   ------------------------------------------------------------
-   Mathematical snap:
-   In Shippo (60x60 tile, r=30), circle centers occur at
-   (j * 30px, k * 30px) where (j + k) is even.
-   SVG center offset is 34px (from 68x68 viewbox), so the
-   translate is (j*30 - 34, k*30 - 34).
-
-   v1.3 fix: scheduleShippoTracer() no longer calls
-   stopShippoTracer() at its head. The previous version added
-   .drawing inside triggerShippoCircle() and then removed it
-   synchronously in the recursive scheduleShippoTracer() call on
-   the very next line, all within the same JS task — so the
-   browser never rendered a single frame of the stroke-dashoffset
-   animation and the tracers were invisible.
-
-   Now split into three functions:
-     clearShippoDrawings()  strips .drawing from all three nodes
-     stopShippoTracer()     cancels the timer AND clears drawings
-                            (used by lifecycle hooks)
-     scheduleShippoTracer() only cancels a pending timer tick
    ============================================================ */
 function triggerShippoCircle() {
   if (currentTheme !== 'autumn') return;
@@ -4714,8 +4756,6 @@ function triggerShippoCircle() {
   var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
   var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
 
-  /* Enforce Shippo geometric parity — circles only sit at even
-     (j + k) intersections of the 60px grid. */
   if ((j + k) % 2 !== 0) j += 1;
 
   var x = (j * 30) - 34;
@@ -4724,7 +4764,7 @@ function triggerShippoCircle() {
 
   tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startAngle + 'deg)';
   tracer.classList.remove('drawing');
-  void tracer.offsetWidth; /* force reflow so the animation restarts */
+  void tracer.offsetWidth;
   tracer.classList.add('drawing');
 }
 
@@ -4743,16 +4783,12 @@ function stopShippoTracer() {
 }
 
 function scheduleShippoTracer() {
-  /* Only clear a pending timer tick — do NOT remove .drawing from
-     active tracers, or the animation gets cancelled in the same
-     task it was started in. */
   if (shippoTimer) {
     clearTimeout(shippoTimer);
     shippoTimer = null;
   }
   if (currentTheme !== 'autumn') return;
 
-  /* Average 1.0s cadence (0.75s to 1.25s organic jitter). */
   var delay = 750 + Math.random() * 500;
   shippoTimer = setTimeout(function() {
     triggerShippoCircle();
