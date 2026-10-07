@@ -109,7 +109,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v1.9.3</div>
+  <div class="app-version" aria-hidden="true">v1.9.4</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -144,6 +144,19 @@
 </div>
 
 <div class="blossom-screen" id="blossomScreen">
+
+  <!-- v1.3: time greeting + therapist name, two stacked lines. The
+       greeting sits in Shippori Mincho at a quiet weight; the name
+       below it in Yuji Syuku with the same autumn colour override
+       used on the panel-0 name span. Populated by
+       updateBlossomGreeting() in app.js on every screen show.
+       aria-live="polite" so assistive tech announces the greeting
+       when the screen becomes visible. -->
+  <div class="blossom-greeting" aria-live="polite">
+    <div class="blossom-greeting-time" id="blossomGreetingTime">こんばんは</div>
+    <div class="blossom-greeting-name" id="blossomGreetingName">桜庭さん</div>
+  </div>
+
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
       <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
@@ -160,7 +173,17 @@
     </div>
     <span class="start-label">はじめる</span>
   </button>
-  <p class="start-hint" id="startHint">水面を、そっと上へなぞってください。</p>
+
+  <!-- v1.3: three poetic interaction hints. Each line arrives on a
+       0.9 / 1.5 / 2.1s stagger the moment the screen becomes visible,
+       so the block reads as a small poem rather than a wall of
+       instructions. The whole block fades out together on the dive
+       that triggers the koi start. See .start-hints in main.css. -->
+  <div class="start-hints">
+    <p class="start-hint-line">水にふれると、さざなみが静かに広がります。</p>
+    <p class="start-hint-line">鯉に、そっとふれてみてください。</p>
+    <p class="start-hint-line">水面をゆっくり上へなぞると、はじまります。</p>
+  </div>
 </div>
 
 <div class="intro-overlay" id="introOverlay">
