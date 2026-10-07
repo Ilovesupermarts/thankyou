@@ -33,6 +33,14 @@
          plus three poetic interaction hints. A looping flowing-
          stream ambient track fades in on the screen and fades out
          on the swipe-up that dives the koi.
+       - Seamless loop for the flowing-stream bed. The raw MP3
+         carries encoder padding at head and tail and no zero-
+         crossing match at the seam, so `loop = true` on the raw
+         buffer produced an audible click at every loop point.
+         makeSeamlessLoop() crossfades the last 1.5s of the buffer
+         over its own head, producing a buffer whose end and
+         beginning are genuinely identical. Applied once at decode
+         time in initSound().
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -180,10 +188,87 @@ function initSound() {
       if (bufs[3]) soundBuffers.drop = bufs[3];
       if (bufs[4]) soundBuffers[AMBIENT_SOUNDS[0].name] = bufs[4];
       if (bufs[5]) soundBuffers[AMBIENT_SOUNDS[1].name] = bufs[5];
-      if (bufs[6]) soundBuffers.stream = bufs[6];
+      /* The stream bed loops for the full life of the blossom screen.
+         Pass the decoded buffer through makeSeamlessLoop() so the
+         loop point has no encoder padding and no zero-crossing
+         discontinuity. Everything else about the buffer is unchanged
+         — same sample rate, same channel count, same duration minus
+         the crossfade tail. */
+      if (bufs[6]) soundBuffers.stream = makeSeamlessLoop(bufs[6], 1.5);
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
+}
+
+/* ============================================================
+   SEAMLESS LOOP
+   ------------------------------------------------------------
+   Produces a buffer whose end and beginning are genuinely the
+   same sample values, so `loop = true` on a BufferSource has no
+   click at the seam.
+
+   Two problems the crossfade solves at once:
+
+     1. MP3 encoder delay and padding. Every MP3 adds ~50 ms of
+        silence at the head (to prime the decoder) and ~100–200 ms
+        at the tail (to flush it). decodeAudioData faithfully
+        returns both. Looping plays that padding end-to-back with
+        the start of the audio, which is audible as a momentary
+        dropout.
+
+     2. Non-zero crossing. Even without padding, the sample value
+        at the last frame rarely equals the value at the first
+        frame. Jumping between them is a step discontinuity — an
+        audible tick.
+
+   The fix: trim the last `crossfadeSec` seconds of the buffer,
+   then crossfade the trimmed tail back over the head. The result
+   is a buffer that is `crossfadeSec` seconds shorter than the
+   input, whose first sample equals the (former) tail's sample at
+   the same index, fading in over the crossfade window.
+
+   1.5 s was chosen for the flowing-stream recording: short enough
+   that the crossfade region is not perceptible as phase smearing
+   on a continuous water bed, long enough that both encoder padding
+   regions are fully absorbed inside the fade window rather than
+   sitting at the seam. If the source has bird calls or other
+   transient events near the loop point, 1.0 s is safer; if it is
+   pure water noise, 2.0 s is also fine.
+   ============================================================ */
+function makeSeamlessLoop(buffer, crossfadeSec) {
+  var sr = buffer.sampleRate;
+  var fadeSamples = Math.floor(sr * crossfadeSec);
+  var originalLength = buffer.length;
+
+  /* Guard: if the buffer is shorter than the crossfade would consume,
+     return it unchanged rather than producing a zero-length result. */
+  if (fadeSamples <= 0 || originalLength <= fadeSamples * 2) return buffer;
+
+  var channels = buffer.numberOfChannels;
+  var newLength = originalLength - fadeSamples;
+  var out = soundAudioCtx.createBuffer(channels, newLength, sr);
+
+  for (var ch = 0; ch < channels; ch++) {
+    var src = buffer.getChannelData(ch);
+    var dst = out.getChannelData(ch);
+
+    /* Copy the body: everything up to (but not including) the last
+       fadeSamples frames. */
+    for (var i = 0; i < newLength; i++) dst[i] = src[i];
+
+    /* Crossfade: the head of the original fades in while the tail
+       fades out, both over the same window. After this loop, dst[0]
+       is (mostly) the tail's value rather than the head's, so the
+       buffer end (dst[newLength - 1]) and the buffer start (dst[0])
+       are adjacent samples from the same recording — no step, no
+       padding, no click. */
+    for (var j = 0; j < fadeSamples; j++) {
+      var t = j / fadeSamples;
+      dst[j] = src[j] * t + src[newLength + j] * (1 - t);
+    }
+  }
+
+  return out;
 }
 
 function loadAudioBuffer(url) {
@@ -362,15 +447,15 @@ function playDrop() { playSound('drop', 1.0); }
    to master gain — matched to the nature ambient, slightly under
    the wind chime.
 
+   The buffer this plays from is the output of makeSeamlessLoop() —
+   see initSound(). loop = true on that buffer has no click at the
+   seam because the head and tail of the buffer are the same samples
+   from the recording, crossfaded.
+
    startBlossomStream() is idempotent: if a source already exists,
    it no-ops. stopBlossomStream() nulls the reference immediately
    so a subsequent start does not false-positive against a still-
-   fading source.
-
-   Buffer is loaded once on the first pointerdown, alongside the
-   other three MP3s. On the tablet the decode completes long before
-   the therapist finishes the name form, so the stream is ready by
-   the time the blossom screen appears. */
+   fading source. */
 var BLOSSOM_STREAM_PEAK = 0.20;
 var BLOSSOM_STREAM_FADE_IN = 2.2;
 var BLOSSOM_STREAM_FADE_OUT = 1.4;
