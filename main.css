@@ -161,14 +161,25 @@
      floating circle. Below about 0.10 the grid disappears under
      the tablet's backlight and the tracer loses its anchor.
 
-     Tracer alignment: triggerShippoCircle() in app.js computes
-     x = j*30 - 34, y = k*30 - 34 with (j + k) even, snapping the
-     68×68 tracer SVG (circle at cx=34, cy=34) so the traced ring
-     lands on grid vertex (j*30, k*30). The element's top-left is at
-     viewport (0,0) via position: fixed; inset: 0, and default
-     background-position: 0 0 places the tile grid origin at the same
-     point the SVG user-space origin sat at, so the mathematical snap
-     aligns at sub-pixel precision across every Shippō ring. */
+     v1.3 (pond mask): a radial-gradient mask fades the pattern to
+     fully transparent at the viewport centre and ramps it up to the
+     element's full 0.13 opacity by roughly 460px radius. The koi
+     sits at the viewport centre on the blossom screen, so the fade
+     reads as a natural pond clearing around it — and on every other
+     screen it doubles as a soft vignette that keeps the pattern out
+     of the centre where panel text sits.
+
+     Inner radius 180px: the outermost pulse-ring peaks at 171px
+     from centre (r=90 × scale 1.9), plus the 6px stroke and the
+     drop-shadow glow. 180px leaves the mask fully transparent at
+     the exact pixel where that outermost ripple's glow has just
+     finished dying, so no ring ever overlaps visible pattern.
+     Outer radius 460px: ~2.7× the inner, giving a clear pond of
+     ~920×920 px before the pattern reaches full strength.
+
+     The mask is on the mosaic element only — it does not touch the
+     tracer layer's grid, so triggerShippoCircle()'s vertex-snap
+     math is unaffected. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
@@ -178,6 +189,12 @@
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 180px, black 460px);
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-image: radial-gradient(circle at 50% 50%, transparent 180px, black 460px);
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
   }
 
   html[data-theme="autumn"] .ambient-mosaic {
@@ -574,6 +591,10 @@
     .light-orb { animation: none !important; }
     .maple-leaf { animation: none !important; }
     .ripple { animation-duration: 300ms; }
+    .gold-band {
+      animation: none !important;
+      filter: drop-shadow(0 0 16px rgba(253, 243, 216, 0.7));
+    }
   }
   @keyframes ambientDrift {
     0%, 100% { transform: translate(0, 0) scale(1); }
@@ -2061,8 +2082,9 @@
     .blossom-greeting { margin-bottom: 48px; }
     .blossom-greeting-time { font-size: 17px; letter-spacing: 4px; margin-bottom: 10px; }
     .blossom-greeting-name { font-size: 38px; letter-spacing: 5px; }
+    .icon-wrapper { margin-bottom: 26px; }
     .start-hints { margin-top: 28px; }
-    .start-hint-line { font-size: 16px; letter-spacing: 3px; }
+    .start-hint-line { font-size: 19px; letter-spacing: 3px; }
     .ty-line { font-size: 21px; }
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
     .ty-line.spacer { margin-top: 28px; }
@@ -2095,8 +2117,9 @@
     .blossom-greeting { margin-bottom: 56px; }
     .blossom-greeting-time { font-size: 18px; letter-spacing: 5px; margin-bottom: 12px; }
     .blossom-greeting-name { font-size: 42px; letter-spacing: 6px; }
+    .icon-wrapper { margin-bottom: 22px; }
     .start-hints { margin-top: 32px; }
-    .start-hint-line { font-size: 17px; letter-spacing: 4px; }
+    .start-hint-line { font-size: 20px; letter-spacing: 4px; }
     .ty-line { font-size: 24px; }
     .ty-mark { font-size: 30px; }
     .quote-line { font-size: 40px; letter-spacing: 5px; }
@@ -2127,9 +2150,9 @@
     .blossom-greeting { margin-bottom: 24px; }
     .blossom-greeting-time { font-size: 14px; letter-spacing: 3px; margin-bottom: 5px; }
     .blossom-greeting-name { font-size: 28px; letter-spacing: 3px; }
+    .icon-wrapper { width: 160px; height: 160px; margin-bottom: 20px; }
     .start-hints { margin-top: 16px; }
-    .start-hint-line { font-size: 13px; letter-spacing: 2px; }
-    .icon-wrapper { width: 160px; height: 160px; margin-bottom: 56px; }
+    .start-hint-line { font-size: 16px; letter-spacing: 2px; }
     .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 2; }
     .transition-line { font-size: 17px; }
@@ -2179,9 +2202,9 @@
     .blossom-greeting { margin-bottom: 16px; }
     .blossom-greeting-time { font-size: 13px; letter-spacing: 2px; margin-bottom: 4px; }
     .blossom-greeting-name { font-size: 24px; letter-spacing: 3px; }
+    .icon-wrapper { width: 140px; height: 140px; margin-bottom: 16px; }
     .start-hints { margin-top: 12px; }
-    .start-hint-line { font-size: 12px; letter-spacing: 2px; line-height: 1.7; }
-    .icon-wrapper { width: 140px; height: 140px; margin-bottom: 44px; }
+    .start-hint-line { font-size: 14.5px; letter-spacing: 2px; line-height: 1.7; }
     .panel { padding: 56px 40px 118px 40px; }
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 2; }
@@ -2324,7 +2347,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-bottom: 80px;
+    margin-bottom: 32px;
   }
 
   /* v1.17.2: koi dive wrapper */
@@ -2441,16 +2464,69 @@
   }
   .start-btn.diving .rings-svg { opacity: 0; }
 
+  /* v1.3: gold band as a slow breathing pulse.
+     Previously a static 6px stroke at #fdf3d8 with a static 16px
+     drop-shadow glow, and a .start-btn.ready override that swapped
+     the filter to a brighter 28px glow. The static version read as
+     a hard ring rather than a living membrane; the ready state was
+     a discrete filter swap rather than a brightness step.
+
+     Now the ring breathes on a 4s ease-in-out cycle. Two properties
+     animate together:
+       - filter drop-shadow radius and alpha — the halo swells and
+         recedes
+       - stroke-width — the ring itself thickens and thins by ~1px,
+         which reads as the ring flexing rather than just glowing
+
+     Both are driven through CSS custom properties so the .ready
+     state can brighten the whole envelope by scaling the same six
+     values, rather than swapping the animation. Changing a custom
+     property mid-animation updates the keyframe values on the next
+     frame without restarting the animation, so the transition from
+     resting to ready state is a brightness step, not a jump.
+
+     Chromium resolves custom properties inside keyframes at
+     animation time, so this works on the Samsung Internet build the
+     tablet runs. will-change promotes the SVG's raster; the layer
+     is only ~420×420 px, well within the Adreno's per-frame budget
+     at 120Hz — the tile dropouts we fixed earlier were specific to
+     full-viewport raster, not to a localised filter. */
   .gold-band {
+    --gold-glow-min: 10px;
+    --gold-glow-max: 24px;
+    --gold-alpha-min: 0.55;
+    --gold-alpha-max: 0.9;
+    --gold-stroke-min: 5.4px;
+    --gold-stroke-max: 6.4px;
+
     stroke: #fdf3d8;
     stroke-width: 6px;
     fill: none;
-    filter: drop-shadow(0 0 16px rgba(253, 243, 216, 0.6));
-    transition: filter 250ms ease;
+    animation: goldBreath 4s ease-in-out infinite;
+    will-change: filter, stroke-width;
   }
-  /* v1.17.2: ready glow when swipe crosses threshold */
+
+  @keyframes goldBreath {
+    0%, 100% {
+      filter: drop-shadow(0 0 var(--gold-glow-min) rgba(253, 243, 216, var(--gold-alpha-min)));
+      stroke-width: var(--gold-stroke-min);
+    }
+    50% {
+      filter: drop-shadow(0 0 var(--gold-glow-max) rgba(253, 240, 200, var(--gold-alpha-max)));
+      stroke-width: var(--gold-stroke-max);
+    }
+  }
+
+  /* Ready state brightens the whole envelope — the ring is already
+     on its way to peak when the swipe crosses threshold. No
+     animation-duration change, no filter swap, no layer churn. */
   .start-btn.ready .gold-band {
-    filter: drop-shadow(0 0 28px rgba(253, 240, 200, 1));
+    --gold-glow-min: 18px;
+    --gold-glow-max: 36px;
+    --gold-alpha-min: 0.85;
+    --gold-alpha-max: 1;
+    --gold-stroke-min: 6px;
+    --gold-stroke-max: 7.4px;
   }
 
   .pulse-ring {
@@ -2465,19 +2541,6 @@
   @keyframes ringPulse {
     0% { transform: scale(1); opacity: 0.7; stroke-width: 2px; }
     100% { transform: scale(1.9); opacity: 0; stroke-width: 0px; }
-  }
-  .start-label {
-    font-size: 17px; font-weight: 600; letter-spacing: 5px; color: #fdf3d8;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    transition: color 250ms ease, text-shadow 250ms ease, opacity 500ms ease, transform 500ms ease;
-  }
-  .start-btn.ready .start-label {
-    color: #ffffff;
-    text-shadow: 0 0 16px rgba(253, 240, 200, 1);
-  }
-  .start-btn.diving .start-label {
-    opacity: 0;
-    transform: translateY(6px);
   }
 
   /* v1.3: three poetic interaction hints below the start button.
@@ -2496,7 +2559,7 @@
   }
   .start-hint-line {
     margin: 4px 0 0 0;
-    font-size: 15px;
+    font-size: 18px;
     font-weight: 500;
     color: var(--text-dark);
     letter-spacing: 2px;
