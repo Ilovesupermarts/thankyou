@@ -2,6 +2,26 @@
    main.css — v1.3
    ============================================================ */
 
+  /* ============ ANIMATABLE CUSTOM PROPERTIES ============
+     v1.3: the two pond radii are registered as animatable <length>
+     custom properties so the mosaic mask can fade from full
+     (178/210) to nothing (0/0) over the same 600ms the blossom
+     screen fades out on dive. Without @property the custom
+     property would be an untyped token and the transition would
+     be discrete — the mask would pop. Registered as <length>, the
+     browser interpolates on each frame and re-evaluates
+     mask-image with the new value. */
+  @property --pond-inner {
+    syntax: '<length>';
+    initial-value: 0px;
+    inherits: false;
+  }
+  @property --pond-outer {
+    syntax: '<length>';
+    initial-value: 0px;
+    inherits: false;
+  }
+
   /* ============ THEME VARIABLES ============ */
   html[data-theme="default"] {
     --bg-base: #faf7f5; --bg-warm: #f7e9e3;
@@ -111,10 +131,17 @@
      hardware sampler. Zero per-frame Skia cost regardless of viewport
      size or scroll.
 
-     v1.3 (pond mask scoping): the mask is NOT on this base rule. It
-     is applied only when the blossom screen is visible, via the
-     html:has(.blossom-screen.visible) rule immediately below. On
-     every other screen the mosaic paints uniformly. */
+     v1.3 (pond mask, animated): the mask is driven by two registered
+     custom properties, --pond-inner and --pond-outer, so the hole in
+     the pattern can fade open and closed in step with the blossom
+     screen's own fade. The base rule holds both radii at 0px, which
+     puts the transparent stop and the black stop at the exact same
+     pixel — a hard-edged cut at the centre, effectively a no-op. The
+     html:has(...) rule below raises the radii to 178px / 210px when
+     the blossom screen is on-screen AND not yet diving. On dive the
+     class .diving lands, the :has rule stops matching, the radii
+     transition back to 0 over 600ms, and the mask collapses in step
+     with the koi's exit. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
@@ -124,12 +151,25 @@
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
+
+    --pond-inner: 0px;
+    --pond-outer: 0px;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--pond-inner), black var(--pond-outer));
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-size: 100% 100%;
+    mask-image: radial-gradient(circle at 50% 50%, transparent var(--pond-inner), black var(--pond-outer));
+    mask-repeat: no-repeat;
+    mask-size: 100% 100%;
+
+    transition: --pond-inner 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                --pond-outer 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
-  /* v1.3: pond mask, scoped to the blossom screen only. A radial-
-     gradient mask fades the pattern to transparent at the viewport
-     centre and ramps it up to full 0.13 opacity by 210px radius, so
-     the koi reads as sitting in a clear pond rather than on a grid.
+  /* v1.3: pond mask, scoped to the blossom screen while the koi is
+     still interactive. A radial-gradient mask fades the pattern to
+     transparent at the viewport centre and ramps it up to full 0.13
+     opacity by 210px radius, so the koi reads as sitting in a clear
+     pond rather than on a grid.
 
      Inner 178px: the outermost .pulse-ring peaks at 171px from centre
      (r=90 × scale 1.9) plus its 6px stroke and glow. 178px leaves the
@@ -138,17 +178,16 @@
      pattern. Outer 210px: a 32px feather, tight enough that the pond
      reads as a disc around the button rather than a wide clearing.
 
-     The :has() selector reacts to the same .visible class the blossom
-     screen already toggles, so the mask appears on name → blossom,
-     disappears on dive → panels, and reappears on reset → blossom,
-     with no JS involved. */
-  html:has(.blossom-screen.visible) .ambient-mosaic {
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-size: 100% 100%;
-    mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
-    mask-repeat: no-repeat;
-    mask-size: 100% 100%;
+     :not(.diving) is load-bearing. The blossom screen keeps .visible
+     throughout the intro overlay — the class is only removed at the
+     end of the kanji arrival, roughly 2 seconds after the overlay
+     starts. Without the :not(.diving) clause, the mask would remain
+     carved out of the mosaic behind the arriving kanji. .diving is
+     added at the exact moment the fade and the koi dive begin, so
+     the mask collapses in step with the visual. */
+  html:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic {
+    --pond-inner: 178px;
+    --pond-outer: 210px;
   }
 
   html[data-theme="autumn"] .ambient-mosaic {
