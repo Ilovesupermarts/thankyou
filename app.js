@@ -24,29 +24,24 @@
        - Night mode: between 19:00 and 04:59 Nagoya time, the day
          rotation is bypassed and Sound/Night.mp3 plays on a fixed
          65s cycle (2s fade-in, 54s sustain, 4s fade-out, 5s
-         silence). The hour check runs at play time, so a day clip
-         mid-flight at the boundary finishes naturally and the next
-         scheduled play sees the new mode.
-       - 6-panel carousel expansion: Panel 0 is now a dynamic
-         personal welcome with a compound weather/time greeting
-         evaluated from the Nagoya forecast. Panels 1–4 host the
-         panel-N.html files. Panel 5 is the hardcoded zero-pressure
-         gate. The greeting is frozen on first mount via
-         greetingFinalized so late network arrivals cannot mutate
-         the DOM while the therapist is reading.
-       - Blossom screen: time greeting (おはようございます /
-         こんにちは / こんばんは) with the therapist's name below,
-         plus three poetic interaction hints. A looping flowing-
-         stream ambient track fades in on the screen and fades out
-         on the swipe-up that dives the koi.
-       - Seamless loop for the flowing-stream bed. The raw MP3
-         carries encoder padding at head and tail and no zero-
-         crossing match at the seam, so `loop = true` on the raw
-         buffer produced an audible click at every loop point.
-         makeSeamlessLoop() crossfades the last 1.5s of the buffer
-         over its own head, producing a buffer whose end and
-         beginning are genuinely identical. Applied once at decode
-         time in initSound().
+         silence).
+       - 6-panel carousel expansion: Panel 0 is a dynamic personal
+         welcome with a compound weather/time greeting evaluated
+         from the Nagoya forecast. Panels 1–4 host the panel-N.html
+         files. Panel 5 is the hardcoded zero-pressure gate. The
+         greeting is frozen on first mount via greetingFinalized so
+         late network arrivals cannot mutate the DOM while the
+         therapist is reading.
+       - Blossom screen: time greeting with the therapist's name
+         below, plus three poetic interaction hints. A looping
+         flowing-stream ambient track fades in on the screen and
+         fades out on the swipe-up that dives the koi.
+       - Seamless loop for the flowing-stream bed via
+         makeSeamlessLoop().
+       - Greeting set revised: warmer, more observational phrasing
+         across all 17 branches. Precip trumps temperature in every
+         compound slot. Tier D remains guarded by temp !== null so
+         an offline tablet never fabricates a "mild weather" line.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -3865,36 +3860,36 @@ confirmYes.addEventListener('click', function(e) {
     updateNumpadVisibility();
 
     /* The landing animation is a first-open-only effect. But the item
-   reveal — which is what actually makes the .receipt-item nodes
-   visible from their resting opacity: 0 — must run on every open.
-   Previously receiptHasLanded gated both, so a second visit built
-   the items and never revealed them: names appeared blank while the
-   counter and total (both outside #receiptItems) kept rendering. */
-var willRunLanding = false;
-if (!receiptHasLanded) {
-  receiptHasLanded = true;
-  var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
+       reveal — which is what actually makes the .receipt-item nodes
+       visible from their resting opacity: 0 — must run on every open.
+       Previously receiptHasLanded gated both, so a second visit built
+       the items and never revealed them: names appeared blank while the
+       counter and total (both outside #receiptItems) kept rendering. */
+    var willRunLanding = false;
+    if (!receiptHasLanded) {
+      receiptHasLanded = true;
+      var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
 
-  if (paperWrap) {
-    willRunLanding = true;
-    paperWrap.classList.remove('landing');
-    void paperWrap.offsetWidth;
+      if (paperWrap) {
+        willRunLanding = true;
+        paperWrap.classList.remove('landing');
+        void paperWrap.offsetWidth;
 
-    paperWrap.classList.add('landing');
-    paperWrap.addEventListener('animationend', function onLandingEnd() {
-      paperWrap.classList.remove('landing');
-      paperWrap.removeEventListener('animationend', onLandingEnd);
+        paperWrap.classList.add('landing');
+        paperWrap.addEventListener('animationend', function onLandingEnd() {
+          paperWrap.classList.remove('landing');
+          paperWrap.removeEventListener('animationend', onLandingEnd);
+          revealReceiptItems(80);
+        });
+      }
+    }
+
+    /* Second and subsequent opens: the wrapper is already in its resting
+       pose, so reveal the items immediately rather than waiting on an
+       animationend that will never fire. */
+    if (!willRunLanding) {
       revealReceiptItems(80);
-    });
-  }
-}
-
-/* Second and subsequent opens: the wrapper is already in its resting
-   pose, so reveal the items immediately rather than waiting on an
-   animationend that will never fire. */
-if (!willRunLanding) {
-  revealReceiptItems(80);
-}
+    }
 
     requestAnimationFrame(updateReceiptScrollIndicator);
     setTimeout(updateReceiptScrollIndicator, 100);
@@ -4528,7 +4523,14 @@ function updateInfoDateTime() {
      E. Offline / loading fallback
 
    The greeting is regenerated on every weather fetch until
-   greetingFinalized flips true, then frozen for the session. */
+   greetingFinalized flips true, then frozen for the session.
+
+   Design note on the phrasing: the variations across branches
+   (朝早くから, 夜遅いお時間にもかかわらず, 無事に, 足元の悪い中,
+   肌寒い中) are deliberate. Do not normalise them to a single
+   template — the variation is what makes the screen read as
+   having noticed the circumstances rather than retrieved a
+   category. */
 function getDynamicGreeting() {
   var time = getTimeOfDayInNagoya();
   var weather = currentWeatherBucket;
@@ -4543,65 +4545,65 @@ function getDynamicGreeting() {
      compound slot — snow already implies cold, and acknowledging the
      snowfall directly is more evocative than commenting on the chill. */
   if (weather === 'snow' && isNight) {
-    return '雪の降る夜遅いお時間に、お部屋まで足を運んでいただき心より感謝申し上げます。';
+    return '雪の降る夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。';
   }
   if (isRain && isNight) {
-    return '雨で足元の悪い夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+    return '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。';
   }
   if (isCold && isNight) {
-    return '冷え込みの厳しい夜遅いお時間に、お部屋までお越しいただき誠にありがとうございます。';
+    return '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。';
   }
   if (isRain && isMorning) {
-    return '雨の降る朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+    return '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。';
   }
   if (isCold && isMorning) {
-    return '朝の冷え込みが厳しい中、お部屋まで足を運んでいただき誠にありがとうございます。';
+    return '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。';
   }
 
   /* B. Single adverse weather. */
   if (weather === 'thunderstorm') {
-    return 'あいにくのお天気の中、無事にお部屋までお越しいただき心より感謝申し上げます。';
+    return 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。';
   }
   if (isRain) {
-    return '雨で足元の悪い中、お部屋までお越しいただき誠にありがとうございます。';
+    return '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。';
   }
   if (weather === 'snow') {
-    return '雪の降る大変寒い中、お部屋まで足を運んでいただき誠にありがとうございます。';
+    return '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。';
   }
   if (weather === 'fog') {
-    return 'お足元の見えにくい中、無事にお越しいただきありがとうございます。';
+    return '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。';
   }
 
   /* C. Single temperature extremes. */
   if (isCold) {
-    return '冷え込みの厳しい中、お部屋までお越しいただき誠にありがとうございます。';
+    return '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。';
   }
   if (temp !== null && temp <= 14) {
-    return '風の冷たい中、お部屋まで足を運んでいただきありがとうございます。';
+    return '肌寒い中、お部屋までお越しいただき、ありがとうございます。';
   }
   if (temp !== null && temp >= 28) {
-    return '日差しの強い暑い中、お部屋までお越しいただき誠にありがとうございます。';
+    return '暑い中、お部屋までお越しいただき、誠にありがとうございます。';
   }
 
   /* D. Single time of day — only when we have a temperature reading.
      An offline tablet must not claim 穏やかなお天気 without knowing. */
   if (temp !== null) {
     if (isNight) {
-      return '夜遅いお時間にもかかわらず、お部屋までお越しいただき誠にありがとうございます。';
+      return '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。';
     }
     if (isMorning) {
-      return '朝早くのお時間に、お部屋までお越しいただき誠にありがとうございます。';
+      return '朝早くからお部屋までお越しいただき、誠にありがとうございます。';
     }
     if (time === 'evening') {
-      return '夕暮れ時のお忙しいお時間に、お越しいただき誠にありがとうございます。';
+      return '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。';
     }
     if (time === 'day') {
-      return '穏やかなお天気の中、お部屋までお越しいただき誠にありがとうございます。';
+      return '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。';
     }
   }
 
   /* E. Offline / loading fallback. */
-  return '秋風の心地よい中、お部屋までお越しいただき誠にありがとうございます。';
+  return '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。';
 }
 
 function updateGreetingPanel() {
