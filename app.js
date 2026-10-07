@@ -39,9 +39,17 @@
        - Seamless loop for the flowing-stream bed via
          makeSeamlessLoop().
        - Greeting set revised: warmer, more observational phrasing
-         across all 17 branches. Precip trumps temperature in every
-         compound slot. Tier D remains guarded by temp !== null so
-         an offline tablet never fabricates a "mild weather" line.
+         across all 17 branches.
+       - Greeting structure refactored. getGreetingTier() walks the
+         priority ladder and returns a tier identifier;
+         GREETING_TEXTS maps tier → greeting text; BURDEN_TIERS
+         marks tiers whose greeting frames the journey as
+         physically demanding. Closing line now varies by tier —
+         どうぞご無理なさらず、おくつろぎください。 for burden
+         tiers, どうぞ肩の力を抜いて、おくつろぎください。 for the
+         rest. C2 (肌寒い) is deliberately on the lighter closing:
+         the greeting drops 誠に to match its own mildness, so the
+         closing follows.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -630,10 +638,6 @@ function playNightSound() {
   var playDur = buffer.duration;
   if (playDur <= 0) return 0;
 
-  /* Cap the fades against the play duration so a truncated or
-     unusually short night clip still has a sustain region. For the
-     1-minute clip, both caps are inert: fadeIn stays 2.0s and
-     fadeOut stays 4.0s. */
   var fadeIn = Math.min(NIGHT_FADE_IN, playDur * 0.25);
   var fadeOut = Math.min(NIGHT_FADE_OUT, playDur * 0.35);
   var peak = NIGHT_PEAK * (0.9 + Math.random() * 0.2);
@@ -3884,9 +3888,6 @@ confirmYes.addEventListener('click', function(e) {
       }
     }
 
-    /* Second and subsequent opens: the wrapper is already in its resting
-       pose, so reveal the items immediately rather than waiting on an
-       animationend that will never fire. */
     if (!willRunLanding) {
       revealReceiptItems(80);
     }
@@ -4525,13 +4526,61 @@ function updateInfoDateTime() {
    The greeting is regenerated on every weather fetch until
    greetingFinalized flips true, then frozen for the session.
 
-   Design note on the phrasing: the variations across branches
+   Structure: getGreetingTier() walks the ladder and returns a
+   tier identifier ('A1', 'B2', etc.). GREETING_TEXTS maps each
+   tier to its greeting text. BURDEN_TIERS marks the tiers whose
+   greeting frames the journey as physically demanding, and those
+   tiers receive the more protective closing line in
+   getClosingLine(). Keeping the ladder separate from the text
+   lookup means edits to wording never touch the priority logic,
+   and edits to priority never touch the strings.
+
+   Design note on phrasing: the variations across branches
    (朝早くから, 夜遅いお時間にもかかわらず, 無事に, 足元の悪い中,
    肌寒い中) are deliberate. Do not normalise them to a single
    template — the variation is what makes the screen read as
    having noticed the circumstances rather than retrieved a
-   category. */
-function getDynamicGreeting() {
+   category.
+
+   Design note on the closing line: the split between the two
+   closings is not "did she experience discomfort" but "did the
+   greeting frame her journey as requiring particular
+   consideration". C2 (肌寒い) is the important judgment call —
+   it acknowledges mild chill, and the greeting itself drops 誠に
+   to match, so it deliberately takes the lighter closing. Night
+   and early morning on their own also take the lighter closing;
+   lateness is worth acknowledging in the greeting but does not
+   by itself imply the therapist had to endure hardship. */
+var GREETING_TEXTS = {
+  A1: '雪の降る夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。',
+  A2: '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。',
+  A3: '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。',
+  A4: '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。',
+  A5: '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。',
+  B1: 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。',
+  B2: '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。',
+  B3: '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。',
+  B4: '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。',
+  C1: '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。',
+  C2: '肌寒い中、お部屋までお越しいただき、ありがとうございます。',
+  C3: '暑い中、お部屋までお越しいただき、誠にありがとうございます。',
+  D1: '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。',
+  D2: '朝早くからお部屋までお越しいただき、誠にありがとうございます。',
+  D3: '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。',
+  D4: '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。',
+  E1: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。'
+};
+
+var BURDEN_TIERS = {
+  A1: true, A2: true, A3: true, A4: true, A5: true,
+  B1: true, B2: true, B3: true, B4: true,
+  C1: true,
+  C3: true
+  /* C2, D1-D4 and E1 are intentionally absent. They receive the
+     lighter closing line. C2 is deliberate — see the comment above. */
+};
+
+function getGreetingTier() {
   var time = getTimeOfDayInNagoya();
   var weather = currentWeatherBucket;
   var temp = currentTemp;
@@ -4541,76 +4590,47 @@ function getDynamicGreeting() {
   var isNight = (time === 'night');
   var isMorning = (time === 'morning');
 
-  /* A. Compound hardships. Precipitation trumps temperature in every
-     compound slot — snow already implies cold, and acknowledging the
-     snowfall directly is more evocative than commenting on the chill. */
-  if (weather === 'snow' && isNight) {
-    return '雪の降る夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (isRain && isNight) {
-    return '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (isCold && isNight) {
-    return '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (isRain && isMorning) {
-    return '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (isCold && isMorning) {
-    return '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。';
-  }
+  if (weather === 'snow' && isNight) return 'A1';
+  if (isRain && isNight) return 'A2';
+  if (isCold && isNight) return 'A3';
+  if (isRain && isMorning) return 'A4';
+  if (isCold && isMorning) return 'A5';
 
-  /* B. Single adverse weather. */
-  if (weather === 'thunderstorm') {
-    return 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (isRain) {
-    return '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (weather === 'snow') {
-    return '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (weather === 'fog') {
-    return '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。';
-  }
+  if (weather === 'thunderstorm') return 'B1';
+  if (isRain) return 'B2';
+  if (weather === 'snow') return 'B3';
+  if (weather === 'fog') return 'B4';
 
-  /* C. Single temperature extremes. */
-  if (isCold) {
-    return '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。';
-  }
-  if (temp !== null && temp <= 14) {
-    return '肌寒い中、お部屋までお越しいただき、ありがとうございます。';
-  }
-  if (temp !== null && temp >= 28) {
-    return '暑い中、お部屋までお越しいただき、誠にありがとうございます。';
-  }
+  if (isCold) return 'C1';
+  if (temp !== null && temp <= 14) return 'C2';
+  if (temp !== null && temp >= 28) return 'C3';
 
-  /* D. Single time of day — only when we have a temperature reading.
-     An offline tablet must not claim 穏やかなお天気 without knowing. */
   if (temp !== null) {
-    if (isNight) {
-      return '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。';
-    }
-    if (isMorning) {
-      return '朝早くからお部屋までお越しいただき、誠にありがとうございます。';
-    }
-    if (time === 'evening') {
-      return '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。';
-    }
-    if (time === 'day') {
-      return '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。';
-    }
+    if (isNight) return 'D1';
+    if (isMorning) return 'D2';
+    if (time === 'evening') return 'D3';
+    if (time === 'day') return 'D4';
   }
 
-  /* E. Offline / loading fallback. */
-  return '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。';
+  return 'E1';
+}
+
+function getDynamicGreeting() {
+  var tier = getGreetingTier();
+  return GREETING_TEXTS[tier] || GREETING_TEXTS.E1;
+}
+
+function getClosingLine() {
+  var tier = getGreetingTier();
+  return BURDEN_TIERS[tier]
+    ? 'どうぞご無理なさらず、おくつろぎください。'
+    : 'どうぞ肩の力を抜いて、おくつろぎください。';
 }
 
 function updateGreetingPanel() {
   var el = document.getElementById('panelGreetingBody');
   if (!el) return;
-  var greeting = getDynamicGreeting();
-  el.innerHTML = '<p>' + greeting + '</p><p>どうぞ肩の力を抜いて、おくつろぎください。</p>';
+  el.innerHTML = '<p>' + getDynamicGreeting() + '</p><p>' + getClosingLine() + '</p>';
   var p0 = document.querySelector('.panel[data-panel="0"]');
   if (p0) preparePanel(p0);
 }
