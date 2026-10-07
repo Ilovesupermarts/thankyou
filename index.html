@@ -109,7 +109,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v1.9.2</div>
+  <div class="app-version" aria-hidden="true">v1.9.3</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -170,16 +170,27 @@
 <div class="stage" id="stage">
   <div class="track" id="track">
 
+    <!-- Panel 0: Dynamic Personal Weather & Time Greeting -->
     <div class="panel" data-panel="0">
       <div class="panel-inner">
         <div class="panel-content">
           <span id="therapistName" class="therapist-name">桜庭さん</span>、初めまして。
+          <div id="panelGreetingBody"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Panel 1: Eze Intro (panel-1.html) -->
+    <div class="panel" data-panel="1">
+      <div class="panel-inner">
+        <div class="panel-content">
           <div id="panel1Body"></div>
         </div>
       </div>
     </div>
 
-    <div class="panel" data-panel="1">
+    <!-- Panel 2: Compliment (panel-2.html) -->
+    <div class="panel" data-panel="2">
       <div class="panel-inner">
         <div class="panel-content">
           <div id="panel2Body"></div>
@@ -187,7 +198,8 @@
       </div>
     </div>
 
-    <div class="panel" data-panel="2">
+    <!-- Panel 3: Proposal Options (panel-3.html or panel-3-no.html) -->
+    <div class="panel" data-panel="3">
       <div class="panel-inner">
         <div class="panel-content">
           <div id="panel3Body"></div>
@@ -195,7 +207,8 @@
       </div>
     </div>
 
-    <div class="panel" data-panel="3">
+    <!-- Panel 4: Reassurance (panel-4.html) -->
+    <div class="panel" data-panel="4">
       <div class="panel-inner">
         <div class="panel-content">
           <div id="panel4Body"></div>
@@ -203,7 +216,8 @@
       </div>
     </div>
 
-    <div class="panel" data-panel="4">
+    <!-- Panel 5: Final Zero-Pressure Gate -->
+    <div class="panel" data-panel="5">
       <div class="panel-inner">
         <div class="panel-content">
           <p class="panel-5-red">もちろん、ご不安なものやご対応が難しいものについては、</p>
@@ -226,8 +240,10 @@
     </span>
   </div>
 
+  <!-- 6 Navigation Dots -->
   <div class="dots" id="dots">
     <div class="dot active"></div>
+    <div class="dot"></div>
     <div class="dot"></div>
     <div class="dot"></div>
     <div class="dot"></div>
