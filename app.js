@@ -3864,22 +3864,37 @@ confirmYes.addEventListener('click', function(e) {
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
 
-    if (!receiptHasLanded) {
-      receiptHasLanded = true;
-      var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
+    /* The landing animation is a first-open-only effect. But the item
+   reveal — which is what actually makes the .receipt-item nodes
+   visible from their resting opacity: 0 — must run on every open.
+   Previously receiptHasLanded gated both, so a second visit built
+   the items and never revealed them: names appeared blank while the
+   counter and total (both outside #receiptItems) kept rendering. */
+var willRunLanding = false;
+if (!receiptHasLanded) {
+  receiptHasLanded = true;
+  var paperWrap = receiptScreen.querySelector('.receipt-paper-wrap');
 
-      if (paperWrap) {
-        paperWrap.classList.remove('landing');
-        void paperWrap.offsetWidth;
+  if (paperWrap) {
+    willRunLanding = true;
+    paperWrap.classList.remove('landing');
+    void paperWrap.offsetWidth;
 
-        paperWrap.classList.add('landing');
-        paperWrap.addEventListener('animationend', function onLandingEnd() {
-          paperWrap.classList.remove('landing');
-          paperWrap.removeEventListener('animationend', onLandingEnd);
-          revealReceiptItems(80);
-        });
-      }
-    }
+    paperWrap.classList.add('landing');
+    paperWrap.addEventListener('animationend', function onLandingEnd() {
+      paperWrap.classList.remove('landing');
+      paperWrap.removeEventListener('animationend', onLandingEnd);
+      revealReceiptItems(80);
+    });
+  }
+}
+
+/* Second and subsequent opens: the wrapper is already in its resting
+   pose, so reveal the items immediately rather than waiting on an
+   animationend that will never fire. */
+if (!willRunLanding) {
+  revealReceiptItems(80);
+}
 
     requestAnimationFrame(updateReceiptScrollIndicator);
     setTimeout(updateReceiptScrollIndicator, 100);
