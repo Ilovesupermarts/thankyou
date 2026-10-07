@@ -871,10 +871,14 @@
   .intro-overlay.finishing { opacity: 0; transition: opacity 0.9s ease; }
 
   /* ============ MAIN CAROUSEL ============ */
+  /* v1.3: 6-panel carousel. Panel 0 is the dynamic weather/time
+     welcome. Panels 1-4 host the panel-N.html bodies. Panel 5 is the
+     hardcoded zero-pressure gate. Track is 600% wide; each panel is
+     1/6th of the track, so its rendered width equals the viewport. */
   .stage { position: relative; height: 100vh; width: 100%; overflow: hidden; touch-action: pan-y; perspective: 1200px; }
-  .track { display: flex; width: 500%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
+  .track { display: flex; width: 600%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .track.dragging { transition: none; }
-  .panel { width: calc(100% / 5); height: 100%; display: flex; align-items: center; justify-content: center; padding: 76px 20px 160px 20px; text-align: center; }
+  .panel { width: calc(100% / 6); height: 100%; display: flex; align-items: center; justify-content: center; padding: 76px 20px 160px 20px; text-align: center; }
   .panel-inner { max-width: 480px; width: 100%; }
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
@@ -909,7 +913,7 @@
   /* ============ PANEL PHRASE REVEAL ============ */
   /* v1.3: will-change: opacity, transform removed. It was a permanent
      compositor-promotion hint on every phrase — 150-300 layers across
-     the five panels, held for the life of the page whether or not the
+     the panels, held for the life of the page whether or not the
      phrases were animating. The 500ms transition is short enough that
      the browser promotes on-demand during the transition and demotes
      after, which reads identically on device. */
