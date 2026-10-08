@@ -10,20 +10,52 @@
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-  :root {
+  /* ============ AUTUMN THEME VARIABLES (from main.css) ============ */
+  html[data-theme="autumn"] {
     --bg-base: #fdf3d8;
+    --bg-warm: #f5d89a;
     --accent: #c9600a;
-    --glow-color: #c9600a;
-    --glow-shadow: rgba(143, 47, 0, 0.95);
+    --accent-2: #8f3f12;
+    --accent-3: #7a3208;
+    --glow: #f7b93c;
+    --petal: #e88a1a;
+    --petal-soft: #fde8b8;
+    --outstanding: #8f2f00;
+    --border-1: #e8c88a;
+    --border-2: #d8b478;
+    --border-3: #f0d8a0;
+    --border-4: #f5e0b0;
+    --border-5: #e8c890;
+    --border-6: #b89860;
+    --soft-1: #fdf0c8;
+    --soft-2: #fdf5e0;
+    --soft-3: #f0e0b8;
+    --soft-4: #fdf6e0;
+    --text-dark: #231304;
+    --text-med: #3d2410;
+    --text-soft: #2a1808;
+    --text-mute: #5a3818;
+    --text-faint: #7a5028;
+    --text-placeholder: #a07a48;
+    --shadow-rose: rgba(120, 70, 20, 0.10);
+    --shadow-rose-2: rgba(120, 70, 20, 0.18);
+    --shadow-accent: rgba(201, 96, 10, 0.32);
+    --amb-1: rgba(247, 185, 60, 0.85);
+    --amb-2: rgba(240, 138, 30, 0.80);
+    --amb-3: rgba(217, 94, 26, 0.72);
+    --amb-4: rgba(143, 63, 18, 0.55);
+    --amb-5: rgba(107, 47, 14, 0.45);
+  }
+
+  /* Sandbox Custom Properties */
+  :root {
+    --tracer-stroke: #c9600a;
+    --tracer-glow: #c9600a;
+    --tracer-shadow: rgba(143, 47, 0, 0.95);
     --stroke-width: 2.2px;
     --draw-duration: 1.5s;
     --fade-duration: 2.5s;
     --mosaic-opacity: 0.13;
-  }
-
-  html[data-theme="dark"] {
-    --bg-base: #1a120b;
-    --mosaic-opacity: 0.22;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -34,21 +66,184 @@
     overflow: hidden;
     background-color: var(--bg-base);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Shippori Mincho", serif;
-    transition: background-color 0.6s ease;
+    user-select: none;
+    -webkit-user-select: none;
   }
 
-  /* ============ SHIPPO MOSAIC BACKGROUND ============ */
+  /* ============ AMBIENT STAGE & LIGHT MESH ============ */
+  .ambient-stage {
+    position: fixed;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    z-index: -3;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(var(--wind-x, 0px), 0, 0);
+  }
+  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
+
+  .ambient-mesh {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.90;
+  }
+
+  .light-orb {
+    position: absolute;
+    border-radius: 50%;
+    pointer-events: none;
+    will-change: transform;
+  }
+
+  .orb-1 {
+    width: 70vw; height: 70vw;
+    max-width: 900px; max-height: 900px;
+    top: 10%; left: 15%;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
+    animation: orbDrift1 11.58s ease-in-out infinite alternate;
+  }
+
+  .orb-2 {
+    width: 80vw; height: 80vw;
+    max-width: 1050px; max-height: 1050px;
+    top: 35%; right: 5%;
+    background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
+    animation: orbDrift2 15.26s ease-in-out infinite alternate;
+  }
+
+  .orb-3 {
+    width: 55vw; height: 55vw;
+    max-width: 700px; max-height: 700px;
+    bottom: 10%; left: 30%;
+    background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
+    animation: orbDrift3 10.00s ease-in-out infinite alternate;
+  }
+
+  @keyframes orbDrift1 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
+    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
+  }
+  @keyframes orbDrift2 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
+    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
+  }
+  @keyframes orbDrift3 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
+    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
+  }
+
+  .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(143, 47, 0, 0.30) 0%, rgba(107, 47, 14, 0.16) 35%, rgba(107, 47, 14, 0) 65%);
+    animation: autumnDrift1 14s ease-in-out infinite;
+    will-change: transform;
+  }
+  @keyframes autumnDrift1 {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
+    23%  { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
+    35%  { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
+    48%  { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
+    60%  { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
+    72%  { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
+    85%  { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* ============ FLOATING MOTES ============ */
+  .mote-field {
+    position: absolute; inset: 0; pointer-events: none;
+    transform-style: preserve-3d;
+    transform: translate3d(var(--wind-x-extra, 0px), 0, 0);
+    will-change: transform;
+  }
+  .mote {
+    position: absolute; border-radius: 50%;
+    background: radial-gradient(circle, var(--glow) 0%, transparent 70%);
+    opacity: 0; pointer-events: none;
+    animation: moteFloat var(--mote-dur, 22s) ease-in-out infinite;
+    animation-delay: var(--mote-delay, 0s);
+    will-change: transform, opacity;
+  }
+  @keyframes moteFloat {
+    0%, 100% { transform: translate3d(0, 0, 0); opacity: 0; }
+    20%      { transform: translate3d(var(--mote-ax, 14px), var(--mote-ay, -10px), 0); opacity: var(--mote-peak, 0.3); }
+    60%      { transform: translate3d(0, 0, 0); opacity: var(--mote-peak, 0.3); }
+    85%      { transform: translate3d(0, 0, 0); opacity: 0; }
+  }
+
+  /* ============ AMBIENT SHIPPO MOSAIC BACKGROUND ============ */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: 1;
+    z-index: -2;
     opacity: var(--mosaic-opacity);
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     transition: opacity 0.3s ease;
+  }
+
+  /* ============ AMBIENT MAPLE LEAVES ============ */
+  .maple-leaves-overlay {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    z-index: -1;
+    opacity: 1;
+  }
+  .maple-leaf {
+    position: absolute;
+    top: -60px;
+    pointer-events: none;
+    will-change: transform;
+    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.07));
+    opacity: 0.30;
+  }
+  .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-4 { width: 66px; height: 66px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
+  .leaf-5 { width: 54px; height: 54px; fill: #c9561b; left: 74%;  animation: mapleDriftB 12s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-7 { width: 57px; height: 57px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+
+  @keyframes mapleDriftA {
+    0%   { transform: translate3d(0, -60px, 0) rotate(-15deg); opacity: 0; }
+    10%  { opacity: 0.95; }
+    28%  { transform: translate3d(38px, 30vh, 0) rotate(42deg); }
+    54%  { transform: translate3d(-32px, 62vh, 0) rotate(-28deg); }
+    78%  { transform: translate3d(44px, 88vh, 0) rotate(55deg); opacity: 0.95; }
+    100% { transform: translate3d(-18px, 115vh, 0) rotate(105deg); opacity: 0; }
+  }
+  @keyframes mapleDriftB {
+    0%   { transform: translate3d(0, -60px, 0) rotate(25deg); opacity: 0; }
+    10%  { opacity: 0.95; }
+    32%  { transform: translate3d(-42px, 34vh, 0) rotate(-48deg); }
+    58%  { transform: translate3d(36px, 66vh, 0) rotate(32deg); }
+    80%  { transform: translate3d(-26px, 92vh, 0) rotate(-40deg); opacity: 0.95; }
+    100% { transform: translate3d(22px, 115vh, 0) rotate(95deg); opacity: 0; }
+  }
+  @keyframes mapleDriftC {
+    0%   { transform: translate3d(0, -60px, 0) rotate(-35deg); opacity: 0; }
+    12%  { opacity: 0.95; }
+    25%  { transform: translate3d(24px, 26vh, 0) rotate(20deg); }
+    50%  { transform: translate3d(-20px, 54vh, 0) rotate(-22deg); }
+    72%  { transform: translate3d(28px, 80vh, 0) rotate(44deg); opacity: 0.95; }
+    100% { transform: translate3d(-10px, 115vh, 0) rotate(85deg); opacity: 0; }
   }
 
   /* ============ TRACER LAYER ============ */
@@ -59,7 +254,6 @@
     z-index: 2;
     overflow: hidden;
   }
-
   .shippo-tracer {
     position: absolute;
     top: 0; left: 0;
@@ -68,38 +262,31 @@
     pointer-events: none;
     will-change: transform, opacity;
   }
-
   .shippo-tracer svg {
     overflow: visible;
     width: 100%; height: 100%;
     display: block;
   }
-
   .tracer-path {
     fill: none;
-    stroke: var(--accent);
+    stroke: var(--tracer-stroke);
     stroke-width: var(--stroke-width);
     stroke-linecap: round;
     stroke-linejoin: round;
     filter:
-      drop-shadow(0 0 2px var(--glow-color))
-      drop-shadow(0 0 8px var(--glow-shadow));
+      drop-shadow(0 0 2px var(--tracer-glow))
+      drop-shadow(0 0 8px var(--tracer-shadow));
   }
-
-  /* Animation classes applied dynamically */
   .shippo-tracer.drawing {
     animation: tracerFade var(--fade-duration) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   }
-
   .shippo-tracer.drawing .tracer-path {
     animation: drawStroke var(--draw-duration) cubic-bezier(0.35, 0, 0.25, 1) forwards;
   }
-
   @keyframes drawStroke {
     0%   { stroke-dashoffset: var(--dash-len, 189); }
     100% { stroke-dashoffset: 0; }
   }
-
   @keyframes tracerFade {
     0%   { opacity: 0; }
     18%  { opacity: 0.85; }
@@ -121,7 +308,6 @@
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(120, 70, 20, 0.15);
   }
-
   .control-card {
     position: fixed;
     top: 60px; right: 18px;
@@ -144,7 +330,6 @@
     opacity: 0;
     pointer-events: none;
   }
-
   .card-title {
     font-family: "Shippori Mincho", serif;
     font-size: 16px; font-weight: 700;
@@ -154,7 +339,6 @@
     border-bottom: 1px solid #ebd4ab;
     display: flex; justify-content: space-between; align-items: center;
   }
-
   .section-label {
     font-weight: 700;
     font-size: 11px;
@@ -163,20 +347,14 @@
     color: #a07a48;
     margin: 14px 0 6px 0;
   }
-
   .control-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 8px;
   }
-
   label { font-weight: 500; }
-
-  select, input[type="range"], input[type="color"] {
-    cursor: pointer;
-  }
-
+  select, input[type="range"], input[type="color"] { cursor: pointer; }
   select {
     padding: 4px 8px;
     border-radius: 6px;
@@ -185,12 +363,10 @@
     font-family: inherit;
     font-size: 12px;
   }
-
   input[type="range"] {
     width: 130px;
     accent-color: #c9600a;
   }
-
   .val-badge {
     font-family: monospace;
     font-size: 11px;
@@ -198,14 +374,12 @@
     min-width: 38px;
     text-align: right;
   }
-
   .btn-group {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
     margin-top: 14px;
   }
-
   .action-btn {
     padding: 9px 12px;
     border-radius: 8px;
@@ -222,7 +396,6 @@
     background: #fff;
     color: #c9600a;
   }
-
   .copy-notice {
     text-align: center;
     color: #2a7a2a;
@@ -236,15 +409,55 @@
 </head>
 <body>
 
-<div class="ambient-mosaic" id="mosaicBg"></div>
+<!-- 1. Ambient Stage (Light Mesh + Gradients + Mote Field) -->
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
+  </div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<!-- 2. Ambient Shippō Mosaic Lattice -->
+<div class="ambient-mosaic" id="mosaicBg" aria-hidden="true"></div>
+
+<!-- 3. Ambient Maple Leaves (Momiji) -->
+<div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+</div>
+
+<!-- 4. Interactive Tracer Layer -->
 <div class="tracer-layer" id="tracerLayer"></div>
 
+<!-- 5. Control Panel & Toggle -->
 <button type="button" class="panel-toggle-btn" id="togglePanelBtn">⚙ 設定パネル</button>
 
 <div class="control-card" id="controlCard">
   <div class="card-title">
     <span>七宝 幾何学ラボ</span>
-    <span style="font-size: 11px; font-weight: normal; color: #a07a48;">v1.0</span>
+    <span style="font-size: 11px; font-weight: normal; color: #a07a48;">Autumn Bed</span>
   </div>
 
   <div class="section-label">形状 (Geometry Shape)</div>
@@ -261,7 +474,7 @@
     </select>
   </div>
 
-  <div class="section-label">スタイル・色調 (Aesthetics)</div>
+  <div class="section-label">スタイル・色調 (Tracer Visuals)</div>
   <div class="control-row">
     <label for="strokeColor">線の色 (Stroke)</label>
     <input type="color" id="strokeColor" value="#c9600a">
@@ -279,13 +492,6 @@
     <label for="mosaicOpacity">背景格子の濃度</label>
     <input type="range" id="mosaicOpacity" min="0.02" max="0.35" step="0.01" value="0.13">
     <span class="val-badge" id="mosaicOpacityVal">0.13</span>
-  </div>
-  <div class="control-row">
-    <label for="themeSelect">背景テーマ</label>
-    <select id="themeSelect">
-      <option value="autumn">秋 (Autumn #fdf3d8)</option>
-      <option value="dark">夜 (Night Dark #1a120b)</option>
-    </select>
   </div>
 
   <div class="section-label">アニメーション (Motion Timing)</div>
@@ -326,35 +532,47 @@
 </div>
 
 <script>
-/* ============================================================
-   GEOMETRIC PATH DEFINITIONS (Centered in 68x68 Box, R=30)
-   ============================================================ */
+/* ============ MOTE BUILDER (from app.js) ============ */
+function buildMotes() {
+  const moteField = document.getElementById('moteField');
+  if (!moteField) return;
+  moteField.innerHTML = '';
+  const count = 8;
+  for (let i = 0; i < count; i++) {
+    const m = document.createElement('div');
+    m.className = 'mote';
+    const size = 14 + Math.random() * 16;
+    m.style.width = size + 'px';
+    m.style.height = size + 'px';
+    m.style.left = (Math.random() * 100) + '%';
+    m.style.top  = (Math.random() * 100) + '%';
+    const dur = 18 + Math.random() * 20;
+    m.style.setProperty('--mote-dur', dur + 's');
+    m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
+    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
+    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
+    m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
+    moteField.appendChild(m);
+  }
+}
+
+/* ============ GEOMETRIC PATH DEFINITIONS ============ */
 const SHAPES = {
-  // 1. Full Circle (Circumference: ~188.5)
   circle: {
     svg: '<circle cx="34" cy="34" r="30" class="tracer-path" />',
     length: 189,
     rotationStep: 90
   },
-
-  // 2. Concave 4-Point Star (Hoshi-gata / 撫角星)
-  // Four inward 90-deg arcs meeting at the 4 cardinal points (Total: ~188.5)
   star: {
     svg: '<path d="M 34,4 A 30 30 0 0 0 64,34 A 30 30 0 0 0 34,64 A 30 30 0 0 0 4,34 A 30 30 0 0 0 34,4 Z" class="tracer-path" />',
     length: 189,
     rotationStep: 45
   },
-
-  // 3. Single Petal (Hana-bira / 花弁)
-  // Authentic Shippo intersection: two 90-degree arcs between points at distance 30*sqrt(2)
   petal: {
     svg: '<path d="M 34,13 A 30 30 0 0 1 34,55 A 30 30 0 0 1 34,13 Z" class="tracer-path" />',
     length: 95,
     rotationStep: 45
   },
-
-  // 4. Four-Petaled Flower (Shippō-bana / 七宝花)
-  // Continuous fluid trace around the 4 petals radiating from center
   flower: {
     svg: `<path d="M 34,34 
              A 30 30 0 0 1 34,4 A 30 30 0 0 1 34,34 
@@ -364,17 +582,11 @@ const SHAPES = {
     length: 252,
     rotationStep: 45
   },
-
-  // 5. Crescent Arc (Enko / 円弧)
-  // A clean 180-degree sweep of a single circle's perimeter
   crescent: {
     svg: '<path d="M 4,34 A 30 30 0 0 1 64,34" class="tracer-path" />',
     length: 95,
     rotationStep: 90
   },
-
-  // 6. S-Curve Stream (Ryūsui / 流水)
-  // Alternating tangent arcs evoking flowing water across the lattice
   wave: {
     svg: '<path d="M 4,34 A 30 30 0 0 1 34,4 A 30 30 0 0 0 64,34" class="tracer-path" />',
     length: 95,
@@ -382,7 +594,7 @@ const SHAPES = {
   }
 };
 
-/* ============ POOL CONTROLLER ============ */
+/* ============ TRACER POOL CONTROLLER ============ */
 const POOL_SIZE = 8;
 const tracerLayer = document.getElementById('tracerLayer');
 const tracerPool = [];
@@ -390,7 +602,6 @@ let poolIndex = 0;
 let autoTimer = null;
 let isAutoRunning = true;
 
-// Build reusable node pool
 for (let i = 0; i < POOL_SIZE; i++) {
   const node = document.createElement('div');
   node.className = 'shippo-tracer';
@@ -417,7 +628,6 @@ function spawnTracer() {
   const svg = tracer.querySelector('svg');
   svg.innerHTML = shapeData.svg;
 
-  // Set dasharray to exact path length
   tracer.style.setProperty('--dash-len', shapeData.length);
   const path = tracer.querySelector('.tracer-path');
   if (path) {
@@ -425,7 +635,6 @@ function spawnTracer() {
     path.style.strokeDashoffset = shapeData.length;
   }
 
-  // Calculate lattice position
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const maxCols = Math.floor(vw / 30);
@@ -436,9 +645,9 @@ function spawnTracer() {
 
   const gridMode = document.getElementById('gridMode').value;
   if (gridMode === 'even') {
-    if ((j + k) % 2 !== 0) j += 1; // Circle / Star centers
+    if ((j + k) % 2 !== 0) j += 1;
   } else if (gridMode === 'odd') {
-    if ((j + k) % 2 === 0) j += 1; // Petal nexus centers
+    if ((j + k) % 2 === 0) j += 1;
   }
 
   const x = (j * 30) - 34;
@@ -448,7 +657,7 @@ function spawnTracer() {
 
   tracer.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${startAngle}deg)`;
   tracer.classList.remove('drawing');
-  void tracer.offsetWidth; // Reflow
+  void tracer.offsetWidth;
   tracer.classList.add('drawing');
 }
 
@@ -467,10 +676,10 @@ function scheduleNext() {
 const root = document.documentElement;
 
 document.getElementById('strokeColor').addEventListener('input', (e) => {
-  root.style.setProperty('--accent', e.target.value);
+  root.style.setProperty('--tracer-stroke', e.target.value);
 });
 document.getElementById('glowColor').addEventListener('input', (e) => {
-  root.style.setProperty('--glow-color', e.target.value);
+  root.style.setProperty('--tracer-glow', e.target.value);
 });
 document.getElementById('strokeWidth').addEventListener('input', (e) => {
   const val = e.target.value + 'px';
@@ -494,11 +703,7 @@ document.getElementById('fadeDuration').addEventListener('input', (e) => {
 document.getElementById('intervalSpeed').addEventListener('input', (e) => {
   document.getElementById('intervalSpeedVal').textContent = e.target.value + 'ms';
 });
-document.getElementById('themeSelect').addEventListener('change', (e) => {
-  root.setAttribute('data-theme', e.target.value);
-});
 
-// Play / Pause
 const autoBtn = document.getElementById('autoBtn');
 autoBtn.addEventListener('click', () => {
   isAutoRunning = !isAutoRunning;
@@ -507,19 +712,14 @@ autoBtn.addEventListener('click', () => {
   else clearTimeout(autoTimer);
 });
 
-// Trigger Once
-document.getElementById('triggerBtn').addEventListener('click', () => {
-  spawnTracer();
-});
+document.getElementById('triggerBtn').addEventListener('click', spawnTracer);
 
-// Panel Hide / Show Toggle
 const togglePanelBtn = document.getElementById('togglePanelBtn');
 const controlCard = document.getElementById('controlCard');
 togglePanelBtn.addEventListener('click', () => {
   controlCard.classList.toggle('hidden');
 });
 
-// Code Snippet Export
 document.getElementById('copyCodeBtn').addEventListener('click', () => {
   const shape = document.getElementById('shapeSelect').value;
   const stroke = document.getElementById('strokeColor').value;
@@ -529,11 +729,11 @@ document.getElementById('copyCodeBtn').addEventListener('click', () => {
   const fadeD = document.getElementById('fadeDuration').value;
   const interval = document.getElementById('intervalSpeed').value;
 
-  const snippet = `/* --- Generated Shippō Tracer Config --- */
+  const snippet = `/* --- Shippō Tracer Autumn Config --- */
 Shape: ${shape}
 Stroke: ${stroke}
 Glow: ${glow}
-Stroke Width: ${sw}px
+Stroke-width: ${sw}px
 Draw Animation: drawStroke ${drawD}s cubic-bezier(0.35, 0, 0.25, 1) forwards;
 Fade Animation: tracerFade ${fadeD}s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
 Interval: ~${interval}ms`;
@@ -545,7 +745,8 @@ Interval: ~${interval}ms`;
   });
 });
 
-// Boot
+/* Boot */
+buildMotes();
 scheduleNext();
 </script>
 </body>
