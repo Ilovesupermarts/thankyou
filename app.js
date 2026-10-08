@@ -3,6 +3,48 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (ambient revamp, phase 2)
+       - Wind chime reinstated as a morning-window layer. Runs
+         independently of the main ambient bed for the life of the
+         carousel, on the pre-revamp random-window / random-offset /
+         random-silence schedule:
+             12–14s play window at a random offset into the buffer
+             2s fade-in, 1.5s fade-out
+             500–2000ms silence measured from play END
+         Window: 05:00–16:59 Nagoya only. The hour check runs at
+         play time, not at schedule time, so a chime mid-flight at
+         the 17:00 boundary finishes naturally and the next cycle
+         sees the closed window and skips. The timer keeps re-arming
+         around the clock regardless.
+         Peak 0.60 — tuned against the new Morning.mp3 bed at peak
+         1.00, which is much louder than the old pool members the
+         chime used to sit beside. Amplitude ratio bed:chime is
+         1.67:1, so the chime reads as a layered presence rather
+         than as a texture buried under the bed.
+       - Ambient background tracks replaced with a time-bucketed
+         full-track loop. Two clips:
+             05:00–16:59  Sound/Morning.mp3       peak 1.00
+             17:00–21:59  Sound/Earlyevening.mp3  peak 1.00
+             22:00–04:59  Sound/Earlyevening.mp3  peak 1.00
+                          (placeholder; awaiting a dedicated late-
+                           night clip)
+         Each play runs the full buffer end-to-end with a 3s fade-in
+         and a 4s fade-out, then immediately re-arms. The hour is
+         checked at play time, not at schedule time, so a clip mid-
+         flight when the wall clock crosses a bucket boundary
+         finishes naturally and the next cycle picks the correct
+         track.
+       - Removed from the ambient pool: the nature recording
+         (baranova_n-birds-forest-river-409229.mp3) and both night
+         clips (Sound/Wind.mp3 and Sound/jauk-calm-zen-river-
+         flowing.mp3). Their supporting code is gone: NIGHT_SOUNDS,
+         AMBIENT_SOUNDS (as a pool), NIGHT_WIND_MAX_PLAY,
+         nightIndex, isNightAmbientHours, the random-window /
+         random-offset logic in playAmbientSound.
+       - Kept: the koi-dive drop effect (one-shot, start button),
+         the blossom-screen flowing-stream bed and its
+         makeSeamlessLoop crossfade (start button), and the three
+         synthesised UI sounds (tock, check, paper).
      v1.3
        - Shippo tracer refactor: concave 4-point star (Hoshi-gata)
          replaces the circle trace. New .tracer-rotator wrapper
@@ -214,41 +256,64 @@ var soundReady = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
+var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
 
-/* Ambient rotation pool for daytime playback. Each entry:
-   { name, url, peak }. peak is the per-play maximum gain relative to
-   the master gain (0.5), before the per-play random variance of
-   0.75–1.25× applied in playAmbientSound(). The wind chime sits
-   higher than the nature recording because its energy is sparse and
-   time-localised; a continuous birds-forest-river bed at the same
-   peak reads as more intrusive. Both peaks were scaled 1.2× from
-   the pre-tuning baseline (0.22 → 0.264, 0.18 → 0.216). */
-var AMBIENT_SOUNDS = [
-  { name: 'windChime', url: 'Sound/freesound_community-wind-chimes-32150.mp3', peak: 0.264 },
-  { name: 'nature',    url: 'Sound/baranova_n-birds-forest-river-409229.mp3',  peak: 0.216 }
+/* Ambient background beds. A single full-length clip loops for the
+   life of the carousel, selected by Nagoya wall-clock hour:
+
+     05:00–16:59   Sound/Morning.mp3
+     17:00–21:59   Sound/Earlyevening.mp3
+     22:00–04:59   Sound/Earlyevening.mp3  (placeholder; awaiting a
+                                             dedicated late-night clip)
+
+   Each play runs the full buffer end-to-end with a linear fade-in
+   at the head and a linear fade-out at the tail, then immediately
+   re-arms for the next cycle. The loop is scheduled, not handled
+   by BufferSource.loop — a native loop cannot fade in and out
+   between iterations, and a fade across the seam is the whole
+   point of the envelope.
+
+   The hour check runs at play time, not at schedule time, so a
+   clip that is mid-flight when the wall clock crosses a bucket
+   boundary finishes naturally and the next cycle picks the
+   correct track. Symmetrically for the other boundary.
+
+   Peaks are 1.00, tuned by ear against the wind chime layer that
+   sits on top during the morning window. Effective level is
+   1.00 × 0.5 master = 0.50, which is much higher than the old
+   pool members — but the bed is continuous background, and the
+   chime carries its own independent peak (0.60) to compensate.
+
+   Lifecycle is shared with the Shippō tracer and maple leaves via
+   the .active class on #mapleLeaves. */
+var AMBIENT_TRACKS = [
+  { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00 },
+  { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00 }
 ];
 
-/* Night rotation pool. Replaces the single-clip night mode of v1.3.
-   Two clips alternate on the same random-window, random-offset,
-   random-silence schedule the day rotation uses. Peaks are tuned
-   per-clip against their actual recordings: the wind file at 0.211
-   (−20% from the wind-chime level) reads as a background bed rather
-   than a foreground presence, and the jauk river at 0.281 (+30% from
-   the nature level) compensates for a much softer source recording.
-   These are the second pass at both — the first pass had wind too
-   forward and jauk too quiet for a night ambience. */
-var NIGHT_SOUNDS = [
-  { name: 'wind', url: 'Sound/Wind.mp3',                              peak: 0.211 },
-  { name: 'jauk', url: 'Sound/jauk-calm-zen-river-flowing.mp3',       peak: 0.281 }
-];
-/* Wind.mp3 is 13s long. The random-window playDur cap is raised to
-   11s so the clip reaches the 12s floor's neighbourhood without
-   exhausting room for the full 2s fade-in and 1.5s fade-out. Above
-   11s the generic buffer-length guard (playDur > bufferDur - 1)
-   would silently clamp every wind draw to 12s, and the fade-scaling
-   rule would then shorten the fades. See playAmbientSound(). */
-var NIGHT_WIND_MAX_PLAY = 11000;
-var nightIndex = 0;
+var AMBIENT_FADE_IN  = 3000;  // ms
+var AMBIENT_FADE_OUT = 4000;  // ms
+
+/* Wind chime layer. Runs only during the morning window
+   (05:00–16:59 Nagoya) and layers on top of Morning.mp3. The
+   envelope and schedule are unchanged from the pre-revamp pool
+   system, because the chime recording is sparse and
+   time-localised — a 12–14s window at a random offset gives a
+   couple of audible strikes per play, which reads as an accent
+   rather than a competing texture.
+
+   Peak raised 0.264 → 0.600 against the much louder new bed.
+   Ratio bed:chime in effective terms is 0.50 : 0.30, i.e.
+   1.67:1 amplitude. The chime's peaks read against the bed's
+   average, not its peaks, so the perceived balance is closer
+   than the amplitude ratio suggests. */
+var WIND_CHIME_PEAK        = 0.600;
+var WIND_CHIME_PLAY_MIN    = 12000;
+var WIND_CHIME_PLAY_MAX    = 14000;
+var WIND_CHIME_FADE_IN     = 2000;
+var WIND_CHIME_FADE_OUT    = 1500;
+var WIND_CHIME_SILENCE_MIN = 500;
+var WIND_CHIME_SILENCE_MAX = 2000;
 
 function initSound() {
   if (soundAudioCtx) return;
@@ -267,18 +332,17 @@ function initSound() {
       synthesizeCheck(),
       synthesizePaper(),
       loadDropBuffer(),
-      loadAudioBuffer(AMBIENT_SOUNDS[0].url),
-      loadAudioBuffer(AMBIENT_SOUNDS[1].url),
+      loadAudioBuffer(AMBIENT_TRACKS[0].url),
+      loadAudioBuffer(AMBIENT_TRACKS[1].url),
       loadAudioBuffer(STREAM_SOUND_URL),
-      loadAudioBuffer(NIGHT_SOUNDS[0].url),
-      loadAudioBuffer(NIGHT_SOUNDS[1].url)
+      loadAudioBuffer(WIND_CHIME_URL)
     ]).then(function(bufs) {
       soundBuffers.tock = bufs[0];
       soundBuffers.check = bufs[1];
       soundBuffers.paper = bufs[2];
       if (bufs[3]) soundBuffers.drop = bufs[3];
-      if (bufs[4]) soundBuffers[AMBIENT_SOUNDS[0].name] = bufs[4];
-      if (bufs[5]) soundBuffers[AMBIENT_SOUNDS[1].name] = bufs[5];
+      if (bufs[4]) soundBuffers[AMBIENT_TRACKS[0].name] = bufs[4];
+      if (bufs[5]) soundBuffers[AMBIENT_TRACKS[1].name] = bufs[5];
       /* The stream bed loops for the full life of the blossom screen.
          Pass the decoded buffer through makeSeamlessLoop() so the
          loop point has no encoder padding and no zero-crossing
@@ -286,8 +350,7 @@ function initSound() {
          — same sample rate, same channel count, same duration minus
          the crossfade tail. */
       if (bufs[6]) soundBuffers.stream = makeSeamlessLoop(bufs[6], 1.5);
-      if (bufs[7]) soundBuffers[NIGHT_SOUNDS[0].name] = bufs[7];
-      if (bufs[8]) soundBuffers[NIGHT_SOUNDS[1].name] = bufs[8];
+      if (bufs[7]) soundBuffers.windChime = bufs[7];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
@@ -603,88 +666,57 @@ function stopBlossomStream() {
 }
 
 /* ============ AMBIENT SOUND ROTATION ============
-   Two clips alternate during the day, and a different two clips
-   alternate during the night. Each play picks a random 12–14s window
-   from the source buffer at a random offset, with linear fade-in /
-   fade-out envelopes so no play ever clicks at the head or tail.
+   See the AMBIENT_TRACKS block above for the bed design rationale.
 
-   The play window is deliberately narrow (12–14s) and the fade-out
-   deliberately short (1.5s) relative to the current play lengths.
-   An earlier configuration used a wider window (6–14s) and a longer
-   fade-out (3s), which read as "the clip is too short" to the ear
-   even at 8–9s runtimes: three seconds of a nine-second play spent
-   fading out meant the audible sustain was closer to five or six
-   seconds, and the tail of every play sounded like the clip ending
-   rather than the clip finishing. Widening the floor and shortening
-   the fade-out moves the perceptual centre of the play back to the
-   sustain region. See AMBIENT_FADE_OUT.
-
-   Scheduling: the silence gap is measured from the END of the
-   previous play, not from its start. playAmbientSound() returns the
-   play duration in ms; the caller arms the next setTimeout for
-   playDur + silenceGap, so the audible quiet interval is bounded at
-   AMBIENT_SILENCE_MIN–MAX regardless of which clip plays or how
-   long it runs.
-
-   Night window (19:00–04:59 Nagoya time): the pool swaps, but the
-   envelope shape and the silence distribution do not. The night
-   window is a pool swap, not a mode change — the previous single-
-   clip fixed-cycle night mode is retired. The hour check runs at
-   play time, not at schedule time, so a day clip that is mid-flight
-   at the boundary finishes naturally and the next scheduled play
-   sees the new pool. Symmetrically for the other boundary.
-
-   Lifecycle is shared with the Shippō tracer and maple leaves via
-   the .active class on #mapleLeaves. */
-var AMBIENT_FIRST_MIN   = 0;
-var AMBIENT_FIRST_MAX   = 0;
-var AMBIENT_SILENCE_MIN = 500;
-var AMBIENT_SILENCE_MAX = 2000;
-var AMBIENT_PLAY_MIN    = 12000;
-var AMBIENT_PLAY_MAX    = 14000;
-var AMBIENT_FADE_IN     = 2000;
-var AMBIENT_FADE_OUT    = 1500;
+   The single source of truth for "should ambient be playing?" is
+   the .active class on #mapleLeaves, shared with the Shippō tracer.
+   startAmbient() and stopAmbient() are called in lockstep with the
+   tracer so the two can never get out of sync. startAmbient() also
+   arms the wind chime layer; stopAmbient() tears both down. */
 
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
-var ambientIndex = 0;
 
-/* Returns true when the current Nagoya hour falls in the night
-   window 19:00–04:59. Uses the canonical Nagoya time source
-   (nagoyaDateParts) so the mode agrees with the info bar. Function
-   declarations hoist, so referencing nagoyaDateParts here — even
-   though it is declared later in the file — is safe at runtime. */
-function isNightAmbientHours() {
+/* Returns the track entry for the current Nagoya hour:
+     05:00–16:59 → morning
+     17:00–21:59 → earlyevening
+     22:00–04:59 → earlyevening (placeholder)
+   Function declarations hoist, so referencing nagoyaDateParts here
+   — even though it is declared later in the file — is safe at
+   runtime. */
+function getCurrentAmbientTrack() {
   var p = nagoyaDateParts();
-  return (p.hour >= 19 || p.hour < 5);
+  var h = p.hour;
+  if (h >= 5 && h < 17) return AMBIENT_TRACKS[0];
+  return AMBIENT_TRACKS[1];
 }
 
 function startAmbient() {
   stopAmbient();
-  ambientIndex = 0;
-  nightIndex = 0;
-  var firstGap = AMBIENT_FIRST_MIN +
-    Math.random() * (AMBIENT_FIRST_MAX - AMBIENT_FIRST_MIN);
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
     scheduleNextAmbient(playMs);
-  }, firstGap);
+  }, 0);
+  startWindChime();
 }
 
+/* Re-arm immediately on the tail of the previous play. There is no
+   silence gap by design: the 4s fade-out at the tail of one pass
+   and the 3s fade-in at the head of the next compose into a
+   continuous 7s crossfade-like transition rather than a hard cut
+   followed by silence followed by a hard attack. */
 function scheduleNextAmbient(prevPlayMs) {
-  var silenceGap = AMBIENT_SILENCE_MIN +
-    Math.random() * (AMBIENT_SILENCE_MAX - AMBIENT_SILENCE_MIN);
-  var delay = (prevPlayMs || 0) + silenceGap;
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
     scheduleNextAmbient(playMs);
-  }, delay);
+  }, prevPlayMs || 0);
 }
 
 function stopAmbient() {
+  stopWindChime();
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
@@ -707,40 +739,140 @@ function playAmbientSound() {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
 
-  var pool, indexVar;
-  var night = isNightAmbientHours();
-  if (night) {
-    pool = NIGHT_SOUNDS;
-    indexVar = 'night';
-  } else {
-    pool = AMBIENT_SOUNDS;
-    indexVar = 'day';
-  }
-  if (!pool.length) return 0;
-
-  var idx = (indexVar === 'night') ? nightIndex : ambientIndex;
-  var entry = pool[idx % pool.length];
-  if (indexVar === 'night') nightIndex = (nightIndex + 1) % pool.length;
-  else ambientIndex = (ambientIndex + 1) % pool.length;
-
-  var buffer = soundBuffers[entry.name];
+  var track = getCurrentAmbientTrack();
+  var buffer = soundBuffers[track.name];
   if (!buffer) return 0;
 
   var bufferDur = buffer.duration;
-  var playDur = AMBIENT_PLAY_MIN +
-    Math.random() * (AMBIENT_PLAY_MAX - AMBIENT_PLAY_MIN);
-  if (night && entry.name === 'wind') {
-    playDur = Math.min(playDur, NIGHT_WIND_MAX_PLAY);
+  if (bufferDur <= 0) return 0;
+
+  /* Clamp fades so a truncated or very short clip cannot have its
+     head ramp and tail ramp overlap. At 17min / 1020s this clamp
+     is inert — 3s and 4s are both under 0.4% of the buffer. */
+  var maxFade = bufferDur * 0.10;
+  var fadeIn  = Math.min(AMBIENT_FADE_IN  / 1000, maxFade);
+  var fadeOut = Math.min(AMBIENT_FADE_OUT / 1000, maxFade);
+  var peak = track.peak;
+
+  var now = soundAudioCtx.currentTime;
+  var src = soundAudioCtx.createBufferSource();
+  src.buffer = buffer;
+  var gain = soundAudioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(peak, now + fadeIn);
+  gain.gain.setValueAtTime(peak, now + bufferDur - fadeOut);
+  gain.gain.linearRampToValueAtTime(0, now + bufferDur);
+
+  src.connect(gain);
+  gain.connect(soundMasterGain);
+  src.start(now);
+  src.stop(now + bufferDur + 0.1);
+
+  ambientSource = src;
+  ambientGain = gain;
+
+  src.onended = function() {
+    if (ambientSource === src) ambientSource = null;
+    if (ambientGain === gain) ambientGain = null;
+    try { gain.disconnect(); } catch (e) {}
+  };
+
+  return bufferDur * 1000;
+}
+
+/* ============ WIND CHIME ROTATION ============
+   Morning-window-only layer sitting on top of the Morning.mp3 bed.
+
+   The envelope and schedule are inherited from the pre-revamp pool
+   system: 12–14s play window at a random offset into the buffer,
+   2s fade-in, 1.5s fade-out, then a 500–2000ms silence measured
+   from the END of the previous play before re-arming. The window
+   and offset are random each cycle so no two chime strikes land
+   at the same point in the source recording.
+
+   The hour check runs at play time, not at schedule time, so a
+   chime that is mid-flight at 17:00 finishes naturally and the
+   next scheduled play sees the closed window and returns early.
+   The timer keeps re-arming around the clock regardless of the
+   hour, so the layer automatically picks up again the next morning
+   without needing a fresh startAmbient() call.
+
+   Lifecycle: startWindChime() and stopWindChime() are called from
+   startAmbient() and stopAmbient() so both layers share the same
+   .active gate on #mapleLeaves. */
+
+var windChimeTimer = null;
+var windChimeSource = null;
+var windChimeGain = null;
+
+/* Returns true when the current Nagoya hour falls in the morning
+   window 05:00–16:59. Function declarations hoist, so referencing
+   nagoyaDateParts here — even though it is declared later in the
+   file — is safe at runtime. */
+function isMorningWindChimeHours() {
+  var p = nagoyaDateParts();
+  return (p.hour >= 5 && p.hour < 17);
+}
+
+function startWindChime() {
+  stopWindChime();
+  windChimeTimer = setTimeout(function() {
+    windChimeTimer = null;
+    var playMs = playWindChimeSound();
+    scheduleNextWindChime(playMs);
+  }, 0);
+}
+
+function scheduleNextWindChime(prevPlayMs) {
+  var silenceGap = WIND_CHIME_SILENCE_MIN +
+    Math.random() * (WIND_CHIME_SILENCE_MAX - WIND_CHIME_SILENCE_MIN);
+  var delay = (prevPlayMs || 0) + silenceGap;
+  windChimeTimer = setTimeout(function() {
+    windChimeTimer = null;
+    var playMs = playWindChimeSound();
+    scheduleNextWindChime(playMs);
+  }, delay);
+}
+
+function stopWindChime() {
+  if (windChimeTimer) {
+    clearTimeout(windChimeTimer);
+    windChimeTimer = null;
   }
+  if (windChimeSource && windChimeGain && soundAudioCtx) {
+    try {
+      var now = soundAudioCtx.currentTime;
+      windChimeGain.gain.cancelScheduledValues(now);
+      windChimeGain.gain.setTargetAtTime(0, now, 0.1);
+      windChimeSource.stop(now + 0.5);
+    } catch (e) {
+      try { windChimeSource.stop(); } catch (e2) {}
+    }
+  }
+  windChimeSource = null;
+  windChimeGain = null;
+}
+
+function playWindChimeSound() {
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
+  if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
+  if (!isMorningWindChimeHours()) return 0;
+
+  var buffer = soundBuffers.windChime;
+  if (!buffer) return 0;
+
+  var bufferDur = buffer.duration;
+  var playDur = WIND_CHIME_PLAY_MIN +
+    Math.random() * (WIND_CHIME_PLAY_MAX - WIND_CHIME_PLAY_MIN);
   if (playDur > bufferDur - 1) playDur = bufferDur - 1;
   if (playDur <= 0) return 0;
 
   var maxStart = Math.max(0, bufferDur - playDur - 0.5);
   var startOffset = Math.random() * maxStart;
 
-  var fadeIn = Math.min(AMBIENT_FADE_IN, playDur * 0.25);
-  var fadeOut = Math.min(AMBIENT_FADE_OUT, playDur * 0.35);
-  var peak = entry.peak * (0.75 + Math.random() * 0.5);
+  var fadeIn  = Math.min(WIND_CHIME_FADE_IN  / 1000, playDur * 0.25);
+  var fadeOut = Math.min(WIND_CHIME_FADE_OUT / 1000, playDur * 0.35);
+  var peak = WIND_CHIME_PEAK;
 
   var now = soundAudioCtx.currentTime;
   var src = soundAudioCtx.createBufferSource();
@@ -756,16 +888,16 @@ function playAmbientSound() {
   src.start(now, startOffset, playDur + 0.1);
   src.stop(now + playDur + 0.15);
 
-  ambientSource = src;
-  ambientGain = gain;
+  windChimeSource = src;
+  windChimeGain = gain;
 
   src.onended = function() {
-    if (ambientSource === src) ambientSource = null;
-    if (ambientGain === gain) ambientGain = null;
+    if (windChimeSource === src) windChimeSource = null;
+    if (windChimeGain === gain) windChimeGain = null;
     try { gain.disconnect(); } catch (e) {}
   };
 
-  return playDur * 1000;
+  return playDur;
 }
 
 document.addEventListener('pointerdown', initSound, { once: true });
@@ -3367,8 +3499,9 @@ function triggerKoiStart() {
         activatePanel(0);
 
         /* v1.3: activate the ambient maple leaves, start the
-           Shippō tracer, and start the ambient sound rotation.
-           All three share the same .active gate on #mapleLeaves. */
+           Shippō tracer, and start the ambient sound layers
+           (bed + wind chime). All share the same .active gate on
+           #mapleLeaves. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
         scheduleShippoTracer();
         startAmbient();
