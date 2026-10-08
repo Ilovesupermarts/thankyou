@@ -50,7 +50,7 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Perfectly Aligned 1.2px Mask Window + Mirrored Motion
+     LAYER 2: Shippō Mask Window (SVG DOM Mask reference)
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
@@ -59,23 +59,16 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Locked strictly to (0, 0), with matching 1.2px stroke thickness */
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    -webkit-mask-repeat: repeat;
-    -webkit-mask-size: 60px 60px;
-    -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    mask-repeat: repeat;
-    mask-size: 60px 60px;
-    mask-position: 0 0;
+    /* Reliable W3C DOM Mask Reference */
+    -webkit-mask: url(#shippoMask);
+    mask: url(#shippoMask);
 
+    /* Clean opacity swell without heavy filters */
     opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
-    filter: brightness(calc(1.1 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.45)))
-            saturate(calc(1.05 + var(--audio-swell, 0) * 0.20));
     transition: opacity 100ms ease-out;
   }
 
-  /* Inner mesh is mirrored horizontally */
+  /* Mirrored mesh inside the mask */
   .shippo-mask-window .ambient-stage.layer-mirrored {
     position: absolute;
     top: -25%; left: -25%;
@@ -278,6 +271,24 @@
 </head>
 <body>
 
+<!-- W3C Compliant DOM Mask Definition: Guarantees 100% support across all engines -->
+<svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true" focusable="false">
+  <defs>
+    <pattern id="shippoPattern" width="60" height="60" patternUnits="userSpaceOnUse">
+      <g fill="none" stroke="white" stroke-width="1.2">
+        <circle cx="0" cy="0" r="30" />
+        <circle cx="60" cy="0" r="30" />
+        <circle cx="0" cy="60" r="30" />
+        <circle cx="60" cy="60" r="30" />
+        <circle cx="30" cy="30" r="30" />
+      </g>
+    </pattern>
+    <mask id="shippoMask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
+      <rect width="100%" height="100%" fill="url(#shippoPattern)" />
+    </mask>
+  </defs>
+</svg>
+
 <!-- LAYER 1: Standard diffuse light mesh -->
 <div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
@@ -289,7 +300,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Aligned Window + 1.2px Mask + Mirrored Content -->
+<!-- LAYER 2: Shippō Masked Lattice (Mirrored) -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -375,7 +386,7 @@
       <span>Decay Speed (Exhale)</span>
       <span class="hud-val" id="valDecay">0.035</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderDecay" min="0.005" max="0.10" step="0.005" value="0.035">
+    <input type="range" class="hud-slider" id="sliderDecay" min="0.01" max="0.10" step="0.005" value="0.035">
   </div>
 
   <div class="hud-section-divider">Layer 1: Diffuse Base Mesh</div>
@@ -416,10 +427,10 @@
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Swell Glow</span>
-      <span class="hud-val" id="valLatticeGlow">+45%</span>
+      <span>Lattice Peak Swell</span>
+      <span class="hud-val" id="valLatticeSwell">+65%</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.10" max="1.00" step="0.05" value="0.45">
+    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.20" max="0.80" step="0.05" value="0.65">
   </div>
 
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
@@ -457,8 +468,7 @@
     brightBoost: 0.22,
     satBoost: 0.20,
     latticeBase: 0.35,
-    latticeSwell: 0.65,
-    latticeGlow: 0.45
+    latticeSwell: 0.65
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -554,7 +564,6 @@
       el.style.setProperty('--ctrl-sat-boost', config.satBoost);
       el.style.setProperty('--ctrl-lattice-base', config.latticeBase);
       el.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
-      el.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
     });
   }
 
@@ -614,7 +623,7 @@
     }
   });
 
-  function bindSlider(id, key, valElId, formatter, cssUpdater) {
+  function bindSlider(id, key, valElId, formatter) {
     var s = document.getElementById(id);
     var v = document.getElementById(valElId);
     s.addEventListener('input', function() {
@@ -622,7 +631,6 @@
       config[key] = val;
       if (formatter) v.textContent = formatter(val);
       else v.textContent = val;
-      if (cssUpdater) cssUpdater(val);
       applyConfigToCSS();
     });
   }
@@ -637,11 +645,8 @@
     return v.toFixed(2);
   });
   bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){
-    config.latticeSwell = parseFloat((1 - v).toFixed(2));
-    return v.toFixed(2);
-  });
-  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){ return v.toFixed(2); });
+  bindSlider('sliderLatticeSwell', 'latticeSwell', 'valLatticeSwell', function(v){ return '+' + Math.round(v * 100) + '%'; });
 
   document.getElementById('btnCopyConfig').addEventListener('click', function() {
     var out = [
@@ -654,7 +659,7 @@
       '--ctrl-mesh-base: ' + config.meshBase + ',',
       '--ctrl-bright-boost: ' + config.brightBoost + ',',
       '--ctrl-lattice-base: ' + config.latticeBase + ',',
-      '--ctrl-lattice-glow: ' + config.latticeGlow
+      '--ctrl-lattice-swell: ' + config.latticeSwell
     ].join('\n');
     navigator.clipboard.writeText(out).then(function() {
       alert('Configuration copied to clipboard!');
