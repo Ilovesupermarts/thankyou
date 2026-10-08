@@ -198,7 +198,25 @@
     display: none;
   }
 
-  /* ============ SHIPPO CIRCLE TRACERS (v1.3) ============ */
+  /* ============ SHIPPO STAR TRACERS (v1.3) ============
+     Concave 4-point star (Hoshi-gata) tracer. The outer .shippo-tracer
+     receives only the grid translate3d from JS — its position on the
+     30px mosaic lattice is written once per spawn and never animated.
+     The inner .tracer-rotator carries the entire exit animation
+     (rotate, scale, blur, opacity). Two elements, two concerns: the
+     exit rotation pivots about the star's centre (transform-origin
+     34px 34px on the rotator) without ever composing against the
+     grid's fixed transform.
+
+     The path is four 90° arcs of radius 30 drawn with sweep-flag 0.
+     Sweep-flag 0 forces SVG to choose the arc centre at the outer
+     grid corner (64, 4) rather than the cell centre (34, 34), so the
+     arc bulges inward and pinches the star from 30px at the four
+     points to 30·(√2 − 1) ≈ 12.4px at the four concave waists.
+     Total perimeter is 4 × 15π = 60π ≈ 188.5, rounded to 189 for
+     stroke-dasharray — a slight overestimate guarantees the "off"
+     segment fully covers the path at dashoffset 189, with no
+     sub-pixel gap at the seam. */
   .tracer-layer {
     position: fixed;
     inset: 0;
@@ -218,21 +236,29 @@
     height: 68px;
     opacity: 0;
     pointer-events: none;
-    will-change: transform, opacity;
+    will-change: transform;
+  }
+
+  .tracer-rotator {
+    width: 100%;
+    height: 100%;
+    transform-origin: 34px 34px;
+    will-change: transform, filter, opacity;
   }
 
   .shippo-tracer svg {
-    overflow: visible;
+    display: block;
     width: 100%;
     height: 100%;
-    display: block;
+    overflow: visible;
   }
 
-  .tracer-circle {
+  .tracer-path {
     fill: none;
     stroke: #c9600a;
     stroke-width: 2.2px;
     stroke-linecap: round;
+    stroke-linejoin: round;
     stroke-dasharray: 189;
     stroke-dashoffset: 189;
     filter:
@@ -240,24 +266,55 @@
       drop-shadow(0 0 8px rgba(143, 47, 0, 0.95));
   }
 
+  /* Active trigger classes */
   .shippo-tracer.drawing {
-    animation: tracerFade 2.5s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    opacity: 1;
   }
 
-  .shippo-tracer.drawing .tracer-circle {
-    animation: drawStroke 1.5s cubic-bezier(0.35, 0, 0.25, 1) forwards;
+  .shippo-tracer.drawing .tracer-rotator {
+    animation: starDissolveCycle 3.4s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
   }
 
+  .shippo-tracer.drawing .tracer-path {
+    animation: drawStroke 2.6s cubic-bezier(0.35, 0, 0.25, 1) forwards;
+  }
+
+  /* Draw stroke keyframe */
   @keyframes drawStroke {
     0%   { stroke-dashoffset: 189; }
     100% { stroke-dashoffset: 0; }
   }
 
-  @keyframes tracerFade {
-    0%   { opacity: 0; }
-    18%  { opacity: 0.68; }
-    75%  { opacity: 0.55; }
-    100% { opacity: 0; }
+  /*
+    Lifecycle:
+    0%  - 70% : Crisp focus, drawing completes
+    70% - 100%: Defocus blur to 2.8px, rotate ±12deg, scale to 1.35x, fade to 0
+  */
+  @keyframes starDissolveCycle {
+    0% {
+      opacity: 0;
+      transform: rotate(0deg) scale(1);
+      filter: blur(0px);
+    }
+    14% {
+      opacity: 0.95;
+      transform: rotate(0deg) scale(1);
+      filter: blur(0px);
+    }
+    70% {
+      opacity: 0.95;
+      transform: rotate(0deg) scale(1);
+      filter: blur(0px);
+    }
+    85% {
+      opacity: 0.75;
+      filter: blur(1.2px);
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(var(--target-rot, 12deg)) scale(1.35);
+      filter: blur(2.8px);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
