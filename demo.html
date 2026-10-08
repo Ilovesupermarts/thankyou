@@ -24,32 +24,24 @@
 
   /* ------------------------------------------------------------
      LAYER 1: Diffuse Base Mesh
+     Native @keyframes orbDrift1-3 and autumnDrift1 run unhindered.
      ------------------------------------------------------------ */
   .layer-diffuse {
-    filter: brightness(calc(1 + var(--audio-swell, 0) * 0.15));
+    z-index: -3 !important;
+    filter: brightness(calc(1 + var(--audio-swell, 0) * 0.16));
     will-change: transform, filter;
   }
 
   .layer-diffuse .ambient-mesh {
-    opacity: calc(0.55 + var(--audio-swell, 0) * 0.45) !important;
-    transition: opacity 120ms ease-out;
-  }
-
-  .layer-diffuse .orb-1 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.22)) !important;
-    transition: transform 140ms ease-out;
-  }
-  .layer-diffuse .orb-2 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.25)) !important;
-    transition: transform 140ms ease-out;
-  }
-  .layer-diffuse .orb-3 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.20)) !important;
-    transition: transform 140ms ease-out;
+    opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.08));
+    transform-origin: 50% 50%;
+    transition: opacity 120ms ease-out, transform 160ms ease-out;
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Delicate Masked Lattice (1.8px, No Flickering)
+     LAYER 2: Mirrored & Shippō-Masked Lattice
+     Aligned to (0, 0), delicate 2.2px lines, warm amber palette.
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
@@ -58,22 +50,23 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Delicate 1.8px Shippō grid, phase-locked to (0, 0) */
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.8'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    /* 2.2px Shippō mask, locked to viewport (0, 0) */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
     -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.8'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     mask-repeat: repeat;
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    /* Mellow swell: transitions smoothly from 0.18 to 0.65 opacity */
-    opacity: calc(var(--ctrl-lattice-base, 0.18) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.48));
+    /* Driven purely by opacity: 0.30 resting -> 0.90 peak swell */
+    opacity: calc(var(--ctrl-lattice-base, 0.30) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.60));
+    filter: brightness(calc(1.0 + var(--audio-swell, 0) * 0.15));
     transition: opacity 120ms ease-out;
   }
 
-  .shippo-mask-window .ambient-stage.layer-mirrored {
+  .shippo-mask-window .stage-mirrored {
     position: absolute;
     top: -25%; left: -25%;
     width: 150%; height: 150%;
@@ -86,26 +79,26 @@
     opacity: 1.0 !important;
   }
 
-  /* Muted Autumn Palette (Warm Rust, Burnt Orange, Amber - No Neon Yellow) */
+  /* Warm Amber, Persimmon, and Cinnabar (No Neon Yellow) */
   .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(185, 75, 25, 0.70) 0%, rgba(195, 105, 35, 0.20) 45%, transparent 70%) !important;
+    background: radial-gradient(circle, rgba(224, 110, 28, 0.75) 0%, rgba(195, 80, 20, 0.30) 45%, transparent 70%) !important;
   }
 
   .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(165, 60, 20, 0.75) 0%, rgba(175, 80, 25, 0.25) 48%, transparent 72%) !important;
+    background: radial-gradient(circle, rgba(210, 95, 24, 0.80) 0%, rgba(180, 65, 18, 0.35) 48%, transparent 72%) !important;
   }
 
   .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(170, 75, 20, 0.60) 0%, rgba(140, 55, 15, 0.20) 40%, transparent 60%) !important;
+    background: radial-gradient(circle, rgba(220, 105, 26, 0.68) 0%, rgba(170, 60, 15, 0.28) 40%, transparent 60%) !important;
   }
 
   .shippo-mask-window .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(195, 95, 25, 0.55) 0%, transparent 55%),
-      radial-gradient(circle at 75% 40%, rgba(175, 70, 20, 0.50) 0%, transparent 58%),
-      radial-gradient(circle at 50% 70%, rgba(150, 50, 15, 0.50) 0%, transparent 52%),
-      radial-gradient(circle at 20% 85%, rgba(120, 40, 10, 0.40) 0%, transparent 50%) !important;
-    opacity: 0.85 !important;
+      radial-gradient(circle at 25% 30%, rgba(225, 115, 28, 0.70) 0%, transparent 55%),
+      radial-gradient(circle at 75% 40%, rgba(195, 80, 20, 0.65) 0%, transparent 58%),
+      radial-gradient(circle at 50% 70%, rgba(175, 65, 18, 0.60) 0%, transparent 52%),
+      radial-gradient(circle at 20% 85%, rgba(140, 45, 12, 0.50) 0%, transparent 50%) !important;
+    opacity: 0.90 !important;
   }
 
   .shippo-mask-window.disabled {
@@ -119,16 +112,16 @@
     position: fixed;
     top: 16px;
     right: 16px;
-    width: 320px;
+    width: 310px;
     max-height: calc(100vh - 32px);
     overflow-y: auto;
-    background: rgba(253, 243, 216, 0.90);
+    background: rgba(253, 243, 216, 0.92);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border: 1.5px solid rgba(143, 47, 0, 0.32);
     border-radius: 20px;
     box-shadow: 0 14px 40px rgba(100, 35, 10, 0.22);
-    padding: 18px 20px;
+    padding: 16px 18px;
     z-index: 1000;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     color: #231304;
@@ -141,11 +134,11 @@
     align-items: center;
     margin-bottom: 12px;
     border-bottom: 1px solid rgba(143, 47, 0, 0.18);
-    padding-bottom: 10px;
+    padding-bottom: 8px;
   }
 
   .hud-title {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     color: #8f2f00;
     letter-spacing: 0.8px;
@@ -153,18 +146,18 @@
   }
 
   .hud-section-divider {
-    font-size: 11px;
+    font-size: 10.5px;
     font-weight: 700;
     color: #8f2f00;
     text-transform: uppercase;
-    letter-spacing: 1.5px;
-    margin: 16px 0 10px 0;
+    letter-spacing: 1.2px;
+    margin: 14px 0 8px 0;
     padding-bottom: 4px;
     border-bottom: 1px dashed rgba(143, 47, 0, 0.25);
   }
 
   .hud-group {
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .hud-label {
@@ -174,7 +167,6 @@
     font-weight: 600;
     color: #5a3818;
     margin-bottom: 4px;
-    letter-spacing: 0.3px;
   }
 
   .hud-val {
@@ -190,9 +182,9 @@
   }
 
   .vu-meter-wrap {
-    height: 10px;
+    height: 8px;
     background: rgba(143, 47, 0, 0.12);
-    border-radius: 5px;
+    border-radius: 4px;
     overflow: hidden;
     margin-top: 4px;
   }
@@ -201,25 +193,25 @@
     height: 100%;
     width: 0%;
     background: linear-gradient(90deg, #e59b24, #c9600a, #8f2229);
-    border-radius: 5px;
-    transition: width 50ms linear;
+    border-radius: 4px;
+    transition: width 40ms linear;
   }
 
   .hud-btn-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
   }
 
   .hud-btn {
     background: #c9600a;
     border: none;
     color: #fff;
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 8px 10px;
+    font-size: 11.5px;
     font-weight: 600;
-    border-radius: 10px;
+    border-radius: 8px;
     cursor: pointer;
     transition: background 0.15s, transform 0.1s;
     text-align: center;
@@ -231,7 +223,7 @@
   }
 
   .hud-btn.secondary {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.85);
     color: #8f2f00;
     border: 1px solid rgba(143, 47, 0, 0.25);
   }
@@ -239,19 +231,6 @@
   .hud-btn.toggle-active {
     background: #8f2f00;
     color: #fff;
-  }
-
-  .hud-copy-btn {
-    width: 100%;
-    background: #8f2f00;
-    color: #fff;
-    padding: 10px;
-    border: none;
-    border-radius: 10px;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    margin-top: 10px;
   }
 
   .center-label {
@@ -272,7 +251,7 @@
 </head>
 <body>
 
-<!-- LAYER 1: Standard diffuse light mesh -->
+<!-- LAYER 1: Autonomous Diffuse Base Mesh -->
 <div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -283,9 +262,9 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Delicate Masked Lattice -->
+<!-- LAYER 2: Mirrored Warm-Amber Shippō Lattice -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
-  <div class="ambient-stage layer-mirrored">
+  <div class="stage-mirrored">
     <div class="ambient-layer ambient-mesh">
       <div class="light-orb orb-1"></div>
       <div class="light-orb orb-2"></div>
@@ -295,10 +274,10 @@
   </div>
 </div>
 
-<!-- Static base lattice (delicate background guide) -->
+<!-- Static base lattice (faint background guide) -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
-<!-- Ambient Falling Maple Leaves -->
+<!-- Falling Momiji Leaves -->
 <div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
   <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
@@ -311,7 +290,7 @@
 
 <div class="center-label">双層・七宝調律室</div>
 
-<!-- Floating HUD -->
+<!-- HUD -->
 <div class="hud-container">
   <div class="hud-header">
     <h3 class="hud-title">Dual Swell Tuner</h3>
@@ -328,6 +307,8 @@
     <button class="hud-btn secondary" id="btnSoloLattice">Solo Layer 2</button>
   </div>
 
+  <button class="hud-btn secondary" id="btnSimulateSwell" style="width: 100%; margin-bottom: 8px;">Simulate Swell (Hold)</button>
+
   <div class="hud-group">
     <div class="hud-label">
       <span>Audio Swell Energy</span>
@@ -338,22 +319,22 @@
     </div>
   </div>
 
-  <div class="hud-section-divider">Layer 2: Muted Lattice Line</div>
+  <div class="hud-section-divider">Layer 2: Shippō Lines</div>
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Base Visibility</span>
-      <span class="hud-val" id="valLatticeBase">0.18</span>
+      <span>Line Base Opacity</span>
+      <span class="hud-val" id="valLatticeBase">0.30</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.50" step="0.01" value="0.18">
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.60" step="0.01" value="0.30">
   </div>
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Peak Swell</span>
-      <span class="hud-val" id="valLatticeSwell">0.48</span>
+      <span>Line Peak Swell</span>
+      <span class="hud-val" id="valLatticeSwell">0.60</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.10" max="0.80" step="0.02" value="0.48">
+    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.20" max="0.80" step="0.02" value="0.60">
   </div>
 
   <div class="hud-section-divider">Audio Envelope Engine</div>
@@ -376,7 +357,7 @@
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Attack Speed (Inhale)</span>
+      <span>Inhale Speed (Attack)</span>
       <span class="hud-val" id="valAttack">0.14</span>
     </div>
     <input type="range" class="hud-slider" id="sliderAttack" min="0.04" max="0.35" step="0.01" value="0.14">
@@ -384,13 +365,11 @@
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Decay Speed (Exhale)</span>
+      <span>Exhale Speed (Decay)</span>
       <span class="hud-val" id="valDecay">0.035</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderDecay" min="0.005" max="0.10" step="0.005" value="0.035">
+    <input type="range" class="hud-slider" id="sliderDecay" min="0.005" max="0.08" step="0.005" value="0.035">
   </div>
-
-  <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
 </div>
 
 <script>
@@ -405,6 +384,7 @@
   var audioGainNode = null;
   var analyserNode = null;
   var isPlaying = false;
+  var isSimulating = false;
 
   var audioEl = new Audio();
   audioEl.loop = true;
@@ -415,12 +395,12 @@
   var freqData = new Uint8Array(256);
 
   var config = {
+    latticeBase: 0.30,
+    latticeSwell: 0.60,
     gainMult: 1.6,
     noiseFloor: 35,
     attack: 0.14,
-    decay: 0.035,
-    latticeBase: 0.18,
-    latticeSwell: 0.48
+    decay: 0.035
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -429,6 +409,7 @@
   var btnToggleTrack = document.getElementById('btnToggleTrack');
   var btnToggleLattice = document.getElementById('btnToggleLattice');
   var btnSoloLattice = document.getElementById('btnSoloLattice');
+  var btnSimulateSwell = document.getElementById('btnSimulateSwell');
   var statusIndicator = document.getElementById('statusIndicator');
   var valSwellEnergy = document.getElementById('valSwellEnergy');
   var vuMeterBar = document.getElementById('vuMeterBar');
@@ -443,7 +424,7 @@
 
     analyserNode = audioCtx.createAnalyser();
     analyserNode.fftSize = 512;
-    analyserNode.smoothingTimeConstant = 0.8;
+    analyserNode.smoothingTimeConstant = 0.82;
 
     audioGainNode = audioCtx.createGain();
     audioGainNode.gain.value = 0.8;
@@ -458,55 +439,55 @@
     if (rafId) cancelAnimationFrame(rafId);
 
     function tick() {
-      if (!isPlaying || !analyserNode) {
-        swellEnergy += (0 - swellEnergy) * 0.05;
-        applySwellToCSS(swellEnergy);
-        if (swellEnergy > 0.005) {
-          rafId = requestAnimationFrame(tick);
-        } else {
-          applySwellToCSS(0);
-          rafId = null;
+      var target = 0;
+
+      if (isSimulating) {
+        target = 1.0;
+      } else if (isPlaying && analyserNode) {
+        analyserNode.getByteFrequencyData(freqData);
+
+        var sum = 0;
+        var count = 30;
+        for (var i = 4; i < 34; i++) {
+          sum += freqData[i];
         }
-        return;
+        var avg = sum / count;
+
+        var clean = Math.max(0, avg - config.noiseFloor);
+        var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
+        target = Math.pow(normalized, 1.35);
       }
 
-      analyserNode.getByteFrequencyData(freqData);
-
-      var sum = 0;
-      var count = 30;
-      for (var i = 4; i < 34; i++) {
-        sum += freqData[i];
-      }
-      var avg = sum / count;
-
-      var clean = Math.max(0, avg - config.noiseFloor);
-      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
-      var target = Math.pow(normalized, 1.35);
-
+      // Attack / Decay filter
       if (target > swellEnergy) {
         swellEnergy += (target - swellEnergy) * config.attack;
       } else {
         swellEnergy += (target - swellEnergy) * config.decay;
       }
 
-      applySwellToCSS(swellEnergy);
+      applySwell(swellEnergy);
 
       valSwellEnergy.textContent = swellEnergy.toFixed(2);
       vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
 
-      rafId = requestAnimationFrame(tick);
+      if (isPlaying || isSimulating || swellEnergy > 0.005) {
+        rafId = requestAnimationFrame(tick);
+      } else {
+        applySwell(0);
+        rafId = null;
+      }
     }
 
     rafId = requestAnimationFrame(tick);
   }
 
-  function applySwellToCSS(val) {
+  function applySwell(val) {
     var vStr = val.toFixed(3);
     if (stageDiffuse) stageDiffuse.style.setProperty('--audio-swell', vStr);
     if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
   }
 
-  function applyConfigToCSS() {
+  function applyConfig() {
     if (stageLattice) {
       stageLattice.style.setProperty('--ctrl-lattice-base', config.latticeBase);
       stageLattice.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
@@ -530,7 +511,7 @@
         statusIndicator.style.color = '#c9600a';
         startSwellLoop();
       }).catch(function() {
-        alert('Audio play error: Ensure audio files exist in Sound/ folder.');
+        alert('Could not start playback. Verify that Sound/Morning.mp3 is available.');
       });
     } else {
       audioEl.pause();
@@ -569,6 +550,23 @@
     }
   });
 
+  // Hold-to-simulate swell button
+  function onStartSim() {
+    isSimulating = true;
+    btnSimulateSwell.classList.add('toggle-active');
+    startSwellLoop();
+  }
+  function onEndSim() {
+    isSimulating = false;
+    btnSimulateSwell.classList.remove('toggle-active');
+  }
+
+  btnSimulateSwell.addEventListener('mousedown', onStartSim);
+  window.addEventListener('mouseup', onEndSim);
+  btnSimulateSwell.addEventListener('touchstart', function(e) { e.preventDefault(); onStartSim(); });
+  window.addEventListener('touchend', onEndSim);
+
+  // Sliders
   function bindSlider(id, key, valElId, formatter) {
     var s = document.getElementById(id);
     var v = document.getElementById(valElId);
@@ -577,7 +575,7 @@
       config[key] = val;
       if (formatter) v.textContent = formatter(val);
       else v.textContent = val;
-      applyConfigToCSS();
+      applyConfig();
     });
   }
 
@@ -588,22 +586,7 @@
   bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
   bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
 
-  document.getElementById('btnCopyConfig').addEventListener('click', function() {
-    var out = [
-      '/* Clean Tuned Dual-Layer Configuration */',
-      'gainMult: ' + config.gainMult + ',',
-      'noiseFloor: ' + config.noiseFloor + ',',
-      'attack: ' + config.attack + ',',
-      'decay: ' + config.decay + ',',
-      'latticeBase: ' + config.latticeBase + ',',
-      'latticeSwell: ' + config.latticeSwell
-    ].join('\n');
-    navigator.clipboard.writeText(out).then(function() {
-      alert('Configuration copied to clipboard!');
-    });
-  });
-
-  applyConfigToCSS();
+  applyConfig();
 </script>
 </body>
 </html>
