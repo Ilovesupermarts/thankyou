@@ -75,12 +75,22 @@
          the day rotation uses. The fixed 65s cycle and the
          NIGHT_PEAK / NIGHT_FADE_IN / NIGHT_FADE_OUT / NIGHT_SILENCE
          constants are retired; playNightSound() is absorbed into
-         playAmbientSound(). Wind.mp3 is 13s long, so its random
-         draw is capped at NIGHT_WIND_MAX_PLAY = 8000 ms — enough to
-         leave room for the full 2s fade-in and 3s fade-out without
-         the fade-scaling rule shrinking them. The night window
-         (19:00–04:59 Nagoya) is unchanged: night is now a pool
-         swap, not a mode change.
+         playAmbientSound(). The night window (19:00–04:59 Nagoya)
+         is unchanged: night is now a pool swap, not a mode change.
+       - Ambient playback envelope retuned. AMBIENT_PLAY_MIN raised
+         6s → 9s → 12s; AMBIENT_PLAY_MAX held at 14s; the shared
+         AMBIENT_FADE_OUT shortened 3s → 1.5s so the sustain region
+         dominates each play rather than competing with the tail.
+         Perceptual length was previously being eaten by the long
+         fade-out; runtime numbers alone did not move the felt
+         duration. NIGHT_WIND_MAX_PLAY raised 8s → 11s so the wind
+         clip reaches the new 12s floor's neighbourhood; the cap
+         exists because Wind.mp3 is 13s long and needs room for the
+         full fade-in and fade-out without a hard cut. Jauk peak
+         raised 0.216 → 0.281 (+30%) because the recording is much
+         softer than Wind at the same gain. Wind peak lowered
+         0.264 → 0.211 (−20%) because at the previous level the wind
+         recording read as too forward for a night ambience bed.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -204,20 +214,24 @@ var AMBIENT_SOUNDS = [
 
 /* Night rotation pool. Replaces the single-clip night mode of v1.3.
    Two clips alternate on the same random-window, random-offset,
-   random-silence schedule the day rotation uses. Peaks mirror the
-   day values: the wind recording sits at the wind-chime level
-   because it is sparse and time-localised, the river bed at the
-   nature level because a continuous water recording at the same
-   peak reads as more intrusive.
-
-   Wind.mp3 is 13s long. The random-window playDur cap is tightened
-   below via NIGHT_WIND_MAX_PLAY so a 6–14s draw never exceeds what
-   the file can supply after fades. See playAmbientSound(). */
+   random-silence schedule the day rotation uses. Peaks are tuned
+   per-clip against their actual recordings: the wind file at 0.211
+   (−20% from the wind-chime level) reads as a background bed rather
+   than a foreground presence, and the jauk river at 0.281 (+30% from
+   the nature level) compensates for a much softer source recording.
+   These are the second pass at both — the first pass had wind too
+   forward and jauk too quiet for a night ambience. */
 var NIGHT_SOUNDS = [
-  { name: 'wind', url: 'Sound/Wind.mp3',                              peak: 0.264 },
-  { name: 'jauk', url: 'Sound/jauk-calm-zen-river-flowing.mp3',       peak: 0.216 }
+  { name: 'wind', url: 'Sound/Wind.mp3',                              peak: 0.211 },
+  { name: 'jauk', url: 'Sound/jauk-calm-zen-river-flowing.mp3',       peak: 0.281 }
 ];
-var NIGHT_WIND_MAX_PLAY = 8000;
+/* Wind.mp3 is 13s long. The random-window playDur cap is raised to
+   11s so the clip reaches the 12s floor's neighbourhood without
+   exhausting room for the full 2s fade-in and 1.5s fade-out. Above
+   11s the generic buffer-length guard (playDur > bufferDur - 1)
+   would silently clamp every wind draw to 12s, and the fade-scaling
+   rule would then shorten the fades. See playAmbientSound(). */
+var NIGHT_WIND_MAX_PLAY = 11000;
 var nightIndex = 0;
 
 function initSound() {
@@ -574,9 +588,20 @@ function stopBlossomStream() {
 
 /* ============ AMBIENT SOUND ROTATION ============
    Two clips alternate during the day, and a different two clips
-   alternate during the night. Each play picks a random 6–14s window
+   alternate during the night. Each play picks a random 12–14s window
    from the source buffer at a random offset, with linear fade-in /
    fade-out envelopes so no play ever clicks at the head or tail.
+
+   The play window is deliberately narrow (12–14s) and the fade-out
+   deliberately short (1.5s) relative to the current play lengths.
+   An earlier configuration used a wider window (6–14s) and a longer
+   fade-out (3s), which read as "the clip is too short" to the ear
+   even at 8–9s runtimes: three seconds of a nine-second play spent
+   fading out meant the audible sustain was closer to five or six
+   seconds, and the tail of every play sounded like the clip ending
+   rather than the clip finishing. Widening the floor and shortening
+   the fade-out moves the perceptual centre of the play back to the
+   sustain region. See AMBIENT_FADE_OUT.
 
    Scheduling: the silence gap is measured from the END of the
    previous play, not from its start. playAmbientSound() returns the
@@ -593,23 +618,16 @@ function stopBlossomStream() {
    at the boundary finishes naturally and the next scheduled play
    sees the new pool. Symmetrically for the other boundary.
 
-   Wind.mp3 is 13s long, so its night draw is capped at
-   NIGHT_WIND_MAX_PLAY (8000 ms) to leave the full 2s fade-in and
-   3s fade-out intact. Without the cap the generic buffer-length
-   guard (playDur > bufferDur - 1) would silently truncate every
-   wind draw to 12s, and the fade-scaling rule (playDur * 0.25)
-   would shrink the fade-in to 3s.
-
    Lifecycle is shared with the Shippō tracer and maple leaves via
    the .active class on #mapleLeaves. */
 var AMBIENT_FIRST_MIN   = 0;
 var AMBIENT_FIRST_MAX   = 0;
 var AMBIENT_SILENCE_MIN = 500;
 var AMBIENT_SILENCE_MAX = 2000;
-var AMBIENT_PLAY_MIN    = 6000;
+var AMBIENT_PLAY_MIN    = 12000;
 var AMBIENT_PLAY_MAX    = 14000;
 var AMBIENT_FADE_IN     = 2000;
-var AMBIENT_FADE_OUT    = 3000;
+var AMBIENT_FADE_OUT    = 1500;
 
 var ambientTimer = null;
 var ambientSource = null;
