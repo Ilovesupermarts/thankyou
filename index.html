@@ -28,7 +28,7 @@
 </head>
 <body>
 
-<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <!-- v1.3: pre-feathered CSS light mesh replaces the ambient video.
        Each .light-orb is a radial-gradient that fades to transparent
        over its own radius — visually a blurred orb of light, with
@@ -46,7 +46,15 @@
        memory at 120Hz and produced the axis-aligned tile dropouts
        observed on the tablet. The CSS rules for these selectors are
        deliberately left in main.css as dead code so step 2/3 can be
-       applied if the artifacts persist without re-authoring anything. -->
+       applied if the artifacts persist without re-authoring anything.
+
+       v1.3 (audio-reactive swell): this element carries the
+       .layer-diffuse class, which drives its brightness, saturation
+       and orb scale from --audio-swell. The animation is upstream of
+       the tracker and receipt screens, so the swell loop's lifecycle
+       is piggybacked on the same .active gate on #mapleLeaves that
+       already controls the Shippō tracer and the ambient sound
+       layers. See app.js's AUDIO-REACTIVE SWELL SYSTEM section. -->
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
@@ -54,6 +62,32 @@
   </div>
   <div class="ambient-layer ambient-primary"></div>
   <div class="mote-field" id="moteField"></div>
+</div>
+
+<!-- ============ LAYER 2: AUDIO-REACTIVE SHIPPŌ MASK ============
+     A mirrored copy of the diffuse orb field, clipped by an SVG
+     Shippō mask at the same 60×60 grid and 1.2px stroke weight as
+     .ambient-mosaic below. Where the mask has strokes, the mirrored
+     orbs show through; everywhere else Layer 2 is fully transparent.
+
+     Guardrails (see main.css for the full rationale):
+       · No .ambient-primary inside. The static gradient would fill
+         the entire masked pattern with light instead of confining
+         the reveal to the orb radii.
+       · Static filter only (hue-rotate + saturate + contrast). No
+         calc(--audio-swell) inside the filter — that would force
+         Chromium to re-rasterize an offscreen framebuffer on every
+         frame and thrash GPU tile memory.
+       · Swell is driven purely by opacity and transform, both of
+         which are handled directly on the compositor thread. -->
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="ambient-stage layer-mirrored">
+    <div class="ambient-layer ambient-mesh">
+      <div class="light-orb orb-1"></div>
+      <div class="light-orb orb-2"></div>
+      <div class="light-orb orb-3"></div>
+    </div>
+  </div>
 </div>
 
 <!-- ============ AMBIENT SHIPPO MOSAIC BACKGROUND ============
@@ -66,7 +100,13 @@
      CSS background-image data-URI on a plain <div>: the 60×60 SVG
      tile is rasterized once into a small texture that the compositor
      samples via GL_REPEAT. Same visual, no possible tile dropouts.
-     The .ambient-mosaic rule in main.css carries the data URI. -->
+     The .ambient-mosaic rule in main.css carries the data URI.
+
+     v1.3 (audio-reactive release): the stroke width was reduced from
+     1.7 to 1.2 to match Layer 2's SVG mask exactly. Both tiles are
+     on the same 60×60 grid pinned to (0, 0), so the two strokes
+     land on identical pixels and Layer 2's reveal sits inside the
+     base pattern's own line weight rather than widening it. -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
 <!-- ============ AMBIENT STAR TRACER POOL ============
@@ -166,7 +206,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.05</div>
+  <div class="app-version" aria-hidden="true">v2.06</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
