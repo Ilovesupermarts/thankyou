@@ -70,10 +70,11 @@
     mask-position: 0 0;
 
     opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
-    /* Shift gold toward warm amber (-20deg) and tame the brightness spike */
-    filter: hue-rotate(-20deg)
+    /* Pulls the bright yellow into warm amber/persimmon and tames the peak spike */
+    filter: sepia(0.35)
+            hue-rotate(-26deg)
             brightness(calc(1.0 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.25)))
-            saturate(calc(1.0 + var(--audio-swell, 0) * 0.15));
+            saturate(calc(1.15 + var(--audio-swell, 0) * 0.20));
     transition: opacity 100ms ease-out;
   }
 
@@ -294,7 +295,7 @@
 
 <div class="center-label">双層・七宝調律室</div>
 
-<!-- HUD Control Panel -->
+<!-- Floating HUD -->
 <div class="hud-container">
   <div class="hud-header">
     <h3 class="hud-title">Dual Swell Tuner</h3>
