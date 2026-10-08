@@ -3,58 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Shippō Tracer Sandbox & Geometry Lab</title>
+<title>Shippō Star Tracer - Dissolve & Rotation Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-  /* ============ AUTUMN THEME VARIABLES (from main.css) ============ */
+  /* ============ AUTUMN PALETTE & THEME CONSTANTS ============ */
   html[data-theme="autumn"] {
     --bg-base: #fdf3d8;
-    --bg-warm: #f5d89a;
     --accent: #c9600a;
-    --accent-2: #8f3f12;
-    --accent-3: #7a3208;
-    --glow: #f7b93c;
-    --petal: #e88a1a;
-    --petal-soft: #fde8b8;
     --outstanding: #8f2f00;
-    --border-1: #e8c88a;
+    --glow: #f7b93c;
     --border-2: #d8b478;
-    --border-3: #f0d8a0;
-    --border-4: #f5e0b0;
-    --border-5: #e8c890;
-    --border-6: #b89860;
-    --soft-1: #fdf0c8;
-    --soft-2: #fdf5e0;
-    --soft-3: #f0e0b8;
-    --soft-4: #fdf6e0;
     --text-dark: #231304;
-    --text-med: #3d2410;
-    --text-soft: #2a1808;
-    --text-mute: #5a3818;
-    --text-faint: #7a5028;
     --text-placeholder: #a07a48;
-    --shadow-rose: rgba(120, 70, 20, 0.10);
-    --shadow-rose-2: rgba(120, 70, 20, 0.18);
-    --shadow-accent: rgba(201, 96, 10, 0.32);
-    --amb-1: rgba(247, 185, 60, 0.85);
-    --amb-2: rgba(240, 138, 30, 0.80);
-    --amb-3: rgba(217, 94, 26, 0.72);
-    --amb-4: rgba(143, 63, 18, 0.55);
-    --amb-5: rgba(107, 47, 14, 0.45);
   }
 
-  /* Sandbox Custom Properties */
+  /* Interactive Tuning Variables */
   :root {
     --tracer-stroke: #c9600a;
-    --tracer-glow: #c9600a;
-    --tracer-shadow: rgba(143, 47, 0, 0.95);
+    --tracer-glow-1: #c9600a;
+    --tracer-glow-2: rgba(143, 47, 0, 0.95);
     --stroke-width: 2.2px;
-    --draw-duration: 1.5s;
-    --fade-duration: 2.5s;
+
+    /* Timing per your configuration */
+    --draw-duration: 2.6s;
+    --fade-duration: 3.4s;
+    --dissolve-start: 70%; /* Point where blur and rotation begin */
+
+    /* Subtle Exit Dissolve Mechanics */
+    --exit-rotate: 12deg;
+    --exit-blur: 2.8px;
+
     --mosaic-opacity: 0.13;
   }
 
@@ -70,57 +52,42 @@
     -webkit-user-select: none;
   }
 
-  /* ============ AMBIENT STAGE & LIGHT MESH ============ */
+  /* ============ 1. AMBIENT BACKGROUND STAGE ============ */
   .ambient-stage {
     position: fixed;
     top: -25%; left: -25%;
     width: 150%; height: 150%;
     z-index: -3;
     pointer-events: none;
-    will-change: transform;
-    transform: translate3d(var(--wind-x, 0px), 0, 0);
   }
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
-
   .ambient-mesh {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
+    position: absolute; inset: 0;
+    overflow: hidden; pointer-events: none;
     opacity: 0.90;
   }
-
   .light-orb {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    will-change: transform;
+    position: absolute; border-radius: 50%;
+    pointer-events: none; will-change: transform;
   }
-
   .orb-1 {
-    width: 70vw; height: 70vw;
-    max-width: 900px; max-height: 900px;
+    width: 70vw; height: 70vw; max-width: 900px; max-height: 900px;
     top: 10%; left: 15%;
     background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
     animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
-
   .orb-2 {
-    width: 80vw; height: 80vw;
-    max-width: 1050px; max-height: 1050px;
+    width: 80vw; height: 80vw; max-width: 1050px; max-height: 1050px;
     top: 35%; right: 5%;
     background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
     animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
-
   .orb-3 {
-    width: 55vw; height: 55vw;
-    max-width: 700px; max-height: 700px;
+    width: 55vw; height: 55vw; max-width: 700px; max-height: 700px;
     bottom: 10%; left: 30%;
     background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
-
   @keyframes orbDrift1 {
     0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
     50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
@@ -136,58 +103,37 @@
     50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
     100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
   }
-
   .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(143, 47, 0, 0.30) 0%, rgba(107, 47, 14, 0.16) 35%, rgba(107, 47, 14, 0) 65%);
+      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, transparent 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, transparent 62%),
+      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, transparent 58%),
+      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, transparent 56%);
     animation: autumnDrift1 14s ease-in-out infinite;
     will-change: transform;
   }
   @keyframes autumnDrift1 {
-    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
-    11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
-    23%  { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
-    35%  { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
-    48%  { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
-    60%  { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
-    72%  { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
-    85%  { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50%      { transform: translate(-3%, 4%) scale(1.08); }
   }
 
-  /* ============ FLOATING MOTES ============ */
-  .mote-field {
-    position: absolute; inset: 0; pointer-events: none;
-    transform-style: preserve-3d;
-    transform: translate3d(var(--wind-x-extra, 0px), 0, 0);
-    will-change: transform;
-  }
+  /* ============ 2. MOTES & MOSAIC ============ */
+  .mote-field { position: absolute; inset: 0; pointer-events: none; }
   .mote {
     position: absolute; border-radius: 50%;
     background: radial-gradient(circle, var(--glow) 0%, transparent 70%);
     opacity: 0; pointer-events: none;
     animation: moteFloat var(--mote-dur, 22s) ease-in-out infinite;
     animation-delay: var(--mote-delay, 0s);
-    will-change: transform, opacity;
   }
   @keyframes moteFloat {
     0%, 100% { transform: translate3d(0, 0, 0); opacity: 0; }
-    20%      { transform: translate3d(var(--mote-ax, 14px), var(--mote-ay, -10px), 0); opacity: var(--mote-peak, 0.3); }
-    60%      { transform: translate3d(0, 0, 0); opacity: var(--mote-peak, 0.3); }
-    85%      { transform: translate3d(0, 0, 0); opacity: 0; }
+    30%      { transform: translate3d(14px, -12px, 0); opacity: var(--mote-peak, 0.3); }
+    70%      { transform: translate3d(-10px, 14px, 0); opacity: var(--mote-peak, 0.3); }
   }
 
-  /* ============ AMBIENT SHIPPO MOSAIC BACKGROUND ============ */
   .ambient-mosaic {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
+    position: fixed; inset: 0; pointer-events: none; z-index: -2;
     opacity: var(--mosaic-opacity);
     background-repeat: repeat;
     background-size: 60px 60px;
@@ -196,220 +142,178 @@
     transition: opacity 0.3s ease;
   }
 
-  /* ============ AMBIENT MAPLE LEAVES ============ */
+  /* ============ 3. MAPLE LEAVES ============ */
   .maple-leaves-overlay {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    overflow: hidden;
-    z-index: -1;
-    opacity: 1;
+    position: fixed; inset: 0; pointer-events: none; z-index: -1;
   }
   .maple-leaf {
-    position: absolute;
-    top: -60px;
-    pointer-events: none;
-    will-change: transform;
-    filter: drop-shadow(0 2px 6px rgba(100, 35, 10, 0.07));
-    opacity: 0.30;
+    position: absolute; top: -60px; pointer-events: none; will-change: transform;
+    opacity: 0.28;
   }
-  .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
-  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
-  .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-4 { width: 66px; height: 66px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
-  .leaf-5 { width: 54px; height: 54px; fill: #c9561b; left: 74%;  animation: mapleDriftB 12s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
-  .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
-  .leaf-7 { width: 57px; height: 57px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
-
-  @keyframes mapleDriftA {
+  .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 12%; animation: mapleDrift 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 45%; animation: mapleDrift 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-3 { width: 48px; height: 48px; fill: #e59b24; left: 78%; animation: mapleDrift 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  @keyframes mapleDrift {
     0%   { transform: translate3d(0, -60px, 0) rotate(-15deg); opacity: 0; }
-    10%  { opacity: 0.95; }
-    28%  { transform: translate3d(38px, 30vh, 0) rotate(42deg); }
-    54%  { transform: translate3d(-32px, 62vh, 0) rotate(-28deg); }
-    78%  { transform: translate3d(44px, 88vh, 0) rotate(55deg); opacity: 0.95; }
-    100% { transform: translate3d(-18px, 115vh, 0) rotate(105deg); opacity: 0; }
-  }
-  @keyframes mapleDriftB {
-    0%   { transform: translate3d(0, -60px, 0) rotate(25deg); opacity: 0; }
-    10%  { opacity: 0.95; }
-    32%  { transform: translate3d(-42px, 34vh, 0) rotate(-48deg); }
-    58%  { transform: translate3d(36px, 66vh, 0) rotate(32deg); }
-    80%  { transform: translate3d(-26px, 92vh, 0) rotate(-40deg); opacity: 0.95; }
-    100% { transform: translate3d(22px, 115vh, 0) rotate(95deg); opacity: 0; }
-  }
-  @keyframes mapleDriftC {
-    0%   { transform: translate3d(0, -60px, 0) rotate(-35deg); opacity: 0; }
     12%  { opacity: 0.95; }
-    25%  { transform: translate3d(24px, 26vh, 0) rotate(20deg); }
-    50%  { transform: translate3d(-20px, 54vh, 0) rotate(-22deg); }
-    72%  { transform: translate3d(28px, 80vh, 0) rotate(44deg); opacity: 0.95; }
-    100% { transform: translate3d(-10px, 115vh, 0) rotate(85deg); opacity: 0; }
+    50%  { transform: translate3d(35px, 55vh, 0) rotate(35deg); }
+    80%  { opacity: 0.95; }
+    100% { transform: translate3d(-20px, 115vh, 0) rotate(90deg); opacity: 0; }
   }
 
-  /* ============ TRACER LAYER ============ */
+  /* ============ 4. SHIPPO TRACER (STAR WITH BLUR & ROTATE) ============ */
   .tracer-layer {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: 2;
-    overflow: hidden;
+    position: fixed; inset: 0; pointer-events: none; z-index: 2; overflow: hidden;
   }
+
+  /* Outer container: locked to grid coordinates */
   .shippo-tracer {
     position: absolute;
     top: 0; left: 0;
     width: 68px; height: 68px;
     opacity: 0;
     pointer-events: none;
-    will-change: transform, opacity;
+    will-change: transform;
   }
+
+  /* Inner motion wrapper: handles exit rotation, defocus blur, and opacity fade */
+  .tracer-rotator {
+    width: 100%; height: 100%;
+    transform-origin: 34px 34px;
+    will-change: transform, filter, opacity;
+  }
+
   .shippo-tracer svg {
     overflow: visible;
     width: 100%; height: 100%;
     display: block;
   }
+
+  /* Star path matching .tracer-circle aesthetics */
   .tracer-path {
     fill: none;
     stroke: var(--tracer-stroke);
     stroke-width: var(--stroke-width);
     stroke-linecap: round;
     stroke-linejoin: round;
+    stroke-dasharray: 189;
+    stroke-dashoffset: 189;
     filter:
-      drop-shadow(0 0 2px var(--tracer-glow))
-      drop-shadow(0 0 8px var(--tracer-shadow));
+      drop-shadow(0 0 2px var(--tracer-glow-1))
+      drop-shadow(0 0 8px var(--tracer-glow-2));
   }
+
+  /* Active Lifecycle Classes */
   .shippo-tracer.drawing {
-    animation: tracerFade var(--fade-duration) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+    opacity: 1; /* Handled inside rotator */
   }
+
+  .shippo-tracer.drawing .tracer-rotator {
+    animation: starDissolveCycle var(--fade-duration) cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+  }
+
   .shippo-tracer.drawing .tracer-path {
     animation: drawStroke var(--draw-duration) cubic-bezier(0.35, 0, 0.25, 1) forwards;
   }
+
+  /* Stroke draw animation */
   @keyframes drawStroke {
-    0%   { stroke-dashoffset: var(--dash-len, 189); }
+    0%   { stroke-dashoffset: 189; }
     100% { stroke-dashoffset: 0; }
   }
-  @keyframes tracerFade {
-    0%   { opacity: 0; }
-    18%  { opacity: 0.85; }
-    75%  { opacity: 0.65; }
-    100% { opacity: 0; }
+
+  /*
+     Dissolve Animation:
+     - 0% -> 15%: Smooth arrival
+     - 15% -> var(--dissolve-start): Pristine focused hold while stroke finishes drawing
+     - var(--dissolve-start) -> 100%: Star rotates slightly, softens via blur, and gently dissolves
+  */
+  @keyframes starDissolveCycle {
+    0% {
+      opacity: 0;
+      transform: rotate(0deg);
+      filter: blur(0px);
+    }
+    14% {
+      opacity: 0.95;
+      transform: rotate(0deg);
+      filter: blur(0px);
+    }
+    70% { /* Aligned to ~2.4s where stroke is complete */
+      opacity: 0.95;
+      transform: rotate(0deg);
+      filter: blur(0px);
+    }
+    85% {
+      opacity: 0.75;
+      filter: blur(calc(var(--exit-blur) * 0.45));
+    }
+    100% {
+      opacity: 0;
+      transform: rotate(var(--target-rot, var(--exit-rotate)));
+      filter: blur(var(--exit-blur));
+    }
   }
 
-  /* ============ CONTROL PANEL UI ============ */
+  /* ============ 5. CONTROL PANEL ============ */
   .panel-toggle-btn {
-    position: fixed;
-    top: 18px; right: 18px;
-    z-index: 100;
-    background: #ffffff;
-    border: 1.5px solid #d8b478;
-    border-radius: 20px;
-    padding: 8px 16px;
-    font-size: 13px; font-weight: 700;
-    color: #8f2f00;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(120, 70, 20, 0.15);
+    position: fixed; top: 18px; right: 18px; z-index: 100;
+    background: #ffffff; border: 1.5px solid var(--border-2);
+    border-radius: 20px; padding: 8px 16px;
+    font-size: 13px; font-weight: 700; color: var(--outstanding);
+    cursor: pointer; box-shadow: 0 4px 14px rgba(120, 70, 20, 0.15);
   }
   .control-card {
-    position: fixed;
-    top: 60px; right: 18px;
-    width: 320px;
-    max-height: calc(100vh - 80px);
-    overflow-y: auto;
-    background: rgba(255, 255, 255, 0.94);
-    backdrop-filter: blur(10px);
-    border: 1.5px solid #d8b478;
-    border-radius: 16px;
-    padding: 18px 20px;
-    z-index: 99;
+    position: fixed; top: 60px; right: 18px; width: 320px;
+    max-height: calc(100vh - 80px); overflow-y: auto;
+    background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px);
+    border: 1.5px solid var(--border-2); border-radius: 16px;
+    padding: 18px 20px; z-index: 99;
     box-shadow: 0 12px 32px rgba(120, 70, 20, 0.18);
-    font-size: 13px;
-    color: #231304;
+    font-size: 13px; color: var(--text-dark);
     transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
   }
   .control-card.hidden {
-    transform: translateY(-20px) scale(0.95);
-    opacity: 0;
-    pointer-events: none;
+    transform: translateY(-20px) scale(0.95); opacity: 0; pointer-events: none;
   }
   .card-title {
     font-family: "Shippori Mincho", serif;
-    font-size: 16px; font-weight: 700;
-    color: #8f2f00;
-    margin: 0 0 12px 0;
-    padding-bottom: 8px;
-    border-bottom: 1px solid #ebd4ab;
+    font-size: 16px; font-weight: 700; color: var(--outstanding);
+    margin: 0 0 12px 0; padding-bottom: 8px; border-bottom: 1px solid #ebd4ab;
     display: flex; justify-content: space-between; align-items: center;
   }
   .section-label {
-    font-weight: 700;
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: #a07a48;
-    margin: 14px 0 6px 0;
+    font-weight: 700; font-size: 11px; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--text-placeholder); margin: 14px 0 6px 0;
   }
   .control-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
+    display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;
   }
   label { font-weight: 500; }
-  select, input[type="range"], input[type="color"] { cursor: pointer; }
-  select {
-    padding: 4px 8px;
-    border-radius: 6px;
-    border: 1px solid #d8b478;
-    background: #fff;
-    font-family: inherit;
-    font-size: 12px;
-  }
-  input[type="range"] {
-    width: 130px;
-    accent-color: #c9600a;
-  }
+  input[type="range"], select { cursor: pointer; }
+  input[type="range"] { width: 125px; accent-color: var(--accent); }
   .val-badge {
-    font-family: monospace;
-    font-size: 11px;
-    color: #8f2f00;
-    min-width: 38px;
-    text-align: right;
+    font-family: monospace; font-size: 11px; color: var(--outstanding);
+    min-width: 44px; text-align: right;
   }
-  .btn-group {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-top: 14px;
-  }
+  .btn-group { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
   .action-btn {
-    padding: 9px 12px;
-    border-radius: 8px;
-    border: 1px solid #c9600a;
-    background: #c9600a;
-    color: #fff;
-    font-weight: 700;
-    font-size: 12px;
-    cursor: pointer;
-    transition: transform 0.1s, opacity 0.2s;
+    padding: 9px 12px; border-radius: 8px; border: 1px solid var(--accent);
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 12px;
+    cursor: pointer; transition: transform 0.1s;
   }
   .action-btn:active { transform: scale(0.97); }
-  .action-btn.secondary {
-    background: #fff;
-    color: #c9600a;
-  }
+  .action-btn.secondary { background: #fff; color: var(--accent); }
   .copy-notice {
-    text-align: center;
-    color: #2a7a2a;
-    font-size: 11px;
-    margin-top: 6px;
-    opacity: 0;
-    transition: opacity 0.3s;
+    text-align: center; color: #2a7a2a; font-size: 11px; margin-top: 6px;
+    opacity: 0; transition: opacity 0.3s;
   }
   .copy-notice.show { opacity: 1; }
 </style>
 </head>
 <body>
 
-<!-- 1. Ambient Stage (Light Mesh + Gradients + Mote Field) -->
+<!-- Ambient Layers -->
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -419,105 +323,73 @@
   <div class="ambient-layer ambient-primary"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
-
-<!-- 2. Ambient Shippō Mosaic Lattice -->
 <div class="ambient-mosaic" id="mosaicBg" aria-hidden="true"></div>
-
-<!-- 3. Ambient Maple Leaves (Momiji) -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
-  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 L 467,762 L 479,994 L 421,994 L 433,762 L 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 L 467,762 L 479,994 L 421,994 L 433,762 L 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 L 467,762 L 479,994 L 421,994 L 433,762 L 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
 </div>
 
-<!-- 4. Interactive Tracer Layer -->
+<!-- Active Star Tracer Layer -->
 <div class="tracer-layer" id="tracerLayer"></div>
 
-<!-- 5. Control Panel & Toggle -->
+<!-- Control Card -->
 <button type="button" class="panel-toggle-btn" id="togglePanelBtn">⚙ 設定パネル</button>
 
 <div class="control-card" id="controlCard">
   <div class="card-title">
-    <span>七宝 幾何学ラボ</span>
-    <span style="font-size: 11px; font-weight: normal; color: #a07a48;">Autumn Bed</span>
+    <span>七宝 撫角星 (Star)</span>
+    <span style="font-size: 11px; font-weight: normal; color: var(--text-placeholder);">Motion Lab</span>
   </div>
 
-  <div class="section-label">形状 (Geometry Shape)</div>
+  <div class="section-label">消失アニメーション (Dissolve & Exit)</div>
   <div class="control-row">
-    <label for="shapeSelect">描画パターン</label>
-    <select id="shapeSelect">
-      <option value="circle">円 (Circle - Default)</option>
-      <option value="star">撫角星 (Concave Star)</option>
-      <option value="petal">花弁 (Single Petal)</option>
-      <option value="flower">七宝花 (4-Petal Flower)</option>
-      <option value="crescent">円弧 (Crescent Arc)</option>
-      <option value="wave">流水 (S-Curve Wave)</option>
-      <option value="random">🎲 ランダム混成 (Random)</option>
+    <label for="exitRotate">回転角度 (Rotate)</label>
+    <input type="range" id="exitRotate" min="-30" max="30" step="1" value="12">
+    <span class="val-badge" id="exitRotateVal">+12°</span>
+  </div>
+  <div class="control-row">
+    <label for="rotDirection">回転方向</label>
+    <select id="rotDirection" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border-2); font-size: 12px;">
+      <option value="fixed">固定 (上記スライダー値)</option>
+      <option value="alternate" selected>左右ランダム (±交互)</option>
     </select>
   </div>
+  <div class="control-row">
+    <label for="exitBlur">ぼかし量 (Blur)</label>
+    <input type="range" id="exitBlur" min="0" max="6" step="0.2" value="2.8">
+    <span class="val-badge" id="exitBlurVal">2.8px</span>
+  </div>
 
-  <div class="section-label">スタイル・色調 (Tracer Visuals)</div>
+  <div class="section-label">タイムライン (Timing)</div>
   <div class="control-row">
-    <label for="strokeColor">線の色 (Stroke)</label>
-    <input type="color" id="strokeColor" value="#c9600a">
+    <label for="drawDuration">描画時間 (Draw)</label>
+    <input type="range" id="drawDuration" min="1.0" max="4.0" step="0.1" value="2.6">
+    <span class="val-badge" id="drawDurationVal">2.6s</span>
   </div>
   <div class="control-row">
-    <label for="glowColor">光彩 (Glow Color)</label>
-    <input type="color" id="glowColor" value="#c9600a">
+    <label for="fadeDuration">全寿命 (Total Life)</label>
+    <input type="range" id="fadeDuration" min="2.0" max="5.5" step="0.1" value="3.4">
+    <span class="val-badge" id="fadeDurationVal">3.4s</span>
   </div>
+  <div class="control-row">
+    <label for="intervalSpeed">生成間隔 (Interval)</label>
+    <input type="range" id="intervalSpeed" min="600" max="3000" step="100" value="1600">
+    <span class="val-badge" id="intervalSpeedVal">1600ms</span>
+  </div>
+
+  <div class="section-label">外観 (Visuals)</div>
   <div class="control-row">
     <label for="strokeWidth">線の太さ</label>
-    <input type="range" id="strokeWidth" min="1.0" max="4.5" step="0.2" value="2.2">
+    <input type="range" id="strokeWidth" min="1.4" max="3.6" step="0.2" value="2.2">
     <span class="val-badge" id="strokeWidthVal">2.2px</span>
   </div>
   <div class="control-row">
-    <label for="mosaicOpacity">背景格子の濃度</label>
-    <input type="range" id="mosaicOpacity" min="0.02" max="0.35" step="0.01" value="0.13">
-    <span class="val-badge" id="mosaicOpacityVal">0.13</span>
-  </div>
-
-  <div class="section-label">アニメーション (Motion Timing)</div>
-  <div class="control-row">
-    <label for="drawDuration">描画速度</label>
-    <input type="range" id="drawDuration" min="0.6" max="3.5" step="0.1" value="1.5">
-    <span class="val-badge" id="drawDurationVal">1.5s</span>
-  </div>
-  <div class="control-row">
-    <label for="fadeDuration">発光〜消滅</label>
-    <input type="range" id="fadeDuration" min="1.2" max="5.0" step="0.1" value="2.5">
-    <span class="val-badge" id="fadeDurationVal">2.5s</span>
-  </div>
-  <div class="control-row">
-    <label for="intervalSpeed">生成間隔</label>
-    <input type="range" id="intervalSpeed" min="400" max="2500" step="50" value="1000">
-    <span class="val-badge" id="intervalSpeedVal">1000ms</span>
-  </div>
-
-  <div class="section-label">格子スナップ (Grid Placement)</div>
-  <div class="control-row">
-    <label for="gridMode">頂点タイプ</label>
-    <select id="gridMode">
-      <option value="even">偶数頂点 (円の中心)</option>
-      <option value="odd">奇数頂点 (花弁の交点)</option>
-      <option value="both">全頂点 (ランダム)</option>
+    <label for="gridMode">配置スナップ</label>
+    <select id="gridMode" style="padding: 3px 6px; border-radius: 6px; border: 1px solid var(--border-2); font-size: 12px;">
+      <option value="even" selected>偶数頂点 (円の中心)</option>
+      <option value="odd">奇数頂点 (交点)</option>
+      <option value="both">全頂点 (自由)</option>
     </select>
   </div>
 
@@ -532,13 +404,12 @@
 </div>
 
 <script>
-/* ============ MOTE BUILDER (from app.js) ============ */
+/* ============ MOTE GENERATOR ============ */
 function buildMotes() {
   const moteField = document.getElementById('moteField');
   if (!moteField) return;
   moteField.innerHTML = '';
-  const count = 8;
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < 8; i++) {
     const m = document.createElement('div');
     m.className = 'mote';
     const size = 14 + Math.random() * 16;
@@ -549,52 +420,27 @@ function buildMotes() {
     const dur = 18 + Math.random() * 20;
     m.style.setProperty('--mote-dur', dur + 's');
     m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
-    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
-    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
     m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
     moteField.appendChild(m);
   }
 }
 
-/* ============ GEOMETRIC PATH DEFINITIONS ============ */
-const SHAPES = {
-  circle: {
-    svg: '<circle cx="34" cy="34" r="30" class="tracer-path" />',
-    length: 189,
-    rotationStep: 90
-  },
-  star: {
-    svg: '<path d="M 34,4 A 30 30 0 0 0 64,34 A 30 30 0 0 0 34,64 A 30 30 0 0 0 4,34 A 30 30 0 0 0 34,4 Z" class="tracer-path" />',
-    length: 189,
-    rotationStep: 45
-  },
-  petal: {
-    svg: '<path d="M 34,13 A 30 30 0 0 1 34,55 A 30 30 0 0 1 34,13 Z" class="tracer-path" />',
-    length: 95,
-    rotationStep: 45
-  },
-  flower: {
-    svg: `<path d="M 34,34 
-             A 30 30 0 0 1 34,4 A 30 30 0 0 1 34,34 
-             A 30 30 0 0 1 64,34 A 30 30 0 0 1 34,34 
-             A 30 30 0 0 1 34,64 A 30 30 0 0 1 34,34 
-             A 30 30 0 0 1 4,34 A 30 30 0 0 1 34,34 Z" class="tracer-path" />`,
-    length: 252,
-    rotationStep: 45
-  },
-  crescent: {
-    svg: '<path d="M 4,34 A 30 30 0 0 1 64,34" class="tracer-path" />',
-    length: 95,
-    rotationStep: 90
-  },
-  wave: {
-    svg: '<path d="M 4,34 A 30 30 0 0 1 34,4 A 30 30 0 0 0 64,34" class="tracer-path" />',
-    length: 95,
-    rotationStep: 90
-  }
-};
+/* ============ STAR GEOMETRY ============ */
+// Concave 4-Point Star (4 arcs of R=30 meeting at 4 cardinal tips)
+const STAR_PATH_SVG = `
+  <div class="tracer-rotator">
+    <svg viewBox="0 0 68 68">
+      <path d="M 34,4 
+               A 30 30 0 0 0 64,34 
+               A 30 30 0 0 0 34,64 
+               A 30 30 0 0 0 4,34 
+               A 30 30 0 0 0 34,4 Z" 
+            class="tracer-path" />
+    </svg>
+  </div>
+`;
 
-/* ============ TRACER POOL CONTROLLER ============ */
+/* ============ POOL CONTROLLER ============ */
 const POOL_SIZE = 8;
 const tracerLayer = document.getElementById('tracerLayer');
 const tracerPool = [];
@@ -605,35 +451,14 @@ let isAutoRunning = true;
 for (let i = 0; i < POOL_SIZE; i++) {
   const node = document.createElement('div');
   node.className = 'shippo-tracer';
-  node.innerHTML = '<svg viewBox="0 0 68 68"></svg>';
+  node.innerHTML = STAR_PATH_SVG;
   tracerLayer.appendChild(node);
   tracerPool.push(node);
 }
 
-function getSelectedShapeKey() {
-  const sel = document.getElementById('shapeSelect').value;
-  if (sel === 'random') {
-    const keys = Object.keys(SHAPES);
-    return keys[Math.floor(Math.random() * keys.length)];
-  }
-  return sel;
-}
-
 function spawnTracer() {
-  const shapeKey = getSelectedShapeKey();
-  const shapeData = SHAPES[shapeKey];
   const tracer = tracerPool[poolIndex];
   poolIndex = (poolIndex + 1) % tracerPool.length;
-
-  const svg = tracer.querySelector('svg');
-  svg.innerHTML = shapeData.svg;
-
-  tracer.style.setProperty('--dash-len', shapeData.length);
-  const path = tracer.querySelector('.tracer-path');
-  if (path) {
-    path.style.strokeDasharray = shapeData.length;
-    path.style.strokeDashoffset = shapeData.length;
-  }
 
   const vw = window.innerWidth;
   const vh = window.innerHeight;
@@ -652,12 +477,25 @@ function spawnTracer() {
 
   const x = (j * 30) - 34;
   const y = (k * 30) - 34;
-  const angleSteps = 360 / shapeData.rotationStep;
-  const startAngle = Math.floor(Math.random() * angleSteps) * shapeData.rotationStep;
+  const startAngle = Math.floor(Math.random() * 8) * 45; // 45° lattice alignment
+
+  // Compute individual rotation delta for exit
+  const baseRot = parseFloat(document.getElementById('exitRotate').value);
+  const mode = document.getElementById('rotDirection').value;
+  let targetRotDeg = baseRot;
+  if (mode === 'alternate') {
+    const sign = Math.random() < 0.5 ? -1 : 1;
+    targetRotDeg = sign * Math.abs(baseRot);
+  }
+
+  const rotator = tracer.querySelector('.tracer-rotator');
+  if (rotator) {
+    rotator.style.setProperty('--target-rot', `${targetRotDeg}deg`);
+  }
 
   tracer.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${startAngle}deg)`;
   tracer.classList.remove('drawing');
-  void tracer.offsetWidth;
+  void tracer.offsetWidth; // Reflow to reset CSS animations cleanly
   tracer.classList.add('drawing');
 }
 
@@ -665,7 +503,7 @@ function scheduleNext() {
   if (!isAutoRunning) return;
   const baseInterval = parseInt(document.getElementById('intervalSpeed').value, 10);
   const jitter = (Math.random() * 0.4 - 0.2) * baseInterval;
-  const delay = Math.max(200, baseInterval + jitter);
+  const delay = Math.max(250, baseInterval + jitter);
   autoTimer = setTimeout(() => {
     spawnTracer();
     scheduleNext();
@@ -675,33 +513,38 @@ function scheduleNext() {
 /* ============ CONTROLS BINDING ============ */
 const root = document.documentElement;
 
-document.getElementById('strokeColor').addEventListener('input', (e) => {
-  root.style.setProperty('--tracer-stroke', e.target.value);
+document.getElementById('exitRotate').addEventListener('input', (e) => {
+  const val = (e.target.value > 0 ? '+' : '') + e.target.value + '°';
+  document.getElementById('exitRotateVal').textContent = val;
+  root.style.setProperty('--exit-rotate', e.target.value + 'deg');
 });
-document.getElementById('glowColor').addEventListener('input', (e) => {
-  root.style.setProperty('--tracer-glow', e.target.value);
-});
-document.getElementById('strokeWidth').addEventListener('input', (e) => {
+
+document.getElementById('exitBlur').addEventListener('input', (e) => {
   const val = e.target.value + 'px';
-  root.style.setProperty('--stroke-width', val);
-  document.getElementById('strokeWidthVal').textContent = val;
+  document.getElementById('exitBlurVal').textContent = val;
+  root.style.setProperty('--exit-blur', val);
 });
-document.getElementById('mosaicOpacity').addEventListener('input', (e) => {
-  root.style.setProperty('--mosaic-opacity', e.target.value);
-  document.getElementById('mosaicOpacityVal').textContent = e.target.value;
-});
+
 document.getElementById('drawDuration').addEventListener('input', (e) => {
   const val = e.target.value + 's';
-  root.style.setProperty('--draw-duration', val);
   document.getElementById('drawDurationVal').textContent = val;
+  root.style.setProperty('--draw-duration', val);
 });
+
 document.getElementById('fadeDuration').addEventListener('input', (e) => {
   const val = e.target.value + 's';
-  root.style.setProperty('--fade-duration', val);
   document.getElementById('fadeDurationVal').textContent = val;
+  root.style.setProperty('--fade-duration', val);
 });
+
 document.getElementById('intervalSpeed').addEventListener('input', (e) => {
   document.getElementById('intervalSpeedVal').textContent = e.target.value + 'ms';
+});
+
+document.getElementById('strokeWidth').addEventListener('input', (e) => {
+  const val = e.target.value + 'px';
+  document.getElementById('strokeWidthVal').textContent = val;
+  root.style.setProperty('--stroke-width', val);
 });
 
 const autoBtn = document.getElementById('autoBtn');
@@ -721,21 +564,23 @@ togglePanelBtn.addEventListener('click', () => {
 });
 
 document.getElementById('copyCodeBtn').addEventListener('click', () => {
-  const shape = document.getElementById('shapeSelect').value;
-  const stroke = document.getElementById('strokeColor').value;
-  const glow = document.getElementById('glowColor').value;
-  const sw = document.getElementById('strokeWidth').value;
+  const rot = document.getElementById('exitRotate').value;
+  const rotMode = document.getElementById('rotDirection').value;
+  const blur = document.getElementById('exitBlur').value;
   const drawD = document.getElementById('drawDuration').value;
   const fadeD = document.getElementById('fadeDuration').value;
   const interval = document.getElementById('intervalSpeed').value;
+  const sw = document.getElementById('strokeWidth').value;
 
-  const snippet = `/* --- Shippō Tracer Autumn Config --- */
-Shape: ${shape}
-Stroke: ${stroke}
-Glow: ${glow}
+  const snippet = `/* --- Final Shippō Star Tracer Settings --- */
+Shape: star (Concave 4-Point Star)
+Stroke Color: #c9600a
+Glow: drop-shadow(0 0 2px #c9600a) drop-shadow(0 0 8px rgba(143, 47, 0, 0.95))
 Stroke-width: ${sw}px
 Draw Animation: drawStroke ${drawD}s cubic-bezier(0.35, 0, 0.25, 1) forwards;
-Fade Animation: tracerFade ${fadeD}s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+Dissolve Animation: starDissolveCycle ${fadeD}s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+Exit Rotate: ${rot}deg (${rotMode})
+Exit Blur: ${blur}px
 Interval: ~${interval}ms`;
 
   navigator.clipboard.writeText(snippet).then(() => {
