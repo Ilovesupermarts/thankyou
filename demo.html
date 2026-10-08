@@ -49,20 +49,19 @@
   /* ------------------------------------------------------------
      LAYER 2: Mirrored mesh masked by the Shippō tile.
 
-     The mask is the same 60×60 Shippō tile used by .ambient-mosaic,
-     at the same stroke width (1.7) and the same grid position
-     (0, 0). Where the base pattern has a stroke, Layer 2's mirrored
-     mesh shows through; the base line becomes warm and reactive
-     rather than gaining a second parallel line — there is only one
-     line position, and both layers contribute to it.
+     Two colour corrections from the original demo:
 
-     Colour: the mesh's amber peak is rotated -28° in hue so the
-     reactive peak lands in the shibu-kaki / toasted amber range
-     instead of pure yellow.
+       1. The mesh's amber peak is rotated -28° in hue so the
+          reactive peak lands in shibu-kaki / toasted amber rather
+          than pure yellow.
 
-     Rest opacity 0.45 (was 0.35 in the original demo, 0.75 in an
-     intermediate attempt). Tune via the Lattice Base Opacity
-     slider. */
+       2. A centre-weighted warm radial (added via the ::after
+          pseudo-element below) ensures the effect is brightest at
+          screen centre and fades outward. Without it, the mirror
+          reflects the source mesh's upper-left bias to the right,
+          leaving the left side of the screen with almost no
+          visible Layer 2 content. The radial is inside the mask,
+          so it appears only on the strokes. */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
@@ -84,6 +83,28 @@
             saturate(calc(1.05 + var(--audio-swell, 0) * 0.40))
             hue-rotate(-28deg);
     transition: opacity 100ms ease-out;
+  }
+
+  /* The centre-out warm radial. It inherits the tile mask from the
+     parent, so it only shows up on the Shippō strokes. Because it's
+     a soft radial centred on the viewport, the strokes near the
+     centre carry warm light and the strokes near the edges fade to
+     nothing — replacing the mirror's natural right-bias with a
+     symmetric centre-out bloom.
+
+     Opacity is audio-reactive: brighter as the audio swells. */
+  .shippo-mask-window::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(ellipse 58% 62% at 50% 50%,
+      rgba(201, 96, 10, 0.50) 0%,
+      rgba(168, 66, 10, 0.32) 34%,
+      rgba(143, 47, 0, 0.14) 62%,
+      rgba(143, 47, 0, 0.03) 82%,
+      transparent 96%);
+    opacity: calc(0.75 + var(--audio-swell, 0) * 0.25);
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -285,7 +306,7 @@
 </div>
 
 <!-- BASE LAYER SHIPPŌ PATTERN: faint static guide lines -->
-<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic" id="baseMosaic" aria-hidden="true"></div>
 
 <div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
@@ -453,6 +474,7 @@
 
   var stageDiffuse = document.getElementById('stageDiffuse');
   var stageLattice = document.getElementById('stageLattice');
+  var baseMosaic = document.getElementById('baseMosaic');
   var btnPlayPause = document.getElementById('btnPlayPause');
   var btnToggleTrack = document.getElementById('btnToggleTrack');
   var btnToggleLattice = document.getElementById('btnToggleLattice');
@@ -595,11 +617,16 @@
     stageLattice.classList.toggle('disabled', !latticeEnabled);
   });
 
+  /* Solo Layer 2: hide both Layer 1 AND the base mosaic. The mosaic
+     is a separate fixed div at the same z-index; without this line
+     it paints on top of Layer 2's masked content in solo mode and
+     the doubled line returns. */
   btnSoloLattice.addEventListener('click', function() {
     soloLattice = !soloLattice;
     btnSoloLattice.classList.toggle('toggle-active', soloLattice);
     btnSoloLattice.textContent = soloLattice ? 'Unsolo Layer 2' : 'Solo Layer 2';
     stageDiffuse.style.display = soloLattice ? 'none' : '';
+    baseMosaic.style.display = soloLattice ? 'none' : '';
     if (soloLattice && !latticeEnabled) {
       btnToggleLattice.click();
     }
