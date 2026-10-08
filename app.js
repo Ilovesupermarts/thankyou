@@ -3,6 +3,29 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (audio-reactive swell system)
+       - New parallel analyser tap feeding a Web Audio analysis
+         loop that drives two CSS custom properties on the
+         background layers: --audio-swell on the Layer 1 diffuse
+         mesh and on the new Layer 2 mirrored-lattice mask.
+         The tap is a leaf node off soundMasterGain via a 2.0×
+         compensation gain so the analyser sees the pre-master-
+         attenuation signal and the sandbox calibration (noise
+         floor 80, gain 3.5, attack 0.06, decay 0.010) transfers
+         unchanged. The audible path is untouched.
+       - Lifecycle piggybacks on startAmbient() / stopAmbient(),
+         which are already gated on the #mapleLeaves .active class
+         shared with the Shippō tracer and chime. stopSwellLoop()
+         flushes --audio-swell to 0 so the background does not
+         freeze half-inflated if the user returns to the start
+         screen mid-beat.
+       - Guardrail: the swell drives opacity and transform only.
+         No per-frame filter recalculations — the Layer 2 color
+         grade is a static filter, and the yellow correction is
+         done by overriding the mesh gradient stops in CSS, not by
+         animating a filter parameter. Per-frame filter changes on
+         masked elements force Chromium to re-rasterize offscreen
+         framebuffers at 60fps and thrash GPU tile memory.
      v1.3 (acoustic engine unit convention + wind chime fixes)
        - Wind chime scheduler pileup fixed. playWindChimeSound()
          was returning raw seconds (~13) to scheduleNextWindChime(),
@@ -223,9 +246,10 @@ function applyTheme(theme) {
      returnToStartScreen(). Gating on that instead of introHasRun
      closes the mid-intro race.
 
-     The ambient sound rotation shares this exact lifecycle: it
-     starts and stops in lockstep with the tracer so a mid-run theme
-     toggle cannot leave sound playing alone against a sakura theme. */
+     The ambient sound rotation and the audio-reactive swell loop
+     share this exact lifecycle: they start and stop in lockstep
+     with the tracer so a mid-run theme toggle cannot leave sound
+     or animation playing alone against a sakura theme. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (theme === 'autumn' && isCarouselRunning) {
     scheduleShippoTracer();
@@ -292,6 +316,18 @@ var soundMasterGain = null;
 var soundBuffers = {};
 var soundReady = false;
 
+/* Audio-reactive swell state. These are set up in initSound() as a
+   parallel leaf branch off soundMasterGain; the analyser never
+   connects to destination, so the audible output is unchanged.
+   See the SWELL SYSTEM section further down for the analysis loop
+   and the calibration constants. */
+var swellAnalyserNode = null;
+var swellCompensationGain = null;
+var swellFreqData = null;
+var swellEnergy = 0.0;
+var swellRafId = null;
+var swellIsRunning = false;
+
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
@@ -330,8 +366,9 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
    pool members — but the bed is continuous background, and the
    chime carries its own independent peak (0.60) to compensate.
 
-   Lifecycle is shared with the Shippō tracer and maple leaves via
-   the .active class on #mapleLeaves. */
+   Lifecycle is shared with the Shippō tracer, the chime, and the
+   audio-reactive swell loop via the .active class on
+   #mapleLeaves. */
 var AMBIENT_TRACKS = [
   { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00, maxPlaySec: null    },
   { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00, maxPlaySec: 16 * 60 }
@@ -379,6 +416,32 @@ function initSound() {
     soundMasterGain = soundAudioCtx.createGain();
     soundMasterGain.gain.value = 0.5;
     soundMasterGain.connect(soundAudioCtx.destination);
+
+    /* Parallel analyser tap for the audio-reactive swell system.
+       Architecture:
+         soundMasterGain ─┬──> destination         (audible path)
+                          └──> compensationGain(2.0) ──> analyser
+                                                       (leaf, no
+                                                        destination
+                                                        connection)
+
+       The 2.0× compensation gain is not a loudness correction —
+       it exists because the analyser reads its input logarithmically
+       against min/maxDecibels, so a 0.5× linear drop is a −6 dB
+       shift at the FFT input that cannot be corrected cleanly by
+       scaling byte values after getByteFrequencyData(). Feeding
+       the analyser the pre-attenuation signal level means the
+       sandbox calibration (noise floor 80, gain multiplier 3.5,
+       attack 0.06, decay 0.010) transfers to production unchanged. */
+    swellCompensationGain = soundAudioCtx.createGain();
+    swellCompensationGain.gain.value = 2.0;
+    swellAnalyserNode = soundAudioCtx.createAnalyser();
+    swellAnalyserNode.fftSize = 512;
+    swellAnalyserNode.smoothingTimeConstant = 0.8;
+    swellFreqData = new Uint8Array(swellAnalyserNode.frequencyBinCount);
+    soundMasterGain.connect(swellCompensationGain);
+    swellCompensationGain.connect(swellAnalyserNode);
+
     if (soundAudioCtx.state === 'suspended') {
       try { soundAudioCtx.resume(); } catch (e) {}
     }
@@ -724,10 +787,12 @@ function stopBlossomStream() {
    See the AMBIENT_TRACKS block above for the bed design rationale.
 
    The single source of truth for "should ambient be playing?" is
-   the .active class on #mapleLeaves, shared with the Shippō tracer.
-   startAmbient() and stopAmbient() are called in lockstep with the
-   tracer so the two can never get out of sync. startAmbient() also
-   arms the wind chime layer; stopAmbient() tears both down. */
+   the .active class on #mapleLeaves, shared with the Shippō tracer
+   and the audio-reactive swell loop. startAmbient() and
+   stopAmbient() are called in lockstep with the tracer so the three
+   can never get out of sync. startAmbient() also arms the wind
+   chime layer and the swell loop; stopAmbient() tears all three
+   down. */
 
 var ambientTimer = null;
 var ambientSource = null;
@@ -755,6 +820,7 @@ function startAmbient() {
     scheduleNextAmbient(playMs);
   }, 0);
   startWindChime();
+  startSwellLoop();
 }
 
 /* Re-arm immediately on the tail of the previous play. There is no
@@ -772,6 +838,7 @@ function scheduleNextAmbient(prevPlayMs) {
 
 function stopAmbient() {
   stopWindChime();
+  stopSwellLoop();
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
@@ -866,8 +933,8 @@ function playAmbientSound() {
    setTimeout that mobile runtimes clamp or drop entirely.
 
    Lifecycle: startWindChime() and stopWindChime() are called from
-   startAmbient() and stopAmbient() so both layers share the same
-   .active gate on #mapleLeaves. */
+   startAmbient() and stopAmbient() so all background layers share
+   the same .active gate on #mapleLeaves. */
 
 var windChimeTimer = null;
 var windChimeSource = null;
@@ -979,6 +1046,108 @@ function playWindChimeSound() {
   };
 
   return playDur * 1000;
+}
+
+/* ============================================================
+   AUDIO-REACTIVE SWELL SYSTEM
+   ------------------------------------------------------------
+   Drives --audio-swell (float 0.00–1.00) on the two background
+   layers, read by main.css to modulate opacity, transform and
+   scale. The analyser sits as a parallel leaf off soundMasterGain
+   (see initSound()); it never reaches the destination, so the
+   audible output is untouched.
+
+   Calibration (locked from the demo sandbox):
+     · Bins 4–33 averaged (30 bins) — captures the melodic and
+       rhythmic fundamentals of the ambient beds. At 44.1kHz with
+       fftSize 512 the bin width is ~86Hz, so this band covers
+       roughly 345Hz–2.84kHz.
+     · Noise floor 80 — rejects quiet passages so the background
+       is not left half-lit during rests.
+     · Gain multiplier 3.5 — amplifies musical accents.
+     · Attack 0.06 — snappy rise on note onsets.
+     · Decay 0.010 — slow, elongated fall so the swell breathes
+       out over several seconds rather than snapping back.
+     · pow(1.35) curve applied after normalisation — biases the
+       response toward the upper end so only genuine peaks reach
+       near 1.0.
+
+   Guardrail: the swell only drives opacity and transform in CSS.
+   No per-frame filter recalculations — Chromium re-rasterizes
+   offscreen framebuffers on masked elements whenever their filter
+   inputs change, and at 60fps that thrashes GPU tile memory.
+
+   Lifecycle: startSwellLoop() and stopSwellLoop() are called from
+   startAmbient() and stopAmbient(). stopSwellLoop() flushes
+   --audio-swell to 0 so the background does not freeze
+   half-inflated if the user returns to the start screen mid-beat. */
+
+function startSwellLoop() {
+  if (swellRafId) cancelAnimationFrame(swellRafId);
+  swellIsRunning = true;
+  swellRafId = requestAnimationFrame(swellTick);
+}
+
+function stopSwellLoop() {
+  swellIsRunning = false;
+  if (swellRafId) {
+    cancelAnimationFrame(swellRafId);
+    swellRafId = null;
+  }
+  swellEnergy = 0;
+  applySwellToCSS(0);
+}
+
+function swellTick() {
+  if (!swellIsRunning) {
+    swellRafId = null;
+    return;
+  }
+
+  if (!swellAnalyserNode || !swellFreqData) {
+    /* No audio pipeline yet, or the analyser was never created.
+       Decay toward zero and idle. */
+    swellEnergy += (0 - swellEnergy) * 0.05;
+    if (swellEnergy < 0.005) swellEnergy = 0;
+  } else {
+    swellAnalyserNode.getByteFrequencyData(swellFreqData);
+
+    var sum = 0;
+    for (var i = 4; i < 34; i++) {
+      sum += swellFreqData[i];
+    }
+    var avg = sum / 30;
+
+    var cleanEnergy = Math.max(0, avg - 80);
+    var normalized = Math.min(1.0, cleanEnergy / (140 / 3.5));
+    var targetEnergy = Math.pow(normalized, 1.35);
+
+    if (targetEnergy > swellEnergy) {
+      swellEnergy += (targetEnergy - swellEnergy) * 0.06;
+    } else {
+      swellEnergy += (targetEnergy - swellEnergy) * 0.010;
+    }
+  }
+
+  applySwellToCSS(swellEnergy);
+
+  if (swellIsRunning) {
+    swellRafId = requestAnimationFrame(swellTick);
+  } else {
+    swellRafId = null;
+  }
+}
+
+/* Writes --audio-swell on the two background layers. The value
+   cascades to every child via CSS custom-property inheritance, so
+   one write per element is enough. If the Layer 2 element has not
+   been added to the DOM (e.g. index.html not yet updated), the
+   ref will be null and the write is skipped — Layer 1 still gets
+   its swell, and no error is thrown. */
+function applySwellToCSS(val) {
+  var vStr = val.toFixed(3);
+  if (ambientStage) ambientStage.style.setProperty('--audio-swell', vStr);
+  if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
 }
 
 document.addEventListener('pointerdown', initSound, { once: true });
@@ -1420,6 +1589,14 @@ var rippleLayer = document.getElementById('rippleLayer');
 
 /* v1.3: maple leaf overlay. */
 var mapleLeaves = document.getElementById('mapleLeaves');
+
+/* v1.3: audio-reactive swell targets.
+   ambientStage is the Layer 1 diffuse mesh element (existing).
+   stageLattice is the Layer 2 Shippō-masked mirror (new element,
+   added to index.html in the same release). Both receive
+   --audio-swell on every frame of the swell loop; the value
+   cascades to their children via CSS custom-property inheritance. */
+var stageLattice = document.getElementById('stageLattice');
 
 /* v1.3: Shippo mosaic star tracer pool — three reusable nodes.
    Each node contains a .tracer-rotator wrapper (carries the exit
@@ -3581,8 +3758,8 @@ function triggerKoiStart() {
 
         /* v1.3: activate the ambient maple leaves, start the
            Shippō tracer, and start the ambient sound layers
-           (bed + wind chime). All share the same .active gate on
-           #mapleLeaves. */
+           (bed + wind chime + audio-reactive swell). All share
+           the same .active gate on #mapleLeaves. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
         scheduleShippoTracer();
         startAmbient();
