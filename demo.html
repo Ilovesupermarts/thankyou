@@ -20,6 +20,7 @@
     user-select: none;
     -webkit-user-select: none;
     background-color: var(--bg-base);
+    transition: background-color 200ms ease;
   }
 
   /* ------------------------------------------------------------
@@ -50,7 +51,7 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Masked Moving Light (1.2px Stroke, No Full Grid)
+     LAYER 2: Masked Spotlights (1.2px Matching Stroke)
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
@@ -59,7 +60,7 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Exact 1.2px hairline stroke matching .ambient-mosaic */
+    /* Matching 1.2px hairline stroke locked to (0, 0) */
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
@@ -69,12 +70,13 @@
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    opacity: calc(var(--ctrl-lattice-base, 0.50) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.50));
-    filter: brightness(calc(1.05 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.25)));
+    opacity: calc(var(--ctrl-lattice-base, 0.40) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.60));
+    filter: brightness(calc(1.05 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.25)))
+            saturate(calc(1.05 + var(--audio-swell, 0) * 0.15));
     transition: opacity 100ms ease-out;
   }
 
-  /* Inner mesh is mirrored horizontally */
+  /* Mirrored stage */
   .shippo-mask-window .ambient-stage.layer-mirrored {
     position: absolute;
     top: -25%; left: -25%;
@@ -84,26 +86,23 @@
     pointer-events: none;
   }
 
-  /* Mesh swells dynamically with the music */
+  /* Scaling parent on swell keeps orb keyframe drift active */
   .shippo-mask-window .ambient-mesh {
     opacity: 1.0 !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.15));
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.18));
     transform-origin: 50% 50%;
     transition: transform 120ms ease-out;
   }
 
-  /* 
-     High-contrast warm persimmon & amber orbs.
-     100% transparent outside their radius so NO grid lines exist outside the light.
-  */
+  /* High-contrast amber & persimmon orbs (100% transparent outside orb radius) */
   .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(240, 115, 30, 0.95) 0%, rgba(205, 80, 20, 0.45) 42%, transparent 70%) !important;
+    background: radial-gradient(circle, rgba(235, 110, 30, 0.95) 0%, rgba(200, 75, 20, 0.45) 45%, transparent 70%) !important;
   }
   .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(245, 130, 35, 0.98) 0%, rgba(200, 70, 18, 0.50) 45%, transparent 72%) !important;
+    background: radial-gradient(circle, rgba(245, 125, 35, 0.98) 0%, rgba(210, 85, 22, 0.50) 48%, transparent 72%) !important;
   }
   .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(230, 105, 25, 0.90) 0%, rgba(185, 60, 15, 0.40) 38%, transparent 62%) !important;
+    background: radial-gradient(circle, rgba(225, 100, 25, 0.90) 0%, rgba(190, 65, 18, 0.40) 40%, transparent 62%) !important;
   }
 
   .shippo-mask-window.disabled {
@@ -281,7 +280,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Only the moving orbs (ambient-primary removed) -->
+<!-- LAYER 2: Moving orbs ONLY (ambient-primary removed) -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -308,7 +307,7 @@
 
 <div class="center-label">双層・七宝調律室</div>
 
-<!-- HUD Control Panel -->
+<!-- Floating HUD -->
 <div class="hud-container">
   <div class="hud-header">
     <h3 class="hud-title">Dual Swell Tuner</h3>
@@ -400,9 +399,9 @@
   <div class="hud-group">
     <div class="hud-label">
       <span>Lattice Base Opacity</span>
-      <span class="hud-val" id="valLatticeBase">0.50</span>
+      <span class="hud-val" id="valLatticeBase">0.40</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.10" max="0.90" step="0.05" value="0.50">
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.00" max="0.80" step="0.05" value="0.40">
   </div>
 
   <div class="hud-group">
@@ -447,8 +446,8 @@
     meshSwell: 0.45,
     brightBoost: 0.22,
     satBoost: 0.20,
-    latticeBase: 0.50,
-    latticeSwell: 0.50,
+    latticeBase: 0.40,
+    latticeSwell: 0.60,
     latticeGlow: 0.25
   };
 
@@ -600,9 +599,14 @@
     soloLattice = !soloLattice;
     btnSoloLattice.classList.toggle('toggle-active', soloLattice);
     btnSoloLattice.textContent = soloLattice ? 'Unsolo Layer 2' : 'Solo Layer 2';
-    // Hides both the diffuse mesh and the static mosaic
+
+    // Hides both the diffuse mesh AND the static base mosaic
     stageDiffuse.style.display = soloLattice ? 'none' : '';
     if (stageMosaic) stageMosaic.style.display = soloLattice ? 'none' : '';
+
+    // Turns background to dark so only the traveling orbs are visible
+    document.body.style.backgroundColor = soloLattice ? '#180c05' : '';
+
     if (soloLattice && !latticeEnabled) {
       btnToggleLattice.click();
     }
