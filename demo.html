@@ -50,17 +50,8 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Aligned Mask Window + Mirrored Motion
-
-     Mask stroke width is 1.7 — same as the .ambient-mosaic base
-     pattern — so the strokes land on the same pixels as the base
-     pattern lines.
-
-     The filter has a -28° hue rotation added, and the brightness/
-     saturate ranges are shifted slightly lower, so the mesh's own
-     amber peak (rgba 247,185,60) reads as shibu-kaki (deep
-     persimmon) rather than pure yellow when the audio peaks.
-     Nothing else changed from the demo you provided. */
+     LAYER 2: Perfectly Aligned Mask Window + Mirrored Motion
+     ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
@@ -68,22 +59,25 @@
     z-index: -2;
     overflow: hidden;
 
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    /* 1.2px hairline stroke matching .ambient-mosaic exactly */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
     -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     mask-repeat: repeat;
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
-    filter: brightness(calc(1.0 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.55)))
-            saturate(calc(1.05 + var(--audio-swell, 0) * 0.35))
-            hue-rotate(-28deg);
+    /* Resting opacity defaults to 0 so it never adds to the base pattern lines */
+    opacity: calc(var(--ctrl-lattice-base, 0.0) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.85));
+    /* Controlled warm boost without channel clipping */
+    filter: brightness(calc(1.0 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.25)))
+            saturate(calc(1.0 + var(--audio-swell, 0) * 0.15));
     transition: opacity 100ms ease-out;
   }
 
+  /* The inner mesh is mirrored horizontally */
   .shippo-mask-window .ambient-stage.layer-mirrored {
     position: absolute;
     top: -25%; left: -25%;
@@ -261,6 +255,7 @@
 </head>
 <body>
 
+<!-- LAYER 1: Standard diffuse light mesh -->
 <div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -271,6 +266,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
+<!-- LAYER 2: Aligned Window + Mask + Mirrored Mesh (ambient-primary removed so only orbs shine through) -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -278,12 +274,13 @@
       <div class="light-orb orb-2"></div>
       <div class="light-orb orb-3"></div>
     </div>
-    <div class="ambient-layer ambient-primary"></div>
   </div>
 </div>
 
+<!-- Static base lattice (faint background guide) -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
+<!-- Ambient Falling Maple Leaves -->
 <div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
   <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
@@ -296,6 +293,7 @@
 
 <div class="center-label">双層・七宝調律室</div>
 
+<!-- Floating HUD -->
 <div class="hud-container">
   <div class="hud-header">
     <h3 class="hud-title">Dual Swell Tuner</h3>
@@ -387,17 +385,17 @@
   <div class="hud-group">
     <div class="hud-label">
       <span>Lattice Base Opacity</span>
-      <span class="hud-val" id="valLatticeBase">0.35</span>
+      <span class="hud-val" id="valLatticeBase">0.00</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.70" step="0.05" value="0.35">
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.00" max="0.50" step="0.05" value="0.00">
   </div>
 
   <div class="hud-group">
     <div class="hud-label">
       <span>Lattice Swell Glow</span>
-      <span class="hud-val" id="valLatticeGlow">+55%</span>
+      <span class="hud-val" id="valLatticeGlow">+25%</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.10" max="1.00" step="0.05" value="0.55">
+    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.05" max="0.60" step="0.05" value="0.25">
   </div>
 
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
@@ -434,9 +432,9 @@
     meshSwell: 0.45,
     brightBoost: 0.22,
     satBoost: 0.20,
-    latticeBase: 0.35,
-    latticeSwell: 0.65,
-    latticeGlow: 0.55
+    latticeBase: 0.00,
+    latticeSwell: 0.85,
+    latticeGlow: 0.25
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
