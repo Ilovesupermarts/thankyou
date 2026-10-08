@@ -3,6 +3,42 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (acoustic engine unit convention + wind chime fixes)
+       - Wind chime scheduler pileup fixed. playWindChimeSound()
+         was returning raw seconds (~13) to scheduleNextWindChime(),
+         which treats the value as milliseconds. The delay collapsed
+         to 13ms + silenceGap, so chimes re-armed every ~1.5s while
+         the previous one was still playing. Fixed at the return
+         boundary: playDur * 1000.
+       - Wind chime random windowing restored. WIND_CHIME_PLAY_MIN
+         and MAX were expressed in ms while bufferDur is in seconds,
+         so the bufferDur-based clamp (playDur > bufferDur - 1)
+         always fired. Every chime played the full file minus one
+         second, and maxStart collapsed to 0.5s so the random offset
+         never moved. Constants now expressed in seconds to match
+         the Web Audio scheduling world, and the off-hours 60s
+         backoff replaces the ~1.5s re-arm between 17:00 and 04:59.
+       - AMBIENT_FADE_IN / AMBIENT_FADE_OUT standardised to seconds
+         (3.0 / 4.0). The /1000 divisions inside playAmbientSound()
+         are dropped; bufferDur was already in seconds, so the
+         expression now reads consistently on both sides.
+       - Architectural convention now enforced across the entire
+         acoustic engine:
+             · playback parameters (play windows, fades) → seconds,
+               consumed by Web Audio scheduling calls
+             · scheduler timers (silence gaps, re-arm delays) → ms,
+               consumed by setTimeout
+             · the only crossing between the two worlds is
+               `return playDur * 1000` at the tail of each player
+               function
+         Constant declarations carry an inline // seconds or // ms
+         label so the two conventions are visible at the point of
+         authoring rather than needing to be inferred from usage.
+       - Earlyevening.mp3 gains a 16-minute playback cap via the
+         new maxPlaySec field on AMBIENT_TRACKS. The last minute of
+         the source file is no longer played; the loop re-arms on
+         the fade-out tail at 16:00. Morning.mp3 has maxPlaySec:
+         null and continues to play the full 17 minutes.
      v1.3 (ambient revamp, phase 2)
        - Wind chime reinstated as a morning-window layer. Runs
          independently of the main ambient bed for the life of the
@@ -15,7 +51,9 @@
          play time, not at schedule time, so a chime mid-flight at
          the 17:00 boundary finishes naturally and the next cycle
          sees the closed window and skips. The timer keeps re-arming
-         around the clock regardless.
+         around the clock regardless, at a flat 60s cadence during
+         off-hours so device suspend/resume self-heals without
+         needing a page refresh.
          Peak 0.60 — tuned against the new Morning.mp3 bed at peak
          1.00, which is much louder than the old pool members the
          chime used to sit beside. Amplitude ratio bed:chime is
@@ -28,12 +66,12 @@
              22:00–04:59  Sound/Earlyevening.mp3  peak 1.00
                           (placeholder; awaiting a dedicated late-
                            night clip)
-         Each play runs the full buffer end-to-end with a 3s fade-in
-         and a 4s fade-out, then immediately re-arms. The hour is
-         checked at play time, not at schedule time, so a clip mid-
-         flight when the wall clock crosses a bucket boundary
-         finishes naturally and the next cycle picks the correct
-         track.
+         Each play runs the buffer end-to-end (or up to maxPlaySec)
+         with a 3s fade-in and a 4s fade-out, then immediately
+         re-arms. The hour is checked at play time, not at schedule
+         time, so a clip mid-flight when the wall clock crosses a
+         bucket boundary finishes naturally and the next cycle
+         picks the correct track.
        - Removed from the ambient pool: the nature recording
          (baranova_n-birds-forest-river-409229.mp3) and both night
          clips (Sound/Wind.mp3 and Sound/jauk-calm-zen-river-
@@ -266,12 +304,20 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
      22:00–04:59   Sound/Earlyevening.mp3  (placeholder; awaiting a
                                              dedicated late-night clip)
 
-   Each play runs the full buffer end-to-end with a linear fade-in
-   at the head and a linear fade-out at the tail, then immediately
-   re-arms for the next cycle. The loop is scheduled, not handled
-   by BufferSource.loop — a native loop cannot fade in and out
-   between iterations, and a fade across the seam is the whole
-   point of the envelope.
+   Each play runs the buffer end-to-end — or up to maxPlaySec, if
+   set — with a linear fade-in at the head and a linear fade-out at
+   the tail, then immediately re-arms for the next cycle. The loop
+   is scheduled, not handled by BufferSource.loop: a native loop
+   cannot fade in and out between iterations, and a fade across
+   the seam is the whole point of the envelope.
+
+   maxPlaySec (seconds) caps how much of the buffer is played:
+     · null / absent → play the full buffer
+     · N → play the first N seconds, then fade and re-arm
+   Earlyevening uses 16 * 60 to cut the source file's last minute;
+   the loop re-arms on the fade-out tail rather than playing through
+   the recording's own baked-in ending. Morning has maxPlaySec:
+   null and plays the full 17 minutes.
 
    The hour check runs at play time, not at schedule time, so a
    clip that is mid-flight when the wall clock crosses a bucket
@@ -287,16 +333,16 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
    Lifecycle is shared with the Shippō tracer and maple leaves via
    the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
-  { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00 },
-  { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00 }
+  { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00, maxPlaySec: null    },
+  { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00, maxPlaySec: 16 * 60 }
 ];
 
-var AMBIENT_FADE_IN  = 3000;  // ms
-var AMBIENT_FADE_OUT = 4000;  // ms
+var AMBIENT_FADE_IN  = 3.0;  // seconds
+var AMBIENT_FADE_OUT = 4.0;  // seconds
 
 /* Wind chime layer. Runs only during the morning window
    (05:00–16:59 Nagoya) and layers on top of Morning.mp3. The
-   envelope and schedule are unchanged from the pre-revamp pool
+   envelope and schedule are inherited from the pre-revamp pool
    system, because the chime recording is sparse and
    time-localised — a 12–14s window at a random offset gives a
    couple of audible strikes per play, which reads as an accent
@@ -306,14 +352,23 @@ var AMBIENT_FADE_OUT = 4000;  // ms
    Ratio bed:chime in effective terms is 0.50 : 0.30, i.e.
    1.67:1 amplitude. The chime's peaks read against the bed's
    average, not its peaks, so the perceived balance is closer
-   than the amplitude ratio suggests. */
+   than the amplitude ratio suggests.
+
+   Unit convention across the acoustic engine:
+     · playback parameters (play window, fades)   → seconds,
+       consumed by Web Audio scheduling calls
+     · scheduler timers (silence gaps)            → milliseconds,
+       consumed by setTimeout
+   The constants below carry an inline // seconds or // ms
+   label so the two conventions are visible at the declaration
+   site rather than needing to be inferred from usage. */
 var WIND_CHIME_PEAK        = 0.600;
-var WIND_CHIME_PLAY_MIN    = 12000;
-var WIND_CHIME_PLAY_MAX    = 14000;
-var WIND_CHIME_FADE_IN     = 2000;
-var WIND_CHIME_FADE_OUT    = 1500;
-var WIND_CHIME_SILENCE_MIN = 500;
-var WIND_CHIME_SILENCE_MAX = 2000;
+var WIND_CHIME_PLAY_MIN    = 12;    // seconds
+var WIND_CHIME_PLAY_MAX    = 14;    // seconds
+var WIND_CHIME_FADE_IN     = 2.0;   // seconds
+var WIND_CHIME_FADE_OUT    = 1.5;   // seconds
+var WIND_CHIME_SILENCE_MIN = 500;   // ms
+var WIND_CHIME_SILENCE_MAX = 2000;  // ms
 
 function initSound() {
   if (soundAudioCtx) return;
@@ -746,12 +801,22 @@ function playAmbientSound() {
   var bufferDur = buffer.duration;
   if (bufferDur <= 0) return 0;
 
+  /* Per-track duration cap. null / absent means "play the full
+     buffer" — Morning uses that. Earlyevening sets 16 * 60 to cut
+     the last minute of the source file: the loop re-arms on the
+     fade-out tail rather than playing through the recording's own
+     baked-in ending. */
+  var playDur = bufferDur;
+  if (track.maxPlaySec && track.maxPlaySec < bufferDur) {
+    playDur = track.maxPlaySec;
+  }
+
   /* Clamp fades so a truncated or very short clip cannot have its
-     head ramp and tail ramp overlap. At 17min / 1020s this clamp
-     is inert — 3s and 4s are both under 0.4% of the buffer. */
-  var maxFade = bufferDur * 0.10;
-  var fadeIn  = Math.min(AMBIENT_FADE_IN  / 1000, maxFade);
-  var fadeOut = Math.min(AMBIENT_FADE_OUT / 1000, maxFade);
+     head ramp and tail ramp overlap. At playDur 960s / 1020s this
+     clamp is inert — 3s and 4s are both under 0.4% of the window. */
+  var maxFade = playDur * 0.10;
+  var fadeIn  = Math.min(AMBIENT_FADE_IN,  maxFade);
+  var fadeOut = Math.min(AMBIENT_FADE_OUT, maxFade);
   var peak = track.peak;
 
   var now = soundAudioCtx.currentTime;
@@ -760,13 +825,13 @@ function playAmbientSound() {
   var gain = soundAudioCtx.createGain();
   gain.gain.setValueAtTime(0, now);
   gain.gain.linearRampToValueAtTime(peak, now + fadeIn);
-  gain.gain.setValueAtTime(peak, now + bufferDur - fadeOut);
-  gain.gain.linearRampToValueAtTime(0, now + bufferDur);
+  gain.gain.setValueAtTime(peak, now + playDur - fadeOut);
+  gain.gain.linearRampToValueAtTime(0, now + playDur);
 
   src.connect(gain);
   gain.connect(soundMasterGain);
   src.start(now);
-  src.stop(now + bufferDur + 0.1);
+  src.stop(now + playDur + 0.1);
 
   ambientSource = src;
   ambientGain = gain;
@@ -777,7 +842,7 @@ function playAmbientSound() {
     try { gain.disconnect(); } catch (e) {}
   };
 
-  return bufferDur * 1000;
+  return playDur * 1000;
 }
 
 /* ============ WIND CHIME ROTATION ============
@@ -793,9 +858,12 @@ function playAmbientSound() {
    The hour check runs at play time, not at schedule time, so a
    chime that is mid-flight at 17:00 finishes naturally and the
    next scheduled play sees the closed window and returns early.
-   The timer keeps re-arming around the clock regardless of the
-   hour, so the layer automatically picks up again the next morning
-   without needing a fresh startAmbient() call.
+   During off-hours the scheduler drops to a flat 60s poll rather
+   than the regular silence-gap cadence: the chime cannot become
+   audible until 05:00, so there is nothing to gain from waking
+   every ~1.5s, and the heartbeat self-heals on device
+   suspend/resume without needing a page refresh or a multi-hour
+   setTimeout that mobile runtimes clamp or drop entirely.
 
    Lifecycle: startWindChime() and stopWindChime() are called from
    startAmbient() and stopAmbient() so both layers share the same
@@ -824,9 +892,22 @@ function startWindChime() {
 }
 
 function scheduleNextWindChime(prevPlayMs) {
-  var silenceGap = WIND_CHIME_SILENCE_MIN +
-    Math.random() * (WIND_CHIME_SILENCE_MAX - WIND_CHIME_SILENCE_MIN);
-  var delay = (prevPlayMs || 0) + silenceGap;
+  var delay;
+  if (!isMorningWindChimeHours()) {
+    /* Off-hours: the chime cannot become audible until 05:00, so
+       there is no reason to wake on the regular 500–2000ms cadence.
+       A flat 60s poll is enough to resume within a minute of the
+       morning window opening, and drops the overnight wake-up count
+       from ~43,000 to ~720. It also self-heals across device
+       suspend/resume: a pending 60s timer fires on wake, the hour
+       check re-reads the wall clock, and the chime either starts or
+       re-arms 60s later — no page refresh, no state reconstruction. */
+    delay = 60000;
+  } else {
+    var silenceGap = WIND_CHIME_SILENCE_MIN +
+      Math.random() * (WIND_CHIME_SILENCE_MAX - WIND_CHIME_SILENCE_MIN);
+    delay = (prevPlayMs || 0) + silenceGap;
+  }
   windChimeTimer = setTimeout(function() {
     windChimeTimer = null;
     var playMs = playWindChimeSound();
@@ -870,8 +951,8 @@ function playWindChimeSound() {
   var maxStart = Math.max(0, bufferDur - playDur - 0.5);
   var startOffset = Math.random() * maxStart;
 
-  var fadeIn  = Math.min(WIND_CHIME_FADE_IN  / 1000, playDur * 0.25);
-  var fadeOut = Math.min(WIND_CHIME_FADE_OUT / 1000, playDur * 0.35);
+  var fadeIn  = Math.min(WIND_CHIME_FADE_IN,  playDur * 0.25);
+  var fadeOut = Math.min(WIND_CHIME_FADE_OUT, playDur * 0.35);
   var peak = WIND_CHIME_PEAK;
 
   var now = soundAudioCtx.currentTime;
@@ -897,7 +978,7 @@ function playWindChimeSound() {
     try { gain.disconnect(); } catch (e) {}
   };
 
-  return playDur;
+  return playDur * 1000;
 }
 
 document.addEventListener('pointerdown', initSound, { once: true });
