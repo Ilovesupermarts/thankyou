@@ -23,57 +23,54 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 1: Diffuse Base Mesh (Sits at z-index -3)
+     LAYER 1: Diffuse Base Mesh
      ------------------------------------------------------------ */
   .layer-diffuse {
-    z-index: -3 !important;
-    filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.18)))
-            saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.10)));
+    filter: brightness(calc(1 + var(--audio-swell, 0) * 0.15));
     will-change: transform, filter;
   }
 
   .layer-diffuse .ambient-mesh {
-    opacity: calc(var(--ctrl-mesh-base, 0.55) + var(--audio-swell, 0) * var(--ctrl-mesh-swell, 0.45)) !important;
-    transition: opacity 100ms ease-out;
+    opacity: calc(0.55 + var(--audio-swell, 0) * 0.45) !important;
+    transition: opacity 120ms ease-out;
   }
 
   .layer-diffuse .orb-1 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.24))) !important;
-    transition: transform 120ms ease-out;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.22)) !important;
+    transition: transform 140ms ease-out;
   }
   .layer-diffuse .orb-2 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.24) * 1.15))) !important;
-    transition: transform 120ms ease-out;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.25)) !important;
+    transition: transform 140ms ease-out;
   }
   .layer-diffuse .orb-3 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.24) * 0.90))) !important;
-    transition: transform 120ms ease-out;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.20)) !important;
+    transition: transform 140ms ease-out;
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Luminous Amber Lattice (Elevated to z-index -1)
+     LAYER 2: Delicate Masked Lattice (1.8px, No Flickering)
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: -1; /* Sits above Layer 1 and static mosaic */
+    z-index: -2;
     overflow: hidden;
 
-    /* Dynamic SVG Mask driven by CSS custom property */
-    -webkit-mask-image: var(--shippo-svg-mask);
+    /* Delicate 1.8px Shippō grid, phase-locked to (0, 0) */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.8'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
     -webkit-mask-position: 0 0;
-    mask-image: var(--shippo-svg-mask);
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.8'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     mask-repeat: repeat;
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    opacity: calc(var(--ctrl-lattice-base, 0.45) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.55));
-    filter: drop-shadow(0 0 calc(var(--audio-swell, 0) * 4px) rgba(225, 95, 20, 0.65))
-            brightness(calc(1.05 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.35)));
-    transition: opacity 100ms ease-out;
+    /* Mellow swell: transitions smoothly from 0.18 to 0.65 opacity */
+    opacity: calc(var(--ctrl-lattice-base, 0.18) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.48));
+    transition: opacity 120ms ease-out;
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -89,26 +86,26 @@
     opacity: 1.0 !important;
   }
 
-  /* Rich Flame-Amber & Molten Copper (Non-Yellowing) */
+  /* Muted Autumn Palette (Warm Rust, Burnt Orange, Amber - No Neon Yellow) */
   .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(235, 110, 25, 0.85) 0%, rgba(205, 75, 18, 0.35) 45%, transparent 70%) !important;
+    background: radial-gradient(circle, rgba(185, 75, 25, 0.70) 0%, rgba(195, 105, 35, 0.20) 45%, transparent 70%) !important;
   }
 
   .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(245, 125, 30, 0.88) 0%, rgba(185, 60, 15, 0.40) 48%, transparent 72%) !important;
+    background: radial-gradient(circle, rgba(165, 60, 20, 0.75) 0%, rgba(175, 80, 25, 0.25) 48%, transparent 72%) !important;
   }
 
   .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(220, 95, 20, 0.75) 0%, rgba(165, 50, 12, 0.30) 40%, transparent 60%) !important;
+    background: radial-gradient(circle, rgba(170, 75, 20, 0.60) 0%, rgba(140, 55, 15, 0.20) 40%, transparent 60%) !important;
   }
 
   .shippo-mask-window .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(240, 120, 25, 0.80) 0%, transparent 55%),
-      radial-gradient(circle at 75% 40%, rgba(215, 85, 20, 0.75) 0%, transparent 58%),
-      radial-gradient(circle at 50% 70%, rgba(185, 65, 15, 0.70) 0%, transparent 52%),
-      radial-gradient(circle at 20% 85%, rgba(150, 45, 10, 0.60) 0%, transparent 50%) !important;
-    opacity: 0.95 !important;
+      radial-gradient(circle at 25% 30%, rgba(195, 95, 25, 0.55) 0%, transparent 55%),
+      radial-gradient(circle at 75% 40%, rgba(175, 70, 20, 0.50) 0%, transparent 58%),
+      radial-gradient(circle at 50% 70%, rgba(150, 50, 15, 0.50) 0%, transparent 52%),
+      radial-gradient(circle at 20% 85%, rgba(120, 40, 10, 0.40) 0%, transparent 50%) !important;
+    opacity: 0.85 !important;
   }
 
   .shippo-mask-window.disabled {
@@ -122,7 +119,7 @@
     position: fixed;
     top: 16px;
     right: 16px;
-    width: 330px;
+    width: 320px;
     max-height: calc(100vh - 32px);
     overflow-y: auto;
     background: rgba(253, 243, 216, 0.90);
@@ -244,11 +241,6 @@
     color: #fff;
   }
 
-  .hud-btn.pulse-active {
-    background: #8f2229 !important;
-    color: #fff !important;
-  }
-
   .hud-copy-btn {
     width: 100%;
     background: #8f2f00;
@@ -291,7 +283,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Aligned Window + Molten Amber Palette + Mirrored Content -->
+<!-- LAYER 2: Delicate Masked Lattice -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -303,7 +295,7 @@
   </div>
 </div>
 
-<!-- Static base lattice (faint background guide) -->
+<!-- Static base lattice (delicate background guide) -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
 <!-- Ambient Falling Maple Leaves -->
@@ -336,8 +328,6 @@
     <button class="hud-btn secondary" id="btnSoloLattice">Solo Layer 2</button>
   </div>
 
-  <button class="hud-btn secondary" id="btnTestSwell" style="width: 100%; margin-bottom: 12px;">Simulate Peak Swell (Hold)</button>
-
   <div class="hud-group">
     <div class="hud-label">
       <span>Audio Swell Energy</span>
@@ -348,30 +338,22 @@
     </div>
   </div>
 
-  <div class="hud-section-divider">Layer 2: Shippō Masked Lines</div>
+  <div class="hud-section-divider">Layer 2: Muted Lattice Line</div>
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Stroke Width</span>
-      <span class="hud-val" id="valStrokeWidth">3.6px</span>
+      <span>Lattice Base Visibility</span>
+      <span class="hud-val" id="valLatticeBase">0.18</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderStrokeWidth" min="1.5" max="6.0" step="0.3" value="3.6">
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.50" step="0.01" value="0.18">
   </div>
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Base Opacity</span>
-      <span class="hud-val" id="valLatticeBase">0.45</span>
+      <span>Lattice Peak Swell</span>
+      <span class="hud-val" id="valLatticeSwell">0.48</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.10" max="0.90" step="0.05" value="0.45">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Lattice Swell Glow</span>
-      <span class="hud-val" id="valLatticeGlow">+35%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.10" max="0.80" step="0.05" value="0.35">
+    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.10" max="0.80" step="0.02" value="0.48">
   </div>
 
   <div class="hud-section-divider">Audio Envelope Engine</div>
@@ -408,32 +390,6 @@
     <input type="range" class="hud-slider" id="sliderDecay" min="0.005" max="0.10" step="0.005" value="0.035">
   </div>
 
-  <div class="hud-section-divider">Layer 1: Diffuse Base Mesh</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Orb Scale Expansion</span>
-      <span class="hud-val" id="valOrbScale">+24%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderOrbScale" min="0.05" max="0.60" step="0.01" value="0.24">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Mesh Base Opacity</span>
-      <span class="hud-val" id="valMeshBase">0.55</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderMeshBase" min="0.20" max="0.80" step="0.05" value="0.55">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Stage Brightness Lift</span>
-      <span class="hud-val" id="valBrightBoost">+18%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderBrightBoost" min="0.05" max="0.50" step="0.01" value="0.18">
-  </div>
-
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
 </div>
 
@@ -449,7 +405,6 @@
   var audioGainNode = null;
   var analyserNode = null;
   var isPlaying = false;
-  var isSimulatingSwell = false;
 
   var audioEl = new Audio();
   audioEl.loop = true;
@@ -464,15 +419,8 @@
     noiseFloor: 35,
     attack: 0.14,
     decay: 0.035,
-    orbScale: 0.24,
-    meshBase: 0.55,
-    meshSwell: 0.45,
-    brightBoost: 0.18,
-    satBoost: 0.10,
-    strokeWidth: 3.6,
-    latticeBase: 0.45,
-    latticeSwell: 0.55,
-    latticeGlow: 0.35
+    latticeBase: 0.18,
+    latticeSwell: 0.48
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -481,25 +429,12 @@
   var btnToggleTrack = document.getElementById('btnToggleTrack');
   var btnToggleLattice = document.getElementById('btnToggleLattice');
   var btnSoloLattice = document.getElementById('btnSoloLattice');
-  var btnTestSwell = document.getElementById('btnTestSwell');
   var statusIndicator = document.getElementById('statusIndicator');
   var valSwellEnergy = document.getElementById('valSwellEnergy');
   var vuMeterBar = document.getElementById('vuMeterBar');
 
   var latticeEnabled = true;
   var soloLattice = false;
-
-  function buildMaskSvgUri(strokeW) {
-    var raw = "<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'>" +
-      "<g fill='none' stroke='white' stroke-width='" + strokeW + "' stroke-linecap='round'>" +
-      "<circle cx='0' cy='0' r='30'/>" +
-      "<circle cx='60' cy='0' r='30'/>" +
-      "<circle cx='0' cy='60' r='30'/>" +
-      "<circle cx='60' cy='60' r='30'/>" +
-      "<circle cx='30' cy='30' r='30'/>" +
-      "</g></svg>";
-    return "url(\"data:image/svg+xml," + encodeURIComponent(raw) + "\")";
-  }
 
   function initAudioPipeline() {
     if (audioCtx) return;
@@ -523,26 +458,31 @@
     if (rafId) cancelAnimationFrame(rafId);
 
     function tick() {
-      var target = 0;
-
-      if (isSimulatingSwell) {
-        target = 1.0;
-      } else if (isPlaying && analyserNode) {
-        analyserNode.getByteFrequencyData(freqData);
-
-        var sum = 0;
-        var count = 30;
-        for (var i = 4; i < 34; i++) {
-          sum += freqData[i];
+      if (!isPlaying || !analyserNode) {
+        swellEnergy += (0 - swellEnergy) * 0.05;
+        applySwellToCSS(swellEnergy);
+        if (swellEnergy > 0.005) {
+          rafId = requestAnimationFrame(tick);
+        } else {
+          applySwellToCSS(0);
+          rafId = null;
         }
-        var avg = sum / count;
-
-        var clean = Math.max(0, avg - config.noiseFloor);
-        var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
-        target = Math.pow(normalized, 1.35);
+        return;
       }
 
-      // Attack / Decay filter
+      analyserNode.getByteFrequencyData(freqData);
+
+      var sum = 0;
+      var count = 30;
+      for (var i = 4; i < 34; i++) {
+        sum += freqData[i];
+      }
+      var avg = sum / count;
+
+      var clean = Math.max(0, avg - config.noiseFloor);
+      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
+      var target = Math.pow(normalized, 1.35);
+
       if (target > swellEnergy) {
         swellEnergy += (target - swellEnergy) * config.attack;
       } else {
@@ -567,19 +507,9 @@
   }
 
   function applyConfigToCSS() {
-    var maskUri = buildMaskSvgUri(config.strokeWidth);
     if (stageLattice) {
-      stageLattice.style.setProperty('--shippo-svg-mask', maskUri);
       stageLattice.style.setProperty('--ctrl-lattice-base', config.latticeBase);
       stageLattice.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
-      stageLattice.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
-    }
-    if (stageDiffuse) {
-      stageDiffuse.style.setProperty('--ctrl-orb-scale', config.orbScale);
-      stageDiffuse.style.setProperty('--ctrl-mesh-base', config.meshBase);
-      stageDiffuse.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
-      stageDiffuse.style.setProperty('--ctrl-bright-boost', config.brightBoost);
-      stageDiffuse.style.setProperty('--ctrl-sat-boost', config.satBoost);
     }
   }
 
@@ -639,23 +569,7 @@
     }
   });
 
-  // Hold-to-simulate peak swell
-  function startTestSwell() {
-    isSimulatingSwell = true;
-    btnTestSwell.classList.add('pulse-active');
-    startSwellLoop();
-  }
-  function stopTestSwell() {
-    isSimulatingSwell = false;
-    btnTestSwell.classList.remove('pulse-active');
-  }
-
-  btnTestSwell.addEventListener('mousedown', startTestSwell);
-  window.addEventListener('mouseup', stopTestSwell);
-  btnTestSwell.addEventListener('touchstart', function(e) { e.preventDefault(); startTestSwell(); });
-  window.addEventListener('touchend', stopTestSwell);
-
-  function bindSlider(id, key, valElId, formatter, cssUpdater) {
+  function bindSlider(id, key, valElId, formatter) {
     var s = document.getElementById(id);
     var v = document.getElementById(valElId);
     s.addEventListener('input', function() {
@@ -663,43 +577,26 @@
       config[key] = val;
       if (formatter) v.textContent = formatter(val);
       else v.textContent = val;
-      if (cssUpdater) cssUpdater(val);
       applyConfigToCSS();
     });
   }
 
-  bindSlider('sliderStrokeWidth', 'strokeWidth', 'valStrokeWidth', function(v){ return v.toFixed(1) + 'px'; });
-  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){
-    config.latticeSwell = parseFloat((1 - v).toFixed(2));
-    return v.toFixed(2);
-  });
-  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
-
+  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){ return v.toFixed(2); });
+  bindSlider('sliderLatticeSwell', 'latticeSwell', 'valLatticeSwell', function(v){ return v.toFixed(2); });
   bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
   bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
   bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
   bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
 
-  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
-    config.meshSwell = parseFloat((1 - v).toFixed(2));
-    return v.toFixed(2);
-  });
-  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
-
   document.getElementById('btnCopyConfig').addEventListener('click', function() {
     var out = [
-      '/* Tuned Dual-Layer Configuration */',
-      'strokeWidth: ' + config.strokeWidth + ',',
-      'latticeBase: ' + config.latticeBase + ',',
-      'latticeGlow: ' + config.latticeGlow + ',',
+      '/* Clean Tuned Dual-Layer Configuration */',
       'gainMult: ' + config.gainMult + ',',
       'noiseFloor: ' + config.noiseFloor + ',',
       'attack: ' + config.attack + ',',
       'decay: ' + config.decay + ',',
-      'orbScale: ' + config.orbScale + ',',
-      'meshBase: ' + config.meshBase + ',',
-      'brightBoost: ' + config.brightBoost
+      'latticeBase: ' + config.latticeBase + ',',
+      'latticeSwell: ' + config.latticeSwell
     ].join('\n');
     navigator.clipboard.writeText(out).then(function() {
       alert('Configuration copied to clipboard!');
