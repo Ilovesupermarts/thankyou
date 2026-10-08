@@ -12,6 +12,14 @@
          Exit rotation randomised ±12° per spawn via --target-rot.
          Star cadence widened to 2100ms base ±20% so the 3.4s
          dissolve cycle breathes before the next star begins.
+       - Star placement is unrestricted: the even-parity grid snap
+         is removed, so the star may spawn on any lattice node
+         across the viewport, including petal intersections and
+         tile boundaries. Initial spawn orientation is randomised
+         per spawn from eight 45° increments so the stroke draw
+         begins from a different tip on each pass — eight distinct
+         draw-in directions, all lattice-aligned because the
+         rotation pivots about the star's own centre.
        - Shippo tracer fix: scheduleShippoTracer() no longer calls
          stopShippoTracer() at its head.
        - Ambient Shippo mosaic + circle tracer.
@@ -1203,10 +1211,12 @@ var mapleLeaves = document.getElementById('mapleLeaves');
 /* v1.3: Shippo mosaic star tracer pool — three reusable nodes.
    Each node contains a .tracer-rotator wrapper (carries the exit
    animation) around the concave 4-point star SVG (carries the
-   stroke draw). The outer .shippo-tracer receives only the grid
-   translate3d from JS; keeping the two concerns on separate
-   elements is what lets the exit rotation/scale/blur play without
-   clobbering the grid position. */
+   stroke draw). The outer .shippo-tracer receives the grid
+   translate3d plus the initial spawn rotation from JS; the inner
+   .tracer-rotator carries the exit dissolve. Keeping the two
+   concerns on separate elements is what lets the exit rotation/
+   scale/blur play without clobbering the grid position, and lets
+   the initial spawn rotation pivot about the star's own centre. */
 var shippoTracers = [
   document.getElementById('shippoTracer0'),
   document.getElementById('shippoTracer1'),
@@ -5117,15 +5127,14 @@ tyReceiptBtn.addEventListener('click', function(e) {
    rotation (±12° randomised), scale expansion to 1.35×, and a
    defocus blur to 2.8px while fading to zero.
 
-   The outer .shippo-tracer element receives only the grid
-   translate3d from JS — its position on the 30px lattice is
-   written once per spawn and never animated. The inner
+   The outer .shippo-tracer element receives the grid translate3d
+   plus the initial spawn rotation from JS. The inner
    .tracer-rotator carries the entire exit animation (rotate,
-   scale, blur, opacity). Keeping the two concerns on separate
-   elements is what stops the exit rotation from clobbering the
-   grid position — a single element would have to compose the
-   grid's fixed transform with the animated one around the wrong
-   origin.
+   scale, blur, opacity). Two elements, two concerns: the exit
+   rotation pivots about the star's centre via the rotator's
+   transform-origin, the spawn rotation pivots about the same
+   centre via the tracer's own transform — and neither clobbers
+   the grid position.
 
    The star path is four 90° arcs of radius 30 drawn with
    sweep-flag 0, which forces the arc centre to the outer grid
@@ -5134,9 +5143,17 @@ tyReceiptBtn.addEventListener('click', function(e) {
    tips to 30·(√2 − 1) ≈ 12.4px at the waist. Total perimeter is
    4 × 15π = 60π ≈ 188.5, rounded to 189 for stroke-dasharray.
 
-   Grid snap enforces even (j + k) parity so the star sits on a
-   mosaic tile centre (points on the tile's four edge midpoints,
-   waist inside the tile) rather than on an intersection. */
+   Placement is unrestricted: the star may spawn on any lattice
+   node across the viewport, including petal intersections and
+   tile boundaries. The initial spawn orientation is randomised
+   per spawn from eight 45° increments so the stroke draw begins
+   from a different tip on each pass — eight distinct draw-in
+   directions, all lattice-aligned because the rotation pivots
+   about the star's own centre. Because the SVG path's M point is
+   the first thing that becomes visible as the stroke-dashoffset
+   animates, rotating the element moves that start tip around the
+   star in 45° steps: 0° → North, 45° → NE, 90° → East, and so on
+   around the compass. */
 function triggerShippoCircle() {
   if (currentTheme !== 'autumn') return;
   var tracer = shippoTracers[shippoTracerIndex];
@@ -5151,27 +5168,31 @@ function triggerShippoCircle() {
   var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
   var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
 
-  /* Even parity so the star sits on a mosaic tile centre, not on an
-     intersection — the concave waist lands inside a tile, the four
-     points land on the tile's four edge midpoints. */
-  if ((j + k) % 2 !== 0) j += 1;
-
   var x = (j * 30) - 34;
   var y = (k * 30) - 34;
+
+  /* Random initial spawn orientation: eight 45° increments
+     (0/45/90/135/180/225/270/315). Written on the OUTER
+     .shippo-tracer element, composed after the grid translate3d,
+     so the drawing stroke's starting tip lands at a different
+     screen position on every spawn instead of always at the top.
+     The inner .tracer-rotator still carries its own exit rotation
+     independently — the two rotations live on separate elements
+     and compose without interference. */
+  var startRotDeg = Math.floor(Math.random() * 8) * 45;
 
   /* Randomise the exit rotation: ±12°. starDissolveCycle reads this
      via var(--target-rot) at its 100% stop. Written on the
      .tracer-rotator — never on the tracer — because the tracer
-     carries the fixed grid translate3d and the rotator carries the
-     animated transforms. Keeping them on separate elements is what
-     prevents the exit rotation from clobbering the grid position. */
+     carries the fixed grid translate3d and the animated transforms
+     must not clobber it. */
   var targetRotDeg = (Math.random() < 0.5 ? -1 : 1) * 12;
   var rotator = tracer.querySelector('.tracer-rotator');
   if (rotator) {
     rotator.style.setProperty('--target-rot', targetRotDeg + 'deg');
   }
 
-  tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0)';
+  tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startRotDeg + 'deg)';
   tracer.classList.remove('drawing');
   void tracer.offsetWidth;
   tracer.classList.add('drawing');
