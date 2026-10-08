@@ -1,427 +1,642 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>鈴虫 (Suzumushi) 音響デモ</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Dual-Layer Audio Reactive Swell Lab</title>
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="main.css">
+
 <style>
-  :root {
-    --bg-base: #1b120c;
-    --bg-card: rgba(38, 26, 18, 0.75);
-    --border: rgba(216, 160, 90, 0.3);
-    --gold: #e8a848;
-    --gold-glow: rgba(232, 168, 72, 0.25);
-    --text-main: #fdf3d8;
-    --text-dim: #a0846c;
-  }
-
-  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-
   body {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
     margin: 0;
-    min-height: 100vh;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: radial-gradient(circle at 50% 35%, #2a1b12 0%, var(--bg-base) 100%);
-    font-family: "Shippori Mincho", serif;
-    color: var(--text-main);
-    padding: 24px;
+    padding: 0;
     user-select: none;
     -webkit-user-select: none;
+    background-color: var(--bg-base);
   }
 
-  .card {
-    width: 100%;
-    max-width: 440px;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 20px;
-    padding: 36px 30px;
-    text-align: center;
-    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(10px);
+  /* ------------------------------------------------------------
+     LAYER 1: Diffuse Base Mesh
+     ------------------------------------------------------------ */
+  .layer-diffuse {
+    filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.22)))
+            saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.20)));
+    will-change: transform, filter;
   }
 
-  .title-mark {
-    font-size: 20px;
-    color: var(--gold);
-    letter-spacing: 6px;
-    margin-bottom: 8px;
+  .layer-diffuse .ambient-mesh {
+    opacity: calc(var(--ctrl-mesh-base, 0.55) + var(--audio-swell, 0) * var(--ctrl-mesh-swell, 0.45)) !important;
+    transition: opacity 100ms ease-out;
   }
 
-  h1 {
-    margin: 0 0 6px 0;
-    font-size: 24px;
-    font-weight: 600;
-    letter-spacing: 4px;
-    color: var(--text-main);
+  .layer-diffuse .orb-1 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.28))) !important;
+    transition: transform 120ms ease-out;
+  }
+  .layer-diffuse .orb-2 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 1.15))) !important;
+    transition: transform 120ms ease-out;
+  }
+  .layer-diffuse .orb-3 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 0.90))) !important;
+    transition: transform 120ms ease-out;
   }
 
-  .subtitle {
-    font-size: 13px;
-    color: var(--text-dim);
-    letter-spacing: 2px;
-    margin-bottom: 28px;
-  }
-
-  .canvas-wrap {
-    position: relative;
-    width: 100%;
-    height: 90px;
-    background: rgba(18, 11, 7, 0.6);
-    border: 1px solid rgba(216, 160, 90, 0.15);
-    border-radius: 12px;
-    margin-bottom: 24px;
+  /* ------------------------------------------------------------
+     LAYER 2: Perfectly Aligned Mask Window + Mirrored Motion
+     ------------------------------------------------------------ */
+  .shippo-mask-window {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
     overflow: hidden;
+
+    /* Locked strictly to (0, 0) matching .ambient-mosaic */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-repeat: repeat;
+    -webkit-mask-size: 60px 60px;
+    -webkit-mask-position: 0 0;
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-repeat: repeat;
+    mask-size: 60px 60px;
+    mask-position: 0 0;
+
+    opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
+    filter: brightness(calc(1.1 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.60)))
+            saturate(calc(1.1 + var(--audio-swell, 0) * 0.40));
+    transition: opacity 100ms ease-out;
   }
 
-  canvas {
-    width: 100%;
-    height: 100%;
-    display: block;
+  /* The inner mesh is mirrored horizontally */
+  .shippo-mask-window .ambient-stage.layer-mirrored {
+    position: absolute;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    transform-origin: 50% 50%;
+    transform: scaleX(-1);
+    pointer-events: none;
   }
 
-  .status-line {
-    font-size: 13px;
-    color: var(--gold);
-    letter-spacing: 1.5px;
-    min-height: 20px;
-    margin-bottom: 22px;
-    transition: opacity 0.3s ease;
+  .shippo-mask-window .ambient-mesh {
+    opacity: 1.0 !important;
   }
 
-  .controls {
+  .shippo-mask-window.disabled {
+    display: none !important;
+  }
+
+  /* ------------------------------------------------------------
+     HUD Control Panel
+     ------------------------------------------------------------ */
+  .hud-container {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 330px;
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    background: rgba(253, 243, 216, 0.88);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1.5px solid rgba(143, 47, 0, 0.32);
+    border-radius: 20px;
+    box-shadow: 0 14px 40px rgba(100, 35, 10, 0.22);
+    padding: 18px 20px;
+    z-index: 1000;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    color: #231304;
+    box-sizing: border-box;
+  }
+
+  .hud-header {
     display: flex;
-    flex-direction: column;
-    gap: 14px;
-  }
-
-  .btn {
-    appearance: none;
-    background: #c9600a;
-    border: 1.5px solid rgba(255, 230, 180, 0.4);
-    color: #ffffff;
-    padding: 14px 20px;
-    border-radius: 30px;
-    font-family: inherit;
-    font-size: 15px;
-    font-weight: 600;
-    letter-spacing: 3px;
-    cursor: pointer;
-    box-shadow: 0 4px 18px rgba(201, 96, 10, 0.35);
-    transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
-  }
-
-  .btn:active {
-    transform: scale(0.97);
-    background: #a34805;
-  }
-
-  .btn.secondary {
-    background: transparent;
-    border: 1px solid var(--border);
-    color: var(--text-main);
-    box-shadow: none;
-  }
-
-  .btn.secondary.active {
-    background: rgba(232, 168, 72, 0.15);
-    border-color: var(--gold);
-    color: var(--gold);
-  }
-
-  .slider-row {
-    margin-top: 18px;
-    display: flex;
-    align-items: center;
     justify-content: space-between;
-    font-size: 13px;
-    color: var(--text-dim);
-    letter-spacing: 1px;
+    align-items: center;
+    margin-bottom: 12px;
+    border-bottom: 1px solid rgba(143, 47, 0, 0.18);
+    padding-bottom: 10px;
   }
 
-  input[type="range"] {
-    flex: 1;
-    margin-left: 14px;
-    accent-color: var(--gold);
+  .hud-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #8f2f00;
+    letter-spacing: 0.8px;
+    margin: 0;
+  }
+
+  .hud-section-divider {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8f2f00;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin: 16px 0 10px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed rgba(143, 47, 0, 0.25);
+  }
+
+  .hud-group {
+    margin-bottom: 12px;
+  }
+
+  .hud-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    font-weight: 600;
+    color: #5a3818;
+    margin-bottom: 4px;
+    letter-spacing: 0.3px;
+  }
+
+  .hud-val {
+    color: #8f2f00;
+    font-weight: 700;
+  }
+
+  .hud-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: #c9600a;
+    cursor: pointer;
+  }
+
+  .vu-meter-wrap {
+    height: 10px;
+    background: rgba(143, 47, 0, 0.12);
+    border-radius: 5px;
+    overflow: hidden;
+    margin-top: 4px;
+  }
+
+  .vu-meter-bar {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, #e59b24, #c9600a, #8f2229);
+    border-radius: 5px;
+    transition: width 50ms linear;
+  }
+
+  .hud-btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .hud-btn {
+    background: #c9600a;
+    border: none;
+    color: #fff;
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
+  }
+
+  .hud-btn:active {
+    transform: scale(0.97);
+    background: #8f2f00;
+  }
+
+  .hud-btn.secondary {
+    background: rgba(255, 255, 255, 0.8);
+    color: #8f2f00;
+    border: 1px solid rgba(143, 47, 0, 0.25);
+  }
+
+  .hud-btn.toggle-active {
+    background: #8f2f00;
+    color: #fff;
+  }
+
+  .hud-copy-btn {
+    width: 100%;
+    background: #8f2f00;
+    color: #fff;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+
+  .center-label {
+    position: absolute;
+    top: 50%;
+    left: 45%;
+    transform: translate(-50%, -50%);
+    font-family: "Shippori Mincho", serif;
+    font-size: 26px;
+    color: #8f2f00;
+    letter-spacing: 8px;
+    pointer-events: none;
+    text-align: center;
+    opacity: 0.85;
+    text-shadow: 0 2px 14px rgba(253, 243, 216, 0.95);
   }
 </style>
 </head>
 <body>
 
-<div class="card">
-  <div class="title-mark">❀</div>
-  <h1>秋夜の静寂</h1>
-  <div class="subtitle">鈴虫（Suzumushi）プロシージャル合成</div>
-
-  <div class="canvas-wrap">
-    <canvas id="scopeCanvas" width="400" height="90"></canvas>
+<!-- LAYER 1: Standard diffuse light mesh -->
+<div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
   </div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="mote-field" id="moteField"></div>
+</div>
 
-  <div class="status-line" id="statusLabel">待機中</div>
-
-  <div class="controls">
-    <button type="button" class="btn" id="playBtn">一回再生する</button>
-    <button type="button" class="btn secondary" id="loopBtn">環境ループ (間隔をあけて巡回): OFF</button>
-  </div>
-
-  <div class="slider-row">
-    <span>音量</span>
-    <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.7">
+<!-- LAYER 2: Aligned Window + Mask + Mirrored Content -->
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="ambient-stage layer-mirrored">
+    <div class="ambient-layer ambient-mesh">
+      <div class="light-orb orb-1"></div>
+      <div class="light-orb orb-2"></div>
+      <div class="light-orb orb-3"></div>
+    </div>
+    <div class="ambient-layer ambient-primary"></div>
   </div>
 </div>
 
+<!-- Static base lattice (faint background guide) -->
+<div class="ambient-mosaic" aria-hidden="true"></div>
+
+<!-- Ambient Falling Maple Leaves -->
+<div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+</div>
+
+<div class="center-label">双層・七宝調律室</div>
+
+<!-- Floating HUD -->
+<div class="hud-container">
+  <div class="hud-header">
+    <h3 class="hud-title">Dual Swell Tuner</h3>
+    <span id="statusIndicator" style="font-size: 11px; font-weight: 700; color: #8f2f00;">PAUSED</span>
+  </div>
+
+  <div class="hud-btn-row">
+    <button class="hud-btn" id="btnPlayPause">Play Music</button>
+    <button class="hud-btn secondary" id="btnToggleTrack">Morning.mp3</button>
+  </div>
+
+  <div class="hud-btn-row">
+    <button class="hud-btn secondary toggle-active" id="btnToggleLattice">Layer 2: On</button>
+    <button class="hud-btn secondary" id="btnSoloLattice">Solo Layer 2</button>
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Audio Swell Energy</span>
+      <span class="hud-val" id="valSwellEnergy">0.00</span>
+    </div>
+    <div class="vu-meter-wrap">
+      <div class="vu-meter-bar" id="vuMeterBar"></div>
+    </div>
+  </div>
+
+  <div class="hud-section-divider">Audio Envelope Engine</div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Sensitivity Multiplier</span>
+      <span class="hud-val" id="valGainMult">1.6x</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderGainMult" min="0.5" max="3.5" step="0.1" value="1.6">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Noise Floor Gate</span>
+      <span class="hud-val" id="valNoiseFloor">35</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderNoiseFloor" min="10" max="80" step="1" value="35">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Attack Speed (Inhale)</span>
+      <span class="hud-val" id="valAttack">0.14</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderAttack" min="0.04" max="0.35" step="0.01" value="0.14">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Decay Speed (Exhale)</span>
+      <span class="hud-val" id="valDecay">0.035</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderDecay" min="0.01" max="0.10" step="0.005" value="0.035">
+  </div>
+
+  <div class="hud-section-divider">Layer 1: Diffuse Base Mesh</div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Orb Scale Expansion</span>
+      <span class="hud-val" id="valOrbScale">+28%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderOrbScale" min="0.05" max="0.60" step="0.01" value="0.28">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Mesh Base Opacity</span>
+      <span class="hud-val" id="valMeshBase">0.55</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderMeshBase" min="0.20" max="0.80" step="0.05" value="0.55">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Stage Brightness Lift</span>
+      <span class="hud-val" id="valBrightBoost">+22%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderBrightBoost" min="0.05" max="0.50" step="0.05" value="0.22">
+  </div>
+
+  <div class="hud-section-divider">Layer 2: Shippō Masked Lines</div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Lattice Base Opacity</span>
+      <span class="hud-val" id="valLatticeBase">0.35</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.70" step="0.05" value="0.35">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Lattice Swell Glow</span>
+      <span class="hud-val" id="valLatticeGlow">+60%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.10" max="1.50" step="0.05" value="0.60">
+  </div>
+
+  <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
+</div>
+
 <script>
-var audioCtx = null;
-var masterGain = null;
-var suzumushiBuffer = null;
-var isRendering = false;
-var loopTimer = null;
-var loopActive = false;
-var activeSource = null;
+  var TRACKS = [
+    { name: 'Morning', url: 'Sound/Morning.mp3' },
+    { name: 'Early Evening', url: 'Sound/Earlyevening.mp3' }
+  ];
+  var currentTrackIdx = 0;
 
-var statusLabel = document.getElementById('statusLabel');
-var playBtn = document.getElementById('playBtn');
-var loopBtn = document.getElementById('loopBtn');
-var volSlider = document.getElementById('volSlider');
-var canvas = document.getElementById('scopeCanvas');
-var ctx2d = canvas.getContext('2d');
-var analyser = null;
+  var audioCtx = null;
+  var audioSourceNode = null;
+  var audioGainNode = null;
+  var analyserNode = null;
+  var isPlaying = false;
 
-function ensureAudioContext() {
-  if (!audioCtx) {
+  var audioEl = new Audio();
+  audioEl.loop = true;
+  audioEl.crossOrigin = 'anonymous';
+
+  var swellEnergy = 0.0;
+  var rafId = null;
+  var freqData = new Uint8Array(256);
+
+  var config = {
+    gainMult: 1.6,
+    noiseFloor: 35,
+    attack: 0.14,
+    decay: 0.035,
+    orbScale: 0.28,
+    meshBase: 0.55,
+    meshSwell: 0.45,
+    brightBoost: 0.22,
+    satBoost: 0.20,
+    latticeBase: 0.35,
+    latticeSwell: 0.65,
+    latticeGlow: 0.60
+  };
+
+  var stageDiffuse = document.getElementById('stageDiffuse');
+  var stageLattice = document.getElementById('stageLattice');
+  var btnPlayPause = document.getElementById('btnPlayPause');
+  var btnToggleTrack = document.getElementById('btnToggleTrack');
+  var btnToggleLattice = document.getElementById('btnToggleLattice');
+  var btnSoloLattice = document.getElementById('btnSoloLattice');
+  var statusIndicator = document.getElementById('statusIndicator');
+  var valSwellEnergy = document.getElementById('valSwellEnergy');
+  var vuMeterBar = document.getElementById('vuMeterBar');
+
+  var latticeEnabled = true;
+  var soloLattice = false;
+
+  function initAudioPipeline() {
+    if (audioCtx) return;
     var Ctx = window.AudioContext || window.webkitAudioContext;
     audioCtx = new Ctx();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = parseFloat(volSlider.value);
-    
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 512;
-    masterGain.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    drawVisualizer();
-  }
-  if (audioCtx.state === 'suspended') {
-    audioCtx.resume();
-  }
-}
 
-function synthesizeSuzumushi() {
-  var sr = audioCtx.sampleRate || 44100;
-  var duration = 7.2;
-  var length = Math.floor(sr * duration);
-  var offline = new OfflineAudioContext(1, length, sr);
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 512;
+    analyserNode.smoothingTimeConstant = 0.8;
 
-  // 1. Nocturnal Air Bed (Filtered Pink Noise)
-  var noiseBuf = offline.createBuffer(1, length, sr);
-  var nd = noiseBuf.getChannelData(0);
-  var b0 = 0, b1 = 0, b2 = 0;
-  for (var i = 0; i < length; i++) {
-    var white = Math.random() * 2 - 1;
-    b0 = 0.99886 * b0 + white * 0.0555179;
-    b1 = 0.99332 * b1 + white * 0.0750759;
-    b2 = 0.96900 * b2 + white * 0.1538520;
-    nd[i] = (b0 + b1 + b2 + white * 0.5362) * 0.08;
+    audioGainNode = audioCtx.createGain();
+    audioGainNode.gain.value = 0.8;
+
+    audioSourceNode = audioCtx.createMediaElementSource(audioEl);
+    audioSourceNode.connect(analyserNode);
+    analyserNode.connect(audioGainNode);
+    audioGainNode.connect(audioCtx.destination);
   }
 
-  var airSrc = offline.createBufferSource();
-  airSrc.buffer = noiseBuf;
+  function startSwellLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
 
-  var airFilter = offline.createBiquadFilter();
-  airFilter.type = 'lowpass';
-  airFilter.frequency.value = 580;
+    function tick() {
+      if (!isPlaying || !analyserNode) {
+        swellEnergy += (0 - swellEnergy) * 0.05;
+        applySwellToCSS(swellEnergy);
+        if (swellEnergy > 0.005) {
+          rafId = requestAnimationFrame(tick);
+        } else {
+          applySwellToCSS(0);
+          rafId = null;
+        }
+        return;
+      }
 
-  var airGain = offline.createGain();
-  airGain.gain.setValueAtTime(0.0001, 0);
-  airGain.gain.exponentialRampToValueAtTime(0.018, 0.8);
-  airGain.gain.setValueAtTime(0.018, duration - 1.0);
-  airGain.gain.exponentialRampToValueAtTime(0.0001, duration);
+      analyserNode.getByteFrequencyData(freqData);
 
-  airSrc.connect(airFilter);
-  airFilter.connect(airGain);
-  airGain.connect(offline.destination);
-  airSrc.start(0);
+      var sum = 0;
+      var count = 30;
+      for (var i = 4; i < 34; i++) {
+        sum += freqData[i];
+      }
+      var avg = sum / count;
 
-  // 2. Bell Carrier & Flutter Engine
-  var carrier1 = offline.createOscillator();
-  carrier1.type = 'sine';
-  carrier1.frequency.value = 4460;
+      var clean = Math.max(0, avg - config.noiseFloor);
+      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
+      var target = Math.pow(normalized, 1.35);
 
-  var carrier2 = offline.createOscillator();
-  carrier2.type = 'sine';
-  carrier2.frequency.value = 4492;
+      if (target > swellEnergy) {
+        swellEnergy += (target - swellEnergy) * config.attack;
+      } else {
+        swellEnergy += (target - swellEnergy) * config.decay;
+      }
 
-  var carrier2Gain = offline.createGain();
-  carrier2Gain.gain.value = 0.35;
+      applySwellToCSS(swellEnergy);
 
-  var amMod = offline.createOscillator();
-  amMod.type = 'sine';
-  amMod.frequency.value = 26;
+      valSwellEnergy.textContent = swellEnergy.toFixed(2);
+      vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
 
-  var amDepth = offline.createGain();
-  amDepth.gain.value = 0.40;
+      rafId = requestAnimationFrame(tick);
+    }
 
-  var amBase = offline.createGain();
-  amBase.gain.value = 0.60;
-
-  amMod.connect(amDepth);
-  amDepth.connect(amBase.gain);
-
-  carrier1.connect(amBase);
-  carrier2.connect(carrier2Gain);
-  carrier2Gain.connect(amBase);
-
-  var cricketFilter = offline.createBiquadFilter();
-  cricketFilter.type = 'bandpass';
-  cricketFilter.frequency.value = 4480;
-  cricketFilter.Q.value = 2.0;
-
-  var phraseGain = offline.createGain();
-  phraseGain.gain.setValueAtTime(0.0001, 0);
-
-  amBase.connect(cricketFilter);
-  cricketFilter.connect(phraseGain);
-  phraseGain.connect(offline.destination);
-
-  // 3. Cadence Timing
-  function scheduleChirp(start, attack, sustain, decay, peak) {
-    var aEnd = start + attack;
-    var sEnd = aEnd + sustain;
-    var dEnd = sEnd + decay;
-    phraseGain.gain.setValueAtTime(0.0001, start);
-    phraseGain.gain.exponentialRampToValueAtTime(peak, aEnd);
-    if (sustain > 0) phraseGain.gain.linearRampToValueAtTime(peak * 0.72, sEnd);
-    phraseGain.gain.exponentialRampToValueAtTime(0.0001, dEnd);
+    rafId = requestAnimationFrame(tick);
   }
 
-  // Phrase 1 (0.6s - 2.3s)
-  scheduleChirp(0.60, 0.015, 0.010, 0.035, 0.12);
-  scheduleChirp(0.74, 0.015, 0.010, 0.035, 0.18);
-  scheduleChirp(0.90, 0.080, 0.700, 0.550, 0.38);
+  function applySwellToCSS(val) {
+    var vStr = val.toFixed(3);
+    if (stageDiffuse) stageDiffuse.style.setProperty('--audio-swell', vStr);
+    if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
+  }
 
-  // Phrase 2 (3.8s - 5.7s)
-  scheduleChirp(3.82, 0.015, 0.010, 0.035, 0.15);
-  scheduleChirp(3.98, 0.090, 0.820, 0.650, 0.42);
-
-  carrier1.start(0);
-  carrier2.start(0);
-  amMod.start(0);
-  carrier1.stop(duration);
-  carrier2.stop(duration);
-  amMod.stop(duration);
-
-  return offline.startRendering();
-}
-
-function playBuffer(buf, onComplete) {
-  if (!buf || !audioCtx) return;
-  var src = audioCtx.createBufferSource();
-  src.buffer = buf;
-  src.connect(masterGain);
-  src.start(0);
-  activeSource = src;
-  statusLabel.textContent = '鈴虫が鳴いています…';
-
-  src.onended = function() {
-    activeSource = null;
-    statusLabel.textContent = loopActive ? '静寂（次の鳴き声まで待機）' : '完了';
-    if (onComplete) onComplete();
-  };
-}
-
-playBtn.addEventListener('click', function() {
-  ensureAudioContext();
-  if (isRendering) return;
-
-  if (!suzumushiBuffer) {
-    statusLabel.textContent = '合成中 (約10ms)...';
-    isRendering = true;
-    var t0 = performance.now();
-    synthesizeSuzumushi().then(function(rendered) {
-      suzumushiBuffer = rendered;
-      isRendering = false;
-      var elapsed = Math.round(performance.now() - t0);
-      statusLabel.textContent = '合成完了 (' + elapsed + 'ms)';
-      playBuffer(suzumushiBuffer);
+  function applyConfigToCSS() {
+    [stageDiffuse, stageLattice].forEach(function(el) {
+      if (!el) return;
+      el.style.setProperty('--ctrl-orb-scale', config.orbScale);
+      el.style.setProperty('--ctrl-mesh-base', config.meshBase);
+      el.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
+      el.style.setProperty('--ctrl-bright-boost', config.brightBoost);
+      el.style.setProperty('--ctrl-sat-boost', config.satBoost);
+      el.style.setProperty('--ctrl-lattice-base', config.latticeBase);
+      el.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
+      el.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
     });
-  } else {
-    playBuffer(suzumushiBuffer);
   }
-});
 
-function scheduleLoopStep() {
-  if (!loopActive) return;
-  playBuffer(suzumushiBuffer, function() {
-    if (!loopActive) return;
-    // 4 to 8 seconds of authentic silence between calls
-    var silence = 4000 + Math.random() * 4000;
-    loopTimer = setTimeout(scheduleLoopStep, silence);
-  });
-}
+  btnPlayPause.addEventListener('click', function() {
+    initAudioPipeline();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
 
-loopBtn.addEventListener('click', function() {
-  ensureAudioContext();
-  loopActive = !loopActive;
-
-  if (loopActive) {
-    loopBtn.classList.add('active');
-    loopBtn.textContent = '環境ループ: ON (間隔あり巡回)';
-    if (!suzumushiBuffer) {
-      statusLabel.textContent = '合成中...';
-      synthesizeSuzumushi().then(function(rendered) {
-        suzumushiBuffer = rendered;
-        scheduleLoopStep();
+    if (!isPlaying) {
+      if (!audioEl.src) {
+        audioEl.src = TRACKS[currentTrackIdx].url;
+      }
+      audioEl.play().then(function() {
+        isPlaying = true;
+        btnPlayPause.textContent = 'Pause Music';
+        statusIndicator.textContent = 'PLAYING';
+        statusIndicator.style.color = '#c9600a';
+        startSwellLoop();
+      }).catch(function() {
+        alert('Audio play error: Ensure audio files exist in Sound/ folder.');
       });
     } else {
-      scheduleLoopStep();
+      audioEl.pause();
+      isPlaying = false;
+      btnPlayPause.textContent = 'Play Music';
+      statusIndicator.textContent = 'PAUSED';
+      statusIndicator.style.color = '#8f2f00';
     }
-  } else {
-    loopBtn.classList.remove('active');
-    loopBtn.textContent = '環境ループ (間隔をあけて巡回): OFF';
-    if (loopTimer) clearTimeout(loopTimer);
-    if (activeSource) {
-      try { activeSource.stop(); } catch (e) {}
+  });
+
+  btnToggleTrack.addEventListener('click', function() {
+    currentTrackIdx = (currentTrackIdx + 1) % TRACKS.length;
+    var t = TRACKS[currentTrackIdx];
+    btnToggleTrack.textContent = t.name + '.mp3';
+    var wasPlaying = isPlaying;
+    audioEl.src = t.url;
+    if (wasPlaying) {
+      audioEl.play();
     }
-    statusLabel.textContent = '待機中';
+  });
+
+  btnToggleLattice.addEventListener('click', function() {
+    latticeEnabled = !latticeEnabled;
+    btnToggleLattice.classList.toggle('toggle-active', latticeEnabled);
+    btnToggleLattice.textContent = latticeEnabled ? 'Layer 2: On' : 'Layer 2: Off';
+    stageLattice.classList.toggle('disabled', !latticeEnabled);
+  });
+
+  btnSoloLattice.addEventListener('click', function() {
+    soloLattice = !soloLattice;
+    btnSoloLattice.classList.toggle('toggle-active', soloLattice);
+    btnSoloLattice.textContent = soloLattice ? 'Unsolo Layer 2' : 'Solo Layer 2';
+    stageDiffuse.style.display = soloLattice ? 'none' : '';
+    if (soloLattice && !latticeEnabled) {
+      btnToggleLattice.click();
+    }
+  });
+
+  function bindSlider(id, key, valElId, formatter, cssUpdater) {
+    var s = document.getElementById(id);
+    var v = document.getElementById(valElId);
+    s.addEventListener('input', function() {
+      var val = parseFloat(s.value);
+      config[key] = val;
+      if (formatter) v.textContent = formatter(val);
+      else v.textContent = val;
+      if (cssUpdater) cssUpdater(val);
+      applyConfigToCSS();
+    });
   }
-});
 
-volSlider.addEventListener('input', function() {
-  if (masterGain) masterGain.gain.value = parseFloat(volSlider.value);
-});
+  bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
+  bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
+  bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
+  bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
+  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
+    config.meshSwell = parseFloat((1 - v).toFixed(2));
+    return v.toFixed(2);
+  });
+  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){
+    config.latticeSwell = parseFloat((1 - v).toFixed(2));
+    return v.toFixed(2);
+  });
+  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
 
-function drawVisualizer() {
-  requestAnimationFrame(drawVisualizer);
-  if (!analyser) return;
+  document.getElementById('btnCopyConfig').addEventListener('click', function() {
+    var out = [
+      '/* Tuned Dual-Layer Configuration */',
+      'gainMult: ' + config.gainMult + ',',
+      'noiseFloor: ' + config.noiseFloor + ',',
+      'attack: ' + config.attack + ',',
+      'decay: ' + config.decay + ',',
+      '--ctrl-orb-scale: ' + config.orbScale + ',',
+      '--ctrl-mesh-base: ' + config.meshBase + ',',
+      '--ctrl-bright-boost: ' + config.brightBoost + ',',
+      '--ctrl-lattice-base: ' + config.latticeBase + ',',
+      '--ctrl-lattice-glow: ' + config.latticeGlow
+    ].join('\n');
+    navigator.clipboard.writeText(out).then(function() {
+      alert('Configuration copied to clipboard!');
+    });
+  });
 
-  var bufferLength = analyser.frequencyBinCount;
-  var dataArray = new Uint8Array(bufferLength);
-  analyser.getByteTimeDomainData(dataArray);
-
-  ctx2d.clearRect(0, 0, canvas.width, canvas.height);
-  ctx2d.lineWidth = 1.5;
-  ctx2d.strokeStyle = 'rgba(232, 168, 72, 0.85)';
-  ctx2d.beginPath();
-
-  var sliceWidth = canvas.width / bufferLength;
-  var x = 0;
-
-  for (var i = 0; i < bufferLength; i++) {
-    var v = dataArray[i] / 128.0;
-    var y = (v * canvas.height) / 2;
-    if (i === 0) ctx2d.moveTo(x, y);
-    else ctx2d.lineTo(x, y);
-    x += sliceWidth;
-  }
-
-  ctx2d.lineTo(canvas.width, canvas.height / 2);
-  ctx2d.stroke();
-}
+  applyConfigToCSS();
 </script>
-
 </body>
 </html>
