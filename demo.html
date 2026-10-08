@@ -24,7 +24,30 @@
 
   /* ------------------------------------------------------------
      LAYER 1: Diffuse Base Mesh
-     ------------------------------------------------------------ */
+
+     RISK NOTE (flagged during first review, unchanged by this
+     pass): the brightness/saturate filter below runs on the full
+     viewport every frame. On a TBDR GPU at 120Hz — the S8 Ultra
+     this app is designed for — a full-viewport filter pass is the
+     same shape of work that produced the earlier checkerboard
+     dropouts when applied to mix-blend-mode layers. A brightness/
+     saturate filter is cheaper than mix-blend-mode because it
+     doesn't need a backdrop read-back, so it may hold 120fps, but
+     it is the single largest GPU cost in this demo and the first
+     thing to watch on the tablet. If it stutters, the fix is to
+     drive the brightness lift via a lighter-weight substitute:
+     raise the orbs' own opacity instead of filtering the whole
+     stage, or widen the mesh opacity ramp and drop the filter
+     entirely.
+
+     The transition on opacity was removed in this pass. Every
+     frame the JS writes a new --audio-swell, and a 100ms CSS
+     transition on top of a value that changes every 16ms never
+     settles — the browser is always interpolating toward a
+     target that has already moved. The attack/decay envelope in
+     JS is the smoothing; the CSS transition was smoothing the
+     smoothed value and adding measurable phase lag between the
+     audio and the visual. */
   .layer-diffuse {
     filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.22)))
             saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.20)));
@@ -33,25 +56,35 @@
 
   .layer-diffuse .ambient-mesh {
     opacity: calc(var(--ctrl-mesh-base, 0.55) + var(--audio-swell, 0) * var(--ctrl-mesh-swell, 0.45)) !important;
-    transition: opacity 100ms ease-out;
   }
 
   .layer-diffuse .orb-1 {
     transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.28))) !important;
-    transition: transform 120ms ease-out;
   }
   .layer-diffuse .orb-2 {
     transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 1.15))) !important;
-    transition: transform 120ms ease-out;
   }
   .layer-diffuse .orb-3 {
     transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 0.90))) !important;
-    transition: transform 120ms ease-out;
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Perfectly Aligned Mask Window + Mirrored Motion
-     ------------------------------------------------------------ */
+     LAYER 2: Aligned Mask Window + Mirrored Motion
+
+     The mask is a white-stroke Shippō tile at the SAME stroke
+     width as the .ambient-mosaic guide (1.7). Both tiles are 60×60
+     viewBoxes at 60px background/mask size, both pinned to (0, 0),
+     so the audio-reactive lattice overlays the static guide
+     exactly.
+
+     Removed in this pass:
+       · the brightness/saturate filter — it multiplied an already
+         amber source (the mesh's brightest stop is rgba(247,185,60))
+         by up to 1.7× and saturation by 1.5×, pushing the lattice
+         into pure yellow. The palette is now stated directly by
+         .lattice-tint below.
+       · the 100ms opacity transition — same per-frame-write
+         rationale as Layer 1. */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
@@ -59,24 +92,25 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Proven data-URI mask with stroke-width 1.2 matching .ambient-mosaic */
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    /* Locked strictly to (0, 0) matching .ambient-mosaic */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
     -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     mask-repeat: repeat;
     mask-size: 60px 60px;
     mask-position: 0 0;
 
     opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
-    /* Soft amber/warm persimmon: prevents channel clipping to neon yellow */
-    filter: brightness(calc(1.02 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.30)))
-            contrast(1.05);
-    transition: opacity 100ms ease-out;
   }
 
-  /* The inner mesh is mirrored horizontally */
+  /* The inner mesh is mirrored horizontally. Note this is not a
+     live reflection — it is an independent second copy of the
+     stage that runs its own drift cycles. The mirror only makes
+     the drift phase differ from Layer 1; the two fields are not
+     synchronised. That is what gives the lattice window its own
+     character rather than reading as a copy of the diffuse layer. */
   .shippo-mask-window .ambient-stage.layer-mirrored {
     position: absolute;
     top: -25%; left: -25%;
@@ -86,8 +120,51 @@
     pointer-events: none;
   }
 
+  /* Reduced from 1.0 to 0.55 in this pass. The mesh is no longer
+     the colour source for the lattice — it is only the motion
+     carrier. At 0.55 it drifts underneath the tint and contributes
+     a slow swell to the composite; the palette itself comes from
+     .lattice-tint below. */
   .shippo-mask-window .ambient-mesh {
-    opacity: 1.0 !important;
+    opacity: 0.55 !important;
+  }
+
+  /* ------------------------------------------------------------
+     Lattice colour tint. Painted inside the mask so it appears
+     only on the Shippō ring outlines, overlaying the mirrored
+     mesh underneath. Establishes the target palette directly as
+     a colour statement rather than leaving it to a brightness/
+     saturate filter chain on the whole mask window — the filter
+     approach was amplifying the mesh's amber stop to pure yellow.
+
+     Palette travels across three named tones:
+       shibu-kaki (deep persimmon)   #6b1f0a → #a8420a
+       toasted amber                 #b06a1a → #b87a20
+       warm maple                    #8f3d1a → #6b1f0a
+
+     The gradient is viewport-wide, not per-tile. Because the mask
+     tiles at 60px, each ring segment samples its local slice of
+     the global gradient — so the lattice colour drifts smoothly
+     across the screen rather than repeating identically in every
+     tile. */
+  .lattice-tint {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(100% 80% at 28% 30%,
+        rgba(168, 66, 10, 0.35) 0%,
+        rgba(143, 47, 0, 0.18) 42%,
+        rgba(143, 47, 0, 0) 72%),
+      linear-gradient(150deg,
+        #6b1f0a 0%,
+        #8f2f00 22%,
+        #a8420a 42%,
+        #b06a1a 58%,
+        #a8420a 74%,
+        #8f3d1a 88%,
+        #6b1f0a 100%);
+    opacity: calc(var(--ctrl-lattice-tint, 0.75) + var(--audio-swell, 0) * 0.15);
   }
 
   .shippo-mask-window.disabled {
@@ -96,7 +173,11 @@
 
   /* ------------------------------------------------------------
      HUD Control Panel
-     ------------------------------------------------------------ */
+
+     The backdrop-filter here is a one-shot blur on a small fixed-
+     size element, not a per-frame full-viewport pass, so it does
+     not carry the tile-rasterization risk flagged for the stage
+     filters above. */
   .hud-container {
     position: fixed;
     top: 16px;
@@ -265,7 +346,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Aligned Window + Mask + Mirrored Content -->
+<!-- LAYER 2: Aligned Window + Mask + Mirrored Content + Tint -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -275,6 +356,7 @@
     </div>
     <div class="ambient-layer ambient-primary"></div>
   </div>
+  <div class="lattice-tint" aria-hidden="true"></div>
 </div>
 
 <!-- Static base lattice (faint background guide) -->
@@ -392,16 +474,50 @@
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Swell Glow</span>
-      <span class="hud-val" id="valLatticeGlow">+30%</span>
+      <span>Lattice Tint Opacity</span>
+      <span class="hud-val" id="valLatticeGlow">0.75</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.05" max="0.60" step="0.05" value="0.30">
+    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.20" max="1.00" step="0.05" value="0.75">
   </div>
 
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
 </div>
 
 <script>
+  /* ------------------------------------------------------------
+     AUDIO PIPELINE — INTEGRATION NOTE
+
+     This demo uses an HTMLAudioElement routed through
+     createMediaElementSource, so the 17-minute ambient tracks
+     stream from the network rather than being decoded into memory.
+     The app's acoustic engine (app.js) instead uses
+     decodeAudioData + AudioBufferSourceNode, which holds the full
+     PCM in RAM — approximately 360MB per 17-minute stereo track,
+     720MB for both. The two are not interchangeable on the same
+     audio element, and the analyser has to tap whichever pipeline
+     is actually playing.
+
+     Three integration paths, in order of increasing disruption:
+
+       A. Keep the app's buffer pipeline; tap an AnalyserNode in
+          parallel off soundMasterGain. Zero disruption to the
+          sound engine, keeps the memory concern, works today.
+
+       B. Move the ambient beds to <audio> elements; keep chime,
+          drop and stream on buffers. Frees ~700MB, loses the
+          seamless-loop crossfade for the beds only. The bed
+          already has a 4s tail fade-out for Earlyevening and a 3s
+          head fade-in for both tracks, so the MP3 encoder padding
+          at the loop seam is already masked — the loss is smaller
+          than it sounds.
+
+       C. Move all audio to <audio>. Maximum memory saving, but
+          the chime's random-offset play window and the stream
+          bed's crossfade loop are both implemented on buffers and
+          would need re-authoring.
+
+     This demo does not attempt to choose; the flag stays open for
+     the integration discussion. */
   var TRACKS = [
     { name: 'Morning', url: 'Sound/Morning.mp3' },
     { name: 'Early Evening', url: 'Sound/Earlyevening.mp3' }
@@ -434,7 +550,7 @@
     satBoost: 0.20,
     latticeBase: 0.35,
     latticeSwell: 0.65,
-    latticeGlow: 0.30
+    latticeTint: 0.75
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -468,6 +584,12 @@
     audioGainNode.connect(audioCtx.destination);
   }
 
+  /* The measured band. At 44.1kHz with fftSize 512 the bin width
+     is about 86Hz, so bins 4-33 cover roughly 345Hz-2.84kHz. That
+     captures the ambient bed's bass and low-mid swell but is deaf
+     to the wind chime, which sits higher. Deliberate for now —
+     the chime is meant to be an accent, not a visual driver — but
+     worth knowing if the lattice ever needs to react to it. */
   function startSwellLoop() {
     if (rafId) cancelAnimationFrame(rafId);
 
@@ -514,24 +636,25 @@
     rafId = requestAnimationFrame(tick);
   }
 
+  /* --audio-swell is written once on the document element and
+     cascades to both stages via CSS variable inheritance. Earlier
+     versions wrote it to each stage element individually, which
+     was two style-property mutations per frame where one
+     suffices. */
   function applySwellToCSS(val) {
-    var vStr = val.toFixed(3);
-    if (stageDiffuse) stageDiffuse.style.setProperty('--audio-swell', vStr);
-    if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
+    document.documentElement.style.setProperty('--audio-swell', val.toFixed(3));
   }
 
   function applyConfigToCSS() {
-    [stageDiffuse, stageLattice].forEach(function(el) {
-      if (!el) return;
-      el.style.setProperty('--ctrl-orb-scale', config.orbScale);
-      el.style.setProperty('--ctrl-mesh-base', config.meshBase);
-      el.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
-      el.style.setProperty('--ctrl-bright-boost', config.brightBoost);
-      el.style.setProperty('--ctrl-sat-boost', config.satBoost);
-      el.style.setProperty('--ctrl-lattice-base', config.latticeBase);
-      el.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
-      el.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
-    });
+    var root = document.documentElement;
+    root.style.setProperty('--ctrl-orb-scale', config.orbScale);
+    root.style.setProperty('--ctrl-mesh-base', config.meshBase);
+    root.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
+    root.style.setProperty('--ctrl-bright-boost', config.brightBoost);
+    root.style.setProperty('--ctrl-sat-boost', config.satBoost);
+    root.style.setProperty('--ctrl-lattice-base', config.latticeBase);
+    root.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
+    root.style.setProperty('--ctrl-lattice-tint', config.latticeTint);
   }
 
   btnPlayPause.addEventListener('click', function() {
@@ -617,7 +740,12 @@
     config.latticeSwell = parseFloat((1 - v).toFixed(2));
     return v.toFixed(2);
   });
-  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  /* Repurposed in this pass. Previously drove a brightness filter
+     that was removed because it was producing the yellow cast on
+     the lattice. Now drives --ctrl-lattice-tint, the opacity of
+     the shibu-kaki / toasted amber / warm maple gradient that
+     paints the ring outlines. */
+  bindSlider('sliderLatticeGlow', 'latticeTint', 'valLatticeGlow', function(v){ return v.toFixed(2); });
 
   document.getElementById('btnCopyConfig').addEventListener('click', function() {
     var out = [
@@ -630,7 +758,7 @@
       '--ctrl-mesh-base: ' + config.meshBase + ',',
       '--ctrl-bright-boost: ' + config.brightBoost + ',',
       '--ctrl-lattice-base: ' + config.latticeBase + ',',
-      '--ctrl-lattice-glow: ' + config.latticeGlow
+      '--ctrl-lattice-tint: ' + config.latticeTint
     ].join('\n');
     navigator.clipboard.writeText(out).then(function() {
       alert('Configuration copied to clipboard!');
