@@ -50,7 +50,7 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Shippō Mask Window (SVG DOM Mask reference)
+     LAYER 2: Perfectly Aligned Mask Window + Mirrored Motion
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
@@ -59,16 +59,24 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Reliable W3C DOM Mask Reference */
-    -webkit-mask: url(#shippoMask);
-    mask: url(#shippoMask);
+    /* Proven data-URI mask with stroke-width 1.2 matching .ambient-mosaic */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-repeat: repeat;
+    -webkit-mask-size: 60px 60px;
+    -webkit-mask-position: 0 0;
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-repeat: repeat;
+    mask-size: 60px 60px;
+    mask-position: 0 0;
 
-    /* Clean opacity swell without heavy filters */
     opacity: calc(var(--ctrl-lattice-base, 0.35) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.65));
+    /* Soft amber/warm persimmon: prevents channel clipping to neon yellow */
+    filter: brightness(calc(1.02 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.30)))
+            contrast(1.05);
     transition: opacity 100ms ease-out;
   }
 
-  /* Mirrored mesh inside the mask */
+  /* The inner mesh is mirrored horizontally */
   .shippo-mask-window .ambient-stage.layer-mirrored {
     position: absolute;
     top: -25%; left: -25%;
@@ -80,31 +88,6 @@
 
   .shippo-mask-window .ambient-mesh {
     opacity: 1.0 !important;
-  }
-
-  /* Deep Persimmon & Warm Amber Gradients for Layer 2 (Eliminates Neon Yellow) */
-  .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(235, 105, 30, 0.90) 0%, rgba(205, 75, 20, 0.40) 45%, transparent 70%) !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.28))) !important;
-    transition: transform 120ms ease-out;
-  }
-  .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(240, 120, 35, 0.92) 0%, rgba(195, 65, 18, 0.45) 48%, transparent 72%) !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 1.15))) !important;
-    transition: transform 120ms ease-out;
-  }
-  .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(225, 95, 25, 0.85) 0%, rgba(180, 55, 15, 0.35) 40%, transparent 60%) !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 0.90))) !important;
-    transition: transform 120ms ease-out;
-  }
-
-  .shippo-mask-window .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(230, 110, 30, 0.80) 0%, transparent 55%),
-      radial-gradient(circle at 75% 40%, rgba(210, 90, 25, 0.75) 0%, transparent 58%),
-      radial-gradient(circle at 50% 70%, rgba(185, 70, 20, 0.70) 0%, transparent 52%),
-      radial-gradient(circle at 20% 85%, rgba(150, 50, 15, 0.60) 0%, transparent 50%) !important;
   }
 
   .shippo-mask-window.disabled {
@@ -271,24 +254,6 @@
 </head>
 <body>
 
-<!-- W3C Compliant DOM Mask Definition: Guarantees 100% support across all engines -->
-<svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true" focusable="false">
-  <defs>
-    <pattern id="shippoPattern" width="60" height="60" patternUnits="userSpaceOnUse">
-      <g fill="none" stroke="white" stroke-width="1.2">
-        <circle cx="0" cy="0" r="30" />
-        <circle cx="60" cy="0" r="30" />
-        <circle cx="0" cy="60" r="30" />
-        <circle cx="60" cy="60" r="30" />
-        <circle cx="30" cy="30" r="30" />
-      </g>
-    </pattern>
-    <mask id="shippoMask" maskUnits="userSpaceOnUse" x="0" y="0" width="100%" height="100%">
-      <rect width="100%" height="100%" fill="url(#shippoPattern)" />
-    </mask>
-  </defs>
-</svg>
-
 <!-- LAYER 1: Standard diffuse light mesh -->
 <div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
@@ -300,7 +265,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Shippō Masked Lattice (Mirrored) -->
+<!-- LAYER 2: Aligned Window + Mask + Mirrored Content -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -328,7 +293,7 @@
 
 <div class="center-label">双層・七宝調律室</div>
 
-<!-- HUD Control Panel -->
+<!-- Floating HUD -->
 <div class="hud-container">
   <div class="hud-header">
     <h3 class="hud-title">Dual Swell Tuner</h3>
@@ -427,10 +392,10 @@
 
   <div class="hud-group">
     <div class="hud-label">
-      <span>Lattice Peak Swell</span>
-      <span class="hud-val" id="valLatticeSwell">+65%</span>
+      <span>Lattice Swell Glow</span>
+      <span class="hud-val" id="valLatticeGlow">+30%</span>
     </div>
-    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.20" max="0.80" step="0.05" value="0.65">
+    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.05" max="0.60" step="0.05" value="0.30">
   </div>
 
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
@@ -468,7 +433,8 @@
     brightBoost: 0.22,
     satBoost: 0.20,
     latticeBase: 0.35,
-    latticeSwell: 0.65
+    latticeSwell: 0.65,
+    latticeGlow: 0.30
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -564,6 +530,7 @@
       el.style.setProperty('--ctrl-sat-boost', config.satBoost);
       el.style.setProperty('--ctrl-lattice-base', config.latticeBase);
       el.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
+      el.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
     });
   }
 
@@ -623,7 +590,7 @@
     }
   });
 
-  function bindSlider(id, key, valElId, formatter) {
+  function bindSlider(id, key, valElId, formatter, cssUpdater) {
     var s = document.getElementById(id);
     var v = document.getElementById(valElId);
     s.addEventListener('input', function() {
@@ -631,6 +598,7 @@
       config[key] = val;
       if (formatter) v.textContent = formatter(val);
       else v.textContent = val;
+      if (cssUpdater) cssUpdater(val);
       applyConfigToCSS();
     });
   }
@@ -645,8 +613,11 @@
     return v.toFixed(2);
   });
   bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){ return v.toFixed(2); });
-  bindSlider('sliderLatticeSwell', 'latticeSwell', 'valLatticeSwell', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){
+    config.latticeSwell = parseFloat((1 - v).toFixed(2));
+    return v.toFixed(2);
+  });
+  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
 
   document.getElementById('btnCopyConfig').addEventListener('click', function() {
     var out = [
@@ -659,7 +630,7 @@
       '--ctrl-mesh-base: ' + config.meshBase + ',',
       '--ctrl-bright-boost: ' + config.brightBoost + ',',
       '--ctrl-lattice-base: ' + config.latticeBase + ',',
-      '--ctrl-lattice-swell: ' + config.latticeSwell
+      '--ctrl-lattice-glow: ' + config.latticeGlow
     ].join('\n');
     navigator.clipboard.writeText(out).then(function() {
       alert('Configuration copied to clipboard!');
