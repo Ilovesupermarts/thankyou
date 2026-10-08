@@ -131,6 +131,13 @@
      hardware sampler. Zero per-frame Skia cost regardless of viewport
      size or scroll.
 
+     v1.3 (stroke width 1.2): the mosaic stroke was reduced from 1.7
+     to 1.2 to match Layer 2's SVG mask exactly. Both tiles are on
+     the same 60×60 grid pinned to (0, 0), so their strokes land on
+     identical pixels. When Layer 2's audio-reactive content is
+     revealed through the mask, the two contributions sit at the
+     same position rather than one inside the other.
+
      v1.3 (pond mask, animated): the mask is driven by two registered
      custom properties, --pond-inner and --pond-outer, so the hole in
      the pattern can fade open and closed in step with the blossom
@@ -191,11 +198,123 @@
   }
 
   html[data-theme="autumn"] .ambient-mosaic {
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.7'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
   }
 
   html[data-theme="default"] .ambient-mosaic {
     display: none;
+  }
+
+  /* ============================================================
+     AUDIO-REACTIVE SWELL SYSTEM (v1.3)
+     ------------------------------------------------------------
+     Two layers driven by --audio-swell, a float from 0.00 to 1.00
+     written each frame from app.js's analyser tap. Layer 1 is the
+     existing diffuse mesh; Layer 2 is a new mirrored copy of the
+     orbs clipped by an SVG Shippō mask.
+
+     Performance note: Layer 2 carries a static filter (hue-rotate,
+     saturate, contrast) and modulates only opacity and transform.
+     This ensures the browser rasterizes the filtered SVG-masked
+     texture once and never re-runs the offscreen pass per frame.
+     Per-frame filter recalculations on masked elements force
+     Chromium to re-rasterize offscreen framebuffers at 60fps and
+     thrash GPU tile memory, which is what produced the checkerboard
+     dropouts earlier in development. Do not add calc(--audio-swell)
+     inside the filter.
+     ============================================================ */
+
+  /* --- LAYER 1: Diffuse base mesh swell --- */
+  .layer-diffuse {
+    filter: brightness(calc(1 + var(--audio-swell, 0) * 0.30))
+            saturate(calc(1 + var(--audio-swell, 0) * 0.20));
+    will-change: transform, filter;
+  }
+
+  .layer-diffuse .ambient-mesh {
+    opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important;
+    transition: opacity 100ms ease-out;
+  }
+
+  /* Individual `scale` longhand, not `transform: scale()`.
+     The orb drift keyframes animate the `transform` shorthand.
+     Setting `scale` operates on a separate transform channel, so
+     the slow drift continues uninterrupted while the audio swell
+     scales on top. `!important` is not needed — the keyframes
+     never touch `scale`. */
+  .layer-diffuse .orb-1 {
+    scale: calc(1 + var(--audio-swell, 0) * 0.53);
+    transition: scale 120ms ease-out;
+  }
+  .layer-diffuse .orb-2 {
+    scale: calc(1 + var(--audio-swell, 0) * 0.61); /* 0.53 * 1.15 */
+    transition: scale 120ms ease-out;
+  }
+  .layer-diffuse .orb-3 {
+    scale: calc(1 + var(--audio-swell, 0) * 0.48); /* 0.53 * 0.90 */
+    transition: scale 120ms ease-out;
+  }
+
+  /* --- LAYER 2: Masked geometric counter-flow --- */
+  .shippo-mask-window {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+
+    /* Phase-locked 1.2px hairline Shippō stencil. Same tile
+       geometry as .ambient-mosaic above. */
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-repeat: repeat;
+    -webkit-mask-size: 60px 60px;
+    -webkit-mask-position: 0 0;
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-repeat: repeat;
+    mask-size: 60px 60px;
+    mask-position: 0 0;
+
+    /* Rest 0.20 → Peak 1.10. Opacity is GPU-composited, no
+       offscreen pass. */
+    opacity: calc(0.20 + var(--audio-swell, 0) * 0.90);
+    transition: opacity 100ms ease-out;
+
+    /* Static color grade. Rendered once at mask setup, then
+       reused across frames. Contains NO calc(--audio-swell)
+       terms — that is the whole point of the static filter. */
+    filter: hue-rotate(-10deg) saturate(1.45) contrast(1.55);
+  }
+
+  .shippo-mask-window .ambient-stage.layer-mirrored {
+    position: absolute;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    transform-origin: 50% 50%;
+    transform: scaleX(-1);
+    pointer-events: none;
+  }
+
+  .shippo-mask-window .ambient-mesh {
+    opacity: 1.0 !important;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.14));
+    transform-origin: 50% 50%;
+    transition: transform 120ms ease-out;
+  }
+
+  /* Saturated persimmon & amber gradients. The saturated stops
+     push the orbs' own color into the shibu-kaki / cinnabar /
+     burnt-amber range so that the static saturate() and
+     contrast() in the filter above cannot drive the red and
+     green channels to 255 and produce electric yellow at peak.
+     These override the base .orb-N gradients inside Layer 2 only. */
+  .shippo-mask-window .orb-1 {
+    background: radial-gradient(circle, rgba(235, 110, 30, 0.95) 0%, rgba(200, 75, 20, 0.45) 45%, transparent 70%) !important;
+  }
+  .shippo-mask-window .orb-2 {
+    background: radial-gradient(circle, rgba(245, 125, 35, 0.98) 0%, rgba(210, 85, 22, 0.50) 48%, transparent 72%) !important;
+  }
+  .shippo-mask-window .orb-3 {
+    background: radial-gradient(circle, rgba(225, 100, 25, 0.90) 0%, rgba(190, 65, 18, 0.40) 40%, transparent 62%) !important;
   }
 
   /* ============ SHIPPO STAR TRACERS (v1.3) ============
@@ -2286,20 +2405,7 @@
   }
   .start-btn.diving .rings-svg { opacity: 0; }
 
-  /* v1.3: gold band as a slow breathing pulse.
-     The ring breathes through four independent channels at once:
-     it grows by 12%, its stroke thickens by 1.5px, its own opacity
-     rises from 0.7 to 1.0, and its glow deepens from a single tight
-     4px/10px pair to a three-layer 10/28/56px bloom. Any one of
-     those on its own would be lost against the warm autumn
-     background; together they read as unmistakably alive. Duration
-     shortened from 4s to 2.8s so the cycle is perceptible without
-     staring.
-
-     transform-box: view-box makes the 180px 180px origin resolve
-     in the SVG's viewBox coordinate system, which is where the
-     circle's centre sits. Default in Chromium, but explicit is
-     safer across the Adreno stack. */
+  /* v1.3: gold band as a slow breathing pulse. */
   .gold-band {
     stroke: #fdf3d8;
     stroke-width: 6px;
@@ -2330,13 +2436,6 @@
     }
   }
 
-  /* Ready state: a fully distinct animation rather than a custom-
-     property override. Custom properties inside keyframes do not
-     re-resolve mid-animation in Chromium, which is why the earlier
-     attempt to intensify via --gold-* variables had no visible
-     effect on the running pulse. A separate @keyframes sidesteps
-     that entirely and lets the ready state be as loud as it wants
-     without fighting the resting animation. */
   .start-btn.ready .gold-band {
     stroke: #ffffff;
     animation: goldBreathReady 1.4s ease-in-out infinite;
