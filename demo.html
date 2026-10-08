@@ -1,624 +1,529 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="theme-color" content="#1a1410">
-<title>Ambient Sound Tuning — 追加オプションのご相談</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Audio Reactive Swell Lab</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="main.css">
+
 <style>
-  *, *::before, *::after { box-sizing: border-box; }
-  html, body {
+  /* Demo Canvas Overrides */
+  body {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
     margin: 0;
-    background: #1a1410;
-    color: #f0e0c8;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
-    -webkit-text-size-adjust: 100%;
-    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  .wrap {
-    max-width: 640px;
-    margin: 0 auto;
-    padding: 40px 24px 80px;
+
+  /* Audio Swell Reactive Hooks */
+  .ambient-stage {
+    filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.25)))
+            saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.20)));
+    will-change: transform, filter;
   }
-  h1 {
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 22px;
-    font-weight: 600;
-    letter-spacing: 2px;
-    color: #f7b93c;
-    margin: 0 0 8px;
+
+  .ambient-mesh {
+    opacity: calc(var(--ctrl-mesh-base, 0.55) + var(--audio-swell, 0) * var(--ctrl-mesh-swell, 0.45)) !important;
+    transition: opacity 100ms ease-out;
   }
-  .sub {
-    font-size: 13px;
-    color: #a89070;
-    margin: 0 0 32px;
-    line-height: 1.7;
+
+  .orb-1 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.28))) !important;
+    transition: transform 120ms ease-out;
   }
-  .sub code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 12px;
-    background: rgba(247, 185, 60, 0.1);
-    padding: 1px 5px;
-    border-radius: 4px;
-    color: #f7b93c;
+  .orb-2 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 1.15))) !important;
+    transition: transform 120ms ease-out;
   }
-  section {
-    padding: 22px 0;
-    border-top: 1px solid rgba(247, 185, 60, 0.15);
+  .orb-3 {
+    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 0.90))) !important;
+    transition: transform 120ms ease-out;
   }
-  section:first-of-type {
-    border-top: none;
-    padding-top: 0;
+
+  html[data-theme="autumn"] .ambient-primary {
+    opacity: calc(0.70 + var(--audio-swell, 0) * 0.30) !important;
+    transition: opacity 120ms ease-out;
   }
-  h2 {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 3px;
-    color: #a89070;
-    text-transform: uppercase;
-    margin: 0 0 14px;
+
+  /* Floating Control HUD */
+  .hud-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    background: rgba(253, 243, 216, 0.88);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1.5px solid rgba(143, 47, 0, 0.3);
+    border-radius: 18px;
+    box-shadow: 0 12px 36px rgba(100, 35, 10, 0.18);
+    padding: 20px;
+    z-index: 1000;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    color: #231304;
+    box-sizing: border-box;
   }
-  button {
-    appearance: none;
-    -webkit-appearance: none;
-    background: rgba(247, 185, 60, 0.08);
-    border: 1px solid rgba(247, 185, 60, 0.3);
-    color: #f0e0c8;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 500;
-    padding: 12px 20px;
-    border-radius: 10px;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.1s;
-  }
-  button:hover:not(:disabled) {
-    background: rgba(247, 185, 60, 0.15);
-    border-color: rgba(247, 185, 60, 0.5);
-  }
-  button:active:not(:disabled) {
-    transform: scale(0.97);
-  }
-  button.active {
-    background: rgba(247, 185, 60, 0.28);
-    border-color: #f7b93c;
-    color: #f7b93c;
-  }
-  button:disabled {
-    opacity: 0.35;
-    cursor: not-allowed;
-  }
-  .clip-buttons {
+
+  .hud-header {
     display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .clip-buttons button {
-    flex: 1;
-    min-width: 140px;
-  }
-  .slider-row {
-    display: flex;
+    justify-content: space-between;
     align-items: center;
-    gap: 16px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid rgba(143, 47, 0, 0.15);
+    padding-bottom: 10px;
+  }
+
+  .hud-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: #8f2f00;
+    letter-spacing: 1px;
+    margin: 0;
+  }
+
+  .hud-group {
     margin-bottom: 14px;
   }
-  input[type="range"] {
-    flex: 1;
-    -webkit-appearance: none;
-    appearance: none;
-    height: 4px;
-    border-radius: 2px;
-    background: rgba(247, 185, 60, 0.2);
-    outline: none;
-    cursor: pointer;
-  }
-  input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #f7b93c;
-    cursor: pointer;
-    border: 2px solid #1a1410;
-    box-shadow: 0 2px 8px rgba(247, 185, 60, 0.5);
-  }
-  input[type="range"]::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
-    background: #f7b93c;
-    cursor: pointer;
-    border: 2px solid #1a1410;
-    box-shadow: 0 2px 8px rgba(247, 185, 60, 0.5);
-  }
-  .readouts {
+
+  .hud-label {
     display: flex;
-    gap: 28px;
-    flex-wrap: wrap;
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 13px;
-    margin-bottom: 12px;
-  }
-  .readouts .label {
-    color: #a89070;
-    margin-right: 6px;
-  }
-  .readouts .val {
+    justify-content: space-between;
+    font-size: 11px;
     font-weight: 600;
-    color: #f7b93c;
+    color: #5a3818;
+    margin-bottom: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
   }
-  .meter {
-    height: 6px;
-    border-radius: 3px;
-    background: rgba(247, 185, 60, 0.12);
+
+  .hud-val {
+    color: #8f2f00;
+    font-weight: 700;
+  }
+
+  .hud-slider {
+    width: 100%;
+    margin: 0;
+    accent-color: #c9600a;
+    cursor: pointer;
+  }
+
+  /* Audio Meter */
+  .vu-meter-wrap {
+    height: 10px;
+    background: rgba(143, 47, 0, 0.12);
+    border-radius: 5px;
     overflow: hidden;
     margin-top: 4px;
+    position: relative;
   }
-  .meter-fill {
+
+  .vu-meter-bar {
     height: 100%;
-    background: linear-gradient(90deg, #7ec87e 0%, #f7b93c 70%, #e86a4a 100%);
-    transform-origin: left center;
-    transform: scaleX(0);
-    transition: transform 60ms linear;
+    width: 0%;
+    background: linear-gradient(90deg, #e59b24, #c9600a, #8f2229);
+    border-radius: 5px;
+    transition: width 50ms linear;
   }
-  .playback-buttons {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-    margin-bottom: 16px;
+
+  /* Action Buttons */
+  .hud-btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 14px;
   }
-  .playback-buttons button {
-    flex: 1;
-    min-width: 110px;
-  }
-  #playBtn.active {
-    background: rgba(120, 200, 120, 0.2);
-    border-color: #7ec87e;
-    color: #7ec87e;
-  }
-  .status {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 13px;
-    color: #a89070;
-    padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 8px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    letter-spacing: 0.3px;
-  }
-  .status.playing { color: #7ec87e; }
-  .status.loading { color: #f7b93c; }
-  .notes ul {
-    padding-left: 20px;
-    margin: 0 0 18px;
-    font-size: 13px;
-    color: #a89070;
-    line-height: 1.9;
-  }
-  .notes li {
-    margin-bottom: 8px;
-  }
-  .notes li:last-child { margin-bottom: 0; }
-  .notes code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+
+  .hud-btn {
+    background: #c9600a;
+    border: none;
+    color: #fff;
+    padding: 10px 12px;
     font-size: 12px;
-    background: rgba(247, 185, 60, 0.1);
-    padding: 1px 5px;
-    border-radius: 4px;
-    color: #f7b93c;
+    font-weight: 600;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.1s;
+    text-align: center;
   }
-  .notes strong { color: #f0e0c8; font-weight: 600; }
-  .reset-vol {
-    background: transparent;
-    border-color: rgba(247, 185, 60, 0.2);
+
+  .hud-btn:active {
+    transform: scale(0.97);
+    background: #8f2f00;
+  }
+
+  .hud-btn.secondary {
+    background: rgba(255, 255, 255, 0.8);
+    color: #8f2f00;
+    border: 1px solid rgba(143, 47, 0, 0.25);
+  }
+
+  .hud-btn.secondary:active {
+    background: #fff;
+  }
+
+  .hud-copy-btn {
+    width: 100%;
+    background: #8f2f00;
+    color: #fff;
+    padding: 10px;
+    border: none;
+    border-radius: 10px;
     font-size: 12px;
-    padding: 7px 14px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 8px;
   }
-  .forget-btn {
-    background: transparent;
-    border-color: rgba(200, 100, 100, 0.3);
-    color: #e8a0a0;
-    font-size: 12px;
-    padding: 9px 16px;
-  }
-  .forget-btn:hover:not(:disabled) {
-    background: rgba(200, 100, 100, 0.1);
-    border-color: rgba(200, 100, 100, 0.5);
+
+  .center-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-family: "Shippori Mincho", serif;
+    font-size: 24px;
+    color: #8f2f00;
+    letter-spacing: 6px;
+    pointer-events: none;
+    text-align: center;
+    opacity: 0.85;
+    text-shadow: 0 2px 14px rgba(253, 243, 216, 0.9);
   }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <h1>Ambient Sound Tuning</h1>
-  <p class="sub">Standalone tool for setting <code>AMBIENT_TRACKS[i].peak</code>. Sits beside <code>index.html</code> and uses the same <code>Sound/</code> assets. Does not register the service worker. Master gain is fixed at 0.5, same as the app.</p>
-
-  <section>
-    <h2>1 · Clip</h2>
-    <div class="clip-buttons">
-      <button class="clip-btn" data-clip="morning">Morning.mp3</button>
-      <button class="clip-btn" data-clip="earlyevening">Earlyevening.mp3</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>2 · Volume (peak)</h2>
-    <div class="slider-row">
-      <input type="range" id="volSlider" min="0" max="1" step="0.01" value="0.24">
-    </div>
-    <div class="readouts">
-      <div><span class="label">peak</span><span class="val" id="peakVal">0.24</span></div>
-      <div><span class="label">× 0.5 master =</span><span class="val" id="effVal">0.12</span></div>
-    </div>
-    <div class="meter"><div class="meter-fill" id="meterFill"></div></div>
-    <div style="margin-top:12px;">
-      <button class="reset-vol" id="resetVol">Reset to 0.24</button>
-    </div>
-  </section>
-
-  <section>
-    <h2>3 · Playback</h2>
-    <div class="playback-buttons">
-      <button id="playBtn">▶ Loop</button>
-      <button id="stopBtn" disabled>■ Stop</button>
-      <button id="tailBtn">⏭ Tail 20s</button>
-    </div>
-    <div class="status" id="status">Stopped.</div>
-  </section>
-
-  <section class="notes">
-    <h2>Notes</h2>
-    <ul>
-      <li>The slider adjusts the track's peak gain <strong>live</strong>. You can hear the change without stopping playback.</li>
-      <li>Loop uses the real envelope: 3s fade-in at the head, 4s fade-out at the tail, then immediately re-arms. The clip crossfades into itself at the seam.</li>
-      <li><strong>Tail 20s</strong> jumps to the last 20 seconds so you can hear the fade-out without waiting the full 17 minutes.</li>
-      <li>Report the peak value you land on for each clip. Those numbers become <code>AMBIENT_TRACKS[i].peak</code>.</li>
-      <li>If you've swapped the mp3 files on disk, hit <strong>Forget cache</strong> below to force a fresh fetch.</li>
-    </ul>
-    <button class="forget-btn" id="forgetBtn">Forget cache &amp; unregister SW</button>
-  </section>
-
+<!-- Ambient Stage (Identical DOM to Production) -->
+<div class="ambient-stage" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
+  </div>
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="mote-field" id="moteField"></div>
 </div>
-<script>
-(function() {
-  'use strict';
 
-  var TRACK_URLS = {
-    morning:      'Sound/Morning.mp3',
-    earlyevening: 'Sound/Earlyevening.mp3'
-  };
-  var MASTER_GAIN = 0.5;
-  var DEFAULT_PEAK = 0.24;
-  var FADE_IN_S = 3.0;
-  var FADE_OUT_S = 4.0;
-  var TAIL_PREVIEW_S = 20;
+<div class="ambient-mosaic" aria-hidden="true"></div>
+
+<!-- Ambient Falling Maple Leaves -->
+<div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
+  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+</div>
+
+<div class="center-label">音の呼吸・調律室</div>
+
+<!-- Control HUD -->
+<div class="hud-container">
+  <div class="hud-header">
+    <h3 class="hud-title">Swell Tuner</h3>
+    <span id="statusIndicator" style="font-size: 11px; font-weight: 700; color: #8f2f00;">PAUSED</span>
+  </div>
+
+  <div class="hud-btn-row">
+    <button class="hud-btn" id="btnPlayPause">Play Music</button>
+    <button class="hud-btn secondary" id="btnToggleTrack">Morning.mp3</button>
+  </div>
+
+  <!-- Real-time Energy Gauge -->
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Audio Swell Energy</span>
+      <span class="hud-val" id="valSwellEnergy">0.00</span>
+    </div>
+    <div class="vu-meter-wrap">
+      <div class="vu-meter-bar" id="vuMeterBar"></div>
+    </div>
+  </div>
+
+  <!-- Dynamic Swell Settings -->
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Sensitivity Multiplier</span>
+      <span class="hud-val" id="valGainMult">1.6x</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderGainMult" min="0.5" max="3.5" step="0.1" value="1.6">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Noise Floor Gate</span>
+      <span class="hud-val" id="valNoiseFloor">35</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderNoiseFloor" min="10" max="80" step="1" value="35">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Attack Speed (Inhale)</span>
+      <span class="hud-val" id="valAttack">0.14</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderAttack" min="0.04" max="0.35" step="0.01" value="0.14">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Decay Speed (Exhale)</span>
+      <span class="hud-val" id="valDecay">0.035</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderDecay" min="0.01" max="0.10" step="0.005" value="0.035">
+  </div>
+
+  <!-- Visual Swell Bounds -->
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Orb Scale Expansion</span>
+      <span class="hud-val" id="valOrbScale">+30%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderOrbScale" min="0.05" max="0.60" step="0.01" value="0.30">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Mesh Base Opacity</span>
+      <span class="hud-val" id="valMeshBase">0.55</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderMeshBase" min="0.20" max="0.80" step="0.05" value="0.55">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Stage Brightness Lift</span>
+      <span class="hud-val" id="valBrightBoost">+25%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderBrightBoost" min="0.05" max="0.50" step="0.05" value="0.25">
+  </div>
+
+  <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
+</div>
+
+<script>
+  var TRACKS = [
+    { name: 'Morning', url: 'Sound/Morning.mp3' },
+    { name: 'Early Evening', url: 'Sound/Earlyevening.mp3' }
+  ];
+  var currentTrackIdx = 0;
 
   var audioCtx = null;
-  var masterGain = null;
-  var analyser = null;
-  var meterData = null;
+  var audioSourceNode = null;
+  var audioGainNode = null;
+  var analyserNode = null;
+  var isPlaying = false;
 
-  var buffers = {};
-  var loadPromises = {};
+  var audioEl = new Audio();
+  audioEl.loop = true;
+  audioEl.crossOrigin = 'anonymous';
 
-  var selectedClip = 'morning';
-  var currentPeak = DEFAULT_PEAK;
+  var swellEnergy = 0.0;
+  var rafId = null;
+  var freqData = new Uint8Array(256);
 
-  var state = 'stopped';           // 'stopped' | 'loading' | 'playing' | 'tail'
-  var currentSource = null;
-  var currentPeakGain = null;
-  var positionTimer = null;
-  var playStartCtxTime = 0;
-  var playDurationS = 0;
-  var playStartOffsetS = 0;
-  var playGeneration = 0;
-
-  var el = {
-    clipBtns:  document.querySelectorAll('.clip-btn'),
-    volSlider: document.getElementById('volSlider'),
-    peakVal:   document.getElementById('peakVal'),
-    effVal:    document.getElementById('effVal'),
-    meterFill: document.getElementById('meterFill'),
-    resetVol:  document.getElementById('resetVol'),
-    playBtn:   document.getElementById('playBtn'),
-    stopBtn:   document.getElementById('stopBtn'),
-    tailBtn:   document.getElementById('tailBtn'),
-    status:    document.getElementById('status'),
-    forgetBtn: document.getElementById('forgetBtn')
+  // Calibration Parameters (Live reactive)
+  var config = {
+    gainMult: 1.6,
+    noiseFloor: 35,
+    attack: 0.14,
+    decay: 0.035,
+    orbScale: 0.30,
+    meshBase: 0.55,
+    meshSwell: 0.45,
+    brightBoost: 0.25,
+    satBoost: 0.20
   };
 
-  function ensureCtx() {
+  // DOM elements
+  var stageEl = document.getElementById('ambientStage');
+  var btnPlayPause = document.getElementById('btnPlayPause');
+  var btnToggleTrack = document.getElementById('btnToggleTrack');
+  var statusIndicator = document.getElementById('statusIndicator');
+  var valSwellEnergy = document.getElementById('valSwellEnergy');
+  var vuMeterBar = document.getElementById('vuMeterBar');
+
+  function initAudioPipeline() {
     if (audioCtx) return;
     var Ctx = window.AudioContext || window.webkitAudioContext;
     audioCtx = new Ctx();
-    masterGain = audioCtx.createGain();
-    masterGain.gain.value = MASTER_GAIN;
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    meterData = new Uint8Array(analyser.fftSize);
-    masterGain.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume().catch(function() {});
-    }
-    requestAnimationFrame(updateMeter);
+
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 512;
+    analyserNode.smoothingTimeConstant = 0.8;
+
+    audioGainNode = audioCtx.createGain();
+    audioGainNode.gain.value = 0.8;
+
+    audioSourceNode = audioCtx.createMediaElementSource(audioEl);
+
+    // Audio Pipeline: Source -> Analyser -> Gain -> Speakers
+    audioSourceNode.connect(analyserNode);
+    analyserNode.connect(audioGainNode);
+    audioGainNode.connect(audioCtx.destination);
   }
 
-  function updateMeter() {
-    if (!analyser) { requestAnimationFrame(updateMeter); return; }
-    analyser.getByteTimeDomainData(meterData);
-    var peak = 0;
-    for (var i = 0; i < meterData.length; i++) {
-      var v = Math.abs(meterData[i] - 128);
-      if (v > peak) peak = v;
-    }
-    var level = peak / 128;
-    // dB scale, -60 dB to 0 dB → 0..1
-    var db = 20 * Math.log10(level + 0.0001);
-    var norm = Math.max(0, Math.min(1, (db + 60) / 60));
-    el.meterFill.style.transform = 'scaleX(' + norm.toFixed(3) + ')';
-    requestAnimationFrame(updateMeter);
-  }
+  function startSwellLoop() {
+    if (rafId) cancelAnimationFrame(rafId);
 
-  function loadBuffer(clip) {
-    if (buffers[clip]) return Promise.resolve(buffers[clip]);
-    if (loadPromises[clip]) return loadPromises[clip];
-    var url = TRACK_URLS[clip] + '?t=' + Date.now();
-    loadPromises[clip] = fetch(url)
-      .then(function(r) {
-        if (!r.ok) throw new Error('HTTP ' + r.status + ' on ' + url);
-        return r.arrayBuffer();
-      })
-      .then(function(ab) {
-        return new Promise(function(resolve, reject) {
-          var prom = audioCtx.decodeAudioData(ab, resolve, reject);
-          if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
-        });
-      })
-      .then(function(buf) {
-        buffers[clip] = buf;
-        loadPromises[clip] = null;
-        return buf;
-      })
-      .catch(function(err) {
-        loadPromises[clip] = null;
-        throw err;
-      });
-    return loadPromises[clip];
-  }
-
-  function stopCurrentSource() {
-    if (currentSource) {
-      try { currentSource.onended = null; currentSource.stop(); } catch (e) {}
-      currentSource = null;
-    }
-    if (currentPeakGain) {
-      try { currentPeakGain.disconnect(); } catch (e) {}
-      currentPeakGain = null;
-    }
-    stopPositionTimer();
-  }
-
-  function stopPlayback() {
-    playGeneration++;
-    stopCurrentSource();
-    state = 'stopped';
-    updateUI();
-  }
-
-  function startPositionTimer() {
-    stopPositionTimer();
-    positionTimer = setInterval(updateStatus, 200);
-  }
-  function stopPositionTimer() {
-    if (positionTimer) {
-      clearInterval(positionTimer);
-      positionTimer = null;
-    }
-  }
-
-  function play(preview) {
-    if (state === 'loading') return;
-    ensureCtx();
-    stopCurrentSource();
-
-    var myToken = ++playGeneration;
-    var clip = selectedClip;
-
-    state = 'loading';
-    updateUI();
-
-    loadBuffer(clip).then(function(buffer) {
-      if (myToken !== playGeneration) return;
-      if (selectedClip !== clip) return;
-      if (state !== 'loading') return;
-
-      var bufferDur = buffer.duration;
-      var playDur, startOffset, fadeIn, fadeOut;
-
-      if (preview === 'tail') {
-        playDur = Math.min(TAIL_PREVIEW_S, bufferDur);
-        startOffset = Math.max(0, bufferDur - playDur);
-        fadeIn = 0.5;
-        fadeOut = Math.min(FADE_OUT_S, playDur * 0.25);
-      } else {
-        playDur = bufferDur;
-        startOffset = 0;
-        var maxFade = playDur * 0.10;
-        fadeIn = Math.min(FADE_IN_S, maxFade);
-        fadeOut = Math.min(FADE_OUT_S, maxFade);
-      }
-
-      var now = audioCtx.currentTime;
-
-      var env = audioCtx.createGain();
-      env.gain.setValueAtTime(0, now);
-      env.gain.linearRampToValueAtTime(1, now + fadeIn);
-      env.gain.setValueAtTime(1, now + playDur - fadeOut);
-      env.gain.linearRampToValueAtTime(0, now + playDur);
-
-      var peakGain = audioCtx.createGain();
-      peakGain.gain.value = currentPeak;
-
-      var src = audioCtx.createBufferSource();
-      src.buffer = buffer;
-
-      src.connect(env);
-      env.connect(peakGain);
-      peakGain.connect(masterGain);
-
-      src.start(now, startOffset, playDur + 0.1);
-      src.stop(now + playDur + 0.1);
-
-      currentSource = src;
-      currentPeakGain = peakGain;
-      playStartCtxTime = now;
-      playDurationS = playDur;
-      playStartOffsetS = startOffset;
-
-      src.onended = function() {
-        if (currentSource !== src) return;
-        currentSource = null;
-        currentPeakGain = null;
-        stopPositionTimer();
-        if (state === 'playing' && myToken === playGeneration) {
-          play(false);   // re-arm the loop
+    function tick() {
+      if (!isPlaying || !analyserNode) {
+        swellEnergy += (0 - swellEnergy) * 0.05;
+        applySwellToCSS(swellEnergy);
+        if (swellEnergy > 0.005) {
+          rafId = requestAnimationFrame(tick);
         } else {
-          state = 'stopped';
-          updateUI();
+          applySwellToCSS(0);
+          rafId = null;
         }
-      };
-
-      state = (preview === 'tail') ? 'tail' : 'playing';
-      startPositionTimer();
-      updateUI();
-    }).catch(function(err) {
-      if (myToken !== playGeneration) return;
-      console.error(err);
-      state = 'stopped';
-      updateUI();
-      el.status.textContent = 'Failed to load ' + clip + '.mp3 — ' + err.message;
-      el.status.className = 'status';
-    });
-  }
-
-  function updateStatus() {
-    if (state === 'stopped') {
-      el.status.textContent = 'Stopped.';
-      el.status.className = 'status';
-      return;
-    }
-    if (state === 'loading') {
-      el.status.textContent = 'Loading ' + selectedClip + '.mp3…';
-      el.status.className = 'status loading';
-      return;
-    }
-    if (!audioCtx) return;
-    var elapsed = audioCtx.currentTime - playStartCtxTime;
-    if (elapsed > playDurationS) elapsed = playDurationS;
-    var shown = playStartOffsetS + elapsed;
-    var total = buffers[selectedClip] ? buffers[selectedClip].duration : 0;
-    var label = (state === 'tail') ? 'Tail' : 'Loop';
-    el.status.textContent = label + ' · ' + fmtTime(shown) + ' / ' + fmtTime(total) +
-                            ' · peak ' + currentPeak.toFixed(2);
-    el.status.className = 'status playing';
-  }
-
-  function fmtTime(seconds) {
-    seconds = Math.max(0, Math.floor(seconds));
-    var m = Math.floor(seconds / 60);
-    var s = seconds % 60;
-    if (s < 10) s = '0' + s;
-    return m + ':' + s;
-  }
-
-  function updateUI() {
-    el.clipBtns.forEach(function(b) {
-      b.classList.toggle('active', b.getAttribute('data-clip') === selectedClip);
-    });
-    el.peakVal.textContent = currentPeak.toFixed(2);
-    el.effVal.textContent  = (currentPeak * MASTER_GAIN).toFixed(2);
-
-    var playing = (state === 'playing' || state === 'tail');
-    var loading = (state === 'loading');
-    var busy = playing || loading;
-
-    el.playBtn.disabled = busy;
-    el.playBtn.classList.toggle('active', state === 'playing');
-    el.playBtn.textContent = state === 'playing' ? '▶ Looping' : '▶ Loop';
-
-    el.stopBtn.disabled = !busy;
-    el.tailBtn.disabled = busy;
-
-    updateStatus();
-  }
-
-  // --- Wiring ---
-
-  el.clipBtns.forEach(function(b) {
-    b.addEventListener('click', function() {
-      var clip = b.getAttribute('data-clip');
-      if (clip === selectedClip) return;
-      var wasBusy = (state === 'playing' || state === 'loading' || state === 'tail');
-      selectedClip = clip;
-      playGeneration++;
-      stopCurrentSource();
-      state = 'stopped';
-      if (wasBusy) {
-        play(false);
-      } else {
-        updateUI();
+        return;
       }
+
+      analyserNode.getByteFrequencyData(freqData);
+
+      // Extract mid/vocal/melodic range (bins 4 to 34 approx 170Hz - 1500Hz)
+      var sum = 0;
+      var count = 30;
+      for (var i = 4; i < 34; i++) {
+        sum += freqData[i];
+      }
+      var avg = sum / count;
+
+      // Noise floor gate
+      var clean = Math.max(0, avg - config.noiseFloor);
+      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
+
+      // Organic perceptual curve
+      var target = Math.pow(normalized, 1.35);
+
+      // Attack vs Decay envelope filter
+      if (target > swellEnergy) {
+        swellEnergy += (target - swellEnergy) * config.attack;
+      } else {
+        swellEnergy += (target - swellEnergy) * config.decay;
+      }
+
+      applySwellToCSS(swellEnergy);
+
+      // Update HUD Gauges
+      valSwellEnergy.textContent = swellEnergy.toFixed(2);
+      vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
+
+      rafId = requestAnimationFrame(tick);
+    }
+
+    rafId = requestAnimationFrame(tick);
+  }
+
+  function applySwellToCSS(val) {
+    if (!stageEl) return;
+    stageEl.style.setProperty('--audio-swell', val.toFixed(3));
+  }
+
+  function applyConfigToCSS() {
+    if (!stageEl) return;
+    stageEl.style.setProperty('--ctrl-orb-scale', config.orbScale);
+    stageEl.style.setProperty('--ctrl-mesh-base', config.meshBase);
+    stageEl.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
+    stageEl.style.setProperty('--ctrl-bright-boost', config.brightBoost);
+    stageEl.style.setProperty('--ctrl-sat-boost', config.satBoost);
+  }
+
+  // Play / Pause Control
+  btnPlayPause.addEventListener('click', function() {
+    initAudioPipeline();
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    if (!isPlaying) {
+      if (!audioEl.src) {
+        audioEl.src = TRACKS[currentTrackIdx].url;
+      }
+      audioEl.play().then(function() {
+        isPlaying = true;
+        btnPlayPause.textContent = 'Pause Music';
+        statusIndicator.textContent = 'PLAYING';
+        statusIndicator.style.color = '#c9600a';
+        startSwellLoop();
+      }).catch(function(e) {
+        alert('Audio play error: Ensure files exist in Sound/ folder.');
+      });
+    } else {
+      audioEl.pause();
+      isPlaying = false;
+      btnPlayPause.textContent = 'Play Music';
+      statusIndicator.textContent = 'PAUSED';
+      statusIndicator.style.color = '#8f2f00';
+    }
+  });
+
+  // Track Swap
+  btnToggleTrack.addEventListener('click', function() {
+    currentTrackIdx = (currentTrackIdx + 1) % TRACKS.length;
+    var t = TRACKS[currentTrackIdx];
+    btnToggleTrack.textContent = t.name + '.mp3';
+    var wasPlaying = isPlaying;
+    audioEl.src = t.url;
+    if (wasPlaying) {
+      audioEl.play();
+    }
+  });
+
+  // Slider bindings
+  function bindSlider(id, key, valElId, formatter, cssUpdater) {
+    var s = document.getElementById(id);
+    var v = document.getElementById(valElId);
+    s.addEventListener('input', function() {
+      var val = parseFloat(s.value);
+      config[key] = val;
+      if (formatter) v.textContent = formatter(val);
+      else v.textContent = val;
+      if (cssUpdater) cssUpdater(val);
+      applyConfigToCSS();
+    });
+  }
+
+  bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
+  bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
+  bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
+  bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
+  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
+    config.meshSwell = parseFloat((1 - v).toFixed(2));
+    return v.toFixed(2);
+  });
+  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
+
+  // Copy Config Button
+  document.getElementById('btnCopyConfig').addEventListener('click', function() {
+    var out = [
+      '/* Tuned Audio Swell Configuration */',
+      'gainMult: ' + config.gainMult + ',',
+      'noiseFloor: ' + config.noiseFloor + ',',
+      'attack: ' + config.attack + ',',
+      'decay: ' + config.decay + ',',
+      '--ctrl-orb-scale: ' + config.orbScale + ',',
+      '--ctrl-mesh-base: ' + config.meshBase + ',',
+      '--ctrl-bright-boost: ' + config.brightBoost
+    ].join('\n');
+    navigator.clipboard.writeText(out).then(function() {
+      alert('Tuned configuration copied to clipboard!');
     });
   });
 
-  el.volSlider.addEventListener('input', function() {
-    var v = parseFloat(el.volSlider.value);
-    if (isNaN(v)) v = 0;
-    currentPeak = v;
-    if (currentPeakGain) currentPeakGain.gain.value = v;
-    updateUI();
-  });
-
-  el.resetVol.addEventListener('click', function() {
-    currentPeak = DEFAULT_PEAK;
-    el.volSlider.value = DEFAULT_PEAK;
-    if (currentPeakGain) currentPeakGain.gain.value = DEFAULT_PEAK;
-    updateUI();
-  });
-
-  el.playBtn.addEventListener('click', function() { play(false); });
-  el.stopBtn.addEventListener('click', stopPlayback);
-  el.tailBtn.addEventListener('click', function() { play('tail'); });
-
-  el.forgetBtn.addEventListener('click', function() {
-    var tasks = [];
-    if ('serviceWorker' in navigator) {
-      tasks.push(navigator.serviceWorker.getRegistrations().then(function(regs) {
-        return Promise.all(regs.map(function(r) { return r.unregister(); }));
-      }));
-    }
-    if (window.caches && caches.keys) {
-      tasks.push(caches.keys().then(function(keys) {
-        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-      }));
-    }
-    Promise.all(tasks).then(function() {
-      el.forgetBtn.textContent = 'Cleared. Reloading…';
-      setTimeout(function() { location.reload(); }, 600);
-    }).catch(function() {
-      el.forgetBtn.textContent = 'Cleared (with errors). Reload to retry.';
-    });
-  });
-
-  updateUI();
-})();
+  applyConfigToCSS();
 </script>
 </body>
 </html>
