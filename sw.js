@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v71';
+const CACHE = 'thankyou-v72';
 
 const ASSETS = [
   './',
@@ -19,13 +19,7 @@ const ASSETS = [
   './icons/apple-touch-icon.png',
   './icons/1790678998862.jpg',
   './icons/1790835034553.jpg',
-  './icons/44173_0c6eff.png',
-  './Sound/cave-water-drop-echo-a053fcdf.mp3',
-  './Sound/freesound_community-wind-chimes-32150.mp3',
-  './Sound/baranova_n-birds-forest-river-409229.mp3',
-  './Sound/alex_jauk-calm-zen-river-flowing-228223.mp3',
-  './Sound/Wind.mp3',
-  './Sound/jauk-calm-zen-river-flowing.mp3'
+  './icons/44173_0c6eff.png'
 ];
 
 self.addEventListener('install', function(e) {
@@ -83,6 +77,36 @@ self.addEventListener('fetch', function(e) {
             }
           });
         })
+    );
+    return;
+  }
+
+  /* Cache-on-first-use for audio. The ambient tracks are 17-minute
+     files (~16MB each) and the app is fully usable before either
+     downloads, so they are kept out of the precache list to keep
+     install fast and robust. The first request for a given .mp3
+     streams from the network and is written into the cache in the
+     background; subsequent requests hit the cache. A partial or
+     failed download leaves no cache entry, so the next request
+     retries from the network.
+
+     The netRes.ok guard is load-bearing: a 404 or 5xx response
+     streams through to the caller (so loadAudioBuffer's !r.ok throw
+     fires and returns null) without being cached. Caching an error
+     response would poison every future session until the cache was
+     manually cleared. */
+  if (url.pathname.endsWith('.mp3')) {
+    e.respondWith(
+      caches.match(e.request).then(function(r) {
+        if (r) return r;
+        return fetch(e.request).then(function(netRes) {
+          if (netRes && netRes.ok) {
+            var copy = netRes.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+          }
+          return netRes;
+        });
+      })
     );
     return;
   }
