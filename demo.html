@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Shippō Star Tracer - Dissolve & Rotation Lab</title>
+<title>Shippō Star Tracer - Dissolve, Rotate & Scale Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -31,10 +31,10 @@
     /* Timing per your configuration */
     --draw-duration: 2.6s;
     --fade-duration: 3.4s;
-    --dissolve-start: 70%; /* Point where blur and rotation begin */
 
     /* Subtle Exit Dissolve Mechanics */
     --exit-rotate: 12deg;
+    --exit-scale: 1.15; /* Scale factor on exit transition */
     --exit-blur: 2.8px;
 
     --mosaic-opacity: 0.13;
@@ -161,12 +161,11 @@
     100% { transform: translate3d(-20px, 115vh, 0) rotate(90deg); opacity: 0; }
   }
 
-  /* ============ 4. SHIPPO TRACER (STAR WITH BLUR & ROTATE) ============ */
+  /* ============ 4. SHIPPO TRACER (STAR WITH ROTATE, SCALE & BLUR) ============ */
   .tracer-layer {
     position: fixed; inset: 0; pointer-events: none; z-index: 2; overflow: hidden;
   }
 
-  /* Outer container: locked to grid coordinates */
   .shippo-tracer {
     position: absolute;
     top: 0; left: 0;
@@ -176,7 +175,6 @@
     will-change: transform;
   }
 
-  /* Inner motion wrapper: handles exit rotation, defocus blur, and opacity fade */
   .tracer-rotator {
     width: 100%; height: 100%;
     transform-origin: 34px 34px;
@@ -189,7 +187,6 @@
     display: block;
   }
 
-  /* Star path matching .tracer-circle aesthetics */
   .tracer-path {
     fill: none;
     stroke: var(--tracer-stroke);
@@ -203,9 +200,8 @@
       drop-shadow(0 0 8px var(--tracer-glow-2));
   }
 
-  /* Active Lifecycle Classes */
   .shippo-tracer.drawing {
-    opacity: 1; /* Handled inside rotator */
+    opacity: 1;
   }
 
   .shippo-tracer.drawing .tracer-rotator {
@@ -216,7 +212,6 @@
     animation: drawStroke var(--draw-duration) cubic-bezier(0.35, 0, 0.25, 1) forwards;
   }
 
-  /* Stroke draw animation */
   @keyframes drawStroke {
     0%   { stroke-dashoffset: 189; }
     100% { stroke-dashoffset: 0; }
@@ -224,24 +219,23 @@
 
   /*
      Dissolve Animation:
-     - 0% -> 15%: Smooth arrival
-     - 15% -> var(--dissolve-start): Pristine focused hold while stroke finishes drawing
-     - var(--dissolve-start) -> 100%: Star rotates slightly, softens via blur, and gently dissolves
+     - 0% -> 70%: Holds scale(1), 0deg, and blur(0px) while drawing cleanly.
+     - 70% -> 100%: Concurrently rotates, scales, blurs, and fades out.
   */
   @keyframes starDissolveCycle {
     0% {
       opacity: 0;
-      transform: rotate(0deg);
+      transform: rotate(0deg) scale(1);
       filter: blur(0px);
     }
     14% {
       opacity: 0.95;
-      transform: rotate(0deg);
+      transform: rotate(0deg) scale(1);
       filter: blur(0px);
     }
-    70% { /* Aligned to ~2.4s where stroke is complete */
+    70% {
       opacity: 0.95;
-      transform: rotate(0deg);
+      transform: rotate(0deg) scale(1);
       filter: blur(0px);
     }
     85% {
@@ -250,7 +244,7 @@
     }
     100% {
       opacity: 0;
-      transform: rotate(var(--target-rot, var(--exit-rotate)));
+      transform: rotate(var(--target-rot, var(--exit-rotate))) scale(var(--exit-scale));
       filter: blur(var(--exit-blur));
     }
   }
@@ -313,7 +307,7 @@
 </head>
 <body>
 
-<!-- Ambient Layers -->
+<!-- Ambient Stage -->
 <div class="ambient-stage" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -343,6 +337,11 @@
   </div>
 
   <div class="section-label">消失アニメーション (Dissolve & Exit)</div>
+  <div class="control-row">
+    <label for="exitScale">拡大倍率 (Scale)</label>
+    <input type="range" id="exitScale" min="0.80" max="1.60" step="0.05" value="1.15">
+    <span class="val-badge" id="exitScaleVal">x1.15</span>
+  </div>
   <div class="control-row">
     <label for="exitRotate">回転角度 (Rotate)</label>
     <input type="range" id="exitRotate" min="-30" max="30" step="1" value="12">
@@ -426,7 +425,6 @@ function buildMotes() {
 }
 
 /* ============ STAR GEOMETRY ============ */
-// Concave 4-Point Star (4 arcs of R=30 meeting at 4 cardinal tips)
 const STAR_PATH_SVG = `
   <div class="tracer-rotator">
     <svg viewBox="0 0 68 68">
@@ -477,9 +475,9 @@ function spawnTracer() {
 
   const x = (j * 30) - 34;
   const y = (k * 30) - 34;
-  const startAngle = Math.floor(Math.random() * 8) * 45; // 45° lattice alignment
+  const startAngle = Math.floor(Math.random() * 8) * 45;
 
-  // Compute individual rotation delta for exit
+  // Compute rotation delta
   const baseRot = parseFloat(document.getElementById('exitRotate').value);
   const mode = document.getElementById('rotDirection').value;
   let targetRotDeg = baseRot;
@@ -495,7 +493,7 @@ function spawnTracer() {
 
   tracer.style.transform = `translate3d(${x}px, ${y}px, 0) rotate(${startAngle}deg)`;
   tracer.classList.remove('drawing');
-  void tracer.offsetWidth; // Reflow to reset CSS animations cleanly
+  void tracer.offsetWidth; // Force reflow
   tracer.classList.add('drawing');
 }
 
@@ -513,18 +511,28 @@ function scheduleNext() {
 /* ============ CONTROLS BINDING ============ */
 const root = document.documentElement;
 
+// Exit Scale control
+document.getElementById('exitScale').addEventListener('input', (e) => {
+  const val = parseFloat(e.target.value).toFixed(2);
+  document.getElementById('exitScaleVal').textContent = 'x' + val;
+  root.style.setProperty('--exit-scale', val);
+});
+
+// Exit Rotate control
 document.getElementById('exitRotate').addEventListener('input', (e) => {
   const val = (e.target.value > 0 ? '+' : '') + e.target.value + '°';
   document.getElementById('exitRotateVal').textContent = val;
   root.style.setProperty('--exit-rotate', e.target.value + 'deg');
 });
 
+// Exit Blur control
 document.getElementById('exitBlur').addEventListener('input', (e) => {
   const val = e.target.value + 'px';
   document.getElementById('exitBlurVal').textContent = val;
   root.style.setProperty('--exit-blur', val);
 });
 
+// Timing controls
 document.getElementById('drawDuration').addEventListener('input', (e) => {
   const val = e.target.value + 's';
   document.getElementById('drawDurationVal').textContent = val;
@@ -541,12 +549,14 @@ document.getElementById('intervalSpeed').addEventListener('input', (e) => {
   document.getElementById('intervalSpeedVal').textContent = e.target.value + 'ms';
 });
 
+// Stroke width
 document.getElementById('strokeWidth').addEventListener('input', (e) => {
   const val = e.target.value + 'px';
   document.getElementById('strokeWidthVal').textContent = val;
   root.style.setProperty('--stroke-width', val);
 });
 
+// Play / Pause
 const autoBtn = document.getElementById('autoBtn');
 autoBtn.addEventListener('click', () => {
   isAutoRunning = !isAutoRunning;
@@ -563,7 +573,9 @@ togglePanelBtn.addEventListener('click', () => {
   controlCard.classList.toggle('hidden');
 });
 
+// Code Snippet Export
 document.getElementById('copyCodeBtn').addEventListener('click', () => {
+  const scale = document.getElementById('exitScale').value;
   const rot = document.getElementById('exitRotate').value;
   const rotMode = document.getElementById('rotDirection').value;
   const blur = document.getElementById('exitBlur').value;
@@ -579,6 +591,7 @@ Glow: drop-shadow(0 0 2px #c9600a) drop-shadow(0 0 8px rgba(143, 47, 0, 0.95))
 Stroke-width: ${sw}px
 Draw Animation: drawStroke ${drawD}s cubic-bezier(0.35, 0, 0.25, 1) forwards;
 Dissolve Animation: starDissolveCycle ${fadeD}s cubic-bezier(0.25, 0.1, 0.25, 1) forwards;
+Exit Scale: x${scale}
 Exit Rotate: ${rot}deg (${rotMode})
 Exit Blur: ${blur}px
 Interval: ~${interval}ms`;
