@@ -23,9 +23,10 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 1: Diffuse Base Mesh
+     LAYER 1: Diffuse Base Mesh (Sits at z-index -3)
      ------------------------------------------------------------ */
   .layer-diffuse {
+    z-index: -3 !important;
     filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.18)))
             saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.10)));
     will-change: transform, filter;
@@ -50,28 +51,29 @@
   }
 
   /* ------------------------------------------------------------
-     LAYER 2: Aligned Window + Mellow Amber Palette + Shippo Mask
+     LAYER 2: Luminous Amber Lattice (Elevated to z-index -1)
      ------------------------------------------------------------ */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
     pointer-events: none;
-    z-index: -2;
+    z-index: -1; /* Sits above Layer 1 and static mosaic */
     overflow: hidden;
 
-    /* Grid alignment matches .ambient-mosaic at (0, 0) */
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    /* Dynamic SVG Mask driven by CSS custom property */
+    -webkit-mask-image: var(--shippo-svg-mask);
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
     -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='2.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-image: var(--shippo-svg-mask);
     mask-repeat: repeat;
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    opacity: calc(var(--ctrl-lattice-base, 0.25) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.45));
-    filter: brightness(calc(0.95 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.22)));
-    transition: opacity 120ms ease-out;
+    opacity: calc(var(--ctrl-lattice-base, 0.45) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.55));
+    filter: drop-shadow(0 0 calc(var(--audio-swell, 0) * 4px) rgba(225, 95, 20, 0.65))
+            brightness(calc(1.05 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.35)));
+    transition: opacity 100ms ease-out;
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -87,26 +89,26 @@
     opacity: 1.0 !important;
   }
 
-  /* Mellow Russet & Persimmon Gradients (Non-Yellow) */
+  /* Rich Flame-Amber & Molten Copper (Non-Yellowing) */
   .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(184, 74, 30, 0.65) 0%, rgba(196, 114, 42, 0.25) 45%, transparent 70%) !important;
+    background: radial-gradient(circle, rgba(235, 110, 25, 0.85) 0%, rgba(205, 75, 18, 0.35) 45%, transparent 70%) !important;
   }
 
   .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(168, 62, 20, 0.70) 0%, rgba(179, 86, 28, 0.30) 48%, transparent 72%) !important;
+    background: radial-gradient(circle, rgba(245, 125, 30, 0.88) 0%, rgba(185, 60, 15, 0.40) 48%, transparent 72%) !important;
   }
 
   .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(173, 85, 24, 0.55) 0%, rgba(143, 63, 18, 0.25) 40%, transparent 60%) !important;
+    background: radial-gradient(circle, rgba(220, 95, 20, 0.75) 0%, rgba(165, 50, 12, 0.30) 40%, transparent 60%) !important;
   }
 
   .shippo-mask-window .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(204, 110, 31, 0.70) 0%, transparent 55%),
-      radial-gradient(circle at 75% 40%, rgba(184, 74, 30, 0.65) 0%, transparent 58%),
-      radial-gradient(circle at 50% 70%, rgba(153, 54, 18, 0.60) 0%, transparent 52%),
-      radial-gradient(circle at 20% 85%, rgba(125, 43, 12, 0.50) 0%, transparent 50%) !important;
-    opacity: 0.85 !important;
+      radial-gradient(circle at 25% 30%, rgba(240, 120, 25, 0.80) 0%, transparent 55%),
+      radial-gradient(circle at 75% 40%, rgba(215, 85, 20, 0.75) 0%, transparent 58%),
+      radial-gradient(circle at 50% 70%, rgba(185, 65, 15, 0.70) 0%, transparent 52%),
+      radial-gradient(circle at 20% 85%, rgba(150, 45, 10, 0.60) 0%, transparent 50%) !important;
+    opacity: 0.95 !important;
   }
 
   .shippo-mask-window.disabled {
@@ -123,7 +125,7 @@
     width: 330px;
     max-height: calc(100vh - 32px);
     overflow-y: auto;
-    background: rgba(253, 243, 216, 0.88);
+    background: rgba(253, 243, 216, 0.90);
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     border: 1.5px solid rgba(143, 47, 0, 0.32);
@@ -210,7 +212,7 @@
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 8px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
   }
 
   .hud-btn {
@@ -240,6 +242,11 @@
   .hud-btn.toggle-active {
     background: #8f2f00;
     color: #fff;
+  }
+
+  .hud-btn.pulse-active {
+    background: #8f2229 !important;
+    color: #fff !important;
   }
 
   .hud-copy-btn {
@@ -284,7 +291,7 @@
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- LAYER 2: Aligned Window + Mellow Palette + Mirrored Content -->
+<!-- LAYER 2: Aligned Window + Molten Amber Palette + Mirrored Content -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
@@ -329,6 +336,8 @@
     <button class="hud-btn secondary" id="btnSoloLattice">Solo Layer 2</button>
   </div>
 
+  <button class="hud-btn secondary" id="btnTestSwell" style="width: 100%; margin-bottom: 12px;">Simulate Peak Swell (Hold)</button>
+
   <div class="hud-group">
     <div class="hud-label">
       <span>Audio Swell Energy</span>
@@ -337,6 +346,32 @@
     <div class="vu-meter-wrap">
       <div class="vu-meter-bar" id="vuMeterBar"></div>
     </div>
+  </div>
+
+  <div class="hud-section-divider">Layer 2: Shippō Masked Lines</div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Stroke Width</span>
+      <span class="hud-val" id="valStrokeWidth">3.6px</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderStrokeWidth" min="1.5" max="6.0" step="0.3" value="3.6">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Lattice Base Opacity</span>
+      <span class="hud-val" id="valLatticeBase">0.45</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.10" max="0.90" step="0.05" value="0.45">
+  </div>
+
+  <div class="hud-group">
+    <div class="hud-label">
+      <span>Lattice Swell Glow</span>
+      <span class="hud-val" id="valLatticeGlow">+35%</span>
+    </div>
+    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.10" max="0.80" step="0.05" value="0.35">
   </div>
 
   <div class="hud-section-divider">Audio Envelope Engine</div>
@@ -399,24 +434,6 @@
     <input type="range" class="hud-slider" id="sliderBrightBoost" min="0.05" max="0.50" step="0.01" value="0.18">
   </div>
 
-  <div class="hud-section-divider">Layer 2: Shippō Masked Lines</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Lattice Base Opacity</span>
-      <span class="hud-val" id="valLatticeBase">0.25</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.05" max="0.70" step="0.05" value="0.25">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Lattice Swell Glow</span>
-      <span class="hud-val" id="valLatticeGlow">+22%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.05" max="0.60" step="0.01" value="0.22">
-  </div>
-
   <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
 </div>
 
@@ -432,6 +449,7 @@
   var audioGainNode = null;
   var analyserNode = null;
   var isPlaying = false;
+  var isSimulatingSwell = false;
 
   var audioEl = new Audio();
   audioEl.loop = true;
@@ -451,9 +469,10 @@
     meshSwell: 0.45,
     brightBoost: 0.18,
     satBoost: 0.10,
-    latticeBase: 0.25,
-    latticeSwell: 0.45,
-    latticeGlow: 0.22
+    strokeWidth: 3.6,
+    latticeBase: 0.45,
+    latticeSwell: 0.55,
+    latticeGlow: 0.35
   };
 
   var stageDiffuse = document.getElementById('stageDiffuse');
@@ -462,12 +481,25 @@
   var btnToggleTrack = document.getElementById('btnToggleTrack');
   var btnToggleLattice = document.getElementById('btnToggleLattice');
   var btnSoloLattice = document.getElementById('btnSoloLattice');
+  var btnTestSwell = document.getElementById('btnTestSwell');
   var statusIndicator = document.getElementById('statusIndicator');
   var valSwellEnergy = document.getElementById('valSwellEnergy');
   var vuMeterBar = document.getElementById('vuMeterBar');
 
   var latticeEnabled = true;
   var soloLattice = false;
+
+  function buildMaskSvgUri(strokeW) {
+    var raw = "<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'>" +
+      "<g fill='none' stroke='white' stroke-width='" + strokeW + "' stroke-linecap='round'>" +
+      "<circle cx='0' cy='0' r='30'/>" +
+      "<circle cx='60' cy='0' r='30'/>" +
+      "<circle cx='0' cy='60' r='30'/>" +
+      "<circle cx='60' cy='60' r='30'/>" +
+      "<circle cx='30' cy='30' r='30'/>" +
+      "</g></svg>";
+    return "url(\"data:image/svg+xml," + encodeURIComponent(raw) + "\")";
+  }
 
   function initAudioPipeline() {
     if (audioCtx) return;
@@ -491,31 +523,26 @@
     if (rafId) cancelAnimationFrame(rafId);
 
     function tick() {
-      if (!isPlaying || !analyserNode) {
-        swellEnergy += (0 - swellEnergy) * 0.05;
-        applySwellToCSS(swellEnergy);
-        if (swellEnergy > 0.005) {
-          rafId = requestAnimationFrame(tick);
-        } else {
-          applySwellToCSS(0);
-          rafId = null;
+      var target = 0;
+
+      if (isSimulatingSwell) {
+        target = 1.0;
+      } else if (isPlaying && analyserNode) {
+        analyserNode.getByteFrequencyData(freqData);
+
+        var sum = 0;
+        var count = 30;
+        for (var i = 4; i < 34; i++) {
+          sum += freqData[i];
         }
-        return;
+        var avg = sum / count;
+
+        var clean = Math.max(0, avg - config.noiseFloor);
+        var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
+        target = Math.pow(normalized, 1.35);
       }
 
-      analyserNode.getByteFrequencyData(freqData);
-
-      var sum = 0;
-      var count = 30;
-      for (var i = 4; i < 34; i++) {
-        sum += freqData[i];
-      }
-      var avg = sum / count;
-
-      var clean = Math.max(0, avg - config.noiseFloor);
-      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
-      var target = Math.pow(normalized, 1.35);
-
+      // Attack / Decay filter
       if (target > swellEnergy) {
         swellEnergy += (target - swellEnergy) * config.attack;
       } else {
@@ -540,17 +567,20 @@
   }
 
   function applyConfigToCSS() {
-    [stageDiffuse, stageLattice].forEach(function(el) {
-      if (!el) return;
-      el.style.setProperty('--ctrl-orb-scale', config.orbScale);
-      el.style.setProperty('--ctrl-mesh-base', config.meshBase);
-      el.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
-      el.style.setProperty('--ctrl-bright-boost', config.brightBoost);
-      el.style.setProperty('--ctrl-sat-boost', config.satBoost);
-      el.style.setProperty('--ctrl-lattice-base', config.latticeBase);
-      el.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
-      el.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
-    });
+    var maskUri = buildMaskSvgUri(config.strokeWidth);
+    if (stageLattice) {
+      stageLattice.style.setProperty('--shippo-svg-mask', maskUri);
+      stageLattice.style.setProperty('--ctrl-lattice-base', config.latticeBase);
+      stageLattice.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
+      stageLattice.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
+    }
+    if (stageDiffuse) {
+      stageDiffuse.style.setProperty('--ctrl-orb-scale', config.orbScale);
+      stageDiffuse.style.setProperty('--ctrl-mesh-base', config.meshBase);
+      stageDiffuse.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
+      stageDiffuse.style.setProperty('--ctrl-bright-boost', config.brightBoost);
+      stageDiffuse.style.setProperty('--ctrl-sat-boost', config.satBoost);
+    }
   }
 
   btnPlayPause.addEventListener('click', function() {
@@ -609,6 +639,22 @@
     }
   });
 
+  // Hold-to-simulate peak swell
+  function startTestSwell() {
+    isSimulatingSwell = true;
+    btnTestSwell.classList.add('pulse-active');
+    startSwellLoop();
+  }
+  function stopTestSwell() {
+    isSimulatingSwell = false;
+    btnTestSwell.classList.remove('pulse-active');
+  }
+
+  btnTestSwell.addEventListener('mousedown', startTestSwell);
+  window.addEventListener('mouseup', stopTestSwell);
+  btnTestSwell.addEventListener('touchstart', function(e) { e.preventDefault(); startTestSwell(); });
+  window.addEventListener('touchend', stopTestSwell);
+
   function bindSlider(id, key, valElId, formatter, cssUpdater) {
     var s = document.getElementById(id);
     var v = document.getElementById(valElId);
@@ -622,34 +668,38 @@
     });
   }
 
-  bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
-  bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
-  bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
-  bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
-  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
-    config.meshSwell = parseFloat((1 - v).toFixed(2));
-    return v.toFixed(2);
-  });
-  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderStrokeWidth', 'strokeWidth', 'valStrokeWidth', function(v){ return v.toFixed(1) + 'px'; });
   bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){
     config.latticeSwell = parseFloat((1 - v).toFixed(2));
     return v.toFixed(2);
   });
   bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
 
+  bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
+  bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
+  bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
+  bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
+
+  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
+  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
+    config.meshSwell = parseFloat((1 - v).toFixed(2));
+    return v.toFixed(2);
+  });
+  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
+
   document.getElementById('btnCopyConfig').addEventListener('click', function() {
     var out = [
       '/* Tuned Dual-Layer Configuration */',
+      'strokeWidth: ' + config.strokeWidth + ',',
+      'latticeBase: ' + config.latticeBase + ',',
+      'latticeGlow: ' + config.latticeGlow + ',',
       'gainMult: ' + config.gainMult + ',',
       'noiseFloor: ' + config.noiseFloor + ',',
       'attack: ' + config.attack + ',',
       'decay: ' + config.decay + ',',
-      '--ctrl-orb-scale: ' + config.orbScale + ',',
-      '--ctrl-mesh-base: ' + config.meshBase + ',',
-      '--ctrl-bright-boost: ' + config.brightBoost + ',',
-      '--ctrl-lattice-base: ' + config.latticeBase + ',',
-      '--ctrl-lattice-glow: ' + config.latticeGlow
+      'orbScale: ' + config.orbScale + ',',
+      'meshBase: ' + config.meshBase + ',',
+      'brightBoost: ' + config.brightBoost
     ].join('\n');
     navigator.clipboard.writeText(out).then(function() {
       alert('Configuration copied to clipboard!');
