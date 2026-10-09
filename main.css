@@ -139,18 +139,12 @@
      v1.3 (opacity 0.08): resting opacity reduced from 0.13. The
      audio-reactive release added a second moving line system on top
      of this one, so the base pattern's resting weight was stepped
-     down to keep the total visual floor stable and give the panel
-     text more room. The pattern is still clearly present; it just
-     no longer competes with the reactive layer for attention.
+     down to keep the total visual floor stable.
 
      v1.3 (pond mask, animated): the mask is driven by two registered
      custom properties, --pond-inner and --pond-outer, so the hole in
      the pattern can fade open and closed in step with the blossom
-     screen's own fade. The base rule holds both radii at 0px, which
-     puts the transparent stop and the black stop at the exact same
-     pixel — a hard-edged cut at the centre, effectively a no-op. The
-     html:has(...) rule below raises the radii to 178px / 210px when
-     the blossom screen is on-screen AND not yet diving. */
+     screen's own fade. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
@@ -174,26 +168,6 @@
                 --pond-outer 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
-  /* v1.3: pond mask, scoped to the blossom screen while the koi is
-     still interactive. A radial-gradient mask fades the pattern to
-     transparent at the viewport centre and ramps it up to full
-     opacity by 210px radius, so the koi reads as sitting in a clear
-     pond rather than on a grid.
-
-     Inner 178px: the outermost .pulse-ring peaks at 171px from centre
-     (r=90 × scale 1.9) plus its 6px stroke and glow. 178px leaves the
-     mask fully transparent at the exact pixel where that ripple's
-     glow has just finished dying, so no ring ever overlaps visible
-     pattern. Outer 210px: a 32px feather, tight enough that the pond
-     reads as a disc around the button rather than a wide clearing.
-
-     :not(.diving) is load-bearing. The blossom screen keeps .visible
-     throughout the intro overlay — the class is only removed at the
-     end of the kanji arrival, roughly 2 seconds after the overlay
-     starts. Without the :not(.diving) clause, the mask would remain
-     carved out of the mosaic behind the arriving kanji. .diving is
-     added at the exact moment the fade and the koi dive begin, so
-     the mask collapses in step with the visual. */
   html:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic {
     --pond-inner: 178px;
     --pond-outer: 210px;
@@ -221,9 +195,8 @@
      texture once and never re-runs the offscreen pass per frame.
      Per-frame filter recalculations on masked elements force
      Chromium to re-rasterize offscreen framebuffers at 60fps and
-     thrash GPU tile memory, which is what produced the checkerboard
-     dropouts earlier in development. Do not add calc(--audio-swell)
-     inside the filter.
+     thrash GPU tile memory. Do not add calc(--audio-swell) inside
+     the filter.
      ============================================================ */
 
   /* --- LAYER 1: Diffuse base mesh swell --- */
@@ -238,12 +211,6 @@
     transition: opacity 100ms ease-out;
   }
 
-  /* Individual `scale` longhand, not `transform: scale()`.
-     The orb drift keyframes animate the `transform` shorthand.
-     Setting `scale` operates on a separate transform channel, so
-     the slow drift continues uninterrupted while the audio swell
-     scales on top. `!important` is not needed — the keyframes
-     never touch `scale`. */
   .layer-diffuse .orb-1 {
     scale: calc(1 + var(--audio-swell, 0) * 0.53);
     transition: scale 120ms ease-out;
@@ -265,8 +232,6 @@
     z-index: -2;
     overflow: hidden;
 
-    /* Phase-locked 1.2px hairline Shippō stencil. Same tile
-       geometry as .ambient-mosaic above. */
     -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
     -webkit-mask-repeat: repeat;
     -webkit-mask-size: 60px 60px;
@@ -276,20 +241,17 @@
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    /* Rest 0.20 → Peak 0.50. Opacity is GPU-composited, no
-       offscreen pass. Amplitude was reduced from 0.90 to 0.30 in
-       the readability pass so the peak no longer overwhelms the
-       carousel text at musical accents. */
-    opacity: calc(0.20 + var(--audio-swell, 0) * 0.30);
+    /* Rest 0.20 → Peak 0.42. The swell amplitude was stepped down
+       from 0.30 to 0.22 in the readability pass. Combined with the
+       panel typography tune this keeps the masked lines from
+       cutting through the text gutters on musical accents. */
+    opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
     transition: opacity 100ms ease-out;
 
-    /* Static color grade. Rendered once at mask setup, then
-       reused across frames. Contains NO calc(--audio-swell)
-       terms — that is the whole point of the static filter.
-       Desaturated from the demo's 1.45 to 0.50 in the
-       readability pass so the masked lines read as a neutral
-       warm tint rather than coloured strokes competing with
-       the panel text. */
+    /* Static color grade. Rendered once at mask setup, then reused
+       across frames. Desaturated from the demo's 1.45 to 0.50 so
+       the masked lines read as a neutral warm tint rather than
+       coloured strokes competing with the panel text. */
     filter: hue-rotate(8deg)
             saturate(0.50)
             contrast(1.60);
@@ -311,12 +273,6 @@
     transition: transform 120ms ease-out;
   }
 
-  /* Saturated persimmon & amber gradients. The saturated stops
-     push the orbs' own color into the shibu-kaki / cinnabar /
-     burnt-amber range so that the static saturate() and
-     contrast() in the filter above cannot drive the red and
-     green channels to 255 and produce electric yellow at peak.
-     These override the base .orb-N gradients inside Layer 2 only. */
   .shippo-mask-window .orb-1 {
     background: radial-gradient(circle, rgba(235, 110, 30, 0.95) 0%, rgba(200, 75, 20, 0.45) 45%, transparent 70%) !important;
   }
@@ -327,25 +283,7 @@
     background: radial-gradient(circle, rgba(225, 100, 25, 0.90) 0%, rgba(190, 65, 18, 0.40) 40%, transparent 62%) !important;
   }
 
-  /* ============ SHIPPO STAR TRACERS (v1.3) ============
-     Concave 4-point star (Hoshi-gata) tracer. The outer .shippo-tracer
-     receives only the grid translate3d from JS — its position on the
-     30px mosaic lattice is written once per spawn and never animated.
-     The inner .tracer-rotator carries the entire exit animation
-     (rotate, scale, blur, opacity). Two elements, two concerns: the
-     exit rotation pivots about the star's centre (transform-origin
-     34px 34px on the rotator) without ever composing against the
-     grid's fixed transform.
-
-     The path is four 90° arcs of radius 30 drawn with sweep-flag 0.
-     Sweep-flag 0 forces SVG to choose the arc centre at the outer
-     grid corner (64, 4) rather than the cell centre (34, 34), so the
-     arc bulges inward and pinches the star from 30px at the four
-     points to 30·(√2 − 1) ≈ 12.4px at the four concave waists.
-     Total perimeter is 4 × 15π = 60π ≈ 188.5, rounded to 189 for
-     stroke-dasharray — a slight overestimate guarantees the "off"
-     segment fully covers the path at dashoffset 189, with no
-     sub-pixel gap at the seam. */
+  /* ============ SHIPPO STAR TRACERS (v1.3) ============ */
   .tracer-layer {
     position: fixed;
     inset: 0;
@@ -395,7 +333,6 @@
       drop-shadow(0 0 8px rgba(143, 47, 0, 0.95));
   }
 
-  /* Active trigger classes */
   .shippo-tracer.drawing {
     opacity: 1;
   }
@@ -408,17 +345,11 @@
     animation: drawStroke 2.6s cubic-bezier(0.35, 0, 0.25, 1) forwards;
   }
 
-  /* Draw stroke keyframe */
   @keyframes drawStroke {
     0%   { stroke-dashoffset: 189; }
     100% { stroke-dashoffset: 0; }
   }
 
-  /*
-    Lifecycle:
-    0%  - 70% : Crisp focus, drawing completes
-    70% - 100%: Defocus blur to 2.8px, rotate ±12deg, scale to 1.35x, fade to 0
-  */
   @keyframes starDissolveCycle {
     0% {
       opacity: 0;
@@ -1031,67 +962,36 @@
   .track { display: flex; width: 600%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .track.dragging { transition: none; }
   .panel { width: calc(100% / 6); height: 100%; display: flex; align-items: center; justify-content: center; padding: 76px 20px 160px 20px; text-align: center; }
+  .panel-inner { max-width: 480px; width: 100%; }
 
   /* ============================================================
-     MAIN CAROUSEL LEGIBILITY TUNE
-     ------------------------------------------------------------
+     PANEL TYPOGRAPHY (v1.3 readability pass)
+
      The audio-reactive release added a second moving line system
-     behind the carousel. Three adjustments keep the panel text
-     readable against it without flattening the background:
+     behind the carousel. Legibility is handled entirely at the
+     glyph level — no scrim, no card, no background shape behind
+     the panel.
 
-       1. Radial scrim on .panel-inner — dims the drifting orbs
-          and lattice directly behind the reading area, while
-          leaving the outer screen perimeter at full strength.
-       2. Refined ink-halo text-shadow on .panel-content — a
-          three-layer falloff (tight opaque root, feathered outer
-          stops) that insulates Mincho hairlines from intersecting
-          Shippō lines without producing a "backlit" glow. The
-          outer stops are deliberately semi-transparent so the
-          halo reads as ink diffusion into washi paper rather than
-          a digital bulb.
-       3. Typography bumps — weight 500 → 600, letter-spacing
-          0.4px → 0.8px, size 18px → 19px. Shippori Mincho at 500
-          uses horizontal hairlines (一, 三, crossbars) that
-          vanish against warm amber backgrounds; 600 thickens
-          exactly those strokes.
+     Three adjustments:
+       · font-weight 500 → 600. Shippori Mincho at 500 uses
+         horizontal hairlines (一, 三, crossbars) that vanish
+         against warm amber backgrounds; 600 thickens exactly
+         those strokes without making verticals look heavy.
+       · letter-spacing 0.4px → 0.8px. Gives complex kanji
+         distinct separation at 19px.
+       · color #160a02 — deep sumi ink, darker than the theme's
+         default --text-dark (#231304), so the strokes sit above
+         any passing background variation.
 
-     The scrim uses a radial gradient rather than an opaque card
-     so the panel doesn't read as a bordered box. Padding on
-     .panel-inner is deliberately small (10px vertical) because
-     repositionHintGroup() in app.js measures .panel-content and
-     writes padding onto .panel, not .panel-inner — any vertical
-     padding here is unaccounted space. The compact-screen media
-     query below collapses it to zero on the short viewports
-     where the stage budget is tightest. */
-  .panel-inner {
-    max-width: 500px;
-    width: 100%;
-    padding: 10px 20px;
-    border-radius: 32px;
-    background: radial-gradient(
-      ellipse at 50% 50%,
-      rgba(253, 243, 216, 0.90) 0%,
-      rgba(253, 243, 216, 0.60) 65%,
-      transparent 85%
-    );
-    box-sizing: border-box;
-  }
-
-  html[data-theme="default"] .panel-inner {
-    background: radial-gradient(
-      ellipse at 50% 50%,
-      rgba(250, 247, 245, 0.90) 0%,
-      rgba(250, 247, 245, 0.60) 65%,
-      transparent 85%
-    );
-  }
-
-  @media (max-height: 700px) {
-    .panel-inner {
-      padding: 0 16px;
-    }
-  }
-
+     The three-layer text-shadow is a refined ink-diffusion halo:
+       · 6px opaque — glues strictly to the glyph hairlines,
+         insulating them from intersecting Shippō lines.
+       · 14px at 0.85 — smooths the edge transition.
+       · 28px at 0.40 — dissolves into the paper with no
+         backlit "neon aura". The outer stop is deliberately
+         semi-transparent so the halo reads as ink bleeding into
+         washi paper rather than a digital bulb.
+     ============================================================ */
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -2105,7 +2005,7 @@
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
     .name-inner { max-width: 560px; }
-    .panel-inner { max-width: 500px; }
+    .panel-inner { max-width: 480px; }
     .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 20px; max-width: 600px; }
@@ -2483,7 +2383,6 @@
   }
   .start-btn.diving .rings-svg { opacity: 0; }
 
-  /* v1.3: gold band as a slow breathing pulse. */
   .gold-band {
     stroke: #fdf3d8;
     stroke-width: 6px;
@@ -2553,7 +2452,6 @@
     100% { transform: scale(1.9); opacity: 0; stroke-width: 0px; }
   }
 
-  /* v1.3: three poetic interaction hints below the start button. */
   .start-hints {
     margin: 24px 0 0 0;
     text-align: center;
