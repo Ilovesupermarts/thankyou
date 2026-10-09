@@ -3489,6 +3489,14 @@ function refreshTransitionGeometry() {
      the visual result. The cache is stored on the DOM node, so
      it is garbage-collected with the node if the paragraph is
      ever rebuilt — no explicit invalidation is needed. */
+     var DRIFT_CONFIG = {
+  LINE_SPREAD_FACTOR: 0.075,
+  MAX_LINE_SPREAD_PX: 38,
+  GLOBAL_DRIFT_FACTOR: 0.08,
+  HORIZONTAL_SWAY_PX: 20,
+  CORE_ZONE_PX: 180,
+  MAX_ZONE_PX: 420
+};
 var _tlDriftActive = false;
 
 function updateTransitionBodyEffects() {
