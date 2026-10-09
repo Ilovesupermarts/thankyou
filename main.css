@@ -134,9 +134,14 @@
      v1.3 (stroke width 1.2): the mosaic stroke was reduced from 1.7
      to 1.2 to match Layer 2's SVG mask exactly. Both tiles are on
      the same 60×60 grid pinned to (0, 0), so their strokes land on
-     identical pixels. When Layer 2's audio-reactive content is
-     revealed through the mask, the two contributions sit at the
-     same position rather than one inside the other.
+     identical pixels.
+
+     v1.3 (opacity 0.08): resting opacity reduced from 0.13. The
+     audio-reactive release added a second moving line system on top
+     of this one, so the base pattern's resting weight was stepped
+     down to keep the total visual floor stable and give the panel
+     text more room. The pattern is still clearly present; it just
+     no longer competes with the reactive layer for attention.
 
      v1.3 (pond mask, animated): the mask is driven by two registered
      custom properties, --pond-inner and --pond-outer, so the hole in
@@ -145,16 +150,13 @@
      puts the transparent stop and the black stop at the exact same
      pixel — a hard-edged cut at the centre, effectively a no-op. The
      html:has(...) rule below raises the radii to 178px / 210px when
-     the blossom screen is on-screen AND not yet diving. On dive the
-     class .diving lands, the :has rule stops matching, the radii
-     transition back to 0 over 600ms, and the mask collapses in step
-     with the koi's exit. */
+     the blossom screen is on-screen AND not yet diving. */
   .ambient-mosaic {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -2;
-    opacity: 0.13;
+    opacity: 0.08;
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
@@ -174,7 +176,7 @@
 
   /* v1.3: pond mask, scoped to the blossom screen while the koi is
      still interactive. A radial-gradient mask fades the pattern to
-     transparent at the viewport centre and ramps it up to full 0.13
+     transparent at the viewport centre and ramps it up to full
      opacity by 210px radius, so the koi reads as sitting in a clear
      pond rather than on a grid.
 
@@ -274,15 +276,23 @@
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    /* Rest 0.20 → Peak 1.10. Opacity is GPU-composited, no
-       offscreen pass. */
+    /* Rest 0.20 → Peak 0.50. Opacity is GPU-composited, no
+       offscreen pass. Amplitude was reduced from 0.90 to 0.30 in
+       the readability pass so the peak no longer overwhelms the
+       carousel text at musical accents. */
     opacity: calc(0.20 + var(--audio-swell, 0) * 0.30);
     transition: opacity 100ms ease-out;
 
     /* Static color grade. Rendered once at mask setup, then
        reused across frames. Contains NO calc(--audio-swell)
-       terms — that is the whole point of the static filter. */
-    filter: hue-rotate(-10deg) saturate(1.45) contrast(1.55);
+       terms — that is the whole point of the static filter.
+       Desaturated from the demo's 1.45 to 0.50 in the
+       readability pass so the masked lines read as a neutral
+       warm tint rather than coloured strokes competing with
+       the panel text. */
+    filter: hue-rotate(8deg)
+            saturate(0.50)
+            contrast(1.60);
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -1021,14 +1031,82 @@
   .track { display: flex; width: 600%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .track.dragging { transition: none; }
   .panel { width: calc(100% / 6); height: 100%; display: flex; align-items: center; justify-content: center; padding: 76px 20px 160px 20px; text-align: center; }
-  .panel-inner { max-width: 480px; width: 100%; }
+
+  /* ============================================================
+     MAIN CAROUSEL LEGIBILITY TUNE
+     ------------------------------------------------------------
+     The audio-reactive release added a second moving line system
+     behind the carousel. Three adjustments keep the panel text
+     readable against it without flattening the background:
+
+       1. Radial scrim on .panel-inner — dims the drifting orbs
+          and lattice directly behind the reading area, while
+          leaving the outer screen perimeter at full strength.
+       2. Refined ink-halo text-shadow on .panel-content — a
+          three-layer falloff (tight opaque root, feathered outer
+          stops) that insulates Mincho hairlines from intersecting
+          Shippō lines without producing a "backlit" glow. The
+          outer stops are deliberately semi-transparent so the
+          halo reads as ink diffusion into washi paper rather than
+          a digital bulb.
+       3. Typography bumps — weight 500 → 600, letter-spacing
+          0.4px → 0.8px, size 18px → 19px. Shippori Mincho at 500
+          uses horizontal hairlines (一, 三, crossbars) that
+          vanish against warm amber backgrounds; 600 thickens
+          exactly those strokes.
+
+     The scrim uses a radial gradient rather than an opaque card
+     so the panel doesn't read as a bordered box. Padding on
+     .panel-inner is deliberately small (10px vertical) because
+     repositionHintGroup() in app.js measures .panel-content and
+     writes padding onto .panel, not .panel-inner — any vertical
+     padding here is unaccounted space. The compact-screen media
+     query below collapses it to zero on the short viewports
+     where the stage budget is tightest. */
+  .panel-inner {
+    max-width: 500px;
+    width: 100%;
+    padding: 10px 20px;
+    border-radius: 32px;
+    background: radial-gradient(
+      ellipse at 50% 50%,
+      rgba(253, 243, 216, 0.90) 0%,
+      rgba(253, 243, 216, 0.60) 65%,
+      transparent 85%
+    );
+    box-sizing: border-box;
+  }
+
+  html[data-theme="default"] .panel-inner {
+    background: radial-gradient(
+      ellipse at 50% 50%,
+      rgba(250, 247, 245, 0.90) 0%,
+      rgba(250, 247, 245, 0.60) 65%,
+      transparent 85%
+    );
+  }
+
+  @media (max-height: 700px) {
+    .panel-inner {
+      padding: 0 16px;
+    }
+  }
+
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    transition-delay: 0.25s; font-size: 18px; font-weight: 500; color: var(--text-dark);
-    line-height: 2.2; letter-spacing: 0.4px;
+    transition-delay: 0.25s;
+    font-size: 19px;
+    font-weight: 600;
+    color: #160a02;
+    line-height: 2.25;
+    letter-spacing: 0.8px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
+    text-shadow:
+      0 0 6px var(--bg-base),
+      0 0 14px rgba(253, 243, 216, 0.85),
+      0 0 28px rgba(253, 243, 216, 0.40);
   }
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .panel.leaving .panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
@@ -2027,7 +2105,7 @@
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
     .name-inner { max-width: 560px; }
-    .panel-inner { max-width: 480px; }
+    .panel-inner { max-width: 500px; }
     .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 20px; max-width: 600px; }
