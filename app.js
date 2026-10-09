@@ -3317,6 +3317,43 @@ var DRIFT_CONFIG = {
   MAX_ZONE_PX: 420
 };
 
+/* Cached document-relative geometry for #transitionLine.
+   updateTransitionBodyEffects() runs once per rAF while scrolling;
+   calling getBoundingClientRect() inside that loop forces a style
+   recalculation before the transform writes below it, which on the
+   S8 Ultra showed up as a sustained frame-rate drop that vanished
+   the moment scrolling stopped. The cached values below turn the
+   per-frame path into pure arithmetic.
+
+   Invalidation surface — every event that can shift the document
+   offset of #transitionLine must call refreshTransitionGeometry():
+     · window.load (boot)
+     · window.resize / orientationchange
+     · document.fonts.ready (font swap can nudge layout by a pixel)
+     · confirmName() after wrapTransitionBody() swaps the body copy
+     · after loadAllPanels() resolves (panel HTML can shift layout
+       above the transition line)
+
+   Do not read offsetTop here. offsetTop is offset-parent relative,
+   not document-relative, and only works by accident when the
+   element's nearest positioned ancestor happens to be <body>.
+   getBoundingClientRect().top + scrollY is the correct formula and
+   costs nothing extra at cache time. */
+var _tlDocTop = 0;
+var _tlHeight = 0;
+
+function refreshTransitionGeometry() {
+  var lineWrapper = document.getElementById('transitionLine');
+  if (!lineWrapper) {
+    _tlDocTop = 0;
+    _tlHeight = 0;
+    return;
+  }
+  var rect = lineWrapper.getBoundingClientRect();
+  _tlDocTop = rect.top + (window.scrollY || window.pageYOffset || 0);
+  _tlHeight = rect.height;
+}
+
 function updateTransitionBodyEffects() {
   var lineWrapper = document.getElementById('transitionLine');
   var bodyEl = document.getElementById('transitionLineBody');
@@ -3333,8 +3370,10 @@ function updateTransitionBodyEffects() {
   var scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
   var vh = window.innerHeight;
   var vc = vh / 2;
-  var rect = lineWrapper.getBoundingClientRect();
-  var blockCenter = rect.top + rect.height / 2;
+  /* Arithmetic only — no layout read. See refreshTransitionGeometry()
+     above for the cache and its invalidation surface. */
+  var rectTop = _tlDocTop - scrollY;
+  var blockCenter = rectTop + _tlHeight / 2;
   var d = blockCenter - vc;
   var absDist = Math.abs(d);
 
@@ -3863,6 +3902,10 @@ function confirmName() {
   if (tlBody) {
     tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
     wrapTransitionBody();
+    /* Body copy was just swapped — paragraph count changed, so the
+       cached height is stale. Re-measure before the next frame
+       reads it. */
+    refreshTransitionGeometry();
     requestAnimationFrame(function() {
       updateTransitionBodyEffects();
     });
@@ -3921,6 +3964,7 @@ nameInput.addEventListener('keydown', function(e) {
 document.getElementById('resetBtn').addEventListener('click', resetAll);
 
 window.addEventListener('load', function() {
+  refreshTransitionGeometry();
   startInfoUpdates();
   loadPresetsFromServer().then(function() {
     buildNameScreenRows();
@@ -3938,11 +3982,16 @@ window.addEventListener('load', function() {
     for (var i = 1; i < panels.length; i++) {
       preparePanel(panels[i]);
     }
+    /* Panel HTML has mounted; any layout shift above the transition
+       line has settled. Re-measure the cached geometry. */
+    refreshTransitionGeometry();
   });
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function() {
       repositionHintGroupAfterLayout();
       repositionNumpad();
+      /* Font swap can nudge document offsets by a pixel or two. */
+      refreshTransitionGeometry();
     });
   }
   if ('serviceWorker' in navigator) {
@@ -4768,6 +4817,7 @@ window.addEventListener('scroll', function() {
 }, { passive: true });
 
 window.addEventListener('resize', function() {
+  refreshTransitionGeometry();
   scheduleEvaluation();
   scheduleTransitionBodyUpdate();
   updateReceiptScrollIndicator();
@@ -4778,6 +4828,7 @@ window.addEventListener('orientationchange', function() {
   setTimeout(repositionNumpad, 200);
   setTimeout(updateNumpadVisibility, 200);
   setTimeout(function() {
+    refreshTransitionGeometry();
     scheduleTransitionBodyUpdate();
     updateReceiptScrollIndicator();
   }, 300);
