@@ -3,6 +3,25 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (blossom stream deferred start)
+       - tryStartBlossomStream() wrapper. startBlossomStream() was
+         being called from confirmName()'s 420ms animation timeout
+         and from returnToStartScreen(), neither of which is
+         coupled to audio readiness. On a warm cache the stream MP3
+         decoded in under 420ms and played; on a cold cache or slow
+         network it was still decoding, hit the readiness guard, and
+         returned silently with no retry. The wrapper polls
+         soundReady / soundBuffers.stream up to 15 times at 400ms
+         intervals and starts the stream when both are true. It
+         self-terminates on the isBlossomInteractive() guard so a
+         user who swipes away mid-decode does not get a spurious
+         stream later.
+     v1.3 (numpad isolation, no JS-side change)
+       - The numpad GPU-dropout fix is entirely in main.css
+         (visibility: hidden on the base state, asymmetric
+         visibility transition, will-change on .visible, reduced
+         shadow blur). updateNumpadVisibility() continues toggling
+         the .visible class unchanged.
      v1.3 (scroll performance, rAF consolidation)
        - Merged the two independent scroll rAF loops
          (scheduleEvaluation and scheduleTransitionBodyUpdate) into
@@ -813,6 +832,48 @@ function stopBlossomStream() {
   } catch (e) { /* silent */ }
   blossomStreamSource = null;
   blossomStreamGain = null;
+}
+
+/* ============ BLOSSOM STREAM DEFERRED START ============
+   startBlossomStream() is called from two places that are not
+   coupled to audio readiness:
+     · confirmName(), inside a 420ms setTimeout that exists purely
+       for the name-screen hide animation
+     · returnToStartScreen(), immediately after the blossom screen
+       is shown
+
+   Both call sites can fire before initSound()'s decode Promise has
+   resolved. On a warm cache the stream MP3 decodes in well under
+   420ms and the sound plays; on a cold cache — first session after
+   install, or a slow network — the decode takes several seconds,
+   startBlossomStream() hits its readiness guard
+   (!soundReady || !soundBuffers.stream) and returns silently with
+   no retry.
+
+   tryStartBlossomStream() polls the readiness state up to
+   (retries + 1) times with a 400ms gap. At the default 15 retries
+   that is a ~6.4s window, which covers a cold decode on Slow 3G
+   with margin. Once soundReady flips and the buffer lands, the
+   stream starts on the next tick.
+
+   The isBlossomInteractive() guard handles two edges:
+     · user leaves the screen before the buffer arrives — polling
+       stops, no stream starts
+     · user swipes up mid-poll to dive the koi — introHasRun flips
+       true, polling stops, no stream starts
+
+   Nothing to tear down: the polling timer is self-terminating on
+   retries-exhausted or on the interactivity guard. */
+function tryStartBlossomStream(retries) {
+  if (typeof retries !== 'number') retries = 15;
+  if (!SOUND_ENABLED) return;
+  if (!isBlossomInteractive()) return;
+  if (soundReady && soundBuffers.stream) {
+    startBlossomStream();
+    return;
+  }
+  if (retries <= 0) return;
+  setTimeout(function() { tryStartBlossomStream(retries - 1); }, 400);
 }
 
 /* ============ AMBIENT SOUND ROTATION ============
@@ -2460,9 +2521,11 @@ function returnToStartScreen() {
 
   if (blossomScreen) blossomScreen.classList.add('visible');
   /* Refresh the greeting in case the time-of-day bucket has rolled
-     over since the last visit, and restart the stream bed. */
+     over since the last visit, and restart the stream bed. The
+     retry wrapper handles the case where the buffer was evicted
+     from memory or the AudioContext was suspended. */
   updateBlossomGreeting();
-  startBlossomStream();
+  tryStartBlossomStream();
   scheduleAmbientRipple();
 }
 
@@ -3992,9 +4055,11 @@ function confirmName() {
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
     /* Populate the greeting with the just-confirmed name and the
-       current time bucket, and fade in the flowing-stream bed. */
+       current time bucket. tryStartBlossomStream() polls for
+       audio readiness — the stream MP3 may not have finished
+       decoding yet, especially on a cold cache. */
     updateBlossomGreeting();
-    startBlossomStream();
+    tryStartBlossomStream();
     updateAllRowLocks();
     recalc();
     scheduleAmbientRipple();
