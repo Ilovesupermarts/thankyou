@@ -2484,3 +2484,90 @@
     opacity: 0;
     transform: translateY(6px);
   }
+
+/* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============
+   Four ginkgo leaves ride inside the same .maple-leaves-overlay
+   as the seven momiji. Same lifecycle, same theme gate, same
+   1.8s opacity fade on .active — no new JS, no new container.
+
+   Two dedicated keyframes rather than reusing mapleDriftA/B/C.
+   Maple tumbles end-over-end (up to 95–105°) because a palmate
+   leaf's mass is off-axis; ginkgo is an aerodynamic fan with a
+   weighted stem that pendulum-rocks side to side (±20–35°) along
+   a gentle zigzag. Spinning a fan past 90° flattens its
+   silhouette and reveals the 2D nature of the SVG, so the
+   rotation range is deliberately capped. Transform-only, so
+   zero added compositor cost.
+
+   Colour progression across the four leaves is a chromatic
+   bridge from lemon-gold ginkgo down to the deep russet of the
+   momiji set: #fed634 → #f3c428 → #ddb01e → #c19618. The last
+   two (ochre, amber) fill the tonal gap between the brightest
+   ginkgo and the darkest maple, so the two species read as one
+   continuous autumn palette rather than two competing ones.
+
+   Size band 42–56px is deliberately smaller than the maples
+   (42–66px). High-luminance yellow reads larger on the retina
+   than dark red at equal width, so matching the maples up to
+   66px would have made the ginkgo the dominant silhouette. The
+   ginkgo viewBox is 600×700, so a 56px-wide leaf renders 65px
+   tall — taller than a maple of equal width, which is correct
+   because the ginkgo SVG includes the stem.
+
+   Negative animation-delay values are chosen from troughs in
+   the maple stagger (−2, −7, −4, −9, −3, −6, −11) so all eleven
+   leaves are pre-phased on first paint. */
+@keyframes ginkgoDriftA {
+  0%   { transform: translate3d(0, -65px, 0) rotate(14deg); opacity: 0; }
+  12%  { opacity: 0.95; }
+  32%  { transform: translate3d(28px, 34vh, 0) rotate(-18deg); }
+  62%  { transform: translate3d(-24px, 68vh, 0) rotate(22deg); }
+  82%  { transform: translate3d(20px, 92vh, 0) rotate(-14deg); opacity: 0.95; }
+  100% { transform: translate3d(-6px, 115vh, 0) rotate(10deg); opacity: 0; }
+}
+
+@keyframes ginkgoDriftB {
+  0%   { transform: translate3d(0, -65px, 0) rotate(-18deg); opacity: 0; }
+  12%  { opacity: 0.95; }
+  35%  { transform: translate3d(-32px, 38vh, 0) rotate(20deg); }
+  65%  { transform: translate3d(26px, 72vh, 0) rotate(-24deg); }
+  85%  { transform: translate3d(-14px, 94vh, 0) rotate(14deg); opacity: 0.95; }
+  100% { transform: translate3d(10px, 115vh, 0) rotate(-8deg); opacity: 0; }
+}
+
+.ginkgo-leaf {
+  position: absolute;
+  top: -65px;
+  pointer-events: none;
+  will-change: transform;
+  filter: drop-shadow(0 2px 6px rgba(100, 70, 10, 0.08));
+  opacity: 0.32;
+}
+
+.ginkgo-1 {
+  width: 48px; height: 56px;
+  fill: #fed634;
+  left: 14%;
+  animation: ginkgoDriftA 12.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -1.0s;
+}
+
+.ginkgo-2 {
+  width: 52px; height: 61px;
+  fill: #f3c428;
+  left: 38%;
+  animation: ginkgoDriftB 14.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -5.0s;
+}
+
+.ginkgo-3 {
+  width: 42px; height: 49px;
+  fill: #ddb01e;
+  left: 64%;
+  animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8.0s;
+}
+
+.ginkgo-4 {
+  width: 56px; height: 65px;
+  fill: #c19618;
+  left: 86%;
+  animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s;
+}
