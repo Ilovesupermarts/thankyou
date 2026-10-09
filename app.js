@@ -3,6 +3,38 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (scroll performance, rAF consolidation)
+       - Merged the two independent scroll rAF loops
+         (scheduleEvaluation and scheduleTransitionBodyUpdate) into
+         a single scheduleScrollTick dispatcher. Running them as
+         two separate requestAnimationFrame callbacks allowed them
+         to interleave within a frame in either order, so a
+         transform write from one could land after the geometry
+         read from the other and invalidate the read. One rAF, one
+         order, no thrash.
+       - Eliminated every getBoundingClientRect() call from the
+         active scroll path. refreshTransitionGeometry() now caches
+         document-relative offsets for #transitionLine, #tableCard,
+         #rejectRow, and the first two table rows. All scroll-time
+         visibility decisions are pure arithmetic against the cache
+         and window.scrollY. The cache is invalidated from:
+           · window.load (boot)
+           · window.resize / orientationchange
+           · document.fonts.ready
+           · confirmName() after the dynamic rows are appended
+           · after loadAllPanels() resolves
+       - updateTransitionBodyEffects() now writes transforms only
+         when the composed string actually changes. At 120Hz the
+         drift values quantise to the same .toFixed(2) output
+         across many consecutive frames, so the majority of writes
+         are skipped. An out-of-zone latch (_tlDriftActive) fires
+         the transform reset once on zone exit rather than on every
+         out-of-zone frame.
+       - updateIntroHintVisibility() and updateSummaryVisibility()
+         take scrollY / vh arguments with undefined-safe fallbacks,
+         so the non-scroll callers (updateGlobalHint, rejectRow
+         timeouts) continue to read window state without silently
+         producing NaN.
      v1.3 (audio-reactive swell system)
        - New parallel analyser tap feeding a Web Audio analysis
          loop that drives two CSS custom properties on the
@@ -2407,8 +2439,10 @@ function returnToStartScreen() {
     var existingDriftItems = transitionLine.querySelectorAll('.transition-line-divider, .transition-line-body p');
     for (var t = 0; t < existingDriftItems.length; t++) {
       existingDriftItems[t].style.transform = '';
+      existingDriftItems[t]._lastDriftStr = '';
     }
   }
+  _tlDriftActive = false;
 
   document.body.classList.remove('info-visible');
   if (infoBar) {
@@ -2445,17 +2479,20 @@ function updateGlobalHint() {
   globalHint.classList.add('shown');
   updateIntroHintVisibility();
 }
-function updateIntroHintVisibility() {
+function updateIntroHintVisibility(scrollY, vh) {
   if (!globalHint) return;
   if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
-  if (blossomScreen.classList.contains('visible')) {
+  if (blossomScreen && blossomScreen.classList.contains('visible')) {
     globalHint.classList.remove('shown');
     return;
   }
   if (!tableEnteredView) { globalHint.classList.add('shown'); return; }
-  var rect = tableCard.getBoundingClientRect();
-  var vh = window.innerHeight;
-  if (rect.top < vh * 0.6) globalHint.classList.remove('shown');
+
+  var sY = (scrollY !== undefined) ? scrollY : (window.scrollY || window.pageYOffset || 0);
+  var winH = (vh !== undefined) ? vh : window.innerHeight;
+  var tcTop = _tcDocTop - sY;
+
+  if (tcTop < winH * 0.6) globalHint.classList.remove('shown');
   else globalHint.classList.add('shown');
 }
 function goToPanel(index, noGust) {
@@ -3306,53 +3343,90 @@ function wrapTransitionBody() {
 }
 
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT
-   ============================================================ */
-var DRIFT_CONFIG = {
-  LINE_SPREAD_FACTOR: 0.075,
-  MAX_LINE_SPREAD_PX: 38,
-  GLOBAL_DRIFT_FACTOR: 0.08,
-  HORIZONTAL_SWAY_PX: 20,
-  CORE_ZONE_PX: 180,
-  MAX_ZONE_PX: 420
-};
+   TRANSITION-LINE & TABLE GEOMETRY CACHE
+   ------------------------------------------------------------
+   Document-relative geometry for every element whose viewport
+   position is consulted on the scroll path: the transition line,
+   the table card, the reject row, and the first two table rows.
+   All scroll-time visibility checks are arithmetic against these
+   values and window.scrollY — no getBoundingClientRect() calls
+   run inside the scroll rAF.
 
-/* Cached document-relative geometry for #transitionLine.
-   updateTransitionBodyEffects() runs once per rAF while scrolling;
-   calling getBoundingClientRect() inside that loop forces a style
-   recalculation before the transform writes below it, which on the
-   S8 Ultra showed up as a sustained frame-rate drop that vanished
-   the moment scrolling stopped. The cached values below turn the
-   per-frame path into pure arithmetic.
-
-   Invalidation surface — every event that can shift the document
-   offset of #transitionLine must call refreshTransitionGeometry():
+   Invalidation surface — every event that can shift any cached
+   element's document offset must call refreshTransitionGeometry():
      · window.load (boot)
      · window.resize / orientationchange
-     · document.fonts.ready (font swap can nudge layout by a pixel)
-     · confirmName() after wrapTransitionBody() swaps the body copy
+     · document.fonts.ready (font swap can nudge layout)
+     · confirmName() after the dynamic rows are appended
      · after loadAllPanels() resolves (panel HTML can shift layout
-       above the transition line)
+       above the table)
 
-   Do not read offsetTop here. offsetTop is offset-parent relative,
-   not document-relative, and only works by accident when the
-   element's nearest positioned ancestor happens to be <body>.
-   getBoundingClientRect().top + scrollY is the correct formula and
-   costs nothing extra at cache time. */
-var _tlDocTop = 0;
-var _tlHeight = 0;
+   getBoundingClientRect().top + scrollY is used rather than
+   offsetTop, because offsetTop is offset-parent relative and only
+   works by accident when the nearest positioned ancestor happens
+   to be <body>. The rect-based formula is correct in all cases
+   and costs nothing extra at cache time. */
+var _tlDocTop = 0, _tlHeight = 0;
+var _tcDocTop = 0, _tcHeight = 0;
+var _rrDocTop = 0, _rrHeight = 0;
+var _row0DocTop = 0;
+var _row1DocTop = 0, _row1Height = 0;
 
 function refreshTransitionGeometry() {
+  var scrollY = window.scrollY || window.pageYOffset || 0;
+
   var lineWrapper = document.getElementById('transitionLine');
-  if (!lineWrapper) {
-    _tlDocTop = 0;
-    _tlHeight = 0;
-    return;
+  if (lineWrapper) {
+    var rTl = lineWrapper.getBoundingClientRect();
+    _tlDocTop = rTl.top + scrollY;
+    _tlHeight = rTl.height;
   }
-  var rect = lineWrapper.getBoundingClientRect();
-  _tlDocTop = rect.top + (window.scrollY || window.pageYOffset || 0);
-  _tlHeight = rect.height;
+
+  var tc = document.getElementById('tableCard');
+  if (tc) {
+    var rTc = tc.getBoundingClientRect();
+    _tcDocTop = rTc.top + scrollY;
+    _tcHeight = rTc.height;
+
+    var rows = tc.querySelectorAll('.row');
+    if (rows.length > 0) {
+      _row0DocTop = rows[0].getBoundingClientRect().top + scrollY;
+    }
+    if (rows.length > 1) {
+      var r1 = rows[1].getBoundingClientRect();
+      _row1DocTop = r1.top + scrollY;
+      _row1Height = r1.height;
+    }
+  }
+
+  var rr = document.getElementById('rejectRow');
+  if (rr) {
+    var rRr = rr.getBoundingClientRect();
+    _rrDocTop = rRr.top + scrollY;
+    _rrHeight = rRr.height;
+  }
 }
+
+/* ============================================================
+   TRANSITION-LINE ACCORDION DRIFT
+   ------------------------------------------------------------
+   Scroll-linked per-item translate() on the divider and each
+   paragraph. All arithmetic — the geometry comes from the cache
+   above, never from a fresh layout read.
+
+   Two guards keep the write count low:
+
+     _tlDriftActive — a latch that fires the transform reset once
+     on zone exit, rather than on every out-of-zone frame.
+
+     item._lastDriftStr — a per-element cache of the last string
+     written. The drift values quantise to two decimal places and
+     at 120Hz consecutive frames frequently produce identical
+     output, so this skips the majority of writes without changing
+     the visual result. The cache is stored on the DOM node, so
+     it is garbage-collected with the node if the paragraph is
+     ever rebuilt — no explicit invalidation is needed. */
+var _tlDriftActive = false;
 
 function updateTransitionBodyEffects() {
   var lineWrapper = document.getElementById('transitionLine');
@@ -3370,19 +3444,23 @@ function updateTransitionBodyEffects() {
   var scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
   var vh = window.innerHeight;
   var vc = vh / 2;
-  /* Arithmetic only — no layout read. See refreshTransitionGeometry()
-     above for the cache and its invalidation surface. */
+
   var rectTop = _tlDocTop - scrollY;
   var blockCenter = rectTop + _tlHeight / 2;
   var d = blockCenter - vc;
   var absDist = Math.abs(d);
 
   if (scrollY <= 0 || absDist >= DRIFT_CONFIG.MAX_ZONE_PX) {
-    for (var k = 0; k < totalItems; k++) {
-      driftItems[k].style.transform = '';
+    if (_tlDriftActive) {
+      _tlDriftActive = false;
+      for (var k = 0; k < totalItems; k++) {
+        driftItems[k]._lastDriftStr = '';
+        driftItems[k].style.transform = '';
+      }
     }
     return;
   }
+  _tlDriftActive = true;
 
   var envelope = 1.0;
   if (absDist > DRIFT_CONFIG.CORE_ZONE_PX) {
@@ -3407,18 +3485,12 @@ function updateTransitionBodyEffects() {
     var swayDir = (i % 2 === 0) ? 1 : -1;
     var swayX = swayDir * normalizedD * DRIFT_CONFIG.HORIZONTAL_SWAY_PX * swayMultiplier * envelope;
 
-    item.style.transform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
+    var nextTransform = 'translate(' + swayX.toFixed(2) + 'px, ' + totalY.toFixed(2) + 'px)';
+    if (item._lastDriftStr !== nextTransform) {
+      item._lastDriftStr = nextTransform;
+      item.style.transform = nextTransform;
+    }
   }
-}
-
-var tbRafPending = false;
-function scheduleTransitionBodyUpdate() {
-  if (tbRafPending) return;
-  tbRafPending = true;
-  requestAnimationFrame(function() {
-    tbRafPending = false;
-    updateTransitionBodyEffects();
-  });
 }
 
 /* ============================================================
@@ -3902,14 +3974,16 @@ function confirmName() {
   if (tlBody) {
     tlBody.innerHTML = anyPresetSelected ? transitionBodyDefault : transitionBodyNoPresets;
     wrapTransitionBody();
-    /* Body copy was just swapped — paragraph count changed, so the
-       cached height is stale. Re-measure before the next frame
-       reads it. */
-    refreshTransitionGeometry();
     requestAnimationFrame(function() {
       updateTransitionBodyEffects();
     });
   }
+
+  /* Table row count just changed — re-measure the geometry cache
+     before the next frame reads it. Ordering matters: this must run
+     after the dynamicRows loop and after wrapTransitionBody(), so
+     the cached offsets reflect the final layout. */
+  refreshTransitionGeometry();
 
   nameInput.classList.add('confirmed');
   haptic(14);
@@ -4726,15 +4800,19 @@ function revealTableSection() {
   }
 }
 
-function updateSummaryVisibility() {
+function updateSummaryVisibility(scrollY, vh) {
   var rows = getRows();
-  var vh = window.innerHeight;
+  var sY = (scrollY !== undefined) ? scrollY : (window.scrollY || window.pageYOffset || 0);
+  var winH = (vh !== undefined) ? vh : window.innerHeight;
 
-  if (summaryEverShown && rows.length >= 2) {
-    var secondRect = rows[1].getBoundingClientRect();
-    var firstRect  = rows[0].getBoundingClientRect();
-    var secondVisible  = (secondRect.top < vh && secondRect.bottom > 0);
-    var firstOffBottom = (firstRect.top >= vh);
+  if (summaryEverShown && rows.length >= 2 && _row1Height > 0) {
+    var secondTop = _row1DocTop - sY;
+    var secondBottom = secondTop + _row1Height;
+    var firstTop = _row0DocTop - sY;
+
+    var secondVisible = (secondTop < winH && secondBottom > 0);
+    var firstOffBottom = (firstTop >= winH);
+
     if (lastScrollDirection === 'down' && secondVisible) {
       summaryHysteresisOn = true;
       summaryBar.classList.add('visible');
@@ -4746,10 +4824,8 @@ function updateSummaryVisibility() {
     return;
   }
 
-  var tableRect = tableCard.getBoundingClientRect();
-  var rejectRect = rejectRow.getBoundingClientRect();
-  var top = Math.min(tableRect.top, rejectRect.top);
-  var bottom = Math.max(tableRect.bottom, rejectRect.bottom);
+  var top = Math.min(_tcDocTop - sY, _rrDocTop - sY);
+  var bottom = Math.max((_tcDocTop + _tcHeight) - sY, (_rrDocTop + _rrHeight) - sY);
   var totalHeight = bottom - top;
   if (totalHeight <= 0) {
     summaryBar.classList.remove('visible');
@@ -4757,14 +4833,17 @@ function updateSummaryVisibility() {
     updateNumpadVisibility();
     return;
   }
+
   var visibleTop = Math.max(top, 0);
-  var visibleBottom = Math.min(bottom, vh);
+  var visibleBottom = Math.min(bottom, winH);
   var visibleHeight = Math.max(0, visibleBottom - visibleTop);
   var ratio = visibleHeight / totalHeight;
-  var spansViewport = (top <= 0 && bottom >= vh);
+  var spansViewport = (top <= 0 && bottom >= winH);
   var effective = spansViewport ? 1 : ratio;
+
   if (!summaryHysteresisOn && effective >= 0.9) summaryHysteresisOn = true;
   else if (summaryHysteresisOn && effective < 0.5) summaryHysteresisOn = false;
+
   if (summaryHysteresisOn) {
     summaryBar.classList.add('visible');
     summaryEverShown = true;
@@ -4774,43 +4853,74 @@ function updateSummaryVisibility() {
   updateNumpadVisibility();
 }
 
-function evaluateScrollState() {
-  var lineRect = transitionLine.getBoundingClientRect();
-  var vh = window.innerHeight;
-  if (lineRect.top < vh - 20) {
+function evaluateScrollState(scrollY, vh) {
+  var sY = (scrollY !== undefined) ? scrollY : (window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0);
+  var winH = (vh !== undefined) ? vh : window.innerHeight;
+  var lineTop = _tlDocTop - sY;
+
+  if (lineTop < winH - 20) {
     revealTableSection();
   }
-  updateSummaryVisibility();
-  updateIntroHintVisibility();
+  updateSummaryVisibility(sY, winH);
+  updateIntroHintVisibility(sY, winH);
 }
 
-var rafPending = false;
-function scheduleEvaluation() {
-  if (rafPending) return;
-  rafPending = true;
+/* ============================================================
+   MERGED SCROLL DISPATCHER
+   ------------------------------------------------------------
+   One rAF per frame drives both the visibility arithmetic and the
+   transition-line drift. The two operations are no longer
+   scheduled on independent rAF queues, so they cannot interleave
+   within a frame in an order that lets one invalidate the other's
+   reads.
+
+   All work in the tick is arithmetic against the geometry cache
+   and the two DOM writes it makes are guarded:
+     · updateTransitionBodyEffects() writes only when the composed
+       transform string changes (per-element _lastDriftStr cache),
+       and resets transforms once on zone exit (_tlDriftActive).
+     · The class toggles in updateSummaryVisibility() and
+       updateIntroHintVisibility() are idempotent — the browser
+       coalesces repeated .classList.add / .remove calls on the
+       same element within a frame.
+
+   scheduleEvaluation() and scheduleTransitionBodyUpdate() remain
+   as named entry points for the non-scroll callers (resize,
+   orientationchange, returnToTable, goToPanel). They funnel into
+   the same dispatcher; the merged tick runs both operations
+   unconditionally, which is correct for every caller because both
+   operations are idempotent. */
+var scrollRafPending = false;
+
+function scheduleScrollTick() {
+  if (scrollRafPending) return;
+  scrollRafPending = true;
   requestAnimationFrame(function() {
-    rafPending = false;
-    evaluateScrollState();
+    scrollRafPending = false;
+    var scrollY = window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0;
+    var vh = window.innerHeight;
+    evaluateScrollState(scrollY, vh);
+    updateTransitionBodyEffects();
   });
 }
 
+function scheduleEvaluation() { scheduleScrollTick(); }
+function scheduleTransitionBodyUpdate() { scheduleScrollTick(); }
+
 window.addEventListener('scroll', function() {
-  var y = window.pageYOffset || document.documentElement.scrollTop;
+  var y = window.pageYOffset || document.documentElement.scrollTop || 0;
   var goingDown = y > lastScrollY + 1;
   var goingUp = y < lastScrollY - 1;
   lastScrollY = y;
   if (goingDown) lastScrollDirection = 'down';
   else if (goingUp) lastScrollDirection = 'up';
 
-  scheduleTransitionBodyUpdate();
+  scheduleScrollTick();
 
-  if (goingDown || goingUp) {
-    scheduleEvaluation();
-  }
-
-  if (!tableVisited && tableCard) {
-    var tcRect = tableCard.getBoundingClientRect();
-    if (tcRect.top < window.innerHeight && tcRect.bottom > 0) {
+  if (!tableVisited && _tcHeight > 0) {
+    var tcTop = _tcDocTop - y;
+    var tcBottom = tcTop + _tcHeight;
+    if (tcTop < window.innerHeight && tcBottom > 0) {
       tableVisited = true;
     }
   }
