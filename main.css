@@ -1101,7 +1101,7 @@
   justify-content: center;
   gap: 12px;
   margin: 0 0 10px 0;
-  will-change: transform;
+  
 }
   .transition-line-mark {
     flex-shrink: 0;
@@ -1128,7 +1128,7 @@
     opacity: 1;
     transform: none;
     transform-origin: 50% 50%;
-    will-change: transform;
+    
   }
   .transition-line-body p:last-child { margin-bottom: 0; }
 
