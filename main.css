@@ -276,7 +276,7 @@
 
     /* Rest 0.20 → Peak 1.10. Opacity is GPU-composited, no
        offscreen pass. */
-    opacity: calc(0.20 + var(--audio-swell, 0) * 0.90);
+    opacity: calc(0.20 + var(--audio-swell, 0) * 0.30);
     transition: opacity 100ms ease-out;
 
     /* Static color grade. Rendered once at mask setup, then
@@ -296,7 +296,7 @@
 
   .shippo-mask-window .ambient-mesh {
     opacity: 1.0 !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.14));
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
     transform-origin: 50% 50%;
     transition: transform 120ms ease-out;
   }
