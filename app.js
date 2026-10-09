@@ -3,6 +3,22 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (scroll-aware swell gate)
+       - The swell loop's CSS write (`applySwellToCSS`) is now
+         gated on a `_scrollActive` flag. During scroll, the loop
+         keeps updating its energy envelope but skips the
+         custom-property write, because that write forces a style
+         recalc down the full 150vw × 150vh ambient stage subtree
+         and competes with the scroll tick for the same frame
+         budget. The energy envelope continues to track the audio
+         so there is no step-function when scroll ends.
+       - The flag is armed on every scroll event, refreshed by a
+         200ms fallback timer, and cleared immediately by the
+         native scrollend event where supported (Chromium 114+,
+         which covers Samsung Internet on the S8 Ultra).
+       - stopSwellLoop() now clears the pending timer and resets
+         the flag, so a return-to-start-screen mid-scroll leaves
+         no leaked timer or stale gate state.
      v1.3 (blossom stream deferred start)
        - tryStartBlossomStream() wrapper. startBlossomStream() was
          being called from confirmName()'s 420ms animation timeout
@@ -378,6 +394,18 @@ var swellFreqData = null;
 var swellEnergy = 0.0;
 var swellRafId = null;
 var swellIsRunning = false;
+
+/* Scroll-active gate. While the user is scrolling, the swell loop
+   continues updating its energy envelope (so the value doesn't
+   jump when scroll ends) but skips the CSS custom-property write.
+   That write forces a style recalc down the full ambient stage
+   subtree (150vw × 150vh), and during scroll it competes with the
+   scroll tick for the same frame budget. The visual difference is
+   invisible — the user is reading text, not watching the
+   background, and the background simply holds its current
+   brightness for the ~200ms of scroll inertia before resuming. */
+var _scrollActive = false;
+var _scrollEndTimer = null;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
@@ -1173,7 +1201,13 @@ function playWindChimeSound() {
    Lifecycle: startSwellLoop() and stopSwellLoop() are called from
    startAmbient() and stopAmbient(). stopSwellLoop() flushes
    --audio-swell to 0 so the background does not freeze
-   half-inflated if the user returns to the start screen mid-beat. */
+   half-inflated if the user returns to the start screen mid-beat.
+
+   Scroll gate: while _scrollActive is true the CSS write is
+   skipped, but the energy envelope keeps updating inside
+   swellTick() so the value does not step-function when scroll
+   ends. See the _scrollActive declaration near the top of the
+   acoustic engine for the full rationale. */
 
 function startSwellLoop() {
   if (swellRafId) cancelAnimationFrame(swellRafId);
@@ -1187,6 +1221,11 @@ function stopSwellLoop() {
     cancelAnimationFrame(swellRafId);
     swellRafId = null;
   }
+  if (_scrollEndTimer) {
+    clearTimeout(_scrollEndTimer);
+    _scrollEndTimer = null;
+  }
+  _scrollActive = false;
   swellEnergy = 0;
   applySwellToCSS(0);
 }
@@ -1222,7 +1261,9 @@ function swellTick() {
     }
   }
 
-  applySwellToCSS(swellEnergy);
+  if (!_scrollActive) {
+    applySwellToCSS(swellEnergy);
+  }
 
   if (swellIsRunning) {
     swellRafId = requestAnimationFrame(swellTick);
@@ -3489,7 +3530,7 @@ function refreshTransitionGeometry() {
      the visual result. The cache is stored on the DOM node, so
      it is garbage-collected with the node if the paragraph is
      ever rebuilt — no explicit invalidation is needed. */
-     var DRIFT_CONFIG = {
+var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.075,
   MAX_LINE_SPREAD_PX: 38,
   GLOBAL_DRIFT_FACTOR: 0.08,
@@ -4981,6 +5022,13 @@ function scheduleEvaluation() { scheduleScrollTick(); }
 function scheduleTransitionBodyUpdate() { scheduleScrollTick(); }
 
 window.addEventListener('scroll', function() {
+  _scrollActive = true;
+  if (_scrollEndTimer) clearTimeout(_scrollEndTimer);
+  _scrollEndTimer = setTimeout(function() {
+    _scrollActive = false;
+    _scrollEndTimer = null;
+  }, 200);
+
   var y = window.pageYOffset || document.documentElement.scrollTop || 0;
   var goingDown = y > lastScrollY + 1;
   var goingUp = y < lastScrollY - 1;
@@ -4998,6 +5046,16 @@ window.addEventListener('scroll', function() {
     }
   }
 }, { passive: true });
+
+if ('onscrollend' in window) {
+  window.addEventListener('scrollend', function() {
+    if (_scrollEndTimer) {
+      clearTimeout(_scrollEndTimer);
+      _scrollEndTimer = null;
+    }
+    _scrollActive = false;
+  }, { passive: true });
+}
 
 window.addEventListener('resize', function() {
   refreshTransitionGeometry();
