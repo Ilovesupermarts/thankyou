@@ -201,10 +201,9 @@
 
   /* --- LAYER 1: Diffuse base mesh swell --- */
   .layer-diffuse {
-    filter: brightness(calc(1 + var(--audio-swell, 0) * 0.30))
-            saturate(calc(1 + var(--audio-swell, 0) * 0.20));
-    will-change: transform, filter;
-  }
+  filter: brightness(1.08) saturate(1.05);
+  will-change: transform;
+}
 
   .layer-diffuse .ambient-mesh {
     opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important;
