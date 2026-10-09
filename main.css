@@ -207,20 +207,20 @@
 
   .layer-diffuse .ambient-mesh {
     opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important;
-    transition: opacity 100ms ease-out;
+    
   }
 
   .layer-diffuse .orb-1 {
     scale: calc(1 + var(--audio-swell, 0) * 0.53);
-    transition: scale 120ms ease-out;
+    
   }
   .layer-diffuse .orb-2 {
     scale: calc(1 + var(--audio-swell, 0) * 0.61); /* 0.53 * 1.15 */
-    transition: scale 120ms ease-out;
+    
   }
   .layer-diffuse .orb-3 {
     scale: calc(1 + var(--audio-swell, 0) * 0.48); /* 0.53 * 0.90 */
-    transition: scale 120ms ease-out;
+    
   }
 
   /* --- LAYER 2: Masked geometric counter-flow --- */
@@ -245,7 +245,7 @@
        panel typography tune this keeps the masked lines from
        cutting through the text gutters on musical accents. */
     opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
-    transition: opacity 100ms ease-out;
+    
 
     /* Static color grade. Rendered once at mask setup, then reused
        across frames. Desaturated from the demo's 1.45 to 0.50 so
@@ -269,7 +269,7 @@
     opacity: 1.0 !important;
     transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
     transform-origin: 50% 50%;
-    transition: transform 120ms ease-out;
+    
   }
 
   .shippo-mask-window .orb-1 {
