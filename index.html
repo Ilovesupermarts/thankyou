@@ -206,7 +206,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.02</div>
+  <div class="app-version" aria-hidden="true">v2.09.03</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -672,7 +672,7 @@
      visible again through the transparent .thankyou-screen. Gated
      to autumn in CSS.
 
-     Eleven leaves total: five Momiji and six Ichō. The maples
+     Eleven leaves total: four Momiji and seven Ichō. The maples
      share the same palmate Japanese maple path; per-leaf colour,
      size, and drift timing come from the .leaf-N classes in
      main.css. The ginkgo use the symmetrical fan path (600×700
@@ -680,27 +680,31 @@
      two dedicated pendulum-flutter keyframes — see main.css for
      the rationale.
 
+     The maple palette has been narrowed to the warm-light band
+     (#b83b1d → #dd8418); the two deepest oxblood tones (#8f2229
+     and #a32e18) were retired in favour of ginkgo, because they
+     pulled the eye away from the panel text at dark-luminance
+     contrast against the amber canvas. What remains reads as a
+     single continuous autumn palette at mid-to-light warmth.
+
      Both sets are aria-hidden on the parent, and each SVG carries
      a redundant aria-hidden="true" for structural parity across
      all eleven nodes. -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
-  <!-- 5 Palmate Japanese Momiji Leaves with Staggered Drifts -->
+  <!-- 4 Palmate Japanese Momiji Leaves with Staggered Drifts -->
   <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000" aria-hidden="true">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
   <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000" aria-hidden="true">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
   <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000" aria-hidden="true">
-    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
-  </svg>
-  <!-- 6 Ichō Ginkgo Leaves with Pendulum-Flutter Drifts -->
+  <!-- 7 Ichō Ginkgo Leaves with Pendulum-Flutter Drifts -->
   <svg class="ginkgo-leaf ginkgo-1" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
@@ -765,7 +769,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-5" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="ginkgo-leaf ginkgo-6" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -781,7 +785,23 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-6" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="ginkgo-leaf ginkgo-7" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="ginkgo-leaf ginkgo-8" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
