@@ -331,7 +331,7 @@ function applyTheme(theme) {
   currentTheme = theme;
   document.documentElement.setAttribute('data-theme', theme);
   if (themeToggle) themeToggle.textContent = (theme === 'autumn') ? '🍁' : '🌸';
-  /* v1.3: tracer lifecycle. The single source of truth for "is
+  /* v1.3: ambient lifecycle. The single source of truth for "is
      the app past the intro?" is the .active class on the maple
      leaves overlay — it is added the moment Panel 0 mounts inside
      triggerKoiStart() and removed synchronously in
@@ -339,15 +339,13 @@ function applyTheme(theme) {
      closes the mid-intro race.
 
      The ambient sound rotation and the audio-reactive swell loop
-     share this exact lifecycle: they start and stop in lockstep
-     with the tracer so a mid-run theme toggle cannot leave sound
-     or animation playing alone against a sakura theme. */
+     share this exact lifecycle so a mid-run theme toggle cannot
+     leave sound or animation playing alone against a sakura
+     theme. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (theme === 'autumn' && isCarouselRunning) {
-    scheduleShippoTracer();
     startAmbient();
   } else {
-    stopShippoTracer();
     stopAmbient();
   }
 }
@@ -1753,23 +1751,6 @@ var mapleLeaves = document.getElementById('mapleLeaves');
    cascades to their children via CSS custom-property inheritance. */
 var stageLattice = document.getElementById('stageLattice');
 
-/* v1.3: Shippo mosaic star tracer pool — three reusable nodes.
-   Each node contains a .tracer-rotator wrapper (carries the exit
-   animation) around the concave 4-point star SVG (carries the
-   stroke draw). The outer .shippo-tracer receives the grid
-   translate3d plus the initial spawn rotation from JS; the inner
-   .tracer-rotator carries the exit dissolve. Keeping the two
-   concerns on separate elements is what lets the exit rotation/
-   scale/blur play without clobbering the grid position, and lets
-   the initial spawn rotation pivot about the star's own centre. */
-var shippoTracers = [
-  document.getElementById('shippoTracer0'),
-  document.getElementById('shippoTracer1'),
-  document.getElementById('shippoTracer2')
-];
-var shippoTracerIndex = 0;
-var shippoTimer = null;
-
 var submitBtn = document.getElementById('submitBtn');
 var confirmScreen = document.getElementById('confirmScreen');
 var confirmYes = document.getElementById('confirmYes');
@@ -2510,7 +2491,6 @@ function returnToStartScreen() {
   resetWind();
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
-  stopShippoTracer();
   stopAmbient();
 
   koiGestureState = 'idle';
@@ -4004,12 +3984,10 @@ function triggerKoiStart() {
 
         activatePanel(0);
 
-        /* v1.3: activate the ambient maple leaves, start the
-           Shippō tracer, and start the ambient sound layers
-           (bed + wind chime + audio-reactive swell). All share
-           the same .active gate on #mapleLeaves. */
+        /* v1.3: activate the ambient maple leaves and start the
+           ambient sound layers (bed + wind chime + audio-reactive
+           swell). All share the same .active gate on #mapleLeaves. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
-        scheduleShippoTracer();
         startAmbient();
 
         koiPushTimer(setTimeout(function() {
@@ -5846,124 +5824,6 @@ tyReceiptBtn.addEventListener('click', function(e) {
     setTimeout(updateReceiptScrollIndicator, 500);
   }, 100);
 });
-
-/* ============================================================
-   SHIPPO MOSAIC STAR TRACER
-   ------------------------------------------------------------
-   A concave 4-point star (Hoshi-gata) draws itself over a mosaic
-   tile, rests, then dissolves outward with a compound exit:
-   rotation (±12° randomised), scale expansion to 1.35×, and a
-   defocus blur to 2.8px while fading to zero.
-
-   The outer .shippo-tracer element receives the grid translate3d
-   plus the initial spawn rotation from JS. The inner
-   .tracer-rotator carries the entire exit animation (rotate,
-   scale, blur, opacity). Two elements, two concerns: the exit
-   rotation pivots about the star's centre via the rotator's
-   transform-origin, the spawn rotation pivots about the same
-   centre via the tracer's own transform — and neither clobbers
-   the grid position.
-
-   The star path is four 90° arcs of radius 30 drawn with
-   sweep-flag 0, which forces the arc centre to the outer grid
-   corner (64, 4) rather than the cell centre (34, 34). The arc
-   therefore bulges inward, pinching the star from 30px at the
-   tips to 30·(√2 − 1) ≈ 12.4px at the waist. Total perimeter is
-   4 × 15π = 60π ≈ 188.5, rounded to 189 for stroke-dasharray.
-
-   Placement is unrestricted: the star may spawn on any lattice
-   node across the viewport, including petal intersections and
-   tile boundaries. The initial spawn orientation is randomised
-   per spawn from eight 45° increments so the stroke draw begins
-   from a different tip on each pass — eight distinct draw-in
-   directions, all lattice-aligned because the rotation pivots
-   about the star's own centre. Because the SVG path's M point is
-   the first thing that becomes visible as the stroke-dashoffset
-   animates, rotating the element moves that start tip around the
-   star in 45° steps: 0° → North, 45° → NE, 90° → East, and so on
-   around the compass. */
-function triggerShippoCircle() {
-  if (currentTheme !== 'autumn') return;
-  var tracer = shippoTracers[shippoTracerIndex];
-  if (!tracer) return;
-  shippoTracerIndex = (shippoTracerIndex + 1) % shippoTracers.length;
-
-  var vw = window.innerWidth;
-  var vh = window.innerHeight;
-  var maxCols = Math.floor(vw / 30);
-  var maxRows = Math.floor(vh / 30);
-
-  var j = 1 + Math.floor(Math.random() * Math.max(1, maxCols - 2));
-  var k = 1 + Math.floor(Math.random() * Math.max(1, maxRows - 2));
-
-  var x = (j * 30) - 34;
-  var y = (k * 30) - 34;
-
-  /* Random initial spawn orientation: eight 45° increments
-     (0/45/90/135/180/225/270/315). Written on the OUTER
-     .shippo-tracer element, composed after the grid translate3d,
-     so the drawing stroke's starting tip lands at a different
-     screen position on every spawn instead of always at the top.
-     The inner .tracer-rotator still carries its own exit rotation
-     independently — the two rotations live on separate elements
-     and compose without interference. */
-  var startRotDeg = Math.floor(Math.random() * 8) * 45;
-
-  /* Randomise the exit rotation: ±12°. starDissolveCycle reads this
-     via var(--target-rot) at its 100% stop. Written on the
-     .tracer-rotator — never on the tracer — because the tracer
-     carries the fixed grid translate3d and the animated transforms
-     must not clobber it. */
-  var targetRotDeg = (Math.random() < 0.5 ? -1 : 1) * 12;
-  var rotator = tracer.querySelector('.tracer-rotator');
-  if (rotator) {
-    rotator.style.setProperty('--target-rot', targetRotDeg + 'deg');
-  }
-
-  tracer.style.transform = 'translate3d(' + x + 'px, ' + y + 'px, 0) rotate(' + startRotDeg + 'deg)';
-  tracer.classList.remove('drawing');
-  void tracer.offsetWidth;
-  tracer.classList.add('drawing');
-}
-
-function clearShippoDrawings() {
-  for (var i = 0; i < shippoTracers.length; i++) {
-    if (shippoTracers[i]) shippoTracers[i].classList.remove('drawing');
-  }
-}
-
-function stopShippoTracer() {
-  if (shippoTimer) {
-    clearTimeout(shippoTimer);
-    shippoTimer = null;
-  }
-  clearShippoDrawings();
-}
-
-/* scheduleShippoTracer() deliberately does NOT call stopShippoTracer()
-   at its head. Doing so would strip .drawing in the same JS task that
-   added it, and the browser would never render a frame. The split
-   between clearShippoDrawings() / stopShippoTracer() /
-   scheduleShippoTracer() is load-bearing — do not merge them.
-
-   Cadence widened to 2100ms base ±20% (1680–2520ms) so the 3.4s
-   dissolve cycle completes and rests before the next star begins.
-   The previous 750–1250ms window overlapped the exit of one star
-   with the draw of the next, reading as a continuous loop rather
-   than an occasional accent. */
-function scheduleShippoTracer() {
-  if (shippoTimer) {
-    clearTimeout(shippoTimer);
-    shippoTimer = null;
-  }
-  if (currentTheme !== 'autumn') return;
-
-  var delay = 2100 * (0.8 + Math.random() * 0.4);
-  shippoTimer = setTimeout(function() {
-    triggerShippoCircle();
-    scheduleShippoTracer();
-  }, delay);
-}
 
 /* ============ BOOTSTRAP ============ */
 applyTimeTheme();
