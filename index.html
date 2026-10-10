@@ -109,80 +109,6 @@
      base pattern's own line weight rather than widening it. -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
-<!-- ============ AMBIENT STAR TRACER POOL ============
-     Three reusable tracer nodes. The app.js controller picks one,
-     snaps it to a Shippō tile centre (grid parity enforced), and
-     plays a 3.4s "drawing → dissolve" cycle.
-
-     Each node has two nested elements by design:
-
-       .shippo-tracer   — receives only the grid translate3d from JS.
-                          Its position on the 30px lattice is written
-                          once per spawn and never animated. Carries
-                          will-change: transform.
-
-       .tracer-rotator  — carries the entire exit animation (rotate,
-                          scale, blur, opacity) via starDissolveCycle.
-                          transform-origin is the star's centre
-                          (34px 34px on a 68×68 box), so the ±12° exit
-                          rotation pivots correctly. Carries
-                          will-change: transform, filter, opacity.
-
-     Two elements, two concerns. A single element would have to
-     compose the grid's fixed transform with the animated one around
-     the wrong origin, and the exit rotation would drift the star off
-     its tile.
-
-     The <path> is a concave 4-point star (Hoshi-gata): four 90° arcs
-     of radius 30 with sweep-flag 0. Sweep-flag 0 forces the arc
-     centre to the outer grid corner (64, 4) rather than the cell
-     centre (34, 34), so each arc bulges inward and pinches the star
-     from 30px at the four points to 30·(√2 − 1) ≈ 12.4px at the four
-     concave waists. Total perimeter is 4 × 15π = 60π ≈ 188.5,
-     rounded to 189 for stroke-dasharray — the slight overestimate
-     guarantees the "off" segment fully covers the path at dashoffset
-     189 with no sub-pixel gap at the seam.
-
-     Gated to autumn and to the active carousel state. -->
-<div class="tracer-layer" id="tracerLayer" aria-hidden="true">
-  <div class="shippo-tracer" id="shippoTracer0">
-    <div class="tracer-rotator">
-      <svg viewBox="0 0 68 68">
-        <path d="M 34,4
-                 A 30 30 0 0 0 64,34
-                 A 30 30 0 0 0 34,64
-                 A 30 30 0 0 0 4,34
-                 A 30 30 0 0 0 34,4 Z"
-              class="tracer-path" />
-      </svg>
-    </div>
-  </div>
-  <div class="shippo-tracer" id="shippoTracer1">
-    <div class="tracer-rotator">
-      <svg viewBox="0 0 68 68">
-        <path d="M 34,4
-                 A 30 30 0 0 0 64,34
-                 A 30 30 0 0 0 34,64
-                 A 30 30 0 0 0 4,34
-                 A 30 30 0 0 0 34,4 Z"
-              class="tracer-path" />
-      </svg>
-    </div>
-  </div>
-  <div class="shippo-tracer" id="shippoTracer2">
-    <div class="tracer-rotator">
-      <svg viewBox="0 0 68 68">
-        <path d="M 34,4
-                 A 30 30 0 0 0 64,34
-                 A 30 30 0 0 0 34,64
-                 A 30 30 0 0 0 4,34
-                 A 30 30 0 0 0 34,4 Z"
-              class="tracer-path" />
-      </svg>
-    </div>
-  </div>
-</div>
-
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 
 <div class="info-bar" id="infoBar">
@@ -206,7 +132,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.04</div>
+  <div class="app-version" aria-hidden="true">v2.09.01</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
