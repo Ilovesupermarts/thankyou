@@ -3,22 +3,47 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (passive-touch scroll path)
+       - The stage's touchmove listener is now passive. Its
+         horizontal branch no longer calls preventDefault because
+         .stage's touch-action: pan-y already tells the browser to
+         route vertical gestures to the scroller and horizontal
+         gestures to JS. A non-passive touchmove forces Chromium to
+         wait for the handler before it can begin the scroll, which
+         made the scroll position lag behind the finger even when
+         frames were otherwise healthy.
+       - The document-level scroll guard is now attached
+         conditionally — only while the table is locked. It is
+         registered by attachScrollGuard() and removed by
+         detachScrollGuard(), both of which use a single named
+         function reference so add/removeEventListener pair
+         correctly across the carousel lifecycle. Previously the
+         guard was registered globally and returned early after the
+         table unlocked, which still forced the browser to wait for
+         the (empty) handler on every touchmove.
+       - The document-wide touchstart listener that suppressed
+         pinch-zoom via a preventDefault was removed. touch-action:
+         pan-y on body plus the viewport meta already handle that.
+       - onDocTouchMoveGuard remains non-passive: it is the one
+         listener that genuinely needs preventDefault, and it is
+         only live while the user is on the koi screen or the panel
+         carousel.
      v1.3 (scroll-aware swell gate)
-       - The swell loop's CSS write (`applySwellToCSS`) is now
-         gated on a `_scrollActive` flag. During scroll, the loop
-         keeps updating its energy envelope but skips the
-         custom-property write, because that write forces a style
-         recalc down the full 150vw × 150vh ambient stage subtree
-         and competes with the scroll tick for the same frame
-         budget. The energy envelope continues to track the audio
-         so there is no step-function when scroll ends.
+       - The swell loop's CSS write (applySwellToCSS) is now gated on
+         a _scrollActive flag. During scroll, the loop keeps updating
+         its energy envelope but skips the custom-property write,
+         because that write forces a style recalc down the full
+         150vw × 150vh ambient stage subtree and competes with the
+         scroll tick for the same frame budget. The energy envelope
+         continues to track the audio so there is no step-function
+         when scroll ends.
        - The flag is armed on every scroll event, refreshed by a
-         200ms fallback timer, and cleared immediately by the
-         native scrollend event where supported (Chromium 114+,
-         which covers Samsung Internet on the S8 Ultra).
-       - stopSwellLoop() now clears the pending timer and resets
-         the flag, so a return-to-start-screen mid-scroll leaves
-         no leaked timer or stale gate state.
+         200ms fallback timer, and cleared immediately by the native
+         scrollend event where supported (Chromium 114+, which
+         covers Samsung Internet on the S8 Ultra).
+       - stopSwellLoop() now clears the pending timer and resets the
+         flag, so a return-to-start-screen mid-scroll leaves no
+         leaked timer or stale gate state.
      v1.3 (blossom stream deferred start)
        - tryStartBlossomStream() wrapper. startBlossomStream() was
          being called from confirmName()'s 420ms animation timeout
@@ -357,10 +382,6 @@ function haptic(ms) {
 ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(evt) {
   document.addEventListener(evt, function(e) { e.preventDefault(); }, { passive: false });
 });
-
-document.addEventListener('touchstart', function(e) {
-  if (e.touches.length > 1) e.preventDefault();
-}, { passive: false });
 
 document.addEventListener('contextmenu', function(e) {
   var t = e.target;
@@ -2468,12 +2489,14 @@ function unlockTable() {
   if (tableUnlocked) return;
   tableUnlocked = true;
   document.body.classList.remove('table-locked');
+  detachScrollGuard();
 }
 function relockTable() {
   if (!tableUnlocked) return;
   tableUnlocked = false;
   window.scrollTo(0, 0);
   document.body.classList.add('table-locked');
+  attachScrollGuard();
 }
 
 /* v1.3: return to the blossom start screen. */
@@ -2535,6 +2558,7 @@ function returnToStartScreen() {
     tableUnlocked = false;
     document.body.classList.add('table-locked');
   }
+  attachScrollGuard();
   window.scrollTo(0, 0);
 
   if (transitionLine) {
@@ -3966,6 +3990,7 @@ function triggerKoiStart() {
         }
         updateGlobalHint();
         document.body.classList.add('table-locked');
+        attachScrollGuard();
         window.scrollTo(0, 0);
         currentPanel = 0;
         track.style.transform = 'translateX(0%)';
@@ -4733,7 +4758,6 @@ function onTouchMove(e) {
     }
   }
   if (isHorizontal) {
-    e.preventDefault();
     currentX = x;
     recordSwipeSample(x);
     if (currentPanel === totalPanels - 1 && deltaX < 0) {
@@ -4818,7 +4842,7 @@ function onTouchEnd() {
   else bounceToCurrentPanel();
 }
 stage.addEventListener('touchstart', onTouchStart, { passive: true });
-stage.addEventListener('touchmove', onTouchMove, { passive: false });
+stage.addEventListener('touchmove', onTouchMove, { passive: true });
 stage.addEventListener('touchend', onTouchEnd, { passive: true });
 stage.addEventListener('touchcancel', onTouchEnd, { passive: true });
 
@@ -4890,12 +4914,33 @@ window.addEventListener('scroll', function() {
   else infoBar.classList.remove('hidden');
 }, { passive: true });
 
-document.addEventListener('touchmove', function(e) {
+/* Document-level scroll guard. Registered only while the table is
+   locked — attached by attachScrollGuard() and detached by
+   detachScrollGuard().
+
+   Non-passive is deliberate and load-bearing: this is the one
+   listener that genuinely needs preventDefault, because it exists to
+   suppress the browser's own scroll gesture while the user is on the
+   koi screen or the panel carousel. Every other touchmove listener in
+   the file is passive so Chromium can start the scroll in parallel
+   with the JS dispatch.
+
+   Registered as a named function so add/removeEventListener pair on
+   the same reference across the table-locked lifecycle. */
+function onDocTouchMoveGuard(e) {
   if (tableUnlocked) return;
   if (isHorizontal) return;
   if (e.target && e.target.closest && e.target.closest('#nameScreen')) return;
   e.preventDefault();
-}, { passive: false });
+}
+
+function attachScrollGuard() {
+  document.addEventListener('touchmove', onDocTouchMoveGuard, { passive: false });
+}
+
+function detachScrollGuard() {
+  document.removeEventListener('touchmove', onDocTouchMoveGuard);
+}
 
 /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 var tableEnteredView = false;
