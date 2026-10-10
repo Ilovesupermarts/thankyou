@@ -547,10 +547,9 @@
   }
 
   .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
   .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-4 { width: 66px; height: 66px; fill: #8f2229; left: 58%;  animation: mapleDriftA 13s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9s; }
   .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
-  .leaf-7 { width: 57px; height: 57px; fill: #a32e18; left: 35%;  animation: mapleDriftA 15s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
 
   @keyframes mapleDriftA {
     0% {
@@ -2489,8 +2488,8 @@
   }
 
 /* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============
-   Six ginkgo leaves ride inside the same .maple-leaves-overlay
-   as the five remaining momiji. Same lifecycle, same theme gate,
+   Seven ginkgo leaves ride inside the same .maple-leaves-overlay
+   as the four remaining momiji. Same lifecycle, same theme gate,
    same 1.8s opacity fade on .active — no new JS, no new
    container.
 
@@ -2503,13 +2502,13 @@
    rotation range is deliberately capped. Transform-only, so
    zero added compositor cost.
 
-   Colour progression across the six leaves is a chromatic
-   bridge from lemon-gold ginkgo down to the deep russet of the
-   momiji set: #fed634 → #f3c428 → #ddb01e → #c19618, with the
-   two additional tones #e6c93a and #cfad1c filling the mid-band.
-   The warmer ambers fill the tonal gap between the brightest
-   ginkgo and the darkest maple, so the two species read as one
-   continuous autumn palette rather than two competing ones.
+   Colour progression across the seven leaves is a chromatic
+   bridge from lemon-gold ginkgo down to the warm amber band:
+   #fed634 → #f3c428 → #e6c93a → #e3c22e → #ddb01e → #cfad1c →
+   #c19618 → #d4b024. The set is deliberately confined to the
+   mid-to-light warmth band so the yellow leaves read as one
+   continuous drift against the amber canvas rather than as
+   competing accents at the dark end.
 
    Size band 42–56px is deliberately smaller than the maples
    (42–66px). High-luminance yellow reads larger on the retina
@@ -2519,10 +2518,9 @@
    tall — taller than a maple of equal width, which is correct
    because the ginkgo SVG includes the stem.
 
-   Negative animation-delay values are chosen from troughs in
-   the maple stagger (−2, −4, −9, −6, −11, after leaf-2 and
-   leaf-5 convert) so all eleven leaves are pre-phased on first
-   paint. */
+   Negative animation-delay values are drawn from the full
+   −1s to −12.5s range so all eleven leaves are pre-phased and
+   non-colliding on first paint. */
 @keyframes ginkgoDriftA {
   0%   { transform: translate3d(0, -65px, 0) rotate(14deg); opacity: 0; }
   12%  { opacity: 0.95; }
@@ -2578,16 +2576,23 @@
   animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s;
 }
 
-.ginkgo-5 {
-  width: 50px; height: 58px;
-  fill: #e6c93a;
-  left: 24%;
-  animation: ginkgoDriftA 13.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s;
-}
-
 .ginkgo-6 {
   width: 54px; height: 63px;
   fill: #cfad1c;
   left: 74%;
-  animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7.0s;
+  animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9.5s;
+}
+
+.ginkgo-7 {
+  width: 60px; height: 70px;
+  fill: #d4b024;
+  left: 58%;
+  animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11.0s;
+}
+
+.ginkgo-8 {
+  width: 44px; height: 51px;
+  fill: #e3c22e;
+  left: 35%;
+  animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s;
 }
