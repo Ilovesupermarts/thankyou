@@ -53,8 +53,15 @@
        and orb scale from --audio-swell. The animation is upstream of
        the tracker and receipt screens, so the swell loop's lifecycle
        is piggybacked on the same .active gate on #mapleLeaves that
-       already controls the Shippō tracer and the ambient sound
-       layers. See app.js's AUDIO-REACTIVE SWELL SYSTEM section. -->
+       already controls the ambient sound layers. See app.js's
+       AUDIO-REACTIVE SWELL SYSTEM section.
+
+       v1.3 (filter removal): the layer-diffuse ancestor filter
+       (brightness 1.08 / saturate 1.05) has been removed. Because
+       --audio-swell continuously mutates descendant transforms, the
+       ancestor filter was invalidating its offscreen render pass
+       every frame. The colour shift is now baked directly into the
+       .light-orb gradient stops in main.css. -->
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
@@ -74,10 +81,9 @@
        · No .ambient-primary inside. The static gradient would fill
          the entire masked pattern with light instead of confining
          the reveal to the orb radii.
-       · Static filter only (hue-rotate + saturate + contrast). No
-         calc(--audio-swell) inside the filter — that would force
-         Chromium to re-rasterize an offscreen framebuffer on every
-         frame and thrash GPU tile memory.
+       · The hue-rotate + saturate + contrast colour grade is baked
+         into the .orb-N gradient stops in main.css, not applied as
+         a runtime filter.
        · Swell is driven purely by opacity and transform, both of
          which are handled directly on the compositor thread. -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
@@ -106,8 +112,17 @@
      1.7 to 1.2 to match Layer 2's SVG mask exactly. Both tiles are
      on the same 60×60 grid pinned to (0, 0), so the two strokes
      land on identical pixels and Layer 2's reveal sits inside the
-     base pattern's own line weight rather than widening it. -->
+     base pattern's own line weight rather than widening it.
+
+     v1.3 (static cross-fade): the "pond" clearing around the koi is
+     now served by a second element, .ambient-mosaic-pond, whose mask
+     is a fixed radial-gradient baked once at first paint. The two
+     layers cross-fade on opacity alone, which runs entirely on the
+     compositor. The previous approach interpolated the mask radii via
+     @property custom properties, forcing a full-viewport mask-image
+     re-evaluation on the main thread for 600ms during the koi dive. -->
 <div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 
@@ -132,7 +147,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.07</div>
+  <div class="app-version" aria-hidden="true">v2.09.08</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -181,13 +196,22 @@
   </div>
 
   <!-- v1.3: はじめる label removed. The button is now icon-only, with
-       the aria-label on the button carrying the accessibility name. -->
+       the aria-label on the button carrying the accessibility name.
+
+       Ring layers, outermost to innermost:
+         .gold-halo  — pre-blurred annular radial-gradient div
+         .gold-glow  — wide soft-gold stroke behind the band
+         .gold-band  — the crisp ring, r=90
+         .pulse-ring — three expanding hairline rings
+       The gold-band's radius matches where every pulse-ring begins. -->
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
+      <div class="gold-halo" aria-hidden="true"></div>
       <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+        <circle cx="180" cy="180" r="90" class="gold-glow" />
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
       <div class="koi-dive-wrap" id="koiDiveWrap">
