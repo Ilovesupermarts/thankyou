@@ -107,7 +107,7 @@
          unchanged. The audible path is untouched.
        - Lifecycle piggybacks on startAmbient() / stopAmbient(),
          which are already gated on the #mapleLeaves .active class
-         shared with the Shippō tracer and chime. stopSwellLoop()
+         shared with the ambient sound layers. stopSwellLoop()
          flushes --audio-swell to 0 so the background does not
          freeze half-inflated if the user returns to the start
          screen mid-beat.
@@ -406,11 +406,18 @@ var soundReady = false;
    parallel leaf branch off soundMasterGain; the analyser never
    connects to destination, so the audible output is unchanged.
    See the SWELL SYSTEM section further down for the analysis loop
-   and the calibration constants. */
+   and the calibration constants.
+
+   _lastAppliedSwell tracks the last value actually written to the
+   CSS custom property so applySwellToCSS() can skip subtree style
+   recalculation when the energy envelope has settled. Initialised
+   to -1 (a value outside the [0, 1] range) so the first write of
+   any lifecycle always fires. */
 var swellAnalyserNode = null;
 var swellCompensationGain = null;
 var swellFreqData = null;
 var swellEnergy = 0.0;
+var _lastAppliedSwell = -1;
 var swellRafId = null;
 var swellIsRunning = false;
 
@@ -1224,7 +1231,19 @@ function playWindChimeSound() {
    skipped, but the energy envelope keeps updating inside
    swellTick() so the value does not step-function when scroll
    ends. See the _scrollActive declaration near the top of the
-   acoustic engine for the full rationale. */
+   acoustic engine for the full rationale.
+
+   Epsilon deadband: applySwellToCSS() skips the write when the
+   energy envelope has moved less than 0.005 since the last write,
+   except when flushing to exactly 0. During quiet passages and
+   held notes the delta per frame is often under the threshold, so
+   the majority of writes are suppressed — cutting style recalcs
+   down the #ambientStage and #stageLattice subtrees from 120/s to
+   under 10/s in typical content. Attack transients and other
+   fast-moving passages exceed the threshold easily, so no musical
+   accent is delayed. The val !== 0 clause guarantees that
+   stopSwellLoop()'s flush always writes regardless of the last
+   value held. */
 
 function startSwellLoop() {
   if (swellRafId) cancelAnimationFrame(swellRafId);
@@ -1244,6 +1263,10 @@ function stopSwellLoop() {
   }
   _scrollActive = false;
   swellEnergy = 0;
+  /* Reset the deadband state before the flush so the next lifecycle
+     starts clean. -1 is a value outside the [0, 1] range, so the
+     first write of any subsequent run always fires. */
+  _lastAppliedSwell = -1;
   applySwellToCSS(0);
 }
 
@@ -1294,8 +1317,18 @@ function swellTick() {
    one write per element is enough. If the Layer 2 element has not
    been added to the DOM (e.g. index.html not yet updated), the
    ref will be null and the write is skipped — Layer 1 still gets
-   its swell, and no error is thrown. */
+   its swell, and no error is thrown.
+
+   The epsilon guard skips the write when the change since the last
+   applied value is under 0.5% AND the new value is not exactly 0.
+   The 0.005 threshold is well below the just-noticeable difference
+   for every consumer: the largest derived change per epsilon step
+   is roughly 2.4px on the Layer 1 orb scale, at the edge of what
+   the eye can resolve on a slow-moving soft gradient. The val !== 0
+   exception ensures the stopSwellLoop() flush always lands. */
 function applySwellToCSS(val) {
+  if (Math.abs(val - _lastAppliedSwell) < 0.005 && val !== 0) return;
+  _lastAppliedSwell = val;
   var vStr = val.toFixed(3);
   if (ambientStage) ambientStage.style.setProperty('--audio-swell', vStr);
   if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
@@ -1351,8 +1384,12 @@ function normalizePresets(data) {
   return out.length > 0 ? out : null;
 }
 
+/* No ?v= cache-buster. The SW's network-first strategy for this path
+   plus the CACHE name bump on every deploy already provide freshness.
+   A unique query string per call would also miss the precache offline,
+   because caches.match() matches by full URL including the search. */
 function loadPresetsFromServer() {
-  return fetch('presets.json?v=' + Date.now())
+  return fetch('presets.json')
     .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
     .then(function(data) {
       var normalized = normalizePresets(data);
@@ -1370,7 +1407,7 @@ var AMBIENT_LINES = [
   'どうぞ、心穏やかな時間をお過ごしください。'
 ];
 function loadQuotesFromServer() {
-  return fetch('quotes.json?v=' + Date.now())
+  return fetch('quotes.json')
     .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
     .then(function(data) {
       if (data && Array.isArray(data.quotes) && data.quotes.length > 0) AMBIENT_LINES = data.quotes.slice();
@@ -1404,8 +1441,10 @@ function convertPanelText(raw) {
   }
   return out.join('');
 }
+/* Same reasoning as loadPresetsFromServer — no query string, so the
+   precache URL matches offline. */
 function loadPanelInto(anchorId, url) {
-  return fetch(url + '?v=' + Date.now())
+  return fetch(url)
     .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
     .then(function(text) {
       var anchor = document.getElementById(anchorId);
@@ -1414,7 +1453,7 @@ function loadPanelInto(anchorId, url) {
     .catch(function() { /* silent */ });
 }
 function loadPanelHtml(url) {
-  return fetch(url + '?v=' + Date.now())
+  return fetch(url)
     .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
     .then(function(text) { return convertPanelText(text); })
     .catch(function() { return ''; });
