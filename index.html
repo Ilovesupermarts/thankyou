@@ -147,7 +147,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.10</div>
+  <div class="app-version" aria-hidden="true">v2.09.20</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -243,6 +243,45 @@
 
 <div class="intro-overlay" id="introOverlay">
   <div class="name-column" id="nameColumn"></div>
+</div>
+
+<!-- ============ AUDIO SPECTRUM & METADATA HUD ============
+     Persistent bottom-left card surfacing the currently-playing
+     ambient bed: track title, artist, a live waterline-mirror
+     spectrum, and a two-stage loading gauge covering both stream
+     transfer and PCM decompression.
+
+     The canvas element carries baseline logical dimensions only
+     (282×26); app.js scales the backing store by devicePixelRatio
+     on boot so the drawing surface matches the display. Setting
+     the markup to the DPR-scaled size would leave a single frame
+     at boot with a mismatched backing store.
+
+     Visibility is governed by a CSS rule on body.info-visible
+     combined with the .shown class that app.js toggles on this
+     element — see main.css for the rule and app.js for the
+     _hudShouldDraw() JS mirror that gates canvas work. -->
+<div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
+  <div class="hud-meta-row">
+    <span class="hud-title" id="hudTrackTitle">草原の風</span>
+    <span class="hud-sep">·</span>
+    <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
+    <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+  </div>
+
+  <div class="hud-visualizer-block">
+    <canvas class="hud-canvas" id="hudCanvas" width="282" height="26"></canvas>
+  </div>
+
+  <div class="hud-gauge-block">
+    <div class="hud-gauge-bar">
+      <div class="hud-gauge-fill" id="hudGaugeFill"></div>
+    </div>
+    <div class="hud-gauge-label">
+      <span id="hudByteStatus">0.0 / 41.0 MB</span>
+      <span id="hudPctStatus">待機中</span>
+    </div>
+  </div>
 </div>
 
 <div class="stage" id="stage">
