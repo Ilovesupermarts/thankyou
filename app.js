@@ -118,6 +118,18 @@
          animating a filter parameter. Per-frame filter changes on
          masked elements force Chromium to re-rasterize offscreen
          framebuffers at 60fps and thrash GPU tile memory.
+       - Epsilon deadband: applySwellToCSS() skips the style write
+         when the energy envelope has moved less than 0.005 since
+         the last write, except when the new value is exactly 0
+         while the previous write was not. The predicate is split
+         into two clauses — an identity check for the settled-zero
+         case and a delta check for the general case — because a
+         single compound predicate cannot express both intents.
+         The identity check is what stops the write on every frame
+         after the fallback branch has clamped swellEnergy to
+         exactly 0; a single `Math.abs(val - last) < 0.005 &&
+         val !== 0` would have evaluated to false in that state and
+         allowed the write through on every frame of silence.
      v1.3 (acoustic engine unit convention + wind chime fixes)
        - Wind chime scheduler pileup fixed. playWindChimeSound()
          was returning raw seconds (~13) to scheduleNextWindChime(),
@@ -1235,15 +1247,29 @@ function playWindChimeSound() {
 
    Epsilon deadband: applySwellToCSS() skips the write when the
    energy envelope has moved less than 0.005 since the last write,
-   except when flushing to exactly 0. During quiet passages and
-   held notes the delta per frame is often under the threshold, so
-   the majority of writes are suppressed — cutting style recalcs
-   down the #ambientStage and #stageLattice subtrees from 120/s to
-   under 10/s in typical content. Attack transients and other
-   fast-moving passages exceed the threshold easily, so no musical
-   accent is delayed. The val !== 0 clause guarantees that
-   stopSwellLoop()'s flush always writes regardless of the last
-   value held. */
+   except when flushing from a settled non-zero value to exactly 0.
+   The predicate is two clauses, not one, because the two intents
+   are different:
+
+     · `_lastAppliedSwell === val` catches the settled-at-zero case.
+       The fallback branch in swellTick() clamps swellEnergy to
+       exactly 0 when it drops below 0.005, and once the CSS var
+       holds 0 the identity check short-circuits every subsequent
+       write. This is what keeps the app from re-writing 0.000 to
+       the DOM 120 times per second during silence.
+
+     · `val !== 0 && Math.abs(val - _lastAppliedSwell) < 0.005`
+       catches the settled-at-any-other-value case. During typical
+       audio decay the analyser branch asymptotes toward 0 without
+       ever clamping, so the delta check carries the whole load and
+       suppresses writes once the per-frame change drops below
+       perceptibility.
+
+   A single compound predicate — `Math.abs(val - _lastAppliedSwell)
+   < 0.005 && val !== 0` — evaluates to false when both sides equal
+   zero (`0 < 0.005` is true, `0 !== 0` is false), which defeats
+   the guard on every idle frame. The identity clause is what makes
+   the guard work at zero. */
 
 function startSwellLoop() {
   if (swellRafId) cancelAnimationFrame(swellRafId);
@@ -1319,15 +1345,25 @@ function swellTick() {
    ref will be null and the write is skipped — Layer 1 still gets
    its swell, and no error is thrown.
 
-   The epsilon guard skips the write when the change since the last
-   applied value is under 0.5% AND the new value is not exactly 0.
-   The 0.005 threshold is well below the just-noticeable difference
-   for every consumer: the largest derived change per epsilon step
-   is roughly 2.4px on the Layer 1 orb scale, at the edge of what
-   the eye can resolve on a slow-moving soft gradient. The val !== 0
-   exception ensures the stopSwellLoop() flush always lands. */
+   The guard has two clauses; see the block comment above
+   startSwellLoop() for the full rationale on why the predicate
+   cannot be a single compound expression. Briefly:
+
+     _lastAppliedSwell === val        — settles every frame at
+                                        any value, including 0,
+                                        so the silent path stops
+                                        writing after the first
+                                        zero flush
+     val !== 0 && delta < 0.005      — settled-anywhere-else, the
+                                        normal audio decay path
+
+   The val !== 0 clause is deliberately scoped inside the second
+   clause only: if it were lifted to the top level it would force
+   a write on every frame of silence once _lastAppliedSwell
+   reached 0, because `0 !== 0` would evaluate false and the guard
+   would not return. */
 function applySwellToCSS(val) {
-  if (Math.abs(val - _lastAppliedSwell) < 0.005 && val !== 0) return;
+  if (_lastAppliedSwell === val || (val !== 0 && Math.abs(val - _lastAppliedSwell) < 0.005)) return;
   _lastAppliedSwell = val;
   var vStr = val.toFixed(3);
   if (ambientStage) ambientStage.style.setProperty('--audio-swell', vStr);
