@@ -92,10 +92,27 @@
   body.thankyou-active .summary { visibility: hidden; }
   body.thankyou-active .numpad:not(.receipt-mode) { visibility: hidden; }
 
+  /* ============================================================
+     AMBIENT STAGE
+     ------------------------------------------------------------
+     Geometry is pixel-clamped rather than viewport-relative so the
+     margin matches WIND_OFFSET_CLAMP (120px) exactly, at any
+     viewport aspect. The stage only needs to be wider than the
+     viewport by 2 × 120px; the height stays at 150% to give the
+     .ambient-primary drift (±6%) vertical room without exposing a
+     hard gradient edge at the bezel.
+
+     No filter here any more — the previous brightness(1.08)
+     saturate(1.05) has been baked into the .light-orb gradient
+     stops below. With no filter on this element, the continuously
+     animating orb transforms no longer invalidate any ancestor
+     offscreen pass, so the whole subtree stays compositor-side. */
   .ambient-stage {
     position: fixed;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
+    top: -25%;
+    left: -120px;
+    width: calc(100% + 240px);
+    height: 150%;
     z-index: -3;
     pointer-events: none;
     will-change: transform;
@@ -115,22 +132,7 @@
      bakes the masked texture once at first paint and never re-evaluates
      it. The blossom-screen swap is a pure opacity cross-fade — both
      layers' `transition` is on opacity only, so both interpolations run
-     on the compositor thread.
-
-     History: the previous implementation used a single .ambient-mosaic
-     element and interpolated the mask radii through two @property-
-     registered custom properties (--pond-inner / --pond-outer). That
-     worked visually but forced a full-viewport mask-image re-evaluation
-     on the main thread on every frame for the 600ms of the transition.
-     On the S8 Ultra, that overlapped the koi dive and produced a hitch.
-     The static-layer cross-fade below eliminates the mask recomputation
-     entirely: the compositor blends two pre-rasterized textures, and the
-     main thread is free during the dive.
-
-     Both layers are in the html[data-theme="autumn"] selector for the
-     background-image data-URI so the pond element inherits the same
-     tile as the base. Without that, the pond element has no image to
-     mask and would render invisibly — the mask would apply to nothing. */
+     on the compositor thread. */
   .ambient-mosaic,
   .ambient-mosaic-pond {
     position: fixed;
@@ -183,19 +185,20 @@
      existing diffuse mesh; Layer 2 is a mirrored copy of the orbs
      clipped by an SVG Shippō mask.
 
-     Performance note: Layer 2 carries a static filter (hue-rotate,
-     saturate, contrast) and modulates only opacity and transform.
-     This ensures the browser rasterizes the filtered SVG-masked
-     texture once and never re-runs the offscreen pass per frame.
-     Per-frame filter recalculations on masked elements force
-     Chromium to re-rasterize offscreen framebuffers at 60fps and
-     thrash GPU tile memory. Do not add calc(--audio-swell) inside
-     the filter.
+     Performance note: the two layers previously carried their
+     ancestor colour grades as CSS `filter` declarations. Because
+     --audio-swell mutates a descendant of both filtered parents on
+     every frame, the parent offscreen render passes were being
+     invalidated every frame, forcing a full FBO allocation,
+     rasterization, and convolution per tick. The colour grades have
+     now been baked directly into the gradient stops below, and both
+     ancestor filters have been removed. The swell now drives opacity
+     and transform only, both compositor-safe, and neither layer
+     issues any per-frame offscreen pass.
      ============================================================ */
 
   /* --- LAYER 1: Diffuse base mesh swell --- */
   .layer-diffuse {
-  filter: brightness(1.08) saturate(1.05);
   will-change: transform;
 }
 
@@ -217,7 +220,10 @@
     
   }
 
-  /* --- LAYER 2: Masked geometric counter-flow --- */
+  /* --- LAYER 2: Masked geometric counter-flow ---
+     Filter removed; contrast/hue/saturation baked into .orb-N
+     overrides below. The mask itself is a static 60×60 SVG tile,
+     so the composited texture is stable across the swell. */
   .shippo-mask-window {
     position: fixed;
     inset: 0;
@@ -235,19 +241,10 @@
     mask-position: 0 0;
 
     /* Rest 0.20 → Peak 0.42. The swell amplitude was stepped down
-       from 0.30 to 0.22 in the readability pass. Combined with the
-       panel typography tune this keeps the masked lines from
-       cutting through the text gutters on musical accents. */
+       from 0.30 to 0.22 in the readability pass. The resting floor
+       stays at 0.20 — the baked contrast in the orb stops preserves
+       the perceived density at this opacity. */
     opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
-    
-
-    /* Static color grade. Rendered once at mask setup, then reused
-       across frames. Desaturated from the demo's 1.45 to 0.50 so
-       the masked lines read as a neutral warm tint rather than
-       coloured strokes competing with the panel text. */
-    filter: hue-rotate(8deg)
-            saturate(0.50)
-            contrast(1.60);
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -266,14 +263,21 @@
     
   }
 
+  /* Layer 2 orb overrides. The previous filter chain
+     (hue-rotate(8deg) saturate(0.50) contrast(1.60)) is baked into
+     these stops directly. Values are best-effort approximations
+     pending pixel-sampling against a running build; the shape and
+     alpha distribution match, and the composite reads slightly
+     denser than the raw alpha suggests — which is what the removed
+     contrast pass was providing. */
   .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(235, 110, 30, 0.95) 0%, rgba(200, 75, 20, 0.45) 45%, transparent 70%) !important;
+    background: radial-gradient(circle, rgba(255, 179, 136, 0.95) 0%, rgba(230, 145, 105, 0.45) 45%, transparent 70%) !important;
   }
   .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(245, 125, 35, 0.98) 0%, rgba(210, 85, 22, 0.50) 48%, transparent 72%) !important;
+    background: radial-gradient(circle, rgba(255, 188, 140, 0.98) 0%, rgba(240, 155, 110, 0.50) 48%, transparent 72%) !important;
   }
   .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(225, 100, 25, 0.90) 0%, rgba(190, 65, 18, 0.40) 40%, transparent 62%) !important;
+    background: radial-gradient(circle, rgba(245, 172, 128, 0.90) 0%, rgba(225, 140, 100, 0.40) 40%, transparent 62%) !important;
   }
 
   /* ============ AMBIENT LIGHT MESH (v1.3) ============ */
@@ -286,6 +290,9 @@
   }
   html[data-theme="default"] .ambient-mesh { display: none; }
 
+  /* The three base orbs. Gradient stops include the previously
+     applied brightness(1.08) saturate(1.05) ancestor filter, baked
+     in so the visual remains constant now that the filter is gone. */
   .light-orb {
     position: absolute;
     border-radius: 50%;
@@ -300,7 +307,7 @@
     max-height: 900px;
     top: 10%;
     left: 15%;
-    background: radial-gradient(circle, rgba(201, 86, 27, 0.50) 0%, rgba(247, 185, 60, 0.18) 42%, transparent 70%);
+    background: radial-gradient(circle, rgba(216, 89, 24, 0.50) 0%, rgba(255, 192, 56, 0.18) 42%, transparent 70%);
     animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
 
@@ -311,7 +318,7 @@
     max-height: 1050px;
     top: 35%;
     right: 5%;
-    background: radial-gradient(circle, rgba(212, 106, 21, 0.68) 0%, rgba(217, 94, 26, 0.41) 48%, transparent 72%);
+    background: radial-gradient(circle, rgba(228, 110, 18, 0.68) 0%, rgba(233, 98, 22, 0.41) 48%, transparent 72%);
     animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
 
@@ -322,7 +329,7 @@
     max-height: 700px;
     bottom: 10%;
     left: 30%;
-    background: radial-gradient(circle, rgba(201, 86, 27, 0.28) 0%, rgba(221, 132, 24, 0.48) 39%, transparent 60%);
+    background: radial-gradient(circle, rgba(216, 89, 24, 0.28) 0%, rgba(238, 137, 20, 0.48) 39%, transparent 60%);
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
@@ -344,6 +351,27 @@
     100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
   }
 
+  /* ============================================================
+     AMBIENT-PRIMARY — TIME AND WEATHER STATES (FLATTENED)
+     ------------------------------------------------------------
+     Previously these were CSS `filter` declarations layered on top
+     of the base gradient. Because .ambient-primary is a descendant
+     of .layer-diffuse (which itself carried a filter), and because
+     --audio-swell mutates its siblings every frame, both offscreen
+     passes were re-run per frame.
+
+     All time and weather variants are now expressed as discrete
+     background gradient declarations. Both axes carry identical
+     (0,3,1) specificity, so source order decides: time rules come
+     first, weather rules after, meaning weather always wins when
+     both attributes are present — exactly as in production where
+     the filter chain resolved the same way.
+
+     The values below include the previously-applied brightness and
+     saturation adjustments. They are best-effort approximations
+     pending pixel-sampling; the structural shape of every gradient
+     matches the base, and the directional shifts (warmer, dimmer,
+     desaturated) follow the filter matrices that were removed. */
   .ambient-primary {
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
@@ -351,30 +379,172 @@
       radial-gradient(circle at 50% 85%, var(--amb-3) 0%, transparent 38%),
       radial-gradient(circle at 15% 70%, var(--amb-4) 0%, transparent 42%);
     animation: ambientDrift 32s ease-in-out infinite;
-    transition: filter 2s ease;
     will-change: transform;
   }
   html[data-theme="autumn"] .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(247, 185, 60, 0.85) 0%, rgba(247, 185, 60, 0.40) 30%, rgba(247, 185, 60, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 138, 30, 0.80) 0%, rgba(240, 138, 30, 0.38) 32%, rgba(240, 138, 30, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(217, 94, 26, 0.72) 0%, rgba(217, 94, 26, 0.34) 28%, rgba(217, 94, 26, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(143, 63, 18, 0.55) 0%, rgba(143, 63, 18, 0.26) 26%, rgba(143, 63, 18, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(107, 47, 14, 0.45) 0%, rgba(107, 47, 14, 0.20) 25%, rgba(107, 47, 14, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(143, 47, 0, 0.30) 0%, rgba(107, 47, 14, 0.16) 35%, rgba(107, 47, 14, 0) 65%);
+      radial-gradient(circle at 25% 30%, rgba(255, 195, 62, 0.85) 0%, rgba(255, 195, 62, 0.40) 30%, rgba(255, 195, 62, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(255, 148, 30, 0.80) 0%, rgba(255, 148, 30, 0.38) 32%, rgba(255, 148, 30, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(230, 100, 26, 0.72) 0%, rgba(230, 100, 26, 0.34) 28%, rgba(230, 100, 26, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(155, 66, 18, 0.55) 0%, rgba(155, 66, 18, 0.26) 26%, rgba(155, 66, 18, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(118, 50, 14, 0.45) 0%, rgba(118, 50, 14, 0.20) 25%, rgba(118, 50, 14, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(155, 50, 0, 0.30) 0%, rgba(118, 50, 14, 0.16) 35%, rgba(118, 50, 14, 0) 65%);
     animation: autumnDrift1 14s ease-in-out infinite;
   }
-  html[data-time="morning"] .ambient-primary { filter: hue-rotate(-8deg) saturate(1.05); }
-  html[data-time="day"]     .ambient-primary { filter: none; }
-  html[data-time="evening"] .ambient-primary { filter: hue-rotate(-18deg) saturate(1.15); }
-  html[data-time="night"]   .ambient-primary { filter: hue-rotate(-28deg) saturate(0.65) brightness(0.92); }
-  html[data-weather="rain"] .ambient-primary,
-  html[data-weather="drizzle"] .ambient-primary { filter: hue-rotate(-13deg) saturate(0.75); }
-  html[data-weather="thunderstorm"] .ambient-primary { filter: hue-rotate(-20deg) saturate(0.6) brightness(0.9); }
-  html[data-weather="fog"] .ambient-primary { filter: saturate(0.55) brightness(1.03); }
-  html[data-weather="clouds"] .ambient-primary { filter: saturate(0.8); }
-  html[data-weather="snow"] .ambient-primary { filter: hue-rotate(6deg) saturate(0.5) brightness(1.06); }
-  html[data-weather="clear"] .ambient-primary { filter: hue-rotate(4deg) saturate(1.1); }
+
+  /* --- AUTUMN: time variants --- */
+  html[data-theme="autumn"][data-time="morning"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(255, 190, 58, 0.85) 0%, rgba(255, 190, 58, 0.40) 30%, rgba(255, 190, 58, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(255, 143, 26, 0.80) 0%, rgba(255, 143, 26, 0.38) 32%, rgba(255, 143, 26, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(235, 96, 22, 0.72) 0%, rgba(235, 96, 22, 0.34) 28%, rgba(235, 96, 22, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(158, 63, 15, 0.55) 0%, rgba(158, 63, 15, 0.26) 26%, rgba(158, 63, 15, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(120, 47, 11, 0.45) 0%, rgba(120, 47, 11, 0.20) 25%, rgba(120, 47, 11, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(158, 47, 0, 0.30) 0%, rgba(120, 47, 11, 0.16) 35%, rgba(120, 47, 11, 0) 65%);
+  }
+  html[data-theme="autumn"][data-time="evening"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(255, 178, 45, 0.85) 0%, rgba(255, 178, 45, 0.40) 30%, rgba(255, 178, 45, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(255, 130, 20, 0.80) 0%, rgba(255, 130, 20, 0.38) 32%, rgba(255, 130, 20, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(245, 88, 18, 0.72) 0%, rgba(245, 88, 18, 0.34) 28%, rgba(245, 88, 18, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(168, 58, 12, 0.55) 0%, rgba(168, 58, 12, 0.26) 26%, rgba(168, 58, 12, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(130, 43, 8, 0.45) 0%, rgba(130, 43, 8, 0.20) 25%, rgba(130, 43, 8, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(170, 43, 0, 0.30) 0%, rgba(130, 43, 8, 0.16) 35%, rgba(130, 43, 8, 0) 65%);
+  }
+  html[data-theme="autumn"][data-time="night"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(225, 155, 62, 0.85) 0%, rgba(225, 155, 62, 0.40) 30%, rgba(225, 155, 62, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(220, 118, 45, 0.80) 0%, rgba(220, 118, 45, 0.38) 32%, rgba(220, 118, 45, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(195, 88, 45, 0.72) 0%, rgba(195, 88, 45, 0.34) 28%, rgba(195, 88, 45, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(135, 63, 35, 0.55) 0%, rgba(135, 63, 35, 0.26) 26%, rgba(135, 63, 35, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(105, 50, 30, 0.45) 0%, rgba(105, 50, 30, 0.20) 25%, rgba(105, 50, 30, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(135, 48, 20, 0.30) 0%, rgba(105, 50, 30, 0.16) 35%, rgba(105, 50, 30, 0) 65%);
+  }
+
+  /* --- AUTUMN: weather variants --- */
+  html[data-theme="autumn"][data-weather="clear"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(255, 200, 60, 0.85) 0%, rgba(255, 200, 60, 0.42) 30%, rgba(255, 200, 60, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(255, 152, 28, 0.80) 0%, rgba(255, 152, 28, 0.40) 32%, rgba(255, 152, 28, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(235, 102, 24, 0.72) 0%, rgba(235, 102, 24, 0.36) 28%, rgba(235, 102, 24, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(158, 68, 17, 0.55) 0%, rgba(158, 68, 17, 0.28) 26%, rgba(158, 68, 17, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(120, 51, 13, 0.45) 0%, rgba(120, 51, 13, 0.22) 25%, rgba(120, 51, 13, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(158, 51, 0, 0.30) 0%, rgba(120, 51, 13, 0.18) 35%, rgba(120, 51, 13, 0) 65%);
+  }
+  html[data-theme="autumn"][data-weather="clouds"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(240, 185, 65, 0.85) 0%, rgba(240, 185, 65, 0.35) 30%, rgba(240, 185, 65, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(235, 140, 32, 0.80) 0%, rgba(235, 140, 32, 0.33) 32%, rgba(235, 140, 32, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(215, 95, 28, 0.72) 0%, rgba(215, 95, 28, 0.30) 28%, rgba(215, 95, 28, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(145, 65, 20, 0.55) 0%, rgba(145, 65, 20, 0.23) 26%, rgba(145, 65, 20, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(110, 50, 15, 0.45) 0%, rgba(110, 50, 15, 0.18) 25%, rgba(110, 50, 15, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(145, 50, 5, 0.30) 0%, rgba(110, 50, 15, 0.14) 35%, rgba(110, 50, 15, 0) 65%);
+  }
+  html[data-theme="autumn"][data-weather="fog"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(245, 200, 90, 0.85) 0%, rgba(245, 200, 90, 0.40) 30%, rgba(245, 200, 90, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 155, 55, 0.80) 0%, rgba(240, 155, 55, 0.38) 32%, rgba(240, 155, 55, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(220, 110, 50, 0.72) 0%, rgba(220, 110, 50, 0.34) 28%, rgba(220, 110, 50, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(155, 78, 40, 0.55) 0%, rgba(155, 78, 40, 0.26) 26%, rgba(155, 78, 40, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(120, 60, 32, 0.45) 0%, rgba(120, 60, 32, 0.20) 25%, rgba(120, 60, 32, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(155, 60, 20, 0.30) 0%, rgba(120, 60, 32, 0.16) 35%, rgba(120, 60, 32, 0) 65%);
+  }
+  html[data-theme="autumn"][data-weather="drizzle"] .ambient-primary,
+  html[data-theme="autumn"][data-weather="rain"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(225, 175, 75, 0.85) 0%, rgba(225, 175, 75, 0.35) 30%, rgba(225, 175, 75, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(215, 130, 45, 0.80) 0%, rgba(215, 130, 45, 0.33) 32%, rgba(215, 130, 45, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(200, 90, 35, 0.72) 0%, rgba(200, 90, 35, 0.30) 28%, rgba(200, 90, 35, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(135, 62, 25, 0.55) 0%, rgba(135, 62, 25, 0.23) 26%, rgba(135, 62, 25, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(105, 47, 18, 0.45) 0%, rgba(105, 47, 18, 0.18) 25%, rgba(105, 47, 18, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(135, 45, 10, 0.30) 0%, rgba(105, 47, 18, 0.14) 35%, rgba(105, 47, 18, 0) 65%);
+  }
+  html[data-theme="autumn"][data-weather="snow"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(245, 215, 130, 0.85) 0%, rgba(245, 215, 130, 0.40) 30%, rgba(245, 215, 130, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(240, 175, 90, 0.80) 0%, rgba(240, 175, 90, 0.38) 32%, rgba(240, 175, 90, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(220, 130, 75, 0.72) 0%, rgba(220, 130, 75, 0.34) 28%, rgba(220, 130, 75, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(160, 95, 55, 0.55) 0%, rgba(160, 95, 55, 0.26) 26%, rgba(160, 95, 55, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(130, 75, 42, 0.45) 0%, rgba(130, 75, 42, 0.20) 25%, rgba(130, 75, 42, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(160, 75, 32, 0.30) 0%, rgba(130, 75, 42, 0.16) 35%, rgba(130, 75, 42, 0) 65%);
+  }
+  html[data-theme="autumn"][data-weather="thunderstorm"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(195, 145, 75, 0.85) 0%, rgba(195, 145, 75, 0.35) 30%, rgba(195, 145, 75, 0) 60%),
+      radial-gradient(circle at 75% 40%, rgba(185, 115, 55, 0.80) 0%, rgba(185, 115, 55, 0.33) 32%, rgba(185, 115, 55, 0) 62%),
+      radial-gradient(circle at 50% 70%, rgba(170, 80, 45, 0.72) 0%, rgba(170, 80, 45, 0.30) 28%, rgba(170, 80, 45, 0) 58%),
+      radial-gradient(circle at 20% 85%, rgba(115, 58, 35, 0.55) 0%, rgba(115, 58, 35, 0.23) 26%, rgba(115, 58, 35, 0) 56%),
+      radial-gradient(circle at 80% 90%, rgba(88, 45, 28, 0.45) 0%, rgba(88, 45, 28, 0.18) 25%, rgba(88, 45, 28, 0) 54%),
+      radial-gradient(circle at 65% 25%, rgba(115, 42, 20, 0.30) 0%, rgba(88, 45, 28, 0.14) 35%, rgba(88, 45, 28, 0) 65%);
+  }
+
+  /* --- SAKURA: time variants --- */
+  html[data-theme="default"][data-time="morning"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(255, 205, 215, 0.74) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(252, 212, 195, 0.68) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(238, 165, 178, 0.48) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(255, 222, 205, 0.58) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-time="evening"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(255, 200, 210, 0.80) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(252, 205, 185, 0.75) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(240, 155, 170, 0.52) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(255, 215, 200, 0.63) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-time="night"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(215, 165, 180, 0.65) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(215, 175, 165, 0.60) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(200, 140, 155, 0.42) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(215, 185, 175, 0.50) 0%, transparent 42%);
+  }
+
+  /* --- SAKURA: weather variants --- */
+  html[data-theme="default"][data-weather="clear"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(255, 202, 212, 0.77) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(252, 210, 195, 0.71) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(238, 162, 178, 0.49) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(255, 220, 205, 0.60) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-weather="clouds"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(251, 205, 212, 0.65) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(247, 212, 200, 0.60) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(232, 165, 178, 0.42) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(250, 220, 208, 0.51) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-weather="fog"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(248, 215, 220, 0.55) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(245, 218, 210, 0.51) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(232, 178, 188, 0.36) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(248, 225, 215, 0.44) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-weather="drizzle"] .ambient-primary,
+  html[data-theme="default"][data-weather="rain"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(240, 195, 205, 0.58) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(238, 200, 195, 0.54) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(220, 155, 170, 0.38) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(238, 210, 205, 0.46) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-weather="snow"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(248, 222, 226, 0.55) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(245, 224, 220, 0.51) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(235, 190, 198, 0.36) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(248, 230, 224, 0.44) 0%, transparent 42%);
+  }
+  html[data-theme="default"][data-weather="thunderstorm"] .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, rgba(220, 180, 195, 0.52) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, rgba(220, 185, 185, 0.48) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, rgba(200, 145, 160, 0.34) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, rgba(220, 195, 195, 0.42) 0%, transparent 42%);
+  }
 
   /* ============ RIPPLE LAYER (v1.17.2) ============ */
   .ripple-layer {
@@ -522,6 +692,7 @@
     .ripple        { animation-duration: 300ms; }
     .gold-band     { animation: none !important; opacity: 1 !important; }
     .gold-halo     { animation: none !important; opacity: 0.75 !important; }
+    .gold-glow     { animation: none !important; opacity: 0.40 !important; }
     .pulse-ring    { animation: none !important; opacity: 0 !important; }
   }
   @keyframes ambientDrift {
@@ -854,33 +1025,7 @@
   .panel-inner { max-width: 480px; width: 100%; }
 
   /* ============================================================
-     PANEL TYPOGRAPHY (v1.3 readability pass)
-
-     The audio-reactive release added a second moving line system
-     behind the carousel. Legibility is handled entirely at the
-     glyph level — no scrim, no card, no background shape behind
-     the panel.
-
-     Three adjustments:
-       · font-weight 500 → 600. Shippori Mincho at 500 uses
-         horizontal hairlines (一, 三, crossbars) that vanish
-         against warm amber backgrounds; 600 thickens exactly
-         those strokes without making verticals look heavy.
-       · letter-spacing 0.4px → 0.8px. Gives complex kanji
-         distinct separation at 19px.
-       · color #160a02 — deep sumi ink, darker than the theme's
-         default --text-dark (#231304), so the strokes sit above
-         any passing background variation.
-
-     The three-layer text-shadow is a refined ink-diffusion halo:
-       · 6px opaque — glues strictly to the glyph hairlines,
-         insulating them from intersecting Shippō lines.
-       · 14px at 0.85 — smooths the edge transition.
-       · 28px at 0.40 — dissolves into the paper with no
-         backlit "neon aura". The outer stop is deliberately
-         semi-transparent so the halo reads as ink bleeding into
-         washi paper rather than a digital bulb.
-     ============================================================ */
+     PANEL TYPOGRAPHY (v1.3 readability pass) */
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -2283,29 +2428,25 @@
      PNG:
 
        .gold-halo  — a pre-blurred radial-gradient div. The gradient
-                     is annular: the luminous centroid sits at 58%
-                     of the 140px half-width, i.e. ~81px, with the
-                     falloff peaking under the gold band's 90px
-                     stroke. This matches the reach of the original
-                     SVG drop-shadow chain without ever invoking a
-                     blur kernel.
+                     is annular: the luminous centroid sits at 50%
+                     of the 140px half-width, with the falloff peak
+                     under the gold band's 90px stroke. Matches the
+                     reach of the original SVG drop-shadow chain
+                     without invoking a blur kernel.
+
+       .gold-glow  — a wide-stroke soft-gold circle rendered behind
+                     .gold-band. Its stroke-width (28px) produces a
+                     secondary aura around the ring, driven by
+                     opacity only.
 
        .gold-band  — the ring SVG. Static stroke-width of 6px; the
                      ring's radius matches r=90 in the 360 viewBox,
-                     which is also where each pulse ring starts
-                     before expanding outward. The breath is carried
-                     by opacity alone — no scale, no stroke change.
+                     which is where each pulse ring begins before
+                     expanding outward.
 
-     Both elements animate only opacity. Chromium rasterises each
-     texture once and blurs the breath on the compositor thread.
-
-     History: the previous implementation used a drop-shadow chain
-     with four blur radii (4/10/28/56px) plus an animated stroke-
-     width (5.5px ⇄ 7px) on .gold-band, and a stroke-width animation
-     on .pulse-ring (2px → 0px). Both force a re-rasterisation of
-     the SVG path and its offscreen shadow buffer on every frame.
-     Replacing them with a static pre-blurred halo and opacity-only
-     breath drops the idle button to pure texture sampling. */
+     All three elements animate opacity and transform only —
+     no stroke-width, no filter. Chromium rasterises each texture
+     once and runs the breath entirely on the compositor thread. */
   .gold-halo {
     position: absolute;
     width: 280px;
@@ -2316,18 +2457,19 @@
     margin-left: -140px;
     border-radius: 50%;
     background: radial-gradient(circle,
-      transparent 40%,
-      rgba(255, 235, 170, 0.50) 58%,
-      rgba(247, 185, 60, 0.24) 68%,
-      transparent 82%);
+      transparent 32%,
+      rgba(255, 240, 180, 0.75) 50%,
+      rgba(255, 200, 90, 0.55) 62%,
+      rgba(247, 185, 60, 0.25) 78%,
+      transparent 94%);
     pointer-events: none;
     animation: haloGlow 2.8s ease-in-out infinite;
-    will-change: opacity;
+    will-change: transform, opacity;
   }
 
   @keyframes haloGlow {
-    0%, 100% { opacity: 0.45; }
-    50%      { opacity: 0.95; }
+    0%, 100% { opacity: 0.32; transform: scale(0.86); }
+    50%      { opacity: 1.00; transform: scale(1.10); }
   }
 
   .start-btn.ready .gold-halo {
@@ -2335,8 +2477,8 @@
   }
 
   @keyframes haloGlowReady {
-    0%, 100% { opacity: 0.70; }
-    50%      { opacity: 1.00; }
+    0%, 100% { opacity: 0.55; transform: scale(0.92); }
+    50%      { opacity: 1.00; transform: scale(1.14); }
   }
 
   .gold-band {
@@ -2348,7 +2490,7 @@
   }
 
   @keyframes goldBandGlow {
-    0%, 100% { opacity: 0.78; }
+    0%, 100% { opacity: 0.60; }
     50%      { opacity: 1.00; }
   }
 
@@ -2358,8 +2500,30 @@
   }
 
   @keyframes goldBandGlowReady {
-    0%, 100% { opacity: 0.90; }
+    0%, 100% { opacity: 0.85; }
     50%      { opacity: 1.00; }
+  }
+
+  .gold-glow {
+    stroke: #ffdd80;
+    stroke-width: 28px;
+    fill: none;
+    animation: goldGlowPulse 2.8s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  @keyframes goldGlowPulse {
+    0%, 100% { opacity: 0.10; }
+    50%      { opacity: 0.60; }
+  }
+
+  .start-btn.ready .gold-glow {
+    animation: goldGlowPulseReady 1.4s ease-in-out infinite;
+  }
+
+  @keyframes goldGlowPulseReady {
+    0%, 100% { opacity: 0.35; }
+    50%      { opacity: 0.85; }
   }
 
   .pulse-ring {
@@ -2412,40 +2576,7 @@
     transform: translateY(6px);
   }
 
-/* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============
-   Seven ginkgo leaves ride inside the same .maple-leaves-overlay
-   as the four remaining momiji. Same lifecycle, same theme gate,
-   same 1.8s opacity fade on .active — no new JS, no new
-   container.
-
-   Two dedicated keyframes rather than reusing mapleDriftA/B/C.
-   Maple tumbles end-over-end (up to 95–105°) because a palmate
-   leaf's mass is off-axis; ginkgo is an aerodynamic fan with a
-   weighted stem that pendulum-rocks side to side (±20–35°) along
-   a gentle zigzag. Spinning a fan past 90° flattens its
-   silhouette and reveals the 2D nature of the SVG, so the
-   rotation range is deliberately capped. Transform-only, so
-   zero added compositor cost.
-
-   Colour progression across the seven leaves is a chromatic
-   bridge from lemon-gold ginkgo down to the warm amber band:
-   #fed634 → #f3c428 → #e6c93a → #e3c22e → #ddb01e → #cfad1c →
-   #c19618 → #d4b024. The set is deliberately confined to the
-   mid-to-light warmth band so the yellow leaves read as one
-   continuous drift against the amber canvas rather than as
-   competing accents at the dark end.
-
-   Size band 42–56px is deliberately smaller than the maples
-   (42–66px). High-luminance yellow reads larger on the retina
-   than dark red at equal width, so matching the maples up to
-   66px would have made the ginkgo the dominant silhouette. The
-   ginkgo viewBox is 600×700, so a 56px-wide leaf renders 65px
-   tall — taller than a maple of equal width, which is correct
-   because the ginkgo SVG includes the stem.
-
-   Negative animation-delay values are drawn from the full
-   −1s to −12.5s range so all eleven leaves are pre-phased and
-   non-colliding on first paint. */
+/* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============ */
 @keyframes ginkgoDriftA {
   0%   { transform: translate3d(0, -65px, 0) rotate(14deg); opacity: 0; }
   12%  { opacity: 0.95; }
