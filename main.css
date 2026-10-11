@@ -2,26 +2,6 @@
    main.css — v1.3
    ============================================================ */
 
-  /* ============ ANIMATABLE CUSTOM PROPERTIES ============
-     v1.3: the two pond radii are registered as animatable <length>
-     custom properties so the mosaic mask can fade from full
-     (178/210) to nothing (0/0) over the same 600ms the blossom
-     screen fades out on dive. Without @property the custom
-     property would be an untyped token and the transition would
-     be discrete — the mask would pop. Registered as <length>, the
-     browser interpolates on each frame and re-evaluates
-     mask-image with the new value. */
-  @property --pond-inner {
-    syntax: '<length>';
-    initial-value: 0px;
-    inherits: false;
-  }
-  @property --pond-outer {
-    syntax: '<length>';
-    initial-value: 0px;
-    inherits: false;
-  }
-
   /* ============ THEME VARIABLES ============ */
   html[data-theme="default"] {
     --bg-base: #faf7f5; --bg-warm: #f7e9e3;
@@ -123,61 +103,75 @@
   }
   .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
 
-  /* ============ AMBIENT SHIPPO MOSAIC (v1.3) ============
-     Hardware-tiled background. The SVG is a 60×60 tile containing five
-     r=30 circles at (0,0), (60,0), (0,60), (60,60), and (30,30) — the
-     same geometry the previous <pattern> element drew. Rasterized once
-     by the compositor into a small texture, then repeated via the
-     hardware sampler. Zero per-frame Skia cost regardless of viewport
-     size or scroll.
+  /* ============ AMBIENT SHIPPO MOSAIC (STATIC CROSS-FADE) ============
+     Two stacked full-viewport elements carry the Shippō pattern:
 
-     v1.3 (stroke width 1.2): the mosaic stroke was reduced from 1.7
-     to 1.2 to match Layer 2's SVG mask exactly. Both tiles are on
-     the same 60×60 grid pinned to (0, 0), so their strokes land on
-     identical pixels.
+       .ambient-mosaic       — base layer, no mask, opacity 0.08 always
+       .ambient-mosaic-pond  — static radial mask (178/210), opacity 0
+                               by default; 0.08 only on the idle blossom
+                               screen
 
-     v1.3 (opacity 0.08): resting opacity reduced from 0.13. The
-     audio-reactive release added a second moving line system on top
-     of this one, so the base pattern's resting weight was stepped
-     down to keep the total visual floor stable.
+     The mask on the pond layer is a fixed radial-gradient, so Chromium
+     bakes the masked texture once at first paint and never re-evaluates
+     it. The blossom-screen swap is a pure opacity cross-fade — both
+     layers' `transition` is on opacity only, so both interpolations run
+     on the compositor thread.
 
-     v1.3 (pond mask, animated): the mask is driven by two registered
-     custom properties, --pond-inner and --pond-outer, so the hole in
-     the pattern can fade open and closed in step with the blossom
-     screen's own fade. */
-  .ambient-mosaic {
+     History: the previous implementation used a single .ambient-mosaic
+     element and interpolated the mask radii through two @property-
+     registered custom properties (--pond-inner / --pond-outer). That
+     worked visually but forced a full-viewport mask-image re-evaluation
+     on the main thread on every frame for the 600ms of the transition.
+     On the S8 Ultra, that overlapped the koi dive and produced a hitch.
+     The static-layer cross-fade below eliminates the mask recomputation
+     entirely: the compositor blends two pre-rasterized textures, and the
+     main thread is free during the dive.
+
+     Both layers are in the html[data-theme="autumn"] selector for the
+     background-image data-URI so the pond element inherits the same
+     tile as the base. Without that, the pond element has no image to
+     mask and would render invisibly — the mask would apply to nothing. */
+  .ambient-mosaic,
+  .ambient-mosaic-pond {
     position: fixed;
     inset: 0;
     pointer-events: none;
     z-index: -2;
-    opacity: 0.08;
     background-repeat: repeat;
     background-size: 60px 60px;
     background-position: 0 0;
+    transition: opacity 600ms ease;
+    will-change: opacity;
+  }
 
-    --pond-inner: 0px;
-    --pond-outer: 0px;
-    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent var(--pond-inner), black var(--pond-outer));
+  .ambient-mosaic {
+    opacity: 0.08;
+  }
+
+  .ambient-mosaic-pond {
+    opacity: 0;
+    -webkit-mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
     -webkit-mask-repeat: no-repeat;
     -webkit-mask-size: 100% 100%;
-    mask-image: radial-gradient(circle at 50% 50%, transparent var(--pond-inner), black var(--pond-outer));
+    mask-image: radial-gradient(circle at 50% 50%, transparent 178px, black 210px);
     mask-repeat: no-repeat;
     mask-size: 100% 100%;
-
-    transition: --pond-inner 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                --pond-outer 600ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
 
   html:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic {
-    --pond-inner: 178px;
-    --pond-outer: 210px;
+    opacity: 0;
+  }
+  html:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic-pond {
+    opacity: 0.08;
   }
 
-  html[data-theme="autumn"] .ambient-mosaic {
+  html[data-theme="autumn"] .ambient-mosaic,
+  html[data-theme="autumn"] .ambient-mosaic-pond {
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
   }
 
-  html[data-theme="default"] .ambient-mosaic {
+  html[data-theme="default"] .ambient-mosaic,
+  html[data-theme="default"] .ambient-mosaic-pond {
     display: none;
   }
 
@@ -186,8 +180,8 @@
      ------------------------------------------------------------
      Two layers driven by --audio-swell, a float from 0.00 to 1.00
      written each frame from app.js's analyser tap. Layer 1 is the
-     existing diffuse mesh; Layer 2 is a new mirrored copy of the
-     orbs clipped by an SVG Shippō mask.
+     existing diffuse mesh; Layer 2 is a mirrored copy of the orbs
+     clipped by an SVG Shippō mask.
 
      Performance note: Layer 2 carries a static filter (hue-rotate,
      saturate, contrast) and modulates only opacity and transform.
@@ -522,17 +516,13 @@
     .ambient-stage { transform: none !important; }
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
-    .light-orb { animation: none !important; }
+    .light-orb     { animation: none !important; }
     .maple-leaf,
-    .ginkgo-leaf { animation: none !important; }
-    .ripple { animation-duration: 300ms; }
-    .gold-band {
-      animation: none !important;
-      opacity: 1;
-      filter:
-        drop-shadow(0 0 10px rgba(255, 250, 220, 0.8))
-        drop-shadow(0 0 24px rgba(255, 215, 110, 0.5));
-    }
+    .ginkgo-leaf   { animation: none !important; }
+    .ripple        { animation-duration: 300ms; }
+    .gold-band     { animation: none !important; opacity: 1 !important; }
+    .gold-halo     { animation: none !important; opacity: 0.75 !important; }
+    .pulse-ring    { animation: none !important; opacity: 0 !important; }
   }
   @keyframes ambientDrift {
     0%, 100% { transform: translate(0, 0) scale(1); }
@@ -2286,73 +2276,106 @@
   }
   .start-btn.diving .rings-svg { opacity: 0; }
 
+  /* ============================================================
+     GOLD RING & HALO (COMPOSITOR-ONLY)
+     ------------------------------------------------------------
+     The idle button carries two decorative elements above the koi
+     PNG:
+
+       .gold-halo  — a pre-blurred radial-gradient div. The gradient
+                     is annular: the luminous centroid sits at 58%
+                     of the 140px half-width, i.e. ~81px, with the
+                     falloff peaking under the gold band's 90px
+                     stroke. This matches the reach of the original
+                     SVG drop-shadow chain without ever invoking a
+                     blur kernel.
+
+       .gold-band  — the ring SVG. Static stroke-width of 6px; the
+                     ring's radius matches r=90 in the 360 viewBox,
+                     which is also where each pulse ring starts
+                     before expanding outward. The breath is carried
+                     by opacity alone — no scale, no stroke change.
+
+     Both elements animate only opacity. Chromium rasterises each
+     texture once and blurs the breath on the compositor thread.
+
+     History: the previous implementation used a drop-shadow chain
+     with four blur radii (4/10/28/56px) plus an animated stroke-
+     width (5.5px ⇄ 7px) on .gold-band, and a stroke-width animation
+     on .pulse-ring (2px → 0px). Both force a re-rasterisation of
+     the SVG path and its offscreen shadow buffer on every frame.
+     Replacing them with a static pre-blurred halo and opacity-only
+     breath drops the idle button to pure texture sampling. */
+  .gold-halo {
+    position: absolute;
+    width: 280px;
+    height: 280px;
+    top: 50%;
+    left: 50%;
+    margin-top: -140px;
+    margin-left: -140px;
+    border-radius: 50%;
+    background: radial-gradient(circle,
+      transparent 40%,
+      rgba(255, 235, 170, 0.50) 58%,
+      rgba(247, 185, 60, 0.24) 68%,
+      transparent 82%);
+    pointer-events: none;
+    animation: haloGlow 2.8s ease-in-out infinite;
+    will-change: opacity;
+  }
+
+  @keyframes haloGlow {
+    0%, 100% { opacity: 0.45; }
+    50%      { opacity: 0.95; }
+  }
+
+  .start-btn.ready .gold-halo {
+    animation: haloGlowReady 1.4s ease-in-out infinite;
+  }
+
+  @keyframes haloGlowReady {
+    0%, 100% { opacity: 0.70; }
+    50%      { opacity: 1.00; }
+  }
+
   .gold-band {
     stroke: #fdf3d8;
     stroke-width: 6px;
     fill: none;
-    transform-box: view-box;
-    transform-origin: 180px 180px;
-    animation: goldBreath 2.8s ease-in-out infinite;
-    will-change: transform, opacity;
+    animation: goldBandGlow 2.8s ease-in-out infinite;
+    will-change: opacity;
   }
 
-  @keyframes goldBreath {
-    0%, 100% {
-      transform: scale(1);
-      opacity: 0.7;
-      stroke-width: 5.5px;
-      filter:
-        drop-shadow(0 0 4px rgba(255, 240, 200, 0.4))
-        drop-shadow(0 0 10px rgba(255, 200, 90, 0.25));
-    }
-    50% {
-      transform: scale(1.12);
-      opacity: 1;
-      stroke-width: 7px;
-      filter:
-        drop-shadow(0 0 10px rgba(255, 250, 220, 0.95))
-        drop-shadow(0 0 28px rgba(255, 215, 110, 0.7))
-        drop-shadow(0 0 56px rgba(255, 195, 70, 0.4));
-    }
+  @keyframes goldBandGlow {
+    0%, 100% { opacity: 0.78; }
+    50%      { opacity: 1.00; }
   }
 
   .start-btn.ready .gold-band {
     stroke: #ffffff;
-    animation: goldBreathReady 1.4s ease-in-out infinite;
+    animation: goldBandGlowReady 1.4s ease-in-out infinite;
   }
 
-  @keyframes goldBreathReady {
-    0%, 100% {
-      transform: scale(1.02);
-      opacity: 0.9;
-      stroke-width: 6px;
-      filter:
-        drop-shadow(0 0 8px rgba(255, 245, 200, 0.7))
-        drop-shadow(0 0 20px rgba(255, 200, 90, 0.5));
-    }
-    50% {
-      transform: scale(1.14);
-      opacity: 1;
-      stroke-width: 7.5px;
-      filter:
-        drop-shadow(0 0 14px rgba(255, 255, 235, 1))
-        drop-shadow(0 0 32px rgba(255, 220, 130, 0.9))
-        drop-shadow(0 0 60px rgba(255, 200, 80, 0.55));
-    }
+  @keyframes goldBandGlowReady {
+    0%, 100% { opacity: 0.90; }
+    50%      { opacity: 1.00; }
   }
 
   .pulse-ring {
     stroke: #fdf3d8;
+    stroke-width: 2px;
     fill: none;
     transform-origin: 180px 180px;
     animation: ringPulse 9s linear infinite;
+    will-change: transform, opacity;
   }
   .ripple-1 { animation-delay: 0s; }
   .ripple-2 { animation-delay: 3s; }
   .ripple-3 { animation-delay: 6s; }
   @keyframes ringPulse {
-    0% { transform: scale(1); opacity: 0.7; stroke-width: 2px; }
-    100% { transform: scale(1.9); opacity: 0; stroke-width: 0px; }
+    0%   { transform: scale(1.0); opacity: 0.7; }
+    100% { transform: scale(1.9); opacity: 0.0; }
   }
 
   .start-hints {
