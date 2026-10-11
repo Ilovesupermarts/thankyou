@@ -464,9 +464,8 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
    pool members — but the bed is continuous background, and the
    chime carries its own independent peak (0.60) to compensate.
 
-   Lifecycle is shared with the Shippō tracer, the chime, and the
-   audio-reactive swell loop via the .active class on
-   #mapleLeaves. */
+   Lifecycle is shared with the chime and the audio-reactive swell
+   loop via the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
   { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00, maxPlaySec: null    },
   { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00, maxPlaySec: 16 * 60 }
@@ -927,12 +926,11 @@ function tryStartBlossomStream(retries) {
    See the AMBIENT_TRACKS block above for the bed design rationale.
 
    The single source of truth for "should ambient be playing?" is
-   the .active class on #mapleLeaves, shared with the Shippō tracer
-   and the audio-reactive swell loop. startAmbient() and
-   stopAmbient() are called in lockstep with the tracer so the three
-   can never get out of sync. startAmbient() also arms the wind
-   chime layer and the swell loop; stopAmbient() tears all three
-   down. */
+   the .active class on #mapleLeaves, shared with the chime and the
+   audio-reactive swell loop. startAmbient() and stopAmbient() are
+   called in lockstep so the three can never get out of sync.
+   startAmbient() also arms the wind chime layer and the swell
+   loop; stopAmbient() tears all three down. */
 
 var ambientTimer = null;
 var ambientSource = null;
@@ -2470,14 +2468,12 @@ function unlockTable() {
   if (tableUnlocked) return;
   tableUnlocked = true;
   document.body.classList.remove('table-locked');
-  detachScrollGuard();
 }
 function relockTable() {
   if (!tableUnlocked) return;
   tableUnlocked = false;
   window.scrollTo(0, 0);
   document.body.classList.add('table-locked');
-  attachScrollGuard();
 }
 
 /* v1.3: return to the blossom start screen. */
@@ -2538,7 +2534,6 @@ function returnToStartScreen() {
     tableUnlocked = false;
     document.body.classList.add('table-locked');
   }
-  attachScrollGuard();
   window.scrollTo(0, 0);
 
   if (transitionLine) {
@@ -3970,7 +3965,6 @@ function triggerKoiStart() {
         }
         updateGlobalHint();
         document.body.classList.add('table-locked');
-        attachScrollGuard();
         window.scrollTo(0, 0);
         currentPanel = 0;
         track.style.transform = 'translateX(0%)';
@@ -4891,34 +4885,6 @@ window.addEventListener('scroll', function() {
   if (window.scrollY > 30) infoBar.classList.add('hidden');
   else infoBar.classList.remove('hidden');
 }, { passive: true });
-
-/* Document-level scroll guard. Registered only while the table is
-   locked — attached by attachScrollGuard() and detached by
-   detachScrollGuard().
-
-   Non-passive is deliberate and load-bearing: this is the one
-   listener that genuinely needs preventDefault, because it exists to
-   suppress the browser's own scroll gesture while the user is on the
-   koi screen or the panel carousel. Every other touchmove listener in
-   the file is passive so Chromium can start the scroll in parallel
-   with the JS dispatch.
-
-   Registered as a named function so add/removeEventListener pair on
-   the same reference across the table-locked lifecycle. */
-function onDocTouchMoveGuard(e) {
-  if (tableUnlocked) return;
-  if (isHorizontal) return;
-  if (e.target && e.target.closest && e.target.closest('#nameScreen')) return;
-  e.preventDefault();
-}
-
-function attachScrollGuard() {
-  document.addEventListener('touchmove', onDocTouchMoveGuard, { passive: false });
-}
-
-function detachScrollGuard() {
-  document.removeEventListener('touchmove', onDocTouchMoveGuard);
-}
 
 /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
 var tableEnteredView = false;
