@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v91';
+const CACHE = 'thankyou-v92';
 
 const ASSETS = [
   './',
@@ -44,6 +44,12 @@ self.addEventListener('activate', function(e) {
 self.addEventListener('fetch', function(e) {
   var url = new URL(e.request.url);
 
+  /* presets.json and quotes.json — network-first with cache fallback.
+     The ignoreSearch flag matters: even though app.js no longer
+     appends a ?v= cache-buster to these URLs, a future change that
+     reintroduces one would break the offline fallback without it.
+     caches.match() matches by full URL including the search string,
+     and the precache installed the bare URL. */
   if (url.pathname.endsWith('/presets.json') ||
       url.pathname.endsWith('/quotes.json')) {
     e.respondWith(
@@ -53,11 +59,17 @@ self.addEventListener('fetch', function(e) {
           caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
           return r;
         })
-        .catch(function() { return caches.match(e.request); })
+        .catch(function() {
+          return caches.match(e.request, { ignoreSearch: true });
+        })
     );
     return;
   }
 
+  /* HTML, CSS, JS, and directory roots — network-first with cached
+     fallback. Same ignoreSearch reasoning as above. The navigation
+     fallback to ./index.html also uses ignoreSearch so a query
+     string on a navigation request still resolves. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
@@ -70,10 +82,10 @@ self.addEventListener('fetch', function(e) {
           return r;
         })
         .catch(function() {
-          return caches.match(e.request).then(function(r) {
+          return caches.match(e.request, { ignoreSearch: true }).then(function(r) {
             if (r) return r;
             if (e.request.mode === 'navigate') {
-              return caches.match('./index.html');
+              return caches.match('./index.html', { ignoreSearch: true });
             }
           });
         })
@@ -94,7 +106,10 @@ self.addEventListener('fetch', function(e) {
      streams through to the caller (so loadAudioBuffer's !r.ok throw
      fires and returns null) without being cached. Caching an error
      response would poison every future session until the cache was
-     manually cleared. */
+     manually cleared.
+
+     .mp3 requests are issued by app.js without a query string, so
+     ignoreSearch is not required here. */
   if (url.pathname.endsWith('.mp3')) {
     e.respondWith(
       caches.match(e.request).then(function(r) {
@@ -111,6 +126,9 @@ self.addEventListener('fetch', function(e) {
     return;
   }
 
+  /* Everything else — cache-first with network fallback. Icons and
+     images fall here, and neither is issued with a query string, so
+     ignoreSearch is left off. */
   e.respondWith(
     caches.match(e.request).then(function(r) {
       return r || fetch(e.request);
