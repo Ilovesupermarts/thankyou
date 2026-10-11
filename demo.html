@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#faf7f5">
-<title>音響スペクトラム &amp; ローディング検証 v2</title>
+<title>音響スペクトラム v3 — 全幅・水鏡の対</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,9 +13,6 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============================================================
-     DEMO VIEWPORT & SAMPLES
-     ============================================================ */
   .demo-viewport {
     position: relative;
     width: 100vw;
@@ -37,7 +34,6 @@
     pointer-events: none;
   }
 
-  /* Sample Panel 0 text mirroring screenshot */
   .sample-panel-content {
     max-width: 540px;
     text-align: center;
@@ -65,7 +61,7 @@
   }
 
   /* ============================================================
-     EXPANDED AUDIO HUD (20%+ Larger, Spectrum-Centric)
+     EXPANDED AUDIO HUD (Full-Width Spectrum Alignment)
      ============================================================ */
   .audio-spectrum-hud {
     position: fixed;
@@ -74,14 +70,14 @@
     z-index: 90;
     display: flex;
     flex-direction: column;
-    gap: 9px;
+    gap: 10px;
     pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
-    width: 318px; /* ~22% larger than original 260px */
+    width: 318px;
     padding: 14px 18px 12px 18px;
     border-radius: 18px;
-    background: rgba(253, 243, 216, 0.72);
+    background: rgba(253, 243, 216, 0.75);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(216, 180, 120, 0.45);
@@ -92,12 +88,11 @@
   }
 
   html[data-theme="default"] .audio-spectrum-hud {
-    background: rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.78);
     border-color: rgba(234, 217, 213, 0.6);
     box-shadow: 0 6px 24px rgba(120, 90, 90, 0.08);
   }
 
-  /* Header Row: Title, Artist, Status Badge */
   .hud-meta-row {
     display: flex;
     align-items: baseline;
@@ -156,10 +151,10 @@
     50% { opacity: 1; }
   }
 
-  /* Prominent Visualizer Block (Full-Width, 32px height) */
+  /* Spectrum Canvas Block */
   .hud-visualizer-block {
     width: 100%;
-    height: 32px;
+    height: 34px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -167,24 +162,23 @@
 
   .hud-canvas {
     width: 100%;
-    height: 32px;
+    height: 34px;
     display: block;
   }
 
-  /* Subordinate Hairline Progress Gauge */
+  /* Gauge Block */
   .hud-gauge-block {
     display: flex;
     flex-direction: column;
     gap: 4px;
     width: 100%;
     padding-top: 2px;
-    border-top: 1px solid rgba(216, 180, 120, 0.22);
   }
 
   .hud-gauge-bar {
     width: 100%;
-    height: 2.5px;
-    background: rgba(216, 180, 120, 0.25);
+    height: 2px;
+    background: rgba(216, 180, 120, 0.28);
     border-radius: 2px;
     overflow: hidden;
   }
@@ -314,7 +308,6 @@
 </head>
 <body>
 
-<!-- Ambient Stage & Shippō Pattern (identical to index.html) -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -326,7 +319,6 @@
 </div>
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
-<!-- Top Info Bar Header -->
 <div class="info-bar shown" id="infoBar">
   <div class="info-inner">
     <div class="info-line">
@@ -343,12 +335,7 @@
   </div>
 </div>
 
-<!-- ============================================================
-     VIEWPORT SAMPLES
-     ============================================================ */ -->
 <div class="demo-viewport">
-
-  <!-- Sample View 1: Welcome Greeting (Panel 0) -->
   <div class="demo-sample-view" id="sampleViewGreeting">
     <div class="sample-panel-content">
       <span class="therapist-name">桜庭さん</span>、初めまして。<br>
@@ -357,7 +344,6 @@
     </div>
   </div>
 
-  <!-- Sample View 2: Service Table Card -->
   <div class="demo-sample-view hidden" id="sampleViewTable">
     <div class="table-card active sample-table-card">
       <div class="privacy-note-inline">
@@ -381,10 +367,8 @@
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- Center Navigation Dots (Matching Production Staging) -->
 <div class="action-hint global-hint shown" style="position:fixed; bottom: 84px; left:0; right:0;">
   <span class="hint-layer active">
     <span>スワイプ</span>
@@ -401,7 +385,7 @@
 </div>
 
 <!-- ============================================================
-     AUDIO SPECTRUM & METADATA HUD (Target Widget in Red Box)
+     AUDIO SPECTRUM & METADATA HUD
      ============================================================ -->
 <div class="audio-spectrum-hud" id="audioSpectrumHud">
   <div class="hud-meta-row">
@@ -411,12 +395,10 @@
     <span class="hud-status-badge ready" id="hudStatusBadge">再生中</span>
   </div>
 
-  <!-- Prominent Centered Spectrum Visualizer -->
   <div class="hud-visualizer-block">
-    <canvas class="hud-canvas" id="hudCanvas" width="560" height="64"></canvas>
+    <canvas class="hud-canvas" id="hudCanvas" width="564" height="68"></canvas>
   </div>
 
-  <!-- Subordinate Loading & Memory Gauge -->
   <div class="hud-gauge-block">
     <div class="hud-gauge-bar">
       <div class="hud-gauge-fill ready" id="hudGaugeFill" style="width: 100%;"></div>
@@ -433,11 +415,10 @@
      ============================================================ -->
 <div class="demo-dock" id="demoDock">
   <div class="demo-dock-title">
-    <span>スペクトラム検証ドック v2</span>
+    <span>水鏡の対 (全幅・拡張検証)</span>
     <button type="button" class="demo-btn" id="btnToggleTheme" style="padding:2px 6px;">🍁/🌸</button>
   </div>
 
-  <!-- Track Meta Switcher -->
   <div class="demo-group">
     <div class="demo-label">楽曲プリセット (小久保隆)</div>
     <div class="demo-buttons">
@@ -446,19 +427,6 @@
     </div>
   </div>
 
-  <!-- Style Selector -->
-  <div class="demo-group">
-    <div class="demo-label">描画スタイル (大型化・高視認性)</div>
-    <div class="demo-buttons">
-      <button type="button" class="demo-btn active" data-style="bars">1. 静寂の細線バー (9本)</button>
-      <button type="button" class="demo-btn" data-style="wave">2. 墨流しの波 (Calligraphy)</button>
-      <button type="button" class="demo-btn" data-style="ripples">3. 水面の波紋 (Ripple Rings)</button>
-      <button type="button" class="demo-btn" data-style="mirror">4. 水鏡の対 (Waterline Mirror)</button>
-      <button type="button" class="demo-btn" data-style="dots">5. 枯山水点描 (Sand Matrix)</button>
-    </div>
-  </div>
-
-  <!-- Audio Generation / Input -->
   <div class="demo-group">
     <div class="demo-label">音源 &amp; 再生</div>
     <div class="demo-buttons">
@@ -467,7 +435,6 @@
     </div>
   </div>
 
-  <!-- Progress Bar Simulation -->
   <div class="demo-group">
     <div class="demo-label">ローディング状態シミュレート</div>
     <div class="demo-buttons">
@@ -479,7 +446,6 @@
     </div>
   </div>
 
-  <!-- Background Surface Toggle -->
   <div class="demo-group">
     <div class="demo-label">背景サンプルの切替</div>
     <div class="demo-buttons">
@@ -489,16 +455,12 @@
   </div>
 
   <div class="demo-hint-box">
-    HUD幅を318px（+22%）に拡大し、スペクトラムをカード全幅（高さ32px）に専有させました。解像度2× DPRで直接ラスタライズされ、TBDRでのFBO無効化は生じません。
+    25本の6.0px太線バーが5.5px間隔を維持したまま、下部のゲージ線と同一幅（282px）で左右均等に整列しています。
   </div>
 </div>
 
-<!-- ============================================================
-     SPECTRUM & PROGRESS ENGINE SCRIPT
-     ============================================================ -->
 <script>
 (function() {
-  /* ============ TRACK METADATA (Takashi Kokubo) ============ */
   var TRACK_METADATA = {
     morning: { 
       title: '草原の風', 
@@ -513,7 +475,6 @@
   };
   var currentTrackKey = 'earlyevening';
 
-  /* ============ DOM REFS ============ */
   var canvas = document.getElementById('hudCanvas');
   var ctx = canvas.getContext('2d');
   var hudTrackTitle = document.getElementById('hudTrackTitle');
@@ -531,18 +492,15 @@
   var sampleViewGreeting = document.getElementById('sampleViewGreeting');
   var sampleViewTable = document.getElementById('sampleViewTable');
 
-  /* Setup Canvas Dimensions with Retina Scaling */
+  /* Precise Retina Layout Dimensions */
   var dpr = window.devicePixelRatio || 1;
-  var displayW = 282; // internal content width
-  var displayH = 32;  // enlarged height
+  var displayW = 282; // Exact full width of the gauge line below
+  var displayH = 34;
   canvas.width = displayW * dpr;
   canvas.height = displayH * dpr;
   ctx.scale(dpr, dpr);
 
-  /* Active Visualizer Style */
-  var activeStyle = 'bars'; // 'bars' | 'wave' | 'ripples' | 'mirror' | 'dots'
-
-  /* ============ WEB AUDIO ENGINE ============ */
+  /* Web Audio Setup */
   var audioCtx = null;
   var analyser = null;
   var freqData = null;
@@ -564,7 +522,6 @@
     }
   }
 
-  /* Synthetic Zen Sound Generator */
   function startSyntheticAudio() {
     initAudio();
     if (isAudioPlaying) {
@@ -579,11 +536,11 @@
     var gain = audioCtx.createGain();
 
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(216, audioCtx.currentTime); // A3 harmonic
+    osc1.frequency.setValueAtTime(216, audioCtx.currentTime);
     osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(324, audioCtx.currentTime); // E4
+    osc2.frequency.setValueAtTime(324, audioCtx.currentTime);
     osc3.type = 'triangle';
-    osc3.frequency.setValueAtTime(648, audioCtx.currentTime); // E5 ambient bell
+    osc3.frequency.setValueAtTime(648, audioCtx.currentTime);
 
     filter.type = 'lowpass';
     filter.frequency.setValueAtTime(1100, audioCtx.currentTime);
@@ -630,7 +587,6 @@
     hudStatusBadge.className = 'hud-status-badge';
   }
 
-  /* ============ REAL MP3 FETCH WITH PROGRESS ============ */
   function fetchTrackWithByteProgress(url) {
     initAudio();
     setLoadingState(0.0, 'downloading');
@@ -669,7 +625,7 @@
         }
         return read();
       })
-      .catch(function(err) {
+      .catch(function() {
         setLoadingState(1.0, 'ready');
         hudByteStatus.textContent = '読込完了 (Cache/Local)';
       });
@@ -694,7 +650,6 @@
     btnToggleAudio.classList.add('active');
   }
 
-  /* ============ GAUGE & BADGE UPDATE HELPER ============ */
   function setLoadingState(pct, state, bytesLoaded, bytesTotal) {
     var pClamped = Math.max(0, Math.min(1.0, pct));
     var pctInt = Math.round(pClamped * 100);
@@ -729,7 +684,6 @@
     }
   }
 
-  /* Track Metadata Switcher */
   function setTrack(key) {
     currentTrackKey = key;
     var t = TRACK_METADATA[key];
@@ -738,8 +692,13 @@
     hudTrackArtist.textContent = t.artist;
   }
 
-  /* ============ 120Hz HIGH-VISIBILITY RENDER LOOP ============ */
-  var barValues = [0, 0, 0, 0, 0, 0, 0, 0, 0];
+  /* ============================================================
+     25-BAR FULL-WIDTH WATERLINE MIRROR RENDERER (120Hz)
+     ============================================================ */
+  var mBars = 25;
+  var mW = 6.0;         // 2.5× thicker than original 2.4px
+  var mGap = 5.5;       // Exact same 5.5px inter-bar spacing
+  var mirrorValues = new Float32Array(mBars);
   var phase = 0;
 
   function renderVisualizer() {
@@ -748,218 +707,64 @@
     ctx.clearRect(0, 0, displayW, displayH);
 
     var themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#c9600a';
-    var themePetal = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#e88a1a';
-    var themeGlow = getComputedStyle(document.documentElement).getPropertyValue('--glow').trim() || '#f7b93c';
+    var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#e88a1a';
 
     if (analyser && isAudioPlaying) {
       analyser.getByteFrequencyData(freqData);
     }
 
     phase += 0.045;
+    var midY = displayH / 2;
 
-    /* ----------------------------------------------------
-       STYLE 1: 静寂の細線バー (9 Taller Hairline Zen Bars)
-       ---------------------------------------------------- */
-    if (activeStyle === 'bars') {
-      var numBars = 9;
-      var barW = 3.2;
-      var gap = 7.0;
-      var totalW = numBars * barW + (numBars - 1) * gap;
-      var startX = (displayW - totalW) / 2;
+    /* Continuous horizontal waterline matching gauge width */
+    ctx.strokeStyle = 'rgba(216, 180, 120, 0.42)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, midY);
+    ctx.lineTo(displayW, midY);
+    ctx.stroke();
 
-      for (var i = 0; i < numBars; i++) {
-        var targetH = 4;
-        if (analyser && isAudioPlaying) {
-          var binIdx = 4 + i * 5;
-          targetH = Math.max(4, (freqData[binIdx] / 255) * (displayH - 4));
-        } else {
-          /* Organic natural breathing curve */
-          targetH = 4 + Math.sin(phase + i * 0.75) * 5.5 + Math.cos(phase * 0.5 + i) * 3;
-        }
-
-        barValues[i] += (targetH - barValues[i]) * 0.25;
-
-        var h = Math.min(displayH, Math.max(3, barValues[i]));
-        var x = startX + i * (barW + gap);
-        var y = displayH - h;
-
-        /* Gradient fill for vertical depth */
-        var grad = ctx.createLinearGradient(0, y, 0, displayH);
-        grad.addColorStop(0, themeAccent);
-        grad.addColorStop(1, themePetal);
-
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.roundRect(x, y, barW, h, 2);
-        ctx.fill();
-
-        /* Micro luminous head cap on active peaks */
-        if (h > 12) {
-          ctx.fillStyle = themeGlow;
-          ctx.beginPath();
-          ctx.arc(x + barW / 2, y + 1.6, 1.6, 0, Math.PI * 2);
-          ctx.fill();
-        }
+    /* Render all 25 thick bars edge-to-edge (0 to 282px) */
+    for (var m = 0; m < mBars; m++) {
+      var targetEnergy = 0.12;
+      if (analyser && isAudioPlaying) {
+        var binIdx = 3 + Math.floor(m * 3.6);
+        targetEnergy = Math.max(0.10, freqData[binIdx] / 255);
+      } else {
+        /* Smooth traveling harmonic wave across 25 bars */
+        targetEnergy = 0.22 + Math.sin(phase + m * 0.42) * 0.18 + Math.cos(phase * 0.7 + m * 0.2) * 0.08;
       }
-    }
 
-    /* ----------------------------------------------------
-       STYLE 2: 墨流しの波 (Flowing Calligraphy Ink Wave)
-       ---------------------------------------------------- */
-    else if (activeStyle === 'wave') {
-      var points = 12;
-      var segW = displayW / (points - 1);
+      /* 120Hz Spring smoothing */
+      mirrorValues[m] += (targetEnergy - mirrorValues[m]) * 0.24;
 
+      var halfH = Math.max(2.2, mirrorValues[m] * (displayH * 0.44));
+      var mx = m * (mW + mGap); // Starts exactly at 0px and spans to 282px
+
+      /* Sky reflection (Upper column) */
+      var gradSky = ctx.createLinearGradient(0, midY - halfH, 0, midY);
+      gradSky.addColorStop(0, themeAccent);
+      gradSky.addColorStop(1, themePetal);
+      ctx.fillStyle = gradSky;
       ctx.beginPath();
-      for (var p = 0; p < points; p++) {
-        var val = 0;
-        if (analyser && isAudioPlaying) {
-          val = (freqData[4 + p * 6] / 255) * (displayH * 0.7);
-        } else {
-          val = (Math.sin(phase * 1.4 + p * 0.6) * 7) + (Math.cos(phase * 0.8 + p * 0.4) * 4);
-        }
-        var px = p * segW;
-        var py = (displayH * 0.55) - val;
+      ctx.roundRect(mx, midY - halfH, mW, halfH, [2, 2, 0, 0]);
+      ctx.fill();
 
-        if (p === 0) ctx.moveTo(px, py);
-        else {
-          var prevX = (p - 1) * segW;
-          var midX = (prevX + px) / 2;
-          ctx.quadraticCurveTo(prevX, py, midX, py);
-        }
-      }
-
-      /* Ink wash stroke */
-      ctx.strokeStyle = themeAccent;
-      ctx.lineWidth = 2.4;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      /* Translucent ambient under-glow */
-      ctx.strokeStyle = 'rgba(247, 185, 60, 0.45)';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
-    }
-
-    /* ----------------------------------------------------
-       STYLE 3: 水面の波紋 (5 Ripple Node Rings)
-       ---------------------------------------------------- */
-    else if (activeStyle === 'ripples') {
-      var nodeCount = 5;
-      var spacing = displayW / (nodeCount + 1);
-
-      for (var r = 0; r < nodeCount; r++) {
-        var energy = 0.2;
-        if (analyser && isAudioPlaying) {
-          energy = Math.max(0.15, freqData[6 + r * 9] / 255);
-        } else {
-          energy = 0.25 + Math.sin(phase + r * 1.1) * 0.2;
-        }
-
-        var cx = spacing * (r + 1);
-        var cy = displayH / 2;
-        var baseR = 3.0 + energy * 7.5;
-
-        /* Solid core node */
-        ctx.fillStyle = themeAccent;
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseR, 0, Math.PI * 2);
-        ctx.fill();
-
-        /* Concentric hairline expansion ring */
-        ctx.strokeStyle = themeGlow;
-        ctx.lineWidth = 1.2;
-        ctx.globalAlpha = Math.max(0, 0.85 - energy * 0.6);
-        ctx.beginPath();
-        ctx.arc(cx, cy, baseR * 1.9, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    /* ----------------------------------------------------
-       STYLE 4: 水鏡の対 (Waterline Mirrored Columns)
-       ---------------------------------------------------- */
-    else if (activeStyle === 'mirror') {
-      var mBars = 13;
-      var mW = 2.4;
-      var mGap = 5.5;
-      var mTotalW = mBars * mW + (mBars - 1) * mGap;
-      var mStartX = (displayW - mTotalW) / 2;
-      var midY = displayH / 2;
-
-      /* Calm horizontal waterline */
-      ctx.strokeStyle = 'rgba(216, 180, 120, 0.45)';
-      ctx.lineWidth = 1;
+      /* Water reflection (Lower mirror) */
+      var gradWater = ctx.createLinearGradient(0, midY, 0, midY + halfH * 0.88);
+      gradWater.addColorStop(0, themePetal);
+      gradWater.addColorStop(1, 'rgba(247, 185, 60, 0.18)');
+      ctx.fillStyle = gradWater;
+      ctx.globalAlpha = 0.48;
       ctx.beginPath();
-      ctx.moveTo(mStartX - 6, midY);
-      ctx.lineTo(mStartX + mTotalW + 6, midY);
-      ctx.stroke();
-
-      for (var m = 0; m < mBars; m++) {
-        var mEnergy = 0.12;
-        if (analyser && isAudioPlaying) {
-          mEnergy = Math.max(0.1, freqData[4 + m * 5] / 255);
-        } else {
-          mEnergy = 0.22 + Math.sin(phase + m * 0.65) * 0.2;
-        }
-
-        var halfH = mEnergy * (displayH * 0.44);
-        var mx = mStartX + m * (mW + mGap);
-
-        /* Top sky reflection */
-        ctx.fillStyle = themeAccent;
-        ctx.beginPath();
-        ctx.roundRect(mx, midY - halfH, mW, halfH, 1.2);
-        ctx.fill();
-
-        /* Water under-reflection (mirror) */
-        ctx.fillStyle = themePetal;
-        ctx.globalAlpha = 0.45;
-        ctx.beginPath();
-        ctx.roundRect(mx, midY, mW, halfH * 0.88, 1.2);
-        ctx.fill();
-        ctx.globalAlpha = 1.0;
-      }
-    }
-
-    /* ----------------------------------------------------
-       STYLE 5: 枯山水点描 (Sand Garden Matrix Nodes)
-       ---------------------------------------------------- */
-    else if (activeStyle === 'dots') {
-      var cols = 10;
-      var colW = displayW / (cols + 1);
-
-      for (var c = 0; c < cols; c++) {
-        var dotEnergy = 0.2;
-        if (analyser && isAudioPlaying) {
-          dotEnergy = freqData[4 + c * 7] / 255;
-        } else {
-          dotEnergy = 0.28 + Math.sin(phase + c * 0.75) * 0.24;
-        }
-
-        var dx = colW * (c + 1);
-        var rise = dotEnergy * (displayH - 8);
-        var dy = (displayH - 5) - rise;
-
-        /* Floating luminous particle */
-        ctx.fillStyle = themeAccent;
-        ctx.beginPath();
-        ctx.arc(dx, dy, 2.4, 0, Math.PI * 2);
-        ctx.fill();
-
-        /* Grounded baseline sand bead */
-        ctx.fillStyle = 'rgba(120, 70, 20, 0.22)';
-        ctx.beginPath();
-        ctx.arc(dx, displayH - 4, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      ctx.roundRect(mx, midY, mW, halfH * 0.88, [0, 0, 2, 2]);
+      ctx.fill();
+      ctx.globalAlpha = 1.0;
     }
   }
   requestAnimationFrame(renderVisualizer);
 
-  /* ============ DOCK CONTROLS ============ */
-  /* Track metadata selector */
+  /* Dock Event Handlers */
   var trackBtns = document.querySelectorAll('.demo-buttons [data-track]');
   trackBtns.forEach(function(b) {
     b.addEventListener('click', function() {
@@ -969,17 +774,6 @@
     });
   });
 
-  /* Visualizer style selector */
-  var styleBtns = document.querySelectorAll('.demo-buttons [data-style]');
-  styleBtns.forEach(function(b) {
-    b.addEventListener('click', function() {
-      styleBtns.forEach(function(btn){ btn.classList.remove('active'); });
-      b.classList.add('active');
-      activeStyle = b.getAttribute('data-style');
-    });
-  });
-
-  /* Progress simulator buttons */
   var simBtns = document.querySelectorAll('.demo-buttons [data-sim]');
   simBtns.forEach(function(b) {
     b.addEventListener('click', function() {
@@ -992,7 +786,6 @@
     });
   });
 
-  /* Audio playback trigger */
   btnToggleAudio.addEventListener('click', function() {
     startSyntheticAudio();
   });
@@ -1001,14 +794,12 @@
     fetchTrackWithByteProgress(TRACK_METADATA[currentTrackKey].url);
   });
 
-  /* Theme toggle */
   btnToggleTheme.addEventListener('click', function() {
     var cur = document.documentElement.getAttribute('data-theme') || 'autumn';
     var next = (cur === 'autumn') ? 'default' : 'autumn';
     document.documentElement.setAttribute('data-theme', next);
   });
 
-  /* Background view switcher */
   btnViewGreeting.addEventListener('click', function() {
     btnViewGreeting.classList.add('active');
     btnViewTable.classList.remove('active');
