@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#faf7f5">
-<title>音響スペクトラム v3 — 全幅・水鏡の対</title>
+<title>音響スペクトラム v3 — コンパクト・全幅水鏡</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -61,7 +61,7 @@
   }
 
   /* ============================================================
-     EXPANDED AUDIO HUD (Full-Width Spectrum Alignment)
+     COMPACT AUDIO HUD (Height Reduced, Zero-Gap Alignment)
      ============================================================ */
   .audio-spectrum-hud {
     position: fixed;
@@ -70,52 +70,53 @@
     z-index: 90;
     display: flex;
     flex-direction: column;
-    gap: 10px;
     pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
     width: 318px;
-    padding: 14px 18px 12px 18px;
-    border-radius: 18px;
-    background: rgba(253, 243, 216, 0.75);
+    padding: 9px 18px 7px 18px; /* Compact vertical padding */
+    border-radius: 15px;
+    background: rgba(253, 243, 216, 0.78);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid rgba(216, 180, 120, 0.45);
     box-shadow: 
-      0 6px 24px rgba(120, 70, 20, 0.09),
+      0 5px 20px rgba(120, 70, 20, 0.08),
       0 1px 3px rgba(120, 70, 20, 0.05);
     transition: opacity 0.4s ease, transform 0.4s ease, background 0.4s ease;
   }
 
   html[data-theme="default"] .audio-spectrum-hud {
-    background: rgba(255, 255, 255, 0.78);
+    background: rgba(255, 255, 255, 0.80);
     border-color: rgba(234, 217, 213, 0.6);
-    box-shadow: 0 6px 24px rgba(120, 90, 90, 0.08);
+    box-shadow: 0 5px 20px rgba(120, 90, 90, 0.07);
   }
 
+  /* Title & Artist Header */
   .hud-meta-row {
     display: flex;
     align-items: baseline;
     gap: 7px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
-    line-height: 1.3;
+    line-height: 1.15;
+    margin-bottom: 4px; /* Tight distance to spectrum */
     white-space: nowrap;
   }
 
   .hud-title {
-    font-size: 15.5px;
+    font-size: 15px;
     font-weight: 700;
     color: var(--accent);
     letter-spacing: 2px;
   }
 
   .hud-sep {
-    font-size: 12px;
+    font-size: 11px;
     color: var(--text-placeholder);
   }
 
   .hud-artist {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 500;
     color: var(--text-mute);
     letter-spacing: 1px;
@@ -123,11 +124,11 @@
 
   .hud-status-badge {
     margin-left: auto;
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
-    padding: 2px 7px;
-    border-radius: 10px;
+    padding: 1px 6px;
+    border-radius: 8px;
     background: rgba(201, 96, 10, 0.12);
     color: var(--accent);
     transition: all 0.3s ease;
@@ -151,28 +152,29 @@
     50% { opacity: 1; }
   }
 
-  /* Spectrum Canvas Block */
+  /* Spectrum Block (Compact 26px height) */
   .hud-visualizer-block {
     width: 100%;
-    height: 34px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
+    margin-bottom: 2px; /* Closed gap directly above the gauge line */
   }
 
   .hud-canvas {
     width: 100%;
-    height: 34px;
+    height: 26px;
     display: block;
   }
 
-  /* Gauge Block */
+  /* Gauge Block directly connected to the spectrum */
   .hud-gauge-block {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 3px;
     width: 100%;
-    padding-top: 2px;
+    padding-top: 0;
   }
 
   .hud-gauge-bar {
@@ -206,7 +208,7 @@
   .hud-gauge-label {
     display: flex;
     justify-content: space-between;
-    font-size: 9.5px;
+    font-size: 9px;
     color: var(--text-placeholder);
     letter-spacing: 0.5px;
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
@@ -385,7 +387,7 @@
 </div>
 
 <!-- ============================================================
-     AUDIO SPECTRUM & METADATA HUD
+     COMPACT AUDIO HUD
      ============================================================ -->
 <div class="audio-spectrum-hud" id="audioSpectrumHud">
   <div class="hud-meta-row">
@@ -396,7 +398,7 @@
   </div>
 
   <div class="hud-visualizer-block">
-    <canvas class="hud-canvas" id="hudCanvas" width="564" height="68"></canvas>
+    <canvas class="hud-canvas" id="hudCanvas" width="564" height="52"></canvas>
   </div>
 
   <div class="hud-gauge-block">
@@ -411,16 +413,16 @@
 </div>
 
 <!-- ============================================================
-     TEST DOCK / CONTROLLER
+     TEST CONTROLLER
      ============================================================ -->
 <div class="demo-dock" id="demoDock">
   <div class="demo-dock-title">
-    <span>水鏡の対 (全幅・拡張検証)</span>
+    <span>水鏡の対 (高さ圧縮版)</span>
     <button type="button" class="demo-btn" id="btnToggleTheme" style="padding:2px 6px;">🍁/🌸</button>
   </div>
 
   <div class="demo-group">
-    <div class="demo-label">楽曲プリセット (小久保隆)</div>
+    <div class="demo-label">楽曲プリセット</div>
     <div class="demo-buttons">
       <button type="button" class="demo-btn active" data-track="earlyevening">夕: 虹を見た日</button>
       <button type="button" class="demo-btn" data-track="morning">朝: 草原の風</button>
@@ -455,7 +457,7 @@
   </div>
 
   <div class="demo-hint-box">
-    25本の6.0px太線バーが5.5px間隔を維持したまま、下部のゲージ線と同一幅（282px）で左右均等に整列しています。
+    スペクトラムとゲージ線の隙間を2pxに密着させ、HUD全体の高さを約115pxから約76pxに圧縮しました。
   </div>
 </div>
 
@@ -492,15 +494,14 @@
   var sampleViewGreeting = document.getElementById('sampleViewGreeting');
   var sampleViewTable = document.getElementById('sampleViewTable');
 
-  /* Precise Retina Layout Dimensions */
+  /* Compact Canvas Dimensions */
   var dpr = window.devicePixelRatio || 1;
-  var displayW = 282; // Exact full width of the gauge line below
-  var displayH = 34;
+  var displayW = 282; // Matches 282px gauge line
+  var displayH = 26;  // Scaled down to 26px
   canvas.width = displayW * dpr;
   canvas.height = displayH * dpr;
   ctx.scale(dpr, dpr);
 
-  /* Web Audio Setup */
   var audioCtx = null;
   var analyser = null;
   var freqData = null;
@@ -673,14 +674,14 @@
       hudGaugeFill.classList.add('decoding');
       hudStatusBadge.textContent = '展開中';
       hudStatusBadge.classList.add('decoding');
-      hudPctStatus.textContent = 'デコード中...';
-      hudByteStatus.textContent = 'PCM展開中';
+      hudPctStatus.textContent = 'PCM展開中';
+      hudByteStatus.textContent = 'デコード中...';
     } else if (state === 'ready') {
       hudGaugeFill.classList.add('ready');
       hudStatusBadge.textContent = '再生中';
       hudStatusBadge.classList.add('ready');
       hudPctStatus.textContent = '待機完了';
-      hudByteStatus.textContent = '15.8 MB (RAM常駐)';
+      hudByteStatus.textContent = '15.8 MB (RAM)';
     }
   }
 
@@ -693,11 +694,11 @@
   }
 
   /* ============================================================
-     25-BAR FULL-WIDTH WATERLINE MIRROR RENDERER (120Hz)
+     RENDER LOOP (Tight Waterline Mirror)
      ============================================================ */
   var mBars = 25;
-  var mW = 6.0;         // 2.5× thicker than original 2.4px
-  var mGap = 5.5;       // Exact same 5.5px inter-bar spacing
+  var mW = 6.0;
+  var mGap = 5.5;
   var mirrorValues = new Float32Array(mBars);
   var phase = 0;
 
@@ -714,57 +715,54 @@
     }
 
     phase += 0.045;
-    var midY = displayH / 2;
+    var midY = Math.round(displayH * 0.44); /* 11.5px: gives balanced headroom above and reflection below */
 
-    /* Continuous horizontal waterline matching gauge width */
-    ctx.strokeStyle = 'rgba(216, 180, 120, 0.42)';
+    /* Thin waterline divider */
+    ctx.strokeStyle = 'rgba(216, 180, 120, 0.40)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
     ctx.lineTo(displayW, midY);
     ctx.stroke();
 
-    /* Render all 25 thick bars edge-to-edge (0 to 282px) */
     for (var m = 0; m < mBars; m++) {
       var targetEnergy = 0.12;
       if (analyser && isAudioPlaying) {
         var binIdx = 3 + Math.floor(m * 3.6);
         targetEnergy = Math.max(0.10, freqData[binIdx] / 255);
       } else {
-        /* Smooth traveling harmonic wave across 25 bars */
         targetEnergy = 0.22 + Math.sin(phase + m * 0.42) * 0.18 + Math.cos(phase * 0.7 + m * 0.2) * 0.08;
       }
 
-      /* 120Hz Spring smoothing */
-      mirrorValues[m] += (targetEnergy - mirrorValues[m]) * 0.24;
+      mirrorValues[m] += (targetEnergy - mirrorValues[m]) * 0.25;
 
-      var halfH = Math.max(2.2, mirrorValues[m] * (displayH * 0.44));
-      var mx = m * (mW + mGap); // Starts exactly at 0px and spans to 282px
+      var halfH = Math.max(2.0, mirrorValues[m] * 10.5);
+      var mx = m * (mW + mGap);
 
-      /* Sky reflection (Upper column) */
+      /* Upper Sky Column */
       var gradSky = ctx.createLinearGradient(0, midY - halfH, 0, midY);
       gradSky.addColorStop(0, themeAccent);
       gradSky.addColorStop(1, themePetal);
       ctx.fillStyle = gradSky;
       ctx.beginPath();
-      ctx.roundRect(mx, midY - halfH, mW, halfH, [2, 2, 0, 0]);
+      ctx.roundRect(mx, midY - halfH, mW, halfH, [1.5, 1.5, 0, 0]);
       ctx.fill();
 
-      /* Water reflection (Lower mirror) */
-      var gradWater = ctx.createLinearGradient(0, midY, 0, midY + halfH * 0.88);
+      /* Lower Water Mirror (extends down close to canvas bottom) */
+      var gradWater = ctx.createLinearGradient(0, midY, 0, midY + halfH * 0.85);
       gradWater.addColorStop(0, themePetal);
-      gradWater.addColorStop(1, 'rgba(247, 185, 60, 0.18)');
+      gradWater.addColorStop(1, 'rgba(247, 185, 60, 0.15)');
       ctx.fillStyle = gradWater;
-      ctx.globalAlpha = 0.48;
+      ctx.globalAlpha = 0.46;
       ctx.beginPath();
-      ctx.roundRect(mx, midY, mW, halfH * 0.88, [0, 0, 2, 2]);
+      ctx.roundRect(mx, midY, mW, halfH * 0.85, [0, 0, 1.5, 1.5]);
       ctx.fill();
       ctx.globalAlpha = 1.0;
     }
   }
   requestAnimationFrame(renderVisualizer);
 
-  /* Dock Event Handlers */
+  /* Controller Handlers */
   var trackBtns = document.querySelectorAll('.demo-buttons [data-track]');
   trackBtns.forEach(function(b) {
     b.addEventListener('click', function() {
