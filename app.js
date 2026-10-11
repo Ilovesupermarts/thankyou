@@ -3,6 +3,49 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (audio spectrum HUD)
+       - New bottom-left persistent HUD surfacing the currently-
+         playing ambient bed: track title, artist, a 25-column
+         waterline-mirror spectrum on a 282×26 micro-canvas at 2×
+         DPR, and a two-stage loading gauge that distinguishes
+         stream transfer from PCM decompression.
+       - Three logical Nagoya time phases decoupled from physical
+         buffers: Morning (草原の風) plays Sound/Morning.mp3,
+         Early Evening (虹を見た日) plays Sound/Earlyevening.mp3,
+         Late Night (カタライザー) plays Sound/Latenight.mp3. Each
+         phase resolves its buffer through track.bufferName so the
+         phase-to-file mapping stays 1:1 in memory.
+       - Aggregated loading tracker: three unique URLs tracked in
+         _hudBytesLoadedMap / _hudBytesTotalMap; _hudTotalFiles is
+         derived at parse time by deduplicating AMBIENT_TRACKS
+         URLs, so adding a fourth phase with a new file requires no
+         counter edit.
+       - Single-authority state renderer _hudRenderState(). Both
+         the streaming loader and the playback lifecycle call it;
+         they never write badge or gauge state directly. Priority:
+           1. ambientSource !== null           → 再生中
+           2. _hudDecodedCount < _hudTotalFiles → DL XX% / 展開中
+           3. otherwise                         → 待機完了
+         This resolves the dual-writer race where a partially-
+         decoded state could leave the badge and gauge contradicting
+         each other during a cold launch.
+       - Streaming loader switched from response.arrayBuffer() to
+         response.body.getReader(), with a byte counter feeding the
+         gauge. Updates are throttled to 100ms with a force bypass
+         on stream-end and decode-end so the final state transitions
+         land immediately.
+       - Canvas rendering is gated on both _scrollActive (shared
+         with the swell CSS write) and _hudShouldDraw() (a JS mirror
+         of the CSS visibility rule), so the 120Hz redraw is halted
+         whenever the HUD is hidden — during the receipt dwell, the
+         thank-you sequence, or an active scroll.
+       - Zero per-frame allocations in drawHudSpectrum(): the two
+         gradient stops per bar were replaced with solid fills
+         (themeAccent above the waterline, themePetal at
+         globalAlpha 0.46 below), eliminating 6,000 CanvasGradient
+         allocations per second at 120Hz.
+       - roundRect feature-detected; falls back to rect on any
+         engine that lacks it.
      v1.3 (passive-touch scroll path)
        - The stage's touchmove listener is now passive. Its
          horizontal branch no longer calls preventDefault because
@@ -33,10 +76,10 @@
          a _scrollActive flag. During scroll, the loop keeps updating
          its energy envelope but skips the custom-property write,
          because that write forces a style recalc down the full
-         150vw × 150vh ambient stage subtree and competes with the
-         scroll tick for the same frame budget. The energy envelope
-         continues to track the audio so there is no step-function
-         when scroll ends.
+         ambient stage subtree and competes with the scroll tick for
+         the same frame budget. The energy envelope continues to
+         track the audio so there is no step-function when scroll
+         ends.
        - The flag is armed on every scroll event, refreshed by a
          200ms fallback timer, and cleared immediately by the native
          scrollend event where supported (Chromium 114+, which
@@ -106,18 +149,12 @@
          floor 80, gain 3.5, attack 0.06, decay 0.010) transfers
          unchanged. The audible path is untouched.
        - Lifecycle piggybacks on startAmbient() / stopAmbient(),
-         which are already gated on the #mapleLeaves .active class
-         shared with the ambient sound layers. stopSwellLoop()
-         flushes --audio-swell to 0 so the background does not
-         freeze half-inflated if the user returns to the start
-         screen mid-beat.
+         which are already gated on the #mapleLeaves .active class.
+         stopSwellLoop() flushes --audio-swell to 0 so the
+         background does not freeze half-inflated if the user
+         returns to the start screen mid-beat.
        - Guardrail: the swell drives opacity and transform only.
-         No per-frame filter recalculations — the Layer 2 color
-         grade is a static filter, and the yellow correction is
-         done by overriding the mesh gradient stops in CSS, not by
-         animating a filter parameter. Per-frame filter changes on
-         masked elements force Chromium to re-rasterize offscreen
-         framebuffers at 60fps and thrash GPU tile memory.
+         No per-frame filter recalculations.
        - Epsilon deadband: applySwellToCSS() skips the style write
          when the energy envelope has moved less than 0.005 since
          the last write, except when the new value is exactly 0
@@ -162,7 +199,7 @@
          label so the two conventions are visible at the point of
          authoring rather than needing to be inferred from usage.
        - Earlyevening.mp3 gains a 16-minute playback cap via the
-         new maxPlaySec field on AMBIENT_TRACKS. The last minute of
+         maxPlaySec field on AMBIENT_TRACKS. The last minute of
          the source file is no longer played; the loop re-arms on
          the fade-out tail at 16:00. Morning.mp3 has maxPlaySec:
          null and continues to play the full 17 minutes.
@@ -187,12 +224,9 @@
          1.67:1, so the chime reads as a layered presence rather
          than as a texture buried under the bed.
        - Ambient background tracks replaced with a time-bucketed
-         full-track loop. Two clips:
-             05:00–16:59  Sound/Morning.mp3       peak 1.00
-             17:00–21:59  Sound/Earlyevening.mp3  peak 1.00
-             22:00–04:59  Sound/Earlyevening.mp3  peak 1.00
-                          (placeholder; awaiting a dedicated late-
-                           night clip)
+         full-track loop. Three logical Nagoya phases, three
+         physical files (see v1.3 audio spectrum HUD above for
+         the current mapping).
          Each play runs the buffer end-to-end (or up to maxPlaySec)
          with a 3s fade-in and a 4s fade-out, then immediately
          re-arms. The hour is checked at play time, not at schedule
@@ -202,31 +236,15 @@
        - Removed from the ambient pool: the nature recording
          (baranova_n-birds-forest-river-409229.mp3) and both night
          clips (Sound/Wind.mp3 and Sound/jauk-calm-zen-river-
-         flowing.mp3). Their supporting code is gone: NIGHT_SOUNDS,
-         AMBIENT_SOUNDS (as a pool), NIGHT_WIND_MAX_PLAY,
-         nightIndex, isNightAmbientHours, the random-window /
-         random-offset logic in playAmbientSound.
+         flowing.mp3). Their supporting code is gone.
        - Kept: the koi-dive drop effect (one-shot, start button),
          the blossom-screen flowing-stream bed and its
          makeSeamlessLoop crossfade (start button), and the three
          synthesised UI sounds (tock, check, paper).
      v1.3
        - Shippo tracer refactor: concave 4-point star (Hoshi-gata)
-         replaces the circle trace. New .tracer-rotator wrapper
-         isolates the fixed grid translate3d (on .shippo-tracer)
-         from the animated exit transforms (on .tracer-rotator),
-         so rotation/scale/blur cannot clobber the grid position.
-         Exit rotation randomised ±12° per spawn via --target-rot.
-         Star cadence widened to 2100ms base ±20% so the 3.4s
-         dissolve cycle breathes before the next star begins.
-       - Star placement is unrestricted: the even-parity grid snap
-         is removed, so the star may spawn on any lattice node
-         across the viewport, including petal intersections and
-         tile boundaries. Initial spawn orientation is randomised
-         per spawn from eight 45° increments so the stroke draw
-         begins from a different tip on each pass — eight distinct
-         draw-in directions, all lattice-aligned because the
-         rotation pivots about the star's own centre.
+         replaces the circle trace.
+       - Star placement is unrestricted.
        - Shippo tracer fix: scheduleShippoTracer() no longer calls
          stopShippoTracer() at its head.
        - Ambient Shippo mosaic + circle tracer.
@@ -242,78 +260,18 @@
        - Reset hot-spot.
        - Transition-line accordion drift.
        - Maple leaf overlay: z-index -1, seven Momiji.
-       - Ambient sound rotation: wind chime and nature recording
-         alternate. Silence measured from play END (0.5–2s).
-       - Night mode: between 19:00 and 04:59 Nagoya time, the day
-         rotation is bypassed and Sound/Night.mp3 plays on a fixed
-         65s cycle (2s fade-in, 54s sustain, 4s fade-out, 5s
-         silence).
-       - 6-panel carousel expansion: Panel 0 is a dynamic personal
-         welcome with a compound weather/time greeting evaluated
-         from the Nagoya forecast. Panels 1–4 host the panel-N.html
-         files. Panel 5 is the hardcoded zero-pressure gate. The
-         greeting is frozen on first mount via greetingFinalized so
-         late network arrivals cannot mutate the DOM while the
-         therapist is reading.
+       - 6-panel carousel expansion.
        - Blossom screen: time greeting with the therapist's name
-         below, plus three poetic interaction hints. A looping
-         flowing-stream ambient track fades in on the screen and
-         fades out on the swipe-up that dives the koi.
+         below, plus three poetic interaction hints.
        - Seamless loop for the flowing-stream bed via
          makeSeamlessLoop().
        - Greeting set revised: warmer, more observational phrasing
          across all 17 branches.
        - Greeting engine consolidated. GREETING_TABLE is a single
-         dictionary mapping each tier to { text, burden };
-         getGreetingTier() walks the priority ladder and returns
-         the tier identifier; updateGreetingPanel() resolves the
-         entry once and derives the closing line from its burden
-         flag. Binding text and burden into atomic entries prevents
-         pairing drift, and calling getGreetingTier() exactly once
-         eliminates the microsecond boundary race where separate
-         calls at a bucket transition could pair one tier's greeting
-         with another tier's closing.
-       - Editorial rule for burden: a tier is a burden when the
-         outside environment imposed a meaningful tax on the
-         therapist — a tax on comfort, focus, or safety — before
-         she crossed the threshold. Physical discomfort (bitter
-         cold, stifling heat, driving rain) and cognitive vigilance
-         (navigating thick fog) both qualify. C2 (肌寒い) does not:
-         the greeting drops 誠に to match its own mildness, and the
-         lighter closing follows. D1–D4 acknowledge lateness or
-         earliness in the greeting but do not by themselves warrant
-         the protective closing. B4 (fog) omits お部屋まで
-         intentionally — the defining event is safe transit through
-         poor visibility, not the destination.
-       - A1 phrasing aligned to the A-tier scaffolding. The greeting
-         now reads 雪の降る中、夜遅いお時間に、… to match A2 and A3,
-         which already break the weather clause from the time clause
-         with 中、. Previously A1 ran straight from 雪の降る into
-         夜遅い, leaving the compound frame broken on its first
-         branch.
-       - Night rotation replaces the single-clip night mode. Two
-         clips — Sound/Wind.mp3 and
-         Sound/jauk-calm-zen-river-flowing.mp3 — alternate on the
-         same random-window, random-offset, random-silence schedule
-         the day rotation uses. The fixed 65s cycle and the
-         NIGHT_PEAK / NIGHT_FADE_IN / NIGHT_FADE_OUT / NIGHT_SILENCE
-         constants are retired; playNightSound() is absorbed into
-         playAmbientSound(). The night window (19:00–04:59 Nagoya)
-         is unchanged: night is now a pool swap, not a mode change.
-       - Ambient playback envelope retuned. AMBIENT_PLAY_MIN raised
-         6s → 9s → 12s; AMBIENT_PLAY_MAX held at 14s; the shared
-         AMBIENT_FADE_OUT shortened 3s → 1.5s so the sustain region
-         dominates each play rather than competing with the tail.
-         Perceptual length was previously being eaten by the long
-         fade-out; runtime numbers alone did not move the felt
-         duration. NIGHT_WIND_MAX_PLAY raised 8s → 11s so the wind
-         clip reaches the new 12s floor's neighbourhood; the cap
-         exists because Wind.mp3 is 13s long and needs room for the
-         full fade-in and fade-out without a hard cut. Jauk peak
-         raised 0.216 → 0.281 (+30%) because the recording is much
-         softer than Wind at the same gain. Wind peak lowered
-         0.264 → 0.211 (−20%) because at the previous level the wind
-         recording read as too forward for a night ambience bed.
+         dictionary mapping each tier to { text, burden }.
+       - Editorial rule for burden documented in the GREETING_TABLE
+         header comment.
+       - A1 phrasing aligned to the A-tier scaffolding.
      v1.17.2
        - Panel-1 opening line source of truth.
        - Transition-line focus snap.
@@ -417,8 +375,6 @@ var soundReady = false;
 /* Audio-reactive swell state. These are set up in initSound() as a
    parallel leaf branch off soundMasterGain; the analyser never
    connects to destination, so the audible output is unchanged.
-   See the SWELL SYSTEM section further down for the analysis loop
-   and the calibration constants.
 
    _lastAppliedSwell tracks the last value actually written to the
    CSS custom property so applySwellToCSS() can skip subtree style
@@ -437,11 +393,9 @@ var swellIsRunning = false;
    continues updating its energy envelope (so the value doesn't
    jump when scroll ends) but skips the CSS custom-property write.
    That write forces a style recalc down the full ambient stage
-   subtree (150vw × 150vh), and during scroll it competes with the
-   scroll tick for the same frame budget. The visual difference is
-   invisible — the user is reading text, not watching the
-   background, and the background simply holds its current
-   brightness for the ~200ms of scroll inertia before resuming. */
+   subtree, and during scroll it competes with the scroll tick for
+   the same frame budget. The visual difference is invisible — the
+   user is reading text, not watching the background. */
 var _scrollActive = false;
 var _scrollEndTimer = null;
 
@@ -449,72 +403,65 @@ var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
 
-/* Ambient background beds. A single full-length clip loops for the
-   life of the carousel, selected by Nagoya wall-clock hour:
+/* ============ TRACK METADATA (3 PHASES, 3 PHYSICAL BUFFERS) ============
+   Three Nagoya time phases, three distinct MP3 files. The
+   bufferName field is the physical soundBuffers key; for the
+   current configuration each phase resolves to a 1:1 buffer, but
+   the indirection is preserved so a future change (e.g. sharing
+   one clip across two phases, or a dedicated late-night clip
+   replacing the placeholder) does not require editing the loader
+   or the playback path.
 
-     05:00–16:59   Sound/Morning.mp3
-     17:00–21:59   Sound/Earlyevening.mp3
-     22:00–04:59   Sound/Earlyevening.mp3  (placeholder; awaiting a
-                                             dedicated late-night clip)
+     morning      05:00–16:59  Sound/Morning.mp3       (17 min, full)
+     earlyevening 17:00–21:59  Sound/Earlyevening.mp3  (~16 min, capped at 16:00)
+     latenight    22:00–04:59  Sound/Latenight.mp3     (18 min, full)
 
    Each play runs the buffer end-to-end — or up to maxPlaySec, if
    set — with a linear fade-in at the head and a linear fade-out at
-   the tail, then immediately re-arms for the next cycle. The loop
-   is scheduled, not handled by BufferSource.loop: a native loop
-   cannot fade in and out between iterations, and a fade across
-   the seam is the whole point of the envelope.
+   the tail, then immediately re-arms for the next cycle. The hour
+   check runs at play time, not at schedule time, so a clip that is
+   mid-flight when the wall clock crosses a bucket boundary
+   finishes naturally and the next cycle picks the correct track.
 
-   maxPlaySec (seconds) caps how much of the buffer is played:
-     · null / absent → play the full buffer
-     · N → play the first N seconds, then fade and re-arm
-   Earlyevening uses 16 * 60 to cut the source file's last minute;
-   the loop re-arms on the fade-out tail rather than playing through
-   the recording's own baked-in ending. Morning has maxPlaySec:
-   null and plays the full 17 minutes.
-
-   The hour check runs at play time, not at schedule time, so a
-   clip that is mid-flight when the wall clock crosses a bucket
-   boundary finishes naturally and the next cycle picks the
-   correct track. Symmetrically for the other boundary.
-
-   Peaks are 1.00, tuned by ear against the wind chime layer that
-   sits on top during the morning window. Effective level is
-   1.00 × 0.5 master = 0.50, which is much higher than the old
-   pool members — but the bed is continuous background, and the
-   chime carries its own independent peak (0.60) to compensate.
-
+   Peaks are 1.00 for all three beds, tuned by ear against the
+   wind chime layer that sits on top during the morning window.
    Lifecycle is shared with the chime and the audio-reactive swell
    loop via the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
-  { name: 'morning',      url: 'Sound/Morning.mp3',      peak: 1.00, maxPlaySec: null    },
-  { name: 'earlyevening', url: 'Sound/Earlyevening.mp3', peak: 1.00, maxPlaySec: 16 * 60 }
+  {
+    name: 'morning',
+    bufferName: 'morning',
+    url: 'Sound/Morning.mp3',
+    title: '草原の風',
+    artist: '小久保隆',
+    peak: 1.00,
+    maxPlaySec: null
+  },
+  {
+    name: 'earlyevening',
+    bufferName: 'earlyevening',
+    url: 'Sound/Earlyevening.mp3',
+    title: '虹を見た日',
+    artist: '小久保隆',
+    peak: 1.00,
+    maxPlaySec: 16 * 60
+  },
+  {
+    name: 'latenight',
+    bufferName: 'latenight',
+    url: 'Sound/Latenight.mp3',
+    title: 'カタライザー',
+    artist: '小久保隆',
+    peak: 1.00,
+    maxPlaySec: null
+  }
 ];
 
 var AMBIENT_FADE_IN  = 3.0;  // seconds
 var AMBIENT_FADE_OUT = 4.0;  // seconds
 
 /* Wind chime layer. Runs only during the morning window
-   (05:00–16:59 Nagoya) and layers on top of Morning.mp3. The
-   envelope and schedule are inherited from the pre-revamp pool
-   system, because the chime recording is sparse and
-   time-localised — a 12–14s window at a random offset gives a
-   couple of audible strikes per play, which reads as an accent
-   rather than a competing texture.
-
-   Peak raised 0.264 → 0.600 against the much louder new bed.
-   Ratio bed:chime in effective terms is 0.50 : 0.30, i.e.
-   1.67:1 amplitude. The chime's peaks read against the bed's
-   average, not its peaks, so the perceived balance is closer
-   than the amplitude ratio suggests.
-
-   Unit convention across the acoustic engine:
-     · playback parameters (play window, fades)   → seconds,
-       consumed by Web Audio scheduling calls
-     · scheduler timers (silence gaps)            → milliseconds,
-       consumed by setTimeout
-   The constants below carry an inline // seconds or // ms
-   label so the two conventions are visible at the declaration
-   site rather than needing to be inferred from usage. */
+   (05:00–16:59 Nagoya) and layers on top of Morning.mp3. */
 var WIND_CHIME_PEAK        = 0.600;
 var WIND_CHIME_PLAY_MIN    = 12;    // seconds
 var WIND_CHIME_PLAY_MAX    = 14;    // seconds
@@ -522,6 +469,270 @@ var WIND_CHIME_FADE_IN     = 2.0;   // seconds
 var WIND_CHIME_FADE_OUT    = 1.5;   // seconds
 var WIND_CHIME_SILENCE_MIN = 500;   // ms
 var WIND_CHIME_SILENCE_MAX = 2000;  // ms
+
+/* ============ AUDIO SPECTRUM & METADATA HUD ============
+   Persistent bottom-left card surfacing the currently-playing
+   ambient bed. Its visibility is governed by two gates that must
+   stay in sync:
+
+     · CSS — body.info-visible:not(.thankyou-active):not(.receipt-locked)
+     · JS  — _hudShouldDraw(), which mirrors the same body-class
+              conditions plus the .shown class on the HUD element.
+
+   The JS mirror exists to skip 120Hz canvas rasterization whenever
+   the CSS rule hides the HUD — during the receipt dwell, the
+   thank-you sequence, and any state where the card is at opacity 0.
+
+   Canvas animation shares the swell loop's _scrollActive gate so
+   the HUD never competes with gesture dispatch during scroll.
+
+   Loading state is aggregated across all unique AMBIENT_TRACKS
+   URLs. _hudTotalFiles is derived by deduplicating that list at
+   parse time, so adding a fourth phase with a new file requires
+   no counter edit. The badge text is written exclusively by
+   _hudRenderState(); the streaming loader and playback lifecycle
+   feed it inputs and never touch the DOM directly. */
+var audioSpectrumHud = document.getElementById('audioSpectrumHud');
+var hudTrackTitle    = document.getElementById('hudTrackTitle');
+var hudTrackArtist   = document.getElementById('hudTrackArtist');
+var hudStatusBadge   = document.getElementById('hudStatusBadge');
+var hudCanvas        = document.getElementById('hudCanvas');
+var hudCtx           = hudCanvas ? hudCanvas.getContext('2d') : null;
+var hudGaugeFill     = document.getElementById('hudGaugeFill');
+var hudByteStatus    = document.getElementById('hudByteStatus');
+var hudPctStatus     = document.getElementById('hudPctStatus');
+
+var HUD_DISPLAY_W = 282;
+var HUD_DISPLAY_H = 26;
+var HUD_BARS = 25;
+var HUD_BAR_W = 6.0;
+var HUD_BAR_GAP = 5.5;
+var _hudMirrorValues = new Float32Array(HUD_BARS);
+var _hudPhase = 0;
+
+if (hudCanvas && hudCtx) {
+  var _hudDpr = window.devicePixelRatio || 1;
+  hudCanvas.width  = HUD_DISPLAY_W * _hudDpr;
+  hudCanvas.height = HUD_DISPLAY_H * _hudDpr;
+  hudCtx.scale(_hudDpr, _hudDpr);
+}
+
+/* Unique physical file count, derived at parse time so the HUD
+   scales automatically when a new URL is introduced. The `seen`
+   map is garbage-collected the moment the IIFE returns. */
+var _hudTotalFiles = (function() {
+  var seen = {}, count = 0;
+  for (var i = 0; i < AMBIENT_TRACKS.length; i++) {
+    var u = AMBIENT_TRACKS[i].url;
+    if (!seen[u]) {
+      seen[u] = true;
+      count++;
+    }
+  }
+  return count;
+})();
+
+/* Aggregated loading tracker */
+var _hudBytesLoadedMap = {};
+var _hudBytesTotalMap  = {};
+var _hudDecodedCount   = 0;
+var _hudLastUpdateMs   = 0;
+
+/* JS-side visibility mirror of the CSS gate. Halted canvas work
+   when the card is hidden. */
+function _hudShouldDraw() {
+  if (!audioSpectrumHud) return false;
+  if (!document.body.classList.contains('info-visible')) return false;
+  if (document.body.classList.contains('thankyou-active')) return false;
+  if (document.body.classList.contains('receipt-locked')) return false;
+  if (!audioSpectrumHud.classList.contains('shown')) return false;
+  return true;
+}
+
+/* Single-authority state renderer. Both the streaming loader and
+   the playback lifecycle funnel through this function; neither
+   writes badge or gauge state directly. */
+function _hudRenderState() {
+  if (!hudStatusBadge || !hudGaugeFill) return;
+
+  var totalExpected = 0;
+  var totalLoaded = 0;
+  for (var url in _hudBytesTotalMap) {
+    totalExpected += _hudBytesTotalMap[url];
+    totalLoaded += (_hudBytesLoadedMap[url] || 0);
+  }
+  /* 41 MB fallback (16 + 16 + 9) before Content-Length headers resolve */
+  if (totalExpected === 0) totalExpected = 41000000;
+
+  var pct = Math.min(1.0, totalLoaded / totalExpected);
+  var pctInt = Math.round(pct * 100);
+  var isPlaying = (ambientSource !== null);
+
+  hudGaugeFill.style.width = pctInt + '%';
+  hudGaugeFill.classList.remove('decoding', 'ready');
+  hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
+
+  if (isPlaying) {
+    /* Priority 1 — audio is audibly playing */
+    hudStatusBadge.textContent = '再生中';
+    hudStatusBadge.classList.add('ready');
+    if (_hudDecodedCount >= _hudTotalFiles) {
+      hudGaugeFill.classList.add('ready');
+      /* Blank the sub-pct line: the full gauge plus the RAM figure
+         below already say everything the pct would. */
+      hudPctStatus.textContent = '';
+      hudByteStatus.textContent = (totalExpected / (1024 * 1024)).toFixed(1) + ' MB (RAM)';
+    } else {
+      hudPctStatus.textContent = pctInt + '%';
+      hudByteStatus.textContent = (totalLoaded / (1024 * 1024)).toFixed(1) + ' / ' + (totalExpected / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+  } else if (_hudDecodedCount < _hudTotalFiles) {
+    /* Priority 2 — in-flight download or decode */
+    if (pct >= 1.0) {
+      hudGaugeFill.classList.add('decoding');
+      hudStatusBadge.textContent = '展開中';
+      hudStatusBadge.classList.add('decoding');
+      hudPctStatus.textContent = 'PCM展開中';
+      hudByteStatus.textContent = 'デコード中...';
+    } else {
+      hudStatusBadge.textContent = 'DL ' + pctInt + '%';
+      hudStatusBadge.classList.add('loading');
+      hudPctStatus.textContent = pctInt + '%';
+      hudByteStatus.textContent = (totalLoaded / (1024 * 1024)).toFixed(1) + ' / ' + (totalExpected / (1024 * 1024)).toFixed(1) + ' MB';
+    }
+  } else {
+    /* Priority 3 — all buffers resident, currently idle */
+    hudGaugeFill.classList.add('ready');
+    hudStatusBadge.textContent = '待機完了';
+    hudStatusBadge.classList.add('ready');
+    hudPctStatus.textContent = '待機完了';
+    hudByteStatus.textContent = (totalExpected / (1024 * 1024)).toFixed(1) + ' MB (RAM)';
+  }
+}
+
+/* Throttled wrapper. 100ms gap during streaming; force === true
+   bypasses the gate for state transitions (decode start, decode
+   end, playback start/stop). */
+function updateHudLoadingAggregated(force) {
+  var now = performance.now();
+  if (!force && now - _hudLastUpdateMs < 100) return;
+  _hudLastUpdateMs = now;
+  _hudRenderState();
+}
+
+/* Streaming loader with byte-level progress reporting. Replaces
+   response.arrayBuffer() with a ReadableStream reader so the gauge
+   can track the transfer, then hands the assembled ArrayBuffer to
+   decodeAudioData. The final byte total is flushed before decode
+   starts so the gauge snaps to 100% and enters the "展開中"
+   state while the PCM pass runs. */
+function loadAudioBufferWithProgress(url) {
+  return fetch(url)
+    .then(function(res) {
+      if (!res.ok) throw new Error('audio fetch failed: ' + url);
+      var len = res.headers.get('content-length');
+      _hudBytesTotalMap[url] = len ? parseInt(len, 10) : 16000000;
+      _hudBytesLoadedMap[url] = 0;
+
+      var reader = res.body.getReader();
+      var chunks = [];
+      var loaded = 0;
+
+      function read() {
+        return reader.read().then(function(result) {
+          if (result.done) {
+            /* Flush exact byte count before PCM decode */
+            _hudBytesLoadedMap[url] = loaded;
+            updateHudLoadingAggregated(true);
+
+            var all = new Uint8Array(loaded);
+            var pos = 0;
+            for (var i = 0; i < chunks.length; i++) {
+              all.set(chunks[i], pos);
+              pos += chunks[i].length;
+            }
+            return new Promise(function(resolve, reject) {
+              soundAudioCtx.decodeAudioData(all.buffer, function(decoded) {
+                _hudDecodedCount++;
+                updateHudLoadingAggregated(true);
+                resolve(decoded);
+              }, reject);
+            });
+          }
+
+          chunks.push(result.value);
+          loaded += result.value.length;
+          _hudBytesLoadedMap[url] = loaded;
+          updateHudLoadingAggregated(false);
+          return read();
+        });
+      }
+      return read();
+    })
+    .catch(function() { return null; });
+}
+
+/* Zero-allocation waterline-mirror spectrum. Two solid fills per
+   bar (no per-frame gradient allocation) split by a horizontal
+   waterline. Above: themeAccent, full opacity. Below: themePetal
+   at globalAlpha 0.46. 25 columns × 6px + 24 × 5.5px = 282px,
+   flush with the gauge bar beneath. */
+function drawHudSpectrum() {
+  if (!hudCtx) return;
+  hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
+
+  var themeAccent = (currentTheme === 'autumn') ? '#c9600a' : '#b04a5a';
+  var themePetal  = (currentTheme === 'autumn') ? '#e88a1a' : '#e8a8b0';
+
+  _hudPhase += 0.045;
+  var midY = Math.round(HUD_DISPLAY_H * 0.44); /* 11px */
+
+  hudCtx.strokeStyle = (currentTheme === 'autumn') ? 'rgba(216, 180, 120, 0.40)' : 'rgba(234, 217, 213, 0.55)';
+  hudCtx.lineWidth = 1;
+  hudCtx.beginPath();
+  hudCtx.moveTo(0, midY);
+  hudCtx.lineTo(HUD_DISPLAY_W, midY);
+  hudCtx.stroke();
+
+  var hasRoundRect = (typeof hudCtx.roundRect === 'function');
+
+  for (var m = 0; m < HUD_BARS; m++) {
+    var targetEnergy = 0.12;
+    if (swellAnalyserNode && swellFreqData && swellIsRunning) {
+      var binIdx = 3 + Math.floor(m * 3.6);
+      targetEnergy = Math.max(0.10, swellFreqData[binIdx] / 255);
+    } else {
+      targetEnergy = 0.22 + Math.sin(_hudPhase + m * 0.42) * 0.18 + Math.cos(_hudPhase * 0.7 + m * 0.2) * 0.08;
+    }
+
+    _hudMirrorValues[m] += (targetEnergy - _hudMirrorValues[m]) * 0.25;
+
+    var halfH = Math.max(2.0, _hudMirrorValues[m] * 10.5);
+    var mx = m * (HUD_BAR_W + HUD_BAR_GAP);
+
+    /* Upper sky column */
+    hudCtx.fillStyle = themeAccent;
+    hudCtx.beginPath();
+    if (hasRoundRect) {
+      hudCtx.roundRect(mx, midY - halfH, HUD_BAR_W, halfH, [1.5, 1.5, 0, 0]);
+    } else {
+      hudCtx.rect(mx, midY - halfH, HUD_BAR_W, halfH);
+    }
+    hudCtx.fill();
+
+    /* Lower water-mirror column */
+    hudCtx.fillStyle = themePetal;
+    hudCtx.globalAlpha = 0.46;
+    hudCtx.beginPath();
+    if (hasRoundRect) {
+      hudCtx.roundRect(mx, midY, HUD_BAR_W, halfH * 0.85, [0, 0, 1.5, 1.5]);
+    } else {
+      hudCtx.rect(mx, midY, HUD_BAR_W, halfH * 0.85);
+    }
+    hudCtx.fill();
+    hudCtx.globalAlpha = 1.0;
+  }
+}
 
 function initSound() {
   if (soundAudioCtx) return;
@@ -533,22 +744,8 @@ function initSound() {
     soundMasterGain.gain.value = 0.5;
     soundMasterGain.connect(soundAudioCtx.destination);
 
-    /* Parallel analyser tap for the audio-reactive swell system.
-       Architecture:
-         soundMasterGain ─┬──> destination         (audible path)
-                          └──> compensationGain(2.0) ──> analyser
-                                                       (leaf, no
-                                                        destination
-                                                        connection)
-
-       The 2.0× compensation gain is not a loudness correction —
-       it exists because the analyser reads its input logarithmically
-       against min/maxDecibels, so a 0.5× linear drop is a −6 dB
-       shift at the FFT input that cannot be corrected cleanly by
-       scaling byte values after getByteFrequencyData(). Feeding
-       the analyser the pre-attenuation signal level means the
-       sandbox calibration (noise floor 80, gain multiplier 3.5,
-       attack 0.06, decay 0.010) transfers to production unchanged. */
+    /* Parallel analyser tap for the audio-reactive swell system
+       and the HUD spectrum. Leaf node, no destination connection. */
     swellCompensationGain = soundAudioCtx.createGain();
     swellCompensationGain.gain.value = 2.0;
     swellAnalyserNode = soundAudioCtx.createAnalyser();
@@ -566,8 +763,9 @@ function initSound() {
       synthesizeCheck(),
       synthesizePaper(),
       loadDropBuffer(),
-      loadAudioBuffer(AMBIENT_TRACKS[0].url),
-      loadAudioBuffer(AMBIENT_TRACKS[1].url),
+      loadAudioBufferWithProgress(AMBIENT_TRACKS[0].url), // Morning.mp3
+      loadAudioBufferWithProgress(AMBIENT_TRACKS[1].url), // Earlyevening.mp3
+      loadAudioBufferWithProgress(AMBIENT_TRACKS[2].url), // Latenight.mp3
       loadAudioBuffer(STREAM_SOUND_URL),
       loadAudioBuffer(WIND_CHIME_URL)
     ]).then(function(bufs) {
@@ -575,63 +773,27 @@ function initSound() {
       soundBuffers.check = bufs[1];
       soundBuffers.paper = bufs[2];
       if (bufs[3]) soundBuffers.drop = bufs[3];
-      if (bufs[4]) soundBuffers[AMBIENT_TRACKS[0].name] = bufs[4];
-      if (bufs[5]) soundBuffers[AMBIENT_TRACKS[1].name] = bufs[5];
+      if (bufs[4]) soundBuffers.morning = bufs[4];
+      if (bufs[5]) soundBuffers.earlyevening = bufs[5];
+      if (bufs[6]) soundBuffers.latenight = bufs[6];
       /* The stream bed loops for the full life of the blossom screen.
          Pass the decoded buffer through makeSeamlessLoop() so the
          loop point has no encoder padding and no zero-crossing
-         discontinuity. Everything else about the buffer is unchanged
-         — same sample rate, same channel count, same duration minus
-         the crossfade tail. */
-      if (bufs[6]) soundBuffers.stream = makeSeamlessLoop(bufs[6], 1.5);
-      if (bufs[7]) soundBuffers.windChime = bufs[7];
+         discontinuity. */
+      if (bufs[7]) soundBuffers.stream = makeSeamlessLoop(bufs[7], 1.5);
+      if (bufs[8]) soundBuffers.windChime = bufs[8];
       soundReady = true;
     }).catch(function() { /* silent */ });
   } catch (e) { /* silent */ }
 }
 
 /* ============================================================
-   SEAMLESS LOOP
-   ------------------------------------------------------------
-   Produces a buffer whose end and beginning are genuinely the
-   same sample values, so `loop = true` on a BufferSource has no
-   click at the seam.
-
-   Two problems the crossfade solves at once:
-
-     1. MP3 encoder delay and padding. Every MP3 adds ~50 ms of
-        silence at the head (to prime the decoder) and ~100–200 ms
-        at the tail (to flush it). decodeAudioData faithfully
-        returns both. Looping plays that padding end-to-back with
-        the start of the audio, which is audible as a momentary
-        dropout.
-
-     2. Non-zero crossing. Even without padding, the sample value
-        at the last frame rarely equals the value at the first
-        frame. Jumping between them is a step discontinuity — an
-        audible tick.
-
-   The fix: trim the last `crossfadeSec` seconds of the buffer,
-   then crossfade the trimmed tail back over the head. The result
-   is a buffer that is `crossfadeSec` seconds shorter than the
-   input, whose first sample equals the (former) tail's sample at
-   the same index, fading in over the crossfade window.
-
-   1.5 s was chosen for the flowing-stream recording: short enough
-   that the crossfade region is not perceptible as phase smearing
-   on a continuous water bed, long enough that both encoder padding
-   regions are fully absorbed inside the fade window rather than
-   sitting at the seam. If the source has bird calls or other
-   transient events near the loop point, 1.0 s is safer; if it is
-   pure water noise, 2.0 s is also fine.
-   ============================================================ */
+   SEAMLESS LOOP */
 function makeSeamlessLoop(buffer, crossfadeSec) {
   var sr = buffer.sampleRate;
   var fadeSamples = Math.floor(sr * crossfadeSec);
   var originalLength = buffer.length;
 
-  /* Guard: if the buffer is shorter than the crossfade would consume,
-     return it unchanged rather than producing a zero-length result. */
   if (fadeSamples <= 0 || originalLength <= fadeSamples * 2) return buffer;
 
   var channels = buffer.numberOfChannels;
@@ -642,16 +804,8 @@ function makeSeamlessLoop(buffer, crossfadeSec) {
     var src = buffer.getChannelData(ch);
     var dst = out.getChannelData(ch);
 
-    /* Copy the body: everything up to (but not including) the last
-       fadeSamples frames. */
     for (var i = 0; i < newLength; i++) dst[i] = src[i];
 
-    /* Crossfade: the head of the original fades in while the tail
-       fades out, both over the same window. After this loop, dst[0]
-       is (mostly) the tail's value rather than the head's, so the
-       buffer end (dst[newLength - 1]) and the buffer start (dst[0])
-       are adjacent samples from the same recording — no step, no
-       padding, no click. */
     for (var j = 0; j < fadeSamples; j++) {
       var t = j / fadeSamples;
       dst[j] = src[j] * t + src[newLength + j] * (1 - t);
@@ -830,22 +984,7 @@ function playCheck(isChecked) { playSound('check', isChecked ? 1.02 : 0.96); }
 function playPaper(isOpen) { playSound('paper', isOpen ? 1.0 : 0.92); }
 function playDrop() { playSound('drop', 1.0); }
 
-/* ============ BLOSSOM STREAM AMBIENT ============
-   A looping flowing-stream bed that plays for the life of the
-   blossom screen. Fades in over 2.2s on screen appear; fades out
-   over 1.4s on the swipe-up that dives the koi. Peak 0.20 relative
-   to master gain — matched to the nature ambient, slightly under
-   the wind chime.
-
-   The buffer this plays from is the output of makeSeamlessLoop() —
-   see initSound(). loop = true on that buffer has no click at the
-   seam because the head and tail of the buffer are the same samples
-   from the recording, crossfaded.
-
-   startBlossomStream() is idempotent: if a source already exists,
-   it no-ops. stopBlossomStream() nulls the reference immediately
-   so a subsequent start does not false-positive against a still-
-   fading source. */
+/* ============ BLOSSOM STREAM AMBIENT ============ */
 var BLOSSOM_STREAM_PEAK = 0.20;
 var BLOSSOM_STREAM_FADE_IN = 2.2;
 var BLOSSOM_STREAM_FADE_OUT = 1.4;
@@ -899,36 +1038,6 @@ function stopBlossomStream() {
   blossomStreamGain = null;
 }
 
-/* ============ BLOSSOM STREAM DEFERRED START ============
-   startBlossomStream() is called from two places that are not
-   coupled to audio readiness:
-     · confirmName(), inside a 420ms setTimeout that exists purely
-       for the name-screen hide animation
-     · returnToStartScreen(), immediately after the blossom screen
-       is shown
-
-   Both call sites can fire before initSound()'s decode Promise has
-   resolved. On a warm cache the stream MP3 decodes in well under
-   420ms and the sound plays; on a cold cache — first session after
-   install, or a slow network — the decode takes several seconds,
-   startBlossomStream() hits its readiness guard
-   (!soundReady || !soundBuffers.stream) and returns silently with
-   no retry.
-
-   tryStartBlossomStream() polls the readiness state up to
-   (retries + 1) times with a 400ms gap. At the default 15 retries
-   that is a ~6.4s window, which covers a cold decode on Slow 3G
-   with margin. Once soundReady flips and the buffer lands, the
-   stream starts on the next tick.
-
-   The isBlossomInteractive() guard handles two edges:
-     · user leaves the screen before the buffer arrives — polling
-       stops, no stream starts
-     · user swipes up mid-poll to dive the koi — introHasRun flips
-       true, polling stops, no stream starts
-
-   Nothing to tear down: the polling timer is self-terminating on
-   retries-exhausted or on the interactivity guard. */
 function tryStartBlossomStream(retries) {
   if (typeof retries !== 'number') retries = 15;
   if (!SOUND_ENABLED) return;
@@ -941,32 +1050,20 @@ function tryStartBlossomStream(retries) {
   setTimeout(function() { tryStartBlossomStream(retries - 1); }, 400);
 }
 
-/* ============ AMBIENT SOUND ROTATION ============
-   See the AMBIENT_TRACKS block above for the bed design rationale.
-
-   The single source of truth for "should ambient be playing?" is
-   the .active class on #mapleLeaves, shared with the chime and the
-   audio-reactive swell loop. startAmbient() and stopAmbient() are
-   called in lockstep so the three can never get out of sync.
-   startAmbient() also arms the wind chime layer and the swell
-   loop; stopAmbient() tears all three down. */
-
+/* ============ AMBIENT SOUND ROTATION ============ */
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
 
-/* Returns the track entry for the current Nagoya hour:
-     05:00–16:59 → morning
-     17:00–21:59 → earlyevening
-     22:00–04:59 → earlyevening (placeholder)
-   Function declarations hoist, so referencing nagoyaDateParts here
-   — even though it is declared later in the file — is safe at
-   runtime. */
+/* Three-way Nagoya hour dispatch. Function declarations hoist, so
+   referencing nagoyaDateParts here — even though it is declared
+   later in the file — is safe at runtime. */
 function getCurrentAmbientTrack() {
   var p = nagoyaDateParts();
   var h = p.hour;
-  if (h >= 5 && h < 17) return AMBIENT_TRACKS[0];
-  return AMBIENT_TRACKS[1];
+  if (h >= 5 && h < 17)  return AMBIENT_TRACKS[0]; // 05:00–16:59 Morning
+  if (h >= 17 && h < 22) return AMBIENT_TRACKS[1]; // 17:00–21:59 Early evening
+  return AMBIENT_TRACKS[2];                        // 22:00–04:59 Late night
 }
 
 function startAmbient() {
@@ -980,11 +1077,6 @@ function startAmbient() {
   startSwellLoop();
 }
 
-/* Re-arm immediately on the tail of the previous play. There is no
-   silence gap by design: the 4s fade-out at the tail of one pass
-   and the 3s fade-in at the head of the next compose into a
-   continuous 7s crossfade-like transition rather than a hard cut
-   followed by silence followed by a hard attack. */
 function scheduleNextAmbient(prevPlayMs) {
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
@@ -1012,6 +1104,9 @@ function stopAmbient() {
   }
   ambientSource = null;
   ambientGain = null;
+
+  /* Badge revert to standby via the single-authority renderer */
+  _hudRenderState();
 }
 
 function playAmbientSound() {
@@ -1019,25 +1114,21 @@ function playAmbientSound() {
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
 
   var track = getCurrentAmbientTrack();
-  var buffer = soundBuffers[track.name];
+  var buffer = soundBuffers[track.bufferName];
   if (!buffer) return 0;
+
+  /* Synchronise HUD metadata to the currently-selected phase */
+  if (hudTrackTitle)  hudTrackTitle.textContent = track.title;
+  if (hudTrackArtist) hudTrackArtist.textContent = track.artist;
 
   var bufferDur = buffer.duration;
   if (bufferDur <= 0) return 0;
 
-  /* Per-track duration cap. null / absent means "play the full
-     buffer" — Morning uses that. Earlyevening sets 16 * 60 to cut
-     the last minute of the source file: the loop re-arms on the
-     fade-out tail rather than playing through the recording's own
-     baked-in ending. */
   var playDur = bufferDur;
   if (track.maxPlaySec && track.maxPlaySec < bufferDur) {
     playDur = track.maxPlaySec;
   }
 
-  /* Clamp fades so a truncated or very short clip cannot have its
-     head ramp and tail ramp overlap. At playDur 960s / 1020s this
-     clamp is inert — 3s and 4s are both under 0.4% of the window. */
   var maxFade = playDur * 0.10;
   var fadeIn  = Math.min(AMBIENT_FADE_IN,  maxFade);
   var fadeOut = Math.min(AMBIENT_FADE_OUT, maxFade);
@@ -1060,47 +1151,25 @@ function playAmbientSound() {
   ambientSource = src;
   ambientGain = gain;
 
+  /* Badge transitions to 再生中 via the single-authority renderer */
+  _hudRenderState();
+
   src.onended = function() {
     if (ambientSource === src) ambientSource = null;
     if (ambientGain === gain) ambientGain = null;
     try { gain.disconnect(); } catch (e) {}
+    /* Defensive: keep the HUD in sync if the re-arm timing changes */
+    _hudRenderState();
   };
 
   return playDur * 1000;
 }
 
-/* ============ WIND CHIME ROTATION ============
-   Morning-window-only layer sitting on top of the Morning.mp3 bed.
-
-   The envelope and schedule are inherited from the pre-revamp pool
-   system: 12–14s play window at a random offset into the buffer,
-   2s fade-in, 1.5s fade-out, then a 500–2000ms silence measured
-   from the END of the previous play before re-arming. The window
-   and offset are random each cycle so no two chime strikes land
-   at the same point in the source recording.
-
-   The hour check runs at play time, not at schedule time, so a
-   chime that is mid-flight at 17:00 finishes naturally and the
-   next scheduled play sees the closed window and returns early.
-   During off-hours the scheduler drops to a flat 60s poll rather
-   than the regular silence-gap cadence: the chime cannot become
-   audible until 05:00, so there is nothing to gain from waking
-   every ~1.5s, and the heartbeat self-heals on device
-   suspend/resume without needing a page refresh or a multi-hour
-   setTimeout that mobile runtimes clamp or drop entirely.
-
-   Lifecycle: startWindChime() and stopWindChime() are called from
-   startAmbient() and stopAmbient() so all background layers share
-   the same .active gate on #mapleLeaves. */
-
+/* ============ WIND CHIME ROTATION ============ */
 var windChimeTimer = null;
 var windChimeSource = null;
 var windChimeGain = null;
 
-/* Returns true when the current Nagoya hour falls in the morning
-   window 05:00–16:59. Function declarations hoist, so referencing
-   nagoyaDateParts here — even though it is declared later in the
-   file — is safe at runtime. */
 function isMorningWindChimeHours() {
   var p = nagoyaDateParts();
   return (p.hour >= 5 && p.hour < 17);
@@ -1118,14 +1187,6 @@ function startWindChime() {
 function scheduleNextWindChime(prevPlayMs) {
   var delay;
   if (!isMorningWindChimeHours()) {
-    /* Off-hours: the chime cannot become audible until 05:00, so
-       there is no reason to wake on the regular 500–2000ms cadence.
-       A flat 60s poll is enough to resume within a minute of the
-       morning window opening, and drops the overnight wake-up count
-       from ~43,000 to ~720. It also self-heals across device
-       suspend/resume: a pending 60s timer fires on wake, the hour
-       check re-reads the wall clock, and the chime either starts or
-       re-arms 60s later — no page refresh, no state reconstruction. */
     delay = 60000;
   } else {
     var silenceGap = WIND_CHIME_SILENCE_MIN +
@@ -1206,71 +1267,7 @@ function playWindChimeSound() {
 }
 
 /* ============================================================
-   AUDIO-REACTIVE SWELL SYSTEM
-   ------------------------------------------------------------
-   Drives --audio-swell (float 0.00–1.00) on the two background
-   layers, read by main.css to modulate opacity, transform and
-   scale. The analyser sits as a parallel leaf off soundMasterGain
-   (see initSound()); it never reaches the destination, so the
-   audible output is untouched.
-
-   Calibration (locked from the demo sandbox):
-     · Bins 4–33 averaged (30 bins) — captures the melodic and
-       rhythmic fundamentals of the ambient beds. At 44.1kHz with
-       fftSize 512 the bin width is ~86Hz, so this band covers
-       roughly 345Hz–2.84kHz.
-     · Noise floor 80 — rejects quiet passages so the background
-       is not left half-lit during rests.
-     · Gain multiplier 3.5 — amplifies musical accents.
-     · Attack 0.06 — snappy rise on note onsets.
-     · Decay 0.010 — slow, elongated fall so the swell breathes
-       out over several seconds rather than snapping back.
-     · pow(1.35) curve applied after normalisation — biases the
-       response toward the upper end so only genuine peaks reach
-       near 1.0.
-
-   Guardrail: the swell only drives opacity and transform in CSS.
-   No per-frame filter recalculations — Chromium re-rasterizes
-   offscreen framebuffers on masked elements whenever their filter
-   inputs change, and at 60fps that thrashes GPU tile memory.
-
-   Lifecycle: startSwellLoop() and stopSwellLoop() are called from
-   startAmbient() and stopAmbient(). stopSwellLoop() flushes
-   --audio-swell to 0 so the background does not freeze
-   half-inflated if the user returns to the start screen mid-beat.
-
-   Scroll gate: while _scrollActive is true the CSS write is
-   skipped, but the energy envelope keeps updating inside
-   swellTick() so the value does not step-function when scroll
-   ends. See the _scrollActive declaration near the top of the
-   acoustic engine for the full rationale.
-
-   Epsilon deadband: applySwellToCSS() skips the write when the
-   energy envelope has moved less than 0.005 since the last write,
-   except when flushing from a settled non-zero value to exactly 0.
-   The predicate is two clauses, not one, because the two intents
-   are different:
-
-     · `_lastAppliedSwell === val` catches the settled-at-zero case.
-       The fallback branch in swellTick() clamps swellEnergy to
-       exactly 0 when it drops below 0.005, and once the CSS var
-       holds 0 the identity check short-circuits every subsequent
-       write. This is what keeps the app from re-writing 0.000 to
-       the DOM 120 times per second during silence.
-
-     · `val !== 0 && Math.abs(val - _lastAppliedSwell) < 0.005`
-       catches the settled-at-any-other-value case. During typical
-       audio decay the analyser branch asymptotes toward 0 without
-       ever clamping, so the delta check carries the whole load and
-       suppresses writes once the per-frame change drops below
-       perceptibility.
-
-   A single compound predicate — `Math.abs(val - _lastAppliedSwell)
-   < 0.005 && val !== 0` — evaluates to false when both sides equal
-   zero (`0 < 0.005` is true, `0 !== 0` is false), which defeats
-   the guard on every idle frame. The identity clause is what makes
-   the guard work at zero. */
-
+   AUDIO-REACTIVE SWELL SYSTEM */
 function startSwellLoop() {
   if (swellRafId) cancelAnimationFrame(swellRafId);
   swellIsRunning = true;
@@ -1289,9 +1286,6 @@ function stopSwellLoop() {
   }
   _scrollActive = false;
   swellEnergy = 0;
-  /* Reset the deadband state before the flush so the next lifecycle
-     starts clean. -1 is a value outside the [0, 1] range, so the
-     first write of any subsequent run always fires. */
   _lastAppliedSwell = -1;
   applySwellToCSS(0);
 }
@@ -1303,17 +1297,13 @@ function swellTick() {
   }
 
   if (!swellAnalyserNode || !swellFreqData) {
-    /* No audio pipeline yet, or the analyser was never created.
-       Decay toward zero and idle. */
     swellEnergy += (0 - swellEnergy) * 0.05;
     if (swellEnergy < 0.005) swellEnergy = 0;
   } else {
     swellAnalyserNode.getByteFrequencyData(swellFreqData);
 
     var sum = 0;
-    for (var i = 4; i < 34; i++) {
-      sum += swellFreqData[i];
-    }
+    for (var i = 4; i < 34; i++) sum += swellFreqData[i];
     var avg = sum / 30;
 
     var cleanEnergy = Math.max(0, avg - 80);
@@ -1329,6 +1319,9 @@ function swellTick() {
 
   if (!_scrollActive) {
     applySwellToCSS(swellEnergy);
+    if (_hudShouldDraw()) {
+      drawHudSpectrum();
+    }
   }
 
   if (swellIsRunning) {
@@ -1338,30 +1331,11 @@ function swellTick() {
   }
 }
 
-/* Writes --audio-swell on the two background layers. The value
-   cascades to every child via CSS custom-property inheritance, so
-   one write per element is enough. If the Layer 2 element has not
-   been added to the DOM (e.g. index.html not yet updated), the
-   ref will be null and the write is skipped — Layer 1 still gets
-   its swell, and no error is thrown.
-
-   The guard has two clauses; see the block comment above
-   startSwellLoop() for the full rationale on why the predicate
-   cannot be a single compound expression. Briefly:
-
-     _lastAppliedSwell === val        — settles every frame at
-                                        any value, including 0,
-                                        so the silent path stops
-                                        writing after the first
-                                        zero flush
-     val !== 0 && delta < 0.005      — settled-anywhere-else, the
-                                        normal audio decay path
-
-   The val !== 0 clause is deliberately scoped inside the second
-   clause only: if it were lifted to the top level it would force
-   a write on every frame of silence once _lastAppliedSwell
-   reached 0, because `0 !== 0` would evaluate false and the guard
-   would not return. */
+/* Writes --audio-swell on both background layers. The guard has
+   two clauses — an identity check for the settled-zero case and a
+   delta check for everything else — because a single compound
+   predicate cannot express both intents. See the changelog block
+   at the top of the file for the full rationale. */
 function applySwellToCSS(val) {
   if (_lastAppliedSwell === val || (val !== 0 && Math.abs(val - _lastAppliedSwell) < 0.005)) return;
   _lastAppliedSwell = val;
@@ -1505,8 +1479,7 @@ function loadAllPanels() {
 }
 
 /* ============================================================
-   ODOMETER ENGINE
-   ============================================================ */
+   ODOMETER ENGINE */
 var NUM_COLS = 6;
 var COMMA_AFTER = 2;
 var SNAP_WINDOW_MS = 260;
@@ -1611,8 +1584,7 @@ function updateReceiptTotal() {
 }
 
 /* ============================================================
-   COUNTER ODOMETER
-   ============================================================ */
+   COUNTER ODOMETER */
 var COUNTER_COLS = 2;
 
 function counterIsColVisible(value, colIndex) {
@@ -1695,8 +1667,7 @@ function updateReceiptItemCount() {
 }
 
 /* ============================================================
-   RUNTIME DIGIT ADVANCE MEASUREMENT
-   ============================================================ */
+   RUNTIME DIGIT ADVANCE MEASUREMENT */
 function measureDigitAdvance() {
   var titleEl = document.querySelector('.receipt-title');
   if (!titleEl) return null;
@@ -1787,13 +1758,6 @@ var stageWidth = window.innerWidth;
 var refWidth = Math.min(window.innerWidth, 600);
 var rejectScrollTimer = null;
 
-/* v1.3: cached weather/time context for the Panel 0 compound greeting.
-   currentTemp is the rounded Celsius value from the last successful
-   Nagoya fetch, or null if no fetch has yet resolved. currentWeatherBucket
-   is the weatherBucket() string of the last successful fetch, or 'clear'
-   as a neutral seed. greetingFinalized flips to true the moment Panel 0
-   mounts inside triggerKoiStart(), freezing the greeting permanently so
-   late network arrivals cannot mutate the DOM while the therapist reads. */
 var currentTemp = null;
 var currentWeatherBucket = 'clear';
 var greetingFinalized = false;
@@ -1804,24 +1768,13 @@ var introOverlay = document.getElementById('introOverlay');
 var nameColumn = document.getElementById('nameColumn');
 var introHasRun = false;
 
-/* Blossom greeting block (time greeting + name). Populated by
-   updateBlossomGreeting() each time the blossom screen is shown. */
 var blossomGreetingTimeEl = document.getElementById('blossomGreetingTime');
 var blossomGreetingNameEl = document.getElementById('blossomGreetingName');
 
-/* Koi water effect DOM refs */
 var koiDiveWrap = document.getElementById('koiDiveWrap');
 var rippleLayer = document.getElementById('rippleLayer');
 
-/* v1.3: maple leaf overlay. */
 var mapleLeaves = document.getElementById('mapleLeaves');
-
-/* v1.3: audio-reactive swell targets.
-   ambientStage is the Layer 1 diffuse mesh element (existing).
-   stageLattice is the Layer 2 Shippō-masked mirror (new element,
-   added to index.html in the same release). Both receive
-   --audio-swell on every frame of the swell loop; the value
-   cascades to their children via CSS custom-property inheritance. */
 var stageLattice = document.getElementById('stageLattice');
 
 var submitBtn = document.getElementById('submitBtn');
@@ -2164,8 +2117,7 @@ tanzakuScreen.addEventListener('click', function(e) {
 });
 
 /* ============================================================
-   PANEL PHRASE REVEAL
-   ============================================================ */
+   PANEL PHRASE REVEAL */
 var PANEL_PHRASE_MIN = 5;
 var PANEL_PHRASE_MAX = 10;
 var PANEL_PHRASE_RISE = 30;
@@ -2186,8 +2138,7 @@ function escapeHtmlForPhrase(s) {
 }
 
 /* ============================================================
-   CHUNKER
-   ============================================================ */
+   CHUNKER */
 function isJapanesePunctuation(ch) {
   return ch === '、' || ch === '。' || ch === '！' || ch === '？';
 }
@@ -2245,8 +2196,7 @@ function chunkPanelText(text) {
 }
 
 /* ============================================================
-   RECURSIVE TEXT-NODE WALKER
-   ============================================================ */
+   RECURSIVE TEXT-NODE WALKER */
 function shouldSkipTextNode(node) {
   var parent = node.parentNode;
   while (parent && parent.nodeType === 1) {
@@ -2301,12 +2251,7 @@ function wrapPhrasesRecursively(root) {
 }
 
 /* ============================================================
-   PANEL-0 SPECIAL SEQUENCE
-   Two-beat opening: the name greeting arrives first, the fixed
-   初めまして。 line arrives second, then the greeting body (either
-   the compound weather/time text or the offline autumn fallback)
-   reveals phrase by phrase.
-   ============================================================ */
+   PANEL-0 SPECIAL SEQUENCE */
 function buildPanel1OpeningBeats(panelEl) {
   if (!panelEl) return;
   var contentEl = panelEl.querySelector('.panel-content');
@@ -2314,9 +2259,6 @@ function buildPanel1OpeningBeats(panelEl) {
   var body = contentEl.querySelector('#panelGreetingBody');
   if (!body) return;
 
-  /* Strip every sibling before #panelGreetingBody — static markup,
-     previously injected .panel-1-beat elements, and any stray text
-     nodes. Idempotent across calls. */
   var child = contentEl.firstChild;
   while (child && child !== body) {
     var nextChild = child.nextSibling;
@@ -2444,8 +2386,7 @@ function playPanel1SpecialSequence(panelEl) {
 }
 
 /* ============================================================
-   PANEL PHRASE REVEAL (general)
-   ============================================================ */
+   PANEL PHRASE REVEAL (general) */
 function clearPanelPhraseTimers() {
   for (var i = 0; i < panelPhraseTimers.length; i++) clearTimeout(panelPhraseTimers[i]);
   panelPhraseTimers = [];
@@ -2551,7 +2492,6 @@ function relockTable() {
   document.body.classList.add('table-locked');
 }
 
-/* v1.3: return to the blossom start screen. */
 function returnToStartScreen() {
   if (!nameConfirmed) return;
   if (receiptScreen && receiptScreen.classList.contains('visible')) return;
@@ -2562,6 +2502,7 @@ function returnToStartScreen() {
   resetWind();
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
+  if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
   stopAmbient();
 
   koiGestureState = 'idle';
@@ -2635,10 +2576,6 @@ function returnToStartScreen() {
   document.body.classList.remove('warm-background');
 
   if (blossomScreen) blossomScreen.classList.add('visible');
-  /* Refresh the greeting in case the time-of-day bucket has rolled
-     over since the last visit, and restart the stream bed. The
-     retry wrapper handles the case where the buffer was evicted
-     from memory or the AudioContext was suspended. */
   updateBlossomGreeting();
   tryStartBlossomStream();
   scheduleAmbientRipple();
@@ -2757,7 +2694,6 @@ function updateAllRowLocks() {
   for (var i = 0; i < rows.length; i++) updateRowLock(rows[i]);
 }
 
-/* ============ FIX-002 ============ */
 function getCustomRows() {
   var all = tableCard.querySelectorAll('.row');
   var out = [];
@@ -3503,8 +3439,7 @@ function updateRejectThanksContent() {
 }
 
 /* ============================================================
-   TRANSITION-LINE BODY WRAPPER
-   ============================================================ */
+   TRANSITION-LINE BODY WRAPPER */
 function wrapTransitionBody() {
   var bodyEl = document.getElementById('transitionLineBody');
   if (!bodyEl) return;
@@ -3521,29 +3456,7 @@ function wrapTransitionBody() {
 }
 
 /* ============================================================
-   TRANSITION-LINE & TABLE GEOMETRY CACHE
-   ------------------------------------------------------------
-   Document-relative geometry for every element whose viewport
-   position is consulted on the scroll path: the transition line,
-   the table card, the reject row, and the first two table rows.
-   All scroll-time visibility checks are arithmetic against these
-   values and window.scrollY — no getBoundingClientRect() calls
-   run inside the scroll rAF.
-
-   Invalidation surface — every event that can shift any cached
-   element's document offset must call refreshTransitionGeometry():
-     · window.load (boot)
-     · window.resize / orientationchange
-     · document.fonts.ready (font swap can nudge layout)
-     · confirmName() after the dynamic rows are appended
-     · after loadAllPanels() resolves (panel HTML can shift layout
-       above the table)
-
-   getBoundingClientRect().top + scrollY is used rather than
-   offsetTop, because offsetTop is offset-parent relative and only
-   works by accident when the nearest positioned ancestor happens
-   to be <body>. The rect-based formula is correct in all cases
-   and costs nothing extra at cache time. */
+   TRANSITION-LINE & TABLE GEOMETRY CACHE */
 var _tlDocTop = 0, _tlHeight = 0;
 var _tcDocTop = 0, _tcHeight = 0;
 var _rrDocTop = 0, _rrHeight = 0;
@@ -3586,24 +3499,7 @@ function refreshTransitionGeometry() {
 }
 
 /* ============================================================
-   TRANSITION-LINE ACCORDION DRIFT
-   ------------------------------------------------------------
-   Scroll-linked per-item translate() on the divider and each
-   paragraph. All arithmetic — the geometry comes from the cache
-   above, never from a fresh layout read.
-
-   Two guards keep the write count low:
-
-     _tlDriftActive — a latch that fires the transform reset once
-     on zone exit, rather than on every out-of-zone frame.
-
-     item._lastDriftStr — a per-element cache of the last string
-     written. The drift values quantise to two decimal places and
-     at 120Hz consecutive frames frequently produce identical
-     output, so this skips the majority of writes without changing
-     the visual result. The cache is stored on the DOM node, so
-     it is garbage-collected with the node if the paragraph is
-     ever rebuilt — no explicit invalidation is needed. */
+   TRANSITION-LINE ACCORDION DRIFT */
 var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.075,
   MAX_LINE_SPREAD_PX: 38,
@@ -3680,8 +3576,7 @@ function updateTransitionBodyEffects() {
 }
 
 /* ============================================================
-   RECEIPT SCROLL RESET + INDICATOR
-   ============================================================ */
+   RECEIPT SCROLL RESET + INDICATOR */
 var RECEIPT_IND_X = 26;
 var RECEIPT_IND_Y = 10;
 var RECEIPT_IND_SIZE = 34;
@@ -3732,8 +3627,7 @@ function updateReceiptScrollIndicator() {
 }
 
 /* ============================================================
-   KOI WATER EFFECTS
-   ============================================================ */
+   KOI WATER EFFECTS */
 var RIPPLE_COLOURS_STRONG = [
   'rgba(253, 243, 216, 0.95)',
   'rgba(247, 185, 60, 0.85)',
@@ -3867,8 +3761,7 @@ function scheduleAmbientRipple() {
 }
 
 /* ============================================================
-   KOI FLINCH
-   ============================================================ */
+   KOI FLINCH */
 function triggerKoiFlinch() {
   if (!koiDiveWrap) return;
   if (koiFlinchActive) return;
@@ -3989,9 +3882,6 @@ function onKoiPointerUp(e) {
 
 function triggerKoiStart() {
   stopAmbientRipple();
-  /* Fade the flowing-stream bed out as the koi dives. The drop sound
-     plays over the 1.4s tail, which reads as the water giving way to
-     the koi rather than the two effects fighting each other. */
   stopBlossomStream();
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
@@ -4045,18 +3935,18 @@ function triggerKoiStart() {
         track.style.transform = 'translateX(0%)';
         for (var d = 0; d < dots.length; d++) dots[d].classList.toggle('active', d === 0);
 
-        /* Freeze the greeting the moment Panel 0 is about to mount.
-           Any weather fetch resolving before this point upgrades the
-           greeting silently behind the intro overlay; any fetch after
-           is ignored. See updateGreetingPanel() and fetchNagoyaWeather(). */
         greetingFinalized = true;
 
         activatePanel(0);
 
-        /* v1.3: activate the ambient maple leaves and start the
-           ambient sound layers (bed + wind chime + audio-reactive
-           swell). All share the same .active gate on #mapleLeaves. */
+        /* Activate the ambient maple leaves, show the audio HUD, and
+           start the ambient sound layers. All share the same .active
+           gate on #mapleLeaves; the HUD is gated on the same
+           .info-visible class added above but only becomes visible
+           through its own .shown class, added here after the intro
+           overlay has cleared. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
+        if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');
         startAmbient();
 
         koiPushTimer(setTimeout(function() {
@@ -4163,10 +4053,6 @@ function confirmName() {
     });
   }
 
-  /* Table row count just changed — re-measure the geometry cache
-     before the next frame reads it. Ordering matters: this must run
-     after the dynamicRows loop and after wrapTransitionBody(), so
-     the cached offsets reflect the final layout. */
   refreshTransitionGeometry();
 
   nameInput.classList.add('confirmed');
@@ -4175,10 +4061,6 @@ function confirmName() {
     try { nameInput.blur(); } catch (err) {}
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
-    /* Populate the greeting with the just-confirmed name and the
-       current time bucket. tryStartBlossomStream() polls for
-       audio readiness — the stream MP3 may not have finished
-       decoding yet, especially on a cold cache. */
     updateBlossomGreeting();
     tryStartBlossomStream();
     updateAllRowLocks();
@@ -4234,23 +4116,16 @@ window.addEventListener('load', function() {
   loadAllPanels().then(function() {
     repositionHintGroupAfterLayout();
     repositionNumpad();
-    /* Seed the Panel 0 greeting with the offline autumn baseline and
-       prepare it before any network fetch resolves. Panel 0 is skipped
-       in the prep loop that follows — updateGreetingPanel() already
-       called preparePanel() on it. */
     updateGreetingPanel();
     for (var i = 1; i < panels.length; i++) {
       preparePanel(panels[i]);
     }
-    /* Panel HTML has mounted; any layout shift above the transition
-       line has settled. Re-measure the cached geometry. */
     refreshTransitionGeometry();
   });
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(function() {
       repositionHintGroupAfterLayout();
       repositionNumpad();
-      /* Font swap can nudge document offsets by a pixel or two. */
       refreshTransitionGeometry();
     });
   }
@@ -4613,12 +4488,6 @@ confirmYes.addEventListener('click', function(e) {
     infoBar.classList.add('hidden');
     updateNumpadVisibility();
 
-    /* The landing animation is a first-open-only effect. But the item
-       reveal — which is what actually makes the .receipt-item nodes
-       visible from their resting opacity: 0 — must run on every open.
-       Previously receiptHasLanded gated both, so a second visit built
-       the items and never revealed them: names appeared blank while the
-       counter and total (both outside #receiptItems) kept rendering. */
     var willRunLanding = false;
     if (!receiptHasLanded) {
       receiptHasLanded = true;
@@ -5044,30 +4913,7 @@ function evaluateScrollState(scrollY, vh) {
 }
 
 /* ============================================================
-   MERGED SCROLL DISPATCHER
-   ------------------------------------------------------------
-   One rAF per frame drives both the visibility arithmetic and the
-   transition-line drift. The two operations are no longer
-   scheduled on independent rAF queues, so they cannot interleave
-   within a frame in an order that lets one invalidate the other's
-   reads.
-
-   All work in the tick is arithmetic against the geometry cache
-   and the two DOM writes it makes are guarded:
-     · updateTransitionBodyEffects() writes only when the composed
-       transform string changes (per-element _lastDriftStr cache),
-       and resets transforms once on zone exit (_tlDriftActive).
-     · The class toggles in updateSummaryVisibility() and
-       updateIntroHintVisibility() are idempotent — the browser
-       coalesces repeated .classList.add / .remove calls on the
-       same element within a frame.
-
-   scheduleEvaluation() and scheduleTransitionBodyUpdate() remain
-   as named entry points for the non-scroll callers (resize,
-   orientationchange, returnToTable, goToPanel). They funnel into
-   the same dispatcher; the merged tick runs both operations
-   unconditionally, which is correct for every caller because both
-   operations are idempotent. */
+   MERGED SCROLL DISPATCHER */
 var scrollRafPending = false;
 
 function scheduleScrollTick() {
@@ -5310,54 +5156,28 @@ function updateInfoDateTime() {
 }
 
 /* ============================================================
-   DYNAMIC GREETING (Panel 0)
-   ------------------------------------------------------------
-   getGreetingTier() walks the priority ladder and returns a tier
-   identifier ('A1', 'B2', etc.). GREETING_TABLE maps each tier to
-   its greeting text and a burden flag.
-
-   Editorial Principle (Environmental Imposition):
-   A tier is marked `burden: true` when the outside environment
-   imposed a meaningful tax on the therapist (chill, heat, rain,
-   or the cognitive vigilance of poor visibility) before crossing
-   the threshold.
-     - burden === true  → 「どうぞご無理なさらず、おくつろぎください。」
-     - burden === false → 「どうぞ肩の力を抜いて、おくつろぎください。」
-
-   Design note on phrasing: the variations across branches
-   (朝早くから, 夜遅いお時間にもかかわらず, 無事に, 足元の悪い中,
-   肌寒い中) are deliberate. Do not normalise them to a single
-   template — the variation is what makes the screen read as
-   having noticed the circumstances rather than retrieved a
-   category. B4 (fog) intentionally omits お部屋まで: because fog
-   dissolves routes and visual anchors, safe transit through poor
-   visibility is the defining event, not the room destination. */
+   DYNAMIC GREETING (Panel 0) */
 var GREETING_TABLE = {
-  // A. Compound Hardships (Adverse Weather + Time of Day)
   A1: { text: '雪の降る中、夜遅いお時間に、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
   A2: { text: '雨で足元の悪い中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
   A3: { text: '冷え込みの厳しい中、夜遅いお時間にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
   A4: { text: '雨の中、朝早くからお部屋までお越しいただき、誠にありがとうございます。', burden: true },
   A5: { text: '朝の冷え込みが厳しい中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
 
-  // B. Single Adverse Weather
   B1: { text: 'あいにくのお天気の中、無事にお部屋までお越しいただき、誠にありがとうございます。', burden: true },
   B2: { text: '雨で足元の悪い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
   B3: { text: '雪の降る寒い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
-  B4: { text: '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。', burden: true }, // Destination omitted intentionally
+  B4: { text: '霧で視界の悪い中、無事にお越しいただき、誠にありがとうございます。', burden: true },
 
-  // C. Temperature Extremes
   C1: { text: '冷え込みの厳しい中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
   C2: { text: '肌寒い中、お部屋までお越しいただき、ありがとうございます。', burden: false },
   C3: { text: '暑い中、お部屋までお越しいただき、誠にありがとうございます。', burden: true },
 
-  // D. Single Time of Day (Mild conditions: 15°C - 27°C)
   D1: { text: '夜遅いお時間にもかかわらず、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
   D2: { text: '朝早くからお部屋までお越しいただき、誠にありがとうございます。', burden: false },
   D3: { text: '夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
   D4: { text: '穏やかなお天気の中、お部屋までお越しいただき、誠にありがとうございます。', burden: false },
 
-  // E. Offline / Loading Fallback
   E1: { text: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。', burden: false }
 };
 
@@ -5371,25 +5191,21 @@ function getGreetingTier() {
   var isNight = (time === 'night');
   var isMorning = (time === 'morning');
 
-  // A. Compound
   if (weather === 'snow' && isNight) return 'A1';
   if (isRain && isNight) return 'A2';
   if (isCold && isNight) return 'A3';
   if (isRain && isMorning) return 'A4';
   if (isCold && isMorning) return 'A5';
 
-  // B. Single Adverse Weather
   if (weather === 'thunderstorm') return 'B1';
   if (isRain) return 'B2';
   if (weather === 'snow') return 'B3';
   if (weather === 'fog') return 'B4';
 
-  // C. Single Temperature Extremes
   if (isCold) return 'C1';
   if (temp !== null && temp <= 14) return 'C2';
   if (temp !== null && temp >= 28) return 'C3';
 
-  // D. Single Time of Day (gated to valid temp reading)
   if (temp !== null) {
     if (isNight) return 'D1';
     if (isMorning) return 'D2';
@@ -5397,7 +5213,6 @@ function getGreetingTier() {
     if (time === 'day') return 'D4';
   }
 
-  // E. Fallback
   return 'E1';
 }
 
@@ -5421,18 +5236,6 @@ function updateGreetingPanel() {
   if (p0) preparePanel(p0);
 }
 
-/* ============ BLOSSOM TIME GREETING ============
-   Two stacked lines on the koi screen: the time greeting in Shippori
-   Mincho, the therapist's name below it in Yuji Syuku.
-
-     morning (05–10)  → おはようございます
-     day     (11–16)  → こんにちは
-     evening / night  → こんばんは
-
-   Night folds into evening here because the Panel 0 hardship line
-   already carries 夜遅い; a greeting that also acknowledged the hour
-   would stammer against it. Uses the Nagoya clock rather than the
-   device clock so the greeting agrees with the info bar. */
 function getTimeGreeting() {
   var t = getTimeOfDayInNagoya();
   if (t === 'morning') return 'おはようございます';
@@ -5465,10 +5268,6 @@ function fetchNagoyaWeather() {
       infoWeather.textContent = weatherEmoji(currentWeatherBucket);
       document.documentElement.setAttribute('data-weather', currentWeatherBucket);
     }
-    /* Only regenerate the greeting body while it is still unfrozen.
-       Once Panel 0 has mounted, further polls update the info bar
-       and cache only — the welcome is a snapshot of arrival
-       conditions. */
     if (!greetingFinalized) {
       updateGreetingPanel();
     }
