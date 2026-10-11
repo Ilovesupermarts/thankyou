@@ -1454,6 +1454,197 @@
   .submit-btn .btn-arrow { display: inline-block; font-weight: 700; transform: translateX(0); transition: transform 0.25s ease; }
   .submit-btn:not(:disabled):hover .btn-arrow, .submit-btn:not(:disabled):active .btn-arrow { transform: translateX(3px); }
 
+  /* ============================================================
+     AUDIO SPECTRUM & METADATA HUD
+     ------------------------------------------------------------
+     Persistent bottom-left card surfacing the currently-playing
+     ambient bed: track title, artist, a live waterline-mirror
+     spectrum, and a loading gauge covering both stream transfer
+     and PCM decompression.
+
+     Visibility is governed by two gates that must stay in sync:
+       · CSS — body.info-visible:not(.thankyou-active):not(.receipt-locked)
+       · JS  — _hudShouldDraw() in app.js, which mirrors the same
+                body-class conditions and additionally checks for
+                the .shown class on the HUD element itself.
+
+     The JS mirror exists to skip 120Hz canvas rasterization whenever
+     the CSS rule hides the HUD. Adding or removing a body class from
+     the visibility rule requires editing both sides.
+
+     All canvas animation is gated on `_scrollActive` inside
+     swellTick(), the same gate that suppresses the swell CSS write,
+     so the HUD never competes with gesture dispatch during scroll.
+
+     Layout is a flex column with three stacked rows:
+       meta-row       — title · artist · status badge
+       visualizer     — 282×26 micro-canvas at 2× DPR
+       gauge          — 2px fill bar + byte/pct label row
+
+     Font stack matches .panel-content so the HUD reads as part of
+     the same typographic family as the carousel. */
+  .audio-spectrum-hud {
+    position: fixed;
+    left: calc(26px + env(safe-area-inset-left, 0px));
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    width: 318px;
+    padding: 9px 18px 7px 18px;
+    border-radius: 15px;
+    background: rgba(253, 243, 216, 0.78);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(216, 180, 120, 0.45);
+    box-shadow:
+      0 5px 20px rgba(120, 70, 20, 0.08),
+      0 1px 3px rgba(120, 70, 20, 0.05);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+
+  body.info-visible:not(.thankyou-active):not(.receipt-locked) .audio-spectrum-hud.shown {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  html[data-theme="default"] .audio-spectrum-hud {
+    background: rgba(255, 255, 255, 0.80);
+    border-color: rgba(234, 217, 213, 0.6);
+    box-shadow: 0 5px 20px rgba(120, 90, 90, 0.07);
+  }
+
+  .hud-meta-row {
+    display: flex;
+    align-items: baseline;
+    gap: 7px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    line-height: 1.15;
+    margin-bottom: 4px;
+    white-space: nowrap;
+  }
+
+  .hud-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+  }
+
+  .hud-sep {
+    font-size: 11px;
+    color: var(--text-placeholder);
+  }
+
+  .hud-artist {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 1px;
+  }
+
+  /* Specific-property transition avoids clashing with the statusPulse
+     opacity keyframe on .decoding. */
+  .hud-status-badge {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(201, 96, 10, 0.12);
+    color: var(--accent);
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+  .hud-status-badge.loading {
+    background: rgba(247, 185, 60, 0.25);
+    color: #8f3f12;
+  }
+  .hud-status-badge.decoding {
+    background: rgba(247, 185, 60, 0.40);
+    color: #7a3208;
+    animation: statusPulse 1.2s ease-in-out infinite;
+  }
+  .hud-status-badge.ready {
+    background: rgba(42, 63, 26, 0.14);
+    color: #2a3f1a;
+  }
+
+  @keyframes statusPulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+  }
+
+  .hud-visualizer-block {
+    width: 100%;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 2px;
+  }
+
+  .hud-canvas {
+    width: 100%;
+    height: 26px;
+    display: block;
+  }
+
+  .hud-gauge-block {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 100%;
+    padding-top: 0;
+  }
+
+  .hud-gauge-bar {
+    width: 100%;
+    height: 2px;
+    background: rgba(216, 180, 120, 0.28);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .hud-gauge-fill {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.15s cubic-bezier(0.2, 0, 0.3, 1), background-color 0.3s ease;
+  }
+  .hud-gauge-fill.decoding {
+    background: #f7b93c;
+    animation: gaugeGlow 1s ease-in-out infinite alternate;
+  }
+  .hud-gauge-fill.ready {
+    background: rgba(42, 63, 26, 0.65);
+  }
+
+  @keyframes gaugeGlow {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+  }
+
+  .hud-gauge-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--text-placeholder);
+    letter-spacing: 0.5px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    line-height: 1;
+  }
+
+  @media (max-height: 600px) and (orientation: landscape) {
+    .audio-spectrum-hud { display: none; }
+  }
+
   /* ============ CONFIRM DIALOG ============ */
   .confirm-screen {
     position: fixed; top: 0; left: 0; right: 0; bottom: 0;
