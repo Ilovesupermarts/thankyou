@@ -1,273 +1,322 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn">
+<html lang="ja" data-theme="autumn" data-time="evening">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Dual-Layer Audio Reactive Swell Lab</title>
+<meta name="theme-color" content="#faf7f5">
+<title>音響スペクトラム &amp; ローディング検証</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+
 <link rel="stylesheet" href="main.css">
 
 <style>
-  body {
-    overflow: hidden;
-    height: 100vh;
+  /* ============================================================
+     DEMO HARNESS & SPECTRUM HUD STYLES
+     ============================================================ */
+  
+  /* Stage positioning sample */
+  .demo-viewport {
+    position: relative;
     width: 100vw;
-    margin: 0;
-    padding: 0;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .demo-sample-view {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 0.5s ease;
+    padding: 24px;
+  }
+  .demo-sample-view.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* Sample Panel 0 content mirroring screenshot */
+  .sample-panel-content {
+    max-width: 520px;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: #160a02;
+    line-height: 2.25;
+    letter-spacing: 0.8px;
+    text-shadow:
+      0 0 6px var(--bg-base),
+      0 0 14px rgba(253, 243, 216, 0.85),
+      0 0 28px rgba(253, 243, 216, 0.40);
+  }
+  .sample-panel-content .therapist-name {
+    font-family: "Yuji Syuku", serif;
+    color: var(--outstanding);
+    font-size: 1.18em;
+  }
+
+  /* Sample Table Card view */
+  .sample-table-card {
+    max-width: 480px;
+    width: 100%;
+    margin-top: 20px;
+  }
+
+  /* ------------------------------------------------------------
+     AUDIO SPECTRUM & METADATA HUD (Bottom-Left Widget)
+     ------------------------------------------------------------ */
+  .audio-spectrum-hud {
+    position: fixed;
+    left: calc(24px + env(safe-area-inset-left, 0px));
+    bottom: calc(26px + env(safe-area-inset-bottom, 0px));
+    z-index: 90;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    pointer-events: auto;
     user-select: none;
     -webkit-user-select: none;
-    background-color: var(--bg-base);
-    transition: background-color 200ms ease;
+    padding: 10px 14px;
+    border-radius: 14px;
+    background: rgba(253, 243, 216, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(216, 180, 120, 0.35);
+    box-shadow: 0 4px 16px rgba(120, 70, 20, 0.08);
+    transition: opacity 0.4s ease, transform 0.4s ease, background 0.4s ease;
+    max-width: 260px;
   }
 
-  /* ------------------------------------------------------------
-     LAYER 1: Diffuse Base Mesh
-     ------------------------------------------------------------ */
-  .layer-diffuse {
-    filter: brightness(calc(1 + var(--audio-swell, 0) * var(--ctrl-bright-boost, 0.22)))
-            saturate(calc(1 + var(--audio-swell, 0) * var(--ctrl-sat-boost, 0.20)));
-    will-change: transform, filter;
+  html[data-theme="default"] .audio-spectrum-hud {
+    background: rgba(255, 255, 255, 0.65);
+    border-color: rgba(234, 217, 213, 0.5);
+    box-shadow: 0 4px 16px rgba(120, 90, 90, 0.06);
   }
 
-  .layer-diffuse .ambient-mesh {
-    opacity: calc(var(--ctrl-mesh-base, 0.55) + var(--audio-swell, 0) * var(--ctrl-mesh-swell, 0.45)) !important;
-    transition: opacity 100ms ease-out;
-  }
-
-  .layer-diffuse .orb-1 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-orb-scale, 0.28))) !important;
-    transition: transform 120ms ease-out;
-  }
-  .layer-diffuse .orb-2 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 1.15))) !important;
-    transition: transform 120ms ease-out;
-  }
-  .layer-diffuse .orb-3 {
-    transform: scale(calc(1 + var(--audio-swell, 0) * (var(--ctrl-orb-scale, 0.28) * 0.90))) !important;
-    transition: transform 120ms ease-out;
-  }
-
-  /* ------------------------------------------------------------
-     LAYER 2: Masked Spotlights
-     ------------------------------------------------------------ */
-  .shippo-mask-window {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
-    overflow: hidden;
-
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    -webkit-mask-repeat: repeat;
-    -webkit-mask-size: 60px 60px;
-    -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    mask-repeat: repeat;
-    mask-size: 60px 60px;
-    mask-position: 0 0;
-
-    opacity: calc(var(--ctrl-lattice-base, 0.40) + var(--audio-swell, 0) * var(--ctrl-lattice-swell, 0.60));
-    filter: hue-rotate(var(--ctrl-lattice-hue, 0deg))
-            brightness(calc(1.0 + var(--audio-swell, 0) * var(--ctrl-lattice-glow, 0.25)))
-            saturate(calc(var(--ctrl-lattice-sat, 1.0) + var(--audio-swell, 0) * 0.15))
-            contrast(var(--ctrl-lattice-contrast, 1.05));
-    transition: opacity 100ms ease-out;
-  }
-
-  .shippo-mask-window .ambient-stage.layer-mirrored {
-    position: absolute;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
-    transform-origin: 50% 50%;
-    transform: scaleX(-1);
-    pointer-events: none;
-  }
-
-  .shippo-mask-window .ambient-mesh {
-    opacity: 1.0 !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * var(--ctrl-lattice-scale, 0.18)));
-    transform-origin: 50% 50%;
-    transition: transform 120ms ease-out;
-  }
-
-  .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(235, 110, 30, 0.95) 0%, rgba(200, 75, 20, 0.45) 45%, transparent 70%) !important;
-  }
-  .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(245, 125, 35, 0.98) 0%, rgba(210, 85, 22, 0.50) 48%, transparent 72%) !important;
-  }
-  .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(225, 100, 25, 0.90) 0%, rgba(190, 65, 18, 0.40) 40%, transparent 62%) !important;
-  }
-
-  .shippo-mask-window.disabled {
-    display: none !important;
-  }
-
-  /* ------------------------------------------------------------
-     HUD Control Panel
-     ------------------------------------------------------------ */
-  .hud-container {
-    position: fixed;
-    top: 16px;
-    right: 16px;
-    width: 340px;
-    max-height: calc(100vh - 32px);
-    overflow-y: auto;
-    background: rgba(253, 243, 216, 0.92);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
-    border: 1.5px solid rgba(143, 47, 0, 0.32);
-    border-radius: 20px;
-    box-shadow: 0 14px 40px rgba(100, 35, 10, 0.22);
-    padding: 16px 20px;
-    z-index: 1000;
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    color: #231304;
-    box-sizing: border-box;
-  }
-
-  .hud-header {
+  .hud-meta-row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-    border-bottom: 1px solid rgba(143, 47, 0, 0.18);
-    padding-bottom: 8px;
+    align-items: baseline;
+    gap: 6px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .hud-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: #8f2f00;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1.5px;
+  }
+
+  .hud-sep {
+    font-size: 11px;
+    color: var(--text-placeholder);
+  }
+
+  .hud-artist {
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--text-mute);
     letter-spacing: 0.8px;
-    margin: 0;
   }
 
-  .hud-section-divider {
-    font-size: 10.5px;
-    font-weight: 700;
-    color: #8f2f00;
-    text-transform: uppercase;
-    letter-spacing: 1.2px;
-    margin: 14px 0 8px 0;
-    padding-bottom: 4px;
-    border-bottom: 1px dashed rgba(143, 47, 0, 0.25);
+  .hud-status-badge {
+    margin-left: auto;
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(201, 96, 10, 0.12);
+    color: var(--accent);
+    transition: all 0.3s ease;
+  }
+  .hud-status-badge.loading {
+    background: rgba(247, 185, 60, 0.22);
+    color: #8f3f12;
+  }
+  .hud-status-badge.decoding {
+    background: rgba(247, 185, 60, 0.35);
+    color: #7a3208;
+    animation: statusPulse 1.2s ease-in-out infinite;
+  }
+  .hud-status-badge.ready {
+    background: rgba(42, 63, 26, 0.12);
+    color: #2a3f1a;
   }
 
-  .hud-group {
-    margin-bottom: 10px;
+  @keyframes statusPulse {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
   }
 
-  .hud-label {
+  .hud-visualizer-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 20px;
+  }
+
+  .hud-canvas {
+    width: 68px;
+    height: 18px;
+    flex-shrink: 0;
+    display: block;
+  }
+
+  /* Progress Gauge */
+  .hud-gauge-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 2px;
+    min-width: 80px;
+  }
+
+  .hud-gauge-bar {
+    width: 100%;
+    height: 2px;
+    background: rgba(216, 180, 120, 0.25);
+    border-radius: 2px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .hud-gauge-fill {
+    width: 0%;
+    height: 100%;
+    background: var(--accent);
+    border-radius: 2px;
+    transition: width 0.15s cubic-bezier(0.2, 0, 0.3, 1), background-color 0.3s ease;
+  }
+  .hud-gauge-fill.decoding {
+    background: #f7b93c;
+    animation: gaugeGlow 1s ease-in-out infinite alternate;
+  }
+  .hud-gauge-fill.ready {
+    background: rgba(42, 63, 26, 0.6);
+  }
+
+  @keyframes gaugeGlow {
+    from { opacity: 0.7; }
+    to { opacity: 1; }
+  }
+
+  .hud-gauge-label {
     display: flex;
     justify-content: space-between;
+    font-size: 8.5px;
+    color: var(--text-placeholder);
+    letter-spacing: 0.5px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  /* ------------------------------------------------------------
+     FLOATING DEMO CONTROL DOCK (Top-Right Inspector)
+     ------------------------------------------------------------ */
+  .demo-dock {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 500;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    padding: 14px 18px;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-size: 13px;
+    color: var(--text-dark);
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .demo-dock-title {
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--accent);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-3);
+    padding-bottom: 6px;
+  }
+
+  .demo-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .demo-label {
     font-size: 11px;
     font-weight: 600;
-    color: #5a3818;
-    margin-bottom: 3px;
+    color: var(--text-mute);
+    letter-spacing: 1px;
+    text-transform: uppercase;
   }
 
-  .hud-val {
-    color: #8f2f00;
-    font-weight: 700;
+  .demo-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
   }
 
-  .hud-slider {
-    width: 100%;
-    margin: 0;
-    accent-color: #c9600a;
-    cursor: pointer;
-  }
-
-  .vu-meter-wrap {
-    height: 8px;
-    background: rgba(143, 47, 0, 0.12);
-    border-radius: 4px;
-    overflow: hidden;
-    margin-top: 4px;
-  }
-
-  .vu-meter-bar {
-    height: 100%;
-    width: 0%;
-    background: linear-gradient(90deg, #e59b24, #c9600a, #8f2229);
-    border-radius: 4px;
-    transition: width 50ms linear;
-  }
-
-  .hud-btn-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
-  }
-
-  .hud-btn {
-    background: #c9600a;
-    border: none;
-    color: #fff;
-    padding: 9px 10px;
-    font-size: 11.5px;
-    font-weight: 600;
+  .demo-btn {
+    background: var(--soft-1);
+    border: 1px solid var(--border-1);
+    color: var(--text-dark);
     border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.15s, transform 0.1s;
-    text-align: center;
-  }
-
-  .hud-btn:active {
-    transform: scale(0.97);
-    background: #8f2f00;
-  }
-
-  .hud-btn.secondary {
-    background: rgba(255, 255, 255, 0.85);
-    color: #8f2f00;
-    border: 1px solid rgba(143, 47, 0, 0.25);
-  }
-
-  .hud-btn.toggle-active {
-    background: #8f2f00;
-    color: #fff;
-  }
-
-  .hud-copy-btn {
-    width: 100%;
-    background: #8f2f00;
-    color: #fff;
-    padding: 10px;
-    border: none;
-    border-radius: 10px;
+    padding: 5px 9px;
     font-size: 11.5px;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-    margin-top: 12px;
+    transition: all 0.2s ease;
+  }
+  .demo-btn:hover {
+    background: #ffffff;
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .demo-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #ffffff;
+    font-weight: 600;
   }
 
-  .center-label {
-    position: absolute;
-    top: 50%;
-    left: 45%;
-    transform: translate(-50%, -50%);
-    font-family: "Shippori Mincho", serif;
-    font-size: 26px;
-    color: #8f2f00;
-    letter-spacing: 8px;
-    pointer-events: none;
-    text-align: center;
-    opacity: 0.85;
-    text-shadow: 0 2px 14px rgba(253, 243, 216, 0.95);
+  .demo-btn.action {
+    background: #2a3f1a;
+    color: #fff;
+    border-color: #2a3f1a;
+  }
+
+  .demo-hint-box {
+    font-size: 11px;
+    color: var(--text-mute);
+    line-height: 1.4;
+    background: var(--soft-3);
+    padding: 6px 10px;
+    border-radius: 6px;
+    border-left: 3px solid var(--accent);
   }
 </style>
 </head>
 <body>
 
-<!-- LAYER 1: Standard diffuse light mesh -->
-<div class="ambient-stage layer-diffuse" id="stageDiffuse" aria-hidden="true">
+<!-- Ambient Stage & Shippō Pattern (identical to index.html) -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
@@ -276,518 +325,650 @@
   <div class="ambient-layer ambient-primary"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
+<div class="ambient-mosaic" aria-hidden="true"></div>
 
-<!-- LAYER 2: Moving orbs ONLY -->
-<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
-  <div class="ambient-stage layer-mirrored">
-    <div class="ambient-layer ambient-mesh">
-      <div class="light-orb orb-1"></div>
-      <div class="light-orb orb-2"></div>
-      <div class="light-orb orb-3"></div>
+<!-- Top Info Bar Header -->
+<div class="info-bar shown" id="infoBar">
+  <div class="info-inner">
+    <div class="info-line">
+      <span class="city">名古屋市</span>
+      <span class="sep">·</span>
+      <span class="date">10月11日(日)</span>
+      <span class="sep">·</span>
+      <span class="time">19時05分</span>
+      <span class="sep">·</span>
+      <span class="temp">23°</span>
+      <span class="sep">·</span>
+      <span class="weather">☀</span>
     </div>
   </div>
 </div>
 
-<!-- Static base lattice -->
-<div class="ambient-mosaic" id="stageMosaic" aria-hidden="true"></div>
+<!-- ============================================================
+     VIEWPORT SAMPLES
+     ============================================================ -->
+<div class="demo-viewport">
 
-<!-- Ambient Falling Maple Leaves -->
-<div class="maple-leaves-overlay active" id="mapleLeaves" aria-hidden="true">
-  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-4" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-5" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
-  <svg class="maple-leaf leaf-7" viewBox="0 0 900 1000"><path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/></svg>
+  <!-- Sample View 1: Welcome Greeting (Panel 0) -->
+  <div class="demo-sample-view" id="sampleViewGreeting">
+    <div class="sample-panel-content">
+      <span class="therapist-name">桜庭さん</span>、初めまして。<br>
+      夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。<br><br>
+      どうぞ肩の力を抜いて、おくつろぎください。
+    </div>
+  </div>
+
+  <!-- Sample View 2: Service Table Card -->
+  <div class="demo-sample-view hidden" id="sampleViewTable">
+    <div class="table-card active sample-table-card">
+      <div class="privacy-note-inline">
+        <p>表に表示されている料金は、必要に応じて変更していただいても構いません。</p>
+      </div>
+      <div class="row filled">
+        <div class="row-check checked"></div>
+        <span class="service-display">アロマオイル追加</span>
+        <div class="price-wrap">
+          <input type="text" class="price-input" value="3,000" readonly>
+          <span class="yen">円</span>
+        </div>
+      </div>
+      <div class="row">
+        <div class="row-check"></div>
+        <span class="service-display">延長マッサージ（30分）</span>
+        <div class="price-wrap">
+          <input type="text" class="price-input" placeholder="料金" readonly>
+          <span class="yen">円</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
-<div class="center-label">双層・七宝調律室</div>
-
-<!-- Floating HUD -->
-<div class="hud-container">
-  <div class="hud-header">
-    <h3 class="hud-title">Dual Swell Tuner</h3>
-    <span id="statusIndicator" style="font-size: 11px; font-weight: 700; color: #8f2f00;">PAUSED</span>
-  </div>
-
-  <div class="hud-btn-row">
-    <button class="hud-btn" id="btnPlayPause">Play Music</button>
-    <button class="hud-btn secondary" id="btnToggleTrack">Morning.mp3</button>
-  </div>
-
-  <div class="hud-btn-row">
-    <button class="hud-btn secondary toggle-active" id="btnToggleLattice">Layer 2: On</button>
-    <button class="hud-btn secondary" id="btnSoloLattice">Solo Layer 2</button>
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Audio Swell Energy</span>
-      <span class="hud-val" id="valSwellEnergy">0.00</span>
-    </div>
-    <div class="vu-meter-wrap">
-      <div class="vu-meter-bar" id="vuMeterBar"></div>
-    </div>
-  </div>
-
-  <!-- Inspection Slider: Freeze/Force Swell at any value -->
-  <div class="hud-group" style="margin-top: 10px;">
-    <div class="hud-label">
-      <span>Freeze / Force Swell Test</span>
-      <span class="hud-val" id="valManualSwell">OFF</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderManualSwell" min="-0.01" max="1.0" step="0.01" value="-0.01">
-  </div>
-
-  <!-- Layer 2 Geometry & Mask Controls -->
-  <div class="hud-section-divider">Layer 2: Mask Geometry</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Mask Stroke Width</span>
-      <span class="hud-val" id="valStrokeWidth">1.2px</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderStrokeWidth" min="0.6" max="3.0" step="0.1" value="1.2">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Lattice Base Opacity</span>
-      <span class="hud-val" id="valLatticeBase">0.40</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeBase" min="0.00" max="0.80" step="0.05" value="0.40">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Lattice Swell Amplitude</span>
-      <span class="hud-val" id="valLatticeSwell">0.60</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeSwell" min="0.10" max="1.00" step="0.05" value="0.60">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Layer 2 Mesh Swell Scale</span>
-      <span class="hud-val" id="valLatticeScale">+18%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeScale" min="0.00" max="0.50" step="0.02" value="0.18">
-  </div>
-
-  <!-- Layer 2 Color Lab -->
-  <div class="hud-section-divider">Layer 2: Color & Tone Lab</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Hue Shift (Red &harr; Gold)</span>
-      <span class="hud-val" id="valLatticeHue">0&deg;</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeHue" min="-60" max="40" step="2" value="0">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Swell Glow Boost</span>
-      <span class="hud-val" id="valLatticeGlow">+25%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeGlow" min="0.00" max="0.80" step="0.05" value="0.25">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Base Saturation</span>
-      <span class="hud-val" id="valLatticeSat">1.00x</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeSat" min="0.50" max="1.80" step="0.05" value="1.00">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Line Contrast</span>
-      <span class="hud-val" id="valLatticeContrast">1.05x</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderLatticeContrast" min="0.80" max="1.60" step="0.05" value="1.05">
-  </div>
-
-  <!-- Layer 1 Diffuse Mesh Controls -->
-  <div class="hud-section-divider">Layer 1: Diffuse Base Mesh</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Orb Scale Expansion</span>
-      <span class="hud-val" id="valOrbScale">+28%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderOrbScale" min="0.05" max="0.60" step="0.01" value="0.28">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Mesh Base Opacity</span>
-      <span class="hud-val" id="valMeshBase">0.55</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderMeshBase" min="0.20" max="0.80" step="0.05" value="0.55">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Stage Brightness Lift</span>
-      <span class="hud-val" id="valBrightBoost">+22%</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderBrightBoost" min="0.05" max="0.50" step="0.05" value="0.22">
-  </div>
-
-  <!-- Audio Envelope Engine Controls -->
-  <div class="hud-section-divider">Audio Envelope Engine</div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Sensitivity Multiplier</span>
-      <span class="hud-val" id="valGainMult">1.6x</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderGainMult" min="0.5" max="3.5" step="0.1" value="1.6">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Noise Floor Gate</span>
-      <span class="hud-val" id="valNoiseFloor">35</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderNoiseFloor" min="10" max="80" step="1" value="35">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Attack Speed (Inhale)</span>
-      <span class="hud-val" id="valAttack">0.14</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderAttack" min="0.04" max="0.35" step="0.01" value="0.14">
-  </div>
-
-  <div class="hud-group">
-    <div class="hud-label">
-      <span>Decay Speed (Exhale)</span>
-      <span class="hud-val" id="valDecay">0.035</span>
-    </div>
-    <input type="range" class="hud-slider" id="sliderDecay" min="0.005" max="0.10" step="0.005" value="0.035">
-  </div>
-
-  <button class="hud-copy-btn" id="btnCopyConfig">Copy Tuned Configuration</button>
+<!-- Center Carousel Dot Staging (aesthetic balance matching production) -->
+<div class="action-hint global-hint shown" style="position:fixed; bottom: 84px; left:0; right:0;">
+  <span class="hint-layer active">
+    <span>スワイプ</span>
+    <span class="hint-arrow right">→</span>
+  </span>
+</div>
+<div class="dots visible" style="position:fixed; bottom: 54px; left:0; right:0;">
+  <div class="dot active"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
+  <div class="dot"></div>
 </div>
 
+<!-- ============================================================
+     AUDIO SPECTRUM & METADATA HUD (Target Widget in Red Box)
+     ============================================================ -->
+<div class="audio-spectrum-hud" id="audioSpectrumHud">
+  <div class="hud-meta-row">
+    <span class="hud-title" id="hudTrackTitle">朝の静寂</span>
+    <span class="hud-sep">·</span>
+    <span class="hud-artist" id="hudTrackArtist">雅音舎</span>
+    <span class="hud-status-badge ready" id="hudStatusBadge">再生中</span>
+  </div>
+
+  <div class="hud-visualizer-row">
+    <!-- Fast 60/120Hz 2D Canvas Visualizer -->
+    <canvas class="hud-canvas" id="hudCanvas" width="136" height="36"></canvas>
+
+    <!-- Byte / Decoding Progress Gauge -->
+    <div class="hud-gauge-wrap">
+      <div class="hud-gauge-bar">
+        <div class="hud-gauge-fill ready" id="hudGaugeFill" style="width: 100%;"></div>
+      </div>
+      <div class="hud-gauge-label">
+        <span id="hudByteStatus">15.8 MB / 15.8 MB</span>
+        <span id="hudPctStatus">準備完了</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     INTERACTIVE TEST DOCK / CONTROLLER
+     ============================================================ -->
+<div class="demo-dock" id="demoDock">
+  <div class="demo-dock-title">
+    <span>スペクトラム検証ドック</span>
+    <button type="button" class="demo-btn" id="btnToggleTheme" style="padding:2px 6px;">🍁/🌸</button>
+  </div>
+
+  <!-- Style Selector -->
+  <div class="demo-group">
+    <div class="demo-label">描画スタイル (5種類)</div>
+    <div class="demo-buttons">
+      <button type="button" class="demo-btn active" data-style="bars">1. 細線バー</button>
+      <button type="button" class="demo-btn" data-style="wave">2. 墨流し波形</button>
+      <button type="button" class="demo-btn" data-style="ripples">3. 水面波紋</button>
+      <button type="button" class="demo-btn" data-style="mirror">4. 水鏡の対</button>
+      <button type="button" class="demo-btn" data-style="dots">5. 枯山水点描</button>
+    </div>
+  </div>
+
+  <!-- Audio Generation / Input -->
+  <div class="demo-group">
+    <div class="demo-label">音源 &amp; 再生</div>
+    <div class="demo-buttons">
+      <button type="button" class="demo-btn action" id="btnToggleAudio">▶ 音声を再生 (Synth)</button>
+      <button type="button" class="demo-btn" id="btnLoadRealMp3">実ファイル読込 (Morning.mp3)</button>
+    </div>
+  </div>
+
+  <!-- Progress Bar Simulation -->
+  <div class="demo-group">
+    <div class="demo-label">ローディング状態シミュレート</div>
+    <div class="demo-buttons">
+      <button type="button" class="demo-btn" data-sim="0">0%</button>
+      <button type="button" class="demo-btn" data-sim="45">45% DL</button>
+      <button type="button" class="demo-btn" data-sim="100">100% DL</button>
+      <button type="button" class="demo-btn" data-sim="decode">デコード中</button>
+      <button type="button" class="demo-btn" data-sim="ready">完了 (Ready)</button>
+    </div>
+  </div>
+
+  <!-- Background Surface Toggle -->
+  <div class="demo-group">
+    <div class="demo-label">背景サンプルの切替</div>
+    <div class="demo-buttons">
+      <button type="button" class="demo-btn active" id="btnViewGreeting">Panel 0 挨拶</button>
+      <button type="button" class="demo-btn" id="btnViewTable">サービス表</button>
+    </div>
+  </div>
+
+  <div class="demo-hint-box">
+    画面左下の赤枠位置にHUDが常駐します。高解像度Retina対応（2× DPR）で描画され、TBDRでのFBO無効化を避けるため単一キャンバスで直接描画されます。
+  </div>
+</div>
+
+<!-- ============================================================
+     SPECTRUM & PROGRESS ENGINE SCRIPT
+     ============================================================ -->
 <script>
-  var TRACKS = [
-    { name: 'Morning', url: 'Sound/Morning.mp3' },
-    { name: 'Early Evening', url: 'Sound/Earlyevening.mp3' }
-  ];
-  var currentTrackIdx = 0;
-
-  var audioCtx = null;
-  var audioSourceNode = null;
-  var audioGainNode = null;
-  var analyserNode = null;
-  var isPlaying = false;
-
-  var audioEl = new Audio();
-  audioEl.loop = true;
-  audioEl.crossOrigin = 'anonymous';
-
-  var swellEnergy = 0.0;
-  var manualSwellValue = -1.0;
-  var rafId = null;
-  var freqData = new Uint8Array(256);
-
-  var config = {
-    strokeWidth: 1.2,
-    latticeBase: 0.40,
-    latticeSwell: 0.60,
-    latticeScale: 0.18,
-    latticeHue: 0,
-    latticeGlow: 0.25,
-    latticeSat: 1.00,
-    latticeContrast: 1.05,
-    orbScale: 0.28,
-    meshBase: 0.55,
-    meshSwell: 0.45,
-    brightBoost: 0.22,
-    satBoost: 0.20,
-    gainMult: 1.6,
-    noiseFloor: 35,
-    attack: 0.14,
-    decay: 0.035
+(function() {
+  /* ============ TRACK METADATA ============ */
+  var TRACK_METADATA = {
+    morning: { title: '朝の静寂', artist: '雅音舎', url: 'Sound/Morning.mp3' },
+    earlyevening: { title: '夕暮れの灯', artist: '風詠工房', url: 'Sound/Earlyevening.mp3' },
+    stream: { title: '清流のせせらぎ', artist: 'alex_jauk', url: 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3' }
   };
+  var currentTrackKey = 'morning';
 
-  var stageDiffuse = document.getElementById('stageDiffuse');
-  var stageLattice = document.getElementById('stageLattice');
-  var stageMosaic = document.getElementById('stageMosaic');
-  var btnPlayPause = document.getElementById('btnPlayPause');
-  var btnToggleTrack = document.getElementById('btnToggleTrack');
-  var btnToggleLattice = document.getElementById('btnToggleLattice');
-  var btnSoloLattice = document.getElementById('btnSoloLattice');
-  var statusIndicator = document.getElementById('statusIndicator');
-  var valSwellEnergy = document.getElementById('valSwellEnergy');
-  var vuMeterBar = document.getElementById('vuMeterBar');
+  /* ============ DOM REFS ============ */
+  var canvas = document.getElementById('hudCanvas');
+  var ctx = canvas.getContext('2d');
+  var hudTrackTitle = document.getElementById('hudTrackTitle');
+  var hudTrackArtist = document.getElementById('hudTrackArtist');
+  var hudStatusBadge = document.getElementById('hudStatusBadge');
+  var hudGaugeFill = document.getElementById('hudGaugeFill');
+  var hudByteStatus = document.getElementById('hudByteStatus');
+  var hudPctStatus = document.getElementById('hudPctStatus');
 
-  var latticeEnabled = true;
-  var soloLattice = false;
+  var btnToggleAudio = document.getElementById('btnToggleAudio');
+  var btnLoadRealMp3 = document.getElementById('btnLoadRealMp3');
+  var btnToggleTheme = document.getElementById('btnToggleTheme');
+  var btnViewGreeting = document.getElementById('btnViewGreeting');
+  var btnViewTable = document.getElementById('btnViewTable');
+  var sampleViewGreeting = document.getElementById('sampleViewGreeting');
+  var sampleViewTable = document.getElementById('sampleViewTable');
 
-  function buildMaskSvgUri(strokeW) {
-    var raw = "<svg xmlns='http://www.w3.org/2000/svg' width='60' height='60' viewBox='0 0 60 60'>" +
-      "<g fill='none' stroke='white' stroke-width='" + strokeW + "'>" +
-      "<circle cx='0' cy='0' r='30'/>" +
-      "<circle cx='60' cy='0' r='30'/>" +
-      "<circle cx='0' cy='60' r='30'/>" +
-      "<circle cx='60' cy='60' r='30'/>" +
-      "<circle cx='30' cy='30' r='30'/>" +
-      "</g></svg>";
-    return "url(\"data:image/svg+xml," + encodeURIComponent(raw) + "\")";
-  }
+  /* High-DPI scaling for crisp 120Hz rendering */
+  var dpr = window.devicePixelRatio || 1;
+  var displayW = 68;
+  var displayH = 18;
+  canvas.width = displayW * dpr;
+  canvas.height = displayH * dpr;
+  ctx.scale(dpr, dpr);
 
-  function initAudioPipeline() {
+  /* Visualizer options */
+  var activeStyle = 'bars'; // 'bars' | 'wave' | 'ripples' | 'mirror' | 'dots'
+
+  /* ============ WEB AUDIO ENGINE ============ */
+  var audioCtx = null;
+  var analyser = null;
+  var freqData = null;
+  var isAudioPlaying = false;
+  var synthNodes = null;
+
+  function initAudio() {
     if (audioCtx) return;
     var Ctx = window.AudioContext || window.webkitAudioContext;
     audioCtx = new Ctx();
 
-    analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 512;
-    analyserNode.smoothingTimeConstant = 0.8;
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.82;
+    freqData = new Uint8Array(analyser.frequencyBinCount);
 
-    audioGainNode = audioCtx.createGain();
-    audioGainNode.gain.value = 0.8;
-
-    audioSourceNode = audioCtx.createMediaElementSource(audioEl);
-    audioSourceNode.connect(analyserNode);
-    analyserNode.connect(audioGainNode);
-    audioGainNode.connect(audioCtx.destination);
-  }
-
-  function startSwellLoop() {
-    if (rafId) cancelAnimationFrame(rafId);
-
-    function tick() {
-      // If user is overriding swell via the inspector slider
-      if (manualSwellValue >= 0) {
-        swellEnergy = manualSwellValue;
-        applySwellToCSS(swellEnergy);
-        valSwellEnergy.textContent = swellEnergy.toFixed(2);
-        vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-
-      if (!isPlaying || !analyserNode) {
-        swellEnergy += (0 - swellEnergy) * 0.05;
-        applySwellToCSS(swellEnergy);
-        valSwellEnergy.textContent = swellEnergy.toFixed(2);
-        vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
-        if (swellEnergy > 0.005) {
-          rafId = requestAnimationFrame(tick);
-        } else {
-          applySwellToCSS(0);
-          rafId = null;
-        }
-        return;
-      }
-
-      analyserNode.getByteFrequencyData(freqData);
-
-      var sum = 0;
-      var count = 30;
-      for (var i = 4; i < 34; i++) {
-        sum += freqData[i];
-      }
-      var avg = sum / count;
-
-      var clean = Math.max(0, avg - config.noiseFloor);
-      var normalized = Math.min(1.0, (clean / (140 / config.gainMult)));
-      var target = Math.pow(normalized, 1.35);
-
-      if (target > swellEnergy) {
-        swellEnergy += (target - swellEnergy) * config.attack;
-      } else {
-        swellEnergy += (target - swellEnergy) * config.decay;
-      }
-
-      applySwellToCSS(swellEnergy);
-
-      valSwellEnergy.textContent = swellEnergy.toFixed(2);
-      vuMeterBar.style.width = (swellEnergy * 100).toFixed(1) + '%';
-
-      rafId = requestAnimationFrame(tick);
-    }
-
-    rafId = requestAnimationFrame(tick);
-  }
-
-  function applySwellToCSS(val) {
-    var vStr = val.toFixed(3);
-    if (stageDiffuse) stageDiffuse.style.setProperty('--audio-swell', vStr);
-    if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
-  }
-
-  function applyConfigToCSS() {
-    if (stageLattice) {
-      stageLattice.style.setProperty('--ctrl-lattice-base', config.latticeBase);
-      stageLattice.style.setProperty('--ctrl-lattice-swell', config.latticeSwell);
-      stageLattice.style.setProperty('--ctrl-lattice-scale', config.latticeScale);
-      stageLattice.style.setProperty('--ctrl-lattice-hue', config.latticeHue + 'deg');
-      stageLattice.style.setProperty('--ctrl-lattice-glow', config.latticeGlow);
-      stageLattice.style.setProperty('--ctrl-lattice-sat', config.latticeSat);
-      stageLattice.style.setProperty('--ctrl-lattice-contrast', config.latticeContrast);
-
-      var maskUri = buildMaskSvgUri(config.strokeWidth);
-      stageLattice.style.webkitMaskImage = maskUri;
-      stageLattice.style.maskImage = maskUri;
-    }
-
-    if (stageDiffuse) {
-      stageDiffuse.style.setProperty('--ctrl-orb-scale', config.orbScale);
-      stageDiffuse.style.setProperty('--ctrl-mesh-base', config.meshBase);
-      stageDiffuse.style.setProperty('--ctrl-mesh-swell', config.meshSwell);
-      stageDiffuse.style.setProperty('--ctrl-bright-boost', config.brightBoost);
-      stageDiffuse.style.setProperty('--ctrl-sat-boost', config.satBoost);
-    }
-  }
-
-  btnPlayPause.addEventListener('click', function() {
-    initAudioPipeline();
     if (audioCtx.state === 'suspended') {
       audioCtx.resume();
     }
-
-    if (!isPlaying) {
-      if (!audioEl.src) {
-        audioEl.src = TRACKS[currentTrackIdx].url;
-      }
-      audioEl.play().then(function() {
-        isPlaying = true;
-        btnPlayPause.textContent = 'Pause Music';
-        statusIndicator.textContent = 'PLAYING';
-        statusIndicator.style.color = '#c9600a';
-        startSwellLoop();
-      }).catch(function() {
-        alert('Audio play error: Ensure audio files exist in Sound/ folder.');
-      });
-    } else {
-      audioEl.pause();
-      isPlaying = false;
-      btnPlayPause.textContent = 'Play Music';
-      statusIndicator.textContent = 'PAUSED';
-      statusIndicator.style.color = '#8f2f00';
-    }
-  });
-
-  btnToggleTrack.addEventListener('click', function() {
-    currentTrackIdx = (currentTrackIdx + 1) % TRACKS.length;
-    var t = TRACKS[currentTrackIdx];
-    btnToggleTrack.textContent = t.name + '.mp3';
-    var wasPlaying = isPlaying;
-    audioEl.src = t.url;
-    if (wasPlaying) {
-      audioEl.play();
-    }
-  });
-
-  btnToggleLattice.addEventListener('click', function() {
-    latticeEnabled = !latticeEnabled;
-    btnToggleLattice.classList.toggle('toggle-active', latticeEnabled);
-    btnToggleLattice.textContent = latticeEnabled ? 'Layer 2: On' : 'Layer 2: Off';
-    stageLattice.classList.toggle('disabled', !latticeEnabled);
-  });
-
-  btnSoloLattice.addEventListener('click', function() {
-    soloLattice = !soloLattice;
-    btnSoloLattice.classList.toggle('toggle-active', soloLattice);
-    btnSoloLattice.textContent = soloLattice ? 'Unsolo Layer 2' : 'Solo Layer 2';
-
-    stageDiffuse.style.display = soloLattice ? 'none' : '';
-    if (stageMosaic) stageMosaic.style.display = soloLattice ? 'none' : '';
-    document.body.style.backgroundColor = soloLattice ? '#180c05' : '';
-
-    if (soloLattice && !latticeEnabled) {
-      btnToggleLattice.click();
-    }
-  });
-
-  function bindSlider(id, key, valElId, formatter, cssUpdater) {
-    var s = document.getElementById(id);
-    var v = document.getElementById(valElId);
-    s.addEventListener('input', function() {
-      var val = parseFloat(s.value);
-      config[key] = val;
-      if (formatter) v.innerHTML = formatter(val);
-      else v.textContent = val;
-      if (cssUpdater) cssUpdater(val);
-      applyConfigToCSS();
-    });
   }
 
-  // Inspection Slider
-  var sliderManualSwell = document.getElementById('sliderManualSwell');
-  var valManualSwell = document.getElementById('valManualSwell');
-  sliderManualSwell.addEventListener('input', function() {
-    var v = parseFloat(sliderManualSwell.value);
-    if (v < 0) {
-      manualSwellValue = -1.0;
-      valManualSwell.textContent = 'OFF';
-    } else {
-      manualSwellValue = v;
-      valManualSwell.textContent = v.toFixed(2);
-      startSwellLoop();
+  /* Synthetic Zen Drone / Harmonics generator (so demo works without sound files) */
+  function startSyntheticAudio() {
+    initAudio();
+    if (isAudioPlaying) {
+      stopSyntheticAudio();
+      return;
     }
-  });
 
-  // Layer 2 Geometry Sliders
-  bindSlider('sliderStrokeWidth', 'strokeWidth', 'valStrokeWidth', function(v){ return v.toFixed(1) + 'px'; });
-  bindSlider('sliderLatticeBase', 'latticeBase', 'valLatticeBase', function(v){ return v.toFixed(2); });
-  bindSlider('sliderLatticeSwell', 'latticeSwell', 'valLatticeSwell', function(v){ return v.toFixed(2); });
-  bindSlider('sliderLatticeScale', 'latticeScale', 'valLatticeScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var osc3 = audioCtx.createOscillator();
+    var filter = audioCtx.createBiquadFilter();
+    var gain = audioCtx.createGain();
 
-  // Layer 2 Color Sliders
-  bindSlider('sliderLatticeHue', 'latticeHue', 'valLatticeHue', function(v){ return v + '&deg;'; });
-  bindSlider('sliderLatticeGlow', 'latticeGlow', 'valLatticeGlow', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderLatticeSat', 'latticeSat', 'valLatticeSat', function(v){ return v.toFixed(2) + 'x'; });
-  bindSlider('sliderLatticeContrast', 'latticeContrast', 'valLatticeContrast', function(v){ return v.toFixed(2) + 'x'; });
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(174, audioCtx.currentTime); // Solfeggio soothing frequency
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(261.63, audioCtx.currentTime); // C4
+    osc3.type = 'triangle';
+    osc3.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5 harmonic
 
-  // Layer 1 Sliders
-  bindSlider('sliderOrbScale', 'orbScale', 'valOrbScale', function(v){ return '+' + Math.round(v * 100) + '%'; });
-  bindSlider('sliderMeshBase', 'meshBase', 'valMeshBase', function(v){
-    config.meshSwell = parseFloat((1 - v).toFixed(2));
-    return v.toFixed(2);
-  });
-  bindSlider('sliderBrightBoost', 'brightBoost', 'valBrightBoost', function(v){ return '+' + Math.round(v * 100) + '%'; });
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(900, audioCtx.currentTime);
 
-  // Audio Engine Sliders
-  bindSlider('sliderGainMult', 'gainMult', 'valGainMult', function(v){ return v.toFixed(1) + 'x'; });
-  bindSlider('sliderNoiseFloor', 'noiseFloor', 'valNoiseFloor', function(v){ return v; });
-  bindSlider('sliderAttack', 'attack', 'valAttack', function(v){ return v.toFixed(2); });
-  bindSlider('sliderDecay', 'decay', 'valDecay', function(v){ return v.toFixed(3); });
+    gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.25, audioCtx.currentTime + 1.2);
 
-  document.getElementById('btnCopyConfig').addEventListener('click', function() {
-    var out = [
-      '/* Tuned Dual-Layer Configuration */',
-      'strokeWidth: ' + config.strokeWidth + ',',
-      '--ctrl-lattice-base: ' + config.latticeBase + ',',
-      '--ctrl-lattice-swell: ' + config.latticeSwell + ',',
-      '--ctrl-lattice-scale: ' + config.latticeScale + ',',
-      '--ctrl-lattice-hue: ' + config.latticeHue + 'deg,',
-      '--ctrl-lattice-glow: ' + config.latticeGlow + ',',
-      '--ctrl-lattice-sat: ' + config.latticeSat + ',',
-      '--ctrl-lattice-contrast: ' + config.latticeContrast + ',',
-      '--ctrl-orb-scale: ' + config.orbScale + ',',
-      '--ctrl-mesh-base: ' + config.meshBase + ',',
-      '--ctrl-bright-boost: ' + config.brightBoost + ',',
-      'gainMult: ' + config.gainMult + ',',
-      'noiseFloor: ' + config.noiseFloor + ',',
-      'attack: ' + config.attack + ',',
-      'decay: ' + config.decay
-    ].join('\n');
-    navigator.clipboard.writeText(out).then(function() {
-      alert('Configuration copied to clipboard!');
+    osc1.connect(filter);
+    osc2.connect(filter);
+    osc3.connect(filter);
+    filter.connect(gain);
+    gain.connect(analyser);
+    analyser.connect(audioCtx.destination);
+
+    osc1.start(); osc2.start(); osc3.start();
+
+    synthNodes = { osc1: osc1, osc2: osc2, osc3: osc3, gain: gain };
+    isAudioPlaying = true;
+    btnToggleAudio.textContent = '■ 音声を停止';
+    btnToggleAudio.classList.add('active');
+    setLoadingState(1.0, 'ready');
+  }
+
+  function stopSyntheticAudio() {
+    if (!synthNodes || !audioCtx) return;
+    var g = synthNodes.gain;
+    var now = audioCtx.currentTime;
+    g.gain.cancelScheduledValues(now);
+    g.gain.setValueAtTime(g.gain.value, now);
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
+    setTimeout(function() {
+      try {
+        synthNodes.osc1.stop();
+        synthNodes.osc2.stop();
+        synthNodes.osc3.stop();
+        synthNodes = null;
+      } catch (e) {}
+    }, 650);
+
+    isAudioPlaying = false;
+    btnToggleAudio.textContent = '▶ 音声を再生 (Synth)';
+    btnToggleAudio.classList.remove('active');
+    hudStatusBadge.textContent = '待機中';
+    hudStatusBadge.className = 'hud-status-badge';
+  }
+
+  /* ============ STREAMING PROGRESS FETCH ============ */
+  function fetchTrackWithByteProgress(url) {
+    initAudio();
+    setLoadingState(0.0, 'downloading');
+
+    fetch(url)
+      .then(function(res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        var contentLength = res.headers.get('content-length');
+        var total = contentLength ? parseInt(contentLength, 10) : 16000000;
+        var loaded = 0;
+        var reader = res.body.getReader();
+        var chunks = [];
+
+        function read() {
+          return reader.read().then(function(result) {
+            if (result.done) {
+              setLoadingState(1.0, 'decoding');
+              var all = new Uint8Array(loaded);
+              var pos = 0;
+              for (var i = 0; i < chunks.length; i++) {
+                all.set(chunks[i], pos);
+                pos += chunks[i].length;
+              }
+              return audioCtx.decodeAudioData(all.buffer).then(function(decodedBuf) {
+                setLoadingState(1.0, 'ready');
+                playDecodedBuffer(decodedBuf);
+              });
+            }
+
+            chunks.push(result.value);
+            loaded += result.value.length;
+            var pct = total > 0 ? (loaded / total) : 0.5;
+            setLoadingState(pct, 'downloading', loaded, total);
+            return read();
+          });
+        }
+        return read();
+      })
+      .catch(function(err) {
+        setLoadingState(1.0, 'ready');
+        hudByteStatus.textContent = '読込エラー (ローカルSynth推奨)';
+      });
+  }
+
+  var liveBufferSource = null;
+  function playDecodedBuffer(buffer) {
+    if (liveBufferSource) {
+      try { liveBufferSource.stop(); } catch(e){}
+    }
+    liveBufferSource = audioCtx.createBufferSource();
+    liveBufferSource.buffer = buffer;
+    liveBufferSource.loop = true;
+    var g = audioCtx.createGain();
+    g.gain.value = 0.5;
+    liveBufferSource.connect(g);
+    g.connect(analyser);
+    analyser.connect(audioCtx.destination);
+    liveBufferSource.start(0);
+    isAudioPlaying = true;
+    btnToggleAudio.textContent = '■ 音声を停止 (MP3)';
+    btnToggleAudio.classList.add('active');
+  }
+
+  /* ============ GAUGE & BADGE UPDATE HELPER ============ */
+  function setLoadingState(pct, state, bytesLoaded, bytesTotal) {
+    var pClamped = Math.max(0, Math.min(1.0, pct));
+    var pctInt = Math.round(pClamped * 100);
+    hudGaugeFill.style.width = pctInt + '%';
+
+    hudGaugeFill.classList.remove('decoding', 'ready');
+    hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
+
+    if (state === 'downloading') {
+      hudStatusBadge.textContent = 'DL ' + pctInt + '%';
+      hudStatusBadge.classList.add('loading');
+      hudPctStatus.textContent = pctInt + '%';
+      if (bytesLoaded && bytesTotal) {
+        var mbLoaded = (bytesLoaded / (1024 * 1024)).toFixed(1);
+        var mbTotal = (bytesTotal / (1024 * 1024)).toFixed(1);
+        hudByteStatus.textContent = mbLoaded + ' / ' + mbTotal + ' MB';
+      } else {
+        hudByteStatus.textContent = (pctInt * 0.16).toFixed(1) + ' / 16.0 MB';
+      }
+    } else if (state === 'decoding') {
+      hudGaugeFill.classList.add('decoding');
+      hudStatusBadge.textContent = '展開中';
+      hudStatusBadge.classList.add('decoding');
+      hudPctStatus.textContent = '展開中...';
+      hudByteStatus.textContent = 'PCMデコード中';
+    } else if (state === 'ready') {
+      hudGaugeFill.classList.add('ready');
+      hudStatusBadge.textContent = '再生中';
+      hudStatusBadge.classList.add('ready');
+      hudPctStatus.textContent = '待機完了';
+      hudByteStatus.textContent = 'RAM常駐 (16 MB)';
+    }
+  }
+
+  /* ============ VISUALIZER RENDER LOOP (120Hz) ============ */
+  /* Physics state arrays for smooth bar/wave interpolation */
+  var barValues = [0.1, 0.1, 0.1, 0.1, 0.1];
+  var phase = 0;
+
+  function renderVisualizer() {
+    requestAnimationFrame(renderVisualizer);
+
+    ctx.clearRect(0, 0, displayW, displayH);
+
+    var themeColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#c9600a';
+    var textMute = getComputedStyle(document.documentElement).getPropertyValue('--text-mute').trim() || '#5a3818';
+
+    /* Sample energy or run idle organic wave */
+    if (analyser && isAudioPlaying) {
+      analyser.getByteFrequencyData(freqData);
+    }
+
+    phase += 0.04;
+
+    /* ----------------------------------------------------
+       OPTION 1: HAIRLINE ZEN BARS (静寂の細線)
+       ---------------------------------------------------- */
+    if (activeStyle === 'bars') {
+      var numBars = 5;
+      var barW = 2.5;
+      var gap = 4.5;
+      var totalW = numBars * barW + (numBars - 1) * gap;
+      var startX = (displayW - totalW) / 2;
+
+      ctx.fillStyle = themeColor;
+      for (var i = 0; i < numBars; i++) {
+        var targetH = 3;
+        if (analyser && isAudioPlaying) {
+          var binIdx = 6 + i * 8;
+          targetH = Math.max(3, (freqData[binIdx] / 255) * (displayH - 2));
+        } else {
+          /* Gentle idle breathing */
+          targetH = 3 + Math.sin(phase + i * 0.8) * 1.5;
+        }
+
+        /* Smooth spring easing */
+        barValues[i] += (targetH - barValues[i]) * 0.22;
+
+        var h = Math.min(displayH, Math.max(2, barValues[i]));
+        var x = startX + i * (barW + gap);
+        var y = displayH - h;
+
+        /* Soft rounded cap */
+        ctx.beginPath();
+        ctx.roundRect(x, y, barW, h, 1.5);
+        ctx.fill();
+      }
+    }
+
+    /* ----------------------------------------------------
+       OPTION 2: INK-WASH FLUID WAVE (墨流しの波)
+       ---------------------------------------------------- */
+    else if (activeStyle === 'wave') {
+      var points = 6;
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = themeColor;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      ctx.beginPath();
+      var segW = displayW / (points - 1);
+
+      for (var p = 0; p < points; p++) {
+        var val = 0;
+        if (analyser && isAudioPlaying) {
+          val = (freqData[4 + p * 10] / 255) * 10;
+        } else {
+          val = Math.sin(phase * 1.2 + p * 1.1) * 3;
+        }
+        var px = p * segW;
+        var py = (displayH / 2) - val;
+
+        if (p === 0) {
+          ctx.moveTo(px, py);
+        } else {
+          var prevX = (p - 1) * segW;
+          var midX = (prevX + px) / 2;
+          ctx.quadraticCurveTo(prevX, py, midX, py);
+        }
+      }
+      ctx.stroke();
+
+      /* Faint reflection under-wash */
+      ctx.strokeStyle = 'rgba(216, 180, 120, 0.35)';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+    }
+
+    /* ----------------------------------------------------
+       OPTION 3: WATER SURFACE RIPPLES (水面波紋)
+       ---------------------------------------------------- */
+    else if (activeStyle === 'ripples') {
+      var nodeCount = 4;
+      var spacing = displayW / (nodeCount + 1);
+      ctx.fillStyle = themeColor;
+
+      for (var r = 0; r < nodeCount; r++) {
+        var energy = 0.2;
+        if (analyser && isAudioPlaying) {
+          energy = Math.max(0.15, freqData[8 + r * 14] / 255);
+        } else {
+          energy = 0.25 + Math.sin(phase + r * 1.2) * 0.15;
+        }
+
+        var cx = spacing * (r + 1);
+        var cy = displayH / 2;
+        var radius = 2.2 + energy * 4.5;
+
+        /* Core dot */
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        /* Faint halo ring */
+        ctx.strokeStyle = themeColor;
+        ctx.lineWidth = 0.8;
+        ctx.globalAlpha = Math.max(0, 0.7 - energy * 0.5);
+        ctx.beginPath();
+        ctx.arc(cx, cy, radius * 1.8, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    /* ----------------------------------------------------
+       OPTION 4: MIRRORED WATER SURFACE (水鏡の対)
+       ---------------------------------------------------- */
+    else if (activeStyle === 'mirror') {
+      var mBars = 7;
+      var mW = 2.0;
+      var mGap = 3.5;
+      var mTotalW = mBars * mW + (mBars - 1) * mGap;
+      var mStartX = (displayW - mTotalW) / 2;
+      var midY = displayH / 2;
+
+      ctx.fillStyle = themeColor;
+      for (var m = 0; m < mBars; m++) {
+        var mEnergy = 0.1;
+        if (analyser && isAudioPlaying) {
+          mEnergy = Math.max(0.1, freqData[6 + m * 8] / 255);
+        } else {
+          mEnergy = 0.2 + Math.sin(phase + m * 0.7) * 0.15;
+        }
+
+        var halfH = mEnergy * (displayH * 0.42);
+        var mx = mStartX + m * (mW + mGap);
+
+        /* Upper spike */
+        ctx.fillRect(mx, midY - halfH, mW, halfH);
+        /* Lower reflection at lower opacity */
+        ctx.globalAlpha = 0.45;
+        ctx.fillRect(mx, midY, mW, halfH * 0.85);
+        ctx.globalAlpha = 1.0;
+      }
+    }
+
+    /* ----------------------------------------------------
+       OPTION 5: SAND GARDEN DOTTED MATRIX (枯山水点描)
+       ---------------------------------------------------- */
+    else if (activeStyle === 'dots') {
+      var cols = 6;
+      var colW = displayW / (cols + 1);
+      ctx.fillStyle = themeColor;
+
+      for (var c = 0; c < cols; c++) {
+        var dotEnergy = 0.2;
+        if (analyser && isAudioPlaying) {
+          dotEnergy = freqData[5 + c * 10] / 255;
+        } else {
+          dotEnergy = 0.3 + Math.sin(phase + c * 0.9) * 0.2;
+        }
+
+        var dx = colW * (c + 1);
+        var maxRise = displayH - 6;
+        var dy = (displayH - 3) - dotEnergy * maxRise;
+
+        /* Floating bead */
+        ctx.beginPath();
+        ctx.arc(dx, dy, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        /* Resting sand baseline bead */
+        ctx.fillStyle = 'rgba(120, 70, 20, 0.25)';
+        ctx.beginPath();
+        ctx.arc(dx, displayH - 3, 1.0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = themeColor;
+      }
+    }
+  }
+  requestAnimationFrame(renderVisualizer);
+
+  /* ============ INSPECTOR & DOCK CONTROLS ============ */
+  /* Style switcher */
+  var styleBtns = document.querySelectorAll('.demo-buttons [data-style]');
+  styleBtns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      styleBtns.forEach(function(btn){ btn.classList.remove('active'); });
+      b.classList.add('active');
+      activeStyle = b.getAttribute('data-style');
     });
   });
 
-  applyConfigToCSS();
+  /* Progress simulator buttons */
+  var simBtns = document.querySelectorAll('.demo-buttons [data-sim]');
+  simBtns.forEach(function(b) {
+    b.addEventListener('click', function() {
+      var sim = b.getAttribute('data-sim');
+      if (sim === '0') setLoadingState(0.0, 'downloading');
+      else if (sim === '45') setLoadingState(0.45, 'downloading', 7200000, 16000000);
+      else if (sim === '100') setLoadingState(1.0, 'downloading', 16000000, 16000000);
+      else if (sim === 'decode') setLoadingState(1.0, 'decoding');
+      else if (sim === 'ready') setLoadingState(1.0, 'ready');
+    });
+  });
+
+  /* Audio playback trigger */
+  btnToggleAudio.addEventListener('click', function() {
+    startSyntheticAudio();
+  });
+
+  btnLoadRealMp3.addEventListener('click', function() {
+    fetchTrackWithByteProgress(TRACK_METADATA.morning.url);
+  });
+
+  /* Theme toggle */
+  btnToggleTheme.addEventListener('click', function() {
+    var cur = document.documentElement.getAttribute('data-theme') || 'autumn';
+    var next = (cur === 'autumn') ? 'default' : 'autumn';
+    document.documentElement.setAttribute('data-theme', next);
+  });
+
+  /* Background view switcher */
+  btnViewGreeting.addEventListener('click', function() {
+    btnViewGreeting.classList.add('active');
+    btnViewTable.classList.remove('active');
+    sampleViewGreeting.classList.remove('hidden');
+    sampleViewTable.classList.add('hidden');
+  });
+
+  btnViewTable.addEventListener('click', function() {
+    btnViewTable.classList.add('active');
+    btnViewGreeting.classList.remove('active');
+    sampleViewTable.classList.remove('hidden');
+    sampleViewGreeting.classList.add('hidden');
+  });
+
+})();
 </script>
+
 </body>
 </html>
