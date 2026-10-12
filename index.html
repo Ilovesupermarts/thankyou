@@ -147,7 +147,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.22</div>
+  <div class="app-version" aria-hidden="true">v2.09.23</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -248,14 +248,19 @@
 <!-- ============ AUDIO SPECTRUM & METADATA HUD ============
      Persistent bottom-left card surfacing the currently-playing
      ambient bed: track title, artist, a live waterline-mirror
-     spectrum, and a two-stage loading gauge covering both stream
-     transfer and PCM decompression.
+     spectrum, and a loading/playback gauge.
 
      The canvas element carries baseline logical dimensions only
      (282×26); app.js scales the backing store by devicePixelRatio
      on boot so the drawing surface matches the display. Setting
      the markup to the DPR-scaled size would leave a single frame
      at boot with a mismatched backing store.
+
+     The gauge bar was repurposed at v1.3 from download progress to
+     playback progress of the current ambient bed. The byte-count
+     span was removed — the badge already surfaces loading state
+     (DL XX% / 展開中 / 待機完了 / 再生中) and hudPctStatus carries
+     the numeric percent during download.
 
      Visibility is governed by a CSS rule on body.info-visible
      combined with the .shown class that app.js toggles on this
@@ -278,7 +283,6 @@
       <div class="hud-gauge-fill" id="hudGaugeFill"></div>
     </div>
     <div class="hud-gauge-label">
-      <span id="hudByteStatus">0.0 / 41.0 MB</span>
       <span id="hudPctStatus">待機中</span>
     </div>
   </div>
@@ -337,9 +341,9 @@
     <div class="panel" data-panel="5">
       <div class="panel-inner">
         <div class="panel-content">
-          <p class="panel-5-red">もちろん、ご不安なものやご対応が難しいものについては、</p>
+          <p>もちろん、ご不安なものやご対応が難しいものについては、</p>
           <p class="msg-3">無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。</p>
-          <p class="panel-5-red">すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
+          <p>すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
         </div>
       </div>
     </div>
