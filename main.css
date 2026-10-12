@@ -1780,14 +1780,15 @@
      the badge already surfaces loading state and hudPctStatus
      carries the numeric percent during download. */
   .hud-gauge-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 9px;
-    color: var(--text-placeholder);
-    letter-spacing: 0.5px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    line-height: 1;
-  }
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  min-height: 10px; /* Reserves the label row when hudPctStatus is blanked during playback. */
+  color: var(--text-placeholder);
+  letter-spacing: 0.5px;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1;
+}
 
   @media (max-height: 600px) and (orientation: landscape) {
     .audio-spectrum-hud { display: none; }
