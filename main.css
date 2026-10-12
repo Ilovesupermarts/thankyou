@@ -1085,10 +1085,17 @@
 
   /* ============================================================
      PANEL TYPOGRAPHY (v1.3 readability pass)
-     colour is var(--text-dark) — 濃茶墨 #241C1A under autumn,
-     giving 14.2:1 WCAG AAA contrast against 絹白 #FFFDF9. The
-     three-layer text-shadow now carries silk-white and 薄杏
-     apricot (was the old yellow-cream #fdf3d8 halo). */
+
+     Base colour is var(--text-dark): 濃茶墨 #241C1A under autumn,
+     giving 14.2:1 WCAG AAA contrast against 絹白 #FFFDF9.
+
+     Base text-shadow (sakura) is the original three-layer
+     silk-white halo. The autumn-scoped rule that follows swaps
+     this for the same two-layer plum/apricot register carried by
+     the therapist name — a near plum bloom plus a wide apricot
+     halo — so the panel prose and the name share a single
+     illuminated register. The name's own scoped rule carries the
+     identical values, so the two are visually identical. */
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -1105,6 +1112,11 @@
       0 0 14px rgba(255, 253, 249, 0.90),
       0 0 28px rgba(251, 236, 224, 0.60);
   }
+
+  html[data-theme="autumn"] .panel-content {
+    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
+  }
+
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .panel.leaving .panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
   .panel-content p { margin: 0 0 0.4em 0; padding: 0; }
@@ -1116,14 +1128,16 @@
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
   /* Autumn-scoped name plum — merged for both the greeting screen
-     and Panel 0's opening beats. Flat plum on the silk floor. */
+     and Panel 0's opening beats. Carries the same two-layer
+     shadow as .panel-content for visual identity; the parent
+     declaration is now the source of truth, and this rule is
+     retained only to guarantee the value when the name appears
+     outside a .panel-content ancestor (blossom-greeting-name). */
   html[data-theme="autumn"] .panel-content .therapist-name,
   html[data-theme="autumn"] .blossom-greeting-name {
     color: #882E47;
     text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
   }
-  .panel-content .panel-5-red { color: var(--accent); }
-  html[data-theme="autumn"] .panel-content .panel-5-red { color: var(--accent); }
   .panel-content .msg-3 {
     padding: 24px 22px; background: var(--box-bg); border-radius: 20px;
     border: 1px solid var(--box-border); box-shadow: var(--box-shadow);
@@ -1198,19 +1212,17 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  /* Autumn: deep 濃茶墨 prose on the silk canvas with a silk-white
-     and 薄杏 apricot halo for legibility against the drifting orbs.
-     The header register (mark, title, rules) draws from the plum
-     --transition-head-color token; the rules are damped to 35% so
-     they read as quiet separators rather than co-equal elements.
-     Was: five paragraphs of bright CTA amber with no text-shadow,
-     which vibrated chromatically against --bg-warm. */
+  /* Autumn: flat 濃茶墨 prose on the silk canvas. No text-shadow —
+     the halo was defensive scaffolding against the old hard orb
+     edges. After A16's Gaussian falloff, there is no luminance
+     step for the text to cross, so the flat ink reads cleanly.
+     Removed at v1.3. The header register (mark, title, rules)
+     draws from the plum --transition-head-color token; the rules
+     are damped to 35% so they read as quiet separators rather
+     than co-equal elements. */
   html[data-theme="autumn"] .transition-line {
     color: var(--text-dark);
-    text-shadow:
-      0 0 6px var(--bg-base),
-      0 0 14px rgba(255, 253, 249, 0.90),
-      0 0 24px rgba(251, 236, 224, 0.60);
+    text-shadow: none;
   }
   html[data-theme="autumn"] .transition-line-mark,
   html[data-theme="autumn"] .transition-line-title {
@@ -1558,8 +1570,7 @@
      ------------------------------------------------------------
      Persistent bottom-left card surfacing the currently-playing
      ambient bed: track title, artist, a live waterline-mirror
-     spectrum, and a loading gauge covering both stream transfer
-     and PCM decompression.
+     spectrum, and a loading/playback gauge.
 
      Visibility is governed by two gates that must stay in sync:
        · CSS — body.info-visible:not(.thankyou-active):not(.receipt-locked)
@@ -1578,7 +1589,15 @@
      Layout is a flex column with three stacked rows:
        meta-row       — title · artist · status badge
        visualizer     — 282×26 micro-canvas at 2× DPR
-       gauge          — 2px fill bar + byte/pct label row
+       gauge          — 6px fill bar + single status label row
+
+     The gauge bar was repurposed at v1.3 from download progress to
+     playback progress. While a track is playing, updateHudProgress()
+     in app.js owns the fill and advances it from 0% to 100% over
+     playDur (capped by maxPlaySec, if set). When idle or loading,
+     _hudRenderState() writes download progress as before. The two
+     writers never race: _hudRenderState() skips its width write
+     whenever ambientSource !== null.
 
      Base card styling (below) is 絹白 Kinushiro glass, shared by
      both themes. Sakura overrides the card at the bottom of this
@@ -1728,11 +1747,14 @@
     padding-top: 0;
   }
 
+  /* 6px bar. Thicker than the loading-era 2px so playback position
+     reads at a glance on the silk-white HUD card. Border-radius
+     tracks the new height for a pill, not a sliver. */
   .hud-gauge-bar {
     width: 100%;
-    height: 2px;
+    height: 6px;
     background: rgba(222, 192, 172, 0.35);
-    border-radius: 2px;
+    border-radius: 3px;
     overflow: hidden;
   }
 
@@ -1740,7 +1762,7 @@
     width: 0%;
     height: 100%;
     background: var(--accent);
-    border-radius: 2px;
+    border-radius: 3px;
     transition: width 0.15s cubic-bezier(0.2, 0, 0.3, 1), background-color 0.3s ease;
   }
   .hud-gauge-fill.decoding {
@@ -1756,6 +1778,9 @@
     to { opacity: 1; }
   }
 
+  /* Single status line. The byte-count span was removed at v1.3 —
+     the badge already surfaces loading state and hudPctStatus
+     carries the numeric percent during download. */
   .hud-gauge-label {
     display: flex;
     justify-content: space-between;
@@ -2830,6 +2855,19 @@
                      .gold-band stroke at r=90px doesn't visually
                      merge into its own glow.
 
+                     Breath is opacity-only at v1.3. The previous
+                     keyframes also animated transform: scale() from
+                     0.86 to 1.10 — a 24% radial expansion at a 2.8s
+                     cadence that read as an active pulse rather than
+                     an ambient breath. Both keyframes now drive
+                     opacity alone, and the cadence is slowed to 8s
+                     rest / 5s ready (7.5 and 12 breaths per minute,
+                     respectively), so the field brightens and dims
+                     in place rather than expanding outward. The
+                     scale removal also eliminates the sole remaining
+                     transform animation on the halo, so will-change
+                     is trimmed to opacity.
+
        .gold-glow  — a wide-stroke soft-gold circle rendered behind
                      .gold-band. Stroke is 金木犀 --glow (#FFA259),
                      not the retired buttercup #ffdd80. The 28px
@@ -2843,8 +2881,8 @@
                      which is where each pulse ring begins before
                      expanding outward. Stroke is 絹白 #FFFDF9.
 
-     All three elements animate opacity and transform only —
-     no stroke-width, no filter. Chromium rasterises each texture
+     All three elements animate opacity only — no stroke-width,
+     no filter, no transform. Chromium rasterises each texture
      once and runs the breath entirely on the compositor thread. */
   .gold-halo {
     position: absolute;
@@ -2862,29 +2900,29 @@
       rgba(230, 104, 38, 0.20) 78%,
       transparent 94%);
     pointer-events: none;
-    animation: haloGlow 2.8s ease-in-out infinite;
-    will-change: transform, opacity;
+    animation: haloGlow 8s ease-in-out infinite;
+    will-change: opacity;
   }
 
   @keyframes haloGlow {
-    0%, 100% { opacity: 0.32; transform: scale(0.86); }
-    50%      { opacity: 1.00; transform: scale(1.10); }
+    0%, 100% { opacity: 0.52; }
+    50%      { opacity: 0.82; }
   }
 
   .start-btn.ready .gold-halo {
-    animation: haloGlowReady 1.4s ease-in-out infinite;
+    animation: haloGlowReady 5s ease-in-out infinite;
   }
 
   @keyframes haloGlowReady {
-    0%, 100% { opacity: 0.55; transform: scale(0.92); }
-    50%      { opacity: 1.00; transform: scale(1.14); }
+    0%, 100% { opacity: 0.66; }
+    50%      { opacity: 0.94; }
   }
 
   .gold-band {
     stroke: #FFFDF9;
     stroke-width: 6px;
     fill: none;
-    animation: goldBandGlow 2.8s ease-in-out infinite;
+    animation: goldBandGlow 8s ease-in-out infinite;
     will-change: opacity;
   }
 
@@ -2895,7 +2933,7 @@
 
   .start-btn.ready .gold-band {
     stroke: #ffffff;
-    animation: goldBandGlowReady 1.4s ease-in-out infinite;
+    animation: goldBandGlowReady 5s ease-in-out infinite;
   }
 
   @keyframes goldBandGlowReady {
@@ -2907,7 +2945,7 @@
     stroke: #FFA259;
     stroke-width: 28px;
     fill: none;
-    animation: goldGlowPulse 2.8s ease-in-out infinite;
+    animation: goldGlowPulse 8s ease-in-out infinite;
     will-change: opacity;
   }
 
@@ -2917,7 +2955,7 @@
   }
 
   .start-btn.ready .gold-glow {
-    animation: goldGlowPulseReady 1.4s ease-in-out infinite;
+    animation: goldGlowPulseReady 5s ease-in-out infinite;
   }
 
   @keyframes goldGlowPulseReady {
