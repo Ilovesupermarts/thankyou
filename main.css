@@ -742,9 +742,7 @@
     .maple-leaf,
     .ginkgo-leaf   { animation: none !important; }
     .ripple        { animation-duration: 300ms; }
-    .gold-band     { animation: none !important; opacity: 1 !important; }
-    .gold-halo     { animation: none !important; opacity: 0.75 !important; }
-    .gold-glow     { animation: none !important; opacity: 0.40 !important; }
+    .soft-glow     { animation: none !important; opacity: 0.72 !important; }
     .pulse-ring    { animation: none !important; opacity: 0 !important; }
   }
   @keyframes ambientDrift {
@@ -2836,131 +2834,111 @@
   .start-btn.diving .rings-svg { opacity: 0; }
 
   /* ============================================================
-     GOLD RING & HALO (金木犀 Osmanthus Amber Glow)
+     RIM LIGHT & RING (v1.3)
      ------------------------------------------------------------
      The idle button carries three decorative elements above the
      koi PNG:
 
-       .gold-halo  — a pre-blurred radial-gradient div. The gradient
-                     is annular: the luminous centroid sits at 50%
-                     of the 140px half-width, with the falloff peak
-                     under the gold band's 90px stroke. Matches the
-                     reach of the original SVG drop-shadow chain
-                     without invoking a blur kernel.
+       .soft-glow  — a radial-gradient div. Its peak lands at
+                     r ≈ 87px on the 262px disc, i.e. just inside
+                     the ring's inner edge (ring centreline is
+                     r=90px, stroke 6px wide, so it spans r=87–93).
+                     The falloff feathers outward to r=131px. Net
+                     effect: a soft white rim hugging the ring,
+                     brightening where it underlaps the stroke
+                     and fading to nothing well past the outer
+                     edge.
 
-                     Stops are silk-white core → peach transition →
-                     金木犀 amber bloom, replacing the retired
-                     marigold/lemon/brass literals. The 50% stop is
-                     deliberately not pure #FFFDF9, so the crisp
-                     .gold-band stroke at r=90px doesn't visually
-                     merge into its own glow.
+                     circle closest-side is load-bearing. The
+                     default size keyword farthest-corner puts
+                     100% at the div's corner (≈1.414× the visible
+                     radius), which pushes every peak outside the
+                     border-radius clip — the failure mode that
+                     produced static rings with no visible glow.
 
-                     Breath is opacity-only at v1.3. The previous
-                     keyframes also animated transform: scale() from
-                     0.86 to 1.10 — a 24% radial expansion at a 2.8s
-                     cadence that read as an active pulse rather than
-                     an ambient breath. Both keyframes now drive
-                     opacity alone, and the cadence is slowed to 8s
-                     rest / 5s ready (7.5 and 12 breaths per minute,
-                     respectively), so the field brightens and dims
-                     in place rather than expanding outward. The
-                     scale removal also eliminates the sole remaining
-                     transform animation on the halo, so will-change
-                     is trimmed to opacity.
+                     Breath is 5s, opacity 0.00 → 1.00 → 0.00.
+                     The glow fully appears and fully disappears
+                     each cycle. In the .ready state (swipe past
+                     the 60px arming threshold) the floor lifts to
+                     0.85 so the halo stays nearly full-strength
+                     throughout — the arming signal.
 
-       .gold-glow  — a wide-stroke soft-gold circle rendered behind
-                     .gold-band. Stroke is 金木犀 --glow (#FFA259),
-                     not the retired buttercup #ffdd80. The 28px
-                     span (r≈76–104px) overlays the peach-to-amber
-                     transition band so the glow reads as an
-                     intensification of the halo underneath rather
-                     than a competing layer.
+       .gold-band  — the ring SVG. Static stroke-width of 6px;
+                     the ring's radius matches r=90 in the 360
+                     viewBox. Stroke is 絹白 #FFFDF9 at rest, and
+                     flips to pure #ffffff in the .ready state.
+                     Opacity is pinned at 1.00 — the ring is the
+                     solid anchor; only the glow behind it
+                     breathes.
 
-       .gold-band  — the ring SVG. Static stroke-width of 6px; the
-                     ring's radius matches r=90 in the 360 viewBox,
-                     which is where each pulse ring begins before
-                     expanding outward. Stroke is 絹白 #FFFDF9.
+       .pulse-ring — three expanding hairline rings sharing the
+                     r=90 stroke centreline. Cycle is 20s, equal to
+                     four glow breaths. The first cascade fires at
+                     t=1.85s, which is 0.65s before the glow's peak
+                     at t=2.5s — the cascade is peak-aligned in the
+                     sense that its first ring launches just before
+                     the glow reaches its brightest, so ring and
+                     glow crest together.
 
-     All three elements animate opacity only — no stroke-width,
-     no filter, no transform. Chromium rasterises each texture
-     once and runs the breath entirely on the compositor thread. */
-  .gold-halo {
+     All four elements animate opacity (and the pulse rings also
+     animate transform scale) — no stroke-width, no filter.
+     Chromium rasterises each texture once and runs the animation
+     entirely on the compositor thread. */
+  .soft-glow {
     position: absolute;
-    width: 280px;
-    height: 280px;
     top: 50%;
     left: 50%;
-    margin-top: -140px;
-    margin-left: -140px;
+    width: 262px;
+    height: 262px;
+    margin-top: -131px;
+    margin-left: -131px;
     border-radius: 50%;
-    background: radial-gradient(circle,
-      transparent 32%,
-      rgba(255, 250, 245, 0.82) 50%,
-      rgba(255, 178, 115, 0.48) 62%,
-      rgba(230, 104, 38, 0.20) 78%,
-      transparent 94%);
     pointer-events: none;
-    animation: haloGlow 8s ease-in-out infinite;
+    z-index: 0;
     will-change: opacity;
+    background: radial-gradient(circle closest-side,
+      transparent 0%,
+      rgba(255, 255, 255,0) 63.36%,
+      rgba(255, 255, 255,0.070) 64.43%,
+      rgba(255, 255, 255,0.246) 65.34%,
+      rgba(255, 255, 255,0.510) 66.02%,
+      rgba(255, 255, 255,0.880) 66.41%,
+      rgba(255, 255, 255,0.510) 72.46%,
+      rgba(255, 255, 255,0.264) 79.85%,
+      rgba(255, 255, 255,0.123) 88.24%,
+      rgba(255, 255, 255,0.044) 94.96%,
+      rgba(255, 255, 255,0) 100%
+    );
+    animation: glowBreath 5s ease-in-out infinite;
   }
 
-  @keyframes haloGlow {
-    0%, 100% { opacity: 0.52; }
-    50%      { opacity: 0.82; }
+  @keyframes glowBreath {
+    0%, 100% { opacity: 0.00; }
+    50%      { opacity: 1.00; }
   }
 
-  .start-btn.ready .gold-halo {
-    animation: haloGlowReady 5s ease-in-out infinite;
+  /* Ready state — the glow stops disappearing between pulses.
+     Floor lifts to 0.85 so the halo reads as continuously lit,
+     gently swelling. Same 5s cadence, so the ripple cascade
+     stays peak-aligned. */
+  .start-btn.ready .soft-glow {
+    animation: glowBreathReady 5s ease-in-out infinite;
   }
 
-  @keyframes haloGlowReady {
-    0%, 100% { opacity: 0.66; }
-    50%      { opacity: 0.94; }
+  @keyframes glowBreathReady {
+    0%, 100% { opacity: 0.85; }
+    50%      { opacity: 1.00; }
   }
 
   .gold-band {
     stroke: #FFFDF9;
     stroke-width: 6px;
     fill: none;
-    animation: goldBandGlow 8s ease-in-out infinite;
-    will-change: opacity;
-  }
-
-  @keyframes goldBandGlow {
-    0%, 100% { opacity: 0.60; }
-    50%      { opacity: 1.00; }
+    opacity: 1.00;
   }
 
   .start-btn.ready .gold-band {
     stroke: #ffffff;
-    animation: goldBandGlowReady 5s ease-in-out infinite;
-  }
-
-  @keyframes goldBandGlowReady {
-    0%, 100% { opacity: 0.85; }
-    50%      { opacity: 1.00; }
-  }
-
-  .gold-glow {
-    stroke: #FFA259;
-    stroke-width: 28px;
-    fill: none;
-    animation: goldGlowPulse 8s ease-in-out infinite;
-    will-change: opacity;
-  }
-
-  @keyframes goldGlowPulse {
-    0%, 100% { opacity: 0.10; }
-    50%      { opacity: 0.60; }
-  }
-
-  .start-btn.ready .gold-glow {
-    animation: goldGlowPulseReady 5s ease-in-out infinite;
-  }
-
-  @keyframes goldGlowPulseReady {
-    0%, 100% { opacity: 0.35; }
-    50%      { opacity: 0.85; }
   }
 
   .pulse-ring {
@@ -2969,12 +2947,16 @@
     fill: none;
     transform-box: view-box;
     transform-origin: 180px 180px;
-    animation: ringPulse 9s linear infinite;
+    animation: ringPulse 20.00s linear infinite;
     will-change: transform, opacity;
   }
-  .ripple-1 { animation-delay: 0s; }
-  .ripple-2 { animation-delay: 3s; }
-  .ripple-3 { animation-delay: 6s; }
+  /* Cascade delays: first ring at t=1.85s, then evenly spaced
+     across 81% of the 20s cycle (5.4s apart). The 0.65s offset
+     before the glow peak at t=2.5s means the ring launches just
+     as the halo is arriving at full brightness. */
+  .ripple-1 { animation-delay: 1.850s; }
+  .ripple-2 { animation-delay: 7.250s; }
+  .ripple-3 { animation-delay: 12.650s; }
   @keyframes ringPulse {
     0%   { transform: scale(1.0); opacity: 0.7; }
     100% { transform: scale(1.9); opacity: 0.0; }
