@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#faf7f5">
-<title>音響スペクトラム v3 — コンパクト・全幅水鏡</title>
+<meta name="theme-color" content="#FAF7F2">
+<title>和田三造 配色選定デモ (Sanzo Wada Palette Inspector)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,6 +13,9 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
+  /* ============================================================
+     DEMO HARNESS & INSPECTOR DOCK
+     ============================================================ */
   .demo-viewport {
     position: relative;
     width: 100vw;
@@ -20,33 +23,34 @@
     overflow: hidden;
   }
 
-  .demo-sample-view {
+  .demo-view {
     position: absolute;
     inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.5s ease;
     padding: 24px;
+    transition: opacity 0.4s ease;
   }
-  .demo-sample-view.hidden {
+  .demo-view.hidden {
     opacity: 0;
     pointer-events: none;
   }
 
+  /* Sample Panel 0 text mirroring screenshot */
   .sample-panel-content {
     max-width: 540px;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-size: 20px;
     font-weight: 600;
-    color: #160a02;
+    color: var(--text-dark);
     line-height: 2.3;
     letter-spacing: 0.8px;
     text-shadow:
       0 0 6px var(--bg-base),
-      0 0 14px rgba(253, 243, 216, 0.85),
-      0 0 28px rgba(253, 243, 216, 0.40);
+      0 0 14px var(--soft-1),
+      0 0 28px var(--soft-2);
   }
   .sample-panel-content .therapist-name {
     font-family: "Yuji Syuku", serif;
@@ -60,256 +64,163 @@
     margin-top: 20px;
   }
 
-  /* ============================================================
-     COMPACT AUDIO HUD (Height Reduced, Zero-Gap Alignment)
-     ============================================================ */
-  .audio-spectrum-hud {
-    position: fixed;
-    left: calc(26px + env(safe-area-inset-left, 0px));
-    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
-    z-index: 90;
-    display: flex;
-    flex-direction: column;
-    pointer-events: auto;
-    user-select: none;
-    -webkit-user-select: none;
-    width: 318px;
-    padding: 9px 18px 7px 18px; /* Compact vertical padding */
-    border-radius: 15px;
-    background: rgba(253, 243, 216, 0.78);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(216, 180, 120, 0.45);
-    box-shadow: 
-      0 5px 20px rgba(120, 70, 20, 0.08),
-      0 1px 3px rgba(120, 70, 20, 0.05);
-    transition: opacity 0.4s ease, transform 0.4s ease, background 0.4s ease;
-  }
-
-  html[data-theme="default"] .audio-spectrum-hud {
-    background: rgba(255, 255, 255, 0.80);
-    border-color: rgba(234, 217, 213, 0.6);
-    box-shadow: 0 5px 20px rgba(120, 90, 90, 0.07);
-  }
-
-  /* Title & Artist Header */
-  .hud-meta-row {
-    display: flex;
-    align-items: baseline;
-    gap: 7px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
-    line-height: 1.15;
-    margin-bottom: 4px; /* Tight distance to spectrum */
-    white-space: nowrap;
-  }
-
-  .hud-title {
-    font-size: 15px;
-    font-weight: 700;
-    color: var(--accent);
-    letter-spacing: 2px;
-  }
-
-  .hud-sep {
-    font-size: 11px;
-    color: var(--text-placeholder);
-  }
-
-  .hud-artist {
-    font-size: 12.5px;
-    font-weight: 500;
-    color: var(--text-mute);
-    letter-spacing: 1px;
-  }
-
-  .hud-status-badge {
-    margin-left: auto;
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 1px;
-    padding: 1px 6px;
-    border-radius: 8px;
-    background: rgba(201, 96, 10, 0.12);
-    color: var(--accent);
-    transition: all 0.3s ease;
-  }
-  .hud-status-badge.loading {
-    background: rgba(247, 185, 60, 0.25);
-    color: #8f3f12;
-  }
-  .hud-status-badge.decoding {
-    background: rgba(247, 185, 60, 0.40);
-    color: #7a3208;
-    animation: statusPulse 1.2s ease-in-out infinite;
-  }
-  .hud-status-badge.ready {
-    background: rgba(42, 63, 26, 0.14);
-    color: #2a3f1a;
-  }
-
-  @keyframes statusPulse {
-    0%, 100% { opacity: 0.6; }
-    50% { opacity: 1; }
-  }
-
-  /* Spectrum Block (Compact 26px height) */
-  .hud-visualizer-block {
-    width: 100%;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 2px; /* Closed gap directly above the gauge line */
-  }
-
-  .hud-canvas {
-    width: 100%;
-    height: 26px;
-    display: block;
-  }
-
-  /* Gauge Block directly connected to the spectrum */
-  .hud-gauge-block {
-    display: flex;
-    flex-direction: column;
-    gap: 3px;
-    width: 100%;
-    padding-top: 0;
-  }
-
-  .hud-gauge-bar {
-    width: 100%;
-    height: 2px;
-    background: rgba(216, 180, 120, 0.28);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .hud-gauge-fill {
-    width: 0%;
-    height: 100%;
-    background: var(--accent);
-    border-radius: 2px;
-    transition: width 0.15s cubic-bezier(0.2, 0, 0.3, 1), background-color 0.3s ease;
-  }
-  .hud-gauge-fill.decoding {
-    background: #f7b93c;
-    animation: gaugeGlow 1s ease-in-out infinite alternate;
-  }
-  .hud-gauge-fill.ready {
-    background: rgba(42, 63, 26, 0.65);
-  }
-
-  @keyframes gaugeGlow {
-    from { opacity: 0.7; }
-    to { opacity: 1; }
-  }
-
-  .hud-gauge-label {
-    display: flex;
-    justify-content: space-between;
-    font-size: 9px;
-    color: var(--text-placeholder);
-    letter-spacing: 0.5px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    line-height: 1;
-  }
-
-  /* ============================================================
-     DEMO TEST DOCK (Top Right)
-     ============================================================ */
-  .demo-dock {
+  /* ------------------------------------------------------------
+     TOP PALETTE INSPECTOR DOCK
+     ------------------------------------------------------------ */
+  .palette-dock {
     position: fixed;
     top: 18px;
     right: 18px;
-    z-index: 500;
-    background: rgba(255, 255, 255, 0.94);
-    border: 1px solid var(--border-2);
-    border-radius: 16px;
-    padding: 14px 18px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.14);
+    z-index: 600;
+    background: rgba(255, 255, 255, 0.95);
+    border: 1px solid var(--border-1);
+    border-radius: 18px;
+    padding: 16px 20px;
+    box-shadow: 0 10px 36px rgba(43, 35, 29, 0.12);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    font-size: 13px;
-    color: var(--text-dark);
-    max-width: 330px;
+    color: #2B231D;
+    width: 360px;
+    max-height: calc(100vh - 36px);
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
   }
 
-  .demo-dock-title {
-    font-weight: 700;
-    font-size: 14px;
-    color: var(--accent);
+  .dock-header {
+    border-bottom: 1px solid var(--border-3);
+    padding-bottom: 8px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
-    border-bottom: 1px solid var(--border-3);
-    padding-bottom: 6px;
+    align-items: baseline;
+  }
+  .dock-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 1px;
+  }
+  .dock-sub {
+    font-size: 10.5px;
+    color: #8E7E72;
   }
 
-  .demo-group {
+  .palette-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .palette-tab-btn {
+    background: #F8F5F0;
+    border: 1px solid #DCD4C6;
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #473B32;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 2px;
   }
-
-  .demo-label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-mute);
-    letter-spacing: 1px;
-    text-transform: uppercase;
+  .palette-tab-btn span.tab-title {
+    font-size: 12.5px;
   }
-
-  .demo-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
+  .palette-tab-btn span.tab-desc {
+    font-size: 10px;
+    color: #8E7E72;
+    font-weight: 400;
   }
-
-  .demo-btn {
-    background: var(--soft-1);
-    border: 1px solid var(--border-1);
-    color: var(--text-dark);
-    border-radius: 8px;
-    padding: 5px 9px;
-    font-size: 11.5px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-  .demo-btn:hover {
-    background: #ffffff;
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .demo-btn.active {
+  .palette-tab-btn.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #ffffff;
-    font-weight: 600;
+  }
+  .palette-tab-btn.active span.tab-desc {
+    color: rgba(255, 255, 255, 0.85);
   }
 
-  .demo-btn.action {
-    background: #2a3f1a;
-    color: #fff;
-    border-color: #2a3f1a;
+  /* Swatch Strip (60-30-10) */
+  .swatch-display {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    background: #FAF7F2;
+    border: 1px solid #EBE4D8;
+    border-radius: 12px;
+    padding: 10px;
   }
-
-  .demo-hint-box {
-    font-size: 11px;
-    color: var(--text-mute);
-    line-height: 1.4;
-    background: var(--soft-3);
-    padding: 6px 10px;
+  .swatch-bars {
+    display: flex;
+    height: 18px;
     border-radius: 6px;
+    overflow: hidden;
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+  }
+  .swatch-seg {
+    height: 100%;
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+  .swatch-legend {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px 12px;
+    font-size: 11px;
+    font-family: "Shippori Mincho", serif;
+  }
+  .swatch-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .swatch-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+  }
+
+  /* View switch buttons */
+  .view-switch {
+    display: flex;
+    gap: 6px;
+  }
+  .view-btn {
+    flex: 1;
+    background: #F4EDE2;
+    border: 1px solid #D1C4B0;
+    border-radius: 8px;
+    padding: 6px;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: #473B32;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+  }
+  .view-btn.active {
+    background: var(--text-dark);
+    border-color: var(--text-dark);
+    color: #ffffff;
+  }
+
+  .dock-note {
+    font-size: 11px;
+    color: #695B50;
+    line-height: 1.5;
+    background: #F4EDE2;
     border-left: 3px solid var(--accent);
+    padding: 8px 10px;
+    border-radius: 6px;
   }
 </style>
 </head>
 <body>
 
+<!-- Ambient Stage & Shippō Pattern (identical to index.html) -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -319,16 +230,17 @@
   <div class="ambient-layer ambient-primary"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
-<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic" id="ambientMosaic" aria-hidden="true"></div>
 
+<!-- Top Info Bar Header -->
 <div class="info-bar shown" id="infoBar">
   <div class="info-inner">
     <div class="info-line">
       <span class="city">名古屋市</span>
       <span class="sep">·</span>
-      <span class="date">10月11日(日)</span>
+      <span class="date">10月12日(月)</span>
       <span class="sep">·</span>
-      <span class="time">19時05分</span>
+      <span class="time">09時48分</span>
       <span class="sep">·</span>
       <span class="temp">23°</span>
       <span class="sep">·</span>
@@ -337,8 +249,13 @@
   </div>
 </div>
 
+<!-- ============================================================
+     VIEWPORT PREVIEWS
+     ============================================================ -->
 <div class="demo-viewport">
-  <div class="demo-sample-view" id="sampleViewGreeting">
+
+  <!-- View 1: Welcome Greeting (Panel 0) -->
+  <div class="demo-view" id="viewGreeting">
     <div class="sample-panel-content">
       <span class="therapist-name">桜庭さん</span>、初めまして。<br>
       夕方のお時間に、お部屋までお越しいただき、誠にありがとうございます。<br><br>
@@ -346,7 +263,8 @@
     </div>
   </div>
 
-  <div class="demo-sample-view hidden" id="sampleViewTable">
+  <!-- View 2: Table Card -->
+  <div class="demo-view hidden" id="viewTable">
     <div class="table-card active sample-table-card">
       <div class="privacy-note-inline">
         <p>表に表示されている料金は、必要に応じて変更していただいても構いません。</p>
@@ -369,8 +287,10 @@
       </div>
     </div>
   </div>
+
 </div>
 
+<!-- Center Dots Staging (Active dot uses secondary accent color) -->
 <div class="action-hint global-hint shown" style="position:fixed; bottom: 84px; left:0; right:0;">
   <span class="hint-layer active">
     <span>スワイプ</span>
@@ -387,9 +307,9 @@
 </div>
 
 <!-- ============================================================
-     COMPACT AUDIO HUD
+     AUDIO SPECTRUM & METADATA HUD (Bottom-Left)
      ============================================================ -->
-<div class="audio-spectrum-hud" id="audioSpectrumHud">
+<div class="audio-spectrum-hud shown" id="audioSpectrumHud">
   <div class="hud-meta-row">
     <span class="hud-title" id="hudTrackTitle">虹を見た日</span>
     <span class="hud-sep">·</span>
@@ -398,7 +318,7 @@
   </div>
 
   <div class="hud-visualizer-block">
-    <canvas class="hud-canvas" id="hudCanvas" width="564" height="52"></canvas>
+    <canvas class="hud-canvas" id="hudCanvas" width="282" height="26"></canvas>
   </div>
 
   <div class="hud-gauge-block">
@@ -406,412 +326,388 @@
       <div class="hud-gauge-fill ready" id="hudGaugeFill" style="width: 100%;"></div>
     </div>
     <div class="hud-gauge-label">
-      <span id="hudByteStatus">15.8 MB / 15.8 MB</span>
-      <span id="hudPctStatus">待機完了 (RAM)</span>
+      <span id="hudByteStatus">32.0 MB (RAM)</span>
+      <span id="hudPctStatus"></span>
     </div>
   </div>
 </div>
 
 <!-- ============================================================
-     TEST CONTROLLER
+     PALETTE INSPECTOR CONTROLLER DOCK
      ============================================================ -->
-<div class="demo-dock" id="demoDock">
-  <div class="demo-dock-title">
-    <span>水鏡の対 (高さ圧縮版)</span>
-    <button type="button" class="demo-btn" id="btnToggleTheme" style="padding:2px 6px;">🍁/🌸</button>
+<div class="palette-dock">
+  <div class="dock-header">
+    <span class="dock-title">和田三造 配色選定 (Sanzo Wada)</span>
+    <span class="dock-sub">大人上品・くすみカラー</span>
   </div>
 
-  <div class="demo-group">
-    <div class="demo-label">楽曲プリセット</div>
-    <div class="demo-buttons">
-      <button type="button" class="demo-btn active" data-track="earlyevening">夕: 虹を見た日</button>
-      <button type="button" class="demo-btn" data-track="morning">朝: 草原の風</button>
+  <div class="palette-tabs">
+    <button type="button" class="palette-tab-btn active" data-palette="A">
+      <span class="tab-title">A. 照柿・利休白茶</span>
+      <span class="tab-desc">秋の実りと茶席 (標準)</span>
+    </button>
+    <button type="button" class="palette-tab-btn" data-palette="B">
+      <span class="tab-title">B. 琥珀・木蘭</span>
+      <span class="tab-desc">銀杏と穏やかな夕暮れ</span>
+    </button>
+    <button type="button" class="palette-tab-btn" data-palette="C">
+      <span class="tab-title">C. 蘇芳・鳩羽鼠</span>
+      <span class="tab-desc">上品な紫泥とコスメ</span>
+    </button>
+    <button type="button" class="palette-tab-btn" data-palette="D">
+      <span class="tab-title">D. 深緋・胡桃染</span>
+      <span class="tab-desc">晩秋の陶器とテラコッタ</span>
+    </button>
+  </div>
+
+  <!-- Swatch Breakdown Card -->
+  <div class="swatch-display">
+    <div class="swatch-bars">
+      <div class="swatch-seg" id="segCanvas" style="width: 60%;"></div>
+      <div class="swatch-seg" id="segSurface" style="width: 20%;"></div>
+      <div class="swatch-seg" id="segText" style="width: 15%;"></div>
+      <div class="swatch-seg" id="segAccent" style="width: 5%;"></div>
+    </div>
+    <div class="swatch-legend">
+      <div class="swatch-legend-item">
+        <div class="swatch-dot" id="dotCanvas"></div>
+        <span id="lblCanvas">生成り (60%)</span>
+      </div>
+      <div class="swatch-legend-item">
+        <div class="swatch-dot" id="dotSurface"></div>
+        <span id="lblSurface">利休白茶 (20%)</span>
+      </div>
+      <div class="swatch-legend-item">
+        <div class="swatch-dot" id="dotText"></div>
+        <span id="lblText">栗皮墨 (15%)</span>
+      </div>
+      <div class="swatch-legend-item">
+        <div class="swatch-dot" id="dotAccent"></div>
+        <span id="lblAccent">照柿 (5%)</span>
+      </div>
+      <div class="swatch-legend-item" style="grid-column: span 2;">
+        <div class="swatch-dot" id="dotTag"></div>
+        <span id="lblTag">副アクセント: 苔色</span>
+      </div>
     </div>
   </div>
 
-  <div class="demo-group">
-    <div class="demo-label">音源 &amp; 再生</div>
-    <div class="demo-buttons">
-      <button type="button" class="demo-btn action" id="btnToggleAudio">▶ 音声を再生 (Synth)</button>
-      <button type="button" class="demo-btn" id="btnLoadRealMp3">実ファイル読込 (MP3)</button>
-    </div>
+  <!-- View Switcher -->
+  <div class="view-switch">
+    <button type="button" class="view-btn active" id="btnGreeting">Panel 0 挨拶画面</button>
+    <button type="button" class="view-btn" id="btnTable">サービス選択表</button>
   </div>
 
-  <div class="demo-group">
-    <div class="demo-label">ローディング状態シミュレート</div>
-    <div class="demo-buttons">
-      <button type="button" class="demo-btn" data-sim="0">0%</button>
-      <button type="button" class="demo-btn" data-sim="50">50% DL</button>
-      <button type="button" class="demo-btn" data-sim="100">100% DL</button>
-      <button type="button" class="demo-btn" data-sim="decode">デコード中</button>
-      <button type="button" class="demo-btn" data-sim="ready">完了 (Ready)</button>
-    </div>
-  </div>
-
-  <div class="demo-group">
-    <div class="demo-label">背景サンプルの切替</div>
-    <div class="demo-buttons">
-      <button type="button" class="demo-btn active" id="btnViewGreeting">Panel 0 挨拶</button>
-      <button type="button" class="demo-btn" id="btnViewTable">サービス表</button>
-    </div>
-  </div>
-
-  <div class="demo-hint-box">
-    スペクトラムとゲージ線の隙間を2pxに密着させ、HUD全体の高さを約115pxから約76pxに圧縮しました。
+  <div class="dock-note" id="dockRationale">
+    【A. 照柿・利休白茶】<br>
+    柔らかな生成り和紙（#FAF7F2）の上に、栗皮墨の文字が静かに沈み、照柿色のアクセントが秋の温もりを届けます。20〜40代女性に最も支持される王道の和モダン配色です。
   </div>
 </div>
 
+<!-- ============================================================
+     SPECTRUM & PALETTE SCRIPT
+     ============================================================ -->
 <script>
 (function() {
-  var TRACK_METADATA = {
-    morning: { 
-      title: '草原の風', 
-      artist: '小久保隆', 
-      url: 'Sound/Morning.mp3' 
+  /* ============ PALETTE DEFINITIONS ============ */
+  var PALETTES = {
+    A: {
+      name: 'A. 照柿・利休白茶 (秋の実りと茶席)',
+      rationale: '【A. 照柿・利休白茶】柔らかな生成り和紙（#FAF7F2）の上に、栗皮墨の文字が静かに沈み、照柿色のアクセントが秋の温もりを届けます。20〜40代女性に最も支持される王道の和モダン配色です。',
+      tokens: {
+        '--bg-base': '#FAF7F2',
+        '--bg-warm': '#F2EAE0',
+        '--accent': '#BA5D3B',
+        '--accent-2': '#9E492B',
+        '--accent-3': '#82381E',
+        '--glow': '#D98862',
+        '--petal': '#C76D49',
+        '--petal-soft': '#F4DDD3',
+        '--outstanding': '#9E492B',
+        '--shadow-accent': 'rgba(186, 93, 59, 0.28)',
+        '--border-1': '#DFD5C5',
+        '--border-2': '#D1C4B0',
+        '--border-3': '#E8E0D2',
+        '--border-4': '#EFE8DD',
+        '--soft-1': '#F4EDE2',
+        '--soft-2': '#FAF5EE',
+        '--soft-3': '#EBE4D8',
+        '--text-dark': '#2B231D',
+        '--text-med': '#473B32',
+        '--text-mute': '#695B50',
+        '--text-faint': '#8E7E72',
+        '--text-placeholder': '#B2A395',
+        '--dot-active-bg': '#76806C',
+        '--dot-active-ring': 'rgba(118, 128, 108, 0.28)',
+        '--dot-active-shadow': 'rgba(118, 128, 108, 0.38)'
+      },
+      legend: {
+        canvas: { name: '生成り #FAF7F2', color: '#FAF7F2' },
+        surface: { name: '利休白茶 #EBE4D8', color: '#EBE4D8' },
+        text: { name: '栗皮墨 #2B231D', color: '#2B231D' },
+        accent: { name: '照柿 #BA5D3B', color: '#BA5D3B' },
+        tag: { name: '苔色 #76806C (タグ・ドット)', color: '#76806C' }
+      },
+      mosaicStroke: '%23BA5D3B'
     },
-    earlyevening: { 
-      title: '虹を見た日', 
-      artist: '小久保隆', 
-      url: 'Sound/Earlyevening.mp3' 
+    B: {
+      name: 'B. 琥珀・木蘭 (銀杏と穏やかな夕暮れ)',
+      rationale: '【B. 琥珀・木蘭】鳥の子色の柔らかなキャンバス（#FAF5E8）に、木蘭色のトープ。ギラつきを抑えた琥珀ブロンズ（#B87333）が、晩秋のあたたかな木漏れ日を演出します。',
+      tokens: {
+        '--bg-base': '#FAF5E8',
+        '--bg-warm': '#F2EBDA',
+        '--accent': '#B87333',
+        '--accent-2': '#9E5F28',
+        '--accent-3': '#804A1B',
+        '--glow': '#D49457',
+        '--petal': '#C48144',
+        '--petal-soft': '#F5E4D0',
+        '--outstanding': '#9E5F28',
+        '--shadow-accent': 'rgba(184, 115, 51, 0.28)',
+        '--border-1': '#DFD4BE',
+        '--border-2': '#D8C7A3',
+        '--border-3': '#E8DEC9',
+        '--border-4': '#EFE7D6',
+        '--soft-1': '#F4ECDA',
+        '--soft-2': '#FAF6EC',
+        '--soft-3': '#EDE3CD',
+        '--text-dark': '#32261C',
+        '--text-med': '#4E3E30',
+        '--text-mute': '#75604E',
+        '--text-faint': '#998370',
+        '--text-placeholder': '#B8A593',
+        '--dot-active-bg': '#8A8265',
+        '--dot-active-ring': 'rgba(138, 130, 101, 0.28)',
+        '--dot-active-shadow': 'rgba(138, 130, 101, 0.38)'
+      },
+      legend: {
+        canvas: { name: '鳥の子色 #FAF5E8', color: '#FAF5E8' },
+        surface: { name: '木蘭色 #EDE3CD', color: '#EDE3CD' },
+        text: { name: '焦茶 #32261C', color: '#32261C' },
+        accent: { name: '琥珀 #B87333', color: '#B87333' },
+        tag: { name: '海松色 #8A8265 (タグ・ドット)', color: '#8A8265' }
+      },
+      mosaicStroke: '%23B87333'
+    },
+    C: {
+      name: 'C. 蘇芳・鳩羽鼠 (上品な紫泥とコスメ)',
+      rationale: '【C. 蘇芳・鳩羽鼠】白練（#F8F6F4）と鳩羽鼠のニュアンスグレーに、くすみプラムローズの蘇芳（#9C5B6B）。高級サロンやスキンケアのブランディングに通じる優美な静けさです。',
+      tokens: {
+        '--bg-base': '#F8F6F4',
+        '--bg-warm': '#EFECE9',
+        '--accent': '#9C5B6B',
+        '--accent-2': '#844755',
+        '--accent-3': '#693340',
+        '--glow': '#BA7B8B',
+        '--petal': '#A86877',
+        '--petal-soft': '#F2DEE3',
+        '--outstanding': '#844755',
+        '--shadow-accent': 'rgba(156, 91, 107, 0.28)',
+        '--border-1': '#DAD2D2',
+        '--border-2': '#CEBEBE',
+        '--border-3': '#E2DADA',
+        '--border-4': '#EBE5E5',
+        '--soft-1': '#F0EAEA',
+        '--soft-2': '#F9F5F5',
+        '--soft-3': '#EAE4E4',
+        '--text-dark': '#2C2226',
+        '--text-med': '#48393F',
+        '--text-mute': '#6A585F',
+        '--text-faint': '#8E7B83',
+        '--text-placeholder': '#B09FA7',
+        '--dot-active-bg': '#6E7C79',
+        '--dot-active-ring': 'rgba(110, 124, 121, 0.28)',
+        '--dot-active-shadow': 'rgba(110, 124, 121, 0.38)'
+      },
+      legend: {
+        canvas: { name: '白練 #F8F6F4', color: '#F8F6F4' },
+        surface: { name: '鳩羽鼠 #EAE4E4', color: '#EAE4E4' },
+        text: { name: '紫黒 #2C2226', color: '#2C2226' },
+        accent: { name: '蘇芳 #9C5B6B', color: '#9C5B6B' },
+        tag: { name: '錆青磁 #6E7C79 (タグ・ドット)', color: '#6E7C79' }
+      },
+      mosaicStroke: '%239C5B6B'
+    },
+    D: {
+      name: 'D. 深緋・胡桃染 (晩秋の陶器とテラコッタ)',
+      rationale: '【D. 深緋・胡桃染】灰白（#F7F4F0）と胡桃染の陶芸的トープに、テラコッタローズの深緋（#A34C44）。凛とした知性とクラフト感を持ち合わせたシックな佇まいです。',
+      tokens: {
+        '--bg-base': '#F7F4F0',
+        '--bg-warm': '#ECE4DC',
+        '--accent': '#A34C44',
+        '--accent-2': '#883A33',
+        '--accent-3': '#6E2B25',
+        '--glow': '#BF6E66',
+        '--petal': '#B05951',
+        '--petal-soft': '#F5DDD9',
+        '--outstanding': '#883A33',
+        '--shadow-accent': 'rgba(163, 76, 68, 0.28)',
+        '--border-1': '#D5C8BD',
+        '--border-2': '#CABBB0',
+        '--border-3': '#E0D4C9',
+        '--border-4': '#EAE0D6',
+        '--soft-1': '#EFE5DC',
+        '--soft-2': '#F8F3ED',
+        '--soft-3': '#E6DDD4',
+        '--text-dark': '#26201C',
+        '--text-med': '#443A34',
+        '--text-mute': '#63554D',
+        '--text-faint': '#88776E',
+        '--text-placeholder': '#AA9990',
+        '--dot-active-bg': '#697A6B',
+        '--dot-active-ring': 'rgba(105, 122, 107, 0.28)',
+        '--dot-active-shadow': 'rgba(105, 122, 107, 0.38)'
+      },
+      legend: {
+        canvas: { name: '灰白 #F7F4F0', color: '#F7F4F0' },
+        surface: { name: '胡桃染 #E6DDD4', color: '#E6DDD4' },
+        text: { name: '黒鳶 #26201C', color: '#26201C' },
+        accent: { name: '深緋 #A34C44', color: '#A34C44' },
+        tag: { name: '利休鼠 #697A6B (タグ・ドット)', color: '#697A6B' }
+      },
+      mosaicStroke: '%23A34C44'
     }
   };
-  var currentTrackKey = 'earlyevening';
 
+  var currentPalette = 'A';
+
+  /* ============ APPLY PALETTE ============ */
+  function applyPalette(key) {
+    var p = PALETTES[key];
+    if (!p) return;
+    currentPalette = key;
+
+    /* Write CSS Custom Properties directly to documentElement */
+    var root = document.documentElement;
+    for (var token in p.tokens) {
+      root.style.setProperty(token, p.tokens[token]);
+    }
+
+    /* Update Shippō Mosaic stroke color */
+    var mosaic = document.getElementById('ambientMosaic');
+    if (mosaic) {
+      mosaic.style.backgroundImage = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='" + p.mosaicStroke + "'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E\")";
+    }
+
+    /* Update Swatch Legend in Dock */
+    document.getElementById('segCanvas').style.background = p.legend.canvas.color;
+    document.getElementById('segSurface').style.background = p.legend.surface.color;
+    document.getElementById('segText').style.background = p.legend.text.color;
+    document.getElementById('segAccent').style.background = p.legend.accent.color;
+
+    document.getElementById('dotCanvas').style.background = p.legend.canvas.color;
+    document.getElementById('lblCanvas').textContent = p.legend.canvas.name;
+
+    document.getElementById('dotSurface').style.background = p.legend.surface.color;
+    document.getElementById('lblSurface').textContent = p.legend.surface.name;
+
+    document.getElementById('dotText').style.background = p.legend.text.color;
+    document.getElementById('lblText').textContent = p.legend.text.name;
+
+    document.getElementById('dotAccent').style.background = p.legend.accent.color;
+    document.getElementById('lblAccent').textContent = p.legend.accent.name;
+
+    document.getElementById('dotTag').style.background = p.legend.tag.color;
+    document.getElementById('lblTag').textContent = p.legend.tag.name;
+
+    document.getElementById('dockRationale').innerHTML = p.rationale;
+
+    /* Update Tab Active States */
+    document.querySelectorAll('.palette-tab-btn').forEach(function(b) {
+      b.classList.toggle('active', b.getAttribute('data-palette') === key);
+    });
+  }
+
+  /* ============ SPECTRUM CANVAS (120Hz Waterline Mirror) ============ */
   var canvas = document.getElementById('hudCanvas');
   var ctx = canvas.getContext('2d');
-  var hudTrackTitle = document.getElementById('hudTrackTitle');
-  var hudTrackArtist = document.getElementById('hudTrackArtist');
-  var hudStatusBadge = document.getElementById('hudStatusBadge');
-  var hudGaugeFill = document.getElementById('hudGaugeFill');
-  var hudByteStatus = document.getElementById('hudByteStatus');
-  var hudPctStatus = document.getElementById('hudPctStatus');
-
-  var btnToggleAudio = document.getElementById('btnToggleAudio');
-  var btnLoadRealMp3 = document.getElementById('btnLoadRealMp3');
-  var btnToggleTheme = document.getElementById('btnToggleTheme');
-  var btnViewGreeting = document.getElementById('btnViewGreeting');
-  var btnViewTable = document.getElementById('btnViewTable');
-  var sampleViewGreeting = document.getElementById('sampleViewGreeting');
-  var sampleViewTable = document.getElementById('sampleViewTable');
-
-  /* Compact Canvas Dimensions */
   var dpr = window.devicePixelRatio || 1;
-  var displayW = 282; // Matches 282px gauge line
-  var displayH = 26;  // Scaled down to 26px
+  var displayW = 282;
+  var displayH = 26;
   canvas.width = displayW * dpr;
   canvas.height = displayH * dpr;
   ctx.scale(dpr, dpr);
 
-  var audioCtx = null;
-  var analyser = null;
-  var freqData = null;
-  var isAudioPlaying = false;
-  var synthNodes = null;
+  var HUD_BARS = 25;
+  var HUD_BAR_W = 6.0;
+  var HUD_BAR_GAP = 5.5;
+  var _hudMirrorValues = new Float32Array(HUD_BARS);
+  var _hudPhase = 0;
 
-  function initAudio() {
-    if (audioCtx) return;
-    var Ctx = window.AudioContext || window.webkitAudioContext;
-    audioCtx = new Ctx();
-
-    analyser = audioCtx.createAnalyser();
-    analyser.fftSize = 256;
-    analyser.smoothingTimeConstant = 0.82;
-    freqData = new Uint8Array(analyser.frequencyBinCount);
-
-    if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
-    }
-  }
-
-  function startSyntheticAudio() {
-    initAudio();
-    if (isAudioPlaying) {
-      stopSyntheticAudio();
-      return;
-    }
-
-    var osc1 = audioCtx.createOscillator();
-    var osc2 = audioCtx.createOscillator();
-    var osc3 = audioCtx.createOscillator();
-    var filter = audioCtx.createBiquadFilter();
-    var gain = audioCtx.createGain();
-
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(216, audioCtx.currentTime);
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(324, audioCtx.currentTime);
-    osc3.type = 'triangle';
-    osc3.frequency.setValueAtTime(648, audioCtx.currentTime);
-
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(1100, audioCtx.currentTime);
-
-    gain.gain.setValueAtTime(0.001, audioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.28, audioCtx.currentTime + 1.2);
-
-    osc1.connect(filter);
-    osc2.connect(filter);
-    osc3.connect(filter);
-    filter.connect(gain);
-    gain.connect(analyser);
-    analyser.connect(audioCtx.destination);
-
-    osc1.start(); osc2.start(); osc3.start();
-
-    synthNodes = { osc1: osc1, osc2: osc2, osc3: osc3, gain: gain };
-    isAudioPlaying = true;
-    btnToggleAudio.textContent = '■ 音声を停止';
-    btnToggleAudio.classList.add('active');
-    setLoadingState(1.0, 'ready');
-  }
-
-  function stopSyntheticAudio() {
-    if (!synthNodes || !audioCtx) return;
-    var g = synthNodes.gain;
-    var now = audioCtx.currentTime;
-    g.gain.cancelScheduledValues(now);
-    g.gain.setValueAtTime(g.gain.value, now);
-    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.6);
-    setTimeout(function() {
-      try {
-        synthNodes.osc1.stop();
-        synthNodes.osc2.stop();
-        synthNodes.osc3.stop();
-        synthNodes = null;
-      } catch (e) {}
-    }, 650);
-
-    isAudioPlaying = false;
-    btnToggleAudio.textContent = '▶ 音声を再生 (Synth)';
-    btnToggleAudio.classList.remove('active');
-    hudStatusBadge.textContent = '待機中';
-    hudStatusBadge.className = 'hud-status-badge';
-  }
-
-  function fetchTrackWithByteProgress(url) {
-    initAudio();
-    setLoadingState(0.0, 'downloading');
-
-    fetch(url)
-      .then(function(res) {
-        if (!res.ok) throw new Error('HTTP ' + res.status);
-        var contentLength = res.headers.get('content-length');
-        var total = contentLength ? parseInt(contentLength, 10) : 16000000;
-        var loaded = 0;
-        var reader = res.body.getReader();
-        var chunks = [];
-
-        function read() {
-          return reader.read().then(function(result) {
-            if (result.done) {
-              setLoadingState(1.0, 'decoding');
-              var all = new Uint8Array(loaded);
-              var pos = 0;
-              for (var i = 0; i < chunks.length; i++) {
-                all.set(chunks[i], pos);
-                pos += chunks[i].length;
-              }
-              return audioCtx.decodeAudioData(all.buffer).then(function(decodedBuf) {
-                setLoadingState(1.0, 'ready');
-                playDecodedBuffer(decodedBuf);
-              });
-            }
-
-            chunks.push(result.value);
-            loaded += result.value.length;
-            var pct = total > 0 ? (loaded / total) : 0.5;
-            setLoadingState(pct, 'downloading', loaded, total);
-            return read();
-          });
-        }
-        return read();
-      })
-      .catch(function() {
-        setLoadingState(1.0, 'ready');
-        hudByteStatus.textContent = '読込完了 (Cache/Local)';
-      });
-  }
-
-  var liveBufferSource = null;
-  function playDecodedBuffer(buffer) {
-    if (liveBufferSource) {
-      try { liveBufferSource.stop(); } catch(e){}
-    }
-    liveBufferSource = audioCtx.createBufferSource();
-    liveBufferSource.buffer = buffer;
-    liveBufferSource.loop = true;
-    var g = audioCtx.createGain();
-    g.gain.value = 0.5;
-    liveBufferSource.connect(g);
-    g.connect(analyser);
-    analyser.connect(audioCtx.destination);
-    liveBufferSource.start(0);
-    isAudioPlaying = true;
-    btnToggleAudio.textContent = '■ 音声を停止 (MP3)';
-    btnToggleAudio.classList.add('active');
-  }
-
-  function setLoadingState(pct, state, bytesLoaded, bytesTotal) {
-    var pClamped = Math.max(0, Math.min(1.0, pct));
-    var pctInt = Math.round(pClamped * 100);
-    hudGaugeFill.style.width = pctInt + '%';
-
-    hudGaugeFill.classList.remove('decoding', 'ready');
-    hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
-
-    if (state === 'downloading') {
-      hudStatusBadge.textContent = 'DL ' + pctInt + '%';
-      hudStatusBadge.classList.add('loading');
-      hudPctStatus.textContent = pctInt + '%';
-      if (bytesLoaded && bytesTotal) {
-        var mbLoaded = (bytesLoaded / (1024 * 1024)).toFixed(1);
-        var mbTotal = (bytesTotal / (1024 * 1024)).toFixed(1);
-        hudByteStatus.textContent = mbLoaded + ' / ' + mbTotal + ' MB';
-      } else {
-        hudByteStatus.textContent = (pctInt * 0.16).toFixed(1) + ' / 16.0 MB';
-      }
-    } else if (state === 'decoding') {
-      hudGaugeFill.classList.add('decoding');
-      hudStatusBadge.textContent = '展開中';
-      hudStatusBadge.classList.add('decoding');
-      hudPctStatus.textContent = 'PCM展開中';
-      hudByteStatus.textContent = 'デコード中...';
-    } else if (state === 'ready') {
-      hudGaugeFill.classList.add('ready');
-      hudStatusBadge.textContent = '再生中';
-      hudStatusBadge.classList.add('ready');
-      hudPctStatus.textContent = '待機完了';
-      hudByteStatus.textContent = '15.8 MB (RAM)';
-    }
-  }
-
-  function setTrack(key) {
-    currentTrackKey = key;
-    var t = TRACK_METADATA[key];
-    if (!t) return;
-    hudTrackTitle.textContent = t.title;
-    hudTrackArtist.textContent = t.artist;
-  }
-
-  /* ============================================================
-     RENDER LOOP (Tight Waterline Mirror)
-     ============================================================ */
-  var mBars = 25;
-  var mW = 6.0;
-  var mGap = 5.5;
-  var mirrorValues = new Float32Array(mBars);
-  var phase = 0;
-
-  function renderVisualizer() {
-    requestAnimationFrame(renderVisualizer);
-
+  function renderSpectrum() {
+    requestAnimationFrame(renderSpectrum);
     ctx.clearRect(0, 0, displayW, displayH);
 
-    var themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#c9600a';
-    var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#e88a1a';
+    var themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#BA5D3B';
+    var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#C76D49';
 
-    if (analyser && isAudioPlaying) {
-      analyser.getByteFrequencyData(freqData);
-    }
+    _hudPhase += 0.045;
+    var midY = Math.round(displayH * 0.44); /* 11px */
 
-    phase += 0.045;
-    var midY = Math.round(displayH * 0.44); /* 11.5px: gives balanced headroom above and reflection below */
-
-    /* Thin waterline divider */
-    ctx.strokeStyle = 'rgba(216, 180, 120, 0.40)';
+    /* Waterline */
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-2').trim() || '#D1C4B0';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
     ctx.lineTo(displayW, midY);
     ctx.stroke();
 
-    for (var m = 0; m < mBars; m++) {
-      var targetEnergy = 0.12;
-      if (analyser && isAudioPlaying) {
-        var binIdx = 3 + Math.floor(m * 3.6);
-        targetEnergy = Math.max(0.10, freqData[binIdx] / 255);
-      } else {
-        targetEnergy = 0.22 + Math.sin(phase + m * 0.42) * 0.18 + Math.cos(phase * 0.7 + m * 0.2) * 0.08;
-      }
+    var hasRoundRect = (typeof ctx.roundRect === 'function');
 
-      mirrorValues[m] += (targetEnergy - mirrorValues[m]) * 0.25;
+    for (var m = 0; m < HUD_BARS; m++) {
+      var targetEnergy = 0.20 + Math.sin(_hudPhase + m * 0.42) * 0.17 + Math.cos(_hudPhase * 0.7 + m * 0.2) * 0.08;
+      _hudMirrorValues[m] += (targetEnergy - _hudMirrorValues[m]) * 0.25;
 
-      var halfH = Math.max(2.0, mirrorValues[m] * 10.5);
-      var mx = m * (mW + mGap);
+      var halfH = Math.max(2.0, _hudMirrorValues[m] * 10.5);
+      var mx = m * (HUD_BAR_W + HUD_BAR_GAP);
 
       /* Upper Sky Column */
-      var gradSky = ctx.createLinearGradient(0, midY - halfH, 0, midY);
-      gradSky.addColorStop(0, themeAccent);
-      gradSky.addColorStop(1, themePetal);
-      ctx.fillStyle = gradSky;
+      ctx.fillStyle = themeAccent;
       ctx.beginPath();
-      ctx.roundRect(mx, midY - halfH, mW, halfH, [1.5, 1.5, 0, 0]);
+      if (hasRoundRect) ctx.roundRect(mx, midY - halfH, HUD_BAR_W, halfH, [1.5, 1.5, 0, 0]);
+      else ctx.rect(mx, midY - halfH, HUD_BAR_W, halfH);
       ctx.fill();
 
-      /* Lower Water Mirror (extends down close to canvas bottom) */
-      var gradWater = ctx.createLinearGradient(0, midY, 0, midY + halfH * 0.85);
-      gradWater.addColorStop(0, themePetal);
-      gradWater.addColorStop(1, 'rgba(247, 185, 60, 0.15)');
-      ctx.fillStyle = gradWater;
+      /* Lower Water Reflection */
+      ctx.fillStyle = themePetal;
       ctx.globalAlpha = 0.46;
       ctx.beginPath();
-      ctx.roundRect(mx, midY, mW, halfH * 0.85, [0, 0, 1.5, 1.5]);
+      if (hasRoundRect) ctx.roundRect(mx, midY, HUD_BAR_W, halfH * 0.85, [0, 0, 1.5, 1.5]);
+      else ctx.rect(mx, midY, HUD_BAR_W, halfH * 0.85);
       ctx.fill();
       ctx.globalAlpha = 1.0;
     }
   }
-  requestAnimationFrame(renderVisualizer);
+  requestAnimationFrame(renderSpectrum);
 
-  /* Controller Handlers */
-  var trackBtns = document.querySelectorAll('.demo-buttons [data-track]');
-  trackBtns.forEach(function(b) {
-    b.addEventListener('click', function() {
-      trackBtns.forEach(function(btn){ btn.classList.remove('active'); });
-      b.classList.add('active');
-      setTrack(b.getAttribute('data-track'));
+  /* ============ DOCK EVENT LISTENERS ============ */
+  document.querySelectorAll('.palette-tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      applyPalette(btn.getAttribute('data-palette'));
     });
   });
 
-  var simBtns = document.querySelectorAll('.demo-buttons [data-sim]');
-  simBtns.forEach(function(b) {
-    b.addEventListener('click', function() {
-      var sim = b.getAttribute('data-sim');
-      if (sim === '0') setLoadingState(0.0, 'downloading');
-      else if (sim === '50') setLoadingState(0.50, 'downloading', 8000000, 16000000);
-      else if (sim === '100') setLoadingState(1.0, 'downloading', 16000000, 16000000);
-      else if (sim === 'decode') setLoadingState(1.0, 'decoding');
-      else if (sim === 'ready') setLoadingState(1.0, 'ready');
-    });
+  var btnGreeting = document.getElementById('btnGreeting');
+  var btnTable = document.getElementById('btnTable');
+  var viewGreeting = document.getElementById('viewGreeting');
+  var viewTable = document.getElementById('viewTable');
+
+  btnGreeting.addEventListener('click', function() {
+    btnGreeting.classList.add('active');
+    btnTable.classList.remove('active');
+    viewGreeting.classList.remove('hidden');
+    viewTable.classList.add('hidden');
   });
 
-  btnToggleAudio.addEventListener('click', function() {
-    startSyntheticAudio();
+  btnTable.addEventListener('click', function() {
+    btnTable.classList.add('active');
+    btnGreeting.classList.remove('active');
+    viewTable.classList.remove('hidden');
+    viewGreeting.classList.add('hidden');
   });
 
-  btnLoadRealMp3.addEventListener('click', function() {
-    fetchTrackWithByteProgress(TRACK_METADATA[currentTrackKey].url);
-  });
-
-  btnToggleTheme.addEventListener('click', function() {
-    var cur = document.documentElement.getAttribute('data-theme') || 'autumn';
-    var next = (cur === 'autumn') ? 'default' : 'autumn';
-    document.documentElement.setAttribute('data-theme', next);
-  });
-
-  btnViewGreeting.addEventListener('click', function() {
-    btnViewGreeting.classList.add('active');
-    btnViewTable.classList.remove('active');
-    sampleViewGreeting.classList.remove('hidden');
-    sampleViewTable.classList.add('hidden');
-  });
-
-  btnViewTable.addEventListener('click', function() {
-    btnViewTable.classList.add('active');
-    btnViewGreeting.classList.remove('active');
-    sampleViewTable.classList.remove('hidden');
-    sampleViewGreeting.classList.add('hidden');
-  });
-
+  /* Initial boot into Palette A */
+  applyPalette('A');
 })();
 </script>
 
