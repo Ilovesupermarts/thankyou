@@ -1,5 +1,13 @@
 /* ============================================================
    main.css — v1.3
+
+   Autumn theme (data-theme="autumn") is the 金木犀 (Kinmokusei
+   & Ebizome) system:
+     Canvas / Base (~60%)  絹白 Kinushiro   #FFFDF9
+     Surface / Card (~20%) 薄杏 Usuanzu     #FBECE0
+     Body Text (~15%)      濃茶墨 Koichazumi #241C1A
+     Primary CTA (~10%)    金木犀 Kinmokusei #E66826
+     Secondary (~5%)       葡萄染 Ebizome    #882E47
    ============================================================ */
 
   /* ============ THEME VARIABLES ============ */
@@ -30,31 +38,87 @@
     --transition-head-color: #fce6dc;
   }
 
+  /* ============================================================
+     AUTUMN THEME — 金木犀 (Kinmokusei & Ebizome)
+     ============================================================ */
   html[data-theme="autumn"] {
-    --bg-base: #fdf3d8; --bg-warm: #f5d89a;
-    --bg-morning: #fdf0c4; --bg-day: #fdf3d8; --bg-evening: #f5d89a; --bg-night: #e8c078;
-    --bg-warm-morning: #fbe8b0; --bg-warm-day: #f5d89a; --bg-warm-evening: #eac880; --bg-warm-night: #d8b068;
-    --bg-rain: #e8d0a0; --bg-rain-warm: #e0c88a; --bg-storm: #d0b078; --bg-storm-warm: #d8b880;
-    --bg-fog: #efe0b8; --bg-clouds: #f0e0b0; --bg-snow: #f0e8cc; --bg-clear: #fdeeb8;
-    --bg-evening-rain: #d8b880; --bg-night-rain: #c8a860;
-    --accent: #c9600a; --accent-2: #8f3f12; --accent-3: #7a3208;
-    --glow: #f7b93c; --petal: #e88a1a; --petal-soft: #fde8b8; --outstanding: #8f2f00;
-    --border-1: #e8c88a; --border-2: #d8b478; --border-3: #f0d8a0;
-    --border-4: #f5e0b0; --border-5: #e8c890; --border-6: #b89860;
-    --soft-1: #fdf0c8; --soft-2: #fdf5e0; --soft-3: #f0e0b8; --soft-4: #fdf6e0;
-    --text-dark: #231304; --text-med: #3d2410; --text-soft: #2a1808;
-    --text-mute: #5a3818; --text-faint: #7a5028; --text-placeholder: #a07a48;
-    --shadow-rose: rgba(120, 70, 20, 0.10); --shadow-rose-2: rgba(120, 70, 20, 0.18);
-    --shadow-accent: rgba(201, 96, 10, 0.32);
-    --box-bg: rgba(253, 240, 200, 0.55); --box-border: rgba(216, 180, 120, 0.4);
-    --box-shadow: 0 2px 12px rgba(120, 70, 20, 0.06);
-    --summary-bg: rgba(253, 240, 200, 0.96); --summary-border: rgba(216, 180, 120, 0.35); --summary-shadow: rgba(120, 70, 20, 0.08);
-    --dot-active-bg: #2a3f1a; --dot-active-ring: rgba(42, 63, 26, 0.28); --dot-active-shadow: rgba(42, 63, 26, 0.4);
-    --ty-line-color: #231304; --ty-line-shadow: 0 1px 8px rgba(253, 240, 200, 0.6); --ty-accent-color: #6b1f2a;
-    --quote-color: #8f2f00; --quote-shadow: 0 2px 24px rgba(253, 232, 184, 0.75);
-    --amb-1: rgba(247, 185, 60, 0.85); --amb-2: rgba(240, 138, 30, 0.80);
-    --amb-3: rgba(217, 94, 26, 0.72); --amb-4: rgba(143, 63, 18, 0.55); --amb-5: rgba(107, 47, 14, 0.45);
-    --transition-head-color: #fdf0c8;
+    /* 60% Canvas / Base (絹白 Kinushiro) */
+    --bg-base: #FFFDF9;
+    --bg-warm: #FBECE0;
+    --bg-morning: #FFFDFB;
+    --bg-day: #FFFDF9;
+    --bg-evening: #FAF1E8;
+    --bg-night: #EFE3D8;
+    --bg-warm-morning: #FAF0E6;
+    --bg-warm-day: #FBECE0;
+    --bg-warm-evening: #F5E4D6;
+    --bg-warm-night: #E8D6C6;
+    --bg-rain: #EDE3DB;
+    --bg-rain-warm: #E8DDD4;
+    --bg-storm: #DED3CA;
+    --bg-storm-warm: #D8CCC3;
+    --bg-fog: #F2EBE4;
+    --bg-clouds: #F5EDE6;
+    --bg-snow: #F8F3ED;
+    --bg-clear: #FFFDF8;
+    --bg-evening-rain: #E5D8CD;
+    --bg-night-rain: #D8C8BB;
+
+    /* 10% Primary Action / CTA (金木犀 Kinmokusei) */
+    --accent: #E66826;
+    --accent-2: #C44E10;
+    --accent-3: #9E3B06;
+    --glow: #FFA259;
+    --petal: #F07D40;
+    --petal-soft: #FDE8DA;
+    --outstanding: #E66826;
+    --shadow-accent: rgba(230, 104, 38, 0.28);
+
+    /* 5% Secondary Accent (葡萄染 Ebizome) */
+    --secondary-accent: #882E47;
+
+    /* 20% Surface / Borders (薄杏 Usuanzu) */
+    --border-1: #EED2C0;
+    --border-2: #DEC0AC;
+    --border-3: #F7DECD;
+    --border-4: #FCEADF;
+    --border-5: #E8C8B5;
+    --border-6: #C2A28F;
+    --soft-1: #FBECE0;
+    --soft-2: #FFF7F2;
+    --soft-3: #F5DFCF;
+    --soft-4: #FAF0E6;
+
+    /* Typography (濃茶墨 Koichazumi) */
+    --text-dark: #241C1A;
+    --text-med: #443430;
+    --text-soft: #352824;
+    --text-mute: #725750;
+    --text-faint: #9E7D75;
+    --text-placeholder: #BEA29B;
+
+    /* Shadows & Cards */
+    --shadow-rose: rgba(68, 52, 48, 0.07);
+    --shadow-rose-2: rgba(68, 52, 48, 0.14);
+    --box-bg: rgba(251, 236, 224, 0.55);
+    --box-border: rgba(222, 192, 172, 0.45);
+    --box-shadow: 0 2px 14px rgba(68, 52, 48, 0.05);
+    --summary-bg: rgba(255, 253, 249, 0.96);
+    --summary-border: rgba(222, 192, 172, 0.40);
+    --summary-shadow: rgba(68, 52, 48, 0.06);
+
+    /* Carousel Dots: 葡萄染 (Ebizome) #882E47 */
+    --dot-active-bg: #882E47;
+    --dot-active-ring: rgba(136, 46, 71, 0.28);
+    --dot-active-shadow: rgba(136, 46, 71, 0.40);
+
+    /* Quotes & Transitions */
+    --ty-line-color: #241C1A;
+    --ty-line-shadow: 0 1px 8px rgba(255, 253, 249, 0.65);
+    --ty-accent-color: #882E47;
+    --quote-color: #C44E10;
+    --quote-shadow: 0 2px 24px rgba(253, 232, 218, 0.65);
+    --transition-head-color: #F7DECD;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -167,9 +231,10 @@
     opacity: 0.08;
   }
 
+  /* 金木犀 (Kinmokusei) Shippō stroke. Was %238f2f00 (old amber-brown). */
   html[data-theme="autumn"] .ambient-mosaic,
   html[data-theme="autumn"] .ambient-mosaic-pond {
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%238f2f00'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%23E66826'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
   }
 
   html[data-theme="default"] .ambient-mosaic,
@@ -263,21 +328,21 @@
     
   }
 
-  /* Layer 2 orb overrides. The previous filter chain
+  /* Layer 2 orb overrides — 金木犀 (Kinmokusei amber / Ebizome plum /
+     Kinmokusei coral). The previous filter chain
      (hue-rotate(8deg) saturate(0.50) contrast(1.60)) is baked into
-     these stops directly. Values are best-effort approximations
-     pending pixel-sampling against a running build; the shape and
-     alpha distribution match, and the composite reads slightly
-     denser than the raw alpha suggests — which is what the removed
-     contrast pass was providing. */
-  .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(255, 179, 136, 0.95) 0%, rgba(230, 145, 105, 0.45) 45%, transparent 70%) !important;
+     these stops directly. Under sakura the base .orb-N values cascade
+     here instead, but Layer 2's .ambient-mesh is display: none under
+     sakura via html[data-theme="default"] .ambient-mesh, so this
+     override is inert in that theme. */
+  html[data-theme="autumn"] .shippo-mask-window .orb-1 {
+    background: radial-gradient(circle, rgba(230, 104, 38, 0.80) 0%, rgba(255, 162, 89, 0.35) 45%, transparent 70%) !important;
   }
-  .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(255, 188, 140, 0.98) 0%, rgba(240, 155, 110, 0.50) 48%, transparent 72%) !important;
+  html[data-theme="autumn"] .shippo-mask-window .orb-2 {
+    background: radial-gradient(circle, rgba(136, 46, 71, 0.70) 0%, rgba(230, 104, 38, 0.25) 48%, transparent 72%) !important;
   }
-  .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(245, 172, 128, 0.90) 0%, rgba(225, 140, 100, 0.40) 40%, transparent 62%) !important;
+  html[data-theme="autumn"] .shippo-mask-window .orb-3 {
+    background: radial-gradient(circle, rgba(255, 162, 89, 0.75) 0%, rgba(136, 46, 71, 0.20) 40%, transparent 62%) !important;
   }
 
   /* ============ AMBIENT LIGHT MESH (v1.3) ============ */
@@ -292,7 +357,8 @@
 
   /* The three base orbs. Gradient stops include the previously
      applied brightness(1.08) saturate(1.05) ancestor filter, baked
-     in so the visual remains constant now that the filter is gone. */
+     in so the visual remains constant now that the filter is gone.
+     金木犀 (Kinmokusei) palette: amber, plum, coral. */
   .light-orb {
     position: absolute;
     border-radius: 50%;
@@ -307,7 +373,7 @@
     max-height: 900px;
     top: 10%;
     left: 15%;
-    background: radial-gradient(circle, rgba(216, 89, 24, 0.50) 0%, rgba(255, 192, 56, 0.18) 42%, transparent 70%);
+    background: radial-gradient(circle, rgba(230, 104, 38, 0.46) 0%, rgba(255, 162, 89, 0.18) 46%, transparent 72%);
     animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
 
@@ -318,7 +384,7 @@
     max-height: 1050px;
     top: 35%;
     right: 5%;
-    background: radial-gradient(circle, rgba(228, 110, 18, 0.68) 0%, rgba(233, 98, 22, 0.41) 48%, transparent 72%);
+    background: radial-gradient(circle, rgba(136, 46, 71, 0.40) 0%, rgba(230, 104, 38, 0.15) 50%, transparent 74%);
     animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
 
@@ -329,7 +395,7 @@
     max-height: 700px;
     bottom: 10%;
     left: 30%;
-    background: radial-gradient(circle, rgba(216, 89, 24, 0.28) 0%, rgba(238, 137, 20, 0.48) 39%, transparent 60%);
+    background: radial-gradient(circle, rgba(255, 162, 89, 0.42) 0%, rgba(136, 46, 71, 0.16) 42%, transparent 64%);
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
@@ -360,18 +426,14 @@
      --audio-swell mutates its siblings every frame, both offscreen
      passes were re-run per frame.
 
-     All time and weather variants are now expressed as discrete
-     background gradient declarations. Both axes carry identical
-     (0,3,1) specificity, so source order decides: time rules come
-     first, weather rules after, meaning weather always wins when
-     both attributes are present — exactly as in production where
-     the filter chain resolved the same way.
+     The ten autumn variant selectors (3 time + 7 weather) that used
+     to live here have been removed. They carried (0,3,1) specificity
+     and were overriding the unified 金木犀 wash on every real
+     Nagoya wall-clock tick. data-time and data-weather still drive
+     the body --bg-* shifts via the AMBIENT THEMING rules further
+     down; only .ambient-primary is now unified.
 
-     The values below include the previously-applied brightness and
-     saturation adjustments. They are best-effort approximations
-     pending pixel-sampling; the structural shape of every gradient
-     matches the base, and the directional shifts (warmer, dimmer,
-     desaturated) follow the filter matrices that were removed. */
+     The values below are the Kinmokusei palette. */
   .ambient-primary {
     background:
       radial-gradient(circle at 28% 35%, var(--amb-1) 0%, transparent 42%),
@@ -381,101 +443,19 @@
     animation: ambientDrift 32s ease-in-out infinite;
     will-change: transform;
   }
+
+  /* Unified 金木犀 (Kinmokusei & Ebizome) autumn wash.
+     Amber (#E66826) upper-left, plum (#882E47) upper-right,
+     coral (#FFA259) lower-centre. The four-point dispersion is
+     wider than the previous single-hue stack, which is why the
+     drift reads gentler at rest even though the animation curve
+     is unchanged (autumnDrift1, 14s, ease-in-out, infinite). */
   html[data-theme="autumn"] .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(255, 195, 62, 0.85) 0%, rgba(255, 195, 62, 0.40) 30%, rgba(255, 195, 62, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(255, 148, 30, 0.80) 0%, rgba(255, 148, 30, 0.38) 32%, rgba(255, 148, 30, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(230, 100, 26, 0.72) 0%, rgba(230, 100, 26, 0.34) 28%, rgba(230, 100, 26, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(155, 66, 18, 0.55) 0%, rgba(155, 66, 18, 0.26) 26%, rgba(155, 66, 18, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(118, 50, 14, 0.45) 0%, rgba(118, 50, 14, 0.20) 25%, rgba(118, 50, 14, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(155, 50, 0, 0.30) 0%, rgba(118, 50, 14, 0.16) 35%, rgba(118, 50, 14, 0) 65%);
+      radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.14) 34%, transparent 64%),
+      radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.10) 36%, transparent 66%),
+      radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, transparent 60%);
     animation: autumnDrift1 14s ease-in-out infinite;
-  }
-
-  /* --- AUTUMN: time variants --- */
-  html[data-theme="autumn"][data-time="morning"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(255, 190, 58, 0.85) 0%, rgba(255, 190, 58, 0.40) 30%, rgba(255, 190, 58, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(255, 143, 26, 0.80) 0%, rgba(255, 143, 26, 0.38) 32%, rgba(255, 143, 26, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(235, 96, 22, 0.72) 0%, rgba(235, 96, 22, 0.34) 28%, rgba(235, 96, 22, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(158, 63, 15, 0.55) 0%, rgba(158, 63, 15, 0.26) 26%, rgba(158, 63, 15, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(120, 47, 11, 0.45) 0%, rgba(120, 47, 11, 0.20) 25%, rgba(120, 47, 11, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(158, 47, 0, 0.30) 0%, rgba(120, 47, 11, 0.16) 35%, rgba(120, 47, 11, 0) 65%);
-  }
-  html[data-theme="autumn"][data-time="evening"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(255, 178, 45, 0.85) 0%, rgba(255, 178, 45, 0.40) 30%, rgba(255, 178, 45, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(255, 130, 20, 0.80) 0%, rgba(255, 130, 20, 0.38) 32%, rgba(255, 130, 20, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(245, 88, 18, 0.72) 0%, rgba(245, 88, 18, 0.34) 28%, rgba(245, 88, 18, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(168, 58, 12, 0.55) 0%, rgba(168, 58, 12, 0.26) 26%, rgba(168, 58, 12, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(130, 43, 8, 0.45) 0%, rgba(130, 43, 8, 0.20) 25%, rgba(130, 43, 8, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(170, 43, 0, 0.30) 0%, rgba(130, 43, 8, 0.16) 35%, rgba(130, 43, 8, 0) 65%);
-  }
-  html[data-theme="autumn"][data-time="night"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(225, 155, 62, 0.85) 0%, rgba(225, 155, 62, 0.40) 30%, rgba(225, 155, 62, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(220, 118, 45, 0.80) 0%, rgba(220, 118, 45, 0.38) 32%, rgba(220, 118, 45, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(195, 88, 45, 0.72) 0%, rgba(195, 88, 45, 0.34) 28%, rgba(195, 88, 45, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(135, 63, 35, 0.55) 0%, rgba(135, 63, 35, 0.26) 26%, rgba(135, 63, 35, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(105, 50, 30, 0.45) 0%, rgba(105, 50, 30, 0.20) 25%, rgba(105, 50, 30, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(135, 48, 20, 0.30) 0%, rgba(105, 50, 30, 0.16) 35%, rgba(105, 50, 30, 0) 65%);
-  }
-
-  /* --- AUTUMN: weather variants --- */
-  html[data-theme="autumn"][data-weather="clear"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(255, 200, 60, 0.85) 0%, rgba(255, 200, 60, 0.42) 30%, rgba(255, 200, 60, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(255, 152, 28, 0.80) 0%, rgba(255, 152, 28, 0.40) 32%, rgba(255, 152, 28, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(235, 102, 24, 0.72) 0%, rgba(235, 102, 24, 0.36) 28%, rgba(235, 102, 24, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(158, 68, 17, 0.55) 0%, rgba(158, 68, 17, 0.28) 26%, rgba(158, 68, 17, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(120, 51, 13, 0.45) 0%, rgba(120, 51, 13, 0.22) 25%, rgba(120, 51, 13, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(158, 51, 0, 0.30) 0%, rgba(120, 51, 13, 0.18) 35%, rgba(120, 51, 13, 0) 65%);
-  }
-  html[data-theme="autumn"][data-weather="clouds"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(240, 185, 65, 0.85) 0%, rgba(240, 185, 65, 0.35) 30%, rgba(240, 185, 65, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(235, 140, 32, 0.80) 0%, rgba(235, 140, 32, 0.33) 32%, rgba(235, 140, 32, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(215, 95, 28, 0.72) 0%, rgba(215, 95, 28, 0.30) 28%, rgba(215, 95, 28, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(145, 65, 20, 0.55) 0%, rgba(145, 65, 20, 0.23) 26%, rgba(145, 65, 20, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(110, 50, 15, 0.45) 0%, rgba(110, 50, 15, 0.18) 25%, rgba(110, 50, 15, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(145, 50, 5, 0.30) 0%, rgba(110, 50, 15, 0.14) 35%, rgba(110, 50, 15, 0) 65%);
-  }
-  html[data-theme="autumn"][data-weather="fog"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(245, 200, 90, 0.85) 0%, rgba(245, 200, 90, 0.40) 30%, rgba(245, 200, 90, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 155, 55, 0.80) 0%, rgba(240, 155, 55, 0.38) 32%, rgba(240, 155, 55, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(220, 110, 50, 0.72) 0%, rgba(220, 110, 50, 0.34) 28%, rgba(220, 110, 50, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(155, 78, 40, 0.55) 0%, rgba(155, 78, 40, 0.26) 26%, rgba(155, 78, 40, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(120, 60, 32, 0.45) 0%, rgba(120, 60, 32, 0.20) 25%, rgba(120, 60, 32, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(155, 60, 20, 0.30) 0%, rgba(120, 60, 32, 0.16) 35%, rgba(120, 60, 32, 0) 65%);
-  }
-  html[data-theme="autumn"][data-weather="drizzle"] .ambient-primary,
-  html[data-theme="autumn"][data-weather="rain"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(225, 175, 75, 0.85) 0%, rgba(225, 175, 75, 0.35) 30%, rgba(225, 175, 75, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(215, 130, 45, 0.80) 0%, rgba(215, 130, 45, 0.33) 32%, rgba(215, 130, 45, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(200, 90, 35, 0.72) 0%, rgba(200, 90, 35, 0.30) 28%, rgba(200, 90, 35, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(135, 62, 25, 0.55) 0%, rgba(135, 62, 25, 0.23) 26%, rgba(135, 62, 25, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(105, 47, 18, 0.45) 0%, rgba(105, 47, 18, 0.18) 25%, rgba(105, 47, 18, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(135, 45, 10, 0.30) 0%, rgba(105, 47, 18, 0.14) 35%, rgba(105, 47, 18, 0) 65%);
-  }
-  html[data-theme="autumn"][data-weather="snow"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(245, 215, 130, 0.85) 0%, rgba(245, 215, 130, 0.40) 30%, rgba(245, 215, 130, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(240, 175, 90, 0.80) 0%, rgba(240, 175, 90, 0.38) 32%, rgba(240, 175, 90, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(220, 130, 75, 0.72) 0%, rgba(220, 130, 75, 0.34) 28%, rgba(220, 130, 75, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(160, 95, 55, 0.55) 0%, rgba(160, 95, 55, 0.26) 26%, rgba(160, 95, 55, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(130, 75, 42, 0.45) 0%, rgba(130, 75, 42, 0.20) 25%, rgba(130, 75, 42, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(160, 75, 32, 0.30) 0%, rgba(130, 75, 42, 0.16) 35%, rgba(130, 75, 42, 0) 65%);
-  }
-  html[data-theme="autumn"][data-weather="thunderstorm"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(195, 145, 75, 0.85) 0%, rgba(195, 145, 75, 0.35) 30%, rgba(195, 145, 75, 0) 60%),
-      radial-gradient(circle at 75% 40%, rgba(185, 115, 55, 0.80) 0%, rgba(185, 115, 55, 0.33) 32%, rgba(185, 115, 55, 0) 62%),
-      radial-gradient(circle at 50% 70%, rgba(170, 80, 45, 0.72) 0%, rgba(170, 80, 45, 0.30) 28%, rgba(170, 80, 45, 0) 58%),
-      radial-gradient(circle at 20% 85%, rgba(115, 58, 35, 0.55) 0%, rgba(115, 58, 35, 0.23) 26%, rgba(115, 58, 35, 0) 56%),
-      radial-gradient(circle at 80% 90%, rgba(88, 45, 28, 0.45) 0%, rgba(88, 45, 28, 0.18) 25%, rgba(88, 45, 28, 0) 54%),
-      radial-gradient(circle at 65% 25%, rgba(115, 42, 20, 0.30) 0%, rgba(88, 45, 28, 0.14) 35%, rgba(88, 45, 28, 0) 65%);
   }
 
   /* --- SAKURA: time variants --- */
@@ -988,10 +968,8 @@
     line-height: 1.2;
     text-shadow: 0 1px 12px var(--petal-soft);
   }
-  html[data-theme="autumn"] .blossom-greeting-name {
-    color: #8f2f00;
-    text-shadow: 0 1px 12px rgba(143, 47, 0, 0.35), 0 2px 20px rgba(253, 232, 184, 0.6);
-  }
+  /* Autumn-scoped name plum — merged into the therapist-name rule
+     below (§8). */
 
   /* ============ INTRO ============ */
   .intro-overlay {
@@ -1004,7 +982,7 @@
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
   .name-char {
     display: block; font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-size: 120px; font-weight: 500; color: #fdf3d8; line-height: 1; letter-spacing: 0;
+    font-size: 120px; font-weight: 500; color: #FFFDF9; line-height: 1; letter-spacing: 0;
     text-shadow: 0 2px 20px rgba(80, 40, 10, 0.35);
     opacity: 0; transform: translateY(-24px); filter: blur(3px);
     animation: charArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
@@ -1036,22 +1014,26 @@
   .panel-inner { max-width: 480px; width: 100%; }
 
   /* ============================================================
-     PANEL TYPOGRAPHY (v1.3 readability pass) */
+     PANEL TYPOGRAPHY (v1.3 readability pass)
+     colour is var(--text-dark) — 濃茶墨 #241C1A under autumn,
+     giving 14.2:1 WCAG AAA contrast against 絹白 #FFFDF9. The
+     three-layer text-shadow now carries silk-white and Usuanzu
+     apricot (was the old yellow-cream #fdf3d8 halo). */
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
     transition: opacity 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.85s cubic-bezier(0.25, 0.46, 0.45, 0.94);
     transition-delay: 0.25s;
     font-size: 19px;
     font-weight: 600;
-    color: #160a02;
+    color: var(--text-dark);
     line-height: 2.25;
     letter-spacing: 0.8px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-shadow:
       0 0 6px var(--bg-base),
-      0 0 14px rgba(253, 243, 216, 0.85),
-      0 0 28px rgba(253, 243, 216, 0.40);
+      0 0 14px rgba(255, 253, 249, 0.90),
+      0 0 28px rgba(251, 236, 224, 0.60);
   }
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .panel.leaving .panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
@@ -1063,9 +1045,14 @@
     font-weight: 600; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
-  html[data-theme="autumn"] .panel-content .therapist-name { color: #8f2f00; text-shadow: 0 1px 12px rgba(143, 47, 0, 0.35), 0 2px 20px rgba(253, 232, 184, 0.6); }
+  /* Autumn-scoped name plum (merged with .blossom-greeting-name). */
+  html[data-theme="autumn"] .panel-content .therapist-name,
+  html[data-theme="autumn"] .blossom-greeting-name {
+    color: #882E47;
+    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
+  }
   .panel-content .panel-5-red { color: var(--accent); }
-  html[data-theme="autumn"] .panel-content .panel-5-red { color: #8f2f00; }
+  html[data-theme="autumn"] .panel-content .panel-5-red { color: var(--accent); }
   .panel-content .msg-3 {
     padding: 24px 22px; background: var(--box-bg); border-radius: 20px;
     border: 1px solid var(--box-border); box-shadow: var(--box-shadow);
@@ -1096,9 +1083,9 @@
     font-size: 14px; color: var(--text-mute); letter-spacing: 4px; font-weight: 500;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
-  html[data-theme="autumn"] .action-hint { color: #3d2410; }
+  html[data-theme="autumn"] .action-hint { color: var(--text-med); }
   .action-hint .hint-arrow { display: inline-block; color: var(--accent); font-size: 16px; line-height: 1; }
-  html[data-theme="autumn"] .action-hint .hint-arrow { color: #8f2f00; }
+  html[data-theme="autumn"] .action-hint .hint-arrow { color: var(--accent); }
   .action-hint .hint-arrow.right { animation: swipeArrow 2s ease-in-out infinite; }
   .action-hint .hint-arrow.down { animation: gentleBounce 2s ease-in-out infinite; }
   @keyframes swipeArrow { 0%, 100% { transform: translateX(0); opacity: 0.6; } 50% { transform: translateX(8px); opacity: 1; } }
@@ -1140,7 +1127,7 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  html[data-theme="autumn"] .transition-line { color: #8f2f00; }
+  html[data-theme="autumn"] .transition-line { color: var(--accent); }
   .transition-line-divider {
   display: flex;
   align-items: center;
@@ -1192,6 +1179,28 @@
   .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--border-2); }
   .divider-text { font-size: 15px; color: var(--accent); letter-spacing: 2px; }
 
+  /* ============================================================
+     SECTION & CATEGORY BLOSSOM MARKS
+     ------------------------------------------------------------
+     Base rule keeps .custom-section-mark on var(--accent) so the
+     base stylesheet is theme-neutral. The autumn-scoped rule that
+     follows routes all three structural blossom anchors to 葡萄染
+     Ebizome (#882E47), the same secondary accent used on carousel
+     dots and HUD Ready badges. .row-check::after keeps var(--accent)
+     (amber CTA), .receipt-to-mark and .receipt-footer-mark keep
+     var(--glow) (coral), and .transition-line-mark keeps
+     var(--transition-head-color) (cream) — none of those are
+     overridden here. */
+  .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 15px; line-height: 1; color: var(--accent); }
+  html[data-theme="autumn"] .custom-section-mark,
+  html[data-theme="autumn"] .divider-text,
+  html[data-theme="autumn"] .blossom-mark {
+    color: var(--secondary-accent, #882E47);
+  }
+  .custom-section-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 14px 4px 14px; padding: 6px 0 2px 0; user-select: none; -webkit-user-select: none; }
+  .custom-section-line { flex: 1; height: 1px; background: var(--border-2); min-width: 20px; }
+  .custom-section-label { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 4px; line-height: 1.4; white-space: nowrap; }
+
   .table-card {
     background: rgba(255, 255, 255, 0.94); border-radius: 18px; padding: 6px 0;
     box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07); border: 1px solid var(--border-3);
@@ -1201,9 +1210,12 @@
   }
   .table-card.active { opacity: 1; transform: translateY(0); }
 
+  /* Fallback background is 薄杏 Usuanzu (#FBECE0) — a soft apricot
+     card during an offline cold paint before the JPG texture loads,
+     instead of the retired dingy yellow #fdf3d8. */
   #tableCard,
   .receipt-paper {
-    background-color: #fdf3d8;
+    background-color: #FBECE0;
     background-image: url('icons/1790835034553.jpg');
     background-size: cover;
     background-position: center center;
@@ -1229,11 +1241,6 @@
   }
   .privacy-note-inline p { margin: 0 0 0.4em 0; padding: 0; }
   .privacy-note-inline p:last-child { margin-bottom: 0; }
-
-  .custom-section-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 14px 4px 14px; padding: 6px 0 2px 0; user-select: none; -webkit-user-select: none; }
-  .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 15px; line-height: 1; color: var(--accent); }
-  .custom-section-line { flex: 1; height: 1px; background: var(--border-2); min-width: 20px; }
-  .custom-section-label { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 4px; line-height: 1.4; white-space: nowrap; }
 
   .row {
     display: flex; align-items: center; gap: 8px; padding: 14px 14px 14px 12px;
@@ -1344,11 +1351,11 @@
     -webkit-user-select: none; user-select: none;
     opacity: 0; transform: translateY(24px);
   }
-  html[data-theme="autumn"] .reject-row { background: rgba(240, 224, 184, 0.94); }
+  html[data-theme="autumn"] .reject-row { background: rgba(251, 236, 224, 0.94); }
   .reject-row.active { opacity: 1; transform: translateY(0); }
   .reject-row:active { transform: scale(0.99); }
   .reject-row.selected { background: rgba(253, 243, 242, 0.96); border: 1.5px solid var(--accent); }
-  html[data-theme="autumn"] .reject-row.selected { background: rgba(253, 240, 200, 0.96); }
+  html[data-theme="autumn"] .reject-row.selected { background: rgba(255, 247, 242, 0.96); }
 
   .reject-box {
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
@@ -1481,8 +1488,9 @@
        visualizer     — 282×26 micro-canvas at 2× DPR
        gauge          — 2px fill bar + byte/pct label row
 
-     Font stack matches .panel-content so the HUD reads as part of
-     the same typographic family as the carousel. */
+     Base card styling (below) is 絹白 Kinushiro glass, shared by
+     both themes. Sakura overrides the card at the bottom of this
+     block via html[data-theme="default"] .audio-spectrum-hud. */
   .audio-spectrum-hud {
     position: fixed;
     left: calc(26px + env(safe-area-inset-left, 0px));
@@ -1496,13 +1504,13 @@
     width: 318px;
     padding: 9px 18px 7px 18px;
     border-radius: 15px;
-    background: rgba(253, 243, 216, 0.78);
+    background: rgba(255, 253, 249, 0.85);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(216, 180, 120, 0.45);
+    border: 1px solid rgba(222, 192, 172, 0.50);
     box-shadow:
-      0 5px 20px rgba(120, 70, 20, 0.08),
-      0 1px 3px rgba(120, 70, 20, 0.05);
+      0 5px 20px rgba(68, 52, 48, 0.08),
+      0 1px 3px rgba(68, 52, 48, 0.05);
     opacity: 0;
     transform: translateY(8px);
     transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
@@ -1548,8 +1556,9 @@
     letter-spacing: 1px;
   }
 
-  /* Specific-property transition avoids clashing with the statusPulse
-     opacity keyframe on .decoding. */
+  /* Base badge state — sakura's rose-and-moss literals. Autumn
+     overrides the four state rules further down in the
+     html[data-theme="autumn"] block that follows. */
   .hud-status-badge {
     margin-left: auto;
     font-size: 10px;
@@ -1557,7 +1566,7 @@
     letter-spacing: 1px;
     padding: 1px 6px;
     border-radius: 8px;
-    background: rgba(201, 96, 10, 0.12);
+    background: rgba(176, 74, 90, 0.12);
     color: var(--accent);
     transition: background-color 0.3s ease, color 0.3s ease;
   }
@@ -1573,6 +1582,30 @@
   .hud-status-badge.ready {
     background: rgba(42, 63, 26, 0.14);
     color: #2a3f1a;
+  }
+
+  /* Autumn overrides — 金木犀 amber badge / 葡萄染 plum Ready. */
+  html[data-theme="autumn"] .hud-status-badge {
+    background: rgba(230, 104, 38, 0.12);
+    color: var(--accent);
+  }
+  html[data-theme="autumn"] .hud-status-badge.loading {
+    background: rgba(255, 162, 89, 0.25);
+    color: #C44E10;
+  }
+  html[data-theme="autumn"] .hud-status-badge.decoding {
+    background: rgba(255, 162, 89, 0.40);
+    color: #9E3B06;
+  }
+  html[data-theme="autumn"] .hud-status-badge.ready {
+    background: rgba(136, 46, 71, 0.12);
+    color: #882E47;
+  }
+  html[data-theme="autumn"] .hud-gauge-fill.decoding {
+    background: #FFA259;
+  }
+  html[data-theme="autumn"] .hud-gauge-fill.ready {
+    background: #882E47;
   }
 
   @keyframes statusPulse {
@@ -1606,7 +1639,7 @@
   .hud-gauge-bar {
     width: 100%;
     height: 2px;
-    background: rgba(216, 180, 120, 0.28);
+    background: rgba(222, 192, 172, 0.35);
     border-radius: 2px;
     overflow: hidden;
   }
@@ -1652,7 +1685,7 @@
     z-index: 250; display: flex; align-items: center; justify-content: center;
     padding: 30px 24px; opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
   }
-  html[data-theme="autumn"] .confirm-screen { background: rgba(253, 243, 216, 0.96); }
+  html[data-theme="autumn"] .confirm-screen { background: rgba(255, 253, 249, 0.96); }
   .confirm-screen.visible { opacity: 1; pointer-events: auto; }
   .confirm-card {
     background: #ffffff; max-width: 380px; width: 100%; padding: 36px 28px 28px 28px;
@@ -1680,7 +1713,7 @@
     z-index: 260; display: flex; align-items: center; justify-content: center;
     padding: 30px 24px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
   }
-  html[data-theme="autumn"] .alert-screen { background: rgba(253, 243, 216, 0.96); }
+  html[data-theme="autumn"] .alert-screen { background: rgba(255, 253, 249, 0.96); }
   .alert-screen.visible { opacity: 1; pointer-events: auto; }
   .alert-card {
     background: #ffffff; width: auto; max-width: 320px; padding: 28px 26px 22px 26px;
@@ -1708,7 +1741,7 @@
     opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
     touch-action: none;
   }
-  html[data-theme="autumn"] .tanzaku-screen { background: rgba(253, 243, 216, 0.96); }
+  html[data-theme="autumn"] .tanzaku-screen { background: rgba(255, 253, 249, 0.96); }
   .tanzaku-screen.visible { opacity: 1; pointer-events: auto; }
   .tanzaku-card {
     background-color: #fcfbf9;
@@ -1858,7 +1891,7 @@
     opacity: 0; pointer-events: none; transition: opacity 0.9s ease;
     perspective: 1200px;
   }
-  html[data-theme="autumn"] .receipt-screen { background: rgba(253, 243, 216, 0.94); }
+  html[data-theme="autumn"] .receipt-screen { background: rgba(255, 253, 249, 0.94); }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
@@ -2228,6 +2261,9 @@
   .ty-ambient-inner { width: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; padding: 20px 0; }
   .blossom-divider { display: flex; justify-content: center; align-items: center; gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%; }
   .blossom-mark { display: inline-block; font-size: 13px; line-height: 1; color: var(--accent); opacity: 0; transform: scale(0.4); filter: blur(4px); transition: opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
+  /* Autumn override routes .blossom-mark to plum — merged with
+     .custom-section-mark and .divider-text in the divider-blossom
+     rule near the top of the TABLE section. */
   .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
   @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
   .blossom-mark.resetting { opacity: 0; transform: scale(0.4); filter: blur(4px); animation: none; transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
@@ -2696,7 +2732,11 @@
 
      All three elements animate opacity and transform only —
      no stroke-width, no filter. Chromium rasterises each texture
-     once and runs the breath entirely on the compositor thread. */
+     once and runs the breath entirely on the compositor thread.
+
+     Ring stroke was #fdf3d8 (retired cream) and is now #FFFDF9
+     絹白 Kinushiro — the silk-white ring reads cleanly against the
+     Kinmokusei ambient wash and matches the arrival glyph. */
   .gold-halo {
     position: absolute;
     width: 280px;
@@ -2732,7 +2772,7 @@
   }
 
   .gold-band {
-    stroke: #fdf3d8;
+    stroke: #FFFDF9;
     stroke-width: 6px;
     fill: none;
     animation: goldBandGlow 2.8s ease-in-out infinite;
@@ -2777,7 +2817,7 @@
   }
 
   .pulse-ring {
-    stroke: #fdf3d8;
+    stroke: #FFFDF9;
     stroke-width: 2px;
     fill: none;
     transform-box: view-box;
