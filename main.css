@@ -231,7 +231,7 @@
     opacity: 0.08;
   }
 
-  /* 金木犀 (Kinmokusei) Shippō stroke. Was %238f2f00 (old amber-brown). */
+  /* 金木犀 (Kinmokusei) Shippō stroke. Was %238f2f00 (retired amber-brown). */
   html[data-theme="autumn"] .ambient-mosaic,
   html[data-theme="autumn"] .ambient-mosaic-pond {
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%23E66826'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
@@ -269,20 +269,20 @@
 
   .layer-diffuse .ambient-mesh {
     opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important;
-    
+
   }
 
   .layer-diffuse .orb-1 {
     scale: calc(1 + var(--audio-swell, 0) * 0.53);
-    
+
   }
   .layer-diffuse .orb-2 {
     scale: calc(1 + var(--audio-swell, 0) * 0.61); /* 0.53 * 1.15 */
-    
+
   }
   .layer-diffuse .orb-3 {
     scale: calc(1 + var(--audio-swell, 0) * 0.48); /* 0.53 * 0.90 */
-    
+
   }
 
   /* --- LAYER 2: Masked geometric counter-flow ---
@@ -325,11 +325,11 @@
     opacity: 1.0 !important;
     transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
     transform-origin: 50% 50%;
-    
+
   }
 
   /* Layer 2 orb overrides — 金木犀 (Kinmokusei amber / Ebizome plum /
-     Kinmokusei coral). The previous filter chain
+     coral). The previous filter chain
      (hue-rotate(8deg) saturate(0.50) contrast(1.60)) is baked into
      these stops directly. Under sakura the base .orb-N values cascade
      here instead, but Layer 2's .ambient-mesh is display: none under
@@ -358,7 +358,7 @@
   /* The three base orbs. Gradient stops include the previously
      applied brightness(1.08) saturate(1.05) ancestor filter, baked
      in so the visual remains constant now that the filter is gone.
-     金木犀 (Kinmokusei) palette: amber, plum, coral. */
+     金木犀 palette: amber, plum, coral. */
   .light-orb {
     position: absolute;
     border-radius: 50%;
@@ -446,10 +446,11 @@
 
   /* Unified 金木犀 (Kinmokusei & Ebizome) autumn wash.
      Amber (#E66826) upper-left, plum (#882E47) upper-right,
-     coral (#FFA259) lower-centre. The four-point dispersion is
-     wider than the previous single-hue stack, which is why the
-     drift reads gentler at rest even though the animation curve
-     is unchanged (autumnDrift1, 14s, ease-in-out, infinite). */
+     coral (#FFA259) lower-centre. The drift is retained via
+     autumnDrift1 (14s ease-in-out infinite) — the new stop
+     dispersion is wider than the previous single-hue stack, so
+     the motion reads gentler at rest even though the curve is
+     unchanged. */
   html[data-theme="autumn"] .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.14) 34%, transparent 64%),
@@ -968,8 +969,8 @@
     line-height: 1.2;
     text-shadow: 0 1px 12px var(--petal-soft);
   }
-  /* Autumn-scoped name plum — merged into the therapist-name rule
-     below (§8). */
+  /* Autumn-scoped plum override merged with the therapist-name rule
+     below (see the PANEL TYPOGRAPHY section). */
 
   /* ============ INTRO ============ */
   .intro-overlay {
@@ -1017,7 +1018,7 @@
      PANEL TYPOGRAPHY (v1.3 readability pass)
      colour is var(--text-dark) — 濃茶墨 #241C1A under autumn,
      giving 14.2:1 WCAG AAA contrast against 絹白 #FFFDF9. The
-     three-layer text-shadow now carries silk-white and Usuanzu
+     three-layer text-shadow now carries silk-white and 薄杏
      apricot (was the old yellow-cream #fdf3d8 halo). */
   .panel-content {
     opacity: 0; transform: translateX(40px); filter: blur(4px);
@@ -1045,7 +1046,8 @@
     font-weight: 600; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
-  /* Autumn-scoped name plum (merged with .blossom-greeting-name). */
+  /* Autumn-scoped name plum — merged for both the greeting screen
+     and Panel 0's opening beats. Flat plum on the silk floor. */
   html[data-theme="autumn"] .panel-content .therapist-name,
   html[data-theme="autumn"] .blossom-greeting-name {
     color: #882E47;
@@ -2035,6 +2037,14 @@
   .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; text-align: center; }
   .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; flex-shrink: 0; }
   .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
+  /* Autumn Therapist Name on Receipt: flat ink on washi.
+     The receipt is a physical artifact — deckle-edge mask, washi
+     grain, paper-land physics. Text on paper is stamped ink, not a
+     luminous bloom, so the name sits flat here (unlike the greeting
+     screen's plum + apricot text-shadow) to preserve the metaphor. */
+  html[data-theme="autumn"] .receipt-to-name {
+    color: #882E47;
+  }
   .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
 
   .receipt-title {
@@ -2262,8 +2272,8 @@
   .blossom-divider { display: flex; justify-content: center; align-items: center; gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%; }
   .blossom-mark { display: inline-block; font-size: 13px; line-height: 1; color: var(--accent); opacity: 0; transform: scale(0.4); filter: blur(4px); transition: opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   /* Autumn override routes .blossom-mark to plum — merged with
-     .custom-section-mark and .divider-text in the divider-blossom
-     rule near the top of the TABLE section. */
+     .custom-section-mark and .divider-text near the top of the
+     SECTION & CATEGORY BLOSSOM MARKS section. */
   .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
   @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
   .blossom-mark.resetting { opacity: 0; transform: scale(0.4); filter: blur(4px); animation: none; transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
