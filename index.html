@@ -147,7 +147,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.21</div>
+  <div class="app-version" aria-hidden="true">v2.09.22</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -668,20 +668,15 @@
      visible again through the transparent .thankyou-screen. Gated
      to autumn in CSS.
 
-     Eleven leaves total: four Momiji and seven Ichō. The maples
-     share the same palmate Japanese maple path; per-leaf colour,
-     size, and drift timing come from the .leaf-N classes in
-     main.css. The ginkgo use the symmetrical fan path (600×700
-     viewBox, longer than wide because of the stem) and drift on
-     two dedicated pendulum-flutter keyframes — see main.css for
-     the rationale.
-
-     The maple palette has been narrowed to the warm-light band
-     (#b83b1d → #dd8418); the two deepest oxblood tones (#8f2229
-     and #a32e18) were retired in favour of ginkgo, because they
-     pulled the eye away from the panel text at dark-luminance
-     contrast against the amber canvas. What remains reads as a
-     single continuous autumn palette at mid-to-light warmth.
+     Eleven leaves total: four Momiji and seven Ichō. Leaf fills are
+     drawn from the 金木犀 & Ebizome palette's higher-contrast tiers —
+     Ebizome plum (#882E47), deep amber (#C44E10), deep rust (#9E3B06),
+     Kinmokusei amber (#E66826), and petal coral (#F07D40) — so the
+     drifting foliage reads as a stylized woodblock/screen-print motif
+     in the same ink family as the rest of the interface. Lighter
+     palette tiers (--glow, --petal-soft) are deliberately excluded
+     because at sub-0.35 element opacity they composite to near-canvas
+     luminance and lose silhouette legibility.
 
      Both sets are aria-hidden on the parent, and each SVG carries
      a redundant aria-hidden="true" for structural parity across
