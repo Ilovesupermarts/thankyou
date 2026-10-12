@@ -118,7 +118,7 @@
     --ty-accent-color: #882E47;
     --quote-color: #C44E10;
     --quote-shadow: 0 2px 24px rgba(253, 232, 218, 0.65);
-    --transition-head-color: #F7DECD;
+    --transition-head-color: #882E47;
   }
 
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -328,21 +328,51 @@
 
   }
 
-  /* Layer 2 orb overrides — 金木犀 (Kinmokusei amber / Ebizome plum /
-     coral). The previous filter chain
-     (hue-rotate(8deg) saturate(0.50) contrast(1.60)) is baked into
-     these stops directly. Under sakura the base .orb-N values cascade
-     here instead, but Layer 2's .ambient-mesh is display: none under
-     sakura via html[data-theme="default"] .ambient-mesh, so this
-     override is inert in that theme. */
+  /* ============ LAYER 2: MIRRORED SHIPPO ORBS ============
+     金木犀 (Kinmokusei amber / Ebizome plum / petal coral). The
+     previous filter chain (hue-rotate(8deg) saturate(0.50)
+     contrast(1.60)) is baked into these stops directly.
+
+     circle closest-side: 100% radius lands on the element's inner
+     border-radius circle, so the zero-alpha stop coincides with the
+     clip boundary. The previous farthest-corner default put 100%
+     at the square's corner (~70.71% of the way to the visible edge),
+     which left ~0.02 alpha at the border-radius cutoff and produced
+     a visible Mach-band arc against the silk canvas. The 6-stop
+     gaussian falloff replaces the linear 3-stop ramp for the same
+     reason — a slope discontinuity reads as a ridge line even when
+     the peak alpha is unchanged.
+
+     Under sakura the base .orb-N values cascade here instead, but
+     Layer 2's .ambient-mesh is display: none under sakura via
+     html[data-theme="default"] .ambient-mesh, so this override is
+     inert in that theme. */
   html[data-theme="autumn"] .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle, rgba(230, 104, 38, 0.80) 0%, rgba(255, 162, 89, 0.35) 45%, transparent 70%) !important;
+    background: radial-gradient(circle closest-side,
+      rgba(230, 104, 38, 0.80) 0%,
+      rgba(230, 104, 38, 0.62) 25%,
+      rgba(255, 162, 89, 0.32) 50%,
+      rgba(255, 162, 89, 0.12) 72%,
+      rgba(255, 162, 89, 0.025) 88%,
+      rgba(255, 162, 89, 0) 100%) !important;
   }
   html[data-theme="autumn"] .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle, rgba(136, 46, 71, 0.70) 0%, rgba(230, 104, 38, 0.25) 48%, transparent 72%) !important;
+    background: radial-gradient(circle closest-side,
+      rgba(136, 46, 71, 0.70) 0%,
+      rgba(136, 46, 71, 0.52) 25%,
+      rgba(230, 104, 38, 0.24) 50%,
+      rgba(230, 104, 38, 0.08) 72%,
+      rgba(230, 104, 38, 0.015) 88%,
+      rgba(230, 104, 38, 0) 100%) !important;
   }
   html[data-theme="autumn"] .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle, rgba(255, 162, 89, 0.75) 0%, rgba(136, 46, 71, 0.20) 40%, transparent 62%) !important;
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 0.75) 0%,
+      rgba(255, 162, 89, 0.56) 25%,
+      rgba(136, 46, 71, 0.20) 50%,
+      rgba(136, 46, 71, 0.07) 72%,
+      rgba(136, 46, 71, 0.015) 88%,
+      rgba(136, 46, 71, 0) 100%) !important;
   }
 
   /* ============ AMBIENT LIGHT MESH (v1.3) ============ */
@@ -358,7 +388,14 @@
   /* The three base orbs. Gradient stops include the previously
      applied brightness(1.08) saturate(1.05) ancestor filter, baked
      in so the visual remains constant now that the filter is gone.
-     金木犀 palette: amber, plum, coral. */
+     金木犀 palette: amber, plum, coral.
+
+     circle closest-side pins the gradient's 100% radius to the
+     element's border-radius circle (see the LAYER 2 comment above
+     for the clipping mechanism). The 6-stop gaussian falloff
+     replaces the 3-stop linear ramp so the opacity drops to a true
+     zero before the clip boundary — no Mach-band ridge, no hard
+     arc against the silk canvas. */
   .light-orb {
     position: absolute;
     border-radius: 50%;
@@ -373,7 +410,13 @@
     max-height: 900px;
     top: 10%;
     left: 15%;
-    background: radial-gradient(circle, rgba(230, 104, 38, 0.46) 0%, rgba(255, 162, 89, 0.18) 46%, transparent 72%);
+    background: radial-gradient(circle closest-side,
+      rgba(230, 104, 38, 0.46) 0%,
+      rgba(230, 104, 38, 0.36) 25%,
+      rgba(255, 162, 89, 0.20) 50%,
+      rgba(255, 162, 89, 0.08) 70%,
+      rgba(255, 162, 89, 0.02) 85%,
+      rgba(255, 162, 89, 0) 100%);
     animation: orbDrift1 11.58s ease-in-out infinite alternate;
   }
 
@@ -384,7 +427,13 @@
     max-height: 1050px;
     top: 35%;
     right: 5%;
-    background: radial-gradient(circle, rgba(136, 46, 71, 0.40) 0%, rgba(230, 104, 38, 0.15) 50%, transparent 74%);
+    background: radial-gradient(circle closest-side,
+      rgba(136, 46, 71, 0.40) 0%,
+      rgba(136, 46, 71, 0.30) 25%,
+      rgba(230, 104, 38, 0.16) 50%,
+      rgba(230, 104, 38, 0.06) 70%,
+      rgba(230, 104, 38, 0.015) 85%,
+      rgba(230, 104, 38, 0) 100%);
     animation: orbDrift2 15.26s ease-in-out infinite alternate;
   }
 
@@ -395,7 +444,13 @@
     max-height: 700px;
     bottom: 10%;
     left: 30%;
-    background: radial-gradient(circle, rgba(255, 162, 89, 0.42) 0%, rgba(136, 46, 71, 0.16) 42%, transparent 64%);
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 0.42) 0%,
+      rgba(255, 162, 89, 0.30) 25%,
+      rgba(136, 46, 71, 0.14) 50%,
+      rgba(136, 46, 71, 0.05) 70%,
+      rgba(136, 46, 71, 0.01) 85%,
+      rgba(136, 46, 71, 0) 100%);
     animation: orbDrift3 10.00s ease-in-out infinite alternate;
   }
 
@@ -446,16 +501,20 @@
 
   /* Unified 金木犀 (Kinmokusei & Ebizome) autumn wash.
      Amber (#E66826) upper-left, plum (#882E47) upper-right,
-     coral (#FFA259) lower-centre. The drift is retained via
-     autumnDrift1 (14s ease-in-out infinite) — the new stop
-     dispersion is wider than the previous single-hue stack, so
-     the motion reads gentler at rest even though the curve is
-     unchanged. */
+     coral (#FFA259) lower-centre.
+
+     The 4-stop falloff replaces the previous 3-stop ramp so each
+     gradient feathers asymptotically toward zero rather than
+     landing on a linear cutoff — the same Mach-band reasoning as
+     the orbs above, applied to the wash layer. The drift is
+     retained via autumnDrift1 (14s ease-in-out infinite); the
+     wider stop dispersion reads gentler at rest even though the
+     curve is unchanged. */
   html[data-theme="autumn"] .ambient-primary {
     background:
-      radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.14) 34%, transparent 64%),
-      radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.10) 36%, transparent 66%),
-      radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, transparent 60%);
+      radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.22) 28%, rgba(230, 104, 38, 0.06) 52%, rgba(230, 104, 38, 0) 74%),
+      radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.16) 28%, rgba(136, 46, 71, 0.04) 52%, rgba(136, 46, 71, 0) 74%),
+      radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, rgba(255, 162, 89, 0.16) 26%, rgba(255, 162, 89, 0.03) 50%, rgba(255, 162, 89, 0) 72%);
     animation: autumnDrift1 14s ease-in-out infinite;
   }
 
@@ -565,7 +624,19 @@
     100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
   }
 
-  /* ============ AMBIENT MAPLE LEAVES (v1.3) ============ */
+  /* ============ AMBIENT MAPLE (MOMIJI) LEAVES ============
+     Fills are drawn from the 金木犀 & Ebizome palette's higher-
+     contrast tiers — Ebizome plum, deep amber, deep rust,
+     Kinmokusei amber, petal coral — so the drifting foliage reads
+     as a stylized woodblock motif in the same ink family as the
+     rest of the interface. Lighter tiers (--glow, --petal-soft)
+     are excluded: at sub-0.35 element opacity they composite to
+     near-canvas luminance and lose silhouette legibility.
+
+     No filter: drop-shadow was removed at v1.3 — at sub-0.35
+     element opacity the 0.07 alpha was imperceptible, and it
+     expanded each leaf's promoted-layer texture by offset + blur
+     radius. */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
@@ -584,21 +655,19 @@
     display: none;
   }
 
-  /* drop-shadow removed — at 0.30 element opacity the 0.07 alpha
-     shadow was imperceptible, and it expanded each leaf's layer
-     texture by offset + blur radius on every promoted layer. */
   .maple-leaf {
     position: absolute;
     top: -60px;
     pointer-events: none;
     will-change: transform;
-    opacity: 0.30;
+    opacity: 0.32;
   }
 
-  .leaf-1 { width: 51px; height: 51px; fill: #b83b1d; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
-  .leaf-2 { width: 63px; height: 63px; fill: #d46a15; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
-  .leaf-3 { width: 45px; height: 45px; fill: #e59b24; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-6 { width: 42px; height: 42px; fill: #dd8418; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  /* Curated 金木犀 & Ebizome distribution across the four Momiji. */
+  .leaf-1 { width: 51px; height: 51px; fill: #882E47; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-2 { width: 63px; height: 63px; fill: #E66826; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+  .leaf-3 { width: 45px; height: 45px; fill: #C44E10; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-6 { width: 42px; height: 42px; fill: #9E3B06; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
 
   @keyframes mapleDriftA {
     0% {
@@ -1129,7 +1198,28 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  html[data-theme="autumn"] .transition-line { color: var(--accent); }
+  /* Autumn: deep 濃茶墨 prose on the silk canvas with a silk-white
+     and 薄杏 apricot halo for legibility against the drifting orbs.
+     The header register (mark, title, rules) draws from the plum
+     --transition-head-color token; the rules are damped to 35% so
+     they read as quiet separators rather than co-equal elements.
+     Was: five paragraphs of bright CTA amber with no text-shadow,
+     which vibrated chromatically against --bg-warm. */
+  html[data-theme="autumn"] .transition-line {
+    color: var(--text-dark);
+    text-shadow:
+      0 0 6px var(--bg-base),
+      0 0 14px rgba(255, 253, 249, 0.90),
+      0 0 24px rgba(251, 236, 224, 0.60);
+  }
+  html[data-theme="autumn"] .transition-line-mark,
+  html[data-theme="autumn"] .transition-line-title {
+    color: var(--transition-head-color);
+  }
+  html[data-theme="autumn"] .transition-line-rule {
+    background: var(--transition-head-color);
+    opacity: 0.35;
+  }
   .transition-line-divider {
   display: flex;
   align-items: center;
@@ -2657,22 +2747,25 @@
     50%      { opacity: 0.3; transform: scale(0.92); }
   }
 
-  /* Static elliptical shadow pool behind the koi. Absorbs the light
-     from directly above the fish; the ellipse origin is nudged
-     slightly below centre (53%) to preserve the original 4px
-     downward offset of the removed drop-shadow. The gradient reaches
-     transparent at 95% of the -18px-expanded box so the penumbra
-     extends past the fish's silhouette — matching the reach of the
-     original 18px blur without invoking a blur kernel. */
+  /* Static elliptical depth pool behind the koi. Stops are 金木犀
+     (Kinmokusei) amber and glow — a warm depth pool rather than a
+     neutral-black one. On the silk-white ambient floor an achromatic
+     0.24 black reads as a scorch mark, not as a shadow; any future
+     shadow here should stay in the warm-light family.
+
+     The ellipse origin is nudged slightly below centre (53%) to
+     preserve the original 4px downward offset of the removed
+     drop-shadow. The gradient feathers to transparent at 80% of
+     the -14px-expanded box so the penumbra extends past the fish's
+     silhouette without the extra reach the retired 18px blur needed. */
   .koi-shadow {
     position: absolute;
-    inset: -18px;
+    inset: -14px;
     border-radius: 50%;
     background: radial-gradient(ellipse at 50% 53%,
-      rgba(0, 0, 0, 0.24) 0%,
-      rgba(0, 0, 0, 0.14) 42%,
-      rgba(0, 0, 0, 0.04) 75%,
-      transparent 95%);
+      rgba(230, 104, 38, 0.12) 0%,
+      rgba(255, 162, 89, 0.06) 45%,
+      transparent 80%);
     pointer-events: none;
     z-index: 0;
     animation: koiShadowFade 5s ease-in-out infinite;
@@ -2718,7 +2811,7 @@
   .start-btn.diving .rings-svg { opacity: 0; }
 
   /* ============================================================
-     GOLD RING & HALO (COMPOSITOR-ONLY)
+     GOLD RING & HALO (金木犀 Osmanthus Amber Glow)
      ------------------------------------------------------------
      The idle button carries three decorative elements above the
      koi PNG:
@@ -2730,23 +2823,29 @@
                      reach of the original SVG drop-shadow chain
                      without invoking a blur kernel.
 
+                     Stops are silk-white core → peach transition →
+                     金木犀 amber bloom, replacing the retired
+                     marigold/lemon/brass literals. The 50% stop is
+                     deliberately not pure #FFFDF9, so the crisp
+                     .gold-band stroke at r=90px doesn't visually
+                     merge into its own glow.
+
        .gold-glow  — a wide-stroke soft-gold circle rendered behind
-                     .gold-band. Its stroke-width (28px) produces a
-                     secondary aura around the ring, driven by
-                     opacity only.
+                     .gold-band. Stroke is 金木犀 --glow (#FFA259),
+                     not the retired buttercup #ffdd80. The 28px
+                     span (r≈76–104px) overlays the peach-to-amber
+                     transition band so the glow reads as an
+                     intensification of the halo underneath rather
+                     than a competing layer.
 
        .gold-band  — the ring SVG. Static stroke-width of 6px; the
                      ring's radius matches r=90 in the 360 viewBox,
                      which is where each pulse ring begins before
-                     expanding outward.
+                     expanding outward. Stroke is 絹白 #FFFDF9.
 
      All three elements animate opacity and transform only —
      no stroke-width, no filter. Chromium rasterises each texture
-     once and runs the breath entirely on the compositor thread.
-
-     Ring stroke was #fdf3d8 (retired cream) and is now #FFFDF9
-     絹白 Kinushiro — the silk-white ring reads cleanly against the
-     Kinmokusei ambient wash and matches the arrival glyph. */
+     once and runs the breath entirely on the compositor thread. */
   .gold-halo {
     position: absolute;
     width: 280px;
@@ -2758,9 +2857,9 @@
     border-radius: 50%;
     background: radial-gradient(circle,
       transparent 32%,
-      rgba(255, 240, 180, 0.75) 50%,
-      rgba(255, 200, 90, 0.55) 62%,
-      rgba(247, 185, 60, 0.25) 78%,
+      rgba(255, 250, 245, 0.82) 50%,
+      rgba(255, 178, 115, 0.48) 62%,
+      rgba(230, 104, 38, 0.20) 78%,
       transparent 94%);
     pointer-events: none;
     animation: haloGlow 2.8s ease-in-out infinite;
@@ -2805,7 +2904,7 @@
   }
 
   .gold-glow {
-    stroke: #ffdd80;
+    stroke: #FFA259;
     stroke-width: 28px;
     fill: none;
     animation: goldGlowPulse 2.8s ease-in-out infinite;
@@ -2877,7 +2976,9 @@
     transform: translateY(6px);
   }
 
-/* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============ */
+/* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============
+   Fills share the 金木犀 & Ebizome higher-contrast tier as the
+   Momiji above. No filter — same reasoning as .maple-leaf. */
 @keyframes ginkgoDriftA {
   0%   { transform: translate3d(0, -65px, 0) rotate(14deg); opacity: 0; }
   12%  { opacity: 0.95; }
@@ -2896,60 +2997,60 @@
   100% { transform: translate3d(10px, 115vh, 0) rotate(-8deg); opacity: 0; }
 }
 
-/* drop-shadow removed — same reasoning as .maple-leaf above. */
 .ginkgo-leaf {
   position: absolute;
   top: -65px;
   pointer-events: none;
   will-change: transform;
-  opacity: 0.32;
+  opacity: 0.34;
 }
 
+/* Curated 金木犀 & Ebizome distribution across the seven Ichō. */
 .ginkgo-1 {
   width: 48px; height: 56px;
-  fill: #fed634;
+  fill: #F07D40;
   left: 14%;
   animation: ginkgoDriftA 12.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -1.0s;
 }
 
 .ginkgo-2 {
   width: 52px; height: 61px;
-  fill: #f3c428;
+  fill: #882E47;
   left: 38%;
   animation: ginkgoDriftB 14.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -5.0s;
 }
 
 .ginkgo-3 {
   width: 42px; height: 49px;
-  fill: #ddb01e;
+  fill: #E66826;
   left: 64%;
   animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8.0s;
 }
 
 .ginkgo-4 {
   width: 56px; height: 65px;
-  fill: #c19618;
+  fill: #C44E10;
   left: 86%;
   animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s;
 }
 
 .ginkgo-6 {
   width: 54px; height: 63px;
-  fill: #cfad1c;
+  fill: #9E3B06;
   left: 74%;
   animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9.5s;
 }
 
 .ginkgo-7 {
   width: 60px; height: 70px;
-  fill: #d4b024;
+  fill: #882E47;
   left: 58%;
   animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11.0s;
 }
 
 .ginkgo-8 {
   width: 44px; height: 51px;
-  fill: #e3c22e;
+  fill: #F07D40;
   left: 35%;
   animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s;
 }
