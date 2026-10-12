@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Start Button Glow — デモ v5</title>
+<title>Start Button Glow — Playground</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,173 +14,428 @@
 
 <style>
 /* ============================================================
-   GLOW DEMO v5 — rim light, corrected
+   GLOW PLAYGROUND
+   Live-tunable rim-light glow around the start-button ring.
 
-   v1–v4 all failed silently: radial-gradient(circle, ...)
-   defaults to farthest-corner, so the gradient's 100% was the
-   square's corner (÷√2 ≈ 1.414× the radius), not the div's
-   visible circle. Every peak landed outside the border-radius
-   clip and was never painted. Only a 0.02-alpha sliver reached
-   the visible edge.
+   Fixed facts:
+     · ring centreline at r = 90px (SVG viewBox r=90, 1:1 pixels)
+     · ring stroke 6px wide, so it spans r=87 … r=93
+     · the glow is a single radial-gradient div, circle closest-side
 
-   Fix: circle closest-side. 100% now equals the div's radius,
-   which is what the percentage math always assumed.
+   Exposed parameters:
+     · inner  — radius where alpha begins rising from 0
+     · peak   — radius where alpha peaks (default at the ring's
+                outer edge, r=93)
+     · outer  — radius where alpha reaches 0 (div half-extent)
+     · alpha  — peak opacity
+     · duration / floor — the breath
+     · colour — solid RGB, alpha handled by the gradient
 
-   Structure: transparent from centre to the ring's inner edge
-   (r=87), peak at the ring's outer edge (r=93), fade to zero
-   at the div's outer radius. That confines the glow to the
-   outer side of the ring — a rim light, not a bloom.
+   circle closest-side is load-bearing. Previous attempts used the
+   default farthest-corner, which places 100% at the div's corner
+   (≈1.414 × the visible radius), pushing every peak outside the
+   border-radius clip. The result rendered as a static ring with
+   no glow. Don't remove it.
    ============================================================ */
 
 html[data-demo="glow"] .ambient-mosaic      { opacity: 0; }
 html[data-demo="glow"] .ambient-mosaic-pond { opacity: 0.08; }
 
-.glow-demo-stage .gold-halo { display: none; }
-.glow-demo-stage .gold-glow { stroke: none; }
-
-body.glow-demo {
-  padding: 40px 24px 100px;
-  background-color: var(--bg-base);
+/* ------------------------------------------------------------
+   Layout
+   ------------------------------------------------------------ */
+body.glow-playground {
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
 }
-.glow-demo-header {
-  max-width: 780px; margin: 0 auto 48px; text-align: center;
+
+.playground {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 400px 1fr;
+  height: 100vh;
+}
+
+.controls {
+  background: rgba(255, 253, 249, 0.72);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid rgba(222, 192, 172, 0.45);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 24px 24px 40px;
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-}
-.glow-demo-header h1 {
-  font-size: 22px; font-weight: 600; color: var(--accent);
-  letter-spacing: 3px; margin: 0 0 12px;
-}
-.glow-demo-header p {
-  font-size: 14px; line-height: 1.9; color: var(--text-med);
-  letter-spacing: 0.4px; margin: 0 0 8px;
-}
-.glow-demo-header code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px; background: var(--soft-1);
-  border-radius: 4px; padding: 1px 6px; color: var(--accent-2);
+  color: var(--text-dark);
 }
 
-.glow-demo-grid {
-  max-width: 1280px; margin: 0 auto;
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 48px 32px;
+.controls header {
+  margin-bottom: 24px;
 }
-.glow-demo-tile {
-  display: flex; flex-direction: column; align-items: center;
-  padding: 16px 12px 24px;
+.controls h1 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 2px;
+  margin: 0 0 8px;
 }
-.glow-demo-stage {
-  position: relative; width: 280px; height: 280px;
-  display: flex; align-items: center; justify-content: center;
+.controls header p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-mute);
+  margin: 0;
+  letter-spacing: 0.3px;
+}
+.controls code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: rgba(251, 236, 224, 0.9);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent-2);
+}
+
+.control-group {
   margin-bottom: 22px;
 }
-.glow-demo-stage .icon-wrapper { width: 200px; height: 200px; margin: 0; }
-.glow-demo-label {
-  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  font-size: 14px; font-weight: 600; color: var(--text-dark);
-  letter-spacing: 1.5px; text-align: center; margin-bottom: 6px;
+
+.control-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
-.glow-demo-note {
-  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  font-size: 12px; color: var(--text-mute);
-  letter-spacing: 0.4px; text-align: center; line-height: 1.7;
-  max-width: 260px;
+.control-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-med);
+  letter-spacing: 1px;
+}
+.control-value {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--accent);
+  letter-spacing: 0;
 }
 
+.control-hint {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.6;
+  margin-top: 4px;
+  letter-spacing: 0.2px;
+}
+
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 26px;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  margin: 0;
+  touch-action: none;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 3px;
+  background: rgba(222, 192, 172, 0.55);
+  border-radius: 2px;
+}
+input[type="range"]::-moz-range-track {
+  height: 3px;
+  background: rgba(222, 192, 172, 0.55);
+  border-radius: 2px;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 2px 6px rgba(68, 52, 48, 0.14);
+  margin-top: -10px;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 1.5px solid var(--accent);
+  box-shadow: 0 2px 6px rgba(68, 52, 48, 0.14);
+}
+
+.colour-buttons {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.colour-btn {
+  flex: 1;
+  height: 36px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-2);
+  cursor: pointer;
+  padding: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  position: relative;
+}
+.colour-btn:active { transform: scale(0.96); }
+.colour-btn.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(230, 104, 38, 0.18);
+}
+
+.colour-custom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.colour-custom label {
+  font-size: 11px;
+  color: var(--text-mute);
+  letter-spacing: 0.4px;
+}
+.colour-custom input[type="color"] {
+  width: 40px;
+  height: 30px;
+  border: 1.5px solid var(--border-2);
+  border-radius: 6px;
+  padding: 1px;
+  background: #ffffff;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.colour-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+.colour-custom input[type="color"]::-webkit-color-swatch {
+  border: none;
+  border-radius: 3px;
+}
+
+.toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-med);
+  letter-spacing: 0.4px;
+  cursor: pointer;
+  user-select: none;
+}
+.toggle-row input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  cursor: pointer;
+  margin: 0;
+}
+
+.preset-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.preset-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--border-2);
+  background: #ffffff;
+  color: var(--text-med);
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  white-space: nowrap;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.preset-btn:active { background: var(--soft-1); border-color: var(--accent); }
+
+.css-block {
+  margin-top: 28px;
+  border-top: 1px solid rgba(222, 192, 172, 0.5);
+  padding-top: 20px;
+}
+.css-block h2 {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-med);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+.css-block pre {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--text-soft);
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(222, 192, 172, 0.5);
+  border-radius: 8px;
+  padding: 12px;
+  margin: 0 0 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.copy-btn {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1.5px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  transition: background 0.15s ease;
+}
+.copy-btn:active { background: var(--accent-3); }
+.copy-btn.copied {
+  background: rgba(42, 63, 26, 0.14);
+  border-color: rgba(42, 63, 26, 0.4);
+  color: #2a3f1a;
+}
+
+/* ------------------------------------------------------------
+   Preview area
+   ------------------------------------------------------------ */
+.preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.preview-stage {
+  position: relative;
+  width: 480px;
+  height: 480px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview .icon-wrapper {
+  width: 200px;
+  height: 200px;
+  margin: 0;
+}
+
+/* Disable main.css's halo and the SVG glow stroke. This demo
+   supplies its own gradient-driven rim light. */
+.preview .gold-halo { display: none; }
+.preview .gold-glow { stroke: none; }
+
+/* Pulse rings — toggled by the checkbox. */
+.preview.no-pulse .pulse-ring { display: none; }
+
+/* Koi — toggled by the checkbox. */
+.preview.no-koi .koi-dive-wrap { display: none; }
+
+/* The rim light. Background, size, position, and animation are
+   all written inline by the script. Only the surrounding rules
+   live here. */
 .soft-glow {
   position: absolute;
-  top: 50%; left: 50%;
+  top: 50%;
+  left: 50%;
   border-radius: 50%;
   pointer-events: none;
   z-index: 0;
-  animation: demoBreath 8s ease-in-out infinite;
   will-change: opacity;
 }
 
-@keyframes demoBreath {
-  0%, 100% { opacity: 0.45; }
+@keyframes glowBreath {
+  0%, 100% { opacity: var(--breath-floor, 0.45); }
   50%      { opacity: 1.00; }
 }
 
-/* ============================================================
-   A · 8px peek — div 202×202 (radius 101)
-   Ring inner edge 87/101 = 86.1%.  Ring outer edge 93/101 = 92.1%.
-   ============================================================ */
-[data-variant="a"] .soft-glow {
-  width: 202px; height: 202px;
-  margin-top: -101px; margin-left: -101px;
-  background: radial-gradient(circle closest-side,
-    transparent 0%,
-    transparent 84%,
-    rgba(255,255,255,0.10) 88%,
-    rgba(255,255,255,0.42) 92.1%,
-    rgba(255,255,255,0.24) 95%,
-    rgba(255,255,255,0.08) 98%,
-    rgba(255,255,255,0) 100%);
+/* Ambient layers get hidden behind the opaque backdrop of the
+   controls panel; keep them bright enough to read the glow. */
+.preview .ambient-stage { opacity: 0.9; }
+
+/* Small on-screen readout of the current parameter set, so you
+   can note a setting without scrolling. */
+.preview-readout {
+  position: absolute;
+  left: 24px;
+  bottom: 20px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--text-mute);
+  letter-spacing: 0.3px;
+  pointer-events: none;
+  user-select: none;
+  background: rgba(255, 253, 249, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(222, 192, 172, 0.4);
+  border-radius: 8px;
+  padding: 10px 14px;
+  max-width: 340px;
+}
+.preview-readout strong {
+  color: var(--accent);
+  font-weight: 600;
 }
 
-/* ============================================================
-   B · 12px peek — div 210×210 (radius 105)
-   Ring inner 87/105 = 82.9%.  Ring outer 93/105 = 88.6%.
-   ============================================================ */
-[data-variant="b"] .soft-glow {
-  width: 210px; height: 210px;
-  margin-top: -105px; margin-left: -105px;
-  background: radial-gradient(circle closest-side,
-    transparent 0%,
-    transparent 80%,
-    rgba(255,255,255,0.10) 84%,
-    rgba(255,255,255,0.42) 88.6%,
-    rgba(255,255,255,0.24) 93%,
-    rgba(255,255,255,0.08) 97%,
-    rgba(255,255,255,0) 100%);
+/* Ring reference note */
+.ring-note {
+  position: absolute;
+  right: 24px;
+  bottom: 20px;
+  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  font-size: 11px;
+  color: var(--text-faint);
+  letter-spacing: 0.3px;
+  text-align: right;
+  line-height: 1.7;
+  pointer-events: none;
+  user-select: none;
+}
+.ring-note code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  background: rgba(255, 253, 249, 0.65);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent-2);
 }
 
-/* ============================================================
-   C · 18px peek — div 222×222 (radius 111)
-   Ring inner 87/111 = 78.4%.  Ring outer 93/111 = 83.8%.
-   ============================================================ */
-[data-variant="c"] .soft-glow {
-  width: 222px; height: 222px;
-  margin-top: -111px; margin-left: -111px;
-  background: radial-gradient(circle closest-side,
-    transparent 0%,
-    transparent 75%,
-    rgba(255,255,255,0.08) 79%,
-    rgba(255,255,255,0.40) 83.8%,
-    rgba(255,255,255,0.26) 89%,
-    rgba(255,255,255,0.10) 95%,
-    rgba(255,255,255,0) 100%);
-}
-
-/* ============================================================
-   D · 25px peek — div 236×236 (radius 118)
-   Ring inner 87/118 = 73.7%.  Ring outer 93/118 = 78.8%.
-   ============================================================ */
-[data-variant="d"] .soft-glow {
-  width: 236px; height: 236px;
-  margin-top: -118px; margin-left: -118px;
-  background: radial-gradient(circle closest-side,
-    transparent 0%,
-    transparent 70%,
-    rgba(255,255,255,0.06) 75%,
-    rgba(255,255,255,0.38) 78.8%,
-    rgba(255,255,255,0.28) 85%,
-    rgba(255,255,255,0.12) 92%,
-    rgba(255,255,255,0) 100%);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .soft-glow, .glow-demo-stage .gold-band, .glow-demo-stage .pulse-ring {
-    animation: none !important;
-  }
-  .soft-glow                   { opacity: 0.72 !important; }
-  .glow-demo-stage .gold-band  { opacity: 1.00 !important; }
-  .glow-demo-stage .pulse-ring { opacity: 0 !important; }
+/* Responsive fallback — stack on narrow viewports. */
+@media (max-width: 900px) {
+  .playground { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .controls { border-right: none; border-bottom: 1px solid rgba(222, 192, 172, 0.45); max-height: 55vh; }
+  .preview-stage { width: 320px; height: 320px; }
 }
 </style>
 </head>
-<body class="glow-demo">
+<body class="glow-playground">
 
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
@@ -205,68 +460,483 @@ body.glow-demo {
 <div class="ambient-mosaic" aria-hidden="true"></div>
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<header class="glow-demo-header">
-  <h1>Start Button Glow — デモ v5</h1>
-  <p>
-    v1–v4 はすべて <code>radial-gradient</code> の既定値 <code>farthest-corner</code> のため、グローのピークが
-    <code>border-radius</code> の外側に落ち、実際には何も描画されていませんでした。<br>
-    今回は <code>circle closest-side</code> を明示。リング外周 <code>r=93px</code> にピークを置き、
-    そこから外側だけに減衰させています。
-  </p>
-</header>
+<div class="playground">
 
-<template id="button-markup">
-  <div class="icon-wrapper">
-    <div class="soft-glow"></div>
-    <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-      <circle cx="180" cy="180" r="90" class="gold-glow" />
-      <circle cx="180" cy="180" r="90" class="gold-band" />
-    </svg>
-    <div class="koi-dive-wrap">
-      <div class="blossom-char">
-        <div class="koi-shadow"></div>
-        <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+  <aside class="controls">
+    <header>
+      <h1>Start Button Glow</h1>
+      <p>
+        リングは <code>r=90px</code>、線幅 <code>6px</code>（外周 <code>r=93px</code>）。
+        グローは <code>radial-gradient</code> 一枚で、<code>circle closest-side</code>
+        により <code>100%</code> は div の半径そのもの。
+      </p>
+    </header>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Inner edge</span>
+        <span class="control-value" id="v-inner">87 px</span>
+      </div>
+      <input type="range" id="r-inner" min="50" max="92" step="1" value="87">
+      <div class="control-hint">Radius where the glow starts rising from zero. The ring's inner edge is 87px.</div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Peak</span>
+        <span class="control-value" id="v-peak">93 px</span>
+      </div>
+      <input type="range" id="r-peak" min="87" max="110" step="1" value="93">
+      <div class="control-hint">Radius of maximum brightness. Ring outer edge is 93px.</div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Outer edge</span>
+        <span class="control-value" id="v-outer">101 px</span>
+      </div>
+      <input type="range" id="r-outer" min="94" max="150" step="1" value="101">
+      <div class="control-hint">Radius where the glow fades to zero. This is the div's half-extent — it decides the peek distance.</div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Peak alpha</span>
+        <span class="control-value" id="v-alpha">0.42</span>
+      </div>
+      <input type="range" id="r-alpha" min="0.05" max="1.00" step="0.01" value="0.42">
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Breath duration</span>
+        <span class="control-value" id="v-duration">8.0 s</span>
+      </div>
+      <input type="range" id="r-duration" min="2" max="20" step="0.5" value="8">
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Breath floor</span>
+        <span class="control-value" id="v-floor">0.45</span>
+      </div>
+      <input type="range" id="r-floor" min="0" max="1" step="0.01" value="0.45">
+      <div class="control-hint">Opacity at the dim end of the breath. 1.00 = no breath.</div>
+    </div>
+
+    <div class="control-group">
+      <div class="control-row">
+        <span class="control-label">Colour</span>
+        <span class="control-value" id="v-colour">#ffffff</span>
+      </div>
+      <div class="colour-buttons">
+        <button class="colour-btn selected" data-colour="255, 255, 255" style="background:#ffffff" title="Pure white"></button>
+        <button class="colour-btn" data-colour="255, 253, 249" style="background:#FFFDF9" title="Silk white"></button>
+        <button class="colour-btn" data-colour="255, 250, 240" style="background:#fffaf0" title="Warm cream"></button>
+        <button class="colour-btn" data-colour="255, 240, 220" style="background:#fff0dc" title="Warm off-white"></button>
+      </div>
+      <div class="colour-custom">
+        <label for="r-colour">Custom</label>
+        <input type="color" id="r-colour" value="#ffffff">
       </div>
     </div>
-  </div>
-</template>
 
-<div class="glow-demo-grid">
+    <div class="control-group">
+      <span class="control-label">Presets</span>
+      <div class="preset-row">
+        <button class="preset-btn" data-preset="tight">Tight 4px</button>
+        <button class="preset-btn" data-preset="rim">Rim 8px</button>
+        <button class="preset-btn" data-preset="soft">Soft 14px</button>
+        <button class="preset-btn" data-preset="wide">Wide 25px</button>
+      </div>
+    </div>
 
-  <div class="glow-demo-tile" data-variant="a">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">A · 8px</div>
-    <div class="glow-demo-note">Very tight rim. Barely beyond the ring.</div>
-  </div>
+    <div class="control-group">
+      <span class="control-label">Preview</span>
+      <div class="toggles">
+        <label class="toggle-row"><input type="checkbox" id="t-koi" checked> Show koi</label>
+        <label class="toggle-row"><input type="checkbox" id="t-pulse"> Show pulse rings</label>
+      </div>
+    </div>
 
-  <div class="glow-demo-tile" data-variant="b">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">B · 12px</div>
-    <div class="glow-demo-note">Soft rim with a little breathing room.</div>
-  </div>
+    <div class="css-block">
+      <h2>Result CSS</h2>
+      <pre id="cssOut"></pre>
+      <button class="copy-btn" id="copyBtn">Copy to clipboard</button>
+    </div>
 
-  <div class="glow-demo-tile" data-variant="c">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">C · 18px</div>
-    <div class="glow-demo-note">Wider shoulder. Still clearly attached to the ring.</div>
-  </div>
+  </aside>
 
-  <div class="glow-demo-tile" data-variant="d">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">D · 25px</div>
-    <div class="glow-demo-note">Broader atmospheric surround.</div>
-  </div>
+  <main class="preview" id="preview">
+
+    <div class="preview-stage">
+      <button type="button" class="start-btn" aria-label="プレビュー">
+        <div class="icon-wrapper">
+          <div class="soft-glow" id="softGlow"></div>
+          <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+            <circle cx="180" cy="180" r="90" class="gold-glow" />
+            <circle cx="180" cy="180" r="90" class="gold-band" />
+          </svg>
+          <div class="koi-dive-wrap">
+            <div class="blossom-char">
+              <div class="koi-shadow" aria-hidden="true"></div>
+              <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+            </div>
+          </div>
+        </div>
+      </button>
+    </div>
+
+    <div class="preview-readout" id="readout"></div>
+
+    <div class="ring-note">
+      ring centreline <code>r=90</code><br>
+      ring outer edge <code>r=93</code>
+    </div>
+
+  </main>
 
 </div>
 
 <script>
 (function() {
-  var tpl = document.getElementById('button-markup');
-  if (!tpl) return;
-  var stages = document.querySelectorAll('.glow-demo-stage');
-  for (var i = 0; i < stages.length; i++) {
-    stages[i].appendChild(tpl.content.cloneNode(true));
+  'use strict';
+
+  /* ------------------------------------------------------------
+     State
+     ------------------------------------------------------------ */
+  var P = {
+    inner: 87,
+    peak: 93,
+    outer: 101,
+    alpha: 0.42,
+    duration: 8,
+    floor: 0.45,
+    colour: '255, 255, 255'
+  };
+
+  var glowEl   = document.getElementById('softGlow');
+  var previewEl = document.getElementById('preview');
+  var cssOut   = document.getElementById('cssOut');
+  var readout  = document.getElementById('readout');
+  var copyBtn  = document.getElementById('copyBtn');
+
+  /* ------------------------------------------------------------
+     Gradient builder — circle closest-side is load-bearing.
+     ------------------------------------------------------------ */
+  function buildGradient() {
+    var innerPct = P.inner / P.outer * 100;
+    var peakPct  = P.peak  / P.outer * 100;
+
+    function riseAt(t) { return innerPct + (peakPct - innerPct) * t; }
+    function fallAt(t) { return peakPct + (100 - peakPct) * t; }
+
+    var c = P.colour;
+    var a = P.alpha;
+
+    function rgba(mult) {
+      var v = (a * mult).toFixed(3);
+      return 'rgba(' + c + ',' + v + ')';
+    }
+
+    var stops = [
+      ['transparent',                    0],
+      [rgba(0),                          innerPct],
+      [rgba(0.08),                       riseAt(0.35)],
+      [rgba(0.28),                       riseAt(0.65)],
+      [rgba(0.58),                       riseAt(0.87)],
+      [rgba(1.00),                       peakPct],
+      [rgba(0.58),                       fallAt(0.18)],
+      [rgba(0.30),                       fallAt(0.40)],
+      [rgba(0.14),                       fallAt(0.65)],
+      [rgba(0.05),                       fallAt(0.85)],
+      ['rgba(' + c + ',0)',              100]
+    ];
+
+    var parts = stops.map(function(s) {
+      return s[0] + ' ' + s[1].toFixed(2) + '%';
+    });
+
+    return 'radial-gradient(circle closest-side, ' + parts.join(', ') + ')';
   }
+
+  /* ------------------------------------------------------------
+     Apply state to preview
+     ------------------------------------------------------------ */
+  function applyState() {
+    var size = P.outer * 2;
+
+    glowEl.style.width  = size + 'px';
+    glowEl.style.height = size + 'px';
+    glowEl.style.marginTop  = (-P.outer) + 'px';
+    glowEl.style.marginLeft = (-P.outer) + 'px';
+    glowEl.style.background = buildGradient();
+    glowEl.style.animation  =
+      'glowBreath ' + P.duration + 's ease-in-out infinite';
+
+    previewEl.style.setProperty('--breath-floor', P.floor);
+  }
+
+  /* ------------------------------------------------------------
+     Live CSS output
+     ------------------------------------------------------------ */
+  function buildCSSOutput() {
+    var size = P.outer * 2;
+    var innerPct = P.inner / P.outer * 100;
+    var peakPct  = P.peak  / P.outer * 100;
+
+    function riseAt(t) { return innerPct + (peakPct - innerPct) * t; }
+    function fallAt(t) { return peakPct + (100 - peakPct) * t; }
+
+    var c = P.colour;
+    var a = P.alpha;
+    function rgba(mult) {
+      return 'rgba(' + c + ',' + (a * mult).toFixed(3) + ')';
+    }
+    function pct(v) { return v.toFixed(2) + '%'; }
+
+    var lines = [
+      '/* rim light — copy into main.css, replacing the current',
+      '   .gold-halo and .gold-glow rules. */',
+      '.soft-glow {',
+      '  position: absolute;',
+      '  top: 50%;',
+      '  left: 50%;',
+      '  width: ' + size + 'px;',
+      '  height: ' + size + 'px;',
+      '  margin-top: ' + (-P.outer) + 'px;',
+      '  margin-left: ' + (-P.outer) + 'px;',
+      '  border-radius: 50%;',
+      '  pointer-events: none;',
+      '  z-index: 0;',
+      '  will-change: opacity;',
+      '  background: radial-gradient(circle closest-side,',
+      '    transparent 0%,',
+      '    rgba(' + c + ',0) ' + pct(innerPct) + ',',
+      '    ' + rgba(0.08) + ' ' + pct(riseAt(0.35)) + ',',
+      '    ' + rgba(0.28) + ' ' + pct(riseAt(0.65)) + ',',
+      '    ' + rgba(0.58) + ' ' + pct(riseAt(0.87)) + ',',
+      '    ' + rgba(1.00) + ' ' + pct(peakPct) + ',',
+      '    ' + rgba(0.58) + ' ' + pct(fallAt(0.18)) + ',',
+      '    ' + rgba(0.30) + ' ' + pct(fallAt(0.40)) + ',',
+      '    ' + rgba(0.14) + ' ' + pct(fallAt(0.65)) + ',',
+      '    ' + rgba(0.05) + ' ' + pct(fallAt(0.85)) + ',',
+      '    rgba(' + c + ',0) 100%',
+      '  );',
+      '  animation: glowBreath ' + P.duration + 's ease-in-out infinite;',
+      '}',
+      '',
+      '@keyframes glowBreath {',
+      '  0%, 100% { opacity: ' + P.floor.toFixed(2) + '; }',
+      '  50%      { opacity: 1.00; }',
+      '}'
+    ];
+
+    return lines.join('\n');
+  }
+
+  /* ------------------------------------------------------------
+     Readout panel
+     ------------------------------------------------------------ */
+  function updateReadout() {
+    readout.innerHTML =
+      'inner <strong>' + P.inner + '</strong> · ' +
+      'peak <strong>' + P.peak + '</strong> · ' +
+      'outer <strong>' + P.outer + '</strong> · ' +
+      'peek <strong>' + (P.outer - 93) + 'px</strong><br>' +
+      'alpha <strong>' + P.alpha.toFixed(2) + '</strong> · ' +
+      'floor <strong>' + P.floor.toFixed(2) + '</strong> · ' +
+      'breath <strong>' + P.duration.toFixed(1) + 's</strong>';
+  }
+
+  /* ------------------------------------------------------------
+     Full render
+     ------------------------------------------------------------ */
+  function render() {
+    /* Enforce ordering so the gradient never inverts. */
+    if (P.inner > P.peak - 2) P.inner = P.peak - 2;
+    if (P.peak > P.outer - 2) P.outer = P.peak + 2;
+    if (P.outer < 94) P.outer = 94;
+
+    applyState();
+    updateReadout();
+    cssOut.textContent = buildCSSOutput();
+
+    /* Sync sliders in case ordering clamps pushed a value. */
+    syncInputs();
+  }
+
+  function syncInputs() {
+    setSlider('r-inner', P.inner, 'v-inner', function(v) { return v + ' px'; });
+    setSlider('r-peak',  P.peak,  'v-peak',  function(v) { return v + ' px'; });
+    setSlider('r-outer', P.outer, 'v-outer', function(v) { return v + ' px'; });
+    setSlider('r-alpha', P.alpha, 'v-alpha', function(v) { return v.toFixed(2); });
+    setSlider('r-duration', P.duration, 'v-duration', function(v) { return v.toFixed(1) + ' s'; });
+    setSlider('r-floor', P.floor, 'v-floor', function(v) { return v.toFixed(2); });
+  }
+
+  function setSlider(id, value, valId, fmt) {
+    var el = document.getElementById(id);
+    var val = document.getElementById(valId);
+    if (el && parseFloat(el.value) !== value) el.value = value;
+    if (val) val.textContent = fmt(value);
+  }
+
+  /* ------------------------------------------------------------
+     Bindings — sliders
+     ------------------------------------------------------------ */
+  bindRange('r-inner',    function(v) { P.inner = v; });
+  bindRange('r-peak',     function(v) { P.peak = v; });
+  bindRange('r-outer',    function(v) { P.outer = v; });
+  bindRange('r-alpha',    function(v) { P.alpha = v; });
+  bindRange('r-duration', function(v) { P.duration = v; });
+  bindRange('r-floor',    function(v) { P.floor = v; });
+
+  function bindRange(id, assign) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('input', function() {
+      assign(parseFloat(el.value));
+      render();
+    });
+  }
+
+  /* ------------------------------------------------------------
+     Bindings — colour
+     ------------------------------------------------------------ */
+  var colourBtns = document.querySelectorAll('.colour-btn');
+  for (var i = 0; i < colourBtns.length; i++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        var c = btn.getAttribute('data-colour');
+        P.colour = c;
+        var hex = rgbToHex(c);
+        var colInput = document.getElementById('r-colour');
+        if (colInput) colInput.value = hex;
+        document.getElementById('v-colour').textContent = hex;
+        for (var k = 0; k < colourBtns.length; k++) {
+          colourBtns[k].classList.toggle('selected', colourBtns[k] === btn);
+        }
+        render();
+      });
+    })(colourBtns[i]);
+  }
+
+  var colourInput = document.getElementById('r-colour');
+  if (colourInput) {
+    colourInput.addEventListener('input', function() {
+      P.colour = hexToRgb(colourInput.value);
+      document.getElementById('v-colour').textContent = colourInput.value;
+      for (var k = 0; k < colourBtns.length; k++) {
+        colourBtns[k].classList.remove('selected');
+      }
+      render();
+    });
+  }
+
+  function hexToRgb(hex) {
+    hex = hex.replace('#', '');
+    if (hex.length === 3) {
+      hex = hex.split('').map(function(c) { return c + c; }).join('');
+    }
+    var n = parseInt(hex, 16);
+    return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255);
+  }
+
+  function rgbToHex(rgb) {
+    var parts = rgb.split(',').map(function(s) { return parseInt(s.trim(), 10); });
+    function h(n) { return ('0' + n.toString(16)).slice(-2); }
+    return '#' + h(parts[0]) + h(parts[1]) + h(parts[2]);
+  }
+
+  /* ------------------------------------------------------------
+     Bindings — presets
+     ------------------------------------------------------------ */
+  var PRESETS = {
+    tight: { inner: 87, peak: 93, outer: 97,  alpha: 0.42 },
+    rim:   { inner: 87, peak: 93, outer: 101, alpha: 0.42 },
+    soft:  { inner: 84, peak: 94, outer: 107, alpha: 0.42 },
+    wide:  { inner: 80, peak: 96, outer: 118, alpha: 0.40 }
+  };
+
+  var presetBtns = document.querySelectorAll('.preset-btn');
+  for (var p = 0; p < presetBtns.length; p++) {
+    (function(btn) {
+      btn.addEventListener('click', function() {
+        var key = btn.getAttribute('data-preset');
+        var cfg = PRESETS[key];
+        if (!cfg) return;
+        P.inner = cfg.inner;
+        P.peak  = cfg.peak;
+        P.outer = cfg.outer;
+        P.alpha = cfg.alpha;
+        render();
+      });
+    })(presetBtns[p]);
+  }
+
+  /* ------------------------------------------------------------
+     Bindings — toggles
+     ------------------------------------------------------------ */
+  var koiToggle = document.getElementById('t-koi');
+  if (koiToggle) {
+    koiToggle.addEventListener('change', function() {
+      previewEl.classList.toggle('no-koi', !koiToggle.checked);
+    });
+  }
+
+  var pulseToggle = document.getElementById('t-pulse');
+  if (pulseToggle) {
+    pulseToggle.addEventListener('change', function() {
+      previewEl.classList.toggle('no-pulse', !pulseToggle.checked);
+    });
+  }
+
+  /* Initial: pulse rings off, matching the production button's
+     idle state which has them visible but rotating through a long
+     cycle. For a static glow comparison they're noise. */
+  previewEl.classList.add('no-pulse');
+
+  /* ------------------------------------------------------------
+     Copy button
+     ------------------------------------------------------------ */
+  if (copyBtn) {
+    copyBtn.addEventListener('click', function() {
+      var text = cssOut.textContent || '';
+      var done = function() {
+        copyBtn.classList.add('copied');
+        copyBtn.textContent = 'Copied';
+        setTimeout(function() {
+          copyBtn.classList.remove('copied');
+          copyBtn.textContent = 'Copy to clipboard';
+        }, 1600);
+      };
+      var fallback = function() {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.left = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        done();
+      };
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(text).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+    });
+  }
+
+  /* ------------------------------------------------------------
+     Go
+     ------------------------------------------------------------ */
+  render();
 })();
 </script>
 
