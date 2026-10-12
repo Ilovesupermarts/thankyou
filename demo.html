@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Start Button Glow — デモ v2</title>
+<title>Start Button Glow — デモ v3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,22 +14,27 @@
 
 <style>
 /* ============================================================
-   GLOW DEMO v2 — peek-only variants
+   GLOW DEMO v3 — soft Gaussian glow
 
-   The 280px .gold-halo from main.css is disabled here. It was
-   too large relative to the ring (r=90 in a 360 viewBox) and
-   read as a discrete circle rather than as a glow. These
-   variants either drop the halo entirely or shrink it so its
-   soft edge sits just outside the ring band (r=87–93).
+   Every previous attempt used an SVG <circle> stroke, which has
+   hard boundaries on both edges by definition. A soft glow needs
+   a radial-gradient with a multi-stop Gaussian-shaped falloff,
+   peaking at the ring's radius (r = 90px on screen) and feathering
+   symmetrically inward and outward.
+
+   These variants replace .gold-glow's SVG stroke with a
+   gradient div. main.css is untouched — this demo only overrides
+   inside .glow-demo-stage.
    ============================================================ */
 
-/* Mosaic swap for the koi-screen backdrop state. */
+/* Koi-screen mosaic state, mirrored from the production :has() rule. */
 html[data-demo="glow"] .ambient-mosaic      { opacity: 0; }
 html[data-demo="glow"] .ambient-mosaic-pond { opacity: 0.08; }
 
-/* Hide main.css's halo everywhere in the demo. Variants that
-   want a halo redeclare it below. */
+/* Disable main.css's 280px halo and the SVG stroke entirely.
+   The variants below supply their own soft gradient div. */
 .glow-demo-stage .gold-halo { display: none; }
+.glow-demo-stage .gold-glow { stroke: none; }
 
 body.glow-demo {
   padding: 40px 24px 100px;
@@ -44,147 +49,143 @@ body.glow-demo {
   color: var(--text-dark);
 }
 .glow-demo-header h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: 3px;
-  margin: 0 0 12px;
+  font-size: 22px; font-weight: 600; color: var(--accent);
+  letter-spacing: 3px; margin: 0 0 12px;
 }
 .glow-demo-header p {
-  font-size: 14px;
-  line-height: 1.9;
-  color: var(--text-med);
-  letter-spacing: 0.4px;
-  margin: 0 0 8px;
-}
-.glow-demo-header code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 13px;
-  background: var(--soft-1);
-  border-radius: 4px;
-  padding: 1px 6px;
-  color: var(--accent-2);
+  font-size: 14px; line-height: 1.9; color: var(--text-med);
+  letter-spacing: 0.4px; margin: 0 0 8px;
 }
 
 .glow-demo-grid {
-  max-width: 1280px;
-  margin: 0 auto;
+  max-width: 1280px; margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 48px 32px;
 }
-
 .glow-demo-tile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  display: flex; flex-direction: column; align-items: center;
   padding: 16px 12px 24px;
 }
-
 .glow-demo-stage {
-  position: relative;
-  width: 280px;
-  height: 280px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  position: relative; width: 280px; height: 280px;
+  display: flex; align-items: center; justify-content: center;
   margin-bottom: 22px;
 }
-
-.glow-demo-stage .icon-wrapper {
-  width: 200px;
-  height: 200px;
-  margin: 0;
-}
-
+.glow-demo-stage .icon-wrapper { width: 200px; height: 200px; margin: 0; }
 .glow-demo-label {
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-dark);
-  letter-spacing: 1.5px;
-  text-align: center;
-  margin-bottom: 6px;
+  font-size: 14px; font-weight: 600; color: var(--text-dark);
+  letter-spacing: 1.5px; text-align: center; margin-bottom: 6px;
 }
 .glow-demo-note {
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  font-size: 12px;
-  color: var(--text-mute);
-  letter-spacing: 0.4px;
-  text-align: center;
-  line-height: 1.7;
+  font-size: 12px; color: var(--text-mute);
+  letter-spacing: 0.4px; text-align: center; line-height: 1.7;
   max-width: 260px;
 }
 
-/* Shared breath — 8s, opacity only. */
+/* ------------------------------------------------------------
+   The soft glow layer
+
+   260×260 div centred on the icon-wrapper. Its 130px half-radius
+   maps to 100% of the radial-gradient. The ring sits at 90px,
+   which is 69.2% — every variant peaks its alpha at that stop.
+
+   Stops are distributed across the falloff to approximate a
+   Gaussian: many low-alpha shoulder stops, a compact high-alpha
+   peak, many low-alpha shoulder stops on the way out. That's
+   what produces the smooth look — a 2- or 3-stop gradient is a
+   trapezoid, not a bell.
+   ------------------------------------------------------------ */
+.soft-glow {
+  position: absolute;
+  width: 260px; height: 260px;
+  top: 50%; left: 50%;
+  margin-top: -130px; margin-left: -130px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 1;
+  animation: demoBreath 8s ease-in-out infinite;
+  will-change: opacity;
+}
+
 @keyframes demoBreath {
-  0%, 100% { opacity: 0.18; }
-  50%      { opacity: 0.72; }
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 1.00; }
 }
 
-/* Shared tight halo: 220px disc, peak alpha at the ring's
-   outer edge, feathering outward. Sits inside the 280px stage
-   so it does not read as a separate circle. */
-.glow-demo-stage .gold-halo {
-  width: 220px;
-  height: 220px;
-  margin-top: -110px;
-  margin-left: -110px;
+/* ============================================================
+   A · Tight soft glow
+   Peak at ring radius, tight Gaussian. The most literal
+   reading of "just peek out behind the ring".
+   ============================================================ */
+[data-variant="a"] .soft-glow {
   background: radial-gradient(circle,
-    transparent 76%,
-    rgba(255, 255, 255, 0.50) 88%,
-    rgba(255, 255, 255, 0.12) 97%,
+    transparent 50%,
+    rgba(255,255,255,0.02) 58%,
+    rgba(255,255,255,0.08) 63%,
+    rgba(255,255,255,0.20) 67%,
+    rgba(255,255,255,0.36) 69.2%,
+    rgba(255,255,255,0.20) 71.5%,
+    rgba(255,255,255,0.08) 76%,
+    rgba(255,255,255,0.02) 83%,
+    transparent 92%);
+}
+
+/* ============================================================
+   B · Tighter still — even less spread
+   ============================================================ */
+[data-variant="b"] .soft-glow {
+  background: radial-gradient(circle,
+    transparent 60%,
+    rgba(255,255,255,0.04) 64%,
+    rgba(255,255,255,0.14) 67%,
+    rgba(255,255,255,0.34) 69.2%,
+    rgba(255,255,255,0.14) 71.5%,
+    rgba(255,255,255,0.04) 75%,
+    transparent 82%);
+}
+
+/* ============================================================
+   C · Broader, softer falloff
+   ============================================================ */
+[data-variant="c"] .soft-glow {
+  background: radial-gradient(circle,
+    transparent 34%,
+    rgba(255,255,255,0.01) 46%,
+    rgba(255,255,255,0.04) 55%,
+    rgba(255,255,255,0.12) 62%,
+    rgba(255,255,255,0.26) 67%,
+    rgba(255,255,255,0.34) 69.2%,
+    rgba(255,255,255,0.26) 72%,
+    rgba(255,255,255,0.12) 78%,
+    rgba(255,255,255,0.04) 86%,
+    rgba(255,255,255,0.01) 94%,
     transparent 100%);
-  animation: demoBreath 8s ease-in-out infinite;
 }
 
 /* ============================================================
-   VARIANT A · No halo, thin glow stroke
+   D · Brightest — full peak, moderate spread
    ============================================================ */
-[data-variant="a"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 22px;
-  animation: demoBreath 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT B · No halo, wide glow stroke
-   ============================================================ */
-[data-variant="b"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 40px;
-  animation: demoBreath 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT C · Tight halo + thin glow
-   ============================================================ */
-[data-variant="c"] .gold-halo { display: block; }
-[data-variant="c"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 22px;
-  animation: demoBreath 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT D · Tight halo + wide glow
-   ============================================================ */
-[data-variant="d"] .gold-halo { display: block; }
-[data-variant="d"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 40px;
-  animation: demoBreath 8s ease-in-out infinite;
+[data-variant="d"] .soft-glow {
+  background: radial-gradient(circle,
+    transparent 50%,
+    rgba(255,255,255,0.03) 57%,
+    rgba(255,255,255,0.12) 62%,
+    rgba(255,255,255,0.28) 66%,
+    rgba(255,255,255,0.48) 69.2%,
+    rgba(255,255,255,0.28) 72%,
+    rgba(255,255,255,0.12) 77%,
+    rgba(255,255,255,0.03) 85%,
+    transparent 94%);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .glow-demo-stage .gold-halo,
-  .glow-demo-stage .gold-glow,
-  .glow-demo-stage .gold-band,
-  .glow-demo-stage .pulse-ring {
+  .soft-glow, .glow-demo-stage .gold-band, .glow-demo-stage .pulse-ring {
     animation: none !important;
   }
-  .glow-demo-stage .gold-halo { opacity: 0.55 !important; }
-  .glow-demo-stage .gold-glow { opacity: 0.45 !important; }
+  .soft-glow                  { opacity: 0.72 !important; }
   .glow-demo-stage .gold-band { opacity: 1.00 !important; }
   .glow-demo-stage .pulse-ring { opacity: 0 !important; }
 }
@@ -216,16 +217,19 @@ body.glow-demo {
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
 <header class="glow-demo-header">
-  <h1>Start Button Glow — デモ v2</h1>
+  <h1>Start Button Glow — デモ v3</h1>
   <p>
-    280px の <code>.gold-halo</code> を無効化しました。リングに対して大きすぎ、独立した円として見えていたためです。<br>
-    ここではハローを完全に外すか、リング外周に沿う 220px に縮めたものだけを比較できます。
+    前回まで SVG の <code>stroke</code> を使っていました。ストロークは定義上、
+    内側にも外側にも硬い境界を持ちます。ここでは <code>radial-gradient</code> の
+    多段ストップでガウス状の柔らかい減衰を作り、リング半径 (r=90px) で
+    ピークするようにしています。
   </p>
 </header>
 
 <template id="button-markup">
   <div class="icon-wrapper">
-    <div class="gold-halo"></div>
+    <!-- The soft glow div replaces both .gold-halo and .gold-glow. -->
+    <div class="soft-glow"></div>
     <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
       <circle cx="180" cy="180" r="90" class="gold-glow" />
       <circle cx="180" cy="180" r="90" class="gold-band" />
@@ -243,26 +247,26 @@ body.glow-demo {
 
   <div class="glow-demo-tile" data-variant="a">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">A · ハロー無し / 細いグロー</div>
-    <div class="glow-demo-note">No halo. 22px glow stroke. The ring plus a slim white rim.</div>
+    <div class="glow-demo-label">A · タイト</div>
+    <div class="glow-demo-note">Tight soft glow. Peak at ring radius, small spread either side.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="b">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">B · ハロー無し / 太いグロー</div>
-    <div class="glow-demo-note">No halo. 40px glow stroke. More presence, still only peeking out.</div>
+    <div class="glow-demo-label">B · 極めてタイト</div>
+    <div class="glow-demo-note">Tighter still. The glow just barely kisses the ring.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="c">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">C · タイトハロー / 細いグロー</div>
-    <div class="glow-demo-note">220px halo hugging the ring outer edge, plus the 22px stroke.</div>
+    <div class="glow-demo-label">C · 広め</div>
+    <div class="glow-demo-note">Broader soft falloff. Longer shoulders, same peak.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="d">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">D · タイトハロー / 太いグロー</div>
-    <div class="glow-demo-note">Same 220px halo, 40px stroke. The warmest of the four.</div>
+    <div class="glow-demo-label">D · 明るめ</div>
+    <div class="glow-demo-note">Brightest peak. Most visible, still soft edges.</div>
   </div>
 
 </div>
