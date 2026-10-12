@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#FAF7F2">
-<title>和田三造 配色選定デモ v2 (背景連動版)</title>
+<meta name="theme-color" content="#FDFBF7">
+<title>秋の伝統配色デモ (Momiji & Kinmokusei Palette Inspector)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,27 +13,31 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
+  /* ============================================================
+     DEMO VIEWPORT & APP-ACCURATE TABLE STYLING
+     ============================================================ */
   .demo-viewport {
     position: relative;
     width: 100vw;
     height: 100vh;
-    overflow: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .demo-view {
-    position: absolute;
-    inset: 0;
+    min-height: 100vh;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 70px 20px 100px 20px;
     transition: opacity 0.4s ease;
   }
   .demo-view.hidden {
+    display: none;
     opacity: 0;
-    pointer-events: none;
   }
 
+  /* Sample Panel 0 text */
   .sample-panel-content {
     max-width: 540px;
     text-align: center;
@@ -45,19 +49,191 @@
     letter-spacing: 0.8px;
     text-shadow:
       0 0 6px var(--bg-base),
-      0 0 14px var(--soft-1),
-      0 0 28px var(--soft-2);
+      0 0 16px rgba(255, 255, 255, 0.9),
+      0 0 28px rgba(255, 255, 255, 0.6);
   }
   .sample-panel-content .therapist-name {
     font-family: "Yuji Syuku", serif;
-    color: var(--outstanding);
-    font-size: 1.2em;
+    color: var(--accent);
+    font-size: 1.25em;
   }
 
+  /* Faithful Reproduction of the Production Table Card */
   .sample-table-card {
-    max-width: 500px;
+    max-width: 540px;
     width: 100%;
-    margin-top: 20px;
+    margin: 0 auto;
+    background-color: var(--soft-1);
+    background-image: url('icons/1790835034553.jpg');
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    border-radius: 20px;
+    border: 1px solid var(--border-3);
+    box-shadow: 0 8px 30px var(--shadow-rose-2);
+    overflow: hidden;
+  }
+
+  .sample-table-card .privacy-note-inline {
+    background: rgba(255, 255, 255, 0.72);
+    border-bottom: 1px solid var(--border-4);
+    padding: 16px 22px 18px 22px;
+    text-align: center;
+    font-family: "Shippori Mincho", serif;
+    font-size: 13.5px;
+    line-height: 1.9;
+    color: var(--text-dark);
+  }
+
+  .sample-table-card .row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 15px 16px;
+    border-bottom: 1px solid var(--border-4);
+    border-left: 3.5px solid transparent;
+    transition: background 0.25s ease, border-left-color 0.25s ease;
+  }
+  .sample-table-card .row.filled {
+    background: rgba(255, 255, 255, 0.68);
+    border-left-color: var(--accent);
+  }
+  .sample-table-card .row.locked {
+    opacity: 0.6;
+  }
+
+  .sample-table-card .row-check {
+    flex-shrink: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 1.5px solid var(--border-2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-family: "Shippori Mincho", serif;
+    font-size: 15px;
+    color: #e0d3ce;
+    transition: all 0.25s ease;
+  }
+  .sample-table-card .row-check::after {
+    content: "❀";
+    opacity: 0.35;
+    transition: all 0.25s ease;
+  }
+  .sample-table-card .row.filled .row-check {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--soft-2);
+  }
+  .sample-table-card .row.filled .row-check::after {
+    opacity: 1;
+    color: var(--accent);
+  }
+
+  .sample-table-card .service-display {
+    flex: 1;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text-dark);
+    line-height: 1.4;
+  }
+  .sample-table-card .service-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    border-bottom: 1.5px dashed var(--border-2);
+    color: var(--text-dark);
+    font-size: 15px;
+    padding: 6px 2px;
+  }
+
+  .sample-table-card .price-wrap {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    background: rgba(255, 255, 255, 0.75);
+    border-radius: 10px;
+    padding: 7px 11px;
+    border: 1.5px solid var(--border-1);
+    min-width: 95px;
+  }
+  .sample-table-card .row.filled .price-wrap {
+    background: #ffffff;
+    border-color: var(--accent);
+    box-shadow: 0 2px 8px var(--shadow-accent);
+  }
+  .sample-table-card .price-input {
+    width: 58px;
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 15px;
+    font-weight: 700;
+    text-align: right;
+  }
+  .sample-table-card .yen {
+    color: var(--accent-2);
+    font-size: 13.5px;
+    font-weight: 700;
+  }
+
+  /* Custom Section Divider */
+  .sample-table-card .custom-section-divider {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin: 16px 16px 6px 16px;
+  }
+  .custom-section-mark {
+    font-size: 15px;
+    color: var(--secondary-accent, var(--accent));
+  }
+  .custom-section-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border-2);
+  }
+  .custom-section-label {
+    font-family: "Shippori Mincho", serif;
+    font-size: 13.5px;
+    font-weight: 600;
+    color: var(--text-mute);
+    letter-spacing: 4px;
+  }
+
+  /* Reject Row */
+  .sample-reject-row {
+    max-width: 540px;
+    width: 100%;
+    margin: 14px auto 0 auto;
+    padding: 18px 18px;
+    background: var(--soft-2);
+    border: 1.5px dashed var(--border-1);
+    border-radius: 16px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+  .sample-reject-box {
+    width: 24px;
+    height: 24px;
+    border-radius: 7px;
+    border: 2px solid var(--border-2);
+    background: #ffffff;
+    margin-top: 2px;
+    flex-shrink: 0;
+  }
+  .sample-reject-text {
+    font-size: 14.5px;
+    color: var(--text-med);
+    line-height: 1.7;
+    font-family: "Shippori Mincho", serif;
   }
 
   /* ------------------------------------------------------------
@@ -72,15 +248,15 @@
     border: 1px solid var(--border-1);
     border-radius: 18px;
     padding: 16px 20px;
-    box-shadow: 0 10px 36px rgba(43, 35, 29, 0.12);
+    box-shadow: 0 10px 36px rgba(43, 35, 29, 0.14);
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     color: #2B231D;
-    width: 360px;
+    width: 370px;
     max-height: calc(100vh - 36px);
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 13px;
   }
 
   .dock-header {
@@ -97,20 +273,21 @@
     letter-spacing: 1px;
   }
   .dock-sub {
-    font-size: 10.5px;
-    color: #8E7E72;
+    font-size: 11px;
+    color: var(--text-mute);
+    font-weight: 500;
   }
 
   .palette-tabs {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 6px;
+    gap: 7px;
   }
   .palette-tab-btn {
-    background: #F8F5F0;
+    background: #FAF7F2;
     border: 1px solid #DCD4C6;
     border-radius: 10px;
-    padding: 8px 10px;
+    padding: 9px 10px;
     font-size: 12px;
     font-weight: 600;
     color: #473B32;
@@ -128,24 +305,24 @@
     border-color: var(--accent);
     color: #ffffff;
   }
-  .palette-tab-btn.active span.tab-desc { color: rgba(255, 255, 255, 0.85); }
+  .palette-tab-btn.active span.tab-desc { color: rgba(255, 255, 255, 0.88); }
 
   .swatch-display {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 7px;
     background: var(--bg-base);
     border: 1px solid var(--border-3);
     border-radius: 12px;
-    padding: 10px;
-    transition: background 0.4s ease;
+    padding: 11px;
+    transition: background 0.3s ease;
   }
   .swatch-bars {
     display: flex;
     height: 18px;
     border-radius: 6px;
     overflow: hidden;
-    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+    box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
   }
   .swatch-seg { height: 100%; transition: background 0.3s ease; }
   .swatch-legend {
@@ -158,13 +335,13 @@
   .swatch-legend-item { display: flex; align-items: center; gap: 6px; }
   .swatch-dot {
     width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
-    box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
+    box-shadow: 0 0 0 1px rgba(0,0,0,0.12);
   }
 
   .view-switch { display: flex; gap: 6px; }
   .view-btn {
     flex: 1; background: #F4EDE2; border: 1px solid #D1C4B0;
-    border-radius: 8px; padding: 6px; font-size: 11.5px; font-weight: 600;
+    border-radius: 8px; padding: 7px; font-size: 11.5px; font-weight: 600;
     color: #473B32; cursor: pointer; text-align: center; transition: all 0.2s;
   }
   .view-btn.active {
@@ -172,15 +349,16 @@
   }
 
   .dock-note {
-    font-size: 11px; color: #695B50; line-height: 1.5;
-    background: #F4EDE2; border-left: 3px solid var(--accent);
-    padding: 8px 10px; border-radius: 6px;
+    font-size: 11px; color: var(--text-med); line-height: 1.55;
+    background: rgba(255, 255, 255, 0.85); border-left: 3.5px solid var(--accent);
+    padding: 9px 11px; border-radius: 6px; border-top: 1px solid var(--border-4);
+    border-right: 1px solid var(--border-4); border-bottom: 1px solid var(--border-4);
   }
 </style>
 </head>
 <body>
 
-<!-- Ambient Stage & Shippō Pattern (identical to index.html) -->
+<!-- Ambient Stage & Shippō Pattern -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh" id="ambientMesh">
     <div class="light-orb orb-1" id="orb1"></div>
@@ -200,7 +378,7 @@
       <span class="sep">·</span>
       <span class="date">10月12日(月)</span>
       <span class="sep">·</span>
-      <span class="time">09時55分</span>
+      <span class="time">10時15分</span>
       <span class="sep">·</span>
       <span class="temp">23°</span>
       <span class="sep">·</span>
@@ -219,32 +397,81 @@
     </div>
   </div>
 
-  <!-- View 2: Table Card -->
+  <!-- View 2: App-Accurate Service Table Card -->
   <div class="demo-view hidden" id="viewTable">
-    <div class="table-card active sample-table-card">
-      <div class="privacy-note-inline">
-        <p>表に表示されている料金は、必要に応じて変更していただいても構いません。</p>
-      </div>
-      <div class="row filled">
-        <div class="row-check checked"></div>
-        <span class="service-display">アロマオイル追加</span>
-        <div class="price-wrap">
-          <input type="text" class="price-input" value="3,000" readonly>
-          <span class="yen">円</span>
+    <div style="width: 100%; max-width: 540px;">
+      <div class="sample-table-card">
+        <div class="privacy-note-inline">
+          <p style="margin: 0 0 4px 0;">なお、お選びいただいた内容が記録・送信されることは一切ございません。</p>
+          <p style="margin: 0; color: var(--text-mute); font-size: 12px;">表の料金は必要に応じてご自由に変更していただけます。どうぞご安心ください。</p>
+        </div>
+
+        <div class="row filled">
+          <div class="row-check"></div>
+          <span class="service-display">アロマオイル追加（ラベンダー＆和薄荷）</span>
+          <div class="price-wrap">
+            <input type="text" class="price-input" value="3,000" readonly>
+            <span class="yen">円</span>
+          </div>
+        </div>
+
+        <div class="row filled">
+          <div class="row-check"></div>
+          <span class="service-display">ホットストーン深層トリートメント</span>
+          <div class="price-wrap">
+            <input type="text" class="price-input" value="4,500" readonly>
+            <span class="yen">円</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-check"></div>
+          <span class="service-display">延長マッサージ（30分）</span>
+          <div class="price-wrap">
+            <input type="text" class="price-input" placeholder="料金" readonly>
+            <span class="yen">円</span>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="row-check"></div>
+          <span class="service-display">ヘッドスパ＆首肩集中ケア</span>
+          <div class="price-wrap">
+            <input type="text" class="price-input" placeholder="料金" readonly>
+            <span class="yen">円</span>
+          </div>
+        </div>
+
+        <div class="custom-section-divider">
+          <span class="custom-section-mark">❀</span>
+          <span class="custom-section-line"></span>
+          <span class="custom-section-label">その他</span>
+          <span class="custom-section-line"></span>
+          <span class="custom-section-mark">❀</span>
+        </div>
+
+        <div class="row locked">
+          <div class="row-check"></div>
+          <input type="text" class="service-input" placeholder="ご希望の施術をご自由にご記入ください" readonly>
+          <div class="price-wrap">
+            <input type="text" class="price-input" placeholder="料金" readonly>
+            <span class="yen">円</span>
+          </div>
         </div>
       </div>
-      <div class="row">
-        <div class="row-check"></div>
-        <span class="service-display">延長マッサージ（30分）</span>
-        <div class="price-wrap">
-          <input type="text" class="price-input" placeholder="料金" readonly>
-          <span class="yen">円</span>
+
+      <!-- Reject Row -->
+      <div class="sample-reject-row">
+        <div class="sample-reject-box"></div>
+        <div class="sample-reject-text">
+          今回はすべて見送ります。<br>いつものマッサージだけをお願いします。
         </div>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Center Dots Navigation -->
 <div class="action-hint global-hint shown" style="position:fixed; bottom: 84px; left:0; right:0;">
   <span class="hint-layer active">
     <span>スワイプ</span>
@@ -287,26 +514,26 @@
 <!-- Palette Inspector Dock -->
 <div class="palette-dock">
   <div class="dock-header">
-    <span class="dock-title">和田三造 配色選定 (背景完全連動版)</span>
-    <span class="dock-sub">大人上品・くすみカラー</span>
+    <span class="dock-title">秋の配色選定インスペクター</span>
+    <span class="dock-sub">高コントラスト &amp; 大人上品</span>
   </div>
 
   <div class="palette-tabs">
-    <button type="button" class="palette-tab-btn active" data-palette="A">
-      <span class="tab-title">A. 照柿・利休白茶</span>
-      <span class="tab-desc">秋の実りと茶席 (標準)</span>
+    <button type="button" class="palette-tab-btn active" data-palette="1">
+      <span class="tab-title">1. 紅葉と銀杏</span>
+      <span class="tab-desc">白茶磁・紅緋・黄櫨染 (高鮮明)</span>
+    </button>
+    <button type="button" class="palette-tab-btn" data-palette="2">
+      <span class="tab-title">2. 金木犀</span>
+      <span class="tab-desc">絹白・金木犀・葡萄染 (シック)</span>
+    </button>
+    <button type="button" class="palette-tab-btn" data-palette="A">
+      <span class="tab-title">3. 照柿・利休白茶</span>
+      <span class="tab-desc">生成り・栗皮墨・照柿 (伝統茶席)</span>
     </button>
     <button type="button" class="palette-tab-btn" data-palette="B">
-      <span class="tab-title">B. 琥珀・木蘭</span>
-      <span class="tab-desc">銀杏と穏やかな夕暮れ</span>
-    </button>
-    <button type="button" class="palette-tab-btn" data-palette="C">
-      <span class="tab-title">C. 蘇芳・鳩羽鼠</span>
-      <span class="tab-desc">上品な紫泥とコスメ</span>
-    </button>
-    <button type="button" class="palette-tab-btn" data-palette="D">
-      <span class="tab-title">D. 深緋・胡桃染</span>
-      <span class="tab-desc">晩秋の陶器とテラコッタ</span>
+      <span class="tab-title">4. 琥珀・木蘭</span>
+      <span class="tab-desc">鳥の子・焦茶・琥珀 (晩秋夕景)</span>
     </button>
   </div>
 
@@ -314,29 +541,30 @@
     <div class="swatch-bars">
       <div class="swatch-seg" id="segCanvas" style="width: 60%;"></div>
       <div class="swatch-seg" id="segSurface" style="width: 20%;"></div>
-      <div class="swatch-seg" id="segText" style="width: 15%;"></div>
-      <div class="swatch-seg" id="segAccent" style="width: 5%;"></div>
+      <div class="swatch-seg" id="segAccent" style="width: 10%;"></div>
+      <div class="swatch-seg" id="segTag" style="width: 5%;"></div>
+      <div class="swatch-seg" id="segText" style="width: 5%;"></div>
     </div>
     <div class="swatch-legend">
       <div class="swatch-legend-item">
         <div class="swatch-dot" id="dotCanvas"></div>
-        <span id="lblCanvas">生成り (60%)</span>
+        <span id="lblCanvas">キャンバス (60%)</span>
       </div>
       <div class="swatch-legend-item">
         <div class="swatch-dot" id="dotSurface"></div>
-        <span id="lblSurface">利休白茶 (20%)</span>
-      </div>
-      <div class="swatch-legend-item">
-        <div class="swatch-dot" id="dotText"></div>
-        <span id="lblText">栗皮墨 (15%)</span>
+        <span id="lblSurface">サーフェス (20%)</span>
       </div>
       <div class="swatch-legend-item">
         <div class="swatch-dot" id="dotAccent"></div>
-        <span id="lblAccent">照柿 (5%)</span>
+        <span id="lblAccent">主要アクション (10%)</span>
+      </div>
+      <div class="swatch-legend-item">
+        <div class="swatch-dot" id="dotTag"></div>
+        <span id="lblTag">副アクセント (5%)</span>
       </div>
       <div class="swatch-legend-item" style="grid-column: span 2;">
-        <div class="swatch-dot" id="dotTag"></div>
-        <span id="lblTag">副アクセント: 苔色</span>
+        <div class="swatch-dot" id="dotText"></div>
+        <span id="lblText">本文テキスト (残り)</span>
       </div>
     </div>
   </div>
@@ -351,21 +579,118 @@
 
 <script>
 (function() {
-  /* ============ PALETTE DEFINITIONS (WITH AMBIENT MESH OVERRIDES) ============ */
+  /* ============ PALETTE DEFINITIONS ============ */
   var PALETTES = {
-    A: {
-      name: 'A. 照柿・利休白茶',
-      rationale: '【A. 照柿・利休白茶】生成り和紙（#FAF7F2）の上に、栗皮墨の文字が沈み、背景のオーブもまろやかな照柿色（薄い柿渋・番茶）に抑制。眩しい黄色が消え、柔らかな手漉き和紙の温もりが広がります。',
+    /* OPTION 1: 紅葉と銀杏 (Momiji & Ginkgo) */
+    '1': {
+      name: '1. 紅葉と銀杏 (Momiji & Ginkgo) — Radiant & Crisp',
+      rationale: '【1. 紅葉と銀杏】磁器のように澄んだ白茶磁（#FDFBF7）で黄ばみ感を一掃。鮮やかな紅緋（#DC3826）がボタンや選択状態を際立たせ、銀杏ゴールド（#F0A71E）が豊かな木漏れ日を添えます。黒に近い焦墨（#1E1815）で極めてシャープな可読性を誇ります。',
+      tokens: {
+        '--bg-base': '#FDFBF7',
+        '--bg-warm': '#F6EFE6',
+        '--accent': '#DC3826',
+        '--accent-2': '#B82818',
+        '--accent-3': '#911B0E',
+        '--secondary-accent': '#F0A71E',
+        '--glow': '#F0A71E',
+        '--petal': '#E6533A',
+        '--petal-soft': '#FDE2DC',
+        '--outstanding': '#DC3826',
+        '--shadow-accent': 'rgba(220, 56, 38, 0.28)',
+        '--border-1': '#EAE0D2',
+        '--border-2': '#DECBB5',
+        '--border-3': '#F0E6D8',
+        '--border-4': '#F7EFE4',
+        '--soft-1': '#F6EFE6',
+        '--soft-2': '#FCF8F2',
+        '--soft-3': '#EFE5D6',
+        '--text-dark': '#1E1815',
+        '--text-med': '#3E322C',
+        '--text-mute': '#6E5D54',
+        '--text-faint': '#98867C',
+        '--text-placeholder': '#BAABA1',
+        '--dot-active-bg': '#F0A71E',
+        '--dot-active-ring': 'rgba(240, 167, 30, 0.32)',
+        '--dot-active-shadow': 'rgba(240, 167, 30, 0.45)'
+      },
+      legend: {
+        canvas: { name: '白茶磁 #FDFBF7 (60%)', color: '#FDFBF7' },
+        surface: { name: '鳥の子 #F6EFE6 (20%)', color: '#F6EFE6' },
+        accent: { name: '紅緋 #DC3826 (10%)', color: '#DC3826' },
+        tag: { name: '黄櫨染/銀杏 #F0A71E (5%)', color: '#F0A71E' },
+        text: { name: '焦墨 #1E1815 (本文)', color: '#1E1815' }
+      },
+      mosaicStroke: '%23DC3826',
+      /* Luminous Vermilion & Ginkgo Light Wash */
+      ambientPrimary: 'radial-gradient(circle at 26% 28%, rgba(240, 167, 30, 0.48) 0%, rgba(240, 167, 30, 0.16) 36%, transparent 64%), radial-gradient(circle at 74% 38%, rgba(220, 56, 38, 0.42) 0%, rgba(220, 56, 38, 0.14) 38%, transparent 66%), radial-gradient(circle at 50% 75%, rgba(230, 110, 40, 0.35) 0%, transparent 60%)',
+      orb1: 'radial-gradient(circle, rgba(220, 56, 38, 0.45) 0%, rgba(240, 167, 30, 0.18) 46%, transparent 72%)',
+      orb2: 'radial-gradient(circle, rgba(240, 167, 30, 0.52) 0%, rgba(230, 83, 58, 0.16) 50%, transparent 74%)',
+      orb3: 'radial-gradient(circle, rgba(230, 83, 58, 0.38) 0%, rgba(240, 167, 30, 0.20) 44%, transparent 64%)'
+    },
+
+    /* OPTION 2: 金木犀 (Kinmokusei) */
+    '2': {
+      name: '2. 金木犀 (Kinmokusei) — Warm Amber & Osmanthus Chic',
+      rationale: '【2. 金木犀】温かみのある絹白（#FFFDF9）と薄杏色のサーフェス。ジューシーな金木犀オレンジ（#E66826）に、ディープな葡萄染（#882E47）がモダンなコスメティック・コントラストをもたらします。フェミニンで華やかな秋の装いです。',
+      tokens: {
+        '--bg-base': '#FFFDF9',
+        '--bg-warm': '#FBECE0',
+        '--accent': '#E66826',
+        '--accent-2': '#C44E10',
+        '--accent-3': '#9E3B06',
+        '--secondary-accent': '#882E47',
+        '--glow': '#FFA259',
+        '--petal': '#F07D40',
+        '--petal-soft': '#FDE8DA',
+        '--outstanding': '#E66826',
+        '--shadow-accent': 'rgba(230, 104, 38, 0.28)',
+        '--border-1': '#EED2C0',
+        '--border-2': '#DEC0AC',
+        '--border-3': '#F7DECD',
+        '--border-4': '#FCEADF',
+        '--soft-1': '#FBECE0',
+        '--soft-2': '#FFF7F2',
+        '--soft-3': '#F5DFCFA',
+        '--text-dark': '#241C1A',
+        '--text-med': '#443430',
+        '--text-mute': '#725750',
+        '--text-faint': '#9E7D75',
+        '--text-placeholder': '#BEA29B',
+        '--dot-active-bg': '#882E47',
+        '--dot-active-ring': 'rgba(136, 46, 71, 0.28)',
+        '--dot-active-shadow': 'rgba(136, 46, 71, 0.40)'
+      },
+      legend: {
+        canvas: { name: '絹白 #FFFDF9 (60%)', color: '#FFFDF9' },
+        surface: { name: '薄杏 #FBECE0 (20%)', color: '#FBECE0' },
+        accent: { name: '金木犀 #E66826 (10%)', color: '#E66826' },
+        tag: { name: '葡萄染 #882E47 (5%)', color: '#882E47' },
+        text: { name: '濃茶墨 #241C1A (本文)', color: '#241C1A' }
+      },
+      mosaicStroke: '%23E66826',
+      /* Osmanthus Amber & Berry Bloom Wash */
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.14) 34%, transparent 64%), radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.10) 36%, transparent 66%), radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, transparent 60%)',
+      orb1: 'radial-gradient(circle, rgba(230, 104, 38, 0.46) 0%, rgba(255, 162, 89, 0.18) 46%, transparent 72%)',
+      orb2: 'radial-gradient(circle, rgba(136, 46, 71, 0.40) 0%, rgba(230, 104, 38, 0.15) 50%, transparent 74%)',
+      orb3: 'radial-gradient(circle, rgba(255, 162, 89, 0.42) 0%, rgba(136, 46, 71, 0.16) 42%, transparent 64%)'
+    },
+
+    /* OPTION A: 照柿・利休白茶 */
+    'A': {
+      name: '3. 照柿・利休白茶 (Aki Tea Harvest)',
+      rationale: '【3. 照柿・利休白茶】生成り和紙（#FAF7F2）に利休白茶のトープ。熟した柿渋の照柿色（#BA5D3B）と、庭園の苔色（#76806C）が織りなす、最も落ち着きのある和の伝統茶席カラーです。',
       tokens: {
         '--bg-base': '#FAF7F2',
         '--bg-warm': '#F2EAE0',
         '--accent': '#BA5D3B',
         '--accent-2': '#9E492B',
         '--accent-3': '#82381E',
+        '--secondary-accent': '#76806C',
         '--glow': '#D98862',
         '--petal': '#C76D49',
         '--petal-soft': '#F4DDD3',
         '--outstanding': '#9E492B',
+        '--shadow-accent': 'rgba(186, 93, 59, 0.28)',
         '--border-1': '#DFD5C5',
         '--border-2': '#D1C4B0',
         '--border-3': '#E8E0D2',
@@ -383,31 +708,35 @@
         '--dot-active-shadow': 'rgba(118, 128, 108, 0.38)'
       },
       legend: {
-        canvas: { name: '生成り #FAF7F2', color: '#FAF7F2' },
-        surface: { name: '利休白茶 #EBE4D8', color: '#EBE4D8' },
-        text: { name: '栗皮墨 #2B231D', color: '#2B231D' },
-        accent: { name: '照柿 #BA5D3B', color: '#BA5D3B' },
-        tag: { name: '苔色 #76806C (タグ・ドット)', color: '#76806C' }
+        canvas: { name: '生成り #FAF7F2 (60%)', color: '#FAF7F2' },
+        surface: { name: '利休白茶 #EBE4D8 (20%)', color: '#EBE4D8' },
+        accent: { name: '照柿 #BA5D3B (10%)', color: '#BA5D3B' },
+        tag: { name: '苔色 #76806C (5%)', color: '#76806C' },
+        text: { name: '栗皮墨 #2B231D (本文)', color: '#2B231D' }
       },
       mosaicStroke: '%23BA5D3B',
-      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(217, 136, 98, 0.35) 0%, rgba(217, 136, 98, 0.12) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(199, 109, 73, 0.28) 0%, rgba(199, 109, 73, 0.08) 34%, transparent 62%), radial-gradient(circle at 50% 70%, rgba(186, 93, 59, 0.24) 0%, transparent 58%), radial-gradient(circle at 80% 90%, rgba(118, 128, 108, 0.18) 0%, transparent 52%)',
-      orb1: 'radial-gradient(circle, rgba(186, 93, 59, 0.22) 0%, rgba(217, 136, 98, 0.08) 42%, transparent 70%)',
-      orb2: 'radial-gradient(circle, rgba(199, 109, 73, 0.26) 0%, rgba(186, 93, 59, 0.10) 46%, transparent 72%)',
-      orb3: 'radial-gradient(circle, rgba(142, 100, 75, 0.18) 0%, rgba(118, 128, 108, 0.14) 40%, transparent 62%)'
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(217, 136, 98, 0.40) 0%, rgba(217, 136, 98, 0.14) 34%, transparent 62%), radial-gradient(circle at 75% 40%, rgba(199, 109, 73, 0.34) 0%, transparent 64%), radial-gradient(circle at 80% 90%, rgba(118, 128, 108, 0.26) 0%, transparent 54%)',
+      orb1: 'radial-gradient(circle, rgba(186, 93, 59, 0.35) 0%, rgba(217, 136, 98, 0.12) 44%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(199, 109, 73, 0.38) 0%, rgba(186, 93, 59, 0.14) 48%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(142, 100, 75, 0.26) 0%, rgba(118, 128, 108, 0.20) 42%, transparent 62%)'
     },
-    B: {
-      name: 'B. 琥珀・木蘭',
-      rationale: '【B. 琥珀・木蘭】鳥の子色（#FAF5E8）に、木蘭色のトープ。背景オーブも蛍光イエローから落ち着いた琥珀ブロンズ（#B87333）へ。ギラつきのない、穏やかな晩秋の夕暮れです。',
+
+    /* OPTION B: 琥珀・木蘭 */
+    'B': {
+      name: '4. 琥珀・木蘭 (Twilight Ginkgo)',
+      rationale: '【4. 琥珀・木蘭】鳥の子色（#FAF5E8）に木蘭トープ。クラシカルな琥珀ブロンズ（#B87333）と海松色（#8A8265）が、深く穏やかな晩秋の夕暮れの気品を保ちます。',
       tokens: {
         '--bg-base': '#FAF5E8',
         '--bg-warm': '#F2EBDA',
         '--accent': '#B87333',
         '--accent-2': '#9E5F28',
         '--accent-3': '#804A1B',
+        '--secondary-accent': '#8A8265',
         '--glow': '#D49457',
         '--petal': '#C48144',
         '--petal-soft': '#F5E4D0',
         '--outstanding': '#9E5F28',
+        '--shadow-accent': 'rgba(184, 115, 51, 0.28)',
         '--border-1': '#DFD4BE',
         '--border-2': '#D8C7A3',
         '--border-3': '#E8DEC9',
@@ -425,116 +754,30 @@
         '--dot-active-shadow': 'rgba(138, 130, 101, 0.38)'
       },
       legend: {
-        canvas: { name: '鳥の子色 #FAF5E8', color: '#FAF5E8' },
-        surface: { name: '木蘭色 #EDE3CD', color: '#EDE3CD' },
-        text: { name: '焦茶 #32261C', color: '#32261C' },
-        accent: { name: '琥珀 #B87333', color: '#B87333' },
-        tag: { name: '海松色 #8A8265 (タグ・ドット)', color: '#8A8265' }
+        canvas: { name: '鳥の子色 #FAF5E8 (60%)', color: '#FAF5E8' },
+        surface: { name: '木蘭色 #EDE3CD (20%)', color: '#EDE3CD' },
+        accent: { name: '琥珀 #B87333 (10%)', color: '#B87333' },
+        tag: { name: '海松色 #8A8265 (5%)', color: '#8A8265' },
+        text: { name: '焦茶 #32261C (本文)', color: '#32261C' }
       },
       mosaicStroke: '%23B87333',
-      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(212, 148, 87, 0.32) 0%, rgba(212, 148, 87, 0.10) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(184, 115, 51, 0.25) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(138, 130, 101, 0.18) 0%, transparent 52%)',
-      orb1: 'radial-gradient(circle, rgba(184, 115, 51, 0.20) 0%, rgba(212, 148, 87, 0.06) 42%, transparent 70%)',
-      orb2: 'radial-gradient(circle, rgba(196, 129, 68, 0.24) 0%, transparent 72%)',
-      orb3: 'radial-gradient(circle, rgba(138, 130, 101, 0.16) 0%, transparent 62%)'
-    },
-    C: {
-      name: 'C. 蘇芳・鳩羽鼠',
-      rationale: '【C. 蘇芳・鳩羽鼠】白練（#F8F6F4）に鳩羽鼠のニュアンスグレー。背景オーブも黄みを完全に脱ぎ捨て、くすみプラムローズ（#9C5B6B）と錆青磁の気品ある陰影へと変化します。',
-      tokens: {
-        '--bg-base': '#F8F6F4',
-        '--bg-warm': '#EFECE9',
-        '--accent': '#9C5B6B',
-        '--accent-2': '#844755',
-        '--accent-3': '#693340',
-        '--glow': '#BA7B8B',
-        '--petal': '#A86877',
-        '--petal-soft': '#F2DEE3',
-        '--outstanding': '#844755',
-        '--border-1': '#DAD2D2',
-        '--border-2': '#CEBEBE',
-        '--border-3': '#E2DADA',
-        '--border-4': '#EBE5E5',
-        '--soft-1': '#F0EAEA',
-        '--soft-2': '#F9F5F5',
-        '--soft-3': '#EAE4E4',
-        '--text-dark': '#2C2226',
-        '--text-med': '#48393F',
-        '--text-mute': '#6A585F',
-        '--text-faint': '#8E7B83',
-        '--text-placeholder': '#B09FA7',
-        '--dot-active-bg': '#6E7C79',
-        '--dot-active-ring': 'rgba(110, 124, 121, 0.28)',
-        '--dot-active-shadow': 'rgba(110, 124, 121, 0.38)'
-      },
-      legend: {
-        canvas: { name: '白練 #F8F6F4', color: '#F8F6F4' },
-        surface: { name: '鳩羽鼠 #EAE4E4', color: '#EAE4E4' },
-        text: { name: '紫黒 #2C2226', color: '#2C2226' },
-        accent: { name: '蘇芳 #9C5B6B', color: '#9C5B6B' },
-        tag: { name: '錆青磁 #6E7C79 (タグ・ドット)', color: '#6E7C79' }
-      },
-      mosaicStroke: '%239C5B6B',
-      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(186, 123, 139, 0.30) 0%, rgba(186, 123, 139, 0.08) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(156, 91, 107, 0.22) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(110, 124, 121, 0.16) 0%, transparent 52%)',
-      orb1: 'radial-gradient(circle, rgba(156, 91, 107, 0.20) 0%, rgba(186, 123, 139, 0.06) 42%, transparent 70%)',
-      orb2: 'radial-gradient(circle, rgba(168, 104, 119, 0.22) 0%, transparent 72%)',
-      orb3: 'radial-gradient(circle, rgba(110, 124, 121, 0.15) 0%, transparent 62%)'
-    },
-    D: {
-      name: 'D. 深緋・胡桃染',
-      rationale: '【D. 深緋・胡桃染】灰白（#F7F4F0）と胡桃染の陶芸的トープ。背景オーブもテラコッタローズの深緋（#A34C44）と利休鼠で構成。知的で凛としたクラフト空間が完成します。',
-      tokens: {
-        '--bg-base': '#F7F4F0',
-        '--bg-warm': '#ECE4DC',
-        '--accent': '#A34C44',
-        '--accent-2': '#883A33',
-        '--accent-3': '#6E2B25',
-        '--glow': '#BF6E66',
-        '--petal': '#B05951',
-        '--petal-soft': '#F5DDD9',
-        '--outstanding': '#883A33',
-        '--border-1': '#D5C8BD',
-        '--border-2': '#CABBB0',
-        '--border-3': '#E0D4C9',
-        '--border-4': '#EAE0D6',
-        '--soft-1': '#EFE5DC',
-        '--soft-2': '#F8F3ED',
-        '--soft-3': '#E6DDD4',
-        '--text-dark': '#26201C',
-        '--text-med': '#443A34',
-        '--text-mute': '#63554D',
-        '--text-faint': '#88776E',
-        '--text-placeholder': '#AA9990',
-        '--dot-active-bg': '#697A6B',
-        '--dot-active-ring': 'rgba(105, 122, 107, 0.28)',
-        '--dot-active-shadow': 'rgba(105, 122, 107, 0.38)'
-      },
-      legend: {
-        canvas: { name: '灰白 #F7F4F0', color: '#F7F4F0' },
-        surface: { name: '胡桃染 #E6DDD4', color: '#E6DDD4' },
-        text: { name: '黒鳶 #26201C', color: '#26201C' },
-        accent: { name: '深緋 #A34C44', color: '#A34C44' },
-        tag: { name: '利休鼠 #697A6B (タグ・ドット)', color: '#697A6B' }
-      },
-      mosaicStroke: '%23A34C44',
-      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(191, 110, 102, 0.30) 0%, rgba(191, 110, 102, 0.08) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(163, 76, 68, 0.24) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(105, 122, 107, 0.16) 0%, transparent 52%)',
-      orb1: 'radial-gradient(circle, rgba(163, 76, 68, 0.20) 0%, rgba(191, 110, 102, 0.06) 42%, transparent 70%)',
-      orb2: 'radial-gradient(circle, rgba(176, 89, 81, 0.22) 0%, transparent 72%)',
-      orb3: 'radial-gradient(circle, rgba(105, 122, 107, 0.15) 0%, transparent 62%)'
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(212, 148, 87, 0.42) 0%, rgba(212, 148, 87, 0.14) 34%, transparent 62%), radial-gradient(circle at 75% 40%, rgba(184, 115, 51, 0.35) 0%, transparent 64%), radial-gradient(circle at 80% 90%, rgba(138, 130, 101, 0.25) 0%, transparent 54%)',
+      orb1: 'radial-gradient(circle, rgba(184, 115, 51, 0.35) 0%, rgba(212, 148, 87, 0.12) 44%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(196, 129, 68, 0.38) 0%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(138, 130, 101, 0.26) 0%, transparent 62%)'
     }
   };
 
-  /* ============ APPLY PALETTE WITH AMBIENT RE-SKINNING ============ */
+  /* ============ APPLY PALETTE ============ */
   function applyPalette(key) {
     var p = PALETTES[key];
     if (!p) return;
 
-    /* 1. CSS Custom Properties */
     var root = document.documentElement;
     for (var token in p.tokens) {
       root.style.setProperty(token, p.tokens[token]);
     }
 
-    /* 2. Overwrite Background Wash & Orbs directly */
     var primary = document.getElementById('ambientPrimary');
     if (primary) primary.style.background = p.ambientPrimary;
 
@@ -545,17 +788,17 @@
     if (orb2) orb2.style.background = p.orb2;
     if (orb3) orb3.style.background = p.orb3;
 
-    /* 3. Overwrite Shippō Mosaic Stroke */
     var mosaic = document.getElementById('ambientMosaic');
     if (mosaic) {
       mosaic.style.backgroundImage = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='" + p.mosaicStroke + "'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E\")";
     }
 
-    /* 4. Update Dock Swatches & Rationale */
+    /* Update Swatches */
     document.getElementById('segCanvas').style.background = p.legend.canvas.color;
     document.getElementById('segSurface').style.background = p.legend.surface.color;
-    document.getElementById('segText').style.background = p.legend.text.color;
     document.getElementById('segAccent').style.background = p.legend.accent.color;
+    document.getElementById('segTag').style.background = p.legend.tag.color;
+    document.getElementById('segText').style.background = p.legend.text.color;
 
     document.getElementById('dotCanvas').style.background = p.legend.canvas.color;
     document.getElementById('lblCanvas').textContent = p.legend.canvas.name;
@@ -563,14 +806,14 @@
     document.getElementById('dotSurface').style.background = p.legend.surface.color;
     document.getElementById('lblSurface').textContent = p.legend.surface.name;
 
-    document.getElementById('dotText').style.background = p.legend.text.color;
-    document.getElementById('lblText').textContent = p.legend.text.name;
-
     document.getElementById('dotAccent').style.background = p.legend.accent.color;
     document.getElementById('lblAccent').textContent = p.legend.accent.name;
 
     document.getElementById('dotTag').style.background = p.legend.tag.color;
     document.getElementById('lblTag').textContent = p.legend.tag.name;
+
+    document.getElementById('dotText').style.background = p.legend.text.color;
+    document.getElementById('lblText').textContent = p.legend.text.name;
 
     document.getElementById('dockRationale').innerHTML = p.rationale;
 
@@ -596,13 +839,13 @@
     requestAnimationFrame(renderSpectrum);
     ctx.clearRect(0, 0, displayW, displayH);
 
-    var themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#BA5D3B';
-    var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#C76D49';
+    var themeAccent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#DC3826';
+    var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#E6533A';
 
     _hudPhase += 0.045;
     var midY = Math.round(displayH * 0.44);
 
-    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-2').trim() || '#D1C4B0';
+    ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-2').trim() || '#DECBB5';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, midY);
@@ -661,7 +904,8 @@
     viewGreeting.classList.add('hidden');
   });
 
-  applyPalette('A');
+  /* Boot into Option 1 */
+  applyPalette('1');
 })();
 </script>
 
