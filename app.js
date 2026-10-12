@@ -676,18 +676,27 @@ function loadAudioBufferWithProgress(url) {
    bar (no per-frame gradient allocation) split by a horizontal
    waterline. Above: themeAccent, full opacity. Below: themePetal
    at globalAlpha 0.46. 25 columns × 6px + 24 × 5.5px = 282px,
-   flush with the gauge bar beneath. */
+   flush with the gauge bar beneath.
+
+   Autumn colours are 金木犀 (Kinmokusei) amber #E66826 for the
+   upper column and petal coral #F07D40 for the mirrored water
+   column. The waterline divider is 薄杏 Usuanzu #DEC0AC at 0.55
+   alpha. Sakura branch keeps the original rose literals. */
 function drawHudSpectrum() {
   if (!hudCtx) return;
   hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
 
-  var themeAccent = (currentTheme === 'autumn') ? '#c9600a' : '#b04a5a';
-  var themePetal  = (currentTheme === 'autumn') ? '#e88a1a' : '#e8a8b0';
+  /* Kinmokusei (#E66826) and Petal Coral (#F07D40) */
+  var themeAccent = (currentTheme === 'autumn') ? '#E66826' : '#b04a5a';
+  var themePetal  = (currentTheme === 'autumn') ? '#F07D40' : '#e8a8b0';
 
   _hudPhase += 0.045;
   var midY = Math.round(HUD_DISPLAY_H * 0.44); /* 11px */
 
-  hudCtx.strokeStyle = (currentTheme === 'autumn') ? 'rgba(216, 180, 120, 0.40)' : 'rgba(234, 217, 213, 0.55)';
+  /* Waterline divider: Usuanzu hairline */
+  hudCtx.strokeStyle = (currentTheme === 'autumn')
+    ? 'rgba(222, 192, 172, 0.55)'
+    : 'rgba(234, 217, 213, 0.55)';
   hudCtx.lineWidth = 1;
   hudCtx.beginPath();
   hudCtx.moveTo(0, midY);
@@ -710,7 +719,7 @@ function drawHudSpectrum() {
     var halfH = Math.max(2.0, _hudMirrorValues[m] * 10.5);
     var mx = m * (HUD_BAR_W + HUD_BAR_GAP);
 
-    /* Upper sky column */
+    /* Upper sky column — #E66826 金木犀 */
     hudCtx.fillStyle = themeAccent;
     hudCtx.beginPath();
     if (hasRoundRect) {
@@ -720,7 +729,7 @@ function drawHudSpectrum() {
     }
     hudCtx.fill();
 
-    /* Lower water-mirror column */
+    /* Lower water-mirror column — #F07D40 at 0.46 alpha */
     hudCtx.fillStyle = themePetal;
     hudCtx.globalAlpha = 0.46;
     hudCtx.beginPath();
