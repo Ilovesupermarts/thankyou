@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Start Button Glow — デモ v4</title>
+<title>Start Button Glow — デモ v5</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,21 +14,27 @@
 
 <style>
 /* ============================================================
-   GLOW DEMO v4 — rim light
+   GLOW DEMO v5 — rim light, corrected
 
-   The ring's outer edge sits at r = 93px on screen (r=90 in the
-   SVG viewBox, plus half of the 6px stroke). Every variant here
-   puts its gradient peak at 93px and lets the falloff reach zero
-   at a controlled outer radius. The div's half-radius IS that
-   outer radius, so the div's size is the glow's extent — the
-   number that was wrong in v1–v3.
+   v1–v4 all failed silently: radial-gradient(circle, ...)
+   defaults to farthest-corner, so the gradient's 100% was the
+   square's corner (÷√2 ≈ 1.414× the radius), not the div's
+   visible circle. Every peak landed outside the border-radius
+   clip and was never painted. Only a 0.02-alpha sliver reached
+   the visible edge.
+
+   Fix: circle closest-side. 100% now equals the div's radius,
+   which is what the percentage math always assumed.
+
+   Structure: transparent from centre to the ring's inner edge
+   (r=87), peak at the ring's outer edge (r=93), fade to zero
+   at the div's outer radius. That confines the glow to the
+   outer side of the ring — a rim light, not a bloom.
    ============================================================ */
 
 html[data-demo="glow"] .ambient-mosaic      { opacity: 0; }
 html[data-demo="glow"] .ambient-mosaic-pond { opacity: 0.08; }
 
-/* Remove main.css's halo and the SVG stroke. Rim light comes
-   entirely from .soft-glow. */
 .glow-demo-stage .gold-halo { display: none; }
 .glow-demo-stage .gold-glow { stroke: none; }
 
@@ -37,7 +43,7 @@ body.glow-demo {
   background-color: var(--bg-base);
 }
 .glow-demo-header {
-  max-width: 760px; margin: 0 auto 48px; text-align: center;
+  max-width: 780px; margin: 0 auto 48px; text-align: center;
   font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
 }
 .glow-demo-header h1 {
@@ -81,8 +87,6 @@ body.glow-demo {
   max-width: 260px;
 }
 
-/* Soft rim-light layer, centred on the icon-wrapper. Its size is
-   set per-variant; position, z-index, animation are shared. */
 .soft-glow {
   position: absolute;
   top: 50%; left: 50%;
@@ -94,83 +98,75 @@ body.glow-demo {
 }
 
 @keyframes demoBreath {
-  0%, 100% { opacity: 0.40; }
+  0%, 100% { opacity: 0.45; }
   50%      { opacity: 1.00; }
 }
 
 /* ============================================================
-   A · Peek 8px — falloff reaches zero at r=101
-   Div 202 (half-radius 101). Ring edge at 93/101 = 92.1%.
+   A · 8px peek — div 202×202 (radius 101)
+   Ring inner edge 87/101 = 86.1%.  Ring outer edge 93/101 = 92.1%.
    ============================================================ */
 [data-variant="a"] .soft-glow {
   width: 202px; height: 202px;
   margin-top: -101px; margin-left: -101px;
-  background: radial-gradient(circle,
-    transparent 55%,
-    rgba(255,255,255,0.02) 70%,
-    rgba(255,255,255,0.08) 82%,
-    rgba(255,255,255,0.22) 88%,
-    rgba(255,255,255,0.40) 92.1%,
-    rgba(255,255,255,0.26) 94%,
-    rgba(255,255,255,0.12) 96%,
-    rgba(255,255,255,0.03) 98%,
+  background: radial-gradient(circle closest-side,
+    transparent 0%,
+    transparent 84%,
+    rgba(255,255,255,0.10) 88%,
+    rgba(255,255,255,0.42) 92.1%,
+    rgba(255,255,255,0.24) 95%,
+    rgba(255,255,255,0.08) 98%,
     rgba(255,255,255,0) 100%);
 }
 
 /* ============================================================
-   B · Peek 12px — zero at r=105
-   Div 210 (half-radius 105). Ring edge at 93/105 = 88.6%.
+   B · 12px peek — div 210×210 (radius 105)
+   Ring inner 87/105 = 82.9%.  Ring outer 93/105 = 88.6%.
    ============================================================ */
 [data-variant="b"] .soft-glow {
   width: 210px; height: 210px;
   margin-top: -105px; margin-left: -105px;
-  background: radial-gradient(circle,
-    transparent 55%,
-    rgba(255,255,255,0.02) 68%,
-    rgba(255,255,255,0.07) 80%,
-    rgba(255,255,255,0.20) 86%,
-    rgba(255,255,255,0.40) 88.6%,
-    rgba(255,255,255,0.26) 91%,
-    rgba(255,255,255,0.12) 94%,
-    rgba(255,255,255,0.03) 97%,
+  background: radial-gradient(circle closest-side,
+    transparent 0%,
+    transparent 80%,
+    rgba(255,255,255,0.10) 84%,
+    rgba(255,255,255,0.42) 88.6%,
+    rgba(255,255,255,0.24) 93%,
+    rgba(255,255,255,0.08) 97%,
     rgba(255,255,255,0) 100%);
 }
 
 /* ============================================================
-   C · Peek 18px — zero at r=111
-   Div 222 (half-radius 111). Ring edge at 93/111 = 83.8%.
+   C · 18px peek — div 222×222 (radius 111)
+   Ring inner 87/111 = 78.4%.  Ring outer 93/111 = 83.8%.
    ============================================================ */
 [data-variant="c"] .soft-glow {
   width: 222px; height: 222px;
   margin-top: -111px; margin-left: -111px;
-  background: radial-gradient(circle,
-    transparent 55%,
-    rgba(255,255,255,0.02) 66%,
-    rgba(255,255,255,0.06) 76%,
-    rgba(255,255,255,0.16) 82%,
-    rgba(255,255,255,0.36) 83.8%,
-    rgba(255,255,255,0.30) 87%,
-    rgba(255,255,255,0.16) 91%,
-    rgba(255,255,255,0.06) 95%,
+  background: radial-gradient(circle closest-side,
+    transparent 0%,
+    transparent 75%,
+    rgba(255,255,255,0.08) 79%,
+    rgba(255,255,255,0.40) 83.8%,
+    rgba(255,255,255,0.26) 89%,
+    rgba(255,255,255,0.10) 95%,
     rgba(255,255,255,0) 100%);
 }
 
 /* ============================================================
-   D · Peek 25px — zero at r=118
-   Div 236 (half-radius 118). Ring edge at 93/118 = 78.8%.
+   D · 25px peek — div 236×236 (radius 118)
+   Ring inner 87/118 = 73.7%.  Ring outer 93/118 = 78.8%.
    ============================================================ */
 [data-variant="d"] .soft-glow {
   width: 236px; height: 236px;
   margin-top: -118px; margin-left: -118px;
-  background: radial-gradient(circle,
-    transparent 55%,
-    rgba(255,255,255,0.015) 64%,
-    rgba(255,255,255,0.05) 72%,
-    rgba(255,255,255,0.14) 77%,
-    rgba(255,255,255,0.32) 78.8%,
-    rgba(255,255,255,0.30) 83%,
-    rgba(255,255,255,0.20) 88%,
-    rgba(255,255,255,0.10) 93%,
+  background: radial-gradient(circle closest-side,
+    transparent 0%,
+    transparent 70%,
+    rgba(255,255,255,0.06) 75%,
+    rgba(255,255,255,0.38) 78.8%,
+    rgba(255,255,255,0.28) 85%,
+    rgba(255,255,255,0.12) 92%,
     rgba(255,255,255,0) 100%);
 }
 
@@ -210,10 +206,12 @@ body.glow-demo {
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
 <header class="glow-demo-header">
-  <h1>Start Button Glow — デモ v4</h1>
+  <h1>Start Button Glow — デモ v5</h1>
   <p>
-    リング外周は <code>r=93px</code>。ここの四つは、ピークを <code>r=93px</code> に合わせ、減衰がゼロになる半径だけを変えています。<br>
-    ディブの半径 = グローの到達半径。それぞれ 8 / 12 / 18 / 25px だけリングの外へはみ出します。
+    v1–v4 はすべて <code>radial-gradient</code> の既定値 <code>farthest-corner</code> のため、グローのピークが
+    <code>border-radius</code> の外側に落ち、実際には何も描画されていませんでした。<br>
+    今回は <code>circle closest-side</code> を明示。リング外周 <code>r=93px</code> にピークを置き、
+    そこから外側だけに減衰させています。
   </p>
 </header>
 
@@ -250,13 +248,13 @@ body.glow-demo {
   <div class="glow-demo-tile" data-variant="c">
     <div class="glow-demo-stage"></div>
     <div class="glow-demo-label">C · 18px</div>
-    <div class="glow-demo-note">Wider shoulder. The glow is still clearly attached to the ring.</div>
+    <div class="glow-demo-note">Wider shoulder. Still clearly attached to the ring.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="d">
     <div class="glow-demo-stage"></div>
     <div class="glow-demo-label">D · 25px</div>
-    <div class="glow-demo-note">Broader atmospheric surround. Closer to the "halo" reading, but explicitly sized.</div>
+    <div class="glow-demo-note">Broader atmospheric surround.</div>
   </div>
 
 </div>
