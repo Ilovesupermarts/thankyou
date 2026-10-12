@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Start Button Glow — デモ</title>
+<title>Start Button Glow — デモ v2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,37 +14,23 @@
 
 <style>
 /* ============================================================
-   GLOW DEMO — variant overrides
+   GLOW DEMO v2 — peek-only variants
 
-   Each variant redeclares .gold-halo's background and .gold-glow's
-   stroke, plus the animation duration. Position, size, z-index,
-   pointer-events and will-change come from main.css unchanged.
-
-   main.css is not edited by this file. The demo tiles re-point
-   animation-name at demoBreath / demoBreathStrong / demoBreathSoft
-   so the production keyframes and the production ring behaviour
-   remain exactly as they are.
+   The 280px .gold-halo from main.css is disabled here. It was
+   too large relative to the ring (r=90 in a 360 viewBox) and
+   read as a discrete circle rather than as a glow. These
+   variants either drop the halo entirely or shrink it so its
+   soft edge sits just outside the ring band (r=87–93).
    ============================================================ */
 
-@keyframes demoBreath {
-  0%, 100% { opacity: 0.35; }
-  50%      { opacity: 1.00; }
-}
-@keyframes demoBreathStrong {
-  0%, 100% { opacity: 0.20; }
-  50%      { opacity: 1.00; }
-}
-@keyframes demoBreathSoft {
-  0%, 100% { opacity: 0.50; }
-  50%      { opacity: 0.85; }
-}
-
-/* Mosaic swap — mirrors the production koi-screen state via the
-   data-demo hook instead of :has(.blossom-screen.visible). */
+/* Mosaic swap for the koi-screen backdrop state. */
 html[data-demo="glow"] .ambient-mosaic      { opacity: 0; }
 html[data-demo="glow"] .ambient-mosaic-pond { opacity: 0.08; }
 
-/* Page chrome */
+/* Hide main.css's halo everywhere in the demo. Variants that
+   want a halo redeclare it below. */
+.glow-demo-stage .gold-halo { display: none; }
+
 body.glow-demo {
   padding: 40px 24px 100px;
   background-color: var(--bg-base);
@@ -69,7 +55,15 @@ body.glow-demo {
   line-height: 1.9;
   color: var(--text-med);
   letter-spacing: 0.4px;
-  margin: 0;
+  margin: 0 0 8px;
+}
+.glow-demo-header code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  background: var(--soft-1);
+  border-radius: 4px;
+  padding: 1px 6px;
+  color: var(--accent-2);
 }
 
 .glow-demo-grid {
@@ -122,34 +116,40 @@ body.glow-demo {
   max-width: 260px;
 }
 
-/* ============================================================
-   VARIANT A · Pure white, tight halo
-   ============================================================ */
-[data-variant="a"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 255, 255, 0.55) 58%,
-    rgba(255, 255, 255, 0.14) 80%,
-    transparent 96%);
-  animation: demoBreath 8s ease-in-out infinite;
+/* Shared breath — 8s, opacity only. */
+@keyframes demoBreath {
+  0%, 100% { opacity: 0.18; }
+  50%      { opacity: 0.72; }
 }
-[data-variant="a"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 28px;
+
+/* Shared tight halo: 220px disc, peak alpha at the ring's
+   outer edge, feathering outward. Sits inside the 280px stage
+   so it does not read as a separate circle. */
+.glow-demo-stage .gold-halo {
+  width: 220px;
+  height: 220px;
+  margin-top: -110px;
+  margin-left: -110px;
+  background: radial-gradient(circle,
+    transparent 76%,
+    rgba(255, 255, 255, 0.50) 88%,
+    rgba(255, 255, 255, 0.12) 97%,
+    transparent 100%);
   animation: demoBreath 8s ease-in-out infinite;
 }
 
 /* ============================================================
-   VARIANT B · Pure white, wide bloom
+   VARIANT A · No halo, thin glow stroke
    ============================================================ */
-[data-variant="b"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 20%,
-    rgba(255, 255, 255, 0.38) 48%,
-    rgba(255, 255, 255, 0.12) 75%,
-    transparent 96%);
+[data-variant="a"] .gold-glow {
+  stroke: #ffffff;
+  stroke-width: 22px;
   animation: demoBreath 8s ease-in-out infinite;
 }
+
+/* ============================================================
+   VARIANT B · No halo, wide glow stroke
+   ============================================================ */
 [data-variant="b"] .gold-glow {
   stroke: #ffffff;
   stroke-width: 40px;
@@ -157,109 +157,25 @@ body.glow-demo {
 }
 
 /* ============================================================
-   VARIANT C · Silk white, matched to .gold-band
+   VARIANT C · Tight halo + thin glow
    ============================================================ */
-[data-variant="c"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 253, 249, 0.55) 58%,
-    rgba(255, 253, 249, 0.15) 80%,
-    transparent 96%);
-  animation: demoBreath 8s ease-in-out infinite;
-}
+[data-variant="c"] .gold-halo { display: block; }
 [data-variant="c"] .gold-glow {
-  stroke: #FFFDF9;
-  stroke-width: 28px;
-  animation: demoBreath 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT D · Warm white / cream
-   ============================================================ */
-[data-variant="d"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 250, 240, 0.58) 58%,
-    rgba(255, 245, 225, 0.16) 80%,
-    transparent 96%);
-  animation: demoBreath 8s ease-in-out infinite;
-}
-[data-variant="d"] .gold-glow {
-  stroke: #fffaf0;
-  stroke-width: 28px;
-  animation: demoBreath 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT E · Brighter, wider swing
-   ============================================================ */
-[data-variant="e"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 255, 255, 0.78) 58%,
-    rgba(255, 255, 255, 0.22) 80%,
-    transparent 96%);
-  animation: demoBreathStrong 8s ease-in-out infinite;
-}
-[data-variant="e"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 34px;
-  animation: demoBreathStrong 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT F · Very subtle, barely-there
-   ============================================================ */
-[data-variant="f"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 255, 255, 0.35) 58%,
-    rgba(255, 255, 255, 0.08) 80%,
-    transparent 96%);
-  animation: demoBreathSoft 8s ease-in-out infinite;
-}
-[data-variant="f"] .gold-glow {
   stroke: #ffffff;
   stroke-width: 22px;
-  animation: demoBreathSoft 8s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT G · Pure white, 12-second breath
-   ============================================================ */
-[data-variant="g"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 20%,
-    rgba(255, 255, 255, 0.38) 48%,
-    rgba(255, 255, 255, 0.12) 75%,
-    transparent 96%);
-  animation: demoBreath 12s ease-in-out infinite;
-}
-[data-variant="g"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 34px;
-  animation: demoBreath 12s ease-in-out infinite;
-}
-
-/* ============================================================
-   VARIANT H · White core, faint 金木犀 amber outer
-   ============================================================ */
-[data-variant="h"] .gold-halo {
-  background: radial-gradient(circle,
-    transparent 36%,
-    rgba(255, 255, 255, 0.58) 55%,
-    rgba(255, 200, 130, 0.16) 78%,
-    transparent 96%);
-  animation: demoBreath 8s ease-in-out infinite;
-}
-[data-variant="h"] .gold-glow {
-  stroke: #ffffff;
-  stroke-width: 28px;
   animation: demoBreath 8s ease-in-out infinite;
 }
 
-/* Reduced motion — freeze all tiles at a comparable settled state
-   so the visual comparison is still legible without motion. */
+/* ============================================================
+   VARIANT D · Tight halo + wide glow
+   ============================================================ */
+[data-variant="d"] .gold-halo { display: block; }
+[data-variant="d"] .gold-glow {
+  stroke: #ffffff;
+  stroke-width: 40px;
+  animation: demoBreath 8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .glow-demo-stage .gold-halo,
   .glow-demo-stage .gold-glow,
@@ -267,8 +183,8 @@ body.glow-demo {
   .glow-demo-stage .pulse-ring {
     animation: none !important;
   }
-  .glow-demo-stage .gold-halo { opacity: 0.70 !important; }
-  .glow-demo-stage .gold-glow { opacity: 0.40 !important; }
+  .glow-demo-stage .gold-halo { opacity: 0.55 !important; }
+  .glow-demo-stage .gold-glow { opacity: 0.45 !important; }
   .glow-demo-stage .gold-band { opacity: 1.00 !important; }
   .glow-demo-stage .pulse-ring { opacity: 0 !important; }
 }
@@ -276,9 +192,6 @@ body.glow-demo {
 </head>
 <body class="glow-demo">
 
-<!-- Ambient background — same layers as index.html. The orbs drift
-     on their own keyframes, so the backdrop is alive while you
-     compare the tiles. -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -303,15 +216,13 @@ body.glow-demo {
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
 <header class="glow-demo-header">
-  <h1>Start Button Glow — デモ</h1>
+  <h1>Start Button Glow — デモ v2</h1>
   <p>
-    八つの候補、同じ鯉・同じリング・同じ呼吸曲線。変えているのはハロー色・外側グロー・周期だけ。<br>
-    良さそうなものを教えていただければ <code>main.css</code> に反映します。
+    280px の <code>.gold-halo</code> を無効化しました。リングに対して大きすぎ、独立した円として見えていたためです。<br>
+    ここではハローを完全に外すか、リング外周に沿う 220px に縮めたものだけを比較できます。
   </p>
 </header>
 
-<!-- Single source of truth for the button markup. Cloned into each
-     tile's stage by the script at the bottom of the page. -->
 <template id="button-markup">
   <div class="icon-wrapper">
     <div class="gold-halo"></div>
@@ -332,50 +243,26 @@ body.glow-demo {
 
   <div class="glow-demo-tile" data-variant="a">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">A · 純白 タイト</div>
-    <div class="glow-demo-note">Pure white, tight halo. The minimal baseline.</div>
+    <div class="glow-demo-label">A · ハロー無し / 細いグロー</div>
+    <div class="glow-demo-note">No halo. 22px glow stroke. The ring plus a slim white rim.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="b">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">B · 純白 ワイド</div>
-    <div class="glow-demo-note">Pure white, wide bloom. More atmospheric presence.</div>
+    <div class="glow-demo-label">B · ハロー無し / 太いグロー</div>
+    <div class="glow-demo-note">No halo. 40px glow stroke. More presence, still only peeking out.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="c">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">C · 絹白</div>
-    <div class="glow-demo-note">Silk white, matched to .gold-band. Reads as one continuous field.</div>
+    <div class="glow-demo-label">C · タイトハロー / 細いグロー</div>
+    <div class="glow-demo-note">220px halo hugging the ring outer edge, plus the 22px stroke.</div>
   </div>
 
   <div class="glow-demo-tile" data-variant="d">
     <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">D · 温白</div>
-    <div class="glow-demo-note">Warm cream white. A hint of warmth, no amber.</div>
-  </div>
-
-  <div class="glow-demo-tile" data-variant="e">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">E · 強め</div>
-    <div class="glow-demo-note">Brighter, wider swing. The most presence.</div>
-  </div>
-
-  <div class="glow-demo-tile" data-variant="f">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">F · 控えめ</div>
-    <div class="glow-demo-note">Very subtle. Quietest of the set.</div>
-  </div>
-
-  <div class="glow-demo-tile" data-variant="g">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">G · ゆっくり (12s)</div>
-    <div class="glow-demo-note">B at a 12-second breath — five per minute.</div>
-  </div>
-
-  <div class="glow-demo-tile" data-variant="h">
-    <div class="glow-demo-stage"></div>
-    <div class="glow-demo-label">H · 白芯 + 金木犀</div>
-    <div class="glow-demo-note">White core, faint 金木犀 amber outer. Warmth without the amber build.</div>
+    <div class="glow-demo-label">D · タイトハロー / 太いグロー</div>
+    <div class="glow-demo-note">Same 220px halo, 40px stroke. The warmest of the four.</div>
   </div>
 
 </div>
