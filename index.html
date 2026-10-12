@@ -198,26 +198,37 @@
   <!-- v1.3: はじめる label removed. The button is now icon-only, with
        the aria-label on the button carrying the accessibility name.
 
-       Ring layers, outermost to innermost:
-         .gold-halo  — pre-blurred annular radial-gradient div
-         .gold-glow  — wide soft-gold stroke behind the band
-         .gold-band  — the crisp ring, r=90
-         .pulse-ring — three expanding hairline rings
-       The gold-band's radius matches where every pulse-ring begins.
+       Ring and glow layers, outermost to innermost:
+
+         .soft-glow  — a radial-gradient div behind the ring. Its
+                       peak lands at r ≈ 87px on the 262px disc,
+                       just inside the ring's inner edge; the
+                       falloff feathers outward to r=131px. Net
+                       effect is a soft white rim hugging the ring.
+                       This is the only element that breathes —
+                       5s, opacity 0.00 → 1.00 → 0.00 at rest, floor
+                       lifted to 0.85 in the .ready state.
+
+         .gold-band  — the crisp ring, r=90, stroke 6px, opacity
+                       pinned at 1.00. Solid anchor; only flips its
+                       stroke colour in the .ready state.
+
+         .pulse-ring — three expanding hairline rings sharing the
+                       r=90 stroke centreline, on a 20s cycle
+                       peak-aligned to four glow breaths.
 
        Koi stack (inside .koi-dive-wrap):
-         .koi-shadow — static elliptical shadow pool, opacity-faded
+         .koi-shadow — static elliptical depth pool, opacity-faded
                        in lockstep with koiDive
          .koi-image  — the fish PNG, rotating continuously on its
                        own layer above the shadow -->
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
-      <div class="gold-halo" aria-hidden="true"></div>
+      <div class="soft-glow" aria-hidden="true"></div>
       <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
         <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-        <circle cx="180" cy="180" r="90" class="gold-glow" />
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
       <div class="koi-dive-wrap" id="koiDiveWrap">
