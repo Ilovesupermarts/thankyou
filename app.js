@@ -3,6 +3,26 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (HUD gauge repurposed: playback progress)
+       - The gauge bar now tracks playback progress of the current
+         ambient bed rather than download progress. While playing,
+         the fill advances from 0% to 100% over playDur (or
+         maxPlaySec, if the track is capped); on track end the bar
+         reverts to loading mode and resets on the next cycle.
+       - The MB (RAM) byte readout is removed. The badge already
+         surfaces loading state (DL XX% / 展開中 / 待機完了 /
+         再生中) and hudPctStatus carries the numeric percent
+         during download, so the byte line was redundant.
+       - The bar is thickened from 2px to 6px so playback position
+         is legible at a glance on the silk-white HUD card;
+         border-radius tracks the new height.
+       - Single-writer discipline: _hudRenderState() skips its
+         width write whenever ambientSource !== null; the swell
+         loop is the sole writer of the fill during playback. The
+         two never race.
+       - Progress is computed from soundAudioCtx.currentTime, so
+         the fill is accurate across fade-in, main body, and
+         fade-out.
      v1.3 (sound readiness decoupling)
        - soundReady now flips after the three synthesised UI
          sounds (tock / check / paper) finish rendering via
@@ -520,7 +540,13 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
    parse time, so adding a fourth phase with a new file requires
    no counter edit. The badge text is written exclusively by
    _hudRenderState(); the streaming loader and playback lifecycle
-   feed it inputs and never touch the DOM directly. */
+   feed it inputs and never touch the DOM directly.
+
+   The gauge bar was repurposed at v1.3 from download progress to
+   playback progress of the current track. During playback,
+   updateHudProgress() is the sole writer of hudGaugeFill's width;
+   _hudRenderState() skips its width write whenever ambientSource
+   is non-null so the two never race. */
 var audioSpectrumHud = document.getElementById('audioSpectrumHud');
 var hudTrackTitle    = document.getElementById('hudTrackTitle');
 var hudTrackArtist   = document.getElementById('hudTrackArtist');
@@ -528,7 +554,6 @@ var hudStatusBadge   = document.getElementById('hudStatusBadge');
 var hudCanvas        = document.getElementById('hudCanvas');
 var hudCtx           = hudCanvas ? hudCanvas.getContext('2d') : null;
 var hudGaugeFill     = document.getElementById('hudGaugeFill');
-var hudByteStatus    = document.getElementById('hudByteStatus');
 var hudPctStatus     = document.getElementById('hudPctStatus');
 
 var HUD_DISPLAY_W = 282;
@@ -580,7 +605,9 @@ function _hudShouldDraw() {
 
 /* Single-authority state renderer. Both the streaming loader and
    the playback lifecycle funnel through this function; neither
-   writes badge or gauge state directly. */
+   writes badge state directly. The gauge fill is written here only
+   while playback is NOT active — during playback the swell loop's
+   updateHudProgress() owns the fill and advances it over playDur. */
 function _hudRenderState() {
   if (!hudStatusBadge || !hudGaugeFill) return;
 
@@ -597,7 +624,14 @@ function _hudRenderState() {
   var pctInt = Math.round(pct * 100);
   var isPlaying = (ambientSource !== null);
 
-  hudGaugeFill.style.width = pctInt + '%';
+  /* Gauge width: during playback the swell loop's updateHudProgress()
+     owns the fill (playback position over playDur). When idle or
+     loading, this function writes download progress. Writing width
+     here during playback would stomp the playback position on every
+     state change. */
+  if (!isPlaying) {
+    hudGaugeFill.style.width = pctInt + '%';
+  }
   hudGaugeFill.classList.remove('decoding', 'ready');
   hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
 
@@ -607,13 +641,11 @@ function _hudRenderState() {
     hudStatusBadge.classList.add('ready');
     if (_hudDecodedCount >= _hudTotalFiles) {
       hudGaugeFill.classList.add('ready');
-      /* Blank the sub-pct line: the full gauge plus the RAM figure
-         below already say everything the pct would. */
+      /* Blank the sub-pct line: the full gauge plus the badge
+         already say everything the pct would. */
       hudPctStatus.textContent = '';
-      hudByteStatus.textContent = (totalExpected / (1024 * 1024)).toFixed(1) + ' MB (RAM)';
     } else {
       hudPctStatus.textContent = pctInt + '%';
-      hudByteStatus.textContent = (totalLoaded / (1024 * 1024)).toFixed(1) + ' / ' + (totalExpected / (1024 * 1024)).toFixed(1) + ' MB';
     }
   } else if (_hudDecodedCount < _hudTotalFiles) {
     /* Priority 2 — in-flight download or decode */
@@ -622,12 +654,10 @@ function _hudRenderState() {
       hudStatusBadge.textContent = '展開中';
       hudStatusBadge.classList.add('decoding');
       hudPctStatus.textContent = 'PCM展開中';
-      hudByteStatus.textContent = 'デコード中...';
     } else {
       hudStatusBadge.textContent = 'DL ' + pctInt + '%';
       hudStatusBadge.classList.add('loading');
       hudPctStatus.textContent = pctInt + '%';
-      hudByteStatus.textContent = (totalLoaded / (1024 * 1024)).toFixed(1) + ' / ' + (totalExpected / (1024 * 1024)).toFixed(1) + ' MB';
     }
   } else {
     /* Priority 3 — all buffers resident, currently idle */
@@ -635,7 +665,6 @@ function _hudRenderState() {
     hudStatusBadge.textContent = '待機完了';
     hudStatusBadge.classList.add('ready');
     hudPctStatus.textContent = '待機完了';
-    hudByteStatus.textContent = (totalExpected / (1024 * 1024)).toFixed(1) + ' MB (RAM)';
   }
 }
 
@@ -647,6 +676,27 @@ function updateHudLoadingAggregated(force) {
   if (!force && now - _hudLastUpdateMs < 100) return;
   _hudLastUpdateMs = now;
   _hudRenderState();
+}
+
+/* Advances the HUD gauge fill over the current ambient track's
+   duration. Called from the swell loop alongside drawHudSpectrum()
+   whenever the HUD is visible and the scroll gate is released.
+   During playback this is the sole writer of hudGaugeFill's width;
+   _hudRenderState() skips its width write whenever ambientSource
+   is non-null so the two never race.
+
+   Progress is computed from soundAudioCtx.currentTime so the fill
+   is accurate across fade-in, main body, and fade-out — no
+   integration of animation frames required. */
+function updateHudProgress() {
+  if (!hudGaugeFill) return;
+  if (ambientSource === null) return;
+  if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return;
+  var elapsed = soundAudioCtx.currentTime - ambientPlayStartTime;
+  if (elapsed < 0) elapsed = 0;
+  if (elapsed > ambientPlayDurationSec) elapsed = ambientPlayDurationSec;
+  var pct = (elapsed / ambientPlayDurationSec) * 100;
+  hudGaugeFill.style.width = pct.toFixed(2) + '%';
 }
 
 /* Streaming loader with byte-level progress reporting. Replaces
@@ -1128,11 +1178,18 @@ function tryStartBlossomStream(retries) {
    before giving up. This closes both the busy-loop that a 0
    return would produce (setTimeout(fn, 0)) and the zombie-poll
    that an uncapped transient return would produce after a
-   permanently failed fetch. */
+   permanently failed fetch.
+
+   ambientPlayStartTime / ambientPlayDurationSec are set at each
+   playAmbientSound() call and consumed by updateHudProgress() to
+   advance the HUD gauge fill. Both reset on src.onended so the
+   next cycle's start position is measured from a clean slate. */
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
 var _ambientBufferRetries = 0;
+var ambientPlayStartTime = -1;
+var ambientPlayDurationSec = 0;
 
 /* Three-way Nagoya hour dispatch. Function declarations hoist, so
    referencing nagoyaDateParts here — even though it is declared
@@ -1189,6 +1246,8 @@ function stopAmbient() {
   }
   ambientSource = null;
   ambientGain = null;
+  ambientPlayStartTime = -1;
+  ambientPlayDurationSec = 0;
 
   /* Badge revert to standby via the single-authority renderer */
   _hudRenderState();
@@ -1266,6 +1325,8 @@ function playAmbientSound() {
 
   ambientSource = src;
   ambientGain = gain;
+  ambientPlayStartTime = now;
+  ambientPlayDurationSec = playDur;
 
   /* Badge transitions to 再生中 via the single-authority renderer */
   _hudRenderState();
@@ -1273,6 +1334,8 @@ function playAmbientSound() {
   src.onended = function() {
     if (ambientSource === src) ambientSource = null;
     if (ambientGain === gain) ambientGain = null;
+    ambientPlayStartTime = -1;
+    ambientPlayDurationSec = 0;
     try { gain.disconnect(); } catch (e) {}
     /* Defensive: keep the HUD in sync if the re-arm timing changes */
     _hudRenderState();
@@ -1437,6 +1500,7 @@ function swellTick() {
     applySwellToCSS(swellEnergy);
     if (_hudShouldDraw()) {
       drawHudSpectrum();
+      updateHudProgress();
     }
   }
 
