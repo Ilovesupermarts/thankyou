@@ -3636,17 +3636,25 @@ function updateReceiptScrollIndicator() {
 }
 
 /* ============================================================
-   KOI WATER EFFECTS */
+   KOI WATER EFFECTS
+   ------------------------------------------------------------
+   The ripple palettes mirror the autumn tokens --bg-base (絹白
+   Kinushiro), --glow (金木犀 glow), and --petal-soft. Update them
+   in lockstep with the palette block in main.css if those tokens
+   change. The sakura theme reuses the same literals here because
+   the ripples are only ever spawned on the koi screen, which is
+   gated behind the same mapleLeaves .active class the theme
+   toggle already keys on. */
 var RIPPLE_COLOURS_STRONG = [
-  'rgba(253, 243, 216, 0.95)',
-  'rgba(247, 185, 60, 0.85)',
-  'rgba(255, 240, 200, 0.70)'
+  'rgba(255, 253, 249, 0.95)',
+  'rgba(255, 162, 89, 0.85)',
+  'rgba(253, 232, 218, 0.70)'
 ];
 var RIPPLE_COLOURS_SUBTLE = [
-  'rgba(247, 185, 60, 0.55)',
-  'rgba(255, 240, 200, 0.40)'
+  'rgba(255, 162, 89, 0.55)',
+  'rgba(253, 232, 218, 0.40)'
 ];
-var RIPPLE_COLOURS_TRAIL  = ['rgba(247, 185, 60, 0.40)'];
+var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
 
 var KOI_RISE_MAX = 40;
 var KOI_RISE_FACTOR = 0.35;
