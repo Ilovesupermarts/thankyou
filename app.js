@@ -3,6 +3,35 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (sound readiness decoupling)
+       - soundReady now flips after the three synthesised UI
+         sounds (tock / check / paper) finish rendering via
+         OfflineAudioContext — ~5ms after the audio context is
+         created — rather than waiting on the 50 MB of ambient
+         MP3s to stream and decode. The audible UI feedback
+         (checkbox taps, numpad presses, paper transitions) is
+         now available from the very first user tap on a cold
+         cache.
+       - Ambient beds, stream, wind chime, and the koi drop one-
+         shot load asynchronously in parallel; each call site
+         already guards on its specific buffer so a not-yet-
+         resident buffer bails silently rather than playing a
+         partial or double-start.
+       - playAmbientSound() now distinguishes terminal guards
+         (sound disabled, non-autumn theme, carousel inactive,
+         no AudioContext) from transient guards (UI synth
+         pending, ambient buffer not yet resident). Terminal
+         guards return 0 and stop the schedule; transient guards
+         return 500 (ms retry delay) and are capped at 120
+         attempts ≈ 60s, after which the schedule terminates.
+         scheduleNextAmbient() exits on any prevPlayMs <= 0,
+         closing the zombie-poll race where a mid-flight tick
+         could re-arm after stopAmbient() already cleared the
+         timer.
+       - playSound() gains a defensive soundAudioCtx.resume() so
+         a context that was suspended between the first user
+         gesture and a subsequent tap is revived on the tap
+         rather than silently swallowing the sound.
      v1.3 (audio spectrum HUD)
        - New bottom-left persistent HUD surfacing the currently-
          playing ambient bed: track title, artist, a 25-column
@@ -767,32 +796,52 @@ function initSound() {
     if (soundAudioCtx.state === 'suspended') {
       try { soundAudioCtx.resume(); } catch (e) {}
     }
+
+    /* FAST PATH: UI sounds are synthesized in memory via
+       OfflineAudioContext. Takes ~5ms and requires zero network
+       requests, so soundReady flips long before the ambient MP3s
+       have finished streaming. Unblocks playSound() for the very
+       first tap on a cold cache. */
     Promise.all([
       synthesizeTock(),
       synthesizeCheck(),
-      synthesizePaper(),
-      loadDropBuffer(),
-      loadAudioBufferWithProgress(AMBIENT_TRACKS[0].url), // Morning.mp3
-      loadAudioBufferWithProgress(AMBIENT_TRACKS[1].url), // Earlyevening.mp3
-      loadAudioBufferWithProgress(AMBIENT_TRACKS[2].url), // Latenight.mp3
-      loadAudioBuffer(STREAM_SOUND_URL),
-      loadAudioBuffer(WIND_CHIME_URL)
-    ]).then(function(bufs) {
-      soundBuffers.tock = bufs[0];
-      soundBuffers.check = bufs[1];
-      soundBuffers.paper = bufs[2];
-      if (bufs[3]) soundBuffers.drop = bufs[3];
-      if (bufs[4]) soundBuffers.morning = bufs[4];
-      if (bufs[5]) soundBuffers.earlyevening = bufs[5];
-      if (bufs[6]) soundBuffers.latenight = bufs[6];
-      /* The stream bed loops for the full life of the blossom screen.
-         Pass the decoded buffer through makeSeamlessLoop() so the
-         loop point has no encoder padding and no zero-crossing
-         discontinuity. */
-      if (bufs[7]) soundBuffers.stream = makeSeamlessLoop(bufs[7], 1.5);
-      if (bufs[8]) soundBuffers.windChime = bufs[8];
+      synthesizePaper()
+    ]).then(function(uiBufs) {
+      soundBuffers.tock = uiBufs[0];
+      soundBuffers.check = uiBufs[1];
+      soundBuffers.paper = uiBufs[2];
       soundReady = true;
     }).catch(function() { /* silent */ });
+
+    /* ASYNC BACKGROUND PATH: one-shots and loop beds load
+       concurrently without blocking the UI fast path. Each call
+       site downstream guards on its own buffer being present, so
+       a not-yet-resident buffer is skipped rather than played
+       partial. */
+    loadDropBuffer().then(function(buf) {
+      if (buf) soundBuffers.drop = buf;
+    });
+
+    loadAudioBuffer(STREAM_SOUND_URL).then(function(buf) {
+      if (buf) soundBuffers.stream = makeSeamlessLoop(buf, 1.5);
+    });
+
+    loadAudioBuffer(WIND_CHIME_URL).then(function(buf) {
+      if (buf) soundBuffers.windChime = buf;
+    });
+
+    /* Ambient rotation: streamed with individual byte tracking
+       so the HUD can show per-file download progress. */
+    loadAudioBufferWithProgress(AMBIENT_TRACKS[0].url).then(function(buf) {
+      if (buf) soundBuffers.morning = buf;
+    });
+    loadAudioBufferWithProgress(AMBIENT_TRACKS[1].url).then(function(buf) {
+      if (buf) soundBuffers.earlyevening = buf;
+    });
+    loadAudioBufferWithProgress(AMBIENT_TRACKS[2].url).then(function(buf) {
+      if (buf) soundBuffers.latenight = buf;
+    });
+
   } catch (e) { /* silent */ }
 }
 
@@ -964,6 +1013,9 @@ function synthesizePaper() {
 
 function playSound(name, rate) {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
+  if (soundAudioCtx.state === 'suspended') {
+    try { soundAudioCtx.resume(); } catch (e) {}
+  }
   var buf = soundBuffers[name];
   if (!buf) return;
   try {
@@ -1059,10 +1111,28 @@ function tryStartBlossomStream(retries) {
   setTimeout(function() { tryStartBlossomStream(retries - 1); }, 400);
 }
 
-/* ============ AMBIENT SOUND ROTATION ============ */
+/* ============ AMBIENT SOUND ROTATION ============
+   The scheduler is a linear setTimeout recursion, not a fixed-rate
+   interval. Each cycle plays a full buffer (or maxPlaySec) and
+   re-arms on the fade-out tail via the return value of
+   playAmbientSound():
+
+     · positive number  → milliseconds until the next tick
+     · 0                → terminal stop; scheduleNextAmbient() exits
+
+   The return value doubles as a signal channel. Terminal states
+   (sound disabled, non-autumn theme, carousel inactive, missing
+   AudioContext) return 0; transient states (UI synth pending,
+   ambient buffer not yet resident) return 500 and are counted by
+   _ambientBufferRetries, which caps the retry window at ~60s
+   before giving up. This closes both the busy-loop that a 0
+   return would produce (setTimeout(fn, 0)) and the zombie-poll
+   that an uncapped transient return would produce after a
+   permanently failed fetch. */
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
+var _ambientBufferRetries = 0;
 
 /* Three-way Nagoya hour dispatch. Function declarations hoist, so
    referencing nagoyaDateParts here — even though it is declared
@@ -1077,6 +1147,7 @@ function getCurrentAmbientTrack() {
 
 function startAmbient() {
   stopAmbient();
+  _ambientBufferRetries = 0;
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
@@ -1087,16 +1158,21 @@ function startAmbient() {
 }
 
 function scheduleNextAmbient(prevPlayMs) {
+  /* Exit condition: 0 or negative signals terminal stop; break
+     the recursion without re-arming. */
+  if (!prevPlayMs || prevPlayMs <= 0) return;
+
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
     scheduleNextAmbient(playMs);
-  }, prevPlayMs || 0);
+  }, prevPlayMs);
 }
 
 function stopAmbient() {
   stopWindChime();
   stopSwellLoop();
+  _ambientBufferRetries = 0;
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
@@ -1119,18 +1195,49 @@ function stopAmbient() {
 }
 
 function playAmbientSound() {
-  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
+  /* Terminal guards: sound disabled, non-autumn theme, or carousel
+     inactive. Each of these states is not expected to flip without
+     a fresh user gesture (or a full reload), so the scheduler stops
+     rather than retrying. */
+  if (!SOUND_ENABLED) return 0;
+  if (currentTheme !== 'autumn') return 0;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
+
+  /* Terminal guard: AudioContext failed or unavailable. Since
+     initSound() already ran via the first pointerdown before
+     startAmbient() could fire, a null soundAudioCtx here means
+     AudioContext construction failed or is unsupported — waiting
+     500ms will never change that. */
+  if (!soundAudioCtx) return 0;
 
   var track = getCurrentAmbientTrack();
   var buffer = soundBuffers[track.bufferName];
-  if (!buffer) return 0;
+
+  /* Transient guards: UI fast-path buffers still synthesizing
+     (~5ms window) or ambient MP3 still streaming/decoding. Both
+     resolve on their own, so retry at 500ms — but capped at 120
+     attempts (~60s), after which either the loader has failed
+     permanently or the environment is too slow to be useful and
+     the schedule terminates cleanly. */
+  if (!soundReady || !buffer) {
+    _ambientBufferRetries++;
+    if (_ambientBufferRetries > 120) {
+      _ambientBufferRetries = 0;
+      return 0;
+    }
+    return 500;
+  }
+  _ambientBufferRetries = 0;
 
   /* Synchronise HUD metadata to the currently-selected phase */
   if (hudTrackTitle)  hudTrackTitle.textContent = track.title;
   if (hudTrackArtist) hudTrackArtist.textContent = track.artist;
 
   var bufferDur = buffer.duration;
+  /* Terminal guard: a successfully decoded AudioBuffer always has
+     positive duration. A zero/negative value would mean decode
+     produced an invalid buffer, which is not a state polling can
+     resolve. Return 0 to halt the schedule. */
   if (bufferDur <= 0) return 0;
 
   var playDur = bufferDur;
