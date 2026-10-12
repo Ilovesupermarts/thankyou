@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FAF7F2">
-<title>和田三造 配色選定デモ (Sanzo Wada Palette Inspector)</title>
+<title>和田三造 配色選定デモ v2 (背景連動版)</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,9 +13,6 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============================================================
-     DEMO HARNESS & INSPECTOR DOCK
-     ============================================================ */
   .demo-viewport {
     position: relative;
     width: 100vw;
@@ -37,7 +34,6 @@
     pointer-events: none;
   }
 
-  /* Sample Panel 0 text mirroring screenshot */
   .sample-panel-content {
     max-width: 540px;
     text-align: center;
@@ -125,32 +121,24 @@
     flex-direction: column;
     gap: 2px;
   }
-  .palette-tab-btn span.tab-title {
-    font-size: 12.5px;
-  }
-  .palette-tab-btn span.tab-desc {
-    font-size: 10px;
-    color: #8E7E72;
-    font-weight: 400;
-  }
+  .palette-tab-btn span.tab-title { font-size: 12.5px; }
+  .palette-tab-btn span.tab-desc { font-size: 10px; color: #8E7E72; font-weight: 400; }
   .palette-tab-btn.active {
     background: var(--accent);
     border-color: var(--accent);
     color: #ffffff;
   }
-  .palette-tab-btn.active span.tab-desc {
-    color: rgba(255, 255, 255, 0.85);
-  }
+  .palette-tab-btn.active span.tab-desc { color: rgba(255, 255, 255, 0.85); }
 
-  /* Swatch Strip (60-30-10) */
   .swatch-display {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    background: #FAF7F2;
-    border: 1px solid #EBE4D8;
+    background: var(--bg-base);
+    border: 1px solid var(--border-3);
     border-radius: 12px;
     padding: 10px;
+    transition: background 0.4s ease;
   }
   .swatch-bars {
     display: flex;
@@ -159,10 +147,7 @@
     overflow: hidden;
     box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
   }
-  .swatch-seg {
-    height: 100%;
-    transition: width 0.3s ease, background 0.3s ease;
-  }
+  .swatch-seg { height: 100%; transition: background 0.3s ease; }
   .swatch-legend {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -170,51 +155,26 @@
     font-size: 11px;
     font-family: "Shippori Mincho", serif;
   }
-  .swatch-legend-item {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
+  .swatch-legend-item { display: flex; align-items: center; gap: 6px; }
   .swatch-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    flex-shrink: 0;
+    width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
     box-shadow: 0 0 0 1px rgba(0,0,0,0.1);
   }
 
-  /* View switch buttons */
-  .view-switch {
-    display: flex;
-    gap: 6px;
-  }
+  .view-switch { display: flex; gap: 6px; }
   .view-btn {
-    flex: 1;
-    background: #F4EDE2;
-    border: 1px solid #D1C4B0;
-    border-radius: 8px;
-    padding: 6px;
-    font-size: 11.5px;
-    font-weight: 600;
-    color: #473B32;
-    cursor: pointer;
-    text-align: center;
-    transition: all 0.2s;
+    flex: 1; background: #F4EDE2; border: 1px solid #D1C4B0;
+    border-radius: 8px; padding: 6px; font-size: 11.5px; font-weight: 600;
+    color: #473B32; cursor: pointer; text-align: center; transition: all 0.2s;
   }
   .view-btn.active {
-    background: var(--text-dark);
-    border-color: var(--text-dark);
-    color: #ffffff;
+    background: var(--text-dark); border-color: var(--text-dark); color: #ffffff;
   }
 
   .dock-note {
-    font-size: 11px;
-    color: #695B50;
-    line-height: 1.5;
-    background: #F4EDE2;
-    border-left: 3px solid var(--accent);
-    padding: 8px 10px;
-    border-radius: 6px;
+    font-size: 11px; color: #695B50; line-height: 1.5;
+    background: #F4EDE2; border-left: 3px solid var(--accent);
+    padding: 8px 10px; border-radius: 6px;
   }
 </style>
 </head>
@@ -222,12 +182,12 @@
 
 <!-- Ambient Stage & Shippō Pattern (identical to index.html) -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
-  <div class="ambient-layer ambient-mesh">
-    <div class="light-orb orb-1"></div>
-    <div class="light-orb orb-2"></div>
-    <div class="light-orb orb-3"></div>
+  <div class="ambient-layer ambient-mesh" id="ambientMesh">
+    <div class="light-orb orb-1" id="orb1"></div>
+    <div class="light-orb orb-2" id="orb2"></div>
+    <div class="light-orb orb-3" id="orb3"></div>
   </div>
-  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer ambient-primary" id="ambientPrimary"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
 <div class="ambient-mosaic" id="ambientMosaic" aria-hidden="true"></div>
@@ -240,7 +200,7 @@
       <span class="sep">·</span>
       <span class="date">10月12日(月)</span>
       <span class="sep">·</span>
-      <span class="time">09時48分</span>
+      <span class="time">09時55分</span>
       <span class="sep">·</span>
       <span class="temp">23°</span>
       <span class="sep">·</span>
@@ -249,11 +209,7 @@
   </div>
 </div>
 
-<!-- ============================================================
-     VIEWPORT PREVIEWS
-     ============================================================ -->
 <div class="demo-viewport">
-
   <!-- View 1: Welcome Greeting (Panel 0) -->
   <div class="demo-view" id="viewGreeting">
     <div class="sample-panel-content">
@@ -287,10 +243,8 @@
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- Center Dots Staging (Active dot uses secondary accent color) -->
 <div class="action-hint global-hint shown" style="position:fixed; bottom: 84px; left:0; right:0;">
   <span class="hint-layer active">
     <span>スワイプ</span>
@@ -306,9 +260,7 @@
   <div class="dot"></div>
 </div>
 
-<!-- ============================================================
-     AUDIO SPECTRUM & METADATA HUD (Bottom-Left)
-     ============================================================ -->
+<!-- Audio Spectrum HUD -->
 <div class="audio-spectrum-hud shown" id="audioSpectrumHud">
   <div class="hud-meta-row">
     <span class="hud-title" id="hudTrackTitle">虹を見た日</span>
@@ -332,12 +284,10 @@
   </div>
 </div>
 
-<!-- ============================================================
-     PALETTE INSPECTOR CONTROLLER DOCK
-     ============================================================ -->
+<!-- Palette Inspector Dock -->
 <div class="palette-dock">
   <div class="dock-header">
-    <span class="dock-title">和田三造 配色選定 (Sanzo Wada)</span>
+    <span class="dock-title">和田三造 配色選定 (背景完全連動版)</span>
     <span class="dock-sub">大人上品・くすみカラー</span>
   </div>
 
@@ -360,7 +310,6 @@
     </button>
   </div>
 
-  <!-- Swatch Breakdown Card -->
   <div class="swatch-display">
     <div class="swatch-bars">
       <div class="swatch-seg" id="segCanvas" style="width: 60%;"></div>
@@ -392,28 +341,21 @@
     </div>
   </div>
 
-  <!-- View Switcher -->
   <div class="view-switch">
     <button type="button" class="view-btn active" id="btnGreeting">Panel 0 挨拶画面</button>
     <button type="button" class="view-btn" id="btnTable">サービス選択表</button>
   </div>
 
-  <div class="dock-note" id="dockRationale">
-    【A. 照柿・利休白茶】<br>
-    柔らかな生成り和紙（#FAF7F2）の上に、栗皮墨の文字が静かに沈み、照柿色のアクセントが秋の温もりを届けます。20〜40代女性に最も支持される王道の和モダン配色です。
-  </div>
+  <div class="dock-note" id="dockRationale"></div>
 </div>
 
-<!-- ============================================================
-     SPECTRUM & PALETTE SCRIPT
-     ============================================================ -->
 <script>
 (function() {
-  /* ============ PALETTE DEFINITIONS ============ */
+  /* ============ PALETTE DEFINITIONS (WITH AMBIENT MESH OVERRIDES) ============ */
   var PALETTES = {
     A: {
-      name: 'A. 照柿・利休白茶 (秋の実りと茶席)',
-      rationale: '【A. 照柿・利休白茶】柔らかな生成り和紙（#FAF7F2）の上に、栗皮墨の文字が静かに沈み、照柿色のアクセントが秋の温もりを届けます。20〜40代女性に最も支持される王道の和モダン配色です。',
+      name: 'A. 照柿・利休白茶',
+      rationale: '【A. 照柿・利休白茶】生成り和紙（#FAF7F2）の上に、栗皮墨の文字が沈み、背景のオーブもまろやかな照柿色（薄い柿渋・番茶）に抑制。眩しい黄色が消え、柔らかな手漉き和紙の温もりが広がります。',
       tokens: {
         '--bg-base': '#FAF7F2',
         '--bg-warm': '#F2EAE0',
@@ -424,7 +366,6 @@
         '--petal': '#C76D49',
         '--petal-soft': '#F4DDD3',
         '--outstanding': '#9E492B',
-        '--shadow-accent': 'rgba(186, 93, 59, 0.28)',
         '--border-1': '#DFD5C5',
         '--border-2': '#D1C4B0',
         '--border-3': '#E8E0D2',
@@ -448,11 +389,15 @@
         accent: { name: '照柿 #BA5D3B', color: '#BA5D3B' },
         tag: { name: '苔色 #76806C (タグ・ドット)', color: '#76806C' }
       },
-      mosaicStroke: '%23BA5D3B'
+      mosaicStroke: '%23BA5D3B',
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(217, 136, 98, 0.35) 0%, rgba(217, 136, 98, 0.12) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(199, 109, 73, 0.28) 0%, rgba(199, 109, 73, 0.08) 34%, transparent 62%), radial-gradient(circle at 50% 70%, rgba(186, 93, 59, 0.24) 0%, transparent 58%), radial-gradient(circle at 80% 90%, rgba(118, 128, 108, 0.18) 0%, transparent 52%)',
+      orb1: 'radial-gradient(circle, rgba(186, 93, 59, 0.22) 0%, rgba(217, 136, 98, 0.08) 42%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(199, 109, 73, 0.26) 0%, rgba(186, 93, 59, 0.10) 46%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(142, 100, 75, 0.18) 0%, rgba(118, 128, 108, 0.14) 40%, transparent 62%)'
     },
     B: {
-      name: 'B. 琥珀・木蘭 (銀杏と穏やかな夕暮れ)',
-      rationale: '【B. 琥珀・木蘭】鳥の子色の柔らかなキャンバス（#FAF5E8）に、木蘭色のトープ。ギラつきを抑えた琥珀ブロンズ（#B87333）が、晩秋のあたたかな木漏れ日を演出します。',
+      name: 'B. 琥珀・木蘭',
+      rationale: '【B. 琥珀・木蘭】鳥の子色（#FAF5E8）に、木蘭色のトープ。背景オーブも蛍光イエローから落ち着いた琥珀ブロンズ（#B87333）へ。ギラつきのない、穏やかな晩秋の夕暮れです。',
       tokens: {
         '--bg-base': '#FAF5E8',
         '--bg-warm': '#F2EBDA',
@@ -463,7 +408,6 @@
         '--petal': '#C48144',
         '--petal-soft': '#F5E4D0',
         '--outstanding': '#9E5F28',
-        '--shadow-accent': 'rgba(184, 115, 51, 0.28)',
         '--border-1': '#DFD4BE',
         '--border-2': '#D8C7A3',
         '--border-3': '#E8DEC9',
@@ -487,11 +431,15 @@
         accent: { name: '琥珀 #B87333', color: '#B87333' },
         tag: { name: '海松色 #8A8265 (タグ・ドット)', color: '#8A8265' }
       },
-      mosaicStroke: '%23B87333'
+      mosaicStroke: '%23B87333',
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(212, 148, 87, 0.32) 0%, rgba(212, 148, 87, 0.10) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(184, 115, 51, 0.25) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(138, 130, 101, 0.18) 0%, transparent 52%)',
+      orb1: 'radial-gradient(circle, rgba(184, 115, 51, 0.20) 0%, rgba(212, 148, 87, 0.06) 42%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(196, 129, 68, 0.24) 0%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(138, 130, 101, 0.16) 0%, transparent 62%)'
     },
     C: {
-      name: 'C. 蘇芳・鳩羽鼠 (上品な紫泥とコスメ)',
-      rationale: '【C. 蘇芳・鳩羽鼠】白練（#F8F6F4）と鳩羽鼠のニュアンスグレーに、くすみプラムローズの蘇芳（#9C5B6B）。高級サロンやスキンケアのブランディングに通じる優美な静けさです。',
+      name: 'C. 蘇芳・鳩羽鼠',
+      rationale: '【C. 蘇芳・鳩羽鼠】白練（#F8F6F4）に鳩羽鼠のニュアンスグレー。背景オーブも黄みを完全に脱ぎ捨て、くすみプラムローズ（#9C5B6B）と錆青磁の気品ある陰影へと変化します。',
       tokens: {
         '--bg-base': '#F8F6F4',
         '--bg-warm': '#EFECE9',
@@ -502,7 +450,6 @@
         '--petal': '#A86877',
         '--petal-soft': '#F2DEE3',
         '--outstanding': '#844755',
-        '--shadow-accent': 'rgba(156, 91, 107, 0.28)',
         '--border-1': '#DAD2D2',
         '--border-2': '#CEBEBE',
         '--border-3': '#E2DADA',
@@ -526,11 +473,15 @@
         accent: { name: '蘇芳 #9C5B6B', color: '#9C5B6B' },
         tag: { name: '錆青磁 #6E7C79 (タグ・ドット)', color: '#6E7C79' }
       },
-      mosaicStroke: '%239C5B6B'
+      mosaicStroke: '%239C5B6B',
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(186, 123, 139, 0.30) 0%, rgba(186, 123, 139, 0.08) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(156, 91, 107, 0.22) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(110, 124, 121, 0.16) 0%, transparent 52%)',
+      orb1: 'radial-gradient(circle, rgba(156, 91, 107, 0.20) 0%, rgba(186, 123, 139, 0.06) 42%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(168, 104, 119, 0.22) 0%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(110, 124, 121, 0.15) 0%, transparent 62%)'
     },
     D: {
-      name: 'D. 深緋・胡桃染 (晩秋の陶器とテラコッタ)',
-      rationale: '【D. 深緋・胡桃染】灰白（#F7F4F0）と胡桃染の陶芸的トープに、テラコッタローズの深緋（#A34C44）。凛とした知性とクラフト感を持ち合わせたシックな佇まいです。',
+      name: 'D. 深緋・胡桃染',
+      rationale: '【D. 深緋・胡桃染】灰白（#F7F4F0）と胡桃染の陶芸的トープ。背景オーブもテラコッタローズの深緋（#A34C44）と利休鼠で構成。知的で凛としたクラフト空間が完成します。',
       tokens: {
         '--bg-base': '#F7F4F0',
         '--bg-warm': '#ECE4DC',
@@ -541,7 +492,6 @@
         '--petal': '#B05951',
         '--petal-soft': '#F5DDD9',
         '--outstanding': '#883A33',
-        '--shadow-accent': 'rgba(163, 76, 68, 0.28)',
         '--border-1': '#D5C8BD',
         '--border-2': '#CABBB0',
         '--border-3': '#E0D4C9',
@@ -565,31 +515,43 @@
         accent: { name: '深緋 #A34C44', color: '#A34C44' },
         tag: { name: '利休鼠 #697A6B (タグ・ドット)', color: '#697A6B' }
       },
-      mosaicStroke: '%23A34C44'
+      mosaicStroke: '%23A34C44',
+      ambientPrimary: 'radial-gradient(circle at 25% 30%, rgba(191, 110, 102, 0.30) 0%, rgba(191, 110, 102, 0.08) 32%, transparent 60%), radial-gradient(circle at 75% 40%, rgba(163, 76, 68, 0.24) 0%, transparent 62%), radial-gradient(circle at 80% 90%, rgba(105, 122, 107, 0.16) 0%, transparent 52%)',
+      orb1: 'radial-gradient(circle, rgba(163, 76, 68, 0.20) 0%, rgba(191, 110, 102, 0.06) 42%, transparent 70%)',
+      orb2: 'radial-gradient(circle, rgba(176, 89, 81, 0.22) 0%, transparent 72%)',
+      orb3: 'radial-gradient(circle, rgba(105, 122, 107, 0.15) 0%, transparent 62%)'
     }
   };
 
-  var currentPalette = 'A';
-
-  /* ============ APPLY PALETTE ============ */
+  /* ============ APPLY PALETTE WITH AMBIENT RE-SKINNING ============ */
   function applyPalette(key) {
     var p = PALETTES[key];
     if (!p) return;
-    currentPalette = key;
 
-    /* Write CSS Custom Properties directly to documentElement */
+    /* 1. CSS Custom Properties */
     var root = document.documentElement;
     for (var token in p.tokens) {
       root.style.setProperty(token, p.tokens[token]);
     }
 
-    /* Update Shippō Mosaic stroke color */
+    /* 2. Overwrite Background Wash & Orbs directly */
+    var primary = document.getElementById('ambientPrimary');
+    if (primary) primary.style.background = p.ambientPrimary;
+
+    var orb1 = document.getElementById('orb1');
+    var orb2 = document.getElementById('orb2');
+    var orb3 = document.getElementById('orb3');
+    if (orb1) orb1.style.background = p.orb1;
+    if (orb2) orb2.style.background = p.orb2;
+    if (orb3) orb3.style.background = p.orb3;
+
+    /* 3. Overwrite Shippō Mosaic Stroke */
     var mosaic = document.getElementById('ambientMosaic');
     if (mosaic) {
       mosaic.style.backgroundImage = "url(\"data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='" + p.mosaicStroke + "'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E\")";
     }
 
-    /* Update Swatch Legend in Dock */
+    /* 4. Update Dock Swatches & Rationale */
     document.getElementById('segCanvas').style.background = p.legend.canvas.color;
     document.getElementById('segSurface').style.background = p.legend.surface.color;
     document.getElementById('segText').style.background = p.legend.text.color;
@@ -612,25 +574,21 @@
 
     document.getElementById('dockRationale').innerHTML = p.rationale;
 
-    /* Update Tab Active States */
     document.querySelectorAll('.palette-tab-btn').forEach(function(b) {
       b.classList.toggle('active', b.getAttribute('data-palette') === key);
     });
   }
 
-  /* ============ SPECTRUM CANVAS (120Hz Waterline Mirror) ============ */
+  /* ============ SPECTRUM CANVAS (120Hz) ============ */
   var canvas = document.getElementById('hudCanvas');
   var ctx = canvas.getContext('2d');
   var dpr = window.devicePixelRatio || 1;
-  var displayW = 282;
-  var displayH = 26;
+  var displayW = 282, displayH = 26;
   canvas.width = displayW * dpr;
   canvas.height = displayH * dpr;
   ctx.scale(dpr, dpr);
 
-  var HUD_BARS = 25;
-  var HUD_BAR_W = 6.0;
-  var HUD_BAR_GAP = 5.5;
+  var HUD_BARS = 25, HUD_BAR_W = 6.0, HUD_BAR_GAP = 5.5;
   var _hudMirrorValues = new Float32Array(HUD_BARS);
   var _hudPhase = 0;
 
@@ -642,9 +600,8 @@
     var themePetal  = getComputedStyle(document.documentElement).getPropertyValue('--petal').trim() || '#C76D49';
 
     _hudPhase += 0.045;
-    var midY = Math.round(displayH * 0.44); /* 11px */
+    var midY = Math.round(displayH * 0.44);
 
-    /* Waterline */
     ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--border-2').trim() || '#D1C4B0';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -661,14 +618,12 @@
       var halfH = Math.max(2.0, _hudMirrorValues[m] * 10.5);
       var mx = m * (HUD_BAR_W + HUD_BAR_GAP);
 
-      /* Upper Sky Column */
       ctx.fillStyle = themeAccent;
       ctx.beginPath();
       if (hasRoundRect) ctx.roundRect(mx, midY - halfH, HUD_BAR_W, halfH, [1.5, 1.5, 0, 0]);
       else ctx.rect(mx, midY - halfH, HUD_BAR_W, halfH);
       ctx.fill();
 
-      /* Lower Water Reflection */
       ctx.fillStyle = themePetal;
       ctx.globalAlpha = 0.46;
       ctx.beginPath();
@@ -680,7 +635,7 @@
   }
   requestAnimationFrame(renderSpectrum);
 
-  /* ============ DOCK EVENT LISTENERS ============ */
+  /* Tab Handlers */
   document.querySelectorAll('.palette-tab-btn').forEach(function(btn) {
     btn.addEventListener('click', function() {
       applyPalette(btn.getAttribute('data-palette'));
@@ -706,7 +661,6 @@
     viewGreeting.classList.add('hidden');
   });
 
-  /* Initial boot into Palette A */
   applyPalette('A');
 })();
 </script>
