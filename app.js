@@ -3053,15 +3053,23 @@ function chunkPanelText(text) {
     segLen = codepointCount(seg);
 
     /* 1. Flush when appending this segment exceeds MAX, provided MIN
-          density is already met. */
-    if (currentLen >= PANEL_PHRASE_MIN && (currentLen + segLen) > PANEL_PHRASE_MAX) {
-      chunks.push(currentChunk);
-      currentChunk = '';
-      currentLen = 0;
-    }
+      density is already met. */
+if (currentLen >= PANEL_PHRASE_MIN && (currentLen + segLen) > PANEL_PHRASE_MAX) {
+  chunks.push(currentChunk);
+  currentChunk = '';
+  currentLen = 0;
+}
 
-    currentChunk += seg;
-    currentLen += segLen;
+/* 1b. Punctuation orphaned by the size flush above belongs to
+       the phrase it terminates, not the phrase it precedes.
+       Japanese 、。！？ always trail their clause. */
+if (isJapanesePunctuation(seg) && currentLen === 0 && chunks.length > 0) {
+  chunks[chunks.length - 1] += seg;
+  continue;
+}
+
+currentChunk += seg;
+currentLen += segLen;
 
     /* 2. Flush on punctuation only after MIN visual weight is met.
           Keeps short formal lead-ins (e.g. 「もし、」) bound to their clause. */
