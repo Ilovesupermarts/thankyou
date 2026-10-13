@@ -1,318 +1,381 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn" data-demo="glow">
+<html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#FFFDF9">
-<title>Start Button Glow — Playground</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>行間デモ — Panel Typography</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<link rel="stylesheet" href="main.css">
-
 <style>
-/* ============================================================
-   GLOW PLAYGROUND — with ripple cascade timing
-
-   Fixed facts:
-     · ring centreline at r = 90px (SVG viewBox r=90, 1:1 pixels)
-     · ring stroke 6px wide, so it spans r=87 … r=93
-     · the glow is a single radial-gradient div, circle closest-side
-     · pulse rings are r=90 circles, three of them, each scaling
-       1.0 → 1.9 and fading 0.7 → 0 over its animation-duration
-
-   Glow parameters: inner, peak, outer, alpha, duration, floor,
-   colour.
-
-   Ripple parameters: the ring cascade is alignment-locked to the
-   glow's peak. The glow peaks at `duration / 2` in every cycle.
-   For the cascade to fire on every peak rather than drifting past
-   it, the ripple cycle must be an integer multiple of the glow
-   duration. The playground warns when it isn't.
-   ============================================================ */
-
-html[data-demo="glow"] .ambient-mosaic      { opacity: 0; }
-html[data-demo="glow"] .ambient-mosaic-pond { opacity: 0.08; }
-
-body.glow-playground {
-  padding: 0;
-  overflow: hidden;
-  height: 100vh;
-}
-
-.playground {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: 400px 1fr;
-  height: 100vh;
-}
-
-.controls {
-  background: rgba(255, 253, 249, 0.72);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border-right: 1px solid rgba(222, 192, 172, 0.45);
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  padding: 24px 24px 40px;
-  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  color: var(--text-dark);
-}
-
-.controls header { margin-bottom: 24px; }
-.controls h1 {
-  font-size: 17px; font-weight: 600; color: var(--accent);
-  letter-spacing: 2px; margin: 0 0 8px;
-}
-.controls header p {
-  font-size: 12px; line-height: 1.7; color: var(--text-mute);
-  margin: 0; letter-spacing: 0.3px;
-}
-.controls code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px; background: rgba(251, 236, 224, 0.9);
-  border-radius: 3px; padding: 1px 5px; color: var(--accent-2);
-}
-
-.section-divider {
-  height: 1px;
-  background: rgba(222, 192, 172, 0.5);
-  margin: 26px 0 20px;
-}
-
-.control-group { margin-bottom: 22px; }
-
-.control-row {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 6px;
-}
-.control-label {
-  font-size: 12px; font-weight: 600; color: var(--text-med);
-  letter-spacing: 1px;
-}
-.control-value {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12px; font-weight: 500; color: var(--accent);
-  letter-spacing: 0;
-}
-
-.control-hint {
-  font-size: 11px; color: var(--text-faint); line-height: 1.6;
-  margin-top: 4px; letter-spacing: 0.2px;
-}
-
-.align-warning {
-  display: none;
-  font-size: 11px;
-  line-height: 1.6;
-  color: #9E3B06;
-  background: rgba(255, 162, 89, 0.20);
-  border: 1px solid rgba(255, 162, 89, 0.45);
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-top: 8px;
-  letter-spacing: 0.2px;
-}
-.align-warning.visible { display: block; }
-
-input[type="range"] {
-  -webkit-appearance: none; appearance: none;
-  width: 100%; height: 26px; background: transparent;
-  cursor: pointer; padding: 0; margin: 0;
-  touch-action: none;
-}
-input[type="range"]::-webkit-slider-runnable-track {
-  height: 3px; background: rgba(222, 192, 172, 0.55); border-radius: 2px;
-}
-input[type="range"]::-moz-range-track {
-  height: 3px; background: rgba(222, 192, 172, 0.55); border-radius: 2px;
-}
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; appearance: none;
-  width: 22px; height: 22px; border-radius: 50%;
-  background: #ffffff; border: 1.5px solid var(--accent);
-  box-shadow: 0 2px 6px rgba(68, 52, 48, 0.14);
-  margin-top: -10px;
-}
-input[type="range"]::-moz-range-thumb {
-  width: 20px; height: 20px; border-radius: 50%;
-  background: #ffffff; border: 1.5px solid var(--accent);
-  box-shadow: 0 2px 6px rgba(68, 52, 48, 0.14);
-}
-
-.colour-buttons { display: flex; gap: 6px; margin-bottom: 8px; }
-.colour-btn {
-  flex: 1; height: 36px; border-radius: 8px;
-  border: 1.5px solid var(--border-2);
-  cursor: pointer; padding: 0;
-  -webkit-appearance: none; appearance: none;
-  transition: transform 0.15s ease, border-color 0.15s ease;
-  position: relative;
-}
-.colour-btn:active { transform: scale(0.96); }
-.colour-btn.selected {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(230, 104, 38, 0.18);
-}
-
-.colour-custom { display: flex; align-items: center; gap: 8px; }
-.colour-custom label {
-  font-size: 11px; color: var(--text-mute); letter-spacing: 0.4px;
-}
-.colour-custom input[type="color"] {
-  width: 40px; height: 30px;
-  border: 1.5px solid var(--border-2); border-radius: 6px;
-  padding: 1px; background: #ffffff; cursor: pointer;
-  -webkit-appearance: none; appearance: none;
-}
-.colour-custom input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
-.colour-custom input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
-
-.toggles { display: flex; flex-direction: column; gap: 8px; }
-.toggle-row {
-  display: flex; align-items: center; gap: 10px;
-  font-size: 12px; color: var(--text-med); letter-spacing: 0.4px;
-  cursor: pointer; user-select: none;
-}
-.toggle-row input[type="checkbox"] {
-  width: 18px; height: 18px; accent-color: var(--accent);
-  cursor: pointer; margin: 0;
-}
-
-.preset-row {
-  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
-}
-.preset-btn {
-  flex: 1; min-width: 0;
-  padding: 8px 10px; border-radius: 8px;
-  border: 1.5px solid var(--border-2);
-  background: #ffffff; color: var(--text-med);
-  font-family: inherit; font-size: 11px; font-weight: 600;
-  letter-spacing: 0.5px; cursor: pointer; white-space: nowrap;
-  -webkit-appearance: none; appearance: none;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.preset-btn:active { background: var(--soft-1); border-color: var(--accent); }
-
-.css-block {
-  margin-top: 28px;
-  border-top: 1px solid rgba(222, 192, 172, 0.5);
-  padding-top: 20px;
-}
-.css-block h2 {
-  font-size: 12px; font-weight: 600; color: var(--text-med);
-  letter-spacing: 1.5px; text-transform: uppercase; margin: 0 0 10px;
-}
-.css-block pre {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px; line-height: 1.6; color: var(--text-soft);
-  background: rgba(255, 255, 255, 0.65);
-  border: 1px solid rgba(222, 192, 172, 0.5);
-  border-radius: 8px; padding: 12px; margin: 0 0 10px;
-  white-space: pre-wrap; word-break: break-all;
-  max-height: 340px; overflow-y: auto;
-}
-.copy-btn {
-  width: 100%; padding: 10px; border-radius: 8px;
-  border: 1.5px solid var(--accent); background: var(--accent);
-  color: #ffffff; font-family: inherit; font-size: 12px;
-  font-weight: 600; letter-spacing: 1px; cursor: pointer;
-  -webkit-appearance: none; appearance: none;
-  transition: background 0.15s ease;
-}
-.copy-btn:active { background: var(--accent-3); }
-.copy-btn.copied {
-  background: rgba(42, 63, 26, 0.14);
-  border-color: rgba(42, 63, 26, 0.4);
-  color: #2a3f1a;
-}
-
-.preview {
-  position: relative;
-  display: flex; align-items: center; justify-content: center;
-  overflow: hidden;
-}
-.preview-stage {
-  position: relative;
-  width: 480px; height: 480px;
-  display: flex; align-items: center; justify-content: center;
-}
-.preview .icon-wrapper { width: 200px; height: 200px; margin: 0; }
-
-.preview .gold-halo { display: none; }
-.preview .gold-glow { stroke: none; }
-
-.preview.no-pulse .pulse-ring { display: none; }
-.preview.no-koi .koi-dive-wrap { display: none; }
-
-.soft-glow {
-  position: absolute; top: 50%; left: 50%;
-  border-radius: 50%;
-  pointer-events: none; z-index: 0;
-  will-change: opacity;
-}
-
-@keyframes glowBreath {
-  0%, 100% { opacity: var(--breath-floor, 0.00); }
-  50%      { opacity: 1.00; }
-}
-
-.preview .ambient-stage { opacity: 0.9; }
-
-.preview-readout {
-  position: absolute; left: 24px; bottom: 20px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px; line-height: 1.7; color: var(--text-mute);
-  letter-spacing: 0.3px; pointer-events: none; user-select: none;
-  background: rgba(255, 253, 249, 0.55);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
-  border: 1px solid rgba(222, 192, 172, 0.4);
-  border-radius: 8px; padding: 10px 14px; max-width: 360px;
-}
-.preview-readout strong { color: var(--accent); font-weight: 600; }
-
-.ring-note {
-  position: absolute; right: 24px; bottom: 20px;
-  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-  font-size: 11px; color: var(--text-faint);
-  letter-spacing: 0.3px; text-align: right; line-height: 1.7;
-  pointer-events: none; user-select: none;
-}
-.ring-note code {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
-  background: rgba(255, 253, 249, 0.65);
-  border-radius: 3px; padding: 1px 5px; color: var(--accent-2);
-}
-
-@media (max-width: 900px) {
-  .playground { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
-  .controls {
-    border-right: none;
-    border-bottom: 1px solid rgba(222, 192, 172, 0.45);
-    max-height: 55vh;
+  /* ---------- AUTUMN THEME TOKENS (subset used by the ambient stack) ---------- */
+  html[data-theme="autumn"] {
+    --bg-base: #FFFDF9;
+    --text-dark: #241C1A;
+    --text-mute: #725750;
+    --text-faint: #9E7D75;
+    --accent: #E66826;
+    --secondary-accent: #882E47;
+    --border-2: #DEC0AC;
+    --audio-swell: 0;
   }
-  .preview-stage { width: 320px; height: 320px; }
-}
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0; padding: 0;
+    color: var(--text-dark);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    font-size: 17px;
+    line-height: 1.7;
+    background-color: var(--bg-base);
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* ============================================================
+     AMBIENT BACKGROUND — LAYER 1 (DIFFUSE MESH)
+     Copied from main.css. The --audio-swell value is pinned to 0
+     above, so all calc() expressions resolve to their resting
+     values (mesh opacity 0.60, orb scale 1).
+     ============================================================ */
+  .ambient-stage {
+    position: fixed;
+    top: -25%;
+    left: -120px;
+    width: calc(100% + 240px);
+    height: 150%;
+    z-index: -3;
+    pointer-events: none;
+    will-change: transform;
+    transform: translate3d(var(--wind-x, 0px), 0, 0);
+  }
+  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
+
+  .layer-diffuse { will-change: transform; }
+  .layer-diffuse .ambient-mesh { opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important; }
+  .layer-diffuse .orb-1 { scale: calc(1 + var(--audio-swell, 0) * 0.53); }
+  .layer-diffuse .orb-2 { scale: calc(1 + var(--audio-swell, 0) * 0.61); }
+  .layer-diffuse .orb-3 { scale: calc(1 + var(--audio-swell, 0) * 0.48); }
+
+  .ambient-mesh {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.90;
+  }
+
+  .light-orb { position: absolute; border-radius: 50%; pointer-events: none; will-change: transform; }
+
+  .orb-1 {
+    width: 70vw; height: 70vw;
+    max-width: 900px; max-height: 900px;
+    top: 10%; left: 15%;
+    background: radial-gradient(circle closest-side,
+      rgba(230, 104, 38, 0.46) 0%,
+      rgba(230, 104, 38, 0.36) 25%,
+      rgba(255, 162, 89, 0.20) 50%,
+      rgba(255, 162, 89, 0.08) 70%,
+      rgba(255, 162, 89, 0.02) 85%,
+      rgba(255, 162, 89, 0) 100%);
+    animation: orbDrift1 11.58s ease-in-out infinite alternate;
+  }
+  .orb-2 {
+    width: 80vw; height: 80vw;
+    max-width: 1050px; max-height: 1050px;
+    top: 35%; right: 5%;
+    background: radial-gradient(circle closest-side,
+      rgba(136, 46, 71, 0.40) 0%,
+      rgba(136, 46, 71, 0.30) 25%,
+      rgba(230, 104, 38, 0.16) 50%,
+      rgba(230, 104, 38, 0.06) 70%,
+      rgba(230, 104, 38, 0.015) 85%,
+      rgba(230, 104, 38, 0) 100%);
+    animation: orbDrift2 15.26s ease-in-out infinite alternate;
+  }
+  .orb-3 {
+    width: 55vw; height: 55vw;
+    max-width: 700px; max-height: 700px;
+    bottom: 10%; left: 30%;
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 0.42) 0%,
+      rgba(255, 162, 89, 0.30) 25%,
+      rgba(136, 46, 71, 0.14) 50%,
+      rgba(136, 46, 71, 0.05) 70%,
+      rgba(136, 46, 71, 0.01) 85%,
+      rgba(136, 46, 71, 0) 100%);
+    animation: orbDrift3 10.00s ease-in-out infinite alternate;
+  }
+
+  /* ---------- AMBIENT-PRIMARY (autumn wash) ---------- */
+  .ambient-primary {
+    background:
+      radial-gradient(circle at 28% 35%, var(--amb-1, transparent) 0%, transparent 42%),
+      radial-gradient(circle at 72% 55%, var(--amb-2, transparent) 0%, transparent 48%),
+      radial-gradient(circle at 50% 85%, var(--amb-3, transparent) 0%, transparent 38%),
+      radial-gradient(circle at 15% 70%, var(--amb-4, transparent) 0%, transparent 42%);
+    animation: ambientDrift 32s ease-in-out infinite;
+    will-change: transform;
+  }
+  html[data-theme="autumn"] .ambient-primary {
+    background:
+      radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.22) 28%, rgba(230, 104, 38, 0.06) 52%, rgba(230, 104, 38, 0) 74%),
+      radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.16) 28%, rgba(136, 46, 71, 0.04) 52%, rgba(136, 46, 71, 0) 74%),
+      radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, rgba(255, 162, 89, 0.16) 26%, rgba(255, 162, 89, 0.03) 50%, rgba(255, 162, 89, 0) 72%);
+    animation: autumnDrift1 14s ease-in-out infinite;
+  }
+
+  @keyframes orbDrift1 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
+    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
+  }
+  @keyframes orbDrift2 {
+    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
+    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
+  }
+  @keyframes orbDrift3 {
+    0%   { transform: translate3d(0, 0, 0) scale(1); }
+    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
+    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
+  }
+  @keyframes ambientDrift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    20% { transform: translate(4%, -3%) scale(1.08); }
+    45% { transform: translate(-3%, 4%) scale(1.12); }
+    70% { transform: translate(3%, 3%) scale(1.05); }
+    85% { transform: translate(-2%, -2%) scale(1.1); }
+  }
+  @keyframes autumnDrift1 {
+    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+    11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
+    23%  { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
+    35%  { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
+    48%  { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
+    60%  { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
+    72%  { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
+    85%  { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
+    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
+  }
+
+  /* ============================================================
+     AMBIENT BACKGROUND — LAYER 2 (MIRRORED SHIPPŌ)
+     Masked copy of the mesh. At rest opacity 0.20. Both mask and
+     orbs are identical to production.
+     ============================================================ */
+  .shippo-mask-window {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    overflow: hidden;
+    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    -webkit-mask-repeat: repeat;
+    -webkit-mask-size: 60px 60px;
+    -webkit-mask-position: 0 0;
+    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+    mask-repeat: repeat;
+    mask-size: 60px 60px;
+    mask-position: 0 0;
+    opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
+  }
+  .shippo-mask-window .ambient-stage.layer-mirrored {
+    position: absolute;
+    top: -25%; left: -25%;
+    width: 150%; height: 150%;
+    transform-origin: 50% 50%;
+    transform: scaleX(-1);
+    pointer-events: none;
+  }
+  .shippo-mask-window .ambient-mesh {
+    opacity: 1.0 !important;
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
+    transform-origin: 50% 50%;
+  }
+  html[data-theme="autumn"] .shippo-mask-window .orb-1 {
+    background: radial-gradient(circle closest-side,
+      rgba(230, 104, 38, 0.80) 0%, rgba(230, 104, 38, 0.62) 25%,
+      rgba(255, 162, 89, 0.32) 50%, rgba(255, 162, 89, 0.12) 72%,
+      rgba(255, 162, 89, 0.025) 88%, rgba(255, 162, 89, 0) 100%) !important;
+  }
+  html[data-theme="autumn"] .shippo-mask-window .orb-2 {
+    background: radial-gradient(circle closest-side,
+      rgba(136, 46, 71, 0.70) 0%, rgba(136, 46, 71, 0.52) 25%,
+      rgba(230, 104, 38, 0.24) 50%, rgba(230, 104, 38, 0.08) 72%,
+      rgba(230, 104, 38, 0.015) 88%, rgba(230, 104, 38, 0) 100%) !important;
+  }
+  html[data-theme="autumn"] .shippo-mask-window .orb-3 {
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 0.75) 0%, rgba(255, 162, 89, 0.56) 25%,
+      rgba(136, 46, 71, 0.20) 50%, rgba(136, 46, 71, 0.07) 72%,
+      rgba(136, 46, 71, 0.015) 88%, rgba(136, 46, 71, 0) 100%) !important;
+  }
+
+  /* ============================================================
+     AMBIENT BACKGROUND — SHIPPŌ MOSAIC
+     Fixed 60×60 tile at opacity 0.08. The pond variant is omitted
+     since the demo has no blossom screen to trigger the cross-fade.
+     ============================================================ */
+  .ambient-mosaic {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -2;
+    background-repeat: repeat;
+    background-size: 60px 60px;
+    background-position: 0 0;
+    opacity: 0.08;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%23E66826'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
+  }
+
+  /* ============================================================
+     DEMO CHROME
+     ============================================================ */
+  body { padding: 40px 20px 80px 20px; }
+
+  .demo-header {
+    max-width: 640px;
+    margin: 0 auto 44px auto;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+  }
+  .demo-header h1 {
+    font-size: 22px; font-weight: 600;
+    color: var(--secondary-accent);
+    letter-spacing: 3px; margin: 0 0 14px 0;
+  }
+  .demo-header p {
+    font-size: 14px; color: var(--text-mute);
+    line-height: 1.9; margin: 0; letter-spacing: 0.5px;
+  }
+  .demo-header .current-note {
+    display: inline-block;
+    margin-top: 18px; padding: 5px 14px;
+    background: rgba(136, 46, 71, 0.12);
+    color: var(--secondary-accent);
+    border-radius: 14px;
+    font-size: 12px; letter-spacing: 1.5px; font-weight: 500;
+  }
+
+  /* ---------- VARIANT CARD ---------- */
+  .variant {
+    width: 100%;
+    max-width: 544px;
+    margin: 0 auto 56px auto;
+    padding: 26px 32px 32px 32px;
+    background: rgba(255, 253, 249, 0.72);
+    border: 1px solid rgba(222, 192, 172, 0.55);
+    border-radius: 18px;
+  }
+  .variant.is-current {
+    background: rgba(255, 253, 249, 0.94);
+    border-color: var(--secondary-accent);
+  }
+
+  .variant-meta {
+    display: flex; justify-content: space-between;
+    align-items: baseline; gap: 12px;
+    margin-bottom: 22px; padding-bottom: 14px;
+    border-bottom: 1px solid rgba(222, 192, 172, 0.45);
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    flex-wrap: wrap;
+  }
+  .variant-label {
+    font-size: 14px; font-weight: 700;
+    color: var(--secondary-accent);
+    letter-spacing: 2px;
+  }
+  .variant-label .current-tag {
+    display: inline-block; margin-left: 10px;
+    padding: 2px 9px;
+    background: rgba(230, 104, 38, 0.16);
+    color: var(--accent);
+    border-radius: 10px;
+    font-size: 10.5px; font-weight: 600;
+    letter-spacing: 1.5px; vertical-align: 2px;
+  }
+  .variant-values {
+    font-size: 12px; color: var(--text-mute);
+    font-family: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+    letter-spacing: 0.3px;
+  }
+  .variant-values .sep { color: #BEA29B; margin: 0 8px; }
+
+  /* ---------- PANEL CONTENT (matches production base styles) ---------- */
+  .panel-content {
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--text-dark);
+    letter-spacing: 0.8px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
+    word-break: auto-phrase;
+    overflow-wrap: break-word;
+    line-break: strict;
+  }
+  .panel-content p { margin: 0; padding: 0; }
+  .panel-content p:last-child { margin-bottom: 0 !important; }
+
+  .variant-a .panel-content { line-height: 2.25; }
+  .variant-a .panel-content p { margin-bottom: 0.40em; }
+
+  .variant-b .panel-content { line-height: 2.10; }
+  .variant-b .panel-content p { margin-bottom: 0.55em; }
+
+  .variant-c .panel-content { line-height: 1.95; }
+  .variant-c .panel-content p { margin-bottom: 0.75em; }
+
+  .variant-d .panel-content { line-height: 1.85; }
+  .variant-d .panel-content p { margin-bottom: 0.95em; }
+
+  .variant-e .panel-content { line-height: 1.75; }
+  .variant-e .panel-content p { margin-bottom: 1.15em; }
+
+  .demo-footer {
+    max-width: 640px;
+    margin: 24px auto 0 auto;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 13px; color: var(--text-faint);
+    letter-spacing: 1px; line-height: 2;
+  }
+  .demo-footer code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; color: var(--text-mute);
+    background: rgba(222, 192, 172, 0.35);
+    padding: 1px 6px; border-radius: 4px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .light-orb, .ambient-primary { animation: none !important; }
+  }
+
+  @media (max-width: 600px) {
+    body { padding: 24px 12px 56px 12px; }
+    .variant { padding: 20px 20px 24px 20px; margin-bottom: 36px; }
+    .panel-content { font-size: 17px; }
+    .variant-meta { flex-direction: column; align-items: flex-start; gap: 6px; }
+    .demo-header h1 { font-size: 19px; letter-spacing: 2px; }
+  }
 </style>
 </head>
-<body class="glow-playground">
+<body>
 
-<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+<!-- ============ AMBIENT BACKGROUND STACK (Layer 1 + Layer 2 + Mosaic) ============ -->
+<div class="ambient-stage layer-diffuse" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
     <div class="light-orb orb-3"></div>
   </div>
   <div class="ambient-layer ambient-primary"></div>
-  <div class="mote-field" id="moteField"></div>
 </div>
 
-<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+<div class="shippo-mask-window" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
       <div class="light-orb orb-1"></div>
@@ -323,619 +386,92 @@ input[type="range"]::-moz-range-thumb {
 </div>
 
 <div class="ambient-mosaic" aria-hidden="true"></div>
-<div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<div class="playground">
-
-  <aside class="controls">
-    <header>
-      <h1>Start Button Glow</h1>
-      <p>
-        リングは <code>r=90px</code>、線幅 <code>6px</code>（外周 <code>r=93px</code>）。
-        グローは <code>radial-gradient</code> 一枚、<code>circle closest-side</code>。
-        リップルはグローのピークに合わせて発火します。
-      </p>
-    </header>
-
-    <!-- =================================================== -->
-    <!-- GLOW SHAPE -->
-    <!-- =================================================== -->
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Inner edge</span>
-        <span class="control-value" id="v-inner">82 px</span>
-      </div>
-      <input type="range" id="r-inner" min="50" max="92" step="1" value="82">
-      <div class="control-hint">Radius where the glow starts rising from zero.</div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Peak</span>
-        <span class="control-value" id="v-peak">91 px</span>
-      </div>
-      <input type="range" id="r-peak" min="87" max="110" step="1" value="91">
-      <div class="control-hint">Radius of maximum brightness. Ring outer edge is 93px.</div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Outer edge</span>
-        <span class="control-value" id="v-outer">127 px</span>
-      </div>
-      <input type="range" id="r-outer" min="94" max="160" step="1" value="127">
-      <div class="control-hint">Radius where the glow fades to zero. Div's half-extent.</div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Peak alpha</span>
-        <span class="control-value" id="v-alpha">1.00</span>
-      </div>
-      <input type="range" id="r-alpha" min="0.05" max="1.00" step="0.01" value="1.00">
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Colour</span>
-        <span class="control-value" id="v-colour">#ffffff</span>
-      </div>
-      <div class="colour-buttons">
-        <button class="colour-btn selected" data-colour="255, 255, 255" style="background:#ffffff" title="Pure white"></button>
-        <button class="colour-btn" data-colour="255, 253, 249" style="background:#FFFDF9" title="Silk white"></button>
-        <button class="colour-btn" data-colour="255, 250, 240" style="background:#fffaf0" title="Warm cream"></button>
-        <button class="colour-btn" data-colour="255, 240, 220" style="background:#fff0dc" title="Warm off-white"></button>
-      </div>
-      <div class="colour-custom">
-        <label for="r-colour">Custom</label>
-        <input type="color" id="r-colour" value="#ffffff">
-      </div>
-    </div>
-
-    <div class="control-group">
-      <span class="control-label">Presets</span>
-      <div class="preset-row">
-        <button class="preset-btn" data-preset="tight">Tight 4px</button>
-        <button class="preset-btn" data-preset="rim">Rim 8px</button>
-        <button class="preset-btn" data-preset="soft">Soft 14px</button>
-        <button class="preset-btn" data-preset="wide">Wide 25px</button>
-      </div>
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- =================================================== -->
-    <!-- GLOW BREATH -->
-    <!-- =================================================== -->
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Breath duration</span>
-        <span class="control-value" id="v-duration">5.0 s</span>
-      </div>
-      <input type="range" id="r-duration" min="2" max="20" step="0.5" value="5">
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Breath floor</span>
-        <span class="control-value" id="v-floor">0.00</span>
-      </div>
-      <input type="range" id="r-floor" min="0" max="1" step="0.01" value="0.00">
-      <div class="control-hint">Opacity at the dim end of the breath. 1.00 = no breath.</div>
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- =================================================== -->
-    <!-- RIPPLE CASCADE -->
-    <!-- =================================================== -->
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Peaks per cascade</span>
-        <span class="control-value" id="v-peaks">2</span>
-      </div>
-      <input type="range" id="r-peaks" min="1" max="6" step="1" value="2">
-      <div class="control-hint">
-        Number of glow peaks between cascades. 1 = cascade at every peak.
-        The ripple cycle is set to <code>breath × N</code> so the next cascade
-        also lands on a peak.
-      </div>
-      <div class="align-warning" id="alignWarning"></div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Cascade offset</span>
-        <span class="control-value" id="v-offset">0.00 s</span>
-      </div>
-      <input type="range" id="r-offset" min="-2" max="2" step="0.05" value="0">
-      <div class="control-hint">
-        Nudge the cascade start relative to the glow peak. Negative = earlier,
-        positive = later.
-      </div>
-    </div>
-
-    <div class="control-group">
-      <div class="control-row">
-        <span class="control-label">Cascade span</span>
-        <span class="control-value" id="v-span">100 %</span>
-      </div>
-      <input type="range" id="r-span" min="30" max="100" step="1" value="100">
-      <div class="control-hint">
-        Percentage of the cycle used to space the three rings. 100% = rings evenly
-        distributed across the whole cycle (default, ring-3 overlaps next cascade's
-        ring-1). 60% = tight cluster at the peak.
-      </div>
-    </div>
-
-    <div class="section-divider"></div>
-
-    <!-- =================================================== -->
-    <!-- PREVIEW -->
-    <!-- =================================================== -->
-
-    <div class="control-group">
-      <span class="control-label">Preview</span>
-      <div class="toggles">
-        <label class="toggle-row"><input type="checkbox" id="t-koi" checked> Show koi</label>
-        <label class="toggle-row"><input type="checkbox" id="t-pulse" checked> Show pulse rings</label>
-      </div>
-    </div>
-
-    <div class="css-block">
-      <h2>Result CSS</h2>
-      <pre id="cssOut"></pre>
-      <button class="copy-btn" id="copyBtn">Copy to clipboard</button>
-    </div>
-
-  </aside>
-
-  <main class="preview" id="preview">
-
-    <div class="preview-stage">
-      <button type="button" class="start-btn" aria-label="プレビュー">
-        <div class="icon-wrapper">
-          <div class="soft-glow" id="softGlow"></div>
-          <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" id="ringA" />
-            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" id="ringB" />
-            <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" id="ringC" />
-            <circle cx="180" cy="180" r="90" class="gold-glow" />
-            <circle cx="180" cy="180" r="90" class="gold-band" />
-          </svg>
-          <div class="koi-dive-wrap">
-            <div class="blossom-char">
-              <div class="koi-shadow" aria-hidden="true"></div>
-              <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
-            </div>
-          </div>
-        </div>
-      </button>
-    </div>
-
-    <div class="preview-readout" id="readout"></div>
-
-    <div class="ring-note">
-      ring centreline <code>r=90</code><br>
-      ring outer edge <code>r=93</code>
-    </div>
-
-  </main>
-
+<!-- ============ DEMO CONTENT ============ -->
+<div class="demo-header">
+  <h1>行間・段落間の最終確認</h1>
+  <p>
+    同じ参照テキストを、<strong>行間（line-height）</strong>と
+    <strong>段落間の余白（段落の margin-bottom）</strong>の異なる組み合わせで並べています。<br>
+    本番と同じ背景・同じパネルタイポグラフィで比較できます。
+  </p>
+  <div class="current-note">A = 現在の本番設定</div>
 </div>
 
-<script>
-(function() {
-  'use strict';
+<div class="variant variant-a is-current">
+  <div class="variant-meta">
+    <span class="variant-label">A<span class="current-tag">現状</span></span>
+    <span class="variant-values">line-height: 2.25<span class="sep">·</span>paragraph: 0.40em</span>
+  </div>
+  <div class="panel-content">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
+  </div>
+</div>
 
-  var P = {
-    inner: 82,
-    peak: 91,
-    outer: 127,
-    alpha: 1.00,
-    duration: 5,
-    floor: 0.00,
-    colour: '255, 255, 255',
-    peaksPerCascade: 2,
-    cascadeOffset: 0,
-    cascadeSpan: 100
-  };
+<div class="variant variant-b">
+  <div class="variant-meta">
+    <span class="variant-label">B</span>
+    <span class="variant-values">line-height: 2.10<span class="sep">·</span>paragraph: 0.55em</span>
+  </div>
+  <div class="panel-content">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
+  </div>
+</div>
 
-  var glowEl     = document.getElementById('softGlow');
-  var previewEl  = document.getElementById('preview');
-  var cssOut     = document.getElementById('cssOut');
-  var readout    = document.getElementById('readout');
-  var copyBtn    = document.getElementById('copyBtn');
-  var warnEl     = document.getElementById('alignWarning');
-  var ringA      = document.getElementById('ringA');
-  var ringB      = document.getElementById('ringB');
-  var ringC      = document.getElementById('ringC');
+<div class="variant variant-c">
+  <div class="variant-meta">
+    <span class="variant-label">C</span>
+    <span class="variant-values">line-height: 1.95<span class="sep">·</span>paragraph: 0.75em</span>
+  </div>
+  <div class="panel-content">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
+  </div>
+</div>
 
-  /* ------------------------------------------------------------
-     Gradient builder
-     ------------------------------------------------------------ */
-  function buildGradient() {
-    var innerPct = P.inner / P.outer * 100;
-    var peakPct  = P.peak  / P.outer * 100;
+<div class="variant variant-d">
+  <div class="variant-meta">
+    <span class="variant-label">D</span>
+    <span class="variant-values">line-height: 1.85<span class="sep">·</span>paragraph: 0.95em</span>
+  </div>
+  <div class="panel-content">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
+  </div>
+</div>
 
-    function riseAt(t) { return innerPct + (peakPct - innerPct) * t; }
-    function fallAt(t) { return peakPct + (100 - peakPct) * t; }
+<div class="variant variant-e">
+  <div class="variant-meta">
+    <span class="variant-label">E</span>
+    <span class="variant-values">line-height: 1.75<span class="sep">·</span>paragraph: 1.15em</span>
+  </div>
+  <div class="panel-content">
+    <p>それでは、本日の癒しのオプションをご覧ください。</p>
+    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+    <p>ありがとうございます。</p>
+  </div>
+</div>
 
-    var c = P.colour;
-    var a = P.alpha;
-
-    function rgba(mult) {
-      return 'rgba(' + c + ',' + (a * mult).toFixed(3) + ')';
-    }
-
-    var stops = [
-      ['transparent',                    0],
-      [rgba(0),                          innerPct],
-      [rgba(0.08),                       riseAt(0.35)],
-      [rgba(0.28),                       riseAt(0.65)],
-      [rgba(0.58),                       riseAt(0.87)],
-      [rgba(1.00),                       peakPct],
-      [rgba(0.58),                       fallAt(0.18)],
-      [rgba(0.30),                       fallAt(0.40)],
-      [rgba(0.14),                       fallAt(0.65)],
-      [rgba(0.05),                       fallAt(0.85)],
-      ['rgba(' + c + ',0)',              100]
-    ];
-
-    var parts = stops.map(function(s) {
-      return s[0] + ' ' + s[1].toFixed(2) + '%';
-    });
-
-    return 'radial-gradient(circle closest-side, ' + parts.join(', ') + ')';
-  }
-
-  /* ------------------------------------------------------------
-     Ripple timing — derived from glow breath.
-
-     Glow peaks at t = duration / 2 within each cycle.
-     Ripple cycle = duration × peaksPerCascade. That's the whole
-     reason peaksPerCascade exists as an integer: it guarantees the
-     next cascade lands on the next peak, no drift.
-     ------------------------------------------------------------ */
-  function rippleTiming() {
-    var glowPeak = P.duration / 2;
-    var cycle    = P.duration * P.peaksPerCascade;
-
-    /* Span as a fraction of the cycle determines how tightly the
-       three rings cluster around the start. */
-    var span = cycle * (P.cascadeSpan / 100);
-    var spacing = span / 3;
-
-    /* Ripple-1 fires at the glow peak, nudged by cascadeOffset. */
-    var r1 = glowPeak + P.cascadeOffset;
-
-    /* Wrap into [0, cycle) so animation-delay is meaningful. */
-    r1 = ((r1 % cycle) + cycle) % cycle;
-
-    return {
-      cycle: cycle,
-      glowPeak: glowPeak,
-      r1: r1,
-      r2: r1 + spacing,
-      r3: r1 + spacing * 2,
-      spacing: spacing,
-      span: span
-    };
-  }
-
-  /* ------------------------------------------------------------
-     Apply state
-     ------------------------------------------------------------ */
-  function applyState() {
-    var size = P.outer * 2;
-
-    glowEl.style.width  = size + 'px';
-    glowEl.style.height = size + 'px';
-    glowEl.style.marginTop  = (-P.outer) + 'px';
-    glowEl.style.marginLeft = (-P.outer) + 'px';
-    glowEl.style.background = buildGradient();
-    glowEl.style.animation  =
-      'glowBreath ' + P.duration + 's ease-in-out infinite';
-
-    previewEl.style.setProperty('--breath-floor', P.floor);
-
-    var t = rippleTiming();
-
-    /* Pausing and restarting the animation on each change gives
-       immediate visual feedback that the delays have moved —
-       otherwise the circles carry on with their old phase until
-       the current cycle ends. */
-    var ringAnim = 'ringPulse ' + t.cycle + 's linear infinite';
-    [ [ringA, t.r1], [ringB, t.r2], [ringC, t.r3] ].forEach(function(pair) {
-      var el = pair[0], delay = pair[1];
-      if (!el) return;
-      el.style.animation = 'none';
-      /* Force reflow so the next assignment re-starts the animation. */
-      void el.getBoundingClientRect();
-      el.style.animation = ringAnim;
-      el.style.animationDelay = delay.toFixed(3) + 's';
-    });
-  }
-
-  /* ------------------------------------------------------------
-     CSS output
-     ------------------------------------------------------------ */
-  function buildCSSOutput() {
-    var size = P.outer * 2;
-    var innerPct = P.inner / P.outer * 100;
-    var peakPct  = P.peak  / P.outer * 100;
-
-    function riseAt(t) { return innerPct + (peakPct - innerPct) * t; }
-    function fallAt(t) { return peakPct + (100 - peakPct) * t; }
-
-    var c = P.colour;
-    var a = P.alpha;
-    function rgba(mult) {
-      return 'rgba(' + c + ',' + (a * mult).toFixed(3) + ')';
-    }
-    function pct(v) { return v.toFixed(2) + '%'; }
-
-    var t = rippleTiming();
-
-    var lines = [
-      '/* rim light + ripple cascade — copy into main.css.',
-      '   Replaces .gold-halo, .gold-glow and their four keyframes.',
-      '   .gold-band and its keyframes stay as they are. */',
-      '',
-      '.soft-glow {',
-      '  position: absolute;',
-      '  top: 50%;',
-      '  left: 50%;',
-      '  width: ' + size + 'px;',
-      '  height: ' + size + 'px;',
-      '  margin-top: ' + (-P.outer) + 'px;',
-      '  margin-left: ' + (-P.outer) + 'px;',
-      '  border-radius: 50%;',
-      '  pointer-events: none;',
-      '  z-index: 0;',
-      '  will-change: opacity;',
-      '  background: radial-gradient(circle closest-side,',
-      '    transparent 0%,',
-      '    rgba(' + c + ',0) ' + pct(innerPct) + ',',
-      '    ' + rgba(0.08) + ' ' + pct(riseAt(0.35)) + ',',
-      '    ' + rgba(0.28) + ' ' + pct(riseAt(0.65)) + ',',
-      '    ' + rgba(0.58) + ' ' + pct(riseAt(0.87)) + ',',
-      '    ' + rgba(1.00) + ' ' + pct(peakPct) + ',',
-      '    ' + rgba(0.58) + ' ' + pct(fallAt(0.18)) + ',',
-      '    ' + rgba(0.30) + ' ' + pct(fallAt(0.40)) + ',',
-      '    ' + rgba(0.14) + ' ' + pct(fallAt(0.65)) + ',',
-      '    ' + rgba(0.05) + ' ' + pct(fallAt(0.85)) + ',',
-      '    rgba(' + c + ',0) 100%',
-      '  );',
-      '  animation: glowBreath ' + P.duration + 's ease-in-out infinite;',
-      '}',
-      '',
-      '@keyframes glowBreath {',
-      '  0%, 100% { opacity: ' + P.floor.toFixed(2) + '; }',
-      '  50%      { opacity: 1.00; }',
-      '}',
-      '',
-      '/* Ripple cascade — peak-aligned to the glow breath.',
-      '   Glow peaks at ' + t.glowPeak.toFixed(2) + 's within each ' + P.duration + 's cycle.',
-      '   Cycle = ' + P.duration + 's × ' + P.peaksPerCascade + ' = ' + t.cycle.toFixed(1) + 's.',
-      '   Cascade offset ' + (P.cascadeOffset >= 0 ? '+' : '') + P.cascadeOffset.toFixed(2) + 's; span ' + P.cascadeSpan + '%. */',
-      '.pulse-ring {',
-      '  animation: ringPulse ' + t.cycle.toFixed(2) + 's linear infinite;',
-      '}',
-      '.ripple-1 { animation-delay: ' + t.r1.toFixed(3) + 's; }',
-      '.ripple-2 { animation-delay: ' + t.r2.toFixed(3) + 's; }',
-      '.ripple-3 { animation-delay: ' + t.r3.toFixed(3) + 's; }'
-    ];
-
-    return lines.join('\n');
-  }
-
-  /* ------------------------------------------------------------
-     Readout
-     ------------------------------------------------------------ */
-  function updateReadout() {
-    var t = rippleTiming();
-    readout.innerHTML =
-      'inner <strong>' + P.inner + '</strong> · ' +
-      'peak <strong>' + P.peak + '</strong> · ' +
-      'outer <strong>' + P.outer + '</strong> · ' +
-      'peek <strong>' + (P.outer - 93) + 'px</strong><br>' +
-      'glow peak <strong>' + t.glowPeak.toFixed(2) + 's</strong> · ' +
-      'cycle <strong>' + t.cycle.toFixed(1) + 's</strong> · ' +
-      'spacing <strong>' + t.spacing.toFixed(2) + 's</strong><br>' +
-      'rings @ <strong>' + t.r1.toFixed(2) + '</strong> / ' +
-      '<strong>' + t.r2.toFixed(2) + '</strong> / ' +
-      '<strong>' + t.r3.toFixed(2) + '</strong> s';
-  }
-
-  /* ------------------------------------------------------------
-     Render
-     ------------------------------------------------------------ */
-  function render() {
-    if (P.inner > P.peak - 2) P.inner = P.peak - 2;
-    if (P.peak > P.outer - 2) P.outer = P.peak + 2;
-    if (P.outer < 94) P.outer = 94;
-
-    updateAlignWarning();
-    applyState();
-    updateReadout();
-    cssOut.textContent = buildCSSOutput();
-    syncInputs();
-  }
-
-  function updateAlignWarning() {
-    if (!warnEl) return;
-    /* peaksPerCascade is an integer by construction, so alignment
-       always holds. The warning is reserved for future fractional
-       cycles; kept as a visible element to make the invariant
-       explicit in the UI. */
-    warnEl.classList.remove('visible');
-    warnEl.textContent = '';
-  }
-
-  function syncInputs() {
-    setSlider('r-inner', P.inner, 'v-inner', function(v) { return v + ' px'; });
-    setSlider('r-peak',  P.peak,  'v-peak',  function(v) { return v + ' px'; });
-    setSlider('r-outer', P.outer, 'v-outer', function(v) { return v + ' px'; });
-    setSlider('r-alpha', P.alpha, 'v-alpha', function(v) { return v.toFixed(2); });
-    setSlider('r-duration', P.duration, 'v-duration', function(v) { return v.toFixed(1) + ' s'; });
-    setSlider('r-floor', P.floor, 'v-floor', function(v) { return v.toFixed(2); });
-    setSlider('r-peaks', P.peaksPerCascade, 'v-peaks', function(v) { return String(v); });
-    setSlider('r-offset', P.cascadeOffset, 'v-offset', function(v) { return v.toFixed(2) + ' s'; });
-    setSlider('r-span', P.cascadeSpan, 'v-span', function(v) { return v + ' %'; });
-  }
-
-  function setSlider(id, value, valId, fmt) {
-    var el = document.getElementById(id);
-    var val = document.getElementById(valId);
-    if (el && parseFloat(el.value) !== value) el.value = value;
-    if (val) val.textContent = fmt(value);
-  }
-
-  /* ------------------------------------------------------------
-     Bindings
-     ------------------------------------------------------------ */
-  bindRange('r-inner',    function(v) { P.inner = v; });
-  bindRange('r-peak',     function(v) { P.peak = v; });
-  bindRange('r-outer',    function(v) { P.outer = v; });
-  bindRange('r-alpha',    function(v) { P.alpha = v; });
-  bindRange('r-duration', function(v) { P.duration = v; });
-  bindRange('r-floor',    function(v) { P.floor = v; });
-  bindRange('r-peaks',    function(v) { P.peaksPerCascade = v; });
-  bindRange('r-offset',   function(v) { P.cascadeOffset = v; });
-  bindRange('r-span',     function(v) { P.cascadeSpan = v; });
-
-  function bindRange(id, assign) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('input', function() {
-      assign(parseFloat(el.value));
-      render();
-    });
-  }
-
-  /* Colour */
-  var colourBtns = document.querySelectorAll('.colour-btn');
-  for (var i = 0; i < colourBtns.length; i++) {
-    (function(btn) {
-      btn.addEventListener('click', function() {
-        var c = btn.getAttribute('data-colour');
-        P.colour = c;
-        var hex = rgbToHex(c);
-        var colInput = document.getElementById('r-colour');
-        if (colInput) colInput.value = hex;
-        document.getElementById('v-colour').textContent = hex;
-        for (var k = 0; k < colourBtns.length; k++) {
-          colourBtns[k].classList.toggle('selected', colourBtns[k] === btn);
-        }
-        render();
-      });
-    })(colourBtns[i]);
-  }
-
-  var colourInput = document.getElementById('r-colour');
-  if (colourInput) {
-    colourInput.addEventListener('input', function() {
-      P.colour = hexToRgb(colourInput.value);
-      document.getElementById('v-colour').textContent = colourInput.value;
-      for (var k = 0; k < colourBtns.length; k++) {
-        colourBtns[k].classList.remove('selected');
-      }
-      render();
-    });
-  }
-
-  function hexToRgb(hex) {
-    hex = hex.replace('#', '');
-    if (hex.length === 3) {
-      hex = hex.split('').map(function(c) { return c + c; }).join('');
-    }
-    var n = parseInt(hex, 16);
-    return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255);
-  }
-
-  function rgbToHex(rgb) {
-    var parts = rgb.split(',').map(function(s) { return parseInt(s.trim(), 10); });
-    function h(n) { return ('0' + n.toString(16)).slice(-2); }
-    return '#' + h(parts[0]) + h(parts[1]) + h(parts[2]);
-  }
-
-  /* Presets — shape only, ripple params untouched */
-  var PRESETS = {
-    tight: { inner: 87, peak: 93, outer: 97,  alpha: 1.00 },
-    rim:   { inner: 82, peak: 91, outer: 127, alpha: 1.00 },
-    soft:  { inner: 80, peak: 92, outer: 140, alpha: 0.85 },
-    wide:  { inner: 72, peak: 94, outer: 160, alpha: 0.75 }
-  };
-
-  var presetBtns = document.querySelectorAll('.preset-btn');
-  for (var p = 0; p < presetBtns.length; p++) {
-    (function(btn) {
-      btn.addEventListener('click', function() {
-        var key = btn.getAttribute('data-preset');
-        var cfg = PRESETS[key];
-        if (!cfg) return;
-        P.inner = cfg.inner;
-        P.peak  = cfg.peak;
-        P.outer = cfg.outer;
-        P.alpha = cfg.alpha;
-        render();
-      });
-    })(presetBtns[p]);
-  }
-
-  /* Toggles */
-  var koiToggle = document.getElementById('t-koi');
-  if (koiToggle) {
-    koiToggle.addEventListener('change', function() {
-      previewEl.classList.toggle('no-koi', !koiToggle.checked);
-    });
-  }
-
-  var pulseToggle = document.getElementById('t-pulse');
-  if (pulseToggle) {
-    pulseToggle.addEventListener('change', function() {
-      previewEl.classList.toggle('no-pulse', !pulseToggle.checked);
-    });
-  }
-
-  /* Copy */
-  if (copyBtn) {
-    copyBtn.addEventListener('click', function() {
-      var text = cssOut.textContent || '';
-      var done = function() {
-        copyBtn.classList.add('copied');
-        copyBtn.textContent = 'Copied';
-        setTimeout(function() {
-          copyBtn.classList.remove('copied');
-          copyBtn.textContent = 'Copy to clipboard';
-        }, 1600);
-      };
-      var fallback = function() {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.position = 'fixed';
-        ta.style.left = '-9999px';
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand('copy'); } catch (e) {}
-        document.body.removeChild(ta);
-        done();
-      };
-      if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(done).catch(fallback);
-      } else {
-        fallback();
-      }
-    });
-  }
-
-  render();
-})();
-</script>
+<div class="demo-footer">
+  行間は <code>.panel-content</code> の <code>line-height</code>、<br>
+  段落間は <code>.panel-content p</code> の <code>margin-bottom</code> に対応します。
+</div>
 
 </body>
 </html>
