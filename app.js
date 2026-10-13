@@ -3,6 +3,43 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (front-layer falling leaves)
+       - A second overlay, .maple-leaves-overlay-front (z-index 5),
+         receives 2 randomly-chosen mid/near leaves at each carousel
+         activation so the panel prose reads as nestled among the
+         foliage. The back overlay (z-index -1) keeps the remaining
+         10 mid/near leaves and all 6 far-plane leaves.
+       - distributeFrontLeaves() runs at the moment
+         triggerKoiStart() adds .active to #mapleLeaves. It returns
+         any leaves previously promoted to the front (so re-entry
+         re-rolls cleanly), collects the mid+near pool from the
+         back overlay, and Fisher-Yates-partial-shuffles two of
+         them into the front.
+       - Far-plane leaves are deliberately excluded from the pool —
+         the depth-of-field layer always stays behind the text.
+         Blur never appears in front of the prose.
+       - Front-promoted leaves read at higher opacity so the text
+         behind them visibly disappears during a crossing rather
+         than tinting through. The scoped override lives in
+         main.css:
+             .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; }
+             .maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
+         Back-plane siblings keep their 0.32 / 0.44. The drift
+         keyframes read var(--leaf-opacity, 0.32) at their peak
+         stops, so the new values are inherited automatically — no
+         keyframe changes required.
+       - The front overlay's .active class mirrors the back
+         overlay's at the two existing call sites — triggerKoiStart()
+         and returnToStartScreen(). Return-to-start does not return
+         the promoted leaves to the back; the next activation's
+         distributeFrontLeaves() call handles that as its first
+         step, so the cleanup lives in one place rather than
+         spread across exit and entry.
+       - z-index 5 was chosen to sit above panel content (default
+         auto / 0) but below every interactive control: theme toggle
+         (10), global hint (9), dots (10), HUD (40), summary (50),
+         numpad (120), every modal (100+), receipt (300),
+         thank-you (350). No leaf ever covers a tappable element.
      v1.3 (phrase-aware text reveal via Intl.Segmenter)
        - chunkPanelText() rewritten around Intl.Segmenter('ja',
          { granularity: 'word' }). The previous implementation cut
@@ -2661,6 +2698,7 @@ var koiDiveWrap = document.getElementById('koiDiveWrap');
 var rippleLayer = document.getElementById('rippleLayer');
 
 var mapleLeaves = document.getElementById('mapleLeaves');
+var mapleLeavesFront = document.getElementById('mapleLeavesFront');
 var stageLattice = document.getElementById('stageLattice');
 
 var submitBtn = document.getElementById('submitBtn');
@@ -3053,23 +3091,26 @@ function chunkPanelText(text) {
     segLen = codepointCount(seg);
 
     /* 1. Flush when appending this segment exceeds MAX, provided MIN
-      density is already met. */
-if (currentLen >= PANEL_PHRASE_MIN && (currentLen + segLen) > PANEL_PHRASE_MAX) {
-  chunks.push(currentChunk);
-  currentChunk = '';
-  currentLen = 0;
-}
+          density is already met. */
+    if (currentLen >= PANEL_PHRASE_MIN && (currentLen + segLen) > PANEL_PHRASE_MAX) {
+      chunks.push(currentChunk);
+      currentChunk = '';
+      currentLen = 0;
+    }
 
-/* 1b. Punctuation orphaned by the size flush above belongs to
-       the phrase it terminates, not the phrase it precedes.
-       Japanese 、。！？ always trail their clause. */
-if (isJapanesePunctuation(seg) && currentLen === 0 && chunks.length > 0) {
-  chunks[chunks.length - 1] += seg;
-  continue;
-}
+    /* 1b. Punctuation orphaned by the size flush above belongs to
+           the phrase it terminates, not the phrase it precedes.
+           Japanese 、。！？ always trail their clause. Without this
+           guard, a comma arriving after a size flush becomes the
+           first character of the next chunk — visible on Panel 4
+           line 5, where 、 preceded お選びいただけますでしょうか。 */
+    if (isJapanesePunctuation(seg) && currentLen === 0 && chunks.length > 0) {
+      chunks[chunks.length - 1] += seg;
+      continue;
+    }
 
-currentChunk += seg;
-currentLen += segLen;
+    currentChunk += seg;
+    currentLen += segLen;
 
     /* 2. Flush on punctuation only after MIN visual weight is met.
           Keeps short formal lead-ins (e.g. 「もし、」) bound to their clause. */
@@ -3450,6 +3491,7 @@ function returnToStartScreen() {
   resetWind();
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
+  if (mapleLeavesFront) mapleLeavesFront.classList.remove('active');
   if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
   stopAmbient();
 
@@ -4741,6 +4783,42 @@ function scheduleAmbientRipple() {
   }, interval);
 }
 
+/* ============ AMBIENT LEAF DISTRIBUTION ============
+   Called at the moment the carousel activates. Returns any leaves
+   previously promoted to the front overlay (fresh start on
+   re-entry), collects the mid + near pool from the back overlay,
+   and Fisher-Yates-partial-shuffles two of them into the front.
+
+   The far-plane leaves are deliberately excluded from the pool —
+   the depth-of-field layer always stays behind the text. See
+   main.css for the scoped opacity override (mid 0.86 / near 0.90)
+   that makes front-promoted leaves read at higher opacity so the
+   text behind them visibly disappears during a crossing. */
+function distributeFrontLeaves() {
+  if (!mapleLeavesFront || !mapleLeaves) return;
+
+  /* Return any leaves previously promoted to the front overlay. */
+  while (mapleLeavesFront.firstChild) {
+    mapleLeaves.appendChild(mapleLeavesFront.firstChild);
+  }
+
+  /* Pool = all mid + near leaves now in the back overlay. Far-plane
+     leaves are deliberately excluded — the depth-of-field layer
+     stays behind the text. */
+  var pool = [];
+  var midNear = mapleLeaves.querySelectorAll('.leaf-mid, .leaf-near');
+  for (var i = 0; i < midNear.length; i++) pool.push(midNear[i]);
+  if (pool.length < 2) return;
+
+  /* Fisher–Yates partial shuffle: move two random leaves to the
+     front overlay. Only the first two positions need to be settled. */
+  for (var j = 0; j < 2; j++) {
+    var k = j + Math.floor(Math.random() * (pool.length - j));
+    var tmp = pool[j]; pool[j] = pool[k]; pool[k] = tmp;
+    mapleLeavesFront.appendChild(pool[j]);
+  }
+}
+
 /* ============================================================
    KOI FLINCH */
 function triggerKoiFlinch() {
@@ -4925,8 +5003,18 @@ function triggerKoiStart() {
            gate on #mapleLeaves; the HUD is gated on the same
            .info-visible class added above but only becomes visible
            through its own .shown class, added here after the intro
-           overlay has cleared. */
+           overlay has cleared.
+
+           distributeFrontLeaves() runs before the .active class is
+           added to the front overlay so the shuffle happens off-
+           screen — the returned-to-back and promoted-to-front moves
+           land in the same frame, before any opacity transition
+           begins. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
+        if (mapleLeavesFront) {
+          distributeFrontLeaves();
+          mapleLeavesFront.classList.add('active');
+        }
         if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');
         startAmbient();
 
