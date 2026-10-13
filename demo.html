@@ -1,381 +1,245 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn">
+<html lang="ja" data-theme="autumn" data-time="day" data-weather="clear">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>行間デモ — Panel Typography</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
+<!-- The real stylesheet. Ambient layers, theme tokens, panel
+     typography, text-shadow — all of it comes from here, so the
+     demo cannot drift from production. -->
+<link rel="stylesheet" href="main.css">
+
 <style>
-  /* ---------- AUTUMN THEME TOKENS (subset used by the ambient stack) ---------- */
-  html[data-theme="autumn"] {
-    --bg-base: #FFFDF9;
-    --text-dark: #241C1A;
-    --text-mute: #725750;
-    --text-faint: #9E7D75;
-    --accent: #E66826;
-    --secondary-accent: #882E47;
-    --border-2: #DEC0AC;
-    --audio-swell: 0;
-  }
-
-  * { box-sizing: border-box; }
-
-  html, body {
-    margin: 0; padding: 0;
-    color: var(--text-dark);
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
-    font-size: 17px;
-    line-height: 1.7;
-    background-color: var(--bg-base);
-    -webkit-text-size-adjust: 100%;
-    text-size-adjust: 100%;
-  }
-
   /* ============================================================
-     AMBIENT BACKGROUND — LAYER 1 (DIFFUSE MESH)
-     Copied from main.css. The --audio-swell value is pinned to 0
-     above, so all calc() expressions resolve to their resting
-     values (mesh opacity 0.60, orb scale 1).
+     DEMO-ONLY OVERRIDES
+     Everything below is scoped to elements that only exist on
+     this page. main.css is loaded unmodified above.
      ============================================================ */
-  .ambient-stage {
-    position: fixed;
-    top: -25%;
-    left: -120px;
-    width: calc(100% + 240px);
-    height: 150%;
-    z-index: -3;
-    pointer-events: none;
-    will-change: transform;
-    transform: translate3d(var(--wind-x, 0px), 0, 0);
+
+  /* main.css reserves 100px at the body's bottom for the summary
+     bar. Not relevant here. */
+  body { padding: 40px 20px 80px 20px !important; }
+
+  /* .panel-content ships with opacity:0 / translateX / blur as
+     the entrance state — it's meant to be revealed by adding
+     .active to its .panel ancestor. There's no .panel here, so
+     force the settled state and inject the slider-driven
+     values via custom properties. */
+  .demo-preview .panel-content {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    transition: none !important;
+    line-height: var(--demo-lh, 2.25) !important;
   }
-  .ambient-layer { position: absolute; inset: 0; pointer-events: none; }
-
-  .layer-diffuse { will-change: transform; }
-  .layer-diffuse .ambient-mesh { opacity: calc(0.60 + var(--audio-swell, 0) * 0.40) !important; }
-  .layer-diffuse .orb-1 { scale: calc(1 + var(--audio-swell, 0) * 0.53); }
-  .layer-diffuse .orb-2 { scale: calc(1 + var(--audio-swell, 0) * 0.61); }
-  .layer-diffuse .orb-3 { scale: calc(1 + var(--audio-swell, 0) * 0.48); }
-
-  .ambient-mesh {
-    position: absolute;
-    inset: 0;
-    overflow: hidden;
-    pointer-events: none;
-    opacity: 0.90;
+  .demo-preview .panel-content p {
+    margin-bottom: var(--demo-pm, 0.40em);
+  }
+  .demo-preview .panel-content p:last-child {
+    margin-bottom: 0;
   }
 
-  .light-orb { position: absolute; border-radius: 50%; pointer-events: none; will-change: transform; }
-
-  .orb-1 {
-    width: 70vw; height: 70vw;
-    max-width: 900px; max-height: 900px;
-    top: 10%; left: 15%;
-    background: radial-gradient(circle closest-side,
-      rgba(230, 104, 38, 0.46) 0%,
-      rgba(230, 104, 38, 0.36) 25%,
-      rgba(255, 162, 89, 0.20) 50%,
-      rgba(255, 162, 89, 0.08) 70%,
-      rgba(255, 162, 89, 0.02) 85%,
-      rgba(255, 162, 89, 0) 100%);
-    animation: orbDrift1 11.58s ease-in-out infinite alternate;
-  }
-  .orb-2 {
-    width: 80vw; height: 80vw;
-    max-width: 1050px; max-height: 1050px;
-    top: 35%; right: 5%;
-    background: radial-gradient(circle closest-side,
-      rgba(136, 46, 71, 0.40) 0%,
-      rgba(136, 46, 71, 0.30) 25%,
-      rgba(230, 104, 38, 0.16) 50%,
-      rgba(230, 104, 38, 0.06) 70%,
-      rgba(230, 104, 38, 0.015) 85%,
-      rgba(230, 104, 38, 0) 100%);
-    animation: orbDrift2 15.26s ease-in-out infinite alternate;
-  }
-  .orb-3 {
-    width: 55vw; height: 55vw;
-    max-width: 700px; max-height: 700px;
-    bottom: 10%; left: 30%;
-    background: radial-gradient(circle closest-side,
-      rgba(255, 162, 89, 0.42) 0%,
-      rgba(255, 162, 89, 0.30) 25%,
-      rgba(136, 46, 71, 0.14) 50%,
-      rgba(136, 46, 71, 0.05) 70%,
-      rgba(136, 46, 71, 0.01) 85%,
-      rgba(136, 46, 71, 0) 100%);
-    animation: orbDrift3 10.00s ease-in-out infinite alternate;
+  /* .panel-inner is reused as the reference column — same 480px
+     max-width the panels clamp to on the tablet. Centered, with
+     text-align matching .panel's own centering. */
+  .demo-preview {
+    max-width: 480px;
+    margin: 0 auto;
+    text-align: center;
+    padding: 40px 20px;
   }
 
-  /* ---------- AMBIENT-PRIMARY (autumn wash) ---------- */
-  .ambient-primary {
-    background:
-      radial-gradient(circle at 28% 35%, var(--amb-1, transparent) 0%, transparent 42%),
-      radial-gradient(circle at 72% 55%, var(--amb-2, transparent) 0%, transparent 48%),
-      radial-gradient(circle at 50% 85%, var(--amb-3, transparent) 0%, transparent 38%),
-      radial-gradient(circle at 15% 70%, var(--amb-4, transparent) 0%, transparent 42%);
-    animation: ambientDrift 32s ease-in-out infinite;
-    will-change: transform;
-  }
-  html[data-theme="autumn"] .ambient-primary {
-    background:
-      radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.22) 28%, rgba(230, 104, 38, 0.06) 52%, rgba(230, 104, 38, 0) 74%),
-      radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.16) 28%, rgba(136, 46, 71, 0.04) 52%, rgba(136, 46, 71, 0) 74%),
-      radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, rgba(255, 162, 89, 0.16) 26%, rgba(255, 162, 89, 0.03) 50%, rgba(255, 162, 89, 0) 72%);
-    animation: autumnDrift1 14s ease-in-out infinite;
-  }
-
-  @keyframes orbDrift1 {
-    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
-    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
-  }
-  @keyframes orbDrift2 {
-    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
-    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
-  }
-  @keyframes orbDrift3 {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
-    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
-  }
-  @keyframes ambientDrift {
-    0%, 100% { transform: translate(0, 0) scale(1); }
-    20% { transform: translate(4%, -3%) scale(1.08); }
-    45% { transform: translate(-3%, 4%) scale(1.12); }
-    70% { transform: translate(3%, 3%) scale(1.05); }
-    85% { transform: translate(-2%, -2%) scale(1.1); }
-  }
-  @keyframes autumnDrift1 {
-    0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
-    11%  { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
-    23%  { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
-    35%  { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
-    48%  { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
-    60%  { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
-    72%  { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
-    85%  { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
-  }
-
-  /* ============================================================
-     AMBIENT BACKGROUND — LAYER 2 (MIRRORED SHIPPŌ)
-     Masked copy of the mesh. At rest opacity 0.20. Both mask and
-     orbs are identical to production.
-     ============================================================ */
-  .shippo-mask-window {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
-    overflow: hidden;
-    -webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    -webkit-mask-repeat: repeat;
-    -webkit-mask-size: 60px 60px;
-    -webkit-mask-position: 0 0;
-    mask-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='white'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-    mask-repeat: repeat;
-    mask-size: 60px 60px;
-    mask-position: 0 0;
-    opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
-  }
-  .shippo-mask-window .ambient-stage.layer-mirrored {
-    position: absolute;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
-    transform-origin: 50% 50%;
-    transform: scaleX(-1);
-    pointer-events: none;
-  }
-  .shippo-mask-window .ambient-mesh {
-    opacity: 1.0 !important;
-    transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
-    transform-origin: 50% 50%;
-  }
-  html[data-theme="autumn"] .shippo-mask-window .orb-1 {
-    background: radial-gradient(circle closest-side,
-      rgba(230, 104, 38, 0.80) 0%, rgba(230, 104, 38, 0.62) 25%,
-      rgba(255, 162, 89, 0.32) 50%, rgba(255, 162, 89, 0.12) 72%,
-      rgba(255, 162, 89, 0.025) 88%, rgba(255, 162, 89, 0) 100%) !important;
-  }
-  html[data-theme="autumn"] .shippo-mask-window .orb-2 {
-    background: radial-gradient(circle closest-side,
-      rgba(136, 46, 71, 0.70) 0%, rgba(136, 46, 71, 0.52) 25%,
-      rgba(230, 104, 38, 0.24) 50%, rgba(230, 104, 38, 0.08) 72%,
-      rgba(230, 104, 38, 0.015) 88%, rgba(230, 104, 38, 0) 100%) !important;
-  }
-  html[data-theme="autumn"] .shippo-mask-window .orb-3 {
-    background: radial-gradient(circle closest-side,
-      rgba(255, 162, 89, 0.75) 0%, rgba(255, 162, 89, 0.56) 25%,
-      rgba(136, 46, 71, 0.20) 50%, rgba(136, 46, 71, 0.07) 72%,
-      rgba(136, 46, 71, 0.015) 88%, rgba(136, 46, 71, 0) 100%) !important;
-  }
-
-  /* ============================================================
-     AMBIENT BACKGROUND — SHIPPŌ MOSAIC
-     Fixed 60×60 tile at opacity 0.08. The pond variant is omitted
-     since the demo has no blossom screen to trigger the cross-fade.
-     ============================================================ */
-  .ambient-mosaic {
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    z-index: -2;
-    background-repeat: repeat;
-    background-size: 60px 60px;
-    background-position: 0 0;
-    opacity: 0.08;
-    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%23E66826'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
-  }
-
-  /* ============================================================
-     DEMO CHROME
-     ============================================================ */
-  body { padding: 40px 20px 80px 20px; }
-
+  /* ---------- Demo chrome ---------- */
   .demo-header {
-    max-width: 640px;
-    margin: 0 auto 44px auto;
+    max-width: 600px;
+    margin: 0 auto 32px auto;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .demo-header h1 {
-    font-size: 22px; font-weight: 600;
-    color: var(--secondary-accent);
-    letter-spacing: 3px; margin: 0 0 14px 0;
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--secondary-accent, #882E47);
+    letter-spacing: 3px;
+    margin: 0 0 14px 0;
   }
   .demo-header p {
-    font-size: 14px; color: var(--text-mute);
-    line-height: 1.9; margin: 0; letter-spacing: 0.5px;
+    font-size: 13.5px;
+    color: var(--text-mute);
+    line-height: 1.9;
+    margin: 0;
+    letter-spacing: 0.5px;
   }
-  .demo-header .current-note {
-    display: inline-block;
-    margin-top: 18px; padding: 5px 14px;
-    background: rgba(136, 46, 71, 0.12);
-    color: var(--secondary-accent);
-    border-radius: 14px;
-    font-size: 12px; letter-spacing: 1.5px; font-weight: 500;
-  }
-
-  /* ---------- VARIANT CARD ---------- */
-  .variant {
-    width: 100%;
-    max-width: 544px;
-    margin: 0 auto 56px auto;
-    padding: 26px 32px 32px 32px;
-    background: rgba(255, 253, 249, 0.72);
-    border: 1px solid rgba(222, 192, 172, 0.55);
-    border-radius: 18px;
-  }
-  .variant.is-current {
-    background: rgba(255, 253, 249, 0.94);
-    border-color: var(--secondary-accent);
-  }
-
-  .variant-meta {
-    display: flex; justify-content: space-between;
-    align-items: baseline; gap: 12px;
-    margin-bottom: 22px; padding-bottom: 14px;
-    border-bottom: 1px solid rgba(222, 192, 172, 0.45);
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    flex-wrap: wrap;
-  }
-  .variant-label {
-    font-size: 14px; font-weight: 700;
-    color: var(--secondary-accent);
-    letter-spacing: 2px;
-  }
-  .variant-label .current-tag {
-    display: inline-block; margin-left: 10px;
-    padding: 2px 9px;
-    background: rgba(230, 104, 38, 0.16);
-    color: var(--accent);
-    border-radius: 10px;
-    font-size: 10.5px; font-weight: 600;
-    letter-spacing: 1.5px; vertical-align: 2px;
-  }
-  .variant-values {
-    font-size: 12px; color: var(--text-mute);
-    font-family: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
-    letter-spacing: 0.3px;
-  }
-  .variant-values .sep { color: #BEA29B; margin: 0 8px; }
-
-  /* ---------- PANEL CONTENT (matches production base styles) ---------- */
-  .panel-content {
-    font-size: 19px;
-    font-weight: 600;
+  .demo-header code {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12.5px;
+    background: rgba(222, 192, 172, 0.45);
+    padding: 1px 6px;
+    border-radius: 4px;
     color: var(--text-dark);
-    letter-spacing: 0.8px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
-    word-break: auto-phrase;
-    overflow-wrap: break-word;
-    line-break: strict;
   }
-  .panel-content p { margin: 0; padding: 0; }
-  .panel-content p:last-child { margin-bottom: 0 !important; }
 
-  .variant-a .panel-content { line-height: 2.25; }
-  .variant-a .panel-content p { margin-bottom: 0.40em; }
+  .controls {
+    max-width: 480px;
+    margin: 0 auto 16px auto;
+    padding: 22px 26px;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid var(--border-2);
+    border-radius: 16px;
+    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    box-shadow: 0 6px 22px rgba(68, 52, 48, 0.10);
+  }
+  .control-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 22px;
+  }
+  .control-row:last-child { margin-bottom: 0; }
+  .control-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-size: 12.5px;
+    color: var(--text-mute);
+    letter-spacing: 1.2px;
+  }
+  .control-label strong {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--secondary-accent, #882E47);
+    font-size: 15px;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+  }
+  .control-row input[type="range"] {
+    width: 100%;
+    height: 24px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    touch-action: manipulation;
+  }
+  .control-row input[type="range"]::-webkit-slider-runnable-track {
+    height: 5px;
+    background: rgba(222, 192, 172, 0.75);
+    border-radius: 3px;
+  }
+  .control-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #FFFDF9;
+    box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
+    margin-top: -8.5px;
+  }
+  .control-row input[type="range"]::-moz-range-track {
+    height: 5px;
+    background: rgba(222, 192, 172, 0.75);
+    border-radius: 3px;
+  }
+  .control-row input[type="range"]::-moz-range-thumb {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #FFFDF9;
+    box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
+  }
 
-  .variant-b .panel-content { line-height: 2.10; }
-  .variant-b .panel-content p { margin-bottom: 0.55em; }
+  .css-output {
+    max-width: 480px;
+    margin: 32px auto 0 auto;
+    padding: 20px 24px;
+    background: rgba(36, 28, 26, 0.94);
+    border-radius: 12px;
+    font-family: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
+    font-size: 13px;
+    line-height: 1.85;
+    color: #FBECE0;
+    letter-spacing: 0.3px;
+    white-space: pre;
+    overflow-x: auto;
+  }
+  .css-output .prop  { color: #FFA259; }
+  .css-output .val   { color: #F07D40; font-weight: 600; }
+  .css-output .sel   { color: #DEC0AC; }
+  .css-output .brace { color: #9E7D75; }
 
-  .variant-c .panel-content { line-height: 1.95; }
-  .variant-c .panel-content p { margin-bottom: 0.75em; }
-
-  .variant-d .panel-content { line-height: 1.85; }
-  .variant-d .panel-content p { margin-bottom: 0.95em; }
-
-  .variant-e .panel-content { line-height: 1.75; }
-  .variant-e .panel-content p { margin-bottom: 1.15em; }
+  .copy-btn {
+    display: block;
+    width: 100%;
+    max-width: 480px;
+    margin: 16px auto 0 auto;
+    padding: 14px 28px;
+    background: var(--accent);
+    color: #ffffff;
+    border: 1.5px solid var(--accent);
+    border-radius: 22px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(230, 104, 38, 0.28);
+    transition: background 0.2s, transform 0.15s, border-color 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .copy-btn:active { transform: scale(0.97); }
+  .copy-btn.copied {
+    background: var(--secondary-accent, #882E47);
+    border-color: var(--secondary-accent, #882E47);
+  }
 
   .demo-footer {
-    max-width: 640px;
-    margin: 24px auto 0 auto;
+    max-width: 600px;
+    margin: 28px auto 0 auto;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 13px; color: var(--text-faint);
-    letter-spacing: 1px; line-height: 2;
-  }
-  .demo-footer code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 12px; color: var(--text-mute);
-    background: rgba(222, 192, 172, 0.35);
-    padding: 1px 6px; border-radius: 4px;
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .light-orb, .ambient-primary { animation: none !important; }
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 1px;
+    line-height: 2;
   }
 
   @media (max-width: 600px) {
-    body { padding: 24px 12px 56px 12px; }
-    .variant { padding: 20px 20px 24px 20px; margin-bottom: 36px; }
-    .panel-content { font-size: 17px; }
-    .variant-meta { flex-direction: column; align-items: flex-start; gap: 6px; }
-    .demo-header h1 { font-size: 19px; letter-spacing: 2px; }
+    body { padding: 24px 14px 56px 14px !important; }
+    .controls { padding: 18px 20px; }
+    .demo-header h1 { font-size: 18px; letter-spacing: 2px; }
+    .css-output { font-size: 12px; padding: 16px 18px; }
   }
 </style>
 </head>
 <body>
 
-<!-- ============ AMBIENT BACKGROUND STACK (Layer 1 + Layer 2 + Mosaic) ============ -->
-<div class="ambient-stage layer-diffuse" aria-hidden="true">
+<!-- ============================================================
+     AMBIENT BACKGROUND — copied verbatim from index.html.
+     All styling comes from main.css; nothing inline. The
+     --audio-swell custom property is never set, so every calc()
+     in main.css resolves through its var(..., 0) fallback to the
+     engine's resting state — same density the tablet shows
+     between tracks.
+     ============================================================ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
     <div class="light-orb orb-2"></div>
     <div class="light-orb orb-3"></div>
   </div>
   <div class="ambient-layer ambient-primary"></div>
+  <div class="mote-field" id="moteField"></div>
 </div>
 
-<div class="shippo-mask-window" aria-hidden="true">
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
     <div class="ambient-layer ambient-mesh">
       <div class="light-orb orb-1"></div>
@@ -386,23 +250,38 @@
 </div>
 
 <div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<!-- ============ DEMO CONTENT ============ -->
+<!-- ============================================================
+     DEMO CONTENT
+     ============================================================ -->
 <div class="demo-header">
-  <h1>行間・段落間の最終確認</h1>
+  <h1>行間・段落間の調整</h1>
   <p>
-    同じ参照テキストを、<strong>行間（line-height）</strong>と
-    <strong>段落間の余白（段落の margin-bottom）</strong>の異なる組み合わせで並べています。<br>
-    本番と同じ背景・同じパネルタイポグラフィで比較できます。
+    <code>main.css</code> をそのまま読み込んでいるため、背景・タイポグラフィ・<br>
+    テキストシャドウはすべて本番と一致します。<br>
+    スライダーで<strong>行間</strong>と<strong>段落間の余白</strong>を自由に調整してください。
   </p>
-  <div class="current-note">A = 現在の本番設定</div>
 </div>
 
-<div class="variant variant-a is-current">
-  <div class="variant-meta">
-    <span class="variant-label">A<span class="current-tag">現状</span></span>
-    <span class="variant-values">line-height: 2.25<span class="sep">·</span>paragraph: 0.40em</span>
+<div class="controls">
+  <div class="control-row">
+    <label class="control-label" for="lh">
+      <span>行間 — line-height</span>
+      <strong id="lh-value">2.25</strong>
+    </label>
+    <input type="range" id="lh" min="1.50" max="2.60" step="0.05" value="2.25">
   </div>
+  <div class="control-row">
+    <label class="control-label" for="pm">
+      <span>段落間 — margin-bottom</span>
+      <strong id="pm-value">0.40em</strong>
+    </label>
+    <input type="range" id="pm" min="0" max="1.60" step="0.05" value="0.40">
+  </div>
+</div>
+
+<div class="demo-preview panel-inner">
   <div class="panel-content">
     <p>それでは、本日の癒しのオプションをご覧ください。</p>
     <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
@@ -412,66 +291,87 @@
   </div>
 </div>
 
-<div class="variant variant-b">
-  <div class="variant-meta">
-    <span class="variant-label">B</span>
-    <span class="variant-values">line-height: 2.10<span class="sep">·</span>paragraph: 0.55em</span>
-  </div>
-  <div class="panel-content">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
-  </div>
-</div>
+<pre class="css-output" id="css-output"><span class="sel">.panel-content</span> <span class="brace">{</span>
+  <span class="prop">line-height</span>: <span class="val" id="out-lh">2.25</span>;
+<span class="brace">}</span>
+<span class="sel">.panel-content p</span> <span class="brace">{</span>
+  <span class="prop">margin-bottom</span>: <span class="val" id="out-pm">0.40em</span>;
+<span class="brace">}</span></pre>
 
-<div class="variant variant-c">
-  <div class="variant-meta">
-    <span class="variant-label">C</span>
-    <span class="variant-values">line-height: 1.95<span class="sep">·</span>paragraph: 0.75em</span>
-  </div>
-  <div class="panel-content">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
-  </div>
-</div>
-
-<div class="variant variant-d">
-  <div class="variant-meta">
-    <span class="variant-label">D</span>
-    <span class="variant-values">line-height: 1.85<span class="sep">·</span>paragraph: 0.95em</span>
-  </div>
-  <div class="panel-content">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
-  </div>
-</div>
-
-<div class="variant variant-e">
-  <div class="variant-meta">
-    <span class="variant-label">E</span>
-    <span class="variant-values">line-height: 1.75<span class="sep">·</span>paragraph: 1.15em</span>
-  </div>
-  <div class="panel-content">
-    <p>それでは、本日の癒しのオプションをご覧ください。</p>
-    <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-    <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-    <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-    <p>ありがとうございます。</p>
-  </div>
-</div>
+<button type="button" class="copy-btn" id="copy-btn">この値をコピー</button>
 
 <div class="demo-footer">
-  行間は <code>.panel-content</code> の <code>line-height</code>、<br>
-  段落間は <code>.panel-content p</code> の <code>margin-bottom</code> に対応します。
+  ここで決めた値を教えていただければ、<br>
+  main.css に反映します。
 </div>
+
+<script>
+(function() {
+  var lhInput  = document.getElementById('lh');
+  var pmInput  = document.getElementById('pm');
+  var lhValue  = document.getElementById('lh-value');
+  var pmValue  = document.getElementById('pm-value');
+  var outLh    = document.getElementById('out-lh');
+  var outPm    = document.getElementById('out-pm');
+  var copyBtn  = document.getElementById('copy-btn');
+  var preview  = document.querySelector('.demo-preview');
+
+  function sync() {
+    var lh = parseFloat(lhInput.value).toFixed(2);
+    var pm = parseFloat(pmInput.value).toFixed(2);
+    var pmStr = pm + 'em';
+
+    lhValue.textContent = lh;
+    pmValue.textContent = pmStr;
+    outLh.textContent = lh;
+    outPm.textContent = pmStr;
+
+    preview.style.setProperty('--demo-lh', lh);
+    preview.style.setProperty('--demo-pm', pmStr);
+  }
+
+  lhInput.addEventListener('input', sync);
+  pmInput.addEventListener('input', sync);
+  sync();
+
+  copyBtn.addEventListener('click', function() {
+    var css =
+      '.panel-content {\n' +
+      '  line-height: ' + parseFloat(lhInput.value).toFixed(2) + ';\n' +
+      '}\n' +
+      '.panel-content p {\n' +
+      '  margin-bottom: ' + parseFloat(pmInput.value).toFixed(2) + 'em;\n' +
+      '}\n';
+    var done = function() {
+      copyBtn.classList.add('copied');
+      copyBtn.textContent = 'コピーしました';
+      setTimeout(function() {
+        copyBtn.classList.remove('copied');
+        copyBtn.textContent = 'この値をコピー';
+      }, 1400);
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(css).then(done).catch(function() {
+        fallback(css, done);
+      });
+    } else {
+      fallback(css, done);
+    }
+  });
+
+  function fallback(text, done) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.left = '-9999px';
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) {}
+    document.body.removeChild(ta);
+  }
+})();
+</script>
 
 </body>
 </html>
