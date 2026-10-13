@@ -3,6 +3,65 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (phrase-aware text reveal via Intl.Segmenter)
+       - chunkPanelText() rewritten around Intl.Segmenter('ja',
+         { granularity: 'word' }). The previous implementation cut
+         at random 5-10 character windows using String.substr,
+         which landed inside Japanese lexical units — お部屋までお
+         / 越しいただき instead of お部屋まで / お越しいただき —
+         and made the stagger reveal read as mechanical fragments
+         rather than the breath-rhythm it was tuned for.
+       - Three aggregation rules replace the old fixed-window cut:
+           1. Flush when appending the next segment would exceed
+              PANEL_PHRASE_MAX, provided PANEL_PHRASE_MIN density
+              is already met.
+           2. Flush on 、。！？ only after PANEL_PHRASE_MIN weight
+              is met. Formal Japanese uses 、 densely; flushing
+              unconditionally fragments polite lead-ins like
+              「もし、」 or 「どうぞ、」 into isolated 2-3 character
+              flashes. Deferring the flush binds the punctuation
+              to its following clause.
+           3. Fuse any undersized tail remainder into the preceding
+              chunk so no standalone sliver reaches the DOM.
+       - The ~25-line post-processing block in the old chunker —
+         leading-punctuation scan, peel-off, graft onto previous,
+         two-pass under-length merge — is retired entirely.
+         Segmenter returns punctuation as distinct segments and
+         the accumulator only appends, so leading punctuation is
+         structurally impossible and the tail-merge reduces to a
+         single conditional.
+       - codepointCount(str) = Array.from(str).length replaces
+         UTF-16 .length for the size checks. Array.from iterates
+         code points, so a surrogate pair counts as one visual
+         character. The old substr path could split a surrogate
+         pair at an odd boundary and corrupt the DOM node with a
+         replacement glyph — latent today (panel content is BMP-
+         only) but the fix is free once the chunker operates on
+         tokens.
+       - The size accumulator is hoisted out of the loop and
+         incremented by segLen per segment, reset to 0 on each
+         flush. Calling codepointCount(currentChunk) on every
+         iteration would re-parse the whole accumulated chunk per
+         segment, making the pass quadratic in total segments;
+         the incremental form is a clean linear O(N).
+       - chunkPanelTextFallback(clean) retains the previous body
+         verbatim as the non-Segmenter path. Feature detection
+         covers any engine that lacks Intl.Segmenter (Chromium
+         87+ / Safari 14.1+ / Firefox 125+ all have it, so the
+         fallback never fires on target hardware). The fallback's
+         header comment notes it still uses UTF-16 code units and
+         can split surrogate pairs — it is a non-breaking legacy
+         path, not an equivalent implementation.
+       - escapeHtmlForPhrase() deleted. Unreferenced —
+         wrapTextNodeInPhrases uses textContent, and the
+         punctuation-shuffling code that might have needed it is
+         retired with the rewrite.
+       - isJapanesePunctuation() retained unchanged — it now
+         serves as the flush oracle rather than a boundary-
+         shuffler, but the predicate itself is identical.
+       - segmenterJa is constructed once at module scope, not per
+         call. preparePanel() runs once per panel on load, so the
+         whole pass is off the frame budget.
      v1.3 (raw fetch retry + pre-decode window reduction)
        - Ambient raw MP3 fetches are now retried on demand. The
          previous architecture fetched each ambient URL exactly
@@ -2957,15 +3016,16 @@ var PANEL_1_POST_BEAT_DELAY = 1000;
 
 var panelPhraseTimers = [];
 
-function escapeHtmlForPhrase(s) {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+/* ============================================================
+   CHUNKER (Intl.Segmenter, Code-Point Safe) */
+var segmenterJa = (typeof Intl !== 'undefined' && Intl.Segmenter)
+  ? new Intl.Segmenter('ja', { granularity: 'word' })
+  : null;
+
+function codepointCount(str) {
+  return Array.from(str).length;
 }
 
-/* ============================================================
-   CHUNKER */
 function isJapanesePunctuation(ch) {
   return ch === '、' || ch === '。' || ch === '！' || ch === '？';
 }
@@ -2974,6 +3034,59 @@ function chunkPanelText(text) {
   var clean = String(text).replace(/\s+/g, '');
   if (clean === '') return [];
 
+  /* Legacy fallback for environments lacking Intl.Segmenter.
+     Note: Still relies on UTF-16 code units (substr) and can split
+     surrogate pairs. Retained solely as a non-breaking legacy path. */
+  if (!segmenterJa) {
+    return chunkPanelTextFallback(clean);
+  }
+
+  var segments = Array.from(segmenterJa.segment(clean), function(s) { return s.segment; });
+  var chunks = [];
+  var currentChunk = '';
+  var currentLen = 0;
+  var seg = '';
+  var segLen = 0;
+
+  for (var i = 0; i < segments.length; i++) {
+    seg = segments[i];
+    segLen = codepointCount(seg);
+
+    /* 1. Flush when appending this segment exceeds MAX, provided MIN
+          density is already met. */
+    if (currentLen >= PANEL_PHRASE_MIN && (currentLen + segLen) > PANEL_PHRASE_MAX) {
+      chunks.push(currentChunk);
+      currentChunk = '';
+      currentLen = 0;
+    }
+
+    currentChunk += seg;
+    currentLen += segLen;
+
+    /* 2. Flush on punctuation only after MIN visual weight is met.
+          Keeps short formal lead-ins (e.g. 「もし、」) bound to their clause. */
+    if (isJapanesePunctuation(seg) && currentLen >= PANEL_PHRASE_MIN) {
+      chunks.push(currentChunk);
+      currentChunk = '';
+      currentLen = 0;
+    }
+  }
+
+  /* 3. Fuse undersized tail fragments into the preceding chunk. */
+  if (currentChunk !== '') {
+    if (chunks.length > 0 && currentLen < PANEL_PHRASE_MIN) {
+      chunks[chunks.length - 1] += currentChunk;
+    } else {
+      chunks.push(currentChunk);
+    }
+  }
+
+  return chunks;
+}
+
+/* ============================================================
+   LEGACY CHUNKER FALLBACK (Pre-Intl.Segmenter Engines) */
+function chunkPanelTextFallback(clean) {
   var raw = [];
   var i = 0;
   while (i < clean.length) {
