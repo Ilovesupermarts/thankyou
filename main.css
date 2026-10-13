@@ -624,19 +624,52 @@
     100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; }
   }
 
-  /* ============ AMBIENT MAPLE (MOMIJI) LEAVES ============
+  /* ============ AMBIENT FALLING LEAVES (v1.3, depth-layered)
+     ------------------------------------------------------------
+     Three depth planes give the field parallax. The previous
+     single-layer arrangement read as flat because every leaf shared
+     the same size, opacity, sharpness, and drift speed — no cue
+     told the eye which leaves were near and which were far.
+
+     Each plane carries its own size / blur / speed / opacity
+     signature; distance is read from the ratio between the planes,
+     not from any single one:
+
+       Far  (z 1) — 6 leaves, 28–38px, blur 2.5px + saturate 0.75,
+                    opacity 0.20, drift 17–21s
+       Mid  (z 2) — 6 leaves, 42–54px, sharp, opacity 0.32,
+                    drift 10–14s
+       Near (z 3) — 6 leaves, 62–84px, sharp, opacity 0.44,
+                    drift  8.5–10.5s
+
+     Total is 18: 6 Momiji (2 per plane) + 12 Ichō (4 per plane).
+     Species and colour are distributed across all three planes so
+     no plane reads as "the plum layer" or "the ginkgo layer".
+     Far leaves cluster toward the centre band; near leaves push
+     toward the edges — this mimics the wider angular spread of
+     objects close to the camera and compounds with the size
+     gradient.
+
+     COMPOSITOR SAFETY. Blur is static on the far plane only. It
+     never changes across the animation, and no ancestor carries a
+     filter — this is the pattern the codebase avoids elsewhere
+     (per-frame convolution on animating subtrees). Here the blurred
+     texture is rasterised once by Chromium, promoted to its own
+     layer via will-change, and sampled by the compositor with a
+     rotated UV per frame. No per-frame blur cost.
+
      Fills are drawn from the 金木犀 & Ebizome palette's higher-
      contrast tiers — Ebizome plum, deep amber, deep rust,
-     Kinmokusei amber, petal coral — so the drifting foliage reads
-     as a stylized woodblock motif in the same ink family as the
-     rest of the interface. Lighter tiers (--glow, --petal-soft)
-     are excluded: at sub-0.35 element opacity they composite to
-     near-canvas luminance and lose silhouette legibility.
+     Kinmokusei amber, and petal coral — so the drifting foliage
+     reads as a stylized woodblock motif in the same ink family as
+     the rest of the interface. Lighter palette tiers (--glow,
+     --petal-soft) are excluded: at sub-0.35 element opacity they
+     composite to near-canvas luminance and lose silhouette
+     legibility.
 
-     No filter: drop-shadow was removed at v1.3 — at sub-0.35
-     element opacity the 0.07 alpha was imperceptible, and it
-     expanded each leaf's promoted-layer texture by offset + blur
-     radius. */
+     No drop-shadow — at sub-0.45 element opacity the 0.07 alpha
+     was imperceptible, and it expanded each leaf's promoted-layer
+     texture by offset + blur radius. */
   .maple-leaves-overlay {
     position: fixed;
     inset: 0;
@@ -655,19 +688,64 @@
     display: none;
   }
 
-  .maple-leaf {
+  /* ---------- Depth-plane base classes ---------- */
+  .leaf-far,
+  .leaf-mid,
+  .leaf-near {
     position: absolute;
     top: -60px;
     pointer-events: none;
     will-change: transform;
-    opacity: 0.32;
   }
 
-  /* Curated 金木犀 & Ebizome distribution across the four Momiji. */
-  .leaf-1 { width: 51px; height: 51px; fill: #882E47; left: 8%;   animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
-  .leaf-2 { width: 63px; height: 63px; fill: #E66826; left: 24%;  animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
-  .leaf-3 { width: 45px; height: 45px; fill: #C44E10; left: 42%;  animation: mapleDriftC 10s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-6 { width: 42px; height: 42px; fill: #9E3B06; left: 88%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .leaf-far {
+    z-index: 1;
+    opacity: 0.20;
+    filter: blur(2.5px) saturate(0.75);
+  }
+  .leaf-mid {
+    z-index: 2;
+    opacity: 0.32;
+  }
+  .leaf-near {
+    z-index: 3;
+    opacity: 0.44;
+  }
+
+  /* ---------- Far plane — Momiji (2) ----------
+     Clustered near the centre band. Small, soft, slowest. */
+  .leaf-far-1 { width: 30px; height: 34px; fill: #9E3B06; left: 22%; animation: mapleDriftA 18s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3s; }
+  .leaf-far-2 { width: 34px; height: 38px; fill: #882E47; left: 48%; animation: mapleDriftB 20s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8s; }
+
+  /* ---------- Far plane — Ichō (4) ---------- */
+  .ginkgo-far-1 { width: 28px; height: 33px; fill: #F07D40; left: 16%; animation: ginkgoDriftA 19s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .ginkgo-far-2 { width: 32px; height: 37px; fill: #E66826; left: 34%; animation: ginkgoDriftB 21s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+  .ginkgo-far-3 { width: 30px; height: 35px; fill: #882E47; left: 62%; animation: ginkgoDriftA 18.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11s; }
+  .ginkgo-far-4 { width: 36px; height: 42px; fill: #C44E10; left: 78%; animation: ginkgoDriftB 17s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -14s; }
+
+  /* ---------- Mid plane — Momiji (2) ----------
+     The two sharp, medium leaves carried over from the previous
+     single-layer set. */
+  .leaf-mid-1 { width: 51px; height: 51px; fill: #882E47; left: 8%;  animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
+  .leaf-mid-2 { width: 63px; height: 63px; fill: #C44E10; left: 24%; animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
+
+  /* ---------- Mid plane — Ichō (4) ---------- */
+  .ginkgo-mid-1 { width: 48px; height: 56px; fill: #F07D40; left: 14%; animation: ginkgoDriftA 12.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -1.0s; }
+  .ginkgo-mid-2 { width: 52px; height: 61px; fill: #882E47; left: 38%; animation: ginkgoDriftB 14.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -5.0s; }
+  .ginkgo-mid-3 { width: 42px; height: 49px; fill: #E66826; left: 64%; animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8.0s; }
+  .ginkgo-mid-4 { width: 54px; height: 63px; fill: #C44E10; left: 74%; animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9.5s; }
+
+  /* ---------- Near plane — Momiji (2) ----------
+     Large, sharp, fastest. Pushed toward the edges to suggest the
+     wider angular spread of objects close to the camera. */
+  .leaf-near-1 { width: 72px; height: 72px; fill: #E66826; left: 5%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
+  .leaf-near-2 { width: 78px; height: 78px; fill: #9E3B06; left: 88%; animation: mapleDriftA 10.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
+
+  /* ---------- Near plane — Ichō (4) ---------- */
+  .ginkgo-near-1 { width: 68px; height: 79px; fill: #F07D40; left: 12%; animation: ginkgoDriftA 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s; }
+  .ginkgo-near-2 { width: 84px; height: 98px; fill: #9E3B06; left: 42%; animation: ginkgoDriftB 10.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7.0s; }
+  .ginkgo-near-3 { width: 72px; height: 84px; fill: #882E47; left: 68%; animation: ginkgoDriftB 9.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11.0s; }
+  .ginkgo-near-4 { width: 62px; height: 72px; fill: #C44E10; left: 92%; animation: ginkgoDriftA 10.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s; }
 
   @keyframes mapleDriftA {
     0% {
@@ -739,8 +817,10 @@
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
     .light-orb     { animation: none !important; }
-    .maple-leaf,
-    .ginkgo-leaf   { animation: none !important; }
+    .leaf-far,
+    .leaf-mid,
+    .leaf-near     { animation: none !important; }
+    .leaf-far      { filter: none; }
     .ripple        { animation-duration: 300ms; }
     .soft-glow     { animation: none !important; opacity: 0.72 !important; }
     .pulse-ring    { animation: none !important; opacity: 0 !important; }
@@ -1530,7 +1610,7 @@
     padding: 14px 22px calc(14px + env(safe-area-inset-bottom));
     box-shadow: 0 -4px 18px var(--summary-shadow);
     opacity: 0; transform: translateY(100%);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    transition: opacity 0.5s ease, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
     pointer-events: none; z-index: 50;
   }
   .summary.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
@@ -1571,7 +1651,9 @@
      spectrum, and a loading/playback gauge.
 
      Visibility is governed by two gates that must stay in sync:
-       · CSS — body.info-visible:not(.thankyou-active):not(.receipt-locked)
+       · CSS — body.info-visible:not(.receipt-locked) .audio-
+                spectrum-hud.shown, plus the summary-lift and
+                thankyou-elevated overrides below
        · JS  — _hudShouldDraw() in app.js, which mirrors the same
                 body-class conditions and additionally checks for
                 the .shown class on the HUD element itself.
@@ -1597,19 +1679,51 @@
      writers never race: _hudRenderState() skips its width write
      whenever ambientSource !== null.
 
-     Base card styling (below) is 絹白 Kinushiro glass, shared by
-     both themes. Sakura overrides the card at the bottom of this
-     block via html[data-theme="default"] .audio-spectrum-hud.
-
      v1.3 (batch A): backdrop-filter: blur(12px) and its -webkit-
      prefixed twin removed. On Adreno 730 TBDR, a backdrop-filter
      on a card overlaying the continuously animating ambient orb
      field forces a per-frame blur convolution of the backdrop
-     texture — a real cost on the tile-based GPU. At 0.92 alpha the
-     blur was imperceptible against the silk canvas anyway. Base
-     background lifted 0.85 → 0.92 to preserve the same perceived
-     legibility now that the blur is gone; sakura override lifted
-     0.80 → 0.92 in lockstep. */
+     texture. At 0.92 alpha the blur was imperceptible against the
+     silk canvas. Base background lifted 0.85 → 0.92; sakura
+     override lifted 0.80 → 0.92 in lockstep.
+
+     v1.3 (A24 coupled motion curve + summary lift): the HUD's
+     transform leg now runs on the same cubic-bezier as the summary
+     bar's slide, so the two arrive at their final positions at the
+     same instant AND hold a constant gap at every intermediate
+     frame — not just the endpoints. The previous ease-out curve
+     placed maximum velocity at t=0, reading as a lurch on a ~75px
+     displacement. Matching the curve as well as the duration is
+     what makes the intermediate trajectory track: an S-curve at
+     the same duration would trail the summary mid-flight, then
+     whoosh to close the gap. The lift itself is driven by the
+     measured --summary-h (published by app.js's
+     measureSummaryHeight()), gated on :has(.summary.visible) so
+     every existing summary-toggle call site picks it up without
+     coupling. On hide the :has() selector stops matching, the
+     cascade falls back to the base .shown rule's translateY(0),
+     and the HUD descends over the same transition. --summary-h is
+     not consulted on the descent; the target is always the base
+     position, so a mid-flight height change cannot strand the HUD
+     off-anchor.
+
+     v1.3 (A25 HUD on thank-you screen): the base shown-state rule
+     drops :not(.thankyou-active) so the HUD remains visible on
+     the thank-you carousel, and an elevated-position rule under
+     body.thankyou-active lifts it 60px — clearing the top edge of
+     the ty-receipt-btn across all breakpoints (button top edge at
+     ~50 / 64 / 70px from viewport bottom, HUD bottom at 28px
+     base + 60px lift = 88px). The receipt-locked clause is
+     retained: the receipt overlay keeps the HUD hidden. The full
+     cycle thank-you → receipt → service table produces exactly one
+     opacity transition per state change because .shown is added
+     once in triggerKoiStart() and removed only in
+     returnToStartScreen() — it does not toggle across this cycle.
+     The receiptOpenedFromThankyou window (thankyou-active +
+     receipt-locked both set) stays hidden via the
+     :not(.receipt-locked) clause, so closing that receipt and
+     returning to the thank-you screen produces one fade-in, not
+     a fade-in-then-fade-out. */
   .audio-spectrum-hud {
     position: fixed;
     left: calc(26px + env(safe-area-inset-left, 0px));
@@ -1630,12 +1744,26 @@
       0 1px 3px rgba(68, 52, 48, 0.05);
     opacity: 0;
     transform: translateY(8px);
-    transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition: opacity 0.6s ease, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 
-  body.info-visible:not(.thankyou-active):not(.receipt-locked) .audio-spectrum-hud.shown {
+  body.info-visible:not(.receipt-locked) .audio-spectrum-hud.shown {
     opacity: 1;
     transform: translateY(0);
+  }
+
+  /* Summary-lift. See the A24 note above. Higher specificity than
+     the base .shown rule via the :has() pseudo. */
+  body.info-visible:not(.receipt-locked):has(.summary.visible) .audio-spectrum-hud.shown {
+    transform: translateY(calc(-1 * var(--summary-h, 0px)));
+  }
+
+  /* Thank-you-screen elevation. Placed after the summary-lift rule
+     so if both somehow matched, the thank-you elevation wins. In
+     practice the two never co-occur: summaryBar loses .visible
+     synchronously when entering the thank-you sequence. */
+  body.info-visible.thankyou-active:not(.receipt-locked) .audio-spectrum-hud.shown {
+    transform: translateY(-60px);
   }
 
   html[data-theme="default"] .audio-spectrum-hud {
@@ -3007,7 +3135,8 @@
 
 /* ============ GINKGO (ICHŌ) DRIFT (v1.3) ============
    Fills share the 金木犀 & Ebizome higher-contrast tier as the
-   Momiji above. No filter — same reasoning as .maple-leaf. */
+   Momiji above. No filter — the far-plane blur is applied via the
+   .leaf-far class, not here. */
 @keyframes ginkgoDriftA {
   0%   { transform: translate3d(0, -65px, 0) rotate(14deg); opacity: 0; }
   12%  { opacity: 0.95; }
@@ -3024,62 +3153,4 @@
   65%  { transform: translate3d(26px, 72vh, 0) rotate(-24deg); }
   85%  { transform: translate3d(-14px, 94vh, 0) rotate(14deg); opacity: 0.95; }
   100% { transform: translate3d(10px, 115vh, 0) rotate(-8deg); opacity: 0; }
-}
-
-.ginkgo-leaf {
-  position: absolute;
-  top: -65px;
-  pointer-events: none;
-  will-change: transform;
-  opacity: 0.34;
-}
-
-/* Curated 金木犀 & Ebizome distribution across the seven Ichō. */
-.ginkgo-1 {
-  width: 48px; height: 56px;
-  fill: #F07D40;
-  left: 14%;
-  animation: ginkgoDriftA 12.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -1.0s;
-}
-
-.ginkgo-2 {
-  width: 52px; height: 61px;
-  fill: #882E47;
-  left: 38%;
-  animation: ginkgoDriftB 14.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -5.0s;
-}
-
-.ginkgo-3 {
-  width: 42px; height: 49px;
-  fill: #E66826;
-  left: 64%;
-  animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8.0s;
-}
-
-.ginkgo-4 {
-  width: 56px; height: 65px;
-  fill: #C44E10;
-  left: 86%;
-  animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s;
-}
-
-.ginkgo-6 {
-  width: 54px; height: 63px;
-  fill: #9E3B06;
-  left: 74%;
-  animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9.5s;
-}
-
-.ginkgo-7 {
-  width: 60px; height: 70px;
-  fill: #882E47;
-  left: 58%;
-  animation: ginkgoDriftB 13.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11.0s;
-}
-
-.ginkgo-8 {
-  width: 44px; height: 51px;
-  fill: #F07D40;
-  left: 35%;
-  animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s;
 }
