@@ -3,6 +3,58 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (raw fetch retry + pre-decode window reduction)
+       - Ambient raw MP3 fetches are now retried on demand. The
+         previous architecture fetched each ambient URL exactly
+         once, from initSound(). A failed download on flaky Wi-Fi
+         left _ambientRawBuffers[url] permanently unpopulated, so
+         playAmbientSound()'s 500ms retry polling drained its
+         120-attempt counter over ~60s and then terminated the
+         schedule — the slot stayed silent until a page reload.
+       - fetchAmbientRaw(track) memoizes the in-flight fetch
+         promise in _ambientRawPromises[url]. All callers — the
+         boot loop in initSound() and the on-demand path from
+         decodeAmbientSlot() — share a single in-flight fetch per
+         URL. Without the memo, a boot fetch that hasn't resolved
+         by the time playAmbientSound() first polls would spawn a
+         second parallel download of the same 16 MB file on a
+         connection that is already struggling.
+       - decodeAmbientSlot(track) now calls fetchAmbientRaw(track)
+         instead of reading _ambientRawBuffers[url] directly. When
+         the raw bytes are missing, the fetch is kicked off and
+         awaited; when the fetch fails, the promise resolves null
+         and the _ambientDecodingPromises entry is deleted, so the
+         next 500ms tick re-enters cleanly and retries. The 120-
+         attempt cap in playAmbientSound() still bounds the whole
+         retry window at ~60s, preserving the existing terminal-
+         stop contract.
+       - The `res` passthrough on the trailing .then() in
+         decodeAmbientSlot() preserves the resolved AudioBuffer
+         (or null) for callers. Today's callers ignore the value,
+         but the omission would have silently resolved the whole
+         chain to undefined and made the helper unusable for any
+         future caller that wants the buffer back.
+       - _hudRenderState()'s 展開中 branch now requires
+         _ambientRawBuffers[currentTrack.url] alongside the in-
+         flight-decode check. Under the new architecture
+         _ambientDecodingPromises[bufferName] is set before the
+         raw fetch resolves — that is the shape of the chain — so
+         without the guard the badge would claim PCM展開中 while
+         bytes were still on the wire. The badge now reads DL XX%
+         during a re-fetch and snaps to PCM展開中 only once
+         decodeAudioData actually starts.
+       - SLOT_PRE_WINDOW_MS reduced from 10 minutes to 2 minutes.
+         The 10-minute window kept current + next slot decoded in
+         parallel for ten full minutes per transition, exposing
+         ~750 MB of PCM for twice the useful duration. Decode
+         takes ~1.2s on Adreno; the shorter window still leaves
+         ample headroom for the decode plus a cold-launch download
+         race, and cuts the dual-resident exposure by ~5×. The
+         scheduler comment block has been rewritten to reason from
+         the new value.
+       - makeSeamlessLoop() copies the prefix via
+         dst.set(src.subarray(0, newLength)) instead of a manual
+         index loop. Same result, single built-in call.
      v1.3 (loadDropBuffer removal)
        - The loadDropBuffer() helper was a byte-for-byte duplicate
          of loadAudioBuffer() with the URL hardcoded and the error
@@ -804,7 +856,16 @@ function _hudShouldDraw() {
 
    The slot-ready check and the in-flight-decode check both read
    from a single currentTrack snapshot so a single Nagoya
-   wall-clock evaluation drives the whole branch. */
+   wall-clock evaluation drives the whole branch.
+
+   The 展開中 branch requires _ambientRawBuffers[currentTrack.url]
+   alongside the in-flight-decode check. Under the raw-fetch-retry
+   architecture, _ambientDecodingPromises[bufferName] is set before
+   the raw fetch resolves — that is the shape of the chain — so
+   without the guard the badge would claim PCM展開中 while bytes
+   were still on the wire. The badge now reads DL XX% during a
+   re-fetch and snaps to PCM展開中 only once decodeAudioData
+   actually starts. */
 function _hudRenderState() {
   if (!hudStatusBadge || !hudGaugeFill) return;
 
@@ -859,8 +920,10 @@ function _hudRenderState() {
     /* Priority 2 — either the active slot is decoding, or raw
        streams are still in flight. Both must resolve before the
        badge may claim 待機完了, so the badge and gauge stay in
-       agreement throughout the cold-launch window. */
-    if (_ambientDecodingPromises[currentTrack.bufferName]) {
+       agreement throughout the cold-launch window. Only claim
+       PCM decompression when the raw bytes are actually resident
+       (see the function-header note above). */
+    if (_ambientDecodingPromises[currentTrack.bufferName] && _ambientRawBuffers[currentTrack.url]) {
       hudGaugeFill.classList.add('decoding');
       hudStatusBadge.textContent = '展開中';
       hudStatusBadge.classList.add('decoding');
@@ -1009,67 +1072,112 @@ function loadAudioBufferRaw(url) {
     .catch(function() { return null; });
 }
 
+/* ============ AMBIENT RAW FETCH MEMOIZATION (v1.3) ============
+   fetchAmbientRaw(track) is the single authority for fetching an
+   ambient MP3's bytes and for writing into _ambientRawBuffers.
+   Every caller — the boot loop in initSound() and the on-demand
+   retry path from decodeAmbientSlot() — goes through this helper.
+
+   Without the memo, a boot fetch that hadn't resolved by the time
+   playAmbientSound() first polls would spawn a second parallel
+   download of the same 16 MB file on a connection that is already
+   struggling. _ambientRawPromises[url] holds the in-flight promise
+   for the duration of the fetch and is deleted on both success and
+   failure, so the next caller either gets the cached buffer or
+   starts a fresh fetch cleanly.
+
+   On failure the promise resolves with null (the inner
+   loadAudioBufferRaw already swallows its own errors). The
+   on-demand retry path treats that as "not yet available" and
+   leaves the slot for the next 500ms tick of playAmbientSound()'s
+   polling loop. The 120-attempt cap on _ambientBufferRetries
+   bounds the whole retry window at ~60s, preserving the existing
+   terminal-stop contract. */
+var _ambientRawPromises = {};
+
+function fetchAmbientRaw(track) {
+  if (_ambientRawBuffers[track.url]) return Promise.resolve(_ambientRawBuffers[track.url]);
+  if (_ambientRawPromises[track.url]) return _ambientRawPromises[track.url];
+
+  var p = loadAudioBufferRaw(track.url).then(function(buf) {
+    delete _ambientRawPromises[track.url];
+    if (buf) _ambientRawBuffers[track.url] = buf;
+    return buf;
+  });
+
+  _ambientRawPromises[track.url] = p;
+  return p;
+}
+
 /* ============ SLOT DECODE (v1.3) ============
    Decodes one ambient phase into soundBuffers[track.bufferName].
-   Three guards:
 
-     1. raw exists           — the .mp3 bytes are in
-                               _ambientRawBuffers. If not, this is
-                               a no-op (the loader will call back
-                               when the bytes arrive).
-     2. not already decoded  — soundBuffers[bufferName] is
-                               populated. Idempotent; safe to call
-                               from both initSound() and the
-                               boundary pre-decode timer near a
-                               phase edge.
-     3. not already decoding — _ambientDecodingPromises holds an
-                               in-flight job. Without this guard
-                               playAmbientSound()'s 500ms retry
-                               polling would stack 2-3 concurrent
-                               decodes on a ~1.2s mobile decode,
-                               spiking transient heap back past
-                               1 GB — the exact pressure this
-                               redesign removes.
+   The function's promise chain is: fetchAmbientRaw → decode → .catch
+   → trailing .then(cleanup). The chain shape matters:
 
-   raw.slice(0) before decodeAudioData is load-bearing, not
-   defensive. The Web Audio spec detaches the passed ArrayBuffer;
-   without the clone the entry in _ambientRawBuffers would be
-   neutered after its first decode, and the 05:00 re-decode the
-   following morning would throw. The transient ~16 MB copy is
-   negligible against the ~375 MB decoded PCM. */
+     · fetchAmbientRaw(track) is the first link. When the raw bytes
+       are missing (a failed earlier download, or boot racing the
+       first poll), it kicks off the fetch and awaits it. When the
+       fetch fails, the promise resolves null and the chain
+       short-circuits to the trailing cleanup — so the next 500ms
+       tick re-enters cleanly and retries, rather than the slot
+       being permanently dead until a page reload.
+
+     · raw.slice(0) before decodeAudioData is load-bearing, not
+       defensive. The Web Audio spec detaches the passed
+       ArrayBuffer; without the clone the entry in
+       _ambientRawBuffers would be neutered after its first
+       decode, and the 05:00 re-decode the following morning
+       would throw. The transient ~16 MB copy is negligible
+       against the ~375 MB decoded PCM.
+
+     · The .catch(function() { return null; }) before the trailing
+       .then guarantees the cleanup runs on both the success and
+       failure paths. Without it, a rejection would skip the
+       cleanup and leave a permanent stale entry in
+       _ambientDecodingPromises, blocking every future retry of
+       that slot.
+
+     · The trailing .then(function(res) { ... return res; })
+       passthrough preserves the resolved AudioBuffer (or null)
+       for the caller. Today's callers ignore the value, but
+       letting the chain resolve to undefined would make the
+       helper unusable for any future caller that wants the
+       buffer back.
+
+   The _ambientDecodingPromises[track.bufferName] memo remains in
+   place: playAmbientSound()'s 500ms retry polling would otherwise
+   stack 2-3 concurrent decodeAudioData passes on a ~1.2s mobile
+   decode, spiking transient heap back past 1 GB. The entry is set
+   before the raw fetch resolves, so a caller entering while the
+   fetch is still in flight gets the same shared promise rather
+   than starting a second fetch-and-decode job. */
 var _ambientRawBuffers = {};
 var _ambientDecodingPromises = {};
 
 function decodeAmbientSlot(track) {
-  var raw = _ambientRawBuffers[track.url];
-  if (!raw) return Promise.resolve();
+  if (soundBuffers[track.bufferName]) return Promise.resolve(soundBuffers[track.bufferName]);
+  if (_ambientDecodingPromises[track.bufferName]) return _ambientDecodingPromises[track.bufferName];
 
-  if (soundBuffers[track.bufferName]) return Promise.resolve();
-
-  if (_ambientDecodingPromises[track.bufferName]) {
-    return _ambientDecodingPromises[track.bufferName];
-  }
-
-  var decodePromise = new Promise(function(resolve, reject) {
-    var prom = soundAudioCtx.decodeAudioData(raw.slice(0), function(decoded) {
-      soundBuffers[track.bufferName] = decoded;
-      delete _ambientDecodingPromises[track.bufferName];
-      _hudRenderState();
-      resolve(decoded);
-    }, function(err) {
-      delete _ambientDecodingPromises[track.bufferName];
-      reject(err);
+  var p = fetchAmbientRaw(track).then(function(raw) {
+    if (!raw) return null;
+    return new Promise(function(resolve, reject) {
+      var prom = soundAudioCtx.decodeAudioData(raw.slice(0), function(decoded) {
+        soundBuffers[track.bufferName] = decoded;
+        _hudRenderState();
+        resolve(decoded);
+      }, reject);
+      if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
     });
-
-    if (prom && typeof prom.then === 'function') {
-      prom.then(resolve, reject);
-    }
   }).catch(function() {
+    return null;
+  }).then(function(res) {
     delete _ambientDecodingPromises[track.bufferName];
+    return res;
   });
 
-  _ambientDecodingPromises[track.bufferName] = decodePromise;
-  return decodePromise;
+  _ambientDecodingPromises[track.bufferName] = p;
+  return p;
 }
 
 /* ============ PHASE BOUNDARY SCHEDULER (v1.3) ============
@@ -1077,24 +1185,30 @@ function decodeAmbientSlot(track) {
    only cross-boundary risk is the moment the wall clock crosses
    one of the three Nagoya bucket edges (05:00, 17:00, 22:00 JST).
    scheduleNextSlotPreDecode() arms a single timer for
-   (time-until-boundary − 10 minutes) so the incoming phase is
-   already decoded into PCM before playAmbientSound() asks for it.
+   (time-until-boundary − SLOT_PRE_WINDOW_MS) so the incoming phase
+   is already decoded into PCM before playAmbientSound() asks for
+   it.
 
-   The 10-minute window is generous: the MP3 bytes are in the SW's
-   unversioned AUDIO cache after the first session, so the pre-
-   decode step is pure PCM expansion — a few seconds on Adreno.
-   Even a first-ever cold launch has the download racing the
-   window, and 16 MB over 10 minutes is ~215 kbps.
+   The pre-decode window is 2 minutes. Decode of a ~16 MB ambient
+   MP3 into PCM is ~1.2s on Adreno, and the raw bytes are in the
+   SW's unversioned AUDIO cache after the first session — so the
+   pre-decode step itself is pure PCM expansion, not a download.
+   The shorter window (down from 10 minutes) cuts the dual-
+   resident exposure of current + next slots (~750 MB combined)
+   by ~5× per transition, twice a day. Because the on-demand
+   retry path in decodeAmbientSlot() now handles a phase flip
+   that catches the pre-decode mid-flight, the pre-decode is a
+   hedge rather than a dependency — the shorter window is safe.
 
    TWO-CLAUSE STRUCTURE (v1.3). The previous single-timer form
    fired its callback at (boundary − SLOT_PRE_WINDOW_MS), which on
    entry into the pre-window itself evaluated to 0 and produced a
    setTimeout(fn, 0) that re-entered the same callback every ~4ms
-   for the full 10-minute window — ~150,000 wakeups plus three
-   Date allocations per tick. The same form, on the fire that
-   followed the boundary, saw current and next already flipped and
-   routed into the else-if branch, decoding the following slot
-   five hours early. Both are closed by the clause split:
+   for the full window — the wakeup count scaled with the window
+   length. The same form, on the fire that followed the boundary,
+   saw current and next already flipped and routed into the else-if
+   branch, decoding the following slot hours early. Both are closed
+   by the clause split:
 
      Clause 1 (inside the pre-window, toBoundary <= PRE_WINDOW):
        ensure the incoming slot is decoding (cold-boot catch), then
@@ -1125,8 +1239,8 @@ function decodeAmbientSlot(track) {
    disarmed by stopAmbient(), matching the .active gate that
    already governs the chime and swell loop. Arming previously
    lived in initSound()'s decode .then(), which meant a tablet
-   parked on the name / blossom screen could wake at 16:50 /
-   21:50 / 04:50 to decompress ~375 MB PCM for an inaudible
+   parked on the name / blossom screen could wake at 16:58 /
+   21:58 / 04:58 to decompress ~375 MB PCM for an inaudible
    engine. Under the new scoping, a phase flip while idle is
    recovered by playAmbientSound()'s transient guard on the next
    startAmbient() — decode resolves in ~1.2s, inside Panel 0's
@@ -1137,7 +1251,7 @@ function decodeAmbientSlot(track) {
    computed delay would shift by at most one hour — still well
    inside the 5-7 hour phase width. */
 var _slotPreDecodeTimer = null;
-var SLOT_PRE_WINDOW_MS = 10 * 60 * 1000; // ms
+var SLOT_PRE_WINDOW_MS = 2 * 60 * 1000; // ms
 
 function getNextAmbientTrack() {
   var p = nagoyaDateParts();
@@ -1185,14 +1299,14 @@ function scheduleNextSlotPreDecode() {
   var toBoundary = msUntilNextPhaseBoundary();
 
   /* Clause 1 — inside the pre-window. Ensure the incoming slot is
-     decoding (covers cold boot into the window: launch at 16:55,
-     for example, where the boundary is only 5 minutes away and no
-     earlier pre-decode could have fired). Then sleep just past the
+     decoding (covers cold boot into the window, e.g. launch at
+     16:59, where the boundary is only a minute away and no earlier
+     pre-decode could have fired). Then sleep just past the
      boundary. The next evaluation sees a fresh multi-hour
      toBoundary and drops into clause 2. */
   if (toBoundary <= SLOT_PRE_WINDOW_MS) {
     var nextEarly = getNextAmbientTrack();
-    if (!soundBuffers[nextEarly.bufferName] && _ambientRawBuffers[nextEarly.url]) {
+    if (!soundBuffers[nextEarly.bufferName]) {
       decodeAmbientSlot(nextEarly);
     }
     _slotPreDecodeTimer = setTimeout(function() {
@@ -1211,9 +1325,9 @@ function scheduleNextSlotPreDecode() {
     _slotPreDecodeTimer = null;
     var current = getCurrentAmbientTrack();
     var next = getNextAmbientTrack();
-    if (!soundBuffers[current.bufferName] && _ambientRawBuffers[current.url]) {
+    if (!soundBuffers[current.bufferName]) {
       decodeAmbientSlot(current);
-    } else if (!soundBuffers[next.bufferName] && _ambientRawBuffers[next.url]) {
+    } else if (!soundBuffers[next.bufferName]) {
       decodeAmbientSlot(next);
     }
     scheduleNextSlotPreDecode();
@@ -1392,19 +1506,21 @@ function initSound() {
        pre-decode timer fires. This is the memory redesign — see
        the changelog entry and decodeAmbientSlot() above.
 
-       The decode of the current slot is the ONLY arming the
-       loader does. scheduleNextSlotPreDecode() is called from
+       Every fetch goes through fetchAmbientRaw(t) so the boot
+       download is registered in _ambientRawPromises[url]. Without
+       that routing, a playAmbientSound() tick that fires before
+       the boot fetch resolves would see an empty memo map and
+       spawn a second parallel download of the active track — on
+       exactly the cold-boot case the memo exists to prevent.
+
+       The decode of the current slot is the ONLY arming the loader
+       does. scheduleNextSlotPreDecode() is called from
        startAmbient() instead — see the LIFECYCLE note on the
-       scheduler. Without that scoping, a tablet parked on the
-       name / blossom screen could pre-decode the next slot for
-       an inaudible engine and hold ~375 MB PCM that no
-       playAmbientSound() would ever consume. */
+       scheduler. */
     var currentTrack = getCurrentAmbientTrack();
     AMBIENT_TRACKS.forEach(function(t) {
-      loadAudioBufferRaw(t.url).then(function(rawBuf) {
+      fetchAmbientRaw(t).then(function(rawBuf) {
         if (!rawBuf) return;
-        _ambientRawBuffers[t.url] = rawBuf;
-
         /* Decode the current slot the instant its own bytes land,
            without waiting for the other two downloads. This avoids
            head-of-line blocking on a cold launch: Morning might
@@ -1436,7 +1552,10 @@ function makeSeamlessLoop(buffer, crossfadeSec) {
     var src = buffer.getChannelData(ch);
     var dst = out.getChannelData(ch);
 
-    for (var i = 0; i < newLength; i++) dst[i] = src[i];
+    /* Prefix copy via built-in set/subarray — the JS index loop
+       was the only hot cost here. The crossfade tail below stays
+       a manual loop because it reads two source windows per write. */
+    dst.set(src.subarray(0, newLength));
 
     for (var j = 0; j < fadeSamples; j++) {
       var t = j / fadeSamples;
@@ -1674,6 +1793,13 @@ function tryStartBlossomStream(retries) {
    that an uncapped transient return would produce after a
    permanently failed fetch.
 
+   Because decodeAmbientSlot() now performs an on-demand raw fetch
+   when _ambientRawBuffers is empty, a failed boot download no
+   longer leaves the slot permanently dead — the 500ms polling
+   loop retries the fetch alongside the decode. The 120-attempt
+   cap still bounds the whole retry window at ~60s, preserving the
+   terminal-stop contract.
+
    ambientPlayStartTime / ambientPlayDurationSec are set at each
    playAmbientSound() call and consumed by updateHudProgress() to
    advance the HUD gauge fill and the label timestamp. All three
@@ -1782,15 +1908,17 @@ function playAmbientSound() {
   var track = getCurrentAmbientTrack();
   var buffer = soundBuffers[track.bufferName];
 
-  /* Transient guard: current slot not decoded yet. Kick off an
-     on-demand decode if the raw bytes are already in
-     _ambientRawBuffers, then return 500. The in-flight promise
-     map in decodeAmbientSlot() ensures this does not stack
-     concurrent decodes across successive 500ms ticks. */
+  /* Transient guard: current slot not decoded yet. decodeAmbientSlot
+     is now responsible for the fetch too — if the raw bytes are
+     missing (a failed boot download, or a boot that hadn't
+     resolved yet), the helper kicks off an on-demand fetch and
+     awaits it alongside the decode. The memo maps in
+     fetchAmbientRaw() and decodeAmbientSlot() ensure this does not
+     stack concurrent fetches or decodes across successive 500ms
+     ticks. The 120-attempt cap below bounds the whole retry
+     window at ~60s. */
   if (!soundReady || !buffer) {
-    if (!buffer && _ambientRawBuffers[track.url]) {
-      decodeAmbientSlot(track);
-    }
+    if (!buffer) decodeAmbientSlot(track);
     _ambientBufferRetries++;
     if (_ambientBufferRetries > 120) {
       _ambientBufferRetries = 0;
