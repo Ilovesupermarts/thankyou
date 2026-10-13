@@ -3,6 +3,33 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (HUD timestamp readout)
+       - The HUD label row now shows elapsed / total playback time
+         (mm:ss / mm:ss) during the playing state, replacing the
+         blank text that used to leave the 10px label row empty.
+         Written once per second from updateHudProgress(), using the
+         same soundAudioCtx.currentTime source as the gauge fill.
+         Zero-padded both fields so the string width is constant
+         and the label does not jitter horizontally as seconds tick.
+       - _hudRenderState() writes the initial 00:00 / MM:SS
+         timestamp at the moment playback starts, so the label is
+         never briefly blank between the "待機完了" state and the
+         first updateHudProgress() tick.
+       - getPlaybackElapsed() centralises the elapsed-time clamp so
+         both writers read from a single source of truth.
+       - During playback the label shows the timestamp
+         unconditionally, regardless of whether background ambient
+         beds are still streaming. This closes a cold-launch dual-
+         writer race where _hudRenderState() at 10Hz would flap
+         between "DL 48%" and "00:04 / 17:00" while Tracks 2 and 3
+         were still downloading. The badge remains the indicator of
+         background decode progress; the gauge fill transitions
+         from amber to plum when the full acoustic bed is resident.
+       - _hudLastRenderedSec resets to -1 in stopAmbient() alongside
+         ambientPlayStartTime and ambientPlayDurationSec, keeping
+         the three playback-window state variables in one cohort.
+       - Assumes tracks under one hour. All current AMBIENT_TRACKS
+         are 16-18 minutes; a longer bed would need hh:mm:ss.
      v1.3 (HUD gauge repurposed: playback progress)
        - The gauge bar now tracks playback progress of the current
          ambient bed rather than download progress. While playing,
@@ -546,7 +573,22 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
    playback progress of the current track. During playback,
    updateHudProgress() is the sole writer of hudGaugeFill's width;
    _hudRenderState() skips its width write whenever ambientSource
-   is non-null so the two never race. */
+   is non-null so the two never race.
+
+   The label row (hudPctStatus) shows:
+     · download percentage during streaming, or
+     · 'PCM展開中' during decode, or
+     · '待機完了' when idle and fully resident, or
+     · 'MM:SS / MM:SS' playback timestamp during the playing state.
+
+   During playback the timestamp is written unconditionally,
+   regardless of whether background beds are still streaming. This
+   closes a cold-launch dual-writer race: _hudRenderState() at
+   10Hz would otherwise flap between 'DL 48%' and '00:04 / 17:00'
+   while Tracks 2 and 3 were still decompressing. The badge
+   remains the indicator of background decode progress; the gauge
+   fill transitions from amber to plum when the full acoustic bed
+   is resident. */
 var audioSpectrumHud = document.getElementById('audioSpectrumHud');
 var hudTrackTitle    = document.getElementById('hudTrackTitle');
 var hudTrackArtist   = document.getElementById('hudTrackArtist');
@@ -592,6 +634,14 @@ var _hudBytesTotalMap  = {};
 var _hudDecodedCount   = 0;
 var _hudLastUpdateMs   = 0;
 
+/* Timestamp throttling gate: the last whole-second value rendered
+   into hudPctStatus during playback. Initialised to -1 so the
+   first write of any playback window always fires. Reset to -1 in
+   stopAmbient() alongside ambientPlayStartTime and
+   ambientPlayDurationSec, keeping the three playback-window state
+   variables in one cohort. */
+var _hudLastRenderedSec = -1;
+
 /* JS-side visibility mirror of the CSS gate. Halted canvas work
    when the card is hidden. */
 function _hudShouldDraw() {
@@ -607,7 +657,11 @@ function _hudShouldDraw() {
    the playback lifecycle funnel through this function; neither
    writes badge state directly. The gauge fill is written here only
    while playback is NOT active — during playback the swell loop's
-   updateHudProgress() owns the fill and advances it over playDur. */
+   updateHudProgress() owns the fill and advances it over playDur.
+
+   During playback the label unconditionally shows the timestamp,
+   even if background beds are still streaming. This is the single-
+   authority resolution of the cold-launch dual-writer race. */
 function _hudRenderState() {
   if (!hudStatusBadge || !hudGaugeFill) return;
 
@@ -639,16 +693,20 @@ function _hudRenderState() {
     /* Priority 1 — audio is audibly playing */
     hudStatusBadge.textContent = '再生中';
     hudStatusBadge.classList.add('ready');
+
     if (_hudDecodedCount >= _hudTotalFiles) {
       hudGaugeFill.classList.add('ready');
-      /* Blank the sub-pct line: the full gauge plus the badge
-         already say everything the pct would. */
-      hudPctStatus.textContent = '';
-    } else {
-      hudPctStatus.textContent = pctInt + '%';
     }
+
+    /* Single authority: while playing, the label always reflects
+       playback timing. Closes the dual-writer race with background
+       stream chunks. The badge and fill already signal background
+       decode progress; the label does not duplicate it. */
+    var elapsed = getPlaybackElapsed();
+    hudPctStatus.textContent = formatHudTime(elapsed) + ' / ' + formatHudTime(ambientPlayDurationSec);
+    _hudLastRenderedSec = Math.floor(elapsed);
   } else if (_hudDecodedCount < _hudTotalFiles) {
-    /* Priority 2 — in-flight download or decode */
+    /* Priority 2 — in-flight download or decode (not playing) */
     if (pct >= 1.0) {
       hudGaugeFill.classList.add('decoding');
       hudStatusBadge.textContent = '展開中';
@@ -678,25 +736,67 @@ function updateHudLoadingAggregated(force) {
   _hudRenderState();
 }
 
+/* Format a duration in seconds as zero-padded mm:ss. Assumes
+   durations under an hour — all current AMBIENT_TRACKS are 16–18
+   minutes. If a longer ambient bed is ever added, this needs an
+   hh:mm:ss branch. */
+function formatHudTime(sec) {
+  if (!isFinite(sec) || sec < 0) sec = 0;
+  var total = Math.floor(sec);
+  var m = Math.floor(total / 60);
+  var s = total % 60;
+  return (m < 10 ? '0' + m : String(m)) + ':' + (s < 10 ? '0' + s : String(s));
+}
+
+/* Elapsed playback seconds, clamped to the current track's playDur.
+   Shared by _hudRenderState() (state transitions) and
+   updateHudProgress() (per-second tick) so both writers of the
+   timestamp read from a single source of truth. Returns 0 when no
+   playback is active or when the timing state is unset. */
+function getPlaybackElapsed() {
+  if (ambientSource === null) return 0;
+  if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return 0;
+  var elapsed = soundAudioCtx.currentTime - ambientPlayStartTime;
+  if (elapsed < 0) elapsed = 0;
+  if (elapsed > ambientPlayDurationSec) elapsed = ambientPlayDurationSec;
+  return elapsed;
+}
+
 /* Advances the HUD gauge fill over the current ambient track's
-   duration. Called from the swell loop alongside drawHudSpectrum()
-   whenever the HUD is visible and the scroll gate is released.
+   duration and updates the label timestamp once per whole second.
+   Called from the swell loop alongside drawHudSpectrum() whenever
+   the HUD is visible and the scroll gate is released.
+
    During playback this is the sole writer of hudGaugeFill's width;
    _hudRenderState() skips its width write whenever ambientSource
    is non-null so the two never race.
 
    Progress is computed from soundAudioCtx.currentTime so the fill
    is accurate across fade-in, main body, and fade-out — no
-   integration of animation frames required. */
+   integration of animation frames required.
+
+   The timestamp string is gated on integer-second changes: the
+   underlying time advances every rAF tick, but the mm:ss string
+   only changes when the whole-second value increments. Writing on
+   every frame would be 100+ redundant DOM mutations per second for
+   no visible effect. */
 function updateHudProgress() {
   if (!hudGaugeFill) return;
   if (ambientSource === null) return;
   if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return;
-  var elapsed = soundAudioCtx.currentTime - ambientPlayStartTime;
-  if (elapsed < 0) elapsed = 0;
-  if (elapsed > ambientPlayDurationSec) elapsed = ambientPlayDurationSec;
+
+  var elapsed = getPlaybackElapsed();
+
+  /* Gauge fill — advances every rAF tick */
   var pct = (elapsed / ambientPlayDurationSec) * 100;
   hudGaugeFill.style.width = pct.toFixed(2) + '%';
+
+  /* Timestamp — updates once per integer second */
+  var elapsedSec = Math.floor(elapsed);
+  if (elapsedSec !== _hudLastRenderedSec && hudPctStatus) {
+    _hudLastRenderedSec = elapsedSec;
+    hudPctStatus.textContent = formatHudTime(elapsed) + ' / ' + formatHudTime(ambientPlayDurationSec);
+  }
 }
 
 /* Streaming loader with byte-level progress reporting. Replaces
@@ -1182,8 +1282,10 @@ function tryStartBlossomStream(retries) {
 
    ambientPlayStartTime / ambientPlayDurationSec are set at each
    playAmbientSound() call and consumed by updateHudProgress() to
-   advance the HUD gauge fill. Both reset on src.onended so the
-   next cycle's start position is measured from a clean slate. */
+   advance the HUD gauge fill and the label timestamp. All three
+   of ambientPlayStartTime, ambientPlayDurationSec, and
+   _hudLastRenderedSec reset together in stopAmbient() so the
+   playback-window state stays in one cohort. */
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
@@ -1248,6 +1350,7 @@ function stopAmbient() {
   ambientGain = null;
   ambientPlayStartTime = -1;
   ambientPlayDurationSec = 0;
+  _hudLastRenderedSec = -1;
 
   /* Badge revert to standby via the single-authority renderer */
   _hudRenderState();
@@ -1336,6 +1439,7 @@ function playAmbientSound() {
     if (ambientGain === gain) ambientGain = null;
     ambientPlayStartTime = -1;
     ambientPlayDurationSec = 0;
+    _hudLastRenderedSec = -1;
     try { gain.disconnect(); } catch (e) {}
     /* Defensive: keep the HUD in sync if the re-arm timing changes */
     _hudRenderState();
