@@ -37,16 +37,15 @@
        The mesh is gated to the autumn theme in main.css; the default
        (sakura) theme keeps its watercolor gradient stack uncluttered.
 
-       v1.3 (raster fix, step 1): the mix-blend-mode layers
+       v1.3 (raster fix): the mix-blend-mode layers
        .ambient-secondary (multiply), .caustics-1 (screen) and
-       .caustics-2 (screen) have been removed from the DOM. Each one
-       forced Chromium to open a separate offscreen render pass on the
-       stage's isolated FBO and read back the backdrop before
-       compositing, which on Adreno TBDR hardware exhausted tile
-       memory at 120Hz and produced the axis-aligned tile dropouts
-       observed on the tablet. The CSS rules for these selectors are
-       deliberately left in main.css as dead code so step 2/3 can be
-       applied if the artifacts persist without re-authoring anything.
+       .caustics-2 (screen) have been removed from both the DOM and
+       main.css. Each layer forced Chromium to open a separate
+       offscreen render pass on the stage's isolated FBO and read
+       back the backdrop before compositing, which on Adreno TBDR
+       hardware exhausted tile memory at 120Hz and produced axis-
+       aligned tile dropouts. The single pre-feathered .ambient-mesh
+       stack now carries the lighting with zero readback passes.
 
        v1.3 (audio-reactive swell): this element carries the
        .layer-diffuse class, which drives its brightness, saturation
@@ -147,7 +146,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.1</div>
+  <div class="app-version" aria-hidden="true">v2.10.01</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
