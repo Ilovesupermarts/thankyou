@@ -3,50 +3,40 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>行間デモ — Panel Typography</title>
+<title>フォント・行間デモ</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<!-- The real stylesheet. Ambient layers, theme tokens, panel
-     typography, text-shadow — all of it comes from here, so the
-     demo cannot drift from production. -->
+<!-- 明朝体 (Mincho / Serif) -->
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Old+Mincho:wght@400;700&family=Hina+Mincho&family=Sawarabi+Mincho&family=Zen+Antique&family=Yuji+Syuku&family=Yuji+Mai&family=BIZ+UDMincho:wght@400;700&display=swap" rel="stylesheet">
+
+<!-- ゴシック体 (Gothic / Sans) -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700&family=M+PLUS+1p:wght@400;500;700&family=Zen+Kurenaido&display=swap" rel="stylesheet">
+
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============================================================
-     DEMO-ONLY OVERRIDES
-     Everything below is scoped to elements that only exist on
-     this page. main.css is loaded unmodified above.
-     ============================================================ */
-
-  /* main.css reserves 100px at the body's bottom for the summary
-     bar. Not relevant here. */
   body { padding: 40px 20px 80px 20px !important; }
 
-  /* .panel-content ships with opacity:0 / translateX / blur as
-     the entrance state — it's meant to be revealed by adding
-     .active to its .panel ancestor. There's no .panel here, so
-     force the settled state and inject the slider-driven
-     values via custom properties. */
+  /* Force the preview panel to settled state — no .active ancestor here. */
   .demo-preview .panel-content {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
     transition: none !important;
     line-height: var(--demo-lh, 2.25) !important;
+    font-family: var(--demo-font, "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif) !important;
   }
   .demo-preview .panel-content p {
     margin-bottom: var(--demo-pm, 0.40em);
   }
-  .demo-preview .panel-content p:last-child {
-    margin-bottom: 0;
+  .demo-preview .panel-content p:last-child { margin-bottom: 0; }
+
+  .demo-preview .therapist-name {
+    font-family: var(--demo-name-font, "Yuji Syuku", "Shippori Mincho", serif) !important;
   }
 
-  /* .panel-inner is reused as the reference column — same 480px
-     max-width the panels clamp to on the tablet. Centered, with
-     text-align matching .panel's own centering. */
   .demo-preview {
     max-width: 480px;
     margin: 0 auto;
@@ -56,36 +46,30 @@
 
   /* ---------- Demo chrome ---------- */
   .demo-header {
-    max-width: 600px;
-    margin: 0 auto 32px auto;
+    max-width: 620px;
+    margin: 0 auto 28px auto;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
   }
   .demo-header h1 {
-    font-size: 21px;
-    font-weight: 600;
+    font-size: 21px; font-weight: 600;
     color: var(--secondary-accent, #882E47);
-    letter-spacing: 3px;
-    margin: 0 0 14px 0;
+    letter-spacing: 3px; margin: 0 0 14px 0;
   }
   .demo-header p {
-    font-size: 13.5px;
-    color: var(--text-mute);
-    line-height: 1.9;
-    margin: 0;
-    letter-spacing: 0.5px;
+    font-size: 13.5px; color: var(--text-mute);
+    line-height: 1.9; margin: 0; letter-spacing: 0.5px;
   }
   .demo-header code {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     font-size: 12.5px;
     background: rgba(222, 192, 172, 0.45);
-    padding: 1px 6px;
-    border-radius: 4px;
+    padding: 1px 6px; border-radius: 4px;
     color: var(--text-dark);
   }
 
   .controls {
-    max-width: 480px;
+    max-width: 520px;
     margin: 0 auto 16px auto;
     padding: 22px 26px;
     background: rgba(255, 253, 249, 0.96);
@@ -94,76 +78,92 @@
     font-family: -apple-system, BlinkMacSystemFont, sans-serif;
     box-shadow: 0 6px 22px rgba(68, 52, 48, 0.10);
   }
+  .controls h2 {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--secondary-accent, #882E47);
+    letter-spacing: 3px;
+    margin: 0 0 18px 0;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(222, 192, 172, 0.55);
+    text-align: center;
+    font-family: "Shippori Mincho", serif;
+  }
+  .controls h2:not(:first-child) { margin-top: 32px; }
+
   .control-row {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 22px;
+    display: flex; flex-direction: column;
+    gap: 10px; margin-bottom: 22px;
   }
   .control-row:last-child { margin-bottom: 0; }
   .control-label {
-    display: flex;
-    justify-content: space-between;
+    display: flex; justify-content: space-between;
     align-items: baseline;
-    font-size: 12.5px;
-    color: var(--text-mute);
+    font-size: 12.5px; color: var(--text-mute);
     letter-spacing: 1.2px;
   }
   .control-label strong {
     font-family: ui-monospace, "SF Mono", Menlo, monospace;
     color: var(--secondary-accent, #882E47);
-    font-size: 15px;
-    letter-spacing: 0.5px;
-    font-weight: 700;
+    font-size: 15px; letter-spacing: 0.5px; font-weight: 700;
   }
   .control-row input[type="range"] {
-    width: 100%;
-    height: 24px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: transparent;
-    cursor: pointer;
+    width: 100%; height: 24px;
+    -webkit-appearance: none; appearance: none;
+    background: transparent; cursor: pointer;
     touch-action: manipulation;
   }
   .control-row input[type="range"]::-webkit-slider-runnable-track {
-    height: 5px;
-    background: rgba(222, 192, 172, 0.75);
-    border-radius: 3px;
+    height: 5px; background: rgba(222, 192, 172, 0.75); border-radius: 3px;
   }
   .control-row input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
+    -webkit-appearance: none; appearance: none;
+    width: 22px; height: 22px; border-radius: 50%;
     background: var(--accent);
     border: 2px solid #FFFDF9;
     box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
     margin-top: -8.5px;
   }
   .control-row input[type="range"]::-moz-range-track {
-    height: 5px;
-    background: rgba(222, 192, 172, 0.75);
-    border-radius: 3px;
+    height: 5px; background: rgba(222, 192, 172, 0.75); border-radius: 3px;
   }
   .control-row input[type="range"]::-moz-range-thumb {
-    width: 22px;
-    height: 22px;
-    border-radius: 50%;
+    width: 22px; height: 22px; border-radius: 50%;
     background: var(--accent);
     border: 2px solid #FFFDF9;
     box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
   }
 
+  select.font-select {
+    width: 100%;
+    padding: 12px 14px;
+    font-size: 15px;
+    font-family: inherit;
+    color: var(--text-dark);
+    background: #FFFDF9;
+    border: 1.5px solid var(--border-2);
+    border-radius: 10px;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23BEA29B' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 38px;
+    cursor: pointer;
+  }
+  select.font-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
   .css-output {
-    max-width: 480px;
+    max-width: 520px;
     margin: 32px auto 0 auto;
     padding: 20px 24px;
     background: rgba(36, 28, 26, 0.94);
     border-radius: 12px;
     font-family: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
-    font-size: 13px;
-    line-height: 1.85;
+    font-size: 13px; line-height: 1.85;
     color: #FBECE0;
     letter-spacing: 0.3px;
     white-space: pre;
@@ -173,26 +173,21 @@
   .css-output .val   { color: #F07D40; font-weight: 600; }
   .css-output .sel   { color: #DEC0AC; }
   .css-output .brace { color: #9E7D75; }
+  .css-output .cmt   { color: #725750; font-style: italic; }
 
   .copy-btn {
-    display: block;
-    width: 100%;
-    max-width: 480px;
-    margin: 16px auto 0 auto;
+    display: block; width: 100%;
+    max-width: 520px; margin: 16px auto 0 auto;
     padding: 14px 28px;
-    background: var(--accent);
-    color: #ffffff;
+    background: var(--accent); color: #ffffff;
     border: 1.5px solid var(--accent);
     border-radius: 22px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 2px;
+    font-size: 13px; font-weight: 600; letter-spacing: 2px;
     cursor: pointer;
     box-shadow: 0 4px 14px rgba(230, 104, 38, 0.28);
     transition: background 0.2s, transform 0.15s, border-color 0.2s;
-    -webkit-appearance: none;
-    appearance: none;
+    -webkit-appearance: none; appearance: none;
   }
   .copy-btn:active { transform: scale(0.97); }
   .copy-btn.copied {
@@ -201,14 +196,20 @@
   }
 
   .demo-footer {
-    max-width: 600px;
-    margin: 28px auto 0 auto;
+    max-width: 620px; margin: 28px auto 0 auto;
     text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 12px;
+    font-size: 12px; color: var(--text-faint);
+    letter-spacing: 1px; line-height: 2;
+  }
+
+  .loading-note {
+    max-width: 520px;
+    margin: 0 auto 20px auto;
+    text-align: center;
+    font-size: 11.5px;
     color: var(--text-faint);
-    letter-spacing: 1px;
-    line-height: 2;
+    letter-spacing: 0.8px;
   }
 
   @media (max-width: 600px) {
@@ -221,14 +222,7 @@
 </head>
 <body>
 
-<!-- ============================================================
-     AMBIENT BACKGROUND — copied verbatim from index.html.
-     All styling comes from main.css; nothing inline. The
-     --audio-swell custom property is never set, so every calc()
-     in main.css resolves through its var(..., 0) fallback to the
-     engine's resting state — same density the tablet shows
-     between tracks.
-     ============================================================ -->
+<!-- ============ AMBIENT BACKGROUND — verbatim from index.html ============ -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -252,19 +246,77 @@
 <div class="ambient-mosaic" aria-hidden="true"></div>
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<!-- ============================================================
-     DEMO CONTENT
-     ============================================================ -->
+<!-- ============ DEMO CONTENT ============ -->
 <div class="demo-header">
-  <h1>行間・段落間の調整</h1>
+  <h1>フォント・行間の最終調整</h1>
   <p>
-    <code>main.css</code> をそのまま読み込んでいるため、背景・タイポグラフィ・<br>
-    テキストシャドウはすべて本番と一致します。<br>
-    スライダーで<strong>行間</strong>と<strong>段落間の余白</strong>を自由に調整してください。
+    <code>main.css</code> をそのまま読み込んでいます。<br>
+    背景・タイポグラフィ・テキストシャドウはすべて本番と一致します。<br>
+    フォント・行間・段落間を自由に調整してください。
   </p>
 </div>
 
+<div class="loading-note">
+  ※ 日本語フォントは初回読み込みに時間がかかる場合があります
+</div>
+
 <div class="controls">
+
+  <h2>フォント</h2>
+
+  <div class="control-row">
+    <label class="control-label" for="font-body">
+      <span>本文フォント — .panel-content</span>
+    </label>
+    <select class="font-select" id="font-body">
+      <optgroup label="明朝体（セリフ）">
+        <option value="'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif" selected>しっぽり明朝（現在）</option>
+        <option value="'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Noto Serif JP（源ノ明朝）</option>
+        <option value="'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Old Mincho（オールド明朝）</option>
+        <option value="'Hina Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">ひな明朝</option>
+        <option value="'Sawarabi Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">さわらび明朝</option>
+        <option value="'Zen Antique', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Antique</option>
+        <option value="'Yuji Syuku', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 粛</option>
+        <option value="'Yuji Mai', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 舞</option>
+        <option value="'BIZ UDMincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">BIZ UD明朝</option>
+      </optgroup>
+      <optgroup label="ゴシック体（サンセリフ）">
+        <option value="'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">Noto Sans JP</option>
+        <option value="'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 角ゴシック New</option>
+        <option value="'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 丸ゴシック</option>
+        <option value="'M PLUS 1p', 'Hiragino Sans', 'Yu Gothic', sans-serif">M PLUS 1p</option>
+        <option value="'Zen Kurenaido', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 紅道</option>
+      </optgroup>
+      <optgroup label="システムフォント">
+        <option value="-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif">システム標準</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <div class="control-row">
+    <label class="control-label" for="font-name">
+      <span>名前フォント — .therapist-name</span>
+    </label>
+    <select class="font-select" id="font-name">
+      <optgroup label="明朝体（セリフ）">
+        <option value="'Yuji Syuku', 'Shippori Mincho', 'Hiragino Mincho ProN', serif" selected>佑字 粛（現在）</option>
+        <option value="'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">しっぽり明朝</option>
+        <option value="'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Noto Serif JP</option>
+        <option value="'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Old Mincho</option>
+        <option value="'Hina Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">ひな明朝</option>
+        <option value="'Yuji Mai', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 舞</option>
+        <option value="'Zen Antique', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Antique</option>
+      </optgroup>
+      <optgroup label="ゴシック体（サンセリフ）">
+        <option value="'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 丸ゴシック</option>
+        <option value="'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 角ゴシック New</option>
+        <option value="'M PLUS 1p', 'Hiragino Sans', 'Yu Gothic', sans-serif">M PLUS 1p</option>
+      </optgroup>
+    </select>
+  </div>
+
+  <h2>行間・段落間</h2>
+
   <div class="control-row">
     <label class="control-label" for="lh">
       <span>行間 — line-height</span>
@@ -281,8 +333,10 @@
   </div>
 </div>
 
+<!-- ============ PREVIEW ============ -->
 <div class="demo-preview panel-inner">
   <div class="panel-content">
+    <span class="therapist-name">桜庭さん</span>、初めまして。
     <p>それでは、本日の癒しのオプションをご覧ください。</p>
     <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
     <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
@@ -291,65 +345,98 @@
   </div>
 </div>
 
-<pre class="css-output" id="css-output"><span class="sel">.panel-content</span> <span class="brace">{</span>
+<!-- ============ CSS OUTPUT ============ -->
+<pre class="css-output" id="css-output"><span class="cmt">/* .panel-content — 本文 */</span>
+<span class="sel">.panel-content</span> <span class="brace">{</span>
+  <span class="prop">font-family</span>: <span class="val" id="out-font">"Shippori Mincho", ...</span>;
   <span class="prop">line-height</span>: <span class="val" id="out-lh">2.25</span>;
 <span class="brace">}</span>
 <span class="sel">.panel-content p</span> <span class="brace">{</span>
   <span class="prop">margin-bottom</span>: <span class="val" id="out-pm">0.40em</span>;
+<span class="brace">}</span>
+
+<span class="cmt">/* .therapist-name — 名前 */</span>
+<span class="sel">.panel-content .therapist-name</span> <span class="brace">{</span>
+  <span class="prop">font-family</span>: <span class="val" id="out-name-font">"Yuji Syuku", ...</span>;
 <span class="brace">}</span></pre>
 
-<button type="button" class="copy-btn" id="copy-btn">この値をコピー</button>
+<button type="button" class="copy-btn" id="copy-btn">この設定をコピー</button>
 
 <div class="demo-footer">
-  ここで決めた値を教えていただければ、<br>
+  ここで決めた設定を教えていただければ、<br>
   main.css に反映します。
 </div>
 
 <script>
 (function() {
-  var lhInput  = document.getElementById('lh');
-  var pmInput  = document.getElementById('pm');
-  var lhValue  = document.getElementById('lh-value');
-  var pmValue  = document.getElementById('pm-value');
-  var outLh    = document.getElementById('out-lh');
-  var outPm    = document.getElementById('out-pm');
-  var copyBtn  = document.getElementById('copy-btn');
-  var preview  = document.querySelector('.demo-preview');
+  var lhInput    = document.getElementById('lh');
+  var pmInput    = document.getElementById('pm');
+  var fontBody   = document.getElementById('font-body');
+  var fontName   = document.getElementById('font-name');
+  var lhValue    = document.getElementById('lh-value');
+  var pmValue    = document.getElementById('pm-value');
+  var outFont    = document.getElementById('out-font');
+  var outNameFont= document.getElementById('out-name-font');
+  var outLh      = document.getElementById('out-lh');
+  var outPm      = document.getElementById('out-pm');
+  var copyBtn    = document.getElementById('copy-btn');
+  var preview    = document.querySelector('.demo-preview');
 
   function sync() {
     var lh = parseFloat(lhInput.value).toFixed(2);
     var pm = parseFloat(pmInput.value).toFixed(2);
     var pmStr = pm + 'em';
+    var bodyFont = fontBody.value;
+    var nameFont = fontName.value;
 
     lhValue.textContent = lh;
     pmValue.textContent = pmStr;
+    outFont.textContent = bodyFont;
+    outNameFont.textContent = nameFont;
     outLh.textContent = lh;
     outPm.textContent = pmStr;
 
+    preview.style.setProperty('--demo-font', bodyFont);
+    preview.style.setProperty('--demo-name-font', nameFont);
     preview.style.setProperty('--demo-lh', lh);
     preview.style.setProperty('--demo-pm', pmStr);
   }
 
   lhInput.addEventListener('input', sync);
   pmInput.addEventListener('input', sync);
+  fontBody.addEventListener('change', sync);
+  fontName.addEventListener('change', sync);
   sync();
 
   copyBtn.addEventListener('click', function() {
+    var lh = parseFloat(lhInput.value).toFixed(2);
+    var pm = parseFloat(pmInput.value).toFixed(2);
+    var bodyFont = fontBody.value;
+    var nameFont = fontName.value;
+
     var css =
+      '/* .panel-content — 本文 */\n' +
       '.panel-content {\n' +
-      '  line-height: ' + parseFloat(lhInput.value).toFixed(2) + ';\n' +
+      '  font-family: ' + bodyFont + ';\n' +
+      '  line-height: ' + lh + ';\n' +
       '}\n' +
       '.panel-content p {\n' +
-      '  margin-bottom: ' + parseFloat(pmInput.value).toFixed(2) + 'em;\n' +
+      '  margin-bottom: ' + pm + 'em;\n' +
+      '}\n\n' +
+      '/* .therapist-name — 名前 */\n' +
+      '.panel-content .therapist-name {\n' +
+      '  font-family: ' + nameFont + ';\n' +
       '}\n';
+
     var done = function() {
       copyBtn.classList.add('copied');
       copyBtn.textContent = 'コピーしました';
       setTimeout(function() {
         copyBtn.classList.remove('copied');
-        copyBtn.textContent = 'この値をコピー';
+        copyBtn.textContent = 'この設定をコピー';
       }, 1400);
     };
+
     if (navigator.clipboard && window.isSecureContext) {
       navigator.clipboard.writeText(css).then(done).catch(function() {
         fallback(css, done);
