@@ -3,6 +3,108 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (slot pre-decode lifecycle scoping + busy-loop fix)
+       - scheduleNextSlotPreDecode() split into two clauses gated
+         on SLOT_PRE_WINDOW_MS (10 minutes). The previous single-
+         timer form fired at (boundary - 10min); if that moment
+         fell inside the pre-window itself, msUntilNextPhaseBoundary
+         returned a value ≤ SLOT_PRE_WINDOW_MS, the subtraction
+         clamped to 0, and the setTimeout callback re-entered the
+         same branch ~250 times per second for the full 10-minute
+         window — ~150,000 timer wakeups plus three Date
+         allocations per tick, twice per day cycle on a battery-
+         powered tablet. The dead-reschedule (toBoundary + 1000ms)
+         parks the timer just past the boundary so the next
+         evaluation sees a fresh multi-hour value and drops into
+         the outside-window clause.
+       - The 5-hour premature decode is closed by the same split.
+         The previous form, on the fire that followed the boundary,
+         saw current and next already flipped and routed into the
+         else-if branch, decoding the following slot five hours
+         early. The new clause 2 is a pure arm — it only decodes
+         when current or next is missing, which after a normal
+         boundary crossing is never.
+       - Cold-boot inside the pre-window (e.g. tab opened at 16:55)
+         is covered by clause 1's !soundBuffers[nextEarly.bufferName]
+         check, which kicks the incoming slot's decode immediately
+         and then sleeps past the boundary.
+       - Lifecycle scoping: scheduleNextSlotPreDecode() is now
+         armed by startAmbient() and disarmed by stopAmbient(),
+         matching the .active gate that already governs the chime
+         and swell loop. The arming previously lived in
+         initSound()'s decode .then(), which meant a tablet parked
+         on the name / blossom screen could wake at 16:50 / 21:50 /
+         04:50 to decompress ~375 MB PCM for an inaudible engine,
+         and a user who tapped the reset hotspot to return to the
+         start screen left the timer running indefinitely across
+         day/night boundaries. Under the new scoping, a phase flip
+         while idle is recovered by playAmbientSound()'s transient
+         guard via the 500ms retry path — decode resolves in
+         ~1.2s, well inside Panel 0's 1.4–2.0s visual entrance
+         envelope.
+     v1.3 (HUD rides above the summary bar)
+       - The audio HUD lifts by the summary bar's rendered height
+         when the price summary becomes visible, preserving the
+         same 28px + safe-area gap it carries against the viewport
+         bottom. The height is measured at runtime into
+         --summary-h rather than hard-coded, because the summary's
+         padding, breakpoint scaling, and env(safe-area-inset-
+         bottom) all vary with viewport.
+       - Motion is coupled to the summary's own slide: both the
+         summary bar and the HUD's transform leg run at 0.5s on
+         the same cubic-bezier(0.4, 0.0, 0.2, 1) — an asymmetric
+         S-curve with zero initial slope (soft lift-off) and near-
+         zero terminal slope (soft arrival). Matching durations
+         ensures both motions land at the same instant; matching
+         curves ensures the HUD's 28px gap against the summary's
+         moving top edge holds at every intermediate frame, not
+         just at the endpoints. The previous ease-out curve placed
+         maximum velocity at t=0, which read as a lurch on a
+         ~75px displacement.
+       - The lift is gated on :has(.summary.visible) in main.css,
+         so every existing call site that toggles the summary's
+         visibility picks it up automatically — no coupling
+         between the summary state machine and the HUD. On hide,
+         the :has() selector stops matching, the cascade falls
+         back to the base .shown rule's translateY(0), and the HUD
+         descends over the same transition. The measured
+         --summary-h is not consulted on the descent; the target
+         is always the base position, so a mid-flight height
+         change cannot strand the HUD off-anchor.
+       - measureSummaryHeight() writes the value to --summary-h on
+         documentElement. Re-measured by a ResizeObserver bound to
+         the summary element (fires on observe plus on any layout
+         change: font-load reflow, breakpoint crossing, safe-area
+         recomputation) and by the existing window resize /
+         orientationchange handlers.
+       - The HUD's opacity leg stays at 0.6s ease — it governs the
+         HUD's intro show, which is unrelated to the summary
+         choreography.
+     v1.3 (HUD visible on the thank-you screen)
+       - The audio HUD now remains visible on the thank-you
+         carousel, elevated above the 内容を確認する button. The
+         base shown-state CSS gate drops :not(.thankyou-active);
+         an elevated-position rule under body.thankyou-active
+         applies a 60px lift, which clears the ty-receipt-btn's
+         top edge across all breakpoints (button top edge at
+         ~50 / 64 / 70px from viewport bottom, HUD bottom at 28px
+         base + 60px lift = 88px).
+       - _hudShouldDraw()'s thankyou-active clause is removed so
+         canvas rasterization continues during the thank-you
+         sequence. The receipt-locked clause is retained: the
+         receipt overlay keeps the HUD hidden, matching the
+         "Receipt page no hud" requirement.
+       - The full cycle thank-you → receipt → service table
+         produces exactly one opacity transition per state change.
+         .shown is added once in triggerKoiStart() and removed
+         only in returnToStartScreen(), so it does not toggle
+         across this cycle; opacity is driven purely by the two
+         body-class gates. The receiptOpenedFromThankyou window —
+         where thankyou-active and receipt-locked are both set —
+         keeps the HUD hidden via the :not(.receipt-locked)
+         clause, so closing that receipt and returning to the
+         thank-you screen produces one fade-in, not a fade-in-
+         then-fade-out.
      v1.3 (lazy slot-based decode)
        - The three ambient beds are downloaded in parallel but
          only the current Nagoya phase is decoded into PCM at
@@ -587,13 +689,13 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
    ambient bed. Its visibility is governed by two gates that must
    stay in sync:
 
-     · CSS — body.info-visible:not(.thankyou-active):not(.receipt-locked)
+     · CSS — body.info-visible:not(.receipt-locked)
      · JS  — _hudShouldDraw(), which mirrors the same body-class
               conditions plus the .shown class on the HUD element.
 
    The JS mirror exists to skip 120Hz canvas rasterization whenever
-   the CSS rule hides the HUD — during the receipt dwell, the
-   thank-you sequence, and any state where the card is at opacity 0.
+   the CSS rule hides the HUD — during the receipt dwell and any
+   state where the card is at opacity 0.
 
    Canvas animation shares the swell loop's _scrollActive gate so
    the HUD never competes with gesture dispatch during scroll.
@@ -665,11 +767,14 @@ var _hudLastUpdateMs   = 0;
 var _hudLastRenderedSec = -1;
 
 /* JS-side visibility mirror of the CSS gate. Halted canvas work
-   when the card is hidden. */
+   when the card is hidden. The receipt-locked class is the only
+   body-class hidden condition — the HUD is now visible on the
+   thank-you screen (see the v1.3 HUD-visible-on-thank-you
+   changelog entry) and the earlier thankyou-active exclusion was
+   removed in lockstep with the CSS gate. */
 function _hudShouldDraw() {
   if (!audioSpectrumHud) return false;
   if (!document.body.classList.contains('info-visible')) return false;
-  if (document.body.classList.contains('thankyou-active')) return false;
   if (document.body.classList.contains('receipt-locked')) return false;
   if (!audioSpectrumHud.classList.contains('shown')) return false;
   return true;
@@ -969,6 +1074,30 @@ function decodeAmbientSlot(track) {
    Even a first-ever cold launch has the download racing the
    window, and 16 MB over 10 minutes is ~215 kbps.
 
+   TWO-CLAUSE STRUCTURE (v1.3). The previous single-timer form
+   fired its callback at (boundary − SLOT_PRE_WINDOW_MS), which on
+   entry into the pre-window itself evaluated to 0 and produced a
+   setTimeout(fn, 0) that re-entered the same callback every ~4ms
+   for the full 10-minute window — ~150,000 wakeups plus three
+   Date allocations per tick. The same form, on the fire that
+   followed the boundary, saw current and next already flipped and
+   routed into the else-if branch, decoding the following slot
+   five hours early. Both are closed by the clause split:
+
+     Clause 1 (inside the pre-window, toBoundary <= PRE_WINDOW):
+       ensure the incoming slot is decoding (cold-boot catch), then
+       sleep toBoundary + 1000ms — just past the boundary. The next
+       evaluation sees a fresh multi-hour toBoundary and drops into
+       clause 2. No spin.
+
+     Clause 2 (outside the pre-window, toBoundary > PRE_WINDOW):
+       sleep toBoundary − PRE_WINDOW, then on fire decode current
+       (suspend catch-up if the tablet slept past a boundary) or
+       next if current is already resident. Reschedule. No
+       premature decode of the subsequent slot at a boundary
+       crossing, because the callback is not re-entered until the
+       following clause-2 arm.
+
    Two edge cases handled by the callback:
 
      · suspend-across-boundary. If the tablet slept through the
@@ -980,11 +1109,23 @@ function decodeAmbientSlot(track) {
        following boundary so a session left running for days keeps
        its pre-decode window current.
 
+   LIFECYCLE (v1.3). The scheduler is armed by startAmbient() and
+   disarmed by stopAmbient(), matching the .active gate that
+   already governs the chime and swell loop. Arming previously
+   lived in initSound()'s decode .then(), which meant a tablet
+   parked on the name / blossom screen could wake at 16:50 /
+   21:50 / 04:50 to decompress ~375 MB PCM for an inaudible
+   engine. Under the new scoping, a phase flip while idle is
+   recovered by playAmbientSound()'s transient guard on the next
+   startAmbient() — decode resolves in ~1.2s, inside Panel 0's
+   1.4–2.0s visual entrance envelope.
+
    Nagoya has no DST, so the boundary math reduces to UTC+9
    arithmetic. If the app is ever deployed to a DST zone, the
    computed delay would shift by at most one hour — still well
    inside the 5-7 hour phase width. */
 var _slotPreDecodeTimer = null;
+var SLOT_PRE_WINDOW_MS = 10 * 60 * 1000; // ms
 
 function getNextAmbientTrack() {
   var p = nagoyaDateParts();
@@ -1024,16 +1165,40 @@ function msUntilNextPhaseBoundary() {
 }
 
 function scheduleNextSlotPreDecode() {
-  if (_slotPreDecodeTimer) clearTimeout(_slotPreDecodeTimer);
-  var ms = msUntilNextPhaseBoundary() - 10 * 60 * 1000;
-  if (ms < 0) ms = 0;
+  if (_slotPreDecodeTimer) {
+    clearTimeout(_slotPreDecodeTimer);
+    _slotPreDecodeTimer = null;
+  }
+
+  var toBoundary = msUntilNextPhaseBoundary();
+
+  /* Clause 1 — inside the pre-window. Ensure the incoming slot is
+     decoding (covers cold boot into the window: launch at 16:55,
+     for example, where the boundary is only 5 minutes away and no
+     earlier pre-decode could have fired). Then sleep just past the
+     boundary. The next evaluation sees a fresh multi-hour
+     toBoundary and drops into clause 2. */
+  if (toBoundary <= SLOT_PRE_WINDOW_MS) {
+    var nextEarly = getNextAmbientTrack();
+    if (!soundBuffers[nextEarly.bufferName] && _ambientRawBuffers[nextEarly.url]) {
+      decodeAmbientSlot(nextEarly);
+    }
+    _slotPreDecodeTimer = setTimeout(function() {
+      _slotPreDecodeTimer = null;
+      scheduleNextSlotPreDecode();
+    }, toBoundary + 1000);
+    return;
+  }
+
+  /* Clause 2 — outside the pre-window. Sleep until the pre-window
+     opens, then on fire decode the incoming slot (or the current
+     slot first, if the tablet slept past a boundary and current is
+     still missing). Reschedule for the following boundary. */
+  var ms = toBoundary - SLOT_PRE_WINDOW_MS;
   _slotPreDecodeTimer = setTimeout(function() {
     _slotPreDecodeTimer = null;
     var current = getCurrentAmbientTrack();
     var next = getNextAmbientTrack();
-    /* Suspend-across-boundary catch-up: if the phase flipped
-       during sleep, decode the (now current) slot before its
-       boundary partner. */
     if (!soundBuffers[current.bufferName] && _ambientRawBuffers[current.url]) {
       decodeAmbientSlot(current);
     } else if (!soundBuffers[next.bufferName] && _ambientRawBuffers[next.url]) {
@@ -1226,7 +1391,15 @@ function initSound() {
        the current Nagoya phase decodes. The other two sit in
        _ambientRawBuffers until their boundary arrives or the
        pre-decode timer fires. This is the memory redesign — see
-       the changelog entry and decodeAmbientSlot() above. */
+       the changelog entry and decodeAmbientSlot() above.
+
+       The decode of the current slot is the ONLY arming the
+       loader does. scheduleNextSlotPreDecode() is called from
+       startAmbient() instead — see the LIFECYCLE note on the
+       scheduler. Without that scoping, a tablet parked on the
+       name / blossom screen could pre-decode the next slot for
+       an inaudible engine and hold ~375 MB PCM that no
+       playAmbientSound() would ever consume. */
     var currentTrack = getCurrentAmbientTrack();
     AMBIENT_TRACKS.forEach(function(t) {
       loadAudioBufferRaw(t.url).then(function(rawBuf) {
@@ -1239,9 +1412,7 @@ function initSound() {
            finish in 2s while Latenight takes 15s, and we want the
            HUD to flip to 再生中 the moment the former is ready. */
         if (t.name === currentTrack.name && !soundBuffers[t.bufferName]) {
-          decodeAmbientSlot(t).then(function() {
-            scheduleNextSlotPreDecode();
-          });
+          decodeAmbientSlot(t);
         }
       });
     });
@@ -1538,6 +1709,11 @@ function startAmbient() {
   }, 0);
   startWindChime();
   startSwellLoop();
+  /* Arm the phase-boundary pre-decode scheduler here rather than in
+     initSound(). The scheduler's lifecycle is now tied to the same
+     .active gate the chime and swell loop share: a return-to-start
+     screen disarms it, and a carousel mount re-arms it. */
+  scheduleNextSlotPreDecode();
 }
 
 function scheduleNextAmbient(prevPlayMs) {
@@ -1559,6 +1735,14 @@ function stopAmbient() {
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
+  }
+  /* Disarm the phase-boundary pre-decode scheduler alongside the
+     playback timer. Idle states must not pre-decode a slot the
+     acoustic engine will never consume — see the LIFECYCLE note
+     on scheduleNextSlotPreDecode(). */
+  if (_slotPreDecodeTimer) {
+    clearTimeout(_slotPreDecodeTimer);
+    _slotPreDecodeTimer = null;
   }
   if (ambientSource && ambientGain && soundAudioCtx) {
     try {
@@ -4015,6 +4199,31 @@ function refreshTransitionGeometry() {
 }
 
 /* ============================================================
+   SUMMARY HEIGHT MEASUREMENT
+   ------------------------------------------------------------
+   Publishes --summary-h on the root element so the HUD-lift rule
+   in main.css (body.info-visible:has(.summary.visible)
+   .audio-spectrum-hud.shown) can raise the HUD by the summary's
+   rendered height. Measured rather than hard-coded because the
+   summary's padding, breakpoint scaling (min-width 700 / 1100,
+   max-height 700 / 600), and env(safe-area-inset-bottom) all vary
+   with viewport.
+
+   offsetHeight is unaffected by the summary's visibility
+   transition — the show/hide animation runs on opacity and
+   transform, neither of which changes layout height — so the
+   measured value is stable across the toggle. Re-measured by a
+   ResizeObserver bound in window.load and by the existing resize /
+   orientationchange handlers. */
+function measureSummaryHeight() {
+  if (!summaryBar) return;
+  var h = summaryBar.offsetHeight;
+  if (h > 0) {
+    document.documentElement.style.setProperty('--summary-h', h + 'px');
+  }
+}
+
+/* ============================================================
    TRANSITION-LINE ACCORDION DRIFT */
 var DRIFT_CONFIG = {
   LINE_SPREAD_FACTOR: 0.075,
@@ -4680,6 +4889,17 @@ window.addEventListener('load', function() {
       updateReceiptScrollIndicator();
     });
     ro.observe(receiptItems);
+  }
+  /* Publish --summary-h for the HUD-lift rule. The observer fires
+     once on observe — establishing the initial value — and again
+     on any layout change to the summary bar: font-load reflow,
+     breakpoint crossing, safe-area recomputation. */
+  measureSummaryHeight();
+  if (window.ResizeObserver && summaryBar) {
+    var roSummary = new ResizeObserver(function() {
+      measureSummaryHeight();
+    });
+    roSummary.observe(summaryBar);
   }
 });
 
@@ -5493,6 +5713,7 @@ if ('onscrollend' in window) {
 
 window.addEventListener('resize', function() {
   refreshTransitionGeometry();
+  measureSummaryHeight();
   scheduleEvaluation();
   scheduleTransitionBodyUpdate();
   updateReceiptScrollIndicator();
@@ -5504,6 +5725,7 @@ window.addEventListener('orientationchange', function() {
   setTimeout(updateNumpadVisibility, 200);
   setTimeout(function() {
     refreshTransitionGeometry();
+    measureSummaryHeight();
     scheduleTransitionBodyUpdate();
     updateReceiptScrollIndicator();
   }, 300);
