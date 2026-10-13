@@ -4797,9 +4797,15 @@ function scheduleAmbientRipple() {
 function distributeFrontLeaves() {
   if (!mapleLeavesFront || !mapleLeaves) return;
 
-  /* Return any leaves previously promoted to the front overlay. */
+  /* Return any leaves previously promoted to the front overlay.
+     Clear the runtime-assigned left so each leaf reverts to its
+     authored back-plane position (the per-leaf classes in main.css)
+     before it re-enters the pool. The reference must be captured
+     before appendChild, because appendChild mutates firstChild. */
   while (mapleLeavesFront.firstChild) {
-    mapleLeaves.appendChild(mapleLeavesFront.firstChild);
+    var returning = mapleLeavesFront.firstChild;
+    returning.style.left = '';
+    mapleLeaves.appendChild(returning);
   }
 
   /* Pool = all mid + near leaves now in the back overlay. Far-plane
@@ -4811,10 +4817,21 @@ function distributeFrontLeaves() {
   if (pool.length < 2) return;
 
   /* Fisher–Yates partial shuffle: move two random leaves to the
-     front overlay. Only the first two positions need to be settled. */
+     front overlay. Only the first two positions need to be settled.
+
+     Each promoted leaf gets a randomised horizontal position in the
+     25–75% band so both crossings reliably intersect the text
+     column at every breakpoint. Without this, a leaf drawn from the
+     edge cluster (6 of the 12 pool leaves sit at left 5–14% or
+     88–92%) drifts only ±40px — roughly ±10% of a phone viewport —
+     and never reaches the prose. Two edge draws co-occur on
+     ~23% of activations, which read as "no leaves in front". The
+     inline left is cleared in the return loop above so the next
+     activation re-rolls cleanly. */
   for (var j = 0; j < 2; j++) {
     var k = j + Math.floor(Math.random() * (pool.length - j));
     var tmp = pool[j]; pool[j] = pool[k]; pool[k] = tmp;
+    pool[j].style.left = (25 + Math.random() * 50) + '%';
     mapleLeavesFront.appendChild(pool[j]);
   }
 }
