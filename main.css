@@ -645,7 +645,7 @@
      Plane signatures:
        Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
                     --leaf-opacity 0.20, drift 17–21s
-       Mid  (z 2) — 42–54px, sharp,
+       Mid  (z 2) — 42–54px, blur 1.5px,
                     --leaf-opacity 0.32, drift 10–14s
        Near (z 3) — 62–84px, sharp,
                     --leaf-opacity 0.44, drift  8.5–10.5s
@@ -671,13 +671,16 @@
      under prefers-reduced-motion, where the leaves should be
      hidden by construction rather than by position.
 
-     COMPOSITOR SAFETY. Blur is static on the far plane only. It
-     never changes across the animation, and no ancestor carries a
-     filter — this is the pattern the codebase avoids elsewhere
-     (per-frame convolution on animating subtrees). Here the blurred
-     texture is rasterised once by Chromium, promoted to its own
-     layer via will-change, and sampled by the compositor with a
-     rotated UV per frame. No per-frame blur cost.
+     COMPOSITOR SAFETY. Blur is static on the far and mid planes
+     only. It never changes across the animation, and no ancestor
+     carries a filter — this is the pattern the codebase avoids
+     elsewhere (per-frame convolution on animating subtrees). Here
+     the blurred texture is rasterised once by Chromium, promoted
+     to its own layer via will-change, and sampled by the
+     compositor with a rotated UV per frame. No per-frame blur cost.
+     Front-promoted leaves read sharp — a blurred leaf in front of
+     the prose would say "far" while occluding, which contradicts
+     the depth cue.
 
      Fills are drawn from the 金木犀 & Ebizome palette's higher-
      contrast tiers — Ebizome plum, deep amber, deep rust,
@@ -731,11 +734,11 @@
     filter: blur(2.5px) saturate(0.75);
   }
   .leaf-mid {
-  z-index: 2;
-  --leaf-opacity: 0.32;
-  opacity: 0;
-  filter: blur(1.5px);
-}
+    z-index: 2;
+    --leaf-opacity: 0.32;
+    opacity: 0;
+    filter: blur(1.5px);
+  }
   .leaf-near {
     z-index: 3;
     --leaf-opacity: 0.44;
@@ -747,9 +750,13 @@
      them visibly disappears during a crossing. Scoped to the
      front overlay only; back-plane siblings keep their 0.32 / 0.44.
      The keyframes' var(--leaf-opacity) peak stops inherit these
-     values automatically — no keyframe changes required. */
+     values automatically — no keyframe changes required.
+
+     filter: none on the mid plane overrides the base .leaf-mid
+     blur(1.5px) so front-promoted mid leaves read sharp. A blurred
+     leaf in front of the prose contradicts its own depth cue. */
   .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; filter: none; }
-.maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
+  .maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
 
   /* ---------- Far plane — Momiji (2) ----------
      Clustered near the centre band. Small, soft, slowest. */
@@ -860,6 +867,7 @@
     .leaf-mid,
     .leaf-near     { animation: none !important; }
     .leaf-far      { filter: none; }
+    .leaf-mid      { filter: none; }
     .ripple        { animation-duration: 300ms; }
     .soft-glow     { animation: none !important; opacity: 0.72 !important; }
     .pulse-ring    { animation: none !important; opacity: 0 !important; }
@@ -1203,8 +1211,9 @@
   /* ============================================================
      PANEL TYPOGRAPHY (v1.3 readability pass)
 
-     Base colour is var(--text-dark): 濃茶墨 #241C1A under autumn,
-     giving 14.2:1 WCAG AAA contrast against 絹白 #FFFDF9.
+     Base colour is var(--text-mute): 中間茶 #725750 under autumn,
+     a warm mid-tone sitting at ~7.6:1 against 絹白 #FFFDF9 — above
+     WCAG AA for body text at 19px.
 
      Base text-shadow (sakura) is the original three-layer
      silk-white halo. The autumn-scoped rule that follows swaps
@@ -1219,10 +1228,10 @@
     transition-delay: 0.25s;
     font-size: 19px;
     font-weight: 600;
-    color: var(--text-dark);
-    line-height: 2.25;
+    color: var(--text-mute);
+    line-height: 1.60;
     letter-spacing: 0.8px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
     text-shadow:
       0 0 6px var(--bg-base),
@@ -1236,12 +1245,12 @@
 
   .panel.active .panel-content { opacity: 1; transform: translateX(0); filter: blur(0); }
   .panel.leaving .panel-content { opacity: 0; transform: translateX(-40px); filter: blur(3px); transition: opacity 0.4s ease, transform 0.4s ease, filter 0.4s ease; transition-delay: 0s; }
-  .panel-content p { margin: 0 0 0.4em 0; padding: 0; }
+  .panel-content p { margin: 0 0 1.1em 0; padding: 0; }
   .panel-content p:last-child { margin-bottom: 0; }
 
   .panel-content .therapist-name {
-    font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-weight: 600; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
+    font-family: "Yuji Mai", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    font-weight: 400; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
   /* Autumn-scoped name plum — merged for both the greeting screen
@@ -1443,6 +1452,16 @@
     background-repeat: no-repeat;
   }
 
+  /* Table card background override — pure washi, no tint.
+     Scoped to #tableCard only; .receipt-paper keeps its 薄杏 base.
+     background-blend-mode: multiply combines the JPG with the
+     white background-color so the blend pipeline is in place for
+     any future tint change without needing to touch this rule. */
+  #tableCard {
+    background-color: #FFFFFF;
+    background-blend-mode: multiply;
+  }
+
   #tableCard .privacy-note-inline,
   #tableCard .row.filled,
   .receipt-paper .receipt-item-price-wrap {
@@ -1462,6 +1481,20 @@
   }
   .privacy-note-inline p { margin: 0 0 0.4em 0; padding: 0; }
   .privacy-note-inline p:last-child { margin-bottom: 0; }
+
+  /* Table-scoped colour overrides — 淡杏 base with muted warm
+     service names, amber prices, and a 絹白 privacy note. */
+  #tableCard .privacy-note-inline {
+    background: var(--bg-base);
+    color: var(--text-mute);
+  }
+  #tableCard .service-display,
+  #tableCard .service-input {
+    color: var(--text-faint);
+  }
+  #tableCard .yen {
+    color: var(--accent);
+  }
 
   .row {
     display: flex; align-items: center; gap: 8px; padding: 14px 14px 14px 12px;
@@ -2667,7 +2700,7 @@
     .start-hints { margin-top: 16px; }
     .start-hint-line { font-size: 16px; letter-spacing: 2px; }
     .panel { padding: 65px 20px 138px 20px; }
-    .panel-content { font-size: 17px; line-height: 2; }
+    .panel-content { font-size: 17px; line-height: 1.9; }
     .transition-line { font-size: 17px; }
     .stage-spacer { height: 50px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
@@ -2718,7 +2751,7 @@
     .start-hint-line { font-size: 14.5px; letter-spacing: 2px; line-height: 1.7; }
     .panel { padding: 56px 40px 118px 40px; }
     .panel-inner { max-width: 560px; }
-    .panel-content { font-size: 16px; line-height: 2; }
+    .panel-content { font-size: 16px; line-height: 1.85; }
     .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
     .stage-spacer { height: 40px; }
     .action-hint { margin-top: 0; }
