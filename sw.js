@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v104';
+const CACHE = 'thankyou-v105';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -53,7 +53,10 @@ self.addEventListener('fetch', function(e) {
      and the precache installed the bare URL.
 
      The put() is guarded on r.ok so a 404 or 5xx never lands in the
-     precache and poisons every future session. */
+     precache and poisons every future session, and wrapped in
+     e.waitUntil so the worker is kept alive until the write
+     completes — a floating promise can be cut short mid-write if
+     the worker is stopped. */
   if (url.pathname.endsWith('/presets.json') ||
       url.pathname.endsWith('/quotes.json')) {
     e.respondWith(
@@ -61,7 +64,7 @@ self.addEventListener('fetch', function(e) {
         .then(function(r) {
           if (r && r.ok) {
             var copy = r.clone();
-            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+            e.waitUntil(caches.open(CACHE).then(function(c) { return c.put(e.request, copy); }));
           }
           return r;
         })
@@ -77,8 +80,10 @@ self.addEventListener('fetch', function(e) {
      fallback to ./index.html also uses ignoreSearch so a query
      string on a navigation request still resolves.
 
-     Same r.ok guard as the JSON branch: an error response must not
-     be written into the versioned precache. */
+     Same r.ok guard and same e.waitUntil wrapping as the JSON
+     branch — an error response must not be written into the
+     versioned precache, and the write must not be cut short if the
+     worker is stopped. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
@@ -88,7 +93,7 @@ self.addEventListener('fetch', function(e) {
         .then(function(r) {
           if (r && r.ok) {
             var copy = r.clone();
-            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+            e.waitUntil(caches.open(CACHE).then(function(c) { return c.put(e.request, copy); }));
           }
           return r;
         })
@@ -129,6 +134,18 @@ self.addEventListener('fetch', function(e) {
      response would poison every future session until the cache was
      manually cleared.
 
+     The write is wrapped in e.waitUntil so the worker is kept alive
+     until the 16MB payload finishes streaming into the cache — on a
+     slow link this can take far longer than the response itself, and
+     an unwrapped floating promise would be cut short when the worker
+     process is stopped, leaving the track uncached and forcing a
+     full re-download on the next visit. The try/catch fallback is a
+     best-effort escape hatch for the spec case where the event's
+     dispatch flag is already unset; in that state no mechanism
+     keeps the worker alive and the pending write may or may not
+     complete. It is NOT equivalent to the e.waitUntil path and
+     should not be treated as a second caching strategy.
+
      .mp3 requests are issued by app.js without a query string, so
      ignoreSearch is not required here. */
   if (url.pathname.endsWith('.mp3')) {
@@ -139,7 +156,11 @@ self.addEventListener('fetch', function(e) {
           return fetch(e.request).then(function(netRes) {
             if (netRes && netRes.ok) {
               var copy = netRes.clone();
-              c.put(e.request, copy);
+              try {
+                e.waitUntil(c.put(e.request, copy));
+              } catch (err) {
+                c.put(e.request, copy);
+              }
             }
             return netRes;
           });
