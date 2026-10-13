@@ -831,12 +831,14 @@ function loadAudioBufferWithProgress(url) {
               pos += chunks[i].length;
             }
             return new Promise(function(resolve, reject) {
-              soundAudioCtx.decodeAudioData(all.buffer, function(decoded) {
-                _hudDecodedCount++;
-                updateHudLoadingAggregated(true);
-                resolve(decoded);
-              }, reject);
-            });
+  soundAudioCtx.decodeAudioData(all.buffer, function(decoded) {
+    var bytes = decoded.length * decoded.numberOfChannels * 4;
+    console.log('[WebAudio PCM]', url, (bytes / (1024 * 1024)).toFixed(1) + ' MB');
+    _hudDecodedCount++;
+    updateHudLoadingAggregated(true);
+    resolve(decoded);
+  }, reject);
+});
           }
 
           chunks.push(result.value);
