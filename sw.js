@@ -1,4 +1,5 @@
-const CACHE = 'thankyou-v100';
+const CACHE = 'thankyou-v101';
+const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
   './',
@@ -33,7 +34,7 @@ self.addEventListener('activate', function(e) {
   e.waitUntil(
     caches.keys().then(function(keys) {
       return Promise.all(
-        keys.filter(function(k) { return k !== CACHE; })
+        keys.filter(function(k) { return k !== CACHE && k !== AUDIO; })
             .map(function(k) { return caches.delete(k); })
       );
     })
@@ -49,14 +50,19 @@ self.addEventListener('fetch', function(e) {
      appends a ?v= cache-buster to these URLs, a future change that
      reintroduces one would break the offline fallback without it.
      caches.match() matches by full URL including the search string,
-     and the precache installed the bare URL. */
+     and the precache installed the bare URL.
+
+     The put() is guarded on r.ok so a 404 or 5xx never lands in the
+     precache and poisons every future session. */
   if (url.pathname.endsWith('/presets.json') ||
       url.pathname.endsWith('/quotes.json')) {
     e.respondWith(
       fetch(e.request)
         .then(function(r) {
-          var copy = r.clone();
-          caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+          if (r && r.ok) {
+            var copy = r.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+          }
           return r;
         })
         .catch(function() {
@@ -69,7 +75,10 @@ self.addEventListener('fetch', function(e) {
   /* HTML, CSS, JS, and directory roots — network-first with cached
      fallback. Same ignoreSearch reasoning as above. The navigation
      fallback to ./index.html also uses ignoreSearch so a query
-     string on a navigation request still resolves. */
+     string on a navigation request still resolves.
+
+     Same r.ok guard as the JSON branch: an error response must not
+     be written into the versioned precache. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
@@ -77,8 +86,10 @@ self.addEventListener('fetch', function(e) {
     e.respondWith(
       fetch(e.request)
         .then(function(r) {
-          var copy = r.clone();
-          caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+          if (r && r.ok) {
+            var copy = r.clone();
+            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
+          }
           return r;
         })
         .catch(function() {
@@ -96,11 +107,21 @@ self.addEventListener('fetch', function(e) {
   /* Cache-on-first-use for audio. The ambient tracks are 17-minute
      files (~16MB each) and the app is fully usable before either
      downloads, so they are kept out of the precache list to keep
-     install fast and robust. The first request for a given .mp3
-     streams from the network and is written into the cache in the
-     background; subsequent requests hit the cache. A partial or
-     failed download leaves no cache entry, so the next request
-     retries from the network.
+     install fast and robust.
+
+     MP3s are stored in AUDIO, not CACHE. AUDIO is NOT versioned —
+     it is deliberately untouched by the version bump and by the
+     activate cleanup, so a deploy that only changes JS/CSS/HTML
+     does not force the ~50MB ambient pool to re-download. The
+     tradeoff is that a change to an MP3 file itself would not be
+     picked up automatically; if a track is ever re-encoded, bump
+     AUDIO's own suffix (v1 → v2) and the old cache will be swept
+     by the next activate.
+
+     The first request for a given .mp3 streams from the network and
+     is written into AUDIO in the background; subsequent requests
+     hit the cache. A partial or failed download leaves no cache
+     entry, so the next request retries from the network.
 
      The netRes.ok guard is load-bearing: a 404 or 5xx response
      streams through to the caller (so loadAudioBuffer's !r.ok throw
@@ -112,14 +133,16 @@ self.addEventListener('fetch', function(e) {
      ignoreSearch is not required here. */
   if (url.pathname.endsWith('.mp3')) {
     e.respondWith(
-      caches.match(e.request).then(function(r) {
-        if (r) return r;
-        return fetch(e.request).then(function(netRes) {
-          if (netRes && netRes.ok) {
-            var copy = netRes.clone();
-            caches.open(CACHE).then(function(c) { c.put(e.request, copy); });
-          }
-          return netRes;
+      caches.open(AUDIO).then(function(c) {
+        return c.match(e.request).then(function(r) {
+          if (r) return r;
+          return fetch(e.request).then(function(netRes) {
+            if (netRes && netRes.ok) {
+              var copy = netRes.clone();
+              c.put(e.request, copy);
+            }
+            return netRes;
+          });
         });
       })
     );
