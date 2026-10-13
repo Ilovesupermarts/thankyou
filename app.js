@@ -3,6 +3,51 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (lazy slot-based decode)
+       - The three ambient beds are downloaded in parallel but
+         only the current Nagoya phase is decoded into PCM at
+         boot. Previously all three decoded eagerly, putting
+         ~1.13 GB of linear float32 PCM into the tab's Web Audio
+         heap — right on the Android renderer's 1.5-2.0 GB LMK
+         boundary, and the primary cause of observed tab reloads
+         during long sessions.
+       - Steady-state footprint drops from ~1.13 GB to a single
+         decoded slot (~358-396 MB, dependent on phase) plus
+         ~48 MB of compressed MP3 ArrayBuffers held for later
+         decode plus ~6-8 MB of one-shot buffers (stream, chime,
+         drop, UI synths). Cold-boot heap snapshot should show
+         exactly one large AudioBuffer allocation.
+       - Slot transitions: scheduleNextSlotPreDecode() fires
+         10 minutes before the next Nagoya boundary (05:00,
+         17:00, 22:00 JST) and pre-decodes the incoming phase.
+         Peak during the overlap window is ~730-770 MB. Once
+         the outgoing track's fade-out completes and
+         src.onended fires, gain.disconnect() plus the nulling
+         of soundBuffers[oldSlot] releases the ~375 MB block for
+         garbage collection.
+       - decodeAmbientSlot() memoizes in-flight decode promises
+         in _ambientDecodingPromises[bufferName]. Without this
+         guard, playAmbientSound()'s 500ms retry polling would
+         stack 2-3 concurrent decodeAudioData passes on a
+         ~1.2s mobile decode, spiking transient heap back up
+         past 1 GB — the exact problem the redesign was meant to
+         solve.
+       - raw.slice(0) before decodeAudioData is load-bearing,
+         not defensive: the Web Audio spec detaches the passed
+         ArrayBuffer, and without the clone _ambientRawBuffers
+         entries would be neutered after their first decode.
+       - HUD: _hudDecodedCount / _hudTotalFiles removed. The
+         "fully resident" state is now derived per-frame from
+         soundBuffers[getCurrentAmbientTrack().bufferName]
+         (slot ready) plus pct >= 1.0 (all raw MP3s downloaded).
+         The badge ladder is preserved:
+           playing              → 再生中
+           decoding current slot → 展開中
+           transfer in flight    → DL XX%
+           slot ready + settled  → 待機完了
+         The gauge fill's amber→plum transition remains gated on
+         pct >= 1.0 so it still signals background I/O
+         completion.
      v1.3 (HUD timestamp readout)
        - The HUD label row now shows elapsed / total playback time
          (mm:ss / mm:ss) during the playing state, replacing the
@@ -92,19 +137,10 @@
          phase resolves its buffer through track.bufferName so the
          phase-to-file mapping stays 1:1 in memory.
        - Aggregated loading tracker: three unique URLs tracked in
-         _hudBytesLoadedMap / _hudBytesTotalMap; _hudTotalFiles is
-         derived at parse time by deduplicating AMBIENT_TRACKS
-         URLs, so adding a fourth phase with a new file requires no
-         counter edit.
+         _hudBytesLoadedMap / _hudBytesTotalMap.
        - Single-authority state renderer _hudRenderState(). Both
          the streaming loader and the playback lifecycle call it;
-         they never write badge or gauge state directly. Priority:
-           1. ambientSource !== null           → 再生中
-           2. _hudDecodedCount < _hudTotalFiles → DL XX% / 展開中
-           3. otherwise                         → 待機完了
-         This resolves the dual-writer race where a partially-
-         decoded state could leave the badge and gauge contradicting
-         each other during a cold launch.
+         they never write badge or gauge state directly.
        - Streaming loader switched from response.arrayBuffer() to
          response.body.getReader(), with a byte counter feeding the
          gauge. Updates are throttled to 100ms with a force bypass
@@ -563,11 +599,13 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
    the HUD never competes with gesture dispatch during scroll.
 
    Loading state is aggregated across all unique AMBIENT_TRACKS
-   URLs. _hudTotalFiles is derived by deduplicating that list at
-   parse time, so adding a fourth phase with a new file requires
-   no counter edit. The badge text is written exclusively by
-   _hudRenderState(); the streaming loader and playback lifecycle
-   feed it inputs and never touch the DOM directly.
+   URLs via _hudBytesLoadedMap / _hudBytesTotalMap. Since v1.3 the
+   decode state is derived per-frame rather than tracked with a
+   counter: "fully resident" is true when the current Nagoya
+   phase's buffer is decoded AND all three raw MP3s have finished
+   downloading. This replaced the old _hudDecodedCount /
+   _hudTotalFiles pair, which assumed all three slots decode
+   eagerly — no longer true under the lazy slot-based architecture.
 
    The gauge bar was repurposed at v1.3 from download progress to
    playback progress of the current track. During playback,
@@ -613,25 +651,9 @@ if (hudCanvas && hudCtx) {
   hudCtx.scale(_hudDpr, _hudDpr);
 }
 
-/* Unique physical file count, derived at parse time so the HUD
-   scales automatically when a new URL is introduced. The `seen`
-   map is garbage-collected the moment the IIFE returns. */
-var _hudTotalFiles = (function() {
-  var seen = {}, count = 0;
-  for (var i = 0; i < AMBIENT_TRACKS.length; i++) {
-    var u = AMBIENT_TRACKS[i].url;
-    if (!seen[u]) {
-      seen[u] = true;
-      count++;
-    }
-  }
-  return count;
-})();
-
 /* Aggregated loading tracker */
 var _hudBytesLoadedMap = {};
 var _hudBytesTotalMap  = {};
-var _hudDecodedCount   = 0;
 var _hudLastUpdateMs   = 0;
 
 /* Timestamp throttling gate: the last whole-second value rendered
@@ -661,7 +683,11 @@ function _hudShouldDraw() {
 
    During playback the label unconditionally shows the timestamp,
    even if background beds are still streaming. This is the single-
-   authority resolution of the cold-launch dual-writer race. */
+   authority resolution of the cold-launch dual-writer race.
+
+   The slot-ready check and the in-flight-decode check both read
+   from a single currentTrack snapshot so a single Nagoya
+   wall-clock evaluation drives the whole branch. */
 function _hudRenderState() {
   if (!hudStatusBadge || !hudGaugeFill) return;
 
@@ -677,6 +703,9 @@ function _hudRenderState() {
   var pct = Math.min(1.0, totalLoaded / totalExpected);
   var pctInt = Math.round(pct * 100);
   var isPlaying = (ambientSource !== null);
+
+  var currentTrack = getCurrentAmbientTrack();
+  var slotReady = !!(soundBuffers && soundBuffers[currentTrack.bufferName]);
 
   /* Gauge width: during playback the swell loop's updateHudProgress()
      owns the fill (playback position over playDur). When idle or
@@ -694,7 +723,11 @@ function _hudRenderState() {
     hudStatusBadge.textContent = '再生中';
     hudStatusBadge.classList.add('ready');
 
-    if (_hudDecodedCount >= _hudTotalFiles) {
+    /* Plum fill only when all three raw MP3s are downloaded. The
+       amber→plum transition signals background I/O completion and
+       must not be short-circuited by the fact that the currently-
+       playing slot is, by definition, decoded. */
+    if (pct >= 1.0) {
       hudGaugeFill.classList.add('ready');
     }
 
@@ -705,9 +738,12 @@ function _hudRenderState() {
     var elapsed = getPlaybackElapsed();
     hudPctStatus.textContent = formatHudTime(elapsed) + ' / ' + formatHudTime(ambientPlayDurationSec);
     _hudLastRenderedSec = Math.floor(elapsed);
-  } else if (_hudDecodedCount < _hudTotalFiles) {
-    /* Priority 2 — in-flight download or decode (not playing) */
-    if (pct >= 1.0) {
+  } else if (!slotReady || pct < 1.0) {
+    /* Priority 2 — either the active slot is decoding, or raw
+       streams are still in flight. Both must resolve before the
+       badge may claim 待機完了, so the badge and gauge stay in
+       agreement throughout the cold-launch window. */
+    if (_ambientDecodingPromises[currentTrack.bufferName]) {
       hudGaugeFill.classList.add('decoding');
       hudStatusBadge.textContent = '展開中';
       hudStatusBadge.classList.add('decoding');
@@ -718,7 +754,8 @@ function _hudRenderState() {
       hudPctStatus.textContent = pctInt + '%';
     }
   } else {
-    /* Priority 3 — all buffers resident, currently idle */
+    /* Priority 3 — active slot decoded AND all raw buffers
+       resident in RAM. */
     hudGaugeFill.classList.add('ready');
     hudStatusBadge.textContent = '待機完了';
     hudStatusBadge.classList.add('ready');
@@ -799,13 +836,24 @@ function updateHudProgress() {
   }
 }
 
-/* Streaming loader with byte-level progress reporting. Replaces
-   response.arrayBuffer() with a ReadableStream reader so the gauge
-   can track the transfer, then hands the assembled ArrayBuffer to
-   decodeAudioData. The final byte total is flushed before decode
-   starts so the gauge snaps to 100% and enters the "展開中"
-   state while the PCM pass runs. */
-function loadAudioBufferWithProgress(url) {
+/* ============ AMBIENT RAW BUFFER LOADER (v1.3) ============
+   Streaming loader with byte-level progress reporting. The
+   ReadableStream reader drives the HUD gauge during transfer; the
+   assembled ArrayBuffer is handed back to the caller WITHOUT
+   decoding. Under the lazy slot-based architecture only the
+   current Nagoya phase is decoded (see decodeAmbientSlot); the
+   other two are stashed in _ambientRawBuffers until their phase
+   arrives or their boundary pre-decode fires.
+
+   Decoding all three at boot put ~1.13 GB of linear float32 PCM
+   into the tab's Web Audio heap, straddling the Android renderer
+   LMK boundary. The split loader caps steady-state at one decoded
+   slot (~360-396 MB) plus ~48 MB of compressed MP3s.
+
+   The final byte total is flushed before resolving so the gauge
+   snaps to 100% for this URL and the aggregate pct updates
+   immediately. */
+function loadAudioBufferRaw(url) {
   return fetch(url)
     .then(function(res) {
       if (!res.ok) throw new Error('audio fetch failed: ' + url);
@@ -820,7 +868,6 @@ function loadAudioBufferWithProgress(url) {
       function read() {
         return reader.read().then(function(result) {
           if (result.done) {
-            /* Flush exact byte count before PCM decode */
             _hudBytesLoadedMap[url] = loaded;
             updateHudLoadingAggregated(true);
 
@@ -830,15 +877,7 @@ function loadAudioBufferWithProgress(url) {
               all.set(chunks[i], pos);
               pos += chunks[i].length;
             }
-            return new Promise(function(resolve, reject) {
-  soundAudioCtx.decodeAudioData(all.buffer, function(decoded) {
-    var bytes = decoded.length * decoded.numberOfChannels * 4;
-    console.log('[WebAudio PCM]', url, (bytes / (1024 * 1024)).toFixed(1) + ' MB');
-    _hudDecodedCount++;
-    updateHudLoadingAggregated(true);
-    resolve(decoded);
-  }, reject);
-});
+            return all.buffer;
           }
 
           chunks.push(result.value);
@@ -849,6 +888,207 @@ function loadAudioBufferWithProgress(url) {
         });
       }
       return read();
+    })
+    .catch(function() { return null; });
+}
+
+/* ============ SLOT DECODE (v1.3) ============
+   Decodes one ambient phase into soundBuffers[track.bufferName].
+   Three guards:
+
+     1. raw exists           — the .mp3 bytes are in
+                               _ambientRawBuffers. If not, this is
+                               a no-op (the loader will call back
+                               when the bytes arrive).
+     2. not already decoded  — soundBuffers[bufferName] is
+                               populated. Idempotent; safe to call
+                               from both initSound() and the
+                               boundary pre-decode timer near a
+                               phase edge.
+     3. not already decoding — _ambientDecodingPromises holds an
+                               in-flight job. Without this guard
+                               playAmbientSound()'s 500ms retry
+                               polling would stack 2-3 concurrent
+                               decodes on a ~1.2s mobile decode,
+                               spiking transient heap back past
+                               1 GB — the exact pressure this
+                               redesign removes.
+
+   raw.slice(0) before decodeAudioData is load-bearing, not
+   defensive. The Web Audio spec detaches the passed ArrayBuffer;
+   without the clone the entry in _ambientRawBuffers would be
+   neutered after its first decode, and the 05:00 re-decode the
+   following morning would throw. The transient ~16 MB copy is
+   negligible against the ~375 MB decoded PCM. */
+var _ambientRawBuffers = {};
+var _ambientDecodingPromises = {};
+
+function decodeAmbientSlot(track) {
+  var raw = _ambientRawBuffers[track.url];
+  if (!raw) return Promise.resolve();
+
+  if (soundBuffers[track.bufferName]) return Promise.resolve();
+
+  if (_ambientDecodingPromises[track.bufferName]) {
+    return _ambientDecodingPromises[track.bufferName];
+  }
+
+  var decodePromise = new Promise(function(resolve, reject) {
+    var prom = soundAudioCtx.decodeAudioData(raw.slice(0), function(decoded) {
+      soundBuffers[track.bufferName] = decoded;
+      delete _ambientDecodingPromises[track.bufferName];
+      _hudRenderState();
+      resolve(decoded);
+    }, function(err) {
+      delete _ambientDecodingPromises[track.bufferName];
+      reject(err);
+    });
+
+    if (prom && typeof prom.then === 'function') {
+      prom.then(resolve, reject);
+    }
+  }).catch(function() {
+    delete _ambientDecodingPromises[track.bufferName];
+  });
+
+  _ambientDecodingPromises[track.bufferName] = decodePromise;
+  return decodePromise;
+}
+
+/* ============ PHASE BOUNDARY SCHEDULER (v1.3) ============
+   Every play cycle runs end-to-end at the current phase, so the
+   only cross-boundary risk is the moment the wall clock crosses
+   one of the three Nagoya bucket edges (05:00, 17:00, 22:00 JST).
+   scheduleNextSlotPreDecode() arms a single timer for
+   (time-until-boundary − 10 minutes) so the incoming phase is
+   already decoded into PCM before playAmbientSound() asks for it.
+
+   The 10-minute window is generous: the MP3 bytes are in the SW's
+   unversioned AUDIO cache after the first session, so the pre-
+   decode step is pure PCM expansion — a few seconds on Adreno.
+   Even a first-ever cold launch has the download racing the
+   window, and 16 MB over 10 minutes is ~215 kbps.
+
+   Two edge cases handled by the callback:
+
+     · suspend-across-boundary. If the tablet slept through the
+       pre-window, the timer fires late. The current-slot check
+       catches the case where the phase flipped during sleep and
+       the incoming slot was never decoded.
+
+     · re-arming. The callback reschedules itself for the
+       following boundary so a session left running for days keeps
+       its pre-decode window current.
+
+   Nagoya has no DST, so the boundary math reduces to UTC+9
+   arithmetic. If the app is ever deployed to a DST zone, the
+   computed delay would shift by at most one hour — still well
+   inside the 5-7 hour phase width. */
+var _slotPreDecodeTimer = null;
+
+function getNextAmbientTrack() {
+  var p = nagoyaDateParts();
+  var h = p.hour;
+  if (h >= 5 && h < 17)  return AMBIENT_TRACKS[1]; // Next: 17:00 Early Evening
+  if (h >= 17 && h < 22) return AMBIENT_TRACKS[2]; // Next: 22:00 Late Night
+  return AMBIENT_TRACKS[0];                        // Next: 05:00 Morning
+}
+
+function msUntilNextPhaseBoundary() {
+  var now = new Date();
+  /* Nagoya is UTC+9. Build a Date whose local-time accessors read
+     as Nagoya wall clock, without Intl parsing. */
+  var nagoyaMs = now.getTime() + (9 * 60 + now.getTimezoneOffset()) * 60 * 1000;
+  var nagoyaDate = new Date(nagoyaMs);
+  var h = nagoyaDate.getHours();
+
+  var targetHour;
+  var addDays = 0;
+
+  if (h < 5) {
+    targetHour = 5;
+  } else if (h < 17) {
+    targetHour = 17;
+  } else if (h < 22) {
+    targetHour = 22;
+  } else {
+    targetHour = 5;
+    addDays = 1;
+  }
+
+  var targetDate = new Date(nagoyaDate);
+  targetDate.setDate(targetDate.getDate() + addDays);
+  targetDate.setHours(targetHour, 0, 0, 0);
+
+  return Math.max(0, targetDate.getTime() - nagoyaDate.getTime());
+}
+
+function scheduleNextSlotPreDecode() {
+  if (_slotPreDecodeTimer) clearTimeout(_slotPreDecodeTimer);
+  var ms = msUntilNextPhaseBoundary() - 10 * 60 * 1000;
+  if (ms < 0) ms = 0;
+  _slotPreDecodeTimer = setTimeout(function() {
+    _slotPreDecodeTimer = null;
+    var current = getCurrentAmbientTrack();
+    var next = getNextAmbientTrack();
+    /* Suspend-across-boundary catch-up: if the phase flipped
+       during sleep, decode the (now current) slot before its
+       boundary partner. */
+    if (!soundBuffers[current.bufferName] && _ambientRawBuffers[current.url]) {
+      decodeAmbientSlot(current);
+    } else if (!soundBuffers[next.bufferName] && _ambientRawBuffers[next.url]) {
+      decodeAmbientSlot(next);
+    }
+    scheduleNextSlotPreDecode();
+  }, ms);
+}
+
+/* Release every decoded ambient buffer except the one about to
+   play. Setting soundBuffers[name] = null severs the JS reference;
+   the active AudioBufferSourceNode already holds its own strong
+   reference via src.buffer, so any in-flight fade-out across a
+   phase boundary is unaffected. GC reclaims the PCM block once
+   src.onended fires and gain.disconnect() drops the last Blink-
+   side reference. */
+function releaseNonCurrentAmbientSlots(keepBufferName) {
+  for (var i = 0; i < AMBIENT_TRACKS.length; i++) {
+    var n = AMBIENT_TRACKS[i].bufferName;
+    if (n !== keepBufferName && soundBuffers[n]) {
+      soundBuffers[n] = null;
+    }
+  }
+}
+
+/* Streaming loader for non-ambient one-shots (drop, stream,
+   chime). These are small enough to decode inline — the split
+   loader exists specifically for the three multi-megabyte ambient
+   beds. */
+function loadAudioBuffer(url) {
+  return fetch(url)
+    .then(function(r) {
+      if (!r.ok) throw new Error('audio fetch failed: ' + url);
+      return r.arrayBuffer();
+    })
+    .then(function(ab) {
+      return new Promise(function(resolve, reject) {
+        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
+        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
+      });
+    })
+    .catch(function() { return null; });
+}
+
+function loadDropBuffer() {
+  return fetch(DROP_SOUND_URL)
+    .then(function(r) {
+      if (!r.ok) throw new Error('drop fetch failed');
+      return r.arrayBuffer();
+    })
+    .then(function(ab) {
+      return new Promise(function(resolve, reject) {
+        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
+        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
+      });
     })
     .catch(function() { return null; });
 }
@@ -982,16 +1222,28 @@ function initSound() {
       if (buf) soundBuffers.windChime = buf;
     });
 
-    /* Ambient rotation: streamed with individual byte tracking
-       so the HUD can show per-file download progress. */
-    loadAudioBufferWithProgress(AMBIENT_TRACKS[0].url).then(function(buf) {
-      if (buf) soundBuffers.morning = buf;
-    });
-    loadAudioBufferWithProgress(AMBIENT_TRACKS[1].url).then(function(buf) {
-      if (buf) soundBuffers.earlyevening = buf;
-    });
-    loadAudioBufferWithProgress(AMBIENT_TRACKS[2].url).then(function(buf) {
-      if (buf) soundBuffers.latenight = buf;
+    /* AMBIENT BEDS: three raw MP3s download in parallel, but only
+       the current Nagoya phase decodes. The other two sit in
+       _ambientRawBuffers until their boundary arrives or the
+       pre-decode timer fires. This is the memory redesign — see
+       the changelog entry and decodeAmbientSlot() above. */
+    var currentTrack = getCurrentAmbientTrack();
+    AMBIENT_TRACKS.forEach(function(t) {
+      loadAudioBufferRaw(t.url).then(function(rawBuf) {
+        if (!rawBuf) return;
+        _ambientRawBuffers[t.url] = rawBuf;
+
+        /* Decode the current slot the instant its own bytes land,
+           without waiting for the other two downloads. This avoids
+           head-of-line blocking on a cold launch: Morning might
+           finish in 2s while Latenight takes 15s, and we want the
+           HUD to flip to 再生中 the moment the former is ready. */
+        if (t.name === currentTrack.name && !soundBuffers[t.bufferName]) {
+          decodeAmbientSlot(t).then(function() {
+            scheduleNextSlotPreDecode();
+          });
+        }
+      });
     });
 
   } catch (e) { /* silent */ }
@@ -1023,36 +1275,6 @@ function makeSeamlessLoop(buffer, crossfadeSec) {
   }
 
   return out;
-}
-
-function loadAudioBuffer(url) {
-  return fetch(url)
-    .then(function(r) {
-      if (!r.ok) throw new Error('audio fetch failed: ' + url);
-      return r.arrayBuffer();
-    })
-    .then(function(ab) {
-      return new Promise(function(resolve, reject) {
-        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
-        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
-      });
-    })
-    .catch(function() { return null; });
-}
-
-function loadDropBuffer() {
-  return fetch(DROP_SOUND_URL)
-    .then(function(r) {
-      if (!r.ok) throw new Error('drop fetch failed');
-      return r.arrayBuffer();
-    })
-    .then(function(ab) {
-      return new Promise(function(resolve, reject) {
-        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
-        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
-      });
-    })
-    .catch(function() { return null; });
 }
 
 function synthesizeTock() {
@@ -1275,7 +1497,7 @@ function tryStartBlossomStream(retries) {
    The return value doubles as a signal channel. Terminal states
    (sound disabled, non-autumn theme, carousel inactive, missing
    AudioContext) return 0; transient states (UI synth pending,
-   ambient buffer not yet resident) return 500 and are counted by
+   current slot not yet decoded) return 500 and are counted by
    _ambientBufferRetries, which caps the retry window at ~60s
    before giving up. This closes both the busy-loop that a 0
    return would produce (setTimeout(fn, 0)) and the zombie-poll
@@ -1377,13 +1599,15 @@ function playAmbientSound() {
   var track = getCurrentAmbientTrack();
   var buffer = soundBuffers[track.bufferName];
 
-  /* Transient guards: UI fast-path buffers still synthesizing
-     (~5ms window) or ambient MP3 still streaming/decoding. Both
-     resolve on their own, so retry at 500ms — but capped at 120
-     attempts (~60s), after which either the loader has failed
-     permanently or the environment is too slow to be useful and
-     the schedule terminates cleanly. */
+  /* Transient guard: current slot not decoded yet. Kick off an
+     on-demand decode if the raw bytes are already in
+     _ambientRawBuffers, then return 500. The in-flight promise
+     map in decodeAmbientSlot() ensures this does not stack
+     concurrent decodes across successive 500ms ticks. */
   if (!soundReady || !buffer) {
+    if (!buffer && _ambientRawBuffers[track.url]) {
+      decodeAmbientSlot(track);
+    }
     _ambientBufferRetries++;
     if (_ambientBufferRetries > 120) {
       _ambientBufferRetries = 0;
@@ -1396,6 +1620,12 @@ function playAmbientSound() {
   /* Synchronise HUD metadata to the currently-selected phase */
   if (hudTrackTitle)  hudTrackTitle.textContent = track.title;
   if (hudTrackArtist) hudTrackArtist.textContent = track.artist;
+
+  /* Release every other decoded slot's PCM before we commit to
+     this one. Safe: the currently-playing AudioBufferSourceNode
+     (if any) holds its own strong reference to its buffer, so a
+     cross-boundary fade-out is unaffected. */
+  releaseNonCurrentAmbientSlots(track.bufferName);
 
   var bufferDur = buffer.duration;
   /* Terminal guard: a successfully decoded AudioBuffer always has
