@@ -147,7 +147,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.09.26</div>
+  <div class="app-version" aria-hidden="true">v2.1</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -683,35 +683,120 @@
      visible again through the transparent .thankyou-screen. Gated
      to autumn in CSS.
 
-     Eleven leaves total: four Momiji and seven Ichō. Leaf fills are
-     drawn from the 金木犀 & Ebizome palette's higher-contrast tiers —
-     Ebizome plum (#882E47), deep amber (#C44E10), deep rust (#9E3B06),
-     Kinmokusei amber (#E66826), and petal coral (#F07D40) — so the
-     drifting foliage reads as a stylized woodblock/screen-print motif
-     in the same ink family as the rest of the interface. Lighter
-     palette tiers (--glow, --petal-soft) are deliberately excluded
-     because at sub-0.35 element opacity they composite to near-canvas
-     luminance and lose silhouette legibility.
+     v1.3 (depth-layering): eighteen leaves across three depth
+     planes, replacing the previous eleven-leaf single-layer set.
+     Each leaf carries TWO classes — a plane class (.leaf-far /
+     .leaf-mid / .leaf-near) and an identity class (per-leaf size,
+     fill, horizontal position, and drift timing in main.css).
+
+     Plane signatures:
+       Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
+                    opacity 0.20, drift 17–21s
+       Mid  (z 2) — 42–54px, sharp, opacity 0.32, drift 10–14s
+       Near (z 3) — 62–84px, sharp, opacity 0.44, drift 8.5–10.5s
+
+     DOM order is far → mid → near so paint order is correct even
+     if the plane z-index rules were removed. See main.css for the
+     compositor-safety rationale on the far-plane blur.
+
+     Leaf fills are drawn from the 金木犀 & Ebizome palette's higher-
+     contrast tiers — Ebizome plum (#882E47), deep amber (#C44E10),
+     deep rust (#9E3B06), Kinmokusei amber (#E66826), and petal
+     coral (#F07D40). Species and colour are distributed across all
+     three planes so no plane reads as a single hue or species.
+     Lighter palette tiers (--glow, --petal-soft) are excluded
+     because at sub-0.45 element opacity they composite to near-
+     canvas luminance and lose silhouette legibility.
 
      Both sets are aria-hidden on the parent, and each SVG carries
      a redundant aria-hidden="true" for structural parity across
-     all eleven nodes. -->
+     all eighteen nodes. -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
-  <!-- 4 Palmate Japanese Momiji Leaves with Staggered Drifts -->
-  <svg class="maple-leaf leaf-1" viewBox="0 0 900 1000" aria-hidden="true">
+
+  <!-- ============ FAR PLANE — Momiji (2) ============ -->
+  <svg class="leaf-far leaf-far-1" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <svg class="maple-leaf leaf-2" viewBox="0 0 900 1000" aria-hidden="true">
+  <svg class="leaf-far leaf-far-2" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <svg class="maple-leaf leaf-3" viewBox="0 0 900 1000" aria-hidden="true">
+
+  <!-- ============ FAR PLANE — Ichō (4) ============ -->
+  <svg class="leaf-far ginkgo-far-1" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-2" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-3" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-4" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+
+  <!-- ============ MID PLANE — Momiji (2) ============ -->
+  <svg class="leaf-mid leaf-mid-1" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <svg class="maple-leaf leaf-6" viewBox="0 0 900 1000" aria-hidden="true">
+  <svg class="leaf-mid leaf-mid-2" viewBox="0 0 900 1000" aria-hidden="true">
     <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
   </svg>
-  <!-- 7 Ichō Ginkgo Leaves with Pendulum-Flutter Drifts -->
-  <svg class="ginkgo-leaf ginkgo-1" viewBox="0 0 600 700" aria-hidden="true">
+
+  <!-- ============ MID PLANE — Ichō (4) ============ -->
+  <svg class="leaf-mid ginkgo-mid-1" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -727,7 +812,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-2" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="leaf-mid ginkgo-mid-2" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -743,7 +828,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-3" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="leaf-mid ginkgo-mid-3" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -759,7 +844,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-4" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="leaf-mid ginkgo-mid-4" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -775,7 +860,17 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-6" viewBox="0 0 600 700" aria-hidden="true">
+
+  <!-- ============ NEAR PLANE — Momiji (2) ============ -->
+  <svg class="leaf-near leaf-near-1" viewBox="0 0 900 1000" aria-hidden="true">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+  <svg class="leaf-near leaf-near-2" viewBox="0 0 900 1000" aria-hidden="true">
+    <path d="M 450,12 C 490,80 525,164 551,164 C 570,164 610,140 628,126 L 606,340 C 603,370 592,394 612,394 C 630,394 645,368 660,340 L 717,266 C 745,335 805,350 881,310 L 841,470 L 898,504 L 692,676 C 680,686 666,702 670,722 L 693,778 L 468,752 C 468,752 467,756 467,762 L 479,994 L 421,994 L 433,762 C 433,756 432,752 432,752 L 207,778 L 230,722 C 234,702 220,686 208,676 L 2,504 L 59,470 L 19,310 C 95,350 155,335 183,266 L 240,340 C 255,368 270,394 288,394 C 308,394 297,370 294,340 L 272,126 C 290,140 330,164 349,164 C 375,164 410,80 450,12 Z"/>
+  </svg>
+
+  <!-- ============ NEAR PLANE — Ichō (4) ============ -->
+  <svg class="leaf-near ginkgo-near-1" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -791,7 +886,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-7" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="leaf-near ginkgo-near-2" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -807,7 +902,7 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
-  <svg class="ginkgo-leaf ginkgo-8" viewBox="0 0 600 700" aria-hidden="true">
+  <svg class="leaf-near ginkgo-near-3" viewBox="0 0 600 700" aria-hidden="true">
     <path d="M 297,670
              L 297,410
              C 270,360 190,310 50,210
@@ -823,6 +918,23 @@
              L 303,670
              C 303,674 297,674 297,670 Z" />
   </svg>
+  <svg class="leaf-near ginkgo-near-4" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+
 </div>
 
 </body>
