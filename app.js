@@ -3,6 +3,18 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (loadDropBuffer removal)
+       - The loadDropBuffer() helper was a byte-for-byte duplicate
+         of loadAudioBuffer() with the URL hardcoded and the error
+         string swapped. The two differed only in DROP_SOUND_URL
+         versus the url argument, and in the thrown error text —
+         the latter is swallowed by .catch(function() { return
+         null; }) at the tail, so it is not observable. The
+         function has been removed and the initSound() call site
+         now reads loadAudioBuffer(DROP_SOUND_URL). Function
+         hoisting makes the textual reorder safe: loadAudioBuffer
+         is a function declaration, hoisted to the top of its
+         enclosing scope before any statement runs.
      v1.3 (slot pre-decode lifecycle scoping + busy-loop fix)
        - scheduleNextSlotPreDecode() split into two clauses gated
          on SLOT_PRE_WINDOW_MS (10 minutes). The previous single-
@@ -1243,21 +1255,6 @@ function loadAudioBuffer(url) {
     .catch(function() { return null; });
 }
 
-function loadDropBuffer() {
-  return fetch(DROP_SOUND_URL)
-    .then(function(r) {
-      if (!r.ok) throw new Error('drop fetch failed');
-      return r.arrayBuffer();
-    })
-    .then(function(ab) {
-      return new Promise(function(resolve, reject) {
-        var prom = soundAudioCtx.decodeAudioData(ab, resolve, reject);
-        if (prom && typeof prom.then === 'function') prom.then(resolve, reject);
-      });
-    })
-    .catch(function() { return null; });
-}
-
 /* Zero-allocation waterline-mirror spectrum. Two solid fills per
    bar (no per-frame gradient allocation) split by a horizontal
    waterline. Above: themeAccent, full opacity. Below: themePetal
@@ -1374,8 +1371,10 @@ function initSound() {
        concurrently without blocking the UI fast path. Each call
        site downstream guards on its own buffer being present, so
        a not-yet-resident buffer is skipped rather than played
-       partial. */
-    loadDropBuffer().then(function(buf) {
+       partial. The drop one-shot uses loadAudioBuffer() directly
+       — the old loadDropBuffer() wrapper was a byte-for-byte
+       duplicate with the URL hardcoded. */
+    loadAudioBuffer(DROP_SOUND_URL).then(function(buf) {
       if (buf) soundBuffers.drop = buf;
     });
 
