@@ -731,10 +731,11 @@
     filter: blur(2.5px) saturate(0.75);
   }
   .leaf-mid {
-    z-index: 2;
-    --leaf-opacity: 0.32;
-    opacity: 0;
-  }
+  z-index: 2;
+  --leaf-opacity: 0.32;
+  opacity: 0;
+  filter: blur(1.5px);
+}
   .leaf-near {
     z-index: 3;
     --leaf-opacity: 0.44;
@@ -747,8 +748,8 @@
      front overlay only; back-plane siblings keep their 0.32 / 0.44.
      The keyframes' var(--leaf-opacity) peak stops inherit these
      values automatically — no keyframe changes required. */
-  .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; }
-  .maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
+  .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; filter: none; }
+.maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
 
   /* ---------- Far plane — Momiji (2) ----------
      Clustered near the centre band. Small, soft, slowest. */
