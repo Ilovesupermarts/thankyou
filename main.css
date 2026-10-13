@@ -626,29 +626,38 @@
 
   /* ============ AMBIENT FALLING LEAVES (v1.3, depth-layered)
      ------------------------------------------------------------
-     Three depth planes give the field parallax. The previous
-     single-layer arrangement read as flat because every leaf shared
-     the same size, opacity, sharpness, and drift speed — no cue
-     told the eye which leaves were near and which were far.
+     Two overlays share a single base rule block:
 
-     Each plane carries its own size / blur / speed / opacity
-     signature; distance is read from the ratio between the planes,
-     not from any single one:
+       .maple-leaves-overlay        — z-index -1, behind all content
+       .maple-leaves-overlay-front  — z-index 5, in front of panel
+                                      text but behind every
+                                      interactive control (theme
+                                      toggle 10, hint 9, dots 10,
+                                      HUD 40, summary 50, numpad 120,
+                                      modals 100+, receipt 300,
+                                      thank-you 350)
 
-       Far  (z 1) — 6 leaves, 28–38px, blur 2.5px + saturate 0.75,
+     Eighteen leaves total across three depth planes. Each leaf
+     carries TWO classes — a plane class (.leaf-far / .leaf-mid /
+     .leaf-near) and an identity class (per-leaf size, fill,
+     horizontal position, and drift timing below).
+
+     Plane signatures:
+       Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
                     --leaf-opacity 0.20, drift 17–21s
-       Mid  (z 2) — 6 leaves, 42–54px, sharp,
+       Mid  (z 2) — 42–54px, sharp,
                     --leaf-opacity 0.32, drift 10–14s
-       Near (z 3) — 6 leaves, 62–84px, sharp,
+       Near (z 3) — 62–84px, sharp,
                     --leaf-opacity 0.44, drift  8.5–10.5s
 
-     Total is 18: 6 Momiji (2 per plane) + 12 Ichō (4 per plane).
-     Species and colour are distributed across all three planes so
-     no plane reads as "the plum layer" or "the ginkgo layer".
-     Far leaves cluster toward the centre band; near leaves push
-     toward the edges — this mimics the wider angular spread of
-     objects close to the camera and compounds with the size
-     gradient.
+     FRONT-LAYER PROMOTION (v1.3, A29). App.js's
+     distributeFrontLeaves() moves 2 randomly-chosen mid/near leaves
+     from the back overlay into the front overlay at the moment the
+     carousel activates. The far plane is never promoted — the
+     depth-of-field layer always stays behind the text. Front
+     leaves read at higher opacity (0.86 mid / 0.90 near) so the
+     prose visibly disappears behind a crossing leaf rather than
+     tinting through it.
 
      OPACITY SOURCE OF TRUTH. The plane opacity lives on
      --leaf-opacity, not on the element's `opacity` declaration.
@@ -682,21 +691,26 @@
      No drop-shadow — at sub-0.45 element opacity the 0.07 alpha
      was imperceptible, and it expanded each leaf's promoted-layer
      texture by offset + blur radius. */
-  .maple-leaves-overlay {
+  .maple-leaves-overlay,
+  .maple-leaves-overlay-front {
     position: fixed;
     inset: 0;
     pointer-events: none;
     overflow: hidden;
-    z-index: -1;
     opacity: 0;
     transition: opacity 1.8s ease;
   }
 
-  .maple-leaves-overlay.active {
+  .maple-leaves-overlay        { z-index: -1; }
+  .maple-leaves-overlay-front  { z-index: 5; }
+
+  .maple-leaves-overlay.active,
+  .maple-leaves-overlay-front.active {
     opacity: 1;
   }
 
-  html[data-theme="default"] .maple-leaves-overlay {
+  html[data-theme="default"] .maple-leaves-overlay,
+  html[data-theme="default"] .maple-leaves-overlay-front {
     display: none;
   }
 
@@ -726,6 +740,15 @@
     --leaf-opacity: 0.44;
     opacity: 0;
   }
+
+  /* ---------- Front-overlay opacity override ----------
+     Front-promoted leaves read at high opacity so the text behind
+     them visibly disappears during a crossing. Scoped to the
+     front overlay only; back-plane siblings keep their 0.32 / 0.44.
+     The keyframes' var(--leaf-opacity) peak stops inherit these
+     values automatically — no keyframe changes required. */
+  .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; }
+  .maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
 
   /* ---------- Far plane — Momiji (2) ----------
      Clustered near the centre band. Small, soft, slowest. */
