@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUD + Tanzaku 素材比較</title>
+<title>HUD 外観テスト v3</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -12,10 +12,6 @@
 <link rel="stylesheet" href="main.css">
 
 <style>
-  /* ============================================================
-     TEST-PAGE OVERRIDES
-     ============================================================ */
-
   body {
     padding-bottom: 0;
     min-height: 100vh;
@@ -51,7 +47,7 @@
   .test-stage {
     max-width: 480px;
     margin: 0 auto;
-    padding: 100px 20px 60px 20px;
+    padding: 100px 20px 220px 20px;
     text-align: center;
   }
   .test-stage .panel-content {
@@ -61,53 +57,9 @@
     transition: none !important;
   }
 
-  /* Inline tanzaku preview — same card markup as production but
-     placed in page flow rather than a fixed overlay, so both the
-     HUD and the tanzaku card are visible simultaneously for the
-     material comparison. */
-  .test-tanzaku-wrap {
-    max-width: 480px;
-    margin: 0 auto 220px auto;
-    padding: 0 24px;
-  }
-
-  .test-section-label {
-    max-width: 480px;
-    margin: 40px auto 20px auto;
-    padding: 0 24px;
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 11px;
-    color: var(--text-faint);
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    opacity: 0.7;
-  }
-
-  .test-caption {
-    max-width: 480px;
-    margin: 24px auto 0 auto;
-    padding: 0 24px;
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 12px;
-    color: var(--text-faint);
-    letter-spacing: 1.5px;
-    line-height: 2;
-  }
-
-  /* ============================================================
-     TANZAKU INPUT — pending main.css change
-     Same rgba surface and border as the audio HUD so the two read
-     as one continuous material family.
-     ============================================================ */
-  .tanzaku-input {
-    background: rgba(255, 253, 249, 0.92) !important;
-    border: 1px solid rgba(222, 192, 172, 0.50) !important;
-  }
-
   /* ============================================================
      AUDIO SPECTRUM & METADATA HUD
+     Background image borrowed from .tanzaku-card.
      ============================================================ */
   .audio-spectrum-hud {
     position: fixed;
@@ -122,7 +74,14 @@
     width: 318px;
     padding: 24px 14px 10px 14px;
     border-radius: 18px;
-    background: rgba(255, 253, 249, 0.92);
+
+    /* --- Same paper as .tanzaku-card --- */
+    background-color: #fcfbf9;
+    background-image: url('icons/1790678998862.jpg');
+    background-size: cover;
+    background-position: bottom right;
+    background-repeat: no-repeat;
+
     border: 1px solid rgba(222, 192, 172, 0.50);
     box-shadow:
       0 6px 22px rgba(68, 52, 48, 0.08),
@@ -136,21 +95,22 @@
     transform: translateY(0);
   }
 
-  /* Top Row — absolutely positioned inside the card so 再生中 pins
-     to the top-left corner and the DL badge to the top-right. */
+  /* ============================================================
+     Badges — absolutely positioned, no flex.
+     .hud-status-badge is hard-pinned to the card's top-left corner.
+     .hud-dl-badge is hard-pinned to the card's top-right corner.
+     ============================================================ */
   .hud-top-row {
     position: absolute;
-    top: 6px;
-    left: 8px;
-    right: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    top: 0; left: 0; right: 0;
+    height: 0;
     pointer-events: none;
   }
 
   .hud-status-badge,
   .hud-dl-badge {
+    position: absolute;
+    top: 6px;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
@@ -161,9 +121,17 @@
   }
 
   .hud-status-badge {
+    left: 8px;
     background: rgba(176, 74, 90, 0.12);
     color: var(--accent);
   }
+  .hud-dl-badge {
+    right: 8px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: rgba(222, 192, 172, 0.28);
+    color: var(--text-mute);
+  }
+
   .hud-status-badge.loading {
     background: rgba(247, 185, 60, 0.22);
     color: #8f3f12;
@@ -194,11 +162,6 @@
     color: #882E47;
   }
 
-  .hud-dl-badge {
-    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    background: rgba(222, 192, 172, 0.28);
-    color: var(--text-mute);
-  }
   .hud-dl-badge.decoding {
     background: rgba(255, 162, 89, 0.32);
     color: #9E3B06;
@@ -218,6 +181,9 @@
     50%      { opacity: 1; }
   }
 
+  /* ============================================================
+     Meta row — title · artist
+     ============================================================ */
   .hud-meta-row {
     display: flex;
     align-items: baseline;
@@ -390,26 +356,6 @@
   </div>
 </main>
 
-<!-- ============ TANZAKU PREVIEW (inline, not overlay) ============ -->
-<div class="test-section-label">Tanzaku Input — Same Material as HUD</div>
-
-<div class="test-tanzaku-wrap">
-  <div class="tanzaku-card">
-    <div class="tanzaku-label">サービスの種類</div>
-    <input type="text" class="tanzaku-input" placeholder="ご記入ください" value="全身リンパマッサージ 60分">
-    <div class="tanzaku-actions">
-      <button type="button" class="tanzaku-btn tanzaku-cancel">キャンセル</button>
-      <button type="button" class="tanzaku-btn tanzaku-confirm">決定</button>
-    </div>
-  </div>
-</div>
-
-<div class="test-caption">
-  HUD と Tanzaku の入力欄が同じ素材 —<br>
-  絹白 #FFFDF9 @ 92% + 薄杏ボーダー
-</div>
-
-<!-- ============ AUDIO SPECTRUM & METADATA HUD ============ -->
 <div class="audio-spectrum-hud shown" id="audioSpectrumHud" aria-hidden="true">
   <div class="hud-top-row">
     <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
@@ -453,8 +399,6 @@
   var stageLattice   = document.getElementById('stageLattice');
   var hudStatusBadge = document.getElementById('hudStatusBadge');
   var hudPctStatus   = document.getElementById('hudPctStatus');
-  var hudTrackTitle  = document.getElementById('hudTrackTitle');
-  var hudTrackArtist = document.getElementById('hudTrackArtist');
   var hudCanvas      = document.getElementById('hudCanvas');
   var hudCtx         = hudCanvas ? hudCanvas.getContext('2d') : null;
   var hudGaugeFill   = document.getElementById('hudGaugeFill');
