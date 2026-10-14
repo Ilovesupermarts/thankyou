@@ -3,6 +3,186 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (receipt numpad focus gate)
+       - updateNumpadVisibility() no longer conflates the numpad's
+         appearance toggle with its functional toggle. The previous
+         form added .visible unconditionally on receipt open and
+         returned early, but resetReceiptScroll() blurs the active
+         element one statement before the function runs, so
+         getActivePriceInput() returned null and every numpad tap
+         fell through handleNumpadKey's null-target guard. The
+         keypad surfaced with no target to service.
+       - The fix splits the two concerns.
+         numpad.classList.toggle('receipt-mode', !!isReceiptOpen)
+         applies the receipt skin unconditionally; .visible is added
+         only inside the isPriceFocused branch that already governs
+         the main table. Matches the table's interaction model.
+       - The rejected clause is now (rejected && !isReceiptOpen).
+         Under the previous early-return form, rejected === true
+         never reached the rejected check because the receipt branch
+         had already returned. A straight (rejected || numpadSuppressed)
+         in the unified form would lock the numpad out of the receipt
+         for the entire declined flow — rejected stays true from the
+         moment the reject row is selected through receipt confirm —
+         and the ささやかなお礼 line item that buildReceipt()
+         synthesizes under the itemCount === 0 && rejected clause
+         would have had its only editable field permanently
+         unserviceable. Inline comment documents the carve-out.
+       - The width guard is now
+         if (!tableCard || window.innerWidth <= 1250)
+           { numpad.classList.remove('visible'); return; }.
+         Previously a bare return past a window.innerWidth <= 1250
+         test relied on the @media (max-width: 1250px) { .numpad
+         { display: none; } } rule to suppress an element that still
+         carried .visible in the DOM. Any resize crossing the 1250px
+         boundary surfaced the class for one paint. Explicit teardown
+         keeps DOM state synchronized with layout reality on every
+         path; symmetrical across all four exit branches.
+       - repositionNumpad() moved inside the isPriceFocused branch.
+         Coordinates are inert while the element is hidden; focusin
+         re-enters the function for every focus event, so no drift
+         accumulates across scroll or the numpad's own show/hide.
+       - numpadSuppressed needs no additional reset on receipt open.
+         The document-level focusin handler routes .service-input and
+         .tanzaku-input into the branch that sets the flag; every
+         other focusable target, including .receipt-price-input,
+         falls into the else that clears it and calls
+         updateNumpadVisibility(). The two states are mutually
+         exclusive by construction.
+     v1.3 (boot-time scroll evaluation gate)
+       - evaluateScrollState() now early-returns on
+         !tableUnlocked || _tlDocTop <= 0. The module-level
+         scheduleEvaluation() call at the bottom of app.js fires on
+         script parse, ahead of the window.load handler that runs
+         refreshTransitionGeometry(). On that first tick _tlDocTop
+         is still its initial 0, so evaluateScrollState() computed
+         lineTop = _tlDocTop − scrollY = 0, saw 0 < winH − 20, and
+         called revealTableSection() — adding body.warm-background
+         (the apricot #FBECE0 canvas tint) and activating .divider,
+         .reject-row, and .table-card while the name screen was
+         still up.
+       - The visible symptom was a background shift on cold boot;
+         the name screen carries background: transparent, so the
+         body's warm-background class showed through. The state
+         symptom was worse — tableEnteredView was pinned to true
+         before the user had done anything, so the transition-line
+         reveal that should fire when the user scrolls past panel 5
+         was silently pre-empted.
+       - Two clauses. !tableUnlocked is the primary gate; _tlDocTop
+         <= 0 is the geometry-readiness check that covers any
+         hypothetical path reaching scheduleEvaluation() after
+         unlock but before the first refreshTransitionGeometry()
+         completes.
+       - The guard does not strand updateSummaryVisibility() or
+         updateIntroHintVisibility(). Both have independent entry
+         points that the early return does not reach, and both are
+         inert while the body is locked. The 80ms scheduleEvaluation()
+         in goToPanel(5) does not itself trigger revealTableSection()
+         — at panel 5 with scrollY === 0 the transition line sits
+         well below winH − 20. What the 80ms tick does is re-enter
+         updateSummaryVisibility() and updateIntroHintVisibility()
+         against a populated geometry cache for the first time.
+       - updateTransitionBodyEffects() is left unguarded. Its
+         scrollY <= 0 early return already neutralises the pre-load
+         tick, and the position: fixed body lock makes a non-zero
+         scrollY before window.load nearly unreachable.
+     v1.3 (receipt first-service re-derivation)
+       - applyTyPanel1Content() now derives the panel-1 variant
+         from the live receipt DOM rather than reading the
+         firstServiceInReceipt snapshot captured inside
+         buildReceipt(). The snapshot was set once when the receipt
+         was first constructed and never refreshed, so a therapist
+         who checked the first preset, advanced to the receipt, and
+         then removed that line item via the × button still saw the
+         microbikini variant on the thank-you carousel.
+       - The same stale-flag leak ran through the reopened-from-
+         thankyou path. tyReceiptBtn calls buildReceipt() on reopen,
+         but the reopened confirm routes into
+         resumeThankyouSequence(), which does not re-render panel-1
+         content. Any change made during the reopen was invisible
+         when she resumed. resumeThankyouSequence() now calls
+         applyTyPanel1Content() at its head. The receipt's DOM is
+         still live at this point — the screen is hidden but not
+         torn down.
+       - The derivation walks .receipt-item elements in DOM order,
+         skips those with data-removing === 'true' or the .removing
+         class, and tests whether the first survivor's
+         .receipt-item-name matches PRESETS[0].name. That mirrors
+         buildReceipt()'s original predicate exactly — "first item
+         built matches" — rather than a looser "any item matches"
+         test that would collapse to the same truth value today but
+         drift under a future re-ordering amendment.
+       - A rejected early return sits at the head of the function.
+         confirmYes's rejected branch transitions directly to
+         thankyouScreen without calling buildReceipt(), so
+         receiptItems may still hold the previous session's
+         elements — and returnToTable() does not clear them. Without
+         the guard, the DOM walk would find the stale first-preset
+         item and paint the microbikini variant for a session that
+         rejected everything. The guard short-circuits to
+         TY_PANEL1_DEFAULT_HTML and sets the flag false before the
+         walk runs.
+       - firstServiceInReceipt is now derived, not stored. The four
+         supporting sites in buildReceipt() — the firstRowIncluded
+         local, the preset0Val local, the itemCount === 0 &&
+         preset0Val !== '' && name === preset0Val conditional, and
+         the firstServiceInReceipt = firstRowIncluded assignment —
+         are all retired. preset0Val had no other reader once the
+         assignment was gone. The firstServiceInReceipt = false
+         assignment inside confirmYes's rejected branch is also
+         removed: the guard sets it on the next
+         applyTyPanel1Content() call, and applyTyPanel1Content()
+         becomes the single writer of the flag.
+     v1.3 (HUD width alignment)
+       - The canvas backing store was 282 CSS pixels wide while the
+         card's content box was 288px. The card declares width:
+         318px, box-sizing: border-box (set globally), 1px borders
+         each side (2px), and 24px 14px 10px 14px padding (28px
+         horizontal). 318 − 2 − 28 = 288. The canvas at width: 100%
+         displayed at 288px, stretching the 282-wide raster by ~2.1%
+         horizontally. Every wave peak landed 2.1% further right
+         than the drawing math intends.
+       - The stale value was inherited from the retired 25-column
+         waterline renderer and never revisited when the fluid-
+         waveform design landed at v1.3. Fixing the number that was
+         wrong (the coordinate space) rather than warping a correct
+         number (the padding) preserves the card's internal
+         proportions. HUD_DISPLAY_W is only read as a scalar width
+         in drawHudSpectrum() and drawFluidRibbon(); 282 → 288
+         shifts every x-coordinate proportionally.
+       - The invariant HUD_DISPLAY_W === .audio-spectrum-hud
+         content-box width is now documented at both sites — as a
+         comment on the var declaration in app.js and as a comment
+         on the CSS rule in main.css — so a future amendment that
+         changes the card's width or horizontal padding cannot
+         silently reintroduce the mismatch.
+     v1.3 (HUD Hann pre-compute and dead-code pruning)
+       - drawFluidRibbon()'s per-frame Hann window is now a lookup
+         table. The envelope term — Math.sin(norm * π)² for every
+         one of the 28 control points, on each of the 6 layers,
+         every animation frame — recomputed the same 28 constants
+         6× per frame at up to 120 Hz, roughly 20,160 redundant
+         trig evaluations and squarings per second. _hudHannWindow
+         is a 28-entry Float32Array populated once at module scope
+         by a self-invoking function; the loop in drawFluidRibbon()
+         collapses to a single array read. The IIFE is deliberate —
+         a plain for at module scope would leak its loop counters as
+         window globals, since app.js is a classic script.
+       - PANEL_PHRASE_MODE retired. It was a two-way tuning switch
+         between 'coexist' and 'sequence'; the codebase has only
+         ever run 'coexist', and the 'sequence' branch's baseDelay =
+         PANEL_PHRASE_DELAY was never exercised. Both ternaries in
+         playPanel1SpecialSequence() and playPanelPhraseReveal() now
+         read var baseDelay = 0; directly. PANEL_PHRASE_DELAY = 300
+         retires with it — its only reader was the
+         Math.max(0, PANEL_PHRASE_DELAY - 300) expression inside the
+         dead branch, which always evaluated to 0.
+       - Three dead DOM refs removed. nameScreenTable was declared
+         at module scope and never read. therapistNameEl was assigned
+         twice (declaration and inside buildPanel1OpeningBeats())
+         and never read. receiptTotal was declared and never read —
+         the receipt total is written through receiptTotalNumber,
+         the digit-roll container inside #receiptTotal.
      v1.3 (fluid waveform HUD revamp)
        - The HUD layout is rebuilt around the reference design:
          red box (top-left) — playback status · yellow box
@@ -11,10 +191,10 @@
          on top of the progress bar · split timestamps below.
        - Top-left and top-right badges are absolutely positioned
          at top: 8px matching the left/right 8px side inset, so
-         再生中 pins hard to the top-left corner and DL XX% to
-         the top-right. The dual-writer race that existed under
-         the previous single-slot label row disappears: status
-         and download now own independent DOM targets.
+         再生中 pins hard to the top-left corner and DL XX% to the
+         top-right. The dual-writer race that existed under the
+         previous single-slot label row disappears: status and
+         download now own independent DOM targets.
        - The 25-column waterline-mirror spectrum is replaced by a
          six-layer fluid waveform. Each layer reads its own
          frequency band — LAYER_BIN_START/END span bins 3 through
@@ -279,8 +459,8 @@
          padding, breakpoint scaling, and env(safe-area-inset-
          bottom) all vary with viewport.
        - Motion is coupled to the summary's own slide: both the
-         summary bar and the HUD's transform leg run at 0.5s on
-         the same cubic-bezier(0.4, 0.0, 0.2, 1) — an asymmetric
+         summary bar and the HUD's transform leg run at 0.5s on the
+         same cubic-bezier(0.4, 0.0, 0.2, 1) — an asymmetric
          S-curve with zero initial slope (soft lift-off) and near-
          zero terminal slope (soft arrival). Matching durations
          ensures both motions land at the same instant; matching
@@ -943,7 +1123,7 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
      · hudStatusBadge (top-left)  — 待機中 / 再生中 / 展開中 / 待機完了
      · hudPctStatus   (top-right) — DL XX% / PCM展開中 / DL 100%
      · hudTrackTitle · hudTrackArtist (centred meta row)
-     · hudCanvas (282×44, six-layer fluid waveform)
+     · hudCanvas (288×44, six-layer fluid waveform)
      · hudGaugeFill (playback progress with glowing playhead)
      · hudTimeElapsed / hudTimeTotal (split timestamps below the bar)
 
@@ -962,7 +1142,11 @@ var hudPctStatus     = document.getElementById('hudPctStatus');
 var hudTimeElapsed   = document.getElementById('hudTimeElapsed');
 var hudTimeTotal     = document.getElementById('hudTimeTotal');
 
-var HUD_DISPLAY_W = 282;
+/* Must equal .audio-spectrum-hud's content-box width in main.css:
+   318px card − 2px borders − 28px horizontal padding = 288. The
+   canvas backing store is sized to this constant; drift re-
+   introduces the aspect stretch the v1.3 amendment closed. */
+var HUD_DISPLAY_W = 288;
 var HUD_DISPLAY_H = 44;
 var HUD_WAVE_PTS  = 28;
 var HUD_LAYERS    = 6;
@@ -976,6 +1160,23 @@ var LAYER_BIN_START = [3, 15, 35, 55, 75, 95];
 var LAYER_BIN_END   = [22, 42, 62, 82, 100, 120];
 
 var _hudMirrorValues = new Float32Array(HUD_LAYERS * HUD_WAVE_PTS);
+
+/* Static Hann window (sin²) pre-computed once at module scope so
+   drawFluidRibbon() reads a lookup table instead of computing 28
+   trig evaluations and squarings per layer per frame — roughly
+   20,160 redundant evaluations per second at 120Hz across the six
+   layers. The IIFE is deliberate: a plain for at module scope
+   would leak _hi / _hs as window globals, since app.js is a
+   classic script. */
+var _hudHannWindow = new Float32Array(HUD_WAVE_PTS);
+(function() {
+  var last = HUD_WAVE_PTS - 1;
+  for (var hi = 0; hi <= last; hi++) {
+    var s = Math.sin((hi / last) * Math.PI);
+    _hudHannWindow[hi] = s * s;
+  }
+})();
+
 var _hudPhase = 0;
 
 if (hudCanvas && hudCtx) {
@@ -1621,7 +1822,12 @@ function drawHudSpectrum() {
    down to the baseline at the right edge. Without that snap the
    last quadratic curve ends at the midpoint between the final two
    control points and the closing lineTo(w, baseY) leaves a
-   sub-pixel diagonal seam. */
+   sub-pixel diagonal seam.
+
+   The Hann window (sin²) tapers wave amplitude to 0 at both edges
+   of the ribbon. It is read from _hudHannWindow — a 28-entry
+   lookup table populated once at module scope — rather than
+   recomputed per frame per layer. */
 function drawFluidRibbon(layerIdx, fillHex, alpha, speedMul, phaseOffset, freqMul, heightScale) {
   var w = HUD_DISPLAY_W;
   var baseY = HUD_DISPLAY_H;
@@ -1640,9 +1846,7 @@ function drawFluidRibbon(layerIdx, fillHex, alpha, speedMul, phaseOffset, freqMu
 
   for (var i = 0; i <= lastIdx; i++) {
     var norm = i / lastIdx;
-    /* Hann window (sin²) tapers wave amplitude to 0 at both edges */
-    var envelope = Math.sin(norm * Math.PI);
-    envelope = envelope * envelope;
+    var envelope = _hudHannWindow[i];
 
     var undulation = 0.72 + 0.28 * Math.sin(_hudPhase * speedMul + norm * Math.PI * freqMul + phaseOffset);
     var amp = _hudMirrorValues[base + i] * undulation * envelope;
@@ -2770,9 +2974,7 @@ var nameScreen = document.getElementById('nameScreen');
 var nameInput = document.getElementById('nameInput');
 var nameBtn = document.getElementById('nameBtn');
 var nameScreenRows = document.getElementById('nameScreenRows');
-var nameScreenTable = document.getElementById('nameScreenTable');
 var nameScreenTotalValue = document.getElementById('nameScreenTotalValue');
-var therapistNameEl = document.getElementById('therapistName');
 var track = document.getElementById('track');
 var stage = document.getElementById('stage');
 var dotsEl = document.getElementById('dots');
@@ -2847,7 +3049,6 @@ var confirmYes = document.getElementById('confirmYes');
 var confirmNo = document.getElementById('confirmNo');
 var receiptScreen = document.getElementById('receiptScreen');
 var receiptItems = document.getElementById('receiptItems');
-var receiptTotal = document.getElementById('receiptTotal');
 var receiptConfirmBtn = document.getElementById('receiptConfirmBtn');
 var receiptBackBtn = document.getElementById('receiptBackBtn');
 
@@ -3077,17 +3278,14 @@ function updateNumpadVisibility() {
     return;
   }
   var isReceiptOpen = receiptScreen && receiptScreen.classList.contains('visible');
-  if (isReceiptOpen) {
-    numpad.classList.add('receipt-mode');
-    numpad.classList.add('visible');
-    repositionNumpad();
+  numpad.classList.toggle('receipt-mode', !!isReceiptOpen);
+
+  if (!tableCard || window.innerWidth <= 1250) {
+    numpad.classList.remove('visible');
     return;
-  } else {
-    numpad.classList.remove('receipt-mode');
   }
-  if (!tableCard) return;
-  if (window.innerWidth <= 1250) return;
-  if (rejected || numpadSuppressed) {
+  /* Allow numpad on receipt even if rejected, so tip remains editable */
+  if ((rejected && !isReceiptOpen) || numpadSuppressed) {
     numpad.classList.remove('visible');
     return;
   }
@@ -3187,8 +3385,11 @@ var PANEL_PHRASE_MAX = 10;
 var PANEL_PHRASE_RISE = 30;
 var PANEL_PHRASE_DURATION = 500;
 var PANEL_PHRASE_STAGGER_MAX = 600;
-var PANEL_PHRASE_DELAY = 300;
-var PANEL_PHRASE_MODE = 'coexist';
+/* PANEL_PHRASE_DELAY and PANEL_PHRASE_MODE retired. The latter was
+   a tuning switch between 'coexist' and 'sequence'; the codebase
+   has only ever run 'coexist', and the sequence branch's baseDelay
+   was never exercised. Its constant input, PANEL_PHRASE_DELAY, had
+   no reader once both ternaries were inlined to baseDelay = 0. */
 
 var PANEL_1_POST_BEAT_DELAY = 1000;
 
@@ -3412,8 +3613,6 @@ function buildPanel1OpeningBeats(panelEl) {
 
   contentEl.insertBefore(beat1, body);
   contentEl.insertBefore(beat2, body);
-
-  therapistNameEl = nameSpan;
 }
 
 function resetPanel1Beats(panelEl) {
@@ -3457,9 +3656,7 @@ function playPanel1SpecialSequence(panelEl) {
     if (!body) return;
     var phrases = body.querySelectorAll('.panel-phrase');
     if (!phrases.length) return;
-    var baseDelay = PANEL_PHRASE_MODE === 'sequence'
-      ? PANEL_PHRASE_DELAY
-      : Math.max(0, PANEL_PHRASE_DELAY - 300);
+    var baseDelay = 0;
     void body.offsetWidth;
     for (var k = 0; k < phrases.length; k++) {
       (function(el) {
@@ -3534,9 +3731,7 @@ function playPanelPhraseReveal(panelEl) {
   var phrases = panelEl.querySelectorAll('.panel-phrase');
   if (!phrases.length) return;
 
-  var baseDelay = PANEL_PHRASE_MODE === 'sequence'
-    ? PANEL_PHRASE_DELAY
-    : Math.max(0, PANEL_PHRASE_DELAY - 300);
+  var baseDelay = 0;
 
   void panelEl.offsetWidth;
 
@@ -5448,8 +5643,6 @@ function buildReceipt(opts) {
   }
   var rows = getRows();
   var itemCount = 0;
-  var firstRowIncluded = false;
-  var preset0Val = (PRESETS[0] && PRESETS[0].name) ? PRESETS[0].name : '';
   for (var i = 0; i < rows.length; i++) {
     var row = rows[i];
     var priceInput = row.querySelector('.price-input');
@@ -5464,7 +5657,6 @@ function buildReceipt(opts) {
     if (display) name = (display.textContent || '').trim();
     else if (textInput) name = (textInput.value || '').trim();
     if (!name) name = 'サービス ' + (i + 1);
-    if (itemCount === 0 && preset0Val !== '' && name === preset0Val) firstRowIncluded = true;
     var itemDiv = document.createElement('div');
     itemDiv.className = 'receipt-item';
     itemDiv._srcRow = row;
@@ -5529,7 +5721,6 @@ function buildReceipt(opts) {
 
   bindReceiptItemListeners();
   updateReceiptTotal();
-  firstServiceInReceipt = firstRowIncluded;
 
   if (!deferItems) revealReceiptItems(80);
 }
@@ -5717,7 +5908,6 @@ confirmYes.addEventListener('click', function(e) {
   confirmScreen.classList.remove('visible');
 
   if (rejected) {
-    firstServiceInReceipt = false;
     thankyouScreen.style.transition = 'none';
     thankyouScreen.classList.add('visible');
     void thankyouScreen.offsetWidth;
@@ -6161,6 +6351,8 @@ function updateSummaryVisibility(scrollY, vh) {
 }
 
 function evaluateScrollState(scrollY, vh) {
+  if (!tableUnlocked || _tlDocTop <= 0) return;
+
   var sY = (scrollY !== undefined) ? scrollY : (window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0);
   var winH = (vh !== undefined) ? vh : window.innerHeight;
   var lineTop = _tlDocTop - sY;
@@ -6642,10 +6834,56 @@ function updateTySwipeHint() {
   else tySwipeHintLabel.textContent = 'スワイプ';
   tySwipeHint.classList.add('shown');
 }
+/* Panel-1 content is derived from the live receipt DOM at paint
+   time. The previous form read firstServiceInReceipt, a snapshot
+   taken inside buildReceipt() and never refreshed when the
+   therapist removed the first-preset line item via the × button.
+   Confirming a receipt whose first item had been removed still
+   rendered the microbikini variant. The same stale flag leaked
+   through the reopened-from-thankyou path, where the receipt was
+   re-built on reopen but resumeThankyouSequence() never
+   re-rendered the panel. Deriving from the DOM closes both: the
+   receipt's elements are still present at every
+   applyTyPanel1Content() call site (direct path: receiptScreen
+   still .visible; reopened path: screen hidden but DOM intact).
+
+   The rejected guard covers the one path that does not rebuild
+   the receipt: confirmYes's rejected branch transitions straight
+   to thankyouScreen without calling buildReceipt(), so
+   receiptItems may still hold the previous session's elements.
+   Without the guard the DOM walk would find that stale
+   first-preset item and paint the microbikini variant for a
+   session that rejected everything. */
 function applyTyPanel1Content() {
   if (!tyPanel1Content) return;
-  if (firstServiceInReceipt) tyPanel1Content.innerHTML = TY_PANEL1_MICROBIKINI_HTML;
-  else tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
+
+  /* If the session was rejected, always show the default polite message */
+  if (rejected) {
+    firstServiceInReceipt = false;
+    tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
+    return;
+  }
+
+  var preset0Name = (PRESETS[0] && PRESETS[0].name) ? PRESETS[0].name : '';
+  var firstMatches = false;
+  if (preset0Name !== '' && receiptItems) {
+    var items = receiptItems.querySelectorAll('.receipt-item');
+    for (var i = 0; i < items.length; i++) {
+      var el = items[i];
+      if (el.getAttribute('data-removing') === 'true') continue;
+      if (el.classList.contains('removing')) continue;
+      var nameEl = el.querySelector('.receipt-item-name');
+      firstMatches = !!(nameEl && nameEl.textContent.trim() === preset0Name);
+      break;
+    }
+  }
+  firstServiceInReceipt = firstMatches;
+
+  if (firstServiceInReceipt) {
+    tyPanel1Content.innerHTML = TY_PANEL1_MICROBIKINI_HTML;
+  } else {
+    tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
+  }
 }
 function activateTyPanel(index) {
   for (var i = 0; i < tyPanels.length; i++) {
@@ -6894,6 +7132,7 @@ function startThankyouSequence() {
   if (numpad) numpad.classList.remove('visible', 'receipt-mode');
 }
 function resumeThankyouSequence() {
+  applyTyPanel1Content();
   tyReceiptBtn.classList.add('shown');
   if (tyExited) {
     tyAmbientStage.classList.add('shown');
