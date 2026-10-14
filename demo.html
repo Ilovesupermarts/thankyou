@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUD 外観テスト v2</title>
+<title>HUD + Tanzaku 素材比較</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
 
 <style>
   /* ============================================================
-     TEST-PAGE OVERRIDES — HUD preview with 6-layer fluid ribbons
+     TEST-PAGE OVERRIDES
      ============================================================ */
 
   body {
@@ -51,7 +51,7 @@
   .test-stage {
     max-width: 480px;
     margin: 0 auto;
-    padding: 100px 20px 220px 20px;
+    padding: 100px 20px 60px 20px;
     text-align: center;
   }
   .test-stage .panel-content {
@@ -60,13 +60,50 @@
     filter: none !important;
     transition: none !important;
   }
-  .test-caption {
+
+  /* Inline tanzaku preview — same card markup as production but
+     placed in page flow rather than a fixed overlay, so both the
+     HUD and the tanzaku card are visible simultaneously for the
+     material comparison. */
+  .test-tanzaku-wrap {
+    max-width: 480px;
+    margin: 0 auto 220px auto;
+    padding: 0 24px;
+  }
+
+  .test-section-label {
+    max-width: 480px;
+    margin: 40px auto 20px auto;
+    padding: 0 24px;
     text-align: center;
-    margin: 32px auto 0 auto;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 11px;
+    color: var(--text-faint);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    opacity: 0.7;
+  }
+
+  .test-caption {
+    max-width: 480px;
+    margin: 24px auto 0 auto;
+    padding: 0 24px;
+    text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
     font-size: 12px;
     color: var(--text-faint);
-    letter-spacing: 2px;
+    letter-spacing: 1.5px;
+    line-height: 2;
+  }
+
+  /* ============================================================
+     TANZAKU INPUT — pending main.css change
+     Same rgba surface and border as the audio HUD so the two read
+     as one continuous material family.
+     ============================================================ */
+  .tanzaku-input {
+    background: rgba(255, 253, 249, 0.92) !important;
+    border: 1px solid rgba(222, 192, 172, 0.50) !important;
   }
 
   /* ============================================================
@@ -83,9 +120,7 @@
     user-select: none;
     -webkit-user-select: none;
     width: 318px;
-    /* Reduced top/left/right padding pulls the status badge closer
-       to the card's actual top-left corner. */
-    padding: 8px 14px 10px 14px;
+    padding: 24px 14px 10px 14px;
     border-radius: 18px;
     background: rgba(255, 253, 249, 0.92);
     border: 1px solid rgba(222, 192, 172, 0.50);
@@ -101,12 +136,17 @@
     transform: translateY(0);
   }
 
-  /* --- Top Row: 再生中 (left) · DL badge (right) --- */
+  /* Top Row — absolutely positioned inside the card so 再生中 pins
+     to the top-left corner and the DL badge to the top-right. */
   .hud-top-row {
+    position: absolute;
+    top: 6px;
+    left: 8px;
+    right: 8px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
+    pointer-events: none;
   }
 
   .hud-status-badge,
@@ -120,7 +160,6 @@
     transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
   }
 
-  /* Red Box (Left): Playback Status */
   .hud-status-badge {
     background: rgba(176, 74, 90, 0.12);
     color: var(--accent);
@@ -155,7 +194,6 @@
     color: #882E47;
   }
 
-  /* Yellow Box (Right): Download Progress */
   .hud-dl-badge {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     background: rgba(222, 192, 172, 0.28);
@@ -180,7 +218,6 @@
     50%      { opacity: 1; }
   }
 
-  /* --- Blue Box: Title · Artist --- */
   .hud-meta-row {
     display: flex;
     align-items: baseline;
@@ -188,7 +225,7 @@
     gap: 6px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     line-height: 1.2;
-    margin-bottom: 0;   /* was 2px — pulled tight against the wave */
+    margin: 0;
     min-width: 0;
   }
   .hud-title {
@@ -218,17 +255,12 @@
     min-width: 0;
   }
 
-  /* --- Wave + Gauge Stack --- */
   .hud-wave-gauge-stack {
     display: flex;
     flex-direction: column;
     width: 100%;
     margin-top: 0;
   }
-
-  /* Canvas height grown from 30 → 44 so the taller ribbons have
-     room to breathe. flex-end keeps the wave baseline flush with
-     the top edge of the gauge bar. */
   .hud-visualizer-block {
     width: 100%;
     height: 44px;
@@ -236,7 +268,7 @@
     align-items: flex-end;
     justify-content: center;
     margin-bottom: 0;
-    margin-top: -2px;   /* slight negative pull toward meta row */
+    margin-top: -2px;
   }
   .hud-canvas {
     width: 100%;
@@ -353,13 +385,31 @@
       <span class="therapist-name">桜庭さん</span>、初めまして。
       <p>それでは、本日の癒しのオプションをご覧ください。</p>
       <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
       <p>ありがとうございます。</p>
     </div>
   </div>
-  <div class="test-caption">HUD 外観テスト v2 — 6層 / 高ピーク</div>
 </main>
 
+<!-- ============ TANZAKU PREVIEW (inline, not overlay) ============ -->
+<div class="test-section-label">Tanzaku Input — Same Material as HUD</div>
+
+<div class="test-tanzaku-wrap">
+  <div class="tanzaku-card">
+    <div class="tanzaku-label">サービスの種類</div>
+    <input type="text" class="tanzaku-input" placeholder="ご記入ください" value="全身リンパマッサージ 60分">
+    <div class="tanzaku-actions">
+      <button type="button" class="tanzaku-btn tanzaku-cancel">キャンセル</button>
+      <button type="button" class="tanzaku-btn tanzaku-confirm">決定</button>
+    </div>
+  </div>
+</div>
+
+<div class="test-caption">
+  HUD と Tanzaku の入力欄が同じ素材 —<br>
+  絹白 #FFFDF9 @ 92% + 薄杏ボーダー
+</div>
+
+<!-- ============ AUDIO SPECTRUM & METADATA HUD ============ -->
 <div class="audio-spectrum-hud shown" id="audioSpectrumHud" aria-hidden="true">
   <div class="hud-top-row">
     <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
@@ -412,17 +462,11 @@
   var hudTimeTotal   = document.getElementById('hudTimeTotal');
   var playBtn        = document.getElementById('playBtn');
 
-  /* ============================================================
-     HUD CONSTANTS — 6 layers, 28 wave points, taller canvas
-     ============================================================ */
   var HUD_DISPLAY_W = 282;
-  var HUD_DISPLAY_H = 44;       // was 30
-  var HUD_WAVE_PTS  = 28;       // was 16 — finer frequency resolution
-  var HUD_LAYERS    = 6;        // was 4
+  var HUD_DISPLAY_H = 44;
+  var HUD_WAVE_PTS  = 28;
+  var HUD_LAYERS    = 6;
 
-  /* Each layer reads its own distinct frequency band so the stack
-     represents a wider slice of the spectrum. Bins span ~280 Hz
-     (layer 0 low) up to ~11 kHz (layer 5 upper). */
   var LAYER_BIN_START = [3, 15, 35, 55, 75, 95];
   var LAYER_BIN_END   = [22, 42, 62, 82, 100, 120];
 
@@ -468,26 +512,22 @@
     return elapsed;
   }
 
-  /* ============================================================
-     FLUID RIBBON RENDERER — 6 layers, per-layer frequency band
-     ============================================================ */
   function drawHudSpectrum() {
     if (!hudCtx) return;
     hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
 
     var isAutumn = (currentTheme === 'autumn');
-    var col0 = isAutumn ? '#882E47' : '#b04a5a'; // back — Ebizome plum
-    var col1 = isAutumn ? '#C44E10' : '#a34a56'; // deep amber
-    var col2 = isAutumn ? '#E66826' : '#d46a7a'; // Kinmokusei
-    var col3 = isAutumn ? '#F07D40' : '#e8a8b0'; // petal coral
-    var col4 = isAutumn ? '#FFA259' : '#e8b4bc'; // glow amber
-    var col5 = '#FFFDF9';                        // Kinushiro core
+    var col0 = isAutumn ? '#882E47' : '#b04a5a';
+    var col1 = isAutumn ? '#C44E10' : '#a34a56';
+    var col2 = isAutumn ? '#E66826' : '#d46a7a';
+    var col3 = isAutumn ? '#F07D40' : '#e8a8b0';
+    var col4 = isAutumn ? '#FFA259' : '#e8b4bc';
+    var col5 = '#FFFDF9';
 
     if (!_prefersReducedMotion) {
       _hudPhase += 0.038;
     }
 
-    /* Update smoothed FFT control points, one band per layer */
     var lastIdx = HUD_WAVE_PTS - 1;
     for (var layer = 0; layer < HUD_LAYERS; layer++) {
       var binStart = LAYER_BIN_START[layer];
@@ -498,8 +538,6 @@
         if (swellAnalyserNode && swellFreqData && swellIsRunning) {
           var t = i / lastIdx;
           var binIdx = binStart + Math.floor(t * (binEnd - binStart));
-          /* 1.35× boost brings ambient program material up into the
-             visible range, clamped at 1.0. */
           target = Math.max(0.08, Math.min(1.0, (swellFreqData[binIdx] / 255) * 1.35));
         } else {
           target = 0.18 + Math.sin(_hudPhase + i * 0.35 + layer * 0.9) * 0.12;
@@ -508,9 +546,6 @@
       }
     }
 
-    /* 6 ribbons, back-to-front. Taller heightScale on the front
-       layers keeps the peak height visually commanding rather than
-       buried behind the wide back ribbons. */
     drawFluidRibbon(0, col0, 0.24,  1.00, 0.0, 1.6, 1.00);
     drawFluidRibbon(1, col1, 0.30, -1.20, 1.7, 2.0, 0.96);
     drawFluidRibbon(2, col2, 0.42,  1.35, 3.4, 2.4, 0.92);
@@ -563,9 +598,6 @@
     hudCtx.globalAlpha = 1.0;
   }
 
-  /* ============================================================
-     HUD STATE (simplified for the test)
-     ============================================================ */
   function renderState() {
     var isPlaying = (ambientSource !== null);
     var elapsed = getPlaybackElapsed();
