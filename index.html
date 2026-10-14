@@ -146,7 +146,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.10.09</div>
+  <div class="app-version" aria-hidden="true">v2.11</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -262,13 +262,13 @@
        top row    — 再生中 (top-left) · DL XX% (top-right),
                     both absolutely positioned against the card
        meta row   — title · artist, centred
-       wave stack — 6-layer fluid spectrum on a 282×44 canvas,
+       wave stack — 6-layer fluid spectrum on a 288×44 canvas,
                     flush on top of the gauge bar
        gauge bar  — 5px pill with a glowing playhead at the fill tip
        time row   — elapsed / total, split left and right
 
      The canvas element carries baseline logical dimensions only
-     (282×44); app.js scales the backing store by devicePixelRatio
+     (288×44); app.js scales the backing store by devicePixelRatio
      on boot. Setting the markup to the DPR-scaled size would
      leave a single frame at boot with a mismatched backing store.
 
@@ -681,41 +681,38 @@
 
 <div class="reset-hotspot" id="resetHotspot" aria-hidden="true"></div>
 
-<!-- v1.3: ambient falling maple + ginkgo leaves. Continuous overlay
-     running the full life of the app once activated — visible above
-     the ambient stage and below every piece of content, occluded by
-     the opaque backdrops of every modal and the receipt, and
-     visible again through the transparent .thankyou-screen. Gated
-     to autumn in CSS.
+<!-- ============ WINTER STARFIELD + SEASONAL FOLIAGE ============
+     Four overlays share one visual band at z-index -1 (back) / 5 (front),
+     with the shared late-night starfield sitting underneath the
+     seasonal particle pair:
 
-     v1.3 (depth-layering): eighteen leaves across three depth
-     planes, replacing the previous eleven-leaf single-layer set.
-     Each leaf carries TWO classes — a plane class (.leaf-far /
-     .leaf-mid / .leaf-near) and an identity class (per-leaf size,
-     fill, horizontal position, and drift timing in main.css).
+       #starField       — 33 far-depth blurred stars, cross-season,
+                          gated to late-night ambient playback under
+                          autumn or winter. Placed FIRST so that at
+                          equal z-index (-1) the stars paint below
+                          #mapleLeaves via DOM order — the stars
+                          always sit behind the falling leaves in
+                          autumn and behind the falling snowflakes
+                          in winter, both above .ambient-mosaic at
+                          z-index -2.
 
-     Plane signatures:
-       Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
-                    opacity 0.20, drift 17–21s
-       Mid  (z 2) — 42–54px, blur 1.5px, opacity 0.32, drift 10–14s
-       Near (z 3) — 62–84px, sharp, opacity 0.44, drift 8.5–10.5s
+       #mapleLeaves     — 18 autumn leaves across three depth planes,
+                          autumn only (html:not([data-theme="autumn"])
+                          hides them).
 
-     DOM order is far → mid → near so paint order is correct even
-     if the plane z-index rules were removed. See main.css for the
-     compositor-safety rationale on the far-plane blur.
+       #snowFlakes      — 32 winter snowflakes across seven depth
+                          tiers, winter only. Two of the mid/near
+                          particles are promoted to #snowFlakesFront
+                          at each carousel activation via
+                          distributeFrontSnow().
 
-     Leaf fills are drawn from the 金木犀 & Ebizome palette's higher-
-     contrast tiers — Ebizome plum (#882E47), deep amber (#C44E10),
-     deep rust (#9E3B06), Kinmokusei amber (#E66826), and petal
-     coral (#F07D40). Species and colour are distributed across all
-     three planes so no plane reads as a single hue or species.
-     Lighter palette tiers (--glow, --petal-soft) are excluded
-     because at sub-0.45 element opacity they composite to near-
-     canvas luminance and lose silhouette legibility.
+     See main.css for the compositor-safety rationale on the far-
+     plane blurs and the per-tier --flake-opacity inheritance, and
+     app.js for the distributeFrontLeaves / distributeFrontSnow
+     promotion logic and updateStarFieldVisibility()'s three-clause
+     gate. -->
+<div class="star-field" id="starField" aria-hidden="true"></div>
 
-     Both sets are aria-hidden on the parent, and each SVG carries
-     a redundant aria-hidden="true" for structural parity across
-     all eighteen nodes. -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
 
   <!-- ============ FAR PLANE — Momiji (2) ============ -->
@@ -942,6 +939,9 @@
 
 </div>
 <div class="maple-leaves-overlay-front" id="mapleLeavesFront" aria-hidden="true"></div>
+
+<div class="snow-flakes-overlay" id="snowFlakes" aria-hidden="true"></div>
+<div class="snow-flakes-overlay-front" id="snowFlakesFront" aria-hidden="true"></div>
 
 </body>
 </html>
