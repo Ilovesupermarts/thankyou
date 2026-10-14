@@ -3,32 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>HUD 外観テスト</title>
+<title>HUD 外観テスト v2</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
 
-<!-- Real stylesheet for the ambient stack, theme tokens, and panels -->
 <link rel="stylesheet" href="main.css">
 
 <style>
   /* ============================================================
-     TEST-PAGE OVERRIDES
-     Everything below is scoped to this page only. main.css is
-     loaded unmodified above. The AUDIO SPECTRUM & METADATA HUD
-     block is inlined here as a preview of the pending main.css
-     compile — same selectors, so source order lets these win.
+     TEST-PAGE OVERRIDES — HUD preview with 6-layer fluid ribbons
      ============================================================ */
 
-  /* Body needs .info-visible for the existing HUD visibility gate
-     to fire. Set on the body element via class, no JS needed. */
   body {
     padding-bottom: 0;
     min-height: 100vh;
   }
 
-  /* --- Play control --- */
   .test-play-btn {
     position: fixed;
     top: 18px;
@@ -56,15 +48,12 @@
     box-shadow: 0 4px 14px rgba(136, 46, 71, 0.28);
   }
 
-  /* --- Mock panel column, so the HUD sits over real content --- */
   .test-stage {
     max-width: 480px;
     margin: 0 auto;
     padding: 100px 20px 220px 20px;
     text-align: center;
   }
-  /* Force the settled state — there's no .panel.active ancestor
-     toggling the entrance animation on this page. */
   .test-stage .panel-content {
     opacity: 1 !important;
     transform: none !important;
@@ -81,7 +70,7 @@
   }
 
   /* ============================================================
-     AUDIO SPECTRUM & METADATA HUD — preview of pending main.css
+     AUDIO SPECTRUM & METADATA HUD
      ============================================================ */
   .audio-spectrum-hud {
     position: fixed;
@@ -94,7 +83,9 @@
     user-select: none;
     -webkit-user-select: none;
     width: 318px;
-    padding: 11px 18px 10px 18px;
+    /* Reduced top/left/right padding pulls the status badge closer
+       to the card's actual top-left corner. */
+    padding: 8px 14px 10px 14px;
     border-radius: 18px;
     background: rgba(255, 253, 249, 0.92);
     border: 1px solid rgba(222, 192, 172, 0.50);
@@ -110,11 +101,12 @@
     transform: translateY(0);
   }
 
+  /* --- Top Row: 再生中 (left) · DL badge (right) --- */
   .hud-top-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 2px;
+    margin-bottom: 4px;
   }
 
   .hud-status-badge,
@@ -188,7 +180,7 @@
     50%      { opacity: 1; }
   }
 
-  /* Blue Box: Centered Title · Artist */
+  /* --- Blue Box: Title · Artist --- */
   .hud-meta-row {
     display: flex;
     align-items: baseline;
@@ -196,7 +188,7 @@
     gap: 6px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     line-height: 1.2;
-    margin-bottom: 2px;
+    margin-bottom: 0;   /* was 2px — pulled tight against the wave */
     min-width: 0;
   }
   .hud-title {
@@ -226,23 +218,29 @@
     min-width: 0;
   }
 
-  /* Waveform + Gauge Stack */
+  /* --- Wave + Gauge Stack --- */
   .hud-wave-gauge-stack {
     display: flex;
     flex-direction: column;
     width: 100%;
+    margin-top: 0;
   }
+
+  /* Canvas height grown from 30 → 44 so the taller ribbons have
+     room to breathe. flex-end keeps the wave baseline flush with
+     the top edge of the gauge bar. */
   .hud-visualizer-block {
     width: 100%;
-    height: 30px;
+    height: 44px;
     display: flex;
     align-items: flex-end;
     justify-content: center;
     margin-bottom: 0;
+    margin-top: -2px;   /* slight negative pull toward meta row */
   }
   .hud-canvas {
     width: 100%;
-    height: 30px;
+    height: 44px;
     display: block;
   }
 
@@ -295,7 +293,6 @@
     to   { opacity: 1; }
   }
 
-  /* Split Timestamps */
   .hud-time-row {
     display: flex;
     justify-content: space-between;
@@ -313,7 +310,6 @@
     .audio-spectrum-hud { display: none; }
   }
 
-  /* Reduced-motion safety */
   @media (prefers-reduced-motion: reduce) {
     .hud-status-badge.decoding,
     .hud-dl-badge.decoding,
@@ -328,7 +324,6 @@
 </head>
 <body class="info-visible">
 
-<!-- ============ AMBIENT BACKGROUND ============ -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -350,10 +345,8 @@
 
 <div class="ambient-mosaic" aria-hidden="true"></div>
 
-<!-- ============ PLAY CONTROL ============ -->
 <button type="button" class="test-play-btn" id="playBtn">▶ 再生</button>
 
-<!-- ============ MOCK PANEL CONTENT ============ -->
 <main class="test-stage">
   <div class="panel-inner">
     <div class="panel-content">
@@ -361,14 +354,12 @@
       <p>それでは、本日の癒しのオプションをご覧ください。</p>
       <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
       <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
       <p>ありがとうございます。</p>
     </div>
   </div>
-  <div class="test-caption">HUD 外観テスト — 右上の「再生」をタップ</div>
+  <div class="test-caption">HUD 外観テスト v2 — 6層 / 高ピーク</div>
 </main>
 
-<!-- ============ AUDIO SPECTRUM & METADATA HUD ============ -->
 <div class="audio-spectrum-hud shown" id="audioSpectrumHud" aria-hidden="true">
   <div class="hud-top-row">
     <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
@@ -383,7 +374,7 @@
 
   <div class="hud-wave-gauge-stack">
     <div class="hud-visualizer-block">
-      <canvas class="hud-canvas" id="hudCanvas" width="282" height="30"></canvas>
+      <canvas class="hud-canvas" id="hudCanvas" width="282" height="44"></canvas>
     </div>
 
     <div class="hud-gauge-bar">
@@ -401,12 +392,6 @@
 (function() {
   'use strict';
 
-  /* ============================================================
-     ACCESSIBILITY / MOTION QUERY
-     Reactive telemetry (vertical waveform displacement driven by
-     acoustic energy) is state feedback and stays live. Vestibular
-     drift (travelling phase) is decorative and freezes.
-     ============================================================ */
   var _prefersReducedMotion = false;
   try {
     if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -414,12 +399,8 @@
     }
   } catch (e) {}
 
-  /* ============================================================
-     DOM REFS
-     ============================================================ */
   var ambientStage   = document.getElementById('ambientStage');
   var stageLattice   = document.getElementById('stageLattice');
-  var audioSpectrumHud = document.getElementById('audioSpectrumHud');
   var hudStatusBadge = document.getElementById('hudStatusBadge');
   var hudPctStatus   = document.getElementById('hudPctStatus');
   var hudTrackTitle  = document.getElementById('hudTrackTitle');
@@ -432,12 +413,20 @@
   var playBtn        = document.getElementById('playBtn');
 
   /* ============================================================
-     HUD CONSTANTS
+     HUD CONSTANTS — 6 layers, 28 wave points, taller canvas
      ============================================================ */
   var HUD_DISPLAY_W = 282;
-  var HUD_DISPLAY_H = 30;
-  var HUD_WAVE_PTS  = 16;
-  var _hudMirrorValues = new Float32Array(HUD_WAVE_PTS);
+  var HUD_DISPLAY_H = 44;       // was 30
+  var HUD_WAVE_PTS  = 28;       // was 16 — finer frequency resolution
+  var HUD_LAYERS    = 6;        // was 4
+
+  /* Each layer reads its own distinct frequency band so the stack
+     represents a wider slice of the spectrum. Bins span ~280 Hz
+     (layer 0 low) up to ~11 kHz (layer 5 upper). */
+  var LAYER_BIN_START = [3, 15, 35, 55, 75, 95];
+  var LAYER_BIN_END   = [22, 42, 62, 82, 100, 120];
+
+  var _hudMirrorValues = new Float32Array(HUD_LAYERS * HUD_WAVE_PTS);
   var _hudPhase = 0;
   var _hudLastRenderedSec = -1;
 
@@ -448,9 +437,6 @@
     hudCtx.scale(_hudDpr, _hudDpr);
   }
 
-  /* ============================================================
-     AUDIO STATE
-     ============================================================ */
   var soundAudioCtx       = null;
   var soundMasterGain     = null;
   var swellAnalyserNode   = null;
@@ -465,9 +451,6 @@
   var decodedBuffer       = null;
   var currentTheme        = 'autumn';
 
-  /* ============================================================
-     TIME FORMATTING
-     ============================================================ */
   function formatHudTime(sec) {
     if (!isFinite(sec) || sec < 0) sec = 0;
     var total = Math.floor(sec);
@@ -486,45 +469,63 @@
   }
 
   /* ============================================================
-     FLUID RIBBON RENDERER
+     FLUID RIBBON RENDERER — 6 layers, per-layer frequency band
      ============================================================ */
   function drawHudSpectrum() {
     if (!hudCtx) return;
     hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
 
     var isAutumn = (currentTheme === 'autumn');
-    var col0 = isAutumn ? '#FFA259' : '#e8b4bc';
-    var col1 = isAutumn ? '#882E47' : '#b04a5a';
-    var col2 = isAutumn ? '#E66826' : '#d46a7a';
-    var col3 = '#FFFDF9';
+    var col0 = isAutumn ? '#882E47' : '#b04a5a'; // back — Ebizome plum
+    var col1 = isAutumn ? '#C44E10' : '#a34a56'; // deep amber
+    var col2 = isAutumn ? '#E66826' : '#d46a7a'; // Kinmokusei
+    var col3 = isAutumn ? '#F07D40' : '#e8a8b0'; // petal coral
+    var col4 = isAutumn ? '#FFA259' : '#e8b4bc'; // glow amber
+    var col5 = '#FFFDF9';                        // Kinushiro core
 
     if (!_prefersReducedMotion) {
       _hudPhase += 0.038;
     }
 
-    for (var i = 0; i < HUD_WAVE_PTS; i++) {
-      var target = 0.14;
-      if (swellAnalyserNode && swellFreqData && swellIsRunning) {
-        var binIdx = 4 + Math.floor(i * 5.0);
-        target = Math.max(0.08, swellFreqData[binIdx] / 255);
-      } else {
-        target = 0.18 + Math.sin(_hudPhase + i * 0.45) * 0.10;
+    /* Update smoothed FFT control points, one band per layer */
+    var lastIdx = HUD_WAVE_PTS - 1;
+    for (var layer = 0; layer < HUD_LAYERS; layer++) {
+      var binStart = LAYER_BIN_START[layer];
+      var binEnd   = LAYER_BIN_END[layer];
+      var base = layer * HUD_WAVE_PTS;
+      for (var i = 0; i < HUD_WAVE_PTS; i++) {
+        var target;
+        if (swellAnalyserNode && swellFreqData && swellIsRunning) {
+          var t = i / lastIdx;
+          var binIdx = binStart + Math.floor(t * (binEnd - binStart));
+          /* 1.35× boost brings ambient program material up into the
+             visible range, clamped at 1.0. */
+          target = Math.max(0.08, Math.min(1.0, (swellFreqData[binIdx] / 255) * 1.35));
+        } else {
+          target = 0.18 + Math.sin(_hudPhase + i * 0.35 + layer * 0.9) * 0.12;
+        }
+        _hudMirrorValues[base + i] += (target - _hudMirrorValues[base + i]) * 0.25;
       }
-      _hudMirrorValues[i] += (target - _hudMirrorValues[i]) * 0.22;
     }
 
-    drawFluidRibbon(col0, 0.36, 1.00,  0.0, 1.8, 0.92);
-    drawFluidRibbon(col1, 0.44, -1.35, 1.9, 2.3, 0.85);
-    drawFluidRibbon(col2, 0.68, 1.55,  3.7, 2.7, 0.78);
-    drawFluidRibbon(col3, 0.30, -0.90, 0.8, 2.1, 0.42);
+    /* 6 ribbons, back-to-front. Taller heightScale on the front
+       layers keeps the peak height visually commanding rather than
+       buried behind the wide back ribbons. */
+    drawFluidRibbon(0, col0, 0.24,  1.00, 0.0, 1.6, 1.00);
+    drawFluidRibbon(1, col1, 0.30, -1.20, 1.7, 2.0, 0.96);
+    drawFluidRibbon(2, col2, 0.42,  1.35, 3.4, 2.4, 0.92);
+    drawFluidRibbon(3, col3, 0.50, -1.10, 5.1, 2.8, 0.86);
+    drawFluidRibbon(4, col4, 0.44,  1.25, 6.8, 3.2, 0.78);
+    drawFluidRibbon(5, col5, 0.32, -0.85, 8.5, 3.6, 0.62);
   }
 
-  function drawFluidRibbon(fillHex, alpha, speedMul, phaseOffset, freqMul, heightScale) {
+  function drawFluidRibbon(layerIdx, fillHex, alpha, speedMul, phaseOffset, freqMul, heightScale) {
     var w = HUD_DISPLAY_W;
     var baseY = HUD_DISPLAY_H;
-    var maxH = (HUD_DISPLAY_H - 3) * heightScale;
+    var maxH = (HUD_DISPLAY_H - 2) * heightScale;
     var lastIdx = HUD_WAVE_PTS - 1;
     var stepX = w / lastIdx;
+    var base = layerIdx * HUD_WAVE_PTS;
 
     hudCtx.fillStyle = fillHex;
     hudCtx.globalAlpha = alpha;
@@ -540,7 +541,7 @@
       envelope = envelope * envelope;
 
       var undulation = 0.72 + 0.28 * Math.sin(_hudPhase * speedMul + norm * Math.PI * freqMul + phaseOffset);
-      var amp = _hudMirrorValues[i] * undulation * envelope;
+      var amp = _hudMirrorValues[base + i] * undulation * envelope;
       var x = i * stepX;
       var y = baseY - (amp * maxH);
 
@@ -563,7 +564,7 @@
   }
 
   /* ============================================================
-     HUD STATE RENDERING (mock — simplified for the test)
+     HUD STATE (simplified for the test)
      ============================================================ */
   function renderState() {
     var isPlaying = (ambientSource !== null);
@@ -616,9 +617,6 @@
     }
   }
 
-  /* ============================================================
-     AMBIENT SWELL — background layers pulse with the audio
-     ============================================================ */
   var _lastAppliedSwell = -1;
   var _swellEnergy = 0;
 
@@ -630,9 +628,6 @@
     if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
   }
 
-  /* ============================================================
-     RAF LOOP
-     ============================================================ */
   function swellTick() {
     if (!swellIsRunning) {
       swellRafId = null;
@@ -663,9 +658,6 @@
     swellRafId = requestAnimationFrame(swellTick);
   }
 
-  /* ============================================================
-     AUDIO BOOT
-     ============================================================ */
   function initSound() {
     if (soundAudioCtx) return;
     var Ctx = window.AudioContext || window.webkitAudioContext;
@@ -727,7 +719,6 @@
 
   function startPlayback() {
     if (!decodedBuffer) return;
-
     stopPlayback();
 
     var now = soundAudioCtx.currentTime;
@@ -771,18 +762,13 @@
     ambientPlayStartTime = -1;
     ambientPlayDurationSec = 0;
     _hudLastRenderedSec = -1;
-
     swellIsRunning = false;
 
     playBtn.textContent = '▶ 再生';
     playBtn.classList.remove('playing');
-
     renderState();
   }
 
-  /* ============================================================
-     WIRE UP
-     ============================================================ */
   playBtn.addEventListener('click', function(e) {
     e.preventDefault();
 
@@ -792,16 +778,8 @@
       try { soundAudioCtx.resume(); } catch (e) {}
     }
 
-    if (ambientSource !== null) {
-      stopPlayback();
-      return;
-    }
-
-    if (!decodedBuffer) {
-      loadBufferAndPlay();
-    } else {
-      startPlayback();
-    }
+    if (ambientSource !== null) { stopPlayback(); return; }
+    if (!decodedBuffer) { loadBufferAndPlay(); } else { startPlayback(); }
   });
 
   renderState();
