@@ -8,6 +8,17 @@
      Body Text (~15%)      濃茶墨 Koichazumi #241C1A
      Primary CTA (~10%)    金木犀 Kinmokusei #E66826
      Secondary (~5%)       葡萄染 Ebizome    #882E47
+
+   Winter theme (data-theme="winter") inherits the entire autumn
+   palette, gradient, shadow and acoustic system verbatim. Only
+   the seasonal particle overlay changes: falling snowflakes
+   replace falling maple/ginkgo leaves. Every
+   html[data-theme="autumn"] rule below is paired with an
+   html[data-theme="winter"] twin so the two warm-palette seasons
+   share a single colour-and-motion definition.
+
+   Default theme (data-theme="default") is the original sakura
+   palette and keeps its own watercolor stack.
    ============================================================ */
 
   /* ============ THEME VARIABLES ============ */
@@ -40,9 +51,14 @@
   }
 
   /* ============================================================
-     AUTUMN THEME — 金木犀 (Kinmokusei & Ebizome)
-     ============================================================ */
-  html[data-theme="autumn"] {
+     AUTUMN + WINTER THEME — 金木犀 (Kinmokusei & Ebizome)
+     ------------------------------------------------------------
+     Winter inherits this block verbatim. The two seasonal themes
+     differ only in which particle overlay is active (falling
+     leaves vs. falling snowflakes); the colour system, gradient
+     stack, shadow tones, and HUD badge palette are identical. */
+  html[data-theme="autumn"],
+  html[data-theme="winter"] {
     /* 60% Canvas / Base (絹白 Kinushiro) */
     --bg-base: #FFFDF9;
     --bg-warm: #FBECE0;
@@ -234,7 +250,9 @@
 
   /* 金木犀 (Kinmokusei) Shippō stroke. Was %238f2f00 (retired amber-brown). */
   html[data-theme="autumn"] .ambient-mosaic,
-  html[data-theme="autumn"] .ambient-mosaic-pond {
+  html[data-theme="autumn"] .ambient-mosaic-pond,
+  html[data-theme="winter"] .ambient-mosaic,
+  html[data-theme="winter"] .ambient-mosaic-pond {
     background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20width='60'%20height='60'%20viewBox='0%200%2060%2060'%3E%3Cg%20fill='none'%20stroke='%23E66826'%20stroke-width='1.2'%3E%3Ccircle%20cx='0'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='0'%20r='30'/%3E%3Ccircle%20cx='0'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='60'%20cy='60'%20r='30'/%3E%3Ccircle%20cx='30'%20cy='30'%20r='30'/%3E%3C/g%3E%3C/svg%3E");
   }
 
@@ -348,7 +366,8 @@
      Layer 2's .ambient-mesh is display: none under sakura via
      html[data-theme="default"] .ambient-mesh, so this override is
      inert in that theme. */
-  html[data-theme="autumn"] .shippo-mask-window .orb-1 {
+  html[data-theme="autumn"] .shippo-mask-window .orb-1,
+  html[data-theme="winter"] .shippo-mask-window .orb-1 {
     background: radial-gradient(circle closest-side,
       rgba(230, 104, 38, 0.80) 0%,
       rgba(230, 104, 38, 0.62) 25%,
@@ -357,7 +376,8 @@
       rgba(255, 162, 89, 0.025) 88%,
       rgba(255, 162, 89, 0) 100%) !important;
   }
-  html[data-theme="autumn"] .shippo-mask-window .orb-2 {
+  html[data-theme="autumn"] .shippo-mask-window .orb-2,
+  html[data-theme="winter"] .shippo-mask-window .orb-2 {
     background: radial-gradient(circle closest-side,
       rgba(136, 46, 71, 0.70) 0%,
       rgba(136, 46, 71, 0.52) 25%,
@@ -366,7 +386,8 @@
       rgba(230, 104, 38, 0.015) 88%,
       rgba(230, 104, 38, 0) 100%) !important;
   }
-  html[data-theme="autumn"] .shippo-mask-window .orb-3 {
+  html[data-theme="autumn"] .shippo-mask-window .orb-3,
+  html[data-theme="winter"] .shippo-mask-window .orb-3 {
     background: radial-gradient(circle closest-side,
       rgba(255, 162, 89, 0.75) 0%,
       rgba(255, 162, 89, 0.56) 25%,
@@ -500,7 +521,7 @@
     will-change: transform;
   }
 
-  /* Unified 金木犀 (Kinmokusei & Ebizome) autumn wash.
+  /* Unified 金木犀 (Kinmokusei & Ebizome) autumn + winter wash.
      Amber (#E66826) upper-left, plum (#882E47) upper-right,
      coral (#FFA259) lower-centre.
 
@@ -511,7 +532,8 @@
      retained via autumnDrift1 (14s ease-in-out infinite); the
      wider stop dispersion reads gentler at rest even though the
      curve is unchanged. */
-  html[data-theme="autumn"] .ambient-primary {
+  html[data-theme="autumn"] .ambient-primary,
+  html[data-theme="winter"] .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.22) 28%, rgba(230, 104, 38, 0.06) 52%, rgba(230, 104, 38, 0) 74%),
       radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.16) 28%, rgba(136, 46, 71, 0.04) 52%, rgba(136, 46, 71, 0) 74%),
@@ -694,7 +716,16 @@
 
      No drop-shadow — at sub-0.45 element opacity the 0.07 alpha
      was imperceptible, and it expanded each leaf's promoted-layer
-     texture by offset + blur radius. */
+     texture by offset + blur radius.
+
+     v1.3 (winter theme): the hide rule is now
+     html:not([data-theme="autumn"]) rather than
+     html[data-theme="default"] — leaves are an autumn-only layer,
+     so they must hide under winter as well as under the sakura
+     default theme. #starField lives at the same z-index -1 and
+     sits before #mapleLeaves in the DOM, so the stars always paint
+     below the leaves in autumn (and below the snowflakes in
+     winter). */
   .maple-leaves-overlay,
   .maple-leaves-overlay-front {
     position: fixed;
@@ -713,8 +744,8 @@
     opacity: 1;
   }
 
-  html[data-theme="default"] .maple-leaves-overlay,
-  html[data-theme="default"] .maple-leaves-overlay-front {
+  html:not([data-theme="autumn"]) .maple-leaves-overlay,
+  html:not([data-theme="autumn"]) .maple-leaves-overlay-front {
     display: none;
   }
 
@@ -1164,8 +1195,8 @@
     line-height: 1.2;
     text-shadow: 0 1px 12px var(--petal-soft);
   }
-  /* Autumn-scoped plum override merged with the therapist-name rule
-     below (see the PANEL TYPOGRAPHY section). */
+  /* Autumn + winter scoped plum override merged with the therapist-
+     name rule below (see the PANEL TYPOGRAPHY section). */
 
   /* ============ INTRO ============ */
   .intro-overlay {
@@ -1212,14 +1243,14 @@
   /* ============================================================
      PANEL TYPOGRAPHY (v1.3 readability pass)
 
-     Base colour is var(--text-mute): 中間茶 #725750 under autumn,
-     a warm mid-tone sitting at ~7.6:1 against 絹白 #FFFDF9 — above
-     WCAG AA for body text at 19px.
+     Base colour is var(--text-mute): 中間茶 #725750 under autumn
+     and winter, a warm mid-tone sitting at ~7.6:1 against 絹白
+     #FFFDF9 — above WCAG AA for body text at 19px.
 
      Base text-shadow (sakura) is the original three-layer
-     silk-white halo. The autumn-scoped rule that follows swaps
-     this for the same two-layer plum/apricot register carried by
-     the therapist name — a near plum bloom plus a wide apricot
+     silk-white halo. The autumn + winter scoped rule that follows
+     swaps this for the same two-layer plum/apricot register carried
+     by the therapist name — a near plum bloom plus a wide apricot
      halo — so the panel prose and the name share a single
      illuminated register. The name's own scoped rule carries the
      identical values, so the two are visually identical. */
@@ -1240,7 +1271,8 @@
       0 0 28px rgba(251, 236, 224, 0.60);
   }
 
-  html[data-theme="autumn"] .panel-content {
+  html[data-theme="autumn"] .panel-content,
+  html[data-theme="winter"] .panel-content {
     text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
   }
 
@@ -1254,14 +1286,16 @@
     font-weight: 400; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
-  /* Autumn-scoped name plum — merged for both the greeting screen
-     and Panel 0's opening beats. Carries the same two-layer
+  /* Autumn + winter scoped name plum — merged for both the greeting
+     screen and Panel 0's opening beats. Carries the same two-layer
      shadow as .panel-content for visual identity; the parent
      declaration is now the source of truth, and this rule is
      retained only to guarantee the value when the name appears
      outside a .panel-content ancestor (blossom-greeting-name). */
   html[data-theme="autumn"] .panel-content .therapist-name,
-  html[data-theme="autumn"] .blossom-greeting-name {
+  html[data-theme="autumn"] .blossom-greeting-name,
+  html[data-theme="winter"] .panel-content .therapist-name,
+  html[data-theme="winter"] .blossom-greeting-name {
     color: #882E47;
     text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
   }
@@ -1295,9 +1329,11 @@
     font-size: 14px; color: var(--text-mute); letter-spacing: 4px; font-weight: 500;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
   }
-  html[data-theme="autumn"] .action-hint { color: var(--text-med); }
+  html[data-theme="autumn"] .action-hint,
+  html[data-theme="winter"] .action-hint { color: var(--text-med); }
   .action-hint .hint-arrow { display: inline-block; color: var(--accent); font-size: 16px; line-height: 1; }
-  html[data-theme="autumn"] .action-hint .hint-arrow { color: var(--accent); }
+  html[data-theme="autumn"] .action-hint .hint-arrow,
+  html[data-theme="winter"] .action-hint .hint-arrow { color: var(--accent); }
   .action-hint .hint-arrow.right { animation: swipeArrow 2s ease-in-out infinite; }
   .action-hint .hint-arrow.down { animation: gentleBounce 2s ease-in-out infinite; }
   @keyframes swipeArrow { 0%, 100% { transform: translateX(0); opacity: 0.6; } 50% { transform: translateX(8px); opacity: 1; } }
@@ -1339,23 +1375,27 @@
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     word-break: auto-phrase; overflow-wrap: break-word; line-break: strict;
   }
-  /* Autumn: flat 濃茶墨 prose on the silk canvas. No text-shadow —
-     the halo was defensive scaffolding against the old hard orb
-     edges. After A16's Gaussian falloff, there is no luminance
-     step for the text to cross, so the flat ink reads cleanly.
-     Removed at v1.3. The header register (mark, title, rules)
-     draws from the plum --transition-head-color token; the rules
-     are damped to 35% so they read as quiet separators rather
-     than co-equal elements. */
-  html[data-theme="autumn"] .transition-line {
+  /* Autumn + winter: flat 濃茶墨 prose on the silk canvas. No
+     text-shadow — the halo was defensive scaffolding against the
+     old hard orb edges. After A16's Gaussian falloff, there is no
+     luminance step for the text to cross, so the flat ink reads
+     cleanly. The header register (mark, title, rules) draws from
+     the plum --transition-head-color token; the rules are damped
+     to 35% so they read as quiet separators rather than co-equal
+     elements. */
+  html[data-theme="autumn"] .transition-line,
+  html[data-theme="winter"] .transition-line {
     color: var(--text-dark);
     text-shadow: none;
   }
   html[data-theme="autumn"] .transition-line-mark,
-  html[data-theme="autumn"] .transition-line-title {
+  html[data-theme="autumn"] .transition-line-title,
+  html[data-theme="winter"] .transition-line-mark,
+  html[data-theme="winter"] .transition-line-title {
     color: var(--transition-head-color);
   }
-  html[data-theme="autumn"] .transition-line-rule {
+  html[data-theme="autumn"] .transition-line-rule,
+  html[data-theme="winter"] .transition-line-rule {
     background: var(--transition-head-color);
     opacity: 0.35;
   }
@@ -1414,18 +1454,21 @@
      SECTION & CATEGORY BLOSSOM MARKS
      ------------------------------------------------------------
      Base rule keeps .custom-section-mark on var(--accent) so the
-     base stylesheet is theme-neutral. The autumn-scoped rule that
-     follows routes all three structural blossom anchors to 葡萄染
-     Ebizome (#882E47), the same secondary accent used on carousel
-     dots and HUD Ready badges. .row-check::after keeps var(--accent)
-     (amber CTA), .receipt-to-mark and .receipt-footer-mark keep
-     var(--glow) (coral), and .transition-line-mark keeps
-     var(--transition-head-color) (cream) — none of those are
-     overridden here. */
+     base stylesheet is theme-neutral. The autumn + winter scoped
+     rule that follows routes all three structural blossom anchors
+     to 葡萄染 Ebizome (#882E47), the same secondary accent used on
+     carousel dots and HUD Ready badges. .row-check::after keeps
+     var(--accent) (amber CTA), .receipt-to-mark and
+     .receipt-footer-mark keep var(--glow) (coral), and
+     .transition-line-mark keeps var(--transition-head-color)
+     (cream) — none of those are overridden here. */
   .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 15px; line-height: 1; color: var(--accent); }
   html[data-theme="autumn"] .custom-section-mark,
   html[data-theme="autumn"] .divider-text,
-  html[data-theme="autumn"] .blossom-mark {
+  html[data-theme="autumn"] .blossom-mark,
+  html[data-theme="winter"] .custom-section-mark,
+  html[data-theme="winter"] .divider-text,
+  html[data-theme="winter"] .blossom-mark {
     color: var(--secondary-accent, #882E47);
   }
   .custom-section-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 14px 4px 14px; padding: 6px 0 2px 0; user-select: none; -webkit-user-select: none; }
@@ -1606,11 +1649,13 @@
     -webkit-user-select: none; user-select: none;
     opacity: 0; transform: translateY(24px);
   }
-  html[data-theme="autumn"] .reject-row { background: rgba(251, 236, 224, 0.94); }
+  html[data-theme="autumn"] .reject-row,
+  html[data-theme="winter"] .reject-row { background: rgba(251, 236, 224, 0.94); }
   .reject-row.active { opacity: 1; transform: translateY(0); }
   .reject-row:active { transform: scale(0.99); }
   .reject-row.selected { background: rgba(253, 243, 242, 0.96); border: 1.5px solid var(--accent); }
-  html[data-theme="autumn"] .reject-row.selected { background: rgba(255, 247, 242, 0.96); }
+  html[data-theme="autumn"] .reject-row.selected,
+  html[data-theme="winter"] .reject-row.selected { background: rgba(255, 247, 242, 0.96); }
 
   .reject-box {
     flex-shrink: 0; width: 26px; height: 26px; border-radius: 8px;
@@ -1724,7 +1769,7 @@
 
        top row    — 再生中 (top-left) · DL XX% (top-right)
        meta row   — title · artist, centred
-       wave stack — 6-layer fluid spectrum on a 282×44 canvas,
+       wave stack — 6-layer fluid spectrum on a 288×44 canvas,
                     flush on top of the gauge bar
        gauge bar  — 5px pill with a glowing playhead at the fill tip
        time row   — elapsed / total, split left and right
@@ -1843,19 +1888,23 @@
     background: rgba(42, 63, 26, 0.14);
     color: #2a3f1a;
   }
-  html[data-theme="autumn"] .hud-status-badge {
+  html[data-theme="autumn"] .hud-status-badge,
+  html[data-theme="winter"] .hud-status-badge {
     background: rgba(230, 104, 38, 0.12);
     color: var(--accent);
   }
-  html[data-theme="autumn"] .hud-status-badge.loading {
+  html[data-theme="autumn"] .hud-status-badge.loading,
+  html[data-theme="winter"] .hud-status-badge.loading {
     background: rgba(255, 162, 89, 0.25);
     color: #C44E10;
   }
-  html[data-theme="autumn"] .hud-status-badge.decoding {
+  html[data-theme="autumn"] .hud-status-badge.decoding,
+  html[data-theme="winter"] .hud-status-badge.decoding {
     background: rgba(255, 162, 89, 0.40);
     color: #9E3B06;
   }
-  html[data-theme="autumn"] .hud-status-badge.ready {
+  html[data-theme="autumn"] .hud-status-badge.ready,
+  html[data-theme="winter"] .hud-status-badge.ready {
     background: rgba(136, 46, 71, 0.14);
     color: #882E47;
   }
@@ -1874,7 +1923,8 @@
     background: rgba(154, 62, 77, 0.12);
     color: var(--secondary-accent, #9a3e4d);
   }
-  html[data-theme="autumn"] .hud-dl-badge.ready {
+  html[data-theme="autumn"] .hud-dl-badge.ready,
+  html[data-theme="winter"] .hud-dl-badge.ready {
     background: rgba(136, 46, 71, 0.12);
     color: var(--secondary-accent, #882E47);
   }
@@ -1905,7 +1955,8 @@
     text-overflow: ellipsis;
     min-width: 0;
   }
-  html[data-theme="autumn"] .hud-title { color: var(--text-med); }
+  html[data-theme="autumn"] .hud-title,
+  html[data-theme="winter"] .hud-title { color: var(--text-med); }
   .hud-sep {
     font-size: 11px;
     color: var(--text-placeholder);
@@ -2035,7 +2086,8 @@
     z-index: 250; display: flex; align-items: center; justify-content: center;
     padding: 30px 24px; opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
   }
-  html[data-theme="autumn"] .confirm-screen { background: rgba(255, 253, 249, 0.96); }
+  html[data-theme="autumn"] .confirm-screen,
+  html[data-theme="winter"] .confirm-screen { background: rgba(255, 253, 249, 0.96); }
   .confirm-screen.visible { opacity: 1; pointer-events: auto; }
   .confirm-card {
     background: #ffffff; max-width: 380px; width: 100%; padding: 36px 28px 28px 28px;
@@ -2063,7 +2115,8 @@
     z-index: 260; display: flex; align-items: center; justify-content: center;
     padding: 30px 24px; opacity: 0; pointer-events: none; transition: opacity 0.4s ease;
   }
-  html[data-theme="autumn"] .alert-screen { background: rgba(255, 253, 249, 0.96); }
+  html[data-theme="autumn"] .alert-screen,
+  html[data-theme="winter"] .alert-screen { background: rgba(255, 253, 249, 0.96); }
   .alert-screen.visible { opacity: 1; pointer-events: auto; }
   .alert-card {
     background: #ffffff; width: auto; max-width: 320px; padding: 28px 26px 22px 26px;
@@ -2091,7 +2144,8 @@
     opacity: 0; pointer-events: none; transition: opacity 0.5s ease;
     touch-action: none;
   }
-  html[data-theme="autumn"] .tanzaku-screen { background: rgba(255, 253, 249, 0.96); }
+  html[data-theme="autumn"] .tanzaku-screen,
+  html[data-theme="winter"] .tanzaku-screen { background: rgba(255, 253, 249, 0.96); }
   .tanzaku-screen.visible { opacity: 1; pointer-events: auto; }
   .tanzaku-card {
     background-color: #fcfbf9;
@@ -2241,7 +2295,8 @@
     opacity: 0; pointer-events: none; transition: opacity 0.9s ease;
     perspective: 1200px;
   }
-  html[data-theme="autumn"] .receipt-screen { background: rgba(255, 253, 249, 0.94); }
+  html[data-theme="autumn"] .receipt-screen,
+  html[data-theme="winter"] .receipt-screen { background: rgba(255, 253, 249, 0.94); }
   .receipt-screen.visible { opacity: 1; pointer-events: auto; }
   .receipt-screen.reopened { z-index: 380; }
   .receipt-screen.above-thankyou { z-index: 400; }
@@ -2385,12 +2440,13 @@
   .receipt-to-row { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 20px 8px 12px 8px; text-align: center; }
   .receipt-to-mark { font-size: 13px; color: var(--glow); line-height: 1; flex-shrink: 0; }
   .receipt-to-name { font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 18px; font-weight: 700; color: var(--accent); letter-spacing: 2px; line-height: 1.4; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  /* Autumn Therapist Name on Receipt: flat ink on washi.
+  /* Autumn + winter Therapist Name on Receipt: flat ink on washi.
      The receipt is a physical artifact — deckle-edge mask, washi
      grain, paper-land physics. Text on paper is stamped ink, not a
      luminous bloom, so the name sits flat here (unlike the greeting
      screen's plum + apricot text-shadow) to preserve the metaphor. */
-  html[data-theme="autumn"] .receipt-to-name {
+  html[data-theme="autumn"] .receipt-to-name,
+  html[data-theme="winter"] .receipt-to-name {
     color: #882E47;
   }
   .receipt-divider { height: 1px; background: linear-gradient(90deg, transparent, var(--border-2) 20%, var(--border-2) 80%, transparent); margin: 22px 0; }
@@ -2611,8 +2667,8 @@
      panels read in the same register as the service panels. The
      accent line (.ty-line.accent) keeps its burgundy colour but no
      longer overrides weight; only the hue distinguishes it from
-     its siblings. The base text-shadow stack and the autumn-scoped
-     override mirror .panel-content exactly. */
+     its siblings. The base text-shadow stack and the autumn +
+     winter scoped override mirror .panel-content exactly. */
   .ty-line {
     font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
     font-size: 19px;
@@ -2629,7 +2685,8 @@
       0 0 14px rgba(255, 253, 249, 0.90),
       0 0 28px rgba(251, 236, 224, 0.60);
   }
-  html[data-theme="autumn"] .ty-line {
+  html[data-theme="autumn"] .ty-line,
+  html[data-theme="winter"] .ty-line {
     text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
   }
   .ty-line.accent { color: var(--ty-accent-color); }
@@ -2645,8 +2702,8 @@
   .ty-ambient-inner { width: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; padding: 20px 0; }
   .blossom-divider { display: flex; justify-content: center; align-items: center; gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%; }
   .blossom-mark { display: inline-block; font-size: 13px; line-height: 1; color: var(--accent); opacity: 0; transform: scale(0.4); filter: blur(4px); transition: opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-  /* Autumn override routes .blossom-mark to plum — merged with
-     .custom-section-mark and .divider-text near the top of the
+  /* Autumn + winter override routes .blossom-mark to plum — merged
+     with .custom-section-mark and .divider-text near the top of the
      SECTION & CATEGORY BLOSSOM MARKS section. */
   .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
   @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
@@ -3277,3 +3334,163 @@
   85%  { transform: translate3d(-14px, 94vh, 0) rotate(14deg); opacity: var(--leaf-opacity, 0.32); }
   100% { transform: translate3d(10px, 115vh, 0) rotate(-8deg); opacity: 0; }
 }
+
+  /* ============================================================
+     WINTER SNOWFLAKES + CROSS-SEASON LATE-NIGHT STARFIELD (v1.3)
+     ------------------------------------------------------------
+     Three overlays share the same visual band as the maple-leaf
+     pair above:
+
+       .snow-flakes-overlay        — z-index -1, 30 back-plane
+                                     snowflakes across six depth
+                                     tiers (blur 5.00px → 0px)
+       .snow-flakes-overlay-front  — z-index  5, 2 promoted mid/
+                                     near snowflakes (sharp, 0.90)
+       .star-field                 — z-index -1, 33 far-depth
+                                     blurred stars, cross-season,
+                                     gated to late-night playback
+                                     under autumn and winter
+
+     #starField is placed BEFORE #mapleLeaves in the DOM so that at
+     equal z-index (-1) the stars paint below the falling leaves in
+     autumn and below the falling snowflakes in winter. The stars
+     sit above .ambient-mosaic at z-index -2.
+
+     Snowflakes are winter-only (html:not([data-theme="winter"])
+     hides them). The starfield is warm-palette-season only
+     (html[data-theme="default"] hides it, matching the same
+     theme-only idiom used for .ambient-mesh and .ambient-mosaic).
+
+     OPACITY SOURCE OF TRUTH. The per-tier peak opacity lives on
+     --flake-opacity, not on the element's `opacity` declaration.
+     The drift keyframes' intermediate stops read
+     var(--flake-opacity, 0.32) — same mechanism as the leaf planes.
+     The element-level `opacity: 0` is the fallback for the no-
+     animation state (reduced motion).
+
+     COMPOSITOR SAFETY. Blur is static per-tier, never animated.
+     No ancestor carries a filter. The blurred texture is
+     rasterised once and sampled by the compositor — no per-frame
+     convolution cost.
+
+     STARFIELD GATE. updateStarFieldVisibility() in app.js toggles
+     .active on #starField only when the theme is autumn or winter,
+     the carousel is running, and Latenight.mp3 is actively
+     playing. The 22:00–04:59 JST late-night phase is the only one
+     under which the stars appear. */
+  .snow-flakes-overlay,
+  .snow-flakes-overlay-front,
+  .star-field {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity 1.8s ease;
+  }
+
+  .snow-flakes-overlay,
+  .star-field                { z-index: -1; }
+  .snow-flakes-overlay-front { z-index: 5; }
+
+  .snow-flakes-overlay.active,
+  .snow-flakes-overlay-front.active,
+  .star-field.active {
+    opacity: 1;
+  }
+
+  html:not([data-theme="winter"]) .snow-flakes-overlay,
+  html:not([data-theme="winter"]) .snow-flakes-overlay-front {
+    display: none;
+  }
+
+  /* Starfield is hidden only under the sakura default theme — it
+     spans both autumn and winter. Mirrors the same idiom used for
+     .ambient-mesh and .ambient-mosaic above. */
+  html[data-theme="default"] .star-field {
+    display: none;
+  }
+
+  .snow-particle {
+    position: absolute;
+    top: -95px;
+    pointer-events: none;
+    will-change: transform;
+    opacity: 0;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  /* 7-Tier Optical Depth & Blur Ladder (maxFarBlurPx = 5.0px, backOpacityMul = 1.0) */
+  .snow-tier-1 { z-index: 1; filter: blur(5.00px) saturate(0.72); --flake-opacity: 0.16; }
+  .snow-tier-2 { z-index: 1; filter: blur(3.40px) saturate(0.78); --flake-opacity: 0.22; }
+  .snow-tier-3 { z-index: 2; filter: blur(2.20px);                --flake-opacity: 0.29; }
+  .snow-tier-4 { z-index: 2; filter: blur(1.25px);                --flake-opacity: 0.35; }
+  .snow-tier-5 { z-index: 3; filter: blur(0.55px);                --flake-opacity: 0.41; }
+  .snow-tier-6 { z-index: 3; filter: none;                        --flake-opacity: 0.47; }
+
+  /* Tier 7: Front-overlay promoted snowflakes (z-index 5, sharp, frontOpacity = 0.90) */
+  .snow-flakes-overlay-front .snow-particle {
+    filter: none !important;
+    --flake-opacity: 0.90;
+  }
+
+  /* Monotonic fall + ±495° continuous axial spin + ±60px S-curve breeze */
+  @keyframes snowFallCw {
+    0%   { transform: translate3d(0px,   0vh,   0) rotate(0deg);     opacity: 0; }
+    10%  { transform: translate3d(33px,  12vh,  0) rotate(49.5deg);  opacity: var(--flake-opacity, 0.32); }
+    25%  { transform: translate3d(60px,  30vh,  0) rotate(123.8deg); }
+    50%  { transform: translate3d(-33px, 60vh,  0) rotate(247.5deg); }
+    75%  { transform: translate3d(60px,  90vh,  0) rotate(371.3deg); }
+    90%  { transform: translate3d(33px,  108vh, 0) rotate(445.5deg); opacity: var(--flake-opacity, 0.32); }
+    100% { transform: translate3d(0px,   120vh, 0) rotate(495deg);   opacity: 0; }
+  }
+
+  @keyframes snowFallCcw {
+    0%   { transform: translate3d(0px,   0vh,   0) rotate(0deg);      opacity: 0; }
+    10%  { transform: translate3d(-33px, 12vh,  0) rotate(-49.5deg);  opacity: var(--flake-opacity, 0.32); }
+    25%  { transform: translate3d(-60px, 30vh,  0) rotate(-123.8deg); }
+    50%  { transform: translate3d(33px,  60vh,  0) rotate(-247.5deg); }
+    75%  { transform: translate3d(-60px, 90vh,  0) rotate(-371.3deg); }
+    90%  { transform: translate3d(-33px, 108vh, 0) rotate(-445.5deg); opacity: var(--flake-opacity, 0.32); }
+    100% { transform: translate3d(0px,   120vh, 0) rotate(-495deg);   opacity: 0; }
+  }
+
+  /* ============ WINTER SPARKLING STARS (Always Far-Depth Blurred) ============ */
+  .sparkle-star {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    will-change: transform, opacity;
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3CradialGradient%20id='g'%3E%3Cstop%20offset='0%25'%20stop-color='%23FFA259'%20stop-opacity='0.78'/%3E%3Cstop%20offset='50%25'%20stop-color='%23E66826'%20stop-opacity='0.26'/%3E%3Cstop%20offset='100%25'%20stop-color='%23E66826'%20stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle%20cx='32'%20cy='32'%20r='30'%20fill='url(%23g)'/%3E%3Cpath%20d='M32,3%20Q32,32%2061,32%20Q32,32%2032,61%20Q32,32%203,32%20Q32,32%2032,3%20Z'%20fill='%23FFFDF9'%20stroke='%23E66826'%20stroke-width='1.5'/%3E%3C/svg%3E");
+    background-size: contain;
+    background-repeat: no-repeat;
+    filter: blur(2.4px);
+    animation: starTwinkle var(--star-dur, 5.5s) ease-in-out infinite;
+    animation-delay: var(--star-delay, 0s);
+  }
+  .sparkle-star.star-plum {
+    background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2064%2064'%3E%3Cdefs%3E%3CradialGradient%20id='g'%3E%3Cstop%20offset='0%25'%20stop-color='%23F07D40'%20stop-opacity='0.65'/%3E%3Cstop%20offset='55%25'%20stop-color='%23882E47'%20stop-opacity='0.22'/%3E%3Cstop%20offset='100%25'%20stop-color='%23882E47'%20stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle%20cx='32'%20cy='32'%20r='30'%20fill='url(%23g)'/%3E%3Cpath%20d='M32,5%20Q32,32%2059,32%20Q32,32%2032,59%20Q32,32%205,32%20Q32,32%2032,5%20Z'%20fill='%23FFFDF9'%20stroke='%23882E47'%20stroke-width='1.4'/%3E%3C/svg%3E");
+  }
+  .sparkle-star.star-deep {
+    filter: blur(3.8px);
+  }
+
+  /* starScale = 1.15× baked into scale stops; starPeakOpacity = 0.65 */
+  @keyframes starTwinkle {
+    0%, 100% { transform: scale(0.23) rotate(0deg);  opacity: 0; }
+    35%      { transform: scale(1.24) rotate(45deg); opacity: 0.65; }
+    72%, 99% { transform: scale(0.29) rotate(90deg); opacity: 0; }
+  }
+
+  /* Reduced motion: the snowflakes and stars are decorative
+     motion with no telemetry role — total suppression rather than
+     the amplitude-only-freeze pattern the HUD waveform uses. */
+  @media (prefers-reduced-motion: reduce) {
+    .snow-particle,
+    .sparkle-star {
+      animation: none !important;
+      opacity: 0 !important;
+      filter: none !important;
+    }
+  }
