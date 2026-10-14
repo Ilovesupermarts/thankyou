@@ -1747,6 +1747,10 @@
      stripped. The waveform's vertical amplitude response stays
      live (state feedback); the travelling phase freezes in the
      renderer via _prefersReducedMotion. */
+  /* Content-box width is 318 − 2 (borders) − 28 (padding) = 288px.
+     This must match HUD_DISPLAY_W in app.js — the canvas backing
+     store is sized to that constant and displayed at width: 100%,
+     so any drift between the two stretches the raster horizontally. */
   .audio-spectrum-hud {
     position: fixed;
     left: calc(26px + env(safe-area-inset-left, 0px));
@@ -2408,7 +2412,6 @@
     display: inline-flex;
     align-items: center;
   }
-  .item-count-unit { /* inherits from .item-count */ }
 
   .counter-digit-roll {
     --digit-h: 1.4em;
@@ -2630,7 +2633,6 @@
     text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
   }
   .ty-line.accent { color: var(--ty-accent-color); }
-  .ty-line.spacer { margin-top: 0; }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
   .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 22px; }
   .action-hint.ty-swipe-hint.shown { opacity: 1; }
@@ -2683,7 +2685,6 @@
     .start-hint-line { font-size: 19px; letter-spacing: 3px; }
     .ty-line { font-size: 20px; }
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
-    .ty-line.spacer { margin-top: 0; }
     .ty-panel { padding: 80px 32px 130px 32px; }
     .ty-ambient-stage { padding: 100px 32px 130px 32px; }
     .quote-line { font-size: 34px; letter-spacing: 4px; }
@@ -2757,7 +2758,6 @@
     .ty-line { font-size: 17px; line-height: 1.9; }
     .ty-mark { font-size: 18px; margin-bottom: 20px; }
     .ty-rule { margin: 18px auto; }
-    .ty-line.spacer { margin-top: 0; }
     .action-hint { margin-top: 0; font-size: 12px; letter-spacing: 3px; }
     .action-hint.global-hint { bottom: 116px; }
     .dots { bottom: 84px; gap: 12px; }
