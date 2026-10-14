@@ -3,355 +3,332 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>フォント・行間・配色デモ</title>
+<title>HUD 外観テスト</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
 
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Old+Mincho:wght@400;700&family=Hina+Mincho&family=Sawarabi+Mincho&family=Zen+Antique&family=Yuji+Syuku&family=Yuji+Mai&family=BIZ+UDMincho:wght@400;700&display=swap" rel="stylesheet">
-
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Zen+Maru+Gothic:wght@400;500;700&family=M+PLUS+1p:wght@400;500;700&family=Zen+Kurenaido&display=swap" rel="stylesheet">
-
+<!-- Real stylesheet for the ambient stack, theme tokens, and panels -->
 <link rel="stylesheet" href="main.css">
 
 <style>
   /* ============================================================
-     DEMO-ONLY OVERRIDES — all scoped under .demo-shell
+     TEST-PAGE OVERRIDES
+     Everything below is scoped to this page only. main.css is
+     loaded unmodified above. The AUDIO SPECTRUM & METADATA HUD
+     block is inlined here as a preview of the pending main.css
+     compile — same selectors, so source order lets these win.
      ============================================================ */
 
-  body { padding: 32px 20px 80px 20px !important; }
-
-  .demo-shell {
-    max-width: 1180px;
-    margin: 0 auto;
+  /* Body needs .info-visible for the existing HUD visibility gate
+     to fire. Set on the body element via class, no JS needed. */
+  body {
+    padding-bottom: 0;
+    min-height: 100vh;
   }
 
-  .demo-header {
-    max-width: 640px;
-    margin: 0 auto 28px auto;
-    text-align: center;
+  /* --- Play control --- */
+  .test-play-btn {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    z-index: 200;
+    padding: 10px 22px;
+    border-radius: 22px;
+    background: var(--accent);
+    color: #ffffff;
+    border: 1.5px solid var(--accent);
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    cursor: pointer;
+    box-shadow: 0 4px 14px var(--shadow-accent);
+    transition: background 0.2s, border-color 0.2s, transform 0.15s, box-shadow 0.2s;
+    -webkit-appearance: none;
+    appearance: none;
   }
-  .demo-header h1 {
-    font-size: 21px; font-weight: 600;
-    color: var(--secondary-accent, #882E47);
-    letter-spacing: 3px; margin: 0 0 14px 0;
-  }
-  .demo-header p {
-    font-size: 13.5px; color: var(--text-mute);
-    line-height: 1.9; margin: 0; letter-spacing: 0.5px;
-  }
-  .demo-header code {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    font-size: 12.5px;
-    background: rgba(222, 192, 172, 0.45);
-    padding: 1px 6px; border-radius: 4px;
-    color: var(--text-dark);
+  .test-play-btn:active { transform: scale(0.97); }
+  .test-play-btn.playing {
+    background: var(--secondary-accent, #882E47);
+    border-color: var(--secondary-accent, #882E47);
+    box-shadow: 0 4px 14px rgba(136, 46, 71, 0.28);
   }
 
-  /* ---------- Two-column layout on tablet+ ---------- */
-  .demo-layout {
-    display: block;
-  }
-  @media (min-width: 900px) {
-    .demo-layout {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 28px;
-      align-items: start;
-    }
-    .preview-column {
-      position: sticky;
-      top: 20px;
-      max-height: calc(100vh - 40px);
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    .controls-column {
-      min-width: 0;
-    }
-  }
-
-  /* ============================================================
-     PREVIEW — reuses .panel-inner / .panel-content / .table-card
-     from main.css. All color and font overrides are driven by
-     CSS custom properties that the control panel writes.
-     ============================================================ */
-
-  .preview-card {
-    background: rgba(255, 253, 249, 0.55);
-    border: 1px solid rgba(222, 192, 172, 0.55);
-    border-radius: 20px;
-    padding: 26px 24px 28px 24px;
-  }
-  .preview-card-label {
-    font-size: 11px;
-    color: var(--text-faint);
-    letter-spacing: 3px;
+  /* --- Mock panel column, so the HUD sits over real content --- */
+  .test-stage {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 100px 20px 220px 20px;
     text-align: center;
-    margin: 0 0 20px 0;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    text-transform: uppercase;
   }
-
-  /* --- Panel typography — forced settled state --- */
-  .demo-shell .panel-content {
+  /* Force the settled state — there's no .panel.active ancestor
+     toggling the entrance animation on this page. */
+  .test-stage .panel-content {
     opacity: 1 !important;
     transform: none !important;
     filter: none !important;
     transition: none !important;
-    font-family: var(--demo-body-font,
-      "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho",
-      "Noto Serif JP", "Noto Serif CJK JP", serif) !important;
-    line-height: var(--demo-lh, 2.25) !important;
-    color: var(--demo-panel-color, var(--text-dark)) !important;
   }
-  .demo-shell .panel-content p {
-    margin-bottom: var(--demo-pm, 0.40em) !important;
-  }
-  .demo-shell .panel-content p:last-child {
-    margin-bottom: 0 !important;
-  }
-  .demo-shell .panel-content .therapist-name {
-    font-family: var(--demo-name-font,
-      "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", serif) !important;
-    color: var(--demo-name-color, #882E47) !important;
-  }
-
-  /* --- Table card background — washi texture + user color
-         combined via multiply so the color choice is visible
-         through the texture. Mirrors how production will apply
-         the change. --- */
-  .demo-shell #tableCard {
-    background-color: var(--demo-table-bg, #FBECE0) !important;
-    background-image: url('icons/1790835034553.jpg') !important;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-blend-mode: multiply !important;
-    margin: 24px 0 0 0 !important;
-    opacity: 1 !important;
-    transform: none !important;
-    transition: none !important;
-  }
-
-  /* --- Service name / price / check colors --- */
-  .demo-shell #tableCard .service-display,
-  .demo-shell #tableCard .service-input {
-    color: var(--demo-service-color, var(--text-dark)) !important;
-  }
-  .demo-shell #tableCard .price-input,
-  .demo-shell #tableCard .yen {
-    color: var(--demo-price-color, var(--accent)) !important;
-  }
-  .demo-shell #tableCard .row-check.checked {
-    border-color: var(--demo-check-color, var(--accent)) !important;
-    color: var(--demo-check-color, var(--accent)) !important;
-  }
-  .demo-shell #tableCard .row-check.checked::after {
-    color: var(--demo-check-color, var(--accent)) !important;
-  }
-
-  /* --- Privacy note --- */
-  .demo-shell #tableCard .privacy-note-inline {
-    background-color: var(--demo-privacy-bg, #FAF0E6) !important;
-    color: var(--demo-privacy-color, var(--text-dark)) !important;
+  .test-caption {
+    text-align: center;
+    margin: 32px auto 0 auto;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
+    font-size: 12px;
+    color: var(--text-faint);
+    letter-spacing: 2px;
   }
 
   /* ============================================================
-     CONTROLS
+     AUDIO SPECTRUM & METADATA HUD — preview of pending main.css
      ============================================================ */
-
-  .controls {
-    background: rgba(255, 253, 249, 0.96);
-    border: 1px solid var(--border-2);
+  .audio-spectrum-hud {
+    position: fixed;
+    left: calc(26px + env(safe-area-inset-left, 0px));
+    bottom: calc(28px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-select: none;
+    width: 318px;
+    padding: 11px 18px 10px 18px;
     border-radius: 18px;
-    padding: 22px 26px 26px 26px;
-    font-family: -apple-system, BlinkMacSystemFont, sans-serif;
-    box-shadow: 0 6px 22px rgba(68, 52, 48, 0.10);
+    background: rgba(255, 253, 249, 0.92);
+    border: 1px solid rgba(222, 192, 172, 0.50);
+    box-shadow:
+      0 6px 22px rgba(68, 52, 48, 0.08),
+      0 1px 3px rgba(68, 52, 48, 0.05);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.6s ease, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
-  .controls h2 {
-    font-size: 12.5px;
-    font-weight: 700;
-    color: var(--secondary-accent, #882E47);
-    letter-spacing: 4px;
-    margin: 0 0 18px 0;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(222, 192, 172, 0.55);
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", serif;
+  body.info-visible .audio-spectrum-hud.shown {
+    opacity: 1;
+    transform: translateY(0);
   }
-  .controls h2:not(:first-child) { margin-top: 36px; }
 
-  .control-row {
-    display: flex; flex-direction: column;
-    gap: 10px; margin-bottom: 22px;
+  .hud-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 2px;
   }
-  .control-row:last-child { margin-bottom: 0; }
-  .control-label {
-    display: flex; justify-content: space-between;
+
+  .hud-status-badge,
+  .hud-dl-badge {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    padding: 2px 7px;
+    border-radius: 8px;
+    line-height: 1.2;
+    transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+  }
+
+  /* Red Box (Left): Playback Status */
+  .hud-status-badge {
+    background: rgba(176, 74, 90, 0.12);
+    color: var(--accent);
+  }
+  .hud-status-badge.loading {
+    background: rgba(247, 185, 60, 0.22);
+    color: #8f3f12;
+  }
+  .hud-status-badge.decoding {
+    background: rgba(247, 185, 60, 0.38);
+    color: #7a3208;
+    animation: statusPulse 1.2s ease-in-out infinite;
+  }
+  .hud-status-badge.ready {
+    background: rgba(42, 63, 26, 0.14);
+    color: #2a3f1a;
+  }
+  html[data-theme="autumn"] .hud-status-badge {
+    background: rgba(230, 104, 38, 0.12);
+    color: var(--accent);
+  }
+  html[data-theme="autumn"] .hud-status-badge.loading {
+    background: rgba(255, 162, 89, 0.25);
+    color: #C44E10;
+  }
+  html[data-theme="autumn"] .hud-status-badge.decoding {
+    background: rgba(255, 162, 89, 0.40);
+    color: #9E3B06;
+  }
+  html[data-theme="autumn"] .hud-status-badge.ready {
+    background: rgba(136, 46, 71, 0.14);
+    color: #882E47;
+  }
+
+  /* Yellow Box (Right): Download Progress */
+  .hud-dl-badge {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    background: rgba(222, 192, 172, 0.28);
+    color: var(--text-mute);
+  }
+  .hud-dl-badge.decoding {
+    background: rgba(255, 162, 89, 0.32);
+    color: #9E3B06;
+    animation: statusPulse 1.2s ease-in-out infinite;
+  }
+  .hud-dl-badge.ready {
+    background: rgba(154, 62, 77, 0.12);
+    color: var(--secondary-accent, #9a3e4d);
+  }
+  html[data-theme="autumn"] .hud-dl-badge.ready {
+    background: rgba(136, 46, 71, 0.12);
+    color: var(--secondary-accent, #882E47);
+  }
+
+  @keyframes statusPulse {
+    0%, 100% { opacity: 0.6; }
+    50%      { opacity: 1; }
+  }
+
+  /* Blue Box: Centered Title · Artist */
+  .hud-meta-row {
+    display: flex;
     align-items: baseline;
-    font-size: 12.5px; color: var(--text-mute);
-    letter-spacing: 1.2px;
+    justify-content: center;
+    gap: 6px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    line-height: 1.2;
+    margin-bottom: 2px;
+    min-width: 0;
   }
-  .control-label strong {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    color: var(--secondary-accent, #882E47);
-    font-size: 14px; letter-spacing: 0.5px; font-weight: 700;
-  }
-
-  .control-row input[type="range"] {
-    width: 100%; height: 24px;
-    -webkit-appearance: none; appearance: none;
-    background: transparent; cursor: pointer;
-    touch-action: manipulation;
-  }
-  .control-row input[type="range"]::-webkit-slider-runnable-track {
-    height: 5px; background: rgba(222, 192, 172, 0.75); border-radius: 3px;
-  }
-  .control-row input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none; appearance: none;
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid #FFFDF9;
-    box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
-    margin-top: -8.5px;
-  }
-  .control-row input[type="range"]::-moz-range-track {
-    height: 5px; background: rgba(222, 192, 172, 0.75); border-radius: 3px;
-  }
-  .control-row input[type="range"]::-moz-range-thumb {
-    width: 22px; height: 22px; border-radius: 50%;
-    background: var(--accent);
-    border: 2px solid #FFFDF9;
-    box-shadow: 0 2px 8px rgba(230, 104, 38, 0.40);
-  }
-
-  select.font-select {
-    width: 100%;
-    padding: 12px 14px;
-    font-size: 15px;
-    font-family: inherit;
+  .hud-title {
+    font-size: 14.5px;
+    font-weight: 700;
     color: var(--text-dark);
-    background: #FFFDF9;
-    border: 1.5px solid var(--border-2);
-    border-radius: 10px;
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23BEA29B' stroke-width='2' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 14px center;
-    padding-right: 38px;
-    cursor: pointer;
+    letter-spacing: 1.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
-  select.font-select:focus { outline: none; border-color: var(--accent); }
+  html[data-theme="autumn"] .hud-title { color: var(--text-med); }
+  .hud-sep {
+    font-size: 11px;
+    color: var(--text-placeholder);
+    flex-shrink: 0;
+  }
+  .hud-artist {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
 
-  /* ---------- Color swatch rows ---------- */
-  .color-control {
-    margin-bottom: 22px;
+  /* Waveform + Gauge Stack */
+  .hud-wave-gauge-stack {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
   }
-  .color-control:last-child { margin-bottom: 0; }
-  .color-control-label {
+  .hud-visualizer-block {
+    width: 100%;
+    height: 30px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    margin-bottom: 0;
+  }
+  .hud-canvas {
+    width: 100%;
+    height: 30px;
+    display: block;
+  }
+
+  .hud-gauge-bar {
+    position: relative;
+    width: 100%;
+    height: 5px;
+    background: rgba(222, 192, 172, 0.38);
+    border-radius: 999px;
+  }
+  .hud-gauge-fill {
+    position: relative;
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, var(--glow), var(--accent));
+    border-radius: 999px;
+    transition: width 0.15s cubic-bezier(0.2, 0, 0.3, 1), background 0.3s ease;
+  }
+  .hud-gauge-fill::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+    border: 2px solid #FFFDF9;
+    box-shadow: 0 0 8px var(--glow);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
+  }
+  .hud-gauge-fill.decoding {
+    background: #FFA259;
+    animation: gaugeGlow 1s ease-in-out infinite alternate;
+  }
+  .hud-gauge-fill.ready {
+    background: linear-gradient(90deg, var(--accent), #882E47);
+  }
+  .hud-gauge-fill.ready::after {
+    background: #882E47;
+    box-shadow: 0 0 8px rgba(136, 46, 71, 0.45);
+  }
+  html[data-theme="autumn"] .hud-gauge-fill.decoding { background: #FFA259; }
+  html[data-theme="autumn"] .hud-gauge-fill.ready {
+    background: linear-gradient(90deg, var(--accent), #882E47);
+  }
+  @keyframes gaugeGlow {
+    from { opacity: 0.7; }
+    to   { opacity: 1; }
+  }
+
+  /* Split Timestamps */
+  .hud-time-row {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
-    font-size: 12.5px;
-    color: var(--text-mute);
-    letter-spacing: 1.2px;
-    margin-bottom: 10px;
-  }
-  .color-control-label strong {
-    font-family: ui-monospace, "SF Mono", Menlo, monospace;
-    color: var(--secondary-accent, #882E47);
-    font-size: 12px;
-    letter-spacing: 0.5px;
-    font-weight: 700;
-  }
-  .swatch-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-  .swatch {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-    border: 2px solid rgba(222, 192, 172, 0.55);
-    padding: 0;
-    cursor: pointer;
-    -webkit-appearance: none;
-    appearance: none;
-    position: relative;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-    -webkit-tap-highlight-color: transparent;
-  }
-  .swatch:active { transform: scale(0.92); }
-  .swatch.selected {
-    box-shadow: 0 0 0 2px #FFFDF9, 0 0 0 4px var(--accent);
-    transform: scale(1.05);
+    align-items: center;
+    margin-top: 6px;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--text-faint);
+    letter-spacing: 0.6px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    line-height: 1;
   }
 
-  /* ============================================================
-     CSS OUTPUT + COPY BUTTON
-     ============================================================ */
-  .css-output {
-    margin: 20px 0 0 0;
-    padding: 22px 24px;
-    background: rgba(36, 28, 26, 0.94);
-    border-radius: 12px;
-    font-family: ui-monospace, "SF Mono", Menlo, "Cascadia Mono", monospace;
-    font-size: 12.5px; line-height: 1.85;
-    color: #FBECE0;
-    letter-spacing: 0.3px;
-    white-space: pre;
-    overflow-x: auto;
-  }
-  .css-output .prop  { color: #FFA259; }
-  .css-output .val   { color: #F07D40; font-weight: 600; }
-  .css-output .sel   { color: #DEC0AC; }
-  .css-output .brace { color: #9E7D75; }
-  .css-output .cmt   { color: #725750; font-style: italic; }
-
-  .copy-btn {
-    display: block; width: 100%;
-    margin: 16px 0 0 0;
-    padding: 15px 28px;
-    background: var(--accent); color: #ffffff;
-    border: 1.5px solid var(--accent);
-    border-radius: 22px;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 13px; font-weight: 600; letter-spacing: 2px;
-    cursor: pointer;
-    box-shadow: 0 4px 14px rgba(230, 104, 38, 0.28);
-    transition: background 0.2s, transform 0.15s, border-color 0.2s;
-    -webkit-appearance: none; appearance: none;
-  }
-  .copy-btn:active { transform: scale(0.97); }
-  .copy-btn.copied {
-    background: var(--secondary-accent, #882E47);
-    border-color: var(--secondary-accent, #882E47);
+  @media (max-height: 600px) and (orientation: landscape) {
+    .audio-spectrum-hud { display: none; }
   }
 
-  .demo-footer {
-    max-width: 640px; margin: 32px auto 0 auto;
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", serif;
-    font-size: 12px; color: var(--text-faint);
-    letter-spacing: 1px; line-height: 2;
-  }
-
-  @media (max-width: 899px) {
-    body { padding: 20px 14px 56px 14px !important; }
-    .controls { padding: 18px 20px; margin-top: 24px; }
-    .preview-card { padding: 20px 16px 22px 16px; }
-    .demo-header h1 { font-size: 18px; letter-spacing: 2px; }
-    .css-output { font-size: 11.5px; padding: 16px 18px; }
+  /* Reduced-motion safety */
+  @media (prefers-reduced-motion: reduce) {
+    .hud-status-badge.decoding,
+    .hud-dl-badge.decoding,
+    .hud-gauge-fill.decoding {
+      animation: none !important;
+    }
+    .hud-gauge-fill::after {
+      box-shadow: none !important;
+    }
   }
 </style>
 </head>
-<body>
+<body class="info-visible">
 
-<!-- ============ AMBIENT BACKGROUND — verbatim from index.html ============ -->
+<!-- ============ AMBIENT BACKGROUND ============ -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
   <div class="ambient-layer ambient-mesh">
     <div class="light-orb orb-1"></div>
@@ -359,7 +336,6 @@
     <div class="light-orb orb-3"></div>
   </div>
   <div class="ambient-layer ambient-primary"></div>
-  <div class="mote-field" id="moteField"></div>
 </div>
 
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
@@ -373,191 +349,52 @@
 </div>
 
 <div class="ambient-mosaic" aria-hidden="true"></div>
-<div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<!-- ============ DEMO ============ -->
-<div class="demo-shell" id="demoShell">
+<!-- ============ PLAY CONTROL ============ -->
+<button type="button" class="test-play-btn" id="playBtn">▶ 再生</button>
 
-  <div class="demo-header">
-    <h1>フォント・行間・配色の最終調整</h1>
-    <p>
-      <code>main.css</code> をそのまま読み込んでいます。<br>
-      背景は本番と一致します。プレビューを見ながら調整してください。
-    </p>
+<!-- ============ MOCK PANEL CONTENT ============ -->
+<main class="test-stage">
+  <div class="panel-inner">
+    <div class="panel-content">
+      <span class="therapist-name">桜庭さん</span>、初めまして。
+      <p>それでは、本日の癒しのオプションをご覧ください。</p>
+      <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
+      <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
+      <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
+      <p>ありがとうございます。</p>
+    </div>
+  </div>
+  <div class="test-caption">HUD 外観テスト — 右上の「再生」をタップ</div>
+</main>
+
+<!-- ============ AUDIO SPECTRUM & METADATA HUD ============ -->
+<div class="audio-spectrum-hud shown" id="audioSpectrumHud" aria-hidden="true">
+  <div class="hud-top-row">
+    <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+    <span class="hud-dl-badge" id="hudPctStatus">DL 0%</span>
   </div>
 
-  <div class="demo-layout">
+  <div class="hud-meta-row">
+    <span class="hud-title" id="hudTrackTitle">草原の風</span>
+    <span class="hud-sep">·</span>
+    <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
+  </div>
 
-    <!-- ============================================================
-         PREVIEW COLUMN
-         ============================================================ -->
-    <div class="preview-column">
-      <div class="preview-card">
-        <div class="preview-card-label">Preview</div>
-
-        <!-- Panel prose -->
-        <div class="panel-inner">
-          <div class="panel-content">
-            <span class="therapist-name">桜庭さん</span>、初めまして。
-            <p>それでは、本日の癒しのオプションをご覧ください。</p>
-            <p>ご無理のない範囲で、ご対応いただけるものがございましたら、横の○をタップしてお選びください。</p>
-            <p>表に表示されている料金は、必要に応じて変更していただいても構いません。また、ご自身が難しいと感じるものは、無理にお選びいただかなくても大丈夫です。すべて見送っていただいても大丈夫です。</p>
-            <p>一覧にないものでも、もしご自身からご提案いただけるものがございましたら、下の欄にご記入ください。</p>
-            <p>ありがとうございます。</p>
-          </div>
-
-          <!-- Table with privacy note + service rows -->
-          <div class="table-card active" id="tableCard">
-            <div class="privacy-note-inline">
-              <p>なお、これからご覧いただく内容や、こちらでお選びいただいた内容が、記録されたり、外部に送信されたりすることは一切ございません。</p>
-              <p>あくまでも、その場でのやり取りを分かりやすくするためのものです。本日のお話や内容についても、すべてお互いの間だけのこととして、大切に扱わせていただきます。</p>
-              <p>どうぞご安心ください。</p>
-            </div>
-
-            <div class="row filled">
-              <div class="row-check checked" role="checkbox" aria-checked="true"></div>
-              <span class="service-display">ダミーテキスト1</span>
-              <div class="price-wrap">
-                <input type="text" class="price-input" value="5,000" readonly>
-                <span class="yen">円</span>
-              </div>
-            </div>
-
-            <div class="row filled">
-              <div class="row-check checked" role="checkbox" aria-checked="true"></div>
-              <span class="service-display">ダミーテキスト2</span>
-              <div class="price-wrap">
-                <input type="text" class="price-input" value="3,000" readonly>
-                <span class="yen">円</span>
-              </div>
-            </div>
-
-            <div class="row">
-              <div class="row-check" role="checkbox" aria-checked="false"></div>
-              <span class="service-display">ダミーテキスト3</span>
-              <div class="price-wrap">
-                <input type="text" class="price-input" value="8,000" readonly>
-                <span class="yen">円</span>
-              </div>
-            </div>
-
-            <div class="custom-section-divider">
-              <span class="custom-section-mark">❀</span>
-              <span class="custom-section-line"></span>
-              <span class="custom-section-label">その他</span>
-              <span class="custom-section-line"></span>
-              <span class="custom-section-mark">❀</span>
-            </div>
-
-            <div class="row locked">
-              <div class="row-check" role="checkbox" aria-checked="false"></div>
-              <input type="text" class="service-input" placeholder="サービスの種類" readonly>
-              <div class="price-wrap">
-                <input type="text" class="price-input" placeholder="料金を入力" disabled>
-                <span class="yen">円</span>
-              </div>
-            </div>
-
-            <div class="row locked">
-              <div class="row-check" role="checkbox" aria-checked="false"></div>
-              <input type="text" class="service-input" placeholder="サービスの種類" readonly>
-              <div class="price-wrap">
-                <input type="text" class="price-input" placeholder="料金を入力" disabled>
-                <span class="yen">円</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+  <div class="hud-wave-gauge-stack">
+    <div class="hud-visualizer-block">
+      <canvas class="hud-canvas" id="hudCanvas" width="282" height="30"></canvas>
     </div>
 
-    <!-- ============================================================
-         CONTROLS COLUMN
-         ============================================================ -->
-    <div class="controls-column">
-      <div class="controls">
-
-        <h2>フォント</h2>
-
-        <div class="control-row">
-          <label class="control-label" for="font-body"><span>本文フォント</span></label>
-          <select class="font-select" id="font-body">
-            <optgroup label="明朝体（セリフ）">
-              <option value="'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', 'Noto Serif JP', serif" selected>しっぽり明朝（現在）</option>
-              <option value="'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Noto Serif JP（源ノ明朝）</option>
-              <option value="'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Old Mincho</option>
-              <option value="'Hina Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">ひな明朝</option>
-              <option value="'Sawarabi Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">さわらび明朝</option>
-              <option value="'Zen Antique', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Antique</option>
-              <option value="'Yuji Syuku', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 粛</option>
-              <option value="'Yuji Mai', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 舞</option>
-              <option value="'BIZ UDMincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">BIZ UD明朝</option>
-            </optgroup>
-            <optgroup label="ゴシック体（サンセリフ）">
-              <option value="'Noto Sans JP', 'Hiragino Sans', 'Yu Gothic', sans-serif">Noto Sans JP</option>
-              <option value="'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 角ゴシック New</option>
-              <option value="'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 丸ゴシック</option>
-              <option value="'M PLUS 1p', 'Hiragino Sans', 'Yu Gothic', sans-serif">M PLUS 1p</option>
-              <option value="'Zen Kurenaido', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 紅道</option>
-            </optgroup>
-            <optgroup label="システムフォント">
-              <option value="-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif">システム標準</option>
-            </optgroup>
-          </select>
-        </div>
-
-        <div class="control-row">
-          <label class="control-label" for="font-name"><span>名前フォント</span></label>
-          <select class="font-select" id="font-name">
-            <optgroup label="明朝体（セリフ）">
-              <option value="'Yuji Syuku', 'Shippori Mincho', 'Hiragino Mincho ProN', serif" selected>佑字 粛（現在）</option>
-              <option value="'Shippori Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">しっぽり明朝</option>
-              <option value="'Noto Serif JP', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Noto Serif JP</option>
-              <option value="'Zen Old Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Old Mincho</option>
-              <option value="'Hina Mincho', 'Hiragino Mincho ProN', 'Yu Mincho', serif">ひな明朝</option>
-              <option value="'Yuji Mai', 'Hiragino Mincho ProN', 'Yu Mincho', serif">佑字 舞</option>
-              <option value="'Zen Antique', 'Hiragino Mincho ProN', 'Yu Mincho', serif">Zen Antique</option>
-            </optgroup>
-            <optgroup label="ゴシック体（サンセリフ）">
-              <option value="'Zen Maru Gothic', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 丸ゴシック</option>
-              <option value="'Zen Kaku Gothic New', 'Hiragino Sans', 'Yu Gothic', sans-serif">Zen 角ゴシック New</option>
-              <option value="'M PLUS 1p', 'Hiragino Sans', 'Yu Gothic', sans-serif">M PLUS 1p</option>
-            </optgroup>
-          </select>
-        </div>
-
-        <h2>行間・段落間</h2>
-
-        <div class="control-row">
-          <label class="control-label" for="lh">
-            <span>行間 — line-height</span>
-            <strong id="lh-value">2.25</strong>
-          </label>
-          <input type="range" id="lh" min="1.50" max="2.60" step="0.05" value="2.25">
-        </div>
-        <div class="control-row">
-          <label class="control-label" for="pm">
-            <span>段落間 — margin-bottom</span>
-            <strong id="pm-value">0.40em</strong>
-          </label>
-          <input type="range" id="pm" min="0" max="1.60" step="0.05" value="0.40">
-        </div>
-
-        <h2>配色</h2>
-        <div id="color-controls"></div>
-
-      </div>
-
-      <pre class="css-output" id="css-output"></pre>
-      <button type="button" class="copy-btn" id="copy-btn">この設定をコピー</button>
+    <div class="hud-gauge-bar">
+      <div class="hud-gauge-fill" id="hudGaugeFill"></div>
     </div>
 
+    <div class="hud-time-row">
+      <span id="hudTimeElapsed">00:00</span>
+      <span id="hudTimeTotal">--:--</span>
+    </div>
   </div>
-
-  <div class="demo-footer">
-    ここで決めた設定を教えていただければ、main.css に反映します。
-  </div>
-
 </div>
 
 <script>
@@ -565,241 +402,409 @@
   'use strict';
 
   /* ============================================================
-     PALETTE — the app's autumn theme colors, as named swatches.
+     ACCESSIBILITY / MOTION QUERY
+     Reactive telemetry (vertical waveform displacement driven by
+     acoustic energy) is state feedback and stays live. Vestibular
+     drift (travelling phase) is decorative and freezes.
      ============================================================ */
-  var PALETTE = [
-    { name: '絹白',    hex: '#FFFDF9' },
-    { name: '白',      hex: '#FFFFFF' },
-    { name: '淡杏',    hex: '#FDE8DA' },
-    { name: '薄杏',    hex: '#FBECE0' },
-    { name: '杏',      hex: '#FFA259' },
-    { name: '蜜柑',    hex: '#F07D40' },
-    { name: '金木犀',  hex: '#E66826' },
-    { name: '深琥珀',  hex: '#C44E10' },
-    { name: '焦茶',    hex: '#9E3B06' },
-    { name: '葡萄染',  hex: '#882E47' },
-    { name: '淡茶',    hex: '#9E7D75' },
-    { name: '中間茶',  hex: '#725750' },
-    { name: '濃茶墨',  hex: '#241C1A' }
-  ];
+  var _prefersReducedMotion = false;
+  try {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      _prefersReducedMotion = true;
+    }
+  } catch (e) {}
 
   /* ============================================================
-     COLOR PICKERS
+     DOM REFS
      ============================================================ */
-  var PICKERS = [
-    { key: 'panelColor',   label: '本文の文字色',            cssVar: '--demo-panel-color',    default: '#241C1A' },
-    { key: 'nameColor',    label: '名前の文字色',            cssVar: '--demo-name-color',     default: '#882E47' },
-    { key: 'serviceColor', label: 'サービス名の文字色',      cssVar: '--demo-service-color',  default: '#241C1A' },
-    { key: 'priceColor',   label: '料金の文字色',            cssVar: '--demo-price-color',    default: '#E66826' },
-    { key: 'checkColor',   label: 'チェックマークの色',      cssVar: '--demo-check-color',    default: '#E66826' },
-    { key: 'tableBg',      label: 'テーブル背景（テクスチャに乗算）', cssVar: '--demo-table-bg',  default: '#FBECE0' },
-    { key: 'privacyBg',    label: 'プライバシー注記の背景',  cssVar: '--demo-privacy-bg',     default: '#FAF0E6' },
-    { key: 'privacyColor', label: 'プライバシー注記の文字色', cssVar: '--demo-privacy-color', default: '#241C1A' }
-  ];
-
-  var state = {
-    bodyFont: '',
-    nameFont: '',
-    lh: '2.25',
-    pm: '0.40',
-    colors: {}
-  };
-
-  var demoShell  = document.getElementById('demoShell');
-  var colorHost  = document.getElementById('color-controls');
-  var fontBody   = document.getElementById('font-body');
-  var fontName   = document.getElementById('font-name');
-  var lhInput    = document.getElementById('lh');
-  var pmInput    = document.getElementById('pm');
-  var lhValue    = document.getElementById('lh-value');
-  var pmValue    = document.getElementById('pm-value');
-  var cssOutput  = document.getElementById('css-output');
-  var copyBtn    = document.getElementById('copy-btn');
+  var ambientStage   = document.getElementById('ambientStage');
+  var stageLattice   = document.getElementById('stageLattice');
+  var audioSpectrumHud = document.getElementById('audioSpectrumHud');
+  var hudStatusBadge = document.getElementById('hudStatusBadge');
+  var hudPctStatus   = document.getElementById('hudPctStatus');
+  var hudTrackTitle  = document.getElementById('hudTrackTitle');
+  var hudTrackArtist = document.getElementById('hudTrackArtist');
+  var hudCanvas      = document.getElementById('hudCanvas');
+  var hudCtx         = hudCanvas ? hudCanvas.getContext('2d') : null;
+  var hudGaugeFill   = document.getElementById('hudGaugeFill');
+  var hudTimeElapsed = document.getElementById('hudTimeElapsed');
+  var hudTimeTotal   = document.getElementById('hudTimeTotal');
+  var playBtn        = document.getElementById('playBtn');
 
   /* ============================================================
-     BUILD COLOR SWATCH ROWS
+     HUD CONSTANTS
      ============================================================ */
-  PICKERS.forEach(function(p) {
-    state.colors[p.key] = p.default;
-    var box = document.createElement('div');
-    box.className = 'color-control';
+  var HUD_DISPLAY_W = 282;
+  var HUD_DISPLAY_H = 30;
+  var HUD_WAVE_PTS  = 16;
+  var _hudMirrorValues = new Float32Array(HUD_WAVE_PTS);
+  var _hudPhase = 0;
+  var _hudLastRenderedSec = -1;
 
-    var lbl = document.createElement('div');
-    lbl.className = 'color-control-label';
-    lbl.innerHTML = '<span>' + p.label + '</span><strong data-hex="' + p.key + '">' + p.default + '</strong>';
-    box.appendChild(lbl);
-
-    var row = document.createElement('div');
-    row.className = 'swatch-row';
-    row.dataset.var = p.cssVar;
-    row.dataset.key = p.key;
-
-    PALETTE.forEach(function(c) {
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'swatch';
-      btn.style.backgroundColor = c.hex;
-      btn.dataset.color = c.hex;
-      btn.dataset.name = c.name;
-      btn.setAttribute('aria-label', c.name);
-      if (c.hex.toLowerCase() === p.default.toLowerCase()) btn.classList.add('selected');
-      row.appendChild(btn);
-    });
-
-    box.appendChild(row);
-    colorHost.appendChild(box);
-  });
-
-  colorHost.addEventListener('click', function(e) {
-    var sw = e.target.closest('.swatch');
-    if (!sw) return;
-    var row = sw.closest('.swatch-row');
-    if (!row) return;
-    var key = row.dataset.key;
-    var cssVar = row.dataset.var;
-    var color = sw.dataset.color;
-
-    row.querySelectorAll('.swatch').forEach(function(s) {
-      s.classList.toggle('selected', s === sw);
-    });
-    var hexLabel = document.querySelector('[data-hex="' + key + '"]');
-    if (hexLabel) hexLabel.textContent = color;
-
-    state.colors[key] = color;
-    demoShell.style.setProperty(cssVar, color);
-    render();
-  });
+  if (hudCanvas && hudCtx) {
+    var _hudDpr = window.devicePixelRatio || 1;
+    hudCanvas.width  = HUD_DISPLAY_W * _hudDpr;
+    hudCanvas.height = HUD_DISPLAY_H * _hudDpr;
+    hudCtx.scale(_hudDpr, _hudDpr);
+  }
 
   /* ============================================================
-     SYNC + RENDER
+     AUDIO STATE
      ============================================================ */
-  function readInputs() {
-    state.bodyFont = fontBody.value;
-    state.nameFont = fontName.value;
-    state.lh = parseFloat(lhInput.value).toFixed(2);
-    state.pm = parseFloat(pmInput.value).toFixed(2);
-
-    lhValue.textContent = state.lh;
-    pmValue.textContent = state.pm + 'em';
-
-    demoShell.style.setProperty('--demo-body-font', state.bodyFont);
-    demoShell.style.setProperty('--demo-name-font', state.nameFont);
-    demoShell.style.setProperty('--demo-lh', state.lh);
-    demoShell.style.setProperty('--demo-pm', state.pm + 'em');
-  }
-
-  function buildCss() {
-    var c = state.colors;
-    return [
-      '/* ============================================================',
-      '   Panel typography — main.css',
-      '   ============================================================ */',
-      '',
-      '/* 本文 */',
-      '.panel-content {',
-      '  font-family: ' + state.bodyFont + ';',
-      '  line-height: ' + state.lh + ';',
-      '  color: ' + c.panelColor + ';',
-      '}',
-      '',
-      '.panel-content p {',
-      '  margin-bottom: ' + state.pm + 'em;',
-      '}',
-      '',
-      '/* 名前 */',
-      '.panel-content .therapist-name {',
-      '  font-family: ' + state.nameFont + ';',
-      '  color: ' + c.nameColor + ';',
-      '}',
-      '',
-      '/* サービステーブル */',
-      '#tableCard {',
-      '  background-color: ' + c.tableBg + ';',
-      '  background-blend-mode: multiply;',
-      '}',
-      '',
-      '#tableCard .service-display,',
-      '#tableCard .service-input {',
-      '  color: ' + c.serviceColor + ';',
-      '}',
-      '',
-      '#tableCard .price-input,',
-      '#tableCard .yen {',
-      '  color: ' + c.priceColor + ';',
-      '}',
-      '',
-      '#tableCard .row-check.checked,',
-      '#tableCard .row-check.checked::after {',
-      '  color: ' + c.checkColor + ';',
-      '}',
-      '',
-      '#tableCard .row-check.checked {',
-      '  border-color: ' + c.checkColor + ';',
-      '}',
-      '',
-      '/* プライバシー注記 */',
-      '#tableCard .privacy-note-inline {',
-      '  background-color: ' + c.privacyBg + ';',
-      '  color: ' + c.privacyColor + ';',
-      '}',
-      ''
-    ].join('\n');
-  }
-
-  function render() {
-    cssOutput.textContent = buildCss();
-  }
-
-  function syncAndRender() {
-    readInputs();
-    render();
-  }
-
-  fontBody.addEventListener('change', syncAndRender);
-  fontName.addEventListener('change', syncAndRender);
-  lhInput.addEventListener('input', syncAndRender);
-  pmInput.addEventListener('input', syncAndRender);
+  var soundAudioCtx       = null;
+  var soundMasterGain     = null;
+  var swellAnalyserNode   = null;
+  var swellCompensationGain = null;
+  var swellFreqData       = null;
+  var swellIsRunning      = false;
+  var swellRafId          = null;
+  var ambientSource       = null;
+  var ambientGain         = null;
+  var ambientPlayStartTime = -1;
+  var ambientPlayDurationSec = 0;
+  var decodedBuffer       = null;
+  var currentTheme        = 'autumn';
 
   /* ============================================================
-     COPY
+     TIME FORMATTING
      ============================================================ */
-  copyBtn.addEventListener('click', function() {
-    var css = buildCss();
-    var done = function() {
-      copyBtn.classList.add('copied');
-      copyBtn.textContent = 'コピーしました';
-      setTimeout(function() {
-        copyBtn.classList.remove('copied');
-        copyBtn.textContent = 'この設定をコピー';
-      }, 1400);
-    };
-    if (navigator.clipboard && window.isSecureContext) {
-      navigator.clipboard.writeText(css).then(done).catch(function() { fallback(css, done); });
+  function formatHudTime(sec) {
+    if (!isFinite(sec) || sec < 0) sec = 0;
+    var total = Math.floor(sec);
+    var m = Math.floor(total / 60);
+    var s = total % 60;
+    return (m < 10 ? '0' + m : String(m)) + ':' + (s < 10 ? '0' + s : String(s));
+  }
+
+  function getPlaybackElapsed() {
+    if (ambientSource === null) return 0;
+    if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return 0;
+    var elapsed = soundAudioCtx.currentTime - ambientPlayStartTime;
+    if (elapsed < 0) elapsed = 0;
+    if (elapsed > ambientPlayDurationSec) elapsed = ambientPlayDurationSec;
+    return elapsed;
+  }
+
+  /* ============================================================
+     FLUID RIBBON RENDERER
+     ============================================================ */
+  function drawHudSpectrum() {
+    if (!hudCtx) return;
+    hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
+
+    var isAutumn = (currentTheme === 'autumn');
+    var col0 = isAutumn ? '#FFA259' : '#e8b4bc';
+    var col1 = isAutumn ? '#882E47' : '#b04a5a';
+    var col2 = isAutumn ? '#E66826' : '#d46a7a';
+    var col3 = '#FFFDF9';
+
+    if (!_prefersReducedMotion) {
+      _hudPhase += 0.038;
+    }
+
+    for (var i = 0; i < HUD_WAVE_PTS; i++) {
+      var target = 0.14;
+      if (swellAnalyserNode && swellFreqData && swellIsRunning) {
+        var binIdx = 4 + Math.floor(i * 5.0);
+        target = Math.max(0.08, swellFreqData[binIdx] / 255);
+      } else {
+        target = 0.18 + Math.sin(_hudPhase + i * 0.45) * 0.10;
+      }
+      _hudMirrorValues[i] += (target - _hudMirrorValues[i]) * 0.22;
+    }
+
+    drawFluidRibbon(col0, 0.36, 1.00,  0.0, 1.8, 0.92);
+    drawFluidRibbon(col1, 0.44, -1.35, 1.9, 2.3, 0.85);
+    drawFluidRibbon(col2, 0.68, 1.55,  3.7, 2.7, 0.78);
+    drawFluidRibbon(col3, 0.30, -0.90, 0.8, 2.1, 0.42);
+  }
+
+  function drawFluidRibbon(fillHex, alpha, speedMul, phaseOffset, freqMul, heightScale) {
+    var w = HUD_DISPLAY_W;
+    var baseY = HUD_DISPLAY_H;
+    var maxH = (HUD_DISPLAY_H - 3) * heightScale;
+    var lastIdx = HUD_WAVE_PTS - 1;
+    var stepX = w / lastIdx;
+
+    hudCtx.fillStyle = fillHex;
+    hudCtx.globalAlpha = alpha;
+    hudCtx.beginPath();
+    hudCtx.moveTo(0, baseY);
+
+    var prevX = 0;
+    var prevY = baseY;
+
+    for (var i = 0; i <= lastIdx; i++) {
+      var norm = i / lastIdx;
+      var envelope = Math.sin(norm * Math.PI);
+      envelope = envelope * envelope;
+
+      var undulation = 0.72 + 0.28 * Math.sin(_hudPhase * speedMul + norm * Math.PI * freqMul + phaseOffset);
+      var amp = _hudMirrorValues[i] * undulation * envelope;
+      var x = i * stepX;
+      var y = baseY - (amp * maxH);
+
+      if (i === 0) {
+        hudCtx.lineTo(x, y);
+      } else {
+        var midX = (prevX + x) * 0.5;
+        var midY = (prevY + y) * 0.5;
+        hudCtx.quadraticCurveTo(prevX, prevY, midX, midY);
+      }
+      prevX = x;
+      prevY = y;
+    }
+
+    hudCtx.lineTo(prevX, prevY);
+    hudCtx.lineTo(w, baseY);
+    hudCtx.closePath();
+    hudCtx.fill();
+    hudCtx.globalAlpha = 1.0;
+  }
+
+  /* ============================================================
+     HUD STATE RENDERING (mock — simplified for the test)
+     ============================================================ */
+  function renderState() {
+    var isPlaying = (ambientSource !== null);
+    var elapsed = getPlaybackElapsed();
+
+    if (isPlaying) {
+      hudStatusBadge.textContent = '再生中';
+      hudStatusBadge.classList.remove('loading', 'decoding');
+      hudStatusBadge.classList.add('ready');
+
+      hudPctStatus.textContent = 'DL 100%';
+      hudPctStatus.classList.remove('decoding');
+      hudPctStatus.classList.add('ready');
+
+      hudGaugeFill.classList.remove('decoding');
+      hudGaugeFill.classList.add('ready');
+
+      hudTimeElapsed.textContent = formatHudTime(elapsed);
+      hudTimeTotal.textContent = formatHudTime(ambientPlayDurationSec);
     } else {
-      fallback(css, done);
+      hudStatusBadge.textContent = '待機中';
+      hudStatusBadge.classList.remove('ready', 'decoding');
+      hudStatusBadge.classList.add('loading');
+
+      hudPctStatus.textContent = 'DL 0%';
+      hudPctStatus.classList.remove('ready', 'decoding');
+
+      hudGaugeFill.classList.remove('ready', 'decoding');
+      hudGaugeFill.style.width = '0%';
+
+      hudTimeElapsed.textContent = '00:00';
+      hudTimeTotal.textContent = '--:--';
+    }
+  }
+
+  function updateHudProgress() {
+    if (!hudGaugeFill) return;
+    if (ambientSource === null) return;
+    if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return;
+
+    var elapsed = getPlaybackElapsed();
+    var pct = (elapsed / ambientPlayDurationSec) * 100;
+    hudGaugeFill.style.width = pct.toFixed(2) + '%';
+
+    var elapsedSec = Math.floor(elapsed);
+    if (elapsedSec !== _hudLastRenderedSec) {
+      _hudLastRenderedSec = elapsedSec;
+      if (hudTimeElapsed) hudTimeElapsed.textContent = formatHudTime(elapsed);
+      if (hudTimeTotal)   hudTimeTotal.textContent   = formatHudTime(ambientPlayDurationSec);
+    }
+  }
+
+  /* ============================================================
+     AMBIENT SWELL — background layers pulse with the audio
+     ============================================================ */
+  var _lastAppliedSwell = -1;
+  var _swellEnergy = 0;
+
+  function applySwellToCSS(val) {
+    if (_lastAppliedSwell === val || (val !== 0 && Math.abs(val - _lastAppliedSwell) < 0.005)) return;
+    _lastAppliedSwell = val;
+    var vStr = val.toFixed(3);
+    if (ambientStage) ambientStage.style.setProperty('--audio-swell', vStr);
+    if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
+  }
+
+  /* ============================================================
+     RAF LOOP
+     ============================================================ */
+  function swellTick() {
+    if (!swellIsRunning) {
+      swellRafId = null;
+      return;
+    }
+
+    if (swellAnalyserNode && swellFreqData) {
+      swellAnalyserNode.getByteFrequencyData(swellFreqData);
+
+      var sum = 0;
+      for (var i = 4; i < 34; i++) sum += swellFreqData[i];
+      var avg = sum / 30;
+      var cleanEnergy = Math.max(0, avg - 80);
+      var normalized = Math.min(1.0, cleanEnergy / (140 / 3.5));
+      var targetEnergy = Math.pow(normalized, 1.35);
+
+      if (targetEnergy > _swellEnergy) {
+        _swellEnergy += (targetEnergy - _swellEnergy) * 0.06;
+      } else {
+        _swellEnergy += (targetEnergy - _swellEnergy) * 0.010;
+      }
+    }
+
+    applySwellToCSS(_swellEnergy);
+    drawHudSpectrum();
+    updateHudProgress();
+
+    swellRafId = requestAnimationFrame(swellTick);
+  }
+
+  /* ============================================================
+     AUDIO BOOT
+     ============================================================ */
+  function initSound() {
+    if (soundAudioCtx) return;
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+
+    soundAudioCtx = new Ctx();
+    soundMasterGain = soundAudioCtx.createGain();
+    soundMasterGain.gain.value = 0.5;
+    soundMasterGain.connect(soundAudioCtx.destination);
+
+    swellCompensationGain = soundAudioCtx.createGain();
+    swellCompensationGain.gain.value = 2.0;
+    swellAnalyserNode = soundAudioCtx.createAnalyser();
+    swellAnalyserNode.fftSize = 512;
+    swellAnalyserNode.smoothingTimeConstant = 0.8;
+    swellFreqData = new Uint8Array(swellAnalyserNode.frequencyBinCount);
+    soundMasterGain.connect(swellCompensationGain);
+    swellCompensationGain.connect(swellAnalyserNode);
+
+    if (soundAudioCtx.state === 'suspended') {
+      try { soundAudioCtx.resume(); } catch (e) {}
+    }
+  }
+
+  function loadBufferAndPlay() {
+    if (!soundAudioCtx) return;
+
+    hudStatusBadge.textContent = '展開中';
+    hudStatusBadge.classList.add('decoding');
+    hudPctStatus.textContent = 'DL 0%';
+
+    fetch('Sound/Morning.mp3')
+      .then(function(r) {
+        if (!r.ok) throw new Error('fetch failed');
+        return r.arrayBuffer();
+      })
+      .then(function(ab) {
+        hudPctStatus.textContent = 'PCM展開中';
+        hudPctStatus.classList.add('decoding');
+        return new Promise(function(resolve, reject) {
+          soundAudioCtx.decodeAudioData(ab, resolve, reject);
+        });
+      })
+      .then(function(buffer) {
+        decodedBuffer = buffer;
+        hudPctStatus.textContent = 'DL 100%';
+        hudPctStatus.classList.remove('decoding');
+        hudPctStatus.classList.add('ready');
+        startPlayback();
+      })
+      .catch(function(err) {
+        hudStatusBadge.textContent = '読込失敗';
+        hudStatusBadge.classList.remove('decoding', 'ready');
+        hudPctStatus.textContent = 'ERR';
+        hudPctStatus.classList.remove('decoding', 'ready');
+        console.error(err);
+      });
+  }
+
+  function startPlayback() {
+    if (!decodedBuffer) return;
+
+    stopPlayback();
+
+    var now = soundAudioCtx.currentTime;
+    var src = soundAudioCtx.createBufferSource();
+    src.buffer = decodedBuffer;
+
+    var gain = soundAudioCtx.createGain();
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(0.8, now + 2.0);
+
+    src.connect(gain);
+    gain.connect(soundMasterGain);
+    src.start(now);
+
+    ambientSource = src;
+    ambientGain = gain;
+    ambientPlayStartTime = now;
+    ambientPlayDurationSec = decodedBuffer.duration;
+    _hudLastRenderedSec = -1;
+
+    swellIsRunning = true;
+    if (!swellRafId) swellRafId = requestAnimationFrame(swellTick);
+
+    playBtn.textContent = '■ 停止';
+    playBtn.classList.add('playing');
+
+    renderState();
+  }
+
+  function stopPlayback() {
+    if (ambientSource && ambientGain && soundAudioCtx) {
+      try {
+        var now = soundAudioCtx.currentTime;
+        ambientGain.gain.cancelScheduledValues(now);
+        ambientGain.gain.setTargetAtTime(0, now, 0.08);
+        ambientSource.stop(now + 0.4);
+      } catch (e) {}
+    }
+    ambientSource = null;
+    ambientGain = null;
+    ambientPlayStartTime = -1;
+    ambientPlayDurationSec = 0;
+    _hudLastRenderedSec = -1;
+
+    swellIsRunning = false;
+
+    playBtn.textContent = '▶ 再生';
+    playBtn.classList.remove('playing');
+
+    renderState();
+  }
+
+  /* ============================================================
+     WIRE UP
+     ============================================================ */
+  playBtn.addEventListener('click', function(e) {
+    e.preventDefault();
+
+    if (!soundAudioCtx) {
+      initSound();
+    } else if (soundAudioCtx.state === 'suspended') {
+      try { soundAudioCtx.resume(); } catch (e) {}
+    }
+
+    if (ambientSource !== null) {
+      stopPlayback();
+      return;
+    }
+
+    if (!decodedBuffer) {
+      loadBufferAndPlay();
+    } else {
+      startPlayback();
     }
   });
 
-  function fallback(text, done) {
-    var ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.position = 'fixed';
-    ta.style.left = '-9999px';
-    document.body.appendChild(ta);
-    ta.focus();
-    ta.select();
-    try { document.execCommand('copy'); done(); } catch (e) {}
-    document.body.removeChild(ta);
-  }
-
-  /* ============================================================
-     INITIALISE — apply defaults to the preview
-     ============================================================ */
-  PICKERS.forEach(function(p) {
-    demoShell.style.setProperty(p.cssVar, p.default);
-  });
-  syncAndRender();
-
+  renderState();
 })();
 </script>
 
