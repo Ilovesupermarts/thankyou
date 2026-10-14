@@ -3,6 +3,74 @@
 
    ------------------------------------------------------------
    Changelog:
+     v1.3 (fluid waveform HUD revamp)
+       - The HUD layout is rebuilt around the reference design:
+         red box (top-left) — playback status · yellow box
+         (top-right) — download progress · blue box (centre) —
+         track · artist · six-layer fluid spectrum resting flush
+         on top of the progress bar · split timestamps below.
+       - Top-left and top-right badges are absolutely positioned
+         at top: 8px matching the left/right 8px side inset, so
+         再生中 pins hard to the top-left corner and DL XX% to
+         the top-right. The dual-writer race that existed under
+         the previous single-slot label row disappears: status
+         and download now own independent DOM targets.
+       - The 25-column waterline-mirror spectrum is replaced by a
+         six-layer fluid waveform. Each layer reads its own
+         frequency band — LAYER_BIN_START/END span bins 3 through
+         120, ~280 Hz to ~11 kHz at 48 kHz with fftSize 512 — so
+         the stack covers a wider slice of the spectrum than the
+         previous shared-band renderer. Bands overlap slightly so
+         transitions between layers do not leave visible gaps.
+       - Canvas height grows from 26 to 44px so the taller peaks
+         have room. HUD_WAVE_PTS is 28 control points per layer
+         (previously 16), finer spatial resolution across each
+         band. _hudMirrorValues is resized to 6 × 28 = 168 floats,
+         a single pre-allocated Float32Array so the renderer
+         remains zero-allocation at 120Hz.
+       - Each ribbon is drawn with quadratic smoothing between
+         consecutive control points, then snapped to the final
+         computed vertex before closing down to the baseline at
+         the right edge. Without the snap-to-vertex, the last
+         quadratic curve ends at the midpoint between the final
+         two control points and the closing lineTo(w, baseY)
+         leaves a sub-pixel diagonal seam.
+       - Hann window (sin²) modulates the per-layer amplitude so
+         the fluid hills taper smoothly into the progress bar at
+         both ends.
+       - The gauge bar is thickened from 6 to 5px and gains a
+         glowing playhead dot (::after) at the right tip of the
+         fill. Fill uses a linear-gradient from --glow to
+         --accent; the ready state swaps in --accent → #882E47
+         so background-I/O completion remains visible.
+       - Split timestamps (#hudTimeElapsed / #hudTimeTotal) replace
+         the previous MM:SS / MM:SS single-label readout. During
+         playback the elapsed time updates once per whole second
+         in updateHudProgress(); _hudRenderState() writes the
+         initial 00:00 / MM:SS at the moment playback starts so
+         the row is never briefly blank.
+       - HUD card adopts the tanzaku paper texture — background-
+         color #fcfbf9 plus icons/1790678998862.jpg at bottom
+         right — matching the tanzaku focus modal's material.
+         Sakura block gains --secondary-accent: #9a3e4d in
+         lockstep so --secondary-accent becomes a cross-theme
+         token rather than an autumn-only ad-hoc property.
+       - _prefersReducedMotion is declared once in the wind field
+         section as a global accessibility intent, distinct from
+         windEnabled (stage particle physics). Under reduced
+         motion, _hudPhase freezes so the travelling phase stops,
+         but the amplitude response to live audio stays active:
+         vertical displacement is state feedback, lateral drift
+         is decorative. Badge/gauge pulses are killed by a
+         media query in main.css.
+       - src.onended timing guard. The source is stopped 100ms
+         past the fade-out tail while scheduleNextAmbient() re-
+         arms right on playDur, so src1's onended can fire during
+         the first frames of src2. Previously the ambientSource
+         null was guarded but the timing trio was not, so src1's
+         handler clobbered src2's start time and duration and the
+         HUD pinned to 00:00 / 00:00 after every transition. All
+         three timing resets now sit behind the identity check.
      v1.3 (front-layer falling leaves)
        - A second overlay, .maple-leaves-overlay-front (z-index 5),
          receives 2 randomly-chosen mid/near leaves at each carousel
@@ -861,34 +929,28 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
    the HUD never competes with gesture dispatch during scroll.
 
    Loading state is aggregated across all unique AMBIENT_TRACKS
-   URLs via _hudBytesLoadedMap / _hudBytesTotalMap. Since v1.3 the
-   decode state is derived per-frame rather than tracked with a
-   counter: "fully resident" is true when the current Nagoya
-   phase's buffer is decoded AND all three raw MP3s have finished
-   downloading. This replaced the old _hudDecodedCount /
-   _hudTotalFiles pair, which assumed all three slots decode
-   eagerly — no longer true under the lazy slot-based architecture.
+   URLs via _hudBytesLoadedMap / _hudBytesTotalMap. The decode
+   state is derived per-frame rather than tracked with a counter:
+   "fully resident" is true when the current Nagoya phase's buffer
+   is decoded AND all three raw MP3s have finished downloading.
 
-   The gauge bar was repurposed at v1.3 from download progress to
-   playback progress of the current track. During playback,
-   updateHudProgress() is the sole writer of hudGaugeFill's width;
-   _hudRenderState() skips its width write whenever ambientSource
-   is non-null so the two never race.
+   The gauge bar tracks playback progress of the current track.
+   During playback, updateHudProgress() is the sole writer of
+   hudGaugeFill's width; _hudRenderState() skips its width write
+   whenever ambientSource is non-null so the two never race.
 
-   The label row (hudPctStatus) shows:
-     · download percentage during streaming, or
-     · 'PCM展開中' during decode, or
-     · '待機完了' when idle and fully resident, or
-     · 'MM:SS / MM:SS' playback timestamp during the playing state.
+   Layout (post-revamp):
+     · hudStatusBadge (top-left)  — 待機中 / 再生中 / 展開中 / 待機完了
+     · hudPctStatus   (top-right) — DL XX% / PCM展開中 / DL 100%
+     · hudTrackTitle · hudTrackArtist (centred meta row)
+     · hudCanvas (282×44, six-layer fluid waveform)
+     · hudGaugeFill (playback progress with glowing playhead)
+     · hudTimeElapsed / hudTimeTotal (split timestamps below the bar)
 
-   During playback the timestamp is written unconditionally,
-   regardless of whether background beds are still streaming. This
-   closes a cold-launch dual-writer race: _hudRenderState() at
-   10Hz would otherwise flap between 'DL 48%' and '00:04 / 17:00'
-   while Tracks 2 and 3 were still decompressing. The badge
-   remains the indicator of background decode progress; the gauge
-   fill transitions from amber to plum when the full acoustic bed
-   is resident. */
+   Status and download have independent DOM targets under the
+   revamp, so the cold-launch dual-writer race that previously
+   flapped the single label row between "DL 48%" and "00:04 /
+   17:00" is structurally closed. */
 var audioSpectrumHud = document.getElementById('audioSpectrumHud');
 var hudTrackTitle    = document.getElementById('hudTrackTitle');
 var hudTrackArtist   = document.getElementById('hudTrackArtist');
@@ -897,13 +959,23 @@ var hudCanvas        = document.getElementById('hudCanvas');
 var hudCtx           = hudCanvas ? hudCanvas.getContext('2d') : null;
 var hudGaugeFill     = document.getElementById('hudGaugeFill');
 var hudPctStatus     = document.getElementById('hudPctStatus');
+var hudTimeElapsed   = document.getElementById('hudTimeElapsed');
+var hudTimeTotal     = document.getElementById('hudTimeTotal');
 
 var HUD_DISPLAY_W = 282;
-var HUD_DISPLAY_H = 26;
-var HUD_BARS = 25;
-var HUD_BAR_W = 6.0;
-var HUD_BAR_GAP = 5.5;
-var _hudMirrorValues = new Float32Array(HUD_BARS);
+var HUD_DISPLAY_H = 44;
+var HUD_WAVE_PTS  = 28;
+var HUD_LAYERS    = 6;
+
+/* Each layer reads its own frequency band so the six-ribbon stack
+   covers a wider slice of the spectrum than a single shared band
+   could. Bins span ~280 Hz (layer 0) to ~11 kHz (layer 5) at 48 kHz
+   with fftSize 512 (93.75 Hz per bin). Bands overlap slightly so
+   transitions between layers do not leave visible gaps. */
+var LAYER_BIN_START = [3, 15, 35, 55, 75, 95];
+var LAYER_BIN_END   = [22, 42, 62, 82, 100, 120];
+
+var _hudMirrorValues = new Float32Array(HUD_LAYERS * HUD_WAVE_PTS);
 var _hudPhase = 0;
 
 if (hudCanvas && hudCtx) {
@@ -919,18 +991,17 @@ var _hudBytesTotalMap  = {};
 var _hudLastUpdateMs   = 0;
 
 /* Timestamp throttling gate: the last whole-second value rendered
-   into hudPctStatus during playback. Initialised to -1 so the
-   first write of any playback window always fires. Reset to -1 in
-   stopAmbient() alongside ambientPlayStartTime and
+   into the split timestamp row during playback. Initialised to -1
+   so the first write of any playback window always fires. Reset to
+   -1 in stopAmbient() alongside ambientPlayStartTime and
    ambientPlayDurationSec, keeping the three playback-window state
    variables in one cohort. */
 var _hudLastRenderedSec = -1;
 
 /* JS-side visibility mirror of the CSS gate. Halted canvas work
    when the card is hidden. The receipt-locked class is the only
-   body-class hidden condition — the HUD is now visible on the
-   thank-you screen (see the v1.3 HUD-visible-on-thank-you
-   changelog entry) and the earlier thankyou-active exclusion was
+   body-class hidden condition — the HUD is visible on the
+   thank-you screen and the earlier thankyou-active exclusion was
    removed in lockstep with the CSS gate. */
 function _hudShouldDraw() {
   if (!audioSpectrumHud) return false;
@@ -946,9 +1017,10 @@ function _hudShouldDraw() {
    while playback is NOT active — during playback the swell loop's
    updateHudProgress() owns the fill and advances it over playDur.
 
-   During playback the label unconditionally shows the timestamp,
-   even if background beds are still streaming. This is the single-
-   authority resolution of the cold-launch dual-writer race.
+   Under the revamp the status badge and the download badge are
+   independent DOM targets. This function writes both, plus the
+   split timestamp row (during playback) or the initial standby
+   values (00:00 / --:--).
 
    The slot-ready check and the in-flight-decode check both read
    from a single currentTrack snapshot so a single Nagoya
@@ -959,9 +1031,7 @@ function _hudShouldDraw() {
    architecture, _ambientDecodingPromises[bufferName] is set before
    the raw fetch resolves — that is the shape of the chain — so
    without the guard the badge would claim PCM展開中 while bytes
-   were still on the wire. The badge now reads DL XX% during a
-   re-fetch and snaps to PCM展開中 only once decodeAudioData
-   actually starts. */
+   were still on the wire. */
 function _hudRenderState() {
   if (!hudStatusBadge || !hudGaugeFill) return;
 
@@ -980,6 +1050,7 @@ function _hudRenderState() {
 
   var currentTrack = getCurrentAmbientTrack();
   var slotReady = !!(soundBuffers && soundBuffers[currentTrack.bufferName]);
+  var isDecodingCurrent = !!(_ambientDecodingPromises[currentTrack.bufferName] && _ambientRawBuffers[currentTrack.url]);
 
   /* Gauge width: during playback the swell loop's updateHudProgress()
      owns the fill (playback position over playDur). When idle or
@@ -991,9 +1062,27 @@ function _hudRenderState() {
   }
   hudGaugeFill.classList.remove('decoding', 'ready');
   hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
+  if (hudPctStatus) hudPctStatus.classList.remove('decoding', 'ready');
 
+  /* Top-right yellow box — download / decompression progress.
+     Independent of the status badge so background download of
+     Tracks 2 and 3 stays visible while Track 1 is playing. */
+  if (hudPctStatus) {
+    if (isDecodingCurrent) {
+      hudPctStatus.textContent = 'PCM展開中';
+      hudPctStatus.classList.add('decoding');
+    } else if (pct < 1.0) {
+      hudPctStatus.textContent = 'DL ' + pctInt + '%';
+    } else {
+      hudPctStatus.textContent = 'DL 100%';
+      hudPctStatus.classList.add('ready');
+    }
+  }
+
+  /* Top-left red box — playback status. Gauge fill classes carry
+     the amber→plum readiness signal; the width is owned by the
+     swell loop during playback. */
   if (isPlaying) {
-    /* Priority 1 — audio is audibly playing */
     hudStatusBadge.textContent = '再生中';
     hudStatusBadge.classList.add('ready');
 
@@ -1005,37 +1094,34 @@ function _hudRenderState() {
       hudGaugeFill.classList.add('ready');
     }
 
-    /* Single authority: while playing, the label always reflects
-       playback timing. Closes the dual-writer race with background
-       stream chunks. The badge and fill already signal background
-       decode progress; the label does not duplicate it. */
     var elapsed = getPlaybackElapsed();
-    hudPctStatus.textContent = formatHudTime(elapsed) + ' / ' + formatHudTime(ambientPlayDurationSec);
+    if (hudTimeElapsed) hudTimeElapsed.textContent = formatHudTime(elapsed);
+    if (hudTimeTotal)   hudTimeTotal.textContent   = formatHudTime(ambientPlayDurationSec);
     _hudLastRenderedSec = Math.floor(elapsed);
   } else if (!slotReady || pct < 1.0) {
     /* Priority 2 — either the active slot is decoding, or raw
        streams are still in flight. Both must resolve before the
        badge may claim 待機完了, so the badge and gauge stay in
        agreement throughout the cold-launch window. Only claim
-       PCM decompression when the raw bytes are actually resident
-       (see the function-header note above). */
-    if (_ambientDecodingPromises[currentTrack.bufferName] && _ambientRawBuffers[currentTrack.url]) {
+       PCM decompression when the raw bytes are actually resident. */
+    if (isDecodingCurrent) {
       hudGaugeFill.classList.add('decoding');
       hudStatusBadge.textContent = '展開中';
       hudStatusBadge.classList.add('decoding');
-      hudPctStatus.textContent = 'PCM展開中';
     } else {
-      hudStatusBadge.textContent = 'DL ' + pctInt + '%';
+      hudStatusBadge.textContent = '待機中';
       hudStatusBadge.classList.add('loading');
-      hudPctStatus.textContent = pctInt + '%';
     }
+    if (hudTimeElapsed) hudTimeElapsed.textContent = '00:00';
+    if (hudTimeTotal)   hudTimeTotal.textContent   = '--:--';
   } else {
     /* Priority 3 — active slot decoded AND all raw buffers
        resident in RAM. */
     hudGaugeFill.classList.add('ready');
     hudStatusBadge.textContent = '待機完了';
     hudStatusBadge.classList.add('ready');
-    hudPctStatus.textContent = '待機完了';
+    if (hudTimeElapsed) hudTimeElapsed.textContent = '00:00';
+    if (hudTimeTotal)   hudTimeTotal.textContent   = '--:--';
   }
 }
 
@@ -1076,9 +1162,9 @@ function getPlaybackElapsed() {
 }
 
 /* Advances the HUD gauge fill over the current ambient track's
-   duration and updates the label timestamp once per whole second.
-   Called from the swell loop alongside drawHudSpectrum() whenever
-   the HUD is visible and the scroll gate is released.
+   duration and updates the split timestamp row once per whole
+   second. Called from the swell loop alongside drawHudSpectrum()
+   whenever the HUD is visible and the scroll gate is released.
 
    During playback this is the sole writer of hudGaugeFill's width;
    _hudRenderState() skips its width write whenever ambientSource
@@ -1088,7 +1174,7 @@ function getPlaybackElapsed() {
    is accurate across fade-in, main body, and fade-out — no
    integration of animation frames required.
 
-   The timestamp string is gated on integer-second changes: the
+   The timestamp strings are gated on integer-second changes: the
    underlying time advances every rAF tick, but the mm:ss string
    only changes when the whole-second value increments. Writing on
    every frame would be 100+ redundant DOM mutations per second for
@@ -1104,11 +1190,12 @@ function updateHudProgress() {
   var pct = (elapsed / ambientPlayDurationSec) * 100;
   hudGaugeFill.style.width = pct.toFixed(2) + '%';
 
-  /* Timestamp — updates once per integer second */
+  /* Split timestamps — updates once per integer second */
   var elapsedSec = Math.floor(elapsed);
-  if (elapsedSec !== _hudLastRenderedSec && hudPctStatus) {
+  if (elapsedSec !== _hudLastRenderedSec) {
     _hudLastRenderedSec = elapsedSec;
-    hudPctStatus.textContent = formatHudTime(elapsed) + ' / ' + formatHudTime(ambientPlayDurationSec);
+    if (hudTimeElapsed) hudTimeElapsed.textContent = formatHudTime(elapsed);
+    if (hudTimeTotal)   hudTimeTotal.textContent   = formatHudTime(ambientPlayDurationSec);
   }
 }
 
@@ -1465,75 +1552,120 @@ function loadAudioBuffer(url) {
     .catch(function() { return null; });
 }
 
-/* Zero-allocation waterline-mirror spectrum. Two solid fills per
-   bar (no per-frame gradient allocation) split by a horizontal
-   waterline. Above: themeAccent, full opacity. Below: themePetal
-   at globalAlpha 0.46. 25 columns × 6px + 24 × 5.5px = 282px,
-   flush with the gauge bar beneath.
+/* Zero-allocation multi-layer fluid spectrum resting flush on top
+   of the progress bar. Six translucent ribbons, each reading its
+   own frequency band from the shared FFT buffer, modulated by a
+   Hann window (sin²) so the hills taper smoothly into the bar at
+   both ends.
 
-   Autumn colours are 金木犀 (Kinmokusei) amber #E66826 for the
-   upper column and petal coral #F07D40 for the mirrored water
-   column. The waterline divider is 薄杏 Usuanzu #DEC0AC at 0.55
-   alpha. Sakura branch keeps the original rose literals. */
+   Palette is back-to-front: Ebizome plum, deep amber, Kinmokusei,
+   petal coral, glow amber, and the Kinushiro cream core. The
+   compounded opacity through the crest lands around 0.75–0.85,
+   warm and dense without going chalky.
+
+   Phase freezes under _prefersReducedMotion: lateral drift is the
+   vestibular trigger. The amplitude response to live audio is
+   state feedback and stays live regardless. */
 function drawHudSpectrum() {
   if (!hudCtx) return;
   hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
 
-  /* Kinmokusei (#E66826) and Petal Coral (#F07D40) */
-  var themeAccent = (currentTheme === 'autumn') ? '#E66826' : '#b04a5a';
-  var themePetal  = (currentTheme === 'autumn') ? '#F07D40' : '#e8a8b0';
+  var isAutumn = (currentTheme === 'autumn');
+  var col0 = isAutumn ? '#882E47' : '#b04a5a';
+  var col1 = isAutumn ? '#C44E10' : '#a34a56';
+  var col2 = isAutumn ? '#E66826' : '#d46a7a';
+  var col3 = isAutumn ? '#F07D40' : '#e8a8b0';
+  var col4 = isAutumn ? '#FFA259' : '#e8b4bc';
+  var col5 = '#FFFDF9';
 
-  _hudPhase += 0.045;
-  var midY = Math.round(HUD_DISPLAY_H * 0.44); /* 11px */
-
-  /* Waterline divider: Usuanzu hairline */
-  hudCtx.strokeStyle = (currentTheme === 'autumn')
-    ? 'rgba(222, 192, 172, 0.55)'
-    : 'rgba(234, 217, 213, 0.55)';
-  hudCtx.lineWidth = 1;
-  hudCtx.beginPath();
-  hudCtx.moveTo(0, midY);
-  hudCtx.lineTo(HUD_DISPLAY_W, midY);
-  hudCtx.stroke();
-
-  var hasRoundRect = (typeof hudCtx.roundRect === 'function');
-
-  for (var m = 0; m < HUD_BARS; m++) {
-    var targetEnergy = 0.12;
-    if (swellAnalyserNode && swellFreqData && swellIsRunning) {
-      var binIdx = 3 + Math.floor(m * 3.6);
-      targetEnergy = Math.max(0.10, swellFreqData[binIdx] / 255);
-    } else {
-      targetEnergy = 0.22 + Math.sin(_hudPhase + m * 0.42) * 0.18 + Math.cos(_hudPhase * 0.7 + m * 0.2) * 0.08;
-    }
-
-    _hudMirrorValues[m] += (targetEnergy - _hudMirrorValues[m]) * 0.25;
-
-    var halfH = Math.max(2.0, _hudMirrorValues[m] * 10.5);
-    var mx = m * (HUD_BAR_W + HUD_BAR_GAP);
-
-    /* Upper sky column — #E66826 金木犀 */
-    hudCtx.fillStyle = themeAccent;
-    hudCtx.beginPath();
-    if (hasRoundRect) {
-      hudCtx.roundRect(mx, midY - halfH, HUD_BAR_W, halfH, [1.5, 1.5, 0, 0]);
-    } else {
-      hudCtx.rect(mx, midY - halfH, HUD_BAR_W, halfH);
-    }
-    hudCtx.fill();
-
-    /* Lower water-mirror column — #F07D40 at 0.46 alpha */
-    hudCtx.fillStyle = themePetal;
-    hudCtx.globalAlpha = 0.46;
-    hudCtx.beginPath();
-    if (hasRoundRect) {
-      hudCtx.roundRect(mx, midY, HUD_BAR_W, halfH * 0.85, [0, 0, 1.5, 1.5]);
-    } else {
-      hudCtx.rect(mx, midY, HUD_BAR_W, halfH * 0.85);
-    }
-    hudCtx.fill();
-    hudCtx.globalAlpha = 1.0;
+  if (!_prefersReducedMotion) {
+    _hudPhase += 0.038;
   }
+
+  /* Update smoothed FFT control points, one band per layer */
+  var lastIdx = HUD_WAVE_PTS - 1;
+  for (var layer = 0; layer < HUD_LAYERS; layer++) {
+    var binStart = LAYER_BIN_START[layer];
+    var binEnd   = LAYER_BIN_END[layer];
+    var base = layer * HUD_WAVE_PTS;
+    for (var i = 0; i < HUD_WAVE_PTS; i++) {
+      var target;
+      if (swellAnalyserNode && swellFreqData && swellIsRunning) {
+        var t = i / lastIdx;
+        var binIdx = binStart + Math.floor(t * (binEnd - binStart));
+        /* 1.35× boost brings ambient program material up into the
+           visible range, clamped at 1.0. */
+        target = Math.max(0.08, Math.min(1.0, (swellFreqData[binIdx] / 255) * 1.35));
+      } else {
+        target = 0.18 + Math.sin(_hudPhase + i * 0.35 + layer * 0.9) * 0.12;
+      }
+      _hudMirrorValues[base + i] += (target - _hudMirrorValues[base + i]) * 0.25;
+    }
+  }
+
+  /* 6 ribbons, back-to-front. Taller heightScale on the front
+     layers keeps the peak height visually commanding rather than
+     buried behind the wide back ribbons. */
+  drawFluidRibbon(0, col0, 0.24,  1.00, 0.0, 1.6, 1.00);
+  drawFluidRibbon(1, col1, 0.30, -1.20, 1.7, 2.0, 0.96);
+  drawFluidRibbon(2, col2, 0.42,  1.35, 3.4, 2.4, 0.92);
+  drawFluidRibbon(3, col3, 0.50, -1.10, 5.1, 2.8, 0.86);
+  drawFluidRibbon(4, col4, 0.44,  1.25, 6.8, 3.2, 0.78);
+  drawFluidRibbon(5, col5, 0.32, -0.85, 8.5, 3.6, 0.62);
+}
+
+/* Draws one translucent fluid ribbon anchored at y = HUD_DISPLAY_H
+   (the bottom of the canvas, flush with the top edge of the gauge
+   bar). Uses quadratic curves for smoothing between control
+   points, then snaps to the final computed vertex before closing
+   down to the baseline at the right edge. Without that snap the
+   last quadratic curve ends at the midpoint between the final two
+   control points and the closing lineTo(w, baseY) leaves a
+   sub-pixel diagonal seam. */
+function drawFluidRibbon(layerIdx, fillHex, alpha, speedMul, phaseOffset, freqMul, heightScale) {
+  var w = HUD_DISPLAY_W;
+  var baseY = HUD_DISPLAY_H;
+  var maxH = (HUD_DISPLAY_H - 2) * heightScale;
+  var lastIdx = HUD_WAVE_PTS - 1;
+  var stepX = w / lastIdx;
+  var base = layerIdx * HUD_WAVE_PTS;
+
+  hudCtx.fillStyle = fillHex;
+  hudCtx.globalAlpha = alpha;
+  hudCtx.beginPath();
+  hudCtx.moveTo(0, baseY);
+
+  var prevX = 0;
+  var prevY = baseY;
+
+  for (var i = 0; i <= lastIdx; i++) {
+    var norm = i / lastIdx;
+    /* Hann window (sin²) tapers wave amplitude to 0 at both edges */
+    var envelope = Math.sin(norm * Math.PI);
+    envelope = envelope * envelope;
+
+    var undulation = 0.72 + 0.28 * Math.sin(_hudPhase * speedMul + norm * Math.PI * freqMul + phaseOffset);
+    var amp = _hudMirrorValues[base + i] * undulation * envelope;
+    var x = i * stepX;
+    var y = baseY - (amp * maxH);
+
+    if (i === 0) {
+      hudCtx.lineTo(x, y);
+    } else {
+      var midX = (prevX + x) * 0.5;
+      var midY = (prevY + y) * 0.5;
+      hudCtx.quadraticCurveTo(prevX, prevY, midX, midY);
+    }
+    prevX = x;
+    prevY = y;
+  }
+
+  /* Snap to the final computed vertex, drop to the baseline, close. */
+  hudCtx.lineTo(prevX, prevY);
+  hudCtx.lineTo(w, baseY);
+  hudCtx.closePath();
+  hudCtx.fill();
+  hudCtx.globalAlpha = 1.0;
 }
 
 function initSound() {
@@ -1898,8 +2030,8 @@ function tryStartBlossomStream(retries) {
 
    ambientPlayStartTime / ambientPlayDurationSec are set at each
    playAmbientSound() call and consumed by updateHudProgress() to
-   advance the HUD gauge fill and the label timestamp. All three
-   of ambientPlayStartTime, ambientPlayDurationSec, and
+   advance the HUD gauge fill and the split timestamp row. All
+   three of ambientPlayStartTime, ambientPlayDurationSec, and
    _hudLastRenderedSec reset together in stopAmbient() so the
    playback-window state stays in one cohort. */
 var ambientTimer = null;
@@ -2074,11 +2206,19 @@ function playAmbientSound() {
   _hudRenderState();
 
   src.onended = function() {
-    if (ambientSource === src) ambientSource = null;
+    /* The source is stopped 100ms past the fade-out tail while
+       scheduleNextAmbient() re-arms right on playDur, so src1's
+       onended can fire during the first frames of src2. Guarding
+       the timing reset behind the identity check keeps src2's
+       start time and duration intact — without this, the HUD
+       pins to 00:00 / 00:00 after every track transition. */
+    if (ambientSource === src) {
+      ambientSource = null;
+      ambientPlayStartTime = -1;
+      ambientPlayDurationSec = 0;
+      _hudLastRenderedSec = -1;
+    }
     if (ambientGain === gain) ambientGain = null;
-    ambientPlayStartTime = -1;
-    ambientPlayDurationSec = 0;
-    _hudLastRenderedSec = -1;
     try { gain.disconnect(); } catch (e) {}
     /* Defensive: keep the HUD in sync if the re-arm timing changes */
     _hudRenderState();
@@ -3942,10 +4082,33 @@ var ambientStyle = ambientStage ? ambientStage.style : null;
 var currentWindOffset = 0;
 var currentWindVelocity = 0;
 var windRafId = null;
+
+/* ============ ACCESSIBILITY / MOTION QUERY ============
+   _prefersReducedMotion is a global accessibility intent, distinct
+   from windEnabled, which describes stage particle physics. Each
+   subsystem answers its own question against the shared probe
+   below.
+
+   Architectural rule for reduced-motion audits:
+     · Reactive telemetry (vertical displacement driven by live
+       acoustic energy) is state feedback — the visualiser confirms
+       the audio engine is processing signal. Keep it under reduced
+       motion; disabling it removes real-time information the user
+       can act on.
+     · Vestibular drift (travelling phase, continuous lateral
+       propagation) is decorative motion. Freeze it. Lateral motion
+       is the vestibular trigger; a static envelope that still rises
+       and falls with the audio satisfies both the accessibility
+       intent and the informative purpose.
+   The same distinction applies elsewhere in the codebase — koi
+   flinch (feedback) vs. swim-circle rotation (decoration), the
+   drift keyframes (decoration) vs. opacity arrival (feedback). */
+var _prefersReducedMotion = false;
 var windEnabled = true;
 
 try {
   if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    _prefersReducedMotion = true;
     windEnabled = false;
   }
 } catch (e) {}
