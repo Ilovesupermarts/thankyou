@@ -146,7 +146,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.10.07</div>
+  <div class="app-version" aria-hidden="true">v2.10.08</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -257,43 +257,49 @@
 
 <!-- ============ AUDIO SPECTRUM & METADATA HUD ============
      Persistent bottom-left card surfacing the currently-playing
-     ambient bed: track title, artist, a live waterline-mirror
-     spectrum, and a loading/playback gauge.
+     ambient bed. Layout:
+
+       top row    — 再生中 (top-left) · DL XX% (top-right),
+                    both absolutely positioned against the card
+       meta row   — title · artist, centred
+       wave stack — 6-layer fluid spectrum on a 282×44 canvas,
+                    flush on top of the gauge bar
+       gauge bar  — 5px pill with a glowing playhead at the fill tip
+       time row   — elapsed / total, split left and right
 
      The canvas element carries baseline logical dimensions only
-     (282×26); app.js scales the backing store by devicePixelRatio
-     on boot so the drawing surface matches the display. Setting
-     the markup to the DPR-scaled size would leave a single frame
-     at boot with a mismatched backing store.
-
-     The gauge bar was repurposed at v1.3 from download progress to
-     playback progress of the current ambient bed. The byte-count
-     span was removed — the badge already surfaces loading state
-     (DL XX% / 展開中 / 待機完了 / 再生中) and hudPctStatus carries
-     the numeric percent during download.
+     (282×44); app.js scales the backing store by devicePixelRatio
+     on boot. Setting the markup to the DPR-scaled size would
+     leave a single frame at boot with a mismatched backing store.
 
      Visibility is governed by a CSS rule on body.info-visible
      combined with the .shown class that app.js toggles on this
      element — see main.css for the rule and app.js for the
      _hudShouldDraw() JS mirror that gates canvas work. -->
 <div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
+  <div class="hud-top-row">
+    <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+    <span class="hud-dl-badge" id="hudPctStatus">DL 0%</span>
+  </div>
+
   <div class="hud-meta-row">
     <span class="hud-title" id="hudTrackTitle">草原の風</span>
     <span class="hud-sep">·</span>
     <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
-    <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
   </div>
 
-  <div class="hud-visualizer-block">
-    <canvas class="hud-canvas" id="hudCanvas" width="282" height="26"></canvas>
-  </div>
+  <div class="hud-wave-gauge-stack">
+    <div class="hud-visualizer-block">
+      <canvas class="hud-canvas" id="hudCanvas" width="282" height="44"></canvas>
+    </div>
 
-  <div class="hud-gauge-block">
     <div class="hud-gauge-bar">
       <div class="hud-gauge-fill" id="hudGaugeFill"></div>
     </div>
-    <div class="hud-gauge-label">
-      <span id="hudPctStatus">待機中</span>
+
+    <div class="hud-time-row">
+      <span id="hudTimeElapsed">00:00</span>
+      <span id="hudTimeTotal">--:--</span>
     </div>
   </div>
 </div>
@@ -691,7 +697,7 @@
      Plane signatures:
        Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
                     opacity 0.20, drift 17–21s
-       Mid  (z 2) — 42–54px, sharp, opacity 0.32, drift 10–14s
+       Mid  (z 2) — 42–54px, blur 1.5px, opacity 0.32, drift 10–14s
        Near (z 3) — 62–84px, sharp, opacity 0.44, drift 8.5–10.5s
 
      DOM order is far → mid → near so paint order is correct even
