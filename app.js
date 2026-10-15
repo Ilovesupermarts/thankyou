@@ -1,4 +1,4 @@
-var BUILD = 'v126';
+var BUILD = 'v127';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -1006,6 +1006,8 @@ var BUILD = 'v126';
        - Backdrop-filters removed on overlays.
        - Koi tap flinch gated on the koi PNG.
        - Ambient subtle ripples on the koi screen.
+       - Start screen reworked: one 4s breath, water-like ripples, pond
+         light, bubbles, florets and a koi that blurs as it sinks.
        - Receipt landing serialization.
        - Receipt close restores previous scroll position.
        - Panel-1 post-beat delay lengthened 500 → 1000ms.
@@ -3990,6 +3992,7 @@ function returnToStartScreen() {
   if (thankyouScreen && thankyouScreen.classList.contains('visible')) return;
 
   stopAmbientRipple();
+  stopPondLife();
   clearKoiTimers();
   resetWind();
 
@@ -4072,6 +4075,7 @@ function returnToStartScreen() {
   updateBlossomGreeting();
   tryStartBlossomStream();
   scheduleAmbientRipple();
+  startPondLife();
 }
 
 function updateGlobalHint() {
@@ -5251,13 +5255,13 @@ function spawnRipples(clientX, clientY, intensity) {
       r.style.left = (clientX + jitterX) + 'px';
       r.style.top  = (clientY + jitterY) + 'px';
       r.style.color = palette[idx];
-      r.style.animationDelay = (idx * 80) + 'ms';
+      r.style.animationDelay = (idx * 150) + 'ms';
       r.style.width  = (baseSize + idx * 6) + 'px';
       r.style.height = (baseSize + idx * 6) + 'px';
       rippleLayer.appendChild(r);
       setTimeout(function() {
         if (r.parentNode) r.parentNode.removeChild(r);
-      }, 1185 + idx * 80);
+      }, 2110 + idx * 150);
     })(i);
   }
 }
@@ -5288,13 +5292,13 @@ function stopAmbientRipple() {
 
 function spawnAmbientBurst() {
   if (!rippleLayer) return;
-  var count = 1 + Math.floor(Math.random() * 5);
+  var count = Math.random() < 0.25 ? 2 : 1;
   var inset = 40;
   var vw = window.innerWidth;
   var vh = window.innerHeight;
   for (var i = 0; i < count; i++) {
     (function(idx) {
-      var delay = idx * 80;
+      var delay = idx * (400 + Math.random() * 500);
       setTimeout(function() {
         if (!isBlossomInteractive()) return;
         var x = inset + Math.random() * Math.max(1, vw - inset * 2);
@@ -5305,9 +5309,137 @@ function spawnAmbientBurst() {
   }
 }
 
+/* ============ POND LIFE (bubbles and florets) ============
+   Two quiet extras on the start screen, run on the same lifecycle as
+   the ambient ripples (startPondLife / stopPondLife are called next to
+   scheduleAmbientRipple / stopAmbientRipple):
+
+     bubbles — 1–3 small bubbles rise past the koi about every 2s,
+               a nudge that "up" is the way in
+     florets — a 金木犀 floret drifts down about every 1s, lands on
+               the water with a small ripple, floats, then fades
+
+   Both are Web Animations on transform and opacity, so the
+   compositor does the work. Under reduced motion neither is built. */
+var pondBubbleBox = document.getElementById('pondBubbles');
+var floretLayer = document.getElementById('floretLayer');
+var pondBubbleTimer = null;
+var floretTimer = null;
+var pondClearTimer = null;
+
+var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+  '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+  '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+  '<circle r="1.5" fill="#C44E10"/></svg>';
+
+function spawnPondBubble(delay) {
+  if (!pondBubbleBox) return;
+  var b = document.createElement('div');
+  b.className = 'pond-bubble';
+  var size = 4 + Math.random() * 4;
+  var x0 = Math.random() * 36 - 18;
+  var rise = 95 + Math.random() * 40;
+  var dur = 2600 + Math.random() * 1200;
+  var wob = 4 + Math.random() * 4;
+  b.style.width = b.style.height = size + 'px';
+  b.style.marginLeft = b.style.marginTop = (-size / 2) + 'px';
+  b.style.opacity = '0';
+  pondBubbleBox.appendChild(b);
+  var a = b.animate([
+    { transform: 'translate(' + x0 + 'px, 62px) scale(0.6)', opacity: 0 },
+    { transform: 'translate(' + (x0 + wob) + 'px, 30px) scale(0.85)', opacity: 0.9, offset: 0.25 },
+    { transform: 'translate(' + (x0 - wob) + 'px, -5px) scale(1)', opacity: 0.9, offset: 0.55 },
+    { transform: 'translate(' + (x0 + wob * 0.5) + 'px, ' + (62 - rise * 0.85) + 'px) scale(1.1)', opacity: 0.85, offset: 0.88 },
+    { transform: 'translate(' + x0 + 'px, ' + (62 - rise) + 'px) scale(1.9)', opacity: 0 }
+  ], { duration: dur, delay: delay, easing: 'cubic-bezier(0.4, 0, 0.7, 1)', fill: 'both' });
+  a.onfinish = function() { if (b.parentNode) b.parentNode.removeChild(b); };
+}
+
+function spawnFloret() {
+  if (!floretLayer) return;
+  var f = document.createElement('div');
+  f.className = 'kinmokusei-floret';
+  f.innerHTML = FLORET_SVG;
+  floretLayer.appendChild(f);
+  var W = window.innerWidth, H = window.innerHeight;
+  var x0 = W * (0.12 + Math.random() * 0.76);
+  var x1 = Math.min(W - 30, Math.max(30, x0 + (Math.random() * 160 - 80)));
+  var y1 = H * (0.3 + Math.random() * 0.55);
+  var s = 0.8 + Math.random() * 0.5;
+  var r0 = Math.random() * 360;
+  var sway = 22 + Math.random() * 18;
+  var fall = 7000 + Math.random() * 3000;
+  var steps = [];
+  for (var i = 0; i <= 6; i++) {
+    var t = i / 6;
+    var x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI * 3) * sway * (1 - t * 0.6);
+    var y = -20 + (y1 + 20) * t;
+    steps.push({
+      transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + (r0 + t * 220).toFixed(0) + 'deg) scale(' + s.toFixed(2) + ')',
+      opacity: i === 0 ? 0 : 1
+    });
+  }
+  var a = f.animate(steps, { duration: fall, easing: 'cubic-bezier(0.3, 0, 0.55, 1)', fill: 'forwards' });
+  a.onfinish = function() {
+    if (!f.parentNode) return;
+    spawnRipples(x1 + 7 * s, y1 + 7 * s, 'trail');
+    var end = 'translate(' + (x1 + 10).toFixed(1) + 'px,' + (y1 + 4).toFixed(1) + 'px) rotate(' + (r0 + 250).toFixed(0) + 'deg) scale(' + (s * 0.9).toFixed(2) + ')';
+    var b = f.animate([steps[6], { transform: end, opacity: 0 }], { duration: 6000, easing: 'ease-in', fill: 'forwards' });
+    b.onfinish = function() { if (f.parentNode) f.parentNode.removeChild(f); };
+  };
+}
+
+function schedulePondBubble(first) {
+  var wait = first ? 3200 : 2000 * (0.7 + Math.random() * 0.6);
+  pondBubbleTimer = setTimeout(function() {
+    pondBubbleTimer = null;
+    if (!isBlossomInteractive()) return;
+    var count = 1 + Math.floor(Math.random() * 3);
+    for (var i = 0; i < count; i++) spawnPondBubble(i * (260 + Math.random() * 300));
+    schedulePondBubble(false);
+  }, wait);
+}
+
+function scheduleFloret(first) {
+  var wait = first ? 1800 : 1000 * (0.7 + Math.random() * 0.6);
+  floretTimer = setTimeout(function() {
+    floretTimer = null;
+    if (!isBlossomInteractive()) return;
+    spawnFloret();
+    scheduleFloret(false);
+  }, wait);
+}
+
+function startPondLife() {
+  if (_prefersReducedMotion) return;
+  if (pondClearTimer) { clearTimeout(pondClearTimer); pondClearTimer = null; }
+  if (floretLayer) { floretLayer.style.transition = ''; floretLayer.style.opacity = ''; }
+  if (pondBubbleTimer) clearTimeout(pondBubbleTimer);
+  if (floretTimer) clearTimeout(floretTimer);
+  schedulePondBubble(true);
+  scheduleFloret(true);
+}
+
+/* Stops new bubbles and florets and lets the ones in flight fade out
+   with the start screen, so nothing is left over the panels. */
+function stopPondLife() {
+  if (pondBubbleTimer) { clearTimeout(pondBubbleTimer); pondBubbleTimer = null; }
+  if (floretTimer) { clearTimeout(floretTimer); floretTimer = null; }
+  if (floretLayer) {
+    floretLayer.style.transition = 'opacity 600ms ease';
+    floretLayer.style.opacity = '0';
+  }
+  if (pondClearTimer) clearTimeout(pondClearTimer);
+  pondClearTimer = setTimeout(function() {
+    pondClearTimer = null;
+    if (floretLayer) floretLayer.innerHTML = '';
+    if (pondBubbleBox) pondBubbleBox.innerHTML = '';
+  }, 700);
+}
+
 function scheduleAmbientRipple() {
   stopAmbientRipple();
-  var interval = 2500 + Math.random() * 2500;
+  var interval = 500 * (0.7 + Math.random() * 0.6);
   ambientRippleTimer = setTimeout(function() {
     ambientRippleTimer = null;
     if (isBlossomInteractive()) {
@@ -5605,6 +5737,7 @@ function onKoiPointerUp(e) {
 
 function triggerKoiStart() {
   stopAmbientRipple();
+  stopPondLife();
   stopBlossomStream();
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
@@ -5790,6 +5923,7 @@ function confirmName() {
     updateAllRowLocks();
     recalc();
     scheduleAmbientRipple();
+    startPondLife();
   }, 420);
 }
 
