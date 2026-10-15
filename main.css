@@ -2127,7 +2127,8 @@
   }
   .alert-screen.visible .alert-card { transform: scale(1); }
   .alert-title { font-size: 15px; font-weight: 600; color: var(--accent); line-height: 1.8; letter-spacing: 0.3px; margin-bottom: 6px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
-  .alert-sub { font-size: 13px; font-weight: 500; color: var(--text-mute); letter-spacing: 0.4px; line-height: 1.8; margin-bottom: 14px; }
+  .alert-sub { font-size: 13px; font-weight: 500; color: var(--text-mute); letter-spacing: 0.4px; line-height: 1.8; margin-bottom: 14px; white-space: pre-line; word-break: auto-phrase; line-break: strict; }
+  .alert-list:empty { display: none; }
   .alert-list { list-style: none; padding: 0; margin: 0 0 18px 0; text-align: left; display: inline-block; max-width: 100%; }
   .alert-list li { font-size: 13.5px; font-weight: 500; color: var(--text-soft); line-height: 1.8; padding: 2px 0 2px 16px; position: relative; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
   .alert-list li::before { content: "・"; position: absolute; left: 0; color: var(--accent); }
@@ -3519,4 +3520,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v120"; }
+:root { --build: "v121"; }
