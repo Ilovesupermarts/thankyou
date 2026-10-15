@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn" class="pv-proposed">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Start Button Preview</title>
+
+<!-- ============================================================
+     start-preview.html — standalone preview of the koi start screen.
+
+     Loads the real main.css and uses the real markup and class names
+     from index.html, so what you see is the actual app. It does NOT
+     load app.js; the few behaviours the start screen needs (touch
+     ripples, swipe-to-start, koi flinch, lanterns) are copied into the
+     small script at the bottom.
+
+     Two modes, switched from the panel:
+       現在 Current  — main.css exactly as the app ships it today.
+       提案 Proposed — main.css plus the generated <style id="pvLive">
+                       block. Every slider rewrites that block, and
+                       "Copy values" copies the same text, so the copied
+                       CSS is exactly what you are looking at.
+
+     Not part of the app: not linked from index.html and not in the
+     service worker's ASSETS list.
+     ============================================================ -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
+
+<!-- Preview-only chrome: the tuning panel, and hiding the new
+     elements while the "Current" mode is shown. Nothing here is
+     part of the copied CSS. -->
+<style>
+  body { overflow: hidden; height: 100vh; padding-bottom: 0; }
+
+  html.pv-current .pond-surface,
+  html.pv-current .gold-band-shadow,
+  html.pv-current .pond-bubbles,
+  html.pv-current .floret-layer { display: none; }
+
+  /* Restarts every animation inside the button in one go, so the
+     glow, ring, ripples and koi stay in step after a slider change. */
+  .blossom-screen.pv-hold .icon-wrapper,
+  .blossom-screen.pv-hold .icon-wrapper * { animation: none !important; }
+
+  .pv-panel {
+    position: fixed; top: 16px; right: 16px; z-index: 1000;
+    width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    touch-action: pan-y;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid var(--border-1);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(68, 52, 48, 0.14);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text-med);
+    -webkit-user-select: none; user-select: none;
+  }
+  .pv-panel.collapsed { width: auto; overflow: hidden; }
+  .pv-panel.collapsed .pv-body { display: none; }
+  .pv-head {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; background: rgba(255, 253, 249, 0.98);
+    border-bottom: 1px solid var(--border-4);
+  }
+  .pv-panel.collapsed .pv-head { border-bottom: none; }
+  .pv-title { font-weight: 600; color: var(--text-dark); letter-spacing: 0.5px; flex: 1; white-space: nowrap; }
+  .pv-seg { display: inline-flex; border: 1px solid var(--border-2); border-radius: 999px; overflow: hidden; }
+  .pv-seg button {
+    border: 0; background: transparent; padding: 5px 11px; font: inherit; color: var(--text-mute); cursor: pointer;
+  }
+  .pv-seg button.on { background: var(--accent); color: #FFFDF9; }
+  .pv-icon-btn {
+    border: 1px solid var(--border-2); background: transparent; border-radius: 999px;
+    width: 30px; height: 30px; font: inherit; color: var(--text-mute); cursor: pointer;
+  }
+  .pv-body { padding: 4px 14px 14px; }
+  .pv-note { margin: 10px 0 0; color: var(--text-mute); font-size: 12px; }
+  .pv-group { margin-top: 14px; }
+  .pv-group-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--secondary-accent); margin-bottom: 4px;
+  }
+  .pv-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 8px; padding: 6px 0; }
+  .pv-row label { color: var(--text-soft); }
+  .pv-val { font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 600; }
+  .pv-row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+  .pv-was { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin-top: -2px; }
+  .pv-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+  .pv-check input { accent-color: var(--accent); width: 18px; height: 18px; }
+  html.pv-current .pv-body .pv-tune { opacity: 0.4; pointer-events: none; }
+  .pv-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .pv-btn {
+    flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
+    border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .pv-btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFDF9; }
+  .pv-btn:active { transform: scale(0.97); }
+  .pv-status { margin-top: 8px; min-height: 18px; color: var(--accent-2); font-size: 12px; }
+  .pv-out {
+    display: none; margin: 8px 0 0; padding: 10px; max-height: 320px; overflow: auto;
+    background: var(--soft-2); border: 1px solid var(--border-4); border-radius: 10px;
+    font: 11px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--text-soft);
+    white-space: pre; -webkit-user-select: text; user-select: text;
+  }
+  .pv-out.shown { display: block; }
+</style>
+
+<!-- The generated "Proposed" CSS goes here. Rewritten by the script. -->
+<style id="pvLive"></style>
+</head>
+<body>
+
+<!-- ============ AMBIENT BACKGROUND (same markup as index.html) ============ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
+  </div>
+  <div class="lantern-layer" id="lanternLit"></div>
+</div>
+<div class="lantern-bloom-layer" id="lanternBloom" aria-hidden="true"></div>
+
+<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
+
+<div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
+
+<!-- New (Proposed only): 金木犀 florets drift down and land on the water. -->
+<div class="floret-layer" id="floretLayer" aria-hidden="true"></div>
+
+<!-- ============ START SCREEN (real markup and class names) ============
+     New elements, shown only in Proposed mode:
+       .pond-surface / .pond-caustic — a faint water surface inside the
+                                       ring with slow drifting light
+       .gold-band-shadow             — a soft warm shadow under the ring
+                                       so the white ring reads on cream
+       .pond-bubbles                 — small bubbles that rise past the
+                                       koi, hinting "upward" -->
+<div class="blossom-screen visible" id="blossomScreen">
+
+  <div class="blossom-greeting" aria-live="polite">
+    <div class="blossom-greeting-time" id="blossomGreetingTime">こんばんは</div>
+    <div class="blossom-greeting-name" id="blossomGreetingName">桜庭さん</div>
+  </div>
+
+  <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
+    <div class="icon-wrapper">
+      <div class="soft-glow" aria-hidden="true"></div>
+      <div class="pond-surface" aria-hidden="true">
+        <div class="pond-caustic"></div>
+        <div class="pond-caustic c2"></div>
+      </div>
+      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+        <defs>
+          <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5"/>
+          </filter>
+        </defs>
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+        <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
+        <circle cx="180" cy="180" r="90" class="gold-band" />
+      </svg>
+      <div class="pond-bubbles" id="pondBubbles" aria-hidden="true"></div>
+      <div class="koi-dive-wrap" id="koiDiveWrap">
+        <div class="blossom-char">
+          <div class="koi-shadow" aria-hidden="true"></div>
+          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+        </div>
+      </div>
+    </div>
+  </button>
+
+  <div class="start-hints">
+    <p class="start-hint-line">水にふれると、さざなみが静かに広がります。</p>
+    <p class="start-hint-line">鯉に、そっとふれてみてください。</p>
+    <p class="start-hint-line">水面をゆっくり上へなぞると、はじまります。</p>
+  </div>
+</div>
+
+<!-- Autumn leaves (same markup as index.html) -->
+<div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
+
+  <!-- Shared momiji (Japanese maple) leaf shape, used by all four maple
+       leaves below. Fitted to the same 900x1000 viewBox and the same
+       bounding box (x 2-898, y 12-994) as the previous leaf so size
+       and pivot are unchanged. Fill comes from each leaf's CSS class. -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+    <defs>
+      <path id="momijiLeafShape" d="M 492.8,992 C 470.2,893.4 457.1,762.7 455.9,623.8 C 420.3,664.1 368,699.8 301.5,714 C 249.2,724.7 206.5,730.7 170.8,742.5 C 201.7,715.2 230.2,678.4 265.9,649.9 C 299.1,623.8 330,610.7 360.9,608.3 C 299.1,621.4 216,619 138.8,596.4 C 82.9,579.8 40.2,564.4 2.2,554.9 C 43.7,543 87.7,521.6 137.6,502.6 C 206.5,476.5 277.8,481.2 338.3,509.7 C 265.9,469.3 201.7,407.6 154.2,331.5 C 118.6,274.5 97.2,227 75.8,189 C 113.8,222.3 159,255.5 213.6,293.5 C 289.6,347 356.2,400.4 398.9,455.1 C 372.8,376.7 368,279.3 401.3,177.1 C 427.4,97.5 455.9,53.6 472.6,12 C 484.4,58.3 505.8,109.4 527.2,184.2 C 555.7,284 551,374.3 515.3,445.6 C 562.8,381.4 634.1,317.3 712.5,265 C 767.2,228.2 814.7,205.6 857.4,183.1 C 824.2,222.3 790.9,269.8 752.9,329.2 C 705.4,402.8 660.3,459.8 613.9,497.8 C 667.4,481.2 731.5,488.3 793.3,512.1 C 831.3,526.3 864.6,540.6 897.8,546.5 C 859.8,557.2 819.4,573.9 771.9,590.5 C 710.1,611.9 648.4,616.6 593.7,605.9 C 634.1,616.6 669.8,640.4 700.6,676 C 719.6,697.4 733.9,718.8 745.8,737.8 C 714.9,728.3 676.9,721.2 634.1,712.8 C 562.8,698.6 503.5,666.5 466.6,623.8 C 467.8,762.7 480.9,893.4 504.6,988.4 C 505.8,994.4 494,995.6 492.8,992 Z"/>
+    </defs>
+  </svg>
+
+  <!-- ============ FAR PLANE — Momiji (2) ============ -->
+  <svg class="leaf-far leaf-far-1" viewBox="0 0 900 1000" aria-hidden="true">
+    <use href="#momijiLeafShape"/>
+  </svg>
+  <svg class="leaf-far leaf-far-2" viewBox="0 0 900 1000" aria-hidden="true">
+    <use href="#momijiLeafShape"/>
+  </svg>
+
+  <!-- ============ FAR PLANE — Ichō (4) ============ -->
+  <svg class="leaf-far ginkgo-far-1" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-2" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-3" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-far ginkgo-far-4" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+
+  <!-- ============ MID PLANE — Momiji (2) ============ -->
+  <svg class="leaf-mid leaf-mid-1" viewBox="0 0 900 1000" aria-hidden="true">
+    <use href="#momijiLeafShape"/>
+  </svg>
+  <svg class="leaf-mid leaf-mid-2" viewBox="0 0 900 1000" aria-hidden="true">
+    <use href="#momijiLeafShape"/>
+  </svg>
+
+  <!-- ============ MID PLANE — Ichō (4) ============ -->
+  <svg class="leaf-mid ginkgo-mid-1" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-mid ginkgo-mid-2" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-mid ginkgo-mid-3" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+  <svg class="leaf-mid ginkgo-mid-4" viewBox="0 0 600 700" aria-hidden="true">
+    <path d="M 297,670
+             L 297,410
+             C 270,360 190,310 50,210
+             C 60,175 90,150 130,140
+             C 150,135 170,115 205,105
+             C 235,95 265,105 285,135
+             C 294,155 298,185 300,210
+             C 302,185 306,155 315,135
+             C 335,105 365,95 395,105
+             C 430,115 450,135 470,140
+             C 510,150 540,175 550,210
+             C 410,310 330,360 303,410
+             L 303,670
+             C 303,674 297,674 297,670 Z" />
+  </svg>
+
+</div>
+
+<!-- ============ TUNING PANEL (preview only) ============ -->
+<div class="pv-panel" id="pvPanel">
+  <div class="pv-head">
+    <span class="pv-title">Start button</span>
+    <span class="pv-seg" role="group" aria-label="Mode">
+      <button type="button" id="pvModeCur">現在 Current</button>
+      <button type="button" id="pvModeNew" class="on">提案 Proposed</button>
+    </span>
+    <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
+  </div>
+  <div class="pv-body">
+    <p class="pv-note">Touch the water, tap the koi, or swipe up on the screen to try it. Grey "app:" notes show today's value.</p>
+    <div class="pv-tune" id="pvControls"></div>
+    <div class="pv-actions">
+      <button type="button" class="pv-btn" id="pvReplay">Replay intro</button>
+      <button type="button" class="pv-btn" id="pvReset">Reset</button>
+      <button type="button" class="pv-btn primary" id="pvCopy">Copy values</button>
+    </div>
+    <div class="pv-status" id="pvStatus"></div>
+    <pre class="pv-out" id="pvOut"></pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     SETTINGS
+     Each entry is one slider (or a checkbox when type is 'check').
+     "was" is today's value in main.css / app.js, shown for comparison.
+     ============================================================ */
+  var CONTROLS = [
+    { group: 'Breath (glow and ring)' },
+    { id: 'breath',     label: 'One breath (s)',          min: 4,   max: 14,  step: 0.5,   def: 8,     was: '5s, even in/out' },
+    { id: 'inhale',     label: 'Breathe-in share',        min: 0.3, max: 0.6, step: 0.02,  def: 0.42,  was: '0.50' },
+    { id: 'glowMax',    label: 'Glow at its brightest',   min: 0.3, max: 1,   step: 0.05,  def: 1,     was: '1.00' },
+    { id: 'glowFloor',  label: 'Glow at its faintest',    min: 0,   max: 0.8, step: 0.02,  def: 0.3,   was: '0.00 (fully disappears)' },
+    { id: 'warmth',     label: 'Halo warmth (white → 金木犀)', min: 0, max: 1, step: 0.05, def: 0.6,   was: '0 (pure white)' },
+    { id: 'glowReach',  label: 'Halo reach (px)',         min: 120, max: 210, step: 2,     def: 160,   was: '131' },
+    { id: 'bandSwell',  label: 'Ring swell with breath',  min: 1,   max: 1.08,step: 0.005, def: 1.025, was: '1.000 (still)' },
+    { id: 'bandShadow', label: 'Warm shadow under ring',  min: 0,   max: 0.5, step: 0.02,  def: 0.24,  was: 'none' },
+    { id: 'koiDepth',   label: 'Koi at its deepest (opacity)', min: 0.2, max: 1, step: 0.05, def: 0.5, was: '0.30, 5s' },
+
+    { group: 'Ring ripples' },
+    { id: 'ripTravel',  label: 'Ripple travel time (s)',  min: 2,   max: 14,  step: 0.5,   def: 6.5,   was: '20s, steady speed' },
+    { id: 'ripReach',   label: 'How far it spreads (×)',  min: 1.4, max: 3.4, step: 0.1,   def: 2.6,   was: '1.9' },
+    { id: 'ripCount',   label: 'Rings per drop',          min: 1,   max: 3,   step: 1,     def: 3,     was: '3, 5.4s apart' },
+    { id: 'ripGap',     label: 'Gap between rings (s)',   min: 0.2, max: 2.5, step: 0.05,  def: 0.65,  was: '5.4' },
+    { id: 'ripEvery',   label: 'One drop every N breaths',min: 1,   max: 3,   step: 1,     def: 1,     was: '—' },
+    { id: 'ripOpacity', label: 'Ripple strength',         min: 0.2, max: 1,   step: 0.05,  def: 0.85,  was: '0.70' },
+    { id: 'ripTint',    label: 'Ripple tint (white → 金木犀)', min: 0, max: 1, step: 0.05, def: 0.4,   was: '0 (white)' },
+
+    { group: 'Touch and rain' },
+    { id: 'tapMs',      label: 'Touch ripple time (ms)',  min: 600, max: 3200,step: 50,    def: 1900,  was: '975' },
+    { id: 'tapSize',    label: 'Touch ripple size (px)',  min: 80,  max: 280, step: 5,     def: 180,   was: '~160, thickens as it grows' },
+    { id: 'rainEvery',  label: 'Rain drop every (s), 0 = off', min: 0, max: 15, step: 0.5, def: 6,     was: '2.5–5s, up to 5 at once' },
+
+    { group: 'Pond details' },
+    { id: 'caustics',   label: 'Light on the water',      min: 0,   max: 0.4, step: 0.02,  def: 0.18,  was: 'none' },
+    { id: 'florets',    label: '金木犀 floret every (s), 0 = off', min: 0, max: 30, step: 1, def: 11,   was: 'none' },
+    { id: 'bubbles',    label: 'Rising bubbles every (s), 0 = off', min: 0, max: 20, step: 1, def: 7,   was: 'none' },
+    { id: 'intro',      label: 'Ensō intro (ring draws itself)', type: 'check', def: true, was: 'none' }
+  ];
+
+  var STORE_KEY = 'startPreviewValues.v1';
+  var DEFAULTS = {};
+  CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
+
+  var v = loadValues();
+  var mode = 'new';
+
+  function loadValues() {
+    var out = {};
+    for (var k in DEFAULTS) out[k] = DEFAULTS[k];
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (saved) for (var s in saved) if (s in out) out[s] = saved[s];
+    } catch (e) {}
+    return out;
+  }
+  function saveValues() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {}
+  }
+
+  /* ============================================================
+     CSS GENERATOR
+     Builds the Proposed CSS from the current values. The preview
+     shows exactly this text, and "Copy values" copies it.
+     withIntro: the ensō intro is only played on load and on
+     "Replay intro", not every time a slider moves.
+     ============================================================ */
+  function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
+  function mix(a, b, t) { return Math.round(a + (b - a) * t); }
+
+  function buildCSS(withIntro) {
+    var B = +v.breath;
+    var F = +v.inhale;
+    var I = withIntro ? 2.4 : 0;                  // intro length (s)
+    var peak = F * B;                             // glow peak inside a breath
+    var P = B * v.ripEvery;                       // one ripple set per P seconds
+    var count = +v.ripCount;
+    var travelPct = Math.min(99, (v.ripTravel / P) * 100);
+    var lead = 0.15;                              // ring leaves just before the peak
+    var R = +v.glowReach;
+    var rim = 87 / R * 100;                       // ring inner edge as % of the halo
+    var W = +v.warmth;
+    var after = function (f) { return rim + (100 - rim) * f; };
+    var tint = 'rgb(' + mix(255, 240, v.ripTint) + ', ' + mix(253, 125, v.ripTint) + ', ' + mix(249, 64, v.ripTint) + ')';
+    var koiDelay = ((I + peak) % B);              // koi reaches the surface at each glow peak
+    var tap = +v.tapMs;
+    var ease = 'cubic-bezier(0.45, 0, 0.55, 1)';
+    var waterOut = 'cubic-bezier(0.15, 0.55, 0.3, 1)';
+    var css = [];
+
+    css.push(
+'/* ============================================================',
+'   START SCREEN — PROPOSED VISUALS',
+'   Generated by start-preview.html. Paste after the START BUTTON',
+'   section of main.css (same selectors, so these win by order).',
+'',
+'   Markup this needs in index.html (inside .icon-wrapper):',
+'     after .soft-glow:',
+'       <div class="pond-surface" aria-hidden="true">',
+'         <div class="pond-caustic"></div>',
+'         <div class="pond-caustic c2"></div>',
+'       </div>',
+'     inside .rings-svg, before .gold-band:',
+'       <defs><filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">',
+'         <feGaussianBlur stdDeviation="3.5"/></filter></defs>',
+'       <circle cx="180" cy="180" r="91" class="gold-band-shadow" />',
+'     before .koi-dive-wrap:',
+'       <div class="pond-bubbles" id="pondBubbles" aria-hidden="true"></div>',
+'',
+'   Numbers for app.js:',
+'     touch ripple removal  ' + tap + 'ms + 150ms per ring (was 1185 + 80)',
+'     ring stagger           150ms (was 80ms)',
+'     rain drop              ' + (v.rainEvery > 0 ? 'one every ~' + n(v.rainEvery, 1) + 's (±30%), 1 ripple, sometimes 2' : 'off') + ' (was 2.5–5s, 1–5)',
+'     金木犀 floret          ' + (v.florets > 0 ? 'one every ~' + v.florets + 's' : 'off'),
+'     rising bubbles         ' + (v.bubbles > 0 ? 'every ~' + v.bubbles + 's, 1–3 at a time' : 'off'),
+'   ============================================================ */',
+''
+    );
+
+    /* --- Halo (soft-glow) --- */
+    css.push(
+'/* Halo: white rim on the ring, warming to 金木犀 as it fades out.',
+'   Breathes in over ' + n(peak, 2) + 's and out over ' + n(B - peak, 2) + 's, never fully gone. */',
+'.soft-glow {',
+'  width: ' + (R * 2) + 'px; height: ' + (R * 2) + 'px;',
+'  margin-top: -' + R + 'px; margin-left: -' + R + 'px;',
+'  will-change: opacity, transform;',
+'  background: radial-gradient(circle closest-side,',
+'    rgba(255, 255, 255, 0) 0%,',
+'    rgba(255, 255, 255, 0) ' + n(rim - 3) + '%,',
+'    rgba(255, 255, 255, 0.35) ' + n(rim - 1.2) + '%,',
+'    rgba(255, 255, 255, 0.95) ' + n(rim) + '%,',
+'    rgba(' + mix(255, 255, W) + ', ' + mix(255, 222, W) + ', ' + mix(255, 196, W) + ', 0.60) ' + n(after(0.14)) + '%,',
+'    rgba(' + mix(255, 255, W) + ', ' + mix(255, 162, W) + ', ' + mix(255, 89, W) + ', ' + n(0.34 + 0.06 * W) + ') ' + n(after(0.36)) + '%,',
+'    rgba(' + mix(255, 230, W) + ', ' + mix(255, 104, W) + ', ' + mix(255, 38, W) + ', ' + n(0.14 + 0.04 * W) + ') ' + n(after(0.62)) + '%,',
+'    rgba(' + mix(255, 230, W) + ', ' + mix(255, 104, W) + ', ' + mix(255, 38, W) + ', 0.04) ' + n(after(0.85)) + '%,',
+'    rgba(' + mix(255, 230, W) + ', ' + mix(255, 104, W) + ', ' + mix(255, 38, W) + ', 0) 100%);',
+'}',
+'.blossom-screen.visible .soft-glow {',
+'  animation: ' + (withIntro ? 'glowIntro 1.4s ease-out ' + n(I - 1.4) + 's both, ' : '') +
+              'glowBreath ' + n(B) + 's linear ' + n(I) + 's infinite;',
+'}',
+'@keyframes glowBreath {',
+'  0%   { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); animation-timing-function: ' + ease + '; }',
+'  ' + n(F * 100) + '%  { opacity: ' + n(v.glowMax) + '; transform: scale(1.03); animation-timing-function: ' + ease + '; }',
+'  100% { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); }',
+'}'
+    );
+    if (withIntro) css.push(
+'@keyframes glowIntro {',
+'  from { opacity: 0; transform: scale(0.9); }',
+'  to   { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); }',
+'}'
+    );
+    css.push(
+'/* Armed (finger has swiped past the threshold): halo stays lit and',
+'   breathes twice as fast; the whole ring lifts slightly. */',
+'.blossom-screen.visible .start-btn.ready .soft-glow {',
+'  animation: glowBreathReady ' + n(B / 2) + 's ease-in-out infinite;',
+'}',
+'@keyframes glowBreathReady {',
+'  0%, 100% { opacity: 0.85; transform: scale(1.04); }',
+'  50%      { opacity: 1.00; transform: scale(1.08); }',
+'}',
+''
+    );
+
+    /* --- Ring --- */
+    css.push(
+'/* Ring: the solid anchor. Swells very slightly with the breath, and',
+'   a blurred warm shadow underneath lets the white stroke read on cream. */',
+'.rings-svg {',
+'  overflow: visible;',
+'  transition: opacity 700ms ease, transform 600ms cubic-bezier(0.34, 1.56, 0.64, 1);',
+'}',
+'.start-btn.ready .rings-svg { transform: translate(-50%, -50%) scale(1.04); }',
+'.gold-band,',
+'.gold-band-shadow {',
+'  transform-box: view-box;',
+'  transform-origin: 180px 180px;',
+'  transform: rotate(-90deg);',
+'  stroke-dasharray: 566 566;',
+'}',
+'.gold-band-shadow {',
+'  fill: none;',
+'  stroke: rgba(196, 78, 16, ' + n(v.bandShadow) + ');',
+'  stroke-width: 9px;',
+'  filter: url(#bandShadowBlur);',
+'}',
+'.blossom-screen.visible .gold-band,',
+'.blossom-screen.visible .gold-band-shadow {',
+'  animation: ' + (withIntro ? 'ensoDraw 2.2s cubic-bezier(0.65, 0, 0.35, 1) 0.2s both, ' : '') +
+              'bandBreath ' + n(B) + 's linear ' + n(I) + 's infinite;',
+'}',
+'@keyframes bandBreath {',
+'  0%   { transform: rotate(-90deg) scale(1); animation-timing-function: ' + ease + '; }',
+'  ' + n(F * 100) + '%  { transform: rotate(-90deg) scale(' + n(v.bandSwell, 3) + '); animation-timing-function: ' + ease + '; }',
+'  100% { transform: rotate(-90deg) scale(1); }',
+'}'
+    );
+    if (withIntro) css.push(
+'/* Ensō: the ring draws itself once, like a single brush stroke. */',
+'@keyframes ensoDraw {',
+'  from { stroke-dashoffset: 566; }',
+'  to   { stroke-dashoffset: 0; }',
+'}'
+    );
+    css.push('');
+
+    /* --- Ring ripples --- */
+    css.push(
+'/* Ring ripples: like a drop in still water. Each set of ' + count + ' ring' + (count > 1 ? 's' : '') + ' leaves',
+'   as the koi surfaces (glow peak), rushes out then slows, thins and',
+'   fades. Travel ' + n(v.ripTravel, 1) + 's, then calm until the next set (' + n(P, 1) + 's cycle). */',
+'.pulse-ring {',
+'  stroke: ' + tint + ';',
+'  vector-effect: non-scaling-stroke;',
+'  opacity: 0;',
+'}',
+'.blossom-screen.visible .pulse-ring {',
+'  animation: ringGrow ' + n(P) + 's linear infinite, ringFade ' + n(P) + 's linear infinite;',
+'}'
+    );
+    for (var i = 1; i <= 3; i++) {
+      if (i <= count) {
+        var d = n(Math.max(0, I + peak - lead + (i - 1) * v.ripGap));
+        css.push('.blossom-screen.visible .ripple-' + i + ' { animation-delay: ' + d + 's, ' + d + 's; }');
+      } else {
+        css.push('.blossom-screen.visible .ripple-' + i + ' { animation: none; opacity: 0; }');
+      }
+    }
+    css.push(
+'@keyframes ringGrow {',
+'  0%   { transform: scale(1); animation-timing-function: ' + waterOut + '; }',
+'  ' + n(travelPct) + '%  { transform: scale(' + n(v.ripReach) + '); }',
+'  100% { transform: scale(' + n(v.ripReach) + '); }',
+'}',
+'@keyframes ringFade {',
+'  0%   { opacity: ' + n(v.ripOpacity) + '; stroke-width: 2.4px; animation-timing-function: cubic-bezier(0.3, 0, 0.7, 1); }',
+'  ' + n(travelPct) + '%  { opacity: 0; stroke-width: 0.6px; }',
+'  100% { opacity: 0; stroke-width: 0.6px; }',
+'}',
+''
+    );
+
+    /* --- Koi --- */
+    css.push(
+'/* Koi: rises and sinks on the same breath, reaching the surface',
+'   exactly when the halo peaks and the ripples leave. */',
+'.blossom-screen.visible .blossom-char {',
+'  animation: ' + (withIntro ? 'koiEmerge 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) 0.9s backwards, ' : '') +
+              'koiDive ' + n(B) + 's ease-in-out ' + n(koiDelay) + 's infinite;',
+'}',
+'.blossom-screen.visible .koi-shadow {',
+'  animation: koiShadowFade ' + n(B) + 's ease-in-out ' + n(koiDelay) + 's infinite;',
+'}',
+'@keyframes koiDive {',
+'  0%, 100% { opacity: 1; transform: scale(1); }',
+'  50%      { opacity: ' + n(v.koiDepth) + '; transform: scale(0.94); }',
+'}'
+    );
+    if (withIntro) css.push(
+'@keyframes koiEmerge {',
+'  from { opacity: 0; transform: scale(0.82); }',
+'  to   { opacity: 1; transform: scale(1); }',
+'}'
+    );
+    css.push('');
+
+    /* --- Pond surface --- */
+    css.push(
+'/* Pond surface: a faint warm depth inside the ring, with two layers of',
+'   soft light turning in opposite directions (caustics). Only rotation',
+'   is animated; the gradients are painted once. */',
+'.pond-surface {',
+'  position: absolute;',
+'  top: 50%; left: 50%;',
+'  width: 174px; height: 174px;',
+'  margin: -87px 0 0 -87px;',
+'  border-radius: 50%;',
+'  overflow: hidden;',
+'  pointer-events: none;',
+'  z-index: 0;',
+'  background: radial-gradient(circle at 50% 42%,',
+'    rgba(255, 253, 249, 0.55) 0%,',
+'    rgba(253, 232, 218, 0.40) 58%,',
+'    rgba(240, 125, 64, 0.16) 100%);',
+'}',
+'.pond-caustic {',
+'  position: absolute;',
+'  inset: -25%;',
+'  opacity: ' + n(v.caustics) + ';',
+'  will-change: transform;',
+'  background:',
+'    radial-gradient(circle at 30% 34%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 13%),',
+'    radial-gradient(circle at 66% 28%, rgba(255, 255, 255, 0.9) 0%, rgba(255, 255, 255, 0) 10%),',
+'    radial-gradient(circle at 72% 64%, rgba(255, 255, 255, 1) 0%, rgba(255, 255, 255, 0) 14%),',
+'    radial-gradient(circle at 38% 72%, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0) 11%),',
+'    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.6) 0%, rgba(255, 255, 255, 0) 9%);',
+'  animation: causticTurn 64s linear infinite;',
+'}',
+'.pond-caustic.c2 {',
+'  transform: rotate(40deg);',
+'  animation-duration: 97s;',
+'  animation-direction: reverse;',
+'}',
+'@keyframes causticTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'
+    );
+    if (withIntro) css.push(
+'.blossom-screen.visible .pond-surface { animation: pondIn 1.6s ease 0.8s both; }',
+'@keyframes pondIn { from { opacity: 0; } to { opacity: 1; } }'
+    );
+    css.push(
+'.start-btn.diving .pond-surface { opacity: 0; transition: opacity 700ms ease; }',
+''
+    );
+
+    /* --- Bubbles and florets --- */
+    css.push(
+'/* Rising bubbles (spawned by app.js) and 金木犀 florets that drift',
+'   down and land on the water (spawned by app.js). */',
+'.pond-bubbles {',
+'  position: absolute; inset: 0;',
+'  pointer-events: none;',
+'  z-index: 1;',
+'}',
+'.pond-bubble {',
+'  position: absolute; left: 50%; top: 50%;',
+'  border-radius: 50%;',
+'  border: 1px solid rgba(255, 253, 249, 0.95);',
+'  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.15) 55%, rgba(255, 255, 255, 0) 70%);',
+'  box-shadow: 0 0 4px rgba(230, 104, 38, 0.25);',
+'  will-change: transform, opacity;',
+'}',
+'.floret-layer {',
+'  position: fixed; inset: 0;',
+'  pointer-events: none;',
+'  z-index: 2;',
+'  overflow: hidden;',
+'}',
+'.kinmokusei-floret {',
+'  position: absolute; left: 0; top: 0;',
+'  width: 14px; height: 14px;',
+'  will-change: transform, opacity;',
+'  filter: drop-shadow(0 1px 1.5px rgba(158, 59, 6, 0.25));',
+'}',
+''
+    );
+
+    /* --- Touch ripples --- */
+    css.push(
+'/* Touch ripples: real water rings get THINNER as they spread. The',
+'   old ripple scaled a small ring up 5×, so its border grew to ~8px.',
+'   Now the ring is drawn at full size and scaled up from small, so',
+'   the line stays hairline. !important overrides the inline size',
+'   app.js sets, so spawnRipples() needs no change apart from timing. */',
+'.ripple {',
+'  width: ' + v.tapSize + 'px !important;',
+'  height: ' + v.tapSize + 'px !important;',
+'  border-width: 1.4px;',
+'  box-shadow: 0 0 6px currentColor, inset 0 0 4px currentColor;',
+'  transform: translate(-50%, -50%) scale(0.06);',
+'  animation: rippleExpand ' + tap + 'ms ' + waterOut + ' forwards;',
+'}',
+'.ripple.subtle { width: ' + Math.round(v.tapSize * 0.7) + 'px !important; height: ' + Math.round(v.tapSize * 0.7) + 'px !important; }',
+'.ripple.trail  { width: ' + Math.round(v.tapSize * 0.45) + 'px !important; height: ' + Math.round(v.tapSize * 0.45) + 'px !important; }',
+'@keyframes rippleExpand {',
+'  0%   { transform: translate(-50%, -50%) scale(0.06); opacity: 0.95; }',
+'  35%  { opacity: 0.6; animation-timing-function: linear; }',
+'  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }',
+'}',
+'@keyframes rippleExpandSubtle {',
+'  0%   { transform: translate(-50%, -50%) scale(0.06); opacity: 0.6; }',
+'  35%  { opacity: 0.35; animation-timing-function: linear; }',
+'  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }',
+'}',
+'@keyframes rippleExpandTrail {',
+'  0%   { transform: translate(-50%, -50%) scale(0.06); opacity: 0.5; }',
+'  100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }',
+'}',
+''
+    );
+
+    /* --- Words --- */
+    css.push(
+'/* Words (text unchanged): hint lines arrive out of a soft blur, and a',
+'   slow 金木犀 glint passes along the swipe hint now and then. */',
+'@keyframes hintLineArrive {',
+'  from { opacity: 0; transform: translateY(6px); filter: blur(5px); }',
+'  to   { opacity: 0.94; transform: translateY(0); filter: blur(0); }',
+'}',
+'.start-hint-line:nth-child(3) {',
+'  background: linear-gradient(100deg, var(--text-dark) 42%, var(--accent) 50%, var(--text-dark) 58%) 100% 0 / 300% 100% no-repeat;',
+'  -webkit-background-clip: text;',
+'  background-clip: text;',
+'  color: transparent;',
+'}',
+'.blossom-screen.visible .start-hint-line:nth-child(3) {',
+'  animation: hintLineArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) 2.1s forwards,',
+'             hintGlint 9s ease-in-out 5s infinite;',
+'}',
+'@keyframes hintGlint {',
+'  0%, 72% { background-position: 100% 0; }',
+'  100%    { background-position: 0 0; }',
+'}'
+    );
+    if (withIntro) css.push(
+'/* Greeting: the time fades up out of a blur, the name is revealed',
+'   left to right like a brush stroke. */',
+'.blossom-screen.visible .blossom-greeting-time {',
+'  animation: greetIn 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s backwards;',
+'}',
+'@keyframes greetIn {',
+'  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }',
+'  to   { opacity: 1; transform: none; filter: blur(0); }',
+'}',
+'.blossom-screen.visible .blossom-greeting-name {',
+'  -webkit-mask-image: linear-gradient(90deg, #000 44%, transparent 56%);',
+'  mask-image: linear-gradient(90deg, #000 44%, transparent 56%);',
+'  -webkit-mask-size: 260% 100%;',
+'  mask-size: 260% 100%;',
+'  -webkit-mask-repeat: no-repeat;',
+'  mask-repeat: no-repeat;',
+'  animation: brushReveal 1.9s cubic-bezier(0.65, 0, 0.35, 1) 0.6s backwards;',
+'}',
+'@keyframes brushReveal {',
+'  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }',
+'  to   { -webkit-mask-position: 0 0; mask-position: 0 0; }',
+'}'
+    );
+    css.push(
+'',
+'@media (prefers-reduced-motion: reduce) {',
+'  .blossom-screen.visible .soft-glow { animation: none !important; opacity: 0.72 !important; }',
+'  .blossom-screen.visible .pulse-ring { animation: none !important; opacity: 0 !important; }',
+'  .blossom-screen.visible .gold-band,',
+'  .blossom-screen.visible .gold-band-shadow,',
+'  .pond-caustic { animation: none !important; }',
+'  .start-hint-line:nth-child(3) { animation-name: hintLineArrive !important; }',
+'}'
+    );
+    return css.join('\n');
+  }
+
+  /* ============================================================
+     APPLY + RESTART
+     ============================================================ */
+  var live = document.getElementById('pvLive');
+  var screen = document.getElementById('blossomScreen');
+  var startBtn = document.getElementById('startBtn');
+  var koiWrap = document.getElementById('koiDiveWrap');
+  var rippleLayer = document.getElementById('rippleLayer');
+  var bubbleBox = document.getElementById('pondBubbles');
+  var floretLayer = document.getElementById('floretLayer');
+
+  function applyCSS(withIntro) {
+    live.textContent = mode === 'new' ? buildCSS(withIntro) : '';
+  }
+
+  /* Restart the button's animations together so they stay in step. */
+  function restartButton(withIntro) {
+    screen.classList.add('pv-hold');
+    applyCSS(withIntro);
+    void screen.offsetWidth;
+    screen.classList.remove('pv-hold');
+  }
+
+  /* Whole-screen replay: hide, then show again, like the app does. */
+  function replayIntro() {
+    resetGesture();
+    screen.classList.remove('visible', 'diving');
+    startBtn.classList.remove('ready', 'diving', 'done', 'startling');
+    applyCSS(true);
+    void screen.offsetWidth;
+    setTimeout(function () { screen.classList.add('visible'); }, 450);
+  }
+
+  var restartTimer = null;
+  function onValueChange() {
+    saveValues();
+    clearTimeout(restartTimer);
+    restartTimer = setTimeout(function () { restartButton(false); }, 220);
+    restartTimers();
+  }
+
+  /* ============================================================
+     PANEL
+     ============================================================ */
+  var controlsBox = document.getElementById('pvControls');
+  var inputs = {};
+
+  function fmt(c, val) {
+    if (c.type === 'check') return '';
+    var d = (String(c.step).split('.')[1] || '').length;
+    var s = (+val).toFixed(d);
+    if ((c.id === 'rainEvery' || c.id === 'florets' || c.id === 'bubbles') && +val === 0) return 'off';
+    return s;
+  }
+
+  CONTROLS.forEach(function (c) {
+    if (c.group) {
+      var g = document.createElement('div');
+      g.className = 'pv-group';
+      g.innerHTML = '<div class="pv-group-title"></div>';
+      g.firstChild.textContent = c.group;
+      controlsBox.appendChild(g);
+      return;
+    }
+    var row = document.createElement('div');
+    var id = 'pv_' + c.id;
+    if (c.type === 'check') {
+      row.className = 'pv-check';
+      row.innerHTML = '<input type="checkbox" id="' + id + '"><label for="' + id + '"></label>';
+      row.querySelector('label').textContent = c.label;
+      var cb = row.querySelector('input');
+      cb.checked = !!v[c.id];
+      cb.addEventListener('change', function () { v[c.id] = cb.checked; saveValues(); });
+      inputs[c.id] = { el: cb, c: c };
+    } else {
+      row.className = 'pv-row';
+      row.innerHTML = '<label for="' + id + '"></label><span class="pv-val"></span>' +
+        '<input type="range" id="' + id + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">' +
+        '<span class="pv-was"></span>';
+      row.querySelector('label').textContent = c.label;
+      row.querySelector('.pv-was').textContent = 'app: ' + c.was;
+      var range = row.querySelector('input');
+      var out = row.querySelector('.pv-val');
+      range.value = v[c.id];
+      out.textContent = fmt(c, v[c.id]);
+      range.addEventListener('input', function () {
+        v[c.id] = +range.value;
+        out.textContent = fmt(c, range.value);
+        onValueChange();
+      });
+      inputs[c.id] = { el: range, out: out, c: c };
+    }
+    controlsBox.lastChild.appendChild(row);
+  });
+
+  function syncInputs() {
+    for (var k in inputs) {
+      var it = inputs[k];
+      if (it.c.type === 'check') it.el.checked = !!v[k];
+      else { it.el.value = v[k]; it.out.textContent = fmt(it.c, v[k]); }
+    }
+  }
+
+  var btnCur = document.getElementById('pvModeCur');
+  var btnNew = document.getElementById('pvModeNew');
+  function setMode(m) {
+    mode = m;
+    document.documentElement.classList.toggle('pv-current', m === 'cur');
+    document.documentElement.classList.toggle('pv-proposed', m === 'new');
+    btnCur.classList.toggle('on', m === 'cur');
+    btnNew.classList.toggle('on', m === 'new');
+    rippleLayer.innerHTML = '';
+    floretLayer.innerHTML = '';
+    bubbleBox.innerHTML = '';
+    restartButton(false);
+    restartTimers();
+  }
+  btnCur.addEventListener('click', function () { setMode('cur'); });
+  btnNew.addEventListener('click', function () { setMode('new'); });
+
+  var panel = document.getElementById('pvPanel');
+  var collapseBtn = document.getElementById('pvCollapse');
+  collapseBtn.addEventListener('click', function () {
+    var c = panel.classList.toggle('collapsed');
+    collapseBtn.textContent = c ? '+' : '–';
+    collapseBtn.setAttribute('aria-label', c ? 'Show panel' : 'Hide panel');
+  });
+
+  document.getElementById('pvReplay').addEventListener('click', replayIntro);
+
+  var statusEl = document.getElementById('pvStatus');
+  var outEl = document.getElementById('pvOut');
+
+  document.getElementById('pvReset').addEventListener('click', function () {
+    for (var k in DEFAULTS) v[k] = DEFAULTS[k];
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    syncInputs();
+    outEl.classList.remove('shown');
+    statusEl.textContent = 'Reset to the proposed defaults.';
+    if (mode !== 'new') setMode('new');
+    restartButton(false);
+    restartTimers();
+  });
+
+  document.getElementById('pvCopy').addEventListener('click', function () {
+    var text = buildCSS(!!v.intro);
+    outEl.textContent = text;
+    outEl.classList.add('shown');
+    function done(ok) {
+      statusEl.textContent = ok ? 'Copied. The CSS is also shown below.'
+                                : 'Could not reach the clipboard. Select the text below and copy it.';
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+    } else {
+      done(fallbackCopy(text));
+    }
+  });
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  /* ============================================================
+     WATER: touch ripples, rain, bubbles, florets
+     Current mode uses app.js's exact numbers.
+     ============================================================ */
+  var RIPPLE_COLOURS_STRONG = ['rgba(255, 253, 249, 0.95)', 'rgba(255, 162, 89, 0.85)', 'rgba(253, 232, 218, 0.70)'];
+  var RIPPLE_COLOURS_SUBTLE = ['rgba(255, 162, 89, 0.55)', 'rgba(253, 232, 218, 0.40)'];
+  var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
+
+  function spawnRipples(x, y, intensity) {
+    var palette, cls, baseSize;
+    if (intensity === 'strong') { palette = RIPPLE_COLOURS_STRONG; cls = ''; baseSize = 30; }
+    else if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
+    else { palette = RIPPLE_COLOURS_SUBTLE; cls = ' subtle'; baseSize = 26; }
+    var isNew = mode === 'new';
+    var stagger = isNew ? 150 : 80;
+    var life = isNew ? +v.tapMs : 975;
+    for (var i = 0; i < palette.length; i++) {
+      (function (idx) {
+        var r = document.createElement('div');
+        r.className = 'ripple' + cls;
+        var jx = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+        var jy = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+        r.style.left = (x + jx) + 'px';
+        r.style.top = (y + jy) + 'px';
+        r.style.color = palette[idx];
+        r.style.animationDelay = (idx * stagger) + 'ms';
+        r.style.width = (baseSize + idx * 6) + 'px';
+        r.style.height = (baseSize + idx * 6) + 'px';
+        rippleLayer.appendChild(r);
+        setTimeout(function () { if (r.parentNode) r.parentNode.removeChild(r); }, life + 210 + idx * stagger);
+      })(i);
+    }
+  }
+
+  var timers = { rain: null, bubbles: null, florets: null };
+  function stopTimers() { for (var k in timers) { clearTimeout(timers[k]); timers[k] = null; } }
+  function restartTimers() {
+    stopTimers();
+    scheduleRain();
+    if (mode === 'new') { scheduleBubbles(true); scheduleFlorets(true); }
+  }
+  function idle() { return screen.classList.contains('visible') && !startBtn.classList.contains('diving'); }
+
+  function scheduleRain() {
+    var wait;
+    if (mode === 'cur') wait = 2500 + Math.random() * 2500;
+    else {
+      if (!(v.rainEvery > 0)) return;
+      wait = v.rainEvery * 1000 * (0.7 + Math.random() * 0.6);
+    }
+    timers.rain = setTimeout(function () {
+      if (idle()) {
+        var count = mode === 'cur' ? 1 + Math.floor(Math.random() * 5) : (Math.random() < 0.25 ? 2 : 1);
+        for (var i = 0; i < count; i++) {
+          (function (idx) {
+            setTimeout(function () {
+              var x = 40 + Math.random() * Math.max(1, innerWidth - 80);
+              var y = 40 + Math.random() * Math.max(1, innerHeight - 80);
+              spawnRipples(x, y, 'subtle');
+            }, mode === 'cur' ? idx * 80 : idx * (400 + Math.random() * 500));
+          })(i);
+        }
+      }
+      scheduleRain();
+    }, wait);
+  }
+
+  /* Bubbles rise past the koi from below and pop just above it, a
+     quiet nudge that "up" is the way in. */
+  function scheduleBubbles(first) {
+    if (!(v.bubbles > 0)) return;
+    var wait = first ? 3200 : v.bubbles * 1000 * (0.7 + Math.random() * 0.6);
+    timers.bubbles = setTimeout(function () {
+      if (idle() && mode === 'new') {
+        var count = 1 + Math.floor(Math.random() * 3);
+        for (var i = 0; i < count; i++) spawnBubble(i * (260 + Math.random() * 300));
+      }
+      scheduleBubbles(false);
+    }, wait);
+  }
+  function spawnBubble(delay) {
+    var b = document.createElement('div');
+    b.className = 'pond-bubble';
+    var size = 4 + Math.random() * 4;
+    var x0 = (Math.random() * 36 - 18);
+    var rise = 95 + Math.random() * 40;
+    var dur = 2600 + Math.random() * 1200;
+    b.style.width = b.style.height = size + 'px';
+    b.style.marginLeft = b.style.marginTop = (-size / 2) + 'px';
+    b.style.opacity = '0';
+    bubbleBox.appendChild(b);
+    var wob = 4 + Math.random() * 4;
+    var a = b.animate([
+      { transform: 'translate(' + x0 + 'px, 62px) scale(0.6)', opacity: 0 },
+      { transform: 'translate(' + (x0 + wob) + 'px, 30px) scale(0.85)', opacity: 0.9, offset: 0.25 },
+      { transform: 'translate(' + (x0 - wob) + 'px, -5px) scale(1)', opacity: 0.9, offset: 0.55 },
+      { transform: 'translate(' + (x0 + wob * 0.5) + 'px, ' + (62 - rise * 0.85) + 'px) scale(1.1)', opacity: 0.85, offset: 0.88 },
+      { transform: 'translate(' + x0 + 'px, ' + (62 - rise) + 'px) scale(1.9)', opacity: 0 }
+    ], { duration: dur, delay: delay, easing: 'cubic-bezier(0.4, 0, 0.7, 1)', fill: 'both' });
+    a.onfinish = function () { if (b.parentNode) b.parentNode.removeChild(b); };
+  }
+
+  /* 金木犀 florets: tiny four-petal flowers drift down with a gentle
+     sway, land on the water with a small ripple, float, then fade. */
+  var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+    '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+    '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+    '<circle r="1.5" fill="#C44E10"/></svg>';
+
+  function scheduleFlorets(first) {
+    if (!(v.florets > 0)) return;
+    var wait = first ? 1800 : v.florets * 1000 * (0.7 + Math.random() * 0.6);
+    timers.florets = setTimeout(function () {
+      if (idle() && mode === 'new') spawnFloret();
+      scheduleFlorets(false);
+    }, wait);
+  }
+  function spawnFloret() {
+    var f = document.createElement('div');
+    f.className = 'kinmokusei-floret';
+    f.innerHTML = FLORET_SVG;
+    floretLayer.appendChild(f);
+    var W = innerWidth, H = innerHeight;
+    var x0 = W * (0.12 + Math.random() * 0.76);
+    var x1 = Math.min(W - 30, Math.max(30, x0 + (Math.random() * 160 - 80)));
+    var y1 = H * (0.3 + Math.random() * 0.55);
+    var s = 0.8 + Math.random() * 0.5;
+    var r0 = Math.random() * 360;
+    var sway = 22 + Math.random() * 18;
+    var fall = 7000 + Math.random() * 3000;
+    var steps = [];
+    for (var i = 0; i <= 6; i++) {
+      var t = i / 6;
+      var x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI * 3) * sway * (1 - t * 0.6);
+      var y = -20 + (y1 + 20) * t;
+      steps.push({
+        transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + (r0 + t * 220).toFixed(0) + 'deg) scale(' + s.toFixed(2) + ')',
+        opacity: i === 0 ? 0 : 1
+      });
+    }
+    var a = f.animate(steps, { duration: fall, easing: 'cubic-bezier(0.3, 0, 0.55, 1)', fill: 'forwards' });
+    a.onfinish = function () {
+      if (!f.parentNode) return;
+      spawnRipples(x1 + 7 * s, y1 + 7 * s, 'trail');
+      var end = 'translate(' + (x1 + 10).toFixed(1) + 'px,' + (y1 + 4).toFixed(1) + 'px) rotate(' + (r0 + 250).toFixed(0) + 'deg) scale(' + (s * 0.9).toFixed(2) + ')';
+      var b = f.animate([steps[6], { transform: end, opacity: 0 }], { duration: 6000, easing: 'ease-in', fill: 'forwards' });
+      b.onfinish = function () { if (f.parentNode) f.parentNode.removeChild(f); };
+    };
+  }
+
+  /* ============================================================
+     GESTURES (same numbers as app.js)
+     tap water → ripples · tap koi → flinch · swipe up → start
+     ============================================================ */
+  var KOI_RISE_MAX = 40, KOI_RISE_FACTOR = 0.35, KOI_SWIPE_THRESHOLD = 60;
+  var KOI_TRAIL_INTERVAL = 90, KOI_TRAIL_MIN_TRAVEL = 18, KOI_TAP_MAX_TRAVEL = 8, KOI_TAP_MAX_MS = 250;
+
+  var g = null;
+  var flinching = false;
+
+  function koiCentre() {
+    var r = koiWrap.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  function resetGesture() {
+    g = null;
+    koiWrap.classList.remove('dragging');
+    koiWrap.style.setProperty('--koi-rise-y', '0px');
+    startBtn.classList.remove('ready');
+  }
+
+  screen.addEventListener('pointerdown', function (e) {
+    if (!idle() || g) return;
+    var c = koiCentre();
+    g = {
+      id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: performance.now(),
+      onKoi: Math.hypot(e.clientX - c.x, e.clientY - c.y) < 75,
+      lastTrailAt: 0, lastTrailX: e.clientX, lastTrailY: e.clientY, dragging: false
+    };
+    try { screen.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+
+  screen.addEventListener('pointermove', function (e) {
+    if (!g || e.pointerId !== g.id) return;
+    var up = g.y0 - e.clientY;
+    var travel = Math.hypot(e.clientX - g.x0, e.clientY - g.y0);
+    if (!g.dragging && travel > KOI_TAP_MAX_TRAVEL) {
+      g.dragging = true;
+      koiWrap.classList.add('dragging');
+    }
+    if (!g.dragging) return;
+    var rise = Math.min(KOI_RISE_MAX, Math.max(0, up) * KOI_RISE_FACTOR);
+    koiWrap.style.setProperty('--koi-rise-y', (-rise) + 'px');
+    startBtn.classList.toggle('ready', up > KOI_SWIPE_THRESHOLD);
+    var now = performance.now();
+    if (now - g.lastTrailAt > KOI_TRAIL_INTERVAL &&
+        Math.hypot(e.clientX - g.lastTrailX, e.clientY - g.lastTrailY) > KOI_TRAIL_MIN_TRAVEL) {
+      spawnRipples(e.clientX, e.clientY, 'trail');
+      g.lastTrailAt = now; g.lastTrailX = e.clientX; g.lastTrailY = e.clientY;
+    }
+  });
+
+  function endGesture(e) {
+    if (!g || e.pointerId !== g.id) return;
+    var up = g.y0 - e.clientY;
+    var travel = Math.hypot(e.clientX - g.x0, e.clientY - g.y0);
+    var quick = performance.now() - g.t0 < KOI_TAP_MAX_MS;
+    var wasOnKoi = g.onKoi;
+    if (e.type === 'pointerup' && g.dragging && up > KOI_SWIPE_THRESHOLD) {
+      g = null;
+      dive();
+      return;
+    }
+    resetGesture();
+    if (e.type === 'pointerup' && travel <= KOI_TAP_MAX_TRAVEL && quick) {
+      spawnRipples(e.clientX, e.clientY, 'strong');
+      if (wasOnKoi) flinch();
+    }
+  }
+  screen.addEventListener('pointerup', endGesture);
+  screen.addEventListener('pointercancel', endGesture);
+
+  function flinch() {
+    if (flinching) return;
+    flinching = true;
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    koiWrap.style.setProperty('--flinch-rot', ((22 + Math.random() * 12) * dir).toFixed(2) + 'deg');
+    koiWrap.style.setProperty('--flinch-scale', (1.14 + Math.random() * 0.08).toFixed(3));
+    koiWrap.style.setProperty('--flinch-x', ((10 + Math.random() * 10) * dir).toFixed(2) + 'px');
+    koiWrap.style.setProperty('--flinch-y', (-(6 + Math.random() * 8)).toFixed(2) + 'px');
+    koiWrap.classList.remove('flinching');
+    void koiWrap.offsetWidth;
+    koiWrap.classList.add('flinching');
+    startBtn.classList.add('startling');
+    setTimeout(function () { startBtn.classList.remove('startling'); }, 220);
+    koiWrap.addEventListener('animationend', function done(ev) {
+      if (ev.animationName !== 'koiFlinch') return;
+      koiWrap.removeEventListener('animationend', done);
+      koiWrap.classList.remove('flinching');
+      flinching = false;
+    });
+  }
+
+  /* The koi dives and the screen would hand over to the app. Here it
+     splashes, waits, and plays the entrance again. */
+  function dive() {
+    koiWrap.classList.remove('dragging');
+    var c = koiCentre();
+    startBtn.classList.add('diving');
+    screen.classList.add('diving');
+    spawnRipples(c.x, c.y, 'strong');
+    if (mode === 'new') {
+      setTimeout(function () { spawnRipples(c.x, c.y + 20, 'strong'); }, 260);
+      setTimeout(function () { spawnRipples(c.x, c.y + 40, 'subtle'); }, 620);
+    }
+    setTimeout(function () {
+      startBtn.classList.remove('diving', 'ready');
+      koiWrap.style.setProperty('--koi-rise-y', '0px');
+      replayIntro();
+    }, 2600);
+  }
+
+  /* ============================================================
+     LANTERNS (copied from app.js so the background is the same)
+     ============================================================ */
+  var LANTERN_COUNT = 10, LANTERN_TILE = 60;
+  var lanternLit = document.getElementById('lanternLit');
+  var lanternBloom = document.getElementById('lanternBloom');
+  function lanternBounds() {
+    var half = LANTERN_TILE / 2;
+    return { maxI: Math.floor(innerWidth / half), maxJ: Math.floor(innerHeight / half) };
+  }
+  function lanternPlace(L) {
+    var half = LANTERN_TILE / 2, dot = LANTERN_TILE * 1.5, glow = LANTERN_TILE * 4;
+    L.dot.style.transform = 'translate3d(' + (L.i * half - dot / 2) + 'px,' + (L.j * half - dot / 2) + 'px,0)';
+    L.glow.style.transform = 'translate3d(' + (L.i * half - glow / 2) + 'px,' + (L.j * half - glow / 2) + 'px,0)';
+  }
+  function lanternRandomSpot() {
+    var b = lanternBounds();
+    var i = 1 + Math.floor(Math.random() * Math.max(1, b.maxI - 1));
+    var j = 1 + Math.floor(Math.random() * Math.max(1, b.maxJ - 1));
+    if ((i + j) % 2) j += 1;
+    return { i: i, j: j };
+  }
+  function lanternStep(L) {
+    var b = lanternBounds();
+    var all = [[1, 1], [1, -1], [-1, 1], [-1, -1]], open = [];
+    for (var t = 0; t < all.length; t++) {
+      var ni = L.i + all[t][0], nj = L.j + all[t][1];
+      if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) open.push(all[t]);
+    }
+    if (!open.length) { var s = lanternRandomSpot(); L.i = s.i; L.j = s.j; L.dir = null; return; }
+    var pick = null;
+    if (L.dir && Math.random() < 0.6) {
+      for (var k = 0; k < open.length; k++) if (open[k][0] === L.dir[0] && open[k][1] === L.dir[1]) pick = open[k];
+    }
+    if (!pick) pick = open[Math.floor(Math.random() * open.length)];
+    L.i += pick[0]; L.j += pick[1]; L.dir = pick;
+  }
+  function buildLanterns() {
+    lanternLit.innerHTML = '';
+    lanternBloom.innerHTML = '';
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    for (var k = 0; k < LANTERN_COUNT; k++) {
+      var delay = (-7 * k / LANTERN_COUNT).toFixed(2) + 's';
+      var dot = document.createElement('div');
+      var glow = document.createElement('div');
+      dot.className = 'lantern';
+      glow.className = 'lantern-bloom';
+      dot.style.setProperty('--d', delay);
+      glow.style.setProperty('--d', delay);
+      dot.style.width = dot.style.height = (LANTERN_TILE * 1.5) + 'px';
+      glow.style.width = glow.style.height = (LANTERN_TILE * 4) + 'px';
+      lanternLit.appendChild(dot);
+      lanternBloom.appendChild(glow);
+      var spot = lanternRandomSpot();
+      var L = { dot: dot, glow: glow, i: spot.i, j: spot.j, dir: null };
+      lanternPlace(L);
+      dot.addEventListener('animationiteration', (function (L) {
+        return function () { lanternStep(L); lanternPlace(L); };
+      })(L));
+    }
+  }
+  var lanternResize = null;
+  addEventListener('resize', function () {
+    clearTimeout(lanternResize);
+    lanternResize = setTimeout(buildLanterns, 250);
+  });
+
+  /* ============================================================
+     START
+     ============================================================ */
+  var leaves = document.getElementById('mapleLeaves');
+  if (leaves) leaves.classList.add('active');
+  buildLanterns();
+  replayIntro();
+  restartTimers();
+})();
+</script>
+</body>
+</html>
