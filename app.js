@@ -1,4 +1,4 @@
-var BUILD = 'v120';
+var BUILD = 'v122';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -6458,7 +6458,7 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   if (activeItems === 0) {
     showAlert(
       'すべての項目が削除されています。',
-      '内容をご確認のうえ、もう一度お試しください。',
+      '内容をご確認のうえ、\nもう一度お試しください。',
       null,
       null
     );
