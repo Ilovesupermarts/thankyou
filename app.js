@@ -1,4 +1,4 @@
-var BUILD = 'v122';
+var BUILD = 'v123';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -4992,7 +4992,13 @@ tableCard.addEventListener('keydown', function(e) {
 tableCard.addEventListener('focusin', function(e) {
   var input = e.target;
   if (input && input.classList.contains('price-input')) {
-    setTimeout(function() { try { input.select(); } catch (err) {} }, 50);
+    /* Only select if the field still has focus. If the pending-row
+       lock bounced focus back to another row, calling select() here
+       would pull focus back to this field and start a loop. */
+    setTimeout(function() {
+      if (document.activeElement !== input) return;
+      try { input.select(); } catch (err) {}
+    }, 50);
   }
 });
 
