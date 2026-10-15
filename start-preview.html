@@ -372,7 +372,6 @@
     <p class="pv-note">Touch the water, tap the koi, or swipe up on the screen to try it. Grey "app:" notes show today's value.</p>
     <div class="pv-tune" id="pvControls"></div>
     <div class="pv-actions">
-      <button type="button" class="pv-btn" id="pvReplay">Replay intro</button>
       <button type="button" class="pv-btn" id="pvReset">Reset</button>
       <button type="button" class="pv-btn primary" id="pvCopy">Copy values</button>
     </div>
@@ -392,38 +391,38 @@
      ============================================================ */
   var CONTROLS = [
     { group: 'Breath (glow and ring)' },
-    { id: 'breath',     label: 'One breath (s)',          min: 4,   max: 14,  step: 0.5,   def: 8,     was: '5s, even in/out' },
-    { id: 'inhale',     label: 'Breathe-in share',        min: 0.3, max: 0.6, step: 0.02,  def: 0.42,  was: '0.50' },
+    { id: 'breath',     label: 'One breath (s)',          min: 4,   max: 14,  step: 0.5,   def: 4,     was: '5s, even in/out' },
+    { id: 'inhale',     label: 'Breathe-in share',        min: 0.3, max: 0.6, step: 0.02,  def: 0.36,  was: '0.50' },
     { id: 'glowMax',    label: 'Glow at its brightest',   min: 0.3, max: 1,   step: 0.05,  def: 1,     was: '1.00' },
-    { id: 'glowFloor',  label: 'Glow at its faintest',    min: 0,   max: 0.8, step: 0.02,  def: 0.3,   was: '0.00 (fully disappears)' },
-    { id: 'warmth',     label: 'Halo warmth (white → 金木犀)', min: 0, max: 1, step: 0.05, def: 0.6,   was: '0 (pure white)' },
-    { id: 'glowReach',  label: 'Halo reach (px)',         min: 120, max: 210, step: 2,     def: 160,   was: '131' },
-    { id: 'bandSwell',  label: 'Ring swell with breath',  min: 1,   max: 1.08,step: 0.005, def: 1.025, was: '1.000 (still)' },
-    { id: 'bandShadow', label: 'Warm shadow under ring',  min: 0,   max: 0.5, step: 0.02,  def: 0.24,  was: 'none' },
+    { id: 'glowFloor',  label: 'Glow at its faintest',    min: 0,   max: 0.8, step: 0.02,  def: 0.48,   was: '0.00 (fully disappears)' },
+    { id: 'warmth',     label: 'Halo warmth (white → 金木犀)', min: 0, max: 1, step: 0.05, def: 0.7,   was: '0 (pure white)' },
+    { id: 'glowReach',  label: 'Halo reach (px)',         min: 120, max: 210, step: 2,     def: 192,   was: '131' },
+    { id: 'bandSwell',  label: 'Ring swell with breath',  min: 1,   max: 1.08,step: 0.005, def: 1, was: '1.000 (still)' },
+    { id: 'bandShadow', label: 'Warm shadow under ring',  min: 0,   max: 0.5, step: 0.02,  def: 0.3,  was: 'none' },
     { id: 'koiDepth',   label: 'Koi at its deepest (opacity)', min: 0.2, max: 1, step: 0.05, def: 0.5, was: '0.30, 5s' },
+    { id: 'koiBlur',    label: 'Koi blur at its deepest (px)', min: 0, max: 8, step: 0.5, def: 3, was: 'none' },
 
     { group: 'Ring ripples' },
-    { id: 'ripTravel',  label: 'Ripple travel time (s)',  min: 2,   max: 14,  step: 0.5,   def: 6.5,   was: '20s, steady speed' },
-    { id: 'ripReach',   label: 'How far it spreads (×)',  min: 1.4, max: 3.4, step: 0.1,   def: 2.6,   was: '1.9' },
+    { id: 'ripTravel',  label: 'Ripple travel time (s)',  min: 2,   max: 14,  step: 0.5,   def: 14,   was: '20s, steady speed' },
+    { id: 'ripReach',   label: 'How far it spreads (×)',  min: 1.4, max: 3.4, step: 0.1,   def: 2,   was: '1.9' },
     { id: 'ripCount',   label: 'Rings per drop',          min: 1,   max: 3,   step: 1,     def: 3,     was: '3, 5.4s apart' },
-    { id: 'ripGap',     label: 'Gap between rings (s)',   min: 0.2, max: 2.5, step: 0.05,  def: 0.65,  was: '5.4' },
+    { id: 'ripGap',     label: 'Gap between rings (s)',   min: 0.2, max: 2.5, step: 0.05,  def: 2.3,  was: '5.4' },
     { id: 'ripEvery',   label: 'One drop every N breaths',min: 1,   max: 3,   step: 1,     def: 1,     was: '—' },
-    { id: 'ripOpacity', label: 'Ripple strength',         min: 0.2, max: 1,   step: 0.05,  def: 0.85,  was: '0.70' },
+    { id: 'ripOpacity', label: 'Ripple strength',         min: 0.2, max: 1,   step: 0.05,  def: 1,  was: '0.70' },
     { id: 'ripTint',    label: 'Ripple tint (white → 金木犀)', min: 0, max: 1, step: 0.05, def: 0.4,   was: '0 (white)' },
 
     { group: 'Touch and rain' },
     { id: 'tapMs',      label: 'Touch ripple time (ms)',  min: 600, max: 3200,step: 50,    def: 1900,  was: '975' },
     { id: 'tapSize',    label: 'Touch ripple size (px)',  min: 80,  max: 280, step: 5,     def: 180,   was: '~160, thickens as it grows' },
-    { id: 'rainEvery',  label: 'Rain drop every (s), 0 = off', min: 0, max: 15, step: 0.5, def: 6,     was: '2.5–5s, up to 5 at once' },
+    { id: 'rainEvery',  label: 'Rain drop every (s), 0 = off', min: 0, max: 15, step: 0.5, def: 0.5,     was: '2.5–5s, up to 5 at once' },
 
     { group: 'Pond details' },
-    { id: 'caustics',   label: 'Light on the water',      min: 0,   max: 0.4, step: 0.02,  def: 0.18,  was: 'none' },
-    { id: 'florets',    label: '金木犀 floret every (s), 0 = off', min: 0, max: 30, step: 1, def: 11,   was: 'none' },
-    { id: 'bubbles',    label: 'Rising bubbles every (s), 0 = off', min: 0, max: 20, step: 1, def: 7,   was: 'none' },
-    { id: 'intro',      label: 'Ensō intro (ring draws itself)', type: 'check', def: true, was: 'none' }
+    { id: 'caustics',   label: 'Light on the water',      min: 0,   max: 0.4, step: 0.02,  def: 0.24,  was: 'none' },
+    { id: 'florets',    label: '金木犀 floret every (s), 0 = off', min: 0, max: 30, step: 1, def: 4,   was: 'none' },
+    { id: 'bubbles',    label: 'Rising bubbles every (s), 0 = off', min: 0, max: 20, step: 1, def: 2,   was: 'none' }
   ];
 
-  var STORE_KEY = 'startPreviewValues.v1';
+  var STORE_KEY = 'startPreviewValues.v2';
   var DEFAULTS = {};
   CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
 
@@ -447,16 +446,13 @@
      CSS GENERATOR
      Builds the Proposed CSS from the current values. The preview
      shows exactly this text, and "Copy values" copies it.
-     withIntro: the ensō intro is only played on load and on
-     "Replay intro", not every time a slider moves.
      ============================================================ */
   function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
   function mix(a, b, t) { return Math.round(a + (b - a) * t); }
 
-  function buildCSS(withIntro) {
+  function buildCSS() {
     var B = +v.breath;
     var F = +v.inhale;
-    var I = withIntro ? 2.4 : 0;                  // intro length (s)
     var peak = F * B;                             // glow peak inside a breath
     var P = B * v.ripEvery;                       // one ripple set per P seconds
     var count = +v.ripCount;
@@ -467,7 +463,7 @@
     var W = +v.warmth;
     var after = function (f) { return rim + (100 - rim) * f; };
     var tint = 'rgb(' + mix(255, 240, v.ripTint) + ', ' + mix(253, 125, v.ripTint) + ', ' + mix(249, 64, v.ripTint) + ')';
-    var koiDelay = ((I + peak) % B);              // koi reaches the surface at each glow peak
+    var koiDelay = peak % B;              // koi reaches the surface at each glow peak
     var tap = +v.tapMs;
     var ease = 'cubic-bezier(0.45, 0, 0.55, 1)';
     var waterOut = 'cubic-bezier(0.15, 0.55, 0.3, 1)';
@@ -522,19 +518,12 @@
 '    rgba(' + mix(255, 230, W) + ', ' + mix(255, 104, W) + ', ' + mix(255, 38, W) + ', 0) 100%);',
 '}',
 '.blossom-screen.visible .soft-glow {',
-'  animation: ' + (withIntro ? 'glowIntro 1.4s ease-out ' + n(I - 1.4) + 's both, ' : '') +
-              'glowBreath ' + n(B) + 's linear ' + n(I) + 's infinite;',
+'  animation: glowBreath ' + n(B) + 's linear infinite;',
 '}',
 '@keyframes glowBreath {',
 '  0%   { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); animation-timing-function: ' + ease + '; }',
 '  ' + n(F * 100) + '%  { opacity: ' + n(v.glowMax) + '; transform: scale(1.03); animation-timing-function: ' + ease + '; }',
 '  100% { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); }',
-'}'
-    );
-    if (withIntro) css.push(
-'@keyframes glowIntro {',
-'  from { opacity: 0; transform: scale(0.9); }',
-'  to   { opacity: ' + n(v.glowFloor) + '; transform: scale(0.97); }',
 '}'
     );
     css.push(
@@ -564,7 +553,6 @@
 '  transform-box: view-box;',
 '  transform-origin: 180px 180px;',
 '  transform: rotate(-90deg);',
-'  stroke-dasharray: 566 566;',
 '}',
 '.gold-band-shadow {',
 '  fill: none;',
@@ -574,20 +562,12 @@
 '}',
 '.blossom-screen.visible .gold-band,',
 '.blossom-screen.visible .gold-band-shadow {',
-'  animation: ' + (withIntro ? 'ensoDraw 2.2s cubic-bezier(0.65, 0, 0.35, 1) 0.2s both, ' : '') +
-              'bandBreath ' + n(B) + 's linear ' + n(I) + 's infinite;',
+'  animation: bandBreath ' + n(B) + 's linear infinite;',
 '}',
 '@keyframes bandBreath {',
 '  0%   { transform: rotate(-90deg) scale(1); animation-timing-function: ' + ease + '; }',
 '  ' + n(F * 100) + '%  { transform: rotate(-90deg) scale(' + n(v.bandSwell, 3) + '); animation-timing-function: ' + ease + '; }',
 '  100% { transform: rotate(-90deg) scale(1); }',
-'}'
-    );
-    if (withIntro) css.push(
-'/* Ensō: the ring draws itself once, like a single brush stroke. */',
-'@keyframes ensoDraw {',
-'  from { stroke-dashoffset: 566; }',
-'  to   { stroke-dashoffset: 0; }',
 '}'
     );
     css.push('');
@@ -608,7 +588,7 @@
     );
     for (var i = 1; i <= 3; i++) {
       if (i <= count) {
-        var d = n(Math.max(0, I + peak - lead + (i - 1) * v.ripGap));
+        var d = n(Math.max(0, peak - lead + (i - 1) * v.ripGap));
         css.push('.blossom-screen.visible .ripple-' + i + ' { animation-delay: ' + d + 's, ' + d + 's; }');
       } else {
         css.push('.blossom-screen.visible .ripple-' + i + ' { animation: none; opacity: 0; }');
@@ -631,23 +611,17 @@
     /* --- Koi --- */
     css.push(
 '/* Koi: rises and sinks on the same breath, reaching the surface',
-'   exactly when the halo peaks and the ripples leave. */',
+'   exactly when the halo peaks and the ripples leave. The deeper it',
+'   goes, the more it blurs (sharp at the surface, ' + n(v.koiBlur, 1) + 'px at the bottom). */',
 '.blossom-screen.visible .blossom-char {',
-'  animation: ' + (withIntro ? 'koiEmerge 1.8s cubic-bezier(0.2, 0.7, 0.3, 1) 0.9s backwards, ' : '') +
-              'koiDive ' + n(B) + 's ease-in-out ' + n(koiDelay) + 's infinite;',
+'  animation: koiDive ' + n(B) + 's ease-in-out ' + n(koiDelay) + 's infinite;',
 '}',
 '.blossom-screen.visible .koi-shadow {',
 '  animation: koiShadowFade ' + n(B) + 's ease-in-out ' + n(koiDelay) + 's infinite;',
 '}',
 '@keyframes koiDive {',
-'  0%, 100% { opacity: 1; transform: scale(1); }',
-'  50%      { opacity: ' + n(v.koiDepth) + '; transform: scale(0.94); }',
-'}'
-    );
-    if (withIntro) css.push(
-'@keyframes koiEmerge {',
-'  from { opacity: 0; transform: scale(0.82); }',
-'  to   { opacity: 1; transform: scale(1); }',
+'  0%, 100% { opacity: 1; transform: scale(1); filter: blur(0); }',
+'  50%      { opacity: ' + n(v.koiDepth) + '; transform: scale(0.94); filter: blur(' + n(v.koiBlur, 1) + 'px); }',
 '}'
     );
     css.push('');
@@ -690,10 +664,6 @@
 '  animation-direction: reverse;',
 '}',
 '@keyframes causticTurn { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }'
-    );
-    if (withIntro) css.push(
-'.blossom-screen.visible .pond-surface { animation: pondIn 1.6s ease 0.8s both; }',
-'@keyframes pondIn { from { opacity: 0; } to { opacity: 1; } }'
     );
     css.push(
 '.start-btn.diving .pond-surface { opacity: 0; transition: opacity 700ms ease; }',
@@ -766,6 +736,24 @@
 ''
     );
 
+    /* --- Leaves and layering --- */
+    css.push(
+'/* No falling leaves on the start screen. They fade back in (main.css',
+'   already has a 1.8s opacity transition) once the koi dives. */',
+'html:has(.blossom-screen.visible:not(.diving)) .maple-leaves-overlay {',
+'  opacity: 0;',
+'}',
+'',
+'/* The ring ripples spread out UNDER the words: greeting and hints sit',
+'   on a higher layer than the button. */',
+'.blossom-greeting,',
+'.start-hints {',
+'  position: relative;',
+'  z-index: 3;',
+'}',
+''
+    );
+
     /* --- Words --- */
     css.push(
 '/* Words (text unchanged): hint lines arrive out of a soft blur, and a',
@@ -787,30 +775,6 @@
 '@keyframes hintGlint {',
 '  0%, 72% { background-position: 100% 0; }',
 '  100%    { background-position: 0 0; }',
-'}'
-    );
-    if (withIntro) css.push(
-'/* Greeting: the time fades up out of a blur, the name is revealed',
-'   left to right like a brush stroke. */',
-'.blossom-screen.visible .blossom-greeting-time {',
-'  animation: greetIn 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.2s backwards;',
-'}',
-'@keyframes greetIn {',
-'  from { opacity: 0; transform: translateY(8px); filter: blur(4px); }',
-'  to   { opacity: 1; transform: none; filter: blur(0); }',
-'}',
-'.blossom-screen.visible .blossom-greeting-name {',
-'  -webkit-mask-image: linear-gradient(90deg, #000 44%, transparent 56%);',
-'  mask-image: linear-gradient(90deg, #000 44%, transparent 56%);',
-'  -webkit-mask-size: 260% 100%;',
-'  mask-size: 260% 100%;',
-'  -webkit-mask-repeat: no-repeat;',
-'  mask-repeat: no-repeat;',
-'  animation: brushReveal 1.9s cubic-bezier(0.65, 0, 0.35, 1) 0.6s backwards;',
-'}',
-'@keyframes brushReveal {',
-'  from { -webkit-mask-position: 100% 0; mask-position: 100% 0; }',
-'  to   { -webkit-mask-position: 0 0; mask-position: 0 0; }',
 '}'
     );
     css.push(
@@ -838,24 +802,24 @@
   var bubbleBox = document.getElementById('pondBubbles');
   var floretLayer = document.getElementById('floretLayer');
 
-  function applyCSS(withIntro) {
-    live.textContent = mode === 'new' ? buildCSS(withIntro) : '';
+  function applyCSS() {
+    live.textContent = mode === 'new' ? buildCSS() : '';
   }
 
   /* Restart the button's animations together so they stay in step. */
-  function restartButton(withIntro) {
+  function restartButton() {
     screen.classList.add('pv-hold');
-    applyCSS(withIntro);
+    applyCSS();
     void screen.offsetWidth;
     screen.classList.remove('pv-hold');
   }
 
-  /* Whole-screen replay: hide, then show again, like the app does. */
-  function replayIntro() {
+  /* Show the screen again after a dive, like returning to it in the app. */
+  function showScreen() {
     resetGesture();
     screen.classList.remove('visible', 'diving');
     startBtn.classList.remove('ready', 'diving', 'done', 'startling');
-    applyCSS(true);
+    applyCSS();
     void screen.offsetWidth;
     setTimeout(function () { screen.classList.add('visible'); }, 450);
   }
@@ -864,7 +828,7 @@
   function onValueChange() {
     saveValues();
     clearTimeout(restartTimer);
-    restartTimer = setTimeout(function () { restartButton(false); }, 220);
+    restartTimer = setTimeout(function () { restartButton(); }, 220);
     restartTimers();
   }
 
@@ -941,7 +905,7 @@
     rippleLayer.innerHTML = '';
     floretLayer.innerHTML = '';
     bubbleBox.innerHTML = '';
-    restartButton(false);
+    restartButton();
     restartTimers();
   }
   btnCur.addEventListener('click', function () { setMode('cur'); });
@@ -955,7 +919,6 @@
     collapseBtn.setAttribute('aria-label', c ? 'Show panel' : 'Hide panel');
   });
 
-  document.getElementById('pvReplay').addEventListener('click', replayIntro);
 
   var statusEl = document.getElementById('pvStatus');
   var outEl = document.getElementById('pvOut');
@@ -967,12 +930,12 @@
     outEl.classList.remove('shown');
     statusEl.textContent = 'Reset to the proposed defaults.';
     if (mode !== 'new') setMode('new');
-    restartButton(false);
+    restartButton();
     restartTimers();
   });
 
   document.getElementById('pvCopy').addEventListener('click', function () {
-    var text = buildCSS(!!v.intro);
+    var text = buildCSS();
     outEl.textContent = text;
     outEl.classList.add('shown');
     function done(ok) {
@@ -1258,7 +1221,7 @@
     setTimeout(function () {
       startBtn.classList.remove('diving', 'ready');
       koiWrap.style.setProperty('--koi-rise-y', '0px');
-      replayIntro();
+      showScreen();
     }, 2600);
   }
 
@@ -1335,7 +1298,7 @@
   var leaves = document.getElementById('mapleLeaves');
   if (leaves) leaves.classList.add('active');
   buildLanterns();
-  replayIntro();
+  showScreen();
   restartTimers();
 })();
 </script>
