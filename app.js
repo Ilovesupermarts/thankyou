@@ -1,3 +1,12 @@
+var BUILD = 'v117';
+(function () {
+  var m = document.querySelector('meta[name="build"]');
+  var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
+  var bad = (m && m.content !== BUILD) || (css && css !== BUILD);
+  var retried = /[?&]r=1/.test(location.search);
+  if (bad && !retried) { location.replace(location.pathname + '?r=1'); throw new Error('build mismatch'); }
+  if (!bad && retried) history.replaceState(null, '', location.pathname);
+})();
 /* ============================================================
    app.js — v1.3
 
