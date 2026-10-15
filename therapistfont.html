@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>セラピスト名フォント試験</title>
+
+<!-- Preview page only. Not linked from the app and not listed in
+     sw.js ASSETS. Loads the real main.css so the panel below picks up
+     the exact .panel / .panel-content / .therapist-name rules. Each
+     candidate font is loaded by its own <link> from app code below,
+     so one failed family cannot break the others. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="main.css">
+
+<style>
+  /* Preview-only controls. Nothing here touches .panel-content or
+     .therapist-name except through the inline style set by the
+     script, so the real main.css rules are what you see. */
+  .tf-drawer {
+    position: fixed; top: 12px; right: 12px; bottom: 12px;
+    width: min(380px, calc(100vw - 32px));
+    z-index: 500;
+    display: flex; flex-direction: column;
+    background: rgba(255, 253, 249, 0.97);
+    border: 1px solid rgba(136, 46, 71, 0.18);
+    border-radius: 18px;
+    box-shadow: 0 8px 30px rgba(80, 40, 10, 0.15);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    font-size: 14px; line-height: 1.5; color: #4a3530;
+    user-select: none; -webkit-user-select: none;
+    transition: transform 0.3s ease;
+    touch-action: auto;
+  }
+  .tf-drawer.collapsed { transform: translateX(calc(100% + 12px)); }
+  /* On a wide screen, keep the whole panel visible beside the open
+     drawer. Media queries in main.css still see the full viewport,
+     so the panel keeps the same font size as in the app. */
+  @media (min-width: 1000px) {
+    body.tf-open .stage { width: calc(100% - 404px); }
+  }
+  .tf-toggle {
+    position: fixed; top: 12px; right: 12px; z-index: 501;
+    border: 1px solid rgba(136, 46, 71, 0.25); background: #FFFDF9; color: #882E47;
+    border-radius: 18px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600;
+    box-shadow: 0 4px 14px rgba(80, 40, 10, 0.12); cursor: pointer;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  }
+  .tf-drawer:not(.collapsed) ~ .tf-toggle { display: none; }
+  .tf-head { padding: 14px 16px 10px; border-bottom: 1px solid rgba(136, 46, 71, 0.12); }
+  .tf-title { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-size: 15px; color: #882E47; }
+  .tf-close { border: none; background: transparent; color: #725750; font-size: 20px; line-height: 1; padding: 4px 8px; cursor: pointer; }
+  .tf-current { margin-top: 6px; font-size: 12.5px; color: #725750; }
+  .tf-current b { color: #4a3530; }
+  .tf-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 10px 16px 14px; overscroll-behavior: contain; }
+  .tf-row { margin: 10px 0; }
+  .tf-row label, .tf-label { display: block; font-size: 12px; font-weight: 600; color: #725750; margin-bottom: 4px; letter-spacing: 0.5px; }
+  .tf-row input[type="text"], .tf-row select {
+    width: 100%; font: inherit; font-size: 15px; padding: 8px 10px;
+    border: 1px solid rgba(136, 46, 71, 0.25); border-radius: 10px; background: #fff; color: #4a3530;
+    user-select: text; -webkit-user-select: text;
+  }
+  .tf-row input[type="range"] { width: 100%; }
+  .tf-inline { display: flex; gap: 8px; align-items: center; }
+  .tf-inline > * { flex: 1; }
+  .tf-val { font-variant-numeric: tabular-nums; color: #4a3530; font-weight: 600; }
+  .tf-check { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+  .tf-check input { width: 20px; height: 20px; }
+  .tf-note { font-size: 11.5px; color: #8a716a; margin-top: 3px; }
+  .tf-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .tf-chip {
+    border: 1px solid rgba(136, 46, 71, 0.25); background: #fff; color: #725750;
+    border-radius: 14px; padding: 5px 10px; font: inherit; font-size: 12.5px; cursor: pointer;
+  }
+  .tf-chip.on { background: #882E47; border-color: #882E47; color: #fff; }
+  .tf-list { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+  .tf-font {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; text-align: left; cursor: pointer;
+    border: 1px solid rgba(136, 46, 71, 0.15); background: #fff; border-radius: 12px;
+    padding: 8px 12px; color: #4a3530; font: inherit;
+  }
+  .tf-font.on { border-color: #882E47; box-shadow: 0 0 0 2px rgba(136, 46, 71, 0.25); }
+  .tf-font-sample { font-size: 24px; line-height: 1.3; color: #882E47; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tf-font-meta { flex-shrink: 0; text-align: right; font-size: 11px; color: #8a716a; line-height: 1.35; }
+  .tf-font-meta .nm { font-size: 12px; color: #4a3530; font-weight: 600; }
+  .tf-font-meta .bad { color: #b3261e; font-weight: 700; }
+  .tf-font-meta .cur { color: #882E47; font-weight: 700; }
+  .tf-actions { display: flex; gap: 8px; padding: 10px 16px; border-top: 1px solid rgba(136, 46, 71, 0.12); }
+  .tf-btn {
+    flex: 1; border-radius: 20px; padding: 10px 12px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+    border: 1.5px solid #882E47; background: #882E47; color: #fff;
+  }
+  .tf-btn.alt { background: #fff; color: #882E47; }
+  .tf-out {
+    margin: 0 16px 14px; padding: 10px 12px; max-height: 26vh; overflow: auto;
+    background: #fbf3ee; border: 1px dashed rgba(136, 46, 71, 0.3); border-radius: 10px;
+    font-family: ui-monospace, "Roboto Mono", monospace; font-size: 11.5px; line-height: 1.55;
+    white-space: pre-wrap; word-break: break-all; color: #4a3530;
+    user-select: text; -webkit-user-select: text;
+  }
+  .tf-out:empty { display: none; }
+  .tf-status { padding: 0 16px 8px; font-size: 12px; color: #2e7d32; font-weight: 600; min-height: 0; }
+  .tf-status:empty { display: none; }
+  .tf-details summary { cursor: pointer; font-size: 12px; font-weight: 600; color: #725750; }
+  .tf-details p, .tf-details li { font-size: 11.5px; color: #8a716a; margin: 4px 0; }
+  .tf-details ul { padding-left: 18px; margin: 4px 0; }
+</style>
+</head>
+<body class="tf-open">
+
+<!-- Static copy of the app's background layers (CSS only, no motion
+     driver), so the name is seen against the same backdrop. -->
+<div class="ambient-stage layer-diffuse" aria-hidden="true">
+  <div class="ambient-layer ambient-mesh">
+    <div class="light-orb orb-1"></div>
+    <div class="light-orb orb-2"></div>
+    <div class="light-orb orb-3"></div>
+  </div>
+  <div class="ambient-layer ambient-primary"></div>
+</div>
+<div class="ambient-mosaic" aria-hidden="true"></div>
+
+<!-- Same structure that index.html + buildPanel1OpeningBeats() and
+     updateGreetingPanel() in app.js produce for Panel 0, with the
+     reveal classes (.active / .shown) already applied. -->
+<div class="stage">
+  <div class="track">
+    <div class="panel active" data-panel="0">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <span class="panel-phrase panel-1-beat shown" data-beat="1"><span id="therapistName" class="therapist-name">桜庭さん</span>、</span><span class="panel-phrase panel-1-beat shown" data-beat="2">初めまして。</span>
+          <div id="panelGreetingBody"><p>秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。</p><p>どうぞ肩の力を抜いて、おくつろぎください。</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<aside class="tf-drawer" id="tfDrawer">
+  <div class="tf-head">
+    <div class="tf-title">
+      <span>名前フォント試験 · Name font test</span>
+      <button type="button" class="tf-close" id="tfClose" aria-label="閉じる">×</button>
+    </div>
+    <div class="tf-current" id="tfCurrent"></div>
+  </div>
+
+  <div class="tf-body">
+    <div class="tf-row">
+      <label for="tfName">名前 · Name</label>
+      <input type="text" id="tfName" value="桜庭さん" autocomplete="off">
+    </div>
+
+    <div class="tf-row tf-inline">
+      <div>
+        <label for="tfWeight">太さ · Weight</label>
+        <select id="tfWeight"></select>
+      </div>
+      <div>
+        <span class="tf-label">斜体 · Italic</span>
+        <label class="tf-check"><input type="checkbox" id="tfItalic"> 斜体（疑似）</label>
+      </div>
+    </div>
+    <div class="tf-note" id="tfWeightNote"></div>
+
+    <div class="tf-row">
+      <label for="tfSize">大きさ · Size <span class="tf-val" id="tfSizeVal"></span></label>
+      <input type="range" id="tfSize" min="0.90" max="1.80" step="0.02">
+    </div>
+    <div class="tf-row">
+      <label for="tfSpacing">字間 · Letter spacing <span class="tf-val" id="tfSpacingVal"></span></label>
+      <input type="range" id="tfSpacing" min="0" max="10" step="0.5">
+    </div>
+
+    <div class="tf-row">
+      <span class="tf-label">種類 · Style group</span>
+      <div class="tf-chips" id="tfFilters"></div>
+    </div>
+
+    <div class="tf-list" id="tfList"></div>
+
+    <div class="tf-row">
+      <details class="tf-details">
+        <summary>除外したフォント · Fonts left out</summary>
+        <p>These Google Fonts were tested and left out because they cannot show most kanji, so many names would fall back to another font or show boxes:</p>
+        <ul>
+          <li>Aoboshi One, Cherry Bomb One, Chokokutai, Darumadrop One, Monomaniac One, Slackside One, Tsukimi Rounded (about 1,300–2,500 kanji only)</li>
+          <li>Shizuru, Palette Mosaic, Rock 3D, Kapakana, Yuji Hentaigana Akari / Akebono (under 1,000 kanji)</li>
+          <li>LXGW WenKai TC, LXGW Marker Gothic, Iansui, Huninn, Chiron GoRound TC (full coverage, but kanji are drawn in the Taiwanese style)</li>
+          <li>Hiragino and Yu Mincho/Gothic are Apple/Windows fonts and do not exist on the Galaxy Tab.</li>
+        </ul>
+        <p>Italic: no Japanese web font has a true italic. The checkbox asks the browser to slant the letters itself.</p>
+      </details>
+    </div>
+  </div>
+
+  <div class="tf-status" id="tfStatus"></div>
+  <pre class="tf-out" id="tfOut"></pre>
+  <div class="tf-actions">
+    <button type="button" class="tf-btn" id="tfCopy">Copy values</button>
+    <button type="button" class="tf-btn alt" id="tfReset">Reset</button>
+  </div>
+</aside>
+<button type="button" class="tf-toggle" id="tfOpen">フォント設定 ◂</button>
+
+<script>
+(function () {
+  'use strict';
+
+  /* Fallback chains copied from main.css so a copied value drops
+     straight into the existing rules. */
+  var MINCHO_FALLBACK = '"Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif';
+  var GOTHIC_FALLBACK = '"Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Noto Sans CJK JP", sans-serif';
+
+  var GROUPS = [
+    { id: 'all',     label: '全部 All' },
+    { id: 'mincho',  label: '明朝 Mincho' },
+    { id: 'brush',   label: '筆・手書き Brush' },
+    { id: 'gothic',  label: 'ゴシック Gothic' },
+    { id: 'round',   label: '丸 Rounded' },
+    { id: 'display', label: 'デザイン Display' },
+    { id: 'device',  label: '端末 Device' }
+  ];
+
+  /* Every Google Fonts family that passed the check: full Japanese
+     kana plus ~12,700 kanji (Murecho ~11,900). Weights are the real
+     weights Google serves for each family. */
+  var FONTS = [
+    // 明朝 / serif
+    { f: 'Noto Serif JP',        g: 'mincho', w: [200, 300, 400, 500, 600, 700, 800, 900] },
+    { f: 'Shippori Mincho',      g: 'mincho', w: [400, 500, 600, 700, 800] },
+    { f: 'Shippori Mincho B1',   g: 'mincho', w: [400, 500, 600, 700, 800] },
+    { f: 'Zen Old Mincho',       g: 'mincho', w: [400, 500, 600, 700, 900] },
+    { f: 'BIZ UDPMincho',        g: 'mincho', w: [400, 700] },
+    { f: 'BIZ UDMincho',         g: 'mincho', w: [400, 700] },
+    { f: 'Sawarabi Mincho',      g: 'mincho', w: [400] },
+    { f: 'Hina Mincho',          g: 'mincho', w: [400] },
+    { f: 'Kaisei Decol',         g: 'mincho', w: [400, 500, 700] },
+    { f: 'Kaisei Opti',          g: 'mincho', w: [400, 500, 700] },
+    { f: 'Kaisei Tokumin',       g: 'mincho', w: [400, 500, 700, 800] },
+    { f: 'Kaisei HarunoUmi',     g: 'mincho', w: [400, 500, 700] },
+    { f: 'Zen Antique',          g: 'mincho', w: [400] },
+    { f: 'Zen Antique Soft',     g: 'mincho', w: [400] },
+    { f: 'Shippori Antique',     g: 'mincho', w: [400] },
+    { f: 'Shippori Antique B1',  g: 'mincho', w: [400] },
+    { f: 'New Tegomin',          g: 'mincho', w: [400] },
+    // 筆・手書き / brush & handwriting
+    { f: 'Yuji Mai',             g: 'brush',  w: [400] },
+    { f: 'Yuji Syuku',           g: 'brush',  w: [400] },
+    { f: 'Yuji Boku',            g: 'brush',  w: [400] },
+    { f: 'Klee One',             g: 'brush',  w: [400, 600] },
+    { f: 'Zen Kurenaido',        g: 'brush',  w: [400] },
+    { f: 'Yomogi',               g: 'brush',  w: [400] },
+    { f: 'Hachi Maru Pop',       g: 'brush',  w: [400] },
+    { f: 'Yusei Magic',          g: 'brush',  w: [400] },
+    // ゴシック / sans
+    { f: 'Noto Sans JP',         g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+    { f: 'Zen Kaku Gothic New',  g: 'gothic', w: [300, 400, 500, 700, 900] },
+    { f: 'Zen Kaku Gothic Antique', g: 'gothic', w: [300, 400, 500, 700, 900] },
+    { f: 'BIZ UDPGothic',        g: 'gothic', w: [400, 700] },
+    { f: 'BIZ UDGothic',         g: 'gothic', w: [400, 700] },
+    { f: 'Sawarabi Gothic',      g: 'gothic', w: [400] },
+    { f: 'M PLUS 1p',            g: 'gothic', w: [100, 300, 400, 500, 700, 800, 900] },
+    { f: 'M PLUS 1',             g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+    { f: 'M PLUS 2',             g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+    { f: 'M PLUS 1 Code',        g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700] },
+    { f: 'Kosugi',               g: 'gothic', w: [400] },
+    { f: 'Murecho',              g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700, 800, 900] },
+    { f: 'IBM Plex Sans JP',     g: 'gothic', w: [100, 200, 300, 400, 500, 600, 700] },
+    { f: 'LINE Seed JP',         g: 'gothic', w: [100, 400, 700, 800] },
+    // 丸 / rounded
+    { f: 'Zen Maru Gothic',      g: 'round',  w: [300, 400, 500, 700, 900] },
+    { f: 'M PLUS Rounded 1c',    g: 'round',  w: [100, 300, 400, 500, 700, 800, 900] },
+    { f: 'Kosugi Maru',          g: 'round',  w: [400] },
+    { f: 'Kiwi Maru',            g: 'round',  w: [300, 400, 500] },
+    // デザイン / display
+    { f: 'Rampart One',          g: 'display', w: [400] },
+    { f: 'Reggae One',           g: 'display', w: [400] },
+    { f: 'RocknRoll One',        g: 'display', w: [400] },
+    { f: 'Stick',                g: 'display', w: [400] },
+    { f: 'DotGothic16',          g: 'display', w: [400] },
+    { f: 'Potta One',            g: 'display', w: [400] },
+    { f: 'Dela Gothic One',      g: 'display', w: [400] },
+    { f: 'Mochiy Pop One',       g: 'display', w: [400] },
+    { f: 'Mochiy Pop P One',     g: 'display', w: [400] },
+    { f: 'Train One',            g: 'display', w: [400] },
+    { f: 'WDXL Lubrifont JP N',  g: 'display', w: [400] },
+    // 端末 / built into Android (Noto CJK). No download needed.
+    { f: 'serif',      g: 'device', w: [400, 700], device: true, label: '端末の明朝 (serif)' },
+    { f: 'sans-serif', g: 'device', w: [400, 700], device: true, label: '端末のゴシック (sans-serif)' }
+  ];
+
+  /* What the real app uses today (main.css .panel-content .therapist-name). */
+  var DEFAULTS = { font: 'Yuji Mai', weight: 400, italic: false, size: 1.18, spacing: 2, name: '桜庭さん' };
+
+  var state = {
+    font: DEFAULTS.font, weight: DEFAULTS.weight, italic: DEFAULTS.italic,
+    size: DEFAULTS.size, spacing: DEFAULTS.spacing, name: DEFAULTS.name, group: 'all'
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+  var nameEl = $('therapistName');
+  var listEl = $('tfList');
+  var weightEl = $('tfWeight');
+  var byFamily = {};
+  FONTS.forEach(function (x) { byFamily[x.f] = x; });
+
+  function fallbackFor(x) {
+    return (x.g === 'mincho' || x.g === 'brush') ? MINCHO_FALLBACK : GOTHIC_FALLBACK;
+  }
+  function stackFor(x) {
+    if (x.device) return x.f;
+    return '"' + x.f + '", ' + fallbackFor(x);
+  }
+  function hasRealBold(x) {
+    return x.w.some(function (w) { return w >= 600; });
+  }
+  function googleParam(x) {
+    var p = 'family=' + x.f.replace(/ /g, '+');
+    if (x.w.length > 1) p += ':wght@' + x.w.join(';');
+    return p;
+  }
+
+  var loadStatus = {};  // family -> 'ok' | 'fail'
+  var sheetLoaded = {}; // family -> true once its Google stylesheet arrived
+
+  /* One stylesheet per family so a single failure stays isolated. */
+  FONTS.forEach(function (x) {
+    if (x.device) return;
+    var link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'https://fonts.googleapis.com/css2?' + googleParam(x) + '&display=swap';
+    link.onload = function () { sheetLoaded[x.f] = true; checkOne(x); };
+    link.onerror = function () { loadStatus[x.f] = 'fail'; scheduleListRender(); };
+    document.head.appendChild(link);
+  });
+
+  /* ---------- font list ---------- */
+  function renderFilters() {
+    var box = $('tfFilters');
+    box.innerHTML = '';
+    GROUPS.forEach(function (g) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tf-chip' + (state.group === g.id ? ' on' : '');
+      b.textContent = g.label;
+      b.addEventListener('click', function () { state.group = g.id; renderFilters(); renderList(); });
+      box.appendChild(b);
+    });
+  }
+
+
+  function renderList() {
+    listEl.innerHTML = '';
+    FONTS.forEach(function (x) {
+      if (state.group !== 'all' && state.group !== x.g) return;
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tf-font' + (state.font === x.f ? ' on' : '');
+      var sample = document.createElement('span');
+      sample.className = 'tf-font-sample';
+      sample.style.fontFamily = stackFor(x);
+      sample.textContent = state.name || ' ';
+      var meta = document.createElement('span');
+      meta.className = 'tf-font-meta';
+      var tags = [];
+      if (x.f === DEFAULTS.font) tags.push('<span class="cur">現在 / current</span>');
+      tags.push(hasRealBold(x) ? '太字あり' : '太字は疑似');
+      if (x.w.length > 1) tags.push(x.w.length + ' weights');
+      if (loadStatus[x.f] === 'fail') tags.push('<span class="bad">読み込み失敗</span>');
+      meta.innerHTML = '<div class="nm"></div>' + tags.join('<br>');
+      meta.firstChild.textContent = x.label || x.f;
+      b.appendChild(sample);
+      b.appendChild(meta);
+      b.addEventListener('click', function () { selectFont(x.f); });
+      listEl.appendChild(b);
+    });
+  }
+
+  /* Ask the browser to load each family for the current name and flag
+     any that fail (e.g. offline), so a broken one is never mistaken
+     for a real look. */
+  function checkOne(x) {
+    if (x.device || !sheetLoaded[x.f] || !document.fonts || !document.fonts.load) return;
+    document.fonts.load('400 24px "' + x.f + '"', state.name || '桜庭さん').then(function (faces) {
+      var prev = loadStatus[x.f];
+      loadStatus[x.f] = faces && faces.length ? 'ok' : 'fail';
+      if (prev !== loadStatus[x.f]) scheduleListRender();
+    }, function () {
+      loadStatus[x.f] = 'fail';
+      scheduleListRender();
+    });
+  }
+  function checkLoads() { FONTS.forEach(checkOne); }
+  var listTimer = 0;
+  function scheduleListRender() {
+    clearTimeout(listTimer);
+    listTimer = setTimeout(renderList, 150);
+  }
+
+  /* ---------- controls ---------- */
+  function renderWeights() {
+    var x = byFamily[state.font];
+    weightEl.innerHTML = '';
+    x.w.forEach(function (w) {
+      var o = document.createElement('option');
+      o.value = String(w);
+      o.textContent = w + (w === 400 ? '（標準）' : w >= 700 ? '（太字）' : '');
+      weightEl.appendChild(o);
+    });
+    if (!hasRealBold(x)) {
+      var o = document.createElement('option');
+      o.value = '700';
+      o.textContent = '700（疑似太字）';
+      weightEl.appendChild(o);
+    }
+    var allowed = x.w.slice();
+    if (!hasRealBold(x)) allowed.push(700);
+    if (allowed.indexOf(state.weight) === -1) {
+      state.weight = allowed.indexOf(400) !== -1 ? 400 : allowed[0];
+    }
+    weightEl.value = String(state.weight);
+    $('tfWeightNote').textContent = hasRealBold(x)
+      ? 'このフォントは本物の太字があります。 This font has real bold weights.'
+      : '太字は1種類のみ。700はブラウザが合成します。 Only one weight; 700 is browser-made (faux bold).';
+  }
+
+  function isFauxBold() {
+    var x = byFamily[state.font];
+    return x.w.indexOf(state.weight) === -1;
+  }
+
+  function apply() {
+    var x = byFamily[state.font];
+    nameEl.textContent = state.name;
+    nameEl.style.fontFamily = stackFor(x);
+    nameEl.style.fontWeight = String(state.weight);
+    nameEl.style.fontStyle = state.italic ? 'italic' : 'normal';
+    nameEl.style.fontSize = state.size.toFixed(2) + 'em';
+    nameEl.style.letterSpacing = state.spacing + 'px';
+    $('tfSizeVal').textContent = state.size.toFixed(2) + 'em';
+    $('tfSpacingVal').textContent = state.spacing + 'px';
+    $('tfCurrent').innerHTML = '';
+    var b = document.createElement('b');
+    b.textContent = x.label || x.f;
+    $('tfCurrent').appendChild(b);
+    $('tfCurrent').appendChild(document.createTextNode(
+      ' · ' + state.weight + (isFauxBold() ? ' (faux)' : '') +
+      (state.italic ? ' · italic (faux)' : '') +
+      ' · ' + state.size.toFixed(2) + 'em · ' + state.spacing + 'px'));
+  }
+
+  function selectFont(f) {
+    state.font = f;
+    renderWeights();
+    renderList();
+    apply();
+  }
+
+  function syncInputs() {
+    $('tfName').value = state.name;
+    $('tfItalic').checked = state.italic;
+    $('tfSize').value = String(state.size);
+    $('tfSpacing').value = String(state.spacing);
+  }
+
+  $('tfName').addEventListener('input', function (e) {
+    state.name = e.target.value;
+    apply();
+    scheduleListRender();
+    checkLoads();
+  });
+  weightEl.addEventListener('change', function () { state.weight = parseInt(weightEl.value, 10); apply(); });
+  $('tfItalic').addEventListener('change', function (e) { state.italic = e.target.checked; apply(); });
+  $('tfSize').addEventListener('input', function (e) { state.size = parseFloat(e.target.value); apply(); });
+  $('tfSpacing').addEventListener('input', function (e) { state.spacing = parseFloat(e.target.value); apply(); });
+
+  $('tfClose').addEventListener('click', function () {
+    $('tfDrawer').classList.add('collapsed');
+    document.body.classList.remove('tf-open');
+  });
+  $('tfOpen').addEventListener('click', function () {
+    $('tfDrawer').classList.remove('collapsed');
+    document.body.classList.add('tf-open');
+  });
+
+  /* ---------- copy / reset ---------- */
+  function buildValues() {
+    var x = byFamily[state.font];
+    var lines = [
+      '/* .panel-content .therapist-name */',
+      'font-family: ' + stackFor(x) + ';',
+      'font-weight: ' + state.weight + ';' + (isFauxBold() ? ' /* faux bold: font has no real bold */' : ''),
+      'font-style: ' + (state.italic ? 'italic; /* faux italic: browser slant */' : 'normal;'),
+      'font-size: ' + state.size.toFixed(2) + 'em;',
+      'letter-spacing: ' + state.spacing + 'px;'
+    ];
+    if (!x.device) {
+      lines.push('', '/* Google Fonts link (add to the css2 URL in index.html): */', googleParam(x));
+    } else {
+      lines.push('', '/* Built-in device font: no download needed. */');
+    }
+    return lines.join('\n');
+  }
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  function flash(msg) {
+    var s = $('tfStatus');
+    s.textContent = msg;
+    clearTimeout(flash.t);
+    flash.t = setTimeout(function () { s.textContent = ''; }, 2500);
+  }
+
+  $('tfCopy').addEventListener('click', function () {
+    var text = buildValues();
+    $('tfOut').textContent = text;
+    var done = function (ok) {
+      flash(ok ? 'コピーしました · Copied to clipboard'
+               : 'コピーできませんでした。下の文字を選んでコピーしてください · Copy failed, select the text below');
+    };
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+    } else {
+      done(fallbackCopy(text));
+    }
+  });
+
+  $('tfReset').addEventListener('click', function () {
+    state.font = DEFAULTS.font;
+    state.weight = DEFAULTS.weight;
+    state.italic = DEFAULTS.italic;
+    state.size = DEFAULTS.size;
+    state.spacing = DEFAULTS.spacing;
+    state.name = DEFAULTS.name;
+    state.group = 'all';
+    $('tfOut').textContent = '';
+    syncInputs();
+    renderFilters();
+    renderWeights();
+    renderList();
+    apply();
+    checkLoads();
+    flash('元に戻しました · Reset to the app’s current values');
+  });
+
+  syncInputs();
+  renderFilters();
+  renderWeights();
+  renderList();
+  apply();
+  checkLoads();
+})();
+</script>
+</body>
+</html>
