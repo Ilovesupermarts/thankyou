@@ -324,11 +324,12 @@
     mask-size: 60px 60px;
     mask-position: 0 0;
 
-    /* Rest 0.20 → Peak 0.42. The swell amplitude was stepped down
-       from 0.30 to 0.22 in the readability pass. The resting floor
-       stays at 0.20 — the baked contrast in the orb stops preserves
-       the perceived density at this opacity. */
-    opacity: calc(0.20 + var(--audio-swell, 0) * 0.22);
+    /* Rest 0.60 → Peak 0.82. This window now carries the 霞灯 lantern
+       light (see the MIST + LANTERNS section below), which is a
+       single thin Shippō ring at a time, so the resting floor is
+       0.60 rather than the 0.20 the old orb mirror used. The swell
+       amplitude is unchanged at 0.22. */
+    opacity: calc(0.60 + var(--audio-swell, 0) * 0.22);
   }
 
   .shippo-mask-window .ambient-stage.layer-mirrored {
@@ -495,6 +496,131 @@
   }
 
   /* ============================================================
+     MIST + LANTERNS — 霞灯 (Kasumi + Akari)
+     ------------------------------------------------------------
+     Replaces the three drifting orbs. Two long bands of mist glide
+     slowly across the page (霞), and single Shippō rings light up
+     one at a time like lanterns, then step to a neighbouring ring
+     (灯り). Tuned on the tablet with background.html:
+
+       mist     ×2.90 speed (24.1s per crossing), 2 bands,
+                strength 0.95, glow on the lines 0.25 × 0.60 = 0.15
+       lanterns ×1.90 speed (3.7s per glow), 10 lights,
+                strength 0.76, glow on the lines 0.60
+       orbs     removed        wash drift   off (wash is static)
+
+     Each half is drawn twice: a soft copy behind the pattern
+     (.mist-soft / .lantern-bloom-layer) and a lit copy inside the
+     Shippō mask (#stageLattice), so the thin strokes catch the light
+     as it passes. The lit mist copy uses the same --y/--h/--d as
+     the soft one so the two stay in step.
+
+     Compositor safety: only transform and opacity are animated, no
+     layer is scaled, and nothing carries a filter. The gradients are
+     painted once. --audio-swell (written by app.js) brightens each
+     layer with the music the same way it did for the orbs.
+
+     Lantern positions are written by buildLanterns() in app.js.
+     Both layers are hidden under the sakura default theme, which
+     keeps its own watercolour wash. */
+  html {
+    --mist-speed: 2.9;
+    --lantern-speed: 1.9;
+  }
+
+  html[data-theme="default"] .mist-soft,
+  html[data-theme="default"] .shippo-mask-window,
+  html[data-theme="default"] .lantern-bloom-layer {
+    display: none;
+  }
+
+  .mist-soft {
+    opacity: calc(0.95 + var(--audio-swell, 0) * 0.35);
+  }
+
+  /* Same box as .ambient-stage, so --y / --h read the same in the
+     lit copy. It follows the swipe wind via --wind-x, which
+     applyWind() writes onto it as well as onto #ambientStage. */
+  .mist-lit-stage {
+    position: absolute;
+    top: -25%;
+    left: -120px;
+    width: calc(100% + 240px);
+    height: 150%;
+    opacity: 0.25;
+    will-change: transform;
+    transform: translate3d(var(--wind-x, 0px), 0, 0);
+  }
+
+  .mist-band {
+    position: absolute;
+    left: 0;
+    top: var(--y);
+    width: 150vw;
+    height: var(--h);
+    margin-top: calc(var(--h) / -2);
+    background: radial-gradient(ellipse closest-side,
+      rgba(var(--c), var(--a)) 0%,
+      rgba(var(--c), calc(var(--a) * 0.62)) 34%,
+      rgba(var(--c), calc(var(--a) * 0.24)) 62%,
+      rgba(var(--c), calc(var(--a) * 0.06)) 84%,
+      rgba(var(--c), 0) 100%);
+    will-change: transform;
+    animation: mistDrift calc(70s / var(--mist-speed)) linear infinite;
+    animation-delay: calc(var(--d) / var(--mist-speed));
+  }
+  @keyframes mistDrift {
+    0%   { transform: translate3d(-150vw, 0, 0); }
+    25%  { transform: translate3d(-83vw, -2.5vh, 0); }
+    50%  { transform: translate3d(-16vw, 0, 0); }
+    75%  { transform: translate3d(51vw, 2.5vh, 0); }
+    100% { transform: translate3d(118vw, 0, 0); }
+  }
+
+  .lantern-layer {
+    position: absolute;
+    inset: 0;
+  }
+  .lantern-bloom-layer {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    pointer-events: none;
+    opacity: calc(0.76 + var(--audio-swell, 0) * 0.35);
+  }
+
+  .lantern,
+  .lantern-bloom {
+    position: absolute;
+    left: 0;
+    top: 0;
+    border-radius: 50%;
+    opacity: 0;
+    will-change: transform, opacity;
+    animation: lanternGlow calc(7s / var(--lantern-speed)) ease-in-out infinite;
+    animation-delay: calc(var(--d) / var(--lantern-speed));
+  }
+  .lantern {
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 1) 0%,
+      rgba(230, 104, 38, 0.95) 38%,
+      rgba(230, 104, 38, 0.40) 68%,
+      rgba(230, 104, 38, 0) 100%);
+  }
+  .lantern-bloom {
+    background: radial-gradient(circle closest-side,
+      rgba(255, 162, 89, 0.30) 0%,
+      rgba(255, 162, 89, 0.14) 45%,
+      rgba(255, 162, 89, 0) 100%);
+  }
+  @keyframes lanternGlow {
+    0%   { opacity: 0; }
+    35%  { opacity: 1; }
+    58%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ============================================================
      AMBIENT-PRIMARY — TIME AND WEATHER STATES (FLATTENED)
      ------------------------------------------------------------
      Previously these were CSS `filter` declarations layered on top
@@ -528,17 +654,15 @@
      The 4-stop falloff replaces the previous 3-stop ramp so each
      gradient feathers asymptotically toward zero rather than
      landing on a linear cutoff — the same Mach-band reasoning as
-     the orbs above, applied to the wash layer. The drift is
-     retained via autumnDrift1 (14s ease-in-out infinite); the
-     wider stop dispersion reads gentler at rest even though the
-     curve is unchanged. */
+     the orbs above, applied to the wash layer. The wash is now
+     static: the mist bands and lanterns below provide the motion. */
   html[data-theme="autumn"] .ambient-primary,
   html[data-theme="winter"] .ambient-primary {
     background:
       radial-gradient(circle at 25% 30%, rgba(230, 104, 38, 0.45) 0%, rgba(230, 104, 38, 0.22) 28%, rgba(230, 104, 38, 0.06) 52%, rgba(230, 104, 38, 0) 74%),
       radial-gradient(circle at 75% 38%, rgba(136, 46, 71, 0.36) 0%, rgba(136, 46, 71, 0.16) 28%, rgba(136, 46, 71, 0.04) 52%, rgba(136, 46, 71, 0) 74%),
       radial-gradient(circle at 50% 75%, rgba(255, 162, 89, 0.38) 0%, rgba(255, 162, 89, 0.16) 26%, rgba(255, 162, 89, 0.03) 50%, rgba(255, 162, 89, 0) 72%);
-    animation: autumnDrift1 14s ease-in-out infinite;
+    animation: none;
   }
 
   /* --- SAKURA: time variants --- */
@@ -649,38 +773,22 @@
 
   /* ============ AMBIENT FALLING LEAVES (v1.3, depth-layered)
      ------------------------------------------------------------
-     Two overlays share a single base rule block:
-
-       .maple-leaves-overlay        — z-index -1, behind all content
-       .maple-leaves-overlay-front  — z-index 5, in front of panel
-                                      text but behind every
-                                      interactive control (theme
-                                      toggle 10, hint 9, dots 10,
-                                      HUD 40, summary 50, numpad 120,
-                                      modals 100+, receipt 300,
-                                      thank-you 350)
-
-     Eighteen leaves total across three depth planes. Each leaf
-     carries TWO classes — a plane class (.leaf-far / .leaf-mid /
-     .leaf-near) and an identity class (per-leaf size, fill,
-     horizontal position, and drift timing below).
+     One overlay, .maple-leaves-overlay (z-index -1, behind all
+     content), holds twelve leaves across two depth planes. Each
+     leaf carries TWO classes — a plane class (.leaf-far / .leaf-mid)
+     and an identity class (per-leaf size, fill, horizontal
+     position, and drift timing below).
 
      Plane signatures:
        Far  (z 1) — 28–38px, blur 2.5px + saturate 0.75,
                     --leaf-opacity 0.20, drift 17–21s
-       Mid  (z 2) — 42–54px, blur 1.5px,
-                    --leaf-opacity 0.32, drift 10–14s
-       Near (z 3) — 62–84px, sharp,
-                    --leaf-opacity 0.44, drift  8.5–10.5s
+       Mid  (z 2) — 42–63px, blur 1.5px,
+                    --leaf-opacity 0.32, drift 11–14s
 
-     FRONT-LAYER PROMOTION (v1.3, A29). App.js's
-     distributeFrontLeaves() moves 2 randomly-chosen mid/near leaves
-     from the back overlay into the front overlay at the moment the
-     carousel activates. The far plane is never promoted — the
-     depth-of-field layer always stays behind the text. Front
-     leaves read at higher opacity (0.86 mid / 0.90 near) so the
-     prose visibly disappears behind a crossing leaf rather than
-     tinting through it.
+     Only blurred leaves are kept. The sharp near plane and the
+     front overlay (which moved two sharp leaves in front of the
+     prose) were removed, so every leaf now reads as soft, out-of-
+     focus foliage behind the text.
 
      OPACITY SOURCE OF TRUTH. The plane opacity lives on
      --leaf-opacity, not on the element's `opacity` declaration.
@@ -694,16 +802,13 @@
      under prefers-reduced-motion, where the leaves should be
      hidden by construction rather than by position.
 
-     COMPOSITOR SAFETY. Blur is static on the far and mid planes
-     only. It never changes across the animation, and no ancestor
+     COMPOSITOR SAFETY. Blur is static on both planes. It never
+     changes across the animation, and no ancestor
      carries a filter — this is the pattern the codebase avoids
      elsewhere (per-frame convolution on animating subtrees). Here
      the blurred texture is rasterised once by Chromium, promoted
      to its own layer via will-change, and sampled by the
      compositor with a rotated UV per frame. No per-frame blur cost.
-     Front-promoted leaves read sharp — a blurred leaf in front of
-     the prose would say "far" while occluding, which contradicts
-     the depth cue.
 
      Fills are drawn from the 金木犀 & Ebizome palette's higher-
      contrast tiers — Ebizome plum, deep amber, deep rust,
@@ -726,8 +831,7 @@
      sits before #mapleLeaves in the DOM, so the stars always paint
      below the leaves in autumn (and below the snowflakes in
      winter). */
-  .maple-leaves-overlay,
-  .maple-leaves-overlay-front {
+  .maple-leaves-overlay {
     position: fixed;
     inset: 0;
     pointer-events: none;
@@ -736,23 +840,19 @@
     transition: opacity 1.8s ease;
   }
 
-  .maple-leaves-overlay        { z-index: -1; }
-  .maple-leaves-overlay-front  { z-index: 5; }
+  .maple-leaves-overlay { z-index: -1; }
 
-  .maple-leaves-overlay.active,
-  .maple-leaves-overlay-front.active {
+  .maple-leaves-overlay.active {
     opacity: 1;
   }
 
-  html:not([data-theme="autumn"]) .maple-leaves-overlay,
-  html:not([data-theme="autumn"]) .maple-leaves-overlay-front {
+  html:not([data-theme="autumn"]) .maple-leaves-overlay {
     display: none;
   }
 
   /* ---------- Depth-plane base classes ---------- */
   .leaf-far,
-  .leaf-mid,
-  .leaf-near {
+  .leaf-mid {
     position: absolute;
     top: -60px;
     pointer-events: none;
@@ -771,24 +871,6 @@
     opacity: 0;
     filter: blur(1.5px);
   }
-  .leaf-near {
-    z-index: 3;
-    --leaf-opacity: 0.44;
-    opacity: 0;
-  }
-
-  /* ---------- Front-overlay opacity override ----------
-     Front-promoted leaves read at high opacity so the text behind
-     them visibly disappears during a crossing. Scoped to the
-     front overlay only; back-plane siblings keep their 0.32 / 0.44.
-     The keyframes' var(--leaf-opacity) peak stops inherit these
-     values automatically — no keyframe changes required.
-
-     filter: none on the mid plane overrides the base .leaf-mid
-     blur(1.5px) so front-promoted mid leaves read sharp. A blurred
-     leaf in front of the prose contradicts its own depth cue. */
-  .maple-leaves-overlay-front .leaf-mid  { --leaf-opacity: 0.86; filter: none; }
-  .maple-leaves-overlay-front .leaf-near { --leaf-opacity: 0.90; }
 
   /* ---------- Far plane — Momiji (2) ----------
      Clustered near the centre band. Small, soft, slowest. */
@@ -802,7 +884,7 @@
   .ginkgo-far-4 { width: 36px; height: 42px; fill: #C44E10; left: 78%; animation: ginkgoDriftB 17s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -14s; }
 
   /* ---------- Mid plane — Momiji (2) ----------
-     The two sharp, medium leaves carried over from the previous
+     The two medium leaves carried over from the previous
      single-layer set. */
   .leaf-mid-1 { width: 51px; height: 51px; fill: #882E47; left: 8%;  animation: mapleDriftA 11s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -2s; }
   .leaf-mid-2 { width: 63px; height: 63px; fill: #C44E10; left: 24%; animation: mapleDriftB 14s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7s; }
@@ -812,18 +894,6 @@
   .ginkgo-mid-2 { width: 52px; height: 61px; fill: #882E47; left: 38%; animation: ginkgoDriftB 14.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -5.0s; }
   .ginkgo-mid-3 { width: 42px; height: 49px; fill: #E66826; left: 64%; animation: ginkgoDriftA 11.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -8.0s; }
   .ginkgo-mid-4 { width: 54px; height: 63px; fill: #C44E10; left: 74%; animation: ginkgoDriftB 12.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -9.5s; }
-
-  /* ---------- Near plane — Momiji (2) ----------
-     Large, sharp, fastest. Pushed toward the edges to suggest the
-     wider angular spread of objects close to the camera. */
-  .leaf-near-1 { width: 72px; height: 72px; fill: #E66826; left: 5%;  animation: mapleDriftC 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -4s; }
-  .leaf-near-2 { width: 78px; height: 78px; fill: #9E3B06; left: 88%; animation: mapleDriftA 10.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -6s; }
-
-  /* ---------- Near plane — Ichō (4) ---------- */
-  .ginkgo-near-1 { width: 68px; height: 79px; fill: #F07D40; left: 12%; animation: ginkgoDriftA 9.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -3.0s; }
-  .ginkgo-near-2 { width: 84px; height: 98px; fill: #9E3B06; left: 42%; animation: ginkgoDriftB 10.5s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -7.0s; }
-  .ginkgo-near-3 { width: 72px; height: 84px; fill: #882E47; left: 68%; animation: ginkgoDriftB 9.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -11.0s; }
-  .ginkgo-near-4 { width: 62px; height: 72px; fill: #C44E10; left: 92%; animation: ginkgoDriftA 10.0s cubic-bezier(0.35, 0.2, 0.45, 0.95) infinite -12.5s; }
 
   @keyframes mapleDriftA {
     0% {
@@ -895,9 +965,11 @@
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
     .light-orb     { animation: none !important; }
+    .mist-band     { animation: none !important; }
+    .lantern,
+    .lantern-bloom { animation: none !important; opacity: 0 !important; }
     .leaf-far,
-    .leaf-mid,
-    .leaf-near     { animation: none !important; }
+    .leaf-mid      { animation: none !important; }
     .leaf-far      { filter: none; }
     .leaf-mid      { filter: none; }
     .ripple        { animation-duration: 300ms; }
@@ -910,17 +982,6 @@
     45% { transform: translate(-3%, 4%) scale(1.12); }
     70% { transform: translate(3%, 3%) scale(1.05); }
     85% { transform: translate(-2%, -2%) scale(1.1); }
-  }
-  @keyframes autumnDrift1 {
-    0% { transform: translate(0, 0) scale(1) rotate(0deg); }
-    11% { transform: translate(6%, -4%) scale(1.12) rotate(1deg); }
-    23% { transform: translate(-3%, 5%) scale(0.96) rotate(-2deg); }
-    35% { transform: translate(4%, 2%) scale(1.08) rotate(2deg); }
-    48% { transform: translate(-5%, -3%) scale(1.15) rotate(-1deg); }
-    60% { transform: translate(2%, 6%) scale(1.02) rotate(3deg); }
-    72% { transform: translate(-4%, 1%) scale(1.10) rotate(-2deg); }
-    85% { transform: translate(3%, -5%) scale(0.98) rotate(1deg); }
-    100% { transform: translate(0, 0) scale(1) rotate(0deg); }
   }
 
   /* ============ INFO BAR ============ */
@@ -3342,11 +3403,10 @@
      Three overlays share the same visual band as the maple-leaf
      pair above:
 
-       .snow-flakes-overlay        — z-index -1, 30 back-plane
-                                     snowflakes across six depth
-                                     tiers (blur 5.00px → 0px)
-       .snow-flakes-overlay-front  — z-index  5, 2 promoted mid/
-                                     near snowflakes (sharp, 0.90)
+       .snow-flakes-overlay        — z-index -1, 28 snowflakes across
+                                     five depth tiers (blur 5.00px
+                                     → 0.55px). Sharp flakes and the
+                                     front overlay were removed.
        .star-field                 — z-index -1, 33 far-depth
                                      blurred stars, cross-season,
                                      gated to late-night playback
@@ -3422,15 +3482,16 @@
     animation-iteration-count: infinite;
   }
 
-  /* 7-Tier Optical Depth & Blur Ladder (maxFarBlurPx = 5.0px, backOpacityMul = 1.0) */
+  /* 5-Tier Optical Depth & Blur Ladder (maxFarBlurPx = 5.0px, backOpacityMul = 1.0).
+     Tier 6 (sharp, no blur) was removed; every flake is blurred. */
   .snow-tier-1 { z-index: 1; filter: blur(5.00px) saturate(0.72); --flake-opacity: 0.16; }
   .snow-tier-2 { z-index: 1; filter: blur(3.40px) saturate(0.78); --flake-opacity: 0.22; }
   .snow-tier-3 { z-index: 2; filter: blur(2.20px);                --flake-opacity: 0.29; }
   .snow-tier-4 { z-index: 2; filter: blur(1.25px);                --flake-opacity: 0.35; }
   .snow-tier-5 { z-index: 3; filter: blur(0.55px);                --flake-opacity: 0.41; }
-  .snow-tier-6 { z-index: 3; filter: none;                        --flake-opacity: 0.47; }
 
-  /* Tier 7: Front-overlay promoted snowflakes (z-index 5, sharp, frontOpacity = 0.90) */
+  /* Front overlay: no longer used by the app (sharp flakes were removed);
+     kept only because demo.html still lays out its own front overlay. */
   .snow-flakes-overlay-front .snow-particle {
     filter: none !important;
     --flake-opacity: 0.90;
@@ -3520,4 +3581,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v123"; }
+:root { --build: "v124"; }
