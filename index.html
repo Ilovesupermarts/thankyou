@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="build" content="v125">
+<meta name="build" content="v126">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
 <title>追加オプションのご相談</title>
@@ -655,20 +655,8 @@
 
 <div class="reset-hotspot" id="resetHotspot" aria-hidden="true"></div>
 
-<!-- ============ WINTER STARFIELD + SEASONAL FOLIAGE ============
-     Three overlays share one visual band at z-index -1,
-     with the shared late-night starfield sitting underneath the
-     seasonal particle pair:
-
-       #starField       — 33 far-depth blurred stars, cross-season,
-                          gated to late-night ambient playback under
-                          autumn or winter. Placed FIRST so that at
-                          equal z-index (-1) the stars paint below
-                          #mapleLeaves via DOM order — the stars
-                          always sit behind the falling leaves in
-                          autumn and behind the falling snowflakes
-                          in winter, both above .ambient-mosaic at
-                          z-index -2.
+<!-- ============ SEASONAL FOLIAGE ============
+     Two overlays share one visual band at z-index -1:
 
        #mapleLeaves     — 12 autumn leaves across two blurred depth
                           planes (far and mid), autumn only
@@ -680,10 +668,7 @@
                           were removed.
 
      See main.css for the compositor-safety rationale on the far-
-     plane blurs and the per-tier --flake-opacity inheritance, and
-     app.js for updateStarFieldVisibility()'s three-clause gate. -->
-<div class="star-field" id="starField" aria-hidden="true"></div>
-
+     plane blurs and the per-tier --flake-opacity inheritance. -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
 
   <!-- Shared momiji (Japanese maple) leaf shape, used by all four maple
