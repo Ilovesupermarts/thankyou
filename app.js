@@ -1,4 +1,4 @@
-var BUILD = 'v124';
+var BUILD = 'v125';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -5569,17 +5569,29 @@ function lanternRandomSpot() {
 }
 function lanternStep(L) {
   var b = lanternBounds();
-  var dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
-  if (L.dir && Math.random() < 0.6) dirs.unshift(L.dir);
-  for (var t = 0; t < dirs.length; t++) {
-    var ni = L.i + dirs[t][0], nj = L.j + dirs[t][1];
-    if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) {
-      L.i = ni; L.j = nj; L.dir = dirs[t];
-      return;
+  var all = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  var open = [];
+  for (var t = 0; t < all.length; t++) {
+    var ni = L.i + all[t][0], nj = L.j + all[t][1];
+    if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) open.push(all[t]);
+  }
+  if (!open.length) {
+    var s = lanternRandomSpot();
+    L.i = s.i; L.j = s.j; L.dir = null;
+    return;
+  }
+  /* Keep going the same way 60% of the time if that way is still
+     open; otherwise pick any open direction at random. The pick must
+     be random: trying the directions in a fixed order always favours
+     one corner, and every lantern ends up stuck there. */
+  var pick = null;
+  if (L.dir && Math.random() < 0.6) {
+    for (var k = 0; k < open.length; k++) {
+      if (open[k][0] === L.dir[0] && open[k][1] === L.dir[1]) pick = open[k];
     }
   }
-  var s = lanternRandomSpot();
-  L.i = s.i; L.j = s.j; L.dir = null;
+  if (!pick) pick = open[Math.floor(Math.random() * open.length)];
+  L.i += pick[0]; L.j += pick[1]; L.dir = pick;
 }
 function buildLanterns() {
   if (!lanternLit || !lanternBloom) return;
