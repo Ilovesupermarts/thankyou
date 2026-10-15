@@ -45,6 +45,7 @@
     --bgp-tile: 60px;
     --bgp-wash: 0.35;
     --bgp-react: 1;
+    --bgp-mist-lit: 1;
   }
   body {
     overflow: hidden;
@@ -110,6 +111,15 @@
   .bgp-canvas-soft {
     opacity: calc(var(--bgp-strength) + var(--audio-swell, 0) * 0.35 * var(--bgp-react));
   }
+
+  /* 霞灯 Kasumi + Akari: the lanterns keep their own strength and
+     speed (--bgp-strength-b / --bgp-speed-b), and the mist's light on
+     the Shippō lines is dimmed on its own (--bgp-mist-lit) so the
+     lanterns stay the brightest thing on the lattice. */
+  .bgp-bloom {
+    opacity: calc(var(--bgp-strength-b, var(--bgp-strength)) + var(--audio-swell, 0) * 0.35 * var(--bgp-react));
+  }
+  html[data-bgp="kasumiakari"] .bgp-inner { opacity: var(--bgp-mist-lit); }
 
   .bgp-lattice { z-index: -2; }
   .bgp-inner {
@@ -202,8 +212,8 @@
     border-radius: 50%;
     opacity: 0;
     will-change: transform, opacity;
-    animation: bgpAkari calc(7s / var(--bgp-speed)) ease-in-out infinite;
-    animation-delay: calc(var(--d) / var(--bgp-speed));
+    animation: bgpAkari calc(7s / var(--bgp-speed-b, var(--bgp-speed))) ease-in-out infinite;
+    animation-delay: calc(var(--d) / var(--bgp-speed-b, var(--bgp-speed)));
   }
   .bgp-akari {
     background: radial-gradient(circle closest-side,
@@ -289,6 +299,7 @@
     padding: 10px 11px;
     cursor: pointer;
   }
+  .bgp-mode.wide { grid-column: 1 / -1; }
   .bgp-mode[aria-pressed="true"] {
     border-color: var(--accent);
     background: #fff;
@@ -542,12 +553,12 @@
   <div class="bgp-section-label">Tweak</div>
 
   <div class="bgp-row">
-    <div class="bgp-row-top"><label for="bgpSpeed">速さ Speed</label><span class="bgp-val" id="bgpSpeedVal"></span></div>
+    <div class="bgp-row-top"><label for="bgpSpeed" id="bgpSpeedLabel">速さ Speed</label><span class="bgp-val" id="bgpSpeedVal"></span></div>
     <input type="range" id="bgpSpeed" min="0.25" max="3" step="0.05">
   </div>
 
   <div class="bgp-row" id="bgpStrengthRow">
-    <div class="bgp-row-top"><label for="bgpStrength">動きの濃さ Motion strength</label><span class="bgp-val" id="bgpStrengthVal"></span></div>
+    <div class="bgp-row-top"><label for="bgpStrength" id="bgpStrengthLabel">動きの濃さ Motion strength</label><span class="bgp-val" id="bgpStrengthVal"></span></div>
     <input type="range" id="bgpStrength" min="0" max="1" step="0.01">
     <div class="hint">How visible the soft (un-masked) half of the motion is.</div>
   </div>
@@ -555,6 +566,25 @@
   <div class="bgp-row" id="bgpCountRow">
     <div class="bgp-row-top"><label for="bgpCount" id="bgpCountLabel">数 Count</label><span class="bgp-val" id="bgpCountVal"></span></div>
     <input type="range" id="bgpCount" min="1" max="6" step="1">
+  </div>
+
+  <!-- 霞灯 only: the lantern half has its own controls -->
+  <div class="bgp-row" id="bgpCount2Row" hidden>
+    <div class="bgp-row-top"><label for="bgpCount2">灯 Lights</label><span class="bgp-val" id="bgpCount2Val"></span></div>
+    <input type="range" id="bgpCount2" min="1" max="14" step="1">
+  </div>
+  <div class="bgp-row" id="bgpSpeed2Row" hidden>
+    <div class="bgp-row-top"><label for="bgpSpeed2">灯の速さ Lantern speed</label><span class="bgp-val" id="bgpSpeed2Val"></span></div>
+    <input type="range" id="bgpSpeed2" min="0.25" max="3" step="0.05">
+  </div>
+  <div class="bgp-row" id="bgpStrength2Row" hidden>
+    <div class="bgp-row-top"><label for="bgpStrength2">灯の濃さ Lantern strength</label><span class="bgp-val" id="bgpStrength2Val"></span></div>
+    <input type="range" id="bgpStrength2" min="0" max="1" step="0.01">
+  </div>
+  <div class="bgp-row" id="bgpMistRow" hidden>
+    <div class="bgp-row-top"><label for="bgpMistLit">霞の七宝光 Mist glow on lines</label><span class="bgp-val" id="bgpMistLitVal"></span></div>
+    <input type="range" id="bgpMistLit" min="0" max="1" step="0.01">
+    <div class="hint">How much the mist lights the Shippō strokes, compared with the lanterns.</div>
   </div>
 
   <div class="bgp-row">
@@ -706,7 +736,20 @@
       defaults: { speed: 1, strength: 0.6, count: 7, lattice: 0.60, lines: 0.08, tile: 60, wash: 0.45, orbs: 'still', washDrift: false, origin: 'center' }
     }
   };
-  var ORDER = ['current', 'kasumi', 'hamon', 'komorebi', 'kokyu', 'akari'];
+  /* 霞灯: Kasumi + Akari together. Defaults are the values tuned on
+     the Tab: mist at ×2.90 / 2 bands / strength 0.95, lanterns at
+     ×1.90 / 8 lights / strength 0.76, lattice glow 0.60 for the
+     lanterns, with the mist's light on the lines at 0.15 ÷ 0.60. */
+  MODES.kasumiakari = {
+    kanji: '霞灯', name: 'Kasumi + Akari', cost: 'low', costLabel: '低 Low', wide: true,
+    base: 70, countLabel: '帯 Bands', countMax: 5,
+    desc: '<strong>霞と灯り。</strong> Mist bands glide across while single Shippō rings light up like lanterns, and the light steps from ring to ring. The mist gives the page a direction; the lanterns give your eye somewhere to rest. Each half has its own speed and strength.',
+    perf: 'Both halves are transform / fade only: 2 bands (plus lit twins) and 8 small dots. About the same cost as Kasumi alone.',
+    lattice: 'own',
+    defaults: { speed: 2.9, strength: 0.95, count: 2, lattice: 0.60, lines: 0.08, tile: 60, wash: 0.30, orbs: 'hidden', washDrift: false, origin: 'center',
+                speed2: 1.9, strength2: 0.76, count2: 8, mistLit: 0.25 }
+  };
+  var ORDER = ['current', 'kasumi', 'hamon', 'komorebi', 'kokyu', 'akari', 'kasumiakari'];
 
   /* ---------- Elements ---------- */
   function $(id) { return document.getElementById(id); }
@@ -718,6 +761,7 @@
   var ui = {
     speed: $('bgpSpeed'), strength: $('bgpStrength'), count: $('bgpCount'),
     lattice: $('bgpLatticeIn'), lines: $('bgpLines'), tile: $('bgpTile'), wash: $('bgpWash'),
+    speed2: $('bgpSpeed2'), strength2: $('bgpStrength2'), count2: $('bgpCount2'), mistLit: $('bgpMistLit'),
     orbs: $('bgpOrbs'), origin: $('bgpOrigin'), panelSel: $('bgpPanelSel'),
     showPanel: $('bgpShowPanel'), react: $('bgpReact'), washDrift: $('bgpWashDrift'),
     tap: $('bgpTap'), fps: $('bgpFpsOn'), pause: $('bgpPause')
@@ -728,7 +772,7 @@
   var state = null;
 
   function freshState(mode) {
-    var d = MODES[mode].defaults, s = { mode: mode };
+    var d = MODES[mode].defaults, s = { mode: mode, speed2: 1.9, strength2: 0.76, count2: 8, mistLit: 0.25 };
     for (var k in d) s[k] = d[k];
     s.showPanel = true; s.panelIndex = 1; s.react = true;
     s.tap = true; s.fps = true; s.pause = false;
@@ -933,6 +977,7 @@
     else if (m === 'hamon') buildHamon(n);
     else if (m === 'komorebi') buildKomorebi(n);
     else if (m === 'akari') buildAkari(n);
+    else if (m === 'kasumiakari') { buildKasumi(n); buildAkari(state.count2); }
   }
 
   /* ---------- Message panel ---------- */
@@ -965,12 +1010,24 @@
     root.style.setProperty('--bgp-tile', state.tile + 'px');
     root.style.setProperty('--bgp-wash', state.wash);
     root.style.setProperty('--bgp-react', state.react ? 1 : 0);
+    var combo = state.mode === 'kasumiakari';
+    if (combo) {
+      root.style.setProperty('--bgp-speed-b', state.speed2);
+      root.style.setProperty('--bgp-strength-b', state.strength2);
+      root.style.setProperty('--bgp-mist-lit', state.mistLit);
+    } else {
+      root.style.removeProperty('--bgp-speed-b');
+      root.style.removeProperty('--bgp-strength-b');
+      root.style.setProperty('--bgp-mist-lit', 1);
+    }
     $('bgpFps').hidden = !state.fps;
     showPanelIndex(state.panelIndex);
 
     /* controls */
     ui.speed.value = state.speed; ui.strength.value = state.strength; ui.count.value = state.count;
     ui.lattice.value = state.lattice; ui.lines.value = state.lines; ui.tile.value = state.tile; ui.wash.value = state.wash;
+    ui.speed2.value = state.speed2; ui.strength2.value = state.strength2;
+    ui.count2.value = state.count2; ui.mistLit.value = state.mistLit;
     ui.orbs.value = state.orbs; ui.origin.value = state.origin;
     ui.showPanel.checked = state.showPanel; ui.react.checked = state.react;
     ui.washDrift.checked = state.washDrift; ui.tap.checked = state.tap;
@@ -987,8 +1044,15 @@
     var hasCount = !!M.countLabel;
     $('bgpCountRow').hidden = !hasCount;
     if (hasCount) { $('bgpCountLabel').textContent = M.countLabel; ui.count.max = M.countMax; }
-    $('bgpStrengthRow').hidden = !(state.mode in { kasumi: 1, hamon: 1, komorebi: 1, akari: 1 });
+    $('bgpStrengthRow').hidden = !(state.mode in { kasumi: 1, hamon: 1, komorebi: 1, akari: 1, kasumiakari: 1 });
     $('bgpOriginRow').hidden = state.mode !== 'hamon';
+    ['bgpCount2Row', 'bgpSpeed2Row', 'bgpStrength2Row', 'bgpMistRow'].forEach(function(id) { $(id).hidden = !combo; });
+    $('bgpSpeedLabel').textContent = combo ? '霞の速さ Mist speed' : '速さ Speed';
+    $('bgpStrengthLabel').textContent = combo ? '霞の濃さ Mist strength' : '動きの濃さ Motion strength';
+    $('bgpCount2Val').textContent = state.count2;
+    $('bgpSpeed2Val').textContent = '×' + fmt(state.speed2, 2) + ' · ' + fmt(7 / state.speed2, 1) + 's cycle';
+    $('bgpStrength2Val').textContent = fmt(state.strength2, 2);
+    $('bgpMistLitVal').textContent = fmt(state.mistLit, 2);
 
     var btns = document.querySelectorAll('.bgp-mode');
     for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', btns[i].dataset.mode === state.mode ? 'true' : 'false');
@@ -1015,7 +1079,7 @@
       var M = MODES[key];
       var b = document.createElement('button');
       b.type = 'button';
-      b.className = 'bgp-mode';
+      b.className = 'bgp-mode' + (M.wide ? ' wide' : '');
       b.dataset.mode = key;
       b.innerHTML = '<div class="bgp-mode-kanji">' + M.kanji + '</div>' +
         '<div class="bgp-mode-name">' + M.name + '</div>' +
@@ -1035,17 +1099,21 @@
   /* ---------- Control wiring ---------- */
   function bindRange(input, key, rebuild) {
     input.addEventListener('input', function() {
-      state[key] = key === 'count' || key === 'tile' ? parseInt(input.value, 10) : parseFloat(input.value);
+      state[key] = key === 'count' || key === 'count2' || key === 'tile' ? parseInt(input.value, 10) : parseFloat(input.value);
       apply(rebuild);
     });
   }
   bindRange(ui.speed, 'speed', false);
   bindRange(ui.strength, 'strength', false);
   bindRange(ui.count, 'count', true);
+  bindRange(ui.count2, 'count2', true);
+  bindRange(ui.speed2, 'speed2', false);
+  bindRange(ui.strength2, 'strength2', false);
+  bindRange(ui.mistLit, 'mistLit', false);
   bindRange(ui.lattice, 'lattice', false);
   bindRange(ui.lines, 'lines', false);
   bindRange(ui.tile, 'tile', false);
-  ui.tile.addEventListener('change', function() { if (state.mode === 'akari') build(); });
+  ui.tile.addEventListener('change', function() { if (state.mode === 'akari' || state.mode === 'kasumiakari') build(); });
   bindRange(ui.wash, 'wash', false);
   ui.orbs.addEventListener('change', function() { state.orbs = ui.orbs.value; apply(false); });
   ui.origin.addEventListener('change', function() { state.origin = ui.origin.value; apply(true); });
@@ -1165,6 +1233,12 @@
     t += 'speed:           ×' + fmt(state.speed, 2) + '  (' + cycleText() + ')\n';
     if (!$('bgpStrengthRow').hidden) t += 'motion strength: ' + fmt(state.strength, 2) + '\n';
     if (M.countLabel) t += (countName + ':                ').slice(0, 17) + state.count + '\n';
+    if (state.mode === 'kasumiakari') {
+      t += 'lantern speed:   ×' + fmt(state.speed2, 2) + '  (' + fmt(7 / state.speed2, 1) + 's cycle)\n';
+      t += 'lantern strength:' + ' ' + fmt(state.strength2, 2) + '\n';
+      t += 'lights:          ' + state.count2 + '\n';
+      t += 'mist glow lines: ' + fmt(state.mistLit, 2) + '  (× lattice glow = ' + fmt(state.mistLit * state.lattice, 2) + ' on screen)\n';
+    }
     if (state.mode === 'hamon') t += 'ripple origin:   ' + state.origin + '\n';
     t += 'lattice glow:    ' + fmt(state.lattice, 2) + '   (app today 0.20)\n';
     t += 'shippō lines:    ' + fmt(state.lines, 3) + '  (app today 0.08) · stroke #E66826 · 1.2px\n';
@@ -1186,6 +1260,13 @@
     if (typeof M.base === 'number') t += '  --bg-motion-cycle: ' + fmt(M.base / state.speed, 2) + 's;\n';
     if (!$('bgpStrengthRow').hidden) t += '  --bg-motion-strength: ' + fmt(state.strength, 2) + ';\n';
     if (M.countLabel) t += '  --bg-motion-count: ' + state.count + ';\n';
+    if (state.mode === 'kasumiakari') {
+      t += '  --bg-lantern-speed: ' + fmt(state.speed2, 2) + ';\n';
+      t += '  --bg-lantern-cycle: ' + fmt(7 / state.speed2, 2) + 's;\n';
+      t += '  --bg-lantern-strength: ' + fmt(state.strength2, 2) + ';\n';
+      t += '  --bg-lantern-count: ' + state.count2 + ';\n';
+      t += '  --bg-mist-line-glow: ' + fmt(state.mistLit, 2) + ';\n';
+    }
     t += '  --shippo-lattice-opacity: ' + fmt(state.lattice, 2) + ';\n';
     t += '  --shippo-line-opacity: ' + fmt(state.lines, 3) + ';\n';
     t += '  --shippo-tile: ' + state.tile + 'px;\n';
@@ -1295,7 +1376,7 @@
 
   window.addEventListener('resize', function() {
     hamonResize();
-    if (state.mode === 'akari' || state.mode === 'hamon') build();
+    if (state.mode === 'akari' || state.mode === 'hamon' || state.mode === 'kasumiakari') build();
   });
 
   /* ---------- Start ---------- */
