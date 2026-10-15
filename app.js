@@ -1,4 +1,4 @@
-var BUILD = 'v121';
+var BUILD = 'v122';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -6301,10 +6301,9 @@ function bindReceiptItemListeners() {
 
 /* ============ ALERT HELPER ============ */
 var alertOkCallback = null;
-function showAlert(title, sub, items, onOk, btnLabel) {
+function showAlert(title, sub, items, onOk) {
   if (alertTitle) alertTitle.textContent = title;
   if (alertSub) alertSub.textContent = sub;
-  alertOk.textContent = btnLabel || '戻って入力する';
   alertList.innerHTML = '';
   if (items && items.length > 0) {
     for (var i = 0; i < items.length; i++) {
@@ -6461,8 +6460,7 @@ receiptConfirmBtn.addEventListener('click', function(e) {
       'すべての項目が削除されています。',
       '内容をご確認のうえ、\nもう一度お試しください。',
       null,
-      null,
-      '入力画面に戻る'
+      null
     );
     return;
   }
