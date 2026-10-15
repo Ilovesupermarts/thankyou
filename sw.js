@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v123';
+const CACHE = 'thankyou-v124';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [

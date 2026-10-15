@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="build" content="v123">
+<meta name="build" content="v124">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
 <title>追加オプションのご相談</title>
@@ -29,72 +29,45 @@
 </head>
 <body>
 
+<!-- ============ AMBIENT BACKGROUND: 霞灯 (Kasumi + Akari) ============
+     Two slow bands of mist drift across the page while single
+     Shippō rings light up like lanterns, one at a time. Everything
+     moves by transform or opacity only, so the compositor does the
+     work and nothing is repainted per frame.
+
+       #ambientStage   — the static 金木犀 colour wash (.ambient-primary)
+                         and the soft, un-masked half of the mist
+                         (.mist-soft). Carries the swipe "wind" offset
+                         and --audio-swell.
+       #stageLattice   — the same 60×60 Shippō mask as .ambient-mosaic
+                         below. Mist and lantern light only show
+                         through the strokes of the pattern here.
+                         Carries --audio-swell.
+       #lanternBloom   — the soft glow around each lantern, outside
+                         the mask. Lanterns are placed and moved by
+                         buildLanterns() in app.js.
+
+     The old drifting orbs were removed: six large animated layers
+     replaced by a few small ones. The mist bands here are drawn
+     twice (soft + lit) with identical --y/--h/--d so the lit copy
+     sits exactly on the soft one. -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
-  <!-- v1.3: pre-feathered CSS light mesh replaces the ambient video.
-       Each .light-orb is a radial-gradient that fades to transparent
-       over its own radius — visually a blurred orb of light, with
-       zero GPU convolution passes. Motion is transform-only, so the
-       compositor drives it without layout or repaint cost.
-       The mesh is gated to the autumn theme in main.css; the default
-       (sakura) theme keeps its watercolor gradient stack uncluttered.
-
-       v1.3 (raster fix): the mix-blend-mode layers
-       .ambient-secondary (multiply), .caustics-1 (screen) and
-       .caustics-2 (screen) have been removed from both the DOM and
-       main.css. Each layer forced Chromium to open a separate
-       offscreen render pass on the stage's isolated FBO and read
-       back the backdrop before compositing, which on Adreno TBDR
-       hardware exhausted tile memory at 120Hz and produced axis-
-       aligned tile dropouts. The single pre-feathered .ambient-mesh
-       stack now carries the lighting with zero readback passes.
-
-       v1.3 (audio-reactive swell): this element carries the
-       .layer-diffuse class, which drives its brightness, saturation
-       and orb scale from --audio-swell. The animation is upstream of
-       the tracker and receipt screens, so the swell loop's lifecycle
-       is piggybacked on the same .active gate on #mapleLeaves that
-       already controls the ambient sound layers. See app.js's
-       AUDIO-REACTIVE SWELL SYSTEM section.
-
-       v1.3 (filter removal): the layer-diffuse ancestor filter
-       (brightness 1.08 / saturate 1.05) has been removed. Because
-       --audio-swell continuously mutates descendant transforms, the
-       ancestor filter was invalidating its offscreen render pass
-       every frame. The colour shift is now baked directly into the
-       .light-orb gradient stops in main.css. -->
-  <div class="ambient-layer ambient-mesh">
-    <div class="light-orb orb-1"></div>
-    <div class="light-orb orb-2"></div>
-    <div class="light-orb orb-3"></div>
-  </div>
   <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
   <div class="mote-field" id="moteField"></div>
 </div>
 
-<!-- ============ LAYER 2: AUDIO-REACTIVE SHIPPŌ MASK ============
-     A mirrored copy of the diffuse orb field, clipped by an SVG
-     Shippō mask at the same 60×60 grid and 1.2px stroke weight as
-     .ambient-mosaic below. Where the mask has strokes, the mirrored
-     orbs show through; everywhere else Layer 2 is fully transparent.
-
-     Guardrails (see main.css for the full rationale):
-       · No .ambient-primary inside. The static gradient would fill
-         the entire masked pattern with light instead of confining
-         the reveal to the orb radii.
-       · The hue-rotate + saturate + contrast colour grade is baked
-         into the .orb-N gradient stops in main.css, not applied as
-         a runtime filter.
-       · Swell is driven purely by opacity and transform, both of
-         which are handled directly on the compositor thread. -->
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
-  <div class="ambient-stage layer-mirrored">
-    <div class="ambient-layer ambient-mesh">
-      <div class="light-orb orb-1"></div>
-      <div class="light-orb orb-2"></div>
-      <div class="light-orb orb-3"></div>
-    </div>
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
   </div>
+  <div class="lantern-layer" id="lanternLit"></div>
 </div>
+<div class="lantern-bloom-layer" id="lanternBloom" aria-hidden="true"></div>
 
 <!-- ============ AMBIENT SHIPPO MOSAIC BACKGROUND ============
      v1.3 (raster fix): was an inline <svg> with a <pattern> fill, which
@@ -683,7 +656,7 @@
 <div class="reset-hotspot" id="resetHotspot" aria-hidden="true"></div>
 
 <!-- ============ WINTER STARFIELD + SEASONAL FOLIAGE ============
-     Four overlays share one visual band at z-index -1 (back) / 5 (front),
+     Three overlays share one visual band at z-index -1,
      with the shared late-night starfield sitting underneath the
      seasonal particle pair:
 
@@ -697,26 +670,23 @@
                           in winter, both above .ambient-mosaic at
                           z-index -2.
 
-       #mapleLeaves     — 18 autumn leaves across three depth planes,
-                          autumn only (html:not([data-theme="autumn"])
-                          hides them).
+       #mapleLeaves     — 12 autumn leaves across two blurred depth
+                          planes (far and mid), autumn only
+                          (html:not([data-theme="autumn"]) hides
+                          them). Sharp leaves were removed.
 
-       #snowFlakes      — 32 winter snowflakes across seven depth
-                          tiers, winter only. Two of the mid/near
-                          particles are promoted to #snowFlakesFront
-                          at each carousel activation via
-                          distributeFrontSnow().
+       #snowFlakes      — 28 winter snowflakes across five blurred
+                          depth tiers, winter only. Sharp snowflakes
+                          were removed.
 
      See main.css for the compositor-safety rationale on the far-
      plane blurs and the per-tier --flake-opacity inheritance, and
-     app.js for the distributeFrontLeaves / distributeFrontSnow
-     promotion logic and updateStarFieldVisibility()'s three-clause
-     gate. -->
+     app.js for updateStarFieldVisibility()'s three-clause gate. -->
 <div class="star-field" id="starField" aria-hidden="true"></div>
 
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true">
 
-  <!-- Shared momiji (Japanese maple) leaf shape, used by all six maple
+  <!-- Shared momiji (Japanese maple) leaf shape, used by all four maple
        leaves below. Fitted to the same 900x1000 viewBox and the same
        bounding box (x 2-898, y 12-994) as the previous leaf so size
        and pivot are unchanged. Fill comes from each leaf's CSS class. -->
@@ -874,85 +844,9 @@
              C 303,674 297,674 297,670 Z" />
   </svg>
 
-  <!-- ============ NEAR PLANE — Momiji (2) ============ -->
-  <svg class="leaf-near leaf-near-1" viewBox="0 0 900 1000" aria-hidden="true">
-    <use href="#momijiLeafShape"/>
-  </svg>
-  <svg class="leaf-near leaf-near-2" viewBox="0 0 900 1000" aria-hidden="true">
-    <use href="#momijiLeafShape"/>
-  </svg>
-
-  <!-- ============ NEAR PLANE — Ichō (4) ============ -->
-  <svg class="leaf-near ginkgo-near-1" viewBox="0 0 600 700" aria-hidden="true">
-    <path d="M 297,670
-             L 297,410
-             C 270,360 190,310 50,210
-             C 60,175 90,150 130,140
-             C 150,135 170,115 205,105
-             C 235,95 265,105 285,135
-             C 294,155 298,185 300,210
-             C 302,185 306,155 315,135
-             C 335,105 365,95 395,105
-             C 430,115 450,135 470,140
-             C 510,150 540,175 550,210
-             C 410,310 330,360 303,410
-             L 303,670
-             C 303,674 297,674 297,670 Z" />
-  </svg>
-  <svg class="leaf-near ginkgo-near-2" viewBox="0 0 600 700" aria-hidden="true">
-    <path d="M 297,670
-             L 297,410
-             C 270,360 190,310 50,210
-             C 60,175 90,150 130,140
-             C 150,135 170,115 205,105
-             C 235,95 265,105 285,135
-             C 294,155 298,185 300,210
-             C 302,185 306,155 315,135
-             C 335,105 365,95 395,105
-             C 430,115 450,135 470,140
-             C 510,150 540,175 550,210
-             C 410,310 330,360 303,410
-             L 303,670
-             C 303,674 297,674 297,670 Z" />
-  </svg>
-  <svg class="leaf-near ginkgo-near-3" viewBox="0 0 600 700" aria-hidden="true">
-    <path d="M 297,670
-             L 297,410
-             C 270,360 190,310 50,210
-             C 60,175 90,150 130,140
-             C 150,135 170,115 205,105
-             C 235,95 265,105 285,135
-             C 294,155 298,185 300,210
-             C 302,185 306,155 315,135
-             C 335,105 365,95 395,105
-             C 430,115 450,135 470,140
-             C 510,150 540,175 550,210
-             C 410,310 330,360 303,410
-             L 303,670
-             C 303,674 297,674 297,670 Z" />
-  </svg>
-  <svg class="leaf-near ginkgo-near-4" viewBox="0 0 600 700" aria-hidden="true">
-    <path d="M 297,670
-             L 297,410
-             C 270,360 190,310 50,210
-             C 60,175 90,150 130,140
-             C 150,135 170,115 205,105
-             C 235,95 265,105 285,135
-             C 294,155 298,185 300,210
-             C 302,185 306,155 315,135
-             C 335,105 365,95 395,105
-             C 430,115 450,135 470,140
-             C 510,150 540,175 550,210
-             C 410,310 330,360 303,410
-             L 303,670
-             C 303,674 297,674 297,670 Z" />
-  </svg>
-
 </div>
-<div class="maple-leaves-overlay-front" id="mapleLeavesFront" aria-hidden="true"></div>
 
 <div class="snow-flakes-overlay" id="snowFlakes" aria-hidden="true"></div>
-<div class="snow-flakes-overlay-front" id="snowFlakesFront" aria-hidden="true"></div>
 
 </body>
 </html>

@@ -1,4 +1,4 @@
-var BUILD = 'v123';
+var BUILD = 'v124';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -9,6 +9,23 @@ var BUILD = 'v123';
 })();
 /* ============================================================
    app.js — v1.3
+
+   Background (霞灯) and falling-particle pass
+       - The three drifting orbs were replaced by 霞灯 (Kasumi +
+         Akari): two bands of mist plus Shippō "lantern" rings that
+         light up one at a time. The mist is static markup in
+         index.html; buildLanterns() below creates the lanterns,
+         steps each one to a neighbouring ring every glow cycle, and
+         rebuilds them on resize. applySwellToCSS() now also writes
+         --audio-swell onto #lanternBloom, and applyWind() also
+         writes --wind-x onto #mistLitStage so the lit mist follows
+         the swipe wind like the soft mist does.
+       - Falling leaves and snowflakes: only the blurred ones are
+         kept. The sharp near-plane leaves (6) and the sharp tier-6
+         snowflakes (4) were removed, and so was the front overlay
+         (distributeFrontLeaves / distributeFrontSnow), because the
+         two promoted particles it put in front of the text were
+         sharp. Totals are now 12 leaves and 28 snowflakes.
 
    ------------------------------------------------------------
    Changelog:
@@ -1150,9 +1167,7 @@ var BUILD = 'v123';
    clause in updateStarFieldVisibility()'s gate. */
 var themeToggle = document.getElementById('themeToggle');
 var mapleLeaves = document.getElementById('mapleLeaves');
-var mapleLeavesFront = document.getElementById('mapleLeavesFront');
 var snowFlakes = document.getElementById('snowFlakes');
-var snowFlakesFront = document.getElementById('snowFlakesFront');
 var starField = document.getElementById('starField');
 var currentTheme = 'autumn';
 var _themeManuallySet = false;
@@ -2898,6 +2913,7 @@ function applySwellToCSS(val) {
   var vStr = val.toFixed(3);
   if (ambientStage) ambientStage.style.setProperty('--audio-swell', vStr);
   if (stageLattice) stageLattice.style.setProperty('--audio-swell', vStr);
+  if (lanternBloom) lanternBloom.style.setProperty('--audio-swell', vStr);
 }
 
 document.addEventListener('pointerdown', initSound, { once: true });
@@ -3259,8 +3275,8 @@ function applyCounterCellWidth() {
 }
 
 /* ============ DOM REFS ============
-   Theme-owned refs (themeToggle, mapleLeaves, mapleLeavesFront,
-   snowFlakes, snowFlakesFront, starField) live at the top of the
+   Theme-owned refs (themeToggle, mapleLeaves, snowFlakes,
+   starField) live at the top of the
    file — see the THEME TOGGLE block. stageLattice stays here
    because it is consumed by applySwellToCSS() inside the swell
    loop, which is unrelated to theme ownership. */
@@ -3334,6 +3350,9 @@ var koiDiveWrap = document.getElementById('koiDiveWrap');
 var rippleLayer = document.getElementById('rippleLayer');
 
 var stageLattice = document.getElementById('stageLattice');
+var lanternBloom = document.getElementById('lanternBloom');
+var lanternLit = document.getElementById('lanternLit');
+var mistLitStage = document.getElementById('mistLitStage');
 
 var submitBtn = document.getElementById('submitBtn');
 var confirmScreen = document.getElementById('confirmScreen');
@@ -4118,9 +4137,7 @@ function returnToStartScreen() {
   resetWind();
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
-  if (mapleLeavesFront) mapleLeavesFront.classList.remove('active');
   if (snowFlakes) snowFlakes.classList.remove('active');
-  if (snowFlakesFront) snowFlakesFront.classList.remove('active');
   if (starField) starField.classList.remove('active');
   if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
   stopAmbient();
@@ -4636,6 +4653,7 @@ function applyWind(x) {
   if (!ambientStyle) return;
   ambientStyle.setProperty('--wind-x', x + 'px');
   ambientStyle.setProperty('--wind-x-extra', (x * 0.4) + 'px');
+  if (mistLitStage) mistLitStage.style.setProperty('--wind-x', x + 'px');
 }
 function windStep(now) {
   var dt = 1;
@@ -5443,65 +5461,12 @@ function scheduleAmbientRipple() {
   }, interval);
 }
 
-/* ============ AMBIENT LEAF DISTRIBUTION ============
-   Called at the moment the carousel activates. Returns any leaves
-   previously promoted to the front overlay (fresh start on
-   re-entry), collects the mid + near pool from the back overlay,
-   and Fisher-Yates-partial-shuffles two of them into the front.
-
-   The far-plane leaves are deliberately excluded from the pool —
-   the depth-of-field layer always stays behind the text. See
-   main.css for the scoped opacity override (mid 0.86 / near 0.90)
-   that makes front-promoted leaves read at higher opacity so the
-   text behind them visibly disappears during a crossing. */
-function distributeFrontLeaves() {
-  if (!mapleLeavesFront || !mapleLeaves) return;
-
-  /* Return any leaves previously promoted to the front overlay.
-     Clear the runtime-assigned left so each leaf reverts to its
-     authored back-plane position (the per-leaf classes in main.css)
-     before it re-enters the pool. The reference must be captured
-     before appendChild, because appendChild mutates firstChild. */
-  while (mapleLeavesFront.firstChild) {
-    var returning = mapleLeavesFront.firstChild;
-    returning.style.left = '';
-    mapleLeaves.appendChild(returning);
-  }
-
-  /* Pool = all mid + near leaves now in the back overlay. Far-plane
-     leaves are deliberately excluded — the depth-of-field layer
-     stays behind the text. */
-  var pool = [];
-  var midNear = mapleLeaves.querySelectorAll('.leaf-mid, .leaf-near');
-  for (var i = 0; i < midNear.length; i++) pool.push(midNear[i]);
-  if (pool.length < 2) return;
-
-  /* Fisher–Yates partial shuffle: move two random leaves to the
-     front overlay. Only the first two positions need to be settled.
-
-     Each promoted leaf gets a randomised horizontal position in the
-     25–75% band so both crossings reliably intersect the text
-     column at every breakpoint. Without this, a leaf drawn from the
-     edge cluster (6 of the 12 pool leaves sit at left 5–14% or
-     88–92%) drifts only ±40px — roughly ±10% of a phone viewport —
-     and never reaches the prose. Two edge draws co-occur on
-     ~23% of activations, which read as "no leaves in front". The
-     inline left is cleared in the return loop above so the next
-     activation re-rolls cleanly. */
-  for (var j = 0; j < 2; j++) {
-    var k = j + Math.floor(Math.random() * (pool.length - j));
-    var tmp = pool[j]; pool[j] = pool[k]; pool[k] = tmp;
-    pool[j].style.left = (25 + Math.random() * 50) + '%';
-    mapleLeavesFront.appendChild(pool[j]);
-  }
-}
-
 /* ============ WINTER SNOWFLAKES + LATE-NIGHT STARFIELD BUILDERS ===
    Two standalone 6-fold snowflake SVG shapes from the reference
    image. Shape A is the Dendritic Ring-Centre Crystal, Shape B is
    the Diamond-Tipped Crystal with inner secondary rays. The two
    shapes are authored 1:2 across the 32-particle pool (indices
-   0..17 explicit, 18..31 scattered). */
+   0..13 explicit, 14..27 scattered). */
 var SNOWFLAKE_PATH_A =
   '<path fill-rule="evenodd" d="M 96.0,75.0 L 96.0,59.6 L 71.2,34.8 L 76.0,30.0 L 96.0,50.0 L 96.0,42.6 L 78.7,25.3 L 83.5,20.5 L 96.0,33.0 L 96.0,28.0 L 90.5,24.5 L 100.0,10.0 L 109.5,24.5 L 104.0,28.0 L 104.0,33.0 L 116.5,20.5 L 121.3,25.3 L 104.0,42.6 L 104.0,50.0 L 124.0,30.0 L 128.8,34.8 L 104.0,59.6 L 104.0,75.0 L 116.5,71.4 L 119.7,84.0 L 133.0,76.3 L 142.1,42.5 L 148.6,44.2 L 141.3,71.5 L 147.7,67.8 L 154.0,44.2 L 160.6,46.0 L 156.0,63.0 L 160.4,60.5 L 160.6,54.0 L 177.9,55.0 L 170.1,70.5 L 164.4,67.5 L 160.0,70.0 L 177.1,74.5 L 175.3,81.1 L 151.7,74.8 L 145.3,78.5 L 172.6,85.8 L 170.9,92.3 L 137.0,83.3 L 123.7,91.0 L 133.0,100.0 L 123.7,109.0 L 137.0,116.7 L 170.9,107.7 L 172.6,114.2 L 145.3,121.5 L 151.7,125.2 L 175.3,118.9 L 177.1,125.5 L 160.0,130.0 L 164.4,132.5 L 170.1,129.5 L 177.9,145.0 L 160.6,146.0 L 160.4,139.5 L 156.0,137.0 L 160.6,154.0 L 154.0,155.8 L 147.7,132.2 L 141.3,128.5 L 148.6,155.8 L 142.1,157.5 L 133.0,123.7 L 119.7,116.0 L 116.5,128.6 L 104.0,125.0 L 104.0,140.4 L 128.8,165.2 L 124.0,170.0 L 104.0,150.0 L 104.0,157.4 L 121.3,174.7 L 116.5,179.5 L 104.0,167.0 L 104.0,172.0 L 109.5,175.5 L 100.0,190.0 L 90.5,175.5 L 96.0,172.0 L 96.0,167.0 L 83.5,179.5 L 78.7,174.7 L 96.0,157.4 L 96.0,150.0 L 76.0,170.0 L 71.2,165.2 L 96.0,140.4 L 96.0,125.0 L 83.5,128.6 L 80.3,116.0 L 67.0,123.7 L 57.9,157.5 L 51.4,155.8 L 58.7,128.5 L 52.3,132.2 L 46.0,155.8 L 39.4,154.0 L 44.0,137.0 L 39.6,139.5 L 39.4,146.0 L 22.1,145.0 L 29.9,129.5 L 35.6,132.5 L 40.0,130.0 L 22.9,125.5 L 24.7,118.9 L 48.3,125.2 L 54.7,121.5 L 27.4,114.2 L 29.1,107.7 L 63.0,116.7 L 76.3,109.0 L 67.0,100.0 L 76.3,91.0 L 63.0,83.3 L 29.1,92.3 L 27.4,85.8 L 54.7,78.5 L 48.3,74.8 L 24.7,81.1 L 22.9,74.5 L 40.0,70.0 L 35.6,67.5 L 29.9,70.5 L 22.1,55.0 L 39.4,54.0 L 39.6,60.5 L 44.0,63.0 L 39.4,46.0 L 46.0,44.2 L 52.3,67.8 L 58.7,71.5 L 51.4,44.2 L 57.9,42.5 L 67.0,76.3 L 80.3,84.0 L 83.5,71.4 Z M 100.0,85.0 A 15.0,15.0 0 1,0 100.0,115.0 A 15.0,15.0 0 1,0 100.0,85.0 Z"/>';
 
@@ -5509,7 +5474,7 @@ var SNOWFLAKE_PATH_B =
   '<path d="M 91.8,66.6 L 91.2,79.6 L 96.2,87.9 L 96.2,59.3 L 70.7,38.3 A 3.8,3.8 0 0,1 75.5,32.5 L 96.2,49.5 L 96.2,41.5 L 85.5,27.0 L 100.0,10.0 L 114.5,27.0 L 103.8,41.5 L 103.8,49.5 L 124.5,32.5 A 3.8,3.8 0 0,1 129.3,38.3 L 103.8,59.3 L 103.8,87.9 L 108.8,79.6 L 108.2,66.6 L 123.0,60.2 L 124.8,76.2 L 113.3,82.2 L 108.6,90.7 L 133.4,76.4 L 138.8,43.8 A 3.8,3.8 0 0,1 146.2,45.0 L 141.8,71.5 L 148.8,67.5 L 156.0,50.9 L 177.9,55.0 L 170.5,76.1 L 152.6,74.0 L 145.6,78.0 L 170.7,87.5 A 3.8,3.8 0 0,1 168.1,94.5 L 137.2,82.9 L 112.4,97.2 L 122.1,97.4 L 133.0,90.4 L 146.0,100.0 L 133.0,109.6 L 122.1,102.6 L 112.4,102.8 L 137.2,117.1 L 168.1,105.5 A 3.8,3.8 0 0,1 170.7,112.5 L 145.6,122.0 L 152.6,126.0 L 170.5,123.9 L 177.9,145.0 L 156.0,149.1 L 148.8,132.5 L 141.8,128.5 L 146.2,155.0 A 3.8,3.8 0 0,1 138.8,156.2 L 133.4,123.6 L 108.6,109.3 L 113.3,117.8 L 124.8,123.8 L 123.0,139.8 L 108.2,133.4 L 108.8,120.4 L 103.8,112.1 L 103.8,140.7 L 129.3,161.7 A 3.8,3.8 0 0,1 124.5,167.5 L 103.8,150.5 L 103.8,158.5 L 114.5,173.0 L 100.0,190.0 L 85.5,173.0 L 96.2,158.5 L 96.2,150.5 L 75.5,167.5 A 3.8,3.8 0 0,1 70.7,161.7 L 96.2,140.7 L 96.2,112.1 L 91.2,120.4 L 91.8,133.4 L 77.0,139.8 L 75.2,123.8 L 86.7,117.8 L 91.4,109.3 L 66.6,123.6 L 61.2,156.2 A 3.8,3.8 0 0,1 53.8,155.0 L 58.2,128.5 L 51.2,132.5 L 44.0,149.1 L 22.1,145.0 L 29.5,123.9 L 47.4,126.0 L 54.4,122.0 L 29.3,112.5 A 3.8,3.8 0 0,1 31.9,105.5 L 62.8,117.1 L 87.6,102.8 L 77.9,102.6 L 67.0,109.6 L 54.0,100.0 L 67.0,90.4 L 77.9,97.4 L 87.6,97.2 L 62.8,82.9 L 31.9,94.5 A 3.8,3.8 0 0,1 29.3,87.5 L 54.4,78.0 L 47.4,74.0 L 29.5,76.1 L 22.1,55.0 L 44.0,50.9 L 51.2,67.5 L 58.2,71.5 L 53.8,45.0 A 3.8,3.8 0 0,1 61.2,43.8 L 66.6,76.4 L 91.4,90.7 L 86.7,82.2 L 75.2,76.2 L 77.0,60.2 Z"/>';
 
 var SNOW_BASE_SLOTS = [
-  /* Tier 1 (Ultra-Far, blur 5.0px) */
+  /* Tier 1 (Ultra-Far, blur 5.0px). Tier 6 (sharp) was removed. */
   { tier: 1, size: 30, fill: '#9E3B06', left: 22, dur: 20.0, delay: -3.0,  shape: 'A' },
   { tier: 1, size: 28, fill: '#F07D40', left: 16, dur: 21.0, delay: -2.0,  shape: 'B' },
   { tier: 1, size: 30, fill: '#882E47', left: 62, dur: 19.5, delay: -11.0, shape: 'B' },
@@ -5527,24 +5492,18 @@ var SNOW_BASE_SLOTS = [
   { tier: 4, size: 54, fill: '#C44E10', left: 74, dur: 11.5, delay: -9.5,  shape: 'B' },
   /* Tier 5 (Near-Soft, blur 0.55px) */
   { tier: 5, size: 64, fill: '#F07D40', left: 12, dur: 10.2, delay: -3.0,  shape: 'B' },
-  { tier: 5, size: 60, fill: '#C44E10', left: 92, dur: 10.0, delay: -12.5, shape: 'B' },
-  /* Tier 6 (Near-Crisp, 0px blur) */
-  { tier: 6, size: 70, fill: '#E66826', left: 5,  dur: 9.5,  delay: -4.0,  shape: 'A' },
-  { tier: 6, size: 74, fill: '#9E3B06', left: 88, dur: 9.8,  delay: -6.0,  shape: 'A' },
-  { tier: 6, size: 80, fill: '#9E3B06', left: 42, dur: 10.4, delay: -7.0,  shape: 'B' },
-  { tier: 6, size: 68, fill: '#882E47', left: 68, dur: 9.0,  delay: -11.0, shape: 'B' }
+  { tier: 5, size: 60, fill: '#C44E10', left: 92, dur: 10.0, delay: -12.5, shape: 'B' }
 ];
 
-/* Builds 32 snowflakes (30 back + 2 mid/near candidates for front
-   promotion) with snowScale = 1.10 and fallDurationMul = 1.90 baked
-   in. See main.css for the seven-tier blur/opacity ladder and the
+/* Builds 28 blurred snowflakes (14 slots, each used twice) with
+   snowScale = 1.10 and fallDurationMul = 1.90 baked in. See
+   main.css for the five-tier blur/opacity ladder and the
    snowFallCw / snowFallCcw keyframes. */
 function buildSnowflakes() {
   if (!snowFlakes) return;
   snowFlakes.innerHTML = '';
-  if (snowFlakesFront) snowFlakesFront.innerHTML = '';
 
-  var total = 32;
+  var total = 28;
   var snowScale = 1.10;
   var fallDurationMul = 1.90;
 
@@ -5576,32 +5535,85 @@ function buildSnowflakes() {
   }
 }
 
-/* Mirrors distributeFrontLeaves(): returns any previously promoted
-   snowflakes to #snowFlakes, then promotes 2 random mid/near
-   (Tiers 3..6) snowflakes into #snowFlakesFront within the 25–75%
-   horizontal band. The far-plane tiers (1..2) are never promoted,
-   matching the leaf system's depth-of-field exclusion. */
-function distributeFrontSnow() {
-  if (!snowFlakesFront || !snowFlakes) return;
+/* ============ 霞灯 LANTERNS (Akari half of the background) ============
+   Each lantern is a small glowing dot sitting on the centre of one
+   Shippō circle, plus a larger, fainter bloom behind the pattern.
+   The 60×60 tile has circle centres every 30px on a checkerboard
+   (column + row even), so a lantern at grid (i, j) lands exactly on
+   a ring. The CSS animation (lanternGlow) only fades opacity; when a
+   lantern finishes a cycle, animationiteration moves it to a
+   neighbouring ring, mostly continuing in the same diagonal, like
+   lights being lit along a path. Numbers from the tablet tuning:
+   10 lights, ×1.90 speed (set in main.css). Under reduced motion
+   nothing is built — the lanterns would be invisible anyway. */
+var LANTERN_COUNT = 10;
+var LANTERN_TILE = 60;
+var _lanterns = [];
 
-  while (snowFlakesFront.firstChild) {
-    var returning = snowFlakesFront.firstChild;
-    returning.style.left = returning.getAttribute('data-orig-left') || '';
-    snowFlakes.appendChild(returning);
+function lanternBounds() {
+  var half = LANTERN_TILE / 2;
+  return { half: half, maxI: Math.floor(window.innerWidth / half), maxJ: Math.floor(window.innerHeight / half) };
+}
+function lanternPlace(L) {
+  var half = LANTERN_TILE / 2;
+  var dot = LANTERN_TILE * 1.5, glow = LANTERN_TILE * 4;
+  L.dot.style.transform = 'translate3d(' + (L.i * half - dot / 2) + 'px,' + (L.j * half - dot / 2) + 'px,0)';
+  L.glow.style.transform = 'translate3d(' + (L.i * half - glow / 2) + 'px,' + (L.j * half - glow / 2) + 'px,0)';
+}
+function lanternRandomSpot() {
+  var b = lanternBounds();
+  var i = 1 + Math.floor(Math.random() * Math.max(1, b.maxI - 1));
+  var j = 1 + Math.floor(Math.random() * Math.max(1, b.maxJ - 1));
+  if ((i + j) % 2) j += 1;
+  return { i: i, j: j };
+}
+function lanternStep(L) {
+  var b = lanternBounds();
+  var dirs = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  if (L.dir && Math.random() < 0.6) dirs.unshift(L.dir);
+  for (var t = 0; t < dirs.length; t++) {
+    var ni = L.i + dirs[t][0], nj = L.j + dirs[t][1];
+    if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) {
+      L.i = ni; L.j = nj; L.dir = dirs[t];
+      return;
+    }
   }
-
-  var pool = [];
-  var midNear = snowFlakes.querySelectorAll('.snow-tier-3, .snow-tier-4, .snow-tier-5, .snow-tier-6');
-  for (var i = 0; i < midNear.length; i++) pool.push(midNear[i]);
-  if (pool.length < 2) return;
-
-  for (var j = 0; j < 2; j++) {
-    var k = j + Math.floor(Math.random() * (pool.length - j));
-    var tmp = pool[j]; pool[j] = pool[k]; pool[k] = tmp;
-    pool[j].style.left = (25 + Math.random() * 50).toFixed(1) + '%';
-    snowFlakesFront.appendChild(pool[j]);
+  var s = lanternRandomSpot();
+  L.i = s.i; L.j = s.j; L.dir = null;
+}
+function buildLanterns() {
+  if (!lanternLit || !lanternBloom) return;
+  lanternLit.innerHTML = '';
+  lanternBloom.innerHTML = '';
+  _lanterns = [];
+  if (_prefersReducedMotion) return;
+  var dotSize = LANTERN_TILE * 1.5, glowSize = LANTERN_TILE * 4;
+  for (var k = 0; k < LANTERN_COUNT; k++) {
+    var delay = (-7 * k / LANTERN_COUNT).toFixed(2) + 's';
+    var dot = document.createElement('div');
+    var glow = document.createElement('div');
+    dot.className = 'lantern';
+    glow.className = 'lantern-bloom';
+    dot.style.setProperty('--d', delay);
+    glow.style.setProperty('--d', delay);
+    dot.style.width = dot.style.height = dotSize + 'px';
+    glow.style.width = glow.style.height = glowSize + 'px';
+    lanternLit.appendChild(dot);
+    lanternBloom.appendChild(glow);
+    var spot = lanternRandomSpot();
+    var L = { dot: dot, glow: glow, i: spot.i, j: spot.j, dir: null };
+    lanternPlace(L);
+    _lanterns.push(L);
+    dot.addEventListener('animationiteration', (function(L) {
+      return function() { lanternStep(L); lanternPlace(L); };
+    })(L));
   }
 }
+var _lanternResizeTimer = null;
+window.addEventListener('resize', function() {
+  if (_lanternResizeTimer) clearTimeout(_lanternResizeTimer);
+  _lanternResizeTimer = setTimeout(buildLanterns, 250);
+});
 
 /* Builds 33 far-depth blurred sparkling stars with starDurationMul
    = 1.30 and starScale = 1.15. Each star re-rolls its (left, top)
@@ -5826,13 +5838,10 @@ function triggerKoiStart() {
 
         /* Activate the ambient maple leaves, activate the winter
            snowflakes, show the audio HUD, and start the ambient
-           sound layers. All four particle overlays share the same
+           sound layers. The particle overlays share the same
            .active gate on #mapleLeaves (autumn) / #snowFlakes
            (winter) — the CSS display rule hides the non-matching
-           seasonal pair. distributeFrontLeaves() and
-           distributeFrontSnow() both run before the .active class
-           is added to their front overlays so the shuffle happens
-           off-screen.
+           seasonal pair.
 
            startAmbient() runs immediately after this block, and
            its playAmbientSound() call will fire
@@ -5841,15 +5850,7 @@ function triggerKoiStart() {
            starfield in one pass if カタライザー is the current
            track. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
-        if (mapleLeavesFront) {
-          distributeFrontLeaves();
-          mapleLeavesFront.classList.add('active');
-        }
         if (snowFlakes) snowFlakes.classList.add('active');
-        if (snowFlakesFront) {
-          distributeFrontSnow();
-          snowFlakesFront.classList.add('active');
-        }
         if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');
         startAmbient();
 
@@ -6042,6 +6043,7 @@ window.addEventListener('load', function() {
      matching theme), so the DOM nodes are stable. */
   buildSnowflakes();
   buildStars();
+  buildLanterns();
 
   /* Cold-boot December switchover. startInfoUpdates() above already
      ran updateInfoDateTime() synchronously, which may have flipped
