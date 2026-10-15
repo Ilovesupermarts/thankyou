@@ -1,4 +1,4 @@
-var BUILD = 'v125';
+var BUILD = 'v126';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -29,54 +29,7 @@ var BUILD = 'v125';
 
    ------------------------------------------------------------
    Changelog:
-     v1.3 (cross-season late-night starfield)
-       - The 33-star far-depth blurred starfield (#starField) is
-         extended from being winter-exclusive to running across
-         both warm-palette seasons (data-theme="autumn" and
-         data-theme="winter"). Every visual parameter is retained
-         verbatim — 33 stars, 0.65 peak opacity, 1.30× twinkle
-         duration (3.9s–8.6s), 1.15× size scale (13px–32px),
-         random (left, top) relocation on animationiteration
-         during the opacity: 0 trough, blur(2.4px) base and
-         blur(3.8px) on .star-deep — so every star sits in the
-         same distant bokeh plane behind both the autumn leaves
-         and the winter snowflakes.
-       - The starfield's display gate moves from the winter-only
-         html:not([data-theme="winter"]) group to a dedicated
-         html[data-theme="default"] .star-field rule, mirroring the
-         same idiom already used for .ambient-mesh and
-         .ambient-mosaic. The starfield is hidden only under the
-         sakura default theme.
-       - updateStarFieldVisibility() now uses
-         isWarmPaletteTheme(currentTheme) rather than
-         currentTheme === 'winter'. This is the fourth application
-         of the same predicate (applyTheme's acoustic gate,
-         drawHudSpectrum's palette branch, playAmbientSound's
-         terminal guard, and now the starfield's visibility check),
-         so autumn and winter stay unified under a single
-         warm-palette definition for both audio management and the
-         visual layer.
-       - #starField is placed immediately before #mapleLeaves in
-         index.html. Both share z-index: -1, and at equal z-index
-         paint order is DOM order — so the stars sit below the
-         falling leaves in autumn and below the falling snowflakes
-         in winter, above .ambient-mosaic at z-index -2 throughout.
-         The ordering holds across the 1.8s opacity cross-fade:
-         opacity < 1 creates a stacking context within the parent's
-         context but does not reorder siblings.
-       - Toggling autumn ↔ winter during late-night playback keeps
-         the starfield continuously visible. applyTheme() calls
-         updateStarFieldVisibility() with the new warm-palette
-         theme (no class change), then startAmbient() runs
-         stopAmbient() → startAmbient() internally, which removes
-         and re-adds .active ~4ms apart — inside a single 8.3ms
-         frame at 120Hz. Browsers retarget an in-flight opacity
-         transition on property change, so any visible traversal
-         is a 1→0.998→1 micro-dip, imperceptible against the 1.8s
-         curve. Toggling to default correctly hides the starfield:
-         isWarmPaletteTheme('default') is false, so the class is
-         removed once and stays removed.
-     v1.3 (winter theme — 7-tier snowfall + late-night starfield)
+     v1.3 (winter theme — 7-tier snowfall)
        - A third theme, data-theme="winter" (❄️), is added
          alongside autumn (🍁) and default sakura (🌸). Winter
          inherits the entire 金木犀 (Kinmokusei) & 葡萄染
@@ -144,49 +97,6 @@ var BUILD = 'v125';
          S-curve is baked into the transform stops rather than an
          easing curve, so the sway reads as wind rather than a
          spring.
-       - Late-night sparkling starfield. #starField (z-index -1)
-         holds 33 distant 4-point Hoshi-gata stars with a
-         radial-gradient halo, two SVG variants (amber-centred
-         .sparkle-star, plum-centred .sparkle-star.star-plum),
-         and two depth classes (filter: blur(2.4px) default,
-         .star-deep at filter: blur(3.8px)). Peak opacity 0.65,
-         1.30× twinkle duration (3.9s–8.6s), 1.15× size scale.
-         Each star's animationiteration listener re-rolls its
-         (left, top) during the opacity: 0 trough at the 72–99%
-         keyframe stop — the relocation lands entirely inside the
-         invisible window, so it reads as a new star appearing
-         elsewhere rather than the existing star drifting.
-       - Triple-gated visibility. updateStarFieldVisibility() adds
-         .active to #starField only when all three conditions hold:
-         the theme is warm-palette, #mapleLeaves carries .active
-         (carousel is running, past the name intro), and
-         _activeAmbientTrackName === 'latenight' with
-         ambientSource !== null. The third gate is what ties the
-         starfield to the late-night phase (カタライザー, 22:00–04:59
-         JST) rather than the theme alone — winter mornings stay
-         starlit-free, and the field only ignites when the
-         late-night bed is actually audible.
-       - Starfield lifecycle. _activeAmbientTrackName is set in
-         playAmbientSound() at the moment ambientSource = src, and
-         reset in two places: inside src.onended (guarded by the
-         existing if (ambientSource === src) identity check) and
-         at the top of stopAmbient()'s state-clearing group. Both
-         reset sites call updateStarFieldVisibility() immediately
-         so the starfield and the HUD read the cleared state on
-         the same tick. The identity guard is load-bearing for the
-         same-track loop case: scheduleNextAmbient re-arms at
-         playDur * 1000 while the outgoing source is stopped at
-         playDur + 0.1, so src2's assignment pre-empts src1's
-         onended by 100ms and the guard evaluates false — the
-         starfield never pulses between successive plays of
-         Latenight.mp3.
-       - stopAmbient() teardown order. _activeAmbientTrackName =
-         null joins ambientSource = null, ambientGain = null, and
-         the timing trio in the same clearing block, and
-         updateStarFieldVisibility() sits between that block and
-         _hudRenderState(). Both readers therefore observe the
-         fully-cleared playback window, and the HUD badge revert
-         and the starfield deactivation land in the same frame.
        - Maple-leaf hiding generalised. The previous
          html[data-theme="default"] .maple-leaves-overlay
          { display: none; } becomes
@@ -198,40 +108,29 @@ var BUILD = 'v125';
          overlay carries the mirror-image rule
          (html:not([data-theme="winter"]) hides it under autumn
          and sakura). Only one seasonal overlay is ever
-         display: block at a time, so the z-index: -1 collision
-         between #starField and .maple-leaves-overlay is
-         structurally impossible.
+         display: block at a time.
        - Reduced-motion handling. A standalone @media
          (prefers-reduced-motion: reduce) block at the bottom of
-         main.css disables both .snow-particle and .sparkle-star —
+         main.css disables .snow-particle —
          animation: none, opacity: 0, filter: none. The snowflakes
-         and stars are decorative motion with no telemetry role,
+         are decorative motion with no telemetry role,
          so the accessibility intent here is total suppression
          rather than the amplitude-only-freeze pattern the HUD
          waveform uses. The standalone block keeps the winter
-         feature self-contained rather than threading two new
-         selectors through the ambient-stage block.
-       - app.js top-of-file ownership. themeToggle, mapleLeaves,
-         mapleLeavesFront, snowFlakes, snowFlakesFront, and
-         starField — all six element lookups — plus currentTheme,
-         _themeManuallySet, and _activeAmbientTrackName, now live
-         together in the theme-toggle block at the top of app.js.
-         The previous arrangement declared mapleLeaves and
-         mapleLeavesFront 60% down the file in DOM REFS while
-         applyTheme() — defined at the very top — read both. var
-         hoisting made it work at runtime, but it was a top-of-
-         file dependency on a lower-section assignment with no
-         syntactic indication. With <script defer> the parser has
-         finished before module evaluation, so the six lookups
-         resolve immediately and the theme subsystem owns its
-         full state surface at the point of definition.
-         stageLattice stays in DOM REFS — it is consumed by
-         applySwellToCSS() inside the swell loop, which is
-         unrelated to theme ownership.
+         feature self-contained rather than threading a new
+         selector through the ambient-stage block.
+       - app.js top-of-file ownership. themeToggle, mapleLeaves and
+         snowFlakes — the element lookups — plus currentTheme and
+         _themeManuallySet, live together in the theme-toggle block
+         at the top of app.js, so the theme subsystem owns its full
+         state surface at the point of definition. stageLattice
+         stays in DOM REFS — it is consumed by applySwellToCSS()
+         inside the swell loop, which is unrelated to theme
+         ownership.
        - Cold-boot ordering in window.load. startInfoUpdates()
          runs first, which synchronously calls updateInfoDateTime()
          and may flip the theme to winter via the December check.
-         buildMotes(), buildSnowflakes(), and buildStars() follow,
+         buildMotes() and buildSnowflakes() follow,
          then the explicit window.load winter re-check. By the
          time any particle is appended, document.documentElement
          already carries its final data-theme for the session, so
@@ -1099,9 +998,6 @@ var BUILD = 'v125';
          makeSeamlessLoop crossfade (start button), and the three
          synthesised UI sounds (tock, check, paper).
      v1.3
-       - Shippo tracer refactor: concave 4-point star (Hoshi-gata)
-         replaces the circle trace.
-       - Star placement is unrestricted.
        - Shippo tracer fix: scheduleShippoTracer() no longer calls
          stopShippoTracer() at its head.
        - Ambient Shippo mosaic + circle tracer.
@@ -1152,26 +1048,21 @@ var BUILD = 'v125';
    ============================================================ */
 
 /* ============ THEME TOGGLE ============
-   All six element refs and all three state variables live together
-   at the top of the file so the theme subsystem owns its full state
-   surface at the point of definition. app.js loads with
-   <script defer>, so the DOM is fully parsed when this block runs —
-   every getElementById resolves immediately, and applyTheme() /
-   updateStarFieldVisibility() never read a value that has not yet
-   been assigned.
+   All element refs and state variables live together at the top of
+   the file so the theme subsystem owns its full state surface at the
+   point of definition. app.js loads with <script defer>, so the DOM
+   is fully parsed when this block runs — every getElementById
+   resolves immediately, and applyTheme() never reads a value that
+   has not yet been assigned.
 
    _themeManuallySet suppresses the December auto-switch for the rest
    of the page session once the user taps the toggle. Reload resets
-   it. _activeAmbientTrackName records the logical phase key of the
-   ambient track currently playing (null when idle); it is the third
-   clause in updateStarFieldVisibility()'s gate. */
+   it. */
 var themeToggle = document.getElementById('themeToggle');
 var mapleLeaves = document.getElementById('mapleLeaves');
 var snowFlakes = document.getElementById('snowFlakes');
-var starField = document.getElementById('starField');
 var currentTheme = 'autumn';
 var _themeManuallySet = false;
-var _activeAmbientTrackName = null;
 
 function isWarmPaletteTheme(theme) {
   return theme === 'autumn' || theme === 'winter';
@@ -1182,17 +1073,6 @@ function isNagoyaWinterSeason() {
   var p = nagoyaDateParts();
   if (p.month !== 12) return false;
   return (p.day > 1 || p.hour > 0 || p.minute >= 1);
-}
-
-/* Stars only appear when:
-   1. Theme is 'autumn' or 'winter' (isWarmPaletteTheme)
-   2. Carousel is active (post-name-intro, #mapleLeaves has .active)
-   3. Late-night ambient music ('latenight') is actively playing */
-function updateStarFieldVisibility() {
-  if (!starField) return;
-  var isCarouselRunning = !!(mapleLeaves && mapleLeaves.classList.contains('active'));
-  var isLateNightPlaying = (ambientSource !== null && _activeAmbientTrackName === 'latenight');
-  starField.classList.toggle('active', isWarmPaletteTheme(currentTheme) && isCarouselRunning && isLateNightPlaying);
 }
 
 function applyTheme(theme) {
@@ -1208,12 +1088,11 @@ function applyTheme(theme) {
      returnToStartScreen(). Gating on that instead of introHasRun
      closes the mid-intro race.
 
-     The ambient sound rotation, the audio-reactive swell loop, and
-     the late-night starfield share this exact lifecycle so a mid-
-     run theme toggle cannot leave sound, animation, or stars
-     running alone against a sakura theme. */
+     The ambient sound rotation and the audio-reactive swell loop
+     share this exact lifecycle so a mid-run theme toggle cannot
+     leave sound or animation running alone against a sakura
+     theme. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
-  updateStarFieldVisibility();
   if (isWarmPaletteTheme(theme) && isCarouselRunning) {
     startAmbient();
   } else {
@@ -1330,9 +1209,8 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
 
    Peaks are 1.00 for all three beds, tuned by ear against the
    wind chime layer that sits on top during the morning window.
-   Lifecycle is shared with the chime, the audio-reactive swell
-   loop, and the late-night starfield via the .active class on
-   #mapleLeaves. */
+   Lifecycle is shared with the chime and the audio-reactive swell
+   loop via the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
   {
     name: 'morning',
@@ -1905,7 +1783,7 @@ function decodeAmbientSlot(track) {
 
    LIFECYCLE (v1.3). The scheduler is armed by startAmbient() and
    disarmed by stopAmbient(), matching the .active gate that
-   already governs the chime, swell loop, and starfield. Arming
+   already governs the chime and swell loop. Arming
    previously lived in initSound()'s decode .then(), which meant a
    tablet parked on the name / blossom screen could wake at 16:58 /
    21:58 / 04:58 to decompress ~375 MB PCM for an inaudible
@@ -2521,13 +2399,7 @@ function tryStartBlossomStream(retries) {
    advance the HUD gauge fill and the split timestamp row. All
    three of ambientPlayStartTime, ambientPlayDurationSec, and
    _hudLastRenderedSec reset together in stopAmbient() so the
-   playback-window state stays in one cohort.
-
-   _activeAmbientTrackName records the logical phase key of the
-   track that is currently audible — null when idle. It is the
-   third clause in updateStarFieldVisibility()'s gate, so the
-   late-night starfield ignites only when カタライザー is actually
-   playing. */
+   playback-window state stays in one cohort. */
 var ambientTimer = null;
 var ambientSource = null;
 var ambientGain = null;
@@ -2603,15 +2475,9 @@ function stopAmbient() {
   }
   ambientSource = null;
   ambientGain = null;
-  _activeAmbientTrackName = null;
   ambientPlayStartTime = -1;
   ambientPlayDurationSec = 0;
   _hudLastRenderedSec = -1;
-
-  /* Starfield reads the cleared playback window on the same tick
-     as the HUD badge revert below — both writers observe the same
-     state. */
-  updateStarFieldVisibility();
 
   /* Badge revert to standby via the single-authority renderer */
   _hudRenderState();
@@ -2701,8 +2567,6 @@ function playAmbientSound() {
   ambientGain = gain;
   ambientPlayStartTime = now;
   ambientPlayDurationSec = playDur;
-  _activeAmbientTrackName = track.name;
-  updateStarFieldVisibility();
 
   /* Badge transitions to 再生中 via the single-authority renderer */
   _hudRenderState();
@@ -2713,18 +2577,12 @@ function playAmbientSound() {
        onended can fire during the first frames of src2. Guarding
        the timing reset behind the identity check keeps src2's
        start time and duration intact — without this, the HUD
-       pins to 00:00 / 00:00 after every track transition.
-
-       The starfield reset rides in the same guard for the same
-       reason: a same-track loop's src1.onended must not clear
-       _activeAmbientTrackName, because src2 has already set it. */
+       pins to 00:00 / 00:00 after every track transition. */
     if (ambientSource === src) {
       ambientSource = null;
-      _activeAmbientTrackName = null;
       ambientPlayStartTime = -1;
       ambientPlayDurationSec = 0;
       _hudLastRenderedSec = -1;
-      updateStarFieldVisibility();
     }
     if (ambientGain === gain) ambientGain = null;
     try { gain.disconnect(); } catch (e) {}
@@ -3275,9 +3133,8 @@ function applyCounterCellWidth() {
 }
 
 /* ============ DOM REFS ============
-   Theme-owned refs (themeToggle, mapleLeaves, snowFlakes,
-   starField) live at the top of the
-   file — see the THEME TOGGLE block. stageLattice stays here
+   Theme-owned refs (themeToggle, mapleLeaves, snowFlakes) live at
+   the top of the file — see the THEME TOGGLE block. stageLattice stays here
    because it is consumed by applySwellToCSS() inside the swell
    loop, which is unrelated to theme ownership. */
 var nameScreen = document.getElementById('nameScreen');
@@ -4138,7 +3995,6 @@ function returnToStartScreen() {
 
   if (mapleLeaves) mapleLeaves.classList.remove('active');
   if (snowFlakes) snowFlakes.classList.remove('active');
-  if (starField) starField.classList.remove('active');
   if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
   stopAmbient();
 
@@ -4610,7 +4466,7 @@ var windRafId = null;
    The same distinction applies elsewhere in the codebase — koi
    flinch (feedback) vs. swim-circle rotation (decoration), the
    drift keyframes (decoration) vs. opacity arrival (feedback),
-   the snowflakes and stars (decoration, fully suppressed). */
+   the snowflakes (decoration, fully suppressed). */
 var _prefersReducedMotion = false;
 var windEnabled = true;
 
@@ -5461,7 +5317,7 @@ function scheduleAmbientRipple() {
   }, interval);
 }
 
-/* ============ WINTER SNOWFLAKES + LATE-NIGHT STARFIELD BUILDERS ===
+/* ============ WINTER SNOWFLAKES BUILDER ===
    Two standalone 6-fold snowflake SVG shapes from the reference
    image. Shape A is the Dendritic Ring-Centre Crystal, Shape B is
    the Diamond-Tipped Crystal with inner secondary rays. The two
@@ -5626,48 +5482,6 @@ window.addEventListener('resize', function() {
   if (_lanternResizeTimer) clearTimeout(_lanternResizeTimer);
   _lanternResizeTimer = setTimeout(buildLanterns, 250);
 });
-
-/* Builds 33 far-depth blurred sparkling stars with starDurationMul
-   = 1.30 and starScale = 1.15. Each star re-rolls its (left, top)
-   coordinates on animationiteration, landing the relocation inside
-   the opacity: 0 trough so it reads as a new star appearing rather
-   than the existing one drifting. Reduced motion suppresses
-   construction entirely — the media query in main.css also kills
-   any pre-existing stars, but skipping build saves 33 DOM nodes. */
-function buildStars() {
-  if (!starField) return;
-  starField.innerHTML = '';
-  if (_prefersReducedMotion) return;
-  var count = 33;
-  var starDurationMul = 1.30;
-  var starScale = 1.15;
-
-  for (var i = 0; i < count; i++) {
-    (function(idx) {
-      var s = document.createElement('div');
-      var depthCls = (idx % 2 === 0) ? ' star-deep' : '';
-      var hueCls   = (idx % 4 === 0) ? ' star-plum' : '';
-      s.className = 'sparkle-star' + depthCls + hueCls;
-      var baseSize = (idx % 3 === 0) ? (11 + Math.random() * 6)
-                   : (idx % 3 === 1) ? (16 + Math.random() * 7)
-                   :                   (21 + Math.random() * 8);
-      var size = baseSize * starScale;
-      s.style.width  = size.toFixed(1) + 'px';
-      s.style.height = size.toFixed(1) + 'px';
-      s.style.left   = (4 + Math.random() * 92).toFixed(1) + '%';
-      s.style.top    = (4 + Math.random() * 92).toFixed(1) + '%';
-      var dur = (3.0 + Math.random() * 3.6) * starDurationMul;
-      s.style.setProperty('--star-dur', dur.toFixed(2) + 's');
-      s.style.setProperty('--star-delay', (-Math.random() * dur).toFixed(2) + 's');
-
-      s.addEventListener('animationiteration', function() {
-        s.style.left = (4 + Math.random() * 92).toFixed(1) + '%';
-        s.style.top  = (4 + Math.random() * 92).toFixed(1) + '%';
-      });
-      starField.appendChild(s);
-    })(i);
-  }
-}
 
 /* ============================================================
    KOI FLINCH */
@@ -5853,14 +5667,7 @@ function triggerKoiStart() {
            sound layers. The particle overlays share the same
            .active gate on #mapleLeaves (autumn) / #snowFlakes
            (winter) — the CSS display rule hides the non-matching
-           seasonal pair.
-
-           startAmbient() runs immediately after this block, and
-           its playAmbientSound() call will fire
-           updateStarFieldVisibility() with the newly-set
-           _activeAmbientTrackName — igniting the late-night
-           starfield in one pass if カタライザー is the current
-           track. */
+           seasonal pair. */
         if (mapleLeaves) mapleLeaves.classList.add('active');
         if (snowFlakes) snowFlakes.classList.add('active');
         if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');
@@ -6054,7 +5861,6 @@ window.addEventListener('load', function() {
      The seasonal gate is CSS-only (display: none for the non-
      matching theme), so the DOM nodes are stable. */
   buildSnowflakes();
-  buildStars();
   buildLanterns();
 
   /* Cold-boot December switchover. startInfoUpdates() above already
