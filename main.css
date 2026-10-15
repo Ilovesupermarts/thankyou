@@ -1282,8 +1282,8 @@
   .panel-content p:last-child { margin-bottom: 0; }
 
   .panel-content .therapist-name {
-    font-family: "Yuji Mai", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-weight: 400; font-size: 1.18em; color: var(--outstanding); letter-spacing: 2px;
+    font-family: "RocknRoll One", "Hiragino Sans", "Yu Gothic", "Noto Sans JP", "Noto Sans CJK JP", sans-serif;
+    font-weight: 400; font-size: 1.10em; color: var(--outstanding); letter-spacing: 0px;
     font-style: normal; text-shadow: 0 1px 8px var(--petal-soft); padding: 0 2px;
   }
   /* Autumn + winter scoped name plum — merged for both the greeting
