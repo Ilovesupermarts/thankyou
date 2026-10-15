@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v115';
+const CACHE = 'thankyou-v117';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -15,8 +15,11 @@ const ASSETS = [
   './panel-3-no.html',
   './panel-4.html',
   './icons/icon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
+  './icons/icon-192x192.png',
+  './icons/icon-512x512.png',
+  './icons/icon-192-maskable.png',
+  './icons/icon-512-maskable.png',
+  './icons/favicon-48x48.png',
   './icons/apple-touch-icon.png',
   './icons/1790678998862.jpg',
   './icons/1790835034553.jpg',
@@ -25,7 +28,11 @@ const ASSETS = [
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
-    caches.open(CACHE).then(function(c) { return c.addAll(ASSETS); })
+    caches.open(CACHE).then(function(c) {
+      return c.addAll(ASSETS.map(function(u) {
+        return new Request(u, { cache: 'reload' });
+      }));
+    })
   );
   self.skipWaiting();
 });
@@ -42,70 +49,65 @@ self.addEventListener('activate', function(e) {
   self.clients.claim();
 });
 
+function cacheKey(req) {
+  var u = new URL(req.url);
+  return u.origin + u.pathname;
+}
+
+function networkFirst(e, navFallback) {
+  var key = cacheKey(e.request);
+  var controller = new AbortController();
+  var abortTimer = setTimeout(function() { controller.abort(); }, 20000);
+  var net = fetch(e.request, { cache: 'no-cache', signal: controller.signal });
+  var timer;
+  var timeout = new Promise(function(_, reject) { timer = setTimeout(reject, 4000); });
+  function store(r) {
+    return caches.open(CACHE).then(function(c) { return c.put(key, r); });
+  }
+  return Promise.race([net, timeout])
+    .then(function(r) {
+      clearTimeout(timer); clearTimeout(abortTimer);
+      if (!r.ok) throw new Error('bad status: ' + r.status);
+      e.waitUntil(store(r.clone()));
+      return r;
+    })
+    .catch(function() {
+      clearTimeout(timer);
+      e.waitUntil(net.then(function(r) {
+        clearTimeout(abortTimer);
+        if (r && r.ok) return store(r.clone());
+      }).catch(function() { clearTimeout(abortTimer); }));
+      return caches.match(key).then(function(hit) {
+        if (hit) return hit;
+        if (navFallback && e.request.mode === 'navigate') {
+          return caches.match(new URL('./index.html', self.location).href)
+            .then(function(idx) { return idx || net; });
+        }
+        return net;
+      });
+    });
+}
+
 self.addEventListener('fetch', function(e) {
+  if (e.request.method !== 'GET') return;
+  if (new URL(e.request.url).origin !== self.location.origin) return;
+
   var url = new URL(e.request.url);
 
-  /* presets.json and quotes.json — network-first with cache fallback.
-     The ignoreSearch flag matters: even though app.js no longer
-     appends a ?v= cache-buster to these URLs, a future change that
-     reintroduces one would break the offline fallback without it.
-     caches.match() matches by full URL including the search string,
-     and the precache installed the bare URL.
-
-     The put() is guarded on r.ok so a 404 or 5xx never lands in the
-     precache and poisons every future session, and wrapped in
-     e.waitUntil so the worker is kept alive until the write
-     completes — a floating promise can be cut short mid-write if
-     the worker is stopped. */
+  /* presets.json and quotes.json — network-first (see networkFirst). */
   if (url.pathname.endsWith('/presets.json') ||
       url.pathname.endsWith('/quotes.json')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(function(r) {
-          if (r && r.ok) {
-            var copy = r.clone();
-            e.waitUntil(caches.open(CACHE).then(function(c) { return c.put(e.request, copy); }));
-          }
-          return r;
-        })
-        .catch(function() {
-          return caches.match(e.request, { ignoreSearch: true });
-        })
-    );
+    e.respondWith(networkFirst(e, false));
     return;
   }
 
-  /* HTML, CSS, JS, and directory roots — network-first with cached
-     fallback. Same ignoreSearch reasoning as above. The navigation
-     fallback to ./index.html also uses ignoreSearch so a query
-     string on a navigation request still resolves.
-
-     Same r.ok guard and same e.waitUntil wrapping as the JSON
-     branch — an error response must not be written into the
-     versioned precache, and the write must not be cut short if the
-     worker is stopped. */
+  /* HTML, CSS, JS, and directory roots — network-first, with a
+     fallback to the cached index.html for navigations. */
   if (url.pathname.endsWith('.html') ||
       url.pathname.endsWith('.css') ||
       url.pathname.endsWith('.js') ||
       url.pathname.endsWith('/')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(function(r) {
-          if (r && r.ok) {
-            var copy = r.clone();
-            e.waitUntil(caches.open(CACHE).then(function(c) { return c.put(e.request, copy); }));
-          }
-          return r;
-        })
-        .catch(function() {
-          return caches.match(e.request, { ignoreSearch: true }).then(function(r) {
-            if (r) return r;
-            if (e.request.mode === 'navigate') {
-              return caches.match('./index.html', { ignoreSearch: true });
-            }
-          });
-        })
-    );
+    e.respondWith(networkFirst(e, true));
     return;
   }
 

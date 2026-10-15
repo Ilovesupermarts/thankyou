@@ -3519,3 +3519,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
+:root { --build: "v117"; }
