@@ -8,27 +8,33 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
 
-<!-- The real stylesheet: palette, Shippō tile, orbs, koi screen. -->
+<!-- The real stylesheet: palette, Shippō tile, orbs, message panels. -->
 <link rel="stylesheet" href="main.css">
 
 <!-- ============================================================
      background.html — PREVIEW ONLY
      ------------------------------------------------------------
      A test bench for Japanese-inspired background motion. It loads
-     the real main.css and reuses the real background markup from
-     index.html (.ambient-stage, .light-orb, .ambient-mosaic,
-     .shippo-mask-window, .blossom-screen …) so what you see here
-     is what the app would look like.
+     the real main.css and reuses the real background markup and the
+     real message panel markup from index.html (.ambient-stage,
+     .light-orb, .ambient-mosaic, .shippo-mask-window, .stage,
+     .panel, .panel-content, .dots …) so what you see here is what
+     the app would look like.
 
      Nothing here is used by the app. It is not in sw.js's ASSETS
      list. Every preview-only class starts with "bgp-".
 
-     Frame-rate rule followed by every mode: only `transform` and
-     `opacity` are animated. Gradients and the Shippō mask are
-     painted once and then just moved / faded by the compositor,
-     so the main thread does no per-frame work.
+     Frame-rate rules:
+       · Only `transform` and `opacity` are animated in CSS.
+       · No layer is scaled far beyond the size it was painted at.
+         (The first Hamon scaled a ring from 8% to 260%; Chrome on
+         Android painted it small and stretched it, which caused the
+         flashing and blocky artifacts.) Hamon is now drawn on one
+         small, low-resolution canvas instead.
+       · Music reaction uses the same --audio-swell variable and the
+         same maths as app.js.
      ============================================================ -->
 <style>
   html {
@@ -38,6 +44,7 @@
     --bgp-lines: 0.08;
     --bgp-tile: 60px;
     --bgp-wash: 0.35;
+    --bgp-react: 1;
   }
   body {
     overflow: hidden;
@@ -45,22 +52,30 @@
     padding-bottom: 0;
   }
 
-  /* ---------- Overrides of real elements, driven by the sliders ---------- */
+  /* ---------- Overrides of real elements, driven by the sliders ----------
+     Each one keeps the app's own music-swell amount on top
+     (× --bgp-react so the "React to music" switch can turn it off). */
   html[data-bgp] .ambient-mosaic,
   html[data-bgp] .ambient-mosaic-pond {
     background-size: var(--bgp-tile) var(--bgp-tile);
   }
   html[data-bgp] .ambient-mosaic { opacity: var(--bgp-lines); }
   html[data-bgp] .ambient-mosaic-pond { opacity: 0; }
-  html[data-bgp]:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic { opacity: 0; }
-  html[data-bgp]:has(.blossom-screen.visible:not(.diving)) .ambient-mosaic-pond { opacity: var(--bgp-lines); }
 
   html[data-bgp] .shippo-mask-window {
-    opacity: var(--bgp-lattice);
+    opacity: calc(var(--bgp-lattice) + var(--audio-swell, 0) * 0.22 * var(--bgp-react));
     -webkit-mask-size: var(--bgp-tile) var(--bgp-tile);
     mask-size: var(--bgp-tile) var(--bgp-tile);
   }
-  html[data-bgp] .layer-diffuse .ambient-mesh { opacity: var(--bgp-wash) !important; }
+  html[data-bgp] .layer-diffuse .ambient-mesh {
+    opacity: calc(var(--bgp-wash) + var(--audio-swell, 0) * 0.40 * var(--bgp-react)) !important;
+  }
+  html[data-bgp] .layer-diffuse .orb-1 { scale: calc(1 + var(--audio-swell, 0) * 0.53 * var(--bgp-react)); }
+  html[data-bgp] .layer-diffuse .orb-2 { scale: calc(1 + var(--audio-swell, 0) * 0.61 * var(--bgp-react)); }
+  html[data-bgp] .layer-diffuse .orb-3 { scale: calc(1 + var(--audio-swell, 0) * 0.48 * var(--bgp-react)); }
+  html[data-bgp] .shippo-mask-window .ambient-mesh {
+    transform: scale(calc(1 + var(--audio-swell, 0) * 0.06 * var(--bgp-react)));
+  }
 
   /* Which Shippō light layer is on: the real mirrored orbs, or ours. */
   html[data-bgp-lattice="mirror"] #bgpLattice { display: none; }
@@ -90,7 +105,11 @@
   html.bgp-paused *::after { animation-play-state: paused !important; }
 
   /* ---------- Preview-only motion layers ---------- */
-  .bgp-soft { opacity: var(--bgp-strength); }
+  .bgp-soft,
+  .bgp-bloom,
+  .bgp-canvas-soft {
+    opacity: calc(var(--bgp-strength) + var(--audio-swell, 0) * 0.35 * var(--bgp-react));
+  }
 
   .bgp-lattice { z-index: -2; }
   .bgp-inner {
@@ -107,8 +126,23 @@
     inset: 0;
     z-index: -2;
     pointer-events: none;
-    opacity: var(--bgp-strength);
   }
+
+  /* Hamon canvases. Drawn at ~40% resolution and stretched by the
+     browser, which keeps them soft and cheap. */
+  .bgp-canvas-soft,
+  .bgp-canvas-lit {
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    display: none;
+  }
+  .bgp-canvas-soft { z-index: -3; }
+  .bgp-canvas-lit { position: absolute; }
+  html[data-bgp="hamon"] .bgp-canvas-soft,
+  html[data-bgp="hamon"] .bgp-canvas-lit { display: block; }
 
   /* 霞 Kasumi — horizontal mist bands, one-way drift */
   .bgp-kasumi {
@@ -134,39 +168,6 @@
     50%  { transform: translate3d(-16vw, 0, 0); }
     75%  { transform: translate3d(51vw, 2.5vh, 0); }
     100% { transform: translate3d(118vw, 0, 0); }
-  }
-
-  /* 波紋 Hamon — light rings spreading like a pond ripple */
-  .bgp-ring {
-    position: absolute;
-    left: var(--x);
-    top: var(--y);
-    width: 50vmax;
-    height: 50vmax;
-    margin: -25vmax 0 0 -25vmax;
-    border-radius: 50%;
-    background: radial-gradient(circle closest-side,
-      rgba(var(--c), 0) 50%,
-      rgba(var(--c), calc(var(--a) * 0.45)) 63%,
-      rgba(var(--c), var(--a)) 74%,
-      rgba(var(--c), calc(var(--a) * 0.40)) 85%,
-      rgba(var(--c), 0) 97%);
-    opacity: 0;
-    will-change: transform, opacity;
-    animation: bgpRing calc(12s / var(--bgp-speed)) cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-    animation-delay: calc(var(--d) / var(--bgp-speed));
-  }
-  .bgp-ring.once {
-    width: 30vmax; height: 30vmax; margin: -15vmax 0 0 -15vmax;
-    animation-duration: calc(5s / var(--bgp-speed));
-    animation-iteration-count: 1;
-    animation-delay: 0s;
-  }
-  @keyframes bgpRing {
-    0%   { transform: scale(0.08); opacity: 0; }
-    12%  { opacity: 1; }
-    70%  { opacity: 0.5; }
-    100% { transform: scale(2.6); opacity: 0; }
   }
 
   /* 木漏れ日 Komorebi — slanted sunbeams that sway */
@@ -223,6 +224,9 @@
     58%  { opacity: 1; }
     100% { opacity: 0; }
   }
+
+  /* Message panel sample: hide when switched off. */
+  html.bgp-no-panel .stage { visibility: hidden; }
 
   /* ---------- Control panel ---------- */
   .bgp-panel {
@@ -295,7 +299,6 @@
   .bgp-cost { display: inline-block; margin-top: 4px; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
   .bgp-cost.low  { background: #E6F0DF; color: #3D5A2C; }
   .bgp-cost.mid  { background: #FBECD0; color: #7A4B0B; }
-  .bgp-cost.high { background: #F6DCDC; color: #7A2222; }
 
   .bgp-desc {
     margin-top: 10px;
@@ -309,7 +312,8 @@
   .bgp-desc .perf { display: block; margin-top: 6px; font-size: 12px; color: var(--text-mute); }
 
   .bgp-row { margin: 12px 0; }
-  .bgp-row-top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .bgp-row[hidden] { display: none; }
+  .bgp-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
   .bgp-row label { font-weight: 600; font-size: 13px; }
   .bgp-row .hint { font-size: 11.5px; color: var(--text-faint); }
   .bgp-val { font-variant-numeric: tabular-nums; font-size: 12.5px; color: var(--accent-2); font-weight: 700; }
@@ -318,11 +322,36 @@
     font: inherit; font-size: 13px;
     padding: 6px 10px; border-radius: 10px;
     border: 1px solid var(--border-2); background: #fff; color: var(--text-dark);
+    max-width: 190px;
   }
 
   .bgp-toggles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
   .bgp-toggles label { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 4px 0; }
-  .bgp-toggles input { width: 18px; height: 18px; accent-color: var(--accent); }
+  .bgp-toggles input { width: 18px; height: 18px; accent-color: var(--accent); flex: none; }
+
+  .bgp-music {
+    margin-top: 4px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--soft-1);
+  }
+  .bgp-music-row { display: flex; gap: 8px; align-items: center; }
+  .bgp-music-row select { flex: 1; min-width: 0; max-width: none; }
+  .bgp-meter {
+    position: relative;
+    height: 8px;
+    margin-top: 10px;
+    border-radius: 999px;
+    background: rgba(136, 46, 71, 0.12);
+    overflow: hidden;
+  }
+  .bgp-meter-fill {
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, #FFA259, #E66826 60%, #882E47);
+    transform-origin: 0 50%;
+    transform: scaleX(0);
+  }
+  .bgp-music-note { font-size: 11.5px; color: var(--text-mute); margin-top: 8px; }
 
   .bgp-actions { display: flex; gap: 8px; margin-top: 16px; }
   .bgp-actions .bgp-btn { flex: 1; padding: 11px 14px; font-size: 14px; }
@@ -382,6 +411,8 @@
   <div class="ambient-layer bgp-soft" id="bgpSoft"></div>
   <div class="mote-field" id="moteField"></div>
 </div>
+<!-- preview-only: Hamon soft ripples (unmasked) -->
+<canvas class="bgp-canvas-soft" id="bgpHamonSoft" aria-hidden="true"></canvas>
 
 <div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
   <div class="ambient-stage layer-mirrored">
@@ -398,6 +429,7 @@
 <div class="shippo-mask-window bgp-lattice" id="bgpLattice" aria-hidden="true">
   <div class="bgp-inner" id="bgpLit"></div>
   <div class="bgp-flat" id="bgpLitFlat"></div>
+  <canvas class="bgp-canvas-lit" id="bgpHamonLit"></canvas>
 </div>
 <div class="bgp-bloom" id="bgpBloom" aria-hidden="true"></div>
 
@@ -406,33 +438,73 @@
 
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 
-<!-- ============ REAL KOI START SCREEN (copied from index.html) ============ -->
-<div class="blossom-screen visible" id="blossomScreen">
-  <div class="blossom-greeting">
-    <div class="blossom-greeting-time">こんばんは</div>
-    <div class="blossom-greeting-name">桜庭さん</div>
-  </div>
-  <button type="button" class="start-btn" id="startBtn" aria-label="プレビュー">
-    <div class="icon-wrapper">
-      <div class="soft-glow" aria-hidden="true"></div>
-      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-        <circle cx="180" cy="180" r="90" class="gold-band" />
-      </svg>
-      <div class="koi-dive-wrap">
-        <div class="blossom-char">
-          <div class="koi-shadow" aria-hidden="true"></div>
-          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+<!-- ============ REAL MESSAGE PANELS (copied from index.html) ============
+     Text is panel-1/2/3/4.html run through the same paragraph rules
+     as app.js's convertPanelText(). Panel 0's weather greeting is
+     written live by app.js, so a fixed sample is used here. -->
+<div class="stage" id="stage">
+  <div class="track" id="track">
+    <div class="panel" data-panel="0">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <span class="therapist-name">桜庭さん</span>、初めまして。
+          <div><p>今夜は少し肌寒いですね。どうぞ、温かくしてお過ごしください。</p></div>
         </div>
       </div>
     </div>
-  </button>
-  <div class="start-hints">
-    <p class="start-hint-line">水にふれると、さざなみが静かに広がります。</p>
-    <p class="start-hint-line">鯉に、そっとふれてみてください。</p>
-    <p class="start-hint-line">水面をゆっくり上へなぞると、はじまります。</p>
+    <div class="panel" data-panel="1">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div><p>シンガポールから参りました、Eze（エズ）と申します。<br>お読みいただきたいメッセージを用意してまいりました。急ぎませんので、どうぞごゆっくりお読みになってください。<br>本日はよろしくお願いいたします。</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="2">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div><p>今日は初めて担当していただくセラピストさんですが、<br>とてもお綺麗で、素敵な方だと感じております。</p><p>お会いできて嬉しく思っております。</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="3">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div><p>もしよろしければ、今回は少し特別な癒しのオプションについて、ご相談がございます。</p><p>こちらの表をご覧いただき、ご自身が無理なく対応できるものがございましたら、お選びいただけますでしょうか。</p><p>組み合わせていただいても構いません。料金につきましては、内容と金額が決まりましたら、その場でお渡しいたします。</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="4">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div><p>どのような内容になりましても、セラピストさんのマッサージを受けられること自体を楽しみにしておりますので、どうぞお気になさらないでください。</p><p>初めてお会いしますが、とても素敵な方だと感じております。今日は素敵な時間を過ごせることを楽しみにしております。</p></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="5">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <p>もちろん、ご不安なものやご対応が難しいものについては、</p>
+          <p class="msg-3">無理にお願いすることは一切ございません。ご自身が安心して対応できる範囲で、ご判断いただければと思っております。</p>
+          <p>すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-hint global-hint shown" id="globalHint">
+    <span class="hint-layer active">
+      <span>スワイプ</span>
+      <span class="hint-arrow right">→</span>
+    </span>
+  </div>
+
+  <div class="dots visible" id="dots">
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
+    <div class="dot"></div>
   </div>
 </div>
 
@@ -452,6 +524,20 @@
   <div class="bgp-section-label">Motion style</div>
   <div class="bgp-modes" id="bgpModes"></div>
   <div class="bgp-desc" id="bgpDesc"></div>
+
+  <div class="bgp-section-label">音楽 Music</div>
+  <div class="bgp-music">
+    <div class="bgp-music-row">
+      <select id="bgpTrack" aria-label="Track">
+        <option value="Sound/Morning.mp3">草原の風 · Morning</option>
+        <option value="Sound/Earlyevening.mp3">虹を見た日 · Early evening</option>
+        <option value="Sound/Latenight.mp3">カタライザー · Late night</option>
+      </select>
+      <button type="button" class="bgp-btn primary" id="bgpPlay">▶ 再生</button>
+    </div>
+    <div class="bgp-meter"><div class="bgp-meter-fill" id="bgpMeter"></div></div>
+    <div class="bgp-music-note" id="bgpMusicNote">Plays the app's own tracks and reacts the same way the app does (swell 0.00).</div>
+  </div>
 
   <div class="bgp-section-label">Tweak</div>
 
@@ -511,15 +597,31 @@
     <div class="bgp-row-top">
       <label for="bgpOrigin">波紋の中心 Ripple origin</label>
       <select id="bgpOrigin">
-        <option value="koi">Koi (centre)</option>
+        <option value="center">Centre</option>
         <option value="random">Wandering</option>
       </select>
     </div>
   </div>
 
+  <div class="bgp-row">
+    <div class="bgp-row-top">
+      <label for="bgpPanelSel">メッセージ Sample panel</label>
+      <select id="bgpPanelSel">
+        <option value="0">0 · ご挨拶</option>
+        <option value="1">1 · 自己紹介</option>
+        <option value="2">2 · お礼</option>
+        <option value="3">3 · ご相談</option>
+        <option value="4">4 · ご安心</option>
+        <option value="5">5 · 最後に</option>
+      </select>
+    </div>
+    <div class="hint">Or swipe left / right on the page.</div>
+  </div>
+
   <div class="bgp-section-label">View</div>
   <div class="bgp-toggles">
-    <label><input type="checkbox" id="bgpKoi"> 鯉の画面 Koi screen</label>
+    <label><input type="checkbox" id="bgpShowPanel"> メッセージ Message panel</label>
+    <label><input type="checkbox" id="bgpReact"> 音に反応 React to music</label>
     <label><input type="checkbox" id="bgpWashDrift"> 色の揺らぎ Wash drift</label>
     <label><input type="checkbox" id="bgpTap"> タップで波紋 Tap ripples</label>
     <label><input type="checkbox" id="bgpFpsOn"> FPS meter</label>
@@ -561,7 +663,7 @@
       desc: '<strong>今の背景。</strong> The three orbs drifting back and forth, plus the colour wash drifting. Here only to compare.',
       perf: '7 big moving layers (3 orbs × 2 + wash). Large 700–1050px textures, so the GPU has the most to move here.',
       lattice: 'mirror',
-      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.20, lines: 0.08, tile: 60, wash: 0.60, orbs: 'drift', washDrift: true, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.20, lines: 0.08, tile: 60, wash: 0.60, orbs: 'drift', washDrift: true, origin: 'center' }
     },
     kasumi: {
       kanji: '霞', name: 'Kasumi · mist bands', cost: 'low', costLabel: '低 Low',
@@ -569,15 +671,15 @@
       desc: '<strong>屏風絵の霞。</strong> Long soft bands of mist, like the gold clouds on a folding screen, glide slowly in one direction. Where a band passes, the Shippō lines catch the light. One calm direction instead of wandering.',
       perf: 'One transform per band (plus its lit twin). Straight-line motion, no scaling, so nothing is re-painted.',
       lattice: 'own',
-      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.32, lines: 0.08, tile: 60, wash: 0.30, orbs: 'hidden', washDrift: false, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.32, lines: 0.08, tile: 60, wash: 0.30, orbs: 'hidden', washDrift: false, origin: 'center' }
     },
     hamon: {
       kanji: '波紋', name: 'Hamon · pond ripple', cost: 'low', costLabel: '低 Low',
       base: 12, countLabel: '輪 Rings at once', countMax: 5,
-      desc: '<strong>池の波紋。</strong> Slow rings of light spread out from the koi, like a drop in a pond, and light up the Shippō lines as they pass. Tap anywhere to drop your own ripple. Ties the background to the koi.',
-      perf: 'Scale + fade on a few pre-painted rings. Cheap, but the rings get large near the end, so keep the count at 2–3.',
+      desc: '<strong>池の波紋。</strong> Slow rings of light spread out across the page, like a drop in a pond, and light up the Shippō lines as they pass. Tap anywhere to drop your own ripple.',
+      perf: 'Drawn on one small canvas at 40% resolution (well under 1ms a frame). Nothing is stretched, so no flashing or blocky tiles.',
       lattice: 'own',
-      defaults: { speed: 1, strength: 0.6, count: 3, lattice: 0.38, lines: 0.08, tile: 60, wash: 0.45, orbs: 'still', washDrift: false, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.7, count: 3, lattice: 0.38, lines: 0.08, tile: 60, wash: 0.45, orbs: 'still', washDrift: false, origin: 'center' }
     },
     komorebi: {
       kanji: '木漏れ日', name: 'Komorebi · sunbeams', cost: 'low', costLabel: '低 Low',
@@ -585,7 +687,7 @@
       desc: '<strong>木漏れ日。</strong> Slanted shafts of afternoon light, as if through leaves or a shōji screen, sway gently and brighten and dim. The motion is a slow swing, so it feels like a breeze rather than wandering.',
       perf: 'Rotate + fade only. Beams are tall but narrow, so the textures are small.',
       lattice: 'own',
-      defaults: { speed: 1, strength: 0.7, count: 3, lattice: 0.30, lines: 0.08, tile: 60, wash: 0.25, orbs: 'hidden', washDrift: false, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.7, count: 3, lattice: 0.30, lines: 0.08, tile: 60, wash: 0.25, orbs: 'hidden', washDrift: false, origin: 'center' }
     },
     kokyu: {
       kanji: '呼吸', name: 'Kokyū · breathing', cost: 'low', costLabel: '低 Lowest',
@@ -593,7 +695,7 @@
       desc: '<strong>呼吸。</strong> The same orbs you have now, but they stay in place and only breathe: 5 seconds in, 5 seconds out, about 6 breaths a minute, which is a relaxing pace. The smallest change from today.',
       perf: 'Same layers as today but they barely move (scale + fade in place), so it is lighter than the current drift.',
       lattice: 'mirror',
-      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.24, lines: 0.08, tile: 60, wash: 0.70, orbs: 'breathe', washDrift: false, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.8, count: 3, lattice: 0.24, lines: 0.08, tile: 60, wash: 0.70, orbs: 'breathe', washDrift: false, origin: 'center' }
     },
     akari: {
       kanji: '灯り', name: 'Akari · lantern rings', cost: 'low', costLabel: '低 Lowest',
@@ -601,7 +703,7 @@
       desc: '<strong>灯籠の灯り。</strong> Single Shippō rings warm up one at a time, glow, fade, then the light steps to the next ring, like lanterns being lit along a path. Makes the pattern itself the star.',
       perf: 'Fade only, on small (~90px) dots. The cheapest option; the orbs are kept still.',
       lattice: 'own',
-      defaults: { speed: 1, strength: 0.6, count: 7, lattice: 0.60, lines: 0.08, tile: 60, wash: 0.45, orbs: 'still', washDrift: false, origin: 'koi' }
+      defaults: { speed: 1, strength: 0.6, count: 7, lattice: 0.60, lines: 0.08, tile: 60, wash: 0.45, orbs: 'still', washDrift: false, origin: 'center' }
     }
   };
   var ORDER = ['current', 'kasumi', 'hamon', 'komorebi', 'kokyu', 'akari'];
@@ -609,23 +711,27 @@
   /* ---------- Elements ---------- */
   function $(id) { return document.getElementById(id); }
   var soft = $('bgpSoft'), lit = $('bgpLit'), litFlat = $('bgpLitFlat'), bloom = $('bgpBloom');
-  var blossom = $('blossomScreen'), rippleLayer = $('rippleLayer');
+  var rippleLayer = $('rippleLayer');
   var panel = $('bgpPanel'), openBtn = $('bgpOpen');
+  var track = $('track'), panels = track.querySelectorAll('.panel'), dots = $('dots').querySelectorAll('.dot');
+  var swellTargets = [$('ambientStage'), $('stageLattice'), $('bgpLattice'), bloom, $('bgpHamonSoft')];
   var ui = {
     speed: $('bgpSpeed'), strength: $('bgpStrength'), count: $('bgpCount'),
     lattice: $('bgpLatticeIn'), lines: $('bgpLines'), tile: $('bgpTile'), wash: $('bgpWash'),
-    orbs: $('bgpOrbs'), origin: $('bgpOrigin'),
-    koi: $('bgpKoi'), washDrift: $('bgpWashDrift'), tap: $('bgpTap'), fps: $('bgpFpsOn'), pause: $('bgpPause')
+    orbs: $('bgpOrbs'), origin: $('bgpOrigin'), panelSel: $('bgpPanelSel'),
+    showPanel: $('bgpShowPanel'), react: $('bgpReact'), washDrift: $('bgpWashDrift'),
+    tap: $('bgpTap'), fps: $('bgpFpsOn'), pause: $('bgpPause')
   };
 
   /* ---------- State ---------- */
-  var STORE_KEY = 'bgp-background-preview-v1';
+  var STORE_KEY = 'bgp-background-preview-v2';
   var state = null;
 
   function freshState(mode) {
     var d = MODES[mode].defaults, s = { mode: mode };
     for (var k in d) s[k] = d[k];
-    s.koi = true; s.tap = true; s.fps = true; s.pause = false;
+    s.showPanel = true; s.panelIndex = 1; s.react = true;
+    s.tap = true; s.fps = true; s.pause = false;
     return s;
   }
 
@@ -676,38 +782,6 @@
     }
   }
 
-  var ringPairs = [];
-  function randomRingSpot() {
-    /* Stage coordinates: the visible area is x 120px…100vw+120px,
-       y 25%…75% of the stage. Keep spots inside that window. */
-    return {
-      x: 'calc(120px + ' + (10 + Math.random() * 80).toFixed(1) + 'vw)',
-      y: (30 + Math.random() * 40).toFixed(1) + '%'
-    };
-  }
-  function buildHamon(n) {
-    ringPairs = [];
-    for (var i = 0; i < n; i++) {
-      var c = i % 2 ? CORAL : AMBER;
-      var spot = state.origin === 'random' ? randomRingSpot() : { x: '50%', y: '50%' };
-      var vars = { '--x': spot.x, '--y': spot.y, '--c': c, '--d': (-12 * i / n).toFixed(2) + 's' };
-      vars['--a'] = '0.45'; var a = el('bgp-ring', vars);
-      vars['--a'] = '0.95'; var b = el('bgp-ring', vars);
-      soft.appendChild(a); lit.appendChild(b);
-      ringPairs.push([a, b]);
-      a.addEventListener('animationiteration', (function(pair) {
-        return function() {
-          if (state.origin !== 'random') return;
-          var s = randomRingSpot();
-          for (var j = 0; j < 2; j++) {
-            pair[j].style.setProperty('--x', s.x);
-            pair[j].style.setProperty('--y', s.y);
-          }
-        };
-      })([a, b]));
-    }
-  }
-
   function buildKomorebi(n) {
     var rnd = seeded(11);
     for (var i = 0; i < n; i++) {
@@ -733,20 +807,11 @@
     L.lit.style.transform = 'translate3d(' + (L.i * half - size / 2) + 'px,' + (L.j * half - size / 2) + 'px,0)';
     L.bloom.style.transform = 'translate3d(' + (L.i * half - bsize / 2) + 'px,' + (L.j * half - bsize / 2) + 'px,0)';
   }
-  function inPond(i, j) {
-    if (!state.koi) return false;
-    var half = state.tile / 2;
-    var dx = i * half - innerWidth / 2, dy = j * half - innerHeight / 2;
-    return Math.sqrt(dx * dx + dy * dy) < 230;
-  }
   function akariRandomSpot() {
     var half = state.tile / 2, maxI = Math.floor(innerWidth / half), maxJ = Math.floor(innerHeight / half);
-    for (var t = 0; t < 40; t++) {
-      var i = 1 + Math.floor(Math.random() * (maxI - 1)), j = 1 + Math.floor(Math.random() * (maxJ - 1));
-      if ((i + j) % 2) j += 1;
-      if (!inPond(i, j)) return { i: i, j: j };
-    }
-    return { i: 2, j: 2 };
+    var i = 1 + Math.floor(Math.random() * (maxI - 1)), j = 1 + Math.floor(Math.random() * (maxJ - 1));
+    if ((i + j) % 2) j += 1;
+    return { i: i, j: j };
   }
   function akariStep(L) {
     var half = state.tile / 2, maxI = Math.floor(innerWidth / half), maxJ = Math.floor(innerHeight / half);
@@ -754,7 +819,7 @@
     if (Math.random() < 0.6 && L.dir) dirs.unshift(L.dir);
     for (var t = 0; t < dirs.length; t++) {
       var ni = L.i + dirs[t][0], nj = L.j + dirs[t][1];
-      if (ni > 0 && nj > 0 && ni < maxI && nj < maxJ && !inPond(ni, nj)) {
+      if (ni > 0 && nj > 0 && ni < maxI && nj < maxJ) {
         L.i = ni; L.j = nj; L.dir = dirs[t]; return;
       }
     }
@@ -779,6 +844,88 @@
     }
   }
 
+  /* ---------- 波紋 Hamon (canvas) ----------
+     Two canvases at 40% of screen resolution: one soft (behind the
+     lattice), one inside the Shippō mask so the strokes light up.
+     Each ring is a thin radial-gradient band drawn fresh every
+     frame, so it is always sharp at its current size. */
+  var hamon = {
+    soft: $('bgpHamonSoft'), lit: $('bgpHamonLit'),
+    sctx: null, lctx: null, k: 0.4, w: 0, h: 0,
+    phase: 0, rings: [], taps: []
+  };
+  hamon.sctx = hamon.soft.getContext('2d');
+  hamon.lctx = hamon.lit.getContext('2d');
+
+  function hamonResize() {
+    hamon.w = Math.max(1, Math.round(innerWidth * hamon.k));
+    hamon.h = Math.max(1, Math.round(innerHeight * hamon.k));
+    hamon.soft.width = hamon.lit.width = hamon.w;
+    hamon.soft.height = hamon.lit.height = hamon.h;
+  }
+  function hamonSpot() {
+    if (state.origin === 'random') {
+      return { x: innerWidth * (0.15 + Math.random() * 0.7), y: innerHeight * (0.15 + Math.random() * 0.7) };
+    }
+    return { x: innerWidth / 2, y: innerHeight / 2 };
+  }
+  function buildHamon(n) {
+    hamon.rings = [];
+    for (var i = 0; i < n; i++) {
+      var s = hamonSpot();
+      hamon.rings.push({ offset: i / n, last: 1, x: s.x, y: s.y, c: i % 2 ? CORAL : AMBER });
+    }
+  }
+  function drawRing(ctx, x, y, r, w, c, a) {
+    if (a <= 0.003 || r <= 0) return;
+    var k = hamon.k;
+    x *= k; y *= k; r *= k; w *= k;
+    var inner = Math.max(0, r - w), outer = r + w;
+    var g = ctx.createRadialGradient(x, y, inner, x, y, outer);
+    g.addColorStop(0, 'rgba(' + c + ',0)');
+    g.addColorStop(0.5, 'rgba(' + c + ',' + a.toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(' + c + ',0)');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, outer, 0, Math.PI * 2);
+    if (inner > 0) ctx.arc(x, y, inner, 0, Math.PI * 2, true);
+    ctx.fill();
+  }
+  function hamonFrame(dt, swell) {
+    var period = 12000, speed = state.speed;
+    hamon.phase += dt * speed / period;
+    var sctx = hamon.sctx, lctx = hamon.lctx;
+    sctx.clearRect(0, 0, hamon.w, hamon.h);
+    lctx.clearRect(0, 0, hamon.w, hamon.h);
+    var boost = 1 + swell * 0.8 * (state.react ? 1 : 0);
+    var reach = Math.sqrt(innerWidth * innerWidth + innerHeight * innerHeight) * 0.6;
+
+    for (var i = 0; i < hamon.rings.length; i++) {
+      var R = hamon.rings[i];
+      var p = (hamon.phase + R.offset) % 1;
+      if (p < R.last) {            /* wrapped: new ring starts */
+        var s = hamonSpot(); R.x = s.x; R.y = s.y;
+      }
+      R.last = p;
+      var ease = 1 - Math.pow(1 - p, 2.2);
+      var r = reach * ease;
+      var w = 26 + 120 * p;
+      var env = Math.min(1, p / 0.08) * Math.pow(1 - p, 1.4);
+      drawRing(sctx, R.x, R.y, r, w, R.c, 0.55 * env * boost);
+      drawRing(lctx, R.x, R.y, r, w, R.c, 1.0 * Math.min(1, env * boost * 1.2));
+    }
+
+    for (var j = hamon.taps.length - 1; j >= 0; j--) {
+      var T = hamon.taps[j];
+      T.t += dt * speed / 5000;
+      if (T.t >= 1) { hamon.taps.splice(j, 1); continue; }
+      var tp = T.t, tr = Math.min(innerWidth, innerHeight) * 0.55 * (1 - Math.pow(1 - tp, 2.2));
+      var tenv = Math.min(1, tp / 0.06) * Math.pow(1 - tp, 1.6);
+      drawRing(sctx, T.x, T.y, tr, 18 + 70 * tp, CORAL, 0.6 * tenv);
+      drawRing(lctx, T.x, T.y, tr, 18 + 70 * tp, CORAL, 1.0 * tenv);
+    }
+  }
+
   function build() {
     clearLayers();
     var m = state.mode, n = state.count;
@@ -786,6 +933,18 @@
     else if (m === 'hamon') buildHamon(n);
     else if (m === 'komorebi') buildKomorebi(n);
     else if (m === 'akari') buildAkari(n);
+  }
+
+  /* ---------- Message panel ---------- */
+  function showPanelIndex(i) {
+    i = Math.max(0, Math.min(panels.length - 1, i));
+    state.panelIndex = i;
+    track.style.transform = 'translate3d(' + (-i * 100 / 6) + '%, 0, 0)';
+    for (var k = 0; k < panels.length; k++) {
+      panels[k].classList.toggle('active', k === i);
+      dots[k].classList.toggle('active', k === i);
+    }
+    ui.panelSel.value = i;
   }
 
   /* ---------- Apply state to the page ---------- */
@@ -798,20 +957,23 @@
     root.setAttribute('data-bgp-orbs', state.orbs);
     root.setAttribute('data-bgp-wash', state.washDrift ? 'drift' : 'still');
     root.classList.toggle('bgp-paused', !!state.pause);
+    root.classList.toggle('bgp-no-panel', !state.showPanel);
     root.style.setProperty('--bgp-speed', state.speed);
     root.style.setProperty('--bgp-strength', state.strength);
     root.style.setProperty('--bgp-lattice', state.lattice);
     root.style.setProperty('--bgp-lines', state.lines);
     root.style.setProperty('--bgp-tile', state.tile + 'px');
     root.style.setProperty('--bgp-wash', state.wash);
-    blossom.classList.toggle('visible', !!state.koi);
+    root.style.setProperty('--bgp-react', state.react ? 1 : 0);
     $('bgpFps').hidden = !state.fps;
+    showPanelIndex(state.panelIndex);
 
     /* controls */
     ui.speed.value = state.speed; ui.strength.value = state.strength; ui.count.value = state.count;
     ui.lattice.value = state.lattice; ui.lines.value = state.lines; ui.tile.value = state.tile; ui.wash.value = state.wash;
     ui.orbs.value = state.orbs; ui.origin.value = state.origin;
-    ui.koi.checked = state.koi; ui.washDrift.checked = state.washDrift; ui.tap.checked = state.tap;
+    ui.showPanel.checked = state.showPanel; ui.react.checked = state.react;
+    ui.washDrift.checked = state.washDrift; ui.tap.checked = state.tap;
     ui.fps.checked = state.fps; ui.pause.checked = state.pause;
 
     $('bgpSpeedVal').textContent = '×' + fmt(state.speed, 2) + ' · ' + cycleText();
@@ -859,7 +1021,8 @@
         '<div class="bgp-mode-name">' + M.name + '</div>' +
         '<span class="bgp-cost ' + M.cost + '">' + M.costLabel + '</span>';
       b.addEventListener('click', function() {
-        var keep = { koi: state.koi, tap: state.tap, fps: state.fps, pause: state.pause };
+        var keep = { showPanel: state.showPanel, panelIndex: state.panelIndex, react: state.react,
+                     tap: state.tap, fps: state.fps, pause: state.pause };
         state = freshState(key);
         for (var k in keep) state[k] = keep[k];
         $('bgpOut').textContent = ''; $('bgpStatus').textContent = '';
@@ -886,19 +1049,97 @@
   bindRange(ui.wash, 'wash', false);
   ui.orbs.addEventListener('change', function() { state.orbs = ui.orbs.value; apply(false); });
   ui.origin.addEventListener('change', function() { state.origin = ui.origin.value; apply(true); });
-  [['koi', true], ['washDrift', false], ['tap', false], ['fps', false], ['pause', false]].forEach(function(p) {
-    ui[p[0]].addEventListener('change', function() { state[p[0]] = ui[p[0]].checked; apply(p[1]); });
+  ui.panelSel.addEventListener('change', function() { state.panelIndex = parseInt(ui.panelSel.value, 10); apply(false); });
+  ['showPanel', 'react', 'washDrift', 'tap', 'fps', 'pause'].forEach(function(key) {
+    ui[key].addEventListener('change', function() { state[key] = ui[key].checked; apply(false); });
   });
 
   $('bgpClose').addEventListener('click', function() { panel.classList.add('collapsed'); openBtn.hidden = false; });
   openBtn.addEventListener('click', function() { panel.classList.remove('collapsed'); openBtn.hidden = true; });
 
   $('bgpReset').addEventListener('click', function() {
+    var keepPanel = state.panelIndex;
     state = freshState(state.mode);
+    state.panelIndex = keepPanel;
     $('bgpOut').textContent = '';
     $('bgpStatus').textContent = 'Reset to the ' + MODES[state.mode].name + ' defaults.';
     apply(true);
   });
+
+  /* ---------- Music + swell (same maths as app.js) ----------
+     app.js: master gain 0.5 → speakers, and a parallel ×2.0 tap
+     into an analyser (fftSize 512, smoothing 0.8). Energy is the
+     average of bins 4–33, minus a floor of 80, normalised, raised
+     to 1.35, then eased up at 0.06 and down at 0.010 per frame. */
+  var audio = null, actx = null, analyser = null, freq = null;
+  var swellEnergy = 0, lastSwell = -1, playing = false;
+
+  function ensureAudio() {
+    if (actx) return;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    actx = new AC();
+    audio = new Audio();
+    audio.loop = true;
+    audio.preload = 'auto';
+    var src = actx.createMediaElementSource(audio);
+    var master = actx.createGain(); master.gain.value = 0.5;
+    var comp = actx.createGain(); comp.gain.value = 2.0;
+    analyser = actx.createAnalyser();
+    analyser.fftSize = 512;
+    analyser.smoothingTimeConstant = 0.8;
+    freq = new Uint8Array(analyser.frequencyBinCount);
+    src.connect(master); master.connect(actx.destination);
+    master.connect(comp); comp.connect(analyser);
+  }
+
+  function setPlaying(on) {
+    playing = on;
+    $('bgpPlay').textContent = on ? '■ 停止' : '▶ 再生';
+  }
+
+  $('bgpPlay').addEventListener('click', function() {
+    ensureAudio();
+    if (!audio) { $('bgpMusicNote').textContent = 'This browser has no Web Audio.'; return; }
+    if (playing) { audio.pause(); setPlaying(false); return; }
+    if (actx.state === 'suspended') actx.resume();
+    var want = new URL($('bgpTrack').value, location.href).href;
+    if (audio.src !== want) audio.src = want;
+    $('bgpMusicNote').textContent = 'Loading… (tracks are ~16MB, the first play can take a moment)';
+    audio.play().then(function() { setPlaying(true); }, function() {
+      $('bgpMusicNote').textContent = 'Could not play this track.';
+      setPlaying(false);
+    });
+  });
+  $('bgpTrack').addEventListener('change', function() {
+    if (audio && playing) { audio.src = $('bgpTrack').value; audio.play(); }
+  });
+
+  function swellTick() {
+    if (!analyser || !playing) {
+      swellEnergy += (0 - swellEnergy) * 0.05;
+      if (swellEnergy < 0.005) swellEnergy = 0;
+    } else {
+      analyser.getByteFrequencyData(freq);
+      var sum = 0;
+      for (var i = 4; i < 34; i++) sum += freq[i];
+      var avg = sum / 30;
+      var clean = Math.max(0, avg - 80);
+      var normalized = Math.min(1.0, clean / (140 / 3.5));
+      var target = Math.pow(normalized, 1.35);
+      if (target > swellEnergy) swellEnergy += (target - swellEnergy) * 0.06;
+      else swellEnergy += (target - swellEnergy) * 0.010;
+    }
+    var v = swellEnergy;
+    if (!(lastSwell === v || (v !== 0 && Math.abs(v - lastSwell) < 0.005))) {
+      lastSwell = v;
+      var vStr = v.toFixed(3);
+      for (var t = 0; t < swellTargets.length; t++) swellTargets[t].style.setProperty('--audio-swell', vStr);
+      $('bgpMeter').style.transform = 'scaleX(' + vStr + ')';
+      if (playing) $('bgpMusicNote').textContent = 'Playing · swell ' + vStr + (state.react ? '' : ' (background reaction off)');
+    }
+    return v;
+  }
 
   /* ---------- Copy values ---------- */
   function toHex(rgb) {
@@ -911,28 +1152,30 @@
     if (!node) return '';
     var cs = getComputedStyle(node);
     var family = cs.fontFamily.split(',')[0].trim();
-    return '  ' + (label + '          ').slice(0, 10) + family + ' · ' + cs.fontWeight + ' · ' + cs.fontSize +
+    return '  ' + (label + '            ').slice(0, 12) + family + ' · ' + cs.fontWeight + ' · ' + cs.fontSize +
       ' · letter-spacing ' + cs.letterSpacing + ' · ' + toHex(cs.color) + '\n';
   }
 
   function valuesText() {
     var M = MODES[state.mode];
     var t = '';
+    var countName = M.countLabel ? M.countLabel.replace(/^\S+\s/, '').toLowerCase() : '';
     t += '/* 背景モーション — ' + M.kanji + ' ' + M.name + ' (from background.html, preview only) */\n\n';
     t += 'mode:            ' + state.mode + '\n';
     t += 'speed:           ×' + fmt(state.speed, 2) + '  (' + cycleText() + ')\n';
     if (!$('bgpStrengthRow').hidden) t += 'motion strength: ' + fmt(state.strength, 2) + '\n';
-    if (M.countLabel) t += M.countLabel.replace(/^\S+\s/, '').toLowerCase() + ':' + '                 '.slice(0, 16 - M.countLabel.replace(/^\S+\s/, '').length) + state.count + '\n';
+    if (M.countLabel) t += (countName + ':                ').slice(0, 17) + state.count + '\n';
     if (state.mode === 'hamon') t += 'ripple origin:   ' + state.origin + '\n';
     t += 'lattice glow:    ' + fmt(state.lattice, 2) + '   (app today 0.20)\n';
     t += 'shippō lines:    ' + fmt(state.lines, 3) + '  (app today 0.08) · stroke #E66826 · 1.2px\n';
     t += 'tile size:       ' + state.tile + 'px  (app today 60px)\n';
     t += 'orbs:            ' + state.orbs + ' · brightness ' + fmt(state.wash, 2) + '  (app today drift · 0.60)\n';
     t += 'wash drift:      ' + (state.washDrift ? 'on' : 'off') + '\n';
-    t += '\nfonts:\n';
-    t += fontLine('greeting', '.blossom-greeting-time');
-    t += fontLine('name', '.blossom-greeting-name');
-    t += fontLine('hints', '.start-hint-line');
+    t += 'music reaction:  ' + (state.react ? 'on' : 'off') + '  (same --audio-swell amounts as the app)\n';
+    t += '\nfonts (message panel):\n';
+    t += fontLine('message', '.panel-content');
+    t += fontLine('name', '.panel-content .therapist-name');
+    t += fontLine('swipe hint', '.action-hint');
     t += '\npalette:\n';
     t += '  金木犀 Kinmokusei #E66826 · 葡萄染 Ebizome #882E47 · glow #FFA259\n';
     t += '  絹白 Kinushiro canvas #FFFDF9 · 薄杏 Usuanzu #FBECE0\n';
@@ -949,6 +1192,7 @@
     t += '  --orb-mode: ' + state.orbs + ';\n';
     t += '  --orb-opacity: ' + fmt(state.wash, 2) + ';\n';
     t += '  --wash-drift: ' + (state.washDrift ? 'on' : 'off') + ';\n';
+    t += '  --music-reaction: ' + (state.react ? 'on' : 'off') + ';\n';
     t += '}\n';
     return t;
   }
@@ -980,7 +1224,7 @@
     });
   });
 
-  /* ---------- Tap ripples (same look as the app) ---------- */
+  /* ---------- Tap ripples + swipe (same ripple look as the app) ---------- */
   function spawnRipples(x, y) {
     for (var i = 0; i < RIPPLE_COLOURS_STRONG.length; i++) {
       (function(idx) {
@@ -996,61 +1240,69 @@
       })(i);
     }
   }
-  function spawnHamonAt(x, y) {
-    /* Tap point is in viewport px; the ring layers use stage coords
-       (stage starts 120px left of and 25% of the height above the viewport). */
-    var sx = (x + 120) + 'px', sy = (y + innerHeight * 0.25) + 'px';
-    [[soft, '0.55'], [lit, '1']].forEach(function(p) {
-      var r = el('bgp-ring once', { '--x': sx, '--y': sy, '--c': CORAL, '--a': p[1] });
-      p[0].appendChild(r);
-      r.addEventListener('animationend', function() { if (r.parentNode) r.parentNode.removeChild(r); });
-    });
-  }
+  var swipeStart = null;
+  function outsideControls(target) { return !panel.contains(target) && target !== openBtn; }
   document.addEventListener('pointerdown', function(e) {
+    if (!outsideControls(e.target)) return;
+    swipeStart = { x: e.clientX, y: e.clientY };
     if (!state.tap) return;
-    if (panel.contains(e.target) || e.target === openBtn) return;
     spawnRipples(e.clientX, e.clientY);
-    if (state.mode === 'hamon') spawnHamonAt(e.clientX, e.clientY);
+    if (state.mode === 'hamon' && hamon.taps.length < 6) hamon.taps.push({ x: e.clientX, y: e.clientY, t: 0 });
+  });
+  document.addEventListener('pointerup', function(e) {
+    if (!swipeStart) return;
+    var dx = e.clientX - swipeStart.x, dy = e.clientY - swipeStart.y;
+    swipeStart = null;
+    if (!state.showPanel || Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return;
+    showPanelIndex(state.panelIndex + (dx < 0 ? 1 : -1));
+    save();
   });
 
-  /* ---------- FPS meter ----------
-     Counts real display frames with requestAnimationFrame. On the
-     Tab S8 Ultra a smooth result is ~120 fps (or ~60 if the screen is
-     set to standard refresh). "Slow" counts frames that took more
-     than 1.5× the normal frame time in the last second. */
-  (function() {
-    var out = $('bgpFps');
-    var last = 0, frames = [], tick = 0;
-    function loop(t) {
-      if (last) frames.push(t - last);
-      last = t;
-      if (++tick % 30 === 0 && !out.hidden) {
-        var cutoff = 0, total = 0, recent = [];
-        for (var i = frames.length - 1; i >= 0 && total < 1000; i--) { total += frames[i]; recent.push(frames[i]); }
-        frames = recent.reverse();
-        if (recent.length > 5) {
-          var sorted = recent.slice().sort(function(a, b) { return a - b; });
-          var median = sorted[Math.floor(sorted.length / 2)];
-          var fps = recent.length * 1000 / total;
-          var worst = sorted[sorted.length - 1];
-          var slow = 0;
-          for (var j = 0; j < recent.length; j++) if (recent[j] > median * 1.5) slow++;
-          var target = median < 11 ? 120 : 60;
-          var cls = fps >= target * 0.95 ? 'ok' : fps >= target * 0.8 ? 'warn' : 'bad';
-          out.innerHTML = '<span class="' + cls + '">' + fps.toFixed(0) + ' fps</span>' +
-            ' · worst ' + worst.toFixed(1) + 'ms · slow ' + slow;
-        }
+  /* ---------- One frame loop: swell, Hamon canvas, FPS meter ----------
+     The FPS meter counts real display frames. On the Tab S8 Ultra a
+     smooth result is ~120 fps (or ~60 on standard refresh). "Slow"
+     counts frames that took more than 1.5× the normal frame time in
+     the last second. */
+  var fpsOut = $('bgpFps');
+  var last = 0, frames = [], tick = 0;
+  function loop(t) {
+    var dt = last ? Math.min(100, t - last) : 16;
+    if (last) frames.push(t - last);
+    last = t;
+
+    var swell = swellTick();
+    if (state.mode === 'hamon' && !state.pause) hamonFrame(dt, swell);
+
+    if (++tick % 30 === 0 && !fpsOut.hidden) {
+      var total = 0, recent = [];
+      for (var i = frames.length - 1; i >= 0 && total < 1000; i--) { total += frames[i]; recent.push(frames[i]); }
+      frames = recent.reverse();
+      if (recent.length > 5) {
+        var sorted = recent.slice().sort(function(a, b) { return a - b; });
+        var median = sorted[Math.floor(sorted.length / 2)];
+        var fps = recent.length * 1000 / total;
+        var worst = sorted[sorted.length - 1];
+        var slow = 0;
+        for (var j = 0; j < recent.length; j++) if (recent[j] > median * 1.5) slow++;
+        var target = median < 11 ? 120 : 60;
+        var cls = fps >= target * 0.95 ? 'ok' : fps >= target * 0.8 ? 'warn' : 'bad';
+        fpsOut.innerHTML = '<span class="' + cls + '">' + fps.toFixed(0) + ' fps</span>' +
+          ' · worst ' + worst.toFixed(1) + 'ms · slow ' + slow;
       }
-      requestAnimationFrame(loop);
     }
     requestAnimationFrame(loop);
-  })();
+  }
 
-  window.addEventListener('resize', function() { if (state.mode === 'akari') build(); });
+  window.addEventListener('resize', function() {
+    hamonResize();
+    if (state.mode === 'akari' || state.mode === 'hamon') build();
+  });
 
   /* ---------- Start ---------- */
   state = load();
+  hamonResize();
   apply(true);
+  requestAnimationFrame(loop);
 })();
 </script>
 </body>
