@@ -1,4 +1,4 @@
-var BUILD = 'v129';
+var BUILD = 'v130';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -7069,6 +7069,29 @@ var GREETING_TABLE = {
   E1: { text: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。', burden: false }
 };
 
+/* A seasonal line for Panel 0, picked by the current month in Nagoya.
+   It comes right after 「〇〇さん、初めまして。」, before the line about
+   the weather. Index 0 is January. */
+var SEASONAL_LINES = [
+  '冬晴れの澄んだ空に、心もすっと晴れるようですね。',
+  '梅の花がほころび、春の気配を感じる頃ですね。',
+  'やわらかな日差しに、春の訪れを感じますね。',
+  '桜が咲き、街の景色も華やぐ季節になりましたね。',
+  '若葉がみずみずしく、風も心地よい季節ですね。',
+  '雨に濡れた緑が、ひときわ鮮やかに感じられますね。',
+  '夏の日差しに、季節の移ろいを感じる頃ですね。',
+  '夏空の広がる、暑い日が続いておりますね。',
+  '少しずつ暑さが和らぎ、秋の気配が感じられますね。',
+  '金木犀の甘い香りに、秋の深まりを感じる頃ですね。',
+  '木々の葉が少しずつ色づき、秋も深まってまいりましたね。',
+  '朝晩の冷え込みに、冬の訪れを感じる頃ですね。'
+];
+function seasonalLineFor(month) {
+  var m = parseInt(month, 10);
+  if (!(m >= 1 && m <= 12)) return '';
+  return SEASONAL_LINES[m - 1];
+}
+
 function getGreetingTier() {
   var time = getTimeOfDayInNagoya();
   var weather = currentWeatherBucket;
@@ -7118,7 +7141,8 @@ function updateGreetingPanel() {
     ? 'どうぞご無理なさらず、おくつろぎください。'
     : 'どうぞ肩の力を抜いて、おくつろぎください。';
 
-  el.innerHTML = '<p>' + entry.text + '</p><p>' + closing + '</p>';
+  var seasonal = seasonalLineFor(nagoyaDateParts().month);
+  el.innerHTML = (seasonal ? '<p>' + seasonal + '</p>' : '') + '<p>' + entry.text + '</p><p>' + closing + '</p>';
 
   var p0 = document.querySelector('.panel[data-panel="0"]');
   if (p0) preparePanel(p0);
