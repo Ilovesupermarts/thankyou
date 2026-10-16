@@ -43,7 +43,9 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- Every font offered in the panel. Only the characters actually shown are
+     downloaded, so this stays light. -->
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Yuji+Boku&family=Zen+Antique&family=Zen+Old+Mincho:wght@400;500;700&family=Shippori+Mincho:wght@400;500;600;700&family=Kaisei+Decol:wght@400;500;700&family=Hina+Mincho&family=Klee+One:wght@400;600&family=Zen+Kurenaido&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="main.css">
 
@@ -109,6 +111,32 @@
   .pv-was { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin-top: -2px; }
   .pv-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text-soft); }
   .pv-check input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .pv-fonts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .pv-font {
+    border: 1px solid var(--border-2); background: #FFFDF9; border-radius: 10px;
+    padding: 8px 6px 6px; text-align: center; cursor: pointer; font: inherit; color: var(--text-dark);
+  }
+  .pv-font .sample { display: block; font-size: 20px; line-height: 1.5; color: var(--text-dark); }
+  .pv-font .nm { display: block; font-size: 10px; color: var(--text-mute); margin-top: 2px; letter-spacing: 0.3px; }
+  .pv-font.on { border-color: var(--accent); background: var(--soft-2); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .pv-font:active { transform: scale(0.97); }
+  .pv-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+  .pv-preset {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border-2); background: #FFFDF9; border-radius: 999px;
+    padding: 4px 11px 4px 7px; font: inherit; color: var(--text-dark); cursor: pointer;
+  }
+  .pv-preset .dots { display: inline-flex; }
+  .pv-preset .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.12); margin-right: -4px; }
+  .pv-preset.on { border-color: var(--accent); background: var(--soft-2); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .pv-preset:active { transform: scale(0.97); }
+  .pv-colour { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px 8px; padding: 5px 0; }
+  .pv-colour label { color: var(--text-soft); }
+  .pv-colour input[type="color"] {
+    width: 44px; height: 30px; padding: 0; border: 1px solid var(--border-2); border-radius: 8px;
+    background: #FFFDF9; cursor: pointer;
+  }
+  .pv-hex { font: 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--accent-2); min-width: 58px; text-align: right; }
   .pv-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .pv-btn {
     flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
@@ -228,7 +256,49 @@
      "was" is today's value in main.css / app.js, shown for comparison.
      The 横書き / 縦書き switch lives in the panel header.
      ============================================================ */
+  /* Fonts offered in the panel. inApp = already loaded by index.html, so
+     choosing it needs no change to the Google Fonts link there. */
+  var FONTS = [
+    { name: 'Yuji Syuku',      note: '筆 · the app today',  inApp: true,  gf: 'Yuji+Syuku' },
+    { name: 'Yuji Mai',        note: '筆 · softer brush',   inApp: true,  gf: 'Yuji+Mai' },
+    { name: 'Yuji Boku',       note: '筆 · bold brush',     inApp: false, gf: 'Yuji+Boku' },
+    { name: 'Zen Antique',     note: '古典 · antique',      inApp: true,  gf: 'Zen+Antique' },
+    { name: 'Zen Old Mincho',  note: '明朝 · old print',    inApp: false, gf: 'Zen+Old+Mincho:wght@400;500;700' },
+    { name: 'Shippori Mincho', note: '明朝 · refined',      inApp: true,  gf: 'Shippori+Mincho:wght@400;500;600;700' },
+    { name: 'Kaisei Decol',    note: '明朝 · decorative',   inApp: false, gf: 'Kaisei+Decol:wght@400;500;700' },
+    { name: 'Hina Mincho',     note: '明朝 · delicate',     inApp: false, gf: 'Hina+Mincho' },
+    { name: 'Klee One',        note: '手書き · pen',        inApp: false, gf: 'Klee+One:wght@400;600' },
+    { name: 'Zen Kurenaido',   note: '手書き · crayon',     inApp: false, gf: 'Zen+Kurenaido' },
+    { name: 'Zen Maru Gothic', note: 'ゴシック · rounded',  inApp: false, gf: 'Zen+Maru+Gothic:wght@400;500;700' },
+    { name: 'Noto Serif JP',   note: '明朝 · plain',        inApp: true,  gf: 'Noto+Serif+JP:wght@400;600;700' }
+  ];
+  var FONT_SAMPLE = '静かな時間';
+
+  /* Colour sets. Each fills the five pickers at once; you can still
+     adjust any picker afterwards. The page background stays autumn. */
+  var PALETTES = [
+    { name: '金木犀', quote: '#C44E10', ring: '#FFFDF9', sweep: '#E9773B', halo: '#EE9567', floret: '#F07D40' },
+    { name: '紅葉',   quote: '#A3282A', ring: '#FFFDF9', sweep: '#C8322F', halo: '#E0705F', floret: '#D9453A' },
+    { name: '桜',     quote: '#B04A5A', ring: '#FFFDF9', sweep: '#E58FA3', halo: '#F2A9B8', floret: '#F4A6B5' },
+    { name: '藤',     quote: '#6B4A8E', ring: '#FFFDF9', sweep: '#9B7BC0', halo: '#B49BD3', floret: '#A98BD0' },
+    { name: '抹茶',   quote: '#4E6B3A', ring: '#FFFDF9', sweep: '#7FA05A', halo: '#A5C084', floret: '#8FB06A' },
+    { name: '藍',     quote: '#2E4A7A', ring: '#FFFDF9', sweep: '#4A72B0', halo: '#7C9FD0', floret: '#6C90C8' },
+    { name: '金',     quote: '#8A5A12', ring: '#FFFDF9', sweep: '#D4A22E', halo: '#E8C56B', floret: '#E2B544' }
+  ];
+  var COLOUR_KEYS = { quote: 'cQuote', ring: 'cRing', sweep: 'cSweep', halo: 'cHalo', floret: 'cFloret' };
+
   var CONTROLS = [
+    { group: 'Font' },
+    { id: 'font',      type: 'font', def: 'Yuji Syuku' },
+
+    { group: 'Colours' },
+    { type: 'presets' },
+    { id: 'cQuote',    type: 'colour', label: 'Words',                           def: '#C44E10', was: '#C44E10' },
+    { id: 'cRing',     type: 'colour', label: 'Ring',                            def: '#FFFDF9', was: '#FFFDF9' },
+    { id: 'cSweep',    type: 'colour', label: 'Countdown sweep and bead',        def: '#E9773B', was: 'none (ring is white only)' },
+    { id: 'cHalo',     type: 'colour', label: 'Glow around the ring, ripples',   def: '#EE9567', was: '#EE9567' },
+    { id: 'cFloret',   type: 'colour', label: 'Floating florets',                def: '#F07D40', was: '#F07D40' },
+
     { group: 'Timing' },
     { id: 'seconds',   label: 'Seconds per quote',          min: 6,   max: 40,  step: 1,    def: 14,   was: '≈12.9s (10 blossoms × 1s, 1s hold, 1.5s fade)' },
     { id: 'fade',      label: 'Fade in / out (s)',          min: 0.6, max: 3,   step: 0.1,  def: 1.6,  was: '1.5' },
@@ -238,7 +308,6 @@
     { group: 'Window' },
     { id: 'size',      label: 'Window size (px across)',    min: 360, max: 720, step: 10,   def: 560,  was: 'ring 180px across, koi inside' },
     { id: 'band',      label: 'Ring thickness (px)',        min: 2,   max: 12,  step: 0.5,  def: 6,    was: '6' },
-    { id: 'orange',    label: '金木犀 strength in the ring', min: 0.4, max: 1,   step: 0.05, def: 0.9,  was: 'ring is white only' },
     { id: 'reach',     label: 'Halo reach (× ring radius)', min: 1.1, max: 2.2, step: 0.05, def: 1.45, was: '2.13 (on the small ring)' },
     { id: 'ripReach',  label: 'Ring ripples spread (×)',    min: 1.1, max: 2.2, step: 0.05, def: 1.4,  was: '2' },
     { id: 'pond',      label: 'Water inside the window',    min: 0,   max: 1,   step: 0.05, def: 0.7,  was: '1 (small pond)' },
@@ -287,12 +356,27 @@
   function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
   var EASE = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
-  /* 金木犀 (230, 104, 38) blended with the ring's white, as one solid
-     colour, so the ring looks the same whichever colour lies under it. */
-  function orangeColour() {
-    var a = +v.orange;
-    var mix = function (w, o) { return Math.round(w + (o - w) * a); };
-    return 'rgb(' + mix(255, 230) + ', ' + mix(253, 104) + ', ' + mix(249, 38) + ')';
+  /* Colour helpers: #rrggbb → [r, g, b], blends between two colours,
+     and rgba() strings. */
+  function rgbOf(hex) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function blend(a, b, t) {
+    var x = rgbOf(a), y = rgbOf(b);
+    return [0, 1, 2].map(function (i) { return Math.round(x[i] + (y[i] - x[i]) * t); });
+  }
+  function rgba(c, alpha) {
+    var x = Array.isArray(c) ? c : rgbOf(c);
+    return 'rgba(' + x[0] + ', ' + x[1] + ', ' + x[2] + ', ' + alpha + ')';
+  }
+  function fontStack(name) {
+    return '"' + name + '", "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
+  }
+  function fontInfo(name) {
+    for (var i = 0; i < FONTS.length; i++) if (FONTS[i].name === name) return FONTS[i];
+    return FONTS[0];
   }
 
   function buildCSS() {
@@ -303,7 +387,8 @@
     var halo = Math.round(R * v.reach);
     var rim = (R - W / 2) / halo * 100;
     var after = function (f) { return rim + (100 - rim) * f; };
-    var orange = orangeColour();
+    var ringC = v.cRing, sweepC = v.cSweep, haloC = v.cHalo;
+    var fi = fontInfo(v.font);
     var bead = Math.round(Math.max(8, W + 4));
     var css = [];
     css.push(
@@ -351,7 +436,10 @@
 '                           (to ' + v.minSize + 'px at least) until the text fits',
 '                           inside ' + Math.round(v.fit * 100) + '% of the ring radius',
 '     ink                   ' + (v.ink > 0 ? 'wrap each character in <span class="quote-char" style="--i:N">\n                           and add .ink to .quote-line' : 'off (whole line at once)'),
-'     florets               ' + (v.floret ? 'one lands on the ring as each quote arrives' : 'ambient only'),
+'     florets               ' + (v.floret ? 'one lands on the ring as each quote arrives' : 'ambient only') + ', colour ' + v.cFloret,
+'                           (the four petals; the centre is that colour darkened)',
+'     rain ripples          tinted from the glow colour ' + haloC,
+'     font                  ' + fi.name + (fi.inApp ? ' (already loaded by index.html)' : ' — add to the Google Fonts link in index.html:\n                           &family=' + fi.gf),
 '   ============================================================ */',
 ''
     );
@@ -364,28 +452,29 @@
 '  width: ' + D + 'px;',
 '  height: ' + D + 'px;',
 '  margin: 0;',
-'  --ring-from: #FFFDF9;',
-'  --ring-to: ' + orange + ';',
+'  --ring-from: ' + ringC + ';',
+'  --ring-to: ' + sweepC + ';',
+'  --quote-color: ' + v.cQuote + ';',
 '}',
 '.quote-window.flip {',
-'  --ring-from: ' + orange + ';',
-'  --ring-to: #FFFDF9;',
+'  --ring-from: ' + sweepC + ';',
+'  --ring-to: ' + ringC + ';',
 '}',
 '',
-'/* Halo: the same white-to-金木犀 glow, reaching ' + n(v.reach) + '× the ring radius. */',
+'/* Halo: the ring colour at the rim, warming into the glow colour as it fades out, reaching ' + n(v.reach) + '× the ring radius. */',
 '.quote-window .soft-glow {',
 '  width: ' + (halo * 2) + 'px; height: ' + (halo * 2) + 'px;',
 '  margin-top: -' + halo + 'px; margin-left: -' + halo + 'px;',
 '  background: radial-gradient(circle closest-side,',
-'    rgba(255, 255, 255, 0) 0%,',
-'    rgba(255, 255, 255, 0) ' + n(rim - 1.5) + '%,',
-'    rgba(255, 255, 255, 0.35) ' + n(rim - 0.6) + '%,',
-'    rgba(255, 255, 255, 0.95) ' + n(rim) + '%,',
-'    rgba(255, 232, 214, 0.60) ' + n(after(0.14)) + '%,',
-'    rgba(255, 190, 139, 0.38) ' + n(after(0.36)) + '%,',
-'    rgba(238, 149, 103, 0.17) ' + n(after(0.62)) + '%,',
-'    rgba(238, 149, 103, 0.04) ' + n(after(0.85)) + '%,',
-'    rgba(238, 149, 103, 0) 100%);',
+'    ' + rgba(ringC, 0) + ' 0%,',
+'    ' + rgba(ringC, 0) + ' ' + n(rim - 1.5) + '%,',
+'    ' + rgba(ringC, 0.35) + ' ' + n(rim - 0.6) + '%,',
+'    ' + rgba(ringC, 0.95) + ' ' + n(rim) + '%,',
+'    ' + rgba(blend(ringC, haloC, 0.25), 0.60) + ' ' + n(after(0.14)) + '%,',
+'    ' + rgba(blend(ringC, haloC, 0.68), 0.38) + ' ' + n(after(0.36)) + '%,',
+'    ' + rgba(haloC, 0.17) + ' ' + n(after(0.62)) + '%,',
+'    ' + rgba(haloC, 0.04) + ' ' + n(after(0.85)) + '%,',
+'    ' + rgba(haloC, 0) + ' 100%);',
 '}',
 '',
 '/* Water inside the window: the pond light keeps drifting behind the words. */',
@@ -406,7 +495,7 @@
 '  position: absolute;',
 '  inset: 0;',
 '  border-radius: 50%;',
-'  border: 1.5px solid rgb(249, 202, 175);',
+'  border: 1.5px solid ' + rgba(blend(ringC, haloC, 0.5), 1) + ';',
 '  opacity: 0;',
 '  pointer-events: none;',
 '  will-change: transform, opacity;',
@@ -440,7 +529,7 @@
 '  pointer-events: none;',
 '}',
 '.quote-window > .quote-ring {',
-'  box-shadow: 0 0 10px rgba(196, 78, 16, 0.22), inset 0 0 8px rgba(196, 78, 16, 0.10);',
+'  box-shadow: 0 0 10px ' + rgba(sweepC, 0.28) + ', inset 0 0 8px ' + rgba(sweepC, 0.12) + ';',
 '}',
 '.quote-timer-half {',
 '  position: absolute;',
@@ -484,9 +573,9 @@
 '  height: ' + bead + 'px;',
 '  margin: -' + n(bead / 2, 1) + 'px 0 0 -' + n(bead / 2, 1) + 'px;',
 '  border-radius: 50%;',
-'  background: #FFFDF9;',
-'  border: 1.5px solid rgb(230, 104, 38);',
-'  box-shadow: 0 0 8px rgba(240, 125, 64, 0.9);',
+'  background: ' + ringC + ';',
+'  border: 1.5px solid ' + sweepC + ';',
+'  box-shadow: 0 0 8px ' + rgba(sweepC, 0.9) + ';',
 '}',
 '.blossom-screen.visible .quote-timer-bead {',
 '  animation: beadGlow 4s ease-in-out infinite;',
@@ -514,6 +603,8 @@
 '  justify-content: center;',
 '}',
 '.quote-window .quote-line {',
+'  font-family: ' + fontStack(fi.name) + ';',
+'  color: var(--quote-color);',
 '  width: fit-content;',
 '  text-align: center;',
 '  max-width: ' + Math.round(D * 0.8) + 'px;',
@@ -856,6 +947,15 @@
   function onValueChange(id) {
     saveValues();
     applyCSS();
+    if (id === 'font') {
+      /* Wait for the font, then refit the words in place (no restart). */
+      var f = fontInfo(v.font).name;
+      var done = function () { if (S.phase !== 'idle') fitText(); };
+      if (document.fonts && document.fonts.load) {
+        Promise.all([document.fonts.load('44px "' + f + '"', FONT_SAMPLE), document.fonts.load('44px "' + f + '"', quoteLine.textContent || FONT_SAMPLE)]).then(done, done);
+      } else done();
+      return;
+    }
     if (BREATH_KEYS[id]) {
       clearTimeout(breathTimer);
       breathTimer = setTimeout(restartBreath, 250);
@@ -880,8 +980,61 @@
       return;
     }
     var row = document.createElement('div');
-    var id = 'pv_' + c.id;
-    if (c.type === 'check') {
+    var id = 'pv_' + (c.id || c.type);
+    if (c.type === 'font') {
+      row.className = 'pv-fonts';
+      FONTS.forEach(function (f) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pv-font';
+        b.dataset.font = f.name;
+        b.innerHTML = '<span class="sample"></span><span class="nm"></span>';
+        b.firstChild.textContent = FONT_SAMPLE;
+        b.firstChild.style.fontFamily = fontStack(f.name);
+        b.lastChild.textContent = f.name + ' · ' + f.note;
+        b.addEventListener('click', function () { v.font = f.name; syncInputs(); onValueChange('font'); });
+        row.appendChild(b);
+      });
+      inputs[c.id] = { c: c, fonts: row };
+    } else if (c.type === 'presets') {
+      row.className = 'pv-presets';
+      PALETTES.forEach(function (pal, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pv-preset';
+        b.dataset.i = i;
+        b.innerHTML = '<span class="dots"><i></i><i></i><i></i></span><span></span>';
+        var dots = b.querySelectorAll('i');
+        dots[0].style.background = pal.quote;
+        dots[1].style.background = pal.sweep;
+        dots[2].style.background = pal.halo;
+        b.lastChild.textContent = pal.name;
+        b.addEventListener('click', function () {
+          for (var k in COLOUR_KEYS) v[COLOUR_KEYS[k]] = pal[k];
+          syncInputs();
+          onValueChange('palette');
+        });
+        row.appendChild(b);
+      });
+      inputs.presets = { c: c, presets: row };
+    } else if (c.type === 'colour') {
+      row.className = 'pv-colour';
+      row.innerHTML = '<label for="' + id + '"></label><span class="pv-hex"></span>' +
+        '<input type="color" id="' + id + '"><span class="pv-was"></span>';
+      row.querySelector('label').textContent = c.label;
+      row.querySelector('.pv-was').textContent = 'app: ' + c.was;
+      var ci = row.querySelector('input');
+      var hex = row.querySelector('.pv-hex');
+      ci.value = v[c.id];
+      hex.textContent = String(v[c.id]).toUpperCase();
+      ci.addEventListener('input', function () {
+        v[c.id] = ci.value;
+        hex.textContent = ci.value.toUpperCase();
+        syncInputs();
+        onValueChange(c.id);
+      });
+      inputs[c.id] = { el: ci, hex: hex, c: c };
+    } else if (c.type === 'check') {
       row.className = 'pv-check';
       row.innerHTML = '<input type="checkbox" id="' + id + '"><label for="' + id + '"></label>';
       row.querySelector('label').textContent = c.label;
@@ -914,6 +1067,16 @@
     for (var k in inputs) {
       var it = inputs[k];
       if (it.c.type === 'check') it.el.checked = !!v[k];
+      else if (it.c.type === 'colour') { it.el.value = v[k]; it.hex.textContent = String(v[k]).toUpperCase(); }
+      else if (it.c.type === 'font') {
+        Array.prototype.forEach.call(it.fonts.children, function (b) { b.classList.toggle('on', b.dataset.font === v.font); });
+      } else if (it.c.type === 'presets') {
+        Array.prototype.forEach.call(it.presets.children, function (b) {
+          var pal = PALETTES[+b.dataset.i], same = true;
+          for (var q in COLOUR_KEYS) if (String(v[COLOUR_KEYS[q]]).toLowerCase() !== pal[q].toLowerCase()) same = false;
+          b.classList.toggle('on', same);
+        });
+      }
       else { it.el.value = v[k]; it.out.textContent = fmt(it.c, v[k]); }
     }
   }
@@ -975,14 +1138,17 @@
   /* ============================================================
      WATER: rain drops and 金木犀 florets (app.js numbers)
      ============================================================ */
-  var RIPPLE_COLOURS_SUBTLE = ['rgba(255, 162, 89, 0.55)', 'rgba(253, 232, 218, 0.40)'];
-  var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
+  /* Rain ripples are tinted from the glow colour. */
+  function rippleColours(kind) {
+    if (kind === 'trail') return [rgba(v.cHalo, 0.45)];
+    return [rgba(v.cHalo, 0.6), rgba(blend('#FFFFFF', v.cHalo, 0.2), 0.45)];
+  }
   var RIPPLE_LIFE = 1900, RIPPLE_STAGGER = 150;
 
   function spawnRipples(x, y, intensity) {
     var palette, cls, baseSize;
-    if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
-    else { palette = RIPPLE_COLOURS_SUBTLE; cls = ' subtle'; baseSize = 26; }
+    if (intensity === 'trail') { palette = rippleColours('trail'); cls = ' trail'; baseSize = 22; }
+    else { palette = rippleColours('subtle'); cls = ' subtle'; baseSize = 26; }
     for (var i = 0; i < palette.length; i++) {
       (function (idx) {
         var r = document.createElement('div');
@@ -1021,10 +1187,14 @@
 
   /* 金木犀 florets: tiny four-petal flowers drift down with a gentle
      sway, land on the water with a small ripple, float, then fade. */
-  var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
-    '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
-    '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
-    '<circle r="1.5" fill="#C44E10"/></svg>';
+  function floretSvg() {
+    var petal = v.cFloret;
+    var centre = 'rgb(' + blend(petal, '#5A1A00', 0.4).join(', ') + ')';
+    return '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+      '<g fill="' + petal + '"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+      '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+      '<circle r="1.5" fill="' + centre + '"/></svg>';
+  }
 
   function scheduleFlorets(first) {
     setTimeout(function () {
@@ -1043,7 +1213,7 @@
     if (reduced) return;
     var f = document.createElement('div');
     f.className = 'kinmokusei-floret';
-    f.innerHTML = FLORET_SVG;
+    f.innerHTML = floretSvg();
     floretLayer.appendChild(f);
     var W = innerWidth, H = innerHeight;
     var x1 = tx != null ? tx : W * (0.12 + Math.random() * 0.76);
@@ -1142,6 +1312,7 @@
   /* ============================================================
      START
      ============================================================ */
+  syncInputs();
   applyCSS();
   restartBreath();
   buildLanterns();
