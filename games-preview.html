@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Games Preview</title>
+
+<!-- ============================================================
+     games-preview.html — standalone preview of three small one-finger
+     games played inside the quotes page's round window (丸窓):
+
+       ポン         Pong: a curved paddle on the ring keeps the ball in.
+       灯籠くずし   Lantern breakout: the same paddle and ball, with
+                    paper lanterns in the middle to knock loose.
+       蛍           Firefly: a firefly follows the finger and lights
+                    the dim stars it touches.
+
+     Loads the real main.css and copies the real quotes page markup
+     (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo,
+     the pond and the words look exactly as in the app. The faint ring,
+     the countdown and the ripples are drawn with the same code as
+     QuoteWindow in app.js. The games are drawn on one extra canvas on
+     top. It does NOT load app.js.
+
+     Quotes are read from quotes.json, the same file the app uses.
+
+     The generated <style id="pvLive"> block holds the proposed window
+     size and every game setting. "Copy values" copies exactly that text.
+
+     Not part of the app: not linked from index.html and not in the
+     service worker's ASSETS list.
+     ============================================================ -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
+
+<!-- Preview-only chrome: the tuning panel, the game canvas and the
+     small lines under the window. Nothing here is part of the copied CSS. -->
+<style>
+  body { overflow: hidden; height: 100vh; padding-bottom: 0; }
+
+  /* The stage takes every touch: the games read the finger anywhere on
+     the screen, not only inside the circle. */
+  .thankyou-screen .ty-ambient-stage { touch-action: none; -webkit-user-select: none; user-select: none; }
+
+  .pv-game-canvas {
+    position: absolute; left: 50%; top: 50%;
+    z-index: 3; pointer-events: none;
+  }
+  .pv-quote-below {
+    position: relative; z-index: 3;
+    margin-top: 34px; min-height: 1.5em; max-width: 90vw;
+    font-family: "Zen Antique", "Yuji Syuku", "Shippori Mincho", "Noto Serif JP", serif;
+    color: #A3282A; letter-spacing: 3px; line-height: 1.5;
+    text-shadow: var(--quote-shadow);
+    opacity: 0; transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .pv-quote-below.shown { opacity: 1; }
+  .pv-quote-below.off { display: none; }
+  .pv-game-hud {
+    position: relative; z-index: 3; margin-top: 10px; min-height: 20px;
+    font-family: "Shippori Mincho", "Noto Serif JP", serif;
+    font-size: 15px; letter-spacing: 3px; color: var(--text-mute);
+    font-variant-numeric: tabular-nums; opacity: 0.85;
+  }
+
+  .pv-fps {
+    position: fixed; left: 12px; bottom: 12px; z-index: 1000;
+    padding: 4px 10px; border-radius: 8px;
+    background: rgba(255, 253, 249, 0.88); border: 1px solid var(--border-4);
+    font: 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--text-soft);
+    pointer-events: none;
+  }
+  .pv-panel {
+    position: fixed; top: 16px; right: 16px; z-index: 1000;
+    width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    touch-action: pan-y;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid var(--border-1);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(68, 52, 48, 0.14);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text-med);
+    -webkit-user-select: none; user-select: none;
+  }
+  .pv-panel.collapsed { width: auto; overflow: hidden; }
+  .pv-panel.collapsed .pv-body { display: none; }
+  .pv-head {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; background: rgba(255, 253, 249, 0.98);
+    border-bottom: 1px solid var(--border-4);
+  }
+  .pv-panel.collapsed .pv-head { border-bottom: none; }
+  .pv-title { font-weight: 600; color: var(--text-dark); letter-spacing: 0.5px; white-space: nowrap; }
+  .pv-head select { flex: 1; min-width: 0; }
+  .pv-icon-btn {
+    border: 1px solid var(--border-2); background: transparent; border-radius: 999px;
+    width: 30px; height: 30px; font: inherit; color: var(--text-mute); cursor: pointer; flex: none;
+  }
+  .pv-body { padding: 4px 14px 14px; }
+  .pv-note { margin: 10px 0 0; color: var(--text-mute); font-size: 12px; }
+  .pv-source { margin: 6px 0 0; font-size: 12px; color: var(--accent-2); }
+  .pv-transport { display: flex; gap: 6px; margin-top: 12px; }
+  .pv-transport button {
+    flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
+    border-radius: 10px; padding: 8px 6px; font: inherit; cursor: pointer;
+  }
+  .pv-transport button:active { transform: scale(0.97); }
+  .pv-group { margin-top: 14px; }
+  .pv-group-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--secondary-accent); margin-bottom: 4px;
+  }
+  .pv-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 8px; padding: 6px 0; }
+  .pv-row label { color: var(--text-soft); }
+  .pv-val { font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 600; }
+  .pv-row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+  .pv-was { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin-top: -2px; }
+  .pv-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text-soft); }
+  .pv-check input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .pv-select { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px; padding: 6px 0; color: var(--text-soft); }
+  .pv-panel select {
+    font: inherit; color: var(--text-dark); background: #FFFDF9;
+    border: 1px solid var(--border-2); border-radius: 10px; padding: 6px 8px;
+  }
+  .pv-colour { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px 8px; padding: 5px 0; }
+  .pv-colour label { color: var(--text-soft); }
+  .pv-colour input[type="color"] {
+    width: 44px; height: 30px; padding: 0; border: 1px solid var(--border-2); border-radius: 8px;
+    background: #FFFDF9; cursor: pointer;
+  }
+  .pv-hex { font: 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--accent-2); min-width: 58px; text-align: right; }
+  .pv-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .pv-btn {
+    flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
+    border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .pv-btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFDF9; }
+  .pv-btn:active { transform: scale(0.97); }
+  .pv-status { margin-top: 8px; min-height: 18px; color: var(--accent-2); font-size: 12px; }
+  .pv-out {
+    display: none; margin: 8px 0 0; padding: 10px; max-height: 320px; overflow: auto;
+    background: var(--soft-2); border: 1px solid var(--border-4); border-radius: 10px;
+    font: 11px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--text-soft);
+    white-space: pre; -webkit-user-select: text; user-select: text;
+  }
+  .pv-out.shown { display: block; }
+</style>
+
+<!-- The generated proposed CSS goes here. Rewritten by the script. -->
+<style id="pvLive"></style>
+</head>
+<body class="thankyou-active">
+
+<!-- ============ AMBIENT BACKGROUND (same markup as index.html) ============ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
+  </div>
+  <div class="lantern-layer" id="lanternLit"></div>
+</div>
+<div class="lantern-bloom-layer" id="lanternBloom" aria-hidden="true"></div>
+
+<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
+
+<!-- ============ QUOTES PAGE (same markup as index.html) ============ -->
+<div class="thankyou-screen visible" id="thankyouScreen">
+  <div class="ty-ambient-stage shown" id="tyAmbientStage">
+    <div class="ty-ambient-inner">
+      <div class="icon-wrapper quote-window" id="quoteWindow">
+        <div class="soft-glow" aria-hidden="true"></div>
+        <canvas class="quote-ripple-canvas" id="quoteRippleCanvas" aria-hidden="true"></canvas>
+        <div class="pond-surface" aria-hidden="true">
+          <div class="pond-caustic"></div>
+          <div class="pond-caustic c2"></div>
+        </div>
+        <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
+        <div class="quote-wrap" aria-live="polite">
+          <div class="quote-line" id="quoteLine"></div>
+        </div>
+        <!-- Preview only: the games are drawn here, above the words. -->
+        <canvas class="pv-game-canvas" id="gameCanvas" aria-hidden="true"></canvas>
+      </div>
+      <div class="pv-quote-below off" id="quoteBelow"></div>
+      <div class="pv-game-hud" id="gameHud" aria-hidden="true"></div>
+      <div class="quote-meta" aria-hidden="true"><span class="quote-count" id="quoteCount"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="pv-fps" id="pvFps" aria-hidden="true"></div>
+
+<!-- ============ TUNING PANEL (preview only) ============ -->
+<div class="pv-panel" id="pvPanel">
+  <div class="pv-head">
+    <span class="pv-title">Game</span>
+    <select id="pvGame" aria-label="Game">
+      <option value="pong">ポン · Pong</option>
+      <option value="lanterns">灯籠くずし · Lantern breakout</option>
+      <option value="firefly">蛍 · Firefly</option>
+      <option value="none">なし · Quotes only</option>
+    </select>
+    <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
+  </div>
+  <div class="pv-body">
+    <p class="pv-note">Play with one finger anywhere on the screen. Pick a game above; the settings below change to match it. Fold this panel with – to see the whole window. Grey "app:" notes show today's value in the real quotes page.</p>
+    <p class="pv-source" id="pvSource">Loading quotes.json…</p>
+    <div class="pv-transport">
+      <button type="button" id="pvRestart">Restart game</button>
+      <button type="button" id="pvPause">Pause</button>
+    </div>
+    <div id="pvControls"></div>
+    <div class="pv-actions">
+      <button type="button" class="pv-btn" id="pvReset">Reset</button>
+      <button type="button" class="pv-btn primary" id="pvCopy">Copy values</button>
+    </div>
+    <div class="pv-status" id="pvStatus"></div>
+    <pre class="pv-out" id="pvOut"></pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     SETTINGS
+     Each entry is one control. `game` says which game it belongs to
+     ('all' = always shown). "was" is today's value in the app.
+     ============================================================ */
+  var CONTROLS = [
+    { group: 'Window', game: 'all' },
+    { id: 'size',       game: 'all', label: 'Ring size (px across)',        min: 500, max: 860, step: 10,  def: 680, was: '500px' },
+    { id: 'countdown',  game: 'all', label: 'Show the countdown on the ring', type: 'check', def: true },
+    { id: 'seconds',    game: 'all', label: 'Seconds per quote',            min: 6,   max: 40,  step: 1,   def: 12,  was: '10' },
+    { id: 'quotePlace', game: 'all', label: 'Quote while playing', type: 'select', def: 'inside',
+      options: [['inside', 'Inside the ring (faint)'], ['below', 'Below the ring'], ['hidden', 'Hidden']] },
+    { id: 'quoteAlpha', game: 'all', label: 'Quote strength inside the ring', min: 0, max: 1, step: 0.05, def: 0.3, was: '1 (no game)' },
+    { id: 'belowSize',  game: 'all', label: 'Quote size below the ring (px)', min: 16, max: 40, step: 1, def: 26 },
+    { id: 'counter',    game: 'all', label: 'Show the little counter under the ring', type: 'check', def: true },
+    { id: 'sound',      game: 'all', label: 'Soft chime on hits', type: 'check', def: true },
+    { id: 'volume',     game: 'all', label: 'Chime volume',                 min: 0,   max: 1,   step: 0.05, def: 0.35 },
+
+    { group: 'Colours', game: 'all' },
+    { id: 'cPaddle',    game: 'all', type: 'colour', label: 'Paddle',  def: '#B5262B' },
+    { id: 'cBall',      game: 'all', type: 'colour', label: 'Ball',    def: '#EE9A5C' },
+    { id: 'cLantern',   game: 'all', type: 'colour', label: 'Lanterns', def: '#E8743B' },
+    { id: 'cFirefly',   game: 'all', type: 'colour', label: 'Firefly and lit stars', def: '#D9C238' },
+
+    { group: 'Pong', game: 'pong' },
+    { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
+      options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
+    { id: 'pBallSpeed', game: 'pong', label: 'Ball speed at the start (px/s)', min: 80,  max: 600, step: 10, def: 220 },
+    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 4 },
+    { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 460 },
+    { id: 'pBallR',     game: 'pong', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 11 },
+    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 50 },
+    { id: 'pPadW',      game: 'pong', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
+    { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
+    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
+    { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: false },
+    { id: 'pRespawn',   game: 'pong', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
+    { id: 'pTrail',     game: 'pong', label: 'Ball leaves a soft trail', type: 'check', def: true },
+
+    { group: 'Lantern breakout', game: 'lanterns' },
+    { id: 'bControl',   game: 'lanterns', label: 'Paddle control', type: 'select', def: 'point',
+      options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
+    { id: 'bRings',     game: 'lanterns', label: 'Lantern rings (1 = 7 lanterns, 2 = 19, 3 = 37)', min: 1, max: 3, step: 1, def: 2 },
+    { id: 'bSize',      game: 'lanterns', label: 'Lantern size (px)',        min: 14,  max: 50,  step: 1,  def: 26 },
+    { id: 'bGap',       game: 'lanterns', label: 'Space between lanterns (px)', min: 36, max: 110, step: 1, def: 58 },
+    { id: 'bHits',      game: 'lanterns', label: 'Hits to free a lantern',   min: 1,   max: 3,   step: 1,  def: 1 },
+    { id: 'bTurn',      game: 'lanterns', label: 'Lanterns slowly turn (degrees/s)', min: 0, max: 30, step: 1, def: 5 },
+    { id: 'bFloat',     game: 'lanterns', label: 'Freed lanterns float up (off = burst)', type: 'check', def: true },
+    { id: 'bRelight',   game: 'lanterns', label: 'New lanterns after clearing (s)', min: 1, max: 6, step: 0.5, def: 2.5 },
+    { id: 'bBallSpeed', game: 'lanterns', label: 'Ball speed at the start (px/s)', min: 80, max: 600, step: 10, def: 230 },
+    { id: 'bSpeedUp',   game: 'lanterns', label: 'Speed-up per paddle hit (%)', min: 0, max: 15, step: 1, def: 2 },
+    { id: 'bMaxSpeed',  game: 'lanterns', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 420 },
+    { id: 'bBallR',     game: 'lanterns', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 10 },
+    { id: 'bPadDeg',    game: 'lanterns', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 55 },
+    { id: 'bPadW',      game: 'lanterns', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
+    { id: 'bFollow',    game: 'lanterns', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
+    { id: 'bEnglish',   game: 'lanterns', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
+    { id: 'bRespawn',   game: 'lanterns', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
+
+    { group: 'Firefly', game: 'firefly' },
+    { id: 'fPattern',   game: 'firefly', label: 'Stars to light', type: 'select', def: 'cycle',
+      options: [['cycle', 'Take turns (all shapes)'], ['dipper', '北斗七星 Big Dipper'], ['star', '星 Star'],
+                ['flower', '花 Flower'], ['circle', '円 Circle'], ['random', 'Random']] },
+    { id: 'fCount',     game: 'firefly', label: 'Stars in Random',           min: 3,   max: 14,  step: 1,  def: 7 },
+    { id: 'fFollow',    game: 'firefly', label: 'How fast the firefly follows', min: 0.5, max: 12, step: 0.5, def: 3 },
+    { id: 'fReach',     game: 'firefly', label: 'How close it must fly to light a star (px)', min: 10, max: 70, step: 1, def: 32 },
+    { id: 'fSize',      game: 'firefly', label: 'Firefly size (px)',         min: 4,   max: 20,  step: 1,  def: 9 },
+    { id: 'fTrail',     game: 'firefly', label: 'Trail length',              min: 0,   max: 40,  step: 1,  def: 18 },
+    { id: 'fOrder',     game: 'firefly', label: 'Stars must be lit in order (connect the dots)', type: 'check', def: false },
+    { id: 'fLines',     game: 'firefly', label: 'Draw the shape when all are lit', type: 'check', def: true },
+    { id: 'fHold',      game: 'firefly', label: 'Show the finished shape for (s)', min: 1, max: 8, step: 0.5, def: 3 },
+    { id: 'fWander',    game: 'firefly', label: 'Firefly drifts on its own when not touched', type: 'check', def: true }
+  ];
+
+  var STORE_KEY = 'gamesPreview.v1';
+  var DEFAULTS = { game: 'pong' };
+  CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
+
+  /* The app's QuoteWindow numbers (app.js QW). `size` comes from the panel. */
+  var QW = {
+    size: 680, band: 10, soft: 4, track: 0.8,
+    bodyW: 12, headW: 18, neck: 110, head: true,
+    tail: 280, taper: 2.7, startFade: 58,
+    bloom: true, fadeBack: 1.4, ripReach: 1.4,
+    seconds: 10, fade: 1600, align: true,
+    maxSize: 44, minSize: 25, fit: 0.82,
+    dprCap: 1.5,
+    cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
+    cHalo: '#E0705F'
+  };
+
+  var v = {};
+  for (var dk in DEFAULTS) v[dk] = DEFAULTS[dk];
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+    if (saved) for (var sk in saved) if (sk in DEFAULTS) v[sk] = saved[sk];
+  } catch (e) {}
+  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
+
+  /* ============================================================
+     ELEMENTS
+     ============================================================ */
+  var stage = document.getElementById('tyAmbientStage');
+  var inner = stage.querySelector('.ty-ambient-inner');
+  var win = document.getElementById('quoteWindow');
+  var ringCv = document.getElementById('quoteRingCanvas');
+  var ripCv = document.getElementById('quoteRippleCanvas');
+  var gameCv = document.getElementById('gameCanvas');
+  var quoteLine = document.getElementById('quoteLine');
+  var quoteBelow = document.getElementById('quoteBelow');
+  var countEl = document.getElementById('quoteCount');
+  var hudEl = document.getElementById('gameHud');
+  var fpsEl = document.getElementById('pvFps');
+  var softGlow = win.querySelector('.soft-glow');
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* ============================================================
+     LIVE CSS — the window size and every game setting. This is the
+     exact text "Copy values" copies.
+     ============================================================ */
+  var live = document.getElementById('pvLive');
+  var GAME_NAMES = { pong: 'Pong', lanterns: 'Lantern breakout', firefly: 'Firefly', none: 'Quotes only' };
+
+  function cssVal(c) {
+    var x = v[c.id];
+    if (c.type === 'check') return x ? '1' : '0';
+    if (c.type === 'select') return '"' + x + '"';
+    return String(x);
+  }
+  function kebab(id) { return id.replace(/[A-Z]/g, function (m) { return '-' + m.toLowerCase(); }); }
+
+  function buildCSS() {
+    var D = +v.size;
+    var G = Math.round(D * 1.452), P = Math.round(D * 0.96);
+    var lines = [];
+    lines.push('/* ============================================================');
+    lines.push('   GAMES IN THE ROUND WINDOW — chosen in games-preview.html');
+    lines.push('   Game on screen when copied: ' + GAME_NAMES[v.game]);
+    lines.push('   The --game settings below are read by the game code;');
+    lines.push('   they do nothing on their own.');
+    lines.push('   ============================================================ */');
+    lines.push('');
+    lines.push('/* The window: ' + D + 'px across (app today: 500px). */');
+    lines.push('.icon-wrapper.quote-window {');
+    lines.push('  width: ' + D + 'px;');
+    lines.push('  height: ' + D + 'px;');
+    lines.push('}');
+    lines.push('.quote-window .soft-glow {');
+    lines.push('  width: ' + G + 'px; height: ' + G + 'px;');
+    lines.push('  margin-top: -' + Math.round(G / 2) + 'px; margin-left: -' + Math.round(G / 2) + 'px;');
+    lines.push('}');
+    lines.push('.quote-window .pond-surface {');
+    lines.push('  width: ' + P + 'px; height: ' + P + 'px;');
+    lines.push('  margin: -' + Math.round(P / 2) + 'px 0 0 -' + Math.round(P / 2) + 'px;');
+    lines.push('}');
+    if (v.game !== 'none') {
+      lines.push('');
+      lines.push('/* The quote while a game is on. */');
+      if (v.quotePlace === 'inside') {
+        lines.push('.quote-window .quote-wrap { opacity: ' + v.quoteAlpha + '; transition: opacity 0.8s ease; }');
+      } else {
+        lines.push('.quote-window .quote-wrap { opacity: 0; transition: opacity 0.8s ease; }');
+      }
+      if (v.quotePlace === 'below') lines.push('.pv-quote-below { font-size: ' + v.belowSize + 'px; }');
+    }
+    var groups = [['all', 'Shared'], ['pong', 'Pong'], ['lanterns', 'Lantern breakout'], ['firefly', 'Firefly']];
+    lines.push('');
+    lines.push('/* Game settings. */');
+    lines.push('.quote-window {');
+    lines.push('  --game: "' + v.game + '";');
+    groups.forEach(function (g) {
+      var list = CONTROLS.filter(function (c) { return c.id && c.game === g[0] && c.id !== 'size' && c.id !== 'seconds' && c.id !== 'quotePlace' && c.id !== 'quoteAlpha' && c.id !== 'belowSize'; });
+      if (!list.length) return;
+      lines.push('  /* ' + g[1] + ' */');
+      list.forEach(function (c) { lines.push('  --game-' + kebab(c.id) + ': ' + cssVal(c) + ';'); });
+    });
+    lines.push('  --game-seconds-per-quote: ' + v.seconds + ';');
+    lines.push('  --game-quote-place: "' + v.quotePlace + '";');
+    lines.push('}');
+    return lines.join('\n') + '\n';
+  }
+  function applyCSS() {
+    live.textContent = buildCSS();
+    quoteBelow.classList.toggle('off', v.game === 'none' || v.quotePlace !== 'below');
+  }
+
+  /* ============================================================
+     THE ROUND WINDOW — ring, countdown, ripples and quotes.
+     Ported from QuoteWindow in app.js; only `size` and `seconds`
+     come from the panel.
+     ============================================================ */
+  var BREATH = 4000, PEAK = 1440;
+  var S = { pos: 0, D: 1, prog: 0, rate: 1, t0: 0, phase: 'idle' };
+  var QUOTES = [];
+
+  function rgbOf(hex) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function blend(a, b, t) {
+    var x = rgbOf(a), y = rgbOf(b);
+    return [0, 1, 2].map(function (i) { return Math.round(x[i] + (y[i] - x[i]) * t); });
+  }
+  function rgbaA(c, a) { return 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', ' + a + ')'; }
+  function lerpC(a, b, t) { return [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); }); }
+  function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+
+  var ringCtx = ringCv.getContext('2d');
+  var ripCtx = ripCv.getContext('2d');
+  var CV = { key: '', S: 0, dpr: 1, RS: 0 };
+  var COL = { start: rgbOf(QW.cStart), end: rgbOf(QW.cEnd), ring: rgbOf(QW.cRing), rip: blend(QW.cRing, QW.cHalo, 0.5) };
+  var PASSES = 5;
+  var DEG = Math.PI / 180;
+  var breathOrigin = 0;
+  var prevSweep = null;
+  var finalCv = document.createElement('canvas');
+  var finalCtx = finalCv.getContext('2d');
+
+  function stepAlpha(p, total) { return (total / PASSES) / (1 - total * p / PASSES); }
+  function canvasPad() { return Math.ceil(QW.headW * 1.9 + 14); }
+
+  function sizeCanvases() {
+    QW.size = +v.size;
+    var D = QW.size;
+    var Sz = D + 2 * canvasPad();
+    var dpr = Math.min(QW.dprCap, window.devicePixelRatio || 1);
+    var RS = Math.ceil(D * QW.ripReach + 20);
+    var key = [Sz, dpr, RS].join();
+    if (key === CV.key) return;
+    CV = { key: key, S: Sz, dpr: dpr, RS: RS };
+    ringCv.width = ringCv.height = finalCv.width = finalCv.height = Math.round(Sz * dpr);
+    ringCv.style.width = ringCv.style.height = Sz + 'px';
+    ringCv.style.margin = (-Sz / 2) + 'px 0 0 ' + (-Sz / 2) + 'px';
+    ripCv.width = ripCv.height = RS;
+    ripCv.style.width = ripCv.style.height = RS + 'px';
+    ripCv.style.margin = (-RS / 2) + 'px 0 0 ' + (-RS / 2) + 'px';
+    sizeGameCanvas();
+  }
+
+  function drawTrack(ctx, cx, cy) {
+    var R = QW.size / 2, T = QW.band, Rc = R - T / 2;
+    var k = Math.min(0.9, 2 * QW.soft / T);
+    ctx.fillStyle = rgbaA(COL.ring, 1);
+    for (var p = 0; p < PASSES; p++) {
+      var half = T / 2 * (1 - k * p / PASSES);
+      ctx.globalAlpha = stepAlpha(p, QW.track);
+      ctx.beginPath();
+      ctx.arc(cx, cy, Rc + half, 0, 2 * Math.PI);
+      ctx.arc(cx, cy, Rc - half, 0, 2 * Math.PI, true);
+      ctx.fill();
+    }
+  }
+
+  function drawSweep(ctx, cx, cy, frac, alpha) {
+    var R = QW.size / 2, T = QW.band, Rc = R - T / 2;
+    var SEAM = 0.4, phi = Math.min(frac * 360, 359.3);
+    if (phi < 0.5 || alpha <= 0.002) return;
+    var hb = QW.bodyW / 2;
+    var r = QW.head ? Math.max(hb, QW.headW / 2) : hb;
+    var Lt = QW.head ? Math.max(10, QW.neck) : 10;
+    var pxDeg = Rc * DEG;
+    var sMax = (phi - SEAM) * pxDeg;
+    var lo = 0, hi = 80 * DEG, al = 0, k;
+    if (r > hb + 0.01) {
+      for (k = 0; k < 24; k++) {
+        al = (lo + hi) / 2;
+        if (Math.tan(al) * Lt > 2.5 * (r * Math.cos(al) - hb)) hi = al; else lo = al;
+      }
+      al = lo;
+    }
+    var phi0 = Math.PI / 2 + al;
+    var d0 = r * (1 - Math.cos(phi0)), h0 = r * Math.sin(phi0), m0 = -Math.tan(al);
+    var ss = [], ww = [], i, s;
+    function put(d, h) { if (d > sMax) { d = sMax; h = hb; } ss.push(d); ww.push(2 * h); }
+    for (i = 0; i <= 24; i++) {
+      var f = phi0 * i / 24;
+      put(r * (1 - Math.cos(f)), r * Math.sin(f));
+    }
+    for (i = 1; i <= 24; i++) {
+      var t = i / 24, t2 = t * t, t3 = t2 * t;
+      put(d0 + Lt * t, (2 * t3 - 3 * t2 + 1) * h0 + (t3 - 2 * t2 + t) * Lt * m0 + (-2 * t3 + 3 * t2) * hb);
+    }
+    for (s = d0 + Lt + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s, hb);
+    put(sMax, hb);
+    var N = ss.length - 1;
+    var grad = ctx.createConicGradient ? ctx.createConicGradient(-Math.PI / 2, cx, cy) : null;
+    if (grad) {
+      var L = QW.tail, SFd = QW.startFade, M = 48;
+      for (i = 0; i <= M; i++) {
+        var u = phi * i / M;
+        var tt = Math.min(1, (phi - u) / L);
+        var a1 = Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
+        grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), a1));
+      }
+      var endC = rgbaA(lerpC(COL.start, COL.end, phi / 360), 0);
+      grad.addColorStop(Math.min(1, phi / 360 + 0.0006), endC);
+      grad.addColorStop(1, endC);
+    }
+    ctx.fillStyle = grad || rgbaA(lerpC(COL.start, COL.end, frac), 1);
+    for (var p = 0; p < PASSES; p++) {
+      var inset = QW.soft * p / PASSES * 2;
+      ctx.globalAlpha = stepAlpha(p, alpha);
+      ctx.beginPath();
+      for (i = 0; i <= N; i++) {
+        var a = (phi - ss[i] / pxDeg - 90) * DEG, rr = Rc + Math.max(0, ww[i] - inset) / 2;
+        if (i === 0) ctx.moveTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+        else ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+      }
+      for (i = N; i >= 0; i--) {
+        var b = (phi - ss[i] / pxDeg - 90) * DEG, q = Rc - Math.max(0, ww[i] - inset) / 2;
+        ctx.lineTo(cx + q * Math.cos(b), cy + q * Math.sin(b));
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  function snapshotFinal() {
+    var c = finalCtx;
+    c.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
+    c.globalAlpha = 1;
+    c.clearRect(0, 0, CV.S, CV.S);
+    drawSweep(c, CV.S / 2, CV.S / 2, 1, 1);
+    c.globalAlpha = 1;
+  }
+
+  function drawBloom(ctx, cx, cy, p) {
+    var R = QW.size / 2, Rc = R - QW.band / 2;
+    var e = 1 - Math.pow(1 - p, 3);
+    var r = QW.headW / 2 * (0.8 + 2.8 * e);
+    var a = 0.5 * (1 - p) * (1 - p);
+    var x = cx, y = cy - Rc;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgbaA(COL.end, a));
+    g.addColorStop(0.5, rgbaA(COL.end, a * 0.5));
+    g.addColorStop(1, rgbaA(COL.end, 0));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  function drawRing(now) {
+    var ctx = ringCtx, cs = CV.S, cx = cs / 2, cy = cs / 2;
+    ctx.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, cs, cs);
+    drawTrack(ctx, cx, cy);
+    if (!v.countdown) return;
+    if (prevSweep) {
+      var age = now - prevSweep.t, fb = QW.fadeBack * 1000;
+      if (age >= Math.max(fb, 1200)) {
+        prevSweep = null;
+      } else {
+        var a = 1 - smooth(age / fb);
+        if (a > 0.003) {
+          ctx.globalAlpha = a;
+          ctx.drawImage(finalCv, 0, 0, cs, cs);
+          ctx.globalAlpha = 1;
+        }
+        if (QW.bloom && age < 1200) drawBloom(ctx, cx, cy, age / 1200);
+      }
+    }
+    if (S.phase !== 'idle') {
+      var e = smooth((now - S.t0) / 450);
+      drawSweep(ctx, cx, cy, Math.max(0, Math.min(1, S.prog / S.D)), e);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function bezierEase(x1, y1, x2, y2) {
+    return function (x) {
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      var t = x;
+      for (var i = 0; i < 6; i++) {
+        var cxv = 3 * x1 * t * (1 - t) * (1 - t) + 3 * x2 * t * t * (1 - t) + t * t * t - x;
+        var dx = 3 * x1 * (1 - t) * (1 - t) + 6 * (x2 - x1) * t * (1 - t) + 3 * (1 - x2) * t * t;
+        if (Math.abs(dx) < 1e-6) break;
+        t -= cxv / dx;
+      }
+      t = Math.max(0, Math.min(1, t));
+      return 3 * y1 * t * (1 - t) * (1 - t) + 3 * y2 * t * t * (1 - t) + t * t * t;
+    };
+  }
+  var rippleEase = bezierEase(0.15, 0.55, 0.3, 1);
+  var RIPPLE_DELAYS = [1290, 2990, 690];
+  var RIPPLE_STROKES = [[4.5, 0.14], [3, 0.24], [1.5, 0.62]];
+
+  function glowAnim() {
+    var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].animationName === 'glowBreath' && list[i].currentTime != null) return list[i];
+    }
+    return null;
+  }
+  function syncBreath() {
+    var an = glowAnim();
+    if (an) breathOrigin = (document.timeline.currentTime || performance.now()) - an.currentTime;
+  }
+  function drawRipples(now) {
+    var ctx = ripCtx, RS = CV.RS;
+    ctx.clearRect(0, 0, RS, RS);
+    if (reduced) return;
+    var R = QW.size / 2, c = RS / 2;
+    var ph = (((now - breathOrigin) % BREATH) + BREATH) % BREATH;
+    for (var k = 0; k < 3; k++) {
+      var tau = ((((ph - RIPPLE_DELAYS[k]) % BREATH) + BREATH) % BREATH) / BREATH;
+      var e = rippleEase(tau);
+      var a = 0.9 * (1 - e);
+      if (a < 0.01) continue;
+      var r = R * (1 + (QW.ripReach - 1) * e);
+      for (var s = 0; s < RIPPLE_STROKES.length; s++) {
+        ctx.lineWidth = RIPPLE_STROKES[s][0];
+        ctx.strokeStyle = rgbaA(COL.rip, a * RIPPLE_STROKES[s][1]);
+        ctx.beginPath();
+        ctx.arc(c, c, r, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+    }
+  }
+
+  function quoteLength() {
+    var N = v.seconds * 1000;
+    var an = glowAnim();
+    if (!an) return N;
+    var p = an.currentTime % BREATH;
+    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
+    if (shift > BREATH / 2) shift -= BREATH;
+    return N + shift;
+  }
+
+  var range = document.createRange();
+  function fitText() {
+    var R = QW.size / 2 * QW.fit;
+    var max = QW.maxSize, min = Math.min(QW.minSize, max);
+    function ok(size) {
+      quoteLine.style.fontSize = size + 'px';
+      range.selectNodeContents(quoteLine);
+      var box = range.getBoundingClientRect();
+      var k = inner.getBoundingClientRect().width / inner.offsetWidth || 1;   /* undo the fit-to-screen scale */
+      return Math.hypot(box.width / k / 2, box.height / k / 2) <= R;
+    }
+    if (ok(max)) return;
+    if (!ok(min)) { quoteLine.style.fontSize = min + 'px'; return; }
+    var lo = min, hi = max;
+    while (hi - lo > 1) {
+      var mid = (lo + hi) >> 1;
+      if (ok(mid)) lo = mid; else hi = mid;
+    }
+    quoteLine.style.fontSize = lo + 'px';
+  }
+
+  var HIRA = /^[぀-ゟ]+$/;
+  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
+  var OPEN = /^[（(「『]+$/;
+  var STOPS = /[、。，．！？!?]/;
+  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  function phraseUnits(text) {
+    var segs = [];
+    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
+    else segs = Array.from(text);
+    var units = [], cur = '', force = false, open = '';
+    segs.forEach(function (sg) {
+      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
+      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
+      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
+      if (cur !== '' && !join) { units.push(cur); cur = ''; }
+      cur += open + sg; open = ''; force = false;
+    });
+    if (cur) units.push(cur);
+    return units;
+  }
+  function lineCounts() {
+    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
+    for (var i = 0; i < units.length; i++) {
+      var r = units[i].getBoundingClientRect();
+      var key = r.top, tol = r.height * 0.5;
+      var row = null;
+      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
+      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
+      row.n += Array.from(units[i].textContent).length;
+    }
+    return rows.map(function (x) { return x.n; });
+  }
+  function fitAndBalance() {
+    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
+    var base = Math.round(QW.size * 0.8);
+    for (var k = 0; k < tries.length; k++) {
+      quoteLine.style.maxWidth = Math.round(base * tries[k]) + 'px';
+      fitText();
+      var c = lineCounts();
+      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
+    }
+    quoteLine.style.maxWidth = base + 'px';
+    fitText();
+  }
+  function renderText(text) {
+    quoteLine.textContent = '';
+    quoteLine.style.maxWidth = '';
+    var units = phraseUnits(text);
+    units.forEach(function (u, ui) {
+      var span = document.createElement('span');
+      span.className = 'quote-unit';
+      span.textContent = u;
+      quoteLine.appendChild(span);
+      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
+    });
+    fitAndBalance();
+    quoteBelow.textContent = text;
+  }
+
+  function showQuote(pos) {
+    var n = QUOTES.length;
+    if (!n) return;
+    S.pos = ((pos % n) + n) % n;
+    quoteLine.classList.remove('shown', 'leaving');
+    quoteBelow.classList.remove('shown');
+    renderText(QUOTES[S.pos]);
+    void quoteLine.offsetWidth;
+    quoteLine.classList.add('shown');
+    quoteBelow.classList.add('shown');
+    var now = performance.now();
+    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
+    S.D = Math.max(1000, quoteLength());
+    S.prog = 0;
+    S.t0 = now;
+    S.phase = 'showing';
+    countEl.textContent = (S.pos + 1) + ' / ' + n;
+  }
+  function startLeaving() {
+    S.phase = 'leaving';
+    quoteLine.classList.remove('shown');
+    quoteLine.classList.add('leaving');
+    quoteBelow.classList.remove('shown');
+  }
+  function refitQuote() {
+    if (S.phase === 'idle' || !QUOTES.length) return;
+    renderText(QUOTES[S.pos]);
+  }
+
+  function fitStage() {
+    var extra = (v.game !== 'none' && v.quotePlace === 'below') ? 90 : 0;
+    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 130 + extra), (window.innerWidth - 40) / +v.size);
+    inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
+  }
+
+  /* ============================================================
+     SOUND — a soft sine chime on a pentatonic scale. Starts on the
+     first touch (the browser only allows sound after one).
+     ============================================================ */
+  var audio = null;
+  var SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.51, 1567.98];
+  function unlockAudio() {
+    if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (AC) audio = new AC();
+  }
+  function chime(step, soft) {
+    if (!v.sound || !audio || +v.volume <= 0) return;
+    var f = SCALE[Math.max(0, Math.min(SCALE.length - 1, step))];
+    var t = audio.currentTime;
+    var g = audio.createGain();
+    var peak = 0.18 * +v.volume * (soft ? 0.5 : 1);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    g.connect(audio.destination);
+    [[1, 1], [2.01, 0.25]].forEach(function (h) {
+      var o = audio.createOscillator();
+      var hg = audio.createGain();
+      o.type = 'sine';
+      o.frequency.value = f * h[0];
+      hg.gain.value = h[1];
+      o.connect(hg); hg.connect(g);
+      o.start(t); o.stop(t + 1.5);
+    });
+  }
+  function randStep() { return Math.floor(Math.random() * 6); }
+
+  /* ============================================================
+     THE FINGER — one pointer, anywhere on the stage, turned into
+     the game's own coordinates (px from the ring's centre, before
+     the fit-to-screen scale).
+     ============================================================ */
+  var finger = { down: false, id: null, x: 0, y: 0, ang: 0, lastAng: 0, dAng: 0 };
+  function toWorld(e) {
+    var r = gameCv.getBoundingClientRect();
+    var k = r.width / GS;
+    return { x: (e.clientX - r.left) / k - GS / 2, y: (e.clientY - r.top) / k - GS / 2 };
+  }
+  stage.addEventListener('pointerdown', function (e) {
+    if (finger.down) return;
+    unlockAudio();
+    finger.down = true; finger.id = e.pointerId;
+    var p = toWorld(e);
+    finger.x = p.x; finger.y = p.y;
+    finger.ang = finger.lastAng = Math.atan2(p.y, p.x);
+    finger.dAng = 0;
+    try { stage.setPointerCapture(e.pointerId); } catch (er) {}
+    e.preventDefault();
+  });
+  stage.addEventListener('pointermove', function (e) {
+    if (!finger.down || e.pointerId !== finger.id) return;
+    var p = toWorld(e);
+    finger.x = p.x; finger.y = p.y;
+    var a = Math.atan2(p.y, p.x);
+    finger.dAng += wrapAng(a - finger.lastAng);
+    finger.lastAng = a;
+    finger.ang = a;
+  });
+  function lift(e) { if (e.pointerId === finger.id) { finger.down = false; finger.id = null; } }
+  stage.addEventListener('pointerup', lift);
+  stage.addEventListener('pointercancel', lift);
+
+  /* ============================================================
+     GAME CANVAS AND SHARED PIECES
+     ============================================================ */
+  var gameCtx = gameCv.getContext('2d');
+  var GS = 0, GDPR = 1;
+  var GAME_PAD = 70;
+  function sizeGameCanvas() {
+    GS = +v.size + 2 * GAME_PAD;
+    GDPR = Math.min(QW.dprCap, window.devicePixelRatio || 1);
+    gameCv.width = gameCv.height = Math.round(GS * GDPR);
+    gameCv.style.width = gameCv.style.height = GS + 'px';
+    gameCv.style.margin = (-GS / 2) + 'px 0 0 ' + (-GS / 2) + 'px';
+  }
+  function Rc() { return +v.size / 2 - QW.band / 2; }
+  function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
+
+  /* Small effects shared by all games: ripples and floating lanterns. */
+  var effects = [];
+  function addRipple(x, y, col, r1, dur) {
+    effects.push({ kind: 'ripple', x: x, y: y, col: rgbOf(col), r1: r1 || 40, t0: performance.now(), dur: dur || 900 });
+  }
+  function drawEffects(ctx, now) {
+    for (var i = effects.length - 1; i >= 0; i--) {
+      var fx = effects[i], p = (now - fx.t0) / fx.dur;
+      if (p >= 1) { effects.splice(i, 1); continue; }
+      if (fx.kind === 'ripple') {
+        var e = 1 - Math.pow(1 - p, 3);
+        ctx.globalAlpha = 0.7 * (1 - p);
+        ctx.strokeStyle = rgbaA(fx.col, 1);
+        ctx.lineWidth = 2.2 * (1 - p) + 0.6;
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, 4 + fx.r1 * e, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      } else if (fx.kind === 'float') {
+        var rise = p * 160;
+        var sway = Math.sin(p * 6 + fx.seed) * 10 * p;
+        drawLantern(ctx, fx.x + sway, fx.y - rise, fx.size * (1 - 0.35 * p), 1, (1 - p) * (1 - p), now);
+      }
+    }
+  }
+
+  /* A soft glowing dot. */
+  function glowDot(ctx, x, y, r, col, a) {
+    var c = rgbOf(col);
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.6);
+    g.addColorStop(0, rgbaA(c, 0.9 * a));
+    g.addColorStop(0.35, rgbaA(c, 0.45 * a));
+    g.addColorStop(1, rgbaA(c, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 2.6, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.fillStyle = rgbaA(lerpC(c, [255, 253, 249], 0.55), a);
+    ctx.beginPath();
+    ctx.arc(x, y, r * 0.75, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  /* The paddle: an arc lying on the ring. */
+  function drawPaddle(ctx, ang, deg, w) {
+    var R = Rc(), half = deg * DEG / 2;
+    var c = rgbOf(v.cPaddle);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgbaA(c, 0.22);
+    ctx.lineWidth = w + 10;
+    ctx.beginPath(); ctx.arc(0, 0, R, ang - half, ang + half); ctx.stroke();
+    ctx.strokeStyle = rgbaA(c, 0.95);
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.arc(0, 0, R, ang - half, ang + half); ctx.stroke();
+    ctx.strokeStyle = rgbaA([255, 253, 249], 0.45);
+    ctx.lineWidth = Math.max(1, w * 0.22);
+    ctx.beginPath(); ctx.arc(0, 0, R - w * 0.18, ang - half * 0.85, ang + half * 0.85); ctx.stroke();
+  }
+
+  /* A paper lantern (提灯): body, ribs, dark caps, warm glow. */
+  function drawLantern(ctx, x, y, size, lit, alpha, now) {
+    if (alpha <= 0.01) return;
+    var c = rgbOf(v.cLantern);
+    var w = size * 0.92, h = size * 1.12;
+    var flick = 0.92 + 0.08 * Math.sin(now / 170 + x * 0.13 + y * 0.07);
+    ctx.globalAlpha = alpha;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, size * 1.6);
+    g.addColorStop(0, rgbaA(c, 0.42 * lit * flick));
+    g.addColorStop(1, rgbaA(c, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, size * 1.6, 0, 2 * Math.PI); ctx.fill();
+    var body = ctx.createRadialGradient(x, y - h * 0.1, 0, x, y, w * 0.6);
+    body.addColorStop(0, rgbaA(lerpC(c, [255, 240, 200], 0.6 * lit), 1));
+    body.addColorStop(1, rgbaA(lerpC(c, [120, 40, 30], 0.25 + 0.3 * (1 - lit)), 1));
+    ctx.fillStyle = body;
+    ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, 2 * Math.PI); ctx.fill();
+    ctx.strokeStyle = rgbaA([110, 40, 30], 0.35);
+    ctx.lineWidth = 1;
+    for (var i = -1; i <= 1; i++) {
+      ctx.beginPath(); ctx.ellipse(x, y + i * h * 0.2, w / 2 * Math.sqrt(1 - Math.pow(i * 0.4, 2)), h * 0.04, 0, 0, Math.PI); ctx.stroke();
+    }
+    ctx.fillStyle = rgbaA([60, 30, 28], 0.9);
+    ctx.fillRect(x - w * 0.24, y - h / 2 - 2, w * 0.48, 4);
+    ctx.fillRect(x - w * 0.24, y + h / 2 - 2, w * 0.48, 4);
+    ctx.globalAlpha = 1;
+  }
+
+  /* ============================================================
+     BALL AND PADDLE — shared by Pong and Lantern breakout.
+     `cfg(name)` reads that game's own setting (pBallSpeed / bBallSpeed …).
+     ============================================================ */
+  function makeBallGame(prefix, extra) {
+    function cfg(n) { return v[prefix + n]; }
+    var G = {
+      padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
+      ball: null, rally: 0, best: 0, trail: [],
+      reset: function () {
+        G.rally = 0; G.trail = [];
+        G.padAng = G.padTarget = -Math.PI / 2;
+        G.serve(performance.now());
+        if (extra && extra.reset) extra.reset();
+      },
+      serve: function (now) {
+        var pos = extra && extra.spawn ? extra.spawn(G) : { x: 0, y: 0, ang: Math.random() * 2 * Math.PI };
+        var sp = +cfg('BallSpeed');
+        G.ball = { x: pos.x, y: pos.y, vx: Math.cos(pos.ang) * sp, vy: Math.sin(pos.ang) * sp, state: 'serve', t0: now, alpha: 0 };
+        G.trail = [];
+      },
+      paddles: function () { return v.game === 'pong' && v.pTwo ? [G.padAng, G.padAng + Math.PI] : [G.padAng]; },
+      update: function (dt, now) {
+        /* Paddle follows the finger. */
+        if (finger.down) {
+          if (cfg('Control') === 'dial') { G.padTarget += finger.dAng; finger.dAng = 0; }
+          else G.padTarget = finger.ang;
+        }
+        var rate = +cfg('Follow');
+        var k = rate >= 40 ? 1 : 1 - Math.exp(-rate * dt);
+        G.padAng = wrapAng(G.padAng + wrapAng(G.padTarget - G.padAng) * k);
+        G.padTarget = G.padAng + wrapAng(G.padTarget - G.padAng);
+
+        var b = G.ball;
+        if (!b) return;
+        if (b.state === 'serve') {
+          b.alpha = smooth((now - b.t0) / 500);
+          if (now - b.t0 >= +cfg('Respawn') * 1000) { b.state = 'play'; b.alpha = 1; }
+          return;
+        }
+        if (b.state === 'lost') {
+          b.x += b.vx * dt; b.y += b.vy * dt;
+          b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
+          if (now - b.t0 > 600) G.serve(now);
+          return;
+        }
+        var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
+        var speed = Math.hypot(b.vx, b.vy);
+        var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
+        var h = dt / steps;
+        for (var s = 0; s < steps; s++) {
+          b.x += b.vx * h; b.y += b.vy * h;
+          if (extra && extra.collide) extra.collide(G, b, br);
+          var d = Math.hypot(b.x, b.y);
+          var inner = R - pw / 2;
+          if (d + br >= inner && d < R) {
+            var nx = b.x / d, ny = b.y / d;
+            if (b.vx * nx + b.vy * ny > 0) {
+              var ang = Math.atan2(b.y, b.x);
+              var reach = +cfg('PadDeg') * DEG / 2 + Math.asin(Math.min(1, br / d));
+              var hit = null;
+              G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
+              if (hit !== null) {
+                /* Bounce off the ring's normal, then angle it by where it hit. */
+                var dot = b.vx * nx + b.vy * ny;
+                var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
+                var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
+                var dir = Math.atan2(ry, rx) + hit * +cfg('English') * DEG;
+                /* Never let it skim along the edge: keep it at most 65° from straight back in. */
+                var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
+                if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
+                b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
+                var back2 = inner - br - 0.5;
+                b.x = nx * back2; b.y = ny * back2;
+                G.rally++;
+                if (G.rally > G.best) G.best = G.rally;
+                addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
+                chime(Math.min(8, 2 + (G.rally % 7)));
+                if (extra && extra.onPaddle) extra.onPaddle(G);
+              }
+            }
+          }
+          if (d > R + 6) {
+            b.state = 'lost'; b.t0 = now;
+            G.rally = 0;
+            return;
+          }
+        }
+        if (cfg('Trail') || prefix === 'b') {
+          G.trail.push({ x: b.x, y: b.y });
+          if (G.trail.length > 10) G.trail.shift();
+        }
+      },
+      draw: function (ctx, now) {
+        G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, +cfg('PadDeg'), +cfg('PadW')); });
+        var b = G.ball;
+        if (!b) return;
+        var br = +cfg('BallR');
+        if ((prefix === 'p' ? v.pTrail : true) && b.state === 'play') {
+          for (var i = 0; i < G.trail.length; i++) {
+            var tp = G.trail[i], f = (i + 1) / G.trail.length;
+            ctx.globalAlpha = 0.18 * f;
+            ctx.fillStyle = v.cBall;
+            ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
+          }
+          ctx.globalAlpha = 1;
+        }
+        var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
+        glowDot(ctx, b.x, b.y, br * pulse, v.cBall, b.alpha);
+      }
+    };
+    return G;
+  }
+
+  /* ---------- Pong ---------- */
+  var pong = makeBallGame('p', null);
+  pong.hud = function () { return 'ラリー ' + pong.rally + '　·　最高 ' + pong.best; };
+
+  /* ---------- Lantern breakout ---------- */
+  var lanternState = { list: [], turn: 0, relightAt: 0, round: 0 };
+  function buildLanterns() {
+    var L = [], rings = +v.bRings, gap = +v.bGap;
+    L.push({ r: 0, a: 0 });
+    for (var k = 1; k <= rings; k++) {
+      var n = 6 * k;
+      for (var i = 0; i < n; i++) L.push({ r: gap * k, a: (i / n) * 2 * Math.PI + (k % 2 ? 0 : Math.PI / n) });
+    }
+    var now = performance.now();
+    lanternState.list = L.map(function (o) { return { r: o.r, a: o.a, x: 0, y: 0, hits: +v.bHits, alive: true, born: now, flash: 0 }; });
+    lanternState.relightAt = 0;
+    placeLanterns();
+  }
+  function placeLanterns() {
+    lanternState.list.forEach(function (l) {
+      l.x = Math.cos(l.a + lanternState.turn) * l.r;
+      l.y = Math.sin(l.a + lanternState.turn) * l.r;
+    });
+  }
+  var lanterns = makeBallGame('b', {
+    reset: function () { lanternState.turn = 0; lanternState.round = 0; buildLanterns(); },
+    spawn: function (G) {
+      /* Just inside the paddle, heading in toward the lanterns. */
+      var outer = +v.bRings * +v.bGap + +v.bSize;
+      var r = Math.min(Rc() - +v.bPadW - +v.bBallR - 6, Math.max(outer + +v.bBallR + 14, Rc() * 0.72));
+      var a = G.padAng;
+      return { x: Math.cos(a) * r, y: Math.sin(a) * r, ang: a + Math.PI + (Math.random() - 0.5) * 40 * DEG };
+    },
+    collide: function (G, b, br) {
+      var now = performance.now();
+      var lr = +v.bSize * 0.52;
+      for (var i = 0; i < lanternState.list.length; i++) {
+        var l = lanternState.list[i];
+        if (!l.alive) continue;
+        var dx = b.x - l.x, dy = b.y - l.y, d = Math.hypot(dx, dy);
+        if (d >= br + lr || d === 0) continue;
+        var nx = dx / d, ny = dy / d, dot = b.vx * nx + b.vy * ny;
+        if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
+        b.x = l.x + nx * (br + lr + 0.5); b.y = l.y + ny * (br + lr + 0.5);
+        l.hits--; l.flash = now;
+        if (l.hits <= 0) {
+          l.alive = false;
+          if (v.bFloat) effects.push({ kind: 'float', x: l.x, y: l.y, size: +v.bSize, t0: now, dur: 2600, seed: Math.random() * 6 });
+          else addRipple(l.x, l.y, v.cLantern, 46, 900);
+          chime(4 + Math.floor(Math.random() * 5));
+          if (lanternState.list.every(function (x) { return !x.alive; })) {
+            lanternState.relightAt = now + +v.bRelight * 1000;
+            lanternState.round++;
+          }
+        } else {
+          chime(randStep(), true);
+        }
+        return;
+      }
+    }
+  });
+  var ballUpdate = lanterns.update;
+  lanterns.update = function (dt, now) {
+    lanternState.turn += +v.bTurn * DEG * dt;
+    placeLanterns();
+    if (lanternState.relightAt && now >= lanternState.relightAt) buildLanterns();
+    ballUpdate(dt, now);
+  };
+  var ballDraw = lanterns.draw;
+  lanterns.draw = function (ctx, now) {
+    var maxH = +v.bHits;
+    lanternState.list.forEach(function (l) {
+      if (!l.alive) return;
+      var lit = 0.35 + 0.65 * (l.hits / maxH);
+      if (now - l.flash < 250) lit = 1.2;
+      drawLantern(ctx, l.x, l.y, +v.bSize, lit, smooth((now - l.born) / 900), now);
+    });
+    ballDraw(ctx, now);
+  };
+  lanterns.hud = function () {
+    var left = lanternState.list.filter(function (l) { return l.alive; }).length;
+    return '灯籠 ' + left + ' / ' + lanternState.list.length + (lanternState.round ? '　·　' + lanternState.round + ' 回クリア' : '');
+  };
+
+  /* ---------- Firefly ---------- */
+  var PATTERNS = {
+    dipper: { pts: [[-0.78, -0.22], [-0.48, -0.32], [-0.2, -0.24], [0.06, -0.08], [0.1, 0.28], [0.56, 0.36], [0.64, 0.02]],
+              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]] },
+    star:   { pts: [0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.78, Math.sin(a) * 0.78]; }),
+              edges: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]], order: [0, 2, 4, 1, 3] },
+    flower: { pts: [[0, 0]].concat([0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.6, Math.sin(a) * 0.6]; })),
+              edges: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5], [5, 1]] },
+    circle: { pts: [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var a = -Math.PI / 2 + i * Math.PI / 4; return [Math.cos(a) * 0.74, Math.sin(a) * 0.74]; }),
+              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] }
+  };
+  var CYCLE = ['dipper', 'star', 'flower', 'circle', 'random'];
+  var NAMES = { dipper: '北斗七星', star: '星', flower: '花', circle: '円', random: '星座' };
+  var ff = { x: 0, y: 0, tx: 0, ty: 0, trail: [], stars: [], edges: [], order: null, next: 0,
+             state: 'play', t0: 0, cycle: 0, name: '', done: 0 };
+
+  function randomPattern(n) {
+    var pts = [], tries = 0, minD = 0.36;
+    while (pts.length < n && tries < 2000) {
+      tries++;
+      var a = Math.random() * 2 * Math.PI, r = Math.sqrt(Math.random()) * 0.8;
+      var p = [Math.cos(a) * r, Math.sin(a) * r];
+      if (pts.every(function (q) { return Math.hypot(p[0] - q[0], p[1] - q[1]) >= minD; })) pts.push(p);
+      if (tries % 400 === 0) minD *= 0.85;
+    }
+    /* Join them nearest-first so the finished shape is one line. */
+    var edges = [], order = [0], used = [true];
+    for (var k = 1; k < pts.length; k++) {
+      var last = order[order.length - 1], best = -1, bd = 1e9;
+      for (var j = 0; j < pts.length; j++) {
+        if (used[j]) continue;
+        var dd = Math.hypot(pts[j][0] - pts[last][0], pts[j][1] - pts[last][1]);
+        if (dd < bd) { bd = dd; best = j; }
+      }
+      used[best] = true; order.push(best); edges.push([last, best]);
+    }
+    return { pts: pts, edges: edges, order: order };
+  }
+  function newConstellation() {
+    var key = v.fPattern === 'cycle' ? CYCLE[ff.cycle++ % CYCLE.length] : v.fPattern;
+    var pat = key === 'random' ? randomPattern(+v.fCount) : PATTERNS[key];
+    var s = Rc() * 0.78, now = performance.now();
+    ff.stars = pat.pts.map(function (p) { return { x: p[0] * s, y: p[1] * s, lit: false, litT: 0, born: now }; });
+    ff.edges = pat.edges;
+    ff.order = pat.order || pat.pts.map(function (_, i) { return i; });
+    ff.next = 0; ff.state = 'play'; ff.name = NAMES[key];
+  }
+  var firefly = {
+    reset: function () {
+      ff.x = 0; ff.y = Rc() * 0.2; ff.tx = ff.x; ff.ty = ff.y; ff.trail = []; ff.cycle = 0; ff.done = 0;
+      newConstellation();
+    },
+    update: function (dt, now) {
+      if (finger.down) { ff.tx = finger.x; ff.ty = finger.y; }
+      else if (v.fWander) {
+        var t = now / 1000, R0 = Rc() * 0.45;
+        var wx = Math.sin(t * 0.37) * R0 + Math.sin(t * 0.91 + 1) * R0 * 0.3;
+        var wy = Math.cos(t * 0.29) * R0 * 0.8 + Math.sin(t * 0.73) * R0 * 0.3;
+        ff.tx += (wx - ff.tx) * (1 - Math.exp(-0.4 * dt));
+        ff.ty += (wy - ff.ty) * (1 - Math.exp(-0.4 * dt));
+      }
+      /* Keep the target inside the ring. */
+      var lim = Rc() - 18, td = Math.hypot(ff.tx, ff.ty);
+      if (td > lim) { ff.tx *= lim / td; ff.ty *= lim / td; }
+      var k = 1 - Math.exp(-(+v.fFollow) * dt);
+      ff.x += (ff.tx - ff.x) * k; ff.y += (ff.ty - ff.y) * k;
+      ff.trail.push({ x: ff.x, y: ff.y });
+      while (ff.trail.length > +v.fTrail) ff.trail.shift();
+
+      if (ff.state === 'play') {
+        var reach = +v.fReach;
+        for (var i = 0; i < ff.stars.length; i++) {
+          var st = ff.stars[i];
+          if (st.lit) continue;
+          if (v.fOrder && ff.order[ff.next] !== i) continue;
+          if (Math.hypot(st.x - ff.x, st.y - ff.y) <= reach) {
+            st.lit = true; st.litT = now;
+            ff.next++;
+            addRipple(st.x, st.y, v.cFirefly, 40, 1000);
+            chime(Math.min(8, ff.stars.filter(function (q) { return q.lit; }).length));
+          }
+        }
+        if (ff.stars.every(function (q) { return q.lit; })) {
+          ff.state = 'done'; ff.t0 = now; ff.done++;
+          setTimeout(function () { chime(5); }, 200);
+          setTimeout(function () { chime(7); }, 420);
+        }
+      } else if (ff.state === 'done' && now - ff.t0 > 900 + +v.fHold * 1000 + 1200) {
+        newConstellation();
+      }
+    },
+    draw: function (ctx, now) {
+      var col = rgbOf(v.cFirefly);
+      var fade = 1;
+      if (ff.state === 'done') {
+        var outT = now - ff.t0 - 900 - +v.fHold * 1000;
+        if (outT > 0) fade = 1 - smooth(outT / 1200);
+      }
+      /* The finished shape: lines drawn out over 0.9s. */
+      if (ff.state === 'done' && v.fLines) {
+        var p = smooth((now - ff.t0) / 900);
+        ctx.strokeStyle = rgbaA(col, 0.65 * fade);
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        ff.edges.forEach(function (e) {
+          var a = ff.stars[e[0]], b = ff.stars[e[1]];
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(a.x + (b.x - a.x) * p, a.y + (b.y - a.y) * p);
+          ctx.stroke();
+        });
+      }
+      /* Stars. */
+      ff.stars.forEach(function (st, i) {
+        var born = smooth((now - st.born) / 900) * fade;
+        if (st.lit) {
+          var tw = 0.85 + 0.15 * Math.sin(now / 300 + i);
+          glowDot(ctx, st.x, st.y, 7 * tw, v.cFirefly, born);
+        } else {
+          var isNext = v.fOrder && ff.order[ff.next] === i;
+          var a = (isNext ? 0.55 + 0.35 * Math.sin(now / 220) : 0.35) * born;
+          ctx.fillStyle = rgbaA([255, 253, 249], a);
+          ctx.beginPath(); ctx.arc(st.x, st.y, isNext ? 5 : 4, 0, 2 * Math.PI); ctx.fill();
+          ctx.strokeStyle = rgbaA(col, a * 0.8);
+          ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.arc(st.x, st.y, 9, 0, 2 * Math.PI); ctx.stroke();
+        }
+      });
+      /* Trail, then the firefly, blinking softly. */
+      for (var t = 0; t < ff.trail.length; t++) {
+        var q = ff.trail[t], f = (t + 1) / ff.trail.length;
+        ctx.fillStyle = rgbaA(col, 0.22 * f);
+        ctx.beginPath(); ctx.arc(q.x, q.y, +v.fSize * 0.5 * f, 0, 2 * Math.PI); ctx.fill();
+      }
+      var blink = 0.65 + 0.35 * Math.sin(now / 260);
+      glowDot(ctx, ff.x, ff.y, +v.fSize * (0.9 + 0.1 * blink), v.cFirefly, blink);
+    },
+    hud: function () {
+      var lit = ff.stars.filter(function (q) { return q.lit; }).length;
+      return ff.name + '　' + lit + ' / ' + ff.stars.length + (ff.done ? '　·　' + ff.done + ' 個完成' : '');
+    }
+  };
+
+  var GAMES = { pong: pong, lanterns: lanterns, firefly: firefly };
+  function current() { return GAMES[v.game] || null; }
+  function restartGame() {
+    effects = [];
+    var g = current();
+    if (g) g.reset();
+    win.classList.toggle('pv-playing', !!g);
+  }
+
+  /* ============================================================
+     THE LOOP
+     ============================================================ */
+  var lastNow = performance.now(), frameNo = 0, paused = false;
+  var fpsFrames = 0, fpsT = performance.now(), hudText = '';
+  function frame() {
+    requestAnimationFrame(frame);
+    var now = performance.now();
+    var dtMs = Math.min(100, now - lastNow);
+    lastNow = now;
+    if (S.phase !== 'idle') {
+      S.prog += dtMs;
+      var rem = Math.max(0, S.D - S.prog);
+      if (S.phase === 'showing' && rem <= QW.fade) startLeaving();
+      if (S.prog >= S.D && S.phase === 'leaving') showQuote(S.pos + 1);
+    }
+    if ((frameNo++ % 90) === 0) syncBreath();
+    drawRing(now);
+    drawRipples(now);
+
+    var g = current();
+    var ctx = gameCtx;
+    ctx.setTransform(GDPR, 0, 0, GDPR, GS / 2 * GDPR, GS / 2 * GDPR);
+    ctx.clearRect(-GS / 2, -GS / 2, GS, GS);
+    if (g) {
+      if (!paused) g.update(Math.min(0.05, dtMs / 1000), now);
+      g.draw(ctx, now);
+    }
+    drawEffects(ctx, now);
+    var t = g && v.counter ? g.hud() : '';
+    if (t !== hudText) { hudText = t; hudEl.textContent = t; }
+
+    fpsFrames++;
+    if (now - fpsT >= 500) {
+      fpsEl.textContent = Math.round(fpsFrames * 1000 / (now - fpsT)) + ' fps';
+      fpsFrames = 0; fpsT = now;
+    }
+  }
+
+  /* ============================================================
+     PANEL
+     ============================================================ */
+  var controlsEl = document.getElementById('pvControls');
+  var gameSel = document.getElementById('pvGame');
+  var inputs = {};
+
+  function fmt(c, x) {
+    var dec = String(c.step).indexOf('.') >= 0 ? String(c.step).split('.')[1].length : 0;
+    return (+x).toFixed(dec);
+  }
+  function onChange(c) {
+    save();
+    applyCSS();
+    if (c.id === 'size') { sizeCanvases(); fitStage(); refitQuote(); restartGame(); }
+    if (c.id === 'quotePlace') fitStage();
+    if (c.id === 'bRings' || c.id === 'bGap' || c.id === 'bHits') { if (v.game === 'lanterns') buildLanterns(); }
+    if (c.id === 'fPattern' || c.id === 'fCount') { if (v.game === 'firefly') { ff.cycle = 0; newConstellation(); } }
+  }
+
+  function buildPanel() {
+    controlsEl.textContent = '';
+    inputs = {};
+    var box = null;
+    CONTROLS.forEach(function (c) {
+      if (c.game !== 'all' && c.game !== v.game) return;
+      if (c.group) {
+        box = document.createElement('div');
+        box.className = 'pv-group';
+        var t = document.createElement('div');
+        t.className = 'pv-group-title';
+        t.textContent = c.group;
+        box.appendChild(t);
+        controlsEl.appendChild(box);
+        return;
+      }
+      var row, inp;
+      if (c.type === 'check') {
+        row = document.createElement('label');
+        row.className = 'pv-check';
+        inp = document.createElement('input');
+        inp.type = 'checkbox';
+        inp.checked = !!v[c.id];
+        inp.addEventListener('change', function () { v[c.id] = inp.checked; onChange(c); });
+        row.appendChild(inp);
+        row.appendChild(document.createTextNode(c.label));
+      } else if (c.type === 'select') {
+        row = document.createElement('div');
+        row.className = 'pv-select';
+        var lb = document.createElement('label');
+        lb.textContent = c.label;
+        inp = document.createElement('select');
+        c.options.forEach(function (o) {
+          var op = document.createElement('option');
+          op.value = o[0]; op.textContent = o[1];
+          inp.appendChild(op);
+        });
+        inp.value = v[c.id];
+        inp.addEventListener('change', function () { v[c.id] = inp.value; onChange(c); });
+        row.appendChild(lb); row.appendChild(inp);
+      } else if (c.type === 'colour') {
+        row = document.createElement('div');
+        row.className = 'pv-colour';
+        var cl = document.createElement('label');
+        cl.textContent = c.label;
+        var hex = document.createElement('span');
+        hex.className = 'pv-hex';
+        hex.textContent = v[c.id];
+        inp = document.createElement('input');
+        inp.type = 'color';
+        inp.value = v[c.id];
+        inp.addEventListener('input', function () { v[c.id] = inp.value.toUpperCase(); hex.textContent = v[c.id]; onChange(c); });
+        row.appendChild(cl); row.appendChild(hex); row.appendChild(inp);
+      } else {
+        row = document.createElement('div');
+        row.className = 'pv-row';
+        var l = document.createElement('label');
+        l.textContent = c.label;
+        var val = document.createElement('span');
+        val.className = 'pv-val';
+        val.textContent = fmt(c, v[c.id]);
+        inp = document.createElement('input');
+        inp.type = 'range';
+        inp.min = c.min; inp.max = c.max; inp.step = c.step;
+        inp.value = v[c.id];
+        inp.addEventListener('input', function () { v[c.id] = +inp.value; val.textContent = fmt(c, v[c.id]); onChange(c); });
+        row.appendChild(l); row.appendChild(val); row.appendChild(inp);
+        if (c.was) {
+          var w = document.createElement('div');
+          w.className = 'pv-was';
+          w.textContent = 'app: ' + c.was;
+          row.appendChild(w);
+        }
+      }
+      inputs[c.id] = inp;
+      (box || controlsEl).appendChild(row);
+    });
+  }
+
+  gameSel.value = v.game;
+  gameSel.addEventListener('change', function () {
+    v.game = gameSel.value;
+    save();
+    buildPanel();
+    applyCSS();
+    fitStage();
+    restartGame();
+  });
+
+  document.getElementById('pvCollapse').addEventListener('click', function () {
+    var p = document.getElementById('pvPanel');
+    p.classList.toggle('collapsed');
+    this.textContent = p.classList.contains('collapsed') ? '+' : '–';
+  });
+  document.getElementById('pvRestart').addEventListener('click', function () {
+    unlockAudio();
+    pong.best = 0; lanterns.best = 0;
+    restartGame();
+  });
+  var pauseBtn = document.getElementById('pvPause');
+  pauseBtn.addEventListener('click', function () {
+    paused = !paused;
+    pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  });
+
+  var statusEl = document.getElementById('pvStatus');
+  var outEl = document.getElementById('pvOut');
+  document.getElementById('pvReset').addEventListener('click', function () {
+    for (var k in DEFAULTS) v[k] = DEFAULTS[k];
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    gameSel.value = v.game;
+    buildPanel();
+    applyCSS();
+    sizeCanvases();
+    fitStage();
+    refitQuote();
+    restartGame();
+    outEl.classList.remove('shown');
+    statusEl.textContent = 'Reset to the proposed defaults.';
+  });
+  document.getElementById('pvCopy').addEventListener('click', function () {
+    var text = buildCSS();
+    outEl.textContent = text;
+    outEl.classList.add('shown');
+    function done(ok) {
+      statusEl.textContent = ok ? 'Copied. The CSS is also shown below.'
+                                : 'Could not reach the clipboard. Select the text below and copy it.';
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+    } else {
+      done(fallbackCopy(text));
+    }
+  });
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  /* ============================================================
+     START
+     ============================================================ */
+  var FALLBACK = ['静かな時間も、また大切な時間です', '小さな幸せを、ひとつずつ', 'ひと休みすることも、大切なことです'];
+  var sourceEl = document.getElementById('pvSource');
+  function loadQuotes() {
+    return fetch('quotes.json', { cache: 'no-store' })
+      .then(function (r) { return r.json(); })
+      .then(function (j) {
+        var q = (j && j.quotes || []).map(function (s) { return String(s).trim(); }).filter(Boolean);
+        if (!q.length) throw new Error('empty');
+        QUOTES = q;
+        sourceEl.textContent = q.length + ' quotes read from quotes.json.';
+      })
+      .catch(function () {
+        QUOTES = FALLBACK;
+        sourceEl.textContent = 'Could not read quotes.json (open this page from the web server, not as a file). Showing a few built-in lines.';
+      });
+  }
+
+  buildPanel();
+  applyCSS();
+  sizeCanvases();
+  fitStage();
+  window.addEventListener('resize', function () { fitStage(); });
+  restartGame();
+  requestAnimationFrame(frame);
+
+  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+  Promise.all([loadQuotes(), ready]).then(function () {
+    syncBreath();
+    setTimeout(function () { showQuote(0); }, 350);
+  });
+})();
+</script>
+</body>
+</html>
