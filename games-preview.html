@@ -7,14 +7,10 @@
 <title>Games Preview</title>
 
 <!-- ============================================================
-     games-preview.html — standalone preview of three small one-finger
-     games played inside the quotes page's round window (丸窓):
+     games-preview.html — standalone preview of a small one-finger
+     game played inside the quotes page's round window (丸窓):
 
-       ポン         Pong: a curved paddle on the ring keeps the ball in.
-       灯籠くずし   Lantern breakout: the same paddle and ball, with
-                    paper lanterns in the middle to knock loose.
-       蛍           Firefly: a firefly follows the finger and lights
-                    the dim stars it touches.
+       ポン         Pong: curved paddles on the ring keep the balls in.
 
      Loads the real main.css and copies the real quotes page markup
      (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo
@@ -25,10 +21,10 @@
 
      Rounds: each round lasts 60 seconds (one turn of the countdown
      ring) and starts on the first touch. The centre of the ring shows
-     現在のスコア, 最高スコア and 残り時間. In Pong and Lantern breakout
-     an extra ball joins after every 6 hits in a row (with a ripple and
+     現在のスコア, 最高スコア and 残り時間, with short how-to-play
+     lines under them. An extra ball joins after every 6 hits in a row (with a ripple and
      ボール追加！), points are multiplied by the balls in play, and the
-     Pong paddles shrink from 30° to 12° over the round. The last 10
+     paddles shrink from 30° to 12° over the round. The last 10
      seconds glow and tick. Each run of hits plays a climbing chime.
 
      Music: three short retro (chiptune) loops, composed here and played
@@ -239,8 +235,6 @@
     <span class="pv-title">Game</span>
     <select id="pvGame" aria-label="Game">
       <option value="pong">ポン · Pong</option>
-      <option value="lanterns">灯籠くずし · Lantern breakout</option>
-      <option value="firefly">蛍 · Firefly</option>
       <option value="none">なし · Ring only</option>
     </select>
     <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
@@ -306,8 +300,6 @@
     { group: 'Colours', game: 'all' },
     { id: 'cPaddle',    game: 'all', type: 'colour', label: 'Paddle',  def: '#B5262B' },
     { id: 'cBall',      game: 'all', type: 'colour', label: 'Ball',    def: '#EE9A5C' },
-    { id: 'cLantern',   game: 'all', type: 'colour', label: 'Lanterns', def: '#E8743B' },
-    { id: 'cFirefly',   game: 'all', type: 'colour', label: 'Firefly and lit stars', def: '#D9C238' },
 
     { group: 'Pong', game: 'pong' },
     { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
@@ -328,47 +320,7 @@
     { id: 'pRespawn',   game: 'pong', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
     { id: 'pTrail',     game: 'pong', label: 'Ball leaves a soft trail', type: 'check', def: true },
     { id: 'pExtraHits', game: 'pong', label: 'Hits in a row for an extra ball', min: 2, max: 20, step: 1, def: 6 },
-    { id: 'pMaxBalls',  game: 'pong', label: 'Most balls at once',       min: 1,   max: 6,   step: 1,  def: 3 },
-
-    { group: 'Lantern breakout', game: 'lanterns' },
-    { id: 'bControl',   game: 'lanterns', label: 'Paddle control', type: 'select', def: 'point',
-      options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
-    { id: 'bRings',     game: 'lanterns', label: 'Lantern rings (1 = 7 lanterns, 2 = 19, 3 = 37)', min: 1, max: 3, step: 1, def: 2 },
-    { id: 'bSize',      game: 'lanterns', label: 'Lantern size (px)',        min: 14,  max: 50,  step: 1,  def: 26 },
-    { id: 'bGap',       game: 'lanterns', label: 'Space between lanterns (px)', min: 36, max: 110, step: 1, def: 58 },
-    { id: 'bHits',      game: 'lanterns', label: 'Hits to free a lantern',   min: 1,   max: 3,   step: 1,  def: 1 },
-    { id: 'bTurn',      game: 'lanterns', label: 'Lanterns slowly turn (degrees/s)', min: 0, max: 30, step: 1, def: 5 },
-    { id: 'bFloat',     game: 'lanterns', label: 'Freed lanterns float up (off = burst)', type: 'check', def: true },
-    { id: 'bRelight',   game: 'lanterns', label: 'New lanterns after clearing (s)', min: 1, max: 6, step: 0.5, def: 2.5 },
-    { id: 'bBallSpeed', game: 'lanterns', label: 'Ball speed at the start (px/s)', min: 80, max: 600, step: 10, def: 230 },
-    { id: 'bSpeedUp',   game: 'lanterns', label: 'Speed-up per paddle hit (%)', min: 0, max: 15, step: 1, def: 2 },
-    { id: 'bMaxSpeed',  game: 'lanterns', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 420 },
-    { id: 'bBallR',     game: 'lanterns', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 10 },
-    { id: 'bShrink',    game: 'lanterns', label: 'Paddle gets shorter during the round', type: 'check', def: false },
-    { id: 'bPadStart',  game: 'lanterns', label: 'Paddle length at the start (degrees)', min: 10, max: 120, step: 1, def: 60 },
-    { id: 'bPadMin',    game: 'lanterns', label: 'Shortest paddle (degrees)', min: 6, max: 120, step: 1, def: 30 },
-    { id: 'bShrinkSecs', game: 'lanterns', label: 'Reaches the shortest after (s)', min: 10, max: 180, step: 5, def: 60 },
-    { id: 'bPadDeg',    game: 'lanterns', label: 'Paddle length when shrinking is off (degrees)', min: 10, max: 120, step: 1, def: 55 },
-    { id: 'bPadW',      game: 'lanterns', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
-    { id: 'bFollow',    game: 'lanterns', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
-    { id: 'bEnglish',   game: 'lanterns', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
-    { id: 'bRespawn',   game: 'lanterns', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
-    { id: 'bExtraHits', game: 'lanterns', label: 'Hits in a row for an extra ball', min: 2, max: 20, step: 1, def: 6 },
-    { id: 'bMaxBalls',  game: 'lanterns', label: 'Most balls at once',   min: 1,   max: 6,   step: 1,  def: 3 },
-
-    { group: 'Firefly', game: 'firefly' },
-    { id: 'fPattern',   game: 'firefly', label: 'Stars to light', type: 'select', def: 'cycle',
-      options: [['cycle', 'Take turns (all shapes)'], ['dipper', '北斗七星 Big Dipper'], ['star', '星 Star'],
-                ['flower', '花 Flower'], ['circle', '円 Circle'], ['random', 'Random']] },
-    { id: 'fCount',     game: 'firefly', label: 'Stars in Random',           min: 3,   max: 14,  step: 1,  def: 7 },
-    { id: 'fFollow',    game: 'firefly', label: 'How fast the firefly follows', min: 0.5, max: 12, step: 0.5, def: 3 },
-    { id: 'fReach',     game: 'firefly', label: 'How close it must fly to light a star (px)', min: 10, max: 70, step: 1, def: 32 },
-    { id: 'fSize',      game: 'firefly', label: 'Firefly size (px)',         min: 4,   max: 20,  step: 1,  def: 9 },
-    { id: 'fTrail',     game: 'firefly', label: 'Trail length',              min: 0,   max: 40,  step: 1,  def: 18 },
-    { id: 'fOrder',     game: 'firefly', label: 'Stars must be lit in order (connect the dots)', type: 'check', def: false },
-    { id: 'fLines',     game: 'firefly', label: 'Draw the shape when all are lit', type: 'check', def: true },
-    { id: 'fHold',      game: 'firefly', label: 'Show the finished shape for (s)', min: 1, max: 8, step: 0.5, def: 3 },
-    { id: 'fWander',    game: 'firefly', label: 'Firefly drifts on its own when not touched', type: 'check', def: true }
+    { id: 'pMaxBalls',  game: 'pong', label: 'Most balls at once',       min: 1,   max: 6,   step: 1,  def: 3 }
   ];
 
   var STORE_KEY = 'gamesPreview.v2';          /* v2: new defaults; values saved under v1 are ignored */
@@ -392,6 +344,7 @@
     var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (saved) for (var sk in saved) if (sk in DEFAULTS) v[sk] = saved[sk];
   } catch (e) {}
+  if (v.game !== 'pong' && v.game !== 'none') v.game = 'pong';
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
 
   /* ============================================================
@@ -419,7 +372,7 @@
      exact text "Copy values" copies.
      ============================================================ */
   var live = document.getElementById('pvLive');
-  var GAME_NAMES = { pong: 'Pong', lanterns: 'Lantern breakout', firefly: 'Firefly', none: 'Ring only' };
+  var GAME_NAMES = { pong: 'Pong', none: 'Ring only' };
 
   function cssVal(c) {
     var x = v[c.id];
@@ -453,7 +406,7 @@
     lines.push('  width: ' + P + 'px; height: ' + P + 'px;');
     lines.push('  margin: -' + Math.round(P / 2) + 'px 0 0 -' + Math.round(P / 2) + 'px;');
     lines.push('}');
-    var groups = [['all', 'Shared'], ['pong', 'Pong'], ['lanterns', 'Lantern breakout'], ['firefly', 'Firefly']];
+    var groups = [['all', 'Shared'], ['pong', 'Pong']];
     lines.push('');
     lines.push('/* Game settings. */');
     lines.push('.quote-window {');
@@ -1029,7 +982,7 @@
   function Rc() { return +v.size / 2 - QW.band / 2; }
   function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
-  /* Small effects shared by all games: ripples and floating lanterns. */
+  /* Small effects: ripples. */
   var effects = [];
   function addRipple(x, y, col, r1, dur) {
     effects.push({ kind: 'ripple', x: x, y: y, col: rgbOf(col), r1: r1 || 40, t0: performance.now(), dur: dur || 900 });
@@ -1047,10 +1000,6 @@
         ctx.arc(fx.x, fx.y, 4 + fx.r1 * e, 0, 2 * Math.PI);
         ctx.stroke();
         ctx.globalAlpha = 1;
-      } else if (fx.kind === 'float') {
-        var rise = p * 160;
-        var sway = Math.sin(p * 6 + fx.seed) * 10 * p;
-        drawLantern(ctx, fx.x + sway, fx.y - rise, fx.size * (1 - 0.35 * p), 1, (1 - p) * (1 - p), now);
       }
     }
   }
@@ -1088,36 +1037,8 @@
     ctx.beginPath(); ctx.arc(0, 0, R - w * 0.18, ang - half * 0.85, ang + half * 0.85); ctx.stroke();
   }
 
-  /* A paper lantern (提灯): body, ribs, dark caps, warm glow. */
-  function drawLantern(ctx, x, y, size, lit, alpha, now) {
-    if (alpha <= 0.01) return;
-    var c = rgbOf(v.cLantern);
-    var w = size * 0.92, h = size * 1.12;
-    var flick = 0.92 + 0.08 * Math.sin(now / 170 + x * 0.13 + y * 0.07);
-    ctx.globalAlpha = alpha;
-    var g = ctx.createRadialGradient(x, y, 0, x, y, size * 1.6);
-    g.addColorStop(0, rgbaA(c, 0.42 * lit * flick));
-    g.addColorStop(1, rgbaA(c, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, size * 1.6, 0, 2 * Math.PI); ctx.fill();
-    var body = ctx.createRadialGradient(x, y - h * 0.1, 0, x, y, w * 0.6);
-    body.addColorStop(0, rgbaA(lerpC(c, [255, 240, 200], 0.6 * lit), 1));
-    body.addColorStop(1, rgbaA(lerpC(c, [120, 40, 30], 0.25 + 0.3 * (1 - lit)), 1));
-    ctx.fillStyle = body;
-    ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, 2 * Math.PI); ctx.fill();
-    ctx.strokeStyle = rgbaA([110, 40, 30], 0.35);
-    ctx.lineWidth = 1;
-    for (var i = -1; i <= 1; i++) {
-      ctx.beginPath(); ctx.ellipse(x, y + i * h * 0.2, w / 2 * Math.sqrt(1 - Math.pow(i * 0.4, 2)), h * 0.04, 0, 0, Math.PI); ctx.stroke();
-    }
-    ctx.fillStyle = rgbaA([60, 30, 28], 0.9);
-    ctx.fillRect(x - w * 0.24, y - h / 2 - 2, w * 0.48, 4);
-    ctx.fillRect(x - w * 0.24, y + h / 2 - 2, w * 0.48, 4);
-    ctx.globalAlpha = 1;
-  }
-
   /* ============================================================
-     BALL AND PADDLE — shared by Pong and Lantern breakout.
+     BALL AND PADDLE
      `cfg(name)` reads that game's own setting (pBallSpeed / bBallSpeed …).
      Several balls can be in play: every `ExtraHits` paddle hits in a
      row (no miss in between) another ball joins, up to `MaxBalls`.
@@ -1136,7 +1057,7 @@
     var G = {
       padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
       balls: [], rally: 0,
-      /* A fresh round: paddle to the top, lanterns rebuilt, no ball yet. */
+      /* A fresh round: paddle to the top, no ball yet. */
       reset: function () {
         G.rally = 0; G.balls = [];
         G.padAng = G.padTarget = -Math.PI / 2;
@@ -1187,7 +1108,7 @@
       draw: function (ctx, now) {
         G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, padDeg(), +cfg('PadW')); });
         var br = +cfg('BallR');
-        var trail = prefix === 'p' ? v.pTrail : true;
+        var trail = v.pTrail;
         G.balls.forEach(function (b) {
           if (trail && b.state === 'play') {
             for (var i = 0; i < b.trail.length; i++) {
@@ -1257,7 +1178,7 @@
           return;
         }
       }
-      if (prefix === 'b' || v.pTrail) {
+      if (v.pTrail) {
         b.trail.push({ x: b.x, y: b.y });
         if (b.trail.length > 10) b.trail.shift();
       }
@@ -1268,227 +1189,7 @@
   /* ---------- Pong: one point per paddle hit ---------- */
   var pong = makeBallGame('p', { onPaddle: function () { addScore(1); } });
 
-  /* ---------- Lantern breakout: one point per lantern freed ---------- */
-  var lanternState = { list: [], turn: 0, relightAt: 0, round: 0 };
-  function buildLanterns() {
-    var L = [], rings = +v.bRings, gap = +v.bGap;
-    L.push({ r: 0, a: 0 });
-    for (var k = 1; k <= rings; k++) {
-      var n = 6 * k;
-      for (var i = 0; i < n; i++) L.push({ r: gap * k, a: (i / n) * 2 * Math.PI + (k % 2 ? 0 : Math.PI / n) });
-    }
-    var now = performance.now();
-    lanternState.list = L.map(function (o) { return { r: o.r, a: o.a, x: 0, y: 0, hits: +v.bHits, alive: true, born: now, flash: 0 }; });
-    lanternState.relightAt = 0;
-    placeLanterns();
-  }
-  function placeLanterns() {
-    lanternState.list.forEach(function (l) {
-      l.x = Math.cos(l.a + lanternState.turn) * l.r;
-      l.y = Math.sin(l.a + lanternState.turn) * l.r;
-    });
-  }
-  var lanterns = makeBallGame('b', {
-    reset: function () { lanternState.turn = 0; lanternState.round = 0; buildLanterns(); },
-    spawn: function (G) {
-      /* Just inside the paddle, heading in toward the lanterns. */
-      var outer = +v.bRings * +v.bGap + +v.bSize;
-      var r = Math.min(Rc() - +v.bPadW - +v.bBallR - 6, Math.max(outer + +v.bBallR + 14, Rc() * 0.72));
-      var a = G.padAng;
-      return { x: Math.cos(a) * r, y: Math.sin(a) * r, ang: a + Math.PI + (Math.random() - 0.5) * 40 * DEG };
-    },
-    collide: function (G, b, br) {
-      var now = performance.now();
-      var lr = +v.bSize * 0.52;
-      for (var i = 0; i < lanternState.list.length; i++) {
-        var l = lanternState.list[i];
-        if (!l.alive) continue;
-        var dx = b.x - l.x, dy = b.y - l.y, d = Math.hypot(dx, dy);
-        if (d >= br + lr || d === 0) continue;
-        var nx = dx / d, ny = dy / d, dot = b.vx * nx + b.vy * ny;
-        if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
-        b.x = l.x + nx * (br + lr + 0.5); b.y = l.y + ny * (br + lr + 0.5);
-        l.hits--; l.flash = now;
-        if (l.hits <= 0) {
-          l.alive = false;
-          if (v.bFloat) effects.push({ kind: 'float', x: l.x, y: l.y, size: +v.bSize, t0: now, dur: 2600, seed: Math.random() * 6 });
-          else addRipple(l.x, l.y, v.cLantern, 46, 900);
-          chime(4 + Math.floor(Math.random() * 5));
-          addScore(1);
-          if (lanternState.list.every(function (x) { return !x.alive; })) {
-            lanternState.relightAt = now + +v.bRelight * 1000;
-            lanternState.round++;
-          }
-        } else {
-          chime(randStep(), true);
-        }
-        return;
-      }
-    }
-  });
-  var ballUpdate = lanterns.update;
-  lanterns.update = function (dt, now) {
-    lanternState.turn += +v.bTurn * DEG * dt;
-    placeLanterns();
-    if (lanternState.relightAt && now >= lanternState.relightAt) buildLanterns();
-    ballUpdate(dt, now);
-  };
-  var ballDraw = lanterns.draw;
-  lanterns.draw = function (ctx, now) {
-    var maxH = +v.bHits;
-    lanternState.list.forEach(function (l) {
-      if (!l.alive) return;
-      var lit = 0.35 + 0.65 * (l.hits / maxH);
-      if (now - l.flash < 250) lit = 1.2;
-      drawLantern(ctx, l.x, l.y, +v.bSize, lit, smooth((now - l.born) / 900), now);
-    });
-    ballDraw(ctx, now);
-  };
-
-  /* ---------- Firefly: one point per star lit ---------- */
-  var PATTERNS = {
-    dipper: { pts: [[-0.78, -0.22], [-0.48, -0.32], [-0.2, -0.24], [0.06, -0.08], [0.1, 0.28], [0.56, 0.36], [0.64, 0.02]],
-              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]] },
-    star:   { pts: [0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.78, Math.sin(a) * 0.78]; }),
-              edges: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]], order: [0, 2, 4, 1, 3] },
-    flower: { pts: [[0, 0]].concat([0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.6, Math.sin(a) * 0.6]; })),
-              edges: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5], [5, 1]] },
-    circle: { pts: [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var a = -Math.PI / 2 + i * Math.PI / 4; return [Math.cos(a) * 0.74, Math.sin(a) * 0.74]; }),
-              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] }
-  };
-  var CYCLE = ['dipper', 'star', 'flower', 'circle', 'random'];
-  var NAMES = { dipper: '北斗七星', star: '星', flower: '花', circle: '円', random: '星座' };
-  var ff = { x: 0, y: 0, tx: 0, ty: 0, trail: [], stars: [], edges: [], order: null, next: 0,
-             state: 'play', t0: 0, cycle: 0, name: '', done: 0 };
-
-  function randomPattern(n) {
-    var pts = [], tries = 0, minD = 0.36;
-    while (pts.length < n && tries < 2000) {
-      tries++;
-      var a = Math.random() * 2 * Math.PI, r = Math.sqrt(Math.random()) * 0.8;
-      var p = [Math.cos(a) * r, Math.sin(a) * r];
-      if (pts.every(function (q) { return Math.hypot(p[0] - q[0], p[1] - q[1]) >= minD; })) pts.push(p);
-      if (tries % 400 === 0) minD *= 0.85;
-    }
-    /* Join them nearest-first so the finished shape is one line. */
-    var edges = [], order = [0], used = [true];
-    for (var k = 1; k < pts.length; k++) {
-      var last = order[order.length - 1], best = -1, bd = 1e9;
-      for (var j = 0; j < pts.length; j++) {
-        if (used[j]) continue;
-        var dd = Math.hypot(pts[j][0] - pts[last][0], pts[j][1] - pts[last][1]);
-        if (dd < bd) { bd = dd; best = j; }
-      }
-      used[best] = true; order.push(best); edges.push([last, best]);
-    }
-    return { pts: pts, edges: edges, order: order };
-  }
-  function newConstellation() {
-    var key = v.fPattern === 'cycle' ? CYCLE[ff.cycle++ % CYCLE.length] : v.fPattern;
-    var pat = key === 'random' ? randomPattern(+v.fCount) : PATTERNS[key];
-    var s = Rc() * 0.78, now = performance.now();
-    ff.stars = pat.pts.map(function (p) { return { x: p[0] * s, y: p[1] * s, lit: false, litT: 0, born: now }; });
-    ff.edges = pat.edges;
-    ff.order = pat.order || pat.pts.map(function (_, i) { return i; });
-    ff.next = 0; ff.state = 'play'; ff.name = NAMES[key];
-  }
-  var firefly = {
-    reset: function () {
-      ff.x = 0; ff.y = Rc() * 0.2; ff.tx = ff.x; ff.ty = ff.y; ff.trail = []; ff.cycle = 0; ff.done = 0;
-      newConstellation();
-    },
-    update: function (dt, now) {
-      if (finger.down) { ff.tx = finger.x; ff.ty = finger.y; }
-      else if (v.fWander) {
-        var t = now / 1000, R0 = Rc() * 0.45;
-        var wx = Math.sin(t * 0.37) * R0 + Math.sin(t * 0.91 + 1) * R0 * 0.3;
-        var wy = Math.cos(t * 0.29) * R0 * 0.8 + Math.sin(t * 0.73) * R0 * 0.3;
-        ff.tx += (wx - ff.tx) * (1 - Math.exp(-0.4 * dt));
-        ff.ty += (wy - ff.ty) * (1 - Math.exp(-0.4 * dt));
-      }
-      /* Keep the target inside the ring. */
-      var lim = Rc() - 18, td = Math.hypot(ff.tx, ff.ty);
-      if (td > lim) { ff.tx *= lim / td; ff.ty *= lim / td; }
-      var k = 1 - Math.exp(-(+v.fFollow) * dt);
-      ff.x += (ff.tx - ff.x) * k; ff.y += (ff.ty - ff.y) * k;
-      ff.trail.push({ x: ff.x, y: ff.y });
-      while (ff.trail.length > +v.fTrail) ff.trail.shift();
-
-      if (ff.state === 'play' && round.state === 'play') {
-        var reach = +v.fReach;
-        for (var i = 0; i < ff.stars.length; i++) {
-          var st = ff.stars[i];
-          if (st.lit) continue;
-          if (v.fOrder && ff.order[ff.next] !== i) continue;
-          if (Math.hypot(st.x - ff.x, st.y - ff.y) <= reach) {
-            st.lit = true; st.litT = now;
-            ff.next++;
-            addRipple(st.x, st.y, v.cFirefly, 40, 1000);
-            addScore(1);
-            chime(Math.min(8, ff.stars.filter(function (q) { return q.lit; }).length));
-          }
-        }
-        if (ff.stars.every(function (q) { return q.lit; })) {
-          ff.state = 'done'; ff.t0 = now; ff.done++;
-          setTimeout(function () { chime(5); }, 200);
-          setTimeout(function () { chime(7); }, 420);
-        }
-      } else if (ff.state === 'done' && now - ff.t0 > 900 + +v.fHold * 1000 + 1200) {
-        newConstellation();
-      }
-    },
-    draw: function (ctx, now) {
-      var col = rgbOf(v.cFirefly);
-      var fade = 1;
-      if (ff.state === 'done') {
-        var outT = now - ff.t0 - 900 - +v.fHold * 1000;
-        if (outT > 0) fade = 1 - smooth(outT / 1200);
-      }
-      /* The finished shape: lines drawn out over 0.9s. */
-      if (ff.state === 'done' && v.fLines) {
-        var p = smooth((now - ff.t0) / 900);
-        ctx.strokeStyle = rgbaA(col, 0.65 * fade);
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ff.edges.forEach(function (e) {
-          var a = ff.stars[e[0]], b = ff.stars[e[1]];
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(a.x + (b.x - a.x) * p, a.y + (b.y - a.y) * p);
-          ctx.stroke();
-        });
-      }
-      /* Stars. */
-      ff.stars.forEach(function (st, i) {
-        var born = smooth((now - st.born) / 900) * fade;
-        if (st.lit) {
-          var tw = 0.85 + 0.15 * Math.sin(now / 300 + i);
-          glowDot(ctx, st.x, st.y, 7 * tw, v.cFirefly, born);
-        } else {
-          var isNext = v.fOrder && ff.order[ff.next] === i;
-          var a = (isNext ? 0.55 + 0.35 * Math.sin(now / 220) : 0.35) * born;
-          ctx.fillStyle = rgbaA([255, 253, 249], a);
-          ctx.beginPath(); ctx.arc(st.x, st.y, isNext ? 5 : 4, 0, 2 * Math.PI); ctx.fill();
-          ctx.strokeStyle = rgbaA(col, a * 0.8);
-          ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.arc(st.x, st.y, 9, 0, 2 * Math.PI); ctx.stroke();
-        }
-      });
-      /* Trail, then the firefly, blinking softly. */
-      for (var t = 0; t < ff.trail.length; t++) {
-        var q = ff.trail[t], f = (t + 1) / ff.trail.length;
-        ctx.fillStyle = rgbaA(col, 0.22 * f);
-        ctx.beginPath(); ctx.arc(q.x, q.y, +v.fSize * 0.5 * f, 0, 2 * Math.PI); ctx.fill();
-      }
-      var blink = 0.65 + 0.35 * Math.sin(now / 260);
-      glowDot(ctx, ff.x, ff.y, +v.fSize * (0.9 + 0.1 * blink), v.cFirefly, blink);
-    }
-  };
-
-  firefly.start = function () {};
-  firefly.stop = function () {};
-
-  var GAMES = { pong: pong, lanterns: lanterns, firefly: firefly };
+  var GAMES = { pong: pong };
   function current() { return GAMES[v.game] || null; }
 
   /* ============================================================
@@ -1572,18 +1273,12 @@
   /* How to play, in Japanese. The lines follow the game and its settings. */
   function howToLines() {
     var lines = [], secs = +v.round + '秒';
-    if (v.game === 'pong' || v.game === 'lanterns') {
-      var pre = v.game === 'pong' ? 'p' : 'b';
-      lines.push(v[pre + 'Control'] === 'dial' ? '指で円を描くようになぞると、パドルが回ります'
-                                              : '指を置いた方向へ、パドルが動きます');
-      lines.push(v.game === 'pong' ? 'ボールを輪の外に出さないよう、打ち返しましょう'
-                                   : 'ボールを打ち返して、灯籠に当てましょう（ひとつ1点）');
-      lines.push(v[pre + 'ExtraHits'] + '回続けて打ち返すと、ボールが増えます');
+    if (v.game === 'pong') {
+      lines.push(v.pControl === 'dial' ? '指で円を描くようになぞると、パドルが回ります'
+                                       : '指を置いた方向へ、パドルが動きます');
+      lines.push('ボールを輪の外に出さないよう、打ち返しましょう');
+      lines.push(v.pExtraHits + '回続けて打ち返すと、ボールが増えます');
       if (v.bonus) lines.push('ボールが多いほど、得点が×2、×3に');
-    } else if (v.game === 'firefly') {
-      lines.push('指でなぞると、蛍がゆっくりついてきます');
-      lines.push(v.fOrder ? '光る点を、順番に灯しましょう（ひとつ1点）' : '蛍を光の点に近づけて、星を灯しましょう（ひとつ1点）');
-      lines.push('すべて灯すと、星座が完成します');
     }
     if (lines.length) lines.push(secs + 'で、最高スコアを目指しましょう');
     return lines;
@@ -1693,8 +1388,6 @@
     applyCSS();
     if (c.id === 'size') { sizeCanvases(); fitStage(); readyRound(); }
     if (c.id === 'round' && round.state !== 'play') readyRound();
-    if (c.id === 'bRings' || c.id === 'bGap' || c.id === 'bHits') { if (v.game === 'lanterns') buildLanterns(); }
-    if (c.id === 'fPattern' || c.id === 'fCount') { if (v.game === 'firefly') { ff.cycle = 0; newConstellation(); } }
   }
 
   function buildPanel() {
