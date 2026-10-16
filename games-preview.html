@@ -26,7 +26,13 @@
      Rounds: each round lasts 60 seconds (one turn of the countdown
      ring) and starts on the first touch. The centre of the ring shows
      現在のスコア, 最高スコア and 残り時間. In Pong and Lantern breakout
-     an extra ball joins after every 6 hits in a row.
+     an extra ball joins after every 6 hits in a row (with a ripple and
+     ボール追加！), points are multiplied by the balls in play, and the
+     Pong paddles shrink from 30° to 12° over the round. The last 10
+     seconds glow and tick. Each run of hits plays a climbing chime.
+
+     Music: three short retro (chiptune) loops, composed here and played
+     live with the Web Audio API, play during a round only.
 
      The generated <style id="pvLive"> block holds the proposed window
      size and every game setting. "Copy values" copies exactly that text.
@@ -71,6 +77,11 @@
   .pv-score .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
   .pv-score .sc-row.main b { display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .pv-score .sc-row.main b.pop { transform: scale(1.25); transition: none; }
+  .pv-score .mult { margin-left: 0.4em; font-size: 0.75em; color: #D9643A; }
+  /* The last seconds: the time turns warm and gently beats. */
+  .pv-score .sc-row.time.warn { color: #C8341F; opacity: 1; font-weight: 600; }
+  .pv-score .sc-row.time.warn span { display: inline-block; animation: pvBeat 1s ease-out infinite; }
+  @keyframes pvBeat { 0% { transform: scale(1.3); } 60%, 100% { transform: scale(1); } }
 
   .pv-fps {
     position: fixed; left: 12px; bottom: 12px; z-index: 1000;
@@ -199,7 +210,7 @@
         <!-- Where the quote sits in the app; here it holds the scores. -->
         <div class="quote-wrap" aria-live="polite">
           <div class="pv-score" id="scoreBox">
-            <div class="sc-row main">現在のスコア：<b id="scoreNow">0</b></div>
+            <div class="sc-row main">現在のスコア：<b id="scoreNow">0</b><span class="mult" id="scoreMult"></span></div>
             <div class="sc-row">最高スコア：<span id="scoreBest">0</span></div>
             <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
             <div class="msg" id="scoreMsg"></div>
@@ -261,6 +272,27 @@
     { id: 'sound',      game: 'all', label: 'Soft chime on hits', type: 'check', def: true },
     { id: 'volume',     game: 'all', label: 'Chime volume',                 min: 0,   max: 1,   step: 0.05, def: 0.35 },
 
+    { id: 'warnSecs',   game: 'all', label: 'Warn for the last … seconds (0 = off)', min: 0, max: 20, step: 1, def: 10 },
+    { id: 'warnTick',   game: 'all', label: 'Soft tick each second while warning', type: 'check', def: true },
+
+    { group: 'Countdown ring', game: 'all' },
+    { id: 'cdHead',     game: 'all', label: 'Water-drop head (a round bulb that tapers into the line)', type: 'check', def: true },
+    { id: 'cdHeadW',    game: 'all', label: 'Bulb width (px)',             min: 12,  max: 40,  step: 1,   def: 21,  was: '18' },
+    { id: 'cdNeck',     game: 'all', label: 'Length of the taper behind the bulb (px)', min: 10, max: 200, step: 5, def: 50, was: '110' },
+    { id: 'cdTail',     game: 'all', label: 'Tail: fades out over this many degrees behind the head', min: 30, max: 360, step: 5, def: 360, was: '280' },
+    { id: 'cdTaper',    game: 'all', label: 'Tail fade curve (higher = fades sooner)', min: 0.2, max: 5, step: 0.1, def: 0.6, was: '2.7' },
+
+    { group: 'Scoring', game: 'all' },
+    { id: 'bonus',      game: 'all', label: 'Bonus: points × balls in play (×2, ×3)', type: 'check', def: true },
+    { id: 'climb',      game: 'all', label: 'Climbing chime: each hit in a row plays the next note up', type: 'check', def: true },
+    { id: 'ballFx',     game: 'all', label: 'Ripple and ボール追加！ when a ball joins', type: 'check', def: true },
+
+    { group: 'Music (plays during a round)', game: 'all' },
+    { id: 'music',      game: 'all', label: 'Tune', type: 'select', def: 'sakura',
+      options: [['off', 'Off'], ['sakura', 'A · さくら散歩 Sakura stroll'], ['yomise', 'B · 夜店 Festival night'], ['hoshi', 'C · 星めぐり Starry walk']] },
+    { id: 'musicVol',   game: 'all', label: 'Music volume',                min: 0,   max: 1,   step: 0.05, def: 0.5 },
+    { id: 'musicListen', game: 'all', type: 'button', label: 'Listen / stop' },
+
     { group: 'Colours', game: 'all' },
     { id: 'cPaddle',    game: 'all', type: 'colour', label: 'Paddle',  def: '#B5262B' },
     { id: 'cBall',      game: 'all', type: 'colour', label: 'Ball',    def: '#EE9A5C' },
@@ -274,7 +306,11 @@
     { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 10 },
     { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 660 },
     { id: 'pBallR',     game: 'pong', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 11 },
-    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 17 },
+    { id: 'pShrink',    game: 'pong', label: 'Paddles get shorter during the round', type: 'check', def: true },
+    { id: 'pPadStart',  game: 'pong', label: 'Paddle length at the start (degrees)', min: 10, max: 120, step: 1, def: 30 },
+    { id: 'pPadMin',    game: 'pong', label: 'Shortest paddle (degrees)',  min: 6,   max: 120, step: 1,  def: 12 },
+    { id: 'pShrinkSecs', game: 'pong', label: 'Reaches the shortest after (s)', min: 10, max: 180, step: 5, def: 60 },
+    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length when shrinking is off (degrees)', min: 10, max: 120, step: 1, def: 17 },
     { id: 'pPadW',      game: 'pong', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
     { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 20 },
     { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 32 },
@@ -298,7 +334,11 @@
     { id: 'bSpeedUp',   game: 'lanterns', label: 'Speed-up per paddle hit (%)', min: 0, max: 15, step: 1, def: 2 },
     { id: 'bMaxSpeed',  game: 'lanterns', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 420 },
     { id: 'bBallR',     game: 'lanterns', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 10 },
-    { id: 'bPadDeg',    game: 'lanterns', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 55 },
+    { id: 'bShrink',    game: 'lanterns', label: 'Paddle gets shorter during the round', type: 'check', def: false },
+    { id: 'bPadStart',  game: 'lanterns', label: 'Paddle length at the start (degrees)', min: 10, max: 120, step: 1, def: 60 },
+    { id: 'bPadMin',    game: 'lanterns', label: 'Shortest paddle (degrees)', min: 6, max: 120, step: 1, def: 30 },
+    { id: 'bShrinkSecs', game: 'lanterns', label: 'Reaches the shortest after (s)', min: 10, max: 180, step: 5, def: 60 },
+    { id: 'bPadDeg',    game: 'lanterns', label: 'Paddle length when shrinking is off (degrees)', min: 10, max: 120, step: 1, def: 55 },
     { id: 'bPadW',      game: 'lanterns', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
     { id: 'bFollow',    game: 'lanterns', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
     { id: 'bEnglish',   game: 'lanterns', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
@@ -323,14 +363,13 @@
 
   var STORE_KEY = 'gamesPreview.v2';          /* v2: new defaults; values saved under v1 are ignored */
   var DEFAULTS = { game: 'pong' };
-  CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
+  CONTROLS.forEach(function (c) { if (c.id && c.type !== 'button') DEFAULTS[c.id] = c.def; });
 
   /* The app's QuoteWindow numbers (app.js QW). `size` comes from the panel. */
   var QW = {
     size: 680, band: 10, soft: 4, track: 0.8,
     bodyW: 12, headW: 18, neck: 110, head: true,
     tail: 280, taper: 2.7, startFade: 58,
-    fullTrail: true,                                 /* games: the line stays full from the top to the head */
     bloom: true, fadeBack: 1.4, ripReach: 1.4,
     dprCap: 1.5,
     cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
@@ -358,6 +397,7 @@
   var scoreNowEl = document.getElementById('scoreNow');
   var scoreBestEl = document.getElementById('scoreBest');
   var scoreTimeEl = document.getElementById('scoreTime');
+  var scoreMultEl = document.getElementById('scoreMult');
   var scoreMsgEl = document.getElementById('scoreMsg');
   var fpsEl = document.getElementById('pvFps');
   var softGlow = win.querySelector('.soft-glow');
@@ -408,7 +448,7 @@
     lines.push('.quote-window {');
     lines.push('  --game: "' + v.game + '";');
     groups.forEach(function (g) {
-      var list = CONTROLS.filter(function (c) { return c.id && c.game === g[0] && c.id !== 'size'; });
+      var list = CONTROLS.filter(function (c) { return c.id && c.type !== 'button' && c.game === g[0] && c.id !== 'size'; });
       if (!list.length) return;
       lines.push('  /* ' + g[1] + ' */');
       list.forEach(function (c) { lines.push('  --game-' + kebab(c.id) + ': ' + cssVal(c) + ';'); });
@@ -453,9 +493,15 @@
   var finalCtx = finalCv.getContext('2d');
 
   function stepAlpha(p, total) { return (total / PASSES) / (1 - total * p / PASSES); }
+  /* The countdown's shape comes from the panel's "Countdown ring" group. */
+  function syncQW() {
+    QW.head = !!v.cdHead; QW.headW = +v.cdHeadW; QW.neck = +v.cdNeck;
+    QW.tail = +v.cdTail; QW.taper = +v.cdTaper;
+  }
   function canvasPad() { return Math.ceil(QW.headW * 1.9 + 14); }
 
   function sizeCanvases() {
+    syncQW();
     QW.size = +v.size;
     var D = QW.size;
     var Sz = D + 2 * canvasPad();
@@ -525,7 +571,7 @@
       for (i = 0; i <= M; i++) {
         var u = phi * i / M;
         var tt = Math.min(1, (phi - u) / L);
-        var a1 = QW.fullTrail ? smooth(u / 4) : Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
+        var a1 = Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
         grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), a1));
       }
       var endC = rgbaA(lerpC(COL.start, COL.end, phi / 360), 0);
@@ -577,12 +623,35 @@
     ctx.fill();
   }
 
+  /* The last seconds: a warm glow on the ring that swells once a second. */
+  function drawWarn(ctx, cx, cy) {
+    var left = warnLeft();
+    if (left === null) return;
+    var beat = left - Math.floor(left);                      /* 1 → 0 within each second */
+    var a = 0.18 + 0.4 * beat * beat;
+    var Rr = QW.size / 2 - QW.band / 2;
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = rgbaA(COL.end, a * 0.35);
+    ctx.lineWidth = QW.band + 16;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = rgbaA(COL.end, a);
+    ctx.lineWidth = QW.band;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+  }
+  /* Seconds left when inside the warning window, otherwise null. */
+  function warnLeft() {
+    if (round.state !== 'play' || !(+v.warnSecs > 0)) return null;
+    var left = Math.max(0, (S.D - S.prog) / 1000);
+    return left <= +v.warnSecs ? left : null;
+  }
+
   function drawRing(now) {
     var ctx = ringCtx, cs = CV.S, cx = cs / 2, cy = cs / 2;
     ctx.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, cs, cs);
     drawTrack(ctx, cx, cy);
+    drawWarn(ctx, cx, cy);
     if (!v.countdown) return;
     if (prevSweep) {
       var age = now - prevSweep.t, fb = QW.fadeBack * 1000;
@@ -668,7 +737,10 @@
      first touch (the browser only allows sound after one).
      ============================================================ */
   var audio = null;
-  var SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.51, 1567.98];
+  /* C major pentatonic from C5 up, a little over two octaves, so a
+     long run of hits keeps climbing. */
+  var SCALE = [];
+  [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28].forEach(function (st) { SCALE.push(523.25 * Math.pow(2, st / 12)); });
   function unlockAudio() {
     if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -676,13 +748,15 @@
   }
   function chime(step, soft) {
     if (!v.sound || !audio || +v.volume <= 0) return;
-    var f = SCALE[Math.max(0, Math.min(SCALE.length - 1, step))];
+    playBell(SCALE[Math.max(0, Math.min(SCALE.length - 1, step))], 0.18 * +v.volume * (soft ? 0.5 : 1), 1.4);
+  }
+  function playBell(f, peak, len) {
+    if (!audio || peak <= 0) return;
     var t = audio.currentTime;
     var g = audio.createGain();
-    var peak = 0.18 * +v.volume * (soft ? 0.5 : 1);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
     g.connect(audio.destination);
     [[1, 1], [2.01, 0.25]].forEach(function (h) {
       var o = audio.createOscillator();
@@ -691,8 +765,204 @@
       o.frequency.value = f * h[0];
       hg.gain.value = h[1];
       o.connect(hg); hg.connect(g);
-      o.start(t); o.stop(t + 1.5);
+      o.start(t); o.stop(t + len + 0.1);
     });
+  }
+  /* A soft wooden tick for the last seconds; higher for the final three. */
+  function tick(final) {
+    if (!v.sound || !v.warnTick) return;
+    playBell(final ? 1760 : 1320, 0.07 * +v.volume, 0.12);
+  }
+  /* A soft low note when the run of hits ends. */
+  function missNote() {
+    if (!v.sound || !v.climb) return;
+    playBell(392, 0.08 * +v.volume, 0.6);
+    setTimeout(function () { playBell(330, 0.06 * +v.volume, 0.7); }, 110);
+  }
+
+  /* ============================================================
+     MUSIC — three short retro (8-bit, chiptune) loops played live by
+     the browser's sound engine, like an old game console's sound
+     chip: a pulse-wave melody, a triangle bass, a quiet arpeggio and
+     noise drums, through a soft low-pass so nothing is harsh.
+     Plays only while a round is on (or after "Listen").
+
+     Each song is 8 bars of 8 eighth notes. In the strings:
+       a note (A4, F#4 …) starts a note, "-" holds it, "." is a rest.
+       bass:  R = chord root, F = fifth, O = octave above
+       arp:   0–3 = notes of the bar's chord, low to high
+       drums: k = kick, s = snare, h = hi-hat
+     ============================================================ */
+  var CHORDS = {
+    C:  { b: 'C3', t: ['C4', 'E4', 'G4', 'C5'] },
+    D:  { b: 'D3', t: ['D4', 'F#4', 'A4', 'D5'] },
+    Dm: { b: 'D3', t: ['D4', 'F4', 'A4', 'D5'] },
+    Em: { b: 'E3', t: ['E4', 'G4', 'B4', 'E5'] },
+    F:  { b: 'F2', t: ['F4', 'A4', 'C5', 'F5'] },
+    G:  { b: 'G2', t: ['G3', 'B3', 'D4', 'G4'] },
+    A:  { b: 'A2', t: ['A3', 'C#4', 'E4', 'A4'] },
+    Am: { b: 'A2', t: ['A3', 'C4', 'E4', 'A4'] }
+  };
+  var SONGS = {
+    /* A · さくら散歩 — an easy walk in D major pentatonic, 96 bpm. */
+    sakura: {
+      bpm: 96, lead: 0.5, leadVol: 0.07,
+      chords: 'D D G A D G A D',
+      melody: 'A4 - B4 A4 F#4 - E4 - | D4 - E4 F#4 A4 - - . | B4 - A4 B4 D5 - B4 - | A4 - - - . . . . |' +
+              'F#4 - A4 B4 D5 - E5 - | D5 - B4 A4 B4 - - . | A4 - F#4 E4 D4 - E4 - | D4 - - - . . . .',
+      bass:  'R - F - R - F -',
+      arp:   '. 0 . 2 . 1 . 2',
+      drums: 'k . h . k . h .'
+    },
+    /* B · 夜店 — a summer-festival bounce in the minyō scale, 120 bpm. */
+    yomise: {
+      bpm: 120, lead: 0.25, leadVol: 0.06,
+      chords: 'Am Am C G Am Dm Em Am',
+      melody: 'E5 - D5 C5 A4 - C5 D5 | E5 - G5 E5 D5 - - . | C5 - D5 E5 D5 C5 A4 - | G4 - A4 - - - . . |' +
+              'A4 C5 D5 - E5 - D5 C5 | D5 - E5 G5 A5 - - . | G5 E5 D5 C5 D5 - E5 - | A4 - - - . . . .',
+      bass:  'R . O F R . F O',
+      arp:   '0 2 1 2 0 2 1 2',
+      drums: 'k . h k s . h h'
+    },
+    /* C · 星めぐり — slow and twinkling in C major, 84 bpm. */
+    hoshi: {
+      bpm: 84, lead: 0.125, leadVol: 0.075,
+      chords: 'C G Am F C Am F C',
+      melody: 'E5 - - - D5 - C5 - | D5 - - - G4 - - - | A4 - C5 - E5 - D5 - | C5 - - - - - . . |' +
+              'E5 - G5 - E5 - D5 - | C5 - - - A4 - - - | G4 - A4 - C5 - D5 - | C5 - - - - - . .',
+      bass:  'R - - - F - - -',
+      arp:   '0 1 2 3 2 1 0 1',
+      drums: '. . h . . . h .'
+    }
+  };
+  var MUSIC_LEVEL = 0.55;
+
+  function midiOf(name) {
+    var m = /^([A-G])(#|b)?(-?\d)$/.exec(name);
+    var semi = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return 12 * (+m[3] + 1) + semi;
+  }
+  function hz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  function toks(str) { return str.replace(/\|/g, ' ').split(/\s+/).filter(Boolean); }
+  /* Turn note/hold/rest tokens into { step: [midi, length] }. */
+  function notesFrom(list, offset, out, toMidi) {
+    for (var i = 0; i < list.length; i++) {
+      var tk = list[i];
+      if (tk === '-' || tk === '.') continue;
+      var n = 1;
+      while (i + n < list.length && list[i + n] === '-') n++;
+      out[offset + i] = [toMidi(tk), n];
+    }
+  }
+  function compileSong(sg) {
+    var chords = toks(sg.chords), len = chords.length * 8;
+    var c = { bpm: sg.bpm, len: len, lead: sg.lead, leadVol: sg.leadVol, mel: {}, bass: {}, arp: {}, drums: {} };
+    notesFrom(toks(sg.melody), 0, c.mel, midiOf);
+    var bassT = toks(sg.bass), arpT = toks(sg.arp), drumT = toks(sg.drums);
+    chords.forEach(function (name, bar) {
+      var ch = CHORDS[name], root = midiOf(ch.b);
+      notesFrom(bassT, bar * 8, c.bass, function (tk) { return root + (tk === 'F' ? 7 : tk === 'O' ? 12 : 0); });
+      arpT.forEach(function (tk, i) { if (/^\d$/.test(tk)) c.arp[bar * 8 + i] = [midiOf(ch.t[+tk]), 1]; });
+      drumT.forEach(function (tk, i) { if (tk !== '.') c.drums[bar * 8 + i] = tk; });
+    });
+    return c;
+  }
+
+  var pulseWaves = {}, noiseBuf = null;
+  function pulseWave(duty) {
+    if (pulseWaves[duty]) return pulseWaves[duty];
+    var N = 40, re = new Float32Array(N), im = new Float32Array(N);
+    for (var n = 1; n < N; n++) re[n] = 2 / (n * Math.PI) * Math.sin(n * Math.PI * duty);
+    return (pulseWaves[duty] = audio.createPeriodicWave(re, im));
+  }
+  function noise() {
+    if (noiseBuf) return noiseBuf;
+    noiseBuf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function voice(dest, wave, f, t, len, vol) {
+    var o = audio.createOscillator();
+    if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
+    o.frequency.value = f;
+    var g = audio.createGain();
+    var hold = Math.max(0.09, len - 0.04);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(vol * 0.6, t + 0.08);
+    g.gain.setValueAtTime(vol * 0.6, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + 0.08);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + hold + 0.1);
+  }
+  function drum(dest, kind, t) {
+    var g = audio.createGain();
+    g.connect(dest);
+    if (kind === 'k') {
+      var o = audio.createOscillator();
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.32, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g); o.start(t); o.stop(t + 0.18);
+      return;
+    }
+    var src = audio.createBufferSource();
+    src.buffer = noise();
+    var f = audio.createBiquadFilter();
+    f.type = kind === 's' ? 'bandpass' : 'highpass';
+    f.frequency.value = kind === 's' ? 1800 : 7000;
+    var dur = kind === 's' ? 0.11 : 0.035;
+    g.gain.setValueAtTime(kind === 's' ? 0.1 : 0.035, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+
+  var music = { on: false, preview: false };
+  function musicStart(key, preview) {
+    musicStop(true);
+    if (!SONGS[key]) return;
+    unlockAudio();
+    if (!audio) return;
+    var out = audio.createGain();
+    var lp = audio.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3600;
+    out.gain.setValueAtTime(0.0001, audio.currentTime);
+    out.gain.setTargetAtTime(MUSIC_LEVEL * +v.musicVol, audio.currentTime, 0.25);
+    out.connect(lp); lp.connect(audio.destination);
+    music = { on: true, preview: !!preview, song: compileSong(SONGS[key]), step: 0,
+              next: audio.currentTime + 0.1, out: out, lp: lp, timer: 0 };
+    music.timer = setInterval(pumpMusic, 25);
+    pumpMusic();
+  }
+  function musicStop(quick) {
+    if (!music.on) return;
+    var m = music;
+    m.on = false;
+    clearInterval(m.timer);
+    var t = audio.currentTime;
+    m.out.gain.cancelScheduledValues(t);
+    m.out.gain.setValueAtTime(Math.max(0.0001, m.out.gain.value), t);
+    m.out.gain.exponentialRampToValueAtTime(0.0001, t + (quick ? 0.05 : 1.2));
+    setTimeout(function () { try { m.out.disconnect(); m.lp.disconnect(); } catch (e) {} }, quick ? 300 : 1600);
+  }
+  /* Schedule the next notes slightly ahead on the audio clock, so the
+     beat stays steady even when a frame is late. */
+  function pumpMusic() {
+    var m = music;
+    if (!m.on) return;
+    var sg = m.song, dur = 60 / sg.bpm / 2;
+    while (m.next < audio.currentTime + 0.15) {
+      var i = m.step % sg.len, t = m.next, e;
+      if ((e = sg.mel[i]))  voice(m.out, pulseWave(sg.lead), hz(e[0]), t, e[1] * dur, sg.leadVol);
+      if ((e = sg.bass[i])) voice(m.out, 'triangle', hz(e[0]), t, e[1] * dur * 0.95, 0.16);
+      if ((e = sg.arp[i]))  voice(m.out, pulseWave(0.125), hz(e[0]), t, dur * 0.5, 0.025);
+      if (sg.drums[i]) drum(m.out, sg.drums[i], t);
+      m.next += dur;
+      m.step++;
+    }
   }
   function randStep() { return Math.floor(Math.random() * 6); }
 
@@ -845,6 +1115,13 @@
      ============================================================ */
   function makeBallGame(prefix, extra) {
     function cfg(n) { return v[prefix + n]; }
+    /* Paddle length now: shrinks from the start length to the shortest
+       over the set time, when shrinking is on. */
+    function padDeg() {
+      if (!cfg('Shrink')) return +cfg('PadDeg');
+      var t = round.state === 'play' ? Math.min(1, S.prog / (+cfg('ShrinkSecs') * 1000)) : round.state === 'over' ? 1 : 0;
+      return +cfg('PadStart') + (+cfg('PadMin') - +cfg('PadStart')) * t;
+    }
     var G = {
       padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
       balls: [], rally: 0,
@@ -897,7 +1174,7 @@
         if (round.state === 'play' && G.live() === 0) G.serve(now, +cfg('Respawn'));
       },
       draw: function (ctx, now) {
-        G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, +cfg('PadDeg'), +cfg('PadW')); });
+        G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, padDeg(), +cfg('PadW')); });
         var br = +cfg('BallR');
         var trail = prefix === 'p' ? v.pTrail : true;
         G.balls.forEach(function (b) {
@@ -930,7 +1207,7 @@
           var nx = b.x / d, ny = b.y / d;
           if (b.vx * nx + b.vy * ny > 0) {
             var ang = Math.atan2(b.y, b.x);
-            var reach = +cfg('PadDeg') * DEG / 2 + Math.asin(Math.min(1, br / d));
+            var reach = padDeg() * DEG / 2 + Math.asin(Math.min(1, br / d));
             var hit = null;
             G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
             if (hit !== null) {
@@ -947,18 +1224,24 @@
               b.x = nx * back2; b.y = ny * back2;
               G.rally++;
               addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
-              chime(Math.min(8, 2 + (G.rally % 7)));
+              chime(v.climb ? G.rally - 1 : Math.min(8, 2 + (G.rally % 7)));
               if (extra && extra.onPaddle) extra.onPaddle(G);
               /* Every N hits in a row, one more ball (up to the limit). */
               if (G.rally % +cfg('ExtraHits') === 0 && G.live() < +cfg('MaxBalls')) {
                 G.serve(now, 0.6);
-                setTimeout(function () { chime(6); }, 120);
+                if (v.ballFx) {
+                  addRipple(0, 0, v.cBall, Rc() * 0.8, 1400);
+                  addRipple(0, 0, v.cPaddle, Rc() * 0.5, 1100);
+                  flashMsg('ボール追加！', 1300);
+                }
+                setTimeout(function () { playBell(1567.98, 0.12 * +v.volume, 1.2); }, 120);
               }
             }
           }
         }
         if (d > R + 6) {
           b.state = 'lost'; b.t0 = now;
+          if (G.rally > 0 && round.state === 'play') missNote();
           G.rally = 0;
           return;
         }
@@ -1210,11 +1493,18 @@
   try { best = JSON.parse(localStorage.getItem(BEST_KEY) || '{}') || {}; } catch (e) { best = {}; }
   function saveBest() { try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) {} }
 
-  var round = { state: 'ready', score: 0, overAt: 0, newBest: false };
+  var round = { state: 'ready', score: 0, overAt: 0, newBest: false, flash: null, lastTick: -1 };
 
+  /* Points are multiplied by the balls in play (when the bonus is on). */
+  function multiplier() {
+    var g = current();
+    if (!v.bonus || !g || !g.live) return 1;
+    return Math.max(1, g.live());
+  }
+  function flashMsg(text, ms) { round.flash = { text: text, until: performance.now() + ms }; }
   function addScore(n) {
     if (round.state !== 'play') return;
-    round.score += n;
+    round.score += n * multiplier();
     scoreNowEl.textContent = round.score;
     scoreNowEl.classList.add('pop');
     requestAnimationFrame(function () { requestAnimationFrame(function () { scoreNowEl.classList.remove('pop'); }); });
@@ -1225,6 +1515,8 @@
     effects = [];
     round.state = 'ready';
     round.score = 0;
+    round.flash = null;
+    if (!music.preview) musicStop(true);
     S.phase = 'idle'; S.prog = 0; prevSweep = null;
     var g = current();
     if (g) g.reset();
@@ -1239,7 +1531,10 @@
     round.state = 'play';
     round.score = 0;
     round.newBest = false;
+    round.flash = null;
+    round.lastTick = -1;
     scoreNowEl.textContent = '0';
+    if (v.music !== 'off') musicStart(v.music);
     S.phase = 'showing'; S.D = +v.round * 1000; S.prog = 0; S.t0 = now; prevSweep = null;
     chime(3);
   }
@@ -1252,6 +1547,7 @@
     snapshotFinal(); prevSweep = { t: now };
     S.phase = 'idle';
     if (g) g.stop(now);
+    musicStop(false);
     chime(4); setTimeout(function () { chime(6); }, 180); setTimeout(function () { chime(8); }, 360);
   }
   /* The first touch starts a round; after a round, a new touch (once
@@ -1273,8 +1569,13 @@
     setText(scoreNowEl, 'now', String(round.score));
     setText(scoreBestEl, 'best', String(best[v.game] || 0));
     setText(scoreTimeEl, 'time', String(left));
+    var m = round.state === 'play' ? multiplier() : 1;
+    setText(scoreMultEl, 'mult', m > 1 ? '×' + m : '');
+    var warn = warnLeft() !== null;
+    if (shown.warn !== warn) { shown.warn = warn; scoreTimeEl.parentNode.classList.toggle('warn', warn); }
     var msg = '', title = false;
     if (round.state === 'ready') msg = 'タッチしてスタート';
+    else if (round.state === 'play' && round.flash && performance.now() < round.flash.until) { msg = round.flash.text; title = true; }
     else if (round.state === 'over') {
       if (performance.now() - round.overAt < 1500) { msg = round.newBest ? '最高スコア更新！' : 'おつかれさまでした'; title = true; }
       else msg = round.newBest ? '最高スコア更新！ · タッチでもう一度' : 'タッチでもう一度';
@@ -1295,6 +1596,11 @@
     lastNow = now;
     if (round.state === 'play' && !paused) {
       S.prog += dtMs;
+      var wl = warnLeft();
+      if (wl !== null) {
+        var sec = Math.ceil(wl);
+        if (sec !== round.lastTick && sec > 0) { round.lastTick = sec; tick(sec <= 3); }
+      }
       if (S.prog >= S.D) endRound(now);
     }
     if ((frameNo++ % 90) === 0) syncBreath();
@@ -1330,7 +1636,18 @@
     var dec = String(c.step).indexOf('.') >= 0 ? String(c.step).split('.')[1].length : 0;
     return (+x).toFixed(dec);
   }
+  function onButton(c) {
+    if (c.id === 'musicListen') {
+      if (music.on) musicStop(false);
+      else if (v.music !== 'off') musicStart(v.music, true);
+    }
+  }
   function onChange(c) {
+    if (/^cd/.test(c.id)) { syncQW(); if (c.id === 'cdHeadW') sizeCanvases(); }
+    if (c.id === 'music' && (music.on || round.state === 'play')) {
+      if (v.music === 'off') musicStop(false); else musicStart(v.music, music.preview);
+    }
+    if (c.id === 'musicVol' && music.on) music.out.gain.setTargetAtTime(MUSIC_LEVEL * +v.musicVol, audio.currentTime, 0.1);
     save();
     applyCSS();
     if (c.id === 'size') { sizeCanvases(); fitStage(); readyRound(); }
@@ -1356,7 +1673,15 @@
         return;
       }
       var row, inp;
-      if (c.type === 'check') {
+      if (c.type === 'button') {
+        row = document.createElement('div');
+        row.className = 'pv-transport';
+        inp = document.createElement('button');
+        inp.type = 'button';
+        inp.textContent = c.label;
+        inp.addEventListener('click', function () { onButton(c); });
+        row.appendChild(inp);
+      } else if (c.type === 'check') {
         row = document.createElement('label');
         row.className = 'pv-check';
         inp = document.createElement('input');
@@ -1441,6 +1766,7 @@
   pauseBtn.addEventListener('click', function () {
     paused = !paused;
     pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    if (round.state === 'play') { if (paused) musicStop(false); else if (v.music !== 'off') musicStart(v.music); }
   });
 
   document.getElementById('pvClearBest').addEventListener('click', function () {
