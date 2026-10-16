@@ -22,17 +22,33 @@
      the ring, the countdown and the ring ripples are plain HTML
      layers that only rotate, scale or fade, so the tablet's graphics
      chip moves them without repainting anything:
-       .quote-ring           — the ring itself (a bordered circle)
-       .quote-timer-half     — two half-windows; inside each, a rotor
-       .quote-timer-rotor      turns a half ring into view. Together
-                               they sweep the next colour clockwise
-                               around the ring over one quote.
-       .quote-timer-bead-rotor — turns the glowing bead with the sweep
+       .quote-track          — the faint ring that is always there
+       .quote-sweep          — the countdown: two copies take turns
+         .quote-timer-half     two half-windows; inside each, a rotor
+         .quote-timer-rotor    turns a half ring into view, with a
+                               feathered leading edge (a mask)
+         .quote-sweep-ring     a conic gradient ring (start colour →
+                               end colour). It counter-rotates against
+                               its rotor, so it stays put while the
+                               rotor uncovers it
+         .quote-sweep-start    one still mask over all of it that fades the
+                               ring in from nothing at the top
+         .quote-sweep-band     one still mask that softens the ring's inner
+                               and outer edges
+         .quote-sweep-cap      a still copy of the first few degrees of
+                               the ring, switched on once the right
+                               rotor has swung past them
+         .quote-timer-bead     a soft circle at the tip, in the
+                               gradient's colour at that point
        .quote-window-ripple  — the three breath ripples
 
-     The countdown never rewinds. When it completes, the ring is fully
-     the new colour; the next countdown sweeps the other colour over
-     it (white → 金木犀 → white …). Quotes change on their own.
+     Soft edges everywhere: the ring's inner and outer edges feather
+     (a radial mask), the sweep fades in from nothing at the top, its
+     tip feathers out, and the bead is a soft circle, not an outline.
+
+     The countdown never rewinds. When a sweep completes, the bead
+     blooms outward and the finished ring fades back into the faint
+     track while the next sweep begins. Quotes change on their own.
 
      The generated <style id="pvLive"> block holds every proposed
      rule. "Copy values" copies exactly that text.
@@ -196,16 +212,28 @@
       <div class="pond-caustic"></div>
       <div class="pond-caustic c2"></div>
     </div>
-    <!-- The ring, and the countdown sweeping over it. -->
-    <div class="quote-ring" aria-hidden="true"></div>
-    <div class="quote-timer-half right" aria-hidden="true">
-      <div class="quote-timer-rotor" id="rotorRight"><div class="quote-ring"></div></div>
+    <!-- The faint ring, and the countdown sweeping over it. Two sweeps
+         take turns: while one fades back, the other begins. -->
+    <div class="quote-track" aria-hidden="true"></div>
+    <div class="quote-sweep" data-k="0" aria-hidden="true">
+      <div class="quote-sweep-start"><div class="quote-sweep-band">
+        <div class="quote-timer-half right"><div class="quote-timer-rotor"><div class="quote-sweep-ring"></div></div></div>
+        <div class="quote-timer-half left"><div class="quote-timer-rotor"><div class="quote-sweep-ring"></div></div></div>
+        <div class="quote-sweep-cap"><div class="quote-sweep-ring"></div></div>
+      </div></div>
+      <div class="quote-timer-bead-rotor">
+        <div class="quote-timer-bead"><i class="bead-a"></i><i class="bead-b"></i><i class="bead-bloom"></i></div>
+      </div>
     </div>
-    <div class="quote-timer-half left" aria-hidden="true">
-      <div class="quote-timer-rotor" id="rotorLeft"><div class="quote-ring"></div></div>
-    </div>
-    <div class="quote-timer-bead-rotor" id="beadRotor" aria-hidden="true">
-      <div class="quote-timer-bead"></div>
+    <div class="quote-sweep" data-k="1" aria-hidden="true">
+      <div class="quote-sweep-start"><div class="quote-sweep-band">
+        <div class="quote-timer-half right"><div class="quote-timer-rotor"><div class="quote-sweep-ring"></div></div></div>
+        <div class="quote-timer-half left"><div class="quote-timer-rotor"><div class="quote-sweep-ring"></div></div></div>
+        <div class="quote-sweep-cap"><div class="quote-sweep-ring"></div></div>
+      </div></div>
+      <div class="quote-timer-bead-rotor">
+        <div class="quote-timer-bead"><i class="bead-a"></i><i class="bead-b"></i><i class="bead-bloom"></i></div>
+      </div>
     </div>
     <div class="quote-wrap" aria-live="polite">
       <div class="quote-line" id="quoteLine"></div>
@@ -277,15 +305,15 @@
   /* Colour sets. Each fills the five pickers at once; you can still
      adjust any picker afterwards. The page background stays autumn. */
   var PALETTES = [
-    { name: '金木犀', quote: '#C44E10', ring: '#FFFDF9', sweep: '#E9773B', halo: '#EE9567', floret: '#F07D40' },
-    { name: '紅葉',   quote: '#A3282A', ring: '#FFFDF9', sweep: '#C8322F', halo: '#E0705F', floret: '#D9453A' },
-    { name: '桜',     quote: '#B04A5A', ring: '#FFFDF9', sweep: '#E58FA3', halo: '#F2A9B8', floret: '#F4A6B5' },
-    { name: '藤',     quote: '#6B4A8E', ring: '#FFFDF9', sweep: '#9B7BC0', halo: '#B49BD3', floret: '#A98BD0' },
-    { name: '抹茶',   quote: '#4E6B3A', ring: '#FFFDF9', sweep: '#7FA05A', halo: '#A5C084', floret: '#8FB06A' },
-    { name: '藍',     quote: '#2E4A7A', ring: '#FFFDF9', sweep: '#4A72B0', halo: '#7C9FD0', floret: '#6C90C8' },
-    { name: '金',     quote: '#8A5A12', ring: '#FFFDF9', sweep: '#D4A22E', halo: '#E8C56B', floret: '#E2B544' }
+    { name: '金木犀', quote: '#C44E10', ring: '#FFFDF9', start: '#F0B455', end: '#DD5E22', halo: '#EE9567', floret: '#F07D40' },
+    { name: '紅葉',   quote: '#A3282A', ring: '#FFFDF9', start: '#EE9A5C', end: '#B5262B', halo: '#E0705F', floret: '#D9453A' },
+    { name: '桜',     quote: '#B04A5A', ring: '#FFFDF9', start: '#F5B8C8', end: '#D9648A', halo: '#F2A9B8', floret: '#F4A6B5' },
+    { name: '藤',     quote: '#6B4A8E', ring: '#FFFDF9', start: '#C3A8E6', end: '#7F5AB0', halo: '#B49BD3', floret: '#A98BD0' },
+    { name: '抹茶',   quote: '#4E6B3A', ring: '#FFFDF9', start: '#C2D88C', end: '#5E8A3C', halo: '#A5C084', floret: '#8FB06A' },
+    { name: '藍',     quote: '#2E4A7A', ring: '#FFFDF9', start: '#8DB8E8', end: '#2F55A0', halo: '#7C9FD0', floret: '#6C90C8' },
+    { name: '金',     quote: '#8A5A12', ring: '#FFFDF9', start: '#F4D36A', end: '#C58A14', halo: '#E8C56B', floret: '#E2B544' }
   ];
-  var COLOUR_KEYS = { quote: 'cQuote', ring: 'cRing', sweep: 'cSweep', halo: 'cHalo', floret: 'cFloret' };
+  var COLOUR_KEYS = { quote: 'cQuote', ring: 'cRing', start: 'cStart', end: 'cEnd', halo: 'cHalo', floret: 'cFloret' };
 
   var CONTROLS = [
     { group: 'Font' },
@@ -294,8 +322,9 @@
     { group: 'Colours' },
     { type: 'presets' },
     { id: 'cQuote',    type: 'colour', label: 'Words',                           def: '#C44E10', was: '#C44E10' },
-    { id: 'cRing',     type: 'colour', label: 'Ring',                            def: '#FFFDF9', was: '#FFFDF9' },
-    { id: 'cSweep',    type: 'colour', label: 'Countdown sweep and bead',        def: '#E9773B', was: 'none (ring is white only)' },
+    { id: 'cRing',     type: 'colour', label: 'Ring (the faint track)',          def: '#FFFDF9', was: '#FFFDF9' },
+    { id: 'cStart',    type: 'colour', label: 'Countdown gradient: start',       def: '#F0B455', was: 'none (ring is white only)' },
+    { id: 'cEnd',      type: 'colour', label: 'Countdown gradient: end (and bead)', def: '#DD5E22', was: 'none' },
     { id: 'cHalo',     type: 'colour', label: 'Glow around the ring, ripples',   def: '#EE9567', was: '#EE9567' },
     { id: 'cFloret',   type: 'colour', label: 'Floating florets',                def: '#F07D40', was: '#F07D40' },
 
@@ -307,7 +336,9 @@
 
     { group: 'Window' },
     { id: 'size',      label: 'Window size (px across)',    min: 360, max: 720, step: 10,   def: 560,  was: 'ring 180px across, koi inside' },
-    { id: 'band',      label: 'Ring thickness (px)',        min: 2,   max: 12,  step: 0.5,  def: 6,    was: '6' },
+    { id: 'band',      label: 'Ring thickness, with its soft edges (px)', min: 4, max: 28, step: 0.5, def: 11, was: '6 (hard edge)' },
+    { id: 'soft',      label: 'Edge softness, inner and outer (px)', min: 0, max: 14, step: 0.5, def: 4.5, was: '0 (hard edge)' },
+    { id: 'track',     label: 'Faint ring strength',        min: 0.2, max: 1,   step: 0.05, def: 0.8,  was: '1' },
     { id: 'reach',     label: 'Halo reach (× ring radius)', min: 1.1, max: 2.2, step: 0.05, def: 1.45, was: '2.13 (on the small ring)' },
     { id: 'ripReach',  label: 'Ring ripples spread (×)',    min: 1.1, max: 2.2, step: 0.05, def: 1.4,  was: '2' },
     { id: 'pond',      label: 'Water inside the window',    min: 0,   max: 1,   step: 0.05, def: 0.7,  was: '1 (small pond)' },
@@ -322,7 +353,12 @@
     { id: 'ink',       label: 'Ink: delay per character (ms), 0 = whole line', min: 0, max: 160, step: 5, def: 70, was: '0 (whole line at once)' },
 
     { group: 'Timer' },
-    { id: 'bead',      label: 'Glowing bead at the sweep', type: 'check', def: true },
+    { id: 'startFeather', label: 'Soft start at the top (degrees)', min: 0, max: 90, step: 2, def: 28, was: 'none' },
+    { id: 'tipFeather',   label: 'Soft leading edge (px)',   min: 0,   max: 140, step: 2,  def: 44,  was: 'none' },
+    { id: 'bead',      label: 'Soft bead at the leading edge', type: 'check', def: true },
+    { id: 'beadSize',  label: 'Bead size (px)',             min: 16,  max: 72,  step: 1,    def: 36,  was: 'none' },
+    { id: 'bloom',     label: 'Bead blooms when the countdown completes', type: 'check', def: true },
+    { id: 'fadeBack',  label: 'Finished ring fades back (s)', min: 0.4, max: 3, step: 0.1,  def: 1.4,  was: 'none' },
     { id: 'count',     label: 'Faint "3 / 16" under the window', type: 'check', def: true },
     { id: 'text',      label: '"次の言葉まで 12秒" under the window', type: 'check', def: false },
 
@@ -387,9 +423,13 @@
     var halo = Math.round(R * v.reach);
     var rim = (R - W / 2) / halo * 100;
     var after = function (f) { return rim + (100 - rim) * f; };
-    var ringC = v.cRing, sweepC = v.cSweep, haloC = v.cHalo;
+    var ringC = v.cRing, startC = v.cStart, endC = v.cEnd, haloC = v.cHalo;
+    var f = Math.min(+v.soft, W / 2);
+    var bandMask = 'radial-gradient(circle closest-side, transparent ' + n(R - W, 1) + 'px, #000 ' + n(R - W + f, 1) + 'px, #000 ' + n(R - f, 1) + 'px, transparent ' + n(R, 1) + 'px)';
+    var SF = Math.round(+v.startFeather), TF = Math.round(+v.tipFeather);
+    var eps = tipDegrees();
     var fi = fontInfo(v.font);
-    var bead = Math.round(Math.max(8, W + 4));
+    var bead = Math.round(+v.beadSize);
     var css = [];
     css.push(
 '/* ============================================================',
@@ -405,12 +445,20 @@
 '       <div class="quote-window-ripple r3"></div>',
 '       <div class="pond-surface"><div class="pond-caustic"></div>',
 '         <div class="pond-caustic c2"></div></div>',
-'       <div class="quote-ring"></div>',
-'       <div class="quote-timer-half right"><div class="quote-timer-rotor">',
-'         <div class="quote-ring"></div></div></div>',
-'       <div class="quote-timer-half left"><div class="quote-timer-rotor">',
-'         <div class="quote-ring"></div></div></div>',
-'       <div class="quote-timer-bead-rotor"><div class="quote-timer-bead"></div></div>',
+'       <div class="quote-track"></div>',
+'       two copies of this, data-k="0" and data-k="1":',
+'       <div class="quote-sweep">',
+'         <div class="quote-sweep-start"><div class="quote-sweep-band">',
+'           <div class="quote-timer-half right"><div class="quote-timer-rotor">',
+'             <div class="quote-sweep-ring"></div></div></div>',
+'           <div class="quote-timer-half left"><div class="quote-timer-rotor">',
+'             <div class="quote-sweep-ring"></div></div></div>',
+'           <div class="quote-sweep-cap"><div class="quote-sweep-ring"></div></div>',
+'         </div></div>',
+'         <div class="quote-timer-bead-rotor"><div class="quote-timer-bead">',
+'           <i class="bead-a"></i><i class="bead-b"></i><i class="bead-bloom"></i>',
+'         </div></div>',
+'       </div>',
 '       <div class="quote-wrap"><div class="quote-line' + (v.vertical ? ' vertical' : '') + '"></div></div>',
 '     </div>',
 '     <div class="quote-meta"><span class="quote-count">3 / 16</span>',
@@ -422,14 +470,23 @@
 '     one quote             ' + v.seconds + 's from arrival to the next (was ≈12.9s)',
 '                           changes on its own, no gestures',
 '     QUOTE_FADE            ' + Math.round(v.fade * 1000) + 'ms (was 1500)',
-'     countdown             for each quote, toggle .flip on .quote-window, then',
-'                           run three Web Animations for the quote\'s length,',
-'                           all linear, transform only (no repaint):',
-'                             right rotor  rotate 0 → 180deg over the first half',
+'     countdown             the two .quote-sweep copies take turns. For each quote,',
+'                           the next one fades in (400ms) and runs Web Animations',
+'                           for the quote\'s length, all linear, transform and',
+'                           opacity only (nothing is repainted):',
+'                             right rotor  rotate 0 → ' + (180 + eps) + 'deg over the first ' + n((180 + eps) / 3.6, 1) + '%, then holds',
+'                                          (the extra ' + eps + 'deg pushes its soft edge out of view)',
 '                             left rotor   rotate 0 → 180deg over the second half',
+'                             each .quote-sweep-ring rotates the same angle the other way,',
+'                                          so the gradient stays where it is',
+'                             .quote-sweep-cap  opacity 0 → 1 at 45% (a still copy of the first',
+'                                          ' + (eps + 3) + 'deg, which the right rotor has swung past)',
 '                             bead rotor   rotate 0 → 360deg',
+'                             .bead-b      opacity 0 → 1 over the whole turn (start → end colour)',
 '                           start the next quote when the bead rotor finishes.',
-'                           Never rewinds: the colours swap instead.',
+'                           When a sweep completes: .bead-bloom ' + (v.bloom ? 'scales 0.7 → 3.4 while fading out (1200ms)' : 'off') + ',',
+'                           and the finished .quote-sweep fades out over ' + Math.round(v.fadeBack * 1000) + 'ms while the next begins.',
+'                           Never rewinds.',
 '     breath alignment      ' + (v.align ? 'on: each quote arrives at a glow peak\n                           (1.44s into each 4s breath)' : 'off'),
 '     order                 ' + (v.shuffle ? 'shuffled, never the same quote twice in a row' : 'in quotes.json order'),
 '     text size             fitted per quote: start at ' + v.maxSize + 'px and step down',
@@ -446,19 +503,12 @@
 
     /* --- Window --- */
     css.push(
-'/* The window: ' + D + 'px across. Its two ring colours swap on every',
-'   quote (.flip), so the countdown never has to rewind. */',
+'/* The window: ' + D + 'px across. */',
 '.quote-window {',
 '  width: ' + D + 'px;',
 '  height: ' + D + 'px;',
 '  margin: 0;',
-'  --ring-from: ' + ringC + ';',
-'  --ring-to: ' + sweepC + ';',
 '  --quote-color: ' + v.cQuote + ';',
-'}',
-'.quote-window.flip {',
-'  --ring-from: ' + sweepC + ';',
-'  --ring-to: ' + ringC + ';',
 '}',
 '',
 '/* Halo: the ring colour at the rim, warming into the glow colour as it fades out, reaching ' + n(v.reach) + '× the ring radius. */',
@@ -516,20 +566,37 @@
 
     /* --- Ring and countdown --- */
     css.push(
-'/* Ring and countdown. The base ring shows the old colour. Two half-',
-'   windows each hold a rotor that turns a half ring of the new colour',
-'   into view: the right one over the first half of the quote, the',
-'   left one over the second. Only transform changes. */',
-'.quote-ring {',
+'/* Ring: a soft band, ' + n(W, 1) + 'px thick, whose inner and outer edges feather',
+'   out over ' + n(f, 1) + 'px (a radial mask), so there is no hard line anywhere. */',
+'.quote-track,',
+'.quote-sweep-band {',
+'  -webkit-mask-image: ' + bandMask + ';',
+'  mask-image: ' + bandMask + ';',
+'}',
+'.quote-sweep-band {',
 '  position: absolute;',
 '  inset: 0;',
-'  box-sizing: border-box;',
+'}',
+'.quote-track {',
+'  position: absolute;',
+'  inset: 0;',
 '  border-radius: 50%;',
-'  border: ' + n(W, 1) + 'px solid var(--ring-from);',
+'  background: ' + rgba(ringC, v.track) + ';',
 '  pointer-events: none;',
 '}',
-'.quote-window > .quote-ring {',
-'  box-shadow: 0 0 10px ' + rgba(sweepC, 0.28) + ', inset 0 0 8px ' + rgba(sweepC, 0.12) + ';',
+'',
+'/* Countdown. Two half-windows each hold a rotor that uncovers half of a',
+'   gradient ring: the right one over the first half of the quote, the left',
+'   one over the second. The ring inside each rotor turns the opposite way',
+'   (app.js), so the gradient stays still while the rotor uncovers it.',
+'   The leading edge of each rotor is a soft mask (' + TF + 'px). Only transform and',
+'   opacity change. */',
+'.quote-sweep {',
+'  position: absolute;',
+'  inset: 0;',
+'  opacity: 0;',
+'  pointer-events: none;',
+'  will-change: opacity;',
 '}',
 '.quote-timer-half {',
 '  position: absolute;',
@@ -550,15 +617,78 @@
 '  will-change: transform;',
 '}',
 '.quote-timer-half.right .quote-timer-rotor { left: -100%; transform-origin: 100% 50%; }',
-'.quote-timer-half.left  .quote-timer-rotor { left: 100%;  transform-origin: 0 50%; }',
-'.quote-timer-rotor .quote-ring {',
-'  width: 200%;',
-'  border-color: var(--ring-to);',
+'.quote-timer-half.left  .quote-timer-rotor { left: 100%;  transform-origin: 0 50%; }'
+    );
+    if (TF > 0) {
+      /* Only the half of each rotor that holds its leading crossing gets the
+         soft fade (right rotor: top half, left rotor: bottom half). The other
+         half stays solid, so the ring where a rotor ends is never dimmed. */
+      var fadeR = 'linear-gradient(to right, #000 calc(100% - ' + TF + 'px), transparent 100%)';
+      var fadeL = 'linear-gradient(to left, #000 calc(100% - ' + TF + 'px), transparent 100%)';
+      var solid = 'linear-gradient(#000, #000)';
+      css.push(
+'.quote-timer-half.right .quote-timer-rotor {',
+'  -webkit-mask-image: ' + fadeR + ', ' + solid + ';',
+'  mask-image: ' + fadeR + ', ' + solid + ';',
+'  -webkit-mask-size: 100% 50%;',
+'  mask-size: 100% 50%;',
+'  -webkit-mask-position: 0 0, 0 100%;',
+'  mask-position: 0 0, 0 100%;',
+'  -webkit-mask-repeat: no-repeat;',
+'  mask-repeat: no-repeat;',
 '}',
-'.quote-timer-half.right .quote-ring { left: 0; right: auto; }',
-'.quote-timer-half.left  .quote-ring { left: -100%; right: auto; }',
+'.quote-timer-half.left .quote-timer-rotor {',
+'  -webkit-mask-image: ' + fadeL + ', ' + solid + ';',
+'  mask-image: ' + fadeL + ', ' + solid + ';',
+'  -webkit-mask-size: 100% 50%;',
+'  mask-size: 100% 50%;',
+'  -webkit-mask-position: 0 100%, 0 0;',
+'  mask-position: 0 100%, 0 0;',
+'  -webkit-mask-repeat: no-repeat;',
+'  mask-repeat: no-repeat;',
+'}'
+      );
+    }
+    css.push(
 '',
-'/* The bead rides the leading edge of the sweep. */',
+'/* The gradient: ' + startC + ' at the top to ' + endC + ' once round, fully solid.',
+'   Both soft edges (start of the ring, and the ring\'s inner and outer edges) are',
+'   still masks over the whole ring, not part of each piece: the pieces overlap,',
+'   and overlapping see-through pieces would show as stripes. */',
+'.quote-sweep-start {',
+'  position: absolute;',
+'  inset: 0;',
+'  pointer-events: none;',
+(SF > 0 ? '  -webkit-mask-image: conic-gradient(from 0deg at 50% 50%, transparent 0deg, #000 ' + SF + 'deg, #000 360deg);\n  mask-image: conic-gradient(from 0deg at 50% 50%, transparent 0deg, #000 ' + SF + 'deg, #000 360deg);' : '  /* no soft start */'),
+'}',
+'.quote-sweep-ring {',
+'  position: absolute;',
+'  top: 0;',
+'  width: 200%;',
+'  height: 100%;',
+'  will-change: transform;',
+'  background: conic-gradient(from 0deg at 50% 50%, ' + startC + ' 0deg, ' + endC + ' 360deg);',
+'}',
+'.quote-timer-half.right .quote-sweep-ring { left: 0; }',
+'.quote-timer-half.left  .quote-sweep-ring { left: -100%; }',
+'',
+'/* The right rotor swings ' + eps + 'deg past the halfway point so its soft edge is',
+'   out of sight, which uncovers the first ' + eps + 'deg of the ring. This still copy',
+'   of that stretch is switched on just before, so nothing is missing. */',
+'.quote-sweep-cap {',
+'  position: absolute;',
+'  inset: 0;',
+'  opacity: 0;',
+'  pointer-events: none;',
+'  -webkit-mask-image: conic-gradient(from 0deg at 50% 50%, #000 0deg, #000 ' + (eps + 3) + 'deg, transparent ' + (eps + 3) + 'deg);',
+'  mask-image: conic-gradient(from 0deg at 50% 50%, #000 0deg, #000 ' + (eps + 3) + 'deg, transparent ' + (eps + 3) + 'deg);',
+'}',
+'.quote-sweep-cap .quote-sweep-ring { left: 0; width: 100%; }',
+'',
+'/* The bead: a soft circle at the leading edge. .bead-a is the start colour,',
+'   .bead-b (the end colour) fades in over it as the sweep goes round, so the',
+'   bead is always the colour of the ring at that point. .bead-bloom is the',
+'   soft ring of light released when a countdown completes. */',
 '.quote-timer-bead-rotor {',
 '  position: absolute;',
 '  inset: 0;',
@@ -572,16 +702,31 @@
 '  width: ' + bead + 'px;',
 '  height: ' + bead + 'px;',
 '  margin: -' + n(bead / 2, 1) + 'px 0 0 -' + n(bead / 2, 1) + 'px;',
+'}',
+'.quote-timer-bead i {',
+'  position: absolute;',
+'  inset: 0;',
 '  border-radius: 50%;',
-'  background: ' + ringC + ';',
-'  border: 1.5px solid ' + sweepC + ';',
-'  box-shadow: 0 0 8px ' + rgba(sweepC, 0.9) + ';',
+'}',
+'.bead-a {',
+'  background: radial-gradient(closest-side,',
+'    ' + rgba(startC, 1) + ' 0%, ' + rgba(startC, 1) + ' 34%, ' + rgba(startC, 0.55) + ' 62%, ' + rgba(startC, 0.16) + ' 84%, ' + rgba(startC, 0) + ' 100%);',
+'}',
+'.bead-b {',
+'  opacity: 0;',
+'  background: radial-gradient(closest-side,',
+'    ' + rgba(endC, 1) + ' 0%, ' + rgba(endC, 1) + ' 34%, ' + rgba(endC, 0.55) + ' 62%, ' + rgba(endC, 0.16) + ' 84%, ' + rgba(endC, 0) + ' 100%);',
+'}',
+'.bead-bloom {',
+'  opacity: 0;',
+'  background: radial-gradient(closest-side,',
+'    ' + rgba(endC, 0.55) + ' 0%, ' + rgba(endC, 0.3) + ' 50%, ' + rgba(endC, 0.1) + ' 78%, ' + rgba(endC, 0) + ' 100%);',
 '}',
 '.blossom-screen.visible .quote-timer-bead {',
 '  animation: beadGlow 4s ease-in-out infinite;',
 '}',
 '@keyframes beadGlow {',
-'  0%, 100% { opacity: 0.75; }',
+'  0%, 100% { opacity: 0.8; }',
 '  36%      { opacity: 1; }',
 '}'
     );
@@ -722,9 +867,19 @@
   var quoteLine = document.getElementById('quoteLine');
   var countEl = document.getElementById('quoteCount');
   var remainNum = document.getElementById('quoteRemainNum');
-  var rotorRight = document.getElementById('rotorRight');
-  var rotorLeft = document.getElementById('rotorLeft');
-  var beadRotor = document.getElementById('beadRotor');
+  var sweeps = Array.prototype.map.call(document.querySelectorAll('.quote-sweep'), function (el) {
+    var rotors = el.querySelectorAll('.quote-timer-rotor');
+    var rings = el.querySelectorAll('.quote-sweep-ring');
+    return {
+      el: el,
+      rotR: rotors[0], rotL: rotors[1],
+      ringR: rings[0], ringL: rings[1],
+      beadRot: el.querySelector('.quote-timer-bead-rotor'),
+      beadB: el.querySelector('.bead-b'),
+      cap: el.querySelector('.quote-sweep-cap'),
+      bloom: el.querySelector('.bead-bloom')
+    };
+  });
   var softGlow = document.querySelector('.soft-glow');
   var sourceEl = document.getElementById('pvSource');
   var btnH = document.getElementById('pvHoriz');
@@ -790,8 +945,9 @@
      quote. A light 100ms check reads their clock to start the fade
      and the next quote; nothing is redrawn by script per frame.
      ============================================================ */
-  var S = { pos: 0, D: 0, phase: 'idle', nextPos: null, lastSec: -1, flip: true };   /* first countdown: 金木犀 over white */
+  var S = { pos: 0, D: 0, phase: 'idle', nextPos: null, lastSec: -1, k: 1 };
   var anims = [];
+  var curSweep = null;
 
   /* Where the 4s breath is right now, read from the halo's own
      animation, so the new quote lands with the ring ripples. */
@@ -850,32 +1006,61 @@
     fitText();
   }
 
-  /* Start a countdown: swap the ring's colours, then sweep the new
-     colour clockwise from the top over the quote's whole length. */
+  /* How many degrees of the ring the soft leading edge covers. */
+  function tipDegrees() {
+    var Rc = v.size / 2 - v.band / 2;
+    return Math.min(170, Math.round(v.tipFeather / Rc * 180 / Math.PI));
+  }
+
+  /* A finished sweep: the bead blooms outward and the whole ring fades
+     back into the faint track. Nothing runs backwards. */
+  function finishSweep(sw) {
+    if (!sw) return;
+    if (v.bloom) {
+      sw.bloom.animate([
+        { opacity: 0.9, transform: 'scale(0.7)' },
+        { opacity: 0.45, transform: 'scale(2.1)', offset: 0.4 },
+        { opacity: 0, transform: 'scale(3.4)' }
+      ], { duration: 1200, easing: 'cubic-bezier(0.2, 0.6, 0.3, 1)', fill: 'forwards' });
+    }
+    sw.el.animate([{ opacity: 1 }, { opacity: 0 }],
+      { duration: v.fadeBack * 1000, easing: 'ease-in-out', fill: 'forwards' });
+  }
+
+  /* Start a countdown on the other sweep: the gradient ring is uncovered
+     clockwise from the top over the quote's whole length, while the
+     previous sweep blooms and fades back. */
   function startCountdown(D) {
-    anims.forEach(function (a) { a.cancel(); });
-    S.flip = !S.flip;
-    win.classList.toggle('flip', S.flip);
+    finishSweep(curSweep);
+    S.k = 1 - S.k;
+    var sw = sweeps[S.k];
+    sw.el.getAnimations({ subtree: true }).forEach(function (a) { a.cancel(); });
+    curSweep = sw;
+    var eps = tipDegrees();
     var o = { duration: D, easing: 'linear', fill: 'forwards' };
+    var turn = function (deg) { return { transform: 'rotate(' + deg + 'deg)' }; };
+    var right = [turn(0), Object.assign(turn(180 + eps), { offset: (180 + eps) / 360 }), turn(180 + eps)];
+    var left = [turn(0), Object.assign(turn(0), { offset: 0.5 }), turn(180)];
+    var back = function (frames) {
+      return frames.map(function (f) {
+        var g = { transform: f.transform.replace(/rotate\((-?[\d.]+)deg\)/, function (m, d) { return 'rotate(' + (-d) + 'deg)'; }) };
+        if (f.offset != null) g.offset = f.offset;
+        return g;
+      });
+    };
     anims = [
-      rotorRight.animate([
-        { transform: 'rotate(0deg)' },
-        { transform: 'rotate(180deg)', offset: 0.5 },
-        { transform: 'rotate(180deg)' }
-      ], o),
-      rotorLeft.animate([
-        { transform: 'rotate(0deg)' },
-        { transform: 'rotate(0deg)', offset: 0.5 },
-        { transform: 'rotate(180deg)' }
-      ], o),
-      beadRotor.animate([
-        { transform: 'rotate(0deg)' },
-        { transform: 'rotate(360deg)' }
-      ], o)
+      sw.beadRot.animate([turn(0), turn(360)], o),
+      sw.rotR.animate(right, o),
+      sw.rotL.animate(left, o),
+      sw.ringR.animate(back(right), o),
+      sw.ringL.animate(back(left), o),
+      sw.beadB.animate([{ opacity: 0 }, { opacity: 1 }], o),
+      sw.cap.animate([{ opacity: 0 }, { opacity: 0, offset: 0.45 }, { opacity: 1, offset: 0.4505 }, { opacity: 1 }], o)
     ];
+    sw.el.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 450, easing: 'ease-out', fill: 'forwards' });
     if (document.hidden) anims.forEach(function (a) { a.pause(); });
   }
-  function clock() { return anims.length ? (anims[2].currentTime || 0) : 0; }
+  function clock() { return anims.length ? (anims[0].currentTime || 0) : 0; }
 
   function showQuote(pos) {
     if (!order.length) buildOrder();
@@ -913,7 +1098,7 @@
   function check() {
     if (S.phase === 'idle' || !anims.length) return;
     var t = clock();
-    var rate = anims[2].playbackRate || 1;
+    var rate = anims[0].playbackRate || 1;
     var rem = (S.D - t) / rate;
     if (S.phase === 'showing' && rem <= v.fade * 1000) startLeaving();
     var sec = Math.max(0, Math.ceil(rem / 1000));
@@ -935,7 +1120,7 @@
      ============================================================ */
   var controlsBox = document.getElementById('pvControls');
   var inputs = {};
-  var RESTART_KEYS = { seconds: 1, fade: 1, align: 1, ink: 1, vertical: 1, maxSize: 1, minSize: 1, fit: 1, spacing: 1, lineH: 1, size: 1 };
+  var RESTART_KEYS = { seconds: 1, fade: 1, align: 1, ink: 1, vertical: 1, maxSize: 1, minSize: 1, fit: 1, spacing: 1, lineH: 1, size: 1, band: 1, startFeather: 1, tipFeather: 1 };
   var BREATH_KEYS = { ripReach: 1, size: 1, reach: 1 };
 
   function fmt(c, val) {
