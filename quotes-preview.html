@@ -7,26 +7,27 @@
 <title>Quotes Preview</title>
 
 <!-- ============================================================
-     quotes-preview.html — standalone preview of how the rotating
-     quotes could be shown on the koi start-screen scene.
+     quotes-preview.html — standalone preview of the rotating quotes
+     shown inside the start screen's ring, like a round window (丸窓).
 
      Loads the real main.css and uses the real markup and class names
-     from index.html (.blossom-screen, .start-btn, .icon-wrapper,
-     .rings-svg, .gold-band, .koi-dive-wrap, .blossom-divider,
-     .blossom-mark, .quote-wrap, .quote-line), so what you see is the
-     app's own look. It does NOT load app.js; the few behaviours it
-     needs are in the small script at the bottom.
+     from index.html (.blossom-screen, .icon-wrapper, .soft-glow,
+     .pond-surface, .pond-caustic, .rings-svg, .pulse-ring, .gold-band,
+     .gold-band-shadow, .quote-wrap, .quote-line), so the halo, the
+     breath, the ring ripples, the pond light and the background are
+     the app's own. It does NOT load app.js.
 
      Quotes are read from quotes.json, the same file the app uses.
 
-     What is new (all on top of the real classes):
-       .quote-timer-arc   — a 金木犀 arc drawn on the koi ring that
-                            unwinds until the next quote
+     What is new:
+       .quote-window      — the ring, enlarged, with the quote inside
+       .quote-timer-arc   — a 金木犀 arc on the ring: it sweeps back to
+                            full as a quote arrives, then unwinds until
+                            the next one. The quotes change on their
+                            own when it runs out. No gestures.
        .quote-timer-bead  — a small glowing bead at the arc's tip
-       .quote-meta        — "3 / 16 · 次の言葉まで 12秒"
-       .quote-line.ink    — characters arrive one by one, like ink
-       .quote-line.vertical — optional 縦書き (top-to-bottom) layout
-       The ❀ blossoms fill up across the same countdown.
+       .quote-count       — a faint "3 / 16" under the window
+       横書き / 縦書き     — switch in the panel to compare
 
      The generated <style id="pvLive"> block holds every proposed
      rule. "Copy values" copies exactly that text.
@@ -41,23 +42,10 @@
 
 <link rel="stylesheet" href="main.css">
 
-<!-- Preview-only chrome: the layout of this page and the tuning
-     panel. Nothing here is part of the copied CSS. -->
+<!-- Preview-only chrome: the tuning panel. Nothing here is part of
+     the copied CSS. -->
 <style>
   body { overflow: hidden; height: 100vh; padding-bottom: 0; }
-
-  /* The quote area sits where the start hints are in the app. */
-  .qp-stage {
-    position: relative; z-index: 3;
-    width: 100%; max-width: 640px;
-    display: flex; flex-direction: column; align-items: center;
-    text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    margin-top: 8px;
-    cursor: pointer;
-  }
-  .blossom-greeting { position: relative; z-index: 3; }
-  html.qp-no-greeting .blossom-greeting { display: none; }
 
   .pv-panel {
     position: fixed; top: 16px; right: 16px; z-index: 1000;
@@ -82,6 +70,11 @@
   }
   .pv-panel.collapsed .pv-head { border-bottom: none; }
   .pv-title { font-weight: 600; color: var(--text-dark); letter-spacing: 0.5px; flex: 1; white-space: nowrap; }
+  .pv-seg { display: inline-flex; border: 1px solid var(--border-2); border-radius: 999px; overflow: hidden; }
+  .pv-seg button {
+    border: 0; background: transparent; padding: 5px 11px; font: inherit; color: var(--text-mute); cursor: pointer;
+  }
+  .pv-seg button.on { background: var(--accent); color: #FFFDF9; }
   .pv-icon-btn {
     border: 1px solid var(--border-2); background: transparent; border-radius: 999px;
     width: 30px; height: 30px; font: inherit; color: var(--text-mute); cursor: pointer;
@@ -154,58 +147,39 @@
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 <div class="floret-layer" id="floretLayer" aria-hidden="true"></div>
 
-<!-- ============ START SCREEN SCENE (real markup and class names) ============ -->
+<!-- ============ ROUND WINDOW (real markup and class names) ============ -->
 <div class="blossom-screen visible" id="blossomScreen">
 
-  <div class="blossom-greeting">
-    <div class="blossom-greeting-time" id="blossomGreetingTime">こんばんは</div>
-    <div class="blossom-greeting-name" id="blossomGreetingName">桜庭さん</div>
-  </div>
-
-  <button type="button" class="start-btn" id="startBtn" aria-label="次の言葉へ">
-    <div class="icon-wrapper">
-      <div class="soft-glow" aria-hidden="true"></div>
-      <div class="pond-surface" aria-hidden="true">
-        <div class="pond-caustic"></div>
-        <div class="pond-caustic c2"></div>
-      </div>
-      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-        <defs>
-          <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur stdDeviation="3.5"/>
-          </filter>
-        </defs>
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
-        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-        <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
-        <circle cx="180" cy="180" r="90" class="gold-band" />
-        <!-- New: the countdown, drawn on the ring itself. -->
-        <circle cx="180" cy="180" r="90" class="quote-timer-arc" id="quoteTimerArc" transform="rotate(-90 180 180)" />
-        <circle cx="180" cy="90" r="4" class="quote-timer-bead" id="quoteTimerBead" />
-      </svg>
-      <div class="pond-bubbles" id="pondBubbles" aria-hidden="true"></div>
-      <div class="koi-dive-wrap" id="koiDiveWrap">
-        <div class="blossom-char">
-          <div class="koi-shadow" aria-hidden="true"></div>
-          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
-        </div>
-      </div>
+  <div class="icon-wrapper quote-window" id="quoteWindow">
+    <div class="soft-glow" aria-hidden="true"></div>
+    <div class="pond-surface" aria-hidden="true">
+      <div class="pond-caustic"></div>
+      <div class="pond-caustic c2"></div>
     </div>
-  </button>
-
-  <!-- Quote area: the real .blossom-divider / .quote-wrap / .quote-line
-       from the thank-you screen, plus the new .quote-meta line. -->
-  <div class="qp-stage" id="qpStage">
-    <div class="blossom-divider" id="blossomDivider" aria-hidden="true"></div>
+    <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+      <defs>
+        <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur id="bandShadowBlurAmount" stdDeviation="3.5"/>
+        </filter>
+      </defs>
+      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+      <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
+      <circle cx="180" cy="180" r="90" class="gold-band" />
+      <!-- New: the countdown, drawn on the ring itself. -->
+      <circle cx="180" cy="180" r="90" class="quote-timer-arc" id="quoteTimerArc" transform="rotate(-90 180 180)" />
+      <circle cx="180" cy="90" r="2" class="quote-timer-bead" id="quoteTimerBead" />
+    </svg>
     <div class="quote-wrap" aria-live="polite">
       <div class="quote-line" id="quoteLine"></div>
     </div>
-    <div class="quote-meta" id="quoteMeta">
-      <span class="quote-count" id="quoteCount">— / —</span>
-      <span class="quote-meta-sep">·</span>
-      <span class="quote-remain" id="quoteRemain">次の言葉まで <span class="quote-remain-num" id="quoteRemainNum">—</span>秒</span>
-    </div>
+  </div>
+
+  <div class="quote-meta" id="quoteMeta">
+    <span class="quote-count" id="quoteCount">— / —</span>
+    <span class="quote-meta-sep">·</span>
+    <span class="quote-remain">次の言葉まで <span class="quote-remain-num" id="quoteRemainNum">—</span>秒</span>
   </div>
 </div>
 
@@ -213,15 +187,18 @@
 <div class="pv-panel" id="pvPanel">
   <div class="pv-head">
     <span class="pv-title">Quotes</span>
+    <span class="pv-seg" role="group" aria-label="Writing direction">
+      <button type="button" id="pvHoriz">横書き</button>
+      <button type="button" id="pvVert">縦書き</button>
+    </span>
     <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
   </div>
   <div class="pv-body">
-    <p class="pv-note">Tap the koi for the next quote. Tap the quote to pause or resume. Swipe left or right on the water to move between quotes. Tap the water anywhere for ripples. Grey "app:" notes show today's value.</p>
+    <p class="pv-note">The quotes change on their own when the ring's countdown runs out. Switch 横書き / 縦書き above to compare. Fold this panel with – to see the whole window. Grey "app:" notes show today's value.</p>
     <p class="pv-source" id="pvSource">Loading quotes.json…</p>
     <div class="pv-transport">
-      <button type="button" id="pvPrev">← 前へ</button>
-      <button type="button" id="pvPause">一時停止</button>
-      <button type="button" id="pvNext">次へ →</button>
+      <button type="button" id="pvPrev">← 前へ (preview only)</button>
+      <button type="button" id="pvNext">次へ → (preview only)</button>
     </div>
     <div id="pvControls"></div>
     <div class="pv-actions">
@@ -241,39 +218,45 @@
      SETTINGS
      Each entry is one slider (or a checkbox when type is 'check').
      "was" is today's value in main.css / app.js, shown for comparison.
+     The 横書き / 縦書き switch lives in the panel header.
      ============================================================ */
   var CONTROLS = [
     { group: 'Timing' },
     { id: 'seconds',   label: 'Seconds per quote',          min: 6,   max: 40,  step: 1,    def: 14,   was: '≈12.9s (10 blossoms × 1s, 1s hold, 1.5s fade)' },
     { id: 'fade',      label: 'Fade in / out (s)',          min: 0.6, max: 3,   step: 0.1,  def: 1.6,  was: '1.5' },
-    { id: 'align',     label: 'New quote arrives as the koi surfaces (on the breath)', type: 'check', def: true },
+    { id: 'refill',    label: 'Ring refills as a quote arrives (s)', min: 0, max: 3, step: 0.1, def: 1.2, was: 'none' },
+    { id: 'align',     label: 'New quote arrives on the breath (with the ring ripples)', type: 'check', def: true },
     { id: 'shuffle',   label: 'Shuffle the order (no repeats in a row)', type: 'check', def: false },
 
+    { group: 'Window' },
+    { id: 'size',      label: 'Window size (px across)',    min: 360, max: 720, step: 10,   def: 560,  was: 'ring 180px across, koi inside' },
+    { id: 'band',      label: 'Ring thickness (px)',        min: 2,   max: 10,  step: 0.5,  def: 5,    was: '6' },
+    { id: 'reach',     label: 'Halo reach (× ring radius)', min: 1.1, max: 2.2, step: 0.05, def: 1.45, was: '2.13 (on the small ring)' },
+    { id: 'ripReach',  label: 'Ring ripples spread (×)',    min: 1.1, max: 2.2, step: 0.05, def: 1.4,  was: '2' },
+    { id: 'pond',      label: 'Water inside the window',    min: 0,   max: 1,   step: 0.05, def: 0.7,  was: '1 (small pond)' },
+
     { group: 'Words' },
-    { id: 'size',      label: 'Text size (px)',             min: 22,  max: 48,  step: 1,    def: 34,   was: '34 on the tablet' },
+    { id: 'maxSize',   label: 'Largest text size (px)',     min: 26,  max: 64,  step: 1,    def: 44,   was: '34 on the tablet' },
+    { id: 'minSize',   label: 'Smallest text size (px)',    min: 18,  max: 40,  step: 1,    def: 26,   was: '—' },
+    { id: 'fit',       label: 'Room around the words (inside the ring)', min: 0.6, max: 0.95, step: 0.01, def: 0.82, was: '—' },
     { id: 'spacing',   label: 'Letter spacing (px)',        min: 0,   max: 10,  step: 0.5,  def: 4,    was: '4' },
-    { id: 'lineH',     label: 'Line height',                min: 1.6, max: 2.6, step: 0.05, def: 2.1,  was: '2.1' },
+    { id: 'lineH',     label: 'Line height',                min: 1.4, max: 2.6, step: 0.05, def: 1.9,  was: '2.1' },
     { id: 'blur',      label: 'Blur as it arrives (px)',    min: 0,   max: 20,  step: 1,    def: 10,   was: '12' },
     { id: 'ink',       label: 'Ink: delay per character (ms), 0 = whole line', min: 0, max: 160, step: 5, def: 70, was: '0 (whole line at once)' },
-    { id: 'vertical',  label: '縦書き: write top-to-bottom',  type: 'check', def: false },
 
     { group: 'Timer' },
-    { id: 'arc',       label: 'Arc on the koi ring',        type: 'check', def: true },
-    { id: 'arcWidth',  label: 'Arc width (px)',             min: 1,   max: 6,   step: 0.5,  def: 2.5,  was: 'none' },
+    { id: 'arcWidth',  label: 'Arc width (px)',             min: 1,   max: 8,   step: 0.5,  def: 3,    was: 'none' },
     { id: 'arcAlpha',  label: 'Arc strength',               min: 0.2, max: 1,   step: 0.05, def: 0.85, was: 'none' },
     { id: 'bead',      label: 'Glowing bead at the arc tip', type: 'check', def: true },
-    { id: 'text',      label: '"次の言葉まで 12秒" text',       type: 'check', def: true },
-    { id: 'count',     label: 'Quote number ("3 / 16")',    type: 'check', def: true },
-    { id: 'blossoms',  label: '❀ blossoms fill up with the countdown', type: 'check', def: true },
+    { id: 'count',     label: 'Faint "3 / 16" under the window', type: 'check', def: true },
+    { id: 'text',      label: '"次の言葉まで 12秒" under the window', type: 'check', def: false },
 
-    { group: 'Water' },
-    { id: 'ripple',    label: 'Soft ripple when a quote arrives', type: 'check', def: true },
-    { id: 'floret',    label: '金木犀 floret lands by the new quote', type: 'check', def: true },
-    { id: 'greeting',  label: 'Show the greeting and name', type: 'check', def: true }
+    { group: 'Florets' },
+    { id: 'floret',    label: 'A floret lands on the ring as each quote arrives', type: 'check', def: true }
   ];
 
-  var STORE_KEY = 'quotesPreviewValues.v1';
-  var DEFAULTS = {};
+  var STORE_KEY = 'quotesPreviewValues.v2';
+  var DEFAULTS = { vertical: false };
   CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
   var v = loadValues();
 
@@ -294,83 +277,177 @@
      CSS GENERATOR
      Builds the proposed CSS from the current values. The preview
      shows exactly this text, and "Copy values" copies it.
+
+     The ring's SVG keeps its 360 × 360 viewBox with r = 90, and is
+     simply drawn larger. k is how much larger, so line widths are
+     divided by k to stay the same on screen.
      ============================================================ */
   function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
   var EASE = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+  function scale() { return v.size / 180; }
 
   function buildCSS() {
+    var D = +v.size, R = D / 2, k = scale();
     var F = n(v.fade, 2) + 's';
     var B = n(v.blur, 1) + 'px';
+    var halo = Math.round(R * v.reach);
+    var rim = (R - 3) / halo * 100;
+    var after = function (f) { return rim + (100 - rim) * f; };
     var css = [];
     css.push(
 '/* ============================================================',
-'   QUOTES — PROPOSED DISPLAY',
+'   QUOTES IN THE ROUND WINDOW — PROPOSED DISPLAY (' + (v.vertical ? '縦書き' : '横書き') + ')',
 '   Generated by quotes-preview.html. Paste after the .quote-line',
 '   rules in main.css (same selectors, so these win by order).',
 '',
-'   Markup this needs in index.html:',
-'     inside .rings-svg, after .gold-band:',
-'       <circle cx="180" cy="180" r="90" class="quote-timer-arc"',
-'               transform="rotate(-90 180 180)" />',
-'       <circle cx="180" cy="90" r="4" class="quote-timer-bead" />',
-'     after .quote-wrap:',
-'       <div class="quote-meta">',
-'         <span class="quote-count">3 / 16</span>',
-'         <span class="quote-meta-sep">·</span>',
-'         <span class="quote-remain">次の言葉まで',
-'           <span class="quote-remain-num">12</span>秒</span>',
-'       </div>',
+'   Markup this needs (in place of the quote area):',
+'     <div class="icon-wrapper quote-window">',
+'       <div class="soft-glow"></div>',
+'       <div class="pond-surface"><div class="pond-caustic"></div>',
+'         <div class="pond-caustic c2"></div></div>',
+'       <svg class="rings-svg" viewBox="0 0 360 360"> … the same',
+'         rings as the start button, then:',
+'         <circle cx="180" cy="180" r="90" class="quote-timer-arc"',
+'                 transform="rotate(-90 180 180)" />',
+'         <circle cx="180" cy="90" r="' + n(4 / k, 2) + '" class="quote-timer-bead" />',
+'       </svg>',
+'       <div class="quote-wrap"><div class="quote-line' + (v.vertical ? ' vertical' : '') + '"></div></div>',
+'     </div>',
+'     <div class="quote-meta"><span class="quote-count">3 / 16</span>',
+'       <span class="quote-meta-sep">·</span>',
+'       <span class="quote-remain">次の言葉まで',
+'         <span class="quote-remain-num">12</span>秒</span></div>',
+'     bandShadowBlur stdDeviation: ' + n(3.5 / k, 2) + ' (the ring is drawn ' + n(k, 2) + '× larger)',
 '',
 '   Numbers for app.js:',
 '     one quote             ' + v.seconds + 's from arrival to the next (was ≈12.9s)',
+'                           changes on its own, no gestures',
 '     QUOTE_FADE            ' + Math.round(v.fade * 1000) + 'ms (was 1500)',
-'     blossoms              10, spread evenly over the countdown',
-'                           (was BLOSSOM_INTERVAL 1000ms each)',
-'     breath alignment      ' + (v.align ? 'on: the next quote waits for the koi to surface\n                           (glow peak, 1.44s into each 4s breath)' : 'off'),
+'     ring refill           ' + (v.refill > 0 ? Math.round(v.refill * 1000) + 'ms sweep back to full, then unwinds' : 'none: starts full'),
+'     arc                   set stroke-dashoffset = 565.49 × (1 − part left)',
+'                           every frame; move the bead to the arc tip',
+'     breath alignment      ' + (v.align ? 'on: each quote arrives at a glow peak\n                           (1.44s into each 4s breath)' : 'off'),
 '     order                 ' + (v.shuffle ? 'shuffled, never the same quote twice in a row' : 'in quotes.json order'),
+'     text size             fitted per quote: start at ' + v.maxSize + 'px and step down',
+'                           (to ' + v.minSize + 'px at least) until the text box fits',
+'                           inside ' + Math.round(v.fit * 100) + '% of the ring radius',
 '     ink                   ' + (v.ink > 0 ? 'wrap each character in <span class="quote-char" style="--i:N">\n                           and add .ink to .quote-line' : 'off (whole line at once)'),
-'     arrival               ' + ([v.ripple ? 'soft ripple at the quote' : '', v.floret ? '金木犀 floret lands by it' : ''].filter(Boolean).join(', ') || 'nothing extra'),
-'     pause                 tap the quote: add .quote-paused to the screen',
+'     florets               ' + (v.floret ? 'one lands on the ring as each quote arrives' : 'ambient only'),
+'     blossom counter       removed',
 '   ============================================================ */',
 ''
     );
 
-    /* --- The words --- */
+    /* --- Window --- */
     css.push(
-'/* Words: a calmer arrival — rises less, blurs less, and the fade',
-'   time matches QUOTE_FADE. */',
-'.quote-wrap {',
-'  min-height: ' + Math.round(v.size * v.lineH * 2.6) + 'px;',
+'/* The window: the start button\'s ring, drawn ' + D + 'px across. */',
+'.quote-window {',
+'  width: ' + D + 'px;',
+'  height: ' + D + 'px;',
+'  margin: 0;',
 '}',
-'.quote-line {',
-'  font-size: ' + v.size + 'px;',
+'.quote-window .rings-svg {',
+'  width: ' + (D * 2) + 'px;',
+'  height: ' + (D * 2) + 'px;',
+'}',
+'.quote-window .gold-band { stroke-width: ' + n(v.band / k, 3) + 'px; }',
+'.quote-window .gold-band-shadow { stroke-width: ' + n((v.band + 3) / k, 3) + 'px; }',
+'',
+'/* Halo: the same white-to-金木犀 glow, reaching ' + n(v.reach) + '× the ring radius. */',
+'.quote-window .soft-glow {',
+'  width: ' + (halo * 2) + 'px; height: ' + (halo * 2) + 'px;',
+'  margin-top: -' + halo + 'px; margin-left: -' + halo + 'px;',
+'  background: radial-gradient(circle closest-side,',
+'    rgba(255, 255, 255, 0) 0%,',
+'    rgba(255, 255, 255, 0) ' + n(rim - 1.5) + '%,',
+'    rgba(255, 255, 255, 0.35) ' + n(rim - 0.6) + '%,',
+'    rgba(255, 255, 255, 0.95) ' + n(rim) + '%,',
+'    rgba(255, 232, 214, 0.60) ' + n(after(0.14)) + '%,',
+'    rgba(255, 190, 139, 0.38) ' + n(after(0.36)) + '%,',
+'    rgba(238, 149, 103, 0.17) ' + n(after(0.62)) + '%,',
+'    rgba(238, 149, 103, 0.04) ' + n(after(0.85)) + '%,',
+'    rgba(238, 149, 103, 0) 100%);',
+'}',
+'',
+'/* Water inside the window: the pond light keeps drifting behind the words. */',
+'.quote-window .pond-surface {',
+'  width: ' + (D - 6) + 'px; height: ' + (D - 6) + 'px;',
+'  margin: -' + (R - 3) + 'px 0 0 -' + (R - 3) + 'px;',
+'  opacity: ' + n(v.pond) + ';',
+'}',
+'',
+'/* Ring ripples: on a ring this size they only need to travel ' + n(v.ripReach) + '×. */',
+'@keyframes ringGrow {',
+'  0%   { transform: scale(1); animation-timing-function: cubic-bezier(0.15, 0.55, 0.3, 1); }',
+'  99%  { transform: scale(' + n(v.ripReach) + '); }',
+'  100% { transform: scale(' + n(v.ripReach) + '); }',
+'}',
+''
+    );
+
+    /* --- Words --- */
+    css.push(
+'/* Words: centred inside the ring. app.js sets font-size per quote so',
+'   the text always fits; the size here is only the starting point. */',
+'.quote-window .quote-wrap {',
+'  position: absolute;',
+'  inset: 0;',
+'  z-index: 2;',
+'  min-height: 0;',
+'  padding: 0;',
+'  display: flex;',
+'  align-items: center;',
+'  justify-content: center;',
+'}',
+'.quote-window .quote-line {',
+'  width: fit-content;',
+'  text-align: center;',
+'  max-width: ' + Math.round(D * 0.8) + 'px;',
+'  font-size: ' + v.maxSize + 'px;',
 '  letter-spacing: ' + n(v.spacing, 1) + 'px;',
 '  line-height: ' + n(v.lineH) + ';',
-'  transform: translateY(16px) scale(0.98);',
+'  transform: translateY(12px) scale(0.98);',
 '  filter: blur(' + B + ');',
 '  transition: opacity ' + F + ' ' + EASE + ',',
 '              transform ' + F + ' ' + EASE + ',',
 '              filter ' + F + ' ' + EASE + ';',
 '}',
-'.quote-line.leaving {',
-'  transform: translateY(-16px) scale(1.01);',
+'.quote-window .quote-line.shown { transform: none; filter: none; opacity: 1; }',
+'.quote-window .quote-line.leaving {',
+'  opacity: 0;',
+'  transform: translateY(-12px) scale(1.01);',
 '  filter: blur(' + B + ');',
 '}',
 ''
     );
 
+    if (v.vertical) {
+      css.push(
+'/* 縦書き: top-to-bottom, right-to-left, like a hanging scroll seen',
+'   through the window. Columns fit a circle naturally. */',
+'.quote-window .quote-line.vertical {',
+'  writing-mode: vertical-rl;',
+'  text-orientation: mixed;',
+'  max-width: none;',
+'  max-height: ' + Math.round(D * 0.66) + 'px;',
+'  text-align: start;',
+'}',
+''
+      );
+    }
+
     if (v.ink > 0) {
       css.push(
 '/* Ink: each character bleeds in out of a soft blur, ' + v.ink + 'ms apart,',
-'   like a brush working across the paper. The line itself does not',
-'   move; it only fades as a whole when it leaves. */',
-'.quote-line.ink,',
-'.quote-line.ink.shown {',
+'   like a brush working across the paper. The line only fades as a',
+'   whole when it leaves. */',
+'.quote-window .quote-line.ink,',
+'.quote-window .quote-line.ink.shown {',
 '  opacity: 1;',
 '  transform: none;',
 '  filter: none;',
 '}',
-'.quote-line.ink.leaving {',
+'.quote-window .quote-line.ink.leaving {',
 '  opacity: 0;',
 '  transform: translateY(-10px);',
 '  filter: blur(' + B + ');',
@@ -395,43 +472,24 @@
       );
     }
 
-    if (v.vertical) {
-      css.push(
-'/* 縦書き: the quote is written top-to-bottom, right-to-left, like a',
-'   hanging scroll. */',
-'.quote-line {',
-'  writing-mode: vertical-rl;',
-'  text-orientation: mixed;',
-'  max-height: ' + Math.round(v.size * 10) + 'px;',
-'  text-align: start;',
-'}',
-'.quote-wrap {',
-'  min-height: ' + Math.round(v.size * 10 + 20) + 'px;',
-'}',
-''
-      );
-    }
-
-    /* --- Timer arc --- */
+    /* --- Timer --- */
     css.push(
-'/* Timer arc: a 金木犀 line drawn over the white koi ring. It starts',
-'   full and unwinds back to the top as the next quote nears. app.js',
-'   sets stroke-dashoffset every frame (565.49 = the ring\'s length). */',
+'/* Timer arc: a 金木犀 line over the white ring. It sweeps back to',
+'   full as each quote arrives, then unwinds to the top; when it is',
+'   gone the next quote comes. */',
 '.quote-timer-arc {',
 '  fill: none;',
 '  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
-'  stroke-width: ' + n(v.arcWidth, 1) + 'px;',
+'  stroke-width: ' + n(v.arcWidth / k, 3) + 'px;',
 '  stroke-linecap: round;',
 '  stroke-dasharray: 565.49;',
-'  filter: drop-shadow(0 0 3px rgba(240, 125, 64, 0.55));',
-'  transition: opacity 600ms ease;',
+'  filter: drop-shadow(0 0 ' + n(3 / k, 2) + 'px rgba(240, 125, 64, 0.55));',
 '}',
 '.quote-timer-bead {',
 '  fill: #FFFDF9;',
 '  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
-'  stroke-width: 1.5px;',
-'  filter: drop-shadow(0 0 5px rgba(240, 125, 64, 0.9));',
-'  transition: opacity 600ms ease;',
+'  stroke-width: ' + n(1.5 / k, 3) + 'px;',
+'  filter: drop-shadow(0 0 ' + n(5 / k, 2) + 'px rgba(240, 125, 64, 0.9));',
 '}',
 '.blossom-screen.visible .quote-timer-bead {',
 '  animation: beadGlow 4s ease-in-out infinite;',
@@ -441,49 +499,36 @@
 '  36%      { opacity: 1; }',
 '}'
     );
-    if (!v.arc) css.push('.quote-timer-arc { display: none; }');
-    if (!v.arc || !v.bead) css.push('.quote-timer-bead { display: none; }');
+    if (!v.bead) css.push('.quote-timer-bead { display: none; }');
     css.push('');
 
     /* --- Meta line --- */
     css.push(
-'/* Meta line under the quote: which quote this is, and how long until',
-'   the next one. Quiet, small, never competing with the words. */',
+'/* Under the window: quiet and small, never competing with the words. */',
 '.quote-meta {',
-'  margin-top: 18px;',
+'  position: relative;',
+'  z-index: 3;',
+'  margin-top: 40px;',
 '  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;',
 '  font-size: 13px;',
 '  letter-spacing: 3px;',
 '  color: var(--text-mute);',
 '  font-variant-numeric: tabular-nums;',
-'  opacity: 0.8;',
+'  opacity: 0.7;',
 '  min-height: 20px;',
 '}',
 '.quote-meta-sep { margin: 0 10px; opacity: 0.6; }',
-'.quote-remain-num {',
-'  display: inline-block;',
-'  min-width: 2ch;',
-'  color: var(--accent);',
-'  transition: opacity 300ms ease;',
-'}'
+'.quote-remain-num { display: inline-block; min-width: 2ch; color: var(--accent); }'
     );
-    if (!v.count) css.push('.quote-count, .quote-meta-sep { display: none; }');
-    if (!v.text) css.push('.quote-remain, .quote-meta-sep { display: none; }');
-    if (!v.blossoms) css.push('.blossom-divider { visibility: hidden; }');
-    css.push('');
-
-    /* --- Paused --- */
+    if (!v.count || !v.text) css.push('.quote-meta-sep { display: none; }');
+    if (!v.count) css.push('.quote-count { display: none; }');
+    if (!v.text) css.push('.quote-remain { display: none; }');
     css.push(
-'/* Paused (tap the quote): the arc dims and everything that pulses',
-'   holds still until the next tap. */',
-'.quote-paused .quote-timer-arc,',
-'.quote-paused .quote-timer-bead { opacity: 0.35; }',
-'.quote-paused .quote-timer-bead,',
-'.quote-paused .blossom-mark.appeared { animation-play-state: paused; }',
 '',
 '@media (prefers-reduced-motion: reduce) {',
 '  .quote-char { transition-delay: 0s !important; }',
-'  .quote-line, .quote-line.leaving { transform: none !important; }',
+'  .quote-window .quote-line,',
+'  .quote-window .quote-line.leaving { transform: none !important; }',
 '  .blossom-screen.visible .quote-timer-bead { animation: none; }',
 '}'
     );
@@ -494,31 +539,28 @@
      ELEMENTS
      ============================================================ */
   var live = document.getElementById('pvLive');
-  var screen = document.getElementById('blossomScreen');
-  var startBtn = document.getElementById('startBtn');
-  var koiWrap = document.getElementById('koiDiveWrap');
+  var win = document.getElementById('quoteWindow');
   var rippleLayer = document.getElementById('rippleLayer');
-  var bubbleBox = document.getElementById('pondBubbles');
   var floretLayer = document.getElementById('floretLayer');
-  var stage = document.getElementById('qpStage');
   var quoteLine = document.getElementById('quoteLine');
-  var divider = document.getElementById('blossomDivider');
   var countEl = document.getElementById('quoteCount');
-  var remainEl = document.getElementById('quoteRemain');
   var remainNum = document.getElementById('quoteRemainNum');
   var arc = document.getElementById('quoteTimerArc');
   var bead = document.getElementById('quoteTimerBead');
+  var blurAmount = document.getElementById('bandShadowBlurAmount');
   var softGlow = document.querySelector('.soft-glow');
-  var pauseBtn = document.getElementById('pvPause');
   var sourceEl = document.getElementById('pvSource');
 
   var RING = 2 * Math.PI * 90;
   var BREATH = 4000, PEAK = 1440;           /* main.css glowBreath: 4s, peak at 36% */
-  var BLOSSOM_COUNT = 10;
 
   function applyCSS() {
     live.textContent = buildCSS();
-    document.documentElement.classList.toggle('qp-no-greeting', !v.greeting);
+    var k = scale();
+    blurAmount.setAttribute('stdDeviation', n(3.5 / k, 3));
+    bead.setAttribute('r', n(4 / k, 3));
+    btnH.classList.toggle('on', !v.vertical);
+    btnV.classList.toggle('on', !!v.vertical);
   }
 
   /* ============================================================
@@ -534,14 +576,14 @@
   var order = [];
 
   function buildOrder() {
-    var keepFirst = order.length ? order[S.pos] : -1;
+    var keep = order.length ? order[S.pos] : -1;
     order = quotes.map(function (_, i) { return i; });
     if (v.shuffle) {
       for (var i = order.length - 1; i > 0; i--) {
         var j = Math.floor(Math.random() * (i + 1));
         var t = order[i]; order[i] = order[j]; order[j] = t;
       }
-      if (order.length > 1 && order[0] === keepFirst) { order.push(order.shift()); }
+      if (order.length > 1 && order[0] === keep) order.push(order.shift());
     }
   }
 
@@ -561,18 +603,17 @@
 
   /* ============================================================
      QUOTE CYCLE
-     One clock drives everything: the arc, the bead, the blossoms,
-     the countdown text, the fade out and the next quote. Pausing
-     simply stops that clock.
+     One clock drives the arc, the bead, the fade out and the next
+     quote. The ring sweeps back to full as a quote arrives, then
+     unwinds; when it reaches the top the quote leaves.
      ============================================================ */
-  var S = { pos: 0, start: 0, D: 0, paused: false, pausedAt: 0, phase: 'idle', nextPos: null, lastSec: -1 };
-  var marks = [];
+  var S = { pos: 0, start: 0, D: 0, frozen: false, frozenAt: 0, phase: 'idle', nextPos: null, lastSec: -1, fromFrac: 0 };
 
   function now() { return performance.now(); }
-  function elapsed() { return (S.paused ? S.pausedAt : now()) - S.start; }
+  function elapsed() { return (S.frozen ? S.frozenAt : now()) - S.start; }
 
   /* Where the 4s breath is right now, read from the halo's own
-     animation so the new quote lands exactly as the koi surfaces. */
+     animation, so the new quote lands with the ring ripples. */
   function breathPhase() {
     var anims = softGlow.getAnimations ? softGlow.getAnimations() : [];
     for (var i = 0; i < anims.length; i++) {
@@ -587,22 +628,26 @@
     if (!v.align) return N;
     var p = breathPhase();
     if (p === null) return N;
-    var arrive = (p + N) % BREATH;
-    var shift = (PEAK - arrive + BREATH) % BREATH;
+    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
     if (shift > BREATH / 2) shift -= BREATH;      /* nearest peak, ±2s */
     return N + shift;
   }
 
-  function buildMarks() {
-    divider.innerHTML = '';
-    marks = [];
-    for (var b = 0; b < BLOSSOM_COUNT; b++) {
-      var m = document.createElement('span');
-      m.className = 'blossom-mark';
-      m.textContent = '❀';
-      divider.appendChild(m);
-      marks.push(m);
+  /* Fit the words inside the ring: start at the largest size and step
+     down until the box around the actual text has its corners inside
+     the circle. A Range measures the text itself, not the line box. */
+  var range = document.createRange();
+  function fitText() {
+    var R = v.size / 2 * v.fit;
+    var size = +v.maxSize;
+    var min = Math.min(+v.minSize, size);
+    for (; size >= min; size -= 1) {
+      quoteLine.style.fontSize = size + 'px';
+      range.selectNodeContents(quoteLine);
+      var box = range.getBoundingClientRect();
+      if (Math.hypot(box.width / 2, box.height / 2) <= R) break;
     }
+    if (size < min) quoteLine.style.fontSize = min + 'px';
   }
 
   function renderText(text) {
@@ -621,152 +666,119 @@
     } else {
       quoteLine.textContent = text;
     }
+    fitText();
   }
 
   function showQuote(pos) {
     if (!order.length) buildOrder();
     S.pos = (pos + order.length) % order.length;
-    renderText(quotes[order[S.pos]]);
     quoteLine.classList.remove('shown', 'leaving');
+    renderText(quotes[order[S.pos]]);
     void quoteLine.offsetWidth;
     quoteLine.classList.add('shown');
-    buildMarks();
     S.start = now();
-    if (S.paused) S.pausedAt = S.start;
+    if (S.frozen) S.frozenAt = S.start;
     S.D = quoteLength();
     S.phase = 'showing';
     S.nextPos = null;
     S.lastSec = -1;
     countEl.textContent = (S.pos + 1) + ' / ' + order.length;
-    remainEl.firstChild.textContent = '次の言葉まで ';
-    arrivalEffects();
+    if (v.floret) floretOnRing();
   }
 
-  function startLeaving() {
+  function startLeaving(fromFrac) {
+    S.fromFrac = fromFrac;
     S.phase = 'leaving';
     quoteLine.classList.remove('shown');
     quoteLine.classList.add('leaving');
-    for (var i = 0; i < marks.length; i++) {
-      marks[i].classList.remove('appeared');
-      marks[i].classList.add('resetting');
-    }
   }
 
-  /* Move to another quote now: fade the current one, then show it. */
+  /* Preview-only shortcut: fade the current quote and show another. */
   function goTo(pos) {
-    if (S.phase === 'leaving') { S.nextPos = pos; return; }
-    if (S.paused) setPaused(false);
     S.nextPos = pos;
+    if (S.phase !== 'showing') return;
+    var from = currentFrac();
     S.D = elapsed() + v.fade * 1000 * 0.7;
-    startLeaving();
+    startLeaving(from);
   }
-  function next() { goTo(S.pos + 1); }
-  function prev() { goTo(S.pos - 1); }
 
-  function setPaused(p) {
-    if (p === S.paused) return;
-    if (p && S.phase !== 'showing') return;
-    if (p) { S.pausedAt = now(); }
-    else { S.start += now() - S.pausedAt; }
-    S.paused = p;
-    screen.classList.toggle('quote-paused', p);
-    pauseBtn.textContent = p ? '再開' : '一時停止';
-    S.lastSec = -1;
+  var easeInOut = function (t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
+
+  /* How much of the ring the arc covers right now (0 to 1). */
+  function currentFrac() {
+    var e = elapsed();
+    var fill = v.refill * 1000;
+    if (fill > 0 && e < fill) return easeInOut(Math.max(0, e) / fill);
+    var run = Math.max(1, S.D - fill);
+    return Math.max(0, Math.min(1, (S.D - e) / run));
+  }
+
+  function drawArc(frac) {
+    arc.style.strokeDashoffset = (RING * (1 - frac)).toFixed(2);
+    var a = frac * 2 * Math.PI;
+    bead.setAttribute('cx', (180 + 90 * Math.sin(a)).toFixed(2));
+    bead.setAttribute('cy', (180 - 90 * Math.cos(a)).toFixed(2));
+    bead.style.visibility = frac > 0.002 ? 'visible' : 'hidden';
   }
 
   function tick() {
     requestAnimationFrame(tick);
     if (S.phase === 'idle') return;
     var e = elapsed();
-    var rem = Math.max(0, S.D - e);
+    var rem = S.D - e;
     var fadeMs = v.fade * 1000;
 
-    /* Arc and bead: full ring at arrival, unwinding to the top. */
-    var frac = Math.max(0, Math.min(1, rem / S.D));
-    arc.style.strokeDashoffset = (RING * (1 - frac)).toFixed(2);
-    var a = frac * 2 * Math.PI;
-    bead.setAttribute('cx', (180 + 90 * Math.sin(a)).toFixed(2));
-    bead.setAttribute('cy', (180 - 90 * Math.cos(a)).toFixed(2));
-
     if (S.phase === 'showing') {
-      /* Blossoms: one by one across the time the quote is up. */
-      var from = 400, to = Math.max(from + 1, S.D - fadeMs - 600);
-      var lit = Math.max(0, Math.min(BLOSSOM_COUNT, Math.floor((e - from) / (to - from) * BLOSSOM_COUNT) + 1));
-      if (e < from) lit = 0;
-      for (var i = 0; i < marks.length; i++) {
-        if (i < lit && !marks[i].classList.contains('appeared')) marks[i].classList.add('appeared');
-      }
-      if (rem <= fadeMs) startLeaving();
+      var frac = currentFrac();
+      drawArc(frac);
+      if (rem <= fadeMs) startLeaving(frac);
+    } else {
+      /* While the words fade, the last of the arc runs out. */
+      drawArc(Math.max(0, S.fromFrac * Math.min(1, Math.max(0, rem) / fadeMs)));
     }
 
-    /* Countdown text. */
-    if (S.paused) {
-      if (S.lastSec !== -2) {
-        remainEl.firstChild.textContent = '一時停止中 · ふれると再開します';
-        remainNum.textContent = '';
-        remainNum.nextSibling.textContent = '';
-        S.lastSec = -2;
-      }
-    } else if (S.phase === 'leaving') {
-      if (S.lastSec !== -3) {
-        remainEl.firstChild.textContent = 'まもなく';
-        remainNum.textContent = '';
-        remainNum.nextSibling.textContent = '';
-        S.lastSec = -3;
-      }
-    } else {
-      var sec = Math.ceil(rem / 1000);
-      if (sec !== S.lastSec) {
-        remainEl.firstChild.textContent = '次の言葉まで ';
-        remainNum.textContent = sec;
-        remainNum.nextSibling.textContent = '秒';
-        S.lastSec = sec;
-      }
-    }
+    var sec = Math.max(0, Math.ceil(rem / 1000));
+    if (sec !== S.lastSec) { remainNum.textContent = sec; S.lastSec = sec; }
 
     if (rem <= 0 && S.phase === 'leaving') {
       showQuote(S.nextPos != null ? S.nextPos : S.pos + 1);
     }
   }
 
-  /* When the new quote arrives: a soft ripple under it, and a
-     金木犀 floret that drifts down and settles beside it. */
-  function arrivalEffects() {
-    var r = quoteLine.getBoundingClientRect();
-    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-    if (v.ripple) {
-      setTimeout(function () { spawnRipples(cx, cy, 'subtle'); }, 250);
-    }
-    if (v.floret) {
-      var side = Math.random() < 0.5 ? -1 : 1;
-      var x = cx + side * (Math.min(r.width, 520) / 2 + 30 + Math.random() * 40);
-      var y = cy + (Math.random() * 40 - 10);
-      spawnFloret(Math.max(30, Math.min(innerWidth - 30, x)), Math.max(60, Math.min(innerHeight - 40, y)), 4200);
-    }
-  }
+  /* Hold the clock while the screen is off, so no quote is skipped
+     unseen. */
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && !S.frozen) { S.frozenAt = now(); S.frozen = true; }
+    else if (!document.hidden && S.frozen) { S.start += now() - S.frozenAt; S.frozen = false; }
+  });
 
   /* ============================================================
      PANEL
      ============================================================ */
   var controlsBox = document.getElementById('pvControls');
   var inputs = {};
-  var CYCLE_KEYS = { seconds: 1, fade: 1, align: 1 };
-  var RERENDER_KEYS = { ink: 1, vertical: 1 };
+  var RESTART_KEYS = { seconds: 1, fade: 1, align: 1, refill: 1, ink: 1, vertical: 1, maxSize: 1, minSize: 1, fit: 1, spacing: 1, lineH: 1, size: 1 };
+  var btnH = document.getElementById('pvHoriz');
+  var btnV = document.getElementById('pvVert');
 
   function fmt(c, val) {
     var d = (String(c.step).split('.')[1] || '').length;
     return (+val).toFixed(d);
   }
 
+  var restartTimer = null;
   function onValueChange(id) {
     saveValues();
     applyCSS();
-    if (id === 'shuffle') { buildOrder(); goTo(0); }
-    else if (RERENDER_KEYS[id] || CYCLE_KEYS[id]) {
-      clearTimeout(onValueChange.t);
-      onValueChange.t = setTimeout(function () { goTo(S.pos); }, 350);
+    if (id === 'shuffle') { buildOrder(); goTo(0); return; }
+    if (RESTART_KEYS[id]) {
+      clearTimeout(restartTimer);
+      restartTimer = setTimeout(function () { goTo(S.pos); }, 350);
     }
   }
+
+  btnH.addEventListener('click', function () { if (v.vertical) { v.vertical = false; onValueChange('vertical'); } });
+  btnV.addEventListener('click', function () { if (!v.vertical) { v.vertical = true; onValueChange('vertical'); } });
 
   CONTROLS.forEach(function (c) {
     if (c.group) {
@@ -824,9 +836,8 @@
     collapseBtn.setAttribute('aria-label', c ? 'Show panel' : 'Hide panel');
   });
 
-  document.getElementById('pvPrev').addEventListener('click', prev);
-  document.getElementById('pvNext').addEventListener('click', next);
-  pauseBtn.addEventListener('click', function () { setPaused(!S.paused); });
+  document.getElementById('pvPrev').addEventListener('click', function () { goTo(S.pos - 1); });
+  document.getElementById('pvNext').addEventListener('click', function () { goTo(S.pos + 1); });
 
   var statusEl = document.getElementById('pvStatus');
   var outEl = document.getElementById('pvOut');
@@ -871,17 +882,15 @@
   }
 
   /* ============================================================
-     WATER: touch ripples, rain, bubbles, florets (app.js numbers)
+     WATER: rain drops and 金木犀 florets (app.js numbers)
      ============================================================ */
-  var RIPPLE_COLOURS_STRONG = ['rgba(255, 253, 249, 0.95)', 'rgba(255, 162, 89, 0.85)', 'rgba(253, 232, 218, 0.70)'];
   var RIPPLE_COLOURS_SUBTLE = ['rgba(255, 162, 89, 0.55)', 'rgba(253, 232, 218, 0.40)'];
   var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
   var RIPPLE_LIFE = 1900, RIPPLE_STAGGER = 150;
 
   function spawnRipples(x, y, intensity) {
     var palette, cls, baseSize;
-    if (intensity === 'strong') { palette = RIPPLE_COLOURS_STRONG; cls = ''; baseSize = 30; }
-    else if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
+    if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
     else { palette = RIPPLE_COLOURS_SUBTLE; cls = ' subtle'; baseSize = 26; }
     for (var i = 0; i < palette.length; i++) {
       (function (idx) {
@@ -903,56 +912,24 @@
 
   var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
+  function randomSpot() {
+    return { x: 40 + Math.random() * Math.max(1, innerWidth - 80), y: 40 + Math.random() * Math.max(1, innerHeight - 80) };
+  }
   function scheduleRain() {
     setTimeout(function () {
       if (!document.hidden && !reduced) {
-        var x = 40 + Math.random() * Math.max(1, innerWidth - 80);
-        var y = 40 + Math.random() * Math.max(1, innerHeight - 80);
-        spawnRipples(x, y, 'subtle');
+        var p = randomSpot();
+        spawnRipples(p.x, p.y, 'subtle');
         if (Math.random() < 0.25) {
-          setTimeout(function () {
-            spawnRipples(40 + Math.random() * Math.max(1, innerWidth - 80), 40 + Math.random() * Math.max(1, innerHeight - 80), 'subtle');
-          }, 400 + Math.random() * 500);
+          setTimeout(function () { var q = randomSpot(); spawnRipples(q.x, q.y, 'subtle'); }, 400 + Math.random() * 500);
         }
       }
       scheduleRain();
     }, 500 * (0.7 + Math.random() * 0.6));
   }
 
-  function scheduleBubbles(first) {
-    setTimeout(function () {
-      if (!document.hidden && !reduced) {
-        var count = 1 + Math.floor(Math.random() * 3);
-        for (var i = 0; i < count; i++) spawnBubble(i * (260 + Math.random() * 300));
-      }
-      scheduleBubbles(false);
-    }, first ? 3200 : 2000 * (0.7 + Math.random() * 0.6));
-  }
-  function spawnBubble(delay) {
-    var b = document.createElement('div');
-    b.className = 'pond-bubble';
-    var size = 4 + Math.random() * 4;
-    var x0 = (Math.random() * 36 - 18);
-    var rise = 95 + Math.random() * 40;
-    var dur = 2600 + Math.random() * 1200;
-    b.style.width = b.style.height = size + 'px';
-    b.style.marginLeft = b.style.marginTop = (-size / 2) + 'px';
-    b.style.opacity = '0';
-    bubbleBox.appendChild(b);
-    var wob = 4 + Math.random() * 4;
-    var a = b.animate([
-      { transform: 'translate(' + x0 + 'px, 62px) scale(0.6)', opacity: 0 },
-      { transform: 'translate(' + (x0 + wob) + 'px, 30px) scale(0.85)', opacity: 0.9, offset: 0.25 },
-      { transform: 'translate(' + (x0 - wob) + 'px, -5px) scale(1)', opacity: 0.9, offset: 0.55 },
-      { transform: 'translate(' + (x0 + wob * 0.5) + 'px, ' + (62 - rise * 0.85) + 'px) scale(1.1)', opacity: 0.85, offset: 0.88 },
-      { transform: 'translate(' + x0 + 'px, ' + (62 - rise) + 'px) scale(1.9)', opacity: 0 }
-    ], { duration: dur, delay: delay, easing: 'cubic-bezier(0.4, 0, 0.7, 1)', fill: 'both' });
-    a.onfinish = function () { if (b.parentNode) b.parentNode.removeChild(b); };
-  }
-
   /* 金木犀 florets: tiny four-petal flowers drift down with a gentle
-     sway, land on the water with a small ripple, float, then fade.
-     With a target they land beside the new quote. */
+     sway, land on the water with a small ripple, float, then fade. */
   var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
     '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
     '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
@@ -963,6 +940,13 @@
       if (!document.hidden && !reduced) spawnFloret();
       scheduleFlorets(false);
     }, first ? 1800 : 4000 * (0.7 + Math.random() * 0.6));
+  }
+  /* One floret settles on the lower half of the ring as a quote arrives. */
+  function floretOnRing() {
+    var r = win.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
+    var a = (25 + Math.random() * 130) * Math.PI / 180;
+    spawnFloret(cx + R * Math.cos(a) - 7, cy + R * Math.sin(a) - 7, 4200);
   }
   function spawnFloret(tx, ty, fallMs) {
     if (reduced) return;
@@ -997,99 +981,6 @@
       b.onfinish = function () { if (f.parentNode) f.parentNode.removeChild(f); };
     };
   }
-
-  /* ============================================================
-     GESTURES
-     tap water → ripples · tap koi → next quote · tap quote → pause
-     swipe left / right → next / previous quote
-     ============================================================ */
-  var SWIPE = 60, TAP_TRAVEL = 8, TAP_MS = 300, TRAIL_EVERY = 90, TRAIL_MIN = 18;
-  var g = null;
-  var flinching = false;
-
-  function koiCentre() {
-    var r = koiWrap.getBoundingClientRect();
-    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
-  }
-
-  screen.addEventListener('pointerdown', function (e) {
-    if (g) return;
-    var c = koiCentre();
-    g = {
-      id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: now(),
-      onKoi: Math.hypot(e.clientX - c.x, e.clientY - c.y) < 75,
-      onQuote: stage.contains(e.target),
-      lastAt: 0, lastX: e.clientX, lastY: e.clientY
-    };
-    try { screen.setPointerCapture(e.pointerId); } catch (err) {}
-  });
-  screen.addEventListener('pointermove', function (e) {
-    if (!g || e.pointerId !== g.id) return;
-    var t = now();
-    if (t - g.lastAt > TRAIL_EVERY && Math.hypot(e.clientX - g.lastX, e.clientY - g.lastY) > TRAIL_MIN) {
-      spawnRipples(e.clientX, e.clientY, 'trail');
-      g.lastAt = t; g.lastX = e.clientX; g.lastY = e.clientY;
-    }
-  });
-  function endGesture(e) {
-    if (!g || e.pointerId !== g.id) return;
-    var dx = e.clientX - g.x0, dy = e.clientY - g.y0;
-    var travel = Math.hypot(dx, dy);
-    var quick = now() - g.t0 < TAP_MS;
-    var was = g;
-    g = null;
-    if (e.type !== 'pointerup') return;
-    if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy) * 1.3) {
-      if (dx < 0) next(); else prev();
-      return;
-    }
-    if (travel <= TAP_TRAVEL && quick) {
-      spawnRipples(e.clientX, e.clientY, was.onQuote ? 'subtle' : 'strong');
-      if (was.onKoi) { flinch(); next(); }
-      else if (was.onQuote) setPaused(!S.paused);
-    }
-  }
-  screen.addEventListener('pointerup', endGesture);
-  screen.addEventListener('pointercancel', endGesture);
-  startBtn.addEventListener('click', function (e) { e.preventDefault(); });
-
-  document.addEventListener('keydown', function (e) {
-    if (e.target && /INPUT|BUTTON/.test(e.target.tagName)) return;
-    if (e.key === 'ArrowRight') next();
-    else if (e.key === 'ArrowLeft') prev();
-    else if (e.key === ' ') { e.preventDefault(); setPaused(!S.paused); }
-  });
-
-  function flinch() {
-    if (flinching) return;
-    flinching = true;
-    var dir = Math.random() < 0.5 ? -1 : 1;
-    koiWrap.style.setProperty('--flinch-rot', ((22 + Math.random() * 12) * dir).toFixed(2) + 'deg');
-    koiWrap.style.setProperty('--flinch-scale', (1.14 + Math.random() * 0.08).toFixed(3));
-    koiWrap.style.setProperty('--flinch-x', ((10 + Math.random() * 10) * dir).toFixed(2) + 'px');
-    koiWrap.style.setProperty('--flinch-y', (-(6 + Math.random() * 8)).toFixed(2) + 'px');
-    koiWrap.classList.remove('flinching');
-    void koiWrap.offsetWidth;
-    koiWrap.classList.add('flinching');
-    startBtn.classList.add('startling');
-    setTimeout(function () { startBtn.classList.remove('startling'); }, 220);
-    var done = function (ev) {
-      if (ev.animationName !== 'koiFlinch') return;
-      koiWrap.removeEventListener('animationend', done);
-      koiWrap.classList.remove('flinching');
-      flinching = false;
-    };
-    koiWrap.addEventListener('animationend', done);
-    setTimeout(function () { flinching = false; koiWrap.classList.remove('flinching'); }, 1500);
-  }
-
-  /* Hold the countdown while the tab is hidden, so a quote is never
-     skipped unseen. */
-  var hiddenPause = false;
-  document.addEventListener('visibilitychange', function () {
-    if (document.hidden && !S.paused && S.phase === 'showing') { setPaused(true); hiddenPause = true; }
-    else if (!document.hidden && hiddenPause) { hiddenPause = false; setPaused(false); }
-  });
 
   /* ============================================================
      LANTERNS (copied from app.js so the background is the same)
@@ -1159,29 +1050,18 @@
   });
 
   /* ============================================================
-     GREETING (Nagoya time, same wording as the app)
-     ============================================================ */
-  function setGreeting() {
-    var h;
-    try { h = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Tokyo' }).format(new Date()); }
-    catch (e) { h = new Date().getHours(); }
-    var t = (h >= 5 && h < 11) ? 'おはようございます' : (h >= 11 && h < 17) ? 'こんにちは' : 'こんばんは';
-    document.getElementById('blossomGreetingTime').textContent = t;
-  }
-
-  /* ============================================================
      START
      ============================================================ */
   applyCSS();
-  setGreeting();
+  drawArc(0);
   buildLanterns();
   scheduleRain();
-  scheduleBubbles(true);
   scheduleFlorets(true);
   requestAnimationFrame(tick);
-  loadQuotes().then(function () {
+  var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+  Promise.all([loadQuotes(), fontsReady]).then(function () {
     buildOrder();
-    setTimeout(function () { showQuote(0); }, 900);
+    setTimeout(function () { showQuote(0); }, 700);
   });
 })();
 </script>
