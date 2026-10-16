@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v131';
+const CACHE = 'thankyou-v132';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -8,7 +8,6 @@ const ASSETS = [
   './app.js',
   './manifest.json',
   './presets.json',
-  './quotes.json',
   './panel-1.html',
   './panel-2.html',
   './panel-3.html',

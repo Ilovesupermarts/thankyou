@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="build" content="v131">
+<meta name="build" content="v132">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
 <title>追加オプションのご相談</title>
@@ -124,7 +124,7 @@
 
 <div class="name-screen" id="nameScreen">
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="テーマ切替">🍁</button>
-  <div class="app-version" aria-hidden="true">v2.11</div>
+  <div class="app-version" aria-hidden="true">v2.12</div>
   <div class="name-inner">
     <div class="name-header">
       <div class="name-label">セラピストのお名前</div>
@@ -640,7 +640,7 @@
             <div class="ty-mark">❀</div>
             <div class="ty-line">まもなく戻ります。</div>
             <div class="ty-rule"></div>
-            <div class="ty-line accent">それまでの間、どうぞごゆっくり、言葉をお楽しみください。</div>
+            <div class="ty-line accent">それまでの間、よろしければ小さなゲームで、<br>ひと息ついてください。</div>
           </div>
         </div>
       </div>
@@ -661,9 +661,10 @@
   </div>
 
   <div class="ty-ambient-stage" id="tyAmbientStage">
-    <!-- Round window (丸窓): the faint ring, the gradient countdown with its
-         water-drop head and the ripples are drawn on the two canvases by
-         QuoteWindow in app.js; the halo and pond are plain layers. -->
+    <!-- Games page (ポン) in the round window (丸窓): the faint ring, the
+         countdown (the round's clock), the ripples and the game are drawn on
+         three canvases by GameWindow in app.js; the halo and pond are plain
+         layers. The centre holds the scores, the button and the instructions. -->
     <div class="ty-ambient-inner">
       <div class="icon-wrapper quote-window" id="quoteWindow">
         <div class="soft-glow" aria-hidden="true"></div>
@@ -673,11 +674,24 @@
           <div class="pond-caustic c2"></div>
         </div>
         <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
-        <div class="quote-wrap" aria-live="polite">
-          <div class="quote-line" id="quoteLine"></div>
+        <div class="game-wrap">
+          <div class="game-score" id="gameScore">
+            <div class="gs-block">
+              <div class="gs-row main">現在のスコア：<b id="gameScoreNow">0</b></div>
+              <div class="gs-row">最高スコア：<span id="gameScoreBest">0</span></div>
+              <div class="gs-row time">残り時間：<span id="gameScoreTime">60</span>秒</div>
+            </div>
+            <div class="gs-slot">
+              <button type="button" class="gs-btn" id="gameBtn" tabindex="-1">
+                <span class="gs-msg" id="gameMsg" aria-live="polite"></span>
+                <span class="gs-tap" id="gameTap"></span>
+              </button>
+            </div>
+            <div class="gs-howto" id="gameHow"></div>
+          </div>
         </div>
+        <canvas class="game-canvas" id="gameCanvas" aria-hidden="true"></canvas>
       </div>
-      <div class="quote-meta" aria-hidden="true"><span class="quote-count" id="quoteCount"></span></div>
     </div>
   </div>
 
