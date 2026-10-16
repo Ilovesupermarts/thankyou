@@ -7,23 +7,28 @@
 <title>Games Preview</title>
 
 <!-- ============================================================
-     games-preview.html — standalone preview of three small one-finger
-     games played inside the quotes page's round window (丸窓):
+     games-preview.html — standalone preview of a small one-finger
+     game played inside the quotes page's round window (丸窓):
 
-       ポン         Pong: a curved paddle on the ring keeps the ball in.
-       灯籠くずし   Lantern breakout: the same paddle and ball, with
-                    paper lanterns in the middle to knock loose.
-       蛍           Firefly: a firefly follows the finger and lights
-                    the dim stars it touches.
+       ポン         Pong: curved paddles on the ring keep the balls in.
 
      Loads the real main.css and copies the real quotes page markup
-     (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo,
-     the pond and the words look exactly as in the app. The faint ring,
-     the countdown and the ripples are drawn with the same code as
+     (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo
+     and the pond look exactly as in the app. The faint ring, the
+     countdown and the ripples are drawn with the same code as
      QuoteWindow in app.js. The games are drawn on one extra canvas on
-     top. It does NOT load app.js.
+     top. It does NOT load app.js. No quotes are shown on this page.
 
-     Quotes are read from quotes.json, the same file the app uses.
+     Rounds: each round lasts 60 seconds (one turn of the countdown
+     ring) and starts on the first touch. The centre of the ring shows
+     現在のスコア, 最高スコア and 残り時間, with short how-to-play
+     lines under them. An extra ball joins after every 6 hits in a row (with a ripple and
+     ボール追加！), points are multiplied by the balls in play, and the
+     paddles shrink from 30° to 12° over the round. The last 10
+     seconds glow and tick. Each run of hits plays a climbing chime.
+
+     Music: three short retro (chiptune) loops, composed here and played
+     live with the Web Audio API, play during a round only.
 
      The generated <style id="pvLive"> block holds the proposed window
      size and every game setting. "Copy values" copies exactly that text.
@@ -51,22 +56,35 @@
     position: absolute; left: 50%; top: 50%;
     z-index: 3; pointer-events: none;
   }
-  .pv-quote-below {
-    position: relative; z-index: 3;
-    margin-top: 34px; min-height: 1.5em; max-width: 90vw;
-    font-family: "Zen Antique", "Yuji Syuku", "Shippori Mincho", "Noto Serif JP", serif;
-    color: #A3282A; letter-spacing: 3px; line-height: 1.5;
-    text-shadow: var(--quote-shadow);
-    opacity: 0; transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* The scores in the centre of the ring. The font size is set by the
+     script from the ring size; everything else is in em. */
+  .pv-score {
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: #A3282A; text-align: center; letter-spacing: 0.12em; line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(255, 253, 249, 0.9), 0 0 22px rgba(255, 253, 249, 0.7);
+    transition: opacity 0.6s ease;
   }
-  .pv-quote-below.shown { opacity: 1; }
-  .pv-quote-below.off { display: none; }
-  .pv-game-hud {
-    position: relative; z-index: 3; margin-top: 10px; min-height: 20px;
-    font-family: "Shippori Mincho", "Noto Serif JP", serif;
-    font-size: 15px; letter-spacing: 3px; color: var(--text-mute);
-    font-variant-numeric: tabular-nums; opacity: 0.85;
+  .pv-score.off { opacity: 0; }
+  .pv-score .sc-row { opacity: 0.8; }
+  .pv-score .sc-row.main { font-size: 1.45em; font-weight: 600; opacity: 0.95; }
+  .pv-score .sc-row.time { margin-top: 0.15em; }
+  .pv-score .msg { margin-top: 0.8em; font-size: 0.9em; color: var(--text-mute); min-height: 1.5em; }
+  .pv-score .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
+  .pv-score .sc-row.main b { display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .pv-score .sc-row.main b.pop { transform: scale(1.25); transition: none; }
+  /* How to play: small and quiet, under the scores. */
+  .pv-score .howto {
+    margin: 0.9em auto 0; font-size: 0.6em; line-height: 1.8; letter-spacing: 0.08em;
+    color: var(--text-mute); transition: opacity 0.8s ease;
   }
+  .pv-score .howto.faint { opacity: 0.35; }
+  .pv-score .howto.gone { opacity: 0; }
+  .pv-score .mult { margin-left: 0.4em; font-size: 0.75em; color: #D9643A; }
+  /* The last seconds: the time turns warm and gently beats. */
+  .pv-score .sc-row.time.warn { color: #C8341F; opacity: 1; font-weight: 600; }
+  .pv-score .sc-row.time.warn span { display: inline-block; animation: pvBeat 1s ease-out infinite; }
+  @keyframes pvBeat { 0% { transform: scale(1.3); } 60%, 100% { transform: scale(1); } }
 
   .pv-fps {
     position: fixed; left: 12px; bottom: 12px; z-index: 1000;
@@ -192,15 +210,19 @@
           <div class="pond-caustic c2"></div>
         </div>
         <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
+        <!-- Where the quote sits in the app; here it holds the scores. -->
         <div class="quote-wrap" aria-live="polite">
-          <div class="quote-line" id="quoteLine"></div>
+          <div class="pv-score" id="scoreBox">
+            <div class="sc-row main">現在のスコア：<b id="scoreNow">0</b><span class="mult" id="scoreMult"></span></div>
+            <div class="sc-row">最高スコア：<span id="scoreBest">0</span></div>
+            <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
+            <div class="msg" id="scoreMsg"></div>
+            <div class="howto" id="scoreHow"></div>
+          </div>
         </div>
-        <!-- Preview only: the games are drawn here, above the words. -->
+        <!-- Preview only: the games are drawn here, above the scores. -->
         <canvas class="pv-game-canvas" id="gameCanvas" aria-hidden="true"></canvas>
       </div>
-      <div class="pv-quote-below off" id="quoteBelow"></div>
-      <div class="pv-game-hud" id="gameHud" aria-hidden="true"></div>
-      <div class="quote-meta" aria-hidden="true"><span class="quote-count" id="quoteCount"></span></div>
     </div>
   </div>
 </div>
@@ -213,18 +235,16 @@
     <span class="pv-title">Game</span>
     <select id="pvGame" aria-label="Game">
       <option value="pong">ポン · Pong</option>
-      <option value="lanterns">灯籠くずし · Lantern breakout</option>
-      <option value="firefly">蛍 · Firefly</option>
-      <option value="none">なし · Quotes only</option>
+      <option value="none">なし · Ring only</option>
     </select>
     <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
   </div>
   <div class="pv-body">
-    <p class="pv-note">Play with one finger anywhere on the screen. Pick a game above; the settings below change to match it. Fold this panel with – to see the whole window. Grey "app:" notes show today's value in the real quotes page.</p>
-    <p class="pv-source" id="pvSource">Loading quotes.json…</p>
+    <p class="pv-note">Play with one finger anywhere on the screen. A round starts on the first touch and lasts one turn of the ring. Pick a game above; the settings below change to match it. Fold this panel with – to see the whole window. Grey "app:" notes show today's value in the real quotes page.</p>
     <div class="pv-transport">
-      <button type="button" id="pvRestart">Restart game</button>
+      <button type="button" id="pvRestart">New round</button>
       <button type="button" id="pvPause">Pause</button>
+      <button type="button" id="pvClearBest">Clear top score</button>
     </div>
     <div id="pvControls"></div>
     <div class="pv-actions">
@@ -249,74 +269,63 @@
     { group: 'Window', game: 'all' },
     { id: 'size',       game: 'all', label: 'Ring size (px across)',        min: 500, max: 860, step: 10,  def: 680, was: '500px' },
     { id: 'countdown',  game: 'all', label: 'Show the countdown on the ring', type: 'check', def: true },
-    { id: 'seconds',    game: 'all', label: 'Seconds per quote',            min: 6,   max: 40,  step: 1,   def: 12,  was: '10' },
-    { id: 'quotePlace', game: 'all', label: 'Quote while playing', type: 'select', def: 'inside',
-      options: [['inside', 'Inside the ring (faint)'], ['below', 'Below the ring'], ['hidden', 'Hidden']] },
-    { id: 'quoteAlpha', game: 'all', label: 'Quote strength inside the ring', min: 0, max: 1, step: 0.05, def: 0.3, was: '1 (no game)' },
-    { id: 'belowSize',  game: 'all', label: 'Quote size below the ring (px)', min: 16, max: 40, step: 1, def: 26 },
-    { id: 'counter',    game: 'all', label: 'Show the little counter under the ring', type: 'check', def: true },
+    { id: 'round',      game: 'all', label: 'Seconds per round (one turn of the ring)', min: 20, max: 180, step: 5, def: 60 },
+    { id: 'counter',    game: 'all', label: 'Show the scores in the centre', type: 'check', def: true },
+    { id: 'howto',      game: 'all', label: 'How-to-play lines under the scores', type: 'select', def: 'faint',
+      options: [['always', 'Always clear'], ['faint', 'Faint during a round'], ['ready', 'Only before and after a round'], ['off', 'Off']] },
     { id: 'sound',      game: 'all', label: 'Soft chime on hits', type: 'check', def: true },
     { id: 'volume',     game: 'all', label: 'Chime volume',                 min: 0,   max: 1,   step: 0.05, def: 0.35 },
+
+    { id: 'warnSecs',   game: 'all', label: 'Warn for the last … seconds (0 = off)', min: 0, max: 20, step: 1, def: 10 },
+    { id: 'warnTick',   game: 'all', label: 'Soft tick each second while warning', type: 'check', def: true },
+
+    { group: 'Countdown ring', game: 'all' },
+    { id: 'cdHead',     game: 'all', label: 'Water-drop head (a round bulb that tapers into the line)', type: 'check', def: true },
+    { id: 'cdHeadW',    game: 'all', label: 'Bulb width (px)',             min: 12,  max: 40,  step: 1,   def: 21,  was: '18' },
+    { id: 'cdNeck',     game: 'all', label: 'Length of the taper behind the bulb (px)', min: 10, max: 200, step: 5, def: 50, was: '110' },
+    { id: 'cdTail',     game: 'all', label: 'Tail: fades out over this many degrees behind the head', min: 30, max: 360, step: 5, def: 360, was: '280' },
+    { id: 'cdTaper',    game: 'all', label: 'Tail fade curve (higher = fades sooner)', min: 0.2, max: 5, step: 0.1, def: 0.6, was: '2.7' },
+
+    { group: 'Scoring', game: 'all' },
+    { id: 'bonus',      game: 'all', label: 'Bonus: points × balls in play (×2, ×3)', type: 'check', def: true },
+    { id: 'climb',      game: 'all', label: 'Climbing chime: each hit in a row plays the next note up', type: 'check', def: true },
+    { id: 'ballFx',     game: 'all', label: 'Ripple and ボール追加！ when a ball joins', type: 'check', def: true },
+
+    { group: 'Music (plays during a round)', game: 'all' },
+    { id: 'music',      game: 'all', label: 'Tune', type: 'select', def: 'sakura',
+      options: [['off', 'Off'], ['sakura', 'A · さくら散歩 Sakura stroll'], ['yomise', 'B · 夜店 Festival night'], ['hoshi', 'C · 星めぐり Starry walk']] },
+    { id: 'musicVol',   game: 'all', label: 'Music volume',                min: 0,   max: 1,   step: 0.05, def: 0.5 },
+    { id: 'musicListen', game: 'all', type: 'button', label: 'Listen / stop' },
 
     { group: 'Colours', game: 'all' },
     { id: 'cPaddle',    game: 'all', type: 'colour', label: 'Paddle',  def: '#B5262B' },
     { id: 'cBall',      game: 'all', type: 'colour', label: 'Ball',    def: '#EE9A5C' },
-    { id: 'cLantern',   game: 'all', type: 'colour', label: 'Lanterns', def: '#E8743B' },
-    { id: 'cFirefly',   game: 'all', type: 'colour', label: 'Firefly and lit stars', def: '#D9C238' },
 
     { group: 'Pong', game: 'pong' },
     { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
       options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
     { id: 'pBallSpeed', game: 'pong', label: 'Ball speed at the start (px/s)', min: 80,  max: 600, step: 10, def: 220 },
-    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 4 },
-    { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 460 },
+    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 10 },
+    { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 660 },
     { id: 'pBallR',     game: 'pong', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 11 },
-    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 50 },
+    { id: 'pShrink',    game: 'pong', label: 'Paddles get shorter during the round', type: 'check', def: true },
+    { id: 'pPadStart',  game: 'pong', label: 'Paddle length at the start (degrees)', min: 10, max: 120, step: 1, def: 30 },
+    { id: 'pPadMin',    game: 'pong', label: 'Shortest paddle (degrees)',  min: 6,   max: 120, step: 1,  def: 12 },
+    { id: 'pShrinkSecs', game: 'pong', label: 'Reaches the shortest after (s)', min: 10, max: 180, step: 5, def: 60 },
+    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length when shrinking is off (degrees)', min: 10, max: 120, step: 1, def: 17 },
     { id: 'pPadW',      game: 'pong', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
-    { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
-    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
-    { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: false },
+    { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 20 },
+    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 32 },
+    { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: true },
     { id: 'pRespawn',   game: 'pong', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
     { id: 'pTrail',     game: 'pong', label: 'Ball leaves a soft trail', type: 'check', def: true },
-
-    { group: 'Lantern breakout', game: 'lanterns' },
-    { id: 'bControl',   game: 'lanterns', label: 'Paddle control', type: 'select', def: 'point',
-      options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
-    { id: 'bRings',     game: 'lanterns', label: 'Lantern rings (1 = 7 lanterns, 2 = 19, 3 = 37)', min: 1, max: 3, step: 1, def: 2 },
-    { id: 'bSize',      game: 'lanterns', label: 'Lantern size (px)',        min: 14,  max: 50,  step: 1,  def: 26 },
-    { id: 'bGap',       game: 'lanterns', label: 'Space between lanterns (px)', min: 36, max: 110, step: 1, def: 58 },
-    { id: 'bHits',      game: 'lanterns', label: 'Hits to free a lantern',   min: 1,   max: 3,   step: 1,  def: 1 },
-    { id: 'bTurn',      game: 'lanterns', label: 'Lanterns slowly turn (degrees/s)', min: 0, max: 30, step: 1, def: 5 },
-    { id: 'bFloat',     game: 'lanterns', label: 'Freed lanterns float up (off = burst)', type: 'check', def: true },
-    { id: 'bRelight',   game: 'lanterns', label: 'New lanterns after clearing (s)', min: 1, max: 6, step: 0.5, def: 2.5 },
-    { id: 'bBallSpeed', game: 'lanterns', label: 'Ball speed at the start (px/s)', min: 80, max: 600, step: 10, def: 230 },
-    { id: 'bSpeedUp',   game: 'lanterns', label: 'Speed-up per paddle hit (%)', min: 0, max: 15, step: 1, def: 2 },
-    { id: 'bMaxSpeed',  game: 'lanterns', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 420 },
-    { id: 'bBallR',     game: 'lanterns', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 10 },
-    { id: 'bPadDeg',    game: 'lanterns', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 55 },
-    { id: 'bPadW',      game: 'lanterns', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
-    { id: 'bFollow',    game: 'lanterns', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
-    { id: 'bEnglish',   game: 'lanterns', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
-    { id: 'bRespawn',   game: 'lanterns', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
-
-    { group: 'Firefly', game: 'firefly' },
-    { id: 'fPattern',   game: 'firefly', label: 'Stars to light', type: 'select', def: 'cycle',
-      options: [['cycle', 'Take turns (all shapes)'], ['dipper', '北斗七星 Big Dipper'], ['star', '星 Star'],
-                ['flower', '花 Flower'], ['circle', '円 Circle'], ['random', 'Random']] },
-    { id: 'fCount',     game: 'firefly', label: 'Stars in Random',           min: 3,   max: 14,  step: 1,  def: 7 },
-    { id: 'fFollow',    game: 'firefly', label: 'How fast the firefly follows', min: 0.5, max: 12, step: 0.5, def: 3 },
-    { id: 'fReach',     game: 'firefly', label: 'How close it must fly to light a star (px)', min: 10, max: 70, step: 1, def: 32 },
-    { id: 'fSize',      game: 'firefly', label: 'Firefly size (px)',         min: 4,   max: 20,  step: 1,  def: 9 },
-    { id: 'fTrail',     game: 'firefly', label: 'Trail length',              min: 0,   max: 40,  step: 1,  def: 18 },
-    { id: 'fOrder',     game: 'firefly', label: 'Stars must be lit in order (connect the dots)', type: 'check', def: false },
-    { id: 'fLines',     game: 'firefly', label: 'Draw the shape when all are lit', type: 'check', def: true },
-    { id: 'fHold',      game: 'firefly', label: 'Show the finished shape for (s)', min: 1, max: 8, step: 0.5, def: 3 },
-    { id: 'fWander',    game: 'firefly', label: 'Firefly drifts on its own when not touched', type: 'check', def: true }
+    { id: 'pExtraHits', game: 'pong', label: 'Hits in a row for an extra ball', min: 2, max: 20, step: 1, def: 6 },
+    { id: 'pMaxBalls',  game: 'pong', label: 'Most balls at once',       min: 1,   max: 6,   step: 1,  def: 3 }
   ];
 
-  var STORE_KEY = 'gamesPreview.v1';
+  var STORE_KEY = 'gamesPreview.v2';          /* v2: new defaults; values saved under v1 are ignored */
   var DEFAULTS = { game: 'pong' };
-  CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
+  CONTROLS.forEach(function (c) { if (c.id && c.type !== 'button') DEFAULTS[c.id] = c.def; });
 
   /* The app's QuoteWindow numbers (app.js QW). `size` comes from the panel. */
   var QW = {
@@ -324,8 +333,6 @@
     bodyW: 12, headW: 18, neck: 110, head: true,
     tail: 280, taper: 2.7, startFade: 58,
     bloom: true, fadeBack: 1.4, ripReach: 1.4,
-    seconds: 10, fade: 1600, align: true,
-    maxSize: 44, minSize: 25, fit: 0.82,
     dprCap: 1.5,
     cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
     cHalo: '#E0705F'
@@ -337,6 +344,7 @@
     var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
     if (saved) for (var sk in saved) if (sk in DEFAULTS) v[sk] = saved[sk];
   } catch (e) {}
+  if (v.game !== 'pong' && v.game !== 'none') v.game = 'pong';
   function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {} }
 
   /* ============================================================
@@ -348,10 +356,13 @@
   var ringCv = document.getElementById('quoteRingCanvas');
   var ripCv = document.getElementById('quoteRippleCanvas');
   var gameCv = document.getElementById('gameCanvas');
-  var quoteLine = document.getElementById('quoteLine');
-  var quoteBelow = document.getElementById('quoteBelow');
-  var countEl = document.getElementById('quoteCount');
-  var hudEl = document.getElementById('gameHud');
+  var scoreBox = document.getElementById('scoreBox');
+  var scoreNowEl = document.getElementById('scoreNow');
+  var scoreBestEl = document.getElementById('scoreBest');
+  var scoreTimeEl = document.getElementById('scoreTime');
+  var scoreMultEl = document.getElementById('scoreMult');
+  var scoreHowEl = document.getElementById('scoreHow');
+  var scoreMsgEl = document.getElementById('scoreMsg');
   var fpsEl = document.getElementById('pvFps');
   var softGlow = win.querySelector('.soft-glow');
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -361,7 +372,7 @@
      exact text "Copy values" copies.
      ============================================================ */
   var live = document.getElementById('pvLive');
-  var GAME_NAMES = { pong: 'Pong', lanterns: 'Lantern breakout', firefly: 'Firefly', none: 'Quotes only' };
+  var GAME_NAMES = { pong: 'Pong', none: 'Ring only' };
 
   function cssVal(c) {
     var x = v[c.id];
@@ -395,45 +406,31 @@
     lines.push('  width: ' + P + 'px; height: ' + P + 'px;');
     lines.push('  margin: -' + Math.round(P / 2) + 'px 0 0 -' + Math.round(P / 2) + 'px;');
     lines.push('}');
-    if (v.game !== 'none') {
-      lines.push('');
-      lines.push('/* The quote while a game is on. */');
-      if (v.quotePlace === 'inside') {
-        lines.push('.quote-window .quote-wrap { opacity: ' + v.quoteAlpha + '; transition: opacity 0.8s ease; }');
-      } else {
-        lines.push('.quote-window .quote-wrap { opacity: 0; transition: opacity 0.8s ease; }');
-      }
-      if (v.quotePlace === 'below') lines.push('.pv-quote-below { font-size: ' + v.belowSize + 'px; }');
-    }
-    var groups = [['all', 'Shared'], ['pong', 'Pong'], ['lanterns', 'Lantern breakout'], ['firefly', 'Firefly']];
+    var groups = [['all', 'Shared'], ['pong', 'Pong']];
     lines.push('');
     lines.push('/* Game settings. */');
     lines.push('.quote-window {');
     lines.push('  --game: "' + v.game + '";');
     groups.forEach(function (g) {
-      var list = CONTROLS.filter(function (c) { return c.id && c.game === g[0] && c.id !== 'size' && c.id !== 'seconds' && c.id !== 'quotePlace' && c.id !== 'quoteAlpha' && c.id !== 'belowSize'; });
+      var list = CONTROLS.filter(function (c) { return c.id && c.type !== 'button' && c.game === g[0] && c.id !== 'size'; });
       if (!list.length) return;
       lines.push('  /* ' + g[1] + ' */');
       list.forEach(function (c) { lines.push('  --game-' + kebab(c.id) + ': ' + cssVal(c) + ';'); });
     });
-    lines.push('  --game-seconds-per-quote: ' + v.seconds + ';');
-    lines.push('  --game-quote-place: "' + v.quotePlace + '";');
     lines.push('}');
     return lines.join('\n') + '\n';
   }
   function applyCSS() {
     live.textContent = buildCSS();
-    quoteBelow.classList.toggle('off', v.game === 'none' || v.quotePlace !== 'below');
   }
 
   /* ============================================================
-     THE ROUND WINDOW — ring, countdown, ripples and quotes.
-     Ported from QuoteWindow in app.js; only `size` and `seconds`
-     come from the panel.
+     THE ROUND WINDOW — ring, countdown and ripples.
+     Ported from QuoteWindow in app.js; `size` comes from the panel.
+     Here the countdown is the round's clock: one turn = one round.
      ============================================================ */
-  var BREATH = 4000, PEAK = 1440;
-  var S = { pos: 0, D: 1, prog: 0, rate: 1, t0: 0, phase: 'idle' };
-  var QUOTES = [];
+  var BREATH = 4000;
+  var S = { D: 1, prog: 0, t0: 0, phase: 'idle' };
 
   function rgbOf(hex) {
     var h = String(hex).replace('#', '');
@@ -460,9 +457,15 @@
   var finalCtx = finalCv.getContext('2d');
 
   function stepAlpha(p, total) { return (total / PASSES) / (1 - total * p / PASSES); }
+  /* The countdown's shape comes from the panel's "Countdown ring" group. */
+  function syncQW() {
+    QW.head = !!v.cdHead; QW.headW = +v.cdHeadW; QW.neck = +v.cdNeck;
+    QW.tail = +v.cdTail; QW.taper = +v.cdTaper;
+  }
   function canvasPad() { return Math.ceil(QW.headW * 1.9 + 14); }
 
   function sizeCanvases() {
+    syncQW();
     QW.size = +v.size;
     var D = QW.size;
     var Sz = D + 2 * canvasPad();
@@ -584,12 +587,35 @@
     ctx.fill();
   }
 
+  /* The last seconds: a warm glow on the ring that swells once a second. */
+  function drawWarn(ctx, cx, cy) {
+    var left = warnLeft();
+    if (left === null) return;
+    var beat = left - Math.floor(left);                      /* 1 → 0 within each second */
+    var a = 0.18 + 0.4 * beat * beat;
+    var Rr = QW.size / 2 - QW.band / 2;
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = rgbaA(COL.end, a * 0.35);
+    ctx.lineWidth = QW.band + 16;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = rgbaA(COL.end, a);
+    ctx.lineWidth = QW.band;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+  }
+  /* Seconds left when inside the warning window, otherwise null. */
+  function warnLeft() {
+    if (round.state !== 'play' || !(+v.warnSecs > 0)) return null;
+    var left = Math.max(0, (S.D - S.prog) / 1000);
+    return left <= +v.warnSecs ? left : null;
+  }
+
   function drawRing(now) {
     var ctx = ringCtx, cs = CV.S, cx = cs / 2, cy = cs / 2;
     ctx.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, cs, cs);
     drawTrack(ctx, cx, cy);
+    drawWarn(ctx, cx, cy);
     if (!v.countdown) return;
     if (prevSweep) {
       var age = now - prevSweep.t, fb = QW.fadeBack * 1000;
@@ -664,128 +690,9 @@
     }
   }
 
-  function quoteLength() {
-    var N = v.seconds * 1000;
-    var an = glowAnim();
-    if (!an) return N;
-    var p = an.currentTime % BREATH;
-    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
-    if (shift > BREATH / 2) shift -= BREATH;
-    return N + shift;
-  }
-
-  var range = document.createRange();
-  function fitText() {
-    var R = QW.size / 2 * QW.fit;
-    var max = QW.maxSize, min = Math.min(QW.minSize, max);
-    function ok(size) {
-      quoteLine.style.fontSize = size + 'px';
-      range.selectNodeContents(quoteLine);
-      var box = range.getBoundingClientRect();
-      var k = inner.getBoundingClientRect().width / inner.offsetWidth || 1;   /* undo the fit-to-screen scale */
-      return Math.hypot(box.width / k / 2, box.height / k / 2) <= R;
-    }
-    if (ok(max)) return;
-    if (!ok(min)) { quoteLine.style.fontSize = min + 'px'; return; }
-    var lo = min, hi = max;
-    while (hi - lo > 1) {
-      var mid = (lo + hi) >> 1;
-      if (ok(mid)) lo = mid; else hi = mid;
-    }
-    quoteLine.style.fontSize = lo + 'px';
-  }
-
-  var HIRA = /^[぀-ゟ]+$/;
-  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
-  var OPEN = /^[（(「『]+$/;
-  var STOPS = /[、。，．！？!?]/;
-  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
-  function phraseUnits(text) {
-    var segs = [];
-    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
-    else segs = Array.from(text);
-    var units = [], cur = '', force = false, open = '';
-    segs.forEach(function (sg) {
-      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
-      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
-      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
-      if (cur !== '' && !join) { units.push(cur); cur = ''; }
-      cur += open + sg; open = ''; force = false;
-    });
-    if (cur) units.push(cur);
-    return units;
-  }
-  function lineCounts() {
-    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
-    for (var i = 0; i < units.length; i++) {
-      var r = units[i].getBoundingClientRect();
-      var key = r.top, tol = r.height * 0.5;
-      var row = null;
-      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
-      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
-      row.n += Array.from(units[i].textContent).length;
-    }
-    return rows.map(function (x) { return x.n; });
-  }
-  function fitAndBalance() {
-    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
-    var base = Math.round(QW.size * 0.8);
-    for (var k = 0; k < tries.length; k++) {
-      quoteLine.style.maxWidth = Math.round(base * tries[k]) + 'px';
-      fitText();
-      var c = lineCounts();
-      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
-    }
-    quoteLine.style.maxWidth = base + 'px';
-    fitText();
-  }
-  function renderText(text) {
-    quoteLine.textContent = '';
-    quoteLine.style.maxWidth = '';
-    var units = phraseUnits(text);
-    units.forEach(function (u, ui) {
-      var span = document.createElement('span');
-      span.className = 'quote-unit';
-      span.textContent = u;
-      quoteLine.appendChild(span);
-      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
-    });
-    fitAndBalance();
-    quoteBelow.textContent = text;
-  }
-
-  function showQuote(pos) {
-    var n = QUOTES.length;
-    if (!n) return;
-    S.pos = ((pos % n) + n) % n;
-    quoteLine.classList.remove('shown', 'leaving');
-    quoteBelow.classList.remove('shown');
-    renderText(QUOTES[S.pos]);
-    void quoteLine.offsetWidth;
-    quoteLine.classList.add('shown');
-    quoteBelow.classList.add('shown');
-    var now = performance.now();
-    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
-    S.D = Math.max(1000, quoteLength());
-    S.prog = 0;
-    S.t0 = now;
-    S.phase = 'showing';
-    countEl.textContent = (S.pos + 1) + ' / ' + n;
-  }
-  function startLeaving() {
-    S.phase = 'leaving';
-    quoteLine.classList.remove('shown');
-    quoteLine.classList.add('leaving');
-    quoteBelow.classList.remove('shown');
-  }
-  function refitQuote() {
-    if (S.phase === 'idle' || !QUOTES.length) return;
-    renderText(QUOTES[S.pos]);
-  }
-
   function fitStage() {
-    var extra = (v.game !== 'none' && v.quotePlace === 'below') ? 90 : 0;
-    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 130 + extra), (window.innerWidth - 40) / +v.size);
+    scoreBox.style.fontSize = Math.round(+v.size * 0.034) + 'px';
+    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 60), (window.innerWidth - 40) / +v.size);
     inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
   }
 
@@ -794,7 +701,10 @@
      first touch (the browser only allows sound after one).
      ============================================================ */
   var audio = null;
-  var SCALE = [523.25, 587.33, 659.25, 783.99, 880.0, 1046.5, 1174.66, 1318.51, 1567.98];
+  /* C major pentatonic from C5 up, a little over two octaves, so a
+     long run of hits keeps climbing. */
+  var SCALE = [];
+  [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28].forEach(function (st) { SCALE.push(523.25 * Math.pow(2, st / 12)); });
   function unlockAudio() {
     if (audio) { if (audio.state === 'suspended') audio.resume(); return; }
     var AC = window.AudioContext || window.webkitAudioContext;
@@ -802,13 +712,15 @@
   }
   function chime(step, soft) {
     if (!v.sound || !audio || +v.volume <= 0) return;
-    var f = SCALE[Math.max(0, Math.min(SCALE.length - 1, step))];
+    playBell(SCALE[Math.max(0, Math.min(SCALE.length - 1, step))], 0.18 * +v.volume * (soft ? 0.5 : 1), 1.4);
+  }
+  function playBell(f, peak, len) {
+    if (!audio || peak <= 0) return;
     var t = audio.currentTime;
     var g = audio.createGain();
-    var peak = 0.18 * +v.volume * (soft ? 0.5 : 1);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 1.4);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
     g.connect(audio.destination);
     [[1, 1], [2.01, 0.25]].forEach(function (h) {
       var o = audio.createOscillator();
@@ -817,8 +729,204 @@
       o.frequency.value = f * h[0];
       hg.gain.value = h[1];
       o.connect(hg); hg.connect(g);
-      o.start(t); o.stop(t + 1.5);
+      o.start(t); o.stop(t + len + 0.1);
     });
+  }
+  /* A soft wooden tick for the last seconds; higher for the final three. */
+  function tick(final) {
+    if (!v.sound || !v.warnTick) return;
+    playBell(final ? 1760 : 1320, 0.07 * +v.volume, 0.12);
+  }
+  /* A soft low note when the run of hits ends. */
+  function missNote() {
+    if (!v.sound || !v.climb) return;
+    playBell(392, 0.08 * +v.volume, 0.6);
+    setTimeout(function () { playBell(330, 0.06 * +v.volume, 0.7); }, 110);
+  }
+
+  /* ============================================================
+     MUSIC — three short retro (8-bit, chiptune) loops played live by
+     the browser's sound engine, like an old game console's sound
+     chip: a pulse-wave melody, a triangle bass, a quiet arpeggio and
+     noise drums, through a soft low-pass so nothing is harsh.
+     Plays only while a round is on (or after "Listen").
+
+     Each song is 8 bars of 8 eighth notes. In the strings:
+       a note (A4, F#4 …) starts a note, "-" holds it, "." is a rest.
+       bass:  R = chord root, F = fifth, O = octave above
+       arp:   0–3 = notes of the bar's chord, low to high
+       drums: k = kick, s = snare, h = hi-hat
+     ============================================================ */
+  var CHORDS = {
+    C:  { b: 'C3', t: ['C4', 'E4', 'G4', 'C5'] },
+    D:  { b: 'D3', t: ['D4', 'F#4', 'A4', 'D5'] },
+    Dm: { b: 'D3', t: ['D4', 'F4', 'A4', 'D5'] },
+    Em: { b: 'E3', t: ['E4', 'G4', 'B4', 'E5'] },
+    F:  { b: 'F2', t: ['F4', 'A4', 'C5', 'F5'] },
+    G:  { b: 'G2', t: ['G3', 'B3', 'D4', 'G4'] },
+    A:  { b: 'A2', t: ['A3', 'C#4', 'E4', 'A4'] },
+    Am: { b: 'A2', t: ['A3', 'C4', 'E4', 'A4'] }
+  };
+  var SONGS = {
+    /* A · さくら散歩 — an easy walk in D major pentatonic, 96 bpm. */
+    sakura: {
+      bpm: 96, lead: 0.5, leadVol: 0.07,
+      chords: 'D D G A D G A D',
+      melody: 'A4 - B4 A4 F#4 - E4 - | D4 - E4 F#4 A4 - - . | B4 - A4 B4 D5 - B4 - | A4 - - - . . . . |' +
+              'F#4 - A4 B4 D5 - E5 - | D5 - B4 A4 B4 - - . | A4 - F#4 E4 D4 - E4 - | D4 - - - . . . .',
+      bass:  'R - F - R - F -',
+      arp:   '. 0 . 2 . 1 . 2',
+      drums: 'k . h . k . h .'
+    },
+    /* B · 夜店 — a summer-festival bounce in the minyō scale, 120 bpm. */
+    yomise: {
+      bpm: 120, lead: 0.25, leadVol: 0.06,
+      chords: 'Am Am C G Am Dm Em Am',
+      melody: 'E5 - D5 C5 A4 - C5 D5 | E5 - G5 E5 D5 - - . | C5 - D5 E5 D5 C5 A4 - | G4 - A4 - - - . . |' +
+              'A4 C5 D5 - E5 - D5 C5 | D5 - E5 G5 A5 - - . | G5 E5 D5 C5 D5 - E5 - | A4 - - - . . . .',
+      bass:  'R . O F R . F O',
+      arp:   '0 2 1 2 0 2 1 2',
+      drums: 'k . h k s . h h'
+    },
+    /* C · 星めぐり — slow and twinkling in C major, 84 bpm. */
+    hoshi: {
+      bpm: 84, lead: 0.125, leadVol: 0.075,
+      chords: 'C G Am F C Am F C',
+      melody: 'E5 - - - D5 - C5 - | D5 - - - G4 - - - | A4 - C5 - E5 - D5 - | C5 - - - - - . . |' +
+              'E5 - G5 - E5 - D5 - | C5 - - - A4 - - - | G4 - A4 - C5 - D5 - | C5 - - - - - . .',
+      bass:  'R - - - F - - -',
+      arp:   '0 1 2 3 2 1 0 1',
+      drums: '. . h . . . h .'
+    }
+  };
+  var MUSIC_LEVEL = 0.55;
+
+  function midiOf(name) {
+    var m = /^([A-G])(#|b)?(-?\d)$/.exec(name);
+    var semi = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return 12 * (+m[3] + 1) + semi;
+  }
+  function hz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  function toks(str) { return str.replace(/\|/g, ' ').split(/\s+/).filter(Boolean); }
+  /* Turn note/hold/rest tokens into { step: [midi, length] }. */
+  function notesFrom(list, offset, out, toMidi) {
+    for (var i = 0; i < list.length; i++) {
+      var tk = list[i];
+      if (tk === '-' || tk === '.') continue;
+      var n = 1;
+      while (i + n < list.length && list[i + n] === '-') n++;
+      out[offset + i] = [toMidi(tk), n];
+    }
+  }
+  function compileSong(sg) {
+    var chords = toks(sg.chords), len = chords.length * 8;
+    var c = { bpm: sg.bpm, len: len, lead: sg.lead, leadVol: sg.leadVol, mel: {}, bass: {}, arp: {}, drums: {} };
+    notesFrom(toks(sg.melody), 0, c.mel, midiOf);
+    var bassT = toks(sg.bass), arpT = toks(sg.arp), drumT = toks(sg.drums);
+    chords.forEach(function (name, bar) {
+      var ch = CHORDS[name], root = midiOf(ch.b);
+      notesFrom(bassT, bar * 8, c.bass, function (tk) { return root + (tk === 'F' ? 7 : tk === 'O' ? 12 : 0); });
+      arpT.forEach(function (tk, i) { if (/^\d$/.test(tk)) c.arp[bar * 8 + i] = [midiOf(ch.t[+tk]), 1]; });
+      drumT.forEach(function (tk, i) { if (tk !== '.') c.drums[bar * 8 + i] = tk; });
+    });
+    return c;
+  }
+
+  var pulseWaves = {}, noiseBuf = null;
+  function pulseWave(duty) {
+    if (pulseWaves[duty]) return pulseWaves[duty];
+    var N = 40, re = new Float32Array(N), im = new Float32Array(N);
+    for (var n = 1; n < N; n++) re[n] = 2 / (n * Math.PI) * Math.sin(n * Math.PI * duty);
+    return (pulseWaves[duty] = audio.createPeriodicWave(re, im));
+  }
+  function noise() {
+    if (noiseBuf) return noiseBuf;
+    noiseBuf = audio.createBuffer(1, audio.sampleRate, audio.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function voice(dest, wave, f, t, len, vol) {
+    var o = audio.createOscillator();
+    if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
+    o.frequency.value = f;
+    var g = audio.createGain();
+    var hold = Math.max(0.09, len - 0.04);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(vol * 0.6, t + 0.08);
+    g.gain.setValueAtTime(vol * 0.6, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + 0.08);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + hold + 0.1);
+  }
+  function drum(dest, kind, t) {
+    var g = audio.createGain();
+    g.connect(dest);
+    if (kind === 'k') {
+      var o = audio.createOscillator();
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.32, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g); o.start(t); o.stop(t + 0.18);
+      return;
+    }
+    var src = audio.createBufferSource();
+    src.buffer = noise();
+    var f = audio.createBiquadFilter();
+    f.type = kind === 's' ? 'bandpass' : 'highpass';
+    f.frequency.value = kind === 's' ? 1800 : 7000;
+    var dur = kind === 's' ? 0.11 : 0.035;
+    g.gain.setValueAtTime(kind === 's' ? 0.1 : 0.035, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+
+  var music = { on: false, preview: false };
+  function musicStart(key, preview) {
+    musicStop(true);
+    if (!SONGS[key]) return;
+    unlockAudio();
+    if (!audio) return;
+    var out = audio.createGain();
+    var lp = audio.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3600;
+    out.gain.setValueAtTime(0.0001, audio.currentTime);
+    out.gain.setTargetAtTime(MUSIC_LEVEL * +v.musicVol, audio.currentTime, 0.25);
+    out.connect(lp); lp.connect(audio.destination);
+    music = { on: true, preview: !!preview, song: compileSong(SONGS[key]), step: 0,
+              next: audio.currentTime + 0.1, out: out, lp: lp, timer: 0 };
+    music.timer = setInterval(pumpMusic, 25);
+    pumpMusic();
+  }
+  function musicStop(quick) {
+    if (!music.on) return;
+    var m = music;
+    m.on = false;
+    clearInterval(m.timer);
+    var t = audio.currentTime;
+    m.out.gain.cancelScheduledValues(t);
+    m.out.gain.setValueAtTime(Math.max(0.0001, m.out.gain.value), t);
+    m.out.gain.exponentialRampToValueAtTime(0.0001, t + (quick ? 0.05 : 1.2));
+    setTimeout(function () { try { m.out.disconnect(); m.lp.disconnect(); } catch (e) {} }, quick ? 300 : 1600);
+  }
+  /* Schedule the next notes slightly ahead on the audio clock, so the
+     beat stays steady even when a frame is late. */
+  function pumpMusic() {
+    var m = music;
+    if (!m.on) return;
+    var sg = m.song, dur = 60 / sg.bpm / 2;
+    while (m.next < audio.currentTime + 0.15) {
+      var i = m.step % sg.len, t = m.next, e;
+      if ((e = sg.mel[i]))  voice(m.out, pulseWave(sg.lead), hz(e[0]), t, e[1] * dur, sg.leadVol);
+      if ((e = sg.bass[i])) voice(m.out, 'triangle', hz(e[0]), t, e[1] * dur * 0.95, 0.16);
+      if ((e = sg.arp[i]))  voice(m.out, pulseWave(0.125), hz(e[0]), t, dur * 0.5, 0.025);
+      if (sg.drums[i]) drum(m.out, sg.drums[i], t);
+      m.next += dur;
+      m.step++;
+    }
   }
   function randStep() { return Math.floor(Math.random() * 6); }
 
@@ -841,6 +949,7 @@
     finger.x = p.x; finger.y = p.y;
     finger.ang = finger.lastAng = Math.atan2(p.y, p.x);
     finger.dAng = 0;
+    onTouchStart(performance.now());
     try { stage.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
   });
@@ -873,7 +982,7 @@
   function Rc() { return +v.size / 2 - QW.band / 2; }
   function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
-  /* Small effects shared by all games: ripples and floating lanterns. */
+  /* Small effects: ripples. */
   var effects = [];
   function addRipple(x, y, col, r1, dur) {
     effects.push({ kind: 'ripple', x: x, y: y, col: rgbOf(col), r1: r1 || 40, t0: performance.now(), dur: dur || 900 });
@@ -891,10 +1000,6 @@
         ctx.arc(fx.x, fx.y, 4 + fx.r1 * e, 0, 2 * Math.PI);
         ctx.stroke();
         ctx.globalAlpha = 1;
-      } else if (fx.kind === 'float') {
-        var rise = p * 160;
-        var sway = Math.sin(p * 6 + fx.seed) * 10 * p;
-        drawLantern(ctx, fx.x + sway, fx.y - rise, fx.size * (1 - 0.35 * p), 1, (1 - p) * (1 - p), now);
       }
     }
   }
@@ -932,55 +1037,45 @@
     ctx.beginPath(); ctx.arc(0, 0, R - w * 0.18, ang - half * 0.85, ang + half * 0.85); ctx.stroke();
   }
 
-  /* A paper lantern (提灯): body, ribs, dark caps, warm glow. */
-  function drawLantern(ctx, x, y, size, lit, alpha, now) {
-    if (alpha <= 0.01) return;
-    var c = rgbOf(v.cLantern);
-    var w = size * 0.92, h = size * 1.12;
-    var flick = 0.92 + 0.08 * Math.sin(now / 170 + x * 0.13 + y * 0.07);
-    ctx.globalAlpha = alpha;
-    var g = ctx.createRadialGradient(x, y, 0, x, y, size * 1.6);
-    g.addColorStop(0, rgbaA(c, 0.42 * lit * flick));
-    g.addColorStop(1, rgbaA(c, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath(); ctx.arc(x, y, size * 1.6, 0, 2 * Math.PI); ctx.fill();
-    var body = ctx.createRadialGradient(x, y - h * 0.1, 0, x, y, w * 0.6);
-    body.addColorStop(0, rgbaA(lerpC(c, [255, 240, 200], 0.6 * lit), 1));
-    body.addColorStop(1, rgbaA(lerpC(c, [120, 40, 30], 0.25 + 0.3 * (1 - lit)), 1));
-    ctx.fillStyle = body;
-    ctx.beginPath(); ctx.ellipse(x, y, w / 2, h / 2, 0, 0, 2 * Math.PI); ctx.fill();
-    ctx.strokeStyle = rgbaA([110, 40, 30], 0.35);
-    ctx.lineWidth = 1;
-    for (var i = -1; i <= 1; i++) {
-      ctx.beginPath(); ctx.ellipse(x, y + i * h * 0.2, w / 2 * Math.sqrt(1 - Math.pow(i * 0.4, 2)), h * 0.04, 0, 0, Math.PI); ctx.stroke();
-    }
-    ctx.fillStyle = rgbaA([60, 30, 28], 0.9);
-    ctx.fillRect(x - w * 0.24, y - h / 2 - 2, w * 0.48, 4);
-    ctx.fillRect(x - w * 0.24, y + h / 2 - 2, w * 0.48, 4);
-    ctx.globalAlpha = 1;
-  }
-
   /* ============================================================
-     BALL AND PADDLE — shared by Pong and Lantern breakout.
+     BALL AND PADDLE
      `cfg(name)` reads that game's own setting (pBallSpeed / bBallSpeed …).
+     Several balls can be in play: every `ExtraHits` paddle hits in a
+     row (no miss in between) another ball joins, up to `MaxBalls`.
+     A miss ends the run of hits; when the last ball is missed a new
+     one is served.
      ============================================================ */
   function makeBallGame(prefix, extra) {
     function cfg(n) { return v[prefix + n]; }
+    /* Paddle length now: shrinks from the start length to the shortest
+       over the set time, when shrinking is on. */
+    function padDeg() {
+      if (!cfg('Shrink')) return +cfg('PadDeg');
+      var t = round.state === 'play' ? Math.min(1, S.prog / (+cfg('ShrinkSecs') * 1000)) : round.state === 'over' ? 1 : 0;
+      return +cfg('PadStart') + (+cfg('PadMin') - +cfg('PadStart')) * t;
+    }
     var G = {
       padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
-      ball: null, rally: 0, best: 0, trail: [],
+      balls: [], rally: 0,
+      /* A fresh round: paddle to the top, no ball yet. */
       reset: function () {
-        G.rally = 0; G.trail = [];
+        G.rally = 0; G.balls = [];
         G.padAng = G.padTarget = -Math.PI / 2;
-        G.serve(performance.now());
         if (extra && extra.reset) extra.reset();
       },
-      serve: function (now) {
+      /* Put a new ball in, waiting `wait` seconds before it moves. */
+      serve: function (now, wait) {
         var pos = extra && extra.spawn ? extra.spawn(G) : { x: 0, y: 0, ang: Math.random() * 2 * Math.PI };
         var sp = +cfg('BallSpeed');
-        G.ball = { x: pos.x, y: pos.y, vx: Math.cos(pos.ang) * sp, vy: Math.sin(pos.ang) * sp, state: 'serve', t0: now, alpha: 0 };
-        G.trail = [];
+        G.balls.push({ x: pos.x, y: pos.y, vx: Math.cos(pos.ang) * sp, vy: Math.sin(pos.ang) * sp,
+                       state: 'serve', t0: now, wait: wait, alpha: 0, trail: [] });
       },
+      start: function (now) { G.serve(now, +cfg('Respawn')); },
+      /* The round is over: every ball fades away where it is. */
+      stop: function (now) {
+        G.balls.forEach(function (b) { if (b.state !== 'lost') { b.state = 'lost'; b.t0 = now; b.vx *= 0.15; b.vy *= 0.15; } });
+      },
+      live: function () { return G.balls.filter(function (b) { return b.state !== 'lost'; }).length; },
       paddles: function () { return v.game === 'pong' && v.pTwo ? [G.padAng, G.padAng + Math.PI] : [G.padAng]; },
       update: function (dt, now) {
         /* Paddle follows the finger. */
@@ -993,338 +1088,256 @@
         G.padAng = wrapAng(G.padAng + wrapAng(G.padTarget - G.padAng) * k);
         G.padTarget = G.padAng + wrapAng(G.padTarget - G.padAng);
 
-        var b = G.ball;
-        if (!b) return;
-        if (b.state === 'serve') {
-          b.alpha = smooth((now - b.t0) / 500);
-          if (now - b.t0 >= +cfg('Respawn') * 1000) { b.state = 'play'; b.alpha = 1; }
-          return;
+        for (var i = G.balls.length - 1; i >= 0; i--) {
+          var b = G.balls[i];
+          if (b.state === 'lost') {
+            b.x += b.vx * dt; b.y += b.vy * dt;
+            b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
+            if (now - b.t0 > 600) G.balls.splice(i, 1);
+            continue;
+          }
+          if (b.state === 'serve') {
+            b.alpha = smooth((now - b.t0) / 500);
+            if (now - b.t0 >= b.wait * 1000) { b.state = 'play'; b.alpha = 1; }
+            continue;
+          }
+          moveBall(b, dt, now);
         }
-        if (b.state === 'lost') {
-          b.x += b.vx * dt; b.y += b.vy * dt;
-          b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
-          if (now - b.t0 > 600) G.serve(now);
-          return;
-        }
-        var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
-        var speed = Math.hypot(b.vx, b.vy);
-        var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
-        var h = dt / steps;
-        for (var s = 0; s < steps; s++) {
-          b.x += b.vx * h; b.y += b.vy * h;
-          if (extra && extra.collide) extra.collide(G, b, br);
-          var d = Math.hypot(b.x, b.y);
-          var inner = R - pw / 2;
-          if (d + br >= inner && d < R) {
-            var nx = b.x / d, ny = b.y / d;
-            if (b.vx * nx + b.vy * ny > 0) {
-              var ang = Math.atan2(b.y, b.x);
-              var reach = +cfg('PadDeg') * DEG / 2 + Math.asin(Math.min(1, br / d));
-              var hit = null;
-              G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
-              if (hit !== null) {
-                /* Bounce off the ring's normal, then angle it by where it hit. */
-                var dot = b.vx * nx + b.vy * ny;
-                var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
-                var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
-                var dir = Math.atan2(ry, rx) + hit * +cfg('English') * DEG;
-                /* Never let it skim along the edge: keep it at most 65° from straight back in. */
-                var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
-                if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
-                b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
-                var back2 = inner - br - 0.5;
-                b.x = nx * back2; b.y = ny * back2;
-                G.rally++;
-                if (G.rally > G.best) G.best = G.rally;
-                addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
-                chime(Math.min(8, 2 + (G.rally % 7)));
-                if (extra && extra.onPaddle) extra.onPaddle(G);
+        if (round.state === 'play' && G.live() === 0) G.serve(now, +cfg('Respawn'));
+      },
+      draw: function (ctx, now) {
+        G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, padDeg(), +cfg('PadW')); });
+        var br = +cfg('BallR');
+        var trail = v.pTrail;
+        G.balls.forEach(function (b) {
+          if (trail && b.state === 'play') {
+            for (var i = 0; i < b.trail.length; i++) {
+              var tp = b.trail[i], f = (i + 1) / b.trail.length;
+              ctx.globalAlpha = 0.18 * f;
+              ctx.fillStyle = v.cBall;
+              ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
+          }
+          var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
+          glowDot(ctx, b.x, b.y, br * pulse, v.cBall, b.alpha);
+        });
+      }
+    };
+
+    function moveBall(b, dt, now) {
+      var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
+      var speed = Math.hypot(b.vx, b.vy);
+      var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
+      var h = dt / steps;
+      for (var s = 0; s < steps; s++) {
+        b.x += b.vx * h; b.y += b.vy * h;
+        if (extra && extra.collide) extra.collide(G, b, br);
+        var d = Math.hypot(b.x, b.y);
+        var inner = R - pw / 2;
+        if (d + br >= inner && d < R) {
+          var nx = b.x / d, ny = b.y / d;
+          if (b.vx * nx + b.vy * ny > 0) {
+            var ang = Math.atan2(b.y, b.x);
+            var reach = padDeg() * DEG / 2 + Math.asin(Math.min(1, br / d));
+            var hit = null;
+            G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
+            if (hit !== null) {
+              /* Bounce off the ring's normal, then angle it by where it hit. */
+              var dot = b.vx * nx + b.vy * ny;
+              var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
+              var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
+              var dir = Math.atan2(ry, rx) + hit * +cfg('English') * DEG;
+              /* Never let it skim along the edge: keep it at most 65° from straight back in. */
+              var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
+              if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
+              b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
+              var back2 = inner - br - 0.5;
+              b.x = nx * back2; b.y = ny * back2;
+              G.rally++;
+              addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
+              chime(v.climb ? G.rally - 1 : Math.min(8, 2 + (G.rally % 7)));
+              if (extra && extra.onPaddle) extra.onPaddle(G);
+              /* Every N hits in a row, one more ball (up to the limit). */
+              if (G.rally % +cfg('ExtraHits') === 0 && G.live() < +cfg('MaxBalls')) {
+                G.serve(now, 0.6);
+                if (v.ballFx) {
+                  addRipple(0, 0, v.cBall, Rc() * 0.8, 1400);
+                  addRipple(0, 0, v.cPaddle, Rc() * 0.5, 1100);
+                  flashMsg('ボール追加！', 1300);
+                }
+                setTimeout(function () { playBell(1567.98, 0.12 * +v.volume, 1.2); }, 120);
               }
             }
           }
-          if (d > R + 6) {
-            b.state = 'lost'; b.t0 = now;
-            G.rally = 0;
-            return;
-          }
         }
-        if (cfg('Trail') || prefix === 'b') {
-          G.trail.push({ x: b.x, y: b.y });
-          if (G.trail.length > 10) G.trail.shift();
+        if (d > R + 6) {
+          b.state = 'lost'; b.t0 = now;
+          if (G.rally > 0 && round.state === 'play') missNote();
+          G.rally = 0;
+          return;
         }
-      },
-      draw: function (ctx, now) {
-        G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, +cfg('PadDeg'), +cfg('PadW')); });
-        var b = G.ball;
-        if (!b) return;
-        var br = +cfg('BallR');
-        if ((prefix === 'p' ? v.pTrail : true) && b.state === 'play') {
-          for (var i = 0; i < G.trail.length; i++) {
-            var tp = G.trail[i], f = (i + 1) / G.trail.length;
-            ctx.globalAlpha = 0.18 * f;
-            ctx.fillStyle = v.cBall;
-            ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
-          }
-          ctx.globalAlpha = 1;
-        }
-        var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
-        glowDot(ctx, b.x, b.y, br * pulse, v.cBall, b.alpha);
       }
-    };
+      if (v.pTrail) {
+        b.trail.push({ x: b.x, y: b.y });
+        if (b.trail.length > 10) b.trail.shift();
+      }
+    }
     return G;
   }
 
-  /* ---------- Pong ---------- */
-  var pong = makeBallGame('p', null);
-  pong.hud = function () { return 'ラリー ' + pong.rally + '　·　最高 ' + pong.best; };
+  /* ---------- Pong: one point per paddle hit ---------- */
+  var pong = makeBallGame('p', { onPaddle: function () { addScore(1); } });
 
-  /* ---------- Lantern breakout ---------- */
-  var lanternState = { list: [], turn: 0, relightAt: 0, round: 0 };
-  function buildLanterns() {
-    var L = [], rings = +v.bRings, gap = +v.bGap;
-    L.push({ r: 0, a: 0 });
-    for (var k = 1; k <= rings; k++) {
-      var n = 6 * k;
-      for (var i = 0; i < n; i++) L.push({ r: gap * k, a: (i / n) * 2 * Math.PI + (k % 2 ? 0 : Math.PI / n) });
-    }
-    var now = performance.now();
-    lanternState.list = L.map(function (o) { return { r: o.r, a: o.a, x: 0, y: 0, hits: +v.bHits, alive: true, born: now, flash: 0 }; });
-    lanternState.relightAt = 0;
-    placeLanterns();
-  }
-  function placeLanterns() {
-    lanternState.list.forEach(function (l) {
-      l.x = Math.cos(l.a + lanternState.turn) * l.r;
-      l.y = Math.sin(l.a + lanternState.turn) * l.r;
-    });
-  }
-  var lanterns = makeBallGame('b', {
-    reset: function () { lanternState.turn = 0; lanternState.round = 0; buildLanterns(); },
-    spawn: function (G) {
-      /* Just inside the paddle, heading in toward the lanterns. */
-      var outer = +v.bRings * +v.bGap + +v.bSize;
-      var r = Math.min(Rc() - +v.bPadW - +v.bBallR - 6, Math.max(outer + +v.bBallR + 14, Rc() * 0.72));
-      var a = G.padAng;
-      return { x: Math.cos(a) * r, y: Math.sin(a) * r, ang: a + Math.PI + (Math.random() - 0.5) * 40 * DEG };
-    },
-    collide: function (G, b, br) {
-      var now = performance.now();
-      var lr = +v.bSize * 0.52;
-      for (var i = 0; i < lanternState.list.length; i++) {
-        var l = lanternState.list[i];
-        if (!l.alive) continue;
-        var dx = b.x - l.x, dy = b.y - l.y, d = Math.hypot(dx, dy);
-        if (d >= br + lr || d === 0) continue;
-        var nx = dx / d, ny = dy / d, dot = b.vx * nx + b.vy * ny;
-        if (dot < 0) { b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny; }
-        b.x = l.x + nx * (br + lr + 0.5); b.y = l.y + ny * (br + lr + 0.5);
-        l.hits--; l.flash = now;
-        if (l.hits <= 0) {
-          l.alive = false;
-          if (v.bFloat) effects.push({ kind: 'float', x: l.x, y: l.y, size: +v.bSize, t0: now, dur: 2600, seed: Math.random() * 6 });
-          else addRipple(l.x, l.y, v.cLantern, 46, 900);
-          chime(4 + Math.floor(Math.random() * 5));
-          if (lanternState.list.every(function (x) { return !x.alive; })) {
-            lanternState.relightAt = now + +v.bRelight * 1000;
-            lanternState.round++;
-          }
-        } else {
-          chime(randStep(), true);
-        }
-        return;
-      }
-    }
-  });
-  var ballUpdate = lanterns.update;
-  lanterns.update = function (dt, now) {
-    lanternState.turn += +v.bTurn * DEG * dt;
-    placeLanterns();
-    if (lanternState.relightAt && now >= lanternState.relightAt) buildLanterns();
-    ballUpdate(dt, now);
-  };
-  var ballDraw = lanterns.draw;
-  lanterns.draw = function (ctx, now) {
-    var maxH = +v.bHits;
-    lanternState.list.forEach(function (l) {
-      if (!l.alive) return;
-      var lit = 0.35 + 0.65 * (l.hits / maxH);
-      if (now - l.flash < 250) lit = 1.2;
-      drawLantern(ctx, l.x, l.y, +v.bSize, lit, smooth((now - l.born) / 900), now);
-    });
-    ballDraw(ctx, now);
-  };
-  lanterns.hud = function () {
-    var left = lanternState.list.filter(function (l) { return l.alive; }).length;
-    return '灯籠 ' + left + ' / ' + lanternState.list.length + (lanternState.round ? '　·　' + lanternState.round + ' 回クリア' : '');
-  };
-
-  /* ---------- Firefly ---------- */
-  var PATTERNS = {
-    dipper: { pts: [[-0.78, -0.22], [-0.48, -0.32], [-0.2, -0.24], [0.06, -0.08], [0.1, 0.28], [0.56, 0.36], [0.64, 0.02]],
-              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]] },
-    star:   { pts: [0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.78, Math.sin(a) * 0.78]; }),
-              edges: [[0, 2], [2, 4], [4, 1], [1, 3], [3, 0]], order: [0, 2, 4, 1, 3] },
-    flower: { pts: [[0, 0]].concat([0, 1, 2, 3, 4].map(function (i) { var a = -Math.PI / 2 + i * 2 * Math.PI / 5; return [Math.cos(a) * 0.6, Math.sin(a) * 0.6]; })),
-              edges: [[0, 1], [0, 2], [0, 3], [0, 4], [0, 5], [1, 2], [2, 3], [3, 4], [4, 5], [5, 1]] },
-    circle: { pts: [0, 1, 2, 3, 4, 5, 6, 7].map(function (i) { var a = -Math.PI / 2 + i * Math.PI / 4; return [Math.cos(a) * 0.74, Math.sin(a) * 0.74]; }),
-              edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 7], [7, 0]] }
-  };
-  var CYCLE = ['dipper', 'star', 'flower', 'circle', 'random'];
-  var NAMES = { dipper: '北斗七星', star: '星', flower: '花', circle: '円', random: '星座' };
-  var ff = { x: 0, y: 0, tx: 0, ty: 0, trail: [], stars: [], edges: [], order: null, next: 0,
-             state: 'play', t0: 0, cycle: 0, name: '', done: 0 };
-
-  function randomPattern(n) {
-    var pts = [], tries = 0, minD = 0.36;
-    while (pts.length < n && tries < 2000) {
-      tries++;
-      var a = Math.random() * 2 * Math.PI, r = Math.sqrt(Math.random()) * 0.8;
-      var p = [Math.cos(a) * r, Math.sin(a) * r];
-      if (pts.every(function (q) { return Math.hypot(p[0] - q[0], p[1] - q[1]) >= minD; })) pts.push(p);
-      if (tries % 400 === 0) minD *= 0.85;
-    }
-    /* Join them nearest-first so the finished shape is one line. */
-    var edges = [], order = [0], used = [true];
-    for (var k = 1; k < pts.length; k++) {
-      var last = order[order.length - 1], best = -1, bd = 1e9;
-      for (var j = 0; j < pts.length; j++) {
-        if (used[j]) continue;
-        var dd = Math.hypot(pts[j][0] - pts[last][0], pts[j][1] - pts[last][1]);
-        if (dd < bd) { bd = dd; best = j; }
-      }
-      used[best] = true; order.push(best); edges.push([last, best]);
-    }
-    return { pts: pts, edges: edges, order: order };
-  }
-  function newConstellation() {
-    var key = v.fPattern === 'cycle' ? CYCLE[ff.cycle++ % CYCLE.length] : v.fPattern;
-    var pat = key === 'random' ? randomPattern(+v.fCount) : PATTERNS[key];
-    var s = Rc() * 0.78, now = performance.now();
-    ff.stars = pat.pts.map(function (p) { return { x: p[0] * s, y: p[1] * s, lit: false, litT: 0, born: now }; });
-    ff.edges = pat.edges;
-    ff.order = pat.order || pat.pts.map(function (_, i) { return i; });
-    ff.next = 0; ff.state = 'play'; ff.name = NAMES[key];
-  }
-  var firefly = {
-    reset: function () {
-      ff.x = 0; ff.y = Rc() * 0.2; ff.tx = ff.x; ff.ty = ff.y; ff.trail = []; ff.cycle = 0; ff.done = 0;
-      newConstellation();
-    },
-    update: function (dt, now) {
-      if (finger.down) { ff.tx = finger.x; ff.ty = finger.y; }
-      else if (v.fWander) {
-        var t = now / 1000, R0 = Rc() * 0.45;
-        var wx = Math.sin(t * 0.37) * R0 + Math.sin(t * 0.91 + 1) * R0 * 0.3;
-        var wy = Math.cos(t * 0.29) * R0 * 0.8 + Math.sin(t * 0.73) * R0 * 0.3;
-        ff.tx += (wx - ff.tx) * (1 - Math.exp(-0.4 * dt));
-        ff.ty += (wy - ff.ty) * (1 - Math.exp(-0.4 * dt));
-      }
-      /* Keep the target inside the ring. */
-      var lim = Rc() - 18, td = Math.hypot(ff.tx, ff.ty);
-      if (td > lim) { ff.tx *= lim / td; ff.ty *= lim / td; }
-      var k = 1 - Math.exp(-(+v.fFollow) * dt);
-      ff.x += (ff.tx - ff.x) * k; ff.y += (ff.ty - ff.y) * k;
-      ff.trail.push({ x: ff.x, y: ff.y });
-      while (ff.trail.length > +v.fTrail) ff.trail.shift();
-
-      if (ff.state === 'play') {
-        var reach = +v.fReach;
-        for (var i = 0; i < ff.stars.length; i++) {
-          var st = ff.stars[i];
-          if (st.lit) continue;
-          if (v.fOrder && ff.order[ff.next] !== i) continue;
-          if (Math.hypot(st.x - ff.x, st.y - ff.y) <= reach) {
-            st.lit = true; st.litT = now;
-            ff.next++;
-            addRipple(st.x, st.y, v.cFirefly, 40, 1000);
-            chime(Math.min(8, ff.stars.filter(function (q) { return q.lit; }).length));
-          }
-        }
-        if (ff.stars.every(function (q) { return q.lit; })) {
-          ff.state = 'done'; ff.t0 = now; ff.done++;
-          setTimeout(function () { chime(5); }, 200);
-          setTimeout(function () { chime(7); }, 420);
-        }
-      } else if (ff.state === 'done' && now - ff.t0 > 900 + +v.fHold * 1000 + 1200) {
-        newConstellation();
-      }
-    },
-    draw: function (ctx, now) {
-      var col = rgbOf(v.cFirefly);
-      var fade = 1;
-      if (ff.state === 'done') {
-        var outT = now - ff.t0 - 900 - +v.fHold * 1000;
-        if (outT > 0) fade = 1 - smooth(outT / 1200);
-      }
-      /* The finished shape: lines drawn out over 0.9s. */
-      if (ff.state === 'done' && v.fLines) {
-        var p = smooth((now - ff.t0) / 900);
-        ctx.strokeStyle = rgbaA(col, 0.65 * fade);
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        ff.edges.forEach(function (e) {
-          var a = ff.stars[e[0]], b = ff.stars[e[1]];
-          ctx.beginPath();
-          ctx.moveTo(a.x, a.y);
-          ctx.lineTo(a.x + (b.x - a.x) * p, a.y + (b.y - a.y) * p);
-          ctx.stroke();
-        });
-      }
-      /* Stars. */
-      ff.stars.forEach(function (st, i) {
-        var born = smooth((now - st.born) / 900) * fade;
-        if (st.lit) {
-          var tw = 0.85 + 0.15 * Math.sin(now / 300 + i);
-          glowDot(ctx, st.x, st.y, 7 * tw, v.cFirefly, born);
-        } else {
-          var isNext = v.fOrder && ff.order[ff.next] === i;
-          var a = (isNext ? 0.55 + 0.35 * Math.sin(now / 220) : 0.35) * born;
-          ctx.fillStyle = rgbaA([255, 253, 249], a);
-          ctx.beginPath(); ctx.arc(st.x, st.y, isNext ? 5 : 4, 0, 2 * Math.PI); ctx.fill();
-          ctx.strokeStyle = rgbaA(col, a * 0.8);
-          ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.arc(st.x, st.y, 9, 0, 2 * Math.PI); ctx.stroke();
-        }
-      });
-      /* Trail, then the firefly, blinking softly. */
-      for (var t = 0; t < ff.trail.length; t++) {
-        var q = ff.trail[t], f = (t + 1) / ff.trail.length;
-        ctx.fillStyle = rgbaA(col, 0.22 * f);
-        ctx.beginPath(); ctx.arc(q.x, q.y, +v.fSize * 0.5 * f, 0, 2 * Math.PI); ctx.fill();
-      }
-      var blink = 0.65 + 0.35 * Math.sin(now / 260);
-      glowDot(ctx, ff.x, ff.y, +v.fSize * (0.9 + 0.1 * blink), v.cFirefly, blink);
-    },
-    hud: function () {
-      var lit = ff.stars.filter(function (q) { return q.lit; }).length;
-      return ff.name + '　' + lit + ' / ' + ff.stars.length + (ff.done ? '　·　' + ff.done + ' 個完成' : '');
-    }
-  };
-
-  var GAMES = { pong: pong, lanterns: lanterns, firefly: firefly };
+  var GAMES = { pong: pong };
   function current() { return GAMES[v.game] || null; }
-  function restartGame() {
+
+  /* ============================================================
+     ROUNDS
+     ready → (first touch) → play for `round` seconds → over
+     → (touch again) → play …
+     The countdown ring is the round's clock: it starts empty and
+     makes one full turn by the end of the round.
+     Top scores are kept per game in this browser.
+     ============================================================ */
+  var BEST_KEY = 'gamesPreview.best';
+  var best = {};
+  try { best = JSON.parse(localStorage.getItem(BEST_KEY) || '{}') || {}; } catch (e) { best = {}; }
+  function saveBest() { try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) {} }
+
+  var round = { state: 'ready', score: 0, overAt: 0, newBest: false, flash: null, lastTick: -1 };
+
+  /* Points are multiplied by the balls in play (when the bonus is on). */
+  function multiplier() {
+    var g = current();
+    if (!v.bonus || !g || !g.live) return 1;
+    return Math.max(1, g.live());
+  }
+  function flashMsg(text, ms) { round.flash = { text: text, until: performance.now() + ms }; }
+  function addScore(n) {
+    if (round.state !== 'play') return;
+    round.score += n * multiplier();
+    scoreNowEl.textContent = round.score;
+    scoreNowEl.classList.add('pop');
+    requestAnimationFrame(function () { requestAnimationFrame(function () { scoreNowEl.classList.remove('pop'); }); });
+  }
+
+  /* Back to "touch to start": used on load, on game change and by "New round". */
+  function readyRound() {
     effects = [];
+    round.state = 'ready';
+    round.score = 0;
+    round.flash = null;
+    if (!music.preview) musicStop(true);
+    S.phase = 'idle'; S.prog = 0; prevSweep = null;
     var g = current();
     if (g) g.reset();
     win.classList.toggle('pv-playing', !!g);
+  }
+  function startRound(now) {
+    var g = current();
+    if (!g) return;
+    effects = [];
+    g.reset();
+    g.start(now);
+    round.state = 'play';
+    round.score = 0;
+    round.newBest = false;
+    round.flash = null;
+    round.lastTick = -1;
+    scoreNowEl.textContent = '0';
+    if (v.music !== 'off') musicStart(v.music);
+    S.phase = 'showing'; S.D = +v.round * 1000; S.prog = 0; S.t0 = now; prevSweep = null;
+    chime(3);
+  }
+  function endRound(now) {
+    var g = current();
+    round.state = 'over';
+    round.overAt = now;
+    if (round.score > (best[v.game] || 0)) { best[v.game] = round.score; round.newBest = true; saveBest(); }
+    /* The finished ring blooms and fades back, as in the app. */
+    snapshotFinal(); prevSweep = { t: now };
+    S.phase = 'idle';
+    if (g) g.stop(now);
+    musicStop(false);
+    chime(4); setTimeout(function () { chime(6); }, 180); setTimeout(function () { chime(8); }, 360);
+  }
+  /* The first touch starts a round; after a round, a new touch (once
+     the result has been on screen for a moment) starts the next. */
+  function onTouchStart(now) {
+    if (!current()) return;
+    if (round.state === 'ready') startRound(now);
+    else if (round.state === 'over' && now - round.overAt > 1500) startRound(now);
+  }
+
+  /* How to play, in Japanese. The lines follow the game and its settings. */
+  function howToLines() {
+    var lines = [], secs = +v.round + '秒';
+    if (v.game === 'pong') {
+      lines.push(v.pControl === 'dial' ? '指で円を描くようになぞると、パドルが回ります'
+                                       : '指を置いた方向へ、パドルが動きます');
+      lines.push('ボールを輪の外に出さないよう、打ち返しましょう');
+      lines.push(v.pExtraHits + '回続けて打ち返すと、ボールが増えます');
+      if (v.bonus) lines.push('ボールが多いほど、得点が×2、×3に');
+    }
+    if (lines.length) lines.push(secs + 'で、最高スコアを目指しましょう');
+    return lines;
+  }
+
+  var shown = {};
+  function setText(el, key, t) { if (shown[key] !== t) { shown[key] = t; el.textContent = t; } }
+  function updateScoreBox() {
+    var on = !!current() && v.counter;
+    scoreBox.classList.toggle('off', !on);
+    if (!on) return;
+    var left = round.state === 'play' ? Math.max(0, Math.ceil((S.D - S.prog) / 1000))
+             : round.state === 'ready' ? +v.round : 0;
+    setText(scoreNowEl, 'now', String(round.score));
+    setText(scoreBestEl, 'best', String(best[v.game] || 0));
+    setText(scoreTimeEl, 'time', String(left));
+    var m = round.state === 'play' ? multiplier() : 1;
+    setText(scoreMultEl, 'mult', m > 1 ? '×' + m : '');
+    var warn = warnLeft() !== null;
+    if (shown.warn !== warn) { shown.warn = warn; scoreTimeEl.parentNode.classList.toggle('warn', warn); }
+    var msg = '', title = false;
+    if (round.state === 'ready') msg = 'タッチしてスタート';
+    else if (round.state === 'play' && round.flash && performance.now() < round.flash.until) { msg = round.flash.text; title = true; }
+    else if (round.state === 'over') {
+      if (performance.now() - round.overAt < 1500) { msg = round.newBest ? '最高スコア更新！' : 'おつかれさまでした'; title = true; }
+      else msg = round.newBest ? '最高スコア更新！ · タッチでもう一度' : 'タッチでもう一度';
+    }
+    setText(scoreMsgEl, 'msg', msg);
+    var how = howToLines(), howKey = how.join('\n');
+    if (shown.how !== howKey) {
+      shown.how = howKey;
+      scoreHowEl.textContent = '';
+      how.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; scoreHowEl.appendChild(d); });
+    }
+    var hs = v.howto === 'off' ? 'gone'
+           : round.state !== 'play' || v.howto === 'always' ? ''
+           : v.howto === 'faint' ? 'faint' : 'gone';
+    if (shown.hs !== hs) { shown.hs = hs; scoreHowEl.className = 'howto' + (hs ? ' ' + hs : ''); }
+    scoreMsgEl.classList.toggle('title', title);
   }
 
   /* ============================================================
      THE LOOP
      ============================================================ */
   var lastNow = performance.now(), frameNo = 0, paused = false;
-  var fpsFrames = 0, fpsT = performance.now(), hudText = '';
+  var fpsFrames = 0, fpsT = performance.now();
   function frame() {
     requestAnimationFrame(frame);
     var now = performance.now();
     var dtMs = Math.min(100, now - lastNow);
     lastNow = now;
-    if (S.phase !== 'idle') {
+    if (round.state === 'play' && !paused) {
       S.prog += dtMs;
-      var rem = Math.max(0, S.D - S.prog);
-      if (S.phase === 'showing' && rem <= QW.fade) startLeaving();
-      if (S.prog >= S.D && S.phase === 'leaving') showQuote(S.pos + 1);
+      var wl = warnLeft();
+      if (wl !== null) {
+        var sec = Math.ceil(wl);
+        if (sec !== round.lastTick && sec > 0) { round.lastTick = sec; tick(sec <= 3); }
+      }
+      if (S.prog >= S.D) endRound(now);
     }
     if ((frameNo++ % 90) === 0) syncBreath();
     drawRing(now);
@@ -1339,8 +1352,7 @@
       g.draw(ctx, now);
     }
     drawEffects(ctx, now);
-    var t = g && v.counter ? g.hud() : '';
-    if (t !== hudText) { hudText = t; hudEl.textContent = t; }
+    updateScoreBox();
 
     fpsFrames++;
     if (now - fpsT >= 500) {
@@ -1360,13 +1372,22 @@
     var dec = String(c.step).indexOf('.') >= 0 ? String(c.step).split('.')[1].length : 0;
     return (+x).toFixed(dec);
   }
+  function onButton(c) {
+    if (c.id === 'musicListen') {
+      if (music.on) musicStop(false);
+      else if (v.music !== 'off') musicStart(v.music, true);
+    }
+  }
   function onChange(c) {
+    if (/^cd/.test(c.id)) { syncQW(); if (c.id === 'cdHeadW') sizeCanvases(); }
+    if (c.id === 'music' && (music.on || round.state === 'play')) {
+      if (v.music === 'off') musicStop(false); else musicStart(v.music, music.preview);
+    }
+    if (c.id === 'musicVol' && music.on) music.out.gain.setTargetAtTime(MUSIC_LEVEL * +v.musicVol, audio.currentTime, 0.1);
     save();
     applyCSS();
-    if (c.id === 'size') { sizeCanvases(); fitStage(); refitQuote(); restartGame(); }
-    if (c.id === 'quotePlace') fitStage();
-    if (c.id === 'bRings' || c.id === 'bGap' || c.id === 'bHits') { if (v.game === 'lanterns') buildLanterns(); }
-    if (c.id === 'fPattern' || c.id === 'fCount') { if (v.game === 'firefly') { ff.cycle = 0; newConstellation(); } }
+    if (c.id === 'size') { sizeCanvases(); fitStage(); readyRound(); }
+    if (c.id === 'round' && round.state !== 'play') readyRound();
   }
 
   function buildPanel() {
@@ -1386,7 +1407,15 @@
         return;
       }
       var row, inp;
-      if (c.type === 'check') {
+      if (c.type === 'button') {
+        row = document.createElement('div');
+        row.className = 'pv-transport';
+        inp = document.createElement('button');
+        inp.type = 'button';
+        inp.textContent = c.label;
+        inp.addEventListener('click', function () { onButton(c); });
+        row.appendChild(inp);
+      } else if (c.type === 'check') {
         row = document.createElement('label');
         row.className = 'pv-check';
         inp = document.createElement('input');
@@ -1455,7 +1484,7 @@
     buildPanel();
     applyCSS();
     fitStage();
-    restartGame();
+    readyRound();
   });
 
   document.getElementById('pvCollapse').addEventListener('click', function () {
@@ -1465,13 +1494,19 @@
   });
   document.getElementById('pvRestart').addEventListener('click', function () {
     unlockAudio();
-    pong.best = 0; lanterns.best = 0;
-    restartGame();
+    readyRound();
   });
   var pauseBtn = document.getElementById('pvPause');
   pauseBtn.addEventListener('click', function () {
     paused = !paused;
     pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+    if (round.state === 'play') { if (paused) musicStop(false); else if (v.music !== 'off') musicStart(v.music); }
+  });
+
+  document.getElementById('pvClearBest').addEventListener('click', function () {
+    delete best[v.game];
+    saveBest();
+    statusEl.textContent = 'Top score cleared for ' + GAME_NAMES[v.game] + '.';
   });
 
   var statusEl = document.getElementById('pvStatus');
@@ -1484,8 +1519,7 @@
     applyCSS();
     sizeCanvases();
     fitStage();
-    refitQuote();
-    restartGame();
+    readyRound();
     outEl.classList.remove('shown');
     statusEl.textContent = 'Reset to the proposed defaults.';
   });
@@ -1519,36 +1553,13 @@
   /* ============================================================
      START
      ============================================================ */
-  var FALLBACK = ['静かな時間も、また大切な時間です', '小さな幸せを、ひとつずつ', 'ひと休みすることも、大切なことです'];
-  var sourceEl = document.getElementById('pvSource');
-  function loadQuotes() {
-    return fetch('quotes.json', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        var q = (j && j.quotes || []).map(function (s) { return String(s).trim(); }).filter(Boolean);
-        if (!q.length) throw new Error('empty');
-        QUOTES = q;
-        sourceEl.textContent = q.length + ' quotes read from quotes.json.';
-      })
-      .catch(function () {
-        QUOTES = FALLBACK;
-        sourceEl.textContent = 'Could not read quotes.json (open this page from the web server, not as a file). Showing a few built-in lines.';
-      });
-  }
-
   buildPanel();
   applyCSS();
   sizeCanvases();
   fitStage();
   window.addEventListener('resize', function () { fitStage(); });
-  restartGame();
+  readyRound();
   requestAnimationFrame(frame);
-
-  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-  Promise.all([loadQuotes(), ready]).then(function () {
-    syncBreath();
-    setTimeout(function () { showQuote(0); }, 350);
-  });
 })();
 </script>
 </body>
