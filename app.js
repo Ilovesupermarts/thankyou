@@ -1,4 +1,4 @@
-var BUILD = 'v130';
+var BUILD = 'v131';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -7630,13 +7630,17 @@ var QuoteWindow = (function() {
      and in from nothing at the top. */
   function drawSweep(ctx, cx, cy, frac, alpha) {
     var R = v.size / 2, T = +v.band, Rc = R - T / 2;
-    var phi = frac * 360;
+    /* Keep clear of the 12 o'clock seam of the conic gradient: the sweep
+       starts 0.4deg after it and stops 0.7deg before it. On a pixel grid
+       that does not line up with the seam, the pixels along the start
+       edge sample the gradient from its far end and draw a thin line. */
+    var SEAM = 0.4, phi = Math.min(frac * 360, 359.3);
     if (phi < 0.5 || alpha <= 0.002) return;
     var hb = +v.bodyW / 2;                                   /* half the line's thickness */
     var r = v.head ? Math.max(hb, +v.headW / 2) : hb;        /* the bulb's radius */
     var Lt = v.head ? Math.max(10, +v.neck) : 10;            /* length of the taper */
     var pxDeg = Rc * DEG;                                    /* pixels along the ring per degree */
-    var sMax = phi * pxDeg;
+    var sMax = (phi - SEAM) * pxDeg;
 
     /* Where the bulb's circle hands over to the taper. Past the widest
        point by `al`, the taper starts with the circle's own slope, so
@@ -7677,6 +7681,10 @@ var QuoteWindow = (function() {
         var al = Math.pow(1 - t, v.taper) * smooth(u / SFd);
         grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), al));
       }
+      /* Nothing past the head: pixels that wrap round the seam are clear. */
+      var endC = rgbaA(lerpC(COL.start, COL.end, phi / 360), 0);
+      grad.addColorStop(Math.min(1, phi / 360 + 0.0006), endC);
+      grad.addColorStop(1, endC);
     }
     ctx.fillStyle = grad || rgbaA(lerpC(COL.start, COL.end, frac), 1);
     for (var p = 0; p < PASSES; p++) {
