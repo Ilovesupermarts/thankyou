@@ -1,4 +1,4 @@
-var BUILD = 'v132';
+var BUILD = 'v133';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -7507,6 +7507,9 @@ var tyIntervals = [];
    not move the paddles. The top score is kept for this visit only
    (newVisit() clears it).
 
+   Look: while the games page is showing, the falling leaves (snow in winter)
+   fade out (body.games-active in main.css).
+
    Sound: while the games page is showing, the ambient music, the wind
    chime and the audio HUD fade out and a short retro (chiptune) loop,
    さくら散歩, plays instead, the whole time. When she leaves the page
@@ -8452,6 +8455,7 @@ var GameWindow = (function() {
     running = false;
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     window.removeEventListener('resize', fitStage);
+    document.body.classList.remove('games-active');      /* the falling leaves / snow come back */
     finger.down = false; finger.id = null;
     readyRound();
     wipe();
@@ -8474,6 +8478,7 @@ var GameWindow = (function() {
     howEl.style.lineHeight = String(G.howtoLine);
     fitStage();
     window.addEventListener('resize', fitStage);
+    document.body.classList.add('games-active');         /* the falling leaves / snow fade out */
     fadeAmbientOut();
     musicStart();
     syncBreath();
