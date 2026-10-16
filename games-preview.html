@@ -31,7 +31,13 @@
      paddle, and a moving paddle pushes the ball by friction. Turn it off
      for the earlier arcade bounce (speed-up and edge angle).
 
-     After a round the result stays on screen until a tap. Paddle and
+     Instructions: sized to fill a set share of the ring's width, never
+     below a set minimum size.
+
+     Paddle slider: a slider under the ring that also moves the paddle(s).
+
+     After a round the result stays on screen as a button; tapping it
+     (or anywhere, if so set) starts the next round. Paddle and
      ball colours can be picked from pairs made of the app's own palette.
 
      Music: three short retro (chiptune) loops, composed here and played
@@ -86,20 +92,51 @@
      tap line together) and equal space above and below, so whatever is in it,
      the scores above and the instructions below stay exactly where they are. */
   .pv-score .slot {
-    height: 3.7em; margin: 0.7em 0;
+    height: 4.4em; margin: 0.6em 0;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
-  .pv-score .msg { font-size: 0.9em; color: var(--text-mute); }
-  /* "Tap here to continue": appears once a tap would be accepted, then breathes gently. */
-  .pv-score .tap { margin-top: 0.15em; font-size: 0.7em; letter-spacing: 0.14em; color: var(--text-mute); opacity: 0; transition: opacity 0.8s ease; }
-  .pv-score .tap.on { opacity: 0.8; animation: pvTap 2.4s ease-in-out infinite; }
-  @keyframes pvTap { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
-  .pv-score .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
+  /* The message slot holds one element. Most of the time it is plain text
+     (タッチしてスタート, ボール追加！). When a round is over it becomes a button. */
+  .pv-score .slotbtn {
+    -webkit-appearance: none; appearance: none; font: inherit; color: inherit; text-align: center;
+    background: none; border: 0; padding: 0; margin: 0; cursor: default; pointer-events: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pv-score .slotbtn .msg { display: block; font-size: 0.9em; color: var(--text-mute); }
+  .pv-score .slotbtn .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
+  /* "Tap here to continue": appears once a tap would be accepted. */
+  .pv-score .slotbtn .tap { display: block; margin-top: 0.15em; font-size: 0.7em; letter-spacing: 0.14em; color: var(--text-mute); opacity: 0; transition: opacity 0.8s ease; }
+  .pv-score .slotbtn .tap.on { opacity: 0.8; }
+
+  /* The button. Warm gradient from the app's accent colours, a light edge, a soft
+     shadow. It shows at once when the round ends but is dimmed until a tap counts. */
+  .pv-score .slotbtn.is-btn {
+    padding: 0.5em 1.7em 0.55em; border-radius: 1.7em;
+    background: linear-gradient(180deg, var(--accent, #E66826) 0%, var(--accent-2, #C44E10) 100%);
+    border: 1px solid rgba(255, 253, 249, 0.6);
+    box-shadow: 0 0.3em 0.75em rgba(158, 59, 6, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    opacity: 0.55; transition: opacity 0.6s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .pv-score .slotbtn.is-btn .msg { font-size: 1.15em; color: #FFFDF9; text-shadow: 0 1px 2px rgba(110, 40, 0, 0.4); }
+  .pv-score .slotbtn.is-btn .tap { color: rgba(255, 253, 249, 0.92); text-shadow: 0 1px 2px rgba(110, 40, 0, 0.35); }
+  .pv-score .slotbtn.is-btn .tap.on { opacity: 1; }
+  .pv-score .slotbtn.is-btn.live { opacity: 1; cursor: pointer; pointer-events: auto; animation: pvBtnGlow 2.4s ease-in-out infinite; }
+  .pv-score .slotbtn.is-btn.live:active, .pv-score .slotbtn.is-btn.pressed {
+    animation: none; transform: translateY(0.1em) scale(0.985);
+    box-shadow: 0 0.1em 0.3em rgba(158, 59, 6, 0.4), inset 0 1px 3px rgba(110, 40, 0, 0.35);
+  }
+  @keyframes pvBtnGlow {
+    0%, 100% { box-shadow: 0 0.3em 0.75em rgba(158, 59, 6, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+    50%      { box-shadow: 0 0.35em 1.1em rgba(230, 104, 38, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+  }
   .pv-score .sc-row.main b { display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
   .pv-score .sc-row.main b.pop { transform: scale(1.25); transition: none; }
   /* How to play: small and quiet, under the scores. */
+  /* The size is set by the script: wide enough to fill a set share of the ring, never
+     below a set minimum (see "Instructions" in the panel). */
   .pv-score .howto {
-    margin: 0 auto; font-size: 0.6em; line-height: 1.8; letter-spacing: 0.08em;
+    margin: 0 auto; font-size: 13px; line-height: 1.8; letter-spacing: 0.08em;
+    width: max-content; max-width: calc(var(--ring, 680px) * 0.94);
     color: var(--text-mute); transition: opacity 0.8s ease;
   }
   .pv-score .howto.faint { opacity: 0.35; }
@@ -111,6 +148,25 @@
   .pv-score .sc-row.time.warn { color: #C8341F; opacity: 1; font-weight: 600; }
   .pv-score .sc-row.time.warn span { display: inline-block; animation: pvBeat 1s ease-out infinite; }
   @keyframes pvBeat { 0% { transform: scale(1.3); } 60%, 100% { transform: scale(1); } }
+
+  /* The paddle slider under the ring. */
+  .pv-padslider {
+    position: absolute; left: 50%; top: 100%; margin-top: 26px; transform: translateX(-50%);
+    height: 56px; z-index: 4; touch-action: none; cursor: pointer;
+    -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  .pv-padslider .pv-rail {
+    position: absolute; left: 0; right: 0; top: 50%; height: 14px; transform: translateY(-50%);
+    border-radius: 999px; background: rgba(255, 253, 249, 0.75); border: 1px solid var(--border-2);
+    box-shadow: inset 0 1px 3px rgba(68, 52, 48, 0.14);
+  }
+  .pv-padslider .pv-mid { position: absolute; left: 50%; top: 50%; width: 2px; height: 14px; margin: -7px 0 0 -1px; background: var(--border-2); border-radius: 1px; }
+  .pv-padslider .pv-thumb {
+    position: absolute; top: 50%; width: 50px; height: 50px; margin: -25px 0 0 -25px; border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0) 55%), var(--pad-col, #B5262B);
+    border: 3px solid #FFFDF9; box-shadow: 0 3px 10px rgba(68, 52, 48, 0.32);
+  }
+  .pv-padslider.grab .pv-thumb { transform: scale(1.08); box-shadow: 0 4px 14px rgba(68, 52, 48, 0.4); }
 
   .pv-fps {
     position: fixed; left: 12px; bottom: 12px; z-index: 1000;
@@ -258,14 +314,21 @@
               <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
             </div>
             <div class="slot" id="scoreSlot">
-              <div class="msg" id="scoreMsg"></div>
-              <div class="tap" id="scoreTap">ここをタップして続ける</div>
+              <button type="button" class="slotbtn" id="scoreBtn" tabindex="-1">
+                <span class="msg" id="scoreMsg"></span>
+                <span class="tap" id="scoreTap">ここをタップして続ける</span>
+              </button>
             </div>
             <div class="howto" id="scoreHow"></div>
           </div>
         </div>
         <!-- Preview only: the games are drawn here, above the scores. -->
         <canvas class="pv-game-canvas" id="gameCanvas" aria-hidden="true"></canvas>
+        <!-- Preview only: a slider under the ring that also moves the paddle(s). -->
+        <div class="pv-padslider" id="padSlider" aria-label="パドル">
+          <div class="pv-rail"></div><div class="pv-mid"></div>
+          <div class="pv-thumb" id="padThumb"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -312,6 +375,8 @@
   var CONTROLS = [
     { group: 'Round', game: 'all' },
     { id: 'round',      game: 'all', label: 'Seconds per round (one turn of the ring)', min: 10, max: 300, step: 5, def: 60 },
+    { id: 'contWhere',  game: 'all', label: 'After a round, tap to continue', type: 'select', def: 'button',
+      options: [['button', 'Only on the button'], ['anywhere', 'Anywhere on the screen']] },
 
     { group: 'Window', game: 'all' },
     { id: 'size',       game: 'all', label: 'Ring size (px across)',        min: 500, max: 860, step: 10,  def: 680, was: '500px' },
@@ -320,6 +385,8 @@
     { id: 'scoreShadow', game: 'all', label: 'Drop shadow under the current score (0 = none)', min: 0, max: 1, step: 0.05, def: 0.6 },
     { id: 'howto',      game: 'all', label: 'How-to-play lines under the scores', type: 'select', def: 'faint',
       options: [['always', 'Always clear'], ['faint', 'Faint during a round'], ['ready', 'Only before and after a round'], ['off', 'Off']] },
+    { id: 'howtoFill',  game: 'all', label: 'Instructions: width as a share of the ring (%); smaller = more space at the sides', min: 40, max: 90, step: 1, def: 66 },
+    { id: 'howtoMin',   game: 'all', label: 'Instructions: smallest text size (px)', min: 9, max: 22, step: 0.5, def: 13 },
     { id: 'sound',      game: 'all', label: 'Soft chime on hits', type: 'check', def: true },
     { id: 'volume',     game: 'all', label: 'Chime volume',                 min: 0,   max: 1,   step: 0.05, def: 0.35 },
 
@@ -352,6 +419,8 @@
     { group: 'Pong', game: 'pong' },
     { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
       options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
+    { id: 'padSlider',  game: 'pong', label: 'Paddle slider under the ring (an extra way to move the paddles)', type: 'check', def: true },
+    { id: 'padSliderDeg', game: 'pong', label: 'Slider travel covers this much of the ring (degrees; 180 is enough with two paddles, use 360 with one)', min: 90, max: 360, step: 15, def: 180 },
     { id: 'pBallSpeed', game: 'pong', label: 'Ball speed at the start (px/s)', min: 80,  max: 600, step: 10, def: 220 },
     { id: 'pReal',      game: 'pong', label: 'Realistic bounce (mirror bounce; a moving paddle pushes the ball; ignores speed-up and edge angle)', type: 'check', def: true },
     { id: 'pGrip',      game: 'pong', label: 'Realistic: paddle grip, how much a moving paddle pushes the ball sideways (0 = none)', min: 0, max: 1.5, step: 0.05, def: 0.5 },
@@ -426,6 +495,9 @@
   var scoreMultEl = document.getElementById('scoreMult');
   var scoreHowEl = document.getElementById('scoreHow');
   var scoreTapEl = document.getElementById('scoreTap');
+  var scoreBtnEl = document.getElementById('scoreBtn');
+  var padSlEl = document.getElementById('padSlider');
+  var padThumb = document.getElementById('padThumb');
   var scoreMsgEl = document.getElementById('scoreMsg');
   var fpsEl = document.getElementById('pvFps');
   var softGlow = win.querySelector('.soft-glow');
@@ -487,6 +559,27 @@
   function applyCSS() {
     live.textContent = buildCSS();
     scoreBox.style.setProperty('--score-shadow', v.scoreShadow);
+    scoreBox.style.setProperty('--ring', (+v.size) + 'px');
+    layoutPadSlider();
+    fitHowto();
+  }
+  /* The paddle slider: shown under the ring in Pong when switched on, 80% of the ring wide. */
+  function sliderOn() { return v.game === 'pong' && !!v.padSlider; }
+  function layoutPadSlider() {
+    padSlEl.style.display = sliderOn() ? '' : 'none';
+    padSlEl.style.width = Math.round(+v.size * 0.8) + 'px';
+    padSlEl.style.setProperty('--pad-col', v.cPaddle);
+  }
+  /* Instructions: as large as lets the longest line fill the chosen share of the ring,
+     but never smaller than the chosen minimum. (Letter spacing is in em, so the width
+     grows in step with the size and one measurement at 10px is enough.) */
+  function fitHowto() {
+    if (!scoreHowEl || !scoreHowEl.firstChild) return;
+    scoreHowEl.style.fontSize = '10px';
+    var w10 = scoreHowEl.offsetWidth;
+    if (!w10) return;
+    var px = 10 * (+v.size * (+v.howtoFill) / 100) / w10;
+    scoreHowEl.style.fontSize = Math.max(+v.howtoMin, px).toFixed(1) + 'px';
   }
 
   /* ============================================================
@@ -757,7 +850,9 @@
 
   function fitStage() {
     scoreBox.style.fontSize = Math.round(+v.size * 0.034) + 'px';
-    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 60), (window.innerWidth - 40) / +v.size);
+    /* With the slider the picture is taller below the ring; the ring stays centred, so allow for it on both sides. */
+    var below = sliderOn() ? 92 : 30;
+    var k = Math.min(1, (window.innerHeight / 2 - 10) / (+v.size / 2 + below), (window.innerWidth - 40) / +v.size);
     inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
   }
 
@@ -1009,15 +1104,46 @@
   stage.addEventListener('pointerdown', function (e) {
     if (finger.down) return;
     unlockAudio();
+    var onBtn = !!(e.target.closest && e.target.closest('#scoreBtn'));
+    /* After a round: only a press on the button (or anywhere, if so set) continues, and
+       that press doesn't also steer the paddle. */
+    if (!onTouchStart(performance.now(), onBtn)) { e.preventDefault(); return; }
     finger.down = true; finger.id = e.pointerId;
     var p = toWorld(e);
     finger.x = p.x; finger.y = p.y;
     finger.ang = finger.lastAng = Math.atan2(p.y, p.x);
     finger.dAng = 0;
-    onTouchStart(performance.now());
     try { stage.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
   });
+
+  /* The paddle slider: dragging it sets the paddle's angle directly. */
+  var padSl = { down: false, id: null, p: 0.5 };
+  function clamp01(x) { return Math.max(0, Math.min(1, x)); }
+  function sliderMove(e) {
+    var r = padSlEl.getBoundingClientRect();
+    padSl.p = clamp01((e.clientX - r.left) / r.width);
+    pong.padTarget = sliderAngle(padSl.p);          /* at once, so even a quick tap counts */
+  }
+  function sliderAngle(p) { return -Math.PI / 2 + (p - 0.5) * (+v.padSliderDeg) * DEG; }
+  function angleToP(a) {
+    var off = wrapAng(a + Math.PI / 2);
+    if (v.pTwo) off -= Math.PI * Math.round(off / Math.PI);          /* two paddles: the opposite one is as good */
+    return clamp01(0.5 + off / (+v.padSliderDeg * DEG));
+  }
+  padSlEl.addEventListener('pointerdown', function (e) {
+    e.stopPropagation(); e.preventDefault();
+    if (round.state === 'over' || padSl.down) return;
+    unlockAudio();
+    if (round.state === 'ready') startRound(performance.now());
+    padSl.down = true; padSl.id = e.pointerId; sliderMove(e);
+    padSlEl.classList.add('grab');
+    try { padSlEl.setPointerCapture(e.pointerId); } catch (er) {}
+  });
+  padSlEl.addEventListener('pointermove', function (e) { if (padSl.down && e.pointerId === padSl.id) sliderMove(e); });
+  function sliderUp(e) { if (e.pointerId === padSl.id) { padSl.down = false; padSl.id = null; padSlEl.classList.remove('grab'); } }
+  padSlEl.addEventListener('pointerup', sliderUp);
+  padSlEl.addEventListener('pointercancel', sliderUp);
   stage.addEventListener('pointermove', function (e) {
     if (!finger.down || e.pointerId !== finger.id) return;
     var p = toWorld(e);
@@ -1148,7 +1274,8 @@
       paddles: function () { return paddlesAt(1); },
       update: function (dt, now) {
         /* Paddle follows the finger. */
-        if (finger.down) {
+        if (padSl.down) G.padTarget = sliderAngle(padSl.p);
+        else if (finger.down) {
           if (cfg('Control') === 'dial') { G.padTarget += finger.dAng; finger.dAng = 0; }
           else G.padTarget = finger.ang;
         }
@@ -1409,10 +1536,16 @@
   }
   /* The first touch starts a round. After a round the result stays on
      screen; a tap (once OVER_GUARD has passed) starts the next one. */
-  function onTouchStart(now) {
-    if (!current()) return;
-    if (round.state === 'ready') startRound(now);
-    else if (round.state === 'over' && now - round.overAt > OVER_GUARD) startRound(now);
+  function onTouchStart(now, onBtn) {          /* returns false when this press must not steer the paddle */
+    if (!current()) return true;
+    if (round.state === 'ready') { startRound(now); return true; }
+    if (round.state === 'over') {
+      if (now - round.overAt <= OVER_GUARD) return false;
+      if (v.contWhere === 'button' && !onBtn) return false;
+      startRound(now);
+      return !onBtn;
+    }
+    return true;
   }
 
   /* How to play, in Japanese. The lines follow the game and its settings. */
@@ -1421,6 +1554,7 @@
     if (v.game === 'pong') {
       lines.push(v.pControl === 'dial' ? '指で円を描くようになぞると、パドルが回ります'
                                        : '指を置いた方向へ、パドルが動きます');
+      if (sliderOn()) lines.push('下のスライダーでも、パドルを動かせます');
       lines.push('ボールを輪の外に出さないよう、打ち返しましょう');
       lines.push(v.pExtraHits + '回続けて打ち返すと、ボールが増えます');
       if (v.bonus) lines.push('ボールが多いほど、得点が×2、×3に');
@@ -1450,12 +1584,15 @@
     else if (round.state === 'over') { msg = round.newBest ? '最高スコア更新！' : 'おつかれさまでした'; title = true; }
     setText(scoreMsgEl, 'msg', msg);
     var tapOn = round.state === 'over' && performance.now() - round.overAt > OVER_GUARD;
-    if (shown.tap !== tapOn) { shown.tap = tapOn; scoreTapEl.classList.toggle('on', tapOn); }
+    if (shown.tap !== tapOn) { shown.tap = tapOn; scoreTapEl.classList.toggle('on', tapOn); scoreBtnEl.classList.toggle('live', tapOn); }
+    var isBtn = round.state === 'over';
+    if (shown.isBtn !== isBtn) { shown.isBtn = isBtn; scoreBtnEl.classList.toggle('is-btn', isBtn); }
     var how = howToLines(), howKey = how.join('\n');
     if (shown.how !== howKey) {
       shown.how = howKey;
       scoreHowEl.textContent = '';
       how.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; scoreHowEl.appendChild(d); });
+      fitHowto();
     }
     var hs = v.howto === 'off' ? 'gone'
            : round.state !== 'play' || v.howto === 'always' ? ''
@@ -1497,6 +1634,18 @@
     }
     drawEffects(ctx, now);
     updateScoreBox();
+    if (sliderOn()) {
+      /* The thumb stays where it was left. Only if the paddle is sent somewhere else
+         (by a finger on the ring) does it move to match. (With two paddles, 0° and 180°
+         are the same place, so those count as a match too.) */
+      if (!padSl.down) {
+        var diff = wrapAng(pong.padTarget - sliderAngle(padSl.p));
+        if (v.pTwo) diff -= Math.PI * Math.round(diff / Math.PI);
+        if (Math.abs(diff) > 0.03) padSl.p = angleToP(pong.padTarget);
+      }
+      var tp = padSl.p;
+      if (shown.thumb !== tp.toFixed(3)) { shown.thumb = tp.toFixed(3); padThumb.style.left = (tp * 100).toFixed(2) + '%'; }
+    }
 
     fpsFrames++;
     if (now - fpsT >= 500) {
@@ -1531,6 +1680,7 @@
     save();
     applyCSS();
     if (c.id === 'size') { sizeCanvases(); fitStage(); readyRound(); }
+    if (c.id === 'padSlider') { fitStage(); shown.how = null; }
     if (c.id === 'round' && round.state !== 'play') readyRound();
   }
 
@@ -1725,6 +1875,8 @@
   window.addEventListener('resize', function () { fitStage(); });
   readyRound();
   requestAnimationFrame(frame);
+  /* The instruction size is measured against the real font, so measure again once it has loaded. */
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitHowto(); });
 })();
 </script>
 </body>
