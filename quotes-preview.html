@@ -25,7 +25,7 @@
      layer and one draw, so nothing can seam or get out of step.
 
      The countdown is a gradient (start colour → end colour) whose line
-     fades out behind a soft, dipper-shaped "tadpole" head. Every edge is soft.
+     fades out behind a soft, water-drop-shaped head. Every edge is soft.
      The countdown never rewinds: when it completes, the head blooms,
      the finished ring fades back, and the next countdown starts from
      the top. Quotes change on their own.
@@ -329,10 +329,9 @@
 
     { group: 'Timer' },
     { id: 'bodyW',     label: 'Countdown line thickness (px)', min: 2, max: 20, step: 0.5, def: 9, was: 'none' },
-    { id: 'head',      label: 'Dipper-shaped head (an oval that tapers into the line)', type: 'check', def: true },
-    { id: 'headW',     label: 'Head width at its widest (px)', min: 8, max: 60, step: 1, def: 28, was: 'none' },
-    { id: 'headLen',   label: 'Head length, nose to widest point (px)', min: 10, max: 120, step: 1, def: 46, was: 'none' },
-    { id: 'neck',      label: 'How gently the head tapers into the line (px)', min: 0, max: 260, step: 5, def: 110, was: 'none' },
+    { id: 'head',      label: 'Water-drop head (a round bulb that tapers into the line)', type: 'check', def: true },
+    { id: 'headW',     label: 'Bulb width (px)',            min: 8, max: 60, step: 1, def: 36, was: 'none' },
+    { id: 'neck',      label: 'Length of the taper behind the bulb (px)', min: 20, max: 300, step: 5, def: 84, was: 'none' },
     { id: 'tail',      label: 'Tail: fades out over this many degrees behind the head', min: 40, max: 360, step: 5, def: 280, was: 'none' },
     { id: 'taper',     label: 'Tail fade curve (higher = fades sooner)', min: 0.6, max: 3.5, step: 0.1, def: 1.2, was: 'none' },
     { id: 'startFade', label: 'Soft start at the top (degrees)', min: 4, max: 90, step: 2, def: 24, was: 'none' },
@@ -368,7 +367,10 @@
      Builds the proposed CSS from the current values. The preview
      shows exactly this text, and "Copy values" copies it.
      ============================================================ */
-  function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
+  function n(x, d) {
+    var t = (+x).toFixed(d === undefined ? 2 : d);
+    return (t.indexOf('.') >= 0 ? t.replace(/\.?0+$/, '') : t) || '0';
+  }
   var EASE = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
 
   /* Colour helpers: #rrggbb → [r, g, b], blends between two colours,
@@ -441,7 +443,7 @@
 '                           curve ' + n(v.taper) + ' (higher = fades sooner); fades in from nothing over',
 '                           the first ' + v.startFade + 'deg at the top. One conic gradient with ~48 alpha stops,',
 '                           rebuilt every frame, colours start → end by angle',
-'     dipper head           ' + (v.head ? 'part of the same shape as the line, not a disc on top: a rounded oval nose ' + n(v.headLen, 0) + 'px long,\n                           widest ' + n(v.headW, 0) + 'px, then easing down to the line over ' + n(v.neck, 0) + 'px' : 'off (the line ends in a rounded nose)'),
+'     water-drop head       ' + (v.head ? 'part of the same shape as the line, not a disc on top: a round bulb ' + n(v.headW, 0) + 'px across at the front,\n                           its sides curving in over ' + n(v.neck, 0) + 'px (a smooth S-curve that meets the circle without a corner)\n                           and levelling out into the ' + n(v.bodyW, 1) + 'px line' : 'off (the line ends in a rounded nose)'),
 '     gradient              ' + startC + ' at the top → ' + endC + ' once round (the head is always the colour',
 '                           of the ring at that point)',
 '     when a countdown ends the finished ring is drawn once into an offscreen canvas and that picture',
@@ -755,35 +757,49 @@
   /* One countdown: the arc from the top round to the head. frac is how
      far round (0 to 1); alpha fades the whole thing.
 
-     One continuous shape. Its width is the line thickness all the way
-     back, except at the front, where it swells into a dipper-shaped
-     head: a rounded oval nose, widest a little behind the tip, then
-     easing down into the line so there is no join. Nothing tapers at
-     the tail; instead the colour fades to nothing (alpha) behind the
-     head and in from nothing at the top. */
+     One continuous shape, shaped like a water drop falling forwards: a
+     round bulb at the front, then sides that curve in (a smooth S-curve)
+     and level out into the line, so the head and the line are one piece.
+     The line keeps one thickness all the way back and never narrows to
+     a point; instead its colour fades to nothing (alpha) behind the head
+     and in from nothing at the top. */
   function drawSweep(ctx, cx, cy, frac, alpha) {
     var R = v.size / 2, T = +v.band, Rc = R - T / 2;
     var phi = frac * 360;
     if (phi < 0.5 || alpha <= 0.002) return;
-    var bodyW = +v.bodyW;
-    var headW = v.head ? Math.max(bodyW, +v.headW) : bodyW;
-    var nose = v.head ? Math.max(4, +v.headLen) : bodyW * 0.6;
-    var neck = v.head ? +v.neck : 0;
-    var pxDeg = Rc * DEG;                 /* pixels along the ring per degree */
+    var hb = +v.bodyW / 2;                                   /* half the line's thickness */
+    var r = v.head ? Math.max(hb, +v.headW / 2) : hb;        /* the bulb's radius */
+    var Lt = v.head ? Math.max(10, +v.neck) : 10;            /* length of the taper */
+    var pxDeg = Rc * DEG;                                    /* pixels along the ring per degree */
     var sMax = phi * pxDeg;
-    var ss = [], ww = [], i, s;
-    function put(d) {                     /* d = distance behind the very front, in px */
-      if (d > sMax) d = sMax;
-      var w;
-      if (d <= nose) w = headW * Math.sqrt(Math.max(0, 1 - Math.pow((nose - d) / nose, 2)));
-      else if (d < nose + neck) w = headW + (bodyW - headW) * smooth((d - nose) / neck);
-      else w = bodyW;
-      ss.push(d); ww.push(w);
+
+    /* Where the bulb's circle hands over to the taper. Past the widest
+       point by `al`, the taper starts with the circle's own slope, so
+       there is no corner. `al` is the largest angle that still lets the
+       curve slide down to the line without dipping below it. */
+    var lo = 0, hi = 80 * DEG, al = 0, k;
+    if (r > hb + 0.01) {
+      for (k = 0; k < 24; k++) {
+        al = (lo + hi) / 2;
+        if (Math.tan(al) * Lt > 2.5 * (r * Math.cos(al) - hb)) hi = al; else lo = al;
+      }
+      al = lo;
     }
-    for (i = 0; i <= 14; i++) put(nose * (1 - Math.cos(i / 14 * Math.PI / 2)));   /* the round nose, dense */
-    for (i = 1; i <= 16 && neck > 0; i++) put(nose + neck * i / 16);
-    for (s = nose + neck + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s);
-    put(sMax);
+    var phi0 = Math.PI / 2 + al;
+    var d0 = r * (1 - Math.cos(phi0)), h0 = r * Math.sin(phi0), m0 = -Math.tan(al);
+
+    var ss = [], ww = [], i, s;
+    function put(d, h) { if (d > sMax) { d = sMax; h = hb; } ss.push(d); ww.push(2 * h); }
+    for (i = 0; i <= 24; i++) {                              /* the round front of the bulb */
+      var f = phi0 * i / 24;
+      put(r * (1 - Math.cos(f)), r * Math.sin(f));
+    }
+    for (i = 1; i <= 24; i++) {                              /* the taper: a cubic that meets the circle's slope and levels out at the line */
+      var t = i / 24, t2 = t * t, t3 = t2 * t;
+      put(d0 + Lt * t, (2 * t3 - 3 * t2 + 1) * h0 + (t3 - 2 * t2 + t) * Lt * m0 + (-2 * t3 + 3 * t2) * hb);
+    }
+    for (s = d0 + Lt + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s, hb);
+    put(sMax, hb);
     var N = ss.length - 1;
 
     /* Colour by angle (start → end) and alpha along the ring. */
