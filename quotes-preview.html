@@ -1,0 +1,1189 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Quotes Preview</title>
+
+<!-- ============================================================
+     quotes-preview.html — standalone preview of how the rotating
+     quotes could be shown on the koi start-screen scene.
+
+     Loads the real main.css and uses the real markup and class names
+     from index.html (.blossom-screen, .start-btn, .icon-wrapper,
+     .rings-svg, .gold-band, .koi-dive-wrap, .blossom-divider,
+     .blossom-mark, .quote-wrap, .quote-line), so what you see is the
+     app's own look. It does NOT load app.js; the few behaviours it
+     needs are in the small script at the bottom.
+
+     Quotes are read from quotes.json, the same file the app uses.
+
+     What is new (all on top of the real classes):
+       .quote-timer-arc   — a 金木犀 arc drawn on the koi ring that
+                            unwinds until the next quote
+       .quote-timer-bead  — a small glowing bead at the arc's tip
+       .quote-meta        — "3 / 16 · 次の言葉まで 12秒"
+       .quote-line.ink    — characters arrive one by one, like ink
+       .quote-line.vertical — optional 縦書き (top-to-bottom) layout
+       The ❀ blossoms fill up across the same countdown.
+
+     The generated <style id="pvLive"> block holds every proposed
+     rule. "Copy values" copies exactly that text.
+
+     Not part of the app: not linked from index.html and not in the
+     service worker's ASSETS list.
+     ============================================================ -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
+
+<!-- Preview-only chrome: the layout of this page and the tuning
+     panel. Nothing here is part of the copied CSS. -->
+<style>
+  body { overflow: hidden; height: 100vh; padding-bottom: 0; }
+
+  /* The quote area sits where the start hints are in the app. */
+  .qp-stage {
+    position: relative; z-index: 3;
+    width: 100%; max-width: 640px;
+    display: flex; flex-direction: column; align-items: center;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    margin-top: 8px;
+    cursor: pointer;
+  }
+  .blossom-greeting { position: relative; z-index: 3; }
+  html.qp-no-greeting .blossom-greeting { display: none; }
+
+  .pv-panel {
+    position: fixed; top: 16px; right: 16px; z-index: 1000;
+    width: 340px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    touch-action: pan-y;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid var(--border-1);
+    border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(68, 52, 48, 0.14);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text-med);
+    -webkit-user-select: none; user-select: none;
+  }
+  .pv-panel.collapsed { width: auto; overflow: hidden; }
+  .pv-panel.collapsed .pv-body { display: none; }
+  .pv-head {
+    position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; background: rgba(255, 253, 249, 0.98);
+    border-bottom: 1px solid var(--border-4);
+  }
+  .pv-panel.collapsed .pv-head { border-bottom: none; }
+  .pv-title { font-weight: 600; color: var(--text-dark); letter-spacing: 0.5px; flex: 1; white-space: nowrap; }
+  .pv-icon-btn {
+    border: 1px solid var(--border-2); background: transparent; border-radius: 999px;
+    width: 30px; height: 30px; font: inherit; color: var(--text-mute); cursor: pointer;
+  }
+  .pv-body { padding: 4px 14px 14px; }
+  .pv-note { margin: 10px 0 0; color: var(--text-mute); font-size: 12px; }
+  .pv-source { margin: 6px 0 0; font-size: 12px; color: var(--accent-2); }
+  .pv-transport { display: flex; gap: 6px; margin-top: 12px; }
+  .pv-transport button {
+    flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
+    border-radius: 10px; padding: 8px 6px; font: inherit; cursor: pointer;
+  }
+  .pv-transport button:active { transform: scale(0.97); }
+  .pv-group { margin-top: 14px; }
+  .pv-group-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--secondary-accent); margin-bottom: 4px;
+  }
+  .pv-row { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 8px; padding: 6px 0; }
+  .pv-row label { color: var(--text-soft); }
+  .pv-val { font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 600; }
+  .pv-row input[type="range"] { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); margin: 2px 0 0; }
+  .pv-was { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin-top: -2px; }
+  .pv-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text-soft); }
+  .pv-check input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .pv-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .pv-btn {
+    flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
+    border-radius: 12px; padding: 10px 12px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .pv-btn.primary { background: var(--accent); border-color: var(--accent); color: #FFFDF9; }
+  .pv-btn:active { transform: scale(0.97); }
+  .pv-status { margin-top: 8px; min-height: 18px; color: var(--accent-2); font-size: 12px; }
+  .pv-out {
+    display: none; margin: 8px 0 0; padding: 10px; max-height: 320px; overflow: auto;
+    background: var(--soft-2); border: 1px solid var(--border-4); border-radius: 10px;
+    font: 11px/1.45 ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--text-soft);
+    white-space: pre; -webkit-user-select: text; user-select: text;
+  }
+  .pv-out.shown { display: block; }
+</style>
+
+<!-- The generated proposed CSS goes here. Rewritten by the script. -->
+<style id="pvLive"></style>
+</head>
+<body>
+
+<!-- ============ AMBIENT BACKGROUND (same markup as index.html) ============ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
+  </div>
+  <div class="lantern-layer" id="lanternLit"></div>
+</div>
+<div class="lantern-bloom-layer" id="lanternBloom" aria-hidden="true"></div>
+
+<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
+
+<div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
+<div class="floret-layer" id="floretLayer" aria-hidden="true"></div>
+
+<!-- ============ START SCREEN SCENE (real markup and class names) ============ -->
+<div class="blossom-screen visible" id="blossomScreen">
+
+  <div class="blossom-greeting">
+    <div class="blossom-greeting-time" id="blossomGreetingTime">こんばんは</div>
+    <div class="blossom-greeting-name" id="blossomGreetingName">桜庭さん</div>
+  </div>
+
+  <button type="button" class="start-btn" id="startBtn" aria-label="次の言葉へ">
+    <div class="icon-wrapper">
+      <div class="soft-glow" aria-hidden="true"></div>
+      <div class="pond-surface" aria-hidden="true">
+        <div class="pond-caustic"></div>
+        <div class="pond-caustic c2"></div>
+      </div>
+      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+        <defs>
+          <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5"/>
+          </filter>
+        </defs>
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+        <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
+        <circle cx="180" cy="180" r="90" class="gold-band" />
+        <!-- New: the countdown, drawn on the ring itself. -->
+        <circle cx="180" cy="180" r="90" class="quote-timer-arc" id="quoteTimerArc" transform="rotate(-90 180 180)" />
+        <circle cx="180" cy="90" r="4" class="quote-timer-bead" id="quoteTimerBead" />
+      </svg>
+      <div class="pond-bubbles" id="pondBubbles" aria-hidden="true"></div>
+      <div class="koi-dive-wrap" id="koiDiveWrap">
+        <div class="blossom-char">
+          <div class="koi-shadow" aria-hidden="true"></div>
+          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+        </div>
+      </div>
+    </div>
+  </button>
+
+  <!-- Quote area: the real .blossom-divider / .quote-wrap / .quote-line
+       from the thank-you screen, plus the new .quote-meta line. -->
+  <div class="qp-stage" id="qpStage">
+    <div class="blossom-divider" id="blossomDivider" aria-hidden="true"></div>
+    <div class="quote-wrap" aria-live="polite">
+      <div class="quote-line" id="quoteLine"></div>
+    </div>
+    <div class="quote-meta" id="quoteMeta">
+      <span class="quote-count" id="quoteCount">— / —</span>
+      <span class="quote-meta-sep">·</span>
+      <span class="quote-remain" id="quoteRemain">次の言葉まで <span class="quote-remain-num" id="quoteRemainNum">—</span>秒</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ TUNING PANEL (preview only) ============ -->
+<div class="pv-panel" id="pvPanel">
+  <div class="pv-head">
+    <span class="pv-title">Quotes</span>
+    <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
+  </div>
+  <div class="pv-body">
+    <p class="pv-note">Tap the koi for the next quote. Tap the quote to pause or resume. Swipe left or right on the water to move between quotes. Tap the water anywhere for ripples. Grey "app:" notes show today's value.</p>
+    <p class="pv-source" id="pvSource">Loading quotes.json…</p>
+    <div class="pv-transport">
+      <button type="button" id="pvPrev">← 前へ</button>
+      <button type="button" id="pvPause">一時停止</button>
+      <button type="button" id="pvNext">次へ →</button>
+    </div>
+    <div id="pvControls"></div>
+    <div class="pv-actions">
+      <button type="button" class="pv-btn" id="pvReset">Reset</button>
+      <button type="button" class="pv-btn primary" id="pvCopy">Copy values</button>
+    </div>
+    <div class="pv-status" id="pvStatus"></div>
+    <pre class="pv-out" id="pvOut"></pre>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     SETTINGS
+     Each entry is one slider (or a checkbox when type is 'check').
+     "was" is today's value in main.css / app.js, shown for comparison.
+     ============================================================ */
+  var CONTROLS = [
+    { group: 'Timing' },
+    { id: 'seconds',   label: 'Seconds per quote',          min: 6,   max: 40,  step: 1,    def: 14,   was: '≈12.9s (10 blossoms × 1s, 1s hold, 1.5s fade)' },
+    { id: 'fade',      label: 'Fade in / out (s)',          min: 0.6, max: 3,   step: 0.1,  def: 1.6,  was: '1.5' },
+    { id: 'align',     label: 'New quote arrives as the koi surfaces (on the breath)', type: 'check', def: true },
+    { id: 'shuffle',   label: 'Shuffle the order (no repeats in a row)', type: 'check', def: false },
+
+    { group: 'Words' },
+    { id: 'size',      label: 'Text size (px)',             min: 22,  max: 48,  step: 1,    def: 34,   was: '34 on the tablet' },
+    { id: 'spacing',   label: 'Letter spacing (px)',        min: 0,   max: 10,  step: 0.5,  def: 4,    was: '4' },
+    { id: 'lineH',     label: 'Line height',                min: 1.6, max: 2.6, step: 0.05, def: 2.1,  was: '2.1' },
+    { id: 'blur',      label: 'Blur as it arrives (px)',    min: 0,   max: 20,  step: 1,    def: 10,   was: '12' },
+    { id: 'ink',       label: 'Ink: delay per character (ms), 0 = whole line', min: 0, max: 160, step: 5, def: 70, was: '0 (whole line at once)' },
+    { id: 'vertical',  label: '縦書き: write top-to-bottom',  type: 'check', def: false },
+
+    { group: 'Timer' },
+    { id: 'arc',       label: 'Arc on the koi ring',        type: 'check', def: true },
+    { id: 'arcWidth',  label: 'Arc width (px)',             min: 1,   max: 6,   step: 0.5,  def: 2.5,  was: 'none' },
+    { id: 'arcAlpha',  label: 'Arc strength',               min: 0.2, max: 1,   step: 0.05, def: 0.85, was: 'none' },
+    { id: 'bead',      label: 'Glowing bead at the arc tip', type: 'check', def: true },
+    { id: 'text',      label: '"次の言葉まで 12秒" text',       type: 'check', def: true },
+    { id: 'count',     label: 'Quote number ("3 / 16")',    type: 'check', def: true },
+    { id: 'blossoms',  label: '❀ blossoms fill up with the countdown', type: 'check', def: true },
+
+    { group: 'Water' },
+    { id: 'ripple',    label: 'Soft ripple when a quote arrives', type: 'check', def: true },
+    { id: 'floret',    label: '金木犀 floret lands by the new quote', type: 'check', def: true },
+    { id: 'greeting',  label: 'Show the greeting and name', type: 'check', def: true }
+  ];
+
+  var STORE_KEY = 'quotesPreviewValues.v1';
+  var DEFAULTS = {};
+  CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
+  var v = loadValues();
+
+  function loadValues() {
+    var out = {};
+    for (var k in DEFAULTS) out[k] = DEFAULTS[k];
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+      if (saved) for (var s in saved) if (s in out) out[s] = saved[s];
+    } catch (e) {}
+    return out;
+  }
+  function saveValues() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(v)); } catch (e) {}
+  }
+
+  /* ============================================================
+     CSS GENERATOR
+     Builds the proposed CSS from the current values. The preview
+     shows exactly this text, and "Copy values" copies it.
+     ============================================================ */
+  function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
+  var EASE = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+
+  function buildCSS() {
+    var F = n(v.fade, 2) + 's';
+    var B = n(v.blur, 1) + 'px';
+    var css = [];
+    css.push(
+'/* ============================================================',
+'   QUOTES — PROPOSED DISPLAY',
+'   Generated by quotes-preview.html. Paste after the .quote-line',
+'   rules in main.css (same selectors, so these win by order).',
+'',
+'   Markup this needs in index.html:',
+'     inside .rings-svg, after .gold-band:',
+'       <circle cx="180" cy="180" r="90" class="quote-timer-arc"',
+'               transform="rotate(-90 180 180)" />',
+'       <circle cx="180" cy="90" r="4" class="quote-timer-bead" />',
+'     after .quote-wrap:',
+'       <div class="quote-meta">',
+'         <span class="quote-count">3 / 16</span>',
+'         <span class="quote-meta-sep">·</span>',
+'         <span class="quote-remain">次の言葉まで',
+'           <span class="quote-remain-num">12</span>秒</span>',
+'       </div>',
+'',
+'   Numbers for app.js:',
+'     one quote             ' + v.seconds + 's from arrival to the next (was ≈12.9s)',
+'     QUOTE_FADE            ' + Math.round(v.fade * 1000) + 'ms (was 1500)',
+'     blossoms              10, spread evenly over the countdown',
+'                           (was BLOSSOM_INTERVAL 1000ms each)',
+'     breath alignment      ' + (v.align ? 'on: the next quote waits for the koi to surface\n                           (glow peak, 1.44s into each 4s breath)' : 'off'),
+'     order                 ' + (v.shuffle ? 'shuffled, never the same quote twice in a row' : 'in quotes.json order'),
+'     ink                   ' + (v.ink > 0 ? 'wrap each character in <span class="quote-char" style="--i:N">\n                           and add .ink to .quote-line' : 'off (whole line at once)'),
+'     arrival               ' + ([v.ripple ? 'soft ripple at the quote' : '', v.floret ? '金木犀 floret lands by it' : ''].filter(Boolean).join(', ') || 'nothing extra'),
+'     pause                 tap the quote: add .quote-paused to the screen',
+'   ============================================================ */',
+''
+    );
+
+    /* --- The words --- */
+    css.push(
+'/* Words: a calmer arrival — rises less, blurs less, and the fade',
+'   time matches QUOTE_FADE. */',
+'.quote-wrap {',
+'  min-height: ' + Math.round(v.size * v.lineH * 2.6) + 'px;',
+'}',
+'.quote-line {',
+'  font-size: ' + v.size + 'px;',
+'  letter-spacing: ' + n(v.spacing, 1) + 'px;',
+'  line-height: ' + n(v.lineH) + ';',
+'  transform: translateY(16px) scale(0.98);',
+'  filter: blur(' + B + ');',
+'  transition: opacity ' + F + ' ' + EASE + ',',
+'              transform ' + F + ' ' + EASE + ',',
+'              filter ' + F + ' ' + EASE + ';',
+'}',
+'.quote-line.leaving {',
+'  transform: translateY(-16px) scale(1.01);',
+'  filter: blur(' + B + ');',
+'}',
+''
+    );
+
+    if (v.ink > 0) {
+      css.push(
+'/* Ink: each character bleeds in out of a soft blur, ' + v.ink + 'ms apart,',
+'   like a brush working across the paper. The line itself does not',
+'   move; it only fades as a whole when it leaves. */',
+'.quote-line.ink,',
+'.quote-line.ink.shown {',
+'  opacity: 1;',
+'  transform: none;',
+'  filter: none;',
+'}',
+'.quote-line.ink.leaving {',
+'  opacity: 0;',
+'  transform: translateY(-10px);',
+'  filter: blur(' + B + ');',
+'}',
+'.quote-char {',
+'  opacity: 0;',
+'  color: transparent;',
+'  text-shadow: 0 0 ' + Math.max(4, v.blur) + 'px var(--quote-color);',
+'  transition: opacity ' + F + ' ' + EASE + ',',
+'              color ' + F + ' ' + EASE + ',',
+'              text-shadow ' + F + ' ' + EASE + ';',
+'  transition-delay: calc(var(--i) * ' + v.ink + 'ms);',
+'}',
+'.quote-line.ink.shown .quote-char,',
+'.quote-line.ink.leaving .quote-char {',
+'  opacity: 1;',
+'  color: var(--quote-color);',
+'  text-shadow: var(--quote-shadow);',
+'}',
+'.quote-line.ink.leaving .quote-char { transition: none; }',
+''
+      );
+    }
+
+    if (v.vertical) {
+      css.push(
+'/* 縦書き: the quote is written top-to-bottom, right-to-left, like a',
+'   hanging scroll. */',
+'.quote-line {',
+'  writing-mode: vertical-rl;',
+'  text-orientation: mixed;',
+'  max-height: ' + Math.round(v.size * 10) + 'px;',
+'  text-align: start;',
+'}',
+'.quote-wrap {',
+'  min-height: ' + Math.round(v.size * 10 + 20) + 'px;',
+'}',
+''
+      );
+    }
+
+    /* --- Timer arc --- */
+    css.push(
+'/* Timer arc: a 金木犀 line drawn over the white koi ring. It starts',
+'   full and unwinds back to the top as the next quote nears. app.js',
+'   sets stroke-dashoffset every frame (565.49 = the ring\'s length). */',
+'.quote-timer-arc {',
+'  fill: none;',
+'  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
+'  stroke-width: ' + n(v.arcWidth, 1) + 'px;',
+'  stroke-linecap: round;',
+'  stroke-dasharray: 565.49;',
+'  filter: drop-shadow(0 0 3px rgba(240, 125, 64, 0.55));',
+'  transition: opacity 600ms ease;',
+'}',
+'.quote-timer-bead {',
+'  fill: #FFFDF9;',
+'  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
+'  stroke-width: 1.5px;',
+'  filter: drop-shadow(0 0 5px rgba(240, 125, 64, 0.9));',
+'  transition: opacity 600ms ease;',
+'}',
+'.blossom-screen.visible .quote-timer-bead {',
+'  animation: beadGlow 4s ease-in-out infinite;',
+'}',
+'@keyframes beadGlow {',
+'  0%, 100% { opacity: 0.75; }',
+'  36%      { opacity: 1; }',
+'}'
+    );
+    if (!v.arc) css.push('.quote-timer-arc { display: none; }');
+    if (!v.arc || !v.bead) css.push('.quote-timer-bead { display: none; }');
+    css.push('');
+
+    /* --- Meta line --- */
+    css.push(
+'/* Meta line under the quote: which quote this is, and how long until',
+'   the next one. Quiet, small, never competing with the words. */',
+'.quote-meta {',
+'  margin-top: 18px;',
+'  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;',
+'  font-size: 13px;',
+'  letter-spacing: 3px;',
+'  color: var(--text-mute);',
+'  font-variant-numeric: tabular-nums;',
+'  opacity: 0.8;',
+'  min-height: 20px;',
+'}',
+'.quote-meta-sep { margin: 0 10px; opacity: 0.6; }',
+'.quote-remain-num {',
+'  display: inline-block;',
+'  min-width: 2ch;',
+'  color: var(--accent);',
+'  transition: opacity 300ms ease;',
+'}'
+    );
+    if (!v.count) css.push('.quote-count, .quote-meta-sep { display: none; }');
+    if (!v.text) css.push('.quote-remain, .quote-meta-sep { display: none; }');
+    if (!v.blossoms) css.push('.blossom-divider { visibility: hidden; }');
+    css.push('');
+
+    /* --- Paused --- */
+    css.push(
+'/* Paused (tap the quote): the arc dims and everything that pulses',
+'   holds still until the next tap. */',
+'.quote-paused .quote-timer-arc,',
+'.quote-paused .quote-timer-bead { opacity: 0.35; }',
+'.quote-paused .quote-timer-bead,',
+'.quote-paused .blossom-mark.appeared { animation-play-state: paused; }',
+'',
+'@media (prefers-reduced-motion: reduce) {',
+'  .quote-char { transition-delay: 0s !important; }',
+'  .quote-line, .quote-line.leaving { transform: none !important; }',
+'  .blossom-screen.visible .quote-timer-bead { animation: none; }',
+'}'
+    );
+    return css.join('\n');
+  }
+
+  /* ============================================================
+     ELEMENTS
+     ============================================================ */
+  var live = document.getElementById('pvLive');
+  var screen = document.getElementById('blossomScreen');
+  var startBtn = document.getElementById('startBtn');
+  var koiWrap = document.getElementById('koiDiveWrap');
+  var rippleLayer = document.getElementById('rippleLayer');
+  var bubbleBox = document.getElementById('pondBubbles');
+  var floretLayer = document.getElementById('floretLayer');
+  var stage = document.getElementById('qpStage');
+  var quoteLine = document.getElementById('quoteLine');
+  var divider = document.getElementById('blossomDivider');
+  var countEl = document.getElementById('quoteCount');
+  var remainEl = document.getElementById('quoteRemain');
+  var remainNum = document.getElementById('quoteRemainNum');
+  var arc = document.getElementById('quoteTimerArc');
+  var bead = document.getElementById('quoteTimerBead');
+  var softGlow = document.querySelector('.soft-glow');
+  var pauseBtn = document.getElementById('pvPause');
+  var sourceEl = document.getElementById('pvSource');
+
+  var RING = 2 * Math.PI * 90;
+  var BREATH = 4000, PEAK = 1440;           /* main.css glowBreath: 4s, peak at 36% */
+  var BLOSSOM_COUNT = 10;
+
+  function applyCSS() {
+    live.textContent = buildCSS();
+    document.documentElement.classList.toggle('qp-no-greeting', !v.greeting);
+  }
+
+  /* ============================================================
+     QUOTES — read from the same quotes.json the app uses
+     ============================================================ */
+  var FALLBACK = [
+    '静かな時間も、また大切な時間です。',
+    'お茶の香りも、どうぞごゆっくりお楽しみください。',
+    '窓の外の音に、そっと耳を澄ましてみてください。',
+    'どうぞ、心穏やかな時間をお過ごしください。'
+  ];
+  var quotes = FALLBACK.slice();
+  var order = [];
+
+  function buildOrder() {
+    var keepFirst = order.length ? order[S.pos] : -1;
+    order = quotes.map(function (_, i) { return i; });
+    if (v.shuffle) {
+      for (var i = order.length - 1; i > 0; i--) {
+        var j = Math.floor(Math.random() * (i + 1));
+        var t = order[i]; order[i] = order[j]; order[j] = t;
+      }
+      if (order.length > 1 && order[0] === keepFirst) { order.push(order.shift()); }
+    }
+  }
+
+  function loadQuotes() {
+    return fetch('quotes.json', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        if (data && Array.isArray(data.quotes) && data.quotes.length) {
+          quotes = data.quotes.map(function (q) { return String(q).trim(); }).filter(Boolean);
+          sourceEl.textContent = quotes.length + ' quotes read from quotes.json.';
+        }
+      })
+      .catch(function () {
+        sourceEl.textContent = 'Could not read quotes.json (open this page from the web server, not as a file). Showing the app\'s built-in lines.';
+      });
+  }
+
+  /* ============================================================
+     QUOTE CYCLE
+     One clock drives everything: the arc, the bead, the blossoms,
+     the countdown text, the fade out and the next quote. Pausing
+     simply stops that clock.
+     ============================================================ */
+  var S = { pos: 0, start: 0, D: 0, paused: false, pausedAt: 0, phase: 'idle', nextPos: null, lastSec: -1 };
+  var marks = [];
+
+  function now() { return performance.now(); }
+  function elapsed() { return (S.paused ? S.pausedAt : now()) - S.start; }
+
+  /* Where the 4s breath is right now, read from the halo's own
+     animation so the new quote lands exactly as the koi surfaces. */
+  function breathPhase() {
+    var anims = softGlow.getAnimations ? softGlow.getAnimations() : [];
+    for (var i = 0; i < anims.length; i++) {
+      if (anims[i].animationName === 'glowBreath' && anims[i].currentTime != null) {
+        return anims[i].currentTime % BREATH;
+      }
+    }
+    return null;
+  }
+  function quoteLength() {
+    var N = v.seconds * 1000;
+    if (!v.align) return N;
+    var p = breathPhase();
+    if (p === null) return N;
+    var arrive = (p + N) % BREATH;
+    var shift = (PEAK - arrive + BREATH) % BREATH;
+    if (shift > BREATH / 2) shift -= BREATH;      /* nearest peak, ±2s */
+    return N + shift;
+  }
+
+  function buildMarks() {
+    divider.innerHTML = '';
+    marks = [];
+    for (var b = 0; b < BLOSSOM_COUNT; b++) {
+      var m = document.createElement('span');
+      m.className = 'blossom-mark';
+      m.textContent = '❀';
+      divider.appendChild(m);
+      marks.push(m);
+    }
+  }
+
+  function renderText(text) {
+    quoteLine.textContent = '';
+    quoteLine.classList.toggle('ink', v.ink > 0);
+    quoteLine.classList.toggle('vertical', !!v.vertical);
+    if (v.ink > 0) {
+      var chars = Array.from(text);
+      for (var i = 0; i < chars.length; i++) {
+        var s = document.createElement('span');
+        s.className = 'quote-char';
+        s.style.setProperty('--i', i);
+        s.textContent = chars[i];
+        quoteLine.appendChild(s);
+      }
+    } else {
+      quoteLine.textContent = text;
+    }
+  }
+
+  function showQuote(pos) {
+    if (!order.length) buildOrder();
+    S.pos = (pos + order.length) % order.length;
+    renderText(quotes[order[S.pos]]);
+    quoteLine.classList.remove('shown', 'leaving');
+    void quoteLine.offsetWidth;
+    quoteLine.classList.add('shown');
+    buildMarks();
+    S.start = now();
+    if (S.paused) S.pausedAt = S.start;
+    S.D = quoteLength();
+    S.phase = 'showing';
+    S.nextPos = null;
+    S.lastSec = -1;
+    countEl.textContent = (S.pos + 1) + ' / ' + order.length;
+    remainEl.firstChild.textContent = '次の言葉まで ';
+    arrivalEffects();
+  }
+
+  function startLeaving() {
+    S.phase = 'leaving';
+    quoteLine.classList.remove('shown');
+    quoteLine.classList.add('leaving');
+    for (var i = 0; i < marks.length; i++) {
+      marks[i].classList.remove('appeared');
+      marks[i].classList.add('resetting');
+    }
+  }
+
+  /* Move to another quote now: fade the current one, then show it. */
+  function goTo(pos) {
+    if (S.phase === 'leaving') { S.nextPos = pos; return; }
+    if (S.paused) setPaused(false);
+    S.nextPos = pos;
+    S.D = elapsed() + v.fade * 1000 * 0.7;
+    startLeaving();
+  }
+  function next() { goTo(S.pos + 1); }
+  function prev() { goTo(S.pos - 1); }
+
+  function setPaused(p) {
+    if (p === S.paused) return;
+    if (p && S.phase !== 'showing') return;
+    if (p) { S.pausedAt = now(); }
+    else { S.start += now() - S.pausedAt; }
+    S.paused = p;
+    screen.classList.toggle('quote-paused', p);
+    pauseBtn.textContent = p ? '再開' : '一時停止';
+    S.lastSec = -1;
+  }
+
+  function tick() {
+    requestAnimationFrame(tick);
+    if (S.phase === 'idle') return;
+    var e = elapsed();
+    var rem = Math.max(0, S.D - e);
+    var fadeMs = v.fade * 1000;
+
+    /* Arc and bead: full ring at arrival, unwinding to the top. */
+    var frac = Math.max(0, Math.min(1, rem / S.D));
+    arc.style.strokeDashoffset = (RING * (1 - frac)).toFixed(2);
+    var a = frac * 2 * Math.PI;
+    bead.setAttribute('cx', (180 + 90 * Math.sin(a)).toFixed(2));
+    bead.setAttribute('cy', (180 - 90 * Math.cos(a)).toFixed(2));
+
+    if (S.phase === 'showing') {
+      /* Blossoms: one by one across the time the quote is up. */
+      var from = 400, to = Math.max(from + 1, S.D - fadeMs - 600);
+      var lit = Math.max(0, Math.min(BLOSSOM_COUNT, Math.floor((e - from) / (to - from) * BLOSSOM_COUNT) + 1));
+      if (e < from) lit = 0;
+      for (var i = 0; i < marks.length; i++) {
+        if (i < lit && !marks[i].classList.contains('appeared')) marks[i].classList.add('appeared');
+      }
+      if (rem <= fadeMs) startLeaving();
+    }
+
+    /* Countdown text. */
+    if (S.paused) {
+      if (S.lastSec !== -2) {
+        remainEl.firstChild.textContent = '一時停止中 · ふれると再開します';
+        remainNum.textContent = '';
+        remainNum.nextSibling.textContent = '';
+        S.lastSec = -2;
+      }
+    } else if (S.phase === 'leaving') {
+      if (S.lastSec !== -3) {
+        remainEl.firstChild.textContent = 'まもなく';
+        remainNum.textContent = '';
+        remainNum.nextSibling.textContent = '';
+        S.lastSec = -3;
+      }
+    } else {
+      var sec = Math.ceil(rem / 1000);
+      if (sec !== S.lastSec) {
+        remainEl.firstChild.textContent = '次の言葉まで ';
+        remainNum.textContent = sec;
+        remainNum.nextSibling.textContent = '秒';
+        S.lastSec = sec;
+      }
+    }
+
+    if (rem <= 0 && S.phase === 'leaving') {
+      showQuote(S.nextPos != null ? S.nextPos : S.pos + 1);
+    }
+  }
+
+  /* When the new quote arrives: a soft ripple under it, and a
+     金木犀 floret that drifts down and settles beside it. */
+  function arrivalEffects() {
+    var r = quoteLine.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+    if (v.ripple) {
+      setTimeout(function () { spawnRipples(cx, cy, 'subtle'); }, 250);
+    }
+    if (v.floret) {
+      var side = Math.random() < 0.5 ? -1 : 1;
+      var x = cx + side * (Math.min(r.width, 520) / 2 + 30 + Math.random() * 40);
+      var y = cy + (Math.random() * 40 - 10);
+      spawnFloret(Math.max(30, Math.min(innerWidth - 30, x)), Math.max(60, Math.min(innerHeight - 40, y)), 4200);
+    }
+  }
+
+  /* ============================================================
+     PANEL
+     ============================================================ */
+  var controlsBox = document.getElementById('pvControls');
+  var inputs = {};
+  var CYCLE_KEYS = { seconds: 1, fade: 1, align: 1 };
+  var RERENDER_KEYS = { ink: 1, vertical: 1 };
+
+  function fmt(c, val) {
+    var d = (String(c.step).split('.')[1] || '').length;
+    return (+val).toFixed(d);
+  }
+
+  function onValueChange(id) {
+    saveValues();
+    applyCSS();
+    if (id === 'shuffle') { buildOrder(); goTo(0); }
+    else if (RERENDER_KEYS[id] || CYCLE_KEYS[id]) {
+      clearTimeout(onValueChange.t);
+      onValueChange.t = setTimeout(function () { goTo(S.pos); }, 350);
+    }
+  }
+
+  CONTROLS.forEach(function (c) {
+    if (c.group) {
+      var g = document.createElement('div');
+      g.className = 'pv-group';
+      g.innerHTML = '<div class="pv-group-title"></div>';
+      g.firstChild.textContent = c.group;
+      controlsBox.appendChild(g);
+      return;
+    }
+    var row = document.createElement('div');
+    var id = 'pv_' + c.id;
+    if (c.type === 'check') {
+      row.className = 'pv-check';
+      row.innerHTML = '<input type="checkbox" id="' + id + '"><label for="' + id + '"></label>';
+      row.querySelector('label').textContent = c.label;
+      var cb = row.querySelector('input');
+      cb.checked = !!v[c.id];
+      cb.addEventListener('change', function () { v[c.id] = cb.checked; onValueChange(c.id); });
+      inputs[c.id] = { el: cb, c: c };
+    } else {
+      row.className = 'pv-row';
+      row.innerHTML = '<label for="' + id + '"></label><span class="pv-val"></span>' +
+        '<input type="range" id="' + id + '" min="' + c.min + '" max="' + c.max + '" step="' + c.step + '">' +
+        '<span class="pv-was"></span>';
+      row.querySelector('label').textContent = c.label;
+      row.querySelector('.pv-was').textContent = 'app: ' + c.was;
+      var range = row.querySelector('input');
+      var out = row.querySelector('.pv-val');
+      range.value = v[c.id];
+      out.textContent = fmt(c, v[c.id]);
+      range.addEventListener('input', function () {
+        v[c.id] = +range.value;
+        out.textContent = fmt(c, range.value);
+        onValueChange(c.id);
+      });
+      inputs[c.id] = { el: range, out: out, c: c };
+    }
+    controlsBox.lastChild.appendChild(row);
+  });
+
+  function syncInputs() {
+    for (var k in inputs) {
+      var it = inputs[k];
+      if (it.c.type === 'check') it.el.checked = !!v[k];
+      else { it.el.value = v[k]; it.out.textContent = fmt(it.c, v[k]); }
+    }
+  }
+
+  var panel = document.getElementById('pvPanel');
+  var collapseBtn = document.getElementById('pvCollapse');
+  collapseBtn.addEventListener('click', function () {
+    var c = panel.classList.toggle('collapsed');
+    collapseBtn.textContent = c ? '+' : '–';
+    collapseBtn.setAttribute('aria-label', c ? 'Show panel' : 'Hide panel');
+  });
+
+  document.getElementById('pvPrev').addEventListener('click', prev);
+  document.getElementById('pvNext').addEventListener('click', next);
+  pauseBtn.addEventListener('click', function () { setPaused(!S.paused); });
+
+  var statusEl = document.getElementById('pvStatus');
+  var outEl = document.getElementById('pvOut');
+
+  document.getElementById('pvReset').addEventListener('click', function () {
+    for (var k in DEFAULTS) v[k] = DEFAULTS[k];
+    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+    syncInputs();
+    applyCSS();
+    outEl.classList.remove('shown');
+    statusEl.textContent = 'Reset to the proposed defaults.';
+    buildOrder();
+    goTo(0);
+  });
+
+  document.getElementById('pvCopy').addEventListener('click', function () {
+    var text = buildCSS();
+    outEl.textContent = text;
+    outEl.classList.add('shown');
+    function done(ok) {
+      statusEl.textContent = ok ? 'Copied. The CSS is also shown below.'
+                                : 'Could not reach the clipboard. Select the text below and copy it.';
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(fallbackCopy(text)); });
+    } else {
+      done(fallbackCopy(text));
+    }
+  });
+
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  /* ============================================================
+     WATER: touch ripples, rain, bubbles, florets (app.js numbers)
+     ============================================================ */
+  var RIPPLE_COLOURS_STRONG = ['rgba(255, 253, 249, 0.95)', 'rgba(255, 162, 89, 0.85)', 'rgba(253, 232, 218, 0.70)'];
+  var RIPPLE_COLOURS_SUBTLE = ['rgba(255, 162, 89, 0.55)', 'rgba(253, 232, 218, 0.40)'];
+  var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
+  var RIPPLE_LIFE = 1900, RIPPLE_STAGGER = 150;
+
+  function spawnRipples(x, y, intensity) {
+    var palette, cls, baseSize;
+    if (intensity === 'strong') { palette = RIPPLE_COLOURS_STRONG; cls = ''; baseSize = 30; }
+    else if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
+    else { palette = RIPPLE_COLOURS_SUBTLE; cls = ' subtle'; baseSize = 26; }
+    for (var i = 0; i < palette.length; i++) {
+      (function (idx) {
+        var r = document.createElement('div');
+        r.className = 'ripple' + cls;
+        var jx = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+        var jy = (idx - (palette.length - 1) / 2) * 3 + (Math.random() * 4 - 2);
+        r.style.left = (x + jx) + 'px';
+        r.style.top = (y + jy) + 'px';
+        r.style.color = palette[idx];
+        r.style.animationDelay = (idx * RIPPLE_STAGGER) + 'ms';
+        r.style.width = (baseSize + idx * 6) + 'px';
+        r.style.height = (baseSize + idx * 6) + 'px';
+        rippleLayer.appendChild(r);
+        setTimeout(function () { if (r.parentNode) r.parentNode.removeChild(r); }, RIPPLE_LIFE + 210 + idx * RIPPLE_STAGGER);
+      })(i);
+    }
+  }
+
+  var reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function scheduleRain() {
+    setTimeout(function () {
+      if (!document.hidden && !reduced) {
+        var x = 40 + Math.random() * Math.max(1, innerWidth - 80);
+        var y = 40 + Math.random() * Math.max(1, innerHeight - 80);
+        spawnRipples(x, y, 'subtle');
+        if (Math.random() < 0.25) {
+          setTimeout(function () {
+            spawnRipples(40 + Math.random() * Math.max(1, innerWidth - 80), 40 + Math.random() * Math.max(1, innerHeight - 80), 'subtle');
+          }, 400 + Math.random() * 500);
+        }
+      }
+      scheduleRain();
+    }, 500 * (0.7 + Math.random() * 0.6));
+  }
+
+  function scheduleBubbles(first) {
+    setTimeout(function () {
+      if (!document.hidden && !reduced) {
+        var count = 1 + Math.floor(Math.random() * 3);
+        for (var i = 0; i < count; i++) spawnBubble(i * (260 + Math.random() * 300));
+      }
+      scheduleBubbles(false);
+    }, first ? 3200 : 2000 * (0.7 + Math.random() * 0.6));
+  }
+  function spawnBubble(delay) {
+    var b = document.createElement('div');
+    b.className = 'pond-bubble';
+    var size = 4 + Math.random() * 4;
+    var x0 = (Math.random() * 36 - 18);
+    var rise = 95 + Math.random() * 40;
+    var dur = 2600 + Math.random() * 1200;
+    b.style.width = b.style.height = size + 'px';
+    b.style.marginLeft = b.style.marginTop = (-size / 2) + 'px';
+    b.style.opacity = '0';
+    bubbleBox.appendChild(b);
+    var wob = 4 + Math.random() * 4;
+    var a = b.animate([
+      { transform: 'translate(' + x0 + 'px, 62px) scale(0.6)', opacity: 0 },
+      { transform: 'translate(' + (x0 + wob) + 'px, 30px) scale(0.85)', opacity: 0.9, offset: 0.25 },
+      { transform: 'translate(' + (x0 - wob) + 'px, -5px) scale(1)', opacity: 0.9, offset: 0.55 },
+      { transform: 'translate(' + (x0 + wob * 0.5) + 'px, ' + (62 - rise * 0.85) + 'px) scale(1.1)', opacity: 0.85, offset: 0.88 },
+      { transform: 'translate(' + x0 + 'px, ' + (62 - rise) + 'px) scale(1.9)', opacity: 0 }
+    ], { duration: dur, delay: delay, easing: 'cubic-bezier(0.4, 0, 0.7, 1)', fill: 'both' });
+    a.onfinish = function () { if (b.parentNode) b.parentNode.removeChild(b); };
+  }
+
+  /* 金木犀 florets: tiny four-petal flowers drift down with a gentle
+     sway, land on the water with a small ripple, float, then fade.
+     With a target they land beside the new quote. */
+  var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+    '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+    '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+    '<circle r="1.5" fill="#C44E10"/></svg>';
+
+  function scheduleFlorets(first) {
+    setTimeout(function () {
+      if (!document.hidden && !reduced) spawnFloret();
+      scheduleFlorets(false);
+    }, first ? 1800 : 4000 * (0.7 + Math.random() * 0.6));
+  }
+  function spawnFloret(tx, ty, fallMs) {
+    if (reduced) return;
+    var f = document.createElement('div');
+    f.className = 'kinmokusei-floret';
+    f.innerHTML = FLORET_SVG;
+    floretLayer.appendChild(f);
+    var W = innerWidth, H = innerHeight;
+    var x1 = tx != null ? tx : W * (0.12 + Math.random() * 0.76);
+    var y1 = ty != null ? ty : H * (0.3 + Math.random() * 0.55);
+    var x0 = Math.min(W - 30, Math.max(30, x1 + (Math.random() * 160 - 80)));
+    var s = 0.8 + Math.random() * 0.5;
+    var r0 = Math.random() * 360;
+    var sway = 22 + Math.random() * 18;
+    var fall = fallMs || 7000 + Math.random() * 3000;
+    var steps = [];
+    for (var i = 0; i <= 6; i++) {
+      var t = i / 6;
+      var x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI * 3) * sway * (1 - t * 0.6);
+      var y = -20 + (y1 + 20) * t;
+      steps.push({
+        transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + (r0 + t * 220).toFixed(0) + 'deg) scale(' + s.toFixed(2) + ')',
+        opacity: i === 0 ? 0 : 1
+      });
+    }
+    var a = f.animate(steps, { duration: fall, easing: 'cubic-bezier(0.3, 0, 0.55, 1)', fill: 'forwards' });
+    a.onfinish = function () {
+      if (!f.parentNode) return;
+      spawnRipples(x1 + 7 * s, y1 + 7 * s, 'trail');
+      var end = 'translate(' + (x1 + 10).toFixed(1) + 'px,' + (y1 + 4).toFixed(1) + 'px) rotate(' + (r0 + 250).toFixed(0) + 'deg) scale(' + (s * 0.9).toFixed(2) + ')';
+      var b = f.animate([steps[6], { transform: end, opacity: 0 }], { duration: 6000, easing: 'ease-in', fill: 'forwards' });
+      b.onfinish = function () { if (f.parentNode) f.parentNode.removeChild(f); };
+    };
+  }
+
+  /* ============================================================
+     GESTURES
+     tap water → ripples · tap koi → next quote · tap quote → pause
+     swipe left / right → next / previous quote
+     ============================================================ */
+  var SWIPE = 60, TAP_TRAVEL = 8, TAP_MS = 300, TRAIL_EVERY = 90, TRAIL_MIN = 18;
+  var g = null;
+  var flinching = false;
+
+  function koiCentre() {
+    var r = koiWrap.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  }
+
+  screen.addEventListener('pointerdown', function (e) {
+    if (g) return;
+    var c = koiCentre();
+    g = {
+      id: e.pointerId, x0: e.clientX, y0: e.clientY, t0: now(),
+      onKoi: Math.hypot(e.clientX - c.x, e.clientY - c.y) < 75,
+      onQuote: stage.contains(e.target),
+      lastAt: 0, lastX: e.clientX, lastY: e.clientY
+    };
+    try { screen.setPointerCapture(e.pointerId); } catch (err) {}
+  });
+  screen.addEventListener('pointermove', function (e) {
+    if (!g || e.pointerId !== g.id) return;
+    var t = now();
+    if (t - g.lastAt > TRAIL_EVERY && Math.hypot(e.clientX - g.lastX, e.clientY - g.lastY) > TRAIL_MIN) {
+      spawnRipples(e.clientX, e.clientY, 'trail');
+      g.lastAt = t; g.lastX = e.clientX; g.lastY = e.clientY;
+    }
+  });
+  function endGesture(e) {
+    if (!g || e.pointerId !== g.id) return;
+    var dx = e.clientX - g.x0, dy = e.clientY - g.y0;
+    var travel = Math.hypot(dx, dy);
+    var quick = now() - g.t0 < TAP_MS;
+    var was = g;
+    g = null;
+    if (e.type !== 'pointerup') return;
+    if (Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy) * 1.3) {
+      if (dx < 0) next(); else prev();
+      return;
+    }
+    if (travel <= TAP_TRAVEL && quick) {
+      spawnRipples(e.clientX, e.clientY, was.onQuote ? 'subtle' : 'strong');
+      if (was.onKoi) { flinch(); next(); }
+      else if (was.onQuote) setPaused(!S.paused);
+    }
+  }
+  screen.addEventListener('pointerup', endGesture);
+  screen.addEventListener('pointercancel', endGesture);
+  startBtn.addEventListener('click', function (e) { e.preventDefault(); });
+
+  document.addEventListener('keydown', function (e) {
+    if (e.target && /INPUT|BUTTON/.test(e.target.tagName)) return;
+    if (e.key === 'ArrowRight') next();
+    else if (e.key === 'ArrowLeft') prev();
+    else if (e.key === ' ') { e.preventDefault(); setPaused(!S.paused); }
+  });
+
+  function flinch() {
+    if (flinching) return;
+    flinching = true;
+    var dir = Math.random() < 0.5 ? -1 : 1;
+    koiWrap.style.setProperty('--flinch-rot', ((22 + Math.random() * 12) * dir).toFixed(2) + 'deg');
+    koiWrap.style.setProperty('--flinch-scale', (1.14 + Math.random() * 0.08).toFixed(3));
+    koiWrap.style.setProperty('--flinch-x', ((10 + Math.random() * 10) * dir).toFixed(2) + 'px');
+    koiWrap.style.setProperty('--flinch-y', (-(6 + Math.random() * 8)).toFixed(2) + 'px');
+    koiWrap.classList.remove('flinching');
+    void koiWrap.offsetWidth;
+    koiWrap.classList.add('flinching');
+    startBtn.classList.add('startling');
+    setTimeout(function () { startBtn.classList.remove('startling'); }, 220);
+    var done = function (ev) {
+      if (ev.animationName !== 'koiFlinch') return;
+      koiWrap.removeEventListener('animationend', done);
+      koiWrap.classList.remove('flinching');
+      flinching = false;
+    };
+    koiWrap.addEventListener('animationend', done);
+    setTimeout(function () { flinching = false; koiWrap.classList.remove('flinching'); }, 1500);
+  }
+
+  /* Hold the countdown while the tab is hidden, so a quote is never
+     skipped unseen. */
+  var hiddenPause = false;
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && !S.paused && S.phase === 'showing') { setPaused(true); hiddenPause = true; }
+    else if (!document.hidden && hiddenPause) { hiddenPause = false; setPaused(false); }
+  });
+
+  /* ============================================================
+     LANTERNS (copied from app.js so the background is the same)
+     ============================================================ */
+  var LANTERN_COUNT = 10, LANTERN_TILE = 60;
+  var lanternLit = document.getElementById('lanternLit');
+  var lanternBloom = document.getElementById('lanternBloom');
+  function lanternBounds() {
+    var half = LANTERN_TILE / 2;
+    return { maxI: Math.floor(innerWidth / half), maxJ: Math.floor(innerHeight / half) };
+  }
+  function lanternPlace(L) {
+    var half = LANTERN_TILE / 2, dot = LANTERN_TILE * 1.5, glow = LANTERN_TILE * 4;
+    L.dot.style.transform = 'translate3d(' + (L.i * half - dot / 2) + 'px,' + (L.j * half - dot / 2) + 'px,0)';
+    L.glow.style.transform = 'translate3d(' + (L.i * half - glow / 2) + 'px,' + (L.j * half - glow / 2) + 'px,0)';
+  }
+  function lanternRandomSpot() {
+    var b = lanternBounds();
+    var i = 1 + Math.floor(Math.random() * Math.max(1, b.maxI - 1));
+    var j = 1 + Math.floor(Math.random() * Math.max(1, b.maxJ - 1));
+    if ((i + j) % 2) j += 1;
+    return { i: i, j: j };
+  }
+  function lanternStep(L) {
+    var b = lanternBounds();
+    var all = [[1, 1], [1, -1], [-1, 1], [-1, -1]], open = [];
+    for (var t = 0; t < all.length; t++) {
+      var ni = L.i + all[t][0], nj = L.j + all[t][1];
+      if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) open.push(all[t]);
+    }
+    if (!open.length) { var s = lanternRandomSpot(); L.i = s.i; L.j = s.j; L.dir = null; return; }
+    var pick = null;
+    if (L.dir && Math.random() < 0.6) {
+      for (var k = 0; k < open.length; k++) if (open[k][0] === L.dir[0] && open[k][1] === L.dir[1]) pick = open[k];
+    }
+    if (!pick) pick = open[Math.floor(Math.random() * open.length)];
+    L.i += pick[0]; L.j += pick[1]; L.dir = pick;
+  }
+  function buildLanterns() {
+    lanternLit.innerHTML = '';
+    lanternBloom.innerHTML = '';
+    if (reduced) return;
+    for (var k = 0; k < LANTERN_COUNT; k++) {
+      var delay = (-7 * k / LANTERN_COUNT).toFixed(2) + 's';
+      var dot = document.createElement('div');
+      var glow = document.createElement('div');
+      dot.className = 'lantern';
+      glow.className = 'lantern-bloom';
+      dot.style.setProperty('--d', delay);
+      glow.style.setProperty('--d', delay);
+      dot.style.width = dot.style.height = (LANTERN_TILE * 1.5) + 'px';
+      glow.style.width = glow.style.height = (LANTERN_TILE * 4) + 'px';
+      lanternLit.appendChild(dot);
+      lanternBloom.appendChild(glow);
+      var spot = lanternRandomSpot();
+      var L = { dot: dot, glow: glow, i: spot.i, j: spot.j, dir: null };
+      lanternPlace(L);
+      dot.addEventListener('animationiteration', (function (L) {
+        return function () { lanternStep(L); lanternPlace(L); };
+      })(L));
+    }
+  }
+  var lanternResize = null;
+  addEventListener('resize', function () {
+    clearTimeout(lanternResize);
+    lanternResize = setTimeout(buildLanterns, 250);
+  });
+
+  /* ============================================================
+     GREETING (Nagoya time, same wording as the app)
+     ============================================================ */
+  function setGreeting() {
+    var h;
+    try { h = +new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Asia/Tokyo' }).format(new Date()); }
+    catch (e) { h = new Date().getHours(); }
+    var t = (h >= 5 && h < 11) ? 'おはようございます' : (h >= 11 && h < 17) ? 'こんにちは' : 'こんばんは';
+    document.getElementById('blossomGreetingTime').textContent = t;
+  }
+
+  /* ============================================================
+     START
+     ============================================================ */
+  applyCSS();
+  setGreeting();
+  buildLanterns();
+  scheduleRain();
+  scheduleBubbles(true);
+  scheduleFlorets(true);
+  requestAnimationFrame(tick);
+  loadQuotes().then(function () {
+    buildOrder();
+    setTimeout(function () { showQuote(0); }, 900);
+  });
+})();
+</script>
+</body>
+</html>
