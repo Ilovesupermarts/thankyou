@@ -17,13 +17,16 @@
                     the dim stars it touches.
 
      Loads the real main.css and copies the real quotes page markup
-     (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo,
-     the pond and the words look exactly as in the app. The faint ring,
-     the countdown and the ripples are drawn with the same code as
+     (.thankyou-screen › .ty-ambient-stage › .quote-window) so the halo
+     and the pond look exactly as in the app. The faint ring, the
+     countdown and the ripples are drawn with the same code as
      QuoteWindow in app.js. The games are drawn on one extra canvas on
-     top. It does NOT load app.js.
+     top. It does NOT load app.js. No quotes are shown on this page.
 
-     Quotes are read from quotes.json, the same file the app uses.
+     Rounds: each round lasts 60 seconds (one turn of the countdown
+     ring) and starts on the first touch. The centre of the ring shows
+     現在のスコア, 最高スコア and 残り時間. In Pong and Lantern breakout
+     an extra ball joins after every 6 hits in a row.
 
      The generated <style id="pvLive"> block holds the proposed window
      size and every game setting. "Copy values" copies exactly that text.
@@ -51,22 +54,23 @@
     position: absolute; left: 50%; top: 50%;
     z-index: 3; pointer-events: none;
   }
-  .pv-quote-below {
-    position: relative; z-index: 3;
-    margin-top: 34px; min-height: 1.5em; max-width: 90vw;
-    font-family: "Zen Antique", "Yuji Syuku", "Shippori Mincho", "Noto Serif JP", serif;
-    color: #A3282A; letter-spacing: 3px; line-height: 1.5;
-    text-shadow: var(--quote-shadow);
-    opacity: 0; transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  /* The scores in the centre of the ring. The font size is set by the
+     script from the ring size; everything else is in em. */
+  .pv-score {
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: #A3282A; text-align: center; letter-spacing: 0.12em; line-height: 1.5;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(255, 253, 249, 0.9), 0 0 22px rgba(255, 253, 249, 0.7);
+    transition: opacity 0.6s ease;
   }
-  .pv-quote-below.shown { opacity: 1; }
-  .pv-quote-below.off { display: none; }
-  .pv-game-hud {
-    position: relative; z-index: 3; margin-top: 10px; min-height: 20px;
-    font-family: "Shippori Mincho", "Noto Serif JP", serif;
-    font-size: 15px; letter-spacing: 3px; color: var(--text-mute);
-    font-variant-numeric: tabular-nums; opacity: 0.85;
-  }
+  .pv-score.off { opacity: 0; }
+  .pv-score .sc-row { opacity: 0.8; }
+  .pv-score .sc-row.main { font-size: 1.45em; font-weight: 600; opacity: 0.95; }
+  .pv-score .sc-row.time { margin-top: 0.15em; }
+  .pv-score .msg { margin-top: 0.8em; font-size: 0.9em; color: var(--text-mute); min-height: 1.5em; }
+  .pv-score .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
+  .pv-score .sc-row.main b { display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .pv-score .sc-row.main b.pop { transform: scale(1.25); transition: none; }
 
   .pv-fps {
     position: fixed; left: 12px; bottom: 12px; z-index: 1000;
@@ -192,15 +196,18 @@
           <div class="pond-caustic c2"></div>
         </div>
         <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
+        <!-- Where the quote sits in the app; here it holds the scores. -->
         <div class="quote-wrap" aria-live="polite">
-          <div class="quote-line" id="quoteLine"></div>
+          <div class="pv-score" id="scoreBox">
+            <div class="sc-row main">現在のスコア：<b id="scoreNow">0</b></div>
+            <div class="sc-row">最高スコア：<span id="scoreBest">0</span></div>
+            <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
+            <div class="msg" id="scoreMsg"></div>
+          </div>
         </div>
-        <!-- Preview only: the games are drawn here, above the words. -->
+        <!-- Preview only: the games are drawn here, above the scores. -->
         <canvas class="pv-game-canvas" id="gameCanvas" aria-hidden="true"></canvas>
       </div>
-      <div class="pv-quote-below off" id="quoteBelow"></div>
-      <div class="pv-game-hud" id="gameHud" aria-hidden="true"></div>
-      <div class="quote-meta" aria-hidden="true"><span class="quote-count" id="quoteCount"></span></div>
     </div>
   </div>
 </div>
@@ -215,16 +222,16 @@
       <option value="pong">ポン · Pong</option>
       <option value="lanterns">灯籠くずし · Lantern breakout</option>
       <option value="firefly">蛍 · Firefly</option>
-      <option value="none">なし · Quotes only</option>
+      <option value="none">なし · Ring only</option>
     </select>
     <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
   </div>
   <div class="pv-body">
-    <p class="pv-note">Play with one finger anywhere on the screen. Pick a game above; the settings below change to match it. Fold this panel with – to see the whole window. Grey "app:" notes show today's value in the real quotes page.</p>
-    <p class="pv-source" id="pvSource">Loading quotes.json…</p>
+    <p class="pv-note">Play with one finger anywhere on the screen. A round starts on the first touch and lasts one turn of the ring. Pick a game above; the settings below change to match it. Fold this panel with – to see the whole window. Grey "app:" notes show today's value in the real quotes page.</p>
     <div class="pv-transport">
-      <button type="button" id="pvRestart">Restart game</button>
+      <button type="button" id="pvRestart">New round</button>
       <button type="button" id="pvPause">Pause</button>
+      <button type="button" id="pvClearBest">Clear top score</button>
     </div>
     <div id="pvControls"></div>
     <div class="pv-actions">
@@ -249,12 +256,8 @@
     { group: 'Window', game: 'all' },
     { id: 'size',       game: 'all', label: 'Ring size (px across)',        min: 500, max: 860, step: 10,  def: 680, was: '500px' },
     { id: 'countdown',  game: 'all', label: 'Show the countdown on the ring', type: 'check', def: true },
-    { id: 'seconds',    game: 'all', label: 'Seconds per quote',            min: 6,   max: 40,  step: 1,   def: 12,  was: '10' },
-    { id: 'quotePlace', game: 'all', label: 'Quote while playing', type: 'select', def: 'inside',
-      options: [['inside', 'Inside the ring (faint)'], ['below', 'Below the ring'], ['hidden', 'Hidden']] },
-    { id: 'quoteAlpha', game: 'all', label: 'Quote strength inside the ring', min: 0, max: 1, step: 0.05, def: 0.3, was: '1 (no game)' },
-    { id: 'belowSize',  game: 'all', label: 'Quote size below the ring (px)', min: 16, max: 40, step: 1, def: 26 },
-    { id: 'counter',    game: 'all', label: 'Show the little counter under the ring', type: 'check', def: true },
+    { id: 'round',      game: 'all', label: 'Seconds per round (one turn of the ring)', min: 20, max: 180, step: 5, def: 60 },
+    { id: 'counter',    game: 'all', label: 'Show the scores in the centre', type: 'check', def: true },
     { id: 'sound',      game: 'all', label: 'Soft chime on hits', type: 'check', def: true },
     { id: 'volume',     game: 'all', label: 'Chime volume',                 min: 0,   max: 1,   step: 0.05, def: 0.35 },
 
@@ -268,16 +271,18 @@
     { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
       options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
     { id: 'pBallSpeed', game: 'pong', label: 'Ball speed at the start (px/s)', min: 80,  max: 600, step: 10, def: 220 },
-    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 4 },
-    { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 460 },
+    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 10 },
+    { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 660 },
     { id: 'pBallR',     game: 'pong', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 11 },
-    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 50 },
+    { id: 'pPadDeg',    game: 'pong', label: 'Paddle length (degrees)',  min: 15,  max: 120, step: 1,  def: 17 },
     { id: 'pPadW',      game: 'pong', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
-    { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
-    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
-    { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: false },
+    { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 20 },
+    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 32 },
+    { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: true },
     { id: 'pRespawn',   game: 'pong', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
     { id: 'pTrail',     game: 'pong', label: 'Ball leaves a soft trail', type: 'check', def: true },
+    { id: 'pExtraHits', game: 'pong', label: 'Hits in a row for an extra ball', min: 2, max: 20, step: 1, def: 6 },
+    { id: 'pMaxBalls',  game: 'pong', label: 'Most balls at once',       min: 1,   max: 6,   step: 1,  def: 3 },
 
     { group: 'Lantern breakout', game: 'lanterns' },
     { id: 'bControl',   game: 'lanterns', label: 'Paddle control', type: 'select', def: 'point',
@@ -298,6 +303,8 @@
     { id: 'bFollow',    game: 'lanterns', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 22 },
     { id: 'bEnglish',   game: 'lanterns', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 22 },
     { id: 'bRespawn',   game: 'lanterns', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
+    { id: 'bExtraHits', game: 'lanterns', label: 'Hits in a row for an extra ball', min: 2, max: 20, step: 1, def: 6 },
+    { id: 'bMaxBalls',  game: 'lanterns', label: 'Most balls at once',   min: 1,   max: 6,   step: 1,  def: 3 },
 
     { group: 'Firefly', game: 'firefly' },
     { id: 'fPattern',   game: 'firefly', label: 'Stars to light', type: 'select', def: 'cycle',
@@ -314,7 +321,7 @@
     { id: 'fWander',    game: 'firefly', label: 'Firefly drifts on its own when not touched', type: 'check', def: true }
   ];
 
-  var STORE_KEY = 'gamesPreview.v1';
+  var STORE_KEY = 'gamesPreview.v2';          /* v2: new defaults; values saved under v1 are ignored */
   var DEFAULTS = { game: 'pong' };
   CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
 
@@ -323,9 +330,8 @@
     size: 680, band: 10, soft: 4, track: 0.8,
     bodyW: 12, headW: 18, neck: 110, head: true,
     tail: 280, taper: 2.7, startFade: 58,
+    fullTrail: true,                                 /* games: the line stays full from the top to the head */
     bloom: true, fadeBack: 1.4, ripReach: 1.4,
-    seconds: 10, fade: 1600, align: true,
-    maxSize: 44, minSize: 25, fit: 0.82,
     dprCap: 1.5,
     cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
     cHalo: '#E0705F'
@@ -348,10 +354,11 @@
   var ringCv = document.getElementById('quoteRingCanvas');
   var ripCv = document.getElementById('quoteRippleCanvas');
   var gameCv = document.getElementById('gameCanvas');
-  var quoteLine = document.getElementById('quoteLine');
-  var quoteBelow = document.getElementById('quoteBelow');
-  var countEl = document.getElementById('quoteCount');
-  var hudEl = document.getElementById('gameHud');
+  var scoreBox = document.getElementById('scoreBox');
+  var scoreNowEl = document.getElementById('scoreNow');
+  var scoreBestEl = document.getElementById('scoreBest');
+  var scoreTimeEl = document.getElementById('scoreTime');
+  var scoreMsgEl = document.getElementById('scoreMsg');
   var fpsEl = document.getElementById('pvFps');
   var softGlow = win.querySelector('.soft-glow');
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -361,7 +368,7 @@
      exact text "Copy values" copies.
      ============================================================ */
   var live = document.getElementById('pvLive');
-  var GAME_NAMES = { pong: 'Pong', lanterns: 'Lantern breakout', firefly: 'Firefly', none: 'Quotes only' };
+  var GAME_NAMES = { pong: 'Pong', lanterns: 'Lantern breakout', firefly: 'Firefly', none: 'Ring only' };
 
   function cssVal(c) {
     var x = v[c.id];
@@ -395,45 +402,31 @@
     lines.push('  width: ' + P + 'px; height: ' + P + 'px;');
     lines.push('  margin: -' + Math.round(P / 2) + 'px 0 0 -' + Math.round(P / 2) + 'px;');
     lines.push('}');
-    if (v.game !== 'none') {
-      lines.push('');
-      lines.push('/* The quote while a game is on. */');
-      if (v.quotePlace === 'inside') {
-        lines.push('.quote-window .quote-wrap { opacity: ' + v.quoteAlpha + '; transition: opacity 0.8s ease; }');
-      } else {
-        lines.push('.quote-window .quote-wrap { opacity: 0; transition: opacity 0.8s ease; }');
-      }
-      if (v.quotePlace === 'below') lines.push('.pv-quote-below { font-size: ' + v.belowSize + 'px; }');
-    }
     var groups = [['all', 'Shared'], ['pong', 'Pong'], ['lanterns', 'Lantern breakout'], ['firefly', 'Firefly']];
     lines.push('');
     lines.push('/* Game settings. */');
     lines.push('.quote-window {');
     lines.push('  --game: "' + v.game + '";');
     groups.forEach(function (g) {
-      var list = CONTROLS.filter(function (c) { return c.id && c.game === g[0] && c.id !== 'size' && c.id !== 'seconds' && c.id !== 'quotePlace' && c.id !== 'quoteAlpha' && c.id !== 'belowSize'; });
+      var list = CONTROLS.filter(function (c) { return c.id && c.game === g[0] && c.id !== 'size'; });
       if (!list.length) return;
       lines.push('  /* ' + g[1] + ' */');
       list.forEach(function (c) { lines.push('  --game-' + kebab(c.id) + ': ' + cssVal(c) + ';'); });
     });
-    lines.push('  --game-seconds-per-quote: ' + v.seconds + ';');
-    lines.push('  --game-quote-place: "' + v.quotePlace + '";');
     lines.push('}');
     return lines.join('\n') + '\n';
   }
   function applyCSS() {
     live.textContent = buildCSS();
-    quoteBelow.classList.toggle('off', v.game === 'none' || v.quotePlace !== 'below');
   }
 
   /* ============================================================
-     THE ROUND WINDOW — ring, countdown, ripples and quotes.
-     Ported from QuoteWindow in app.js; only `size` and `seconds`
-     come from the panel.
+     THE ROUND WINDOW — ring, countdown and ripples.
+     Ported from QuoteWindow in app.js; `size` comes from the panel.
+     Here the countdown is the round's clock: one turn = one round.
      ============================================================ */
-  var BREATH = 4000, PEAK = 1440;
-  var S = { pos: 0, D: 1, prog: 0, rate: 1, t0: 0, phase: 'idle' };
-  var QUOTES = [];
+  var BREATH = 4000;
+  var S = { D: 1, prog: 0, t0: 0, phase: 'idle' };
 
   function rgbOf(hex) {
     var h = String(hex).replace('#', '');
@@ -532,7 +525,7 @@
       for (i = 0; i <= M; i++) {
         var u = phi * i / M;
         var tt = Math.min(1, (phi - u) / L);
-        var a1 = Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
+        var a1 = QW.fullTrail ? smooth(u / 4) : Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
         grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), a1));
       }
       var endC = rgbaA(lerpC(COL.start, COL.end, phi / 360), 0);
@@ -664,128 +657,9 @@
     }
   }
 
-  function quoteLength() {
-    var N = v.seconds * 1000;
-    var an = glowAnim();
-    if (!an) return N;
-    var p = an.currentTime % BREATH;
-    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
-    if (shift > BREATH / 2) shift -= BREATH;
-    return N + shift;
-  }
-
-  var range = document.createRange();
-  function fitText() {
-    var R = QW.size / 2 * QW.fit;
-    var max = QW.maxSize, min = Math.min(QW.minSize, max);
-    function ok(size) {
-      quoteLine.style.fontSize = size + 'px';
-      range.selectNodeContents(quoteLine);
-      var box = range.getBoundingClientRect();
-      var k = inner.getBoundingClientRect().width / inner.offsetWidth || 1;   /* undo the fit-to-screen scale */
-      return Math.hypot(box.width / k / 2, box.height / k / 2) <= R;
-    }
-    if (ok(max)) return;
-    if (!ok(min)) { quoteLine.style.fontSize = min + 'px'; return; }
-    var lo = min, hi = max;
-    while (hi - lo > 1) {
-      var mid = (lo + hi) >> 1;
-      if (ok(mid)) lo = mid; else hi = mid;
-    }
-    quoteLine.style.fontSize = lo + 'px';
-  }
-
-  var HIRA = /^[぀-ゟ]+$/;
-  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
-  var OPEN = /^[（(「『]+$/;
-  var STOPS = /[、。，．！？!?]/;
-  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
-  function phraseUnits(text) {
-    var segs = [];
-    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
-    else segs = Array.from(text);
-    var units = [], cur = '', force = false, open = '';
-    segs.forEach(function (sg) {
-      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
-      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
-      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
-      if (cur !== '' && !join) { units.push(cur); cur = ''; }
-      cur += open + sg; open = ''; force = false;
-    });
-    if (cur) units.push(cur);
-    return units;
-  }
-  function lineCounts() {
-    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
-    for (var i = 0; i < units.length; i++) {
-      var r = units[i].getBoundingClientRect();
-      var key = r.top, tol = r.height * 0.5;
-      var row = null;
-      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
-      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
-      row.n += Array.from(units[i].textContent).length;
-    }
-    return rows.map(function (x) { return x.n; });
-  }
-  function fitAndBalance() {
-    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
-    var base = Math.round(QW.size * 0.8);
-    for (var k = 0; k < tries.length; k++) {
-      quoteLine.style.maxWidth = Math.round(base * tries[k]) + 'px';
-      fitText();
-      var c = lineCounts();
-      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
-    }
-    quoteLine.style.maxWidth = base + 'px';
-    fitText();
-  }
-  function renderText(text) {
-    quoteLine.textContent = '';
-    quoteLine.style.maxWidth = '';
-    var units = phraseUnits(text);
-    units.forEach(function (u, ui) {
-      var span = document.createElement('span');
-      span.className = 'quote-unit';
-      span.textContent = u;
-      quoteLine.appendChild(span);
-      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
-    });
-    fitAndBalance();
-    quoteBelow.textContent = text;
-  }
-
-  function showQuote(pos) {
-    var n = QUOTES.length;
-    if (!n) return;
-    S.pos = ((pos % n) + n) % n;
-    quoteLine.classList.remove('shown', 'leaving');
-    quoteBelow.classList.remove('shown');
-    renderText(QUOTES[S.pos]);
-    void quoteLine.offsetWidth;
-    quoteLine.classList.add('shown');
-    quoteBelow.classList.add('shown');
-    var now = performance.now();
-    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
-    S.D = Math.max(1000, quoteLength());
-    S.prog = 0;
-    S.t0 = now;
-    S.phase = 'showing';
-    countEl.textContent = (S.pos + 1) + ' / ' + n;
-  }
-  function startLeaving() {
-    S.phase = 'leaving';
-    quoteLine.classList.remove('shown');
-    quoteLine.classList.add('leaving');
-    quoteBelow.classList.remove('shown');
-  }
-  function refitQuote() {
-    if (S.phase === 'idle' || !QUOTES.length) return;
-    renderText(QUOTES[S.pos]);
-  }
-
   function fitStage() {
-    var extra = (v.game !== 'none' && v.quotePlace === 'below') ? 90 : 0;
-    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 130 + extra), (window.innerWidth - 40) / +v.size);
+    scoreBox.style.fontSize = Math.round(+v.size * 0.034) + 'px';
+    var k = Math.min(1, (window.innerHeight - 40) / (+v.size + 60), (window.innerWidth - 40) / +v.size);
     inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
   }
 
@@ -841,6 +715,7 @@
     finger.x = p.x; finger.y = p.y;
     finger.ang = finger.lastAng = Math.atan2(p.y, p.x);
     finger.dAng = 0;
+    onTouchStart(performance.now());
     try { stage.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
   });
@@ -963,24 +838,35 @@
   /* ============================================================
      BALL AND PADDLE — shared by Pong and Lantern breakout.
      `cfg(name)` reads that game's own setting (pBallSpeed / bBallSpeed …).
+     Several balls can be in play: every `ExtraHits` paddle hits in a
+     row (no miss in between) another ball joins, up to `MaxBalls`.
+     A miss ends the run of hits; when the last ball is missed a new
+     one is served.
      ============================================================ */
   function makeBallGame(prefix, extra) {
     function cfg(n) { return v[prefix + n]; }
     var G = {
       padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
-      ball: null, rally: 0, best: 0, trail: [],
+      balls: [], rally: 0,
+      /* A fresh round: paddle to the top, lanterns rebuilt, no ball yet. */
       reset: function () {
-        G.rally = 0; G.trail = [];
+        G.rally = 0; G.balls = [];
         G.padAng = G.padTarget = -Math.PI / 2;
-        G.serve(performance.now());
         if (extra && extra.reset) extra.reset();
       },
-      serve: function (now) {
+      /* Put a new ball in, waiting `wait` seconds before it moves. */
+      serve: function (now, wait) {
         var pos = extra && extra.spawn ? extra.spawn(G) : { x: 0, y: 0, ang: Math.random() * 2 * Math.PI };
         var sp = +cfg('BallSpeed');
-        G.ball = { x: pos.x, y: pos.y, vx: Math.cos(pos.ang) * sp, vy: Math.sin(pos.ang) * sp, state: 'serve', t0: now, alpha: 0 };
-        G.trail = [];
+        G.balls.push({ x: pos.x, y: pos.y, vx: Math.cos(pos.ang) * sp, vy: Math.sin(pos.ang) * sp,
+                       state: 'serve', t0: now, wait: wait, alpha: 0, trail: [] });
       },
+      start: function (now) { G.serve(now, +cfg('Respawn')); },
+      /* The round is over: every ball fades away where it is. */
+      stop: function (now) {
+        G.balls.forEach(function (b) { if (b.state !== 'lost') { b.state = 'lost'; b.t0 = now; b.vx *= 0.15; b.vy *= 0.15; } });
+      },
+      live: function () { return G.balls.filter(function (b) { return b.state !== 'lost'; }).length; },
       paddles: function () { return v.game === 'pong' && v.pTwo ? [G.padAng, G.padAng + Math.PI] : [G.padAng]; },
       update: function (dt, now) {
         /* Paddle follows the finger. */
@@ -993,92 +879,102 @@
         G.padAng = wrapAng(G.padAng + wrapAng(G.padTarget - G.padAng) * k);
         G.padTarget = G.padAng + wrapAng(G.padTarget - G.padAng);
 
-        var b = G.ball;
-        if (!b) return;
-        if (b.state === 'serve') {
-          b.alpha = smooth((now - b.t0) / 500);
-          if (now - b.t0 >= +cfg('Respawn') * 1000) { b.state = 'play'; b.alpha = 1; }
-          return;
-        }
-        if (b.state === 'lost') {
-          b.x += b.vx * dt; b.y += b.vy * dt;
-          b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
-          if (now - b.t0 > 600) G.serve(now);
-          return;
-        }
-        var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
-        var speed = Math.hypot(b.vx, b.vy);
-        var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
-        var h = dt / steps;
-        for (var s = 0; s < steps; s++) {
-          b.x += b.vx * h; b.y += b.vy * h;
-          if (extra && extra.collide) extra.collide(G, b, br);
-          var d = Math.hypot(b.x, b.y);
-          var inner = R - pw / 2;
-          if (d + br >= inner && d < R) {
-            var nx = b.x / d, ny = b.y / d;
-            if (b.vx * nx + b.vy * ny > 0) {
-              var ang = Math.atan2(b.y, b.x);
-              var reach = +cfg('PadDeg') * DEG / 2 + Math.asin(Math.min(1, br / d));
-              var hit = null;
-              G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
-              if (hit !== null) {
-                /* Bounce off the ring's normal, then angle it by where it hit. */
-                var dot = b.vx * nx + b.vy * ny;
-                var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
-                var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
-                var dir = Math.atan2(ry, rx) + hit * +cfg('English') * DEG;
-                /* Never let it skim along the edge: keep it at most 65° from straight back in. */
-                var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
-                if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
-                b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
-                var back2 = inner - br - 0.5;
-                b.x = nx * back2; b.y = ny * back2;
-                G.rally++;
-                if (G.rally > G.best) G.best = G.rally;
-                addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
-                chime(Math.min(8, 2 + (G.rally % 7)));
-                if (extra && extra.onPaddle) extra.onPaddle(G);
-              }
-            }
+        for (var i = G.balls.length - 1; i >= 0; i--) {
+          var b = G.balls[i];
+          if (b.state === 'lost') {
+            b.x += b.vx * dt; b.y += b.vy * dt;
+            b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
+            if (now - b.t0 > 600) G.balls.splice(i, 1);
+            continue;
           }
-          if (d > R + 6) {
-            b.state = 'lost'; b.t0 = now;
-            G.rally = 0;
-            return;
+          if (b.state === 'serve') {
+            b.alpha = smooth((now - b.t0) / 500);
+            if (now - b.t0 >= b.wait * 1000) { b.state = 'play'; b.alpha = 1; }
+            continue;
           }
+          moveBall(b, dt, now);
         }
-        if (cfg('Trail') || prefix === 'b') {
-          G.trail.push({ x: b.x, y: b.y });
-          if (G.trail.length > 10) G.trail.shift();
-        }
+        if (round.state === 'play' && G.live() === 0) G.serve(now, +cfg('Respawn'));
       },
       draw: function (ctx, now) {
         G.paddles().forEach(function (pa) { drawPaddle(ctx, pa, +cfg('PadDeg'), +cfg('PadW')); });
-        var b = G.ball;
-        if (!b) return;
         var br = +cfg('BallR');
-        if ((prefix === 'p' ? v.pTrail : true) && b.state === 'play') {
-          for (var i = 0; i < G.trail.length; i++) {
-            var tp = G.trail[i], f = (i + 1) / G.trail.length;
-            ctx.globalAlpha = 0.18 * f;
-            ctx.fillStyle = v.cBall;
-            ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
+        var trail = prefix === 'p' ? v.pTrail : true;
+        G.balls.forEach(function (b) {
+          if (trail && b.state === 'play') {
+            for (var i = 0; i < b.trail.length; i++) {
+              var tp = b.trail[i], f = (i + 1) / b.trail.length;
+              ctx.globalAlpha = 0.18 * f;
+              ctx.fillStyle = v.cBall;
+              ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
+            }
+            ctx.globalAlpha = 1;
           }
-          ctx.globalAlpha = 1;
-        }
-        var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
-        glowDot(ctx, b.x, b.y, br * pulse, v.cBall, b.alpha);
+          var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
+          glowDot(ctx, b.x, b.y, br * pulse, v.cBall, b.alpha);
+        });
       }
     };
+
+    function moveBall(b, dt, now) {
+      var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
+      var speed = Math.hypot(b.vx, b.vy);
+      var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
+      var h = dt / steps;
+      for (var s = 0; s < steps; s++) {
+        b.x += b.vx * h; b.y += b.vy * h;
+        if (extra && extra.collide) extra.collide(G, b, br);
+        var d = Math.hypot(b.x, b.y);
+        var inner = R - pw / 2;
+        if (d + br >= inner && d < R) {
+          var nx = b.x / d, ny = b.y / d;
+          if (b.vx * nx + b.vy * ny > 0) {
+            var ang = Math.atan2(b.y, b.x);
+            var reach = +cfg('PadDeg') * DEG / 2 + Math.asin(Math.min(1, br / d));
+            var hit = null;
+            G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
+            if (hit !== null) {
+              /* Bounce off the ring's normal, then angle it by where it hit. */
+              var dot = b.vx * nx + b.vy * ny;
+              var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
+              var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
+              var dir = Math.atan2(ry, rx) + hit * +cfg('English') * DEG;
+              /* Never let it skim along the edge: keep it at most 65° from straight back in. */
+              var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
+              if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
+              b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
+              var back2 = inner - br - 0.5;
+              b.x = nx * back2; b.y = ny * back2;
+              G.rally++;
+              addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
+              chime(Math.min(8, 2 + (G.rally % 7)));
+              if (extra && extra.onPaddle) extra.onPaddle(G);
+              /* Every N hits in a row, one more ball (up to the limit). */
+              if (G.rally % +cfg('ExtraHits') === 0 && G.live() < +cfg('MaxBalls')) {
+                G.serve(now, 0.6);
+                setTimeout(function () { chime(6); }, 120);
+              }
+            }
+          }
+        }
+        if (d > R + 6) {
+          b.state = 'lost'; b.t0 = now;
+          G.rally = 0;
+          return;
+        }
+      }
+      if (prefix === 'b' || v.pTrail) {
+        b.trail.push({ x: b.x, y: b.y });
+        if (b.trail.length > 10) b.trail.shift();
+      }
+    }
     return G;
   }
 
-  /* ---------- Pong ---------- */
-  var pong = makeBallGame('p', null);
-  pong.hud = function () { return 'ラリー ' + pong.rally + '　·　最高 ' + pong.best; };
+  /* ---------- Pong: one point per paddle hit ---------- */
+  var pong = makeBallGame('p', { onPaddle: function () { addScore(1); } });
 
-  /* ---------- Lantern breakout ---------- */
+  /* ---------- Lantern breakout: one point per lantern freed ---------- */
   var lanternState = { list: [], turn: 0, relightAt: 0, round: 0 };
   function buildLanterns() {
     var L = [], rings = +v.bRings, gap = +v.bGap;
@@ -1124,6 +1020,7 @@
           if (v.bFloat) effects.push({ kind: 'float', x: l.x, y: l.y, size: +v.bSize, t0: now, dur: 2600, seed: Math.random() * 6 });
           else addRipple(l.x, l.y, v.cLantern, 46, 900);
           chime(4 + Math.floor(Math.random() * 5));
+          addScore(1);
           if (lanternState.list.every(function (x) { return !x.alive; })) {
             lanternState.relightAt = now + +v.bRelight * 1000;
             lanternState.round++;
@@ -1153,12 +1050,8 @@
     });
     ballDraw(ctx, now);
   };
-  lanterns.hud = function () {
-    var left = lanternState.list.filter(function (l) { return l.alive; }).length;
-    return '灯籠 ' + left + ' / ' + lanternState.list.length + (lanternState.round ? '　·　' + lanternState.round + ' 回クリア' : '');
-  };
 
-  /* ---------- Firefly ---------- */
+  /* ---------- Firefly: one point per star lit ---------- */
   var PATTERNS = {
     dipper: { pts: [[-0.78, -0.22], [-0.48, -0.32], [-0.2, -0.24], [0.06, -0.08], [0.1, 0.28], [0.56, 0.36], [0.64, 0.02]],
               edges: [[0, 1], [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [6, 3]] },
@@ -1227,7 +1120,7 @@
       ff.trail.push({ x: ff.x, y: ff.y });
       while (ff.trail.length > +v.fTrail) ff.trail.shift();
 
-      if (ff.state === 'play') {
+      if (ff.state === 'play' && round.state === 'play') {
         var reach = +v.fReach;
         for (var i = 0; i < ff.stars.length; i++) {
           var st = ff.stars[i];
@@ -1237,6 +1130,7 @@
             st.lit = true; st.litT = now;
             ff.next++;
             addRipple(st.x, st.y, v.cFirefly, 40, 1000);
+            addScore(1);
             chime(Math.min(8, ff.stars.filter(function (q) { return q.lit; }).length));
           }
         }
@@ -1294,37 +1188,114 @@
       }
       var blink = 0.65 + 0.35 * Math.sin(now / 260);
       glowDot(ctx, ff.x, ff.y, +v.fSize * (0.9 + 0.1 * blink), v.cFirefly, blink);
-    },
-    hud: function () {
-      var lit = ff.stars.filter(function (q) { return q.lit; }).length;
-      return ff.name + '　' + lit + ' / ' + ff.stars.length + (ff.done ? '　·　' + ff.done + ' 個完成' : '');
     }
   };
 
+  firefly.start = function () {};
+  firefly.stop = function () {};
+
   var GAMES = { pong: pong, lanterns: lanterns, firefly: firefly };
   function current() { return GAMES[v.game] || null; }
-  function restartGame() {
+
+  /* ============================================================
+     ROUNDS
+     ready → (first touch) → play for `round` seconds → over
+     → (touch again) → play …
+     The countdown ring is the round's clock: it starts empty and
+     makes one full turn by the end of the round.
+     Top scores are kept per game in this browser.
+     ============================================================ */
+  var BEST_KEY = 'gamesPreview.best';
+  var best = {};
+  try { best = JSON.parse(localStorage.getItem(BEST_KEY) || '{}') || {}; } catch (e) { best = {}; }
+  function saveBest() { try { localStorage.setItem(BEST_KEY, JSON.stringify(best)); } catch (e) {} }
+
+  var round = { state: 'ready', score: 0, overAt: 0, newBest: false };
+
+  function addScore(n) {
+    if (round.state !== 'play') return;
+    round.score += n;
+    scoreNowEl.textContent = round.score;
+    scoreNowEl.classList.add('pop');
+    requestAnimationFrame(function () { requestAnimationFrame(function () { scoreNowEl.classList.remove('pop'); }); });
+  }
+
+  /* Back to "touch to start": used on load, on game change and by "New round". */
+  function readyRound() {
     effects = [];
+    round.state = 'ready';
+    round.score = 0;
+    S.phase = 'idle'; S.prog = 0; prevSweep = null;
     var g = current();
     if (g) g.reset();
     win.classList.toggle('pv-playing', !!g);
+  }
+  function startRound(now) {
+    var g = current();
+    if (!g) return;
+    effects = [];
+    g.reset();
+    g.start(now);
+    round.state = 'play';
+    round.score = 0;
+    round.newBest = false;
+    scoreNowEl.textContent = '0';
+    S.phase = 'showing'; S.D = +v.round * 1000; S.prog = 0; S.t0 = now; prevSweep = null;
+    chime(3);
+  }
+  function endRound(now) {
+    var g = current();
+    round.state = 'over';
+    round.overAt = now;
+    if (round.score > (best[v.game] || 0)) { best[v.game] = round.score; round.newBest = true; saveBest(); }
+    /* The finished ring blooms and fades back, as in the app. */
+    snapshotFinal(); prevSweep = { t: now };
+    S.phase = 'idle';
+    if (g) g.stop(now);
+    chime(4); setTimeout(function () { chime(6); }, 180); setTimeout(function () { chime(8); }, 360);
+  }
+  /* The first touch starts a round; after a round, a new touch (once
+     the result has been on screen for a moment) starts the next. */
+  function onTouchStart(now) {
+    if (!current()) return;
+    if (round.state === 'ready') startRound(now);
+    else if (round.state === 'over' && now - round.overAt > 1500) startRound(now);
+  }
+
+  var shown = {};
+  function setText(el, key, t) { if (shown[key] !== t) { shown[key] = t; el.textContent = t; } }
+  function updateScoreBox() {
+    var on = !!current() && v.counter;
+    scoreBox.classList.toggle('off', !on);
+    if (!on) return;
+    var left = round.state === 'play' ? Math.max(0, Math.ceil((S.D - S.prog) / 1000))
+             : round.state === 'ready' ? +v.round : 0;
+    setText(scoreNowEl, 'now', String(round.score));
+    setText(scoreBestEl, 'best', String(best[v.game] || 0));
+    setText(scoreTimeEl, 'time', String(left));
+    var msg = '', title = false;
+    if (round.state === 'ready') msg = 'タッチしてスタート';
+    else if (round.state === 'over') {
+      if (performance.now() - round.overAt < 1500) { msg = round.newBest ? '最高スコア更新！' : 'おつかれさまでした'; title = true; }
+      else msg = round.newBest ? '最高スコア更新！ · タッチでもう一度' : 'タッチでもう一度';
+    }
+    setText(scoreMsgEl, 'msg', msg);
+    scoreMsgEl.classList.toggle('title', title);
   }
 
   /* ============================================================
      THE LOOP
      ============================================================ */
   var lastNow = performance.now(), frameNo = 0, paused = false;
-  var fpsFrames = 0, fpsT = performance.now(), hudText = '';
+  var fpsFrames = 0, fpsT = performance.now();
   function frame() {
     requestAnimationFrame(frame);
     var now = performance.now();
     var dtMs = Math.min(100, now - lastNow);
     lastNow = now;
-    if (S.phase !== 'idle') {
+    if (round.state === 'play' && !paused) {
       S.prog += dtMs;
-      var rem = Math.max(0, S.D - S.prog);
-      if (S.phase === 'showing' && rem <= QW.fade) startLeaving();
-      if (S.prog >= S.D && S.phase === 'leaving') showQuote(S.pos + 1);
+      if (S.prog >= S.D) endRound(now);
     }
     if ((frameNo++ % 90) === 0) syncBreath();
     drawRing(now);
@@ -1339,8 +1310,7 @@
       g.draw(ctx, now);
     }
     drawEffects(ctx, now);
-    var t = g && v.counter ? g.hud() : '';
-    if (t !== hudText) { hudText = t; hudEl.textContent = t; }
+    updateScoreBox();
 
     fpsFrames++;
     if (now - fpsT >= 500) {
@@ -1363,8 +1333,8 @@
   function onChange(c) {
     save();
     applyCSS();
-    if (c.id === 'size') { sizeCanvases(); fitStage(); refitQuote(); restartGame(); }
-    if (c.id === 'quotePlace') fitStage();
+    if (c.id === 'size') { sizeCanvases(); fitStage(); readyRound(); }
+    if (c.id === 'round' && round.state !== 'play') readyRound();
     if (c.id === 'bRings' || c.id === 'bGap' || c.id === 'bHits') { if (v.game === 'lanterns') buildLanterns(); }
     if (c.id === 'fPattern' || c.id === 'fCount') { if (v.game === 'firefly') { ff.cycle = 0; newConstellation(); } }
   }
@@ -1455,7 +1425,7 @@
     buildPanel();
     applyCSS();
     fitStage();
-    restartGame();
+    readyRound();
   });
 
   document.getElementById('pvCollapse').addEventListener('click', function () {
@@ -1465,13 +1435,18 @@
   });
   document.getElementById('pvRestart').addEventListener('click', function () {
     unlockAudio();
-    pong.best = 0; lanterns.best = 0;
-    restartGame();
+    readyRound();
   });
   var pauseBtn = document.getElementById('pvPause');
   pauseBtn.addEventListener('click', function () {
     paused = !paused;
     pauseBtn.textContent = paused ? 'Resume' : 'Pause';
+  });
+
+  document.getElementById('pvClearBest').addEventListener('click', function () {
+    delete best[v.game];
+    saveBest();
+    statusEl.textContent = 'Top score cleared for ' + GAME_NAMES[v.game] + '.';
   });
 
   var statusEl = document.getElementById('pvStatus');
@@ -1484,8 +1459,7 @@
     applyCSS();
     sizeCanvases();
     fitStage();
-    refitQuote();
-    restartGame();
+    readyRound();
     outEl.classList.remove('shown');
     statusEl.textContent = 'Reset to the proposed defaults.';
   });
@@ -1519,36 +1493,13 @@
   /* ============================================================
      START
      ============================================================ */
-  var FALLBACK = ['静かな時間も、また大切な時間です', '小さな幸せを、ひとつずつ', 'ひと休みすることも、大切なことです'];
-  var sourceEl = document.getElementById('pvSource');
-  function loadQuotes() {
-    return fetch('quotes.json', { cache: 'no-store' })
-      .then(function (r) { return r.json(); })
-      .then(function (j) {
-        var q = (j && j.quotes || []).map(function (s) { return String(s).trim(); }).filter(Boolean);
-        if (!q.length) throw new Error('empty');
-        QUOTES = q;
-        sourceEl.textContent = q.length + ' quotes read from quotes.json.';
-      })
-      .catch(function () {
-        QUOTES = FALLBACK;
-        sourceEl.textContent = 'Could not read quotes.json (open this page from the web server, not as a file). Showing a few built-in lines.';
-      });
-  }
-
   buildPanel();
   applyCSS();
   sizeCanvases();
   fitStage();
   window.addEventListener('resize', function () { fitStage(); });
-  restartGame();
+  readyRound();
   requestAnimationFrame(frame);
-
-  var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-  Promise.all([loadQuotes(), ready]).then(function () {
-    syncBreath();
-    setTimeout(function () { showQuote(0); }, 350);
-  });
 })();
 </script>
 </body>
