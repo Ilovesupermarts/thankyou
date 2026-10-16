@@ -1,4 +1,4 @@
-var BUILD = 'v128';
+var BUILD = 'v130';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -7069,6 +7069,29 @@ var GREETING_TABLE = {
   E1: { text: '秋風の心地よい中、お部屋までお越しいただき、誠にありがとうございます。', burden: false }
 };
 
+/* A seasonal line for Panel 0, picked by the current month in Nagoya.
+   It comes right after 「〇〇さん、初めまして。」, before the line about
+   the weather. Index 0 is January. */
+var SEASONAL_LINES = [
+  '冬晴れの澄んだ空に、心もすっと晴れるようですね。',
+  '梅の花がほころび、春の気配を感じる頃ですね。',
+  'やわらかな日差しに、春の訪れを感じますね。',
+  '桜が咲き、街の景色も華やぐ季節になりましたね。',
+  '若葉がみずみずしく、風も心地よい季節ですね。',
+  '雨に濡れた緑が、ひときわ鮮やかに感じられますね。',
+  '夏の日差しに、季節の移ろいを感じる頃ですね。',
+  '夏空の広がる、暑い日が続いておりますね。',
+  '少しずつ暑さが和らぎ、秋の気配が感じられますね。',
+  '金木犀の甘い香りに、秋の深まりを感じる頃ですね。',
+  '木々の葉が少しずつ色づき、秋も深まってまいりましたね。',
+  '朝晩の冷え込みに、冬の訪れを感じる頃ですね。'
+];
+function seasonalLineFor(month) {
+  var m = parseInt(month, 10);
+  if (!(m >= 1 && m <= 12)) return '';
+  return SEASONAL_LINES[m - 1];
+}
+
 function getGreetingTier() {
   var time = getTimeOfDayInNagoya();
   var weather = currentWeatherBucket;
@@ -7118,7 +7141,8 @@ function updateGreetingPanel() {
     ? 'どうぞご無理なさらず、おくつろぎください。'
     : 'どうぞ肩の力を抜いて、おくつろぎください。';
 
-  el.innerHTML = '<p>' + entry.text + '</p><p>' + closing + '</p>';
+  var seasonal = seasonalLineFor(nagoyaDateParts().month);
+  el.innerHTML = (seasonal ? '<p>' + seasonal + '</p>' : '') + '<p>' + entry.text + '</p><p>' + closing + '</p>';
 
   var p0 = document.querySelector('.panel[data-panel="0"]');
   if (p0) preparePanel(p0);
@@ -7498,12 +7522,12 @@ var QuoteWindow = (function() {
     size: 500, band: 10, soft: 4, track: 0.8,
     bodyW: 12, headW: 18, neck: 110, head: true,
     tail: 280, taper: 2.7, startFade: 58,
-    bloom: true, fadeBack: 1400, ripReach: 1.4,
+    bloom: true, fadeBack: 1.4, ripReach: 1.4,       /* fadeBack is in seconds */
     seconds: 10, fade: 1600, align: true,
     maxSize: 44, minSize: 25, fit: 0.82,
     dprCap: 1.5,
     cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
-    cHalo: '#E0705F', cFloret: '#D9453A'
+    cHalo: '#E0705F'
   };
   var v = QW;
 
@@ -7932,7 +7956,6 @@ var QuoteWindow = (function() {
     S.t0 = now;
     S.phase = 'showing';
     if (countEl) countEl.textContent = (S.pos + 1) + ' / ' + n;
-    floretOnRing();
   }
 
   function startLeaving() {
@@ -7942,56 +7965,9 @@ var QuoteWindow = (function() {
   }
 
 
-  /* One 金木犀 floret drifts down and settles on the lower half of the
-     ring each time a quote arrives, then floats a moment and fades. */
-  var floretBox = document.getElementById('quoteFloretLayer');
-  var FLORET_CENTRE = 'rgb(' + blend(v.cFloret, '#5A1A00', 0.4).join(', ') + ')';
-  function floretSvg() {
-    return '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
-      '<g fill="' + v.cFloret + '"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
-      '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
-      '<circle r="1.5" fill="' + FLORET_CENTRE + '"/></svg>';
-  }
-  function floretOnRing() {
-    if (!floretBox || reduced) return;
-    var r = win.getBoundingClientRect();
-    var cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
-    var a = (25 + Math.random() * 130) * Math.PI / 180;
-    var x1 = cx + R * Math.cos(a) - 7, y1 = cy + R * Math.sin(a) - 7;
-    var f = document.createElement('div');
-    f.className = 'kinmokusei-floret';
-    f.innerHTML = floretSvg();
-    floretBox.appendChild(f);
-    florets.push(f);
-    var W = window.innerWidth;
-    var x0 = Math.min(W - 30, Math.max(30, x1 + (Math.random() * 160 - 80)));
-    var s = 0.8 + Math.random() * 0.5, r0 = Math.random() * 360, sway = 22 + Math.random() * 18;
-    var steps = [];
-    for (var i = 0; i <= 6; i++) {
-      var t = i / 6;
-      var x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI * 3) * sway * (1 - t * 0.6);
-      var y = -20 + (y1 + 20) * t;
-      steps.push({
-        transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + (r0 + t * 220).toFixed(0) + 'deg) scale(' + s.toFixed(2) + ')',
-        opacity: i === 0 ? 0 : 1
-      });
-    }
-    var drop = f.animate(steps, { duration: 4200, easing: 'cubic-bezier(0.3, 0, 0.55, 1)', fill: 'forwards' });
-    drop.onfinish = function() {
-      if (!f.parentNode) return;
-      var end = 'translate(' + (x1 + 10).toFixed(1) + 'px,' + (y1 + 4).toFixed(1) + 'px) rotate(' + (r0 + 250).toFixed(0) + 'deg) scale(' + (s * 0.9).toFixed(2) + ')';
-      var b = f.animate([steps[6], { transform: end, opacity: 0 }], { duration: 6000, easing: 'ease-in', fill: 'forwards' });
-      b.onfinish = function() {
-        if (f.parentNode) f.parentNode.removeChild(f);
-        var k = florets.indexOf(f); if (k >= 0) florets.splice(k, 1);
-      };
-    };
-  }
-
   /* ---------- the loop ---------- */
   var rafId = 0, lastNow = 0, frameNo = 0, running = false, startTimer = 0;
   var quoteIdx = 0;
-  var florets = [];
 
   function frame() {
     rafId = requestAnimationFrame(frame);
@@ -8017,11 +7993,6 @@ var QuoteWindow = (function() {
     inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
   }
 
-  function clearFlorets() {
-    florets.forEach(function(f) { if (f.parentNode) f.parentNode.removeChild(f); });
-    florets = [];
-  }
-
   function wipe() {
     quoteLine.classList.remove('shown', 'leaving', 'ink', 'vertical');
     quoteLine.textContent = '';
@@ -8043,7 +8014,6 @@ var QuoteWindow = (function() {
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     window.removeEventListener('resize', fitStage);
     wipe();
-    clearFlorets();
   }
 
   function start(index) {
