@@ -10,24 +10,29 @@
      quotes-preview.html — standalone preview of the rotating quotes
      shown inside the start screen's ring, like a round window (丸窓).
 
-     Loads the real main.css and uses the real markup and class names
-     from index.html (.blossom-screen, .icon-wrapper, .soft-glow,
-     .pond-surface, .pond-caustic, .rings-svg, .pulse-ring, .gold-band,
-     .gold-band-shadow, .quote-wrap, .quote-line), so the halo, the
-     breath, the ring ripples, the pond light and the background are
-     the app's own. It does NOT load app.js.
+     Loads the real main.css and uses the real classes for the halo
+     (.soft-glow), the water light (.pond-surface, .pond-caustic), the
+     words (.quote-wrap, .quote-line) and the background, so they look
+     and breathe exactly as in the app. It does NOT load app.js.
 
      Quotes are read from quotes.json, the same file the app uses.
 
-     What is new:
-       .quote-window      — the ring, enlarged, with the quote inside
-       .quote-timer-arc   — a 金木犀 arc on the ring: it sweeps back to
-                            full as a quote arrives, then unwinds until
-                            the next one. The quotes change on their
-                            own when it runs out. No gestures.
-       .quote-timer-bead  — a small glowing bead at the arc's tip
-       .quote-count       — a faint "3 / 16" under the window
-       横書き / 縦書き     — switch in the panel to compare
+     Smoothness: at this size the app's SVG ring (with its blurred
+     shadow) would be repainted on every frame, which stutters. Here
+     the ring, the countdown and the ring ripples are plain HTML
+     layers that only rotate, scale or fade, so the tablet's graphics
+     chip moves them without repainting anything:
+       .quote-ring           — the ring itself (a bordered circle)
+       .quote-timer-half     — two half-windows; inside each, a rotor
+       .quote-timer-rotor      turns a half ring into view. Together
+                               they sweep the next colour clockwise
+                               around the ring over one quote.
+       .quote-timer-bead-rotor — turns the glowing bead with the sweep
+       .quote-window-ripple  — the three breath ripples
+
+     The countdown never rewinds. When it completes, the ring is fully
+     the new colour; the next countdown sweeps the other colour over
+     it (white → 金木犀 → white …). Quotes change on their own.
 
      The generated <style id="pvLive"> block holds every proposed
      rule. "Copy values" copies exactly that text.
@@ -38,14 +43,20 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
+<!-- Every font offered in the panel. Only the characters actually shown are
+     downloaded, so this stays light. -->
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Yuji+Boku&family=Zen+Antique&family=Zen+Old+Mincho:wght@400;500;700&family=Shippori+Mincho:wght@400;500;600;700&family=Kaisei+Decol:wght@400;500;700&family=Hina+Mincho&family=Klee+One:wght@400;600&family=Zen+Kurenaido&family=Zen+Maru+Gothic:wght@400;500;700&family=Noto+Serif+JP:wght@400;600;700&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="main.css">
 
-<!-- Preview-only chrome: the tuning panel. Nothing here is part of
+<!-- Preview-only chrome: the tuning panel, and a switch that restarts
+     every animation in the window together. Nothing here is part of
      the copied CSS. -->
 <style>
   body { overflow: hidden; height: 100vh; padding-bottom: 0; }
+
+  .blossom-screen.pv-hold .quote-window,
+  .blossom-screen.pv-hold .quote-window * { animation: none !important; }
 
   .pv-panel {
     position: fixed; top: 16px; right: 16px; z-index: 1000;
@@ -100,6 +111,32 @@
   .pv-was { grid-column: 1 / -1; font-size: 11px; color: var(--text-faint); margin-top: -2px; }
   .pv-check { display: flex; align-items: center; gap: 8px; padding: 6px 0; color: var(--text-soft); }
   .pv-check input { accent-color: var(--accent); width: 18px; height: 18px; flex: none; }
+  .pv-fonts { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px; }
+  .pv-font {
+    border: 1px solid var(--border-2); background: #FFFDF9; border-radius: 10px;
+    padding: 8px 6px 6px; text-align: center; cursor: pointer; font: inherit; color: var(--text-dark);
+  }
+  .pv-font .sample { display: block; font-size: 20px; line-height: 1.5; color: var(--text-dark); }
+  .pv-font .nm { display: block; font-size: 10px; color: var(--text-mute); margin-top: 2px; letter-spacing: 0.3px; }
+  .pv-font.on { border-color: var(--accent); background: var(--soft-2); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .pv-font:active { transform: scale(0.97); }
+  .pv-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 6px; }
+  .pv-preset {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid var(--border-2); background: #FFFDF9; border-radius: 999px;
+    padding: 4px 11px 4px 7px; font: inherit; color: var(--text-dark); cursor: pointer;
+  }
+  .pv-preset .dots { display: inline-flex; }
+  .pv-preset .dots i { width: 12px; height: 12px; border-radius: 50%; border: 1px solid rgba(0,0,0,0.12); margin-right: -4px; }
+  .pv-preset.on { border-color: var(--accent); background: var(--soft-2); box-shadow: 0 0 0 1px var(--accent) inset; }
+  .pv-preset:active { transform: scale(0.97); }
+  .pv-colour { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 4px 8px; padding: 5px 0; }
+  .pv-colour label { color: var(--text-soft); }
+  .pv-colour input[type="color"] {
+    width: 44px; height: 30px; padding: 0; border: 1px solid var(--border-2); border-radius: 8px;
+    background: #FFFDF9; cursor: pointer;
+  }
+  .pv-hex { font: 11px ui-monospace, "SF Mono", Menlo, Consolas, monospace; color: var(--accent-2); min-width: 58px; text-align: right; }
   .pv-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
   .pv-btn {
     flex: 1; border: 1px solid var(--border-2); background: #FFFDF9; color: var(--text-dark);
@@ -147,30 +184,29 @@
 <div class="ripple-layer" id="rippleLayer" aria-hidden="true"></div>
 <div class="floret-layer" id="floretLayer" aria-hidden="true"></div>
 
-<!-- ============ ROUND WINDOW (real markup and class names) ============ -->
+<!-- ============ ROUND WINDOW ============ -->
 <div class="blossom-screen visible" id="blossomScreen">
 
   <div class="icon-wrapper quote-window" id="quoteWindow">
     <div class="soft-glow" aria-hidden="true"></div>
+    <div class="quote-window-ripple r1" aria-hidden="true"></div>
+    <div class="quote-window-ripple r2" aria-hidden="true"></div>
+    <div class="quote-window-ripple r3" aria-hidden="true"></div>
     <div class="pond-surface" aria-hidden="true">
       <div class="pond-caustic"></div>
       <div class="pond-caustic c2"></div>
     </div>
-    <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
-      <defs>
-        <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur id="bandShadowBlurAmount" stdDeviation="3.5"/>
-        </filter>
-      </defs>
-      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
-      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
-      <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
-      <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
-      <circle cx="180" cy="180" r="90" class="gold-band" />
-      <!-- New: the countdown, drawn on the ring itself. -->
-      <circle cx="180" cy="180" r="90" class="quote-timer-arc" id="quoteTimerArc" transform="rotate(-90 180 180)" />
-      <circle cx="180" cy="90" r="2" class="quote-timer-bead" id="quoteTimerBead" />
-    </svg>
+    <!-- The ring, and the countdown sweeping over it. -->
+    <div class="quote-ring" aria-hidden="true"></div>
+    <div class="quote-timer-half right" aria-hidden="true">
+      <div class="quote-timer-rotor" id="rotorRight"><div class="quote-ring"></div></div>
+    </div>
+    <div class="quote-timer-half left" aria-hidden="true">
+      <div class="quote-timer-rotor" id="rotorLeft"><div class="quote-ring"></div></div>
+    </div>
+    <div class="quote-timer-bead-rotor" id="beadRotor" aria-hidden="true">
+      <div class="quote-timer-bead"></div>
+    </div>
     <div class="quote-wrap" aria-live="polite">
       <div class="quote-line" id="quoteLine"></div>
     </div>
@@ -194,7 +230,7 @@
     <button type="button" class="pv-icon-btn" id="pvCollapse" aria-label="Hide panel">–</button>
   </div>
   <div class="pv-body">
-    <p class="pv-note">The quotes change on their own when the ring's countdown runs out. Switch 横書き / 縦書き above to compare. Fold this panel with – to see the whole window. Grey "app:" notes show today's value.</p>
+    <p class="pv-note">The quotes change on their own when the ring's countdown completes. Each countdown sweeps the other colour around the ring, so it never rewinds. Switch 横書き / 縦書き above to compare. Fold this panel with – to see the whole window. Grey "app:" notes show today's value.</p>
     <p class="pv-source" id="pvSource">Loading quotes.json…</p>
     <div class="pv-transport">
       <button type="button" id="pvPrev">← 前へ (preview only)</button>
@@ -220,17 +256,58 @@
      "was" is today's value in main.css / app.js, shown for comparison.
      The 横書き / 縦書き switch lives in the panel header.
      ============================================================ */
+  /* Fonts offered in the panel. inApp = already loaded by index.html, so
+     choosing it needs no change to the Google Fonts link there. */
+  var FONTS = [
+    { name: 'Yuji Syuku',      note: '筆 · the app today',  inApp: true,  gf: 'Yuji+Syuku' },
+    { name: 'Yuji Mai',        note: '筆 · softer brush',   inApp: true,  gf: 'Yuji+Mai' },
+    { name: 'Yuji Boku',       note: '筆 · bold brush',     inApp: false, gf: 'Yuji+Boku' },
+    { name: 'Zen Antique',     note: '古典 · antique',      inApp: true,  gf: 'Zen+Antique' },
+    { name: 'Zen Old Mincho',  note: '明朝 · old print',    inApp: false, gf: 'Zen+Old+Mincho:wght@400;500;700' },
+    { name: 'Shippori Mincho', note: '明朝 · refined',      inApp: true,  gf: 'Shippori+Mincho:wght@400;500;600;700' },
+    { name: 'Kaisei Decol',    note: '明朝 · decorative',   inApp: false, gf: 'Kaisei+Decol:wght@400;500;700' },
+    { name: 'Hina Mincho',     note: '明朝 · delicate',     inApp: false, gf: 'Hina+Mincho' },
+    { name: 'Klee One',        note: '手書き · pen',        inApp: false, gf: 'Klee+One:wght@400;600' },
+    { name: 'Zen Kurenaido',   note: '手書き · crayon',     inApp: false, gf: 'Zen+Kurenaido' },
+    { name: 'Zen Maru Gothic', note: 'ゴシック · rounded',  inApp: false, gf: 'Zen+Maru+Gothic:wght@400;500;700' },
+    { name: 'Noto Serif JP',   note: '明朝 · plain',        inApp: true,  gf: 'Noto+Serif+JP:wght@400;600;700' }
+  ];
+  var FONT_SAMPLE = '静かな時間';
+
+  /* Colour sets. Each fills the five pickers at once; you can still
+     adjust any picker afterwards. The page background stays autumn. */
+  var PALETTES = [
+    { name: '金木犀', quote: '#C44E10', ring: '#FFFDF9', sweep: '#E9773B', halo: '#EE9567', floret: '#F07D40' },
+    { name: '紅葉',   quote: '#A3282A', ring: '#FFFDF9', sweep: '#C8322F', halo: '#E0705F', floret: '#D9453A' },
+    { name: '桜',     quote: '#B04A5A', ring: '#FFFDF9', sweep: '#E58FA3', halo: '#F2A9B8', floret: '#F4A6B5' },
+    { name: '藤',     quote: '#6B4A8E', ring: '#FFFDF9', sweep: '#9B7BC0', halo: '#B49BD3', floret: '#A98BD0' },
+    { name: '抹茶',   quote: '#4E6B3A', ring: '#FFFDF9', sweep: '#7FA05A', halo: '#A5C084', floret: '#8FB06A' },
+    { name: '藍',     quote: '#2E4A7A', ring: '#FFFDF9', sweep: '#4A72B0', halo: '#7C9FD0', floret: '#6C90C8' },
+    { name: '金',     quote: '#8A5A12', ring: '#FFFDF9', sweep: '#D4A22E', halo: '#E8C56B', floret: '#E2B544' }
+  ];
+  var COLOUR_KEYS = { quote: 'cQuote', ring: 'cRing', sweep: 'cSweep', halo: 'cHalo', floret: 'cFloret' };
+
   var CONTROLS = [
+    { group: 'Font' },
+    { id: 'font',      type: 'font', def: 'Yuji Syuku' },
+
+    { group: 'Colours' },
+    { type: 'presets' },
+    { id: 'cQuote',    type: 'colour', label: 'Words',                           def: '#C44E10', was: '#C44E10' },
+    { id: 'cRing',     type: 'colour', label: 'Ring',                            def: '#FFFDF9', was: '#FFFDF9' },
+    { id: 'cSweep',    type: 'colour', label: 'Countdown sweep and bead',        def: '#E9773B', was: 'none (ring is white only)' },
+    { id: 'cHalo',     type: 'colour', label: 'Glow around the ring, ripples',   def: '#EE9567', was: '#EE9567' },
+    { id: 'cFloret',   type: 'colour', label: 'Floating florets',                def: '#F07D40', was: '#F07D40' },
+
     { group: 'Timing' },
     { id: 'seconds',   label: 'Seconds per quote',          min: 6,   max: 40,  step: 1,    def: 14,   was: '≈12.9s (10 blossoms × 1s, 1s hold, 1.5s fade)' },
     { id: 'fade',      label: 'Fade in / out (s)',          min: 0.6, max: 3,   step: 0.1,  def: 1.6,  was: '1.5' },
-    { id: 'refill',    label: 'Ring refills as a quote arrives (s)', min: 0, max: 3, step: 0.1, def: 1.2, was: 'none' },
     { id: 'align',     label: 'New quote arrives on the breath (with the ring ripples)', type: 'check', def: true },
     { id: 'shuffle',   label: 'Shuffle the order (no repeats in a row)', type: 'check', def: false },
 
     { group: 'Window' },
     { id: 'size',      label: 'Window size (px across)',    min: 360, max: 720, step: 10,   def: 560,  was: 'ring 180px across, koi inside' },
-    { id: 'band',      label: 'Ring thickness (px)',        min: 2,   max: 10,  step: 0.5,  def: 5,    was: '6' },
+    { id: 'band',      label: 'Ring thickness (px)',        min: 2,   max: 12,  step: 0.5,  def: 6,    was: '6' },
     { id: 'reach',     label: 'Halo reach (× ring radius)', min: 1.1, max: 2.2, step: 0.05, def: 1.45, was: '2.13 (on the small ring)' },
     { id: 'ripReach',  label: 'Ring ripples spread (×)',    min: 1.1, max: 2.2, step: 0.05, def: 1.4,  was: '2' },
     { id: 'pond',      label: 'Water inside the window',    min: 0,   max: 1,   step: 0.05, def: 0.7,  was: '1 (small pond)' },
@@ -245,9 +322,7 @@
     { id: 'ink',       label: 'Ink: delay per character (ms), 0 = whole line', min: 0, max: 160, step: 5, def: 70, was: '0 (whole line at once)' },
 
     { group: 'Timer' },
-    { id: 'arcWidth',  label: 'Arc width (px)',             min: 1,   max: 8,   step: 0.5,  def: 3,    was: 'none' },
-    { id: 'arcAlpha',  label: 'Arc strength',               min: 0.2, max: 1,   step: 0.05, def: 0.85, was: 'none' },
-    { id: 'bead',      label: 'Glowing bead at the arc tip', type: 'check', def: true },
+    { id: 'bead',      label: 'Glowing bead at the sweep', type: 'check', def: true },
     { id: 'count',     label: 'Faint "3 / 16" under the window', type: 'check', def: true },
     { id: 'text',      label: '"次の言葉まで 12秒" under the window', type: 'check', def: false },
 
@@ -255,7 +330,7 @@
     { id: 'floret',    label: 'A floret lands on the ring as each quote arrives', type: 'check', def: true }
   ];
 
-  var STORE_KEY = 'quotesPreviewValues.v2';
+  var STORE_KEY = 'quotesPreviewValues.v3';
   var DEFAULTS = { vertical: false };
   CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
   var v = loadValues();
@@ -277,22 +352,44 @@
      CSS GENERATOR
      Builds the proposed CSS from the current values. The preview
      shows exactly this text, and "Copy values" copies it.
-
-     The ring's SVG keeps its 360 × 360 viewBox with r = 90, and is
-     simply drawn larger. k is how much larger, so line widths are
-     divided by k to stay the same on screen.
      ============================================================ */
   function n(x, d) { return (+x).toFixed(d === undefined ? 2 : d).replace(/\.?0+$/, '') || '0'; }
   var EASE = 'cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-  function scale() { return v.size / 180; }
+
+  /* Colour helpers: #rrggbb → [r, g, b], blends between two colours,
+     and rgba() strings. */
+  function rgbOf(hex) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function blend(a, b, t) {
+    var x = rgbOf(a), y = rgbOf(b);
+    return [0, 1, 2].map(function (i) { return Math.round(x[i] + (y[i] - x[i]) * t); });
+  }
+  function rgba(c, alpha) {
+    var x = Array.isArray(c) ? c : rgbOf(c);
+    return 'rgba(' + x[0] + ', ' + x[1] + ', ' + x[2] + ', ' + alpha + ')';
+  }
+  function fontStack(name) {
+    return '"' + name + '", "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
+  }
+  function fontInfo(name) {
+    for (var i = 0; i < FONTS.length; i++) if (FONTS[i].name === name) return FONTS[i];
+    return FONTS[0];
+  }
 
   function buildCSS() {
-    var D = +v.size, R = D / 2, k = scale();
+    var D = +v.size, R = D / 2;
+    var W = +v.band;
     var F = n(v.fade, 2) + 's';
     var B = n(v.blur, 1) + 'px';
     var halo = Math.round(R * v.reach);
-    var rim = (R - 3) / halo * 100;
+    var rim = (R - W / 2) / halo * 100;
     var after = function (f) { return rim + (100 - rim) * f; };
+    var ringC = v.cRing, sweepC = v.cSweep, haloC = v.cHalo;
+    var fi = fontInfo(v.font);
+    var bead = Math.round(Math.max(8, W + 4));
     var css = [];
     css.push(
 '/* ============================================================',
@@ -303,87 +400,193 @@
 '   Markup this needs (in place of the quote area):',
 '     <div class="icon-wrapper quote-window">',
 '       <div class="soft-glow"></div>',
+'       <div class="quote-window-ripple r1"></div>',
+'       <div class="quote-window-ripple r2"></div>',
+'       <div class="quote-window-ripple r3"></div>',
 '       <div class="pond-surface"><div class="pond-caustic"></div>',
 '         <div class="pond-caustic c2"></div></div>',
-'       <svg class="rings-svg" viewBox="0 0 360 360"> … the same',
-'         rings as the start button, then:',
-'         <circle cx="180" cy="180" r="90" class="quote-timer-arc"',
-'                 transform="rotate(-90 180 180)" />',
-'         <circle cx="180" cy="90" r="' + n(4 / k, 2) + '" class="quote-timer-bead" />',
-'       </svg>',
+'       <div class="quote-ring"></div>',
+'       <div class="quote-timer-half right"><div class="quote-timer-rotor">',
+'         <div class="quote-ring"></div></div></div>',
+'       <div class="quote-timer-half left"><div class="quote-timer-rotor">',
+'         <div class="quote-ring"></div></div></div>',
+'       <div class="quote-timer-bead-rotor"><div class="quote-timer-bead"></div></div>',
 '       <div class="quote-wrap"><div class="quote-line' + (v.vertical ? ' vertical' : '') + '"></div></div>',
 '     </div>',
 '     <div class="quote-meta"><span class="quote-count">3 / 16</span>',
 '       <span class="quote-meta-sep">·</span>',
 '       <span class="quote-remain">次の言葉まで',
 '         <span class="quote-remain-num">12</span>秒</span></div>',
-'     bandShadowBlur stdDeviation: ' + n(3.5 / k, 2) + ' (the ring is drawn ' + n(k, 2) + '× larger)',
 '',
 '   Numbers for app.js:',
 '     one quote             ' + v.seconds + 's from arrival to the next (was ≈12.9s)',
 '                           changes on its own, no gestures',
 '     QUOTE_FADE            ' + Math.round(v.fade * 1000) + 'ms (was 1500)',
-'     ring refill           ' + (v.refill > 0 ? Math.round(v.refill * 1000) + 'ms sweep back to full, then unwinds' : 'none: starts full'),
-'     arc                   set stroke-dashoffset = 565.49 × (1 − part left)',
-'                           every frame; move the bead to the arc tip',
+'     countdown             for each quote, toggle .flip on .quote-window, then',
+'                           run three Web Animations for the quote\'s length,',
+'                           all linear, transform only (no repaint):',
+'                             right rotor  rotate 0 → 180deg over the first half',
+'                             left rotor   rotate 0 → 180deg over the second half',
+'                             bead rotor   rotate 0 → 360deg',
+'                           start the next quote when the bead rotor finishes.',
+'                           Never rewinds: the colours swap instead.',
 '     breath alignment      ' + (v.align ? 'on: each quote arrives at a glow peak\n                           (1.44s into each 4s breath)' : 'off'),
 '     order                 ' + (v.shuffle ? 'shuffled, never the same quote twice in a row' : 'in quotes.json order'),
 '     text size             fitted per quote: start at ' + v.maxSize + 'px and step down',
-'                           (to ' + v.minSize + 'px at least) until the text box fits',
+'                           (to ' + v.minSize + 'px at least) until the text fits',
 '                           inside ' + Math.round(v.fit * 100) + '% of the ring radius',
 '     ink                   ' + (v.ink > 0 ? 'wrap each character in <span class="quote-char" style="--i:N">\n                           and add .ink to .quote-line' : 'off (whole line at once)'),
-'     florets               ' + (v.floret ? 'one lands on the ring as each quote arrives' : 'ambient only'),
-'     blossom counter       removed',
+'     florets               ' + (v.floret ? 'one lands on the ring as each quote arrives' : 'ambient only') + ', colour ' + v.cFloret,
+'                           (the four petals; the centre is that colour darkened)',
+'     rain ripples          tinted from the glow colour ' + haloC,
+'     font                  ' + fi.name + (fi.inApp ? ' (already loaded by index.html)' : ' — add to the Google Fonts link in index.html:\n                           &family=' + fi.gf),
 '   ============================================================ */',
 ''
     );
 
     /* --- Window --- */
     css.push(
-'/* The window: the start button\'s ring, drawn ' + D + 'px across. */',
+'/* The window: ' + D + 'px across. Its two ring colours swap on every',
+'   quote (.flip), so the countdown never has to rewind. */',
 '.quote-window {',
 '  width: ' + D + 'px;',
 '  height: ' + D + 'px;',
 '  margin: 0;',
+'  --ring-from: ' + ringC + ';',
+'  --ring-to: ' + sweepC + ';',
+'  --quote-color: ' + v.cQuote + ';',
 '}',
-'.quote-window .rings-svg {',
-'  width: ' + (D * 2) + 'px;',
-'  height: ' + (D * 2) + 'px;',
+'.quote-window.flip {',
+'  --ring-from: ' + sweepC + ';',
+'  --ring-to: ' + ringC + ';',
 '}',
-'.quote-window .gold-band { stroke-width: ' + n(v.band / k, 3) + 'px; }',
-'.quote-window .gold-band-shadow { stroke-width: ' + n((v.band + 3) / k, 3) + 'px; }',
 '',
-'/* Halo: the same white-to-金木犀 glow, reaching ' + n(v.reach) + '× the ring radius. */',
+'/* Halo: the ring colour at the rim, warming into the glow colour as it fades out, reaching ' + n(v.reach) + '× the ring radius. */',
 '.quote-window .soft-glow {',
 '  width: ' + (halo * 2) + 'px; height: ' + (halo * 2) + 'px;',
 '  margin-top: -' + halo + 'px; margin-left: -' + halo + 'px;',
 '  background: radial-gradient(circle closest-side,',
-'    rgba(255, 255, 255, 0) 0%,',
-'    rgba(255, 255, 255, 0) ' + n(rim - 1.5) + '%,',
-'    rgba(255, 255, 255, 0.35) ' + n(rim - 0.6) + '%,',
-'    rgba(255, 255, 255, 0.95) ' + n(rim) + '%,',
-'    rgba(255, 232, 214, 0.60) ' + n(after(0.14)) + '%,',
-'    rgba(255, 190, 139, 0.38) ' + n(after(0.36)) + '%,',
-'    rgba(238, 149, 103, 0.17) ' + n(after(0.62)) + '%,',
-'    rgba(238, 149, 103, 0.04) ' + n(after(0.85)) + '%,',
-'    rgba(238, 149, 103, 0) 100%);',
+'    ' + rgba(ringC, 0) + ' 0%,',
+'    ' + rgba(ringC, 0) + ' ' + n(rim - 1.5) + '%,',
+'    ' + rgba(ringC, 0.35) + ' ' + n(rim - 0.6) + '%,',
+'    ' + rgba(ringC, 0.95) + ' ' + n(rim) + '%,',
+'    ' + rgba(blend(ringC, haloC, 0.25), 0.60) + ' ' + n(after(0.14)) + '%,',
+'    ' + rgba(blend(ringC, haloC, 0.68), 0.38) + ' ' + n(after(0.36)) + '%,',
+'    ' + rgba(haloC, 0.17) + ' ' + n(after(0.62)) + '%,',
+'    ' + rgba(haloC, 0.04) + ' ' + n(after(0.85)) + '%,',
+'    ' + rgba(haloC, 0) + ' 100%);',
 '}',
 '',
 '/* Water inside the window: the pond light keeps drifting behind the words. */',
 '.quote-window .pond-surface {',
-'  width: ' + (D - 6) + 'px; height: ' + (D - 6) + 'px;',
-'  margin: -' + (R - 3) + 'px 0 0 -' + (R - 3) + 'px;',
+'  width: ' + (D - 2 * W) + 'px; height: ' + (D - 2 * W) + 'px;',
+'  margin: -' + (R - W) + 'px 0 0 -' + (R - W) + 'px;',
 '  opacity: ' + n(v.pond) + ';',
-'}',
-'',
-'/* Ring ripples: on a ring this size they only need to travel ' + n(v.ripReach) + '×. */',
-'@keyframes ringGrow {',
-'  0%   { transform: scale(1); animation-timing-function: cubic-bezier(0.15, 0.55, 0.3, 1); }',
-'  99%  { transform: scale(' + n(v.ripReach) + '); }',
-'  100% { transform: scale(' + n(v.ripReach) + '); }',
 '}',
 ''
     );
+
+    /* --- Ripples --- */
+    css.push(
+'/* Ring ripples: three rings leave the window on the 4s breath, as on',
+'   the start button (same delays). HTML circles that only scale and',
+'   fade, so they never repaint. */',
+'.quote-window-ripple {',
+'  position: absolute;',
+'  inset: 0;',
+'  border-radius: 50%;',
+'  border: 1.5px solid ' + rgba(blend(ringC, haloC, 0.5), 1) + ';',
+'  opacity: 0;',
+'  pointer-events: none;',
+'  will-change: transform, opacity;',
+'}',
+'.blossom-screen.visible .quote-window-ripple {',
+'  animation: windowRipple 4s linear infinite;',
+'}',
+'.blossom-screen.visible .quote-window-ripple.r1 { animation-delay: 1.29s; }',
+'.blossom-screen.visible .quote-window-ripple.r2 { animation-delay: 2.99s; }',
+'.blossom-screen.visible .quote-window-ripple.r3 { animation-delay: 4.69s; }',
+'@keyframes windowRipple {',
+'  0%   { transform: scale(1); opacity: 0.9; animation-timing-function: cubic-bezier(0.15, 0.55, 0.3, 1); }',
+'  99%  { transform: scale(' + n(v.ripReach) + '); opacity: 0; }',
+'  100% { transform: scale(' + n(v.ripReach) + '); opacity: 0; }',
+'}',
+''
+    );
+
+    /* --- Ring and countdown --- */
+    css.push(
+'/* Ring and countdown. The base ring shows the old colour. Two half-',
+'   windows each hold a rotor that turns a half ring of the new colour',
+'   into view: the right one over the first half of the quote, the',
+'   left one over the second. Only transform changes. */',
+'.quote-ring {',
+'  position: absolute;',
+'  inset: 0;',
+'  box-sizing: border-box;',
+'  border-radius: 50%;',
+'  border: ' + n(W, 1) + 'px solid var(--ring-from);',
+'  pointer-events: none;',
+'}',
+'.quote-window > .quote-ring {',
+'  box-shadow: 0 0 10px ' + rgba(sweepC, 0.28) + ', inset 0 0 8px ' + rgba(sweepC, 0.12) + ';',
+'}',
+'.quote-timer-half {',
+'  position: absolute;',
+'  top: 0;',
+'  width: 50%;',
+'  height: 100%;',
+'  overflow: hidden;',
+'  pointer-events: none;',
+'}',
+'.quote-timer-half.right { left: 50%; }',
+'.quote-timer-half.left  { left: 0; }',
+'.quote-timer-rotor {',
+'  position: absolute;',
+'  top: 0;',
+'  width: 100%;',
+'  height: 100%;',
+'  overflow: hidden;',
+'  will-change: transform;',
+'}',
+'.quote-timer-half.right .quote-timer-rotor { left: -100%; transform-origin: 100% 50%; }',
+'.quote-timer-half.left  .quote-timer-rotor { left: 100%;  transform-origin: 0 50%; }',
+'.quote-timer-rotor .quote-ring {',
+'  width: 200%;',
+'  border-color: var(--ring-to);',
+'}',
+'.quote-timer-half.right .quote-ring { left: 0; right: auto; }',
+'.quote-timer-half.left  .quote-ring { left: -100%; right: auto; }',
+'',
+'/* The bead rides the leading edge of the sweep. */',
+'.quote-timer-bead-rotor {',
+'  position: absolute;',
+'  inset: 0;',
+'  pointer-events: none;',
+'  will-change: transform;',
+'}',
+'.quote-timer-bead {',
+'  position: absolute;',
+'  left: 50%;',
+'  top: ' + n(W / 2, 1) + 'px;',
+'  width: ' + bead + 'px;',
+'  height: ' + bead + 'px;',
+'  margin: -' + n(bead / 2, 1) + 'px 0 0 -' + n(bead / 2, 1) + 'px;',
+'  border-radius: 50%;',
+'  background: ' + ringC + ';',
+'  border: 1.5px solid ' + sweepC + ';',
+'  box-shadow: 0 0 8px ' + rgba(sweepC, 0.9) + ';',
+'}',
+'.blossom-screen.visible .quote-timer-bead {',
+'  animation: beadGlow 4s ease-in-out infinite;',
+'}',
+'@keyframes beadGlow {',
+'  0%, 100% { opacity: 0.75; }',
+'  36%      { opacity: 1; }',
+'}'
+    );
+    if (!v.bead) css.push('.quote-timer-bead-rotor { display: none; }');
+    css.push('');
 
     /* --- Words --- */
     css.push(
@@ -400,6 +603,8 @@
 '  justify-content: center;',
 '}',
 '.quote-window .quote-line {',
+'  font-family: ' + fontStack(fi.name) + ';',
+'  color: var(--quote-color);',
 '  width: fit-content;',
 '  text-align: center;',
 '  max-width: ' + Math.round(D * 0.8) + 'px;',
@@ -472,36 +677,6 @@
       );
     }
 
-    /* --- Timer --- */
-    css.push(
-'/* Timer arc: a 金木犀 line over the white ring. It sweeps back to',
-'   full as each quote arrives, then unwinds to the top; when it is',
-'   gone the next quote comes. */',
-'.quote-timer-arc {',
-'  fill: none;',
-'  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
-'  stroke-width: ' + n(v.arcWidth / k, 3) + 'px;',
-'  stroke-linecap: round;',
-'  stroke-dasharray: 565.49;',
-'  filter: drop-shadow(0 0 ' + n(3 / k, 2) + 'px rgba(240, 125, 64, 0.55));',
-'}',
-'.quote-timer-bead {',
-'  fill: #FFFDF9;',
-'  stroke: rgba(230, 104, 38, ' + n(v.arcAlpha) + ');',
-'  stroke-width: ' + n(1.5 / k, 3) + 'px;',
-'  filter: drop-shadow(0 0 ' + n(5 / k, 2) + 'px rgba(240, 125, 64, 0.9));',
-'}',
-'.blossom-screen.visible .quote-timer-bead {',
-'  animation: beadGlow 4s ease-in-out infinite;',
-'}',
-'@keyframes beadGlow {',
-'  0%, 100% { opacity: 0.75; }',
-'  36%      { opacity: 1; }',
-'}'
-    );
-    if (!v.bead) css.push('.quote-timer-bead { display: none; }');
-    css.push('');
-
     /* --- Meta line --- */
     css.push(
 '/* Under the window: quiet and small, never competing with the words. */',
@@ -529,6 +704,7 @@
 '  .quote-char { transition-delay: 0s !important; }',
 '  .quote-window .quote-line,',
 '  .quote-window .quote-line.leaving { transform: none !important; }',
+'  .blossom-screen.visible .quote-window-ripple { animation: none; }',
 '  .blossom-screen.visible .quote-timer-bead { animation: none; }',
 '}'
     );
@@ -539,28 +715,35 @@
      ELEMENTS
      ============================================================ */
   var live = document.getElementById('pvLive');
+  var screen = document.getElementById('blossomScreen');
   var win = document.getElementById('quoteWindow');
   var rippleLayer = document.getElementById('rippleLayer');
   var floretLayer = document.getElementById('floretLayer');
   var quoteLine = document.getElementById('quoteLine');
   var countEl = document.getElementById('quoteCount');
   var remainNum = document.getElementById('quoteRemainNum');
-  var arc = document.getElementById('quoteTimerArc');
-  var bead = document.getElementById('quoteTimerBead');
-  var blurAmount = document.getElementById('bandShadowBlurAmount');
+  var rotorRight = document.getElementById('rotorRight');
+  var rotorLeft = document.getElementById('rotorLeft');
+  var beadRotor = document.getElementById('beadRotor');
   var softGlow = document.querySelector('.soft-glow');
   var sourceEl = document.getElementById('pvSource');
+  var btnH = document.getElementById('pvHoriz');
+  var btnV = document.getElementById('pvVert');
 
-  var RING = 2 * Math.PI * 90;
   var BREATH = 4000, PEAK = 1440;           /* main.css glowBreath: 4s, peak at 36% */
 
   function applyCSS() {
     live.textContent = buildCSS();
-    var k = scale();
-    blurAmount.setAttribute('stdDeviation', n(3.5 / k, 3));
-    bead.setAttribute('r', n(4 / k, 3));
     btnH.classList.toggle('on', !v.vertical);
     btnV.classList.toggle('on', !!v.vertical);
+  }
+
+  /* Restart the halo, ripples, bead and water together so the ripples
+     stay on the breath after the CSS is rewritten. */
+  function restartBreath() {
+    screen.classList.add('pv-hold');
+    void screen.offsetWidth;
+    screen.classList.remove('pv-hold');
   }
 
   /* ============================================================
@@ -603,22 +786,20 @@
 
   /* ============================================================
      QUOTE CYCLE
-     One clock drives the arc, the bead, the fade out and the next
-     quote. The ring sweeps back to full as a quote arrives, then
-     unwinds; when it reaches the top the quote leaves.
+     Three Web Animations (transform only) run the countdown for each
+     quote. A light 100ms check reads their clock to start the fade
+     and the next quote; nothing is redrawn by script per frame.
      ============================================================ */
-  var S = { pos: 0, start: 0, D: 0, frozen: false, frozenAt: 0, phase: 'idle', nextPos: null, lastSec: -1, fromFrac: 0 };
-
-  function now() { return performance.now(); }
-  function elapsed() { return (S.frozen ? S.frozenAt : now()) - S.start; }
+  var S = { pos: 0, D: 0, phase: 'idle', nextPos: null, lastSec: -1, flip: true };   /* first countdown: 金木犀 over white */
+  var anims = [];
 
   /* Where the 4s breath is right now, read from the halo's own
      animation, so the new quote lands with the ring ripples. */
   function breathPhase() {
-    var anims = softGlow.getAnimations ? softGlow.getAnimations() : [];
-    for (var i = 0; i < anims.length; i++) {
-      if (anims[i].animationName === 'glowBreath' && anims[i].currentTime != null) {
-        return anims[i].currentTime % BREATH;
+    var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].animationName === 'glowBreath' && list[i].currentTime != null) {
+        return list[i].currentTime % BREATH;
       }
     }
     return null;
@@ -669,6 +850,33 @@
     fitText();
   }
 
+  /* Start a countdown: swap the ring's colours, then sweep the new
+     colour clockwise from the top over the quote's whole length. */
+  function startCountdown(D) {
+    anims.forEach(function (a) { a.cancel(); });
+    S.flip = !S.flip;
+    win.classList.toggle('flip', S.flip);
+    var o = { duration: D, easing: 'linear', fill: 'forwards' };
+    anims = [
+      rotorRight.animate([
+        { transform: 'rotate(0deg)' },
+        { transform: 'rotate(180deg)', offset: 0.5 },
+        { transform: 'rotate(180deg)' }
+      ], o),
+      rotorLeft.animate([
+        { transform: 'rotate(0deg)' },
+        { transform: 'rotate(0deg)', offset: 0.5 },
+        { transform: 'rotate(180deg)' }
+      ], o),
+      beadRotor.animate([
+        { transform: 'rotate(0deg)' },
+        { transform: 'rotate(360deg)' }
+      ], o)
+    ];
+    if (document.hidden) anims.forEach(function (a) { a.pause(); });
+  }
+  function clock() { return anims.length ? (anims[2].currentTime || 0) : 0; }
+
   function showQuote(pos) {
     if (!order.length) buildOrder();
     S.pos = (pos + order.length) % order.length;
@@ -676,9 +884,8 @@
     renderText(quotes[order[S.pos]]);
     void quoteLine.offsetWidth;
     quoteLine.classList.add('shown');
-    S.start = now();
-    if (S.frozen) S.frozenAt = S.start;
     S.D = quoteLength();
+    startCountdown(S.D);
     S.phase = 'showing';
     S.nextPos = null;
     S.lastSec = -1;
@@ -686,70 +893,41 @@
     if (v.floret) floretOnRing();
   }
 
-  function startLeaving(fromFrac) {
-    S.fromFrac = fromFrac;
+  function startLeaving() {
     S.phase = 'leaving';
     quoteLine.classList.remove('shown');
     quoteLine.classList.add('leaving');
   }
 
-  /* Preview-only shortcut: fade the current quote and show another. */
+  /* Preview-only shortcut: the sweep hurries to finish (it never
+     rewinds), the words fade, and the chosen quote comes next. */
   function goTo(pos) {
     S.nextPos = pos;
-    if (S.phase !== 'showing') return;
-    var from = currentFrac();
-    S.D = elapsed() + v.fade * 1000 * 0.7;
-    startLeaving(from);
+    if (S.phase === 'idle' || !anims.length) return;
+    var left = S.D - clock();
+    var hurry = Math.max(300, v.fade * 1000 * 0.7);
+    if (left > hurry) anims.forEach(function (a) { a.updatePlaybackRate(left / hurry); });
+    if (S.phase === 'showing') startLeaving();
   }
 
-  var easeInOut = function (t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; };
-
-  /* How much of the ring the arc covers right now (0 to 1). */
-  function currentFrac() {
-    var e = elapsed();
-    var fill = v.refill * 1000;
-    if (fill > 0 && e < fill) return easeInOut(Math.max(0, e) / fill);
-    var run = Math.max(1, S.D - fill);
-    return Math.max(0, Math.min(1, (S.D - e) / run));
-  }
-
-  function drawArc(frac) {
-    arc.style.strokeDashoffset = (RING * (1 - frac)).toFixed(2);
-    var a = frac * 2 * Math.PI;
-    bead.setAttribute('cx', (180 + 90 * Math.sin(a)).toFixed(2));
-    bead.setAttribute('cy', (180 - 90 * Math.cos(a)).toFixed(2));
-    bead.style.visibility = frac > 0.002 ? 'visible' : 'hidden';
-  }
-
-  function tick() {
-    requestAnimationFrame(tick);
-    if (S.phase === 'idle') return;
-    var e = elapsed();
-    var rem = S.D - e;
-    var fadeMs = v.fade * 1000;
-
-    if (S.phase === 'showing') {
-      var frac = currentFrac();
-      drawArc(frac);
-      if (rem <= fadeMs) startLeaving(frac);
-    } else {
-      /* While the words fade, the last of the arc runs out. */
-      drawArc(Math.max(0, S.fromFrac * Math.min(1, Math.max(0, rem) / fadeMs)));
-    }
-
+  function check() {
+    if (S.phase === 'idle' || !anims.length) return;
+    var t = clock();
+    var rate = anims[2].playbackRate || 1;
+    var rem = (S.D - t) / rate;
+    if (S.phase === 'showing' && rem <= v.fade * 1000) startLeaving();
     var sec = Math.max(0, Math.ceil(rem / 1000));
     if (sec !== S.lastSec) { remainNum.textContent = sec; S.lastSec = sec; }
-
-    if (rem <= 0 && S.phase === 'leaving') {
+    if (t >= S.D && S.phase === 'leaving') {
       showQuote(S.nextPos != null ? S.nextPos : S.pos + 1);
     }
   }
+  setInterval(check, 100);
 
-  /* Hold the clock while the screen is off, so no quote is skipped
-     unseen. */
+  /* Hold the countdown while the screen is off, so no quote is
+     skipped unseen. */
   document.addEventListener('visibilitychange', function () {
-    if (document.hidden && !S.frozen) { S.frozenAt = now(); S.frozen = true; }
-    else if (!document.hidden && S.frozen) { S.start += now() - S.frozenAt; S.frozen = false; }
+    anims.forEach(function (a) { if (document.hidden) a.pause(); else a.play(); });
   });
 
   /* ============================================================
@@ -757,19 +935,31 @@
      ============================================================ */
   var controlsBox = document.getElementById('pvControls');
   var inputs = {};
-  var RESTART_KEYS = { seconds: 1, fade: 1, align: 1, refill: 1, ink: 1, vertical: 1, maxSize: 1, minSize: 1, fit: 1, spacing: 1, lineH: 1, size: 1 };
-  var btnH = document.getElementById('pvHoriz');
-  var btnV = document.getElementById('pvVert');
+  var RESTART_KEYS = { seconds: 1, fade: 1, align: 1, ink: 1, vertical: 1, maxSize: 1, minSize: 1, fit: 1, spacing: 1, lineH: 1, size: 1 };
+  var BREATH_KEYS = { ripReach: 1, size: 1, reach: 1 };
 
   function fmt(c, val) {
     var d = (String(c.step).split('.')[1] || '').length;
     return (+val).toFixed(d);
   }
 
-  var restartTimer = null;
+  var restartTimer = null, breathTimer = null;
   function onValueChange(id) {
     saveValues();
     applyCSS();
+    if (id === 'font') {
+      /* Wait for the font, then refit the words in place (no restart). */
+      var f = fontInfo(v.font).name;
+      var done = function () { if (S.phase !== 'idle') fitText(); };
+      if (document.fonts && document.fonts.load) {
+        Promise.all([document.fonts.load('44px "' + f + '"', FONT_SAMPLE), document.fonts.load('44px "' + f + '"', quoteLine.textContent || FONT_SAMPLE)]).then(done, done);
+      } else done();
+      return;
+    }
+    if (BREATH_KEYS[id]) {
+      clearTimeout(breathTimer);
+      breathTimer = setTimeout(restartBreath, 250);
+    }
     if (id === 'shuffle') { buildOrder(); goTo(0); return; }
     if (RESTART_KEYS[id]) {
       clearTimeout(restartTimer);
@@ -790,8 +980,61 @@
       return;
     }
     var row = document.createElement('div');
-    var id = 'pv_' + c.id;
-    if (c.type === 'check') {
+    var id = 'pv_' + (c.id || c.type);
+    if (c.type === 'font') {
+      row.className = 'pv-fonts';
+      FONTS.forEach(function (f) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pv-font';
+        b.dataset.font = f.name;
+        b.innerHTML = '<span class="sample"></span><span class="nm"></span>';
+        b.firstChild.textContent = FONT_SAMPLE;
+        b.firstChild.style.fontFamily = fontStack(f.name);
+        b.lastChild.textContent = f.name + ' · ' + f.note;
+        b.addEventListener('click', function () { v.font = f.name; syncInputs(); onValueChange('font'); });
+        row.appendChild(b);
+      });
+      inputs[c.id] = { c: c, fonts: row };
+    } else if (c.type === 'presets') {
+      row.className = 'pv-presets';
+      PALETTES.forEach(function (pal, i) {
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'pv-preset';
+        b.dataset.i = i;
+        b.innerHTML = '<span class="dots"><i></i><i></i><i></i></span><span></span>';
+        var dots = b.querySelectorAll('i');
+        dots[0].style.background = pal.quote;
+        dots[1].style.background = pal.sweep;
+        dots[2].style.background = pal.halo;
+        b.lastChild.textContent = pal.name;
+        b.addEventListener('click', function () {
+          for (var k in COLOUR_KEYS) v[COLOUR_KEYS[k]] = pal[k];
+          syncInputs();
+          onValueChange('palette');
+        });
+        row.appendChild(b);
+      });
+      inputs.presets = { c: c, presets: row };
+    } else if (c.type === 'colour') {
+      row.className = 'pv-colour';
+      row.innerHTML = '<label for="' + id + '"></label><span class="pv-hex"></span>' +
+        '<input type="color" id="' + id + '"><span class="pv-was"></span>';
+      row.querySelector('label').textContent = c.label;
+      row.querySelector('.pv-was').textContent = 'app: ' + c.was;
+      var ci = row.querySelector('input');
+      var hex = row.querySelector('.pv-hex');
+      ci.value = v[c.id];
+      hex.textContent = String(v[c.id]).toUpperCase();
+      ci.addEventListener('input', function () {
+        v[c.id] = ci.value;
+        hex.textContent = ci.value.toUpperCase();
+        syncInputs();
+        onValueChange(c.id);
+      });
+      inputs[c.id] = { el: ci, hex: hex, c: c };
+    } else if (c.type === 'check') {
       row.className = 'pv-check';
       row.innerHTML = '<input type="checkbox" id="' + id + '"><label for="' + id + '"></label>';
       row.querySelector('label').textContent = c.label;
@@ -806,16 +1049,16 @@
         '<span class="pv-was"></span>';
       row.querySelector('label').textContent = c.label;
       row.querySelector('.pv-was').textContent = 'app: ' + c.was;
-      var range = row.querySelector('input');
+      var rng = row.querySelector('input');
       var out = row.querySelector('.pv-val');
-      range.value = v[c.id];
+      rng.value = v[c.id];
       out.textContent = fmt(c, v[c.id]);
-      range.addEventListener('input', function () {
-        v[c.id] = +range.value;
-        out.textContent = fmt(c, range.value);
+      rng.addEventListener('input', function () {
+        v[c.id] = +rng.value;
+        out.textContent = fmt(c, rng.value);
         onValueChange(c.id);
       });
-      inputs[c.id] = { el: range, out: out, c: c };
+      inputs[c.id] = { el: rng, out: out, c: c };
     }
     controlsBox.lastChild.appendChild(row);
   });
@@ -824,6 +1067,16 @@
     for (var k in inputs) {
       var it = inputs[k];
       if (it.c.type === 'check') it.el.checked = !!v[k];
+      else if (it.c.type === 'colour') { it.el.value = v[k]; it.hex.textContent = String(v[k]).toUpperCase(); }
+      else if (it.c.type === 'font') {
+        Array.prototype.forEach.call(it.fonts.children, function (b) { b.classList.toggle('on', b.dataset.font === v.font); });
+      } else if (it.c.type === 'presets') {
+        Array.prototype.forEach.call(it.presets.children, function (b) {
+          var pal = PALETTES[+b.dataset.i], same = true;
+          for (var q in COLOUR_KEYS) if (String(v[COLOUR_KEYS[q]]).toLowerCase() !== pal[q].toLowerCase()) same = false;
+          b.classList.toggle('on', same);
+        });
+      }
       else { it.el.value = v[k]; it.out.textContent = fmt(it.c, v[k]); }
     }
   }
@@ -847,6 +1100,7 @@
     try { localStorage.removeItem(STORE_KEY); } catch (e) {}
     syncInputs();
     applyCSS();
+    restartBreath();
     outEl.classList.remove('shown');
     statusEl.textContent = 'Reset to the proposed defaults.';
     buildOrder();
@@ -884,14 +1138,17 @@
   /* ============================================================
      WATER: rain drops and 金木犀 florets (app.js numbers)
      ============================================================ */
-  var RIPPLE_COLOURS_SUBTLE = ['rgba(255, 162, 89, 0.55)', 'rgba(253, 232, 218, 0.40)'];
-  var RIPPLE_COLOURS_TRAIL  = ['rgba(255, 162, 89, 0.40)'];
+  /* Rain ripples are tinted from the glow colour. */
+  function rippleColours(kind) {
+    if (kind === 'trail') return [rgba(v.cHalo, 0.45)];
+    return [rgba(v.cHalo, 0.6), rgba(blend('#FFFFFF', v.cHalo, 0.2), 0.45)];
+  }
   var RIPPLE_LIFE = 1900, RIPPLE_STAGGER = 150;
 
   function spawnRipples(x, y, intensity) {
     var palette, cls, baseSize;
-    if (intensity === 'trail') { palette = RIPPLE_COLOURS_TRAIL; cls = ' trail'; baseSize = 22; }
-    else { palette = RIPPLE_COLOURS_SUBTLE; cls = ' subtle'; baseSize = 26; }
+    if (intensity === 'trail') { palette = rippleColours('trail'); cls = ' trail'; baseSize = 22; }
+    else { palette = rippleColours('subtle'); cls = ' subtle'; baseSize = 26; }
     for (var i = 0; i < palette.length; i++) {
       (function (idx) {
         var r = document.createElement('div');
@@ -930,10 +1187,14 @@
 
   /* 金木犀 florets: tiny four-petal flowers drift down with a gentle
      sway, land on the water with a small ripple, float, then fade. */
-  var FLORET_SVG = '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
-    '<g fill="#F07D40"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
-    '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
-    '<circle r="1.5" fill="#C44E10"/></svg>';
+  function floretSvg() {
+    var petal = v.cFloret;
+    var centre = 'rgb(' + blend(petal, '#5A1A00', 0.4).join(', ') + ')';
+    return '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+      '<g fill="' + petal + '"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+      '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+      '<circle r="1.5" fill="' + centre + '"/></svg>';
+  }
 
   function scheduleFlorets(first) {
     setTimeout(function () {
@@ -952,7 +1213,7 @@
     if (reduced) return;
     var f = document.createElement('div');
     f.className = 'kinmokusei-floret';
-    f.innerHTML = FLORET_SVG;
+    f.innerHTML = floretSvg();
     floretLayer.appendChild(f);
     var W = innerWidth, H = innerHeight;
     var x1 = tx != null ? tx : W * (0.12 + Math.random() * 0.76);
@@ -1048,16 +1309,15 @@
     clearTimeout(lanternResize);
     lanternResize = setTimeout(buildLanterns, 250);
   });
-
   /* ============================================================
      START
      ============================================================ */
+  syncInputs();
   applyCSS();
-  drawArc(0);
+  restartBreath();
   buildLanterns();
   scheduleRain();
   scheduleFlorets(true);
-  requestAnimationFrame(tick);
   var fontsReady = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
   Promise.all([loadQuotes(), fontsReady]).then(function () {
     buildOrder();
