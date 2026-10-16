@@ -25,7 +25,7 @@
      layer and one draw, so nothing can seam or get out of step.
 
      The countdown is a gradient (start colour → end colour) whose line
-     tapers behind a round, soft "tadpole" head. Every edge is soft.
+     fades out behind a soft, dipper-shaped "tadpole" head. Every edge is soft.
      The countdown never rewinds: when it completes, the head blooms,
      the finished ring fades back, and the next countdown starts from
      the top. Quotes change on their own.
@@ -328,12 +328,14 @@
     { id: 'ink',       label: 'Ink: delay per character (ms), 0 = whole line', min: 0, max: 160, step: 5, def: 70, was: '0 (whole line at once)' },
 
     { group: 'Timer' },
-    { id: 'bodyW',     label: 'Countdown line thickness behind the head (px)', min: 2, max: 20, step: 0.5, def: 12, was: 'none' },
-    { id: 'tailW',     label: 'Thickness at the far end of the tail (px)', min: 0, max: 8, step: 0.5, def: 2.5, was: 'none' },
-    { id: 'tail',      label: 'Tail length (degrees of the ring)', min: 30, max: 360, step: 5, def: 170, was: 'none' },
-    { id: 'taper',     label: 'Tail taper (higher = thinner sooner)', min: 0.6, max: 3.5, step: 0.1, def: 1.3, was: 'none' },
-    { id: 'head',      label: 'Tadpole head', type: 'check', def: true },
-    { id: 'headSize',  label: 'Head size (px across)',      min: 12,  max: 64,  step: 1,    def: 28,  was: 'none' },
+    { id: 'bodyW',     label: 'Countdown line thickness (px)', min: 2, max: 20, step: 0.5, def: 9, was: 'none' },
+    { id: 'head',      label: 'Dipper-shaped head (an oval that tapers into the line)', type: 'check', def: true },
+    { id: 'headW',     label: 'Head width at its widest (px)', min: 8, max: 60, step: 1, def: 28, was: 'none' },
+    { id: 'headLen',   label: 'Head length, nose to widest point (px)', min: 10, max: 120, step: 1, def: 46, was: 'none' },
+    { id: 'neck',      label: 'How gently the head tapers into the line (px)', min: 0, max: 260, step: 5, def: 110, was: 'none' },
+    { id: 'tail',      label: 'Tail: fades out over this many degrees behind the head', min: 40, max: 360, step: 5, def: 280, was: 'none' },
+    { id: 'taper',     label: 'Tail fade curve (higher = fades sooner)', min: 0.6, max: 3.5, step: 0.1, def: 1.2, was: 'none' },
+    { id: 'startFade', label: 'Soft start at the top (degrees)', min: 4, max: 90, step: 2, def: 24, was: 'none' },
     { id: 'bloom',     label: 'Head blooms when the countdown completes', type: 'check', def: true },
     { id: 'fadeBack',  label: 'Finished ring fades back (s)', min: 0.4, max: 3, step: 0.1,  def: 1.4,  was: 'none' },
     { id: 'count',     label: 'Faint "3 / 16" under the window', type: 'check', def: true },
@@ -343,7 +345,7 @@
     { id: 'floret',    label: 'A floret lands on the ring as each quote arrives', type: 'check', def: true }
   ];
 
-  var STORE_KEY = 'quotesPreviewValues.v4';
+  var STORE_KEY = 'quotesPreviewValues.v5';
   var DEFAULTS = { vertical: false };
   CONTROLS.forEach(function (c) { if (c.id) DEFAULTS[c.id] = c.def; });
   var v = loadValues();
@@ -434,13 +436,16 @@
 '     ripple canvas         ' + rs + ' × ' + rs + ' CSS px, centred, backing store at 1×',
 '     faint ring            ' + n(W, 1) + 'px thick, colour ' + ringC + ', strength ' + n(v.track),
 '     edge softness         ' + n(v.soft, 1) + 'px on each edge (5 stacked passes)',
-'     countdown line        ' + n(v.bodyW, 1) + 'px thick behind the head, ' + n(v.tailW, 1) + 'px at the far end',
-'     tail                  tapers over ' + v.tail + 'deg behind the head, curve ' + n(v.taper) + ' (higher = thinner sooner)',
-'                           and eases in from nothing over the first 10deg of the ring',
-'     tadpole head          ' + (v.head ? n(v.headSize, 0) + 'px across, a soft round bulb in the gradient colour at that point' : 'off'),
+'     countdown line        ' + n(v.bodyW, 1) + 'px thick, the same all the way round; it never narrows',
+'     tail                  fades to nothing (alpha, not width) over ' + v.tail + 'deg behind the head,',
+'                           curve ' + n(v.taper) + ' (higher = fades sooner); fades in from nothing over',
+'                           the first ' + v.startFade + 'deg at the top. One conic gradient with ~48 alpha stops,',
+'                           rebuilt every frame, colours start → end by angle',
+'     dipper head           ' + (v.head ? 'part of the same shape as the line, not a disc on top: a rounded oval nose ' + n(v.headLen, 0) + 'px long,\n                           widest ' + n(v.headW, 0) + 'px, then easing down to the line over ' + n(v.neck, 0) + 'px' : 'off (the line ends in a rounded nose)'),
 '     gradient              ' + startC + ' at the top → ' + endC + ' once round (the head is always the colour',
 '                           of the ring at that point)',
-'     when a countdown ends ' + (v.bloom ? 'the head blooms outward (1200ms), ' : '') + 'the finished ring fades out over ' + Math.round(v.fadeBack * 1000) + 'ms',
+'     when a countdown ends the finished ring is drawn once into an offscreen canvas and that picture',
+'                           fades out over ' + Math.round(v.fadeBack * 1000) + 'ms as a whole' + (v.bloom ? ', with a soft bloom at the top (1200ms)' : '') + ',',
 '                           while the next one starts from the top. Never rewinds.',
 '     ripples               three rings on the 4s breath (delays 1.29s, 2.99s, 0.69s), spreading to ' + n(v.ripReach) + '×,',
 '                           colour ' + rgbaA(blend(ringC, haloC, 0.5), 1),
@@ -448,6 +453,11 @@
 '     QUOTE_FADE            ' + Math.round(v.fade * 1000) + 'ms (was 1500)',
 '     breath alignment      ' + (v.align ? 'on: each quote arrives at a glow peak\n                           (1.44s into each 4s breath)' : 'off'),
 '     order                 ' + (v.shuffle ? 'shuffled, never the same quote twice in a row' : 'in quotes.json order'),
+'     line breaks           app.js splits each quote into phrases (Intl.Segmenter, Japanese; small',
+'                           hiragana words join the word before; a break always follows 、 or 。),',
+'                           wraps each in <span class="quote-unit"> with <wbr> between, so a line can',
+'                           only break between phrases. If any line would hold 2 characters or fewer,',
+'                           the text box is narrowed a little and the fit is redone.',
 '     text size             fitted per quote (binary search): start at ' + v.maxSize + 'px, step down',
 '                           (to ' + v.minSize + 'px at least) until the text fits',
 '                           inside ' + Math.round(v.fit * 100) + '% of the ring radius',
@@ -538,6 +548,7 @@
 '              transform ' + F + ' ' + EASE + ',',
 '              filter ' + F + ' ' + EASE + ';',
 '}',
+'.quote-unit { display: inline-block; white-space: nowrap; }',
 '.quote-window .quote-line.shown { transform: none; filter: none; opacity: 1; }',
 '.quote-window .quote-line.leaving {',
 '  opacity: 0;',
@@ -693,8 +704,10 @@
   var DEG = Math.PI / 180;
   var breathOrigin = 0;
   var prevSweep = null;
+  var finalCv = document.createElement('canvas');
+  var finalCtx = finalCv.getContext('2d');
 
-  function canvasPad() { return Math.ceil(+v.headSize * 1.9 + 14); }
+  function canvasPad() { return Math.ceil(+v.headW * 1.9 + 14); }
 
   function cacheColours() {
     COL.start = rgbOf(v.cStart);
@@ -716,7 +729,7 @@
     var key = [S, dpr, RS].join();
     if (key === CV.key) return;
     CV = { key: key, S: S, dpr: dpr, RS: RS };
-    ringCv.width = ringCv.height = Math.round(S * dpr);
+    ringCv.width = ringCv.height = finalCv.width = finalCv.height = Math.round(S * dpr);
     ringCv.style.width = ringCv.style.height = S + 'px';
     ringCv.style.margin = (-S / 2) + 'px 0 0 ' + (-S / 2) + 'px';
     ripCv.width = ripCv.height = RS;
@@ -740,64 +753,86 @@
   }
 
   /* One countdown: the arc from the top round to the head. frac is how
-     far round (0 to 1), alpha fades the whole thing, hs scales the head. */
-  function drawSweep(ctx, cx, cy, frac, alpha, hs) {
+     far round (0 to 1); alpha fades the whole thing.
+
+     One continuous shape. Its width is the line thickness all the way
+     back, except at the front, where it swells into a dipper-shaped
+     head: a rounded oval nose, widest a little behind the tip, then
+     easing down into the line so there is no join. Nothing tapers at
+     the tail; instead the colour fades to nothing (alpha) behind the
+     head and in from nothing at the top. */
+  function drawSweep(ctx, cx, cy, frac, alpha) {
     var R = v.size / 2, T = +v.band, Rc = R - T / 2;
     var phi = frac * 360;
-    var bodyW = +v.bodyW, tailW = Math.min(+v.tailW, bodyW);
-    var k = Math.min(0.9, 2 * v.soft / Math.max(bodyW, 1));
-    var N = Math.max(4, Math.ceil(phi / 2));
-    var us = [], ws = [], i;
-    for (i = 0; i <= N; i++) {
-      var u = phi * i / N;                       /* degrees from the top */
-      var t = Math.min(1, (phi - u) / v.tail);   /* 0 at the head, 1 at the end of the tail */
-      var w = tailW + (bodyW - tailW) * Math.pow(1 - t, v.taper);
-      us.push(u);
-      ws.push(w * smooth(u / 10));               /* ease in from nothing at the very start */
+    if (phi < 0.5 || alpha <= 0.002) return;
+    var bodyW = +v.bodyW;
+    var headW = v.head ? Math.max(bodyW, +v.headW) : bodyW;
+    var nose = v.head ? Math.max(4, +v.headLen) : bodyW * 0.6;
+    var neck = v.head ? +v.neck : 0;
+    var pxDeg = Rc * DEG;                 /* pixels along the ring per degree */
+    var sMax = phi * pxDeg;
+    var ss = [], ww = [], i, s;
+    function put(d) {                     /* d = distance behind the very front, in px */
+      if (d > sMax) d = sMax;
+      var w;
+      if (d <= nose) w = headW * Math.sqrt(Math.max(0, 1 - Math.pow((nose - d) / nose, 2)));
+      else if (d < nose + neck) w = headW + (bodyW - headW) * smooth((d - nose) / neck);
+      else w = bodyW;
+      ss.push(d); ww.push(w);
     }
+    for (i = 0; i <= 14; i++) put(nose * (1 - Math.cos(i / 14 * Math.PI / 2)));   /* the round nose, dense */
+    for (i = 1; i <= 16 && neck > 0; i++) put(nose + neck * i / 16);
+    for (s = nose + neck + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s);
+    put(sMax);
+    var N = ss.length - 1;
+
+    /* Colour by angle (start → end) and alpha along the ring. */
     var grad = ctx.createConicGradient ? ctx.createConicGradient(-Math.PI / 2, cx, cy) : null;
-    if (grad) { grad.addColorStop(0, rgbaA(COL.start, 1)); grad.addColorStop(1, rgbaA(COL.end, 1)); }
+    if (grad) {
+      var L = +v.tail, SFd = +v.startFade, M = 48;
+      for (i = 0; i <= M; i++) {
+        var u = phi * i / M;
+        var t = Math.min(1, (phi - u) / L);
+        var al = Math.pow(1 - t, v.taper) * smooth(u / SFd);
+        grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), al));
+      }
+    }
     ctx.fillStyle = grad || rgbaA(lerpC(COL.start, COL.end, frac), 1);
     for (var p = 0; p < PASSES; p++) {
-      var shrink = 1 - k * p / PASSES;
+      var inset = v.soft * p / PASSES * 2;         /* soft edge: each pass is a little narrower */
       ctx.globalAlpha = stepAlpha(p, alpha);
       ctx.beginPath();
       for (i = 0; i <= N; i++) {
-        var a = (us[i] - 90) * DEG, r = Rc + ws[i] * shrink / 2;
+        var a = (phi - ss[i] / pxDeg - 90) * DEG, r = Rc + Math.max(0, ww[i] - inset) / 2;
         if (i === 0) ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
         else ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
       }
       for (i = N; i >= 0; i--) {
-        var b = (us[i] - 90) * DEG, q = Rc - ws[i] * shrink / 2;
+        var b = (phi - ss[i] / pxDeg - 90) * DEG, q = Rc - Math.max(0, ww[i] - inset) / 2;
         ctx.lineTo(cx + q * Math.cos(b), cy + q * Math.sin(b));
       }
       ctx.closePath();
       ctx.fill();
     }
-    /* The tadpole head: a soft round bulb in the colour of the ring here. */
-    if (v.head && hs > 0.01) {
-      var Rh = v.headSize / 2 * hs;
-      var ha = (phi - 90) * DEG, hx = cx + Rc * Math.cos(ha), hy = cy + Rc * Math.sin(ha);
-      var c = lerpC(COL.start, COL.end, frac);
-      var g = ctx.createRadialGradient(hx, hy, 0, hx, hy, Rh);
-      g.addColorStop(0, rgbaA(c, 1));
-      g.addColorStop(0.45, rgbaA(c, 0.96));
-      g.addColorStop(0.72, rgbaA(c, 0.5));
-      g.addColorStop(1, rgbaA(c, 0));
-      ctx.globalAlpha = alpha;
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.arc(hx, hy, Rh, 0, 2 * Math.PI);
-      ctx.fill();
-    }
+  }
+
+  /* The finished ring, drawn once into its own canvas so it can fade as
+     one picture (nothing in it can fade before anything else). */
+  function snapshotFinal() {
+    var c = finalCtx;
+    c.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
+    c.globalAlpha = 1;
+    c.clearRect(0, 0, CV.S, CV.S);
+    drawSweep(c, CV.S / 2, CV.S / 2, 1, 1);
+    c.globalAlpha = 1;
   }
 
   /* The soft ring of light released at the top when a countdown ends. */
   function drawBloom(ctx, cx, cy, p) {
     var R = v.size / 2, Rc = R - v.band / 2;
     var e = 1 - Math.pow(1 - p, 3);
-    var r = v.headSize / 2 * (0.8 + 2.8 * e);
-    var a = 0.6 * (1 - p) * (1 - p);
+    var r = v.headW / 2 * (0.8 + 2.8 * e);
+    var a = 0.5 * (1 - p) * (1 - p);
     var x = cx, y = cy - Rc;
     var g = ctx.createRadialGradient(x, y, 0, x, y, r);
     g.addColorStop(0, rgbaA(COL.end, a));
@@ -822,13 +857,17 @@
         prevSweep = null;
       } else {
         var a = 1 - smooth(age / fb);
-        if (a > 0.003) drawSweep(ctx, cx, cy, 1, a, 1);
+        if (a > 0.003) {
+          ctx.globalAlpha = a;
+          ctx.drawImage(finalCv, 0, 0, cs, cs);
+          ctx.globalAlpha = 1;
+        }
         if (v.bloom && age < 1200) drawBloom(ctx, cx, cy, age / 1200);
       }
     }
     if (S.phase !== 'idle') {
       var e = smooth((now - S.t0) / 450);
-      drawSweep(ctx, cx, cy, Math.max(0, Math.min(1, S.prog / S.D)), e, e);
+      drawSweep(ctx, cx, cy, Math.max(0, Math.min(1, S.prog / S.D)), e);
     }
     ctx.globalAlpha = 1;
   }
@@ -979,23 +1018,89 @@
     quoteLine.style.fontSize = lo + 'px';
   }
 
+  /* Split a quote into phrases so a line only ever breaks between
+     phrases, never inside a word. Intl.Segmenter finds the Japanese
+     words; small hiragana words (particles and endings such as が, に,
+     ます, という) join the word before; honorific お / ご joins the
+     word after; 、 and 。 stay with the word before and always allow
+     a break after them. */
+  var HIRA = /^[぀-ゟ]+$/;
+  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
+  var OPEN = /^[（(「『]+$/;
+  var STOPS = /[、。，．！？!?]/;
+  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  function phraseUnits(text) {
+    var segs = [];
+    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
+    else segs = Array.from(text);
+    var units = [], cur = '', force = false, open = '';
+    segs.forEach(function (sg) {
+      /* An opening bracket, or an honorific お / ご, belongs to the word after it. */
+      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
+      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
+      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
+      if (cur !== '' && !join) { units.push(cur); cur = ''; }
+      cur += open + sg; open = ''; force = false;
+    });
+    if (cur) units.push(cur);
+    return units;
+  }
+
+  /* How many characters are on each line (or column, for 縦書き). */
+  function lineCounts() {
+    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
+    for (var i = 0; i < units.length; i++) {
+      var r = units[i].getBoundingClientRect();
+      var key = v.vertical ? r.left : r.top, tol = (v.vertical ? r.width : r.height) * 0.5;
+      var row = null;
+      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
+      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
+      row.n += Array.from(units[i].textContent).length;
+    }
+    return rows.map(function (x) { return x.n; });
+  }
+
+  /* Fit the words, and make sure no line is left with just one or two
+     characters: if one is, narrow the text box a little (so the lines
+     balance differently) and fit again. */
+  function fitAndBalance() {
+    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
+    var base = v.vertical ? Math.round(v.size * 0.66) : Math.round(v.size * 0.8);
+    var prop = v.vertical ? 'maxHeight' : 'maxWidth';
+    for (var k = 0; k < tries.length; k++) {
+      quoteLine.style[prop] = Math.round(base * tries[k]) + 'px';
+      fitText();
+      var c = lineCounts();
+      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
+    }
+    quoteLine.style[prop] = base + 'px';
+    fitText();
+  }
+
   function renderText(text) {
     quoteLine.textContent = '';
+    quoteLine.style.maxWidth = quoteLine.style.maxHeight = '';
     quoteLine.classList.toggle('ink', v.ink > 0);
     quoteLine.classList.toggle('vertical', !!v.vertical);
-    if (v.ink > 0) {
-      var chars = Array.from(text);
-      for (var i = 0; i < chars.length; i++) {
-        var s = document.createElement('span');
-        s.className = 'quote-char';
-        s.style.setProperty('--i', i);
-        s.textContent = chars[i];
-        quoteLine.appendChild(s);
+    var units = phraseUnits(text), idx = 0;
+    units.forEach(function (u, ui) {
+      var span = document.createElement('span');
+      span.className = 'quote-unit';
+      if (v.ink > 0) {
+        Array.from(u).forEach(function (ch) {
+          var c = document.createElement('span');
+          c.className = 'quote-char';
+          c.style.setProperty('--i', idx++);
+          c.textContent = ch;
+          span.appendChild(c);
+        });
+      } else {
+        span.textContent = u;
       }
-    } else {
-      quoteLine.textContent = text;
-    }
-    fitText();
+      quoteLine.appendChild(span);
+      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
+    });
+    fitAndBalance();
   }
 
   function showQuote(pos) {
@@ -1008,7 +1113,7 @@
     var now = performance.now();
     /* The countdown that just completed stays as a full ring, blooms and
        fades back while the next one starts from the top. */
-    if (S.phase !== 'idle') prevSweep = { t: now };
+    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
     S.D = Math.max(1000, quoteLength());
     S.prog = 0;
     S.rate = 1;
@@ -1093,7 +1198,7 @@
     if (id === 'font') {
       /* Wait for the font, then refit the words in place (no restart). */
       var f = fontInfo(v.font).name;
-      var done = function () { if (S.phase !== 'idle') fitText(); };
+      var done = function () { if (S.phase !== 'idle') fitAndBalance(); };
       if (document.fonts && document.fonts.load) {
         Promise.all([document.fonts.load('44px "' + f + '"', FONT_SAMPLE), document.fonts.load('44px "' + f + '"', quoteLine.textContent || FONT_SAMPLE)]).then(done, done);
       } else done();
