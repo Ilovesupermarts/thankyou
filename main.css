@@ -2771,6 +2771,160 @@
   .quote-line { font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 26px; font-weight: 500; color: var(--quote-color); line-height: 2.1; letter-spacing: 3px; opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px); transition: opacity 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; text-shadow: var(--quote-shadow); }
   .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
   .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
+
+  /* ============================================================
+     QUOTES IN THE ROUND WINDOW (丸窓)
+     Shown after the last thank-you message. Tuned in
+     quotes-preview.html; these are the chosen settings.
+
+     The faint ring, the gradient countdown with its water-drop head
+     and the three ripples are drawn on the two canvases by
+     QuoteWindow in app.js, once per frame. Everything else is here:
+     the halo, the pond, and the words. The selectors are scoped to
+     .quote-window, so the older .quote-line rules above only supply
+     the base (weight, line breaking, glow) and these win.
+     ============================================================ */
+  .thankyou-screen .ty-ambient-stage { overflow: hidden; padding: 0 20px; }
+  .ty-ambient-inner { transform-origin: 50% 50%; }
+  .quote-floret-layer { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 4; }
+
+  /* The window: 500px across. */
+  .icon-wrapper.quote-window {
+    width: 500px;
+    height: 500px;
+    margin: 0;
+    flex: none;
+    --quote-color: #A3282A;
+  }
+
+  /* Halo: the ring colour at the rim, warming into the glow colour as it
+     fades out, reaching 1.45x the ring radius. Breathes on the same 4s
+     breath as the start screen (the ripples and the quote changes follow
+     it). */
+  .quote-window .soft-glow {
+    width: 726px; height: 726px;
+    margin-top: -363px; margin-left: -363px;
+    background: radial-gradient(circle closest-side,
+      rgba(255, 253, 249, 0) 0%,
+      rgba(255, 253, 249, 0) 65.99%,
+      rgba(255, 253, 249, 0.35) 66.89%,
+      rgba(255, 253, 249, 0.95) 67.49%,
+      rgba(247, 218, 211, 0.6) 72.04%,
+      rgba(234, 157, 144, 0.38) 79.2%,
+      rgba(224, 112, 95, 0.17) 87.65%,
+      rgba(224, 112, 95, 0.04) 95.12%,
+      rgba(224, 112, 95, 0) 100%);
+    animation: glowBreath 4s linear infinite;
+  }
+
+  /* Water inside the window: the pond light keeps drifting behind the words. */
+  .quote-window .pond-surface {
+    width: 480px; height: 480px;
+    margin: -240px 0 0 -240px;
+    opacity: 0.7;
+  }
+
+  /* Nothing moves while the window is out of sight. */
+  .ty-ambient-stage:not(.shown) .quote-window .soft-glow,
+  .ty-ambient-stage:not(.shown) .quote-window .pond-caustic { animation-play-state: paused; }
+
+  /* The two canvases. app.js sets each one's width, height and negative
+     margins (half its size) so it is centred on the window. The ring sits
+     above the pond and below the words. */
+  .quote-ring-canvas,
+  .quote-ripple-canvas {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    pointer-events: none;
+  }
+  .quote-ring-canvas { z-index: 1; }
+
+  /* Words: centred inside the ring. app.js sets font-size per quote so
+     the text always fits; the size here is only the starting point. */
+  .quote-window .quote-wrap {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    min-height: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .quote-window .quote-line {
+    font-family: "Zen Antique", "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    color: var(--quote-color);
+    width: fit-content;
+    text-align: center;
+    max-width: 400px;
+    font-size: 44px;
+    letter-spacing: 4px;
+    line-height: 1.4;
+    transform: translateY(12px) scale(0.98);
+    filter: blur(10px);
+    transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                filter 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  }
+  .quote-unit { display: inline-block; white-space: nowrap; }
+  .quote-window .quote-line.shown { transform: none; filter: none; opacity: 1; }
+  .quote-window .quote-line.leaving {
+    opacity: 0;
+    transform: translateY(-12px) scale(1.01);
+    filter: blur(10px);
+  }
+
+  /* Ink: each character fades in and settles a few pixels, 70ms apart,
+     like a brush working across the paper. Only opacity and transform
+     change, so it stays light. The line itself only fades when it leaves. */
+  .quote-window .quote-line.ink,
+  .quote-window .quote-line.ink.shown {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .quote-window .quote-line.ink.leaving {
+    opacity: 0;
+    transform: translateY(-10px);
+    filter: blur(10px);
+  }
+  .quote-char {
+    display: inline-block;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                transform 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transition-delay: calc(var(--i) * 70ms);
+  }
+  .quote-line.ink.shown .quote-char,
+  .quote-line.ink.leaving .quote-char {
+    opacity: 1;
+    transform: none;
+  }
+  .quote-line.ink.leaving .quote-char { transition: none; }
+
+  /* Under the window: quiet and small, never competing with the words. */
+  .quote-meta {
+    position: relative;
+    z-index: 3;
+    margin-top: 40px;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 13px;
+    letter-spacing: 3px;
+    color: var(--text-mute);
+    font-variant-numeric: tabular-nums;
+    opacity: 0.7;
+    min-height: 20px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .quote-char { transition-delay: 0s !important; }
+    .quote-window .quote-line,
+    .quote-window .quote-line.leaving { transform: none !important; }
+    .quote-window .soft-glow { animation: none !important; opacity: 0.72 !important; }
+    .quote-window .pond-caustic { animation: none !important; }
+  }
   .ty-receipt-btn { position: absolute; bottom: 20px; left: 20px; background: transparent; border: none; color: var(--text-mute); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 12px; font-weight: 500; letter-spacing: 2px; padding: 8px 12px; padding-left: calc(12px + env(safe-area-inset-left, 0px)); border-radius: 16px; cursor: pointer; opacity: 0; transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.2s ease, color 0.2s ease; -webkit-appearance: none; appearance: none; white-space: nowrap; z-index: 30; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; }
   .ty-receipt-btn.shown { opacity: 0.75; pointer-events: auto; }
   .ty-receipt-btn:active { opacity: 1; background: rgba(255, 255, 255, 0.5); color: var(--accent); }
@@ -3787,4 +3941,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v127"; }
+:root { --build: "v128"; }

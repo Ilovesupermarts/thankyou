@@ -2,7 +2,7 @@
 <html lang="ja" data-theme="autumn">
 <head>
 <meta charset="UTF-8">
-<meta name="build" content="v127">
+<meta name="build" content="v128">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
 <title>追加オプションのご相談</title>
@@ -661,12 +661,25 @@
   </div>
 
   <div class="ty-ambient-stage" id="tyAmbientStage">
+    <!-- Round window (丸窓): the faint ring, the gradient countdown with its
+         water-drop head and the ripples are drawn on the two canvases by
+         QuoteWindow in app.js; the halo and pond are plain layers. -->
     <div class="ty-ambient-inner">
-      <div class="blossom-divider" id="blossomDivider"></div>
-      <div class="quote-wrap">
-        <div class="quote-line" id="quoteLine"></div>
+      <div class="icon-wrapper quote-window" id="quoteWindow">
+        <div class="soft-glow" aria-hidden="true"></div>
+        <canvas class="quote-ripple-canvas" id="quoteRippleCanvas" aria-hidden="true"></canvas>
+        <div class="pond-surface" aria-hidden="true">
+          <div class="pond-caustic"></div>
+          <div class="pond-caustic c2"></div>
+        </div>
+        <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
+        <div class="quote-wrap" aria-live="polite">
+          <div class="quote-line" id="quoteLine"></div>
+        </div>
       </div>
+      <div class="quote-meta" aria-hidden="true"><span class="quote-count" id="quoteCount"></span></div>
     </div>
+    <div class="quote-floret-layer" id="quoteFloretLayer" aria-hidden="true"></div>
   </div>
 
   <button type="button" class="ty-receipt-btn" id="tyReceiptBtn">

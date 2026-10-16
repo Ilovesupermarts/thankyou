@@ -1,4 +1,4 @@
-var BUILD = 'v127';
+var BUILD = 'v128';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -3242,8 +3242,6 @@ var tySwipeHint = document.getElementById('tySwipeHint');
 var tySwipeHintLabel = document.getElementById('tySwipeHintLabel');
 var tyPanel1Content = document.getElementById('tyPanel1Content');
 var tyAmbientStage = document.getElementById('tyAmbientStage');
-var blossomDivider = document.getElementById('blossomDivider');
-var quoteLine = document.getElementById('quoteLine');
 var tyReceiptBtn = document.getElementById('tyReceiptBtn');
 var tyReceiptBtnLabel = document.getElementById('tyReceiptBtnLabel');
 
@@ -6481,9 +6479,7 @@ function returnToTable() {
     finished = true;
     receiptScreen.removeEventListener('transitionend', onFade);
     tyAmbientStage.classList.remove('shown');
-    quoteLine.classList.remove('shown', 'leaving');
-    quoteLine.textContent = '';
-    blossomDivider.innerHTML = '';
+    QuoteWindow.reset();
     tyReceiptBtn.classList.remove('shown');
     currentPanel = totalPanels - 1;
     track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
@@ -7346,8 +7342,7 @@ function exitTyToQuotes() {
   tyCarousel.classList.add('hidden-out');
   tyPushTimeout(function() {
     tyAmbientStage.classList.add('shown');
-    buildBlossomDivider();
-    startQuoteCycle();
+    startQuoteCycle(0);
   }, 700);
 }
 var tyStartX = 0, tyStartY = 0, tyCurrentX = 0;
@@ -7480,71 +7475,622 @@ window.addEventListener('mouseup', function() {
   else goToTyPanel(tyCurrentPanel);
 });
 
-/* ============ QUOTES + BLOSSOMS ============ */
-var BLOSSOM_COUNT = 10;
-var BLOSSOM_INTERVAL = 1000;
-var QUOTE_FADE = 1500;
+/* ============ QUOTES ============ */
 var tyTimers = [];
 var tyIntervals = [];
-var currentQuoteIndex = 0;
+
+/* ============ QUOTES IN THE ROUND WINDOW ============
+   Shown when she swipes past the last thank-you message. A round
+   window with the faint ring, a gradient countdown that ends in a
+   water-drop head, and three ripples on the 4-second breath. The
+   words sit inside it, one quote at a time, and change on their own
+   when the countdown completes.
+
+   The ring, the countdown and the ripples are drawn on two canvases,
+   once per animation frame (a single layer each, so nothing can seam
+   or cut off). The numbers in QW are the settings chosen in
+   quotes-preview.html. Nothing here touches the sound: the ambient
+   music keeps playing exactly as it does on every other screen.
+
+   Public: QuoteWindow.start(index), .stop(), .reset(), .index() */
+var QuoteWindow = (function() {
+  var QW = {
+    size: 500, band: 10, soft: 4, track: 0.8,
+    bodyW: 12, headW: 18, neck: 110, head: true,
+    tail: 280, taper: 2.7, startFade: 58,
+    bloom: true, fadeBack: 1400, ripReach: 1.4,
+    seconds: 10, fade: 1600, align: true,
+    maxSize: 44, minSize: 25, fit: 0.82,
+    dprCap: 1.5,
+    cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
+    cHalo: '#E0705F', cFloret: '#D9453A'
+  };
+  var v = QW;
+
+  var stage = document.getElementById('tyAmbientStage');
+  var inner = stage ? stage.querySelector('.ty-ambient-inner') : null;
+  var win = document.getElementById('quoteWindow');
+  var ringCv = document.getElementById('quoteRingCanvas');
+  var ripCv = document.getElementById('quoteRippleCanvas');
+  var quoteLine = document.getElementById('quoteLine');
+  var countEl = document.getElementById('quoteCount');
+  var softGlow = win ? win.querySelector('.soft-glow') : null;
+  if (!stage || !win || !ringCv || !ripCv || !quoteLine) {
+    return { start: function() {}, stop: function() {}, reset: function() {}, index: function() { return 0; } };
+  }
+  var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var BREATH = 4000, PEAK = 1440;           /* main.css glowBreath: 4s, peak at 36% */
+
+  var S = { pos: 0, D: 1, prog: 0, rate: 1, t0: 0, phase: 'idle', nextPos: null, lastSec: -1 };
+
+  /* Colour helpers: #rrggbb → [r, g, b], blends between two colours,
+     and rgba() strings. */
+  function rgbOf(hex) {
+    var h = String(hex).replace('#', '');
+    if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
+    return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+  }
+  function blend(a, b, t) {
+    var x = rgbOf(a), y = rgbOf(b);
+    return [0, 1, 2].map(function (i) { return Math.round(x[i] + (y[i] - x[i]) * t); });
+  }
+  function rgba(c, alpha) {
+    var x = Array.isArray(c) ? c : rgbOf(c);
+    return 'rgba(' + x[0] + ', ' + x[1] + ', ' + x[2] + ', ' + alpha + ')';
+  }
+
+  var ringCtx = ringCv.getContext('2d');
+  var ripCtx = ripCv.getContext('2d');
+  var CV = { key: '', S: 0, dpr: 1, RS: 0 };
+  var COL = { start: [0, 0, 0], end: [0, 0, 0], ring: [255, 255, 255], rip: [255, 255, 255] };
+  var PASSES = 5;
+  var DEG = Math.PI / 180;
+  var breathOrigin = 0;
+  var prevSweep = null;
+  var finalCv = document.createElement('canvas');
+  var finalCtx = finalCv.getContext('2d');
+
+  function canvasPad() { return Math.ceil(+v.headW * 1.9 + 14); }
+
+  function cacheColours() {
+    COL.start = rgbOf(v.cStart);
+    COL.end = rgbOf(v.cEnd);
+    COL.ring = rgbOf(v.cRing);
+    COL.rip = blend(v.cRing, v.cHalo, 0.5);
+  }
+  function rgbaA(c, a) { return 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', ' + a + ')'; }
+  function lerpC(a, b, t) { return [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); }); }
+  function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+  /* Alpha of pass p so the stack builds evenly to `total` at the core. */
+  function stepAlpha(p, total) { return (total / PASSES) / (1 - total * p / PASSES); }
+
+  function sizeCanvases() {
+    var D = +v.size;
+    var S = D + 2 * canvasPad();
+    var dpr = Math.min(+v.dprCap, window.devicePixelRatio || 1);
+    var RS = Math.ceil(D * v.ripReach + 20);
+    var key = [S, dpr, RS].join();
+    if (key === CV.key) return;
+    CV = { key: key, S: S, dpr: dpr, RS: RS };
+    ringCv.width = ringCv.height = finalCv.width = finalCv.height = Math.round(S * dpr);
+    ringCv.style.width = ringCv.style.height = S + 'px';
+    ringCv.style.margin = (-S / 2) + 'px 0 0 ' + (-S / 2) + 'px';
+    ripCv.width = ripCv.height = RS;
+    ripCv.style.width = ripCv.style.height = RS + 'px';
+    ripCv.style.margin = (-RS / 2) + 'px 0 0 ' + (-RS / 2) + 'px';
+  }
+
+  /* The faint ring that is always there. */
+  function drawTrack(ctx, cx, cy) {
+    var R = v.size / 2, T = +v.band, Rc = R - T / 2;
+    var k = Math.min(0.9, 2 * v.soft / T);
+    ctx.fillStyle = rgbaA(COL.ring, 1);
+    for (var p = 0; p < PASSES; p++) {
+      var half = T / 2 * (1 - k * p / PASSES);
+      ctx.globalAlpha = stepAlpha(p, +v.track);
+      ctx.beginPath();
+      ctx.arc(cx, cy, Rc + half, 0, 2 * Math.PI);
+      ctx.arc(cx, cy, Rc - half, 0, 2 * Math.PI, true);
+      ctx.fill();
+    }
+  }
+
+  /* One countdown: the arc from the top round to the head. frac is how
+     far round (0 to 1); alpha fades the whole thing.
+
+     One continuous shape, shaped like a water drop falling forwards: a
+     round bulb at the front, then sides that curve in (a smooth S-curve)
+     and level out into the line, so the head and the line are one piece.
+     The line keeps one thickness all the way back and never narrows to
+     a point; instead its colour fades to nothing (alpha) behind the head
+     and in from nothing at the top. */
+  function drawSweep(ctx, cx, cy, frac, alpha) {
+    var R = v.size / 2, T = +v.band, Rc = R - T / 2;
+    var phi = frac * 360;
+    if (phi < 0.5 || alpha <= 0.002) return;
+    var hb = +v.bodyW / 2;                                   /* half the line's thickness */
+    var r = v.head ? Math.max(hb, +v.headW / 2) : hb;        /* the bulb's radius */
+    var Lt = v.head ? Math.max(10, +v.neck) : 10;            /* length of the taper */
+    var pxDeg = Rc * DEG;                                    /* pixels along the ring per degree */
+    var sMax = phi * pxDeg;
+
+    /* Where the bulb's circle hands over to the taper. Past the widest
+       point by `al`, the taper starts with the circle's own slope, so
+       there is no corner. `al` is the largest angle that still lets the
+       curve slide down to the line without dipping below it. */
+    var lo = 0, hi = 80 * DEG, al = 0, k;
+    if (r > hb + 0.01) {
+      for (k = 0; k < 24; k++) {
+        al = (lo + hi) / 2;
+        if (Math.tan(al) * Lt > 2.5 * (r * Math.cos(al) - hb)) hi = al; else lo = al;
+      }
+      al = lo;
+    }
+    var phi0 = Math.PI / 2 + al;
+    var d0 = r * (1 - Math.cos(phi0)), h0 = r * Math.sin(phi0), m0 = -Math.tan(al);
+
+    var ss = [], ww = [], i, s;
+    function put(d, h) { if (d > sMax) { d = sMax; h = hb; } ss.push(d); ww.push(2 * h); }
+    for (i = 0; i <= 24; i++) {                              /* the round front of the bulb */
+      var f = phi0 * i / 24;
+      put(r * (1 - Math.cos(f)), r * Math.sin(f));
+    }
+    for (i = 1; i <= 24; i++) {                              /* the taper: a cubic that meets the circle's slope and levels out at the line */
+      var t = i / 24, t2 = t * t, t3 = t2 * t;
+      put(d0 + Lt * t, (2 * t3 - 3 * t2 + 1) * h0 + (t3 - 2 * t2 + t) * Lt * m0 + (-2 * t3 + 3 * t2) * hb);
+    }
+    for (s = d0 + Lt + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s, hb);
+    put(sMax, hb);
+    var N = ss.length - 1;
+
+    /* Colour by angle (start → end) and alpha along the ring. */
+    var grad = ctx.createConicGradient ? ctx.createConicGradient(-Math.PI / 2, cx, cy) : null;
+    if (grad) {
+      var L = +v.tail, SFd = +v.startFade, M = 48;
+      for (i = 0; i <= M; i++) {
+        var u = phi * i / M;
+        var t = Math.min(1, (phi - u) / L);
+        var al = Math.pow(1 - t, v.taper) * smooth(u / SFd);
+        grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), al));
+      }
+    }
+    ctx.fillStyle = grad || rgbaA(lerpC(COL.start, COL.end, frac), 1);
+    for (var p = 0; p < PASSES; p++) {
+      var inset = v.soft * p / PASSES * 2;         /* soft edge: each pass is a little narrower */
+      ctx.globalAlpha = stepAlpha(p, alpha);
+      ctx.beginPath();
+      for (i = 0; i <= N; i++) {
+        var a = (phi - ss[i] / pxDeg - 90) * DEG, r = Rc + Math.max(0, ww[i] - inset) / 2;
+        if (i === 0) ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        else ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+      }
+      for (i = N; i >= 0; i--) {
+        var b = (phi - ss[i] / pxDeg - 90) * DEG, q = Rc - Math.max(0, ww[i] - inset) / 2;
+        ctx.lineTo(cx + q * Math.cos(b), cy + q * Math.sin(b));
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  /* The finished ring, drawn once into its own canvas so it can fade as
+     one picture (nothing in it can fade before anything else). */
+  function snapshotFinal() {
+    var c = finalCtx;
+    c.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
+    c.globalAlpha = 1;
+    c.clearRect(0, 0, CV.S, CV.S);
+    drawSweep(c, CV.S / 2, CV.S / 2, 1, 1);
+    c.globalAlpha = 1;
+  }
+
+  /* The soft ring of light released at the top when a countdown ends. */
+  function drawBloom(ctx, cx, cy, p) {
+    var R = v.size / 2, Rc = R - v.band / 2;
+    var e = 1 - Math.pow(1 - p, 3);
+    var r = v.headW / 2 * (0.8 + 2.8 * e);
+    var a = 0.5 * (1 - p) * (1 - p);
+    var x = cx, y = cy - Rc;
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, rgbaA(COL.end, a));
+    g.addColorStop(0.5, rgbaA(COL.end, a * 0.5));
+    g.addColorStop(1, rgbaA(COL.end, 0));
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, 2 * Math.PI);
+    ctx.fill();
+  }
+
+  function drawRing(now) {
+    var ctx = ringCtx, cs = CV.S, cx = cs / 2, cy = cs / 2;
+    ctx.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.clearRect(0, 0, cs, cs);
+    drawTrack(ctx, cx, cy);
+    if (prevSweep) {
+      var age = now - prevSweep.t, fb = v.fadeBack * 1000;
+      if (age >= Math.max(fb, 1200)) {
+        prevSweep = null;
+      } else {
+        var a = 1 - smooth(age / fb);
+        if (a > 0.003) {
+          ctx.globalAlpha = a;
+          ctx.drawImage(finalCv, 0, 0, cs, cs);
+          ctx.globalAlpha = 1;
+        }
+        if (v.bloom && age < 1200) drawBloom(ctx, cx, cy, age / 1200);
+      }
+    }
+    if (S.phase !== 'idle') {
+      var e = smooth((now - S.t0) / 450);
+      drawSweep(ctx, cx, cy, Math.max(0, Math.min(1, S.prog / S.D)), e);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* cubic-bezier easing, the same curve main.css uses for ring ripples. */
+  function bezierEase(x1, y1, x2, y2) {
+    return function (x) {
+      if (x <= 0) return 0;
+      if (x >= 1) return 1;
+      var t = x;
+      for (var i = 0; i < 6; i++) {
+        var cxv = 3 * x1 * t * (1 - t) * (1 - t) + 3 * x2 * t * t * (1 - t) + t * t * t - x;
+        var dx = 3 * x1 * (1 - t) * (1 - t) + 6 * (x2 - x1) * t * (1 - t) + 3 * (1 - x2) * t * t;
+        if (Math.abs(dx) < 1e-6) break;
+        t -= cxv / dx;
+      }
+      t = Math.max(0, Math.min(1, t));
+      return 3 * y1 * t * (1 - t) * (1 - t) + 3 * y2 * t * t * (1 - t) + t * t * t;
+    };
+  }
+  var rippleEase = bezierEase(0.15, 0.55, 0.3, 1);
+  var RIPPLE_DELAYS = [1290, 2990, 690];   /* ms, as in main.css */
+  var RIPPLE_STROKES = [[4.5, 0.14], [3, 0.24], [1.5, 0.62]];   /* [width, share of the alpha], soft */
+
+  /* The halo's own animation is the clock for the 4s breath, so the
+     ripples leave exactly as the halo peaks. */
+  function syncBreath() {
+    var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].animationName === 'glowBreath' && list[i].currentTime != null) {
+        breathOrigin = (document.timeline.currentTime || performance.now()) - list[i].currentTime;
+        return;
+      }
+    }
+  }
+
+  function drawRipples(now) {
+    var ctx = ripCtx, RS = CV.RS;
+    ctx.clearRect(0, 0, RS, RS);
+    if (reduced) return;
+    var R = v.size / 2, c = RS / 2;
+    var ph = (((now - breathOrigin) % BREATH) + BREATH) % BREATH;
+    for (var k = 0; k < 3; k++) {
+      var tau = ((((ph - RIPPLE_DELAYS[k]) % BREATH) + BREATH) % BREATH) / BREATH;
+      var e = rippleEase(tau);
+      var a = 0.9 * (1 - e);
+      if (a < 0.01) continue;
+      var r = R * (1 + (v.ripReach - 1) * e);
+      for (var s = 0; s < RIPPLE_STROKES.length; s++) {
+        ctx.lineWidth = RIPPLE_STROKES[s][0];
+        ctx.strokeStyle = rgbaA(COL.rip, a * RIPPLE_STROKES[s][1]);
+        ctx.beginPath();
+        ctx.arc(c, c, r, 0, 2 * Math.PI);
+        ctx.stroke();
+      }
+    }
+  }
+
+
+  /* Where the 4s breath is right now, so the new quote lands with the
+     ring ripples. */
+  function breathPhase() {
+    var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i].animationName === 'glowBreath' && list[i].currentTime != null) {
+        return list[i].currentTime % BREATH;
+      }
+    }
+    return null;
+  }
+  function quoteLength() {
+    var N = v.seconds * 1000;
+    if (!v.align) return N;
+    var p = breathPhase();
+    if (p === null) return N;
+    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
+    if (shift > BREATH / 2) shift -= BREATH;      /* nearest peak, ±2s */
+    return N + shift;
+  }
+
+  /* Fit the words inside the ring: the largest size whose text box (the
+     actual text, measured with a Range) has its corners inside the
+     circle. Binary search, so a new quote costs a handful of measures. */
+  var range = document.createRange();
+  function fitText() {
+    var R = v.size / 2 * v.fit;
+    var max = +v.maxSize, min = Math.min(+v.minSize, max);
+    function ok(size) {
+      quoteLine.style.fontSize = size + 'px';
+      range.selectNodeContents(quoteLine);
+      var box = range.getBoundingClientRect();
+      return Math.hypot(box.width / 2, box.height / 2) <= R;
+    }
+    if (ok(max)) return;
+    if (!ok(min)) { quoteLine.style.fontSize = min + 'px'; return; }
+    var lo = min, hi = max;
+    while (hi - lo > 1) {
+      var mid = (lo + hi) >> 1;
+      if (ok(mid)) lo = mid; else hi = mid;
+    }
+    quoteLine.style.fontSize = lo + 'px';
+  }
+
+  /* Split a quote into phrases so a line only ever breaks between
+     phrases, never inside a word. Intl.Segmenter finds the Japanese
+     words; small hiragana words (particles and endings such as が, に,
+     ます, という) join the word before; honorific お / ご joins the
+     word after; 、 and 。 stay with the word before and always allow
+     a break after them. */
+  var HIRA = /^[぀-ゟ]+$/;
+  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
+  var OPEN = /^[（(「『]+$/;
+  var STOPS = /[、。，．！？!?]/;
+  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+  function phraseUnits(text) {
+    var segs = [];
+    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
+    else segs = Array.from(text);
+    var units = [], cur = '', force = false, open = '';
+    segs.forEach(function (sg) {
+      /* An opening bracket, or an honorific お / ご, belongs to the word after it. */
+      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
+      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
+      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
+      if (cur !== '' && !join) { units.push(cur); cur = ''; }
+      cur += open + sg; open = ''; force = false;
+    });
+    if (cur) units.push(cur);
+    return units;
+  }
+
+  /* How many characters are on each line (or column, for 縦書き). */
+  function lineCounts() {
+    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
+    for (var i = 0; i < units.length; i++) {
+      var r = units[i].getBoundingClientRect();
+      var key = v.vertical ? r.left : r.top, tol = (v.vertical ? r.width : r.height) * 0.5;
+      var row = null;
+      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
+      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
+      row.n += Array.from(units[i].textContent).length;
+    }
+    return rows.map(function (x) { return x.n; });
+  }
+
+  /* Fit the words, and make sure no line is left with just one or two
+     characters: if one is, narrow the text box a little (so the lines
+     balance differently) and fit again. */
+  function fitAndBalance() {
+    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
+    var base = v.vertical ? Math.round(v.size * 0.66) : Math.round(v.size * 0.8);
+    var prop = v.vertical ? 'maxHeight' : 'maxWidth';
+    for (var k = 0; k < tries.length; k++) {
+      quoteLine.style[prop] = Math.round(base * tries[k]) + 'px';
+      fitText();
+      var c = lineCounts();
+      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
+    }
+    quoteLine.style[prop] = base + 'px';
+    fitText();
+  }
+
+  function renderText(text) {
+    quoteLine.textContent = '';
+    quoteLine.style.maxWidth = quoteLine.style.maxHeight = '';
+    quoteLine.classList.toggle('ink', v.ink > 0);
+    quoteLine.classList.toggle('vertical', !!v.vertical);
+    var units = phraseUnits(text), idx = 0;
+    units.forEach(function (u, ui) {
+      var span = document.createElement('span');
+      span.className = 'quote-unit';
+      if (v.ink > 0) {
+        Array.from(u).forEach(function (ch) {
+          var c = document.createElement('span');
+          c.className = 'quote-char';
+          c.style.setProperty('--i', idx++);
+          c.textContent = ch;
+          span.appendChild(c);
+        });
+      } else {
+        span.textContent = u;
+      }
+      quoteLine.appendChild(span);
+      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
+    });
+    fitAndBalance();
+  }
+
+  function showQuote(pos) {
+    var lines = AMBIENT_LINES, n = lines.length;
+    if (!n) return;
+    S.pos = ((pos % n) + n) % n;
+    quoteIdx = S.pos;
+    quoteLine.classList.remove('shown', 'leaving');
+    renderText(lines[S.pos]);
+    void quoteLine.offsetWidth;
+    quoteLine.classList.add('shown');
+    var now = performance.now();
+    /* The countdown that just completed stays as a full ring, blooms and
+       fades back while the next one starts from the top. */
+    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
+    S.D = Math.max(1000, quoteLength());
+    S.prog = 0;
+    S.rate = 1;
+    S.t0 = now;
+    S.phase = 'showing';
+    if (countEl) countEl.textContent = (S.pos + 1) + ' / ' + n;
+    floretOnRing();
+  }
+
+  function startLeaving() {
+    S.phase = 'leaving';
+    quoteLine.classList.remove('shown');
+    quoteLine.classList.add('leaving');
+  }
+
+
+  /* One 金木犀 floret drifts down and settles on the lower half of the
+     ring each time a quote arrives, then floats a moment and fades. */
+  var floretBox = document.getElementById('quoteFloretLayer');
+  var FLORET_CENTRE = 'rgb(' + blend(v.cFloret, '#5A1A00', 0.4).join(', ') + ')';
+  function floretSvg() {
+    return '<svg viewBox="-7 -7 14 14" width="14" height="14">' +
+      '<g fill="' + v.cFloret + '"><circle cx="0" cy="-3" r="2.9"/><circle cx="3" cy="0" r="2.9"/>' +
+      '<circle cx="0" cy="3" r="2.9"/><circle cx="-3" cy="0" r="2.9"/></g>' +
+      '<circle r="1.5" fill="' + FLORET_CENTRE + '"/></svg>';
+  }
+  function floretOnRing() {
+    if (!floretBox || reduced) return;
+    var r = win.getBoundingClientRect();
+    var cx = r.left + r.width / 2, cy = r.top + r.height / 2, R = r.width / 2;
+    var a = (25 + Math.random() * 130) * Math.PI / 180;
+    var x1 = cx + R * Math.cos(a) - 7, y1 = cy + R * Math.sin(a) - 7;
+    var f = document.createElement('div');
+    f.className = 'kinmokusei-floret';
+    f.innerHTML = floretSvg();
+    floretBox.appendChild(f);
+    florets.push(f);
+    var W = window.innerWidth;
+    var x0 = Math.min(W - 30, Math.max(30, x1 + (Math.random() * 160 - 80)));
+    var s = 0.8 + Math.random() * 0.5, r0 = Math.random() * 360, sway = 22 + Math.random() * 18;
+    var steps = [];
+    for (var i = 0; i <= 6; i++) {
+      var t = i / 6;
+      var x = x0 + (x1 - x0) * t + Math.sin(t * Math.PI * 3) * sway * (1 - t * 0.6);
+      var y = -20 + (y1 + 20) * t;
+      steps.push({
+        transform: 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) rotate(' + (r0 + t * 220).toFixed(0) + 'deg) scale(' + s.toFixed(2) + ')',
+        opacity: i === 0 ? 0 : 1
+      });
+    }
+    var drop = f.animate(steps, { duration: 4200, easing: 'cubic-bezier(0.3, 0, 0.55, 1)', fill: 'forwards' });
+    drop.onfinish = function() {
+      if (!f.parentNode) return;
+      var end = 'translate(' + (x1 + 10).toFixed(1) + 'px,' + (y1 + 4).toFixed(1) + 'px) rotate(' + (r0 + 250).toFixed(0) + 'deg) scale(' + (s * 0.9).toFixed(2) + ')';
+      var b = f.animate([steps[6], { transform: end, opacity: 0 }], { duration: 6000, easing: 'ease-in', fill: 'forwards' });
+      b.onfinish = function() {
+        if (f.parentNode) f.parentNode.removeChild(f);
+        var k = florets.indexOf(f); if (k >= 0) florets.splice(k, 1);
+      };
+    };
+  }
+
+  /* ---------- the loop ---------- */
+  var rafId = 0, lastNow = 0, frameNo = 0, running = false, startTimer = 0;
+  var quoteIdx = 0;
+  var florets = [];
+
+  function frame() {
+    rafId = requestAnimationFrame(frame);
+    var now = performance.now();
+    var dt = Math.min(100, now - lastNow);
+    lastNow = now;
+    if (S.phase !== 'idle') {
+      S.prog += dt * S.rate;
+      var rem = Math.max(0, S.D - S.prog) / S.rate;
+      if (S.phase === 'showing' && rem <= v.fade) startLeaving();
+      if (S.prog >= S.D && S.phase === 'leaving') showQuote(S.pos + 1);
+    }
+    if ((frameNo++ % 90) === 0) syncBreath();
+    drawRing(now);
+    drawRipples(now);
+  }
+
+  /* Fit the window to the screen: if the screen is short, the whole
+     window (and its counter) shrinks a little so it never scrolls. */
+  function fitStage() {
+    if (!inner) return;
+    var k = Math.min(1, (window.innerHeight - 40) / (v.size + 100), (window.innerWidth - 40) / v.size);
+    inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
+  }
+
+  function clearFlorets() {
+    florets.forEach(function(f) { if (f.parentNode) f.parentNode.removeChild(f); });
+    florets = [];
+  }
+
+  function wipe() {
+    quoteLine.classList.remove('shown', 'leaving', 'ink', 'vertical');
+    quoteLine.textContent = '';
+    quoteLine.style.maxWidth = quoteLine.style.maxHeight = '';
+    if (countEl) countEl.textContent = '';
+    S.phase = 'idle';
+    S.prog = 0;
+    prevSweep = null;
+    if (CV.S) {
+      ringCtx.setTransform(1, 0, 0, 1, 0, 0);
+      ringCtx.clearRect(0, 0, ringCv.width, ringCv.height);
+      ripCtx.clearRect(0, 0, ripCv.width, ripCv.height);
+    }
+  }
+
+  function stop() {
+    running = false;
+    if (startTimer) { clearTimeout(startTimer); startTimer = 0; }
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    window.removeEventListener('resize', fitStage);
+    wipe();
+    clearFlorets();
+  }
+
+  function start(index) {
+    stop();
+    quoteIdx = (index || 0);
+    running = true;
+    cacheColours();
+    sizeCanvases();
+    fitStage();
+    window.addEventListener('resize', fitStage);
+    var go = function() {
+      startTimer = 0;
+      if (!running) return;
+      syncBreath();
+      lastNow = performance.now();
+      rafId = requestAnimationFrame(frame);
+      showQuote(quoteIdx);
+    };
+    /* Wait for the fonts so the first quote is fitted to the real
+       letters, and give the stage's fade-in a moment to begin. */
+    var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
+    ready.then(function() { if (running) startTimer = setTimeout(go, 350); });
+  }
+
+  return {
+    start: start,
+    stop: stop,
+    reset: function() { stop(); },
+    index: function() { return quoteIdx; }
+  };
+})();
+
 function clearAllTyTimers() {
   for (var i = 0; i < tyTimers.length; i++) clearTimeout(tyTimers[i]);
   for (var j = 0; j < tyIntervals.length; j++) clearInterval(tyIntervals[j]);
   tyTimers = [];
   tyIntervals = [];
+  /* The quotes window stops with everything else on this screen (going
+     back to the receipt, back to the table). The sound is not touched. */
+  if (typeof QuoteWindow !== 'undefined') QuoteWindow.stop();
 }
 function tyPushTimeout(fn, ms) {
   var id = setTimeout(fn, ms);
   tyTimers.push(id);
   return id;
 }
-function buildBlossomDivider() {
-  blossomDivider.innerHTML = '';
-  for (var b = 0; b < BLOSSOM_COUNT; b++) {
-    var mark = document.createElement('span');
-    mark.className = 'blossom-mark';
-    mark.textContent = '❀';
-    blossomDivider.appendChild(mark);
-  }
-}
-function resetBlossomDivider() {
-  var els = blossomDivider.querySelectorAll('.blossom-mark');
-  for (var i = 0; i < els.length; i++) {
-    els[i].classList.remove('appeared');
-    els[i].classList.add('resetting');
-  }
-}
-function startQuoteCycle() { showQuote(0); }
-function showQuote(index) {
-  currentQuoteIndex = index;
-  var text = AMBIENT_LINES[index % AMBIENT_LINES.length];
-  buildBlossomDivider();
-  quoteLine.textContent = text;
-  quoteLine.classList.remove('shown', 'leaving');
-  void quoteLine.offsetWidth;
-  quoteLine.classList.add('shown');
-  tyPushTimeout(function() {
-    var els = blossomDivider.querySelectorAll('.blossom-mark');
-    var current = 0;
-    els[0].classList.add('appeared');
-    current = 1;
-    var interval = setInterval(function() {
-      if (current < BLOSSOM_COUNT) {
-        els[current].classList.add('appeared');
-        current += 1;
-      } else {
-        clearInterval(interval);
-        tyPushTimeout(function() {
-          quoteLine.classList.remove('shown');
-          quoteLine.classList.add('leaving');
-          resetBlossomDivider();
-          tyPushTimeout(function() { showQuote((index + 1) % AMBIENT_LINES.length); }, QUOTE_FADE);
-        }, 1000);
-      }
-    }, BLOSSOM_INTERVAL);
-    tyIntervals.push(interval);
-  }, 400);
-}
+function startQuoteCycle(index) { QuoteWindow.start(index || 0); }
 
 /* ============ THANK-YOU SEQUENCE ============ */
 function startThankyouSequence() {
@@ -7558,9 +8104,7 @@ function startThankyouSequence() {
   tyCarousel.classList.remove('hidden-out');
   tyDotsEl.classList.remove('hidden');
   tyAmbientStage.classList.remove('shown');
-  quoteLine.classList.remove('shown', 'leaving');
-  quoteLine.textContent = '';
-  blossomDivider.innerHTML = '';
+  QuoteWindow.reset();
   tyReceiptBtn.classList.add('shown');
   tyCurrentPanel = 0;
   tyTrack.style.transform = 'translateX(0%)';
@@ -7574,7 +8118,7 @@ function resumeThankyouSequence() {
   tyReceiptBtn.classList.add('shown');
   if (tyExited) {
     tyAmbientStage.classList.add('shown');
-    showQuote(currentQuoteIndex);
+    startQuoteCycle(QuoteWindow.index());
   } else {
     updateTySwipeHint();
   }
