@@ -2767,42 +2767,38 @@
   .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
   @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
   .blossom-mark.resetting { opacity: 0; transform: scale(0.4); filter: blur(4px); animation: none; transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
-  .quote-wrap { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; width: 100%; padding: 0 8px; }
-  .quote-line { font-family: "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 26px; font-weight: 500; color: var(--quote-color); line-height: 2.1; letter-spacing: 3px; opacity: 0; transform: translateY(24px) scale(0.96); filter: blur(12px); transition: opacity 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.5s cubic-bezier(0.25, 0.46, 0.45, 0.94); word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; text-shadow: var(--quote-shadow); }
-  .quote-line.shown { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  .quote-line.leaving { opacity: 0; transform: translateY(-24px) scale(1.02); filter: blur(12px); }
 
   /* ============================================================
-     QUOTES IN THE ROUND WINDOW (丸窓)
-     Shown after the last thank-you message. Tuned in
-     quotes-preview.html; these are the chosen settings.
+     GAMES IN THE ROUND WINDOW (丸窓) — ポン
+     Shown after the last thank-you message, in place of the quotes.
+     Tuned in games-preview.html; these are the chosen settings.
 
-     The faint ring, the gradient countdown with its water-drop head
-     and the three ripples are drawn on the two canvases by
-     QuoteWindow in app.js, once per frame. Everything else is here:
-     the halo, the pond, and the words. The selectors are scoped to
-     .quote-window, so the older .quote-line rules above only supply
-     the base (weight, line breaking, glow) and these win.
+     The faint ring, the countdown (the round's clock), the ripples
+     and the game itself are drawn on three canvases by GameWindow in
+     app.js, once per frame. Everything else is here: the halo, the
+     pond, the scores, the button and the instructions.
      ============================================================ */
-  .thankyou-screen .ty-ambient-stage { overflow: hidden; padding: 0 20px; }
+  .thankyou-screen .ty-ambient-stage {
+    overflow: hidden; padding: 0 20px;
+    /* Every touch on the stage goes to the game: the paddles follow the finger. */
+    touch-action: none; -webkit-user-select: none; user-select: none;
+  }
   .ty-ambient-inner { transform-origin: 50% 50%; }
 
-  /* The window: 500px across. */
+  /* The window: 610px across. */
   .icon-wrapper.quote-window {
-    width: 500px;
-    height: 500px;
+    width: 610px;
+    height: 610px;
     margin: 0;
     flex: none;
-    --quote-color: #A3282A;
   }
 
   /* Halo: the ring colour at the rim, warming into the glow colour as it
      fades out, reaching 1.45x the ring radius. Breathes on the same 4s
-     breath as the start screen (the ripples and the quote changes follow
-     it). */
+     breath as the start screen (the ripples follow it). */
   .quote-window .soft-glow {
-    width: 726px; height: 726px;
-    margin-top: -363px; margin-left: -363px;
+    width: 886px; height: 886px;
+    margin-top: -443px; margin-left: -443px;
     background: radial-gradient(circle closest-side,
       rgba(255, 253, 249, 0) 0%,
       rgba(255, 253, 249, 0) 65.99%,
@@ -2816,10 +2812,10 @@
     animation: glowBreath 4s linear infinite;
   }
 
-  /* Water inside the window: the pond light keeps drifting behind the words. */
+  /* Water inside the window: the pond light keeps drifting behind the game. */
   .quote-window .pond-surface {
-    width: 480px; height: 480px;
-    margin: -240px 0 0 -240px;
+    width: 586px; height: 586px;
+    margin: -293px 0 0 -293px;
     opacity: 0.7;
   }
 
@@ -2827,102 +2823,112 @@
   .ty-ambient-stage:not(.shown) .quote-window .soft-glow,
   .ty-ambient-stage:not(.shown) .quote-window .pond-caustic { animation-play-state: paused; }
 
-  /* The two canvases. app.js sets each one's width, height and negative
+  /* The three canvases. app.js sets each one's width, height and negative
      margins (half its size) so it is centred on the window. The ring sits
-     above the pond and below the words. */
+     above the pond, the scores above the ring, the game above everything. */
   .quote-ring-canvas,
-  .quote-ripple-canvas {
+  .quote-ripple-canvas,
+  .game-canvas {
     position: absolute;
     left: 50%;
     top: 50%;
     pointer-events: none;
   }
   .quote-ring-canvas { z-index: 1; }
+  .game-canvas { z-index: 3; }
 
-  /* Words: centred inside the ring. app.js sets font-size per quote so
-     the text always fits; the size here is only the starting point. */
-  .quote-window .quote-wrap {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    min-height: 0;
-    padding: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  /* The scores, the button and the instructions, in the middle of the ring.
+     app.js sets the font size from the ring size (3.4% of it); everything
+     else is in em. Three rows: the top and bottom rows are always the same
+     height, so the middle row (the button) sits exactly at the centre of the
+     ring with the same gap (3em) above and below. The scores hang down from
+     the top row and the instructions from the bottom row. */
+  .game-wrap {
+    position: absolute; inset: 0; z-index: 2;
+    display: flex; align-items: center; justify-content: center;
   }
-  .quote-window .quote-line {
-    font-family: "Zen Antique", "Yuji Syuku", "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    color: var(--quote-color);
-    width: fit-content;
-    text-align: center;
-    max-width: 400px;
-    font-size: 44px;
-    letter-spacing: 4px;
-    line-height: 1.4;
-    transform: translateY(12px) scale(0.98);
-    filter: blur(10px);
-    transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                transform 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                filter 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  }
-  .quote-unit { display: inline-block; white-space: nowrap; }
-  .quote-window .quote-line.shown { transform: none; filter: none; opacity: 1; }
-  .quote-window .quote-line.leaving {
-    opacity: 0;
-    transform: translateY(-12px) scale(1.01);
-    filter: blur(10px);
-  }
-
-  /* Ink: each character fades in and settles a few pixels, 70ms apart,
-     like a brush working across the paper. Only opacity and transform
-     change, so it stays light. The line itself only fades when it leaves. */
-  .quote-window .quote-line.ink,
-  .quote-window .quote-line.ink.shown {
-    opacity: 1;
-    transform: none;
-    filter: none;
-  }
-  .quote-window .quote-line.ink.leaving {
-    opacity: 0;
-    transform: translateY(-10px);
-    filter: blur(10px);
-  }
-  .quote-char {
-    display: inline-block;
-    opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-                transform 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-    transition-delay: calc(var(--i) * 70ms);
-  }
-  .quote-line.ink.shown .quote-char,
-  .quote-line.ink.leaving .quote-char {
-    opacity: 1;
-    transform: none;
-  }
-  .quote-line.ink.leaving .quote-char { transition: none; }
-
-  /* Under the window: quiet and small, never competing with the words. */
-  .quote-meta {
-    position: relative;
-    z-index: 3;
-    margin-top: 40px;
+  .game-score {
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    font-size: 13px;
-    letter-spacing: 3px;
-    color: var(--text-mute);
+    color: #A3282A; text-align: center; letter-spacing: 0.12em; line-height: 1.5;
     font-variant-numeric: tabular-nums;
-    opacity: 0.7;
-    min-height: 20px;
+    text-shadow: 0 0 10px rgba(255, 253, 249, 0.9), 0 0 22px rgba(255, 253, 249, 0.7);
+    height: 100%; display: grid; grid-template-rows: minmax(0, 1fr) auto minmax(0, 1fr);
+    row-gap: 3em; justify-items: center;
   }
+  .game-score .gs-block { align-self: end; }
+  .game-score .gs-row { opacity: 0.8; }
+  .game-score .gs-row.main {
+    font-size: 1.45em; font-weight: 600; opacity: 0.95; white-space: nowrap;
+    /* A soft drop shadow: a tight warm-brown one under the letters and a wider burgundy one. */
+    text-shadow: 0 0.07em 0.09em rgba(68, 52, 48, calc(var(--score-shadow, 0.6) * 0.55)),
+                 0 0.16em 0.42em rgba(136, 46, 71, calc(var(--score-shadow, 0.6) * 0.4));
+  }
+  .game-score .gs-row.main b { display: inline-block; transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1); }
+  .game-score .gs-row.main b.pop { transform: scale(1.25); transition: none; }
+  .game-score .gs-row.time { margin-top: 0.15em; }
+  /* The last seconds: the time turns warm and gently beats. */
+  .game-score .gs-row.time.warn { color: #C8341F; opacity: 1; font-weight: 600; }
+  .game-score .gs-row.time.warn span { display: inline-block; animation: gsBeat 1s ease-out infinite; }
+  @keyframes gsBeat { 0% { transform: scale(1.3); } 60%, 100% { transform: scale(1); } }
+
+  /* The middle row has a fixed height, so whatever it holds, nothing above or
+     below it moves. Before and after a round it holds the button; during a
+     round it is plain text (ボール追加！) or empty. */
+  .game-score .gs-slot {
+    height: 4.4em; margin: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .game-score .gs-btn {
+    -webkit-appearance: none; appearance: none; font: inherit; color: inherit; text-align: center;
+    background: none; border: 0; padding: 0; margin: 0; cursor: default; pointer-events: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .game-score .gs-msg { display: block; font-size: 0.9em; color: var(--text-mute); }
+  .game-score .gs-msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
+  /* "Tap here to continue": appears once a tap would be accepted. */
+  .game-score .gs-tap { display: block; margin-top: 0.15em; font-size: 0.7em; letter-spacing: 0.14em; color: var(--text-mute); opacity: 0; transition: opacity 0.8s ease; }
+  .game-score .gs-tap.on { opacity: 0.8; }
+
+  /* The button: a warm gradient from the app's accent colours, a light edge and
+     a soft shadow, the same size whatever it says. After a round it shows at
+     once but stays dimmed until a tap counts. */
+  .game-score .gs-btn.is-btn {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-width: 12.8em; min-height: 4em;
+    padding: 0.5em 1.7em 0.55em; border-radius: 1.7em;
+    background: linear-gradient(180deg, var(--accent, #E66826) 0%, var(--accent-2, #C44E10) 100%);
+    border: 1px solid rgba(255, 253, 249, 0.6);
+    box-shadow: 0 0.3em 0.75em rgba(158, 59, 6, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    opacity: 0.55; transition: opacity 0.6s ease, transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  .game-score .gs-btn.is-btn .gs-msg { font-size: 1.15em; color: #FFFDF9; text-shadow: 0 1px 2px rgba(110, 40, 0, 0.4); }
+  .game-score .gs-btn.is-btn .gs-tap { color: rgba(255, 253, 249, 0.92); text-shadow: 0 1px 2px rgba(110, 40, 0, 0.35); }
+  .game-score .gs-btn.is-btn .gs-tap.on { opacity: 1; }
+  .game-score .gs-btn.is-btn.live { opacity: 1; cursor: pointer; pointer-events: auto; animation: gsBtnGlow 2.4s ease-in-out infinite; }
+  .game-score .gs-btn.is-btn.live:active {
+    animation: none; transform: translateY(0.1em) scale(0.985);
+    box-shadow: 0 0.1em 0.3em rgba(158, 59, 6, 0.4), inset 0 1px 3px rgba(110, 40, 0, 0.35);
+  }
+  @keyframes gsBtnGlow {
+    0%, 100% { box-shadow: 0 0.3em 0.75em rgba(158, 59, 6, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+    50%      { box-shadow: 0 0.35em 1.1em rgba(230, 104, 38, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.4); }
+  }
+
+  /* How to play, under the button. app.js sets the size (the longest line fills
+     66% of the ring, never below 13px), the line height (2) and a small nudge
+     that keeps the button exactly halfway between the scores and these lines.
+     They go faint while a round is being played. */
+  .game-score .gs-howto {
+    margin: 0 auto; align-self: start; font-size: 13px; line-height: 2; letter-spacing: 0.08em;
+    width: max-content; max-width: calc(var(--ring, 610px) * 0.94);
+    color: var(--text-mute); transition: opacity 0.8s ease;
+  }
+  .game-score .gs-howto.faint { opacity: 0.35; }
 
   @media (prefers-reduced-motion: reduce) {
-    .quote-char { transition-delay: 0s !important; }
-    .quote-window .quote-line,
-    .quote-window .quote-line.leaving { transform: none !important; }
     .quote-window .soft-glow { animation: none !important; opacity: 0.72 !important; }
     .quote-window .pond-caustic { animation: none !important; }
+    .game-score .gs-btn.is-btn.live { animation: none; }
   }
   .ty-receipt-btn { position: absolute; bottom: 20px; left: 20px; background: transparent; border: none; color: var(--text-mute); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 12px; font-weight: 500; letter-spacing: 2px; padding: 8px 12px; padding-left: calc(12px + env(safe-area-inset-left, 0px)); border-radius: 16px; cursor: pointer; opacity: 0; transition: opacity 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94), background 0.2s ease, color 0.2s ease; -webkit-appearance: none; appearance: none; white-space: nowrap; z-index: 30; pointer-events: none; display: inline-flex; align-items: center; gap: 6px; }
   .ty-receipt-btn.shown { opacity: 0.75; pointer-events: auto; }
@@ -2956,8 +2962,6 @@
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
     .ty-panel { padding: 80px 32px 130px 32px; }
     .ty-ambient-stage { padding: 100px 32px 130px 32px; }
-    .quote-line { font-size: 34px; letter-spacing: 4px; }
-    .quote-wrap { min-height: 220px; }
     .blossom-mark { font-size: 16px; }
     .blossom-divider { gap: 11px; margin-bottom: 42px; }
     .ty-dots { bottom: 74px; }
@@ -2988,8 +2992,6 @@
     .start-hint-line { font-size: 20px; letter-spacing: 4px; }
     .ty-line { font-size: 22px; }
     .ty-mark { font-size: 30px; }
-    .quote-line { font-size: 40px; letter-spacing: 5px; }
-    .quote-wrap { min-height: 260px; }
     .blossom-mark { font-size: 18px; }
     .blossom-divider { gap: 14px; margin-bottom: 50px; }
     .ty-dots { bottom: 80px; }
@@ -3035,8 +3037,6 @@
     .ty-ambient-stage { padding: 70px 20px 100px 20px; }
     .blossom-divider { gap: 6px; margin-bottom: 18px; height: 18px; }
     .blossom-mark { font-size: 11px; }
-    .quote-line { font-size: 22px; line-height: 1.9; }
-    .quote-wrap { min-height: 120px; }
     .ty-receipt-btn { bottom: 12px; left: 14px; padding: 6px 10px; font-size: 11px; }
     .price-wrap { min-width: 88px; padding: 7px 9px; }
     .summary { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
@@ -3082,8 +3082,6 @@
     .ty-panel { padding: 55px 40px 90px 40px; }
     .ty-panel-inner, .ty-ambient-inner { max-width: 640px; }
     .ty-line { font-size: 16px; line-height: 1.85; }
-    .quote-line { font-size: 22px; letter-spacing: 3px; }
-    .quote-wrap { min-height: 110px; }
     .ty-dots { bottom: 48px; }
     .ty-receipt-btn { bottom: 8px; left: 12px; padding: 6px 10px; font-size: 10.5px; }
     .gift-divider-label { font-size: 14px; letter-spacing: 3px; }
@@ -3940,4 +3938,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v131"; }
+:root { --build: "v132"; }

@@ -1,4 +1,4 @@
-var BUILD = 'v131';
+var BUILD = 'v132';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -2839,23 +2839,6 @@ function loadPresetsFromServer() {
       return PRESETS;
     })
     .catch(function() { return PRESETS; });
-}
-
-/* ============ QUOTES ============ */
-var AMBIENT_LINES = [
-  '静かな時間も、また大切な時間です。',
-  'お茶の香りも、どうぞごゆっくりお楽しみください。',
-  '窓の外の音に、そっと耳を澄ましてみてください。',
-  'どうぞ、心穏やかな時間をお過ごしください。'
-];
-function loadQuotesFromServer() {
-  return fetch('quotes.json')
-    .then(function(r) { if (!r.ok) throw new Error(); return r.json(); })
-    .then(function(data) {
-      if (data && Array.isArray(data.quotes) && data.quotes.length > 0) AMBIENT_LINES = data.quotes.slice();
-      return AMBIENT_LINES;
-    })
-    .catch(function() { return AMBIENT_LINES; });
 }
 
 /* ============ PANEL LOADER ============ */
@@ -5968,7 +5951,6 @@ window.addEventListener('load', function() {
     buildNameScreenRows();
     setTimeout(function() { try { nameInput.focus(); } catch (err) {} }, 300);
   });
-  loadQuotesFromServer();
   loadAllPanels().then(function() {
     repositionHintGroupAfterLayout();
     repositionNumpad();
@@ -6479,7 +6461,7 @@ function returnToTable() {
     finished = true;
     receiptScreen.removeEventListener('transitionend', onFade);
     tyAmbientStage.classList.remove('shown');
-    QuoteWindow.reset();
+    GameWindow.stop();
     tyReceiptBtn.classList.remove('shown');
     currentPanel = totalPanels - 1;
     track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
@@ -7358,7 +7340,7 @@ function goToTyPanel(index) {
   activateTyPanel(tyCurrentPanel);
   updateTySwipeHint();
 }
-function exitTyToQuotes() {
+function exitTyToGames() {
   if (tyExited) return;
   tyExited = true;
   tySwipeHint.classList.remove('shown');
@@ -7366,7 +7348,7 @@ function exitTyToQuotes() {
   tyCarousel.classList.add('hidden-out');
   tyPushTimeout(function() {
     tyAmbientStage.classList.add('shown');
-    startQuoteCycle(0);
+    GameWindow.start();
   }, 700);
 }
 var tyStartX = 0, tyStartY = 0, tyCurrentX = 0;
@@ -7448,7 +7430,7 @@ function tyTouchEnd() {
   var deltaX = tyCurrentX - tyStartX;
   var threshold = tyRefWidth * 0.12;
   if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
-    if (deltaX < -threshold) { exitTyToQuotes(); return; }
+    if (deltaX < -threshold) { exitTyToGames(); return; }
     if (deltaX > threshold && tyCurrentPanel > 0) { goToTyPanel(tyCurrentPanel - 1); return; }
     goToTyPanel(tyCurrentPanel); return;
   }
@@ -7490,7 +7472,7 @@ window.addEventListener('mouseup', function() {
   var deltaX = tyCurrentX - tyStartX;
   var threshold = tyRefWidth * 0.12;
   if (tyCurrentPanel === TY_TOTAL_PANELS - 1) {
-    if (deltaX < -threshold) { exitTyToQuotes(); return; }
+    if (deltaX < -threshold) { exitTyToGames(); return; }
     if (deltaX > threshold && tyCurrentPanel > 0) { goToTyPanel(tyCurrentPanel - 1); return; }
     goToTyPanel(tyCurrentPanel); return;
   }
@@ -7499,56 +7481,109 @@ window.addEventListener('mouseup', function() {
   else goToTyPanel(tyCurrentPanel);
 });
 
-/* ============ QUOTES ============ */
+/* ============ THANK-YOU TIMERS ============ */
 var tyTimers = [];
 var tyIntervals = [];
 
-/* ============ QUOTES IN THE ROUND WINDOW ============
-   Shown when she swipes past the last thank-you message. A round
-   window with the faint ring, a gradient countdown that ends in a
-   water-drop head, and three ripples on the 4-second breath. The
-   words sit inside it, one quote at a time, and change on their own
-   when the countdown completes.
+/* ============ GAMES IN THE ROUND WINDOW (ポン) ============
+   Shown when she swipes past the last thank-you message, in place of
+   the quotes. The same round window (丸窓): the faint ring, the halo,
+   the pond and three ripples on the 4-second breath. Inside it, a
+   one-finger Pong:
 
-   The ring, the countdown and the ripples are drawn on two canvases,
-   once per animation frame (a single layer each, so nothing can seam
-   or cut off). The numbers in QW are the settings chosen in
-   quotes-preview.html. Nothing here touches the sound: the ambient
-   music keeps playing exactly as it does on every other screen.
+     · two curved paddles on the ring, opposite each other, follow the
+       finger (they point where the finger is, anywhere on the screen);
+     · a round lasts 60 seconds, one full turn of the countdown ring;
+     · one point per paddle hit; after every 4 hits in a row another
+       ball joins (up to 5), with a ripple and ボール追加！;
+     · the paddles shrink from 60° to 10° over the first 50 seconds;
+     · the last 10 seconds glow on the ring and tick softly;
+     · the centre shows 現在のスコア / 最高スコア / 残り時間, a button
+       (タッチしてスタート before a round, the result and
+       ここをタップして続ける after one) and short instructions.
+       The button sits exactly at the centre of the ring.
 
-   Public: QuoteWindow.start(index), .stop(), .reset(), .index() */
-var QuoteWindow = (function() {
+   Only the button starts or continues a round, and pressing it does
+   not move the paddles. The top score is kept for this visit only
+   (newVisit() clears it).
+
+   Sound: while the games page is showing, the ambient music, the wind
+   chime and the audio HUD fade out and a short retro (chiptune) loop,
+   さくら散歩, plays instead, the whole time. When she leaves the page
+   (the receipt, back to the table) the game music fades out and the
+   ambient music and the HUD come back. Game sounds go straight to the
+   speakers through their own gain, not through soundMasterGain, so
+   they don't drive the swell analyser.
+
+   The numbers in G and QW are the settings chosen in
+   games-preview.html (“Copy values”).
+
+   Public: GameWindow.start(), .stop(), .newVisit() */
+var GameWindow = (function() {
+  var G = {
+    size: 610,
+    round: 60,                 /* seconds per round: one full turn of the countdown */
+    warnSecs: 10,              /* the last seconds glow and tick */
+    overGuard: 1200,           /* ms after a round ends before the continue button counts */
+    scoreShadow: 0.6,          /* drop shadow under 現在のスコア */
+    howtoFill: 66,             /* instructions: the longest line fills this % of the ring */
+    howtoMin: 13,              /* instructions: never smaller than this (px) */
+    howtoLine: 2,              /* instructions: line height */
+    gapEm: 3,                  /* space between the button and the scores / instructions (em) */
+    volume: 0.35,              /* chimes */
+    musicVol: 0.5,
+    cPaddle: '#725750', cBall: '#E66826',
+    ballSpeed: 220,            /* px/s at the start */
+    speedUp: 15,               /* % per paddle hit */
+    maxSpeed: 770,             /* px/s */
+    ballR: 12,
+    padStart: 60, padMin: 10, shrinkSecs: 50,     /* paddle length (degrees) shrinks over the round */
+    padW: 14,
+    english: 36,               /* edge hits angle the ball by up to this many degrees */
+    respawn: 1.4,              /* s before a new ball moves */
+    trailLen: 85,              /* px of soft trail behind the ball */
+    extraHits: 4,              /* hits in a row for an extra ball */
+    maxBalls: 5
+  };
   var QW = {
-    size: 500, band: 10, soft: 4, track: 0.8,
-    bodyW: 12, headW: 18, neck: 110, head: true,
-    tail: 280, taper: 2.7, startFade: 58,
-    bloom: true, fadeBack: 1.4, ripReach: 1.4,       /* fadeBack is in seconds */
-    seconds: 10, fade: 1600, align: true,
-    maxSize: 44, minSize: 25, fit: 0.82,
+    size: 610, band: 10, soft: 4, track: 0.8,
+    bodyW: 12, headW: 23, neck: 40, head: true,
+    tail: 360, taper: 0.6, startFade: 58,
+    bloom: true, fadeBack: 1.4, ripReach: 1.4,
     dprCap: 1.5,
     cRing: '#FFFDF9', cStart: '#EE9A5C', cEnd: '#B5262B',
     cHalo: '#E0705F'
   };
-  var v = QW;
+  var HOWTO = [
+    '指を置いた方向へ、パドルが動きます',
+    'ボールを輪の外に出さないよう、打ち返しましょう',
+    G.extraHits + '回続けて打ち返すと、ボールが増えます',
+    G.round + '秒で、最高スコアを目指しましょう'
+  ];
 
   var stage = document.getElementById('tyAmbientStage');
   var inner = stage ? stage.querySelector('.ty-ambient-inner') : null;
   var win = document.getElementById('quoteWindow');
   var ringCv = document.getElementById('quoteRingCanvas');
   var ripCv = document.getElementById('quoteRippleCanvas');
-  var quoteLine = document.getElementById('quoteLine');
-  var countEl = document.getElementById('quoteCount');
+  var gameCv = document.getElementById('gameCanvas');
+  var scoreBox = document.getElementById('gameScore');
+  var scoreNowEl = document.getElementById('gameScoreNow');
+  var scoreBestEl = document.getElementById('gameScoreBest');
+  var scoreTimeEl = document.getElementById('gameScoreTime');
+  var btnEl = document.getElementById('gameBtn');
+  var msgEl = document.getElementById('gameMsg');
+  var tapEl = document.getElementById('gameTap');
+  var howEl = document.getElementById('gameHow');
   var softGlow = win ? win.querySelector('.soft-glow') : null;
-  if (!stage || !win || !ringCv || !ripCv || !quoteLine) {
-    return { start: function() {}, stop: function() {}, reset: function() {}, index: function() { return 0; } };
+  if (!stage || !inner || !win || !ringCv || !ripCv || !gameCv || !scoreBox || !btnEl || !howEl || !softGlow) {
+    return { start: function() {}, stop: function() {}, newVisit: function() {} };
   }
   var reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  var BREATH = 4000, PEAK = 1440;           /* main.css glowBreath: 4s, peak at 36% */
+  var BREATH = 4000;
+  var DEG = Math.PI / 180;
 
-  var S = { pos: 0, D: 1, prog: 0, rate: 1, t0: 0, phase: 'idle', nextPos: null, lastSec: -1 };
-
-  /* Colour helpers: #rrggbb → [r, g, b], blends between two colours,
-     and rgba() strings. */
+  /* ---------- colours ---------- */
   function rgbOf(hex) {
     var h = String(hex).replace('#', '');
     if (h.length === 3) h = h.replace(/(.)/g, '$1$1');
@@ -7558,60 +7593,58 @@ var QuoteWindow = (function() {
     var x = rgbOf(a), y = rgbOf(b);
     return [0, 1, 2].map(function (i) { return Math.round(x[i] + (y[i] - x[i]) * t); });
   }
-  function rgba(c, alpha) {
-    var x = Array.isArray(c) ? c : rgbOf(c);
-    return 'rgba(' + x[0] + ', ' + x[1] + ', ' + x[2] + ', ' + alpha + ')';
-  }
+  function rgbaA(c, a) { return 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', ' + a + ')'; }
+  function lerpC(a, b, t) { return [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); }); }
+  function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
+  function wrapAng(a) { while (a > Math.PI) a -= 2 * Math.PI; while (a < -Math.PI) a += 2 * Math.PI; return a; }
 
+  /* ============================================================
+     THE RING — the faint track, the countdown (the round's clock),
+     the bloom when it completes, and the ripples on the breath.
+     Same drawing as the quotes window had.
+     ============================================================ */
   var ringCtx = ringCv.getContext('2d');
   var ripCtx = ripCv.getContext('2d');
   var CV = { key: '', S: 0, dpr: 1, RS: 0 };
-  var COL = { start: [0, 0, 0], end: [0, 0, 0], ring: [255, 255, 255], rip: [255, 255, 255] };
+  var COL = { start: rgbOf(QW.cStart), end: rgbOf(QW.cEnd), ring: rgbOf(QW.cRing), rip: blend(QW.cRing, QW.cHalo, 0.5) };
   var PASSES = 5;
-  var DEG = Math.PI / 180;
   var breathOrigin = 0;
   var prevSweep = null;
   var finalCv = document.createElement('canvas');
   var finalCtx = finalCv.getContext('2d');
+  var S = { D: 1, prog: 0, t0: 0, phase: 'idle' };
 
-  function canvasPad() { return Math.ceil(+v.headW * 1.9 + 14); }
-
-  function cacheColours() {
-    COL.start = rgbOf(v.cStart);
-    COL.end = rgbOf(v.cEnd);
-    COL.ring = rgbOf(v.cRing);
-    COL.rip = blend(v.cRing, v.cHalo, 0.5);
-  }
-  function rgbaA(c, a) { return 'rgba(' + c[0] + ', ' + c[1] + ', ' + c[2] + ', ' + a + ')'; }
-  function lerpC(a, b, t) { return [0, 1, 2].map(function (i) { return Math.round(a[i] + (b[i] - a[i]) * t); }); }
-  function smooth(x) { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); }
-  /* Alpha of pass p so the stack builds evenly to `total` at the core. */
   function stepAlpha(p, total) { return (total / PASSES) / (1 - total * p / PASSES); }
+  function canvasPad() { return Math.ceil(QW.headW * 1.9 + 14); }
 
   function sizeCanvases() {
-    var D = +v.size;
-    var S = D + 2 * canvasPad();
-    var dpr = Math.min(+v.dprCap, window.devicePixelRatio || 1);
-    var RS = Math.ceil(D * v.ripReach + 20);
-    var key = [S, dpr, RS].join();
+    var D = QW.size;
+    var Sz = D + 2 * canvasPad();
+    var dpr = Math.min(QW.dprCap, window.devicePixelRatio || 1);
+    var RS = Math.ceil(D * QW.ripReach + 20);
+    var key = [Sz, dpr, RS].join();
     if (key === CV.key) return;
-    CV = { key: key, S: S, dpr: dpr, RS: RS };
-    ringCv.width = ringCv.height = finalCv.width = finalCv.height = Math.round(S * dpr);
-    ringCv.style.width = ringCv.style.height = S + 'px';
-    ringCv.style.margin = (-S / 2) + 'px 0 0 ' + (-S / 2) + 'px';
+    CV = { key: key, S: Sz, dpr: dpr, RS: RS };
+    ringCv.width = ringCv.height = finalCv.width = finalCv.height = Math.round(Sz * dpr);
+    ringCv.style.width = ringCv.style.height = Sz + 'px';
+    ringCv.style.margin = (-Sz / 2) + 'px 0 0 ' + (-Sz / 2) + 'px';
     ripCv.width = ripCv.height = RS;
     ripCv.style.width = ripCv.style.height = RS + 'px';
     ripCv.style.margin = (-RS / 2) + 'px 0 0 ' + (-RS / 2) + 'px';
+    GS = QW.size + 2 * GAME_PAD;
+    GDPR = dpr;
+    gameCv.width = gameCv.height = Math.round(GS * GDPR);
+    gameCv.style.width = gameCv.style.height = GS + 'px';
+    gameCv.style.margin = (-GS / 2) + 'px 0 0 ' + (-GS / 2) + 'px';
   }
 
-  /* The faint ring that is always there. */
   function drawTrack(ctx, cx, cy) {
-    var R = v.size / 2, T = +v.band, Rc = R - T / 2;
-    var k = Math.min(0.9, 2 * v.soft / T);
+    var R = QW.size / 2, T = QW.band, Rc = R - T / 2;
+    var k = Math.min(0.9, 2 * QW.soft / T);
     ctx.fillStyle = rgbaA(COL.ring, 1);
     for (var p = 0; p < PASSES; p++) {
       var half = T / 2 * (1 - k * p / PASSES);
-      ctx.globalAlpha = stepAlpha(p, +v.track);
+      ctx.globalAlpha = stepAlpha(p, QW.track);
       ctx.beginPath();
       ctx.arc(cx, cy, Rc + half, 0, 2 * Math.PI);
       ctx.arc(cx, cy, Rc - half, 0, 2 * Math.PI, true);
@@ -7619,33 +7652,17 @@ var QuoteWindow = (function() {
     }
   }
 
-  /* One countdown: the arc from the top round to the head. frac is how
-     far round (0 to 1); alpha fades the whole thing.
-
-     One continuous shape, shaped like a water drop falling forwards: a
-     round bulb at the front, then sides that curve in (a smooth S-curve)
-     and level out into the line, so the head and the line are one piece.
-     The line keeps one thickness all the way back and never narrows to
-     a point; instead its colour fades to nothing (alpha) behind the head
-     and in from nothing at the top. */
+  /* One countdown: the arc from the top round to the water-drop head.
+     frac is how far round (0 to 1); alpha fades the whole thing. */
   function drawSweep(ctx, cx, cy, frac, alpha) {
-    var R = v.size / 2, T = +v.band, Rc = R - T / 2;
-    /* Keep clear of the 12 o'clock seam of the conic gradient: the sweep
-       starts 0.4deg after it and stops 0.7deg before it. On a pixel grid
-       that does not line up with the seam, the pixels along the start
-       edge sample the gradient from its far end and draw a thin line. */
+    var R = QW.size / 2, T = QW.band, Rc = R - T / 2;
     var SEAM = 0.4, phi = Math.min(frac * 360, 359.3);
     if (phi < 0.5 || alpha <= 0.002) return;
-    var hb = +v.bodyW / 2;                                   /* half the line's thickness */
-    var r = v.head ? Math.max(hb, +v.headW / 2) : hb;        /* the bulb's radius */
-    var Lt = v.head ? Math.max(10, +v.neck) : 10;            /* length of the taper */
-    var pxDeg = Rc * DEG;                                    /* pixels along the ring per degree */
+    var hb = QW.bodyW / 2;
+    var r = QW.head ? Math.max(hb, QW.headW / 2) : hb;
+    var Lt = QW.head ? Math.max(10, QW.neck) : 10;
+    var pxDeg = Rc * DEG;
     var sMax = (phi - SEAM) * pxDeg;
-
-    /* Where the bulb's circle hands over to the taper. Past the widest
-       point by `al`, the taper starts with the circle's own slope, so
-       there is no corner. `al` is the largest angle that still lets the
-       curve slide down to the line without dipping below it. */
     var lo = 0, hi = 80 * DEG, al = 0, k;
     if (r > hb + 0.01) {
       for (k = 0; k < 24; k++) {
@@ -7656,45 +7673,41 @@ var QuoteWindow = (function() {
     }
     var phi0 = Math.PI / 2 + al;
     var d0 = r * (1 - Math.cos(phi0)), h0 = r * Math.sin(phi0), m0 = -Math.tan(al);
-
     var ss = [], ww = [], i, s;
     function put(d, h) { if (d > sMax) { d = sMax; h = hb; } ss.push(d); ww.push(2 * h); }
-    for (i = 0; i <= 24; i++) {                              /* the round front of the bulb */
+    for (i = 0; i <= 24; i++) {
       var f = phi0 * i / 24;
       put(r * (1 - Math.cos(f)), r * Math.sin(f));
     }
-    for (i = 1; i <= 24; i++) {                              /* the taper: a cubic that meets the circle's slope and levels out at the line */
+    for (i = 1; i <= 24; i++) {
       var t = i / 24, t2 = t * t, t3 = t2 * t;
       put(d0 + Lt * t, (2 * t3 - 3 * t2 + 1) * h0 + (t3 - 2 * t2 + t) * Lt * m0 + (-2 * t3 + 3 * t2) * hb);
     }
     for (s = d0 + Lt + 2 * pxDeg; s < sMax; s += 2 * pxDeg) put(s, hb);
     put(sMax, hb);
     var N = ss.length - 1;
-
-    /* Colour by angle (start → end) and alpha along the ring. */
     var grad = ctx.createConicGradient ? ctx.createConicGradient(-Math.PI / 2, cx, cy) : null;
     if (grad) {
-      var L = +v.tail, SFd = +v.startFade, M = 48;
+      var L = QW.tail, SFd = QW.startFade, M = 48;
       for (i = 0; i <= M; i++) {
         var u = phi * i / M;
-        var t = Math.min(1, (phi - u) / L);
-        var al = Math.pow(1 - t, v.taper) * smooth(u / SFd);
-        grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), al));
+        var tt = Math.min(1, (phi - u) / L);
+        var a1 = Math.pow(1 - tt, QW.taper) * smooth(u / SFd);
+        grad.addColorStop(Math.min(1, u / 360), rgbaA(lerpC(COL.start, COL.end, u / 360), a1));
       }
-      /* Nothing past the head: pixels that wrap round the seam are clear. */
       var endC = rgbaA(lerpC(COL.start, COL.end, phi / 360), 0);
       grad.addColorStop(Math.min(1, phi / 360 + 0.0006), endC);
       grad.addColorStop(1, endC);
     }
     ctx.fillStyle = grad || rgbaA(lerpC(COL.start, COL.end, frac), 1);
     for (var p = 0; p < PASSES; p++) {
-      var inset = v.soft * p / PASSES * 2;         /* soft edge: each pass is a little narrower */
+      var inset = QW.soft * p / PASSES * 2;
       ctx.globalAlpha = stepAlpha(p, alpha);
       ctx.beginPath();
       for (i = 0; i <= N; i++) {
-        var a = (phi - ss[i] / pxDeg - 90) * DEG, r = Rc + Math.max(0, ww[i] - inset) / 2;
-        if (i === 0) ctx.moveTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-        else ctx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
+        var a = (phi - ss[i] / pxDeg - 90) * DEG, rr = Rc + Math.max(0, ww[i] - inset) / 2;
+        if (i === 0) ctx.moveTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
+        else ctx.lineTo(cx + rr * Math.cos(a), cy + rr * Math.sin(a));
       }
       for (i = N; i >= 0; i--) {
         var b = (phi - ss[i] / pxDeg - 90) * DEG, q = Rc - Math.max(0, ww[i] - inset) / 2;
@@ -7705,8 +7718,6 @@ var QuoteWindow = (function() {
     }
   }
 
-  /* The finished ring, drawn once into its own canvas so it can fade as
-     one picture (nothing in it can fade before anything else). */
   function snapshotFinal() {
     var c = finalCtx;
     c.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
@@ -7716,11 +7727,10 @@ var QuoteWindow = (function() {
     c.globalAlpha = 1;
   }
 
-  /* The soft ring of light released at the top when a countdown ends. */
   function drawBloom(ctx, cx, cy, p) {
-    var R = v.size / 2, Rc = R - v.band / 2;
+    var R = QW.size / 2, Rc = R - QW.band / 2;
     var e = 1 - Math.pow(1 - p, 3);
-    var r = v.headW / 2 * (0.8 + 2.8 * e);
+    var r = QW.headW / 2 * (0.8 + 2.8 * e);
     var a = 0.5 * (1 - p) * (1 - p);
     var x = cx, y = cy - Rc;
     var g = ctx.createRadialGradient(x, y, 0, x, y, r);
@@ -7734,14 +7744,37 @@ var QuoteWindow = (function() {
     ctx.fill();
   }
 
+  /* Seconds left when inside the warning window, otherwise null. */
+  function warnLeft() {
+    if (round.state !== 'play' || !(G.warnSecs > 0)) return null;
+    var left = Math.max(0, (S.D - S.prog) / 1000);
+    return left <= G.warnSecs ? left : null;
+  }
+  /* The last seconds: a warm glow on the ring that swells once a second. */
+  function drawWarn(ctx, cx, cy) {
+    var left = warnLeft();
+    if (left === null) return;
+    var beat = left - Math.floor(left);
+    var a = 0.18 + 0.4 * beat * beat;
+    var Rr = QW.size / 2 - QW.band / 2;
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = rgbaA(COL.end, a * 0.35);
+    ctx.lineWidth = QW.band + 16;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+    ctx.strokeStyle = rgbaA(COL.end, a);
+    ctx.lineWidth = QW.band;
+    ctx.beginPath(); ctx.arc(cx, cy, Rr, 0, 2 * Math.PI); ctx.stroke();
+  }
+
   function drawRing(now) {
     var ctx = ringCtx, cs = CV.S, cx = cs / 2, cy = cs / 2;
     ctx.setTransform(CV.dpr, 0, 0, CV.dpr, 0, 0);
     ctx.globalAlpha = 1;
     ctx.clearRect(0, 0, cs, cs);
     drawTrack(ctx, cx, cy);
+    drawWarn(ctx, cx, cy);
     if (prevSweep) {
-      var age = now - prevSweep.t, fb = v.fadeBack * 1000;
+      var age = now - prevSweep.t, fb = QW.fadeBack * 1000;
       if (age >= Math.max(fb, 1200)) {
         prevSweep = null;
       } else {
@@ -7751,7 +7784,7 @@ var QuoteWindow = (function() {
           ctx.drawImage(finalCv, 0, 0, cs, cs);
           ctx.globalAlpha = 1;
         }
-        if (v.bloom && age < 1200) drawBloom(ctx, cx, cy, age / 1200);
+        if (QW.bloom && age < 1200) drawBloom(ctx, cx, cy, age / 1200);
       }
     }
     if (S.phase !== 'idle') {
@@ -7778,11 +7811,10 @@ var QuoteWindow = (function() {
     };
   }
   var rippleEase = bezierEase(0.15, 0.55, 0.3, 1);
-  var RIPPLE_DELAYS = [1290, 2990, 690];   /* ms, as in main.css */
-  var RIPPLE_STROKES = [[4.5, 0.14], [3, 0.24], [1.5, 0.62]];   /* [width, share of the alpha], soft */
+  var RIPPLE_DELAYS = [1290, 2990, 690];
+  var RIPPLE_STROKES = [[4.5, 0.14], [3, 0.24], [1.5, 0.62]];
 
-  /* The halo's own animation is the clock for the 4s breath, so the
-     ripples leave exactly as the halo peaks. */
+  /* The halo's own animation is the clock for the 4s breath. */
   function syncBreath() {
     var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
     for (var i = 0; i < list.length; i++) {
@@ -7792,19 +7824,18 @@ var QuoteWindow = (function() {
       }
     }
   }
-
   function drawRipples(now) {
     var ctx = ripCtx, RS = CV.RS;
     ctx.clearRect(0, 0, RS, RS);
     if (reduced) return;
-    var R = v.size / 2, c = RS / 2;
+    var R = QW.size / 2, c = RS / 2;
     var ph = (((now - breathOrigin) % BREATH) + BREATH) % BREATH;
     for (var k = 0; k < 3; k++) {
       var tau = ((((ph - RIPPLE_DELAYS[k]) % BREATH) + BREATH) % BREATH) / BREATH;
       var e = rippleEase(tau);
       var a = 0.9 * (1 - e);
       if (a < 0.01) continue;
-      var r = R * (1 + (v.ripReach - 1) * e);
+      var r = R * (1 + (QW.ripReach - 1) * e);
       for (var s = 0; s < RIPPLE_STROKES.length; s++) {
         ctx.lineWidth = RIPPLE_STROKES[s][0];
         ctx.strokeStyle = rgbaA(COL.rip, a * RIPPLE_STROKES[s][1]);
@@ -7815,242 +7846,649 @@ var QuoteWindow = (function() {
     }
   }
 
+  /* ============================================================
+     LAYOUT — fit the window to the screen, size the instructions,
+     and keep the button exactly between the scores and the
+     instructions.
+     ============================================================ */
+  function fitStage() {
+    scoreBox.style.fontSize = Math.round(QW.size * 0.034) + 'px';
+    var k = Math.min(1, (window.innerHeight - 40) / (QW.size + 60), (window.innerWidth - 40) / QW.size);
+    inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
+    fitHowto();
+  }
+  /* Instructions: as large as lets the longest line fill G.howtoFill % of the ring,
+     never smaller than G.howtoMin. (Letter spacing is in em, so one measurement
+     at 10px is enough.) */
+  function fitHowto() {
+    if (!howEl.firstChild) return;
+    howEl.style.fontSize = '10px';
+    var w10 = howEl.offsetWidth;
+    if (!w10) return;
+    var px = 10 * (QW.size * G.howtoFill / 100) / w10;
+    howEl.style.fontSize = Math.max(G.howtoMin, px).toFixed(1) + 'px';
+    balanceHowto();
+  }
+  /* The centre of the ring should be exactly halfway between the last line of the
+     scores and the first line of the instructions. The two blocks have different
+     line spacing, so measure the real text edges and nudge the instructions. */
+  function balanceHowto() {
+    var first = howEl.firstElementChild, timeRow = scoreTimeEl.parentNode;
+    if (!first) return;
+    howEl.style.marginTop = '0px';
+    var qr = win.getBoundingClientRect();
+    var k = qr.width / win.offsetWidth || 1;
+    var C = qr.top + qr.height / 2;
+    var a = document.createRange(); a.selectNodeContents(timeRow);
+    var b = document.createRange(); b.selectNodeContents(first);
+    var above = C - a.getBoundingClientRect().bottom, below = b.getBoundingClientRect().top - C;
+    howEl.style.marginTop = ((above - below) / k).toFixed(1) + 'px';
+  }
+  function buildHowto() {
+    howEl.textContent = '';
+    HOWTO.forEach(function (t) { var d = document.createElement('div'); d.textContent = t; howEl.appendChild(d); });
+  }
 
-  /* Where the 4s breath is right now, so the new quote lands with the
-     ring ripples. */
-  function breathPhase() {
-    var list = softGlow.getAnimations ? softGlow.getAnimations() : [];
+  /* ============================================================
+     SOUND — soft sine chimes (pentatonic) and the music. Played on
+     the app's AudioContext, straight to the speakers.
+     ============================================================ */
+  var out = null;
+  function audioOut() {
+    if (!SOUND_ENABLED || !soundAudioCtx) return null;
+    if (soundAudioCtx.state === 'suspended') { try { soundAudioCtx.resume(); } catch (e) {} }
+    if (!out) {
+      out = soundAudioCtx.createGain();
+      out.gain.value = 1;
+      out.connect(soundAudioCtx.destination);
+    }
+    return out;
+  }
+  var SCALE = [];
+  [0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28].forEach(function (st) { SCALE.push(523.25 * Math.pow(2, st / 12)); });
+  function playBell(f, peak, len) {
+    var o = audioOut();
+    if (!o || peak <= 0) return;
+    var ac = soundAudioCtx, t = ac.currentTime;
+    var g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    g.connect(o);
+    [[1, 1], [2.01, 0.25]].forEach(function (h) {
+      var osc = ac.createOscillator();
+      var hg = ac.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = f * h[0];
+      hg.gain.value = h[1];
+      osc.connect(hg); hg.connect(g);
+      osc.start(t); osc.stop(t + len + 0.1);
+    });
+  }
+  function chime(step, soft) {
+    playBell(SCALE[Math.max(0, Math.min(SCALE.length - 1, step))], 0.18 * G.volume * (soft ? 0.5 : 1), 1.4);
+  }
+  /* A soft tick each second in the last seconds; higher for the final three. */
+  function tick(final) { playBell(final ? 1760 : 1320, 0.07 * G.volume, 0.12); }
+
+  /* ---------- music: さくら散歩, a short 8-bit loop ----------
+     8 bars of 8 eighth notes. A note (A4, F#4 …) starts a note, "-" holds
+     it, "." is a rest. Bass: R = chord root, F = fifth. Arp: 0–3 = notes of
+     the bar's chord. Drums: k = kick, h = hi-hat. */
+  var CHORDS = {
+    D: { b: 'D3', t: ['D4', 'F#4', 'A4', 'D5'] },
+    G: { b: 'G2', t: ['G3', 'B3', 'D4', 'G4'] },
+    A: { b: 'A2', t: ['A3', 'C#4', 'E4', 'A4'] }
+  };
+  var SONG = {
+    bpm: 96, lead: 0.5, leadVol: 0.07,
+    chords: 'D D G A D G A D',
+    melody: 'A4 - B4 A4 F#4 - E4 - | D4 - E4 F#4 A4 - - . | B4 - A4 B4 D5 - B4 - | A4 - - - . . . . |' +
+            'F#4 - A4 B4 D5 - E5 - | D5 - B4 A4 B4 - - . | A4 - F#4 E4 D4 - E4 - | D4 - - - . . . .',
+    bass:  'R - F - R - F -',
+    arp:   '. 0 . 2 . 1 . 2',
+    drums: 'k . h . k . h .'
+  };
+  var MUSIC_LEVEL = 0.55;
+  function midiOf(name) {
+    var m = /^([A-G])(#|b)?(-?\d)$/.exec(name);
+    var semi = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 }[m[1]] + (m[2] === '#' ? 1 : m[2] === 'b' ? -1 : 0);
+    return 12 * (+m[3] + 1) + semi;
+  }
+  function hz(midi) { return 440 * Math.pow(2, (midi - 69) / 12); }
+  function toks(str) { return str.replace(/\|/g, ' ').split(/\s+/).filter(Boolean); }
+  function notesFrom(list, offset, outMap, toMidi) {
     for (var i = 0; i < list.length; i++) {
-      if (list[i].animationName === 'glowBreath' && list[i].currentTime != null) {
-        return list[i].currentTime % BREATH;
+      var tk = list[i];
+      if (tk === '-' || tk === '.') continue;
+      var n = 1;
+      while (i + n < list.length && list[i + n] === '-') n++;
+      outMap[offset + i] = [toMidi(tk), n];
+    }
+  }
+  function compileSong(sg) {
+    var chords = toks(sg.chords), len = chords.length * 8;
+    var c = { bpm: sg.bpm, len: len, lead: sg.lead, leadVol: sg.leadVol, mel: {}, bass: {}, arp: {}, drums: {} };
+    notesFrom(toks(sg.melody), 0, c.mel, midiOf);
+    var bassT = toks(sg.bass), arpT = toks(sg.arp), drumT = toks(sg.drums);
+    chords.forEach(function (name, bar) {
+      var ch = CHORDS[name], root = midiOf(ch.b);
+      notesFrom(bassT, bar * 8, c.bass, function (tk) { return root + (tk === 'F' ? 7 : tk === 'O' ? 12 : 0); });
+      arpT.forEach(function (tk, i) { if (/^\d$/.test(tk)) c.arp[bar * 8 + i] = [midiOf(ch.t[+tk]), 1]; });
+      drumT.forEach(function (tk, i) { if (tk !== '.') c.drums[bar * 8 + i] = tk; });
+    });
+    return c;
+  }
+  var SONG_C = compileSong(SONG);
+  var pulseWaves = {}, noiseBuf = null;
+  function pulseWave(duty) {
+    if (pulseWaves[duty]) return pulseWaves[duty];
+    var N = 40, re = new Float32Array(N), im = new Float32Array(N);
+    for (var n = 1; n < N; n++) re[n] = 2 / (n * Math.PI) * Math.sin(n * Math.PI * duty);
+    return (pulseWaves[duty] = soundAudioCtx.createPeriodicWave(re, im));
+  }
+  function noise() {
+    if (noiseBuf) return noiseBuf;
+    var ac = soundAudioCtx;
+    noiseBuf = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+    var d = noiseBuf.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return noiseBuf;
+  }
+  function voice(dest, wave, f, t, len, vol) {
+    var ac = soundAudioCtx, o = ac.createOscillator();
+    if (typeof wave === 'string') o.type = wave; else o.setPeriodicWave(wave);
+    o.frequency.value = f;
+    var g = ac.createGain();
+    var hold = Math.max(0.09, len - 0.04);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(vol * 0.6, t + 0.08);
+    g.gain.setValueAtTime(vol * 0.6, t + hold);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + hold + 0.08);
+    o.connect(g); g.connect(dest);
+    o.start(t); o.stop(t + hold + 0.1);
+  }
+  function drum(dest, kind, t) {
+    var ac = soundAudioCtx, g = ac.createGain();
+    g.connect(dest);
+    if (kind === 'k') {
+      var o = ac.createOscillator();
+      o.frequency.setValueAtTime(140, t);
+      o.frequency.exponentialRampToValueAtTime(45, t + 0.12);
+      g.gain.setValueAtTime(0.32, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+      o.connect(g); o.start(t); o.stop(t + 0.18);
+      return;
+    }
+    var src = ac.createBufferSource();
+    src.buffer = noise();
+    var f = ac.createBiquadFilter();
+    f.type = kind === 's' ? 'bandpass' : 'highpass';
+    f.frequency.value = kind === 's' ? 1800 : 7000;
+    var dur = kind === 's' ? 0.11 : 0.035;
+    g.gain.setValueAtTime(kind === 's' ? 0.1 : 0.035, t);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    src.connect(f); f.connect(g);
+    src.start(t, Math.random() * 0.5); src.stop(t + dur + 0.02);
+  }
+  var music = { on: false };
+  /* Fade the music in over about two seconds and keep it looping. */
+  function musicStart() {
+    musicStop(true);
+    var o = audioOut();
+    if (!o) return;
+    var ac = soundAudioCtx;
+    var mOut = ac.createGain();
+    var lp = ac.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 3600;
+    mOut.gain.setValueAtTime(0.0001, ac.currentTime);
+    mOut.gain.setTargetAtTime(MUSIC_LEVEL * G.musicVol, ac.currentTime, 0.6);
+    mOut.connect(lp); lp.connect(o);
+    music = { on: true, step: 0, next: ac.currentTime + 0.1, out: mOut, lp: lp, timer: 0 };
+    music.timer = setInterval(pumpMusic, 25);
+    pumpMusic();
+  }
+  function musicStop(quick) {
+    if (!music.on) return;
+    var m = music;
+    m.on = false;
+    clearInterval(m.timer);
+    var t = soundAudioCtx.currentTime;
+    try {
+      m.out.gain.cancelScheduledValues(t);
+      m.out.gain.setValueAtTime(Math.max(0.0001, m.out.gain.value), t);
+      m.out.gain.exponentialRampToValueAtTime(0.0001, t + (quick ? 0.05 : 1.5));
+    } catch (e) {}
+    setTimeout(function () { try { m.out.disconnect(); m.lp.disconnect(); } catch (e) {} }, quick ? 300 : 1900);
+  }
+  /* Schedule the next notes slightly ahead on the audio clock, so the beat
+     stays steady even when a frame is late. */
+  function pumpMusic() {
+    var m = music;
+    if (!m.on) return;
+    var sg = SONG_C, dur = 60 / sg.bpm / 2;
+    while (m.next < soundAudioCtx.currentTime + 0.15) {
+      var i = m.step % sg.len, t = m.next, e;
+      if ((e = sg.mel[i]))  voice(m.out, pulseWave(sg.lead), hz(e[0]), t, e[1] * dur, sg.leadVol);
+      if ((e = sg.bass[i])) voice(m.out, 'triangle', hz(e[0]), t, e[1] * dur * 0.95, 0.16);
+      if ((e = sg.arp[i]))  voice(m.out, pulseWave(0.125), hz(e[0]), t, dur * 0.5, 0.025);
+      if (sg.drums[i]) drum(m.out, sg.drums[i], t);
+      m.next += dur;
+      m.step++;
+    }
+  }
+
+  /* ---------- the ambient music and the HUD step aside ---------- */
+  var ambientHandedOver = false, ambientStopTimer = 0;
+  function fadeAmbientOut() {
+    if (ambientHandedOver) return;
+    ambientHandedOver = true;
+    if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
+    /* No new track or chime may start while the old one fades. */
+    if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
+    if (windChimeTimer) { clearTimeout(windChimeTimer); windChimeTimer = null; }
+    if (soundAudioCtx) {
+      var now = soundAudioCtx.currentTime;
+      [ambientGain, windChimeGain].forEach(function (g) {
+        if (!g) return;
+        try {
+          g.gain.cancelScheduledValues(now);
+          g.gain.setValueAtTime(g.gain.value, now);
+          g.gain.setTargetAtTime(0, now, 0.5);
+        } catch (e) {}
+      });
+    }
+    ambientStopTimer = setTimeout(function () { ambientStopTimer = 0; stopAmbient(); }, 2500);
+  }
+  function restoreAmbient() {
+    if (!ambientHandedOver) return;
+    ambientHandedOver = false;
+    if (ambientStopTimer) { clearTimeout(ambientStopTimer); ambientStopTimer = 0; }
+    stopAmbient();
+    if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');
+    startAmbient();
+  }
+
+  /* ============================================================
+     THE FINGER — one pointer, anywhere on the stage, in the game's
+     own coordinates (px from the ring's centre, before the
+     fit-to-screen scale).
+     ============================================================ */
+  var finger = { down: false, id: null, x: 0, y: 0, ang: 0 };
+  function toWorld(e) {
+    var r = gameCv.getBoundingClientRect();
+    var k = r.width / GS;
+    return { x: (e.clientX - r.left) / k - GS / 2, y: (e.clientY - r.top) / k - GS / 2 };
+  }
+  stage.addEventListener('pointerdown', function (e) {
+    if (!running || finger.down) return;
+    var onBtn = !!(e.target.closest && e.target.closest('#gameBtn'));
+    /* Only the button starts or continues a round, and that press doesn't steer. */
+    if (round.state !== 'play') {
+      if (onBtn) pressButton(performance.now());
+      e.preventDefault();
+      return;
+    }
+    finger.down = true; finger.id = e.pointerId;
+    var p = toWorld(e);
+    finger.x = p.x; finger.y = p.y;
+    finger.ang = Math.atan2(p.y, p.x);
+    try { stage.setPointerCapture(e.pointerId); } catch (er) {}
+    e.preventDefault();
+  });
+  stage.addEventListener('pointermove', function (e) {
+    if (!finger.down || e.pointerId !== finger.id) return;
+    var p = toWorld(e);
+    finger.x = p.x; finger.y = p.y;
+    finger.ang = Math.atan2(p.y, p.x);
+  });
+  function lift(e) { if (e.pointerId === finger.id) { finger.down = false; finger.id = null; } }
+  stage.addEventListener('pointerup', lift);
+  stage.addEventListener('pointercancel', lift);
+
+  /* ============================================================
+     THE GAME CANVAS, EFFECTS, BALLS AND PADDLES
+     ============================================================ */
+  var gameCtx = gameCv.getContext('2d');
+  var GS = 0, GDPR = 1, GAME_PAD = 70;
+  function Rc() { return QW.size / 2 - QW.band / 2; }
+
+  var effects = [];
+  function addRipple(x, y, col, r1, dur) {
+    effects.push({ x: x, y: y, col: rgbOf(col), r1: r1 || 40, t0: performance.now(), dur: dur || 900 });
+  }
+  function drawEffects(ctx, now) {
+    for (var i = effects.length - 1; i >= 0; i--) {
+      var fx = effects[i], p = (now - fx.t0) / fx.dur;
+      if (p >= 1) { effects.splice(i, 1); continue; }
+      var e = 1 - Math.pow(1 - p, 3);
+      ctx.globalAlpha = 0.7 * (1 - p);
+      ctx.strokeStyle = rgbaA(fx.col, 1);
+      ctx.lineWidth = 2.2 * (1 - p) + 0.6;
+      ctx.beginPath();
+      ctx.arc(fx.x, fx.y, 4 + fx.r1 * e, 0, 2 * Math.PI);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+  }
+  function glowDot(ctx, x, y, r, col, a) {
+    var c = rgbOf(col);
+    var g = ctx.createRadialGradient(x, y, 0, x, y, r * 2.6);
+    g.addColorStop(0, rgbaA(c, 0.9 * a));
+    g.addColorStop(0.35, rgbaA(c, 0.45 * a));
+    g.addColorStop(1, rgbaA(c, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, r * 2.6, 0, 2 * Math.PI); ctx.fill();
+    ctx.fillStyle = rgbaA(lerpC(c, [255, 253, 249], 0.55), a);
+    ctx.beginPath(); ctx.arc(x, y, r * 0.75, 0, 2 * Math.PI); ctx.fill();
+  }
+  /* The paddle: an arc lying on the ring. */
+  function drawPaddle(ctx, ang, deg, w) {
+    var R = Rc(), half = deg * DEG / 2;
+    var c = rgbOf(G.cPaddle);
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = rgbaA(c, 0.22);
+    ctx.lineWidth = w + 10;
+    ctx.beginPath(); ctx.arc(0, 0, R, ang - half, ang + half); ctx.stroke();
+    ctx.strokeStyle = rgbaA(c, 0.95);
+    ctx.lineWidth = w;
+    ctx.beginPath(); ctx.arc(0, 0, R, ang - half, ang + half); ctx.stroke();
+    ctx.strokeStyle = rgbaA([255, 253, 249], 0.45);
+    ctx.lineWidth = Math.max(1, w * 0.22);
+    ctx.beginPath(); ctx.arc(0, 0, R - w * 0.18, ang - half * 0.85, ang + half * 0.85); ctx.stroke();
+  }
+
+  var pad = { ang: -Math.PI / 2, prev: -Math.PI / 2, delta: 0, t: 0 };
+  var balls = [], rally = 0;
+  /* Paddle length now: from G.padStart to G.padMin over G.shrinkSecs. When the
+     round is over it keeps the length it had when time ran out. */
+  function padDeg() {
+    if (round.state === 'play') pad.t = Math.min(1, S.prog / (G.shrinkSecs * 1000));
+    else if (round.state === 'ready') pad.t = 0;
+    return G.padStart + (G.padMin - G.padStart) * pad.t;
+  }
+  /* Where the two paddles are part-way through this frame (f = 0 → 1), so a fast
+     sweep can't jump over a ball. */
+  function paddlesAt(f) { var a = pad.prev + pad.delta * f; return [a, a + Math.PI]; }
+  function live() { return balls.filter(function (b) { return b.state !== 'lost'; }).length; }
+  function serve(now, wait) {
+    var ang = Math.random() * 2 * Math.PI;
+    balls.push({ x: 0, y: 0, vx: Math.cos(ang) * G.ballSpeed, vy: Math.sin(ang) * G.ballSpeed,
+                 state: 'serve', t0: now, wait: wait, alpha: 0, trail: [] });
+  }
+  function resetBalls() {
+    balls = []; rally = 0; pad.t = 0;
+    pad.ang = pad.prev = -Math.PI / 2; pad.delta = 0;
+  }
+  /* The round is over: every ball fades away where it is. */
+  function fadeBalls(now) {
+    balls.forEach(function (b) { if (b.state !== 'lost') { b.state = 'lost'; b.t0 = now; b.vx *= 0.15; b.vy *= 0.15; } });
+  }
+
+  /* Everything that happens when a ball is returned. */
+  function paddleHit(cx, cy, now) {
+    rally++;
+    addScore(1);
+    addRipple(cx, cy, G.cPaddle, 34, 800);
+    chime(Math.min(8, 2 + (rally % 7)));
+    /* Every G.extraHits hits in a row, one more ball (up to G.maxBalls). */
+    if (rally % G.extraHits === 0 && live() < G.maxBalls) {
+      serve(now, 0.6);
+      addRipple(0, 0, G.cBall, Rc() * 0.8, 1400);
+      addRipple(0, 0, G.cPaddle, Rc() * 0.5, 1100);
+      round.flash = { text: 'ボール追加！', until: now + 1300 };
+      setTimeout(function () { playBell(1567.98, 0.12 * G.volume, 1.2); }, 120);
+    }
+  }
+
+  function moveBall(b, dt, now) {
+    var R = Rc(), br = G.ballR, pw = G.padW;
+    var speed = Math.hypot(b.vx, b.vy);
+    var steps = Math.max(1, Math.min(150, Math.ceil((speed * dt + Math.abs(pad.delta) * R) / Math.max(2, br * 0.5))));
+    var h = dt / steps;
+    for (var s = 0; s < steps; s++) {
+      b.x += b.vx * h; b.y += b.vy * h;
+      var d = Math.hypot(b.x, b.y);
+      var inner = R - pw / 2;
+      if (d + br >= inner && d < R) {
+        var nx = b.x / d, ny = b.y / d;
+        if (b.vx * nx + b.vy * ny > 0) {
+          var ang = Math.atan2(b.y, b.x);
+          var reach = padDeg() * DEG / 2 + Math.asin(Math.min(1, br / d));
+          var hit = null;
+          paddlesAt((s + 1) / steps).forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
+          if (hit !== null) {
+            /* Bounce off the ring's normal, then angle it by where it hit. */
+            var dot = b.vx * nx + b.vy * ny;
+            var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
+            var sp = Math.min(G.maxSpeed, Math.hypot(rx, ry) * (1 + G.speedUp / 100));
+            var dir = Math.atan2(ry, rx) + hit * G.english * DEG;
+            /* Never let it skim along the edge: at most 65° from straight back in. */
+            var back = Math.atan2(-ny, -nx), dev = wrapAng(dir - back), lim = 65 * DEG;
+            if (dev > lim) dir = back + lim; else if (dev < -lim) dir = back - lim;
+            b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
+            var back2 = inner - br - 0.5;
+            b.x = nx * back2; b.y = ny * back2;
+            paddleHit(nx * R, ny * R, now);
+          }
+        }
+      }
+      if (d > R + 6) {
+        b.state = 'lost'; b.t0 = now;
+        rally = 0;
+        return;
       }
     }
-    return null;
-  }
-  function quoteLength() {
-    var N = v.seconds * 1000;
-    if (!v.align) return N;
-    var p = breathPhase();
-    if (p === null) return N;
-    var shift = (PEAK - (p + N) % BREATH + BREATH) % BREATH;
-    if (shift > BREATH / 2) shift -= BREATH;      /* nearest peak, ±2s */
-    return N + shift;
-  }
-
-  /* Fit the words inside the ring: the largest size whose text box (the
-     actual text, measured with a Range) has its corners inside the
-     circle. Binary search, so a new quote costs a handful of measures. */
-  var range = document.createRange();
-  function fitText() {
-    var R = v.size / 2 * v.fit;
-    var max = +v.maxSize, min = Math.min(+v.minSize, max);
-    function ok(size) {
-      quoteLine.style.fontSize = size + 'px';
-      range.selectNodeContents(quoteLine);
-      var box = range.getBoundingClientRect();
-      return Math.hypot(box.width / 2, box.height / 2) <= R;
+    /* A point every 5px along the path; the trail is cut to G.trailLen. */
+    var last = b.trail[b.trail.length - 1];
+    if (!last || Math.hypot(b.x - last.x, b.y - last.y) >= 5) b.trail.push({ x: b.x, y: b.y });
+    var run = 0, tr = b.trail;
+    for (var ti = tr.length - 1; ti > 0; ti--) {
+      run += Math.hypot(tr[ti].x - tr[ti - 1].x, tr[ti].y - tr[ti - 1].y);
+      if (run > G.trailLen) { tr.splice(0, ti - 1); break; }
     }
-    if (ok(max)) return;
-    if (!ok(min)) { quoteLine.style.fontSize = min + 'px'; return; }
-    var lo = min, hi = max;
-    while (hi - lo > 1) {
-      var mid = (lo + hi) >> 1;
-      if (ok(mid)) lo = mid; else hi = mid;
-    }
-    quoteLine.style.fontSize = lo + 'px';
   }
 
-  /* Split a quote into phrases so a line only ever breaks between
-     phrases, never inside a word. Intl.Segmenter finds the Japanese
-     words; small hiragana words (particles and endings such as が, に,
-     ます, という) join the word before; honorific お / ご joins the
-     word after; 、 and 。 stay with the word before and always allow
-     a break after them. */
-  var HIRA = /^[぀-ゟ]+$/;
-  var CLOSE = /^[、。，．！？!?）)」』…]+$/;
-  var OPEN = /^[（(「『]+$/;
-  var STOPS = /[、。，．！？!?]/;
-  var segmenter = (window.Intl && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
-  function phraseUnits(text) {
-    var segs = [];
-    if (segmenter) { var it = segmenter.segment(text)[Symbol.iterator](), nx; while (!(nx = it.next()).done) segs.push(nx.value.segment); }
-    else segs = Array.from(text);
-    var units = [], cur = '', force = false, open = '';
-    segs.forEach(function (sg) {
-      /* An opening bracket, or an honorific お / ご, belongs to the word after it. */
-      if (OPEN.test(sg) || /^[おご御]$/.test(sg)) { if (cur) { units.push(cur); cur = ''; } open += sg; force = false; return; }
-      if (CLOSE.test(sg)) { cur += sg; if (STOPS.test(sg)) force = true; return; }
-      var join = cur !== '' && !force && !open && HIRA.test(sg) && Array.from(sg).length <= 3;
-      if (cur !== '' && !join) { units.push(cur); cur = ''; }
-      cur += open + sg; open = ''; force = false;
-    });
-    if (cur) units.push(cur);
-    return units;
-  }
-
-  /* How many characters are on each line (or column, for 縦書き). */
-  function lineCounts() {
-    var rows = [], units = quoteLine.querySelectorAll('.quote-unit');
-    for (var i = 0; i < units.length; i++) {
-      var r = units[i].getBoundingClientRect();
-      var key = v.vertical ? r.left : r.top, tol = (v.vertical ? r.width : r.height) * 0.5;
-      var row = null;
-      for (var j = 0; j < rows.length; j++) if (Math.abs(rows[j].k - key) < tol) { row = rows[j]; break; }
-      if (!row) { row = { k: key, n: 0 }; rows.push(row); }
-      row.n += Array.from(units[i].textContent).length;
-    }
-    return rows.map(function (x) { return x.n; });
-  }
-
-  /* Fit the words, and make sure no line is left with just one or two
-     characters: if one is, narrow the text box a little (so the lines
-     balance differently) and fit again. */
-  function fitAndBalance() {
-    var tries = [1, 0.92, 0.84, 0.76, 0.68, 1.1];
-    var base = v.vertical ? Math.round(v.size * 0.66) : Math.round(v.size * 0.8);
-    var prop = v.vertical ? 'maxHeight' : 'maxWidth';
-    for (var k = 0; k < tries.length; k++) {
-      quoteLine.style[prop] = Math.round(base * tries[k]) + 'px';
-      fitText();
-      var c = lineCounts();
-      if (c.length < 2 || Math.min.apply(null, c) > 2) return;
-    }
-    quoteLine.style[prop] = base + 'px';
-    fitText();
-  }
-
-  function renderText(text) {
-    quoteLine.textContent = '';
-    quoteLine.style.maxWidth = quoteLine.style.maxHeight = '';
-    quoteLine.classList.toggle('ink', v.ink > 0);
-    quoteLine.classList.toggle('vertical', !!v.vertical);
-    var units = phraseUnits(text), idx = 0;
-    units.forEach(function (u, ui) {
-      var span = document.createElement('span');
-      span.className = 'quote-unit';
-      if (v.ink > 0) {
-        Array.from(u).forEach(function (ch) {
-          var c = document.createElement('span');
-          c.className = 'quote-char';
-          c.style.setProperty('--i', idx++);
-          c.textContent = ch;
-          span.appendChild(c);
-        });
-      } else {
-        span.textContent = u;
+  function updateGame(dt, now) {
+    /* The paddles point where the finger is (instantly). */
+    pad.prev = pad.ang;
+    if (finger.down && round.state === 'play') pad.ang = finger.ang;
+    pad.delta = wrapAng(pad.ang - pad.prev);
+    for (var i = balls.length - 1; i >= 0; i--) {
+      var b = balls[i];
+      if (b.state === 'lost') {
+        b.x += b.vx * dt; b.y += b.vy * dt;
+        b.alpha = Math.max(0, 1 - (now - b.t0) / 500);
+        if (now - b.t0 > 600) balls.splice(i, 1);
+        continue;
       }
-      quoteLine.appendChild(span);
-      if (ui < units.length - 1) quoteLine.appendChild(document.createElement('wbr'));
+      if (b.state === 'serve') {
+        b.alpha = smooth((now - b.t0) / 500);
+        if (now - b.t0 >= b.wait * 1000) { b.state = 'play'; b.alpha = 1; }
+        continue;
+      }
+      moveBall(b, dt, now);
+    }
+    if (round.state === 'play' && live() === 0) serve(now, G.respawn);
+  }
+  function drawGame(ctx, now) {
+    var deg = padDeg();
+    paddlesAt(1).forEach(function (pa) { drawPaddle(ctx, pa, deg, G.padW); });
+    var br = G.ballR;
+    balls.forEach(function (b) {
+      if (b.state === 'play') {
+        for (var i = 0; i < b.trail.length; i++) {
+          var tp = b.trail[i], f = (i + 1) / b.trail.length;
+          ctx.globalAlpha = 0.18 * f;
+          ctx.fillStyle = G.cBall;
+          ctx.beginPath(); ctx.arc(tp.x, tp.y, br * (0.4 + 0.6 * f), 0, 2 * Math.PI); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+      }
+      var pulse = b.state === 'serve' ? 0.85 + 0.15 * Math.sin(now / 140) : 1;
+      glowDot(ctx, b.x, b.y, br * pulse, G.cBall, b.alpha);
     });
-    fitAndBalance();
   }
 
-  function showQuote(pos) {
-    var lines = AMBIENT_LINES, n = lines.length;
-    if (!n) return;
-    S.pos = ((pos % n) + n) % n;
-    quoteIdx = S.pos;
-    quoteLine.classList.remove('shown', 'leaving');
-    renderText(lines[S.pos]);
-    void quoteLine.offsetWidth;
-    quoteLine.classList.add('shown');
-    var now = performance.now();
-    /* The countdown that just completed stays as a full ring, blooms and
-       fades back while the next one starts from the top. */
-    if (S.phase !== 'idle') { snapshotFinal(); prevSweep = { t: now }; }
-    S.D = Math.max(1000, quoteLength());
-    S.prog = 0;
-    S.rate = 1;
-    S.t0 = now;
-    S.phase = 'showing';
-    if (countEl) countEl.textContent = (S.pos + 1) + ' / ' + n;
+  /* ============================================================
+     ROUNDS: ready → (button) → play for G.round seconds → over →
+     (button) → play …  The countdown ring is the round's clock.
+     ============================================================ */
+  var best = 0;
+  var round = { state: 'ready', score: 0, overAt: 0, newBest: false, flash: null, lastTick: -1 };
+  function addScore(n) {
+    if (round.state !== 'play') return;
+    round.score += n;
+    scoreNowEl.textContent = round.score;
+    scoreNowEl.classList.add('pop');
+    requestAnimationFrame(function () { requestAnimationFrame(function () { scoreNowEl.classList.remove('pop'); }); });
+  }
+  function readyRound() {
+    effects = [];
+    round.state = 'ready'; round.score = 0; round.flash = null;
+    S.phase = 'idle'; S.prog = 0; prevSweep = null;
+    resetBalls();
+  }
+  function startRound(now) {
+    effects = [];
+    resetBalls();
+    serve(now, G.respawn);
+    round.state = 'play'; round.score = 0; round.newBest = false; round.flash = null; round.lastTick = -1;
+    scoreNowEl.textContent = '0';
+    S.phase = 'showing'; S.D = G.round * 1000; S.prog = 0; S.t0 = now; prevSweep = null;
+    chime(3);
+  }
+  function endRound(now) {
+    round.state = 'over';
+    round.overAt = now;
+    if (round.score > best) { best = round.score; round.newBest = true; }
+    /* The finished ring blooms and fades back. */
+    snapshotFinal(); prevSweep = { t: now };
+    S.phase = 'idle';
+    fadeBalls(now);
+    chime(4); setTimeout(function () { chime(6); }, 180); setTimeout(function () { chime(8); }, 360);
+  }
+  /* The button: タッチしてスタート works at once; the continue button waits a moment. */
+  function pressButton(now) {
+    if (round.state === 'ready' || (round.state === 'over' && now - round.overAt > G.overGuard)) {
+      haptic(10);
+      startRound(now);
+    }
   }
 
-  function startLeaving() {
-    S.phase = 'leaving';
-    quoteLine.classList.remove('shown');
-    quoteLine.classList.add('leaving');
+  var shown = {};
+  function setText(el, key, t) { if (shown[key] !== t) { shown[key] = t; el.textContent = t; } }
+  function updateScoreBox(now) {
+    var left = round.state === 'play' ? Math.max(0, Math.ceil((S.D - S.prog) / 1000))
+             : round.state === 'ready' ? G.round : 0;
+    setText(scoreNowEl, 'now', String(round.score));
+    setText(scoreBestEl, 'best', String(best));
+    setText(scoreTimeEl, 'time', String(left));
+    var warn = warnLeft() !== null;
+    if (shown.warn !== warn) { shown.warn = warn; scoreTimeEl.parentNode.classList.toggle('warn', warn); }
+    var msg = '', title = false;
+    if (round.state === 'ready') { msg = 'タッチしてスタート'; title = true; }
+    else if (round.state === 'play' && round.flash && now < round.flash.until) { msg = round.flash.text; title = true; }
+    else if (round.state === 'over') { msg = round.newBest ? '最高スコア更新！' : 'おつかれさまでした'; title = true; }
+    setText(msgEl, 'msg', msg);
+    if (shown.title !== title) { shown.title = title; msgEl.classList.toggle('title', title); }
+    var tapOn = round.state === 'over' && now - round.overAt > G.overGuard;
+    if (shown.tap !== tapOn) { shown.tap = tapOn; tapEl.classList.toggle('on', tapOn); }
+    setText(tapEl, 'tapText', round.state === 'over' ? 'ここをタップして続ける' : '');
+    var isBtn = round.state === 'ready' || round.state === 'over';
+    if (shown.isBtn !== isBtn) { shown.isBtn = isBtn; btnEl.classList.toggle('is-btn', isBtn); }
+    var liveBtn = round.state === 'ready' || tapOn;
+    if (shown.live !== liveBtn) { shown.live = liveBtn; btnEl.classList.toggle('live', liveBtn); }
+    /* The instructions go faint while a round is being played. */
+    var faint = round.state === 'play';
+    if (shown.faint !== faint) { shown.faint = faint; howEl.classList.toggle('faint', faint); }
   }
 
-
-  /* ---------- the loop ---------- */
-  var rafId = 0, lastNow = 0, frameNo = 0, running = false, startTimer = 0;
-  var quoteIdx = 0;
-
+  /* ============================================================
+     THE LOOP
+     ============================================================ */
+  var rafId = 0, lastNow = 0, frameNo = 0, running = false;
   function frame() {
     rafId = requestAnimationFrame(frame);
     var now = performance.now();
-    var dt = Math.min(100, now - lastNow);
+    var dtMs = Math.min(100, now - lastNow);
     lastNow = now;
-    if (S.phase !== 'idle') {
-      S.prog += dt * S.rate;
-      var rem = Math.max(0, S.D - S.prog) / S.rate;
-      if (S.phase === 'showing' && rem <= v.fade) startLeaving();
-      if (S.prog >= S.D && S.phase === 'leaving') showQuote(S.pos + 1);
+    if (round.state === 'play') {
+      S.prog += dtMs;
+      var wl = warnLeft();
+      if (wl !== null) {
+        var sec = Math.ceil(wl);
+        if (sec !== round.lastTick && sec > 0) { round.lastTick = sec; tick(sec <= 3); }
+      }
+      if (S.prog >= S.D) endRound(now);
     }
     if ((frameNo++ % 90) === 0) syncBreath();
     drawRing(now);
     drawRipples(now);
-  }
-
-  /* Fit the window to the screen: if the screen is short, the whole
-     window (and its counter) shrinks a little so it never scrolls. */
-  function fitStage() {
-    if (!inner) return;
-    var k = Math.min(1, (window.innerHeight - 40) / (v.size + 100), (window.innerWidth - 40) / v.size);
-    inner.style.transform = k < 0.999 ? 'scale(' + k.toFixed(3) + ')' : '';
+    var ctx = gameCtx;
+    ctx.setTransform(GDPR, 0, 0, GDPR, GS / 2 * GDPR, GS / 2 * GDPR);
+    ctx.clearRect(-GS / 2, -GS / 2, GS, GS);
+    updateGame(Math.min(0.05, dtMs / 1000), now);
+    drawGame(ctx, now);
+    drawEffects(ctx, now);
+    updateScoreBox(now);
   }
 
   function wipe() {
-    quoteLine.classList.remove('shown', 'leaving', 'ink', 'vertical');
-    quoteLine.textContent = '';
-    quoteLine.style.maxWidth = quoteLine.style.maxHeight = '';
-    if (countEl) countEl.textContent = '';
-    S.phase = 'idle';
-    S.prog = 0;
-    prevSweep = null;
     if (CV.S) {
       ringCtx.setTransform(1, 0, 0, 1, 0, 0);
       ringCtx.clearRect(0, 0, ringCv.width, ringCv.height);
       ripCtx.clearRect(0, 0, ripCv.width, ripCv.height);
+      gameCtx.setTransform(1, 0, 0, 1, 0, 0);
+      gameCtx.clearRect(0, 0, gameCv.width, gameCv.height);
     }
   }
 
+  /* Leave the games page: the round in progress is dropped, the music
+     fades out and the ambient music and the HUD come back. */
   function stop() {
+    var was = running;
     running = false;
-    if (startTimer) { clearTimeout(startTimer); startTimer = 0; }
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
     window.removeEventListener('resize', fitStage);
+    finger.down = false; finger.id = null;
+    readyRound();
     wipe();
+    if (was) musicStop(false);
+    restoreAmbient();
   }
 
-  function start(index) {
-    stop();
-    quoteIdx = (index || 0);
+  /* Show the games page: the ambient music and the HUD fade out and the
+     game music fades in; the round waits for タッチしてスタート. */
+  function start() {
+    if (running) return;
     running = true;
-    cacheColours();
+    readyRound();
+    shown = {};
     sizeCanvases();
+    if (!howEl.firstChild) buildHowto();
+    scoreBox.style.setProperty('--score-shadow', String(G.scoreShadow));
+    scoreBox.style.setProperty('--ring', QW.size + 'px');
+    scoreBox.style.rowGap = G.gapEm + 'em';
+    howEl.style.lineHeight = String(G.howtoLine);
     fitStage();
     window.addEventListener('resize', fitStage);
-    var go = function() {
-      startTimer = 0;
-      if (!running) return;
-      syncBreath();
-      lastNow = performance.now();
-      rafId = requestAnimationFrame(frame);
-      showQuote(quoteIdx);
-    };
-    /* Wait for the fonts so the first quote is fitted to the real
-       letters, and give the stage's fade-in a moment to begin. */
+    fadeAmbientOut();
+    musicStart();
+    syncBreath();
+    lastNow = performance.now();
+    rafId = requestAnimationFrame(frame);
+    /* The instruction size is measured against the real font, so measure again once it has loaded. */
     var ready = (document.fonts && document.fonts.ready) ? document.fonts.ready : Promise.resolve();
-    ready.then(function() { if (running) startTimer = setTimeout(go, 350); });
+    ready.then(function () { if (running) fitHowto(); });
   }
 
   return {
     start: start,
     stop: stop,
-    reset: function() { stop(); },
-    index: function() { return quoteIdx; }
+    /* A new visit: the top score starts again from 0. */
+    newVisit: function () { best = 0; }
   };
 })();
 
@@ -8059,16 +8497,16 @@ function clearAllTyTimers() {
   for (var j = 0; j < tyIntervals.length; j++) clearInterval(tyIntervals[j]);
   tyTimers = [];
   tyIntervals = [];
-  /* The quotes window stops with everything else on this screen (going
-     back to the receipt, back to the table). The sound is not touched. */
-  if (typeof QuoteWindow !== 'undefined') QuoteWindow.stop();
+  /* The games page stops with everything else on this screen (going to the
+     receipt, back to the table). Stopping it fades the game music out and
+     brings the ambient music and the HUD back. */
+  if (typeof GameWindow !== 'undefined') GameWindow.stop();
 }
 function tyPushTimeout(fn, ms) {
   var id = setTimeout(fn, ms);
   tyTimers.push(id);
   return id;
 }
-function startQuoteCycle(index) { QuoteWindow.start(index || 0); }
 
 /* ============ THANK-YOU SEQUENCE ============ */
 function startThankyouSequence() {
@@ -8082,7 +8520,8 @@ function startThankyouSequence() {
   tyCarousel.classList.remove('hidden-out');
   tyDotsEl.classList.remove('hidden');
   tyAmbientStage.classList.remove('shown');
-  QuoteWindow.reset();
+  GameWindow.stop();
+  GameWindow.newVisit();                 /* the top score is for this visit only */
   tyReceiptBtn.classList.add('shown');
   tyCurrentPanel = 0;
   tyTrack.style.transform = 'translateX(0%)';
@@ -8096,7 +8535,7 @@ function resumeThankyouSequence() {
   tyReceiptBtn.classList.add('shown');
   if (tyExited) {
     tyAmbientStage.classList.add('shown');
-    startQuoteCycle(QuoteWindow.index());
+    GameWindow.start();
   } else {
     updateTySwipeHint();
   }
