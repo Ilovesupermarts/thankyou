@@ -27,6 +27,10 @@
      paddles shrink from 30° to 12° over the round. The last 10
      seconds glow and tick. Each run of hits plays a climbing chime.
 
+     Bounce: "Realistic" (default) is a true mirror bounce off a rounded
+     paddle, and a moving paddle pushes the ball by friction. Turn it off
+     for the earlier arcade bounce (speed-up and edge angle).
+
      After a round the result stays on screen until a tap. Paddle and
      ball colours can be picked from pairs made of the app's own palette.
 
@@ -77,9 +81,17 @@
                  0 0.16em 0.42em rgba(136, 46, 71, calc(var(--score-shadow, 0.6) * 0.4));
   }
   .pv-score .sc-row.time { margin-top: 0.15em; }
-  .pv-score .msg { margin-top: 0.8em; font-size: 0.9em; color: var(--text-mute); min-height: 1.5em; }
+  .pv-score .sc-row.main { white-space: nowrap; }
+  /* The message slot has a fixed height (big enough for the result and the
+     tap line together) and equal space above and below, so whatever is in it,
+     the scores above and the instructions below stay exactly where they are. */
+  .pv-score .slot {
+    height: 3.7em; margin: 0.7em 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+  }
+  .pv-score .msg { font-size: 0.9em; color: var(--text-mute); }
   /* "Tap here to continue": appears once a tap would be accepted, then breathes gently. */
-  .pv-score .tap { margin-top: 0.2em; font-size: 0.7em; letter-spacing: 0.14em; color: var(--text-mute); opacity: 0; transition: opacity 0.8s ease; min-height: 1.5em; }
+  .pv-score .tap { margin-top: 0.15em; font-size: 0.7em; letter-spacing: 0.14em; color: var(--text-mute); opacity: 0; transition: opacity 0.8s ease; }
   .pv-score .tap.on { opacity: 0.8; animation: pvTap 2.4s ease-in-out infinite; }
   @keyframes pvTap { 0%, 100% { opacity: 0.45; } 50% { opacity: 0.9; } }
   .pv-score .msg.title { font-size: 1.3em; font-weight: 600; color: #A3282A; }
@@ -87,12 +99,14 @@
   .pv-score .sc-row.main b.pop { transform: scale(1.25); transition: none; }
   /* How to play: small and quiet, under the scores. */
   .pv-score .howto {
-    margin: 0.9em auto 0; font-size: 0.6em; line-height: 1.8; letter-spacing: 0.08em;
+    margin: 0 auto; font-size: 0.6em; line-height: 1.8; letter-spacing: 0.08em;
     color: var(--text-mute); transition: opacity 0.8s ease;
   }
   .pv-score .howto.faint { opacity: 0.35; }
   .pv-score .howto.gone { opacity: 0; }
-  .pv-score .mult { margin-left: 0.4em; font-size: 0.75em; color: #D9643A; }
+  /* The ×2 / ×3 sits beside the score without taking part in the centring, so the score never shifts. */
+  .pv-score .mainwrap { position: relative; display: inline-block; }
+  .pv-score .mult { position: absolute; left: 100%; bottom: 0.05em; margin-left: 0.4em; white-space: nowrap; font-size: 0.75em; color: #D9643A; }
   /* The last seconds: the time turns warm and gently beats. */
   .pv-score .sc-row.time.warn { color: #C8341F; opacity: 1; font-weight: 600; }
   .pv-score .sc-row.time.warn span { display: inline-block; animation: pvBeat 1s ease-out infinite; }
@@ -234,12 +248,19 @@
         <canvas class="quote-ring-canvas" id="quoteRingCanvas" aria-hidden="true"></canvas>
         <!-- Where the quote sits in the app; here it holds the scores. -->
         <div class="quote-wrap" aria-live="polite">
+          <!-- Three blocks that never move: the scores, a fixed-height slot for
+               messages (centred between the scores and the instructions), and
+               the instructions. -->
           <div class="pv-score" id="scoreBox">
-            <div class="sc-row main">現在のスコア：<b id="scoreNow">0</b><span class="mult" id="scoreMult"></span></div>
-            <div class="sc-row">最高スコア：<span id="scoreBest">0</span></div>
-            <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
-            <div class="msg" id="scoreMsg"></div>
-            <div class="tap" id="scoreTap">ここをタップして続ける</div>
+            <div class="sc-block">
+              <div class="sc-row main"><span class="mainwrap">現在のスコア：<b id="scoreNow">0</b><span class="mult" id="scoreMult"></span></span></div>
+              <div class="sc-row">最高スコア：<span id="scoreBest">0</span></div>
+              <div class="sc-row time">残り時間：<span id="scoreTime">60</span>秒</div>
+            </div>
+            <div class="slot" id="scoreSlot">
+              <div class="msg" id="scoreMsg"></div>
+              <div class="tap" id="scoreTap">ここをタップして続ける</div>
+            </div>
             <div class="howto" id="scoreHow"></div>
           </div>
         </div>
@@ -332,7 +353,10 @@
     { id: 'pControl',   game: 'pong', label: 'Paddle control', type: 'select', def: 'point',
       options: [['point', 'Point: paddle goes where the finger is'], ['dial', 'Dial: drag to turn the paddle']] },
     { id: 'pBallSpeed', game: 'pong', label: 'Ball speed at the start (px/s)', min: 80,  max: 600, step: 10, def: 220 },
-    { id: 'pSpeedUp',   game: 'pong', label: 'Speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 10 },
+    { id: 'pReal',      game: 'pong', label: 'Realistic bounce (mirror bounce; a moving paddle pushes the ball; ignores speed-up and edge angle)', type: 'check', def: true },
+    { id: 'pGrip',      game: 'pong', label: 'Realistic: paddle grip, how much a moving paddle pushes the ball sideways (0 = none)', min: 0, max: 1.5, step: 0.05, def: 0.5 },
+    { id: 'pBounce',    game: 'pong', label: 'Realistic: bounciness (1 = perfectly springy)', min: 0.5, max: 1, step: 0.02, def: 1 },
+    { id: 'pSpeedUp',   game: 'pong', label: 'Arcade only: speed-up per hit (%)',     min: 0,   max: 15,  step: 1,  def: 10 },
     { id: 'pMaxSpeed',  game: 'pong', label: 'Top speed (px/s)',         min: 150, max: 900, step: 10, def: 660 },
     { id: 'pBallR',     game: 'pong', label: 'Ball size (radius px)',    min: 4,   max: 26,  step: 1,  def: 11 },
     { id: 'pShrink',    game: 'pong', label: 'Paddles get shorter during the round', type: 'check', def: true },
@@ -342,7 +366,7 @@
     { id: 'pPadDeg',    game: 'pong', label: 'Paddle length when shrinking is off (degrees)', min: 10, max: 120, step: 1, def: 17 },
     { id: 'pPadW',      game: 'pong', label: 'Paddle thickness (px)',    min: 4,   max: 30,  step: 1,  def: 14 },
     { id: 'pFollow',    game: 'pong', label: 'Paddle follow speed (40 = instant)', min: 2, max: 40, step: 1, def: 20 },
-    { id: 'pEnglish',   game: 'pong', label: 'Edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 32 },
+    { id: 'pEnglish',   game: 'pong', label: 'Arcade only: edge hits angle the ball by (degrees)', min: 0, max: 45, step: 1, def: 32 },
     { id: 'pTwo',       game: 'pong', label: 'Second paddle on the opposite side', type: 'check', def: true },
     { id: 'pRespawn',   game: 'pong', label: 'Pause before a new ball (s)', min: 0.5, max: 4, step: 0.1, def: 1.4 },
     { id: 'pTrail',     game: 'pong', label: 'Ball leaves a soft trail', type: 'check', def: true },
@@ -1092,16 +1116,20 @@
        over the set time, when shrinking is on. */
     function padDeg() {
       if (!cfg('Shrink')) return +cfg('PadDeg');
-      var t = round.state === 'play' ? Math.min(1, S.prog / (+cfg('ShrinkSecs') * 1000)) : round.state === 'over' ? 1 : 0;
-      return +cfg('PadStart') + (+cfg('PadMin') - +cfg('PadStart')) * t;
+      if (round.state === 'play') G.padT = Math.min(1, S.prog / (+cfg('ShrinkSecs') * 1000));
+      else if (round.state === 'ready') G.padT = 0;
+      /* When the round is over the paddle keeps the length it had when time ran out. */
+      return +cfg('PadStart') + (+cfg('PadMin') - +cfg('PadStart')) * G.padT;
     }
     var G = {
       padAng: -Math.PI / 2, padTarget: -Math.PI / 2,
+      padPrev: -Math.PI / 2, padDelta: 0, omega: 0, padT: 0,   /* omega: how fast the paddle is turning (rad/s) */
+      padDeg: padDeg,
       balls: [], rally: 0,
       /* A fresh round: paddle to the top, no ball yet. */
       reset: function () {
-        G.rally = 0; G.balls = [];
-        G.padAng = G.padTarget = -Math.PI / 2;
+        G.rally = 0; G.balls = []; G.padT = 0;
+        G.padAng = G.padTarget = G.padPrev = -Math.PI / 2; G.padDelta = G.omega = 0;
         if (extra && extra.reset) extra.reset();
       },
       /* Put a new ball in, waiting `wait` seconds before it moves. */
@@ -1117,7 +1145,7 @@
         G.balls.forEach(function (b) { if (b.state !== 'lost') { b.state = 'lost'; b.t0 = now; b.vx *= 0.15; b.vy *= 0.15; } });
       },
       live: function () { return G.balls.filter(function (b) { return b.state !== 'lost'; }).length; },
-      paddles: function () { return v.game === 'pong' && v.pTwo ? [G.padAng, G.padAng + Math.PI] : [G.padAng]; },
+      paddles: function () { return paddlesAt(1); },
       update: function (dt, now) {
         /* Paddle follows the finger. */
         if (finger.down) {
@@ -1126,8 +1154,11 @@
         }
         var rate = +cfg('Follow');
         var k = rate >= 40 ? 1 : 1 - Math.exp(-rate * dt);
+        G.padPrev = G.padAng;
         G.padAng = wrapAng(G.padAng + wrapAng(G.padTarget - G.padAng) * k);
         G.padTarget = G.padAng + wrapAng(G.padTarget - G.padAng);
+        G.padDelta = wrapAng(G.padAng - G.padPrev);                 /* how far it turned this frame */
+        G.omega = dt > 1e-4 ? G.padDelta / dt : 0;
 
         for (var i = G.balls.length - 1; i >= 0; i--) {
           var b = G.balls[i];
@@ -1166,25 +1197,104 @@
       }
     };
 
+    /* Where the paddle(s) are part-way through this frame (f = 0 → 1), so a
+       fast sweep can't jump over a ball. */
+    function paddlesAt(f) {
+      var a = G.padPrev + G.padDelta * f;
+      return v.game === 'pong' && v.pTwo ? [a, a + Math.PI] : [a];
+    }
+
+    /* Everything that happens when the ball is returned. (cx, cy) is the contact point. */
+    function paddleHit(cx, cy, now) {
+      G.rally++;
+      addRipple(cx, cy, v.cPaddle, 34, 800);
+      chime(v.climb ? G.rally - 1 : Math.min(8, 2 + (G.rally % 7)));
+      if (extra && extra.onPaddle) extra.onPaddle(G);
+      /* Every N hits in a row, one more ball (up to the limit). */
+      if (G.rally % +cfg('ExtraHits') === 0 && G.live() < +cfg('MaxBalls')) {
+        G.serve(now, 0.6);
+        if (v.ballFx) {
+          addRipple(0, 0, v.cBall, Rc() * 0.8, 1400);
+          addRipple(0, 0, v.cPaddle, Rc() * 0.5, 1100);
+          flashMsg('ボール追加！', 1300);
+        }
+        setTimeout(function () { playBell(1567.98, 0.12 * +v.volume, 1.2); }, 120);
+      }
+    }
+
+    /* REALISTIC BOUNCE. The paddle is a rounded bar lying on the ring (the
+       same shape that is drawn). A ball that touches it is bounced like this:
+         · the bounce is measured against the paddle's own surface speed, so a
+           paddle sweeping into a ball hits it harder, and one moving away
+           hits it softer;
+         · friction ("grip") drags the ball sideways toward the paddle's own speed,
+           so a moving paddle pushes the ball, but never more than the grip allows
+           and never beyond the paddle's speed. A still paddle pushes nothing;
+         · the ends of the bar are round, so a ball that catches an end is
+           knocked off at an angle, like a real ball off a real bat;
+         · no speed-up and no edge-angle trick: only the top speed still applies.
+       Returns the contact point if there was a hit, otherwise null. */
+    function realHit(b, br, pw, R, pads) {
+      var a = Math.atan2(b.y, b.x), d = Math.hypot(b.x, b.y), half = padDeg() * DEG / 2, om = G.omega;
+      for (var i = 0; i < pads.length; i++) {
+        var off = wrapAng(a - pads[i]), onBody = Math.abs(off) <= half;
+        var pa = onBody ? a : pads[i] + (off > 0 ? half : -half);      /* nearest point on the bar's centre line */
+        var px = R * Math.cos(pa), py = R * Math.sin(pa), nx, ny;
+        if (onBody) {
+          if (R - d >= br + pw / 2 || d > R + pw / 2) continue;         /* not touching (or already past) */
+          nx = -Math.cos(a); ny = -Math.sin(a);                         /* straight back toward the centre */
+        } else {
+          var dx = b.x - px, dy = b.y - py, dist = Math.hypot(dx, dy);
+          if (dist >= br + pw / 2) continue;
+          if (dist < 1e-6) { nx = -Math.cos(a); ny = -Math.sin(a); } else { nx = dx / dist; ny = dy / dist; }
+        }
+        var ux = -om * py, uy = om * px;                                /* the paddle's surface speed at the contact */
+        var wx = b.vx - ux, wy = b.vy - uy;                             /* the ball as the paddle sees it */
+        var vn = wx * nx + wy * ny;
+        if (vn >= 0) continue;                                          /* already moving apart */
+        var jn = -(1 + +cfg('Bounce')) * vn;                            /* the bounce: a push along the surface normal */
+        b.vx += jn * nx; b.vy += jn * ny;                               /* (a still paddle gives an exact mirror bounce) */
+        /* Grip: the moving surface drags the ball sideways. The push is never more than
+           the paddle's own surface speed, never more than grip × the bounce force, and
+           never takes the ball past the paddle's speed. So a still paddle pushes nothing
+           and gives an exact mirror bounce. */
+        var tx = -ny, ty = nx, ut = ux * tx + uy * ty;
+        var sgn = ut < 0 ? -1 : 1, slower = Math.abs(ut) - sgn * (b.vx * tx + b.vy * ty);
+        var drag = Math.min(Math.abs(ut), +cfg('Grip') * jn, Math.max(0, slower));
+        b.vx += sgn * drag * tx; b.vy += sgn * drag * ty;
+        var sp = Math.hypot(b.vx, b.vy), top = +cfg('MaxSpeed');
+        if (sp > top) { b.vx *= top / sp; b.vy *= top / sp; }
+        b.x = px + nx * (br + pw / 2 + 0.5); b.y = py + ny * (br + pw / 2 + 0.5);
+        return { x: px, y: py };
+      }
+      return null;
+    }
+
     function moveBall(b, dt, now) {
       var R = Rc(), br = +cfg('BallR'), pw = +cfg('PadW');
       var speed = Math.hypot(b.vx, b.vy);
-      var steps = Math.max(1, Math.ceil(speed * dt / Math.max(2, br * 0.5)));
+      var steps = Math.max(1, Math.min(150, Math.ceil((speed * dt + Math.abs(G.padDelta) * R) / Math.max(2, br * 0.5))));
       var h = dt / steps;
       for (var s = 0; s < steps; s++) {
         b.x += b.vx * h; b.y += b.vy * h;
         if (extra && extra.collide) extra.collide(G, b, br);
         var d = Math.hypot(b.x, b.y);
+        var pads = paddlesAt((s + 1) / steps);
+        if (v.pReal) {
+          var rh = realHit(b, br, pw, R, pads);
+          if (rh) paddleHit(rh.x, rh.y, now);
+          d = Math.hypot(b.x, b.y);
+        }
         var inner = R - pw / 2;
-        if (d + br >= inner && d < R) {
+        if (!v.pReal && d + br >= inner && d < R) {
           var nx = b.x / d, ny = b.y / d;
           if (b.vx * nx + b.vy * ny > 0) {
             var ang = Math.atan2(b.y, b.x);
             var reach = padDeg() * DEG / 2 + Math.asin(Math.min(1, br / d));
             var hit = null;
-            G.paddles().forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
+            pads.forEach(function (pa) { var off = wrapAng(ang - pa); if (Math.abs(off) <= reach) hit = off / reach; });
             if (hit !== null) {
-              /* Bounce off the ring's normal, then angle it by where it hit. */
+              /* ARCADE BOUNCE: bounce off the ring's normal, then angle it by where it hit. */
               var dot = b.vx * nx + b.vy * ny;
               var rx = b.vx - 2 * dot * nx, ry = b.vy - 2 * dot * ny;
               var sp = Math.min(+cfg('MaxSpeed'), Math.hypot(rx, ry) * (1 + cfg('SpeedUp') / 100));
@@ -1195,20 +1305,7 @@
               b.vx = Math.cos(dir) * sp; b.vy = Math.sin(dir) * sp;
               var back2 = inner - br - 0.5;
               b.x = nx * back2; b.y = ny * back2;
-              G.rally++;
-              addRipple(nx * R, ny * R, v.cPaddle, 34, 800);
-              chime(v.climb ? G.rally - 1 : Math.min(8, 2 + (G.rally % 7)));
-              if (extra && extra.onPaddle) extra.onPaddle(G);
-              /* Every N hits in a row, one more ball (up to the limit). */
-              if (G.rally % +cfg('ExtraHits') === 0 && G.live() < +cfg('MaxBalls')) {
-                G.serve(now, 0.6);
-                if (v.ballFx) {
-                  addRipple(0, 0, v.cBall, Rc() * 0.8, 1400);
-                  addRipple(0, 0, v.cPaddle, Rc() * 0.5, 1100);
-                  flashMsg('ボール追加！', 1300);
-                }
-                setTimeout(function () { playBell(1567.98, 0.12 * +v.volume, 1.2); }, 120);
-              }
+              paddleHit(nx * R, ny * R, now);
             }
           }
         }
