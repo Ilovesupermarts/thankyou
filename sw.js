@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v133';
+const CACHE = 'thankyou-v134';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -93,9 +93,8 @@ self.addEventListener('fetch', function(e) {
 
   var url = new URL(e.request.url);
 
-  /* presets.json and quotes.json — network-first (see networkFirst). */
-  if (url.pathname.endsWith('/presets.json') ||
-      url.pathname.endsWith('/quotes.json')) {
+  /* presets.json — network-first (see networkFirst). */
+  if (url.pathname.endsWith('/presets.json')) {
     e.respondWith(networkFirst(e, false));
     return;
   }

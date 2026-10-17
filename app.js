@@ -1,4 +1,4 @@
-var BUILD = 'v133';
+var BUILD = 'v134';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -4660,7 +4660,10 @@ nameScreenRows.addEventListener('input', function(e) {
 nameScreenRows.addEventListener('focusin', function(e) {
   var input = e.target;
   if (input && input.classList.contains('price-input')) {
-    setTimeout(function() { try { input.select(); } catch (err) {} }, 50);
+    setTimeout(function() {
+      if (document.activeElement !== input) return;
+      try { input.select(); } catch (err) {}
+    }, 50);
   }
 });
 
@@ -4870,7 +4873,10 @@ if (tipInput) {
     else tipInput.value = parseInt(digits, 10).toLocaleString();
   });
   tipInput.addEventListener('focus', function() {
-    setTimeout(function() { tipInput.select(); }, 50);
+    setTimeout(function() {
+      if (document.activeElement !== tipInput) return;
+      tipInput.select();
+    }, 50);
   });
 }
 function setTipValue(value) {
@@ -6158,7 +6164,10 @@ function bindReceiptItemListeners() {
         updateReceiptTotal();
       });
       input.addEventListener('focus', function() {
-        setTimeout(function() { input.select(); }, 50);
+        setTimeout(function() {
+          if (document.activeElement !== input) return;
+          input.select();
+        }, 50);
       });
       input.addEventListener('focusout', function() {
         var item = input.closest('.receipt-item');
@@ -8071,6 +8080,9 @@ var GameWindow = (function() {
     var m = music;
     if (!m.on) return;
     var sg = SONG_C, dur = 60 / sg.bpm / 2;
+    /* After the screen sleeps the timer stalls but the audio clock may
+       not. Skip the missed notes instead of playing them all at once. */
+    if (m.next < soundAudioCtx.currentTime) m.next = soundAudioCtx.currentTime + 0.05;
     while (m.next < soundAudioCtx.currentTime + 0.15) {
       var i = m.step % sg.len, t = m.next, e;
       if ((e = sg.mel[i]))  voice(m.out, pulseWave(sg.lead), hz(e[0]), t, e[1] * dur, sg.leadVol);
