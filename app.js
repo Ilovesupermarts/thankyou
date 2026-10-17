@@ -3198,6 +3198,7 @@ var receiptScreen = document.getElementById('receiptScreen');
 var receiptItems = document.getElementById('receiptItems');
 var receiptConfirmBtn = document.getElementById('receiptConfirmBtn');
 var receiptBackBtn = document.getElementById('receiptBackBtn');
+var receiptStampEl = document.getElementById('receiptStamp');
 
 var thankyouScreen = document.getElementById('thankyouScreen');
 
@@ -6046,6 +6047,7 @@ function buildReceipt(opts) {
   var deferItems = !!opts.deferItems;
 
   cancelPendingReceiptShake();
+  resetReceiptStamp();
   receiptItems.innerHTML = '';
   var receiptToName = document.getElementById('receiptToName');
   if (receiptToName) {
@@ -6388,8 +6390,65 @@ confirmNo.addEventListener('click', function(e) {
 });
 
 /* ============ RECEIPT CONFIRM ============ */
+/* Hanko stamp: she taps confirm, the 承 seal presses onto the paper
+   beside the total, holds for a beat, then the receipt carries on to the
+   thank-you screen. receiptStampTimers lets a fresh receipt cancel a
+   stamp that is still landing. */
+var receiptStampBusy = false;
+var receiptStampTimers = [];
+
+function resetReceiptStamp() {
+  for (var i = 0; i < receiptStampTimers.length; i++) clearTimeout(receiptStampTimers[i]);
+  receiptStampTimers = [];
+  receiptStampBusy = false;
+  if (receiptStampEl) receiptStampEl.classList.remove('stamping');
+  if (receiptScreen) receiptScreen.classList.remove('stamping');
+}
+
+function playReceiptStamp(onDone) {
+  receiptStampBusy = true;
+  receiptScreen.classList.add('stamping');
+
+  var reduced = false;
+  try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (err) { /* silent */ }
+
+  /* The stamp sits beside the total. If the receipt is scrolled so the
+     total is off screen, bring it into view first. */
+  var lead = 0;
+  var paper = receiptScreen.querySelector('.receipt-paper');
+  var totalLine = receiptScreen.querySelector('.receipt-total-line');
+  if (paper && totalLine) {
+    var pr = paper.getBoundingClientRect();
+    var lr = totalLine.getBoundingClientRect();
+    if (lr.top < pr.top + 24 || lr.bottom > pr.bottom - 24) {
+      var shift = (lr.top + lr.height / 2) - (pr.top + pr.height / 2);
+      try { paper.scrollBy({ top: shift, behavior: 'smooth' }); } catch (err) { paper.scrollTop += shift; }
+      lead = 350;
+    }
+  }
+
+  receiptStampTimers.push(setTimeout(function() {
+    if (receiptStampEl) {
+      void receiptStampEl.offsetWidth;
+      receiptStampEl.classList.add('stamping');
+    }
+    if (!reduced) {
+      /* Impact is about 55% through the 0.55s press. */
+      receiptStampTimers.push(setTimeout(function() { haptic(18); }, 300));
+    } else {
+      haptic(18);
+    }
+    receiptStampTimers.push(setTimeout(function() {
+      receiptStampBusy = false;
+      receiptScreen.classList.remove('stamping');
+      onDone();
+    }, reduced ? 400 : 1050));
+  }, lead));
+}
+
 receiptConfirmBtn.addEventListener('click', function(e) {
   e.preventDefault();
+  if (receiptStampBusy) return;
   haptic(8);
   cancelPendingReceiptShake();
 
@@ -6410,6 +6469,10 @@ receiptConfirmBtn.addEventListener('click', function(e) {
     return;
   }
 
+  playReceiptStamp(continueAfterReceiptStamp);
+});
+
+function continueAfterReceiptStamp() {
   if (receiptOpenedFromThankyou) {
     receiptOpenedFromThankyou = false;
     unlockBodyForReceipt();
@@ -6443,12 +6506,13 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   setTimeout(function() {
     receiptScreen.classList.remove('above-thankyou');
   }, 1100);
-});
+}
 
 /* ============ BACK TO TABLE ============ */
 function returnToTable() {
   clearAllTyTimers();
   cancelPendingReceiptShake();
+  resetReceiptStamp();
   var receiptWasVisible = receiptScreen.classList.contains('visible');
   if (thankyouScreen.classList.contains('visible')) {
     thankyouScreen.style.transition = 'none';
