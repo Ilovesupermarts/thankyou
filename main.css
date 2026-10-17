@@ -2551,6 +2551,39 @@
   .receipt-footer { text-align: center; margin-top: 22px; }
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
+  /* Hanko (承) stamped beside the total when she confirms. Hidden until
+     .stamping / .stamped is added from app.js. multiply lets the washi
+     fibres show faintly through the ink, like a real impression. */
+  .receipt-total-line { position: relative; }
+  .receipt-stamp {
+    position: absolute; left: 43%; top: 50%;
+    width: 104px; height: 104px; margin-top: -52px;
+    pointer-events: none; z-index: 2;
+    mix-blend-mode: multiply;
+    opacity: 0;
+    transform: rotate(-12deg);
+    transform-origin: 50% 50%;
+  }
+  .receipt-stamp svg { display: block; width: 100%; height: 100%; overflow: visible; }
+  .receipt-stamp.stamping {
+    animation: receiptStampPress 0.55s cubic-bezier(0.3, 0, 0.2, 1) forwards;
+  }
+  /* Lifted high and a little large, drops onto the paper (impact at ~55%),
+     squashes slightly, settles. */
+  @keyframes receiptStampPress {
+    0%   { opacity: 0;    transform: translateY(-14px) rotate(-18deg) scale(1.7); }
+    30%  { opacity: 0.55; transform: translateY(-8px)  rotate(-15deg) scale(1.35); }
+    55%  { opacity: 0.95; transform: translateY(0)     rotate(-12deg) scale(0.93); }
+    75%  { opacity: 0.92; transform: translateY(0)     rotate(-12deg) scale(1.03); }
+    100% { opacity: 0.92; transform: translateY(0)     rotate(-12deg) scale(1); }
+  }
+  /* While the stamp lands, ignore taps on the receipt so nothing can be
+     edited or pressed twice. */
+  .receipt-screen.stamping .receipt-paper { pointer-events: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .receipt-stamp.stamping { animation: none; opacity: 0.92; }
+  }
+
   @media (min-width: 700px) {
     .receipt-paper { max-width: 480px; padding: 42px 42px 34px 42px; }
     .receipt-thanks { font-size: 22px; letter-spacing: 2px; margin-bottom: 18px; }
