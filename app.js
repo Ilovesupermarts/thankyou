@@ -1,4 +1,4 @@
-var BUILD = 'v134';
+var BUILD = 'v135';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -54,14 +54,9 @@ var BUILD = 'v134';
          session. Reload restores it.
        - Three-way toggle. #themeToggle cycles 🍁 autumn → ❄️
          winter → 🌸 default → 🍁 autumn. isWarmPaletteTheme(theme)
-         returns true for autumn and winter, so the ambient
-         acoustic engine and the HUD spectrum palette both treat
-         winter as a first-class autumn-family theme rather than
-         a separate code path. playAmbientSound()'s terminal guard
-         is now if (!isWarmPaletteTheme(currentTheme)) return 0; —
-         an explicit 'autumn' string check would have silently
-         killed playback in winter. drawHudSpectrum() reads the
-         same predicate for its isAutumn colour branch.
+         returns true for autumn and winter. It now only picks the
+         HUD spectrum colours (drawHudSpectrum()); the ambient music
+         plays in every theme, sakura included.
        - 7-tier falling snowflakes. Two overlays,
          .snow-flakes-overlay (z-index -1) and
          .snow-flakes-overlay-front (z-index 5), mirroring the
@@ -1095,7 +1090,7 @@ function applyTheme(theme) {
      leave sound or animation running alone against a sakura
      theme. */
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
-  if (isWarmPaletteTheme(theme) && isCarouselRunning) {
+  if (isCarouselRunning) {
     startAmbient();
   } else {
     stopAmbient();
@@ -2486,12 +2481,11 @@ function stopAmbient() {
 }
 
 function playAmbientSound() {
-  /* Terminal guards: sound disabled, non-warm-palette theme, or
-     carousel inactive. Each of these states is not expected to
+  /* Terminal guards: sound disabled or carousel inactive. Every theme
+     (autumn, winter, sakura) plays the same ambient music. Each of these states is not expected to
      flip without a fresh user gesture (or a full reload), so the
      scheduler stops rather than retrying. */
   if (!SOUND_ENABLED) return 0;
-  if (!isWarmPaletteTheme(currentTheme)) return 0;
   if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
 
   /* Terminal guard: AudioContext failed or unavailable. Since
@@ -7519,11 +7513,14 @@ var tyIntervals = [];
    Look: while the games page is showing, the falling leaves (snow in winter)
    fade out (body.games-active in main.css).
 
-   Sound: while the games page is showing, the ambient music, the wind
-   chime and the audio HUD fade out and a short retro (chiptune) loop,
-   さくら散歩, plays instead, the whole time. When she leaves the page
-   (the receipt, back to the table) the game music fades out and the
-   ambient music and the HUD come back. Game sounds go straight to the
+   Sound: the games page opens quietly: the ambient music, the wind
+   chime and the audio HUD carry on. Only when she taps タッチしてスタート
+   do they fade out and a short retro (chiptune) loop, さくら散歩, play
+   instead. If she doesn't continue within G.idleReturn ms after a round,
+   the game music fades out and the ambient music and the HUD come back
+   (tapping ここをタップして続ける before that keeps the game music).
+   When she leaves the page (the receipt, back to the table) the game
+   music fades out and the ambient music and the HUD come back. Game sounds go straight to the
    speakers through their own gain, not through soundMasterGain, so
    they don't drive the swell analyser.
 
@@ -7537,6 +7534,9 @@ var GameWindow = (function() {
     round: 60,                 /* seconds per round: one full turn of the countdown */
     warnSecs: 10,              /* the last seconds glow and tick */
     overGuard: 1200,           /* ms after a round ends before the continue button counts */
+    idleReturn: 20000,         /* ms after a round with no tap on continue: the ambient music returns */
+    steerSlop: 20,             /* px: the finger that started a round must move this far before it steers */
+    deadCentre: 20,            /* px: a finger this close to the ring's centre doesn't turn the paddles */
     scoreShadow: 0.6,          /* drop shadow under 現在のスコア */
     howtoFill: 66,             /* instructions: the longest line fills this % of the ring */
     howtoMin: 13,              /* instructions: never smaller than this (px) */
@@ -8130,7 +8130,7 @@ var GameWindow = (function() {
      own coordinates (px from the ring's centre, before the
      fit-to-screen scale).
      ============================================================ */
-  var finger = { down: false, id: null, x: 0, y: 0, ang: 0 };
+  var finger = { down: false, id: null, x: 0, y: 0, ang: 0, armed: false, ax: 0, ay: 0 };
   function toWorld(e) {
     var r = gameCv.getBoundingClientRect();
     var k = r.width / GS;
@@ -8139,16 +8139,22 @@ var GameWindow = (function() {
   stage.addEventListener('pointerdown', function (e) {
     if (!running || finger.down) return;
     var onBtn = !!(e.target.closest && e.target.closest('#gameBtn'));
-    /* Only the button starts or continues a round, and that press doesn't steer. */
+    var p = toWorld(e);
+    /* Only the button starts or continues a round. If that press starts
+       a round, the same finger can carry on and steer, but the paddles
+       stay put until it has moved a little from where it pressed. */
     if (round.state !== 'play') {
       if (onBtn) pressButton(performance.now());
       e.preventDefault();
-      return;
+      if (round.state !== 'play') return;
+      finger.armed = true; finger.ax = p.x; finger.ay = p.y;
+    } else {
+      finger.armed = false;
     }
     finger.down = true; finger.id = e.pointerId;
-    var p = toWorld(e);
     finger.x = p.x; finger.y = p.y;
-    finger.ang = Math.atan2(p.y, p.x);
+    /* Near the centre the angle jumps about, so keep the paddles where they are. */
+    finger.ang = (!finger.armed && Math.hypot(p.x, p.y) >= G.deadCentre) ? Math.atan2(p.y, p.x) : pad.ang;
     try { stage.setPointerCapture(e.pointerId); } catch (er) {}
     e.preventDefault();
   });
@@ -8156,6 +8162,11 @@ var GameWindow = (function() {
     if (!finger.down || e.pointerId !== finger.id) return;
     var p = toWorld(e);
     finger.x = p.x; finger.y = p.y;
+    if (finger.armed) {
+      if (Math.hypot(p.x - finger.ax, p.y - finger.ay) < G.steerSlop) return;
+      finger.armed = false;
+    }
+    if (Math.hypot(p.x, p.y) < G.deadCentre) return;
     finger.ang = Math.atan2(p.y, p.x);
   });
   function lift(e) { if (e.pointerId === finger.id) { finger.down = false; finger.id = null; } }
@@ -8359,13 +8370,20 @@ var GameWindow = (function() {
     scoreNowEl.classList.add('pop');
     requestAnimationFrame(function () { requestAnimationFrame(function () { scoreNowEl.classList.remove('pop'); }); });
   }
+  var idleTimer = 0;
+  function clearIdleTimer() { if (idleTimer) { clearTimeout(idleTimer); idleTimer = 0; } }
   function readyRound() {
+    clearIdleTimer();
     effects = [];
     round.state = 'ready'; round.score = 0; round.flash = null;
     S.phase = 'idle'; S.prog = 0; prevSweep = null;
     resetBalls();
   }
   function startRound(now) {
+    clearIdleTimer();
+    /* The game music takes over from the ambient music only now. */
+    fadeAmbientOut();
+    musicStart();
     effects = [];
     resetBalls();
     serve(now, G.respawn);
@@ -8383,6 +8401,14 @@ var GameWindow = (function() {
     S.phase = 'idle';
     fadeBalls(now);
     chime(4); setTimeout(function () { chime(6); }, 180); setTimeout(function () { chime(8); }, 360);
+    /* Nobody continued: let the room go back to the ambient music. */
+    clearIdleTimer();
+    idleTimer = setTimeout(function () {
+      idleTimer = 0;
+      if (!running || round.state !== 'over') return;
+      musicStop(false);
+      restoreAmbient();
+    }, G.idleReturn);
   }
   /* The button: タッチしてスタート works at once; the continue button waits a moment. */
   function pressButton(now) {
@@ -8491,8 +8517,6 @@ var GameWindow = (function() {
     fitStage();
     window.addEventListener('resize', fitStage);
     document.body.classList.add('games-active');         /* the falling leaves / snow fade out */
-    fadeAmbientOut();
-    musicStart();
     syncBreath();
     lastNow = performance.now();
     rafId = requestAnimationFrame(frame);
