@@ -1537,7 +1537,7 @@
     75% { border-bottom-color: var(--accent); background: var(--soft-1); }
     100% { border-bottom-color: var(--border-2); background: transparent; }
   }
-  .row.service-hint .service-input { animation: serviceHintFlash 0.9s ease-out; border-bottom-style: solid; }
+  .row.service-hint .service-input { animation: serviceHintFlash 0.9s ease-out; }
 
   @keyframes priceHintFlash {
     0% { background: var(--soft-1); border-color: var(--border-1); }

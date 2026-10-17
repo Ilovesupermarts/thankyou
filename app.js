@@ -4206,6 +4206,8 @@ function flashCustomRowHint(row) {
 function tryOpenCustomService(row, withHint) {
   if (!row) return;
   if (!isAllowedCustomRow(row)) {
+    var tapped = row.querySelector('.service-input');
+    if (tapped && document.activeElement === tapped) { try { tapped.blur(); } catch (e) {} }
     var first = firstUnnamedCustomRow();
     if (first) { flashCustomRowHint(first); haptic(15); }
     return;
