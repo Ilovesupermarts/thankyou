@@ -2643,6 +2643,16 @@
     transition: opacity 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .ty-carousel.hidden-out { opacity: 0; transform: translateY(-20px); filter: blur(12px); pointer-events: none; }
+  /* While the receipt is reopened from the thank-you screen, everything the
+     thank-you screen shows (text, dots, swipe hint, button, games stage) is
+     tucked away, so the translucent receipt sits over the plain background
+     only. Without this the thank-you text showed through the paper as it
+     faded out. Removing the class lets each piece fade back in at its own
+     pace once the receipt is gone. */
+  .thankyou-screen.under-receipt > * {
+    opacity: 0 !important; pointer-events: none !important;
+    transition: opacity 0.35s ease !important;
+  }
   .ty-track { display: flex; width: 400%; height: 100%; transition: transform 0.5s cubic-bezier(0.33, 1, 0.68, 1); will-change: transform; }
   .ty-track.dragging { transition: none; }
   .ty-panel { width: calc(100% / 4); height: 100%; display: flex; align-items: center; justify-content: center; padding: 80px 24px 120px 24px; text-align: center; }

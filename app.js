@@ -6511,6 +6511,7 @@ function continueAfterReceiptStamp() {
 /* ============ BACK TO TABLE ============ */
 function returnToTable() {
   clearAllTyTimers();
+  thankyouScreen.classList.remove('under-receipt');
   cancelPendingReceiptShake();
   resetReceiptStamp();
   var receiptWasVisible = receiptScreen.classList.contains('visible');
@@ -8618,6 +8619,7 @@ function tyPushTimeout(fn, ms) {
 /* ============ THANK-YOU SEQUENCE ============ */
 function startThankyouSequence() {
   clearAllTyTimers();
+  thankyouScreen.classList.remove('under-receipt');
   document.body.classList.add('thankyou-active');
   if (tyReceiptBtnLabel) {
     tyReceiptBtnLabel.textContent = rejected ? 'サービス選択に戻る' : '内容を確認する';
@@ -8638,6 +8640,7 @@ function startThankyouSequence() {
   if (numpad) numpad.classList.remove('visible', 'receipt-mode');
 }
 function resumeThankyouSequence() {
+  thankyouScreen.classList.remove('under-receipt');
   applyTyPanel1Content();
   tyReceiptBtn.classList.add('shown');
   if (tyExited) {
@@ -8658,6 +8661,7 @@ tyReceiptBtn.addEventListener('click', function(e) {
   }
   clearAllTyTimers();
   buildReceipt();
+  thankyouScreen.classList.add('under-receipt');
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');
   setTimeout(function() {
