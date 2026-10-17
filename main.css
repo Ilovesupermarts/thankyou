@@ -184,9 +184,8 @@
      hard gradient edge at the bezel.
 
      No filter here any more — the previous brightness(1.08)
-     saturate(1.05) has been baked into the .light-orb gradient
-     stops below. With no filter on this element, the continuously
-     animating orb transforms no longer invalidate any ancestor
+     saturate(1.05) is gone. With no filter on this element, the
+     animating layers inside it no longer invalidate any ancestor
      offscreen pass, so the whole subtree stays compositor-side. */
   .ambient-stage {
     position: fixed;
@@ -332,15 +331,6 @@
     opacity: calc(0.60 + var(--audio-swell, 0) * 0.22);
   }
 
-  .shippo-mask-window .ambient-stage.layer-mirrored {
-    position: absolute;
-    top: -25%; left: -25%;
-    width: 150%; height: 150%;
-    transform-origin: 50% 50%;
-    transform: scaleX(-1);
-    pointer-events: none;
-  }
-
   .shippo-mask-window .ambient-mesh {
     opacity: 1.0 !important;
     transform: scale(calc(1 + var(--audio-swell, 0) * 0.06));
@@ -407,93 +397,6 @@
     opacity: 0.90;
   }
   html[data-theme="default"] .ambient-mesh { display: none; }
-
-  /* The three base orbs. Gradient stops include the previously
-     applied brightness(1.08) saturate(1.05) ancestor filter, baked
-     in so the visual remains constant now that the filter is gone.
-     金木犀 palette: amber, plum, coral.
-
-     circle closest-side pins the gradient's 100% radius to the
-     element's border-radius circle (see the LAYER 2 comment above
-     for the clipping mechanism). The 6-stop gaussian falloff
-     replaces the 3-stop linear ramp so the opacity drops to a true
-     zero before the clip boundary — no Mach-band ridge, no hard
-     arc against the silk canvas. */
-  .light-orb {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-    will-change: transform;
-  }
-
-  .orb-1 {
-    width: 70vw;
-    height: 70vw;
-    max-width: 900px;
-    max-height: 900px;
-    top: 10%;
-    left: 15%;
-    background: radial-gradient(circle closest-side,
-      rgba(230, 104, 38, 0.46) 0%,
-      rgba(230, 104, 38, 0.36) 25%,
-      rgba(255, 162, 89, 0.20) 50%,
-      rgba(255, 162, 89, 0.08) 70%,
-      rgba(255, 162, 89, 0.02) 85%,
-      rgba(255, 162, 89, 0) 100%);
-    animation: orbDrift1 11.58s ease-in-out infinite alternate;
-  }
-
-  .orb-2 {
-    width: 80vw;
-    height: 80vw;
-    max-width: 1050px;
-    max-height: 1050px;
-    top: 35%;
-    right: 5%;
-    background: radial-gradient(circle closest-side,
-      rgba(136, 46, 71, 0.40) 0%,
-      rgba(136, 46, 71, 0.30) 25%,
-      rgba(230, 104, 38, 0.16) 50%,
-      rgba(230, 104, 38, 0.06) 70%,
-      rgba(230, 104, 38, 0.015) 85%,
-      rgba(230, 104, 38, 0) 100%);
-    animation: orbDrift2 15.26s ease-in-out infinite alternate;
-  }
-
-  .orb-3 {
-    width: 55vw;
-    height: 55vw;
-    max-width: 700px;
-    max-height: 700px;
-    bottom: 10%;
-    left: 30%;
-    background: radial-gradient(circle closest-side,
-      rgba(255, 162, 89, 0.42) 0%,
-      rgba(255, 162, 89, 0.30) 25%,
-      rgba(136, 46, 71, 0.14) 50%,
-      rgba(136, 46, 71, 0.05) 70%,
-      rgba(136, 46, 71, 0.01) 85%,
-      rgba(136, 46, 71, 0) 100%);
-    animation: orbDrift3 10.00s ease-in-out infinite alternate;
-  }
-
-  @keyframes orbDrift1 {
-    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(22%, -16.5%, 0) scale(1.144) rotate(4deg); }
-    100% { transform: translate3d(-13.75%, 22%, 0) scale(0.928) rotate(-3deg); }
-  }
-
-  @keyframes orbDrift2 {
-    0%   { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-    50%  { transform: translate3d(-24.75%, 19.25%, 0) scale(1.096) rotate(-5deg); }
-    100% { transform: translate3d(16.5%, -22%, 0) scale(0.952) rotate(3deg); }
-  }
-
-  @keyframes orbDrift3 {
-    0%   { transform: translate3d(0, 0, 0) scale(1); }
-    50%  { transform: translate3d(16.5%, 13.75%, 0) scale(1.18); }
-    100% { transform: translate3d(-19.25%, -11%, 0) scale(0.904); }
-  }
 
   /* ============================================================
      MIST + LANTERNS — 霞灯 (Kasumi + Akari)
@@ -961,7 +864,6 @@
     .ambient-stage { transform: none !important; }
     .mote-field    { transform: none !important; }
     .mote          { animation: none !important; opacity: 0 !important; }
-    .light-orb     { animation: none !important; }
     .mist-band     { animation: none !important; }
     .lantern,
     .lantern-bloom { animation: none !important; opacity: 0 !important; }
@@ -1523,10 +1425,8 @@
   .custom-section-mark { flex-shrink: 0; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 15px; line-height: 1; color: var(--accent); }
   html[data-theme="autumn"] .custom-section-mark,
   html[data-theme="autumn"] .divider-text,
-  html[data-theme="autumn"] .blossom-mark,
   html[data-theme="winter"] .custom-section-mark,
-  html[data-theme="winter"] .divider-text,
-  html[data-theme="winter"] .blossom-mark {
+  html[data-theme="winter"] .divider-text {
     color: var(--secondary-accent, #882E47);
   }
   .custom-section-divider { display: flex; align-items: center; justify-content: center; gap: 10px; margin: 14px 14px 4px 14px; padding: 6px 0 2px 0; user-select: none; -webkit-user-select: none; }
@@ -2759,14 +2659,6 @@
   .ty-ambient-stage { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 100px 28px 120px 28px; overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 2s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   .ty-ambient-stage.shown { opacity: 1; pointer-events: auto; }
   .ty-ambient-inner { width: 100%; max-width: 640px; margin: auto; display: flex; flex-direction: column; align-items: center; text-align: center; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; padding: 20px 0; }
-  .blossom-divider { display: flex; justify-content: center; align-items: center; gap: 8px; height: 22px; margin: 0 0 34px 0; width: 100%; }
-  .blossom-mark { display: inline-block; font-size: 13px; line-height: 1; color: var(--accent); opacity: 0; transform: scale(0.4); filter: blur(4px); transition: opacity 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94), filter 0.9s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
-  /* Autumn + winter override routes .blossom-mark to plum — merged
-     with .custom-section-mark and .divider-text near the top of the
-     SECTION & CATEGORY BLOSSOM MARKS section. */
-  .blossom-mark.appeared { opacity: 1; transform: scale(1); filter: blur(0); animation: blossomPulse 2s ease-in-out infinite; }
-  @keyframes blossomPulse { 0%, 100% { opacity: 0.85; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }
-  .blossom-mark.resetting { opacity: 0; transform: scale(0.4); filter: blur(4px); animation: none; transition: opacity 0.7s ease, transform 0.7s ease, filter 0.7s ease; }
 
   /* ============================================================
      GAMES IN THE ROUND WINDOW (丸窓) — ポン
@@ -2969,8 +2861,6 @@
     .ty-mark { font-size: 26px; letter-spacing: 12px; }
     .ty-panel { padding: 80px 32px 130px 32px; }
     .ty-ambient-stage { padding: 100px 32px 130px 32px; }
-    .blossom-mark { font-size: 16px; }
-    .blossom-divider { gap: 11px; margin-bottom: 42px; }
     .ty-dots { bottom: 74px; }
     .ty-receipt-btn { font-size: 13px; padding: 10px 14px; bottom: 22px; left: 24px; }
     .dot { width: 12px; height: 12px; }
@@ -2999,8 +2889,6 @@
     .start-hint-line { font-size: 20px; letter-spacing: 4px; }
     .ty-line { font-size: 22px; }
     .ty-mark { font-size: 30px; }
-    .blossom-mark { font-size: 18px; }
-    .blossom-divider { gap: 14px; margin-bottom: 50px; }
     .ty-dots { bottom: 80px; }
     .ty-receipt-btn { font-size: 14px; padding: 10px 16px; bottom: 26px; left: 28px; }
     .dot { width: 13px; height: 13px; }
@@ -3042,8 +2930,6 @@
     .dot { width: 9px; height: 9px; }
     .ty-dots { bottom: 56px; }
     .ty-ambient-stage { padding: 70px 20px 100px 20px; }
-    .blossom-divider { gap: 6px; margin-bottom: 18px; height: 18px; }
-    .blossom-mark { font-size: 11px; }
     .ty-receipt-btn { bottom: 12px; left: 14px; padding: 6px 10px; font-size: 11px; }
     .price-wrap { min-width: 88px; padding: 7px 9px; }
     .summary { padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); }
@@ -3719,6 +3605,11 @@
   will-change: transform, opacity;
   filter: drop-shadow(0 1px 1.5px rgba(158, 59, 6, 0.25));
 }
+/* Sakura theme: the same florets in sakura pink, deep enough to read
+   against the pale sakura background. */
+html[data-theme="default"] .kinmokusei-floret { filter: drop-shadow(0 1px 1.5px rgba(122, 38, 54, 0.25)); }
+html[data-theme="default"] .kinmokusei-floret g { fill: #D96A80; }
+html[data-theme="default"] .kinmokusei-floret circle[r="1.5"] { fill: #9A3E4D; }
 
 /* Touch ripples: real water rings get THINNER as they spread. The
    old ripple scaled a small ring up 5×, so its border grew to ~8px.
@@ -3945,4 +3836,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v133"; }
+:root { --build: "v135"; }
