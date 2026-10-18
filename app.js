@@ -2070,6 +2070,8 @@ function initSound() {
       soundBuffers.check = uiBufs[1];
       soundBuffers.paper = uiBufs[2];
       soundReady = true;
+      /* Heavier than the UI taps, so rendered after they are ready. */
+      synthesizeStampChime().then(function(buf) { soundBuffers.stampChime = buf; }).catch(function() { /* silent */ });
     }).catch(function() { /* silent */ });
 
     /* ASYNC BACKGROUND PATH: one-shots and loop beds load
@@ -2155,6 +2157,104 @@ function makeSeamlessLoop(buffer, crossfadeSec) {
   }
 
   return out;
+}
+
+/* The stamp jingle (about 3s): a two-step bell fanfare, a quick koto-style
+   flourish up the scale, then a long shimmering chord with a few twinkles.
+   D major pentatonic, built from sine/triangle partials and a short
+   reverb, like the other synthesized UI sounds. Rendered once, off the
+   critical path, and played through playSound('stampChime'). */
+function synthesizeStampChime() {
+  var sr = soundAudioCtx.sampleRate;
+  var seconds = 3.0;
+  var offline = new OfflineAudioContext(1, Math.floor(sr * seconds), sr);
+
+  var master = offline.createGain();
+  master.connect(offline.destination);
+  var dry = offline.createGain();
+  dry.gain.value = 0.9;
+  dry.connect(master);
+
+  var irLen = Math.floor(sr * 1.6);
+  var ir = offline.createBuffer(1, irLen, sr);
+  var irData = ir.getChannelData(0);
+  var seed = 12345;
+  for (var n = 0; n < irLen; n++) {
+    seed = (seed * 1664525 + 1013904223) >>> 0;
+    var noise = (seed / 4294967296) * 2 - 1;
+    irData[n] = noise * Math.exp(-n / (sr * 0.45)) * (n < 200 ? n / 200 : 1);
+  }
+  var reverb = offline.createConvolver();
+  reverb.buffer = ir;
+  var reverbOut = offline.createGain();
+  reverbOut.gain.value = 0.55;
+  reverb.connect(reverbOut);
+  reverbOut.connect(master);
+  var wet = offline.createGain();
+  wet.connect(reverb);
+
+  function bell(dest, t, f, vol, dur) {
+    var parts = [[1, 1.0, 1.0], [2.01, 0.42, 0.55], [2.76, 0.28, 0.35], [4.07, 0.14, 0.22], [5.4, 0.07, 0.15]];
+    for (var i = 0; i < parts.length; i++) {
+      var o = offline.createOscillator();
+      o.type = 'sine';
+      o.frequency.value = f * parts[i][0];
+      var g = offline.createGain();
+      var pd = dur * parts[i][2];
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.linearRampToValueAtTime(vol * parts[i][1], t + 0.004);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + pd);
+      o.connect(g);
+      g.connect(dest);
+      o.start(t);
+      o.stop(t + pd + 0.05);
+    }
+  }
+  function pluck(dest, t, f, vol, dur) {
+    var o = offline.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = f;
+    var lp = offline.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.setValueAtTime(f * 9, t);
+    lp.frequency.exponentialRampToValueAtTime(f * 1.6, t + dur * 0.8);
+    var g = offline.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.linearRampToValueAtTime(vol, t + 0.003);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(lp);
+    lp.connect(g);
+    g.connect(dest);
+    o.start(t);
+    o.stop(t + dur + 0.05);
+  }
+
+  var D5 = 587.33, Fs5 = 739.99, A5 = 880.0, B5 = 987.77;
+  var D6 = 1174.66, E6 = 1318.51, Fs6 = 1479.98, A6 = 1760.0, B6 = 1975.53, D7 = 2349.32, E7 = 2637.02;
+
+  [D5, Fs5, A5].forEach(function(f) { bell(dry, 0.05, f, 0.26, 0.55); bell(wet, 0.05, f, 0.2, 0.55); });
+  var flourish = [A5, B5, D6, E6, Fs6, A6];
+  flourish.forEach(function(f, i) { pluck(dry, 0.30 + i * 0.055, f, 0.22, 0.5); pluck(wet, 0.30 + i * 0.055, f, 0.18, 0.5); });
+  var t = 0.30 + flourish.length * 0.055 + 0.02;
+  [D6, Fs6, A6, D7].forEach(function(f, k) { bell(dry, t + k * 0.01, f, 0.28, 4.0); bell(wet, t + k * 0.01, f, 0.24, 4.0); });
+  [[E7, 0.35], [B6, 0.62], [Fs6 * 2, 0.88], [A6, 1.12], [D7, 1.35]].forEach(function(p) {
+    bell(wet, t + p[1], p[0], 0.13, 1.6);
+  });
+
+  return offline.startRendering().then(function(buf) {
+    /* Level it like the other UI sounds and ease the last 0.25s to silence. */
+    var d = buf.getChannelData(0);
+    var peak = 0, i;
+    for (i = 0; i < d.length; i++) peak = Math.max(peak, Math.abs(d[i]));
+    var scale = peak > 0 ? 0.7 / peak : 1;
+    var fadeStart = d.length - Math.floor(sr * 0.25);
+    for (i = 0; i < d.length; i++) {
+      var v = d[i] * scale;
+      if (i > fadeStart) v *= (d.length - i) / (d.length - fadeStart);
+      d[i] = v;
+    }
+    return buf;
+  });
 }
 
 function synthesizeTock() {
@@ -6047,7 +6147,7 @@ function buildReceipt(opts) {
   var deferItems = !!opts.deferItems;
 
   cancelPendingReceiptShake();
-  resetReceiptStamp();
+  if (opts.keepStamp) cancelReceiptStampTimers(); else resetReceiptStamp();
   receiptItems.innerHTML = '';
   var receiptToName = document.getElementById('receiptToName');
   if (receiptToName) {
@@ -6135,6 +6235,8 @@ function buildReceipt(opts) {
   bindReceiptItemListeners();
   updateReceiptTotal();
 
+  if (opts.keepStamp) restoreReceiptStamp();
+
   if (!deferItems) revealReceiptItems(80);
 }
 
@@ -6186,6 +6288,7 @@ function bindReceiptItemListeners() {
         var item = btn.closest('.receipt-item');
         if (!item) return;
         if (item.classList.contains('removing')) return;
+        if (receiptStamped) return;
         haptic(8);
         cancelPendingReceiptShake();
         if (item._srcRow) {
@@ -6220,6 +6323,7 @@ function bindReceiptItemListeners() {
         var item = btn.closest('.receipt-item');
         if (!item) return;
         if (!item.classList.contains('removing')) return;
+        if (receiptStamped) return;
         haptic(10);
         if (item._srcRow) {
           var srcBox = item._srcRow.querySelector('.row-check');
@@ -6390,60 +6494,216 @@ confirmNo.addEventListener('click', function(e) {
 });
 
 /* ============ RECEIPT CONFIRM ============ */
-/* Hanko stamp: she taps confirm, the 承 seal presses onto the paper
-   beside the total, holds for a beat, then the receipt carries on to the
-   thank-you screen. receiptStampTimers lets a fresh receipt cancel a
-   stamp that is still landing. */
+/* Hanko stamp. The empty box between 合計 and the price is a signing box.
+   Tapping it presses the 承 seal exactly where she tapped (so it can land on
+   other content, like a real seal), plays a short jingle and locks the
+   receipt. A small ⊗ beside the seal lifts it off and unlocks again.
+   receiptStampMemo remembers where the seal sits so it comes back in the
+   same place when she reopens the receipt from the thank-you screen; it is
+   cleared when she lifts the seal, goes back to the service table, or a
+   fresh receipt is built. */
 var receiptStampBusy = false;
+var receiptStamped = false;
+var receiptStampMemo = null;
 var receiptStampTimers = [];
+var receiptStampZone = document.getElementById('receiptStampZone');
+var receiptStampHolder = document.getElementById('receiptStampHolder');
+var receiptStampX = document.getElementById('receiptStampX');
 
-function resetReceiptStamp() {
+function cancelReceiptStampTimers() {
   for (var i = 0; i < receiptStampTimers.length; i++) clearTimeout(receiptStampTimers[i]);
   receiptStampTimers = [];
   receiptStampBusy = false;
-  if (receiptStampEl) receiptStampEl.classList.remove('stamping');
   if (receiptScreen) receiptScreen.classList.remove('stamping');
 }
 
-function playReceiptStamp(onDone) {
-  receiptStampBusy = true;
-  receiptScreen.classList.add('stamping');
+/* Locked = stamped: no price edits, no removals. */
+function setReceiptLocked(locked) {
+  receiptScreen.classList.toggle('stamped', locked);
+  var inputs = receiptItems.querySelectorAll('.receipt-price-input');
+  for (var i = 0; i < inputs.length; i++) inputs[i].readOnly = locked;
+}
 
-  var reduced = false;
-  try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (err) { /* silent */ }
+function resetReceiptStamp() {
+  cancelReceiptStampTimers();
+  receiptStamped = false;
+  receiptStampMemo = null;
+  if (receiptStampEl) receiptStampEl.classList.remove('stamping', 'shown', 'lifting');
+  if (receiptStampX) receiptStampX.classList.remove('on');
+  if (receiptScreen) setReceiptLocked(false);
+}
 
-  /* The stamp sits beside the total. If the receipt is scrolled so the
-     total is off screen, bring it into view first. */
-  var lead = 0;
-  var paper = receiptScreen.querySelector('.receipt-paper');
-  var totalLine = receiptScreen.querySelector('.receipt-total-line');
-  if (paper && totalLine) {
-    var pr = paper.getBoundingClientRect();
-    var lr = totalLine.getBoundingClientRect();
-    if (lr.top < pr.top + 24 || lr.bottom > pr.bottom - 24) {
-      var shift = (lr.top + lr.height / 2) - (pr.top + pr.height / 2);
-      try { paper.scrollBy({ top: shift, behavior: 'smooth' }); } catch (err) { paper.scrollTop += shift; }
-      lead = 350;
-    }
+function placeReceiptStampAt(memo) {
+  receiptStampHolder.style.left = (memo.fx * 100) + '%';
+  receiptStampHolder.style.top = (memo.fy * 100) + '%';
+  receiptStampEl.style.setProperty('--stamp-rot', memo.rot + 'deg');
+}
+
+/* Reopened from the thank-you screen: the seal is already there, in the
+   same place, with no animation and no jingle. */
+function restoreReceiptStamp() {
+  if (!receiptStampMemo) { setReceiptLocked(false); return; }
+  placeReceiptStampAt(receiptStampMemo);
+  receiptStampEl.classList.remove('stamping', 'lifting');
+  receiptStampEl.classList.add('shown');
+  receiptStampX.classList.add('on');
+  receiptStamped = true;
+  setReceiptLocked(true);
+}
+
+function countActiveReceiptItems() {
+  var n = 0;
+  var els = receiptItems.querySelectorAll('.receipt-item');
+  for (var i = 0; i < els.length; i++) {
+    if (els[i].getAttribute('data-removing') === 'true') continue;
+    if (els[i].classList.contains('removing')) continue;
+    n++;
   }
+  return n;
+}
 
-  receiptStampTimers.push(setTimeout(function() {
-    if (receiptStampEl) {
-      void receiptStampEl.offsetWidth;
-      receiptStampEl.classList.add('stamping');
+function showNoItemsAlert() {
+  showAlert(
+    'すべての項目が削除されています。',
+    '内容をご確認のうえ、\nもう一度お試しください。',
+    null,
+    null
+  );
+}
+
+/* Scrolls the signing box into view if the receipt has been scrolled away. */
+function scrollReceiptStampZoneIntoView() {
+  var paper = receiptScreen.querySelector('.receipt-paper');
+  if (!paper || !receiptStampZone) return;
+  var pr = paper.getBoundingClientRect();
+  var zr = receiptStampZone.getBoundingClientRect();
+  if (zr.top < pr.top + 24 || zr.bottom > pr.bottom - 24) {
+    var shift = (zr.top + zr.height / 2) - (pr.top + pr.height / 2);
+    try { paper.scrollBy({ top: shift, behavior: 'smooth' }); } catch (err) { paper.scrollTop += shift; }
+  }
+}
+
+/* Confirm tapped before stamping: pulse the box a few times. */
+function nudgeReceiptStampZone() {
+  scrollReceiptStampZoneIntoView();
+  receiptStampZone.classList.remove('nudge');
+  void receiptStampZone.offsetWidth;
+  receiptStampZone.classList.add('nudge');
+  setTimeout(function() { receiptStampZone.classList.remove('nudge'); }, 1900);
+}
+
+/* An item with a blank price is incomplete: shake it and put the cursor
+   back in it instead of stamping (same nudge the receipt already gives). */
+function firstEmptyReceiptPriceItem() {
+  var els = receiptItems.querySelectorAll('.receipt-item');
+  for (var i = 0; i < els.length; i++) {
+    if (els[i].classList.contains('removing')) continue;
+    if (els[i].getAttribute('data-removing') === 'true') continue;
+    var input = els[i].querySelector('.receipt-price-input');
+    if (input && (input.value || '').trim() === '') return els[i];
+  }
+  return null;
+}
+
+if (receiptStampZone) {
+  receiptStampZone.addEventListener('click', function(e) {
+    e.preventDefault();
+    if (e.target.closest && e.target.closest('.receipt-stamp-x')) return;
+    if (receiptStampBusy || receiptStamped) return;
+    cancelPendingReceiptShake();
+
+    if (countActiveReceiptItems() === 0) { showNoItemsAlert(); return; }
+
+    var emptyItem = firstEmptyReceiptPriceItem();
+    if (emptyItem) {
+      var wrap = emptyItem.querySelector('.receipt-item-price-wrap');
+      if (wrap) {
+        wrap.classList.remove('shake');
+        void wrap.offsetWidth;
+        wrap.classList.add('shake');
+        setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+      }
+      haptic(6);
+      var emptyInput = emptyItem.querySelector('.receipt-price-input');
+      if (emptyInput) { try { emptyInput.focus(); } catch (err) { /* silent */ } }
+      return;
     }
-    if (!reduced) {
-      /* Impact is about 55% through the 0.55s press. */
-      receiptStampTimers.push(setTimeout(function() { haptic(18); }, 300));
+
+    haptic(8);
+    /* A price still being typed counts as confirmed: close the keypad. */
+    try {
+      if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    } catch (err) { /* silent */ }
+    updateNumpadVisibility();
+
+    /* Where she tapped, as a share of the box so it survives a resize. */
+    var w = receiptStampZone.offsetWidth || 1;
+    var h = receiptStampZone.offsetHeight || 1;
+    var zr = receiptStampZone.getBoundingClientRect();
+    var ox, oy;
+    if (e.target === receiptStampZone && typeof e.offsetX === 'number') {
+      ox = e.offsetX; oy = e.offsetY;
     } else {
-      haptic(18);
+      ox = e.clientX - zr.left; oy = e.clientY - zr.top;
     }
+    ox = Math.max(0, Math.min(w, ox));
+    oy = Math.max(0, Math.min(h, oy));
+    /* Keep the whole seal, and its ⊗, on the paper. */
+    var paper = receiptScreen.querySelector('.receipt-paper');
+    if (paper) {
+      var pr = paper.getBoundingClientRect();
+      var minX = (pr.left + 56) - zr.left;
+      var maxX = (pr.right - 62) - zr.left;
+      if (minX < maxX) ox = Math.max(minX, Math.min(maxX, ox));
+    }
+    var memo = { fx: ox / w, fy: oy / h, rot: Math.round((Math.random() * 28 - 14) * 10) / 10 };
+
+    var reduced = false;
+    try { reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (err) { /* silent */ }
+
+    receiptStampBusy = true;
+    receiptStampMemo = memo;
+    receiptScreen.classList.add('stamping');
+    setReceiptLocked(true);
+    placeReceiptStampAt(memo);
+    receiptStampEl.classList.remove('shown', 'lifting');
+    void receiptStampEl.offsetWidth;
+    receiptStampEl.classList.add('stamping');
+
+    /* Impact is about 55% through the 0.55s press: buzz and jingle there. */
+    receiptStampTimers.push(setTimeout(function() {
+      haptic(18);
+      playSound('stampChime', 1.0);
+    }, reduced ? 0 : 300));
     receiptStampTimers.push(setTimeout(function() {
       receiptStampBusy = false;
+      receiptStamped = true;
       receiptScreen.classList.remove('stamping');
-      onDone();
-    }, reduced ? 400 : 1050));
-  }, lead));
+    }, reduced ? 100 : 600));
+    receiptStampTimers.push(setTimeout(function() {
+      receiptStampX.classList.add('on');
+    }, reduced ? 150 : 1100));
+  });
+}
+
+/* ⊗: lift the seal off, bring the box back, unlock the receipt. */
+if (receiptStampX) {
+  receiptStampX.addEventListener('click', function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    if (receiptStampBusy || !receiptStamped) return;
+    haptic(8);
+    playPaper(false);
+    receiptStamped = false;
+    receiptStampMemo = null;
+    receiptStampX.classList.remove('on');
+    receiptStampEl.classList.remove('stamping', 'shown');
+    receiptStampEl.classList.add('lifting');
+    receiptStampTimers.push(setTimeout(function() {
+      receiptStampEl.classList.remove('lifting');
+    }, 450));
+    setReceiptLocked(false);
+  });
 }
 
 receiptConfirmBtn.addEventListener('click', function(e) {
@@ -6452,24 +6712,17 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   haptic(8);
   cancelPendingReceiptShake();
 
-  var activeItems = 0;
-  var receiptItemEls = receiptItems.querySelectorAll('.receipt-item');
-  for (var i = 0; i < receiptItemEls.length; i++) {
-    if (receiptItemEls[i].getAttribute('data-removing') === 'true') continue;
-    if (receiptItemEls[i].classList.contains('removing')) continue;
-    activeItems++;
-  }
-  if (activeItems === 0) {
-    showAlert(
-      'すべての項目が削除されています。',
-      '内容をご確認のうえ、\nもう一度お試しください。',
-      null,
-      null
-    );
+  if (countActiveReceiptItems() === 0) {
+    showNoItemsAlert();
     return;
   }
 
-  playReceiptStamp(continueAfterReceiptStamp);
+  /* Confirm only goes through once the seal is on. */
+  if (!receiptStamped) {
+    nudgeReceiptStampZone();
+    return;
+  }
+  continueAfterReceiptStamp();
 });
 
 function continueAfterReceiptStamp() {
@@ -8660,7 +8913,7 @@ tyReceiptBtn.addEventListener('click', function(e) {
     return;
   }
   clearAllTyTimers();
-  buildReceipt();
+  buildReceipt({ keepStamp: true });
   thankyouScreen.classList.add('under-receipt');
   receiptOpenedFromThankyou = true;
   receiptScreen.classList.add('reopened');

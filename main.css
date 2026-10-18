@@ -2551,37 +2551,114 @@
   .receipt-footer { text-align: center; margin-top: 22px; }
   .receipt-footer-mark { font-size: 12px; color: var(--glow); letter-spacing: 10px; }
 
-  /* Hanko (承) stamped beside the total when she confirms. Hidden until
-     .stamping / .stamped is added from app.js. multiply lets the washi
-     fibres show faintly through the ink, like a real impression. */
+  /* Hanko (承) signing box between 合計 and the price. The whole box is the
+     tap target; the seal lands wherever she taps, even over other content,
+     like a real seal. multiply lets the washi fibres show faintly through
+     the ink. The faint dotted box and its hint sit there from the start and
+     fade away under the seal; lifting the seal (the ⊗) brings them back. */
   .receipt-total-line { position: relative; }
+  .receipt-stamp-zone {
+    position: relative; flex: 1 1 auto; align-self: stretch;
+    margin: -18px 6px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
+  .receipt-stamp-zone::before {
+    content: ''; position: absolute; left: 0; right: 0; top: 6px; bottom: 6px;
+    border: 2px dotted rgba(200, 54, 31, 0.34); border-radius: 14px;
+    background: rgba(200, 54, 31, 0.025);
+    pointer-events: none;
+    transition: opacity 0.6s ease;
+  }
+  .receipt-stamp-hint {
+    position: absolute; left: 0; right: 0; top: 6px; bottom: 6px;
+    display: flex; flex-wrap: wrap; align-content: center; justify-content: center;
+    padding: 0 10px; text-align: center; pointer-events: none;
+    font-size: 14px; font-weight: 400; line-height: 1.7; letter-spacing: 0.3px;
+    color: var(--text-mute); opacity: 0.8;
+    word-break: keep-all; line-break: strict;
+    transition: opacity 0.6s ease;
+  }
+  .receipt-stamp-hint > span { display: inline-block; }
+  .receipt-screen.stamped .receipt-stamp-zone { cursor: default; }
+  .receipt-screen.stamped .receipt-stamp-zone::before,
+  .receipt-screen.stamped .receipt-stamp-hint { opacity: 0; }
+
+  /* Tapping confirm before stamping: pulse the box a few times. */
+  .receipt-stamp-zone.nudge::before { animation: receiptStampNudge 0.6s ease-in-out 3; }
+  .receipt-stamp-zone.nudge .receipt-stamp-hint { animation: receiptStampNudgeText 0.6s ease-in-out 3; }
+  @keyframes receiptStampNudge {
+    0%, 100% { transform: scale(1);     border-color: rgba(200, 54, 31, 0.34); background: rgba(200, 54, 31, 0.025); }
+    50%      { transform: scale(1.035); border-color: rgba(200, 54, 31, 0.90); background: rgba(200, 54, 31, 0.11); }
+  }
+  @keyframes receiptStampNudgeText {
+    0%, 100% { opacity: 0.8; }
+    50%      { opacity: 1; }
+  }
+
+  /* The holder is a zero-size anchor placed at the tap point (left/top set
+     from app.js). The seal and its ⊗ are positioned around it. */
+  .receipt-stamp-holder {
+    position: absolute; left: 50%; top: 50%; width: 0; height: 0;
+    z-index: 3; pointer-events: none;
+  }
   .receipt-stamp {
-    position: absolute; left: 43%; top: 50%;
-    width: 104px; height: 104px; margin-top: -52px;
-    pointer-events: none; z-index: 2;
+    position: absolute; left: -52px; top: -52px;
+    width: 104px; height: 104px;
+    pointer-events: none;
     mix-blend-mode: multiply;
     opacity: 0;
-    transform: rotate(-12deg);
+    transform: rotate(var(--stamp-rot, -12deg));
     transform-origin: 50% 50%;
   }
   .receipt-stamp svg { display: block; width: 100%; height: 100%; overflow: visible; }
   .receipt-stamp.stamping {
     animation: receiptStampPress 0.55s cubic-bezier(0.3, 0, 0.2, 1) forwards;
   }
+  /* Already stamped (restored when the receipt is reopened): no animation. */
+  .receipt-stamp.shown { opacity: 0.92; }
+  .receipt-stamp.lifting { animation: receiptStampLift 0.4s ease forwards; }
   /* Lifted high and a little large, drops onto the paper (impact at ~55%),
      squashes slightly, settles. */
   @keyframes receiptStampPress {
-    0%   { opacity: 0;    transform: translateY(-14px) rotate(-18deg) scale(1.7); }
-    30%  { opacity: 0.55; transform: translateY(-8px)  rotate(-15deg) scale(1.35); }
-    55%  { opacity: 0.95; transform: translateY(0)     rotate(-12deg) scale(0.93); }
-    75%  { opacity: 0.92; transform: translateY(0)     rotate(-12deg) scale(1.03); }
-    100% { opacity: 0.92; transform: translateY(0)     rotate(-12deg) scale(1); }
+    0%   { opacity: 0;    transform: translateY(-14px) rotate(calc(var(--stamp-rot, -12deg) - 6deg)) scale(1.7); }
+    30%  { opacity: 0.55; transform: translateY(-8px)  rotate(calc(var(--stamp-rot, -12deg) - 3deg)) scale(1.35); }
+    55%  { opacity: 0.95; transform: translateY(0)     rotate(var(--stamp-rot, -12deg)) scale(0.93); }
+    75%  { opacity: 0.92; transform: translateY(0)     rotate(var(--stamp-rot, -12deg)) scale(1.03); }
+    100% { opacity: 0.92; transform: translateY(0)     rotate(var(--stamp-rot, -12deg)) scale(1); }
   }
-  /* While the stamp lands, ignore taps on the receipt so nothing can be
+  @keyframes receiptStampLift {
+    0%   { opacity: 0.92; transform: translateY(0)    rotate(var(--stamp-rot, -12deg)) scale(1); }
+    100% { opacity: 0;    transform: translateY(-8px) rotate(var(--stamp-rot, -12deg)) scale(1.08); }
+  }
+  /* The small ⊗ at the seal's top-right corner, like a superscript. Its
+     visible circle is small; ::after widens the touch target. */
+  .receipt-stamp-x {
+    position: absolute; left: 33px; top: -56px; width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    padding: 0; border-radius: 50%;
+    border: 1.2px solid #C8361F; background: rgba(255, 251, 244, 0.96); color: #C8361F;
+    font: 400 15px/1 sans-serif; box-shadow: 0 1px 3px rgba(120, 40, 20, 0.22);
+    opacity: 0; pointer-events: none; cursor: pointer;
+    transition: opacity 0.45s ease;
+    -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent;
+  }
+  .receipt-stamp-x::after { content: ''; position: absolute; left: -12px; right: -12px; top: -12px; bottom: -12px; }
+  .receipt-stamp-x.on { opacity: 1; pointer-events: auto; }
+  /* While the seal lands, ignore taps on the receipt so nothing can be
      edited or pressed twice. */
   .receipt-screen.stamping .receipt-paper { pointer-events: none; }
+  /* Stamped: no edits. Prices turn into plain text, the × buttons go, and an
+     item waiting on "undo" keeps its undo button, visible but locked until
+     the seal is lifted. */
+  .receipt-screen.stamped .receipt-item-remove { opacity: 0; pointer-events: none; }
+  .receipt-screen.stamped .receipt-price-input { pointer-events: none; }
+  .receipt-screen.stamped .receipt-item-price-wrap { background: transparent; border-color: transparent; }
+  .receipt-screen.stamped .receipt-item.removing .receipt-item-undo { opacity: 0.45; pointer-events: none; }
   @media (prefers-reduced-motion: reduce) {
     .receipt-stamp.stamping { animation: none; opacity: 0.92; }
+    .receipt-stamp.lifting { animation: none; opacity: 0; }
+    .receipt-stamp-zone.nudge::before { animation: none; border-color: rgba(200, 54, 31, 0.90); background: rgba(200, 54, 31, 0.11); }
+    .receipt-stamp-zone.nudge .receipt-stamp-hint { animation: none; opacity: 1; }
   }
 
   @media (min-width: 700px) {
@@ -2597,6 +2674,8 @@
     .receipt-item-price-wrap { font-size: 16px; padding: 5px 10px; }
     .receipt-item-price-wrap .yen-symbol { font-size: 12px; }
     .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
+    .receipt-stamp-zone { margin: -22px 6px; }
+    .receipt-stamp-hint { font-size: 15px; }
     .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
     .receipt-total-value { font-size: 22px; }
     .receipt-total-value .yen-symbol { font-size: 15px; }
@@ -2608,6 +2687,7 @@
     .receipt-divider { margin: 26px 0; }
   }
   @media (min-width: 1100px) {
+    .receipt-stamp-hint { font-size: 16px; }
     .receipt-paper { max-width: 540px; padding: 48px 48px 38px 48px; }
     .receipt-thanks { font-size: 26px; }
     .receipt-subthanks { font-size: 16px; }
