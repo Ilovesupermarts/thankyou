@@ -2645,29 +2645,33 @@
     60% { transform: rotate(-10deg) scale(1.2); }
     80% { transform: rotate(5deg) scale(1.1); }
   }
-  /* The confirm button only exists once the seal is on: it opens up below
-     サービスの選択に戻る (height and fade together) when the seal lands and
-     closes again when the seal is lifted. */
-  .receipt-confirm-wrap {
-    display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
-    transition: grid-template-rows 0.5s ease, opacity 0.5s ease, visibility 0s linear 0.5s;
+  /* The two bottom buttons share one spot and swap: サービスの選択に戻る
+     until the seal is on, then こちらの内容でお願いいたします (with its small
+     second line) until the seal is lifted. Both keep the receipt's original
+     button size; the slot is as tall as the taller one, so nothing on the
+     page moves when they swap. */
+  .receipt-action-slot { display: grid; margin-top: 26px; }
+  .receipt-action-slot > button { grid-area: 1 / 1; align-self: start; margin: 0 auto; }
+  .receipt-action-slot .receipt-confirm-btn {
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 0.4s ease 0.2s, visibility 0s linear 0.6s, background 0.2s, border-color 0.2s, transform 0.15s;
   }
-  .receipt-confirm-inner { overflow: hidden; min-height: 0; }
-  .receipt-screen.stamp-confirm .receipt-confirm-wrap {
-    grid-template-rows: 1fr; opacity: 1; visibility: visible;
-    transition: grid-template-rows 0.5s ease, opacity 0.5s ease, visibility 0s;
+  .receipt-action-slot .receipt-back-btn {
+    transition: opacity 0.25s ease 0.2s, visibility 0s linear 0s, background 0.2s, border-color 0.2s, transform 0.15s;
   }
-  .receipt-confirm-wrap .receipt-confirm-btn { max-width: 400px; margin: 12px auto 16px auto; }
+  .receipt-screen.stamp-confirm .receipt-action-slot .receipt-confirm-btn {
+    opacity: 1; visibility: visible; pointer-events: auto;
+    transition: opacity 0.4s ease 0.2s, visibility 0s, background 0.2s, border-color 0.2s, transform 0.15s;
+  }
+  .receipt-screen.stamp-confirm .receipt-action-slot .receipt-back-btn {
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transition: opacity 0.25s ease, visibility 0s linear 0.25s, background 0.2s, border-color 0.2s, transform 0.15s;
+  }
   .receipt-confirm-main { display: block; }
   .receipt-confirm-sub {
-    display: block; margin-top: 4px; font-size: 11px; font-weight: 400;
-    letter-spacing: 0.3px; opacity: 0.92; white-space: nowrap;
+    display: block; margin-top: 4px; font-size: 9px; font-weight: 400;
+    letter-spacing: 0.2px; opacity: 0.92; white-space: nowrap;
   }
-  /* Stamped: サービスの選択に戻る is on hold until the seal is lifted. It
-     stays visible so a tap on it can wiggle the ✕. */
-  .receipt-back-btn { transition: background 0.2s, border-color 0.2s, transform 0.15s, opacity 0.4s ease; }
-  .receipt-screen.stamped .receipt-back-btn { opacity: 0.45; cursor: default; }
-  .receipt-screen.stamped .receipt-back-btn:active { transform: none; background: #ffffff; border-color: var(--border-1); }
   /* While the seal lands, ignore taps on the receipt so nothing can be
      edited or pressed twice. */
   .receipt-screen.stamping .receipt-paper { pointer-events: none; }
@@ -2699,7 +2703,8 @@
     .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
     .receipt-stamp-zone { margin: -22px 6px; }
     .receipt-stamp-hint { font-size: 15px; }
-    .receipt-confirm-sub { font-size: 12px; }
+    .receipt-action-slot { margin-top: 30px; }
+    .receipt-confirm-sub { font-size: 10px; }
     .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
     .receipt-total-value { font-size: 22px; }
     .receipt-total-value .yen-symbol { font-size: 15px; }
@@ -2711,7 +2716,7 @@
   }
   @media (min-width: 1100px) {
     .receipt-stamp-hint { font-size: 16px; }
-    .receipt-confirm-sub { font-size: 13px; }
+    .receipt-confirm-sub { font-size: 11px; }
     .receipt-paper { max-width: 540px; padding: 48px 48px 38px 48px; }
     .receipt-thanks { font-size: 26px; }
     .receipt-subthanks { font-size: 16px; }
