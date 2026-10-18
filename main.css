@@ -2545,7 +2545,6 @@
     border-color: var(--accent-3);
     transform: scale(0.97);
   }
-  .receipt-confirm-btn + .receipt-back-btn { margin-top: 12px; }
   .receipt-back-btn { display: block; width: 100%; max-width: 260px; margin: 26px auto 0 auto; background: #ffffff; border: 1.5px solid var(--border-1); color: var(--accent); font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif; font-size: 13px; font-weight: 600; letter-spacing: 2px; padding: 12px 20px; border-radius: 22px; cursor: pointer; transition: background 0.2s, border-color 0.2s, transform 0.15s; -webkit-appearance: none; appearance: none; white-space: nowrap; }
   .receipt-back-btn:active { background: var(--soft-2); border-color: var(--accent); transform: scale(0.97); }
   .receipt-footer { text-align: center; margin-top: 22px; }
@@ -2579,33 +2578,10 @@
     transition: opacity 0.6s ease;
   }
   .receipt-stamp-hint > span { display: inline-block; }
-  /* Reassurance under the box: the seal can be taken back. Fades with the
-     hint once she has stamped (the ✕ is then on screen to speak for itself). */
-  .receipt-stamp-note {
-    margin: 14px 0 0 0; text-align: center;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-size: 12px; font-weight: 400; line-height: 1.5; letter-spacing: 0.3px;
-    color: var(--text-mute); opacity: 0.8;
-    word-break: keep-all; line-break: strict;
-    transition: opacity 0.6s ease;
-  }
-  .receipt-stamp-note + .receipt-confirm-btn { margin-top: 18px; }
-  .receipt-screen.stamped .receipt-stamp-note { opacity: 0; }
   .receipt-screen.stamped .receipt-stamp-zone { cursor: default; }
   .receipt-screen.stamped .receipt-stamp-zone::before,
   .receipt-screen.stamped .receipt-stamp-hint { opacity: 0; }
 
-  /* Tapping confirm before stamping: pulse the box a few times. */
-  .receipt-stamp-zone.nudge::before { animation: receiptStampNudge 0.6s ease-in-out 3; }
-  .receipt-stamp-zone.nudge .receipt-stamp-hint { animation: receiptStampNudgeText 0.6s ease-in-out 3; }
-  @keyframes receiptStampNudge {
-    0%, 100% { transform: scale(1);     border-color: rgba(200, 54, 31, 0.34); background: rgba(200, 54, 31, 0.025); }
-    50%      { transform: scale(1.035); border-color: rgba(200, 54, 31, 0.90); background: rgba(200, 54, 31, 0.11); }
-  }
-  @keyframes receiptStampNudgeText {
-    0%, 100% { opacity: 0.8; }
-    50%      { opacity: 1; }
-  }
 
   /* The holder is a zero-size anchor placed at the tap point (left/top set
      from app.js). The seal and its ⊗ are positioned around it. */
@@ -2658,6 +2634,40 @@
   }
   .receipt-stamp-x::after { content: ''; position: absolute; left: -14.5px; right: -14.5px; top: -14.5px; bottom: -14.5px; }
   .receipt-stamp-x.on { opacity: 1; pointer-events: auto; }
+  /* Locked and she taps something: the ✕ gives a little wiggle to show how
+     to unlock. */
+  .receipt-stamp-x { transform-origin: 50% 50%; }
+  .receipt-stamp-x.wiggle { animation: receiptStampXWiggle 0.5s ease; }
+  @keyframes receiptStampXWiggle {
+    0%, 100% { transform: rotate(0) scale(1); }
+    20% { transform: rotate(-18deg) scale(1.3); }
+    40% { transform: rotate(16deg) scale(1.3); }
+    60% { transform: rotate(-10deg) scale(1.2); }
+    80% { transform: rotate(5deg) scale(1.1); }
+  }
+  /* The confirm button only exists once the seal is on: it opens up below
+     サービスの選択に戻る (height and fade together) when the seal lands and
+     closes again when the seal is lifted. */
+  .receipt-confirm-wrap {
+    display: grid; grid-template-rows: 0fr; opacity: 0; visibility: hidden;
+    transition: grid-template-rows 0.5s ease, opacity 0.5s ease, visibility 0s linear 0.5s;
+  }
+  .receipt-confirm-inner { overflow: hidden; min-height: 0; }
+  .receipt-screen.stamp-confirm .receipt-confirm-wrap {
+    grid-template-rows: 1fr; opacity: 1; visibility: visible;
+    transition: grid-template-rows 0.5s ease, opacity 0.5s ease, visibility 0s;
+  }
+  .receipt-confirm-wrap .receipt-confirm-btn { max-width: 400px; margin: 12px auto 16px auto; }
+  .receipt-confirm-main { display: block; }
+  .receipt-confirm-sub {
+    display: block; margin-top: 4px; font-size: 11px; font-weight: 400;
+    letter-spacing: 0.3px; opacity: 0.92; white-space: nowrap;
+  }
+  /* Stamped: サービスの選択に戻る is on hold until the seal is lifted. It
+     stays visible so a tap on it can wiggle the ✕. */
+  .receipt-back-btn { transition: background 0.2s, border-color 0.2s, transform 0.15s, opacity 0.4s ease; }
+  .receipt-screen.stamped .receipt-back-btn { opacity: 0.45; cursor: default; }
+  .receipt-screen.stamped .receipt-back-btn:active { transform: none; background: #ffffff; border-color: var(--border-1); }
   /* While the seal lands, ignore taps on the receipt so nothing can be
      edited or pressed twice. */
   .receipt-screen.stamping .receipt-paper { pointer-events: none; }
@@ -2671,8 +2681,7 @@
   @media (prefers-reduced-motion: reduce) {
     .receipt-stamp.stamping { animation: none; opacity: 0.92; }
     .receipt-stamp.lifting { animation: none; opacity: 0; }
-    .receipt-stamp-zone.nudge::before { animation: none; border-color: rgba(200, 54, 31, 0.90); background: rgba(200, 54, 31, 0.11); }
-    .receipt-stamp-zone.nudge .receipt-stamp-hint { animation: none; opacity: 1; }
+    .receipt-stamp-x.wiggle { animation: none; }
   }
 
   @media (min-width: 700px) {
@@ -2690,12 +2699,11 @@
     .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
     .receipt-stamp-zone { margin: -22px 6px; }
     .receipt-stamp-hint { font-size: 15px; }
-    .receipt-stamp-note { font-size: 13px; }
+    .receipt-confirm-sub { font-size: 12px; }
     .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
     .receipt-total-value { font-size: 22px; }
     .receipt-total-value .yen-symbol { font-size: 15px; }
     .receipt-confirm-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
-    .receipt-confirm-btn + .receipt-back-btn { margin-top: 14px; }
     .receipt-back-btn { font-size: 14px; padding: 13px 24px; max-width: 300px; margin-top: 30px; }
     .receipt-item-remove { width: 28px; height: 28px; font-size: 18px; }
     .receipt-footer-mark { font-size: 14px; letter-spacing: 12px; }
@@ -2703,7 +2711,7 @@
   }
   @media (min-width: 1100px) {
     .receipt-stamp-hint { font-size: 16px; }
-    .receipt-stamp-note { font-size: 14px; }
+    .receipt-confirm-sub { font-size: 13px; }
     .receipt-paper { max-width: 540px; padding: 48px 48px 38px 48px; }
     .receipt-thanks { font-size: 26px; }
     .receipt-subthanks { font-size: 16px; }
