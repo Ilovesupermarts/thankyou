@@ -10,6 +10,20 @@ var BUILD = 'v135';
 /* ============================================================
    app.js — v1.3
 
+   Dynamic background (v1.4)
+       - The twelve CSS-animated leaves and the DOM snowflakes are
+         replaced by DynBG (search "DYNAMIC BACKGROUND (v1.4)"), a
+         canvas drawn in code that follows the real time, sun, moon
+         and weather over Nagoya. See the comment above it, the
+         canvases in index.html and the .dyn-* rules in main.css.
+       - The music display moved to the top right (top aligned with
+         the weather line) and its two "lift" rules were removed.
+       - The summary bar still covers the snow and leaf strip at the
+         bottom; the table and the text scroll in behind that strip.
+       - Night text: from 18:00 to 06:00 Nagoya time the message
+         text and the ordinary thank-you lines use the darkest brown
+         (applyNightText, .night-text in main.css).
+
    Background (霞灯) and falling-particle pass
        - The three drifting orbs were replaced by 霞灯 (Kasumi +
          Akari): two bands of mist plus Shippō "lantern" rings that
@@ -5533,79 +5547,8 @@ function scheduleAmbientRipple() {
   }, interval);
 }
 
-/* ============ WINTER SNOWFLAKES BUILDER ===
-   Two standalone 6-fold snowflake SVG shapes from the reference
-   image. Shape A is the Dendritic Ring-Centre Crystal, Shape B is
-   the Diamond-Tipped Crystal with inner secondary rays. The two
-   shapes are authored 1:2 across the 32-particle pool (indices
-   0..13 explicit, 14..27 scattered). */
-var SNOWFLAKE_PATH_A =
-  '<path fill-rule="evenodd" d="M 96.0,75.0 L 96.0,59.6 L 71.2,34.8 L 76.0,30.0 L 96.0,50.0 L 96.0,42.6 L 78.7,25.3 L 83.5,20.5 L 96.0,33.0 L 96.0,28.0 L 90.5,24.5 L 100.0,10.0 L 109.5,24.5 L 104.0,28.0 L 104.0,33.0 L 116.5,20.5 L 121.3,25.3 L 104.0,42.6 L 104.0,50.0 L 124.0,30.0 L 128.8,34.8 L 104.0,59.6 L 104.0,75.0 L 116.5,71.4 L 119.7,84.0 L 133.0,76.3 L 142.1,42.5 L 148.6,44.2 L 141.3,71.5 L 147.7,67.8 L 154.0,44.2 L 160.6,46.0 L 156.0,63.0 L 160.4,60.5 L 160.6,54.0 L 177.9,55.0 L 170.1,70.5 L 164.4,67.5 L 160.0,70.0 L 177.1,74.5 L 175.3,81.1 L 151.7,74.8 L 145.3,78.5 L 172.6,85.8 L 170.9,92.3 L 137.0,83.3 L 123.7,91.0 L 133.0,100.0 L 123.7,109.0 L 137.0,116.7 L 170.9,107.7 L 172.6,114.2 L 145.3,121.5 L 151.7,125.2 L 175.3,118.9 L 177.1,125.5 L 160.0,130.0 L 164.4,132.5 L 170.1,129.5 L 177.9,145.0 L 160.6,146.0 L 160.4,139.5 L 156.0,137.0 L 160.6,154.0 L 154.0,155.8 L 147.7,132.2 L 141.3,128.5 L 148.6,155.8 L 142.1,157.5 L 133.0,123.7 L 119.7,116.0 L 116.5,128.6 L 104.0,125.0 L 104.0,140.4 L 128.8,165.2 L 124.0,170.0 L 104.0,150.0 L 104.0,157.4 L 121.3,174.7 L 116.5,179.5 L 104.0,167.0 L 104.0,172.0 L 109.5,175.5 L 100.0,190.0 L 90.5,175.5 L 96.0,172.0 L 96.0,167.0 L 83.5,179.5 L 78.7,174.7 L 96.0,157.4 L 96.0,150.0 L 76.0,170.0 L 71.2,165.2 L 96.0,140.4 L 96.0,125.0 L 83.5,128.6 L 80.3,116.0 L 67.0,123.7 L 57.9,157.5 L 51.4,155.8 L 58.7,128.5 L 52.3,132.2 L 46.0,155.8 L 39.4,154.0 L 44.0,137.0 L 39.6,139.5 L 39.4,146.0 L 22.1,145.0 L 29.9,129.5 L 35.6,132.5 L 40.0,130.0 L 22.9,125.5 L 24.7,118.9 L 48.3,125.2 L 54.7,121.5 L 27.4,114.2 L 29.1,107.7 L 63.0,116.7 L 76.3,109.0 L 67.0,100.0 L 76.3,91.0 L 63.0,83.3 L 29.1,92.3 L 27.4,85.8 L 54.7,78.5 L 48.3,74.8 L 24.7,81.1 L 22.9,74.5 L 40.0,70.0 L 35.6,67.5 L 29.9,70.5 L 22.1,55.0 L 39.4,54.0 L 39.6,60.5 L 44.0,63.0 L 39.4,46.0 L 46.0,44.2 L 52.3,67.8 L 58.7,71.5 L 51.4,44.2 L 57.9,42.5 L 67.0,76.3 L 80.3,84.0 L 83.5,71.4 Z M 100.0,85.0 A 15.0,15.0 0 1,0 100.0,115.0 A 15.0,15.0 0 1,0 100.0,85.0 Z"/>';
-
-var SNOWFLAKE_PATH_B =
-  '<path d="M 91.8,66.6 L 91.2,79.6 L 96.2,87.9 L 96.2,59.3 L 70.7,38.3 A 3.8,3.8 0 0,1 75.5,32.5 L 96.2,49.5 L 96.2,41.5 L 85.5,27.0 L 100.0,10.0 L 114.5,27.0 L 103.8,41.5 L 103.8,49.5 L 124.5,32.5 A 3.8,3.8 0 0,1 129.3,38.3 L 103.8,59.3 L 103.8,87.9 L 108.8,79.6 L 108.2,66.6 L 123.0,60.2 L 124.8,76.2 L 113.3,82.2 L 108.6,90.7 L 133.4,76.4 L 138.8,43.8 A 3.8,3.8 0 0,1 146.2,45.0 L 141.8,71.5 L 148.8,67.5 L 156.0,50.9 L 177.9,55.0 L 170.5,76.1 L 152.6,74.0 L 145.6,78.0 L 170.7,87.5 A 3.8,3.8 0 0,1 168.1,94.5 L 137.2,82.9 L 112.4,97.2 L 122.1,97.4 L 133.0,90.4 L 146.0,100.0 L 133.0,109.6 L 122.1,102.6 L 112.4,102.8 L 137.2,117.1 L 168.1,105.5 A 3.8,3.8 0 0,1 170.7,112.5 L 145.6,122.0 L 152.6,126.0 L 170.5,123.9 L 177.9,145.0 L 156.0,149.1 L 148.8,132.5 L 141.8,128.5 L 146.2,155.0 A 3.8,3.8 0 0,1 138.8,156.2 L 133.4,123.6 L 108.6,109.3 L 113.3,117.8 L 124.8,123.8 L 123.0,139.8 L 108.2,133.4 L 108.8,120.4 L 103.8,112.1 L 103.8,140.7 L 129.3,161.7 A 3.8,3.8 0 0,1 124.5,167.5 L 103.8,150.5 L 103.8,158.5 L 114.5,173.0 L 100.0,190.0 L 85.5,173.0 L 96.2,158.5 L 96.2,150.5 L 75.5,167.5 A 3.8,3.8 0 0,1 70.7,161.7 L 96.2,140.7 L 96.2,112.1 L 91.2,120.4 L 91.8,133.4 L 77.0,139.8 L 75.2,123.8 L 86.7,117.8 L 91.4,109.3 L 66.6,123.6 L 61.2,156.2 A 3.8,3.8 0 0,1 53.8,155.0 L 58.2,128.5 L 51.2,132.5 L 44.0,149.1 L 22.1,145.0 L 29.5,123.9 L 47.4,126.0 L 54.4,122.0 L 29.3,112.5 A 3.8,3.8 0 0,1 31.9,105.5 L 62.8,117.1 L 87.6,102.8 L 77.9,102.6 L 67.0,109.6 L 54.0,100.0 L 67.0,90.4 L 77.9,97.4 L 87.6,97.2 L 62.8,82.9 L 31.9,94.5 A 3.8,3.8 0 0,1 29.3,87.5 L 54.4,78.0 L 47.4,74.0 L 29.5,76.1 L 22.1,55.0 L 44.0,50.9 L 51.2,67.5 L 58.2,71.5 L 53.8,45.0 A 3.8,3.8 0 0,1 61.2,43.8 L 66.6,76.4 L 91.4,90.7 L 86.7,82.2 L 75.2,76.2 L 77.0,60.2 Z"/>';
-
-var SNOW_BASE_SLOTS = [
-  /* Tier 1 (Ultra-Far, blur 5.0px). Tier 6 (sharp) was removed. */
-  { tier: 1, size: 30, fill: '#9E3B06', left: 22, dur: 20.0, delay: -3.0,  shape: 'A' },
-  { tier: 1, size: 28, fill: '#F07D40', left: 16, dur: 21.0, delay: -2.0,  shape: 'B' },
-  { tier: 1, size: 30, fill: '#882E47', left: 62, dur: 19.5, delay: -11.0, shape: 'B' },
-  /* Tier 2 (Far, blur 3.4px) */
-  { tier: 2, size: 34, fill: '#882E47', left: 48, dur: 18.5, delay: -8.0,  shape: 'A' },
-  { tier: 2, size: 32, fill: '#E66826', left: 34, dur: 19.0, delay: -6.0,  shape: 'B' },
-  { tier: 2, size: 36, fill: '#C44E10', left: 78, dur: 17.5, delay: -14.0, shape: 'B' },
-  /* Tier 3 (Mid-Far, blur 2.2px) */
-  { tier: 3, size: 48, fill: '#882E47', left: 8,  dur: 13.5, delay: -2.0,  shape: 'A' },
-  { tier: 3, size: 46, fill: '#F07D40', left: 14, dur: 14.0, delay: -1.0,  shape: 'B' },
-  { tier: 3, size: 42, fill: '#E66826', left: 64, dur: 13.0, delay: -8.0,  shape: 'B' },
-  /* Tier 4 (Mid-Near, blur 1.25px) */
-  { tier: 4, size: 58, fill: '#C44E10', left: 24, dur: 12.0, delay: -7.0,  shape: 'A' },
-  { tier: 4, size: 52, fill: '#882E47', left: 38, dur: 12.5, delay: -5.0,  shape: 'B' },
-  { tier: 4, size: 54, fill: '#C44E10', left: 74, dur: 11.5, delay: -9.5,  shape: 'B' },
-  /* Tier 5 (Near-Soft, blur 0.55px) */
-  { tier: 5, size: 64, fill: '#F07D40', left: 12, dur: 10.2, delay: -3.0,  shape: 'B' },
-  { tier: 5, size: 60, fill: '#C44E10', left: 92, dur: 10.0, delay: -12.5, shape: 'B' }
-];
-
-/* Builds 28 blurred snowflakes (14 slots, each used twice) with
-   snowScale = 1.10 and fallDurationMul = 1.90 baked in. See
-   main.css for the five-tier blur/opacity ladder and the
-   snowFallCw / snowFallCcw keyframes. */
-function buildSnowflakes() {
-  if (!snowFlakes) return;
-  snowFlakes.innerHTML = '';
-
-  var total = 28;
-  var snowScale = 1.10;
-  var fallDurationMul = 1.90;
-
-  for (var i = 0; i < total; i++) {
-    var spec = SNOW_BASE_SLOTS[i % SNOW_BASE_SLOTS.length];
-    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('viewBox', '0 0 200 200');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.setAttribute('class', 'snow-particle snow-tier-' + spec.tier);
-
-    var leftPos = (i < SNOW_BASE_SLOTS.length) ? spec.left : (6 + ((i * 19) % 88));
-    var sizePx  = Math.round(spec.size * snowScale);
-    var durSec  = (spec.dur * fallDurationMul).toFixed(2);
-    var delaySec = (i < SNOW_BASE_SLOTS.length)
-      ? spec.delay.toFixed(2)
-      : (-((i * 2.3) % (spec.dur * fallDurationMul))).toFixed(2);
-
-    svg.setAttribute('data-orig-left', leftPos + '%');
-    svg.style.width  = sizePx + 'px';
-    svg.style.height = sizePx + 'px';
-    svg.style.fill   = spec.fill;
-    svg.style.left   = leftPos + '%';
-    svg.style.animationName = (i % 2 === 0) ? 'snowFallCw' : 'snowFallCcw';
-    svg.style.animationDuration = durSec + 's';
-    svg.style.animationDelay = delaySec + 's';
-
-    svg.innerHTML = (spec.shape === 'A') ? SNOWFLAKE_PATH_A : SNOWFLAKE_PATH_B;
-    snowFlakes.appendChild(svg);
-  }
-}
+/* (The DOM snowflake builder that stood here was replaced by the canvas
+   snow in DynBG, further down.) */
 
 /* ============ 霞灯 LANTERNS (Akari half of the background) ============
    Each lantern is a small glowing dot sitting on the centre of one
@@ -6074,10 +6017,6 @@ window.addEventListener('load', function() {
     navigator.serviceWorker.register('sw.js').catch(function() {});
   }
   buildMotes();
-  /* Winter particles are built once and persist across the session.
-     The seasonal gate is CSS-only (display: none for the non-
-     matching theme), so the DOM nodes are stable. */
-  buildSnowflakes();
   buildLanterns();
 
   /* Cold-boot December switchover. startInfoUpdates() above already
@@ -7291,7 +7230,14 @@ function getTimeOfDayInNagoya() {
   if (h >= 17 && h < 21) return 'evening';
   return 'night';
 }
-function applyTimeTheme() { document.documentElement.setAttribute('data-time', getTimeOfDayInNagoya()); }
+function applyTimeTheme() { document.documentElement.setAttribute('data-time', getTimeOfDayInNagoya()); applyNightText(); }
+
+/* Night text: from 18:00 to 06:00 Nagoya time <body> carries .night-text, and
+   main.css swaps the message and thank-you text to a darker brown. */
+function applyNightText() {
+  var p = nagoyaDateParts();
+  document.body.classList.toggle('night-text', p.hour >= 18 || p.hour < 6);
+}
 
 function weatherBucket(code) {
   if (code === 0) return 'clear';
@@ -7348,6 +7294,7 @@ function updateInfoDateTime() {
   var wd = JP_WEEKDAYS[p.weekday];
   infoDate.textContent = p.month + '月' + p.day + '日(' + wd + ')';
   infoTime.textContent = hhPadded + '時' + mmPadded + '分';
+  applyNightText();
 
   /* December auto-switchover. Fires on the 30s clock tick so a
      session left running across the 1 Dec 00:01 boundary flips
@@ -7482,9 +7429,11 @@ function updateBlossomGreeting() {
 
 function fetchNagoyaWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
-            '&current=temperature_2m,weather_code&timezone=Asia%2FTokyo';
+            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation' +
+            '&wind_speed_unit=ms&timezone=Asia%2FTokyo';
   fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (!data || !data.current) return;
+    if (typeof DynBG !== 'undefined' && DynBG) DynBG.onWeather(data.current);
     var temp = data.current.temperature_2m;
     var code = data.current.weather_code;
     if (typeof temp === 'number') {
@@ -8940,6 +8889,2456 @@ tyReceiptBtn.addEventListener('click', function(e) {
     if (receiptStamped) setTimeout(scrollReceiptConfirmIntoView, 1000);
   }, 100);
 });
+
+/* ============================================================
+   DYNAMIC BACKGROUND (v1.4)
+   ------------------------------------------------------------
+   Replaces the old twelve CSS-animated leaves and the DOM snowflakes
+   with a canvas drawn in code (no images): leaves of four kinds that
+   each have their own shape, colour and way of falling; the real sun
+   and moon over Nagoya; weather from the app's own Open-Meteo request
+   (wind, rain, cloud, fog, snow); a bare tree in the autumn theme and a
+   winter tree with a snowman in the winter theme; a pile of fallen leaves
+   or a snow bank along the bottom; and a dragonfly, cricket and fireflies
+   that land on the message text. It was tuned on dynamic.html and the
+   values there are the ones baked into S below.
+   Wrapped in a function so none of its names can clash with the app's.
+   ============================================================ */
+var DynBG = (function () {
+/* ============================================================
+   0. SMALL HELPERS
+   ============================================================ */
+var PI = Math.PI, TAU = Math.PI * 2, DEG = Math.PI / 180;
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function bell(x, m, s) { var d = (x - m) / s; return Math.exp(-d * d); }
+function angDiff(a, b) { return Math.atan2(Math.sin(a - b), Math.cos(a - b)); }
+function hexToRgb(h) {
+  h = h.replace('#', '');
+  return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+}
+function mixRgb(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function rgba(c, a) {
+  return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' +
+         Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : clamp(a, 0, 1)).toFixed(3) + ')';
+}
+function scaleRgb(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
+
+/* Seeded random (mulberry32) so a leaf keeps the same shape when it is redrawn. */
+function rngFrom(seed) {
+  var a = seed >>> 0;
+  return function() {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hash1(i) { var s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+/* Smooth 1-D value noise, 0..1 */
+function noise1(x) {
+  var i = Math.floor(x), f = x - i;
+  var u = f * f * (3 - 2 * f);
+  return lerp(hash1(i), hash1(i + 1), u);
+}
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+/* ============================================================
+   1. SETTINGS — the values tuned on dynamic.html. Leaf size 0.6, tree
+   size 0.82 and moon size 1.05 are the three that were changed from the
+   preview's starting values; everything else is as it was.
+   ============================================================ */
+var NAGOYA = { lat: 35.1815, lon: 136.9066 };
+var SITE_LEAF_COLOURS = ['#9E3B06', '#882E47', '#F07D40', '#E66826', '#C44E10'];
+
+var _tokyoFmt = null;
+function tokyoNow() {
+  var p = {};
+  try {
+    if (!_tokyoFmt) _tokyoFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    _tokyoFmt.formatToParts(new Date()).forEach(function(x) { p[x.type] = x.value; });
+    return {
+      date: p.year + '-' + p.month + '-' + p.day,
+      hour: (parseInt(p.hour, 10) % 24) + parseInt(p.minute, 10) / 60 + parseInt(p.second, 10) / 3600
+    };
+  } catch (e) {
+    var d = new Date();
+    return {
+      date: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+      hour: d.getHours() + d.getMinutes() / 60
+    };
+  }
+}
+
+var S = {
+  hour: 12, date: '2026-01-01',
+  condition: 'clear', windSpeed: 2.5, windDir: 300, gustiness: 0.35,
+  temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
+  density: 1, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
+  shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
+  speciesMode: 'auto', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
+  colorMode: 'auto', colorProgress: 0.3, colorVariety: 0.6, paletteBlend: 0.45, lightTint: 0.7, skyTint: 0.8,
+  depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
+  rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
+  lightning: true, frost: true, snowMix: true,
+  sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1.05, moonPath: 'arc',
+  birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
+  figureSide: 'auto',
+  tree: true, treeSize: 0.82, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
+  winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
+  frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
+  heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
+  dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
+  renderScale: 0.75
+};
+
+/* ============================================================
+   2. TIME, SUN, MOON, SEASON
+   ============================================================ */
+function parseDate(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  if (!m) { var n = tokyoNow(); m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(n.date); }
+  return { y: +m[1], m: +m[2], d: +m[3] };
+}
+function fmtDate(y, m, d) { return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2); }
+function addDays(s, n) {
+  var p = parseDate(s), t = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
+  return fmtDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+function dayOfYear(p) { return (Date.UTC(p.y, p.m - 1, p.d) - Date.UTC(p.y, 0, 0)) / 864e5; }
+
+/* Sunrise / sunset in Nagoya (NOAA approximation), hours in JST. */
+function sunTimes(p) {
+  var N = dayOfYear(p), g = TAU / 365 * (N - 1);
+  var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+             0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  var eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+             0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  var lat = NAGOYA.lat * DEG;
+  var cosHa = Math.cos(90.833 * DEG) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+  var ha = Math.acos(clamp(cosHa, -1, 1)) / DEG;
+  var noon = 720 - 4 * NAGOYA.lon - eqt + 540;
+  return { rise: (noon - 4 * ha) / 60, set: (noon + 4 * ha) / 60, noon: noon / 60 };
+}
+
+/* Real sun and moon positions for Nagoya (low-precision almanac
+   formulas, good to well under a degree for drawing). Azimuth is
+   measured from north toward east. */
+function astro(p, hour) {
+  var d = (Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3) / 864e5 - 10957.5;
+  var T = d / 36525;
+  function sd(x) { return Math.sin(x * DEG); }
+  var g = (357.528 + 0.9856003 * d) * DEG;
+  var lamS = 280.46 + 0.9856474 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+  var lamM = 218.32 + 481267.881 * T + 6.29 * sd(134.9 + 477198.85 * T) - 1.27 * sd(259.2 - 413335.38 * T) +
+             0.66 * sd(235.7 + 890534.23 * T) + 0.21 * sd(269.9 + 954397.70 * T) - 0.19 * sd(357.5 + 35999.05 * T) -
+             0.11 * sd(186.6 + 966404.05 * T);
+  var betM = 5.13 * sd(93.3 + 483202.03 * T) + 0.28 * sd(228.2 + 960400.87 * T) -
+             0.28 * sd(318.3 + 6003.18 * T) - 0.17 * sd(217.6 - 407332.20 * T);
+  var eps = 23.439 * DEG, lat = NAGOYA.lat * DEG;
+  var lst = (280.46061837 + 360.98564736629 * d + NAGOYA.lon) * DEG;
+  function horizon(lamDeg, betDeg) {
+    var lam = lamDeg * DEG, bet = betDeg * DEG;
+    var ra = Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam));
+    var dec = Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam));
+    var ha = lst - ra;
+    var alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha));
+    var az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(lat) - Math.sin(lat) * Math.cos(ha)) / DEG;
+    return { alt: alt / DEG, az: (az + 360) % 360 };
+  }
+  var elong = (((lamM - lamS) % 360) + 360) % 360;
+  return {
+    sun: horizon(lamS, 0), moon: horizon(lamM, betM),
+    elong: elong, illum: (1 - Math.cos(elong * DEG)) / 2, waxing: elong < 180
+  };
+}
+function moonName(a) {
+  var k = a.illum;
+  if (k < 0.03) return 'New moon 新月';
+  if (k > 0.97) return 'Full moon 満月';
+  if (a.waxing) return k < 0.35 ? 'Waxing crescent 三日月' : (k < 0.65 ? 'First quarter 上弦の月' : 'Waxing gibbous 十三夜');
+  return k < 0.35 ? 'Waning crescent 有明月' : (k < 0.65 ? 'Last quarter 下弦の月' : 'Waning gibbous 寝待月');
+}
+function compassName(az) {
+  var n = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return n[Math.round(az / 22.5) % 16];
+}
+/* Sky to screen: right edge = east, left edge = west, bottom = horizon.
+   Used for left/right placement, and for which way the moon's lit side faces. */
+function skyToScreen(alt, az) {
+  var x = W * (0.5 + angDiff(180 * DEG, az * DEG) / DEG / 220);
+  var e = (alt < 0 ? -1 : 1) * Math.pow(Math.min(Math.abs(alt), 90) / 80, 0.6);
+  return { x: x, y: H * 0.9 - H * 0.82 * e };
+}
+
+/* Which picture goes with the date: Oct–Nov bare autumn tree, Dec–Feb bare winter tree. */
+/* The sun and moon sit in a band just under the info bar (both lines). */
+var _barBottom = 93;   // the info bar is 93px tall; measured twice a second so drawing never forces a layout
+function measureInfoBar() {
+  var bar = document.getElementById('infoBar');
+  _barBottom = (bar && bar.offsetHeight > 0) ? Math.max(bar.getBoundingClientRect().bottom, 40) : 93;
+}
+function skyBandY(radius) { return _barBottom + radius + 18; }
+function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
+
+/* The picture follows the app's theme (the 🍁 / ❄️ toggle and the December
+   switch): autumn theme → bare tree and falling leaves, winter theme → bare
+   winter tree, snowman and snow. The sakura theme shows none of it (the loop
+   does not run). Which months get which picture is still to be decided. */
+function sceneFor(p) {
+  return (typeof currentTheme === 'string' && currentTheme === 'winter') ? 'winter' : 'autumn';
+}
+
+/* How far autumn has turned, 0 (green) .. 1 (bare brown), from the date. */
+function seasonProgress(p) {
+  var doy = dayOfYear(p);
+  var pts = [[258, 0], [288, 0.25], [314, 0.55], [334, 0.8], [354, 1]];
+  if (doy < 60) return 1;
+  if (doy <= pts[0][0]) return 0;
+  for (var i = 1; i < pts.length; i++) {
+    if (doy <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], (doy - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]));
+  }
+  return 1;
+}
+
+/* Light colour through the day, keyed to the real sunrise/sunset. */
+var LIGHT_STOPS_FN = function(sr, ss, noon) {
+  return [
+    [sr - 1.6, '#46557f', 0.26, 0.60],
+    [sr - 0.6, '#6d6a96', 0.22, 0.50],
+    [sr,       '#f2a3a0', 0.20, 0.25],
+    [sr + 0.7, '#ffc77a', 0.16, 0.05],
+    [sr + 2.5, '#fff3df', 0.05, 0.00],
+    [noon,     '#ffffff', 0.00, 0.00],
+    [ss - 2.2, '#fff0d6', 0.05, 0.00],
+    [ss - 0.9, '#ffb055', 0.18, 0.00],
+    [ss - 0.1, '#ee8a7a', 0.22, 0.12],
+    [ss + 0.6, '#8d7fb0', 0.24, 0.40],
+    [ss + 1.5, '#46557f', 0.26, 0.60]
+  ];
+};
+function lightAt(h, sun) {
+  var st = LIGHT_STOPS_FN(sun.rise, sun.set, sun.noon);
+  var col, amt, dark;
+  if (h <= st[0][0] || h >= st[st.length - 1][0]) {
+    col = hexToRgb('#46557f'); amt = 0.26; dark = 0.6;
+  } else {
+    for (var i = 1; i < st.length; i++) {
+      if (h <= st[i][0]) {
+        var t = (h - st[i - 1][0]) / (st[i][0] - st[i - 1][0]);
+        col = mixRgb(hexToRgb(st[i - 1][1]), hexToRgb(st[i][1]), t);
+        amt = lerp(st[i - 1][2], st[i][2], t);
+        dark = lerp(st[i - 1][3], st[i][3], t);
+        break;
+      }
+    }
+  }
+  var phase;
+  if (h < sun.rise - 0.8 || h > sun.set + 0.9) phase = 'night';
+  else if (h < sun.rise + 1) phase = 'dawn';
+  else if (h > sun.set - 0.3) phase = 'dusk';
+  else if (h > sun.set - 1.6) phase = 'golden';
+  else if (h < 11) phase = 'morning';
+  else phase = 'day';
+  var daylight = smooth(sun.rise - 0.3, sun.rise + 0.8, h) * (1 - smooth(sun.set - 0.6, sun.set + 0.4, h));
+  return { col: col, amt: amt, dark: dark, phase: phase, daylight: daylight };
+}
+var PHASE_NAMES = { night: 'Night 夜', dawn: 'Dawn 夜明け', morning: 'Morning 朝', day: 'Midday 昼', golden: 'Golden hour 夕方', dusk: 'Dusk 黄昏' };
+
+/* ============================================================
+   3. ENVIRONMENT (recomputed a few times a second)
+   ============================================================ */
+var ENV = {};
+function computeEnv() {
+  var p = parseDate(S.date);
+  var sun = sunTimes(p);
+  var L = lightAt(S.hour, sun);
+  var c = S.condition;
+  var rainy = (c === 'rain' || c === 'drizzle' || c === 'thunderstorm');
+  var wet = rainy ? clamp(0.3 + S.rainMm / 5, 0.3, 1) : 0;
+  var frost = (S.frost && S.temperature < 5) ? clamp((5 - S.temperature) / 8, 0, 1) : 0;
+  var autoP = seasonProgress(p);
+  var P = S.colorMode === 'auto' ? autoP : S.colorProgress;
+  var fog = c === 'fog' ? Math.max(S.fogDensity, 0.15) : S.fogDensity;
+  var sunAmt = 0;
+  if (c === 'clear') sunAmt = 1 - S.cloudCover / 140;
+  else if (c === 'clouds') sunAmt = Math.max(0, 0.6 - S.cloudCover / 120);
+  sunAmt *= L.daylight;
+  var windScreen = S.windSpeed * -Math.sin(S.windDir * DEG);
+  ENV = {
+    p: p, sun: sun, light: L, phase: L.phase, rainy: rainy, wet: wet, frost: frost,
+    season: P, autoSeason: autoP, fog: fog, sunAmt: sunAmt,
+    windPx: windScreen * 14, windMs: S.windSpeed,
+    snowing: c === 'snow' || (S.snowMix && S.temperature < 3),
+    snowAmt: c === 'snow' ? clamp(0.4 + S.rainMm / 3, 0.4, 1.6) : (S.snowMix && S.temperature < 3 ? 0.12 : 0),
+    astro: astro(p, S.hour),
+    scene: sceneFor(p),
+    side: S.figureSide === 'auto' ? (dayOfYear(p) % 2 ? 'left' : 'right') : S.figureSide
+  };
+  // The winter theme always has a little snow falling, as the old snowflakes did.
+  if (ENV.scene === 'winter') { ENV.snowing = true; ENV.snowAmt = Math.max(ENV.snowAmt, 0.35); }
+}
+
+/* ============================================================
+   4. LEAF SHAPES — built in code, a little different every time.
+      Unit space: leaf length 1, blade base at (0,0), tip toward -y.
+   ============================================================ */
+var SPECIES = {
+  momiji: { name: 'Momiji (maple)', size: 56, ramp: [[0, '#6b8f3a'], [0.25, '#a7a336'], [0.4, '#e0a02c'], [0.55, '#E66826'], [0.7, '#C44E10'], [0.82, '#9E3B06'], [0.9, '#882E47'], [1, '#6e4a35']],
+            site: [0, 1, 2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } },
+  ginkgo: { name: 'Ginkgo (ichō)',   size: 46, ramp: [[0, '#7d9a3c'], [0.2, '#b8b440'], [0.35, '#e8c534'], [0.6, '#f0b429'], [0.8, '#d99a2b'], [1, '#9c7a3a']],
+            site: [2, 3], modes: { flutter: 0.3, tumble: 0.15, glide: 0.1, spiral: 0.45 } },
+  oak:    { name: 'Oak (konara)',    size: 50, ramp: [[0, '#6a7f3a'], [0.3, '#9a8a3a'], [0.5, '#b8823a'], [0.7, '#9a5e2c'], [1, '#6b4a30']],
+            site: [0, 4], modes: { flutter: 0.35, tumble: 0.4, glide: 0.2, spiral: 0.05 } },
+  keyaki: { name: 'Zelkova (keyaki)', size: 40, ramp: [[0, '#73903c'], [0.3, '#c0a03a'], [0.5, '#d9822e'], [0.7, '#b0502a'], [0.85, '#8a4a2a'], [1, '#6e4b33']],
+            site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } },
+  generic: { name: 'Tree leaf', size: 20, ramp: [[0, '#7d9440'], [0.25, '#c4a83a'], [0.45, '#e09a34'], [0.65, '#cc6a2c'], [0.85, '#9a5a32'], [1, '#76553a']],
+            site: [2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } }
+};
+(function prepRamps() {
+  for (var k in SPECIES) SPECIES[k].rampRgb = SPECIES[k].ramp.map(function(s) { return [s[0], hexToRgb(s[1])]; });
+})();
+var SITE_RGB = SITE_LEAF_COLOURS.map(hexToRgb);
+function rampAt(r, p) {
+  p = clamp(p, 0, 1);
+  for (var i = 1; i < r.length; i++) {
+    if (p <= r[i][0]) return mixRgb(r[i - 1][1], r[i][1], (p - r[i - 1][0]) / (r[i][0] - r[i - 1][0]));
+  }
+  return r[r.length - 1][1];
+}
+
+function geoMomiji(r, v) {
+  var n = r() < 0.12 * v ? (r() < 0.5 ? 5 : 9) : 7;
+  var spread = (235 + (r() - 0.5) * 30 * v) * DEG;
+  var gap = spread / (n - 1), mid = (n - 1) / 2;
+  var prof = [1, 0.92, 0.74, 0.48, 0.32];
+  var lobes = [];
+  for (var i = 0; i < n; i++) {
+    var d = Math.round(Math.abs(i - mid));
+    lobes.push({
+      a: -PI / 2 + (i - mid) * gap + (r() - 0.5) * gap * 0.25 * v,
+      L: prof[Math.min(d, 4)] * (1 + (r() - 0.5) * 0.28 * v),
+      w: gap * (0.78 + (r() - 0.5) * 0.2 * v)
+    });
+  }
+  var rs = 0.3 * (1 + (r() - 0.5) * 0.5 * v);
+  var teeth = 70 + r() * 40, toothAmp = 0.03 + 0.025 * r();
+  var pts = [], N = 340;
+  for (var k = 0; k < N; k++) {
+    var th = PI / 2 + TAU * k / N;
+    var rr = 0;
+    for (var j = 0; j < n; j++) {
+      var x = Math.abs(angDiff(th, lobes[j].a)) / lobes[j].w;
+      if (x < 1) rr = Math.max(rr, lobes[j].L * Math.pow(1 - x, 0.75));
+    }
+    var fromUp = Math.abs(angDiff(th, -PI / 2));
+    var floor = 0.05 + (rs - 0.05) * smooth(spread / 2 + gap * 0.6, spread / 2, fromUp);
+    rr = Math.max(rr, floor);
+    if (rr > 0.4) {
+      var tf = th * teeth / TAU; tf = tf - Math.floor(tf);
+      rr *= 1 + toothAmp * (Math.abs(2 * tf - 1) - 0.5) * Math.min(1, (rr - 0.4) / 0.3);
+    }
+    pts.push([rr * Math.cos(th), rr * Math.sin(th)]);
+  }
+  var veins = lobes.map(function(l) { return [0, 0, 0.85 * l.L * Math.cos(l.a), 0.85 * l.L * Math.sin(l.a)]; });
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.03 * (r() - 0.5), 0.2], [0.08 * (r() - 0.5), 0.42]] };
+}
+
+function geoGinkgo(r, v) {
+  var phi = (62 + r() * 18) * DEG;
+  var R = 0.95 * (1 + (r() - 0.5) * 0.15 * v);
+  var notch = r() < 0.7 ? (0.15 + 0.35 * r()) * (0.5 + 0.5 * v) : 0.03;
+  var wavK = 6 + r() * 10, wavA = 0.025 * v + 0.01, ph = r() * 6;
+  var pts = [[-0.015, 0.0], [0.45 * R * Math.cos(-PI / 2 - phi * 0.86), 0.45 * R * Math.sin(-PI / 2 - phi * 0.86)]];
+  var N = 140;
+  for (var k = 0; k <= N; k++) {
+    var th = -PI / 2 - phi + 2 * phi * k / N;
+    var dd = th + PI / 2;
+    var rr = R * (1 + wavA * Math.sin(th * wavK + ph)) * (1 - notch * Math.exp(-Math.pow(dd / 0.07, 2)));
+    rr *= 1 - 0.25 * Math.pow(Math.abs(dd) / phi, 8);
+    pts.push([rr * Math.cos(th), rr * Math.sin(th)]);
+  }
+  pts.push([0.45 * R * Math.cos(-PI / 2 + phi * 0.86), 0.45 * R * Math.sin(-PI / 2 + phi * 0.86)]);
+  pts.push([0.015, 0.0]);
+  var veins = [];
+  for (var i = 0; i < 16; i++) {
+    var a = -PI / 2 - phi * 0.92 + (2 * phi * 0.92) * i / 15;
+    veins.push([0, 0, 0.88 * R * Math.cos(a), 0.88 * R * Math.sin(a)]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'fine', stem: [[0, 0], [0.02 * (r() - 0.5), 0.28], [0.06 * (r() - 0.5), 0.55]] };
+}
+
+function geoOak(r, v) {
+  var nL = 4 + Math.floor(r() * 3);
+  var W = 0.3 * (1 + (r() - 0.5) * 0.25 * v);
+  var depth = 0.25 + 0.2 * r() * (0.5 + v);
+  var phL = r() * 0.6 * v, phR = r() * 0.6 * v;
+  function hw(t, ph) {
+    var env = Math.pow(Math.sin(PI * Math.pow(t, 0.75)), 0.85);
+    return W * env * ((1 - depth) + depth * Math.abs(Math.sin(PI * nL * t + ph)));
+  }
+  var pts = [], N = 90, i, t;
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t, phL), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t, phR), -t]); }
+  var veins = [[0, 0, 0, -0.95]];
+  for (var k = 0; k < nL; k++) {
+    t = (k + 0.5) / nL;
+    if (t > 0.9) continue;
+    veins.push([0, -t * 0.85, -hw(t, phL) * 0.8, -t - 0.04]);
+    veins.push([0, -t * 0.85, hw(t, phR) * 0.8, -t - 0.04]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.1], [0.02 * (r() - 0.5), 0.18]] };
+}
+
+function geoKeyaki(r, v) {
+  var W = 0.22 * (1 + (r() - 0.5) * 0.3 * v);
+  var teeth = 10 + r() * 5, amp = 0.05 + 0.04 * r();
+  function hw(t) {
+    var base = W * Math.pow(Math.sin(PI * Math.pow(t, 0.62)), 1.1);
+    if (t > 0.12) { var f = t * teeth; f = f - Math.floor(f); base *= 1 + amp * f; }
+    return base;
+  }
+  var pts = [], N = 110, i, t;
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
+  var veins = [[0, 0, 0, -0.95]];
+  for (var k = 1; k < teeth - 1; k++) {
+    t = k / teeth;
+    veins.push([0, -t, -0.85 * hw(t + 0.08), -(t + 0.08)]);
+    veins.push([0, -t, 0.85 * hw(t + 0.08), -(t + 0.08)]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.07], [0.02 * (r() - 0.5), 0.13]] };
+}
+/* Plain, generic leaf for the bare tree: a small almond shape with a midrib. */
+function geoGeneric(r, v) {
+  var W2 = 0.2 * (1 + (r() - 0.5) * 0.4 * v), N = 40, pts = [], i, t;
+  function hw(tt) { return W2 * Math.pow(Math.sin(PI * Math.pow(tt, 0.75)), 0.9); }
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
+  return { pts: pts, veins: [[0, 0, 0, -0.9]], veinStyle: 'light', stem: [[0, 0], [0.01, 0.08], [0.02 * (r() - 0.5), 0.15]] };
+}
+var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, generic: geoGeneric };
+
+/* Build one leaf's geometry from its seed, then bend it and add wear. */
+function buildGeometry(L) {
+  var r = rngFrom(L.seed);
+  var v = S.shapeVariation;
+  var g = GEO[L.species](r, v);
+  var bend = (r() - 0.5) * 0.4 * v;
+  var bendFn = function(p) { return [p[0] + bend * p[1] * p[1], p[1]]; };
+  g.pts = g.pts.map(bendFn);
+  g.stem = g.stem.map(bendFn);
+  g.veins = g.veins.map(function(s) {
+    var a = bendFn([s[0], s[1]]), b = bendFn([s[2], s[3]]);
+    return [a[0], a[1], b[0], b[1]];
+  });
+  var w = S.wear;
+  var wr = r();
+  g.bites = [];
+  g.spots = [];
+  if (wr < w * 0.7) {
+    var nb = 1 + Math.floor(r() * 2);
+    for (var i = 0; i < nb; i++) {
+      var q = g.pts[Math.floor(r() * g.pts.length)];
+      g.bites.push([q[0] * 1.05, q[1] * 1.05, 0.06 + r() * 0.08]);
+    }
+  }
+  if (r() < w) {
+    var ns = 2 + Math.floor(r() * 6);
+    for (var j = 0; j < ns; j++) {
+      var pt = g.pts[Math.floor(r() * g.pts.length)], f = 0.2 + r() * 0.55;
+      g.spots.push([pt[0] * f, pt[1] * f, 0.015 + r() * 0.03]);
+    }
+  }
+  g.dry = clamp(w * (0.4 + ENV.season) * r(), 0, 1);
+  L.geo = g;
+}
+
+/* ============================================================
+   5. LEAF SPRITES — each leaf is drawn once into its own small
+      canvas (colour, veins, wear, light, wetness, frost, blur
+      baked in), then just moved and turned each frame.
+   ============================================================ */
+var PR = 1;
+var scratch = document.createElement('canvas');
+var sctx = scratch.getContext('2d');
+var HAS_FILTER = typeof sctx.filter === 'string';
+var lookVersion = 1, geomVersion = 1;
+
+function leafBlur(L) {
+  if (L.hero) return 0;
+  if (L.onTree) return 0.4;             // leaves still on the tree stay crisp, like the branches
+  var zc = clamp(L.z, 0, 1);
+  return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
+}
+function leafColours(L) {
+  var sp = SPECIES[L.species];
+  var p = clamp(ENV.season + L.pj * 0.2 * S.colorVariety, 0, 1);
+  var site = SITE_RGB[sp.site[L.palIdx % sp.site.length]];
+  var k = 1 + L.bright * S.colorVariety;
+  function at(pp) { return scaleRgb(mixRgb(rampAt(sp.rampRgb, pp), site, S.paletteBlend), k); }
+  return { base: at(p - 0.08), mid: at(p), tip: at(p + (L.species === 'ginkgo' ? 0.14 : 0.1)) };
+}
+function tracePath(ctx, pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+}
+
+function bakeLeaf(L) {
+  if (L.geomV !== geomVersion || !L.geo) { buildGeometry(L); L.geomV = geomVersion; }
+  var g = L.geo;
+  var pr = L.hero ? Math.min(PR, 1.5) : PR;
+  var blur = leafBlur(L);
+  var s = L.size * pr;
+  var side = Math.ceil(2.4 * s + blur * pr * 6 + 4);
+  if (scratch.width < side || scratch.height < side) {
+    scratch.width = Math.max(scratch.width, side);
+    scratch.height = Math.max(scratch.height, side);
+  }
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.globalCompositeOperation = 'source-over';
+  sctx.globalAlpha = 1;
+  sctx.clearRect(0, 0, side, side);
+  sctx.setTransform(s, 0, 0, s, side / 2, side / 2 + 0.25 * s);
+
+  var C = leafColours(L);
+  var grad = sctx.createLinearGradient(0, 0.1, 0, -1);
+  grad.addColorStop(0, rgba(C.base));
+  grad.addColorStop(0.5, rgba(C.mid));
+  grad.addColorStop(1, rgba(C.tip));
+
+  // stem
+  sctx.strokeStyle = rgba(scaleRgb(C.base, 0.7));
+  sctx.lineWidth = L.species === 'ginkgo' ? 0.022 : 0.028;
+  sctx.lineCap = 'round';
+  sctx.beginPath();
+  sctx.moveTo(g.stem[0][0], g.stem[0][1]);
+  sctx.quadraticCurveTo(g.stem[1][0], g.stem[1][1], g.stem[2][0], g.stem[2][1]);
+  sctx.stroke();
+
+  // blade
+  tracePath(sctx, g.pts);
+  sctx.fillStyle = grad;
+  sctx.fill();
+
+  sctx.save();
+  sctx.clip();
+  // veins
+  sctx.lineWidth = g.veinStyle === 'fine' ? 0.007 : 0.014;
+  sctx.strokeStyle = g.veinStyle === 'fine' ? 'rgba(120,80,20,0.14)' : 'rgba(255,236,205,0.24)';
+  sctx.beginPath();
+  for (var i = 0; i < g.veins.length; i++) {
+    sctx.moveTo(g.veins[i][0], g.veins[i][1]);
+    sctx.lineTo(g.veins[i][2], g.veins[i][3]);
+  }
+  sctx.stroke();
+  // brown spots
+  sctx.fillStyle = 'rgba(90,50,25,0.45)';
+  for (var j = 0; j < g.spots.length; j++) {
+    sctx.beginPath();
+    sctx.arc(g.spots[j][0], g.spots[j][1], g.spots[j][2], 0, TAU);
+    sctx.fill();
+  }
+  // dry edge
+  if (g.dry > 0.05) {
+    tracePath(sctx, g.pts);
+    sctx.strokeStyle = 'rgba(110,70,35,' + (0.5 * g.dry).toFixed(3) + ')';
+    sctx.lineWidth = 0.07;
+    sctx.stroke();
+  }
+  // wet: darker + a thin shine
+  if (ENV.wet > 0) {
+    sctx.fillStyle = 'rgba(40,20,22,' + (0.22 * ENV.wet).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+    sctx.strokeStyle = 'rgba(255,255,255,' + (0.38 * ENV.wet).toFixed(3) + ')';
+    sctx.lineWidth = 0.025;
+    sctx.beginPath();
+    sctx.moveTo(-0.16, -0.2);
+    sctx.quadraticCurveTo(-0.2, -0.45, -0.06, -0.72);
+    sctx.stroke();
+  }
+  // time-of-day light on the leaf
+  var Lt = ENV.light;
+  if (S.lightTint > 0) {
+    sctx.fillStyle = rgba(Lt.col, S.lightTint * Lt.amt * 1.5);
+    sctx.fillRect(-2, -2, 4, 4);
+    if (Lt.dark > 0) {
+      sctx.fillStyle = 'rgba(28,32,58,' + (S.lightTint * Lt.dark * 0.5).toFixed(3) + ')';
+      sctx.fillRect(-2, -2, 4, 4);
+    }
+  }
+  // fog fades far leaves toward the paper colour
+  var zc = clamp(L.z, 0, 1);
+  if (ENV.fog > 0 && !L.hero) {
+    sctx.fillStyle = 'rgba(250,246,240,' + (ENV.fog * (1 - zc) * 0.55).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+  }
+  // frost on the edges when cold
+  if (ENV.frost > 0) {
+    sctx.fillStyle = 'rgba(225,235,250,' + (0.18 * ENV.frost).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+    tracePath(sctx, g.pts);
+    sctx.strokeStyle = 'rgba(250,252,255,' + (0.8 * ENV.frost).toFixed(3) + ')';
+    sctx.lineWidth = 0.08;
+    sctx.stroke();
+  }
+  sctx.restore();
+
+  // bites and tears
+  if (g.bites.length) {
+    sctx.globalCompositeOperation = 'destination-out';
+    for (var b = 0; b < g.bites.length; b++) {
+      sctx.beginPath();
+      sctx.arc(g.bites[b][0], g.bites[b][1], g.bites[b][2], 0, TAU);
+      sctx.fill();
+    }
+    sctx.globalCompositeOperation = 'source-over';
+  }
+
+  // copy into the leaf's own sprite, with its depth blur
+  if (!L.spr || L.spr.width !== side) {
+    L.spr = document.createElement('canvas');
+    L.spr.width = L.spr.height = side;
+    L.back = document.createElement('canvas');
+    L.back.width = L.back.height = side;
+  }
+  var c1 = L.spr.getContext('2d');
+  c1.clearRect(0, 0, side, side);
+  if (HAS_FILTER && blur > 0.05) c1.filter = 'blur(' + (blur * pr).toFixed(2) + 'px)';
+  c1.drawImage(scratch, 0, 0, side, side, 0, 0, side, side);
+  if (HAS_FILTER) c1.filter = 'none';
+  var c2 = L.back.getContext('2d');
+  c2.clearRect(0, 0, side, side);
+  if (HAS_FILTER) c2.filter = 'brightness(1.12) saturate(0.7)';
+  else c2.globalAlpha = 0.85;
+  c2.drawImage(L.spr, 0, 0);
+  if (HAS_FILTER) c2.filter = 'none';
+  c2.globalAlpha = 1;
+  L.hs = side / (2 * pr);
+  L.bakedV = lookVersion;
+}
+
+/* ============================================================
+   6. LEAF MOTION
+   ============================================================ */
+var leaves = [];   // falling, sorted far → near
+var pile = [];     // landed at the bottom edge
+var hero = null;   // the occasional close-up leaf
+var nextId = 1;
+
+function speciesWeights() {
+  if (S.speciesMode === 'manual') {
+    return { momiji: S.wMomiji, ginkgo: S.wGinkgo, oak: S.wOak, keyaki: S.wKeyaki };
+  }
+  var p = ENV.season;
+  return {
+    ginkgo: 0.03 + bell(p, 0.4, 0.3),
+    momiji: 0.03 + bell(p, 0.65, 0.3),
+    keyaki: 0.03 + 0.6 * bell(p, 0.45, 0.35),
+    oak:    0.03 + 0.7 * bell(p, 0.85, 0.25)
+  };
+}
+function pickWeighted(w) {
+  var tot = 0, k;
+  for (k in w) tot += Math.max(0, w[k]);
+  if (tot <= 0) return null;
+  var x = Math.random() * tot;
+  for (k in w) { x -= Math.max(0, w[k]); if (x <= 0) return k; }
+  return k;
+}
+function setMode(L, forced) {
+  var w = {};
+  var base = SPECIES[L.species].modes;
+  for (var k in base) w[k] = base[k];
+  if (ENV.windMs > 6) { w.tumble *= 1.8; w.glide *= 1.5; }
+  if (ENV.rainy) { w.tumble *= 2; w.flutter *= 0.5; }
+  if (ENV.frost > 0) { w.flutter *= 0.6; w.tumble *= 1.4; }
+  var m = forced || pickWeighted(w);
+  var depth = 0.5 + 0.5 * clamp(L.z, 0, 1.4);
+  L.mode = m;
+  L.modeVx = 0;
+  if (m === 'flutter') {
+    L.swayAmp = rnd(18, 48) * S.sway * depth; L.sf = rnd(1.4, 2.6);
+    L.flipV = (Math.random() - 0.5) * 1.2; L.fallMul = 0.85; L.modeT = rnd(2, 6);
+  } else if (m === 'tumble') {
+    L.swayAmp = 6 * S.sway; L.sf = 2;
+    L.flipV = (Math.random() < 0.5 ? -1 : 1) * rnd(5, 9); L.rotV = (Math.random() < 0.5 ? -1 : 1) * rnd(1.5, 3.5);
+    L.fallMul = 1.35; L.modeT = rnd(1, 3);
+  } else if (m === 'glide') {
+    L.glideDir = Math.abs(ENV.windPx) > 20 && Math.random() < 0.7 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? -1 : 1);
+    L.modeVx = L.glideDir * rnd(40, 90) * depth;
+    L.swayAmp = 4; L.sf = 1; L.flipV = (Math.random() - 0.5) * 0.6;
+    L.fallMul = 0.55; L.modeT = rnd(1.2, 2.5);
+  } else {
+    L.swayAmp = rnd(14, 32) * S.sway * depth; L.sf = rnd(3, 5);
+    L.flipV = L.sf; L.rotV = (Math.random() < 0.5 ? -1 : 1) * 2.4;
+    L.fallMul = 0.95; L.modeT = rnd(2, 5);
+  }
+}
+
+function makeLeaf(opts) {
+  opts = opts || {};
+  var species = opts.species || pickWeighted(speciesWeights()) || 'momiji';
+  var z = opts.z !== undefined ? opts.z : lerp(1, 0, S.depthSpread * Math.pow(Math.random(), 0.8));
+  var L = {
+    id: nextId++, seed: (Math.random() * 4294967296) >>> 0, species: species, z: z,
+    hero: !!opts.hero,
+    size: SPECIES[species].size * (0.45 + 0.6 * clamp(z, 0, 1)) * S.sizeScale * rnd(0.85, 1.15) * (opts.hero ? 1.3 : 1),
+    x: 0, y: 0, vx: 0, vy: 0, rot: rnd(-PI, PI), baseRot: rnd(-0.6, 0.6),
+    phi: rnd(0, TAU), sp: rnd(0, TAU), so: 0, age: 0,
+    fallJ: rnd(0.8, 1.2), groundY: rnd(4, 30),
+    pj: (Math.random() + Math.random() + Math.random() - 1.5) * 1.4,
+    palIdx: Math.floor(Math.random() * 5), bright: rnd(-0.06, 0.06),
+    gid: 0, settled: false
+  };
+  setMode(L);
+  return L;
+}
+function insertSorted(L) {
+  var i = leaves.length;
+  while (i > 0 && leaves[i - 1].z > L.z) i--;
+  leaves.splice(i, 0, L);
+}
+function spawnLeaf(opts) {
+  opts = opts || {};
+  if (ENV.scene === 'winter' && !opts.hero) return null;
+  if (leaves.length >= S.maxLeaves && !opts.force) return null;
+  var L = makeLeaf(opts);
+  // The nearest leaves fall in front of the text (a few at a time).
+  if (S.frontLeaves > 0 && L.z >= 0.7 && frontLeafCount < S.frontLeaves) { L.front = true; frontLeafCount++; }
+  var wp = ENV.windPx;
+  if (opts.x !== undefined) { L.x = opts.x; L.y = opts.y; }
+  else if (Math.abs(wp) > 30 && Math.random() < Math.min(0.5, Math.abs(wp) / 250)) {
+    L.x = wp > 0 ? -L.size : W + L.size;
+    L.y = Math.random() * H * 0.5;
+  } else {
+    L.x = Math.random() * W * 1.2 - W * 0.1 - wp * 3;
+    L.y = -L.size * 1.2 - Math.random() * 40;
+  }
+  if (opts.vx !== undefined) L.vx = opts.vx;
+  if (opts.prefill) { L.y = Math.random() * H; L.age = 5; }
+  bakeLeaf(L);
+  insertSorted(L);
+  return L;
+}
+
+function updateLeaf(L, dt, t) {
+  L.age += dt;
+  L.modeT -= dt;
+  if (L.modeT <= 0) setMode(L);
+  var zc = clamp(L.z, 0, 1.4);
+  var T = 46 * (0.45 + 0.55 * zc) * S.fallSpeed * L.fallJ * (L.hero ? 0.7 : 1) * (ENV.rainy ? 1 + 0.25 * ENV.wet : 1);
+  var gustEnv = Math.max(0.2, 1 + S.gustiness * 0.6 * (noise1(t * 0.25) * 2 - 1));
+  var turb = (ENV.windMs * 6 + 8) * (noise1(L.seed % 997 + t * 0.7) * 2 - 1);
+  var wx = (ENV.windPx * gustEnv + turb) * (0.35 + 0.65 * zc);
+  var tvx = wx + L.modeVx;
+  L.vx += (tvx - L.vx) * (1 - Math.exp(-dt * 1.6));
+  L.sp += L.sf * dt;
+  var tvy = T * L.fallMul;
+  var targetSo = 0;
+  if (L.mode === 'flutter') {
+    tvy *= 0.55 + 0.9 * Math.abs(Math.cos(L.sp));
+    targetSo = L.swayAmp * Math.sin(L.sp);
+    var rt = L.baseRot + 0.55 * Math.cos(L.sp) * Math.min(1.5, S.sway);
+    L.rot += angDiff(rt, L.rot) * (1 - Math.exp(-dt * 3));
+    L.baseRot += (Math.random() - 0.5) * dt * 0.4;
+  } else if (L.mode === 'tumble' || L.mode === 'spiral') {
+    targetSo = L.swayAmp * Math.sin(L.sp);
+    L.rot += L.rotV * dt;
+  } else {
+    var gt = L.baseRot + L.glideDir * 0.5;
+    L.rot += angDiff(gt, L.rot) * (1 - Math.exp(-dt * 2));
+  }
+  L.vy += (tvy - L.vy) * (1 - Math.exp(-dt * 2.2));
+  L.so += (targetSo - L.so) * (1 - Math.exp(-dt * 4));
+  L.phi += L.flipV * dt * (0.5 + 0.5 * S.flip3d);
+  L.x += L.vx * dt;
+  L.y += L.vy * dt;
+}
+
+function settleLeaf(L) {
+  L.settled = true;
+  L.front = false;
+  L.y = H - L.groundY;
+  L.pileSy = rnd(0.45, 0.72);
+  L.pileSx = Math.random() < 0.5 ? -1 : 1;
+  L.pileFace = Math.cos(L.phi) >= 0;
+  pile.push(L);
+  while (pile.length > S.pileMax) pile.shift();
+}
+function liftFromPile(L, vx, vy) {
+  var i = pile.indexOf(L);
+  if (i >= 0) pile.splice(i, 1);
+  L.settled = false;
+  L.vx = vx; L.vy = vy;
+  L.y -= 4;
+  setMode(L, 'tumble');
+  insertSorted(L);
+}
+
+/* ============================================================
+   7. WIND EVENTS — gusts, tap/swipe puffs, lightning scatter
+   ============================================================ */
+var gusts = [], gustId = 1;
+function startGust(force) {
+  var dir = Math.abs(ENV.windPx) > 4 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? -1 : 1);
+  var g = {
+    id: gustId++, dir: dir, x: dir > 0 ? -100 : W + 100,
+    speed: 650 + ENV.windMs * 30,
+    str: (90 + ENV.windMs * 22) * (0.6 + S.gustiness) * (force ? 1.3 : 1)
+  };
+  gusts.push(g);
+  var n = 3 + Math.floor(Math.random() * 5);
+  for (var i = 0; i < n; i++) {
+    spawnLeaf({ x: dir > 0 ? -30 : W + 30, y: Math.random() * H * 0.6, vx: dir * g.str * rnd(0.5, 1), force: force });
+  }
+}
+function updateGusts(dt) {
+  for (var i = gusts.length - 1; i >= 0; i--) {
+    var g = gusts[i];
+    g.x += g.dir * g.speed * dt;
+    for (var j = 0; j < leaves.length; j++) {
+      var L = leaves[j];
+      if (L.gid === g.id) continue;
+      if (g.dir > 0 ? L.x < g.x : L.x > g.x) {
+        L.gid = g.id;
+        L.vx += g.dir * g.str * (0.5 + 0.5 * clamp(L.z, 0, 1)) * rnd(0.7, 1.3);
+        L.vy -= g.str * 0.25 * Math.random();
+      }
+    }
+    for (var k = pile.length - 1; k >= 0; k--) {
+      var P = pile[k];
+      if (P.gid === g.id) continue;
+      if (g.dir > 0 ? P.x < g.x : P.x > g.x) {
+        P.gid = g.id;
+        if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
+      }
+    }
+    if (tree && tree.gid !== g.id && (g.dir > 0 ? tree.bx < g.x : tree.bx > g.x)) {
+      tree.gid = g.id;
+      tree.gustV += g.dir * 0.5 * (g.str / 200);
+      for (var q = tree.leaves.length - 1; q >= 0; q--) if (Math.random() < 0.25) detachTreeLeaf(q);
+    }
+    if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
+  }
+}
+function pushAround(px, py, radius, fx, fy, radial, liftChance) {
+  var all = leaves.slice();
+  if (hero) all.push(hero);
+  for (var i = 0; i < all.length; i++) {
+    var L = all[i];
+    var dx = L.x - px, dy = L.y - py, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > radius) continue;
+    var f = 1 - d / radius;
+    var nx = d > 0.01 ? dx / d : 0, ny = d > 0.01 ? dy / d : -1;
+    var k = f * (0.5 + 0.5 * clamp(L.z, 0, 1.4));
+    L.vx += (fx + nx * radial) * k;
+    L.vy += (fy + ny * radial) * k;
+    if (L.mode !== 'tumble' && Math.random() < f) setMode(L, 'tumble');
+  }
+  for (var j = pile.length - 1; j >= 0; j--) {
+    var P = pile[j];
+    var ex = P.x - px, ey = P.y - py, e = Math.sqrt(ex * ex + ey * ey);
+    if (e < radius * 0.8 && Math.random() < liftChance) {
+      liftFromPile(P, fx * 0.6 + (ex / (e || 1)) * radial * 0.8, -rnd(120, 260));
+    }
+  }
+}
+
+var lightningNext = 0, flashes = [];
+function strikeLightning() {
+  var t0 = performance.now() / 1000;
+  flashes.push({ at: t0, a: 0.55 }, { at: t0 + 0.18, a: 0.35 });
+  setTimeout(function() {
+    pushAround(Math.random() * W, Math.random() * H * 0.6, Math.max(W, H), 0, -40, 220, 0.8);
+  }, 250);
+}
+
+/* ============================================================
+   8. WEATHER & TIME-OF-DAY LAYERS
+   ============================================================ */
+var streaks = [], splashes = [], flakes = [], specks = [], birds = [], dragonfly = null;
+var cloudSprite = null, fogSprite = null, speckSprite = null;
+var cloudShadowsPos = [{ x: 0, y: 0.1 }, { x: 0.55, y: 0.45 }, { x: 1.1, y: 0.2 }];
+var fogBands = [{ x: 0, y: 0.25, s: 1 }, { x: 0.4, y: 0.55, s: 0.7 }, { x: 0.8, y: 0.8, s: 1.2 }];
+
+function makeSprites() {
+  makeSnowSprites();
+  cloudSprite = document.createElement('canvas');
+  cloudSprite.width = 320; cloudSprite.height = 220;
+  var c = cloudSprite.getContext('2d');
+  // every blob fades out well inside the sprite, so no hard edges
+  var blobs = [[100, 120, 60], [150, 105, 70], [200, 125, 55], [130, 135, 50], [230, 110, 45]];
+  blobs.forEach(function(b) {
+    var g = c.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+    g.addColorStop(0, 'rgba(70,50,60,0.55)');
+    g.addColorStop(1, 'rgba(70,50,60,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 320, 220);
+  });
+  fogSprite = document.createElement('canvas');
+  fogSprite.width = 640; fogSprite.height = 240;
+  var f = fogSprite.getContext('2d');
+  for (var i = 0; i < 9; i++) {
+    var x = 130 + i * 47.5, y = 120 + (Math.random() - 0.5) * 30, r = 60 + Math.random() * 40;
+    var g2 = f.createRadialGradient(x, y, 0, x, y, r);
+    g2.addColorStop(0, 'rgba(252,249,245,0.6)');
+    g2.addColorStop(1, 'rgba(252,249,245,0)');
+    f.fillStyle = g2;
+    f.fillRect(0, 0, 640, 240);
+  }
+  speckSprite = document.createElement('canvas');
+  speckSprite.width = speckSprite.height = 32;
+  var sp = speckSprite.getContext('2d');
+  var g3 = sp.createRadialGradient(16, 16, 0, 16, 16, 16);
+  // firefly light: a bright yellow-green centre in a soft warm halo
+  g3.addColorStop(0, 'rgba(250,255,200,1)');
+  g3.addColorStop(0.18, 'rgba(214,236,110,0.9)');
+  g3.addColorStop(0.45, 'rgba(230,200,90,0.35)');
+  g3.addColorStop(1, 'rgba(255,170,90,0)');
+  sp.fillStyle = g3;
+  sp.fillRect(0, 0, 32, 32);
+}
+
+function updateRain(dt) {
+  var c = S.condition;
+  var drizzle = c === 'drizzle';
+  var target = 0;
+  if (ENV.rainy) target = drizzle ? 110 * S.rainStreaks : Math.min(450, (40 + S.rainMm * 30) * S.rainStreaks);
+  target = Math.round(target);
+  while (streaks.length < target) {
+    var z = rnd(0.2, 1);
+    streaks.push({ x: Math.random() * W, y: Math.random() * H, z: z });
+  }
+  if (streaks.length > target) streaks.length = target;
+  var vx = ENV.windPx * 2.5;
+  for (var i = 0; i < streaks.length; i++) {
+    var s = streaks[i];
+    var spd = (700 + 600 * s.z) * (drizzle ? 0.6 : 1);
+    s.y += spd * dt;
+    s.x += vx * dt;
+    if (s.y > H) {
+      if (S.splashes && s.z > 0.6 && Math.random() < 0.5) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
+      s.y = -30 - Math.random() * 60;
+      s.x = Math.random() * (W + 200) - 100 - vx * 0.5;
+    }
+    if (s.x < -100) s.x += W + 200;
+    if (s.x > W + 100) s.x -= W + 200;
+  }
+  for (var j = splashes.length - 1; j >= 0; j--) {
+    splashes[j].t += dt;
+    if (splashes[j].t > 0.35) splashes.splice(j, 1);
+  }
+}
+function drawRain(ctx) {
+  if (!streaks.length && !splashes.length) return;
+  var drizzle = S.condition === 'drizzle';
+  var lenMul = (drizzle ? 0.75 : 1) * (1 + S.rainMm / 10);
+  var ang = Math.atan2(700, ENV.windPx * 2.5);
+  var cx = Math.cos(ang), cy = Math.sin(ang);
+  for (var pass = 0; pass < 2; pass++) {
+    ctx.beginPath();
+    for (var i = 0; i < streaks.length; i++) {
+      var s = streaks[i];
+      if ((s.z >= 0.6) !== (pass === 1)) continue;
+      var len = (10 + 18 * s.z) * lenMul;
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - cx * len, s.y - cy * len);
+    }
+    // Dark plum-grey streaks: pale rain vanished on the silk-white page.
+    var ra = pass === 0 ? (drizzle ? 0.16 : 0.22) : (drizzle ? 0.26 : 0.38);
+    ctx.strokeStyle = rgba([70, 60, 95], ra * S.rainContrast);
+    ctx.lineWidth = pass === 0 ? (drizzle ? 0.8 : 1.0) : (drizzle ? 1.1 : 1.5);
+    ctx.stroke();
+  }
+  ctx.lineWidth = 0.9;
+  for (var j = 0; j < splashes.length; j++) {
+    var sp = splashes[j], k = sp.t / 0.35, r = (7 + 5 * sp.z) * k;
+    ctx.strokeStyle = rgba([70, 60, 95], 0.5 * (1 - k) * S.rainContrast);
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, r, r * 0.35, 0, 0, TAU);
+    ctx.stroke();
+  }
+}
+
+/* Snow is drawn on the back canvas (behind the text) in five depth
+   tiers: far flakes are small, slow, faint and blurred; near flakes
+   are bigger, faster and sharper. Each tier is one pre-blurred sprite. */
+var SNOW_TIERS = [
+  { blur: 3.2, r: 1.8, a: 0.45, v: 22 },
+  { blur: 2.2, r: 2.4, a: 0.55, v: 32 },
+  { blur: 1.4, r: 3.0, a: 0.55, v: 44 },
+  { blur: 0.8, r: 3.8, a: 0.7,  v: 58 },
+  { blur: 0.3, r: 4.8, a: 0.85, v: 74 }
+];
+var snowSprites = [];
+function makeSnowSprites() {
+  snowSprites = SNOW_TIERS.map(function(tr) {
+    var c = document.createElement('canvas'), sz = 64;
+    c.width = c.height = sz;
+    var x = c.getContext('2d');
+    if (HAS_FILTER) x.filter = 'blur(' + (tr.blur * 3).toFixed(1) + 'px)';
+    var g = x.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, 15);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.65, 'rgba(244,243,250,1)');
+    g.addColorStop(1, 'rgba(150,140,180,0.9)');   // soft lilac rim so flakes show on the silk-white page
+    x.fillStyle = g;
+    x.beginPath(); x.arc(sz / 2, sz / 2, 15, 0, TAU); x.fill();
+    return c;
+  });
+}
+function updateSnow(dt, t) {
+  var target = ENV.snowing ? Math.round(140 * ENV.snowAmt) : 0;
+  while (flakes.length < target) {
+    flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, tier: Math.floor(Math.pow(Math.random(), 1.3) * 5),
+                  ph: rnd(0, TAU), sw: rnd(8, 18), sf: rnd(0.8, 1.6), r: Math.random() });
+  }
+  if (flakes.length > target) flakes.length = target;
+  for (var i = 0; i < flakes.length; i++) {
+    var f = flakes[i], tr = SNOW_TIERS[f.tier], depth = (f.tier + 1) / 5;
+    f.y += tr.v * dt;
+    f.x += (ENV.windPx * 0.6 * depth + Math.sin(t * f.sf + f.ph) * f.sw * depth) * dt;
+    if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; }
+    if (f.x < -20) f.x += W + 40;
+    if (f.x > W + 20) f.x -= W + 40;
+  }
+}
+/* Which tier group to draw:
+   'far'   — the small, soft far tiers (behind the tree and fog)
+   'near'  — the larger tiers, still behind the text
+   'front' — a random share of the larger flakes, drawn above the text */
+function isFrontFlake(f) { return f.tier >= 2 && f.r < S.snowFront; }
+function drawSnow(c, mode) {
+  if (!flakes.length) return;
+  for (var i = 0; i < flakes.length; i++) {
+    var f = flakes[i], fr = isFrontFlake(f);
+    if (mode === 'front') { if (!fr) continue; }
+    else if (fr || (f.tier >= 3) !== (mode === 'near')) continue;
+    var tr = SNOW_TIERS[f.tier], d = tr.r * 2 * (64 / 30);
+    c.globalAlpha = mode === 'front' ? tr.a * 0.85 : tr.a;
+    c.drawImage(snowSprites[f.tier], f.x - d / 2, f.y - d / 2, d, d);
+  }
+  c.globalAlpha = 1;
+}
+
+function drawSky(ctx, t) {
+  var Lt = ENV.light;
+  var a = S.skyTint * Lt.amt * 1.2;
+  if (a > 0.003) {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgba(Lt.col, a));
+    g.addColorStop(1, rgba(Lt.col, a * 0.5));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (Lt.dark > 0.01) {
+    ctx.fillStyle = 'rgba(35,40,70,' + (S.skyTint * Lt.dark * 0.35).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  var wd = S.skyTint * (S.cloudCover / 100 * 0.1 + (ENV.rainy ? 0.06 : 0) + (S.condition === 'thunderstorm' ? 0.1 : 0));
+  if (wd > 0.003) {
+    ctx.fillStyle = 'rgba(70,64,82,' + wd.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (S.dawnGlow && Lt.phase === 'dawn') {
+    var k = 1 - Math.min(1, Math.abs(S.hour - ENV.sun.rise) / 1.2);
+    var rg = ctx.createRadialGradient(W * 0.3, H * 1.05, 0, W * 0.3, H * 1.05, Math.max(W, H) * 0.8);
+    rg.addColorStop(0, 'rgba(255,184,150,' + (0.22 * k).toFixed(3) + ')');
+    rg.addColorStop(1, 'rgba(255,184,150,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawSun(ctx, t) {
+  var a = ENV.astro.sun;
+  if (!S.sun || a.alt < -1.5) return;
+  var vis = smooth(-1.5, 1.5, a.alt) * clamp(1 - S.cloudCover / 100 * 0.75, 0.15, 1) *
+            (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
+  if (vis < 0.01) return;
+  var clear = vis * clamp(1 - S.cloudCover / 100 * 0.8, 0, 1) * (1 - ENV.fog * 0.8);
+  var low = 1 - smooth(2, 18, a.alt);            // near the horizon: bigger, more orange
+  var size = 24 * S.sunSize * (1 + low * 0.35);
+  var x = skyToScreen(a.alt, a.az).x, y = skyBandY(size);
+  var warm = mixRgb([255, 214, 160], [255, 140, 80], low);
+  // wide bloom
+  var R = size * 9 * Math.max(0.2, S.sunGlow);
+  var g = ctx.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, rgba([255, 252, 244], 0.9 * vis));
+  g.addColorStop(0.08, rgba(warm, 0.55 * vis * S.sunGlow));
+  g.addColorStop(0.35, rgba(warm, 0.18 * vis * S.sunGlow));
+  g.addColorStop(1, rgba(warm, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
+  if (clear > 0.02) {
+    // starburst: thin tapering rays that slowly turn and shimmer
+    for (var i = 0; i < 16; i++) {
+      var ang = i / 16 * TAU + t * 0.015 + (hash1(i) - 0.5) * 0.3;
+      var len = size * (3 + 6 * hash1(i + 9)) * (0.85 + 0.15 * Math.sin(t * 1.3 + i * 2.1)) * S.sunGlow;
+      var w = size * 0.1 * (0.5 + hash1(i + 3));
+      var nx = -Math.sin(ang) * w, ny = Math.cos(ang) * w;
+      var ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len;
+      var rg = ctx.createLinearGradient(x, y, ex, ey);
+      rg.addColorStop(0, rgba([255, 255, 255], 0.8 * clear));
+      rg.addColorStop(0.3, rgba(warm, 0.4 * clear));
+      rg.addColorStop(1, rgba(warm, 0));
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.moveTo(x + nx, y + ny);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(x - nx, y - ny);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // faint lens ghosts on the line toward the centre of the screen
+    var cx = W * 0.5, cy = H * 0.5;
+    [[0.55, 26, [255, 190, 140]], [0.95, 14, [255, 220, 170]], [1.35, 40, [190, 205, 255]]].forEach(function(gh) {
+      var gx = x + (cx - x) * gh[0], gy = y + (cy - y) * gh[0], gr = gh[1] * S.sunSize;
+      var gg = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      gg.addColorStop(0, rgba(gh[2], 0.1 * clear));
+      gg.addColorStop(0.7, rgba(gh[2], 0.06 * clear));
+      gg.addColorStop(1, rgba(gh[2], 0));
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, TAU); ctx.fill();
+    });
+  }
+  var cg = ctx.createRadialGradient(x, y, 0, x, y, size);
+  cg.addColorStop(0, rgba([255, 255, 255], vis));
+  cg.addColorStop(0.7, rgba([255, 253, 246], 0.95 * vis));
+  cg.addColorStop(1, rgba([255, 245, 225], 0));
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.arc(x, y, size, 0, TAU); ctx.fill();
+}
+
+/* The moon at its real place and real phase. The lit side always
+   faces the sun, so a crescent, half moon or full moon looks right. */
+/* Night window for the moon: 20:00–05:00. Returns 0..1 through the
+   night, or -1 outside it. */
+function moonNightU() {
+  var h = S.hour;
+  if (h >= 20) return (h - 20) / 9;
+  if (h < 5) return (h + 4) / 9;
+  return -1;
+}
+/* Where the moon is drawn, and how visible it is.
+   'arc'  — one smooth glide every night, east (right) at 20:00 to west
+            (left) at 05:00, like the sun. Phase is real, position is not.
+   'real' — its real place in the sky; it fades out as it sinks to the
+            horizon and is not shown while it is really below it. */
+function moonPlacement(r) {
+  var m = ENV.astro.moon, cx, fade;
+  if (sunIsUp()) return null;                 // never together with the sun
+  if (S.moonPath === 'real') {
+    fade = smooth(-0.8, 2.5, m.alt);
+    cx = skyToScreen(m.alt, m.az).x;
+  } else {
+    var u = moonNightU();
+    if (u < 0) return null;
+    fade = smooth(0, 0.03, u) * (1 - smooth(0.97, 1, u));
+    cx = W * lerp(0.85, 0.15, u);
+  }
+  if (fade < 0.02) return null;
+  return { x: cx, y: skyBandY(r), fade: fade };
+}
+function moonNote() {
+  if (sunIsUp()) return ' (hidden while the sun is shown)';
+  if (S.moonPath === 'real') return ENV.astro.moon.alt > 0 ? '' : ' (below the horizon, so not shown in real-sky mode)';
+  return moonNightU() < 0 ? ' (moon is shown 20:00–05:00)' : '';
+}
+function drawMoon(ctx, t) {
+  if (!S.moon) return;
+  var A = ENV.astro;
+  var r = 28 * S.moonSize;
+  var P = moonPlacement(r);
+  if (!P) return;
+  var day = ENV.light.daylight;
+  var vis = P.fade * lerp(1, 0.55, day) * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) *
+            (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
+  if (vis < 0.02) return;
+  var cx = P.x, cy = P.y;
+  // The lit side faces the sun. The sun is below the horizon at night, so
+  // this is worked out from the phase alone: a waxing moon is lit toward
+  // the west (left), a waning one toward the east (right), tilted down.
+  // It changes smoothly with the phase, so the moon never flips.
+  var toSun = Math.atan2(1, -Math.sin(A.elong * DEG) * 2.5);
+  var litCol = mixRgb([255, 246, 226], [236, 240, 250], day);
+  var glowA = 0.32 * vis * (1 - day * 0.7) * A.illum;
+  if (glowA > 0.005) {
+    var glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 4.5);
+    glow.addColorStop(0, rgba([255, 240, 215], glowA));
+    glow.addColorStop(1, rgba([255, 240, 215], 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - r * 4.5, cy - r * 4.5, r * 9, r * 9);
+  }
+  var k = Math.cos(A.elong * DEG);
+  function litPath() {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -PI / 2, PI / 2, false);
+    ctx.ellipse(0, 0, r * Math.abs(k), r, 0, PI / 2, -PI / 2, k > 0);
+    ctx.closePath();
+  }
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(toSun);
+  if (A.illum > 0.015) {
+    litPath();
+    ctx.fillStyle = rgba(litCol, 0.92 * vis);
+    ctx.fill();
+    // grey "seas" on the lit part, fixed to the moon's face
+    ctx.save();
+    ctx.clip();
+    ctx.rotate(-toSun);
+    ctx.fillStyle = rgba(day > 0.5 ? [160, 165, 190] : [200, 185, 160], 0.3 * vis);
+    [[-0.25, -0.3, 0.28], [0.2, -0.15, 0.22], [0.05, 0.3, 0.2], [-0.35, 0.15, 0.16], [0.4, 0.25, 0.12]].forEach(function(mr) {
+      ctx.beginPath(); ctx.arc(mr[0] * r, mr[1] * r, mr[2] * r, 0, TAU); ctx.fill();
+    });
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+function drawCloudShadows(ctx, dt) {
+  var a = 0.07 * S.cloudShadows * (S.cloudCover / 100) * (0.3 + 0.7 * ENV.light.daylight);
+  var drift = (ENV.windPx * 0.25 + 8) * dt;
+  for (var i = 0; i < cloudShadowsPos.length; i++) {
+    var c = cloudShadowsPos[i];
+    c.x += drift / W;
+    if (c.x > 1.3) c.x -= 2.2;
+    if (c.x < -0.9) c.x += 2.2;
+  }
+  if (a < 0.003) return;
+  ctx.globalAlpha = a / 0.55;
+  for (var j = 0; j < cloudShadowsPos.length; j++) {
+    var p = cloudShadowsPos[j];
+    ctx.drawImage(cloudSprite, p.x * W - W * 0.45, p.y * H, W * 0.9, H * 0.55);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawRays(ctx, t) {
+  var amt = ENV.sunAmt * S.lightRays;
+  if (amt < 0.01) return;
+  var sun = ENV.sun, h = S.hour;
+  var u = clamp((h - sun.rise) / (sun.set - sun.rise), 0, 1);
+  var golden = ENV.light.phase === 'golden' || ENV.light.phase === 'dawn' ? 1.6 : 1;
+  var ox = lerp(-0.15, 1.15, u) * W, oy = -0.25 * H;
+  if (S.sun && ENV.astro.sun.alt > 0) {
+    ox = skyToScreen(ENV.astro.sun.alt, ENV.astro.sun.az).x;
+    oy = skyBandY(24 * S.sunSize);
+  }
+  var ang0 = Math.atan2(H * 0.9 - oy, W * 0.5 - ox);
+  var len = Math.sqrt(W * W + H * H) * 1.4;
+  var col = mixRgb(ENV.light.col, [255, 214, 150], 0.5);
+  for (var i = 0; i < 5; i++) {
+    var a = ang0 + (i - 2) * 0.12 + 0.05 * Math.sin(t * 0.07 + i * 1.7);
+    var w = 0.035 + 0.03 * noise1(t * 0.05 + i * 3.1);
+    var alpha = 0.06 * amt * golden * (0.6 + 0.4 * Math.sin(t * 0.3 + i));
+    var ex = ox + Math.cos(a) * len, ey = oy + Math.sin(a) * len;
+    var g = ctx.createLinearGradient(ox, oy, ex, ey);
+    g.addColorStop(0, rgba(col, alpha * 0.2));
+    g.addColorStop(0.35, rgba(col, alpha));
+    g.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + Math.cos(a - w) * len, oy + Math.sin(a - w) * len);
+    ctx.lineTo(ox + Math.cos(a + w) * len, oy + Math.sin(a + w) * len);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawFog(ctx, dt) {
+  var f = ENV.fog * S.fogHaze;
+  for (var i = 0; i < fogBands.length; i++) {
+    var b = fogBands[i];
+    b.x += (ENV.windPx * 0.15 + 6 * b.s) * dt / W;
+    if (b.x > 1.2) b.x -= 2.4;
+    if (b.x < -1.2) b.x += 2.4;
+  }
+  if (f < 0.01) return;
+  ctx.fillStyle = 'rgba(250,247,243,' + (f * 0.25).toFixed(3) + ')';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = clamp(f * 0.9, 0, 1);
+  for (var j = 0; j < fogBands.length; j++) {
+    var p = fogBands[j];
+    var bw = W * 1.6 * p.s, bh = H * 0.6 * p.s;
+    ctx.drawImage(fogSprite, p.x * W - bw * 0.3, p.y * H - bh / 2, bw, bh);
+    ctx.drawImage(fogSprite, p.x * W - bw * 0.3 - bw, p.y * H - bh / 2, bw, bh);
+  }
+  ctx.globalAlpha = 1;
+}
+
+var birdNext = 0;
+function sendBirds() {
+  var dir = Math.random() < 0.5 ? -1 : 1;
+  var n = 3 + Math.floor(Math.random() * 5);
+  var y0 = H * rnd(0.08, 0.35), spd = rnd(40, 70), size = rnd(7, 11);
+  for (var i = 0; i < n; i++) {
+    var row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+    birds.push({
+      x: (dir > 0 ? -40 : W + 40) - dir * row * 22, y: y0 + side * row * 12,
+      vx: dir * spd * rnd(0.95, 1.05), s: size * rnd(0.85, 1.1), ph: rnd(0, TAU), f: rnd(6, 9)
+    });
+  }
+}
+function updateBirds(dt, t) {
+  var birdTime = ENV.astro.sun.alt > 0 && (ENV.phase === 'dawn' || ENV.phase === 'golden' || ENV.phase === 'morning');
+  if (S.birds && t > birdNext && birdTime) {
+    if (birdNext > 0) sendBirds();
+    birdNext = t + rnd(45, 140);
+  }
+  if (ENV.astro.sun.alt < -2) birds.length = 0;      // no birds at night
+  for (var i = birds.length - 1; i >= 0; i--) {
+    var b = birds[i];
+    b.x += b.vx * dt;
+    b.y += Math.sin(t * 0.8 + b.ph) * 4 * dt;
+    if (b.x < -120 || b.x > W + 120) birds.splice(i, 1);
+  }
+}
+function drawBirds(ctx, t) {
+  if (!birds.length) return;
+  ctx.strokeStyle = 'rgba(80,55,60,0.38)';
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (var i = 0; i < birds.length; i++) {
+    var b = birds[i], w = Math.sin(t * b.f + b.ph), s = b.s;
+    ctx.moveTo(b.x - s, b.y - w * s * 0.5);
+    ctx.quadraticCurveTo(b.x - s * 0.5, b.y - w * s, b.x, b.y);
+    ctx.quadraticCurveTo(b.x + s * 0.5, b.y - w * s, b.x + s, b.y - w * s * 0.5);
+  }
+  ctx.stroke();
+}
+
+/* Fireflies: most drift behind the text; now and then some fly to a
+   message character, land on it and glow there for a while, then lift
+   off again. Several can sit on different characters at once. */
+var fireflyGlyphs = [], fireflyGlyphsAt = -10;
+function freeGlyphFor(t) {
+  if (t - fireflyGlyphsAt > 1) { fireflyGlyphs = glyphSpots(); fireflyGlyphsAt = t; }
+  if (!fireflyGlyphs.length) return null;
+  for (var tries = 0; tries < 6; tries++) {
+    var g = fireflyGlyphs[Math.floor(Math.random() * fireflyGlyphs.length)], taken = false;
+    for (var i = 0; i < specks.length; i++) {
+      var o = specks[i].target;
+      if (o && Math.abs(o.x - g.x) < 4 && Math.abs(o.y - g.y) < 4) { taken = true; break; }
+    }
+    if (!taken) return g;
+  }
+  return null;
+}
+function updateSpecks(dt, t) {
+  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk')) ? 24 : 0;
+  while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11), state: 'drift' });
+  if (specks.length > target) specks.length = target;
+  var landed = 0;
+  for (var k = 0; k < specks.length; k++) if (specks[k].state !== 'drift') landed++;
+  for (var i = 0; i < specks.length; i++) {
+    var p = specks[i];
+    if (p.state === 'drift') {
+      p.x += ((noise1(p.s + t * 0.15) - 0.5) * 40 + ENV.windPx * 0.15) * dt;
+      p.y += (noise1(p.s + 50 + t * 0.15) - 0.5) * 30 * dt;
+      if (p.x < -20) p.x += W + 40;
+      if (p.x > W + 20) p.x -= W + 40;
+      if (p.y < -20) p.y += H + 40;
+      if (p.y > H + 20) p.y -= H + 40;
+      if (S.fireflyLand && dynFrontMul > 0.5 && landed < S.fireflyMax && Math.random() < dt * 0.05) {
+        var g = freeGlyphFor(t);
+        if (g) { p.state = 'fly'; p.target = g; landed++; }
+      }
+    } else if (p.state === 'fly') {
+      // a gentle, wavering flight to the character
+      var dx = p.target.x - p.x, dy = p.target.y - 3 - p.y, d = Math.sqrt(dx * dx + dy * dy);
+      var sp = Math.min(70, d * 1.5 + 10);
+      if (d > 1.5) {
+        p.x += (dx / d * sp + Math.sin(t * 3 + p.s) * 14 * Math.min(1, d / 60)) * dt;
+        p.y += (dy / d * sp + Math.cos(t * 2.4 + p.s) * 10 * Math.min(1, d / 60)) * dt;
+      } else {
+        p.state = 'perch';
+        p.rest = rnd(3, 9);
+      }
+    } else if (p.state === 'perch') {
+      p.x = p.target.x; p.y = p.target.y - 3;
+      p.rest -= dt;
+      if (p.rest <= 0) { p.state = 'drift'; p.target = null; p.y -= 6; }
+    }
+  }
+}
+function fireflyAlpha(p, t) {
+  if (p.state === 'perch') return 0.45 + 0.5 * (0.5 + 0.5 * Math.sin(t * 2.2 + p.s));   // slow glow pulse
+  return 0.15 + 0.55 * noise1(p.s * 3 + t * 0.9);
+}
+/* front = false: drifting fireflies behind the text; true: the ones
+   flying to, or sitting on, a character (drawn above the text). */
+function drawSpecks(ctx, t, front) {
+  for (var i = 0; i < specks.length; i++) {
+    var p = specks[i];
+    if ((p.state !== 'drift') !== !!front) continue;
+    var r = front ? 14 : p.r;
+    var a = fireflyAlpha(p, t);
+    if (front) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(60,45,30,0.7)';       // tiny body, so it reads as an insect on the character
+      ctx.beginPath(); ctx.ellipse(p.x - 1.5, p.y, 2.6, 1.4, 0, 0, TAU); ctx.fill();
+    }
+    ctx.globalAlpha = a;
+    ctx.drawImage(speckSprite, p.x - r, p.y - r, r * 2, r * 2);
+  }
+  ctx.globalAlpha = 1;
+}
+function fireflyOnText() {
+  for (var i = 0; i < specks.length; i++) if (specks[i].state !== 'drift') return true;
+  return false;
+}
+
+/* ============================================================
+   8b. SEASONAL PICTURE — bare autumn tree (Oct–Nov), bare winter tree (Dec–Feb)
+   ============================================================ */
+var tree = null;
+var TREE_DEPTH = 7;
+function strSeed(str) {
+  var h = 2166136261;
+  for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+function treeLeafTarget() {
+  if (ENV.scene === 'winter') return 0;
+  return Math.round(S.treeLeaves * lerp(48, 10, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
+}
+/* A new tree shape every day (seeded by the date), leaning in from one side.
+   Autumn: a broad, spreading tree. Winter: a different kind — a tall,
+   upright, vase-shaped keyaki (zelkova) with a fine broom of twigs. */
+function buildTree(key) {
+  var r = rngFrom(strSeed(key));
+  var left = ENV.side === 'left', dir = left ? 1 : -1;
+  var winter = ENV.scene === 'winter';
+  var scale = H * S.treeSize * (winter ? 1.1 : 1);
+  var nodes = [], tips = [];
+  var dens = S.winterTreeDensity;          // winter only: 0.1 very sparse … 1 the old dense look
+  var maxD = winter ? 4 + Math.round(dens * 4) : TREE_DEPTH;
+  function grow(parent, abs, len, w, d) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
+    var idx = nodes.length;
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= maxD || len < scale * (winter ? 0.018 : 0.025)) { tips.push(idx); return; }
+    // a sparse winter tree: some twigs simply stop early
+    if (winter && d >= 3 && r() < (1 - dens) * 0.4) { tips.push(idx); return; }
+    var n, spread, upPull, shrink;
+    if (winter) {
+      n = d === 0 ? 2 : ((dens > 0.55 && r() < 0.45 * dens) ? 3 : 2);
+      spread = (0.36 + r() * 0.2) * (n === 3 ? 0.85 : 1);
+      upPull = 0.2;
+      shrink = 0.74 + r() * 0.1;
+    } else {
+      n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+      spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+      upPull = 0.1;
+      shrink = 0.68 + r() * 0.14;
+    }
+    for (var i = 0; i < n; i++) {
+      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      ca = lerp(ca, -PI / 2, upPull);
+      grow(idx, ca, len * shrink, Math.max(winter ? 0.9 : 0.7, w * (winter ? 0.64 : 0.66)), d + 1);
+    }
+  }
+  var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
+  if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(5, scale * 0.026), 0);
+  else grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(6, scale * 0.032), 0);
+  var T = { key: key, bx: bx, by: H + 6, nodes: nodes, tips: tips, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0,
+            scale: scale, maxD: maxD, winter: winter };
+  var n0 = treeLeafTarget();
+  for (var j = 0; j < n0; j++) addTreeLeaf(T, true);
+  return T;
+}
+function addTreeLeaf(T, initial) {
+  if (!T.tips.length) return;
+  var L = makeLeaf({ z: 0.85, species: 'generic' });
+  L.size = T.scale * rnd(0.042, 0.055) * S.sizeScale;   // in proportion to the tree
+  L.onTree = true;
+  L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
+  L.hang = rnd(-0.5, 0.5);
+  L.ff = rnd(1.4, 2.8);
+  L.age = initial ? 5 : 0;
+  L.fadeDur = initial ? 0.6 : 4;
+  bakeLeaf(L);
+  T.leaves.push(L);
+}
+function detachTreeLeaf(j) {
+  var L = tree.leaves.splice(j, 1)[0];
+  L.attach = undefined;
+  L.onTree = false;
+  L.bakedV = -1;                        // re-draw with the normal falling-leaf softness
+  L.vx = ENV.windPx * 0.4;
+  L.vy = 5;
+  L.fadeDur = 0.6;
+  L.age = Math.max(L.age, 1);
+  setMode(L);
+  insertSorted(L);
+}
+function ensureTree() {
+  var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
+  if (!want) { tree = null; return; }
+  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize + '|' + S.winterTreeDensity;
+  if (!tree || tree.key !== key) tree = buildTree(key);
+}
+function updateTree(dt, t) {
+  if (!tree) return;
+  var T = tree, ns = T.nodes;
+  // a gust gives the whole tree a push that springs back
+  T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
+  T.gust += T.gustV * dt;
+  var wind = ENV.windPx * 0.0012 * S.treeSway;
+  var amp = (0.015 + 0.01 * ENV.windMs) * S.treeSway;
+  var spd = 1 + ENV.windMs * 0.08;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i];
+    var k = Math.pow(n.d / T.maxD, 1.6) + 0.02;     // thin twigs move most
+    var sway = (wind + Math.sin(t * n.f * spd + n.ph) * amp +
+                Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * k;
+    var par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel + sway;
+    n.sx = par ? par.ex : T.bx;
+    n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len;
+    n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+  for (var j = T.leaves.length - 1; j >= 0; j--) {
+    var L = T.leaves[j], a = ns[L.attach];
+    L.age += dt;
+    var rot = PI + L.hang + Math.sin(t * L.ff + (L.seed % 7)) * (0.25 + 0.05 * ENV.windMs) -
+              ENV.windPx * 0.003 - T.gust * 2;
+    var off = (0.25 + L.geo.stem[2][1]) * L.size;     // hang from the tip of the stem
+    L.rot = rot;
+    L.phi = Math.sin(t * L.ff * 0.7 + (L.seed % 5)) * (0.5 + 0.08 * ENV.windMs);
+    L.x = a.ex + off * Math.sin(rot);
+    L.y = a.ey - off * Math.cos(rot);
+    L.so = 0;
+    if (Math.random() < 0.0025 * (1 + ENV.windMs / 3) * dt) detachTreeLeaf(j);
+  }
+  T.regrow -= dt;
+  if (T.regrow <= 0) {
+    T.regrow = rnd(15, 30);
+    if (T.leaves.length < treeLeafTarget()) addTreeLeaf(T, false);
+  }
+}
+function drawTree(ctx, t) {
+  var fig = ENV.scene === 'winter' && S.snowman;
+  if (!tree && !fig) return;
+  // Branches (and the snowman's body) go onto their own layer at full
+  // strength, then the layer is laid down at the chosen strength, so joints
+  // don't show darker spots and the snowman matches the tree.
+  ctxT.setTransform(1, 0, 0, 1, 0, 0);
+  ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
+  ctxT.setTransform(PR, 0, 0, PR, 0, 0);
+  ctxT.strokeStyle = rgba(mixRgb(ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44], ENV.light.col, 0.12));
+  ctxT.lineCap = 'round';
+  if (tree) {
+    var ns = tree.nodes;
+    for (var i = 0; i < ns.length; i++) {
+      var n = ns[i];
+      ctxT.lineWidth = n.w;
+      ctxT.beginPath();
+      ctxT.moveTo(n.sx, n.sy);
+      ctxT.lineTo(n.ex, n.ey);
+      ctxT.stroke();
+    }
+  }
+  var sm = fig ? snowmanBody(ctxT, t) : null;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = S.treeOpacity * treeFade;           // the tree fades as the page scrolls down to the table
+  ctx.drawImage(treeLayer, 0, 0);
+  if (tree) for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = treeFade;
+  if (sm) snowmanDress(ctx, t, sm);
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   8b-2. WINTER GROUND — accumulated snow and a snowman silhouette.
+   Colours are the site palette: 絹白 silk white, 薄桃 petal-soft and the
+   soft cream tiers for the snow; plum, 金木犀 orange and amber for the
+   scarf and hat; the same taupe as the winter tree for the silhouette.
+   ============================================================ */
+var snowAccum = 0;            // 0..1: grows while it snows, melts slowly when mild
+var snowman = { wind: 0 };
+var _bankPh = 0;
+var SNOWC = {
+  white: [255, 253, 249], soft1: [251, 236, 224], soft3: [245, 223, 207], petalSoft: [253, 232, 218],
+  border1: [238, 210, 192], border2: [222, 192, 172], plum: [136, 46, 71], plumLight: [158, 62, 92],
+  accent: [230, 104, 38], accent2: [196, 78, 16], amber: [158, 59, 6]
+};
+/* Palette colour as it looks in the current light: warmer at dusk, darker at night. */
+function snowLit(c) {
+  var Lt = ENV.light, o = mixRgb(c, Lt.col, clamp(Lt.amt * S.lightTint * 0.8, 0, 0.5));
+  return scaleRgb(o, 1 - Lt.dark * 0.35 * S.lightTint);
+}
+function updateWinterGround(dt) {
+  if (ENV.scene !== 'winter') return;
+  _bankPh = (dayOfYear(ENV.p) % 97) * 0.43;                  // a different set of hills each day
+  if (S.condition === 'snow') snowAccum = Math.min(1, snowAccum + dt * ENV.snowAmt / 900);
+  else if (S.temperature > 3) snowAccum = Math.max(0, snowAccum - dt / 3000);
+  var target = clamp(ENV.windPx / 50 + (tree ? tree.gust * 4 : 0), -1.3, 1.3);
+  snowman.wind += (target - snowman.wind) * (1 - Math.exp(-dt * 1.5));
+}
+function bankHeightPx(layer) {
+  var base = H * 0.03 * S.snowBankHeight, acc = H * 0.045 * snowAccum * S.snowBankHeight;
+  return layer === 'far' ? (base + acc) * 1.7 + H * 0.01 : base + acc;
+}
+/* Rolling hills: three sine waves of different length. */
+function bankSurface(x, layer) {
+  var far = layer === 'far', h = bankHeightPx(layer), ph = _bankPh + (far ? 2.1 : 0), k = far ? 0.7 : 1;
+  return H - h * (0.72 + 0.28 * Math.sin(x * 0.0042 * k + ph) + 0.14 * Math.sin(x * 0.0105 * k + ph * 1.7 + 1) +
+                  0.05 * Math.sin(x * 0.026 + ph * 2.3));
+}
+function drawSnowBank(ctx, layer) {
+  if (ENV.scene !== 'winter' || !S.snowBank) return;
+  var far = layer === 'far', hpx = bankHeightPx(layer), x;
+  ctx.beginPath();
+  ctx.moveTo(-6, H + 6);
+  for (x = -6; x <= W + 18; x += 12) ctx.lineTo(x, bankSurface(x, layer));
+  ctx.lineTo(W + 6, H + 6);
+  ctx.closePath();
+  var g = ctx.createLinearGradient(0, H - hpx * 1.25, 0, H);
+  if (far) {
+    g.addColorStop(0, rgba(snowLit(SNOWC.petalSoft), 0.78));
+    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.85));
+  } else {
+    g.addColorStop(0, rgba(snowLit(SNOWC.white), 0.98));
+    g.addColorStop(0.55, rgba(snowLit(SNOWC.soft1), 0.98));
+    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.98));
+  }
+  ctx.fillStyle = g;
+  ctx.fill();
+  // crest: a thin warm line, plus a bright highlight just above it
+  ctx.beginPath();
+  for (x = -6; x <= W + 18; x += 12) { if (x === -6) ctx.moveTo(x, bankSurface(x, layer)); else ctx.lineTo(x, bankSurface(x, layer)); }
+  ctx.strokeStyle = rgba(snowLit(far ? SNOWC.border1 : SNOWC.border2), far ? 0.5 : 0.65);
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  if (!far) {
+    ctx.translate(0, -1.6);
+    ctx.strokeStyle = rgba(snowLit(SNOWC.white), 0.8);
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.translate(0, 1.6);
+  }
+}
+function snowmanLayout() {
+  var left = ENV.side === 'left';
+  var bx = tree ? tree.bx : (left ? W * 0.07 : W * 0.93);
+  var x = clamp(left ? bx + H * 0.2 : bx - H * 0.2, W * 0.06, W * 0.94);
+  var R = H * 0.064 * S.snowmanSize, r2 = R * 0.66;
+  var gy = bankSurface(x, 'near') + R * 0.22;               // sinks a little into the snow
+  var by = gy - R * 0.92, hy = by - R * 0.78 - r2 * 0.62;
+  return { x: x, R: R, r2: r2, gy: gy, by: by, hy: hy, left: left };
+}
+/* The silhouette itself: two snowballs and twig arms, drawn on the tree's layer. */
+function snowmanBody(c, t) {
+  var m = snowmanLayout(), x = m.x;
+  var col = rgba(mixRgb([78, 66, 72], ENV.light.col, 0.12));
+  c.fillStyle = col;
+  c.strokeStyle = col;
+  c.lineCap = 'round';
+  c.beginPath(); c.arc(x, m.by, m.R, 0, TAU); c.fill();
+  c.beginPath(); c.arc(x, m.hy, m.r2, 0, TAU); c.fill();
+  var sway = Math.sin(t * 0.9 + 1) * 0.04 + snowman.wind * 0.08;
+  [-1, 1].forEach(function(sd) {
+    var a = (sd > 0 ? -0.55 : PI + 0.55) + sway, len = m.R * 1.25;
+    var sx0 = x + sd * m.R * 0.82, sy0 = m.by - m.R * 0.32;
+    var ex = sx0 + Math.cos(a) * len, ey = sy0 + Math.sin(a) * len;
+    c.lineWidth = Math.max(1.6, m.R * 0.06);
+    c.beginPath(); c.moveTo(sx0, sy0); c.lineTo(ex, ey); c.stroke();
+    c.lineWidth = Math.max(1.1, m.R * 0.04);
+    [0.62, 0.85].forEach(function(f, i) {
+      var fx = sx0 + Math.cos(a) * len * f, fy = sy0 + Math.sin(a) * len * f, fa = a + (i ? 0.55 : -0.6) * sd;
+      c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + Math.cos(fa) * len * 0.3, fy + Math.sin(fa) * len * 0.3); c.stroke();
+    });
+  });
+  return m;
+}
+/* Scarf (flutters in the wind) and bucket hat, in palette colours. */
+function snowmanDress(ctx, t, m) {
+  var x = m.x, w = snowman.wind, aw = Math.abs(w);
+  var ny = m.hy + m.r2 * 0.78;                              // neck
+  var Lt = ENV.light, dark = 1 - Lt.dark * 0.3;
+  // tails
+  var th = Math.atan(w), ax = Math.sin(th), ay = Math.cos(th), nx = ay, nyv = -ax;
+  var kx = x + clamp(w, -1, 1) * m.r2 * 0.55, ky = ny + m.r2 * 0.08;
+  for (var j = 1; j >= 0; j--) {
+    var len = m.R * (1.55 + 0.15 * aw) * (1 - 0.2 * j), N = 14, L = [], Rr = [];
+    var amp = m.R * (0.07 + 0.17 * aw), fr = 4.5 + 3 * aw, ph = j * 1.5;
+    for (var i = 0; i <= N; i++) {
+      var u = i / N;
+      var wave = (Math.sin(t * fr - u * 6 + ph) + 0.35 * Math.sin(t * fr * 1.9 - u * 11 + ph)) * amp * u;
+      var px = kx - j * m.r2 * 0.14 + ax * len * u + nx * wave;
+      var py = ky + ay * len * u + nyv * wave + u * u * m.R * 0.32 * (1 - aw * 0.6);
+      var hw = m.r2 * (0.17 - 0.05 * u);
+      L.push([px + nx * hw, py + nyv * hw]);
+      Rr.push([px - nx * hw, py - nyv * hw]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(L[0][0], L[0][1]);
+    for (i = 1; i <= N; i++) ctx.lineTo(L[i][0], L[i][1]);
+    for (i = N; i >= 0; i--) ctx.lineTo(Rr[i][0], Rr[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = rgba(scaleRgb(j ? SNOWC.accent2 : SNOWC.accent, dark), 0.95);
+    ctx.fill();
+  }
+  // band around the neck
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.95);
+  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = rgba(scaleRgb(SNOWC.accent2, dark), 0.8);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0.1, PI - 0.1); ctx.stroke();
+  // bucket hat
+  var brimW = m.r2 * 1.5, topW = m.r2 * 0.92, hh = m.r2 * 0.82;
+  ctx.save();
+  ctx.translate(x + m.r2 * 0.06, m.hy - m.r2 * 0.7);
+  ctx.rotate(m.left ? 0.1 : -0.1);
+  function wAt(f) { return (brimW + (topW - brimW) * f) / 2; }
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark), 0.97);
+  ctx.beginPath();
+  ctx.moveTo(-brimW / 2, 0); ctx.lineTo(brimW / 2, 0); ctx.lineTo(topW / 2, -hh); ctx.lineTo(-topW / 2, -hh);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.9);
+  ctx.beginPath();
+  ctx.moveTo(-wAt(0), 0); ctx.lineTo(wAt(0), 0); ctx.lineTo(wAt(0.26), -hh * 0.26); ctx.lineTo(-wAt(0.26), -hh * 0.26);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark * 0.9), 0.97);
+  ctx.beginPath(); ctx.ellipse(0, 0, brimW * 0.64, hh * 0.13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plumLight, dark), 0.97);
+  ctx.beginPath(); ctx.ellipse(0, -hh, topW / 2, hh * 0.1, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  // soft shadow where it stands
+  ctx.fillStyle = rgba(snowLit(SNOWC.border2), 0.35);
+  ctx.beginPath(); ctx.ellipse(x + m.R * 0.3, m.gy - m.R * 0.04, m.R * 1.1, m.R * 0.16, 0, 0, TAU); ctx.fill();
+}
+
+/* ============================================================
+   8c. VISITORS — red dragonfly by day, cricket at night.
+       They perch on the characters of the message text.
+   ============================================================ */
+var _glyphsReadyAt = 0;   // characters are still sliding in until this time
+function glyphSpots() {
+  if (performance.now() < _glyphsReadyAt || dynFrontMul < 0.5) return [];
+  var root = document.querySelector('.stage .panel.active .panel-content');
+  if (!root) return [];
+  var out = [], range = document.createRange();
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var ph = node.parentNode && node.parentNode.closest ? node.parentNode.closest('.panel-phrase') : null;
+    if (ph && !ph.classList.contains('shown')) continue;          // phrase has not faded in yet
+    var txt = node.nodeValue;
+    for (var i = 0; i < txt.length; i++) {
+      if (/[\s、。，．！？（）「」・…]/.test(txt.charAt(i))) continue;
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      var r = range.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3) continue;
+      out.push({ x: r.left + r.width / 2, y: r.top + r.height * 0.14, glyph: true });
+    }
+  }
+  return out;
+}
+function spotPos(sp) {
+  if (sp.node !== undefined && tree && tree.nodes[sp.node]) return { x: tree.nodes[sp.node].ex, y: tree.nodes[sp.node].ey };
+  return sp;
+}
+function pickPerch(near, textOnly) {
+  var g = glyphSpots(), extra = [];
+  if (tree && !textOnly) {
+    for (var i = 0; i < 8; i++) {
+      var idx = Math.floor(Math.random() * tree.nodes.length);
+      if (tree.nodes[idx].d >= 3) extra.push({ node: idx });
+    }
+  }
+  var pool = (g.length && (Math.random() < 0.8 || !extra.length)) ? g : extra;
+  if (!pool.length) return { x: W * rnd(0.2, 0.8), y: H * rnd(0.3, 0.7) };
+  if (near) {
+    var close = pool.filter(function(sp) {
+      var p = spotPos(sp), dx = p.x - near.x, dy = p.y - near.y, d = Math.sqrt(dx * dx + dy * dy);
+      return d > 50 && d < 380;
+    });
+    if (close.length) pool = close;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+/* When the panel changes, the text they stand on is gone. */
+function insectsLeaveText() {
+  fireflyGlyphsAt = -10;
+  for (var i = 0; i < specks.length; i++) {
+    if (specks[i].state !== 'drift') { specks[i].state = 'drift'; specks[i].target = null; }
+  }
+  if (dragonfly && dragonfly.perch && dragonfly.perch.glyph) {
+    if (dragonfly.state === 'perch') dragonfly.rest = Math.min(dragonfly.rest, 0.2);
+    else if (dragonfly.state === 'approach') dragonfly.perch = { x: dragonfly.x, y: dragonfly.y - 30 };
+  }
+  if (cricket) {
+    cricket.seq = cricket.seq.filter(function(sp) { return !sp.glyph; });
+    if (cricket.state === 'rest') cricket.rest = Math.min(cricket.rest, 0.3);
+  }
+}
+
+/* Akatombo: darts and hovers, lands on a character, slowly folds its
+   wings in and out while resting, then flies on or leaves. */
+var dragonfly = null, dragonflyNext = 0;
+function sendDragonfly() {
+  var fromLeft = Math.random() < 0.5;
+  dragonfly = {
+    x: fromLeft ? -40 : W + 40, y: H * rnd(0.15, 0.55), heading: fromLeft ? 0 : PI,
+    state: 'dash', tx: W * rnd(0.2, 0.8), ty: H * rnd(0.15, 0.6), hoverT: 0,
+    legs: 1 + Math.floor(Math.random() * 3), landings: 1 + Math.floor(Math.random() * 3),
+    t: 0, fold: 0, perch: null, perchT: 0, rest: 0, foldRate: 1.5, perchHeading: 0, leaving: false
+  };
+}
+function dfNextLeg(d) {
+  if (d.legs > 0) {
+    d.legs--;
+    d.state = 'dash';
+    d.tx = clamp(d.x + rnd(-400, 400), 40, W - 40);
+    d.ty = clamp(d.y + rnd(-220, 220), H * 0.1, H * 0.75);
+  } else if (d.landings > 0) {
+    d.landings--;
+    d.perch = pickPerch();
+    d.state = 'approach';
+  } else {
+    d.leaving = true;
+    d.state = 'dash';
+    d.tx = d.x < W / 2 ? -100 : W + 100;
+    d.ty = d.y + rnd(-150, 50);
+  }
+}
+function updateDragonfly(dt, t) {
+  var okTime = ENV.light.daylight > 0.5 && !ENV.rainy && S.condition !== 'snow' && S.temperature >= 12 && ENV.scene !== 'winter';
+  if (!dragonfly && S.dragonfly && okTime && dynFrontMul > 0.5 && t > dragonflyNext) {
+    if (dragonflyNext > 0) sendDragonfly();
+    dragonflyNext = t + rnd(60, 180);
+  }
+  var d = dragonfly;
+  if (!d) return;
+  d.t += dt;
+  if (d.state === 'dash' || d.state === 'approach') {
+    var tgt = d.state === 'approach' ? spotPos(d.perch) : { x: d.tx, y: d.ty };
+    var dx = tgt.x - d.x, dy = tgt.y - d.y, dist = Math.sqrt(dx * dx + dy * dy);
+    var sp = d.state === 'approach' ? Math.min(420, dist * 4 + 20) : Math.min(520, dist * 6);
+    if (dist > 0.5) {
+      var step = Math.min(dist, sp * dt);
+      d.x += dx / dist * step;
+      d.y += dy / dist * step;
+      if (dist > 6) d.heading += angDiff(Math.atan2(dy, dx), d.heading) * (1 - Math.exp(-dt * 10));
+    }
+    d.fold += (0 - d.fold) * (1 - Math.exp(-dt * 12));
+    if (dist < 2) {
+      if (d.state === 'approach') {
+        d.state = 'perch';
+        d.rest = rnd(3, 8);
+        d.perchT = 0;
+        d.foldRate = rnd(1.1, 2.2);
+        d.perchHeading = (Math.random() < 0.5 ? 0 : PI) + rnd(-0.35, 0.35);
+      } else if (d.leaving) {
+        dragonfly = null;
+        return;
+      } else {
+        d.state = 'hover';
+        d.hoverT = rnd(0.4, 1.2);
+      }
+    }
+  } else if (d.state === 'hover') {
+    d.hoverT -= dt;
+    d.x += Math.sin(d.t * 7) * 6 * dt;
+    d.y += Math.cos(d.t * 9) * 6 * dt;
+    if (d.hoverT <= 0) dfNextLeg(d);
+  } else if (d.state === 'perch') {
+    var p = spotPos(d.perch);
+    d.x = p.x; d.y = p.y;
+    d.perchT += dt;
+    d.rest -= dt;
+    d.heading += angDiff(d.perchHeading, d.heading) * (1 - Math.exp(-dt * 4));
+    var cyc = 0.5 - 0.5 * Math.cos(d.perchT * d.foldRate);
+    d.fold += (Math.pow(cyc, 1.5) - d.fold) * (1 - Math.exp(-dt * 6));
+    if (d.rest <= 0) { d.legs = Math.floor(Math.random() * 2); dfNextLeg(d); }
+  }
+  if (dragonfly && (d.x < -200 || d.x > W + 200)) dragonfly = null;
+}
+function drawDragonfly(ctx, t) {
+  var d = dragonfly;
+  if (!d) return;
+  var k = 1.2 * S.insectSize;
+  var perched = d.state === 'perch';
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(d.heading);
+  if (perched) {
+    ctx.fillStyle = 'rgba(60,40,40,0.12)';
+    ctx.beginPath(); ctx.ellipse(-4 * k + 3, 5, 18 * k, 4 * k, 0, 0, TAU); ctx.fill();
+  }
+  ctx.scale(k, k);
+  var flap = perched ? 0 : Math.sin(t * 90) * 0.15;
+  var fa = lerp(80, 152, d.fold) - flap * 60;     // 152° = folded back along the body
+  var ha = lerp(100, 164, d.fold) - flap * 60;
+  ctx.lineWidth = 0.6;
+  [[10, -fa, 22, 4.5], [10, fa, 22, 4.5], [6, -ha, 21, 5.5], [6, ha, 21, 5.5]].forEach(function(w) {
+    ctx.save();
+    ctx.translate(w[0], 0);
+    ctx.rotate(w[1] * DEG);
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.strokeStyle = 'rgba(90,60,60,0.35)';
+    ctx.beginPath(); ctx.ellipse(w[2] / 2, 0, w[2] / 2, w[3] / 2, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(w[2] - 1, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,60,40,0.55)';
+    ctx.fillRect(w[2] - 4, -w[3] * 0.25, 2, w[3] * 0.4);
+    ctx.restore();
+  });
+  ctx.strokeStyle = '#c4361e';
+  ctx.lineCap = 'round';
+  for (var i = 0; i < 6; i++) {
+    ctx.lineWidth = 2.6 - i * 0.18;
+    ctx.beginPath(); ctx.moveTo(6 - i * 6, 0); ctx.lineTo(1 - i * 6, 0); ctx.stroke();
+  }
+  ctx.fillStyle = '#a8321f';
+  ctx.beginPath(); ctx.ellipse(10, 0, 5, 3.2, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a2a1c';
+  ctx.beginPath(); ctx.arc(16, 0, 3.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+/* Cricket (コオロギ): hops from character to character, sometimes
+   chirps, then hops off the screen. */
+var cricket = null, cricketNext = 0;
+function sendCricket() {
+  var seq = [], last = null, n = 3 + Math.floor(Math.random() * 5);
+  for (var i = 0; i < n; i++) {
+    var p = pickPerch(last, true);     // crickets only use the text, never the tree
+    seq.push(p);
+    last = spotPos(p);
+  }
+  var fromLeft = Math.random() < 0.5;
+  cricket = { x: fromLeft ? -30 : W + 30, y: H * rnd(0.6, 0.9), seq: seq, i: 0, state: 'rest', rest: 0,
+              exiting: false, facing: fromLeft ? 1 : -1, t: 0, hop: null, cur: null, chirpT: 0, u: 0 };
+}
+function crHop(c, to) {
+  var tp = spotPos(to), dx = tp.x - c.x, dy = tp.y - c.y, dist = Math.sqrt(dx * dx + dy * dy);
+  c.hop = { fx: c.x, fy: c.y, to: to, t: 0, dur: 0.3 + dist / 1100, h: 30 + dist * 0.3 };
+  c.state = 'hop';
+  c.u = 0;
+  if (Math.abs(dx) > 2) c.facing = dx > 0 ? 1 : -1;
+}
+function updateCricket(dt, t) {
+  var night = ENV.phase === 'night' || ENV.phase === 'dusk';
+  if (!cricket && S.cricket && night && dynFrontMul > 0.5 && ENV.scene !== 'winter' && !(ENV.rainy && S.rainMm > 2) && S.condition !== 'snow' && t > cricketNext) {
+    if (cricketNext > 0) sendCricket();
+    cricketNext = t + rnd(60, 180);
+  }
+  var c = cricket;
+  if (!c) return;
+  c.t += dt;
+  if (c.state === 'rest') {
+    if (c.cur) { var p = spotPos(c.cur); c.x = p.x; c.y = p.y; }
+    c.rest -= dt;
+    if (c.chirpT > 0) c.chirpT -= dt;
+    else if (night && c.cur && Math.random() < dt * 0.6) c.chirpT = rnd(0.6, 1.4);
+    if (c.rest <= 0) {
+      c.chirpT = 0;
+      if (c.i < c.seq.length) crHop(c, c.seq[c.i++]);
+      else if (!c.exiting) { c.exiting = true; crHop(c, { x: c.x < W / 2 ? -60 : W + 60, y: c.y + rnd(-40, 80) }); }
+      else cricket = null;
+    }
+  } else {
+    var h = c.hop;
+    h.t += dt;
+    var u = Math.min(1, h.t / h.dur), tp = spotPos(h.to);
+    c.x = lerp(h.fx, tp.x, u);
+    c.y = lerp(h.fy, tp.y, u) - h.h * 4 * u * (1 - u);
+    c.u = u;
+    if (u >= 1) {
+      if (c.exiting) { cricket = null; return; }
+      c.state = 'rest';
+      c.cur = h.to;
+      c.rest = rnd(0.6, 2.2);
+    }
+  }
+}
+function drawCricket(ctx, t) {
+  var c = cricket;
+  if (!c) return;
+  var k = 1.15 * S.insectSize;
+  var hopping = c.state === 'hop', u = hopping ? c.u : 0;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  if (!hopping) {
+    ctx.fillStyle = 'rgba(40,25,20,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 1, 10 * k, 2.2 * k, 0, 0, TAU); ctx.fill();
+  }
+  ctx.scale(c.facing * k, k);
+  if (hopping) ctx.rotate(lerp(-0.5, 0.45, u));    // nose up on take-off, down for landing
+  // hind legs stretch out on take-off and fold again for landing
+  var ext = hopping ? Math.sin(Math.min(1, u * 3) * PI / 2) * (1 - smooth(0.6, 1, u)) : 0;
+  var knee = [lerp(-8, -12, ext), lerp(-12, -5, ext)], foot = [lerp(-13, -21, ext), lerp(0, -1, ext)];
+  ctx.lineCap = 'round';
+  // far hind leg
+  ctx.strokeStyle = '#6b5040';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(0.5, -5); ctx.lineTo(knee[0] + 1.5, knee[1] + 0.5); ctx.stroke();
+  ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(knee[0] + 1.5, knee[1] + 0.5); ctx.lineTo(foot[0] + 1.5, foot[1]); ctx.stroke();
+  // front and middle legs
+  ctx.strokeStyle = '#3a2a20';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (hopping) { ctx.moveTo(6, -4); ctx.lineTo(9, -2); ctx.moveTo(2, -4); ctx.lineTo(1, -1.5); }
+  else { ctx.moveTo(6, -4); ctx.lineTo(8.5, 0); ctx.moveTo(2, -4); ctx.lineTo(0.5, 0); }
+  ctx.stroke();
+  // body
+  ctx.fillStyle = '#3a2a20';
+  ctx.beginPath(); ctx.ellipse(-2, -6, 8, 3.6, 0, 0, TAU); ctx.fill();
+  var chirping = c.chirpT > 0 && !hopping;
+  ctx.fillStyle = '#5a4330';
+  ctx.beginPath(); ctx.ellipse(-3, -7.6, 7, 2.6, chirping ? -0.12 + Math.sin(t * 40) * 0.06 : 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,170,120,0.25)';
+  ctx.lineWidth = 0.4;
+  ctx.beginPath(); ctx.moveTo(-9, -7.6); ctx.lineTo(3, -7.8); ctx.moveTo(-7, -6.4); ctx.lineTo(1, -8.8); ctx.stroke();
+  ctx.fillStyle = '#2e211a';
+  ctx.beginPath(); ctx.ellipse(4.5, -6.8, 3, 3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2a1d16';
+  ctx.beginPath(); ctx.arc(8.5, -6, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(210,180,130,0.8)';
+  ctx.beginPath(); ctx.arc(9.6, -6.8, 0.8, 0, TAU); ctx.fill();
+  // tail feelers (cerci) and long twitching antennae
+  ctx.strokeStyle = '#3a2a20';
+  ctx.lineWidth = 0.6;
+  var tw = Math.sin(t * 7) * 2 + Math.sin(t * 13 + 1);
+  ctx.beginPath();
+  ctx.moveTo(-10, -6); ctx.lineTo(-15, -8.5);
+  ctx.moveTo(-10, -5.5); ctx.lineTo(-15, -4.5);
+  ctx.moveTo(10.5, -8); ctx.quadraticCurveTo(17, -18, 26, -16 + tw);
+  ctx.moveTo(10, -8); ctx.quadraticCurveTo(14, -20, 22, -22 + tw * 0.7);
+  ctx.stroke();
+  // near hind leg: big jumping leg
+  ctx.strokeStyle = '#2e211a';
+  ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(-1, -5); ctx.lineTo(knee[0], knee[1]); ctx.stroke();
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.moveTo(knee[0], knee[1]); ctx.lineTo(foot[0], foot[1]); ctx.stroke();
+  // chirp: little sound arcs
+  if (chirping) {
+    for (var j = 0; j < 3; j++) {
+      var rr = 4 + j * 3 + (t * 12) % 3;
+      ctx.strokeStyle = 'rgba(120,90,60,' + (0.35 * (1 - j / 3)).toFixed(3) + ')';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.arc(-4, -12, rr, -PI * 0.8, -PI * 0.2); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+/* ============================================================
+   9. CANVAS, SPAWNING, MAIN LOOP
+   ============================================================ */
+/* ============================================================
+   9. CANVASES, SPAWNING, MAIN LOOP
+   Three canvases (see index.html and main.css):
+     #dynBack    behind everything (z -1): sky, sun, moon, far leaves and
+                 snow, trees, snowman, fog, rain
+     #dynGround  a short strip along the bottom edge ABOVE the page content
+                 (z 8): the near snow bank and the pile of fallen leaves, so
+                 text and the table scroll in behind them. The summary bar
+                 (z 50) still covers it.
+     #dynFront   full screen above the message text (z 10): the nearest
+                 leaves and flakes, the dragonfly, cricket and fireflies on
+                 the characters. It fades out on the table and thank-you
+                 pages.
+   ============================================================ */
+var cvBack = document.getElementById('dynBack');
+var cvGround = document.getElementById('dynGround');
+var cvFront = document.getElementById('dynFront');
+var dynVeil = document.getElementById('dynVeil');
+var ctx = cvBack ? cvBack.getContext('2d') : null;
+var ctxG = cvGround ? cvGround.getContext('2d') : null;
+var ctxF = cvFront ? cvFront.getContext('2d') : null;
+var treeLayer = document.createElement('canvas');
+var ctxT = treeLayer.getContext('2d');
+var W = 0, H = 0, GH = 150;                  // GH: height (CSS px) of the ground strip
+var treeFade = 1, drawOffsetY = 0, dynFrontMul = 0;
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  PR = (window.devicePixelRatio || 1) * S.renderScale;
+  var cw = Math.round(W * PR), ch = Math.round(H * PR);
+  cvBack.width = cvFront.width = treeLayer.width = cw;
+  cvBack.height = cvFront.height = treeLayer.height = ch;
+  cvGround.width = cw;
+  cvGround.height = Math.round(GH * PR);
+  lookVersion++;
+}
+
+var flurryQueue = [];
+var heroNext = 0;
+function spawnRate(t) {
+  var timeMul = { night: 0.5, dawn: 0.8, morning: 1, day: 1.2, golden: 1.05, dusk: 0.9 }[ENV.phase] || 1;
+  var weatherMul = 1 + ENV.windMs / 6;
+  if (ENV.rainy) weatherMul *= 1.1;
+  if (S.condition === 'snow') weatherMul *= 0.5;
+  var lull = 1 - S.lulls * smooth(0.55, 0.85, noise1(t / 18 + 7.3));
+  return 1.1 * S.density * timeMul * weatherMul * lull;
+}
+function spawnTick(dt, t) {
+  var rate = spawnRate(t);
+  var n = rate * dt;
+  while (n > 0) { if (Math.random() < n) spawnLeaf(); n -= 1; }
+  if (Math.random() < S.flurries * 0.06 * dt * S.density) {
+    var x0 = Math.random() * W, k = 3 + Math.floor(Math.random() * 4);
+    for (var i = 0; i < k; i++) flurryQueue.push({ at: t + Math.random() * 1.5, x: x0 + rnd(-80, 80) });
+  }
+  for (var j = flurryQueue.length - 1; j >= 0; j--) {
+    if (flurryQueue[j].at <= t) {
+      spawnLeaf({ x: flurryQueue[j].x - ENV.windPx * 2, y: -40 - Math.random() * 30 });
+      flurryQueue.splice(j, 1);
+    }
+  }
+  if (Math.random() < S.gustiness * (0.012 + ENV.windMs * 0.008) * dt) startGust(false);
+  if (S.condition === 'thunderstorm' && S.lightning) {
+    if (lightningNext === 0) lightningNext = t + rnd(8, 25);
+    if (t > lightningNext) { strikeLightning(); lightningNext = t + rnd(8, 25); }
+  }
+  if (S.heroLeaf && !hero && ENV.scene !== 'winter') {
+    if (heroNext === 0) heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4);
+    if (t > heroNext) { sendHero(); heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4); }
+  }
+}
+function sendHero() {
+  hero = makeLeaf({ hero: true, z: 1.35 });
+  hero.x = W * rnd(0.15, 0.85);
+  hero.y = -hero.size * 1.3;
+  setMode(hero, 'flutter');
+  hero.swayAmp = rnd(60, 110) * S.sway;
+  hero.sf = rnd(0.9, 1.3);
+  bakeLeaf(hero);
+}
+
+function leafAlpha(L, t) {
+  var zc = clamp(L.z, 0, 1);
+  var a = L.hero ? 0.6 : (L.onTree ? S.treeLeafOpacity * treeFade : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
+  a *= Math.min(1, L.age / (L.fadeDur || 0.6));
+  if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
+  if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
+  return clamp(a, 0, 1);
+}
+function isFrontLeaf(L) { return !!L.front && S.frontLeaves > 0; }
+function drawLeaf(L, t, inPile, target) {
+  if (!L.spr) return;
+  var g = target || ctx;
+  var sx, sy, rot = L.rot, x = L.x + (inPile ? 0 : L.so), y = L.y, spr;
+  if (inPile) {
+    sx = L.pileSx; sy = L.pileSy; spr = L.pileFace ? L.spr : L.back;
+  } else {
+    var f = Math.min(1, S.flip3d), c = Math.cos(L.phi);
+    sx = lerp(1, c, f);
+    if (Math.abs(sx) < 0.06) sx = sx < 0 ? -0.06 : 0.06;
+    sy = 1 - 0.18 * f * (0.5 + 0.5 * Math.sin(L.phi * 0.7 + (L.seed % 10)));
+    spr = c >= 0 || f < 0.05 ? L.spr : L.back;
+  }
+  var cs = Math.cos(rot), sn = Math.sin(rot);
+  g.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, (y - drawOffsetY) * PR);
+  g.globalAlpha = inPile ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  g.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
+}
+
+
+var lastT = 0, envTimer = 0, clockTimer = 0, barTimer = 0, lastLookKey = '', lastDate = '';
+var rebakeIdx = 0, lastScene = '', frontLeafCount = 0;
+var dynMaster = 0, dynScrollY = 0, dynLastMs = 0, dynBegun = false, _lastPanel = -1;
+var dynReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+function lookKey() {
+  var Lt = ENV.light;
+  return [Math.round(Lt.amt * 40), Math.round(Lt.dark * 40), Lt.col.map(function(v) { return Math.round(v / 12); }).join('.'),
+          Math.round(ENV.wet * 10), Math.round(ENV.frost * 10), Math.round(ENV.fog * 20), Math.round(ENV.season * 40)].join('|');
+}
+
+
+/* Nagoya clock, once a second. */
+function advanceClock() {
+  var n = tokyoNow();
+  S.hour = n.hour; S.date = n.date;
+  if (lastDate && S.date !== lastDate && S.pileClearMidnight) pile.length = 0;
+  lastDate = S.date;
+}
+
+function prefill() {
+  var n = Math.min(S.maxLeaves * 0.6, spawnRate(0) * 25);
+  for (var i = 0; i < n; i++) spawnLeaf({ prefill: true });
+}
+
+/* Past the intro (the same flag the ambient sound uses), a warm theme, the
+   page visible, and not on the games page. */
+function dynIntroDone() {
+  return typeof mapleLeaves !== 'undefined' && !!mapleLeaves && mapleLeaves.classList.contains('active');
+}
+function dynWantsToRun() {
+  if (dynReduceMotion || document.hidden) return false;
+  if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return false;
+  return dynIntroDone() && !document.body.classList.contains('games-active');
+}
+/* 1 on the message panels, fading to 0 as the page scrolls to the table, and 0
+   on the thank-you pages and the receipt (the same rule for all of them). */
+function dynFrontTarget() {
+  var cl = document.body.classList;
+  if (cl.contains('thankyou-active') || cl.contains('receipt-locked')) return 0;
+  return 1 - smooth(20, 160, dynScrollY);
+}
+
+function dynBegin() {
+  resize();
+  advanceClock();
+  computeEnv();
+  ensureTree();
+  lastScene = ENV.scene;
+  lastLookKey = lookKey();
+  if (ENV.scene !== 'winter') prefill();
+  dynBegun = true;
+}
+/* Back at the start screen: forget everything and clear the canvases. */
+function dynReset() {
+  leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
+  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
+  dragonfly = null; cricket = null; tree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
+  [ctx, ctxG, ctxF].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
+  dynBegun = false;
+}
+function dynApplyOpacity() {
+  cvBack.style.opacity = dynMaster.toFixed(3);
+  cvGround.style.opacity = dynMaster.toFixed(3);
+  cvFront.style.opacity = (dynMaster * dynFrontMul).toFixed(3);
+}
+
+function dynStep(dt, t, want) {
+  dynMaster += ((want ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
+  if (!want) { dynApplyOpacity(); return; }
+  if (!dynBegun) dynBegin();
+
+  dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
+  dynFrontMul += (dynFrontTarget() - dynFrontMul) * (1 - Math.exp(-dt * 3));
+  treeFade = 1 - 0.75 * smooth(30, 400, dynScrollY);
+
+  clockTimer -= dt;
+  if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
+  barTimer -= dt;
+  if (barTimer <= 0) { measureInfoBar(); barTimer = 0.5; }
+  if (typeof currentPanel !== 'undefined' && currentPanel !== _lastPanel) {   // a new message panel: insects leave the old text
+    _lastPanel = currentPanel;
+    insectsLeaveText();
+    _glyphsReadyAt = performance.now() + 1800;
+  }
+  envTimer -= dt;
+  if (envTimer <= 0) {
+    computeEnv();
+    envTimer = 0.25;
+    var k = lookKey();
+    if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
+    if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
+      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; }
+      else if (lastScene === 'winter') prefill();
+      tree = null;
+      lastScene = ENV.scene;
+    }
+    ensureTree();
+  }
+
+  spawnTick(dt, t);
+  updateGusts(dt);
+  var nFront = 0;
+  for (var i = leaves.length - 1; i >= 0; i--) {
+    var L = leaves[i];
+    updateLeaf(L, dt, t);
+    if (isFrontLeaf(L)) nFront++;
+    var landY = H - L.groundY;
+    if (S.pile && L.z > 0.3 && L.y >= landY && L.vy > 0 && Math.random() < 0.7) {
+      leaves.splice(i, 1);
+      settleLeaf(L);
+      continue;
+    }
+    if (L.y > H + L.size * 1.5 || L.x < -W * 0.4 - 200 || L.x > W * 1.4 + 200) leaves.splice(i, 1);
+  }
+  frontLeafCount = nFront;
+  if (hero) {
+    updateLeaf(hero, dt, t);
+    if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
+  }
+  updateRain(dt);
+  updateSnow(dt, t);
+  updateBirds(dt, t);
+  updateSpecks(dt, t);
+  updateTree(dt, t);
+  updateWinterGround(dt);
+  updateDragonfly(dt, t);
+  updateCricket(dt, t);
+  if (dynFrontMul < 0.05 && (dragonfly || cricket)) { dragonfly = null; cricket = null; insectsLeaveText(); }
+
+  // re-draw a few leaf sprites per frame when the look changed
+  var budget = 10, all = leaves.concat(pile);
+  if (hero) all.push(hero);
+  if (tree) all = all.concat(tree.leaves);
+  for (var b = 0; b < all.length && budget > 0; b++) {
+    var Lb = all[(rebakeIdx + b) % all.length];
+    if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
+  }
+  rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
+
+  // ---- back canvas ----
+  drawOffsetY = 0;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, cvBack.width, cvBack.height);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  drawSky(ctx, t);
+  drawSun(ctx, t);
+  drawMoon(ctx, t);
+  drawCloudShadows(ctx, dt);
+  drawRays(ctx, t);
+  drawBirds(ctx, t);
+  var split = 0;
+  while (split < leaves.length && leaves[split].z < 0.5) split++;
+  for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawSnow(ctx, 'far');
+  drawSnowBank(ctx, 'far');
+  drawTree(ctx, t);
+  drawFog(ctx, dt);
+  for (var n = split; n < leaves.length; n++) if (!isFrontLeaf(leaves[n])) drawLeaf(leaves[n], t, false);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawSnow(ctx, 'near');
+  drawRain(ctx);
+  drawSpecks(ctx, t, false);
+
+  var flashA = 0;
+  for (var q = flashes.length - 1; q >= 0; q--) {
+    var age = t - flashes[q].at;
+    if (age < 0) continue;
+    if (age > 0.4) { flashes.splice(q, 1); continue; }
+    flashA = Math.max(flashA, flashes[q].a * (1 - age / 0.4));
+  }
+  if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
+  if (dynVeil) dynVeil.style.opacity = (flashA * 0.35 * dynMaster).toFixed(3);
+
+  // ---- ground strip: near snow bank and the leaf pile, above the page content ----
+  drawOffsetY = H - GH;
+  ctxG.setTransform(1, 0, 0, 1, 0, 0);
+  ctxG.globalAlpha = 1;
+  ctxG.clearRect(0, 0, cvGround.width, cvGround.height);
+  ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
+  drawSnowBank(ctxG, 'near');
+  for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
+  drawOffsetY = 0;
+
+  // ---- front canvas: only while it is visible ----
+  if (dynFrontMul > 0.01) {
+    ctxF.setTransform(1, 0, 0, 1, 0, 0);
+    ctxF.clearRect(0, 0, cvFront.width, cvFront.height);
+    ctxF.setTransform(PR, 0, 0, PR, 0, 0);
+    drawSnow(ctxF, 'front');
+    for (var fl = 0; fl < leaves.length; fl++) if (isFrontLeaf(leaves[fl])) drawLeaf(leaves[fl], t, false, ctxF);
+    if (hero) drawLeaf(hero, t, false, ctxF);
+    ctxF.setTransform(PR, 0, 0, PR, 0, 0); ctxF.globalAlpha = 1;
+    drawSpecks(ctxF, t, true);
+    drawDragonfly(ctxF, t);
+    drawCricket(ctxF, t);
+    frontCleared = false;
+  } else if (!frontCleared) {
+    ctxF.setTransform(1, 0, 0, 1, 0, 0);
+    ctxF.clearRect(0, 0, cvFront.width, cvFront.height);
+    frontCleared = true;
+  }
+  dynApplyOpacity();
+}
+var frontCleared = true;
+
+/* rAF while running; a slow poll while idle (start screen, sakura theme,
+   games page, hidden tab) so nothing is drawn or kept busy. At most 60
+   frames a second (the tablet is 120Hz), and about 30 while scrolling, as the
+   music display also holds back its drawing during a scroll. */
+function dynLoop(ms) {
+  var want = dynWantsToRun();
+  if (!want && dynMaster < 0.01) {
+    if (dynBegun && !dynIntroDone()) dynReset();
+    dynLastMs = 0;
+    setTimeout(function() { requestAnimationFrame(dynLoop); }, 250);
+    return;
+  }
+  var gap = (typeof _scrollActive !== 'undefined' && _scrollActive) ? 30 : 15;
+  if (dynLastMs && ms - dynLastMs < gap) { requestAnimationFrame(dynLoop); return; }
+  var dt = dynLastMs ? Math.min(0.05, (ms - dynLastMs) / 1000) : 0.016;
+  dynLastMs = ms;
+  lastT = ms / 1000;
+  dynStep(dt, lastT, want);
+  requestAnimationFrame(dynLoop);
+}
+
+/* ============================================================
+   10. TAP & SWIPE WIND — only while the leaves are in front (message panels)
+   ============================================================ */
+var ptr = null;
+window.addEventListener('pointerdown', function(e) {
+  if (dynFrontMul < 0.5 || !S.tapWind) { ptr = null; return; }
+  ptr = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+}, { passive: true });
+window.addEventListener('pointermove', function(e) {
+  if (!ptr || dynFrontMul < 0.5) return;
+  var now = performance.now(), dts = Math.max(0.008, (now - ptr.t) / 1000);
+  var dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+  ptr.moved += Math.abs(dx) + Math.abs(dy);
+  var vx = clamp(dx / dts, -2500, 2500), vy = clamp(dy / dts, -2500, 2500);
+  pushAround(e.clientX, e.clientY, 200, vx * 0.06 * S.tapStrength, vy * 0.06 * S.tapStrength, 0, 0.15 * S.tapStrength);
+  ptr.x = e.clientX; ptr.y = e.clientY; ptr.t = now;
+}, { passive: true });
+window.addEventListener('pointerup', function(e) {
+  if (!ptr) return;
+  if (ptr.moved < 12 && dynFrontMul >= 0.5) pushAround(e.clientX, e.clientY, 180, 0, -30 * S.tapStrength, 160 * S.tapStrength, 0.7);
+  ptr = null;
+}, { passive: true });
+window.addEventListener('pointercancel', function() { ptr = null; }, { passive: true });
+
+/* ============================================================
+   11. LIVE WEATHER — the app's own Open-Meteo request (fetchNagoyaWeather)
+   hands its `current` block here every 5 minutes. Offline, the defaults
+   in S simply stay.
+   ============================================================ */
+function onWeather(c) {
+  if (!c) return;
+  if (typeof c.weather_code === 'number' && typeof weatherBucket === 'function') S.condition = weatherBucket(c.weather_code);
+  if (typeof c.temperature_2m === 'number') S.temperature = Math.round(c.temperature_2m);
+  if (typeof c.wind_speed_10m === 'number') S.windSpeed = Math.round(c.wind_speed_10m * 2) / 2;
+  if (typeof c.wind_direction_10m === 'number') S.windDir = Math.round(c.wind_direction_10m / 5) * 5 % 360;
+  if (typeof c.wind_gusts_10m === 'number' && typeof c.wind_speed_10m === 'number') {
+    S.gustiness = clamp(Math.round(((c.wind_gusts_10m - c.wind_speed_10m) / 8) * 20) / 20, 0.1, 1);
+  }
+  if (typeof c.cloud_cover === 'number') S.cloudCover = Math.round(c.cloud_cover / 5) * 5;
+  if (typeof c.precipitation === 'number') S.rainMm = Math.round(c.precipitation * 5) / 5;
+  S.fogDensity = S.condition === 'fog' ? 0.7 : 0;
+  envTimer = 0;
+}
+
+/* ============================================================
+   START
+   ============================================================ */
+if (cvBack && cvGround && cvFront && ctx && ctxG && ctxF) {
+  makeSprites();
+  resize();
+  window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
+  requestAnimationFrame(dynLoop);
+}
+return { onWeather: onWeather };
+
+})();
 
 /* ============ BOOTSTRAP ============ */
 applyTimeTheme();
