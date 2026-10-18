@@ -1,0 +1,2208 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn" data-time="day" data-weather="clear">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Dynamic Background Lab</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
+
+<!-- ============================================================
+     DYNAMIC BACKGROUND LAB — preview page only.
+     Not linked from index.html and not in the service worker's
+     ASSETS list. Loads the real main.css so the 金木犀 & Ebizome
+     palette, the Shippō tile, the mist bands, the info bar and the
+     panel typography are the real thing.
+
+     Everything that moves in the background is drawn in code on
+     one <canvas> (#dynCanvas, z-index -1, the same plane the real
+     .maple-leaves-overlay uses): leaves, rain, snow, light rays,
+     cloud shadows, fog, moon, birds, dragonfly, the leaf pile.
+     No bitmap images.
+     ============================================================ -->
+<style>
+  .dyn-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+    pointer-events: none;
+  }
+  .flash-veil {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    background: #ffffff;
+    opacity: 0;
+  }
+
+  /* Only two message panels on this page. */
+  body.dyn-demo .track { width: 200%; }
+  body.dyn-demo .panel { width: 50%; }
+  body.dyn-demo.hide-text .stage .panel-content { visibility: hidden; }
+
+  /* ============ FLOATING TUNING DRAWER (same look as demo.html) ============ */
+  .tuner-drawer {
+    position: fixed;
+    top: 16px;
+    right: 16px;
+    width: 340px;
+    max-height: calc(100vh - 32px);
+    background: rgba(255, 253, 249, 0.95);
+    border: 1px solid var(--border-1);
+    border-radius: 16px;
+    box-shadow: 0 8px 28px rgba(68, 52, 48, 0.12);
+    z-index: 900;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-size: 12px;
+    color: var(--text-dark);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .tuner-drawer.collapsed { width: auto; }
+  .tuner-drawer.collapsed .tuner-body,
+  .tuner-drawer.collapsed .tuner-footer { display: none; }
+  .tuner-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--soft-1);
+    border-bottom: 1px solid var(--border-3);
+    cursor: pointer;
+    gap: 10px;
+  }
+  .tuner-drawer.collapsed .tuner-header { border-bottom: none; }
+  .tuner-title {
+    font-weight: 700;
+    font-size: 12.5px;
+    color: var(--secondary-accent);
+    letter-spacing: 0.8px;
+  }
+  .tuner-toggle-btn {
+    background: #fff;
+    border: 1px solid var(--border-1);
+    border-radius: 8px;
+    padding: 3px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .tuner-body {
+    padding: 12px 14px 14px 14px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .tuner-section {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: var(--secondary-accent);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    border-bottom: 1px dashed var(--border-2);
+    padding-bottom: 3px;
+    margin-top: 6px;
+  }
+  .tuner-row { display: flex; flex-direction: column; gap: 3px; }
+  .tuner-label-line {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-med);
+  }
+  .tuner-val {
+    font-weight: 700;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  .tuner-hint { font-size: 10.5px; color: var(--text-mute); line-height: 1.4; }
+  .tuner-row input[type="range"] { width: 100%; accent-color: var(--accent); margin: 0; }
+  .tuner-row select,
+  .tuner-row input[type="date"] {
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border-1);
+    background: #fff;
+    color: var(--text-dark);
+    font-size: 12px;
+    font-family: inherit;
+  }
+  .tuner-check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-med);
+    cursor: pointer;
+  }
+  .tuner-check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+  .tuner-info {
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--text-soft);
+    background: var(--soft-1);
+    border: 1px solid var(--border-3);
+    border-radius: 10px;
+    padding: 7px 9px;
+  }
+  .tuner-btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .tuner-footer {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px 12px 14px;
+    border-top: 1px solid var(--border-3);
+    background: var(--soft-1);
+  }
+  .tuner-actions { display: flex; gap: 6px; }
+  .tuner-btn {
+    flex: 1;
+    padding: 7px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border-1);
+    background: #fff;
+    color: var(--text-med);
+    font-size: 11.5px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .tuner-btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tuner-btn:active { transform: scale(0.97); }
+  .tuner-stats { font-size: 10.5px; color: var(--text-mute); font-variant-numeric: tabular-nums; }
+  .copy-out {
+    display: none;
+    margin: 0;
+    max-height: 200px;
+    overflow: auto;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+    font-size: 10px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+    word-break: break-all;
+    background: #fff;
+    border: 1px solid var(--border-1);
+    border-radius: 10px;
+    padding: 8px;
+    color: var(--text-dark);
+  }
+  .copy-out.shown { display: block; }
+</style>
+</head>
+<body class="table-locked info-visible dyn-demo">
+
+<!-- ============ REAL AMBIENT BACKGROUND (from index.html) ============ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
+</div>
+
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
+  </div>
+</div>
+
+<!-- Shippō tile pattern -->
+<div class="ambient-mosaic" aria-hidden="true"></div>
+
+<!-- ============ DYNAMIC BACKGROUND CANVAS (z-index -1) ============ -->
+<canvas class="dyn-canvas" id="dynCanvas" aria-hidden="true"></canvas>
+
+<!-- ============ TOP INFO BAR ============ -->
+<div class="info-bar shown" id="infoBar">
+  <div class="info-inner">
+    <div class="info-line" id="infoLine">
+      <span class="city" id="infoCity">名古屋市</span>
+      <span class="sep">·</span>
+      <span class="date" id="infoDate">—月—日(—)</span>
+      <span class="sep">·</span>
+      <span class="time" id="infoTime">—時—分</span>
+      <span class="sep">·</span>
+      <span class="temp" id="infoTemp">—°</span>
+      <span class="sep">·</span>
+      <span class="weather" id="infoWeather">—</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MAIN STAGE: the two main message panels ============ -->
+<div class="stage" id="stage">
+  <div class="track" id="track" style="transform: translateX(0%);">
+    <div class="panel active" data-panel="1">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div id="panel1Body"></div>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="2">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <div id="panel2Body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="action-hint global-hint shown" id="globalHint">
+    <span class="hint-layer active">
+      <span>スワイプ</span>
+      <span class="hint-arrow right">→</span>
+    </span>
+  </div>
+
+  <div class="dots visible" id="dots">
+    <div class="dot active"></div>
+    <div class="dot"></div>
+  </div>
+</div>
+
+<div class="flash-veil" id="flashVeil" aria-hidden="true"></div>
+
+<!-- ============ LIVE TUNING DRAWER ============ -->
+<div class="tuner-drawer" id="tunerDrawer">
+  <div class="tuner-header" id="tunerHeader">
+    <span class="tuner-title">🍁 Dynamic Background Lab</span>
+    <button type="button" class="tuner-toggle-btn" id="tunerCollapseBtn">Hide</button>
+  </div>
+  <div class="tuner-body" id="tunerBody"></div>
+  <div class="tuner-footer">
+    <div class="tuner-stats" id="tunerStats"></div>
+    <div class="tuner-actions">
+      <button type="button" class="tuner-btn" id="btnReset">Reset</button>
+      <button type="button" class="tuner-btn primary" id="btnCopy">Copy values</button>
+    </div>
+    <pre class="copy-out" id="copyOut"></pre>
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   0. SMALL HELPERS
+   ============================================================ */
+var PI = Math.PI, TAU = Math.PI * 2, DEG = Math.PI / 180;
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+function bell(x, m, s) { var d = (x - m) / s; return Math.exp(-d * d); }
+function angDiff(a, b) { return Math.atan2(Math.sin(a - b), Math.cos(a - b)); }
+function hexToRgb(h) {
+  h = h.replace('#', '');
+  return [parseInt(h.substr(0, 2), 16), parseInt(h.substr(2, 2), 16), parseInt(h.substr(4, 2), 16)];
+}
+function mixRgb(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function rgba(c, a) {
+  return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' +
+         Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : clamp(a, 0, 1)).toFixed(3) + ')';
+}
+function scaleRgb(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
+
+/* Seeded random (mulberry32) so a leaf keeps the same shape when it is redrawn. */
+function rngFrom(seed) {
+  var a = seed >>> 0;
+  return function() {
+    a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hash1(i) { var s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+/* Smooth 1-D value noise, 0..1 */
+function noise1(x) {
+  var i = Math.floor(x), f = x - i;
+  var u = f * f * (3 - 2 * f);
+  return lerp(hash1(i), hash1(i + 1), u);
+}
+function rnd(a, b) { return a + Math.random() * (b - a); }
+
+/* ============================================================
+   1. SETTINGS (defaults, live state, saved copy)
+   ============================================================ */
+var NAGOYA = { lat: 35.1815, lon: 136.9066 };
+var SITE_LEAF_COLOURS = ['#9E3B06', '#882E47', '#F07D40', '#E66826', '#C44E10'];
+var STORE_KEY = 'dynamicBgLab.v1';
+
+var _tokyoFmt = null;
+function tokyoNow() {
+  var p = {};
+  try {
+    if (!_tokyoFmt) _tokyoFmt = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Tokyo', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    });
+    _tokyoFmt.formatToParts(new Date()).forEach(function(x) { p[x.type] = x.value; });
+    return {
+      date: p.year + '-' + p.month + '-' + p.day,
+      hour: (parseInt(p.hour, 10) % 24) + parseInt(p.minute, 10) / 60 + parseInt(p.second, 10) / 3600
+    };
+  } catch (e) {
+    var d = new Date();
+    return {
+      date: d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2),
+      hour: d.getHours() + d.getMinutes() / 60
+    };
+  }
+}
+
+function makeDefaults() {
+  var now = tokyoNow();
+  return {
+    liveTime: true, hour: now.hour, date: now.date, timeLapse: 1,
+    liveWeather: true, condition: 'clear', windSpeed: 2.5, windDir: 300, gustiness: 0.35,
+    temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
+    density: 1, maxLeaves: 70, sizeScale: 1, fallSpeed: 1, sway: 1, flip3d: 0.8,
+    shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
+    speciesMode: 'auto', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
+    colorMode: 'auto', colorProgress: 0.3, colorVariety: 0.6, paletteBlend: 0.45, lightTint: 0.7, skyTint: 0.8,
+    depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
+    rainStreaks: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
+    lightning: true, frost: true, snowMix: true,
+    moon: true, birds: true, nightSpecks: true, dawnGlow: true,
+    heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
+    dragonfly: true, tapWind: true, tapStrength: 1,
+    panel: '1', showText: true,
+    renderScale: 0.75, showStats: true
+  };
+}
+var DEFAULTS = makeDefaults();
+var S = makeDefaults();
+(function loadSaved() {
+  try {
+    var raw = localStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    var saved = JSON.parse(raw);
+    for (var k in saved) if (Object.prototype.hasOwnProperty.call(DEFAULTS, k)) S[k] = saved[k];
+    if (S.liveTime) { var n = tokyoNow(); S.hour = n.hour; S.date = n.date; }
+  } catch (e) { /* storage blocked: run with defaults */ }
+})();
+var _saveTimer = 0;
+function scheduleSave() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(function() {
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(S)); } catch (e) {}
+  }, 400);
+}
+
+/* ============================================================
+   2. TIME, SUN, MOON, SEASON
+   ============================================================ */
+function parseDate(s) {
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || '');
+  if (!m) { var n = tokyoNow(); m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(n.date); }
+  return { y: +m[1], m: +m[2], d: +m[3] };
+}
+function fmtDate(y, m, d) { return y + '-' + ('0' + m).slice(-2) + '-' + ('0' + d).slice(-2); }
+function addDays(s, n) {
+  var p = parseDate(s), t = new Date(Date.UTC(p.y, p.m - 1, p.d + n));
+  return fmtDate(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+function dayOfYear(p) { return (Date.UTC(p.y, p.m - 1, p.d) - Date.UTC(p.y, 0, 0)) / 864e5; }
+
+/* Sunrise / sunset in Nagoya (NOAA approximation), hours in JST. */
+function sunTimes(p) {
+  var N = dayOfYear(p), g = TAU / 365 * (N - 1);
+  var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+             0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  var eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+             0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  var lat = NAGOYA.lat * DEG;
+  var cosHa = Math.cos(90.833 * DEG) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+  var ha = Math.acos(clamp(cosHa, -1, 1)) / DEG;
+  var noon = 720 - 4 * NAGOYA.lon - eqt + 540;
+  return { rise: (noon - 4 * ha) / 60, set: (noon + 4 * ha) / 60, noon: noon / 60 };
+}
+
+/* Moon phase 0..1 (0 = new, 0.5 = full) */
+function moonPhase(p, hour) {
+  var ms = Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3;
+  var syn = 29.530588853 * 864e5;
+  var ph = ((ms - 947182440000) / syn) % 1;
+  return ph < 0 ? ph + 1 : ph;
+}
+
+/* How far autumn has turned, 0 (green) .. 1 (bare brown), from the date. */
+function seasonProgress(p) {
+  var doy = dayOfYear(p);
+  var pts = [[258, 0], [288, 0.25], [314, 0.55], [334, 0.8], [354, 1]];
+  if (doy < 60) return 1;
+  if (doy <= pts[0][0]) return 0;
+  for (var i = 1; i < pts.length; i++) {
+    if (doy <= pts[i][0]) return lerp(pts[i - 1][1], pts[i][1], (doy - pts[i - 1][0]) / (pts[i][0] - pts[i - 1][0]));
+  }
+  return 1;
+}
+
+/* Light colour through the day, keyed to the real sunrise/sunset. */
+var LIGHT_STOPS_FN = function(sr, ss, noon) {
+  return [
+    [sr - 1.6, '#46557f', 0.26, 0.60],
+    [sr - 0.6, '#6d6a96', 0.22, 0.50],
+    [sr,       '#f2a3a0', 0.20, 0.25],
+    [sr + 0.7, '#ffc77a', 0.16, 0.05],
+    [sr + 2.5, '#fff3df', 0.05, 0.00],
+    [noon,     '#ffffff', 0.00, 0.00],
+    [ss - 2.2, '#fff0d6', 0.05, 0.00],
+    [ss - 0.9, '#ffb055', 0.18, 0.00],
+    [ss - 0.1, '#ee8a7a', 0.22, 0.12],
+    [ss + 0.6, '#8d7fb0', 0.24, 0.40],
+    [ss + 1.5, '#46557f', 0.26, 0.60]
+  ];
+};
+function lightAt(h, sun) {
+  var st = LIGHT_STOPS_FN(sun.rise, sun.set, sun.noon);
+  var col, amt, dark;
+  if (h <= st[0][0] || h >= st[st.length - 1][0]) {
+    col = hexToRgb('#46557f'); amt = 0.26; dark = 0.6;
+  } else {
+    for (var i = 1; i < st.length; i++) {
+      if (h <= st[i][0]) {
+        var t = (h - st[i - 1][0]) / (st[i][0] - st[i - 1][0]);
+        col = mixRgb(hexToRgb(st[i - 1][1]), hexToRgb(st[i][1]), t);
+        amt = lerp(st[i - 1][2], st[i][2], t);
+        dark = lerp(st[i - 1][3], st[i][3], t);
+        break;
+      }
+    }
+  }
+  var phase;
+  if (h < sun.rise - 0.8 || h > sun.set + 0.9) phase = 'night';
+  else if (h < sun.rise + 1) phase = 'dawn';
+  else if (h > sun.set - 0.3) phase = 'dusk';
+  else if (h > sun.set - 1.6) phase = 'golden';
+  else if (h < 11) phase = 'morning';
+  else phase = 'day';
+  var daylight = smooth(sun.rise - 0.3, sun.rise + 0.8, h) * (1 - smooth(sun.set - 0.6, sun.set + 0.4, h));
+  return { col: col, amt: amt, dark: dark, phase: phase, daylight: daylight };
+}
+var PHASE_NAMES = { night: 'Night 夜', dawn: 'Dawn 夜明け', morning: 'Morning 朝', day: 'Midday 昼', golden: 'Golden hour 夕方', dusk: 'Dusk 黄昏' };
+
+/* ============================================================
+   3. ENVIRONMENT (recomputed a few times a second)
+   ============================================================ */
+var ENV = {};
+function computeEnv() {
+  var p = parseDate(S.date);
+  var sun = sunTimes(p);
+  var L = lightAt(S.hour, sun);
+  var c = S.condition;
+  var rainy = (c === 'rain' || c === 'drizzle' || c === 'thunderstorm');
+  var wet = rainy ? clamp(0.3 + S.rainMm / 5, 0.3, 1) : 0;
+  var frost = (S.frost && S.temperature < 5) ? clamp((5 - S.temperature) / 8, 0, 1) : 0;
+  var autoP = seasonProgress(p);
+  var P = S.colorMode === 'auto' ? autoP : S.colorProgress;
+  var fog = c === 'fog' ? Math.max(S.fogDensity, 0.15) : S.fogDensity;
+  var sunAmt = 0;
+  if (c === 'clear') sunAmt = 1 - S.cloudCover / 140;
+  else if (c === 'clouds') sunAmt = Math.max(0, 0.6 - S.cloudCover / 120);
+  sunAmt *= L.daylight;
+  var windScreen = S.windSpeed * -Math.sin(S.windDir * DEG);
+  ENV = {
+    p: p, sun: sun, light: L, phase: L.phase, rainy: rainy, wet: wet, frost: frost,
+    season: P, autoSeason: autoP, fog: fog, sunAmt: sunAmt,
+    windPx: windScreen * 14, windMs: S.windSpeed,
+    snowing: c === 'snow' || (S.snowMix && S.temperature < 3),
+    snowAmt: c === 'snow' ? clamp(0.4 + S.rainMm / 3, 0.4, 1.6) : (S.snowMix && S.temperature < 3 ? 0.12 : 0),
+    moon: moonPhase(p, S.hour)
+  };
+}
+
+/* ============================================================
+   4. LEAF SHAPES — built in code, a little different every time.
+      Unit space: leaf length 1, blade base at (0,0), tip toward -y.
+   ============================================================ */
+var SPECIES = {
+  momiji: { name: 'Momiji (maple)', size: 56, ramp: [[0, '#6b8f3a'], [0.25, '#a7a336'], [0.4, '#e0a02c'], [0.55, '#E66826'], [0.7, '#C44E10'], [0.82, '#9E3B06'], [0.9, '#882E47'], [1, '#6e4a35']],
+            site: [0, 1, 2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } },
+  ginkgo: { name: 'Ginkgo (ichō)',   size: 46, ramp: [[0, '#7d9a3c'], [0.2, '#b8b440'], [0.35, '#e8c534'], [0.6, '#f0b429'], [0.8, '#d99a2b'], [1, '#9c7a3a']],
+            site: [2, 3], modes: { flutter: 0.3, tumble: 0.15, glide: 0.1, spiral: 0.45 } },
+  oak:    { name: 'Oak (konara)',    size: 50, ramp: [[0, '#6a7f3a'], [0.3, '#9a8a3a'], [0.5, '#b8823a'], [0.7, '#9a5e2c'], [1, '#6b4a30']],
+            site: [0, 4], modes: { flutter: 0.35, tumble: 0.4, glide: 0.2, spiral: 0.05 } },
+  keyaki: { name: 'Zelkova (keyaki)', size: 40, ramp: [[0, '#73903c'], [0.3, '#c0a03a'], [0.5, '#d9822e'], [0.7, '#b0502a'], [0.85, '#8a4a2a'], [1, '#6e4b33']],
+            site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } }
+};
+(function prepRamps() {
+  for (var k in SPECIES) SPECIES[k].rampRgb = SPECIES[k].ramp.map(function(s) { return [s[0], hexToRgb(s[1])]; });
+})();
+var SITE_RGB = SITE_LEAF_COLOURS.map(hexToRgb);
+function rampAt(r, p) {
+  p = clamp(p, 0, 1);
+  for (var i = 1; i < r.length; i++) {
+    if (p <= r[i][0]) return mixRgb(r[i - 1][1], r[i][1], (p - r[i - 1][0]) / (r[i][0] - r[i - 1][0]));
+  }
+  return r[r.length - 1][1];
+}
+
+function geoMomiji(r, v) {
+  var n = r() < 0.12 * v ? (r() < 0.5 ? 5 : 9) : 7;
+  var spread = (235 + (r() - 0.5) * 30 * v) * DEG;
+  var gap = spread / (n - 1), mid = (n - 1) / 2;
+  var prof = [1, 0.92, 0.74, 0.48, 0.32];
+  var lobes = [];
+  for (var i = 0; i < n; i++) {
+    var d = Math.round(Math.abs(i - mid));
+    lobes.push({
+      a: -PI / 2 + (i - mid) * gap + (r() - 0.5) * gap * 0.25 * v,
+      L: prof[Math.min(d, 4)] * (1 + (r() - 0.5) * 0.28 * v),
+      w: gap * (0.78 + (r() - 0.5) * 0.2 * v)
+    });
+  }
+  var rs = 0.3 * (1 + (r() - 0.5) * 0.5 * v);
+  var teeth = 70 + r() * 40, toothAmp = 0.03 + 0.025 * r();
+  var pts = [], N = 340;
+  for (var k = 0; k < N; k++) {
+    var th = PI / 2 + TAU * k / N;
+    var rr = 0;
+    for (var j = 0; j < n; j++) {
+      var x = Math.abs(angDiff(th, lobes[j].a)) / lobes[j].w;
+      if (x < 1) rr = Math.max(rr, lobes[j].L * Math.pow(1 - x, 0.75));
+    }
+    var fromUp = Math.abs(angDiff(th, -PI / 2));
+    var floor = 0.05 + (rs - 0.05) * smooth(spread / 2 + gap * 0.6, spread / 2, fromUp);
+    rr = Math.max(rr, floor);
+    if (rr > 0.4) {
+      var tf = th * teeth / TAU; tf = tf - Math.floor(tf);
+      rr *= 1 + toothAmp * (Math.abs(2 * tf - 1) - 0.5) * Math.min(1, (rr - 0.4) / 0.3);
+    }
+    pts.push([rr * Math.cos(th), rr * Math.sin(th)]);
+  }
+  var veins = lobes.map(function(l) { return [0, 0, 0.85 * l.L * Math.cos(l.a), 0.85 * l.L * Math.sin(l.a)]; });
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.03 * (r() - 0.5), 0.2], [0.08 * (r() - 0.5), 0.42]] };
+}
+
+function geoGinkgo(r, v) {
+  var phi = (62 + r() * 18) * DEG;
+  var R = 0.95 * (1 + (r() - 0.5) * 0.15 * v);
+  var notch = r() < 0.7 ? (0.15 + 0.35 * r()) * (0.5 + 0.5 * v) : 0.03;
+  var wavK = 6 + r() * 10, wavA = 0.025 * v + 0.01, ph = r() * 6;
+  var pts = [[-0.015, 0.0], [0.45 * R * Math.cos(-PI / 2 - phi * 0.86), 0.45 * R * Math.sin(-PI / 2 - phi * 0.86)]];
+  var N = 140;
+  for (var k = 0; k <= N; k++) {
+    var th = -PI / 2 - phi + 2 * phi * k / N;
+    var dd = th + PI / 2;
+    var rr = R * (1 + wavA * Math.sin(th * wavK + ph)) * (1 - notch * Math.exp(-Math.pow(dd / 0.07, 2)));
+    rr *= 1 - 0.25 * Math.pow(Math.abs(dd) / phi, 8);
+    pts.push([rr * Math.cos(th), rr * Math.sin(th)]);
+  }
+  pts.push([0.45 * R * Math.cos(-PI / 2 + phi * 0.86), 0.45 * R * Math.sin(-PI / 2 + phi * 0.86)]);
+  pts.push([0.015, 0.0]);
+  var veins = [];
+  for (var i = 0; i < 16; i++) {
+    var a = -PI / 2 - phi * 0.92 + (2 * phi * 0.92) * i / 15;
+    veins.push([0, 0, 0.88 * R * Math.cos(a), 0.88 * R * Math.sin(a)]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'fine', stem: [[0, 0], [0.02 * (r() - 0.5), 0.28], [0.06 * (r() - 0.5), 0.55]] };
+}
+
+function geoOak(r, v) {
+  var nL = 4 + Math.floor(r() * 3);
+  var W = 0.3 * (1 + (r() - 0.5) * 0.25 * v);
+  var depth = 0.25 + 0.2 * r() * (0.5 + v);
+  var phL = r() * 0.6 * v, phR = r() * 0.6 * v;
+  function hw(t, ph) {
+    var env = Math.pow(Math.sin(PI * Math.pow(t, 0.75)), 0.85);
+    return W * env * ((1 - depth) + depth * Math.abs(Math.sin(PI * nL * t + ph)));
+  }
+  var pts = [], N = 90, i, t;
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t, phL), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t, phR), -t]); }
+  var veins = [[0, 0, 0, -0.95]];
+  for (var k = 0; k < nL; k++) {
+    t = (k + 0.5) / nL;
+    if (t > 0.9) continue;
+    veins.push([0, -t * 0.85, -hw(t, phL) * 0.8, -t - 0.04]);
+    veins.push([0, -t * 0.85, hw(t, phR) * 0.8, -t - 0.04]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.1], [0.02 * (r() - 0.5), 0.18]] };
+}
+
+function geoKeyaki(r, v) {
+  var W = 0.22 * (1 + (r() - 0.5) * 0.3 * v);
+  var teeth = 10 + r() * 5, amp = 0.05 + 0.04 * r();
+  function hw(t) {
+    var base = W * Math.pow(Math.sin(PI * Math.pow(t, 0.62)), 1.1);
+    if (t > 0.12) { var f = t * teeth; f = f - Math.floor(f); base *= 1 + amp * f; }
+    return base;
+  }
+  var pts = [], N = 110, i, t;
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
+  var veins = [[0, 0, 0, -0.95]];
+  for (var k = 1; k < teeth - 1; k++) {
+    t = k / teeth;
+    veins.push([0, -t, -0.85 * hw(t + 0.08), -(t + 0.08)]);
+    veins.push([0, -t, 0.85 * hw(t + 0.08), -(t + 0.08)]);
+  }
+  return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.07], [0.02 * (r() - 0.5), 0.13]] };
+}
+var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki };
+
+/* Build one leaf's geometry from its seed, then bend it and add wear. */
+function buildGeometry(L) {
+  var r = rngFrom(L.seed);
+  var v = S.shapeVariation;
+  var g = GEO[L.species](r, v);
+  var bend = (r() - 0.5) * 0.4 * v;
+  var bendFn = function(p) { return [p[0] + bend * p[1] * p[1], p[1]]; };
+  g.pts = g.pts.map(bendFn);
+  g.stem = g.stem.map(bendFn);
+  g.veins = g.veins.map(function(s) {
+    var a = bendFn([s[0], s[1]]), b = bendFn([s[2], s[3]]);
+    return [a[0], a[1], b[0], b[1]];
+  });
+  var w = S.wear;
+  var wr = r();
+  g.bites = [];
+  g.spots = [];
+  if (wr < w * 0.7) {
+    var nb = 1 + Math.floor(r() * 2);
+    for (var i = 0; i < nb; i++) {
+      var q = g.pts[Math.floor(r() * g.pts.length)];
+      g.bites.push([q[0] * 1.05, q[1] * 1.05, 0.06 + r() * 0.08]);
+    }
+  }
+  if (r() < w) {
+    var ns = 2 + Math.floor(r() * 6);
+    for (var j = 0; j < ns; j++) {
+      var pt = g.pts[Math.floor(r() * g.pts.length)], f = 0.2 + r() * 0.55;
+      g.spots.push([pt[0] * f, pt[1] * f, 0.015 + r() * 0.03]);
+    }
+  }
+  g.dry = clamp(w * (0.4 + ENV.season) * r(), 0, 1);
+  L.geo = g;
+}
+
+/* ============================================================
+   5. LEAF SPRITES — each leaf is drawn once into its own small
+      canvas (colour, veins, wear, light, wetness, frost, blur
+      baked in), then just moved and turned each frame.
+   ============================================================ */
+var PR = 1;
+var scratch = document.createElement('canvas');
+var sctx = scratch.getContext('2d');
+var HAS_FILTER = typeof sctx.filter === 'string';
+var lookVersion = 1, geomVersion = 1;
+
+function leafBlur(L) {
+  if (L.hero) return 0;
+  var zc = clamp(L.z, 0, 1);
+  return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
+}
+function leafColours(L) {
+  var sp = SPECIES[L.species];
+  var p = clamp(ENV.season + L.pj * 0.2 * S.colorVariety, 0, 1);
+  var site = SITE_RGB[sp.site[L.palIdx % sp.site.length]];
+  var k = 1 + L.bright * S.colorVariety;
+  function at(pp) { return scaleRgb(mixRgb(rampAt(sp.rampRgb, pp), site, S.paletteBlend), k); }
+  return { base: at(p - 0.08), mid: at(p), tip: at(p + (L.species === 'ginkgo' ? 0.14 : 0.1)) };
+}
+function tracePath(ctx, pts) {
+  ctx.beginPath();
+  ctx.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
+  ctx.closePath();
+}
+
+function bakeLeaf(L) {
+  if (L.geomV !== geomVersion || !L.geo) { buildGeometry(L); L.geomV = geomVersion; }
+  var g = L.geo;
+  var pr = L.hero ? Math.min(PR, 1.5) : PR;
+  var blur = leafBlur(L);
+  var s = L.size * pr;
+  var side = Math.ceil(2.4 * s + blur * pr * 6 + 4);
+  if (scratch.width < side || scratch.height < side) {
+    scratch.width = Math.max(scratch.width, side);
+    scratch.height = Math.max(scratch.height, side);
+  }
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.globalCompositeOperation = 'source-over';
+  sctx.globalAlpha = 1;
+  sctx.clearRect(0, 0, side, side);
+  sctx.setTransform(s, 0, 0, s, side / 2, side / 2 + 0.25 * s);
+
+  var C = leafColours(L);
+  var grad = sctx.createLinearGradient(0, 0.1, 0, -1);
+  grad.addColorStop(0, rgba(C.base));
+  grad.addColorStop(0.5, rgba(C.mid));
+  grad.addColorStop(1, rgba(C.tip));
+
+  // stem
+  sctx.strokeStyle = rgba(scaleRgb(C.base, 0.7));
+  sctx.lineWidth = L.species === 'ginkgo' ? 0.022 : 0.028;
+  sctx.lineCap = 'round';
+  sctx.beginPath();
+  sctx.moveTo(g.stem[0][0], g.stem[0][1]);
+  sctx.quadraticCurveTo(g.stem[1][0], g.stem[1][1], g.stem[2][0], g.stem[2][1]);
+  sctx.stroke();
+
+  // blade
+  tracePath(sctx, g.pts);
+  sctx.fillStyle = grad;
+  sctx.fill();
+
+  sctx.save();
+  sctx.clip();
+  // veins
+  sctx.lineWidth = g.veinStyle === 'fine' ? 0.007 : 0.014;
+  sctx.strokeStyle = g.veinStyle === 'fine' ? 'rgba(120,80,20,0.14)' : 'rgba(255,236,205,0.24)';
+  sctx.beginPath();
+  for (var i = 0; i < g.veins.length; i++) {
+    sctx.moveTo(g.veins[i][0], g.veins[i][1]);
+    sctx.lineTo(g.veins[i][2], g.veins[i][3]);
+  }
+  sctx.stroke();
+  // brown spots
+  sctx.fillStyle = 'rgba(90,50,25,0.45)';
+  for (var j = 0; j < g.spots.length; j++) {
+    sctx.beginPath();
+    sctx.arc(g.spots[j][0], g.spots[j][1], g.spots[j][2], 0, TAU);
+    sctx.fill();
+  }
+  // dry edge
+  if (g.dry > 0.05) {
+    tracePath(sctx, g.pts);
+    sctx.strokeStyle = 'rgba(110,70,35,' + (0.5 * g.dry).toFixed(3) + ')';
+    sctx.lineWidth = 0.07;
+    sctx.stroke();
+  }
+  // wet: darker + a thin shine
+  if (ENV.wet > 0) {
+    sctx.fillStyle = 'rgba(40,20,22,' + (0.22 * ENV.wet).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+    sctx.strokeStyle = 'rgba(255,255,255,' + (0.38 * ENV.wet).toFixed(3) + ')';
+    sctx.lineWidth = 0.025;
+    sctx.beginPath();
+    sctx.moveTo(-0.16, -0.2);
+    sctx.quadraticCurveTo(-0.2, -0.45, -0.06, -0.72);
+    sctx.stroke();
+  }
+  // time-of-day light on the leaf
+  var Lt = ENV.light;
+  if (S.lightTint > 0) {
+    sctx.fillStyle = rgba(Lt.col, S.lightTint * Lt.amt * 1.5);
+    sctx.fillRect(-2, -2, 4, 4);
+    if (Lt.dark > 0) {
+      sctx.fillStyle = 'rgba(28,32,58,' + (S.lightTint * Lt.dark * 0.5).toFixed(3) + ')';
+      sctx.fillRect(-2, -2, 4, 4);
+    }
+  }
+  // fog fades far leaves toward the paper colour
+  var zc = clamp(L.z, 0, 1);
+  if (ENV.fog > 0 && !L.hero) {
+    sctx.fillStyle = 'rgba(250,246,240,' + (ENV.fog * (1 - zc) * 0.55).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+  }
+  // frost on the edges when cold
+  if (ENV.frost > 0) {
+    sctx.fillStyle = 'rgba(225,235,250,' + (0.18 * ENV.frost).toFixed(3) + ')';
+    sctx.fillRect(-2, -2, 4, 4);
+    tracePath(sctx, g.pts);
+    sctx.strokeStyle = 'rgba(250,252,255,' + (0.8 * ENV.frost).toFixed(3) + ')';
+    sctx.lineWidth = 0.08;
+    sctx.stroke();
+  }
+  sctx.restore();
+
+  // bites and tears
+  if (g.bites.length) {
+    sctx.globalCompositeOperation = 'destination-out';
+    for (var b = 0; b < g.bites.length; b++) {
+      sctx.beginPath();
+      sctx.arc(g.bites[b][0], g.bites[b][1], g.bites[b][2], 0, TAU);
+      sctx.fill();
+    }
+    sctx.globalCompositeOperation = 'source-over';
+  }
+
+  // copy into the leaf's own sprite, with its depth blur
+  if (!L.spr || L.spr.width !== side) {
+    L.spr = document.createElement('canvas');
+    L.spr.width = L.spr.height = side;
+    L.back = document.createElement('canvas');
+    L.back.width = L.back.height = side;
+  }
+  var c1 = L.spr.getContext('2d');
+  c1.clearRect(0, 0, side, side);
+  if (HAS_FILTER && blur > 0.05) c1.filter = 'blur(' + (blur * pr).toFixed(2) + 'px)';
+  c1.drawImage(scratch, 0, 0, side, side, 0, 0, side, side);
+  if (HAS_FILTER) c1.filter = 'none';
+  var c2 = L.back.getContext('2d');
+  c2.clearRect(0, 0, side, side);
+  if (HAS_FILTER) c2.filter = 'brightness(1.12) saturate(0.7)';
+  else c2.globalAlpha = 0.85;
+  c2.drawImage(L.spr, 0, 0);
+  if (HAS_FILTER) c2.filter = 'none';
+  c2.globalAlpha = 1;
+  L.hs = side / (2 * pr);
+  L.bakedV = lookVersion;
+}
+
+/* ============================================================
+   6. LEAF MOTION
+   ============================================================ */
+var leaves = [];   // falling, sorted far → near
+var pile = [];     // landed at the bottom edge
+var hero = null;   // the occasional close-up leaf
+var nextId = 1;
+
+function speciesWeights() {
+  if (S.speciesMode === 'manual') {
+    return { momiji: S.wMomiji, ginkgo: S.wGinkgo, oak: S.wOak, keyaki: S.wKeyaki };
+  }
+  var p = ENV.season;
+  return {
+    ginkgo: 0.03 + bell(p, 0.4, 0.3),
+    momiji: 0.03 + bell(p, 0.65, 0.3),
+    keyaki: 0.03 + 0.6 * bell(p, 0.45, 0.35),
+    oak:    0.03 + 0.7 * bell(p, 0.85, 0.25)
+  };
+}
+function pickWeighted(w) {
+  var tot = 0, k;
+  for (k in w) tot += Math.max(0, w[k]);
+  if (tot <= 0) return null;
+  var x = Math.random() * tot;
+  for (k in w) { x -= Math.max(0, w[k]); if (x <= 0) return k; }
+  return k;
+}
+function setMode(L, forced) {
+  var w = {};
+  var base = SPECIES[L.species].modes;
+  for (var k in base) w[k] = base[k];
+  if (ENV.windMs > 6) { w.tumble *= 1.8; w.glide *= 1.5; }
+  if (ENV.rainy) { w.tumble *= 2; w.flutter *= 0.5; }
+  if (ENV.frost > 0) { w.flutter *= 0.6; w.tumble *= 1.4; }
+  var m = forced || pickWeighted(w);
+  var depth = 0.5 + 0.5 * clamp(L.z, 0, 1.4);
+  L.mode = m;
+  L.modeVx = 0;
+  if (m === 'flutter') {
+    L.swayAmp = rnd(18, 48) * S.sway * depth; L.sf = rnd(1.4, 2.6);
+    L.flipV = (Math.random() - 0.5) * 1.2; L.fallMul = 0.85; L.modeT = rnd(2, 6);
+  } else if (m === 'tumble') {
+    L.swayAmp = 6 * S.sway; L.sf = 2;
+    L.flipV = (Math.random() < 0.5 ? -1 : 1) * rnd(5, 9); L.rotV = (Math.random() < 0.5 ? -1 : 1) * rnd(1.5, 3.5);
+    L.fallMul = 1.35; L.modeT = rnd(1, 3);
+  } else if (m === 'glide') {
+    L.glideDir = Math.abs(ENV.windPx) > 20 && Math.random() < 0.7 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? -1 : 1);
+    L.modeVx = L.glideDir * rnd(40, 90) * depth;
+    L.swayAmp = 4; L.sf = 1; L.flipV = (Math.random() - 0.5) * 0.6;
+    L.fallMul = 0.55; L.modeT = rnd(1.2, 2.5);
+  } else {
+    L.swayAmp = rnd(14, 32) * S.sway * depth; L.sf = rnd(3, 5);
+    L.flipV = L.sf; L.rotV = (Math.random() < 0.5 ? -1 : 1) * 2.4;
+    L.fallMul = 0.95; L.modeT = rnd(2, 5);
+  }
+}
+
+function makeLeaf(opts) {
+  opts = opts || {};
+  var species = opts.species || pickWeighted(speciesWeights()) || 'momiji';
+  var z = opts.z !== undefined ? opts.z : lerp(1, 0, S.depthSpread * Math.pow(Math.random(), 0.8));
+  var L = {
+    id: nextId++, seed: (Math.random() * 4294967296) >>> 0, species: species, z: z,
+    hero: !!opts.hero,
+    size: SPECIES[species].size * (0.45 + 0.6 * clamp(z, 0, 1)) * S.sizeScale * rnd(0.85, 1.15) * (opts.hero ? 2.2 : 1),
+    x: 0, y: 0, vx: 0, vy: 0, rot: rnd(-PI, PI), baseRot: rnd(-0.6, 0.6),
+    phi: rnd(0, TAU), sp: rnd(0, TAU), so: 0, age: 0,
+    fallJ: rnd(0.8, 1.2), groundY: rnd(4, 30),
+    pj: (Math.random() + Math.random() + Math.random() - 1.5) * 1.4,
+    palIdx: Math.floor(Math.random() * 5), bright: rnd(-0.06, 0.06),
+    gid: 0, settled: false
+  };
+  setMode(L);
+  return L;
+}
+function insertSorted(L) {
+  var i = leaves.length;
+  while (i > 0 && leaves[i - 1].z > L.z) i--;
+  leaves.splice(i, 0, L);
+}
+function spawnLeaf(opts) {
+  opts = opts || {};
+  if (leaves.length >= S.maxLeaves && !opts.force) return null;
+  var L = makeLeaf(opts);
+  var wp = ENV.windPx;
+  if (opts.x !== undefined) { L.x = opts.x; L.y = opts.y; }
+  else if (Math.abs(wp) > 30 && Math.random() < Math.min(0.5, Math.abs(wp) / 250)) {
+    L.x = wp > 0 ? -L.size : W + L.size;
+    L.y = Math.random() * H * 0.5;
+  } else {
+    L.x = Math.random() * W * 1.2 - W * 0.1 - wp * 3;
+    L.y = -L.size * 1.2 - Math.random() * 40;
+  }
+  if (opts.vx !== undefined) L.vx = opts.vx;
+  if (opts.prefill) { L.y = Math.random() * H; L.age = 5; }
+  bakeLeaf(L);
+  insertSorted(L);
+  return L;
+}
+
+function updateLeaf(L, dt, t) {
+  L.age += dt;
+  L.modeT -= dt;
+  if (L.modeT <= 0) setMode(L);
+  var zc = clamp(L.z, 0, 1.4);
+  var T = 46 * (0.45 + 0.55 * zc) * S.fallSpeed * L.fallJ * (L.hero ? 0.7 : 1) * (ENV.rainy ? 1 + 0.25 * ENV.wet : 1);
+  var gustEnv = Math.max(0.2, 1 + S.gustiness * 0.6 * (noise1(t * 0.25) * 2 - 1));
+  var turb = (ENV.windMs * 6 + 8) * (noise1(L.seed % 997 + t * 0.7) * 2 - 1);
+  var wx = (ENV.windPx * gustEnv + turb) * (0.35 + 0.65 * zc);
+  var tvx = wx + L.modeVx;
+  L.vx += (tvx - L.vx) * (1 - Math.exp(-dt * 1.6));
+  L.sp += L.sf * dt;
+  var tvy = T * L.fallMul;
+  var targetSo = 0;
+  if (L.mode === 'flutter') {
+    tvy *= 0.55 + 0.9 * Math.abs(Math.cos(L.sp));
+    targetSo = L.swayAmp * Math.sin(L.sp);
+    var rt = L.baseRot + 0.55 * Math.cos(L.sp) * Math.min(1.5, S.sway);
+    L.rot += angDiff(rt, L.rot) * (1 - Math.exp(-dt * 3));
+    L.baseRot += (Math.random() - 0.5) * dt * 0.4;
+  } else if (L.mode === 'tumble' || L.mode === 'spiral') {
+    targetSo = L.swayAmp * Math.sin(L.sp);
+    L.rot += L.rotV * dt;
+  } else {
+    var gt = L.baseRot + L.glideDir * 0.5;
+    L.rot += angDiff(gt, L.rot) * (1 - Math.exp(-dt * 2));
+  }
+  L.vy += (tvy - L.vy) * (1 - Math.exp(-dt * 2.2));
+  L.so += (targetSo - L.so) * (1 - Math.exp(-dt * 4));
+  L.phi += L.flipV * dt * (0.5 + 0.5 * S.flip3d);
+  L.x += L.vx * dt;
+  L.y += L.vy * dt;
+}
+
+function settleLeaf(L) {
+  L.settled = true;
+  L.y = H - L.groundY;
+  L.pileSy = rnd(0.45, 0.72);
+  L.pileSx = Math.random() < 0.5 ? -1 : 1;
+  L.pileFace = Math.cos(L.phi) >= 0;
+  pile.push(L);
+  while (pile.length > S.pileMax) pile.shift();
+}
+function liftFromPile(L, vx, vy) {
+  var i = pile.indexOf(L);
+  if (i >= 0) pile.splice(i, 1);
+  L.settled = false;
+  L.vx = vx; L.vy = vy;
+  L.y -= 4;
+  setMode(L, 'tumble');
+  insertSorted(L);
+}
+
+/* ============================================================
+   7. WIND EVENTS — gusts, tap/swipe puffs, lightning scatter
+   ============================================================ */
+var gusts = [], gustId = 1;
+function startGust(force) {
+  var dir = Math.abs(ENV.windPx) > 4 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? -1 : 1);
+  var g = {
+    id: gustId++, dir: dir, x: dir > 0 ? -100 : W + 100,
+    speed: 650 + ENV.windMs * 30,
+    str: (90 + ENV.windMs * 22) * (0.6 + S.gustiness) * (force ? 1.3 : 1)
+  };
+  gusts.push(g);
+  var n = 3 + Math.floor(Math.random() * 5);
+  for (var i = 0; i < n; i++) {
+    spawnLeaf({ x: dir > 0 ? -30 : W + 30, y: Math.random() * H * 0.6, vx: dir * g.str * rnd(0.5, 1), force: force });
+  }
+}
+function updateGusts(dt) {
+  for (var i = gusts.length - 1; i >= 0; i--) {
+    var g = gusts[i];
+    g.x += g.dir * g.speed * dt;
+    for (var j = 0; j < leaves.length; j++) {
+      var L = leaves[j];
+      if (L.gid === g.id) continue;
+      if (g.dir > 0 ? L.x < g.x : L.x > g.x) {
+        L.gid = g.id;
+        L.vx += g.dir * g.str * (0.5 + 0.5 * clamp(L.z, 0, 1)) * rnd(0.7, 1.3);
+        L.vy -= g.str * 0.25 * Math.random();
+      }
+    }
+    for (var k = pile.length - 1; k >= 0; k--) {
+      var P = pile[k];
+      if (P.gid === g.id) continue;
+      if (g.dir > 0 ? P.x < g.x : P.x > g.x) {
+        P.gid = g.id;
+        if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
+      }
+    }
+    if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
+  }
+}
+function pushAround(px, py, radius, fx, fy, radial, liftChance) {
+  var all = leaves.slice();
+  if (hero) all.push(hero);
+  for (var i = 0; i < all.length; i++) {
+    var L = all[i];
+    var dx = L.x - px, dy = L.y - py, d = Math.sqrt(dx * dx + dy * dy);
+    if (d > radius) continue;
+    var f = 1 - d / radius;
+    var nx = d > 0.01 ? dx / d : 0, ny = d > 0.01 ? dy / d : -1;
+    var k = f * (0.5 + 0.5 * clamp(L.z, 0, 1.4));
+    L.vx += (fx + nx * radial) * k;
+    L.vy += (fy + ny * radial) * k;
+    if (L.mode !== 'tumble' && Math.random() < f) setMode(L, 'tumble');
+  }
+  for (var j = pile.length - 1; j >= 0; j--) {
+    var P = pile[j];
+    var ex = P.x - px, ey = P.y - py, e = Math.sqrt(ex * ex + ey * ey);
+    if (e < radius * 0.8 && Math.random() < liftChance) {
+      liftFromPile(P, fx * 0.6 + (ex / (e || 1)) * radial * 0.8, -rnd(120, 260));
+    }
+  }
+}
+
+var lightningNext = 0, flashes = [];
+function strikeLightning() {
+  var t0 = performance.now() / 1000;
+  flashes.push({ at: t0, a: 0.55 }, { at: t0 + 0.18, a: 0.35 });
+  setTimeout(function() {
+    pushAround(Math.random() * W, Math.random() * H * 0.6, Math.max(W, H), 0, -40, 220, 0.8);
+  }, 250);
+}
+
+/* ============================================================
+   8. WEATHER & TIME-OF-DAY LAYERS
+   ============================================================ */
+var streaks = [], splashes = [], flakes = [], specks = [], birds = [], dragonfly = null;
+var cloudSprite = null, fogSprite = null, speckSprite = null;
+var cloudShadowsPos = [{ x: 0, y: 0.1 }, { x: 0.55, y: 0.45 }, { x: 1.1, y: 0.2 }];
+var fogBands = [{ x: 0, y: 0.25, s: 1 }, { x: 0.4, y: 0.55, s: 0.7 }, { x: 0.8, y: 0.8, s: 1.2 }];
+
+function makeSprites() {
+  cloudSprite = document.createElement('canvas');
+  cloudSprite.width = 320; cloudSprite.height = 220;
+  var c = cloudSprite.getContext('2d');
+  // every blob fades out well inside the sprite, so no hard edges
+  var blobs = [[100, 120, 60], [150, 105, 70], [200, 125, 55], [130, 135, 50], [230, 110, 45]];
+  blobs.forEach(function(b) {
+    var g = c.createRadialGradient(b[0], b[1], 0, b[0], b[1], b[2]);
+    g.addColorStop(0, 'rgba(70,50,60,0.55)');
+    g.addColorStop(1, 'rgba(70,50,60,0)');
+    c.fillStyle = g;
+    c.fillRect(0, 0, 320, 220);
+  });
+  fogSprite = document.createElement('canvas');
+  fogSprite.width = 640; fogSprite.height = 240;
+  var f = fogSprite.getContext('2d');
+  for (var i = 0; i < 9; i++) {
+    var x = 130 + i * 47.5, y = 120 + (Math.random() - 0.5) * 30, r = 60 + Math.random() * 40;
+    var g2 = f.createRadialGradient(x, y, 0, x, y, r);
+    g2.addColorStop(0, 'rgba(252,249,245,0.6)');
+    g2.addColorStop(1, 'rgba(252,249,245,0)');
+    f.fillStyle = g2;
+    f.fillRect(0, 0, 640, 240);
+  }
+  speckSprite = document.createElement('canvas');
+  speckSprite.width = speckSprite.height = 32;
+  var sp = speckSprite.getContext('2d');
+  var g3 = sp.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g3.addColorStop(0, 'rgba(255,226,170,1)');
+  g3.addColorStop(0.25, 'rgba(255,190,120,0.6)');
+  g3.addColorStop(1, 'rgba(255,170,90,0)');
+  sp.fillStyle = g3;
+  sp.fillRect(0, 0, 32, 32);
+}
+
+function updateRain(dt) {
+  var c = S.condition;
+  var drizzle = c === 'drizzle';
+  var target = 0;
+  if (ENV.rainy) target = drizzle ? 60 * S.rainStreaks : Math.min(450, (20 + S.rainMm * 30) * S.rainStreaks);
+  target = Math.round(target);
+  while (streaks.length < target) {
+    var z = rnd(0.2, 1);
+    streaks.push({ x: Math.random() * W, y: Math.random() * H, z: z });
+  }
+  if (streaks.length > target) streaks.length = target;
+  var vx = ENV.windPx * 2.5;
+  for (var i = 0; i < streaks.length; i++) {
+    var s = streaks[i];
+    var spd = (700 + 600 * s.z) * (drizzle ? 0.6 : 1);
+    s.y += spd * dt;
+    s.x += vx * dt;
+    if (s.y > H) {
+      if (S.splashes && s.z > 0.6 && Math.random() < 0.5) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
+      s.y = -30 - Math.random() * 60;
+      s.x = Math.random() * (W + 200) - 100 - vx * 0.5;
+    }
+    if (s.x < -100) s.x += W + 200;
+    if (s.x > W + 100) s.x -= W + 200;
+  }
+  for (var j = splashes.length - 1; j >= 0; j--) {
+    splashes[j].t += dt;
+    if (splashes[j].t > 0.35) splashes.splice(j, 1);
+  }
+}
+function drawRain(ctx) {
+  if (!streaks.length && !splashes.length) return;
+  var drizzle = S.condition === 'drizzle';
+  var lenMul = (drizzle ? 0.6 : 1) * (1 + S.rainMm / 10);
+  var ang = Math.atan2(700, ENV.windPx * 2.5);
+  var cx = Math.cos(ang), cy = Math.sin(ang);
+  for (var pass = 0; pass < 2; pass++) {
+    ctx.beginPath();
+    for (var i = 0; i < streaks.length; i++) {
+      var s = streaks[i];
+      if ((s.z >= 0.6) !== (pass === 1)) continue;
+      var len = (10 + 18 * s.z) * lenMul;
+      ctx.moveTo(s.x, s.y);
+      ctx.lineTo(s.x - cx * len, s.y - cy * len);
+    }
+    ctx.strokeStyle = pass === 0 ? 'rgba(105,95,120,' + (drizzle ? 0.07 : 0.1) + ')' : 'rgba(105,95,120,' + (drizzle ? 0.12 : 0.18) + ')';
+    ctx.lineWidth = pass === 0 ? 0.8 : 1.1;
+    ctx.stroke();
+  }
+  ctx.lineWidth = 0.9;
+  for (var j = 0; j < splashes.length; j++) {
+    var sp = splashes[j], k = sp.t / 0.35, r = (7 + 5 * sp.z) * k;
+    ctx.strokeStyle = 'rgba(105,95,120,' + (0.35 * (1 - k)).toFixed(3) + ')';
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, r, r * 0.35, 0, 0, TAU);
+    ctx.stroke();
+  }
+}
+
+function updateSnow(dt, t) {
+  var target = ENV.snowing ? Math.round(60 * ENV.snowAmt) : 0;
+  while (flakes.length < target) flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, z: rnd(0.2, 1), ph: rnd(0, TAU) });
+  if (flakes.length > target) flakes.length = target;
+  for (var i = 0; i < flakes.length; i++) {
+    var f = flakes[i];
+    f.y += (40 + 40 * f.z) * dt;
+    f.x += (ENV.windPx * 0.6 * f.z + Math.sin(t * 1.2 + f.ph) * 14) * dt;
+    if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; }
+    if (f.x < -20) f.x += W + 40;
+    if (f.x > W + 20) f.x -= W + 40;
+  }
+}
+function drawSnow(ctx) {
+  for (var i = 0; i < flakes.length; i++) {
+    var f = flakes[i], r = 1.2 + 2.6 * f.z;
+    ctx.save();
+    ctx.translate(f.x, f.y);
+    ctx.rotate(f.ph);
+    ctx.strokeStyle = 'rgba(120,110,150,' + (0.25 + 0.3 * f.z).toFixed(3) + ')';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    for (var a = 0; a < 3; a++) {
+      var ca = Math.cos(a * PI / 3) * r * 1.6, sa = Math.sin(a * PI / 3) * r * 1.6;
+      ctx.moveTo(-ca, -sa); ctx.lineTo(ca, sa);
+    }
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.9)';
+    ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawSky(ctx, t) {
+  var Lt = ENV.light;
+  var a = S.skyTint * Lt.amt * 1.2;
+  if (a > 0.003) {
+    var g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, rgba(Lt.col, a));
+    g.addColorStop(1, rgba(Lt.col, a * 0.5));
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (Lt.dark > 0.01) {
+    ctx.fillStyle = 'rgba(35,40,70,' + (S.skyTint * Lt.dark * 0.35).toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  var wd = S.skyTint * (S.cloudCover / 100 * 0.1 + (ENV.rainy ? 0.06 : 0) + (S.condition === 'thunderstorm' ? 0.1 : 0));
+  if (wd > 0.003) {
+    ctx.fillStyle = 'rgba(70,64,82,' + wd.toFixed(3) + ')';
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (S.dawnGlow && Lt.phase === 'dawn') {
+    var k = 1 - Math.min(1, Math.abs(S.hour - ENV.sun.rise) / 1.2);
+    var rg = ctx.createRadialGradient(W * 0.3, H * 1.05, 0, W * 0.3, H * 1.05, Math.max(W, H) * 0.8);
+    rg.addColorStop(0, 'rgba(255,184,150,' + (0.22 * k).toFixed(3) + ')');
+    rg.addColorStop(1, 'rgba(255,184,150,0)');
+    ctx.fillStyle = rg;
+    ctx.fillRect(0, 0, W, H);
+  }
+}
+
+function drawMoon(ctx) {
+  if (!S.moon) return;
+  var h = S.hour, sun = ENV.sun;
+  var nightLen = 24 - (sun.set - sun.rise);
+  var since = h >= sun.set ? h - sun.set : h + 24 - sun.set;
+  if (since > nightLen) return;
+  var vis = smooth(0.2, 0.9, since) * smooth(0.2, 0.9, nightLen - since);
+  if (vis <= 0.01) return;
+  var u = since / nightLen;
+  var cx = W * lerp(0.82, 0.18, u), cy = H * (0.2 - 0.1 * Math.sin(u * PI)), r = 24;
+  var glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 4);
+  glow.addColorStop(0, 'rgba(255,240,215,' + (0.3 * vis).toFixed(3) + ')');
+  glow.addColorStop(1, 'rgba(255,240,215,0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(cx - r * 4, cy - r * 4, r * 8, r * 8);
+  ctx.fillStyle = 'rgba(255,248,232,' + (0.12 * vis).toFixed(3) + ')';
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
+  var ph = ENV.moon;
+  var waxing = ph < 0.5;
+  var k = Math.cos(ph * TAU);
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (!waxing) ctx.scale(-1, 1);
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -PI / 2, PI / 2, false);
+  ctx.ellipse(0, 0, r * Math.abs(k), r, 0, PI / 2, -PI / 2, k > 0);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,246,226,' + (0.75 * vis).toFixed(3) + ')';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawCloudShadows(ctx, dt) {
+  var a = 0.07 * S.cloudShadows * (S.cloudCover / 100) * (0.3 + 0.7 * ENV.light.daylight);
+  var drift = (ENV.windPx * 0.25 + 8) * dt;
+  for (var i = 0; i < cloudShadowsPos.length; i++) {
+    var c = cloudShadowsPos[i];
+    c.x += drift / W;
+    if (c.x > 1.3) c.x -= 2.2;
+    if (c.x < -0.9) c.x += 2.2;
+  }
+  if (a < 0.003) return;
+  ctx.globalAlpha = a / 0.55;
+  for (var j = 0; j < cloudShadowsPos.length; j++) {
+    var p = cloudShadowsPos[j];
+    ctx.drawImage(cloudSprite, p.x * W - W * 0.45, p.y * H, W * 0.9, H * 0.55);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawRays(ctx, t) {
+  var amt = ENV.sunAmt * S.lightRays;
+  if (amt < 0.01) return;
+  var sun = ENV.sun, h = S.hour;
+  var u = clamp((h - sun.rise) / (sun.set - sun.rise), 0, 1);
+  var golden = ENV.light.phase === 'golden' || ENV.light.phase === 'dawn' ? 1.6 : 1;
+  var ox = lerp(-0.15, 1.15, u) * W, oy = -0.25 * H;
+  var ang0 = Math.atan2(H * 0.9 - oy, W * 0.5 - ox);
+  var len = Math.sqrt(W * W + H * H) * 1.4;
+  var col = mixRgb(ENV.light.col, [255, 214, 150], 0.5);
+  for (var i = 0; i < 5; i++) {
+    var a = ang0 + (i - 2) * 0.12 + 0.05 * Math.sin(t * 0.07 + i * 1.7);
+    var w = 0.035 + 0.03 * noise1(t * 0.05 + i * 3.1);
+    var alpha = 0.06 * amt * golden * (0.6 + 0.4 * Math.sin(t * 0.3 + i));
+    var ex = ox + Math.cos(a) * len, ey = oy + Math.sin(a) * len;
+    var g = ctx.createLinearGradient(ox, oy, ex, ey);
+    g.addColorStop(0, rgba(col, alpha * 0.2));
+    g.addColorStop(0.35, rgba(col, alpha));
+    g.addColorStop(1, rgba(col, 0));
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.moveTo(ox, oy);
+    ctx.lineTo(ox + Math.cos(a - w) * len, oy + Math.sin(a - w) * len);
+    ctx.lineTo(ox + Math.cos(a + w) * len, oy + Math.sin(a + w) * len);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawFog(ctx, dt) {
+  var f = ENV.fog * S.fogHaze;
+  for (var i = 0; i < fogBands.length; i++) {
+    var b = fogBands[i];
+    b.x += (ENV.windPx * 0.15 + 6 * b.s) * dt / W;
+    if (b.x > 1.2) b.x -= 2.4;
+    if (b.x < -1.2) b.x += 2.4;
+  }
+  if (f < 0.01) return;
+  ctx.fillStyle = 'rgba(250,247,243,' + (f * 0.25).toFixed(3) + ')';
+  ctx.fillRect(0, 0, W, H);
+  ctx.globalAlpha = clamp(f * 0.9, 0, 1);
+  for (var j = 0; j < fogBands.length; j++) {
+    var p = fogBands[j];
+    var bw = W * 1.6 * p.s, bh = H * 0.6 * p.s;
+    ctx.drawImage(fogSprite, p.x * W - bw * 0.3, p.y * H - bh / 2, bw, bh);
+    ctx.drawImage(fogSprite, p.x * W - bw * 0.3 - bw, p.y * H - bh / 2, bw, bh);
+  }
+  ctx.globalAlpha = 1;
+}
+
+var birdNext = 0;
+function sendBirds() {
+  var dir = Math.random() < 0.5 ? -1 : 1;
+  var n = 3 + Math.floor(Math.random() * 5);
+  var y0 = H * rnd(0.08, 0.35), spd = rnd(40, 70), size = rnd(7, 11);
+  for (var i = 0; i < n; i++) {
+    var row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+    birds.push({
+      x: (dir > 0 ? -40 : W + 40) - dir * row * 22, y: y0 + side * row * 12,
+      vx: dir * spd * rnd(0.95, 1.05), s: size * rnd(0.85, 1.1), ph: rnd(0, TAU), f: rnd(6, 9)
+    });
+  }
+}
+function updateBirds(dt, t) {
+  if (S.birds && t > birdNext && (ENV.phase === 'dawn' || ENV.phase === 'dusk' || ENV.phase === 'golden' || ENV.phase === 'morning')) {
+    if (birdNext > 0) sendBirds();
+    birdNext = t + rnd(45, 140);
+  }
+  for (var i = birds.length - 1; i >= 0; i--) {
+    var b = birds[i];
+    b.x += b.vx * dt;
+    b.y += Math.sin(t * 0.8 + b.ph) * 4 * dt;
+    if (b.x < -120 || b.x > W + 120) birds.splice(i, 1);
+  }
+}
+function drawBirds(ctx, t) {
+  if (!birds.length) return;
+  ctx.strokeStyle = 'rgba(80,55,60,0.38)';
+  ctx.lineWidth = 1.4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  for (var i = 0; i < birds.length; i++) {
+    var b = birds[i], w = Math.sin(t * b.f + b.ph), s = b.s;
+    ctx.moveTo(b.x - s, b.y - w * s * 0.5);
+    ctx.quadraticCurveTo(b.x - s * 0.5, b.y - w * s, b.x, b.y);
+    ctx.quadraticCurveTo(b.x + s * 0.5, b.y - w * s, b.x + s, b.y - w * s * 0.5);
+  }
+  ctx.stroke();
+}
+
+function updateSpecks(dt, t) {
+  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk')) ? 24 : 0;
+  while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11) });
+  if (specks.length > target) specks.length = target;
+  for (var i = 0; i < specks.length; i++) {
+    var p = specks[i];
+    p.x += ((noise1(p.s + t * 0.15) - 0.5) * 40 + ENV.windPx * 0.15) * dt;
+    p.y += (noise1(p.s + 50 + t * 0.15) - 0.5) * 30 * dt;
+    if (p.x < -20) p.x += W + 40;
+    if (p.x > W + 20) p.x -= W + 40;
+    if (p.y < -20) p.y += H + 40;
+    if (p.y > H + 20) p.y -= H + 40;
+  }
+}
+function drawSpecks(ctx, t) {
+  for (var i = 0; i < specks.length; i++) {
+    var p = specks[i];
+    var a = 0.15 + 0.55 * noise1(p.s * 3 + t * 0.9);
+    ctx.globalAlpha = a;
+    ctx.drawImage(speckSprite, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* Akatombo (red dragonfly): darts, hovers, darts again, then leaves. */
+var dragonflyNext = 0;
+function sendDragonfly() {
+  var fromLeft = Math.random() < 0.5;
+  dragonfly = {
+    x: fromLeft ? -40 : W + 40, y: H * rnd(0.15, 0.6), heading: fromLeft ? 0 : PI,
+    state: 'dash', tx: W * rnd(0.2, 0.8), ty: H * rnd(0.15, 0.65), hoverT: 0, legs: 3 + Math.floor(Math.random() * 4), t: 0
+  };
+}
+function updateDragonfly(dt, t) {
+  var okWeather = (S.condition === 'clear' || S.condition === 'clouds') && S.temperature >= 14 && S.hour >= 10 && S.hour <= 17;
+  if (!dragonfly && S.dragonfly && okWeather && t > dragonflyNext) {
+    if (dragonflyNext > 0) sendDragonfly();
+    dragonflyNext = t + rnd(60, 180);
+  }
+  var d = dragonfly;
+  if (!d) return;
+  d.t += dt;
+  if (d.state === 'dash') {
+    var dx = d.tx - d.x, dy = d.ty - d.y, dist = Math.sqrt(dx * dx + dy * dy);
+    var sp = Math.min(520, dist * 6);
+    if (dist > 0.5) {
+      d.x += dx / dist * sp * dt; d.y += dy / dist * sp * dt;
+      d.heading += angDiff(Math.atan2(dy, dx), d.heading) * (1 - Math.exp(-dt * 10));
+    }
+    if (dist < 4) {
+      if (d.legs <= 0) { dragonfly = null; return; }
+      d.state = 'hover'; d.hoverT = rnd(0.5, 1.6);
+    }
+  } else {
+    d.hoverT -= dt;
+    d.x += Math.sin(d.t * 7) * 6 * dt;
+    d.y += Math.cos(d.t * 9) * 6 * dt;
+    if (d.hoverT <= 0) {
+      d.legs--;
+      d.state = 'dash';
+      if (d.legs <= 0) { d.tx = d.x < W / 2 ? -80 : W + 80; d.ty = d.y + rnd(-100, 100); }
+      else { d.tx = clamp(d.x + rnd(-400, 400), 40, W - 40); d.ty = clamp(d.y + rnd(-250, 250), H * 0.1, H * 0.7); }
+    }
+  }
+  if (d.x < -150 || d.x > W + 150) dragonfly = null;
+}
+function drawDragonfly(ctx, t) {
+  var d = dragonfly;
+  if (!d) return;
+  ctx.save();
+  ctx.translate(d.x, d.y);
+  ctx.rotate(d.heading);
+  ctx.scale(1.1, 1.1);
+  var flap = Math.sin(t * 90) * 0.15;
+  ctx.fillStyle = 'rgba(255,255,255,0.32)';
+  ctx.strokeStyle = 'rgba(90,60,60,0.3)';
+  ctx.lineWidth = 0.6;
+  [[10, -80 + flap * 60, 22, 4.5], [10, 80 - flap * 60, 22, 4.5], [6, -100 - flap * 60, 21, 5.5], [6, 100 + flap * 60, 21, 5.5]].forEach(function(w) {
+    ctx.save();
+    ctx.translate(w[0], 0);
+    ctx.rotate(w[1] * DEG);
+    ctx.beginPath();
+    ctx.ellipse(w[2] / 2, 0, w[2] / 2, w[3] / 2, 0, 0, TAU);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
+  ctx.strokeStyle = '#c4361e';
+  ctx.lineCap = 'round';
+  for (var i = 0; i < 6; i++) {
+    ctx.lineWidth = 2.6 - i * 0.18;
+    ctx.beginPath();
+    ctx.moveTo(6 - i * 6, 0);
+    ctx.lineTo(1 - i * 6, 0);
+    ctx.stroke();
+  }
+  ctx.fillStyle = '#a8321f';
+  ctx.beginPath(); ctx.ellipse(10, 0, 5, 3.2, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#7a2a1c';
+  ctx.beginPath(); ctx.arc(16, 0, 3.2, 0, TAU); ctx.fill();
+  ctx.restore();
+}
+
+/* ============================================================
+   9. CANVAS, SPAWNING, MAIN LOOP
+   ============================================================ */
+var canvas = document.getElementById('dynCanvas');
+var ctx = canvas.getContext('2d');
+var W = 0, H = 0;
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  PR = (window.devicePixelRatio || 1) * S.renderScale;
+  canvas.width = Math.round(W * PR);
+  canvas.height = Math.round(H * PR);
+  lookVersion++;
+}
+window.addEventListener('resize', resize);
+
+var flurryQueue = [];
+var heroNext = 0;
+function spawnRate(t) {
+  var timeMul = { night: 0.5, dawn: 0.8, morning: 1, day: 1.2, golden: 1.05, dusk: 0.9 }[ENV.phase] || 1;
+  var weatherMul = 1 + ENV.windMs / 6;
+  if (ENV.rainy) weatherMul *= 1.1;
+  if (S.condition === 'snow') weatherMul *= 0.5;
+  var lull = 1 - S.lulls * smooth(0.55, 0.85, noise1(t / 18 + 7.3));
+  return 1.1 * S.density * timeMul * weatherMul * lull;
+}
+function spawnTick(dt, t) {
+  var rate = spawnRate(t);
+  var n = rate * dt;
+  while (n > 0) { if (Math.random() < n) spawnLeaf(); n -= 1; }
+  if (Math.random() < S.flurries * 0.06 * dt * S.density) {
+    var x0 = Math.random() * W, k = 3 + Math.floor(Math.random() * 4);
+    for (var i = 0; i < k; i++) flurryQueue.push({ at: t + Math.random() * 1.5, x: x0 + rnd(-80, 80) });
+  }
+  for (var j = flurryQueue.length - 1; j >= 0; j--) {
+    if (flurryQueue[j].at <= t) {
+      spawnLeaf({ x: flurryQueue[j].x - ENV.windPx * 2, y: -40 - Math.random() * 30 });
+      flurryQueue.splice(j, 1);
+    }
+  }
+  if (Math.random() < S.gustiness * (0.012 + ENV.windMs * 0.008) * dt) startGust(false);
+  if (S.condition === 'thunderstorm' && S.lightning) {
+    if (lightningNext === 0) lightningNext = t + rnd(8, 25);
+    if (t > lightningNext) { strikeLightning(); lightningNext = t + rnd(8, 25); }
+  }
+  if (S.heroLeaf && !hero) {
+    if (heroNext === 0) heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4);
+    if (t > heroNext) { sendHero(); heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4); }
+  }
+}
+function sendHero() {
+  hero = makeLeaf({ hero: true, z: 1.35 });
+  hero.x = W * rnd(0.15, 0.85);
+  hero.y = -hero.size * 1.3;
+  setMode(hero, 'flutter');
+  hero.swayAmp = rnd(60, 110) * S.sway;
+  hero.sf = rnd(0.9, 1.3);
+  bakeLeaf(hero);
+}
+
+function leafAlpha(L, t) {
+  var zc = clamp(L.z, 0, 1);
+  var a = L.hero ? 0.78 : lerp(S.farOpacity, S.nearOpacity, zc);
+  a *= Math.min(1, L.age / 0.6);
+  if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
+  if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
+  return clamp(a, 0, 1);
+}
+function drawLeaf(L, t, inPile) {
+  if (!L.spr) return;
+  var sx, sy, rot = L.rot, x = L.x + (inPile ? 0 : L.so), y = L.y, spr;
+  if (inPile) {
+    sx = L.pileSx; sy = L.pileSy; spr = L.pileFace ? L.spr : L.back;
+  } else {
+    var f = Math.min(1, S.flip3d), c = Math.cos(L.phi);
+    sx = lerp(1, c, f);
+    if (Math.abs(sx) < 0.06) sx = sx < 0 ? -0.06 : 0.06;
+    sy = 1 - 0.18 * f * (0.5 + 0.5 * Math.sin(L.phi * 0.7 + (L.seed % 10)));
+    spr = c >= 0 || f < 0.05 ? L.spr : L.back;
+  }
+  var cs = Math.cos(rot), sn = Math.sin(rot);
+  ctx.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, y * PR);
+  ctx.globalAlpha = inPile ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  ctx.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
+}
+
+var lastT = 0, envTimer = 0, uiTimer = 0, lastLookKey = '', lastDate = '';
+var fps = 60, rebakeIdx = 0;
+var veil = document.getElementById('flashVeil');
+
+function lookKey() {
+  var Lt = ENV.light;
+  return [Math.round(Lt.amt * 40), Math.round(Lt.dark * 40), Lt.col.map(function(v) { return Math.round(v / 12); }).join('.'),
+          Math.round(ENV.wet * 10), Math.round(ENV.frost * 10), Math.round(ENV.fog * 20), Math.round(ENV.season * 40)].join('|');
+}
+
+function advanceClock(dt) {
+  if (S.liveTime) {
+    var n = tokyoNow();
+    S.hour = n.hour; S.date = n.date;
+  } else {
+    S.hour += dt * S.timeLapse / 3600;
+    while (S.hour >= 24) { S.hour -= 24; S.date = addDays(S.date, 1); }
+  }
+  if (lastDate && S.date !== lastDate && S.pileClearMidnight) pile.length = 0;
+  lastDate = S.date;
+}
+
+function frame(ms) {
+  var t = ms / 1000;
+  var dt = lastT ? Math.min(0.05, t - lastT) : 0.016;
+  lastT = t;
+  fps += ((1 / Math.max(dt, 0.001)) - fps) * 0.05;
+
+  advanceClock(dt);
+  envTimer -= dt;
+  if (envTimer <= 0) {
+    computeEnv();
+    envTimer = 0.25;
+    var k = lookKey();
+    if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
+  }
+
+  spawnTick(dt, t);
+  updateGusts(dt);
+  for (var i = leaves.length - 1; i >= 0; i--) {
+    var L = leaves[i];
+    updateLeaf(L, dt, t);
+    var landY = H - L.groundY;
+    if (S.pile && L.z > 0.3 && L.y >= landY && L.vy > 0 && Math.random() < 0.7) {
+      leaves.splice(i, 1);
+      settleLeaf(L);
+      continue;
+    }
+    if (L.y > H + L.size * 1.5 || L.x < -W * 0.4 - 200 || L.x > W * 1.4 + 200) leaves.splice(i, 1);
+  }
+  if (hero) {
+    updateLeaf(hero, dt, t);
+    if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
+  }
+  updateRain(dt);
+  updateSnow(dt, t);
+  updateBirds(dt, t);
+  updateSpecks(dt, t);
+  updateDragonfly(dt, t);
+
+  // re-draw a few leaf sprites per frame when the look changed
+  var budget = 10, all = leaves.concat(pile);
+  if (hero) all.push(hero);
+  for (var b = 0; b < all.length && budget > 0; b++) {
+    var Lb = all[(rebakeIdx + b) % all.length];
+    if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
+  }
+  rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
+
+  // ---- draw ----
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  drawSky(ctx, t);
+  drawMoon(ctx);
+  drawCloudShadows(ctx, dt);
+  drawRays(ctx, t);
+  drawBirds(ctx, t);
+  var split = 0;
+  while (split < leaves.length && leaves[split].z < 0.5) split++;
+  for (var f = 0; f < split; f++) drawLeaf(leaves[f], t, false);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawFog(ctx, dt);
+  for (var n = split; n < leaves.length; n++) drawLeaf(leaves[n], t, false);
+  for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawDragonfly(ctx, t);
+  drawSnow(ctx);
+  drawRain(ctx);
+  if (hero) { drawLeaf(hero, t, false); ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1; }
+  drawSpecks(ctx, t);
+
+  var flashA = 0;
+  for (var q = flashes.length - 1; q >= 0; q--) {
+    var age = t - flashes[q].at;
+    if (age < 0) continue;
+    if (age > 0.4) { flashes.splice(q, 1); continue; }
+    flashA = Math.max(flashA, flashes[q].a * (1 - age / 0.4));
+  }
+  if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
+  veil.style.opacity = (flashA * 0.35).toFixed(3);
+
+  uiTimer -= dt;
+  if (uiTimer <= 0) { uiTimer = 0.5; updateUiLive(); }
+  requestAnimationFrame(frame);
+}
+
+/* ============================================================
+   10. TAP & SWIPE WIND, PANEL SWIPE
+   ============================================================ */
+var ptr = null;
+function inDrawer(e) { return e.target && e.target.closest && e.target.closest('#tunerDrawer'); }
+window.addEventListener('pointerdown', function(e) {
+  if (inDrawer(e)) return;
+  ptr = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
+});
+window.addEventListener('pointermove', function(e) {
+  if (!ptr) return;
+  var now = performance.now(), dts = Math.max(0.008, (now - ptr.t) / 1000);
+  var dx = e.clientX - ptr.x, dy = e.clientY - ptr.y;
+  ptr.moved += Math.abs(dx) + Math.abs(dy);
+  if (S.tapWind) {
+    var vx = clamp(dx / dts, -2500, 2500), vy = clamp(dy / dts, -2500, 2500);
+    pushAround(e.clientX, e.clientY, 200, vx * 0.06 * S.tapStrength, vy * 0.06 * S.tapStrength, 0, 0.15 * S.tapStrength);
+  }
+  ptr.x = e.clientX; ptr.y = e.clientY; ptr.t = now;
+});
+window.addEventListener('pointerup', function(e) {
+  if (!ptr) return;
+  var dx = e.clientX - ptr.x0, dy = e.clientY - ptr.y0;
+  if (ptr.moved < 12 && S.tapWind) {
+    pushAround(e.clientX, e.clientY, 180, 0, -30 * S.tapStrength, 160 * S.tapStrength, 0.7);
+  } else if (Math.abs(dx) > 70 && Math.abs(dx) > Math.abs(dy)) {
+    setSetting('panel', dx < 0 ? '2' : '1');
+  }
+  ptr = null;
+});
+window.addEventListener('pointercancel', function() { ptr = null; });
+
+/* ============================================================
+   11. MESSAGE PANELS (real panel-1.html / panel-2.html text)
+   ============================================================ */
+var FALLBACK_PANELS = {
+  1: 'シンガポールから参りました、Eze（エズ）と申します。\nお読みいただきたいメッセージを用意してまいりました。急ぎませんので、どうぞごゆっくりお読みになってください。\n本日はよろしくお願いいたします。',
+  2: '今日は初めて担当していただくセラピストさんですが、\nとてもお綺麗で、素敵な方だと感じております。\n\nお会いできて嬉しく思っております。'
+};
+var segmenterJa = (typeof Intl !== 'undefined' && Intl.Segmenter) ? new Intl.Segmenter('ja', { granularity: 'word' }) : null;
+function isJapanesePunctuation(ch) { return ch === '、' || ch === '。' || ch === '！' || ch === '？'; }
+function chunkPanelText(text) {
+  var clean = String(text).replace(/\s+/g, '');
+  if (clean === '' || !segmenterJa) return [clean];
+  var segments = Array.from(segmenterJa.segment(clean), function(s) { return s.segment; });
+  var chunks = [], cur = '', len = 0;
+  for (var i = 0; i < segments.length; i++) {
+    var seg = segments[i], segLen = Array.from(seg).length;
+    if (len >= 5 && (len + segLen) > 10) { chunks.push(cur); cur = ''; len = 0; }
+    if (isJapanesePunctuation(seg) && len === 0 && chunks.length > 0) { chunks[chunks.length - 1] += seg; continue; }
+    cur += seg; len += segLen;
+    if (isJapanesePunctuation(seg) && len >= 5) { chunks.push(cur); cur = ''; len = 0; }
+  }
+  if (cur !== '') {
+    if (chunks.length > 0 && len < 5) chunks[chunks.length - 1] += cur;
+    else chunks.push(cur);
+  }
+  return chunks;
+}
+function renderPanel(n, raw) {
+  var anchor = document.getElementById('panel' + n + 'Body');
+  var text = String(raw).replace(/\r\n?/g, '\n').trim();
+  anchor.innerHTML = '';
+  text.split(/\n{2,}/).forEach(function(para) {
+    var p = document.createElement('p');
+    para.split('\n').forEach(function(line, li) {
+      if (li > 0) p.appendChild(document.createElement('br'));
+      chunkPanelText(line.trim()).forEach(function(c) {
+        var sp = document.createElement('span');
+        sp.className = 'panel-phrase';
+        sp.textContent = c;
+        p.appendChild(sp);
+      });
+    });
+    anchor.appendChild(p);
+  });
+  if (String(S.panel) === String(n)) replayPhrases();
+}
+function replayPhrases() {
+  var phrases = document.querySelectorAll('.panel[data-panel="' + S.panel + '"] .panel-phrase');
+  phrases.forEach(function(el) {
+    el.classList.remove('shown');
+    el.style.setProperty('--phrase-start-x', ((Math.random() < 0.5 ? -1 : 1) * 30) + 'px');
+  });
+  void document.body.offsetWidth;
+  phrases.forEach(function(el, i) {
+    setTimeout(function() { el.classList.add('shown'); }, 250 + i * 90 + Math.random() * 120);
+  });
+}
+function showPanel() {
+  var idx = S.panel === '2' ? 1 : 0;
+  document.getElementById('track').style.transform = 'translateX(' + (-50 * idx) + '%)';
+  document.querySelectorAll('.stage .panel').forEach(function(p, i) { p.classList.toggle('active', i === idx); });
+  document.querySelectorAll('#dots .dot').forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  replayPhrases();
+}
+[1, 2].forEach(function(n) {
+  fetch('panel-' + n + '.html')
+    .then(function(r) { if (!r.ok) throw new Error(); return r.text(); })
+    .then(function(txt) { renderPanel(n, txt); })
+    .catch(function() { renderPanel(n, FALLBACK_PANELS[n]); });
+});
+
+/* ============================================================
+   12. LIVE NAGOYA WEATHER (Open-Meteo)
+   ============================================================ */
+var weatherStatus = 'Not loaded yet';
+function weatherBucket(code) {
+  if (code === 0) return 'clear';
+  if (code === 1 || code === 2 || code === 3) return 'clouds';
+  if (code === 45 || code === 48) return 'fog';
+  if (code >= 51 && code <= 57) return 'drizzle';
+  if (code >= 61 && code <= 67) return 'rain';
+  if (code >= 71 && code <= 77) return 'snow';
+  if (code >= 80 && code <= 82) return 'rain';
+  if (code === 85 || code === 86) return 'snow';
+  if (code >= 95) return 'thunderstorm';
+  return 'clear';
+}
+var WEATHER_EMOJI = { clear: '☀', clouds: '☁', fog: '🌫', drizzle: '🌦', rain: '🌧', snow: '❄', thunderstorm: '⛈' };
+var WEATHER_JA = { clear: '晴れ', clouds: 'くもり', fog: '霧', drizzle: '霧雨', rain: '雨', snow: '雪', thunderstorm: '雷雨' };
+function fetchLiveWeather() {
+  weatherStatus = 'Loading…';
+  var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
+            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation' +
+            '&wind_speed_unit=ms&timezone=Asia%2FTokyo';
+  fetch(url).then(function(r) { return r.json(); }).then(function(data) {
+    var c = data && data.current;
+    if (!c || !S.liveWeather) return;
+    S.condition = weatherBucket(c.weather_code);
+    S.temperature = Math.round(c.temperature_2m);
+    S.windSpeed = Math.round(c.wind_speed_10m * 2) / 2;
+    S.windDir = Math.round(c.wind_direction_10m / 5) * 5 % 360;
+    S.gustiness = clamp(Math.round(((c.wind_gusts_10m - c.wind_speed_10m) / 8) * 20) / 20, 0.1, 1);
+    S.cloudCover = Math.round(c.cloud_cover / 5) * 5;
+    S.rainMm = Math.round(c.precipitation * 5) / 5;
+    S.fogDensity = S.condition === 'fog' ? 0.7 : 0;
+    var n = tokyoNow(), hh = Math.floor(n.hour), mm = Math.floor((n.hour - hh) * 60);
+    weatherStatus = 'Live at ' + hh + ':' + ('0' + mm).slice(-2) + ' — ' + WEATHER_JA[S.condition] + ' ' + S.temperature + '°C, wind ' +
+                    S.windSpeed + ' m/s from ' + dirName(S.windDir) + ', clouds ' + S.cloudCover + '%';
+    WEATHER_KEYS.forEach(refreshControl);
+    computeEnv();
+    scheduleSave();
+  }).catch(function() { weatherStatus = 'Could not reach Open-Meteo. Using the sliders below.'; });
+}
+setInterval(function() { if (S.liveWeather) fetchLiveWeather(); }, 10 * 60 * 1000);
+
+var PRESETS = {
+  clear:        { cloudCover: 10,  rainMm: 0,   fogDensity: 0,    windSpeed: 2.5, gustiness: 0.35 },
+  clouds:       { cloudCover: 75,  rainMm: 0,   fogDensity: 0,    windSpeed: 3,   gustiness: 0.4 },
+  fog:          { cloudCover: 90,  rainMm: 0,   fogDensity: 0.75, windSpeed: 0.8, gustiness: 0.1 },
+  drizzle:      { cloudCover: 95,  rainMm: 0.8, fogDensity: 0.2,  windSpeed: 2,   gustiness: 0.3 },
+  rain:         { cloudCover: 100, rainMm: 5,   fogDensity: 0.1,  windSpeed: 4,   gustiness: 0.5 },
+  snow:         { cloudCover: 95,  rainMm: 1,   fogDensity: 0.1,  windSpeed: 3,   gustiness: 0.3, temperature: 1 },
+  thunderstorm: { cloudCover: 100, rainMm: 9,   fogDensity: 0,    windSpeed: 8,   gustiness: 0.9 }
+};
+
+/* ============================================================
+   13. CONTROLS
+   ============================================================ */
+function fmtHour(v) { var h = Math.floor(v), m = Math.floor((v - h) * 60); return h + ':' + ('0' + m).slice(-2); }
+function dirName(d) {
+  var n = ['N 北', 'NE 北東', 'E 東', 'SE 南東', 'S 南', 'SW 南西', 'W 西', 'NW 北西'];
+  return n[Math.round(((d % 360) + 360) % 360 / 45) % 8];
+}
+function seasonName(p) {
+  if (p < 0.15) return 'still green';
+  if (p < 0.35) return 'green → yellow';
+  if (p < 0.6) return 'turning orange';
+  if (p < 0.85) return 'peak red';
+  return 'late, browning';
+}
+var x2 = function(v) { return v.toFixed(2) + '×'; };
+var f2 = function(v) { return v.toFixed(2); };
+var px = function(v) { return v.toFixed(2) + 'px'; };
+
+var SPEC = [
+  { sec: 'Time & date 時間' },
+  { k: 'liveTime', t: 'check', label: 'Use the real time in Nagoya' },
+  { k: 'hour', t: 'range', label: 'Time of day', min: 0, max: 23.95, step: 0.05, fmt: fmtHour },
+  { k: 'date', t: 'date', label: 'Date (sets how far autumn has turned)' },
+  { k: 'timeLapse', t: 'select', label: 'Clock speed', opts: [['1', 'Normal'], ['60', '1 minute per second'], ['600', '10 minutes per second'], ['3600', '1 hour per second']] },
+  { info: 'sunInfo' },
+  { sec: 'Weather 天気' },
+  { k: 'liveWeather', t: 'check', label: 'Use live Nagoya weather (Open-Meteo)' },
+  { info: 'weatherInfo' },
+  { k: 'condition', t: 'select', label: 'Weather', opts: [['clear', '☀ Clear 晴れ'], ['clouds', '☁ Cloudy くもり'], ['fog', '🌫 Fog 霧'], ['drizzle', '🌦 Drizzle 霧雨'], ['rain', '🌧 Rain 雨'], ['snow', '❄ Snow 雪'], ['thunderstorm', '⛈ Thunderstorm 雷雨']] },
+  { k: 'windSpeed', t: 'range', label: 'Wind speed', min: 0, max: 20, step: 0.5, fmt: function(v) { return v.toFixed(1) + ' m/s'; } },
+  { k: 'windDir', t: 'range', label: 'Wind comes from', min: 0, max: 355, step: 5, fmt: function(v) { return v + '° ' + dirName(v); } },
+  { k: 'gustiness', t: 'range', label: 'Gustiness', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'temperature', t: 'range', label: 'Temperature', min: -5, max: 32, step: 1, fmt: function(v) { return v + '°C'; } },
+  { k: 'cloudCover', t: 'range', label: 'Cloud cover', min: 0, max: 100, step: 5, fmt: function(v) { return v + '%'; } },
+  { k: 'rainMm', t: 'range', label: 'Rain / snow amount', min: 0, max: 12, step: 0.2, fmt: function(v) { return v.toFixed(1) + ' mm/h'; } },
+  { k: 'fogDensity', t: 'range', label: 'Fog', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { sec: 'Leaves 落ち葉' },
+  { k: 'density', t: 'range', label: 'How many leaves fall', min: 0, max: 3, step: 0.05, fmt: x2 },
+  { k: 'maxLeaves', t: 'range', label: 'Most leaves on screen at once', min: 10, max: 160, step: 5, fmt: String },
+  { k: 'sizeScale', t: 'range', label: 'Leaf size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
+  { k: 'fallSpeed', t: 'range', label: 'Fall speed', min: 0.3, max: 2.5, step: 0.05, fmt: x2 },
+  { k: 'sway', t: 'range', label: 'Side-to-side sway', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'flip3d', t: 'range', label: 'Turning over (3D flip)', min: 0, max: 1.5, step: 0.05, fmt: f2 },
+  { k: 'shapeVariation', t: 'range', label: 'Shape variety', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'wear', t: 'range', label: 'Bites, tears and spots', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'flurries', t: 'range', label: 'Sudden small flurries', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'lulls', t: 'range', label: 'Quiet spells with no leaves', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { sec: 'Leaf kinds 種類' },
+  { k: 'speciesMode', t: 'select', label: 'Mix of leaf kinds', opts: [['auto', 'Follow the date'], ['manual', 'Use the sliders below']] },
+  { info: 'speciesInfo' },
+  { k: 'wMomiji', t: 'range', label: 'Momiji (maple)', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'wGinkgo', t: 'range', label: 'Ginkgo (ichō)', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'wOak', t: 'range', label: 'Oak (konara)', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'wKeyaki', t: 'range', label: 'Zelkova (keyaki)', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { sec: 'Colour 色' },
+  { k: 'colorMode', t: 'select', label: 'Leaf colour stage', opts: [['auto', 'Follow the date'], ['manual', 'Use the slider below']] },
+  { k: 'colorProgress', t: 'range', label: 'Autumn stage', min: 0, max: 1, step: 0.01, fmt: function(v) { return v.toFixed(2) + ' ' + seasonName(v); } },
+  { k: 'colorVariety', t: 'range', label: 'Colour variety between leaves', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'paletteBlend', t: 'range', label: 'Natural colours ↔ site palette', min: 0, max: 1, step: 0.05, fmt: function(v) { return Math.round((1 - v) * 100) + ' / ' + Math.round(v * 100); } },
+  { k: 'lightTint', t: 'range', label: 'Leaves take on the light', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'skyTint', t: 'range', label: 'Background takes on the light', min: 0, max: 1.5, step: 0.05, fmt: f2 },
+  { sec: 'Depth & focus' },
+  { k: 'depthSpread', t: 'range', label: 'Depth range (far ↔ near)', min: 0.2, max: 1, step: 0.05, fmt: f2 },
+  { k: 'farBlur', t: 'range', label: 'Blur of far leaves', min: 0, max: 8, step: 0.25, fmt: px },
+  { k: 'nearBlur', t: 'range', label: 'Blur of near leaves', min: 0, max: 4, step: 0.25, fmt: px },
+  { k: 'farOpacity', t: 'range', label: 'Strength of far leaves', min: 0.05, max: 0.8, step: 0.01, fmt: f2 },
+  { k: 'nearOpacity', t: 'range', label: 'Strength of near leaves', min: 0.1, max: 1, step: 0.01, fmt: f2 },
+  { sec: 'Weather effects' },
+  { k: 'rainStreaks', t: 'range', label: 'Rain streaks', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'splashes', t: 'check', label: 'Splash rings at the bottom' },
+  { k: 'lightRays', t: 'range', label: 'Sun rays', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'sunFlicker', t: 'range', label: 'Sunlight flicker on leaves', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'cloudShadows', t: 'range', label: 'Cloud shadows', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'fogHaze', t: 'range', label: 'Fog haze', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'lightning', t: 'check', label: 'Lightning in thunderstorms' },
+  { k: 'frost', t: 'check', label: 'Frosty edges below 5°C' },
+  { k: 'snowMix', t: 'check', label: 'First snowflakes below 3°C' },
+  { sec: 'Time-of-day extras' },
+  { k: 'moon', t: 'check', label: 'Moon at night (real phase)' },
+  { k: 'birds', t: 'check', label: 'Distant birds at dawn and dusk' },
+  { k: 'nightSpecks', t: 'check', label: 'Glowing specks at night' },
+  { k: 'dawnGlow', t: 'check', label: 'Warm glow at dawn' },
+  { sec: 'Surprises' },
+  { k: 'heroLeaf', t: 'check', label: 'One leaf falls close and in focus' },
+  { k: 'heroEvery', t: 'range', label: 'About every', min: 0.5, max: 60, step: 0.5, fmt: function(v) { return v + ' min'; } },
+  { k: 'pile', t: 'check', label: 'Leaves pile up at the bottom' },
+  { k: 'pileMax', t: 'range', label: 'Most leaves in the pile', min: 0, max: 200, step: 5, fmt: String },
+  { k: 'pileClearMidnight', t: 'check', label: 'Pile is swept clean at midnight' },
+  { k: 'dragonfly', t: 'check', label: 'Red dragonfly on warm sunny afternoons' },
+  { k: 'tapWind', t: 'check', label: 'Tap or swipe moves the leaves' },
+  { k: 'tapStrength', t: 'range', label: 'Tap / swipe strength', min: 0, max: 3, step: 0.1, fmt: x2 },
+  { buttons: [['Leaf up close', 'hero'], ['Gust of wind', 'gust'], ['Lightning', 'lightning'], ['Dragonfly', 'dragonfly'], ['Birds', 'birds'], ['Clear the pile', 'clearPile']] },
+  { sec: 'Message panels' },
+  { k: 'panel', t: 'select', label: 'Panel shown', opts: [['1', 'Panel 1 — 自己紹介'], ['2', 'Panel 2 — メッセージ']] },
+  { k: 'showText', t: 'check', label: 'Show panel text' },
+  { buttons: [['Replay text', 'replay']] },
+  { sec: 'Performance' },
+  { k: 'renderScale', t: 'range', label: 'Drawing sharpness', min: 0.4, max: 1, step: 0.05, fmt: f2 },
+  { k: 'showStats', t: 'check', label: 'Show frame rate' }
+];
+var SPEC_BY_KEY = {};
+SPEC.forEach(function(s) { if (s.k) SPEC_BY_KEY[s.k] = s; });
+var WEATHER_KEYS = ['condition', 'windSpeed', 'windDir', 'gustiness', 'temperature', 'cloudCover', 'rainMm', 'fogDensity'];
+var LOOK_KEYS = ['colorMode', 'colorProgress', 'colorVariety', 'paletteBlend', 'lightTint', 'farBlur', 'nearBlur'];
+var GEOM_KEYS = ['shapeVariation', 'wear'];
+
+var ACTIONS = {
+  hero: function() { sendHero(); },
+  gust: function() { computeEnv(); startGust(true); },
+  lightning: function() { strikeLightning(); },
+  dragonfly: function() { sendDragonfly(); },
+  birds: function() { sendBirds(); },
+  clearPile: function() { pile.length = 0; },
+  replay: function() { replayPhrases(); }
+};
+
+function buildControls() {
+  var body = document.getElementById('tunerBody');
+  body.innerHTML = '';
+  var note = document.createElement('div');
+  note.className = 'tuner-info';
+  note.id = 'motionNote';
+  note.style.display = 'none';
+  note.textContent = 'This tablet has "Reduce motion" turned on. The real app hides the leaves then; this preview keeps them moving so you can test.';
+  body.appendChild(note);
+  SPEC.forEach(function(it) {
+    var el;
+    if (it.sec) {
+      el = document.createElement('div'); el.className = 'tuner-section'; el.textContent = it.sec;
+    } else if (it.info) {
+      el = document.createElement('div'); el.className = 'tuner-info'; el.id = it.info;
+    } else if (it.buttons) {
+      el = document.createElement('div'); el.className = 'tuner-btn-grid';
+      it.buttons.forEach(function(b) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'tuner-btn'; btn.textContent = b[0];
+        btn.addEventListener('click', ACTIONS[b[1]]);
+        el.appendChild(btn);
+      });
+    } else if (it.t === 'check') {
+      el = document.createElement('label'); el.className = 'tuner-check';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.id = 'c_' + it.k;
+      cb.addEventListener('change', function() { setSetting(it.k, cb.checked, true); });
+      var sp = document.createElement('span'); sp.textContent = it.label;
+      el.appendChild(cb); el.appendChild(sp);
+    } else {
+      el = document.createElement('div'); el.className = 'tuner-row';
+      var line = document.createElement('div'); line.className = 'tuner-label-line';
+      var lab = document.createElement('span'); lab.textContent = it.label;
+      line.appendChild(lab);
+      var input;
+      if (it.t === 'range') {
+        var val = document.createElement('span'); val.className = 'tuner-val'; val.id = 'v_' + it.k;
+        line.appendChild(val);
+        input = document.createElement('input'); input.type = 'range';
+        input.min = it.min; input.max = it.max; input.step = it.step;
+        input.addEventListener('input', function() { setSetting(it.k, parseFloat(input.value), true); });
+      } else if (it.t === 'select') {
+        input = document.createElement('select');
+        it.opts.forEach(function(o) {
+          var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; input.appendChild(op);
+        });
+        input.addEventListener('change', function() {
+          setSetting(it.k, it.k === 'timeLapse' ? parseFloat(input.value) : input.value, true);
+        });
+      } else if (it.t === 'date') {
+        input = document.createElement('input'); input.type = 'date';
+        input.addEventListener('change', function() { if (input.value) setSetting(it.k, input.value, true); });
+      }
+      input.id = 'c_' + it.k;
+      el.appendChild(line); el.appendChild(input);
+    }
+    body.appendChild(el);
+  });
+  for (var k in SPEC_BY_KEY) refreshControl(k);
+}
+
+function refreshControl(k) {
+  var it = SPEC_BY_KEY[k];
+  if (!it) return;
+  var input = document.getElementById('c_' + k);
+  if (!input) return;
+  if (it.t === 'check') input.checked = !!S[k];
+  else if (document.activeElement !== input || it.t !== 'range') input.value = String(S[k]);
+  var v = document.getElementById('v_' + k);
+  if (v && it.fmt) v.textContent = it.fmt(S[k]);
+}
+
+function setSetting(k, value, fromUser) {
+  S[k] = value;
+  if (fromUser) {
+    if (WEATHER_KEYS.indexOf(k) >= 0 && S.liveWeather) { S.liveWeather = false; refreshControl('liveWeather'); weatherStatus = 'Manual weather'; }
+    if ((k === 'hour' || k === 'date') && S.liveTime) { S.liveTime = false; refreshControl('liveTime'); }
+    if (k === 'timeLapse' && S.timeLapse > 1 && S.liveTime) { S.liveTime = false; refreshControl('liveTime'); }
+    if (k === 'liveTime' && value) { S.timeLapse = 1; refreshControl('timeLapse'); }
+    if (k === 'liveWeather' && value) fetchLiveWeather();
+    if (k === 'condition') {
+      var pr = PRESETS[value];
+      for (var pk in pr) { S[pk] = pr[pk]; refreshControl(pk); }
+    }
+    if (k === 'colorProgress' && S.colorMode !== 'manual') { S.colorMode = 'manual'; refreshControl('colorMode'); }
+    if (/^w(Momiji|Ginkgo|Oak|Keyaki)$/.test(k) && S.speciesMode !== 'manual') { S.speciesMode = 'manual'; refreshControl('speciesMode'); }
+  }
+  if (k === 'renderScale') resize();
+  if (LOOK_KEYS.indexOf(k) >= 0) lookVersion++;
+  if (GEOM_KEYS.indexOf(k) >= 0) geomVersion++;
+  if (k === 'panel') showPanel();
+  if (k === 'showText') document.body.classList.toggle('hide-text', !S.showText);
+  if (k === 'pile' && !S.pile) pile.length = 0;
+  if (k === 'pileMax') while (pile.length > S.pileMax) pile.shift();
+  if (k === 'maxLeaves') while (leaves.length > S.maxLeaves) leaves.shift();
+  if (k === 'heroEvery') heroNext = 0;
+  refreshControl(k);
+  computeEnv();
+  updateUiLive();
+  scheduleSave();
+}
+
+var _lastUiHour = -1;
+function updateUiLive() {
+  var p = ENV.p, sun = ENV.sun;
+  // info bar, same format as the real app
+  var dow = '日月火水木金土'.charAt(new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay());
+  var hh = Math.floor(S.hour), mm = Math.floor((S.hour - hh) * 60);
+  document.getElementById('infoDate').textContent = p.m + '月' + p.d + '日(' + dow + ')';
+  document.getElementById('infoTime').textContent = ('0' + hh).slice(-2) + '時' + ('0' + mm).slice(-2) + '分';
+  document.getElementById('infoTemp').textContent = Math.round(S.temperature) + '°';
+  document.getElementById('infoWeather').textContent = WEATHER_EMOJI[S.condition] || '—';
+  var dt = hh >= 5 && hh < 11 ? 'morning' : (hh >= 11 && hh < 17 ? 'day' : (hh >= 17 && hh < 21 ? 'evening' : 'night'));
+  document.documentElement.setAttribute('data-time', dt);
+  document.documentElement.setAttribute('data-weather', S.condition);
+
+  if (Math.abs(S.hour - _lastUiHour) > 0.004) { _lastUiHour = S.hour; refreshControl('hour'); refreshControl('date'); }
+
+  var moonPct = Math.round((1 - Math.cos(ENV.moon * TAU)) / 2 * 100);
+  var si = document.getElementById('sunInfo');
+  if (si) si.textContent = 'Sunrise ' + fmtHour(sun.rise) + ' · Sunset ' + fmtHour(sun.set) + ' · Now: ' +
+    PHASE_NAMES[ENV.phase] + ' · Moon ' + moonPct + '% lit · Autumn stage ' + ENV.season.toFixed(2) + ' (' + seasonName(ENV.season) + ')';
+  var wi = document.getElementById('weatherInfo');
+  if (wi) wi.textContent = S.liveWeather ? weatherStatus : 'Manual weather (tick the box above to go back to live)';
+  var sp = document.getElementById('speciesInfo');
+  if (sp) {
+    var w = speciesWeights(), tot = 0, k;
+    for (k in w) tot += w[k];
+    var parts = [];
+    for (k in w) parts.push(SPECIES[k].name.split(' ')[0] + ' ' + Math.round(w[k] / (tot || 1) * 100) + '%');
+    sp.textContent = (S.speciesMode === 'auto' ? 'Today\'s mix: ' : 'Your mix: ') + parts.join(' · ');
+  }
+  var st = document.getElementById('tunerStats');
+  st.style.display = S.showStats ? '' : 'none';
+  st.textContent = Math.round(fps) + ' fps · ' + leaves.length + ' falling · ' + pile.length + ' on the ground' +
+    (HAS_FILTER ? '' : ' · blur not supported here');
+}
+
+/* ============================================================
+   14. COPY VALUES / RESET / DRAWER
+   ============================================================ */
+function computedStyleOf(sel, props) {
+  var el = document.querySelector(sel);
+  if (!el) return null;
+  var cs = getComputedStyle(el), out = {};
+  props.forEach(function(p) { out[p] = cs.getPropertyValue(p).trim(); });
+  return out;
+}
+function buildCopyText() {
+  var root = getComputedStyle(document.documentElement);
+  var cssVar = function(n) { return root.getPropertyValue(n).trim(); };
+  var textProps = ['font-family', 'font-size', 'font-weight', 'line-height', 'letter-spacing', 'color', 'text-shadow'];
+  var out = {
+    page: 'dynamic.html — dynamic autumn background preview',
+    fonts: {
+      panelText: computedStyleOf('.panel.active .panel-content', textProps),
+      swipeHint: computedStyleOf('.action-hint', ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color']),
+      infoBar: computedStyleOf('.info-line', ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color']),
+      therapistName: '"Zen Antique", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif (color #882E47)'
+    },
+    palette: {
+      accent: cssVar('--accent'), secondaryAccent: cssVar('--secondary-accent'),
+      textMute: cssVar('--text-mute'), background: cssVar('--bg-base'),
+      siteLeafColours: SITE_LEAF_COLOURS
+    },
+    scene: {
+      date: S.date, time: fmtHour(S.hour), lightPhase: ENV.phase,
+      sunrise: fmtHour(ENV.sun.rise), sunset: fmtHour(ENV.sun.set),
+      autumnStage: +ENV.season.toFixed(2), moonLitPercent: Math.round((1 - Math.cos(ENV.moon * TAU)) / 2 * 100),
+      weather: S.condition, liveWeather: S.liveWeather
+    },
+    settings: {}
+  };
+  for (var k in S) {
+    var v = S[k];
+    out.settings[k] = typeof v === 'number' ? Math.round(v * 1000) / 1000 : v;
+  }
+  return JSON.stringify(out, null, 2);
+}
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise(function(res, rej) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy') ? res() : rej(); } catch (e) { rej(e); }
+    document.body.removeChild(ta);
+  });
+}
+document.getElementById('btnCopy').addEventListener('click', function() {
+  var text = buildCopyText();
+  var outEl = document.getElementById('copyOut');
+  outEl.textContent = text;
+  outEl.classList.add('shown');
+  var btn = this;
+  copyText(text).then(function() { btn.textContent = 'Copied!'; }, function() { btn.textContent = 'Shown below (copy blocked)'; })
+    .then(function() { setTimeout(function() { btn.textContent = 'Copy values'; }, 1500); });
+});
+document.getElementById('btnReset').addEventListener('click', function() {
+  try { localStorage.removeItem(STORE_KEY); } catch (e) {}
+  S = makeDefaults();
+  leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
+  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; dragonfly = null;
+  heroNext = 0; lookVersion++; geomVersion++;
+  document.getElementById('copyOut').classList.remove('shown');
+  document.body.classList.toggle('hide-text', !S.showText);
+  resize();
+  computeEnv();
+  for (var k in SPEC_BY_KEY) refreshControl(k);
+  showPanel();
+  prefill();
+  fetchLiveWeather();
+});
+document.getElementById('tunerHeader').addEventListener('click', function() {
+  var drawer = document.getElementById('tunerDrawer');
+  var collapsed = drawer.classList.toggle('collapsed');
+  document.getElementById('tunerCollapseBtn').textContent = collapsed ? 'Show' : 'Hide';
+});
+
+/* ============================================================
+   15. START
+   ============================================================ */
+function prefill() {
+  var n = Math.min(S.maxLeaves * 0.6, spawnRate(0) * 25);
+  for (var i = 0; i < n; i++) spawnLeaf({ prefill: true });
+}
+makeSprites();
+resize();
+computeEnv();
+lastLookKey = lookKey();
+lastDate = S.date;
+buildControls();
+document.body.classList.toggle('hide-text', !S.showText);
+try {
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    document.getElementById('motionNote').style.display = '';
+  }
+} catch (e) {}
+showPanel();
+prefill();
+if (S.liveWeather) fetchLiveWeather();
+updateUiLive();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
