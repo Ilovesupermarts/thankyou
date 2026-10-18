@@ -53,21 +53,17 @@
     opacity: 0;
   }
 
-  /* Night text, 18:00–06:00: the message text switches from the muted brown
-     (--text-mute, only about 2:1 against the dusky night background) to a
-     darker brown from the same palette, with a pale halo built from the
-     silk-white and petal tones lifting the background right behind the
-     characters. Set on the paragraphs so the change can fade smoothly. */
+  /* Night text, 18:00–06:00: only the colour of the font changes, from the
+     muted brown (--text-mute, about 2:1 against the dusky night background)
+     to a darker brown from the same palette. No glow or halo is added, and
+     the text-shadow stays exactly as the theme sets it. Set on the
+     paragraphs so the colour can fade smoothly. */
   body.dyn-demo .panel-content p {
     color: var(--dyn-text, var(--text-mute));
-    text-shadow: var(--dyn-shadow, 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60), 0 0 0 rgba(255, 253, 249, 0));
-    transition: color 1.2s ease, text-shadow 1.2s ease;
+    transition: color 1.2s ease;
   }
   body.dyn-demo.night-text {
     --dyn-text: var(--dyn-text-night, var(--text-dark));
-    --dyn-shadow: 0 0 3px rgba(255, 253, 249, calc(0.95 * var(--dyn-halo, 0.8))),
-                  0 0 12px rgba(255, 247, 242, calc(0.85 * var(--dyn-halo, 0.8))),
-                  0 0 26px rgba(253, 232, 218, calc(0.8 * var(--dyn-halo, 0.8)));
   }
 
   /* Only two message panels on this page. */
@@ -419,7 +415,7 @@ function makeDefaults() {
     sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1, moonPath: 'arc',
     birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
     scene: 'auto', figureSide: 'auto',
-    nightText: true, nightTextColor: 'var(--text-dark)', nightTextHalo: 0.8,
+    nightText: true, nightTextColor: 'var(--text-dark)',
     tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
     winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
     frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
@@ -2913,7 +2909,6 @@ var SPEC = [
   { sec: 'Message panels' },
   { k: 'nightText', t: 'check', label: 'Higher-contrast text from 18:00 to 06:00' },
   { k: 'nightTextColor', t: 'select', label: 'Night text colour (site palette)', opts: [['var(--text-dark)', 'Darkest brown · 墨 --text-dark #241C1A'], ['var(--text-soft)', 'Deep brown · --text-soft #352824'], ['var(--text-med)', 'Medium brown · --text-med #443430']] },
-  { k: 'nightTextHalo', t: 'range', label: 'Pale halo behind the night text', min: 0, max: 1, step: 0.05, fmt: f2 },
   { k: 'panel', t: 'select', label: 'Panel shown', opts: [['1', 'Panel 1 — 自己紹介'], ['2', 'Panel 2 — メッセージ']] },
   { k: 'showText', t: 'check', label: 'Show panel text' },
   { buttons: [['Replay text', 'replay']] },
@@ -3035,7 +3030,7 @@ function setSetting(k, value, fromUser) {
   if (k === 'pileMax') while (pile.length > S.pileMax) pile.shift();
   if (k === 'maxLeaves') while (leaves.length > S.maxLeaves) leaves.shift();
   if (k === 'heroEvery') heroNext = 0;
-  if (k === 'nightText' || k === 'nightTextColor' || k === 'nightTextHalo') applyNightText();
+  if (k === 'nightText' || k === 'nightTextColor') applyNightText();
   if (TREE_KEYS.indexOf(k) >= 0) { tree = null; computeEnv(); ensureTree(); }
   refreshControl(k);
   computeEnv();
@@ -3049,7 +3044,6 @@ function applyNightText() {
   document.body.classList.toggle('night-text', on);
   var st = document.documentElement.style;
   st.setProperty('--dyn-text-night', S.nightTextColor);
-  st.setProperty('--dyn-halo', String(S.nightTextHalo));
 }
 var _lastUiHour = -1;
 function updateUiLive() {
