@@ -34,6 +34,16 @@
     z-index: -1;
     pointer-events: none;
   }
+  /* Front layer: only the dragonfly and the cricket, so they can sit
+     on the message characters. Never takes touches. */
+  .dyn-front {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 8;
+    pointer-events: none;
+  }
   .flash-veil {
     position: fixed;
     inset: 0;
@@ -279,6 +289,9 @@
   </div>
 </div>
 
+<!-- Dragonfly / cricket layer, above the message text -->
+<canvas class="dyn-front" id="dynFront" aria-hidden="true"></canvas>
+
 <div class="flash-veil" id="flashVeil" aria-hidden="true"></div>
 
 <!-- ============ LIVE TUNING DRAWER ============ -->
@@ -378,11 +391,15 @@ function makeDefaults() {
     speciesMode: 'auto', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
     colorMode: 'auto', colorProgress: 0.3, colorVariety: 0.6, paletteBlend: 0.45, lightTint: 0.7, skyTint: 0.8,
     depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
-    rainStreaks: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
+    rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
     lightning: true, frost: true, snowMix: true,
-    moon: true, birds: true, nightSpecks: true, dawnGlow: true,
+    sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1,
+    birds: true, nightSpecks: true, dawnGlow: true,
+    scene: 'auto', figureSide: 'auto',
+    tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5,
+    snowman: true, snowmanSize: 1,
     heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
-    dragonfly: true, tapWind: true, tapStrength: 1,
+    dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
     panel: '1', showText: true,
     renderScale: 0.75, showStats: true
   };
@@ -435,12 +452,61 @@ function sunTimes(p) {
   return { rise: (noon - 4 * ha) / 60, set: (noon + 4 * ha) / 60, noon: noon / 60 };
 }
 
-/* Moon phase 0..1 (0 = new, 0.5 = full) */
-function moonPhase(p, hour) {
-  var ms = Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3;
-  var syn = 29.530588853 * 864e5;
-  var ph = ((ms - 947182440000) / syn) % 1;
-  return ph < 0 ? ph + 1 : ph;
+/* Real sun and moon positions for Nagoya (low-precision almanac
+   formulas, good to well under a degree for drawing). Azimuth is
+   measured from north toward east. */
+function astro(p, hour) {
+  var d = (Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3) / 864e5 - 10957.5;
+  var T = d / 36525;
+  function sd(x) { return Math.sin(x * DEG); }
+  var g = (357.528 + 0.9856003 * d) * DEG;
+  var lamS = 280.46 + 0.9856474 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+  var lamM = 218.32 + 481267.881 * T + 6.29 * sd(134.9 + 477198.85 * T) - 1.27 * sd(259.2 - 413335.38 * T) +
+             0.66 * sd(235.7 + 890534.23 * T) + 0.21 * sd(269.9 + 954397.70 * T) - 0.19 * sd(357.5 + 35999.05 * T) -
+             0.11 * sd(186.6 + 966404.05 * T);
+  var betM = 5.13 * sd(93.3 + 483202.03 * T) + 0.28 * sd(228.2 + 960400.87 * T) -
+             0.28 * sd(318.3 + 6003.18 * T) - 0.17 * sd(217.6 - 407332.20 * T);
+  var eps = 23.439 * DEG, lat = NAGOYA.lat * DEG;
+  var lst = (280.46061837 + 360.98564736629 * d + NAGOYA.lon) * DEG;
+  function horizon(lamDeg, betDeg) {
+    var lam = lamDeg * DEG, bet = betDeg * DEG;
+    var ra = Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam));
+    var dec = Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam));
+    var ha = lst - ra;
+    var alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha));
+    var az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(lat) - Math.sin(lat) * Math.cos(ha)) / DEG;
+    return { alt: alt / DEG, az: (az + 360) % 360 };
+  }
+  var elong = (((lamM - lamS) % 360) + 360) % 360;
+  return {
+    sun: horizon(lamS, 0), moon: horizon(lamM, betM),
+    elong: elong, illum: (1 - Math.cos(elong * DEG)) / 2, waxing: elong < 180
+  };
+}
+function moonName(a) {
+  var k = a.illum;
+  if (k < 0.03) return 'New moon 新月';
+  if (k > 0.97) return 'Full moon 満月';
+  if (a.waxing) return k < 0.35 ? 'Waxing crescent 三日月' : (k < 0.65 ? 'First quarter 上弦の月' : 'Waxing gibbous 十三夜');
+  return k < 0.35 ? 'Waning crescent 有明月' : (k < 0.65 ? 'Last quarter 下弦の月' : 'Waning gibbous 寝待月');
+}
+function compassName(az) {
+  var n = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  return n[Math.round(az / 22.5) % 16];
+}
+/* Sky to screen: right edge = east, left edge = west, bottom = horizon. */
+function skyToScreen(alt, az) {
+  var x = W * (0.5 + angDiff(180 * DEG, az * DEG) / DEG / 220);
+  var e = (alt < 0 ? -1 : 1) * Math.pow(Math.min(Math.abs(alt), 90) / 80, 0.6);
+  return { x: x, y: H * 0.9 - H * 0.82 * e };
+}
+
+/* Which picture goes with the date: Dec–Feb snowman, Oct–Nov bare tree. */
+function sceneFor(p) {
+  if (S.scene !== 'auto') return S.scene;
+  if (p.m === 12 || p.m <= 2) return 'winter';
+  if (p.m === 10 || p.m === 11) return 'autumn';
+  return 'plain';
 }
 
 /* How far autumn has turned, 0 (green) .. 1 (bare brown), from the date. */
@@ -525,7 +591,9 @@ function computeEnv() {
     windPx: windScreen * 14, windMs: S.windSpeed,
     snowing: c === 'snow' || (S.snowMix && S.temperature < 3),
     snowAmt: c === 'snow' ? clamp(0.4 + S.rainMm / 3, 0.4, 1.6) : (S.snowMix && S.temperature < 3 ? 0.12 : 0),
-    moon: moonPhase(p, S.hour)
+    astro: astro(p, S.hour),
+    scene: sceneFor(p),
+    side: S.figureSide === 'auto' ? (dayOfYear(p) % 2 ? 'left' : 'right') : S.figureSide
   };
 }
 
@@ -942,6 +1010,7 @@ function insertSorted(L) {
 }
 function spawnLeaf(opts) {
   opts = opts || {};
+  if (ENV.scene === 'winter' && !opts.hero) return null;
   if (leaves.length >= S.maxLeaves && !opts.force) return null;
   var L = makeLeaf(opts);
   var wp = ENV.windPx;
@@ -1051,6 +1120,11 @@ function updateGusts(dt) {
         if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
       }
     }
+    if (tree && tree.gid !== g.id && (g.dir > 0 ? tree.bx < g.x : tree.bx > g.x)) {
+      tree.gid = g.id;
+      tree.gustV += g.dir * 0.5 * (g.str / 200);
+      for (var q = tree.leaves.length - 1; q >= 0; q--) if (Math.random() < 0.25) detachTreeLeaf(q);
+    }
     if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
   }
 }
@@ -1133,7 +1207,7 @@ function updateRain(dt) {
   var c = S.condition;
   var drizzle = c === 'drizzle';
   var target = 0;
-  if (ENV.rainy) target = drizzle ? 60 * S.rainStreaks : Math.min(450, (20 + S.rainMm * 30) * S.rainStreaks);
+  if (ENV.rainy) target = drizzle ? 110 * S.rainStreaks : Math.min(450, (40 + S.rainMm * 30) * S.rainStreaks);
   target = Math.round(target);
   while (streaks.length < target) {
     var z = rnd(0.2, 1);
@@ -1162,7 +1236,7 @@ function updateRain(dt) {
 function drawRain(ctx) {
   if (!streaks.length && !splashes.length) return;
   var drizzle = S.condition === 'drizzle';
-  var lenMul = (drizzle ? 0.6 : 1) * (1 + S.rainMm / 10);
+  var lenMul = (drizzle ? 0.75 : 1) * (1 + S.rainMm / 10);
   var ang = Math.atan2(700, ENV.windPx * 2.5);
   var cx = Math.cos(ang), cy = Math.sin(ang);
   for (var pass = 0; pass < 2; pass++) {
@@ -1174,14 +1248,16 @@ function drawRain(ctx) {
       ctx.moveTo(s.x, s.y);
       ctx.lineTo(s.x - cx * len, s.y - cy * len);
     }
-    ctx.strokeStyle = pass === 0 ? 'rgba(105,95,120,' + (drizzle ? 0.07 : 0.1) + ')' : 'rgba(105,95,120,' + (drizzle ? 0.12 : 0.18) + ')';
-    ctx.lineWidth = pass === 0 ? 0.8 : 1.1;
+    // Dark plum-grey streaks: pale rain vanished on the silk-white page.
+    var ra = pass === 0 ? (drizzle ? 0.16 : 0.22) : (drizzle ? 0.26 : 0.38);
+    ctx.strokeStyle = rgba([70, 60, 95], ra * S.rainContrast);
+    ctx.lineWidth = pass === 0 ? (drizzle ? 0.8 : 1.0) : (drizzle ? 1.1 : 1.5);
     ctx.stroke();
   }
   ctx.lineWidth = 0.9;
   for (var j = 0; j < splashes.length; j++) {
     var sp = splashes[j], k = sp.t / 0.35, r = (7 + 5 * sp.z) * k;
-    ctx.strokeStyle = 'rgba(105,95,120,' + (0.35 * (1 - k)).toFixed(3) + ')';
+    ctx.strokeStyle = rgba([70, 60, 95], 0.5 * (1 - k) * S.rainContrast);
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y, r, r * 0.35, 0, 0, TAU);
     ctx.stroke();
@@ -1250,35 +1326,119 @@ function drawSky(ctx, t) {
   }
 }
 
-function drawMoon(ctx) {
+function drawSun(ctx, t) {
+  var a = ENV.astro.sun;
+  if (!S.sun || a.alt < -1.5) return;
+  var vis = smooth(-1.5, 1.5, a.alt) * clamp(1 - S.cloudCover / 100 * 0.75, 0.15, 1) *
+            (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
+  if (vis < 0.01) return;
+  var clear = vis * clamp(1 - S.cloudCover / 100 * 0.8, 0, 1) * (1 - ENV.fog * 0.8);
+  var pos = skyToScreen(a.alt, a.az), x = pos.x, y = pos.y;
+  var low = 1 - smooth(2, 18, a.alt);            // near the horizon: bigger, more orange
+  var size = 24 * S.sunSize * (1 + low * 0.35);
+  var warm = mixRgb([255, 214, 160], [255, 140, 80], low);
+  // wide bloom
+  var R = size * 9 * Math.max(0.2, S.sunGlow);
+  var g = ctx.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, rgba([255, 252, 244], 0.9 * vis));
+  g.addColorStop(0.08, rgba(warm, 0.55 * vis * S.sunGlow));
+  g.addColorStop(0.35, rgba(warm, 0.18 * vis * S.sunGlow));
+  g.addColorStop(1, rgba(warm, 0));
+  ctx.fillStyle = g;
+  ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
+  if (clear > 0.02) {
+    // starburst: thin tapering rays that slowly turn and shimmer
+    for (var i = 0; i < 16; i++) {
+      var ang = i / 16 * TAU + t * 0.015 + (hash1(i) - 0.5) * 0.3;
+      var len = size * (3 + 6 * hash1(i + 9)) * (0.85 + 0.15 * Math.sin(t * 1.3 + i * 2.1)) * S.sunGlow;
+      var w = size * 0.1 * (0.5 + hash1(i + 3));
+      var nx = -Math.sin(ang) * w, ny = Math.cos(ang) * w;
+      var ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len;
+      var rg = ctx.createLinearGradient(x, y, ex, ey);
+      rg.addColorStop(0, rgba([255, 255, 255], 0.8 * clear));
+      rg.addColorStop(0.3, rgba(warm, 0.4 * clear));
+      rg.addColorStop(1, rgba(warm, 0));
+      ctx.fillStyle = rg;
+      ctx.beginPath();
+      ctx.moveTo(x + nx, y + ny);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(x - nx, y - ny);
+      ctx.closePath();
+      ctx.fill();
+    }
+    // faint lens ghosts on the line toward the centre of the screen
+    var cx = W * 0.5, cy = H * 0.5;
+    [[0.55, 26, [255, 190, 140]], [0.95, 14, [255, 220, 170]], [1.35, 40, [190, 205, 255]]].forEach(function(gh) {
+      var gx = x + (cx - x) * gh[0], gy = y + (cy - y) * gh[0], gr = gh[1] * S.sunSize;
+      var gg = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
+      gg.addColorStop(0, rgba(gh[2], 0.1 * clear));
+      gg.addColorStop(0.7, rgba(gh[2], 0.06 * clear));
+      gg.addColorStop(1, rgba(gh[2], 0));
+      ctx.fillStyle = gg;
+      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, TAU); ctx.fill();
+    });
+  }
+  var cg = ctx.createRadialGradient(x, y, 0, x, y, size);
+  cg.addColorStop(0, rgba([255, 255, 255], vis));
+  cg.addColorStop(0.7, rgba([255, 253, 246], 0.95 * vis));
+  cg.addColorStop(1, rgba([255, 245, 225], 0));
+  ctx.fillStyle = cg;
+  ctx.beginPath(); ctx.arc(x, y, size, 0, TAU); ctx.fill();
+}
+
+/* The moon at its real place and real phase. The lit side always
+   faces the sun, so a crescent, half moon or full moon looks right. */
+function drawMoon(ctx, t) {
   if (!S.moon) return;
-  var h = S.hour, sun = ENV.sun;
-  var nightLen = 24 - (sun.set - sun.rise);
-  var since = h >= sun.set ? h - sun.set : h + 24 - sun.set;
-  if (since > nightLen) return;
-  var vis = smooth(0.2, 0.9, since) * smooth(0.2, 0.9, nightLen - since);
-  if (vis <= 0.01) return;
-  var u = since / nightLen;
-  var cx = W * lerp(0.82, 0.18, u), cy = H * (0.2 - 0.1 * Math.sin(u * PI)), r = 24;
-  var glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 4);
-  glow.addColorStop(0, 'rgba(255,240,215,' + (0.3 * vis).toFixed(3) + ')');
-  glow.addColorStop(1, 'rgba(255,240,215,0)');
-  ctx.fillStyle = glow;
-  ctx.fillRect(cx - r * 4, cy - r * 4, r * 8, r * 8);
-  ctx.fillStyle = 'rgba(255,248,232,' + (0.12 * vis).toFixed(3) + ')';
+  var A = ENV.astro, m = A.moon;
+  if (m.alt < -2) return;
+  var day = ENV.light.daylight;
+  var vis = smooth(-2, 3, m.alt) * lerp(1, 0.55, day) * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) *
+            (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
+  if (vis < 0.02) return;
+  var pos = skyToScreen(m.alt, m.az), cx = pos.x, cy = pos.y, r = 28 * S.moonSize;
+  var sp = skyToScreen(A.sun.alt, A.sun.az);
+  var toSun = Math.atan2(sp.y - cy, sp.x - cx);
+  var litCol = mixRgb([255, 246, 226], [236, 240, 250], day);
+  var glowA = 0.32 * vis * (1 - day * 0.7) * (0.3 + 0.7 * A.illum);
+  if (glowA > 0.005) {
+    var glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 4.5);
+    glow.addColorStop(0, rgba([255, 240, 215], glowA));
+    glow.addColorStop(1, rgba([255, 240, 215], 0));
+    ctx.fillStyle = glow;
+    ctx.fillRect(cx - r * 4.5, cy - r * 4.5, r * 9, r * 9);
+  }
+  // the dark part, faintly visible (earthshine)
+  ctx.fillStyle = rgba(day > 0.5 ? [200, 205, 225] : [255, 248, 232], 0.13 * vis);
   ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
-  var ph = ENV.moon;
-  var waxing = ph < 0.5;
-  var k = Math.cos(ph * TAU);
+  var k = Math.cos(A.elong * DEG);
+  function litPath() {
+    ctx.beginPath();
+    ctx.arc(0, 0, r, -PI / 2, PI / 2, false);
+    ctx.ellipse(0, 0, r * Math.abs(k), r, 0, PI / 2, -PI / 2, k > 0);
+    ctx.closePath();
+  }
   ctx.save();
   ctx.translate(cx, cy);
-  if (!waxing) ctx.scale(-1, 1);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -PI / 2, PI / 2, false);
-  ctx.ellipse(0, 0, r * Math.abs(k), r, 0, PI / 2, -PI / 2, k > 0);
-  ctx.closePath();
-  ctx.fillStyle = 'rgba(255,246,226,' + (0.75 * vis).toFixed(3) + ')';
-  ctx.fill();
+  ctx.rotate(toSun);
+  if (A.illum > 0.015) {
+    litPath();
+    ctx.fillStyle = rgba(litCol, 0.92 * vis);
+    ctx.fill();
+    // grey "seas" on the lit part, fixed to the moon's face
+    ctx.save();
+    ctx.clip();
+    ctx.rotate(-toSun);
+    ctx.fillStyle = rgba(day > 0.5 ? [160, 165, 190] : [200, 185, 160], 0.3 * vis);
+    [[-0.25, -0.3, 0.28], [0.2, -0.15, 0.22], [0.05, 0.3, 0.2], [-0.35, 0.15, 0.16], [0.4, 0.25, 0.12]].forEach(function(mr) {
+      ctx.beginPath(); ctx.arc(mr[0] * r, mr[1] * r, mr[2] * r, 0, TAU); ctx.fill();
+    });
+    ctx.restore();
+  }
+  // thin outline so the pale day-time moon still shows on the light page
+  ctx.strokeStyle = rgba([130, 130, 170], (0.12 + 0.2 * day) * vis);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
   ctx.restore();
 }
 
@@ -1307,6 +1467,10 @@ function drawRays(ctx, t) {
   var u = clamp((h - sun.rise) / (sun.set - sun.rise), 0, 1);
   var golden = ENV.light.phase === 'golden' || ENV.light.phase === 'dawn' ? 1.6 : 1;
   var ox = lerp(-0.15, 1.15, u) * W, oy = -0.25 * H;
+  if (S.sun && ENV.astro.sun.alt > 0) {
+    var ssp = skyToScreen(ENV.astro.sun.alt, ENV.astro.sun.az);
+    ox = ssp.x; oy = ssp.y;
+  }
   var ang0 = Math.atan2(H * 0.9 - oy, W * 0.5 - ox);
   var len = Math.sqrt(W * W + H * H) * 1.4;
   var col = mixRgb(ENV.light.col, [255, 214, 150], 0.5);
@@ -1414,77 +1578,435 @@ function drawSpecks(ctx, t) {
   ctx.globalAlpha = 1;
 }
 
-/* Akatombo (red dragonfly): darts, hovers, darts again, then leaves. */
-var dragonflyNext = 0;
+/* ============================================================
+   8b. SEASONAL PICTURE — bare tree (Oct–Nov), snowman (Dec–Feb)
+   ============================================================ */
+var tree = null, snowmanSpot = null;
+var TREE_DEPTH = 7;
+function strSeed(str) {
+  var h = 2166136261;
+  for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+function treeLeafTarget() {
+  return Math.round(S.treeLeaves * lerp(16, 4, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
+}
+/* A new tree shape every day (seeded by the date), leaning in from one side. */
+function buildTree(key) {
+  var r = rngFrom(strSeed(key));
+  var left = ENV.side === 'left', dir = left ? 1 : -1;
+  var scale = H * S.treeSize;
+  var nodes = [], tips = [];
+  function grow(parent, abs, len, w, d) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
+    var idx = nodes.length;
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= TREE_DEPTH || len < scale * 0.025) { tips.push(idx); return; }
+    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+    for (var i = 0; i < n; i++) {
+      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      ca = lerp(ca, -PI / 2, 0.1);
+      grow(idx, ca, len * (0.68 + r() * 0.14), Math.max(0.7, w * 0.66), d + 1);
+    }
+  }
+  var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(6, scale * 0.032), 0);
+  var T = { key: key, bx: bx, by: H + 6, nodes: nodes, tips: tips, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0 };
+  var n0 = treeLeafTarget();
+  for (var j = 0; j < n0; j++) addTreeLeaf(T, true);
+  return T;
+}
+function addTreeLeaf(T, initial) {
+  if (!T.tips.length) return;
+  var L = makeLeaf({ z: 0.85 });
+  L.size *= 0.8;
+  L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
+  L.hang = rnd(-0.5, 0.5);
+  L.ff = rnd(1.4, 2.8);
+  L.age = initial ? 5 : 0;
+  L.fadeDur = initial ? 0.6 : 4;
+  bakeLeaf(L);
+  T.leaves.push(L);
+}
+function detachTreeLeaf(j) {
+  var L = tree.leaves.splice(j, 1)[0];
+  L.attach = undefined;
+  L.vx = ENV.windPx * 0.4;
+  L.vy = 5;
+  L.fadeDur = 0.6;
+  L.age = Math.max(L.age, 1);
+  setMode(L);
+  insertSorted(L);
+}
+function ensureTree() {
+  if (ENV.scene !== 'autumn' || !S.tree) { tree = null; return; }
+  var key = S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
+  if (!tree || tree.key !== key) tree = buildTree(key);
+}
+function updateTree(dt, t) {
+  if (!tree) return;
+  var T = tree, ns = T.nodes;
+  // a gust gives the whole tree a push that springs back
+  T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
+  T.gust += T.gustV * dt;
+  var wind = ENV.windPx * 0.0012 * S.treeSway;
+  var amp = (0.015 + 0.01 * ENV.windMs) * S.treeSway;
+  var spd = 1 + ENV.windMs * 0.08;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i];
+    var k = Math.pow(n.d / TREE_DEPTH, 1.6) + 0.02;     // thin twigs move most
+    var sway = (wind + Math.sin(t * n.f * spd + n.ph) * amp +
+                Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * k;
+    var par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel + sway;
+    n.sx = par ? par.ex : T.bx;
+    n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len;
+    n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+  for (var j = T.leaves.length - 1; j >= 0; j--) {
+    var L = T.leaves[j], a = ns[L.attach];
+    L.age += dt;
+    var rot = PI + L.hang + Math.sin(t * L.ff + (L.seed % 7)) * (0.25 + 0.05 * ENV.windMs) -
+              ENV.windPx * 0.003 - T.gust * 2;
+    var off = (0.25 + L.geo.stem[2][1]) * L.size;     // hang from the tip of the stem
+    L.rot = rot;
+    L.phi = Math.sin(t * L.ff * 0.7 + (L.seed % 5)) * (0.5 + 0.08 * ENV.windMs);
+    L.x = a.ex + off * Math.sin(rot);
+    L.y = a.ey - off * Math.cos(rot);
+    L.so = 0;
+    if (Math.random() < 0.0025 * (1 + ENV.windMs / 3) * dt) detachTreeLeaf(j);
+  }
+  T.regrow -= dt;
+  if (T.regrow <= 0) {
+    T.regrow = rnd(15, 30);
+    if (T.leaves.length < treeLeafTarget()) addTreeLeaf(T, false);
+  }
+}
+function drawTree(ctx, t) {
+  if (!tree) return;
+  // Branches go onto their own layer at full strength, then the layer is
+  // laid down at the chosen strength, so joints don't show darker spots.
+  ctxT.setTransform(1, 0, 0, 1, 0, 0);
+  ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
+  ctxT.setTransform(PR, 0, 0, PR, 0, 0);
+  ctxT.strokeStyle = rgba(mixRgb([70, 46, 44], ENV.light.col, 0.12));
+  ctxT.lineCap = 'round';
+  var ns = tree.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i];
+    ctxT.lineWidth = n.w;
+    ctxT.beginPath();
+    ctxT.moveTo(n.sx, n.sy);
+    ctxT.lineTo(n.ex, n.ey);
+    ctxT.stroke();
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = S.treeOpacity;
+  ctx.drawImage(treeLayer, 0, 0);
+  for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+}
+
+/* Japanese-style snowman (雪だるま): two snowballs, a bucket hat,
+   twig arms and a scarf that moves in the wind. */
+function bankY(x) {
+  var bankH = H * 0.035;
+  return H - bankH - Math.sin(x * 0.006 + 1.3) * bankH * 0.35 - Math.sin(x * 0.017) * bankH * 0.12;
+}
+function snowBall(ctx, x, y, r) {
+  var g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
+  g.addColorStop(0, '#ffffff');
+  g.addColorStop(0.6, '#f2f4f9');
+  g.addColorStop(1, '#cfd4e3');
+  ctx.fillStyle = g;
+  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(120,110,150,0.35)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+}
+function drawSnowman(ctx, t) {
+  if (ENV.scene !== 'winter' || !S.snowman) return null;
+  var left = ENV.side === 'left', out = left ? -1 : 1;
+  var s = H * 0.075 * S.snowmanSize;
+  var cx = left ? W * 0.13 : W * 0.87;
+  // snow bank along the bottom edge
+  ctx.beginPath();
+  ctx.moveTo(0, H + 2);
+  for (var x = 0; x <= W + 24; x += 24) ctx.lineTo(x, bankY(x));
+  ctx.lineTo(W, H + 2);
+  ctx.closePath();
+  var bg = ctx.createLinearGradient(0, H - H * 0.06, 0, H);
+  bg.addColorStop(0, 'rgba(255,255,255,0.95)');
+  bg.addColorStop(1, 'rgba(226,230,242,0.95)');
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(120,110,150,0.22)';
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+
+  var gy = bankY(cx) + s * 0.1;
+  ctx.fillStyle = 'rgba(90,90,130,0.14)';
+  ctx.beginPath(); ctx.ellipse(cx, gy, s * 1.15, s * 0.22, 0, 0, TAU); ctx.fill();
+  var by = gy - s * 0.82, tr = s * 0.66, ty = by - s * 0.78 - tr * 0.78;
+  snowBall(ctx, cx, by, s);
+
+  // twig arms, swaying a little
+  ctx.strokeStyle = '#5a3d30';
+  ctx.lineCap = 'round';
+  [-1, 1].forEach(function(side) {
+    var a = (side > 0 ? -0.55 : PI + 0.55) + Math.sin(t * 1.1 + side) * 0.05 + ENV.windPx * 0.0006;
+    var bx = cx + side * s * 0.78, byy = by - s * 0.45, len = s * 1.1;
+    var ex = bx + Math.cos(a) * len, ey = byy + Math.sin(a) * len;
+    ctx.lineWidth = Math.max(2, s * 0.05);
+    ctx.beginPath(); ctx.moveTo(bx, byy); ctx.lineTo(ex, ey); ctx.stroke();
+    var fx = bx + Math.cos(a) * len * 0.65, fy = byy + Math.sin(a) * len * 0.65, fa = a - side * 0.6;
+    ctx.lineWidth = Math.max(1.2, s * 0.03);
+    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx + Math.cos(fa) * len * 0.35, fy + Math.sin(fa) * len * 0.35); ctx.stroke();
+    var ga = a + side * 0.5;
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(ga) * len * 0.2, ey + Math.sin(ga) * len * 0.2); ctx.stroke();
+  });
+
+  snowBall(ctx, cx, ty, tr);
+
+  // scarf with a tail that flutters
+  var nY = by - s * 0.82;
+  ctx.fillStyle = '#882E47';
+  ctx.beginPath(); ctx.ellipse(cx, nY, tr * 0.95, tr * 0.2, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(230,104,38,0.8)';
+  ctx.lineWidth = Math.max(1, tr * 0.05);
+  for (var st = -2; st <= 2; st++) {
+    ctx.beginPath();
+    ctx.moveTo(cx + st * tr * 0.3, nY - tr * 0.17);
+    ctx.lineTo(cx + st * tr * 0.3, nY + tr * 0.17);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = '#882E47';
+  ctx.lineWidth = tr * 0.26;
+  ctx.lineCap = 'butt';
+  ctx.beginPath();
+  for (var i = 0; i <= 6; i++) {
+    var u = i / 6;
+    var wave = Math.sin(t * 3 - i * 0.9) * (1.5 + ENV.windMs * 0.6) * u + ENV.windPx * 0.02 * u;
+    var px = cx + out * (tr * 0.55 + i * s * 0.05) + wave, py = nY + i * s * 0.09;
+    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+  }
+  ctx.stroke();
+  ctx.lineCap = 'round';
+
+  // face
+  ctx.fillStyle = 'rgba(240,125,64,0.28)';
+  ctx.beginPath(); ctx.ellipse(cx - tr * 0.5, ty + tr * 0.18, tr * 0.16, tr * 0.1, 0, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + tr * 0.5, ty + tr * 0.18, tr * 0.16, tr * 0.1, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2b2220';
+  ctx.beginPath(); ctx.arc(cx - tr * 0.32, ty - tr * 0.1, tr * 0.085, 0, TAU); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx + tr * 0.32, ty - tr * 0.1, tr * 0.085, 0, TAU); ctx.fill();
+  ctx.strokeStyle = '#2b2220';
+  ctx.lineWidth = Math.max(1, tr * 0.05);
+  ctx.beginPath(); ctx.arc(cx, ty + tr * 0.05, tr * 0.25, 0.2 * PI, 0.8 * PI); ctx.stroke();
+
+  // bucket hat (バケツ)
+  var hatRot = out * 0.18 + Math.sin(t * 0.5) * 0.01;
+  var hx = cx + out * tr * 0.1, hy = ty - tr * 0.82;
+  var bw = tr * 1.25, tw = tr * 0.95, hh = tr * 0.85;
+  ctx.save();
+  ctx.translate(hx, hy);
+  ctx.rotate(hatRot);
+  var hg = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0);
+  hg.addColorStop(0, '#C44E10'); hg.addColorStop(0.45, '#F07D40'); hg.addColorStop(1, '#C44E10');
+  ctx.fillStyle = hg;
+  ctx.beginPath();
+  ctx.moveTo(-bw / 2, 0); ctx.lineTo(bw / 2, 0); ctx.lineTo(tw / 2, -hh); ctx.lineTo(-tw / 2, -hh);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#9E3B06';
+  ctx.fillRect(-bw / 2 - 1, -tr * 0.12, bw + 2, tr * 0.12);
+  ctx.beginPath(); ctx.ellipse(0, -hh, tw / 2, tr * 0.08, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  return { x: hx + Math.sin(hatRot) * hh, y: hy - Math.cos(hatRot) * hh - tr * 0.05 };
+}
+
+/* ============================================================
+   8c. VISITORS — red dragonfly by day, cricket at night.
+       They perch on the characters of the message text.
+   ============================================================ */
+function glyphSpots() {
+  if (!S.showText) return [];
+  var root = document.querySelector('.stage .panel.active .panel-content');
+  if (!root) return [];
+  var out = [], range = document.createRange();
+  var dr = document.getElementById('tunerDrawer').getBoundingClientRect();
+  var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  var node;
+  while ((node = walker.nextNode())) {
+    var txt = node.nodeValue;
+    for (var i = 0; i < txt.length; i++) {
+      if (/[\s、。，．！？（）「」・…]/.test(txt.charAt(i))) continue;
+      range.setStart(node, i);
+      range.setEnd(node, i + 1);
+      var r = range.getBoundingClientRect();
+      if (r.width < 3 || r.height < 3) continue;
+      var x = r.left + r.width / 2, y = r.top + r.height * 0.14;
+      if (x > dr.left - 10 && x < dr.right && y < dr.bottom) continue;   // not under the settings panel
+      out.push({ x: x, y: y, glyph: true });
+    }
+  }
+  return out;
+}
+function spotPos(sp) {
+  if (sp.node !== undefined && tree && tree.nodes[sp.node]) return { x: tree.nodes[sp.node].ex, y: tree.nodes[sp.node].ey };
+  if (sp.snow && snowmanSpot) return snowmanSpot;
+  return sp;
+}
+function pickPerch(near) {
+  var g = glyphSpots(), extra = [];
+  if (tree) {
+    for (var i = 0; i < 8; i++) {
+      var idx = Math.floor(Math.random() * tree.nodes.length);
+      if (tree.nodes[idx].d >= 3) extra.push({ node: idx });
+    }
+  }
+  if (snowmanSpot) extra.push({ snow: true });
+  var pool = (g.length && (Math.random() < 0.8 || !extra.length)) ? g : extra;
+  if (!pool.length) return { x: W * rnd(0.2, 0.8), y: H * rnd(0.3, 0.7) };
+  if (near) {
+    var close = pool.filter(function(sp) {
+      var p = spotPos(sp), dx = p.x - near.x, dy = p.y - near.y, d = Math.sqrt(dx * dx + dy * dy);
+      return d > 50 && d < 380;
+    });
+    if (close.length) pool = close;
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+/* When the panel changes, the text they stand on is gone. */
+function insectsLeaveText() {
+  if (dragonfly && dragonfly.perch && dragonfly.perch.glyph) {
+    if (dragonfly.state === 'perch') dragonfly.rest = Math.min(dragonfly.rest, 0.2);
+    else if (dragonfly.state === 'approach') dragonfly.perch = { x: dragonfly.x, y: dragonfly.y - 30 };
+  }
+  if (cricket) {
+    cricket.seq = cricket.seq.filter(function(sp) { return !sp.glyph; });
+    if (cricket.state === 'rest') cricket.rest = Math.min(cricket.rest, 0.3);
+  }
+}
+
+/* Akatombo: darts and hovers, lands on a character, slowly folds its
+   wings in and out while resting, then flies on or leaves. */
+var dragonfly = null, dragonflyNext = 0;
 function sendDragonfly() {
   var fromLeft = Math.random() < 0.5;
   dragonfly = {
-    x: fromLeft ? -40 : W + 40, y: H * rnd(0.15, 0.6), heading: fromLeft ? 0 : PI,
-    state: 'dash', tx: W * rnd(0.2, 0.8), ty: H * rnd(0.15, 0.65), hoverT: 0, legs: 3 + Math.floor(Math.random() * 4), t: 0
+    x: fromLeft ? -40 : W + 40, y: H * rnd(0.15, 0.55), heading: fromLeft ? 0 : PI,
+    state: 'dash', tx: W * rnd(0.2, 0.8), ty: H * rnd(0.15, 0.6), hoverT: 0,
+    legs: 1 + Math.floor(Math.random() * 3), landings: 1 + Math.floor(Math.random() * 3),
+    t: 0, fold: 0, perch: null, perchT: 0, rest: 0, foldRate: 1.5, perchHeading: 0, leaving: false
   };
 }
+function dfNextLeg(d) {
+  if (d.legs > 0) {
+    d.legs--;
+    d.state = 'dash';
+    d.tx = clamp(d.x + rnd(-400, 400), 40, W - 40);
+    d.ty = clamp(d.y + rnd(-220, 220), H * 0.1, H * 0.75);
+  } else if (d.landings > 0) {
+    d.landings--;
+    d.perch = pickPerch();
+    d.state = 'approach';
+  } else {
+    d.leaving = true;
+    d.state = 'dash';
+    d.tx = d.x < W / 2 ? -100 : W + 100;
+    d.ty = d.y + rnd(-150, 50);
+  }
+}
 function updateDragonfly(dt, t) {
-  var okWeather = (S.condition === 'clear' || S.condition === 'clouds') && S.temperature >= 14 && S.hour >= 10 && S.hour <= 17;
-  if (!dragonfly && S.dragonfly && okWeather && t > dragonflyNext) {
+  var okTime = ENV.light.daylight > 0.5 && !ENV.rainy && S.condition !== 'snow' && S.temperature >= 12 && ENV.scene !== 'winter';
+  if (!dragonfly && S.dragonfly && okTime && t > dragonflyNext) {
     if (dragonflyNext > 0) sendDragonfly();
     dragonflyNext = t + rnd(60, 180);
   }
   var d = dragonfly;
   if (!d) return;
   d.t += dt;
-  if (d.state === 'dash') {
-    var dx = d.tx - d.x, dy = d.ty - d.y, dist = Math.sqrt(dx * dx + dy * dy);
-    var sp = Math.min(520, dist * 6);
+  if (d.state === 'dash' || d.state === 'approach') {
+    var tgt = d.state === 'approach' ? spotPos(d.perch) : { x: d.tx, y: d.ty };
+    var dx = tgt.x - d.x, dy = tgt.y - d.y, dist = Math.sqrt(dx * dx + dy * dy);
+    var sp = d.state === 'approach' ? Math.min(420, dist * 4 + 20) : Math.min(520, dist * 6);
     if (dist > 0.5) {
-      d.x += dx / dist * sp * dt; d.y += dy / dist * sp * dt;
-      d.heading += angDiff(Math.atan2(dy, dx), d.heading) * (1 - Math.exp(-dt * 10));
+      var step = Math.min(dist, sp * dt);
+      d.x += dx / dist * step;
+      d.y += dy / dist * step;
+      if (dist > 6) d.heading += angDiff(Math.atan2(dy, dx), d.heading) * (1 - Math.exp(-dt * 10));
     }
-    if (dist < 4) {
-      if (d.legs <= 0) { dragonfly = null; return; }
-      d.state = 'hover'; d.hoverT = rnd(0.5, 1.6);
+    d.fold += (0 - d.fold) * (1 - Math.exp(-dt * 12));
+    if (dist < 2) {
+      if (d.state === 'approach') {
+        d.state = 'perch';
+        d.rest = rnd(3, 8);
+        d.perchT = 0;
+        d.foldRate = rnd(1.1, 2.2);
+        d.perchHeading = (Math.random() < 0.5 ? 0 : PI) + rnd(-0.35, 0.35);
+      } else if (d.leaving) {
+        dragonfly = null;
+        return;
+      } else {
+        d.state = 'hover';
+        d.hoverT = rnd(0.4, 1.2);
+      }
     }
-  } else {
+  } else if (d.state === 'hover') {
     d.hoverT -= dt;
     d.x += Math.sin(d.t * 7) * 6 * dt;
     d.y += Math.cos(d.t * 9) * 6 * dt;
-    if (d.hoverT <= 0) {
-      d.legs--;
-      d.state = 'dash';
-      if (d.legs <= 0) { d.tx = d.x < W / 2 ? -80 : W + 80; d.ty = d.y + rnd(-100, 100); }
-      else { d.tx = clamp(d.x + rnd(-400, 400), 40, W - 40); d.ty = clamp(d.y + rnd(-250, 250), H * 0.1, H * 0.7); }
-    }
+    if (d.hoverT <= 0) dfNextLeg(d);
+  } else if (d.state === 'perch') {
+    var p = spotPos(d.perch);
+    d.x = p.x; d.y = p.y;
+    d.perchT += dt;
+    d.rest -= dt;
+    d.heading += angDiff(d.perchHeading, d.heading) * (1 - Math.exp(-dt * 4));
+    var cyc = 0.5 - 0.5 * Math.cos(d.perchT * d.foldRate);
+    d.fold += (Math.pow(cyc, 1.5) - d.fold) * (1 - Math.exp(-dt * 6));
+    if (d.rest <= 0) { d.legs = Math.floor(Math.random() * 2); dfNextLeg(d); }
   }
-  if (d.x < -150 || d.x > W + 150) dragonfly = null;
+  if (dragonfly && (d.x < -200 || d.x > W + 200)) dragonfly = null;
 }
 function drawDragonfly(ctx, t) {
   var d = dragonfly;
   if (!d) return;
+  var k = 1.2 * S.insectSize;
+  var perched = d.state === 'perch';
   ctx.save();
   ctx.translate(d.x, d.y);
   ctx.rotate(d.heading);
-  ctx.scale(1.1, 1.1);
-  var flap = Math.sin(t * 90) * 0.15;
-  ctx.fillStyle = 'rgba(255,255,255,0.32)';
-  ctx.strokeStyle = 'rgba(90,60,60,0.3)';
+  if (perched) {
+    ctx.fillStyle = 'rgba(60,40,40,0.12)';
+    ctx.beginPath(); ctx.ellipse(-4 * k + 3, 5, 18 * k, 4 * k, 0, 0, TAU); ctx.fill();
+  }
+  ctx.scale(k, k);
+  var flap = perched ? 0 : Math.sin(t * 90) * 0.15;
+  var fa = lerp(80, 152, d.fold) - flap * 60;     // 152° = folded back along the body
+  var ha = lerp(100, 164, d.fold) - flap * 60;
   ctx.lineWidth = 0.6;
-  [[10, -80 + flap * 60, 22, 4.5], [10, 80 - flap * 60, 22, 4.5], [6, -100 - flap * 60, 21, 5.5], [6, 100 + flap * 60, 21, 5.5]].forEach(function(w) {
+  [[10, -fa, 22, 4.5], [10, fa, 22, 4.5], [6, -ha, 21, 5.5], [6, ha, 21, 5.5]].forEach(function(w) {
     ctx.save();
     ctx.translate(w[0], 0);
     ctx.rotate(w[1] * DEG);
-    ctx.beginPath();
-    ctx.ellipse(w[2] / 2, 0, w[2] / 2, w[3] / 2, 0, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    ctx.strokeStyle = 'rgba(90,60,60,0.35)';
+    ctx.beginPath(); ctx.ellipse(w[2] / 2, 0, w[2] / 2, w[3] / 2, 0, 0, TAU); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(w[2] - 1, 0); ctx.stroke();
+    ctx.fillStyle = 'rgba(120,60,40,0.55)';
+    ctx.fillRect(w[2] - 4, -w[3] * 0.25, 2, w[3] * 0.4);
     ctx.restore();
   });
   ctx.strokeStyle = '#c4361e';
   ctx.lineCap = 'round';
   for (var i = 0; i < 6; i++) {
     ctx.lineWidth = 2.6 - i * 0.18;
-    ctx.beginPath();
-    ctx.moveTo(6 - i * 6, 0);
-    ctx.lineTo(1 - i * 6, 0);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(6 - i * 6, 0); ctx.lineTo(1 - i * 6, 0); ctx.stroke();
   }
   ctx.fillStyle = '#a8321f';
   ctx.beginPath(); ctx.ellipse(10, 0, 5, 3.2, 0, 0, TAU); ctx.fill();
@@ -1493,17 +2015,150 @@ function drawDragonfly(ctx, t) {
   ctx.restore();
 }
 
+/* Cricket (コオロギ): hops from character to character, sometimes
+   chirps, then hops off the screen. */
+var cricket = null, cricketNext = 0;
+function sendCricket() {
+  var seq = [], last = null, n = 3 + Math.floor(Math.random() * 5);
+  for (var i = 0; i < n; i++) {
+    var p = pickPerch(last);
+    seq.push(p);
+    last = spotPos(p);
+  }
+  var fromLeft = Math.random() < 0.5;
+  cricket = { x: fromLeft ? -30 : W + 30, y: H * rnd(0.6, 0.9), seq: seq, i: 0, state: 'rest', rest: 0,
+              exiting: false, facing: fromLeft ? 1 : -1, t: 0, hop: null, cur: null, chirpT: 0, u: 0 };
+}
+function crHop(c, to) {
+  var tp = spotPos(to), dx = tp.x - c.x, dy = tp.y - c.y, dist = Math.sqrt(dx * dx + dy * dy);
+  c.hop = { fx: c.x, fy: c.y, to: to, t: 0, dur: 0.3 + dist / 1100, h: 30 + dist * 0.3 };
+  c.state = 'hop';
+  c.u = 0;
+  if (Math.abs(dx) > 2) c.facing = dx > 0 ? 1 : -1;
+}
+function updateCricket(dt, t) {
+  var night = ENV.phase === 'night' || ENV.phase === 'dusk';
+  if (!cricket && S.cricket && night && ENV.scene !== 'winter' && !(ENV.rainy && S.rainMm > 2) && S.condition !== 'snow' && t > cricketNext) {
+    if (cricketNext > 0) sendCricket();
+    cricketNext = t + rnd(60, 180);
+  }
+  var c = cricket;
+  if (!c) return;
+  c.t += dt;
+  if (c.state === 'rest') {
+    if (c.cur) { var p = spotPos(c.cur); c.x = p.x; c.y = p.y; }
+    c.rest -= dt;
+    if (c.chirpT > 0) c.chirpT -= dt;
+    else if (night && c.cur && Math.random() < dt * 0.6) c.chirpT = rnd(0.6, 1.4);
+    if (c.rest <= 0) {
+      c.chirpT = 0;
+      if (c.i < c.seq.length) crHop(c, c.seq[c.i++]);
+      else if (!c.exiting) { c.exiting = true; crHop(c, { x: c.x < W / 2 ? -60 : W + 60, y: c.y + rnd(-40, 80) }); }
+      else cricket = null;
+    }
+  } else {
+    var h = c.hop;
+    h.t += dt;
+    var u = Math.min(1, h.t / h.dur), tp = spotPos(h.to);
+    c.x = lerp(h.fx, tp.x, u);
+    c.y = lerp(h.fy, tp.y, u) - h.h * 4 * u * (1 - u);
+    c.u = u;
+    if (u >= 1) {
+      if (c.exiting) { cricket = null; return; }
+      c.state = 'rest';
+      c.cur = h.to;
+      c.rest = rnd(0.6, 2.2);
+    }
+  }
+}
+function drawCricket(ctx, t) {
+  var c = cricket;
+  if (!c) return;
+  var k = 1.15 * S.insectSize;
+  var hopping = c.state === 'hop', u = hopping ? c.u : 0;
+  ctx.save();
+  ctx.translate(c.x, c.y);
+  if (!hopping) {
+    ctx.fillStyle = 'rgba(40,25,20,0.18)';
+    ctx.beginPath(); ctx.ellipse(0, 1, 10 * k, 2.2 * k, 0, 0, TAU); ctx.fill();
+  }
+  ctx.scale(c.facing * k, k);
+  if (hopping) ctx.rotate(lerp(-0.5, 0.45, u));    // nose up on take-off, down for landing
+  // hind legs stretch out on take-off and fold again for landing
+  var ext = hopping ? Math.sin(Math.min(1, u * 3) * PI / 2) * (1 - smooth(0.6, 1, u)) : 0;
+  var knee = [lerp(-8, -12, ext), lerp(-12, -5, ext)], foot = [lerp(-13, -21, ext), lerp(0, -1, ext)];
+  ctx.lineCap = 'round';
+  // far hind leg
+  ctx.strokeStyle = '#6b5040';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath(); ctx.moveTo(0.5, -5); ctx.lineTo(knee[0] + 1.5, knee[1] + 0.5); ctx.stroke();
+  ctx.lineWidth = 0.9;
+  ctx.beginPath(); ctx.moveTo(knee[0] + 1.5, knee[1] + 0.5); ctx.lineTo(foot[0] + 1.5, foot[1]); ctx.stroke();
+  // front and middle legs
+  ctx.strokeStyle = '#3a2a20';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  if (hopping) { ctx.moveTo(6, -4); ctx.lineTo(9, -2); ctx.moveTo(2, -4); ctx.lineTo(1, -1.5); }
+  else { ctx.moveTo(6, -4); ctx.lineTo(8.5, 0); ctx.moveTo(2, -4); ctx.lineTo(0.5, 0); }
+  ctx.stroke();
+  // body
+  ctx.fillStyle = '#3a2a20';
+  ctx.beginPath(); ctx.ellipse(-2, -6, 8, 3.6, 0, 0, TAU); ctx.fill();
+  var chirping = c.chirpT > 0 && !hopping;
+  ctx.fillStyle = '#5a4330';
+  ctx.beginPath(); ctx.ellipse(-3, -7.6, 7, 2.6, chirping ? -0.12 + Math.sin(t * 40) * 0.06 : 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = 'rgba(200,170,120,0.25)';
+  ctx.lineWidth = 0.4;
+  ctx.beginPath(); ctx.moveTo(-9, -7.6); ctx.lineTo(3, -7.8); ctx.moveTo(-7, -6.4); ctx.lineTo(1, -8.8); ctx.stroke();
+  ctx.fillStyle = '#2e211a';
+  ctx.beginPath(); ctx.ellipse(4.5, -6.8, 3, 3, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = '#2a1d16';
+  ctx.beginPath(); ctx.arc(8.5, -6, 3, 0, TAU); ctx.fill();
+  ctx.fillStyle = 'rgba(210,180,130,0.8)';
+  ctx.beginPath(); ctx.arc(9.6, -6.8, 0.8, 0, TAU); ctx.fill();
+  // tail feelers (cerci) and long twitching antennae
+  ctx.strokeStyle = '#3a2a20';
+  ctx.lineWidth = 0.6;
+  var tw = Math.sin(t * 7) * 2 + Math.sin(t * 13 + 1);
+  ctx.beginPath();
+  ctx.moveTo(-10, -6); ctx.lineTo(-15, -8.5);
+  ctx.moveTo(-10, -5.5); ctx.lineTo(-15, -4.5);
+  ctx.moveTo(10.5, -8); ctx.quadraticCurveTo(17, -18, 26, -16 + tw);
+  ctx.moveTo(10, -8); ctx.quadraticCurveTo(14, -20, 22, -22 + tw * 0.7);
+  ctx.stroke();
+  // near hind leg: big jumping leg
+  ctx.strokeStyle = '#2e211a';
+  ctx.lineWidth = 2.6;
+  ctx.beginPath(); ctx.moveTo(-1, -5); ctx.lineTo(knee[0], knee[1]); ctx.stroke();
+  ctx.lineWidth = 1.1;
+  ctx.beginPath(); ctx.moveTo(knee[0], knee[1]); ctx.lineTo(foot[0], foot[1]); ctx.stroke();
+  // chirp: little sound arcs
+  if (chirping) {
+    for (var j = 0; j < 3; j++) {
+      var rr = 4 + j * 3 + (t * 12) % 3;
+      ctx.strokeStyle = 'rgba(120,90,60,' + (0.35 * (1 - j / 3)).toFixed(3) + ')';
+      ctx.lineWidth = 0.7;
+      ctx.beginPath(); ctx.arc(-4, -12, rr, -PI * 0.8, -PI * 0.2); ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
 /* ============================================================
    9. CANVAS, SPAWNING, MAIN LOOP
    ============================================================ */
 var canvas = document.getElementById('dynCanvas');
 var ctx = canvas.getContext('2d');
+var canvasF = document.getElementById('dynFront');
+var ctxF = canvasF.getContext('2d');
+var treeLayer = document.createElement('canvas');
+var ctxT = treeLayer.getContext('2d');
 var W = 0, H = 0;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
-  canvas.width = Math.round(W * PR);
-  canvas.height = Math.round(H * PR);
+  canvas.width = canvasF.width = treeLayer.width = Math.round(W * PR);
+  canvas.height = canvasF.height = treeLayer.height = Math.round(H * PR);
   lookVersion++;
 }
 window.addEventListener('resize', resize);
@@ -1537,7 +2192,7 @@ function spawnTick(dt, t) {
     if (lightningNext === 0) lightningNext = t + rnd(8, 25);
     if (t > lightningNext) { strikeLightning(); lightningNext = t + rnd(8, 25); }
   }
-  if (S.heroLeaf && !hero) {
+  if (S.heroLeaf && !hero && ENV.scene !== 'winter') {
     if (heroNext === 0) heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4);
     if (t > heroNext) { sendHero(); heroNext = t + S.heroEvery * 60 * rnd(0.6, 1.4); }
   }
@@ -1555,7 +2210,7 @@ function sendHero() {
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
   var a = L.hero ? 0.78 : lerp(S.farOpacity, S.nearOpacity, zc);
-  a *= Math.min(1, L.age / 0.6);
+  a *= Math.min(1, L.age / (L.fadeDur || 0.6));
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
   return clamp(a, 0, 1);
@@ -1579,7 +2234,7 @@ function drawLeaf(L, t, inPile) {
 }
 
 var lastT = 0, envTimer = 0, uiTimer = 0, lastLookKey = '', lastDate = '';
-var fps = 60, rebakeIdx = 0;
+var fps = 60, rebakeIdx = 0, frontDirty = false, lastScene = '';
 var veil = document.getElementById('flashVeil');
 
 function lookKey() {
@@ -1613,6 +2268,13 @@ function frame(ms) {
     envTimer = 0.25;
     var k = lookKey();
     if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
+    if (ENV.scene !== lastScene) {
+      // Dec–Feb has no falling leaves; coming back out of winter fills the sky again.
+      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; }
+      else if (lastScene === 'winter') prefill();
+      lastScene = ENV.scene;
+    }
+    ensureTree();
   }
 
   spawnTick(dt, t);
@@ -1636,11 +2298,14 @@ function frame(ms) {
   updateSnow(dt, t);
   updateBirds(dt, t);
   updateSpecks(dt, t);
+  updateTree(dt, t);
   updateDragonfly(dt, t);
+  updateCricket(dt, t);
 
   // re-draw a few leaf sprites per frame when the look changed
   var budget = 10, all = leaves.concat(pile);
   if (hero) all.push(hero);
+  if (tree) all = all.concat(tree.leaves);
   for (var b = 0; b < all.length && budget > 0; b++) {
     var Lb = all[(rebakeIdx + b) % all.length];
     if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
@@ -1653,7 +2318,8 @@ function frame(ms) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   drawSky(ctx, t);
-  drawMoon(ctx);
+  drawSun(ctx, t);
+  drawMoon(ctx, t);
   drawCloudShadows(ctx, dt);
   drawRays(ctx, t);
   drawBirds(ctx, t);
@@ -1661,11 +2327,12 @@ function frame(ms) {
   while (split < leaves.length && leaves[split].z < 0.5) split++;
   for (var f = 0; f < split; f++) drawLeaf(leaves[f], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawTree(ctx, t);
   drawFog(ctx, dt);
   for (var n = split; n < leaves.length; n++) drawLeaf(leaves[n], t, false);
   for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
-  drawDragonfly(ctx, t);
+  snowmanSpot = drawSnowman(ctx, t);
   drawSnow(ctx);
   drawRain(ctx);
   if (hero) { drawLeaf(hero, t, false); ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1; }
@@ -1680,6 +2347,16 @@ function frame(ms) {
   }
   if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
   veil.style.opacity = (flashA * 0.35).toFixed(3);
+
+  // front layer: dragonfly and cricket over the text
+  if (dragonfly || cricket || frontDirty) {
+    ctxF.setTransform(1, 0, 0, 1, 0, 0);
+    ctxF.clearRect(0, 0, canvasF.width, canvasF.height);
+    ctxF.setTransform(PR, 0, 0, PR, 0, 0);
+    drawDragonfly(ctxF, t);
+    drawCricket(ctxF, t);
+    frontDirty = !!(dragonfly || cricket);
+  }
 
   uiTimer -= dt;
   if (uiTimer <= 0) { uiTimer = 0.5; updateUiLive(); }
@@ -1780,6 +2457,7 @@ function showPanel() {
   document.getElementById('track').style.transform = 'translateX(' + (-50 * idx) + '%)';
   document.querySelectorAll('.stage .panel').forEach(function(p, i) { p.classList.toggle('active', i === idx); });
   document.querySelectorAll('#dots .dot').forEach(function(d, i) { d.classList.toggle('active', i === idx); });
+  insectsLeaveText();
   replayPhrases();
 }
 [1, 2].forEach(function(n) {
@@ -1880,6 +2558,17 @@ var SPEC = [
   { k: 'cloudCover', t: 'range', label: 'Cloud cover', min: 0, max: 100, step: 5, fmt: function(v) { return v + '%'; } },
   { k: 'rainMm', t: 'range', label: 'Rain / snow amount', min: 0, max: 12, step: 0.2, fmt: function(v) { return v.toFixed(1) + ' mm/h'; } },
   { k: 'fogDensity', t: 'range', label: 'Fog', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { sec: 'Scene 季節の風景' },
+  { k: 'scene', t: 'select', label: 'Picture', opts: [['auto', 'Follow the date (Oct–Nov tree, Dec–Feb snowman)'], ['autumn', 'Autumn: bare tree + falling leaves'], ['winter', 'Winter: snowman, no falling leaves'], ['plain', 'Falling leaves only']] },
+  { info: 'sceneInfo' },
+  { k: 'figureSide', t: 'select', label: 'Tree / snowman side', opts: [['auto', 'Changes each day'], ['left', 'Left'], ['right', 'Right']] },
+  { k: 'tree', t: 'check', label: 'Bare tree in autumn' },
+  { k: 'treeSize', t: 'range', label: 'Tree height', min: 0.35, max: 0.95, step: 0.01, fmt: f2 },
+  { k: 'treeSway', t: 'range', label: 'Branch sway', min: 0, max: 3, step: 0.05, fmt: x2 },
+  { k: 'treeLeaves', t: 'range', label: 'Leaves left on the tree', min: 0, max: 3, step: 0.05, fmt: x2 },
+  { k: 'treeOpacity', t: 'range', label: 'Tree strength', min: 0.15, max: 1, step: 0.01, fmt: f2 },
+  { k: 'snowman', t: 'check', label: 'Snowman in winter' },
+  { k: 'snowmanSize', t: 'range', label: 'Snowman size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { sec: 'Leaves 落ち葉' },
   { k: 'density', t: 'range', label: 'How many leaves fall', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'maxLeaves', t: 'range', label: 'Most leaves on screen at once', min: 10, max: 160, step: 5, fmt: String },
@@ -1912,7 +2601,8 @@ var SPEC = [
   { k: 'farOpacity', t: 'range', label: 'Strength of far leaves', min: 0.05, max: 0.8, step: 0.01, fmt: f2 },
   { k: 'nearOpacity', t: 'range', label: 'Strength of near leaves', min: 0.1, max: 1, step: 0.01, fmt: f2 },
   { sec: 'Weather effects' },
-  { k: 'rainStreaks', t: 'range', label: 'Rain streaks', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'rainStreaks', t: 'range', label: 'Amount of rain streaks', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'rainContrast', t: 'range', label: 'How dark the rain is', min: 0.3, max: 2.5, step: 0.05, fmt: x2 },
   { k: 'splashes', t: 'check', label: 'Splash rings at the bottom' },
   { k: 'lightRays', t: 'range', label: 'Sun rays', min: 0, max: 2, step: 0.05, fmt: x2 },
   { k: 'sunFlicker', t: 'range', label: 'Sunlight flicker on leaves', min: 0, max: 1, step: 0.05, fmt: f2 },
@@ -1921,8 +2611,14 @@ var SPEC = [
   { k: 'lightning', t: 'check', label: 'Lightning in thunderstorms' },
   { k: 'frost', t: 'check', label: 'Frosty edges below 5°C' },
   { k: 'snowMix', t: 'check', label: 'First snowflakes below 3°C' },
+  { sec: 'Sun & moon 太陽と月' },
+  { info: 'skyInfo' },
+  { k: 'sun', t: 'check', label: 'Show the sun (real position: right = east, left = west)' },
+  { k: 'sunSize', t: 'range', label: 'Sun size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
+  { k: 'sunGlow', t: 'range', label: 'Sun glow and rays', min: 0, max: 2, step: 0.05, fmt: x2 },
+  { k: 'moon', t: 'check', label: 'Show the moon (real position and phase)' },
+  { k: 'moonSize', t: 'range', label: 'Moon size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { sec: 'Time-of-day extras' },
-  { k: 'moon', t: 'check', label: 'Moon at night (real phase)' },
   { k: 'birds', t: 'check', label: 'Distant birds at dawn and dusk' },
   { k: 'nightSpecks', t: 'check', label: 'Glowing specks at night' },
   { k: 'dawnGlow', t: 'check', label: 'Warm glow at dawn' },
@@ -1932,10 +2628,14 @@ var SPEC = [
   { k: 'pile', t: 'check', label: 'Leaves pile up at the bottom' },
   { k: 'pileMax', t: 'range', label: 'Most leaves in the pile', min: 0, max: 200, step: 5, fmt: String },
   { k: 'pileClearMidnight', t: 'check', label: 'Pile is swept clean at midnight' },
-  { k: 'dragonfly', t: 'check', label: 'Red dragonfly on warm sunny afternoons' },
   { k: 'tapWind', t: 'check', label: 'Tap or swipe moves the leaves' },
   { k: 'tapStrength', t: 'range', label: 'Tap / swipe strength', min: 0, max: 3, step: 0.1, fmt: x2 },
-  { buttons: [['Leaf up close', 'hero'], ['Gust of wind', 'gust'], ['Lightning', 'lightning'], ['Dragonfly', 'dragonfly'], ['Birds', 'birds'], ['Clear the pile', 'clearPile']] },
+  { buttons: [['Leaf up close', 'hero'], ['Gust of wind', 'gust'], ['Lightning', 'lightning'], ['Birds', 'birds'], ['Clear the pile', 'clearPile']] },
+  { sec: 'Visitors 虫' },
+  { k: 'dragonfly', t: 'check', label: 'Red dragonfly by day — lands on the message characters' },
+  { k: 'cricket', t: 'check', label: 'Cricket at night — hops from character to character' },
+  { k: 'insectSize', t: 'range', label: 'Insect size', min: 0.6, max: 2, step: 0.05, fmt: x2 },
+  { buttons: [['Dragonfly now', 'dragonfly'], ['Cricket now', 'cricket']] },
   { sec: 'Message panels' },
   { k: 'panel', t: 'select', label: 'Panel shown', opts: [['1', 'Panel 1 — 自己紹介'], ['2', 'Panel 2 — メッセージ']] },
   { k: 'showText', t: 'check', label: 'Show panel text' },
@@ -1949,12 +2649,14 @@ SPEC.forEach(function(s) { if (s.k) SPEC_BY_KEY[s.k] = s; });
 var WEATHER_KEYS = ['condition', 'windSpeed', 'windDir', 'gustiness', 'temperature', 'cloudCover', 'rainMm', 'fogDensity'];
 var LOOK_KEYS = ['colorMode', 'colorProgress', 'colorVariety', 'paletteBlend', 'lightTint', 'farBlur', 'nearBlur'];
 var GEOM_KEYS = ['shapeVariation', 'wear'];
+var TREE_KEYS = ['scene', 'figureSide', 'tree', 'treeSize', 'treeLeaves'];
 
 var ACTIONS = {
   hero: function() { sendHero(); },
   gust: function() { computeEnv(); startGust(true); },
   lightning: function() { strikeLightning(); },
   dragonfly: function() { sendDragonfly(); },
+  cricket: function() { sendCricket(); },
   birds: function() { sendBirds(); },
   clearPile: function() { pile.length = 0; },
   replay: function() { replayPhrases(); }
@@ -2056,6 +2758,7 @@ function setSetting(k, value, fromUser) {
   if (k === 'pileMax') while (pile.length > S.pileMax) pile.shift();
   if (k === 'maxLeaves') while (leaves.length > S.maxLeaves) leaves.shift();
   if (k === 'heroEvery') heroNext = 0;
+  if (TREE_KEYS.indexOf(k) >= 0) { tree = null; computeEnv(); ensureTree(); }
   refreshControl(k);
   computeEnv();
   updateUiLive();
@@ -2078,10 +2781,17 @@ function updateUiLive() {
 
   if (Math.abs(S.hour - _lastUiHour) > 0.004) { _lastUiHour = S.hour; refreshControl('hour'); refreshControl('date'); }
 
-  var moonPct = Math.round((1 - Math.cos(ENV.moon * TAU)) / 2 * 100);
+  var A = ENV.astro, moonPct = Math.round(A.illum * 100);
   var si = document.getElementById('sunInfo');
   if (si) si.textContent = 'Sunrise ' + fmtHour(sun.rise) + ' · Sunset ' + fmtHour(sun.set) + ' · Now: ' +
-    PHASE_NAMES[ENV.phase] + ' · Moon ' + moonPct + '% lit · Autumn stage ' + ENV.season.toFixed(2) + ' (' + seasonName(ENV.season) + ')';
+    PHASE_NAMES[ENV.phase] + ' · Autumn stage ' + ENV.season.toFixed(2) + ' (' + seasonName(ENV.season) + ')';
+  var ki = document.getElementById('skyInfo');
+  if (ki) ki.textContent = 'Sun: ' + (A.sun.alt > 0 ? Math.round(A.sun.alt) + '° up in the ' + compassName(A.sun.az) : 'below the horizon') +
+    ' · Moon: ' + moonName(A) + ', ' + moonPct + '% lit, ' +
+    (A.moon.alt > 0 ? Math.round(A.moon.alt) + '° up in the ' + compassName(A.moon.az) : 'below the horizon');
+  var ci = document.getElementById('sceneInfo');
+  if (ci) ci.textContent = 'Now showing: ' + ({ autumn: 'autumn — bare tree on the ' + ENV.side + ', leaves falling',
+    winter: 'winter — snowman on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
   var wi = document.getElementById('weatherInfo');
   if (wi) wi.textContent = S.liveWeather ? weatherStatus : 'Manual weather (tick the box above to go back to live)';
   var sp = document.getElementById('speciesInfo');
@@ -2128,7 +2838,10 @@ function buildCopyText() {
     scene: {
       date: S.date, time: fmtHour(S.hour), lightPhase: ENV.phase,
       sunrise: fmtHour(ENV.sun.rise), sunset: fmtHour(ENV.sun.set),
-      autumnStage: +ENV.season.toFixed(2), moonLitPercent: Math.round((1 - Math.cos(ENV.moon * TAU)) / 2 * 100),
+      autumnStage: +ENV.season.toFixed(2), picture: ENV.scene, pictureSide: ENV.side,
+      sun: { altitude: Math.round(ENV.astro.sun.alt), azimuth: Math.round(ENV.astro.sun.az) },
+      moon: { phase: moonName(ENV.astro), litPercent: Math.round(ENV.astro.illum * 100),
+              altitude: Math.round(ENV.astro.moon.alt), azimuth: Math.round(ENV.astro.moon.az) },
       weather: S.condition, liveWeather: S.liveWeather
     },
     settings: {}
@@ -2162,7 +2875,8 @@ document.getElementById('btnReset').addEventListener('click', function() {
   try { localStorage.removeItem(STORE_KEY); } catch (e) {}
   S = makeDefaults();
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
-  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; dragonfly = null;
+  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0;
+  dragonfly = null; cricket = null; tree = null; frontDirty = true;
   heroNext = 0; lookVersion++; geomVersion++;
   document.getElementById('copyOut').classList.remove('shown');
   document.body.classList.toggle('hide-text', !S.showText);
@@ -2189,8 +2903,10 @@ function prefill() {
 makeSprites();
 resize();
 computeEnv();
+ensureTree();
 lastLookKey = lookKey();
 lastDate = S.date;
+lastScene = ENV.scene;
 buildControls();
 document.body.classList.toggle('hide-text', !S.showText);
 try {
