@@ -6530,7 +6530,7 @@ function resetReceiptStamp() {
   receiptStampMemo = null;
   if (receiptStampEl) receiptStampEl.classList.remove('stamping', 'shown', 'lifting');
   if (receiptStampX) receiptStampX.classList.remove('on');
-  if (receiptScreen) setReceiptLocked(false);
+  if (receiptScreen) { receiptScreen.classList.remove('stamp-confirm'); setReceiptLocked(false); }
 }
 
 function placeReceiptStampAt(memo) {
@@ -6547,6 +6547,7 @@ function restoreReceiptStamp() {
   receiptStampEl.classList.remove('stamping', 'lifting');
   receiptStampEl.classList.add('shown');
   receiptStampX.classList.add('on');
+  receiptScreen.classList.add('stamp-confirm');
   receiptStamped = true;
   setReceiptLocked(true);
 }
@@ -6571,25 +6572,28 @@ function showNoItemsAlert() {
   );
 }
 
-/* Scrolls the signing box into view if the receipt has been scrolled away. */
-function scrollReceiptStampZoneIntoView() {
+/* The confirm button opens below サービスの選択に戻る once the seal is on, and
+   the receipt paper often scrolls, so bring the new button into view. */
+function scrollReceiptConfirmIntoView() {
   var paper = receiptScreen.querySelector('.receipt-paper');
-  if (!paper || !receiptStampZone) return;
+  if (!paper || !receiptConfirmBtn || !receiptStamped) return;
   var pr = paper.getBoundingClientRect();
-  var zr = receiptStampZone.getBoundingClientRect();
-  if (zr.top < pr.top + 24 || zr.bottom > pr.bottom - 24) {
-    var shift = (zr.top + zr.height / 2) - (pr.top + pr.height / 2);
+  var br = receiptConfirmBtn.getBoundingClientRect();
+  if (br.bottom > pr.bottom - 20) {
+    var shift = br.bottom - pr.bottom + 28;
     try { paper.scrollBy({ top: shift, behavior: 'smooth' }); } catch (err) { paper.scrollTop += shift; }
   }
 }
 
-/* Confirm tapped before stamping: pulse the box a few times. */
-function nudgeReceiptStampZone() {
-  scrollReceiptStampZoneIntoView();
-  receiptStampZone.classList.remove('nudge');
-  void receiptStampZone.offsetWidth;
-  receiptStampZone.classList.add('nudge');
-  setTimeout(function() { receiptStampZone.classList.remove('nudge'); }, 1900);
+/* She tapped something that is locked while the seal is on: wiggle the ✕ to
+   show how to unlock. */
+function wiggleReceiptStampX() {
+  if (!receiptStampX) return;
+  haptic(6);
+  receiptStampX.classList.remove('wiggle');
+  void receiptStampX.offsetWidth;
+  receiptStampX.classList.add('wiggle');
+  setTimeout(function() { receiptStampX.classList.remove('wiggle'); }, 550);
 }
 
 /* An item with a blank price is incomplete: shake it and put the cursor
@@ -6682,11 +6686,18 @@ if (receiptStampZone) {
     }, reduced ? 100 : 600));
     receiptStampTimers.push(setTimeout(function() {
       receiptStampX.classList.add('on');
+      receiptScreen.classList.add('stamp-confirm');
     }, reduced ? 150 : 1100));
+    receiptStampTimers.push(setTimeout(scrollReceiptConfirmIntoView, reduced ? 250 : 1800));
   });
 }
 
-/* ⊗: lift the seal off, bring the box back, unlock the receipt. */
+/* A tap on a locked item (price, ×, undo) wiggles the ✕. */
+receiptItems.addEventListener('click', function() {
+  if (receiptStamped) wiggleReceiptStampX();
+});
+
+/* ✕: lift the seal off, bring the box back, unlock the receipt. */
 if (receiptStampX) {
   receiptStampX.addEventListener('click', function(e) {
     e.preventDefault();
@@ -6697,6 +6708,7 @@ if (receiptStampX) {
     receiptStamped = false;
     receiptStampMemo = null;
     receiptStampX.classList.remove('on');
+    receiptScreen.classList.remove('stamp-confirm');
     receiptStampEl.classList.remove('stamping', 'shown');
     receiptStampEl.classList.add('lifting');
     receiptStampTimers.push(setTimeout(function() {
@@ -6717,11 +6729,8 @@ receiptConfirmBtn.addEventListener('click', function(e) {
     return;
   }
 
-  /* Confirm only goes through once the seal is on. */
-  if (!receiptStamped) {
-    nudgeReceiptStampZone();
-    return;
-  }
+  /* The button only appears once the seal is on; this is a safety net. */
+  if (!receiptStamped) return;
   continueAfterReceiptStamp();
 });
 
@@ -6827,6 +6836,8 @@ function returnToTable() {
 }
 receiptBackBtn.addEventListener('click', function(e) {
   e.preventDefault();
+  /* While the seal is on, going back is on hold until she lifts it. */
+  if (receiptStamped || receiptStampBusy) { wiggleReceiptStampX(); return; }
   haptic(10);
   returnToTable();
 });
@@ -8926,6 +8937,7 @@ tyReceiptBtn.addEventListener('click', function(e) {
     requestAnimationFrame(updateReceiptScrollIndicator);
     setTimeout(updateReceiptScrollIndicator, 100);
     setTimeout(updateReceiptScrollIndicator, 500);
+    if (receiptStamped) setTimeout(scrollReceiptConfirmIntoView, 1000);
   }, 100);
 });
 
