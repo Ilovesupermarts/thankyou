@@ -399,11 +399,12 @@ function makeDefaults() {
     depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
     rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
     lightning: true, frost: true, snowMix: true,
-    sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1,
+    sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1, moonPath: 'arc',
     birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
     scene: 'auto', figureSide: 'auto',
     tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
-    winterTree: true,
+    winterTree: true, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
+    frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
     heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
     dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
     panel: '1', showText: true,
@@ -1040,6 +1041,8 @@ function spawnLeaf(opts) {
   if (ENV.scene === 'winter' && !opts.hero) return null;
   if (leaves.length >= S.maxLeaves && !opts.force) return null;
   var L = makeLeaf(opts);
+  // The nearest leaves fall in front of the text (a few at a time).
+  if (S.frontLeaves > 0 && L.z >= 0.7 && frontLeafCount < S.frontLeaves) { L.front = true; frontLeafCount++; }
   var wp = ENV.windPx;
   if (opts.x !== undefined) { L.x = opts.x; L.y = opts.y; }
   else if (Math.abs(wp) > 30 && Math.random() < Math.min(0.5, Math.abs(wp) / 250)) {
@@ -1092,6 +1095,7 @@ function updateLeaf(L, dt, t) {
 
 function settleLeaf(L) {
   L.settled = true;
+  L.front = false;
   L.y = H - L.groundY;
   L.pileSy = rnd(0.45, 0.72);
   L.pileSx = Math.random() < 0.5 ? -1 : 1;
@@ -1324,7 +1328,7 @@ function updateSnow(dt, t) {
   var target = ENV.snowing ? Math.round(140 * ENV.snowAmt) : 0;
   while (flakes.length < target) {
     flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, tier: Math.floor(Math.pow(Math.random(), 1.3) * 5),
-                  ph: rnd(0, TAU), sw: rnd(8, 18), sf: rnd(0.8, 1.6) });
+                  ph: rnd(0, TAU), sw: rnd(8, 18), sf: rnd(0.8, 1.6), r: Math.random() });
   }
   if (flakes.length > target) flakes.length = target;
   for (var i = 0; i < flakes.length; i++) {
@@ -1336,17 +1340,22 @@ function updateSnow(dt, t) {
     if (f.x > W + 20) f.x -= W + 40;
   }
 }
-/* near = false draws the far tiers (behind the tree and fog), true the near ones. */
-function drawSnow(ctx, near) {
+/* Which tier group to draw:
+   'far'   — the small, soft far tiers (behind the tree and fog)
+   'near'  — the larger tiers, still behind the text
+   'front' — a random share of the larger flakes, drawn above the text */
+function isFrontFlake(f) { return f.tier >= 2 && f.r < S.snowFront; }
+function drawSnow(c, mode) {
   if (!flakes.length) return;
   for (var i = 0; i < flakes.length; i++) {
-    var f = flakes[i];
-    if ((f.tier >= 3) !== near) continue;
+    var f = flakes[i], fr = isFrontFlake(f);
+    if (mode === 'front') { if (!fr) continue; }
+    else if (fr || (f.tier >= 3) !== (mode === 'near')) continue;
     var tr = SNOW_TIERS[f.tier], d = tr.r * 2 * (64 / 30);
-    ctx.globalAlpha = tr.a;
-    ctx.drawImage(snowSprites[f.tier], f.x - d / 2, f.y - d / 2, d, d);
+    c.globalAlpha = mode === 'front' ? tr.a * 0.85 : tr.a;
+    c.drawImage(snowSprites[f.tier], f.x - d / 2, f.y - d / 2, d, d);
   }
-  ctx.globalAlpha = 1;
+  c.globalAlpha = 1;
 }
 
 function drawSky(ctx, t) {
@@ -1448,24 +1457,47 @@ function moonNightU() {
   if (h < 5) return (h + 4) / 9;
   return -1;
 }
+/* Where the moon is drawn, and how visible it is.
+   'arc'  — one smooth glide every night, east (right) at 20:00 to west
+            (left) at 05:00, like the sun. Phase is real, position is not.
+   'real' — its real place in the sky; it fades out as it sinks to the
+            horizon and is not shown while it is really below it. */
+function moonPlacement(r) {
+  var m = ENV.astro.moon, cx, fade;
+  if (sunIsUp()) return null;                 // never together with the sun
+  if (S.moonPath === 'real') {
+    fade = smooth(-0.8, 2.5, m.alt);
+    cx = skyToScreen(m.alt, m.az).x;
+  } else {
+    var u = moonNightU();
+    if (u < 0) return null;
+    fade = smooth(0, 0.03, u) * (1 - smooth(0.97, 1, u));
+    cx = W * lerp(0.85, 0.15, u);
+  }
+  if (fade < 0.02) return null;
+  return { x: cx, y: skyBandY(r), fade: fade };
+}
+function moonNote() {
+  if (sunIsUp()) return ' (hidden while the sun is shown)';
+  if (S.moonPath === 'real') return ENV.astro.moon.alt > 0 ? '' : ' (below the horizon, so not shown in real-sky mode)';
+  return moonNightU() < 0 ? ' (moon is shown 20:00–05:00)' : '';
+}
 function drawMoon(ctx, t) {
   if (!S.moon) return;
-  var A = ENV.astro, m = A.moon;
-  var u = moonNightU();
-  if (u < 0 || sunIsUp()) return;           // only 20:00–05:00, never together with the sun
-  var day = ENV.light.daylight;
-  // fade in just after 20:00 and out just before 05:00
-  var vis = smooth(0, 0.03, u) * (1 - smooth(0.97, 1, u)) * lerp(1, 0.55, day) *
-            clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) * (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
-  if (vis < 0.02) return;
+  var A = ENV.astro;
   var r = 28 * S.moonSize;
-  // Real phase always. Left/right follows the real direction while the moon
-  // is up; when it is really below the horizon it crosses the sky band
-  // from east (right) to west (left) through the night instead.
-  var pos = skyToScreen(m.alt, m.az);
-  var cx = m.alt > 0 ? pos.x : W * lerp(0.85, 0.15, u), cy = skyBandY(r);
-  var sp = skyToScreen(A.sun.alt, A.sun.az);
-  var toSun = Math.atan2(sp.y - pos.y, sp.x - pos.x);
+  var P = moonPlacement(r);
+  if (!P) return;
+  var day = ENV.light.daylight;
+  var vis = P.fade * lerp(1, 0.55, day) * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) *
+            (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
+  if (vis < 0.02) return;
+  var cx = P.x, cy = P.y;
+  // The lit side faces the sun. The sun is below the horizon at night, so
+  // this is worked out from the phase alone: a waxing moon is lit toward
+  // the west (left), a waning one toward the east (right), tilted down.
+  // It changes smoothly with the phase, so the moon never flips.
+  var toSun = Math.atan2(1, -Math.sin(A.elong * DEG) * 2.5);
   var litCol = mixRgb([255, 246, 226], [236, 240, 250], day);
   var glowA = 0.32 * vis * (1 - day * 0.7) * A.illum;
   if (glowA > 0.005) {
@@ -1826,29 +1858,196 @@ function updateTree(dt, t) {
   }
 }
 function drawTree(ctx, t) {
-  if (!tree) return;
-  // Branches go onto their own layer at full strength, then the layer is
-  // laid down at the chosen strength, so joints don't show darker spots.
+  var fig = ENV.scene === 'winter' && S.snowman;
+  if (!tree && !fig) return;
+  // Branches (and the snowman's body) go onto their own layer at full
+  // strength, then the layer is laid down at the chosen strength, so joints
+  // don't show darker spots and the snowman matches the tree.
   ctxT.setTransform(1, 0, 0, 1, 0, 0);
   ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
   ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-  ctxT.strokeStyle = rgba(mixRgb(tree.winter ? [78, 66, 72] : [70, 46, 44], ENV.light.col, 0.12));
+  ctxT.strokeStyle = rgba(mixRgb(ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44], ENV.light.col, 0.12));
   ctxT.lineCap = 'round';
-  var ns = tree.nodes;
-  for (var i = 0; i < ns.length; i++) {
-    var n = ns[i];
-    ctxT.lineWidth = n.w;
-    ctxT.beginPath();
-    ctxT.moveTo(n.sx, n.sy);
-    ctxT.lineTo(n.ex, n.ey);
-    ctxT.stroke();
+  if (tree) {
+    var ns = tree.nodes;
+    for (var i = 0; i < ns.length; i++) {
+      var n = ns[i];
+      ctxT.lineWidth = n.w;
+      ctxT.beginPath();
+      ctxT.moveTo(n.sx, n.sy);
+      ctxT.lineTo(n.ex, n.ey);
+      ctxT.stroke();
+    }
   }
+  var sm = fig ? snowmanBody(ctxT, t) : null;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = S.treeOpacity;
   ctx.drawImage(treeLayer, 0, 0);
-  for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
+  if (tree) for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
+  if (sm) snowmanDress(ctx, t, sm);
+}
+
+/* ============================================================
+   8b-2. WINTER GROUND — accumulated snow and a snowman silhouette.
+   Colours are the site palette: 絹白 silk white, 薄桃 petal-soft and the
+   soft cream tiers for the snow; plum, 金木犀 orange and amber for the
+   scarf and hat; the same taupe as the winter tree for the silhouette.
+   ============================================================ */
+var snowAccum = 0;            // 0..1: grows while it snows, melts slowly when mild
+var snowman = { wind: 0 };
+var _bankPh = 0;
+var SNOWC = {
+  white: [255, 253, 249], soft1: [251, 236, 224], soft3: [245, 223, 207], petalSoft: [253, 232, 218],
+  border1: [238, 210, 192], border2: [222, 192, 172], plum: [136, 46, 71], plumLight: [158, 62, 92],
+  accent: [230, 104, 38], accent2: [196, 78, 16], amber: [158, 59, 6]
+};
+/* Palette colour as it looks in the current light: warmer at dusk, darker at night. */
+function snowLit(c) {
+  var Lt = ENV.light, o = mixRgb(c, Lt.col, clamp(Lt.amt * S.lightTint * 0.8, 0, 0.5));
+  return scaleRgb(o, 1 - Lt.dark * 0.35 * S.lightTint);
+}
+function updateWinterGround(dt) {
+  if (ENV.scene !== 'winter') return;
+  _bankPh = (dayOfYear(ENV.p) % 97) * 0.43;                  // a different set of hills each day
+  if (S.condition === 'snow') snowAccum = Math.min(1, snowAccum + dt * ENV.snowAmt / 900);
+  else if (S.temperature > 3) snowAccum = Math.max(0, snowAccum - dt / 3000);
+  var target = clamp(ENV.windPx / 50 + (tree ? tree.gust * 4 : 0), -1.3, 1.3);
+  snowman.wind += (target - snowman.wind) * (1 - Math.exp(-dt * 1.5));
+}
+function bankHeightPx(layer) {
+  var base = H * 0.03 * S.snowBankHeight, acc = H * 0.045 * snowAccum * S.snowBankHeight;
+  return layer === 'far' ? (base + acc) * 1.7 + H * 0.01 : base + acc;
+}
+/* Rolling hills: three sine waves of different length. */
+function bankSurface(x, layer) {
+  var far = layer === 'far', h = bankHeightPx(layer), ph = _bankPh + (far ? 2.1 : 0), k = far ? 0.7 : 1;
+  return H - h * (0.72 + 0.28 * Math.sin(x * 0.0042 * k + ph) + 0.14 * Math.sin(x * 0.0105 * k + ph * 1.7 + 1) +
+                  0.05 * Math.sin(x * 0.026 + ph * 2.3));
+}
+function drawSnowBank(ctx, layer) {
+  if (ENV.scene !== 'winter' || !S.snowBank) return;
+  var far = layer === 'far', hpx = bankHeightPx(layer), x;
+  ctx.beginPath();
+  ctx.moveTo(-6, H + 6);
+  for (x = -6; x <= W + 18; x += 12) ctx.lineTo(x, bankSurface(x, layer));
+  ctx.lineTo(W + 6, H + 6);
+  ctx.closePath();
+  var g = ctx.createLinearGradient(0, H - hpx * 1.25, 0, H);
+  if (far) {
+    g.addColorStop(0, rgba(snowLit(SNOWC.petalSoft), 0.78));
+    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.85));
+  } else {
+    g.addColorStop(0, rgba(snowLit(SNOWC.white), 0.98));
+    g.addColorStop(0.55, rgba(snowLit(SNOWC.soft1), 0.98));
+    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.98));
+  }
+  ctx.fillStyle = g;
+  ctx.fill();
+  // crest: a thin warm line, plus a bright highlight just above it
+  ctx.beginPath();
+  for (x = -6; x <= W + 18; x += 12) { if (x === -6) ctx.moveTo(x, bankSurface(x, layer)); else ctx.lineTo(x, bankSurface(x, layer)); }
+  ctx.strokeStyle = rgba(snowLit(far ? SNOWC.border1 : SNOWC.border2), far ? 0.5 : 0.65);
+  ctx.lineWidth = 1.2;
+  ctx.stroke();
+  if (!far) {
+    ctx.translate(0, -1.6);
+    ctx.strokeStyle = rgba(snowLit(SNOWC.white), 0.8);
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.translate(0, 1.6);
+  }
+}
+function snowmanLayout() {
+  var left = ENV.side === 'left';
+  var bx = tree ? tree.bx : (left ? W * 0.07 : W * 0.93);
+  var x = clamp(left ? bx + H * 0.2 : bx - H * 0.2, W * 0.06, W * 0.94);
+  var R = H * 0.064 * S.snowmanSize, r2 = R * 0.66;
+  var gy = bankSurface(x, 'near') + R * 0.22;               // sinks a little into the snow
+  var by = gy - R * 0.92, hy = by - R * 0.78 - r2 * 0.62;
+  return { x: x, R: R, r2: r2, gy: gy, by: by, hy: hy, left: left };
+}
+/* The silhouette itself: two snowballs and twig arms, drawn on the tree's layer. */
+function snowmanBody(c, t) {
+  var m = snowmanLayout(), x = m.x;
+  var col = rgba(mixRgb([78, 66, 72], ENV.light.col, 0.12));
+  c.fillStyle = col;
+  c.strokeStyle = col;
+  c.lineCap = 'round';
+  c.beginPath(); c.arc(x, m.by, m.R, 0, TAU); c.fill();
+  c.beginPath(); c.arc(x, m.hy, m.r2, 0, TAU); c.fill();
+  var sway = Math.sin(t * 0.9 + 1) * 0.04 + snowman.wind * 0.08;
+  [-1, 1].forEach(function(sd) {
+    var a = (sd > 0 ? -0.55 : PI + 0.55) + sway, len = m.R * 1.25;
+    var sx0 = x + sd * m.R * 0.82, sy0 = m.by - m.R * 0.32;
+    var ex = sx0 + Math.cos(a) * len, ey = sy0 + Math.sin(a) * len;
+    c.lineWidth = Math.max(1.6, m.R * 0.06);
+    c.beginPath(); c.moveTo(sx0, sy0); c.lineTo(ex, ey); c.stroke();
+    c.lineWidth = Math.max(1.1, m.R * 0.04);
+    [0.62, 0.85].forEach(function(f, i) {
+      var fx = sx0 + Math.cos(a) * len * f, fy = sy0 + Math.sin(a) * len * f, fa = a + (i ? 0.55 : -0.6) * sd;
+      c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + Math.cos(fa) * len * 0.3, fy + Math.sin(fa) * len * 0.3); c.stroke();
+    });
+  });
+  return m;
+}
+/* Scarf (flutters in the wind) and bucket hat, in palette colours. */
+function snowmanDress(ctx, t, m) {
+  var x = m.x, w = snowman.wind, aw = Math.abs(w);
+  var ny = m.hy + m.r2 * 0.78;                              // neck
+  var Lt = ENV.light, dark = 1 - Lt.dark * 0.3;
+  // tails
+  var th = Math.atan(w), ax = Math.sin(th), ay = Math.cos(th), nx = ay, nyv = -ax;
+  var kx = x + clamp(w, -1, 1) * m.r2 * 0.55, ky = ny + m.r2 * 0.08;
+  for (var j = 1; j >= 0; j--) {
+    var len = m.R * (1.55 + 0.15 * aw) * (1 - 0.2 * j), N = 14, L = [], Rr = [];
+    var amp = m.R * (0.07 + 0.17 * aw), fr = 4.5 + 3 * aw, ph = j * 1.5;
+    for (var i = 0; i <= N; i++) {
+      var u = i / N;
+      var wave = (Math.sin(t * fr - u * 6 + ph) + 0.35 * Math.sin(t * fr * 1.9 - u * 11 + ph)) * amp * u;
+      var px = kx - j * m.r2 * 0.14 + ax * len * u + nx * wave;
+      var py = ky + ay * len * u + nyv * wave + u * u * m.R * 0.32 * (1 - aw * 0.6);
+      var hw = m.r2 * (0.17 - 0.05 * u);
+      L.push([px + nx * hw, py + nyv * hw]);
+      Rr.push([px - nx * hw, py - nyv * hw]);
+    }
+    ctx.beginPath();
+    ctx.moveTo(L[0][0], L[0][1]);
+    for (i = 1; i <= N; i++) ctx.lineTo(L[i][0], L[i][1]);
+    for (i = N; i >= 0; i--) ctx.lineTo(Rr[i][0], Rr[i][1]);
+    ctx.closePath();
+    ctx.fillStyle = rgba(scaleRgb(j ? SNOWC.accent2 : SNOWC.accent, dark), 0.95);
+    ctx.fill();
+  }
+  // band around the neck
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.95);
+  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0, TAU); ctx.fill();
+  ctx.strokeStyle = rgba(scaleRgb(SNOWC.accent2, dark), 0.8);
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0.1, PI - 0.1); ctx.stroke();
+  // bucket hat
+  var brimW = m.r2 * 1.5, topW = m.r2 * 0.92, hh = m.r2 * 0.82;
+  ctx.save();
+  ctx.translate(x + m.r2 * 0.06, m.hy - m.r2 * 0.7);
+  ctx.rotate(m.left ? 0.1 : -0.1);
+  function wAt(f) { return (brimW + (topW - brimW) * f) / 2; }
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark), 0.97);
+  ctx.beginPath();
+  ctx.moveTo(-brimW / 2, 0); ctx.lineTo(brimW / 2, 0); ctx.lineTo(topW / 2, -hh); ctx.lineTo(-topW / 2, -hh);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.9);
+  ctx.beginPath();
+  ctx.moveTo(-wAt(0), 0); ctx.lineTo(wAt(0), 0); ctx.lineTo(wAt(0.26), -hh * 0.26); ctx.lineTo(-wAt(0.26), -hh * 0.26);
+  ctx.closePath(); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark * 0.9), 0.97);
+  ctx.beginPath(); ctx.ellipse(0, 0, brimW * 0.64, hh * 0.13, 0, 0, TAU); ctx.fill();
+  ctx.fillStyle = rgba(scaleRgb(SNOWC.plumLight, dark), 0.97);
+  ctx.beginPath(); ctx.ellipse(0, -hh, topW / 2, hh * 0.1, 0, 0, TAU); ctx.fill();
+  ctx.restore();
+  // soft shadow where it stands
+  ctx.fillStyle = rgba(snowLit(SNOWC.border2), 0.35);
+  ctx.beginPath(); ctx.ellipse(x + m.R * 0.3, m.gy - m.R * 0.04, m.R * 1.1, m.R * 0.16, 0, 0, TAU); ctx.fill();
 }
 
 /* ============================================================
@@ -2235,14 +2434,16 @@ function sendHero() {
 
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
-  var a = L.hero ? 0.78 : (L.onTree ? S.treeLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc));
+  var a = L.hero ? 0.6 : (L.onTree ? S.treeLeafOpacity : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
   return clamp(a, 0, 1);
 }
-function drawLeaf(L, t, inPile) {
+function isFrontLeaf(L) { return !!L.front && S.frontLeaves > 0; }
+function drawLeaf(L, t, inPile, target) {
   if (!L.spr) return;
+  var g = target || ctx;
   var sx, sy, rot = L.rot, x = L.x + (inPile ? 0 : L.so), y = L.y, spr;
   if (inPile) {
     sx = L.pileSx; sy = L.pileSy; spr = L.pileFace ? L.spr : L.back;
@@ -2254,13 +2455,13 @@ function drawLeaf(L, t, inPile) {
     spr = c >= 0 || f < 0.05 ? L.spr : L.back;
   }
   var cs = Math.cos(rot), sn = Math.sin(rot);
-  ctx.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, y * PR);
-  ctx.globalAlpha = inPile ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
-  ctx.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
+  g.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, y * PR);
+  g.globalAlpha = inPile ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  g.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
 }
 
 var lastT = 0, envTimer = 0, uiTimer = 0, lastLookKey = '', lastDate = '';
-var fps = 60, rebakeIdx = 0, frontDirty = false, lastScene = '';
+var fps = 60, rebakeIdx = 0, frontDirty = false, lastScene = '', frontLeafCount = 0;
 var veil = document.getElementById('flashVeil');
 
 function lookKey() {
@@ -2305,9 +2506,11 @@ function frame(ms) {
 
   spawnTick(dt, t);
   updateGusts(dt);
+  var nFront = 0;
   for (var i = leaves.length - 1; i >= 0; i--) {
     var L = leaves[i];
     updateLeaf(L, dt, t);
+    if (isFrontLeaf(L)) nFront++;
     var landY = H - L.groundY;
     if (S.pile && L.z > 0.3 && L.y >= landY && L.vy > 0 && Math.random() < 0.7) {
       leaves.splice(i, 1);
@@ -2316,6 +2519,7 @@ function frame(ms) {
     }
     if (L.y > H + L.size * 1.5 || L.x < -W * 0.4 - 200 || L.x > W * 1.4 + 200) leaves.splice(i, 1);
   }
+  frontLeafCount = nFront;
   if (hero) {
     updateLeaf(hero, dt, t);
     if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
@@ -2325,6 +2529,7 @@ function frame(ms) {
   updateBirds(dt, t);
   updateSpecks(dt, t);
   updateTree(dt, t);
+  updateWinterGround(dt);
   updateDragonfly(dt, t);
   updateCricket(dt, t);
 
@@ -2351,17 +2556,18 @@ function frame(ms) {
   drawBirds(ctx, t);
   var split = 0;
   while (split < leaves.length && leaves[split].z < 0.5) split++;
-  for (var f = 0; f < split; f++) drawLeaf(leaves[f], t, false);
+  for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
-  drawSnow(ctx, false);
+  drawSnow(ctx, 'far');
+  drawSnowBank(ctx, 'far');
   drawTree(ctx, t);
   drawFog(ctx, dt);
-  for (var n = split; n < leaves.length; n++) drawLeaf(leaves[n], t, false);
+  for (var n = split; n < leaves.length; n++) if (!isFrontLeaf(leaves[n])) drawLeaf(leaves[n], t, false);
   for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
-  drawSnow(ctx, true);
+  drawSnowBank(ctx, 'near');
+  drawSnow(ctx, 'near');
   drawRain(ctx);
-  if (hero) { drawLeaf(hero, t, false); ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1; }
   drawSpecks(ctx, t, false);
 
   var flashA = 0;
@@ -2376,14 +2582,20 @@ function frame(ms) {
 
   // front layer: dragonfly and cricket over the text
   var ffFront = fireflyOnText();
-  if (dragonfly || cricket || ffFront || frontDirty) {
+  var leafFront = frontLeafCount > 0 || !!hero;
+  var snowFront = S.snowFront > 0 && flakes.length > 0;
+  if (dragonfly || cricket || ffFront || leafFront || snowFront || frontDirty) {
     ctxF.setTransform(1, 0, 0, 1, 0, 0);
     ctxF.clearRect(0, 0, canvasF.width, canvasF.height);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0);
+    drawSnow(ctxF, 'front');
+    for (var fl = 0; fl < leaves.length; fl++) if (isFrontLeaf(leaves[fl])) drawLeaf(leaves[fl], t, false, ctxF);
+    if (hero) drawLeaf(hero, t, false, ctxF);
+    ctxF.setTransform(PR, 0, 0, PR, 0, 0); ctxF.globalAlpha = 1;
     drawSpecks(ctxF, t, true);
     drawDragonfly(ctxF, t);
     drawCricket(ctxF, t);
-    frontDirty = !!(dragonfly || cricket || ffFront);
+    frontDirty = !!(dragonfly || cricket || ffFront || leafFront || snowFront);
   }
 
   uiTimer -= dt;
@@ -2599,6 +2811,10 @@ var SPEC = [
   { k: 'treeOpacity', t: 'range', label: 'Tree strength', min: 0.15, max: 1, step: 0.01, fmt: f2 },
   { k: 'treeLeafOpacity', t: 'range', label: 'Strength of leaves on the tree', min: 0.2, max: 1, step: 0.01, fmt: f2 },
   { k: 'winterTree', t: 'check', label: 'Bare winter tree (a different kind) in Dec–Feb' },
+  { k: 'snowman', t: 'check', label: 'Snowman silhouette beside the winter tree' },
+  { k: 'snowmanSize', t: 'range', label: 'Snowman size', min: 0.6, max: 1.8, step: 0.05, fmt: x2 },
+  { k: 'snowBank', t: 'check', label: 'Accumulated snow along the bottom in Dec–Feb' },
+  { k: 'snowBankHeight', t: 'range', label: 'Depth of the snow layer', min: 0.4, max: 2.5, step: 0.05, fmt: x2 },
   { sec: 'Leaves 落ち葉' },
   { k: 'density', t: 'range', label: 'How many leaves fall', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'maxLeaves', t: 'range', label: 'Most leaves on screen at once', min: 10, max: 160, step: 5, fmt: String },
@@ -2610,6 +2826,8 @@ var SPEC = [
   { k: 'wear', t: 'range', label: 'Bites, tears and spots', min: 0, max: 1, step: 0.05, fmt: f2 },
   { k: 'flurries', t: 'range', label: 'Sudden small flurries', min: 0, max: 1, step: 0.05, fmt: f2 },
   { k: 'lulls', t: 'range', label: 'Quiet spells with no leaves', min: 0, max: 1, step: 0.05, fmt: f2 },
+  { k: 'frontLeaves', t: 'range', label: 'Nearest leaves in front of the text (most at once, 0 = none)', min: 0, max: 10, step: 1, fmt: String },
+  { k: 'frontLeafOpacity', t: 'range', label: 'Strength of leaves in front of the text', min: 0.15, max: 1, step: 0.01, fmt: f2 },
   { sec: 'Leaf kinds 種類' },
   { k: 'speciesMode', t: 'select', label: 'Mix of leaf kinds', opts: [['auto', 'Follow the date'], ['manual', 'Use the sliders below']] },
   { info: 'speciesInfo' },
@@ -2641,12 +2859,14 @@ var SPEC = [
   { k: 'lightning', t: 'check', label: 'Lightning in thunderstorms' },
   { k: 'frost', t: 'check', label: 'Frosty edges below 5°C' },
   { k: 'snowMix', t: 'check', label: 'First snowflakes below 3°C' },
+  { k: 'snowFront', t: 'range', label: 'Snowflakes in front of the text (share of the larger flakes)', min: 0, max: 0.6, step: 0.01, fmt: function(v) { return Math.round(v * 100) + '%'; } },
   { sec: 'Sun & moon 太陽と月' },
   { info: 'skyInfo' },
   { k: 'sun', t: 'check', label: 'Show the sun (real position: right = east, left = west)' },
   { k: 'sunSize', t: 'range', label: 'Sun size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { k: 'sunGlow', t: 'range', label: 'Sun glow and rays', min: 0, max: 2, step: 0.05, fmt: x2 },
-  { k: 'moon', t: 'check', label: 'Show the moon 20:00–05:00 (real phase)' },
+  { k: 'moon', t: 'check', label: 'Show the moon (real phase)' },
+  { k: 'moonPath', t: 'select', label: 'Moon path', opts: [['arc', 'Smooth nightly arc, 20:00–05:00 (right → left)'], ['real', 'Real position in the sky (hidden when it has set)']] },
   { k: 'moonSize', t: 'range', label: 'Moon size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { sec: 'Time-of-day extras' },
   { k: 'birds', t: 'check', label: 'Distant birds at dawn and dusk' },
@@ -2822,10 +3042,10 @@ function updateUiLive() {
   if (ki) ki.textContent = 'Sun: ' + (A.sun.alt > 0 ? Math.round(A.sun.alt) + '° up in the ' + compassName(A.sun.az) : 'below the horizon') +
     ' · Moon: ' + moonName(A) + ', ' + moonPct + '% lit, ' +
     (A.moon.alt > 0 ? Math.round(A.moon.alt) + '° up in the ' + compassName(A.moon.az) : 'below the horizon') +
-    (moonNightU() < 0 ? ' (moon is shown 20:00–05:00)' : (sunIsUp() ? ' (hidden while the sun is shown)' : ''));
+    moonNote();
   var ci = document.getElementById('sceneInfo');
   if (ci) ci.textContent = 'Now showing: ' + ({ autumn: 'autumn — bare tree on the ' + ENV.side + ', leaves falling',
-    winter: 'winter — bare winter tree on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
+    winter: 'winter — bare winter tree and snowman on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
   var wi = document.getElementById('weatherInfo');
   if (wi) wi.textContent = S.liveWeather ? weatherStatus : 'Manual weather (tick the box above to go back to live)';
   var sp = document.getElementById('speciesInfo');
@@ -2910,7 +3130,7 @@ document.getElementById('btnReset').addEventListener('click', function() {
   S = makeDefaults();
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0;
-  dragonfly = null; cricket = null; tree = null; frontDirty = true;
+  dragonfly = null; cricket = null; tree = null; frontDirty = true; snowAccum = 0; frontLeafCount = 0;
   heroNext = 0; lookVersion++; geomVersion++;
   document.getElementById('copyOut').classList.remove('shown');
   document.body.classList.toggle('hide-text', !S.showText);
