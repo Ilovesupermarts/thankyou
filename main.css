@@ -2630,21 +2630,20 @@
     0%   { opacity: 0.92; transform: translateY(0)    rotate(var(--stamp-rot, -12deg)) scale(1); }
     100% { opacity: 0;    transform: translateY(-8px) rotate(var(--stamp-rot, -12deg)) scale(1.08); }
   }
-  /* The small ⊗ at the seal's top-right corner, like a superscript. Drawn as
-     one SVG so the cross runs right out to the circle, like a literal ⊗.
-     Its visible circle is small; ::after keeps the touch target at 46px. */
+  /* The small ✕ at the seal's top-right corner, like a superscript, about
+     the size of the sakura above the 承. A bare, bold cross in the seal's
+     ink; ::after keeps the touch target at 46px. */
   .receipt-stamp-x {
-    position: absolute; left: 35.2px; top: -53.8px; width: 17.6px; height: 17.6px;
-    padding: 0; border: none; border-radius: 50%;
-    background-color: rgba(255, 251, 244, 0.96);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Ccircle cx='10' cy='10' r='9.3' fill='none' stroke='%23C8361F' stroke-width='1.4'/%3E%3Cpath d='M3.42 3.42L16.58 16.58M16.58 3.42L3.42 16.58' stroke='%23C8361F' stroke-width='1.4' stroke-linecap='butt'/%3E%3C/svg%3E");
+    position: absolute; left: 35.5px; top: -53.5px; width: 17px; height: 17px;
+    padding: 0; border: none; background-color: transparent;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M3.5 3.5L16.5 16.5M16.5 3.5L3.5 16.5' stroke='%23C8361F' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E");
     background-size: 100% 100%; background-repeat: no-repeat;
-    font-size: 0; color: transparent; box-shadow: 0 1px 3px rgba(120, 40, 20, 0.22);
+    font-size: 0; color: transparent;
     opacity: 0; pointer-events: none; cursor: pointer;
     transition: opacity 0.45s ease;
     -webkit-appearance: none; appearance: none; -webkit-tap-highlight-color: transparent;
   }
-  .receipt-stamp-x::after { content: ''; position: absolute; left: -14.2px; right: -14.2px; top: -14.2px; bottom: -14.2px; }
+  .receipt-stamp-x::after { content: ''; position: absolute; left: -14.5px; right: -14.5px; top: -14.5px; bottom: -14.5px; }
   .receipt-stamp-x.on { opacity: 1; pointer-events: auto; }
   /* While the seal lands, ignore taps on the receipt so nothing can be
      edited or pressed twice. */
