@@ -2555,9 +2555,17 @@
      .stamping / .stamped is added from app.js. multiply lets the washi
      fibres show faintly through the ink, like a real impression. */
   .receipt-total-line { position: relative; }
+  /* The tap target for the stamp: the empty gap between 合計 and the price.
+     It stretches over the line's own padding so the whole band is easy to
+     hit, and it holds the seal so the seal lands in the middle of it. */
+  .receipt-stamp-zone {
+    position: relative; flex: 1 1 auto; align-self: stretch;
+    margin: -18px 6px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  }
   .receipt-stamp {
-    position: absolute; left: 43%; top: 50%;
-    width: 104px; height: 104px; margin-top: -52px;
+    position: absolute; left: 50%; top: 50%;
+    width: 104px; height: 104px; margin-top: -52px; margin-left: -52px;
     pointer-events: none; z-index: 2;
     mix-blend-mode: multiply;
     opacity: 0;
@@ -2578,7 +2586,8 @@
     100% { opacity: 0.92; transform: translateY(0)     rotate(-12deg) scale(1); }
   }
   /* While the stamp lands, ignore taps on the receipt so nothing can be
-     edited or pressed twice. */
+     edited or pressed twice. Once it has landed the receipt is live again
+     and the seal simply stays until she confirms. */
   .receipt-screen.stamping .receipt-paper { pointer-events: none; }
   @media (prefers-reduced-motion: reduce) {
     .receipt-stamp.stamping { animation: none; opacity: 0.92; }
@@ -2597,6 +2606,7 @@
     .receipt-item-price-wrap { font-size: 16px; padding: 5px 10px; }
     .receipt-item-price-wrap .yen-symbol { font-size: 12px; }
     .receipt-total-line { padding: 22px 4px; margin-top: 18px; }
+    .receipt-stamp-zone { margin: -22px 6px; }
     .receipt-total-label { font-size: 22px; letter-spacing: 5px; }
     .receipt-total-value { font-size: 22px; }
     .receipt-total-value .yen-symbol { font-size: 15px; }
