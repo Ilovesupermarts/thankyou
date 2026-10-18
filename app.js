@@ -14,7 +14,8 @@ var BUILD = 'v135';
        - The twelve CSS-animated leaves and the DOM snowflakes are
          replaced by DynBG (search "DYNAMIC BACKGROUND (v1.4)"), a
          canvas drawn in code that follows the real time, sun, moon
-         and weather over Nagoya. See the comment above it, the
+         and weather over Nagoya. There is a tall, sharp tree on one side
+         (alternating daily) and a shorter, slightly soft one on the other. See the comment above it, the
          canvases in index.html and the .dyn-* rules in main.css.
        - The music display moved to the top right (top aligned with
          the weather line) and its two "lift" rules were removed.
@@ -9371,7 +9372,7 @@ var lookVersion = 1, geomVersion = 1;
 
 function leafBlur(L) {
   if (L.hero) return 0;
-  if (L.onTree) return 0.4;             // leaves still on the tree stay crisp, like the branches
+  if (L.onTree) return L.farTree ? 1.3 : 0.4;   // leaves on the near tree stay crisp, like its branches; the far tree's are soft
   var zc = clamp(L.z, 0, 1);
   return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
 }
@@ -9720,11 +9721,13 @@ function updateGusts(dt) {
         if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
       }
     }
-    if (tree && tree.gid !== g.id && (g.dir > 0 ? tree.bx < g.x : tree.bx > g.x)) {
-      tree.gid = g.id;
-      tree.gustV += g.dir * 0.5 * (g.str / 200);
-      for (var q = tree.leaves.length - 1; q >= 0; q--) if (Math.random() < 0.25) detachTreeLeaf(q);
-    }
+    [tree, farTree].forEach(function(T) {
+      if (T && T.gid !== g.id && (g.dir > 0 ? T.bx < g.x : T.bx > g.x)) {
+        T.gid = g.id;
+        T.gustV += g.dir * 0.5 * (g.str / 200);
+        for (var q = T.leaves.length - 1; q >= 0; q--) if (Math.random() < 0.25) detachTreeLeaf(T, q);
+      }
+    });
     if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
   }
 }
@@ -10301,25 +10304,32 @@ function fireflyOnText() {
 /* ============================================================
    8b. SEASONAL PICTURE — bare autumn tree (Oct–Nov), bare winter tree (Dec–Feb)
    ============================================================ */
-var tree = null;
+var tree = null;          // the near tree: taller and sharp; the snowman stands beside it
+var farTree = null;       // the far tree on the other side: shorter, a little soft and paler
 var TREE_DEPTH = 7;
+var FAR_TREE_SCALE = 0.6;     // far tree height as a share of the near tree
+var FAR_TREE_ALPHA = 0.8;     // and how strong it looks next to the near tree
+var FAR_LAYER_SCALE = 0.5;    // the far tree is drawn at half resolution and scaled up: that is its blur
 function strSeed(str) {
   var h = 2166136261;
   for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
   return h >>> 0;
 }
-function treeLeafTarget() {
+function treeLeafTarget(far) {
   if (ENV.scene === 'winter') return 0;
-  return Math.round(S.treeLeaves * lerp(48, 10, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
+  return Math.round(S.treeLeaves * lerp(48, 10, clamp((ENV.season - 0.2) / 0.7, 0, 1)) * (far ? 0.7 : 1));
 }
 /* A new tree shape every day (seeded by the date), leaning in from one side.
    Autumn: a broad, spreading tree. Winter: a different kind — a tall,
-   upright, vase-shaped keyaki (zelkova) with a fine broom of twigs. */
-function buildTree(key) {
+   upright, vase-shaped keyaki (zelkova) with a fine broom of twigs.
+   There are two: the near tree stands on ENV.side, the far one on the other
+   side, shorter and drawn a little soft (far = true). */
+function buildTree(key, far) {
   var r = rngFrom(strSeed(key));
-  var left = ENV.side === 'left', dir = left ? 1 : -1;
+  var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
+  var left = side === 'left', dir = left ? 1 : -1;
   var winter = ENV.scene === 'winter';
-  var scale = H * S.treeSize * (winter ? 1.1 : 1);
+  var scale = H * S.treeSize * (winter ? 1.1 : 1) * (far ? FAR_TREE_SCALE : 1);
   var nodes = [], tips = [];
   var dens = S.winterTreeDensity;          // winter only: 0.1 very sparse … 1 the old dense look
   var maxD = winter ? 4 + Math.round(dens * 4) : TREE_DEPTH;
@@ -10350,11 +10360,14 @@ function buildTree(key) {
     }
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
-  if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(5, scale * 0.026), 0);
-  else grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(6, scale * 0.032), 0);
-  var T = { key: key, bx: bx, by: H + 6, nodes: nodes, tips: tips, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0,
+  if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(far ? 3 : 5, scale * 0.026), 0);
+  else grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(far ? 3.5 : 6, scale * 0.032), 0);
+  // branches of one depth share a width, so each depth is drawn with a single stroke
+  var byDepth = [];
+  for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
+  var T = { key: key, far: !!far, bx: bx, by: H + 6, nodes: nodes, tips: tips, byDepth: byDepth, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0,
             scale: scale, maxD: maxD, winter: winter };
-  var n0 = treeLeafTarget();
+  var n0 = treeLeafTarget(far);
   for (var j = 0; j < n0; j++) addTreeLeaf(T, true);
   return T;
 }
@@ -10363,6 +10376,7 @@ function addTreeLeaf(T, initial) {
   var L = makeLeaf({ z: 0.85, species: 'generic' });
   L.size = T.scale * rnd(0.042, 0.055) * S.sizeScale;   // in proportion to the tree
   L.onTree = true;
+  L.farTree = !!T.far;                                   // far-tree leaves are baked soft
   L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
   L.hang = rnd(-0.5, 0.5);
   L.ff = rnd(1.4, 2.8);
@@ -10371,10 +10385,11 @@ function addTreeLeaf(T, initial) {
   bakeLeaf(L);
   T.leaves.push(L);
 }
-function detachTreeLeaf(j) {
-  var L = tree.leaves.splice(j, 1)[0];
+function detachTreeLeaf(T, j) {
+  var L = T.leaves.splice(j, 1)[0];
   L.attach = undefined;
   L.onTree = false;
+  L.farTree = false;
   L.bakedV = -1;                        // re-draw with the normal falling-leaf softness
   L.vx = ENV.windPx * 0.4;
   L.vy = 5;
@@ -10385,13 +10400,17 @@ function detachTreeLeaf(j) {
 }
 function ensureTree() {
   var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
-  if (!want) { tree = null; return; }
+  if (!want) { tree = null; farTree = null; return; }
   var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize + '|' + S.winterTreeDensity;
-  if (!tree || tree.key !== key) tree = buildTree(key);
+  if (!tree || tree.key !== key) tree = buildTree(key, false);
+  if (!farTree || farTree.key !== key + '|far') farTree = buildTree(key + '|far', true);
 }
 function updateTree(dt, t) {
-  if (!tree) return;
-  var T = tree, ns = T.nodes;
+  if (farTree) updateOneTree(farTree, dt, t);
+  if (tree) updateOneTree(tree, dt, t);
+}
+function updateOneTree(T, dt, t) {
+  var ns = T.nodes;
   // a gust gives the whole tree a push that springs back
   T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
   T.gust += T.gustV * dt;
@@ -10421,45 +10440,67 @@ function updateTree(dt, t) {
     L.x = a.ex + off * Math.sin(rot);
     L.y = a.ey - off * Math.cos(rot);
     L.so = 0;
-    if (Math.random() < 0.0025 * (1 + ENV.windMs / 3) * dt) detachTreeLeaf(j);
+    if (Math.random() < 0.0025 * (1 + ENV.windMs / 3) * dt) detachTreeLeaf(T, j);
   }
   T.regrow -= dt;
   if (T.regrow <= 0) {
     T.regrow = rnd(15, 30);
-    if (T.leaves.length < treeLeafTarget()) addTreeLeaf(T, false);
+    if (T.leaves.length < treeLeafTarget(T.far)) addTreeLeaf(T, false);
+  }
+}
+function strokeTree(c, T) {
+  var ns = T.nodes;
+  for (var d = 0; d < T.byDepth.length; d++) {
+    var arr = T.byDepth[d];
+    if (!arr || !arr.length) continue;
+    c.lineWidth = ns[arr[0]].w;
+    c.beginPath();
+    for (var i = 0; i < arr.length; i++) {
+      var n = ns[arr[i]];
+      c.moveTo(n.sx, n.sy);
+      c.lineTo(n.ex, n.ey);
+    }
+    c.stroke();
   }
 }
 function drawTree(ctx, t) {
   var fig = ENV.scene === 'winter' && S.snowman;
-  if (!tree && !fig) return;
-  // Branches (and the snowman's body) go onto their own layer at full
+  if (!tree && !farTree && !fig) return;
+  var tint = ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44];
+  // The far tree first. It is drawn onto a half-size layer and scaled back up,
+  // which softens it a little (no per-frame blur filter), and it is paler and a
+  // touch weaker than the near tree.
+  if (farTree) {
+    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
+    ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
+    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    ctxFar.strokeStyle = rgba(mixRgb(mixRgb(tint, [235, 224, 224], 0.2), ENV.light.col, 0.12));
+    ctxFar.lineCap = 'round';
+    strokeTree(ctxFar, farTree);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = S.treeOpacity * FAR_TREE_ALPHA;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+    for (var f = 0; f < farTree.leaves.length; f++) drawLeaf(farTree.leaves[f], t, false);
+  }
+  // The near tree (and the snowman's body) go onto their own layer at full
   // strength, then the layer is laid down at the chosen strength, so joints
   // don't show darker spots and the snowman matches the tree.
   ctxT.setTransform(1, 0, 0, 1, 0, 0);
   ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
   ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-  ctxT.strokeStyle = rgba(mixRgb(ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44], ENV.light.col, 0.12));
+  ctxT.strokeStyle = rgba(mixRgb(tint, ENV.light.col, 0.12));
   ctxT.lineCap = 'round';
-  if (tree) {
-    var ns = tree.nodes;
-    for (var i = 0; i < ns.length; i++) {
-      var n = ns[i];
-      ctxT.lineWidth = n.w;
-      ctxT.beginPath();
-      ctxT.moveTo(n.sx, n.sy);
-      ctxT.lineTo(n.ex, n.ey);
-      ctxT.stroke();
-    }
-  }
+  if (tree) strokeTree(ctxT, tree);
   var sm = fig ? snowmanBody(ctxT, t) : null;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = S.treeOpacity * treeFade;           // the tree fades as the page scrolls down to the table
+  ctx.globalAlpha = S.treeOpacity;
   ctx.drawImage(treeLayer, 0, 0);
   if (tree) for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  ctx.globalAlpha = treeFade;
-  if (sm) snowmanDress(ctx, t, sm);
   ctx.globalAlpha = 1;
+  if (sm) snowmanDress(ctx, t, sm);
 }
 
 /* ============================================================
@@ -10967,14 +11008,18 @@ var ctxG = cvGround ? cvGround.getContext('2d') : null;
 var ctxF = cvFront ? cvFront.getContext('2d') : null;
 var treeLayer = document.createElement('canvas');
 var ctxT = treeLayer.getContext('2d');
+var farLayer = document.createElement('canvas');          // half-size layer for the far tree
+var ctxFar = farLayer.getContext('2d');
 var W = 0, H = 0, GH = 150;                  // GH: height (CSS px) of the ground strip
-var treeFade = 1, drawOffsetY = 0, dynFrontMul = 0;
+var drawOffsetY = 0, dynFrontMul = 0;
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
   cvBack.width = cvFront.width = treeLayer.width = cw;
   cvBack.height = cvFront.height = treeLayer.height = ch;
+  farLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
+  farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
   cvGround.height = Math.round(GH * PR);
   lookVersion++;
@@ -11026,7 +11071,7 @@ function sendHero() {
 
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
-  var a = L.hero ? 0.6 : (L.onTree ? S.treeLeafOpacity * treeFade : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
+  var a = L.hero ? 0.6 : (L.onTree ? S.treeLeafOpacity * (L.farTree ? FAR_TREE_ALPHA : 1) : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
@@ -11110,7 +11155,7 @@ function dynBegin() {
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
-  dragonfly = null; cricket = null; tree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
+  dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
   [ctx, ctxG, ctxF].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
@@ -11127,7 +11172,6 @@ function dynStep(dt, t, want) {
 
   dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
   dynFrontMul += (dynFrontTarget() - dynFrontMul) * (1 - Math.exp(-dt * 3));
-  treeFade = 1 - 0.75 * smooth(30, 400, dynScrollY);
 
   clockTimer -= dt;
   if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
@@ -11147,7 +11191,7 @@ function dynStep(dt, t, want) {
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
       if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; }
       else if (lastScene === 'winter') prefill();
-      tree = null;
+      tree = null; farTree = null;
       lastScene = ENV.scene;
     }
     ensureTree();
@@ -11187,6 +11231,7 @@ function dynStep(dt, t, want) {
   var budget = 10, all = leaves.concat(pile);
   if (hero) all.push(hero);
   if (tree) all = all.concat(tree.leaves);
+  if (farTree) all = all.concat(farTree.leaves);
   for (var b = 0; b < all.length && budget > 0; b++) {
     var Lb = all[(rebakeIdx + b) % all.length];
     if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
