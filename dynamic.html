@@ -254,6 +254,12 @@
       <span class="sep">·</span>
       <span class="weather" id="infoWeather">—</span>
     </div>
+    <div class="ticker-wrap shown" id="tickerWrap">
+      <div class="ticker-track" id="tickerTrack">
+        <span>名古屋市 3時間 ☀18° → ☀17° → ☁16° ・ 明日: 名古屋市 ☀ 21°/12° ・ 東京都 ☁ 19°/13° ・ 大阪市 ☀ 22°/14° ・ 京都市 ☀ 21°/11° ・ </span>
+        <span>名古屋市 3時間 ☀18° → ☀17° → ☁16° ・ 明日: 名古屋市 ☀ 21°/12° ・ 東京都 ☁ 19°/13° ・ 大阪市 ☀ 22°/14° ・ 京都市 ☀ 21°/11° ・ </span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -397,7 +403,7 @@ function makeDefaults() {
     birds: true, nightSpecks: true, dawnGlow: true,
     scene: 'auto', figureSide: 'auto',
     tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5,
-    snowman: true, snowmanSize: 1,
+    winterTree: true,
     heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
     dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
     panel: '1', showText: true,
@@ -494,14 +500,24 @@ function compassName(az) {
   var n = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   return n[Math.round(az / 22.5) % 16];
 }
-/* Sky to screen: right edge = east, left edge = west, bottom = horizon. */
+/* Sky to screen: right edge = east, left edge = west, bottom = horizon.
+   Used for left/right placement, and for which way the moon's lit side faces. */
 function skyToScreen(alt, az) {
   var x = W * (0.5 + angDiff(180 * DEG, az * DEG) / DEG / 220);
   var e = (alt < 0 ? -1 : 1) * Math.pow(Math.min(Math.abs(alt), 90) / 80, 0.6);
   return { x: x, y: H * 0.9 - H * 0.82 * e };
 }
 
-/* Which picture goes with the date: Dec–Feb snowman, Oct–Nov bare tree. */
+/* Which picture goes with the date: Oct–Nov bare autumn tree, Dec–Feb bare winter tree. */
+/* The sun and moon sit in a band just under the info bar (both lines). */
+var _barBottom = 70;   // refreshed twice a second, so drawing never forces a layout
+function measureInfoBar() {
+  var bar = document.getElementById('infoBar');
+  if (bar) _barBottom = Math.max(bar.getBoundingClientRect().bottom, 40);
+}
+function skyBandY(radius) { return _barBottom + radius + 18; }
+function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
+
 function sceneFor(p) {
   if (S.scene !== 'auto') return S.scene;
   if (p.m === 12 || p.m <= 2) return 'winter';
@@ -609,7 +625,9 @@ var SPECIES = {
   oak:    { name: 'Oak (konara)',    size: 50, ramp: [[0, '#6a7f3a'], [0.3, '#9a8a3a'], [0.5, '#b8823a'], [0.7, '#9a5e2c'], [1, '#6b4a30']],
             site: [0, 4], modes: { flutter: 0.35, tumble: 0.4, glide: 0.2, spiral: 0.05 } },
   keyaki: { name: 'Zelkova (keyaki)', size: 40, ramp: [[0, '#73903c'], [0.3, '#c0a03a'], [0.5, '#d9822e'], [0.7, '#b0502a'], [0.85, '#8a4a2a'], [1, '#6e4b33']],
-            site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } }
+            site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } },
+  generic: { name: 'Tree leaf', size: 20, ramp: [[0, '#7d9440'], [0.25, '#c4a83a'], [0.45, '#e09a34'], [0.65, '#cc6a2c'], [0.85, '#9a5a32'], [1, '#76553a']],
+            site: [2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } }
 };
 (function prepRamps() {
   for (var k in SPECIES) SPECIES[k].rampRgb = SPECIES[k].ramp.map(function(s) { return [s[0], hexToRgb(s[1])]; });
@@ -725,7 +743,15 @@ function geoKeyaki(r, v) {
   }
   return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.07], [0.02 * (r() - 0.5), 0.13]] };
 }
-var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki };
+/* Plain, generic leaf for the bare tree: a small almond shape with a midrib. */
+function geoGeneric(r, v) {
+  var W2 = 0.2 * (1 + (r() - 0.5) * 0.4 * v), N = 40, pts = [], i, t;
+  function hw(tt) { return W2 * Math.pow(Math.sin(PI * Math.pow(tt, 0.75)), 0.9); }
+  for (i = 0; i <= N; i++) { t = i / N; pts.push([-hw(t), -t]); }
+  for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
+  return { pts: pts, veins: [[0, 0, 0, -0.9]], veinStyle: 'light', stem: [[0, 0], [0.01, 0.08], [0.02 * (r() - 0.5), 0.15]] };
+}
+var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, generic: geoGeneric };
 
 /* Build one leaf's geometry from its seed, then bend it and add wear. */
 function buildGeometry(L) {
@@ -1169,6 +1195,7 @@ var cloudShadowsPos = [{ x: 0, y: 0.1 }, { x: 0.55, y: 0.45 }, { x: 1.1, y: 0.2 
 var fogBands = [{ x: 0, y: 0.25, s: 1 }, { x: 0.4, y: 0.55, s: 0.7 }, { x: 0.8, y: 0.8, s: 1.2 }];
 
 function makeSprites() {
+  makeSnowSprites();
   cloudSprite = document.createElement('canvas');
   cloudSprite.width = 320; cloudSprite.height = 220;
   var c = cloudSprite.getContext('2d');
@@ -1264,37 +1291,59 @@ function drawRain(ctx) {
   }
 }
 
+/* Snow is drawn on the back canvas (behind the text) in five depth
+   tiers: far flakes are small, slow, faint and blurred; near flakes
+   are bigger, faster and sharper. Each tier is one pre-blurred sprite. */
+var SNOW_TIERS = [
+  { blur: 3.2, r: 1.8, a: 0.45, v: 22 },
+  { blur: 2.2, r: 2.4, a: 0.55, v: 32 },
+  { blur: 1.4, r: 3.0, a: 0.55, v: 44 },
+  { blur: 0.8, r: 3.8, a: 0.7,  v: 58 },
+  { blur: 0.3, r: 4.8, a: 0.85, v: 74 }
+];
+var snowSprites = [];
+function makeSnowSprites() {
+  snowSprites = SNOW_TIERS.map(function(tr) {
+    var c = document.createElement('canvas'), sz = 64;
+    c.width = c.height = sz;
+    var x = c.getContext('2d');
+    if (HAS_FILTER) x.filter = 'blur(' + (tr.blur * 3).toFixed(1) + 'px)';
+    var g = x.createRadialGradient(sz / 2, sz / 2, 0, sz / 2, sz / 2, 15);
+    g.addColorStop(0, 'rgba(255,255,255,1)');
+    g.addColorStop(0.65, 'rgba(244,243,250,1)');
+    g.addColorStop(1, 'rgba(150,140,180,0.9)');   // soft lilac rim so flakes show on the silk-white page
+    x.fillStyle = g;
+    x.beginPath(); x.arc(sz / 2, sz / 2, 15, 0, TAU); x.fill();
+    return c;
+  });
+}
 function updateSnow(dt, t) {
-  var target = ENV.snowing ? Math.round(60 * ENV.snowAmt) : 0;
-  while (flakes.length < target) flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, z: rnd(0.2, 1), ph: rnd(0, TAU) });
+  var target = ENV.snowing ? Math.round(140 * ENV.snowAmt) : 0;
+  while (flakes.length < target) {
+    flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, tier: Math.floor(Math.pow(Math.random(), 1.3) * 5),
+                  ph: rnd(0, TAU), sw: rnd(8, 18), sf: rnd(0.8, 1.6) });
+  }
   if (flakes.length > target) flakes.length = target;
   for (var i = 0; i < flakes.length; i++) {
-    var f = flakes[i];
-    f.y += (40 + 40 * f.z) * dt;
-    f.x += (ENV.windPx * 0.6 * f.z + Math.sin(t * 1.2 + f.ph) * 14) * dt;
+    var f = flakes[i], tr = SNOW_TIERS[f.tier], depth = (f.tier + 1) / 5;
+    f.y += tr.v * dt;
+    f.x += (ENV.windPx * 0.6 * depth + Math.sin(t * f.sf + f.ph) * f.sw * depth) * dt;
     if (f.y > H + 10) { f.y = -10; f.x = Math.random() * W; }
     if (f.x < -20) f.x += W + 40;
     if (f.x > W + 20) f.x -= W + 40;
   }
 }
-function drawSnow(ctx) {
+/* near = false draws the far tiers (behind the tree and fog), true the near ones. */
+function drawSnow(ctx, near) {
+  if (!flakes.length) return;
   for (var i = 0; i < flakes.length; i++) {
-    var f = flakes[i], r = 1.2 + 2.6 * f.z;
-    ctx.save();
-    ctx.translate(f.x, f.y);
-    ctx.rotate(f.ph);
-    ctx.strokeStyle = 'rgba(120,110,150,' + (0.25 + 0.3 * f.z).toFixed(3) + ')';
-    ctx.lineWidth = 0.9;
-    ctx.beginPath();
-    for (var a = 0; a < 3; a++) {
-      var ca = Math.cos(a * PI / 3) * r * 1.6, sa = Math.sin(a * PI / 3) * r * 1.6;
-      ctx.moveTo(-ca, -sa); ctx.lineTo(ca, sa);
-    }
-    ctx.stroke();
-    ctx.fillStyle = 'rgba(255,255,255,0.9)';
-    ctx.beginPath(); ctx.arc(0, 0, r * 0.6, 0, TAU); ctx.fill();
-    ctx.restore();
+    var f = flakes[i];
+    if ((f.tier >= 3) !== near) continue;
+    var tr = SNOW_TIERS[f.tier], d = tr.r * 2 * (64 / 30);
+    ctx.globalAlpha = tr.a;
+    ctx.drawImage(snowSprites[f.tier], f.x - d / 2, f.y - d / 2, d, d);
   }
+  ctx.globalAlpha = 1;
 }
 
 function drawSky(ctx, t) {
@@ -1333,9 +1382,9 @@ function drawSun(ctx, t) {
             (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
   if (vis < 0.01) return;
   var clear = vis * clamp(1 - S.cloudCover / 100 * 0.8, 0, 1) * (1 - ENV.fog * 0.8);
-  var pos = skyToScreen(a.alt, a.az), x = pos.x, y = pos.y;
   var low = 1 - smooth(2, 18, a.alt);            // near the horizon: bigger, more orange
   var size = 24 * S.sunSize * (1 + low * 0.35);
+  var x = skyToScreen(a.alt, a.az).x, y = skyBandY(size);
   var warm = mixRgb([255, 214, 160], [255, 140, 80], low);
   // wide bloom
   var R = size * 9 * Math.max(0.2, S.sunGlow);
@@ -1391,16 +1440,17 @@ function drawSun(ctx, t) {
 function drawMoon(ctx, t) {
   if (!S.moon) return;
   var A = ENV.astro, m = A.moon;
-  if (m.alt < -2) return;
+  if (m.alt < -2 || sunIsUp()) return;      // never on screen together with the sun
   var day = ENV.light.daylight;
   var vis = smooth(-2, 3, m.alt) * lerp(1, 0.55, day) * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) *
             (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
   if (vis < 0.02) return;
-  var pos = skyToScreen(m.alt, m.az), cx = pos.x, cy = pos.y, r = 28 * S.moonSize;
+  var r = 28 * S.moonSize;
+  var pos = skyToScreen(m.alt, m.az), cx = pos.x, cy = skyBandY(r);
   var sp = skyToScreen(A.sun.alt, A.sun.az);
-  var toSun = Math.atan2(sp.y - cy, sp.x - cx);
+  var toSun = Math.atan2(sp.y - pos.y, sp.x - pos.x);
   var litCol = mixRgb([255, 246, 226], [236, 240, 250], day);
-  var glowA = 0.32 * vis * (1 - day * 0.7) * (0.3 + 0.7 * A.illum);
+  var glowA = 0.32 * vis * (1 - day * 0.7) * A.illum;
   if (glowA > 0.005) {
     var glow = ctx.createRadialGradient(cx, cy, r * 0.8, cx, cy, r * 4.5);
     glow.addColorStop(0, rgba([255, 240, 215], glowA));
@@ -1408,9 +1458,6 @@ function drawMoon(ctx, t) {
     ctx.fillStyle = glow;
     ctx.fillRect(cx - r * 4.5, cy - r * 4.5, r * 9, r * 9);
   }
-  // the dark part, faintly visible (earthshine)
-  ctx.fillStyle = rgba(day > 0.5 ? [200, 205, 225] : [255, 248, 232], 0.13 * vis);
-  ctx.beginPath(); ctx.arc(cx, cy, r, 0, TAU); ctx.fill();
   var k = Math.cos(A.elong * DEG);
   function litPath() {
     ctx.beginPath();
@@ -1435,10 +1482,6 @@ function drawMoon(ctx, t) {
     });
     ctx.restore();
   }
-  // thin outline so the pale day-time moon still shows on the light page
-  ctx.strokeStyle = rgba([130, 130, 170], (0.12 + 0.2 * day) * vis);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
   ctx.restore();
 }
 
@@ -1468,8 +1511,8 @@ function drawRays(ctx, t) {
   var golden = ENV.light.phase === 'golden' || ENV.light.phase === 'dawn' ? 1.6 : 1;
   var ox = lerp(-0.15, 1.15, u) * W, oy = -0.25 * H;
   if (S.sun && ENV.astro.sun.alt > 0) {
-    var ssp = skyToScreen(ENV.astro.sun.alt, ENV.astro.sun.az);
-    ox = ssp.x; oy = ssp.y;
+    ox = skyToScreen(ENV.astro.sun.alt, ENV.astro.sun.az).x;
+    oy = skyBandY(24 * S.sunSize);
   }
   var ang0 = Math.atan2(H * 0.9 - oy, W * 0.5 - ox);
   var len = Math.sqrt(W * W + H * H) * 1.4;
@@ -1528,10 +1571,12 @@ function sendBirds() {
   }
 }
 function updateBirds(dt, t) {
-  if (S.birds && t > birdNext && (ENV.phase === 'dawn' || ENV.phase === 'dusk' || ENV.phase === 'golden' || ENV.phase === 'morning')) {
+  var birdTime = ENV.astro.sun.alt > 0 && (ENV.phase === 'dawn' || ENV.phase === 'golden' || ENV.phase === 'morning');
+  if (S.birds && t > birdNext && birdTime) {
     if (birdNext > 0) sendBirds();
     birdNext = t + rnd(45, 140);
   }
+  if (ENV.astro.sun.alt < -2) birds.length = 0;      // no birds at night
   for (var i = birds.length - 1; i >= 0; i--) {
     var b = birds[i];
     b.x += b.vx * dt;
@@ -1579,9 +1624,9 @@ function drawSpecks(ctx, t) {
 }
 
 /* ============================================================
-   8b. SEASONAL PICTURE — bare tree (Oct–Nov), snowman (Dec–Feb)
+   8b. SEASONAL PICTURE — bare autumn tree (Oct–Nov), bare winter tree (Dec–Feb)
    ============================================================ */
-var tree = null, snowmanSpot = null;
+var tree = null;
 var TREE_DEPTH = 7;
 function strSeed(str) {
   var h = 2166136261;
@@ -1589,39 +1634,56 @@ function strSeed(str) {
   return h >>> 0;
 }
 function treeLeafTarget() {
-  return Math.round(S.treeLeaves * lerp(16, 4, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
+  if (ENV.scene === 'winter') return 0;
+  return Math.round(S.treeLeaves * lerp(30, 6, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
 }
-/* A new tree shape every day (seeded by the date), leaning in from one side. */
+/* A new tree shape every day (seeded by the date), leaning in from one side.
+   Autumn: a broad, spreading tree. Winter: a different kind — a tall,
+   upright, vase-shaped keyaki (zelkova) with a fine broom of twigs. */
 function buildTree(key) {
   var r = rngFrom(strSeed(key));
   var left = ENV.side === 'left', dir = left ? 1 : -1;
-  var scale = H * S.treeSize;
+  var winter = ENV.scene === 'winter';
+  var scale = H * S.treeSize * (winter ? 1.1 : 1);
   var nodes = [], tips = [];
+  var maxD = winter ? 8 : TREE_DEPTH;
   function grow(parent, abs, len, w, d) {
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
     var idx = nodes.length;
     nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
                  ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
-    if (d >= TREE_DEPTH || len < scale * 0.025) { tips.push(idx); return; }
-    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
-    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+    if (d >= maxD || len < scale * (winter ? 0.018 : 0.025)) { tips.push(idx); return; }
+    var n, spread, upPull, shrink;
+    if (winter) {
+      n = d === 0 ? 3 : (r() < 0.45 ? 3 : 2);
+      spread = (0.26 + r() * 0.16) * (n === 3 ? 0.85 : 1);
+      upPull = 0.22;
+      shrink = 0.7 + r() * 0.1;
+    } else {
+      n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+      spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+      upPull = 0.1;
+      shrink = 0.68 + r() * 0.14;
+    }
     for (var i = 0; i < n; i++) {
       var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
-      ca = lerp(ca, -PI / 2, 0.1);
-      grow(idx, ca, len * (0.68 + r() * 0.14), Math.max(0.7, w * 0.66), d + 1);
+      ca = lerp(ca, -PI / 2, upPull);
+      grow(idx, ca, len * shrink, Math.max(winter ? 0.55 : 0.7, w * (winter ? 0.62 : 0.66)), d + 1);
     }
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
-  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(6, scale * 0.032), 0);
-  var T = { key: key, bx: bx, by: H + 6, nodes: nodes, tips: tips, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0 };
+  if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(5, scale * 0.026), 0);
+  else grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(6, scale * 0.032), 0);
+  var T = { key: key, bx: bx, by: H + 6, nodes: nodes, tips: tips, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0,
+            scale: scale, maxD: maxD, winter: winter };
   var n0 = treeLeafTarget();
   for (var j = 0; j < n0; j++) addTreeLeaf(T, true);
   return T;
 }
 function addTreeLeaf(T, initial) {
   if (!T.tips.length) return;
-  var L = makeLeaf({ z: 0.85 });
-  L.size *= 0.8;
+  var L = makeLeaf({ z: 0.85, species: 'generic' });
+  L.size = T.scale * rnd(0.028, 0.036) * S.sizeScale;   // in proportion to the tree
   L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
   L.hang = rnd(-0.5, 0.5);
   L.ff = rnd(1.4, 2.8);
@@ -1641,8 +1703,9 @@ function detachTreeLeaf(j) {
   insertSorted(L);
 }
 function ensureTree() {
-  if (ENV.scene !== 'autumn' || !S.tree) { tree = null; return; }
-  var key = S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
+  var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
+  if (!want) { tree = null; return; }
+  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
   if (!tree || tree.key !== key) tree = buildTree(key);
 }
 function updateTree(dt, t) {
@@ -1656,7 +1719,7 @@ function updateTree(dt, t) {
   var spd = 1 + ENV.windMs * 0.08;
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i];
-    var k = Math.pow(n.d / TREE_DEPTH, 1.6) + 0.02;     // thin twigs move most
+    var k = Math.pow(n.d / T.maxD, 1.6) + 0.02;     // thin twigs move most
     var sway = (wind + Math.sin(t * n.f * spd + n.ph) * amp +
                 Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * k;
     var par = n.p < 0 ? null : ns[n.p];
@@ -1692,7 +1755,7 @@ function drawTree(ctx, t) {
   ctxT.setTransform(1, 0, 0, 1, 0, 0);
   ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
   ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-  ctxT.strokeStyle = rgba(mixRgb([70, 46, 44], ENV.light.col, 0.12));
+  ctxT.strokeStyle = rgba(mixRgb(tree.winter ? [78, 66, 72] : [70, 46, 44], ENV.light.col, 0.12));
   ctxT.lineCap = 'round';
   var ns = tree.nodes;
   for (var i = 0; i < ns.length; i++) {
@@ -1709,123 +1772,6 @@ function drawTree(ctx, t) {
   for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
-}
-
-/* Japanese-style snowman (雪だるま): two snowballs, a bucket hat,
-   twig arms and a scarf that moves in the wind. */
-function bankY(x) {
-  var bankH = H * 0.035;
-  return H - bankH - Math.sin(x * 0.006 + 1.3) * bankH * 0.35 - Math.sin(x * 0.017) * bankH * 0.12;
-}
-function snowBall(ctx, x, y, r) {
-  var g = ctx.createRadialGradient(x - r * 0.35, y - r * 0.4, r * 0.1, x, y, r);
-  g.addColorStop(0, '#ffffff');
-  g.addColorStop(0.6, '#f2f4f9');
-  g.addColorStop(1, '#cfd4e3');
-  ctx.fillStyle = g;
-  ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(120,110,150,0.35)';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-}
-function drawSnowman(ctx, t) {
-  if (ENV.scene !== 'winter' || !S.snowman) return null;
-  var left = ENV.side === 'left', out = left ? -1 : 1;
-  var s = H * 0.075 * S.snowmanSize;
-  var cx = left ? W * 0.13 : W * 0.87;
-  // snow bank along the bottom edge
-  ctx.beginPath();
-  ctx.moveTo(0, H + 2);
-  for (var x = 0; x <= W + 24; x += 24) ctx.lineTo(x, bankY(x));
-  ctx.lineTo(W, H + 2);
-  ctx.closePath();
-  var bg = ctx.createLinearGradient(0, H - H * 0.06, 0, H);
-  bg.addColorStop(0, 'rgba(255,255,255,0.95)');
-  bg.addColorStop(1, 'rgba(226,230,242,0.95)');
-  ctx.fillStyle = bg;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(120,110,150,0.22)';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  var gy = bankY(cx) + s * 0.1;
-  ctx.fillStyle = 'rgba(90,90,130,0.14)';
-  ctx.beginPath(); ctx.ellipse(cx, gy, s * 1.15, s * 0.22, 0, 0, TAU); ctx.fill();
-  var by = gy - s * 0.82, tr = s * 0.66, ty = by - s * 0.78 - tr * 0.78;
-  snowBall(ctx, cx, by, s);
-
-  // twig arms, swaying a little
-  ctx.strokeStyle = '#5a3d30';
-  ctx.lineCap = 'round';
-  [-1, 1].forEach(function(side) {
-    var a = (side > 0 ? -0.55 : PI + 0.55) + Math.sin(t * 1.1 + side) * 0.05 + ENV.windPx * 0.0006;
-    var bx = cx + side * s * 0.78, byy = by - s * 0.45, len = s * 1.1;
-    var ex = bx + Math.cos(a) * len, ey = byy + Math.sin(a) * len;
-    ctx.lineWidth = Math.max(2, s * 0.05);
-    ctx.beginPath(); ctx.moveTo(bx, byy); ctx.lineTo(ex, ey); ctx.stroke();
-    var fx = bx + Math.cos(a) * len * 0.65, fy = byy + Math.sin(a) * len * 0.65, fa = a - side * 0.6;
-    ctx.lineWidth = Math.max(1.2, s * 0.03);
-    ctx.beginPath(); ctx.moveTo(fx, fy); ctx.lineTo(fx + Math.cos(fa) * len * 0.35, fy + Math.sin(fa) * len * 0.35); ctx.stroke();
-    var ga = a + side * 0.5;
-    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(ex + Math.cos(ga) * len * 0.2, ey + Math.sin(ga) * len * 0.2); ctx.stroke();
-  });
-
-  snowBall(ctx, cx, ty, tr);
-
-  // scarf with a tail that flutters
-  var nY = by - s * 0.82;
-  ctx.fillStyle = '#882E47';
-  ctx.beginPath(); ctx.ellipse(cx, nY, tr * 0.95, tr * 0.2, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(230,104,38,0.8)';
-  ctx.lineWidth = Math.max(1, tr * 0.05);
-  for (var st = -2; st <= 2; st++) {
-    ctx.beginPath();
-    ctx.moveTo(cx + st * tr * 0.3, nY - tr * 0.17);
-    ctx.lineTo(cx + st * tr * 0.3, nY + tr * 0.17);
-    ctx.stroke();
-  }
-  ctx.strokeStyle = '#882E47';
-  ctx.lineWidth = tr * 0.26;
-  ctx.lineCap = 'butt';
-  ctx.beginPath();
-  for (var i = 0; i <= 6; i++) {
-    var u = i / 6;
-    var wave = Math.sin(t * 3 - i * 0.9) * (1.5 + ENV.windMs * 0.6) * u + ENV.windPx * 0.02 * u;
-    var px = cx + out * (tr * 0.55 + i * s * 0.05) + wave, py = nY + i * s * 0.09;
-    if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
-  }
-  ctx.stroke();
-  ctx.lineCap = 'round';
-
-  // face
-  ctx.fillStyle = 'rgba(240,125,64,0.28)';
-  ctx.beginPath(); ctx.ellipse(cx - tr * 0.5, ty + tr * 0.18, tr * 0.16, tr * 0.1, 0, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.ellipse(cx + tr * 0.5, ty + tr * 0.18, tr * 0.16, tr * 0.1, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#2b2220';
-  ctx.beginPath(); ctx.arc(cx - tr * 0.32, ty - tr * 0.1, tr * 0.085, 0, TAU); ctx.fill();
-  ctx.beginPath(); ctx.arc(cx + tr * 0.32, ty - tr * 0.1, tr * 0.085, 0, TAU); ctx.fill();
-  ctx.strokeStyle = '#2b2220';
-  ctx.lineWidth = Math.max(1, tr * 0.05);
-  ctx.beginPath(); ctx.arc(cx, ty + tr * 0.05, tr * 0.25, 0.2 * PI, 0.8 * PI); ctx.stroke();
-
-  // bucket hat (バケツ)
-  var hatRot = out * 0.18 + Math.sin(t * 0.5) * 0.01;
-  var hx = cx + out * tr * 0.1, hy = ty - tr * 0.82;
-  var bw = tr * 1.25, tw = tr * 0.95, hh = tr * 0.85;
-  ctx.save();
-  ctx.translate(hx, hy);
-  ctx.rotate(hatRot);
-  var hg = ctx.createLinearGradient(-bw / 2, 0, bw / 2, 0);
-  hg.addColorStop(0, '#C44E10'); hg.addColorStop(0.45, '#F07D40'); hg.addColorStop(1, '#C44E10');
-  ctx.fillStyle = hg;
-  ctx.beginPath();
-  ctx.moveTo(-bw / 2, 0); ctx.lineTo(bw / 2, 0); ctx.lineTo(tw / 2, -hh); ctx.lineTo(-tw / 2, -hh);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = '#9E3B06';
-  ctx.fillRect(-bw / 2 - 1, -tr * 0.12, bw + 2, tr * 0.12);
-  ctx.beginPath(); ctx.ellipse(0, -hh, tw / 2, tr * 0.08, 0, 0, TAU); ctx.fill();
-  ctx.restore();
-  return { x: hx + Math.sin(hatRot) * hh, y: hy - Math.cos(hatRot) * hh - tr * 0.05 };
 }
 
 /* ============================================================
@@ -1857,18 +1803,16 @@ function glyphSpots() {
 }
 function spotPos(sp) {
   if (sp.node !== undefined && tree && tree.nodes[sp.node]) return { x: tree.nodes[sp.node].ex, y: tree.nodes[sp.node].ey };
-  if (sp.snow && snowmanSpot) return snowmanSpot;
   return sp;
 }
-function pickPerch(near) {
+function pickPerch(near, textOnly) {
   var g = glyphSpots(), extra = [];
-  if (tree) {
+  if (tree && !textOnly) {
     for (var i = 0; i < 8; i++) {
       var idx = Math.floor(Math.random() * tree.nodes.length);
       if (tree.nodes[idx].d >= 3) extra.push({ node: idx });
     }
   }
-  if (snowmanSpot) extra.push({ snow: true });
   var pool = (g.length && (Math.random() < 0.8 || !extra.length)) ? g : extra;
   if (!pool.length) return { x: W * rnd(0.2, 0.8), y: H * rnd(0.3, 0.7) };
   if (near) {
@@ -2021,7 +1965,7 @@ var cricket = null, cricketNext = 0;
 function sendCricket() {
   var seq = [], last = null, n = 3 + Math.floor(Math.random() * 5);
   for (var i = 0; i < n; i++) {
-    var p = pickPerch(last);
+    var p = pickPerch(last, true);     // crickets only use the text, never the tree
     seq.push(p);
     last = spotPos(p);
   }
@@ -2327,13 +2271,13 @@ function frame(ms) {
   while (split < leaves.length && leaves[split].z < 0.5) split++;
   for (var f = 0; f < split; f++) drawLeaf(leaves[f], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
+  drawSnow(ctx, false);
   drawTree(ctx, t);
   drawFog(ctx, dt);
   for (var n = split; n < leaves.length; n++) drawLeaf(leaves[n], t, false);
   for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
-  snowmanSpot = drawSnowman(ctx, t);
-  drawSnow(ctx);
+  drawSnow(ctx, true);
   drawRain(ctx);
   if (hero) { drawLeaf(hero, t, false); ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1; }
   drawSpecks(ctx, t);
@@ -2559,16 +2503,15 @@ var SPEC = [
   { k: 'rainMm', t: 'range', label: 'Rain / snow amount', min: 0, max: 12, step: 0.2, fmt: function(v) { return v.toFixed(1) + ' mm/h'; } },
   { k: 'fogDensity', t: 'range', label: 'Fog', min: 0, max: 1, step: 0.05, fmt: f2 },
   { sec: 'Scene 季節の風景' },
-  { k: 'scene', t: 'select', label: 'Picture', opts: [['auto', 'Follow the date (Oct–Nov tree, Dec–Feb snowman)'], ['autumn', 'Autumn: bare tree + falling leaves'], ['winter', 'Winter: snowman, no falling leaves'], ['plain', 'Falling leaves only']] },
+  { k: 'scene', t: 'select', label: 'Picture', opts: [['auto', 'Follow the date (Oct–Nov autumn tree, Dec–Feb winter tree)'], ['autumn', 'Autumn: bare tree + falling leaves'], ['winter', 'Winter: bare winter tree, no falling leaves'], ['plain', 'Falling leaves only']] },
   { info: 'sceneInfo' },
-  { k: 'figureSide', t: 'select', label: 'Tree / snowman side', opts: [['auto', 'Changes each day'], ['left', 'Left'], ['right', 'Right']] },
+  { k: 'figureSide', t: 'select', label: 'Tree side', opts: [['auto', 'Changes each day'], ['left', 'Left'], ['right', 'Right']] },
   { k: 'tree', t: 'check', label: 'Bare tree in autumn' },
   { k: 'treeSize', t: 'range', label: 'Tree height', min: 0.35, max: 0.95, step: 0.01, fmt: f2 },
   { k: 'treeSway', t: 'range', label: 'Branch sway', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'treeLeaves', t: 'range', label: 'Leaves left on the tree', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'treeOpacity', t: 'range', label: 'Tree strength', min: 0.15, max: 1, step: 0.01, fmt: f2 },
-  { k: 'snowman', t: 'check', label: 'Snowman in winter' },
-  { k: 'snowmanSize', t: 'range', label: 'Snowman size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
+  { k: 'winterTree', t: 'check', label: 'Bare winter tree (a different kind) in Dec–Feb' },
   { sec: 'Leaves 落ち葉' },
   { k: 'density', t: 'range', label: 'How many leaves fall', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'maxLeaves', t: 'range', label: 'Most leaves on screen at once', min: 10, max: 160, step: 5, fmt: String },
@@ -2649,7 +2592,7 @@ SPEC.forEach(function(s) { if (s.k) SPEC_BY_KEY[s.k] = s; });
 var WEATHER_KEYS = ['condition', 'windSpeed', 'windDir', 'gustiness', 'temperature', 'cloudCover', 'rainMm', 'fogDensity'];
 var LOOK_KEYS = ['colorMode', 'colorProgress', 'colorVariety', 'paletteBlend', 'lightTint', 'farBlur', 'nearBlur'];
 var GEOM_KEYS = ['shapeVariation', 'wear'];
-var TREE_KEYS = ['scene', 'figureSide', 'tree', 'treeSize', 'treeLeaves'];
+var TREE_KEYS = ['scene', 'figureSide', 'tree', 'winterTree', 'treeSize', 'treeLeaves', 'sizeScale'];
 
 var ACTIONS = {
   hero: function() { sendHero(); },
@@ -2767,6 +2710,7 @@ function setSetting(k, value, fromUser) {
 
 var _lastUiHour = -1;
 function updateUiLive() {
+  measureInfoBar();
   var p = ENV.p, sun = ENV.sun;
   // info bar, same format as the real app
   var dow = '日月火水木金土'.charAt(new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay());
@@ -2788,10 +2732,11 @@ function updateUiLive() {
   var ki = document.getElementById('skyInfo');
   if (ki) ki.textContent = 'Sun: ' + (A.sun.alt > 0 ? Math.round(A.sun.alt) + '° up in the ' + compassName(A.sun.az) : 'below the horizon') +
     ' · Moon: ' + moonName(A) + ', ' + moonPct + '% lit, ' +
-    (A.moon.alt > 0 ? Math.round(A.moon.alt) + '° up in the ' + compassName(A.moon.az) : 'below the horizon');
+    (A.moon.alt > 0 ? Math.round(A.moon.alt) + '° up in the ' + compassName(A.moon.az) : 'below the horizon') +
+    (A.moon.alt > 0 && sunIsUp() ? ' (hidden while the sun is shown)' : '');
   var ci = document.getElementById('sceneInfo');
   if (ci) ci.textContent = 'Now showing: ' + ({ autumn: 'autumn — bare tree on the ' + ENV.side + ', leaves falling',
-    winter: 'winter — snowman on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
+    winter: 'winter — bare winter tree on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
   var wi = document.getElementById('weatherInfo');
   if (wi) wi.textContent = S.liveWeather ? weatherStatus : 'Manual weather (tick the box above to go back to live)';
   var sp = document.getElementById('speciesInfo');
