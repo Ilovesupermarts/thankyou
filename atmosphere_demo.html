@@ -3,16 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Peaceful Landscape</title>
+    <title>Atmospheric Landscape</title>
     <style>
         :root {
-            --sky-top: #3b6a95;
-            --sky-bottom: #a3c4d6;
-            --water-color: #7db6cf;
-            --mountain-color: #568693;
-            --grass-color: #6a8a5e;
-            --coat-color: #9985cc;
-            --pants-color: #cdbeb2;
+            --sky-top: #42718f;
+            --sky-bottom: #a5c2d1;
+            --mist-color: #a5c2d1;
+            --water: #6ba3b8;
+            --grass-base: #5e7f54;
         }
 
         body, html {
@@ -22,53 +20,99 @@
             height: 100%;
             overflow: hidden;
             background-color: var(--sky-bottom);
+            font-family: sans-serif;
         }
 
-        #scene {
+        .scene {
             position: relative;
             width: 100vw;
             height: 100vh;
-            overflow: hidden;
         }
 
-        /* --- SKY & CLOUDS --- */
+        /* --- SKY --- */
         .sky {
             position: absolute;
             top: 0;
             width: 100%;
-            height: 70%;
-            background: linear-gradient(to bottom, var(--sky-top), var(--sky-bottom));
+            height: 65%;
+            background: linear-gradient(to bottom, var(--sky-top) 0%, var(--sky-bottom) 100%);
             z-index: 1;
         }
 
-        .cloud {
+        /* --- DISTANT BIRDS --- */
+        .birds {
             position: absolute;
-            background: rgba(255, 255, 255, 0.15);
-            border-radius: 50%;
-            filter: blur(20px);
-            animation: drift linear infinite;
+            top: 15%;
+            width: 100%;
+            height: 20%;
+            z-index: 2;
+            pointer-events: none;
         }
 
-        @keyframes drift {
-            from { transform: translateX(-20vw); }
-            to { transform: translateX(120vw); }
+        .bird {
+            position: absolute;
+            animation: fly linear forwards;
         }
 
-        /* --- MOUNTAINS --- */
-        .mountains {
+        .bird svg {
+            width: 15px;
+            height: 15px;
+            fill: none;
+            stroke: rgba(255, 255, 255, 0.6);
+            stroke-width: 1.5;
+            animation: flap 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes fly {
+            0% { transform: translate(105vw, 10vh); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translate(-10vw, -5vh); opacity: 0; }
+        }
+
+        @keyframes flap {
+            0% { transform: scaleY(1); }
+            100% { transform: scaleY(0.3); }
+        }
+
+        /* --- MOUNTAINS & MIST --- */
+        .horizon-container {
             position: absolute;
             top: 55%;
             width: 100%;
             height: 20%;
-            z-index: 2;
-            filter: blur(4px);
-            opacity: 0.8;
+            z-index: 3;
         }
 
-        .mountains svg {
+        .mountains-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.4;
+            filter: blur(6px);
+        }
+
+        .mountains-front {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0.6;
+            filter: blur(3px);
+        }
+
+        .mountains-back svg, .mountains-front svg {
             width: 100%;
             height: 100%;
             preserveAspectRatio: none;
+        }
+
+        .mist {
+            position: absolute;
+            bottom: -20%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(to bottom, rgba(165, 194, 209, 0) 0%, rgba(165, 194, 209, 0.9) 80%, var(--mist-color) 100%);
+            z-index: 4;
         }
 
         /* --- WATER --- */
@@ -77,258 +121,228 @@
             top: 65%;
             width: 100%;
             height: 20%;
-            background: linear-gradient(to bottom, #8ec3d9, var(--water-color));
-            z-index: 3;
+            background: linear-gradient(to bottom, #80b8ce 0%, var(--water) 50%, #5a8e9f 100%);
+            z-index: 5;
+            overflow: hidden;
         }
 
+        /* Soft horizontal water ripples */
         .water::after {
             content: '';
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: repeating-linear-gradient(
-                to right,
-                transparent,
-                transparent 50px,
-                rgba(255, 255, 255, 0.05) 50px,
-                rgba(255, 255, 255, 0.05) 100px
-            );
-            animation: ripple 10s linear infinite;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: linear-gradient(to right, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0) 50%, rgba(255,255,255,0.05) 100%);
+            background-size: 200% 100%;
+            animation: shimmer 15s linear infinite;
         }
 
-        @keyframes ripple {
-            0% { transform: translateX(0); }
-            100% { transform: translateX(-100px); }
+        @keyframes shimmer {
+            0% { background-position: 100% 0; }
+            100% { background-position: -100% 0; }
         }
 
-        /* --- FOREGROUND GRASS --- */
-        .foreground {
+        /* --- FOREGROUND GRASS (SVG for organic curve) --- */
+        .foreground-container {
             position: absolute;
             bottom: 0;
             width: 100%;
             height: 25%;
-            background: linear-gradient(to bottom, #789c68, var(--grass-color));
-            z-index: 4;
-            border-top-left-radius: 50% 20%;
-            border-top-right-radius: 40% 15%;
+            z-index: 6;
         }
 
-        /* --- GRASS BLADES --- */
-        .grass-blades {
+        .foreground-svg {
             position: absolute;
             bottom: 0;
             width: 100%;
-            height: 50px;
-            z-index: 5;
+            height: 100%;
+        }
+
+        /* --- GRASS BLADES --- */
+        #grass-container {
+            position: absolute;
+            bottom: 0;
+            width: 100%;
+            height: 100px;
+            z-index: 7;
+            overflow: hidden;
             display: flex;
             justify-content: space-around;
             align-items: flex-end;
-            overflow: hidden;
         }
 
         .blade {
             width: 2px;
-            background: #8fb87a;
+            background-color: #729165;
             border-radius: 50% 50% 0 0;
             transform-origin: bottom;
-            animation: sway 3s ease-in-out infinite alternate;
+            animation: sway ease-in-out infinite alternate;
+            position: absolute;
+            bottom: 0;
         }
 
         @keyframes sway {
-            0% { transform: rotate(-5deg); }
-            100% { transform: rotate(15deg); }
+            0% { transform: rotate(-3deg) skewX(0deg); }
+            100% { transform: rotate(12deg) skewX(5deg); }
         }
 
-        /* --- BIRDS --- */
-        .bird {
+        /* --- THE FIGURE --- */
+        .figure-container {
             position: absolute;
-            z-index: 2;
-            animation: fly linear forwards;
-        }
-
-        .bird svg {
-            width: 30px;
-            height: 30px;
-            stroke: rgba(255, 255, 255, 0.7);
-            stroke-width: 2;
-            fill: none;
-            animation: flap 0.6s ease-in-out infinite alternate;
-        }
-
-        @keyframes fly {
-            0% { transform: translate(110vw, 30vh) scale(0.5); opacity: 0; }
-            10% { opacity: 1; }
-            90% { opacity: 1; }
-            100% { transform: translate(-20vw, 10vh) scale(1); opacity: 0; }
-        }
-
-        @keyframes flap {
-            0% { transform: scaleY(1); }
-            100% { transform: scaleY(0.5); }
-        }
-
-        /* --- THE PERSON --- */
-        .person-container {
-            position: absolute;
-            bottom: 10%;
-            right: 25%;
-            width: 150px;
-            height: 300px;
+            bottom: 12%;
+            right: 28%;
+            width: 120px;
+            height: 250px;
             z-index: 10;
         }
 
-        .person-svg {
+        .figure-svg {
             width: 100%;
             height: 100%;
             overflow: visible;
+            filter: drop-shadow(0 10px 10px rgba(0,0,0,0.15));
         }
 
-        /* Wind Animations */
-        .coat-tail {
-            transform-origin: 70px 100px;
-            animation: wind-coat 2.5s ease-in-out infinite alternate;
-        }
-
+        /* Animations for clothing and hair */
         .hair {
-            transform-origin: 80px 45px;
-            animation: wind-hair 2s ease-in-out infinite alternate;
+            transform-origin: 75px 30px;
+            animation: wind-hair 3s ease-in-out infinite alternate;
         }
 
-        @keyframes wind-coat {
-            0% { transform: rotate(0deg) skewX(0deg); }
-            100% { transform: rotate(8deg) skewX(-5deg); }
+        .coat {
+            transform-origin: 65px 90px;
+            animation: wind-coat 3.5s ease-in-out infinite alternate;
         }
 
         @keyframes wind-hair {
             0% { transform: rotate(0deg); }
-            100% { transform: rotate(10deg) translateX(2px); }
+            100% { transform: rotate(8deg) translateX(3px); }
         }
 
-        /* Mist at the base of mountains */
-        .mist {
-            position: absolute;
-            top: 60%;
-            width: 100%;
-            height: 10%;
-            background: linear-gradient(to bottom, transparent, rgba(163, 196, 214, 0.8));
-            z-index: 2;
+        @keyframes wind-coat {
+            0% { transform: rotate(0deg) skewX(0deg); }
+            100% { transform: rotate(4deg) skewX(-3deg); }
         }
 
     </style>
 </head>
 <body>
 
-<div id="scene">
+<div class="scene">
     <!-- Sky -->
     <div class="sky"></div>
-    
-    <!-- Slow moving clouds -->
-    <div class="cloud" style="width: 300px; height: 80px; top: 10%; animation-duration: 60s;"></div>
-    <div class="cloud" style="width: 500px; height: 120px; top: 25%; animation-duration: 90s; animation-delay: -20s;"></div>
-    <div class="cloud" style="width: 200px; height: 60px; top: 40%; animation-duration: 45s; animation-delay: -10s;"></div>
 
     <!-- Birds -->
-    <div class="bird" style="animation-duration: 12s; animation-delay: 2s;">
-        <svg viewBox="0 0 20 20"><path d="M 0 10 Q 5 0 10 10 Q 15 0 20 10" /></svg>
-    </div>
-    <div class="bird" style="animation-duration: 15s; animation-delay: 4s; top: 5vh;">
-        <svg viewBox="0 0 20 20"><path d="M 0 10 Q 5 0 10 10 Q 15 0 20 10" /></svg>
-    </div>
-    <div class="bird" style="animation-duration: 18s; animation-delay: 1s; top: -5vh;">
-        <svg viewBox="0 0 20 20"><path d="M 0 10 Q 5 0 10 10 Q 15 0 20 10" /></svg>
-    </div>
-
-    <!-- Misty Mountains -->
-    <div class="mountains">
-        <svg viewBox="0 0 100 100" preserveAspectRatio="none">
-            <path d="M0,100 L0,70 Q20,40 40,70 Q60,30 80,60 Q90,50 100,70 L100,100 Z" fill="var(--mountain-color)"></path>
-            <path d="M0,100 L0,80 Q30,60 50,80 Q70,50 100,80 L100,100 Z" fill="#4a7c89" opacity="0.6"></path>
-        </svg>
+    <div class="birds">
+        <div class="bird" style="animation-duration: 20s; animation-delay: 2s; top: 20%;">
+            <svg viewBox="0 0 20 10"><path d="M 0 5 Q 5 0 10 5 Q 15 0 20 5" /></svg>
+        </div>
+        <div class="bird" style="animation-duration: 25s; animation-delay: 5s; top: 10%;">
+            <svg viewBox="0 0 20 10"><path d="M 0 5 Q 5 0 10 5 Q 15 0 20 5" /></svg>
+        </div>
+        <div class="bird" style="animation-duration: 18s; animation-delay: 1s; top: 30%;">
+            <svg viewBox="0 0 20 10"><path d="M 0 5 Q 5 0 10 5 Q 15 0 20 5" /></svg>
+        </div>
     </div>
 
-    <!-- Mist overlay -->
-    <div class="mist"></div>
+    <!-- Horizon / Mountains -->
+    <div class="horizon-container">
+        <div class="mountains-back">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path d="M0,100 L0,60 Q15,45 30,65 T60,55 T100,70 L100,100 Z" fill="#5c8a96"></path>
+            </svg>
+        </div>
+        <div class="mountains-front">
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path d="M0,100 L0,75 Q25,55 45,75 T80,65 T100,85 L100,100 Z" fill="#4a7885"></path>
+            </svg>
+        </div>
+        <div class="mist"></div>
+    </div>
 
     <!-- Water -->
     <div class="water"></div>
 
-    <!-- Grass & Foreground -->
-    <div class="foreground">
-        <!-- Decorative rocks/flowers -->
-        <svg width="100%" height="100%" style="position: absolute; bottom: 0; z-index: 6; opacity: 0.7;">
-            <circle cx="10%" cy="90%" r="3" fill="#dcdca7"/>
-            <circle cx="15%" cy="95%" r="2" fill="#e8e8c0"/>
-            <circle cx="80%" cy="85%" r="2" fill="#dcdca7"/>
-            <circle cx="85%" cy="92%" r="4" fill="#b3b391"/>
-            <path d="M 5% 100% Q 10% 80% 15% 100%" stroke="#5c7c50" stroke-width="2" fill="none"/>
+    <!-- Foreground Base -->
+    <div class="foreground-container">
+        <svg class="foreground-svg" preserveAspectRatio="none" viewBox="0 0 100 100">
+            <path d="M0,100 L0,30 Q20,10 50,20 T100,15 L100,100 Z" fill="var(--grass-base)"></path>
+            <!-- Slight color variation overlay -->
+            <path d="M0,100 L0,40 Q30,20 60,30 T100,25 L100,100 Z" fill="#688a5d" opacity="0.6"></path>
         </svg>
     </div>
 
-    <!-- Swaying Grass Blades (Generated via JS for randomness) -->
-    <div class="grass-blades" id="grass-container"></div>
+    <!-- Dynamic Grass Blades -->
+    <div id="grass-container"></div>
 
-    <!-- The Person (SVG) -->
-    <div class="person-container">
-        <svg class="person-svg" viewBox="0 0 150 300">
-            <!-- Legs / Pants -->
-            <path d="M 65 180 L 60 280 L 75 280 L 75 180 Z" fill="var(--pants-color)"></path>
-            <path d="M 75 180 L 80 280 L 95 280 L 85 180 Z" fill="var(--pants-color)"></path>
+    <!-- The Person -->
+    <div class="figure-container">
+        <svg class="figure-svg" viewBox="0 0 100 200">
+            <!-- Shadow -->
+            <ellipse cx="45" cy="195" rx="20" ry="4" fill="rgba(0,0,0,0.2)"></ellipse>
             
-            <!-- Body / Shoulders -->
-            <path d="M 60 80 Q 70 70 85 80 L 90 180 L 60 180 Z" fill="#b0a2d6"></path>
+            <!-- Back Leg (Pants) -->
+            <path d="M 55 120 L 60 190 L 50 190 L 48 120 Z" fill="#cbbdb3"></path>
+            <!-- Front Leg (Pants) -->
+            <path d="M 45 120 L 40 190 L 30 190 L 38 120 Z" fill="#dcd0c6"></path>
             
-            <!-- Coat (Animated) -->
-            <g class="coat-tail">
-                <path d="M 60 80 Q 70 70 85 80 L 95 200 Q 80 220 60 210 Z" fill="var(--coat-color)"></path>
-                <!-- Coat slit/fold detail -->
-                <path d="M 75 80 L 80 200 Q 75 205 70 200 L 65 80 Z" fill="#8a76b8" opacity="0.5"></path>
-            </g>
-
-            <!-- Arm (holding coat) -->
-            <path d="M 65 90 L 50 140 L 60 145 L 70 100 Z" fill="var(--coat-color)"></path>
-
+            <!-- Body/Shoulders (hidden mostly by coat) -->
+            <path d="M 35 60 Q 45 55 55 60 L 50 120 L 40 120 Z" fill="#d4c5e3"></path>
+            
             <!-- Hair (Animated) -->
             <g class="hair">
-                <path d="M 75 40 Q 95 40 90 70 Q 85 80 80 60 Q 75 50 75 40 Z" fill="#7a6a5a"></path>
-                <path d="M 80 45 Q 95 50 92 75 Q 90 85 85 75 Q 82 60 80 45 Z" fill="#6a5a4a"></path>
+                <path d="M 42 30 Q 55 30 58 50 Q 60 65 55 75 Q 50 60 48 45 Q 45 35 42 30 Z" fill="#887467"></path>
             </g>
 
-            <!-- Head -->
-            <circle cx="75" cy="45" r="12" fill="#f0d5c0"></circle>
-            
-            <!-- Neck -->
-            <path d="M 70 55 L 80 55 L 78 70 L 72 70 Z" fill="#f0d5c0"></path>
+            <!-- Head & Neck -->
+            <circle cx="42" cy="30" r="9" fill="#e8d0b9"></circle>
+            <path d="M 38 38 L 46 38 L 45 50 L 37 50 Z" fill="#e8d0b9"></path>
+
+            <!-- The Purple Coat (Animated) -->
+            <g class="coat">
+                <!-- Main coat body -->
+                <path d="M 35 55 Q 45 50 52 55 L 58 130 Q 45 135 32 128 Z" fill="#9d8bcc"></path>
+                <!-- Coat Fold / Shading -->
+                <path d="M 45 55 L 50 125 Q 48 128 42 130 L 38 55 Z" fill="#8a75bf" opacity="0.4"></path>
+                <!-- Arm holding the coat closed -->
+                <path d="M 38 60 L 30 95 Q 32 98 36 96 L 45 65 Z" fill="#9d8bcc"></path>
+                <!-- Hand -->
+                <circle cx="32" cy="96" r="3" fill="#e8d0b9"></circle>
+                <!-- Coat collar -->
+                <path d="M 38 50 Q 42 55 45 50 L 48 60 Q 42 58 35 62 Z" fill="#8a75bf"></path>
+            </g>
         </svg>
     </div>
 
 </div>
 
 <script>
-    // Generate random grass blades dynamically
+    // Generate dense, realistic grass blades
     const grassContainer = document.getElementById('grass-container');
-    const numBlades = 40;
+    const numBlades = 150; // Much denser than before
+
+    const colors = ['#5c7a50', '#6a8a5c', '#7a9c6a', '#4e6843'];
 
     for (let i = 0; i < numBlades; i++) {
         const blade = document.createElement('div');
         blade.classList.add('blade');
         
-        // Randomize height, left position, and animation duration
-        const height = Math.random() * 30 + 10;
-        const left = Math.random() * 100;
-        const duration = Math.random() * 2 + 2; // between 2s and 4s
-        const delay = Math.random() * -5; // Start at random times
-
+        // Randomize visual properties
+        const height = Math.random() * 40 + 10; // 10px to 50px
+        const width = Math.random() * 2 + 1;    // 1px to 3px
+        const left = Math.random() * 100;       // 0% to 100%
+        const duration = Math.random() * 2 + 2.5; // 2.5s to 4.5s
+        const delay = Math.random() * -5; 
+        
+        // Apply styles
         blade.style.height = `${height}px`;
+        blade.style.width = `${width}px`;
         blade.style.left = `${left}%`;
-        blade.style.position = 'absolute';
+        blade.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
         blade.style.animationDuration = `${duration}s`;
         blade.style.animationDelay = `${delay}s`;
         
-        // Vary colors slightly
-        const colors = ['#8fb87a', '#7a9c68', '#a3c78c'];
-        blade.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+        // Add slight opacity variations
+        blade.style.opacity = Math.random() * 0.5 + 0.5;
 
         grassContainer.appendChild(blade);
     }
