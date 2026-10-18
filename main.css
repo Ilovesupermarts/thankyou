@@ -2651,7 +2651,10 @@
      button size; the slot is as tall as the taller one, so nothing on the
      page moves when they swap. */
   .receipt-action-slot { display: grid; margin-top: 26px; }
-  .receipt-action-slot > button { grid-area: 1 / 1; align-self: start; margin: 0 auto; }
+  .receipt-action-slot > button { grid-area: 1 / 1; align-self: stretch; margin: 0 auto; }
+  /* The confirm button carries two lines, so trim its padding a little; the
+     back button stretches to the same height, so the two match exactly. */
+  .receipt-action-slot .receipt-confirm-btn { padding-top: 11px; padding-bottom: 11px; }
   .receipt-action-slot .receipt-confirm-btn {
     opacity: 0; visibility: hidden; pointer-events: none;
     transition: opacity 0.4s ease 0.2s, visibility 0s linear 0.6s, background 0.2s, border-color 0.2s, transform 0.15s;
