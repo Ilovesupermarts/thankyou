@@ -400,9 +400,9 @@ function makeDefaults() {
     rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
     lightning: true, frost: true, snowMix: true,
     sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1,
-    birds: true, nightSpecks: true, dawnGlow: true,
+    birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
     scene: 'auto', figureSide: 'auto',
-    tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5,
+    tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
     winterTree: true,
     heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
     dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
@@ -801,6 +801,7 @@ var lookVersion = 1, geomVersion = 1;
 
 function leafBlur(L) {
   if (L.hero) return 0;
+  if (L.onTree) return 0.4;             // leaves still on the tree stay crisp, like the branches
   var zc = clamp(L.z, 0, 1);
   return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
 }
@@ -1018,7 +1019,7 @@ function makeLeaf(opts) {
   var L = {
     id: nextId++, seed: (Math.random() * 4294967296) >>> 0, species: species, z: z,
     hero: !!opts.hero,
-    size: SPECIES[species].size * (0.45 + 0.6 * clamp(z, 0, 1)) * S.sizeScale * rnd(0.85, 1.15) * (opts.hero ? 2.2 : 1),
+    size: SPECIES[species].size * (0.45 + 0.6 * clamp(z, 0, 1)) * S.sizeScale * rnd(0.85, 1.15) * (opts.hero ? 1.3 : 1),
     x: 0, y: 0, vx: 0, vy: 0, rot: rnd(-PI, PI), baseRot: rnd(-0.6, 0.6),
     phi: rnd(0, TAU), sp: rnd(0, TAU), so: 0, age: 0,
     fallJ: rnd(0.8, 1.2), groundY: rnd(4, 30),
@@ -1223,8 +1224,10 @@ function makeSprites() {
   speckSprite.width = speckSprite.height = 32;
   var sp = speckSprite.getContext('2d');
   var g3 = sp.createRadialGradient(16, 16, 0, 16, 16, 16);
-  g3.addColorStop(0, 'rgba(255,226,170,1)');
-  g3.addColorStop(0.25, 'rgba(255,190,120,0.6)');
+  // firefly light: a bright yellow-green centre in a soft warm halo
+  g3.addColorStop(0, 'rgba(250,255,200,1)');
+  g3.addColorStop(0.18, 'rgba(214,236,110,0.9)');
+  g3.addColorStop(0.45, 'rgba(230,200,90,0.35)');
   g3.addColorStop(1, 'rgba(255,170,90,0)');
   sp.fillStyle = g3;
   sp.fillRect(0, 0, 32, 32);
@@ -1437,16 +1440,30 @@ function drawSun(ctx, t) {
 
 /* The moon at its real place and real phase. The lit side always
    faces the sun, so a crescent, half moon or full moon looks right. */
+/* Night window for the moon: 20:00–05:00. Returns 0..1 through the
+   night, or -1 outside it. */
+function moonNightU() {
+  var h = S.hour;
+  if (h >= 20) return (h - 20) / 9;
+  if (h < 5) return (h + 4) / 9;
+  return -1;
+}
 function drawMoon(ctx, t) {
   if (!S.moon) return;
   var A = ENV.astro, m = A.moon;
-  if (m.alt < -2 || sunIsUp()) return;      // never on screen together with the sun
+  var u = moonNightU();
+  if (u < 0 || sunIsUp()) return;           // only 20:00–05:00, never together with the sun
   var day = ENV.light.daylight;
-  var vis = smooth(-2, 3, m.alt) * lerp(1, 0.55, day) * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) *
-            (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
+  // fade in just after 20:00 and out just before 05:00
+  var vis = smooth(0, 0.03, u) * (1 - smooth(0.97, 1, u)) * lerp(1, 0.55, day) *
+            clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1) * (ENV.rainy ? 0.4 : 1) * (1 - ENV.fog * 0.6);
   if (vis < 0.02) return;
   var r = 28 * S.moonSize;
-  var pos = skyToScreen(m.alt, m.az), cx = pos.x, cy = skyBandY(r);
+  // Real phase always. Left/right follows the real direction while the moon
+  // is up; when it is really below the horizon it crosses the sky band
+  // from east (right) to west (left) through the night instead.
+  var pos = skyToScreen(m.alt, m.az);
+  var cx = m.alt > 0 ? pos.x : W * lerp(0.85, 0.15, u), cy = skyBandY(r);
   var sp = skyToScreen(A.sun.alt, A.sun.az);
   var toSun = Math.atan2(sp.y - pos.y, sp.x - pos.x);
   var litCol = mixRgb([255, 246, 226], [236, 240, 250], day);
@@ -1599,28 +1616,85 @@ function drawBirds(ctx, t) {
   ctx.stroke();
 }
 
+/* Fireflies: most drift behind the text; now and then some fly to a
+   message character, land on it and glow there for a while, then lift
+   off again. Several can sit on different characters at once. */
+var fireflyGlyphs = [], fireflyGlyphsAt = -10;
+function freeGlyphFor(t) {
+  if (t - fireflyGlyphsAt > 1) { fireflyGlyphs = glyphSpots(); fireflyGlyphsAt = t; }
+  if (!fireflyGlyphs.length) return null;
+  for (var tries = 0; tries < 6; tries++) {
+    var g = fireflyGlyphs[Math.floor(Math.random() * fireflyGlyphs.length)], taken = false;
+    for (var i = 0; i < specks.length; i++) {
+      var o = specks[i].target;
+      if (o && Math.abs(o.x - g.x) < 4 && Math.abs(o.y - g.y) < 4) { taken = true; break; }
+    }
+    if (!taken) return g;
+  }
+  return null;
+}
 function updateSpecks(dt, t) {
   var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk')) ? 24 : 0;
-  while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11) });
+  while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11), state: 'drift' });
   if (specks.length > target) specks.length = target;
+  var landed = 0;
+  for (var k = 0; k < specks.length; k++) if (specks[k].state !== 'drift') landed++;
   for (var i = 0; i < specks.length; i++) {
     var p = specks[i];
-    p.x += ((noise1(p.s + t * 0.15) - 0.5) * 40 + ENV.windPx * 0.15) * dt;
-    p.y += (noise1(p.s + 50 + t * 0.15) - 0.5) * 30 * dt;
-    if (p.x < -20) p.x += W + 40;
-    if (p.x > W + 20) p.x -= W + 40;
-    if (p.y < -20) p.y += H + 40;
-    if (p.y > H + 20) p.y -= H + 40;
+    if (p.state === 'drift') {
+      p.x += ((noise1(p.s + t * 0.15) - 0.5) * 40 + ENV.windPx * 0.15) * dt;
+      p.y += (noise1(p.s + 50 + t * 0.15) - 0.5) * 30 * dt;
+      if (p.x < -20) p.x += W + 40;
+      if (p.x > W + 20) p.x -= W + 40;
+      if (p.y < -20) p.y += H + 40;
+      if (p.y > H + 20) p.y -= H + 40;
+      if (S.fireflyLand && landed < S.fireflyMax && Math.random() < dt * 0.05) {
+        var g = freeGlyphFor(t);
+        if (g) { p.state = 'fly'; p.target = g; landed++; }
+      }
+    } else if (p.state === 'fly') {
+      // a gentle, wavering flight to the character
+      var dx = p.target.x - p.x, dy = p.target.y - 3 - p.y, d = Math.sqrt(dx * dx + dy * dy);
+      var sp = Math.min(70, d * 1.5 + 10);
+      if (d > 1.5) {
+        p.x += (dx / d * sp + Math.sin(t * 3 + p.s) * 14 * Math.min(1, d / 60)) * dt;
+        p.y += (dy / d * sp + Math.cos(t * 2.4 + p.s) * 10 * Math.min(1, d / 60)) * dt;
+      } else {
+        p.state = 'perch';
+        p.rest = rnd(3, 9);
+      }
+    } else if (p.state === 'perch') {
+      p.x = p.target.x; p.y = p.target.y - 3;
+      p.rest -= dt;
+      if (p.rest <= 0) { p.state = 'drift'; p.target = null; p.y -= 6; }
+    }
   }
 }
-function drawSpecks(ctx, t) {
+function fireflyAlpha(p, t) {
+  if (p.state === 'perch') return 0.45 + 0.5 * (0.5 + 0.5 * Math.sin(t * 2.2 + p.s));   // slow glow pulse
+  return 0.15 + 0.55 * noise1(p.s * 3 + t * 0.9);
+}
+/* front = false: drifting fireflies behind the text; true: the ones
+   flying to, or sitting on, a character (drawn above the text). */
+function drawSpecks(ctx, t, front) {
   for (var i = 0; i < specks.length; i++) {
     var p = specks[i];
-    var a = 0.15 + 0.55 * noise1(p.s * 3 + t * 0.9);
+    if ((p.state !== 'drift') !== !!front) continue;
+    var r = front ? 14 : p.r;
+    var a = fireflyAlpha(p, t);
+    if (front) {
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(60,45,30,0.7)';       // tiny body, so it reads as an insect on the character
+      ctx.beginPath(); ctx.ellipse(p.x - 1.5, p.y, 2.6, 1.4, 0, 0, TAU); ctx.fill();
+    }
     ctx.globalAlpha = a;
-    ctx.drawImage(speckSprite, p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+    ctx.drawImage(speckSprite, p.x - r, p.y - r, r * 2, r * 2);
   }
   ctx.globalAlpha = 1;
+}
+function fireflyOnText() {
+  for (var i = 0; i < specks.length; i++) if (specks[i].state !== 'drift') return true;
+  return false;
 }
 
 /* ============================================================
@@ -1635,7 +1709,7 @@ function strSeed(str) {
 }
 function treeLeafTarget() {
   if (ENV.scene === 'winter') return 0;
-  return Math.round(S.treeLeaves * lerp(30, 6, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
+  return Math.round(S.treeLeaves * lerp(48, 10, clamp((ENV.season - 0.2) / 0.7, 0, 1)));
 }
 /* A new tree shape every day (seeded by the date), leaning in from one side.
    Autumn: a broad, spreading tree. Winter: a different kind — a tall,
@@ -1683,7 +1757,8 @@ function buildTree(key) {
 function addTreeLeaf(T, initial) {
   if (!T.tips.length) return;
   var L = makeLeaf({ z: 0.85, species: 'generic' });
-  L.size = T.scale * rnd(0.028, 0.036) * S.sizeScale;   // in proportion to the tree
+  L.size = T.scale * rnd(0.042, 0.055) * S.sizeScale;   // in proportion to the tree
+  L.onTree = true;
   L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
   L.hang = rnd(-0.5, 0.5);
   L.ff = rnd(1.4, 2.8);
@@ -1695,6 +1770,8 @@ function addTreeLeaf(T, initial) {
 function detachTreeLeaf(j) {
   var L = tree.leaves.splice(j, 1)[0];
   L.attach = undefined;
+  L.onTree = false;
+  L.bakedV = -1;                        // re-draw with the normal falling-leaf softness
   L.vx = ENV.windPx * 0.4;
   L.vy = 5;
   L.fadeDur = 0.6;
@@ -1778,8 +1855,9 @@ function drawTree(ctx, t) {
    8c. VISITORS — red dragonfly by day, cricket at night.
        They perch on the characters of the message text.
    ============================================================ */
+var _glyphsReadyAt = 0;   // characters are still sliding in until this time
 function glyphSpots() {
-  if (!S.showText) return [];
+  if (!S.showText || performance.now() < _glyphsReadyAt) return [];
   var root = document.querySelector('.stage .panel.active .panel-content');
   if (!root) return [];
   var out = [], range = document.createRange();
@@ -1826,6 +1904,10 @@ function pickPerch(near, textOnly) {
 }
 /* When the panel changes, the text they stand on is gone. */
 function insectsLeaveText() {
+  fireflyGlyphsAt = -10;
+  for (var i = 0; i < specks.length; i++) {
+    if (specks[i].state !== 'drift') { specks[i].state = 'drift'; specks[i].target = null; }
+  }
   if (dragonfly && dragonfly.perch && dragonfly.perch.glyph) {
     if (dragonfly.state === 'perch') dragonfly.rest = Math.min(dragonfly.rest, 0.2);
     else if (dragonfly.state === 'approach') dragonfly.perch = { x: dragonfly.x, y: dragonfly.y - 30 };
@@ -2153,7 +2235,7 @@ function sendHero() {
 
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
-  var a = L.hero ? 0.78 : lerp(S.farOpacity, S.nearOpacity, zc);
+  var a = L.hero ? 0.78 : (L.onTree ? S.treeLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
@@ -2280,7 +2362,7 @@ function frame(ms) {
   drawSnow(ctx, true);
   drawRain(ctx);
   if (hero) { drawLeaf(hero, t, false); ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1; }
-  drawSpecks(ctx, t);
+  drawSpecks(ctx, t, false);
 
   var flashA = 0;
   for (var q = flashes.length - 1; q >= 0; q--) {
@@ -2293,13 +2375,15 @@ function frame(ms) {
   veil.style.opacity = (flashA * 0.35).toFixed(3);
 
   // front layer: dragonfly and cricket over the text
-  if (dragonfly || cricket || frontDirty) {
+  var ffFront = fireflyOnText();
+  if (dragonfly || cricket || ffFront || frontDirty) {
     ctxF.setTransform(1, 0, 0, 1, 0, 0);
     ctxF.clearRect(0, 0, canvasF.width, canvasF.height);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0);
+    drawSpecks(ctxF, t, true);
     drawDragonfly(ctxF, t);
     drawCricket(ctxF, t);
-    frontDirty = !!(dragonfly || cricket);
+    frontDirty = !!(dragonfly || cricket || ffFront);
   }
 
   uiTimer -= dt;
@@ -2395,6 +2479,8 @@ function replayPhrases() {
   phrases.forEach(function(el, i) {
     setTimeout(function() { el.classList.add('shown'); }, 250 + i * 90 + Math.random() * 120);
   });
+  // panel slide (0.5s) and the last phrase's 0.5s fade must finish before anything lands on the text
+  _glyphsReadyAt = performance.now() + Math.max(600, 250 + phrases.length * 90 + 120 + 550);
 }
 function showPanel() {
   var idx = S.panel === '2' ? 1 : 0;
@@ -2511,6 +2597,7 @@ var SPEC = [
   { k: 'treeSway', t: 'range', label: 'Branch sway', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'treeLeaves', t: 'range', label: 'Leaves left on the tree', min: 0, max: 3, step: 0.05, fmt: x2 },
   { k: 'treeOpacity', t: 'range', label: 'Tree strength', min: 0.15, max: 1, step: 0.01, fmt: f2 },
+  { k: 'treeLeafOpacity', t: 'range', label: 'Strength of leaves on the tree', min: 0.2, max: 1, step: 0.01, fmt: f2 },
   { k: 'winterTree', t: 'check', label: 'Bare winter tree (a different kind) in Dec–Feb' },
   { sec: 'Leaves 落ち葉' },
   { k: 'density', t: 'range', label: 'How many leaves fall', min: 0, max: 3, step: 0.05, fmt: x2 },
@@ -2559,11 +2646,13 @@ var SPEC = [
   { k: 'sun', t: 'check', label: 'Show the sun (real position: right = east, left = west)' },
   { k: 'sunSize', t: 'range', label: 'Sun size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { k: 'sunGlow', t: 'range', label: 'Sun glow and rays', min: 0, max: 2, step: 0.05, fmt: x2 },
-  { k: 'moon', t: 'check', label: 'Show the moon (real position and phase)' },
+  { k: 'moon', t: 'check', label: 'Show the moon 20:00–05:00 (real phase)' },
   { k: 'moonSize', t: 'range', label: 'Moon size', min: 0.5, max: 2, step: 0.05, fmt: x2 },
   { sec: 'Time-of-day extras' },
   { k: 'birds', t: 'check', label: 'Distant birds at dawn and dusk' },
-  { k: 'nightSpecks', t: 'check', label: 'Glowing specks at night' },
+  { k: 'nightSpecks', t: 'check', label: 'Fireflies at night' },
+  { k: 'fireflyLand', t: 'check', label: 'Fireflies land on the message characters' },
+  { k: 'fireflyMax', t: 'range', label: 'Most fireflies on the text at once', min: 1, max: 10, step: 1, fmt: String },
   { k: 'dawnGlow', t: 'check', label: 'Warm glow at dawn' },
   { sec: 'Surprises' },
   { k: 'heroLeaf', t: 'check', label: 'One leaf falls close and in focus' },
@@ -2733,7 +2822,7 @@ function updateUiLive() {
   if (ki) ki.textContent = 'Sun: ' + (A.sun.alt > 0 ? Math.round(A.sun.alt) + '° up in the ' + compassName(A.sun.az) : 'below the horizon') +
     ' · Moon: ' + moonName(A) + ', ' + moonPct + '% lit, ' +
     (A.moon.alt > 0 ? Math.round(A.moon.alt) + '° up in the ' + compassName(A.moon.az) : 'below the horizon') +
-    (A.moon.alt > 0 && sunIsUp() ? ' (hidden while the sun is shown)' : '');
+    (moonNightU() < 0 ? ' (moon is shown 20:00–05:00)' : (sunIsUp() ? ' (hidden while the sun is shown)' : ''));
   var ci = document.getElementById('sceneInfo');
   if (ci) ci.textContent = 'Now showing: ' + ({ autumn: 'autumn — bare tree on the ' + ENV.side + ', leaves falling',
     winter: 'winter — bare winter tree on the ' + ENV.side + ', no falling leaves', plain: 'falling leaves only' })[ENV.scene];
