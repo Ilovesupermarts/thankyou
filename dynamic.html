@@ -53,6 +53,23 @@
     opacity: 0;
   }
 
+  /* Night text, 18:00–06:00: the message text switches from the muted brown
+     (--text-mute, only about 2:1 against the dusky night background) to a
+     darker brown from the same palette, with a pale halo built from the
+     silk-white and petal tones lifting the background right behind the
+     characters. Set on the paragraphs so the change can fade smoothly. */
+  body.dyn-demo .panel-content p {
+    color: var(--dyn-text, var(--text-mute));
+    text-shadow: var(--dyn-shadow, 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60), 0 0 0 rgba(255, 253, 249, 0));
+    transition: color 1.2s ease, text-shadow 1.2s ease;
+  }
+  body.dyn-demo.night-text {
+    --dyn-text: var(--dyn-text-night, var(--text-dark));
+    --dyn-shadow: 0 0 3px rgba(255, 253, 249, calc(0.95 * var(--dyn-halo, 0.8))),
+                  0 0 12px rgba(255, 247, 242, calc(0.85 * var(--dyn-halo, 0.8))),
+                  0 0 26px rgba(253, 232, 218, calc(0.8 * var(--dyn-halo, 0.8)));
+  }
+
   /* Only two message panels on this page. */
   body.dyn-demo .track { width: 200%; }
   body.dyn-demo .panel { width: 50%; }
@@ -402,8 +419,9 @@ function makeDefaults() {
     sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1, moonPath: 'arc',
     birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
     scene: 'auto', figureSide: 'auto',
+    nightText: true, nightTextColor: 'var(--text-dark)', nightTextHalo: 0.8,
     tree: true, treeSize: 0.62, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
-    winterTree: true, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
+    winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
     frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
     heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
     dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
@@ -1752,19 +1770,22 @@ function buildTree(key) {
   var winter = ENV.scene === 'winter';
   var scale = H * S.treeSize * (winter ? 1.1 : 1);
   var nodes = [], tips = [];
-  var maxD = winter ? 8 : TREE_DEPTH;
+  var dens = S.winterTreeDensity;          // winter only: 0.1 very sparse … 1 the old dense look
+  var maxD = winter ? 4 + Math.round(dens * 4) : TREE_DEPTH;
   function grow(parent, abs, len, w, d) {
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
     var idx = nodes.length;
     nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
                  ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
     if (d >= maxD || len < scale * (winter ? 0.018 : 0.025)) { tips.push(idx); return; }
+    // a sparse winter tree: some twigs simply stop early
+    if (winter && d >= 3 && r() < (1 - dens) * 0.4) { tips.push(idx); return; }
     var n, spread, upPull, shrink;
     if (winter) {
-      n = d === 0 ? 3 : (r() < 0.45 ? 3 : 2);
-      spread = (0.26 + r() * 0.16) * (n === 3 ? 0.85 : 1);
-      upPull = 0.22;
-      shrink = 0.7 + r() * 0.1;
+      n = d === 0 ? 2 : ((dens > 0.55 && r() < 0.45 * dens) ? 3 : 2);
+      spread = (0.36 + r() * 0.2) * (n === 3 ? 0.85 : 1);
+      upPull = 0.2;
+      shrink = 0.74 + r() * 0.1;
     } else {
       n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
       spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
@@ -1774,7 +1795,7 @@ function buildTree(key) {
     for (var i = 0; i < n; i++) {
       var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
       ca = lerp(ca, -PI / 2, upPull);
-      grow(idx, ca, len * shrink, Math.max(winter ? 0.55 : 0.7, w * (winter ? 0.62 : 0.66)), d + 1);
+      grow(idx, ca, len * shrink, Math.max(winter ? 0.9 : 0.7, w * (winter ? 0.64 : 0.66)), d + 1);
     }
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
@@ -1814,7 +1835,7 @@ function detachTreeLeaf(j) {
 function ensureTree() {
   var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
   if (!want) { tree = null; return; }
-  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
+  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize + '|' + S.winterTreeDensity;
   if (!tree || tree.key !== key) tree = buildTree(key);
 }
 function updateTree(dt, t) {
@@ -2811,6 +2832,7 @@ var SPEC = [
   { k: 'treeOpacity', t: 'range', label: 'Tree strength', min: 0.15, max: 1, step: 0.01, fmt: f2 },
   { k: 'treeLeafOpacity', t: 'range', label: 'Strength of leaves on the tree', min: 0.2, max: 1, step: 0.01, fmt: f2 },
   { k: 'winterTree', t: 'check', label: 'Bare winter tree (a different kind) in Dec–Feb' },
+  { k: 'winterTreeDensity', t: 'range', label: 'Winter tree branches (sparse ↔ dense)', min: 0.1, max: 1, step: 0.05, fmt: f2 },
   { k: 'snowman', t: 'check', label: 'Snowman silhouette beside the winter tree' },
   { k: 'snowmanSize', t: 'range', label: 'Snowman size', min: 0.6, max: 1.8, step: 0.05, fmt: x2 },
   { k: 'snowBank', t: 'check', label: 'Accumulated snow along the bottom in Dec–Feb' },
@@ -2889,6 +2911,9 @@ var SPEC = [
   { k: 'insectSize', t: 'range', label: 'Insect size', min: 0.6, max: 2, step: 0.05, fmt: x2 },
   { buttons: [['Dragonfly now', 'dragonfly'], ['Cricket now', 'cricket']] },
   { sec: 'Message panels' },
+  { k: 'nightText', t: 'check', label: 'Higher-contrast text from 18:00 to 06:00' },
+  { k: 'nightTextColor', t: 'select', label: 'Night text colour (site palette)', opts: [['var(--text-dark)', 'Darkest brown · 墨 --text-dark #241C1A'], ['var(--text-soft)', 'Deep brown · --text-soft #352824'], ['var(--text-med)', 'Medium brown · --text-med #443430']] },
+  { k: 'nightTextHalo', t: 'range', label: 'Pale halo behind the night text', min: 0, max: 1, step: 0.05, fmt: f2 },
   { k: 'panel', t: 'select', label: 'Panel shown', opts: [['1', 'Panel 1 — 自己紹介'], ['2', 'Panel 2 — メッセージ']] },
   { k: 'showText', t: 'check', label: 'Show panel text' },
   { buttons: [['Replay text', 'replay']] },
@@ -2901,7 +2926,7 @@ SPEC.forEach(function(s) { if (s.k) SPEC_BY_KEY[s.k] = s; });
 var WEATHER_KEYS = ['condition', 'windSpeed', 'windDir', 'gustiness', 'temperature', 'cloudCover', 'rainMm', 'fogDensity'];
 var LOOK_KEYS = ['colorMode', 'colorProgress', 'colorVariety', 'paletteBlend', 'lightTint', 'farBlur', 'nearBlur'];
 var GEOM_KEYS = ['shapeVariation', 'wear'];
-var TREE_KEYS = ['scene', 'figureSide', 'tree', 'winterTree', 'treeSize', 'treeLeaves', 'sizeScale'];
+var TREE_KEYS = ['scene', 'figureSide', 'tree', 'winterTree', 'winterTreeDensity', 'treeSize', 'treeLeaves', 'sizeScale'];
 
 var ACTIONS = {
   hero: function() { sendHero(); },
@@ -3010,6 +3035,7 @@ function setSetting(k, value, fromUser) {
   if (k === 'pileMax') while (pile.length > S.pileMax) pile.shift();
   if (k === 'maxLeaves') while (leaves.length > S.maxLeaves) leaves.shift();
   if (k === 'heroEvery') heroNext = 0;
+  if (k === 'nightText' || k === 'nightTextColor' || k === 'nightTextHalo') applyNightText();
   if (TREE_KEYS.indexOf(k) >= 0) { tree = null; computeEnv(); ensureTree(); }
   refreshControl(k);
   computeEnv();
@@ -3017,8 +3043,17 @@ function setSetting(k, value, fromUser) {
   scheduleSave();
 }
 
+/* 18:00–06:00 (in the time shown on the page, real or chosen). */
+function applyNightText() {
+  var on = !!S.nightText && (S.hour >= 18 || S.hour < 6);
+  document.body.classList.toggle('night-text', on);
+  var st = document.documentElement.style;
+  st.setProperty('--dyn-text-night', S.nightTextColor);
+  st.setProperty('--dyn-halo', String(S.nightTextHalo));
+}
 var _lastUiHour = -1;
 function updateUiLive() {
+  applyNightText();
   measureInfoBar();
   var p = ENV.p, sun = ENV.sun;
   // info bar, same format as the real app
@@ -3087,6 +3122,7 @@ function buildCopyText() {
     palette: {
       accent: cssVar('--accent'), secondaryAccent: cssVar('--secondary-accent'),
       textMute: cssVar('--text-mute'), background: cssVar('--bg-base'),
+      nightTextColour: S.nightText ? S.nightTextColor + ' = ' + cssVar(S.nightTextColor.replace(/^var\((.*)\)$/, '$1')) + ' (18:00–06:00)' : 'off',
       siteLeafColours: SITE_LEAF_COLOURS
     },
     scene: {
@@ -3158,6 +3194,7 @@ makeSprites();
 resize();
 computeEnv();
 ensureTree();
+applyNightText();
 lastLookKey = lookKey();
 lastDate = S.date;
 lastScene = ENV.scene;
