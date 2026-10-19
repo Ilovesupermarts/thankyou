@@ -102,6 +102,8 @@
 <div class="floret-layer" id="floretLayer" aria-hidden="true"></div>
 
 <div class="info-bar" id="infoBar">
+  <!-- The bending rim along the bottom of the glass pane (see #barGlass). -->
+  <div class="bar-rim" aria-hidden="true"></div>
   <div class="info-inner">
     <div class="info-line" id="infoLine">
       <span class="city" id="infoCity">名古屋市</span>
@@ -125,14 +127,14 @@
        stays when the music display steps aside for the games. -->
   <span class="hud-dl-badge" id="hudPctStatus" aria-hidden="true">0%</span>
 
-  <!-- Music display, at the right of the toolbar and exactly as tall as the
-       weather bar:
-         meta row   — title · artist, pinned to the top, over the wave
-         wave stack — 6-layer fluid spectrum on a 288×52 canvas, flush on
+  <!-- Music display, at the right of the toolbar, spanning exactly the two
+       weather lines (the static line and the ticker):
+         meta row   — title · artist, laid over the top of the wave
+         wave stack — 6-layer fluid spectrum on a 288×44 canvas, flush on
                       top of the gauge bar
-         gauge bar  — 5px pill with a glowing playhead at the fill tip
-         time row   — elapsed / total, at the bottom
-       The canvas carries baseline logical dimensions only (288×52); app.js
+         gauge bar  — 5px pill; its playhead dot is hidden
+         time row   — elapsed / total, hidden (app.js still writes to it)
+       The canvas carries baseline logical dimensions only (288×44); app.js
        scales the backing store by devicePixelRatio on boot.
        The 再生中 badge is kept but hidden: _hudRenderState() in app.js
        still writes to it, and stops early without it.
@@ -153,7 +155,7 @@
 
     <div class="hud-wave-gauge-stack">
       <div class="hud-visualizer-block">
-        <canvas class="hud-canvas" id="hudCanvas" width="288" height="52"></canvas>
+        <canvas class="hud-canvas" id="hudCanvas" width="288" height="44"></canvas>
       </div>
 
       <div class="hud-gauge-bar">
@@ -297,41 +299,24 @@
   <div class="name-column" id="nameColumn"></div>
 </div>
 
-<!-- ============ TOOLBAR GLASS FILTER ============
-     Drawn in code, no image files. The toolbar across the top (the weather
-     bar and the music display) is a pane of frosted glass; main.css points
-     the backdrop-filter of .info-bar::before at #barGlass. main.css softens
-     the scene with a CSS blur before and after this filter: that blur
-     handles the screen edges cleanly, where an SVG blur would draw a dark
-     line along them. Steps here:
-       frost  — roughen what is behind the pane
-       wobble — a slow, wide ripple, like the faint unevenness of real glass
-       rim    — bend it hard along the bottom edge, the only edge you can see
-                (the others are the edges of the screen), and pull red, green
-                and blue apart by slightly different amounts there (the
-                coloured fringe on the edge of thick glass)
-     The rim is steered by the map in <feImage id="barGlassMap">: green runs
-     from neutral down to dark over the bottom 24px, so the edge shows what
-     is just above it, magnified. app.js redraws the map for the pane's real
-     height (setBarGlassMap); this copy is for a 102px pane.
-     <feImage id="barGlassEdge"> fades the frost and ripple out along the top
-     and sides, where there is nothing past the screen to show; app.js draws
-     it for the real size (until then it lets everything through). -->
+<!-- ============ TOOLBAR RIM FILTER ============
+     Drawn in code, no image files. The toolbar across the top is a pane of
+     frosted glass; the frost itself is a plain CSS blur (.info-bar::before,
+     cheap). Only the strip along the bottom rim (.bar-rim, 56px tall) uses
+     this filter, which bends the frosted scene like the edge of thick glass
+     and pulls red, green and blue apart by slightly different amounts (the
+     coloured fringe on a real glass edge).
+     The bend is steered by the map in the <feImage>: green is neutral over
+     the strip's top 32px and darkens over the bottom 24px, so the rim shows
+     what is just above it, magnified, reaching at most 32px up: always
+     inside the strip. The map is stretched to the strip, which is always
+     56px tall, so it never needs redrawing. -->
 <svg width="0" height="0" style="position:fixed" aria-hidden="true" focusable="false"><defs>
 <filter id="barGlass" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
-<feImage id="barGlassEdge" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22%23fff%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="edge"/>
-<feTurbulence type="fractalNoise" baseFrequency="0.45" numOctaves="2" seed="3" result="grainRaw"/>
-<feColorMatrix in="grainRaw" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0 1" result="grainOpaque"/>
-<feComposite in="grainOpaque" in2="edge" operator="arithmetic" k1="1" k2="0" k3="-0.5" k4="0.5" result="grain"/>
-<feDisplacementMap in="SourceGraphic" in2="grain" scale="5" xChannelSelector="R" yChannelSelector="G" result="frost"/>
-<feTurbulence type="fractalNoise" baseFrequency="0.004 0.03" numOctaves="1" seed="11" result="rippleRaw"/>
-<feColorMatrix in="rippleRaw" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0 1" result="rippleOpaque"/>
-<feComposite in="rippleOpaque" in2="edge" operator="arithmetic" k1="1" k2="0" k3="-0.5" k4="0.5" result="ripple"/>
-<feDisplacementMap in="frost" in2="ripple" scale="12" xChannelSelector="R" yChannelSelector="G" result="waved"/>
-<feImage id="barGlassMap" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%22102%22 viewBox=%220 0 16 102%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220.0000%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.7647%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.7882%22 stop-color=%22rgb(128,126,128)%22/%3E%3Cstop offset=%220.8118%22 stop-color=%22rgb(128,121,128)%22/%3E%3Cstop offset=%220.8353%22 stop-color=%22rgb(128,113,128)%22/%3E%3Cstop offset=%220.8588%22 stop-color=%22rgb(128,103,128)%22/%3E%3Cstop offset=%220.8824%22 stop-color=%22rgb(128,91,128)%22/%3E%3Cstop offset=%220.9059%22 stop-color=%22rgb(128,77,128)%22/%3E%3Cstop offset=%220.9294%22 stop-color=%22rgb(128,61,128)%22/%3E%3Cstop offset=%220.9529%22 stop-color=%22rgb(128,42,128)%22/%3E%3Cstop offset=%220.9765%22 stop-color=%22rgb(128,22,128)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(128,0,128)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23g)%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="map"/>
-<feDisplacementMap in="waved" in2="map" scale="64" xChannelSelector="R" yChannelSelector="G" result="dr"/>
-<feDisplacementMap in="waved" in2="map" scale="58" xChannelSelector="R" yChannelSelector="G" result="dg"/>
-<feDisplacementMap in="waved" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G" result="db"/>
+<feImage href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2256%22 viewBox=%220 0 16 56%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.5714%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.6143%22 stop-color=%22rgb(128,126,128)%22/%3E%3Cstop offset=%220.6571%22 stop-color=%22rgb(128,121,128)%22/%3E%3Cstop offset=%220.7000%22 stop-color=%22rgb(128,113,128)%22/%3E%3Cstop offset=%220.7429%22 stop-color=%22rgb(128,103,128)%22/%3E%3Cstop offset=%220.7857%22 stop-color=%22rgb(128,91,128)%22/%3E%3Cstop offset=%220.8286%22 stop-color=%22rgb(128,77,128)%22/%3E%3Cstop offset=%220.8714%22 stop-color=%22rgb(128,61,128)%22/%3E%3Cstop offset=%220.9143%22 stop-color=%22rgb(128,42,128)%22/%3E%3Cstop offset=%220.9571%22 stop-color=%22rgb(128,22,128)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(128,0,128)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23g)%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="map"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="64" xChannelSelector="R" yChannelSelector="G" result="dr"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="58" xChannelSelector="R" yChannelSelector="G" result="dg"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G" result="db"/>
 <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
 <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
 <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
