@@ -740,27 +740,128 @@
     85% { transform: translate(-2%, -2%) scale(1.1); }
   }
 
-  /* ============ INFO BAR ============ */
+  /* ============ INFO BAR = GLASS TOOLBAR ============
+     A pane of frosted glass across the top of the screen, like the macOS
+     menu bar, from the first message panel on (body.info-visible) and on
+     the thank-you screen. It carries the weather line and ticker (centre),
+     the music display (right, .audio-spectrum-hud) and the download battery
+     (far right, .hud-dl-badge). Things scrolling or falling behind it are
+     frosted and bent by the glass; the text on it has no glow.
+
+     Layers inside the bar (it is its own stacking context):
+       ::after   z -2  the soft shadow under the pane
+       ::before  z -1  the glass: tint, sun glint, backdrop-filter #barGlass
+       content         weather, music display, battery
+     The pane reaches 14px below the weather bar, so the bar's own height
+     (which places the sun and moon, and spaces the message panels) is
+     unchanged. The shadow is a separate layer because Chrome sizes a
+     backdrop filter from everything the element paints, shadow included.
+
+     Shown / hidden with visibility, and faded layer by layer, never with
+     opacity on the bar: opacity under 1 would cut the glass off from the
+     scene behind it. .hidden (the receipt) hides the whole bar.
+
+     Pop-ups (confirm, alert, tanzaku) cover the bar: it drops under their
+     sheet while one is open, and only comes back on top once the sheet has
+     faded out (the z-index change waits 0.5s). */
   .info-bar {
     position: fixed; top: 0; left: 0; right: 0; z-index: 500;
     padding: 18px 20px 12px 20px; text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    opacity: 0; transform: translateY(-6px);
-    transition: opacity 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    visibility: hidden; transform: translateY(-6px);
+    transition: transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), visibility 0s linear 1.4s, z-index 0s linear 0.5s;
     pointer-events: none; line-height: 1.4;
-    text-shadow: 0 1px 3px rgba(250, 247, 245, 0.95), 0 0 10px rgba(250, 247, 245, 0.8);
     display: none;
   }
+  .info-bar > *,
+  .info-bar::before,
+  .info-bar::after { opacity: 0; transition: opacity 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94); }
   body.info-visible .info-bar { display: block; }
-  .info-bar.shown { opacity: 1; transform: translateY(0); }
-  .info-bar.hidden { opacity: 0; transform: translateY(-14px); transition: opacity 0.6s ease, transform 0.6s ease; }
+  .info-bar.shown {
+    visibility: visible; transform: translateY(0);
+    transition: transform 1.4s cubic-bezier(0.25, 0.46, 0.45, 0.94), visibility 0s linear 0s, z-index 0s linear 0.5s;
+  }
+  .info-bar.shown > *,
+  .info-bar.shown::before,
+  .info-bar.shown::after { opacity: 1; }
+  .info-bar.hidden {
+    visibility: hidden; transform: translateY(-14px);
+    transition: transform 0.6s ease, visibility 0s linear 0.6s, z-index 0s linear 0.5s;
+  }
+  .info-bar.hidden > *,
+  .info-bar.hidden::before,
+  .info-bar.hidden::after { opacity: 0; transition: opacity 0.6s ease; }
+  body:has(.confirm-screen.visible) .info-bar,
+  body:has(.alert-screen.visible) .info-bar,
+  body:has(.tanzaku-screen.visible) .info-bar {
+    z-index: 240;
+    transition: transform 0.6s ease, visibility 0s linear 0s, z-index 0s linear 0s;
+  }
+
+  /* ---- The glass pane ----------------------------------------------------
+     #barGlass (index.html) frosts the scene behind, ripples it slightly, and
+     bends it hard along the bottom rim with a coloured fringe. Browsers that
+     cannot take an SVG filter here keep the plain blur on the first line.
+     The light arrives as variables written by updateToolbarLight() in
+     app.js (all default to "no light"):
+       --glass-sx   the sun's (or moon's) x, as a % of the pane's width
+       --glass-sy   its y, as a % of the pane's height (below the pane: > 100%)
+       --glass-i    how strong it is, 0..1
+     The sun sits just under the pane, so its light catches the bottom rim
+     right above it (the bright glint) and spreads up into the glass. */
+  .info-bar::before {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: -14px;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(110px 18px at var(--glass-sx, 50%) 100%,
+        rgba(255, 255, 255, calc(var(--glass-i, 0) * 0.95)) 0%,
+        rgba(255, 255, 255, 0) 100%),
+      radial-gradient(360px 170px at var(--glass-sx, 50%) var(--glass-sy, 200%),
+        rgba(255, 242, 214, calc(var(--glass-i, 0) * 0.50)) 0%,
+        rgba(255, 226, 170, calc(var(--glass-i, 0) * 0.16)) 50%,
+        rgba(255, 226, 170, 0) 100%),
+      rgba(255, 253, 249, 0.10);
+    -webkit-backdrop-filter: blur(5px) saturate(1.2);
+    backdrop-filter: blur(5px) saturate(1.2);
+    -webkit-backdrop-filter: blur(1px) url(#barGlass) blur(1px) saturate(1.2);
+    backdrop-filter: blur(1px) url(#barGlass) blur(1px) saturate(1.2);
+    box-shadow:
+      /* the bottom rim: a bright edge line and the thickness of the glass */
+      inset 0 -1px 0 rgba(255, 255, 255, 0.75),
+      inset 0 -8px 10px -7px rgba(255, 255, 255, 0.45),
+      inset 0 -2px 0 rgba(255, 255, 255, 0.18),
+      /* the SVG filter darkens the outer 2px at the screen's top and sides;
+         a faint light edge there evens it out */
+      inset 3px 0 3px -1px rgba(255, 255, 255, 0.30),
+      inset -3px 0 3px -1px rgba(255, 255, 255, 0.30),
+      inset 0 3px 3px -1px rgba(255, 255, 255, 0.30);
+  }
+  .info-bar::after {
+    content: "";
+    position: absolute;
+    left: 0; right: 0; top: 0; bottom: -14px;
+    z-index: -2;
+    pointer-events: none;
+    box-shadow: 0 6px 18px rgba(68, 52, 48, 0.10), 0 1px 3px rgba(68, 52, 48, 0.06);
+  }
+  /* The sakura theme has no sun or moon (the background loop does not run),
+     so its glass is just the tint: no glint left over from another theme. */
+  html[data-theme="default"] .info-bar::before {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  html[data-theme="default"] .info-bar::after {
+    box-shadow: 0 6px 18px rgba(120, 90, 90, 0.10), 0 1px 3px rgba(120, 90, 90, 0.06);
+  }
   .info-inner { display: inline-block; position: relative; max-width: 100%; text-align: center; padding-bottom: 26px; }
   .info-line { display: inline-block; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 1.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .info-line .city { font-weight: 600; color: var(--accent); letter-spacing: 2px; }
-  .info-line .sep { color: #d8ccc8; margin: 0 8px; font-weight: 400; }
+  .info-line .city { font-weight: 600; color: var(--accent-2); letter-spacing: 2px; }
+  .info-line .sep { color: var(--text-mute); margin: 0 8px; font-weight: 400; }
   .info-line .date { color: var(--text-mute); }
-  .info-line .time { color: var(--accent); font-weight: 600; }
-  .info-line .temp { color: var(--accent); font-weight: 600; }
+  .info-line .time { color: var(--accent-2); font-weight: 600; }
+  .info-line .temp { color: var(--accent-2); font-weight: 600; }
   .info-line .weather { color: var(--text-mute); }
   .ticker-wrap {
     position: absolute; left: 0; right: 0; bottom: 0; height: 22px;
@@ -1579,29 +1680,25 @@
   /* ============================================================
      AUDIO SPECTRUM & METADATA HUD
      ------------------------------------------------------------
-     Persistent top-right card (top aligned with the weather line of the
-     info bar) surfacing the currently-playing ambient bed. Layout:
+     The music display sits on the glass toolbar (.info-bar), at the right,
+     and spans exactly the weather bar's height: the title at the top, the
+     time at the bottom. Layout:
 
-       top row    — 再生中 (top-left) · DL XX% (top-right)
-       meta row   — title · artist, centred
-       wave stack — 6-layer fluid spectrum on a 288×44 canvas,
+       meta row   — title · artist, centred, pinned to the top and laid
+                    over the wave (on shorter screens they overlap more)
+       wave stack — 6-layer fluid spectrum on a 288×52 canvas,
                     flush on top of the gauge bar
        gauge bar  — 5px pill with a glowing playhead at the fill tip
        time row   — elapsed / total, split left and right
 
-     Both badges are absolutely positioned at top: 8px — matching
-     the left/right 8px side inset — so 再生中 pins hard to the
-     top-left corner and DL XX% to the top-right. Card padding-top
-     is 24px to reserve clearance for them.
-
-     The card is frosted glass (a blurred, tinted view of whatever is behind
-     it), not paper. Text and wave colours are the darker palette steps so
-     they hold up over the sun, leaves and pattern at any hour.
+     The 再生中 badge (.hud-top-row) is hidden but kept in the page, since
+     _hudRenderState() writes to it. The download battery (.hud-dl-badge)
+     sits to the right of the display, outside it, so it stays when the
+     display steps aside for the games.
 
      Visibility gates (mirror in app.js's _hudShouldDraw()):
        · CSS — body.info-visible:not(.receipt-locked) .audio-
-                spectrum-hud.shown, plus summary-lift and
-                thankyou-elevated overrides below
+                spectrum-hud.shown
        · JS  — same body-class conditions plus .shown on the HUD
 
      Reduced motion: badge/gauge pulses killed, playhead glow
@@ -1611,38 +1708,29 @@
   /* Content-box width is 318 − 2 (borders) − 28 (padding) = 288px.
      This must match HUD_DISPLAY_W in app.js — the canvas backing
      store is sized to that constant and displayed at width: 100%,
-     so any drift between the two stretches the raster horizontally. */
+     so any drift between the two stretches the raster horizontally.
+     right: the battery's 26px margin + 46px battery + 4px nub + 18px gap. */
   .audio-spectrum-hud {
-    position: fixed;
-    top: 24px;
-    right: calc(26px + env(safe-area-inset-right, 0px));
-    z-index: 40;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(94px + env(safe-area-inset-right, 0px));
     display: flex;
     flex-direction: column;
+    justify-content: flex-end;
     pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
     width: 318px;
-    padding: 24px 14px 10px 14px;
-    border-radius: 18px;
-    /* The card itself paints nothing. The glass (::before) and its soft
-       shadow (::after) sit behind the content, because Chrome sizes a
-       backdrop filter from everything an element paints, shadow included;
-       a shadow on the glass layer shifts the whole effect off the card.
-       The 1px transparent border keeps the 288px content width. */
+    padding: 0 14px;
     border: 1px solid transparent;
-    text-shadow: 0 0 6px rgba(255, 253, 249, 0.75);
-    /* Hidden with visibility and faded layer by layer (see below), never with
-       opacity on the card: opacity under 1 would cut the glass off from the
-       scene behind it. */
+    /* Hidden with visibility and faded child by child, as before. */
     visibility: hidden;
     transform: translateY(-8px);
     transition: visibility 0s linear 0.6s, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
 
-  .audio-spectrum-hud > *,
-  .audio-spectrum-hud::before,
-  .audio-spectrum-hud::after {
+  .audio-spectrum-hud > * {
     opacity: 0;
     transition: opacity 0.6s ease;
   }
@@ -1652,94 +1740,16 @@
     transform: translateY(0);
     transition: visibility 0s linear 0s, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
   }
-  body.info-visible:not(.receipt-locked) .audio-spectrum-hud.shown > *,
-  body.info-visible:not(.receipt-locked) .audio-spectrum-hud.shown::before,
-  body.info-visible:not(.receipt-locked) .audio-spectrum-hud.shown::after {
+  body.info-visible:not(.receipt-locked) .audio-spectrum-hud.shown > * {
     opacity: 1;
   }
 
-  /* ---- Glass pane -------------------------------------------------------
-     #hudGlass (index.html) frosts and bends what is behind the card: a light
-     grain scatters it like rough glass, and the rim bends it like the edge of
-     a thick pane, with the three colours bent by slightly different amounts
-     (the coloured fringe on a real glass edge). Browsers that cannot take an
-     SVG filter here keep the plain blur on the first line.
-     The sun's position arrives as --glass-* variables, written by
-     updateHudGlassLight() in app.js (all default to "no light"):
-       --glass-lx / --glass-ly   unit vector from the card toward the light
-       --glass-sx / --glass-sy   where the light is, as a % of the card
-       --glass-i                 how strong it is, 0..1
-     Light facing the sun catches the near rim brightly and the far rim
-     faintly (it leaves through the other side), and a warm glow spreads
-     in from the sun's side. */
-  .audio-spectrum-hud::before {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    border-radius: 18px;
-    pointer-events: none;
-    background:
-      radial-gradient(150px 110px at var(--glass-sx, 50%) var(--glass-sy, -40%),
-        rgba(255, 244, 218, calc(var(--glass-i, 0) * 0.55)) 0%,
-        rgba(255, 226, 170, calc(var(--glass-i, 0) * 0.18)) 55%,
-        rgba(255, 226, 170, 0) 100%),
-      linear-gradient(160deg, rgba(255, 255, 255, 0.26) 0%, rgba(255, 255, 255, 0.04) 36%, rgba(255, 255, 255, 0) 100%),
-      rgba(255, 253, 249, 0.10);
-    -webkit-backdrop-filter: blur(5px) saturate(1.2);
-    backdrop-filter: blur(5px) saturate(1.2);
-    -webkit-backdrop-filter: url(#hudGlass) saturate(1.2);
-    backdrop-filter: url(#hudGlass) saturate(1.2);
-    border: 1px solid rgba(255, 255, 255, 0.45);
-    box-shadow:
-      /* the rim facing the light, and a faint one where it leaves */
-      inset calc(var(--glass-lx, 0) * -2px) calc(var(--glass-ly, -1) * -2px) 2px -1px rgba(255, 255, 255, calc(0.55 + var(--glass-i, 0) * 0.45)),
-      inset calc(var(--glass-lx, 0) * 2px) calc(var(--glass-ly, -1) * 2px) 3px -1px rgba(255, 255, 255, calc(0.18 + var(--glass-i, 0) * 0.30)),
-      /* thickness: a soft bright edge all the way round */
-      inset 0 0 14px rgba(255, 255, 255, 0.32),
-      inset 0 0 0 1px rgba(255, 255, 255, 0.20);
-  }
-  .audio-spectrum-hud::after {
-    content: "";
-    position: absolute;
-    inset: -1px;
-    z-index: -2;
-    border-radius: 18px;
-    pointer-events: none;
-    box-shadow:
-      0 10px 30px rgba(68, 52, 48, 0.14),
-      0 2px 4px rgba(68, 52, 48, 0.08);
-  }
-
-  /* The card used to lift above the summary bar and the thank-you buttons
-     when it sat at the bottom left. At the top right nothing is in its way,
-     so those two lift rules are gone. */
-
-  html[data-theme="default"] .audio-spectrum-hud::before {
-    background:
-      radial-gradient(150px 110px at var(--glass-sx, 50%) var(--glass-sy, -40%),
-        rgba(255, 244, 218, calc(var(--glass-i, 0) * 0.55)) 0%,
-        rgba(255, 226, 170, calc(var(--glass-i, 0) * 0.18)) 55%,
-        rgba(255, 226, 170, 0) 100%),
-      linear-gradient(160deg, rgba(255, 255, 255, 0.28) 0%, rgba(255, 255, 255, 0.05) 36%, rgba(255, 255, 255, 0) 100%),
-      rgba(255, 255, 255, 0.12);
-  }
-  html[data-theme="default"] .audio-spectrum-hud::after {
-    box-shadow:
-      0 10px 30px rgba(120, 90, 90, 0.14),
-      0 2px 4px rgba(120, 90, 90, 0.08);
-  }
-
-  /* --- Top row — absolutely positioned badges --- */
+  /* --- Top row — the 再生中 badge, hidden (see above) --- */
   .hud-top-row {
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 0;
-    pointer-events: none;
+    display: none;
   }
 
-  .hud-status-badge,
-  .hud-dl-badge {
+  .hud-status-badge {
     position: absolute;
     top: 8px;
     font-size: 10px;
@@ -1751,7 +1761,6 @@
     transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
   }
   .hud-status-badge { left: 8px; }
-  .hud-dl-badge     { right: 8px; }
 
   .hud-status-badge {
     background: rgba(176, 74, 90, 0.16);
@@ -1791,33 +1800,83 @@
     color: #882E47;
   }
 
+  /* --- Download battery: far right of the toolbar, level with the weather
+     line. The outline is the battery, the nub is ::after, and the fill
+     (::before) follows the download; --dl (0..100) is written by
+     _hudRenderState() in app.js. The number sits on top. 展開中 pulses while
+     the track is being unpacked; the battery turns 葡萄染 when full. Its
+     top is set per screen size (the weather line moves) in the size blocks
+     further down; 18px matches the default padding and font size. */
   .hud-dl-badge {
+    position: absolute;
+    top: 18px;
+    right: calc(30px + env(safe-area-inset-right, 0px));
+    width: 46px;
+    height: 20px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid rgba(68, 52, 48, 0.55);
+    border-radius: 7px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    background: rgba(222, 192, 172, 0.28);
-    color: var(--text-mute);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-dark);
+    isolation: isolate;
+    transition: color 0.3s ease, border-color 0.3s ease;
   }
+  .hud-dl-badge::before {
+    content: "";
+    position: absolute;
+    left: 2px; top: 2px; bottom: 2px;
+    width: calc((100% - 4px) * var(--dl, 0) / 100);
+    border-radius: 4px;
+    background: rgba(230, 104, 38, 0.40);
+    z-index: -1;
+    transition: width 0.4s ease, background-color 0.3s ease;
+  }
+  .hud-dl-badge::after {
+    content: "";
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    width: 3px;
+    height: 8px;
+    margin-top: -4px;
+    border-radius: 0 2px 2px 0;
+    background: rgba(68, 52, 48, 0.55);
+    transition: background-color 0.3s ease;
+  }
+  html[data-theme="default"] .hud-dl-badge::before { background: rgba(176, 74, 90, 0.32); }
   .hud-dl-badge.decoding {
-    background: rgba(255, 162, 89, 0.32);
+    font-size: 9.5px;
+    letter-spacing: 0;
     color: #9E3B06;
     animation: statusPulse 1.2s ease-in-out infinite;
   }
+  .hud-dl-badge.decoding::before { background: rgba(255, 162, 89, 0.55); }
   .hud-dl-badge.ready {
-    background: rgba(154, 62, 77, 0.12);
     color: var(--secondary-accent, #9a3e4d);
+    border-color: rgba(136, 46, 71, 0.65);
   }
-  html[data-theme="autumn"] .hud-dl-badge.ready,
-  html[data-theme="winter"] .hud-dl-badge.ready {
-    background: rgba(136, 46, 71, 0.12);
-    color: var(--secondary-accent, #882E47);
-  }
+  .hud-dl-badge.ready::before { background: rgba(136, 46, 71, 0.28); }
+  .hud-dl-badge.ready::after { background: rgba(136, 46, 71, 0.65); }
 
   @keyframes statusPulse {
     0%, 100% { opacity: 0.6; }
     50%      { opacity: 1; }
   }
 
-  /* --- Meta row: title · artist, centred --- */
+  /* --- Meta row: title · artist, centred, pinned to the top of the
+     display and laid over the wave --- */
   .hud-meta-row {
+    position: absolute;
+    top: 0; left: 14px; right: 14px;
+    z-index: 1;
     display: flex;
     align-items: baseline;
     justify-content: center;
@@ -1864,7 +1923,7 @@
   }
   .hud-visualizer-block {
     width: 100%;
-    height: 44px;
+    height: 52px;
     display: flex;
     align-items: flex-end;
     justify-content: center;
@@ -1873,7 +1932,7 @@
   }
   .hud-canvas {
     width: 100%;
-    height: 44px;
+    height: 52px;
     display: block;
   }
 
@@ -2934,6 +2993,7 @@
     .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px 14px 24px; }
+    .hud-dl-badge { top: 22px; }
     .ticker-track { font-size: 13px; }
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
@@ -2969,6 +3029,7 @@
   @media (min-width: 1100px) {
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px 16px 28px; }
+    .hud-dl-badge { top: 25px; }
     .ticker-track { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .name-inner { max-width: 600px; }
     .panel { padding: 88px 32px 170px 32px; }
@@ -2996,6 +3057,7 @@
   }
   @media (max-height: 700px) {
     .info-bar { padding: 12px 16px 10px 16px; }
+    .hud-dl-badge { top: 10px; }
     .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
     .ticker-track { font-size: 11.5px; }
@@ -3041,6 +3103,7 @@
   }
   @media (max-height: 600px) and (orientation: landscape) {
     .info-bar { padding: 8px 14px 6px 14px; }
+    .hud-dl-badge { top: 6px; }
     .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
     .ticker-track { font-size: 10.5px; letter-spacing: 1px; }

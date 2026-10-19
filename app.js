@@ -1297,7 +1297,7 @@ var WIND_CHIME_SILENCE_MAX = 2000;  // ms
      · hudStatusBadge (top-left)  — 待機中 / 再生中 / 展開中 / 待機完了
      · hudPctStatus   (top-right) — DL XX% / PCM展開中 / DL 100%
      · hudTrackTitle · hudTrackArtist (centred meta row)
-     · hudCanvas (288×44, six-layer fluid waveform)
+     · hudCanvas (288×52, six-layer fluid waveform)
      · hudGaugeFill (playback progress with glowing playhead)
      · hudTimeElapsed / hudTimeTotal (split timestamps below the bar)
 
@@ -1321,7 +1321,7 @@ var hudTimeTotal     = document.getElementById('hudTimeTotal');
    canvas backing store is sized to this constant; drift re-
    introduces the aspect stretch the v1.3 amendment closed. */
 var HUD_DISPLAY_W = 288;
-var HUD_DISPLAY_H = 44;
+var HUD_DISPLAY_H = 52;   /* 44 → 52 when the display moved onto the toolbar: the wave fills up to the title */
 var HUD_WAVE_PTS  = 28;
 var HUD_LAYERS    = 6;
 
@@ -1439,17 +1439,19 @@ function _hudRenderState() {
   hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
   if (hudPctStatus) hudPctStatus.classList.remove('decoding', 'ready');
 
-  /* Top-right yellow box — download / decompression progress.
-     Independent of the status badge so background download of
-     Tracks 2 and 3 stays visible while Track 1 is playing. */
+  /* Download battery at the far right of the toolbar — download /
+     decompression progress. Independent of the status badge so background
+     download of Tracks 2 and 3 stays visible while Track 1 is playing.
+     --dl sets how full the battery is drawn. */
   if (hudPctStatus) {
+    hudPctStatus.style.setProperty('--dl', pctInt);
     if (isDecodingCurrent) {
-      hudPctStatus.textContent = 'PCM展開中';
+      hudPctStatus.textContent = '展開中';
       hudPctStatus.classList.add('decoding');
     } else if (pct < 1.0) {
-      hudPctStatus.textContent = 'DL ' + pctInt + '%';
+      hudPctStatus.textContent = pctInt + '%';
     } else {
-      hudPctStatus.textContent = 'DL 100%';
+      hudPctStatus.textContent = '100%';
       hudPctStatus.classList.add('ready');
     }
   }
@@ -3321,6 +3323,52 @@ var receiptStampEl = document.getElementById('receiptStamp');
 var thankyouScreen = document.getElementById('thankyouScreen');
 
 var infoBar = document.getElementById('infoBar');
+
+/* The glass toolbar's two maps (index.html), redrawn whenever the weather
+   bar changes size. The pane is the bar + 14px below (.info-bar::before).
+   #barGlassMap — the rim: a vertical gradient, neutral down to the last 24px
+     of the pane and then darkening to the bottom edge, so the rim shows what
+     is just above it, magnified.
+   #barGlassEdge — white, fading to black over the 18px along the top and
+     sides: the frost and ripple fade out there, since past the screen's
+     edge there is nothing to show and they would draw a ragged line. */
+var BAR_GLASS_EXTRA = 14, BAR_GLASS_RIM = 24, BAR_GLASS_EDGE = 18, _barGlassMapKey = '';
+function setBarGlassMap() {
+  var img = document.getElementById('barGlassMap');
+  var edge = document.getElementById('barGlassEdge');
+  if (!img || !edge || !infoBar) return;
+  var h = Math.round(infoBar.offsetHeight + BAR_GLASS_EXTRA);
+  var w = Math.round(infoBar.offsetWidth);
+  if (h <= BAR_GLASS_EXTRA || w < 1 || (w + 'x' + h) === _barGlassMapKey) return;
+  _barGlassMapKey = w + 'x' + h;
+  var stops = '<stop offset="0" stop-color="rgb(128,128,128)"/>';
+  for (var i = 0; i <= 10; i++) {
+    var t = i / 10;
+    var off = (h - BAR_GLASS_RIM + BAR_GLASS_RIM * t) / h;
+    var g = Math.round(128 - 128 * Math.pow(t, 1.8));
+    stops += '<stop offset="' + off.toFixed(4) + '" stop-color="rgb(128,' + g + ',128)"/>';
+  }
+  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="' + h + '" viewBox="0 0 16 ' + h + '" preserveAspectRatio="none">' +
+            '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' + stops + '</linearGradient></defs>' +
+            '<rect width="100%" height="100%" fill="url(#g)"/></svg>';
+  img.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(svg));
+
+  var e = BAR_GLASS_EDGE;
+  var esvg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+             '<defs>' +
+             '<linearGradient id="l" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
+             '<linearGradient id="r" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
+             '<linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
+             '</defs>' +
+             '<rect width="' + w + '" height="' + h + '" fill="#fff"/>' +
+             '<rect width="' + e + '" height="' + h + '" fill="url(#l)"/>' +
+             '<rect x="' + (w - e) + '" width="' + e + '" height="' + h + '" fill="url(#r)"/>' +
+             '<rect width="' + w + '" height="' + e + '" fill="url(#t)"/></svg>';
+  edge.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(esvg));
+}
+if (infoBar && typeof ResizeObserver !== 'undefined') {
+  new ResizeObserver(setBarGlassMap).observe(infoBar);
+}
 var infoCity = document.getElementById('infoCity');
 var infoDate = document.getElementById('infoDate');
 var infoTime = document.getElementById('infoTime');
@@ -6959,9 +7007,6 @@ document.addEventListener('keydown', function(e) {
 
 window.addEventListener('scroll', function() {
   if (!tableUnlocked && window.scrollY > 0) { window.scrollTo(0, 0); return; }
-  if (receiptScreen && receiptScreen.classList.contains('visible')) return;
-  if (window.scrollY > 30) infoBar.classList.add('hidden');
-  else infoBar.classList.remove('hidden');
 }, { passive: true });
 
 /* ============ TRANSITION LINE / TABLE VISIBILITY ============ */
@@ -9088,13 +9133,14 @@ function measureInfoBar() {
 }
 function skyBandY(radius) { return _barBottom + radius + 18; }
 
-/* The music card is frosted glass; this tells its CSS where the light is
-   (see .audio-spectrum-hud::before in main.css). The sun is the light by day,
+/* The toolbar across the top is frosted glass; this tells its CSS where the
+   light is (see .info-bar::before in main.css). The sun is the light by day,
    the moon (much weaker) by night. Written twice a second, and only when the
    numbers change, so it costs no layout or style work most of the time. */
 var _glassKey = '';
-function updateHudGlassLight() {
-  if (!audioSpectrumHud) return;
+function updateToolbarLight() {
+  var bar = document.getElementById('infoBar');
+  if (!bar) return;
   var sx = 0, sy = 0, str = 0, a = ENV.astro;
   if (a && sunIsUp()) {
     var low = 1 - smooth(2, 18, a.sun.alt);
@@ -9111,28 +9157,23 @@ function updateHudGlassLight() {
     key = 'off';
     if (key !== _glassKey) {
       _glassKey = key;
-      audioSpectrumHud.style.removeProperty('--glass-i');
+      bar.style.removeProperty('--glass-i');
     }
     return;
   }
-  var r = audioSpectrumHud.getBoundingClientRect();
+  var r = bar.getBoundingClientRect();
   if (r.width < 1) return;
-  var dx = sx - (r.left + r.width / 2), dy = sy - (r.top + r.height / 2);
-  var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-  var near = 1 - smooth(350, 1500, dist);          // the nearer the sun, the stronger the glint
-  var i = (str * (0.4 + 0.6 * near)).toFixed(2);
-  var lx = (dx / dist).toFixed(2), ly = (dy / dist).toFixed(2);
-  var px = clamp((sx - r.left) / r.width * 100, -200, 300).toFixed(0);
-  var py = clamp((sy - r.top) / r.height * 100, -200, 300).toFixed(0);
-  key = lx + ',' + ly + ',' + px + ',' + py + ',' + i;
+  /* the pane (.info-bar::before) reaches 14px below the bar */
+  var paneL = r.left, paneW = r.width, paneT = r.top, paneH = r.height + 14;
+  var i = str.toFixed(2);
+  var px = clamp((sx - paneL) / paneW * 100, -20, 120).toFixed(1);
+  var py = clamp((sy - paneT) / paneH * 100, 0, 400).toFixed(0);
+  key = px + ',' + py + ',' + i;
   if (key === _glassKey) return;
   _glassKey = key;
-  var st = audioSpectrumHud.style;
-  st.setProperty('--glass-lx', lx);
-  st.setProperty('--glass-ly', ly);
-  st.setProperty('--glass-sx', px + '%');
-  st.setProperty('--glass-sy', py + '%');
-  st.setProperty('--glass-i', i);
+  bar.style.setProperty('--glass-sx', px + '%');
+  bar.style.setProperty('--glass-sy', py + '%');
+  bar.style.setProperty('--glass-i', i);
 }
 function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
 
@@ -11226,7 +11267,7 @@ function dynStep(dt, t, want) {
   clockTimer -= dt;
   if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
   barTimer -= dt;
-  if (barTimer <= 0) { measureInfoBar(); updateHudGlassLight(); barTimer = 0.5; }
+  if (barTimer <= 0) { measureInfoBar(); updateToolbarLight(); barTimer = 0.5; }
   if (typeof currentPanel !== 'undefined' && currentPanel !== _lastPanel) {   // a new message panel: insects leave the old text
     _lastPanel = currentPanel;
     insectsLeaveText();
