@@ -766,15 +766,18 @@
      sheet while one is open, and only comes back on top once the sheet has
      faded out (the z-index change waits 0.5s). */
   .info-bar {
-    /* Geometry shared by the pane, the music display and the battery:
-         --bar-pt  the bar's top padding = the top of the weather line
-         --line-h  the weather line's height (font size × 1.4)
-         --info-h  both weather lines: the line + the 26px ticker row
-         --pane-h  the glass: down to 24px below the ticker
-       Set again in each screen-size block with the padding and font size. */
+    /* Geometry shared by the pane, the music display and the 七十二候:
+         --bar-pt     the bar's top padding = the top of the weather line
+         --line-h     the weather line's height (font size × 1.4)
+         --ticker-top the top of the ticker row
+         --pane-h     the glass: down to 24px below the ticker
+       --bar-pt and --line-h are set again in each screen-size block with
+       the padding and font size. --ticker-top and --pane-h are measured by
+       layoutToolbar() in app.js (the ticker sits a few px lower than the
+       sum of the parts); the values here are close estimates until then. */
     --bar-pt: 18px; --line-h: 19.6px;
-    --info-h: calc(var(--line-h) + 26px);
-    --pane-h: calc(var(--bar-pt) + var(--info-h) + 24px);
+    --ticker-top: calc(var(--bar-pt) + var(--line-h) + 8.8px);
+    --pane-h: calc(var(--ticker-top) + 22px + 24px);
     position: fixed; top: 0; left: 0; right: 0; z-index: 500;
     padding: 18px 20px 12px 20px; text-align: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
@@ -860,8 +863,17 @@
       linear-gradient(to bottom, transparent 0, #000 14px),
       linear-gradient(to right, transparent 0, #000 6px, #000 calc(100% - 6px), transparent 100%);
     mask-composite: intersect;
+  }
+  /* The bright bottom edge of the glass and the glow of its thickness, on
+     their own layer above the music display and the 七十二候, so the line
+     is unbroken across the screen and the wave's base tucks under it. */
+  .bar-edge {
+    position: absolute;
+    left: 0; right: 0;
+    top: calc(var(--pane-h) - 10px);
+    height: 10px;
+    pointer-events: none;
     box-shadow:
-      /* the bottom edge: a bright line and the thickness of the glass */
       inset 0 -1px 0 rgba(255, 255, 255, 0.75),
       inset 0 -8px 10px -7px rgba(255, 255, 255, 0.45),
       inset 0 -2px 0 rgba(255, 255, 255, 0.18);
@@ -908,6 +920,63 @@
     animation: tickerScroll 60s linear infinite; will-change: transform; line-height: 22px;
   }
   @keyframes tickerScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+  /* ---- 七十二候, the left of the toolbar ------------------------------------
+     Mirrors the music display: centred at 16.75% across (halfway between
+     the screen's left edge and where a full weather line starts, 33.5%).
+     Top line level with the weather line, in the music title's type
+     (name) and artist's type (reading); second line level with the ticker,
+     in the ticker's type. Filled by updateSeasonKo() in app.js. */
+  .season-ko {
+    position: absolute;
+    top: var(--bar-pt);
+    left: 16.75%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 32%;
+    text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    pointer-events: none;
+  }
+  .ko-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 6px;
+    height: var(--line-h);
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .ko-name {
+    font-size: 15.95px;
+    font-weight: 700;
+    color: var(--text-dark);
+    letter-spacing: 1.5px;
+  }
+  .ko-sep {
+    font-size: 12.1px;
+    color: var(--text-mute);
+  }
+  .ko-yomi {
+    font-size: 13.75px;
+    font-weight: 500;
+    color: var(--text-med);
+    letter-spacing: 1px;
+  }
+  .ko-sub {
+    position: absolute;
+    top: calc(var(--ticker-top) - var(--bar-pt));
+    left: 50%;
+    transform: translateX(-50%);
+    height: 22px;
+    line-height: 22px;
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-mute);
+    letter-spacing: 1.2px;
+    white-space: nowrap;
+    opacity: 0.9;
+  }
 
   /* ============ AMBIENT THEMING ============ */
   html[data-time="morning"] body:not(.warm-background) { background-color: var(--bg-morning); }
@@ -1711,21 +1780,22 @@
   /* ============================================================
      AUDIO SPECTRUM & METADATA HUD
      ------------------------------------------------------------
-     The music display sits on the glass toolbar (.info-bar), at the right,
-     spanning exactly the two weather lines (--bar-pt / --info-h): its top
-     level with the static line, its bottom with the ticker. Layout:
+     The music display sits on the glass toolbar (.info-bar), on the right,
+     centred at 83.25% across: halfway between the end of a full weather
+     line on the tablet (66.5%) and the screen's right edge. Fixed, so it
+     does not move when the weather text changes. Its top is level with the
+     weather line; the wave rests on the bottom edge of the glass. Layout:
 
-       meta row   — title · artist, centred, laid over the top of the wave,
-                    with a soft drop shadow to lift it off the wave
-       wave stack — 6-layer fluid spectrum on a 288×44 canvas,
-                    flush on top of the gauge bar
-       gauge bar  — 5px pill; the playhead dot is hidden
-       time row   — elapsed / total, hidden (app.js still writes to it)
+       meta row   — title · artist, centred, 10% larger than on the old
+                    card, with a soft drop shadow; under it the two pills:
+                    再生中 lined up with the start of the title, DL XX%
+                    with the end of the artist (they move with the names)
+       wave stack — 6-layer fluid spectrum on a 288×44 canvas, its base
+                    tucked under the glass's bright edge (.bar-edge)
+       gauge bar, time row — hidden; app.js still writes to them
 
-     The 再生中 badge (.hud-top-row) is hidden but kept in the page, since
-     _hudRenderState() writes to it. The download battery (.hud-dl-badge)
-     sits to the right of the display, outside it, so it stays when the
-     display steps aside for the games.
+     The display never leaves the games page; while the game music plays
+     it shows the ambient track as paused.
 
      Visibility gates (mirror in app.js's _hudShouldDraw()):
        · CSS — body.info-visible:not(.receipt-locked) .audio-
@@ -1740,12 +1810,14 @@
      This must match HUD_DISPLAY_W in app.js — the canvas backing
      store is sized to that constant and displayed at width: 100%,
      so any drift between the two stretches the raster horizontally.
-     right: the battery's 26px margin + 46px battery + 4px nub + 18px gap. */
+     159px is half of the 318px width. */
   .audio-spectrum-hud {
     position: absolute;
     top: var(--bar-pt);
-    height: var(--info-h);
-    right: calc(94px + env(safe-area-inset-right, 0px));
+    /* down to 2px above the glass's bottom edge: the wave rests on the
+       bright edge line (.bar-edge), which stays the same all the way across */
+    height: calc(var(--pane-h) - var(--bar-pt) - 2px);
+    left: calc(83.25% - 159px);
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
@@ -1754,7 +1826,8 @@
     -webkit-user-select: none;
     width: 318px;
     padding: 0 14px;
-    border: 1px solid transparent;
+    border: solid transparent;
+    border-width: 0 1px;             /* sides only: the wave's base reaches the edge line */
     /* Hidden with visibility and faded child by child, as before. */
     visibility: hidden;
     transform: translateY(-8px);
@@ -1775,23 +1848,33 @@
     opacity: 1;
   }
 
-  /* --- Top row — the 再生中 badge, hidden (see above) --- */
+  /* --- Pill row, just under the title · artist (inside .hud-meta-row,
+     so it is exactly as wide as the names): 再生中 at its left end, DL XX%
+     at its right end. --- */
   .hud-top-row {
-    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0; right: 0;
+    margin-top: 2px;
+    height: 16px;
+    text-shadow: none;
   }
 
-  .hud-status-badge {
+  .hud-status-badge,
+  .hud-dl-badge {
     position: absolute;
-    top: 8px;
+    top: 0;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
     padding: 2px 7px;
     border-radius: 8px;
     line-height: 1.2;
+    white-space: nowrap;
     transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
   }
-  .hud-status-badge { left: 8px; }
+  .hud-status-badge { left: 0; }
+  .hud-dl-badge     { right: 0; }
 
   .hud-status-badge {
     background: rgba(176, 74, 90, 0.16);
@@ -1831,81 +1914,41 @@
     color: #882E47;
   }
 
-  /* --- Download battery: far right of the toolbar, level with the weather
-     line. The outline is the battery, the nub is ::after, and the fill
-     (::before) follows the download; --dl (0..100) is written by
-     _hudRenderState() in app.js. The number sits on top. 展開中 pulses while
-     the track is being unpacked; the battery turns 葡萄染 when full. It is
-     centred on the weather line (--bar-pt / --line-h, see .info-bar). */
   .hud-dl-badge {
-    position: absolute;
-    top: calc(var(--bar-pt) + (var(--line-h) - 20px) / 2);
-    right: calc(30px + env(safe-area-inset-right, 0px));
-    width: 46px;
-    height: 20px;
-    box-sizing: border-box;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1.5px solid rgba(68, 52, 48, 0.55);
-    border-radius: 7px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.2px;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-    color: var(--text-dark);
-    isolation: isolate;
-    transition: color 0.3s ease, border-color 0.3s ease;
+    background: rgba(222, 192, 172, 0.28);
+    color: var(--text-mute);
   }
-  .hud-dl-badge::before {
-    content: "";
-    position: absolute;
-    left: 2px; top: 2px; bottom: 2px;
-    width: calc((100% - 4px) * var(--dl, 0) / 100);
-    border-radius: 4px;
-    background: rgba(230, 104, 38, 0.40);
-    z-index: -1;
-    transition: width 0.4s ease, background-color 0.3s ease;
-  }
-  .hud-dl-badge::after {
-    content: "";
-    position: absolute;
-    right: -5px;
-    top: 50%;
-    width: 3px;
-    height: 8px;
-    margin-top: -4px;
-    border-radius: 0 2px 2px 0;
-    background: rgba(68, 52, 48, 0.55);
-    transition: background-color 0.3s ease;
-  }
-  html[data-theme="default"] .hud-dl-badge::before { background: rgba(176, 74, 90, 0.32); }
   .hud-dl-badge.decoding {
-    font-size: 9.5px;
-    letter-spacing: 0;
+    background: rgba(255, 162, 89, 0.32);
     color: #9E3B06;
     animation: statusPulse 1.2s ease-in-out infinite;
   }
-  .hud-dl-badge.decoding::before { background: rgba(255, 162, 89, 0.55); }
   .hud-dl-badge.ready {
+    background: rgba(154, 62, 77, 0.12);
     color: var(--secondary-accent, #9a3e4d);
-    border-color: rgba(136, 46, 71, 0.65);
   }
-  .hud-dl-badge.ready::before { background: rgba(136, 46, 71, 0.28); }
-  .hud-dl-badge.ready::after { background: rgba(136, 46, 71, 0.65); }
+  html[data-theme="autumn"] .hud-dl-badge.ready,
+  html[data-theme="winter"] .hud-dl-badge.ready {
+    background: rgba(136, 46, 71, 0.12);
+    color: var(--secondary-accent, #882E47);
+  }
 
   @keyframes statusPulse {
     0%, 100% { opacity: 0.6; }
     50%      { opacity: 1; }
   }
 
-  /* --- Meta row: title · artist, centred, pinned to the top of the
-     display and laid over the wave --- */
+  /* --- Meta row: title · artist, centred at the top of the display, only
+     as wide as the names (so the pill row under it lines up with them).
+     line-height 1.4 as on the weather line, so the tops of the characters
+     line up with it. --- */
   .hud-meta-row {
     position: absolute;
-    top: 0; left: 14px; right: 14px;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: max-content;
+    max-width: 288px;
     z-index: 1;
     text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
     display: flex;
@@ -1913,12 +1956,12 @@
     justify-content: center;
     gap: 6px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-    line-height: 1.2;
+    line-height: 1.4;
     margin: 0;
     min-width: 0;
   }
   .hud-title {
-    font-size: 14.5px;
+    font-size: 15.95px;
     font-weight: 700;
     color: var(--text-dark);
     letter-spacing: 1.5px;
@@ -1930,15 +1973,16 @@
   html[data-theme="autumn"] .hud-title,
   html[data-theme="winter"] .hud-title { color: var(--text-dark); }
   .hud-sep {
-    font-size: 11px;
+    font-size: 12.1px;
     color: var(--text-mute);
     flex-shrink: 0;
   }
   .hud-artist {
-    font-size: 12.5px;
+    font-size: 13.75px;
     font-weight: 500;
     color: var(--text-med);
     letter-spacing: 1px;
+    margin-right: -1px;            /* no trailing letter-space: DL lines up with the last character */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2036,10 +2080,10 @@
     line-height: 1;
   }
 
-  /* On the toolbar the display shows no time and no playhead dot; the
+  /* On the toolbar the display shows no progress bar and no time; the
      elements stay because app.js writes to them. */
-  .hud-time-row,
-  .hud-gauge-fill::after { display: none; }
+  .hud-gauge-bar,
+  .hud-time-row { display: none; }
 
   @media (max-height: 600px) and (orientation: landscape) {
     .audio-spectrum-hud { display: none; }
@@ -3029,7 +3073,7 @@
     .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px 14px 24px; --bar-pt: 22px; --line-h: 21px; }
-    .ticker-track { font-size: 13px; }
+    .ticker-track, .ko-sub { font-size: 13px; }
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
     .name-inner { max-width: 560px; }
@@ -3064,7 +3108,7 @@
   @media (min-width: 1100px) {
     .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px 16px 28px; --bar-pt: 24px; --line-h: 22.4px; }
-    .ticker-track { font-size: 13.5px; }
+    .ticker-track, .ko-sub { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .name-inner { max-width: 600px; }
     .panel { padding: 88px 32px 170px 32px; }
     .panel-content { font-size: 22px; }
@@ -3093,7 +3137,7 @@
     .info-bar { padding: 12px 16px 10px 16px; --bar-pt: 12px; --line-h: 17.5px; }
     .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
-    .ticker-track { font-size: 11.5px; }
+    .ticker-track, .ko-sub { font-size: 11.5px; }
     .name-screen { padding: 55px 0 0 0; }
     .name-inner { padding: 0 20px; }
     .name-header { padding-top: 12px; padding-bottom: 8px; }
@@ -3138,7 +3182,7 @@
     .info-bar { padding: 8px 14px 6px 14px; --bar-pt: 8px; --line-h: 16.1px; }
     .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
-    .ticker-track { font-size: 10.5px; letter-spacing: 1px; }
+    .ticker-track, .ko-sub { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 0 0 0; }
     .name-inner { padding: 0 24px; max-width: 480px; }
     .name-header { padding-top: 8px; padding-bottom: 6px; }

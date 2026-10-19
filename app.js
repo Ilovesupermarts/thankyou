@@ -1439,19 +1439,17 @@ function _hudRenderState() {
   hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
   if (hudPctStatus) hudPctStatus.classList.remove('decoding', 'ready');
 
-  /* Download battery at the far right of the toolbar — download /
+  /* DL pill, under the end of the artist name — download /
      decompression progress. Independent of the status badge so background
-     download of Tracks 2 and 3 stays visible while Track 1 is playing.
-     --dl sets how full the battery is drawn. */
+     download of Tracks 2 and 3 stays visible while Track 1 is playing. */
   if (hudPctStatus) {
-    hudPctStatus.style.setProperty('--dl', pctInt);
     if (isDecodingCurrent) {
-      hudPctStatus.textContent = '展開中';
+      hudPctStatus.textContent = 'PCM展開中';
       hudPctStatus.classList.add('decoding');
     } else if (pct < 1.0) {
-      hudPctStatus.textContent = pctInt + '%';
+      hudPctStatus.textContent = 'DL ' + pctInt + '%';
     } else {
-      hudPctStatus.textContent = '100%';
+      hudPctStatus.textContent = 'DL 100%';
       hudPctStatus.classList.add('ready');
     }
   }
@@ -3324,12 +3322,102 @@ var thankyouScreen = document.getElementById('thankyouScreen');
 
 var infoBar = document.getElementById('infoBar');
 
+/* ============ 七十二候 (TOOLBAR, LEFT) ============
+   Today's micro-season. The year is split by the sun's ecliptic longitude
+   into 24 節気 of 15°, each into three 候 of 5°; the list starts at 立春
+   (315°). The longitude comes from the same low-precision formula as the
+   sun in the background (good to well under an hour at a boundary). The
+   dates shown are the Japanese (JST) days the 候 starts and ends on.
+   Updated on load and every 10 minutes. */
+var SEKKI_NAMES = ['立春', '雨水', '啓蟄', '春分', '清明', '穀雨', '立夏', '小満', '芒種', '夏至', '小暑', '大暑',
+                   '立秋', '処暑', '白露', '秋分', '寒露', '霜降', '立冬', '小雪', '大雪', '冬至', '小寒', '大寒'];
+var KO_PART = ['初候', '次候', '末候'];
+var KO_LIST = [
+  ['東風解凍', 'はるかぜこおりをとく'], ['黄鶯睍睆', 'うぐいすなく'], ['魚上氷', 'うおこおりをいずる'],
+  ['土脉潤起', 'つちのしょううるおいおこる'], ['霞始靆', 'かすみはじめてたなびく'], ['草木萌動', 'そうもくめばえいずる'],
+  ['蟄虫啓戸', 'すごもりむしとをひらく'], ['桃始笑', 'ももはじめてさく'], ['菜虫化蝶', 'なむしちょうとなる'],
+  ['雀始巣', 'すずめはじめてすくう'], ['櫻始開', 'さくらはじめてさく'], ['雷乃発声', 'かみなりすなわちこえをはっす'],
+  ['玄鳥至', 'つばめきたる'], ['鴻雁北', 'こうがんかえる'], ['虹始見', 'にじはじめてあらわる'],
+  ['葭始生', 'あしはじめてしょうず'], ['霜止出苗', 'しもやんでなえいずる'], ['牡丹華', 'ぼたんはなさく'],
+  ['蛙始鳴', 'かわずはじめてなく'], ['蚯蚓出', 'みみずいずる'], ['竹笋生', 'たけのこしょうず'],
+  ['蚕起食桑', 'かいこおきてくわをはむ'], ['紅花栄', 'べにばなさかう'], ['麦秋至', 'むぎのときいたる'],
+  ['蟷螂生', 'かまきりしょうず'], ['腐草為螢', 'くされたるくさほたるとなる'], ['梅子黄', 'うめのみきばむ'],
+  ['乃東枯', 'なつかれくさかるる'], ['菖蒲華', 'あやめはなさく'], ['半夏生', 'はんげしょうず'],
+  ['温風至', 'あつかぜいたる'], ['蓮始開', 'はすはじめてひらく'], ['鷹乃学習', 'たかすなわちわざをならう'],
+  ['桐始結花', 'きりはじめてはなをむすぶ'], ['土潤溽暑', 'つちうるおうてむしあつし'], ['大雨時行', 'たいうときどきふる'],
+  ['涼風至', 'すずかぜいたる'], ['寒蝉鳴', 'ひぐらしなく'], ['蒙霧升降', 'ふかききりまとう'],
+  ['綿柎開', 'わたのはなしべひらく'], ['天地始粛', 'てんちはじめてさむし'], ['禾乃登', 'こくものすなわちみのる'],
+  ['草露白', 'くさのつゆしろし'], ['鶺鴒鳴', 'せきれいなく'], ['玄鳥去', 'つばめさる'],
+  ['雷乃収声', 'かみなりすなわちこえをおさむ'], ['蟄虫坏戸', 'むしかくれてとをふさぐ'], ['水始涸', 'みずはじめてかるる'],
+  ['鴻雁来', 'こうがんきたる'], ['菊花開', 'きくのはなひらく'], ['蟋蟀在戸', 'きりぎりすとにあり'],
+  ['霜始降', 'しもはじめてふる'], ['霎時施', 'こさめときどきふる'], ['楓蔦黄', 'もみじつたきばむ'],
+  ['山茶始開', 'つばきはじめてひらく'], ['地始凍', 'ちはじめてこおる'], ['金盞香', 'きんせんかさく'],
+  ['虹蔵不見', 'にじかくれてみえず'], ['朔風払葉', 'きたかぜこのはをはらう'], ['橘始黄', 'たちばなはじめてきばむ'],
+  ['閉塞成冬', 'そらさむくふゆとなる'], ['熊蟄穴', 'くまあなにこもる'], ['鱖魚群', 'さけのうおむらがる'],
+  ['乃東生', 'なつかれくさしょうず'], ['麋角解', 'さわしかのつのおつる'], ['雪下出麦', 'ゆきわたりてむぎのびる'],
+  ['芹乃栄', 'せりすなわちさかう'], ['水泉動', 'しみずあたたかをふくむ'], ['雉始雊', 'きじはじめてなく'],
+  ['款冬華', 'ふきのはなさく'], ['水沢腹堅', 'さわみずこおりつめる'], ['鶏始乳', 'にわとりはじめてとやにつく']
+];
+function sunLongitudeAt(ms) {
+  var d = ms / 86400000 + 2440587.5 - 2451545.0;
+  var g = (357.528 + 0.9856003 * d) * Math.PI / 180;
+  var lam = 280.460 + 0.9856474 * d + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g);
+  return ((lam % 360) + 360) % 360;
+}
+function koIndexAt(ms) {
+  return Math.floor((((sunLongitudeAt(ms) - 315) % 360 + 360) % 360) / 5) % 72;
+}
+function jstMonthDay(ms) {
+  var j = new Date(ms + 9 * 3600000);                  // JST has no daylight saving
+  return [j.getUTCMonth() + 1, j.getUTCDate()];
+}
+function updateSeasonKo() {
+  var nameEl = document.getElementById('koName');
+  var yomiEl = document.getElementById('koYomi');
+  var subEl = document.getElementById('koSub');
+  if (!nameEl || !yomiEl || !subEl) return;
+  var now = Date.now(), H = 3600000, k = koIndexAt(now);
+  var start = now, end = now, i;
+  for (i = 0; i < 24 * 8 && koIndexAt(start - H) === k; i++) start -= H;
+  for (i = 0; i < 24 * 8 && koIndexAt(end + H) === k; i++) end += H;
+  /* the last day is the day before the next 候 starts */
+  var a = jstMonthDay(start), b = jstMonthDay(end + H - 86400000);
+  var dates = a[0] + '月' + a[1] + '日〜' + (b[0] === a[0] ? '' : b[0] + '月') + b[1] + '日';
+  nameEl.textContent = KO_LIST[k][0];
+  yomiEl.textContent = KO_LIST[k][1];
+  subEl.textContent = SEKKI_NAMES[Math.floor(k / 3)] + ' · ' + KO_PART[k % 3] + ' · ' + dates;
+}
+updateSeasonKo();
+setInterval(updateSeasonKo, 600000);
+
 var infoCity = document.getElementById('infoCity');
 var infoDate = document.getElementById('infoDate');
 var infoTime = document.getElementById('infoTime');
 var infoTemp = document.getElementById('infoTemp');
 var infoWeather = document.getElementById('infoWeather');
 var tickerWrap = document.getElementById('tickerWrap');
+
+/* Measures where the ticker row really sits (it lands a few px lower than
+   the sum of the paddings and font sizes) and hands main.css the two
+   numbers the toolbar's layers hang off: --ticker-top (the 七十二候's
+   second line) and --pane-h (the glass ends 24px below the ticker; the
+   music display's wave rests on that edge). Re-run whenever the bar
+   changes size and once the fonts have loaded. */
+var _toolbarKey = '';
+function layoutToolbar() {
+  var line = document.getElementById('infoLine');
+  if (!infoBar || !line || !tickerWrap) return;
+  var b = infoBar.getBoundingClientRect(), t = tickerWrap.getBoundingClientRect();
+  if (b.height < 1 || t.height < 1) return;
+  var top = (t.top - b.top).toFixed(1), pane = (t.bottom - b.top + 24).toFixed(1);
+  var key = top + ',' + pane;
+  if (key === _toolbarKey) return;
+  _toolbarKey = key;
+  infoBar.style.setProperty('--ticker-top', top + 'px');
+  infoBar.style.setProperty('--pane-h', pane + 'px');
+}
+if (infoBar && typeof ResizeObserver !== 'undefined') new ResizeObserver(layoutToolbar).observe(infoBar);
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutToolbar);
 var tickerTrack = document.getElementById('tickerTrack');
 
 var tyCarousel = document.getElementById('tyCarousel');
@@ -7799,14 +7887,16 @@ var tyIntervals = [];
    Look: while the games page is showing, the falling leaves (snow in winter)
    fade out (body.games-active in main.css).
 
-   Sound: the games page opens quietly: the ambient music, the wind
-   chime and the audio HUD carry on. Only when she taps タッチしてスタート
-   do they fade out and a short retro (chiptune) loop, さくら散歩, play
-   instead. If she doesn't continue within G.idleReturn ms after a round,
-   the game music fades out and the ambient music and the HUD come back
-   (tapping ここをタップして続ける before that keeps the game music).
-   When she leaves the page (the receipt, back to the table) the game
-   music fades out and the ambient music and the HUD come back. Game sounds go straight to the
+   Sound: the games page opens quietly: the ambient music and the wind
+   chime carry on. Only when she taps タッチしてスタート do they fade out
+   and a short retro (chiptune) loop, さくら散歩, play instead. If she
+   doesn't continue within G.idleReturn ms after a round, the game music
+   fades out and the ambient music comes back (tapping
+   ここをタップして続ける before that keeps the game music). When she
+   leaves the page (the receipt, back to the table) the game music fades
+   out and the ambient music comes back. The music display on the toolbar
+   stays throughout; while the game music plays it shows the ambient
+   track as paused. Game sounds go straight to the
    speakers through their own gain, not through soundMasterGain, so
    they don't drive the swell analyser.
 
@@ -8380,12 +8470,13 @@ var GameWindow = (function() {
     }
   }
 
-  /* ---------- the ambient music and the HUD step aside ---------- */
+  /* ---------- the ambient music steps aside ----------
+     The music display stays on the toolbar (it never leaves the games
+     page); it shows the ambient track as paused until the music returns. */
   var ambientHandedOver = false, ambientStopTimer = 0;
   function fadeAmbientOut() {
     if (ambientHandedOver) return;
     ambientHandedOver = true;
-    if (audioSpectrumHud) audioSpectrumHud.classList.remove('shown');
     /* No new track or chime may start while the old one fades. */
     if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
     if (windChimeTimer) { clearTimeout(windChimeTimer); windChimeTimer = null; }
@@ -8773,7 +8864,7 @@ var GameWindow = (function() {
   }
 
   /* Leave the games page: the round in progress is dropped, the music
-     fades out and the ambient music and the HUD come back. */
+     fades out and the ambient music comes back. */
   function stop() {
     var was = running;
     running = false;
@@ -8787,8 +8878,8 @@ var GameWindow = (function() {
     restoreAmbient();
   }
 
-  /* Show the games page: the ambient music and the HUD fade out and the
-     game music fades in; the round waits for タッチしてスタート. */
+  /* Show the games page: the round waits for タッチしてスタート (only then
+     does the game music take over from the ambient music). */
   function start() {
     if (running) return;
     running = true;
@@ -8826,7 +8917,7 @@ function clearAllTyTimers() {
   tyIntervals = [];
   /* The games page stops with everything else on this screen (going to the
      receipt, back to the table). Stopping it fades the game music out and
-     brings the ambient music and the HUD back. */
+     brings the ambient music back. */
   if (typeof GameWindow !== 'undefined') GameWindow.stop();
 }
 function tyPushTimeout(fn, ms) {

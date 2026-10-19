@@ -121,36 +121,43 @@
     </div>
   </div>
 
-  <!-- Download level, at the far right of the toolbar like a battery: the
-       fill and the number follow the ambient-music download; 展開中 while the
-       track is being unpacked. Written by _hudRenderState() in app.js. It
-       stays when the music display steps aside for the games. -->
-  <span class="hud-dl-badge" id="hudPctStatus" aria-hidden="true">0%</span>
+  <!-- 七十二候: today's micro-season, at the left of the toolbar, mirroring
+       the music display on the right. Top line (level with the weather
+       line): the 候's name · its reading. Second line (level with the
+       ticker): 節気 · 初候/次候/末候 · its dates. Written by
+       updateSeasonKo() in app.js from the sun's position. -->
+  <div class="season-ko" aria-hidden="true">
+    <div class="ko-line">
+      <span class="ko-name" id="koName"></span>
+      <span class="ko-sep">·</span>
+      <span class="ko-yomi" id="koYomi"></span>
+    </div>
+    <div class="ko-sub" id="koSub"></div>
+  </div>
 
-  <!-- Music display, at the right of the toolbar, spanning exactly the two
-       weather lines (the static line and the ticker):
-         meta row   — title · artist, laid over the top of the wave
-         wave stack — 6-layer fluid spectrum on a 288×44 canvas, flush on
-                      top of the gauge bar
-         gauge bar  — 5px pill; its playhead dot is hidden
-         time row   — elapsed / total, hidden (app.js still writes to it)
+  <!-- Music display, at the right of the toolbar: its top level with the
+       weather line, the wave resting on the bottom edge of the glass.
+         meta row   — title · artist, with the two pills under it:
+                      再生中 under the start of the title, DL XX% under
+                      the end of the artist
+         wave stack — 6-layer fluid spectrum on a 288×44 canvas
+         gauge bar, time row — hidden; app.js still writes to them, and
+                      _hudRenderState() stops early without the gauge
        The canvas carries baseline logical dimensions only (288×44); app.js
        scales the backing store by devicePixelRatio on boot.
-       The 再生中 badge is kept but hidden: _hudRenderState() in app.js
-       still writes to it, and stops early without it.
        Visibility is governed by a CSS rule on body.info-visible combined
        with the .shown class that app.js toggles on this element — see
        main.css for the rule and app.js for the _hudShouldDraw() JS mirror
        that gates canvas work. -->
   <div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
-    <div class="hud-top-row">
-      <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
-    </div>
-
     <div class="hud-meta-row">
       <span class="hud-title" id="hudTrackTitle">草原の風</span>
       <span class="hud-sep">·</span>
       <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
+      <div class="hud-top-row">
+        <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+        <span class="hud-dl-badge" id="hudPctStatus">DL 0%</span>
+      </div>
     </div>
 
     <div class="hud-wave-gauge-stack">
@@ -168,6 +175,10 @@
       </div>
     </div>
   </div>
+
+  <!-- The bright bottom edge of the glass, drawn above everything on the
+       toolbar so the line stays unbroken where the wave meets it. -->
+  <div class="bar-edge" aria-hidden="true"></div>
 </div>
 
 <div class="name-screen" id="nameScreen">
