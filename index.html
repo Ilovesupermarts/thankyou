@@ -118,6 +118,54 @@
       <div class="ticker-track" id="tickerTrack"></div>
     </div>
   </div>
+
+  <!-- Download level, at the far right of the toolbar like a battery: the
+       fill and the number follow the ambient-music download; 展開中 while the
+       track is being unpacked. Written by _hudRenderState() in app.js. It
+       stays when the music display steps aside for the games. -->
+  <span class="hud-dl-badge" id="hudPctStatus" aria-hidden="true">0%</span>
+
+  <!-- Music display, at the right of the toolbar and exactly as tall as the
+       weather bar:
+         meta row   — title · artist, pinned to the top, over the wave
+         wave stack — 6-layer fluid spectrum on a 288×52 canvas, flush on
+                      top of the gauge bar
+         gauge bar  — 5px pill with a glowing playhead at the fill tip
+         time row   — elapsed / total, at the bottom
+       The canvas carries baseline logical dimensions only (288×52); app.js
+       scales the backing store by devicePixelRatio on boot.
+       The 再生中 badge is kept but hidden: _hudRenderState() in app.js
+       still writes to it, and stops early without it.
+       Visibility is governed by a CSS rule on body.info-visible combined
+       with the .shown class that app.js toggles on this element — see
+       main.css for the rule and app.js for the _hudShouldDraw() JS mirror
+       that gates canvas work. -->
+  <div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
+    <div class="hud-top-row">
+      <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+    </div>
+
+    <div class="hud-meta-row">
+      <span class="hud-title" id="hudTrackTitle">草原の風</span>
+      <span class="hud-sep">·</span>
+      <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
+    </div>
+
+    <div class="hud-wave-gauge-stack">
+      <div class="hud-visualizer-block">
+        <canvas class="hud-canvas" id="hudCanvas" width="288" height="52"></canvas>
+      </div>
+
+      <div class="hud-gauge-bar">
+        <div class="hud-gauge-fill" id="hudGaugeFill"></div>
+      </div>
+
+      <div class="hud-time-row">
+        <span id="hudTimeElapsed">00:00</span>
+        <span id="hudTimeTotal">--:--</span>
+      </div>
+    </div>
+  </div>
 </div>
 
 <div class="name-screen" id="nameScreen">
@@ -249,80 +297,47 @@
   <div class="name-column" id="nameColumn"></div>
 </div>
 
-<!-- ============ HUD GLASS FILTER ============
-     Drawn in code, no image files. The music card (below) is frosted glass;
-     main.css points its backdrop-filter at #hudGlass. Steps: soften and
-     roughen what is behind the card (frost), then bend it near the rim and
-     pull the red, green and blue apart by slightly different amounts (the
-     coloured fringe at the edge of real glass). The bend is steered by the
-     map in the <feImage>: two gradients (red = left/right, green = up/down)
-     that are neutral in the middle and push inward over the outer 34px.
-     It is stretched to the card, which is 318 x about 116px. -->
+<!-- ============ TOOLBAR GLASS FILTER ============
+     Drawn in code, no image files. The toolbar across the top (the weather
+     bar and the music display) is a pane of frosted glass; main.css points
+     the backdrop-filter of .info-bar::before at #barGlass. main.css softens
+     the scene with a CSS blur before and after this filter: that blur
+     handles the screen edges cleanly, where an SVG blur would draw a dark
+     line along them. Steps here:
+       frost  — roughen what is behind the pane
+       wobble — a slow, wide ripple, like the faint unevenness of real glass
+       rim    — bend it hard along the bottom edge, the only edge you can see
+                (the others are the edges of the screen), and pull red, green
+                and blue apart by slightly different amounts there (the
+                coloured fringe on the edge of thick glass)
+     The rim is steered by the map in <feImage id="barGlassMap">: green runs
+     from neutral down to dark over the bottom 24px, so the edge shows what
+     is just above it, magnified. app.js redraws the map for the pane's real
+     height (setBarGlassMap); this copy is for a 102px pane.
+     <feImage id="barGlassEdge"> fades the frost and ripple out along the top
+     and sides, where there is nothing past the screen to show; app.js draws
+     it for the real size (until then it lets everything through). -->
 <svg width="0" height="0" style="position:fixed" aria-hidden="true" focusable="false"><defs>
-<filter id="hudGlass" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
-<feGaussianBlur in="SourceGraphic" stdDeviation="1.2" result="soft"/>
-<feTurbulence type="fractalNoise" baseFrequency="0.45" numOctaves="2" seed="3" result="grain"/>
-<feDisplacementMap in="soft" in2="grain" scale="7" xChannelSelector="R" yChannelSelector="G" result="rough"/>
-<feGaussianBlur in="rough" stdDeviation="1.4" result="frost"/>
-<feImage href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22318%22 height=%22116%22 viewBox=%220 0 318 116%22%3E%3Cdefs%3E%3ClinearGradient id=%22gx%22 x1=%220%22 y1=%220%22 x2=%221%22 y2=%220%22%3E%3Cstop offset=%220.0000%22 stop-color=%22rgb(255,0,0)%22/%3E%3Cstop offset=%220.0107%22 stop-color=%22rgb(226,0,0)%22/%3E%3Cstop offset=%220.0214%22 stop-color=%22rgb(202,0,0)%22/%3E%3Cstop offset=%220.0321%22 stop-color=%22rgb(181,0,0)%22/%3E%3Cstop offset=%220.0428%22 stop-color=%22rgb(165,0,0)%22/%3E%3Cstop offset=%220.0535%22 stop-color=%22rgb(151,0,0)%22/%3E%3Cstop offset=%220.0642%22 stop-color=%22rgb(141,0,0)%22/%3E%3Cstop offset=%220.0748%22 stop-color=%22rgb(134,0,0)%22/%3E%3Cstop offset=%220.0855%22 stop-color=%22rgb(130,0,0)%22/%3E%3Cstop offset=%220.0962%22 stop-color=%22rgb(128,0,0)%22/%3E%3Cstop offset=%220.1069%22 stop-color=%22rgb(127,0,0)%22/%3E%3Cstop offset=%220.8931%22 stop-color=%22rgb(128,0,0)%22/%3E%3Cstop offset=%220.9038%22 stop-color=%22rgb(127,0,0)%22/%3E%3Cstop offset=%220.9145%22 stop-color=%22rgb(125,0,0)%22/%3E%3Cstop offset=%220.9252%22 stop-color=%22rgb(121,0,0)%22/%3E%3Cstop offset=%220.9358%22 stop-color=%22rgb(114,0,0)%22/%3E%3Cstop offset=%220.9465%22 stop-color=%22rgb(104,0,0)%22/%3E%3Cstop offset=%220.9572%22 stop-color=%22rgb(90,0,0)%22/%3E%3Cstop offset=%220.9679%22 stop-color=%22rgb(74,0,0)%22/%3E%3Cstop offset=%220.9786%22 stop-color=%22rgb(53,0,0)%22/%3E%3Cstop offset=%220.9893%22 stop-color=%22rgb(29,0,0)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(0,0,0)%22/%3E%3C/linearGradient%3E%3ClinearGradient id=%22gy%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220.0000%22 stop-color=%22rgb(0,255,0)%22/%3E%3Cstop offset=%220.0293%22 stop-color=%22rgb(0,226,0)%22/%3E%3Cstop offset=%220.0586%22 stop-color=%22rgb(0,202,0)%22/%3E%3Cstop offset=%220.0879%22 stop-color=%22rgb(0,181,0)%22/%3E%3Cstop offset=%220.1172%22 stop-color=%22rgb(0,165,0)%22/%3E%3Cstop offset=%220.1466%22 stop-color=%22rgb(0,151,0)%22/%3E%3Cstop offset=%220.1759%22 stop-color=%22rgb(0,141,0)%22/%3E%3Cstop offset=%220.2052%22 stop-color=%22rgb(0,134,0)%22/%3E%3Cstop offset=%220.2345%22 stop-color=%22rgb(0,130,0)%22/%3E%3Cstop offset=%220.2638%22 stop-color=%22rgb(0,128,0)%22/%3E%3Cstop offset=%220.2931%22 stop-color=%22rgb(0,127,0)%22/%3E%3Cstop offset=%220.7069%22 stop-color=%22rgb(0,128,0)%22/%3E%3Cstop offset=%220.7362%22 stop-color=%22rgb(0,127,0)%22/%3E%3Cstop offset=%220.7655%22 stop-color=%22rgb(0,125,0)%22/%3E%3Cstop offset=%220.7948%22 stop-color=%22rgb(0,121,0)%22/%3E%3Cstop offset=%220.8241%22 stop-color=%22rgb(0,114,0)%22/%3E%3Cstop offset=%220.8534%22 stop-color=%22rgb(0,104,0)%22/%3E%3Cstop offset=%220.8828%22 stop-color=%22rgb(0,90,0)%22/%3E%3Cstop offset=%220.9121%22 stop-color=%22rgb(0,74,0)%22/%3E%3Cstop offset=%220.9414%22 stop-color=%22rgb(0,53,0)%22/%3E%3Cstop offset=%220.9707%22 stop-color=%22rgb(0,29,0)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(0,0,0)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22%23000%22/%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23gx)%22/%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23gy)%22 style=%22mix-blend-mode:screen%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="map"/>
-<feDisplacementMap in="frost" in2="map" scale="54.0" xChannelSelector="R" yChannelSelector="G" result="dr"/>
-<feDisplacementMap in="frost" in2="map" scale="50.2" xChannelSelector="R" yChannelSelector="G" result="dg"/>
-<feDisplacementMap in="frost" in2="map" scale="46.4" xChannelSelector="R" yChannelSelector="G" result="db"/>
+<filter id="barGlass" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+<feImage id="barGlassEdge" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22%3E%3Crect width=%2216%22 height=%2216%22 fill=%22%23fff%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="edge"/>
+<feTurbulence type="fractalNoise" baseFrequency="0.45" numOctaves="2" seed="3" result="grainRaw"/>
+<feColorMatrix in="grainRaw" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0 1" result="grainOpaque"/>
+<feComposite in="grainOpaque" in2="edge" operator="arithmetic" k1="1" k2="0" k3="-0.5" k4="0.5" result="grain"/>
+<feDisplacementMap in="SourceGraphic" in2="grain" scale="5" xChannelSelector="R" yChannelSelector="G" result="frost"/>
+<feTurbulence type="fractalNoise" baseFrequency="0.004 0.03" numOctaves="1" seed="11" result="rippleRaw"/>
+<feColorMatrix in="rippleRaw" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 0 1" result="rippleOpaque"/>
+<feComposite in="rippleOpaque" in2="edge" operator="arithmetic" k1="1" k2="0" k3="-0.5" k4="0.5" result="ripple"/>
+<feDisplacementMap in="frost" in2="ripple" scale="12" xChannelSelector="R" yChannelSelector="G" result="waved"/>
+<feImage id="barGlassMap" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%22102%22 viewBox=%220 0 16 102%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220.0000%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.7647%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.7882%22 stop-color=%22rgb(128,126,128)%22/%3E%3Cstop offset=%220.8118%22 stop-color=%22rgb(128,121,128)%22/%3E%3Cstop offset=%220.8353%22 stop-color=%22rgb(128,113,128)%22/%3E%3Cstop offset=%220.8588%22 stop-color=%22rgb(128,103,128)%22/%3E%3Cstop offset=%220.8824%22 stop-color=%22rgb(128,91,128)%22/%3E%3Cstop offset=%220.9059%22 stop-color=%22rgb(128,77,128)%22/%3E%3Cstop offset=%220.9294%22 stop-color=%22rgb(128,61,128)%22/%3E%3Cstop offset=%220.9529%22 stop-color=%22rgb(128,42,128)%22/%3E%3Cstop offset=%220.9765%22 stop-color=%22rgb(128,22,128)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(128,0,128)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23g)%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="map"/>
+<feDisplacementMap in="waved" in2="map" scale="64" xChannelSelector="R" yChannelSelector="G" result="dr"/>
+<feDisplacementMap in="waved" in2="map" scale="58" xChannelSelector="R" yChannelSelector="G" result="dg"/>
+<feDisplacementMap in="waved" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G" result="db"/>
 <feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
 <feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
 <feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
 <feBlend in="r" in2="g" mode="screen" result="rg"/>
 <feBlend in="rg" in2="b" mode="screen"/>
 </filter></defs></svg>
-
-<!-- ============ AUDIO SPECTRUM & METADATA HUD ============
-     Persistent bottom-left card surfacing the currently-playing
-     ambient bed. Layout:
-
-       top row    — 再生中 (top-left) · DL XX% (top-right),
-                    both absolutely positioned against the card
-       meta row   — title · artist, centred
-       wave stack — 6-layer fluid spectrum on a 288×44 canvas,
-                    flush on top of the gauge bar
-       gauge bar  — 5px pill with a glowing playhead at the fill tip
-       time row   — elapsed / total, split left and right
-
-     The canvas element carries baseline logical dimensions only
-     (288×44); app.js scales the backing store by devicePixelRatio
-     on boot. Setting the markup to the DPR-scaled size would
-     leave a single frame at boot with a mismatched backing store.
-
-     Visibility is governed by a CSS rule on body.info-visible
-     combined with the .shown class that app.js toggles on this
-     element — see main.css for the rule and app.js for the
-     _hudShouldDraw() JS mirror that gates canvas work. -->
-<div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
-  <div class="hud-top-row">
-    <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
-    <span class="hud-dl-badge" id="hudPctStatus">DL 0%</span>
-  </div>
-
-  <div class="hud-meta-row">
-    <span class="hud-title" id="hudTrackTitle">草原の風</span>
-    <span class="hud-sep">·</span>
-    <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
-  </div>
-
-  <div class="hud-wave-gauge-stack">
-    <div class="hud-visualizer-block">
-      <canvas class="hud-canvas" id="hudCanvas" width="288" height="44"></canvas>
-    </div>
-
-    <div class="hud-gauge-bar">
-      <div class="hud-gauge-fill" id="hudGaugeFill"></div>
-    </div>
-
-    <div class="hud-time-row">
-      <span id="hudTimeElapsed">00:00</span>
-      <span id="hudTimeTotal">--:--</span>
-    </div>
-  </div>
-</div>
 
 <div class="stage" id="stage">
   <div class="track" id="track">
