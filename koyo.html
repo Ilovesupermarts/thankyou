@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Kōyō Tree Lab</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="main.css">
+
+<style>
+  /* ============================================================
+     KŌYŌ TREE LAB — preview only.
+     The page around the trees is the real app: main.css with the real
+     class names (ambient wash, mist, Shippō mosaic, toolbar, carousel
+     panels, dots). Only the two trees on #dynBack are new; they are the
+     "foliage clumps" idea, drawn here by the small script at the bottom.
+     Nothing in app.js is used or changed.
+     ============================================================ */
+  html, body { overflow: hidden; height: 100%; }
+  body { padding-bottom: 0; }
+
+  /* The real app fades #dynBack in after the intro; here it is always on. */
+  .dyn-canvas.dyn-back { opacity: 1; }
+
+  /* Only two panels in this preview instead of six. */
+  .track { width: 200%; }
+  .panel { width: 50%; }
+
+  /* ---------- Control panel (demo only) ---------- */
+  .lab {
+    position: fixed; top: 108px; right: 14px; z-index: 1000;
+    width: 330px; max-height: calc(100vh - 128px); overflow-y: auto;
+    background: rgba(255, 253, 249, 0.90);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(222, 192, 172, 0.7); border-radius: 16px;
+    box-shadow: 0 10px 30px rgba(68, 52, 48, 0.16);
+    padding: 14px 16px 16px;
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    font-size: 13px; line-height: 1.4; color: #241C1A;
+    -webkit-user-select: none; user-select: none;
+    touch-action: pan-y;
+  }
+  .lab.collapsed { width: auto; padding: 8px 12px; overflow: hidden; }
+  .lab.collapsed .lab-body { display: none; }
+  .lab-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .lab-head h3 { margin: 0; font-size: 15px; color: #882E47; }
+  .lab button {
+    font: inherit; font-weight: 600; border-radius: 10px; padding: 7px 12px; cursor: pointer;
+    border: 1px solid #DEC0AC; background: #FBECE0; color: #443430;
+  }
+  .lab button.primary { background: #E66826; border-color: #C44E10; color: #FFFDF9; }
+  .lab-row-btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 4px; }
+  .lab-sec { margin-top: 14px; padding-top: 10px; border-top: 1px solid rgba(222, 192, 172, 0.6); }
+  .lab-sec > h4 { margin: 0 0 6px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: #9E7D75; }
+  .lab-ctl { margin: 8px 0; }
+  .lab-ctl label { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; color: #443430; }
+  .lab-ctl label span.v { font-variant-numeric: tabular-nums; color: #C44E10; font-weight: 700; }
+  .lab-ctl input[type=range] { width: 100%; accent-color: #E66826; margin: 4px 0 0; }
+  .lab-ctl .hint { font-size: 11px; color: #9E7D75; margin-top: 2px; }
+  .lab-ctl select { width: 100%; font: inherit; padding: 5px; border-radius: 8px; border: 1px solid #DEC0AC; background: #FFFDF9; margin-top: 4px; }
+  .lab-chk { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #443430; margin: 8px 0; }
+  .lab-chk input { width: 18px; height: 18px; accent-color: #E66826; }
+  .lab-colours { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+  .lab-colour { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #443430; }
+  .lab-colour input { width: 34px; height: 26px; padding: 0; border: 1px solid #DEC0AC; border-radius: 6px; background: none; }
+
+  .lab-out {
+    position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 1001;
+    width: min(720px, calc(100vw - 32px)); max-height: 46vh; display: none; flex-direction: column;
+    background: rgba(255, 253, 249, 0.97); border: 1px solid #DEC0AC; border-radius: 14px;
+    box-shadow: 0 12px 36px rgba(68, 52, 48, 0.22);
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif; font-size: 13px; color: #241C1A;
+  }
+  .lab-out.shown { display: flex; }
+  .lab-out-head { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid #EED2C0; }
+  .lab-out-head b { color: #882E47; }
+  .lab-out-head button { font: inherit; border: 1px solid #DEC0AC; background: #FBECE0; border-radius: 8px; padding: 4px 10px; }
+  .lab-out pre {
+    margin: 0; padding: 12px 14px; overflow: auto; white-space: pre-wrap; word-break: break-word;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.5;
+    -webkit-user-select: text; user-select: text;
+  }
+
+  .panel-nav {
+    position: fixed; left: 0; right: 0; bottom: 40px; z-index: 20;
+    display: flex; justify-content: center; gap: 12px; pointer-events: none;
+  }
+  .panel-nav button {
+    pointer-events: auto; font: 600 14px -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
+    border: 1px solid #DEC0AC; background: rgba(255, 253, 249, 0.85); color: #443430;
+    border-radius: 999px; padding: 8px 18px;
+  }
+</style>
+</head>
+<body class="info-visible">
+
+<!-- ============ The real ambient background (same markup as index.html) ============ -->
+<div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
+  <div class="ambient-layer ambient-primary"></div>
+  <div class="ambient-layer mist-soft">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.50"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.50"></div>
+  </div>
+  <div class="mote-field" id="moteField"></div>
+</div>
+
+<div class="shippo-mask-window" id="stageLattice" aria-hidden="true">
+  <div class="mist-lit-stage" id="mistLitStage">
+    <div class="mist-band" style="--y:39.9%; --h:40.1vh; --d:-0.92s;  --c:230, 104, 38; --a:0.95"></div>
+    <div class="mist-band" style="--y:58.5%; --h:38.0vh; --d:-39.05s; --c:136, 46, 71;  --a:0.95"></div>
+  </div>
+  <div class="lantern-layer" id="lanternLit"></div>
+</div>
+<div class="lantern-bloom-layer" id="lanternBloom" aria-hidden="true"></div>
+
+<div class="ambient-mosaic" aria-hidden="true"></div>
+<div class="ambient-mosaic-pond" aria-hidden="true"></div>
+
+<!-- ============ The real toolbar (static text) ============ -->
+<div class="info-bar" id="infoBar">
+  <div class="bar-rim" aria-hidden="true"></div>
+  <div class="info-inner">
+    <div class="info-line" id="infoLine">
+      <span class="city" id="infoCity">名古屋市</span>
+      <span class="sep">·</span>
+      <span class="date" id="infoDate">—月—日(—)</span>
+      <span class="sep">·</span>
+      <span class="time" id="infoTime">—時—分</span>
+      <span class="sep">·</span>
+      <span class="temp" id="infoTemp">16°</span>
+      <span class="sep">·</span>
+      <span class="weather" id="infoWeather">晴れ</span>
+    </div>
+    <div class="ticker-wrap" id="tickerWrap">
+      <div class="ticker-track" id="tickerTrack"></div>
+    </div>
+  </div>
+  <div class="season-ko" aria-hidden="true">
+    <div class="ko-line">
+      <span class="ko-name" id="koName">楓蔦黄</span>
+      <span class="ko-sep">·</span>
+      <span class="ko-yomi" id="koYomi">もみじつたきばむ</span>
+    </div>
+    <div class="ko-sub" id="koSub">霜降 · 末候</div>
+  </div>
+  <div class="bar-edge" aria-hidden="true"></div>
+</div>
+
+<!-- ============ The trees (the only new drawing) ============ -->
+<canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
+
+<!-- ============ Two real message panels ============ -->
+<div class="stage" id="stage">
+  <div class="track" id="track">
+    <div class="panel active" data-panel="0">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <p><span class="therapist-name">桜庭さん</span>、初めまして。</p>
+          <p>シンガポールから参りました、Eze（エズ）と申します。</p>
+          <p class="msg-3">お読みいただきたいメッセージを用意してまいりました。急ぎませんので、どうぞごゆっくりお読みになってください。</p>
+          <p>本日はよろしくお願いいたします。</p>
+        </div>
+      </div>
+    </div>
+    <div class="panel" data-panel="1">
+      <div class="panel-inner">
+        <div class="panel-content">
+          <p>今日は初めて担当していただくセラピストさんですが、<br>とてもお綺麗で、素敵な方だと感じております。</p>
+          <p>お会いできて嬉しく思っております。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="dots visible" id="dots">
+    <div class="dot active"></div>
+    <div class="dot"></div>
+  </div>
+</div>
+
+<div class="panel-nav">
+  <button type="button" id="prevPanel">← パネル 1</button>
+  <button type="button" id="nextPanel">パネル 2 →</button>
+</div>
+
+<!-- ============ Controls (demo only) ============ -->
+<div class="lab" id="lab">
+  <div class="lab-head">
+    <h3>🍁 Kōyō Tree Lab</h3>
+    <button type="button" id="labToggle">Hide</button>
+  </div>
+  <div class="lab-body" id="labBody">
+    <div class="lab-row-btns">
+      <button type="button" class="primary" id="btnCopy">Copy values</button>
+      <button type="button" id="btnReset">Reset</button>
+      <button type="button" id="btnSeed">New tree shape</button>
+    </div>
+    <div id="labControls"></div>
+  </div>
+</div>
+
+<div class="lab-out" id="labOut">
+  <div class="lab-out-head"><b id="labOutTitle">Copied to clipboard</b><button type="button" id="labOutClose">Close</button></div>
+  <pre id="labOutText"></pre>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* ============================================================
+   1. VALUES — every control on the panel. DEFAULTS are the
+   suggestions from the walkthrough.
+   ============================================================ */
+var DEFAULTS = {
+  seed: 7,
+  nearSide: 'left',
+  treeSize: 0.82,
+  twigDepth: 5,
+  maxWidth: 30,
+  season: 0.7,
+  fullness: 0.8,
+  leafDensity: 1,
+  leafSize: 1,
+  mixRed: 0.55, mixOrange: 0.25, mixGold: 0.12, mixGreen: 0.05, mixEvergreen: 0.03,
+  patchiness: 0.6,
+  shadeDepth: 0.55,
+  lightFrom: -0.4,
+  timeOfDay: 'day',
+  nearOpacity: 0.88,
+  farOpacity: 0.6,
+  farHaze: 0.35,
+  branchOpacity: 0.5,
+  showFar: true,
+  wind: 1,
+  falling: 14,
+  colours: {
+    shadeDeep: '#7A1F1F', shadePlum: '#882E47',
+    red: '#C8321E', redOrange: '#E2552A', orange: '#E66826', orangeLit: '#F08A30',
+    gold: '#F2B33A', goldLit: '#E8C547', green: '#B5BE4A', evergreen: '#3E5A3A',
+    bark: '#3A2624'
+  }
+};
+var STORE_KEY = 'koyoLabValues';
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+var V = clone(DEFAULTS);
+try {
+  var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+  if (saved && typeof saved === 'object') {
+    for (var k in saved) if (k in V && k !== 'colours') V[k] = saved[k];
+    if (saved.colours) for (var c in saved.colours) if (c in V.colours) V.colours[c] = saved.colours[c];
+  }
+} catch (e) {}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(V)); } catch (e) {} }
+
+/* ============================================================
+   2. CONTROL PANEL
+   ============================================================ */
+var GROUPS = [
+  { title: 'Tree shape', ctls: [
+    { k: 'nearSide', label: 'Near (big) tree on', type: 'select', opts: [['left', 'Left'], ['right', 'Right']] },
+    { k: 'treeSize', label: 'Tree height', min: 0.5, max: 1.1, step: 0.01, hint: 'Share of the screen height.' },
+    { k: 'twigDepth', label: 'Branch levels', min: 4, max: 7, step: 1, hint: 'Now 7 in the app. Fewer = no fine twig web.' },
+    { k: 'maxWidth', label: 'Max canopy width (% of screen)', min: 15, max: 50, step: 1, hint: 'Keeps the foliage away from the message text.' }
+  ]},
+  { title: 'Season & density', ctls: [
+    { k: 'season', label: 'Season (early Oct → late Nov)', min: 0, max: 1, step: 0.01, hint: '0 gold-green · 0.7 peak red · 1 thinning' },
+    { k: 'fullness', label: 'Fullness (how many clumps)', min: 0.2, max: 1, step: 0.01 },
+    { k: 'leafDensity', label: 'Leaves per clump', min: 0.4, max: 2, step: 0.05 },
+    { k: 'leafSize', label: 'Leaf size', min: 0.6, max: 1.8, step: 0.05 },
+    { k: 'falling', label: 'Falling leaves on screen', min: 0, max: 40, step: 1 }
+  ]},
+  { title: 'Colour range (share of clumps)', ctls: [
+    { k: 'mixRed', label: 'Red (maple)', min: 0, max: 1, step: 0.01 },
+    { k: 'mixOrange', label: 'Orange', min: 0, max: 1, step: 0.01 },
+    { k: 'mixGold', label: 'Gold / yellow', min: 0, max: 1, step: 0.01 },
+    { k: 'mixGreen', label: 'Yellow-green', min: 0, max: 1, step: 0.01 },
+    { k: 'mixEvergreen', label: 'Evergreen', min: 0, max: 1, step: 0.01 },
+    { k: 'patchiness', label: 'Patchiness', min: 0, max: 1, step: 0.01, hint: '0 = even mix · 1 = big patches of one colour' }
+  ]},
+  { title: 'Light & strength', ctls: [
+    { k: 'timeOfDay', label: 'Time of day', type: 'select', opts: [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']] },
+    { k: 'lightFrom', label: 'Light from (left ↔ right)', min: -1, max: 1, step: 0.05 },
+    { k: 'shadeDepth', label: 'Shade under clumps', min: 0, max: 1, step: 0.01 },
+    { k: 'nearOpacity', label: 'Near foliage strength', min: 0.3, max: 1, step: 0.01, hint: 'The app now draws the tree at 0.5.' },
+    { k: 'farOpacity', label: 'Far foliage strength', min: 0.1, max: 1, step: 0.01 },
+    { k: 'farHaze', label: 'Far tree haze', min: 0, max: 0.8, step: 0.01 },
+    { k: 'branchOpacity', label: 'Branch strength', min: 0, max: 1, step: 0.01 },
+    { k: 'showFar', label: 'Show far tree', type: 'check' },
+    { k: 'wind', label: 'Wind sway', min: 0, max: 3, step: 0.05 }
+  ]}
+];
+var COLOUR_LABELS = {
+  shadeDeep: 'Deep shade', shadePlum: 'Plum shade', red: 'Red', redOrange: 'Red-orange',
+  orange: 'Orange', orangeLit: 'Orange (lit)', gold: 'Gold', goldLit: 'Gold (lit)',
+  green: 'Yellow-green', evergreen: 'Evergreen', bark: 'Bark'
+};
+var inputs = {};
+function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
+function buildControls() {
+  var host = document.getElementById('labControls');
+  host.innerHTML = '';
+  GROUPS.forEach(function (g) {
+    var sec = document.createElement('div');
+    sec.className = 'lab-sec';
+    sec.innerHTML = '<h4>' + g.title + '</h4>';
+    g.ctls.forEach(function (ctl) {
+      var wrap = document.createElement('div');
+      if (ctl.type === 'check') {
+        wrap.className = 'lab-chk';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!V[ctl.k];
+        cb.addEventListener('change', function () { V[ctl.k] = cb.checked; changed(); });
+        var lb = document.createElement('span'); lb.textContent = ctl.label;
+        wrap.appendChild(cb); wrap.appendChild(lb);
+        inputs[ctl.k] = { el: cb, ctl: ctl };
+      } else {
+        wrap.className = 'lab-ctl';
+        var label = document.createElement('label');
+        var name = document.createElement('span'); name.textContent = ctl.label;
+        label.appendChild(name);
+        var el;
+        if (ctl.type === 'select') {
+          el = document.createElement('select');
+          ctl.opts.forEach(function (o) {
+            var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
+          });
+          el.value = V[ctl.k];
+          el.addEventListener('change', function () { V[ctl.k] = el.value; changed(); });
+        } else {
+          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, V[ctl.k]);
+          label.appendChild(val);
+          el = document.createElement('input');
+          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = V[ctl.k];
+          el.addEventListener('input', function () { V[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, V[ctl.k]); changed(); });
+          inputs[ctl.k + '_v'] = val;
+        }
+        wrap.appendChild(label); wrap.appendChild(el);
+        if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
+        inputs[ctl.k] = { el: el, ctl: ctl };
+      }
+      sec.appendChild(wrap);
+    });
+    host.appendChild(sec);
+  });
+  var cs = document.createElement('div');
+  cs.className = 'lab-sec';
+  cs.innerHTML = '<h4>Colours (from the reference photo)</h4>';
+  var grid = document.createElement('div'); grid.className = 'lab-colours';
+  Object.keys(V.colours).forEach(function (key) {
+    var row = document.createElement('label'); row.className = 'lab-colour';
+    var inp = document.createElement('input'); inp.type = 'color'; inp.value = V.colours[key];
+    inp.addEventListener('input', function () { V.colours[key] = inp.value; changed(); });
+    var t = document.createElement('span'); t.textContent = COLOUR_LABELS[key] || key;
+    row.appendChild(inp); row.appendChild(t); grid.appendChild(row);
+  });
+  cs.appendChild(grid);
+  host.appendChild(cs);
+}
+
+var _changeQueued = false;
+function changed() {
+  save();
+  if (_changeQueued) return;
+  _changeQueued = true;
+  requestAnimationFrame(function () { _changeQueued = false; rebuild(); });
+}
+
+document.getElementById('labToggle').addEventListener('click', function () {
+  var lab = document.getElementById('lab');
+  var c = lab.classList.toggle('collapsed');
+  this.textContent = c ? 'Show' : 'Hide';
+});
+document.getElementById('btnReset').addEventListener('click', function () {
+  V = clone(DEFAULTS); save(); buildControls(); rebuild();
+});
+document.getElementById('btnSeed').addEventListener('click', function () {
+  V.seed = (V.seed * 9301 + 49297) % 233280; save(); rebuild();
+});
+
+/* ============================================================
+   3. COPY VALUES — fonts and colours the page actually uses (read
+   from the live styles) plus every tree value.
+   ============================================================ */
+function styleOf(sel) {
+  var el = document.querySelector(sel);
+  if (!el) return null;
+  var s = getComputedStyle(el);
+  return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, colour: s.color, shadow: s.textShadow };
+}
+function buildCopyText() {
+  var body = styleOf('.panel.active .panel-content') || styleOf('.panel-content');
+  var name = styleOf('.therapist-name');
+  var lines = [];
+  lines.push('/* Kōyō tree — values from koyo.html */');
+  lines.push('');
+  lines.push('Message text font: ' + body.font + ' · ' + body.weight + ' · ' + body.size + ' · ' + body.colour);
+  lines.push('Message text shadow: ' + body.shadow);
+  lines.push('Therapist name font: ' + name.font + ' · ' + name.weight + ' · ' + name.colour);
+  lines.push('');
+  lines.push('Tree shape: near tree ' + V.nearSide + ', height ' + V.treeSize.toFixed(2) + ', branch levels ' + V.twigDepth +
+             ', max canopy width ' + V.maxWidth + '% of screen');
+  lines.push('Season ' + V.season.toFixed(2) + ', fullness ' + V.fullness.toFixed(2) + ', leaves per clump ' + V.leafDensity.toFixed(2) +
+             ', leaf size ' + V.leafSize.toFixed(2) + ', falling leaves ' + V.falling);
+  lines.push('Colour shares: red ' + V.mixRed.toFixed(2) + ', orange ' + V.mixOrange.toFixed(2) + ', gold ' + V.mixGold.toFixed(2) +
+             ', yellow-green ' + V.mixGreen.toFixed(2) + ', evergreen ' + V.mixEvergreen.toFixed(2) + ', patchiness ' + V.patchiness.toFixed(2));
+  lines.push('Light: ' + V.timeOfDay + ', from ' + V.lightFrom.toFixed(2) + ', shade ' + V.shadeDepth.toFixed(2));
+  lines.push('Strength: near foliage ' + V.nearOpacity.toFixed(2) + ', far foliage ' + V.farOpacity.toFixed(2) +
+             ', far haze ' + V.farHaze.toFixed(2) + ', branches ' + V.branchOpacity.toFixed(2) + ', far tree ' + (V.showFar ? 'on' : 'off') +
+             ', wind ' + V.wind.toFixed(2));
+  lines.push('Colours:');
+  Object.keys(V.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + V.colours[k].toUpperCase()); });
+  lines.push('');
+  lines.push('JSON:');
+  lines.push(JSON.stringify(V, null, 2));
+  return lines.join('\n');
+}
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  return new Promise(function (res, rej) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) {}
+    document.body.removeChild(ta);
+    ok ? res() : rej();
+  });
+}
+document.getElementById('btnCopy').addEventListener('click', function () {
+  var text = buildCopyText();
+  document.getElementById('labOutText').textContent = text;
+  document.getElementById('labOut').classList.add('shown');
+  var title = document.getElementById('labOutTitle');
+  copyText(text).then(function () { title.textContent = 'Copied to clipboard'; },
+                      function () { title.textContent = 'Could not copy — select the text below'; });
+});
+document.getElementById('labOutClose').addEventListener('click', function () {
+  document.getElementById('labOut').classList.remove('shown');
+});
+
+/* ============================================================
+   4. PANELS — the two real message panels, swipe or tap to switch.
+   ============================================================ */
+var panelIdx = 0;
+var panels = document.querySelectorAll('.panel');
+var dots = document.querySelectorAll('.dot');
+var track = document.getElementById('track');
+function showPanel(i) {
+  panelIdx = Math.max(0, Math.min(panels.length - 1, i));
+  track.style.transform = 'translateX(' + (-panelIdx * 100 / panels.length) + '%)';
+  for (var p = 0; p < panels.length; p++) {
+    panels[p].classList.toggle('active', p === panelIdx);
+    dots[p].classList.toggle('active', p === panelIdx);
+  }
+}
+document.getElementById('prevPanel').addEventListener('click', function () { showPanel(panelIdx - 1); });
+document.getElementById('nextPanel').addEventListener('click', function () { showPanel(panelIdx + 1); });
+var sx = null;
+var stageEl = document.getElementById('stage');
+stageEl.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
+stageEl.addEventListener('touchend', function (e) {
+  if (sx === null) return;
+  var dx = e.changedTouches[0].clientX - sx; sx = null;
+  if (Math.abs(dx) > 50) showPanel(panelIdx + (dx < 0 ? 1 : -1));
+});
+
+/* Toolbar date and time (Nagoya). */
+function tickClock() {
+  var d = new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
+  var wd = '日月火水木金土'.charAt(d.getDay());
+  document.getElementById('infoDate').textContent = (d.getMonth() + 1) + '月' + d.getDate() + '日(' + wd + ')';
+  document.getElementById('infoTime').textContent = d.getHours() + '時' + ('0' + d.getMinutes()).slice(-2) + '分';
+}
+tickClock();
+setInterval(tickClock, 30000);
+
+/* ============================================================
+   5. TREE DRAWING — the "foliage clumps" idea.
+   ============================================================ */
+var PI = Math.PI, TAU = PI * 2;
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rngFrom(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hex(h) { var n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function scale(a, k) { return [a[0] * k, a[1] * k, a[2] * k]; }
+function rgb(c, a) {
+  return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' +
+         Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : a) + ')';
+}
+
+var cv = document.getElementById('dynBack');
+var ctx = cv.getContext('2d');
+var nearBranch = document.createElement('canvas'), nbx = nearBranch.getContext('2d');
+var nearLeaf = document.createElement('canvas'), nlx = nearLeaf.getContext('2d');
+var farLayer = document.createElement('canvas'), flx = farLayer.getContext('2d');
+var W = 0, H = 0, PR = 1;
+var FAR_SCALE = 0.6, FAR_RES = 0.5;
+var trees = [], falling = [], fallSprites = [];
+var PAPER = hex('#FBECE0');
+
+/* Time-of-day light, the same idea as the app's light tint. */
+function light(c) {
+  if (V.timeOfDay === 'evening') return scale(mix(c, [255, 176, 85], 0.18), 0.97);
+  if (V.timeOfDay === 'night') return scale(mix(c, [42, 47, 85], 0.4), 0.62);
+  return c;
+}
+
+/* The five colour families, each [shade, mid, lit]. */
+function families() {
+  var C = {}; for (var k in V.colours) C[k] = hex(V.colours[k]);
+  var s = V.season;
+  // Late season: a little browner.
+  var brown = clamp((s - 0.85) / 0.15, 0, 1) * 0.35, B = [138, 90, 58];
+  function f(a, b, c) { return [mix(a, B, brown), mix(b, B, brown), mix(c, B, brown)]; }
+  return {
+    red:       f(C.shadeDeep, C.red, C.redOrange),
+    orange:    f(mix(C.red, C.shadeDeep, 0.3), C.orange, C.orangeLit),
+    gold:      f(mix(C.orange, C.redOrange, 0.4), C.gold, C.goldLit),
+    green:     f(mix(C.green, C.evergreen, 0.55), C.green, mix(C.green, C.goldLit, 0.5)),
+    evergreen: [scale(C.evergreen, 0.7), C.evergreen, mix(C.evergreen, C.green, 0.35)],
+    plum: C.shadePlum, bark: C.bark
+  };
+}
+/* Colour shares, moved by the season: early = more gold and green, peak = as set. */
+function weights() {
+  var s = V.season, early = clamp(1 - s / 0.6, 0, 1);
+  var w = {
+    red: V.mixRed * lerp(1, 0.25, early),
+    orange: V.mixOrange * lerp(1, 0.8, early),
+    gold: V.mixGold + early * 0.35,
+    green: V.mixGreen + early * 0.3,
+    evergreen: V.mixEvergreen
+  };
+  var sum = 0; for (var k in w) sum += w[k];
+  if (sum <= 0) { w.red = 1; sum = 1; }
+  for (var k2 in w) w[k2] /= sum;
+  return w;
+}
+function pickFamily(r, w) {
+  var x = r(), acc = 0;
+  for (var k in w) { acc += w[k]; if (x <= acc) return k; }
+  return 'red';
+}
+
+/* One maple-leaf outline in unit space (tip toward -y), used for every leaf dab. */
+var MOMIJI = (function () {
+  var pts = [], lobes = 7, N = 140;
+  for (var i = 0; i <= N; i++) {
+    var a = -PI / 2 + (i / N) * TAU;
+    var rel = a + PI / 2;                          // 0 at the tip
+    var lobe = Math.pow(Math.abs(Math.cos(rel * lobes / 2)), 0.6);
+    var r = (0.4 + 0.6 * lobe) * (Math.cos(rel) < -0.6 ? 0.55 : 1);   // short lobes at the stem
+    pts.push([Math.cos(a) * r * 0.5, Math.sin(a) * r * 0.5]);
+  }
+  return pts;
+})();
+function leafPath(c, x, y, size, rot) {
+  var cs = Math.cos(rot) * size, sn = Math.sin(rot) * size;
+  c.beginPath();
+  for (var i = 0; i < MOMIJI.length; i++) {
+    var p = MOMIJI[i];
+    var px = x + p[0] * cs - p[1] * sn, py = y + p[0] * sn + p[1] * cs;
+    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+  }
+  c.closePath();
+}
+
+/* Bake one clump: a dense mass of small maple leaves, lit on the light side. */
+function bakeClump(R, fam, back, far, r, res) {
+  var F = families();
+  var tones = F[fam];
+  var side = Math.ceil(R * 2.6 * res);
+  var cnv = document.createElement('canvas');
+  cnv.width = cnv.height = side;
+  var c = cnv.getContext('2d');
+  c.setTransform(res, 0, 0, res, side / 2, side / 2);
+  var lx = V.lightFrom, ly = -0.85, ll = Math.hypot(lx, ly); lx /= ll; ly /= ll;
+  var shade = V.shadeDepth;
+  function col(c0) {
+    var o = c0;
+    if (back) o = mix(o, F.plum, 0.2 + shade * 0.25);
+    if (far) o = mix(o, PAPER, V.farHaze);
+    return light(o);
+  }
+  // A lumpy, darker core so the clump reads as a solid mass, not confetti.
+  // Made of overlapping blobs (no smooth gradient, which showed as bands).
+  c.fillStyle = rgb(col(scale(tones[0], 1 - shade * 0.25)));
+  for (var b = 0; b < 9; b++) {
+    var ba = r() * TAU, bd = r() * 0.4;
+    c.beginPath();
+    c.arc(Math.cos(ba) * bd * R, Math.sin(ba) * bd * R * 0.75 + R * 0.05, R * (0.32 + r() * 0.18), 0, TAU);
+    c.fill();
+  }
+
+  var n = Math.round(85 * V.leafDensity * (far ? 0.7 : 1));
+  var dabs = [];
+  for (var i = 0; i < n; i++) {
+    var a = r() * TAU, d = Math.sqrt(r());
+    var edge = r() < 0.28;                          // bigger, crisper leaves around the rim
+    if (edge) d = 0.85 + r() * 0.2;
+    var x = Math.cos(a) * d * R * 0.95, y = Math.sin(a) * d * R * 0.78;
+    if (y > R * 0.45) y *= 0.8;                     // flatter underside
+    var t = (x * lx + y * ly) / R + (r() - 0.5) * 0.5;   // -1 shade … +1 lit
+    var size = R * (edge ? 0.3 : 0.24) * V.leafSize * (0.7 + r() * 0.6);
+    dabs.push({ x: x, y: y, t: t, s: size, rot: (r() - 0.5) * 1.6 + (x / R) * 0.6 });
+  }
+  dabs.sort(function (p, q) { return p.t - q.t; });  // shade first, lit leaves on top
+  for (var j = 0; j < dabs.length; j++) {
+    var D = dabs[j], tone;
+    if (D.t < -0.25) tone = mix(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
+    else if (D.t < 0.35) tone = mix(tones[1], tones[0], clamp((0.35 - D.t) / 0.6, 0, 1) * 0.35);
+    else tone = mix(tones[1], tones[2], clamp((D.t - 0.35) / 0.5, 0, 1));
+    tone = scale(tone, 1 - shade * 0.3 * clamp(-D.t, 0, 1) + (r() - 0.5) * 0.1);
+    leafPath(c, D.x, D.y, D.s, D.rot);
+    c.fillStyle = rgb(col(tone));
+    c.fill();
+    // a faint midrib catches the light on the lit leaves
+    if (D.t > 0.4 && !far) {
+      c.strokeStyle = 'rgba(255,236,205,0.18)';
+      c.lineWidth = Math.max(0.6, D.s * 0.04);
+      c.beginPath();
+      c.moveTo(D.x, D.y + D.s * 0.15);
+      c.lineTo(D.x + Math.sin(D.rot) * D.s * 0.4, D.y - Math.cos(D.rot) * D.s * 0.4);
+      c.stroke();
+    }
+  }
+  return { cnv: cnv, half: side / (2 * res) };
+}
+
+/* Build one tree: a branch skeleton (fewer levels) plus foliage clumps. */
+function buildTree(far) {
+  var r = rngFrom(V.seed * 7919 + (far ? 101 : 0));
+  var side = far ? (V.nearSide === 'left' ? 'right' : 'left') : V.nearSide;
+  var left = side === 'left', dir = left ? 1 : -1;
+  var sc = H * V.treeSize * (far ? FAR_SCALE : 1);
+  var maxD = V.twigDepth;
+  var nodes = [];
+  function grow(parent, abs, len, w, d) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
+    var idx = nodes.length;
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= maxD) return;
+    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+    // Fewer levels, so each one is a little longer to keep the tree's size.
+    var shrink = (0.68 + r() * 0.14) * lerp(1.1, 1, (maxD - 4) / 3);
+    for (var i = 0; i < n; i++) {
+      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      ca = lerp(ca, -PI / 2, 0.1);
+      grow(idx, ca, len * shrink, Math.max(0.8, w * 0.62), d + 1);
+    }
+  }
+  var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), sc * 0.26, Math.max(far ? 4 : 7, sc * 0.034), 0);
+  var byDepth = [];
+  for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
+  var T = { far: far, left: left, bx: bx, by: H + 6, nodes: nodes, byDepth: byDepth, scale: sc, maxD: maxD,
+            clumps: [], k: 1, gust: 0, gustV: 0 };
+  restPose(T);
+
+  // Clumps on the upper branches. Late in the season the tree thins.
+  var thin = lerp(1, 0.5, clamp((V.season - 0.85) / 0.15, 0, 1));
+  var keep = clamp(V.fullness * thin, 0.05, 1);
+  var w = weights();
+  var cell = sc * 0.16, cellFam = {};
+  var res = PR * (far ? FAR_RES : 1);
+  for (var j = 1; j < nodes.length; j++) {
+    var nd = nodes[j];
+    var upper = nd.d >= maxD - 1, mid = nd.d >= 2 && nd.d < maxD - 1;
+    if (!upper && !mid) continue;
+    if (r() > (upper ? keep : keep * 0.6)) continue;
+    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, V.fullness);
+    // Patches: neighbouring clumps tend to share a colour.
+    var ck = Math.floor(nd.ex / cell) + ',' + Math.floor(nd.ey / cell);
+    if (!cellFam[ck]) cellFam[ck] = pickFamily(r, w);
+    var fam = r() < V.patchiness ? cellFam[ck] : pickFamily(r, w);
+    // Evergreen only sits low and behind, like the pines among the maples in the photo.
+    if (fam === 'evergreen' && upper) fam = 'red';
+    var back = mid || r() < 0.3;
+    var spr = bakeClump(R, fam, back, far, r, res);
+    T.clumps.push({ node: j, R: R, fam: fam, back: back, spr: spr,
+                    ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU });
+  }
+  // Back clumps first, then from low to high so the top of the canopy sits in front.
+  T.clumps.sort(function (a, b) {
+    if (a.back !== b.back) return a.back ? -1 : 1;
+    return nodes[b.node].ey - nodes[a.node].ey;
+  });
+
+  // Keep the canopy within the chosen share of the screen width: squeeze the
+  // branch spread toward the trunk (the leaf clumps keep their own size).
+  var limit = V.maxWidth / 100 * W, k = 1;
+  for (var m = 0; m < T.clumps.length; m++) {
+    var cn = nodes[T.clumps[m].node], edge = T.clumps[m].R * 1.25;   // outer leaves reach ~1.25 R
+    var dx = left ? cn.ex - bx : bx - cn.ex;
+    var room = left ? limit - bx - edge : limit - (W - bx) - edge;
+    if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
+  }
+  T.k = k;
+  return T;
+}
+function restPose(T) {
+  var ns = T.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i], par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+function swayTree(T, t, dt) {
+  T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
+  T.gust += T.gustV * dt;
+  if (Math.random() < 0.004 * V.wind) T.gustV += (Math.random() * 0.25) * V.wind * (T.left ? 1 : -1);
+  var amp = 0.02 * V.wind, ns = T.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i];
+    var kk = Math.pow(n.d / T.maxD, 1.6) + 0.02;
+    var sw = (Math.sin(t * n.f + n.ph) * amp + Math.sin(t * 0.37 + n.ph * 0.3) * amp * 0.6 + T.gust) * kk;
+    var par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+function X(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
+
+function drawBranches(c, T) {
+  var F = families();
+  var bark = light(T.far ? mix(F.bark, PAPER, V.farHaze) : F.bark);
+  c.strokeStyle = rgb(bark);
+  c.lineCap = 'round';
+  var ns = T.nodes;
+  for (var d = 0; d < T.byDepth.length; d++) {
+    var arr = T.byDepth[d];
+    if (!arr) continue;
+    c.lineWidth = ns[arr[0]].w;
+    c.beginPath();
+    for (var i = 0; i < arr.length; i++) {
+      var n = ns[arr[i]];
+      c.moveTo(X(T, n.sx), n.sy); c.lineTo(X(T, n.ex), n.ey);
+    }
+    c.stroke();
+  }
+}
+function drawClumps(c, T, t) {
+  var ns = T.nodes;
+  for (var i = 0; i < T.clumps.length; i++) {
+    var C = T.clumps[i], n = ns[C.node];
+    var x = X(T, n.ex + C.ox), y = n.ey + C.oy;
+    var rot = (n.cur - n.abs) * 0.6 + Math.sin(t * 0.9 + C.ph) * 0.015 * V.wind;
+    var h = C.spr.half;
+    c.save();
+    c.translate(x, y); c.rotate(rot);
+    c.drawImage(C.spr.cnv, -h, -h, h * 2, h * 2);
+    c.restore();
+  }
+}
+
+/* Falling leaves: a few small sprites in the clump colours. */
+function bakeFallSprites() {
+  fallSprites = [];
+  var F = families(), w = weights(), r = rngFrom(V.seed + 3);
+  for (var i = 0; i < 14; i++) {
+    var fam = pickFamily(r, w), tones = F[fam];
+    var size = 22 * V.leafSize, side = Math.ceil(size * 1.4 * PR);
+    var cnv = document.createElement('canvas'); cnv.width = cnv.height = side;
+    var c = cnv.getContext('2d');
+    c.setTransform(PR, 0, 0, PR, side / 2, side / 2);
+    var g = c.createLinearGradient(0, size * 0.5, 0, -size * 0.5);
+    g.addColorStop(0, rgb(light(tones[0])));
+    g.addColorStop(0.5, rgb(light(tones[1])));
+    g.addColorStop(1, rgb(light(tones[2])));
+    leafPath(c, 0, 0, size, 0);
+    c.fillStyle = g; c.fill();
+    fallSprites.push({ cnv: cnv, half: side / (2 * PR) });
+  }
+}
+function spawnFalling() {
+  var T = trees[Math.random() < 0.7 || trees.length < 2 ? 0 : 1];
+  if (!T || !T.clumps.length) return;
+  var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n = T.nodes[C.node];
+  falling.push({
+    x: X(T, n.ex), y: n.ey, vy: 28 + Math.random() * 30, ph: Math.random() * TAU, f: 0.8 + Math.random() * 1.2,
+    rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 2.4, s: (T.far ? 0.6 : 1) * (0.7 + Math.random() * 0.5),
+    spr: fallSprites[Math.floor(Math.random() * fallSprites.length)], a: T.far ? 0.6 : 0.9
+  });
+}
+
+function resize() {
+  W = window.innerWidth; H = window.innerHeight;
+  PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;   // the app renders at 0.75
+  cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
+  nearBranch.width = nearLeaf.width = cv.width; nearBranch.height = nearLeaf.height = cv.height;
+  farLayer.width = Math.round(W * PR * FAR_RES); farLayer.height = Math.round(H * PR * FAR_RES);
+}
+function rebuild() {
+  if (!W) resize();
+  trees = [buildTree(false)];
+  if (V.showFar) trees.push(buildTree(true));
+  bakeFallSprites();
+  falling = [];
+}
+
+var last = 0;
+function frame(now) {
+  var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
+  last = t;
+  trees.forEach(function (T) { swayTree(T, t, dt); });
+
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, cv.width, cv.height);
+
+  // Far tree: branches and foliage on a half-size layer, scaled up (soft), weaker.
+  var far = trees[1];
+  if (far) {
+    flx.setTransform(1, 0, 0, 1, 0, 0);
+    flx.clearRect(0, 0, farLayer.width, farLayer.height);
+    flx.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
+    flx.globalAlpha = V.branchOpacity;
+    drawBranches(flx, far);
+    flx.globalAlpha = 1;
+    drawClumps(flx, far, t);
+    ctx.globalAlpha = V.farOpacity;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(farLayer, 0, 0, cv.width, cv.height);
+  }
+
+  // Near tree: branches on one layer, foliage on another, each laid down at its own strength.
+  var near = trees[0];
+  nbx.setTransform(1, 0, 0, 1, 0, 0); nbx.clearRect(0, 0, cv.width, cv.height);
+  nbx.setTransform(PR, 0, 0, PR, 0, 0);
+  drawBranches(nbx, near);
+  nlx.setTransform(1, 0, 0, 1, 0, 0); nlx.clearRect(0, 0, cv.width, cv.height);
+  nlx.setTransform(PR, 0, 0, PR, 0, 0);
+  drawClumps(nlx, near, t);
+  ctx.globalAlpha = V.branchOpacity;
+  ctx.drawImage(nearBranch, 0, 0);
+  ctx.globalAlpha = V.nearOpacity;
+  ctx.drawImage(nearLeaf, 0, 0);
+
+  // Falling leaves.
+  if (falling.length < V.falling && Math.random() < 0.06) spawnFalling();
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = falling.length - 1; i >= 0; i--) {
+    var L = falling[i];
+    L.y += L.vy * dt;
+    L.x += (Math.sin(t * L.f + L.ph) * 30 + 12 * V.wind) * dt;
+    L.rot += L.vr * dt;
+    if (L.y > H + 30 || falling.length > V.falling + 2) { falling.splice(i, 1); continue; }
+    var h = L.spr.half * L.s;
+    ctx.globalAlpha = L.a;
+    ctx.save();
+    ctx.translate(L.x, L.y); ctx.rotate(L.rot); ctx.scale(Math.cos(t * L.f * 1.3 + L.ph), 1);
+    ctx.drawImage(L.spr.cnv, -h, -h, h * 2, h * 2);
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(frame);
+}
+
+var _rz = null;
+window.addEventListener('resize', function () {
+  clearTimeout(_rz);
+  _rz = setTimeout(function () { resize(); rebuild(); }, 200);
+});
+
+buildControls();
+resize();
+rebuild();
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
