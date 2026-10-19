@@ -1321,7 +1321,7 @@ var hudTimeTotal     = document.getElementById('hudTimeTotal');
    canvas backing store is sized to this constant; drift re-
    introduces the aspect stretch the v1.3 amendment closed. */
 var HUD_DISPLAY_W = 288;
-var HUD_DISPLAY_H = 52;   /* 44 → 52 when the display moved onto the toolbar: the wave fills up to the title */
+var HUD_DISPLAY_H = 44;
 var HUD_WAVE_PTS  = 28;
 var HUD_LAYERS    = 6;
 
@@ -3324,51 +3324,6 @@ var thankyouScreen = document.getElementById('thankyouScreen');
 
 var infoBar = document.getElementById('infoBar');
 
-/* The glass toolbar's two maps (index.html), redrawn whenever the weather
-   bar changes size. The pane is the bar + 14px below (.info-bar::before).
-   #barGlassMap — the rim: a vertical gradient, neutral down to the last 24px
-     of the pane and then darkening to the bottom edge, so the rim shows what
-     is just above it, magnified.
-   #barGlassEdge — white, fading to black over the 18px along the top and
-     sides: the frost and ripple fade out there, since past the screen's
-     edge there is nothing to show and they would draw a ragged line. */
-var BAR_GLASS_EXTRA = 14, BAR_GLASS_RIM = 24, BAR_GLASS_EDGE = 18, _barGlassMapKey = '';
-function setBarGlassMap() {
-  var img = document.getElementById('barGlassMap');
-  var edge = document.getElementById('barGlassEdge');
-  if (!img || !edge || !infoBar) return;
-  var h = Math.round(infoBar.offsetHeight + BAR_GLASS_EXTRA);
-  var w = Math.round(infoBar.offsetWidth);
-  if (h <= BAR_GLASS_EXTRA || w < 1 || (w + 'x' + h) === _barGlassMapKey) return;
-  _barGlassMapKey = w + 'x' + h;
-  var stops = '<stop offset="0" stop-color="rgb(128,128,128)"/>';
-  for (var i = 0; i <= 10; i++) {
-    var t = i / 10;
-    var off = (h - BAR_GLASS_RIM + BAR_GLASS_RIM * t) / h;
-    var g = Math.round(128 - 128 * Math.pow(t, 1.8));
-    stops += '<stop offset="' + off.toFixed(4) + '" stop-color="rgb(128,' + g + ',128)"/>';
-  }
-  var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="' + h + '" viewBox="0 0 16 ' + h + '" preserveAspectRatio="none">' +
-            '<defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1">' + stops + '</linearGradient></defs>' +
-            '<rect width="100%" height="100%" fill="url(#g)"/></svg>';
-  img.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(svg));
-
-  var e = BAR_GLASS_EDGE;
-  var esvg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
-             '<defs>' +
-             '<linearGradient id="l" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
-             '<linearGradient id="r" x1="1" y1="0" x2="0" y2="0"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
-             '<linearGradient id="t" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-opacity="1"/><stop offset="1" stop-opacity="0"/></linearGradient>' +
-             '</defs>' +
-             '<rect width="' + w + '" height="' + h + '" fill="#fff"/>' +
-             '<rect width="' + e + '" height="' + h + '" fill="url(#l)"/>' +
-             '<rect x="' + (w - e) + '" width="' + e + '" height="' + h + '" fill="url(#r)"/>' +
-             '<rect width="' + w + '" height="' + e + '" fill="url(#t)"/></svg>';
-  edge.setAttribute('href', 'data:image/svg+xml,' + encodeURIComponent(esvg));
-}
-if (infoBar && typeof ResizeObserver !== 'undefined') {
-  new ResizeObserver(setBarGlassMap).observe(infoBar);
-}
 var infoCity = document.getElementById('infoCity');
 var infoDate = document.getElementById('infoDate');
 var infoTime = document.getElementById('infoTime');
@@ -5824,8 +5779,9 @@ function triggerKoiStart() {
 
   playDrop();
   haptic(12);
+  /* The toolbar takes its place now (so the layout does not move later),
+     but stays invisible until the name animation has finished. */
   document.body.classList.add('info-visible');
-  if (infoBar) infoBar.classList.add('shown');
   repositionHintGroupAfterLayout();
   repositionNumpad();
 
@@ -5887,6 +5843,7 @@ function triggerKoiStart() {
 
         koiPushTimer(setTimeout(function() {
           if (introOverlay) introOverlay.classList.remove('active', 'finishing');
+          if (infoBar) infoBar.classList.add('shown');        /* the toolbar fades in */
           repositionHintGroupAfterLayout();
           repositionNumpad();
           koiGestureState = 'done';
@@ -9163,8 +9120,10 @@ function updateToolbarLight() {
   }
   var r = bar.getBoundingClientRect();
   if (r.width < 1) return;
-  /* the pane (.info-bar::before) reaches 14px below the bar */
-  var paneL = r.left, paneW = r.width, paneT = r.top, paneH = r.height + 14;
+  /* the pane (.info-bar::before) ends where the rim strip ends */
+  var rim = bar.querySelector('.bar-rim');
+  var rb = rim ? rim.getBoundingClientRect().bottom : r.bottom;
+  var paneL = r.left, paneW = r.width, paneT = r.top, paneH = Math.max(1, rb - r.top);
   var i = str.toFixed(2);
   var px = clamp((sx - paneL) / paneW * 100, -20, 120).toFixed(1);
   var py = clamp((sy - paneT) / paneH * 100, 0, 400).toFixed(0);
