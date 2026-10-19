@@ -9087,6 +9087,53 @@ function measureInfoBar() {
   _barBottom = (bar && bar.offsetHeight > 0) ? Math.max(bar.getBoundingClientRect().bottom, 40) : 93;
 }
 function skyBandY(radius) { return _barBottom + radius + 18; }
+
+/* The music card is frosted glass; this tells its CSS where the light is
+   (see .audio-spectrum-hud::before in main.css). The sun is the light by day,
+   the moon (much weaker) by night. Written twice a second, and only when the
+   numbers change, so it costs no layout or style work most of the time. */
+var _glassKey = '';
+function updateHudGlassLight() {
+  if (!audioSpectrumHud) return;
+  var sx = 0, sy = 0, str = 0, a = ENV.astro;
+  if (a && sunIsUp()) {
+    var low = 1 - smooth(2, 18, a.sun.alt);
+    str = smooth(-1.5, 1.5, a.sun.alt) * clamp(1 - S.cloudCover / 100 * 0.75, 0.15, 1) *
+          (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
+    sx = skyToScreen(a.sun.alt, a.sun.az).x;
+    sy = skyBandY(24 * S.sunSize * (1 + low * 0.35));
+  } else if (a && S.moon) {
+    var P = moonPlacement(28 * S.moonSize);
+    if (P) { str = P.fade * 0.3 * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1); sx = P.x; sy = P.y; }
+  }
+  var key;
+  if (str < 0.02) {
+    key = 'off';
+    if (key !== _glassKey) {
+      _glassKey = key;
+      audioSpectrumHud.style.removeProperty('--glass-i');
+    }
+    return;
+  }
+  var r = audioSpectrumHud.getBoundingClientRect();
+  if (r.width < 1) return;
+  var dx = sx - (r.left + r.width / 2), dy = sy - (r.top + r.height / 2);
+  var dist = Math.sqrt(dx * dx + dy * dy) || 1;
+  var near = 1 - smooth(350, 1500, dist);          // the nearer the sun, the stronger the glint
+  var i = (str * (0.4 + 0.6 * near)).toFixed(2);
+  var lx = (dx / dist).toFixed(2), ly = (dy / dist).toFixed(2);
+  var px = clamp((sx - r.left) / r.width * 100, -200, 300).toFixed(0);
+  var py = clamp((sy - r.top) / r.height * 100, -200, 300).toFixed(0);
+  key = lx + ',' + ly + ',' + px + ',' + py + ',' + i;
+  if (key === _glassKey) return;
+  _glassKey = key;
+  var st = audioSpectrumHud.style;
+  st.setProperty('--glass-lx', lx);
+  st.setProperty('--glass-ly', ly);
+  st.setProperty('--glass-sx', px + '%');
+  st.setProperty('--glass-sy', py + '%');
+  st.setProperty('--glass-i', i);
+}
 function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
 
 /* The picture follows the app's theme (the 🍁 / ❄️ toggle and the December
@@ -11179,7 +11226,7 @@ function dynStep(dt, t, want) {
   clockTimer -= dt;
   if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
   barTimer -= dt;
-  if (barTimer <= 0) { measureInfoBar(); barTimer = 0.5; }
+  if (barTimer <= 0) { measureInfoBar(); updateHudGlassLight(); barTimer = 0.5; }
   if (typeof currentPanel !== 'undefined' && currentPanel !== _lastPanel) {   // a new message panel: insects leave the old text
     _lastPanel = currentPanel;
     insectsLeaveText();
