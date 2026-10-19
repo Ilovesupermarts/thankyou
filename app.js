@@ -21,6 +21,16 @@ var BUILD = 'v135';
          the weather line) and its two "lift" rules were removed.
        - The summary bar still covers the snow and leaf strip at the
          bottom; the table and the text scroll in behind that strip.
+       - Kōyō falling leaves: the falling leaves (and the hero leaf and
+         the pile) use the maple tuned on koyo.html: its seven-lobed
+         shape, its size and its colour families (red 0.55, orange
+         0.25, gold 0.12, yellow-green 0.05, evergreen 0.03), shaded
+         from the stem to the tip, with no wear spots. They still fall
+         from the top of the screen and keep the depth ladder (smaller,
+         softer and fainter further back). Strength raised to 0.6 far
+         → 0.9 near (was 0.2 → 0.42) to match koyo.html. The old four
+         species stay available with speciesMode 'auto'. The trees are
+         unchanged.
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -9077,9 +9087,9 @@ var S = {
   temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
   density: 1, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
   shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
-  speciesMode: 'auto', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
+  speciesMode: 'koyo', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
   colorMode: 'auto', colorProgress: 0.3, colorVariety: 0.6, paletteBlend: 0.45, lightTint: 0.7, skyTint: 0.8,
-  depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
+  depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.6, nearOpacity: 0.9,
   rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
   lightning: true, frost: true, snowMix: true,
   sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1.05, moonPath: 'arc',
@@ -9338,6 +9348,8 @@ var SPECIES = {
             site: [0, 4], modes: { flutter: 0.35, tumble: 0.4, glide: 0.2, spiral: 0.05 } },
   keyaki: { name: 'Zelkova (keyaki)', size: 40, ramp: [[0, '#73903c'], [0.3, '#c0a03a'], [0.5, '#d9822e'], [0.7, '#b0502a'], [0.85, '#8a4a2a'], [1, '#6e4b33']],
             site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } },
+  koyo:   { name: 'Kōyō maple',      size: 33, ramp: [[0, '#7A1F1F'], [0.5, '#C8321E'], [1, '#E2552A']],
+            site: [0], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } },
   generic: { name: 'Tree leaf', size: 20, ramp: [[0, '#7d9440'], [0.25, '#c4a83a'], [0.45, '#e09a34'], [0.65, '#cc6a2c'], [0.85, '#9a5a32'], [1, '#76553a']],
             site: [2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } }
 };
@@ -9345,6 +9357,28 @@ var SPECIES = {
   for (var k in SPECIES) SPECIES[k].rampRgb = SPECIES[k].ramp.map(function(s) { return [s[0], hexToRgb(s[1])]; });
 })();
 var SITE_RGB = SITE_LEAF_COLOURS.map(hexToRgb);
+
+/* Kōyō falling leaves — shape, size and colours chosen on koyo.html.
+   Each leaf belongs to one colour family [shade, mid, lit]; the blade is
+   shaded from the stem (shade) to the tip (lit). The shares are how many
+   leaves of each family fall. */
+var KOYO_FAMILIES = {
+  red:       ['#7A1F1F', '#C8321E', '#E2552A'],
+  orange:    [null,      '#E66826', '#F08A30'],   // shade: red mixed 30% toward deep shade
+  gold:      [null,      '#F2B33A', '#E8C547'],   // shade: orange mixed 40% toward red-orange
+  green:     [null,      '#B5BE4A', null],        // shade and lit mixed from yellow-green
+  evergreen: [null,      '#3E5A3A', null]
+};
+var KOYO_SHARES = { red: 0.55, orange: 0.25, gold: 0.12, green: 0.05, evergreen: 0.03 };
+(function prepKoyo() {
+  var h = hexToRgb, F = KOYO_FAMILIES;
+  F.red = F.red.map(h);
+  F.orange = [mixRgb(F.red[1], F.red[0], 0.3), h(F.orange[1]), h(F.orange[2])];
+  F.gold = [mixRgb(F.orange[1], F.red[2], 0.4), h(F.gold[1]), h(F.gold[2])];
+  var ev = h(F.evergreen[1]), gr = h(F.green[1]);
+  F.green = [mixRgb(gr, ev, 0.55), gr, mixRgb(gr, F.gold[2], 0.5)];
+  F.evergreen = [scaleRgb(ev, 0.7), ev, mixRgb(ev, gr, 0.35)];
+})();
 function rampAt(r, p) {
   p = clamp(p, 0, 1);
   for (var i = 1; i < r.length; i++) {
@@ -9455,6 +9489,18 @@ function geoKeyaki(r, v) {
   }
   return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.07], [0.02 * (r() - 0.5), 0.13]] };
 }
+/* Kōyō maple (koyo.html): a seven-lobed star with short lobes by the stem,
+   centred half a leaf above the base. No veins and no visible stem. */
+function geoKoyo(r, v) {
+  var pts = [], N = 140;
+  for (var i = 0; i <= N; i++) {
+    var a = -PI / 2 + (i / N) * TAU, rel = a + PI / 2;
+    var lobe = Math.pow(Math.abs(Math.cos(rel * 3.5)), 0.6);
+    var rr = (0.4 + 0.6 * lobe) * (Math.cos(rel) < -0.6 ? 0.55 : 1);
+    pts.push([Math.cos(a) * rr * 0.5, Math.sin(a) * rr * 0.5 - 0.5]);
+  }
+  return { pts: pts, veins: [], veinStyle: 'light', stem: [[0, -0.5], [0, -0.45], [0, -0.4]] };
+}
 /* Plain, generic leaf for the bare tree: a small almond shape with a midrib. */
 function geoGeneric(r, v) {
   var W2 = 0.2 * (1 + (r() - 0.5) * 0.4 * v), N = 40, pts = [], i, t;
@@ -9463,7 +9509,7 @@ function geoGeneric(r, v) {
   for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
   return { pts: pts, veins: [[0, 0, 0, -0.9]], veinStyle: 'light', stem: [[0, 0], [0.01, 0.08], [0.02 * (r() - 0.5), 0.15]] };
 }
-var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, generic: geoGeneric };
+var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, koyo: geoKoyo, generic: geoGeneric };
 
 /* Build one leaf's geometry from its seed, then bend it and add wear. */
 function buildGeometry(L) {
@@ -9478,7 +9524,7 @@ function buildGeometry(L) {
     var a = bendFn([s[0], s[1]]), b = bendFn([s[2], s[3]]);
     return [a[0], a[1], b[0], b[1]];
   });
-  var w = S.wear;
+  var w = L.species === 'koyo' ? 0 : S.wear;     // the kōyō leaves stay clean, as on koyo.html
   var wr = r();
   g.bites = [];
   g.spots = [];
@@ -9518,6 +9564,10 @@ function leafBlur(L) {
   return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
 }
 function leafColours(L) {
+  if (L.species === 'koyo') {
+    var tones = KOYO_FAMILIES[L.fam] || KOYO_FAMILIES.red, kk = 1 + L.bright;
+    return { base: scaleRgb(tones[0], kk), mid: scaleRgb(tones[1], kk), tip: scaleRgb(tones[2], kk) };
+  }
   var sp = SPECIES[L.species];
   var p = clamp(ENV.season + L.pj * 0.2 * S.colorVariety, 0, 1);
   var site = SITE_RGB[sp.site[L.palIdx % sp.site.length]];
@@ -9678,6 +9728,7 @@ function speciesWeights() {
   if (S.speciesMode === 'manual') {
     return { momiji: S.wMomiji, ginkgo: S.wGinkgo, oak: S.wOak, keyaki: S.wKeyaki };
   }
+  if (S.speciesMode === 'koyo') return { koyo: 1 };
   var p = ENV.season;
   return {
     ginkgo: 0.03 + bell(p, 0.4, 0.3),
@@ -9739,6 +9790,7 @@ function makeLeaf(opts) {
     palIdx: Math.floor(Math.random() * 5), bright: rnd(-0.06, 0.06),
     gid: 0, settled: false
   };
+  if (species === 'koyo') L.fam = pickWeighted(KOYO_SHARES);
   setMode(L);
   return L;
 }
