@@ -21,6 +21,20 @@ var BUILD = 'v135';
          the weather line) and its two "lift" rules were removed.
        - The summary bar still covers the snow and leaf strip at the
          bottom; the table and the text scroll in behind that strip.
+       - Kōyō (紅葉) trees and leaves, as tuned on koyo.html (values in
+         KOYO / KOYO_SHARES / KOYO_FAMILIES). Autumn trees are a branch
+         skeleton (6 levels) carrying foliage clumps of small maple
+         leaves, baked once per clump and re-baked a few per frame when
+         the light changes. The canopy stays within 30% of the screen
+         width: the trunk slides up to 8% past the edge first, then the
+         spread is squeezed. At night the trees are lit from below by
+         warm lamps (koyoNight / koyoGlow). The small leaves that hung
+         on the old bare branches are gone. Falling leaves use the same
+         maple (shape, size, colour families, no wear spots) with the
+         depth ladder unchanged; 60% fall from the top, the rest drop
+         from the trees (dropKoyoLeaf), more in a gust. Leaf strength
+         0.6 far → 0.9 near (was 0.2 → 0.42); density 0.4 (was 1), so
+         about 27 leaves are on screen. The winter tree is unchanged.
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -9075,17 +9089,17 @@ var S = {
   hour: 12, date: '2026-01-01',
   condition: 'clear', windSpeed: 2.5, windDir: 300, gustiness: 0.35,
   temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
-  density: 1, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
+  density: 0.4, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
   shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
-  speciesMode: 'auto', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
+  speciesMode: 'koyo', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
   colorMode: 'auto', colorProgress: 0.3, colorVariety: 0.6, paletteBlend: 0.45, lightTint: 0.7, skyTint: 0.8,
-  depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.2, nearOpacity: 0.42,
+  depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.6, nearOpacity: 0.9,
   rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
   lightning: true, frost: true, snowMix: true,
   sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1.05, moonPath: 'arc',
   birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
   figureSide: 'auto',
-  tree: true, treeSize: 0.82, treeSway: 1, treeLeaves: 1, treeOpacity: 0.5, treeLeafOpacity: 0.85,
+  tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
   frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
@@ -9172,7 +9186,6 @@ function skyToScreen(alt, az) {
   return { x: x, y: H * 0.9 - H * 0.82 * e };
 }
 
-/* Which picture goes with the date: Oct–Nov bare autumn tree, Dec–Feb bare winter tree. */
 /* The sun and moon sit in a band just under the info bar (both lines). */
 var _barBottom = 93;   // the info bar is 93px tall; measured twice a second so drawing never forces a layout
 function measureInfoBar() {
@@ -9228,7 +9241,7 @@ function updateToolbarLight() {
 function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
 
 /* The picture follows the app's theme (the 🍁 / ❄️ toggle and the December
-   switch): autumn theme → bare tree and falling leaves, winter theme → bare
+   switch): autumn theme → kōyō trees and falling leaves, winter theme → bare
    winter tree, snowman and snow. The sakura theme shows none of it (the loop
    does not run). Which months get which picture is still to be decided. */
 function sceneFor(p) {
@@ -9338,6 +9351,8 @@ var SPECIES = {
             site: [0, 4], modes: { flutter: 0.35, tumble: 0.4, glide: 0.2, spiral: 0.05 } },
   keyaki: { name: 'Zelkova (keyaki)', size: 40, ramp: [[0, '#73903c'], [0.3, '#c0a03a'], [0.5, '#d9822e'], [0.7, '#b0502a'], [0.85, '#8a4a2a'], [1, '#6e4b33']],
             site: [3, 4, 1], modes: { flutter: 0.45, tumble: 0.2, glide: 0.25, spiral: 0.1 } },
+  koyo:   { name: 'Kōyō maple',      size: 37, ramp: [[0, '#7A1F1F'], [0.5, '#C8321E'], [1, '#E2552A']],
+            site: [0], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } },
   generic: { name: 'Tree leaf', size: 20, ramp: [[0, '#7d9440'], [0.25, '#c4a83a'], [0.45, '#e09a34'], [0.65, '#cc6a2c'], [0.85, '#9a5a32'], [1, '#76553a']],
             site: [2, 3, 4], modes: { flutter: 0.5, tumble: 0.25, glide: 0.15, spiral: 0.1 } }
 };
@@ -9345,6 +9360,30 @@ var SPECIES = {
   for (var k in SPECIES) SPECIES[k].rampRgb = SPECIES[k].ramp.map(function(s) { return [s[0], hexToRgb(s[1])]; });
 })();
 var SITE_RGB = SITE_LEAF_COLOURS.map(hexToRgb);
+
+/* Kōyō (紅葉) — the autumn trees and falling leaves, with the values chosen
+   on koyo.html. Each leaf and each foliage clump belongs to one colour
+   family [shade, mid, lit]; KOYO_SHARES is how often each family is used. */
+var KOYO = {
+  treeSize: 0.94, twigDepth: 6, maxWidth: 30, fullness: 0.8, leafDensity: 1, leafSize: 1,
+  patchiness: 0.39, shadeDepth: 0.55, lightFrom: -0.4, nearOpacity: 0.88, farOpacity: 0.76,
+  farHaze: 0.09, branchOpacity: 0.5, nightGlow: 0.7, fallTop: 0.6
+};
+var KOYO_SHARES = { red: 0.55, orange: 0.25, gold: 0.12, green: 0.05, evergreen: 0.03 };
+var KOYO_FAMILIES = (function() {
+  var h = hexToRgb;
+  var shadeDeep = h('#7A1F1F'), red = h('#C8321E'), redOrange = h('#E2552A'), orange = h('#E66826'),
+      orangeLit = h('#F08A30'), gold = h('#F2B33A'), goldLit = h('#E8C547'), green = h('#B5BE4A'), ever = h('#3E5A3A');
+  return {
+    red:       [shadeDeep, red, redOrange],
+    orange:    [mixRgb(red, shadeDeep, 0.3), orange, orangeLit],
+    gold:      [mixRgb(orange, redOrange, 0.4), gold, goldLit],
+    green:     [mixRgb(green, ever, 0.55), green, mixRgb(green, goldLit, 0.5)],
+    evergreen: [scaleRgb(ever, 0.7), ever, mixRgb(ever, green, 0.35)]
+  };
+})();
+var KOYO_PLUM = hexToRgb('#882E47'), KOYO_BARK = hexToRgb('#3A2624'), KOYO_PAPER = hexToRgb('#FBECE0');
+var KOYO_LAMP = [255, 196, 128];
 function rampAt(r, p) {
   p = clamp(p, 0, 1);
   for (var i = 1; i < r.length; i++) {
@@ -9455,6 +9494,22 @@ function geoKeyaki(r, v) {
   }
   return { pts: pts, veins: veins, veinStyle: 'light', stem: [[0, 0], [0.01, 0.07], [0.02 * (r() - 0.5), 0.13]] };
 }
+/* Kōyō maple: a seven-lobed star with short lobes by the stem. n points
+   round the edge, centred at (0, cy), half a leaf across. */
+function koyoOutline(n, cy) {
+  var pts = [];
+  for (var i = 0; i <= n; i++) {
+    var a = -PI / 2 + (i / n) * TAU, rel = a + PI / 2;
+    var lobe = Math.pow(Math.abs(Math.cos(rel * 3.5)), 0.6);
+    var rr = (0.4 + 0.6 * lobe) * (Math.cos(rel) < -0.6 ? 0.55 : 1);
+    pts.push([Math.cos(a) * rr * 0.5, Math.sin(a) * rr * 0.5 + cy]);
+  }
+  return pts;
+}
+/* The falling kōyō leaf: no veins and no visible stem (it sits under the blade). */
+function geoKoyo(r, v) {
+  return { pts: koyoOutline(140, -0.5), veins: [], veinStyle: 'light', stem: [[0, -0.5], [0, -0.45], [0, -0.4]] };
+}
 /* Plain, generic leaf for the bare tree: a small almond shape with a midrib. */
 function geoGeneric(r, v) {
   var W2 = 0.2 * (1 + (r() - 0.5) * 0.4 * v), N = 40, pts = [], i, t;
@@ -9463,7 +9518,7 @@ function geoGeneric(r, v) {
   for (i = N; i >= 0; i--) { t = i / N; pts.push([hw(t), -t]); }
   return { pts: pts, veins: [[0, 0, 0, -0.9]], veinStyle: 'light', stem: [[0, 0], [0.01, 0.08], [0.02 * (r() - 0.5), 0.15]] };
 }
-var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, generic: geoGeneric };
+var GEO = { momiji: geoMomiji, ginkgo: geoGinkgo, oak: geoOak, keyaki: geoKeyaki, koyo: geoKoyo, generic: geoGeneric };
 
 /* Build one leaf's geometry from its seed, then bend it and add wear. */
 function buildGeometry(L) {
@@ -9478,7 +9533,7 @@ function buildGeometry(L) {
     var a = bendFn([s[0], s[1]]), b = bendFn([s[2], s[3]]);
     return [a[0], a[1], b[0], b[1]];
   });
-  var w = S.wear;
+  var w = L.species === 'koyo' ? 0 : S.wear;     // the kōyō leaves stay clean
   var wr = r();
   g.bites = [];
   g.spots = [];
@@ -9513,11 +9568,16 @@ var lookVersion = 1, geomVersion = 1;
 
 function leafBlur(L) {
   if (L.hero) return 0;
-  if (L.onTree) return L.farTree ? 1.3 : 0.4;   // leaves on the near tree stay crisp, like its branches; the far tree's are soft
   var zc = clamp(L.z, 0, 1);
   return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
 }
 function leafColours(L) {
+  if (L.species === 'koyo') {
+    // shade at the stem, lit at the tip; a little warm lamp light at night
+    var tones = KOYO_FAMILIES[L.fam] || KOYO_FAMILIES.red, kk = 1 + L.bright, n = koyoNight() * KOYO.nightGlow;
+    return { base: scaleRgb(tones[0], kk), mid: scaleRgb(mixRgb(tones[1], KOYO_LAMP, n * 0.12), kk),
+             tip: scaleRgb(mixRgb(tones[2], KOYO_LAMP, n * 0.18), kk) };
+  }
   var sp = SPECIES[L.species];
   var p = clamp(ENV.season + L.pj * 0.2 * S.colorVariety, 0, 1);
   var site = SITE_RGB[sp.site[L.palIdx % sp.site.length]];
@@ -9678,6 +9738,7 @@ function speciesWeights() {
   if (S.speciesMode === 'manual') {
     return { momiji: S.wMomiji, ginkgo: S.wGinkgo, oak: S.wOak, keyaki: S.wKeyaki };
   }
+  if (S.speciesMode === 'koyo') return { koyo: 1 };
   var p = ENV.season;
   return {
     ginkgo: 0.03 + bell(p, 0.4, 0.3),
@@ -9739,6 +9800,7 @@ function makeLeaf(opts) {
     palIdx: Math.floor(Math.random() * 5), bright: rnd(-0.06, 0.06),
     gid: 0, settled: false
   };
+  if (species === 'koyo') L.fam = pickWeighted(KOYO_SHARES);
   setMode(L);
   return L;
 }
@@ -9866,7 +9928,7 @@ function updateGusts(dt) {
       if (T && T.gid !== g.id && (g.dir > 0 ? T.bx < g.x : T.bx > g.x)) {
         T.gid = g.id;
         T.gustV += g.dir * 0.5 * (g.str / 200);
-        for (var q = T.leaves.length - 1; q >= 0; q--) if (Math.random() < 0.25) detachTreeLeaf(T, q);
+        if (T.koyo) for (var q = 2 + Math.floor(Math.random() * 4); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
       }
     });
     if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
@@ -10443,10 +10505,12 @@ function fireflyOnText() {
 }
 
 /* ============================================================
-   8b. SEASONAL PICTURE — bare autumn tree (Oct–Nov), bare winter tree (Dec–Feb)
+   8b. SEASONAL PICTURE — kōyō trees (autumn theme), bare winter tree (winter theme)
    ============================================================ */
 var tree = null;          // the near tree: taller and sharp; the snowman stands beside it
 var farTree = null;       // the far tree on the other side: shorter, a little soft and paler
+var koyoLeafLayer = document.createElement('canvas');   // the near kōyō tree's foliage, laid down at its own strength
+var ctxKL = koyoLeafLayer.getContext('2d');
 var TREE_DEPTH = 7;
 var FAR_TREE_SCALE = 0.6;     // far tree height as a share of the near tree
 var FAR_TREE_ALPHA = 0.8;     // and how strong it looks next to the near tree
@@ -10456,16 +10520,13 @@ function strSeed(str) {
   for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
   return h >>> 0;
 }
-function treeLeafTarget(far) {
-  if (ENV.scene === 'winter') return 0;
-  return Math.round(S.treeLeaves * lerp(48, 10, clamp((ENV.season - 0.2) / 0.7, 0, 1)) * (far ? 0.7 : 1));
-}
 /* A new tree shape every day (seeded by the date), leaning in from one side.
    Autumn: a broad, spreading tree. Winter: a different kind — a tall,
    upright, vase-shaped keyaki (zelkova) with a fine broom of twigs.
    There are two: the near tree stands on ENV.side, the far one on the other
    side, shorter and drawn a little soft (far = true). */
 function buildTree(key, far) {
+  if (ENV.scene !== 'winter') return buildKoyoTree(key, far);
   var r = rngFrom(strSeed(key));
   var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
   var left = side === 'left', dir = left ? 1 : -1;
@@ -10506,38 +10567,279 @@ function buildTree(key, far) {
   // branches of one depth share a width, so each depth is drawn with a single stroke
   var byDepth = [];
   for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
-  var T = { key: key, far: !!far, bx: bx, by: H + 6, nodes: nodes, tips: tips, byDepth: byDepth, leaves: [], gust: 0, gustV: 0, regrow: 20, gid: 0,
-            scale: scale, maxD: maxD, winter: winter };
-  var n0 = treeLeafTarget(far);
-  for (var j = 0; j < n0; j++) addTreeLeaf(T, true);
+  return { key: key, far: !!far, bx: bx, by: H + 6, nodes: nodes, tips: tips, byDepth: byDepth, gust: 0, gustV: 0, gid: 0,
+           scale: scale, maxD: maxD, winter: winter };
+}
+/* ---------- Kōyō trees (autumn) — the koyo.html design ----------
+   A branch skeleton with fewer levels, carrying foliage clumps: each clump
+   is a dense mass of small maple leaves baked once into its own sprite,
+   darker underneath and lit on the light side, then moved with its branch.
+   Neighbouring clumps tend to share a colour (patches, as in the photo).
+   The canopy is squeezed toward its trunk so it stays within KOYO.maxWidth
+   percent of the screen. At night the trees are lit up from below by warm
+   lamps instead of going dark. Clumps are re-baked a few per frame when the
+   light changes (lookVersion). */
+var KOYO_CLUMP_LEAF = koyoOutline(70, 0);
+function koyoNight() { return smooth(0.25, 0.5, ENV.light ? ENV.light.dark : 0); }   // 0 day … 1 night
+/* The app's light on the trees: the daytime tint, the night tint, rain. */
+function koyoLight(c) {
+  var Lt = ENV.light, n = koyoNight(), g = KOYO.nightGlow;
+  var day = scaleRgb(mixRgb(c, Lt.col, clamp(Lt.amt * 0.9, 0, 0.25)), 1 - Lt.dark * 0.1);
+  var night = scaleRgb(mixRgb(c, [60, 52, 96], 0.14 * (1 - g * 0.5)), lerp(0.72, 0.95, g));
+  var o = mixRgb(day, night, n);
+  return ENV.wet > 0 ? scaleRgb(o, 1 - 0.18 * ENV.wet) : o;
+}
+function koyoFamily(r) {
+  var x = r(), acc = 0;
+  for (var k in KOYO_SHARES) { acc += KOYO_SHARES[k]; if (x <= acc) return k; }
+  return 'red';
+}
+function koyoLeafPath(c, x, y, size, rot) {
+  var cs = Math.cos(rot) * size, sn = Math.sin(rot) * size, P = KOYO_CLUMP_LEAF;
+  c.beginPath();
+  for (var i = 0; i < P.length; i++) {
+    var px = x + P[i][0] * cs - P[i][1] * sn, py = y + P[i][0] * sn + P[i][1] * cs;
+    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+  }
+  c.closePath();
+}
+/* Draw one clump into its sprite (made once, re-drawn when the light changes). */
+function bakeClump(C, far) {
+  var r = rngFrom(C.seed), tones = KOYO_FAMILIES[C.fam], R = C.R;
+  var res = PR * (far ? FAR_LAYER_SCALE : 1), side = Math.ceil(R * 2.6 * res);
+  if (!C.cnv || C.cnv.width !== side) { C.cnv = document.createElement('canvas'); C.cnv.width = C.cnv.height = side; }
+  var c = C.cnv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, side, side);
+  c.setTransform(res, 0, 0, res, side / 2, side / 2);
+  var n = koyoNight(), glow = KOYO.nightGlow * n, shade = KOYO.shadeDepth;
+  // by day the light comes from above, at night from the lamps below
+  var lx = KOYO.lightFrom * lerp(1, 0.5, n), ly = lerp(-0.85, 0.8, n), ll = Math.hypot(lx, ly); lx /= ll; ly /= ll;
+  function col(c0) {
+    var o = c0;
+    if (C.back) o = mixRgb(o, KOYO_PLUM, 0.2 + shade * 0.25);
+    if (far) o = mixRgb(o, KOYO_PAPER, KOYO.farHaze);
+    return koyoLight(o);
+  }
+  // a lumpy darker core so the clump reads as one mass
+  var core = mixRgb(col(scaleRgb(tones[0], 1 - shade * 0.25)), col(tones[1]), glow * 0.45);
+  c.fillStyle = rgba(core);
+  for (var b = 0; b < 9; b++) {
+    var ba = r() * TAU, bd = r() * 0.4;
+    c.beginPath();
+    c.arc(Math.cos(ba) * bd * R, Math.sin(ba) * bd * R * 0.75 + R * 0.05, R * (0.32 + r() * 0.18), 0, TAU);
+    c.fill();
+  }
+  var count = Math.round(85 * KOYO.leafDensity * (far ? 0.7 : 1)), dabs = [];
+  for (var i = 0; i < count; i++) {
+    var a = r() * TAU, d = Math.sqrt(r()), edge = r() < 0.28;     // bigger leaves round the rim
+    if (edge) d = 0.85 + r() * 0.2;
+    var x = Math.cos(a) * d * R * 0.95, y = Math.sin(a) * d * R * 0.78;
+    if (y > R * 0.45) y *= 0.8;                                    // flatter underside
+    dabs.push({ x: x, y: y, t: (x * lx + y * ly) / R + (r() - 0.5) * 0.5,
+                s: R * (edge ? 0.3 : 0.24) * KOYO.leafSize * (0.7 + r() * 0.6),
+                rot: (r() - 0.5) * 1.6 + (x / R) * 0.6, j: r() });
+  }
+  dabs.sort(function(p, q) { return p.t - q.t; });                // shade first, lit leaves on top
+  for (var k = 0; k < dabs.length; k++) {
+    var D = dabs[k], tone;
+    if (D.t < -0.25) tone = mixRgb(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
+    else if (D.t < 0.35) tone = mixRgb(tones[1], tones[0], clamp((0.35 - D.t) / 0.6, 0, 1) * 0.35);
+    else tone = mixRgb(tones[1], tones[2], clamp((D.t - 0.35) / 0.5, 0, 1));
+    tone = scaleRgb(tone, 1 - shade * 0.3 * clamp(-D.t, 0, 1) + (D.j - 0.5) * 0.1);
+    var lit = col(tone);
+    if (glow > 0) lit = scaleRgb(mixRgb(lit, KOYO_LAMP, glow * 0.22 * clamp(D.t + 0.3, 0, 1.3)), 1 + glow * 0.12 * clamp(D.t, 0, 1));
+    koyoLeafPath(c, D.x, D.y, D.s, D.rot);
+    c.fillStyle = rgba(lit);
+    c.fill();
+    if (D.t > 0.4 && !far) {                                       // a faint midrib on the lit leaves
+      c.strokeStyle = 'rgba(255,236,205,0.18)';
+      c.lineWidth = Math.max(0.6, D.s * 0.04);
+      c.beginPath();
+      c.moveTo(D.x, D.y + D.s * 0.15);
+      c.lineTo(D.x + Math.sin(D.rot) * D.s * 0.4, D.y - Math.cos(D.rot) * D.s * 0.4);
+      c.stroke();
+    }
+  }
+  C.half = side / (2 * res);
+  C.bakedV = lookVersion;
+}
+function buildKoyoTree(key, far) {
+  var r = rngFrom(strSeed(key));
+  var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
+  var left = side === 'left', dir = left ? 1 : -1;
+  var sc = H * KOYO.treeSize * (far ? FAR_TREE_SCALE : 1), maxD = KOYO.twigDepth, nodes = [];
+  function grow(parent, abs, len, w, d) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, idx = nodes.length;
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= maxD) return;
+    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+    var shrink = (0.68 + r() * 0.14) * lerp(1.1, 1, (maxD - 4) / 3);   // fewer levels: each a little longer
+    for (var i = 0; i < n; i++) {
+      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      grow(idx, lerp(ca, -PI / 2, 0.1), len * shrink, Math.max(0.8, w * 0.62), d + 1);
+    }
+  }
+  var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), sc * 0.26, Math.max(far ? 4 : 7, sc * 0.034), 0);
+  var byDepth = [];
+  for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
+  var T = { key: key, far: !!far, koyo: true, left: left, bx: bx, by: H + 6, nodes: nodes, byDepth: byDepth, clumps: [],
+            gust: 0, gustV: 0, gid: 0, scale: sc, maxD: maxD, winter: false, k: 1 };
+  // rest pose, to place the clumps
+  for (var m = 0; m < nodes.length; m++) {
+    var nd = nodes[m], par = nd.p < 0 ? null : nodes[nd.p];
+    nd.sx = par ? par.ex : bx; nd.sy = par ? par.ey : T.by;
+    nd.ex = nd.sx + Math.cos(nd.abs) * nd.len; nd.ey = nd.sy + Math.sin(nd.abs) * nd.len;
+  }
+  var keep = KOYO.fullness, cell = sc * 0.16, cellFam = {};
+  for (var j = 1; j < nodes.length; j++) {
+    var N = nodes[j], upper = N.d >= maxD - 1, mid = N.d >= 2 && N.d < maxD - 1;
+    if (!upper && !mid) continue;
+    if (r() > (upper ? keep : keep * 0.6)) continue;
+    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, KOYO.fullness);
+    var ck = Math.floor(N.ex / cell) + ',' + Math.floor(N.ey / cell);
+    if (!cellFam[ck]) cellFam[ck] = koyoFamily(r);
+    var fam = r() < KOYO.patchiness ? cellFam[ck] : koyoFamily(r);
+    if (fam === 'evergreen' && upper) fam = 'red';                  // evergreen only low and behind
+    T.clumps.push({ node: j, R: R, fam: fam, back: mid || r() < 0.3, seed: (r() * 4294967296) >>> 0,
+                    ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU, bakedV: -1 });
+  }
+  // back clumps first, then low to high so the top of the canopy sits in front
+  T.clumps.sort(function(a, b) {
+    if (a.back !== b.back) return a.back ? -1 : 1;
+    return nodes[b.node].ey - nodes[a.node].ey;
+  });
+  // Keep within the width limit (outer leaves reach ~1.25 R): first slide the
+  // trunk partly past the screen edge (at most 8% of the width), then squeeze
+  // the spread toward the trunk for whatever is still too wide.
+  var limit = KOYO.maxWidth / 100 * W, k = 1, over = 0;
+  T.clumps.forEach(function(C) {
+    var cn = nodes[C.node];
+    over = Math.max(over, (left ? cn.ex : W - cn.ex) + C.R * 1.25 - limit);
+  });
+  var slide = Math.min(over, (left ? bx : W - bx) + W * 0.08);
+  if (slide > 0) {
+    bx += left ? -slide : slide;
+    T.bx = bx;
+    nodes.forEach(function(nd) { nd.sx += left ? -slide : slide; nd.ex += left ? -slide : slide; });
+  }
+  T.clumps.forEach(function(C) {
+    var cn = nodes[C.node], dx = left ? cn.ex - bx : bx - cn.ex;
+    var room = (left ? limit - bx : limit - (W - bx)) - C.R * 1.25;
+    if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
+  });
+  T.k = k;
+  // where the canopy sits, for the night glow
+  var sx = 0, sy = 0, top = H, bot = 0;
+  T.clumps.forEach(function(C) {
+    var cn = nodes[C.node];
+    sx += koyoX(T, cn.ex); sy += cn.ey; top = Math.min(top, cn.ey - C.R); bot = Math.max(bot, cn.ey + C.R);
+  });
+  var nc = T.clumps.length || 1;
+  T.cx = sx / nc; T.cy = sy / nc; T.cr = Math.max(40, (bot - top) * 0.75);
+  T.clumps.forEach(function(C) { bakeClump(C, far); });
   return T;
 }
-function addTreeLeaf(T, initial) {
-  if (!T.tips.length) return;
-  var L = makeLeaf({ z: 0.85, species: 'generic' });
-  L.size = T.scale * rnd(0.042, 0.055) * S.sizeScale;   // in proportion to the tree
-  L.onTree = true;
-  L.farTree = !!T.far;                                   // far-tree leaves are baked soft
-  L.attach = T.tips[Math.floor(Math.random() * T.tips.length)];
-  L.hang = rnd(-0.5, 0.5);
-  L.ff = rnd(1.4, 2.8);
-  L.age = initial ? 5 : 0;
-  L.fadeDur = initial ? 0.6 : 4;
-  bakeLeaf(L);
-  T.leaves.push(L);
+function koyoX(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
+/* A leaf drops from a random clump; it falls at that tree's depth. */
+function dropKoyoLeaf(T, vx) {
+  if (!T || !T.clumps.length) return;
+  var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n = T.nodes[C.node];
+  spawnLeaf({ x: koyoX(T, n.ex + C.ox), y: n.ey + C.oy, z: T.far ? rnd(0.2, 0.45) : rnd(0.75, 1),
+              vx: vx !== undefined ? vx : ENV.windPx * 0.4, force: vx !== undefined });
 }
-function detachTreeLeaf(T, j) {
-  var L = T.leaves.splice(j, 1)[0];
-  L.attach = undefined;
-  L.onTree = false;
-  L.farTree = false;
-  L.bakedV = -1;                        // re-draw with the normal falling-leaf softness
-  L.vx = ENV.windPx * 0.4;
-  L.vy = 5;
-  L.fadeDur = 0.6;
-  L.age = Math.max(L.age, 1);
-  setMode(L);
-  insertSorted(L);
+/* Re-draw a few clumps per frame after the light changed. */
+function rebakeClumps(budget) {
+  [tree, farTree].forEach(function(T) {
+    if (!T || !T.koyo) return;
+    for (var i = 0; i < T.clumps.length && budget > 0; i++) {
+      if (T.clumps[i].bakedV !== lookVersion) { bakeClump(T.clumps[i], T.far); budget--; }
+    }
+  });
+}
+function strokeKoyoBranches(c, T) {
+  var bark = koyoLight(T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK);
+  bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
+  c.strokeStyle = rgba(bark);
+  c.lineCap = 'round';
+  var ns = T.nodes;
+  for (var d = 0; d < T.byDepth.length; d++) {
+    var arr = T.byDepth[d];
+    if (!arr || !arr.length) continue;
+    c.lineWidth = ns[arr[0]].w;
+    c.beginPath();
+    for (var i = 0; i < arr.length; i++) {
+      var n = ns[arr[i]];
+      c.moveTo(koyoX(T, n.sx), n.sy);
+      c.lineTo(koyoX(T, n.ex), n.ey);
+    }
+    c.stroke();
+  }
+}
+function drawKoyoClumps(c, T, t) {
+  var ns = T.nodes;
+  for (var i = 0; i < T.clumps.length; i++) {
+    var C = T.clumps[i], n = ns[C.node];
+    if (!C.cnv) continue;
+    var rot = (n.cur - n.abs) * 0.6 + Math.sin(t * 0.9 + C.ph) * 0.015 * S.treeSway;
+    c.save();
+    c.translate(koyoX(T, n.ex + C.ox), n.ey + C.oy);
+    c.rotate(rot);
+    c.drawImage(C.cnv, -C.half, -C.half, C.half * 2, C.half * 2);
+    c.restore();
+  }
+}
+/* Night: a soft warm pool of lamp light under each lit canopy. */
+function koyoGlow(ctx, T, strength) {
+  var a = koyoNight() * KOYO.nightGlow * strength;
+  if (a <= 0.01 || !T.clumps.length) return;
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+  var gy = T.cy + T.cr * 0.25, g = ctx.createRadialGradient(T.cx, gy, 0, T.cx, gy, T.cr * 1.3);
+  g.addColorStop(0, 'rgba(255,184,110,' + (0.32 * a).toFixed(3) + ')');
+  g.addColorStop(0.5, 'rgba(255,170,96,' + (0.14 * a).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,160,90,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(T.cx - T.cr * 1.4, gy - T.cr * 1.4, T.cr * 2.8, T.cr * 2.8);
+}
+function drawKoyoTrees(ctx, t) {
+  if (farTree) {
+    koyoGlow(ctx, farTree, 0.6);
+    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
+    ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
+    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    ctxFar.globalAlpha = KOYO.branchOpacity;
+    strokeKoyoBranches(ctxFar, farTree);
+    ctxFar.globalAlpha = 1;
+    drawKoyoClumps(ctxFar, farTree, t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = KOYO.farOpacity;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+  }
+  if (tree) {
+    koyoGlow(ctx, tree, 1);
+    // branches and foliage on their own layers, each laid down at its own strength
+    ctxT.setTransform(1, 0, 0, 1, 0, 0);
+    ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
+    ctxT.setTransform(PR, 0, 0, PR, 0, 0);
+    strokeKoyoBranches(ctxT, tree);
+    ctxKL.setTransform(1, 0, 0, 1, 0, 0);
+    ctxKL.clearRect(0, 0, koyoLeafLayer.width, koyoLeafLayer.height);
+    ctxKL.setTransform(PR, 0, 0, PR, 0, 0);
+    drawKoyoClumps(ctxKL, tree, t);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = KOYO.branchOpacity;
+    ctx.drawImage(treeLayer, 0, 0);
+    ctx.globalAlpha = KOYO.nearOpacity;
+    ctx.drawImage(koyoLeafLayer, 0, 0);
+  }
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
 }
 function ensureTree() {
   var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
@@ -10549,6 +10851,7 @@ function ensureTree() {
 function updateTree(dt, t) {
   if (farTree) updateOneTree(farTree, dt, t);
   if (tree) updateOneTree(tree, dt, t);
+  rebakeClumps(3);
 }
 function updateOneTree(T, dt, t) {
   var ns = T.nodes;
@@ -10570,24 +10873,6 @@ function updateOneTree(T, dt, t) {
     n.ex = n.sx + Math.cos(n.cur) * n.len;
     n.ey = n.sy + Math.sin(n.cur) * n.len;
   }
-  for (var j = T.leaves.length - 1; j >= 0; j--) {
-    var L = T.leaves[j], a = ns[L.attach];
-    L.age += dt;
-    var rot = PI + L.hang + Math.sin(t * L.ff + (L.seed % 7)) * (0.25 + 0.05 * ENV.windMs) -
-              ENV.windPx * 0.003 - T.gust * 2;
-    var off = (0.25 + L.geo.stem[2][1]) * L.size;     // hang from the tip of the stem
-    L.rot = rot;
-    L.phi = Math.sin(t * L.ff * 0.7 + (L.seed % 5)) * (0.5 + 0.08 * ENV.windMs);
-    L.x = a.ex + off * Math.sin(rot);
-    L.y = a.ey - off * Math.cos(rot);
-    L.so = 0;
-    if (Math.random() < 0.0025 * (1 + ENV.windMs / 3) * dt) detachTreeLeaf(T, j);
-  }
-  T.regrow -= dt;
-  if (T.regrow <= 0) {
-    T.regrow = rnd(15, 30);
-    if (T.leaves.length < treeLeafTarget(T.far)) addTreeLeaf(T, false);
-  }
 }
 function strokeTree(c, T) {
   var ns = T.nodes;
@@ -10605,6 +10890,7 @@ function strokeTree(c, T) {
   }
 }
 function drawTree(ctx, t) {
+  if (ENV.scene !== 'winter') { drawKoyoTrees(ctx, t); return; }
   var fig = ENV.scene === 'winter' && S.snowman;
   if (!tree && !farTree && !fig) return;
   var tint = ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44];
@@ -10623,7 +10909,6 @@ function drawTree(ctx, t) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
-    for (var f = 0; f < farTree.leaves.length; f++) drawLeaf(farTree.leaves[f], t, false);
   }
   // The near tree (and the snowman's body) go onto their own layer at full
   // strength, then the layer is laid down at the chosen strength, so joints
@@ -10638,7 +10923,6 @@ function drawTree(ctx, t) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = S.treeOpacity;
   ctx.drawImage(treeLayer, 0, 0);
-  if (tree) for (var j = 0; j < tree.leaves.length; j++) drawLeaf(tree.leaves[j], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
   if (sm) snowmanDress(ctx, t, sm);
@@ -11157,8 +11441,8 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
-  cvBack.width = cvFront.width = treeLayer.width = cw;
-  cvBack.height = cvFront.height = treeLayer.height = ch;
+  cvBack.width = cvFront.width = treeLayer.width = koyoLeafLayer.width = cw;
+  cvBack.height = cvFront.height = treeLayer.height = koyoLeafLayer.height = ch;
   farLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
   farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
@@ -11180,6 +11464,11 @@ function spawnTick(dt, t) {
   var rate = spawnRate(t);
   var n = rate * dt;
   while (n > 0) { if (Math.random() < n) spawnLeaf(); n -= 1; }
+  // The rest of the kōyō leaves drop from the trees (KOYO.fallTop come from the top).
+  if (ENV.scene !== 'winter' && leaves.length < S.maxLeaves) {
+    var m = rate * (1 - KOYO.fallTop) / KOYO.fallTop * dt;
+    while (m > 0) { if (Math.random() < m) dropKoyoLeaf(Math.random() < 0.7 || !farTree ? tree : farTree); m -= 1; }
+  }
   if (Math.random() < S.flurries * 0.06 * dt * S.density) {
     var x0 = Math.random() * W, k = 3 + Math.floor(Math.random() * 4);
     for (var i = 0; i < k; i++) flurryQueue.push({ at: t + Math.random() * 1.5, x: x0 + rnd(-80, 80) });
@@ -11212,7 +11501,7 @@ function sendHero() {
 
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
-  var a = L.hero ? 0.6 : (L.onTree ? S.treeLeafOpacity * (L.farTree ? FAR_TREE_ALPHA : 1) : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
+  var a = L.hero ? 0.6 : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
@@ -11371,8 +11660,6 @@ function dynStep(dt, t, want) {
   // re-draw a few leaf sprites per frame when the look changed
   var budget = 10, all = leaves.concat(pile);
   if (hero) all.push(hero);
-  if (tree) all = all.concat(tree.leaves);
-  if (farTree) all = all.concat(farTree.leaves);
   for (var b = 0; b < all.length && budget > 0; b++) {
     var Lb = all[(rebakeIdx + b) % all.length];
     if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
