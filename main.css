@@ -1594,8 +1594,9 @@
      top-left corner and DL XX% to the top-right. Card padding-top
      is 24px to reserve clearance for them.
 
-     The card adopts the tanzaku paper texture (#fcfbf9 base +
-     icons/1790678998862.jpg at bottom right).
+     The card is frosted glass (a blurred, tinted view of whatever is behind
+     it), not paper. Text and wave colours are the darker palette steps so
+     they hold up over the sun, leaves and pattern at any hour.
 
      Visibility gates (mirror in app.js's _hudShouldDraw()):
        · CSS — body.info-visible:not(.receipt-locked) .audio-
@@ -1624,15 +1625,22 @@
     width: 318px;
     padding: 24px 14px 10px 14px;
     border-radius: 18px;
-    background-color: #fcfbf9;
-    background-image: url('icons/1790678998862.jpg');
-    background-size: cover;
-    background-position: bottom right;
-    background-repeat: no-repeat;
-    border: 1px solid rgba(222, 192, 172, 0.50);
+    /* Frosted glass: a faint cream tint over a blurred, slightly more
+       saturated copy of whatever is behind the card (sun, leaves, the
+       Shippō pattern). The bright inner edge and the soft top sheen stand in
+       for light catching the rim of the pane. The cream text-shadow keeps the
+       small text readable when a bright patch passes behind it. */
+    background-color: rgba(255, 253, 249, 0.30);
+    background-image: linear-gradient(160deg, rgba(255, 255, 255, 0.40) 0%, rgba(255, 255, 255, 0.06) 38%, rgba(255, 255, 255, 0) 100%);
+    -webkit-backdrop-filter: blur(16px) saturate(1.5);
+    backdrop-filter: blur(16px) saturate(1.5);
+    border: 1px solid rgba(255, 255, 255, 0.60);
     box-shadow:
-      0 6px 22px rgba(68, 52, 48, 0.08),
-      0 1px 3px rgba(68, 52, 48, 0.05);
+      0 8px 28px rgba(68, 52, 48, 0.12),
+      0 1px 3px rgba(68, 52, 48, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.25);
+    text-shadow: 0 0 6px rgba(255, 253, 249, 0.75);
     opacity: 0;
     transform: translateY(-8px);
     transition: opacity 0.6s ease, transform 0.5s cubic-bezier(0.4, 0.0, 0.2, 1);
@@ -1648,9 +1656,13 @@
      so those two lift rules are gone. */
 
   html[data-theme="default"] .audio-spectrum-hud {
-    background-color: #ffffff;
-    border-color: rgba(234, 217, 213, 0.6);
-    box-shadow: 0 6px 22px rgba(120, 90, 90, 0.07);
+    background-color: rgba(255, 255, 255, 0.32);
+    border-color: rgba(255, 255, 255, 0.65);
+    box-shadow:
+      0 8px 28px rgba(120, 90, 90, 0.12),
+      0 1px 3px rgba(120, 90, 90, 0.08),
+      inset 0 1px 0 rgba(255, 255, 255, 0.75),
+      inset 0 -1px 0 rgba(255, 255, 255, 0.25);
   }
 
   /* --- Top row — absolutely positioned badges --- */
@@ -1677,8 +1689,8 @@
   .hud-dl-badge     { right: 8px; }
 
   .hud-status-badge {
-    background: rgba(176, 74, 90, 0.12);
-    color: var(--accent);
+    background: rgba(176, 74, 90, 0.16);
+    color: var(--accent-3);
   }
   .hud-status-badge.loading {
     background: rgba(247, 185, 60, 0.22);
@@ -1695,13 +1707,13 @@
   }
   html[data-theme="autumn"] .hud-status-badge,
   html[data-theme="winter"] .hud-status-badge {
-    background: rgba(230, 104, 38, 0.12);
-    color: var(--accent);
+    background: rgba(230, 104, 38, 0.18);
+    color: var(--accent-3);
   }
   html[data-theme="autumn"] .hud-status-badge.loading,
   html[data-theme="winter"] .hud-status-badge.loading {
-    background: rgba(255, 162, 89, 0.25);
-    color: #C44E10;
+    background: rgba(255, 162, 89, 0.30);
+    color: var(--accent-3);
   }
   html[data-theme="autumn"] .hud-status-badge.decoding,
   html[data-theme="winter"] .hud-status-badge.decoding {
@@ -1761,16 +1773,16 @@
     min-width: 0;
   }
   html[data-theme="autumn"] .hud-title,
-  html[data-theme="winter"] .hud-title { color: var(--text-med); }
+  html[data-theme="winter"] .hud-title { color: var(--text-dark); }
   .hud-sep {
     font-size: 11px;
-    color: var(--text-placeholder);
+    color: var(--text-mute);
     flex-shrink: 0;
   }
   .hud-artist {
     font-size: 12.5px;
     font-weight: 500;
-    color: var(--text-mute);
+    color: var(--text-med);
     letter-spacing: 1px;
     white-space: nowrap;
     overflow: hidden;
@@ -1804,7 +1816,7 @@
     position: relative;
     width: 100%;
     height: 5px;
-    background: rgba(222, 192, 172, 0.38);
+    background: rgba(114, 87, 80, 0.30);
     border-radius: 999px;
   }
   .hud-gauge-fill {
@@ -1863,7 +1875,7 @@
     margin-top: 6px;
     font-size: 10px;
     font-weight: 500;
-    color: var(--text-faint);
+    color: var(--text-mute);
     letter-spacing: 0.6px;
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
     line-height: 1;
