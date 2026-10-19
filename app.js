@@ -1946,12 +1946,15 @@ function drawHudSpectrum() {
   hudCtx.clearRect(0, 0, HUD_DISPLAY_W, HUD_DISPLAY_H);
 
   var isAutumn = isWarmPaletteTheme(currentTheme);
-  var col0 = isAutumn ? '#882E47' : '#b04a5a';
-  var col1 = isAutumn ? '#C44E10' : '#a34a56';
-  var col2 = isAutumn ? '#E66826' : '#d46a7a';
-  var col3 = isAutumn ? '#F07D40' : '#e8a8b0';
-  var col4 = isAutumn ? '#FFA259' : '#e8b4bc';
-  var col5 = '#FFFDF9';
+  /* One palette step darker than before so the ribbons stay visible over
+     the frosted glass (sun, leaves) at any hour; the old cream front layer
+     vanished on a light pane. */
+  var col0 = isAutumn ? '#882E47' : '#9a3e4d';
+  var col1 = isAutumn ? '#882E47' : '#9a3e4d';
+  var col2 = isAutumn ? '#9E3B06' : '#a34a56';
+  var col3 = isAutumn ? '#C44E10' : '#b04a5a';
+  var col4 = isAutumn ? '#E66826' : '#d46a7a';
+  var col5 = isAutumn ? '#F07D40' : '#e8a8b0';
 
   if (!_prefersReducedMotion) {
     _hudPhase += 0.038;
@@ -1983,10 +1986,10 @@ function drawHudSpectrum() {
      buried behind the wide back ribbons. */
   drawFluidRibbon(0, col0, 0.24,  1.00, 0.0, 1.6, 1.00);
   drawFluidRibbon(1, col1, 0.30, -1.20, 1.7, 2.0, 0.96);
-  drawFluidRibbon(2, col2, 0.42,  1.35, 3.4, 2.4, 0.92);
-  drawFluidRibbon(3, col3, 0.50, -1.10, 5.1, 2.8, 0.86);
-  drawFluidRibbon(4, col4, 0.44,  1.25, 6.8, 3.2, 0.78);
-  drawFluidRibbon(5, col5, 0.32, -0.85, 8.5, 3.6, 0.62);
+  drawFluidRibbon(2, col2, 0.46,  1.35, 3.4, 2.4, 0.92);
+  drawFluidRibbon(3, col3, 0.54, -1.10, 5.1, 2.8, 0.86);
+  drawFluidRibbon(4, col4, 0.50,  1.25, 6.8, 3.2, 0.78);
+  drawFluidRibbon(5, col5, 0.40, -0.85, 8.5, 3.6, 0.62);
 }
 
 /* Draws one translucent fluid ribbon anchored at y = HUD_DISPLAY_H
