@@ -785,6 +785,10 @@
      bank and the insects are drawn in code by DynBG in app.js (no images).
      Three canvases:
 
+       #dynSky     z-index -1, under #dynBack: only the time-of-day sky colour.
+                   It fades in when the name animation starts, so the name
+                   already sits on the evening or night sky; everything else
+                   (sun and moon, trees, leaves, landscape) still comes after.
        #dynBack    z-index -1, behind everything.
        #dynGround  z-index 8, a short strip along the bottom edge ABOVE the
                    page content (snow bank and fallen leaves), so the text
@@ -805,6 +809,7 @@
      flag (ambient sound, return to the start screen). -->
 <div class="maple-leaves-overlay" id="mapleLeaves" aria-hidden="true"></div>
 <div class="snow-flakes-overlay" id="snowFlakes" aria-hidden="true"></div>
+<canvas class="dyn-canvas dyn-back" id="dynSky" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-front" id="dynFront" aria-hidden="true"></canvas>

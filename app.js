@@ -52,6 +52,12 @@ var BUILD = 'v135';
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
+       - Name animation: the time-of-day sky colour now fades in as the
+         name starts (#dynSky, a quarter-size canvas under #dynBack, see
+         dynPrelude), so the name sits on the evening or night sky and
+         nothing changes colour when the scene arrives. The sun and moon,
+         trees, leaves, landscape and toolbar still come after the name;
+         the landscape is baked during the name so that work is done first.
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -12104,12 +12110,15 @@ function drawNearBand(c) {
                  the characters. It fades out on the table and thank-you
                  pages.
    ============================================================ */
+var cvSky = document.getElementById('dynSky');      // the sky colour only (see dynPrelude)
 var cvBack = document.getElementById('dynBack');
 var cvGround = document.getElementById('dynGround');
 var cvFront = document.getElementById('dynFront');
 var cvNear = document.getElementById('dynNear');
 var dynVeil = document.getElementById('dynVeil');
 var ctx = cvBack ? cvBack.getContext('2d') : null;
+var ctxSky = cvSky ? cvSky.getContext('2d') : null;
+var SKY_RES = 0.25;                          // the sky is smooth gradients: a quarter-size canvas, stretched
 var ctxG = cvGround ? cvGround.getContext('2d') : null;
 var ctxF = cvFront ? cvFront.getContext('2d') : null;
 var ctxN = cvNear ? cvNear.getContext('2d') : null;
@@ -12129,6 +12138,9 @@ function resize() {
   farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
   cvGround.height = Math.round(GH * PR);
+  cvSky.width = Math.max(1, Math.round(W * PR * SKY_RES));
+  cvSky.height = Math.max(1, Math.round(H * PR * SKY_RES));
+  skyTimer = 0;
   lookVersion++;
 }
 
@@ -12236,6 +12248,7 @@ var lastT = 0, envTimer = 0, clockTimer = 0, barTimer = 0, lastLookKey = '';
 var rebakeIdx = 0, lastScene = '', frontLeafCount = 0;
 var dynNearMul = 0, nearCleared = true;
 var dynMaster = 0, dynScrollY = 0, dynLastMs = 0, dynBegun = false, _lastPanel = -1;
+var skyMaster = 0, skyTimer = 0;
 var dynReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 function lookKey() {
@@ -12296,20 +12309,60 @@ function dynReset() {
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
   dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false;
-  [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
+  skyMaster = 0; skyTimer = 0;
+  [ctx, ctxG, ctxF, ctxN, ctxSky].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
 function dynApplyOpacity() {
+  cvSky.style.opacity = skyMaster.toFixed(3);
   cvBack.style.opacity = dynMaster.toFixed(3);
   cvGround.style.opacity = dynMaster.toFixed(3);
   cvFront.style.opacity = (dynMaster * dynFrontMul).toFixed(3);
   cvNear.style.opacity = (dynMaster * dynNearMul).toFixed(3);
 }
 
+/* The time-of-day sky colour on its own quarter-size canvas. It changes
+   slowly, so it is repainted every two seconds (or after a resize). */
+function updateSkyLayer(dt, t) {
+  skyTimer -= dt;
+  if (skyTimer > 0) return;
+  skyTimer = 2;
+  ctxSky.setTransform(1, 0, 0, 1, 0, 0);
+  ctxSky.globalAlpha = 1;
+  ctxSky.clearRect(0, 0, cvSky.width, cvSky.height);
+  ctxSky.setTransform(PR * SKY_RES, 0, 0, PR * SKY_RES, 0, 0);
+  drawSky(ctxSky, t);
+}
+/* The name animation: past the koi, before the message panels. Only the sky
+   colour fades in, so the name already sits on the evening or night sky and
+   nothing changes colour when the scene arrives; the sun and moon, trees,
+   leaves and landscape still wait (dynWantsToRun). Meanwhile the scene is
+   set up and the landscape baked, so that work is done before it shows. */
+function dynSkyWanted() {
+  if (dynReduceMotion || document.hidden) return false;
+  if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return false;
+  if (document.body.classList.contains('games-active')) return false;
+  return dynIntroDone() || (typeof introOverlay !== 'undefined' && !!introOverlay && introOverlay.classList.contains('active'));
+}
+function dynPrelude(dt, t, skyWant) {
+  skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
+  if (skyWant) {
+    if (!dynBegun) dynBegin();
+    clockTimer -= dt;
+    if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
+    envTimer -= dt;
+    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; ensureTree(); }
+    updateLandscape(t);
+    updateSkyLayer(dt, t);
+  }
+  dynApplyOpacity();
+}
 function dynStep(dt, t, want) {
   dynMaster += ((want ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
+  skyMaster += ((want ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
   if (!want) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
+  updateSkyLayer(dt, t);
 
   dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
   dynFrontMul += (dynFrontTarget() - dynFrontMul) * (1 - Math.exp(-dt * 3));
@@ -12398,7 +12451,6 @@ function dynStep(dt, t, want) {
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cvBack.width, cvBack.height);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  drawSky(ctx, t);
   drawSun(ctx, t);
   drawMoon(ctx, t);
   drawLandscape(ctx, dt);
@@ -12484,8 +12536,8 @@ var frontCleared = true;
    frames a second (the tablet is 120Hz), and about 30 while scrolling, as the
    music display also holds back its drawing during a scroll. */
 function dynLoop(ms) {
-  var want = dynWantsToRun();
-  if (!want && dynMaster < 0.01) {
+  var want = dynWantsToRun(), skyWant = want || dynSkyWanted();
+  if (!skyWant && dynMaster < 0.01 && skyMaster < 0.01) {
     if (dynBegun && !dynIntroDone()) dynReset();
     dynLastMs = 0;
     setTimeout(function() { requestAnimationFrame(dynLoop); }, 250);
@@ -12496,7 +12548,8 @@ function dynLoop(ms) {
   var dt = dynLastMs ? Math.min(0.05, (ms - dynLastMs) / 1000) : 0.016;
   dynLastMs = ms;
   lastT = ms / 1000;
-  dynStep(dt, lastT, want);
+  if (!want && dynMaster < 0.01) dynPrelude(dt, lastT, skyWant);
+  else dynStep(dt, lastT, want);
   requestAnimationFrame(dynLoop);
 }
 
@@ -12547,7 +12600,7 @@ function onWeather(c) {
 /* ============================================================
    START
    ============================================================ */
-if (cvBack && cvGround && cvFront && cvNear && ctx && ctxG && ctxF && ctxN) {
+if (cvSky && cvBack && cvGround && cvFront && cvNear && ctxSky && ctx && ctxG && ctxF && ctxN) {
   makeSprites();
   resize();
   window.addEventListener('resize', resize);
