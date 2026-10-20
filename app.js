@@ -1209,6 +1209,10 @@ var swellIsRunning = false;
 var _scrollActive = false;
 var _scrollEndTimer = null;
 var _hudScrollFrameSkip = false;
+/* Set while a finger is dragging the main panels sideways. The swell
+   loop and the sky loop ease off exactly as they do for a scroll, so
+   the swipe gets the frame budget. */
+var _swipeActive = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
@@ -2878,8 +2882,9 @@ function swellTick() {
      The HUD wave keeps moving while a finger is held down and
      dragging; during a scroll it draws every other frame (about
      60 a second) so it stays light next to the scroll work. */
-  if (!_scrollActive) applySwellToCSS(swellEnergy);
-  _hudScrollFrameSkip = _scrollActive ? !_hudScrollFrameSkip : false;
+  var _gestureBusy = _scrollActive || _swipeActive;
+  if (!_gestureBusy) applySwellToCSS(swellEnergy);
+  _hudScrollFrameSkip = _gestureBusy ? !_hudScrollFrameSkip : false;
   if (!_hudScrollFrameSkip && _hudShouldDraw()) {
     drawHudSpectrum();
     updateHudProgress();
@@ -6899,6 +6904,23 @@ receiptBackBtn.addEventListener('click', function(e) {
 /* ============ MAIN CAROUSEL SWIPE ============ */
 var startX = 0, startY = 0, currentX = 0;
 var dragging = false, decided = false, isHorizontal = false;
+/* The .panel-content nodes never change (panel text loads into an
+   anchor inside them), so look them up once instead of on every
+   touchmove. */
+var panelContents = [];
+for (var _pc = 0; _pc < panels.length; _pc++) {
+  panelContents[_pc] = panels[_pc].querySelector('.panel-content');
+}
+/* The incoming panel's blur only changes in 0.5px steps. Each new
+   blur value makes the GPU redo the blur on the whole text block,
+   so writing a fresh value on every touchmove was the costliest
+   part of the drag; eight steps look the same to the eye. */
+function swipeBlur(el, px) {
+  var b = Math.round(px * 2) / 2;
+  if (el._swipeBlur === b) return;
+  el._swipeBlur = b;
+  el.style.filter = 'blur(' + b + 'px)';
+}
 function onTouchStart(e) {
   startX = e.touches[0].clientX;
   startY = e.touches[0].clientY;
@@ -6915,7 +6937,10 @@ function onTouchMove(e) {
     if (Math.abs(deltaX) > 8 || Math.abs(deltaY) > 8) {
       decided = true;
       isHorizontal = Math.abs(deltaX) > Math.abs(deltaY);
-      if (isHorizontal) track.classList.add('dragging');
+      if (isHorizontal) {
+        track.classList.add('dragging');
+        _swipeActive = true;
+      }
     }
   }
   if (isHorizontal) {
@@ -6941,47 +6966,41 @@ function onTouchMove(e) {
     track.style.transform = 'translateX(' + pct + '%)';
     var dragRatio = Math.min(1, Math.abs(deltaX) / (refWidth * 0.35));
     if (deltaX < 0) {
-      if (panels[currentPanel]) {
-        var curC = panels[currentPanel].querySelector('.panel-content');
-        if (curC) curC.style.opacity = 1 - dragRatio;
-      }
-      if (panels[currentPanel + 1]) {
-        var nextC = panels[currentPanel + 1].querySelector('.panel-content');
-        if (nextC) {
-          nextC.style.opacity = dragRatio;
-          nextC.style.transform = 'translateX(' + (40 - 40 * dragRatio) + 'px)';
-          nextC.style.filter = 'blur(' + (4 - 4 * dragRatio) + 'px)';
-        }
+      var curC = panelContents[currentPanel];
+      if (curC) curC.style.opacity = 1 - dragRatio;
+      var nextC = panelContents[currentPanel + 1];
+      if (nextC) {
+        nextC.style.opacity = dragRatio;
+        nextC.style.transform = 'translateX(' + (40 - 40 * dragRatio) + 'px)';
+        swipeBlur(nextC, 4 - 4 * dragRatio);
       }
     } else if (deltaX > 0) {
-      if (panels[currentPanel]) {
-        var curC2 = panels[currentPanel].querySelector('.panel-content');
-        if (curC2) curC2.style.opacity = 1 - dragRatio;
-      }
-      if (panels[currentPanel - 1]) {
-        var prevC = panels[currentPanel - 1].querySelector('.panel-content');
-        if (prevC) {
-          prevC.style.opacity = dragRatio;
-          prevC.style.transform = 'translateX(' + (-40 + 40 * dragRatio) + 'px)';
-          prevC.style.filter = 'blur(' + (4 - 4 * dragRatio) + 'px)';
-        }
+      var curC2 = panelContents[currentPanel];
+      if (curC2) curC2.style.opacity = 1 - dragRatio;
+      var prevC = panelContents[currentPanel - 1];
+      if (prevC) {
+        prevC.style.opacity = dragRatio;
+        prevC.style.transform = 'translateX(' + (-40 + 40 * dragRatio) + 'px)';
+        swipeBlur(prevC, 4 - 4 * dragRatio);
       }
     }
   }
 }
 function clearInlineFades() {
-  for (var c = 0; c < panels.length; c++) {
-    var content = panels[c].querySelector('.panel-content');
+  for (var c = 0; c < panelContents.length; c++) {
+    var content = panelContents[c];
     if (content) {
       content.style.opacity = '';
       content.style.transform = '';
       content.style.filter = '';
+      content._swipeBlur = undefined;
     }
   }
 }
 function onTouchEnd() {
   if (!dragging) return;
   dragging = false;
+  _swipeActive = false;
   track.classList.remove('dragging');
   if (!isHorizontal) { clearInlineFades(); return; }
   clearInlineFades();
@@ -11750,7 +11769,7 @@ function dynLoop(ms) {
     setTimeout(function() { requestAnimationFrame(dynLoop); }, 250);
     return;
   }
-  var gap = (typeof _scrollActive !== 'undefined' && _scrollActive) ? 30 : 15;
+  var gap = (typeof _scrollActive !== 'undefined' && (_scrollActive || _swipeActive)) ? 30 : 15;
   if (dynLastMs && ms - dynLastMs < gap) { requestAnimationFrame(dynLoop); return; }
   var dt = dynLastMs ? Math.min(0.05, (ms - dynLastMs) / 1000) : 0.016;
   dynLastMs = ms;
