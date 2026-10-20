@@ -9591,6 +9591,9 @@ var lookVersion = 1, geomVersion = 1;
 
 function leafBlur(L) {
   if (L.hero) return 0;
+  // A leaf falling in front of the text or table at full strength is in focus. It
+  // stays sharp after it lands (L.solid), so a later re-bake doesn't soften it.
+  if (L.solid || (isFrontLeaf(L) && S.frontLeafOpacity >= 1)) return 0;
   var zc = clamp(L.z, 0, 1);
   return lerp(S.farBlur, S.nearBlur, zc) + ENV.fog * (1 - zc) * 2;
 }
