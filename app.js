@@ -52,6 +52,24 @@ var BUILD = 'v135';
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
+       - Winter landscape, as tuned on winter.html (values in WINT,
+         section 8d), replacing the bare winter tree, the snowman and the
+         snow bank: Fuji with a big snow cap (rounded tongues down the
+         gullies) and mist at its foot, three ridges in front of it, a
+         snowfield of gentle swells with pale frosted trees, two snowy firs
+         and a red torii on the left, partly off the screen. Plum (ume)
+         branches with snow and red blossoms hang in from both top corners
+         (three from each): every side shoot bounces at random, sheds puffs
+         of snow (now and then, on a hard bounce, in a gust) and springs up
+         a little; the snow builds back up and petals drift down. Falling
+         snow at every depth (size, blur, speed and drift follow it); the
+         nearest flakes fall in front of the text and table and land on a
+         soft snowdrift along the bottom, where they melt. The wind and
+         gusts are as tuned (the real wind sets their direction), and a
+         sideways swipe sends a gust. It shares the autumn landscape's bake
+         rhythm. In winter the swipe hint and dots stay at least 208px /
+         140px up. The old snowflakes now only fall in the autumn theme
+         when it really snows.
        - Koi screen and name animation: the time-of-day sky colour shows
          from the koi screen on (#dynSky, a quarter-size canvas under
          #dynBack, see dynPrelude), so the session starts on the evening or
@@ -1143,7 +1161,7 @@ function applyTheme(theme) {
      share this exact lifecycle so a mid-run theme toggle cannot
      leave sound or animation running alone against a sakura
      theme. */
-  // the swipe hint and dots sit higher in autumn (see repositionHintGroup)
+  // the swipe hint and dots sit higher in autumn and winter (see repositionHintGroup)
   if (typeof panels !== 'undefined' && panels && typeof stage !== 'undefined' && stage) repositionHintGroup();
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (isCarouselRunning) {
@@ -3566,6 +3584,11 @@ function repositionHintGroup() {
   if (currentTheme === 'autumn') {
     var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
     dotsBottom += lift; hintBottom += lift;
+  }
+  // Winter: clear of the snowdrift (as placed on winter.html: dots at least 140px up, hint 208px).
+  if (currentTheme === 'winter') {
+    var liftW = Math.max(0, 140 - dotsBottom, 208 - hintBottom);
+    dotsBottom += liftW; hintBottom += liftW;
   }
   if (globalHint) globalHint.style.bottom = hintBottom + 'px';
   if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
@@ -9064,9 +9087,9 @@ tyReceiptBtn.addEventListener('click', function(e) {
    with a canvas drawn in code (no images): leaves of four kinds that
    each have their own shape, colour and way of falling; the real sun
    and moon over Nagoya; weather from the app's own Open-Meteo request
-   (wind, rain, cloud, fog, snow); a bare tree in the autumn theme and a
-   winter tree with a snowman in the winter theme; a pile of fallen leaves
-   or a snow bank along the bottom; and a dragonfly, cricket and fireflies
+   (wind, rain, cloud, fog, snow); kōyō trees and an autumn landscape in
+   the autumn theme (8b, 8c) and a snowy landscape with plum branches in
+   the winter theme (8d); and a dragonfly, cricket and fireflies
    that land on the message text. It was tuned on dynamic.html and the
    values there are the ones baked into S below.
    Wrapped in a function so none of its names can clash with the app's.
@@ -9156,7 +9179,6 @@ var S = {
   birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
   figureSide: 'auto',
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
-  winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
   frontLeaves: 20, frontLeafOpacity: 1, frontLeafMinZ: 0.8, nearShare: 0.2, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60,
   dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
@@ -9297,8 +9319,8 @@ function updateToolbarLight() {
 function sunIsUp() { return S.sun && ENV.astro.sun.alt > -1.5; }
 
 /* The picture follows the app's theme (the 🍁 / ❄️ toggle and the December
-   switch): autumn theme → kōyō trees and falling leaves, winter theme → bare
-   winter tree, snowman and snow. The sakura theme shows none of it (the loop
+   switch): autumn theme → kōyō trees and falling leaves, winter theme → the
+   snowy landscape with plum branches and falling snow (8d). The sakura theme shows none of it (the loop
    does not run). Which months get which picture is still to be decided. */
 function sceneFor(p) {
   return (typeof currentTheme === 'string' && currentTheme === 'winter') ? 'winter' : 'autumn';
@@ -9390,8 +9412,6 @@ function computeEnv() {
     scene: sceneFor(p),
     side: S.figureSide === 'auto' ? (dayOfYear(p) % 2 ? 'left' : 'right') : S.figureSide
   };
-  // The winter theme always has a little snow falling, as the old snowflakes did.
-  if (ENV.scene === 'winter') { ENV.snowing = true; ENV.snowAmt = Math.max(ENV.snowAmt, 0.35); }
 }
 
 /* ============================================================
@@ -10164,7 +10184,8 @@ function drawRain(ctx) {
   }
 }
 
-/* Snow is drawn on the back canvas (behind the text) in five depth
+/* Snow when it really snows in the autumn theme (the winter theme has its
+   own, 8d). It is drawn on the back canvas (behind the text) in five depth
    tiers: far flakes are small, slow, faint and blurred; near flakes
    are bigger, faster and sharper. Each tier is one pre-blurred sprite. */
 var SNOW_TIERS = [
@@ -10191,7 +10212,7 @@ function makeSnowSprites() {
   });
 }
 function updateSnow(dt, t) {
-  var target = ENV.snowing ? Math.round(140 * ENV.snowAmt) : 0;
+  var target = ENV.snowing && ENV.scene !== 'winter' ? Math.round(140 * ENV.snowAmt) : 0;   // winter has its own snow (8d)
   while (flakes.length < target) {
     flakes.push({ x: Math.random() * W, y: -10 - Math.random() * H, tier: Math.floor(Math.pow(Math.random(), 1.3) * 5),
                   ph: rnd(0, TAU), sw: rnd(8, 18), sf: rnd(0.8, 1.6), r: Math.random() });
@@ -10596,9 +10617,9 @@ function fireflyOnText() {
 }
 
 /* ============================================================
-   8b. SEASONAL PICTURE — kōyō trees (autumn theme), bare winter tree (winter theme)
+   8b. SEASONAL PICTURE — kōyō trees (autumn theme; the winter scene is 8d)
    ============================================================ */
-var tree = null;          // the near tree: taller and sharp; the snowman stands beside it
+var tree = null;          // the near tree: taller and sharp
 var farTree = null;       // the far tree on the other side: shorter, a little soft and paler
 var koyoLeafLayer = document.createElement('canvas');   // the near kōyō tree's foliage, laid down at its own strength
 var ctxKL = koyoLeafLayer.getContext('2d');
@@ -10652,61 +10673,6 @@ function fitBranch(nodes, parent, sx, sy, abs, len, w) {
   }
   return null;
 }
-/* A new tree shape every day (seeded by the date), leaning in from one side.
-   Autumn: a broad, spreading tree. Winter: a different kind — a tall,
-   upright, vase-shaped keyaki (zelkova) with a fine broom of twigs.
-   There are two: the near tree stands on ENV.side, the far one on the other
-   side, shorter and drawn a little soft (far = true). */
-function buildTree(key, far) {
-  if (ENV.scene !== 'winter') return buildKoyoTree(key, far);
-  var r = rngFrom(strSeed(key));
-  var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
-  var left = side === 'left', dir = left ? 1 : -1;
-  var winter = ENV.scene === 'winter';
-  var scale = H * S.treeSize * (winter ? 1.1 : 1) * (far ? FAR_TREE_SCALE : 1);
-  var nodes = [], tips = [];
-  var dens = S.winterTreeDensity;          // winter only: 0.1 very sparse … 1 the old dense look
-  var maxD = winter ? 4 + Math.round(dens * 4) : TREE_DEPTH;
-  function grow(parent, abs, len, w, d) {
-    var sx = parent < 0 ? bx : nodes[parent].ex, sy = parent < 0 ? H + 6 : nodes[parent].ey;
-    var fit = fitBranch(nodes, parent, sx, sy, abs, len, w);
-    if (!fit) return;
-    abs = fit.abs; len = fit.len;
-    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
-    var idx = nodes.length;
-    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
-                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: sx, sy: sy, ex: fit.ex, ey: fit.ey });
-    if (d >= maxD || len < scale * (winter ? 0.018 : 0.025)) { tips.push(idx); return; }
-    // a sparse winter tree: some twigs simply stop early
-    if (winter && d >= 3 && r() < (1 - dens) * 0.4) { tips.push(idx); return; }
-    var n, spread, upPull, shrink;
-    if (winter) {
-      n = d === 0 ? 2 : ((dens > 0.55 && r() < 0.45 * dens) ? 3 : 2);
-      spread = (0.36 + r() * 0.2) * (n === 3 ? 0.85 : 1);
-      upPull = 0.2;
-      shrink = 0.74 + r() * 0.1;
-    } else {
-      n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
-      spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
-      upPull = 0.1;
-      shrink = 0.68 + r() * 0.14;
-    }
-    for (var i = 0; i < n; i++) {
-      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
-      ca = lerp(ca, -PI / 2, upPull);
-      grow(idx, ca, len * shrink, Math.max(winter ? 0.9 : 0.7, w * (winter ? 0.64 : 0.66)), d + 1);
-    }
-    if (nodes.length === idx + 1) tips.push(idx);   // every twig was left off: this is a tip now
-  }
-  var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
-  if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(far ? 3 : 5, scale * 0.026), 0);
-  else grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), scale * 0.24, Math.max(far ? 3.5 : 6, scale * 0.032), 0);
-  // branches of one depth share a width, so each depth is drawn with a single stroke
-  var byDepth = [];
-  for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
-  return { key: key, far: !!far, bx: bx, by: H + 6, nodes: nodes, tips: tips, byDepth: byDepth, gust: 0, gustV: 0, gid: 0,
-           scale: scale, maxD: maxD, winter: winter };
-}
 /* ---------- Kōyō trees (autumn) — the koyo.html design ----------
    A branch skeleton with fewer levels, carrying foliage clumps: each clump
    is a dense mass of small maple leaves baked once into its own sprite,
@@ -10718,9 +10684,10 @@ function buildTree(key, far) {
    light changes (lookVersion). */
 var KOYO_CLUMP_LEAF = koyoOutline(70, 0);
 function koyoNight() { return smooth(0.25, 0.5, ENV.light ? ENV.light.dark : 0); }   // 0 day … 1 night
-/* The app's light on the trees: the daytime tint, the night tint, rain. */
-function koyoLight(c) {
-  var Lt = ENV.light, n = koyoNight(), g = KOYO.nightGlow;
+/* The app's light on the trees: the daytime tint, the night tint, rain.
+   glow: how strongly lamps light things at night (KOYO.nightGlow by default). */
+function koyoLight(c, glow) {
+  var Lt = ENV.light, n = koyoNight(), g = glow === undefined ? KOYO.nightGlow : glow;
   var day = scaleRgb(mixRgb(c, Lt.col, clamp(Lt.amt * 0.9, 0, 0.25)), 1 - Lt.dark * 0.1);
   var night = scaleRgb(mixRgb(c, [60, 52, 96], 0.14 * (1 - g * 0.5)), lerp(0.72, 0.95, g));
   var o = mixRgb(day, night, n);
@@ -11006,11 +10973,10 @@ function drawKoyoTrees(ctx, t) {
   ctx.globalAlpha = 1;
 }
 function ensureTree() {
-  var want = (ENV.scene === 'autumn' && S.tree) || (ENV.scene === 'winter' && S.winterTree);
-  if (!want) { tree = null; farTree = null; return; }
-  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize + '|' + S.winterTreeDensity;
-  if (!tree || tree.key !== key) tree = buildTree(key, false);
-  if (!farTree || farTree.key !== key + '|far') farTree = buildTree(key + '|far', true);
+  if (ENV.scene !== 'autumn' || !S.tree) { tree = null; farTree = null; return; }
+  var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
+  if (!tree || tree.key !== key) tree = buildKoyoTree(key, false);
+  if (!farTree || farTree.key !== key + '|far') farTree = buildKoyoTree(key + '|far', true);
 }
 function updateTree(dt, t) {
   if (farTree) updateOneTree(farTree, dt, t);
@@ -11038,219 +11004,8 @@ function updateOneTree(T, dt, t) {
     n.ey = n.sy + Math.sin(n.cur) * n.len;
   }
 }
-function strokeTree(c, T) {
-  var ns = T.nodes;
-  for (var d = 0; d < T.byDepth.length; d++) {
-    var arr = T.byDepth[d];
-    if (!arr || !arr.length) continue;
-    c.lineWidth = ns[arr[0]].w;
-    c.beginPath();
-    for (var i = 0; i < arr.length; i++) {
-      var n = ns[arr[i]];
-      c.moveTo(n.sx, n.sy);
-      c.lineTo(n.ex, n.ey);
-    }
-    c.stroke();
-  }
-}
 function drawTree(ctx, t) {
-  if (ENV.scene !== 'winter') { drawKoyoTrees(ctx, t); return; }
-  var fig = ENV.scene === 'winter' && S.snowman;
-  if (!tree && !farTree && !fig) return;
-  var tint = ENV.scene === 'winter' ? [78, 66, 72] : [70, 46, 44];
-  // The far tree first. It is drawn onto a half-size layer and scaled back up,
-  // which softens it a little (no per-frame blur filter), and it is paler and a
-  // touch weaker than the near tree.
-  if (farTree) {
-    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
-    ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
-    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
-    ctxFar.strokeStyle = rgba(mixRgb(mixRgb(tint, [235, 224, 224], 0.2), ENV.light.col, 0.12));
-    ctxFar.lineCap = 'round';
-    strokeTree(ctxFar, farTree);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = S.treeOpacity * FAR_TREE_ALPHA;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
-  }
-  // The near tree (and the snowman's body) go onto their own layer at full
-  // strength, then the layer is laid down at the chosen strength, so joints
-  // don't show darker spots and the snowman matches the tree.
-  ctxT.setTransform(1, 0, 0, 1, 0, 0);
-  ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
-  ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-  ctxT.strokeStyle = rgba(mixRgb(tint, ENV.light.col, 0.12));
-  ctxT.lineCap = 'round';
-  if (tree) strokeTree(ctxT, tree);
-  var sm = fig ? snowmanBody(ctxT, t) : null;
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = S.treeOpacity;
-  ctx.drawImage(treeLayer, 0, 0);
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  ctx.globalAlpha = 1;
-  if (sm) snowmanDress(ctx, t, sm);
-}
-
-/* ============================================================
-   8b-2. WINTER GROUND — accumulated snow and a snowman silhouette.
-   Colours are the site palette: 絹白 silk white, 薄桃 petal-soft and the
-   soft cream tiers for the snow; plum, 金木犀 orange and amber for the
-   scarf and hat; the same taupe as the winter tree for the silhouette.
-   ============================================================ */
-var snowAccum = 0;            // 0..1: grows while it snows, melts slowly when mild
-var snowman = { wind: 0 };
-var _bankPh = 0;
-var SNOWC = {
-  white: [255, 253, 249], soft1: [251, 236, 224], soft3: [245, 223, 207], petalSoft: [253, 232, 218],
-  border1: [238, 210, 192], border2: [222, 192, 172], plum: [136, 46, 71], plumLight: [158, 62, 92],
-  accent: [230, 104, 38], accent2: [196, 78, 16], amber: [158, 59, 6]
-};
-/* Palette colour as it looks in the current light: warmer at dusk, darker at night. */
-function snowLit(c) {
-  var Lt = ENV.light, o = mixRgb(c, Lt.col, clamp(Lt.amt * S.lightTint * 0.8, 0, 0.5));
-  return scaleRgb(o, 1 - Lt.dark * 0.35 * S.lightTint);
-}
-function updateWinterGround(dt) {
-  if (ENV.scene !== 'winter') return;
-  _bankPh = (dayOfYear(ENV.p) % 97) * 0.43;                  // a different set of hills each day
-  if (S.condition === 'snow') snowAccum = Math.min(1, snowAccum + dt * ENV.snowAmt / 900);
-  else if (S.temperature > 3) snowAccum = Math.max(0, snowAccum - dt / 3000);
-  var target = clamp(ENV.windPx / 50 + (tree ? tree.gust * 4 : 0), -1.3, 1.3);
-  snowman.wind += (target - snowman.wind) * (1 - Math.exp(-dt * 1.5));
-}
-function bankHeightPx(layer) {
-  var base = H * 0.03 * S.snowBankHeight, acc = H * 0.045 * snowAccum * S.snowBankHeight;
-  return layer === 'far' ? (base + acc) * 1.7 + H * 0.01 : base + acc;
-}
-/* Rolling hills: three sine waves of different length. */
-function bankSurface(x, layer) {
-  var far = layer === 'far', h = bankHeightPx(layer), ph = _bankPh + (far ? 2.1 : 0), k = far ? 0.7 : 1;
-  return H - h * (0.72 + 0.28 * Math.sin(x * 0.0042 * k + ph) + 0.14 * Math.sin(x * 0.0105 * k + ph * 1.7 + 1) +
-                  0.05 * Math.sin(x * 0.026 + ph * 2.3));
-}
-function drawSnowBank(ctx, layer) {
-  if (ENV.scene !== 'winter' || !S.snowBank) return;
-  var far = layer === 'far', hpx = bankHeightPx(layer), x;
-  ctx.beginPath();
-  ctx.moveTo(-6, H + 6);
-  for (x = -6; x <= W + 18; x += 12) ctx.lineTo(x, bankSurface(x, layer));
-  ctx.lineTo(W + 6, H + 6);
-  ctx.closePath();
-  var g = ctx.createLinearGradient(0, H - hpx * 1.25, 0, H);
-  if (far) {
-    g.addColorStop(0, rgba(snowLit(SNOWC.petalSoft), 0.78));
-    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.85));
-  } else {
-    g.addColorStop(0, rgba(snowLit(SNOWC.white), 0.98));
-    g.addColorStop(0.55, rgba(snowLit(SNOWC.soft1), 0.98));
-    g.addColorStop(1, rgba(snowLit(SNOWC.soft3), 0.98));
-  }
-  ctx.fillStyle = g;
-  ctx.fill();
-  // crest: a thin warm line, plus a bright highlight just above it
-  ctx.beginPath();
-  for (x = -6; x <= W + 18; x += 12) { if (x === -6) ctx.moveTo(x, bankSurface(x, layer)); else ctx.lineTo(x, bankSurface(x, layer)); }
-  ctx.strokeStyle = rgba(snowLit(far ? SNOWC.border1 : SNOWC.border2), far ? 0.5 : 0.65);
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-  if (!far) {
-    ctx.translate(0, -1.6);
-    ctx.strokeStyle = rgba(snowLit(SNOWC.white), 0.8);
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-    ctx.translate(0, 1.6);
-  }
-}
-function snowmanLayout() {
-  var left = ENV.side === 'left';
-  var bx = tree ? tree.bx : (left ? W * 0.07 : W * 0.93);
-  var x = clamp(left ? bx + H * 0.2 : bx - H * 0.2, W * 0.06, W * 0.94);
-  var R = H * 0.064 * S.snowmanSize, r2 = R * 0.66;
-  var gy = bankSurface(x, 'near') + R * 0.22;               // sinks a little into the snow
-  var by = gy - R * 0.92, hy = by - R * 0.78 - r2 * 0.62;
-  return { x: x, R: R, r2: r2, gy: gy, by: by, hy: hy, left: left };
-}
-/* The silhouette itself: two snowballs and twig arms, drawn on the tree's layer. */
-function snowmanBody(c, t) {
-  var m = snowmanLayout(), x = m.x;
-  var col = rgba(mixRgb([78, 66, 72], ENV.light.col, 0.12));
-  c.fillStyle = col;
-  c.strokeStyle = col;
-  c.lineCap = 'round';
-  c.beginPath(); c.arc(x, m.by, m.R, 0, TAU); c.fill();
-  c.beginPath(); c.arc(x, m.hy, m.r2, 0, TAU); c.fill();
-  var sway = Math.sin(t * 0.9 + 1) * 0.04 + snowman.wind * 0.08;
-  [-1, 1].forEach(function(sd) {
-    var a = (sd > 0 ? -0.55 : PI + 0.55) + sway, len = m.R * 1.25;
-    var sx0 = x + sd * m.R * 0.82, sy0 = m.by - m.R * 0.32;
-    var ex = sx0 + Math.cos(a) * len, ey = sy0 + Math.sin(a) * len;
-    c.lineWidth = Math.max(1.6, m.R * 0.06);
-    c.beginPath(); c.moveTo(sx0, sy0); c.lineTo(ex, ey); c.stroke();
-    c.lineWidth = Math.max(1.1, m.R * 0.04);
-    [0.62, 0.85].forEach(function(f, i) {
-      var fx = sx0 + Math.cos(a) * len * f, fy = sy0 + Math.sin(a) * len * f, fa = a + (i ? 0.55 : -0.6) * sd;
-      c.beginPath(); c.moveTo(fx, fy); c.lineTo(fx + Math.cos(fa) * len * 0.3, fy + Math.sin(fa) * len * 0.3); c.stroke();
-    });
-  });
-  return m;
-}
-/* Scarf (flutters in the wind) and bucket hat, in palette colours. */
-function snowmanDress(ctx, t, m) {
-  var x = m.x, w = snowman.wind, aw = Math.abs(w);
-  var ny = m.hy + m.r2 * 0.78;                              // neck
-  var Lt = ENV.light, dark = 1 - Lt.dark * 0.3;
-  // tails
-  var th = Math.atan(w), ax = Math.sin(th), ay = Math.cos(th), nx = ay, nyv = -ax;
-  var kx = x + clamp(w, -1, 1) * m.r2 * 0.55, ky = ny + m.r2 * 0.08;
-  for (var j = 1; j >= 0; j--) {
-    var len = m.R * (1.55 + 0.15 * aw) * (1 - 0.2 * j), N = 14, L = [], Rr = [];
-    var amp = m.R * (0.07 + 0.17 * aw), fr = 4.5 + 3 * aw, ph = j * 1.5;
-    for (var i = 0; i <= N; i++) {
-      var u = i / N;
-      var wave = (Math.sin(t * fr - u * 6 + ph) + 0.35 * Math.sin(t * fr * 1.9 - u * 11 + ph)) * amp * u;
-      var px = kx - j * m.r2 * 0.14 + ax * len * u + nx * wave;
-      var py = ky + ay * len * u + nyv * wave + u * u * m.R * 0.32 * (1 - aw * 0.6);
-      var hw = m.r2 * (0.17 - 0.05 * u);
-      L.push([px + nx * hw, py + nyv * hw]);
-      Rr.push([px - nx * hw, py - nyv * hw]);
-    }
-    ctx.beginPath();
-    ctx.moveTo(L[0][0], L[0][1]);
-    for (i = 1; i <= N; i++) ctx.lineTo(L[i][0], L[i][1]);
-    for (i = N; i >= 0; i--) ctx.lineTo(Rr[i][0], Rr[i][1]);
-    ctx.closePath();
-    ctx.fillStyle = rgba(scaleRgb(j ? SNOWC.accent2 : SNOWC.accent, dark), 0.95);
-    ctx.fill();
-  }
-  // band around the neck
-  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.95);
-  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = rgba(scaleRgb(SNOWC.accent2, dark), 0.8);
-  ctx.lineWidth = 1;
-  ctx.beginPath(); ctx.ellipse(x, ny, m.r2 * 0.92, m.r2 * 0.21, 0, 0.1, PI - 0.1); ctx.stroke();
-  // bucket hat
-  var brimW = m.r2 * 1.5, topW = m.r2 * 0.92, hh = m.r2 * 0.82;
-  ctx.save();
-  ctx.translate(x + m.r2 * 0.06, m.hy - m.r2 * 0.7);
-  ctx.rotate(m.left ? 0.1 : -0.1);
-  function wAt(f) { return (brimW + (topW - brimW) * f) / 2; }
-  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark), 0.97);
-  ctx.beginPath();
-  ctx.moveTo(-brimW / 2, 0); ctx.lineTo(brimW / 2, 0); ctx.lineTo(topW / 2, -hh); ctx.lineTo(-topW / 2, -hh);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = rgba(scaleRgb(SNOWC.accent, dark), 0.9);
-  ctx.beginPath();
-  ctx.moveTo(-wAt(0), 0); ctx.lineTo(wAt(0), 0); ctx.lineTo(wAt(0.26), -hh * 0.26); ctx.lineTo(-wAt(0.26), -hh * 0.26);
-  ctx.closePath(); ctx.fill();
-  ctx.fillStyle = rgba(scaleRgb(SNOWC.plum, dark * 0.9), 0.97);
-  ctx.beginPath(); ctx.ellipse(0, 0, brimW * 0.64, hh * 0.13, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = rgba(scaleRgb(SNOWC.plumLight, dark), 0.97);
-  ctx.beginPath(); ctx.ellipse(0, -hh, topW / 2, hh * 0.1, 0, 0, TAU); ctx.fill();
-  ctx.restore();
-  // soft shadow where it stands
-  ctx.fillStyle = rgba(snowLit(SNOWC.border2), 0.35);
-  ctx.beginPath(); ctx.ellipse(x + m.R * 0.3, m.gy - m.R * 0.04, m.R * 1.1, m.R * 0.16, 0, 0, TAU); ctx.fill();
+  if (ENV.scene === 'autumn') drawKoyoTrees(ctx, t);
 }
 
 /* ============================================================
@@ -12040,43 +11795,47 @@ function buildBed() {
 
 /* ---------- bake when needed, draw each frame ---------- */
 function landKey() {
-  return [lookVersion, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : ''].join('|');
+  return [lookVersion, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : '', ENV.scene].join('|');
 }
+/* Both scenes bake this way: the autumn one here (8c), the winter one in 8d. */
 function updateLandscape(t) {
-  if (ENV.scene !== 'autumn') return;
-  var k = landKey();
+  if (ENV.scene !== 'autumn' && ENV.scene !== 'winter') return;
+  var win = ENV.scene === 'winter', k = landKey();
   if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
-    if (LS.step === 2) landBakeGround();
+    if (LS.step === 2) { if (win) winBakeGround(); else landBakeGround(); }
+    else if (win) { winBakeNear(); winBakeSprites(); LS.ready = true; }
     else { landBakeNear(); LS.ready = true; placeFloor(); }
     LS.step = LS.step === 2 ? 3 : 0;
     return;                                       // the loose leaves are laid on a later frame
   } else if (k !== LS.key) {
-    var sized = LS.key.split('|').slice(1, 4).join('|') !== k.split('|').slice(1, 4).join('|');
+    var was = LS.key.split('|'), now = k.split('|');
+    var sized = was.slice(1, 4).join('|') !== now.slice(1, 4).join('|') || was[was.length - 1] !== now[now.length - 1];
     var scrolling = typeof _scrollActive !== 'undefined' && (_scrollActive || _swipeActive);
-    // a new size (or the first bake) at once; a light change at most every LAND_REBAKE seconds, never mid-scroll
+    // a new size or scene (or the first bake) at once; a light change at most every LAND_REBAKE seconds, never mid-scroll
     if (!LS.ready || sized || (!scrolling && t - LS.at > LAND_REBAKE)) {
-      landBakeScenery();
+      if (win) winBakeScenery(); else landBakeScenery();
       LS.key = k; LS.at = t; LS.step = 2;
     }
   }
-  if (LS.ready && !LS.floorBuilt) buildBed();
+  if (!win && LS.ready && !LS.floorBuilt) buildBed();
 }
 function drawLandscape(c, dt) {
-  if (ENV.scene !== 'autumn' || !LS.ready) return;
+  if ((ENV.scene !== 'autumn' && ENV.scene !== 'winter') || !LS.ready) return;
+  var P = ENV.scene === 'winter' ? WINT : LAND;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
   var sy0 = Math.floor(LS.scnTop * LAND_SR), sh0 = LS.SCN.cnv.height - sy0;   // the empty sky above the peaks is skipped
   c.drawImage(LS.SCN.cnv, 0, sy0, LS.SCN.cnv.width, sh0, 0, sy0 / LAND_SR * PR, cvBack.width, sh0 / LAND_SR * PR);
-  if (LAND.mistDrift > 0) {                                                // mist drifting along the ridges
-    var hy = H * LAND.horizon, drift = 0.5 + 0.5 * Math.min(2, ENV.windMs / 3);
+  if (P.mistDrift > 0) {                                                   // mist drifting along the ridges
+    var hy = H * P.horizon, drift = 0.5 + 0.5 * Math.min(2, ENV.windMs / 3);
     c.setTransform(PR, 0, 0, PR, 0, 0);
-    c.globalAlpha = LAND.mistDrift * 0.5;
+    c.globalAlpha = P.mistDrift * 0.5;
     for (var i = 0; i < LS.mist.length; i++) {
       var B = LS.mist[i], bw = B.w * W;
       B.x += B.v * dt * drift;
       if (B.x - bw / 2 > W + 50) B.x = -bw / 2 - 40;
       if (B.x + bw / 2 < -50) B.x = W + bw / 2 + 40;
-      c.drawImage(LS.MIST.cnv, B.x - bw / 2, hy - LAND.mtnHeight * H * B.y - B.h / 2, bw, B.h);
+      c.drawImage(LS.MIST.cnv, B.x - bw / 2, hy - P.mtnHeight * H * B.y - B.h / 2, bw, B.h);
     }
     c.globalAlpha = 1;
   }
@@ -12084,15 +11843,1037 @@ function drawLandscape(c, dt) {
   c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
   c.setTransform(PR, 0, 0, PR, 0, 0);
 }
-/* The near band goes under the leaves already drawn on the ground strip
-   (it has its own night glow baked in). */
+/* The near band (leaves in autumn, the snowdrift in winter) goes under the
+   leaves or flakes already drawn on the ground strip (it has its own night
+   glow baked in). */
 function drawNearBand(c) {
-  if (ENV.scene !== 'autumn' || !LS.ready || !LS.nearH) return;
+  if (!LS.ready || !LS.nearH) return;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
   c.globalCompositeOperation = 'destination-over';
   c.drawImage(LS.NEAR.cnv, 0, Math.round((GH - LS.nearH) * PR));
   c.globalCompositeOperation = 'source-over';
+}
+
+/* ============================================================
+   8d. WINTER LANDSCAPE — as tuned on winter.html (values in WINT).
+   Winter theme only; the autumn scene is unchanged. It uses the autumn
+   landscape's canvases and bake rhythm (LS, section 8c: baked, re-baked
+   when the light changes at most every LAND_REBAKE seconds and never
+   mid-scroll, spread over three frames).
+     #dynBack    Fuji with a big snow cap and mist at its foot, three
+                 ridges in front of it, and a snowfield of gentle swells
+                 with pale frosted trees, two snowy firs on the right and a
+                 red torii on the left, partly off the screen (baked); the
+                 falling snow behind the text and table; and plum (ume)
+                 branches with snow and blossoms hanging in from both top
+                 corners. Every side shoot bounces at random; now and then
+                 (and on a hard bounce, or in a gust) a shoot sheds a puff of
+                 snow and springs up a little, the snow builds back up, and
+                 the odd petal drifts down.
+     #dynGround  a soft snowdrift along the bottom edge, above the text and
+                 table, where the nearest flakes land and slowly melt.
+     #dynNear    the nearest flakes (in front of the text and table) and a
+                 few big soft flakes close to the glass.
+   Every flake has its own depth: size, blur, strength, speed and drift
+   follow it. The blur comes from 8 soft dots baked once, never from a
+   filter per frame. The wind and gusts are as tuned; the real wind sets
+   their direction and a strong one adds a little. A sideways swipe on the
+   message panels sends a gust. Lit by the app's own light (winLight); at
+   night a warm lamp at the foot of the torii lights the snow around it.
+   ============================================================ */
+var WINT = {
+  seed: 7, wind: 1.85, gustEvery: 6, gustStrength: 1.4, lampGlow: 0.78,
+  // the ridges in front of Fuji, and the mist
+  ridges: 3, horizon: 0.79, mtnHeight: 0.22, mtnStrength: 1, mtnHaze: 0.35, mtnBlur: 2.1, ridgeSnow: 0.25,
+  mist: 0.9, mistDrift: 0.7,
+  // Fuji
+  fujiX: 0.77, fujiHeight: 0.4, fujiWidth: 3.25, fujiSnow: 0.42, fujiGully: 0.65, fujiHaze: 0.15,
+  // the snowfield
+  groundStrength: 1, swells: 10, swellHeight: 2.45, swellShadow: 0.76, groundHaze: 0.89, sparkle: 0.72,
+  // what stands on it
+  toriiX: 0.03, toriiDepth: 0.18, toriiSize: 0.2, toriiSnow: 1.75,
+  firs: 2, firX: 0.96, firSize: 0.95,
+  frostTrees: 9, frostSize: 1.35,
+  // the plum branches
+  branchCount: 3, branchSize: 1.05, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22,
+  sway: 2.5, swayRandom: 1.7, shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75,
+  // the falling snow
+  flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 5.3, nearBlur: 0.3, fallSpeed: 0.6, flakeSway: 2.05,
+  frontShare: 0.17, landShare: 0.7, meltTime: 16.5, bokeh: 6,
+  // the snowdrift in front of the text and table
+  nearHeight: 53, nearLumps: 0.25, nearShade: 0.3, nearShadow: 1, nearShadowSize: 14
+};
+var WINT_C = (function() {
+  var h = hexToRgb;
+  return { fuji: h('#8E98AE'), fujiSnow: h('#FAF8F6'), mtnFar: h('#BBBEC9'), mtnMid: h('#A9AEBD'), mtnNear: h('#979EAF'),
+           mist: h('#F6EEE8'), snowLit: h('#FFFDFB'), snowShade: h('#C9CCDA'), snowDeep: h('#A3A8BC'),
+           branch: h('#3B2B2A'), blossom: h('#D93B3B'), blossomDeep: h('#A8212E'), stamen: h('#F4D27A'),
+           torii: h('#D2452B'), toriiDark: h('#3A2B2B'), fir: h('#4F5E58'), frost: h('#A39BA3') };
+})();
+var WS = { torii: null, sparkles: [], bKey: '', branches: [], puffs: [], petals: [], shedTimer: 3, petalTimer: 2,
+           blooms: [], flakeSpr: [], flakes: [], filled: false, landed: [], bokeh: [], gusts: [], gustTimer: 4, field: [],
+           wood: '', snow: '', shade: '', petal: '', petalDk: '' };
+function winLight(c) { return koyoLight(c, WINT.lampGlow); }
+function winEllipse(c, x, y, rx, ry) { c.moveTo(x + rx, y); c.ellipse(x, y, rx, ry, 0, 0, TAU); }
+
+/* ---------- Fuji, the ridges and the mist, behind everything ---------- */
+/* Snow on the high parts of a ridge: a band under the ridge line whose
+   depth grows with the height and runs down in streaks (lit from the left). */
+function winRidgeSnow(c, f, base, amp, body, d, r) {
+  if (WINT.ridgeSnow <= 0) return;
+  var snow = winLight(mixRgb(WINT_C.fujiSnow, WINT_C.mist, WINT.mtnHaze * (1 - d * 0.6) * 0.45));
+  var shade = mixRgb(snow, body, 0.32);
+  var ph = r() * TAU, ph2 = r() * TAU, STEP = 3, xs = [], ys = [], ds = [], x;
+  for (x = -20; x <= W + 20; x += STEP) {
+    var h = f(x), y = base - amp * h;
+    var k = clamp((h - (0.8 - WINT.ridgeSnow)) / 0.5, 0, 1);
+    var streak = Math.pow(Math.abs(Math.sin(x * 0.07 + ph)), 3) * 0.9 + 0.35 * Math.sin(x * 0.021 + ph2) + 0.4;
+    xs.push(x); ys.push(y); ds.push(amp * WINT.ridgeSnow * 0.55 * k * Math.max(0.15, streak));
+  }
+  c.save();
+  c.beginPath();
+  c.moveTo(xs[0], ys[0]);
+  for (var i = 1; i < xs.length; i++) c.lineTo(xs[i], ys[i]);
+  for (var j = xs.length - 1; j >= 0; j--) c.lineTo(xs[j], ys[j] + ds[j]);
+  c.closePath();
+  c.fillStyle = rgba(shade);
+  c.fill();
+  c.clip();
+  c.fillStyle = rgba(snow);                                 // faces turned to the light (rising to the right)
+  for (var q = 1; q < xs.length - 1; q++) {
+    if (ys[q + 1] < ys[q - 1] && ds[q] > 0.3) c.fillRect(xs[q] - STEP / 2, ys[q] - 4, STEP + 0.8, ds[q] + 8);
+  }
+  c.restore();
+}
+/* Fuji: a narrow flat summit and concave slopes, with a big snow cap whose
+   lower edge curves down the gullies in rounded tongues. */
+function winFuji(c, hy) {
+  var C = WINT_C, Hf = WINT.fujiHeight * H, fx = WINT.fujiX * W, top = hy - Hf, bh = Hf * WINT.fujiWidth, sh = Hf * 0.1;
+  function py(x) {
+    var dx = Math.abs(x - fx);
+    if (dx <= sh) return top + Hf * 0.008 * Math.sin(dx * 0.35);
+    var u = Math.min(1, (dx - sh) / (bh - sh));
+    return top + Hf * (1 - Math.pow(1 - u, 2.1));
+  }
+  function cone() {
+    c.beginPath(); c.moveTo(fx - bh - 10, hy + 40);
+    for (var x = fx - bh; x <= fx + bh; x += 3) c.lineTo(x, py(x));
+    c.lineTo(fx + bh + 10, hy + 40); c.closePath();
+  }
+  var body = winLight(mixRgb(C.fuji, C.mist, WINT.fujiHaze));
+  cone(); c.fillStyle = rgba(body); c.fill();
+  var snow = winLight(mixRgb(C.fujiSnow, C.mist, WINT.fujiHaze * 0.3));
+  var ys = top + Hf * WINT.fujiSnow;
+  var u = 1 - Math.pow(1 - WINT.fujiSnow, 1 / 2.1), xs = sh + u * (bh - sh);
+  var r = rngFrom(WINT.seed * 977 + 5), n = 11 + Math.floor(r() * 5), pts = [];
+  for (var i = 0; i <= n; i++) {
+    var x = fx + xs * 1.25 - (i / n) * xs * 2.5, mid = 1 - Math.abs(x - fx) / (xs * 1.3);
+    pts.push([x + (r() - 0.5) * xs * 0.08, ys - Hf * 0.03 * r()]);
+    if (i < n) {
+      var gx = x - xs * 1.25 / n * lerp(0.6, 1.4, r()) * 0.7, deep = Math.pow(r(), 1.6);
+      pts.push([gx, ys + Hf * lerp(0.02, 0.16, deep) * 1.4 * WINT.fujiGully * (0.4 + 0.6 * Math.max(0, mid))]);
+    }
+  }
+  function cap() {
+    var j, last = pts.length - 1;
+    c.beginPath(); c.moveTo(fx + xs * 1.3, top - 30); c.lineTo(fx + xs * 1.3, ys); c.lineTo(pts[0][0], pts[0][1]);
+    for (j = 1; j < last; j++) c.quadraticCurveTo(pts[j][0], pts[j][1], (pts[j][0] + pts[j + 1][0]) / 2, (pts[j][1] + pts[j + 1][1]) / 2);
+    c.lineTo(pts[last][0], pts[last][1]);
+    c.lineTo(fx - xs * 1.3, top - 30); c.closePath();
+  }
+  c.save(); cone(); c.clip();
+  cap(); c.fillStyle = rgba(snow); c.fill();
+  // the side away from the light is shaded, blending in across the middle
+  var sg = c.createLinearGradient(fx - xs * 0.15, 0, fx + xs * 0.5, 0);
+  sg.addColorStop(0, rgba(mixRgb(snow, body, 0.3), 0)); sg.addColorStop(1, rgba(mixRgb(snow, body, 0.3), 1));
+  cap(); c.fillStyle = sg; c.fill();
+  c.restore();
+}
+function winBakeScenery() {
+  var C = WINT_C, hy = H * WINT.horizon, mistC = winLight(C.mist);
+  LAND_SR = PR * LAND_SCN_RES;
+  [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
+  var m = LS.MTN.c, s = LS.SCN.c;
+  landBlurInto(m, WINT.mtnBlur * 1.3, function(c) { winFuji(c, hy); });       // the furthest: Fuji
+  var r = rngFrom(WINT.seed * 131 + 17), R = WINT.ridges;
+  for (var i = 0; i < R; i++) {
+    var d = R === 1 ? 0.6 : i / (R - 1);                                   // 0 far … 1 near
+    var top = WINT.mtnHeight * H * lerp(1, 0.5, d);
+    var base = hy - top * 0.6, amp = top * 0.42, f = landRidge(r);
+    var col = d < 0.5 ? mixRgb(C.mtnFar, C.mtnMid, d * 2) : mixRgb(C.mtnMid, C.mtnNear, (d - 0.5) * 2);
+    col = winLight(mixRgb(col, C.mist, WINT.mtnHaze * (1 - d * 0.6)));
+    (function(col, base, amp, f, d) {
+      landBlurInto(m, WINT.mtnBlur * lerp(1.3, 0.7, d), function(c) {
+        c.fillStyle = rgba(col);
+        c.beginPath(); c.moveTo(-20, hy + 40);
+        for (var x = -20; x <= W + 20; x += 6) c.lineTo(x, base - amp * f(x));
+        c.lineTo(W + 20, hy + 40); c.closePath(); c.fill();
+        winRidgeSnow(c, f, base, amp, col, d, r);
+      });
+    })(col, base, amp, f, d);
+    if (WINT.mist > 0) {                                                  // mist rising from the foot of the ridge (霞)
+      var y0 = base - amp * 0.1, y1 = hy + 6;
+      m.setTransform(LAND_SR, 0, 0, LAND_SR, 0, 0);
+      var g = m.createLinearGradient(0, y0, 0, y1);
+      g.addColorStop(0, rgba(mistC, 0));
+      g.addColorStop(0.65, rgba(mistC, WINT.mist * 0.5));
+      g.addColorStop(1, rgba(mistC, WINT.mist * 0.85));
+      m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
+    }
+  }
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.globalAlpha = WINT.mtnStrength;
+  s.drawImage(LS.MTN.cnv, 0, 0);
+  s.globalAlpha = 1;
+  LS.scnTop = Math.max(0, Math.floor(hy - Math.max(WINT.fujiHeight, WINT.mtnHeight) * H - 40));
+  // one soft white blob: the mist drifting along the ridges, and the powder shaken off the branches
+  var mc = LS.MIST.c; LS.MIST.cnv.width = LS.MIST.cnv.height = 128;
+  var rg = mc.createRadialGradient(64, 64, 0, 64, 64, 64);
+  rg.addColorStop(0, rgba(mistC, 1)); rg.addColorStop(0.5, rgba(mistC, 0.55)); rg.addColorStop(1, rgba(mistC, 0));
+  mc.fillStyle = rg; mc.fillRect(0, 0, 128, 128);
+  if (!LS.mist.length) {
+    var r4 = rngFrom(WINT.seed * 17 + 1);
+    for (var b = 0; b < 5; b++) {
+      LS.mist.push({ x: r4() * W * 1.4 - W * 0.2, y: lerp(0.05, 0.45, r4()), w: lerp(0.35, 0.6, r4()), h: lerp(28, 70, r4()),
+                     v: lerp(4, 10, r4()) * (r4() < 0.8 ? 1 : -1) });
+    }
+  }
+}
+
+/* ---------- the snowfield and what stands on it ---------- */
+function winSwellFn(r, u) {
+  var sc = lerp(0.5, 1, u);                     // further swells look shorter (perspective)
+  var L = [lerp(1.3, 2.2, r()) * sc, lerp(0.6, 0.9, r()) * sc];
+  var p = [r() * TAU, r() * TAU];
+  return function(x) {
+    return 0.75 * Math.sin(x / (W * L[0]) * TAU + p[0]) + 0.25 * Math.sin(x / (W * L[1]) * TAU + p[1]);
+  };
+}
+/* Where things stand: [x share, depth 0 far … 1 near, size]. The frosted
+   trees: a cluster left of the middle and a few on the right, in the mist. */
+var WIN_FROST = [[0.25, 0.2, 1], [0.31, 0.12, 0.75], [0.19, 0.28, 0.85], [0.73, 0.22, 0.9],
+                 [0.67, 0.14, 0.7], [0.6, 0.08, 0.6], [0.4, 0.06, 0.55], [0.79, 0.32, 0.8]];
+var WIN_FIRS = [[0, 0.42, 1], [-0.05, 0.36, 0.8], [0.045, 0.48, 0.9], [-0.095, 0.3, 0.65],
+                [0.085, 0.4, 0.7], [-0.13, 0.25, 0.55], [0.12, 0.52, 0.75], [-0.025, 0.55, 0.6]];
+function winPlan(r) {
+  var list = [], i;
+  for (i = 0; i < WINT.frostTrees; i++) {
+    var s = i < WIN_FROST.length ? WIN_FROST[i] : [r(), r() * 0.4, lerp(0.5, 0.9, r())];
+    list.push({ type: 'frost', x: (s[0] + (r() - 0.5) * 0.03) * W, u: s[1], size: s[2] * lerp(0.85, 1.15, r()), seed: Math.floor(r() * 1e9) });
+  }
+  for (i = 0; i < WINT.firs; i++) {
+    var f = WIN_FIRS[i % WIN_FIRS.length];
+    list.push({ type: 'fir', x: (WINT.firX + f[0]) * W, u: f[1], size: f[2] * lerp(0.9, 1.1, r()), seed: Math.floor(r() * 1e9) });
+  }
+  list.push({ type: 'torii', x: WINT.toriiX * W, u: WINT.toriiDepth, size: 1, seed: 1 });
+  var order = { frost: 0, fir: 1, torii: 2 };
+  list.sort(function(a, b) { return a.u - b.u || order[a.type] - order[b.type]; });
+  return list;
+}
+/* A pale, bare, frosted tree in the mist. */
+function winFrostTree(t, B, yBase, u, haze) {
+  var C = WINT_C, r = rngFrom(B.seed), h = H * lerp(0.08, 0.2, u) * B.size * WINT.frostSize;
+  var col = winLight(mixRgb(C.frost, C.mist, Math.min(0.8, haze * 0.6))), hi = winLight(mixRgb(C.snowLit, C.mist, haze));
+  var segs = [];
+  function br(x, y, a, len, w, d) {
+    var ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
+    segs.push([x, y, ex, ey, w]);
+    if (d >= 5) return;
+    var n = d === 0 ? 3 : 2 + (r() < 0.35 ? 1 : 0);
+    for (var i = 0; i < n; i++) {
+      var ca = a + ((n > 1 ? i / (n - 1) : 0.5) - 0.5) * lerp(0.7, 1.1, r()) * (d === 0 ? 1.6 : 1) + (r() - 0.5) * 0.3;
+      ca = lerp(ca, -PI / 2, 0.1);
+      br(ex, ey, ca, len * lerp(0.62, 0.8, r()), Math.max(0.4, w * 0.62), d + 1);
+    }
+  }
+  br(B.x, yBase, -PI / 2 + (r() - 0.5) * 0.12, h * 0.26, Math.max(0.8, h * 0.032), 0);
+  t.lineCap = 'round';
+  t.strokeStyle = rgba(col);
+  for (var i = 0; i < segs.length; i++) {
+    var s = segs[i]; t.lineWidth = s[4]; t.beginPath(); t.moveTo(s[0], s[1]); t.lineTo(s[2], s[3]); t.stroke();
+  }
+  t.strokeStyle = rgba(hi, 0.7);                      // frost along the top of the thicker branches
+  for (i = 0; i < segs.length; i++) {
+    var q = segs[i]; if (q[4] < 1.2) continue;
+    t.lineWidth = q[4] * 0.45; t.beginPath(); t.moveTo(q[0], q[1] - q[4] * 0.3); t.lineTo(q[2], q[3] - q[4] * 0.3); t.stroke();
+  }
+}
+/* A fir laden with snow: tiers of dark needles, each mostly covered by a
+   heavy layer of snow with a scalloped lower edge. */
+function winFir(t, B, yb, u, haze) {
+  var C = WINT_C, r = rngFrom(B.seed), h = H * lerp(0.17, 0.3, u) * B.size * WINT.firSize, x = B.x;
+  var dark = winLight(mixRgb(C.fir, C.mist, haze)), mid = winLight(mixRgb(mixRgb(C.fir, [200, 210, 205], 0.22), C.mist, haze));
+  var snow = winLight(mixRgb(C.snowLit, C.mist, haze * 0.6)), snowSh = winLight(mixRgb(C.snowShade, C.mist, haze));
+  var tiers = 7 + Math.floor(r() * 3), wMax = h * 0.3;
+  t.fillStyle = rgba(dark);                           // a glimpse of trunk
+  t.fillRect(x - h * 0.012, yb - h * 0.08, h * 0.024, h * 0.08);
+  for (var i = 0; i < tiers; i++) {
+    var u0 = i / tiers, u1 = Math.min(1, (i + 1.7) / tiers);
+    var yTop = yb - h + h * 0.92 * u0, yBot = yb - h + h * 0.92 * u1, th = yBot - yTop;
+    var hw = wMax * Math.pow(u1, 0.85) * lerp(0.85, 1.1, r()), sk = (r() - 0.5) * hw * 0.1;
+    var ns = 3 + Math.round(hw / (h * 0.05)), k;
+    // the needles: a drooping skirt with a jagged hem
+    t.fillStyle = rgba(i % 2 ? dark : mixRgb(dark, mid, 0.35));
+    t.beginPath(); t.moveTo(x, yTop);
+    t.quadraticCurveTo(x + hw * 0.45 + sk, yTop + th * 0.45, x + hw + sk, yBot);
+    for (k = 1; k <= ns; k++) t.lineTo(x + hw + sk - 2 * hw * k / ns, yBot - (k % 2 ? th * 0.12 : 0));
+    t.quadraticCurveTo(x - hw * 0.45 + sk, yTop + th * 0.45, x, yTop);
+    t.fill();
+    // the snow on it: the upper part, with a lumpy lower edge
+    var sy = yTop + th * lerp(0.55, 0.72, r()), shw = hw * lerp(0.78, 0.9, r()) * (sy - yTop) / th + hw * 0.12;
+    t.fillStyle = rgba(snow);
+    t.beginPath(); t.moveTo(x, yTop - th * 0.04);
+    t.quadraticCurveTo(x + shw * 0.5 + sk, yTop + (sy - yTop) * 0.4, x + shw + sk, sy);
+    var nl = 2 + Math.round(shw / (h * 0.035));
+    for (k = 0; k < nl; k++) {
+      var xa = x + shw + sk - 2 * shw * k / nl, xb = x + shw + sk - 2 * shw * (k + 1) / nl;
+      t.quadraticCurveTo((xa + xb) / 2, sy + th * lerp(0.08, 0.2, r()), xb, sy + th * lerp(-0.02, 0.04, r()));
+    }
+    t.quadraticCurveTo(x - shw * 0.5 + sk, yTop + (sy - yTop) * 0.4, x, yTop - th * 0.04);
+    t.fill();
+    // shade on the side away from the light
+    var sg = t.createLinearGradient(x - shw, 0, x + shw, 0);
+    sg.addColorStop(0, rgba(snowSh, 0)); sg.addColorStop(0.55, rgba(snowSh, 0.15)); sg.addColorStop(1, rgba(snowSh, 0.6));
+    t.fillStyle = sg; t.fill();
+  }
+  t.fillStyle = rgba(snow);                           // a heap of snow at its foot
+  t.beginPath(); winEllipse(t, x, yb, wMax * 1.05, h * 0.035); t.fill();
+}
+/* The torii: two red pillars leaning in a touch, the tie beam (nuki), the
+   central strut, and the curved top beams with upturned ends, all with
+   snow heaped on top. */
+function winTorii(t, B, yb, u, haze) {
+  var C = WINT_C, Ht = H * WINT.toriiSize, cx = B.x;
+  var red = winLight(mixRgb(C.torii, C.mist, haze)), redSh = winLight(mixRgb(scaleRgb(C.torii, 0.7), C.mist, haze));
+  var dark = winLight(mixRgb(C.toriiDark, C.mist, haze)), snow = winLight(mixRgb(C.snowLit, C.mist, haze * 0.5));
+  var snowSh = winLight(mixRgb(C.snowShade, C.mist, haze));
+  var span = Ht * 0.72, pw = Ht * 0.075, lean = Ht * 0.02;
+  var xL = cx - span / 2, xR = cx + span / 2, yNuki = yb - Ht * 0.7, yKasa = yb - Ht * 0.9;
+  function pillar(x, s) {                             // s: -1 left, +1 right
+    var topX = x - s * lean;
+    t.fillStyle = rgba(red);
+    t.beginPath(); t.moveTo(x - pw * 0.55, yb); t.lineTo(x + pw * 0.55, yb); t.lineTo(topX + pw * 0.45, yKasa); t.lineTo(topX - pw * 0.45, yKasa); t.closePath(); t.fill();
+    t.fillStyle = rgba(redSh, 0.55);                   // the side away from the light
+    t.beginPath(); t.moveTo(x + pw * 0.12, yb); t.lineTo(x + pw * 0.55, yb); t.lineTo(topX + pw * 0.45, yKasa); t.lineTo(topX + pw * 0.08, yKasa); t.closePath(); t.fill();
+    t.fillStyle = rgba(dark);                          // the dark band at the foot
+    t.fillRect(x - pw * 0.6, yb - Ht * 0.07, pw * 1.2, Ht * 0.07);
+  }
+  pillar(xL, -1); pillar(xR, 1);
+  t.fillStyle = rgba(red); t.fillRect(cx - pw * 0.3, yKasa, pw * 0.6, yNuki - yKasa);        // the central strut
+  t.fillStyle = rgba(redSh, 0.5); t.fillRect(cx + pw * 0.05, yKasa, pw * 0.25, yNuki - yKasa);
+  var nT = Ht * 0.05, nx0 = xL - pw * 1.4, nx1 = xR + pw * 1.4;                              // the tie beam
+  t.fillStyle = rgba(red); t.fillRect(nx0, yNuki, nx1 - nx0, nT);
+  t.fillStyle = rgba(redSh, 0.5); t.fillRect(nx0, yNuki + nT * 0.6, nx1 - nx0, nT * 0.4);
+  // the top beams: the lower one (shimaki) and the top one (kasagi) with upturned ends
+  var half = span / 2 + pw * 2.4, kT = Ht * 0.06, sT = Ht * 0.05, lift = Ht * 0.07;
+  function curve(h0, up, y0) {                        // the top edge of a beam, as points
+    var pts = [];
+    for (var i = 0; i <= 24; i++) {
+      var s = i / 24, e = Math.abs(s * 2 - 1);
+      pts.push([cx - h0 + 2 * h0 * s, y0 - up * Math.pow(e, 2.4)]);
+    }
+    return pts;
+  }
+  function beam(pts, th, style) {
+    t.beginPath();
+    for (var i = 0; i < pts.length; i++) i ? t.lineTo(pts[i][0], pts[i][1]) : t.moveTo(pts[i][0], pts[i][1]);
+    for (i = pts.length - 1; i >= 0; i--) {
+      var e = Math.abs(i / (pts.length - 1) * 2 - 1);
+      t.lineTo(pts[i][0], pts[i][1] + th * lerp(1, 0.55, Math.pow(e, 3)));
+    }
+    t.closePath(); t.fillStyle = style; t.fill();
+  }
+  var shim = curve(half * 0.9, lift * 0.4, yKasa - sT), kasa = curve(half, lift, yKasa - sT - kT);
+  beam(shim, sT, rgba(red));
+  beam(kasa, kT, rgba(red));
+  var kg = t.createLinearGradient(0, yKasa - sT - kT, 0, yKasa);   // shade under the top beam
+  kg.addColorStop(0, rgba(redSh, 0)); kg.addColorStop(1, rgba(redSh, 0.6));
+  beam(shim, sT, kg);
+  t.strokeStyle = rgba(dark, 0.7); t.lineWidth = Math.max(0.8, Ht * 0.008);   // a dark line along the top edge
+  t.beginPath(); for (var j = 0; j < kasa.length; j++) j ? t.lineTo(kasa[j][0], kasa[j][1]) : t.moveTo(kasa[j][0], kasa[j][1]); t.stroke();
+  // snow heaped on the top beam and the tie beam
+  var rs = rngFrom(WINT.seed * 41 + 3);
+  function heap(pts, hgt) {
+    if (hgt <= 0) return;
+    var n = pts.length, i, top = [];
+    for (i = 0; i < n; i++) {
+      var s = i / (n - 1), env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, s)), 0.35);
+      top.push([pts[i][0], pts[i][1] - hgt * env * lerp(0.75, 1.15, rs())]);
+    }
+    t.beginPath(); t.moveTo(pts[0][0] - hgt * 0.3, pts[0][1] + hgt * 0.15);
+    for (i = 0; i < n; i++) t.lineTo(top[i][0], top[i][1]);
+    t.lineTo(pts[n - 1][0] + hgt * 0.3, pts[n - 1][1] + hgt * 0.15);
+    for (i = n - 1; i >= 0; i--) t.lineTo(pts[i][0], pts[i][1] + hgt * 0.25);
+    t.closePath();
+    t.fillStyle = rgba(snow); t.fill();
+    var g = t.createLinearGradient(0, pts[Math.floor(n / 2)][1] - hgt, 0, pts[Math.floor(n / 2)][1] + hgt * 0.3);
+    g.addColorStop(0, rgba(snowSh, 0)); g.addColorStop(0.6, rgba(snowSh, 0.1)); g.addColorStop(1, rgba(snowSh, 0.55));
+    t.fillStyle = g; t.fill();
+    t.fillStyle = rgba(snow);                       // drips over the front edge
+    t.beginPath();
+    for (i = 2; i < n - 2; i += 3) if (rs() < 0.5) winEllipse(t, pts[i][0], pts[i][1] + hgt * 0.35, hgt * 0.16, hgt * lerp(0.25, 0.45, rs()));
+    t.fill();
+  }
+  heap(kasa, Ht * 0.055 * WINT.toriiSnow);
+  heap(curve((nx1 - nx0) / 2, 0, yNuki).map(function(p) { return [p[0] + (nx0 + nx1) / 2 - cx, p[1]]; }), Ht * 0.03 * WINT.toriiSnow);
+  t.fillStyle = rgba(snow);                           // snow heaped at the feet of the pillars
+  t.beginPath(); winEllipse(t, xL, yb, pw * 1.5, Ht * 0.02); winEllipse(t, xR, yb, pw * 1.5, Ht * 0.02); t.fill();
+  WS.torii = { x: cx, y: yb, h: Ht };
+}
+/* One swell: lit snow with a faint cool gradient, and one soft, blurred
+   band of shade below the crest, a little deeper where the swell turns
+   away from the light (on the right of each rise). */
+function winSwell(t, k, u, yk, amp, f, haze, depthPx) {
+  var C = WINT_C, litC = winLight(mixRgb(C.snowLit, C.mist, haze)), shC = winLight(mixRgb(C.snowShade, C.mist, haze)), x;
+  function outline() {
+    t.beginPath(); t.moveTo(-10, H + 10);
+    for (x = -10; x <= W + 10; x += 6) t.lineTo(x, yk - amp * f(x));
+    t.lineTo(W + 10, H + 10); t.closePath();
+  }
+  outline();
+  var g = t.createLinearGradient(0, yk - amp, 0, yk + amp + depthPx * 0.18);
+  g.addColorStop(0, rgba(litC)); g.addColorStop(1, rgba(mixRgb(litC, shC, 0.12)));
+  t.fillStyle = g; t.fill();
+  if (WINT.swellShadow <= 0 || !HAS_FILTER) return;
+  var bl = amp * 0.45 + 4, off = amp * 0.12 + bl * 1.1, pts = [];
+  for (x = -60; x <= W + 60; x += 8) {
+    var dn = (f(x - 8) - f(x + 8)) / 16 * W * 0.08;
+    pts.push([x, yk - amp * f(x) + off, (amp * 0.9 + 6 + 8 * u) * clamp(0.6 + dn * 0.8, 0.3, 1.3)]);
+  }
+  t.save();
+  outline(); t.clip();
+  t.filter = 'blur(' + (bl * PR).toFixed(1) + 'px)';
+  t.beginPath(); t.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) t.lineTo(pts[i][0], pts[i][1]);
+  for (i = pts.length - 1; i >= 0; i--) t.lineTo(pts[i][0], pts[i][1] + pts[i][2]);
+  t.closePath();
+  t.fillStyle = rgba(shC, WINT.swellShadow * 0.55); t.fill();
+  t.restore();
+}
+/* At night a warm lamp at the foot of the torii lights the snow around it
+   (yBase: the height of the glow on the canvas it is drawn on). */
+function winGlow(c, yBase) {
+  var n = koyoNight() * WINT.lampGlow;
+  if (n < 0.01) return;
+  var x = WS.torii ? WS.torii.x : W * 0.5, R = W * 0.22;
+  c.save();
+  c.globalCompositeOperation = 'source-atop';
+  var g = c.createRadialGradient(x, yBase, 0, x, yBase, R);
+  g.addColorStop(0, 'rgba(255,184,110,' + (0.45 * n).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,170,96,0)');
+  c.fillStyle = g;
+  c.fillRect(x - R, yBase - R, R * 2, R * 2);
+  c.restore();
+}
+function winBakeGround() {
+  var hy = H * WINT.horizon, r = rngFrom(WINT.seed * 71 + 3), N = Math.max(2, Math.round(WINT.swells));
+  var depthPx = Math.max(1, H - hy);
+  var grdTop = LS.grdTop = Math.max(0, Math.floor(hy - H * 0.75));   // the torii and the firs rise well above the horizon
+  if (!LS.GTMP) LS.GTMP = landCanvas();
+  var gw = Math.round(W * PR), gh = Math.max(1, Math.round((H - grdTop) * PR));
+  LS.GRD.cnv.width = LS.GTMP.cnv.width = gw; LS.GRD.cnv.height = LS.GTMP.cnv.height = gh;
+  var g0 = LS.GRD.c, tg = LS.GTMP.c;
+  WS.sparkles = []; WS.torii = null;
+  var things = winPlan(rngFrom(WINT.seed * 313 + 11)), swells = [], k;
+  for (k = 0; k < N; k++) {
+    var u0 = k / (N - 1);
+    swells.push({ u: u0, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * WINT.swellHeight, f: winSwellFn(r, u0) });
+  }
+  for (k = 0; k < N; k++) {
+    var S0 = swells[k], haze = WINT.groundHaze * Math.pow(1 - S0.u, 2) * 0.9;
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, gw, gh);
+    tg.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+    winSwell(tg, k, S0.u, S0.yk, S0.amp, S0.f, haze, depthPx);
+    for (var b = 0; b < things.length; b++) {
+      var B = things[b];
+      if (Math.round(B.u * (N - 1)) !== k) continue;
+      var yb = S0.yk - S0.amp * S0.f(B.x) + S0.amp * 0.5 + 2, hz = WINT.groundHaze * Math.pow(1 - B.u, 2) * 0.9;
+      if (B.type === 'frost') winFrostTree(tg, B, yb, B.u, hz);
+      else if (B.type === 'fir') winFir(tg, B, yb, B.u, hz);
+      else winTorii(tg, B, yb, B.u, hz * 0.8);
+    }
+    g0.save();
+    g0.setTransform(1, 0, 0, 1, 0, 0);
+    g0.globalAlpha = WINT.groundStrength;
+    var bl = lerp(1.4, 0, S0.u) * PR;                       // further = softer
+    g0.filter = HAS_FILTER && bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
+    g0.drawImage(LS.GTMP.cnv, 0, 0);
+    g0.restore();
+    if (S0.u > 0.25) {                                      // a few points that glint now and then
+      for (var sp = 0, ns = Math.round(WINT.sparkle * 10 * S0.u); sp < ns; sp++) {
+        var sx2 = r() * W;
+        WS.sparkles.push({ x: sx2, y: S0.yk - S0.amp * S0.f(sx2) + lerp(3, 14, r()) * (0.5 + S0.u), ph: r() * TAU, f: lerp(0.4, 1.1, r()), s: lerp(1.5, 3.5, S0.u) });
+      }
+    }
+  }
+  LS.GTMP.cnv.width = LS.GTMP.cnv.height = 1;               // the scratch layer is not needed until the next bake
+  // mist lying low where the snowfield meets the mountains
+  g0.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  var mz = g0.createLinearGradient(0, hy - depthPx * 0.15, 0, hy + depthPx * 0.35), mc = winLight(WINT_C.mist);
+  mz.addColorStop(0, rgba(mc, 0));
+  mz.addColorStop(0.35, rgba(mc, 0.6 * WINT.groundHaze));
+  mz.addColorStop(1, rgba(mc, 0));
+  g0.fillStyle = mz;
+  g0.fillRect(-10, hy - depthPx * 0.15, W + 20, depthPx * 0.5);
+  winGlow(g0, WS.torii ? WS.torii.y : H - depthPx * 0.3);
+}
+function winDrawSparkles(c, t) {
+  var sp = WS.sparkles;
+  if (!sp.length) return;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.strokeStyle = 'rgba(255,255,255,1)';
+  c.fillStyle = 'rgba(255,255,255,1)';
+  c.lineWidth = 0.7;
+  for (var i = 0; i < sp.length; i++) {
+    var S0 = sp[i], a = Math.pow(Math.max(0, Math.sin(t * S0.f + S0.ph)), 12) * Math.min(1, WINT.sparkle * 1.5);
+    if (a < 0.02) continue;
+    c.globalAlpha = a;
+    c.beginPath();
+    c.moveTo(S0.x - S0.s * 1.6, S0.y); c.lineTo(S0.x + S0.s * 1.6, S0.y);
+    c.moveTo(S0.x, S0.y - S0.s * 1.6); c.lineTo(S0.x, S0.y + S0.s * 1.6);
+    c.stroke();
+    c.beginPath(); c.arc(S0.x, S0.y, S0.s * 0.35, 0, TAU); c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
+/* ---------- the snowdrift in front of the text and table ---------- */
+/* Long gentle mounds, a faint cool edge over the content and one soft,
+   blurred band of shade below the top. Flakes land on its surface. */
+function winBakeNear() {
+  var C = WINT_C, nH = WINT.nearHeight, hh = Math.min(GH, Math.ceil(nH * 1.6 + 30));
+  LS.nearH = hh;
+  LS.NEAR.cnv.width = LS.NEART.cnv.width = Math.round(W * PR);
+  LS.NEAR.cnv.height = LS.NEART.cnv.height = Math.max(1, Math.round(hh * PR));
+  var c = LS.NEAR.c, t = LS.NEART.c;
+  t.setTransform(PR, 0, 0, PR, 0, 0);                    // y = hh is the bottom of the screen
+  var r = rngFrom(WINT.seed * 29 + 7), CR = 2, nC = Math.ceil(W * CR) + 4, surf = new Float32Array(nC), x, q;
+  var L = [lerp(420, 700, r()), lerp(180, 300, r())], p = [r() * TAU, r() * TAU];
+  var base = hh - nH * 0.6;
+  for (q = 0; q < nC; q++) {
+    var xx = q / CR, v = 0.65 * Math.sin(xx / L[0] * TAU + p[0]) + 0.35 * Math.sin(xx / L[1] * TAU + p[1]);
+    surf[q] = clamp(base - nH * 0.4 * WINT.nearLumps * v, hh - nH * 1.25, hh - nH * 0.2);
+  }
+  var lit = winLight(C.snowLit), sh = winLight(C.snowShade), deep = winLight(C.snowDeep);
+  function outline() {
+    t.beginPath(); t.moveTo(-10, hh + 10); t.lineTo(-10, surf[0]);
+    for (q = 0; q < nC; q += 4) t.lineTo(q / CR, surf[q]);
+    t.lineTo(W + 10, surf[nC - 1]); t.lineTo(W + 10, hh + 10); t.closePath();
+  }
+  t.save();
+  t.shadowColor = rgba(scaleRgb(deep, 0.7), 0.5 * WINT.nearShadow);
+  t.shadowBlur = WINT.nearShadowSize * PR;
+  t.shadowOffsetY = -0.5 * PR;
+  var g = t.createLinearGradient(0, hh - nH * 1.25, 0, hh);
+  g.addColorStop(0, rgba(lit)); g.addColorStop(1, rgba(mixRgb(lit, sh, WINT.nearShade * 0.3)));
+  outline(); t.fillStyle = g; t.fill();
+  t.restore();
+  if (WINT.nearShade > 0 && HAS_FILTER) {
+    var bl = Math.max(3, nH * 0.22), bottom = [];
+    t.save(); outline(); t.clip();
+    t.filter = 'blur(' + (bl * PR).toFixed(1) + 'px)';
+    t.beginPath();
+    for (x = -20; x <= W + 20; x += 6) {
+      var y = surf[clamp(Math.round(x * CR), 0, nC - 1)] + bl * 1.1;
+      var dn = (surf[clamp(Math.round((x + 6) * CR), 0, nC - 1)] - surf[clamp(Math.round((x - 6) * CR), 0, nC - 1)]) / 12 * 6;
+      if (x === -20) t.moveTo(x, y); else t.lineTo(x, y);
+      bottom.push([x, y + nH * 0.5 * clamp(0.6 + dn, 0.3, 1.3)]);
+    }
+    for (q = bottom.length - 1; q >= 0; q--) t.lineTo(bottom[q][0], bottom[q][1]);
+    t.closePath();
+    t.fillStyle = rgba(sh, WINT.nearShade * 0.6); t.fill();
+    t.restore();
+  }
+  t.setTransform(PR, 0, 0, PR, 0, 0);
+  winGlow(t, hh);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(LS.NEART.cnv, 0, 0);
+  LS.surf = surf; LS.sr = CR; LS.nearTop = H - hh;      // local y + nearTop = screen y
+}
+function winFloorY(x) {
+  var sf = LS.surf;
+  if (!sf) return H - 4;
+  return sf[clamp(Math.round(x * LS.sr), 0, sf.length - 1)] + LS.nearTop + 1.5;
+}
+
+/* ---------- wind: a steady breeze with ripples, and gust fronts ---------- */
+function winWindDir() { return ENV.windPx < -4 ? -1 : 1; }
+function winWind() { return WINT.wind * clamp(0.6 + ENV.windMs / 6, 0.6, 1.6); }
+function winStartGust(dir, k) {
+  WS.gusts.push({ dir: dir, x: dir > 0 ? -200 : W + 200, v: 300 + Math.random() * 120,
+                  str: 0.5 * WINT.gustStrength * (k || 1) * (0.7 + 0.6 * Math.random()), hit: {} });
+}
+function winUpdateField(t) {
+  var FB = 10, cnt = Math.ceil(W / FB) + 2, wk = winWind() * winWindDir(), F = WS.field, G = WS.gusts;
+  for (var i = 0; i < cnt; i++) {
+    var x = i * FB, gs = 0;
+    for (var g = 0; g < G.length; g++) {
+      var d = (G[g].x - x) * G[g].dir;
+      gs += G[g].dir * G[g].str * (d < 0 ? Math.exp(-(d * d) / 8100) : Math.exp(-d / 260));
+    }
+    F[i] = wk * (0.12 + 0.1 * Math.sin(x * 0.0055 - t * 1.25) + 0.05 * Math.sin(x * 0.013 - t * 2.1 + 1.3)) + gs;
+  }
+  F.length = cnt;
+}
+function winFieldAt(x) { var F = WS.field, i = Math.round(x / 10); i = i < 0 ? 0 : i >= F.length ? F.length - 1 : i; return F[i] || 0; }
+function winUpdateGusts(dt) {
+  WS.gustTimer -= dt;
+  if (WS.gustTimer <= 0) {
+    if (WINT.gustStrength > 0) winStartGust((Math.random() < 0.8 ? 1 : -1) * winWindDir());
+    WS.gustTimer = WINT.gustEvery * (0.6 + 0.8 * Math.random());
+  }
+  for (var i = WS.gusts.length - 1; i >= 0; i--) {
+    var g = WS.gusts[i];
+    g.x += g.dir * g.v * dt;
+    for (var ti = 0; ti < WS.branches.length; ti++) {
+      var T = WS.branches[ti], side = T.left ? -1 : 1;
+      if (!g.hit[ti] && (g.x - (T.left ? 0 : W)) * g.dir > 0) {
+        g.hit[ti] = 1;
+        T.gustV += g.dir * g.str * 0.4 * side;
+        for (var s = 0; s < T.springs.length; s++) T.springs[s].v += g.dir * g.str * rnd(0.1, 0.5) * side;
+        for (var q = 0; q < T.groups.length; q++) if (Math.random() < 0.25 * g.str) umeShed(T, q, 0.35);
+      }
+    }
+    if (g.x < -1400 || g.x > W + 1400) WS.gusts.splice(i, 1);
+  }
+  WS.shedTimer -= dt;                                         // now and then a shoot sheds its snow on its own
+  if (WS.shedTimer <= 0) {
+    var T2 = WS.branches[Math.floor(Math.random() * WS.branches.length)];
+    if (T2) umeShed(T2, Math.floor(Math.random() * T2.groups.length), lerp(0.3, 0.6, Math.random()));
+    WS.shedTimer = WINT.shedEvery * (0.4 + 1.2 * Math.random());
+  }
+}
+
+/* ---------- the plum branches hanging in from the top ---------- */
+var UME_S0 = 20;                              // blossom sprites are drawn for a 20px flower and scaled
+function umeBakeBlooms() {
+  var C = WINT_C, RS = 2, red = winLight(C.blossom), deep = winLight(C.blossomDeep), st = winLight(C.stamen);
+  WS.blooms = [];
+  for (var kind = 0; kind < 3; kind++) {
+    for (var v = 0; v < 3; v++) {
+      var side = Math.ceil(UME_S0 * 1.4 * RS), cnv = document.createElement('canvas');
+      cnv.width = cnv.height = side;
+      var c = cnv.getContext('2d'), r = rngFrom(kind * 31 + v * 7 + 5), p;
+      c.setTransform(RS, 0, 0, RS, side / 2, side / 2);
+      if (kind === 0) {                          // open: five round petals and a ring of stamens
+        for (p = 0; p < 5; p++) {
+          var a = -PI / 2 + p * TAU / 5 + (r() - 0.5) * 0.25, pr = UME_S0 * 0.24 * lerp(0.9, 1.1, r());
+          var g = c.createRadialGradient(0, 0, 0, 0, 0, UME_S0 * 0.5);
+          g.addColorStop(0, rgba(deep)); g.addColorStop(0.45, rgba(red)); g.addColorStop(1, rgba(mixRgb(red, [255, 255, 255], 0.14)));
+          c.fillStyle = g; c.beginPath(); c.arc(Math.cos(a) * UME_S0 * 0.24, Math.sin(a) * UME_S0 * 0.24, pr, 0, TAU); c.fill();
+        }
+        c.fillStyle = rgba(scaleRgb(deep, 0.85)); c.beginPath(); c.arc(0, 0, UME_S0 * 0.09, 0, TAU); c.fill();
+        c.fillStyle = rgba(st);
+        for (var q = 0; q < 8; q++) {
+          var aa = q * TAU / 8 + r() * 0.3, d = UME_S0 * lerp(0.12, 0.18, r());
+          c.beginPath(); c.arc(Math.cos(aa) * d, Math.sin(aa) * d, UME_S0 * 0.026, 0, TAU); c.fill();
+        }
+      } else if (kind === 1) {                   // half open: a cup seen from the side
+        c.fillStyle = rgba(red);
+        for (p = 0; p < 3; p++) { c.beginPath(); winEllipse(c, (p - 1) * UME_S0 * 0.14, -UME_S0 * 0.04 + Math.abs(p - 1) * UME_S0 * 0.03, UME_S0 * 0.15, UME_S0 * 0.2); c.fill(); }
+        c.fillStyle = rgba(deep); c.beginPath(); winEllipse(c, 0, UME_S0 * 0.12, UME_S0 * 0.13, UME_S0 * 0.07); c.fill();
+      } else {                                   // a bud
+        c.fillStyle = rgba(deep); c.beginPath(); winEllipse(c, 0, 0, UME_S0 * 0.12, UME_S0 * 0.14); c.fill();
+        c.fillStyle = rgba(mixRgb(red, [255, 255, 255], 0.25), 0.8); c.beginPath(); winEllipse(c, -UME_S0 * 0.03, -UME_S0 * 0.04, UME_S0 * 0.04, UME_S0 * 0.05); c.fill();
+      }
+      WS.blooms.push({ cnv: cnv, half: side / (2 * RS) });
+    }
+  }
+  WS.wood = rgba(winLight(C.branch)); WS.snow = rgba(winLight(C.snowLit)); WS.shade = rgba(winLight(C.snowShade), 0.5);
+  WS.petal = rgba(winLight(C.blossom)); WS.petalDk = rgba(winLight(C.blossomDeep));
+}
+/* idx 0: the main limb coming in from the side; idx 1: a shorter one
+   hanging down from above the top edge, a little further in; idx 2: a
+   small one from the side, lower down. Angles are worked out for the left
+   branch and mirrored for the right one. */
+function umeBuild(left, idx) {
+  var r = rngFrom(WINT.seed * 7919 + (left ? 0 : 101) + idx * 577);
+  function M(a) { return left ? a : PI - a; }
+  var sc = Math.min(W * 0.42, H * 0.62) * WINT.branchSize * [1, 0.62, 0.5][idx];
+  var nodes = [], springs = [], blooms = [], groups = [];
+  function add(parent, abs, len, w, flex, sp, g) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [];
+    for (var i = 0; i < 7; i++) lump.push(lerp(0.7, 1.25, r()));
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, flex: flex, sp: sp === undefined ? -1 : sp, g: g,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0,
+                 snow: WINT.branchSnow * lerp(0.7, 1, r()), lump: lump });
+    groups[g].nodes.push(nodes.length - 1);
+    return nodes.length - 1;
+  }
+  function bloomOn(ni, k) {
+    var n = nodes[ni], cnt = Math.round(lerp(1, 3.5, r()) * WINT.blossoms * (k || 1) * clamp(n.len / (sc * 0.07), 0.5, 2));
+    for (var q = 0; q < cnt; q++) {
+      var kind = r() < 0.62 ? 0 : (r() < 0.55 ? 1 : 2);
+      blooms.push({ node: ni, t: lerp(0.15, 1, r()), off: (r() - 0.5) * Math.max(4, n.w * 2.2), rot: r() * TAU,
+                    size: sc * lerp(0.024, 0.034, r()) * WINT.blossomSize * (kind === 2 ? 0.8 : 1), spr: kind * 3 + Math.floor(r() * 3), kind: kind });
+    }
+  }
+  // the limb: a zigzag reaching in and drooping down
+  groups.push({ sp: -1, nodes: [] });
+  var bx = left ? -sc * 0.04 : W + sc * 0.04, by = WINT.branchTop + lerp(-10, 20, r()), a0 = lerp(0.12, 0.3, r());
+  if (idx === 1) { var ix = W * lerp(0.1, 0.16, r()); bx = left ? ix : W - ix; by = -sc * 0.12; a0 = lerp(0.85, 1.1, r()); }
+  if (idx === 2) { by = WINT.branchTop + lerp(110, 170, r()); a0 = lerp(-0.1, 0.08, r()); }
+  var nM = 7, prev = -1, mains = [], las = [], i;
+  for (i = 0; i < nM; i++) {
+    var la = a0 + 0.075 * WINT.branchDroop * i + (i % 2 ? 1 : -1) * lerp(0.12, 0.28, r());
+    prev = add(prev, M(la), sc * 0.95 / nM * lerp(0.8, 1.2, r()), lerp(sc * 0.05, sc * 0.012, i / (nM - 1)),
+               0.02 + 0.1 * Math.pow(i / nM, 1.3), undefined, 0);
+    mains.push(prev); las.push(la);
+  }
+  // side shoots: straight shoots reaching up (as ume grows) or drooping ones, with twigs
+  for (i = 1; i < nM; i++) {
+    var nb = r() < 0.7 ? 2 : 1;
+    for (var b = 0; b < nb; b++) {
+      var up = r() < 0.55;
+      var la2 = up ? lerp(-1.3, -0.5, r()) : las[i] + lerp(0.4, 1.0, r());
+      var len = sc * lerp(0.12, 0.24, r()) * (1 - i / nM * 0.35);
+      springs.push({ o: 0, v: 0, up: left ? -1 : 1 });
+      var sp = springs.length - 1, g = groups.length;
+      groups.push({ sp: sp, nodes: [] });
+      var segs = 2 + (r() < 0.5 ? 1 : 0), p0 = mains[i];
+      for (var s = 0; s < segs; s++) {
+        var node = add(p0, M(la2), len / segs * lerp(0.8, 1.2, r()), lerp(sc * 0.014, sc * 0.006, s / segs), 0.15 + 0.15 * s, s === 0 ? sp : undefined, g);
+        if (r() < 0.6) {
+          var ta = la2 + (r() < 0.5 ? -1 : 1) * lerp(0.4, 0.8, r());
+          bloomOn(add(node, M(ta), sc * lerp(0.04, 0.08, r()), sc * 0.004, 0.5, undefined, g));
+        }
+        bloomOn(node);
+        p0 = node; la2 += (r() - 0.5) * 0.35;
+      }
+    }
+  }
+  for (i = 3; i < nM; i++) bloomOn(mains[i], 0.6);   // a few on the outer part of the limb too
+  var T = { left: left, bx: bx, by: by, nodes: nodes, springs: springs, blooms: blooms, groups: groups, sc: sc, gust: 0, gustV: 0 };
+  T.endW = nodes.map(function(n, j) {
+    for (var q = j + 1; q < nodes.length; q++) if (nodes[q].p === j) return nodes[q].w / 2;
+    return n.w * 0.3;
+  });
+  umePose(T, 0, 0);
+  return T;
+}
+function umeBuildAll() {
+  WS.branches = []; WS.puffs = []; WS.petals = [];
+  for (var idx = WINT.branchCount - 1; idx >= 0; idx--) {   // the main limbs last, in front
+    WS.branches.push(umeBuild(true, idx));
+    WS.branches.push(umeBuild(false, idx));
+  }
+}
+/* Place every piece from its parent: the wind's sway (thin pieces move
+   most), the whole branch's gust push, and each shoot's own spring. */
+function umePose(T, t, amp) {
+  var ns = T.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i];
+    var sw = (Math.sin(t * n.f + n.ph) * amp + Math.sin(t * 0.37 + n.ph * 0.3) * amp * 0.6 + T.gust) * n.flex;
+    if (n.sp >= 0) sw += T.springs[n.sp].o;
+    var par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+function umeSway(T, t, dt) {
+  var wk = winWind();
+  T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
+  T.gust += T.gustV * dt;
+  if (Math.random() < dt * 0.08 * WINT.swayRandom) T.gustV += (Math.random() - 0.5) * 0.12 * WINT.swayRandom;
+  for (var s = 0; s < T.springs.length; s++) {
+    var B = T.springs[s];
+    B.v += (-9 * B.o - 2.2 * B.v) * dt;
+    B.o += B.v * dt;
+    if (Math.random() < dt * 0.3 * WINT.swayRandom) B.v += (Math.random() - 0.5) * 0.4 * WINT.swayRandom * (0.5 + 0.5 * wk);
+  }
+  umePose(T, t, 0.02 * wk * WINT.sway);
+  var grow = dt * 0.012 * WINT.regrow, ns = T.nodes;           // the snow builds back up while it falls
+  for (var i = 0; i < ns.length; i++) ns[i].snow = Math.min(WINT.branchSnow, ns[i].snow + grow);
+  for (var g = 1; g < T.groups.length; g++) {                   // a hard bounce shakes snow off that shoot
+    if (Math.abs(T.springs[T.groups[g].sp].v) > 0.45 && Math.random() < dt * 3) umeShed(T, g, 0.4);
+  }
+}
+function umeShed(T, gi, frac) {
+  var G = T.groups[gi];
+  if (!G || WINT.shedAmount <= 0) return;
+  var tot = 0, cx = 0, cy = 0, cn = 0;
+  for (var i = 0; i < G.nodes.length; i++) {
+    var n = T.nodes[G.nodes[i]];
+    if (n.snow < 0.1) continue;
+    var d = Math.min(n.snow, n.snow * frac * lerp(0.7, 1.3, Math.random()));
+    n.snow -= d; tot += d;
+    var cnt = Math.round(clamp(n.len / 6, 2, 14) * d * 2 * WINT.shedAmount);
+    for (var q = 0; q < cnt; q++) {
+      var tt = Math.random();
+      WS.puffs.push({ x: lerp(n.sx, n.ex, tt), y: lerp(n.sy, n.ey, tt) - n.w * 0.6, vx: (Math.random() - 0.5) * 24, vy: rnd(-10, 8),
+                      r: rnd(0.8, 2.6), a: rnd(0.7, 1), life: rnd(2.5, 4.5), age: 0, kind: 0 });
+    }
+    cx += (n.sx + n.ex) / 2; cy += (n.sy + n.ey) / 2; cn++;
+  }
+  if (cn && tot > 0.15) {                                       // a soft cloud of powder
+    for (var c = 0, nc = Math.round(1 + tot * WINT.shedAmount); c < nc; c++) {
+      WS.puffs.push({ x: cx / cn + (Math.random() - 0.5) * 30, y: cy / cn, vx: (Math.random() - 0.5) * 12, vy: rnd(10, 25),
+                      r: T.sc * lerp(0.04, 0.08, Math.random()), a: 0.5 * Math.min(1, tot) * WINT.shedAmount, life: rnd(1.6, 2.6), age: 0, kind: 1 });
+    }
+  }
+  if (G.sp >= 0) T.springs[G.sp].v += T.springs[G.sp].up * 0.3 * Math.min(1, tot);   // lighter now: it springs up a little
+}
+function umeUpdatePuffs(dt) {
+  for (var i = WS.puffs.length - 1; i >= 0; i--) {
+    var P = WS.puffs[i];
+    P.age += dt;
+    if (P.age > P.life || P.y > H + 20) { WS.puffs.splice(i, 1); continue; }
+    if (P.kind === 0) {
+      P.vy = Math.min(P.vy + 160 * dt, 85);
+      P.vx += (winFieldAt(P.x) * 90 - P.vx) * (1 - Math.exp(-dt * 1.5));
+    } else {
+      P.vy *= Math.exp(-dt * 1.2); P.r += dt * P.r * 0.5;
+      P.vx += (winFieldAt(P.x) * 60 - P.vx) * (1 - Math.exp(-dt));
+    }
+    P.x += P.vx * dt; P.y += P.vy * dt;
+  }
+}
+function umeBloomPos(T, B) {
+  var n = T.nodes[B.node], dx = n.ex - n.sx, dy = n.ey - n.sy, len = Math.hypot(dx, dy) || 1;
+  return { x: n.sx + dx * B.t - dy / len * B.off, y: n.sy + dy * B.t + dx / len * B.off, rot: B.rot + (n.cur - n.abs) };
+}
+/* Petals: now and then one comes loose from an open blossom and drifts down. */
+function umeUpdatePetals(t, dt) {
+  WS.petalTimer -= dt * WINT.petals;
+  if (WS.petalTimer <= 0 && WS.branches.length) {
+    var T = WS.branches[Math.floor(Math.random() * WS.branches.length)], B = T.blooms[Math.floor(Math.random() * T.blooms.length)];
+    if (B && B.kind === 0) {
+      var p = umeBloomPos(T, B);
+      WS.petals.push({ x: p.x, y: p.y, vx: 0, vy: rnd(14, 24), s: B.size * 0.28, rot: rnd(0, TAU), vr: rnd(-2, 2),
+                       f: rnd(1.5, 3), ph: rnd(0, TAU), sw: rnd(12, 26), at: t });
+    }
+    WS.petalTimer = rnd(1.5, 5);
+  }
+  for (var i = WS.petals.length - 1; i >= 0; i--) {
+    var P = WS.petals[i];
+    P.vx += (winFieldAt(P.x) * 120 - P.vx) * (1 - Math.exp(-dt * 1.2));
+    P.x += (P.vx + Math.sin(t * 0.9 + P.ph) * P.sw) * dt;
+    P.y += P.vy * WINT.fallSpeed * dt;
+    P.rot += P.vr * dt;
+    if (P.y > H + 20 || P.x < -60 || P.x > W + 60) WS.petals.splice(i, 1);
+  }
+}
+/* A branch: solid, tapering, with round joints; the snow along the top of
+   each piece (thinner on steep pieces); then the blossoms. */
+function umeDraw(c, T) {
+  var ns = T.nodes, i, n;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.fillStyle = WS.wood;
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var w0 = n.w / 2, w1 = T.endW[i];
+    var dx = n.ex - n.sx, dy = n.ey - n.sy, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+    c.moveTo(n.sx + px * w0, n.sy + py * w0);
+    c.lineTo(n.ex + px * w1, n.ey + py * w1);
+    c.lineTo(n.ex - px * w1, n.ey - py * w1);
+    c.lineTo(n.sx - px * w0, n.sy - py * w0);
+    c.closePath();
+  }
+  c.fill();
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) { n = ns[i]; c.moveTo(n.ex + T.endW[i], n.ey); c.arc(n.ex, n.ey, T.endW[i], 0, TAU); }
+  c.fill();
+  // the snow: a lumpy mound along the upper side of each piece, and a cool band at its foot
+  var top = new Path2D(), band = new Path2D();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    if (n.snow < 0.03) continue;
+    var ddx = n.ex - n.sx, ddy = n.ey - n.sy, L = Math.hypot(ddx, ddy) || 1, ux = ddx / L, uy = ddy / L;
+    var nx = uy, ny = -ux;
+    if (ny > 0) { nx = -nx; ny = -ny; }                  // the side facing up
+    var hS = (n.w * 0.5 + 1.2 + T.sc * 0.005) * n.snow * Math.pow(Math.abs(ux), 0.8);
+    if (hS < 0.4) continue;
+    var bs = [], ts = [], j;
+    for (j = 0; j <= 6; j++) {
+      var tt = j / 6, wA = lerp(n.w / 2, T.endW[i], tt) * 0.8, env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, tt)), 0.22);
+      var bxp = n.sx + ddx * tt + nx * wA, byp = n.sy + ddy * tt + ny * wA;
+      bs.push([bxp, byp]); ts.push([bxp + nx * hS * env * n.lump[j], byp + ny * hS * env * n.lump[j], env]);
+    }
+    top.moveTo(bs[0][0], bs[0][1]);
+    for (j = 0; j <= 6; j++) top.lineTo(ts[j][0], ts[j][1]);
+    for (j = 6; j >= 0; j--) top.lineTo(bs[j][0], bs[j][1]);
+    top.closePath();
+    band.moveTo(bs[0][0], bs[0][1]);
+    for (j = 0; j <= 6; j++) band.lineTo(bs[j][0] + nx * hS * 0.35 * ts[j][2], bs[j][1] + ny * hS * 0.35 * ts[j][2]);
+    for (j = 6; j >= 0; j--) band.lineTo(bs[j][0], bs[j][1]);
+    band.closePath();
+  }
+  c.fillStyle = WS.snow; c.fill(top);
+  c.fillStyle = WS.shade; c.fill(band);
+  for (i = 0; i < T.blooms.length; i++) {
+    var B = T.blooms[i], p = umeBloomPos(T, B), S0 = WS.blooms[B.spr], k = B.size / UME_S0;
+    var cs = Math.cos(p.rot) * k * PR, sn = Math.sin(p.rot) * k * PR;
+    c.setTransform(cs, sn, -sn, cs, PR * p.x, PR * p.y);
+    c.drawImage(S0.cnv, -S0.half, -S0.half, S0.half * 2, S0.half * 2);
+  }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+}
+
+/* ---------- the falling snow ---------- */
+var WIN_LEVELS = 8, WIN_QMAX = 2.4, WIN_R0 = 10;
+function winBakeFlakes() {
+  var C = WINT_C, core = winLight(C.snowLit), rim = winLight(mixRgb(mixRgb(C.snowShade, [150, 140, 180], 0.4), C.snowLit, 0.3)), RS = 2;
+  WS.flakeSpr = [];
+  for (var i = 0; i < WIN_LEVELS; i++) {
+    var b = i / (WIN_LEVELS - 1) * WIN_QMAX * WIN_R0, pad = b * 2.2 + 2;
+    var side = Math.ceil((WIN_R0 + pad) * 2 * RS), cnv = document.createElement('canvas');
+    cnv.width = cnv.height = side;
+    var c = cnv.getContext('2d');
+    if (HAS_FILTER && b > 0.05) c.filter = 'blur(' + (b * RS * 0.6).toFixed(2) + 'px)';
+    var g = c.createRadialGradient(side / 2, side / 2, 0, side / 2, side / 2, WIN_R0 * RS);
+    g.addColorStop(0, rgba(core, 1)); g.addColorStop(0.65, rgba(mixRgb(core, rim, 0.15), 1)); g.addColorStop(1, rgba(rim, 0.9));
+    c.fillStyle = g;
+    c.beginPath(); c.arc(side / 2, side / 2, WIN_R0 * RS, 0, TAU); c.fill();
+    WS.flakeSpr.push({ cnv: cnv, half: side / (2 * RS) });
+  }
+}
+/* A soft dot: the blur is measured against its size and picks one of the 8 sprites. */
+function winFlake(c, x, y, rad, blurPx) {
+  var lv = Math.round(clamp(blurPx / Math.max(0.3, rad) / WIN_QMAX, 0, 1) * (WIN_LEVELS - 1));
+  var S0 = WS.flakeSpr[lv], h = S0.half * rad / WIN_R0;
+  c.drawImage(S0.cnv, x - h, y - h, h * 2, h * 2);
+}
+function winNearZ() { return 1 - WINT.frontShare; }
+function winMakeFlake(prefill) {
+  var z = Math.pow(Math.random(), 1.15);
+  return { z: z, x: rnd(-0.1, 1.1) * W, y: prefill ? rnd(-0.05, 0.95) * H : rnd(-30, -8),
+           vy: lerp(14, 72, z) * rnd(0.8, 1.2), vx: 0, sw: lerp(4, 22, z) * rnd(0.6, 1.3), sf: rnd(0.5, 1.4), ph: rnd(0, TAU),
+           s: rnd(0.75, 1.25), land: Math.random() < WINT.landShare };
+}
+function winFlakeRad(f) { return lerp(WINT.sizeFar, WINT.sizeNear, Math.pow(f.z, 1.6)) * f.s; }
+function winFlakeBlur(f) { return lerp(WINT.farBlur, WINT.nearBlur, Math.pow(f.z, 0.8)); }
+/* Where a flake falling behind the content meets the snowfield: further
+   back = nearer the horizon. It settles there and fades into it. */
+function winBackY(f) {
+  var hy = H * WINT.horizon;
+  return hy + (H - hy) * (0.08 + 0.8 * clamp(f.z / winNearZ(), 0, 1));
+}
+function winUpdateFlakes(t, dt) {
+  var F = WS.flakes, nz = winNearZ(), wk = winWind() * winWindDir();
+  while (F.length < WINT.flakes) F.push(winMakeFlake(!WS.filled));
+  WS.filled = true;
+  for (var i = 0; i < F.length; i++) {
+    var f = F[i];
+    if (f.fade !== undefined) {
+      f.fade -= dt / 1.2;
+      if (f.fade <= 0) F[i] = winMakeFlake(false);
+      continue;
+    }
+    var depth = 0.35 + 0.65 * f.z;
+    f.vx += ((winFieldAt(f.x) * 130 + 6 * wk) * depth - f.vx) * (1 - Math.exp(-dt * 1.4));
+    f.x += (f.vx + Math.sin(t * f.sf + f.ph) * f.sw * WINT.flakeSway) * dt;
+    f.y += f.vy * WINT.fallSpeed * dt;
+    if (f.z >= nz) {
+      if (f.land && LS.surf && f.y >= winFloorY(f.x)) {          // lands on the snowdrift and melts there
+        WS.landed.push({ x: f.x, y: winFloorY(f.x), r: winFlakeRad(f), b: Math.min(winFlakeBlur(f), 0.6), at: t });
+        if (WS.landed.length > 200) WS.landed.shift();
+        F[i] = winMakeFlake(false);
+        continue;
+      }
+      if (f.y > H + 12) F[i] = winMakeFlake(false);
+    } else if (f.y >= winBackY(f)) f.fade = 1;                  // settled on the snowfield: fades into it
+    if (f.x < -40) f.x += W + 80;
+    else if (f.x > W + 40) f.x -= W + 80;
+  }
+  for (var j = WS.landed.length - 1; j >= 0; j--) if (t - WS.landed[j].at > WINT.meltTime) WS.landed.splice(j, 1);
+  var Bk = WS.bokeh;                                             // the big soft flakes close to the glass
+  while (Bk.length < WINT.bokeh) Bk.push({ x: rnd(0, W), y: Bk.ready ? rnd(-80, -40) : rnd(0, H), r: rnd(14, 30),
+                                          vy: rnd(28, 50), sw: rnd(10, 30), sf: rnd(0.2, 0.5), ph: rnd(0, TAU), a: rnd(0.16, 0.3) });
+  Bk.ready = true;
+  for (var b = 0; b < Bk.length; b++) {
+    var B = Bk[b];
+    B.y += B.vy * WINT.fallSpeed * dt;
+    B.x += (winFieldAt(B.x) * 160 + Math.sin(t * B.sf + B.ph) * B.sw) * dt;
+    if (B.y > H + 40) { B.y = rnd(-80, -40); B.x = rnd(0, W); }
+  }
+}
+function winDrawFlakes(c, from, to) {
+  var F = WS.flakes;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = 0; i < F.length; i++) {
+    var f = F[i];
+    if (f.z < from || f.z >= to) continue;
+    c.globalAlpha = lerp(0.45, 0.95, f.z) * (f.fade === undefined ? 1 : f.fade);
+    winFlake(c, f.x, f.y, winFlakeRad(f), winFlakeBlur(f));
+  }
+  c.globalAlpha = 1;
+}
+
+/* ---------- each frame ---------- */
+function winReset() {
+  WS.bKey = ''; WS.branches = []; WS.puffs = []; WS.petals = []; WS.flakes = []; WS.filled = false;
+  WS.landed = []; WS.bokeh = []; WS.gusts = []; WS.sparkles = [];
+}
+/* The light-dependent sprites (blossoms, flakes), baked with the landscape;
+   the branches themselves only when the screen size changes. */
+function winBakeSprites() {
+  umeBakeBlooms();
+  winBakeFlakes();
+  var key = W + 'x' + H;
+  if (WS.bKey !== key) { WS.bKey = key; umeBuildAll(); }
+}
+function winUpdate(dt, t) {
+  if (!LS.ready || !WS.flakeSpr.length) return;
+  winUpdateGusts(dt);
+  winUpdateField(t);
+  for (var i = 0; i < WS.branches.length; i++) umeSway(WS.branches[i], t, dt);
+  umeUpdatePuffs(dt);
+  umeUpdatePetals(t, dt);
+  winUpdateFlakes(t, dt);
+}
+/* #dynBack, after the landscape: the flakes behind the text and table,
+   then the branches in front of them, the snow they shed and the petals. */
+function winDrawBack(c, t) {
+  if (!LS.ready || !WS.flakeSpr.length) return;
+  winDrawFlakes(c, -1, winNearZ());
+  for (var i = 0; i < WS.branches.length; i++) umeDraw(c, WS.branches[i]);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (i = 0; i < WS.puffs.length; i++) {
+    var P = WS.puffs[i], k = P.age / P.life, a = P.a * (k < 0.15 ? k / 0.15 : 1 - Math.pow((k - 0.15) / 0.85, 1.5));
+    c.globalAlpha = clamp(a, 0, 1);
+    if (P.kind === 1) c.drawImage(LS.MIST.cnv, P.x - P.r, P.y - P.r * 0.7, P.r * 2, P.r * 1.4);
+    else winFlake(c, P.x, P.y, P.r, 0.4);
+  }
+  for (i = 0; i < WS.petals.length; i++) {
+    var Q = WS.petals[i], fl = Math.cos(t * Q.f + Q.ph);
+    c.setTransform(PR, 0, 0, PR, PR * Q.x, PR * Q.y);
+    c.rotate(Q.rot); c.scale(fl, 1);
+    c.globalAlpha = clamp((t - Q.at) / 0.4, 0, 1);
+    c.fillStyle = fl > 0 ? WS.petal : WS.petalDk;
+    c.beginPath(); winEllipse(c, 0, 0, Q.s, Q.s * 0.8); c.fill();
+  }
+  c.globalAlpha = 1;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+}
+/* #dynGround (transform already set for screen coordinates): the flakes
+   lying on the snowdrift, shrinking and fading as they melt. */
+function winDrawLanded(c, t) {
+  if (!WS.flakeSpr.length) return;
+  var mt = WINT.meltTime;
+  for (var i = 0; i < WS.landed.length; i++) {
+    var L = WS.landed[i], k = (t - L.at) / mt;
+    c.globalAlpha = clamp(k < 0.6 ? 1 : 1 - (k - 0.6) / 0.4, 0, 1) * 0.95;
+    c.save(); c.translate(L.x, L.y); c.scale(1, 0.6);
+    winFlake(c, 0, 0, L.r * lerp(1, 0.55, k), L.b);
+    c.restore();
+  }
+  c.globalAlpha = 1;
+}
+/* #dynNear: the nearest flakes and the big soft ones close to the glass. */
+function winDrawNear(c) {
+  if (!LS.ready || !WS.flakeSpr.length) return;
+  winDrawFlakes(c, winNearZ(), 2);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = 0; i < WS.bokeh.length; i++) {
+    var B = WS.bokeh[i];
+    c.globalAlpha = B.a;
+    winFlake(c, B.x, B.y, B.r, B.r * WIN_QMAX);
+  }
+  c.globalAlpha = 1;
 }
 
 /* ============================================================
@@ -12310,8 +13091,9 @@ function dynBegin() {
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
-  dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
+  dragonfly = null; cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false;
+  winReset();
   [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
@@ -12398,8 +13180,9 @@ function dynStep(dt, t, want, skyWant) {
     var k = lookKey();
     if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
+      LS.ready = false; LS.step = 0;           // the other scene's landscape is baked afresh
       if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; }
-      else if (lastScene === 'winter') prefill();
+      else if (lastScene === 'winter') { winReset(); prefill(); }
       tree = null; farTree = null;
       lastScene = ENV.scene;
     }
@@ -12445,7 +13228,7 @@ function dynStep(dt, t, want, skyWant) {
   updateBirds(dt, t);
   updateSpecks(dt, t);
   updateTree(dt, t);
-  updateWinterGround(dt);
+  if (ENV.scene === 'winter') winUpdate(dt, t);
   updateDragonfly(dt, t);
   updateCricket(dt, t);
   if (dynFrontMul < 0.05 && (dragonfly || cricket)) { dragonfly = null; cricket = null; insectsLeaveText(); }
@@ -12468,6 +13251,7 @@ function dynStep(dt, t, want, skyWant) {
   drawSun(ctx, t);
   drawMoon(ctx, t);
   drawLandscape(ctx, dt);
+  if (ENV.scene === 'winter') winDrawSparkles(ctx, t);
   drawCloudShadows(ctx, dt);
   drawRays(ctx, t);
   drawBirds(ctx, t);
@@ -12476,9 +13260,9 @@ function dynStep(dt, t, want, skyWant) {
   for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'far');
-  drawSnowBank(ctx, 'far');
   drawTree(ctx, t);
   drawFog(ctx, dt);
+  if (ENV.scene === 'winter') winDrawBack(ctx, t);
   for (var n = split; n < leaves.length; n++) if (!isFrontLeaf(leaves[n])) drawLeaf(leaves[n], t, false);
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'near');
@@ -12495,19 +13279,22 @@ function dynStep(dt, t, want, skyWant) {
   if (flashA > 0) { ctx.fillStyle = 'rgba(255,255,255,' + flashA.toFixed(3) + ')'; ctx.fillRect(0, 0, W, H); }
   if (dynVeil) dynVeil.style.opacity = (flashA * 0.35 * dynMaster).toFixed(3);
 
-  // ---- ground strip: near snow bank and the leaf pile, above the page content ----
+  // ---- ground strip: the near band and what lies on it, above the page content ----
   drawOffsetY = H - GH;
   ctxG.setTransform(1, 0, 0, 1, 0, 0);
   ctxG.globalAlpha = 1;
   ctxG.clearRect(0, 0, cvGround.width, cvGround.height);
   ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
-  drawSnowBank(ctxG, 'near');
   for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
   drawOffsetY = 0;
   if (ENV.scene === 'autumn') {
     ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
     ctxG.globalAlpha = 1;
     landGlow(ctxG, H);
+    drawNearBand(ctxG);
+  } else if (ENV.scene === 'winter') {
+    ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
+    winDrawLanded(ctxG, t);
     drawNearBand(ctxG);
   }
 
@@ -12528,12 +13315,13 @@ function dynStep(dt, t, want, skyWant) {
     ctxF.clearRect(0, 0, cvFront.width, cvFront.height);
     frontCleared = true;
   }
-  // ---- near canvas: the nearest falling leaves, on the table too ----
+  // ---- near canvas: the nearest falling leaves (or flakes), on the table too ----
   if (dynNearMul > 0.01) {
     ctxN.setTransform(1, 0, 0, 1, 0, 0);
     ctxN.clearRect(0, 0, cvNear.width, cvNear.height);
     ctxN.setTransform(PR, 0, 0, PR, 0, 0);
     for (var nl = 0; nl < leaves.length; nl++) if (isFrontLeaf(leaves[nl])) drawLeaf(leaves[nl], t, false, ctxN);
+    if (ENV.scene === 'winter') winDrawNear(ctxN);
     ctxN.setTransform(PR, 0, 0, PR, 0, 0); ctxN.globalAlpha = 1;
     nearCleared = false;
   } else if (!nearCleared) {
@@ -12587,6 +13375,8 @@ window.addEventListener('pointermove', function(e) {
 window.addEventListener('pointerup', function(e) {
   if (!ptr) return;
   if (ptr.moved < 12 && dynFrontMul >= 0.5) pushAround(e.clientX, e.clientY, 180, 0, -30 * S.tapStrength, 160 * S.tapStrength, 0.7);
+  var sdx = e.clientX - ptr.x0;                   // winter: a sideways swipe sends a gust through the branches and snow
+  if (ENV.scene === 'winter' && Math.abs(sdx) > 50 && Math.abs(sdx) > Math.abs(e.clientY - ptr.y0)) winStartGust(sdx < 0 ? -1 : 1, 1.3);
   ptr = null;
 }, { passive: true });
 window.addEventListener('pointercancel', function() { ptr = null; }, { passive: true });
