@@ -26,7 +26,9 @@
      with snow hanging in from the top corners (they sway at random, shed
      snow and drop the odd petal), and falling snow at every depth, the
      nearest in front of the text and table, landing on a snowdrift
-     along the bottom edge.
+     along the bottom edge. Cross-country skiers stride across the
+     snowfield, each in their own outfit with a fluttering scarf, at
+     different depths, passing behind the nearer trees and the torii.
      Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
@@ -275,6 +277,7 @@
       <button type="button" id="btnSeed">New shapes</button>
       <button type="button" id="btnGust">Gust now</button>
       <button type="button" id="btnShake">Shake the branches</button>
+      <button type="button" id="btnSkier">Send a skier</button>
     </div>
     <div id="labControls"></div>
   </div>
@@ -299,89 +302,102 @@
    ============================================================ */
 var DEFAULTS = {
   seed: 7,
-  timeOfDay: 'day',
-  wind: 1,
-  gustEvery: 9,
-  gustStrength: 1,
-  lampGlow: 0.7,
+  timeOfDay: 'night',
+  wind: 1.85,
+  gustEvery: 6,
+  gustStrength: 1.4,
+  lampGlow: 0.78,
   // mountains
   showMountains: true,
   ridges: 3,
-  horizon: 0.78,
-  mtnHeight: 0.24,
+  horizon: 0.79,
+  mtnHeight: 0.22,
   mtnStrength: 1,
   mtnHaze: 0.35,
-  mtnBlur: 3,
+  mtnBlur: 2.1,
   ridgeSnow: 0.25,
   mist: 0.9,
   mistDrift: 0.7,
-  treeLine: true,
+  treeLine: false,
   // Fuji
   showFuji: true,
-  fujiX: 0.74,
+  fujiX: 0.77,
   fujiHeight: 0.4,
-  fujiWidth: 2.5,
-  fujiSnow: 0.41,
-  fujiGully: 1.95,
-  fujiHaze: 0.21,
+  fujiWidth: 3.25,
+  fujiSnow: 0.42,
+  fujiGully: 0.65,
+  fujiHaze: 0.15,
   // the snowfield
   groundStrength: 1,
-  swells: 5,
-  swellHeight: 0.6,
-  swellShadow: 0.45,
-  groundHaze: 0.6,
-  sparkle: 0.3,
+  swells: 10,
+  swellHeight: 2.45,
+  swellShadow: 0.76,
+  groundHaze: 0.89,
+  sparkle: 0.72,
   // the torii
   torii: true,
-  toriiX: 0.07,
-  toriiDepth: 0.2,
-  toriiSize: 0.16,
+  toriiX: 0.03,
+  toriiDepth: 0.18,
+  toriiSize: 0.2,
   toriiSnow: 1.75,
   // snowy firs
-  firs: 8,
-  firX: 0.93,
+  firs: 2,
+  firX: 0.96,
   firSize: 0.95,
   // frosted trees
-  frostTrees: 12,
-  frostSize: 1.2,
+  frostTrees: 9,
+  frostSize: 1.35,
   berries: false,
   berryAmount: 0.5,
   shrubs: 0,
   // plum branches hanging in from the top
-  branchCount: 2,
+  branchCount: 3,
   leftBranch: true,
   rightBranch: true,
-  branchSize: 0.93,
-  branchDroop: 1,
-  branchTop: 76,
-  blossoms: 0.25,
-  blossomSize: 1,
-  branchSnow: 1,
-  sway: 2.2,
-  swayRandom: 1,
+  branchSize: 0.9,
+  branchDroop: 1.7,
+  branchTop: 73,
+  blossoms: 0.9,
+  blossomSize: 1.05,
+  branchSnow: 1.22,
+  sway: 2.5,
+  swayRandom: 1.7,
   shedEvery: 3,
   shedAmount: 1,
   regrow: 2.35,
-  petals: 1.8,
+  petals: 2.75,
+  // skiers
+  skiers: true,
+  maxSkiers: 5,
+  skiGapMin: 3,
+  skiGapMax: 10,
+  skiSpeed: 1,
+  skiSize: 1,
+  skiFar: 0.1,
+  skiNear: 0.75,
+  skiFarBlur: 2.5,
+  skiNearBlur: 0.2,
+  scarfLength: 1,
+  scarfFlutter: 1,
   // falling snow
-  flakes: 127,
-  sizeFar: 3.4,
-  sizeNear: 6,
-  farBlur: 3,
+  flakes: 334,
+  sizeFar: 0.9,
+  sizeNear: 4.6,
+  farBlur: 5.3,
   nearBlur: 0.3,
-  fallSpeed: 1,
-  flakeSway: 1,
-  frontShare: 0.15,
+  fallSpeed: 0.6,
+  flakeSway: 2.05,
+  frontShare: 0.17,
   landShare: 0.7,
-  meltTime: 6,
-  bokeh: 3,
+  meltTime: 16.5,
+  bokeh: 6,
   // the snowdrift in front of the text and table
   showNear: true,
-  nearHeight: 34,
-  nearLumps: 0.8,
-  nearShade: 0.4,
-  nearShadow: 0.45,
-  nearShadowSize: 5,
+  nearHeight: 53,
+  nearLumps: 0.25,
+  nearShade: 0.3,
+  nearShadow: 1,
+  nearShadowSize: 14,
   scrollTest: true,
   // layout
   hintLift: 60,
@@ -396,7 +412,7 @@ var DEFAULTS = {
     torii: '#D2452B', toriiDark: '#3A2B2B', fir: '#4F5E58', frost: '#A39BA3', berry: '#C8321E'
   }
 };
-var STORE_KEY = 'winterLabValues2';   // new key: the scene changed
+var STORE_KEY = 'winterLabValues3';   // new key: the defaults are the values approved for the app
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var V = clone(DEFAULTS);
 try {
@@ -487,6 +503,20 @@ var GROUPS = [
     { k: 'shedAmount', label: 'Snow in each puff', min: 0, max: 3, step: 0.05 },
     { k: 'regrow', label: 'Snow building back up', min: 0, max: 5, step: 0.05 },
     { k: 'petals', label: 'Falling petals', min: 0, max: 3, step: 0.05 }
+  ]},
+  { title: 'Skiers', ctls: [
+    { k: 'skiers', label: 'Show skiers', type: 'check', re: 'ground' },
+    { k: 'maxSkiers', label: 'Most on screen at once', min: 0, max: 5, step: 1 },
+    { k: 'skiGapMin', label: 'A new skier after at least (seconds)', min: 1, max: 60, step: 0.5 },
+    { k: 'skiGapMax', label: '… and at most (seconds)', min: 1, max: 90, step: 0.5, hint: 'Each starts on its own timer, left to right or right to left.' },
+    { k: 'skiSpeed', label: 'Speed', min: 0.3, max: 2.5, step: 0.05, hint: 'Each skier also has a speed of their own, slower uphill.' },
+    { k: 'skiSize', label: 'Size (× life size next to the torii)', min: 0.5, max: 2, step: 0.05 },
+    { k: 'skiFar', label: 'Furthest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground', hint: 'Skiers further back pass behind the nearer trees and the torii.' },
+    { k: 'skiNear', label: 'Nearest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'skiFarBlur', label: 'Blur of the furthest (px)', min: 0, max: 6, step: 0.1 },
+    { k: 'skiNearBlur', label: 'Blur of the nearest (px)', min: 0, max: 4, step: 0.1 },
+    { k: 'scarfLength', label: 'Scarf length', min: 0.3, max: 2.5, step: 0.05 },
+    { k: 'scarfFlutter', label: 'Scarf flutter', min: 0, max: 3, step: 0.05 }
   ]},
   { title: 'Falling snow', ctls: [
     { k: 'flakes', label: 'Flakes on screen', min: 0, max: 400, step: 1 },
@@ -629,6 +659,7 @@ document.getElementById('btnSeed').addEventListener('click', function () {
 });
 document.getElementById('btnGust').addEventListener('click', function () { startGust(1, 1.3); });
 document.getElementById('btnShake').addEventListener('click', function () { branches.forEach(shakeBranch); });
+document.getElementById('btnSkier').addEventListener('click', function () { spawnSkier(); });
 
 /* ============================================================
    3. COPY VALUES — the fonts and styles the page actually uses (read
@@ -679,6 +710,10 @@ function buildCopyText() {
              ', droop ' + f2(V.branchDroop) + ', in at ' + V.branchTop + 'px, blossoms ' + f2(V.blossoms) + ' (size ' +
              f2(V.blossomSize) + '), snow ' + f2(V.branchSnow) + ', sway ' + f2(V.sway) + ', random bounces ' + f2(V.swayRandom) +
              ', sheds every ' + f2(V.shedEvery) + 's, puff ' + f2(V.shedAmount) + ', regrow ' + f2(V.regrow) + ', petals ' + f2(V.petals));
+  lines.push('Skiers: ' + onOff(V.skiers) + ', up to ' + V.maxSkiers + ' at once, a new one every ' + f2(V.skiGapMin) + '–' +
+             f2(V.skiGapMax) + 's, speed ' + f2(V.skiSpeed) + ', size ' + f2(V.skiSize) + ', depth ' + f2(V.skiFar) + '–' +
+             f2(V.skiNear) + ', blur ' + f2(V.skiFarBlur) + '→' + f2(V.skiNearBlur) + 'px, scarf length ' + f2(V.scarfLength) +
+             ', flutter ' + f2(V.scarfFlutter));
   lines.push('Falling snow: ' + V.flakes + ' flakes, size ' + f2(V.sizeFar) + '–' + f2(V.sizeNear) + 'px, blur ' + f2(V.farBlur) +
              '→' + f2(V.nearBlur) + 'px, speed ' + f2(V.fallSpeed) + ', drift ' + f2(V.flakeSway) + ', ' +
              Math.round(V.frontShare * 100) + '% in front, ' + Math.round(V.landShare * 100) + '% of those land and melt after ' +
@@ -1005,9 +1040,9 @@ function drawFuji(c, C, hy) {
    softer. On it, each at its own depth (so the swells in front hide
    their feet, and further ones are hazier and softer): pale frosted
    trees, a group of snow-laden firs, a red torii with snow on its beams,
-   and snowy shrubs. Baked once into GRD (redone only when a value changes).
+   and snowy shrubs. Baked once in slices by depth (redone only when a value changes).
    ============================================================ */
-var GRD = mk(), GTMP = mk(), grdTop = 0, sparkles = [], toriiSpot = null;
+var GTMP = mk(), sparkles = [], toriiSpot = null;
 function swellFn(r, u) {
   var sc = lerp(0.5, 1, u);                     // further swells look shorter (perspective)
   var L = [lerp(1.3, 2.2, r()) * sc, lerp(0.6, 0.9, r()) * sc];
@@ -1233,60 +1268,94 @@ function drawTorii(t, B, yb, u, haze, C) {
   t.beginPath(); ellipse(t, xL, yb, pw * 1.5, Ht * 0.02); ellipse(t, xR, yb, pw * 1.5, Ht * 0.02); t.fill();
   toriiSpot = { x: cx, y: yb, h: Ht };
 }
+/* The snowfield is baked in slices by depth (SLABS): a new slice starts
+   after every swell a skier may ride on, so the skiers on it can be drawn
+   between the slices, and the nearer swells, with the trees and torii on
+   them, then pass in front. A slice reaches down only as far as the next
+   swell's crest could leave it showing. The mist lying low at the horizon
+   is its own layer (GMIST), drawn over all of them. */
+var SLABS = [], GMIST = mk(), GROUND = { swells: [] };
+function thingTop(B) {
+  if (B.type === 'frost') return B.yb - H * lerp(0.08, 0.2, B.u) * B.size * V.frostSize * 1.1;
+  if (B.type === 'fir') return B.yb - H * lerp(0.17, 0.3, B.u) * B.size * V.firSize * 1.05;
+  if (B.type === 'torii') return B.yb - H * V.toriiSize * (1.2 + 0.06 * V.toriiSnow);
+  return B.yb - H * lerp(0.025, 0.06, B.u) * B.size * 2;
+}
 function bakeGround() {
   var C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), N = Math.max(2, Math.round(V.swells));
-  var depthPx = Math.max(1, H - hy), mistC = C.mist;
-  grdTop = Math.max(0, Math.floor(hy - H * 0.75));   // tall things (the torii, the firs) rise well above the horizon
-  var gw = Math.round(W * PR), gh = Math.max(1, Math.round((H - grdTop) * PR));
-  GRD.cnv.width = GTMP.cnv.width = gw; GRD.cnv.height = GTMP.cnv.height = gh;
-  var g0 = GRD.c;
-  g0.setTransform(1, 0, 0, 1, 0, 0); g0.clearRect(0, 0, gw, gh);
-  sparkles = []; toriiSpot = null;
+  var depthPx = Math.max(1, H - hy), mistC = C.mist, k, b;
+  SLABS = []; sparkles = []; toriiSpot = null; GROUND.swells = [];
+  GMIST.cnv.width = GMIST.cnv.height = 1;
   if (V.groundStrength <= 0) return;
-  var things = planScene(rngFrom(V.seed * 313 + 11)), swells = [];
-  for (var k = 0; k < N; k++) {
-    var u = k / (N - 1);
-    swells.push({ u: u, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u, 1.4)) * V.swellHeight, f: swellFn(r, u) });
-  }
+  var things = planScene(rngFrom(V.seed * 313 + 11)), swells = GROUND.swells;
   for (k = 0; k < N; k++) {
-    var S = swells[k], haze = V.groundHaze * Math.pow(1 - S.u, 2) * 0.9;
-    var tg = GTMP.c;
-    tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, gw, gh);
-    tg.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
-    swellLayer(tg, C, k, S.u, S.yk, S.amp, S.f, haze, depthPx);
-    for (var b = 0; b < things.length; b++) {
-      var B = things[b];
-      if (Math.round(B.u * (N - 1)) !== k) continue;
-      var yb = S.yk - S.amp * S.f(B.x) + S.amp * 0.5 + 2, hz = V.groundHaze * Math.pow(1 - B.u, 2) * 0.9;
-      if (B.type === 'frost') drawFrost(tg, B, yb, B.u, hz, C);
-      else if (B.type === 'fir') drawFir(tg, B, yb, B.u, hz, C);
-      else if (B.type === 'torii') drawTorii(tg, B, yb, B.u, hz * 0.8, C);
-      else drawShrub(tg, B, yb, B.u, hz, C);
+    var u = k / (N - 1);
+    swells.push({ u: u, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u, 1.4)) * V.swellHeight,
+                  f: swellFn(r, u), things: [] });
+  }
+  for (b = 0; b < things.length; b++) {
+    var B = things[b], Sb = swells[Math.round(B.u * (N - 1))];
+    B.yb = Sb.yk - Sb.amp * Sb.f(B.x) + Sb.amp * 0.5 + 2;
+    Sb.things.push(B);
+    if (B.type === 'torii') toriiSpot = { x: B.x, y: B.yb, h: H * V.toriiSize };   // known before baking, for the lamp glow
+  }
+  var lr = V.skiers ? laneRange(N) : [N, -1], groups = [], a0 = 0;
+  for (k = 0; k < N; k++) if (k === N - 1 || (k >= lr[0] && k <= lr[1])) { groups.push([a0, k]); a0 = k + 1; }
+  for (var gi = 0; gi < groups.length; gi++) {
+    var k0 = groups[gi][0], k1 = groups[gi][1], top = Infinity;
+    for (k = k0; k <= k1; k++) {
+      top = Math.min(top, swells[k].yk - swells[k].amp - 8);
+      for (b = 0; b < swells[k].things.length; b++) top = Math.min(top, thingTop(swells[k].things[b]) - 12);
     }
-    g0.save();
-    g0.setTransform(1, 0, 0, 1, 0, 0);
-    g0.globalAlpha = V.groundStrength;
-    var bl = lerp(1.4, 0, S.u) * PR;                           // further = softer
-    g0.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
-    g0.drawImage(GTMP.cnv, 0, 0);
-    g0.restore();
-    if (S.u > 0.25) {                                          // a few points that glint now and then
-      for (var sp = 0, ns = Math.round(V.sparkle * 10 * S.u); sp < ns; sp++) {
-        var sx2 = r() * W;
-        sparkles.push({ x: sx2, y: S.yk - S.amp * S.f(sx2) + lerp(3, 14, r()) * (0.5 + S.u), ph: r() * TAU, f: lerp(0.4, 1.1, r()), s: lerp(1.5, 3.5, S.u) });
+    top = Math.max(0, Math.floor(top));
+    var bottom = k1 < N - 1 ? Math.min(H, Math.ceil(swells[k1 + 1].yk + swells[k1 + 1].amp + 14)) : H;
+    var slab = mk();
+    slab.top = top; slab.kFrom = k0 - 1; slab.kTo = k1;
+    slab.cnv.width = GTMP.cnv.width = Math.round(W * PR);
+    slab.cnv.height = GTMP.cnv.height = Math.max(1, Math.round((bottom - top) * PR));
+    for (k = k0; k <= k1; k++) {
+      var Sw = swells[k], haze = V.groundHaze * Math.pow(1 - Sw.u, 2) * 0.9, tg = GTMP.c;
+      tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, GTMP.cnv.width, GTMP.cnv.height);
+      tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
+      swellLayer(tg, C, k, Sw.u, Sw.yk, Sw.amp, Sw.f, haze, depthPx);
+      for (b = 0; b < Sw.things.length; b++) {
+        var T = Sw.things[b], hz = V.groundHaze * Math.pow(1 - T.u, 2) * 0.9;
+        if (T.type === 'frost') drawFrost(tg, T, T.yb, T.u, hz, C);
+        else if (T.type === 'fir') drawFir(tg, T, T.yb, T.u, hz, C);
+        else if (T.type === 'torii') drawTorii(tg, T, T.yb, T.u, hz * 0.8, C);
+        else drawShrub(tg, T, T.yb, T.u, hz, C);
+      }
+      slab.c.save();
+      slab.c.setTransform(1, 0, 0, 1, 0, 0);
+      slab.c.globalAlpha = V.groundStrength;
+      var bl = lerp(1.4, 0, Sw.u) * PR;                         // further = softer
+      slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
+      slab.c.drawImage(GTMP.cnv, 0, 0);
+      slab.c.restore();
+      if (Sw.u > 0.25) {                                        // a few points that glint now and then
+        for (var sp = 0, ns = Math.round(V.sparkle * 10 * Sw.u); sp < ns; sp++) {
+          var sx2 = r() * W;
+          sparkles.push({ x: sx2, y: Sw.yk - Sw.amp * Sw.f(sx2) + lerp(3, 14, r()) * (0.5 + Sw.u), ph: r() * TAU, f: lerp(0.4, 1.1, r()), s: lerp(1.5, 3.5, Sw.u) });
+        }
       }
     }
+    slab.c.setTransform(PR, 0, 0, PR, 0, -top * PR);
+    groundGlow(slab.c, toriiSpot ? toriiSpot.y : H - depthPx * 0.3);
+    SLABS.push(slab);
   }
+  GTMP.cnv.width = GTMP.cnv.height = 1;                         // the scratch layer is not needed until the next bake
   // mist lying low where the snowfield meets the mountains, as in the picture
-  g0.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
-  var mz = g0.createLinearGradient(0, hy - depthPx * 0.15, 0, hy + depthPx * 0.35);
-  var mc = light(mistC);
+  var my0 = hy - depthPx * 0.15, mh = depthPx * 0.5;
+  GMIST.top = my0;
+  GMIST.cnv.width = Math.round(W * PR); GMIST.cnv.height = Math.max(1, Math.round(mh * PR));
+  var gm = GMIST.c;
+  gm.setTransform(PR, 0, 0, PR, 0, -my0 * PR);
+  var mz = gm.createLinearGradient(0, my0, 0, my0 + mh), mc = light(mistC);
   mz.addColorStop(0, rgb(mc, 0));
-  mz.addColorStop(0.35, rgb(mc, 0.6 * V.groundHaze));
+  mz.addColorStop(0.4, rgb(mc, 0.6 * V.groundHaze));
   mz.addColorStop(1, rgb(mc, 0));
-  g0.fillStyle = mz;
-  g0.fillRect(-10, hy - depthPx * 0.15, W + 20, depthPx * 0.5);
-  groundGlow(g0, toriiSpot ? toriiSpot.y : H - depthPx * 0.3);
+  gm.fillStyle = mz;
+  gm.fillRect(-10, my0, W + 20, mh);
 }
 function swellLayer(t, C, k, u, yk, amp, f, haze, depthPx) {
   var litC = light(mix(C.snowLit, C.mist, haze)), shC = light(mix(C.snowShade, C.mist, haze)), x;
@@ -1348,6 +1417,156 @@ function groundGlow(c, yBase) {
   c.fillStyle = g;
   c.fillRect(x - R, y - R, R * 2, R * 2);
   c.restore();
+}
+
+/* ============================================================
+   7b. SKIERS — cross-country skiers striding across the snowfield, left to
+   right or right to left, on their own timer: a new one every skiGapMin–
+   skiGapMax seconds, up to maxSkiers at once. Each rides one swell (a depth
+   between skiFar and skiNear): further = smaller, hazier and softer, and
+   the nearer swells, with their trees and the torii, pass in front of it
+   (the snowfield is baked in slices by depth, see bakeGround). Every skier
+   looks different (jacket, trousers, hat, scarf, skis) and has a speed of
+   their own, a little slower uphill and faster downhill; the scarf streams
+   out behind and flutters, more in a gust.
+   Each skier is drawn on a small canvas of its own at a resolution that
+   falls with depth and is then scaled up: that is the blur, so no blur
+   filter runs per frame.
+   ============================================================ */
+var skiers = [], skiTimer = 1.5;
+var SKI_JACKETS = ['#C8321E', '#882E47', '#2F4A6B', '#3E5A3A', '#E66826', '#5A4A7A', '#D9A23A', '#1F6F78', '#F2EDE4'];
+var SKI_PANTS = ['#2A2A35', '#3B3F52', '#4A3A3E', '#2F4A6B', '#5B4636', '#3E4A3A'];
+var SKI_HATS = ['#F2EDE4', '#C8321E', '#E66826', '#2F4A6B', '#882E47', '#F2B33A', '#1F6F78'];
+var SKI_SCARVES = ['#D93B3B', '#F2B33A', '#E66826', '#882E47', '#1F6F78', '#F2EDE4', '#7FA35A', '#5A4A7A'];
+var SKI_SKIS = ['#A8212E', '#2F4A6B', '#E6E1D8', '#E66826', '#3B3B44'];
+var SKI_SKIN = ['#EBC7AA', '#DDB091', '#C89878'];
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+/* The swells a skier may ride on (indices into GROUND.swells). */
+function laneRange(N) {
+  var a = Math.round(clamp(V.skiFar, 0, 1) * (N - 1)), b = Math.round(clamp(V.skiNear, 0, 1) * (N - 1));
+  return [Math.min(a, b), Math.max(a, b)];
+}
+/* Where a skier's skis touch the snow on swell S: the same line the trees stand on. */
+function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.5 + 2; }
+function spawnSkier(dir) {
+  var SW = GROUND.swells, N = SW.length;
+  if (!N) return;
+  var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), u = SW[k].u;
+  var h = H * lerp(0.04, 0.09, u) * V.skiSize * rnd(0.9, 1.08);
+  dir = dir || (Math.random() < 0.5 ? 1 : -1);
+  var jacket = pick(SKI_JACKETS), scarf = pick(SKI_SCARVES), hat = pick(SKI_HATS);
+  while (scarf === jacket) scarf = pick(SKI_SCARVES);
+  skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0,
+                ph: rnd(0, TAU), sph: rnd(0, TAU), sf: rnd(0.8, 1.3), stripe: Math.random() < 0.5,
+                col: { jacket: hex(jacket), pants: hex(pick(SKI_PANTS)), hat: hex(hat), pom: hex(pick(SKI_HATS)),
+                       scarf: hex(scarf), skis: hex(pick(SKI_SKIS)), skin: hex(pick(SKI_SKIN)) },
+                cnv: document.createElement('canvas') });
+}
+function updateSkiers(dt) {
+  if (!V.skiers) { skiers = []; return; }
+  skiTimer -= dt;
+  if (skiTimer <= 0) {
+    if (skiers.length < V.maxSkiers) spawnSkier();
+    skiTimer = rnd(Math.min(V.skiGapMin, V.skiGapMax), Math.max(V.skiGapMin, V.skiGapMax));
+  }
+  for (var i = skiers.length - 1; i >= 0; i--) {
+    var K = skiers[i], S = GROUND.swells[K.k];
+    if (!S) { skiers.splice(i, 1); continue; }
+    var down = K.dir * (skiGroundY(S, K.x + 3) - skiGroundY(S, K.x - 3)) / 6;   // > 0: going downhill
+    K.v = K.vb * K.h * V.skiSpeed * clamp(1 + 1.5 * down, 0.55, 1.5);
+    K.x += K.dir * K.v * dt;
+    K.ph += dt * TAU * K.v / (K.h * 1.7);                  // one stride every 1.7 body heights
+    if (K.dir > 0 ? K.x > W + K.h * 1.6 : K.x < -K.h * 1.6) skiers.splice(i, 1);
+  }
+}
+/* One skier on its own small canvas, drawn facing +x and mirrored when
+   going left: skis, the far leg and arm (a little darker), the body, the
+   near leg and arm, the poles, the head and hat, and the scarf. */
+function drawSkier(c, K, t) {
+  var C = cols(), S = GROUND.swells[K.k], h = K.h;
+  if (!S) return;
+  var haze = V.groundHaze * Math.pow(1 - K.u, 2) * 0.9;
+  function col(x, k) { return rgb(light(mix(scale(x, k || 1), C.mist, haze))); }
+  var blur = lerp(V.skiFarBlur, V.skiNearBlur, K.u), res = clamp(PR / (1 + blur * PR * 0.9), 0.12, PR);
+  var bw = h * 3, bh = h * 1.7, ox = h * 1.5, oy = h * 1.35;      // the box, and where the feet are in it
+  var cw = Math.max(1, Math.ceil(bw * res)), ch = Math.max(1, Math.ceil(bh * res));
+  if (K.cnv.width !== cw || K.cnv.height !== ch) { K.cnv.width = cw; K.cnv.height = ch; }
+  var g = K.cnv.getContext('2d');
+  g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch);
+  g.setTransform(res * K.dir, 0, 0, res, ox * res, oy * res);   // local: feet at 0,0, facing +x, up is -y
+  var gy0 = skiGroundY(S, K.x), ms = K.dir * (skiGroundY(S, K.x + 4) - skiGroundY(S, K.x - 4)) / 8;
+  function gY(lx) { return lx * ms; }                              // the snow under local x
+  var p = K.ph, s1 = Math.sin(p), bob = Math.abs(Math.cos(p)) * 0.018 * h;
+  var hip = [0.02 * h, -0.47 * h - bob], lean = 0.4;
+  var sho = [hip[0] + Math.sin(lean) * 0.31 * h, hip[1] - Math.cos(lean) * 0.31 * h];
+  var head = [sho[0] + 0.06 * h, sho[1] - 0.1 * h], hr = 0.068 * h;
+  var fN = 0.24 * h * s1, fF = -fN;                                // near and far foot, sliding back and forth
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  // a soft shadow on the snow
+  g.fillStyle = rgb(light(mix(C.snowShade, C.mist, haze)), 0.35);
+  g.beginPath(); ellipse(g, 0.1 * h, gY(0.1 * h) + 0.015 * h, 0.6 * h, 0.05 * h); g.fill();
+  function ski(fx, k) {
+    var x0 = fx - 0.45 * h, x1 = fx + 0.65 * h;
+    g.strokeStyle = col(K.col.skis, k); g.lineWidth = Math.max(0.6, 0.028 * h);
+    g.beginPath(); g.moveTo(x0, gY(x0)); g.lineTo(x1 - 0.06 * h, gY(x1 - 0.06 * h));
+    g.quadraticCurveTo(x1, gY(x1), x1 + 0.02 * h, gY(x1) - 0.05 * h); g.stroke();
+  }
+  function leg(fx, k) {
+    var fy = gY(fx) - 0.02 * h, kn = [(hip[0] + fx) / 2 + 0.07 * h, (hip[1] + fy) / 2];
+    g.strokeStyle = col(K.col.pants, k); g.lineWidth = 0.075 * h;
+    g.beginPath(); g.moveTo(hip[0], hip[1]); g.lineTo(kn[0], kn[1]); g.lineTo(fx, fy); g.stroke();
+    g.strokeStyle = col([40, 36, 40], k); g.lineWidth = 0.07 * h;                        // the boot
+    g.beginPath(); g.moveTo(fx - 0.02 * h, fy); g.lineTo(fx + 0.06 * h, gY(fx + 0.06 * h) - 0.02 * h); g.stroke();
+  }
+  function arm(sw, k) {                                           // sw: -1 … 1, forward when > 0
+    var hand = [sho[0] + 0.05 * h + 0.26 * h * sw, sho[1] + 0.24 * h - 0.05 * h * sw];
+    var el = [(sho[0] + hand[0]) / 2 - 0.02 * h, (sho[1] + hand[1]) / 2 + 0.04 * h];
+    var tipX = hand[0] - 0.24 * h, tip = [tipX, gY(tipX) - 0.01 * h];
+    g.strokeStyle = col([60, 58, 66], k); g.lineWidth = Math.max(0.5, 0.016 * h);     // the pole
+    g.beginPath(); g.moveTo(hand[0], hand[1] - 0.03 * h); g.lineTo(tip[0], tip[1]); g.stroke();
+    g.strokeStyle = col(K.col.jacket, k); g.lineWidth = 0.06 * h;
+    g.beginPath(); g.moveTo(sho[0], sho[1]); g.lineTo(el[0], el[1]); g.lineTo(hand[0], hand[1]); g.stroke();
+    g.fillStyle = col([50, 44, 48], k); g.beginPath(); g.arc(hand[0], hand[1], 0.03 * h, 0, TAU); g.fill();   // the mitten
+  }
+  ski(fF, 0.82); leg(fF, 0.82); arm(-s1, 0.82);                   // the far side, a little darker
+  g.strokeStyle = col(K.col.jacket); g.lineWidth = 0.15 * h;      // the body
+  g.beginPath(); g.moveTo(hip[0], hip[1]); g.lineTo(sho[0], sho[1]); g.stroke();
+  if (K.stripe) {
+    g.strokeStyle = col(K.col.scarf, 0.95); g.lineWidth = 0.03 * h;
+    g.beginPath(); g.moveTo(lerp(hip[0], sho[0], 0.45) - 0.07 * h, lerp(hip[1], sho[1], 0.45) - 0.02 * h);
+    g.lineTo(lerp(hip[0], sho[0], 0.45) + 0.07 * h, lerp(hip[1], sho[1], 0.45) + 0.02 * h); g.stroke();
+  }
+  ski(fN, 1); leg(fN, 1);
+  // the scarf: two tails streaming out behind, fluttering; the faster or the gustier, the flatter
+  var flow = clamp(K.v / (h * 2), 0.3, 1.5) + clamp(K.dir * fieldAt(K.x) * 3, -0.6, 1.2);
+  var a0 = Math.atan2(0.45, -Math.max(0.15, flow)), neck = [sho[0] + 0.03 * h, sho[1] - 0.02 * h];
+  var segL = 0.055 * h * V.scarfLength, nS = 7, fl = V.scarfFlutter;
+  for (var tail = 0; tail < 2; tail++) {
+    var px = neck[0], py = neck[1] + tail * 0.025 * h, pts = [[px, py]];
+    for (var j = 1; j <= nS; j++) {
+      var a = a0 + tail * 0.12 + Math.sin(t * (7 + 3 * flow) * fl * K.sf - j * 0.8 + K.sph + tail * 1.3) * 0.28 * fl * (j / nS) * (0.5 + 0.5 * flow);
+      px += Math.cos(a) * segL; py += Math.sin(a) * segL; pts.push([px, py]);
+    }
+    g.strokeStyle = col(K.col.scarf, tail ? 0.85 : 1);
+    for (j = 0; j < nS; j++) {
+      g.lineWidth = Math.max(0.5, 0.05 * h * (1 - j / nS * 0.45));
+      g.beginPath(); g.moveTo(pts[j][0], pts[j][1]); g.lineTo(pts[j + 1][0], pts[j + 1][1]); g.stroke();
+    }
+  }
+  arm(s1, 1);                                                     // the near arm, over the body
+  g.fillStyle = col(K.col.scarf); g.beginPath(); ellipse(g, neck[0], neck[1], 0.075 * h, 0.04 * h); g.fill();   // wrapped round the neck
+  g.fillStyle = col(K.col.skin); g.beginPath(); g.arc(head[0], head[1], hr, 0, TAU); g.fill();
+  g.fillStyle = col(K.col.hat);                                   // a knitted hat with a bobble
+  g.beginPath(); g.arc(head[0] - 0.005 * h, head[1] - 0.012 * h, hr * 1.04, PI * 1.02, PI * 2.02); g.fill();
+  g.fillRect(head[0] - hr * 1.08, head[1] - 0.025 * h, hr * 2.1, 0.03 * h);
+  g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.imageSmoothingEnabled = true;
+  c.drawImage(K.cnv, K.x - (K.dir > 0 ? ox : bw - ox), gy0 - oy, bw, bh);
+}
+/* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices). */
+function drawSkiers(c, t, kFrom, kTo) {
+  for (var i = 0; i < skiers.length; i++) if (skiers[i].k > kFrom && skiers[i].k <= kTo) drawSkier(c, skiers[i], t);
 }
 
 /* ============================================================
@@ -1954,6 +2173,7 @@ function frame(now) {
   updatePuffs(dt);
   updatePetals(t, dt);
   updateFlakes(t, dt);
+  updateSkiers(dt);
   var nz = nearZ();
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -1975,9 +2195,16 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
 
-  // The snowfield with the torii, firs, frosted trees and shrubs (baked), and the odd glint.
+  // The snowfield with the torii, firs and frosted trees (baked in slices by
+  // depth), the skiers between the slices, the low mist over them, and the odd glint.
+  for (var si = 0; si < SLABS.length; si++) {
+    var SL = SLABS[si];
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(SL.cnv, 0, Math.round(SL.top * PR));
+    drawSkiers(ctx, t, SL.kFrom, SL.kTo);
+  }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
+  if (GMIST.top !== undefined) ctx.drawImage(GMIST.cnv, 0, Math.round(GMIST.top * PR));
   drawSparkles(ctx, t);
 
   // Flakes behind the text and table, then the plum branches in front of
