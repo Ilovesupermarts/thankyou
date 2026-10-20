@@ -35,6 +35,18 @@ var BUILD = 'v135';
          from the trees (dropKoyoLeaf), more in a gust. Leaf strength
          0.6 far → 0.9 near (was 0.2 → 0.42); density 0.4 (was 1), so
          about 27 leaves are on screen. The winter tree is unchanged.
+       - Autumn landscape, as tuned on landscape.html (values in LAND,
+         section 8c): faint blurred mountains with a Fuji-like peak and
+         mist between the ridges, a strip of ground covered in fallen
+         leaves, and a band of near leaves along the bottom edge that the
+         text and table scroll in behind. Only the nearest leaves (z 0.8+)
+         fall in front of the content, at the band's size, and they land
+         on it (settling flat, with a soft shadow); a gust lifts them, and
+         when there are too many the oldest is blown away. Leaves falling
+         behind the content settle on the far ground and fade into it. The
+         kōyō branches are solid and taper smoothly at the forks. In
+         autumn the swipe hint and dots stay clear of the leaves (dots at
+         least 136px up, hint 184px). The winter scene is unchanged.
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -1118,6 +1130,8 @@ function applyTheme(theme) {
      share this exact lifecycle so a mid-run theme toggle cannot
      leave sound or animation running alone against a sakura
      theme. */
+  // the swipe hint and dots sit higher in autumn (see repositionHintGroup)
+  if (typeof panels !== 'undefined' && panels && typeof stage !== 'undefined' && stage) repositionHintGroup();
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (isCarouselRunning) {
     startAmbient();
@@ -3534,6 +3548,12 @@ function repositionHintGroup() {
   var actualDotsBottomFromStage = stageHeight - (actualDotsTop + totalDotsBlockH);
   var hintBottom = actualDotsBottomFromStage + dotsH + spaceBetween;
   var dotsBottom = actualDotsBottomFromStage;
+  // Autumn: keep them clear of the band of leaves along the bottom edge (the
+  // positions chosen on landscape.html: dots at least 136px up, hint 184px).
+  if (currentTheme === 'autumn') {
+    var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
+    dotsBottom += lift; hintBottom += lift;
+  }
   if (globalHint) globalHint.style.bottom = hintBottom + 'px';
   if (dotsEl) dotsEl.style.bottom = dotsBottom + 'px';
 }
@@ -9124,8 +9144,8 @@ var S = {
   figureSide: 'auto',
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
-  frontLeaves: 8, frontLeafOpacity: 1, frontLeafScale: 1.9, frontLeafMinZ: 0.6, snowFront: 0.25,
-  heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
+  frontLeaves: 8, frontLeafOpacity: 1, frontLeafMinZ: 0.8, snowFront: 0.25,
+  heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60,
   dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
   renderScale: 0.75
 };
@@ -9750,6 +9770,7 @@ function bakeLeaf(L) {
   c2.globalAlpha = 1;
   L.hs = side / (2 * pr);
   L.bakedV = lookVersion;
+  if (L.shd) bakeLeafShadow(L);        // on the ground (or just lifted): its soft shadow, re-made in the new light
 }
 
 /* ============================================================
@@ -9821,7 +9842,7 @@ function makeLeaf(opts) {
     size: SPECIES[species].size * (0.45 + 0.6 * clamp(z, 0, 1)) * S.sizeScale * rnd(0.85, 1.15) * (opts.hero ? 1.3 : 1),
     x: 0, y: 0, vx: 0, vy: 0, rot: rnd(-PI, PI), baseRot: rnd(-0.6, 0.6),
     phi: rnd(0, TAU), sp: rnd(0, TAU), so: 0, age: 0,
-    fallJ: rnd(0.8, 1.2), groundY: rnd(4, 30),
+    fallJ: rnd(0.8, 1.2),
     pj: (Math.random() + Math.random() + Math.random() - 1.5) * 1.4,
     palIdx: Math.floor(Math.random() * 5), bright: rnd(-0.06, 0.06),
     gid: 0, settled: false
@@ -9843,7 +9864,8 @@ function spawnLeaf(opts) {
   // The nearest leaves fall in front of the text (a few at a time).
   if (S.frontLeaves > 0 && L.z >= S.frontLeafMinZ && frontLeafCount < S.frontLeaves) {
     L.front = true; frontLeafCount++;
-    L.size *= S.frontLeafScale;           // nearest to the glass: noticeably bigger than the rest
+    L.size = nearLeafPx() * rnd(0.85, 1.15);   // nearest to the glass: the near band's size (8c)
+    if (L.fam === 'green' || L.fam === 'evergreen') L.fam = 'orange';   // big green leaves stood out this close
   }
   var wp = ENV.windPx;
   if (opts.x !== undefined) { L.x = opts.x; L.y = opts.y; }
@@ -9871,6 +9893,7 @@ function updateLeaf(L, dt, t) {
   var turb = (ENV.windMs * 6 + 8) * (noise1(L.seed % 997 + t * 0.7) * 2 - 1);
   var wx = (ENV.windPx * gustEnv + turb) * (0.35 + 0.65 * zc);
   var tvx = wx + L.modeVx;
+  if (L.blown) tvx = L.blown * 170;              // blown off the ground: carried away on the wind
   L.vx += (tvx - L.vx) * (1 - Math.exp(-dt * 1.6));
   L.sp += L.sf * dt;
   var tvy = T * L.fallMul;
@@ -9888,6 +9911,7 @@ function updateLeaf(L, dt, t) {
     var gt = L.baseRot + L.glideDir * 0.5;
     L.rot += angDiff(gt, L.rot) * (1 - Math.exp(-dt * 2));
   }
+  if (L.blown) tvy = -20;                         // and rising gently, so it leaves the screen
   L.vy += (tvy - L.vy) * (1 - Math.exp(-dt * 2.2));
   L.so += (targetSo - L.so) * (1 - Math.exp(-dt * 4));
   L.phi += L.flipV * dt * (0.5 + 0.5 * S.flip3d);
@@ -9895,24 +9919,35 @@ function updateLeaf(L, dt, t) {
   L.y += L.vy * dt;
 }
 
-function settleLeaf(L) {
-  L.settled = true;
-  L.solid = !!L.front;                    // a leaf that fell in front lands at full strength too
-  L.front = false;
-  L.y = H - L.groundY;
+/* Landing (only the leaves falling in front of the text and table land, on
+   the near band's ground — see 8c). The leaf keeps its turn and settles flat
+   over a moment, from how it was falling to how it lies, and its soft shadow
+   fades in, instead of switching at once. */
+function settleLeaf(L, t) {
+  var f = Math.min(1, S.flip3d), c = Math.cos(L.phi), sx = lerp(1, c, f);
+  if (Math.abs(sx) < 0.06) sx = sx < 0 ? -0.06 : 0.06;
+  L.sx0 = sx;
+  L.sy0 = 1 - 0.18 * f * (0.5 + 0.5 * Math.sin(L.phi * 0.7 + (L.seed % 10)));
+  L.pileFace = c >= 0 || f < 0.05;
+  L.pileSx = sx < 0 ? -1 : 1;
   L.pileSy = rnd(0.45, 0.72);
-  L.pileSx = Math.random() < 0.5 ? -1 : 1;
-  L.pileFace = Math.cos(L.phi) >= 0;
-  pile.push(L);
-  while (pile.length > S.pileMax) pile.shift();
+  L.x += L.so; L.so = 0;
+  L.y0 = L.y; L.st = t; L.liftT = undefined; L.blown = 0;
+  addToFloor(L);
+  bakeLeafShadow(L);
 }
+/* A leaf leaves the ground (a gust, a tap, or blown away): it stays in front
+   of the text and table, and eases from how it lay into its falling shape. */
 function liftFromPile(L, vx, vy) {
   var i = pile.indexOf(L);
   if (i >= 0) pile.splice(i, 1);
   L.settled = false;
+  L.front = true;
   L.vx = vx; L.vy = vy;
-  L.y -= 4;
+  L.liftT = lastT; L.st = undefined; L.fade = undefined;
+  L.land = Math.random() < LAND.landShare; L.gy = rnd(2, LAND.bedDepth);
   setMode(L, 'tumble');
+  L.phi = L.pileFace === false ? PI : 0;          // its flip starts as it lay
   insertSorted(L);
 }
 
@@ -9952,6 +9987,7 @@ function updateGusts(dt) {
       if (g.dir > 0 ? P.x < g.x : P.x > g.x) {
         P.gid = g.id;
         if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
+        else P.kick = g.dir * 0.3 * Math.min(1.5, g.str / 150);   // the rest tremble as it passes
       }
     }
     [tree, farTree].forEach(function(T) {
@@ -10840,24 +10876,42 @@ function rebakeClumps(budget) {
     }
   });
 }
-function strokeKoyoBranches(c, T) {
-  var bark = koyoLight(T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK);
+/* The branches, solid: their soft look comes from mixing the bark toward the
+   paper colour by the strength they used to be laid down at, so nothing (the
+   mountains) shows through the trunk. Each branch tapers from its own
+   thickness to the thickness of the branches that grow from it, with a round
+   joint at the fork, so there are no steps (notches) at the forks. The tapers
+   and the joints are two fills: in one path, where they overlap with opposite
+   winding the canvas would leave a hole. */
+function fillKoyoBranches(c, T, strength) {
+  var bark = T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK;
+  bark = koyoLight(mixRgb(bark, KOYO_PAPER, 1 - strength));
   bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
-  c.strokeStyle = rgba(bark);
-  c.lineCap = 'round';
-  var ns = T.nodes;
-  for (var d = 0; d < T.byDepth.length; d++) {
-    var arr = T.byDepth[d];
-    if (!arr || !arr.length) continue;
-    c.lineWidth = ns[arr[0]].w;
-    c.beginPath();
-    for (var i = 0; i < arr.length; i++) {
-      var n = ns[arr[i]];
-      c.moveTo(koyoX(T, n.sx), n.sy);
-      c.lineTo(koyoX(T, n.ex), n.ey);
-    }
-    c.stroke();
+  c.fillStyle = rgba(bark);
+  var ns = T.nodes, i, n;
+  function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var w0 = n.w / 2, w1 = endW(n);
+    var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
+    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+    c.moveTo(x0 + px * w0, y0 + py * w0);
+    c.lineTo(x1 + px * w1, y1 + py * w1);
+    c.lineTo(x1 - px * w1, y1 - py * w1);
+    c.lineTo(x0 - px * w0, y0 - py * w0);
+    c.closePath();
   }
+  c.fill();
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    if (n.d >= T.maxD) continue;                  // a twig's tip has no fork, so no joint
+    var r = endW(n), ex = koyoX(T, n.ex);
+    c.moveTo(ex + r, n.ey);
+    c.arc(ex, n.ey, r, 0, TAU);
+  }
+  c.fill();
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -10888,40 +10942,37 @@ function koyoGlow(ctx, T, strength) {
 function drawKoyoTrees(ctx, t) {
   if (farTree) {
     koyoGlow(ctx, farTree, 0.6);
-    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
-    ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
-    // The branches go down at full strength on a spare layer first, then that
-    // layer is laid down at branch strength. Stroked straight at half strength,
-    // each piece showed through the next, leaving dark knots at every joint.
+    // The far tree's branches go down solid, at half size and scaled up (soft),
+    // then its foliage on a half-size layer laid down at the far strength.
     ctxT.setTransform(1, 0, 0, 1, 0, 0);
     ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
     ctxT.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
-    strokeKoyoBranches(ctxT, farTree);
-    ctxFar.globalAlpha = KOYO.branchOpacity;
-    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
-    ctxFar.drawImage(treeLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, farLayer.width, farLayer.height);
-    ctxFar.globalAlpha = 1;
-    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
-    drawKoyoClumps(ctxFar, farTree, t);
+    fillKoyoBranches(ctxT, farTree, KOYO.branchOpacity * KOYO.farOpacity);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = KOYO.farOpacity;
+    ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(treeLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
+    ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
+    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    drawKoyoClumps(ctxFar, farTree, t);
+    ctx.globalAlpha = KOYO.farOpacity;
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
   if (tree) {
     koyoGlow(ctx, tree, 1);
-    // branches and foliage on their own layers, each laid down at its own strength
+    // solid branches, then the foliage on its own layer laid down at its strength
     ctxT.setTransform(1, 0, 0, 1, 0, 0);
     ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
     ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-    strokeKoyoBranches(ctxT, tree);
+    fillKoyoBranches(ctxT, tree, KOYO.branchOpacity);
     ctxKL.setTransform(1, 0, 0, 1, 0, 0);
     ctxKL.clearRect(0, 0, koyoLeafLayer.width, koyoLeafLayer.height);
     ctxKL.setTransform(PR, 0, 0, PR, 0, 0);
     drawKoyoClumps(ctxKL, tree, t);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = KOYO.branchOpacity;
+    ctx.globalAlpha = 1;
     ctx.drawImage(treeLayer, 0, 0);
     ctx.globalAlpha = KOYO.nearOpacity;
     ctx.drawImage(koyoLeafLayer, 0, 0);
@@ -11496,6 +11547,530 @@ function drawCricket(ctx, t) {
 }
 
 /* ============================================================
+   8c. AUTUMN LANDSCAPE — as tuned on landscape.html (values in LAND).
+   Autumn theme only; the winter scene is unchanged.
+     #dynBack    faint blurred mountains with a Fuji-like peak and mist
+                 between the ridges (霞), and a strip of ground covered in
+                 fallen leaves, behind the trees. Baked, not drawn per frame.
+     #dynGround  the band of near leaves along the bottom edge, above the
+                 text and table (they scroll in behind it), and on it the
+                 loose leaves and every leaf that lands.
+   Everything is lit by the app's own light (koyoLight / koyoNight) and is
+   baked again when the light changes, at most every LAND_REBAKE seconds and
+   never mid-scroll.
+   ============================================================ */
+var LAND = {
+  seed: 7,
+  // mountains
+  ridges: 3, horizon: 0.86, mtnHeight: 0.2, mtnStrength: 1, mtnHaze: 0.67, mtnBlur: 2.5,
+  mist: 0.82, mistDrift: 0.6, treeLine: true,
+  // the Fuji-like peak
+  fujiX: 0.73, fujiHeight: 0.34, fujiWidth: 2.6, fujiSnow: 0.1,
+  // the ground of fallen leaves
+  groundStrength: 1, carpetDensity: 1.1, carpetSize: 1, leafAge: 0.35, groundHaze: 0.5,
+  // loose leaves lying in front, and how much they tremble
+  bedLeaves: 110, bedDepth: 17, tremble: 1,
+  // the near band in front of the text and table
+  nearHeight: 32, nearDensity: 0.9, nearSize: 1.2, nearShade: 0.15, nearBlur: 0, nearCover: 1,
+  nearShadow: 0.73, nearShadowSize: 4.5,
+  // only leaves this near or nearer fall in front of the text and table, and land
+  nearZ: 0.8, landShare: 0.7
+};
+var LAND_C = (function() {
+  var h = hexToRgb;
+  return { mtnFar: h('#B4B8CC'), mtnMid: h('#9198B2'), mtnNear: h('#737C95'), fujiSnow: h('#F7F3EC'),
+           mist: h('#FBECE0'), treeLine: h('#5F6B48'), soil: h('#4A2A20'), litterBrown: h('#7E4A30'), litterTan: h('#B7814F') };
+})();
+var LAND_REBAKE = 90;                 // seconds between light-driven re-bakes
+var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are baked at 0.6 resolution
+var KOYO_FALL1 = SPECIES.koyo.size * 1.05 * S.sizeScale;   // size of the nearest falling kōyō leaf
+var KOYO_LEAF_LO = koyoOutline(23, 0);  // a lighter maple outline for the thousands of leaves on the ground
+function landCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
+var LS = { ready: false, key: '', at: -1e9, step: 0, grdTop: 0, scnTop: 0, mist: [], bornN: 0, floorBuilt: false,
+           SCN: landCanvas(), MTN: landCanvas(), TMP: landCanvas(), GRD: landCanvas(), MIST: landCanvas(),
+           NEAR: landCanvas(), NEART: landCanvas(), nearH: 0, surf: null, sr: 2, nearTop: 0 };
+
+/* Size of a leaf in front of the text and table (falling on #dynNear or lying
+   on the ground): the near band's scale, so it looks as near as the band. */
+function nearLeafPx() { return KOYO_FALL1 * Math.max(1.25, LAND.nearSize); }
+function landLitter(p) {
+  var st = [LAND_C.soil, LAND_C.litterBrown, LAND_C.litterTan];
+  p = clamp(p, 0, 1) * 2;
+  var i = Math.min(1, Math.floor(p));
+  return mixRgb(st[i], st[i + 1], p - i);
+}
+function landLeafLo(c, size, rot) {
+  var cs = Math.cos(rot) * size, sn = Math.sin(rot) * size, P = KOYO_LEAF_LO;
+  c.beginPath();
+  for (var i = 0; i < P.length; i++) {
+    var px = P[i][0] * cs - P[i][1] * sn, py = P[i][0] * sn + P[i][1] * cs;
+    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+  }
+  c.closePath();
+}
+/* The subtle shadow a leaf lying on top casts on the text and table below it.
+   Canvas shadow offsets are in device pixels, so they are scaled here. */
+function landShadow(c, on) {
+  if (!on || LAND.nearShadow <= 0) { c.shadowColor = 'rgba(0,0,0,0)'; c.shadowBlur = 0; c.shadowOffsetY = 0; return; }
+  c.shadowColor = 'rgba(40,18,12,' + (0.55 * LAND.nearShadow).toFixed(3) + ')';
+  c.shadowBlur = LAND.nearShadowSize * PR;
+  c.shadowOffsetX = 0;
+  c.shadowOffsetY = 1.5 * PR;
+}
+/* At night the lamps under the trees also light the fallen leaves round their roots. */
+function landGlow(c, yBase) {
+  var n = koyoNight() * KOYO.nightGlow;
+  if (n <= 0.01) return;
+  c.globalCompositeOperation = 'source-atop';
+  [tree, farTree].forEach(function(T) {
+    if (!T) return;
+    var R = W * (T.far ? 0.14 : 0.2), a = 0.5 * n * (T.far ? 0.6 : 1);
+    var g = c.createRadialGradient(T.bx, yBase, 0, T.bx, yBase, R);
+    g.addColorStop(0, 'rgba(255,184,110,' + a.toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,170,96,0)');
+    c.fillStyle = g;
+    c.fillRect(T.bx - R, yBase - R, R * 2, R * 2);
+  });
+  c.globalCompositeOperation = 'source-over';
+}
+
+/* ---------- mountains, the Fuji-like peak, mist ---------- */
+var LAND_SR = 1;
+function landBlurInto(dst, blurCss, draw) {
+  var t = LS.TMP.c;
+  t.setTransform(1, 0, 0, 1, 0, 0);
+  t.clearRect(0, 0, LS.TMP.cnv.width, LS.TMP.cnv.height);
+  t.setTransform(LAND_SR, 0, 0, LAND_SR, 0, 0);
+  draw(t);
+  dst.save();
+  dst.setTransform(1, 0, 0, 1, 0, 0);
+  var px = blurCss * LAND_SR;
+  dst.filter = HAS_FILTER && px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
+  dst.drawImage(LS.TMP.cnv, 0, 0);
+  dst.restore();
+}
+/* A ridge line: sharp-peaked waves of four lengths. Returns -1 … 1. */
+function landRidge(r) {
+  var lams = [0.55, 0.23, 0.09, 0.035], amps = [1, 0.5, 0.22, 0.08], waves = [];
+  for (var k = 0; k < 4; k++) waves.push({ f: PI / (W * lams[k] * lerp(0.8, 1.25, r())), p: r() * TAU, a: amps[k] });
+  return function(x) {
+    var s = 0;
+    for (var i = 0; i < 4; i++) { var w = waves[i]; s += w.a * (1 - 2 * Math.abs(Math.sin(x * w.f + w.p))); }
+    return s / 1.8;
+  };
+}
+/* The Fuji-like cone: a narrow flat summit and concave slopes that flatten
+   toward the base, with a snow cap whose lower edge runs down in gullies. */
+function landFuji(c, hy) {
+  var C = LAND_C, Hf = LAND.fujiHeight * H, fx = LAND.fujiX * W, top = hy - Hf, bh = Hf * LAND.fujiWidth, sh = Hf * 0.1;
+  function py(x) {
+    var dx = Math.abs(x - fx);
+    if (dx <= sh) return top + Hf * 0.008 * Math.sin(dx * 0.35);
+    var u = Math.min(1, (dx - sh) / (bh - sh));
+    return top + Hf * (1 - Math.pow(1 - u, 2.1));
+  }
+  function cone() {
+    c.beginPath(); c.moveTo(fx - bh - 10, hy + 40);
+    for (var x = fx - bh; x <= fx + bh; x += 3) c.lineTo(x, py(x));
+    c.lineTo(fx + bh + 10, hy + 40); c.closePath();
+  }
+  var body = koyoLight(mixRgb(C.mtnFar, C.mist, LAND.mtnHaze * 0.8));
+  cone(); c.fillStyle = rgba(body); c.fill();
+  if (LAND.fujiSnow <= 0) return;
+  var snow = koyoLight(mixRgb(C.fujiSnow, C.mist, LAND.mtnHaze * 0.25));
+  var ys = top + Hf * LAND.fujiSnow;
+  var u = 1 - Math.pow(1 - LAND.fujiSnow, 1 / 2.1), xs = sh + u * (bh - sh);
+  var r = rngFrom(LAND.seed * 977 + 5), n = 9 + Math.floor(r() * 4), pts = [];
+  for (var i = 0; i <= n; i++) {
+    var x = fx + xs * 1.25 - (i / n) * xs * 2.5, mid = 1 - Math.abs(x - fx) / (xs * 1.3);
+    pts.push([x, ys - Hf * 0.015 * r()]);
+    if (i < n) pts.push([x - xs * 1.25 / n, ys + Hf * lerp(0.03, 0.13, r()) * (0.4 + 0.6 * Math.max(0, mid))]);
+  }
+  function cap() {
+    c.beginPath(); c.moveTo(fx + xs * 1.3, top - 30); c.lineTo(fx + xs * 1.3, ys);
+    for (var j = 0; j < pts.length; j++) c.lineTo(pts[j][0], pts[j][1]);
+    c.lineTo(fx - xs * 1.3, top - 30); c.closePath();
+  }
+  c.save(); cone(); c.clip();
+  cap(); c.fillStyle = rgba(snow); c.fill();
+  c.beginPath(); c.rect(fx, top - 40, bh, Hf + 80); c.clip();     // the side away from the light, a little shaded
+  cap(); c.fillStyle = rgba(mixRgb(snow, body, 0.22)); c.fill();
+  c.restore();
+}
+function landBakeScenery() {
+  var C = LAND_C, hy = H * LAND.horizon, mistC = koyoLight(C.mist);
+  LAND_SR = PR * LAND_SCN_RES;
+  [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
+  var m = LS.MTN.c, s = LS.SCN.c;
+  landBlurInto(m, LAND.mtnBlur * 1.3, function(c) { landFuji(c, hy); });   // the furthest: palest, softest
+  var r = rngFrom(LAND.seed * 131 + 17), R = LAND.ridges;
+  for (var i = 0; i < R; i++) {
+    var d = R === 1 ? 0.6 : i / (R - 1);                                   // 0 far … 1 near
+    var top = LAND.mtnHeight * H * lerp(1, 0.5, d);
+    var base = hy - top * 0.6, amp = top * 0.42, f = landRidge(r);
+    var col = d < 0.5 ? mixRgb(C.mtnFar, C.mtnMid, d * 2) : mixRgb(C.mtnMid, C.mtnNear, (d - 0.5) * 2);
+    col = koyoLight(mixRgb(col, C.mist, LAND.mtnHaze * (1 - d * 0.6)));
+    (function(col, base, amp, f) {
+      landBlurInto(m, LAND.mtnBlur * lerp(1.3, 0.7, d), function(c) {
+        c.fillStyle = rgba(col);
+        c.beginPath(); c.moveTo(-20, hy + 40);
+        for (var x = -20; x <= W + 20; x += 6) c.lineTo(x, base - amp * f(x));
+        c.lineTo(W + 20, hy + 40); c.closePath(); c.fill();
+      });
+    })(col, base, amp, f);
+    if (LAND.mist > 0) {                                                  // mist rising from the foot of the ridge (霞)
+      var y0 = base - amp * 0.1, y1 = hy + 6;
+      m.setTransform(LAND_SR, 0, 0, LAND_SR, 0, 0);
+      var g = m.createLinearGradient(0, y0, 0, y1);
+      g.addColorStop(0, rgba(mistC, 0));
+      g.addColorStop(0.65, rgba(mistC, LAND.mist * 0.5));
+      g.addColorStop(1, rgba(mistC, LAND.mist * 0.85));
+      m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
+    }
+  }
+  if (LAND.treeLine) {
+    var r2 = rngFrom(LAND.seed * 53 + 9), tl = rgba(koyoLight(mixRgb(C.treeLine, C.mist, 0.3 + LAND.mtnHaze * 0.3)));
+    landBlurInto(m, Math.max(0.6, LAND.mtnBlur * 0.35), function(c) {
+      c.fillStyle = tl;
+      var x = -10;
+      while (x < W + 10) {
+        if (r2() < 0.45) {
+          var run = lerp(30, 170, r2());
+          for (var xx = x; xx < x + run; xx += lerp(4, 9, r2())) {
+            var rr = lerp(2.5, 7, r2());
+            c.beginPath(); c.arc(xx, hy - rr * 0.4 + 3, rr, 0, TAU); c.fill();
+          }
+          x += run;
+        } else x += lerp(40, 220, r2());
+      }
+    });
+  }
+  s.setTransform(1, 0, 0, 1, 0, 0);
+  s.globalAlpha = LAND.mtnStrength;
+  s.drawImage(LS.MTN.cnv, 0, 0);
+  s.globalAlpha = 1;
+  // the top of the highest peak (with room for its blur and the drifting mist):
+  // only the scenery below it is drawn each frame
+  LS.scnTop = Math.max(0, Math.floor(hy - Math.max(LAND.fujiHeight, LAND.mtnHeight) * H - 40));
+  // one soft mist blob, drawn a few times per frame drifting along the ridges
+  var mc = LS.MIST.c; LS.MIST.cnv.width = LS.MIST.cnv.height = 128;
+  var rg = mc.createRadialGradient(64, 64, 0, 64, 64, 64);
+  rg.addColorStop(0, rgba(mistC, 1)); rg.addColorStop(0.5, rgba(mistC, 0.55)); rg.addColorStop(1, rgba(mistC, 0));
+  mc.fillStyle = rg; mc.fillRect(0, 0, 128, 128);
+  if (!LS.mist.length) {
+    var r4 = rngFrom(LAND.seed * 17 + 1);
+    for (var b = 0; b < 5; b++) {
+      LS.mist.push({ x: r4() * W * 1.4 - W * 0.2, y: lerp(0.05, 0.45, r4()), w: lerp(0.35, 0.6, r4()), h: lerp(28, 70, r4()),
+                     v: lerp(4, 10, r4()) * (r4() < 0.8 ? 1 : -1) });
+    }
+  }
+}
+
+/* ---------- the ground of fallen leaves, behind the trees ---------- */
+function landBakeGround() {
+  var C = LAND_C, F = KOYO_FAMILIES, hy = H * LAND.horizon, r = rngFrom(LAND.seed * 71 + 3), ph1 = r() * TAU, ph2 = r() * TAU;
+  var grdTop = LS.grdTop = Math.max(0, Math.floor(hy - 8));
+  LS.GRD.cnv.width = Math.round(W * PR); LS.GRD.cnv.height = Math.max(1, Math.round((H - grdTop) * PR));
+  var c = LS.GRD.c;
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  c.save();
+  c.globalAlpha = LAND.groundStrength;
+  c.beginPath(); c.moveTo(-10, H + 10);                                    // a gently uneven edge at the horizon
+  for (var x = -10; x <= W + 10; x += 8) c.lineTo(x, hy + 2 * Math.sin(x * 0.004 + ph1) + 1.5 * Math.sin(x * 0.013 + ph2));
+  c.lineTo(W + 10, H + 10); c.closePath(); c.clip();
+  var g = c.createLinearGradient(0, hy, 0, H), warm = F.red[0];          // leaf-litter base, hazy at the horizon
+  g.addColorStop(0, rgba(koyoLight(mixRgb(mixRgb(landLitter(0.7), warm, 0.25), C.mist, LAND.groundHaze * 0.75))));
+  g.addColorStop(0.35, rgba(koyoLight(mixRgb(mixRgb(landLitter(0.45), warm, 0.3), C.mist, LAND.groundHaze * 0.3))));
+  g.addColorStop(1, rgba(koyoLight(mixRgb(landLitter(0.2), warm, 0.35))));
+  c.fillStyle = g;
+  c.fillRect(-10, hy - 10, W + 20, H - hy + 20);
+  var depthPx = Math.max(1, H - hy), n = Math.round(W * depthPx / 16 * LAND.carpetDensity), list = [];
+  for (var i = 0; i < n; i++) {                                            // the carpet, far rows first
+    var u = r(), fam = koyoFamily(r);
+    if (fam === 'evergreen') fam = 'red';                                  // evergreens don't shed onto the ground
+    var tones = F[fam], tone = mixRgb(tones[0], tones[2], r());
+    if (r() < LAND.leafAge) tone = mixRgb(tone, landLitter(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
+    tone = scaleRgb(tone, lerp(0.74, 1.05, r()));                          // some lie in shade
+    tone = mixRgb(tone, C.mist, LAND.groundHaze * Math.pow(1 - u, 2) * 0.8);
+    list.push({ x: r() * (W + 40) - 20, y: hy + 2 + (depthPx - 2) * u,
+                s: lerp(4.5, 18, Math.pow(u, 1.2)) * LAND.carpetSize * lerp(0.75, 1.25, r()),
+                rot: r() * TAU, sy: lerp(0.35, 0.6, r()) * lerp(0.6, 1, u), col: rgba(koyoLight(tone)) });
+  }
+  list.sort(function(a, b) { return a.y - b.y; });
+  for (var j = 0; j < list.length; j++) {
+    var L = list[j];
+    c.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
+    landLeafLo(c, L.s, L.rot);
+    c.fillStyle = L.col;
+    c.fill();
+  }
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);                          // haze where it meets the mountains
+  var mz = c.createLinearGradient(0, hy - 2, 0, hy + depthPx * 0.45), mistC = koyoLight(C.mist);
+  mz.addColorStop(0, rgba(mistC, 0.85 * LAND.groundHaze));
+  mz.addColorStop(1, rgba(mistC, 0));
+  c.globalAlpha = 1;
+  c.fillStyle = mz;
+  c.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  c.restore();
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  landGlow(c, H - depthPx * 0.3);
+}
+
+/* ---------- the near band, above the text and table ----------
+   Big, slightly darker maple leaves with a subtle shadow, lying on ground
+   shaped like a real heap:
+    1. G: the topmost edge of the big leaves in each column (a hair inside),
+       never lower than the band's base line.
+    2. G spread into gentle curved mounds, so a high leaf rests on a heap that
+       slopes away on both sides, never on a straight-sided column.
+    3. Solid ground below that, softened a touch, packed with small leaves.
+    4. A continuous row of overlapping leaves along its edge, sunk in so the
+       edge is always behind them, then the big leaves on top.
+   So every visible edge is a leaf outline and every leaf has ground under it:
+   no straight edges and no pockets of text between the leaves. */
+function landBakeNear() {
+  var nH = LAND.nearHeight, hh = Math.min(GH, Math.ceil(nH * 1.6 + 30));
+  LS.nearH = hh;
+  LS.NEAR.cnv.width = LS.NEART.cnv.width = Math.round(W * PR);
+  LS.NEAR.cnv.height = LS.NEART.cnv.height = Math.max(1, Math.round(hh * PR));
+  var c = LS.NEAR.c, t = LS.NEART.c, F = KOYO_FAMILIES, r = rngFrom(LAND.seed * 29 + 7), q, x;
+  t.setTransform(PR, 0, 0, PR, 0, 0);                                      // y = hh is the bottom of the screen
+  var base = koyoLight(scaleRgb(mixRgb(landLitter(0.2), F.red[0], 0.35), 1 - LAND.nearShade * 0.5));
+  function famNear() { var fm = koyoFamily(r); return fm === 'evergreen' || fm === 'green' ? 'orange' : fm; }   // big green leaves stood out this close
+  function shaded(k0, k1) {
+    var ft = F[famNear()], fc = mixRgb(ft[0], ft[1], r());
+    if (r() < LAND.leafAge) fc = mixRgb(fc, landLitter(0.2 + r() * 0.6), 0.6);
+    return rgba(koyoLight(scaleRgb(fc, lerp(k0, k1, r()) * (1 - LAND.nearShade * 0.5))));
+  }
+  var size0 = KOYO_FALL1 * LAND.nearSize, list = [];
+  var n = Math.round(W * nH / (size0 * size0 * 0.2) * 1.4 * LAND.nearDensity);
+  for (var i = 0; i < n; i++) {
+    var u = Math.pow(r(), 1.5), y = hh + 4 - nH * u;                      // more toward the bottom, few at the top edge
+    var tones = F[famNear()], tone = mixRgb(tones[0], tones[2], r());
+    if (r() < LAND.leafAge) tone = mixRgb(tone, landLitter(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
+    tone = scaleRgb(tone, lerp(0.8, 1.05, r()) * (1 - LAND.nearShade * lerp(1, 0.6, u)));
+    list.push({ x: r() * (W + 60) - 30, y: y, s: size0 * lerp(1.15, 0.8, u) * lerp(0.8, 1.2, r()),
+                sy: lerp(0.55, 0.85, r()), rot: r() * TAU, col: rgba(koyoLight(tone)) });
+  }
+  list.sort(function(a, b) { return a.y - b.y; });                      // lower = nearer, drawn on top
+  var CR = 2, nC = Math.ceil(W * CR) + 4, baseY = hh - nH * 0.3, P = KOYO_CLUMP_LEAF;
+  var G = new Float32Array(nC), cov = new Float32Array(nC);
+  for (q = 0; q < nC; q++) G[q] = baseY;
+  for (q = 0; q < list.length; q++) {                                    // 1. walk each big leaf's outline
+    var A = list[q], cs = Math.cos(A.rot) * A.s * 0.97, sn = Math.sin(A.rot) * A.s * 0.97, px0 = 0, py0 = 0;
+    for (var m = 0; m < P.length; m++) {
+      var px1 = (A.x + P[m][0] * cs - P[m][1] * sn) * CR, py1 = A.y + (P[m][0] * sn + P[m][1] * cs) * A.sy;
+      if (m > 0) {
+        var xa = Math.min(px0, px1), xb = Math.max(px0, px1), span = px1 - px0;
+        for (x = Math.max(0, Math.ceil(xa)); x <= Math.min(nC - 1, Math.floor(xb)); x++) {
+          var yv = span === 0 ? Math.min(py0, py1) : py0 + (py1 - py0) * (x - px0) / span;
+          if (yv < G[x]) G[x] = yv;
+        }
+      }
+      px0 = px1; py0 = py1;
+    }
+  }
+  var es0 = size0 * 0.7, kc = 0.8 / es0, Rw = Math.ceil(Math.sqrt((nH * 1.5) / kc) * CR);   // 2. mounds
+  for (x = 0; x < nC; x++) {
+    var best = G[x];
+    for (var d = 1; d <= Rw; d++) {
+      var dd = d / CR, add = kc * dd * dd;
+      if (x - d >= 0 && G[x - d] + add < best) best = G[x - d] + add;
+      if (x + d < nC && G[x + d] + add < best) best = G[x + d] + add;
+    }
+    cov[x] = best;
+  }
+  function covAt(xx) { return cov[Math.max(0, Math.min(nC - 1, Math.round(xx * CR)))]; }
+  function covMax(x0, x1) {
+    var mm = -Infinity;
+    for (var k = Math.max(0, Math.floor(x0 * CR)); k <= Math.min(nC - 1, Math.ceil(x1 * CR)); k++) if (cov[k] > mm) mm = cov[k];
+    return mm;
+  }
+  t.save();                                                              // 3. the ground, softened a touch
+  t.globalAlpha = LAND.nearCover;
+  if (HAS_FILTER) t.filter = 'blur(' + (1.2 * PR).toFixed(2) + 'px)';
+  t.fillStyle = rgba(base);
+  t.beginPath();
+  t.moveTo(-10, hh + 30);
+  t.lineTo(-10, cov[0] + es0 * 0.08);
+  for (x = 0; x < nC; x++) t.lineTo(x / CR, cov[x] + es0 * 0.08);
+  t.lineTo(W + 10, cov[nC - 1] + es0 * 0.08);
+  t.lineTo(W + 10, hh + 30);
+  t.closePath();
+  t.fill();
+  t.restore();
+  var fs = size0 * 0.47, nf = Math.round(W * nH / (fs * fs * 0.25) * 1.2);   // small leaves in shade, kept inside it
+  for (q = 0; q < nf; q++) {
+    var fx = r() * (W + 40) - 20, fsz = fs * lerp(0.75, 1.3, r()), fsy = lerp(0.5, 0.8, r());
+    var top0 = covMax(fx - fsz * 0.5, fx + fsz * 0.5) + fsz * 0.5 * fsy + es0 * 0.15;
+    if (top0 > hh + 4) continue;
+    t.setTransform(PR, 0, 0, PR * fsy, fx * PR, lerp(top0, hh + 4, r()) * PR);
+    landLeafLo(t, fsz, r() * TAU);
+    t.fillStyle = shaded(0.6, 0.8);
+    t.fill();
+  }
+  landShadow(t, true);                                                   // 4. the row along the edge, then the big leaves
+  for (x = -es0; x < W + es0; x += es0 * 0.25) {
+    var ex = x + (r() - 0.5) * es0 * 0.1, esz = es0 * lerp(0.85, 1.15, r()), esy = lerp(0.55, 0.8, r());
+    t.setTransform(PR, 0, 0, PR * esy, ex * PR, (covAt(ex) + esz * esy * 0.4) * PR);
+    koyoLeafPath(t, 0, 0, esz, r() * TAU);
+    t.fillStyle = shaded(0.68, 0.9);
+    t.fill();
+  }
+  for (var j = 0; j < list.length; j++) {
+    var L = list[j];
+    t.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, L.y * PR);
+    koyoLeafPath(t, 0, 0, L.s, L.rot);
+    t.fillStyle = L.col;
+    t.fill();
+  }
+  landShadow(t, false);
+  t.setTransform(PR, 0, 0, PR, 0, 0);
+  landGlow(t, hh);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (HAS_FILTER && LAND.nearBlur > 0.05) c.filter = 'blur(' + (LAND.nearBlur * PR).toFixed(2) + 'px)';
+  c.drawImage(LS.NEART.cnv, 0, 0);
+  if (HAS_FILTER) c.filter = 'none';
+  LS.surf = cov; LS.sr = CR; LS.nearTop = H - hh;                         // local y + nearTop = screen y
+}
+
+/* ---------- leaves on the ground ---------- */
+/* Where a leaf lying in front rests: on the near band's ground, at the lowest
+   ground edge under most of its width (so there is ground under the whole
+   leaf), sunk in a little. */
+function floorY(x, gy) {
+  var sf = LS.surf, y = H - 6;
+  if (sf) {
+    y = -Infinity;
+    var hw = nearLeafPx() * 0.4;
+    for (var i = Math.max(0, Math.round((x - hw) * LS.sr)); i <= Math.min(sf.length - 1, Math.round((x + hw) * LS.sr)); i++) if (sf[i] > y) y = sf[i];
+    y += LS.nearTop;
+  }
+  return y + nearLeafPx() * 0.15 + gy * 0.35;
+}
+/* Where a leaf falling behind the content meets the far ground: further back =
+   nearer the horizon. It settles there and fades into the carpet. */
+function backGroundY(L) {
+  var hy = H * LAND.horizon;
+  return hy + (H - hy) * (0.1 + 0.75 * clamp(L.z / LAND.nearZ, 0, 1));
+}
+function placeFloor() {
+  for (var i = 0; i < pile.length; i++) pile[i].y = floorY(pile[i].x, pile[i].gy);
+  pile.sort(function(a, b) { return a.y - b.y; });
+}
+/* A leaf in front of the text and table: the band's size, sharp and solid. */
+function makeNearLeaf(z) {
+  var L = makeLeaf({ species: 'koyo', z: z });
+  if (L.fam === 'green' || L.fam === 'evergreen') L.fam = 'orange';     // big green leaves stood out this close
+  L.front = true;
+  L.size = nearLeafPx() * rnd(0.85, 1.15);
+  return L;
+}
+/* Its soft shadow, baked into a copy of its sprite (re-made when it is re-baked). */
+function bakeLeafShadow(L) {
+  if (!L.spr) return;
+  var side = L.spr.width;
+  if (!L.shd || L.shd.width !== side) { L.shd = document.createElement('canvas'); L.shd.width = L.shd.height = side; }
+  var c = L.shd.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, side, side);
+  landShadow(c, true);
+  c.drawImage(L.pileFace === false ? L.back : L.spr, 0, 0);
+  landShadow(c, false);
+}
+/* Put a leaf on the ground, in drawing order (further back first). */
+function addToFloor(L) {
+  L.y = floorY(L.x, L.gy);
+  L.settled = true; L.solid = true; L.front = false;
+  L.wob = rnd(0.5, 1.2) * (Math.random() < 0.5 ? -1 : 1); L.wph = rnd(0, TAU); L.kick = 0;
+  L.born = LS.bornN++;
+  var i = pile.length;
+  while (i > 0 && pile[i - 1].y > L.y) i--;
+  pile.splice(i, 0, L);
+  trimFloor();
+}
+/* Too many leaves on the ground: the oldest is blown away, never just removed. */
+function trimFloor() {
+  while (pile.length > LAND.bedLeaves + S.pileMax) {
+    var o = 0;
+    for (var i = 1; i < pile.length; i++) if (pile[i].born < pile[o].born) o = i;
+    var P = pile[o], dir = Math.abs(ENV.windPx) > 4 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? 1 : -1);
+    liftFromPile(P, dir * rnd(120, 200), -rnd(30, 70));
+    P.blown = dir; P.land = false;
+  }
+}
+/* The loose leaves lying in front, there from the start. */
+function buildBed() {
+  for (var i = 0; i < LAND.bedLeaves; i++) {
+    var gy = rnd(2, LAND.bedDepth);
+    var L = makeNearLeaf(lerp(1, LAND.nearZ, gy / Math.max(1, LAND.bedDepth)));
+    L.x = rnd(-20, W + 20); L.gy = gy; L.age = 5;
+    L.solid = true; L.pileFace = true;
+    L.pileSx = Math.random() < 0.5 ? -1 : 1; L.pileSy = rnd(0.45, 0.72);
+    bakeLeaf(L);
+    addToFloor(L);
+  }
+  LS.floorBuilt = true;
+}
+
+/* ---------- bake when needed, draw each frame ---------- */
+function landKey() {
+  return [lookVersion, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : ''].join('|');
+}
+function updateLandscape(t) {
+  if (ENV.scene !== 'autumn') return;
+  var k = landKey();
+  if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
+    if (LS.step === 2) landBakeGround();
+    else { landBakeNear(); LS.ready = true; placeFloor(); }
+    LS.step = LS.step === 2 ? 3 : 0;
+    return;                                       // the loose leaves are laid on a later frame
+  } else if (k !== LS.key) {
+    var sized = LS.key.split('|').slice(1, 4).join('|') !== k.split('|').slice(1, 4).join('|');
+    var scrolling = typeof _scrollActive !== 'undefined' && (_scrollActive || _swipeActive);
+    // a new size (or the first bake) at once; a light change at most every LAND_REBAKE seconds, never mid-scroll
+    if (!LS.ready || sized || (!scrolling && t - LS.at > LAND_REBAKE)) {
+      landBakeScenery();
+      LS.key = k; LS.at = t; LS.step = 2;
+    }
+  }
+  if (LS.ready && !LS.floorBuilt) buildBed();
+}
+function drawLandscape(c, dt) {
+  if (ENV.scene !== 'autumn' || !LS.ready) return;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  var sy0 = Math.floor(LS.scnTop * LAND_SR), sh0 = LS.SCN.cnv.height - sy0;   // the empty sky above the peaks is skipped
+  c.drawImage(LS.SCN.cnv, 0, sy0, LS.SCN.cnv.width, sh0, 0, sy0 / LAND_SR * PR, cvBack.width, sh0 / LAND_SR * PR);
+  if (LAND.mistDrift > 0) {                                                // mist drifting along the ridges
+    var hy = H * LAND.horizon, drift = 0.5 + 0.5 * Math.min(2, ENV.windMs / 3);
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    c.globalAlpha = LAND.mistDrift * 0.5;
+    for (var i = 0; i < LS.mist.length; i++) {
+      var B = LS.mist[i], bw = B.w * W;
+      B.x += B.v * dt * drift;
+      if (B.x - bw / 2 > W + 50) B.x = -bw / 2 - 40;
+      if (B.x + bw / 2 < -50) B.x = W + bw / 2 + 40;
+      c.drawImage(LS.MIST.cnv, B.x - bw / 2, hy - LAND.mtnHeight * H * B.y - B.h / 2, bw, B.h);
+    }
+    c.globalAlpha = 1;
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+}
+/* The near band goes under the leaves already drawn on the ground strip
+   (it has its own night glow baked in). */
+function drawNearBand(c) {
+  if (ENV.scene !== 'autumn' || !LS.ready || !LS.nearH) return;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'destination-over';
+  c.drawImage(LS.NEAR.cnv, 0, Math.round((GH - LS.nearH) * PR));
+  c.globalCompositeOperation = 'source-over';
+}
+
+/* ============================================================
    9. CANVAS, SPAWNING, MAIN LOOP
    ============================================================ */
 /* ============================================================
@@ -11593,6 +12168,7 @@ function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
   var a = L.hero ? 0.6 : (L.solid ? 1 : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
+  if (L.fade !== undefined) a *= Math.max(0, L.fade);   // settling into the far ground (8c)
   if (L.solid || (isFrontLeaf(L) && S.frontLeafOpacity >= 1)) return clamp(a, 0, 1);   // full strength: no fog or sun dimming
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
@@ -11602,24 +12178,43 @@ function isFrontLeaf(L) { return !!L.front && S.frontLeaves > 0; }
 function drawLeaf(L, t, inPile, target) {
   if (!L.spr) return;
   var g = target || ctx;
-  var sx, sy, rot = L.rot, x = L.x + (inPile ? 0 : L.so), y = L.y, spr;
+  var sx, sy, rot = L.rot, x = L.x + (inPile ? 0 : L.so), y = L.y, spr, shdA = 0;
   if (inPile) {
-    sx = L.pileSx; sy = L.pileSy; spr = L.pileFace ? L.spr : L.back;
+    var k = L.st === undefined ? 1 : clamp((t - L.st) / 0.45, 0, 1);
+    k = k * k * (3 - 2 * k);                      // just landed: settling flat
+    if (k >= 1) L.st = undefined;
+    sx = k < 1 ? lerp(L.sx0, L.pileSx, k) : L.pileSx;
+    sy = k < 1 ? lerp(L.sy0, L.pileSy, k) : L.pileSy;
+    if (k < 1) y = lerp(L.y0, L.y, k);
+    rot += (L.wob || 0) * LAND.tremble * ((L.kick || 0) + 0.03 * Math.min(2, ENV.windMs / 3) * Math.sin(t * 1.7 + (L.wph || 0)));
+    spr = L.pileFace ? L.spr : L.back;
+    shdA = L.shd ? k : 0;
   } else {
     var f = Math.min(1, S.flip3d), c = Math.cos(L.phi);
     sx = lerp(1, c, f);
     if (Math.abs(sx) < 0.06) sx = sx < 0 ? -0.06 : 0.06;
     sy = 1 - 0.18 * f * (0.5 + 0.5 * Math.sin(L.phi * 0.7 + (L.seed % 10)));
     spr = c >= 0 || f < 0.05 ? L.spr : L.back;
+    if (L.liftT !== undefined) {                  // just lifted: from how it lay into its falling shape
+      var kl = clamp((t - L.liftT) / 0.35, 0, 1);
+      sx = lerp(L.pileSx, sx, kl); sy = lerp(L.pileSy, sy, kl);
+      shdA = L.shd ? 1 - kl : 0;
+      if (kl >= 1) L.liftT = undefined;
+    }
   }
   var cs = Math.cos(rot), sn = Math.sin(rot);
   g.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, (y - drawOffsetY) * PR);
-  g.globalAlpha = inPile && !L.solid ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  var a = inPile && !L.solid ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  g.globalAlpha = a;
   g.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
+  if (shdA > 0.01) {                              // its soft shadow on the text and table below
+    g.globalAlpha = a * shdA;
+    g.drawImage(L.shd, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
+  }
 }
 
 
-var lastT = 0, envTimer = 0, clockTimer = 0, barTimer = 0, lastLookKey = '', lastDate = '';
+var lastT = 0, envTimer = 0, clockTimer = 0, barTimer = 0, lastLookKey = '';
 var rebakeIdx = 0, lastScene = '', frontLeafCount = 0;
 var dynNearMul = 0, nearCleared = true;
 var dynMaster = 0, dynScrollY = 0, dynLastMs = 0, dynBegun = false, _lastPanel = -1;
@@ -11636,8 +12231,6 @@ function lookKey() {
 function advanceClock() {
   var n = tokyoNow();
   S.hour = n.hour; S.date = n.date;
-  if (lastDate && S.date !== lastDate && S.pileClearMidnight) pile.length = 0;
-  lastDate = S.date;
 }
 
 function prefill() {
@@ -11684,6 +12277,7 @@ function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
   dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
+  LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false;
   [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
@@ -11719,7 +12313,7 @@ function dynStep(dt, t, want) {
     var k = lookKey();
     if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
-      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; }
+      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; }
       else if (lastScene === 'winter') prefill();
       tree = null; farTree = null;
       lastScene = ENV.scene;
@@ -11727,21 +12321,35 @@ function dynStep(dt, t, want) {
     ensureTree();
   }
 
+  updateLandscape(t);
   spawnTick(dt, t);
   updateGusts(dt);
   var nFront = 0;
   for (var i = leaves.length - 1; i >= 0; i--) {
     var L = leaves[i];
-    updateLeaf(L, dt, t);
-    if (isFrontLeaf(L)) nFront++;
-    var landY = H - L.groundY;
-    if (S.pile && L.z > 0.3 && L.y >= landY && L.vy > 0 && Math.random() < 0.7) {
-      leaves.splice(i, 1);
-      settleLeaf(L);
+    if (L.fade !== undefined) {                   // on the far ground: comes to rest and fades into the carpet
+      var damp = Math.exp(-dt * 5);
+      L.vx *= damp; L.vy *= damp; L.so *= damp;
+      L.x += L.vx * dt; L.y += L.vy * dt;
+      L.fade -= dt / 1.8;
+      if (L.fade <= 0) leaves.splice(i, 1);
       continue;
     }
-    if (L.y > H + L.size * 1.5 || L.x < -W * 0.4 - 200 || L.x > W * 1.4 + 200) leaves.splice(i, 1);
+    updateLeaf(L, dt, t);
+    if (isFrontLeaf(L)) nFront++;
+    if (ENV.scene === 'autumn' && LS.ready) {
+      if (isFrontLeaf(L)) {                       // in front of the text and table: lands on the near band
+        if (L.land === undefined) { L.land = Math.random() < LAND.landShare; L.gy = rnd(2, LAND.bedDepth); }
+        if (S.pile && L.land && L.vy > 0 && L.y >= floorY(L.x, L.gy)) {
+          leaves.splice(i, 1);
+          settleLeaf(L, t);
+          continue;
+        }
+      } else if (L.vy > 0 && L.y >= backGroundY(L)) L.fade = 1;   // behind the content: settles on the far ground
+    }
+    if (L.y > H + L.size * 1.5 || L.y < -H * 0.3 - 200 || L.x < -W * 0.4 - 200 || L.x > W * 1.4 + 200) leaves.splice(i, 1);
   }
+  for (var pk = 0; pk < pile.length; pk++) if (pile[pk].kick) pile[pk].kick *= Math.exp(-dt * 3);
   frontLeafCount = nFront;
   if (hero) {
     updateLeaf(hero, dt, t);
@@ -11775,6 +12383,7 @@ function dynStep(dt, t, want) {
   drawSky(ctx, t);
   drawSun(ctx, t);
   drawMoon(ctx, t);
+  drawLandscape(ctx, dt);
   drawCloudShadows(ctx, dt);
   drawRays(ctx, t);
   drawBirds(ctx, t);
@@ -11811,6 +12420,12 @@ function dynStep(dt, t, want) {
   drawSnowBank(ctxG, 'near');
   for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
   drawOffsetY = 0;
+  if (ENV.scene === 'autumn') {
+    ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
+    ctxG.globalAlpha = 1;
+    landGlow(ctxG, H);
+    drawNearBand(ctxG);
+  }
 
   // ---- front canvas: only while it is visible ----
   if (dynFrontMul > 0.01) {
