@@ -56,7 +56,8 @@ var BUILD = 'v135';
          from the koi screen on (#dynSky, a quarter-size canvas under
          #dynBack, see dynPrelude), so the session starts on the evening or
          night sky and nothing changes colour later. The setup screen before
-         the koi keeps the plain palette. The sun and moon,
+         the koi keeps the plain palette. The games page keeps the sky colour
+         too; only the scene (trees, leaves, landscape) fades out there. The sun and moon,
          trees, leaves, landscape and toolbar still come after the name;
          the landscape is baked during the name so that work is done first.
        - Night text: from 18:00 to 06:00 Nagoya time the message
@@ -12338,14 +12339,15 @@ function updateSkyLayer(dt, t) {
    time-of-day sky colour shows, so the session starts on the evening or night
    sky and nothing changes colour later; the sun and moon, trees, leaves and
    landscape still wait for the message panels (dynWantsToRun). The setup
-   screen before the koi keeps the plain palette. */
+   screen before the koi keeps the plain palette. On the games page the scene
+   fades out but the sky colour stays, so the colour doesn't jump there. */
 function dynNaming() {
   return typeof introOverlay !== 'undefined' && !!introOverlay && introOverlay.classList.contains('active');
 }
 function dynSkyWanted() {
   if (dynReduceMotion || document.hidden) return false;
   if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return false;
-  if (document.body.classList.contains('games-active')) return false;
+  // the games page keeps the sky colour too (only the scene fades out there)
   var koi = typeof blossomScreen !== 'undefined' && !!blossomScreen && blossomScreen.classList.contains('visible');
   return dynIntroDone() || koi || dynNaming();
 }

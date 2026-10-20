@@ -3063,9 +3063,10 @@
   }
   .game-score .gs-howto.faint { opacity: 0.35; }
 
-  /* No falling leaves (or snow, sun, trees…) on the games page. app.js puts
-     .games-active on <body> while the games page is showing; DynBG fades its
-     canvases out and back in itself, so there is no CSS rule for it here. */
+  /* No falling leaves (or snow, sun, trees…) on the games page; only the
+     time-of-day sky colour (#dynSky) stays. app.js puts .games-active on
+     <body> while the games page is showing; DynBG fades its canvases out and
+     back in itself, so there is no CSS rule for it here. */
 
   @media (prefers-reduced-motion: reduce) {
     .quote-window .soft-glow { animation: none !important; opacity: 0.72 !important; }
