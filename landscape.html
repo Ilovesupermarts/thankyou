@@ -319,8 +319,10 @@ var DEFAULTS = {
   nearDensity: 1,
   nearSize: 1.8,
   nearShade: 0.15,
-  nearBlur: 0.5,
+  nearBlur: 0,
   nearCover: 1,
+  nearShadow: 0.45,
+  nearShadowSize: 4,
   scrollTest: true,
   // falling leaves
   falling: 41,
@@ -408,8 +410,10 @@ var GROUPS = [
     { k: 'nearDensity', label: 'Leaves in the band', min: 0.3, max: 2.5, step: 0.05, re: 'near' },
     { k: 'nearSize', label: 'Leaf size (× the front leaves)', min: 1, max: 3, step: 0.05, re: 'near', hint: 'Bigger = closer to the viewer.' },
     { k: 'nearShade', label: 'Shade', min: 0, max: 0.6, step: 0.01, re: 'near', hint: 'A little darker than the leaves behind, as the nearest leaves are.' },
-    { k: 'nearBlur', label: 'Blur (out of focus)', min: 0, max: 4, step: 0.1, re: 'near' },
-    { k: 'nearCover', label: 'Solid base under the leaves', min: 0, max: 1, step: 0.01, re: 'near', hint: 'At 1 nothing shows through the gaps between the leaves.' },
+    { k: 'nearBlur', label: 'Blur (out of focus)', min: 0, max: 4, step: 0.1, re: 'near', hint: '0 keeps the leaf outlines crisp against the text and table.' },
+    { k: 'nearCover', label: 'Solid base under the lowest leaves', min: 0, max: 1, step: 0.01, re: 'near', hint: 'Only along the very bottom, hidden under the leaves. Higher up the text shows between the leaves.' },
+    { k: 'nearShadow', label: 'Leaf shadow strength', min: 0, max: 1, step: 0.01, re: 'near', hint: 'The soft shadow the leaves cast on the text and table. Also used for the loose leaves.' },
+    { k: 'nearShadowSize', label: 'Leaf shadow softness (px)', min: 0, max: 12, step: 0.5, re: 'near' },
     { k: 'scrollTest', label: 'Scroll test: text and table drifting behind', type: 'check', re: 'css' }
   ]},
   { title: 'Falling leaves', ctls: [
@@ -501,7 +505,7 @@ function changed(re) {
     if (p.indexOf('all') >= 0) { rebuildAll(); return; }
     if (p.indexOf('scene') >= 0) bakeScenery();
     if (p.indexOf('ground') >= 0) bakeGround();
-    if (p.indexOf('near') >= 0) bakeNear();
+    if (p.indexOf('near') >= 0) { bakeNear(); bakeGroundSprites(); }
     if (p.indexOf('bed') >= 0) buildBed();
     if (p.indexOf('css') >= 0) applyLift();
     if (p.indexOf('pile') >= 0) trimFloor();
@@ -565,7 +569,7 @@ function buildCopyText() {
   lines.push('Loose leaves in front: ' + V.bedLeaves + ' in a ' + V.bedDepth + 'px band, tremble ' + f2(V.tremble));
   lines.push('Near band (in front of the text): ' + (V.showNear ? 'on' : 'off') + ', ' + V.nearHeight + 'px high, leaves ' +
              f2(V.nearDensity) + ', size ' + f2(V.nearSize) + '×, shade ' + f2(V.nearShade) + ', blur ' + f2(V.nearBlur) +
-             'px, solid base ' + f2(V.nearCover));
+             'px, solid base ' + f2(V.nearCover) + ', leaf shadow ' + f2(V.nearShadow) + ' (' + V.nearShadowSize + 'px soft)');
   lines.push('Trunk and branches: solid (no see-through), same colour as before');
   lines.push('Leaves: ' + V.falling + ' falling, ' + Math.round(V.landShare * 100) + '% land on the ground, up to ' + V.pileMax + ' extra can pile up');
   lines.push('Colours:');
@@ -906,20 +910,35 @@ function drawBranches(c, T, strength) {
   var bark = T.far ? mix(F.bark, PAPER, TREE.farHaze) : F.bark;
   bark = light(mix(bark, PAPER, 1 - strength));
   if (isNight()) bark = mix(bark, [150, 96, 70], TREE.nightGlow * 0.4);
-  c.strokeStyle = rgb(bark);
-  c.lineCap = 'round';
-  var ns = T.nodes;
-  for (var d = 0; d < T.byDepth.length; d++) {
-    var arr = T.byDepth[d];
-    if (!arr) continue;
-    c.lineWidth = ns[arr[0]].w;
-    c.beginPath();
-    for (var i = 0; i < arr.length; i++) {
-      var n = ns[arr[i]];
-      c.moveTo(X(T, n.sx), n.sy); c.lineTo(X(T, n.ex), n.ey);
-    }
-    c.stroke();
+  // Each branch tapers from its own thickness to the thickness of the branches
+  // that grow from it, with a round joint at the fork, so the thickness flows
+  // on without the steps (notches) that same-width segments left at each fork.
+  // The tapers and the joints are two separate fills: in one path, where they
+  // overlap with opposite winding the canvas would leave a hole.
+  c.fillStyle = rgb(bark);
+  var ns = T.nodes, i, n;
+  function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var w0 = n.w / 2, w1 = endW(n);
+    var x0 = X(T, n.sx), y0 = n.sy, x1 = X(T, n.ex), y1 = n.ey;
+    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+    c.moveTo(x0 + px * w0, y0 + py * w0);
+    c.lineTo(x1 + px * w1, y1 + py * w1);
+    c.lineTo(x1 - px * w1, y1 - py * w1);
+    c.lineTo(x0 - px * w0, y0 - py * w0);
+    c.closePath();
   }
+  c.fill();
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var r = endW(n), ex = X(T, n.ex);
+    c.moveTo(ex + r, n.ey);
+    c.arc(ex, n.ey, r, 0, TAU);
+  }
+  c.fill();
 }
 function drawClumps(c, T, t) {
   var ns = T.nodes;
@@ -1174,9 +1193,9 @@ function bakeGround() {
 }
 
 /* The band of near leaves at the very bottom of #dynGround, above the text
-   and table. Baked once (redone on a change): a base in the ground's own
-   colour, solid at the bottom and fading out at the top, covered in big,
-   slightly darker maple leaves whose tops give it a ragged edge. */
+   and table. Baked once (redone on a change): big, slightly darker maple
+   leaves with a subtle shadow, over a solid strip along the very bottom
+   whose edge is hidden under the lowest leaves. */
 var NEAR = mk(), NEART = mk();
 NEAR.h = 0;
 function bakeNear() {
@@ -1191,12 +1210,6 @@ function bakeNear() {
   t.setTransform(PR, 0, 0, PR, 0, 0);                         // y = hh is the bottom of the screen
   var F = families(), w = weights(), r = rngFrom(V.seed * 29 + 7);
   var base = light(scale(mix(litterRamp(0.2), F.red[0], 0.35), 1 - V.nearShade * 0.5));
-  var g = t.createLinearGradient(0, hh - nH, 0, hh);
-  g.addColorStop(0, rgb(base, 0));
-  g.addColorStop(0.45, rgb(base, V.nearCover));
-  g.addColorStop(1, rgb(base, V.nearCover));
-  t.fillStyle = g;
-  t.fillRect(0, hh - nH, W, nH);
   var size0 = fallSize(1) * V.nearSize, list = [];
   var n = Math.round(W * nH / (size0 * size0 * 0.2) * 1.4 * V.nearDensity);
   for (var i = 0; i < n; i++) {
@@ -1206,10 +1219,27 @@ function bakeNear() {
     var tones = F[fam], tone = mix(tones[0], tones[2], r());
     if (r() < V.leafAge) tone = mix(tone, litterRamp(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
     tone = scale(tone, lerp(0.8, 1.05, r()) * (1 - V.nearShade * lerp(1, 0.6, u)));
-    list.push({ x: r() * (W + 60) - 30, y: y, s: size0 * lerp(1.15, 0.8, u) * lerp(0.8, 1.2, r()),
+    list.push({ x: r() * (W + 60) - 30, y: y, u: u, s: size0 * lerp(1.15, 0.8, u) * lerp(0.8, 1.2, r()),
                 sy: lerp(0.55, 0.85, r()), rot: r() * TAU, col: rgb(light(tone)) });
   }
   list.sort(function (a, b) { return a.y - b.y; });           // lower = nearer, drawn on top
+  // A solid strip along the very bottom so nothing shows through there. Its
+  // top edge is broken up by the lowest leaves' own shapes, a little bigger,
+  // so there is no straight line: higher up, the text and table show between
+  // the leaves and the leaf outlines read clearly against them.
+  if (V.nearCover > 0) {
+    var stripTop = hh - nH * 0.3;
+    t.fillStyle = rgb(base, V.nearCover);
+    t.fillRect(0, stripTop, W, hh - stripTop);
+    for (var b = 0; b < list.length; b++) {
+      var Bk = list[b];
+      if (Bk.u > 0.35) continue;
+      t.setTransform(PR, 0, 0, PR * Bk.sy, Bk.x * PR, Bk.y * PR);
+      leafPath(t, 0, 0, Bk.s * 1.15, Bk.rot);
+      t.fill();
+    }
+  }
+  leafShadow(t, true);
   for (var j = 0; j < list.length; j++) {
     var L = list[j];
     t.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, L.y * PR);
@@ -1217,11 +1247,21 @@ function bakeNear() {
     t.fillStyle = L.col;
     t.fill();
   }
+  leafShadow(t, false);
   t.setTransform(PR, 0, 0, PR, 0, 0);
   groundGlow(t, hh);
   c.filter = V.nearBlur > 0.05 ? 'blur(' + (V.nearBlur * PR).toFixed(2) + 'px)' : 'none';
   c.drawImage(NEART.cnv, 0, 0);
   c.filter = 'none';
+}
+/* The subtle shadow a leaf lying on top casts on the text and table below
+   it. Canvas shadow offsets are in device pixels, so they are scaled here. */
+function leafShadow(c, on) {
+  if (!on || V.nearShadow <= 0) { c.shadowColor = 'rgba(0,0,0,0)'; c.shadowBlur = 0; c.shadowOffsetY = 0; return; }
+  c.shadowColor = 'rgba(40,18,12,' + (0.55 * V.nearShadow).toFixed(3) + ')';
+  c.shadowBlur = V.nearShadowSize * PR;
+  c.shadowOffsetX = 0;
+  c.shadowOffsetY = 1.5 * PR;
 }
 /* The loose and landed leaves lie just behind the near band's ragged top. */
 function floorLift() { return V.showNear ? V.nearHeight * 0.55 : 0; }
@@ -1358,17 +1398,27 @@ function bakeFallSprites() {
       c.fillStyle = g; c.fill();
       set.push({ cnv: cnv, half: side / (2 * PR) });
     }
-    // a sharp copy for leaves lying in the grass
-    var sz = fallSize(1), sd = Math.ceil((sz * 1.2 + 4) * PR);
+    set.tones = tones;
+    fallSprites.push(set);
+  }
+  bakeGroundSprites();
+}
+/* A sharp copy of each leaf for the ones lying on the ground, with the
+   same subtle shadow as the near band (it shows where they lie over the
+   text and table). */
+function bakeGroundSprites() {
+  for (var i = 0; i < fallSprites.length; i++) {
+    var tones = fallSprites[i].tones, pad = V.nearShadow > 0 ? V.nearShadowSize * 2 + 3 : 0;
+    var sz = fallSize(1), sd = Math.ceil((sz * 1.2 + 4 + pad * 2) * PR);
     var cv2 = document.createElement('canvas'); cv2.width = cv2.height = sd;
     var c2 = cv2.getContext('2d');
     c2.setTransform(PR, 0, 0, PR, sd / 2, sd / 2);
     var g2 = c2.createLinearGradient(0, sz * 0.5, 0, -sz * 0.5);
     g2.addColorStop(0, rgb(light(scale(tones[0], 0.92)))); g2.addColorStop(0.55, rgb(light(tones[1]))); g2.addColorStop(1, rgb(light(tones[2])));
+    leafShadow(c2, true);
     leafPath(c2, 0, 0, sz, 0);
     c2.fillStyle = g2; c2.fill();
-    set.ground = { cnv: cv2, half: sd / (2 * PR) };
-    fallSprites.push(set);
+    fallSprites[i].ground = { cnv: cv2, half: sd / (2 * PR) };
   }
 }
 function insertFalling(L) {
