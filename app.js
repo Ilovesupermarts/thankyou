@@ -78,6 +78,12 @@ var BUILD = 'v135';
          too; only the scene (trees, leaves, landscape) fades out there. The sun and moon,
          trees, leaves, landscape and toolbar still come after the name;
          the landscape is baked during the name so that work is done first.
+         In autumn that work is spread over the name's frames so the name
+         does not stutter: the landscape a part per frame, the fallen leaves
+         ten at a time, then the first leaves and the tree clumps (about
+         8 ms a frame, each clump painted once so the scene's first frame
+         does not have to). If any is left when the scene would show, its
+         fade-in waits up to 1.5 s for it (dynSetupStep, dynHoldForSetup).
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -10768,7 +10774,7 @@ function bakeClump(C, far) {
   C.half = side / (2 * res);
   C.bakedV = lookVersion;
 }
-function buildKoyoTree(key, far) {
+function buildKoyoTree(key, far, lazy) {
   var r = rngFrom(strSeed(key));
   var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
   var left = side === 'left', dir = left ? 1 : -1;
@@ -10848,7 +10854,7 @@ function buildKoyoTree(key, far) {
   });
   var nc = T.clumps.length || 1;
   T.cx = sx / nc; T.cy = sy / nc; T.cr = Math.max(40, (bot - top) * 0.75);
-  T.clumps.forEach(function(C) { bakeClump(C, far); });
+  if (!lazy) T.clumps.forEach(function(C) { bakeClump(C, far); });   // lazy (during the name): baked a few per frame by bakePendingClumps
   return T;
 }
 function koyoX(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
@@ -10867,6 +10873,28 @@ function rebakeClumps(budget) {
       if (T.clumps[i].bakedV !== lookVersion) { bakeClump(T.clumps[i], T.far); budget--; }
     }
   });
+}
+/* During the name: bake the clumps still waiting for about ms milliseconds
+   (at least one; Infinity bakes them all). True when none are left. Each one
+   is also drawn once onto a 1-pixel canvas: the browser only really paints a
+   sprite the first time it is used, and otherwise would paint all of them in
+   the scene's first frame. */
+var clumpWarm = document.createElement('canvas');
+clumpWarm.width = clumpWarm.height = 1;
+var ctxWarm = clumpWarm.getContext('2d');
+function bakePendingClumps(ms) {
+  var t0 = performance.now(), done = true;
+  [tree, farTree].forEach(function(T) {
+    if (!T || !T.koyo) return;
+    for (var i = 0; i < T.clumps.length; i++) {
+      var C = T.clumps[i];
+      if (C.bakedV === lookVersion) continue;
+      if (performance.now() - t0 > ms) { done = false; return; }
+      bakeClump(C, T.far);
+      ctxWarm.drawImage(C.cnv, 0, 0, 1, 1);
+    }
+  });
+  return done;
 }
 /* The branches, solid: their soft look comes from mixing the bark toward the
    paper colour by the strength they used to be laid down at, so nothing (the
@@ -10972,11 +11000,11 @@ function drawKoyoTrees(ctx, t) {
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 }
-function ensureTree() {
+function ensureTree(lazy) {
   if (ENV.scene !== 'autumn' || !S.tree) { tree = null; farTree = null; return; }
   var key = ENV.scene + '|' + S.date + '|' + ENV.side + '|' + W + 'x' + H + '|' + S.treeSize;
-  if (!tree || tree.key !== key) tree = buildKoyoTree(key, false);
-  if (!farTree || farTree.key !== key + '|far') farTree = buildKoyoTree(key + '|far', true);
+  if (!tree || tree.key !== key) { tree = buildKoyoTree(key, false, lazy); if (lazy) dynSetupLeft = true; }
+  if (!farTree || farTree.key !== key + '|far') { farTree = buildKoyoTree(key + '|far', true, lazy); if (lazy) dynSetupLeft = true; }
 }
 function updateTree(dt, t) {
   if (farTree) updateOneTree(farTree, dt, t);
@@ -11366,7 +11394,7 @@ var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are 
 var KOYO_FALL1 = SPECIES.koyo.size * 1.05 * S.sizeScale;   // size of the nearest falling kōyō leaf
 var KOYO_LEAF_LO = koyoOutline(23, 0);  // a lighter maple outline for the thousands of leaves on the ground
 function landCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
-var LS = { ready: false, key: '', at: -1e9, step: 0, grdTop: 0, scnTop: 0, mist: [], bornN: 0, floorBuilt: false,
+var LS = { ready: false, key: '', at: -1e9, step: 0, grdTop: 0, scnTop: 0, mist: [], bornN: 0, floorBuilt: false, bedN: 0,
            SCN: landCanvas(), MTN: landCanvas(), TMP: landCanvas(), GRD: landCanvas(), MIST: landCanvas(),
            NEAR: landCanvas(), NEART: landCanvas(), nearH: 0, surf: null, sr: 2, nearTop: 0 };
 
@@ -11779,9 +11807,11 @@ function trimFloor() {
     P.blown = dir; P.land = false;
   }
 }
-/* The loose leaves lying in front, there from the start. */
-function buildBed() {
-  for (var i = 0; i < LAND.bedLeaves; i++) {
+/* The loose leaves lying in front, there from the start: at most batch of
+   them per call (all at once when batch is left out). */
+function buildBed(batch) {
+  var n = Math.min(LAND.bedLeaves - LS.bedN, batch === undefined ? Infinity : batch);
+  for (var i = 0; i < n; i++) {
     var gy = rnd(2, LAND.bedDepth);
     var L = makeNearLeaf(lerp(1, LAND.nearZ, gy / Math.max(1, LAND.bedDepth)));
     L.x = rnd(-20, W + 20); L.gy = gy; L.age = 5;
@@ -11790,15 +11820,17 @@ function buildBed() {
     bakeLeaf(L);
     addToFloor(L);
   }
-  LS.floorBuilt = true;
+  LS.bedN += n;
+  if (LS.bedN >= LAND.bedLeaves) LS.floorBuilt = true;
 }
 
 /* ---------- bake when needed, draw each frame ---------- */
 function landKey() {
   return [lookVersion, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : '', ENV.scene].join('|');
 }
-/* Both scenes bake this way: the autumn one here (8c), the winter one in 8d. */
-function updateLandscape(t) {
+/* Both scenes bake this way: the autumn one here (8c), the winter one in 8d.
+   bedBatch: during the name the fallen leaves are laid a few per frame. */
+function updateLandscape(t, bedBatch) {
   if (ENV.scene !== 'autumn' && ENV.scene !== 'winter') return;
   var win = ENV.scene === 'winter', k = landKey();
   if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
@@ -11817,7 +11849,7 @@ function updateLandscape(t) {
       LS.key = k; LS.at = t; LS.step = 2;
     }
   }
-  if (!win && LS.ready && !LS.floorBuilt) buildBed();
+  if (!win && LS.ready && !LS.floorBuilt) buildBed(bedBatch);
 }
 function drawLandscape(c, dt) {
   if ((ENV.scene !== 'autumn' && ENV.scene !== 'winter') || !LS.ready) return;
@@ -13047,9 +13079,13 @@ function advanceClock() {
   S.hour = n.hour; S.date = n.date;
 }
 
-function prefill() {
-  var n = Math.min(S.maxLeaves * 0.6, spawnRate(0) * 25);
-  for (var i = 0; i < n; i++) spawnLeaf({ prefill: true });
+var prefillLeft = 0, dynSetupLeft = false;
+function prefill(later) {
+  prefillLeft = Math.min(S.maxLeaves * 0.6, spawnRate(0) * 25);
+  if (!later) prefillSome(Infinity);
+}
+function prefillSome(max) {
+  for (var i = 0; i < max && prefillLeft > 0; i++, prefillLeft--) spawnLeaf({ prefill: true });
 }
 
 /* Past the intro (the same flag the ambient sound uses), a warm theme, the
@@ -13076,15 +13112,46 @@ function dynFrontTarget() {
   return 1 - smooth(20, 160, dynScrollY);
 }
 
-function dynBegin() {
+/* lazy (during the name): the trees' clumps and the first leaves are left for
+   dynSetupStep to do a few per frame. */
+function dynBegin(lazy) {
   resize();
   advanceClock();
   computeEnv();
-  ensureTree();
+  ensureTree(lazy);
   lastScene = ENV.scene;
   lastLookKey = lookKey();
-  if (ENV.scene !== 'winter') prefill();
+  if (ENV.scene !== 'winter') { prefill(lazy); if (lazy) dynSetupLeft = true; }
   dynBegun = true;
+}
+/* One frame's share of the work dynBegin(true) left: the landscape first (a
+   part per frame, then the fallen leaves ten at a time), then the first
+   leaves, then the tree clumps (about 8 ms a frame). */
+function dynSetupStep(t) {
+  if (ENV.scene === 'autumn' || ENV.scene === 'winter') {
+    if (!LS.ready || LS.step || (ENV.scene === 'autumn' && !LS.floorBuilt)) { updateLandscape(t, 10); return; }
+  }
+  if (!dynSetupLeft) return;
+  if (prefillLeft > 0) { prefillSome(6); return; }
+  if (bakePendingClumps(8)) dynSetupLeft = false;
+}
+/* The scene would show, but the name's setup is not finished (a slow
+   moment): it carries on a little per frame and the scene's fade-in waits,
+   for at most 1.5 s; then whatever is left is done at once. True while
+   waiting. */
+var dynHoldUntil = 0;
+function dynHoldForSetup(t) {
+  if (!dynSetupLeft) { dynHoldUntil = 0; return false; }
+  if (!dynHoldUntil) dynHoldUntil = t + 1.5;
+  if (t < dynHoldUntil) { dynSetupStep(t); return true; }
+  dynFinishSetup();
+  dynHoldUntil = 0;
+  return false;
+}
+function dynFinishSetup() {
+  prefillSome(Infinity);
+  bakePendingClumps(Infinity);
+  dynSetupLeft = false;
 }
 /* Back at the start screen: forget everything and clear the canvases (the
    sky colour stays: the koi screen shows it). */
@@ -13092,7 +13159,8 @@ function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
   dragonfly = null; cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
-  LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false;
+  LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0;
+  prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
   winReset();
   [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
@@ -13141,22 +13209,24 @@ function dynPrelude(dt, t, skyWant) {
     clockTimer -= dt;
     if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
     envTimer -= dt;
-    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; if (dynBegun) ensureTree(); }
+    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; if (dynBegun) ensureTree(naming); }
     // During the name the scene is set up and the landscape baked, so that work
     // is done before it shows (not on the koi screen, where it could make the
-    // koi stutter while someone touches the water).
+    // koi stutter while someone touches the water). It is spread out, one small
+    // part per frame, so the name animation does not stutter either.
     if (naming) {
-      if (!dynBegun) dynBegin();
-      updateLandscape(t);
+      if (!dynBegun) dynBegin(true);
+      else dynSetupStep(t);
     }
     updateSkyLayer(dt, t);
   }
   dynApplyOpacity();
 }
 function dynStep(dt, t, want, skyWant) {
-  dynMaster += ((want ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
+  var hold = want && dynBegun && dynHoldForSetup(t);
+  dynMaster += ((want && !hold ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
   skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
-  if (!want) { dynApplyOpacity(); return; }
+  if (!want || hold) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
   updateSkyLayer(dt, t);
 
@@ -13181,7 +13251,7 @@ function dynStep(dt, t, want, skyWant) {
     if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
       LS.ready = false; LS.step = 0;           // the other scene's landscape is baked afresh
-      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; }
+      if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; LS.bedN = 0; }
       else if (lastScene === 'winter') { winReset(); prefill(); }
       tree = null; farTree = null;
       lastScene = ENV.scene;
