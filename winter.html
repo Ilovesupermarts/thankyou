@@ -51,17 +51,19 @@
   .stage .dots { transform: translate(var(--dots-x, 0px), calc(-1 * var(--dots-lift, 40px))); }
   .stage .dot { cursor: pointer; }
 
-  /* Scroll test (demo only): the real table card and message text drifting
-     up and down behind #dynGround (z 8), the way the page content scrolls
-     behind the bottom strip in the app. */
+  /* Scroll test (demo only): the real table card and message text behind
+     #dynGround (z 8), the way the page content scrolls behind the bottom
+     strip in the app. Scrolled by hand: drag up or down anywhere on the
+     screen (or use the mouse wheel); a sideways swipe still changes panel. */
   .scroll-test {
     position: fixed; left: 0; right: 0; bottom: 0; height: 320px; z-index: 7;
     pointer-events: none; overflow: hidden; display: none;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 70px);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 70px);
   }
   .scroll-test.shown { display: block; }
-  .scroll-test-inner { max-width: 620px; margin: 0 auto; animation: scrollTest 16s ease-in-out infinite alternate; }
+  .scroll-test-inner { max-width: 620px; margin: 0 auto; padding: 250px 0 60px; }
   .scroll-test-inner .panel-content { text-align: center; margin-bottom: 18px; }
-  @keyframes scrollTest { from { transform: translateY(300px); } to { transform: translateY(-260px); } }
 
   /* ---------- Control panel (demo only) ---------- */
   .lab {
@@ -288,7 +290,8 @@
 (function () {
 'use strict';
 /* ============================================================
-   1. VALUES — every control on the panel. The look follows the second
+   1. VALUES — every control on the panel; the defaults are the values
+   approved on the tablet. The look follows the second
    reference picture: a soft, misty scene with Fuji in the middle,
    plum branches with snow hanging in from the top corners, a red torii
    on the left (partly off the screen), snowy firs on the right and pale
@@ -303,24 +306,24 @@ var DEFAULTS = {
   lampGlow: 0.7,
   // mountains
   showMountains: true,
-  ridges: 2,
-  horizon: 0.76,
-  mtnHeight: 0.12,
+  ridges: 3,
+  horizon: 0.78,
+  mtnHeight: 0.24,
   mtnStrength: 1,
-  mtnHaze: 0.7,
+  mtnHaze: 0.35,
   mtnBlur: 3,
   ridgeSnow: 0.25,
   mist: 0.9,
   mistDrift: 0.7,
-  treeLine: false,
+  treeLine: true,
   // Fuji
   showFuji: true,
-  fujiX: 0.5,
+  fujiX: 0.74,
   fujiHeight: 0.4,
   fujiWidth: 2.5,
-  fujiSnow: 0.42,
-  fujiGully: 1.8,
-  fujiHaze: 0.35,
+  fujiSnow: 0.41,
+  fujiGully: 1.95,
+  fujiHaze: 0.21,
   // the snowfield
   groundStrength: 1,
   swells: 5,
@@ -331,37 +334,38 @@ var DEFAULTS = {
   // the torii
   torii: true,
   toriiX: 0.07,
-  toriiDepth: 0.55,
-  toriiSize: 0.36,
-  toriiSnow: 1,
+  toriiDepth: 0.2,
+  toriiSize: 0.16,
+  toriiSnow: 1.75,
   // snowy firs
-  firs: 4,
-  firX: 0.88,
-  firSize: 1,
+  firs: 8,
+  firX: 0.93,
+  firSize: 0.95,
   // frosted trees
-  frostTrees: 6,
-  frostSize: 1,
+  frostTrees: 12,
+  frostSize: 1.2,
   berries: false,
   berryAmount: 0.5,
-  shrubs: 1,
+  shrubs: 0,
   // plum branches hanging in from the top
+  branchCount: 2,
   leftBranch: true,
   rightBranch: true,
-  branchSize: 1,
+  branchSize: 0.93,
   branchDroop: 1,
-  branchTop: 50,
-  blossoms: 1,
+  branchTop: 76,
+  blossoms: 0.25,
   blossomSize: 1,
   branchSnow: 1,
-  sway: 1,
+  sway: 2.2,
   swayRandom: 1,
-  shedEvery: 6,
+  shedEvery: 3,
   shedAmount: 1,
-  regrow: 1,
-  petals: 0.5,
+  regrow: 2.35,
+  petals: 1.8,
   // falling snow
-  flakes: 170,
-  sizeFar: 1.8,
+  flakes: 127,
+  sizeFar: 3.4,
   sizeNear: 6,
   farBlur: 3,
   nearBlur: 0.3,
@@ -470,6 +474,7 @@ var GROUPS = [
   { title: 'Plum branches from the top', ctls: [
     { k: 'leftBranch', label: 'Branch from the top left', type: 'check', re: 'branches' },
     { k: 'rightBranch', label: 'Branch from the top right', type: 'check', re: 'branches' },
+    { k: 'branchCount', label: 'Branches from each corner', min: 1, max: 3, step: 1, re: 'branches', hint: 'The main limb from the side, one hanging from the top edge, and a small one lower down.' },
     { k: 'branchSize', label: 'Reach', min: 0.4, max: 1.6, step: 0.01, re: 'branches' },
     { k: 'branchDroop', label: 'Droop', min: 0, max: 2.5, step: 0.05, re: 'branches' },
     { k: 'branchTop', label: 'Comes in at (px from the top)', min: -40, max: 240, step: 1, re: 'branches', hint: 'The toolbar is 93px tall; the branch shows through its glass.' },
@@ -503,7 +508,7 @@ var GROUPS = [
     { k: 'nearShade', label: 'Shade', min: 0, max: 1, step: 0.01, re: 'near' },
     { k: 'nearShadow', label: 'Soft edge over the content', min: 0, max: 1, step: 0.01, re: 'near' },
     { k: 'nearShadowSize', label: 'Edge softness (px)', min: 0, max: 14, step: 0.5, re: 'near' },
-    { k: 'scrollTest', label: 'Scroll test: text and table drifting behind', type: 'check', re: 'css' }
+    { k: 'scrollTest', label: 'Scroll test: text and table behind the drift', type: 'check', re: 'css', hint: 'Drag up or down anywhere on the screen (or use the mouse wheel) to scroll them.' }
   ]},
   { title: 'Layout: swipe hint and dots', ctls: [
     { k: 'hintLift', label: 'スワイプ: up (px)', min: -60, max: 320, step: 1, re: 'css' },
@@ -670,7 +675,7 @@ function buildCopyText() {
   lines.push('Firs: ' + V.firs + ' at ' + f2(V.firX) + ', size ' + f2(V.firSize));
   lines.push('Frosted trees: ' + V.frostTrees + ', size ' + f2(V.frostSize) + ', berries ' + onOff(V.berries) +
              ' (' + f2(V.berryAmount) + '), shrubs ' + f2(V.shrubs));
-  lines.push('Plum branches: left ' + onOff(V.leftBranch) + ', right ' + onOff(V.rightBranch) + ', reach ' + f2(V.branchSize) +
+  lines.push('Plum branches: left ' + onOff(V.leftBranch) + ', right ' + onOff(V.rightBranch) + ', ' + V.branchCount + ' from each corner, reach ' + f2(V.branchSize) +
              ', droop ' + f2(V.branchDroop) + ', in at ' + V.branchTop + 'px, blossoms ' + f2(V.blossoms) + ' (size ' +
              f2(V.blossomSize) + '), snow ' + f2(V.branchSnow) + ', sway ' + f2(V.sway) + ', random bounces ' + f2(V.swayRandom) +
              ', sheds every ' + f2(V.shedEvery) + 's, puff ' + f2(V.shedAmount) + ', regrow ' + f2(V.regrow) + ', petals ' + f2(V.petals));
@@ -730,17 +735,32 @@ function showPanel(i) {
 for (var di = 0; di < dots.length; di++) {
   (function (i) { dots[i].addEventListener('click', function () { showPanel(i); }); })(di);
 }
-var sx = null;
-var stageEl = document.getElementById('stage');
-stageEl.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
-stageEl.addEventListener('touchend', function (e) {
+/* A sideways swipe changes panel; an up-and-down drag scrolls the text and
+   table at the bottom (the scroll test), as the page scrolls in the app. */
+var sx = null, sy = null, sTop = 0, dragAxis = '';
+var stageEl = document.getElementById('stage'), scrollEl = document.getElementById('scrollTest');
+function dragStart(x, y) { sx = x; sy = y; sTop = scrollEl.scrollTop; dragAxis = ''; }
+function dragMove(x, y) {
   if (sx === null) return;
-  var dx = e.changedTouches[0].clientX - sx; sx = null;
-  if (Math.abs(dx) > 50) {
+  var dx = x - sx, dy = y - sy;
+  if (!dragAxis && Math.abs(dx) + Math.abs(dy) > 8) dragAxis = Math.abs(dy) > Math.abs(dx) ? 'y' : 'x';
+  if (dragAxis === 'y' && V.scrollTest) scrollEl.scrollTop = sTop - dy;
+}
+function dragEnd(x) {
+  if (sx === null) return;
+  var dx = x - sx; sx = null;
+  if (dragAxis !== 'y' && Math.abs(dx) > 50) {
     showPanel(panelIdx + (dx < 0 ? 1 : -1));
     startGust(dx < 0 ? -1 : 1, 1.3);
   }
-});
+}
+stageEl.addEventListener('touchstart', function (e) { dragStart(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+stageEl.addEventListener('touchmove', function (e) { dragMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+stageEl.addEventListener('touchend', function (e) { dragEnd(e.changedTouches[0].clientX); });
+stageEl.addEventListener('mousedown', function (e) { dragStart(e.clientX, e.clientY); });
+window.addEventListener('mousemove', function (e) { dragMove(e.clientX, e.clientY); });
+window.addEventListener('mouseup', function (e) { dragEnd(e.clientX); });
+stageEl.addEventListener('wheel', function (e) { if (V.scrollTest) scrollEl.scrollTop += e.deltaY; }, { passive: true });
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -961,12 +981,14 @@ function drawFuji(c, C, hy) {
     pts.push([x + (r() - 0.5) * xs * 0.08, ys - Hf * 0.03 * r()]);
     if (i < n) {
       var gx = x - xs * 1.25 / n * lerp(0.6, 1.4, r()) * 0.7, deep = Math.pow(r(), 1.6);
-      pts.push([gx, ys + Hf * lerp(0.02, 0.16, deep) * V.fujiGully * (0.4 + 0.6 * Math.max(0, mid))]);
+      pts.push([gx, ys + Hf * lerp(0.02, 0.16, deep) * 1.4 * V.fujiGully * (0.4 + 0.6 * Math.max(0, mid))]);
     }
   }
-  function cap() {
-    c.beginPath(); c.moveTo(fx + xs * 1.3, top - 30); c.lineTo(fx + xs * 1.3, ys);
-    for (var j = 0; j < pts.length; j++) c.lineTo(pts[j][0], pts[j][1]);
+  function cap() {                                   // the lower edge curves through the points, so the tongues are rounded
+    var j, last = pts.length - 1;
+    c.beginPath(); c.moveTo(fx + xs * 1.3, top - 30); c.lineTo(fx + xs * 1.3, ys); c.lineTo(pts[0][0], pts[0][1]);
+    for (j = 1; j < last; j++) c.quadraticCurveTo(pts[j][0], pts[j][1], (pts[j][0] + pts[j + 1][0]) / 2, (pts[j][1] + pts[j + 1][1]) / 2);
+    c.lineTo(pts[last][0], pts[last][1]);
     c.lineTo(fx - xs * 1.3, top - 30); c.closePath();
   }
   c.save(); cone(); c.clip();
@@ -987,12 +1009,11 @@ function drawFuji(c, C, hy) {
    ============================================================ */
 var GRD = mk(), GTMP = mk(), grdTop = 0, sparkles = [], toriiSpot = null;
 function swellFn(r, u) {
-  var sc = lerp(0.4, 1, u);                     // further swells look shorter (perspective)
-  var L = [lerp(0.9, 1.6, r()) * sc, lerp(0.35, 0.6, r()) * sc, lerp(0.12, 0.2, r()) * sc];
-  var p = [r() * TAU, r() * TAU, r() * TAU];
+  var sc = lerp(0.5, 1, u);                     // further swells look shorter (perspective)
+  var L = [lerp(1.3, 2.2, r()) * sc, lerp(0.6, 0.9, r()) * sc];
+  var p = [r() * TAU, r() * TAU];
   return function (x) {
-    return 0.55 * Math.sin(x / (W * L[0]) * TAU + p[0]) + 0.3 * Math.sin(x / (W * L[1]) * TAU + p[1]) +
-           0.15 * Math.sin(x / (W * L[2]) * TAU + p[2]);
+    return 0.75 * Math.sin(x / (W * L[0]) * TAU + p[0]) + 0.25 * Math.sin(x / (W * L[1]) * TAU + p[1]);
   };
 }
 /* Where things stand: [x share, depth 0 far … 1 near, size]. The frosted
@@ -1268,35 +1289,33 @@ function bakeGround() {
   groundGlow(g0, toriiSpot ? toriiSpot.y : H - depthPx * 0.3);
 }
 function swellLayer(t, C, k, u, yk, amp, f, haze, depthPx) {
-  var litC = light(mix(C.snowLit, C.mist, haze)), shC = light(mix(C.snowShade, C.mist, haze));
-  var deepC = light(mix(C.snowDeep, C.mist, haze * 1.1)), x;
-  t.beginPath(); t.moveTo(-10, H + 10);
-  for (x = -10; x <= W + 10; x += 4) t.lineTo(x, yk - amp * f(x));
-  t.lineTo(W + 10, H + 10); t.closePath();
-  var g = t.createLinearGradient(0, yk - amp, 0, yk + amp + depthPx * 0.18);
-  g.addColorStop(0, rgb(litC)); g.addColorStop(1, rgb(mix(litC, shC, 0.3)));
-  t.fillStyle = g; t.fill();
-  var a0 = V.swellShadow, STEP = 3;
-  if (a0 > 0) {
-    // the shade just under the crest, in short columns so it can change along the swell
-    for (x = -6; x <= W + 6; x += STEP) {
-      var y = yk - amp * f(x);
-      var dn = (f(x - STEP) - f(x + STEP)) / (2 * STEP) * W * 0.08;   // > 0: falling away to the right, away from the light
-      var sK = clamp(0.35 + dn * 0.9, 0, 1) * (0.55 + 0.9 * noise1(x * 0.011 + k * 7.3));
-      var th = (amp * 0.7 + 4 + 6 * u) * (0.5 + noise1(x * 0.013 + k * 3.1));
-      var off = amp * 0.12 + 1;
-      var gg = t.createLinearGradient(0, y + off, 0, y + off + th);
-      gg.addColorStop(0, rgb(shC, a0 * sK));
-      gg.addColorStop(0.35, rgb(shC, a0 * sK * 0.6));
-      gg.addColorStop(1, rgb(shC, 0));
-      t.fillStyle = gg; t.fillRect(x - STEP / 2, y + off - 0.5, STEP + 0.6, th);
-    }
-    t.beginPath();
-    for (x = -10; x <= W + 10; x += 4) { if (x === -10) t.moveTo(x, yk - amp * f(x)); else t.lineTo(x, yk - amp * f(x)); }
-    t.strokeStyle = rgb(deepC, 0.18 * a0);
-    t.lineWidth = lerp(0.6, 1.4, u);
-    t.stroke();
+  var litC = light(mix(C.snowLit, C.mist, haze)), shC = light(mix(C.snowShade, C.mist, haze)), x;
+  function outline() {
+    t.beginPath(); t.moveTo(-10, H + 10);
+    for (x = -10; x <= W + 10; x += 6) t.lineTo(x, yk - amp * f(x));
+    t.lineTo(W + 10, H + 10); t.closePath();
   }
+  outline();
+  var g = t.createLinearGradient(0, yk - amp, 0, yk + amp + depthPx * 0.18);
+  g.addColorStop(0, rgb(litC)); g.addColorStop(1, rgb(mix(litC, shC, 0.12)));
+  t.fillStyle = g; t.fill();
+  if (V.swellShadow <= 0) return;
+  // one soft, blurred band of cool shade below the crest, a little deeper
+  // where the swell turns away from the light (on the right of each rise)
+  var bl = amp * 0.45 + 4, off = amp * 0.12 + bl * 1.1, pts = [];
+  for (x = -60; x <= W + 60; x += 8) {
+    var dn = (f(x - 8) - f(x + 8)) / 16 * W * 0.08;
+    pts.push([x, yk - amp * f(x) + off, (amp * 0.9 + 6 + 8 * u) * clamp(0.6 + dn * 0.8, 0.3, 1.3)]);
+  }
+  t.save();
+  outline(); t.clip();
+  t.filter = 'blur(' + (bl * PR).toFixed(1) + 'px)';
+  t.beginPath(); t.moveTo(pts[0][0], pts[0][1]);
+  for (var i = 1; i < pts.length; i++) t.lineTo(pts[i][0], pts[i][1]);
+  for (i = pts.length - 1; i >= 0; i--) t.lineTo(pts[i][0], pts[i][1] + pts[i][2]);
+  t.closePath();
+  t.fillStyle = rgb(shC, V.swellShadow * 0.55); t.fill();
+  t.restore();
 }
 function drawSparkles(c, t) {
   if (!sparkles.length) return;
@@ -1380,10 +1399,13 @@ function bakeBloomSprites() {
     }
   }
 }
-function buildBranch(left) {
-  var r = rngFrom(V.seed * 7919 + (left ? 0 : 101));
+/* idx 0: the main limb coming in from the side; idx 1: a shorter one
+   hanging down from the top edge, a little further in; idx 2: a small one
+   from the side, lower down. */
+function buildBranch(left, idx) {
+  var r = rngFrom(V.seed * 7919 + (left ? 0 : 101) + idx * 577);
   function M(a) { return left ? a : PI - a; }     // angles are worked out for the left branch and mirrored
-  var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize;
+  var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize * [1, 0.62, 0.5][idx];
   var nodes = [], springs = [], blooms = [], groups = [];
   function add(parent, abs, len, w, flex, sp, g) {
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [];
@@ -1404,8 +1426,10 @@ function buildBranch(left) {
   }
   // the main limb: a zigzag reaching in and drooping down
   groups.push({ sp: -1, nodes: [] });
-  var bx = left ? -sc * 0.04 : W + sc * 0.04, by = V.branchTop + lerp(-10, 20, r());
-  var nM = 7, a0 = lerp(0.12, 0.3, r()), prev = -1, mains = [], las = [], i;
+  var bx = left ? -sc * 0.04 : W + sc * 0.04, by = V.branchTop + lerp(-10, 20, r()), a0 = lerp(0.12, 0.3, r());
+  if (idx === 1) { var ix = W * lerp(0.1, 0.16, r()); bx = left ? ix : W - ix; by = -sc * 0.12; a0 = lerp(0.85, 1.1, r()); }   // starts above the screen
+  if (idx === 2) { by = V.branchTop + lerp(110, 170, r()); a0 = lerp(-0.1, 0.08, r()); }
+  var nM = 7, prev = -1, mains = [], las = [], i;
   for (i = 0; i < nM; i++) {
     var la = a0 + 0.075 * V.branchDroop * i + (i % 2 ? 1 : -1) * lerp(0.12, 0.28, r());
     prev = add(prev, M(la), sc * 0.95 / nM * lerp(0.8, 1.2, r()), lerp(sc * 0.05, sc * 0.012, i / (nM - 1)),
@@ -1414,7 +1438,7 @@ function buildBranch(left) {
   }
   // side shoots: straight shoots reaching up (as ume grows) or drooping ones, with twigs
   for (i = 1; i < nM; i++) {
-    var nb = r() < 0.5 ? 2 : 1;
+    var nb = r() < 0.7 ? 2 : 1;
     for (var b = 0; b < nb; b++) {
       var up = r() < 0.55;
       var la2 = up ? lerp(-1.3, -0.5, r()) : las[i] + lerp(0.4, 1.0, r());
@@ -1456,8 +1480,10 @@ function restPose(T) {
 function buildBranches() {
   bakeBloomSprites();
   branches = [];
-  if (V.leftBranch) branches.push(buildBranch(true));
-  if (V.rightBranch) branches.push(buildBranch(false));
+  for (var idx = Math.round(V.branchCount) - 1; idx >= 0; idx--) {   // the main limbs last, in front
+    if (V.leftBranch) branches.push(buildBranch(true, idx));
+    if (V.rightBranch) branches.push(buildBranch(false, idx));
+  }
   puffs = []; petals = [];
 }
 function swayBranch(T, t, dt) {
@@ -1661,17 +1687,17 @@ function bakeNear() {
   t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, NEART.cnv.width, NEART.cnv.height);
   t.setTransform(PR, 0, 0, PR, 0, 0);                    // y = hh is the bottom of the screen
   var r = rngFrom(V.seed * 29 + 7), CR = 2, nC = Math.ceil(W * CR) + 4, surf = new Float32Array(nC), x, q;
-  var L = [lerp(260, 480, r()), lerp(110, 190, r()), lerp(45, 75, r())], p = [r() * TAU, r() * TAU, r() * TAU];
+  var L = [lerp(420, 700, r()), lerp(180, 300, r())], p = [r() * TAU, r() * TAU];
   var base = hh - nH * 0.6;
   function sAt(xx) {
-    var v = 0.5 * Math.sin(xx / L[0] * TAU + p[0]) + 0.32 * Math.sin(xx / L[1] * TAU + p[1]) + 0.18 * Math.sin(xx / L[2] * TAU + p[2]);
+    var v = 0.65 * Math.sin(xx / L[0] * TAU + p[0]) + 0.35 * Math.sin(xx / L[1] * TAU + p[1]);
     return base - nH * 0.4 * V.nearLumps * v;
   }
   for (q = 0; q < nC; q++) surf[q] = clamp(sAt(q / CR), hh - nH * 1.25, hh - nH * 0.2);
   var lit = light(C.snowLit), sh = light(C.snowShade), deep = light(C.snowDeep);
   function outline() {
     t.beginPath(); t.moveTo(-10, hh + 10); t.lineTo(-10, surf[0]);
-    for (q = 0; q < nC; q += 2) t.lineTo(q / CR, surf[q]);
+    for (q = 0; q < nC; q += 4) t.lineTo(q / CR, surf[q]);
     t.lineTo(W + 10, surf[nC - 1]); t.lineTo(W + 10, hh + 10); t.closePath();
   }
   // the body, with its soft cool edge over the content
@@ -1682,33 +1708,27 @@ function bakeNear() {
     t.shadowOffsetY = -0.5 * PR;
   }
   var g = t.createLinearGradient(0, hh - nH * 1.25, 0, hh);
-  g.addColorStop(0, rgb(lit)); g.addColorStop(1, rgb(mix(lit, sh, V.nearShade * 0.45)));
+  g.addColorStop(0, rgb(lit)); g.addColorStop(1, rgb(mix(lit, sh, V.nearShade * 0.3)));
   outline(); t.fillStyle = g; t.fill();
   t.restore();
-  // the shade under each crest, deeper on the faces turned away from the light
-  t.save(); outline(); t.clip();
-  var STEP = 2;
-  for (x = -4; x <= W + 4; x += STEP) {
-    var y = surf[clamp(Math.round(x * CR), 0, nC - 1)];
-    var dn = (surf[clamp(Math.round((x + 4) * CR), 0, nC - 1)] - surf[clamp(Math.round((x - 4) * CR), 0, nC - 1)]) / 8 * 6;
-    var sK = clamp(0.3 + dn, 0, 1) * (0.6 + 0.8 * noise1(x * 0.02 + 3.3)), th = nH * lerp(0.35, 0.7, noise1(x * 0.017 + 9.1));
-    var gg = t.createLinearGradient(0, y + 1, 0, y + 1 + th);
-    gg.addColorStop(0, rgb(sh, V.nearShade * sK * 0.85));
-    gg.addColorStop(0.4, rgb(sh, V.nearShade * sK * 0.45));
-    gg.addColorStop(1, rgb(sh, 0));
-    t.fillStyle = gg; t.fillRect(x - STEP / 2, y + 0.5, STEP + 0.6, th);
+  // one soft, blurred band of shade below the top, deeper on the faces turned from the light
+  if (V.nearShade > 0) {
+    var bl = Math.max(3, nH * 0.22);
+    t.save(); outline(); t.clip();
+    t.filter = 'blur(' + (bl * PR).toFixed(1) + 'px)';
+    t.beginPath();
+    var bottom = [];
+    for (x = -20; x <= W + 20; x += 6) {
+      var y = surf[clamp(Math.round(x * CR), 0, nC - 1)] + bl * 1.1;
+      var dn = (surf[clamp(Math.round((x + 6) * CR), 0, nC - 1)] - surf[clamp(Math.round((x - 6) * CR), 0, nC - 1)]) / 12 * 6;
+      if (x === -20) t.moveTo(x, y); else t.lineTo(x, y);
+      bottom.push([x, y + nH * 0.5 * clamp(0.6 + dn, 0.3, 1.3)]);
+    }
+    for (q = bottom.length - 1; q >= 0; q--) t.lineTo(bottom[q][0], bottom[q][1]);
+    t.closePath();
+    t.fillStyle = rgb(sh, V.nearShade * 0.6); t.fill();
+    t.restore();
   }
-  // soft dimples in the snow
-  for (q = 0; q < W / 25; q++) {
-    var dx = r() * W, dy = lerp(surf[clamp(Math.round(dx * CR), 0, nC - 1)] + 6, hh, r());
-    t.fillStyle = rgb(sh, 0.08 * V.nearShade + 0.03);
-    t.beginPath(); ellipse(t, dx, dy, lerp(6, 18, r()), lerp(1.5, 3.5, r())); t.fill();
-  }
-  t.restore();
-  // the crest: a thin cool line under a bright edge
-  t.beginPath();
-  for (q = 0; q < nC; q += 2) { if (q === 0) t.moveTo(0, surf[0]); else t.lineTo(q / CR, surf[q]); }
-  t.strokeStyle = rgb(deep, 0.18 + 0.2 * V.nearShade); t.lineWidth = 1.1; t.stroke();
   t.setTransform(PR, 0, 0, PR, 0, 0);
   groundGlow(t, hh);
   c.drawImage(NEART.cnv, 0, 0);
