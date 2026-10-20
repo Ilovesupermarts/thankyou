@@ -43,6 +43,18 @@
   }
   .stage .dot { cursor: pointer; }
 
+  /* Scroll test (demo only): the real table card and message text drifting
+     up and down behind #dynGround (z 8), the way the page content scrolls
+     behind the bottom strip in the app. */
+  .scroll-test {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 320px; z-index: 7;
+    pointer-events: none; overflow: hidden; display: none;
+  }
+  .scroll-test.shown { display: block; }
+  .scroll-test-inner { max-width: 620px; margin: 0 auto; animation: scrollTest 16s ease-in-out infinite alternate; }
+  .scroll-test-inner .panel-content { text-align: center; margin-bottom: 18px; }
+  @keyframes scrollTest { from { transform: translateY(300px); } to { transform: translateY(-260px); } }
+
   /* ---------- Control panel (demo only) ---------- */
   .lab {
     position: fixed; top: 108px; right: 14px; z-index: 1000;
@@ -156,10 +168,50 @@
 <!-- ============ The scene (the real canvases, as in index.html) ============
      #dynBack   behind everything: mountains, Fuji, mist, the ground of
                 fallen leaves, trees, falling leaves.
-     #dynGround the strip along the bottom edge: the loose leaves lying in
-                front and the leaves that land there. -->
+     #dynGround the strip along the bottom edge, above the page content: the
+                loose leaves lying in front, the leaves that land there, and
+                the band of near leaves at the very bottom that the text and
+                table scroll in behind. -->
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
+
+<!-- ============ Scroll test (demo only): real text and table card ============ -->
+<div class="scroll-test" id="scrollTest" aria-hidden="true">
+  <div class="scroll-test-inner">
+    <div class="panel-content">
+      <p>すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
+    </div>
+    <div class="table-card active">
+      <div class="privacy-note-inline">
+        <p>なお、これからご覧いただく内容や、こちらでお選びいただいた内容が、記録されたり、外部に送信されたりすることは一切ございません。</p>
+        <p>どうぞご安心ください。</p>
+      </div>
+      <div class="custom-section-divider">
+        <span class="custom-section-mark">❀</span>
+        <span class="custom-section-line"></span>
+        <span class="custom-section-label">その他</span>
+        <span class="custom-section-line"></span>
+        <span class="custom-section-mark">❀</span>
+      </div>
+      <div class="row locked">
+        <div class="row-check" role="checkbox" aria-checked="false"></div>
+        <input type="text" class="service-input" placeholder="サービスの種類" readonly>
+        <div class="price-wrap">
+          <input type="text" class="price-input" placeholder="料金を入力" disabled>
+          <span class="yen">円</span>
+        </div>
+      </div>
+      <div class="row locked">
+        <div class="row-check" role="checkbox" aria-checked="false"></div>
+        <input type="text" class="service-input" placeholder="サービスの種類" readonly>
+        <div class="price-wrap">
+          <input type="text" class="price-input" placeholder="料金を入力" disabled>
+          <span class="yen">円</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- ============ Two real message panels, the swipe hint and the dots ============ -->
 <div class="stage" id="stage">
@@ -225,49 +277,57 @@
 
 /* ============================================================
    1. VALUES — every control on the panel. DEFAULTS are the
-   suggestions from the walkthrough, with the ground changed to a
-   floor of fallen leaves: three blurred ridges with mist between them,
-   a Fuji-like peak, and a lower strip of leaf-covered ground.
+   values approved on the tablet (night, Fuji at 0.73, a 17px band of
+   loose leaves …), plus the new band of near leaves at the bottom.
    ============================================================ */
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
-  timeOfDay: 'day',
+  timeOfDay: 'night',
   wind: 1,
   gustEvery: 9,
   gustStrength: 1,
   // mountains
   showMountains: true,
   ridges: 3,
-  horizon: 0.87,
+  horizon: 0.86,
   mtnHeight: 0.2,
-  mtnStrength: 0.75,
-  mtnHaze: 0.5,
+  mtnStrength: 1,
+  mtnHaze: 0.67,
   mtnBlur: 2.5,
-  mist: 0.6,
-  mistDrift: 0.45,
+  mist: 0.82,
+  mistDrift: 0.6,
   treeLine: true,
   // Fuji
   showFuji: true,
-  fujiX: 0.62,
-  fujiHeight: 0.26,
+  fujiX: 0.73,
+  fujiHeight: 0.34,
   fujiWidth: 2.6,
-  fujiSnow: 0.3,
+  fujiSnow: 0.1,
   // ground of fallen leaves
-  groundStrength: 0.9,
-  carpetDensity: 1,
+  groundStrength: 1,
+  carpetDensity: 1.1,
   carpetSize: 1,
   leafAge: 0.35,
   groundHaze: 0.5,
   bedLeaves: 110,
-  bedDepth: 40,
+  bedDepth: 17,
   tremble: 1,
+  // near leaves at the very bottom, in front of the text and table
+  showNear: true,
+  nearHeight: 44,
+  nearDensity: 1,
+  nearSize: 1.8,
+  nearShade: 0.15,
+  nearBlur: 0.5,
+  nearCover: 1,
+  scrollTest: true,
   // falling leaves
-  falling: 27,
+  falling: 41,
   landShare: 0.7,
   pileMax: 60,
   // layout
-  lift: 60,
+  lift: 36,
   colours: {
     mtnFar: '#B4B8CC', mtnMid: '#9198B2', mtnNear: '#737C95', fujiSnow: '#F7F3EC',
     mist: '#FBECE0', treeLine: '#5F6B48',
@@ -342,6 +402,16 @@ var GROUPS = [
     { k: 'bedDepth', label: 'Depth of the front leaf band (px)', min: 10, max: 120, step: 1, re: 'bed', hint: 'The front strip sits above the text, so keep it shallow.' },
     { k: 'tremble', label: 'Tremble in the wind', min: 0, max: 2.5, step: 0.05 }
   ]},
+  { title: 'Near leaves (in front of the text)', ctls: [
+    { k: 'showNear', label: 'Show the near band', type: 'check', re: 'near bed' },
+    { k: 'nearHeight', label: 'Band height (px)', min: 16, max: 80, step: 1, re: 'near bed', hint: 'The text and table disappear behind this band as they scroll.' },
+    { k: 'nearDensity', label: 'Leaves in the band', min: 0.3, max: 2.5, step: 0.05, re: 'near' },
+    { k: 'nearSize', label: 'Leaf size (× the front leaves)', min: 1, max: 3, step: 0.05, re: 'near', hint: 'Bigger = closer to the viewer.' },
+    { k: 'nearShade', label: 'Shade', min: 0, max: 0.6, step: 0.01, re: 'near', hint: 'A little darker than the leaves behind, as the nearest leaves are.' },
+    { k: 'nearBlur', label: 'Blur (out of focus)', min: 0, max: 4, step: 0.1, re: 'near' },
+    { k: 'nearCover', label: 'Solid base under the leaves', min: 0, max: 1, step: 0.01, re: 'near', hint: 'At 1 nothing shows through the gaps between the leaves.' },
+    { k: 'scrollTest', label: 'Scroll test: text and table drifting behind', type: 'check', re: 'css' }
+  ]},
   { title: 'Falling leaves', ctls: [
     { k: 'falling', label: 'Falling leaves on screen', min: 0, max: 60, step: 1 },
     { k: 'landShare', label: 'Share that land on the ground', min: 0, max: 1, step: 0.05 },
@@ -358,7 +428,7 @@ var COLOUR_LABELS = {
 };
 var COLOUR_RE = {
   mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', fujiSnow: 'scene', treeLine: 'scene',
-  mist: 'scene ground', soil: 'ground', litterBrown: 'ground', litterTan: 'ground'
+  mist: 'scene ground', soil: 'ground near', litterBrown: 'ground near', litterTan: 'ground near'
 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
@@ -431,12 +501,16 @@ function changed(re) {
     if (p.indexOf('all') >= 0) { rebuildAll(); return; }
     if (p.indexOf('scene') >= 0) bakeScenery();
     if (p.indexOf('ground') >= 0) bakeGround();
+    if (p.indexOf('near') >= 0) bakeNear();
     if (p.indexOf('bed') >= 0) buildBed();
     if (p.indexOf('css') >= 0) applyLift();
     if (p.indexOf('pile') >= 0) trimFloor();
   });
 }
-function applyLift() { document.documentElement.style.setProperty('--lift', V.lift + 'px'); }
+function applyLift() {
+  document.documentElement.style.setProperty('--lift', V.lift + 'px');
+  document.getElementById('scrollTest').classList.toggle('shown', !!V.scrollTest);
+}
 
 document.getElementById('labToggle').addEventListener('click', function () {
   var lab = document.getElementById('lab');
@@ -489,6 +563,10 @@ function buildCopyText() {
   lines.push('Ground: strength ' + f2(V.groundStrength) + ', leaves covering it ' + f2(V.carpetDensity) +
              ', leaf size ' + f2(V.carpetSize) + ', older leaves ' + f2(V.leafAge) + ', haze ' + f2(V.groundHaze));
   lines.push('Loose leaves in front: ' + V.bedLeaves + ' in a ' + V.bedDepth + 'px band, tremble ' + f2(V.tremble));
+  lines.push('Near band (in front of the text): ' + (V.showNear ? 'on' : 'off') + ', ' + V.nearHeight + 'px high, leaves ' +
+             f2(V.nearDensity) + ', size ' + f2(V.nearSize) + '×, shade ' + f2(V.nearShade) + ', blur ' + f2(V.nearBlur) +
+             'px, solid base ' + f2(V.nearCover));
+  lines.push('Trunk and branches: solid (no see-through), same colour as before');
   lines.push('Leaves: ' + V.falling + ' falling, ' + Math.round(V.landShare * 100) + '% land on the ground, up to ' + V.pileMax + ' extra can pile up');
   lines.push('Colours:');
   Object.keys(V.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + V.colours[k].toUpperCase()); });
@@ -590,7 +668,7 @@ function cols() { var C = {}; for (var k in V.colours) C[k] = hex(V.colours[k]);
 var cv = document.getElementById('dynBack'), ctx = cv.getContext('2d');
 var cvG = document.getElementById('dynGround'), gctx = cvG.getContext('2d');
 function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
-var NB = mk(), NL = mk(), FL = mk();          // near branches, near leaves, far tree
+var NB = mk(), NL = mk(), FL = mk(), FBR = mk(); // near branches, near leaves, far foliage, far branches
 var SCN = mk(), MTN = mk(), TMP = mk();       // baked scenery, mountains, scratch
 var GL = mk();                                // the back grass and susuki, redrawn each frame
 var MIST = mk();                              // one soft mist blob
@@ -820,9 +898,13 @@ function swayTree(T, t, dt) {
   }
 }
 function X(T, x) { return T.bx + (x - T.bx) * T.k; }
-function drawBranches(c, T) {
+/* Branches are drawn solid. Their soft look comes from mixing the bark
+   toward the paper colour by the strength they used to be drawn at, so the
+   mountains no longer show through the trunk. */
+function drawBranches(c, T, strength) {
   var F = families();
-  var bark = light(T.far ? mix(F.bark, PAPER, TREE.farHaze) : F.bark);
+  var bark = T.far ? mix(F.bark, PAPER, TREE.farHaze) : F.bark;
+  bark = light(mix(bark, PAPER, 1 - strength));
   if (isNight()) bark = mix(bark, [150, 96, 70], TREE.nightGlow * 0.4);
   c.strokeStyle = rgb(bark);
   c.lineCap = 'round';
@@ -1058,7 +1140,9 @@ function bakeGround() {
   var w = weights(), depthPx = Math.max(1, H - hy);
   var n = Math.round(W * depthPx / 16 * V.carpetDensity), list = [];
   for (var i = 0; i < n; i++) {
-    var u = r(), tones = F[pickFamily(r, w)];
+    var u = r(), fam = pickFamily(r, w);
+    if (fam === 'evergreen') fam = 'red';                          // evergreens don't shed onto the ground
+    var tones = F[fam];
     var tone = mix(tones[0], tones[2], r());
     if (r() < V.leafAge) tone = mix(tone, litterRamp(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
     tone = scale(tone, lerp(0.74, 1.05, r()));                      // some lie in shade
@@ -1089,9 +1173,62 @@ function bakeGround() {
   groundGlow(c, H - depthPx * 0.3);
 }
 
+/* The band of near leaves at the very bottom of #dynGround, above the text
+   and table. Baked once (redone on a change): a base in the ground's own
+   colour, solid at the bottom and fading out at the top, covered in big,
+   slightly darker maple leaves whose tops give it a ragged edge. */
+var NEAR = mk(), NEART = mk();
+NEAR.h = 0;
+function bakeNear() {
+  var nH = V.showNear ? V.nearHeight : 0, hh = Math.min(GH, Math.ceil(nH * 1.6 + 30));
+  NEAR.h = nH ? hh : 0;
+  NEAR.cnv.width = NEART.cnv.width = Math.round(W * PR);
+  NEAR.cnv.height = NEART.cnv.height = Math.max(1, Math.round(hh * PR));
+  var c = NEAR.c, t = NEART.c;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, NEAR.cnv.width, NEAR.cnv.height);
+  if (!nH) return;
+  t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, NEART.cnv.width, NEART.cnv.height);
+  t.setTransform(PR, 0, 0, PR, 0, 0);                         // y = hh is the bottom of the screen
+  var F = families(), w = weights(), r = rngFrom(V.seed * 29 + 7);
+  var base = light(scale(mix(litterRamp(0.2), F.red[0], 0.35), 1 - V.nearShade * 0.5));
+  var g = t.createLinearGradient(0, hh - nH, 0, hh);
+  g.addColorStop(0, rgb(base, 0));
+  g.addColorStop(0.45, rgb(base, V.nearCover));
+  g.addColorStop(1, rgb(base, V.nearCover));
+  t.fillStyle = g;
+  t.fillRect(0, hh - nH, W, nH);
+  var size0 = fallSize(1) * V.nearSize, list = [];
+  var n = Math.round(W * nH / (size0 * size0 * 0.2) * 1.4 * V.nearDensity);
+  for (var i = 0; i < n; i++) {
+    var u = Math.pow(r(), 1.5), y = hh + 4 - nH * u;          // more toward the bottom, few at the top edge
+    var fam = pickFamily(r, w);
+    if (fam === 'evergreen' || fam === 'green') fam = 'orange';    // big green leaves stood out this close
+    var tones = F[fam], tone = mix(tones[0], tones[2], r());
+    if (r() < V.leafAge) tone = mix(tone, litterRamp(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
+    tone = scale(tone, lerp(0.8, 1.05, r()) * (1 - V.nearShade * lerp(1, 0.6, u)));
+    list.push({ x: r() * (W + 60) - 30, y: y, s: size0 * lerp(1.15, 0.8, u) * lerp(0.8, 1.2, r()),
+                sy: lerp(0.55, 0.85, r()), rot: r() * TAU, col: rgb(light(tone)) });
+  }
+  list.sort(function (a, b) { return a.y - b.y; });           // lower = nearer, drawn on top
+  for (var j = 0; j < list.length; j++) {
+    var L = list[j];
+    t.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, L.y * PR);
+    leafPath(t, 0, 0, L.s, L.rot);
+    t.fillStyle = L.col;
+    t.fill();
+  }
+  t.setTransform(PR, 0, 0, PR, 0, 0);
+  groundGlow(t, hh);
+  c.filter = V.nearBlur > 0.05 ? 'blur(' + (V.nearBlur * PR).toFixed(2) + 'px)' : 'none';
+  c.drawImage(NEART.cnv, 0, 0);
+  c.filter = 'none';
+}
+/* The loose and landed leaves lie just behind the near band's ragged top. */
+function floorLift() { return V.showNear ? V.nearHeight * 0.55 : 0; }
+
 /* The floor leaves on #dynGround: nearer (lower) ones are a little bigger. */
 function floorLeaf(P) {
-  P.py = H - P.gy;
+  P.py = H - P.gy - floorLift();
   P.psy = lerp(0.4, 0.62, Math.random());     // seen from the side: flattened
   P.prot = Math.random() * TAU;
   P.ps = P.s * fallSize(P.z) / fallSize(1);
@@ -1275,7 +1412,7 @@ function moveFalling(t, dt) {
     L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
     L.y += L.vy * dt;
     L.rot += L.vr * dt;
-    if (L.land && L.vy > 0 && L.y >= H - L.gy && V.bedLeaves + V.pileMax > 0) { falling.splice(i, 1); settle(L); continue; }
+    if (L.land && L.vy > 0 && L.y >= H - L.gy - floorLift() && V.bedLeaves + V.pileMax > 0) { falling.splice(i, 1); settle(L); continue; }
     if (L.y > H + 30 || L.x < -300 || L.x > W + 300) falling.splice(i, 1);
   }
   // a strong enough gust lifts leaves out of the grass
@@ -1326,7 +1463,8 @@ function resize() {
   GH = cvG.clientHeight || 150;
   cvG.width = Math.round(W * PR); cvG.height = Math.round(GH * PR);
   NB.cnv.width = NL.cnv.width = cv.width; NB.cnv.height = NL.cnv.height = cv.height;
-  FL.cnv.width = Math.round(W * PR * FAR_RES); FL.cnv.height = Math.round(H * PR * FAR_RES);
+  FL.cnv.width = FBR.cnv.width = Math.round(W * PR * FAR_RES);
+  FL.cnv.height = FBR.cnv.height = Math.round(H * PR * FAR_RES);
   SCN.cnv.width = MTN.cnv.width = TMP.cnv.width = Math.round(W * SR);
   SCN.cnv.height = MTN.cnv.height = TMP.cnv.height = Math.round(H * SR);
 }
@@ -1340,6 +1478,7 @@ function rebuildAll() {
   for (var p = 0; p < pile.length; p++) pile[p].spr = fallSprites[pile[p].si][pile[p].tier];   // re-baked for the new light
   bakeScenery();
   bakeGround();
+  bakeNear();
   if (!pile.length) buildBed();
 }
 
@@ -1376,7 +1515,8 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
-  // Far tree: branches and foliage on a half-size layer, scaled up (soft), weaker.
+  // Far tree: branches and foliage on half-size layers, scaled up (soft).
+  // The branches are solid; only the foliage is laid down weaker.
   var far = trees[1];
   if (far) {
     nightGlow(far, 0.6);
@@ -1385,10 +1525,13 @@ function frame(now) {
     fl.setTransform(1, 0, 0, 1, 0, 0);
     fl.clearRect(0, 0, FL.cnv.width, FL.cnv.height);
     fl.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
-    fl.globalAlpha = TREE.branchOpacity;
-    drawBranches(fl, far);
-    fl.globalAlpha = 1;
     drawClumps(fl, far, t);
+    var fb = FBR.c;
+    fb.setTransform(1, 0, 0, 1, 0, 0);
+    fb.clearRect(0, 0, FBR.cnv.width, FBR.cnv.height);
+    fb.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
+    drawBranches(fb, far, TREE.branchOpacity * TREE.farOpacity);
+    ctx.drawImage(FBR.cnv, 0, 0, cv.width, cv.height);
     ctx.globalAlpha = TREE.farOpacity;
     ctx.drawImage(FL.cnv, 0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
@@ -1403,12 +1546,11 @@ function frame(now) {
   var nb = NB.c, nl2 = NL.c;
   nb.setTransform(1, 0, 0, 1, 0, 0); nb.clearRect(0, 0, NB.cnv.width, NB.cnv.height);
   nb.setTransform(PR, 0, 0, PR, 0, 0);
-  drawBranches(nb, near);
+  drawBranches(nb, near, TREE.branchOpacity);
   nl2.setTransform(1, 0, 0, 1, 0, 0); nl2.clearRect(0, 0, NL.cnv.width, NL.cnv.height);
   nl2.setTransform(PR, 0, 0, PR, 0, 0);
   drawClumps(nl2, near, t);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = TREE.branchOpacity;
   ctx.drawImage(NB.cnv, 0, 0);
   ctx.globalAlpha = TREE.nearOpacity;
   ctx.drawImage(NL.cnv, 0, 0);
@@ -1424,6 +1566,11 @@ function frame(now) {
   gctx.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
   drawPile(gctx, t);
   groundGlow(gctx, H);
+  // the near band, on top of everything in the strip
+  if (NEAR.h) {
+    gctx.setTransform(1, 0, 0, 1, 0, 0);
+    gctx.drawImage(NEAR.cnv, 0, Math.round((GH - NEAR.h) * PR));
+  }
 
   requestAnimationFrame(frame);
 }
