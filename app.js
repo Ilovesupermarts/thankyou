@@ -43,7 +43,12 @@ var BUILD = 'v135';
          fall in front of the content, at the band's size, and they land
          on it (settling flat, with a soft shadow); a gust lifts them, and
          when there are too many the oldest is blown away. Leaves falling
-         behind the content settle on the far ground and fade into it. The
+         behind the content settle on the far ground and fade into it. A
+         fifth of all leaves are near ones (S.nearShare), up to 20 at a time
+         in front; the leaves in front and on the ground are lit and shaded
+         like the band (they used to be brighter or pinker at dusk); gusts,
+         which blow leaves off the ground, come with a 40% shorter interval
+         (GUST_MORE). The
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
@@ -9144,7 +9149,7 @@ var S = {
   figureSide: 'auto',
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
-  frontLeaves: 8, frontLeafOpacity: 1, frontLeafMinZ: 0.8, snowFront: 0.25,
+  frontLeaves: 20, frontLeafOpacity: 1, frontLeafMinZ: 0.8, nearShare: 0.2, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60,
   dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
   renderScale: 0.75
@@ -9621,6 +9626,14 @@ function leafColours(L) {
   if (L.species === 'koyo') {
     // shade at the stem, lit at the tip; a little warm lamp light at night
     var tones = KOYO_FAMILIES[L.fam] || KOYO_FAMILIES.red, kk = 1 + L.bright, n = koyoNight() * KOYO.nightGlow;
+    if (L.front || L.solid) {
+      // in front of the text and table, or lying on the ground: lit like the
+      // near band (koyoLight, its shade, its share of older browner leaves), so
+      // a leaf matches the ground it lands on (8c)
+      var sh = (1 - LAND.nearShade * 0.8) * kk, ag = L.aged || 0;
+      var near = function(c) { return koyoLight(scaleRgb(ag ? mixRgb(c, landLitter(L.agedTone), ag) : c, sh)); };
+      return { base: near(tones[0]), mid: near(tones[1]), tip: near(mixRgb(tones[1], tones[2], 0.5)), lit: true };
+    }
     return { base: scaleRgb(tones[0], kk), mid: scaleRgb(mixRgb(tones[1], KOYO_LAMP, n * 0.12), kk),
              tip: scaleRgb(mixRgb(tones[2], KOYO_LAMP, n * 0.18), kk) };
   }
@@ -9700,9 +9713,9 @@ function bakeLeaf(L) {
     sctx.lineWidth = 0.07;
     sctx.stroke();
   }
-  // wet: darker + a thin shine
+  // wet: darker (already in the light for C.lit) + a thin shine
   if (ENV.wet > 0) {
-    sctx.fillStyle = 'rgba(40,20,22,' + (0.22 * ENV.wet).toFixed(3) + ')';
+    sctx.fillStyle = 'rgba(40,20,22,' + (0.22 * ENV.wet * (C.lit ? 0 : 1)).toFixed(3) + ')';
     sctx.fillRect(-2, -2, 4, 4);
     sctx.strokeStyle = 'rgba(255,255,255,' + (0.38 * ENV.wet).toFixed(3) + ')';
     sctx.lineWidth = 0.025;
@@ -9713,7 +9726,7 @@ function bakeLeaf(L) {
   }
   // time-of-day light on the leaf
   var Lt = ENV.light;
-  if (S.lightTint > 0) {
+  if (S.lightTint > 0 && !C.lit) {                // C.lit: the light is already in the colours
     sctx.fillStyle = rgba(Lt.col, S.lightTint * Lt.amt * 1.5);
     sctx.fillRect(-2, -2, 4, 4);
     if (Lt.dark > 0) {
@@ -9835,7 +9848,9 @@ function setMode(L, forced) {
 function makeLeaf(opts) {
   opts = opts || {};
   var species = opts.species || pickWeighted(speciesWeights()) || 'momiji';
-  var z = opts.z !== undefined ? opts.z : lerp(1, 0, S.depthSpread * Math.pow(Math.random(), 0.8));
+  // S.nearShare of the leaves are near ones (they fall in front of the text and table); the rest spread over all depths
+  var z = opts.z !== undefined ? opts.z :
+          (Math.random() < S.nearShare ? rnd(S.frontLeafMinZ, 1) : lerp(1, 0, S.depthSpread * Math.pow(Math.random(), 0.8)));
   var L = {
     id: nextId++, seed: (Math.random() * 4294967296) >>> 0, species: species, z: z,
     hero: !!opts.hero,
@@ -9848,6 +9863,8 @@ function makeLeaf(opts) {
     gid: 0, settled: false
   };
   if (species === 'koyo') L.fam = pickWeighted(KOYO_SHARES);
+  L.aged = Math.random() < LAND.leafAge ? rnd(0.4, 0.85) : 0;   // older, browner (used for leaves in front, 8c)
+  L.agedTone = rnd(0.2, 1);
   setMode(L);
   return L;
 }
@@ -10864,7 +10881,7 @@ function koyoX(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
 function dropKoyoLeaf(T, vx) {
   if (!T || !T.clumps.length) return;
   var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n = T.nodes[C.node];
-  spawnLeaf({ x: koyoX(T, n.ex + C.ox), y: n.ey + C.oy, z: T.far ? rnd(0.2, 0.45) : rnd(0.75, 1),
+  spawnLeaf({ x: koyoX(T, n.ex + C.ox), y: n.ey + C.oy, z: T.far ? rnd(0.2, 0.45) : rnd(S.frontLeafMinZ, 1),
               vx: vx !== undefined ? vx : ENV.windPx * 0.4, force: vx !== undefined });
 }
 /* Re-draw a few clumps per frame after the light changed. */
@@ -12117,6 +12134,7 @@ function resize() {
 
 var flurryQueue = [];
 var heroNext = 0;
+var GUST_MORE = 1 / 0.6;     // gusts (which blow leaves off the ground) come with a 40% shorter interval
 function spawnRate(t) {
   var timeMul = { night: 0.5, dawn: 0.8, morning: 1, day: 1.2, golden: 1.05, dusk: 0.9 }[ENV.phase] || 1;
   var weatherMul = 1 + ENV.windMs / 6;
@@ -12144,7 +12162,7 @@ function spawnTick(dt, t) {
       flurryQueue.splice(j, 1);
     }
   }
-  if (Math.random() < S.gustiness * (0.012 + ENV.windMs * 0.008) * dt) startGust(false);
+  if (Math.random() < S.gustiness * (0.012 + ENV.windMs * 0.008) * GUST_MORE * dt) startGust(false);
   if (S.condition === 'thunderstorm' && S.lightning) {
     if (lightningNext === 0) lightningNext = t + rnd(8, 25);
     if (t > lightningNext) { strikeLightning(); lightningNext = t + rnd(8, 25); }
