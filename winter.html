@@ -278,6 +278,7 @@
       <button type="button" id="btnGust">Gust now</button>
       <button type="button" id="btnShake">Shake the branches</button>
       <button type="button" id="btnSkier">Send a skier</button>
+      <button type="button" id="btnSkierFront">Ski past the dots</button>
     </div>
     <div id="labControls"></div>
   </div>
@@ -377,6 +378,7 @@ var DEFAULTS = {
   skiNear: 0.75,
   skiFarBlur: 2.5,
   skiNearBlur: 0.2,
+  skiFront: 0.2,
   scarfLength: 1,
   scarfFlutter: 1,
   // falling snow
@@ -511,6 +513,7 @@ var GROUPS = [
     { k: 'skiGapMax', label: '… and at most (seconds)', min: 1, max: 90, step: 0.5, hint: 'Each starts on its own timer, left to right or right to left.' },
     { k: 'skiSpeed', label: 'Speed', min: 0.3, max: 2.5, step: 0.05, hint: 'Each skier also has a speed of their own, slower uphill.' },
     { k: 'skiSize', label: 'Size (× life size next to the torii)', min: 0.5, max: 2, step: 0.05 },
+    { k: 'skiFront', label: 'Share that ski in front of the page dots', min: 0, max: 1, step: 0.05, hint: 'Now and then a skier passes right at the front, over the dots.' },
     { k: 'skiFar', label: 'Furthest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground', hint: 'Skiers further back pass behind the nearer trees and the torii.' },
     { k: 'skiNear', label: 'Nearest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground' },
     { k: 'skiFarBlur', label: 'Blur of the furthest (px)', min: 0, max: 6, step: 0.1 },
@@ -659,7 +662,8 @@ document.getElementById('btnSeed').addEventListener('click', function () {
 });
 document.getElementById('btnGust').addEventListener('click', function () { startGust(1, 1.3); });
 document.getElementById('btnShake').addEventListener('click', function () { branches.forEach(shakeBranch); });
-document.getElementById('btnSkier').addEventListener('click', function () { spawnSkier(); });
+document.getElementById('btnSkier').addEventListener('click', function () { spawnSkier(0, false); });
+document.getElementById('btnSkierFront').addEventListener('click', function () { spawnSkier(0, true); });
 
 /* ============================================================
    3. COPY VALUES — the fonts and styles the page actually uses (read
@@ -713,7 +717,7 @@ function buildCopyText() {
   lines.push('Skiers: ' + onOff(V.skiers) + ', up to ' + V.maxSkiers + ' at once, a new one every ' + f2(V.skiGapMin) + '–' +
              f2(V.skiGapMax) + 's, speed ' + f2(V.skiSpeed) + ', size ' + f2(V.skiSize) + ', depth ' + f2(V.skiFar) + '–' +
              f2(V.skiNear) + ', blur ' + f2(V.skiFarBlur) + '→' + f2(V.skiNearBlur) + 'px, scarf length ' + f2(V.scarfLength) +
-             ', flutter ' + f2(V.scarfFlutter));
+             ', flutter ' + f2(V.scarfFlutter) + ', ' + Math.round(V.skiFront * 100) + '% in front of the dots');
   lines.push('Falling snow: ' + V.flakes + ' flakes, size ' + f2(V.sizeFar) + '–' + f2(V.sizeNear) + 'px, blur ' + f2(V.farBlur) +
              '→' + f2(V.nearBlur) + 'px, speed ' + f2(V.fallSpeed) + ', drift ' + f2(V.flakeSway) + ', ' +
              Math.round(V.frontShare * 100) + '% in front, ' + Math.round(V.landShare * 100) + '% of those land and melt after ' +
@@ -1448,15 +1452,25 @@ function laneRange(N) {
 }
 /* Where a skier's skis touch the snow on swell S: the same line the trees stand on. */
 function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.5 + 2; }
-function spawnSkier(dir) {
+/* front: a skier at the very front, on #dynNear above the page, so it
+   passes in front of the page dots. It rides its own gentle path at the
+   dots' height (its own "swell", S), at the nearest skiers' size, sharp. */
+function spawnSkier(dir, front) {
   var SW = GROUND.swells, N = SW.length;
   if (!N) return;
-  var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), u = SW[k].u;
+  if (front === undefined) front = Math.random() < V.skiFront;
+  var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), u = SW[k].u, path = null;
+  if (front) {
+    k = -1; u = 1;
+    var de = document.getElementById('dots'), rc = de ? de.getBoundingClientRect() : null;
+    var dotsY = rc && rc.height ? rc.top + rc.height / 2 : H - 140, ph0 = rnd(0, TAU), wl = W * rnd(0.3, 0.45);
+  }
   var h = H * lerp(0.04, 0.09, u) * V.skiSize * rnd(0.9, 1.08);
+  if (front) path = { yk: dotsY + h * 0.55 - 5, amp: 6, f: function (x) { return Math.sin(x / wl + ph0); } };   // the feet just below the dots
   dir = dir || (Math.random() < 0.5 ? 1 : -1);
   var jacket = pick(SKI_JACKETS), scarf = pick(SKI_SCARVES), hat = pick(SKI_HATS);
   while (scarf === jacket) scarf = pick(SKI_SCARVES);
-  skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0,
+  skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0, S: path,
                 ph: rnd(0, TAU), sph: rnd(0, TAU), sf: rnd(0.8, 1.3), stripe: Math.random() < 0.5,
                 col: { jacket: hex(jacket), pants: hex(pick(SKI_PANTS)), hat: hex(hat), pom: hex(pick(SKI_HATS)),
                        scarf: hex(scarf), skis: hex(pick(SKI_SKIS)), skin: hex(pick(SKI_SKIN)) },
@@ -1470,7 +1484,7 @@ function updateSkiers(dt) {
     skiTimer = rnd(Math.min(V.skiGapMin, V.skiGapMax), Math.max(V.skiGapMin, V.skiGapMax));
   }
   for (var i = skiers.length - 1; i >= 0; i--) {
-    var K = skiers[i], S = GROUND.swells[K.k];
+    var K = skiers[i], S = K.S || GROUND.swells[K.k];
     if (!S) { skiers.splice(i, 1); continue; }
     var down = K.dir * (skiGroundY(S, K.x + 3) - skiGroundY(S, K.x - 3)) / 6;   // > 0: going downhill
     K.v = K.vb * K.h * V.skiSpeed * clamp(1 + 1.5 * down, 0.55, 1.5);
@@ -1483,7 +1497,7 @@ function updateSkiers(dt) {
    going left: skis, the far leg and arm (a little darker), the body, the
    near leg and arm, the poles, the head and hat, and the scarf. */
 function drawSkier(c, K, t) {
-  var C = cols(), S = GROUND.swells[K.k], h = K.h;
+  var C = cols(), S = K.S || GROUND.swells[K.k], h = K.h;
   if (!S) return;
   var haze = V.groundHaze * Math.pow(1 - K.u, 2) * 0.9;
   function col(x, k) { return rgb(light(mix(scale(x, k || 1), C.mist, haze))); }
@@ -1564,9 +1578,13 @@ function drawSkier(c, K, t) {
   c.imageSmoothingEnabled = true;
   c.drawImage(K.cnv, K.x - (K.dir > 0 ? ox : bw - ox), gy0 - oy, bw, bh);
 }
-/* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices). */
+/* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices);
+   the ones in front of the page dots have k = -1 and are drawn on #dynNear. */
 function drawSkiers(c, t, kFrom, kTo) {
   for (var i = 0; i < skiers.length; i++) if (skiers[i].k > kFrom && skiers[i].k <= kTo) drawSkier(c, skiers[i], t);
+}
+function drawFrontSkiers(c, t) {
+  for (var i = 0; i < skiers.length; i++) if (skiers[i].S) drawSkier(c, skiers[i], t);
 }
 
 /* ============================================================
@@ -2218,6 +2236,7 @@ function frame(now) {
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
   drawFlakes(nctx, nz, 2);
+  drawFrontSkiers(nctx, t);
   drawBokeh(nctx);
 
   // Ground strip: the snowdrift, and the flakes that landed on it, melting.
