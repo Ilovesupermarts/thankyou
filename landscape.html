@@ -19,8 +19,8 @@
      class names (ambient wash, mist, Shippō mosaic, toolbar, carousel
      panels, swipe hint, dots) and the real #dynBack / #dynGround canvases.
      New here: faint blurred mountains with a Fuji-like peak, mist between
-     the ridges, an autumn meadow, swaying grass and susuki (芒), and the
-     falling leaves landing in the grass. The trees are the ones tuned on
+     the ridges, and a low strip of ground covered in fallen leaves (no
+     grass), with the falling leaves landing on it. The trees are the ones tuned on
      koyo.html (the KOYO values in app.js). Nothing in app.js is used or
      changed.
      ============================================================ */
@@ -35,7 +35,7 @@
   .track { width: 200%; }
   .panel { width: 50%; }
 
-  /* The swipe hint and the dots, lifted clear of the grass (the "Lift" slider). */
+  /* The swipe hint and the dots, lifted clear of the ground (the "Lift" slider). */
   .stage .dots,
   .stage .action-hint.global-hint {
     transform: translateY(calc(-1 * var(--lift, 60px)));
@@ -154,10 +154,10 @@
 </div>
 
 <!-- ============ The scene (the real canvases, as in index.html) ============
-     #dynBack   behind everything: mountains, Fuji, mist, meadow, trees,
-                the taller grass and susuki at the back, falling leaves.
-     #dynGround the strip along the bottom edge: the short front grass and
-                the fallen leaves resting in it. -->
+     #dynBack   behind everything: mountains, Fuji, mist, the ground of
+                fallen leaves, trees, falling leaves.
+     #dynGround the strip along the bottom edge: the loose leaves lying in
+                front and the leaves that land there. -->
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 
@@ -225,19 +225,21 @@
 
 /* ============================================================
    1. VALUES — every control on the panel. DEFAULTS are the
-   suggestions from the walkthrough: an autumn meadow (olive at the
-   back, straw and gold in front), susuki by the trees, three blurred
-   ridges with mist between them and a Fuji-like peak.
+   suggestions from the walkthrough, with the ground changed to a
+   floor of fallen leaves: three blurred ridges with mist between them,
+   a Fuji-like peak, and a lower strip of leaf-covered ground.
    ============================================================ */
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
   timeOfDay: 'day',
   wind: 1,
+  gustEvery: 9,
+  gustStrength: 1,
   // mountains
   showMountains: true,
   ridges: 3,
-  horizon: 0.8,
+  horizon: 0.87,
   mtnHeight: 0.2,
   mtnStrength: 0.75,
   mtnHaze: 0.5,
@@ -251,25 +253,16 @@ var DEFAULTS = {
   fujiHeight: 0.26,
   fujiWidth: 2.6,
   fujiSnow: 0.3,
-  // meadow & grass
-  meadowStrength: 0.7,
-  grassGold: 0.6,
-  grassVariety: 0.5,
-  backDensity: 1,
-  backHeight: 34,
-  tallNearTrees: 2.4,
-  tallSpread: 0.16,
-  frontDensity: 1,
-  frontHeight: 26,
-  grassSway: 1,
-  gustEvery: 9,
-  gustStrength: 1,
-  // susuki
-  susukiClumps: 5,
-  susukiHeight: 0.24,
-  plumeSize: 1,
-  susukiNearTrees: 0.75,
-  // leaves
+  // ground of fallen leaves
+  groundStrength: 0.9,
+  carpetDensity: 1,
+  carpetSize: 1,
+  leafAge: 0.35,
+  groundHaze: 0.5,
+  bedLeaves: 110,
+  bedDepth: 40,
+  tremble: 1,
+  // falling leaves
   falling: 27,
   landShare: 0.7,
   pileMax: 60,
@@ -278,11 +271,10 @@ var DEFAULTS = {
   colours: {
     mtnFar: '#B4B8CC', mtnMid: '#9198B2', mtnNear: '#737C95', fujiSnow: '#F7F3EC',
     mist: '#FBECE0', treeLine: '#5F6B48',
-    grassDeep: '#4F5530', grassGreen: '#7C8A44', grassOlive: '#A69C52', grassStraw: '#CDB36E', grassGold: '#E2B95A',
-    susukiStem: '#B39B66', susukiPlume: '#EEDFC0'
+    soil: '#4A2A20', litterBrown: '#7E4A30', litterTan: '#B7814F'
   }
 };
-var STORE_KEY = 'landscapeLabValues';
+var STORE_KEY = 'landscapeLabValues2';   // new key: the ground values changed
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var V = clone(DEFAULTS);
 try {
@@ -310,20 +302,21 @@ var TREE = {
 
 /* ============================================================
    2. CONTROL PANEL. "re" says what has to be redrawn on a change:
-   all (trees too), scene (mountains + meadow), grass, css, or nothing.
+   all (trees too), scene (mountains), ground (the leaf floor), bed (the
+   loose leaves in front), pile, css, or nothing.
    ============================================================ */
 var GROUPS = [
   { title: 'Light & wind', ctls: [
     { k: 'timeOfDay', label: 'Time of day', type: 'select', opts: [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']], re: 'all' },
     { k: 'nearSide', label: 'Near (big) tree on', type: 'select', opts: [['left', 'Left'], ['right', 'Right']], re: 'all' },
-    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the trees, grass and leaves.' },
-    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'Gusts sweep across the field as a visible wave. Swiping also makes one.' },
+    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the trees and leaves.' },
+    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'Gusts sweep across the screen: the trees sway and the leaves on the ground stir or lift. Swiping also makes one.' },
     { k: 'gustStrength', label: 'Gust strength', min: 0, max: 2, step: 0.05 }
   ]},
   { title: 'Mountains', ctls: [
     { k: 'showMountains', label: 'Show mountains', type: 'check', re: 'scene' },
     { k: 'ridges', label: 'Ridges', min: 1, max: 3, step: 1, re: 'scene' },
-    { k: 'horizon', label: 'Horizon (share of screen height)', min: 0.6, max: 0.92, step: 0.01, re: 'scene', hint: 'Where the mountains meet the meadow.' },
+    { k: 'horizon', label: 'Horizon (share of screen height)', min: 0.7, max: 0.97, step: 0.01, re: 'scene ground', hint: 'Where the mountains meet the ground. Higher number = lower, thinner ground.' },
     { k: 'mtnHeight', label: 'Ridge height', min: 0.05, max: 0.4, step: 0.01, re: 'scene' },
     { k: 'mtnStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Keep it low so the text stays easy to read.' },
     { k: 'mtnHaze', label: 'Distance haze', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Far ridges fade toward the paper colour.' },
@@ -339,43 +332,33 @@ var GROUPS = [
     { k: 'fujiWidth', label: 'Width', min: 1.6, max: 4, step: 0.05, re: 'scene' },
     { k: 'fujiSnow', label: 'Snow cap', min: 0, max: 0.6, step: 0.01, re: 'scene' }
   ]},
-  { title: 'Meadow & grass', ctls: [
-    { k: 'meadowStrength', label: 'Meadow strength', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'The soft field between the horizon and the grass.' },
-    { k: 'grassGold', label: 'Colour: green ↔ gold', min: 0, max: 1, step: 0.01, re: 'grass', hint: 'Back rows stay a little greener than the front.' },
-    { k: 'grassVariety', label: 'Colour variety', min: 0, max: 1, step: 0.01, re: 'grass' },
-    { k: 'backDensity', label: 'Back grass density', min: 0, max: 2.5, step: 0.05, re: 'grass' },
-    { k: 'backHeight', label: 'Back grass height (px)', min: 10, max: 90, step: 1, re: 'grass' },
-    { k: 'tallNearTrees', label: 'Taller near the trees', min: 0, max: 5, step: 0.1, re: 'grass' },
-    { k: 'tallSpread', label: 'How far the tall grass spreads', min: 0.04, max: 0.4, step: 0.01, re: 'grass' },
-    { k: 'frontDensity', label: 'Front grass density', min: 0, max: 2.5, step: 0.05, re: 'grass' },
-    { k: 'frontHeight', label: 'Front grass height (px)', min: 8, max: 70, step: 1, re: 'grass', hint: 'The front strip sits above the text, so keep it short.' },
-    { k: 'grassSway', label: 'Grass sway', min: 0, max: 2.5, step: 0.05 }
-  ]},
-  { title: 'Susuki (芒)', ctls: [
-    { k: 'susukiClumps', label: 'Clumps', min: 0, max: 14, step: 1, re: 'grass' },
-    { k: 'susukiHeight', label: 'Height (share of screen)', min: 0.08, max: 0.45, step: 0.01, re: 'grass' },
-    { k: 'plumeSize', label: 'Plume size', min: 0.4, max: 2, step: 0.05, re: 'grass' },
-    { k: 'susukiNearTrees', label: 'Share by the tree roots', min: 0, max: 1, step: 0.05, re: 'grass', hint: 'The rest stay near the edges, away from the text.' }
+  { title: 'Ground of fallen leaves', ctls: [
+    { k: 'groundStrength', label: 'Ground strength', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'carpetDensity', label: 'Leaves covering the ground', min: 0.2, max: 2.5, step: 0.05, re: 'ground', hint: 'Baked once, so it costs nothing per frame.' },
+    { k: 'carpetSize', label: 'Leaf size on the ground', min: 0.5, max: 1.8, step: 0.05, re: 'ground' },
+    { k: 'leafAge', label: 'Share of older, browner leaves', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'groundHaze', label: 'Haze toward the horizon', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'bedLeaves', label: 'Loose leaves in front', min: 0, max: 300, step: 1, re: 'bed', hint: 'Lying there from the start; gusts stir and lift them.' },
+    { k: 'bedDepth', label: 'Depth of the front leaf band (px)', min: 10, max: 120, step: 1, re: 'bed', hint: 'The front strip sits above the text, so keep it shallow.' },
+    { k: 'tremble', label: 'Tremble in the wind', min: 0, max: 2.5, step: 0.05 }
   ]},
   { title: 'Falling leaves', ctls: [
     { k: 'falling', label: 'Falling leaves on screen', min: 0, max: 60, step: 1 },
-    { k: 'landShare', label: 'Share that land in the grass', min: 0, max: 1, step: 0.05 },
-    { k: 'pileMax', label: 'Most leaves lying in the grass', min: 0, max: 150, step: 1, re: 'pile' }
+    { k: 'landShare', label: 'Share that land on the ground', min: 0, max: 1, step: 0.05 },
+    { k: 'pileMax', label: 'Extra leaves that can pile up', min: 0, max: 150, step: 1, re: 'pile' }
   ]},
   { title: 'Layout', ctls: [
-    { k: 'lift', label: 'Lift swipe hint & dots (px)', min: 0, max: 200, step: 1, re: 'css', hint: 'Raises them above the grass.' }
+    { k: 'lift', label: 'Lift swipe hint & dots (px)', min: 0, max: 200, step: 1, re: 'css', hint: 'Raises them above the leaf-covered ground.' }
   ]}
 ];
 var COLOUR_LABELS = {
   mtnFar: 'Far ridge', mtnMid: 'Middle ridge', mtnNear: 'Near ridge', fujiSnow: 'Fuji snow',
   mist: 'Mist / haze', treeLine: 'Tree line',
-  grassDeep: 'Grass (deep)', grassGreen: 'Grass (green)', grassOlive: 'Grass (olive)', grassStraw: 'Grass (straw)',
-  grassGold: 'Grass (gold)', susukiStem: 'Susuki stem', susukiPlume: 'Susuki plume'
+  soil: 'Ground (dark)', litterBrown: 'Old leaves (brown)', litterTan: 'Old leaves (tan)'
 };
 var COLOUR_RE = {
   mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', fujiSnow: 'scene', treeLine: 'scene',
-  mist: 'scene grass', grassDeep: 'scene grass', grassGreen: 'scene grass', grassOlive: 'scene grass',
-  grassStraw: 'scene grass', grassGold: 'scene grass', susukiStem: 'grass', susukiPlume: 'grass'
+  mist: 'scene ground', soil: 'ground', litterBrown: 'ground', litterTan: 'ground'
 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
@@ -447,9 +430,10 @@ function changed(re) {
     _pending = ''; _changeQueued = false;
     if (p.indexOf('all') >= 0) { rebuildAll(); return; }
     if (p.indexOf('scene') >= 0) bakeScenery();
-    if (p.indexOf('grass') >= 0) buildGrass();
+    if (p.indexOf('ground') >= 0) bakeGround();
+    if (p.indexOf('bed') >= 0) buildBed();
     if (p.indexOf('css') >= 0) applyLift();
-    if (p.indexOf('pile') >= 0) while (pile.length > V.pileMax) pile.shift();
+    if (p.indexOf('pile') >= 0) trimFloor();
   });
 }
 function applyLift() { document.documentElement.style.setProperty('--lift', V.lift + 'px'); }
@@ -502,13 +486,10 @@ function buildCopyText() {
              ', tree line ' + (V.treeLine ? 'on' : 'off'));
   lines.push('Fuji: ' + (V.showFuji ? 'on' : 'off') + ', position ' + f2(V.fujiX) + ', height ' + f2(V.fujiHeight) +
              ', width ' + f2(V.fujiWidth) + ', snow cap ' + f2(V.fujiSnow));
-  lines.push('Meadow strength ' + f2(V.meadowStrength) + ', green↔gold ' + f2(V.grassGold) + ', variety ' + f2(V.grassVariety));
-  lines.push('Back grass: density ' + f2(V.backDensity) + ', height ' + V.backHeight + 'px, taller near trees ' + f2(V.tallNearTrees) +
-             ' over ' + f2(V.tallSpread) + ' of the width');
-  lines.push('Front grass: density ' + f2(V.frontDensity) + ', height ' + V.frontHeight + 'px, sway ' + f2(V.grassSway));
-  lines.push('Susuki: ' + V.susukiClumps + ' clumps, height ' + f2(V.susukiHeight) + ', plume ' + f2(V.plumeSize) +
-             ', by the trees ' + f2(V.susukiNearTrees));
-  lines.push('Leaves: ' + V.falling + ' falling, ' + Math.round(V.landShare * 100) + '% land in the grass, at most ' + V.pileMax + ' lying');
+  lines.push('Ground: strength ' + f2(V.groundStrength) + ', leaves covering it ' + f2(V.carpetDensity) +
+             ', leaf size ' + f2(V.carpetSize) + ', older leaves ' + f2(V.leafAge) + ', haze ' + f2(V.groundHaze));
+  lines.push('Loose leaves in front: ' + V.bedLeaves + ' in a ' + V.bedDepth + 'px band, tremble ' + f2(V.tremble));
+  lines.push('Leaves: ' + V.falling + ' falling, ' + Math.round(V.landShare * 100) + '% land on the ground, up to ' + V.pileMax + ' extra can pile up');
   lines.push('Colours:');
   Object.keys(V.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + V.colours[k].toUpperCase()); });
   lines.push('');
@@ -823,7 +804,7 @@ function restPose(T) {
   }
 }
 /* The trees sway as on koyo.html; the gusts that push them now come from the
-   same gust fronts that sweep across the grass (see updateGusts). */
+   same gust fronts that stir the leaves on the ground (see updateGusts). */
 function swayTree(T, t, dt) {
   T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
   T.gust += T.gustV * dt;
@@ -885,7 +866,7 @@ function nightGlow(T, strength) {
 }
 
 /* ============================================================
-   7. MOUNTAINS, FUJI, MIST AND MEADOW — baked once into SCN (redone
+   7. MOUNTAINS, FUJI AND MIST — baked once into SCN (redone
    only when a value or the time of day changes), so the blur costs
    nothing per frame. Each ridge is drawn sharp into TMP and laid onto
    MTN through a blur filter: further back = paler (haze) and softer.
@@ -912,12 +893,6 @@ function ridgeFn(r) {
     for (var i = 0; i < 4; i++) { var w = waves[i]; s += w.a * (1 - 2 * Math.abs(Math.sin(x * w.f + w.p))); }
     return s / 1.8;
   };
-}
-function grassRamp(p) {
-  var C = cols(), stops = [C.grassDeep, C.grassGreen, C.grassOlive, C.grassStraw, C.grassGold];
-  p = clamp(p, 0, 1) * 4;
-  var i = Math.min(3, Math.floor(p));
-  return mix(stops[i], stops[i + 1], p - i);
 }
 var mistBlobs = [];
 function bakeScenery() {
@@ -976,34 +951,6 @@ function bakeScenery() {
     s.restore();
   }
 
-  // The meadow: hazy olive at the horizon, warmer toward the bottom.
-  if (V.meadowStrength > 0) {
-    var r3 = rngFrom(V.seed * 71 + 3), ph1 = r3() * TAU, ph2 = r3() * TAU;
-    var c1 = light(mix(grassRamp(V.grassGold * 0.6 + 0.1), C.mist, 0.55));
-    var c2 = light(mix(grassRamp(V.grassGold * 0.8 + 0.08), C.mist, 0.3));
-    var c3 = light(mix(grassRamp(V.grassGold + 0.05), C.mist, 0.1));
-    var tex = rgb(light(C.grassDeep), 0.16);
-    blurInto(s, 0.8, function (c) {
-      var g = c.createLinearGradient(0, hy - 6, 0, H);
-      g.addColorStop(0, rgb(c1)); g.addColorStop(0.45, rgb(c2)); g.addColorStop(1, rgb(c3));
-      c.fillStyle = g;
-      c.globalAlpha = V.meadowStrength;
-      c.beginPath(); c.moveTo(-10, H + 10);
-      for (var x = -10; x <= W + 10; x += 8) c.lineTo(x, hy + 3 * Math.sin(x * 0.004 + ph1) + 2 * Math.sin(x * 0.013 + ph2));
-      c.lineTo(W + 10, H + 10); c.closePath(); c.fill();
-      // Fine texture: tiny tufts, bigger toward the viewer.
-      c.globalAlpha = V.meadowStrength;
-      c.strokeStyle = tex; c.lineWidth = 1;
-      c.beginPath();
-      for (var i = 0, n = Math.round(W * 0.9); i < n; i++) {
-        var u = Math.pow(r3(), 0.7), y = hy + 4 + (H - hy) * u, tx = r3() * W, len = lerp(1.5, 9, u);
-        c.moveTo(tx, y); c.lineTo(tx + (r3() - 0.4) * len * 0.5, y - len);
-      }
-      c.stroke();
-      c.globalAlpha = 1;
-    });
-  }
-
   // One soft mist blob, drawn a few times per frame drifting along the ridges.
   var mc = MIST.c; MIST.cnv.width = MIST.cnv.height = 128;
   var rg = mc.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -1057,117 +1004,124 @@ function drawFuji(c, C, hy) {
 }
 
 /* ============================================================
-   8. GRASS AND SUSUKI. Blades are grouped by colour so each colour is
-   one fill per frame. The back grass and susuki go on GL (only the
-   bottom band of the screen); the short front grass on #dynGround,
-   in two passes with the fallen leaves between them, so some blades
-   always cross in front of a leaf and it looks settled into the grass.
+   8. THE GROUND — a floor of fallen leaves instead of grass.
+   GRD (baked, behind the trees): a dark leaf-litter base from the
+   horizon down, covered in small fallen maple leaves that get smaller,
+   flatter and hazier toward the horizon. Redrawn only when a value or
+   the time of day changes.
+   #dynGround (every frame): the loose leaves lying in front, there from
+   the start (the "bed"), plus every leaf that lands. They tremble as a
+   gust passes, and a strong gust lifts some of them.
    ============================================================ */
-var NC = 8;                                   // colour steps along the green → gold ramp
-var backGroups = [], backCols = [], backOrder = [];
-var frontA = [], frontB = [], frontCols = [], frontOrder = [];
-var susuki = [], susukiCols = {}, ZH = 200, groundGrad = null;
-function tallAt(x) {
-  var k = 1;
-  for (var i = 0; i < trees.length; i++) {
-    var T = trees[i], s = W * V.tallSpread;
-    k += V.tallNearTrees * (T.far ? 0.6 : 1) * Math.exp(-Math.pow((x - T.bx) / s, 2));
+var GRD = mk(), grdTop = 0, bornN = 0;
+/* A lighter maple outline for the thousands of leaves on the ground. */
+var MOMIJI_LO = MOMIJI.filter(function (p, i) { return i % 3 === 0; });
+function leafPathLo(c, size, rot) {
+  var cs = Math.cos(rot) * size, sn = Math.sin(rot) * size;
+  c.beginPath();
+  for (var i = 0; i < MOMIJI_LO.length; i++) {
+    var p = MOMIJI_LO[i], px = p[0] * cs - p[1] * sn, py = p[0] * sn + p[1] * cs;
+    if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
   }
-  return k;
+  c.closePath();
 }
-function bladeOf(r, x, y, h, w) {
-  return { x: x, y: y, h: h, w: w, lean: (r() - 0.5) * 0.5, flex: (0.6 + 0.5 * r()) * Math.sqrt(h / 30),
-           ph: r() * TAU, fr: 1.6 + r() * 1.4 };
+function litterRamp(p) {
+  var C = cols(), st = [C.soil, C.litterBrown, C.litterTan];
+  p = clamp(p, 0, 1) * 2;
+  var i = Math.min(1, Math.floor(p));
+  return mix(st[i], st[i + 1], p - i);
 }
-function buildGrass() {
-  var C = cols(), r = rngFrom(V.seed * 389 + 11), ci, i, n, nl;
-  // colours
-  var HAZE = [0.04, 0.16, 0.3];
-  backCols = []; frontCols = []; backOrder = []; frontOrder = [];
-  for (ci = 0; ci < NC; ci++) {
-    var base = grassRamp((ci + 0.5) / NC);
-    for (var hz = 0; hz < 3; hz++) backCols[ci * 3 + hz] = rgb(light(mix(base, C.mist, HAZE[hz])));
-    frontCols[ci * 2] = rgb(light(scale(base, 0.84)));
-    frontCols[ci * 2 + 1] = rgb(light(base));
+function bakeGround() {
+  var C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), ph1 = r() * TAU, ph2 = r() * TAU;
+  grdTop = Math.max(0, Math.floor(hy - 8));
+  GRD.cnv.width = Math.round(W * PR); GRD.cnv.height = Math.max(1, Math.round((H - grdTop) * PR));
+  var c = GRD.c;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, GRD.cnv.width, GRD.cnv.height);
+  if (V.groundStrength <= 0) return;
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  c.save();
+  c.globalAlpha = V.groundStrength;
+  // a gently uneven edge at the horizon
+  c.beginPath(); c.moveTo(-10, H + 10);
+  for (var x = -10; x <= W + 10; x += 8) c.lineTo(x, hy + 2 * Math.sin(x * 0.004 + ph1) + 1.5 * Math.sin(x * 0.013 + ph2));
+  c.lineTo(W + 10, H + 10); c.closePath(); c.clip();
+  // dark leaf-litter base, hazy at the horizon
+  var g = c.createLinearGradient(0, hy, 0, H);
+  var F = families(), warm = F.red[0];                             // the base leans toward the leaf colours
+  g.addColorStop(0, rgb(light(mix(mix(litterRamp(0.7), warm, 0.25), C.mist, V.groundHaze * 0.75))));
+  g.addColorStop(0.35, rgb(light(mix(mix(litterRamp(0.45), warm, 0.3), C.mist, V.groundHaze * 0.3))));
+  g.addColorStop(1, rgb(light(mix(litterRamp(0.2), warm, 0.35))));
+  c.fillStyle = g;
+  c.fillRect(-10, hy - 10, W + 20, H - hy + 20);
+  // the carpet of fallen leaves, far rows first
+  var w = weights(), depthPx = Math.max(1, H - hy);
+  var n = Math.round(W * depthPx / 16 * V.carpetDensity), list = [];
+  for (var i = 0; i < n; i++) {
+    var u = r(), tones = F[pickFamily(r, w)];
+    var tone = mix(tones[0], tones[2], r());
+    if (r() < V.leafAge) tone = mix(tone, litterRamp(0.2 + r() * 0.8), lerp(0.4, 0.85, r()));
+    tone = scale(tone, lerp(0.74, 1.05, r()));                      // some lie in shade
+    tone = mix(tone, C.mist, V.groundHaze * Math.pow(1 - u, 2) * 0.8);
+    list.push({ x: r() * (W + 40) - 20, y: hy + 2 + (depthPx - 2) * u,
+                s: lerp(4.5, 18, Math.pow(u, 1.2)) * V.carpetSize * lerp(0.75, 1.25, r()),
+                rot: r() * TAU, sy: lerp(0.35, 0.6, r()) * lerp(0.6, 1, u), col: rgb(light(tone)) });
   }
-  for (hz = 2; hz >= 0; hz--) for (ci = 0; ci < NC; ci++) backOrder.push(ci * 3 + hz);
-  for (var sh = 0; sh < 2; sh++) for (ci = 0; ci < NC; ci++) frontOrder.push(ci * 2 + sh);
-
-  // back grass: rooted behind the front strip, taller by the tree roots
-  backGroups = [];
-  var topMost = 0;
-  for (i = 0, n = Math.round(W * 0.55 * V.backDensity); i < n; i++) {
-    var u = r(), x = r() * W * 1.04 - W * 0.02, y = H - lerp(100, 34, u), tall = tallAt(x);
-    var h = V.backHeight * (0.55 + 0.9 * r()) * tall * (0.75 + 0.25 * u);
-    var B = bladeOf(r, x, y, h, lerp(1.1, 2.1, r()) * (0.8 + 0.4 * u) * Math.min(1.6, Math.sqrt(tall)));
-    var p = clamp(V.grassGold * 0.85 - 0.14 * (1 - u) + 0.05 + (r() - 0.5) * V.grassVariety * 0.9, 0, 0.999);
-    var bi = Math.floor(p * NC) * 3 + (u < 0.33 ? 2 : u < 0.66 ? 1 : 0);
-    (backGroups[bi] = backGroups[bi] || []).push(B);
-    topMost = Math.max(topMost, H - y + h);
+  list.sort(function (a, b) { return a.y - b.y; });
+  for (var j = 0; j < list.length; j++) {
+    var L = list[j];
+    c.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
+    leafPathLo(c, L.s, L.rot);
+    c.fillStyle = L.col;
+    c.fill();
   }
-  // front grass: short, in two passes around the fallen leaves
-  frontA = []; frontB = [];
-  for (i = 0, n = Math.round(W * 1.0 * V.frontDensity); i < n; i++) {
-    u = r(); x = r() * W * 1.04 - W * 0.02; y = H - lerp(44, -2, u);
-    h = V.frontHeight * (0.5 + 0.9 * r()) * (0.75 + 0.4 * u) * Math.pow(tallAt(x), 0.35);
-    B = bladeOf(r, x, y, h, lerp(1.2, 2.4, r()) * (0.85 + 0.3 * u));
-    p = clamp(V.grassGold + 0.06 * u + (r() - 0.5) * V.grassVariety * 0.9, 0, 0.999);
-    bi = Math.floor(p * NC) * 2 + (u < 0.5 ? 0 : 1);
-    var dst = u < 0.55 ? frontA : frontB;
-    (dst[bi] = dst[bi] || []).push(B);
-  }
-  // susuki clumps: mostly by the tree roots, the rest near the edges
-  susuki = [];
-  var nearTrees = trees.slice();
-  for (i = 0; i < V.susukiClumps; i++) {
-    var byTree = nearTrees.length && r() < V.susukiNearTrees, cx2, ks = 1;
-    if (byTree) {
-      var T = nearTrees[r() < 0.7 || nearTrees.length < 2 ? 0 : 1];
-      cx2 = T.bx + (T.left ? 1 : -1) * W * lerp(0.01, 0.15, r());
-      if (T.far) ks = 0.85;
-    } else {
-      cx2 = (r() < 0.5 ? lerp(0.02, 0.3, r()) : lerp(0.7, 0.98, r())) * W;
-    }
-    var K = { x: cx2, y: H - lerp(40, 75, r()), stems: [], leaves: [] };
-    var ns = 7 + Math.floor(r() * 6), len0 = V.susukiHeight * H * ks;
-    for (var j = 0; j < ns; j++) {
-      var len = len0 * lerp(0.65, 1.05, r()), S = {
-        dx: (r() - 0.5) * 14, len: len, lean: (r() - 0.5) * 0.55, flex: lerp(0.55, 0.8, r()),
-        ph: r() * TAU, fr: 1.1 + r() * 0.8, plume: r() < 0.85, strands: []
-      };
-      var nst = Math.round(14 * V.plumeSize);
-      for (var q = 0; q < nst; q++) {
-        var su = lerp(0.72, 1, r());
-        S.strands.push({ u: su, side: r() < 0.5 ? -1 : 1, ang: lerp(0.2, 0.7, r()), ph: r() * TAU,
-                         l: len * 0.09 * V.plumeSize * lerp(0.6, 1.1, r()) * (1.25 - (su - 0.72) * 1.6) });
-      }
-      K.stems.push(S);
-      topMost = Math.max(topMost, H - K.y + len * 1.1);
-    }
-    for (j = 0, nl = 6 + Math.floor(r() * 5); j < nl; j++) {
-      var side = r() < 0.5 ? -1 : 1, lh = len0 * lerp(0.3, 0.55, r());
-      K.leaves.push({ dx: (r() - 0.5) * 10, h: lh, w: 1.6, lean: side * lerp(0.45, 1.15, r()),
-                      flex: 0.5 * Math.sqrt(lh / 30), ph: r() * TAU, fr: 1.2 + r() });
-    }
-    susuki.push(K);
-  }
-  susukiCols = {
-    leaf: rgb(light(mix(C.grassOlive, C.susukiStem, 0.35))),
-    stem: rgb(light(C.susukiStem)),
-    plume: rgb(light(C.susukiPlume), 0.7),
-    core: rgb(light(mix(C.susukiPlume, C.susukiStem, 0.3)), 0.85)
-  };
-  ZH = Math.min(H, Math.ceil(topMost + 30));
-  GL.cnv.width = Math.round(W * PR); GL.cnv.height = Math.max(1, Math.round(ZH * PR));
-
-  // a soft, dense base under the front grass
-  gctx.setTransform(1, 0, 0, 1, 0, 0);
-  groundGrad = gctx.createLinearGradient(0, H - 60, 0, H);
-  var gb = light(mix(grassRamp(V.grassGold * 0.8), C.grassDeep, 0.35));
-  groundGrad.addColorStop(0, rgb(gb, 0)); groundGrad.addColorStop(0.5, rgb(gb, 0.45)); groundGrad.addColorStop(1, rgb(gb, 0.75));
+  // haze where the ground meets the mountains, so the edge melts into the mist
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  var mz = c.createLinearGradient(0, hy - 2, 0, hy + depthPx * 0.45);
+  var mistC = light(C.mist);
+  mz.addColorStop(0, rgb(mistC, 0.85 * V.groundHaze));
+  mz.addColorStop(1, rgb(mistC, 0));
+  c.globalAlpha = 1;
+  c.fillStyle = mz;
+  c.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  c.restore();
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  groundGlow(c, H - depthPx * 0.3);
 }
 
-/* Wind field: a steady breeze with ripples that travel across the field,
+/* The floor leaves on #dynGround: nearer (lower) ones are a little bigger. */
+function floorLeaf(P) {
+  P.py = H - P.gy;
+  P.psy = lerp(0.4, 0.62, Math.random());     // seen from the side: flattened
+  P.prot = Math.random() * TAU;
+  P.ps = P.s * fallSize(P.z) / fallSize(1);
+  P.wob = lerp(0.5, 1.2, Math.random()) * (Math.random() < 0.5 ? -1 : 1);
+  P.ph = Math.random() * TAU;
+  P.born = bornN++;
+  var i = pile.length;
+  while (i > 0 && pile[i - 1].py > P.py) i--;
+  pile.splice(i, 0, P);
+  trimFloor();
+}
+function trimFloor() {
+  while (pile.length > V.bedLeaves + V.pileMax) {
+    var o = 0;
+    for (var i = 1; i < pile.length; i++) if (pile[i].born < pile[o].born) o = i;
+    pile.splice(o, 1);
+  }
+}
+function buildBed() {
+  pile = [];
+  for (var i = 0; i < V.bedLeaves; i++) {
+    // a full leaf, so a gust can lift it and it falls like the others
+    var gy = lerp(2, V.bedDepth, Math.random());
+    var L = makeLeaf(lerp(1, 0.72, gy / Math.max(1, V.bedDepth)), Math.random() * (W + 40) - 20, 0);
+    L.gy = gy;
+    floorLeaf(L);
+  }
+}
+
+/* Wind field: a steady breeze with ripples that travel across the screen,
    plus the gust fronts. Worked out once per frame in 10px columns. */
 var FB = 10, field = [], gustF = [];
 function updateField(t) {
@@ -1180,7 +1134,7 @@ function updateField(t) {
       var G = gusts[g], d = (G.x - x) * G.dir;
       gs += G.dir * G.str * (d < 0 ? Math.exp(-(d * d) / 8100) : Math.exp(-d / 260));
     }
-    field[i] = (base + gs) * V.grassSway;
+    field[i] = base + gs;
     gustF[i] = gs;
   }
   field.length = gustF.length = cnt;
@@ -1189,93 +1143,8 @@ function idx(x) { var i = Math.round(x / FB); return i < 0 ? 0 : i >= field.leng
 function fieldAt(x) { return field[idx(x)] || 0; }
 function gustAt(x) { return gustF[idx(x)] || 0; }
 
-function bladePath(c, x, y, h, w, b) {
-  var sb = Math.sin(b), cb = Math.cos(b), sh = Math.sin(b * 0.45), ch = Math.cos(b * 0.45);
-  var tx = x + sb * h, ty = y - cb * h, cx = x + sh * h * 0.55, cy = y - ch * h * 0.55;
-  c.moveTo(x - w, y);
-  c.quadraticCurveTo(cx - w * 0.35, cy, tx, ty);
-  c.quadraticCurveTo(cx + w * 0.35, cy, x + w, y);
-}
-function drawBlades(c, groups, colours, order, t) {
-  for (var o = 0; o < order.length; o++) {
-    var arr = groups[order[o]];
-    if (!arr || !arr.length) continue;
-    c.fillStyle = colours[order[o]];
-    c.beginPath();
-    for (var i = 0; i < arr.length; i++) {
-      var B = arr[i];
-      var b = clamp(B.lean + B.flex * fieldAt(B.x) + 0.045 * Math.sin(t * B.fr + B.ph), -1.25, 1.25);
-      bladePath(c, B.x, B.y, B.h, B.w, b);
-    }
-    c.fill();
-  }
-}
-function quad(a, b, c2, u) { var v = 1 - u; return v * v * a + 2 * u * v * b + u * u * c2; }
-function drawSusuki(c, t) {
-  if (!susuki.length) return;
-  var i, j, K, S, f;
-  c.fillStyle = susukiCols.leaf;
-  c.beginPath();
-  for (i = 0; i < susuki.length; i++) {
-    K = susuki[i]; f = fieldAt(K.x);
-    for (j = 0; j < K.leaves.length; j++) {
-      var L = K.leaves[j];
-      bladePath(c, K.x + L.dx, K.y, L.h, L.w, clamp(L.lean + L.flex * f + 0.04 * Math.sin(t * L.fr + L.ph), -1.5, 1.5));
-    }
-  }
-  c.fill();
-  // stems: one curve each, the end points kept for the plumes
-  c.strokeStyle = susukiCols.stem; c.lineWidth = 1.3; c.lineCap = 'round';
-  c.beginPath();
-  for (i = 0; i < susuki.length; i++) {
-    K = susuki[i]; f = fieldAt(K.x);
-    for (j = 0; j < K.stems.length; j++) {
-      S = K.stems[j];
-      var b = clamp(S.lean + S.flex * f * 1.3 + 0.05 * Math.sin(t * S.fr + S.ph), -1.3, 1.3);
-      S.x0 = K.x + S.dx; S.y0 = K.y;
-      S.x1 = S.x0 + Math.sin(b * 0.4) * S.len * 0.5; S.y1 = S.y0 - Math.cos(b * 0.4) * S.len * 0.5;
-      S.x2 = S.x0 + Math.sin(b) * S.len; S.y2 = S.y0 - Math.cos(b) * S.len;
-      S.f = f;
-      c.moveTo(S.x0, S.y0); c.quadraticCurveTo(S.x1, S.y1, S.x2, S.y2);
-    }
-  }
-  c.stroke();
-  // plume body along the top of each stem
-  c.strokeStyle = susukiCols.core; c.lineWidth = 2.4;
-  c.beginPath();
-  for (i = 0; i < susuki.length; i++) {
-    for (j = 0; j < susuki[i].stems.length; j++) {
-      S = susuki[i].stems[j];
-      if (!S.plume) continue;
-      for (var k = 0; k <= 4; k++) {
-        var uu = 0.72 + k * 0.07, px = quad(S.x0, S.x1, S.x2, uu), py = quad(S.y0, S.y1, S.y2, uu);
-        if (k === 0) c.moveTo(px, py); else c.lineTo(px, py);
-      }
-    }
-  }
-  c.stroke();
-  // the silky strands, blown to the downwind side
-  c.strokeStyle = susukiCols.plume; c.lineWidth = 1.1;
-  c.beginPath();
-  for (i = 0; i < susuki.length; i++) {
-    for (j = 0; j < susuki[i].stems.length; j++) {
-      S = susuki[i].stems[j];
-      if (!S.plume) continue;
-      for (var q = 0; q < S.strands.length; q++) {
-        var st = S.strands[q], u = st.u, v = 1 - u;
-        var px2 = quad(S.x0, S.x1, S.x2, u), py2 = quad(S.y0, S.y1, S.y2, u);
-        var tx = 2 * v * (S.x1 - S.x0) + 2 * u * (S.x2 - S.x1), ty = 2 * v * (S.y1 - S.y0) + 2 * u * (S.y2 - S.y1);
-        var ang = Math.atan2(ty, tx) + st.side * st.ang + S.f * 0.6 + 0.08 * Math.sin(t * 2.3 + st.ph);
-        var ca = Math.cos(ang) * st.l, sa = Math.sin(ang) * st.l;
-        c.moveTo(px2, py2);
-        c.quadraticCurveTo(px2 + ca * 0.55, py2 + sa * 0.55, px2 + ca, py2 + sa + st.l * 0.12);
-      }
-    }
-  }
-  c.stroke();
-}
-/* At night the lamps under the trees also light the grass around their roots. */
-function grassGlow(c, yBase) {
+/* At night the lamps under the trees also light the fallen leaves around their roots. */
+function groundGlow(c, yBase) {
   if (!isNight() || TREE.nightGlow <= 0) return;
   c.globalCompositeOperation = 'source-atop';
   for (var i = 0; i < trees.length; i++) {
@@ -1292,9 +1161,9 @@ function grassGlow(c, yBase) {
 
 /* ============================================================
    9. GUSTS — a gust is a front that travels across the screen. The
-   grass bends as it passes (a visible wave), the trees get a push when
+   leaves on the ground tremble as it passes, the trees get a push when
    it reaches them and drop a few leaves, and fallen leaves can be
-   lifted from the grass.
+   lifted from the ground.
    ============================================================ */
 var gusts = [], gustTimer = 4;
 function startGust(dir, k) {
@@ -1324,8 +1193,8 @@ function updateGusts(dt) {
 
 /* ============================================================
    10. FALLING LEAVES — the koyo.html leaves (same depth style), now
-   pushed by the wind field. Most of the nearer ones land in the front
-   grass and stay there until a gust lifts them again.
+   pushed by the wind field. Most of the nearer ones land on the front
+   of the ground and stay there until a gust lifts them again.
    ============================================================ */
 var FALL_TIERS = [0.1, 0.4, 0.7, 1.0];
 function fallSize(z) { return 22 * TREE.leafSize * (0.45 + 0.6 * z); }
@@ -1378,8 +1247,8 @@ function makeLeaf(z, x, y) {
     z: z, x: x, y: y, vx: 0, vy: vy, vyT: vy, sway: 30 * (0.5 + 0.5 * z),
     ph: Math.random() * TAU, f: 0.8 + Math.random() * 1.2,
     rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 2.4, s: 0.85 + Math.random() * 0.3,
-    si: si, spr: fallSprites[si][tier], a: lerp(0.6, 0.9, z),
-    land: z > 0.3 && Math.random() < V.landShare, gy: lerp(6, 40, Math.random())
+    si: si, tier: tier, spr: fallSprites[si][tier], a: lerp(0.6, 0.9, z),
+    land: z > 0.3 && Math.random() < V.landShare, gy: lerp(2, V.bedDepth, Math.random())
   };
 }
 function spawnFromTree(T) {
@@ -1396,14 +1265,7 @@ function spawnFalling(prefill) {
     spawnFromTree(trees[Math.random() < 0.7 || trees.length < 2 ? 0 : 1]);
   }
 }
-function settle(L) {
-  L.py = H - L.gy;
-  L.psy = lerp(0.4, 0.62, Math.random());     // seen from the side: flattened
-  L.prot = Math.random() * TAU;
-  L.ps = L.s * fallSize(L.z) / fallSize(1);
-  pile.push(L);
-  while (pile.length > V.pileMax) pile.shift();
-}
+function settle(L) { floorLeaf(L); }
 function moveFalling(t, dt) {
   for (var i = falling.length - 1; i >= 0; i--) {
     var L = falling[i];
@@ -1413,7 +1275,7 @@ function moveFalling(t, dt) {
     L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
     L.y += L.vy * dt;
     L.rot += L.vr * dt;
-    if (L.land && L.vy > 0 && L.y >= H - L.gy && V.pileMax > 0) { falling.splice(i, 1); settle(L); continue; }
+    if (L.land && L.vy > 0 && L.y >= H - L.gy && V.bedLeaves + V.pileMax > 0) { falling.splice(i, 1); settle(L); continue; }
     if (L.y > H + 30 || L.x < -300 || L.x > W + 300) falling.splice(i, 1);
   }
   // a strong enough gust lifts leaves out of the grass
@@ -1423,7 +1285,7 @@ function moveFalling(t, dt) {
       pile.splice(j, 1);
       P.y = P.py - 4; P.vy = -lerp(50, 130, Math.random());
       P.vx = (gs > 0 ? 1 : -1) * lerp(60, 160, Math.random());
-      P.land = Math.random() < V.landShare; P.gy = lerp(6, 40, Math.random());
+      P.land = Math.random() < V.landShare; P.gy = lerp(2, V.bedDepth, Math.random());
       insertFalling(P);
     }
   }
@@ -1442,11 +1304,12 @@ function drawFalling(t, from, to) {
   }
   ctx.globalAlpha = 1;
 }
-function drawPile(c) {
+function drawPile(c, t) {
   for (var i = 0; i < pile.length; i++) {
     var P = pile[i], spr = fallSprites[P.si].ground, h = spr.half * P.ps;
+    var rot = P.prot + P.wob * V.tremble * (gustAt(P.x) * 0.5 + 0.03 * V.wind * Math.sin(t * 1.7 + P.ph));
     c.save();
-    c.translate(P.x, P.py); c.scale(1, P.psy); c.rotate(P.prot);
+    c.translate(P.x, P.py); c.scale(1, P.psy); c.rotate(rot);
     c.drawImage(spr.cnv, -h, -h, h * 2, h * 2);
     c.restore();
   }
@@ -1474,9 +1337,10 @@ function rebuildAll() {
   bakeFallSprites();
   falling = [];
   for (var i = 0; i < Math.round(V.falling * 0.5); i++) spawnFalling(true);
-  for (var p = 0; p < pile.length; p++) pile[p].si = Math.min(pile[p].si, fallSprites.length - 1);
+  for (var p = 0; p < pile.length; p++) pile[p].spr = fallSprites[pile[p].si][pile[p].tier];   // re-baked for the new light
   bakeScenery();
-  buildGrass();
+  bakeGround();
+  if (!pile.length) buildBed();
 }
 
 var last = 0;
@@ -1493,7 +1357,7 @@ function frame(now) {
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cv.width, cv.height);
 
-  // Mountains, Fuji and meadow (baked), then the mist drifting along the ridges.
+  // Mountains and Fuji (baked), then the mist drifting along the ridges.
   ctx.drawImage(SCN.cnv, 0, 0, cv.width, cv.height);
   if (V.showMountains && V.mistDrift > 0) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
@@ -1507,6 +1371,10 @@ function frame(now) {
     }
     ctx.globalAlpha = 1;
   }
+
+  // The ground of fallen leaves (baked).
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
   // Far tree: branches and foliage on a half-size layer, scaled up (soft), weaker.
   var far = trees[1];
@@ -1546,30 +1414,16 @@ function frame(now) {
   ctx.drawImage(NL.cnv, 0, 0);
   ctx.globalAlpha = 1;
 
-  // Back grass and susuki, in front of the tree roots.
-  var gl = GL.c;
-  gl.setTransform(1, 0, 0, 1, 0, 0);
-  gl.clearRect(0, 0, GL.cnv.width, GL.cnv.height);
-  gl.setTransform(PR, 0, 0, PR, 0, -(H - ZH) * PR);
-  drawBlades(gl, backGroups, backCols, backOrder, t);
-  drawSusuki(gl, t);
-  grassGlow(gl, H - 40);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.drawImage(GL.cnv, 0, Math.round((H - ZH) * PR));
-
   // The nearer leaves fall in front of it.
   drawFalling(t, 0.55, 2);
 
-  // Ground strip: front grass, the fallen leaves, then the front-most blades.
+  // Ground strip: the loose leaves lying in front, and every leaf that landed.
   gctx.setTransform(1, 0, 0, 1, 0, 0);
   gctx.globalAlpha = 1;
   gctx.clearRect(0, 0, cvG.width, cvG.height);
   gctx.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
-  if (groundGrad) { gctx.fillStyle = groundGrad; gctx.fillRect(0, H - 60, W, 60); }
-  drawBlades(gctx, frontA, frontCols, frontOrder, t);
-  drawPile(gctx);
-  drawBlades(gctx, frontB, frontCols, frontOrder, t);
-  grassGlow(gctx, H);
+  drawPile(gctx, t);
+  groundGlow(gctx, H);
 
   requestAnimationFrame(frame);
 }
