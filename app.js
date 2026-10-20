@@ -11896,7 +11896,7 @@ var WINT = {
   firs: 2, firX: 0.96, firSize: 0.95,
   frostTrees: 9, frostSize: 1.35,
   // the plum branches
-  branchCount: 3, branchSize: 1.05, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22,
+  branchCount: 3, branchSize: 0.9, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22,
   sway: 2.5, swayRandom: 1.7, shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75,
   // the falling snow
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 5.3, nearBlur: 0.3, fallSpeed: 0.6, flakeSway: 2.05,
