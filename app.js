@@ -10543,6 +10543,47 @@ function strSeed(str) {
   for (var i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
   return h >>> 0;
 }
+/* No branch may cross or touch another, apart from where it forks off.
+   A new branch that would is turned a little either way, then tried
+   shorter, and if none of those fit it is left off. Sisters share their
+   fork, so for them only the tips must stay clear. BRANCH_GAP is the
+   least clear space (CSS px) between two branches' edges. */
+var BRANCH_GAP = 3;
+var BRANCH_LENGTHS = [1, 0.75, 0.55];
+var BRANCH_TURNS = [0, 0.14, -0.14, 0.28, -0.28, 0.42, -0.42, 0.56, -0.56];
+function pointSegDist(px, py, ax, ay, bx, by) {
+  var dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy;
+  var u = l2 ? clamp(((px - ax) * dx + (py - ay) * dy) / l2, 0, 1) : 0;
+  return Math.hypot(px - ax - u * dx, py - ay - u * dy);
+}
+function segSegDist(ax, ay, bx, by, cx, cy, dx, dy) {
+  var d1 = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax), d2 = (bx - ax) * (dy - ay) - (by - ay) * (dx - ax);
+  var d3 = (dx - cx) * (ay - cy) - (dy - cy) * (ax - cx), d4 = (dx - cx) * (by - cy) - (dy - cy) * (bx - cx);
+  if (d1 * d2 < 0 && d3 * d4 < 0) return 0;
+  return Math.min(pointSegDist(ax, ay, cx, cy, dx, dy), pointSegDist(bx, by, cx, cy, dx, dy),
+                  pointSegDist(cx, cy, ax, ay, bx, by), pointSegDist(dx, dy, ax, ay, bx, by));
+}
+function branchClear(nodes, parent, sx, sy, ex, ey, w) {
+  for (var i = 0; i < nodes.length; i++) {
+    var o = nodes[i], room = (w + o.w) / 2 + BRANCH_GAP;
+    if (i === parent) continue;
+    if (o.p === parent) {
+      if (pointSegDist(ex, ey, o.sx, o.sy, o.ex, o.ey) < room ||
+          pointSegDist(o.ex, o.ey, sx, sy, ex, ey) < room) return false;
+    } else if (segSegDist(sx, sy, ex, ey, o.sx, o.sy, o.ex, o.ey) < room) return false;
+  }
+  return true;
+}
+function fitBranch(nodes, parent, sx, sy, abs, len, w) {
+  for (var s = 0; s < BRANCH_LENGTHS.length; s++) {
+    var l = len * BRANCH_LENGTHS[s];
+    for (var i = 0; i < BRANCH_TURNS.length; i++) {
+      var a = abs + BRANCH_TURNS[i], ex = sx + Math.cos(a) * l, ey = sy + Math.sin(a) * l;
+      if (branchClear(nodes, parent, sx, sy, ex, ey, w)) return { abs: a, len: l, ex: ex, ey: ey };
+    }
+  }
+  return null;
+}
 /* A new tree shape every day (seeded by the date), leaning in from one side.
    Autumn: a broad, spreading tree. Winter: a different kind — a tall,
    upright, vase-shaped keyaki (zelkova) with a fine broom of twigs.
@@ -10559,10 +10600,14 @@ function buildTree(key, far) {
   var dens = S.winterTreeDensity;          // winter only: 0.1 very sparse … 1 the old dense look
   var maxD = winter ? 4 + Math.round(dens * 4) : TREE_DEPTH;
   function grow(parent, abs, len, w, d) {
+    var sx = parent < 0 ? bx : nodes[parent].ex, sy = parent < 0 ? H + 6 : nodes[parent].ey;
+    var fit = fitBranch(nodes, parent, sx, sy, abs, len, w);
+    if (!fit) return;
+    abs = fit.abs; len = fit.len;
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
     var idx = nodes.length;
     nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
-                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: sx, sy: sy, ex: fit.ex, ey: fit.ey });
     if (d >= maxD || len < scale * (winter ? 0.018 : 0.025)) { tips.push(idx); return; }
     // a sparse winter tree: some twigs simply stop early
     if (winter && d >= 3 && r() < (1 - dens) * 0.4) { tips.push(idx); return; }
@@ -10583,6 +10628,7 @@ function buildTree(key, far) {
       ca = lerp(ca, -PI / 2, upPull);
       grow(idx, ca, len * shrink, Math.max(winter ? 0.9 : 0.7, w * (winter ? 0.64 : 0.66)), d + 1);
     }
+    if (nodes.length === idx + 1) tips.push(idx);   // every twig was left off: this is a tip now
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
   if (winter) grow(-1, -PI / 2 + dir * (0.03 + r() * 0.05), scale * 0.3, Math.max(far ? 3 : 5, scale * 0.026), 0);
@@ -10693,9 +10739,13 @@ function buildKoyoTree(key, far) {
   var left = side === 'left', dir = left ? 1 : -1;
   var sc = H * KOYO.treeSize * (far ? FAR_TREE_SCALE : 1), maxD = KOYO.twigDepth, nodes = [];
   function grow(parent, abs, len, w, d) {
+    var sx = parent < 0 ? bx : nodes[parent].ex, sy = parent < 0 ? H + 6 : nodes[parent].ey;
+    var fit = fitBranch(nodes, parent, sx, sy, abs, len, w);
+    if (!fit) return;
+    abs = fit.abs; len = fit.len;
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, idx = nodes.length;
     nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d,
-                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: sx, sy: sy, ex: fit.ex, ey: fit.ey });
     if (d >= maxD) return;
     var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
     var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
@@ -10833,10 +10883,18 @@ function drawKoyoTrees(ctx, t) {
     koyoGlow(ctx, farTree, 0.6);
     ctxFar.setTransform(1, 0, 0, 1, 0, 0);
     ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
-    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    // The branches go down at full strength on a spare layer first, then that
+    // layer is laid down at branch strength. Stroked straight at half strength,
+    // each piece showed through the next, leaving dark knots at every joint.
+    ctxT.setTransform(1, 0, 0, 1, 0, 0);
+    ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
+    ctxT.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    strokeKoyoBranches(ctxT, farTree);
     ctxFar.globalAlpha = KOYO.branchOpacity;
-    strokeKoyoBranches(ctxFar, farTree);
+    ctxFar.setTransform(1, 0, 0, 1, 0, 0);
+    ctxFar.drawImage(treeLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, farLayer.width, farLayer.height);
     ctxFar.globalAlpha = 1;
+    ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
     drawKoyoClumps(ctxFar, farTree, t);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = KOYO.farOpacity;
