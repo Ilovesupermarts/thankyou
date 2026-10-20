@@ -790,10 +790,13 @@
                    page content (snow bank and fallen leaves), so the text
                    and the table scroll in behind it. The summary bar covers
                    it, and the dots and the swipe hint stay above it.
-       #dynFront   z-index 10, above the message text: the nearest leaves and
-                   flakes, and the dragonfly, cricket and fireflies that land
-                   on the characters. It fades out on the table and the
-                   thank-you pages.
+       #dynFront   z-index 10, above the message text: the nearest flakes,
+                   and the dragonfly, cricket and fireflies that land on the
+                   characters. It fades out on the table and the thank-you
+                   pages.
+       #dynNear    z-index 10, just above #dynFront: the nearest falling
+                   leaves, at full strength. They also fall in front of the
+                   table; only the thank-you pages and the receipt hide them.
 
      #dynVeil is the white flash for lightning.
 
@@ -805,6 +808,7 @@
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-front" id="dynFront" aria-hidden="true"></canvas>
+<canvas class="dyn-canvas dyn-near" id="dynNear" aria-hidden="true"></canvas>
 <div class="dyn-veil" id="dynVeil" aria-hidden="true"></div>
 
 </body>

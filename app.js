@@ -9124,7 +9124,7 @@ var S = {
   figureSide: 'auto',
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   winterTree: true, winterTreeDensity: 0.4, snowman: true, snowmanSize: 1, snowBank: true, snowBankHeight: 1,
-  frontLeaves: 4, frontLeafOpacity: 0.5, snowFront: 0.25,
+  frontLeaves: 8, frontLeafOpacity: 1, frontLeafScale: 1.9, frontLeafMinZ: 0.6, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60, pileClearMidnight: true,
   dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
   renderScale: 0.75
@@ -9838,7 +9838,10 @@ function spawnLeaf(opts) {
   if (leaves.length >= S.maxLeaves && !opts.force) return null;
   var L = makeLeaf(opts);
   // The nearest leaves fall in front of the text (a few at a time).
-  if (S.frontLeaves > 0 && L.z >= 0.7 && frontLeafCount < S.frontLeaves) { L.front = true; frontLeafCount++; }
+  if (S.frontLeaves > 0 && L.z >= S.frontLeafMinZ && frontLeafCount < S.frontLeaves) {
+    L.front = true; frontLeafCount++;
+    L.size *= S.frontLeafScale;           // nearest to the glass: noticeably bigger than the rest
+  }
   var wp = ENV.windPx;
   if (opts.x !== undefined) { L.x = opts.x; L.y = opts.y; }
   else if (Math.abs(wp) > 30 && Math.random() < Math.min(0.5, Math.abs(wp) / 250)) {
@@ -9891,6 +9894,7 @@ function updateLeaf(L, dt, t) {
 
 function settleLeaf(L) {
   L.settled = true;
+  L.solid = !!L.front;                    // a leaf that fell in front lands at full strength too
   L.front = false;
   L.y = H - L.groundY;
   L.pileSy = rnd(0.45, 0.72);
@@ -11508,10 +11512,12 @@ function drawCricket(ctx, t) {
 var cvBack = document.getElementById('dynBack');
 var cvGround = document.getElementById('dynGround');
 var cvFront = document.getElementById('dynFront');
+var cvNear = document.getElementById('dynNear');
 var dynVeil = document.getElementById('dynVeil');
 var ctx = cvBack ? cvBack.getContext('2d') : null;
 var ctxG = cvGround ? cvGround.getContext('2d') : null;
 var ctxF = cvFront ? cvFront.getContext('2d') : null;
+var ctxN = cvNear ? cvNear.getContext('2d') : null;
 var treeLayer = document.createElement('canvas');
 var ctxT = treeLayer.getContext('2d');
 var farLayer = document.createElement('canvas');          // half-size layer for the far tree
@@ -11522,8 +11528,8 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
-  cvBack.width = cvFront.width = treeLayer.width = koyoLeafLayer.width = cw;
-  cvBack.height = cvFront.height = treeLayer.height = koyoLeafLayer.height = ch;
+  cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = cw;
+  cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = ch;
   farLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
   farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
@@ -11582,8 +11588,9 @@ function sendHero() {
 
 function leafAlpha(L, t) {
   var zc = clamp(L.z, 0, 1);
-  var a = L.hero ? 0.6 : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc));
+  var a = L.hero ? 0.6 : (L.solid ? 1 : (isFrontLeaf(L) ? S.frontLeafOpacity : lerp(S.farOpacity, S.nearOpacity, zc)));
   a *= Math.min(1, L.age / (L.fadeDur || 0.6));
+  if (L.solid || (isFrontLeaf(L) && S.frontLeafOpacity >= 1)) return clamp(a, 0, 1);   // full strength: no fog or sun dimming
   if (!L.hero) a *= 1 - ENV.fog * (1 - zc) * 0.6;
   if (ENV.sunAmt > 0.05 && S.sunFlicker > 0) a *= 1 - S.sunFlicker * 0.35 * ENV.sunAmt * noise1(L.x * 0.004 + t * 0.8 + (L.seed % 100));
   return clamp(a, 0, 1);
@@ -11604,13 +11611,14 @@ function drawLeaf(L, t, inPile, target) {
   }
   var cs = Math.cos(rot), sn = Math.sin(rot);
   g.setTransform(cs * sx * PR, sn * sx * PR, -sn * sy * PR, cs * sy * PR, x * PR, (y - drawOffsetY) * PR);
-  g.globalAlpha = inPile ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
+  g.globalAlpha = inPile && !L.solid ? leafAlpha(L, t) * 0.95 : leafAlpha(L, t);
   g.drawImage(spr, -L.hs, -L.hs, L.hs * 2, L.hs * 2);
 }
 
 
 var lastT = 0, envTimer = 0, clockTimer = 0, barTimer = 0, lastLookKey = '', lastDate = '';
 var rebakeIdx = 0, lastScene = '', frontLeafCount = 0;
+var dynNearMul = 0, nearCleared = true;
 var dynMaster = 0, dynScrollY = 0, dynLastMs = 0, dynBegun = false, _lastPanel = -1;
 var dynReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
@@ -11644,6 +11652,12 @@ function dynWantsToRun() {
   if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return false;
   return dynIntroDone() && !document.body.classList.contains('games-active');
 }
+/* The nearest leaves: 1 everywhere, the table included, and 0 only on the
+   thank-you pages and the receipt. */
+function dynNearTarget() {
+  var cl = document.body.classList;
+  return (cl.contains('thankyou-active') || cl.contains('receipt-locked')) ? 0 : 1;
+}
 /* 1 on the message panels, fading to 0 as the page scrolls to the table, and 0
    on the thank-you pages and the receipt (the same rule for all of them). */
 function dynFrontTarget() {
@@ -11667,13 +11681,14 @@ function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
   dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
-  [ctx, ctxG, ctxF].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
+  [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
 function dynApplyOpacity() {
   cvBack.style.opacity = dynMaster.toFixed(3);
   cvGround.style.opacity = dynMaster.toFixed(3);
   cvFront.style.opacity = (dynMaster * dynFrontMul).toFixed(3);
+  cvNear.style.opacity = (dynMaster * dynNearMul).toFixed(3);
 }
 
 function dynStep(dt, t, want) {
@@ -11683,6 +11698,7 @@ function dynStep(dt, t, want) {
 
   dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
   dynFrontMul += (dynFrontTarget() - dynFrontMul) * (1 - Math.exp(-dt * 3));
+  dynNearMul += (dynNearTarget() - dynNearMul) * (1 - Math.exp(-dt * 3));
 
   clockTimer -= dt;
   if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
@@ -11799,7 +11815,6 @@ function dynStep(dt, t, want) {
     ctxF.clearRect(0, 0, cvFront.width, cvFront.height);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0);
     drawSnow(ctxF, 'front');
-    for (var fl = 0; fl < leaves.length; fl++) if (isFrontLeaf(leaves[fl])) drawLeaf(leaves[fl], t, false, ctxF);
     if (hero) drawLeaf(hero, t, false, ctxF);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0); ctxF.globalAlpha = 1;
     drawSpecks(ctxF, t, true);
@@ -11810,6 +11825,19 @@ function dynStep(dt, t, want) {
     ctxF.setTransform(1, 0, 0, 1, 0, 0);
     ctxF.clearRect(0, 0, cvFront.width, cvFront.height);
     frontCleared = true;
+  }
+  // ---- near canvas: the nearest falling leaves, on the table too ----
+  if (dynNearMul > 0.01) {
+    ctxN.setTransform(1, 0, 0, 1, 0, 0);
+    ctxN.clearRect(0, 0, cvNear.width, cvNear.height);
+    ctxN.setTransform(PR, 0, 0, PR, 0, 0);
+    for (var nl = 0; nl < leaves.length; nl++) if (isFrontLeaf(leaves[nl])) drawLeaf(leaves[nl], t, false, ctxN);
+    ctxN.setTransform(PR, 0, 0, PR, 0, 0); ctxN.globalAlpha = 1;
+    nearCleared = false;
+  } else if (!nearCleared) {
+    ctxN.setTransform(1, 0, 0, 1, 0, 0);
+    ctxN.clearRect(0, 0, cvNear.width, cvNear.height);
+    nearCleared = true;
   }
   dynApplyOpacity();
 }
@@ -11883,7 +11911,7 @@ function onWeather(c) {
 /* ============================================================
    START
    ============================================================ */
-if (cvBack && cvGround && cvFront && ctx && ctxG && ctxF) {
+if (cvBack && cvGround && cvFront && cvNear && ctx && ctxG && ctxF && ctxN) {
   makeSprites();
   resize();
   window.addEventListener('resize', resize);

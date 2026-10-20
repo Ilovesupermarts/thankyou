@@ -683,6 +683,7 @@
                           content (table, text) and below .stage (z 9, so its
                           dots and swipe hint stay on top of the snow), the
                           summary bar (z 50), the music display (z 40)
+       .dyn-near    z 10  the nearest leaves, above .dyn-front; kept on the table
        .dyn-front   z 10  above the message text; DynBG fades it out on the
                           table and thank-you pages
 
@@ -697,6 +698,7 @@
   .dyn-back   { top: 0; height: 100%; z-index: -1; }
   .dyn-ground { bottom: 0; height: 150px; z-index: 8; }
   .dyn-front  { top: 0; height: 100%; z-index: 10; }
+  .dyn-near   { top: 0; height: 100%; z-index: 10; }
   .dyn-veil   { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 60; pointer-events: none; background: #ffffff; opacity: 0; }
   html:not([data-theme="autumn"]):not([data-theme="winter"]) .dyn-canvas,
   html:not([data-theme="autumn"]):not([data-theme="winter"]) .dyn-veil { display: none; }
