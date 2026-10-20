@@ -1452,20 +1452,28 @@ function laneRange(N) {
 }
 /* Where a skier's skis touch the snow on swell S: the same line the trees stand on. */
 function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.5 + 2; }
-/* front: a skier at the very front, on #dynNear above the page, so it
-   passes in front of the page dots. It rides its own gentle path at the
-   dots' height (its own "swell", S), at the nearest skiers' size, sharp. */
+/* front: a skier on #dynNear above the page, so it passes in front of the
+   page dots. It rides its own gentle path at the dots' height (its own
+   "swell", S), sized, hazed and blurred for the depth of the snowfield there. */
 function spawnSkier(dir, front) {
   var SW = GROUND.swells, N = SW.length;
   if (!N) return;
   if (front === undefined) front = Math.random() < V.skiFront;
   var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), u = SW[k].u, path = null;
+  var hk = V.skiSize * rnd(0.9, 1.08);
   if (front) {
-    k = -1; u = 1;
+    // Its depth is where its skis would touch the snowfield (just below the
+    // dots): the swell whose snow line is nearest there, so it has the size,
+    // haze and blur of the other skiers at that depth.
     var de = document.getElementById('dots'), rc = de ? de.getBoundingClientRect() : null;
-    var dotsY = rc && rc.height ? rc.top + rc.height / 2 : H - 140, ph0 = rnd(0, TAU), wl = W * rnd(0.3, 0.45);
+    var dotsY = rc && rc.height ? rc.top + rc.height / 2 : H - 140, ph0 = rnd(0, TAU), wl = W * rnd(0.3, 0.45), best = Infinity;
+    for (var q = 0; q < N; q++) {
+      var hq = H * lerp(0.04, 0.09, SW[q].u) * hk, dq = Math.abs(SW[q].yk + SW[q].amp * 0.5 - (dotsY + hq * 0.55));
+      if (dq < best) { best = dq; u = SW[q].u; }
+    }
+    k = -1;
   }
-  var h = H * lerp(0.04, 0.09, u) * V.skiSize * rnd(0.9, 1.08);
+  var h = H * lerp(0.04, 0.09, u) * hk;
   if (front) path = { yk: dotsY + h * 0.55 - 5, amp: 6, f: function (x) { return Math.sin(x / wl + ph0); } };   // the feet just below the dots
   dir = dir || (Math.random() < 0.5 ? 1 : -1);
   var jacket = pick(SKI_JACKETS), scarf = pick(SKI_SCARVES), hat = pick(SKI_HATS);
