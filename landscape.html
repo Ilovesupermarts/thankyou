@@ -1405,7 +1405,7 @@ function buildBed() {
   for (var i = 0; i < V.bedLeaves; i++) {
     // a full leaf, so a gust can lift it and it falls like the others
     var gy = lerp(2, V.bedDepth, Math.random());
-    var L = makeLeaf(lerp(1, 0.72, gy / Math.max(1, V.bedDepth)), Math.random() * (W + 40) - 20, 0);
+    var L = makeLeaf(lerp(1, NEAR_Z, gy / Math.max(1, V.bedDepth)), Math.random() * (W + 40) - 20, 0);   // near leaves, so a lifted one stays in front
     L.gy = gy;
     floorLeaf(L);
   }
@@ -1487,7 +1487,8 @@ function updateGusts(dt) {
    of the ground and stay there until a gust lifts them again.
    ============================================================ */
 var FALL_TIERS = [0.1, 0.4, 0.7, 1.0];
-var NEAR_Z = 0.55;      // leaves this near or nearer fall on #dynNear, above the text and table, and can land
+var MID_Z = 0.55;       // leaves this near or nearer fall in front of the near tree
+var NEAR_Z = 0.8;       // only the nearest (large, sharp) fall on #dynNear, above the text and table, and can land
 function fallSize(z) { return 22 * TREE.leafSize * (0.45 + 0.6 * z); }
 function bakeFallSprites() {
   fallSprites = [];
@@ -1736,7 +1737,7 @@ function frame(now) {
   }
 
   // Leaves further back fall behind the near tree.
-  drawFalling(ctx, t, -1, NEAR_Z);
+  drawFalling(ctx, t, -1, MID_Z);
 
   // Near tree: branches on one layer, foliage on another.
   var near = trees[0];
@@ -1754,7 +1755,10 @@ function frame(now) {
   ctx.drawImage(NL.cnv, 0, 0);
   ctx.globalAlpha = 1;
 
-  // The nearer leaves fall in front of everything, on #dynNear (above the text and table).
+  // Mid-depth leaves: in front of the near tree, but still behind the text and table.
+  drawFalling(ctx, t, MID_Z, NEAR_Z);
+
+  // The nearest leaves fall in front of everything, on #dynNear (above the text and table).
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
   drawFalling(nctx, t, NEAR_Z, 2);
