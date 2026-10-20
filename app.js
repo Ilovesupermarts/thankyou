@@ -1208,6 +1208,7 @@ var swellIsRunning = false;
    user is reading text, not watching the background. */
 var _scrollActive = false;
 var _scrollEndTimer = null;
+var _hudScrollFrameSkip = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
@@ -2873,12 +2874,15 @@ function swellTick() {
     }
   }
 
-  if (!_scrollActive) {
-    applySwellToCSS(swellEnergy);
-    if (_hudShouldDraw()) {
-      drawHudSpectrum();
-      updateHudProgress();
-    }
+  /* Only the background swell write waits for the scroll to end.
+     The HUD wave keeps moving while a finger is held down and
+     dragging; during a scroll it draws every other frame (about
+     60 a second) so it stays light next to the scroll work. */
+  if (!_scrollActive) applySwellToCSS(swellEnergy);
+  _hudScrollFrameSkip = _scrollActive ? !_hudScrollFrameSkip : false;
+  if (!_hudScrollFrameSkip && _hudShouldDraw()) {
+    drawHudSpectrum();
+    updateHudProgress();
   }
 
   if (swellIsRunning) {
