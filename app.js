@@ -52,10 +52,11 @@ var BUILD = 'v135';
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
-       - Name animation: the time-of-day sky colour now fades in as the
-         name starts (#dynSky, a quarter-size canvas under #dynBack, see
-         dynPrelude), so the name sits on the evening or night sky and
-         nothing changes colour when the scene arrives. The sun and moon,
+       - Koi screen and name animation: the time-of-day sky colour shows
+         from the koi screen on (#dynSky, a quarter-size canvas under
+         #dynBack, see dynPrelude), so the session starts on the evening or
+         night sky and nothing changes colour later. The setup screen before
+         the koi keeps the plain palette. The sun and moon,
          trees, leaves, landscape and toolbar still come after the name;
          the landscape is baked during the name so that work is done first.
        - Night text: from 18:00 to 06:00 Nagoya time the message
@@ -12303,14 +12304,14 @@ function dynBegin() {
   if (ENV.scene !== 'winter') prefill();
   dynBegun = true;
 }
-/* Back at the start screen: forget everything and clear the canvases. */
+/* Back at the start screen: forget everything and clear the canvases (the
+   sky colour stays: the koi screen shows it). */
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
   dragonfly = null; cricket = null; tree = null; farTree = null; snowAccum = 0; frontLeafCount = 0; heroNext = 0;
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false;
-  skyMaster = 0; skyTimer = 0;
-  [ctx, ctxG, ctxF, ctxN, ctxSky].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
+  [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
 }
 function dynApplyOpacity() {
@@ -12333,33 +12334,44 @@ function updateSkyLayer(dt, t) {
   ctxSky.setTransform(PR * SKY_RES, 0, 0, PR * SKY_RES, 0, 0);
   drawSky(ctxSky, t);
 }
-/* The name animation: past the koi, before the message panels. Only the sky
-   colour fades in, so the name already sits on the evening or night sky and
-   nothing changes colour when the scene arrives; the sun and moon, trees,
-   leaves and landscape still wait (dynWantsToRun). Meanwhile the scene is
-   set up and the landscape baked, so that work is done before it shows. */
+/* The koi screen and the name animation, before the message panels. Only the
+   time-of-day sky colour shows, so the session starts on the evening or night
+   sky and nothing changes colour later; the sun and moon, trees, leaves and
+   landscape still wait for the message panels (dynWantsToRun). The setup
+   screen before the koi keeps the plain palette. */
+function dynNaming() {
+  return typeof introOverlay !== 'undefined' && !!introOverlay && introOverlay.classList.contains('active');
+}
 function dynSkyWanted() {
   if (dynReduceMotion || document.hidden) return false;
   if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return false;
   if (document.body.classList.contains('games-active')) return false;
-  return dynIntroDone() || (typeof introOverlay !== 'undefined' && !!introOverlay && introOverlay.classList.contains('active'));
+  var koi = typeof blossomScreen !== 'undefined' && !!blossomScreen && blossomScreen.classList.contains('visible');
+  return dynIntroDone() || koi || dynNaming();
 }
 function dynPrelude(dt, t, skyWant) {
   skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
+  var naming = dynNaming();
+  if (dynBegun && !naming && !dynIntroDone()) dynReset();   // back at the koi screen: the scene starts afresh next time
   if (skyWant) {
-    if (!dynBegun) dynBegin();
     clockTimer -= dt;
     if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
     envTimer -= dt;
-    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; ensureTree(); }
-    updateLandscape(t);
+    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; if (dynBegun) ensureTree(); }
+    // During the name the scene is set up and the landscape baked, so that work
+    // is done before it shows (not on the koi screen, where it could make the
+    // koi stutter while someone touches the water).
+    if (naming) {
+      if (!dynBegun) dynBegin();
+      updateLandscape(t);
+    }
     updateSkyLayer(dt, t);
   }
   dynApplyOpacity();
 }
-function dynStep(dt, t, want) {
+function dynStep(dt, t, want, skyWant) {
   dynMaster += ((want ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
-  skyMaster += ((want ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
+  skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
   if (!want) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
   updateSkyLayer(dt, t);
@@ -12549,7 +12561,7 @@ function dynLoop(ms) {
   dynLastMs = ms;
   lastT = ms / 1000;
   if (!want && dynMaster < 0.01) dynPrelude(dt, lastT, skyWant);
-  else dynStep(dt, lastT, want);
+  else dynStep(dt, lastT, want, skyWant);
   requestAnimationFrame(dynLoop);
 }
 
