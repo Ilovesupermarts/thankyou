@@ -910,20 +910,35 @@ function drawBranches(c, T, strength) {
   var bark = T.far ? mix(F.bark, PAPER, TREE.farHaze) : F.bark;
   bark = light(mix(bark, PAPER, 1 - strength));
   if (isNight()) bark = mix(bark, [150, 96, 70], TREE.nightGlow * 0.4);
-  c.strokeStyle = rgb(bark);
-  c.lineCap = 'round';
-  var ns = T.nodes;
-  for (var d = 0; d < T.byDepth.length; d++) {
-    var arr = T.byDepth[d];
-    if (!arr) continue;
-    c.lineWidth = ns[arr[0]].w;
-    c.beginPath();
-    for (var i = 0; i < arr.length; i++) {
-      var n = ns[arr[i]];
-      c.moveTo(X(T, n.sx), n.sy); c.lineTo(X(T, n.ex), n.ey);
-    }
-    c.stroke();
+  // Each branch tapers from its own thickness to the thickness of the branches
+  // that grow from it, with a round joint at the fork, so the thickness flows
+  // on without the steps (notches) that same-width segments left at each fork.
+  // The tapers and the joints are two separate fills: in one path, where they
+  // overlap with opposite winding the canvas would leave a hole.
+  c.fillStyle = rgb(bark);
+  var ns = T.nodes, i, n;
+  function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var w0 = n.w / 2, w1 = endW(n);
+    var x0 = X(T, n.sx), y0 = n.sy, x1 = X(T, n.ex), y1 = n.ey;
+    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+    c.moveTo(x0 + px * w0, y0 + py * w0);
+    c.lineTo(x1 + px * w1, y1 + py * w1);
+    c.lineTo(x1 - px * w1, y1 - py * w1);
+    c.lineTo(x0 - px * w0, y0 - py * w0);
+    c.closePath();
   }
+  c.fill();
+  c.beginPath();
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var r = endW(n), ex = X(T, n.ex);
+    c.moveTo(ex + r, n.ey);
+    c.arc(ex, n.ey, r, 0, TAU);
+  }
+  c.fill();
 }
 function drawClumps(c, T, t) {
   var ns = T.nodes;
