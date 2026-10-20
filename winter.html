@@ -19,12 +19,14 @@
      class names (ambient wash, mist, Shippō mosaic, toolbar, carousel
      panels, swipe hint, dots) and the real #dynBack / #dynGround /
      #dynNear canvases, in the winter theme.
-     The scene: the autumn mountains, ridges and mist with a much bigger
-     snow cap on the Fuji-like peak and snow on the ridge tops; a rolling
-     snowfield with a few bare trees (berries optional); Japanese pines
-     with snow on their pads at the sides, which sway at random and shed
-     snow; falling snow at every depth, the nearest in front of the text
-     and table, landing on a snowdrift along the bottom edge.
+     The scene follows the second reference picture: Fuji in the middle
+     with a big snow cap and mist at its foot, low ridges in front of it,
+     a gentle snowfield with pale frosted trees, snowy firs on the right
+     and a red torii on the left (partly off the screen), plum branches
+     with snow hanging in from the top corners (they sway at random, shed
+     snow and drop the odd petal), and falling snow at every depth, the
+     nearest in front of the text and table, landing on a snowdrift
+     along the bottom edge.
      Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
@@ -172,8 +174,9 @@
 </div>
 
 <!-- ============ The scene (the real canvases, as in index.html) ============
-     #dynBack   behind everything: mountains, Fuji, mist, the snowfield
-                with its bare trees, the pines, the snow behind the text.
+     #dynBack   behind everything: Fuji, the ridges, mist, the snowfield
+                with the torii, firs and trees, the plum branches, the
+                snow behind the text.
      #dynGround the strip along the bottom edge, above the page content:
                 the snowdrift the text and table scroll in behind, and the
                 flakes that land on it and melt.
@@ -269,7 +272,7 @@
       <button type="button" id="btnReset">Reset</button>
       <button type="button" id="btnSeed">New shapes</button>
       <button type="button" id="btnGust">Gust now</button>
-      <button type="button" id="btnShake">Shake a pine</button>
+      <button type="button" id="btnShake">Shake the branches</button>
     </div>
     <div id="labControls"></div>
   </div>
@@ -284,15 +287,15 @@
 <script>
 (function () {
 'use strict';
-
 /* ============================================================
-   1. VALUES — every control on the panel. The mountains, ridges, mist
-   and Fuji start from the approved autumn values (LAND in app.js), with
-   a much bigger snow cap and snow on the ridge tops.
+   1. VALUES — every control on the panel. The look follows the second
+   reference picture: a soft, misty scene with Fuji in the middle,
+   plum branches with snow hanging in from the top corners, a red torii
+   on the left (partly off the screen), snowy firs on the right and pale
+   frosted trees, all on a gentle snowfield.
    ============================================================ */
 var DEFAULTS = {
   seed: 7,
-  nearSide: 'left',
   timeOfDay: 'day',
   wind: 1,
   gustEvery: 9,
@@ -300,50 +303,64 @@ var DEFAULTS = {
   lampGlow: 0.7,
   // mountains
   showMountains: true,
-  ridges: 3,
-  horizon: 0.8,
-  mtnHeight: 0.2,
+  ridges: 2,
+  horizon: 0.76,
+  mtnHeight: 0.12,
   mtnStrength: 1,
-  mtnHaze: 0.55,
-  mtnBlur: 2.5,
-  ridgeSnow: 0.7,
-  mist: 0.75,
-  mistDrift: 0.6,
-  treeLine: true,
+  mtnHaze: 0.7,
+  mtnBlur: 3,
+  ridgeSnow: 0.25,
+  mist: 0.9,
+  mistDrift: 0.7,
+  treeLine: false,
   // Fuji
   showFuji: true,
-  fujiX: 0.73,
-  fujiHeight: 0.34,
-  fujiWidth: 2.6,
+  fujiX: 0.5,
+  fujiHeight: 0.4,
+  fujiWidth: 2.5,
   fujiSnow: 0.42,
   fujiGully: 1.8,
+  fujiHaze: 0.35,
   // the snowfield
   groundStrength: 1,
-  swells: 7,
-  swellHeight: 1,
-  swellShadow: 0.8,
-  groundHaze: 0.5,
-  sparkle: 0.4,
-  // bare trees on the snowfield
-  bareTrees: 5,
-  bareSize: 1,
-  berries: true,
-  berryAmount: 0.6,
-  // pines at the sides
-  pineSize: 0.62,
-  pineWidth: 32,
-  padSize: 1,
-  padSnow: 1,
-  showFarPine: true,
-  pineOpacity: 0.95,
-  farPineOpacity: 0.75,
+  swells: 5,
+  swellHeight: 0.6,
+  swellShadow: 0.45,
+  groundHaze: 0.6,
+  sparkle: 0.3,
+  // the torii
+  torii: true,
+  toriiX: 0.07,
+  toriiDepth: 0.55,
+  toriiSize: 0.36,
+  toriiSnow: 1,
+  // snowy firs
+  firs: 4,
+  firX: 0.88,
+  firSize: 1,
+  // frosted trees
+  frostTrees: 6,
+  frostSize: 1,
+  berries: false,
+  berryAmount: 0.5,
+  shrubs: 1,
+  // plum branches hanging in from the top
+  leftBranch: true,
+  rightBranch: true,
+  branchSize: 1,
+  branchDroop: 1,
+  branchTop: 50,
+  blossoms: 1,
+  blossomSize: 1,
+  branchSnow: 1,
   sway: 1,
   swayRandom: 1,
   shedEvery: 6,
   shedAmount: 1,
   regrow: 1,
+  petals: 0.5,
   // falling snow
-  flakes: 160,
+  flakes: 170,
   sizeFar: 1.8,
   sizeNear: 6,
   farBlur: 3,
@@ -357,8 +374,8 @@ var DEFAULTS = {
   // the snowdrift in front of the text and table
   showNear: true,
   nearHeight: 34,
-  nearLumps: 1,
-  nearShade: 0.5,
+  nearLumps: 0.8,
+  nearShade: 0.4,
   nearShadow: 0.45,
   nearShadowSize: 5,
   scrollTest: true,
@@ -368,14 +385,14 @@ var DEFAULTS = {
   dotsLift: 40,
   dotsX: 0,
   colours: {
-    mtnFar: '#B7B5D2', mtnMid: '#958DBA', mtnNear: '#776A9A', fujiSnow: '#F8F7FC',
-    mist: '#F3F1F7', treeLine: '#4E5F5A',
-    snowLit: '#FDFCFF', snowShade: '#B8C2E0', snowDeep: '#8E9AC6',
-    needle: '#456A58', needleDark: '#22362E', bark: '#4B3B45',
-    bareBranch: '#5E4B60', berry: '#C8321E'
+    fuji: '#8E98AE', fujiSnow: '#FAF8F6', mtnFar: '#BBBEC9', mtnMid: '#A9AEBD', mtnNear: '#979EAF',
+    mist: '#F6EEE8', treeLine: '#6E7A78',
+    snowLit: '#FFFDFB', snowShade: '#C9CCDA', snowDeep: '#A3A8BC',
+    branch: '#3B2B2A', blossom: '#D93B3B', blossomDeep: '#A8212E', stamen: '#F4D27A',
+    torii: '#D2452B', toriiDark: '#3A2B2B', fir: '#4F5E58', frost: '#A39BA3', berry: '#C8321E'
   }
 };
-var STORE_KEY = 'winterLabValues1';
+var STORE_KEY = 'winterLabValues2';   // new key: the scene changed
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var V = clone(DEFAULTS);
 try {
@@ -389,66 +406,82 @@ function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(V)); } ca
 
 /* ============================================================
    2. CONTROL PANEL. "re" says what has to be redrawn on a change:
-   all, scene (mountains), ground (the snowfield), pines, near (the
-   snowdrift), flakes (the snow sprites), css, or nothing.
+   all, scene (mountains), ground (the snowfield and what stands on it),
+   branches, near (the snowdrift), flakes (the snow sprites), css, or
+   nothing.
    ============================================================ */
 var GROUPS = [
   { title: 'Light & wind', ctls: [
     { k: 'timeOfDay', label: 'Time of day', type: 'select', opts: [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']], re: 'all' },
-    { k: 'nearSide', label: 'Near (big) pine on', type: 'select', opts: [['left', 'Left'], ['right', 'Right']], re: 'pines ground near' },
-    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the pines and the snow.' },
-    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'A gust sweeps across: the pines sway and some pads shed their snow. Swiping also makes one.' },
+    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the branches and the snow.' },
+    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'A gust sweeps across: the branches sway and shed some snow. Swiping also makes one.' },
     { k: 'gustStrength', label: 'Gust strength', min: 0, max: 2, step: 0.05 },
-    { k: 'lampGlow', label: 'Lamp glow at night', min: 0, max: 1, step: 0.01, re: 'all', hint: 'Warm lamps under the pines light the snow around them.' }
+    { k: 'lampGlow', label: 'Lamp glow at night', min: 0, max: 1, step: 0.01, re: 'all', hint: 'A warm glow on the snow at the foot of the torii.' }
   ]},
-  { title: 'Mountains', ctls: [
+  { title: 'Fuji', ctls: [
+    { k: 'showFuji', label: 'Show Fuji', type: 'check', re: 'scene' },
+    { k: 'fujiX', label: 'Position (left ↔ right)', min: 0.1, max: 0.9, step: 0.01, re: 'scene' },
+    { k: 'fujiHeight', label: 'Height', min: 0.08, max: 0.55, step: 0.01, re: 'scene' },
+    { k: 'fujiWidth', label: 'Width', min: 1.6, max: 4, step: 0.05, re: 'scene' },
+    { k: 'fujiSnow', label: 'Snow cap (share of the height)', min: 0, max: 0.8, step: 0.01, re: 'scene' },
+    { k: 'fujiGully', label: 'Snow streaks down the gullies', min: 0, max: 4, step: 0.05, re: 'scene' },
+    { k: 'fujiHaze', label: 'Haze on Fuji', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Lower = a clearer, bluer mountain.' }
+  ]},
+  { title: 'Ridges & mist', ctls: [
     { k: 'showMountains', label: 'Show mountains', type: 'check', re: 'scene' },
-    { k: 'ridges', label: 'Ridges in front of the peak', min: 1, max: 3, step: 1, re: 'scene' },
+    { k: 'ridges', label: 'Ridges in front of Fuji', min: 1, max: 3, step: 1, re: 'scene' },
     { k: 'horizon', label: 'Horizon (share of screen height)', min: 0.6, max: 0.95, step: 0.01, re: 'scene ground', hint: 'Where the mountains meet the snowfield. Lower number = more snowfield.' },
-    { k: 'mtnHeight', label: 'Ridge height', min: 0.05, max: 0.4, step: 0.01, re: 'scene' },
+    { k: 'mtnHeight', label: 'Ridge height', min: 0.03, max: 0.4, step: 0.01, re: 'scene' },
     { k: 'mtnStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Keep it low so the text stays easy to read.' },
-    { k: 'mtnHaze', label: 'Distance haze', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Far ridges fade toward the mist colour.' },
+    { k: 'mtnHaze', label: 'Distance haze', min: 0, max: 1, step: 0.01, re: 'scene' },
     { k: 'mtnBlur', label: 'Blur (depth of field)', min: 0, max: 8, step: 0.1, re: 'scene', hint: 'Baked once, so it costs nothing per frame.' },
     { k: 'ridgeSnow', label: 'Snow on the ridge tops', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'mist', label: 'Mist between ridges (霞)', min: 0, max: 1, step: 0.01, re: 'scene' },
+    { k: 'mist', label: 'Mist at the foot of the mountains (霞)', min: 0, max: 1, step: 0.01, re: 'scene' },
     { k: 'mistDrift', label: 'Drifting mist', min: 0, max: 1, step: 0.01, re: 'scene' },
     { k: 'treeLine', label: 'Snowy conifers along the horizon', type: 'check', re: 'scene' }
   ]},
-  { title: 'Fuji-like peak', ctls: [
-    { k: 'showFuji', label: 'Show the peak', type: 'check', re: 'scene' },
-    { k: 'fujiX', label: 'Position (left ↔ right)', min: 0.1, max: 0.9, step: 0.01, re: 'scene' },
-    { k: 'fujiHeight', label: 'Height', min: 0.08, max: 0.45, step: 0.01, re: 'scene' },
-    { k: 'fujiWidth', label: 'Width', min: 1.6, max: 4, step: 0.05, re: 'scene' },
-    { k: 'fujiSnow', label: 'Snow cap (share of the height)', min: 0, max: 0.8, step: 0.01, re: 'scene' },
-    { k: 'fujiGully', label: 'Snow streaks down the gullies', min: 0, max: 4, step: 0.05, re: 'scene' }
-  ]},
   { title: 'Snowfield', ctls: [
     { k: 'groundStrength', label: 'Snowfield strength', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'swells', label: 'Rolling swells', min: 2, max: 12, step: 1, re: 'ground', hint: 'Layers of gentle snowy hills, bigger toward the front.' },
+    { k: 'swells', label: 'Rolling swells', min: 2, max: 12, step: 1, re: 'ground' },
     { k: 'swellHeight', label: 'Swell height', min: 0, max: 3, step: 0.05, re: 'ground' },
-    { k: 'swellShadow', label: 'Blue shadow under the crests', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'swellShadow', label: 'Shadow under the crests', min: 0, max: 1, step: 0.01, re: 'ground' },
     { k: 'groundHaze', label: 'Haze toward the horizon', min: 0, max: 1, step: 0.01, re: 'ground' },
     { k: 'sparkle', label: 'Sparkle on the snow', min: 0, max: 1, step: 0.01, re: 'ground' }
   ]},
-  { title: 'Bare trees on the snowfield', ctls: [
-    { k: 'bareTrees', label: 'How many', min: 0, max: 12, step: 1, re: 'ground', hint: 'The first four stand where they are in the picture; more are added after that.' },
-    { k: 'bareSize', label: 'Size', min: 0.4, max: 2.5, step: 0.05, re: 'ground' },
-    { k: 'berries', label: 'Red berries', type: 'check', re: 'ground' },
-    { k: 'berryAmount', label: 'Berries per tree', min: 0, max: 1, step: 0.01, re: 'ground' }
+  { title: 'Torii', ctls: [
+    { k: 'torii', label: 'Show the torii', type: 'check', re: 'ground' },
+    { k: 'toriiX', label: 'Position (left ↔ right)', min: -0.05, max: 0.95, step: 0.01, re: 'ground', hint: 'Near 0 its left pillar goes off the screen.' },
+    { k: 'toriiDepth', label: 'Distance (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'toriiSize', label: 'Height (share of screen)', min: 0.1, max: 0.7, step: 0.01, re: 'ground' },
+    { k: 'toriiSnow', label: 'Snow on the beams', min: 0, max: 2, step: 0.05, re: 'ground' }
   ]},
-  { title: 'Pines at the sides', ctls: [
-    { k: 'pineSize', label: 'Height (share of screen)', min: 0.4, max: 1.3, step: 0.01, re: 'pines ground near' },
-    { k: 'pineWidth', label: 'Widest reach (% of screen)', min: 15, max: 50, step: 1, re: 'pines', hint: 'The pads are pulled in so the tree stays within this width.' },
-    { k: 'padSize', label: 'Pad size', min: 0.5, max: 1.6, step: 0.05, re: 'pines' },
-    { k: 'padSnow', label: 'Snow on the pads', min: 0, max: 1, step: 0.01, re: 'pines' },
-    { k: 'showFarPine', label: 'Smaller, softer pine on the other side', type: 'check', re: 'pines ground near' },
-    { k: 'pineOpacity', label: 'Near pine strength', min: 0.2, max: 1, step: 0.01 },
-    { k: 'farPineOpacity', label: 'Far pine strength', min: 0.2, max: 1, step: 0.01 },
+  { title: 'Snowy firs', ctls: [
+    { k: 'firs', label: 'How many', min: 0, max: 8, step: 1, re: 'ground' },
+    { k: 'firX', label: 'Position of the group', min: 0.05, max: 1, step: 0.01, re: 'ground' },
+    { k: 'firSize', label: 'Size', min: 0.4, max: 2, step: 0.05, re: 'ground' }
+  ]},
+  { title: 'Frosted trees & shrubs', ctls: [
+    { k: 'frostTrees', label: 'Frosted trees', min: 0, max: 12, step: 1, re: 'ground', hint: 'Pale, bare trees in the mist, as in the picture.' },
+    { k: 'frostSize', label: 'Size', min: 0.4, max: 2.5, step: 0.05, re: 'ground' },
+    { k: 'berries', label: 'Red berries on them', type: 'check', re: 'ground' },
+    { k: 'berryAmount', label: 'Berries per tree', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { k: 'shrubs', label: 'Snowy shrubs', min: 0, max: 2, step: 0.05, re: 'ground' }
+  ]},
+  { title: 'Plum branches from the top', ctls: [
+    { k: 'leftBranch', label: 'Branch from the top left', type: 'check', re: 'branches' },
+    { k: 'rightBranch', label: 'Branch from the top right', type: 'check', re: 'branches' },
+    { k: 'branchSize', label: 'Reach', min: 0.4, max: 1.6, step: 0.01, re: 'branches' },
+    { k: 'branchDroop', label: 'Droop', min: 0, max: 2.5, step: 0.05, re: 'branches' },
+    { k: 'branchTop', label: 'Comes in at (px from the top)', min: -40, max: 240, step: 1, re: 'branches', hint: 'The toolbar is 93px tall; the branch shows through its glass.' },
+    { k: 'blossoms', label: 'Blossoms', min: 0, max: 2.5, step: 0.05, re: 'branches' },
+    { k: 'blossomSize', label: 'Blossom size', min: 0.5, max: 2, step: 0.05, re: 'branches' },
+    { k: 'branchSnow', label: 'Snow on the branches', min: 0, max: 1.5, step: 0.01, re: 'branches' },
     { k: 'sway', label: 'Sway in the wind', min: 0, max: 3, step: 0.05 },
-    { k: 'swayRandom', label: 'Random branch bounces', min: 0, max: 3, step: 0.05, hint: 'Each branch gets its own small, irregular pushes.' },
-    { k: 'shedEvery', label: 'A pad sheds snow every (seconds)', min: 1, max: 30, step: 0.5, hint: 'On average. A gust or a hard bounce also shakes snow off.' },
+    { k: 'swayRandom', label: 'Random bounces', min: 0, max: 3, step: 0.05, hint: 'Each side shoot gets its own small, irregular pushes.' },
+    { k: 'shedEvery', label: 'Snow falls off every (seconds)', min: 1, max: 30, step: 0.5, hint: 'On average. A gust or a hard bounce also shakes snow off.' },
     { k: 'shedAmount', label: 'Snow in each puff', min: 0, max: 3, step: 0.05 },
-    { k: 'regrow', label: 'Snow building back up', min: 0, max: 5, step: 0.05, hint: 'How fast falling snow covers a pad again.' }
+    { k: 'regrow', label: 'Snow building back up', min: 0, max: 5, step: 0.05 },
+    { k: 'petals', label: 'Falling petals', min: 0, max: 3, step: 0.05 }
   ]},
   { title: 'Falling snow', ctls: [
     { k: 'flakes', label: 'Flakes on screen', min: 0, max: 400, step: 1 },
@@ -467,8 +500,8 @@ var GROUPS = [
     { k: 'showNear', label: 'Show the snowdrift', type: 'check', re: 'near' },
     { k: 'nearHeight', label: 'Drift height (px)', min: 14, max: 90, step: 1, re: 'near', hint: 'The text and table disappear behind it as they scroll.' },
     { k: 'nearLumps', label: 'Lumpiness', min: 0, max: 2, step: 0.05, re: 'near' },
-    { k: 'nearShade', label: 'Blue shade', min: 0, max: 1, step: 0.01, re: 'near' },
-    { k: 'nearShadow', label: 'Soft edge over the content', min: 0, max: 1, step: 0.01, re: 'near', hint: 'A faint cool shadow along the top of the drift, so it stands off the white table.' },
+    { k: 'nearShade', label: 'Shade', min: 0, max: 1, step: 0.01, re: 'near' },
+    { k: 'nearShadow', label: 'Soft edge over the content', min: 0, max: 1, step: 0.01, re: 'near' },
     { k: 'nearShadowSize', label: 'Edge softness (px)', min: 0, max: 14, step: 0.5, re: 'near' },
     { k: 'scrollTest', label: 'Scroll test: text and table drifting behind', type: 'check', re: 'css' }
   ]},
@@ -480,16 +513,17 @@ var GROUPS = [
   ]}
 ];
 var COLOUR_LABELS = {
-  mtnFar: 'Far ridge', mtnMid: 'Middle ridge', mtnNear: 'Near ridge', fujiSnow: 'Mountain snow',
+  fuji: 'Fuji', fujiSnow: 'Mountain snow', mtnFar: 'Far ridge', mtnMid: 'Middle ridge', mtnNear: 'Near ridge',
   mist: 'Mist / haze', treeLine: 'Horizon conifers',
   snowLit: 'Snow in light', snowShade: 'Snow in shade', snowDeep: 'Snow, deep shade',
-  needle: 'Pine needles', needleDark: 'Pine needles (shade)', bark: 'Pine bark',
-  bareBranch: 'Bare tree branches', berry: 'Berries'
+  branch: 'Plum branch', blossom: 'Blossom', blossomDeep: 'Blossom centre', stamen: 'Stamens',
+  torii: 'Torii', toriiDark: 'Torii base bands', fir: 'Firs', frost: 'Frosted trees', berry: 'Berries'
 };
 var COLOUR_RE = {
-  mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', fujiSnow: 'scene', treeLine: 'scene',
-  mist: 'scene ground pines', snowLit: 'ground pines near flakes', snowShade: 'ground pines near flakes', snowDeep: 'ground near',
-  needle: 'pines', needleDark: 'pines', bark: 'pines', bareBranch: 'ground', berry: 'ground'
+  fuji: 'scene', fujiSnow: 'scene', mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', treeLine: 'scene',
+  mist: 'scene ground', snowLit: 'ground branches near flakes', snowShade: 'ground branches near flakes', snowDeep: 'ground near',
+  branch: 'branches', blossom: 'branches', blossomDeep: 'branches', stamen: 'branches',
+  torii: 'ground', toriiDark: 'ground', fir: 'ground', frost: 'ground', berry: 'ground'
 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
@@ -560,7 +594,7 @@ function changed(re) {
     var p = _pending;
     _pending = ''; _changeQueued = false;
     if (p.indexOf('all') >= 0) { rebuildAll(); return; }
-    if (p.indexOf('pines') >= 0) buildPines();
+    if (p.indexOf('branches') >= 0) buildBranches();
     if (p.indexOf('flakes') >= 0) bakeFlakeSprites();
     if (p.indexOf('scene') >= 0) bakeScenery();
     if (p.indexOf('ground') >= 0) bakeGround();
@@ -589,7 +623,7 @@ document.getElementById('btnSeed').addEventListener('click', function () {
   V.seed = (V.seed * 9301 + 49297) % 233280; save(); rebuildAll();
 });
 document.getElementById('btnGust').addEventListener('click', function () { startGust(1, 1.3); });
-document.getElementById('btnShake').addEventListener('click', function () { shakePine(pines[0]); });
+document.getElementById('btnShake').addEventListener('click', function () { branches.forEach(shakeBranch); });
 
 /* ============================================================
    3. COPY VALUES — the fonts and styles the page actually uses (read
@@ -621,21 +655,25 @@ function buildCopyText() {
   lines.push('Dots position: bottom ' + dots.bottom + ' + up ' + V.dotsLift + 'px = ' + (parseFloat(dots.bottom) + V.dotsLift) +
              'px from the bottom, moved ' + V.dotsX + 'px sideways');
   lines.push('');
-  lines.push('Light: ' + V.timeOfDay + ', near pine ' + V.nearSide + ', wind ' + f2(V.wind) +
-             ', a gust every ' + V.gustEvery + 's, gust strength ' + f2(V.gustStrength) + ', lamp glow ' + f2(V.lampGlow));
-  lines.push('Mountains: ' + onOff(V.showMountains) + ', ' + V.ridges + ' ridges, horizon ' + f2(V.horizon) +
+  lines.push('Light: ' + V.timeOfDay + ', wind ' + f2(V.wind) + ', a gust every ' + V.gustEvery + 's, gust strength ' +
+             f2(V.gustStrength) + ', lamp glow ' + f2(V.lampGlow));
+  lines.push('Fuji: ' + onOff(V.showFuji) + ', position ' + f2(V.fujiX) + ', height ' + f2(V.fujiHeight) +
+             ', width ' + f2(V.fujiWidth) + ', snow cap ' + f2(V.fujiSnow) + ', gully streaks ' + f2(V.fujiGully) + ', haze ' + f2(V.fujiHaze));
+  lines.push('Ridges: ' + onOff(V.showMountains) + ', ' + V.ridges + ' ridges, horizon ' + f2(V.horizon) +
              ', height ' + f2(V.mtnHeight) + ', strength ' + f2(V.mtnStrength) + ', haze ' + f2(V.mtnHaze) +
              ', blur ' + f2(V.mtnBlur) + 'px, ridge snow ' + f2(V.ridgeSnow) + ', mist ' + f2(V.mist) +
              ', drifting mist ' + f2(V.mistDrift) + ', horizon conifers ' + onOff(V.treeLine));
-  lines.push('Fuji: ' + onOff(V.showFuji) + ', position ' + f2(V.fujiX) + ', height ' + f2(V.fujiHeight) +
-             ', width ' + f2(V.fujiWidth) + ', snow cap ' + f2(V.fujiSnow) + ', gully streaks ' + f2(V.fujiGully));
   lines.push('Snowfield: strength ' + f2(V.groundStrength) + ', ' + V.swells + ' swells, swell height ' + f2(V.swellHeight) +
              ', crest shadow ' + f2(V.swellShadow) + ', haze ' + f2(V.groundHaze) + ', sparkle ' + f2(V.sparkle));
-  lines.push('Bare trees: ' + V.bareTrees + ', size ' + f2(V.bareSize) + ', berries ' + onOff(V.berries) + ' (' + f2(V.berryAmount) + ')');
-  lines.push('Pines: height ' + f2(V.pineSize) + ', reach ' + V.pineWidth + '%, pad size ' + f2(V.padSize) + ', snow on pads ' +
-             f2(V.padSnow) + ', far pine ' + onOff(V.showFarPine) + ', strength ' + f2(V.pineOpacity) + ' / ' + f2(V.farPineOpacity) +
-             ', sway ' + f2(V.sway) + ', random bounces ' + f2(V.swayRandom) + ', sheds every ' + f2(V.shedEvery) +
-             's, puff ' + f2(V.shedAmount) + ', regrow ' + f2(V.regrow));
+  lines.push('Torii: ' + onOff(V.torii) + ', position ' + f2(V.toriiX) + ', distance ' + f2(V.toriiDepth) +
+             ', height ' + f2(V.toriiSize) + ', snow ' + f2(V.toriiSnow));
+  lines.push('Firs: ' + V.firs + ' at ' + f2(V.firX) + ', size ' + f2(V.firSize));
+  lines.push('Frosted trees: ' + V.frostTrees + ', size ' + f2(V.frostSize) + ', berries ' + onOff(V.berries) +
+             ' (' + f2(V.berryAmount) + '), shrubs ' + f2(V.shrubs));
+  lines.push('Plum branches: left ' + onOff(V.leftBranch) + ', right ' + onOff(V.rightBranch) + ', reach ' + f2(V.branchSize) +
+             ', droop ' + f2(V.branchDroop) + ', in at ' + V.branchTop + 'px, blossoms ' + f2(V.blossoms) + ' (size ' +
+             f2(V.blossomSize) + '), snow ' + f2(V.branchSnow) + ', sway ' + f2(V.sway) + ', random bounces ' + f2(V.swayRandom) +
+             ', sheds every ' + f2(V.shedEvery) + 's, puff ' + f2(V.shedAmount) + ', regrow ' + f2(V.regrow) + ', petals ' + f2(V.petals));
   lines.push('Falling snow: ' + V.flakes + ' flakes, size ' + f2(V.sizeFar) + '–' + f2(V.sizeNear) + 'px, blur ' + f2(V.farBlur) +
              '→' + f2(V.nearBlur) + 'px, speed ' + f2(V.fallSpeed) + ', drift ' + f2(V.flakeSway) + ', ' +
              Math.round(V.frontShare * 100) + '% in front, ' + Math.round(V.landShare * 100) + '% of those land and melt after ' +
@@ -750,11 +788,10 @@ var cv = document.getElementById('dynBack'), ctx = cv.getContext('2d');
 var cvG = document.getElementById('dynGround'), gctx = cvG.getContext('2d');
 var cvN = document.getElementById('dynNear'), nctx = cvN.getContext('2d');
 function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
-var NB = mk(), NL = mk(), FL = mk(), FBR = mk(); // near branches, near pads, far pads, far branches
 var SCN = mk(), MTN = mk(), TMP = mk();       // baked scenery, mountains, scratch
 var MIST = mk();                              // one soft mist blob (also the powder puff)
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
-var FAR_SCALE = 0.62, FAR_RES = 0.5, SCN_RES = 0.6;
+var SCN_RES = 0.6;
 
 /* Time-of-day light, as on landscape.html. */
 var LAMP = [255, 196, 128];
@@ -885,7 +922,7 @@ function bakeScenery() {
     s.restore();
   }
 
-  // One soft white blob: the drifting mist, and the powder puffs shaken off the pines.
+  // One soft white blob: the drifting mist, and the powder puffs shaken off the branches.
   var mc = MIST.c; MIST.cnv.width = MIST.cnv.height = 128;
   var rg = mc.createRadialGradient(64, 64, 0, 64, 64, 64);
   rg.addColorStop(0, rgb(mistC, 1)); rg.addColorStop(0.5, rgb(mistC, 0.55)); rg.addColorStop(1, rgb(mistC, 0));
@@ -912,10 +949,10 @@ function drawFuji(c, C, hy) {
     for (var x = fx - bh; x <= fx + bh; x += 3) c.lineTo(x, py(x));
     c.lineTo(fx + bh + 10, hy + 40); c.closePath();
   }
-  var body = light(mix(C.mtnFar, C.mist, V.mtnHaze * 0.8));
+  var body = light(mix(C.fuji, C.mist, V.fujiHaze));
   cone(); c.fillStyle = rgb(body); c.fill();
   if (V.fujiSnow <= 0) return;
-  var snow = light(mix(C.fujiSnow, C.mist, V.mtnHaze * 0.2));
+  var snow = light(mix(C.fujiSnow, C.mist, V.fujiHaze * 0.3));
   var ys = top + Hf * V.fujiSnow;
   var u = 1 - Math.pow(1 - V.fujiSnow, 1 / 2.1), xs = sh + u * (bh - sh);
   var r = rngFrom(V.seed * 977 + 5), n = 11 + Math.floor(r() * 5), pts = [];
@@ -940,15 +977,15 @@ function drawFuji(c, C, hy) {
   cap(); c.fillStyle = sg; c.fill();
   c.restore();
 }
-
 /* ============================================================
-   7. THE SNOWFIELD — rolling swells from the horizon down, each with a
-   soft blue shadow just under its crest (stronger on faces turned away
-   from the light), further ones paler, flatter and softer. The bare
-   trees stand on their swell, so the swells in front hide their feet.
-   Baked once into GRD (redone only when a value changes).
+   7. THE SNOWFIELD — gentle swells from the horizon down, each with a
+   soft cool shadow just under its crest, further ones paler, flatter and
+   softer. On it, each at its own depth (so the swells in front hide
+   their feet, and further ones are hazier and softer): pale frosted
+   trees, a group of snow-laden firs, a red torii with snow on its beams,
+   and snowy shrubs. Baked once into GRD (redone only when a value changes).
    ============================================================ */
-var GRD = mk(), GTMP = mk(), grdTop = 0, sparkles = [];
+var GRD = mk(), GTMP = mk(), grdTop = 0, sparkles = [], toriiSpot = null;
 function swellFn(r, u) {
   var sc = lerp(0.4, 1, u);                     // further swells look shorter (perspective)
   var L = [lerp(0.9, 1.6, r()) * sc, lerp(0.35, 0.6, r()) * sc, lerp(0.12, 0.2, r()) * sc];
@@ -958,99 +995,277 @@ function swellFn(r, u) {
            0.15 * Math.sin(x / (W * L[2]) * TAU + p[2]);
   };
 }
-/* Where the bare trees stand: the first four as in the picture (x, depth
-   0 far … 1 near, size), then more spread about. */
-var BARE_SPOTS = [[0.6, 0.1, 0.6], [0.36, 0.42, 0.85], [0.07, 0.95, 0.9], [0.94, 0.72, 0.8],
-                  [0.82, 0.3, 0.6], [0.2, 0.2, 0.65], [0.5, 0.62, 0.8], [0.7, 0.85, 0.9]];
-function planBare(r, N) {
-  var out = [];
-  for (var i = 0; i < V.bareTrees; i++) {
-    var s = i < BARE_SPOTS.length ? BARE_SPOTS[i] : [r(), r(), lerp(0.6, 0.9, r())];
-    out.push({ x: (s[0] + (r() - 0.5) * 0.04) * W, k: Math.round(s[1] * (N - 1)), size: s[2] * lerp(0.85, 1.15, r()),
-               seed: Math.floor(r() * 1e9) });
+/* Where things stand: [x share, depth 0 far … 1 near, size]. The frosted
+   trees follow the picture: a cluster left of the middle and a few on the
+   right, in the mist. */
+var FROST_SPOTS = [[0.25, 0.2, 1], [0.31, 0.12, 0.75], [0.19, 0.28, 0.85], [0.73, 0.22, 0.9],
+                   [0.67, 0.14, 0.7], [0.6, 0.08, 0.6], [0.4, 0.06, 0.55], [0.79, 0.32, 0.8]];
+var FIR_OFFSETS = [[0, 0.42, 1], [-0.05, 0.36, 0.8], [0.045, 0.48, 0.9], [-0.095, 0.3, 0.65],
+                   [0.085, 0.4, 0.7], [-0.13, 0.25, 0.55], [0.12, 0.52, 0.75], [-0.025, 0.55, 0.6]];
+function planScene(r) {
+  var list = [], i;
+  for (i = 0; i < V.frostTrees; i++) {
+    var s = i < FROST_SPOTS.length ? FROST_SPOTS[i] : [r(), r() * 0.4, lerp(0.5, 0.9, r())];
+    list.push({ type: 'frost', x: (s[0] + (r() - 0.5) * 0.03) * W, u: s[1], size: s[2] * lerp(0.85, 1.15, r()), seed: Math.floor(r() * 1e9) });
   }
-  return out;
+  for (i = 0; i < V.firs; i++) {
+    var f = FIR_OFFSETS[i % FIR_OFFSETS.length];
+    list.push({ type: 'fir', x: (V.firX + f[0]) * W, u: f[1], size: f[2] * lerp(0.9, 1.1, r()), seed: Math.floor(r() * 1e9) });
+  }
+  if (V.torii) list.push({ type: 'torii', x: V.toriiX * W, u: V.toriiDepth, size: 1, seed: 1 });
+  var nS = Math.round(6 * V.shrubs);
+  for (i = 0; i < nS; i++) {
+    var sx, su;
+    if (i % 3 === 0 && V.torii) { sx = (V.toriiX + lerp(-0.08, 0.14, r())) * W; su = Math.min(1, V.toriiDepth + lerp(0.02, 0.15, r())); }
+    else if (i % 3 === 1 && V.firs) { sx = (V.firX + lerp(-0.12, 0.1, r())) * W; su = lerp(0.5, 0.65, r()); }
+    else { sx = r() * W; su = lerp(0.3, 0.8, r()); }
+    list.push({ type: 'shrub', x: sx, u: su, size: lerp(0.7, 1.3, r()), seed: Math.floor(r() * 1e9) });
+  }
+  var order = { frost: 0, fir: 1, torii: 2, shrub: 3 };
+  list.sort(function (a, b) { return a.u - b.u || order[a.type] - order[b.type]; });
+  return list;
 }
-function drawBare(t, B, yBase, u, haze, C) {
-  var r = rngFrom(B.seed), h = H * lerp(0.045, 0.12, u) * B.size * V.bareSize;
-  var col = light(mix(C.bareBranch, C.mist, Math.min(0.85, haze + (1 - u) * 0.2)));
-  var berry = light(mix(C.berry, C.mist, haze * 0.9)), tips = [];
-  t.strokeStyle = rgb(col); t.lineCap = 'round';
+/* A pale, bare, frosted tree in the mist (berries optional). */
+function drawFrost(t, B, yBase, u, haze, C) {
+  var r = rngFrom(B.seed), h = H * lerp(0.08, 0.2, u) * B.size * V.frostSize;
+  var col = light(mix(C.frost, C.mist, Math.min(0.8, haze * 0.6))), hi = light(mix(C.snowLit, C.mist, haze));
+  var berry = light(mix(C.berry, C.mist, haze * 0.9)), tips = [], segs = [];
   function br(x, y, a, len, w, d) {
     var ex = x + Math.cos(a) * len, ey = y + Math.sin(a) * len;
-    t.lineWidth = w; t.beginPath(); t.moveTo(x, y); t.lineTo(ex, ey); t.stroke();
-    if (d >= 4) { tips.push([ex, ey]); return; }
-    var n = d === 0 ? 3 : 2 + (r() < 0.4 ? 1 : 0);
+    segs.push([x, y, ex, ey, w]);
+    if (d >= 5) { tips.push([ex, ey]); return; }
+    var n = d === 0 ? 3 : 2 + (r() < 0.35 ? 1 : 0);
     for (var i = 0; i < n; i++) {
-      var ca = a + ((n > 1 ? i / (n - 1) : 0.5) - 0.5) * lerp(0.7, 1.1, r()) * (d === 0 ? 1.5 : 1) + (r() - 0.5) * 0.25;
-      ca = lerp(ca, -PI / 2, 0.12);
-      br(ex, ey, ca, len * lerp(0.6, 0.78, r()), Math.max(0.45, w * 0.62), d + 1);
+      var ca = a + ((n > 1 ? i / (n - 1) : 0.5) - 0.5) * lerp(0.7, 1.1, r()) * (d === 0 ? 1.6 : 1) + (r() - 0.5) * 0.3;
+      ca = lerp(ca, -PI / 2, 0.1);
+      br(ex, ey, ca, len * lerp(0.62, 0.8, r()), Math.max(0.4, w * 0.62), d + 1);
     }
   }
-  br(B.x, yBase, -PI / 2 + (r() - 0.5) * 0.12, h * 0.32, Math.max(0.7, h * 0.035), 0);
-  t.fillStyle = rgb(light(mix(C.snowLit, C.mist, haze)));           // a little snow heaped at its foot
-  t.beginPath(); ellipse(t, B.x, yBase, Math.max(2, h * 0.13), Math.max(1, h * 0.03)); t.fill();
+  br(B.x, yBase, -PI / 2 + (r() - 0.5) * 0.12, h * 0.26, Math.max(0.8, h * 0.032), 0);
+  t.lineCap = 'round';
+  t.strokeStyle = rgb(col);
+  for (var i = 0; i < segs.length; i++) {
+    var s = segs[i]; t.lineWidth = s[4]; t.beginPath(); t.moveTo(s[0], s[1]); t.lineTo(s[2], s[3]); t.stroke();
+  }
+  t.strokeStyle = rgb(hi, 0.7);                       // frost along the top of the thicker branches
+  for (i = 0; i < segs.length; i++) {
+    var q = segs[i]; if (q[4] < 1.2) continue;
+    t.lineWidth = q[4] * 0.45; t.beginPath(); t.moveTo(q[0], q[1] - q[4] * 0.3); t.lineTo(q[2], q[3] - q[4] * 0.3); t.stroke();
+  }
   if (V.berries && V.berryAmount > 0) {
     t.fillStyle = rgb(berry);
-    var br0 = Math.max(0.6, h * 0.012);
+    var br0 = Math.max(0.6, h * 0.01);
     t.beginPath();
-    for (var i = 0; i < tips.length; i++) {
+    for (i = 0; i < tips.length; i++) {
       if (r() > V.berryAmount) continue;
-      for (var q = 0, nq = 2 + Math.floor(r() * 3); q < nq; q++) {
-        ellipse(t, tips[i][0] + (r() - 0.5) * br0 * 4, tips[i][1] + (r() - 0.3) * br0 * 4, br0, br0);
-      }
+      ellipse(t, tips[i][0], tips[i][1], br0, br0);
     }
     t.fill();
   }
 }
+/* A fir laden with snow: tiers of dark needles, each mostly covered by a
+   heavy layer of snow with a scalloped lower edge. */
+function drawFir(t, B, yb, u, haze, C) {
+  var r = rngFrom(B.seed), h = H * lerp(0.17, 0.3, u) * B.size * V.firSize, x = B.x;
+  var dark = light(mix(C.fir, C.mist, haze)), mid = light(mix(mix(C.fir, [200, 210, 205], 0.22), C.mist, haze));
+  var snow = light(mix(C.snowLit, C.mist, haze * 0.6)), snowSh = light(mix(C.snowShade, C.mist, haze));
+  var tiers = 7 + Math.floor(r() * 3), wMax = h * 0.3;
+  t.fillStyle = rgb(dark);                             // a glimpse of trunk
+  t.fillRect(x - h * 0.012, yb - h * 0.08, h * 0.024, h * 0.08);
+  for (var i = 0; i < tiers; i++) {
+    var u0 = i / tiers, u1 = Math.min(1, (i + 1.7) / tiers);
+    var yTop = yb - h + h * 0.92 * u0, yBot = yb - h + h * 0.92 * u1, th = yBot - yTop;
+    var hw = wMax * Math.pow(u1, 0.85) * lerp(0.85, 1.1, r()), sk = (r() - 0.5) * hw * 0.1;
+    var ns = 3 + Math.round(hw / (h * 0.05)), k;
+    // the needles: a drooping skirt with a jagged hem
+    t.fillStyle = rgb(i % 2 ? dark : mix(dark, mid, 0.35));
+    t.beginPath(); t.moveTo(x, yTop);
+    t.quadraticCurveTo(x + hw * 0.45 + sk, yTop + th * 0.45, x + hw + sk, yBot);
+    for (k = 1; k <= ns; k++) t.lineTo(x + hw + sk - 2 * hw * k / ns, yBot - (k % 2 ? th * 0.12 : 0));
+    t.quadraticCurveTo(x - hw * 0.45 + sk, yTop + th * 0.45, x, yTop);
+    t.fill();
+    // the snow on it: the upper part, with a lumpy lower edge
+    var sy = yTop + th * lerp(0.55, 0.72, r()), shw = hw * lerp(0.78, 0.9, r()) * (sy - yTop) / th + hw * 0.12;
+    t.fillStyle = rgb(snow);
+    t.beginPath(); t.moveTo(x, yTop - th * 0.04);
+    t.quadraticCurveTo(x + shw * 0.5 + sk, yTop + (sy - yTop) * 0.4, x + shw + sk, sy);
+    var nl = 2 + Math.round(shw / (h * 0.035));
+    for (k = 0; k < nl; k++) {
+      var xa = x + shw + sk - 2 * shw * k / nl, xb = x + shw + sk - 2 * shw * (k + 1) / nl;
+      t.quadraticCurveTo((xa + xb) / 2, sy + th * lerp(0.08, 0.2, r()), xb, sy + th * lerp(-0.02, 0.04, r()));
+    }
+    t.quadraticCurveTo(x - shw * 0.5 + sk, yTop + (sy - yTop) * 0.4, x, yTop - th * 0.04);
+    t.fill();
+    // shade on the side away from the light
+    var sg = t.createLinearGradient(x - shw, 0, x + shw, 0);
+    sg.addColorStop(0, rgb(snowSh, 0)); sg.addColorStop(0.55, rgb(snowSh, 0.15)); sg.addColorStop(1, rgb(snowSh, 0.6));
+    t.fillStyle = sg; t.fill();
+  }
+  // a heap of snow at its foot
+  t.fillStyle = rgb(snow);
+  t.beginPath(); ellipse(t, x, yb, wMax * 1.05, h * 0.035); t.fill();
+}
+/* A low shrub buried in snow: soft white mounds with a few dark twigs. */
+function drawShrub(t, B, yb, u, haze, C) {
+  var r = rngFrom(B.seed), s = H * lerp(0.025, 0.06, u) * B.size;
+  var snow = light(mix(C.snowLit, C.mist, haze * 0.6)), sh = light(mix(C.snowShade, C.mist, haze));
+  var tw = light(mix(C.branch, C.mist, Math.min(0.8, haze + 0.35))), n = 3 + Math.floor(r() * 3), bumps = [];
+  for (var i = 0; i < n; i++) {
+    var bx = B.x + (i / (n - 1) - 0.5) * s * 2.2 + (r() - 0.5) * s * 0.3, rr = s * lerp(0.5, 0.85, r()) * (1 - Math.abs(i / (n - 1) - 0.5) * 0.6);
+    bumps.push([bx, yb - rr * 0.55, rr]);
+  }
+  t.strokeStyle = rgb(tw, 0.45); t.lineCap = 'round'; t.lineWidth = Math.max(0.5, s * 0.02);
+  t.beginPath();
+  for (i = 0; i < 5; i++) {
+    var a = -PI / 2 + (r() - 0.5) * 1.6, x0 = B.x + (r() - 0.5) * s * 1.6;
+    t.moveTo(x0, yb - s * 0.5); t.lineTo(x0 + Math.cos(a) * s * 0.9, yb - s * 0.5 + Math.sin(a) * s * 0.9);
+  }
+  t.stroke();
+  t.beginPath();
+  for (i = 0; i < bumps.length; i++) ellipse(t, bumps[i][0], bumps[i][1], bumps[i][2], bumps[i][2] * 0.75);
+  t.fillStyle = rgb(snow); t.fill();
+  var g = t.createLinearGradient(0, yb - s, 0, yb);
+  g.addColorStop(0, rgb(sh, 0)); g.addColorStop(1, rgb(sh, 0.55));
+  t.fillStyle = g; t.fill();
+}
+/* The torii: two red pillars leaning in a touch, the tie beam (nuki), the
+   central strut, and the curved top beams with upturned ends, all with
+   snow heaped on top. */
+function drawTorii(t, B, yb, u, haze, C) {
+  var Ht = H * V.toriiSize, cx = B.x;
+  var red = light(mix(C.torii, C.mist, haze)), redSh = light(mix(scale(C.torii, 0.7), C.mist, haze));
+  var dark = light(mix(C.toriiDark, C.mist, haze)), snow = light(mix(C.snowLit, C.mist, haze * 0.5));
+  var snowSh = light(mix(C.snowShade, C.mist, haze));
+  var span = Ht * 0.72, pw = Ht * 0.075, lean = Ht * 0.02;
+  var xL = cx - span / 2, xR = cx + span / 2, yNuki = yb - Ht * 0.7, yKasa = yb - Ht * 0.9;
+  function pillar(x, s) {                             // s: -1 left, +1 right
+    var topX = x - s * lean;
+    t.fillStyle = rgb(red);
+    t.beginPath(); t.moveTo(x - pw * 0.55, yb); t.lineTo(x + pw * 0.55, yb); t.lineTo(topX + pw * 0.45, yKasa); t.lineTo(topX - pw * 0.45, yKasa); t.closePath(); t.fill();
+    t.fillStyle = rgb(redSh, 0.55);                    // the side away from the light
+    t.beginPath(); t.moveTo(x + pw * 0.12, yb); t.lineTo(x + pw * 0.55, yb); t.lineTo(topX + pw * 0.45, yKasa); t.lineTo(topX + pw * 0.08, yKasa); t.closePath(); t.fill();
+    t.fillStyle = rgb(dark);                           // the dark band at the foot
+    t.fillRect(x - pw * 0.6, yb - Ht * 0.07, pw * 1.2, Ht * 0.07);
+  }
+  pillar(xL, -1); pillar(xR, 1);
+  // the central strut
+  t.fillStyle = rgb(red); t.fillRect(cx - pw * 0.3, yKasa, pw * 0.6, yNuki - yKasa);
+  t.fillStyle = rgb(redSh, 0.5); t.fillRect(cx + pw * 0.05, yKasa, pw * 0.25, yNuki - yKasa);
+  // the tie beam (nuki), running a little past the pillars
+  var nT = Ht * 0.05, nx0 = xL - pw * 1.4, nx1 = xR + pw * 1.4;
+  t.fillStyle = rgb(red); t.fillRect(nx0, yNuki, nx1 - nx0, nT);
+  t.fillStyle = rgb(redSh, 0.5); t.fillRect(nx0, yNuki + nT * 0.6, nx1 - nx0, nT * 0.4);
+  // the top beams: the lower one (shimaki) and the top one (kasagi) with upturned ends
+  var half = span / 2 + pw * 2.4, kT = Ht * 0.06, sT = Ht * 0.05, lift = Ht * 0.07;
+  function curve(h0, up, y0) {                        // the top edge of a beam, as points
+    var pts = [];
+    for (var i = 0; i <= 24; i++) {
+      var s = i / 24, xx = cx - h0 + 2 * h0 * s, e = Math.abs(s * 2 - 1);
+      pts.push([xx, y0 - up * Math.pow(e, 2.4)]);
+    }
+    return pts;
+  }
+  function beam(pts, th, style) {
+    t.beginPath();
+    for (var i = 0; i < pts.length; i++) i ? t.lineTo(pts[i][0], pts[i][1]) : t.moveTo(pts[i][0], pts[i][1]);
+    for (i = pts.length - 1; i >= 0; i--) {
+      var e = Math.abs(i / (pts.length - 1) * 2 - 1);
+      t.lineTo(pts[i][0], pts[i][1] + th * lerp(1, 0.55, Math.pow(e, 3)));
+    }
+    t.closePath(); t.fillStyle = style; t.fill();
+  }
+  var shim = curve(half * 0.9, lift * 0.4, yKasa - sT), kasa = curve(half, lift, yKasa - sT - kT);
+  beam(shim, sT, rgb(red));
+  beam(kasa, kT, rgb(red));
+  var kg = t.createLinearGradient(0, yKasa - sT - kT, 0, yKasa);   // shade under the top beam
+  kg.addColorStop(0, rgb(redSh, 0)); kg.addColorStop(1, rgb(redSh, 0.6));
+  beam(shim, sT, kg);
+  t.strokeStyle = rgb(dark, 0.7); t.lineWidth = Math.max(0.8, Ht * 0.008);   // a dark line along the top edge
+  t.beginPath(); for (var j = 0; j < kasa.length; j++) j ? t.lineTo(kasa[j][0], kasa[j][1]) : t.moveTo(kasa[j][0], kasa[j][1]); t.stroke();
+  // snow heaped on the top beam and the tie beam
+  var rs = rngFrom(V.seed * 41 + 3);
+  function heap(pts, hgt) {
+    if (hgt <= 0) return;
+    var n = pts.length, i, top = [];
+    for (i = 0; i < n; i++) {
+      var s = i / (n - 1), env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, s)), 0.35);
+      top.push([pts[i][0], pts[i][1] - hgt * env * lerp(0.75, 1.15, rs())]);
+    }
+    t.beginPath(); t.moveTo(pts[0][0] - hgt * 0.3, pts[0][1] + hgt * 0.15);
+    for (i = 0; i < n; i++) t.lineTo(top[i][0], top[i][1]);
+    t.lineTo(pts[n - 1][0] + hgt * 0.3, pts[n - 1][1] + hgt * 0.15);
+    for (i = n - 1; i >= 0; i--) t.lineTo(pts[i][0], pts[i][1] + hgt * 0.25);
+    t.closePath();
+    t.fillStyle = rgb(snow); t.fill();
+    var g = t.createLinearGradient(0, pts[Math.floor(n / 2)][1] - hgt, 0, pts[Math.floor(n / 2)][1] + hgt * 0.3);
+    g.addColorStop(0, rgb(snowSh, 0)); g.addColorStop(0.6, rgb(snowSh, 0.1)); g.addColorStop(1, rgb(snowSh, 0.55));
+    t.fillStyle = g; t.fill();
+    t.fillStyle = rgb(snow);                         // drips over the front edge
+    t.beginPath();
+    for (i = 2; i < n - 2; i += 3) if (rs() < 0.5) ellipse(t, pts[i][0], pts[i][1] + hgt * 0.35, hgt * 0.16, hgt * lerp(0.25, 0.45, rs()));
+    t.fill();
+  }
+  heap(kasa, Ht * 0.055 * V.toriiSnow);
+  heap(curve((nx1 - nx0) / 2, 0, yNuki).map(function (p) { return [p[0] + (nx0 + nx1) / 2 - cx, p[1]]; }), Ht * 0.03 * V.toriiSnow);
+  // snow heaped at the feet of the pillars
+  t.fillStyle = rgb(snow);
+  t.beginPath(); ellipse(t, xL, yb, pw * 1.5, Ht * 0.02); ellipse(t, xR, yb, pw * 1.5, Ht * 0.02); t.fill();
+  toriiSpot = { x: cx, y: yb, h: Ht };
+}
 function bakeGround() {
   var C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), N = Math.max(2, Math.round(V.swells));
   var depthPx = Math.max(1, H - hy), mistC = C.mist;
-  grdTop = Math.max(0, Math.floor(hy - 20));
+  grdTop = Math.max(0, Math.floor(hy - H * 0.75));   // tall things (the torii, the firs) rise well above the horizon
   var gw = Math.round(W * PR), gh = Math.max(1, Math.round((H - grdTop) * PR));
   GRD.cnv.width = GTMP.cnv.width = gw; GRD.cnv.height = GTMP.cnv.height = gh;
   var g0 = GRD.c;
   g0.setTransform(1, 0, 0, 1, 0, 0); g0.clearRect(0, 0, gw, gh);
-  sparkles = [];
+  sparkles = []; toriiSpot = null;
   if (V.groundStrength <= 0) return;
-  var bares = planBare(r, N);
+  var things = planScene(rngFrom(V.seed * 313 + 11)), swells = [];
   for (var k = 0; k < N; k++) {
-    var u = k / (N - 1);                                     // 0 far … 1 near
-    var yk = hy + depthPx * 0.92 * Math.pow(k / N, 1.25);
-    var amp = lerp(3, 26, Math.pow(u, 1.4)) * V.swellHeight;
-    var f = swellFn(r, u), haze = V.groundHaze * Math.pow(1 - u, 2) * 0.9;
+    var u = k / (N - 1);
+    swells.push({ u: u, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u, 1.4)) * V.swellHeight, f: swellFn(r, u) });
+  }
+  for (k = 0; k < N; k++) {
+    var S = swells[k], haze = V.groundHaze * Math.pow(1 - S.u, 2) * 0.9;
     var tg = GTMP.c;
     tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, gw, gh);
     tg.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
-    swellLayer(tg, C, k, u, yk, amp, f, haze, depthPx);
-    for (var b = 0; b < bares.length; b++) {
-      if (bares[b].k !== k) continue;
-      drawBare(tg, bares[b], yk - amp * f(bares[b].x) + amp * 0.5 + 2, u, haze, C);
+    swellLayer(tg, C, k, S.u, S.yk, S.amp, S.f, haze, depthPx);
+    for (var b = 0; b < things.length; b++) {
+      var B = things[b];
+      if (Math.round(B.u * (N - 1)) !== k) continue;
+      var yb = S.yk - S.amp * S.f(B.x) + S.amp * 0.5 + 2, hz = V.groundHaze * Math.pow(1 - B.u, 2) * 0.9;
+      if (B.type === 'frost') drawFrost(tg, B, yb, B.u, hz, C);
+      else if (B.type === 'fir') drawFir(tg, B, yb, B.u, hz, C);
+      else if (B.type === 'torii') drawTorii(tg, B, yb, B.u, hz * 0.8, C);
+      else drawShrub(tg, B, yb, B.u, hz, C);
     }
     g0.save();
     g0.setTransform(1, 0, 0, 1, 0, 0);
     g0.globalAlpha = V.groundStrength;
-    var bl = lerp(1.4, 0, u) * PR;                           // further = softer
+    var bl = lerp(1.4, 0, S.u) * PR;                           // further = softer
     g0.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
     g0.drawImage(GTMP.cnv, 0, 0);
     g0.restore();
-    // a few points that glint now and then
-    if (u > 0.25) {
-      for (var sp = 0, ns = Math.round(V.sparkle * 10 * u); sp < ns; sp++) {
+    if (S.u > 0.25) {                                          // a few points that glint now and then
+      for (var sp = 0, ns = Math.round(V.sparkle * 10 * S.u); sp < ns; sp++) {
         var sx2 = r() * W;
-        sparkles.push({ x: sx2, y: yk - amp * f(sx2) + lerp(3, 14, r()) * (0.5 + u), ph: r() * TAU, f: lerp(0.4, 1.1, r()), s: lerp(1.5, 3.5, u) });
+        sparkles.push({ x: sx2, y: S.yk - S.amp * S.f(sx2) + lerp(3, 14, r()) * (0.5 + S.u), ph: r() * TAU, f: lerp(0.4, 1.1, r()), s: lerp(1.5, 3.5, S.u) });
       }
     }
   }
-  // haze where the snowfield meets the mountains, so the edge melts into the mist
+  // mist lying low where the snowfield meets the mountains, as in the picture
   g0.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
-  var mz = g0.createLinearGradient(0, hy - 4, 0, hy + depthPx * 0.35);
+  var mz = g0.createLinearGradient(0, hy - depthPx * 0.15, 0, hy + depthPx * 0.35);
   var mc = light(mistC);
-  mz.addColorStop(0, rgb(mc, 0.75 * V.groundHaze));
+  mz.addColorStop(0, rgb(mc, 0));
+  mz.addColorStop(0.35, rgb(mc, 0.6 * V.groundHaze));
   mz.addColorStop(1, rgb(mc, 0));
   g0.fillStyle = mz;
-  g0.fillRect(-10, hy - 20, W + 20, depthPx * 0.35 + 20);
-  groundGlow(g0, H - depthPx * 0.3);
+  g0.fillRect(-10, hy - depthPx * 0.15, W + 20, depthPx * 0.5);
+  groundGlow(g0, toriiSpot ? toriiSpot.y : H - depthPx * 0.3);
 }
 function swellLayer(t, C, k, u, yk, amp, f, haze, depthPx) {
   var litC = light(mix(C.snowLit, C.mist, haze)), shC = light(mix(C.snowShade, C.mist, haze));
@@ -1059,7 +1274,7 @@ function swellLayer(t, C, k, u, yk, amp, f, haze, depthPx) {
   for (x = -10; x <= W + 10; x += 4) t.lineTo(x, yk - amp * f(x));
   t.lineTo(W + 10, H + 10); t.closePath();
   var g = t.createLinearGradient(0, yk - amp, 0, yk + amp + depthPx * 0.18);
-  g.addColorStop(0, rgb(litC)); g.addColorStop(1, rgb(mix(litC, shC, 0.35)));
+  g.addColorStop(0, rgb(litC)); g.addColorStop(1, rgb(mix(litC, shC, 0.3)));
   t.fillStyle = g; t.fill();
   var a0 = V.swellShadow, STEP = 3;
   if (a0 > 0) {
@@ -1078,7 +1293,7 @@ function swellLayer(t, C, k, u, yk, amp, f, haze, depthPx) {
     }
     t.beginPath();
     for (x = -10; x <= W + 10; x += 4) { if (x === -10) t.moveTo(x, yk - amp * f(x)); else t.lineTo(x, yk - amp * f(x)); }
-    t.strokeStyle = rgb(deepC, 0.22 * a0);
+    t.strokeStyle = rgb(deepC, 0.18 * a0);
     t.lineWidth = lerp(0.6, 1.4, u);
     t.stroke();
   }
@@ -1101,178 +1316,132 @@ function drawSparkles(c, t) {
   }
   c.globalAlpha = 1;
 }
-/* At night the lamps under the pines also light the snow around their roots. */
+/* At night a warm lamp at the foot of the torii lights the snow around it
+   (yBase: the height of the glow on the canvas it is drawn on). */
 function groundGlow(c, yBase) {
   if (!isNight() || V.lampGlow <= 0) return;
+  var x = toriiSpot ? toriiSpot.x : W * 0.5, y = yBase, R = W * 0.22;
   c.save();
   c.globalCompositeOperation = 'source-atop';
-  for (var i = 0; i < pines.length; i++) {
-    var T = pines[i], R = W * (T.far ? 0.16 : 0.24);
-    var g = c.createRadialGradient(T.bx, yBase, 0, T.bx, yBase, R);
-    var a = 0.45 * V.lampGlow * (T.far ? 0.6 : 1);
-    g.addColorStop(0, 'rgba(255,184,110,' + a.toFixed(3) + ')');
-    g.addColorStop(1, 'rgba(255,170,96,0)');
-    c.fillStyle = g;
-    c.fillRect(T.bx - R, yBase - R, R * 2, R * 2);
-  }
+  var g = c.createRadialGradient(x, y, 0, x, y, R);
+  g.addColorStop(0, 'rgba(255,184,110,' + (0.45 * V.lampGlow).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,170,96,0)');
+  c.fillStyle = g;
+  c.fillRect(x - R, y - R, R * 2, R * 2);
   c.restore();
 }
 
 /* ============================================================
-   8. PINES — a Japanese pine (松) on each side: a curving trunk, near
-   level branches, and on each branch end a flat pad of needles with a
-   mound of snow on top. Built like the kōyō trees (a branch skeleton
-   carrying pads that are baked once), so they sway the same way.
-   On top of the wind, every branch has its own spring that gets small
-   random pushes, so the tree never moves in a regular rhythm.
-   A pad sheds snow now and then, when its branch bounces hard, or when
-   a gust hits: its snow mound shrinks, a puff of powder falls, and the
-   branch springs up a little, lighter. The snow slowly builds back up.
+   8. PLUM BRANCHES — ume (梅) branches hanging in from the top corners,
+   as in the picture: a dark zigzag limb reaching in and drooping, side
+   shoots and short twigs carrying red blossoms and buds, and snow lying
+   along the top of every branch. Built like the trees (a branch skeleton
+   that sways), and every side shoot has its own spring that gets small
+   random pushes, so they never move in a regular rhythm.
+   Now and then a shoot sheds its snow (also on a hard bounce or in a
+   gust): the snow on it gets thinner, a puff of powder falls, and the
+   shoot springs up a little, lighter. The snow slowly builds back up,
+   and the odd petal comes loose and drifts down.
    ============================================================ */
-var pines = [], puffs = [], shedTimer = 3;
-function padShape(R, r) {
-  var bumps = [], n = 4 + Math.floor(r() * 3);
-  for (var i = 0; i < n; i++) {
-    var u = n > 1 ? (i / (n - 1)) * 2 - 1 : 0, mid = 1 - Math.abs(u) * 0.55;
-    var ry = R * 0.44 * mid * lerp(0.85, 1.15, r());
-    bumps.push({ cx: u * R * 0.7 + (r() - 0.5) * R * 0.12, cy: -ry * 0.35 + (r() - 0.5) * R * 0.05,
-                 rx: R * lerp(0.32, 0.42, r()), ry: ry });
-  }
-  bumps.push({ cx: 0, cy: R * 0.06, rx: R * 0.92, ry: R * 0.15 });   // a flat underside
-  return bumps;
-}
-function bakePad(R, far, r) {
-  var C = cols(), res = PR * (far ? FAR_RES : 1), haze = far ? 0.22 : 0;
-  var wC = R * 2.5, hC = R * 1.9, cx0 = wC / 2, cy0 = R * 1.05;
-  function canvas() {
-    var cnv = document.createElement('canvas');
-    cnv.width = Math.ceil(wC * res); cnv.height = Math.ceil(hC * res);
-    var c = cnv.getContext('2d'); c.setTransform(res, 0, 0, res, cx0 * res, cy0 * res);
-    return { cnv: cnv, c: c };
-  }
-  var bumps = padShape(R, r), i, b;
-  // the needles: a dark mass, tufts of needles lit from the upper left, a darker underside
-  var P = canvas(), c = P.c;
-  var dark = light(mix(C.needleDark, C.mist, haze)), mid = light(mix(C.needle, C.mist, haze));
-  var lit = light(mix(mix(C.needle, [214, 226, 205], 0.3), C.mist, haze));
-  c.fillStyle = rgb(dark);
-  c.beginPath(); for (i = 0; i < bumps.length; i++) { b = bumps[i]; ellipse(c, b.cx, b.cy, b.rx, b.ry); } c.fill();
-  var nT = Math.round(clamp(R * R * 0.09, 30, 360) * (far ? 0.6 : 1));
-  c.lineCap = 'round';
-  c.lineWidth = Math.max(0.6, R * 0.014);
-  for (i = 0; i < nT; i++) {
-    b = bumps[Math.floor(r() * (bumps.length - 1))];
-    var a = r() * TAU, d = Math.sqrt(r()) * 0.9, px = b.cx + Math.cos(a) * b.rx * d, py = b.cy + Math.sin(a) * b.ry * d;
-    var tt = clamp(0.45 - py / (R * 0.45) * 0.5 - px / R * 0.25 + (r() - 0.5) * 0.4, 0, 1);
-    c.strokeStyle = rgb(tt < 0.5 ? mix(dark, mid, tt * 2) : mix(mid, lit, (tt - 0.5) * 2));
-    var len = R * lerp(0.07, 0.12, r()), base = -PI / 2 + (r() - 0.5) * 1.2;
-    c.beginPath();
-    for (var q = -2; q <= 2; q++) {
-      var na = base + q * 0.32;
-      c.moveTo(px, py); c.lineTo(px + Math.cos(na) * len, py + Math.sin(na) * len * 0.8);
+var branches = [], puffs = [], petals = [], shedTimer = 3, petalTimer = 2, bloomSprites = [];
+var BLOOM_S0 = 20;                            // sprites are drawn for a 20px flower and scaled
+function bakeBloomSprites() {
+  var C = cols(), RS = 2, red = light(C.blossom), deep = light(C.blossomDeep), st = light(C.stamen);
+  bloomSprites = [];
+  for (var kind = 0; kind < 3; kind++) {
+    for (var v = 0; v < 3; v++) {
+      var side = Math.ceil(BLOOM_S0 * 1.4 * RS), cnv = document.createElement('canvas');
+      cnv.width = cnv.height = side;
+      var c = cnv.getContext('2d'), r = rngFrom(kind * 31 + v * 7 + 5), p;
+      c.setTransform(RS, 0, 0, RS, side / 2, side / 2);
+      if (kind === 0) {                          // open: five round petals and a ring of stamens
+        for (p = 0; p < 5; p++) {
+          var a = -PI / 2 + p * TAU / 5 + (r() - 0.5) * 0.25, pr = BLOOM_S0 * 0.24 * lerp(0.9, 1.1, r());
+          var px = Math.cos(a) * BLOOM_S0 * 0.24, py = Math.sin(a) * BLOOM_S0 * 0.24;
+          var g = c.createRadialGradient(0, 0, 0, 0, 0, BLOOM_S0 * 0.5);
+          g.addColorStop(0, rgb(deep)); g.addColorStop(0.45, rgb(red)); g.addColorStop(1, rgb(mix(red, [255, 255, 255], 0.14)));
+          c.fillStyle = g; c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+        }
+        c.fillStyle = rgb(scale(deep, 0.85)); c.beginPath(); c.arc(0, 0, BLOOM_S0 * 0.09, 0, TAU); c.fill();
+        c.fillStyle = rgb(st);
+        for (var q = 0; q < 8; q++) {
+          var aa = q * TAU / 8 + r() * 0.3, d = BLOOM_S0 * lerp(0.12, 0.18, r());
+          c.beginPath(); c.arc(Math.cos(aa) * d, Math.sin(aa) * d, BLOOM_S0 * 0.026, 0, TAU); c.fill();
+        }
+      } else if (kind === 1) {                   // half open: a cup seen from the side
+        c.fillStyle = rgb(red);
+        for (p = 0; p < 3; p++) { c.beginPath(); ellipse(c, (p - 1) * BLOOM_S0 * 0.14, -BLOOM_S0 * 0.04 + Math.abs(p - 1) * BLOOM_S0 * 0.03, BLOOM_S0 * 0.15, BLOOM_S0 * 0.2); c.fill(); }
+        c.fillStyle = rgb(deep); c.beginPath(); ellipse(c, 0, BLOOM_S0 * 0.12, BLOOM_S0 * 0.13, BLOOM_S0 * 0.07); c.fill();
+      } else {                                   // a bud
+        c.fillStyle = rgb(deep); c.beginPath(); ellipse(c, 0, 0, BLOOM_S0 * 0.12, BLOOM_S0 * 0.14); c.fill();
+        c.fillStyle = rgb(mix(red, [255, 255, 255], 0.25), 0.8); c.beginPath(); ellipse(c, -BLOOM_S0 * 0.03, -BLOOM_S0 * 0.04, BLOOM_S0 * 0.04, BLOOM_S0 * 0.05); c.fill();
+      }
+      bloomSprites.push({ cnv: cnv, half: side / (2 * RS) });
     }
-    c.stroke();
   }
-  c.save();
-  c.globalCompositeOperation = 'source-atop';
-  var ug = c.createLinearGradient(0, -R * 0.1, 0, R * 0.25);
-  ug.addColorStop(0, rgb(dark, 0)); ug.addColorStop(1, rgb(scale(dark, 0.8), 0.6));
-  c.fillStyle = ug; c.fillRect(-R * 1.3, -R, R * 2.6, R * 2);
-  c.restore();
-  // the snow on top: a mound over each bump, white in the light, blue underneath and on the right
-  var S = canvas(), s = S.c;
-  var sLit = light(mix(C.snowLit, C.mist, haze)), sSh = light(mix(C.snowShade, C.mist, haze));
-  var top = 0, anchor = 0, n;
-  s.fillStyle = rgb(sLit);
-  s.beginPath();
-  for (i = 0; i < bumps.length - 1; i++) {
-    b = bumps[i];
-    var scy = b.cy - b.ry * 0.45, sry = b.ry * 0.72;
-    ellipse(s, b.cx, scy, b.rx * 1.04, sry);
-    top = Math.min(top, scy - sry); anchor += scy + sry * 0.5;
-  }
-  anchor /= (bumps.length - 1);
-  s.fill();
-  s.beginPath();                                          // a few drips over the edge
-  for (i = 0, n = 3 + Math.floor(r() * 4); i < n; i++) {
-    b = bumps[Math.floor(r() * (bumps.length - 1))];
-    var dx = b.cx + (r() - 0.5) * b.rx * 1.4;
-    ellipse(s, dx, b.cy - b.ry * 0.5 + b.ry * 0.55, R * lerp(0.035, 0.06, r()), R * lerp(0.05, 0.09, r()));
-  }
-  s.fill();
-  s.save();
-  s.globalCompositeOperation = 'source-atop';
-  var sg = s.createLinearGradient(0, top, 0, anchor + R * 0.12);
-  sg.addColorStop(0, rgb(sSh, 0)); sg.addColorStop(0.55, rgb(sSh, 0.1)); sg.addColorStop(1, rgb(sSh, 0.85));
-  s.fillStyle = sg; s.fillRect(-R * 1.3, -R, R * 2.6, R * 2);
-  var sg2 = s.createLinearGradient(-R, 0, R, 0);
-  sg2.addColorStop(0, rgb(sSh, 0)); sg2.addColorStop(1, rgb(sSh, 0.35));
-  s.fillStyle = sg2; s.fillRect(-R * 1.3, -R, R * 2.6, R * 2);
-  s.restore();
-  return { pad: P.cnv, snow: S.cnv, w: wC, h: hC, cx: cx0, cy: cy0, anchor: anchor };
 }
-function buildPine(far) {
-  var r = rngFrom(V.seed * 7919 + (far ? 101 : 0));
-  var side = far ? (V.nearSide === 'left' ? 'right' : 'left') : V.nearSide;
-  var left = side === 'left', dir = left ? 1 : -1;
-  var sc = H * V.pineSize * (far ? FAR_SCALE : 1);
-  var nodes = [], springs = [];
-  function add(parent, abs, len, w, flex, sp) {
-    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
-    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, flex: flex, sp: sp === undefined ? -1 : sp,
-                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0, branch: sp !== undefined || flex > 0.2 });
+function buildBranch(left) {
+  var r = rngFrom(V.seed * 7919 + (left ? 0 : 101));
+  function M(a) { return left ? a : PI - a; }     // angles are worked out for the left branch and mirrored
+  var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize;
+  var nodes = [], springs = [], blooms = [], groups = [];
+  function add(parent, abs, len, w, flex, sp, g) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [];
+    for (var i = 0; i < 7; i++) lump.push(lerp(0.7, 1.25, r()));
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, flex: flex, sp: sp === undefined ? -1 : sp, g: g,
+                 ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0,
+                 snow: V.branchSnow * lerp(0.7, 1, r()), lump: lump });
+    groups[g].nodes.push(nodes.length - 1);
     return nodes.length - 1;
   }
-  // the trunk: a gentle S-curve leaning into the picture
-  var nT = 6, segLen = sc * 0.93 / nT, ph = r() * TAU, lean = lerp(0.1, 0.2, r()), trunk = [], prev = -1;
-  for (var i = 0; i < nT; i++) {
-    var a = -PI / 2 + dir * (lean + 0.2 * Math.sin(i * 0.95 + ph));
-    prev = add(prev, a, segLen, lerp(sc * 0.045, sc * 0.014, i / (nT - 1)), 0.02 + 0.12 * Math.pow(i / nT, 1.5));
-    trunk.push(prev);
-  }
-  // branches from the upper two-thirds, near level, curving up at the end; a pad at each end
-  var padEnds = [], sideNext = r() < 0.5 ? 1 : -1;
-  for (var t = 1; t < nT; t++) {
-    var nb = r() < 0.35 ? 2 : 1;
-    for (var b = 0; b < nb; b++) {
-      var s = nb === 2 ? (b === 0 ? 1 : -1) : sideNext;
-      sideNext = -sideNext;
-      if (s === -dir && r() < 0.35) s = dir;                  // more reach into the picture than out of it
-      var ba = -PI / 2 + s * lerp(1.05, 1.35, r());
-      var bl = sc * lerp(0.16, 0.28, r()) * (1 - t / nT * 0.45);
-      springs.push({ o: 0, v: 0, s: s });
-      var b1 = add(trunk[t], ba, bl * 0.6, sc * lerp(0.012, 0.009, t / nT), 0.25, springs.length - 1);
-      var b2 = add(b1, ba - s * lerp(0.15, 0.35, r()), bl * 0.4, sc * 0.007, 0.45);
-      padEnds.push({ node: b2, R: sc * lerp(0.11, 0.15, r()) * (1 - 0.3 * t / nT), sp: springs.length - 1 });
-      if (bl > sc * 0.2 && r() < 0.4) padEnds.push({ node: b1, R: sc * lerp(0.07, 0.09, r()), sp: springs.length - 1, small: true });
+  function bloomOn(ni, g, k) {
+    var n = nodes[ni], cnt = Math.round(lerp(1, 3.5, r()) * V.blossoms * (k || 1) * clamp(n.len / (sc * 0.07), 0.5, 2));
+    for (var q = 0; q < cnt; q++) {
+      var kind = r() < 0.62 ? 0 : (r() < 0.55 ? 1 : 2);
+      blooms.push({ node: ni, t: lerp(0.15, 1, r()), off: (r() - 0.5) * Math.max(4, n.w * 2.2), rot: r() * TAU,
+                    size: sc * lerp(0.024, 0.034, r()) * V.blossomSize * (kind === 2 ? 0.8 : 1), spr: kind * 3 + Math.floor(r() * 3), kind: kind });
     }
   }
-  springs.push({ o: 0, v: 0, s: 0 });                         // the crown
-  padEnds.push({ node: trunk[nT - 1], R: sc * lerp(0.11, 0.13, r()), sp: springs.length - 1 });
-  var bx = left ? W * (0.03 + r() * 0.05) : W * (0.92 + r() * 0.05);
-  var T = { far: far, left: left, bx: bx, by: H + 8, nodes: nodes, springs: springs, scale: sc, pads: [], k: 1, gust: 0, gustV: 0 };
-  restPose(T);
-  for (var p = 0; p < padEnds.length; p++) {
-    var E = padEnds[p], R = E.R * V.padSize;
-    T.pads.push({ node: E.node, R: R, sp: E.sp, spr: bakePad(R, far, r), amt: V.padSnow * lerp(0.8, 1, r()),
-                  ox: (r() - 0.5) * R * 0.2, oy: -R * 0.1, ph: r() * TAU });
+  // the main limb: a zigzag reaching in and drooping down
+  groups.push({ sp: -1, nodes: [] });
+  var bx = left ? -sc * 0.04 : W + sc * 0.04, by = V.branchTop + lerp(-10, 20, r());
+  var nM = 7, a0 = lerp(0.12, 0.3, r()), prev = -1, mains = [], las = [], i;
+  for (i = 0; i < nM; i++) {
+    var la = a0 + 0.075 * V.branchDroop * i + (i % 2 ? 1 : -1) * lerp(0.12, 0.28, r());
+    prev = add(prev, M(la), sc * 0.95 / nM * lerp(0.8, 1.2, r()), lerp(sc * 0.05, sc * 0.012, i / (nM - 1)),
+               0.02 + 0.1 * Math.pow(i / nM, 1.3), undefined, 0);
+    mains.push(prev); las.push(la);
   }
-  T.pads.sort(function (a, b) { return nodes[a.node].ey - nodes[b.node].ey; });   // lower pads drawn later, in front
-  // pull the reach in so the pine stays within the chosen width
-  var limit = V.pineWidth / 100 * W, kk = 1;
-  for (var m = 0; m < T.pads.length; m++) {
-    var cn = nodes[T.pads[m].node], edge = T.pads[m].R * 1.05;
-    var dx = left ? cn.ex - bx : bx - cn.ex;
-    var room = left ? limit - bx - edge : limit - (W - bx) - edge;
-    if (dx > 0 && dx * kk > room) kk = Math.max(0.3, room / dx);
+  // side shoots: straight shoots reaching up (as ume grows) or drooping ones, with twigs
+  for (i = 1; i < nM; i++) {
+    var nb = r() < 0.5 ? 2 : 1;
+    for (var b = 0; b < nb; b++) {
+      var up = r() < 0.55;
+      var la2 = up ? lerp(-1.3, -0.5, r()) : las[i] + lerp(0.4, 1.0, r());
+      var len = sc * lerp(0.12, 0.24, r()) * (1 - i / nM * 0.35);
+      springs.push({ o: 0, v: 0, up: left ? -1 : 1 });
+      var sp = springs.length - 1, g = groups.length;
+      groups.push({ sp: sp, nodes: [] });
+      var segs = 2 + (r() < 0.5 ? 1 : 0), p0 = mains[i];
+      for (var s = 0; s < segs; s++) {
+        var node = add(p0, M(la2), len / segs * lerp(0.8, 1.2, r()), lerp(sc * 0.014, sc * 0.006, s / segs), 0.15 + 0.15 * s, s === 0 ? sp : undefined, g);
+        if (r() < 0.6) {
+          var ta = la2 + (r() < 0.5 ? -1 : 1) * lerp(0.4, 0.8, r());
+          bloomOn(add(node, M(ta), sc * lerp(0.04, 0.08, r()), sc * 0.004, 0.5, undefined, g), g);
+        }
+        bloomOn(node, g);
+        p0 = node; la2 += (r() - 0.5) * 0.35;
+      }
+    }
   }
-  T.k = kk;
-  var sx2 = 0, sy2 = 0, top = H, bot = 0, nC = T.pads.length || 1;
-  T.pads.forEach(function (Pd) {
-    var nn = nodes[Pd.node]; sx2 += X(T, nn.ex); sy2 += nn.ey;
-    top = Math.min(top, nn.ey - Pd.R); bot = Math.max(bot, nn.ey + Pd.R);
+  for (i = 3; i < nM; i++) bloomOn(mains[i], 0, 0.6);   // a few on the outer part of the limb too
+  var T = { left: left, bx: bx, by: by, nodes: nodes, springs: springs, blooms: blooms, groups: groups, sc: sc,
+            k: 1, gust: 0, gustV: 0 };
+  T.endW = nodes.map(function (n, idx) {
+    for (var j = idx + 1; j < nodes.length; j++) if (nodes[j].p === idx) return nodes[j].w / 2;
+    return n.w * 0.3;
   });
-  T.cx = sx2 / nC; T.cy = sy2 / nC; T.cr = Math.max(40, (bot - top) * 0.75);
+  restPose(T);
   return T;
 }
 function restPose(T) {
@@ -1284,13 +1453,14 @@ function restPose(T) {
     n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
   }
 }
-function X(T, x) { return T.bx + (x - T.bx) * T.k; }
-function buildPines() {
-  pines = [buildPine(false)];
-  if (V.showFarPine) pines.push(buildPine(true));
-  puffs = [];
+function buildBranches() {
+  bakeBloomSprites();
+  branches = [];
+  if (V.leftBranch) branches.push(buildBranch(true));
+  if (V.rightBranch) branches.push(buildBranch(false));
+  puffs = []; petals = [];
 }
-function swayPine(T, t, dt) {
+function swayBranch(T, t, dt) {
   T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
   T.gust += T.gustV * dt;
   if (Math.random() < dt * 0.08 * V.swayRandom) T.gustV += (Math.random() - 0.5) * 0.12 * V.swayRandom;
@@ -1301,6 +1471,7 @@ function swayPine(T, t, dt) {
     if (Math.random() < dt * 0.3 * V.swayRandom) B.v += (Math.random() - 0.5) * 0.4 * V.swayRandom * (0.5 + 0.5 * V.wind);
   }
   var amp = 0.02 * V.wind * V.sway, ns = T.nodes;
+  var grow = dt * 0.012 * V.regrow * (V.flakes > 0 ? 1 : 0);
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i];
     var sw = (Math.sin(t * n.f + n.ph) * amp + Math.sin(t * 0.37 + n.ph * 0.3) * amp * 0.6 + T.gust) * n.flex;
@@ -1309,47 +1480,51 @@ function swayPine(T, t, dt) {
     n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
     n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
     n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+    n.snow = Math.min(V.branchSnow, n.snow + grow);       // snow builds back up while it falls
   }
-  // snow builds back up while it falls; a hard bounce shakes some off
-  var grow = dt * 0.012 * V.regrow * (V.flakes > 0 ? 1 : 0);
-  for (var p = 0; p < T.pads.length; p++) {
-    var Pd = T.pads[p];
-    Pd.amt = Math.min(V.padSnow, Pd.amt + grow);
-    if (Pd.amt > 0.3 && Math.abs(T.springs[Pd.sp].v) > 0.45 && Math.random() < dt * 3) shed(T, Pd, 0.4);
-  }
-}
-function shed(T, Pd, frac) {
-  if (Pd.amt < 0.12 || V.shedAmount <= 0) return;
-  var d = Pd.amt * frac * lerp(0.7, 1.3, Math.random());
-  d = Math.min(d, Pd.amt);
-  Pd.amt -= d;
-  var B = T.springs[Pd.sp];
-  if (B.s) B.v -= B.s * 0.35 * d;                         // lighter now: the branch springs up a little
-  var n = T.nodes[Pd.node], x0 = X(T, n.ex + Pd.ox), y0 = n.ey + Pd.oy - Pd.R * 0.2, R = Pd.R;
-  var cnt = Math.round(clamp(R / 3, 8, 50) * d * 2.2 * V.shedAmount);
-  for (var i = 0; i < cnt; i++) {
-    puffs.push({ far: T.far, x: x0 + (Math.random() - 0.5) * R * 1.4, y: y0 + (Math.random() - 0.5) * R * 0.2,
-                 vx: (Math.random() - 0.5) * 30, vy: rnd(-12, 10), r: rnd(0.8, 2.6) * (T.far ? 0.6 : 1),
-                 a: rnd(0.7, 1), life: rnd(2, 3.5), age: 0, kind: 0 });
-  }
-  for (var c = 0, nc = Math.round(1 + 2 * d * V.shedAmount); c < nc; c++) {   // a soft cloud of powder
-    puffs.push({ far: T.far, x: x0 + (Math.random() - 0.5) * R * 0.8, y: y0 + R * 0.1, vx: (Math.random() - 0.5) * 12, vy: rnd(10, 25),
-                 r: R * lerp(0.35, 0.6, Math.random()), a: 0.5 * Math.min(1, d * 2) * V.shedAmount, life: rnd(1.6, 2.6), age: 0, kind: 1 });
+  // a hard bounce shakes snow off that shoot
+  for (var g = 1; g < T.groups.length; g++) {
+    var G = T.groups[g];
+    if (Math.abs(T.springs[G.sp].v) > 0.45 && Math.random() < dt * 3) shed(T, g, 0.4);
   }
 }
-function shakePine(T) {
-  if (!T) return;
+function shed(T, gi, frac) {
+  var G = T.groups[gi];
+  if (!G || V.shedAmount <= 0) return;
+  var tot = 0, cx = 0, cy = 0, cn = 0;
+  for (var i = 0; i < G.nodes.length; i++) {
+    var n = T.nodes[G.nodes[i]];
+    if (n.snow < 0.1) continue;
+    var d = Math.min(n.snow, n.snow * frac * lerp(0.7, 1.3, Math.random()));
+    n.snow -= d; tot += d;
+    var cnt = Math.round(clamp(n.len / 6, 2, 14) * d * 2 * V.shedAmount);
+    for (var q = 0; q < cnt; q++) {
+      var tt = Math.random();
+      puffs.push({ x: lerp(n.sx, n.ex, tt), y: lerp(n.sy, n.ey, tt) - n.w * 0.6, vx: (Math.random() - 0.5) * 24, vy: rnd(-10, 8),
+                   r: rnd(0.8, 2.6), a: rnd(0.7, 1), life: rnd(2.5, 4.5), age: 0, kind: 0 });
+    }
+    cx += (n.sx + n.ex) / 2; cy += (n.sy + n.ey) / 2; cn++;
+  }
+  if (cn && tot > 0.15) {                                 // a soft cloud of powder
+    for (var c = 0, nc = Math.round(1 + tot * V.shedAmount); c < nc; c++) {
+      puffs.push({ x: cx / cn + (Math.random() - 0.5) * 30, y: cy / cn, vx: (Math.random() - 0.5) * 12, vy: rnd(10, 25),
+                   r: T.sc * lerp(0.04, 0.08, Math.random()), a: 0.5 * Math.min(1, tot) * V.shedAmount, life: rnd(1.6, 2.6), age: 0, kind: 1 });
+    }
+  }
+  if (G.sp >= 0) T.springs[G.sp].v += T.springs[G.sp].up * 0.3 * Math.min(1, tot);   // lighter now: it springs up a little
+}
+function shakeBranch(T) {
   for (var s = 0; s < T.springs.length; s++) T.springs[s].v += (Math.random() - 0.5) * 1.2;
-  T.gustV += (T.left ? 1 : -1) * 0.25;
-  for (var p = 0; p < T.pads.length; p++) if (Math.random() < 0.4) shed(T, T.pads[p], 0.6);
+  T.gustV += (T.left ? 1 : -1) * 0.2;
+  for (var g = 0; g < T.groups.length; g++) if (Math.random() < 0.5) shed(T, g, 0.6);
 }
 function updatePuffs(dt) {
   for (var i = puffs.length - 1; i >= 0; i--) {
     var P = puffs[i];
     P.age += dt;
-    if (P.age > P.life) { puffs.splice(i, 1); continue; }
+    if (P.age > P.life || P.y > H + 20) { puffs.splice(i, 1); continue; }
     if (P.kind === 0) {
-      P.vy = Math.min(P.vy + 160 * dt, P.far ? 55 : 85);
+      P.vy = Math.min(P.vy + 160 * dt, 85);
       P.vx += (fieldAt(P.x) * 90 - P.vx) * (1 - Math.exp(-dt * 1.5));
     } else {
       P.vy *= Math.exp(-dt * 1.2); P.r += dt * P.r * 0.5;
@@ -1358,92 +1533,112 @@ function updatePuffs(dt) {
     P.x += P.vx * dt; P.y += P.vy * dt;
   }
 }
-function drawPuffs(c, far) {
+function drawPuffs(c) {
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < puffs.length; i++) {
-    var P = puffs[i];
-    if (P.far !== far) continue;
-    var k = P.age / P.life, a = P.a * (k < 0.15 ? k / 0.15 : 1 - Math.pow((k - 0.15) / 0.85, 1.5));
+    var P = puffs[i], k = P.age / P.life, a = P.a * (k < 0.15 ? k / 0.15 : 1 - Math.pow((k - 0.15) / 0.85, 1.5));
     c.globalAlpha = clamp(a, 0, 1);
     if (P.kind === 1) c.drawImage(MIST.cnv, P.x - P.r, P.y - P.r * 0.7, P.r * 2, P.r * 1.4);
-    else drawFlakeSprite(c, P.x, P.y, P.r, far ? 1.2 : 0.4);
+    else drawFlakeSprite(c, P.x, P.y, P.r, 0.4);
   }
   c.globalAlpha = 1;
 }
-/* Branches are drawn solid and tapered as on landscape.html, with a
-   thin line of snow along the top of each branch. */
-function drawBranches(c, T, strength) {
-  var C = cols();
-  var bark = light(mix(mix(C.bark, C.mist, T.far ? 0.25 : 0), C.mist, 1 - strength));
-  if (isNight()) bark = mix(bark, [150, 96, 70], V.lampGlow * 0.4);
-  c.fillStyle = rgb(bark);
-  var ns = T.nodes, i, n;
-  function endW(n) { var ch = null; for (var j = 0; j < ns.length; j++) if (ns[j].p === ns.indexOf(n)) { ch = ns[j]; break; } return (ch ? ch.w : n.w * 0.6) / 2; }
-  if (!T.endW) T.endW = ns.map(function (n) { return endW(n); });
+/* Petals: now and then one comes loose from an open blossom and drifts down. */
+function bloomPos(T, B) {
+  var n = T.nodes[B.node], dx = n.ex - n.sx, dy = n.ey - n.sy, len = Math.hypot(dx, dy) || 1;
+  return { x: n.sx + dx * B.t - dy / len * B.off, y: n.sy + dy * B.t + dx / len * B.off, rot: B.rot + (n.cur - n.abs) };
+}
+function updatePetals(t, dt) {
+  petalTimer -= dt * V.petals;
+  if (petalTimer <= 0 && branches.length) {
+    var T = branches[Math.floor(Math.random() * branches.length)], B = T.blooms[Math.floor(Math.random() * T.blooms.length)];
+    if (B && B.kind === 0) {
+      var p = bloomPos(T, B);
+      petals.push({ x: p.x, y: p.y, vx: 0, vy: rnd(14, 24), s: B.size * 0.28, rot: rnd(0, TAU), vr: rnd(-2, 2),
+                    f: rnd(1.5, 3), ph: rnd(0, TAU), sw: rnd(12, 26), at: t });
+    }
+    petalTimer = rnd(1.5, 5);
+  }
+  for (var i = petals.length - 1; i >= 0; i--) {
+    var P = petals[i];
+    P.vx += (fieldAt(P.x) * 120 - P.vx) * (1 - Math.exp(-dt * 1.2));
+    P.x += (P.vx + Math.sin(t * 0.9 + P.ph) * P.sw) * dt;
+    P.y += P.vy * V.fallSpeed * dt;
+    P.rot += P.vr * dt;
+    if (P.y > H + 20 || P.x < -60 || P.x > W + 60) petals.splice(i, 1);
+  }
+}
+function drawPetals(c, t) {
+  if (!petals.length) return;
+  var C = cols(), col = rgb(light(C.blossom)), dk = rgb(light(C.blossomDeep));
+  for (var i = 0; i < petals.length; i++) {
+    var P = petals[i], a = clamp((t - P.at) / 0.4, 0, 1);
+    c.setTransform(PR, 0, 0, PR, PR * P.x, PR * P.y);
+    c.rotate(P.rot); c.scale(Math.cos(t * P.f + P.ph), 1);
+    c.globalAlpha = a;
+    c.fillStyle = Math.cos(t * P.f + P.ph) > 0 ? col : dk;
+    c.beginPath(); ellipse(c, 0, 0, P.s, P.s * 0.8); c.fill();
+  }
+  c.globalAlpha = 1;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+}
+/* The branch: solid, tapering, with round joints; the snow along the top
+   of each piece (thinner on steep pieces); then the blossoms. */
+function drawBranch(c, T, t) {
+  var C = cols(), ns = T.nodes, i, n;
+  var wood = light(C.branch), snow = light(C.snowLit), shade = light(C.snowShade);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.fillStyle = rgb(wood);
   c.beginPath();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
     var w0 = n.w / 2, w1 = T.endW[i];
-    var x0 = X(T, n.sx), y0 = n.sy, x1 = X(T, n.ex), y1 = n.ey;
-    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
-    c.moveTo(x0 + px * w0, y0 + py * w0);
-    c.lineTo(x1 + px * w1, y1 + py * w1);
-    c.lineTo(x1 - px * w1, y1 - py * w1);
-    c.lineTo(x0 - px * w0, y0 - py * w0);
+    var dx = n.ex - n.sx, dy = n.ey - n.sy, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+    c.moveTo(n.sx + px * w0, n.sy + py * w0);
+    c.lineTo(n.ex + px * w1, n.ey + py * w1);
+    c.lineTo(n.ex - px * w1, n.ey - py * w1);
+    c.lineTo(n.sx - px * w0, n.sy - py * w0);
     c.closePath();
   }
   c.fill();
   c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    var rr = T.endW[i], ex = X(T, n.ex);
-    c.moveTo(ex + rr, n.ey);
-    c.arc(ex, n.ey, rr, 0, TAU);
-  }
+  for (i = 0; i < ns.length; i++) { n = ns[i]; c.moveTo(n.ex + T.endW[i], n.ey); c.arc(n.ex, n.ey, T.endW[i], 0, TAU); }
   c.fill();
-  // snow lying along the branches
-  c.strokeStyle = rgb(light(mix(C.snowLit, C.mist, T.far ? 0.25 : 0)), 0.9);
-  c.lineCap = 'round';
+  // the snow: a lumpy mound along the upper side of each piece, and a cool band at its foot
+  var top = new Path2D(), band = new Path2D();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
-    if (!n.branch) continue;
-    var sxa = X(T, n.sx), sxb = X(T, n.ex);
-    c.lineWidth = Math.max(0.8, n.w * 0.55);
-    c.beginPath();
-    c.moveTo(sxa, n.sy - n.w * 0.45); c.lineTo(sxb, n.ey - T.endW[i] * 0.9);
-    c.stroke();
-  }
-}
-function drawPads(c, T, t) {
-  var ns = T.nodes;
-  for (var i = 0; i < T.pads.length; i++) {
-    var Pd = T.pads[i], n = ns[Pd.node], S = Pd.spr;
-    var x = X(T, n.ex + Pd.ox), y = n.ey + Pd.oy;
-    var rot = (n.cur - n.abs) * 0.5 + Math.sin(t * 0.9 + Pd.ph) * 0.01 * V.wind;
-    c.save();
-    c.translate(x, y); c.rotate(rot);
-    c.drawImage(S.pad, -S.cx, -S.cy, S.w, S.h);
-    if (Pd.amt > 0.02) {
-      // the mound settles down toward the needles as it gets thinner
-      var a = Pd.amt, ky = lerp(0.3, 1, a), kx = lerp(0.75, 1, a);
-      c.globalAlpha = clamp(a * 4, 0, 1);
-      c.translate(0, S.anchor); c.scale(kx, ky); c.translate(0, -S.anchor);
-      c.drawImage(S.snow, -S.cx, -S.cy, S.w, S.h);
+    if (n.snow < 0.03) continue;
+    var ddx = n.ex - n.sx, ddy = n.ey - n.sy, L = Math.hypot(ddx, ddy) || 1, ux = ddx / L, uy = ddy / L;
+    var nx = uy, ny = -ux;
+    if (ny > 0) { nx = -nx; ny = -ny; }                  // the side facing up
+    var hS = (n.w * 0.5 + 1.2 + T.sc * 0.005) * n.snow * Math.pow(Math.abs(ux), 0.8);
+    if (hS < 0.4) continue;
+    var bs = [], ts = [], j;
+    for (j = 0; j <= 6; j++) {
+      var tt = j / 6, wA = lerp(n.w / 2, T.endW[i], tt) * 0.8, env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, tt)), 0.22);
+      var bxp = n.sx + ddx * tt + nx * wA, byp = n.sy + ddy * tt + ny * wA;
+      bs.push([bxp, byp]); ts.push([bxp + nx * hS * env * n.lump[j], byp + ny * hS * env * n.lump[j], env]);
     }
-    c.restore();
+    top.moveTo(bs[0][0], bs[0][1]);
+    for (j = 0; j <= 6; j++) top.lineTo(ts[j][0], ts[j][1]);
+    for (j = 6; j >= 0; j--) top.lineTo(bs[j][0], bs[j][1]);
+    top.closePath();
+    band.moveTo(bs[0][0], bs[0][1]);
+    for (j = 0; j <= 6; j++) band.lineTo(bs[j][0] + nx * hS * 0.35 * ts[j][2], bs[j][1] + ny * hS * 0.35 * ts[j][2]);
+    for (j = 6; j >= 0; j--) band.lineTo(bs[j][0], bs[j][1]);
+    band.closePath();
   }
-}
-function nightGlow(T, strength) {
-  if (!isNight() || V.lampGlow <= 0 || !T.pads.length) return;
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  var gy = T.cy + T.cr * 0.25;
-  var g = ctx.createRadialGradient(T.cx, gy, 0, T.cx, gy, T.cr * 1.3);
-  g.addColorStop(0, 'rgba(255,184,110,' + (0.28 * V.lampGlow * strength).toFixed(3) + ')');
-  g.addColorStop(0.5, 'rgba(255,170,96,' + (0.12 * V.lampGlow * strength).toFixed(3) + ')');
-  g.addColorStop(1, 'rgba(255,160,90,0)');
-  ctx.globalAlpha = 1;
-  ctx.fillStyle = g;
-  ctx.fillRect(T.cx - T.cr * 1.4, gy - T.cr * 1.4, T.cr * 2.8, T.cr * 2.8);
+  c.fillStyle = rgb(snow); c.fill(top);
+  c.fillStyle = rgb(shade, 0.5); c.fill(band);
+  // the blossoms
+  for (i = 0; i < T.blooms.length; i++) {
+    var B = T.blooms[i], p = bloomPos(T, B), S = bloomSprites[B.spr], k = B.size / BLOOM_S0;
+    var cs = Math.cos(p.rot) * k * PR, sn = Math.sin(p.rot) * k * PR;
+    c.setTransform(cs, sn, -sn, cs, PR * p.x, PR * p.y);
+    c.drawImage(S.cnv, -S.half, -S.half, S.half * 2, S.half * 2);
+  }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
 }
 
 /* ============================================================
@@ -1527,8 +1722,8 @@ function floorY(x) {
 
 /* ============================================================
    10. WIND — a steady breeze with ripples travelling across, plus the
-   gust fronts (as on landscape.html). A gust gives each pine a push,
-   bounces its branches and shakes snow off a few pads.
+   gust fronts (as on landscape.html). A gust gives each plum branch a
+   push, bounces its shoots and shakes snow off a few of them.
    ============================================================ */
 var FB = 10, field = [];
 function updateField(t) {
@@ -1560,22 +1755,22 @@ function updateGusts(dt) {
   for (var i = gusts.length - 1; i >= 0; i--) {
     var g = gusts[i];
     g.x += g.dir * g.v * dt;
-    for (var ti = 0; ti < pines.length; ti++) {
-      var T = pines[ti];
-      if (!g.hit[ti] && (g.x - T.bx) * g.dir > 0) {
+    for (var ti = 0; ti < branches.length; ti++) {
+      var T = branches[ti];
+      if (!g.hit[ti] && (g.x - (T.left ? 0 : W)) * g.dir > 0) {
         g.hit[ti] = 1;
-        T.gustV += g.dir * g.str * 0.4 * (T.far ? 0.7 : 1);
-        for (var s = 0; s < T.springs.length; s++) T.springs[s].v += g.dir * g.str * rnd(0.1, 0.5);
-        for (var p = 0; p < T.pads.length; p++) if (Math.random() < 0.25 * g.str) shed(T, T.pads[p], 0.35);
+        T.gustV += g.dir * g.str * 0.4 * (T.left ? -1 : 1);
+        for (var s = 0; s < T.springs.length; s++) T.springs[s].v += g.dir * g.str * rnd(0.1, 0.5) * (T.left ? -1 : 1);
+        for (var q = 0; q < T.groups.length; q++) if (Math.random() < 0.25 * g.str) shed(T, q, 0.35);
       }
     }
     if (g.x < -1400 || g.x > W + 1400) gusts.splice(i, 1);
   }
-  // now and then a pad sheds on its own
+  // now and then a shoot sheds its snow on its own
   shedTimer -= dt;
   if (shedTimer <= 0) {
-    var T2 = pines[Math.random() < 0.7 || pines.length < 2 ? 0 : 1];
-    if (T2 && T2.pads.length) shed(T2, T2.pads[Math.floor(Math.random() * T2.pads.length)], lerp(0.3, 0.6, Math.random()));
+    var T2 = branches[Math.floor(Math.random() * branches.length)];
+    if (T2) shed(T2, Math.floor(Math.random() * T2.groups.length), lerp(0.3, 0.6, Math.random()));
     shedTimer = V.shedEvery * (0.4 + 1.2 * Math.random());
   }
 }
@@ -1717,36 +1912,16 @@ function resize() {
   GH = cvG.clientHeight || 150;
   cvG.width = Math.round(W * PR); cvG.height = Math.round(GH * PR);
   cvN.width = cv.width; cvN.height = cv.height;
-  NB.cnv.width = NL.cnv.width = cv.width; NB.cnv.height = NL.cnv.height = cv.height;
-  FL.cnv.width = FBR.cnv.width = Math.round(W * PR * FAR_RES);
-  FL.cnv.height = FBR.cnv.height = Math.round(H * PR * FAR_RES);
   SCN.cnv.width = MTN.cnv.width = TMP.cnv.width = Math.round(W * SR);
   SCN.cnv.height = MTN.cnv.height = TMP.cnv.height = Math.round(H * SR);
 }
 function rebuildAll() {
   if (!W) resize();
-  buildPines();
   bakeFlakeSprites();
   bakeScenery();
   bakeGround();
+  buildBranches();
   bakeNear();
-}
-function drawPine(T, t) {
-  if (!T) return;
-  var far = T.far, B = far ? FBR : NB, Lr = far ? FL : NL, res = PR * (far ? FAR_RES : 1);
-  nightGlow(T, far ? 0.6 : 1);
-  var b = B.c, l = Lr.c;
-  b.setTransform(1, 0, 0, 1, 0, 0); b.clearRect(0, 0, B.cnv.width, B.cnv.height);
-  b.setTransform(res, 0, 0, res, 0, 0);
-  drawBranches(b, T, far ? V.farPineOpacity : 1);
-  l.setTransform(1, 0, 0, 1, 0, 0); l.clearRect(0, 0, Lr.cnv.width, Lr.cnv.height);
-  l.setTransform(res, 0, 0, res, 0, 0);
-  drawPads(l, T, t);
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.globalAlpha = far ? V.farPineOpacity : V.pineOpacity;
-  ctx.drawImage(B.cnv, 0, 0, cv.width, cv.height);
-  ctx.drawImage(Lr.cnv, 0, 0, cv.width, cv.height);
-  ctx.globalAlpha = 1;
 }
 
 var last = 0;
@@ -1755,8 +1930,9 @@ function frame(now) {
   last = t;
   updateGusts(dt);
   updateField(t);
-  pines.forEach(function (T) { swayPine(T, t, dt); });
+  branches.forEach(function (T) { swayBranch(T, t, dt); });
   updatePuffs(dt);
+  updatePetals(t, dt);
   updateFlakes(t, dt);
   var nz = nearZ();
 
@@ -1764,7 +1940,7 @@ function frame(now) {
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cv.width, cv.height);
 
-  // Mountains and Fuji (baked), then the mist drifting along the ridges.
+  // Fuji, the ridges and the mist (baked), then the mist drifting along them.
   ctx.drawImage(SCN.cnv, 0, 0, cv.width, cv.height);
   if (V.showMountains && V.mistDrift > 0) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
@@ -1779,21 +1955,17 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
 
-  // The snowfield and its bare trees (baked), and the odd glint.
+  // The snowfield with the torii, firs, frosted trees and shrubs (baked), and the odd glint.
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
   drawSparkles(ctx, t);
 
-  // The far pine (half resolution, scaled up: soft), the snow shaken off it,
-  // then the flakes further back, then the near pine and the snow it sheds.
-  drawPine(pines[1], t);
-  drawPuffs(ctx, true);
-  drawFlakes(ctx, -1, MID_Z);
-  drawPine(pines[0], t);
-  drawPuffs(ctx, false);
-
-  // Mid-depth flakes: in front of the near pine, still behind the text and table.
-  drawFlakes(ctx, MID_Z, nz);
+  // Flakes behind the text and table, then the plum branches in front of
+  // them, the snow they shed and the petals.
+  drawFlakes(ctx, -1, nz);
+  for (var b = 0; b < branches.length; b++) drawBranch(ctx, branches[b], t);
+  drawPuffs(ctx);
+  drawPetals(ctx, t);
 
   // The nearest flakes, and the big soft ones, in front of everything on #dynNear.
   nctx.setTransform(1, 0, 0, 1, 0, 0);
