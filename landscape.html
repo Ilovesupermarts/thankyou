@@ -29,7 +29,8 @@
 
   /* The real app fades the canvases in after the intro; here they are always on. */
   .dyn-canvas.dyn-back,
-  .dyn-canvas.dyn-ground { opacity: 1; }
+  .dyn-canvas.dyn-ground,
+  .dyn-canvas.dyn-near { opacity: 1; }
 
   /* Only two panels in this preview instead of six. */
   .track { width: 200%; }
@@ -171,9 +172,13 @@
      #dynGround the strip along the bottom edge, above the page content: the
                 loose leaves lying in front, the leaves that land there, and
                 the band of near leaves at the very bottom that the text and
-                table scroll in behind. -->
+                table scroll in behind.
+     #dynNear   above the page content (as in the app): the nearer falling
+                leaves, so a leaf that lands is seen landing, and one that is
+                lifted or blown away is seen leaving. -->
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
+<canvas class="dyn-canvas dyn-near" id="dynNear" aria-hidden="true"></canvas>
 
 <!-- ============ Scroll test (demo only): real text and table card ============ -->
 <div class="scroll-test" id="scrollTest" aria-hidden="true">
@@ -671,6 +676,8 @@ function cols() { var C = {}; for (var k in V.colours) C[k] = hex(V.colours[k]);
 
 var cv = document.getElementById('dynBack'), ctx = cv.getContext('2d');
 var cvG = document.getElementById('dynGround'), gctx = cvG.getContext('2d');
+var cvN = document.getElementById('dynNear'), nctx = cvN.getContext('2d');
+var nowT = 0;                                 // the frame time, for leaves that start moving outside the frame loop
 function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 var NB = mk(), NL = mk(), FL = mk(), FBR = mk(); // near branches, near leaves, far foliage, far branches
 var SCN = mk(), MTN = mk(), TMP = mk();       // baked scenery, mountains, scratch
@@ -1194,8 +1201,8 @@ function bakeGround() {
 
 /* The band of near leaves at the very bottom of #dynGround, above the text
    and table. Baked once (redone on a change): big, slightly darker maple
-   leaves with a subtle shadow, lying on solid leafy ground that reaches up
-   to the middle of every leaf, so no text shows through between them. */
+   leaves with a subtle shadow, over a row of leaves along the bottom, all
+   lying on ground made from their own shapes (see below). */
 var NEAR = mk(), NEART = mk();
 NEAR.h = 0;
 function bakeNear() {
@@ -1224,63 +1231,97 @@ function bakeNear() {
                 sy: lerp(0.55, 0.85, r()), rot: r() * TAU, col: rgb(light(tone)) });
   }
   list.sort(function (a, b) { return a.y - b.y; });           // lower = nearer, drawn on top
-  // The ground the band's leaves lie on: under every leaf, from its middle
-  // down to the bottom edge, plus a strip along the very bottom. Nothing shows
-  // through below a leaf, so there are no pockets of text between the leaves
-  // (they looked as if they floated). Only the tops of the uppermost leaves
-  // stand out against the text and table. surf[] keeps the height of this
-  // ground at each x, for the loose and landed leaves to lie on.
-  var stripTop = hh - nH * 0.3, surf = new Float32Array(Math.ceil(W) + 2), q, x;
-  for (q = 0; q < surf.length; q++) surf[q] = stripTop;
-  t.beginPath();
-  t.rect(-10, stripTop, W + 20, hh - stripTop + 10);
-  for (q = 0; q < list.length; q++) {
-    // narrow enough that the leaf itself covers it, so it never shows as a dark post
-    var G = list[q], rx = G.s * 0.3, ry = rx * G.sy, gy0 = G.y + ry * 0.25;
-    t.rect(G.x - rx, gy0, rx * 2, hh - gy0 + 10);
-    t.moveTo(G.x + rx, gy0);
-    t.ellipse(G.x, gy0, rx, ry, 0, 0, TAU);
-    for (x = Math.max(0, Math.ceil(G.x - rx)); x <= Math.min(surf.length - 1, Math.floor(G.x + rx)); x++) {
-      var k = (x - G.x) / rx, top = gy0 - ry * Math.sqrt(Math.max(0, 1 - k * k));
-      if (top < surf[x]) surf[x] = top;
+  // Ground without an outline of its own, shaped like a real heap:
+  //  1. G: the topmost edge of the big leaves in each column (a hair inside),
+  //     never lower than the band's base line.
+  //  2. Gs: G spread into gentle curved mounds, so a high leaf rests on a heap
+  //     that slopes away on both sides, never on a straight-sided column.
+  //  3. Solid ground below Gs, softened a touch.
+  //  4. A continuous row of overlapping leaves along Gs, sunk in so the
+  //     ground's edge is always behind them, then the big leaves on top.
+  // So every visible edge is a leaf outline, and every leaf has ground under
+  // it: no straight edges, no pockets. Above the leaves is only the content.
+  var q, x;
+  function shaded(k0, k1) {
+    var fm = pickFamily(r, w);
+    if (fm === 'evergreen' || fm === 'green') fm = 'orange';
+    var ft = F[fm], fc = mix(ft[0], ft[1], r());
+    if (r() < V.leafAge) fc = mix(fc, litterRamp(0.2 + r() * 0.6), 0.6);
+    return rgb(light(scale(fc, lerp(k0, k1, r()) * (1 - V.nearShade * 0.5))));
+  }
+  var CR = 2, nC = Math.ceil(W * CR) + 4, baseY = hh - nH * 0.3;
+  var G = new Float32Array(nC), cov = new Float32Array(nC);
+  for (q = 0; q < nC; q++) G[q] = baseY;
+  for (q = 0; q < list.length; q++) {                     // 1. walk each big leaf's outline
+    var A = list[q], cs = Math.cos(A.rot) * A.s * 0.97, sn = Math.sin(A.rot) * A.s * 0.97, px0 = 0, py0 = 0;
+    for (var m = 0; m < MOMIJI.length; m++) {
+      var pt = MOMIJI[m];
+      var px1 = (A.x + pt[0] * cs - pt[1] * sn) * CR, py1 = A.y + (pt[0] * sn + pt[1] * cs) * A.sy;
+      if (m > 0) {
+        var xa = Math.min(px0, px1), xb = Math.max(px0, px1), span = px1 - px0;
+        for (x = Math.max(0, Math.ceil(xa)); x <= Math.min(nC - 1, Math.floor(xb)); x++) {
+          var yv = span === 0 ? Math.min(py0, py1) : py0 + (py1 - py0) * (x - px0) / span;
+          if (yv < G[x]) G[x] = yv;
+        }
+      }
+      px0 = px1; py0 = py1;
     }
   }
-  // Fill any dip in the ground narrower than about half a leaf (a closing:
-  // the deepest of the highest points on either side), so no thin slivers of
-  // text show between two leaves; then clip to that smoothed ground.
-  var R = Math.max(2, Math.round(size0 * 0.6)), n2 = surf.length, lo = new Float32Array(n2), hi = new Float32Array(n2);
-  for (x = 0; x < n2; x++) {
-    var mL = Infinity, mR = Infinity;
-    for (q = Math.max(0, x - R); q <= x; q++) if (surf[q] < mL) mL = surf[q];
-    for (q = x; q <= Math.min(n2 - 1, x + R); q++) if (surf[q] < mR) mR = surf[q];
-    lo[x] = Math.max(mL, mR);
+  var es0 = size0 * 0.7, kc = 0.8 / es0;                  // 2. mound curvature (per px²)
+  var Rw = Math.ceil(Math.sqrt((nH * 1.5) / kc) * CR);
+  for (x = 0; x < nC; x++) {
+    var best = G[x];
+    for (var d = 1; d <= Rw; d++) {
+      var dd = d / CR, add = kc * dd * dd;
+      if (x - d >= 0 && G[x - d] + add < best) best = G[x - d] + add;
+      if (x + d < nC && G[x + d] + add < best) best = G[x + d] + add;
+    }
+    cov[x] = best;
   }
-  for (x = 0; x < n2; x++) hi[x] = Math.min(surf[x], lo[x]);
-  surf = hi;
-  t.beginPath();
-  t.moveTo(-10, hh + 10);
-  t.lineTo(-10, surf[0]);
-  for (x = 0; x < n2; x++) t.lineTo(x, surf[x]);
-  t.lineTo(W + 10, surf[n2 - 1]);
-  t.lineTo(W + 10, hh + 10);
-  t.closePath();
-  t.save();
-  t.clip();
+  function covAt(xx) { return cov[Math.max(0, Math.min(nC - 1, Math.round(xx * CR)))]; }
+  function covMax(x0, x1) {                               // lowest ground edge across [x0, x1]
+    var mm = -Infinity;
+    for (var i = Math.max(0, Math.floor(x0 * CR)); i <= Math.min(nC - 1, Math.ceil(x1 * CR)); i++) if (cov[i] > mm) mm = cov[i];
+    return mm;
+  }
+  t.save();                                               // 3. the ground, softened a touch
+  t.setTransform(PR, 0, 0, PR, 0, 0);
   t.globalAlpha = V.nearCover;
+  t.filter = 'blur(' + (1.2 * PR).toFixed(2) + 'px)';
   t.fillStyle = rgb(base);
-  t.fillRect(-10, 0, W + 20, hh + 10);
-  // packed with smaller leaves in shade, so the ground reads as more leaves
-  var fs = size0 * 0.47, nf = Math.round(W * nH / (fs * fs * 0.25) * 2.2);
+  t.beginPath();
+  t.moveTo(-10, hh + 30);
+  t.lineTo(-10, cov[0] + es0 * 0.08);
+  for (x = 0; x < nC; x++) t.lineTo(x / CR, cov[x] + es0 * 0.08);
+  t.lineTo(W + 10, cov[nC - 1] + es0 * 0.08);
+  t.lineTo(W + 10, hh + 30);
+  t.closePath();
+  t.fill();
+  t.restore();
+  // smaller leaves in shade packed into the ground, kept inside it
+  var fs = size0 * 0.47, nf = Math.round(W * nH / (fs * fs * 0.25) * 1.2);
   for (q = 0; q < nf; q++) {
-    var ft = F[pickFamily(r, w)], fc = mix(ft[0], ft[1], r());
-    if (r() < V.leafAge) fc = mix(fc, litterRamp(0.2 + r() * 0.6), 0.6);
-    t.setTransform(PR, 0, 0, PR * lerp(0.5, 0.8, r()), (r() * (W + 40) - 20) * PR, (hh + 6 - nH * 1.1 * r()) * PR);
-    leafPathLo(t, fs * lerp(0.75, 1.3, r()), r() * TAU);
-    t.fillStyle = rgb(light(scale(fc, lerp(0.6, 0.8, r()) * (1 - V.nearShade * 0.5))));
+    var fx = r() * (W + 40) - 20, fsz = fs * lerp(0.75, 1.3, r()), fsy = lerp(0.5, 0.8, r());
+    var top0 = covMax(fx - fsz * 0.5, fx + fsz * 0.5) + fsz * 0.5 * fsy + es0 * 0.15;
+    if (top0 > hh + 4) continue;
+    t.setTransform(PR, 0, 0, PR * fsy, fx * PR, lerp(top0, hh + 4, r()) * PR);
+    leafPathLo(t, fsz, r() * TAU);
+    t.fillStyle = shaded(0.6, 0.8);
     t.fill();
   }
-  t.restore();
-  NEAR.surf = surf;
+  // 4. the continuous row along the ground's edge, sunk in by 0.4 of a leaf's
+  // height so the edge is always behind it, with the same soft shadow
+  leafShadow(t, true);
+  for (x = -es0; x < W + es0; x += es0 * 0.25) {
+    var ex = x + (r() - 0.5) * es0 * 0.1, esz = es0 * lerp(0.85, 1.15, r()), esy = lerp(0.55, 0.8, r());
+    t.setTransform(PR, 0, 0, PR * esy, ex * PR, (covAt(ex) + esz * esy * 0.4) * PR);
+    leafPath(t, 0, 0, esz, r() * TAU);
+    t.fillStyle = shaded(0.68, 0.9);
+    t.fill();
+  }
+  leafShadow(t, false);
+  NEAR.surf = cov;
+  NEAR.sr = CR;
   NEAR.top = H - hh;                                           // local y + NEAR.top = screen y
   leafShadow(t, true);
   for (var j = 0; j < list.length; j++) {
@@ -1306,12 +1347,18 @@ function leafShadow(c, on) {
   c.shadowOffsetX = 0;
   c.shadowOffsetY = 1.5 * PR;
 }
-/* The loose and landed leaves lie on the near band's ground: on its surface,
-   sunk in by up to a third of the band depth, so the ground is under them. */
+/* The loose and landed leaves lie on the near band's ground, sunk in a little,
+   so there is ground under the whole leaf. */
 function floorY(x, gy) {
-  var sf = NEAR.surf, y = H;
-  if (sf) y = sf[Math.max(0, Math.min(sf.length - 1, Math.round(x)))] + NEAR.top;
-  return y + gy * 0.35;
+  var sf = NEAR.surf, y = H - 6;
+  if (sf) {
+    // the lowest "certainly ground" point under the leaf's width, so the whole
+    // leaf lies on ground and no gap opens under its lobes
+    y = -Infinity;
+    for (var i = Math.max(0, Math.round((x - 10) * NEAR.sr)); i <= Math.min(sf.length - 1, Math.round((x + 10) * NEAR.sr)); i++) if (sf[i] > y) y = sf[i];
+    y += NEAR.top;
+  }
+  return y + 4 + gy * 0.35;
 }
 function placeFloor() {
   for (var i = 0; i < pile.length; i++) pile[i].py = floorY(pile[i].x, pile[i].gy);
@@ -1332,12 +1379,26 @@ function floorLeaf(P) {
   pile.splice(i, 0, P);
   trimFloor();
 }
+/* Too many leaves on the ground: the oldest is blown away (never just removed). */
 function trimFloor() {
   while (pile.length > V.bedLeaves + V.pileMax) {
     var o = 0;
     for (var i = 1; i < pile.length; i++) if (pile[i].born < pile[o].born) o = i;
-    pile.splice(o, 1);
+    var P = pile[o], dir = V.wind > 0 ? (Math.random() < 0.85 ? 1 : -1) : (Math.random() < 0.5 ? 1 : -1);
+    liftLeaf(o, nowT, dir * lerp(120, 200, Math.random()), -lerp(30, 70, Math.random()));
+    P.blown = dir; P.vyT = -lerp(10, 30, Math.random()); P.land = false;
   }
+}
+/* A leaf leaves the ground: it keeps its look and eases back into its falling shape. */
+function liftLeaf(j, t, vx, vy) {
+  var P = pile[j];
+  pile.splice(j, 1);
+  P.y = P.py; P.vx = vx; P.vy = vy;
+  P.rot = P.prot;
+  P.ph = -t * P.f * 1.3;                        // its flip starts face-on, as it lay
+  P.liftT = t; P.st = undefined; P.fade = undefined;
+  P.land = Math.random() < V.landShare; P.gy = lerp(2, V.bedDepth, Math.random());
+  insertFalling(P);
 }
 function buildBed() {
   pile = [];
@@ -1426,6 +1487,7 @@ function updateGusts(dt) {
    of the ground and stay there until a gust lifts them again.
    ============================================================ */
 var FALL_TIERS = [0.1, 0.4, 0.7, 1.0];
+var NEAR_Z = 0.55;      // leaves this near or nearer fall on #dynNear, above the text and table, and can land
 function fallSize(z) { return 22 * TREE.leafSize * (0.45 + 0.6 * z); }
 function bakeFallSprites() {
   fallSprites = [];
@@ -1487,14 +1549,16 @@ function makeLeaf(z, x, y) {
     ph: Math.random() * TAU, f: 0.8 + Math.random() * 1.2,
     rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 2.4, s: 0.85 + Math.random() * 0.3,
     si: si, tier: tier, spr: fallSprites[si][tier], a: lerp(0.6, 0.9, z),
-    land: z > 0.3 && Math.random() < V.landShare, gy: lerp(2, V.bedDepth, Math.random())
+    land: z >= NEAR_Z && Math.random() < V.landShare, gy: lerp(2, V.bedDepth, Math.random())
   };
 }
 function spawnFromTree(T) {
   if (!T || !T.clumps.length || falling.length > V.falling * 1.5) return;
   var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n2 = T.nodes[C.node];
   var z = T.far ? lerp(0.2, 0.45, Math.random()) : lerp(0.75, 1, Math.random());
-  insertFalling(makeLeaf(z, X(T, n2.ex), n2.ey));
+  var L = makeLeaf(z, X(T, n2.ex), n2.ey);
+  L.fi = nowT;                                   // fades in as it comes loose, instead of appearing at once
+  insertFalling(L);
 }
 function spawnFalling(prefill) {
   if (prefill || Math.random() < TREE.fallTop) {
@@ -1504,51 +1568,81 @@ function spawnFalling(prefill) {
     spawnFromTree(trees[Math.random() < 0.7 || trees.length < 2 ? 0 : 1]);
   }
 }
-function settle(L) { floorLeaf(L); }
+/* Landing: the leaf keeps its turn and settles flat over a moment, from
+   how it was falling to how it lies, instead of switching at once. */
+function settle(L, t) {
+  var rot = L.rot, sx0 = Math.cos(t * L.f * 1.3 + L.ph), a0 = L.a, y0 = L.y;
+  floorLeaf(L);
+  L.prot = rot;
+  L.ps = L.s * fallSize(FALL_TIERS[L.tier]) / fallSize(1);
+  L.st = t; L.sx0 = sx0; L.a0 = a0; L.y0 = y0; L.liftT = undefined; L.blown = 0;
+}
+/* Where a leaf falling behind the content meets the far ground: further
+   back = nearer the horizon. It settles there and fades into the carpet. */
+function backGroundY(L) {
+  var hy = H * V.horizon;
+  return hy + (H - hy) * (0.1 + 0.75 * clamp(L.z / NEAR_Z, 0, 1));
+}
 function moveFalling(t, dt) {
   for (var i = falling.length - 1; i >= 0; i--) {
     var L = falling[i];
-    L.vy += (L.vyT - L.vy) * (1 - Math.exp(-dt * 1.2));
-    var tx = 12 * V.wind * (0.5 + 0.5 * L.z) + fieldAt(L.x) * 140 * (0.5 + 0.5 * L.z);
-    L.vx += (tx - L.vx) * (1 - Math.exp(-dt * 1.6));
+    if (L.fade === undefined && L.z < NEAR_Z && L.vy > 0 && L.y >= backGroundY(L)) { L.fade = 1; L.vyT = 0; }
+    if (L.fade !== undefined) {
+      // settled on the far ground: comes to rest and fades into the carpet
+      var damp = Math.exp(-dt * 5);
+      L.vx *= damp; L.vy *= damp; L.sway *= damp; L.vr *= damp;
+      L.fade -= dt / 1.8;
+      if (L.fade <= 0) { falling.splice(i, 1); continue; }
+    } else {
+      L.vy += (L.vyT - L.vy) * (1 - Math.exp(-dt * 1.2));
+      var tx = L.blown ? L.blown * 170 : 12 * V.wind * (0.5 + 0.5 * L.z) + fieldAt(L.x) * 140 * (0.5 + 0.5 * L.z);
+      L.vx += (tx - L.vx) * (1 - Math.exp(-dt * 1.6));
+    }
     L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
     L.y += L.vy * dt;
     L.rot += L.vr * dt;
-    if (L.land && L.vy > 0 && L.y >= floorY(L.x, L.gy) && V.bedLeaves + V.pileMax > 0) { falling.splice(i, 1); settle(L); continue; }
-    if (L.y > H + 30 || L.x < -300 || L.x > W + 300) falling.splice(i, 1);
+    if (L.land && L.vy > 0 && L.y >= floorY(L.x, L.gy) && V.bedLeaves + V.pileMax > 0) { falling.splice(i, 1); settle(L, t); continue; }
+    if (L.y > H + 30 || L.y < -120 || L.x < -300 || L.x > W + 300) falling.splice(i, 1);
   }
-  // a strong enough gust lifts leaves out of the grass
+  // a strong enough gust lifts leaves off the ground
   for (var j = pile.length - 1; j >= 0; j--) {
     var P = pile[j], gs = gustAt(P.x), a = Math.abs(gs);
     if (a > 0.18 && Math.random() < dt * 3 * a) {
-      pile.splice(j, 1);
-      P.y = P.py - 4; P.vy = -lerp(50, 130, Math.random());
-      P.vx = (gs > 0 ? 1 : -1) * lerp(60, 160, Math.random());
-      P.land = Math.random() < V.landShare; P.gy = lerp(2, V.bedDepth, Math.random());
-      insertFalling(P);
+      liftLeaf(j, t, (gs > 0 ? 1 : -1) * lerp(60, 160, Math.random()), -lerp(50, 130, Math.random()));
     }
   }
 }
-function drawFalling(t, from, to) {
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+function drawFalling(c, t, from, to) {
+  c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < falling.length; i++) {
     var L = falling[i];
     if (L.z < from || L.z >= to) continue;
-    var h = L.spr.half * L.s;
-    ctx.globalAlpha = L.a;
-    ctx.save();
-    ctx.translate(L.x, L.y); ctx.rotate(L.rot); ctx.scale(Math.cos(t * L.f * 1.3 + L.ph), 1);
-    ctx.drawImage(L.spr.cnv, -h, -h, h * 2, h * 2);
-    ctx.restore();
+    var h = L.spr.half * L.s, a = L.a, ys = 1;
+    if (L.liftT !== undefined) {                 // just lifted: still flattened as it lay
+      var k = clamp((t - L.liftT) / 0.35, 0, 1);
+      ys = lerp(L.psy, 1, k); a = lerp(1, L.a, k);
+    }
+    if (L.fade !== undefined) a *= L.fade;
+    if (L.fi !== undefined) a *= clamp((t - L.fi) / 0.5, 0, 1);
+    c.globalAlpha = a;
+    c.save();
+    c.translate(L.x, L.y); c.scale(1, ys); c.rotate(L.rot); c.scale(Math.cos(t * L.f * 1.3 + L.ph), 1);
+    c.drawImage(L.spr.cnv, -h, -h, h * 2, h * 2);
+    c.restore();
   }
-  ctx.globalAlpha = 1;
+  c.globalAlpha = 1;
 }
 function drawPile(c, t) {
   for (var i = 0; i < pile.length; i++) {
     var P = pile[i], spr = fallSprites[P.si].ground, h = spr.half * P.ps;
     var rot = P.prot + P.wob * V.tremble * (gustAt(P.x) * 0.5 + 0.03 * V.wind * Math.sin(t * 1.7 + P.ph));
+    var k = P.st === undefined ? 1 : clamp((t - P.st) / 0.45, 0, 1);
+    k = k * k * (3 - 2 * k);                     // just landed: settling flat
     c.save();
-    c.translate(P.x, P.py); c.scale(1, P.psy); c.rotate(rot);
+    c.globalAlpha = k < 1 ? lerp(P.a0, 1, k) : 1;
+    c.translate(P.x, k < 1 ? lerp(P.y0, P.py, k) : P.py);
+    c.scale(1, lerp(1, P.psy, k)); c.rotate(rot);
+    if (k < 1) c.scale(lerp(P.sx0, 1, k), 1);
     c.drawImage(spr.cnv, -h, -h, h * 2, h * 2);
     c.restore();
   }
@@ -1564,6 +1658,7 @@ function resize() {
   cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
   GH = cvG.clientHeight || 150;
   cvG.width = Math.round(W * PR); cvG.height = Math.round(GH * PR);
+  cvN.width = cv.width; cvN.height = cv.height;
   NB.cnv.width = NL.cnv.width = cv.width; NB.cnv.height = NL.cnv.height = cv.height;
   FL.cnv.width = FBR.cnv.width = Math.round(W * PR * FAR_RES);
   FL.cnv.height = FBR.cnv.height = Math.round(H * PR * FAR_RES);
@@ -1588,6 +1683,7 @@ var last = 0;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t;
+  nowT = t;
   updateGusts(dt);
   updateField(t);
   trees.forEach(function (T) { swayTree(T, t, dt); });
@@ -1640,7 +1736,7 @@ function frame(now) {
   }
 
   // Leaves further back fall behind the near tree.
-  drawFalling(t, -1, 0.55);
+  drawFalling(ctx, t, -1, NEAR_Z);
 
   // Near tree: branches on one layer, foliage on another.
   var near = trees[0];
@@ -1658,8 +1754,10 @@ function frame(now) {
   ctx.drawImage(NL.cnv, 0, 0);
   ctx.globalAlpha = 1;
 
-  // The nearer leaves fall in front of it.
-  drawFalling(t, 0.55, 2);
+  // The nearer leaves fall in front of everything, on #dynNear (above the text and table).
+  nctx.setTransform(1, 0, 0, 1, 0, 0);
+  nctx.clearRect(0, 0, cvN.width, cvN.height);
+  drawFalling(nctx, t, NEAR_Z, 2);
 
   // Ground strip: the loose leaves and every leaf that landed, lying on the near band's ground.
   gctx.setTransform(1, 0, 0, 1, 0, 0);
