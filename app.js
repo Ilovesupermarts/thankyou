@@ -100,6 +100,13 @@ var BUILD = 'v135';
          once they have landed (nameLandsAt) and, while the name stands
          still (until nameLeavesAt), takes bigger steps, since a long frame
          does not show then. Both themes.
+       - The name is written like ink on washi (墨のにじみ): each character
+         is brushed in from the top down behind a soft edge, its wet ink
+         spreading with a pale bloom and then drying sharp (inkBrush and
+         inkDry in main.css). The characters follow 0.42 s apart
+         (NAME_STAGGER) and each has settled 1.7 s after it starts
+         (NAME_ARRIVE), so a three-character name takes about 2.7 s to
+         arrive (was about 1.8 s).
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -5564,6 +5571,10 @@ function spawnRipples(clientX, clientY, intensity) {
   }
 }
 
+/* The name's characters are brushed in one after another (main.css
+   .name-char): each starts NAME_STAGGER s after the one before and has
+   settled NAME_ARRIVE s after it starts. */
+var NAME_STAGGER = 0.42, NAME_ARRIVE = 1.7;
 function renderIntroGlyph(text) {
   if (!nameColumn) return;
   nameColumn.innerHTML = '';
@@ -5572,7 +5583,7 @@ function renderIntroGlyph(text) {
     var span = document.createElement('span');
     span.className = 'name-char';
     span.textContent = chars[i];
-    span.style.animationDelay = (i * 0.22) + 's';
+    span.style.animationDelay = (i * NAME_STAGGER) + 's';
     nameColumn.appendChild(span);
   }
 }
@@ -5997,7 +6008,7 @@ function triggerKoiStart() {
       if (introOverlay) introOverlay.classList.add('active');
 
       var totalChars = nameText.length;
-      var arrivalTime = (totalChars * 220) + 1100;
+      var arrivalTime = ((totalChars - 1) * NAME_STAGGER + NAME_ARRIVE) * 1000 + 220;
       var holdTime = 1200;
       nameLandsAt = performance.now() + arrivalTime;
       nameLeavesAt = nameLandsAt + holdTime;

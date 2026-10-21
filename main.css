@@ -1227,20 +1227,39 @@
   }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  /* The name is written like ink on washi (墨のにじみ): each character is
+     brushed in from the top down behind a soft edge (inkBrush), while its
+     ink, wet at first, spreads into the paper with a pale bloom and then
+     dries sharp (inkDry). app.js staggers the characters (NAME_STAGGER) and
+     waits NAME_ARRIVE for each. The padding (taken back by the margin)
+     gives the mask room for the blur and the shadow. */
   .name-char {
     display: block; font-family: "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
     font-size: 120px; font-weight: 500; color: #FFFDF9; line-height: 1; letter-spacing: 0;
+    padding: 0.3em; margin: -0.3em;
     text-shadow: 0 2px 20px rgba(80, 40, 10, 0.35);
-    opacity: 0; transform: translateY(-24px); filter: blur(3px);
-    animation: charArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    opacity: 0;
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 42%, transparent 58%);
+    -webkit-mask-size: 100% 320%; mask-size: 100% 320%;
+    -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat;
+    -webkit-mask-position: 0 86%; mask-position: 0 86%;   /* the soft edge just above the character */
+    animation: inkBrush 1.2s cubic-bezier(0.45, 0.05, 0.35, 1) both,
+               inkDry 1.7s cubic-bezier(0.3, 0.6, 0.3, 1) both;
     will-change: opacity, transform, filter;   /* own layer from the start, so the arrival glides even while the background is busy */
     transition: opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
-  @keyframes charArrive {
-    0% { opacity: 0; transform: translateY(-24px); filter: blur(3px); }
-    100% { opacity: 1; transform: translateY(0); filter: blur(0); }
+  @keyframes inkBrush {
+    0%   { opacity: 0; -webkit-mask-position: 0 86%; mask-position: 0 86%; }
+    12%  { opacity: 1; }
+    100% { opacity: 1; -webkit-mask-position: 0 0; mask-position: 0 0; }
+  }
+  @keyframes inkDry {
+    0%   { filter: blur(6px);   transform: scale(1.035); text-shadow: 0 0 30px rgba(255, 246, 230, 0.55); }
+    40%  { filter: blur(2.4px); transform: scale(1.015); text-shadow: 0 0 26px rgba(255, 246, 230, 0.4); }
+    100% { filter: blur(0);     transform: scale(1);     text-shadow: 0 2px 20px rgba(80, 40, 10, 0.35); }
   }
   .intro-overlay.finishing .name-char { opacity: 0; transform: translateY(20px); filter: blur(3px); }
   .intro-overlay.finishing { opacity: 0; transition: opacity 0.9s ease; }
