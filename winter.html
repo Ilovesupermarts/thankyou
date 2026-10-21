@@ -74,7 +74,7 @@
      position" control. The chime's canvas is placed and sized by the
      script; touches go to .furin-hit, a box that follows the chime as it swings
      (the only part of the toolbar that takes touches). */
-  .furin-text { left: var(--furin-text-x, 16.75%); }
+  .furin-text { left: var(--furin-text-x, 16.75%); text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28); }   /* the music display's shadow */
   .furin-text .ko-line .hud-title { overflow: visible; }
   .furin-text .ko-sub {
     display: flex; align-items: baseline; justify-content: center; gap: 6px;
@@ -196,7 +196,7 @@
   </div>
   <div class="season-ko furin-text" id="furinText" aria-hidden="true">
     <div class="ko-line">
-      <span class="hud-title">風鈴にそっとふれると、音が鳴ります。</span>
+      <span class="hud-title">風鈴にそっとふれると、音が鳴ります</span>
     </div>
     <div class="ko-sub">
       <span class="hud-artist">名古屋の風</span><span class="hud-sep">·</span><span class="hud-artist" id="furinWind">そよ風 2.5m/s</span>
@@ -466,23 +466,23 @@ var V = JSON.parse(JSON.stringify(DEFAULTS));
    ============================================================ */
 var FURIN_DEFAULTS = {
   // sound
-  sound: 'synth',            // 'synth' = the generated ring, 'real' = Sound/RealWindchimes.mp3
-  volume: 0.6,
-  pitch: 1480,               // generated ring: the main note (Hz)
-  ringLength: 3.2,           // how long it rings on (s)
+  sound: 'real',             // 'synth' = the generated ring, 'real' = Sound/RealWindchimes.mp3
+  volume: 0.78,
+  pitch: 2890,               // generated ring: the main note (Hz)
+  ringLength: 2.6,           // how long it rings on (s)
   shimmer: 0.6,              // the slow wavering of the note (iron bells beat)
-  brightness: 0.5,           // the higher overtones
-  strike: 0.45,              // the small "tick" of the clapper hitting the iron
-  pitchVary: 20,             // each ring a little higher or lower (cents)
+  brightness: 0.74,          // the higher overtones
+  strike: 0.64,              // the small "tick" of the clapper hitting the iron
+  pitchVary: 76,             // each ring a little higher or lower (cents)
   // ringing
-  clapperGap: 0.16,          // room for the clapper to swing before it meets the bell
-  ringThreshold: 1,          // how hard the clapper must hit for the wind to ring it
-  windRingGap: 5,            // at least this many seconds between rings from the wind
+  clapperGap: 0.2,           // room for the clapper to swing before it meets the bell
+  ringThreshold: 1.85,       // how hard the clapper must hit for the wind to ring it
+  windRingGap: 0,            // at least this many seconds between rings from the wind
   // wind
   useLiveWind: true,         // the real Nagoya wind; off = the test wind below
   testWind: 2.5,             // m/s
   windPush: 1,               // how far the steady wind leans the strip
-  gustPush: 1,               // how much the scene's gusts swing it
+  gustPush: 2.55,            // how much the scene's gusts swing it
   flutter: 1,                // the small, restless movements in the breeze
   touchPush: 1,              // how hard a tap or a flick swings it
   // motion
@@ -493,23 +493,28 @@ var FURIN_DEFAULTS = {
   swingSpeed: 1,             // faster / slower swings (shorter / longer cords)
   settle: 1,                 // how quickly a swing dies down
   // look and place
-  x: 42,                     // px from the screen's left edge
-  size: 1,
-  cordLen: 22,               // from the top of the screen to the bell (px)
+  x: 45,                     // px from the screen's left edge
+  size: 0.99,
+  cordLen: 19,               // from the top of the screen to the bell (px)
   bellW: 32,
   bellH: 30,
   stripCord: 22,             // from the clapper down to the paper strip (px)
-  stripW: 21,
-  stripH: 56,
+  stripW: 23,
+  stripH: 58,
   rimLight: 0.55,            // the soft highlight on the iron
   pattern: 0.45,             // the pattern pressed into the bell
-  flowers: 7,                // small white flowers on the strip
+  flowers: 7,                // small white flowers on the strip (winter)
   stripes: 0.5,              // the fine lines in the paper
   shadow: 0.35,
   textX: 16.75,              // the two lines' centre, % across the screen
+  // the wording on the paper strip
+  season: 'winter',          // 'winter' = 冬の便り, 'autumn' = 秋の風 with a momiji leaf
+  inkSize: 10.5,             // size of the brush characters (px; shrinks to fit the strip)
+  leafSize: 1,               // the momiji leaf (autumn)
   colours: {
     bell: '#1C2742', cord: '#B4693C', string: '#2E3548',
-    paper: '#F6D8C1', paperBack: '#E9C3A9', flower: '#FFFFFF'
+    paper: '#F6D8C1', paperBack: '#E9C3A9', flower: '#FFFFFF',
+    ink: '#4A2A26', momiji: '#C8361F'
   }
 };
 var FURIN_KEY = 'furinLabValues1';
@@ -567,15 +572,20 @@ var GROUPS = [
     { k: 'stripH', label: 'Paper strip length (px)', min: 20, max: 140, step: 1, re: 'size' },
     { k: 'rimLight', label: 'Highlight on the iron', min: 0, max: 1, step: 0.01 },
     { k: 'pattern', label: 'Pattern on the bell', min: 0, max: 1, step: 0.01 },
-    { k: 'flowers', label: 'Flowers on the strip', min: 0, max: 16, step: 1, re: 'size' },
+    { k: 'flowers', label: 'Flowers on the strip (winter)', min: 0, max: 16, step: 1, re: 'size' },
     { k: 'stripes', label: 'Lines in the paper', min: 0, max: 1, step: 0.01 },
     { k: 'shadow', label: 'Shadow', min: 0, max: 1, step: 0.01 },
     { k: 'textX', label: 'Text position (% across)', min: 8, max: 30, step: 0.05, re: 'text' }
+  ]},
+  { title: 'Wording on the paper strip', ctls: [
+    { k: 'season', label: 'Season to preview', type: 'select', opts: [['winter', 'Winter: 冬の便り'], ['autumn', 'Autumn: 秋の風 and a momiji leaf']], hint: 'The app will pick this from its own theme; here you choose it to see both.' },
+    { k: 'inkSize', label: 'Brush characters (px)', min: 6, max: 16, step: 0.5, hint: 'Shrinks by itself if the words would not fit the strip.' },
+    { k: 'leafSize', label: 'Momiji leaf size (autumn)', min: 0.4, max: 2, step: 0.05 }
   ]}
 ];
 var COLOUR_LABELS = {
   bell: 'Bell (iron)', cord: 'Cord to the strip', string: 'Cord from the top',
-  paper: 'Paper strip', paperBack: 'Back of the strip', flower: 'Flowers'
+  paper: 'Paper strip', paperBack: 'Back of the strip', flower: 'Flowers', ink: 'Brush ink', momiji: 'Momiji leaf'
 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
@@ -700,6 +710,7 @@ function buildCopyText() {
   lines.push('Look: ' + FC.x + 'px from the left, size ' + f2(FC.size) + ', cord ' + FC.cordLen + 'px, bell ' + FC.bellW + '×' + FC.bellH +
              'px, strip cord ' + FC.stripCord + 'px, strip ' + FC.stripW + '×' + FC.stripH + 'px, highlight ' + f2(FC.rimLight) +
              ', pattern ' + f2(FC.pattern) + ', ' + FC.flowers + ' flowers, paper lines ' + f2(FC.stripes) + ', shadow ' + f2(FC.shadow));
+  lines.push('Strip wording: ' + (FC.season === 'autumn' ? '秋の風 and a momiji leaf' : '冬の便り') + ', Yuji Syuku, ' + f2(FC.inkSize) + 'px, leaf ' + f2(FC.leafSize));
   lines.push('Colours:');
   Object.keys(FC.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + FC.colours[k].toUpperCase()); });
   lines.push('');
@@ -2248,8 +2259,8 @@ function layoutFurin() {
   var r = rngFrom(41);
   furinFlowers = [];
   for (var i = 0; i < FC.flowers; i++) {
-    furinFlowers.push({ u: (i % 2 ? 0.2 : -0.2) + lerp(-0.1, 0.1, r()), v: lerp(0.18, 0.92, (i + 0.3 + 0.4 * r()) / Math.max(1, FC.flowers)),
-                        k: lerp(0.8, 1.15, r()), a: r() * TAU });
+    furinFlowers.push({ u: (i % 2 ? 0.36 : -0.36) + lerp(-0.03, 0.03, r()), v: lerp(0.2, 0.92, (i + 0.3 + 0.4 * r()) / Math.max(1, FC.flowers)),
+                        k: lerp(0.65, 0.95, r()), a: r() * TAU });
   }
 }
 
@@ -2363,6 +2374,42 @@ fhit.addEventListener('pointerup', fptrEnd);
 fhit.addEventListener('pointercancel', fptrEnd);
 
 /* ---- drawing ---- */
+/* The words run down the strip in Yuji Syuku, the brush face the app uses
+   for the therapist's name. Autumn adds a momiji leaf under 秋の風. */
+document.fonts && document.fonts.load('12px "Yuji Syuku"');
+function momiji(c, x, y, r, col, rot) {
+  c.save(); c.translate(x, y); c.rotate(rot);
+  var tips = [1, 0.92, 0.7, 0.7, 0.92];
+  c.fillStyle = rgb(col); c.strokeStyle = rgb(col); c.lineJoin = 'round'; c.lineWidth = r * 0.12;
+  c.beginPath();
+  for (var k = 0; k < 5; k++) {
+    var a = -PI / 2 + k * TAU / 5, v = a + TAU / 10, a2 = a + TAU / 5;
+    c.lineTo(Math.cos(a) * r * tips[k], Math.sin(a) * r * tips[k]);
+    c.lineTo(Math.cos(a + TAU / 20) * r * 0.62, Math.sin(a + TAU / 20) * r * 0.62);   // a small point on the way down
+    c.lineTo(Math.cos(v) * r * 0.34, Math.sin(v) * r * 0.34);
+    c.lineTo(Math.cos(a2 - TAU / 20) * r * 0.62, Math.sin(a2 - TAU / 20) * r * 0.62);
+  }
+  c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = rgb(mix(col, [255, 255, 255], 0.35), 0.6); c.lineWidth = r * 0.07;
+  c.beginPath();
+  for (var q = 0; q < 5; q++) { var aa = -PI / 2 + q * TAU / 5; c.moveTo(0, 0); c.lineTo(Math.cos(aa) * r * tips[q] * 0.72, Math.sin(aa) * r * tips[q] * 0.72); }
+  c.stroke();
+  c.strokeStyle = rgb(col); c.lineWidth = r * 0.12;
+  c.beginPath(); c.moveTo(0, r * 0.2); c.lineTo(0, r * 1.2); c.stroke();
+  c.restore();
+}
+function drawStripWords(c, text, L, S, autumn) {
+  var n = text.length, y0 = 11.5 * S, tail = autumn ? 14 * S * FC.leafSize + 3 * S : 3 * S;
+  var px = Math.min(FC.inkSize * S, (L - y0 - tail) / (n * 1.06));
+  if (px < 4) return;
+  c.save();
+  c.font = px.toFixed(2) + 'px "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = FC.colours.ink;
+  for (var i = 0; i < n; i++) c.fillText(text.charAt(i), 0, y0 + (i + 0.5) * px * 1.06);
+  c.restore();
+  if (autumn) momiji(c, 0, y0 + n * px * 1.06 + 2 * S + 4.2 * S * FC.leafSize, 4.2 * S * FC.leafSize, hex(FC.colours.momiji), 0.25);
+}
 function shade(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
 function drawFurin() {
   var c = fctx, S = FC.size, X = FS;
@@ -2406,8 +2453,11 @@ function drawFurin() {
     for (var lx = -hw + 1.6 * S; lx < hw; lx += 2.2 * S) { c.moveTo(lx, 0.5); c.lineTo(lx, L - 0.5); }
     c.stroke();
   }
-  // small white flowers on the front
-  if (front) {
+  // the wording, brushed down the middle (the back of the strip is blank)
+  var autumn = FC.season === 'autumn';
+  if (front) drawStripWords(c, autumn ? '秋の風' : '冬の便り', L, S, autumn);
+  // small white flowers down the two sides (winter)
+  if (front && !autumn) {
     var fl = hex(FC.colours.flower);
     for (var i = 0; i < furinFlowers.length; i++) {
       var F = furinFlowers[i], fx = F.u * hw * 2, fy = F.v * L, fr = 1.15 * S * F.k;
