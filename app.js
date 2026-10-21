@@ -10554,7 +10554,7 @@ function drawFog(ctx, dt) {
    Each bird sits at one of three depths. The far ones are small, soft
    (the depth of field) and a little hazy, and go behind both trees; the
    middle and near ones fly between the far tree and the main tree
-   (drawKoyoTrees). Every pose is baked once per kind and depth (8 flap
+   (drawKoyoTrees, which hides them fully behind the trees: birdLayer). Every pose is baked once per kind and depth (8 flap
    frames, a glide and a folded frame), so a frame only copies images. */
 var BIRD_KINDS = {
   onaga: {
@@ -10869,6 +10869,33 @@ var tree = null;          // the near tree: taller and sharp
 var farTree = null;       // the far tree on the other side: shorter, a little soft and paler
 var koyoLeafLayer = document.createElement('canvas');   // the near kōyō tree's foliage, laid down at its own strength
 var ctxKL = koyoLeafLayer.getContext('2d');
+// The birds go on a layer of their own and the trees in front are cut out of
+// it, so a bird behind a tree is hidden completely (the foliage itself is laid
+// down a little see-through). Only the box around the birds is worked on.
+var birdLayer = document.createElement('canvas');
+var ctxBL = birdLayer.getContext('2d');
+var birdBox = null;
+function birdBounds() {
+  if (!birds.length) return null;
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, pad = 80;
+  for (var i = 0; i < birds.length; i++) {
+    var b = birds[i];
+    x0 = Math.min(x0, b.x); x1 = Math.max(x1, b.x); y0 = Math.min(y0, b.y); y1 = Math.max(y1, b.y);
+  }
+  x0 = Math.max(0, Math.floor((x0 - pad) * PR)); y0 = Math.max(0, Math.floor((y0 - pad) * PR));
+  x1 = Math.min(birdLayer.width, Math.ceil((x1 + pad) * PR)); y1 = Math.min(birdLayer.height, Math.ceil((y1 + pad) * PR));
+  return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
+}
+// Cut a tree layer (k: its size against the screen) out of the birds. The
+// foliage is cut three times so its soft, part see-through leaves hide them too.
+function birdsCutOut(src, k, times) {
+  var B = birdBox;
+  ctxBL.setTransform(1, 0, 0, 1, 0, 0);
+  ctxBL.globalAlpha = 1;
+  ctxBL.globalCompositeOperation = 'destination-out';
+  for (var i = 0; i < times; i++) ctxBL.drawImage(src, B.x * k, B.y * k, B.w * k, B.h * k, B.x, B.y, B.w, B.h);
+  ctxBL.globalCompositeOperation = 'source-over';
+}
 var TREE_DEPTH = 7;
 var FAR_TREE_SCALE = 0.6;     // far tree height as a share of the near tree
 var FAR_TREE_ALPHA = 0.8;     // and how strong it looks next to the near tree
@@ -11200,6 +11227,12 @@ function koyoGlow(ctx, T, strength) {
   ctx.fillRect(T.cx - T.cr * 1.4, gy - T.cr * 1.4, T.cr * 2.8, T.cr * 2.8);
 }
 function drawKoyoTrees(ctx, t) {
+  birdBox = birdBounds();
+  if (birdBox) {                                  // the far birds first: behind both trees
+    ctxBL.setTransform(1, 0, 0, 1, 0, 0);
+    ctxBL.clearRect(birdBox.x, birdBox.y, birdBox.w, birdBox.h);
+    drawBirds(ctxBL, t, 'far');
+  }
   if (farTree) {
     koyoGlow(ctx, farTree, 0.6);
     // The far tree's branches go down solid, at half size and scaled up (soft),
@@ -11220,7 +11253,10 @@ function drawKoyoTrees(ctx, t) {
     ctx.globalAlpha = KOYO.farOpacity;
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
-  drawBirds(ctx, t, 'near');                    // the middle and near birds fly between the two trees
+  if (birdBox) {
+    if (farTree) { birdsCutOut(treeLayer, FAR_LAYER_SCALE, 1); birdsCutOut(farLayer, FAR_LAYER_SCALE, 3); }
+    drawBirds(ctxBL, t, 'near');                  // the middle and near birds fly between the two trees
+  }
   if (tree) {
     koyoGlow(ctx, tree, 1);
     // solid branches, then the foliage on its own layer laid down at its strength
@@ -11237,6 +11273,13 @@ function drawKoyoTrees(ctx, t) {
     ctx.drawImage(treeLayer, 0, 0);
     ctx.globalAlpha = KOYO.nearOpacity;
     ctx.drawImage(koyoLeafLayer, 0, 0);
+  }
+  if (birdBox) {
+    if (tree) { birdsCutOut(treeLayer, 1, 1); birdsCutOut(koyoLeafLayer, 1, 3); }
+    var B = birdBox;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.drawImage(birdLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
   }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
@@ -13336,8 +13379,8 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
-  cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = cw;
-  cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = ch;
+  cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = birdLayer.width = cw;
+  cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = birdLayer.height = ch;
   farLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
   farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
@@ -13717,7 +13760,6 @@ function dynStep(dt, t, want, skyWant) {
   if (ENV.scene === 'winter') winDrawSparkles(ctx, t);
   drawCloudShadows(ctx, dt);
   drawRays(ctx, t);
-  drawBirds(ctx, t, 'far');
   var split = 0;
   while (split < leaves.length && leaves[split].z < 0.5) split++;
   for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
