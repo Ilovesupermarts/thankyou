@@ -9139,7 +9139,7 @@ tyReceiptBtn.addEventListener('click', function(e) {
    and moon over Nagoya; weather from the app's own Open-Meteo request
    (wind, rain, cloud, fog, snow); kōyō trees and an autumn landscape in
    the autumn theme (8b, 8c) and a snowy landscape with plum branches in
-   the winter theme (8d); and a dragonfly, cricket and fireflies
+   the winter theme (8d); and a cricket and fireflies
    that land on the message text. It was tuned on dynamic.html and the
    values there are the ones baked into S below.
    Wrapped in a function so none of its names can clash with the app's.
@@ -9231,7 +9231,7 @@ var S = {
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   frontLeaves: 20, frontLeafOpacity: 1, frontLeafMinZ: 0.8, nearShare: 0.2, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60,
-  dragonfly: true, cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
+  cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
   renderScale: 0.75
 };
 
@@ -10130,7 +10130,7 @@ function strikeLightning() {
 /* ============================================================
    8. WEATHER & TIME-OF-DAY LAYERS
    ============================================================ */
-var streaks = [], splashes = [], flakes = [], specks = [], birds = [], dragonfly = null;
+var streaks = [], splashes = [], flakes = [], specks = [], birds = [];
 var cloudSprite = null, fogSprite = null, speckSprite = null;
 var cloudShadowsPos = [{ x: 0, y: 0.1 }, { x: 0.55, y: 0.45 }, { x: 1.1, y: 0.2 }];
 var fogBands = [{ x: 0, y: 0.25, s: 1 }, { x: 0.4, y: 0.55, s: 0.7 }, { x: 0.8, y: 0.8, s: 1.2 }];
@@ -10545,7 +10545,8 @@ function drawFog(ctx, dt) {
 
 /* Birds: a small flock of one kind crosses the autumn sky now and then,
    from sunrise to 17:00 (not in rain or snow, never in winter). The next
-   flock is always a different kind, after a random wait. Three kinds:
+   flock is always a different kind, 5-10 s later (the first one a few
+   seconds after the landscape is drawn), from either side. Three kinds:
    オナガ (azure-winged magpie: grey, sky-blue wings, long blue tail,
    flaps then glides), メジロ (Japanese white-eye: small, olive green,
    white eye-ring, quick whirring wings that fold between bursts) and
@@ -10734,9 +10735,11 @@ function sendBirds() {
 function updateBirds(dt, t) {
   var h = S.hour, sky = !ENV.rainy && !ENV.snowing && S.condition !== 'thunderstorm';
   var birdTime = S.birds && ENV.scene === 'autumn' && sky && h >= ENV.sun.rise && h < 17;
-  if (birdTime && t > birdNext) {
-    if (birdNext > 0) sendBirds();
-    birdNext = t + rnd(30, 110);
+  // the landscape and trees fully drawn and the scene faded in
+  var ready = LS.ready && !LS.step && LS.floorBuilt && !dynSetupLeft && dynMaster > 0.9;
+  if (birdTime && ready) {
+    if (!birdNext) birdNext = t + rnd(0.5, 2);     // the first flock is in view within a few seconds
+    else if (t > birdNext) { sendBirds(); birdNext = t + rnd(5, 10); }
   }
   // none in winter, and none left over when the clock is moved outside the hours
   if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) birds.length = 0;
@@ -11275,8 +11278,8 @@ function drawTree(ctx, t) {
 }
 
 /* ============================================================
-   8c. VISITORS — red dragonfly by day, cricket at night.
-       They perch on the characters of the message text.
+   8c. VISITORS — a cricket at night (the red dragonfly was removed).
+       It perches on the characters of the message text.
    ============================================================ */
 var _glyphsReadyAt = 0;   // characters are still sliding in until this time
 function glyphSpots() {
@@ -11330,137 +11333,10 @@ function insectsLeaveText() {
   for (var i = 0; i < specks.length; i++) {
     if (specks[i].state !== 'drift') { specks[i].state = 'drift'; specks[i].target = null; }
   }
-  if (dragonfly && dragonfly.perch && dragonfly.perch.glyph) {
-    if (dragonfly.state === 'perch') dragonfly.rest = Math.min(dragonfly.rest, 0.2);
-    else if (dragonfly.state === 'approach') dragonfly.perch = { x: dragonfly.x, y: dragonfly.y - 30 };
-  }
   if (cricket) {
     cricket.seq = cricket.seq.filter(function(sp) { return !sp.glyph; });
     if (cricket.state === 'rest') cricket.rest = Math.min(cricket.rest, 0.3);
   }
-}
-
-/* Akatombo: darts and hovers, lands on a character, slowly folds its
-   wings in and out while resting, then flies on or leaves. */
-var dragonfly = null, dragonflyNext = 0;
-function sendDragonfly() {
-  var fromLeft = Math.random() < 0.5;
-  dragonfly = {
-    x: fromLeft ? -40 : W + 40, y: H * rnd(0.15, 0.55), heading: fromLeft ? 0 : PI,
-    state: 'dash', tx: W * rnd(0.2, 0.8), ty: H * rnd(0.15, 0.6), hoverT: 0,
-    legs: 1 + Math.floor(Math.random() * 3), landings: 1 + Math.floor(Math.random() * 3),
-    t: 0, fold: 0, perch: null, perchT: 0, rest: 0, foldRate: 1.5, perchHeading: 0, leaving: false
-  };
-}
-function dfNextLeg(d) {
-  if (d.legs > 0) {
-    d.legs--;
-    d.state = 'dash';
-    d.tx = clamp(d.x + rnd(-400, 400), 40, W - 40);
-    d.ty = clamp(d.y + rnd(-220, 220), H * 0.1, H * 0.75);
-  } else if (d.landings > 0) {
-    d.landings--;
-    d.perch = pickPerch();
-    d.state = 'approach';
-  } else {
-    d.leaving = true;
-    d.state = 'dash';
-    d.tx = d.x < W / 2 ? -100 : W + 100;
-    d.ty = d.y + rnd(-150, 50);
-  }
-}
-function updateDragonfly(dt, t) {
-  var okTime = ENV.light.daylight > 0.5 && !ENV.rainy && S.condition !== 'snow' && S.temperature >= 12 && ENV.scene !== 'winter';
-  if (!dragonfly && S.dragonfly && okTime && dynFrontMul > 0.5 && t > dragonflyNext) {
-    if (dragonflyNext > 0) sendDragonfly();
-    dragonflyNext = t + rnd(60, 180);
-  }
-  var d = dragonfly;
-  if (!d) return;
-  d.t += dt;
-  if (d.state === 'dash' || d.state === 'approach') {
-    var tgt = d.state === 'approach' ? spotPos(d.perch) : { x: d.tx, y: d.ty };
-    var dx = tgt.x - d.x, dy = tgt.y - d.y, dist = Math.sqrt(dx * dx + dy * dy);
-    var sp = d.state === 'approach' ? Math.min(420, dist * 4 + 20) : Math.min(520, dist * 6);
-    if (dist > 0.5) {
-      var step = Math.min(dist, sp * dt);
-      d.x += dx / dist * step;
-      d.y += dy / dist * step;
-      if (dist > 6) d.heading += angDiff(Math.atan2(dy, dx), d.heading) * (1 - Math.exp(-dt * 10));
-    }
-    d.fold += (0 - d.fold) * (1 - Math.exp(-dt * 12));
-    if (dist < 2) {
-      if (d.state === 'approach') {
-        d.state = 'perch';
-        d.rest = rnd(3, 8);
-        d.perchT = 0;
-        d.foldRate = rnd(1.1, 2.2);
-        d.perchHeading = (Math.random() < 0.5 ? 0 : PI) + rnd(-0.35, 0.35);
-      } else if (d.leaving) {
-        dragonfly = null;
-        return;
-      } else {
-        d.state = 'hover';
-        d.hoverT = rnd(0.4, 1.2);
-      }
-    }
-  } else if (d.state === 'hover') {
-    d.hoverT -= dt;
-    d.x += Math.sin(d.t * 7) * 6 * dt;
-    d.y += Math.cos(d.t * 9) * 6 * dt;
-    if (d.hoverT <= 0) dfNextLeg(d);
-  } else if (d.state === 'perch') {
-    var p = spotPos(d.perch);
-    d.x = p.x; d.y = p.y;
-    d.perchT += dt;
-    d.rest -= dt;
-    d.heading += angDiff(d.perchHeading, d.heading) * (1 - Math.exp(-dt * 4));
-    var cyc = 0.5 - 0.5 * Math.cos(d.perchT * d.foldRate);
-    d.fold += (Math.pow(cyc, 1.5) - d.fold) * (1 - Math.exp(-dt * 6));
-    if (d.rest <= 0) { d.legs = Math.floor(Math.random() * 2); dfNextLeg(d); }
-  }
-  if (dragonfly && (d.x < -200 || d.x > W + 200)) dragonfly = null;
-}
-function drawDragonfly(ctx, t) {
-  var d = dragonfly;
-  if (!d) return;
-  var k = 1.2 * S.insectSize;
-  var perched = d.state === 'perch';
-  ctx.save();
-  ctx.translate(d.x, d.y);
-  ctx.rotate(d.heading);
-  if (perched) {
-    ctx.fillStyle = 'rgba(60,40,40,0.12)';
-    ctx.beginPath(); ctx.ellipse(-4 * k + 3, 5, 18 * k, 4 * k, 0, 0, TAU); ctx.fill();
-  }
-  ctx.scale(k, k);
-  var flap = perched ? 0 : Math.sin(t * 90) * 0.15;
-  var fa = lerp(80, 152, d.fold) - flap * 60;     // 152° = folded back along the body
-  var ha = lerp(100, 164, d.fold) - flap * 60;
-  ctx.lineWidth = 0.6;
-  [[10, -fa, 22, 4.5], [10, fa, 22, 4.5], [6, -ha, 21, 5.5], [6, ha, 21, 5.5]].forEach(function(w) {
-    ctx.save();
-    ctx.translate(w[0], 0);
-    ctx.rotate(w[1] * DEG);
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
-    ctx.strokeStyle = 'rgba(90,60,60,0.35)';
-    ctx.beginPath(); ctx.ellipse(w[2] / 2, 0, w[2] / 2, w[3] / 2, 0, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(1, 0); ctx.lineTo(w[2] - 1, 0); ctx.stroke();
-    ctx.fillStyle = 'rgba(120,60,40,0.55)';
-    ctx.fillRect(w[2] - 4, -w[3] * 0.25, 2, w[3] * 0.4);
-    ctx.restore();
-  });
-  ctx.strokeStyle = '#c4361e';
-  ctx.lineCap = 'round';
-  for (var i = 0; i < 6; i++) {
-    ctx.lineWidth = 2.6 - i * 0.18;
-    ctx.beginPath(); ctx.moveTo(6 - i * 6, 0); ctx.lineTo(1 - i * 6, 0); ctx.stroke();
-  }
-  ctx.fillStyle = '#a8321f';
-  ctx.beginPath(); ctx.ellipse(10, 0, 5, 3.2, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#7a2a1c';
-  ctx.beginPath(); ctx.arc(16, 0, 3.2, 0, TAU); ctx.fill();
-  ctx.restore();
 }
 
 /* Cricket (コオロギ): hops from character to character, sometimes
@@ -13434,7 +13310,7 @@ function winDrawNear(c) {
                  text and the table scroll in behind them. The summary bar
                  (z 50) still covers it.
      #dynFront   full screen above the message text (z 10): the nearest
-                 leaves and flakes, the dragonfly, cricket and fireflies on
+                 leaves and flakes, the cricket and fireflies on
                  the characters. It fades out on the table and thank-you
                  pages.
    ============================================================ */
@@ -13672,8 +13548,8 @@ function dynFinishSetup() {
    sky colour stays: the koi screen shows it). */
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
-  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0;
-  dragonfly = null; cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
+  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0; birdNext = 0;
+  cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
   winReset();
@@ -13817,9 +13693,8 @@ function dynStep(dt, t, want, skyWant) {
   updateSpecks(dt, t);
   updateTree(dt, t);
   if (ENV.scene === 'winter') winUpdate(dt, t);
-  updateDragonfly(dt, t);
   updateCricket(dt, t);
-  if (dynFrontMul < 0.05 && (dragonfly || cricket)) { dragonfly = null; cricket = null; insectsLeaveText(); }
+  if (dynFrontMul < 0.05 && cricket) { cricket = null; insectsLeaveText(); }
 
   // re-draw a few leaf sprites per frame when the look changed
   var budget = 10, all = leaves.concat(pile);
@@ -13895,7 +13770,6 @@ function dynStep(dt, t, want, skyWant) {
     if (hero) drawLeaf(hero, t, false, ctxF);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0); ctxF.globalAlpha = 1;
     drawSpecks(ctxF, t, true);
-    drawDragonfly(ctxF, t);
     drawCricket(ctxF, t);
     frontCleared = false;
   } else if (!frontCleared) {
