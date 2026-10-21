@@ -1272,8 +1272,8 @@ function drawTorii(t, B, yb, u, haze, C) {
   t.beginPath(); ellipse(t, xL, yb, pw * 1.5, Ht * 0.02); ellipse(t, xR, yb, pw * 1.5, Ht * 0.02); t.fill();
   toriiSpot = { x: cx, y: yb, h: Ht };
 }
-/* The snowfield is baked in slices by depth (SLABS): a new slice starts
-   after every swell a skier may ride on, so the skiers on it can be drawn
+/* The snowfield is baked in slices by depth (SLABS): with skiers, one slice
+   per swell, so the skiers on each swell can be drawn
    between the slices, and the nearer swells, with the trees and torii on
    them, then pass in front. A slice reaches down only as far as the next
    swell's crest could leave it showing. The mist lying low at the horizon
@@ -1303,8 +1303,9 @@ function bakeGround() {
     Sb.things.push(B);
     if (B.type === 'torii') toriiSpot = { x: B.x, y: B.yb, h: H * V.toriiSize };   // known before baking, for the lamp glow
   }
-  var lr = V.skiers ? laneRange(N) : [N, -1], groups = [], a0 = 0;
-  for (k = 0; k < N; k++) if (k === N - 1 || (k >= lr[0] && k <= lr[1])) { groups.push([a0, k]); a0 = k + 1; }
+  // with skiers, one slice per swell, so a skier on any swell sits between the right ones
+  var groups = [], a0 = 0;
+  for (k = 0; k < N; k++) if (k === N - 1 || V.skiers) { groups.push([a0, k]); a0 = k + 1; }
   for (var gi = 0; gi < groups.length; gi++) {
     var k0 = groups[gi][0], k1 = groups[gi][1], top = Infinity;
     for (k = k0; k <= k1; k++) {
@@ -1451,34 +1452,43 @@ function laneRange(N) {
   return [Math.min(a, b), Math.max(a, b)];
 }
 /* Where a skier's skis touch the snow on swell S: the same line the trees stand on. */
-function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.5 + 2; }
-/* front: a skier on #dynNear above the page, so it passes in front of the
-   page dots. It rides its own gentle path at the dots' height (its own
-   "swell", S), sized, hazed and blurred for the depth of the snowfield there. */
+/* A skier's skis are a little further down the face of its swell than the
+   trees and the torii on that swell stand (they stand at amp * 0.5 + 2), so
+   a skier passing one on the same swell is nearer, lower and in front, as it
+   looks; on a further swell it is behind them and the swells in front. */
+function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.85 + 4; }
+/* front: a skier that passes in front of the page dots. It rides the swell
+   whose snow line under the dots is nearest just below them, like any other
+   skier there (same size, haze and blur, behind the nearer swells, trees and
+   torii); only where it crosses the dots is it copied onto #dynNear, above
+   the page (K.dots, the box around the dots). */
 function spawnSkier(dir, front) {
   var SW = GROUND.swells, N = SW.length;
   if (!N) return;
   if (front === undefined) front = Math.random() < V.skiFront;
-  var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), u = SW[k].u, path = null;
+  var lr = laneRange(N), k = lr[0] + Math.floor(Math.random() * (lr[1] - lr[0] + 1)), box = null;
   var hk = V.skiSize * rnd(0.9, 1.08);
   if (front) {
-    // Its depth is where its skis would touch the snowfield (just below the
-    // dots): the swell whose snow line is nearest there, so it has the size,
-    // haze and blur of the other skiers at that depth.
-    var de = document.getElementById('dots'), rc = de ? de.getBoundingClientRect() : null;
-    var dotsY = rc && rc.height ? rc.top + rc.height / 2 : H - 140, ph0 = rnd(0, TAU), wl = W * rnd(0.3, 0.45), best = Infinity;
-    for (var q = 0; q < N; q++) {
-      var hq = H * lerp(0.04, 0.09, SW[q].u) * hk, dq = Math.abs(SW[q].yk + SW[q].amp * 0.5 - (dotsY + hq * 0.55));
-      if (dq < best) { best = dq; u = SW[q].u; }
+    var ds = document.querySelectorAll('.dot'), x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+    for (var d = 0; d < ds.length; d++) {
+      var rc = ds[d].getBoundingClientRect();
+      if (!rc.width) continue;
+      x0 = Math.min(x0, rc.left); x1 = Math.max(x1, rc.right); y0 = Math.min(y0, rc.top); y1 = Math.max(y1, rc.bottom);
     }
-    k = -1;
+    if (x1 > x0) {
+      box = { x0: x0 - 12, x1: x1 + 12, y0: y0 - 12, y1: y1 + 12 };      // with room for the active dot's halo
+      var dx = (x0 + x1) / 2, dy = (y0 + y1) / 2, best = Infinity;
+      for (var q = 0; q < N; q++) {
+        var hq = H * lerp(0.04, 0.09, SW[q].u) * hk, dq = Math.abs(skiGroundY(SW[q], dx) - (dy + hq * 0.55));
+        if (dq < best) { best = dq; k = q; }
+      }
+    }
   }
-  var h = H * lerp(0.04, 0.09, u) * hk;
-  if (front) path = { yk: dotsY + h * 0.55 - 5, amp: 6, f: function (x) { return Math.sin(x / wl + ph0); } };   // the feet just below the dots
+  var u = SW[k].u, h = H * lerp(0.04, 0.09, u) * hk;
   dir = dir || (Math.random() < 0.5 ? 1 : -1);
   var jacket = pick(SKI_JACKETS), scarf = pick(SKI_SCARVES), hat = pick(SKI_HATS);
   while (scarf === jacket) scarf = pick(SKI_SCARVES);
-  skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0, S: path,
+  skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0, dots: box,
                 ph: rnd(0, TAU), sph: rnd(0, TAU), sf: rnd(0.8, 1.3), stripe: Math.random() < 0.5,
                 col: { jacket: hex(jacket), pants: hex(pick(SKI_PANTS)), hat: hex(hat), pom: hex(pick(SKI_HATS)),
                        scarf: hex(scarf), skis: hex(pick(SKI_SKIS)), skin: hex(pick(SKI_SKIN)) },
@@ -1492,7 +1502,7 @@ function updateSkiers(dt) {
     skiTimer = rnd(Math.min(V.skiGapMin, V.skiGapMax), Math.max(V.skiGapMin, V.skiGapMax));
   }
   for (var i = skiers.length - 1; i >= 0; i--) {
-    var K = skiers[i], S = K.S || GROUND.swells[K.k];
+    var K = skiers[i], S = GROUND.swells[K.k];
     if (!S) { skiers.splice(i, 1); continue; }
     var down = K.dir * (skiGroundY(S, K.x + 3) - skiGroundY(S, K.x - 3)) / 6;   // > 0: going downhill
     K.v = K.vb * K.h * V.skiSpeed * clamp(1 + 1.5 * down, 0.55, 1.5);
@@ -1505,7 +1515,7 @@ function updateSkiers(dt) {
    going left: skis, the far leg and arm (a little darker), the body, the
    near leg and arm, the poles, the head and hat, and the scarf. */
 function drawSkier(c, K, t) {
-  var C = cols(), S = K.S || GROUND.swells[K.k], h = K.h;
+  var C = cols(), S = GROUND.swells[K.k], h = K.h;
   if (!S) return;
   var haze = V.groundHaze * Math.pow(1 - K.u, 2) * 0.9;
   function col(x, k) { return rgb(light(mix(scale(x, k || 1), C.mist, haze))); }
@@ -1582,17 +1592,28 @@ function drawSkier(c, K, t) {
   g.beginPath(); g.arc(head[0] - 0.005 * h, head[1] - 0.012 * h, hr * 1.04, PI * 1.02, PI * 2.02); g.fill();
   g.fillRect(head[0] - hr * 1.08, head[1] - 0.025 * h, hr * 2.1, 0.03 * h);
   g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
+  K.blit = [K.x - (K.dir > 0 ? ox : bw - ox), gy0 - oy, bw, bh];
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.imageSmoothingEnabled = true;
-  c.drawImage(K.cnv, K.x - (K.dir > 0 ? ox : bw - ox), gy0 - oy, bw, bh);
+  c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
 }
-/* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices);
-   the ones in front of the page dots have k = -1 and are drawn on #dynNear. */
+/* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices). */
 function drawSkiers(c, t, kFrom, kTo) {
   for (var i = 0; i < skiers.length; i++) if (skiers[i].k > kFrom && skiers[i].k <= kTo) drawSkier(c, skiers[i], t);
 }
-function drawFrontSkiers(c, t) {
-  for (var i = 0; i < skiers.length; i++) if (skiers[i].S) drawSkier(c, skiers[i], t);
+/* #dynNear: the part of a dots skier that crosses the dots, copied from the
+   picture already drawn for it on #dynBack this frame. */
+function drawFrontSkiers(c) {
+  for (var i = 0; i < skiers.length; i++) {
+    var K = skiers[i], B = K.dots;
+    if (!B || !K.blit || K.blit[0] > B.x1 || K.blit[0] + K.blit[2] < B.x0) continue;
+    c.save();
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    c.beginPath(); c.rect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0); c.clip();
+    c.imageSmoothingEnabled = true;
+    c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
+    c.restore();
+  }
 }
 
 /* ============================================================
@@ -2244,7 +2265,7 @@ function frame(now) {
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
   drawFlakes(nctx, nz, 2);
-  drawFrontSkiers(nctx, t);
+  drawFrontSkiers(nctx);
   drawBokeh(nctx);
 
   // Ground strip: the snowdrift, and the flakes that landed on it, melting.
