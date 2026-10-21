@@ -96,6 +96,17 @@ var BUILD = 'v135';
          8 ms a frame, each clump painted once so the scene's first frame
          does not have to). If any is left when the scene would show, its
          fade-in waits up to 1.5 s for it (dynSetupStep, dynHoldForSetup).
+         None of it runs while the characters are still arriving: it starts
+         once they have landed (nameLandsAt) and, while the name stands
+         still (until nameLeavesAt), takes bigger steps, since a long frame
+         does not show then. Both themes.
+       - The name is written like ink on washi (墨のにじみ): each character
+         is brushed in from the top down behind a soft edge, its wet ink
+         spreading with a pale bloom and then drying sharp (inkBrush and
+         inkDry in main.css). The characters follow 0.42 s apart
+         (NAME_STAGGER) and each has settled 1.7 s after it starts
+         (NAME_ARRIVE), so a three-character name takes about 2.7 s to
+         arrive (was about 1.8 s).
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -3380,6 +3391,10 @@ var greetingFinalized = false;
 var startBtn = document.getElementById('startBtn');
 var blossomScreen = document.getElementById('blossomScreen');
 var introOverlay = document.getElementById('introOverlay');
+/* When the name's characters have all arrived, and when they start to leave:
+   in between the name is still, and the background does its heavy setup
+   then (see dynPrelude). */
+var nameLandsAt = 0, nameLeavesAt = 0;
 var nameColumn = document.getElementById('nameColumn');
 var introHasRun = false;
 
@@ -5556,6 +5571,10 @@ function spawnRipples(clientX, clientY, intensity) {
   }
 }
 
+/* The name's characters are brushed in one after another (main.css
+   .name-char): each starts NAME_STAGGER s after the one before and has
+   settled NAME_ARRIVE s after it starts. */
+var NAME_STAGGER = 0.42, NAME_ARRIVE = 1.7;
 function renderIntroGlyph(text) {
   if (!nameColumn) return;
   nameColumn.innerHTML = '';
@@ -5564,7 +5583,7 @@ function renderIntroGlyph(text) {
     var span = document.createElement('span');
     span.className = 'name-char';
     span.textContent = chars[i];
-    span.style.animationDelay = (i * 0.22) + 's';
+    span.style.animationDelay = (i * NAME_STAGGER) + 's';
     nameColumn.appendChild(span);
   }
 }
@@ -5989,8 +6008,10 @@ function triggerKoiStart() {
       if (introOverlay) introOverlay.classList.add('active');
 
       var totalChars = nameText.length;
-      var arrivalTime = (totalChars * 220) + 1100;
+      var arrivalTime = ((totalChars - 1) * NAME_STAGGER + NAME_ARRIVE) * 1000 + 220;
       var holdTime = 1200;
+      nameLandsAt = performance.now() + arrivalTime;
+      nameLeavesAt = nameLandsAt + holdTime;
 
       koiPushTimer(setTimeout(function() {
         var fadingChars = nameColumn ? nameColumn.querySelectorAll('.name-char') : [];
@@ -13413,14 +13434,16 @@ function dynBegin(lazy) {
 }
 /* One frame's share of the work dynBegin(true) left: the landscape first (a
    part per frame, then the fallen leaves ten at a time), then the first
-   leaves, then the tree clumps (about 8 ms a frame). */
-function dynSetupStep(t) {
+   leaves, then the tree clumps (about 8 ms a frame). still: the name is
+   standing still, so a long frame does not show and each frame does more
+   (all the fallen leaves, all the first leaves, about 50 ms of clumps). */
+function dynSetupStep(t, still) {
   if (ENV.scene === 'autumn' || ENV.scene === 'winter') {
-    if (!LS.ready || LS.step || (ENV.scene === 'autumn' && !LS.floorBuilt)) { updateLandscape(t, 10); return; }
+    if (!LS.ready || LS.step || (ENV.scene === 'autumn' && !LS.floorBuilt)) { updateLandscape(t, still ? undefined : 10); return; }
   }
   if (!dynSetupLeft) return;
-  if (prefillLeft > 0) { prefillSome(6); return; }
-  if (bakePendingClumps(8)) dynSetupLeft = false;
+  if (prefillLeft > 0) { prefillSome(still ? Infinity : 6); return; }
+  if (bakePendingClumps(still ? 50 : 8)) dynSetupLeft = false;
 }
 /* The scene would show, but the name's setup is not finished (a slow
    moment): it carries on a little per frame and the scene's fade-in waits,
@@ -13501,9 +13524,12 @@ function dynPrelude(dt, t, skyWant) {
     // is done before it shows (not on the koi screen, where it could make the
     // koi stutter while someone touches the water). It is spread out, one small
     // part per frame, so the name animation does not stutter either.
-    if (naming) {
+    // Nothing heavy while the characters are still arriving: it waits until
+    // they have landed and the name stands still.
+    var nowMs = performance.now();
+    if (naming && nowMs >= nameLandsAt) {
       if (!dynBegun) dynBegin(true);
-      else dynSetupStep(t);
+      else dynSetupStep(t, nowMs < nameLeavesAt);
     }
     updateSkyLayer(dt, t);
   }
