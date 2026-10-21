@@ -1233,6 +1233,7 @@
     text-shadow: 0 2px 20px rgba(80, 40, 10, 0.35);
     opacity: 0; transform: translateY(-24px); filter: blur(3px);
     animation: charArrive 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    will-change: opacity, transform, filter;   /* own layer from the start, so the arrival glides even while the background is busy */
     transition: opacity 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 transform 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94),
                 filter 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94);
