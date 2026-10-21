@@ -78,8 +78,9 @@ var BUILD = 'v135';
          slice per swell (5 swells now, height 1.05) so they pass behind
          the nearer swells, trees and torii, and in front (lower) on the
          same swell. Most of them (85%) ride the swell just below the page
-         dots, and where they cross the dots that part is drawn above the
-         page on #dynNear.
+         dots; those are drawn above the page on #dynNear for their whole
+         way across, with the same low mist and nearer swells over them, so
+         they look the same throughout.
        - Koi screen and name animation: the time-of-day sky colour shows
          from the koi screen on (#dynSky, a quarter-size canvas under
          #dynBack, see dynPrelude), so the session starts on the evening or
@@ -11921,8 +11922,8 @@ function drawNearBand(c) {
      #dynGround  a soft snowdrift along the bottom edge, above the text and
                  table, where the nearest flakes land and slowly melt.
      #dynNear    the nearest flakes (in front of the text and table), a few
-                 big soft flakes close to the glass, and the part of a skier
-                 that crosses the page dots.
+                 big soft flakes close to the glass, and the skiers that pass
+                 in front of the page dots.
    Every flake has its own depth: size, blur, strength, speed and drift
    follow it. The blur comes from 8 soft dots baked once, never from a
    filter per frame. The wind and gusts are as tuned; the real wind sets
@@ -12402,7 +12403,7 @@ function winDrawGround(c, t) {
     var SL = WS.slabs[i];
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.drawImage(SL.cnv, 0, Math.round(SL.top * PR));
-    for (var j = 0; j < WS.skiers.length; j++) if (WS.skiers[j].k === SL.k) winDrawSkier(c, WS.skiers[j], t);
+    for (var j = 0; j < WS.skiers.length; j++) if (WS.skiers[j].k === SL.k && !WS.skiers[j].dots) winDrawSkier(c, WS.skiers[j], t);
   }
   if (WS.gmist) { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(WS.gmist.cnv, 0, Math.round(WS.gmist.top * PR)); }
 }
@@ -12419,8 +12420,8 @@ function winDrawGround(c, t) {
    streams out behind and flutters, more in a gust. Each is drawn on a small
    canvas of its own at a resolution that falls with depth, then scaled up:
    that is the blur. A share of them (skiFront) ride the swell just below
-   the page dots, and where they cross the dots that part of them is copied
-   onto #dynNear, above the page. */
+   the page dots; those are drawn on #dynNear, above the page, for their
+   whole way across, with the same mist and nearer swells over them. */
 var WIN_JACKETS = ['#C8321E', '#882E47', '#2F4A6B', '#3E5A3A', '#E66826', '#5A4A7A', '#D9A23A', '#1F6F78', '#F2EDE4'];
 var WIN_PANTS = ['#2A2A35', '#3B3F52', '#4A3A3E', '#2F4A6B', '#5B4636', '#3E4A3A'];
 var WIN_HATS = ['#F2EDE4', '#C8321E', '#E66826', '#2F4A6B', '#882E47', '#F2B33A', '#1F6F78'];
@@ -12565,24 +12566,42 @@ function winDrawSkier(c, K, t) {
   g.fillRect(head[0] - hr * 1.08, head[1] - 0.025 * h, hr * 2.1, 0.03 * h);
   g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
   K.blit = [K.x - ox, gy0 - oy, bw, bh];
+  if (!c) return;                                                 // only drawn on its own canvas (a dots skier)
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.imageSmoothingEnabled = true;
   c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
 }
-/* #dynNear: the part of a dots skier that crosses the dots, copied from the
-   picture already drawn for it on #dynBack this frame. */
-function winDrawFrontSkiers(c) {
-  var B = WS.dots;
-  if (!B) return;
+/* #dynNear: a skier that passes the page dots is drawn here (above the
+   page) for its whole way across, not on #dynBack, so it looks the same
+   from start to finish: on a small layer of its own it is hidden where the
+   nearer swells cover it and washed by the low mist, as the skiers on
+   #dynBack are, then laid down. */
+function winDrawFrontSkiers(c, t) {
   for (var i = 0; i < WS.skiers.length; i++) {
     var K = WS.skiers[i];
-    if (!K.dots || !K.blit || K.blit[0] > B.x1 || K.blit[0] + K.blit[2] < B.x0) continue;
-    c.save();
-    c.setTransform(PR, 0, 0, PR, 0, 0);
-    c.beginPath(); c.rect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0); c.clip();
-    c.imageSmoothingEnabled = true;
-    c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
-    c.restore();
+    if (!K.dots) continue;
+    winDrawSkier(null, K, t);
+    var bx = K.blit[0], by = K.blit[1], fw = Math.ceil(K.blit[2] * PR), fh = Math.ceil(K.blit[3] * PR);
+    if (!WS.ftmp) WS.ftmp = landCanvas();
+    var F = WS.ftmp, f = F.c;
+    if (F.cnv.width !== fw || F.cnv.height !== fh) { F.cnv.width = fw; F.cnv.height = fh; }
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, fw, fh);
+    f.imageSmoothingEnabled = true;
+    f.drawImage(K.cnv, 0, 0, K.blit[2] * PR, K.blit[3] * PR);
+    f.globalCompositeOperation = 'destination-out';              // the nearer swells hide it
+    for (var j = 0; j < WS.slabs.length; j++) {
+      var SL = WS.slabs[j];
+      if (SL.k > K.k) f.drawImage(SL.cnv, -bx * PR, Math.round(SL.top * PR) - by * PR);
+    }
+    if (WS.gmist) {                                              // the low mist over it
+      f.globalCompositeOperation = 'source-atop';
+      f.drawImage(WS.gmist.cnv, -bx * PR, Math.round(WS.gmist.top * PR) - by * PR);
+    }
+    f.globalCompositeOperation = 'source-over';
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(F.cnv, bx * PR, by * PR);
   }
 }
 function winDrawSparkles(c, t) {
@@ -13135,8 +13154,8 @@ function winDrawLanded(c, t) {
 /* #dynNear: the nearest flakes and the big soft ones close to the glass. */
 function winDrawNear(c) {
   if (!LS.ready || !WS.flakeSpr.length) return;
+  winDrawFrontSkiers(c, lastT);
   winDrawFlakes(c, winNearZ(), 2);
-  winDrawFrontSkiers(c);
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < WS.bokeh.length; i++) {
     var B = WS.bokeh[i];

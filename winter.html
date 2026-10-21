@@ -1459,9 +1459,9 @@ function laneRange(N) {
 function skiGroundY(S, x) { return S.yk - S.amp * S.f(x) + S.amp * 0.85 + 4; }
 /* front: a skier that passes in front of the page dots. It rides the swell
    whose snow line under the dots is nearest just below them, like any other
-   skier there (same size, haze and blur, behind the nearer swells, trees and
-   torii); only where it crosses the dots is it copied onto #dynNear, above
-   the page (K.dots, the box around the dots). */
+   skier there (same size, haze and blur); it is drawn on #dynNear, above the
+   page, for its whole way across, with the nearer swells and the low mist
+   over it as on #dynBack (see drawFrontSkiers). */
 function spawnSkier(dir, front) {
   var SW = GROUND.swells, N = SW.length;
   if (!N) return;
@@ -1593,26 +1593,45 @@ function drawSkier(c, K, t) {
   g.fillRect(head[0] - hr * 1.08, head[1] - 0.025 * h, hr * 2.1, 0.03 * h);
   g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
   K.blit = [K.x - (K.dir > 0 ? ox : bw - ox), gy0 - oy, bw, bh];
+  if (!c) return;                                                 // only drawn on its own canvas (a dots skier)
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.imageSmoothingEnabled = true;
   c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
 }
 /* The skiers riding the swells kFrom < k ≤ kTo (drawn between the slices). */
 function drawSkiers(c, t, kFrom, kTo) {
-  for (var i = 0; i < skiers.length; i++) if (skiers[i].k > kFrom && skiers[i].k <= kTo) drawSkier(c, skiers[i], t);
+  for (var i = 0; i < skiers.length; i++) if (skiers[i].k > kFrom && skiers[i].k <= kTo && !skiers[i].dots) drawSkier(c, skiers[i], t);
 }
-/* #dynNear: the part of a dots skier that crosses the dots, copied from the
-   picture already drawn for it on #dynBack this frame. */
-function drawFrontSkiers(c) {
+/* #dynNear: a skier that passes the page dots is drawn here (above the
+   page) for its whole way across, not on #dynBack, so it looks the same
+   from start to finish: on a small layer of its own it is hidden where the
+   nearer swells cover it and washed by the low mist, as the skiers on
+   #dynBack are, then laid down. */
+var FTMP = mk();
+function drawFrontSkiers(c, t) {
   for (var i = 0; i < skiers.length; i++) {
-    var K = skiers[i], B = K.dots;
-    if (!B || !K.blit || K.blit[0] > B.x1 || K.blit[0] + K.blit[2] < B.x0) continue;
-    c.save();
-    c.setTransform(PR, 0, 0, PR, 0, 0);
-    c.beginPath(); c.rect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0); c.clip();
-    c.imageSmoothingEnabled = true;
-    c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
-    c.restore();
+    var K = skiers[i];
+    if (!K.dots) continue;
+    drawSkier(null, K, t);
+    if (!K.blit) continue;
+    var bx = K.blit[0], by = K.blit[1], fw = Math.ceil(K.blit[2] * PR), fh = Math.ceil(K.blit[3] * PR), f = FTMP.c;
+    if (FTMP.cnv.width !== fw || FTMP.cnv.height !== fh) { FTMP.cnv.width = fw; FTMP.cnv.height = fh; }
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, fw, fh);
+    f.imageSmoothingEnabled = true;
+    f.drawImage(K.cnv, 0, 0, K.blit[2] * PR, K.blit[3] * PR);
+    f.globalCompositeOperation = 'destination-out';              // the nearer swells hide it
+    for (var j = 0; j < SLABS.length; j++) {
+      if (SLABS[j].kTo > K.k) f.drawImage(SLABS[j].cnv, -bx * PR, Math.round(SLABS[j].top * PR) - by * PR);
+    }
+    if (GMIST.top !== undefined) {                               // the low mist over it
+      f.globalCompositeOperation = 'source-atop';
+      f.drawImage(GMIST.cnv, -bx * PR, Math.round(GMIST.top * PR) - by * PR);
+    }
+    f.globalCompositeOperation = 'source-over';
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(FTMP.cnv, bx * PR, by * PR);
   }
 }
 
@@ -2264,8 +2283,8 @@ function frame(now) {
   // The nearest flakes, and the big soft ones, in front of everything on #dynNear.
   nctx.setTransform(1, 0, 0, 1, 0, 0);
   nctx.clearRect(0, 0, cvN.width, cvN.height);
+  drawFrontSkiers(nctx, t);
   drawFlakes(nctx, nz, 2);
-  drawFrontSkiers(nctx);
   drawBokeh(nctx);
 
   // Ground strip: the snowdrift, and the flakes that landed on it, melting.
