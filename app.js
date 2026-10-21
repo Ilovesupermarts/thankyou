@@ -1294,7 +1294,6 @@ var _swipeActive = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
-var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
 
 /* ============ TRACK METADATA (3 PHASES, 3 PHYSICAL BUFFERS) ============
    Three Nagoya time phases, three distinct MP3 files. The
@@ -1316,10 +1315,8 @@ var WIND_CHIME_URL = 'Sound/freesound_community-wind-chimes-32150.mp3';
    mid-flight when the wall clock crosses a bucket boundary
    finishes naturally and the next cycle picks the correct track.
 
-   Peaks are 1.00 for all three beds, tuned by ear against the
-   wind chime layer that sits on top during the morning window.
-   Lifecycle is shared with the chime and the audio-reactive swell
-   loop via the .active class on #mapleLeaves. */
+   Peaks are 1.00 for all three beds. Lifecycle is shared with the
+   audio-reactive swell loop via the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
   {
     name: 'morning',
@@ -1352,16 +1349,6 @@ var AMBIENT_TRACKS = [
 
 var AMBIENT_FADE_IN  = 3.0;  // seconds
 var AMBIENT_FADE_OUT = 4.0;  // seconds
-
-/* Wind chime layer. Runs only during the morning window
-   (05:00–16:59 Nagoya) and layers on top of Morning.mp3. */
-var WIND_CHIME_PEAK        = 0.600;
-var WIND_CHIME_PLAY_MIN    = 12;    // seconds
-var WIND_CHIME_PLAY_MAX    = 14;    // seconds
-var WIND_CHIME_FADE_IN     = 2.0;   // seconds
-var WIND_CHIME_FADE_OUT    = 1.5;   // seconds
-var WIND_CHIME_SILENCE_MIN = 500;   // ms
-var WIND_CHIME_SILENCE_MAX = 2000;  // ms
 
 /* ============ AUDIO SPECTRUM & METADATA HUD ============
    Persistent bottom-left card surfacing the currently-playing
@@ -1892,7 +1879,7 @@ function decodeAmbientSlot(track) {
 
    LIFECYCLE (v1.3). The scheduler is armed by startAmbient() and
    disarmed by stopAmbient(), matching the .active gate that
-   already governs the chime and swell loop. Arming
+   already governs the swell loop. Arming
    previously lived in initSound()'s decode .then(), which meant a
    tablet parked on the name / blossom screen could wake at 16:58 /
    21:58 / 04:58 to decompress ~375 MB PCM for an inaudible
@@ -2005,8 +1992,8 @@ function releaseNonCurrentAmbientSlots(keepBufferName) {
   }
 }
 
-/* Streaming loader for non-ambient one-shots (drop, stream,
-   chime). These are small enough to decode inline — the split
+/* Streaming loader for non-ambient one-shots (drop and
+   stream). These are small enough to decode inline — the split
    loader exists specifically for the three multi-megabyte ambient
    beds. */
 function loadAudioBuffer(url) {
@@ -2202,10 +2189,6 @@ function initSound() {
 
     loadAudioBuffer(STREAM_SOUND_URL).then(function(buf) {
       if (buf) soundBuffers.stream = makeSeamlessLoop(buf, 1.5);
-    });
-
-    loadAudioBuffer(WIND_CHIME_URL).then(function(buf) {
-      if (buf) soundBuffers.windChime = buf;
     });
 
     /* AMBIENT BEDS: three raw MP3s download in parallel, but only
@@ -2638,11 +2621,10 @@ function startAmbient() {
     var playMs = playAmbientSound();
     scheduleNextAmbient(playMs);
   }, 0);
-  startWindChime();
   startSwellLoop();
   /* Arm the phase-boundary pre-decode scheduler here rather than in
      initSound(). The scheduler's lifecycle is now tied to the same
-     .active gate the chime and swell loop share: a return-to-start
+     .active gate the swell loop shares: a return-to-start
      screen disarms it, and a carousel mount re-arms it. */
   scheduleNextSlotPreDecode();
 }
@@ -2660,7 +2642,6 @@ function scheduleNextAmbient(prevPlayMs) {
 }
 
 function stopAmbient() {
-  stopWindChime();
   stopSwellLoop();
   _ambientBufferRetries = 0;
   if (ambientTimer) {
@@ -2799,107 +2780,6 @@ function playAmbientSound() {
     try { gain.disconnect(); } catch (e) {}
     /* Defensive: keep the HUD in sync if the re-arm timing changes */
     _hudRenderState();
-  };
-
-  return playDur * 1000;
-}
-
-/* ============ WIND CHIME ROTATION ============ */
-var windChimeTimer = null;
-var windChimeSource = null;
-var windChimeGain = null;
-
-function isMorningWindChimeHours() {
-  var p = nagoyaDateParts();
-  return (p.hour >= 5 && p.hour < 17);
-}
-
-function startWindChime() {
-  stopWindChime();
-  windChimeTimer = setTimeout(function() {
-    windChimeTimer = null;
-    var playMs = playWindChimeSound();
-    scheduleNextWindChime(playMs);
-  }, 0);
-}
-
-function scheduleNextWindChime(prevPlayMs) {
-  var delay;
-  if (!isMorningWindChimeHours()) {
-    delay = 60000;
-  } else {
-    var silenceGap = WIND_CHIME_SILENCE_MIN +
-      Math.random() * (WIND_CHIME_SILENCE_MAX - WIND_CHIME_SILENCE_MIN);
-    delay = (prevPlayMs || 0) + silenceGap;
-  }
-  windChimeTimer = setTimeout(function() {
-    windChimeTimer = null;
-    var playMs = playWindChimeSound();
-    scheduleNextWindChime(playMs);
-  }, delay);
-}
-
-function stopWindChime() {
-  if (windChimeTimer) {
-    clearTimeout(windChimeTimer);
-    windChimeTimer = null;
-  }
-  if (windChimeSource && windChimeGain && soundAudioCtx) {
-    try {
-      var now = soundAudioCtx.currentTime;
-      windChimeGain.gain.cancelScheduledValues(now);
-      windChimeGain.gain.setTargetAtTime(0, now, 0.1);
-      windChimeSource.stop(now + 0.5);
-    } catch (e) {
-      try { windChimeSource.stop(); } catch (e2) {}
-    }
-  }
-  windChimeSource = null;
-  windChimeGain = null;
-}
-
-function playWindChimeSound() {
-  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return 0;
-  if (!mapleLeaves || !mapleLeaves.classList.contains('active')) return 0;
-  if (!isMorningWindChimeHours()) return 0;
-
-  var buffer = soundBuffers.windChime;
-  if (!buffer) return 0;
-
-  var bufferDur = buffer.duration;
-  var playDur = WIND_CHIME_PLAY_MIN +
-    Math.random() * (WIND_CHIME_PLAY_MAX - WIND_CHIME_PLAY_MIN);
-  if (playDur > bufferDur - 1) playDur = bufferDur - 1;
-  if (playDur <= 0) return 0;
-
-  var maxStart = Math.max(0, bufferDur - playDur - 0.5);
-  var startOffset = Math.random() * maxStart;
-
-  var fadeIn  = Math.min(WIND_CHIME_FADE_IN,  playDur * 0.25);
-  var fadeOut = Math.min(WIND_CHIME_FADE_OUT, playDur * 0.35);
-  var peak = WIND_CHIME_PEAK;
-
-  var now = soundAudioCtx.currentTime;
-  var src = soundAudioCtx.createBufferSource();
-  src.buffer = buffer;
-  var gain = soundAudioCtx.createGain();
-  gain.gain.setValueAtTime(0, now);
-  gain.gain.linearRampToValueAtTime(peak, now + fadeIn);
-  gain.gain.setValueAtTime(peak, now + playDur - fadeOut);
-  gain.gain.linearRampToValueAtTime(0, now + playDur);
-
-  src.connect(gain);
-  gain.connect(soundMasterGain);
-  src.start(now, startOffset, playDur + 0.1);
-  src.stop(now + playDur + 0.15);
-
-  windChimeSource = src;
-  windChimeGain = gain;
-
-  src.onended = function() {
-    if (windChimeSource === src) windChimeSource = null;
-    if (windChimeGain === gain) windChimeGain = null;
-    try { gain.disconnect(); } catch (e) {}
   };
 
   return playDur * 1000;
@@ -3494,6 +3374,467 @@ function updateSeasonKo() {
 }
 updateSeasonKo();
 setInterval(updateSeasonKo, 600000);
+
+/* ============ 風鈴 (TOOLBAR, LEFT — AUTUMN AND WINTER) ============
+   In the autumn and winter themes an iron wind chime takes the 七十二候's
+   place (the sakura theme keeps the 七十二候; main.css shows one or the
+   other). It hangs on a cord from the top of the screen: the bell on the
+   glass, the clapper inside it, and below the glass's edge the paper
+   strip (短冊) that catches the wind, with 秋の風 and a momiji leaf in
+   autumn, 冬の便り and small white flowers in winter. Beside it two lines
+   in the music display's type: 風鈴にそっとふれると、音が鳴ります, and
+   名古屋の風 · <the live wind>.
+   Three linked swings (bell, clapper, strip) plus the strip turning on its
+   cord. The wind on the strip is the live Nagoya wind (a steady lean and a
+   restless flutter; handed over by fetchNagoyaWeather) plus the scene's
+   gusts as they sweep past (DynBG.furinGust). It rings when the clapper
+   really hits the bell: from the wind only when it hits hard enough, from
+   a tap every time. The ring is made here (makeSynth), no sound file.
+   Every value was tuned on winter.html. Angles are from straight down;
+   positive swings to the right. Runs on its own frames, only while the
+   toolbar is showing in autumn or winter. */
+var Furin = (function () {
+'use strict';
+var FC = {
+  volume: 0.8, pitch: 2890, ringLength: 2.6, shimmer: 1.45, brightness: 0.74, strike: 0.64, pitchVary: 76,
+  clapperGap: 0.2, ringThreshold: 1.85, windRingGap: 0,
+  windPush: 1, gustPush: 2.55, flutter: 1, touchPush: 1,
+  bellSwing: 1, clapperSwing: 1, stripSwing: 1, twirl: 1, swingSpeed: 1, settle: 1,
+  x: 45, size: 0.99, cordLen: 19, bellW: 32, bellH: 30, stripCord: 22, stripW: 23, stripH: 58,
+  rimLight: 0.55, pattern: 0.45, flowers: 7, stripes: 0.5, shadow: 0.35,
+  inkSize: 10.5, leafSize: 1,
+  colours: {
+    bell: '#1C2742', cord: '#B4693C', string: '#2E3548',
+    paper: '#F6D8C1', paperBack: '#E9C3A9', flower: '#FFFFFF',
+    ink: '#4A2A26', momiji: '#C8361F'
+  }
+};
+var PI = Math.PI, TAU = PI * 2;
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function lerp(a, b, t) { return a + (b - a) * t; }
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function rngFrom(seed) {
+  var a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    var t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function hash1(i) { var s = Math.sin(i * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); }
+function noise1(x) {                          // smooth 1-D value noise, 0..1
+  var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(hash1(i), hash1(i + 1), u);
+}
+function hex(h) { var n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function rgb(c, a) {
+  return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' +
+         Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : clamp(a, 0, 1).toFixed(3)) + ')';
+}
+function ellipse(c, x, y, rx, ry) { c.moveTo(x + rx, y); c.ellipse(x, y, rx, ry, 0, 0, TAU); }
+
+var fcv = document.getElementById('furinCanvas'), fhit = document.getElementById('furinHit');
+if (!fcv || !fhit) return { onWeather: function () {} };
+var fctx = fcv.getContext('2d');
+var FG = {};                                   // geometry in CSS px (set by layoutFurin)
+var FS = { b: 0, bv: 0, z: 0, zv: 0, s: 0, sv: 0, p: 0, pv: 0 };
+var furinT = 0, tapUntil = -1, lastRing = -9, lastWindRing = -9, furinFlowers = [];
+var liveWind = null;                           // { ms, dir } from fetchNagoyaWeather()
+
+function layoutFurin() {
+  var S = FC.size;
+  FG.L0 = FC.cordLen * S; FG.bw = FC.bellW * S; FG.bh = FC.bellH * S;
+  FG.lc = FC.stripCord * S; FG.sw = FC.stripW * S; FG.sh = FC.stripH * S;
+  FG.piv = FG.L0 + FG.bh * 0.16;               // where the clapper hangs, inside the bell's top
+  FG.lz = FG.bh * 0.8;                          // to the clapper, which sits just inside the rim
+  FG.rc = Math.max(2, FG.bw * 0.13);            // the clapper's half-width
+  var tot = FG.piv + FG.lz + FG.lc + FG.sh;
+  FG.cw = Math.ceil(2 * (tot * 0.62 + FG.bw));
+  FG.ch = Math.ceil(tot + 30 * S);
+  var pr = window.devicePixelRatio || 1;
+  FG.pr = pr;
+  fcv.width = Math.round(FG.cw * pr); fcv.height = Math.round(FG.ch * pr);
+  fcv.style.width = FG.cw + 'px'; fcv.style.height = FG.ch + 'px';
+  fcv.style.left = (FC.x - FG.cw / 2) + 'px';
+  FG.hw = Math.max(FG.bw, FG.sw) + 18 * S;
+  fhit.style.width = FG.hw + 'px'; fhit.style.height = (tot + 8 * S) + 'px';
+  // the flowers on the strip, the same every time
+  var r = rngFrom(41);
+  furinFlowers = [];
+  for (var i = 0; i < FC.flowers; i++) {
+    furinFlowers.push({ u: (i % 2 ? 0.36 : -0.36) + lerp(-0.03, 0.03, r()), v: lerp(0.2, 0.92, (i + 0.3 + 0.4 * r()) / Math.max(1, FC.flowers)),
+                        k: lerp(0.65, 0.95, r()), a: r() * TAU });
+  }
+}
+
+/* ---- the wind ---- */
+function windMs() { return liveWind ? liveWind.ms : 2.5; }   // a light breeze until the first reading
+function windSide() {                         // -1..1: how much of it blows across the screen, and which way
+  return liveWind ? -Math.sin(liveWind.dir * PI / 180) : 1;   // from the west (270°) blows to the right
+}
+function windWord(m) {
+  if (m < 0.3) return '無風';
+  if (m < 1.6) return '微風';
+  if (m < 3.4) return 'そよ風';
+  if (m < 5.5) return '心地よい風';
+  if (m < 8) return 'やや強い風';
+  return '強い風';
+}
+/* 名古屋の風 alone until the first reading; then · そよ風 2.5m/s */
+var furinWindEl = document.getElementById('furinWind');
+function updateWindLine() {
+  if (!furinWindEl) return;
+  var sep = furinWindEl.previousElementSibling;
+  if (sep) sep.style.display = liveWind ? '' : 'none';
+  furinWindEl.textContent = liveWind ? windWord(liveWind.ms) + ' ' + liveWind.ms.toFixed(1) + 'm/s' : '';
+}
+function onWeather(c) {
+  if (!c || typeof c.wind_speed_10m !== 'number') return;
+  liveWind = { ms: c.wind_speed_10m, dir: typeof c.wind_direction_10m === 'number' ? c.wind_direction_10m : 270 };
+  updateWindLine();
+}
+
+/* ---- the swings ---- */
+function furinStep(t, h, gustLean) {
+  var m = windMs(), side = windSide();
+  var lean = side * FC.windPush * 0.24 * (1 - Math.exp(-m / 4));
+  var fl = FC.flutter * (0.04 + 0.035 * m) * ((noise1(t * 1.3) + 0.6 * noise1(t * 3.1 + 7) - 0.8) * 1.6);
+  var Fw = lean + fl + gustLean;
+  var sp = FC.swingSpeed, se = FC.settle;
+  var ws = TAU / 0.95 * sp, wz = TAU / 1.15 * sp, wb = TAU / 1.7 * sp, wp = TAU / 2.6 * sp;
+  var X = FS;
+  var pull = X.s - X.z - Fw * FC.stripSwing;  // the strip pulls on the clapper's cord
+  var as = -ws * ws * pull - 2 * 0.12 * se * ws * (X.sv - X.zv);
+  var az = -wz * wz * (X.z - X.b - Fw * 0.3 * FC.clapperSwing) - 2 * 0.08 * se * wz * (X.zv - X.bv) + 0.5 * wz * wz * pull * FC.clapperSwing;
+  var ab = -wb * wb * (X.b - Fw * 0.06 * FC.bellSwing) - 2 * 0.18 * se * wb * X.bv + 0.08 * wz * wz * (X.z - X.b) * FC.bellSwing;
+  var tq = FC.twirl * 0.5 * ((noise1(t * 0.9 + 31) - 0.5) * 2 * (0.6 + m * 0.5 + Math.abs(gustLean) * 8) + (X.sv - X.zv) * 0.8);
+  var ap = wp * wp * (tq - X.p) - 2 * 0.06 * se * wp * X.pv;
+  X.sv += as * h; X.zv += az * h; X.bv += ab * h; X.pv += ap * h;
+  X.s += X.sv * h; X.z += X.zv * h; X.b += X.bv * h; X.p += X.pv * h;
+  // the clapper hits the inside of the bell
+  var rel = X.z - X.b;
+  if (Math.abs(rel) > FC.clapperGap) {
+    var sg = rel > 0 ? 1 : -1, rv = X.zv - X.bv;
+    X.z = X.b + sg * FC.clapperGap;
+    if (rv * sg > 0) {
+      X.zv = X.bv - rv * 0.4;
+      X.bv += rv * 0.12 * FC.bellSwing;
+      furinHit(Math.abs(rv), t);
+    }
+  }
+}
+function furinHit(speed, t) {
+  if (t - lastRing < 0.12) return;
+  var tap = t < tapUntil;
+  if (tap ? speed < 0.3 : (speed < FC.ringThreshold * 0.3 || t - lastWindRing < FC.windRingGap)) return;
+  lastRing = t;
+  if (!tap) lastWindRing = t;
+  playRing(clamp(speed / 2, 0.25, 1));     // the wind rings it softly, a tap clearly
+}
+function updateFurin(t, dt) {
+  furinT = t;
+  var gl = FC.gustPush * (DynBG ? DynBG.furinGust(FC.x) : 0) * 0.35;
+  var n = 4, h = dt / n;
+  for (var i = 0; i < n; i++) furinStep(t + i * h, h, gl);
+}
+function tapFurin(dir) {
+  var k = FC.touchPush;
+  FS.zv += dir * 3.2 * k; FS.sv += dir * 3.8 * k; FS.bv += dir * 0.5 * k; FS.pv += rnd(-3, 3) * k;
+  tapUntil = furinT + 0.8;
+}
+
+/* ---- touch: the hit area follows the chime; a tap swings it away from
+   the finger, a flick pushes it along ---- */
+var fptr = null;
+fhit.addEventListener('pointerdown', function (e) {
+  /* initSound() runs from the document's first pointerdown, after this */
+  if (soundAudioCtx && soundAudioCtx.state === 'suspended') { try { soundAudioCtx.resume(); } catch (er) {} }
+  var r = fhit.getBoundingClientRect();
+  var dir = e.clientX < r.left + r.width / 2 ? 1 : -1;
+  tapFurin(dir);
+  fptr = { id: e.pointerId, x: e.clientX };
+  try { fhit.setPointerCapture(e.pointerId); } catch (er) {}
+  e.preventDefault();
+});
+fhit.addEventListener('pointermove', function (e) {
+  if (!fptr || e.pointerId !== fptr.id) return;
+  var dx = e.clientX - fptr.x; fptr.x = e.clientX;
+  var k = FC.touchPush;
+  FS.sv += dx * 0.03 * k; FS.zv += dx * 0.02 * k; FS.pv += dx * 0.02 * k;
+  tapUntil = furinT + 0.8;
+});
+function fptrEnd() { fptr = null; }
+fhit.addEventListener('pointerup', fptrEnd);
+fhit.addEventListener('pointercancel', fptrEnd);
+
+/* ---- drawing ---- */
+/* The words run down the strip in Yuji Syuku, the brush face the app uses
+   for the therapist's name. Autumn adds a momiji leaf under 秋の風. */
+document.fonts && document.fonts.load('12px "Yuji Syuku"');
+function momiji(c, x, y, r, col, rot) {
+  c.save(); c.translate(x, y); c.rotate(rot);
+  var tips = [1, 0.92, 0.7, 0.7, 0.92];
+  c.fillStyle = rgb(col); c.strokeStyle = rgb(col); c.lineJoin = 'round'; c.lineWidth = r * 0.12;
+  c.beginPath();
+  for (var k = 0; k < 5; k++) {
+    var a = -PI / 2 + k * TAU / 5, v = a + TAU / 10, a2 = a + TAU / 5;
+    c.lineTo(Math.cos(a) * r * tips[k], Math.sin(a) * r * tips[k]);
+    c.lineTo(Math.cos(a + TAU / 20) * r * 0.62, Math.sin(a + TAU / 20) * r * 0.62);   // a small point on the way down
+    c.lineTo(Math.cos(v) * r * 0.34, Math.sin(v) * r * 0.34);
+    c.lineTo(Math.cos(a2 - TAU / 20) * r * 0.62, Math.sin(a2 - TAU / 20) * r * 0.62);
+  }
+  c.closePath(); c.fill(); c.stroke();
+  c.strokeStyle = rgb(mix(col, [255, 255, 255], 0.35), 0.6); c.lineWidth = r * 0.07;
+  c.beginPath();
+  for (var q = 0; q < 5; q++) { var aa = -PI / 2 + q * TAU / 5; c.moveTo(0, 0); c.lineTo(Math.cos(aa) * r * tips[q] * 0.72, Math.sin(aa) * r * tips[q] * 0.72); }
+  c.stroke();
+  c.strokeStyle = rgb(col); c.lineWidth = r * 0.12;
+  c.beginPath(); c.moveTo(0, r * 0.2); c.lineTo(0, r * 1.2); c.stroke();
+  c.restore();
+}
+function drawStripWords(c, text, L, S, autumn) {
+  var n = text.length, y0 = 11.5 * S, tail = autumn ? 14 * S * FC.leafSize + 3 * S : 3 * S;
+  var px = Math.min(FC.inkSize * S, (L - y0 - tail) / (n * 1.06));
+  if (px < 4) return;
+  c.save();
+  c.font = px.toFixed(2) + 'px "Yuji Syuku", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif';
+  c.textAlign = 'center'; c.textBaseline = 'middle';
+  c.fillStyle = FC.colours.ink;
+  for (var i = 0; i < n; i++) c.fillText(text.charAt(i), 0, y0 + (i + 0.5) * px * 1.06);
+  c.restore();
+  if (autumn) momiji(c, 0, y0 + n * px * 1.06 + 2 * S + 4.2 * S * FC.leafSize, 4.2 * S * FC.leafSize, hex(FC.colours.momiji), 0.25);
+}
+function shade(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
+function drawFurin() {
+  var c = fctx, S = FC.size, X = FS;
+  var bell = hex(FC.colours.bell), cord = hex(FC.colours.cord), str = hex(FC.colours.string);
+  c.setTransform(FG.pr, 0, 0, FG.pr, 0, 0);
+  c.clearRect(0, 0, FG.cw, FG.ch);
+  c.translate(FG.cw / 2, 0);
+  var sh = FC.shadow;
+  function shadowOn() { c.shadowColor = 'rgba(40,24,34,' + (0.5 * sh).toFixed(3) + ')'; c.shadowBlur = 7 * S; c.shadowOffsetY = 3 * S; c.shadowOffsetX = 1.5 * S; }
+  function shadowOff() { c.shadowColor = 'rgba(0,0,0,0)'; c.shadowBlur = 0; c.shadowOffsetX = c.shadowOffsetY = 0; }
+
+  // where things are: the clapper hangs inside the bell, the strip from the clapper
+  var px = Math.sin(X.b) * FG.piv, py = Math.cos(X.b) * FG.piv;
+  var bx = px + Math.sin(X.z) * FG.lz, by = py + Math.cos(X.z) * FG.lz;
+  var cx0 = bx + Math.sin(X.z) * 2.5 * S, cy0 = by + Math.cos(X.z) * 2.5 * S;
+  var sx0 = cx0 + Math.sin(X.s) * FG.lc, sy0 = cy0 + Math.cos(X.s) * FG.lc;
+
+  // the cord down to the strip, bowing a little as it swings
+  var bow = clamp((X.sv - X.zv) * 2 * S, -6 * S, 6 * S);
+  c.strokeStyle = rgb(cord); c.lineWidth = 1.3 * S; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx0, cy0);
+  c.quadraticCurveTo((cx0 + sx0) / 2 - bow * Math.cos(X.s), (cy0 + sy0) / 2 + bow * Math.sin(X.s), sx0, sy0);
+  c.stroke();
+
+  // the paper strip, turning on its cord
+  c.save();
+  c.translate(sx0, sy0); c.rotate(-X.s);
+  var cp = Math.cos(X.p), ac = Math.max(0.04, Math.abs(cp)), front = cp >= 0;
+  var hw = FG.sw / 2, L = FG.sh;
+  c.save();
+  c.scale(ac, 1);
+  shadowOn();
+  c.fillStyle = FC.colours[front ? 'paper' : 'paperBack'];
+  c.beginPath(); c.rect(-hw, 0, hw * 2, L); c.fill();
+  shadowOff();
+  // the fine lines in the paper
+  if (FC.stripes > 0) {
+    c.strokeStyle = 'rgba(255,255,255,' + (0.35 * FC.stripes).toFixed(3) + ')';
+    c.lineWidth = 0.6 * S;
+    c.beginPath();
+    for (var lx = -hw + 1.6 * S; lx < hw; lx += 2.2 * S) { c.moveTo(lx, 0.5); c.lineTo(lx, L - 0.5); }
+    c.stroke();
+  }
+  // the wording, brushed down the middle (the back of the strip is blank)
+  var autumn = currentTheme === 'autumn';
+  if (front) drawStripWords(c, autumn ? '秋の風' : '冬の便り', L, S, autumn);
+  // small white flowers down the two sides (winter)
+  if (front && !autumn) {
+    var fl = hex(FC.colours.flower);
+    for (var i = 0; i < furinFlowers.length; i++) {
+      var F = furinFlowers[i], fx = F.u * hw * 2, fy = F.v * L, fr = 1.15 * S * F.k;
+      c.fillStyle = rgb(fl, 0.85);
+      c.beginPath();
+      for (var q = 0; q < 5; q++) { var a = F.a + q * TAU / 5; ellipse(c, fx + Math.cos(a) * fr, fy + Math.sin(a) * fr, fr * 0.78, fr * 0.78); }
+      c.fill();
+      c.fillStyle = rgb(mix(fl, hex(FC.colours.paper), 0.45), 0.9);
+      c.beginPath(); ellipse(c, fx, fy, fr * 0.42, fr * 0.42); c.fill();
+    }
+  }
+  // turned edge-on, the strip reads darker
+  c.fillStyle = 'rgba(80,44,30,' + ((1 - ac) * 0.28 + (front ? 0 : 0.06)).toFixed(3) + ')';
+  c.fillRect(-hw, 0, hw * 2, L);
+  // the hole the cord is tied through
+  c.fillStyle = 'rgba(120,70,50,0.35)';
+  c.beginPath(); ellipse(c, 0, 5 * S, 1.7 * S, 1.7 * S); c.fill();
+  c.restore();
+  // the knot
+  c.strokeStyle = rgb(cord); c.lineWidth = 1.2 * S;
+  c.beginPath(); c.moveTo(0, -1 * S); c.lineTo(0, 4 * S); c.stroke();
+  c.fillStyle = rgb(shade(cord, 0.85));
+  c.beginPath(); ellipse(c, 0, -0.5 * S, 1.5 * S, 1.2 * S); c.fill();
+  c.restore();
+
+  // the clapper (its lower edge just shows under the rim)
+  c.save();
+  c.translate(bx, by); c.rotate(-X.z);
+  c.fillStyle = rgb(shade(bell, 0.75));
+  c.beginPath(); c.rect(-FG.rc, -3 * S, FG.rc * 2, 5.5 * S); c.fill();
+  c.restore();
+
+  // the cord from the top of the screen, and the bell
+  c.save();
+  c.rotate(-X.b);
+  var w = FG.bw / 2, yT = FG.L0, yB = FG.L0 + FG.bh, bh = FG.bh, ry = Math.max(2, 3.2 * S);
+  c.strokeStyle = rgb(str); c.lineWidth = 1.2 * S;
+  c.beginPath(); c.moveTo(0, -4); c.lineTo(0, yT - 2 * S); c.stroke();
+  c.fillStyle = rgb(shade(bell, 0.8));
+  c.beginPath(); c.rect(-2.4 * S, yT - 3.6 * S, 4.8 * S, 4.2 * S); c.fill();
+  function bellPath() {
+    c.beginPath();
+    c.moveTo(-w * 1.02, yB);
+    c.bezierCurveTo(-w * 0.98, yB - bh * 0.35, -w * 0.95, yT + bh * 0.02, 0, yT);
+    c.bezierCurveTo(w * 0.95, yT + bh * 0.02, w * 0.98, yB - bh * 0.35, w * 1.02, yB);
+    c.ellipse(0, yB, w * 1.02, ry, 0, 0, PI);
+    c.closePath();
+  }
+  shadowOn();
+  c.fillStyle = rgb(bell);
+  bellPath(); c.fill();
+  shadowOff();
+  c.save();
+  bellPath(); c.clip();
+  var lit = mix(bell, [205, 214, 238], 0.38 * FC.rimLight);
+  var g = c.createLinearGradient(-w, 0, w, 0);
+  g.addColorStop(0, rgb(shade(bell, 0.62)));
+  g.addColorStop(0.3, rgb(lit));
+  g.addColorStop(0.58, rgb(bell));
+  g.addColorStop(1, rgb(shade(bell, 0.5)));
+  c.fillStyle = g; c.fillRect(-w * 1.1, yT - 1, w * 2.2, bh + ry + 2);
+  var sp = c.createRadialGradient(-w * 0.32, yT + bh * 0.24, 0, -w * 0.32, yT + bh * 0.24, w * 0.62);
+  sp.addColorStop(0, 'rgba(255,255,255,' + (0.3 * FC.rimLight).toFixed(3) + ')');
+  sp.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sp; c.fillRect(-w * 1.1, yT - 1, w * 2.2, bh + ry + 2);
+  // the pattern pressed into the iron: a leaf on a curling stem, and a few
+  // dots, catching the light
+  if (FC.pattern > 0) {
+    var pc = 'rgba(190,200,230,';
+    c.strokeStyle = pc + (0.3 * FC.pattern).toFixed(3) + ')';
+    c.lineWidth = 0.7 * S;
+    c.beginPath();
+    c.moveTo(-w * 0.62, yB - bh * 0.12); c.bezierCurveTo(-w * 0.5, yB - bh * 0.42, -w * 0.2, yB - bh * 0.5, -w * 0.05, yB - bh * 0.62);
+    c.stroke();
+    c.fillStyle = pc + (0.18 * FC.pattern).toFixed(3) + ')';
+    c.beginPath();
+    c.moveTo(-w * 0.05, yB - bh * 0.62);
+    c.quadraticCurveTo(w * 0.05, yT + bh * 0.12, w * 0.42, yT + bh * 0.2);
+    c.quadraticCurveTo(w * 0.22, yB - bh * 0.5, -w * 0.05, yB - bh * 0.62);
+    c.fill(); c.stroke();
+    c.fillStyle = pc + (0.25 * FC.pattern).toFixed(3) + ')';
+    c.beginPath();
+    ellipse(c, w * 0.5, yB - bh * 0.3, 0.8 * S, 0.8 * S); ellipse(c, w * 0.62, yB - bh * 0.18, 0.6 * S, 0.6 * S);
+    ellipse(c, -w * 0.72, yT + bh * 0.45, 0.7 * S, 0.7 * S);
+    c.fill();
+  }
+  c.restore();
+  // the mouth: the dark inside, and the lip catching the light
+  c.fillStyle = rgb(shade(bell, 0.38));
+  c.beginPath(); ellipse(c, 0, yB, w * 1.0, ry * 0.8); c.fill();
+  c.strokeStyle = 'rgba(220,228,248,' + (0.12 + 0.3 * FC.rimLight).toFixed(3) + ')';
+  c.lineWidth = 1 * S;
+  c.beginPath(); c.ellipse(0, yB, w * 1.01, ry, 0, 0.15, PI - 0.15); c.stroke();
+  c.restore();
+
+  // the touch area follows the chime
+  fhit.style.transform = 'translate(' + (FC.x - FG.hw / 2) + 'px,0) rotate(' + (-(X.b + X.s) / 2) + 'rad)';
+}
+
+/* ---- sound: a ring made here, straight to the speakers at the volume
+   approved on winter.html (not through the music's master gain, so the
+   music display's wave does not take it for music) ---- */
+var synthBuf = null, voices = [];
+/* An iron 風鈴: a clear high note with a few inharmonic overtones that
+   die away faster, a second note a hair apart (the slow beat, ゆらぎ),
+   and a short tick where the clapper hits. */
+function makeSynth() {
+  if (synthBuf) return synthBuf;
+  var sr = soundAudioCtx.sampleRate, dur = Math.min(10, FC.ringLength * 1.6 + 0.2), N = Math.round(sr * dur);
+  var buf = soundAudioCtx.createBuffer(1, N, sr), d = buf.getChannelData(0);
+  var f0 = FC.pitch, tau = FC.ringLength / 6.9, br = FC.brightness * 2;
+  var parts = [[1, 1, 1], [1 + 0.0035 * FC.shimmer, 0.55 * Math.min(1, FC.shimmer), 0.95],
+               [2.76, 0.42 * br, 0.45], [5.40, 0.22 * br, 0.26], [8.93, 0.1 * br, 0.15]];
+  var peak = 0, prev = 0, i, j;
+  for (i = 0; i < N; i++) {
+    var t = i / sr, v = 0, att = Math.min(1, t / 0.0015);
+    for (j = 0; j < parts.length; j++) {
+      var P = parts[j];
+      if (!P[1] || f0 * P[0] > sr / 2.2) continue;
+      v += P[1] * Math.exp(-t / (tau * P[2])) * Math.sin(TAU * f0 * P[0] * t + j);
+    }
+    v *= att;
+    if (t < 0.02 && FC.strike > 0) {
+      var nz = Math.random() * 2 - 1;
+      v += (nz - prev) * 0.6 * FC.strike * Math.exp(-t / 0.0018);
+      prev = nz;
+    }
+    d[i] = v;
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+  }
+  var k = peak > 0 ? 0.9 / peak : 1;
+  for (i = 0; i < N; i++) d[i] *= k;
+  synthBuf = buf;
+  return buf;
+}
+function playRing(strength) {
+  if (!SOUND_ENABLED || !soundAudioCtx || soundAudioCtx.state !== 'running') return;
+  var buf = makeSynth();
+  var now = soundAudioCtx.currentTime;
+  var src = soundAudioCtx.createBufferSource(); src.buffer = buf;
+  src.playbackRate.value = Math.pow(2, rnd(-1, 1) * FC.pitchVary / 1200);
+  var g = soundAudioCtx.createGain(); g.gain.value = FC.volume * strength;
+  src.connect(g); g.connect(soundAudioCtx.destination);
+  src.start(now);
+  var vo = { src: src, g: g };
+  voices.push(vo);
+  src.onended = function () { var i = voices.indexOf(vo); if (i >= 0) voices.splice(i, 1); };
+  if (voices.length > 6) {                     // too many still ringing: fade the oldest
+    var old = voices.shift();
+    try { old.g.gain.setTargetAtTime(0, now, 0.05); old.src.stop(now + 0.3); } catch (e) {}
+  }
+}
+
+/* ============================================================
+
+/* ---- frames: only while the toolbar shows the chime ---- */
+function showing() {
+  return (currentTheme === 'autumn' || currentTheme === 'winter') && !document.hidden &&
+         infoBar && infoBar.classList.contains('shown') && !infoBar.classList.contains('hidden') &&
+         document.body.classList.contains('info-visible');
+}
+var lastMs = 0;
+function loop(ms) {
+  if (!showing()) {
+    lastMs = 0;
+    setTimeout(function () { requestAnimationFrame(loop); }, 300);
+    return;
+  }
+  var dt = lastMs ? Math.min(0.05, (ms - lastMs) / 1000) : 0.016;
+  lastMs = ms;
+  updateFurin(ms / 1000, dt);
+  drawFurin();
+  requestAnimationFrame(loop);
+}
+layoutFurin();
+updateWindLine();
+window.addEventListener('resize', layoutFurin);
+requestAnimationFrame(loop);
+return { onWeather: onWeather };
+})();
 
 var infoCity = document.getElementById('infoCity');
 var infoDate = document.getElementById('infoDate');
@@ -7671,6 +8012,7 @@ function fetchNagoyaWeather() {
   fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (!data || !data.current) return;
     if (typeof DynBG !== 'undefined' && DynBG) DynBG.onWeather(data.current);
+    if (Furin) Furin.onWeather(data.current);
     var temp = data.current.temperature_2m;
     var code = data.current.weather_code;
     if (typeof temp === 'number') {
@@ -8030,9 +8372,9 @@ var tyIntervals = [];
    Look: while the games page is showing, the falling leaves (snow in winter)
    fade out (body.games-active in main.css).
 
-   Sound: the games page opens quietly: the ambient music and the wind
-   chime carry on. Only when she taps タッチしてスタート do they fade out
-   and a short retro (chiptune) loop, さくら散歩, play instead. If she
+   Sound: the games page opens quietly: the ambient music carries on.
+   Only when she taps タッチしてスタート does it fade out and a short
+   retro (chiptune) loop, さくら散歩, play instead. If she
    doesn't continue within G.idleReturn ms after a round, the game music
    fades out and the ambient music comes back (tapping
    ここをタップして続ける before that keeps the game music). When she
@@ -8620,12 +8962,11 @@ var GameWindow = (function() {
   function fadeAmbientOut() {
     if (ambientHandedOver) return;
     ambientHandedOver = true;
-    /* No new track or chime may start while the old one fades. */
+    /* No new track may start while the old one fades. */
     if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
-    if (windChimeTimer) { clearTimeout(windChimeTimer); windChimeTimer = null; }
     if (soundAudioCtx) {
       var now = soundAudioCtx.currentTime;
-      [ambientGain, windChimeGain].forEach(function (g) {
+      [ambientGain].forEach(function (g) {
         if (!g) return;
         try {
           g.gain.cancelScheduledValues(now);
@@ -13865,6 +14206,7 @@ function dynLoop(ms) {
 var ptr = null;
 window.addEventListener('pointerdown', function(e) {
   if (dynFrontMul < 0.5 || !S.tapWind) { ptr = null; return; }
+  if (e.target && e.target.closest && e.target.closest('.furin-hit')) { ptr = null; return; }   // the 風鈴 takes its own touches
   ptr = { x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY, t: performance.now(), moved: 0 };
 }, { passive: true });
 window.addEventListener('pointermove', function(e) {
@@ -13915,7 +14257,21 @@ if (cvSky && cvBack && cvGround && cvFront && cvNear && ctxSky && ctx && ctxG &&
   window.addEventListener('orientationchange', resize);
   requestAnimationFrame(dynLoop);
 }
-return { onWeather: onWeather };
+/* The 風鈴 on the toolbar (Furin, above) asks how much the scene's gusts
+   push at its x: in winter the wind field the branches and snow follow,
+   less its steady breeze; in autumn each gust front as it sweeps past,
+   on the same scale. 0 while the scene is not running. */
+function furinGust(x) {
+  if (dynMaster < 0.01) return 0;
+  if (ENV.scene === 'winter') return winFieldAt(x) - winWind() * winWindDir() * 0.12;
+  var gs = 0;
+  for (var i = 0; i < gusts.length; i++) {
+    var g = gusts[i], d = (g.x - x) * g.dir;
+    gs += g.dir * 0.7 * (g.str / 140) * (d < 0 ? Math.exp(-(d * d) / 8100) : Math.exp(-d / 260));
+  }
+  return gs;
+}
+return { onWeather: onWeather, furinGust: furinGust };
 
 })();
 

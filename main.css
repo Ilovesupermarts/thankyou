@@ -980,6 +980,39 @@
     opacity: 0.9;
   }
 
+  /* ---- 風鈴, the left of the toolbar in autumn and winter ------------------
+     In those two themes the wind chime takes the 七十二候's place; the
+     sakura theme keeps the 七十二候. The text block sits where the 七十二候
+     does (.season-ko), in the music display's type and with its shadow:
+     風鈴にそっとふれると、音が鳴ります (.hud-title) level with the weather line,
+     名古屋の風 · <the wind> (.hud-artist) level with the ticker. The chime is
+     drawn on .furin-canvas by Furin in app.js, which also places and sizes
+     it; touches go to .furin-hit, a box that follows the chime as it swings. */
+  .furin-text,
+  .furin-canvas,
+  .furin-hit { display: none; }
+  html[data-theme="autumn"] .season-koyomi,
+  html[data-theme="winter"] .season-koyomi { display: none; }
+  html[data-theme="autumn"] .furin-text,
+  html[data-theme="winter"] .furin-text,
+  html[data-theme="autumn"] .furin-canvas,
+  html[data-theme="winter"] .furin-canvas,
+  html[data-theme="autumn"] .furin-hit,
+  html[data-theme="winter"] .furin-hit { display: block; }
+  .furin-text { text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28); }
+  .furin-text .ko-line .hud-title { overflow: visible; }
+  .furin-text .ko-sub {
+    display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    opacity: 1;
+  }
+  .furin-text .ko-sub .hud-artist { margin-right: 0; overflow: visible; }
+  .furin-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .furin-hit {
+    position: absolute; top: 0; left: 0; transform-origin: 50% 0;
+    pointer-events: auto; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* ============ AMBIENT THEMING ============ */
   html[data-time="morning"] body:not(.warm-background) { background-color: var(--bg-morning); }
   html[data-time="day"] body:not(.warm-background) { background-color: var(--bg-day); }
