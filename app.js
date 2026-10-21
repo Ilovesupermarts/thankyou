@@ -10543,46 +10543,239 @@ function drawFog(ctx, dt) {
   ctx.globalAlpha = 1;
 }
 
-var birdNext = 0;
+/* Birds: a small flock of one kind crosses the autumn sky now and then,
+   from sunrise to 17:00 (not in rain or snow, never in winter). The next
+   flock is always a different kind, after a random wait. Three kinds:
+   オナガ (azure-winged magpie: grey, sky-blue wings, long blue tail,
+   flaps then glides), メジロ (Japanese white-eye: small, olive green,
+   white eye-ring, quick whirring wings that fold between bursts) and
+   オオルリ (blue-and-white flycatcher: deep cobalt, white belly).
+   Each bird sits at one of three depths. The far ones are small, soft
+   (the depth of field) and a little hazy, and go behind both trees; the
+   middle and near ones fly between the far tree and the main tree
+   (drawKoyoTrees). Every pose is baked once per kind and depth (8 flap
+   frames, a glide and a folded frame), so a frame only copies images. */
+var BIRD_KINDS = {
+  onaga: {
+    scale: 1, tail: 0.95, tailW: 0.12, span: 0.9, flock: [5, 8],
+    hz: 5.5, beats: [3, 6], glide: [0.5, 1.1], fold: false, speed: [80, 110], lift: 10, sink: 7,
+    back: '#a9a3a2', belly: '#e6e2dd', cap: '#1d1c24', capFace: true, eyeRing: null,
+    wing: '#79b4e2', wingDark: '#3f7dbf', tailCol: '#6aa6d8', tailTip: '#f4f2ee', beak: '#24222a'
+  },
+  mejiro: {
+    scale: 0.75, tail: 0.38, tailW: 0.1, span: 0.8, flock: [6, 10],
+    hz: 11, beats: [4, 8], glide: [0.15, 0.35], fold: true, speed: [90, 125], lift: 26, sink: 30,
+    back: '#879a2b', belly: '#d8d6c4', cap: '#8fa431', capFace: false, eyeRing: '#ffffff', throat: '#e3d24a',
+    wing: '#7f932a', wingDark: '#566620', tailCol: '#6e7f26', tailTip: null, beak: '#3a3330'
+  },
+  ruri: {
+    scale: 0.8, tail: 0.5, tailW: 0.12, span: 0.85, flock: [4, 6],
+    hz: 8, beats: [4, 7], glide: [0.25, 0.6], fold: false, speed: [85, 120], lift: 16, sink: 14,
+    back: '#2457b8', belly: '#f2f1ee', cap: '#3f7fe0', capFace: false, eyeRing: null, face: '#141a33',
+    wing: '#2a5fc4', wingDark: '#15306e', tailCol: '#1f4ea8', tailTip: null, beak: '#141418'
+  }
+};
+var BIRD_ORDER = ['onaga', 'mejiro', 'ruri'];
+// depth tiers: body length in CSS px, blur (CSS px), haze, screen speed, opacity
+var BIRD_TIERS = [
+  { size: 36, blur: 0,   haze: 0,    speed: 1,    alpha: 1 },       // near
+  { size: 24, blur: 0.6, haze: 0.12, speed: 0.86, alpha: 0.95 },    // middle
+  { size: 14, blur: 1.1, haze: 0.25, speed: 0.72, alpha: 0.9 }     // far: behind both trees
+];
+var BIRD_FRAMES = 8, BIRD_GLIDE = 8, BIRD_FOLD = 9;
+var birdSprites = {}, birdSpritePR = 0, birdNext = 0, birdLastKind = '';
+
+// One wing in bird units (x forward, y down, body length 1). a: 1 up, -1 down.
+function birdWing(c, k, a, far, fold) {
+  var sx = 0.06, sy = -0.07;
+  c.beginPath();
+  if (fold) {                                      // folded along the back
+    c.moveTo(sx + 0.1, sy + 0.02);
+    c.quadraticCurveTo(sx - 0.1, sy - 0.07, sx - 0.42, sy + 0.04);
+    c.quadraticCurveTo(sx - 0.15, sy + 0.08, sx + 0.1, sy + 0.02);
+  } else {
+    // seen a little from the side: the far wing sits further forward and looks shorter
+    var dir = a >= 0 ? -1 : 1, L = k.span * (0.2 + 0.8 * Math.abs(a)) * (far ? 0.78 : 1);
+    if (far) sx += 0.1;
+    var tx = sx - 0.12 - 0.16 * Math.abs(a), ty = sy + dir * L;
+    c.moveTo(sx + 0.16, sy);
+    c.bezierCurveTo(sx + 0.2, sy + dir * L * 0.45, tx + 0.12, ty - dir * 0.04, tx, ty);   // leading edge
+    // trailing edge with the primaries as small scallops, then the inner wing
+    var bx = sx - 0.12, by = sy + dir * L * 0.35;
+    for (var i = 1; i <= 4; i++) {
+      var f = i / 4;
+      var px = lerp(tx, bx, f), py = lerp(ty, by, f);
+      c.quadraticCurveTo(px - 0.06, py - dir * 0.06, px, py);
+    }
+    c.quadraticCurveTo(sx - 0.24, sy + dir * 0.06, sx - 0.2, sy + 0.02);
+    c.closePath();
+  }
+  var g = c.createLinearGradient(sx, sy, sx - 0.2, sy + (a >= 0 ? -1 : 1) * k.span);
+  g.addColorStop(0, far ? k.wingDark : k.wing);
+  g.addColorStop(0.55, k.wing);
+  g.addColorStop(1, k.wingDark);
+  c.fillStyle = g;
+  c.fill();
+  if (far) { c.fillStyle = 'rgba(20,24,40,0.28)'; c.fill(); }      // the far wing is in shade
+}
+function birdBody(c, k) {
+  // tail
+  c.beginPath();
+  c.moveTo(-0.28, -0.04);
+  c.lineTo(-0.3 - k.tail, -0.02 - k.tailW * 0.4);
+  c.quadraticCurveTo(-0.34 - k.tail, 0.01, -0.3 - k.tail, 0.02 + k.tailW * 0.6);
+  c.lineTo(-0.28, 0.05);
+  c.closePath();
+  c.fillStyle = k.tailCol; c.fill();
+  if (k.tailTip) {
+    c.save(); c.clip();
+    c.fillStyle = k.tailTip;
+    c.fillRect(-0.34 - k.tail, -0.2, 0.16, 0.4);
+    c.restore();
+  }
+  // body
+  var g = c.createLinearGradient(0, -0.15, 0, 0.15);
+  g.addColorStop(0, k.back); g.addColorStop(0.45, k.back); g.addColorStop(0.7, k.belly); g.addColorStop(1, k.belly);
+  c.beginPath();
+  c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
+  c.fillStyle = g; c.fill();
+  if (k.throat) {                                   // メジロ: yellow throat
+    c.beginPath(); c.ellipse(0.24, 0.03, 0.12, 0.07, 0.3, 0, TAU);
+    c.fillStyle = k.throat; c.fill();
+  }
+  // head
+  var hx = 0.36, hy = -0.06, hr = 0.135;
+  c.beginPath(); c.arc(hx, hy, hr, 0, TAU);
+  c.fillStyle = k.face || (k.capFace ? k.belly : k.back); c.fill();
+  c.save();
+  c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.clip();
+  c.fillStyle = k.cap;
+  if (k.capFace) c.fillRect(hx - hr, hy - hr, hr * 2, hr * 1.15);   // オナガ: black cap down to the eye
+  else c.fillRect(hx - hr, hy - hr, hr * 2, hr * 0.8);
+  c.restore();
+  // beak
+  c.beginPath();
+  c.moveTo(hx + hr * 0.8, hy - 0.035); c.lineTo(hx + hr + 0.08, hy + 0.005); c.lineTo(hx + hr * 0.8, hy + 0.035);
+  c.closePath(); c.fillStyle = k.beak; c.fill();
+  // eye
+  if (k.eyeRing) { c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.042, 0, TAU); c.fillStyle = k.eyeRing; c.fill(); }
+  c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.022, 0, TAU); c.fillStyle = '#0d0c10'; c.fill();
+  // a soft light on the back
+  var hl = c.createRadialGradient(0.05, -0.1, 0, 0.05, -0.1, 0.3);
+  hl.addColorStop(0, 'rgba(255,255,255,0.22)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+  c.beginPath(); c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
+  c.fillStyle = hl; c.fill();
+}
+function bakeBirdFrame(k, tier, frame) {
+  var u = tier.size * k.scale * PR;                 // device px per bird unit
+  var pad = (tier.blur * 2 + 1) * PR;
+  var x0 = -0.4 - k.tail, x1 = 0.62, y0 = -k.span - 0.12, y1 = k.span + 0.12;
+  var cv = document.createElement('canvas');
+  cv.width = Math.ceil((x1 - x0) * u + pad * 2);
+  cv.height = Math.ceil((y1 - y0) * u + pad * 2);
+  var c = cv.getContext('2d');
+  var a = frame === BIRD_GLIDE ? 0.12 : Math.cos(frame / BIRD_FRAMES * TAU), fold = frame === BIRD_FOLD;
+  var draw = function(dst) {
+    dst.setTransform(u, 0, 0, u, pad - x0 * u, pad - y0 * u);
+    birdWing(dst, k, a, true, fold);
+    birdBody(dst, k);
+    birdWing(dst, k, a, false, fold);
+  };
+  if (tier.blur > 0 && HAS_FILTER) {
+    var tmp = document.createElement('canvas');
+    tmp.width = cv.width; tmp.height = cv.height;
+    draw(tmp.getContext('2d'));
+    c.filter = 'blur(' + (tier.blur * PR).toFixed(2) + 'px)';
+    c.drawImage(tmp, 0, 0);
+    c.filter = 'none';
+  } else draw(c);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (tier.haze > 0) {                              // distance: a little of the pale sky over it
+    c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = 'rgba(238,230,222,' + tier.haze + ')';
+    c.fillRect(0, 0, cv.width, cv.height);
+    c.globalCompositeOperation = 'source-over';
+  }
+  return { cv: cv, ox: (pad - x0 * u) / PR, oy: (pad - y0 * u) / PR, w: cv.width / PR, h: cv.height / PR };
+}
+function birdSpritesFor(kind, ti) {
+  if (birdSpritePR !== PR) { birdSprites = {}; birdSpritePR = PR; }
+  var key = kind + ti;
+  if (!birdSprites[key]) {
+    var list = [];
+    for (var f = 0; f <= BIRD_FOLD; f++) list.push(bakeBirdFrame(BIRD_KINDS[kind], BIRD_TIERS[ti], f));
+    birdSprites[key] = list;
+  }
+  return birdSprites[key];
+}
 function sendBirds() {
+  var choices = BIRD_ORDER.filter(function(n) { return n !== birdLastKind; });
+  var kind = choices[Math.floor(Math.random() * choices.length)], k = BIRD_KINDS[kind];
+  birdLastKind = kind;
   var dir = Math.random() < 0.5 ? -1 : 1;
-  var n = 3 + Math.floor(Math.random() * 5);
-  var y0 = H * rnd(0.08, 0.35), spd = rnd(40, 70), size = rnd(7, 11);
+  var n = k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1));
+  var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
   for (var i = 0; i < n; i++) {
-    var row = Math.ceil(i / 2), side = i % 2 ? 1 : -1;
+    var r = Math.random(), ti = r < 0.3 ? 2 : (r < 0.72 ? 1 : 0), tier = BIRD_TIERS[ti];
+    birdSpritesFor(kind, ti);
+    // a loose group: the far birds start a little ahead, as they cross the screen more slowly
+    var home = y0 + rnd(-1, 1) * H * 0.07 * (ti === 2 ? 0.6 : 1);
     birds.push({
-      x: (dir > 0 ? -40 : W + 40) - dir * row * 22, y: y0 + side * row * 12,
-      vx: dir * spd * rnd(0.95, 1.05), s: size * rnd(0.85, 1.1), ph: rnd(0, TAU), f: rnd(6, 9)
+      kind: kind, ti: ti, dir: dir,
+      x: (dir > 0 ? -60 : W + 60) - dir * (i * rnd(18, 34) - (ti === 2 ? 60 : 0)),
+      y: home, home: home, vy: 0,
+      vx: dir * spd * tier.speed * rnd(0.94, 1.06),
+      ph: rnd(0, TAU), hz: k.hz * rnd(0.9, 1.1),
+      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0
     });
   }
+  birds.sort(function(a, b) { return b.ti - a.ti; });   // far first, near last
 }
 function updateBirds(dt, t) {
-  var birdTime = ENV.astro.sun.alt > 0 && (ENV.phase === 'dawn' || ENV.phase === 'golden' || ENV.phase === 'morning');
-  if (S.birds && t > birdNext && birdTime) {
+  var h = S.hour, sky = !ENV.rainy && !ENV.snowing && S.condition !== 'thunderstorm';
+  var birdTime = S.birds && ENV.scene === 'autumn' && sky && h >= ENV.sun.rise && h < 17;
+  if (birdTime && t > birdNext) {
     if (birdNext > 0) sendBirds();
-    birdNext = t + rnd(45, 140);
+    birdNext = t + rnd(30, 110);
   }
-  if (ENV.astro.sun.alt < -2) birds.length = 0;      // no birds at night
+  // none in winter, and none left over when the clock is moved outside the hours
+  if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) birds.length = 0;
   for (var i = birds.length - 1; i >= 0; i--) {
-    var b = birds[i];
+    var b = birds[i], k = BIRD_KINDS[b.kind];
     b.x += b.vx * dt;
-    b.y += Math.sin(t * 0.8 + b.ph) * 4 * dt;
-    if (b.x < -120 || b.x > W + 120) birds.splice(i, 1);
+    if (b.glide > 0) {                              // gliding: sinks a little
+      b.glide -= dt;
+      b.vy += (k.sink - b.vy) * dt * 3;
+      if (b.glide <= 0) { b.beats = Math.floor(rnd(k.beats[0], k.beats[1] + 1)); b.ph = 0; }
+    } else {                                        // flapping: rises a little
+      var before = b.ph;
+      b.ph += TAU * b.hz * dt;
+      b.vy += (-k.lift - b.vy) * dt * 3;
+      if (Math.floor(b.ph / TAU) > Math.floor(before / TAU) && --b.beats <= 0) {
+        b.glide = rnd(k.glide[0], k.glide[1]); b.ph = 0;
+      }
+    }
+    b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
+    b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
+    if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
   }
 }
-function drawBirds(ctx, t) {
+// layer 'far': the far birds (behind both trees); 'near': the middle and near ones
+function drawBirds(ctx, t, layer) {
   if (!birds.length) return;
-  ctx.strokeStyle = 'rgba(80,55,60,0.38)';
-  ctx.lineWidth = 1.4;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
   for (var i = 0; i < birds.length; i++) {
-    var b = birds[i], w = Math.sin(t * b.f + b.ph), s = b.s;
-    ctx.moveTo(b.x - s, b.y - w * s * 0.5);
-    ctx.quadraticCurveTo(b.x - s * 0.5, b.y - w * s, b.x, b.y);
-    ctx.quadraticCurveTo(b.x + s * 0.5, b.y - w * s, b.x + s, b.y - w * s * 0.5);
+    var b = birds[i];
+    if ((b.ti === 2) !== (layer === 'far')) continue;
+    var k = BIRD_KINDS[b.kind], frames = birdSpritesFor(b.kind, b.ti), f;
+    if (b.glide > 0) f = k.fold ? BIRD_FOLD : BIRD_GLIDE;
+    else f = Math.floor((b.ph % TAU) / TAU * BIRD_FRAMES) % BIRD_FRAMES;
+    var s = frames[f];
+    ctx.globalAlpha = BIRD_TIERS[b.ti].alpha;
+    ctx.setTransform(PR * b.dir, 0, 0, PR, b.x * PR, b.y * PR);
+    ctx.drawImage(s.cv, -s.ox, -s.oy, s.w, s.h);
   }
-  ctx.stroke();
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
 }
 
 /* Fireflies: most drift behind the text; now and then some fly to a
@@ -11024,6 +11217,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.globalAlpha = KOYO.farOpacity;
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
+  drawBirds(ctx, t, 'near');                    // the middle and near birds fly between the two trees
   if (tree) {
     koyoGlow(ctx, tree, 1);
     // solid branches, then the foliage on its own layer laid down at its strength
@@ -13648,7 +13842,7 @@ function dynStep(dt, t, want, skyWant) {
   if (ENV.scene === 'winter') winDrawSparkles(ctx, t);
   drawCloudShadows(ctx, dt);
   drawRays(ctx, t);
-  drawBirds(ctx, t);
+  drawBirds(ctx, t, 'far');
   var split = 0;
   while (split < leaves.length && leaves[split].z < 0.5) split++;
   for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
