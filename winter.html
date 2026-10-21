@@ -67,6 +67,27 @@
   .scroll-test-inner { max-width: 620px; margin: 0 auto; padding: 250px 0 60px; }
   .scroll-test-inner .panel-content { text-align: center; margin-bottom: 18px; }
 
+  /* ---------- 風鈴 (wind chime) test, the left of the toolbar ----------
+     The text block takes the 七十二候's place and layout (.season-ko:
+     top line level with the weather line, second line level with the
+     ticker), in the music display's type. --furin-text-x is the "Text
+     position" control. The chime's canvas is placed and sized by the
+     script; touches go to .furin-hit, a box that follows the chime as it swings
+     (the only part of the toolbar that takes touches). */
+  .furin-text { left: var(--furin-text-x, 16.75%); }
+  .furin-text .ko-line .hud-title { overflow: visible; }
+  .furin-text .ko-sub {
+    display: flex; align-items: baseline; justify-content: center; gap: 6px;
+    opacity: 1;
+  }
+  .furin-text .ko-sub .hud-artist { margin-right: 0; overflow: visible; }
+  .furin-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+  .furin-hit {
+    position: absolute; top: 0; left: 0; transform-origin: 50% 0;
+    pointer-events: auto; touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
   /* ---------- Control panel (demo only) ---------- */
   .lab {
     position: fixed; top: 108px; right: 14px; z-index: 1000;
@@ -147,8 +168,15 @@
 <div class="ambient-mosaic" aria-hidden="true"></div>
 <div class="ambient-mosaic-pond" aria-hidden="true"></div>
 
-<!-- ============ The real toolbar (static text) ============ -->
-<div class="info-bar" id="infoBar">
+<!-- ============ The real toolbar ============
+     The weather line and ticker as in the app (static sample text). On the
+     left, in place of the 七十二候: the 風鈴 (wind chime) test. Its two
+     lines use the music display's type (.hud-title / .hud-sep /
+     .hud-artist); the wind speed in the second line is the live Nagoya
+     wind from Open-Meteo (or the test value on the panel). The chime itself
+     is drawn on #furinCanvas, above the glass's bright bottom edge, so the
+     paper strip hangs out over the scene. -->
+<div class="info-bar shown" id="infoBar">
   <div class="bar-rim" aria-hidden="true"></div>
   <div class="info-inner">
     <div class="info-line" id="infoLine">
@@ -162,20 +190,33 @@
       <span class="sep">·</span>
       <span class="weather" id="infoWeather">雪</span>
     </div>
-    <div class="ticker-wrap" id="tickerWrap">
-      <div class="ticker-track" id="tickerTrack"></div>
+    <div class="ticker-wrap shown" id="tickerWrap">
+      <div class="ticker-track" id="tickerTrack"><span>東京 ☁ 9°/3° ・ 大阪 ☀ 11°/4° ・ 札幌 ❄ -2°/-7° ・ 仙台 ☁ 6°/0° ・ 福岡 ☀ 12°/5° ・ </span><span>東京 ☁ 9°/3° ・ 大阪 ☀ 11°/4° ・ 札幌 ❄ -2°/-7° ・ 仙台 ☁ 6°/0° ・ 福岡 ☀ 12°/5° ・ </span></div>
     </div>
   </div>
-  <div class="season-ko" aria-hidden="true">
+  <div class="season-ko furin-text" id="furinText" aria-hidden="true">
     <div class="ko-line">
-      <span class="ko-name" id="koName">閉塞成冬</span>
-      <span class="ko-sep">·</span>
-      <span class="ko-yomi" id="koYomi">そらさむくふゆとなる</span>
+      <span class="hud-title">風鈴にそっとふれると、音が鳴ります。</span>
     </div>
-    <div class="ko-sub" id="koSub">大雪 · 初候</div>
+    <div class="ko-sub">
+      <span class="hud-artist">名古屋の風</span><span class="hud-sep">·</span><span class="hud-artist" id="furinWind">そよ風 2.5m/s</span>
+    </div>
   </div>
   <div class="bar-edge" aria-hidden="true"></div>
+  <canvas class="furin-canvas" id="furinCanvas" aria-label="風鈴"></canvas>
 </div>
+<svg width="0" height="0" style="position:fixed" aria-hidden="true" focusable="false"><defs>
+<filter id="barGlass" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+<feImage href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2256%22 viewBox=%220 0 16 56%22 preserveAspectRatio=%22none%22%3E%3Cdefs%3E%3ClinearGradient id=%22g%22 x1=%220%22 y1=%220%22 x2=%220%22 y2=%221%22%3E%3Cstop offset=%220%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.5714%22 stop-color=%22rgb(128,128,128)%22/%3E%3Cstop offset=%220.6143%22 stop-color=%22rgb(128,126,128)%22/%3E%3Cstop offset=%220.6571%22 stop-color=%22rgb(128,121,128)%22/%3E%3Cstop offset=%220.7000%22 stop-color=%22rgb(128,113,128)%22/%3E%3Cstop offset=%220.7429%22 stop-color=%22rgb(128,103,128)%22/%3E%3Cstop offset=%220.7857%22 stop-color=%22rgb(128,91,128)%22/%3E%3Cstop offset=%220.8286%22 stop-color=%22rgb(128,77,128)%22/%3E%3Cstop offset=%220.8714%22 stop-color=%22rgb(128,61,128)%22/%3E%3Cstop offset=%220.9143%22 stop-color=%22rgb(128,42,128)%22/%3E%3Cstop offset=%220.9571%22 stop-color=%22rgb(128,22,128)%22/%3E%3Cstop offset=%221.0000%22 stop-color=%22rgb(128,0,128)%22/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width=%22100%25%22 height=%22100%25%22 fill=%22url(%23g)%22/%3E%3C/svg%3E" preserveAspectRatio="none" result="map"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="64" xChannelSelector="R" yChannelSelector="G" result="dr"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="58" xChannelSelector="R" yChannelSelector="G" result="dg"/>
+<feDisplacementMap in="SourceGraphic" in2="map" scale="52" xChannelSelector="R" yChannelSelector="G" result="db"/>
+<feColorMatrix in="dr" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="r"/>
+<feColorMatrix in="dg" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="g"/>
+<feColorMatrix in="db" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="b"/>
+<feBlend in="r" in2="g" mode="screen" result="rg"/>
+<feBlend in="rg" in2="b" mode="screen"/>
+</filter></defs></svg>
 
 <!-- ============ The scene (the real canvases, as in index.html) ============
      #dynBack   behind everything: Fuji, the ridges, mist, the snowfield
@@ -267,19 +308,17 @@
 <!-- ============ Controls (demo only) ============ -->
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3>❄️ Winter Lab</h3>
+    <h3>🎐 風鈴 Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
     <div class="lab-row-btns">
       <button type="button" class="primary" id="btnCopy">Copy values</button>
       <button type="button" id="btnReset">Reset</button>
-      <button type="button" id="btnSeed">New shapes</button>
+      <button type="button" id="btnRing">Ring it</button>
       <button type="button" id="btnGust">Gust now</button>
-      <button type="button" id="btnShake">Shake the branches</button>
-      <button type="button" id="btnSkier">Send a skier</button>
-      <button type="button" id="btnSkierFront">Ski past the dots</button>
     </div>
+    <div class="hint" id="furinStatus" style="font-size:11px;color:#9E7D75"></div>
     <div id="labControls"></div>
   </div>
 </div>
@@ -294,8 +333,8 @@
 (function () {
 'use strict';
 /* ============================================================
-   1. VALUES — every control on the panel; the defaults are the values
-   approved on the tablet. The look follows the second
+   1. THE SCENE — the values approved on the tablet, now fixed (the
+   panel only has the 風鈴 controls). The look follows the second
    reference picture: a soft, misty scene with Fuji in the middle,
    plum branches with snow hanging in from the top corners, a red torii
    on the left (partly off the screen), snowy firs on the right and pale
@@ -414,154 +453,129 @@ var DEFAULTS = {
     torii: '#D2452B', toriiDark: '#3A2B2B', fir: '#4F5E58', frost: '#A39BA3', berry: '#C8321E'
   }
 };
-var STORE_KEY = 'winterLabValues3';   // new key: the defaults are the values approved for the app
-function clone(o) { return JSON.parse(JSON.stringify(o)); }
-var V = clone(DEFAULTS);
-try {
-  var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  if (saved && typeof saved === 'object') {
-    for (var k in saved) if (k in V && k !== 'colours') V[k] = saved[k];
-    if (saved.colours) for (var c in saved.colours) if (c in V.colours) V.colours[c] = saved.colours[c];
-  }
-} catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(V)); } catch (e) {} }
+var V = JSON.parse(JSON.stringify(DEFAULTS));
 
 /* ============================================================
-   2. CONTROL PANEL. "re" says what has to be redrawn on a change:
-   all, scene (mountains), ground (the snowfield and what stands on it),
-   branches, near (the snowdrift), flakes (the snow sprites), css, or
-   nothing.
+   2. 風鈴 VALUES — every control on the panel. The scene above is fixed;
+   the panel is only for the wind chime: how it looks, how it moves in
+   the wind and when you touch it, and how it sounds. Saved on this
+   tablet, so a reload keeps them; Reset goes back to these.
+   "re" says what has to be redone on a change: size (the chime's
+   canvas), sound (the generated ring is made again), text, wind (the
+   wind line), or nothing.
    ============================================================ */
+var FURIN_DEFAULTS = {
+  // sound
+  sound: 'synth',            // 'synth' = the generated ring, 'real' = Sound/RealWindchimes.mp3
+  volume: 0.6,
+  pitch: 1480,               // generated ring: the main note (Hz)
+  ringLength: 3.2,           // how long it rings on (s)
+  shimmer: 0.6,              // the slow wavering of the note (iron bells beat)
+  brightness: 0.5,           // the higher overtones
+  strike: 0.45,              // the small "tick" of the clapper hitting the iron
+  pitchVary: 20,             // each ring a little higher or lower (cents)
+  // ringing
+  clapperGap: 0.16,          // room for the clapper to swing before it meets the bell
+  ringThreshold: 1,          // how hard the clapper must hit for the wind to ring it
+  windRingGap: 5,            // at least this many seconds between rings from the wind
+  // wind
+  useLiveWind: true,         // the real Nagoya wind; off = the test wind below
+  testWind: 2.5,             // m/s
+  windPush: 1,               // how far the steady wind leans the strip
+  gustPush: 1,               // how much the scene's gusts swing it
+  flutter: 1,                // the small, restless movements in the breeze
+  touchPush: 1,              // how hard a tap or a flick swings it
+  // motion
+  bellSwing: 1,              // how much the heavy bell itself moves
+  clapperSwing: 1,
+  stripSwing: 1,
+  twirl: 1,                  // the paper strip turning on its cord
+  swingSpeed: 1,             // faster / slower swings (shorter / longer cords)
+  settle: 1,                 // how quickly a swing dies down
+  // look and place
+  x: 42,                     // px from the screen's left edge
+  size: 1,
+  cordLen: 22,               // from the top of the screen to the bell (px)
+  bellW: 32,
+  bellH: 30,
+  stripCord: 22,             // from the clapper down to the paper strip (px)
+  stripW: 21,
+  stripH: 56,
+  rimLight: 0.55,            // the soft highlight on the iron
+  pattern: 0.45,             // the pattern pressed into the bell
+  flowers: 7,                // small white flowers on the strip
+  stripes: 0.5,              // the fine lines in the paper
+  shadow: 0.35,
+  textX: 16.75,              // the two lines' centre, % across the screen
+  colours: {
+    bell: '#1C2742', cord: '#B4693C', string: '#2E3548',
+    paper: '#F6D8C1', paperBack: '#E9C3A9', flower: '#FFFFFF'
+  }
+};
+var FURIN_KEY = 'furinLabValues1';
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+var FC = clone(FURIN_DEFAULTS);
+try {
+  var saved = JSON.parse(localStorage.getItem(FURIN_KEY) || 'null');
+  if (saved && typeof saved === 'object') {
+    for (var k in saved) if (k in FC && k !== 'colours') FC[k] = saved[k];
+    if (saved.colours) for (var c in saved.colours) if (c in FC.colours) FC.colours[c] = saved.colours[c];
+  }
+} catch (e) {}
+function save() { try { localStorage.setItem(FURIN_KEY, JSON.stringify(FC)); } catch (e) {} }
+
 var GROUPS = [
-  { title: 'Light & wind', ctls: [
-    { k: 'timeOfDay', label: 'Time of day', type: 'select', opts: [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']], re: 'all' },
-    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the branches and the snow.' },
-    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'A gust sweeps across: the branches sway and shed some snow. Swiping also makes one.' },
-    { k: 'gustStrength', label: 'Gust strength', min: 0, max: 2, step: 0.05 },
-    { k: 'lampGlow', label: 'Lamp glow at night', min: 0, max: 1, step: 0.01, re: 'all', hint: 'A warm glow on the snow at the foot of the torii.' }
+  { title: 'Sound', ctls: [
+    { k: 'sound', label: 'Which sound', type: 'select', opts: [['synth', '1) Generated ring'], ['real', '2) Your recording (RealWindchimes.mp3)']] },
+    { k: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01 },
+    { k: 'pitch', label: 'Generated: note (Hz)', min: 700, max: 3000, step: 10, re: 'sound', hint: 'Iron 風鈴 ring high and clear: about 1200–2000 Hz.' },
+    { k: 'ringLength', label: 'Generated: rings on for (seconds)', min: 0.6, max: 8, step: 0.1, re: 'sound' },
+    { k: 'shimmer', label: 'Generated: wavering of the note', min: 0, max: 2, step: 0.05, re: 'sound', hint: 'The slow beat you hear in a real iron bell.' },
+    { k: 'brightness', label: 'Generated: brightness (overtones)', min: 0, max: 1, step: 0.01, re: 'sound' },
+    { k: 'strike', label: 'Generated: tick of the clapper', min: 0, max: 1, step: 0.01, re: 'sound' },
+    { k: 'pitchVary', label: 'Each ring a little different (cents)', min: 0, max: 100, step: 1, hint: 'Applies to both sounds.' }
   ]},
-  { title: 'Fuji', ctls: [
-    { k: 'showFuji', label: 'Show Fuji', type: 'check', re: 'scene' },
-    { k: 'fujiX', label: 'Position (left ↔ right)', min: 0.1, max: 0.9, step: 0.01, re: 'scene' },
-    { k: 'fujiHeight', label: 'Height', min: 0.08, max: 0.55, step: 0.01, re: 'scene' },
-    { k: 'fujiWidth', label: 'Width', min: 1.6, max: 4, step: 0.05, re: 'scene' },
-    { k: 'fujiSnow', label: 'Snow cap (share of the height)', min: 0, max: 0.8, step: 0.01, re: 'scene' },
-    { k: 'fujiGully', label: 'Snow streaks down the gullies', min: 0, max: 4, step: 0.05, re: 'scene' },
-    { k: 'fujiHaze', label: 'Haze on Fuji', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Lower = a clearer, bluer mountain.' }
+  { title: 'Ringing', ctls: [
+    { k: 'clapperGap', label: 'Room for the clapper', min: 0.05, max: 0.45, step: 0.01, hint: 'How far the clapper swings before it meets the bell. Smaller = it rings more easily.' },
+    { k: 'ringThreshold', label: 'Wind needed to ring it', min: 0.2, max: 5, step: 0.05, hint: 'How hard the clapper has to hit the bell. Higher = only strong gusts ring it. A tap always rings it.' },
+    { k: 'windRingGap', label: 'Rings from the wind at most every (seconds)', min: 0, max: 30, step: 0.5 }
   ]},
-  { title: 'Ridges & mist', ctls: [
-    { k: 'showMountains', label: 'Show mountains', type: 'check', re: 'scene' },
-    { k: 'ridges', label: 'Ridges in front of Fuji', min: 1, max: 3, step: 1, re: 'scene' },
-    { k: 'horizon', label: 'Horizon (share of screen height)', min: 0.6, max: 0.95, step: 0.01, re: 'scene ground', hint: 'Where the mountains meet the snowfield. Lower number = more snowfield.' },
-    { k: 'mtnHeight', label: 'Ridge height', min: 0.03, max: 0.4, step: 0.01, re: 'scene' },
-    { k: 'mtnStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Keep it low so the text stays easy to read.' },
-    { k: 'mtnHaze', label: 'Distance haze', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'mtnBlur', label: 'Blur (depth of field)', min: 0, max: 8, step: 0.1, re: 'scene', hint: 'Baked once, so it costs nothing per frame.' },
-    { k: 'ridgeSnow', label: 'Snow on the ridge tops', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'mist', label: 'Mist at the foot of the mountains (霞)', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'mistDrift', label: 'Drifting mist', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'treeLine', label: 'Snowy conifers along the horizon', type: 'check', re: 'scene' }
+  { title: 'Wind', ctls: [
+    { k: 'useLiveWind', label: 'Use the live Nagoya wind', type: 'check', re: 'wind', hint: 'Off: the test wind below (also used until the first reading arrives).' },
+    { k: 'testWind', label: 'Test wind (m/s)', min: 0, max: 12, step: 0.1, re: 'wind' },
+    { k: 'windPush', label: 'Steady wind: how far it leans', min: 0, max: 3, step: 0.05 },
+    { k: 'gustPush', label: 'Gusts: how much they swing it', min: 0, max: 3, step: 0.05, hint: 'The scene\'s gusts (and the one a swipe makes) swing it as they pass.' },
+    { k: 'flutter', label: 'Flutter in the breeze', min: 0, max: 3, step: 0.05 },
+    { k: 'touchPush', label: 'Tap / flick strength', min: 0.2, max: 3, step: 0.05 }
   ]},
-  { title: 'Snowfield', ctls: [
-    { k: 'groundStrength', label: 'Snowfield strength', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'swells', label: 'Rolling swells', min: 2, max: 12, step: 1, re: 'ground' },
-    { k: 'swellHeight', label: 'Swell height', min: 0, max: 3, step: 0.05, re: 'ground' },
-    { k: 'swellShadow', label: 'Shadow under the crests', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'groundHaze', label: 'Haze toward the horizon', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'sparkle', label: 'Sparkle on the snow', min: 0, max: 1, step: 0.01, re: 'ground' }
+  { title: 'Motion', ctls: [
+    { k: 'bellSwing', label: 'Bell swing', min: 0, max: 3, step: 0.05 },
+    { k: 'clapperSwing', label: 'Clapper swing', min: 0, max: 3, step: 0.05 },
+    { k: 'stripSwing', label: 'Paper strip swing', min: 0, max: 3, step: 0.05 },
+    { k: 'twirl', label: 'Paper strip twirl', min: 0, max: 3, step: 0.05 },
+    { k: 'swingSpeed', label: 'Swing speed', min: 0.4, max: 2, step: 0.05 },
+    { k: 'settle', label: 'Settles down (slow ↔ quick)', min: 0.2, max: 3, step: 0.05 }
   ]},
-  { title: 'Torii', ctls: [
-    { k: 'torii', label: 'Show the torii', type: 'check', re: 'ground' },
-    { k: 'toriiX', label: 'Position (left ↔ right)', min: -0.05, max: 0.95, step: 0.01, re: 'ground', hint: 'Near 0 its left pillar goes off the screen.' },
-    { k: 'toriiDepth', label: 'Distance (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'toriiSize', label: 'Height (share of screen)', min: 0.1, max: 0.7, step: 0.01, re: 'ground' },
-    { k: 'toriiSnow', label: 'Snow on the beams', min: 0, max: 2, step: 0.05, re: 'ground' }
-  ]},
-  { title: 'Snowy firs', ctls: [
-    { k: 'firs', label: 'How many', min: 0, max: 8, step: 1, re: 'ground' },
-    { k: 'firX', label: 'Position of the group', min: 0.05, max: 1, step: 0.01, re: 'ground' },
-    { k: 'firSize', label: 'Size', min: 0.4, max: 2, step: 0.05, re: 'ground' }
-  ]},
-  { title: 'Frosted trees & shrubs', ctls: [
-    { k: 'frostTrees', label: 'Frosted trees', min: 0, max: 12, step: 1, re: 'ground', hint: 'Pale, bare trees in the mist, as in the picture.' },
-    { k: 'frostSize', label: 'Size', min: 0.4, max: 2.5, step: 0.05, re: 'ground' },
-    { k: 'berries', label: 'Red berries on them', type: 'check', re: 'ground' },
-    { k: 'berryAmount', label: 'Berries per tree', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'shrubs', label: 'Snowy shrubs', min: 0, max: 2, step: 0.05, re: 'ground' }
-  ]},
-  { title: 'Plum branches from the top', ctls: [
-    { k: 'leftBranch', label: 'Branch from the top left', type: 'check', re: 'branches' },
-    { k: 'rightBranch', label: 'Branch from the top right', type: 'check', re: 'branches' },
-    { k: 'branchCount', label: 'Branches from each corner', min: 1, max: 3, step: 1, re: 'branches', hint: 'The main limb from the side, one hanging from the top edge, and a small one lower down.' },
-    { k: 'branchSize', label: 'Reach', min: 0.4, max: 1.6, step: 0.01, re: 'branches' },
-    { k: 'branchDroop', label: 'Droop', min: 0, max: 2.5, step: 0.05, re: 'branches' },
-    { k: 'branchTop', label: 'Comes in at (px from the top)', min: -40, max: 240, step: 1, re: 'branches', hint: 'The toolbar is 93px tall; the branch shows through its glass.' },
-    { k: 'blossoms', label: 'Blossoms', min: 0, max: 2.5, step: 0.05, re: 'branches' },
-    { k: 'blossomSize', label: 'Blossom size', min: 0.5, max: 2, step: 0.05, re: 'branches' },
-    { k: 'branchSnow', label: 'Snow on the branches', min: 0, max: 1.5, step: 0.01, re: 'branches' },
-    { k: 'sway', label: 'Sway in the wind', min: 0, max: 3, step: 0.05 },
-    { k: 'swayRandom', label: 'Random bounces', min: 0, max: 3, step: 0.05, hint: 'Each side shoot gets its own small, irregular pushes.' },
-    { k: 'shedEvery', label: 'Snow falls off every (seconds)', min: 1, max: 30, step: 0.5, hint: 'On average. A gust or a hard bounce also shakes snow off.' },
-    { k: 'shedAmount', label: 'Snow in each puff', min: 0, max: 3, step: 0.05 },
-    { k: 'regrow', label: 'Snow building back up', min: 0, max: 5, step: 0.05 },
-    { k: 'petals', label: 'Falling petals', min: 0, max: 3, step: 0.05 }
-  ]},
-  { title: 'Skiers', ctls: [
-    { k: 'skiers', label: 'Show skiers', type: 'check', re: 'ground' },
-    { k: 'maxSkiers', label: 'Most on screen at once', min: 0, max: 5, step: 1 },
-    { k: 'skiGapMin', label: 'A new skier after at least (seconds)', min: 1, max: 60, step: 0.5 },
-    { k: 'skiGapMax', label: '… and at most (seconds)', min: 1, max: 90, step: 0.5, hint: 'Each starts on its own timer, left to right or right to left.' },
-    { k: 'skiSpeed', label: 'Speed', min: 0.3, max: 2.5, step: 0.05, hint: 'Each skier also has a speed of their own, slower uphill.' },
-    { k: 'skiSize', label: 'Size (× life size next to the torii)', min: 0.5, max: 2, step: 0.05 },
-    { k: 'skiFront', label: 'Share that ski in front of the torii and dots', min: 0, max: 1, step: 0.01, hint: 'The rest are split evenly: far (behind the torii and the dots) and near (above the snowdrift). Each also takes its own path down its swell.' },
-    { k: 'skiFar', label: 'Furthest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground', hint: 'Skiers further back pass behind the nearer trees and the torii.' },
-    { k: 'skiNear', label: 'Nearest they ski (far ↔ near)', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'skiFarBlur', label: 'Blur of the furthest (px)', min: 0, max: 6, step: 0.1 },
-    { k: 'skiNearBlur', label: 'Blur of the nearest (px)', min: 0, max: 4, step: 0.1 },
-    { k: 'scarfLength', label: 'Scarf length', min: 0.3, max: 2.5, step: 0.05 },
-    { k: 'scarfFlutter', label: 'Scarf flutter', min: 0, max: 3, step: 0.05 }
-  ]},
-  { title: 'Falling snow', ctls: [
-    { k: 'flakes', label: 'Flakes on screen', min: 0, max: 400, step: 1 },
-    { k: 'sizeFar', label: 'Size of the furthest flakes (px)', min: 0.5, max: 4, step: 0.1 },
-    { k: 'sizeNear', label: 'Size of the nearest flakes (px)', min: 2, max: 12, step: 0.1 },
-    { k: 'farBlur', label: 'Blur of the furthest flakes (px)', min: 0, max: 6, step: 0.1 },
-    { k: 'nearBlur', label: 'Blur of the nearest flakes (px)', min: 0, max: 6, step: 0.1 },
-    { k: 'fallSpeed', label: 'Fall speed', min: 0.2, max: 3, step: 0.05 },
-    { k: 'flakeSway', label: 'Drift side to side', min: 0, max: 3, step: 0.05 },
-    { k: 'frontShare', label: 'Share falling in front of the text', min: 0, max: 0.5, step: 0.01, hint: 'Only the nearest flakes, sharp and bigger.' },
-    { k: 'landShare', label: 'Share of those that land on the drift', min: 0, max: 1, step: 0.05 },
-    { k: 'meltTime', label: 'Landed flakes melt after (seconds)', min: 1, max: 20, step: 0.5 },
-    { k: 'bokeh', label: 'Big soft flakes close to the glass', min: 0, max: 12, step: 1 }
-  ]},
-  { title: 'Snowdrift (in front of the text)', ctls: [
-    { k: 'showNear', label: 'Show the snowdrift', type: 'check', re: 'near' },
-    { k: 'nearHeight', label: 'Drift height (px)', min: 14, max: 90, step: 1, re: 'near', hint: 'The text and table disappear behind it as they scroll.' },
-    { k: 'nearLumps', label: 'Lumpiness', min: 0, max: 2, step: 0.05, re: 'near' },
-    { k: 'nearShade', label: 'Shade', min: 0, max: 1, step: 0.01, re: 'near' },
-    { k: 'nearShadow', label: 'Soft edge over the content', min: 0, max: 1, step: 0.01, re: 'near' },
-    { k: 'nearShadowSize', label: 'Edge softness (px)', min: 0, max: 14, step: 0.5, re: 'near' },
-    { k: 'scrollTest', label: 'Scroll test: text and table behind the drift', type: 'check', re: 'css', hint: 'Drag up or down anywhere on the screen (or use the mouse wheel) to scroll them.' }
-  ]},
-  { title: 'Layout: swipe hint and dots', ctls: [
-    { k: 'hintLift', label: 'スワイプ: up (px)', min: -60, max: 320, step: 1, re: 'css' },
-    { k: 'hintX', label: 'スワイプ: left ↔ right (px)', min: -400, max: 400, step: 1, re: 'css' },
-    { k: 'dotsLift', label: 'Dots: up (px)', min: -60, max: 320, step: 1, re: 'css' },
-    { k: 'dotsX', label: 'Dots: left ↔ right (px)', min: -400, max: 400, step: 1, re: 'css' }
+  { title: 'Look & place', ctls: [
+    { k: 'x', label: 'Position from the left (px)', min: 16, max: 400, step: 1, re: 'size' },
+    { k: 'size', label: 'Overall size', min: 0.5, max: 2, step: 0.01, re: 'size' },
+    { k: 'cordLen', label: 'Cord to the bell (px)', min: 4, max: 80, step: 1, re: 'size' },
+    { k: 'bellW', label: 'Bell width (px)', min: 14, max: 60, step: 1, re: 'size' },
+    { k: 'bellH', label: 'Bell height (px)', min: 14, max: 60, step: 1, re: 'size' },
+    { k: 'stripCord', label: 'Cord to the paper strip (px)', min: 6, max: 70, step: 1, re: 'size' },
+    { k: 'stripW', label: 'Paper strip width (px)', min: 8, max: 50, step: 1, re: 'size' },
+    { k: 'stripH', label: 'Paper strip length (px)', min: 20, max: 140, step: 1, re: 'size' },
+    { k: 'rimLight', label: 'Highlight on the iron', min: 0, max: 1, step: 0.01 },
+    { k: 'pattern', label: 'Pattern on the bell', min: 0, max: 1, step: 0.01 },
+    { k: 'flowers', label: 'Flowers on the strip', min: 0, max: 16, step: 1, re: 'size' },
+    { k: 'stripes', label: 'Lines in the paper', min: 0, max: 1, step: 0.01 },
+    { k: 'shadow', label: 'Shadow', min: 0, max: 1, step: 0.01 },
+    { k: 'textX', label: 'Text position (% across)', min: 8, max: 30, step: 0.05, re: 'text' }
   ]}
 ];
 var COLOUR_LABELS = {
-  fuji: 'Fuji', fujiSnow: 'Mountain snow', mtnFar: 'Far ridge', mtnMid: 'Middle ridge', mtnNear: 'Near ridge',
-  mist: 'Mist / haze', treeLine: 'Horizon conifers',
-  snowLit: 'Snow in light', snowShade: 'Snow in shade', snowDeep: 'Snow, deep shade',
-  branch: 'Plum branch', blossom: 'Blossom', blossomDeep: 'Blossom centre', stamen: 'Stamens',
-  torii: 'Torii', toriiDark: 'Torii base bands', fir: 'Firs', frost: 'Frosted trees', berry: 'Berries'
-};
-var COLOUR_RE = {
-  fuji: 'scene', fujiSnow: 'scene', mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', treeLine: 'scene',
-  mist: 'scene ground', snowLit: 'ground branches near flakes', snowShade: 'ground branches near flakes', snowDeep: 'ground near',
-  branch: 'branches', blossom: 'branches', blossomDeep: 'branches', stamen: 'branches',
-  torii: 'ground', toriiDark: 'ground', fir: 'ground', frost: 'ground', berry: 'ground'
+  bell: 'Bell (iron)', cord: 'Cord to the strip', string: 'Cord from the top',
+  paper: 'Paper strip', paperBack: 'Back of the strip', flower: 'Flowers'
 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
@@ -576,8 +590,8 @@ function buildControls() {
       if (ctl.type === 'check') {
         wrap.className = 'lab-chk';
         var cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.checked = !!V[ctl.k];
-        cb.addEventListener('change', function () { V[ctl.k] = cb.checked; changed(ctl.re); });
+        cb.type = 'checkbox'; cb.checked = !!FC[ctl.k];
+        cb.addEventListener('change', function () { FC[ctl.k] = cb.checked; changed(ctl.re); });
         var lb = document.createElement('span'); lb.textContent = ctl.label;
         wrap.appendChild(cb); wrap.appendChild(lb);
       } else {
@@ -591,14 +605,14 @@ function buildControls() {
           ctl.opts.forEach(function (o) {
             var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
           });
-          el.value = V[ctl.k];
-          el.addEventListener('change', function () { V[ctl.k] = el.value; changed(ctl.re); });
+          el.value = FC[ctl.k];
+          el.addEventListener('change', function () { FC[ctl.k] = el.value; changed(ctl.re); });
         } else {
-          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, V[ctl.k]);
+          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, FC[ctl.k]);
           label.appendChild(val);
           el = document.createElement('input');
-          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = V[ctl.k];
-          el.addEventListener('input', function () { V[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, V[ctl.k]); changed(ctl.re); });
+          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = FC[ctl.k];
+          el.addEventListener('input', function () { FC[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, FC[ctl.k]); changed(ctl.re); });
         }
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
@@ -611,10 +625,10 @@ function buildControls() {
   cs.className = 'lab-sec';
   cs.innerHTML = '<h4>Colours</h4>';
   var grid = document.createElement('div'); grid.className = 'lab-colours';
-  Object.keys(V.colours).forEach(function (key) {
+  Object.keys(FC.colours).forEach(function (key) {
     var row = document.createElement('label'); row.className = 'lab-colour';
-    var inp = document.createElement('input'); inp.type = 'color'; inp.value = V.colours[key];
-    inp.addEventListener('input', function () { V.colours[key] = inp.value; changed(COLOUR_RE[key]); });
+    var inp = document.createElement('input'); inp.type = 'color'; inp.value = FC.colours[key];
+    inp.addEventListener('input', function () { FC.colours[key] = inp.value; changed(); });
     var t = document.createElement('span'); t.textContent = COLOUR_LABELS[key] || key;
     row.appendChild(inp); row.appendChild(t); grid.appendChild(row);
   });
@@ -622,24 +636,16 @@ function buildControls() {
   host.appendChild(cs);
 }
 
-var _pending = '', _changeQueued = false;
 function changed(re) {
   save();
-  if (re) _pending += ' ' + re;
-  if (_changeQueued) return;
-  _changeQueued = true;
-  requestAnimationFrame(function () {
-    var p = _pending;
-    _pending = ''; _changeQueued = false;
-    if (p.indexOf('all') >= 0) { rebuildAll(); return; }
-    if (p.indexOf('branches') >= 0) buildBranches();
-    if (p.indexOf('flakes') >= 0) bakeFlakeSprites();
-    if (p.indexOf('scene') >= 0) bakeScenery();
-    if (p.indexOf('ground') >= 0) bakeGround();
-    if (p.indexOf('near') >= 0) bakeNear();
-    if (p.indexOf('css') >= 0) applyLayout();
-  });
+  re = re || '';
+  if (re.indexOf('size') >= 0) layoutFurin();
+  if (re.indexOf('sound') >= 0) synthKey = '';
+  if (re.indexOf('text') >= 0) applyLayout();
+  if (re.indexOf('wind') >= 0) updateWindLine();
 }
+/* The swipe hint, the dots and the scroll test at their approved places,
+   and the chime's text where the panel puts it. */
 function applyLayout() {
   var s = document.documentElement.style;
   s.setProperty('--hint-lift', V.hintLift + 'px');
@@ -647,6 +653,7 @@ function applyLayout() {
   s.setProperty('--dots-lift', V.dotsLift + 'px');
   s.setProperty('--dots-x', V.dotsX + 'px');
   document.getElementById('scrollTest').classList.toggle('shown', !!V.scrollTest);
+  document.getElementById('furinText').style.setProperty('--furin-text-x', FC.textX + '%');
 }
 
 document.getElementById('labToggle').addEventListener('click', function () {
@@ -655,80 +662,49 @@ document.getElementById('labToggle').addEventListener('click', function () {
   this.textContent = c ? 'Show' : 'Hide';
 });
 document.getElementById('btnReset').addEventListener('click', function () {
-  V = clone(DEFAULTS); save(); buildControls(); applyLayout(); rebuildAll();
+  FC = clone(FURIN_DEFAULTS); save(); buildControls(); applyLayout(); layoutFurin(); synthKey = ''; updateWindLine();
 });
-document.getElementById('btnSeed').addEventListener('click', function () {
-  V.seed = (V.seed * 9301 + 49297) % 233280; save(); rebuildAll();
-});
+document.getElementById('btnRing').addEventListener('click', function () { ensureAudio(); tapFurin(Math.random() < 0.5 ? -1 : 1); });
 document.getElementById('btnGust').addEventListener('click', function () { startGust(1, 1.3); });
-document.getElementById('btnShake').addEventListener('click', function () { branches.forEach(shakeBranch); });
-document.getElementById('btnSkier').addEventListener('click', function () { spawnSkier(0, false); });
-document.getElementById('btnSkierFront').addEventListener('click', function () { spawnSkier(0, true); });
 
 /* ============================================================
-   3. COPY VALUES — the fonts and styles the page actually uses (read
-   from the live styles) plus every winter value.
+   3. COPY VALUES — the type the two lines actually use (read from the
+   live styles) plus every 風鈴 value.
    ============================================================ */
 function styleOf(sel) {
   var el = document.querySelector(sel);
   if (!el) return null;
   var s = getComputedStyle(el);
-  return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, colour: s.color, shadow: s.textShadow,
-           spacing: s.letterSpacing, bottom: s.bottom };
+  return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, colour: s.color, spacing: s.letterSpacing };
 }
 function f2(x) { return Number(x).toFixed(2); }
 function onOff(b) { return b ? 'on' : 'off'; }
 function buildCopyText() {
-  var body = styleOf('.panel.active .panel-content') || styleOf('.panel-content');
-  var name = styleOf('.therapist-name');
-  var hint = styleOf('#globalHint');
-  var dots = styleOf('#dots');
+  var l1 = styleOf('.furin-text .hud-title'), l2 = styleOf('.furin-text .hud-artist');
   var lines = [];
-  lines.push('/* Winter landscape — values from winter.html */');
+  lines.push('/* 風鈴 (wind chime) — values from winter.html */');
   lines.push('');
-  lines.push('Message text font: ' + body.font + ' · ' + body.weight + ' · ' + body.size + ' · ' + body.colour);
-  lines.push('Message text shadow: ' + body.shadow);
-  lines.push('Therapist name font: ' + name.font + ' · ' + name.weight + ' · ' + name.colour);
-  lines.push('Swipe hint font: ' + hint.font + ' · ' + hint.weight + ' · ' + hint.size + ' · letter-spacing ' + hint.spacing + ' · ' + hint.colour);
-  lines.push('Swipe hint position: bottom ' + hint.bottom + ' + up ' + V.hintLift + 'px = ' + (parseFloat(hint.bottom) + V.hintLift) +
-             'px from the bottom, moved ' + V.hintX + 'px sideways');
-  lines.push('Dots position: bottom ' + dots.bottom + ' + up ' + V.dotsLift + 'px = ' + (parseFloat(dots.bottom) + V.dotsLift) +
-             'px from the bottom, moved ' + V.dotsX + 'px sideways');
+  lines.push('Line 1 (music title type): ' + l1.font + ' · ' + l1.weight + ' · ' + l1.size + ' · letter-spacing ' + l1.spacing + ' · ' + l1.colour);
+  lines.push('Line 2 (music artist type): ' + l2.font + ' · ' + l2.weight + ' · ' + l2.size + ' · letter-spacing ' + l2.spacing + ' · ' + l2.colour);
+  lines.push('Text centred at ' + f2(FC.textX) + '% across');
   lines.push('');
-  lines.push('Light: ' + V.timeOfDay + ', wind ' + f2(V.wind) + ', a gust every ' + V.gustEvery + 's, gust strength ' +
-             f2(V.gustStrength) + ', lamp glow ' + f2(V.lampGlow));
-  lines.push('Fuji: ' + onOff(V.showFuji) + ', position ' + f2(V.fujiX) + ', height ' + f2(V.fujiHeight) +
-             ', width ' + f2(V.fujiWidth) + ', snow cap ' + f2(V.fujiSnow) + ', gully streaks ' + f2(V.fujiGully) + ', haze ' + f2(V.fujiHaze));
-  lines.push('Ridges: ' + onOff(V.showMountains) + ', ' + V.ridges + ' ridges, horizon ' + f2(V.horizon) +
-             ', height ' + f2(V.mtnHeight) + ', strength ' + f2(V.mtnStrength) + ', haze ' + f2(V.mtnHaze) +
-             ', blur ' + f2(V.mtnBlur) + 'px, ridge snow ' + f2(V.ridgeSnow) + ', mist ' + f2(V.mist) +
-             ', drifting mist ' + f2(V.mistDrift) + ', horizon conifers ' + onOff(V.treeLine));
-  lines.push('Snowfield: strength ' + f2(V.groundStrength) + ', ' + V.swells + ' swells, swell height ' + f2(V.swellHeight) +
-             ', crest shadow ' + f2(V.swellShadow) + ', haze ' + f2(V.groundHaze) + ', sparkle ' + f2(V.sparkle));
-  lines.push('Torii: ' + onOff(V.torii) + ', position ' + f2(V.toriiX) + ', distance ' + f2(V.toriiDepth) +
-             ', height ' + f2(V.toriiSize) + ', snow ' + f2(V.toriiSnow));
-  lines.push('Firs: ' + V.firs + ' at ' + f2(V.firX) + ', size ' + f2(V.firSize));
-  lines.push('Frosted trees: ' + V.frostTrees + ', size ' + f2(V.frostSize) + ', berries ' + onOff(V.berries) +
-             ' (' + f2(V.berryAmount) + '), shrubs ' + f2(V.shrubs));
-  lines.push('Plum branches: left ' + onOff(V.leftBranch) + ', right ' + onOff(V.rightBranch) + ', ' + V.branchCount + ' from each corner, reach ' + f2(V.branchSize) +
-             ', droop ' + f2(V.branchDroop) + ', in at ' + V.branchTop + 'px, blossoms ' + f2(V.blossoms) + ' (size ' +
-             f2(V.blossomSize) + '), snow ' + f2(V.branchSnow) + ', sway ' + f2(V.sway) + ', random bounces ' + f2(V.swayRandom) +
-             ', sheds every ' + f2(V.shedEvery) + 's, puff ' + f2(V.shedAmount) + ', regrow ' + f2(V.regrow) + ', petals ' + f2(V.petals));
-  lines.push('Skiers: ' + onOff(V.skiers) + ', up to ' + V.maxSkiers + ' at once, a new one every ' + f2(V.skiGapMin) + '–' +
-             f2(V.skiGapMax) + 's, speed ' + f2(V.skiSpeed) + ', size ' + f2(V.skiSize) + ', depth ' + f2(V.skiFar) + '–' +
-             f2(V.skiNear) + ', blur ' + f2(V.skiFarBlur) + '→' + f2(V.skiNearBlur) + 'px, scarf length ' + f2(V.scarfLength) +
-             ', flutter ' + f2(V.scarfFlutter) + ', ' + Math.round(V.skiFront * 100) + '% in front of the torii and dots, the rest split evenly far / near');
-  lines.push('Falling snow: ' + V.flakes + ' flakes, size ' + f2(V.sizeFar) + '–' + f2(V.sizeNear) + 'px, blur ' + f2(V.farBlur) +
-             '→' + f2(V.nearBlur) + 'px, speed ' + f2(V.fallSpeed) + ', drift ' + f2(V.flakeSway) + ', ' +
-             Math.round(V.frontShare * 100) + '% in front, ' + Math.round(V.landShare * 100) + '% of those land and melt after ' +
-             V.meltTime + 's, ' + V.bokeh + ' big soft flakes');
-  lines.push('Snowdrift: ' + onOff(V.showNear) + ', ' + V.nearHeight + 'px high, lumps ' + f2(V.nearLumps) + ', shade ' +
-             f2(V.nearShade) + ', soft edge ' + f2(V.nearShadow) + ' (' + V.nearShadowSize + 'px)');
+  lines.push('Sound: ' + (FC.sound === 'real' ? 'your recording (Sound/RealWindchimes.mp3)' : 'generated ring') + ', volume ' + f2(FC.volume) +
+             ', each ring ±' + FC.pitchVary + ' cents');
+  lines.push('Generated ring: ' + FC.pitch + ' Hz, rings ' + f2(FC.ringLength) + 's, wavering ' + f2(FC.shimmer) +
+             ', brightness ' + f2(FC.brightness) + ', clapper tick ' + f2(FC.strike));
+  lines.push('Ringing: clapper room ' + f2(FC.clapperGap) + ', wind needed ' + f2(FC.ringThreshold) + ', wind rings at most every ' + f2(FC.windRingGap) + 's');
+  lines.push('Wind: live ' + onOff(FC.useLiveWind) + ' (test ' + f2(FC.testWind) + ' m/s), lean ' + f2(FC.windPush) + ', gusts ' +
+             f2(FC.gustPush) + ', flutter ' + f2(FC.flutter) + ', tap/flick ' + f2(FC.touchPush));
+  lines.push('Motion: bell ' + f2(FC.bellSwing) + ', clapper ' + f2(FC.clapperSwing) + ', strip ' + f2(FC.stripSwing) +
+             ', twirl ' + f2(FC.twirl) + ', speed ' + f2(FC.swingSpeed) + ', settle ' + f2(FC.settle));
+  lines.push('Look: ' + FC.x + 'px from the left, size ' + f2(FC.size) + ', cord ' + FC.cordLen + 'px, bell ' + FC.bellW + '×' + FC.bellH +
+             'px, strip cord ' + FC.stripCord + 'px, strip ' + FC.stripW + '×' + FC.stripH + 'px, highlight ' + f2(FC.rimLight) +
+             ', pattern ' + f2(FC.pattern) + ', ' + FC.flowers + ' flowers, paper lines ' + f2(FC.stripes) + ', shadow ' + f2(FC.shadow));
   lines.push('Colours:');
-  Object.keys(V.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + V.colours[k].toUpperCase()); });
+  Object.keys(FC.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + FC.colours[k].toUpperCase()); });
   lines.push('');
   lines.push('JSON:');
-  lines.push(JSON.stringify(V, null, 2));
+  lines.push(JSON.stringify(FC, null, 2));
   return lines.join('\n');
 }
 function copyText(text) {
@@ -2231,6 +2207,380 @@ function drawBokeh(c) {
 }
 
 /* ============================================================
+   11b. 風鈴 — the iron wind chime at the left of the toolbar.
+   It hangs on a cord from the top of the screen: the bell on the glass,
+   the clapper inside it, and below the glass's edge the paper strip
+   (短冊) that catches the wind. Three linked swings (bell, clapper,
+   strip) plus the strip turning on its cord. The wind on the strip is
+   the live Nagoya wind (a steady lean and a restless flutter) plus the
+   scene's gusts as they sweep past (fieldAt). It rings when the clapper
+   really hits the bell: from the wind only when it hits hard enough and
+   not too often, from a tap every time.
+   Angles are from straight down; positive swings to the right.
+   ============================================================ */
+var fcv = document.getElementById('furinCanvas'), fctx = fcv.getContext('2d');
+var fhit = document.createElement('div');
+fhit.className = 'furin-hit';
+document.getElementById('infoBar').appendChild(fhit);
+var FG = {};                                   // geometry in CSS px (set by layoutFurin)
+var FS = { b: 0, bv: 0, z: 0, zv: 0, s: 0, sv: 0, p: 0, pv: 0 };
+var furinT = 0, tapUntil = -1, lastRing = -9, lastWindRing = -9, furinFlowers = [];
+var liveWind = null;                           // { ms, dir } once Open-Meteo answers
+
+function layoutFurin() {
+  var S = FC.size;
+  FG.L0 = FC.cordLen * S; FG.bw = FC.bellW * S; FG.bh = FC.bellH * S;
+  FG.lc = FC.stripCord * S; FG.sw = FC.stripW * S; FG.sh = FC.stripH * S;
+  FG.piv = FG.L0 + FG.bh * 0.16;               // where the clapper hangs, inside the bell's top
+  FG.lz = FG.bh * 0.8;                          // to the clapper, which sits just inside the rim
+  FG.rc = Math.max(2, FG.bw * 0.13);            // the clapper's half-width
+  var tot = FG.piv + FG.lz + FG.lc + FG.sh;
+  FG.cw = Math.ceil(2 * (tot * 0.62 + FG.bw));
+  FG.ch = Math.ceil(tot + 30 * S);
+  var pr = window.devicePixelRatio || 1;
+  FG.pr = pr;
+  fcv.width = Math.round(FG.cw * pr); fcv.height = Math.round(FG.ch * pr);
+  fcv.style.width = FG.cw + 'px'; fcv.style.height = FG.ch + 'px';
+  fcv.style.left = (FC.x - FG.cw / 2) + 'px';
+  FG.hw = Math.max(FG.bw, FG.sw) + 18 * S;
+  fhit.style.width = FG.hw + 'px'; fhit.style.height = (tot + 8 * S) + 'px';
+  // the flowers on the strip, the same every time
+  var r = rngFrom(41);
+  furinFlowers = [];
+  for (var i = 0; i < FC.flowers; i++) {
+    furinFlowers.push({ u: (i % 2 ? 0.2 : -0.2) + lerp(-0.1, 0.1, r()), v: lerp(0.18, 0.92, (i + 0.3 + 0.4 * r()) / Math.max(1, FC.flowers)),
+                        k: lerp(0.8, 1.15, r()), a: r() * TAU });
+  }
+}
+
+/* ---- the wind ---- */
+function windMs() { return FC.useLiveWind && liveWind ? liveWind.ms : FC.testWind; }
+function windSide() {                         // -1..1: how much of it blows across the screen, and which way
+  if (!(FC.useLiveWind && liveWind)) return 1;
+  return -Math.sin(liveWind.dir * PI / 180);   // from the west (270°) blows to the right
+}
+function windWord(m) {
+  if (m < 0.3) return '無風';
+  if (m < 1.6) return '微風';
+  if (m < 3.4) return 'そよ風';
+  if (m < 5.5) return '心地よい風';
+  if (m < 8) return 'やや強い風';
+  return '強い風';
+}
+var furinWindEl = document.getElementById('furinWind');
+function updateWindLine() {
+  var sep = furinWindEl.previousElementSibling;
+  var known = !FC.useLiveWind || liveWind;
+  sep.style.display = known ? '' : 'none';
+  furinWindEl.textContent = known ? windWord(windMs()) + ' ' + windMs().toFixed(1) + 'm/s' : '';
+  var st = document.getElementById('furinStatus');
+  if (st) {
+    st.textContent = (liveWind ? 'Live Nagoya wind: ' + liveWind.ms.toFixed(1) + ' m/s from ' + liveWind.dir + '°' : 'Live Nagoya wind: waiting for the first reading') +
+                     ' · recording: ' + (realBuf ? 'loaded (' + realBuf.duration.toFixed(1) + 's)' : realState);
+  }
+}
+function fetchWind() {
+  fetch('https://api.open-meteo.com/v1/forecast?latitude=35.1815&longitude=136.9066&current=wind_speed_10m,wind_direction_10m&wind_speed_unit=ms&timezone=Asia%2FTokyo')
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      if (d && d.current && typeof d.current.wind_speed_10m === 'number') {
+        liveWind = { ms: d.current.wind_speed_10m, dir: d.current.wind_direction_10m || 0 };
+        updateWindLine();
+      }
+    }).catch(function () {});
+}
+
+/* ---- the swings ---- */
+function furinStep(t, h, gustLean) {
+  var m = windMs(), side = windSide();
+  var lean = side * FC.windPush * 0.24 * (1 - Math.exp(-m / 4));
+  var fl = FC.flutter * (0.04 + 0.035 * m) * ((noise1(t * 1.3) + 0.6 * noise1(t * 3.1 + 7) - 0.8) * 1.6);
+  var Fw = lean + fl + gustLean;
+  var sp = FC.swingSpeed, se = FC.settle;
+  var ws = TAU / 0.95 * sp, wz = TAU / 1.15 * sp, wb = TAU / 1.7 * sp, wp = TAU / 2.6 * sp;
+  var X = FS;
+  var pull = X.s - X.z - Fw * FC.stripSwing;  // the strip pulls on the clapper's cord
+  var as = -ws * ws * pull - 2 * 0.12 * se * ws * (X.sv - X.zv);
+  var az = -wz * wz * (X.z - X.b - Fw * 0.3 * FC.clapperSwing) - 2 * 0.08 * se * wz * (X.zv - X.bv) + 0.5 * wz * wz * pull * FC.clapperSwing;
+  var ab = -wb * wb * (X.b - Fw * 0.06 * FC.bellSwing) - 2 * 0.18 * se * wb * X.bv + 0.08 * wz * wz * (X.z - X.b) * FC.bellSwing;
+  var tq = FC.twirl * 0.5 * ((noise1(t * 0.9 + 31) - 0.5) * 2 * (0.6 + m * 0.5 + Math.abs(gustLean) * 8) + (X.sv - X.zv) * 0.8);
+  var ap = wp * wp * (tq - X.p) - 2 * 0.06 * se * wp * X.pv;
+  X.sv += as * h; X.zv += az * h; X.bv += ab * h; X.pv += ap * h;
+  X.s += X.sv * h; X.z += X.zv * h; X.b += X.bv * h; X.p += X.pv * h;
+  // the clapper hits the inside of the bell
+  var rel = X.z - X.b;
+  if (Math.abs(rel) > FC.clapperGap) {
+    var sg = rel > 0 ? 1 : -1, rv = X.zv - X.bv;
+    X.z = X.b + sg * FC.clapperGap;
+    if (rv * sg > 0) {
+      X.zv = X.bv - rv * 0.4;
+      X.bv += rv * 0.12 * FC.bellSwing;
+      furinHit(Math.abs(rv), t);
+    }
+  }
+}
+function furinHit(speed, t) {
+  if (t - lastRing < 0.12) return;
+  var tap = t < tapUntil;
+  if (tap ? speed < 0.3 : (speed < FC.ringThreshold * 0.3 || t - lastWindRing < FC.windRingGap)) return;
+  lastRing = t;
+  if (!tap) lastWindRing = t;
+  playRing(clamp(speed / 2, 0.25, 1));     // the wind rings it softly, a tap clearly
+}
+function updateFurin(t, dt) {
+  furinT = t;
+  var gl = FC.gustPush * (fieldAt(FC.x) - V.wind * 0.12) * 0.35;
+  var n = 4, h = dt / n;
+  for (var i = 0; i < n; i++) furinStep(t + i * h, h, gl);
+}
+function tapFurin(dir) {
+  var k = FC.touchPush;
+  FS.zv += dir * 3.2 * k; FS.sv += dir * 3.8 * k; FS.bv += dir * 0.5 * k; FS.pv += rnd(-3, 3) * k;
+  tapUntil = furinT + 0.8;
+}
+
+/* ---- touch: the hit area follows the chime; a tap swings it away from
+   the finger, a flick pushes it along ---- */
+var fptr = null;
+fhit.addEventListener('pointerdown', function (e) {
+  ensureAudio();
+  var r = fhit.getBoundingClientRect();
+  var dir = e.clientX < r.left + r.width / 2 ? 1 : -1;
+  tapFurin(dir);
+  fptr = { id: e.pointerId, x: e.clientX };
+  try { fhit.setPointerCapture(e.pointerId); } catch (er) {}
+  e.preventDefault();
+});
+fhit.addEventListener('pointermove', function (e) {
+  if (!fptr || e.pointerId !== fptr.id) return;
+  var dx = e.clientX - fptr.x; fptr.x = e.clientX;
+  var k = FC.touchPush;
+  FS.sv += dx * 0.03 * k; FS.zv += dx * 0.02 * k; FS.pv += dx * 0.02 * k;
+  tapUntil = furinT + 0.8;
+});
+function fptrEnd() { fptr = null; }
+fhit.addEventListener('pointerup', fptrEnd);
+fhit.addEventListener('pointercancel', fptrEnd);
+
+/* ---- drawing ---- */
+function shade(c, k) { return [c[0] * k, c[1] * k, c[2] * k]; }
+function drawFurin() {
+  var c = fctx, S = FC.size, X = FS;
+  var bell = hex(FC.colours.bell), cord = hex(FC.colours.cord), str = hex(FC.colours.string);
+  c.setTransform(FG.pr, 0, 0, FG.pr, 0, 0);
+  c.clearRect(0, 0, FG.cw, FG.ch);
+  c.translate(FG.cw / 2, 0);
+  var sh = FC.shadow;
+  function shadowOn() { c.shadowColor = 'rgba(40,24,34,' + (0.5 * sh).toFixed(3) + ')'; c.shadowBlur = 7 * S; c.shadowOffsetY = 3 * S; c.shadowOffsetX = 1.5 * S; }
+  function shadowOff() { c.shadowColor = 'rgba(0,0,0,0)'; c.shadowBlur = 0; c.shadowOffsetX = c.shadowOffsetY = 0; }
+
+  // where things are: the clapper hangs inside the bell, the strip from the clapper
+  var px = Math.sin(X.b) * FG.piv, py = Math.cos(X.b) * FG.piv;
+  var bx = px + Math.sin(X.z) * FG.lz, by = py + Math.cos(X.z) * FG.lz;
+  var cx0 = bx + Math.sin(X.z) * 2.5 * S, cy0 = by + Math.cos(X.z) * 2.5 * S;
+  var sx0 = cx0 + Math.sin(X.s) * FG.lc, sy0 = cy0 + Math.cos(X.s) * FG.lc;
+
+  // the cord down to the strip, bowing a little as it swings
+  var bow = clamp((X.sv - X.zv) * 2 * S, -6 * S, 6 * S);
+  c.strokeStyle = rgb(cord); c.lineWidth = 1.3 * S; c.lineCap = 'round';
+  c.beginPath(); c.moveTo(cx0, cy0);
+  c.quadraticCurveTo((cx0 + sx0) / 2 - bow * Math.cos(X.s), (cy0 + sy0) / 2 + bow * Math.sin(X.s), sx0, sy0);
+  c.stroke();
+
+  // the paper strip, turning on its cord
+  c.save();
+  c.translate(sx0, sy0); c.rotate(-X.s);
+  var cp = Math.cos(X.p), ac = Math.max(0.04, Math.abs(cp)), front = cp >= 0;
+  var hw = FG.sw / 2, L = FG.sh;
+  c.save();
+  c.scale(ac, 1);
+  shadowOn();
+  c.fillStyle = FC.colours[front ? 'paper' : 'paperBack'];
+  c.beginPath(); c.rect(-hw, 0, hw * 2, L); c.fill();
+  shadowOff();
+  // the fine lines in the paper
+  if (FC.stripes > 0) {
+    c.strokeStyle = 'rgba(255,255,255,' + (0.35 * FC.stripes).toFixed(3) + ')';
+    c.lineWidth = 0.6 * S;
+    c.beginPath();
+    for (var lx = -hw + 1.6 * S; lx < hw; lx += 2.2 * S) { c.moveTo(lx, 0.5); c.lineTo(lx, L - 0.5); }
+    c.stroke();
+  }
+  // small white flowers on the front
+  if (front) {
+    var fl = hex(FC.colours.flower);
+    for (var i = 0; i < furinFlowers.length; i++) {
+      var F = furinFlowers[i], fx = F.u * hw * 2, fy = F.v * L, fr = 1.15 * S * F.k;
+      c.fillStyle = rgb(fl, 0.85);
+      c.beginPath();
+      for (var q = 0; q < 5; q++) { var a = F.a + q * TAU / 5; ellipse(c, fx + Math.cos(a) * fr, fy + Math.sin(a) * fr, fr * 0.78, fr * 0.78); }
+      c.fill();
+      c.fillStyle = rgb(mix(fl, hex(FC.colours.paper), 0.45), 0.9);
+      c.beginPath(); ellipse(c, fx, fy, fr * 0.42, fr * 0.42); c.fill();
+    }
+  }
+  // turned edge-on, the strip reads darker
+  c.fillStyle = 'rgba(80,44,30,' + ((1 - ac) * 0.28 + (front ? 0 : 0.06)).toFixed(3) + ')';
+  c.fillRect(-hw, 0, hw * 2, L);
+  // the hole the cord is tied through
+  c.fillStyle = 'rgba(120,70,50,0.35)';
+  c.beginPath(); ellipse(c, 0, 5 * S, 1.7 * S, 1.7 * S); c.fill();
+  c.restore();
+  // the knot
+  c.strokeStyle = rgb(cord); c.lineWidth = 1.2 * S;
+  c.beginPath(); c.moveTo(0, -1 * S); c.lineTo(0, 4 * S); c.stroke();
+  c.fillStyle = rgb(shade(cord, 0.85));
+  c.beginPath(); ellipse(c, 0, -0.5 * S, 1.5 * S, 1.2 * S); c.fill();
+  c.restore();
+
+  // the clapper (its lower edge just shows under the rim)
+  c.save();
+  c.translate(bx, by); c.rotate(-X.z);
+  c.fillStyle = rgb(shade(bell, 0.75));
+  c.beginPath(); c.rect(-FG.rc, -3 * S, FG.rc * 2, 5.5 * S); c.fill();
+  c.restore();
+
+  // the cord from the top of the screen, and the bell
+  c.save();
+  c.rotate(-X.b);
+  var w = FG.bw / 2, yT = FG.L0, yB = FG.L0 + FG.bh, bh = FG.bh, ry = Math.max(2, 3.2 * S);
+  c.strokeStyle = rgb(str); c.lineWidth = 1.2 * S;
+  c.beginPath(); c.moveTo(0, -4); c.lineTo(0, yT - 2 * S); c.stroke();
+  c.fillStyle = rgb(shade(bell, 0.8));
+  c.beginPath(); c.rect(-2.4 * S, yT - 3.6 * S, 4.8 * S, 4.2 * S); c.fill();
+  function bellPath() {
+    c.beginPath();
+    c.moveTo(-w * 1.02, yB);
+    c.bezierCurveTo(-w * 0.98, yB - bh * 0.35, -w * 0.95, yT + bh * 0.02, 0, yT);
+    c.bezierCurveTo(w * 0.95, yT + bh * 0.02, w * 0.98, yB - bh * 0.35, w * 1.02, yB);
+    c.ellipse(0, yB, w * 1.02, ry, 0, 0, PI);
+    c.closePath();
+  }
+  shadowOn();
+  c.fillStyle = rgb(bell);
+  bellPath(); c.fill();
+  shadowOff();
+  c.save();
+  bellPath(); c.clip();
+  var lit = mix(bell, [205, 214, 238], 0.38 * FC.rimLight);
+  var g = c.createLinearGradient(-w, 0, w, 0);
+  g.addColorStop(0, rgb(shade(bell, 0.62)));
+  g.addColorStop(0.3, rgb(lit));
+  g.addColorStop(0.58, rgb(bell));
+  g.addColorStop(1, rgb(shade(bell, 0.5)));
+  c.fillStyle = g; c.fillRect(-w * 1.1, yT - 1, w * 2.2, bh + ry + 2);
+  var sp = c.createRadialGradient(-w * 0.32, yT + bh * 0.24, 0, -w * 0.32, yT + bh * 0.24, w * 0.62);
+  sp.addColorStop(0, 'rgba(255,255,255,' + (0.3 * FC.rimLight).toFixed(3) + ')');
+  sp.addColorStop(1, 'rgba(255,255,255,0)');
+  c.fillStyle = sp; c.fillRect(-w * 1.1, yT - 1, w * 2.2, bh + ry + 2);
+  // the pattern pressed into the iron: a leaf on a curling stem, and a few
+  // dots, catching the light
+  if (FC.pattern > 0) {
+    var pc = 'rgba(190,200,230,';
+    c.strokeStyle = pc + (0.3 * FC.pattern).toFixed(3) + ')';
+    c.lineWidth = 0.7 * S;
+    c.beginPath();
+    c.moveTo(-w * 0.62, yB - bh * 0.12); c.bezierCurveTo(-w * 0.5, yB - bh * 0.42, -w * 0.2, yB - bh * 0.5, -w * 0.05, yB - bh * 0.62);
+    c.stroke();
+    c.fillStyle = pc + (0.18 * FC.pattern).toFixed(3) + ')';
+    c.beginPath();
+    c.moveTo(-w * 0.05, yB - bh * 0.62);
+    c.quadraticCurveTo(w * 0.05, yT + bh * 0.12, w * 0.42, yT + bh * 0.2);
+    c.quadraticCurveTo(w * 0.22, yB - bh * 0.5, -w * 0.05, yB - bh * 0.62);
+    c.fill(); c.stroke();
+    c.fillStyle = pc + (0.25 * FC.pattern).toFixed(3) + ')';
+    c.beginPath();
+    ellipse(c, w * 0.5, yB - bh * 0.3, 0.8 * S, 0.8 * S); ellipse(c, w * 0.62, yB - bh * 0.18, 0.6 * S, 0.6 * S);
+    ellipse(c, -w * 0.72, yT + bh * 0.45, 0.7 * S, 0.7 * S);
+    c.fill();
+  }
+  c.restore();
+  // the mouth: the dark inside, and the lip catching the light
+  c.fillStyle = rgb(shade(bell, 0.38));
+  c.beginPath(); ellipse(c, 0, yB, w * 1.0, ry * 0.8); c.fill();
+  c.strokeStyle = 'rgba(220,228,248,' + (0.12 + 0.3 * FC.rimLight).toFixed(3) + ')';
+  c.lineWidth = 1 * S;
+  c.beginPath(); c.ellipse(0, yB, w * 1.01, ry, 0, 0.15, PI - 0.15); c.stroke();
+  c.restore();
+
+  // the touch area follows the chime
+  fhit.style.transform = 'translate(' + (FC.x - FG.hw / 2) + 'px,0) rotate(' + (-(X.b + X.s) / 2) + 'rad)';
+}
+
+/* ---- sound: 1) a ring made here, 2) Sound/RealWindchimes.mp3 ---- */
+var actx = null, amaster = null, synthBuf = null, synthKey = '', realBuf = null, realState = 'not loaded yet', voices = [];
+function ensureAudio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      amaster = actx.createGain(); amaster.connect(actx.destination);
+    } catch (e) { actx = null; return; }
+    loadReal();
+  }
+  if (actx.state === 'suspended') actx.resume();
+}
+document.addEventListener('pointerdown', ensureAudio, true);
+function loadReal() {
+  realState = 'loading…'; updateWindLine();
+  fetch('Sound/RealWindchimes.mp3')
+    .then(function (r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+    .then(function (ab) { return actx.decodeAudioData(ab); })
+    .then(function (b) { realBuf = b; updateWindLine(); })
+    .catch(function () { realState = 'could not load (open the page from the web server, not as a file)'; updateWindLine(); });
+}
+/* An iron 風鈴: a clear high note with a few inharmonic overtones that
+   die away faster, a second note a hair apart (the slow beat, ゆらぎ),
+   and a short tick where the clapper hits. */
+function makeSynth() {
+  var key = [FC.pitch, FC.ringLength, FC.shimmer, FC.brightness, FC.strike].join(',');
+  if (synthBuf && key === synthKey) return synthBuf;
+  var sr = actx.sampleRate, dur = Math.min(10, FC.ringLength * 1.6 + 0.2), N = Math.round(sr * dur);
+  var buf = actx.createBuffer(1, N, sr), d = buf.getChannelData(0);
+  var f0 = FC.pitch, tau = FC.ringLength / 6.9, br = FC.brightness * 2;
+  var parts = [[1, 1, 1], [1 + 0.0035 * FC.shimmer, 0.55 * Math.min(1, FC.shimmer), 0.95],
+               [2.76, 0.42 * br, 0.45], [5.40, 0.22 * br, 0.26], [8.93, 0.1 * br, 0.15]];
+  var peak = 0, prev = 0, i, j;
+  for (i = 0; i < N; i++) {
+    var t = i / sr, v = 0, att = Math.min(1, t / 0.0015);
+    for (j = 0; j < parts.length; j++) {
+      var P = parts[j];
+      if (!P[1] || f0 * P[0] > sr / 2.2) continue;
+      v += P[1] * Math.exp(-t / (tau * P[2])) * Math.sin(TAU * f0 * P[0] * t + j);
+    }
+    v *= att;
+    if (t < 0.02 && FC.strike > 0) {
+      var nz = Math.random() * 2 - 1;
+      v += (nz - prev) * 0.6 * FC.strike * Math.exp(-t / 0.0018);
+      prev = nz;
+    }
+    d[i] = v;
+    if (Math.abs(v) > peak) peak = Math.abs(v);
+  }
+  var k = peak > 0 ? 0.9 / peak : 1;
+  for (i = 0; i < N; i++) d[i] *= k;
+  synthBuf = buf; synthKey = key;
+  return buf;
+}
+function playRing(strength) {
+  if (!actx || actx.state !== 'running') return;
+  var buf = FC.sound === 'real' ? realBuf : makeSynth();
+  if (!buf) return;
+  var now = actx.currentTime;
+  var src = actx.createBufferSource(); src.buffer = buf;
+  src.playbackRate.value = Math.pow(2, rnd(-1, 1) * FC.pitchVary / 1200);
+  var g = actx.createGain(); g.gain.value = FC.volume * strength;
+  src.connect(g); g.connect(amaster);
+  src.start(now);
+  var vo = { src: src, g: g };
+  voices.push(vo);
+  src.onended = function () { var i = voices.indexOf(vo); if (i >= 0) voices.splice(i, 1); };
+  if (voices.length > 6) {                     // too many still ringing: fade the oldest
+    var old = voices.shift();
+    try { old.g.gain.setTargetAtTime(0, now, 0.05); old.src.stop(now + 0.3); } catch (e) {}
+  }
+}
+
+/* ============================================================
    12. FRAME
    ============================================================ */
 function resize() {
@@ -2264,6 +2614,7 @@ function frame(now) {
   updatePetals(t, dt);
   updateFlakes(t, dt);
   updateSkiers(dt);
+  updateFurin(t, dt);
   var nz = nearZ();
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -2319,19 +2670,25 @@ function frame(now) {
   gctx.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
   drawLanded(gctx, t);
 
+  drawFurin();
+
   requestAnimationFrame(frame);
 }
 
 var _rz = null;
 window.addEventListener('resize', function () {
   clearTimeout(_rz);
-  _rz = setTimeout(function () { resize(); landed = []; rebuildAll(); }, 200);
+  _rz = setTimeout(function () { resize(); landed = []; rebuildAll(); layoutFurin(); }, 200);
 });
 
 buildControls();
 applyLayout();
 resize();
 rebuildAll();
+layoutFurin();
+updateWindLine();
+fetchWind();
+setInterval(fetchWind, 5 * 60 * 1000);
 requestAnimationFrame(frame);
 })();
 </script>
