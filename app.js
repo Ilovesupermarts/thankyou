@@ -77,9 +77,11 @@ var BUILD = 'v135';
          further = smaller, hazier, softer. The snowfield is baked in one
          slice per swell (5 swells now, height 1.05) so they pass behind
          the nearer swells, trees and torii, and in front (lower) on the
-         same swell. Most of them (85%) ride the swell just below the page
-         dots, and where they cross the dots that part is drawn above the
-         page on #dynNear.
+         same swell. A third ride the swell just below the page dots, a third
+         the far swells behind the torii and the dots, a third the near
+         swells, each at its own depth on its swell; those at the dots are drawn above the page on #dynNear for their whole
+         way across, with the same low mist and nearer swells over them, so
+         they look the same throughout.
        - Koi screen and name animation: the time-of-day sky colour shows
          from the koi screen on (#dynSky, a quarter-size canvas under
          #dynBack, see dynPrelude), so the session starts on the evening or
@@ -11921,8 +11923,8 @@ function drawNearBand(c) {
      #dynGround  a soft snowdrift along the bottom edge, above the text and
                  table, where the nearest flakes land and slowly melt.
      #dynNear    the nearest flakes (in front of the text and table), a few
-                 big soft flakes close to the glass, and the part of a skier
-                 that crosses the page dots.
+                 big soft flakes close to the glass, and the skiers that pass
+                 in front of the page dots.
    Every flake has its own depth: size, blur, strength, speed and drift
    follow it. The blur comes from 8 soft dots baked once, never from a
    filter per frame. The wind and gusts are as tuned; the real wind sets
@@ -11948,7 +11950,7 @@ var WINT = {
   sway: 2.5, swayRandom: 1.7, shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75,
   // the skiers
   maxSkiers: 5, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1,
-  skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.85, scarfLength: 1.25, scarfFlutter: 0.5,
+  skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 1 / 3, scarfLength: 1.25, scarfFlutter: 0.5,
   // the falling snow
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 5.3, nearBlur: 0.3, fallSpeed: 0.6, flakeSway: 2.05,
   frontShare: 0.17, landShare: 0.7, meltTime: 16.5, bokeh: 6,
@@ -12343,7 +12345,7 @@ function winBakeGround() {
     var B = things[b], Sb = swells[Math.round(B.u * (N - 1))];
     B.yb = Sb.yk - Sb.amp * Sb.f(B.x) + Sb.amp * 0.5 + 2;
     Sb.things.push(B);
-    if (B.type === 'torii') WS.torii = { x: B.x, y: B.yb, h: H * WINT.toriiSize };   // known before baking, for the lamp glow
+    if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: H * WINT.toriiSize }; WS.toriiK = Math.round(B.u * (N - 1)); }   // known before baking (lamp glow, skiers)
   }
   for (k = 0; k < N; k++) {
     var S0 = swells[k], haze = WINT.groundHaze * Math.pow(1 - S0.u, 2) * 0.9, top = S0.yk - S0.amp - 8;
@@ -12402,7 +12404,7 @@ function winDrawGround(c, t) {
     var SL = WS.slabs[i];
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.drawImage(SL.cnv, 0, Math.round(SL.top * PR));
-    for (var j = 0; j < WS.skiers.length; j++) if (WS.skiers[j].k === SL.k) winDrawSkier(c, WS.skiers[j], t);
+    for (var j = 0; j < WS.skiers.length; j++) if (WS.skiers[j].k === SL.k && !WS.skiers[j].dots) winDrawSkier(c, WS.skiers[j], t);
   }
   if (WS.gmist) { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(WS.gmist.cnv, 0, Math.round(WS.gmist.top * PR)); }
 }
@@ -12418,9 +12420,10 @@ function winDrawGround(c, t) {
    and has a speed of their own (slower uphill, faster downhill); the scarf
    streams out behind and flutters, more in a gust. Each is drawn on a small
    canvas of its own at a resolution that falls with depth, then scaled up:
-   that is the blur. A share of them (skiFront) ride the swell just below
-   the page dots, and where they cross the dots that part of them is copied
-   onto #dynNear, above the page. */
+   that is the blur. A third of them (skiFront) ride the swell just below
+   the page dots, a third the far swells, a third the near ones (see
+   winSpawnSkier); the ones at the dots are drawn on #dynNear, above the page, for their
+   whole way across, with the same mist and nearer swells over them. */
 var WIN_JACKETS = ['#C8321E', '#882E47', '#2F4A6B', '#3E5A3A', '#E66826', '#5A4A7A', '#D9A23A', '#1F6F78', '#F2EDE4'];
 var WIN_PANTS = ['#2A2A35', '#3B3F52', '#4A3A3E', '#2F4A6B', '#5B4636', '#3E4A3A'];
 var WIN_HATS = ['#F2EDE4', '#C8321E', '#E66826', '#2F4A6B', '#882E47', '#F2B33A', '#1F6F78'];
@@ -12443,25 +12446,51 @@ function winMeasureDots() {
   }
   if (x1 > x0) WS.dots = { x0: x0 - 12, x1: x1 + 12, y0: y0 - 12, y1: y1 + 12 };   // with room for the active dot's halo
 }
+/* Three kinds of skier, in turn at random: a share skiFront pass in front
+   of the torii and the page dots (they ride the swell just below the dots),
+   and the rest are split evenly between the far swells behind the torii and
+   the dots, and the near swells in front of the dots (those above the
+   snowdrift along the bottom, so they are seen). Each also goes its
+   own way down the face of its swell (K.off, at most halfway to the next
+   swell, and never up, so it stays in front of what stands on its swell),
+   so no two take the same path; its size, haze and blur follow that depth. */
 function winSpawnSkier() {
   var SW = WS.swells, N = SW.length;
   if (!N) return;
   var a = Math.round(clamp(WINT.skiFar, 0, 1) * (N - 1)), z = Math.round(clamp(WINT.skiNear, 0, 1) * (N - 1));
-  var lo = Math.min(a, z), k = lo + Math.floor(Math.random() * (Math.max(a, z) - lo + 1));
-  var hk = WINT.skiSize * rnd(0.9, 1.08), box = null;
-  if (WS.dots && Math.random() < WINT.skiFront) {
-    // past the dots: the swell whose snow line under the dots is nearest just below them
-    box = WS.dots;
-    var dx = (box.x0 + box.x1) / 2, dy = (box.y0 + box.y1) / 2, best = Infinity;
+  var lo = Math.min(a, z), hi = Math.max(a, z), hk = WINT.skiSize * rnd(0.9, 1.08);
+  function hOf(u) { return H * lerp(0.04, 0.09, u) * hk; }
+  function pickIn(k0, k1) { k0 = clamp(k0, lo, hi); k1 = clamp(k1, k0, hi); return k0 + Math.floor(Math.random() * (k1 - k0 + 1)); }
+  // the swell that passes just under the dots (its snow line at or above where the feet should be)
+  var kD = -1, offD = 0, B = WS.dots;
+  if (B) {
+    var dx = (B.x0 + B.x1) / 2, dy = (B.y0 + B.y1) / 2, best = Infinity;
     for (var q = 0; q < N; q++) {
-      var hq = H * lerp(0.04, 0.09, SW[q].u) * hk, dq = Math.abs(winSkiY(SW[q], dx) - (dy + hq * 0.55));
-      if (dq < best) { best = dq; k = q; }
+      var gap = dy + hOf(SW[q].u) * 0.55 - winSkiY(SW[q], dx);
+      if (gap >= 0 && gap < best) { best = gap; kD = q; offD = gap; }
     }
   }
-  var u = SW[k].u, h = H * lerp(0.04, 0.09, u) * hk, dir = Math.random() < 0.5 ? 1 : -1;
+  var kT = WS.toriiK === undefined ? 0 : WS.toriiK, kMid = kD >= 0 ? kD : kT;
+  var r = Math.random(), f = kD >= 0 ? WINT.skiFront : 0, k, off, dots = false;
+  if (r < f) {                                                  // in front of the torii and the dots
+    k = kD; dots = true;
+    off = Math.max(0, offD + hOf(SW[k].u) * rnd(-0.18, 0.18));
+  } else {
+    if (r < f + (1 - f) / 2) k = pickIn(lo, Math.min(kT, kMid) - 1);   // far: behind the torii and the dots
+    else {                                                              // near, but above the snowdrift
+      var kN = hi, top = WS.driftY || H;
+      while (kN > kMid + 1 && winSkiY(SW[kN], W / 2) > top - 6) kN--;
+      k = pickIn(kMid + 1, kN);
+    }
+    var room = k < N - 1 ? SW[k + 1].yk - SW[k].yk : SW[k].amp + 10;
+    off = rnd(0, 0.5) * room;
+    if (WS.driftY) off = Math.min(off, Math.max(0, WS.driftY - 6 - winSkiY(SW[k], W / 2)));   // the skis stay clear of the drift
+  }
+  var u = k < N - 1 ? lerp(SW[k].u, SW[k + 1].u, clamp(off / (SW[k + 1].yk - SW[k].yk), 0, 1)) : SW[k].u;
+  var h = hOf(u), dir = Math.random() < 0.5 ? 1 : -1;
   var jacket = winPick(WIN_JACKETS), scarf = winPick(WIN_SCARVES);
   while (scarf === jacket) scarf = winPick(WIN_SCARVES);
-  WS.skiers.push({ k: k, u: u, h: h, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0, dots: !!box,
+  WS.skiers.push({ k: k, u: u, h: h, off: off, dir: dir, x: dir > 0 ? -h * 1.6 : W + h * 1.6, vb: rnd(1.1, 2.4), v: 0, dots: dots,
                    ph: rnd(0, TAU), sph: rnd(0, TAU), sf: rnd(0.8, 1.3), stripe: Math.random() < 0.5, blit: null,
                    col: { jacket: hexToRgb(jacket), pants: hexToRgb(winPick(WIN_PANTS)), hat: hexToRgb(winPick(WIN_HATS)),
                           pom: hexToRgb(winPick(WIN_HATS)), scarf: hexToRgb(scarf), skis: hexToRgb(winPick(WIN_SKIS)),
@@ -12499,7 +12528,7 @@ function winDrawSkier(c, K, t) {
   var g = K.cnv.getContext('2d');
   g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cw, ch);
   g.setTransform(res * K.dir, 0, 0, res, ox * res, oy * res);    // local: feet at 0,0, facing +x, up is -y
-  var gy0 = winSkiY(S, K.x), ms = K.dir * (winSkiY(S, K.x + 4) - winSkiY(S, K.x - 4)) / 8;
+  var gy0 = winSkiY(S, K.x) + K.off, ms = K.dir * (winSkiY(S, K.x + 4) - winSkiY(S, K.x - 4)) / 8;
   function gY(lx) { return lx * ms; }                               // the snow under local x
   var p = K.ph, s1 = Math.sin(p), bob = Math.abs(Math.cos(p)) * 0.018 * h;
   var hip = [0.02 * h, -0.47 * h - bob], lean = 0.4;
@@ -12565,24 +12594,42 @@ function winDrawSkier(c, K, t) {
   g.fillRect(head[0] - hr * 1.08, head[1] - 0.025 * h, hr * 2.1, 0.03 * h);
   g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
   K.blit = [K.x - ox, gy0 - oy, bw, bh];
+  if (!c) return;                                                 // only drawn on its own canvas (a dots skier)
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.imageSmoothingEnabled = true;
   c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
 }
-/* #dynNear: the part of a dots skier that crosses the dots, copied from the
-   picture already drawn for it on #dynBack this frame. */
-function winDrawFrontSkiers(c) {
-  var B = WS.dots;
-  if (!B) return;
+/* #dynNear: a skier that passes the page dots is drawn here (above the
+   page) for its whole way across, not on #dynBack, so it looks the same
+   from start to finish: on a small layer of its own it is hidden where the
+   nearer swells cover it and washed by the low mist, as the skiers on
+   #dynBack are, then laid down. */
+function winDrawFrontSkiers(c, t) {
   for (var i = 0; i < WS.skiers.length; i++) {
     var K = WS.skiers[i];
-    if (!K.dots || !K.blit || K.blit[0] > B.x1 || K.blit[0] + K.blit[2] < B.x0) continue;
-    c.save();
-    c.setTransform(PR, 0, 0, PR, 0, 0);
-    c.beginPath(); c.rect(B.x0, B.y0, B.x1 - B.x0, B.y1 - B.y0); c.clip();
-    c.imageSmoothingEnabled = true;
-    c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
-    c.restore();
+    if (!K.dots) continue;
+    winDrawSkier(null, K, t);
+    var bx = K.blit[0], by = K.blit[1], fw = Math.ceil(K.blit[2] * PR), fh = Math.ceil(K.blit[3] * PR);
+    if (!WS.ftmp) WS.ftmp = landCanvas();
+    var F = WS.ftmp, f = F.c;
+    if (F.cnv.width !== fw || F.cnv.height !== fh) { F.cnv.width = fw; F.cnv.height = fh; }
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.globalCompositeOperation = 'source-over';
+    f.clearRect(0, 0, fw, fh);
+    f.imageSmoothingEnabled = true;
+    f.drawImage(K.cnv, 0, 0, K.blit[2] * PR, K.blit[3] * PR);
+    f.globalCompositeOperation = 'destination-out';              // the nearer swells hide it
+    for (var j = 0; j < WS.slabs.length; j++) {
+      var SL = WS.slabs[j];
+      if (SL.k > K.k) f.drawImage(SL.cnv, -bx * PR, Math.round(SL.top * PR) - by * PR);
+    }
+    if (WS.gmist) {                                              // the low mist over it
+      f.globalCompositeOperation = 'source-atop';
+      f.drawImage(WS.gmist.cnv, -bx * PR, Math.round(WS.gmist.top * PR) - by * PR);
+    }
+    f.globalCompositeOperation = 'source-over';
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(F.cnv, bx * PR, by * PR);
   }
 }
 function winDrawSparkles(c, t) {
@@ -12657,6 +12704,8 @@ function winBakeNear() {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.drawImage(LS.NEART.cnv, 0, 0);
   LS.surf = surf; LS.sr = CR; LS.nearTop = H - hh;      // local y + nearTop = screen y
+  for (var sum = 0, sq = 0; sq < nC; sq += 8) sum += surf[sq];
+  WS.driftY = LS.nearTop + sum / Math.ceil(nC / 8);     // the drift's usual top edge on the screen (for the near skiers)
 }
 function winFloorY(x) {
   var sf = LS.surf;
@@ -13135,8 +13184,8 @@ function winDrawLanded(c, t) {
 /* #dynNear: the nearest flakes and the big soft ones close to the glass. */
 function winDrawNear(c) {
   if (!LS.ready || !WS.flakeSpr.length) return;
+  winDrawFrontSkiers(c, lastT);
   winDrawFlakes(c, winNearZ(), 2);
-  winDrawFrontSkiers(c);
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < WS.bokeh.length; i++) {
     var B = WS.bokeh[i];
