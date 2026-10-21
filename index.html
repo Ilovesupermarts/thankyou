@@ -125,8 +125,9 @@
        the music display on the right. Top line (level with the weather
        line): the 候's name · its reading. Second line (level with the
        ticker): 節気 · 初候/次候/末候 · its dates. Written by
-       updateSeasonKo() in app.js from the sun's position. -->
-  <div class="season-ko" aria-hidden="true">
+       updateSeasonKo() in app.js from the sun's position. Sakura theme
+       only: autumn and winter show the 風鈴 below instead. -->
+  <div class="season-ko season-koyomi" aria-hidden="true">
     <div class="ko-line">
       <span class="ko-name" id="koName"></span>
       <span class="ko-sep">·</span>
@@ -176,9 +177,28 @@
     </div>
   </div>
 
+  <!-- 風鈴: in the autumn and winter themes, in the 七十二候's place. The
+       two lines in the music display's type; the wind is filled in by
+       Furin in app.js from the live Nagoya weather. -->
+  <div class="season-ko furin-text" aria-hidden="true">
+    <div class="ko-line">
+      <span class="hud-title">風鈴にそっとふれると、音が鳴ります</span>
+    </div>
+    <div class="ko-sub">
+      <span class="hud-artist">名古屋の風</span><span class="hud-sep">·</span><span class="hud-artist" id="furinWind"></span>
+    </div>
+  </div>
+
   <!-- The bright bottom edge of the glass, drawn above everything on the
        toolbar so the line stays unbroken where the wave meets it. -->
   <div class="bar-edge" aria-hidden="true"></div>
+
+  <!-- The 風鈴 itself, drawn by Furin in app.js above the glass's edge so
+       its paper strip hangs out over the scene. #furinHit is the touch
+       area that follows it as it swings: the only part of the toolbar that
+       takes touches. -->
+  <canvas class="furin-canvas" id="furinCanvas" aria-hidden="true"></canvas>
+  <div class="furin-hit" id="furinHit" aria-hidden="true"></div>
 </div>
 
 <div class="name-screen" id="nameScreen">
