@@ -106,7 +106,11 @@ var BUILD = 'v135';
          inkDry in main.css). The characters follow 0.42 s apart
          (NAME_STAGGER) and each has settled 1.7 s after it starts
          (NAME_ARRIVE), so a three-character name takes about 2.7 s to
-         arrive (was about 1.8 s).
+         arrive (was about 1.8 s). On the way out the ink softens, blooms a
+         little and sinks back into the paper (inkFade), each character
+         0.24 s after the one above it (NAME_EXIT_STAGGER) over 1.4 s
+         (NAME_EXIT); the overlay goes once the last has faded, and lets
+         touches through while they fade.
        - Night text: from 18:00 to 06:00 Nagoya time the message
          text and the ordinary thank-you lines use the darkest brown
          (applyNightText, .night-text in main.css).
@@ -5573,8 +5577,9 @@ function spawnRipples(clientX, clientY, intensity) {
 
 /* The name's characters are brushed in one after another (main.css
    .name-char): each starts NAME_STAGGER s after the one before and has
-   settled NAME_ARRIVE s after it starts. */
-var NAME_STAGGER = 0.42, NAME_ARRIVE = 1.7;
+   settled NAME_ARRIVE s after it starts. On the way out each fades
+   NAME_EXIT_STAGGER s after the one above it, over NAME_EXIT s. */
+var NAME_STAGGER = 0.42, NAME_ARRIVE = 1.7, NAME_EXIT_STAGGER = 0.24, NAME_EXIT = 1.4;
 function renderIntroGlyph(text) {
   if (!nameColumn) return;
   nameColumn.innerHTML = '';
@@ -6016,9 +6021,16 @@ function triggerKoiStart() {
       koiPushTimer(setTimeout(function() {
         var fadingChars = nameColumn ? nameColumn.querySelectorAll('.name-char') : [];
         for (var f = 0; f < fadingChars.length; f++) {
-          fadingChars[f].style.transitionDelay = (f * 0.18) + 's';
+          fadingChars[f].style.animationDelay = (f * NAME_EXIT_STAGGER) + 's';
         }
         if (introOverlay) introOverlay.classList.add('finishing');
+        // once the last character has faded the overlay goes; the characters
+        // are cleared first so the arrival does not play again behind it
+        var exitTime = ((fadingChars.length - 1) * NAME_EXIT_STAGGER + NAME_EXIT) * 1000 + 100;
+        koiPushTimer(setTimeout(function() {
+          if (nameColumn) nameColumn.innerHTML = '';
+          if (introOverlay) introOverlay.classList.remove('active', 'finishing');
+        }, Math.max(1400, exitTime)));
         if (dotsEl) dotsEl.classList.add('visible');
         if (blossomScreen) {
           blossomScreen.classList.remove('visible');
@@ -6048,7 +6060,6 @@ function triggerKoiStart() {
         startAmbient();
 
         koiPushTimer(setTimeout(function() {
-          if (introOverlay) introOverlay.classList.remove('active', 'finishing');
           if (infoBar) infoBar.classList.add('shown');        /* the toolbar fades in */
           repositionHintGroupAfterLayout();
           repositionNumpad();
