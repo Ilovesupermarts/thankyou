@@ -138,32 +138,59 @@
 
   <!-- Music display, at the right of the toolbar: its top level with the
        weather line, the wave resting on the bottom edge of the glass.
-         meta row   — title · artist, with the two pills under it:
-                      再生中 under the start of the title, DL XX% under
-                      the end of the artist
-         wave stack — 6-layer fluid spectrum on a 288×44 canvas
+         meta row   — ⏮ title · artist ⏭ (back at the start of the song
+                      details, next at the end)
+         control row — pause/play · mute, with the DL XX% pill at its right
+                      end. Both rows are the same three-column grid, so the
+                      bullet of this row always sits straight under the
+                      bullet between title and artist.
+         wave stack — 6-layer fluid spectrum on a 410×44 canvas
          gauge bar, time row — hidden; app.js still writes to them, and
                       _hudRenderState() stops early without the gauge
-       The canvas carries baseline logical dimensions only (288×44); app.js
+       The canvas carries baseline logical dimensions only (410×44); app.js
        scales the backing store by devicePixelRatio on boot.
+       The card itself ignores touches; only the four buttons take them.
        Visibility is governed by a CSS rule on body.info-visible combined
        with the .shown class that app.js toggles on this element — see
        main.css for the rule and app.js for the _hudShouldDraw() JS mirror
        that gates canvas work. -->
-  <div class="audio-spectrum-hud" id="audioSpectrumHud" aria-hidden="true">
+  <div class="audio-spectrum-hud" id="audioSpectrumHud">
     <div class="hud-meta-row">
-      <span class="hud-title" id="hudTrackTitle">草原の風</span>
+      <div class="hud-side hud-side-start">
+        <button type="button" class="hud-btn" id="hudBtnBack" aria-label="曲の頭へ(2回で前の曲)">
+          <svg class="hud-ic" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="1" y="1.5" width="2.2" height="11" rx="0.8"/><path d="M12.5 2.2v9.6a.7.7 0 0 1-1.05.6L4.6 7.6a.7.7 0 0 1 0-1.2l6.85-4.8a.7.7 0 0 1 1.05.6z"/></svg>
+        </button>
+        <span class="hud-title" id="hudTrackTitle">準備中</span>
+      </div>
+      <span class="hud-sep hud-sep-off" id="hudTrackSep">·</span>
+      <div class="hud-side hud-side-end">
+        <span class="hud-artist" id="hudTrackArtist"></span>
+        <button type="button" class="hud-btn" id="hudBtnNext" aria-label="次の曲">
+          <svg class="hud-ic" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><rect x="10.8" y="1.5" width="2.2" height="11" rx="0.8"/><path d="M1.5 2.2v9.6a.7.7 0 0 0 1.05.6L9.4 7.6a.7.7 0 0 0 0-1.2L2.55 1.6a.7.7 0 0 0-1.05.6z"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div class="hud-ctrl-row">
+      <div class="hud-side hud-side-start">
+        <button type="button" class="hud-btn" id="hudBtnPlay" aria-label="一時停止">
+          <svg class="hud-ic hud-ic-main" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><rect x="3.5" y="2.5" width="3.6" height="13" rx="1"/><rect x="10.9" y="2.5" width="3.6" height="13" rx="1"/></svg>
+          <svg class="hud-ic hud-ic-alt" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M4.5 2.9v12.2a.9.9 0 0 0 1.35.78l9.35-6.1a.9.9 0 0 0 0-1.56l-9.35-6.1a.9.9 0 0 0-1.35.78z"/></svg>
+        </button>
+      </div>
       <span class="hud-sep">·</span>
-      <span class="hud-artist" id="hudTrackArtist">小久保隆</span>
-      <div class="hud-top-row">
-        <span class="hud-status-badge" id="hudStatusBadge">待機中</span>
+      <div class="hud-side hud-side-end">
+        <button type="button" class="hud-btn" id="hudBtnMute" aria-label="ミュート" aria-pressed="false">
+          <svg class="hud-ic hud-ic-main" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1.5 6.5h3l4.3-3.6a.6.6 0 0 1 1 .46v11.28a.6.6 0 0 1-1 .46L4.5 11.5h-3a.8.8 0 0 1-.8-.8V7.3a.8.8 0 0 1 .8-.8z"/><path d="M12 6a4.2 4.2 0 0 1 0 6l-1.1-1.1a2.7 2.7 0 0 0 0-3.8z"/><path d="M14.1 3.9a7.2 7.2 0 0 1 0 10.2L13 13a5.7 5.7 0 0 0 0-8z"/></svg>
+          <svg class="hud-ic hud-ic-alt" width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path d="M1.5 6.5h3l4.3-3.6a.6.6 0 0 1 1 .46v11.28a.6.6 0 0 1-1 .46L4.5 11.5h-3a.8.8 0 0 1-.8-.8V7.3a.8.8 0 0 1 .8-.8z"/><path d="M11.4 6.3l1.1-1.1 2 2 2-2 1.1 1.1-2 2 2 2-1.1 1.1-2-2-2 2-1.1-1.1 2-2z" transform="translate(0 .7)"/></svg>
+        </button>
         <span class="hud-dl-badge" id="hudPctStatus">DL 0%</span>
       </div>
     </div>
 
     <div class="hud-wave-gauge-stack">
       <div class="hud-visualizer-block">
-        <canvas class="hud-canvas" id="hudCanvas" width="288" height="44"></canvas>
+        <canvas class="hud-canvas" id="hudCanvas" width="410" height="44"></canvas>
       </div>
 
       <div class="hud-gauge-bar">
