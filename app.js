@@ -2893,7 +2893,7 @@ function _ambientActive() {
 function _hudSetMeta(title, artist) {
   if (hudTrackTitle)  hudTrackTitle.textContent = title;
   if (hudTrackArtist) hudTrackArtist.textContent = artist || '';
-  if (hudTrackSep)    hudTrackSep.classList.toggle('hud-sep-off', !artist);
+  if (hudTrackSep)    hudTrackSep.classList.toggle('hud-dot-off', !artist);
 }
 
 /* ---------- ID3 tags ---------- */
