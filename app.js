@@ -12153,14 +12153,21 @@ function updateTree(dt, t) {
 function updateOneTree(T, dt, t) {
   var ns = T.nodes;
   // a gust gives the whole tree a push that springs back
-  T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
-  T.gust += T.gustV * dt;
-  var wind = ENV.windPx * 0.0012 * S.treeSway;
-  var amp = (0.015 + 0.01 * ENV.windMs) * S.treeSway;
-  var spd = 1 + ENV.windMs * 0.08;
+  // (damping ratio ~0.7: it settles in one swing instead of ringing, and a
+  // gust landing on a moving tree cannot stack up past the limit)
+  T.gustV += (-6 * T.gust - 3.4 * T.gustV) * dt;
+  T.gustV = clamp(T.gustV, -0.25, 0.25);
+  T.gust = clamp(T.gust + T.gustV * dt, -0.12, 0.12);
+  var wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
+  var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway;
+  var spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i];
-    var k = Math.pow(n.d / T.maxD, 1.6) + 0.02;     // thin twigs move most
+    // Each branch's bend is added to its parent's, so down the six levels the
+    // angles pile up. The weights below sum to about 1 along any trunk-to-twig
+    // chain (thin twigs still bend most), so the tip turns by the amounts
+    // above and no more.
+    var k = (Math.pow(n.d / T.maxD, 1.6) + 0.02) * 0.34;
     var sway = (wind + Math.sin(t * n.f * spd + n.ph) * amp +
                 Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * k;
     var par = n.p < 0 ? null : ns[n.p];
