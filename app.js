@@ -11628,9 +11628,21 @@ function birdNote(s, t0, out, p, sp) {
   node.connect(env); env.connect(out);
   osc.start(t); osc.stop(t + d + 0.05);
 }
+var birdCalls = [];     // the calls still sounding, so they can be faded out at once
+function fadeBirdCalls() {
+  if (!birdCalls.length || !soundAudioCtx) { birdCalls.length = 0; return; }
+  var now = soundAudioCtx.currentTime;
+  for (var i = 0; i < birdCalls.length; i++) {
+    if (birdCalls[i].end < now) continue;
+    try { birdCalls[i].g.gain.cancelScheduledValues(now); birdCalls[i].g.gain.setTargetAtTime(0, now, 0.03); } catch (e) { /* silent */ }
+  }
+  birdCalls.length = 0;
+}
 function birdCall(b) {
   if (!SOUND_ENABLED || !soundReady || !soundAudioCtx || soundAudioCtx.state !== 'running') return;
   try {
+    var nowC = soundAudioCtx.currentTime;
+    while (birdCalls.length && birdCalls[0].end < nowC) birdCalls.shift();
     if (!birdBus) { birdBus = soundAudioCtx.createGain(); birdBus.gain.value = BIRD_SOUND.volume; birdBus.connect(soundMasterGain); }
     var cfg = BIRD_SOUND[b.kind], vr = cfg.variation;
     var spec = BIRD_VOICES[b.kind](vr);
@@ -11642,8 +11654,9 @@ function birdCall(b) {
       var pan = soundAudioCtx.createStereoPanner(); pan.pan.value = clamp((b.x / W) * 2 - 1, -1, 1) * 0.8;
       out.connect(pan); pan.connect(birdBus);
     } else out.connect(birdBus);
-    var t0 = soundAudioCtx.currentTime + 0.02;
-    for (var i = 0; i < spec.length; i++) birdNote(spec[i], t0, out, p, sp);
+    var t0 = soundAudioCtx.currentTime + 0.02, tEnd = t0;
+    for (var i = 0; i < spec.length; i++) { birdNote(spec[i], t0, out, p, sp); tEnd = Math.max(tEnd, t0 + (spec[i].t + spec[i].dur) / sp); }
+    birdCalls.push({ g: out, end: tEnd + 0.1 });
   } catch (e) { /* silent */ }
 }
 function sendBirds() {
@@ -11699,12 +11712,14 @@ function updateBirds(dt, t) {
     }
     b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
     b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
-    if (b.x > 0 && b.x < W) {                       // calls only while on screen
+    if (b.vis) {                                    // calls only while it can be seen (not behind a tree)
+      if (!b.wasVis) { b.wasVis = true; b.callT = rnd(0.05, 0.6); }   // just came out: calls within a moment
       b.callT -= dt;
       if (b.callT <= 0) { birdCall(b); b.callT = BIRD_SOUND.callEvery * rnd(0.6, 1.4); }
-    }
+    } else b.wasVis = false;
     if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
   }
+  if (!birds.length) fadeBirdCalls();               // the last bird has gone: the chirping ends
 }
 // layer 'far': the far birds (behind both trees); 'near': the middle and near ones
 function drawBirds(ctx, t, layer) {
@@ -11838,6 +11853,42 @@ function birdsCutOut(src, k, times) {
   ctxBL.globalCompositeOperation = 'destination-out';
   for (var i = 0; i < times; i++) ctxBL.drawImage(src, B.x * k, B.y * k, B.w * k, B.h * k, B.x, B.y, B.w, B.h);
   ctxBL.globalCompositeOperation = 'source-over';
+}
+/* Which birds can be seen. The birds' layer, after both trees have been cut
+   out of it, holds only what shows; about ten times a second a small copy of
+   it is read and each bird's body is checked for visible pixels. The calls use
+   this (birdCall, updateBirds): none while every bird is behind a tree. */
+var birdVisT = -1, birdNoneSeen = 0;
+var birdVisCv = document.createElement('canvas');
+var birdVisCtx = birdVisCv.getContext('2d', { willReadFrequently: true });
+function birdVisCheck(t) {
+  if (t - birdVisT < 0.1 || !birdBox) return;
+  birdVisT = t;
+  var B = birdBox, sc = 0.4, w = Math.max(1, Math.ceil(B.w * sc)), h = Math.max(1, Math.ceil(B.h * sc)), d = null, i;
+  try {
+    if (birdVisCv.width !== w || birdVisCv.height !== h) { birdVisCv.width = w; birdVisCv.height = h; }
+    else birdVisCtx.clearRect(0, 0, w, h);
+    birdVisCtx.drawImage(birdLayer, B.x, B.y, B.w, B.h, 0, 0, w, h);
+    d = birdVisCtx.getImageData(0, 0, w, h).data;
+  } catch (e) { d = null; }
+  var any = false;
+  for (i = 0; i < birds.length; i++) {
+    var b = birds[i], seen = false;
+    if (!d) seen = b.x > 0 && b.x < W;              // cannot be read: treat the ones on screen as seen
+    else {
+      var u = BIRD_TIERS[b.ti].size * BIRD_KINDS[b.kind].scale * PR;
+      var xa = b.x * PR - (b.dir > 0 ? 0.4 : -0.55) * u, xb = b.x * PR + (b.dir > 0 ? 0.55 : -0.4) * u;
+      var x0 = Math.floor((Math.min(xa, xb) - B.x) * sc), x1 = Math.ceil((Math.max(xa, xb) - B.x) * sc);
+      var y0 = Math.floor((b.y * PR - 0.2 * u - B.y) * sc), y1 = Math.ceil((b.y * PR + 0.2 * u - B.y) * sc);
+      x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(w - 1, x1); y1 = Math.min(h - 1, y1);
+      for (var y = y0; y <= y1 && !seen; y++)
+        for (var x = x0; x <= x1; x++) if (d[(y * w + x) * 4 + 3] > 40) { seen = true; break; }
+    }
+    b.vis = seen;
+    if (seen) any = true;
+  }
+  if (any) birdNoneSeen = 0;
+  else if (++birdNoneSeen === 2) fadeBirdCalls();   // the last bird is hidden: the chirping ends at once
 }
 var TREE_DEPTH = 7;
 var FAR_TREE_SCALE = 0.6;     // far tree height as a share of the near tree
@@ -12223,6 +12274,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(birdLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
+    birdVisCheck(t);
   }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
