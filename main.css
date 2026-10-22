@@ -901,12 +901,25 @@
     box-shadow: 0 6px 18px rgba(120, 90, 90, 0.10), 0 1px 3px rgba(120, 90, 90, 0.06);
   }
   .info-inner { display: inline-block; position: relative; max-width: 100%; text-align: center; padding-bottom: 26px; }
-  .info-line { display: inline-block; font-size: 14px; font-weight: 500; color: var(--text-mute); letter-spacing: 1.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .info-line .city { font-weight: 600; color: var(--accent-2); letter-spacing: 2px; }
-  .info-line .sep { color: var(--text-mute); margin: 0 8px; font-weight: 400; }
-  .info-line .date { color: var(--text-mute); }
-  .info-line .time { color: var(--accent-2); font-weight: 600; }
-  .info-line .temp { color: var(--accent-2); font-weight: 600; }
+  /* The top line is set in the music title's type (.hud-title): same face,
+     size, weight, spacing and soft shadow. Its bullets are the same 4px dot
+     as the music display's, in the line's colour. */
+  .info-line {
+    display: inline-block; max-width: 100%;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+    font-size: 15.95px; font-weight: 700; color: var(--text-mute); letter-spacing: 1.5px;
+    text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .info-line .city { color: var(--accent-2); }
+  .info-line .sep {
+    display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--accent-3); font-size: 0; margin: 0 8px; vertical-align: 4.5px;
+    text-shadow: none;
+  }
+  .info-line .date { color: var(--accent-3); }
+  .info-line .time { color: var(--accent-2); }
+  .info-line .temp { color: var(--accent-2); }
   .info-line .weather { color: var(--text-mute); }
   .ticker-wrap {
     position: absolute; left: 0; right: 0; bottom: 0; height: 22px;
@@ -918,7 +931,10 @@
   .ticker-track {
     display: inline-block; white-space: nowrap;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
-    font-size: 12.5px; font-weight: 500; color: var(--text-mute); letter-spacing: 1.2px;
+    /* The wind line's type (.hud-artist under the 風鈴): same size, weight,
+       colour, spacing and soft shadow, at every screen size. */
+    font-size: 13.75px; font-weight: 500; color: var(--text-med); letter-spacing: 1px;
+    text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
     animation: tickerScroll 60s linear infinite; will-change: transform; line-height: 22px;
   }
   @keyframes tickerScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
@@ -3141,10 +3157,9 @@
 
   /* ============ RESPONSIVE ============ */
   @media (min-width: 700px) {
-    .info-line { font-size: 15px; letter-spacing: 2px; }
     .info-line .sep { margin: 0 10px; }
     .info-bar { padding: 22px 24px 14px 24px; --bar-pt: 22px; --line-h: 21px; }
-    .ticker-track, .ko-sub { font-size: 13px; }
+    .ko-sub { font-size: 13px; }
     .table-card, .reject-row, .divider { max-width: 560px; }
     .table-card, .reject-row, .divider { margin-left: auto; margin-right: auto; }
     .name-inner { max-width: 560px; }
@@ -3177,9 +3192,8 @@
     .custom-section-label { font-size: 15px; letter-spacing: 5px; }
   }
   @media (min-width: 1100px) {
-    .info-line { font-size: 16px; letter-spacing: 2.5px; }
     .info-bar { padding: 24px 28px 16px 28px; --bar-pt: 24px; --line-h: 22.4px; }
-    .ticker-track, .ko-sub { font-size: 13.5px; }
+    .ko-sub { font-size: 13.5px; }
     .table-card, .reject-row, .divider, .panel-inner, .summary-inner, .name-inner { max-width: 600px; }
     .panel { padding: 88px 32px 170px 32px; }
     .panel-content { font-size: 22px; }
@@ -3206,9 +3220,8 @@
   }
   @media (max-height: 700px) {
     .info-bar { padding: 12px 16px 10px 16px; --bar-pt: 12px; --line-h: 17.5px; }
-    .info-line { font-size: 12.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 6px; }
-    .ticker-track, .ko-sub { font-size: 11.5px; }
+    .ko-sub { font-size: 11.5px; }
     .name-screen { padding: 55px 0 0 0; }
     .name-inner { padding: 0 20px; }
     .name-header { padding-top: 12px; padding-bottom: 8px; }
@@ -3251,9 +3264,8 @@
   }
   @media (max-height: 600px) and (orientation: landscape) {
     .info-bar { padding: 8px 14px 6px 14px; --bar-pt: 8px; --line-h: 16.1px; }
-    .info-line { font-size: 11.5px; letter-spacing: 1px; }
     .info-line .sep { margin: 0 5px; }
-    .ticker-track, .ko-sub { font-size: 10.5px; letter-spacing: 1px; }
+    .ko-sub { font-size: 10.5px; letter-spacing: 1px; }
     .name-screen { padding: 48px 0 0 0; }
     .name-inner { padding: 0 24px; max-width: 480px; }
     .name-header { padding-top: 8px; padding-bottom: 6px; }
