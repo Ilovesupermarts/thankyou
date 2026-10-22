@@ -905,7 +905,7 @@
      size, weight, spacing and soft shadow. Its bullets are the same 4px dot
      as the music display's, in the line's colour. */
   .info-line {
-    display: inline-block; max-width: 100%;
+    display: inline-flex; align-items: center; gap: 5.5px; max-width: 100%;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     font-size: 15.95px; font-weight: 700; color: var(--text-mute); letter-spacing: 1.5px;
     text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
@@ -914,7 +914,8 @@
   .info-line .city { color: var(--accent-2); }
   .info-line .sep {
     display: inline-block; width: 4px; height: 4px; border-radius: 50%;
-    background: var(--accent-3); font-size: 0; margin: 0 8px; vertical-align: 4.5px;
+    background: var(--accent-3); font-size: 0; margin: 0 8px; flex: none;
+    position: relative; top: 0.5px;   /* the glyphs sit a touch below their line box's middle */
     text-shadow: none;
   }
   .info-line .date { color: var(--accent-3); }
@@ -1029,8 +1030,8 @@
     display: inline-block; flex: none; width: 4px; height: 4px; border-radius: 50%;
     background: var(--text-med); font-size: 0; text-shadow: none;
   }
-  .furin-text .hud-sep { align-self: center; }
-  .ticker-track .hud-sep { vertical-align: -3px; margin: 0 1px; }
+  .furin-text .hud-sep { align-self: center; position: relative; top: 0.5px; }
+  .ticker-track .hud-sep { vertical-align: -4px; margin: 0 1px; }
   .furin-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
   .furin-hit {
     position: absolute; top: 0; left: 0; transform-origin: 50% 0;
