@@ -2893,7 +2893,7 @@ function _ambientActive() {
 function _hudSetMeta(title, artist) {
   if (hudTrackTitle)  hudTrackTitle.textContent = title;
   if (hudTrackArtist) hudTrackArtist.textContent = artist || '';
-  if (hudTrackSep)    hudTrackSep.classList.toggle('hud-sep-off', !artist);
+  if (hudTrackSep)    hudTrackSep.classList.toggle('hud-dot-off', !artist);
 }
 
 /* ---------- ID3 tags ---------- */
@@ -8602,7 +8602,9 @@ function renderTicker(text) {
   if (!tickerTrack || !tickerWrap) return;
   if (!text || text === '') { tickerWrap.classList.remove('shown'); tickerTrack.textContent = ''; return; }
   var half = text + ' ・ ';
-  var html = '<span>' + escapeHtml(half) + '</span><span>' + escapeHtml(half) + '</span>';
+  /* The bullets are the wind line's: the same · glyph and size (.hud-sep). */
+  var halfHtml = escapeHtml(half).split('・').join('<span class="hud-sep">·</span>');
+  var html = '<span>' + halfHtml + '</span><span>' + halfHtml + '</span>';
   tickerTrack.innerHTML = html;
   tickerWrap.classList.add('shown');
 }
