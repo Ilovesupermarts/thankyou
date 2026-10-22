@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Landscape Lab</title>
+<title>Bird Sound Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,15 +14,17 @@
 
 <style>
   /* ============================================================
-     LANDSCAPE LAB — preview only.
+     LANDSCAPE LAB — now the BIRD SOUND test bed. Preview only.
      The page around the scene is the real app: main.css with the real
-     class names (ambient wash, mist, Shippō mosaic, toolbar, carousel
-     panels, swipe hint, dots) and the real #dynBack / #dynGround canvases.
+     class names (ambient wash, mist, Shippō mosaic, toolbar, the
+     one message panel) and the real #dynBack / #dynGround canvases.
      New here: faint blurred mountains with a Fuji-like peak, mist between
      the ridges, and a low strip of ground covered in fallen leaves (no
      grass), with the falling leaves landing on it. The trees are the ones tuned on
-     koyo.html (the KOYO values in app.js). Nothing in app.js is used or
-     changed.
+     koyo.html (the KOYO values in app.js). The scene is fixed; the control
+     panel only has bird sound values. The flocks are the app's own (copied
+     from app.js), each species with its own call. Nothing in app.js is used
+     or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -32,29 +34,9 @@
   .dyn-canvas.dyn-ground,
   .dyn-canvas.dyn-near { opacity: 1; }
 
-  /* Only two panels in this preview instead of six. */
-  .track { width: 200%; }
-  .panel { width: 50%; }
-
-  /* The swipe hint and the dots, lifted clear of the ground (the "Lift" slider). */
-  .stage .dots,
-  .stage .action-hint.global-hint {
-    transform: translateY(calc(-1 * var(--lift, 60px)));
-    transition: transform 0.3s ease, opacity 0.8s ease;
-  }
-  .stage .dot { cursor: pointer; }
-
-  /* Scroll test (demo only): the real table card and message text drifting
-     up and down behind #dynGround (z 8), the way the page content scrolls
-     behind the bottom strip in the app. */
-  .scroll-test {
-    position: fixed; left: 0; right: 0; bottom: 0; height: 320px; z-index: 7;
-    pointer-events: none; overflow: hidden; display: none;
-  }
-  .scroll-test.shown { display: block; }
-  .scroll-test-inner { max-width: 620px; margin: 0 auto; animation: scrollTest 16s ease-in-out infinite alternate; }
-  .scroll-test-inner .panel-content { text-align: center; margin-bottom: 18px; }
-  @keyframes scrollTest { from { transform: translateY(300px); } to { transform: translateY(-260px); } }
+  /* One message panel in this preview instead of six. */
+  .track { width: 100%; }
+  .panel { width: 100%; }
 
   /* ---------- Control panel (demo only) ---------- */
   .lab {
@@ -180,45 +162,7 @@
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-near" id="dynNear" aria-hidden="true"></canvas>
 
-<!-- ============ Scroll test (demo only): real text and table card ============ -->
-<div class="scroll-test" id="scrollTest" aria-hidden="true">
-  <div class="scroll-test-inner">
-    <div class="panel-content">
-      <p>すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</p>
-    </div>
-    <div class="table-card active">
-      <div class="privacy-note-inline">
-        <p>なお、これからご覧いただく内容や、こちらでお選びいただいた内容が、記録されたり、外部に送信されたりすることは一切ございません。</p>
-        <p>どうぞご安心ください。</p>
-      </div>
-      <div class="custom-section-divider">
-        <span class="custom-section-mark">❀</span>
-        <span class="custom-section-line"></span>
-        <span class="custom-section-label">その他</span>
-        <span class="custom-section-line"></span>
-        <span class="custom-section-mark">❀</span>
-      </div>
-      <div class="row locked">
-        <div class="row-check" role="checkbox" aria-checked="false"></div>
-        <input type="text" class="service-input" placeholder="サービスの種類" readonly>
-        <div class="price-wrap">
-          <input type="text" class="price-input" placeholder="料金を入力" disabled>
-          <span class="yen">円</span>
-        </div>
-      </div>
-      <div class="row locked">
-        <div class="row-check" role="checkbox" aria-checked="false"></div>
-        <input type="text" class="service-input" placeholder="サービスの種類" readonly>
-        <div class="price-wrap">
-          <input type="text" class="price-input" placeholder="料金を入力" disabled>
-          <span class="yen">円</span>
-        </div>
-      </div>
-    </div>
-  </div>
-</div>
-
-<!-- ============ Two real message panels, the swipe hint and the dots ============ -->
+<!-- ============ One real message panel ============ -->
 <div class="stage" id="stage">
   <div class="track" id="track">
     <div class="panel active" data-panel="0">
@@ -231,42 +175,22 @@
         </div>
       </div>
     </div>
-    <div class="panel" data-panel="1">
-      <div class="panel-inner">
-        <div class="panel-content">
-          <p>今日は初めて担当していただくセラピストさんですが、<br>とてもお綺麗で、素敵な方だと感じております。</p>
-          <p>お会いできて嬉しく思っております。</p>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div class="action-hint global-hint shown" id="globalHint">
-    <span class="hint-layer active" id="globalHintLayerSwipe">
-      <span>スワイプ</span>
-      <span class="hint-arrow right">→</span>
-    </span>
-  </div>
-
-  <div class="dots visible" id="dots">
-    <div class="dot active"></div>
-    <div class="dot"></div>
   </div>
 </div>
 
 <!-- ============ Controls (demo only) ============ -->
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3>🌾 Landscape Lab</h3>
+    <h3>🐦 Bird Sound Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
+    <div class="lab-status" id="labStatus"></div>
     <div class="lab-row-btns">
       <button type="button" class="primary" id="btnCopy">Copy values</button>
       <button type="button" id="btnReset">Reset</button>
-      <button type="button" id="btnSeed">New shapes</button>
-      <button type="button" id="btnGust">Gust now</button>
     </div>
+    <div class="lab-sec"><h4>Send a flock now</h4><div class="lab-row-btns" id="labSend"></div></div>
     <div id="labControls"></div>
   </div>
 </div>
@@ -288,7 +212,7 @@
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
-  timeOfDay: 'night',
+  timeOfDay: 'day',          // the birds fly by day in the app
   wind: 1,
   gustEvery: 9,
   gustStrength: 1,
@@ -318,7 +242,7 @@ var DEFAULTS = {
   bedLeaves: 110,
   bedDepth: 17,
   tremble: 1,
-  // near leaves at the very bottom, in front of the text and table
+  // near leaves at the very bottom
   showNear: true,
   nearHeight: 32,
   nearDensity: 0.9,
@@ -328,30 +252,18 @@ var DEFAULTS = {
   nearCover: 1,
   nearShadow: 0.73,
   nearShadowSize: 4.5,
-  scrollTest: true,
   // falling leaves
   falling: 41,
   landShare: 0.7,
   pileMax: 60,
-  // layout
-  lift: 36,
   colours: {
     mtnFar: '#B4B8CC', mtnMid: '#9198B2', mtnNear: '#737C95', fujiSnow: '#F7F3EC',
     mist: '#FBECE0', treeLine: '#5F6B48',
     soil: '#4A2A20', litterBrown: '#7E4A30', litterTan: '#B7814F'
   }
 };
-var STORE_KEY = 'landscapeLabValues2';   // new key: the ground values changed
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-var V = clone(DEFAULTS);
-try {
-  var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  if (saved && typeof saved === 'object') {
-    for (var k in saved) if (k in V && k !== 'colours') V[k] = saved[k];
-    if (saved.colours) for (var c in saved.colours) if (c in V.colours) V.colours[c] = saved.colours[c];
-  }
-} catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(V)); } catch (e) {} }
+var V = clone(DEFAULTS);       // the scene is fixed; only the bird sound has controls (section 2)
 
 /* The trees and falling leaves exactly as tuned on koyo.html (KOYO in app.js). */
 var TREE = {
@@ -368,77 +280,59 @@ var TREE = {
 };
 
 /* ============================================================
-   2. CONTROL PANEL. "re" says what has to be redrawn on a change:
-   all (trees too), scene (mountains), ground (the leaf floor), bed (the
-   loose leaves in front), pile, css, or nothing.
+   2. BIRD SOUND LAB — every control on the panel. Nothing here
+   redraws the scene: a change is heard on the next call.
+   Three sets of voices (A natural, B soft, C bright and
+   chime-like) are built in section 11b; each species picks one.
    ============================================================ */
+var KINDS = [['onaga', 'オナガ'], ['mejiro', 'メジロ'], ['ruri', 'オオルリ']];
+var VOICE_OPTS = [['A', 'A) Natural'], ['B', 'B) Soft'], ['C', 'C) Bright, chime-like']];
+var BDEF = {
+  flocksOn: true, flockEvery: 8, flockSize: 1,
+  onagaOn: true, mejiroOn: true, ruriOn: true,
+  soundOn: true, volume: 0.8, callEvery: 2.5, farQuiet: 0.5
+};
+KINDS.forEach(function (K) {
+  BDEF[K[0] + 'Voice'] = 'A'; BDEF[K[0] + 'Vol'] = 1; BDEF[K[0] + 'Pitch'] = 0;
+  BDEF[K[0] + 'Speed'] = 1; BDEF[K[0] + 'Var'] = 0.5;
+});
+var STORE_KEY = 'birdSoundLabValues1';
+var B = clone(BDEF);
+try {
+  var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
+  if (saved && typeof saved === 'object') for (var k in saved) if (k in B) B[k] = saved[k];
+} catch (e) {}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(B)); } catch (e) {} }
+
 var GROUPS = [
-  { title: 'Light & wind', ctls: [
-    { k: 'timeOfDay', label: 'Time of day', type: 'select', opts: [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']], re: 'all' },
-    { k: 'nearSide', label: 'Near (big) tree on', type: 'select', opts: [['left', 'Left'], ['right', 'Right']], re: 'all' },
-    { k: 'wind', label: 'Wind', min: 0, max: 3, step: 0.05, hint: 'Steady breeze for the trees and leaves.' },
-    { k: 'gustEvery', label: 'A gust every (seconds)', min: 3, max: 30, step: 1, hint: 'Gusts sweep across the screen: the trees sway and the leaves on the ground stir or lift. Swiping also makes one.' },
-    { k: 'gustStrength', label: 'Gust strength', min: 0, max: 2, step: 0.05 }
+  { title: 'Flocks flying in', ctls: [
+    { k: 'flocksOn', label: 'Flocks fly in by themselves', type: 'check', hint: 'Off = only the "Send a flock now" buttons.' },
+    { k: 'flockEvery', label: 'A new flock every (seconds)', min: 2, max: 60, step: 1, hint: 'On average; each gap is 65–135% of this. The app uses 5–10.' },
+    { k: 'flockSize', label: 'Flock size (× the app\'s birds)', min: 0.5, max: 2, step: 0.1, hint: '1 = the app\'s 5–8 オナガ, 6–10 メジロ, 4–6 オオルリ.' }
   ]},
-  { title: 'Mountains', ctls: [
-    { k: 'showMountains', label: 'Show mountains', type: 'check', re: 'scene' },
-    { k: 'ridges', label: 'Ridges', min: 1, max: 3, step: 1, re: 'scene' },
-    { k: 'horizon', label: 'Horizon (share of screen height)', min: 0.7, max: 0.97, step: 0.01, re: 'scene ground', hint: 'Where the mountains meet the ground. Higher number = lower, thinner ground.' },
-    { k: 'mtnHeight', label: 'Ridge height', min: 0.05, max: 0.4, step: 0.01, re: 'scene' },
-    { k: 'mtnStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Keep it low so the text stays easy to read.' },
-    { k: 'mtnHaze', label: 'Distance haze', min: 0, max: 1, step: 0.01, re: 'scene', hint: 'Far ridges fade toward the paper colour.' },
-    { k: 'mtnBlur', label: 'Blur (depth of field)', min: 0, max: 8, step: 0.1, re: 'scene', hint: 'Baked once, so it costs nothing per frame.' },
-    { k: 'mist', label: 'Mist between ridges (霞)', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'mistDrift', label: 'Drifting mist', min: 0, max: 1, step: 0.01, re: 'scene' },
-    { k: 'treeLine', label: 'Distant tree line on the horizon', type: 'check', re: 'scene' }
+  { title: 'Which species fly in', ctls: [
+    { k: 'onagaOn', label: 'オナガ (azure-winged magpie)', type: 'check' },
+    { k: 'mejiroOn', label: 'メジロ (white-eye)', type: 'check' },
+    { k: 'ruriOn', label: 'オオルリ (blue-and-white flycatcher)', type: 'check', hint: 'Each flock is one species, never the same as the one before.' }
   ]},
-  { title: 'Fuji-like peak', ctls: [
-    { k: 'showFuji', label: 'Show the peak', type: 'check', re: 'scene' },
-    { k: 'fujiX', label: 'Position (left ↔ right)', min: 0.1, max: 0.9, step: 0.01, re: 'scene' },
-    { k: 'fujiHeight', label: 'Height', min: 0.08, max: 0.45, step: 0.01, re: 'scene' },
-    { k: 'fujiWidth', label: 'Width', min: 1.6, max: 4, step: 0.05, re: 'scene' },
-    { k: 'fujiSnow', label: 'Snow cap', min: 0, max: 0.6, step: 0.01, re: 'scene' }
-  ]},
-  { title: 'Ground of fallen leaves', ctls: [
-    { k: 'groundStrength', label: 'Ground strength', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'carpetDensity', label: 'Leaves covering the ground', min: 0.2, max: 2.5, step: 0.05, re: 'ground', hint: 'Baked once, so it costs nothing per frame.' },
-    { k: 'carpetSize', label: 'Leaf size on the ground', min: 0.5, max: 1.8, step: 0.05, re: 'ground' },
-    { k: 'leafAge', label: 'Share of older, browner leaves', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'groundHaze', label: 'Haze toward the horizon', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { k: 'bedLeaves', label: 'Loose leaves in front', min: 0, max: 300, step: 1, re: 'bed', hint: 'Lying there from the start; gusts stir and lift them.' },
-    { k: 'bedDepth', label: 'How deep loose leaves sink in (px)', min: 0, max: 120, step: 1, re: 'bed', hint: 'They lie on the near band\'s ground, sunk in by up to a third of this.' },
-    { k: 'tremble', label: 'Tremble in the wind', min: 0, max: 2.5, step: 0.05 }
-  ]},
-  { title: 'Near leaves (in front of the text)', ctls: [
-    { k: 'showNear', label: 'Show the near band', type: 'check', re: 'near bed' },
-    { k: 'nearHeight', label: 'Band height (px)', min: 16, max: 80, step: 1, re: 'near bed', hint: 'The text and table disappear behind this band as they scroll.' },
-    { k: 'nearDensity', label: 'Leaves in the band', min: 0.3, max: 2.5, step: 0.05, re: 'near' },
-    { k: 'nearSize', label: 'Leaf size (× the front leaves)', min: 1, max: 3, step: 0.05, re: 'near', hint: 'Bigger = closer to the viewer.' },
-    { k: 'nearShade', label: 'Shade', min: 0, max: 0.6, step: 0.01, re: 'near', hint: 'A little darker than the leaves behind, as the nearest leaves are.' },
-    { k: 'nearBlur', label: 'Blur (out of focus)', min: 0, max: 4, step: 0.1, re: 'near', hint: '0 keeps the leaf outlines crisp against the text and table.' },
-    { k: 'nearCover', label: 'Ground under the leaves', min: 0, max: 1, step: 0.01, re: 'near', hint: 'At 1 the leaves lie on solid ground and nothing shows through between them.' },
-    { k: 'nearShadow', label: 'Leaf shadow strength', min: 0, max: 1, step: 0.01, re: 'near', hint: 'The soft shadow the leaves cast on the text and table. Also used for the loose leaves.' },
-    { k: 'nearShadowSize', label: 'Leaf shadow softness (px)', min: 0, max: 12, step: 0.5, re: 'near' },
-    { k: 'scrollTest', label: 'Scroll test: text and table drifting behind', type: 'check', re: 'css' }
-  ]},
-  { title: 'Falling leaves', ctls: [
-    { k: 'falling', label: 'Falling leaves on screen', min: 0, max: 60, step: 1 },
-    { k: 'landShare', label: 'Share that land on the ground', min: 0, max: 1, step: 0.05 },
-    { k: 'pileMax', label: 'Extra leaves that can pile up', min: 0, max: 150, step: 1, re: 'pile' }
-  ]},
-  { title: 'Layout', ctls: [
-    { k: 'lift', label: 'Lift swipe hint & dots (px)', min: 0, max: 200, step: 1, re: 'css', hint: 'Raises them above the leaf-covered ground.' }
+  { title: 'Sound (all birds)', ctls: [
+    { k: 'soundOn', label: 'Bird sound on', type: 'check', hint: 'The browser starts sound only after your first tap on the page.' },
+    { k: 'volume', label: 'Master volume', min: 0, max: 1.5, step: 0.05 },
+    { k: 'callEvery', label: 'Each bird calls every (seconds)', min: 0.5, max: 8, step: 0.1, hint: 'On average; every bird in a flock calls on its own timing.' },
+    { k: 'farQuiet', label: 'Far birds\' volume (× near)', min: 0, max: 1, step: 0.05, hint: 'The small far birds sound further away; the middle ones halfway.' }
   ]}
 ];
-var COLOUR_LABELS = {
-  mtnFar: 'Far ridge', mtnMid: 'Middle ridge', mtnNear: 'Near ridge', fujiSnow: 'Fuji snow',
-  mist: 'Mist / haze', treeLine: 'Tree line',
-  soil: 'Ground (dark)', litterBrown: 'Old leaves (brown)', litterTan: 'Old leaves (tan)'
-};
-var COLOUR_RE = {
-  mtnFar: 'scene', mtnMid: 'scene', mtnNear: 'scene', fujiSnow: 'scene', treeLine: 'scene',
-  mist: 'scene ground', soil: 'ground near', litterBrown: 'ground near', litterTan: 'ground near'
-};
+KINDS.forEach(function (K) {
+  var n = K[0];
+  GROUPS.push({ title: K[1] + ' — one voice for the whole species', ctls: [
+    { k: n + 'Voice', label: 'Voice', type: 'select', opts: VOICE_OPTS },
+    { k: n + 'Vol', label: 'Volume', min: 0, max: 2, step: 0.05 },
+    { k: n + 'Pitch', label: 'Pitch (cents, 100 = a semitone)', min: -1200, max: 1200, step: 25 },
+    { k: n + 'Speed', label: 'Speed of the call', min: 0.6, max: 1.6, step: 0.05, hint: 'Higher = quicker, shorter calls.' },
+    { k: n + 'Var', label: 'Variation between calls', min: 0, max: 1, step: 0.05, hint: '0 = the same call every time; 1 = very different each time.' },
+    { type: 'button', label: '▶ Hear one ' + K[1], act: function () { previewCall(n); } }
+  ]});
+});
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
 function buildControls() {
   var host = document.getElementById('labControls');
@@ -449,11 +343,16 @@ function buildControls() {
     sec.innerHTML = '<h4>' + g.title + '</h4>';
     g.ctls.forEach(function (ctl) {
       var wrap = document.createElement('div');
-      if (ctl.type === 'check') {
+      if (ctl.type === 'button') {
+        wrap.className = 'lab-ctl';
+        var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = ctl.label;
+        bt.addEventListener('click', ctl.act);
+        wrap.appendChild(bt);
+      } else if (ctl.type === 'check') {
         wrap.className = 'lab-chk';
         var cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.checked = !!V[ctl.k];
-        cb.addEventListener('change', function () { V[ctl.k] = cb.checked; changed(ctl.re); });
+        cb.type = 'checkbox'; cb.checked = !!B[ctl.k];
+        cb.addEventListener('change', function () { B[ctl.k] = cb.checked; changed(); });
         var lb = document.createElement('span'); lb.textContent = ctl.label;
         wrap.appendChild(cb); wrap.appendChild(lb);
       } else {
@@ -467,59 +366,36 @@ function buildControls() {
           ctl.opts.forEach(function (o) {
             var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
           });
-          el.value = V[ctl.k];
-          el.addEventListener('change', function () { V[ctl.k] = el.value; changed(ctl.re); });
+          el.value = B[ctl.k];
+          el.addEventListener('change', function () { B[ctl.k] = el.value; changed(); });
         } else {
-          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, V[ctl.k]);
+          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, B[ctl.k]);
           label.appendChild(val);
           el = document.createElement('input');
-          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = V[ctl.k];
-          el.addEventListener('input', function () { V[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, V[ctl.k]); changed(ctl.re); });
+          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = B[ctl.k];
+          el.addEventListener('input', function () { B[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, B[ctl.k]); changed(); });
         }
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
+      }
+      if (ctl.type === 'check' && ctl.hint) {       // the hint goes under the tick box, not beside it
+        var box = document.createElement('div'), h2 = document.createElement('div');
+        box.className = 'lab-ctl'; h2.className = 'hint'; h2.textContent = ctl.hint;
+        box.appendChild(wrap); box.appendChild(h2); wrap = box;
       }
       sec.appendChild(wrap);
     });
     host.appendChild(sec);
   });
-  var cs = document.createElement('div');
-  cs.className = 'lab-sec';
-  cs.innerHTML = '<h4>Colours</h4>';
-  var grid = document.createElement('div'); grid.className = 'lab-colours';
-  Object.keys(V.colours).forEach(function (key) {
-    var row = document.createElement('label'); row.className = 'lab-colour';
-    var inp = document.createElement('input'); inp.type = 'color'; inp.value = V.colours[key];
-    inp.addEventListener('input', function () { V.colours[key] = inp.value; changed(COLOUR_RE[key]); });
-    var t = document.createElement('span'); t.textContent = COLOUR_LABELS[key] || key;
-    row.appendChild(inp); row.appendChild(t); grid.appendChild(row);
-  });
-  cs.appendChild(grid);
-  host.appendChild(cs);
-}
-
-var _pending = '', _changeQueued = false;
-function changed(re) {
-  save();
-  if (re) _pending += ' ' + re;
-  if (_changeQueued) return;
-  _changeQueued = true;
-  requestAnimationFrame(function () {
-    var p = _pending;
-    _pending = ''; _changeQueued = false;
-    if (p.indexOf('all') >= 0) { rebuildAll(); return; }
-    if (p.indexOf('scene') >= 0) bakeScenery();
-    if (p.indexOf('ground') >= 0) bakeGround();
-    if (p.indexOf('near') >= 0) { bakeNear(); bakeGroundSprites(); placeFloor(); }
-    if (p.indexOf('bed') >= 0) buildBed();
-    if (p.indexOf('css') >= 0) applyLift();
-    if (p.indexOf('pile') >= 0) trimFloor();
+  var send = document.getElementById('labSend');
+  send.innerHTML = '';
+  KINDS.forEach(function (K) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = K[1];
+    b.addEventListener('click', function () { ensureAudio(); sendBirds(K[0]); });
+    send.appendChild(b);
   });
 }
-function applyLift() {
-  document.documentElement.style.setProperty('--lift', V.lift + 'px');
-  document.getElementById('scrollTest').classList.toggle('shown', !!V.scrollTest);
-}
+function changed() { save(); applyAudio(); }
 
 document.getElementById('labToggle').addEventListener('click', function () {
   var lab = document.getElementById('lab');
@@ -527,61 +403,29 @@ document.getElementById('labToggle').addEventListener('click', function () {
   this.textContent = c ? 'Show' : 'Hide';
 });
 document.getElementById('btnReset').addEventListener('click', function () {
-  V = clone(DEFAULTS); save(); buildControls(); applyLift(); rebuildAll();
+  B = clone(BDEF); save(); buildControls(); applyAudio(); birdNext = 0;
 });
-document.getElementById('btnSeed').addEventListener('click', function () {
-  V.seed = (V.seed * 9301 + 49297) % 233280; save(); rebuildAll();
-});
-document.getElementById('btnGust').addEventListener('click', function () { startGust(1, 1.3); });
 
 /* ============================================================
-   3. COPY VALUES — the fonts and styles the page actually uses (read
-   from the live styles) plus every landscape value.
+   3. COPY VALUES — every bird sound value, in words and as JSON.
    ============================================================ */
-function styleOf(sel) {
-  var el = document.querySelector(sel);
-  if (!el) return null;
-  var s = getComputedStyle(el);
-  return { font: s.fontFamily, size: s.fontSize, weight: s.fontWeight, colour: s.color, shadow: s.textShadow,
-           spacing: s.letterSpacing, bottom: s.bottom };
-}
 function f2(x) { return Number(x).toFixed(2); }
 function buildCopyText() {
-  var body = styleOf('.panel.active .panel-content') || styleOf('.panel-content');
-  var name = styleOf('.therapist-name');
-  var hint = styleOf('#globalHint');
-  var dots = styleOf('#dots');
   var lines = [];
-  lines.push('/* Landscape — values from landscape.html */');
+  lines.push('/* Bird sound — values from landscape.html */');
   lines.push('');
-  lines.push('Message text font: ' + body.font + ' · ' + body.weight + ' · ' + body.size + ' · ' + body.colour);
-  lines.push('Message text shadow: ' + body.shadow);
-  lines.push('Therapist name font: ' + name.font + ' · ' + name.weight + ' · ' + name.colour);
-  lines.push('Swipe hint font: ' + hint.font + ' · ' + hint.weight + ' · ' + hint.size + ' · letter-spacing ' + hint.spacing + ' · ' + hint.colour);
-  lines.push('Swipe hint bottom: ' + hint.bottom + ' + lift ' + V.lift + 'px = ' + (parseFloat(hint.bottom) + V.lift) + 'px');
-  lines.push('Dots bottom: ' + dots.bottom + ' + lift ' + V.lift + 'px = ' + (parseFloat(dots.bottom) + V.lift) + 'px');
-  lines.push('');
-  lines.push('Light: ' + V.timeOfDay + ', near tree ' + V.nearSide + ', wind ' + f2(V.wind) +
-             ', a gust every ' + V.gustEvery + 's, gust strength ' + f2(V.gustStrength));
-  lines.push('Mountains: ' + (V.showMountains ? 'on' : 'off') + ', ' + V.ridges + ' ridges, horizon ' + f2(V.horizon) +
-             ', height ' + f2(V.mtnHeight) + ', strength ' + f2(V.mtnStrength) + ', haze ' + f2(V.mtnHaze) +
-             ', blur ' + f2(V.mtnBlur) + 'px, mist ' + f2(V.mist) + ', drifting mist ' + f2(V.mistDrift) +
-             ', tree line ' + (V.treeLine ? 'on' : 'off'));
-  lines.push('Fuji: ' + (V.showFuji ? 'on' : 'off') + ', position ' + f2(V.fujiX) + ', height ' + f2(V.fujiHeight) +
-             ', width ' + f2(V.fujiWidth) + ', snow cap ' + f2(V.fujiSnow));
-  lines.push('Ground: strength ' + f2(V.groundStrength) + ', leaves covering it ' + f2(V.carpetDensity) +
-             ', leaf size ' + f2(V.carpetSize) + ', older leaves ' + f2(V.leafAge) + ', haze ' + f2(V.groundHaze));
-  lines.push('Loose leaves in front: ' + V.bedLeaves + ' in a ' + V.bedDepth + 'px band, tremble ' + f2(V.tremble));
-  lines.push('Near band (in front of the text): ' + (V.showNear ? 'on' : 'off') + ', ' + V.nearHeight + 'px high, leaves ' +
-             f2(V.nearDensity) + ', size ' + f2(V.nearSize) + '×, shade ' + f2(V.nearShade) + ', blur ' + f2(V.nearBlur) +
-             'px, ground under the leaves ' + f2(V.nearCover) + ', leaf shadow ' + f2(V.nearShadow) + ' (' + V.nearShadowSize + 'px soft)');
-  lines.push('Trunk and branches: solid (no see-through), same colour as before');
-  lines.push('Leaves: ' + V.falling + ' falling, ' + Math.round(V.landShare * 100) + '% land on the ground, up to ' + V.pileMax + ' extra can pile up');
-  lines.push('Colours:');
-  Object.keys(V.colours).forEach(function (k) { lines.push('  ' + (COLOUR_LABELS[k] || k) + ': ' + V.colours[k].toUpperCase()); });
+  lines.push('Flocks: ' + (B.flocksOn ? 'on' : 'off') + ', a new flock every ' + B.flockEvery + 's, size ×' + f2(B.flockSize));
+  lines.push('Species flying in: ' + KINDS.filter(function (K) { return B[K[0] + 'On']; }).map(function (K) { return K[1]; }).join(', '));
+  lines.push('Sound: ' + (B.soundOn ? 'on' : 'off') + ', master volume ' + f2(B.volume) + ', each bird calls every ' + f2(B.callEvery) +
+             's, far birds ×' + f2(B.farQuiet));
+  KINDS.forEach(function (K) {
+    var n = K[0];
+    lines.push(K[1] + ': voice ' + B[n + 'Voice'] + ', volume ' + f2(B[n + 'Vol']) + ', pitch ' + B[n + 'Pitch'] + ' cents, speed ×' +
+               f2(B[n + 'Speed']) + ', variation ' + f2(B[n + 'Var']));
+  });
   lines.push('');
   lines.push('JSON:');
-  lines.push(JSON.stringify(V, null, 2));
+  lines.push(JSON.stringify(B, null, 2));
   return lines.join('\n');
 }
 function copyText(text) {
@@ -606,37 +450,6 @@ document.getElementById('btnCopy').addEventListener('click', function () {
 });
 document.getElementById('labOutClose').addEventListener('click', function () {
   document.getElementById('labOut').classList.remove('shown');
-});
-
-/* ============================================================
-   4. PANELS — the two real message panels. Swipe, or tap a dot.
-   A swipe also sends a gust across the field, as in the app.
-   ============================================================ */
-var panelIdx = 0;
-var panels = document.querySelectorAll('.panel');
-var dots = document.querySelectorAll('.dot');
-var track = document.getElementById('track');
-function showPanel(i) {
-  panelIdx = Math.max(0, Math.min(panels.length - 1, i));
-  track.style.transform = 'translateX(' + (-panelIdx * 100 / panels.length) + '%)';
-  for (var p = 0; p < panels.length; p++) {
-    panels[p].classList.toggle('active', p === panelIdx);
-    dots[p].classList.toggle('active', p === panelIdx);
-  }
-}
-for (var di = 0; di < dots.length; di++) {
-  (function (i) { dots[i].addEventListener('click', function () { showPanel(i); }); })(di);
-}
-var sx = null;
-var stageEl = document.getElementById('stage');
-stageEl.addEventListener('touchstart', function (e) { sx = e.touches[0].clientX; }, { passive: true });
-stageEl.addEventListener('touchend', function (e) {
-  if (sx === null) return;
-  var dx = e.changedTouches[0].clientX - sx; sx = null;
-  if (Math.abs(dx) > 50) {
-    showPanel(panelIdx + (dx < 0 ? 1 : -1));
-    startGust(dx < 0 ? -1 : 1, 1.3);
-  }
 });
 
 /* Toolbar date and time (Nagoya). */
@@ -1676,6 +1489,397 @@ function drawPile(c, t) {
 }
 
 /* ============================================================
+   11. BIRDS — the same flocks as the app (app.js: BIRD_KINDS, sendBirds,
+   updateBirds, drawBirds), each with its own call. A flock is one
+   species and never the same as the one before. The far birds (small,
+   soft) fly behind both trees; the middle and near ones between the two
+   trees. Every bird calls now and then while it is on screen.
+   ============================================================ */
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+var HAS_FILTER = typeof ctx.filter === 'string';
+var BIRD_KINDS = {
+  onaga: {
+    scale: 1, tail: 0.95, tailW: 0.12, span: 0.9, flock: [5, 8],
+    hz: 5.5, beats: [3, 6], glide: [0.5, 1.1], fold: false, speed: [80, 110], lift: 10, sink: 7,
+    back: '#a9a3a2', belly: '#e6e2dd', cap: '#1d1c24', capFace: true, eyeRing: null,
+    wing: '#79b4e2', wingDark: '#3f7dbf', tailCol: '#6aa6d8', tailTip: '#f4f2ee', beak: '#24222a'
+  },
+  mejiro: {
+    scale: 0.75, tail: 0.38, tailW: 0.1, span: 0.8, flock: [6, 10],
+    hz: 11, beats: [4, 8], glide: [0.15, 0.35], fold: true, speed: [90, 125], lift: 26, sink: 30,
+    back: '#879a2b', belly: '#d8d6c4', cap: '#8fa431', capFace: false, eyeRing: '#ffffff', throat: '#e3d24a',
+    wing: '#7f932a', wingDark: '#566620', tailCol: '#6e7f26', tailTip: null, beak: '#3a3330'
+  },
+  ruri: {
+    scale: 0.8, tail: 0.5, tailW: 0.12, span: 0.85, flock: [4, 6],
+    hz: 8, beats: [4, 7], glide: [0.25, 0.6], fold: false, speed: [85, 120], lift: 16, sink: 14,
+    back: '#2457b8', belly: '#f2f1ee', cap: '#3f7fe0', capFace: false, eyeRing: null, face: '#141a33',
+    wing: '#2a5fc4', wingDark: '#15306e', tailCol: '#1f4ea8', tailTip: null, beak: '#141418'
+  }
+};
+var BIRD_TIERS = [
+  { size: 36, blur: 0,   haze: 0,    speed: 1,    alpha: 1 },       // near
+  { size: 24, blur: 0.6, haze: 0.12, speed: 0.86, alpha: 0.95 },    // middle
+  { size: 14, blur: 1.1, haze: 0.25, speed: 0.72, alpha: 0.9 }     // far: behind both trees
+];
+var BIRD_FRAMES = 8, BIRD_GLIDE = 8, BIRD_FOLD = 9;
+var birds = [], birdSprites = {}, birdSpritePR = 0, birdNext = 0, birdLastKind = '', flocksSent = 0;
+
+// One wing in bird units (x forward, y down, body length 1). a: 1 up, -1 down.
+function birdWing(c, k, a, far, fold) {
+  var sx = 0.06, sy = -0.07;
+  c.beginPath();
+  if (fold) {                                      // folded along the back
+    c.moveTo(sx + 0.1, sy + 0.02);
+    c.quadraticCurveTo(sx - 0.1, sy - 0.07, sx - 0.42, sy + 0.04);
+    c.quadraticCurveTo(sx - 0.15, sy + 0.08, sx + 0.1, sy + 0.02);
+  } else {
+    // seen a little from the side: the far wing sits further forward and looks shorter
+    var dir = a >= 0 ? -1 : 1, L = k.span * (0.2 + 0.8 * Math.abs(a)) * (far ? 0.78 : 1);
+    if (far) sx += 0.1;
+    var tx = sx - 0.12 - 0.16 * Math.abs(a), ty = sy + dir * L;
+    c.moveTo(sx + 0.16, sy);
+    c.bezierCurveTo(sx + 0.2, sy + dir * L * 0.45, tx + 0.12, ty - dir * 0.04, tx, ty);   // leading edge
+    // trailing edge with the primaries as small scallops, then the inner wing
+    var bx = sx - 0.12, by = sy + dir * L * 0.35;
+    for (var i = 1; i <= 4; i++) {
+      var f = i / 4;
+      var px = lerp(tx, bx, f), py = lerp(ty, by, f);
+      c.quadraticCurveTo(px - 0.06, py - dir * 0.06, px, py);
+    }
+    c.quadraticCurveTo(sx - 0.24, sy + dir * 0.06, sx - 0.2, sy + 0.02);
+    c.closePath();
+  }
+  var g = c.createLinearGradient(sx, sy, sx - 0.2, sy + (a >= 0 ? -1 : 1) * k.span);
+  g.addColorStop(0, far ? k.wingDark : k.wing);
+  g.addColorStop(0.55, k.wing);
+  g.addColorStop(1, k.wingDark);
+  c.fillStyle = g;
+  c.fill();
+  if (far) { c.fillStyle = 'rgba(20,24,40,0.28)'; c.fill(); }      // the far wing is in shade
+}
+function birdBody(c, k) {
+  // tail
+  c.beginPath();
+  c.moveTo(-0.28, -0.04);
+  c.lineTo(-0.3 - k.tail, -0.02 - k.tailW * 0.4);
+  c.quadraticCurveTo(-0.34 - k.tail, 0.01, -0.3 - k.tail, 0.02 + k.tailW * 0.6);
+  c.lineTo(-0.28, 0.05);
+  c.closePath();
+  c.fillStyle = k.tailCol; c.fill();
+  if (k.tailTip) {
+    c.save(); c.clip();
+    c.fillStyle = k.tailTip;
+    c.fillRect(-0.34 - k.tail, -0.2, 0.16, 0.4);
+    c.restore();
+  }
+  // body
+  var g = c.createLinearGradient(0, -0.15, 0, 0.15);
+  g.addColorStop(0, k.back); g.addColorStop(0.45, k.back); g.addColorStop(0.7, k.belly); g.addColorStop(1, k.belly);
+  c.beginPath();
+  c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
+  c.fillStyle = g; c.fill();
+  if (k.throat) {                                   // メジロ: yellow throat
+    c.beginPath(); c.ellipse(0.24, 0.03, 0.12, 0.07, 0.3, 0, TAU);
+    c.fillStyle = k.throat; c.fill();
+  }
+  // head
+  var hx = 0.36, hy = -0.06, hr = 0.135;
+  c.beginPath(); c.arc(hx, hy, hr, 0, TAU);
+  c.fillStyle = k.face || (k.capFace ? k.belly : k.back); c.fill();
+  c.save();
+  c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.clip();
+  c.fillStyle = k.cap;
+  if (k.capFace) c.fillRect(hx - hr, hy - hr, hr * 2, hr * 1.15);   // オナガ: black cap down to the eye
+  else c.fillRect(hx - hr, hy - hr, hr * 2, hr * 0.8);
+  c.restore();
+  // beak
+  c.beginPath();
+  c.moveTo(hx + hr * 0.8, hy - 0.035); c.lineTo(hx + hr + 0.08, hy + 0.005); c.lineTo(hx + hr * 0.8, hy + 0.035);
+  c.closePath(); c.fillStyle = k.beak; c.fill();
+  // eye
+  if (k.eyeRing) { c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.042, 0, TAU); c.fillStyle = k.eyeRing; c.fill(); }
+  c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.022, 0, TAU); c.fillStyle = '#0d0c10'; c.fill();
+  // a soft light on the back
+  var hl = c.createRadialGradient(0.05, -0.1, 0, 0.05, -0.1, 0.3);
+  hl.addColorStop(0, 'rgba(255,255,255,0.22)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
+  c.beginPath(); c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
+  c.fillStyle = hl; c.fill();
+}
+function bakeBirdFrame(k, tier, frame) {
+  var u = tier.size * k.scale * PR;                 // device px per bird unit
+  var pad = (tier.blur * 2 + 1) * PR;
+  var x0 = -0.4 - k.tail, x1 = 0.62, y0 = -k.span - 0.12, y1 = k.span + 0.12;
+  var cv = document.createElement('canvas');
+  cv.width = Math.ceil((x1 - x0) * u + pad * 2);
+  cv.height = Math.ceil((y1 - y0) * u + pad * 2);
+  var c = cv.getContext('2d');
+  var a = frame === BIRD_GLIDE ? 0.12 : Math.cos(frame / BIRD_FRAMES * TAU), fold = frame === BIRD_FOLD;
+  var draw = function(dst) {
+    dst.setTransform(u, 0, 0, u, pad - x0 * u, pad - y0 * u);
+    birdWing(dst, k, a, true, fold);
+    birdBody(dst, k);
+    birdWing(dst, k, a, false, fold);
+  };
+  if (tier.blur > 0 && HAS_FILTER) {
+    var tmp = document.createElement('canvas');
+    tmp.width = cv.width; tmp.height = cv.height;
+    draw(tmp.getContext('2d'));
+    c.filter = 'blur(' + (tier.blur * PR).toFixed(2) + 'px)';
+    c.drawImage(tmp, 0, 0);
+    c.filter = 'none';
+  } else draw(c);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (tier.haze > 0) {                              // distance: a little of the pale sky over it
+    c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = 'rgba(238,230,222,' + tier.haze + ')';
+    c.fillRect(0, 0, cv.width, cv.height);
+    c.globalCompositeOperation = 'source-over';
+  }
+  return { cv: cv, ox: (pad - x0 * u) / PR, oy: (pad - y0 * u) / PR, w: cv.width / PR, h: cv.height / PR };
+}
+function birdSpritesFor(kind, ti) {
+  if (birdSpritePR !== PR) { birdSprites = {}; birdSpritePR = PR; }
+  var key = kind + ti;
+  if (!birdSprites[key]) {
+    var list = [];
+    for (var f = 0; f <= BIRD_FOLD; f++) list.push(bakeBirdFrame(BIRD_KINDS[kind], BIRD_TIERS[ti], f));
+    birdSprites[key] = list;
+  }
+  return birdSprites[key];
+}
+function sendBirds(forceKind) {
+  var kind;
+  if (forceKind) kind = forceKind;
+  else {
+    var choices = KINDS.map(function (K) { return K[0]; }).filter(function (n) { return B[n + 'On'] && n !== birdLastKind; });
+    if (!choices.length) choices = KINDS.map(function (K) { return K[0]; }).filter(function (n) { return B[n + 'On']; });
+    if (!choices.length) return;
+    kind = pick(choices);
+  }
+  var k = BIRD_KINDS[kind];
+  birdLastKind = kind; flocksSent++;
+  var dir = Math.random() < 0.5 ? -1 : 1;
+  var n = Math.max(1, Math.round((k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1))) * B.flockSize));
+  var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
+  var vr = B[kind + 'Var'], flockPitch = 1 + rnd(-0.04, 0.04) * vr;   // this flock's own touch of pitch
+  for (var i = 0; i < n; i++) {
+    var r = Math.random(), ti = r < 0.3 ? 2 : (r < 0.72 ? 1 : 0), tier = BIRD_TIERS[ti];
+    birdSpritesFor(kind, ti);
+    // a loose group: the far birds start a little ahead, as they cross the screen more slowly
+    var home = y0 + rnd(-1, 1) * H * 0.07 * (ti === 2 ? 0.6 : 1);
+    birds.push({
+      kind: kind, ti: ti, dir: dir,
+      x: (dir > 0 ? -60 : W + 60) - dir * (i * rnd(18, 34) - (ti === 2 ? 60 : 0)),
+      y: home, home: home, vy: 0,
+      vx: dir * spd * tier.speed * rnd(0.94, 1.06),
+      ph: rnd(0, TAU), hz: k.hz * rnd(0.9, 1.1),
+      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0,
+      fp: flockPitch * (1 + rnd(-0.015, 0.015) * vr), callT: rnd(0.2, 1.6)
+    });
+  }
+  birds.sort(function(a, b) { return b.ti - a.ti; });   // far first, near last
+  updateStatus();
+}
+function updateBirds(dt, t) {
+  if (B.flocksOn) {
+    if (!birdNext) birdNext = t + rnd(0.5, 2);          // the first flock is in view within a few seconds
+    else if (t > birdNext) { sendBirds(); birdNext = t + B.flockEvery * rnd(0.65, 1.35); }
+  } else birdNext = 0;
+  for (var i = birds.length - 1; i >= 0; i--) {
+    var b = birds[i], k = BIRD_KINDS[b.kind];
+    b.x += b.vx * dt;
+    if (b.glide > 0) {                              // gliding: sinks a little
+      b.glide -= dt;
+      b.vy += (k.sink - b.vy) * dt * 3;
+      if (b.glide <= 0) { b.beats = Math.floor(rnd(k.beats[0], k.beats[1] + 1)); b.ph = 0; }
+    } else {                                        // flapping: rises a little
+      var before = b.ph;
+      b.ph += TAU * b.hz * dt;
+      b.vy += (-k.lift - b.vy) * dt * 3;
+      if (Math.floor(b.ph / TAU) > Math.floor(before / TAU) && --b.beats <= 0) {
+        b.glide = rnd(k.glide[0], k.glide[1]); b.ph = 0;
+      }
+    }
+    b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
+    b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
+    if (b.x > 0 && b.x < W) {                       // calls only while on screen
+      b.callT -= dt;
+      if (b.callT <= 0) { birdCall(b); b.callT = B.callEvery * rnd(0.6, 1.4); }
+    }
+    if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
+  }
+}
+// layer 'far': the far birds (behind both trees); 'near': the middle and near ones
+function drawBirds(c, t, layer) {
+  if (!birds.length) return;
+  for (var i = 0; i < birds.length; i++) {
+    var b = birds[i];
+    if ((b.ti === 2) !== (layer === 'far')) continue;
+    var k = BIRD_KINDS[b.kind], frames = birdSpritesFor(b.kind, b.ti), f;
+    if (b.glide > 0) f = k.fold ? BIRD_FOLD : BIRD_GLIDE;
+    else f = Math.floor((b.ph % TAU) / TAU * BIRD_FRAMES) % BIRD_FRAMES;
+    var s = frames[f];
+    c.globalAlpha = BIRD_TIERS[b.ti].alpha;
+    c.setTransform(PR * b.dir, 0, 0, PR, b.x * PR, b.y * PR);
+    c.drawImage(s.cv, -s.ox, -s.oy, s.w, s.h);
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+}
+
+/* ============================================================
+   11b. BIRD VOICES. A voice makes the notes of one call as a list
+   {t, dur, gain, pts: [[0-1 along the note, Hz], …], …}. R() picks a
+   random value around the middle of a range; "variation" narrows or
+   widens how far it strays. The call is then scaled by the species'
+   pitch and speed and played with Web Audio on its own bird's spot
+   (left to right across the screen, quieter when far).
+   ============================================================ */
+function R(a, b, vr) { var m = (a + b) / 2; return m + (rnd(a, b) - m) * vr; }
+function RI(a, b, vr) { return Math.round(R(a - 0.49, b + 0.49, vr)); }
+var VOICES = {
+  A: {   // natural
+    onaga: function (vr) {                 // rough, nasal "gyuu, gyuu"
+      var n = RI(2, 3, vr), b = R(1500, 1800, vr), s = [], t = 0;
+      for (var i = 0; i < n; i++, t += 0.3)
+        s.push({ t: t, dur: 0.24, gain: 0.35, type: 'sawtooth', atk: 0.03, pts: [[0, b * 1.2], [0.35, b * 1.45], [1, b * 0.85]],
+                 filter: ['bandpass', b * 1.3, 2.5], vib: [38, 90] });
+      return s;
+    },
+    mejiro: function (vr) {                // thin, quick "chi-chu-chi-chi"
+      var n = RI(4, 7, vr), f = R(5800, 6800, vr), s = [], t = 0;
+      for (var i = 0; i < n; i++) {
+        var up = Math.random() < 0.5, d = R(0.05, 0.09, vr);
+        s.push({ t: t, dur: d, gain: 0.3, atk: 0.006, pts: [[0, up ? f : f * 1.15], [1, up ? f * 1.15 : f]] });
+        t += d + R(0.02, 0.07, vr);
+      }
+      return s;
+    },
+    ruri: function (vr) {                  // a singing whistle with a little trill
+      var f = R(2600, 2900, vr);
+      return [
+        { t: 0,    dur: 0.28, gain: 0.3, atk: 0.04, pts: [[0, f], [1, f * 1.3]], h2: 0.15 },
+        { t: 0.34, dur: 0.22, gain: 0.3, atk: 0.03, pts: [[0, f * 1.35], [1, f * 1.5]], h2: 0.15 },
+        { t: 0.61, dur: 0.45, gain: 0.3, atk: 0.03, pts: [[0, f * 1.6], [0.6, f * 1.45], [1, f]], vib: [24, 140], h2: 0.12 }
+      ];
+    }
+  },
+  B: {   // soft
+    onaga: function (vr) {
+      var f = R(1300, 1500, vr);
+      return [
+        { t: 0,   dur: 0.3,  gain: 0.3, atk: 0.06, pts: [[0, f], [1, f * 1.25]], filter: ['lowpass', 2500, 1] },
+        { t: 0.4, dur: 0.38, gain: 0.3, atk: 0.06, pts: [[0, f * 1.3], [1, f * 0.9]], filter: ['lowpass', 2500, 1] }
+      ];
+    },
+    mejiro: function (vr) {
+      var f = R(3800, 4400, vr), n = RI(3, 5, vr), s = [], t = 0;
+      for (var i = 0; i < n; i++, t += R(0.12, 0.18, vr)) s.push({ t: t, dur: 0.11, gain: 0.25, atk: 0.025, pts: [[0, f], [1, f * R(0.95, 1.1, vr)]] });
+      return s;
+    },
+    ruri: function (vr) {
+      var f = R(2200, 2500, vr);
+      return [
+        { t: 0,   dur: 0.4,  gain: 0.28, atk: 0.08, pts: [[0, f * 1.4], [1, f]] },
+        { t: 0.5, dur: 0.55, gain: 0.28, atk: 0.08, pts: [[0, f * 1.2], [1, f * 0.8]], vib: [6, 40] }
+      ];
+    }
+  },
+  C: {   // bright, chime-like (pentatonic notes with a ringing tail)
+    onaga: function (vr) {
+      var sc = [523, 587, 659, 784, 880], a = pick(sc) * 2, b = pick(sc) * 2;
+      if (vr === 0) { a = 1318; b = 1046; }
+      return [
+        { t: 0,    dur: 0.35, gain: 0.3, atk: 0.004, pts: [[0, a], [1, a]], h2: 0.2 },
+        { t: 0.47, dur: 0.45, gain: 0.3, atk: 0.004, pts: [[0, b], [1, b]], h2: 0.2 }
+      ];
+    },
+    mejiro: function (vr) {
+      var sc = [1568, 1760, 1976, 2349, 2637, 3136], n = RI(3, 5, vr), i0 = RI(0, 2, vr), s = [];
+      for (var k = 0; k < n; k++) { var f = sc[Math.min(5, i0 + k)]; s.push({ t: k * 0.09, dur: 0.18, gain: 0.22, atk: 0.003, pts: [[0, f], [1, f]] }); }
+      return s;
+    },
+    ruri: function (vr) {
+      var f = vr === 0 ? 1319 : pick([1175, 1319, 1568]), s = [];
+      [1, 1.25, 1.5, 2].forEach(function (r, i) { s.push({ t: i * 0.16, dur: 0.5, gain: 0.25, atk: 0.004, pts: [[0, f * r], [1, f * r]], h2: 0.15 }); });
+      return s;
+    }
+  }
+};
+
+var actx = null, amaster = null;
+function ensureAudio() {
+  if (!actx) {
+    try {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      var comp = actx.createDynamicsCompressor();
+      amaster = actx.createGain(); amaster.connect(comp); comp.connect(actx.destination);
+      actx.onstatechange = updateStatus;
+      applyAudio();
+    } catch (e) { actx = null; }
+  }
+  if (actx && actx.state === 'suspended') actx.resume();
+  updateStatus();
+}
+document.addEventListener('pointerdown', ensureAudio, true);
+function applyAudio() { if (amaster) amaster.gain.value = B.soundOn ? B.volume : 0; }
+function updateStatus() {
+  var el = document.getElementById('labStatus');
+  if (!el) return;
+  var on = actx && actx.state === 'running';
+  el.textContent = (on ? 'Sound is on.' : 'Sound is off until you tap the page once.') +
+    '  Flocks so far: ' + flocksSent + (birdLastKind ? ' (last: ' + KINDS.filter(function (K) { return K[0] === birdLastKind; })[0][1] + ')' : '');
+}
+
+/* One note of a call: a sine (or other wave) gliding through pts, with a quick attack and a falling tail. */
+function playNote(s, t0, out, p, sp) {
+  var d = Math.max(0.02, s.dur / sp), t = t0 + s.t / sp, g = s.gain;
+  var osc = actx.createOscillator(); osc.type = s.type || 'sine';
+  osc.frequency.setValueAtTime(s.pts[0][1] * p, t);
+  for (var i = 1; i < s.pts.length; i++) osc.frequency.linearRampToValueAtTime(s.pts[i][1] * p, t + s.pts[i][0] * d);
+  var env = actx.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(g, t + Math.min(d * 0.5, Math.max(0.003, (s.atk || 0.01) / sp)));
+  env.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  var node = osc;
+  if (s.vib) {
+    var lfo = actx.createOscillator(), lg = actx.createGain();
+    lfo.frequency.value = s.vib[0]; lg.gain.value = s.vib[1] * p;
+    lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + d + 0.05);
+  }
+  if (s.filter) {
+    var f = actx.createBiquadFilter(); f.type = s.filter[0]; f.frequency.value = s.filter[1] * p; f.Q.value = s.filter[2];
+    osc.connect(f); node = f;
+  }
+  node.connect(env); env.connect(out);
+  osc.start(t); osc.stop(t + d + 0.05);
+  if (s.h2) playNote({ t: s.t, dur: s.dur, gain: g * s.h2, atk: s.atk,
+                       pts: s.pts.map(function (q) { return [q[0], q[1] * 2]; }) }, t0, out, p, sp);
+}
+function birdCall(b) {
+  if (!B.soundOn || !actx || actx.state !== 'running') return;
+  var n = b.kind, vr = B[n + 'Var'];
+  var spec = VOICES[B[n + 'Voice']][n](vr);
+  var p = Math.pow(2, B[n + 'Pitch'] / 1200) * b.fp;
+  var sp = B[n + 'Speed'] * rnd(1 - 0.08 * vr, 1 + 0.08 * vr);
+  var tierGain = b.ti === 2 ? B.farQuiet : (b.ti === 1 ? (1 + B.farQuiet) / 2 : 1);
+  var out = actx.createGain(); out.gain.value = B[n + 'Vol'] * tierGain * rnd(1 - 0.2 * vr, 1);
+  if (actx.createStereoPanner) {
+    var pan = actx.createStereoPanner(); pan.pan.value = clamp((b.x / W) * 2 - 1, -1, 1) * 0.8;
+    out.connect(pan); pan.connect(amaster);
+  } else out.connect(amaster);
+  var t0 = actx.currentTime + 0.02;
+  spec.forEach(function (s) { playNote(s, t0, out, p, sp); });
+}
+function previewCall(kind) {
+  ensureAudio();
+  if (!actx) return;
+  var go = function () { birdCall({ kind: kind, ti: 0, x: W / 2, fp: 1 }); };
+  if (actx.state === 'running') go(); else actx.resume().then(go);
+}
+/* ============================================================
    11. FRAME
    ============================================================ */
 function resize() {
@@ -1716,6 +1920,7 @@ function frame(now) {
   trees.forEach(function (T) { swayTree(T, t, dt); });
   if (falling.length < V.falling && Math.random() < 0.08) spawnFalling(false);
   moveFalling(t, dt);
+  updateBirds(dt, t);
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -1740,6 +1945,10 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
+  // Far birds (small, soft): behind both trees.
+  drawBirds(ctx, t, 'far');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
   var far = trees[1];
@@ -1761,6 +1970,10 @@ function frame(now) {
     ctx.drawImage(FL.cnv, 0, 0, cv.width, cv.height);
     ctx.globalAlpha = 1;
   }
+
+  // Middle and near birds: between the far tree and the near tree.
+  drawBirds(ctx, t, 'near');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
@@ -1814,7 +2027,6 @@ window.addEventListener('resize', function () {
 });
 
 buildControls();
-applyLift();
 resize();
 rebuildAll();
 requestAnimationFrame(frame);
