@@ -1,4 +1,4 @@
-var BUILD = 'v135';
+var BUILD = 'v136';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -12219,6 +12219,7 @@ function buildKoyoTree(key, far, lazy) {
   });
   var nc = T.clumps.length || 1;
   T.cx = sx / nc; T.cy = sy / nc; T.cr = Math.max(40, (bot - top) * 0.75);
+  NightLife.addPerch(T, r);                         // the owl's branch (8b)
   if (!lazy) T.clumps.forEach(function(C) { bakeClump(C, far); });   // lazy (during the name): baked a few per frame by bakePendingClumps
   return T;
 }
@@ -12278,6 +12279,7 @@ function fillKoyoBranches(c, T, strength) {
   c.beginPath();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
+    if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
     var w0 = n.w / 2, w1 = endW(n);
     var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
     var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
@@ -12291,12 +12293,13 @@ function fillKoyoBranches(c, T, strength) {
   c.beginPath();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
-    if (n.d >= T.maxD) continue;                  // a twig's tip has no fork, so no joint
+    if (n.d >= T.maxD || n.perch) continue;       // a twig's tip has no fork, so no joint
     var r = endW(n), ex = koyoX(T, n.ex);
     c.moveTo(ex + r, n.ey);
     c.arc(ex, n.ey, r, 0, TAU);
   }
   c.fill();
+  if (T.perch !== undefined) NightLife.drawPerch(c, T);
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -12310,6 +12313,7 @@ function drawKoyoClumps(c, T, t) {
     c.drawImage(C.cnv, -C.half, -C.half, C.half * 2, C.half * 2);
     c.restore();
   }
+  if (T.perch !== undefined) NightLife.drawPerchLeaves(c, T);
 }
 /* Night: a soft warm pool of lamp light under each lit canopy. */
 function koyoGlow(ctx, T, strength) {
@@ -12331,6 +12335,7 @@ function drawKoyoTrees(ctx, t) {
     ctxBL.clearRect(birdBox.x, birdBox.y, birdBox.w, birdBox.h);
     drawBirds(ctxBL, t, 'far');
   }
+  NightLife.drawSlot(ctx, 'A');                   // the owl and the animals further back than the far tree (8b)
   if (farTree) {
     koyoGlow(ctx, farTree, 0.6);
     // The far tree's branches go down solid, at half size and scaled up (soft),
@@ -12351,6 +12356,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.globalAlpha = KOYO.farOpacity;
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
+  NightLife.drawSlot(ctx, 'B');                   // between the two trees
   if (birdBox) {
     if (farTree) { birdsCutOut(treeLayer, FAR_LAYER_SCALE, 1); birdsCutOut(farLayer, FAR_LAYER_SCALE, 3); }
     drawBirds(ctxBL, t, 'near');                  // the middle and near birds fly between the two trees
@@ -12372,6 +12378,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.globalAlpha = KOYO.nearOpacity;
     ctx.drawImage(koyoLeafLayer, 0, 0);
   }
+  NightLife.drawSlot(ctx, 'C');                   // in front of the near tree
   if (birdBox) {
     if (tree) { birdsCutOut(treeLayer, 1, 1); birdsCutOut(koyoLeafLayer, 1, 3); }
     var B = birdBox;
@@ -12407,6 +12414,11 @@ function updateOneTree(T, dt, t) {
     T.gust = 0.35 * Math.sign(T.gust);
     if (T.gustV * T.gust > 0) T.gustV = 0;
   }
+  if (T.perch !== undefined) {                      // the owl's branch: sags a little under the owl, bounces after a landing or take-off (8b)
+    var sag = NightLife.owlOn(T) ? 0.035 * NightLife.O.owlWeight : 0;
+    T.pbV += (-70 * (T.pb - sag) - 4.5 * T.pbV) * dt;
+    T.pb += T.pbV * dt;
+  }
   var wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
   var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway;
   var spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
@@ -12419,6 +12431,7 @@ function updateOneTree(T, dt, t) {
     var k = (Math.pow(n.d / T.maxD, 1.6) + 0.02) * 0.34;
     var sway = (wind + Math.sin(t * n.f * spd + n.ph) * amp +
                 Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * k;
+    if (n.perch) sway = sway * 0.6 + T.pb * n.side;
     var par = n.p < 0 ? null : ns[n.p];
     n.cur = (par ? par.cur : -PI / 2) + n.rel + sway;
     n.sx = par ? par.ex : T.bx;
@@ -12467,7 +12480,7 @@ function pickPerch(near, textOnly) {
   if (tree && !textOnly) {
     for (var i = 0; i < 8; i++) {
       var idx = Math.floor(Math.random() * tree.nodes.length);
-      if (tree.nodes[idx].d >= 3) extra.push({ node: idx });
+      if (tree.nodes[idx].d >= 3 && !tree.nodes[idx].perch) extra.push({ node: idx });
     }
   }
   var pool = (g.length && (Math.random() < 0.8 || !extra.length)) ? g : extra;
@@ -12873,12 +12886,20 @@ function landBakeGround() {
                 rot: r() * TAU, sy: lerp(0.35, 0.6, r()) * lerp(0.6, 1, u), col: rgba(koyoLight(tone)) });
   }
   list.sort(function(a, b) { return a.y - b.y; });
+  var gl = LS.GRDL.c;                                                     // every third leaf again on its own, laid over the animals' feet (8b)
+  LS.GRDL.cnv.width = LS.GRD.cnv.width; LS.GRDL.cnv.height = LS.GRD.cnv.height;
   for (var j = 0; j < list.length; j++) {
     var L = list[j];
     c.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
     landLeafLo(c, L.s, L.rot);
     c.fillStyle = L.col;
     c.fill();
+    if (j % 3 === 0) {
+      gl.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
+      landLeafLo(gl, L.s, L.rot);
+      gl.fillStyle = L.col;
+      gl.fill();
+    }
   }
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);                          // haze where it meets the mountains
   var mz = c.createLinearGradient(0, hy - 2, 0, hy + depthPx * 0.45), mistC = koyoLight(C.mist);
@@ -12887,6 +12908,11 @@ function landBakeGround() {
   c.globalAlpha = 1;
   c.fillStyle = mz;
   c.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  gl.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  gl.globalCompositeOperation = 'source-atop';
+  gl.fillStyle = mz;
+  gl.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  gl.globalCompositeOperation = 'source-over';
   c.restore();
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
   landGlow(c, H - depthPx * 0.3);
@@ -13639,6 +13665,7 @@ function winBakeGround() {
   }
   LS.GTMP.cnv.width = LS.GTMP.cnv.height = 1;               // the scratch layer is not needed until the next bake
   LS.GRD.cnv.width = LS.GRD.cnv.height = 1; LS.grdTop = 0;  // the autumn ground layer is not used in winter
+  LS.GRDL.cnv.width = LS.GRDL.cnv.height = 1;
   // mist lying low where the snowfield meets the mountains
   var my0 = hy - depthPx * 0.15, mh = depthPx * 0.5;
   if (!WS.gmist) WS.gmist = landCanvas();
@@ -14452,6 +14479,2136 @@ function winDrawNear(c) {
 }
 
 /* ============================================================
+   8b. NIGHT LIFE (autumn, at night) — designed on landscape.html, with the
+       values chosen there. A bare branch sticks out of each kōyō tree (it is
+       part of the tree day and night). At nightfall an owl flies in and
+       perches on one of them; it blinks, hoots now and then, flies off into
+       the distance (smaller, softer and hazier as it goes) and comes back to
+       either tree. A herd of sika deer (shika) and a tanuki mother with her
+       kit cross the fallen leaves now and then: the deer walk, graze and may
+       bolt, the tanuki scurry and stop to look at us. At dawn the owl leaves
+       for good and no more animals come.
+       The owl is a small 3D model drawn into sprites; the animals are drawn
+       with WebGL 2 (smooth shaded bodies) where it is there, or with hair
+       strokes on a 2D canvas where it is not. Sprites are baked a few per
+       frame. They stand at a depth k (1: the near tree, FAR_TREE_SCALE: the
+       far tree) and are drawn in one of three slots: 'A' behind the far
+       tree, 'B' between the trees, 'C' in front of the near tree.
+   ============================================================ */
+var NightLife = (function () {
+var O = {
+  // the owl's look
+  look: 'fukurou', size: 0.115, strength: 1, vivid: 1.15, lampGlow: 0.8,
+  // the branch it sits on
+  branchHeight: 0.3, branchLength: 0.2, branchAngle: 8, perchAt: 0.7, branchLeaves: 5, branchBounce: 1.7, owlWeight: 1.85,
+  // timing (seconds)
+  perchMin: 10, perchMax: 20, awayTime: 10, landNear: 0.85,
+  // flight
+  flyAwayTime: 10, returnTime: 10, flapHz: 2.4, flapBeats: 4, glideTime: 0.7, vanishHeight: 0.12, vanishSpread: 0.5,
+  // depth of field
+  farthest: 0.08, farBlur: 0.9, maxBlur: 2.6, haze: 0.55, fadeFrom: 0.39,
+  // blinking
+  blinkMin: 1, blinkMax: 5, blinkTime: 0.2, doubleBlink: 0.2,
+  // extras (hootPitch in cents)
+  headTurn: false, headEvery: 12, hoot: true, hootEvery: 10, hootVolume: 0.6, hootPitch: 850,
+  // sika deer
+  deerOn: true, deerEvery: 25, herdMin: 2, herdMax: 4, stagChance: 1, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
+  grazeMin: 5, grazeMax: 15, deerLook: 0.5, runChance: 0.5, deerRun: 4.5, deerFar: 0.34, deerNear: 0.61,
+  // tanuki
+  tanukiOn: true, tanukiEvery: 50, kitChance: 1, tanukiSize: 0.058, tanukiSpeed: 2, tanukiStops: 0.7, tanukiLook: 0.9,
+  lookTime: 2.5, tanukiFar: 0.7, tanukiNear: 1.05,
+  // both
+  animStrength: 0.95, animHaze: 0.5
+};
+var OWL_COLOURS = {
+  fukurou:    { back: '#8B6B52', wing: '#6A4E3C', spot: '#F1E2CC', chest: '#EFE2CF', streak: '#6A4632', face: '#DCCDB9',
+                rim: '#5A3F2E', eye: '#1C130F', beak: '#F2C661', feet: '#E6D8C2', under: '#F3E9DA' },
+  konohazuku: { back: '#8E7556', wing: '#6B563F', spot: '#E8D5B2', chest: '#D3BE9C', streak: '#3B2C20', face: '#C4AC88',
+                rim: '#3E2E22', eye: '#F7A21B', beak: '#4C4038', feet: '#CDBA98', under: '#E6D6B8' }
+};var ANIMAL_COLOURS = {
+  hind:   { coat: '#8E6446', back: '#6B4A33', belly: '#DCC9B0', spot: '#EFE2CC', rump: '#F5EFE6', rim: '#2A1E18',
+            leg: '#7A5A42', hoof: '#2A221E', nose: '#1E1715', eye: '#140E0C', ear: '#D2B3A2' },
+  stag:   { coat: '#5E4636', back: '#46342A', belly: '#BFAE98', spot: '#D8C8B0', rump: '#F2ECE2', rim: '#221813',
+            leg: '#54402F', hoof: '#221C18', nose: '#1A1412', eye: '#120C0A', ear: '#B89C8C', antler: '#DCCBAA', mane: '#3A2C24' },
+  tanuki: { fur: '#86684A', tip: '#E0CCA6', dark: '#2A211C', mask: '#211915', pale: '#EDE0CB', nose: '#141010', eye: '#120D0B' }
+};O.colours = OWL_COLOURS;
+O.animColours = ANIMAL_COLOURS;
+
+/* The names the design page used, on the app's own helpers and settings. */
+var hex = hexToRgb, mix = mixRgb, scale = scaleRgb, PAPER = KOYO_PAPER, FAR_SCALE = FAR_TREE_SCALE;
+function rgb(c, a) { return rgba(c, a); }
+function light(c) { return koyoLight(c); }
+function cols() { return LAND_C; }
+function isNight() { return koyoNight() > 0.5; }
+function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
+var TREE = { farOpacity: KOYO.farOpacity };
+var V = { horizon: LAND.horizon };
+var trees = [];                                      // [near tree, far tree], as they are this frame
+var owlActive = false, animalsActive = false;        // at night in autumn: the owl comes and the animals come out
+LS.GRDL = mk();                                      // every third leaf of the far ground again on its own (landBakeGround), laid over feet
+
+/* The owl's branch: a bare branch that grows from the limb nearest
+   O.branchHeight up the tree, on the side facing the middle of the screen,
+   and reaches out past the leaves. Its start follows the squeezed canopy
+   (koyoX) but its own length is not squeezed, so it always sticks out. It
+   sways with the tree and has a spring of its own (T.pb): it sags a little
+   under the owl and bounces when the owl lands or takes off. */
+function addPerch(T, r) {
+  var ns = T.nodes, inward = T.left ? 1 : -1, ty = T.by - T.scale * O.branchHeight, best = -1, bestOut = -Infinity, pf = 1, i, n;
+  // the limb or trunk passing through that height furthest toward the middle; the branch grows from that point on it
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    if (n.d > 3 || (ty - n.sy) * (ty - n.ey) > 0 || n.sy === n.ey) continue;
+    var f = (n.sy - ty) / (n.sy - n.ey), out = (koyoX(T, lerp(n.sx, n.ex, f)) - T.bx) * inward;
+    if (out > bestOut) { bestOut = out; best = i; pf = f; }
+  }
+  if (best < 0) {                                    // nothing at that height: the limb end nearest it
+    var bestS = Infinity;
+    for (i = 1; i < ns.length; i++) {
+      n = ns[i];
+      if (n.d > 3) continue;
+      if (Math.abs(n.ey - ty) < bestS) { bestS = Math.abs(n.ey - ty); best = i; }
+    }
+    pf = 1;
+  }
+  var par = ns[best], a = O.branchAngle * PI / 180;
+  var abs = inward > 0 ? -a : PI + a;
+  // long enough that the owl sits clear of the leaves at its height
+  var x0 = koyoX(T, lerp(par.sx, par.ex, pf)), y0 = lerp(par.sy, par.ey, pf), oh = O.size * H * (T.far ? FAR_SCALE : 1), edge = 0;
+  T.clumps.forEach(function (C) {
+    var cn = ns[C.node], cy = cn.ey + C.oy;
+    if (cy + C.R < y0 - oh || cy - C.R > y0) return;
+    edge = Math.max(edge, (koyoX(T, cn.ex + C.ox) - x0) * inward + C.R * 1.05);
+  });
+  var len = Math.max(T.scale * O.branchLength, (edge + oh * 0.35) / Math.cos(a) / O.perchAt);
+  T.perch = ns.length;
+  ns.push({ p: best, rel: abs - par.abs, abs: abs, len: len, w: Math.max(T.scale * 0.011, par.w * 0.62 * 0.9),
+            d: par.d + 1, ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0, perch: true, side: inward, pf: pf });
+  T.pb = 0; T.pbV = 0;
+  // a few kōyō leaves at the tip and on the little twig near it
+  var leaves = [];
+  for (var j = 0; j < O.branchLeaves; j++) {
+    var fam = koyoFamily(r);
+    if (fam === 'evergreen' || fam === 'green') fam = 'orange';
+    leaves.push({ at: j % 2, dx: (r() - 0.5) * 0.8, dy: (r() - 0.5) * 0.8, rot: r() * TAU,
+                  s: T.scale * 0.026 * KOYO.leafSize * lerp(0.8, 1.2, r()), tone: mixRgb(KOYO_FAMILIES[fam][1], KOYO_FAMILIES[fam][2], r()) });
+  }
+  T.perchLeaves = leaves;
+}
+/* The branch as a gentle upward bow (a quadratic curve) from its limb. */
+function perchCurve(T) {
+  var n = T.nodes[T.perch], par = T.nodes[n.p];
+  var x0 = koyoX(T, lerp(par.sx, par.ex, n.pf)), y0 = lerp(par.sy, par.ey, n.pf), c = Math.cos(n.cur), s = Math.sin(n.cur), L = n.len;
+  var ux = s * n.side, uy = -c * n.side;                       // "up", across the branch
+  return { x0: x0, y0: y0, x1: x0 + c * L * 0.5 + ux * L * 0.06, y1: y0 + s * L * 0.5 + uy * L * 0.06,
+           x2: x0 + c * L, y2: y0 + s * L, L: L, n: n };
+}
+function curvePt(P, u) {
+  var a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u;
+  var tx = 2 * (1 - u) * (P.x1 - P.x0) + 2 * u * (P.x2 - P.x1), ty = 2 * (1 - u) * (P.y1 - P.y0) + 2 * u * (P.y2 - P.y1);
+  var tl = Math.hypot(tx, ty) || 1;
+  tx /= tl; ty /= tl;
+  return { x: a * P.x0 + b * P.x1 + d * P.x2, y: a * P.y0 + b * P.y1 + d * P.y2, tx: tx, ty: ty,
+           nx: ty * P.n.side, ny: -tx * P.n.side, w: lerp(P.n.w, Math.max(1.3, P.n.w * 0.3), u) };
+}
+/* Where the owl's feet go: on top of the branch at O.perchAt, and how far
+   the branch is tipped from its rest angle (the owl leans with it). */
+function seat(T) {
+  var P = perchCurve(T), q = curvePt(P, O.perchAt);
+  return { x: q.x + q.nx * q.w / 2, y: q.y + q.ny * q.w / 2, rot: (P.n.cur - P.n.abs) * 0.6 };
+}
+function perchTwig(P) {
+  var q = curvePt(P, clamp(O.perchAt + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
+  return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
+}
+/* Drawn with the tree's branches, in their colour (fillStyle already set). */
+function drawPerch(c, T) {
+  var P = perchCurve(T), N = 14, i, q, Lft = [], Rgt = [];
+  for (i = 0; i <= N; i++) {
+    q = curvePt(P, i / N);
+    Lft.push([q.x + q.nx * q.w / 2, q.y + q.ny * q.w / 2]);
+    Rgt.push([q.x - q.nx * q.w / 2, q.y - q.ny * q.w / 2]);
+  }
+  c.beginPath();
+  c.moveTo(Lft[0][0], Lft[0][1]);
+  for (i = 1; i <= N; i++) c.lineTo(Lft[i][0], Lft[i][1]);
+  c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
+  for (i = N; i >= 0; i--) c.lineTo(Rgt[i][0], Rgt[i][1]);
+  c.closePath();
+  c.fill();
+  // a short twig near the tip, angled up and out
+  var tw = perchTwig(P), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
+  c.beginPath();
+  c.moveTo(tw.q.x + px * w0, tw.q.y + py * w0);
+  c.lineTo(tw.x + px * w1, tw.y + py * w1);
+  c.lineTo(tw.x - px * w1, tw.y - py * w1);
+  c.lineTo(tw.q.x - px * w0, tw.q.y - py * w0);
+  c.closePath();
+  c.fill();
+}
+/* Its leaves, drawn with the tree's foliage, in the light of the moment (the
+   lamps catch them at night, as they do the clumps). */
+function drawPerchLeaves(c, T) {
+  if (!T.perchLeaves || !T.perchLeaves.length) return;
+  var P = perchCurve(T), tip = curvePt(P, 1), tw = perchTwig(P), tilt = P.n.cur - P.n.abs, g = koyoNight() * KOYO.nightGlow;
+  for (var i = 0; i < T.perchLeaves.length; i++) {
+    var Lf = T.perchLeaves[i], x = Lf.at ? tw.x : tip.x, y = Lf.at ? tw.y : tip.y;
+    var lit = koyoLight(T.far ? mixRgb(Lf.tone, KOYO_PAPER, KOYO.farHaze) : Lf.tone);
+    if (g > 0) lit = scaleRgb(mixRgb(lit, KOYO_LAMP, g * 0.18), 1 + g * 0.06);
+    koyoLeafPath(c, x + Lf.dx * Lf.s, y + Lf.dy * Lf.s - Lf.s * 0.2, Lf.s, Lf.rot + tilt);
+    c.fillStyle = rgba(lit);
+    c.fill();
+  }
+}var OWL_FRAMES = 12, OWL_GLIDE = 12;                 // baked flying sprites: 12 wingbeat frames and a glide
+var OWL_STEPS = 9, KLIVE = 0.42;                     // smaller than KLIVE it uses sprites baked at OWL_STEPS depths
+var SIT_BOX = [-0.62, -1.3, 0.62, 0.14];            // sprite bounds in owl units: height 1, feet at (0, 0)
+var FLY_BOX = [-1.42, -1.95, 1.42, 0.85];
+var HEAD_YAWS = [-0.75, -0.38, 0, 0.38, 0.75];       // the head turns through these (radians)
+var OWL_ELEV = 0.72;                                 // in flight it is seen this far from above (going away) or below (coming back)
+var owlSit = [], owlFly = [], owlQueue = [], owl = null, OWLTMP = mk(), OWLOUT = mk(), owlPal = {}, owlLiveSpr = null, owlLiveN = 0;
+
+/* How it looks at size k (1 on the near branch, FAR_SCALE on the far one,
+   O.farthest where it disappears). */
+function owlBlur(k) {
+  if (k >= FAR_SCALE) return lerp(O.farBlur, 0, clamp((k - FAR_SCALE) / (1 - FAR_SCALE), 0, 1));
+  return lerp(O.maxBlur, O.farBlur, clamp((k - O.farthest) / (FAR_SCALE - O.farthest), 0, 1));
+}
+function owlHaze(k) { return O.haze * Math.pow(clamp((1 - k) / (1 - O.farthest), 0, 1), 1.5); }
+function owlAlpha(k) { return smooth(O.farthest, Math.max(O.fadeFrom, O.farthest + 0.01), k); }
+function owlSlot(k) { return k >= 0.9 ? 'C' : (k >= FAR_SCALE * 0.97 ? 'B' : 'A'); }
+function owlLod(k) { return clamp(O.size * H * k * PR / 110, 0.25, 1); }   // fewer, simpler feathers when small
+
+/* Its colours at size k: the chosen colours made a little more vivid, then
+   (after lighting, in fin) mixed toward the paper by its strength (paler
+   on the far tree, as the far tree is), a touch of the night, and the
+   night haze with distance. */
+function vivid(c, s) { var l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11; return [l + (c[0] - l) * s, l + (c[1] - l) * s, l + (c[2] - l) * s]; }
+function owlPalette(k) {
+  var src = O.colours[O.look] || OWL_COLOURS.fukurou, P = {};
+  var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.strength * lerp(1, TREE.farOpacity, far);
+  var hz = owlHaze(k), mist = light(cols().mist), night = isNight();
+  for (var key in OWL_COLOURS.fukurou) P[key] = vivid(hex(src[key] || OWL_COLOURS.fukurou[key]), O.vivid);
+  P.lid = mix(scale(P.face, 0.86), [200, 150, 150], 0.18);
+  P.fin = function (c) {
+    var o = mix(c, PAPER, 1 - str);
+    if (night) o = mix(o, [60, 52, 96], 0.06);
+    return mix(o, mist, hz);
+  };
+  P.lamp = night ? O.lampGlow : 0.25;
+  P.hz = hz;
+  return P;
+}
+function owlPaletteCached(k) {
+  var key = Math.round(k * 200);
+  if (!owlPal[key]) owlPal[key] = owlPalette(k);
+  return owlPal[key];
+}
+
+/* ---------- A little 3D ----------
+   In the owl's own space x is its right, y up, z its front; owl units
+   (height 1 sitting). The view turns it (yaw) and tilts it toward us
+   (elev: + shows its top); the body centre lands at (0, -0.42) on the
+   sprite, so the feet of the sitting owl are at (0, 0). */
+function vAdd(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+function vSub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function vMul(a, k) { return [a[0] * k, a[1] * k, a[2] * k]; }
+function vMad(a, b, k) { return [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]; }
+function vDot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function vCross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function vNorm(a) { var l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+var OV = { cy: 1, sy: 0, ce: 1, se: 0 };
+function setView(yaw, elev) { OV.cy = Math.cos(yaw); OV.sy = Math.sin(yaw); OV.ce = Math.cos(elev); OV.se = Math.sin(elev); }
+function tv(p) {                                     // into view space (a turn, then a tilt)
+  var x = p[0] * OV.cy + p[2] * OV.sy, z = -p[0] * OV.sy + p[2] * OV.cy;
+  return [x, p[1] * OV.ce - z * OV.se, p[1] * OV.se + z * OV.ce];
+}
+function sp(p) { var v = tv(p); return [v[0], -v[1] - 0.42]; }   // onto the sprite
+/* The flat outline of an ellipsoid (centre c, three axis vectors); pj: the
+   projection (sp for the owl, ap for the animals). */
+function projEllipse(c, A, B, C, pj) {
+  var p = (pj || sp)(c), a = tv(A), b = tv(B), d = tv(C);
+  var sxx = a[0] * a[0] + b[0] * b[0] + d[0] * d[0], syy = a[1] * a[1] + b[1] * b[1] + d[1] * d[1];
+  var sxy = -(a[0] * a[1] + b[0] * b[1] + d[0] * d[1]);
+  var tr = (sxx + syy) / 2, df = Math.sqrt(Math.max(0, tr * tr - (sxx * syy - sxy * sxy)));
+  return { x: p[0], y: p[1], rx: Math.sqrt(tr + df), ry: Math.sqrt(Math.max(1e-6, tr - df)), rot: 0.5 * Math.atan2(2 * sxy, sxx - syy) };
+}
+/* Light on a surface facing nv (view space, toward us): the night sky from
+   above left, the warm lamps from below, a rim of light at the edges
+   (warm underneath, cool on top). occ < 1 darkens it (in shadow). */
+var OWL_LM = vNorm([-0.45, 0.8, 0.45]), OWL_LL = vNorm([0.3, -0.8, 0.5]);
+function owlLit(base, nv, P, occ) {
+  var m = Math.max(0, vDot(nv, OWL_LM)), l = Math.max(0, vDot(nv, OWL_LL)), f = clamp(nv[2], 0, 1);
+  var rim = Math.pow(1 - f, 3), g = P.lamp, a = (occ === undefined ? 1 : occ) * (0.5 + 0.2 * f + 0.42 * m);
+  var warm = rim * clamp(0.25 - nv[1], 0, 1) * g, cool = rim * clamp(nv[1] + 0.35, 0, 1) * 0.45;
+  return P.fin([base[0] * (a + l * g * 0.6) + warm * 150 + cool * 70,
+                base[1] * (a + l * g * 0.44) + warm * 88 + cool * 80,
+                base[2] * (a + l * g * 0.26) + warm * 40 + cool * 108]);
+}
+var owlDirSets = {};
+function owlDirs(n, seed) {                          // n directions spread evenly over a sphere, a little jittered
+  var key = n + ':' + seed;
+  if (!owlDirSets[key]) {
+    var r = rngFrom(seed), out = [], g = PI * (3 - Math.sqrt(5));
+    for (var i = 0; i < n; i++) {
+      var y = 1 - 2 * (i + 0.5) / n, rr = Math.sqrt(1 - y * y), a = g * i + (r() - 0.5) * 0.5;
+      out.push({ u: [Math.cos(a) * rr, y, Math.sin(a) * rr], j: r(), j2: r(), j3: r() });
+    }
+    owlDirSets[key] = out;
+  }
+  return owlDirSets[key];
+}
+
+/* ---------- Feathers ----------
+   One feather: a rounded blade from base b to tip t (owl space), w its
+   half-width vector; pj: the projection (sp unless given). Returns the three
+   points of its tip, for the fringe. */
+function featherPath(c, b, t, w, pj) {
+  var d = vSub(t, b), pr = pj || sp;
+  var p0 = pr(vMad(b, w, 0.5)), p1 = pr(vMad(vMad(b, w, 0.5), d, 0.6)), p2 = pr(vMad(t, w, 0.55)), pt = pr(t);
+  var q2 = pr(vMad(t, w, -0.55)), q1 = pr(vMad(vMad(b, w, -0.5), d, 0.6)), q0 = pr(vMad(b, w, -0.5));
+  c.beginPath();
+  c.moveTo(p0[0], p0[1]);
+  c.bezierCurveTo(p1[0], p1[1], p2[0], p2[1], pt[0], pt[1]);
+  c.bezierCurveTo(q2[0], q2[1], q1[0], q1[1], q0[0], q0[1]);
+  c.closePath();
+  return [p2, pt, q2];
+}
+function fringe(c, tip, col, a) {                    // the paler edge at a feather's tip
+  c.strokeStyle = rgb(col, a);
+  c.beginPath(); c.moveTo(tip[0][0], tip[0][1]); c.quadraticCurveTo(tip[1][0], tip[1][1], tip[2][0], tip[2][1]); c.stroke();
+}
+/* Bands across a feather, kept inside its width. */
+function featherBars(c, b, t, w, n, col, a) {
+  c.fillStyle = rgb(col, a);
+  for (var i = 0; i < n; i++) {
+    var s0 = (i + 0.3) / (n + 0.6), s1 = s0 + 0.45 / (n + 0.6), k = s1 > 0.8 ? 0.6 : 0.88;
+    var p = [sp(vMad(vMad(b, vSub(t, b), s0), w, 0.88)), sp(vMad(vMad(b, vSub(t, b), s1), w, k)),
+             sp(vMad(vMad(b, vSub(t, b), s1), w, -k)), sp(vMad(vMad(b, vSub(t, b), s0), w, -0.88))];
+    c.beginPath(); c.moveTo(p[0][0], p[0][1]);
+    for (var k = 1; k < 4; k++) c.lineTo(p[k][0], p[k][1]);
+    c.closePath(); c.fill();
+  }
+}
+function featherShaft(c, b, t, col, a) {             // the quill down the middle
+  var p = sp(vMad(b, vSub(t, b), 0.08)), q = sp(vMad(b, vSub(t, b), 0.92));
+  c.strokeStyle = rgb(col, a);
+  c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke();
+}
+
+/* ---------- Body ----------
+   An egg of feathers: the pale chest with dark streaks in front, the
+   spotted back behind, and (sitting) the folded wings down the sides. The
+   feathers overlap from the head down, like real plumage. */
+function drawBody(c, P, F, lod) {
+  var tufts = O.look === 'konohazuku';
+  var e = projEllipse(F.O, vMul(F.X, F.rx), vMul(F.A, F.ra), vMul(F.D, F.rd));
+  // underneath: pale where the chest faces us, brown elsewhere, so no gap between feathers shows dark
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 0.97, e.ry * 0.97, e.rot, 0, TAU);
+  var cf = tv(F.D)[2], cp = sp(vMad(F.O, F.D, F.rd * 0.8)), back0 = rgb(owlLit(scale(P.back, 0.78), [0, 0, 1], P));
+  if (cf > 0.05) {
+    var gb = c.createRadialGradient(cp[0], cp[1], 0, cp[0], cp[1], Math.max(e.rx, e.ry) * 0.95);
+    gb.addColorStop(0, rgb(owlLit(mix(P.chest, P.back, 0.15), [0, 0, 1], P))); gb.addColorStop(0.55 * cf + 0.1, rgb(owlLit(mix(P.chest, P.back, 0.35), [0, 0, 1], P)));
+    gb.addColorStop(1, back0);
+    c.fillStyle = gb;
+  } else c.fillStyle = back0;
+  c.fill();
+  var dirs = owlDirs(270, 11), list = [], down = vMul(F.A, -1), i;
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i];
+    if (d.j > lod + 0.08) continue;
+    var u = d.u;                                     // (its right, along the body toward the head, its front)
+    var p = vAdd(vAdd(vMad(F.O, F.X, F.rx * u[0]), vMul(F.A, F.ra * u[1])), vMul(F.D, F.rd * u[2]));
+    var n = vNorm(vAdd(vAdd(vMul(F.X, u[0] / F.rx), vMul(F.A, u[1] / F.ra)), vMul(F.D, u[2] / F.rd)));
+    var nv = tv(n);
+    if (nv[2] < 0.02) continue;
+    list.push({ d: d, u: u, p: p, n: n, nv: nv });
+  }
+  list.sort(function (a, b) { return a.u[1] - b.u[1]; });   // from the tail end up: the higher feathers lie over the lower
+  var sz = 1.08 / Math.sqrt(Math.max(0.35, Math.min(1, lod + 0.08)));
+  c.lineWidth = 0.006;
+  for (i = 0; i < list.length; i++) {
+    var L = list[i], uu = L.u, side = Math.abs(uu[0]), front = uu[2], lat = uu[1];
+    var region = F.folded && side > 0.58 && front < 0.42 && lat < 0.75 ? 'wing' : (front > -0.08 ? 'chest' : 'back');
+    var fl = (region === 'wing' ? 0.16 : (region === 'chest' ? 0.13 : 0.12)) * sz, fw = fl * (region === 'wing' ? 0.7 : 0.98);
+    var t = vNorm(vSub(down, vMul(L.n, vDot(down, L.n))));
+    var w = vMul(vNorm(vCross(L.n, t)), fw * 0.5);
+    var b = vMad(vMad(L.p, t, -fl * 0.45), L.n, 0.004), tip = vMad(vMad(L.p, t, fl * 0.55), L.n, 0.014);
+    var base, occ = 1;
+    if (region === 'chest') {
+      base = mix(P.chest, P.back, clamp((0.1 - front) * 1.8, 0, 0.85));
+      if (lat < -0.45) base = mix(base, P.spot, 0.35);                   // the soft, pale belly
+      occ = 1 - 0.3 * smooth(0.4, 0.9, lat) * clamp(front * 2, 0, 1);   // in the shadow of the head
+    } else if (region === 'wing') base = mix(P.wing, P.back, L.d.j3 * 0.5);
+    else base = mix(P.back, P.wing, L.d.j3 * 0.35);
+    base = scale(base, 0.95 + L.d.j2 * 0.1);
+    featherPath(c, b, tip, w);
+    c.fillStyle = rgb(owlLit(base, L.nv, P, occ));
+    c.fill();
+    var mark = L.d.j2;
+    if (region === 'chest' && mark > 0.3 && front > 0.15) {           // a dark streak down the feather, tapered at both ends
+      featherPath(c, vMad(b, vSub(tip, b), 0.3), vMad(b, vSub(tip, b), 0.92), vMul(w, tufts ? 0.16 : 0.22));
+      c.fillStyle = rgb(owlLit(P.streak, L.nv, P, occ), 0.8); c.fill();
+      c.strokeStyle = c.fillStyle;
+      if (tufts) {                                                   // the scops owl's fine cross-bars
+        var m0 = sp(vMad(vMad(b, vSub(tip, b), 0.58), w, 0.42)), m1 = sp(vMad(vMad(b, vSub(tip, b), 0.58), w, -0.42));
+        c.strokeStyle = rgb(owlLit(P.streak, L.nv, P, occ), 0.45); c.lineWidth = fw * 0.05;
+        c.beginPath(); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]); c.stroke();
+      }
+      c.lineWidth = 0.006;
+    } else if (region !== 'chest' && mark > (region === 'wing' ? 0.45 : 0.62)) {   // a pale spot near the tip
+      var sc = sp(vMad(b, vSub(tip, b), 0.68)), sr = Math.hypot(sp(vAdd(b, w))[0] - sp(b)[0], sp(vAdd(b, w))[1] - sp(b)[1]);
+      c.fillStyle = rgb(owlLit(P.spot, L.nv, P), 0.85);
+      c.beginPath(); c.ellipse(sc[0], sc[1], sr * 0.42, sr * 0.3, 0, 0, TAU); c.fill();
+    }
+    if (lod > 0.55) fringe(c, [sp(vMad(tip, w, 0.55)), sp(tip), sp(vMad(tip, w, -0.55))], owlLit(scale(base, 1.25), L.nv, P), 0.2);
+  }
+  roundness(c, e, 0.4);
+}
+/* Shade toward the edges of an outline (e: a projected ellipse), so the
+   feathers read as one rounded form. */
+function roundness(c, e, a) {
+  c.save();
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 1.06, e.ry * 1.06, e.rot, 0, TAU); c.clip();
+  c.translate(e.x, e.y); c.rotate(e.rot); c.scale(e.rx, e.ry);
+  var g = c.createRadialGradient(-0.22, -0.25, 0.1, -0.1, -0.1, 1.25);
+  g.addColorStop(0, 'rgba(255,244,230,0.08)'); g.addColorStop(0.55, 'rgba(30,16,20,0)'); g.addColorStop(1, 'rgba(30,16,20,' + a + ')');
+  c.fillStyle = g; c.fillRect(-1.2, -1.2, 2.4, 2.4);
+  c.restore();
+}
+
+/* ---------- Head and face ---------- */
+function headFrame(F, yaw, ps) {
+  var tufts = O.look === 'konohazuku';
+  return { H: vAdd(vMad(F.O, F.A, 0.37), [0, 0.04 * ps, 0]), r: [Math.cos(yaw), 0, -Math.sin(yaw)], u: [0, 1, 0], f: [Math.sin(yaw), 0, Math.cos(yaw)],
+           rx: tufts ? 0.245 : 0.27, ry: tufts ? 0.21 : 0.23, rz: tufts ? 0.21 : 0.23 };
+}
+/* Map the face's flat plane (x right, y down, owl units) onto the sprite. */
+function faceFrame(c, Hd, depth) {
+  var o = sp(vMad(Hd.H, Hd.f, depth)), ex = tv(Hd.r), ey = tv(Hd.u);
+  c.transform(ex[0], -ex[1], -ey[0], ey[1], o[0], o[1]);
+}
+function drawHead(c, P, F, Hd, pose, lod) {
+  var tufts = O.look === 'konohazuku', i;
+  // a soft shadow under the head on the body and wings
+  var sh = projEllipse(vAdd(Hd.H, [0, -0.09, 0]), vMul(Hd.r, Hd.rx * 1.05), vMul(Hd.u, Hd.ry), vMul(Hd.f, Hd.rz));
+  c.save();
+  c.globalCompositeOperation = 'source-atop';
+  c.translate(sh.x, sh.y); c.rotate(sh.rot); c.scale(sh.rx, sh.ry);
+  var gs = c.createRadialGradient(0, 0, 0.3, 0, 0, 1.15);
+  gs.addColorStop(0, 'rgba(30,18,22,0.32)'); gs.addColorStop(1, 'rgba(30,18,22,0)');
+  c.fillStyle = gs; c.fillRect(-1.3, -1.3, 2.6, 2.6);
+  c.restore();
+  var e = projEllipse(Hd.H, vMul(Hd.r, Hd.rx), vMul(Hd.u, Hd.ry), vMul(Hd.f, Hd.rz));
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 0.97, e.ry * 0.97, e.rot, 0, TAU);
+  c.fillStyle = rgb(owlLit(scale(P.back, 0.72), [0, 0, 1], P)); c.fill();
+  // the crown and the back of the head: small feathers flowing down and back
+  var dirs = owlDirs(200, 23), list = [], flow = vNorm(vAdd(vMul(Hd.u, -1), vMul(Hd.f, -0.55)));
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i], u = d.u;
+    if (d.j > lod + 0.08 || u[2] > 0.42) continue;                 // the face disc covers the front
+    var p = vAdd(vAdd(vMad(Hd.H, Hd.r, Hd.rx * u[0]), vMul(Hd.u, Hd.ry * u[1])), vMul(Hd.f, Hd.rz * u[2]));
+    var n = vNorm(vAdd(vAdd(vMul(Hd.r, u[0] / Hd.rx), vMul(Hd.u, u[1] / Hd.ry)), vMul(Hd.f, u[2] / Hd.rz)));
+    var nv = tv(n);
+    if (nv[2] < 0.02) continue;
+    list.push({ d: d, u: u, p: p, n: n, nv: nv });
+  }
+  list.sort(function (a, b) { return a.u[1] - b.u[1]; });
+  var sz = 1 / Math.sqrt(Math.max(0.35, Math.min(1, lod + 0.08)));
+  c.lineWidth = 0.005;
+  for (i = 0; i < list.length; i++) {
+    var L = list[i], fl = 0.08 * sz, fw = fl * 0.82;
+    var t = vNorm(vSub(flow, vMul(L.n, vDot(flow, L.n))));
+    var w = vMul(vNorm(vCross(L.n, t)), fw * 0.5);
+    var b = vMad(vMad(L.p, t, -fl * 0.45), L.n, 0.004), tip = vMad(vMad(L.p, t, fl * 0.55), L.n, 0.012);
+    var base = scale(mix(P.back, P.wing, L.d.j3 * 0.3), 0.95 + L.d.j2 * 0.1);
+    var tip3 = featherPath(c, b, tip, w);
+    c.fillStyle = rgb(owlLit(base, L.nv, P)); c.fill();
+    if (L.d.j2 > 0.55) {                                         // pale flecks on the crown
+      var s0 = sp(vMad(b, vSub(tip, b), 0.35)), s1 = sp(vMad(b, vSub(tip, b), 0.85));
+      c.strokeStyle = rgb(owlLit(P.spot, L.nv, P), 0.75); c.lineWidth = fw * 0.22;
+      c.beginPath(); c.moveTo(s0[0], s0[1]); c.lineTo(s1[0], s1[1]); c.stroke();
+      c.lineWidth = 0.005;
+    }
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.25), L.nv, P), 0.2);
+  }
+  roundness(c, e, 0.32);
+  if (tufts) {                                                   // ear tufts: a few long feathers each side
+    for (var s = -1; s <= 1; s += 2) for (i = 0; i < 5; i++) {
+      var bb = vAdd(vAdd(vMad(Hd.H, Hd.u, Hd.ry * 0.6), vMul(Hd.r, s * (0.08 + i * 0.022))), vMul(Hd.f, 0.05 - i * 0.008));
+      var tt = vAdd(vAdd(vMad(bb, Hd.u, 0.1 + (2 - Math.abs(i - 2)) * 0.02), vMul(Hd.r, s * (0.03 + i * 0.012))), vMul(Hd.f, -0.02));
+      var ww = vMul(vNorm(vCross(Hd.f, vSub(tt, bb))), 0.034);
+      var nt = tv(Hd.f), ntf = nt[2] < 0 ? vMul(nt, -1) : nt;
+      featherPath(c, bb, tt, ww);
+      c.fillStyle = rgb(owlLit(i % 2 ? P.streak : P.back, ntf, P)); c.fill();
+    }
+  }
+  var fz = tv(Hd.f)[2];
+  if (fz > 0.02) drawFace(c, P, Hd, pose.eyes, fz, lod);
+}
+function drawFace(c, P, Hd, eyes, fz, lod) {
+  var tufts = O.look === 'konohazuku', i, s, a;
+  var drx = tufts ? 0.19 : 0.215, dry = tufts ? 0.165 : 0.185, ex = tufts ? 0.075 : 0.08, re = tufts ? 0.056 : 0.047;
+  var fv = tv(Hd.f), lit = function (col, al) { return rgb(owlLit(col, fv, P), al); };
+  c.save();
+  faceFrame(c, Hd, Hd.rz * 0.72);
+  c.globalAlpha = smooth(0.02, 0.3, fz);
+  // the dark rim, then the disc: paler in the middle
+  c.beginPath(); c.ellipse(0, 0.004, drx + 0.02, dry + 0.018, 0, 0, TAU); c.fillStyle = lit(P.rim); c.fill();
+  var g = c.createRadialGradient(0, 0.02, 0.02, 0, 0, drx);
+  g.addColorStop(0, lit(scale(P.face, 1.04))); g.addColorStop(0.65, lit(P.face)); g.addColorStop(1, lit(scale(P.face, 0.8)));
+  c.beginPath(); c.ellipse(0, 0, drx, dry, 0, 0, TAU); c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  if (lod > 0.35) {                                               // fine feathers radiating from each eye
+    c.lineWidth = 0.0055;
+    for (s = -1; s <= 1; s += 2) for (i = 0; i < 28; i++) {
+      a = i / 28 * TAU + s * 0.1;
+      c.strokeStyle = lit(scale(P.face, 0.74 + (i % 3) * 0.06), 0.5);
+      c.beginPath(); c.moveTo(s * ex + Math.cos(a) * re * 1.6, Math.sin(a) * re * 1.6); c.lineTo(s * ex + Math.cos(a) * 0.17, Math.sin(a) * 0.15); c.stroke();
+    }
+    if (!tufts) {                                                 // フクロウ: faint rings round the eyes
+      c.strokeStyle = lit(P.rim, 0.16); c.lineWidth = 0.007;
+      for (s = -1; s <= 1; s += 2) for (i = 1; i <= 2; i++) { c.beginPath(); c.ellipse(s * ex, 0.005, re * (1.5 + i * 0.55), re * (1.4 + i * 0.5), 0, 0, TAU); c.stroke(); }
+    }
+  }
+  c.restore();
+  if (lod > 0.35) {                                               // the rim's short, dark feathers
+    c.lineWidth = 0.011;
+    for (i = 0; i < 64; i++) {
+      a = i / 64 * TAU;
+      c.strokeStyle = lit(scale(P.rim, 0.8 + (i % 4) * 0.12), 0.75);
+      c.beginPath(); c.moveTo(Math.cos(a) * drx * 0.97, Math.sin(a) * dry * 0.97); c.lineTo(Math.cos(a) * (drx + 0.026), Math.sin(a) * (dry + 0.022)); c.stroke();
+    }
+  }
+  // pale brows meeting over the beak
+  c.lineWidth = 0.012;
+  for (s = -1; s <= 1; s += 2) for (i = 0; i <= 10; i++) {
+    var q = i / 10, bx = lerp(lerp(s * 0.17, s * 0.075, q), lerp(s * 0.075, s * 0.012, q), q), by = lerp(lerp(-0.06, -0.095, q), lerp(-0.095, 0.03, q), q);
+    c.strokeStyle = lit(scale(P.spot, 0.95 + (i % 3) * 0.04), 0.9);
+    c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + s * 0.018, by - 0.024); c.stroke();
+  }
+  for (s = -1; s <= 1; s += 2) drawEye(c, P, s * ex, 0.005, re, eyes, lit);
+  drawBeak(c, P, lit, lod);
+  c.restore();
+}
+/* A glossy eye: the iris, the pupil, the shadow of the brow, the warm
+   lamps reflected low, the sky as a bright window high, and a sparkle.
+   eyes: 0 open, 1 half shut, 2 shut (the upper lid comes down). */
+function drawEye(c, P, x, y, r, eyes, lit) {
+  var tufts = O.look === 'konohazuku', fade = 1 - P.hz * 0.7, i;
+  var g = c.createRadialGradient(x, y, r * 0.85, x, y, r * 1.6);   // the socket
+  g.addColorStop(0, lit(mix(P.face, P.rim, 0.8))); g.addColorStop(1, lit(mix(P.face, P.rim, 0.3), 0));
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 1.6, 0, TAU); c.fill();
+  c.save();
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.clip();
+  var gi = c.createRadialGradient(x - r * 0.15, y - r * 0.2, r * 0.05, x, y, r);
+  if (tufts) {
+    gi.addColorStop(0, rgb(P.fin(mix(P.eye, [255, 240, 170], 0.5)))); gi.addColorStop(0.55, rgb(P.fin(P.eye))); gi.addColorStop(1, rgb(P.fin(scale(P.eye, 0.55))));
+  } else {
+    gi.addColorStop(0, rgb(P.fin(mix(P.eye, [120, 80, 55], 0.35)))); gi.addColorStop(0.7, rgb(P.fin(P.eye))); gi.addColorStop(1, rgb(P.fin(scale(P.eye, 0.5))));
+  }
+  c.fillStyle = gi; c.fillRect(x - r, y - r, r * 2, r * 2);
+  if (tufts) {                                                   // fibres in the orange iris, and the round black pupil
+    c.lineWidth = r * 0.05;
+    for (i = 0; i < 26; i++) {
+      var a = i / 26 * TAU;
+      c.strokeStyle = rgb(P.fin(scale(P.eye, 0.6)), 0.35);
+      c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); c.lineTo(x + Math.cos(a) * r * 0.95, y + Math.sin(a) * r * 0.95); c.stroke();
+    }
+    c.beginPath(); c.arc(x, y + r * 0.02, r * 0.46, 0, TAU); c.fillStyle = rgb(P.fin([12, 8, 8])); c.fill();
+  } else {
+    c.beginPath(); c.arc(x, y + r * 0.02, r * 0.55, 0, TAU); c.fillStyle = rgb(P.fin([6, 4, 4]), 0.55); c.fill();
+  }
+  var gsh = c.createLinearGradient(0, y - r, 0, y + r * 0.1);       // the brow's shadow over the top
+  gsh.addColorStop(0, 'rgba(10,6,6,0.55)'); gsh.addColorStop(1, 'rgba(10,6,6,0)');
+  c.fillStyle = gsh; c.fillRect(x - r, y - r, r * 2, r * 1.1);
+  c.restore();
+  // reflections
+  c.lineWidth = r * 0.17;
+  c.strokeStyle = 'rgba(255,186,118,' + (0.6 * Math.min(1, P.lamp) * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(x, y, r * 0.74, 0.22 * PI, 0.78 * PI); c.stroke();
+  c.fillStyle = 'rgba(255,250,240,' + (0.88 * fade).toFixed(3) + ')';
+  c.beginPath(); c.ellipse(x - r * 0.3, y - r * 0.34, r * 0.3, r * 0.21, -0.5, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,' + (0.8 * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(x + r * 0.3, y - r * 0.1, r * 0.09, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(16,10,8,0.5)'; c.lineWidth = r * 0.1;
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.stroke();
+  if (eyes > 0) {
+    var edge = eyes === 1 ? y - r * 0.05 : y + r * 1.15;
+    c.save();
+    c.beginPath(); c.arc(x, y, r * 1.14, 0, TAU); c.clip();
+    var gl = c.createLinearGradient(0, y - r, 0, edge);
+    gl.addColorStop(0, lit(scale(P.lid, 1.1))); gl.addColorStop(1, lit(scale(P.lid, 0.88)));
+    c.fillStyle = gl;
+    c.beginPath(); c.moveTo(x - r * 1.2, y - r * 1.2); c.lineTo(x + r * 1.2, y - r * 1.2); c.lineTo(x + r * 1.2, edge - r * 0.1);
+    c.quadraticCurveTo(x, edge + r * 0.28, x - r * 1.2, edge - r * 0.1); c.closePath(); c.fill();
+    c.strokeStyle = lit(scale(P.lid, 1.18), 0.5); c.lineWidth = r * 0.07;   // tiny feathers on the lid
+    for (i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * r * 0.32, edge - r * 0.75); c.lineTo(x + i * r * 0.36, edge - r * 0.35); c.stroke(); }
+    c.restore();
+    c.strokeStyle = lit(scale(P.rim, 0.55)); c.lineWidth = r * 0.16;
+    c.beginPath();
+    if (eyes === 1) { c.moveTo(x - r * 0.97, edge - r * 0.06); c.quadraticCurveTo(x, edge + r * 0.24, x + r * 0.97, edge - r * 0.06); }
+    else { c.moveTo(x - r, y + r * 0.05); c.quadraticCurveTo(x, y + r * 0.55, x + r, y + r * 0.05); }
+    c.stroke();
+  }
+}
+function drawBeak(c, P, lit, lod) {
+  var y0 = 0.035, i;
+  c.beginPath();
+  c.moveTo(-0.032, y0); c.quadraticCurveTo(0, y0 - 0.02, 0.032, y0);
+  c.bezierCurveTo(0.03, y0 + 0.045, 0.012, y0 + 0.085, 0, y0 + 0.1);
+  c.bezierCurveTo(-0.012, y0 + 0.085, -0.03, y0 + 0.045, -0.032, y0);
+  c.closePath();
+  var g = c.createLinearGradient(-0.032, 0, 0.032, 0);
+  g.addColorStop(0, lit(scale(P.beak, 1.15))); g.addColorStop(0.5, lit(P.beak)); g.addColorStop(1, lit(scale(P.beak, 0.68)));
+  c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  c.fillStyle = lit(scale(P.beak, 0.45), 0.5); c.fillRect(-0.04, y0 + 0.07, 0.08, 0.04);   // the darker hooked tip
+  c.restore();
+  c.strokeStyle = 'rgba(255,250,240,0.5)'; c.lineWidth = 0.007;
+  c.beginPath(); c.moveTo(-0.014, y0 + 0.008); c.quadraticCurveTo(-0.016, y0 + 0.04, -0.006, y0 + 0.07); c.stroke();
+  if (lod > 0.35) {                                               // bristles over the base of the beak
+    c.lineWidth = 0.007;
+    for (i = 0; i < 11; i++) {
+      var x = (i - 5) * 0.009;
+      c.strokeStyle = lit(scale(P.spot, 0.92 + (i % 2) * 0.08), 0.85);
+      c.beginPath(); c.moveTo(x * 1.2, y0 - 0.035); c.lineTo(x * 2, y0 + 0.028 + Math.abs(x) * 0.6); c.stroke();
+    }
+  }
+}
+
+/* ---------- Wings ----------
+   An arm (shoulder to wrist) and a hand (wrist to tip). Raised by phi
+   (the arm) and phh (the hand, lagging behind in the beat), shortened by
+   fold on the way up, and twisted (twist) so the leading edge dips on the
+   downstroke and lifts high to brake when landing. */
+function wingAngles(pose) {
+  var p = pose.ph, phi, phh, fold, twist;
+  if (pose.glide) { phi = 0.12; phh = 0.04; fold = 1; twist = 0.05; }
+  else {
+    phi = 0.18 + 0.82 * Math.cos(p);
+    phh = phi + 0.42 * Math.sin(p) - 0.08;
+    fold = 1 - 0.32 * Math.max(0, -Math.sin(p));
+    twist = 0.35 * Math.sin(p);
+  }
+  var ld = pose.land || 0;
+  phi = lerp(phi, 1.18, ld); phh = lerp(phh, 0.98, ld); fold = lerp(fold, 0.96, ld); twist = lerp(twist, -1.05, ld);
+  var op = pose.spread === undefined ? 1 : pose.spread;
+  if (op < 1) { phi = lerp(-1.25, phi, op); phh = lerp(-1.4, phh, op); fold = lerp(0.32, fold, op); twist = lerp(0, twist, op); }
+  return { phi: phi, phh: phh, fold: fold, twist: twist };
+}
+function chordFor(d, twist, side) {                   // the direction from leading to trailing edge
+  var c0 = vNorm(vSub([0, 0, -1], vMul(d, -d[2])));
+  var tw = twist * side;
+  return vNorm(vAdd(vMul(c0, Math.cos(tw)), vMul(vCross(d, c0), Math.sin(tw))));
+}
+function wingGeom(F, side, pose) {
+  var g = wingAngles(pose);
+  var S = vAdd(vAdd(vMad(F.O, F.A, 0.17), vMul(F.dor, 0.05)), [side * 0.17, 0, 0]);
+  var dA = [side * Math.cos(g.phi), Math.sin(g.phi), 0], armL = 0.4;
+  var W = vMad(S, dA, armL);
+  var dH = vNorm([side * Math.cos(g.phh), Math.sin(g.phh), -0.22]), handL = 0.56 * g.fold;
+  var cA = chordFor(dA, g.twist * 0.45, side), cH = chordFor(dH, g.twist, side);
+  return { S: S, W: W, dA: dA, dH: dH, cA: cA, cH: cH, armL: armL, handL: handL, fold: g.fold,
+           nA: vMul(vNorm(vCross(dA, cA)), side), nH: vMul(vNorm(vCross(dH, cH)), side) };
+}
+function drawWing(c, P, G, side, lod) {
+  var nvA = tv(G.nA), nvH = tv(G.nH), upA = nvA[2] >= 0, upH = nvH[2] >= 0;
+  var fA = upA ? nvA : vMul(nvA, -1), fH = upH ? nvH : vMul(nvH, -1), i, f;
+  var feathers = [];
+  function add(kind, seg, b, t, wd, j) { feathers.push({ kind: kind, seg: seg, b: b, t: t, wd: wd, j: j }); }
+  // flight feathers: the secondaries along the arm, the primaries fanning from the hand
+  for (i = 0; i <= 8; i++) {
+    var ua = 0.04 + 0.96 * i / 8, bs = vMad(vMad(G.S, G.dA, G.armL * ua), G.cA, 0.1);
+    add('flight', 'A', bs, vMad(vMad(bs, G.cA, 0.33), G.dA, 0.015), 0.1, i / 8);
+  }
+  for (i = 0; i <= 9; i++) {
+    var s = i / 9, bp = vMad(vMad(G.W, G.dH, G.handL * (0.06 + 0.82 * s)), G.cH, 0.06);
+    var dir = vNorm(vAdd(vMul(G.dH, 0.15 + 0.85 * s * s), vMul(G.cH, 1 - 0.72 * s)));
+    var len = (0.38 + 0.1 * s) * (s > 0.85 ? 0.9 : 1) * lerp(0.8, 1, G.fold);
+    add('flight', 'H', bp, vMad(bp, dir, len), 0.078 - 0.022 * s, s);
+  }
+  // coverts in rows over them, smaller toward the leading edge
+  var rows = lod < 0.45 ? [[0.03, 0.18, 0.09, 12]] : [[0.03, 0.18, 0.09, 12], [-0.005, 0.12, 0.075, 13], [-0.03, 0.075, 0.06, 15]];
+  rows.forEach(function (R, ri) {
+    for (var k = 0; k < R[3]; k++) {
+      var q = (k + 0.5) / R[3], b, t;
+      if (q < 0.56) { b = vMad(vMad(G.S, G.dA, G.armL * q / 0.56), G.cA, R[0]); t = vMad(b, G.cA, R[1]); }
+      else { b = vMad(vMad(G.W, G.dH, G.handL * (q - 0.56) / 0.44 * (0.75 - ri * 0.15)), G.cH, R[0]); t = vMad(vMad(b, G.cH, R[1] * 0.9), G.dH, 0.03); }
+      add('covert' + ri, q < 0.56 ? 'A' : 'H', b, t, R[2], q);
+    }
+  });
+  // the whole wing's shape underneath, so nothing shows between the feathers
+  var tipL = vMad(G.W, G.dH, G.handL), outline = [G.S, G.W, tipL], under;
+  for (i = 18; i >= 0; i--) outline.push(feathers[i].t);
+  outline.push(vMad(G.S, G.cA, 0.4));
+  c.beginPath();
+  outline.forEach(function (p, k) { var q2 = sp(p); if (k) c.lineTo(q2[0], q2[1]); else c.moveTo(q2[0], q2[1]); });
+  c.closePath();
+  under = !upA;
+  c.fillStyle = rgb(owlLit(scale(under ? P.under : P.wing, 0.7), fA, P)); c.fill();
+  // draw order: flight feathers (inner to outer on top, the other way round underneath), then the rows of coverts
+  var flight = feathers.slice(0, 19);
+  if (!upH) flight.reverse();
+  var order = flight.concat(feathers.slice(19));
+  c.lineWidth = 0.006;
+  for (i = 0; i < order.length; i++) {
+    f = order[i];
+    var up = f.seg === 'A' ? upA : upH, nv = f.seg === 'A' ? fA : fH, nm = f.seg === 'A' ? G.nA : G.nH;
+    var w = vMul(vNorm(vCross(nm, vSub(f.t, f.b))), f.wd * 0.5), base;
+    if (f.kind === 'flight') base = up ? mix(P.wing, P.back, f.j * 0.25) : mix(P.under, P.wing, 0.08 + f.j * 0.12);
+    else if (f.kind === 'covert0') base = up ? mix(P.back, P.wing, 0.3) : P.under;
+    else base = up ? P.back : scale(P.under, 1.03);
+    var tip3 = featherPath(c, f.b, f.t, w);
+    c.fillStyle = rgb(owlLit(base, nv, P, up ? 1 : 0.92)); c.fill();
+    if (f.kind === 'flight' && lod > 0.3) {
+      featherBars(c, f.b, f.t, w, up ? (f.seg === 'H' ? 4 : 3) : 2, owlLit(up ? P.spot : scale(P.wing, 0.9), nv, P), up ? 0.42 : 0.13);
+      if (!up) {                                                    // darker tips underneath
+        var tq = sp(vMad(f.b, vSub(f.t, f.b), 0.86));
+        c.fillStyle = rgb(owlLit(P.wing, nv, P), 0.28); c.beginPath(); c.arc(tq[0], tq[1], f.wd * 0.4, 0, TAU); c.fill();
+      }
+      if (lod > 0.6 && up) featherShaft(c, f.b, f.t, owlLit(scale(P.wing, 0.7), nv, P), 0.5);
+    } else if (up && f.j * 997 % 1 > 0.45) {                      // pale spots on the upper coverts
+      var sc = sp(vMad(f.b, vSub(f.t, f.b), 0.62)), r0 = Math.hypot(sp(vAdd(f.b, w))[0] - sp(f.b)[0], sp(vAdd(f.b, w))[1] - sp(f.b)[1]);
+      c.fillStyle = rgb(owlLit(P.spot, nv, P), 0.85); c.beginPath(); c.ellipse(sc[0], sc[1], r0 * 0.4, r0 * 0.3, 0, 0, TAU); c.fill();
+    }
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.25), nv, P), up ? 0.25 : 0.12);
+  }
+  if (!upA && lod > 0.3) {                                        // the dark patch at the wrist, underneath
+    var wp = sp(vMad(G.W, G.cA, 0.05)), wr = Math.hypot(sp(vMad(G.W, G.dA, 0.05))[0] - sp(G.W)[0], sp(vMad(G.W, G.dA, 0.05))[1] - sp(G.W)[1]);
+    c.fillStyle = rgb(owlLit(P.streak, fA, P), 0.75); c.beginPath(); c.ellipse(wp[0], wp[1], Math.max(0.015, wr), Math.max(0.012, wr * 0.7), 0, 0, TAU); c.fill();
+  }
+}
+
+/* ---------- Tail, legs, feet ---------- */
+function drawTail(c, P, F, lod) {
+  var tb = vAdd(vMad(F.O, F.A, -0.28), vMul(F.dor, 0.04)), nv = tv(F.dor), up = nv[2] >= 0, fn = up ? nv : vMul(nv, -1);
+  var idx = [0, 7, 1, 6, 2, 5, 3, 4];                       // outer feathers first, the middle pair on top
+  c.lineWidth = 0.006;
+  for (var k = 0; k < 8; k++) {
+    var i = idx[k], s = (i - 3.5) / 3.5, dir = vNorm(vAdd(vAdd(vMul(F.A, -1), vMul(F.X, s * 0.42)), vMul(F.dor, 0.06)));
+    var t = vMad(tb, dir, 0.3 - Math.abs(s) * 0.03), w = vMul(vNorm(vCross(F.dor, dir)), 0.04);
+    var base = up ? mix(P.wing, P.back, 0.3) : P.under;
+    var tip3 = featherPath(c, tb, t, w);
+    c.fillStyle = rgb(owlLit(base, fn, P)); c.fill();
+    if (lod > 0.3) featherBars(c, tb, t, w, 4, owlLit(up ? P.spot : P.wing, fn, P), 0.4);
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.3), fn, P), 0.3);
+  }
+}
+function talon(c, x0, y0, x1, y1, P) {
+  c.strokeStyle = rgb(P.fin([42, 34, 32])); c.lineWidth = 0.012;
+  c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x1 + (x1 - x0) * 0.2, y0, x1, y1); c.stroke();
+  c.strokeStyle = 'rgba(255,240,225,0.35)'; c.lineWidth = 0.004;
+  c.beginPath(); c.moveTo(x0, y0 - 0.002); c.quadraticCurveTo(x1 + (x1 - x0) * 0.2, y0 - 0.002, x1, y1 - 0.004); c.stroke();
+}
+function drawLegs(c, P, F, reach) {                  // legs reaching down for the branch, talons open
+  var nv = [0, 0, 1];
+  c.lineCap = 'round';
+  for (var s = -1; s <= 1; s += 2) {
+    var hip = vAdd(vAdd(vMad(F.O, F.A, -0.12), vMul(F.D, 0.14)), [s * 0.08, 0, 0]);
+    var ank = vAdd(hip, [s * 0.02, -0.36 * reach, 0.09 * reach]);
+    var h = sp(hip), a = sp(ank);
+    c.strokeStyle = rgb(owlLit(scale(P.feet, 0.85), nv, P)); c.lineWidth = 0.058;
+    c.beginPath(); c.moveTo(h[0], h[1]); c.lineTo(a[0], a[1]); c.stroke();
+    c.strokeStyle = rgb(owlLit(P.feet, nv, P), 0.6); c.lineWidth = 0.02;
+    c.beginPath(); c.moveTo(h[0] - s * 0.012, h[1]); c.lineTo(a[0] - s * 0.012, a[1]); c.stroke();
+    for (var j = 0; j < 4; j++) {
+      var ang = j === 3 ? -PI / 2 - s * 0.4 : PI / 2 + (j - 1) * 0.55;
+      var tx = a[0] + Math.cos(ang) * 0.06, ty = a[1] + Math.sin(ang) * 0.05;
+      c.strokeStyle = rgb(owlLit(P.feet, nv, P)); c.lineWidth = 0.026;
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(tx, ty); c.stroke();
+      talon(c, tx, ty, tx + Math.cos(ang) * 0.025, ty + 0.035, P);
+    }
+  }
+  c.lineCap = 'round';
+}
+function drawPerchFeet(c, P, F) {                    // feathered toes on the branch, talons curling over its front
+  var nv = [0, 0, 1];
+  for (var s = -1; s <= 1; s += 2) {
+    var p = sp(vAdd(vAdd(vMad(F.O, F.A, -0.41), vMul(F.D, 0.1)), [s * 0.085, 0, 0]));
+    for (var j = 0; j < 3; j++) {
+      var x = p[0] + (j - 1) * 0.027 + s * 0.004, y = -0.006;
+      c.beginPath(); c.ellipse(x, y, 0.017, 0.024, (j - 1) * 0.25, 0, TAU);
+      c.fillStyle = rgb(owlLit(scale(P.feet, 0.82 + j * 0.04), nv, P)); c.fill();
+      talon(c, x, y + 0.016, x - 0.004, y + 0.05, P);
+    }
+  }
+}
+
+/* ---------- The whole owl ----------
+   pose: yaw, elev (the view), pitch (0 upright … ~1.2 level in flight),
+   headYaw, eyes, spread (0 wings folded … 1 open), ph / glide (the
+   wingbeat), land (0 … 1 braking to land), legs (0 tucked … 1 reaching),
+   perch (feet on the branch), lod. */
+function renderOwl(c, P, pose) {
+  var tufts = O.look === 'konohazuku', lod = pose.lod, pc = Math.cos(pose.pitch), ps = Math.sin(pose.pitch);
+  setView(pose.yaw, pose.elev);
+  var F = { O: [0, 0, 0], X: [1, 0, 0], A: [0, pc, ps], D: [0, -ps, pc], rx: tufts ? 0.26 : 0.29, ra: 0.39, rd: tufts ? 0.25 : 0.27,
+            folded: (pose.spread || 0) < 0.5 };
+  F.dor = vMul(F.D, -1);
+  var Hd = headFrame(F, pose.headYaw || 0, ps), parts = [];
+  function depth(p) { return tv(p)[2]; }
+  parts.push({ z: depth(vMad(F.O, F.A, -0.45)) - 0.01, f: function () { drawTail(c, P, F, lod); } });
+  parts.push({ z: 0, f: function () { drawBody(c, P, F, lod); } });
+  var wa = smooth(0.35, 0.75, pose.spread || 0);
+  if (wa > 0.01) [-1, 1].forEach(function (s) {
+    var G = wingGeom(F, s, pose);
+    parts.push({ z: wa < 1 ? -1 : depth(vMad(G.W, G.dH, 0.15)), f: function () {
+      if (wa >= 1) { drawWing(c, P, G, s, lod); return; }
+      c.save(); c.globalAlpha = wa; drawWing(c, P, G, s, lod); c.restore();
+    } });
+  });
+  if (pose.legs > 0.02) parts.push({ z: depth(vMad(F.O, F.D, 0.2)) + 0.05, f: function () { drawLegs(c, P, F, pose.legs); } });
+  parts.push({ z: depth(Hd.H) + 0.05, f: function () { drawHead(c, P, F, Hd, pose, lod); } });
+  if (pose.perch) parts.push({ z: 9, f: function () { drawPerchFeet(c, P, F); } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+function sitPose(k, eyes, hi) {
+  return { yaw: 0, elev: 0.02, pitch: 0.06, headYaw: HEAD_YAWS[hi], eyes: eyes, spread: 0, ph: 0, glide: false, land: 0, legs: 0, perch: true, lod: owlLod(k) };
+}
+function flyPose(k, view, f) {
+  var front = view === 'front';
+  return { yaw: front ? 0 : PI, elev: front ? -OWL_ELEV : OWL_ELEV, pitch: 1.2, headYaw: 0, eyes: 0, spread: 1,
+           ph: f / OWL_FRAMES * TAU, glide: f === OWL_GLIDE, land: 0, legs: 0, perch: false, lod: owlLod(k) };
+}
+
+/* Draw into a sprite: paint(t, home, info) draws sharp, in units of u
+   device pixels with (0, 0) at the sprite's anchor (home() puts that
+   transform back; info: the sprite's size w, h and anchor ox, oy in device
+   pixels, and u); then it is laid down through the blur for its depth.
+   box: the bounds in those units. into: a canvas to reuse, else a new one. */
+function spriteFrom(u, box, blur, paint, into) {
+  var pad = Math.ceil(blur * 3 * PR) + 2;
+  var w = Math.max(1, Math.ceil((box[2] - box[0]) * u) + pad * 2), h = Math.max(1, Math.ceil((box[3] - box[1]) * u) + pad * 2);
+  var ox = pad - box[0] * u, oy = pad - box[1] * u;
+  var tc = OWLTMP.cnv, t = OWLTMP.c;
+  if (tc.width !== w || tc.height !== h) { tc.width = w; tc.height = h; } else { t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, w, h); }
+  t.setTransform(u, 0, 0, u, ox, oy);
+  t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1;
+  paint(t, function () { t.setTransform(u, 0, 0, u, ox, oy); }, { w: w, h: h, ox: ox, oy: oy, u: u });
+  t.globalCompositeOperation = 'source-over';
+  var cv2 = into || document.createElement('canvas');
+  if (cv2.width !== w || cv2.height !== h) { cv2.width = w; cv2.height = h; }
+  var c = cv2.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (into) c.clearRect(0, 0, w, h);
+  c.filter = blur > 0.05 && HAS_FILTER ? 'blur(' + (blur * PR).toFixed(2) + 'px)' : 'none';
+  c.drawImage(tc, 0, 0);
+  c.filter = 'none';
+  return { cv: cv2, ox: ox / PR, oy: oy / PR, w: w / PR, h: h / PR };
+}
+/* One owl pose at size k: drawn, then a touch of the lamp glow over it. */
+function bakeOwl(k, box, P, pose, into) {
+  var spr = spriteFrom(O.size * H * k * PR, box, owlBlur(k), function (t, home) {
+    renderOwl(t, P, pose);
+    home();
+    t.globalCompositeOperation = 'source-atop';
+    var a = (1 - P.hz) * (isNight() ? O.lampGlow : 0);
+    if (a > 0) {
+      var g = t.createLinearGradient(0, 0.2, 0, -0.75);
+      g.addColorStop(0, 'rgba(255,184,110,' + (0.14 * a).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,184,110,0)');
+      t.fillStyle = g; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+    }
+  }, into);
+  spr.k = k;
+  return spr;
+}
+/* Every sprite is queued and baked a few per frame (bakeOwlQueue): the
+   sitting poses first, then the small flying ones. The owl flies in at
+   nightfall, so they are ready long before it lands. now: use the new set at
+   once (a new size: what is not baked yet is drawn there and then); else the
+   old one is kept until the new one is done (the light moved on). */
+function bakeOwlSprites(now) {
+  if (!H) return;
+  owlPal = {}; owlQueue = [];
+  var sit = [1, FAR_SCALE].map(function (k) { return { k: k, poses: {} }; }), fly = [];
+  sit.forEach(function (S) {
+    for (var e = 0; e < 3; e++) for (var hi = 0; hi < HEAD_YAWS.length; hi++) owlQueue.push(sitJob(S, e, hi));
+  });
+  for (var i = 0; i < OWL_STEPS; i++) {
+    var k = KLIVE * Math.pow(O.farthest / KLIVE, i / (OWL_STEPS - 1)), st = { k: k, back: [], front: [] };
+    fly.push(st);
+    for (var f = 0; f <= OWL_GLIDE; f++) { owlQueue.push(flyJob(st, 'back', f)); owlQueue.push(flyJob(st, 'front', f)); }
+  }
+  if (now || !owlSit.length) { owlSit = sit; owlFly = fly; }
+  else owlQueue.push(function () { owlSit = sit; owlFly = fly; });
+}
+function sitJob(S, e, hi) { return function () { S.poses[e + ',' + hi] = bakeOwl(S.k, SIT_BOX, owlPaletteCached(S.k), sitPose(S.k, e, hi)); }; }
+function flyJob(st, view, f) { return function () { st[view][f] = bakeOwl(st.k, FLY_BOX, owlPaletteCached(st.k), flyPose(st.k, view, f)); }; }
+function bakeOwlQueue(ms) {
+  var t0 = performance.now();
+  while (owlQueue.length && performance.now() - t0 < ms) owlQueue.shift()();
+}
+function flyStep(k) {
+  var i = Math.round(Math.log(Math.max(k, O.farthest) / KLIVE) / Math.log(O.farthest / KLIVE) * (OWL_STEPS - 1));
+  return clamp(i, 0, OWL_STEPS - 1);
+}
+
+/* ---------- What it does ---------- */
+function perchTime() { return rnd(Math.min(O.perchMin, O.perchMax), Math.max(O.perchMin, O.perchMax)); }
+function nextTree() { return trees.length < 2 || Math.random() < O.landNear ? 0 : 1; }
+function bez(p, s) {
+  var a = (1 - s) * (1 - s) * (1 - s), b = 3 * (1 - s) * (1 - s) * s, c = 3 * (1 - s) * s * s, d = s * s * s;
+  return [a * p[0] + b * p[2] + c * p[4] + d * p[6], a * p[1] + b * p[3] + c * p[5] + d * p[7]];
+}
+function startOwl(t) {
+  owl = { state: 'perch', ti: nextTree(), t0: t, until: t + perchTime(), landed: false,
+          blinkAt: t + rnd(1, 3), blinkT0: -1, dbl: false, headT: 0, headI: 0, headStep: 0, headAt: t + O.headEvery * rnd(0.6, 1.4), headUntil: 0,
+          hootAt: t + O.hootEvery * rnd(0.3, 1), x: 0, y: 0, k: 1, ph: 0, beats: 0, glide: 0, bob: 0, frame: 0,
+          lastX: 0, vx: 0, rot: 0, fx: 1, fy: 1, alpha: 1, slot: 'C', pose: 'sit', key: '0,2', view: 'front', live: false, pose3: null };
+}
+function owlOn(T) { return !!owl && owl.state === 'perch' && trees[owl.ti] === T; }
+function flapOwl(dt, hz) {
+  var o = owl;
+  if (o.glide > 0) {
+    o.glide -= dt;
+    if (o.glide <= 0) { o.beats = O.flapBeats; o.ph = 0; }
+  } else {
+    var before = o.ph;
+    o.ph += TAU * hz * dt;
+    if (Math.floor(o.ph / TAU) > Math.floor(before / TAU) && --o.beats <= 0 && O.glideTime > 0) {
+      o.glide = O.glideTime * rnd(0.7, 1.3); o.ph = 0;
+    }
+  }
+  o.frame = o.glide > 0 ? OWL_GLIDE : Math.floor((o.ph % TAU) / TAU * OWL_FRAMES + 0.5) % OWL_FRAMES;
+  o.bob = o.glide > 0 ? 0 : -Math.sin(o.ph) * 0.035 * O.size * H * o.k;   // rises a little on each downstroke
+}
+/* A lean into turns: from how fast it is moving across the screen. */
+function bank(dt) {
+  var o = owl, v = (o.x - o.lastX) / Math.max(dt, 0.001);
+  o.vx += (v - o.vx) * Math.min(1, dt * 4);
+  o.lastX = o.x;
+  return clamp(o.vx * 0.0009, -0.22, 0.22);
+}
+function takeOff(t) {
+  var o = owl, T = trees[o.ti], inward = T.left ? 1 : -1;
+  T.pbV += 0.5 * O.branchBounce;                     // it pushes off: the branch dips, then springs back
+  var x3 = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread), y3 = H * (V.horizon - O.vanishHeight);
+  o.state = 'leave'; o.t0 = t; o.dur = O.flyAwayTime; o.k0 = o.ti === 0 ? 1 : FAR_SCALE; o.inward = inward;
+  // it drops off the branch toward the middle of the screen, then rises away over the mountains
+  o.path = [o.x, o.y, o.x + inward * W * 0.1, o.y + H * 0.03, lerp(o.x, x3, 0.6), Math.min(o.y, y3) - H * 0.06, x3, y3];
+  o.ph = PI * 0.15; o.beats = O.flapBeats + 2; o.glide = 0; o.lastX = o.x; o.vx = 0; o.headT = 0; o.headI = 0;
+}
+function comeBack(t, ti) {
+  var o = owl;
+  o.ti = ti !== undefined ? ti : (o.next !== undefined ? o.next : nextTree());
+  if (o.ti >= trees.length) o.ti = 0;
+  o.next = undefined;
+  o.state = 'return'; o.t0 = t; o.dur = O.returnTime; o.kT = o.ti === 0 ? 1 : FAR_SCALE;
+  o.sx = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread); o.sy = H * (V.horizon - O.vanishHeight);
+  o.ph = 0; o.beats = O.flapBeats; o.glide = 0; o.lastX = o.sx; o.vx = 0; o.yaw = 0;
+}
+function land(t) {
+  var o = owl, T = trees[o.ti];
+  T.pbV += 0.7 * O.branchBounce;                     // the branch dips under it and springs back
+  o.state = 'perch'; o.landed = true; o.t0 = t; o.until = t + perchTime();
+  o.blinkAt = t + rnd(1, 3); o.blinkT0 = -1; o.dbl = false; o.headT = 0; o.headI = 0;
+  o.headAt = t + O.headEvery * rnd(0.6, 1.4); o.hootAt = t + O.hootEvery * rnd(0.4, 1);
+}
+function updateOwl(t, dt) {
+  if (!trees.length || !owl) return;
+  var o = owl, T, inward, tt, u, s, p;
+  if (o.ti >= trees.length) o.ti = 0;
+  o.fx = 1; o.fy = 1; o.alpha = 1; o.live = false;
+  if (o.state === 'perch') {
+    T = trees[o.ti]; inward = T.left ? 1 : -1;
+    var st = seat(T);
+    o.x = st.x; o.y = st.y; o.k = o.ti === 0 ? 1 : FAR_SCALE; o.lastX = o.x; o.vx = 0;
+    o.pose = 'sit'; o.slot = o.ti === 0 ? 'C' : 'B';
+    // blinking: half shut, shut, half shut; now and then twice in a row
+    var eyes = 0;
+    if (o.blinkT0 < 0 && t >= o.blinkAt) o.blinkT0 = t;
+    if (o.blinkT0 >= 0) {
+      var bp = (t - o.blinkT0) / Math.max(0.04, O.blinkTime);
+      eyes = bp < 0.2 ? 1 : (bp < 0.7 ? 2 : (bp < 1 ? 1 : 0));
+      if (bp >= 1) {
+        o.blinkT0 = -1;
+        if (!o.dbl && Math.random() < O.doubleBlink) { o.dbl = true; o.blinkAt = t + 0.1; }
+        else { o.dbl = false; o.blinkAt = t + rnd(Math.min(O.blinkMin, O.blinkMax), Math.max(O.blinkMin, O.blinkMax)); }
+      }
+    }
+    // a look to one side now and then (when switched on, or from the button); the head swings round in steps
+    if (o.headT !== 0 && t >= o.headUntil) { o.headT = 0; o.headAt = t + O.headEvery * rnd(0.6, 1.4); }
+    else if (O.headTurn && o.headT === 0 && o.headI === 0 && t >= o.headAt) { o.headT = Math.random() < 0.5 ? -2 : 2; o.headUntil = t + rnd(1.5, 3.5); }
+    if (t >= o.headStep && o.headI !== o.headT) { o.headI += o.headI < o.headT ? 1 : -1; o.headStep = t + 0.055; }
+    if (O.hoot && t >= o.hootAt) { hoot(); o.hootAt = t + O.hootEvery * rnd(0.6, 1.4); }
+    o.key = eyes + ',' + (o.headI + 2);
+    o.rot = st.rot;
+    o.fy = 1 + 0.008 * Math.sin(t * 1.7);             // breathing
+    var ts = t - o.t0, lean = smooth(o.until - 0.5, o.until, t);
+    if (o.landed && ts < 0.5) {                        // just landed: the wings come down and fold away
+      o.live = true;
+      o.pose3 = { yaw: 0, elev: lerp(-0.08, 0.02, smooth(0, 0.4, ts)), pitch: lerp(0.3, 0.06, smooth(0, 0.4, ts)), headYaw: 0, eyes: 0,
+                  spread: 1 - smooth(0.05, 0.5, ts), ph: 0, glide: true, land: 1 - smooth(0, 0.3, ts), legs: 1 - smooth(0, 0.15, ts), perch: true, lod: owlLod(o.k) };
+    } else if (lean > 0) {                             // about to go: it crouches, leans toward where it will fly, wings loosen
+      o.live = true;
+      o.pose3 = { yaw: 0, elev: 0.02, pitch: 0.06 + 0.32 * lean, headYaw: HEAD_YAWS[o.headI + 2], eyes: 0, spread: 0, ph: 0, glide: true,
+                  land: 0, legs: 0, perch: true, lod: owlLod(o.k) };
+      o.rot += inward * 0.12 * lean; o.fy = 1 - 0.06 * lean;
+    }
+    if (t >= o.until) takeOff(t);
+  } else if (o.state === 'leave') {
+    tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = 1 - Math.pow(1 - u, 1.5);
+    p = bez(o.path, s);
+    // it keeps its depth while it clears the tree, then goes further and further away
+    o.k = Math.exp(lerp(Math.log(o.k0), Math.log(O.farthest), Math.pow(clamp((u - 0.1) / 0.9, 0, 1), 1.2)));
+    flapOwl(dt, O.flapHz * (tt < 1.2 ? 1.3 : 1));
+    if (tt < 0.5) o.bob *= tt / 0.5;
+    // it turns right round to fly away from us, opening its wings as it drops off the branch
+    var yaw = o.inward * PI * smooth(0.12, 0.85, tt);
+    o.view = Math.cos(yaw) < 0 ? 'back' : 'front';
+    o.live = o.k >= KLIVE || tt < 1;
+    o.pose3 = { yaw: yaw, elev: lerp(0.02, OWL_ELEV, smooth(0.05, 0.6, tt)), pitch: lerp(0.38, 1.2, smooth(0.05, 0.7, tt)), headYaw: 0, eyes: 0,
+                spread: smooth(0, 0.25, tt), ph: o.ph, glide: o.glide > 0, land: 1 - smooth(0.05, 0.4, tt),
+                legs: 1 - smooth(0.1, 0.5, tt), perch: false, lod: owlLod(o.k) };
+    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt);
+    o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
+    if (u >= 1) { o.state = 'gone'; o.until = t + (o.quick ? 1 : O.awayTime); o.quick = false; }
+  } else if (o.state === 'gone') {
+    o.alpha = 0;
+    if (t >= o.until && owlActive) comeBack(t);     // after dawn it stays away
+  } else if (o.state === 'return') {
+    T = trees[o.ti]; inward = T.left ? 1 : -1;
+    var sp2 = seat(T);
+    tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = u * u * (3 - 2 * u);
+    // from far over the mountains, round to the inner side of the branch, and in to land
+    p = bez([o.sx, o.sy, o.sx, o.sy - H * 0.04, sp2.x + inward * W * 0.16, sp2.y - H * 0.08, sp2.x, sp2.y], s);
+    o.k = Math.exp(lerp(Math.log(O.farthest), Math.log(o.kT), clamp(s / 0.85, 0, 1)));
+    var lb = smooth(o.dur - 0.8, o.dur - 0.05, tt);   // the last moment: body up, wings high and braking, legs out
+    flapOwl(dt, O.flapHz * (1 + lb * 0.4));
+    o.bob *= 1 - lb;
+    o.view = 'front';
+    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt) * (1 - lb);
+    o.yaw = lerp(o.yaw || 0, clamp(o.vx * 0.0012, -0.45, 0.45) * smooth(KLIVE, 0.6, o.k) * (1 - lb), Math.min(1, dt * 3));
+    o.live = o.k >= KLIVE;
+    o.pose3 = { yaw: o.yaw, elev: lerp(-OWL_ELEV, -0.08, lb), pitch: lerp(1.2, 0.3, lb), headYaw: 0, eyes: 0, spread: 1, ph: o.ph, glide: o.glide > 0 && lb < 0.5,
+                land: lb, legs: smooth(o.dur - 1.0, o.dur - 0.3, tt), perch: false, lod: owlLod(o.k) };
+    o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
+    if (u >= 1) land(t);
+  }
+}
+/* slot 'A': further than the far tree (drawn behind it); 'B': between the
+   two trees; 'C': in front of the near tree. */
+function drawOwl(c, slot) {
+  if (!owl || owl.slot !== slot || owl.alpha <= 0.003 || !owlSit.length || owl.state === 'gone') return;
+  var spr = null, sc = 1;
+  if (owl.live && owl.pose3) {                     // drawn afresh, every other frame (the wingbeat at 30 a second)
+    owlLiveN++;
+    if (!owlLiveSpr || owlLiveN % 2) owlLiveSpr = bakeOwl(owl.k, FLY_BOX, owlPaletteCached(owl.k), owl.pose3, OWLOUT.cnv);
+    spr = owlLiveSpr;
+  } else if (owl.pose === 'sit') {
+    owlLiveSpr = null;
+    spr = owlSit[owl.ti === 0 ? 0 : 1].poses[owl.key];
+    if (!spr) { var ky = owl.key.split(','); spr = bakeOwl(owl.k, SIT_BOX, owlPaletteCached(owl.k), sitPose(owl.k, +ky[0], +ky[1]), OWLOUT.cnv); }
+  } else {
+    owlLiveSpr = null;
+    var st = owlFly[flyStep(owl.k)];
+    spr = st && (owl.view === 'back' ? st.back : st.front)[owl.frame];
+    if (spr) sc = owl.k / st.k;
+    else spr = bakeOwl(owl.k, FLY_BOX, owlPaletteCached(owl.k), flyPose(owl.k, owl.view, owl.frame), OWLOUT.cnv);   // not baked yet
+  }
+  if (!spr) return;
+  c.setTransform(PR, 0, 0, PR, owl.x * PR, owl.y * PR);
+  c.rotate(owl.rot);
+  c.scale(sc * owl.fx, sc * owl.fy);
+  c.globalAlpha = owl.alpha;
+  c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+}
+/* ---------- The hoot ----------
+   On the app's sound (as the birds' calls are), only while the sound is on
+   and the scene can be seen. Notes: [start s, length s, from Hz, to Hz]. */
+var HOOTS = {
+  // フクロウ: "hoo … hoo, go-ro-suke hoo-hoo", low and soft
+  fukurou: [[0, 0.42, 420, 398], [0.62, 0.42, 412, 388], [1.6, 0.15, 404, 392], [1.82, 0.15, 400, 388],
+            [2.04, 0.2, 404, 384], [2.45, 0.36, 408, 388], [2.95, 0.48, 398, 372]],
+  // コノハズク: "bu-ppō-sō" (仏法僧), higher and shorter
+  konohazuku: [[0, 0.1, 1120, 1090], [0.24, 0.17, 1290, 1240], [0.56, 0.3, 1150, 1040]]
+};
+var hootCalls = [];
+function hoot() {
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx || soundAudioCtx.state !== 'running' || !owl || dynMaster < 0.5) return;
+  try {
+    var ac = soundAudioCtx, p = Math.pow(2, O.hootPitch / 1200), t0 = ac.currentTime + 0.03, tEnd = t0;
+    var out = ac.createGain(); out.gain.value = O.hootVolume * lerp(0.35, 1, clamp(owl.k, 0, 1));
+    if (ac.createStereoPanner) {
+      var pan = ac.createStereoPanner(); pan.pan.value = clamp(owl.x / W * 2 - 1, -1, 1) * 0.8;
+      out.connect(pan); pan.connect(soundMasterGain);
+    } else out.connect(soundMasterGain);
+    var lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800 * p; lp.connect(out);
+    (HOOTS[O.look] || HOOTS.fukurou).forEach(function (n) {
+      var t = t0 + n[0], d = n[1];
+      var osc = ac.createOscillator(); osc.type = 'sine';
+      osc.frequency.setValueAtTime(n[2] * p, t); osc.frequency.linearRampToValueAtTime(n[3] * p, t + d);
+      var env = ac.createGain();
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.linearRampToValueAtTime(0.4, t + Math.min(0.07, d * 0.4));
+      env.gain.setValueAtTime(0.4, t + d * 0.6);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.12);
+      osc.connect(env); env.connect(lp);
+      osc.start(t); osc.stop(t + d + 0.2);
+      tEnd = Math.max(tEnd, t + d + 0.2);
+    });
+    while (hootCalls.length && hootCalls[0].end < ac.currentTime) hootCalls.shift();
+    hootCalls.push({ g: out, end: tEnd });
+  } catch (e) { /* silent */ }
+}
+function fadeHoots() {
+  if (!hootCalls.length || !soundAudioCtx) { hootCalls.length = 0; return; }
+  var now = soundAudioCtx.currentTime;
+  for (var i = 0; i < hootCalls.length; i++) {
+    if (hootCalls[i].end < now) continue;
+    try { hootCalls[i].g.gain.cancelScheduledValues(now); hootCalls[i].g.gain.setTargetAtTime(0, now, 0.03); } catch (e) { /* silent */ }
+  }
+  hootCalls.length = 0;
+}
+var ANIM_YAW = -0.22, ANIM_ELEV = 0.16;              // seen a little from the front and from above
+var DEER_BOX = [-1.2, -2.1, 1.4, 0.14], TANUKI_BOX = [-1.25, -1.3, 1.3, 0.14];   // sprite bounds in shoulder heights
+var animals = [], animSets = {}, animQueue = [], deerNext = 0, tanukiNext = 0, herdN = 0;
+var FUR_MID = { j: 0.5, j2: 0.5, j3: 0.5 };
+function vLerp(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function ap(p) { var v = tv(p); return [v[0], -v[1]]; }   // onto an animal's sprite: (0, 0) is the ground under its middle
+
+/* Where an animal at depth k stands, and how big it is. */
+function groundY(k) { var hy = H * V.horizon; return hy + (H - hy) * clamp(k / 1.15, 0, 1); }
+function animUnitPx(kind, variant, k) { return (kind === 'deer' ? O.deerSize : O.tanukiSize * (variant === 'kit' ? 0.7 : 1)) * H * k; }
+function animBlur(k) {
+  if (k >= FAR_SCALE) return lerp(O.farBlur, 0, clamp((k - FAR_SCALE) / (1 - FAR_SCALE), 0, 1));
+  return lerp(O.farBlur * 1.7, O.farBlur, clamp((k - 0.3) / (FAR_SCALE - 0.3), 0, 1));
+}
+function animHaze(k) { return O.animHaze * Math.pow(clamp((1 - k) / 0.7, 0, 1), 1.4); }
+function animPalette(variant, k) {
+  var src = O.animColours[variant === 'kit' || variant === 'mother' ? 'tanuki' : variant], P = {};
+  for (var key in src) P[key] = vivid(hex(src[key]), O.vivid);
+  if (variant === 'kit') { P.fur = mix(P.fur, P.dark, 0.1); P.tip = mix(P.tip, P.fur, 0.15); }   // a little darker and fluffier
+  var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.animStrength * lerp(1, TREE.farOpacity, far * 0.7);
+  var hz = animHaze(k), mist = light(cols().mist), night = isNight();
+  P.fin = function (c) {
+    var o = mix(c, PAPER, 1 - str);
+    if (night) o = mix(o, [60, 52, 96], 0.06);
+    return mix(o, mist, hz);
+  };
+  P.lamp = night ? O.lampGlow : 0.25;
+  P.hz = hz; P.str = str; P.mist = mist; P.night = night;
+  return P;
+}
+
+/* ---------- Drawing helpers (units: shoulder heights; x its front, y up) ----------
+   The hair-stroke drawing, used where there is no WebGL 2 (see glAnimSprite). */
+/* An ellipsoid covered in hair: centre o, three axis vectors ax (scaled),
+   flow: the way the hair lies; colour(u, d): a hair's own colour at unit
+   direction u (along the three axes). hl, hw: hair length and width;
+   twist: how far each hair strays from the flow (fluffy); rnd: the
+   shading toward the edges (roundness), 0.28 unless given. */
+function furBall(c, P, o, ax, flow, colour, hl, hw, lod, n, seed, twist, rnd) {
+  var e = projEllipse(o, ax[0], ax[1], ax[2], ap);
+  var l0 = vDot(ax[0], ax[0]), l1 = vDot(ax[1], ax[1]), l2 = vDot(ax[2], ax[2]), i;
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx, e.ry, e.rot, 0, TAU);
+  c.fillStyle = rgb(owlLit(scale(colour([0, 0.2, 0.98], FUR_MID), 0.82), [0, 0, 1], P)); c.fill();
+  var dirs = owlDirs(n, seed);
+  c.lineWidth = hw;
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i];
+    if (d.j > lod + 0.1) continue;
+    var u = d.u, p = vAdd(vAdd(vMad(o, ax[0], u[0]), vMul(ax[1], u[1])), vMul(ax[2], u[2]));
+    var nm = vNorm(vAdd(vAdd(vMul(ax[0], u[0] / l0), vMul(ax[1], u[1] / l1)), vMul(ax[2], u[2] / l2)));
+    var nv = tv(nm);
+    if (nv[2] < -0.1) continue;                        // just past the edge still shows: a soft, furry outline
+    var tt = vSub(flow, vMul(nm, vDot(flow, nm)));
+    tt = vDot(tt, tt) < 1e-6 ? vNorm(vCross(nm, [0, 0, 1])) : vNorm(tt);
+    if (twist) { var sd = vCross(nm, tt), ta = (d.j3 - 0.5) * 2 * twist; tt = vAdd(vMul(tt, Math.cos(ta)), vMul(sd, Math.sin(ta))); }
+    var len = hl * (0.8 + d.j3 * 0.4);
+    var a = ap(vMad(vMad(p, tt, -len * 0.3), nm, 0.004)), b = ap(vMad(vMad(p, tt, len * 0.7), nm, 0.02));
+    c.strokeStyle = rgb(owlLit(colour(u, d), nv[2] < 0.3 ? vNorm([nv[0], nv[1], 0.3]) : nv, P));   // gentle at the edge: no bright rim on the hairs
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  if (rnd !== 0) roundness(c, e, rnd === undefined ? 0.28 : rnd);
+  return e;
+}
+/* A rounded limb from a to b (radii ra, rb), shaded across. */
+function tube(c, P, a3, b3, ra, rb, col) {
+  var A = ap(a3), B = ap(b3), dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy) || 1e-6;
+  var px = -dy / L, py = dx / L, an = Math.atan2(py, px);
+  var g = c.createLinearGradient(A[0] + px * ra, A[1] + py * ra, A[0] - px * ra, A[1] - py * ra);
+  g.addColorStop(0, rgb(owlLit(col, vNorm([px, -py, 0.5]), P)));
+  g.addColorStop(0.5, rgb(owlLit(col, [0, 0, 1], P)));
+  g.addColorStop(1, rgb(owlLit(scale(col, 0.82), vNorm([-px, py, 0.5]), P)));
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(A[0] + px * ra, A[1] + py * ra);
+  c.lineTo(B[0] + px * rb, B[1] + py * rb);
+  c.arc(B[0], B[1], rb, an, an - PI, true);
+  c.lineTo(A[0] - px * ra, A[1] - py * ra);
+  c.arc(A[0], A[1], ra, an + PI, an, true);
+  c.closePath();
+  c.fill();
+}
+/* An eye: dark and glossy, the lamps caught in it (eyeshine) the more it
+   faces us, and a sparkle. */
+function animEye(c, P, p, r, face) {
+  var q = ap(p), fade = 1 - P.hz * 0.6;
+  c.fillStyle = rgb(P.fin(P.eye)); c.beginPath(); c.arc(q[0], q[1], r, 0, TAU); c.fill();
+  var s = 0.8 * Math.min(1, P.lamp) * face * fade;
+  if (s > 0.02) {
+    var g = c.createRadialGradient(q[0] + r * 0.1, q[1] + r * 0.15, 0, q[0], q[1], r);
+    g.addColorStop(0, 'rgba(232,240,170,' + s.toFixed(3) + ')');
+    g.addColorStop(0.6, 'rgba(170,212,120,' + (s * 0.55).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(120,160,90,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(q[0], q[1], r, 0, TAU); c.fill();
+  }
+  c.fillStyle = 'rgba(255,252,245,' + (0.85 * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(q[0] - r * 0.32, q[1] - r * 0.32, r * 0.3, 0, TAU); c.fill();
+}
+function glossyNose(c, P, p, r) {
+  var q = ap(p);
+  c.fillStyle = rgb(P.fin(P.nose)); c.beginPath(); c.ellipse(q[0], q[1], r * 1.15, r * 0.85, 0, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,245,235,' + (0.35 * (1 - P.hz)).toFixed(3) + ')';
+  c.beginPath(); c.ellipse(q[0] - r * 0.3, q[1] - r * 0.35, r * 0.4, r * 0.22, -0.3, 0, TAU); c.fill();
+}
+/* An ear: a flat leaf from base to tip, its outer side or (facing us) its
+   paler inside. nrm: the way its inside faces. */
+function animEar(c, P, base, tip, nrm, wd, outer, inner) {
+  var w = vMul(vNorm(vCross(nrm, vSub(tip, base))), wd), nv = tv(nrm), front = nv[2] > 0, fn = front ? nv : vMul(nv, -1);
+  featherPath(c, base, tip, w, ap);
+  c.fillStyle = rgb(owlLit(outer, fn, P)); c.fill();
+  if (front) {
+    featherPath(c, vMad(base, vSub(tip, base), 0.12), vMad(tip, vSub(tip, base), -0.12), vMul(w, 0.62), ap);
+    c.fillStyle = rgb(owlLit(inner, fn, P)); c.fill();
+  }
+}
+
+/* ---------- Legs and gaits ---------- */
+/* Where a foot is in its step: phase ph, the leg's offset in the cycle,
+   the share of the cycle it is on the ground (duty), how far it travels
+   back while there (stride), how high it lifts. */
+function footAt(ph, off, duty, stride, lift) {
+  var q = ((ph / TAU + off) % 1 + 1) % 1;
+  if (q < duty) return [stride * (0.5 - q / duty), 0];
+  var s = (q - duty) / (1 - duty);
+  return [stride * (-0.5 + (1 - Math.cos(PI * s)) / 2), lift * Math.sin(PI * s)];
+}
+/* The middle joint of a two-part leg from hip h to foot f (side view),
+   bulging forward (bend 1: a deer's front knee) or back (-1: a hock). */
+function ik2(h, f, l1, l2, bend) {
+  var dx = f[0] - h[0], dy = f[1] - h[1], d = Math.max(1e-4, Math.min(Math.hypot(dx, dy), l1 + l2 - 1e-4));
+  var a = Math.atan2(dy, dx), b = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1)), ang = a + b * bend;
+  return [h[0] + Math.cos(ang) * l1, h[1] + Math.sin(ang) * l1];
+}
+/* Legs: near front, far front, near hind, far hind. */
+var GAITS = {
+  walk: { offs: [0.25, 0.75, 0, 0.5], duty: 0.62, stride: 0.62, lift: 0.11 },   // a deer's slow four-beat walk
+  run:  { offs: [0.45, 0.55, 0, 0.08], duty: 0.32, stride: 0.6, lift: 0.3 },     // its bounding gallop
+  trot: { offs: [0, 0.5, 0.5, 0], duty: 0.5, stride: 0.45, lift: 0.13 }          // a tanuki's quick trot
+};
+
+/* ---------- Sika deer ----------
+   pose: gait ('walk', 'run', 'stand'), ph, neck (0 head high … 0.15 carried
+   … 1 grazing), look (0 … 1 head turned to us), chew, tail (0 down … 1 up,
+   its white flag), ears (0 … 1 pricked). */
+var ANTLER = { beam: [[0, 0, 0], [-0.05, 0.16, 0.035], [-0.11, 0.34, 0.075], [-0.09, 0.52, 0.105]],
+               tines: [[[0, 0.07, 0.015], [0.13, 0.14, 0.05]], [[-0.11, 0.34, 0.075], [0, 0.47, 0.095]],
+                       [[-0.09, 0.52, 0.105], [-0.02, 0.63, 0.12]], [[-0.09, 0.52, 0.105], [-0.18, 0.6, 0.13]]] };
+function drawAntler(c, P, base, f, u, r, s) {
+  function W(q) { return ap(vAdd(vAdd(vAdd(base, vMul(f, q[0])), vMul(u, q[1])), vMul(r, s * q[2]))); }
+  var nv = [0, 0.3, 0.95], c0 = owlLit(scale(P.antler, 0.6), nv, P), c1 = owlLit(P.antler, nv, P), c2 = owlLit(scale(P.antler, 1.15), nv, P), i, a, b;
+  for (i = 0; i < 3; i++) {
+    a = W(ANTLER.beam[i]); b = W(ANTLER.beam[i + 1]);
+    c.strokeStyle = rgb(mix(c0, c1, i / 2)); c.lineWidth = 0.05 - i * 0.011;
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  for (i = 0; i < ANTLER.tines.length; i++) {
+    a = W(ANTLER.tines[i][0]); b = W(ANTLER.tines[i][1]);
+    c.strokeStyle = rgb(c1); c.lineWidth = 0.022;
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    c.strokeStyle = rgb(c2, 0.8); c.lineWidth = 0.009;           // pale, polished tips
+    c.beginPath(); c.moveTo(lerp(a[0], b[0], 0.5), lerp(a[1], b[1], 0.5)); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  a = W([0, 0, 0]);
+  c.fillStyle = rgb(c0); c.beginPath(); c.arc(a[0], a[1], 0.03, 0, TAU); c.fill();   // the burr at its base
+}
+function renderDeer(c, P, pose, stag, lod) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  var g = GAITS[pose.gait] || GAITS.walk, ph = pose.ph || 0, bob = 0, pitch = 0, parts = [];
+  if (pose.gait === 'walk') bob = 0.012 * Math.cos(2 * ph);
+  if (pose.gait === 'run') { bob = 0.05 + 0.08 * Math.sin(ph + 0.6); pitch = 0.12 * Math.sin(ph - 0.4); }
+  var cp = Math.cos(pitch), spn = Math.sin(pitch), AX = [cp, spn, 0], AY = [-spn, cp, 0], AZ = [0, 0, 1];
+  function B(x, y, z) { var yy = y - 0.95; return [x * cp - yy * spn, 0.95 + x * spn + yy * cp + bob, z]; }
+  function depth(p) { return tv(p)[2]; }
+  function coat(u, d) {
+    var col = mix(P.coat, P.back, smooth(0.45, 0.95, u[1]));
+    if (u[1] < -0.35) col = mix(col, P.belly, smooth(-0.35, -0.75, u[1]));
+    return scale(col, 0.95 + d.j2 * 0.1);
+  }
+  // the body: chest, barrel and haunch
+  [[B(0.34, 0.97, 0), [0.33, 0.33, 0.24]], [B(0, 0.93, 0), [0.46, 0.28, 0.25]], [B(-0.4, 1.0, 0), [0.33, 0.31, 0.25]]].forEach(function (T, i) {
+    parts.push({ z: depth(T[0]) + (i === 0 ? 0.002 : 0), f: function () {
+      furBall(c, P, T[0], [vMul(AX, T[1][0]), vMul(AY, T[1][1]), vMul(AZ, T[1][2])], vMul(AX, -1), function (u, d) {
+        if (i === 2 && u[0] < -0.42 && u[1] > -0.25) return u[0] < -0.55 ? scale(P.rump, 0.96 + d.j2 * 0.08) : P.rim;   // the white rump, rimmed in black
+        return coat(u, d);
+      }, 0.06, 0.022, lod, 170, 31 + i, 0.15, 0.12);
+      if (!stag && i > 0) spots(T[0], T[1]);
+    } });
+  });
+  // a hind's faint pale spots along her flank, in rows
+  function spots(o, rr) {
+    var dirs = owlDirs(70, 91), sc = rgb(owlLit(P.spot, [0, 0, 1], P), 0.5);
+    c.fillStyle = sc;
+    for (var k = 0; k < dirs.length; k++) {
+      var uu = dirs[k].u;
+      if (uu[2] < 0.3 || uu[1] < 0.05 || uu[1] > 0.62 || dirs[k].j > 0.55) continue;
+      var pp = vAdd(vAdd(vMad(o, AX, rr[0] * uu[0]), vMul(AY, rr[1] * uu[1])), vMul(AZ, rr[2] * uu[2] * 1.02));
+      var nz = tv(vNorm([uu[0] / rr[0], uu[1] / rr[1], uu[2] / rr[2]]))[2];
+      if (nz < 0.25) continue;
+      var q = ap(pp);
+      c.beginPath(); c.ellipse(q[0], q[1], 0.017 * nz, 0.013, 0, 0, TAU); c.fill();
+    }
+  }
+  // the tail: hanging, flicked, or raised as a white flag
+  var ta = lerp(-1.75, 0.9, pose.tail || 0), tb = B(-0.7, 1.08, 0), td = [Math.cos(ta + pitch), Math.sin(ta + pitch), 0];
+  parts.push({ z: depth(tb) - 0.01, f: function () {
+    furBall(c, P, vMad(tb, td, 0.07), [vMul(td, 0.08), vMul(vNorm(vCross([0, 0, 1], td)), 0.045), [0, 0, 0.035]], td, function (uu) {
+      return uu[1] > 0.55 ? P.rim : P.rump;
+    }, 0.04, 0.02, lod, 40, 77);
+  } });
+  // legs
+  [[0.4, 0.11, true], [0.4, -0.11, true], [-0.44, 0.12, false], [-0.44, -0.12, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = front ? 0.45 : 0.5, l2 = front ? 0.46 : 0.45;
+    var hip = B(L[0], front ? 0.86 : 0.9, L[1]), fx, fy;
+    if (pose.gait === 'stand') { fx = L[0] + (near ? 0.03 : -0.03) * (front ? 1 : -1); fy = 0; }
+    else { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.leg : scale(P.leg, 0.78);
+    parts.push({ z: depth(knee) + (near ? 0.05 : -0.05), f: function () {
+      tube(c, P, hip, knee, front ? 0.1 : 0.15, front ? 0.05 : 0.06, col);
+      tube(c, P, knee, foot, front ? 0.04 : 0.045, 0.028, col);
+      tube(c, P, vAdd(foot, [0.005, 0.06, 0]), vAdd(foot, [0.03, 0.004, 0]), 0.03, 0.034, P.hoof);   // the hoof
+    } });
+  });
+  // the neck: a few rounded pieces along a curve to the head
+  var n = pose.neck === undefined ? 0.15 : pose.neck, nb = B(0.5, 1.12, 0);
+  var Hup = vAdd(nb, [0.2, 0.55, 0]), Hcar = vAdd(nb, [0.36, 0.36, 0]), Hdn = [0.95, 0.36, 0];
+  var H0 = n < 0.15 ? vLerp(Hup, Hcar, n / 0.15) : vLerp(Hcar, Hdn, smooth(0, 1, (n - 0.15) / 0.85));
+  var hp = n < 0.15 ? lerp(-0.25, -0.5, n / 0.15) : lerp(-0.5, -1.35, smooth(0, 1, (n - 0.15) / 0.85));
+  if (pose.chew) { hp += 0.12; H0 = vAdd(H0, [0, 0.015, 0]); }
+  var hy = 0.95 * (pose.look || 0), ears = pose.ears || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r = vNorm(vCross(f, [0, 1, 0])), u = vCross(r, f);
+  var nt = vAdd(vMad(H0, f, -0.1), vMul(u, -0.03)), nc = vAdd(vLerp(nb, nt, 0.5), [0.05, 0.1 * (1 - n), 0]);
+  [0.08, 0.26, 0.44, 0.62, 0.8, 0.95].forEach(function (s, i) {
+    var cc = vAdd(vAdd(vMul(nb, (1 - s) * (1 - s)), vMul(nc, 2 * (1 - s) * s)), vMul(nt, s * s));
+    var tg = vNorm(vAdd(vMul(vSub(nc, nb), 2 * (1 - s)), vMul(vSub(nt, nc), 2 * s))), pr = vNorm(vCross([0, 0, 1], tg));
+    var ra = lerp(0.18, 0.11, s) * (stag ? 1.3 - 0.25 * s : 1);
+    parts.push({ z: depth(cc) + 0.01 + i * 0.001, f: function () {
+      furBall(c, P, cc, [vMul(tg, 0.13), vMul(pr, ra), [0, 0, ra * 0.85]], vMul(tg, -1), function (uu, d) {
+        var col = stag ? mix(P.coat, P.mane, smooth(-0.2, 0.6, uu[1]) * 0.85) : mix(P.coat, P.back, smooth(0.4, 1, uu[1]) * 0.6);
+        if (uu[1] < -0.5) col = mix(col, P.belly, 0.4);              // the paler throat
+        return scale(col, 0.95 + d.j2 * 0.1);
+      }, stag ? 0.09 : 0.06, 0.024, lod, 70, 41 + i, stag ? 0.3 : 0.12, 0);
+    } });
+  });
+  // the head: far ear and antler, skull, muzzle, nose, eyes, near ear and antler
+  parts.push({ z: depth(H0) + 0.06, f: function () {
+    var sides = [-1, 1].sort(function (a, b) { return tv(vMul(r, a))[2] - tv(vMul(r, b))[2]; });
+    function ear(s) {
+      var base = vAdd(vAdd(vMad(H0, f, -0.07), vMul(u, 0.1)), vMul(r, s * 0.065));
+      var dir = vNorm(vAdd(vAdd(vMul(u, 0.7 + 0.25 * ears), vMul(f, -(0.45 - 0.35 * ears))), vMul(r, s * 0.6)));
+      animEar(c, P, base, vMad(base, dir, 0.22), vNorm(vAdd(vMul(f, 0.55), vMul(r, s * 0.7))), 0.065, P.coat, P.ear);
+    }
+    function antler(s) { if (stag) drawAntler(c, P, vAdd(vAdd(vMad(H0, f, -0.03), vMul(u, 0.1)), vMul(r, s * 0.05)), f, u, r, s); }
+    ear(sides[0]); antler(sides[0]);
+    furBall(c, P, H0, [vMul(f, 0.17), vMul(u, 0.13), vMul(r, 0.105)], vMul(f, -1), function (uu, d) {
+      return scale(mix(P.coat, P.belly, uu[1] < -0.4 ? 0.45 : 0.12), 0.95 + d.j2 * 0.1);
+    }, 0.045, 0.02, lod, 80, 47, 0.1, 0.15);
+    furBall(c, P, vAdd(vMad(H0, f, 0.19), vMul(u, -0.04)), [vMul(f, 0.15), vMul(u, 0.075), vMul(r, 0.068)], vMul(f, -1), function (uu, d) {
+      return scale(mix(mix(P.coat, P.belly, 0.25), P.nose, uu[0] > 0.6 ? 0.5 : 0), 0.95 + d.j2 * 0.1);
+    }, 0.035, 0.018, lod, 50, 48, 0.1, 0.12);
+    glossyNose(c, P, vAdd(vMad(H0, f, 0.33), vMul(u, -0.05)), 0.034);
+    [-1, 1].forEach(function (s) {
+      var side = tv(vMul(r, s))[2];
+      if (side > -0.05) animEye(c, P, vAdd(vAdd(vMad(H0, f, 0.04), vMul(u, 0.04)), vMul(r, s * 0.098)), 0.029, clamp(side * 1.4 + 0.2, 0, 1));
+    });
+    ear(sides[1]); antler(sides[1]);
+  } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+
+/* ---------- Tanuki ----------
+   pose: gait ('trot' or 'stand'), ph, head ('trot', 'up', 'sniff'), bob
+   (sniffing), look (0 … 1 face turned to us), ears, tilt. kit: the young
+   one — bigger head, shorter legs, fluffier. */
+function renderTanuki(c, P, pose, kit, lod) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  var g = GAITS.trot, ph = pose.ph || 0, trot = pose.gait === 'trot', parts = [];
+  var bob = trot ? 0.025 * Math.cos(2 * ph) : 0, hs = kit ? 1.2 : 1, lg = kit ? 0.82 : 1, hl = kit ? 0.12 : 0.105;
+  function B(x, y, z) { return [x, y * lg + bob, z]; }
+  function depth(p) { return tv(p)[2]; }
+  function fur(u, d) {                                   // grizzled: pale-tipped and dark hairs through the brown
+    var col = P.fur;
+    if (d.j2 > 0.6) col = mix(P.fur, P.tip, 0.42);
+    else if (d.j2 < 0.14) col = mix(P.fur, P.dark, 0.5);
+    return scale(col, 0.95 + d.j3 * 0.1);
+  }
+  // the round, fluffy body: chest, barrel, rump
+  [[B(0.3, 0.58, 0), [0.3, 0.32, 0.3], 'chest'], [B(0, 0.56, 0), [0.5, 0.33, 0.34], 'barrel'], [B(-0.36, 0.6, 0), [0.32, 0.35, 0.32], 'rump']].forEach(function (T, i) {
+    var rr = kit ? [T[1][0] * 0.92, T[1][1] * 1.05, T[1][2] * 1.05] : T[1];
+    parts.push({ z: depth(T[0]) + (i === 0 ? 0.002 : 0), f: function () {
+      furBall(c, P, T[0], [[rr[0], 0, 0], [0, rr[1], 0], [0, 0, rr[2]]], [-0.6, -0.8, 0], function (u, d) {
+        var col = fur(u, d);
+        if (u[1] < -0.45) col = mix(col, P.dark, 0.75);                                     // dark underneath
+        if (T[2] === 'chest') col = mix(col, P.dark, u[0] > 0.35 || u[1] < 0.1 ? 0.72 : (u[1] < 0.55 ? 0.38 : 0));   // dark chest, a darker cape over the shoulders
+        return col;
+      }, hl, 0.028, lod, 190, 51 + i, 0.7, 0.14);
+    } });
+  });
+  // the bushy tail, dark at the tip, swinging as it trots
+  var ta = -2.15 + (trot ? 0.18 * Math.sin(ph) : 0), td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.62, 0.54, 0);
+  parts.push({ z: depth(tb) - 0.01, f: function () {
+    furBall(c, P, vMad(tb, td, 0.2), [vMul(td, 0.27), vMul(vNorm(vCross([0, 0, 1], td)), 0.12), [0, 0, 0.11]], td, function (uu, d) {
+      return uu[0] > 0.45 ? scale(P.dark, 0.9 + d.j2 * 0.2) : fur(uu, d);
+    }, hl * 1.1, 0.03, lod, 80, 61, 0.5, 0.12);
+  } });
+  // short dark legs
+  [[0.34, 0.14, true], [0.34, -0.14, true], [-0.36, 0.14, false], [-0.36, -0.14, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = 0.22 * lg, l2 = 0.22 * lg;
+    var hip = B(L[0], 0.43, L[1]), fx, fy;
+    if (trot) { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    else { fx = L[0] + (near ? 0.04 : -0.06); fy = 0; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.dark : scale(P.dark, 0.75);
+    parts.push({ z: depth(knee) + (near ? 0.05 : -0.05), f: function () {
+      tube(c, P, hip, knee, 0.1, 0.068, col);
+      tube(c, P, knee, foot, 0.062, 0.048, col);
+      tube(c, P, vAdd(foot, [-0.01, 0.03, 0]), vAdd(foot, [0.04, 0.012, 0]), 0.045, 0.04, scale(col, 0.85));   // the paw
+    } });
+  });
+  // the head: a masked face with pale brows and cheeks, small round ears
+  var nb = B(0.5, 0.68, 0), hd = pose.head || 'up';
+  var H0 = hd === 'sniff' ? [0.74, 0.24 * lg + 0.02 * (pose.bob || 0), 0] : vAdd(nb, hd === 'up' ? [0.2, 0.12, 0] : [0.25, 0.03, 0]);
+  var hp = hd === 'sniff' ? -0.95 + 0.12 * (pose.bob || 0) : (hd === 'up' ? -0.12 : -0.3), hy = 1.05 * (pose.look || 0), tl = pose.tilt || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r0 = vNorm(vCross(f, [0, 1, 0])), u0 = vCross(r0, f);
+  var r = vAdd(vMul(r0, Math.cos(tl)), vMul(u0, Math.sin(tl))), u = vSub(vMul(u0, Math.cos(tl)), vMul(r0, Math.sin(tl)));
+  var nk = vLerp(nb, H0, 0.45), nd = vNorm(vSub(H0, nb));
+  parts.push({ z: depth(nk) + 0.01, f: function () {
+    furBall(c, P, nk, [vMul(nd, 0.2), vMul(vNorm(vCross([0, 0, 1], nd)), 0.2), [0, 0, 0.21]], vMul(nd, -1), function (uu, d) {
+      return uu[1] < -0.2 ? mix(fur(uu, d), P.dark, 0.6) : fur(uu, d);
+    }, hl, 0.028, lod, 80, 66, 0.6, 0);
+  } });
+  parts.push({ z: depth(H0) + 0.06, f: function () {
+    var sides = [-1, 1].sort(function (a, b) { return tv(vMul(r, a))[2] - tv(vMul(r, b))[2]; });
+    function ear(s) {
+      var base = vAdd(vAdd(vMad(H0, f, -0.04 * hs), vMul(u, 0.15 * hs)), vMul(r, s * 0.12 * hs));
+      var dir = vNorm(vAdd(vAdd(vMul(u, 0.9), vMul(r, s * (0.3 + 0.12 * (pose.ears || 0)))), vMul(f, -0.15)));
+      animEar(c, P, base, vMad(base, dir, 0.11 * hs), vNorm(vAdd(vMul(f, 0.7), vMul(r, s * 0.4))), 0.05 * hs, P.dark, P.pale);
+    }
+    ear(sides[0]);
+    furBall(c, P, H0, [vMul(f, 0.21 * hs), vMul(u, 0.19 * hs), vMul(r, 0.21 * hs)], vSub(vMul(f, -1), vMul(u, 0.3)), function (uu, d) {
+      var fwd = uu[0], up = uu[1], side = uu[2];
+      if (fwd > 0.15 && Math.abs(side) > 0.3 && up > -0.42 && up < 0.32) return scale(P.mask, 0.92 + d.j2 * 0.16);   // the dark mask
+      if (fwd > 0.05 && (up >= 0.32 || up < -0.3)) return mix(P.pale, P.fur, d.j2 * 0.35);                          // pale brows and cheeks
+      return fur(uu, d);
+    }, hl * 0.7, 0.026, lod, 130, 67, 0.35, 0.14);
+    var mz = vAdd(vMad(H0, f, 0.19 * hs), vMul(u, -0.06 * hs)), ms = kit ? 0.85 : 1;
+    furBall(c, P, mz, [vMul(f, 0.13 * ms), vMul(u, 0.08 * ms), vMul(r, 0.085 * ms)], vMul(f, -1), function (uu, d) {
+      return scale(mix(mix(P.pale, P.fur, 0.3), P.dark, uu[0] > 0.55 ? 0.65 : 0), 0.94 + d.j2 * 0.12);
+    }, 0.045, 0.026, lod, 50, 68);
+    glossyNose(c, P, vAdd(vMad(H0, f, (0.19 + 0.13 * ms) * hs), vMul(u, -0.05 * hs)), 0.036);
+    [-1, 1].forEach(function (s) {
+      var side = tv(vMul(r, s))[2], face = clamp(tv(f)[2] * 0.7 + side * 0.7 + 0.15, 0, 1);
+      if (side > -0.25 || tv(f)[2] > 0.5) animEye(c, P, vAdd(vAdd(vMad(H0, f, 0.13 * hs), vMul(u, 0.03 * hs)), vMul(r, s * 0.115 * hs)), 0.033 * (kit ? 1.25 : 1), face);
+    });
+    ear(sides[1]);
+  } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+
+/* ---------- Drawn smooth, on the graphics chip (WebGL 2) ----------
+   Each animal is a handful of smooth solid shapes — ellipsoids for the
+   body, neck, head, ears and tail, tapered rounded rods for the legs and
+   antlers — blended into one surface where they meet, so its outline is a
+   single smooth, anti-aliased contour. Every pixel finds that surface and
+   is shaded from its true slant: the night sky from above (with soft
+   shadows: the neck on the chest, the body on the far legs), the warm
+   lamps from below, a rim of light round the edge, and darker where parts
+   meet (between the legs, under the neck, near the ground). Its colour
+   comes from the part (darker back, paler belly), patches painted onto the
+   surface (the rump, the spots, the tanuki's mask), and a fine grain of
+   fur that follows the lie of the hair. Without WebGL 2 the hair-stroke
+   drawing above is used instead. */
+var GL_MAXP = 48, GL_MAXD = 32, GL_UBO = (GL_MAXP * 5 + GL_MAXP * 4 + GL_MAXD * 2) * 4;
+var ANIM_VS = '#version 300 es\nvoid main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }';
+var ANIM_FS = [
+  '#version 300 es',
+  'precision highp float; precision highp int;',
+  // per shape: 5 of G (where, size, axes, bounds), 4 of M (colours, fur, kind, the way the hair lies); per patch: 2 of D
+  'layout(std140) uniform Scene { vec4 G[' + GL_MAXP * 5 + ']; vec4 M[' + GL_MAXP * 4 + ']; vec4 D[' + GL_MAXD * 2 + ']; };',
+  'uniform int uN, uND;',
+  'uniform vec4 uMap;',                                   // anchor x, y and height of the sprite (device px), px per unit
+  'uniform vec3 uPaper, uMist;',
+  'uniform float uStr, uNight, uHz, uLamp;',
+  'out vec4 outC;',
+  'uint m0, m1;',
+  'const vec3 LM = vec3(-0.4537, 0.8066, 0.3781), LL = vec3(0.3093, -0.8248, 0.4730);',   // the sky, the lamps (as for the owl)
+  'bool on(int i) { return i < 32 ? ((m0 >> uint(i)) & 1u) == 1u : ((m1 >> uint(i - 32)) & 1u) == 1u; }',
+  'float sdEll(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.0) / max(k1, 1e-6); }',
+  'float sdRC(vec3 p, vec3 a, vec3 b, float r1, float r2) {',
+  '  vec3 ba = b - a; float l2 = dot(ba, ba), rr = r1 - r2, a2 = l2 - rr * rr, il2 = 1.0 / l2;',
+  '  vec3 pa = p - a; float y = dot(pa, ba), z = y - l2; vec3 xv = pa * l2 - ba * y; float x2 = dot(xv, xv), y2 = y * y * l2, z2 = z * z * l2;',
+  '  float k = sign(rr) * rr * rr * x2;',
+  '  if (sign(z) * a2 * z2 > k) return sqrt(x2 + z2) * il2 - r2;',
+  '  if (sign(y) * a2 * y2 < k) return sqrt(x2 + y2) * il2 - r1;',
+  '  return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;',
+  '}',
+  'float smin(float a, float b, float k) { if (k <= 0.0) return min(a, b); float h = max(k - abs(a - b), 0.0) / k; return min(a, b) - h * h * k * 0.25; }',
+  'float prim(int i, vec3 p) {',
+  '  vec4 g0 = G[i * 5], g1 = G[i * 5 + 1];',
+  '  if (g0.w < 0.5) { vec3 q = p - g0.xyz, ax = G[i * 5 + 2].xyz, ay = G[i * 5 + 3].xyz; return sdEll(vec3(dot(q, ax), dot(q, ay), dot(q, cross(ax, ay))), g1.xyz); }',
+  '  return sdRC(p, g0.xyz, g1.xyz, G[i * 5 + 2].w, G[i * 5 + 3].w);',
+  '}',
+  // the shapes along this pixel's line of sight (m0, m1), blended smoothly
+  'float map(vec3 p) { float d = 1e5; for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; if (!on(i)) continue; d = smin(d, prim(i, p), G[i * 5 + 1].w); } return d; }',
+  // all of them (for shadows), skipping any too far away to matter
+  'float mapAll(vec3 p) { float d = 1e5; for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; vec4 b = G[i * 5 + 4]; float k = G[i * 5 + 1].w; if (length(p - b.xyz) - b.w > d + k) continue; d = smin(d, prim(i, p), k); } return d; }',
+  'vec3 nrm(vec3 p) { const vec2 k = vec2(1.0, -1.0); float e = 0.0015; return normalize(k.xyy * map(p + k.xyy * e) + k.yyx * map(p + k.yyx * e) + k.yxy * map(p + k.yxy * e) + k.xxx * map(p + k.xxx * e)); }',
+  'float occl(vec3 p, vec3 n) { float o = 0.0, s = 1.0; for (int i = 1; i <= 4; i++) { float h = 0.035 * float(i); o += (h - map(p + n * h)) * s; s *= 0.6; } return clamp(1.0 - 2.4 * o, 0.3, 1.0); }',
+  'float shadow(vec3 p, vec3 l) { float r = 1.0, t = 0.03; for (int i = 0; i < 16; i++) { float h = mapAll(p + l * t); r = min(r, 9.0 * h / t); t += clamp(h, 0.03, 0.16); if (r < 0.02 || t > 1.4) break; } return clamp(r, 0.0, 1.0); }',
+  'float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }',
+  'float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),',
+  '             mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y), f.z); }',
+  // a shape's own colour here: darker on top, paler underneath (ellipsoids); from one end to the other (rods)
+  'vec3 primCol(int i, vec3 p) {',
+  '  vec4 g0 = G[i * 5]; vec3 top = M[i * 4].rgb, side = M[i * 4 + 1].rgb, bot = M[i * 4 + 2].rgb;',
+  '  if (g0.w < 0.5) { float ly = dot(p - g0.xyz, G[i * 5 + 3].xyz) / G[i * 5 + 1].y; vec3 c = mix(bot, side, smoothstep(-0.75, -0.2, ly)); return mix(c, top, smoothstep(0.4, 0.95, ly)); }',
+  '  vec3 ba = G[i * 5 + 1].xyz - g0.xyz; return mix(top, bot, clamp(dot(p - g0.xyz, ba) / dot(ba, ba), 0.0, 1.0));',
+  '}',
+  'void material(vec3 p, out vec3 col, out float fur, out float kind, out float griz, out vec3 flow, out float shine) {',
+  '  float ds[' + GL_MAXP + ']; float dmin = 1e5;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; ds[i] = 1e5; if (!on(i)) continue; ds[i] = prim(i, p); dmin = min(dmin, ds[i]); }',
+  '  col = vec3(0.0); float ws = 0.0, wb = -1.0; fur = 0.0; kind = 0.0; griz = 0.0; flow = vec3(-1.0, 0.0, 0.0); shine = 0.0;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; if (ds[i] > 1e4) continue;',
+  '    float w = clamp(1.0 - (ds[i] - dmin) / (G[i * 5 + 1].w * 1.2 + 0.004), 0.0, 1.0); w *= w; if (w <= 0.0) continue;',
+  '    col += w * primCol(i, p); ws += w;',
+  '    if (w > wb) { wb = w; fur = M[i * 4].w; kind = M[i * 4 + 1].w; griz = M[i * 4 + 2].w; flow = M[i * 4 + 3].xyz; shine = M[i * 4 + 3].w; } }',
+  '  col /= max(ws, 1e-4);',
+  '  if (kind < 0.5) for (int j = 0; j < ' + GL_MAXD + '; j++) { if (j >= uND) break; vec4 a = D[j * 2], b = D[j * 2 + 1];',
+  '    col = mix(col, b.rgb, 1.0 - smoothstep(a.w * (1.0 - b.w), a.w, length(p - a.xyz))); }',
+  '}',
+  'void main() {',
+  '  vec2 px = vec2(gl_FragCoord.x, uMap.z - gl_FragCoord.y);',
+  '  vec3 ro = vec3((px.x - uMap.x) / uMap.w, -(px.y - uMap.y) / uMap.w, 0.0);',
+  '  m0 = 0u; m1 = 0u; float zs = -1e5;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; vec4 b = G[i * 5 + 4]; float k = G[i * 5 + 1].w;',
+  '    if (length(ro.xy - b.xy) < b.w + k + 0.16) { if (i < 32) m0 |= (1u << uint(i)); else m1 |= (1u << uint(i - 32)); zs = max(zs, b.z + b.w + k + 0.05); } }',
+  '  if (m0 == 0u && m1 == 0u) { outC = vec4(0.0); return; }',
+  '  float pix = 1.0 / uMap.w, t = 0.0, minD = 1e5, tMin = 0.0; bool hit = false; ro.z = zs;',
+  '  for (int s = 0; s < 110; s++) { float d = map(ro - vec3(0.0, 0.0, t)); if (d < minD) { minD = d; tMin = t; } if (d < 0.0006) { hit = true; break; } t += max(d * 0.8, 0.0015); if (t > zs + 3.0) break; }',
+  '  if (!hit && minD > pix * 3.0) { outC = vec4(0.0); return; }',
+  '  vec3 p = ro - vec3(0.0, 0.0, hit ? t : tMin), n = nrm(p);',
+  '  vec3 col, flow; float fur, kind, griz, shine; material(p, col, fur, kind, griz, flow, shine);',
+  '  float hl = max(length(flow), 1e-3); vec3 fl = flow / hl; fl = fl - n * dot(fl, n); fl = dot(fl, fl) < 1e-5 ? cross(n, vec3(0.0, 0.0, 1.0)) : normalize(fl);',
+  '  vec3 s1 = normalize(cross(n, fl));',
+  '  float grain = 0.5;',
+  '  if (kind < 0.5 && fur > 0.0) {',                     // fine hair along the flow: streaks of light and dark, the hairs catching the light
+  '    vec3 q = vec3(dot(p, fl) * 7.0 / hl, dot(p, s1) * 60.0 / hl, dot(p, n) * 60.0 / hl);',
+  '    grain = vnoise(q) * 0.62 + vnoise(q * 2.07 + 3.1) * 0.38;',
+  '    col *= mix(1.0, 0.8 + 0.4 * grain, fur);',
+  '    float g2 = vnoise(q * vec3(1.6, 1.9, 1.9) + 7.7);',
+  '    col = mix(col, min(col * 1.35 + 0.05, vec3(1.0)), smoothstep(0.58, 0.9, g2) * griz * 0.55);',   // pale-tipped (grizzled) hairs
+  '    n = normalize(n + s1 * (grain - 0.5) * 0.3 * fur);',
+  '  }',
+  '  float alpha = 1.0;',
+  '  if (!hit) alpha = clamp(1.0 - (minD + (grain - 0.5) * pix * 1.8 * fur) / (pix * 1.5), 0.0, 1.0);',   // a soft, anti-aliased, slightly furry edge
+  '  float ao = occl(p, n), sh = hit ? shadow(p + n * 0.01, LM) : 1.0;',
+  '  float m = max(dot(n, LM), 0.0) * mix(0.35, 1.0, sh), l = max(dot(n, LL), 0.0), f = clamp(n.z, 0.0, 1.0), rim = pow(1.0 - f, 3.0);',
+  '  vec3 c = col * ((0.46 + 0.2 * f) * ao + 0.46 * m) + col * l * uLamp * vec3(0.62, 0.45, 0.27) * (0.5 + 0.5 * ao);',
+  '  c += rim * (clamp(0.25 - n.y, 0.0, 1.0) * uLamp * vec3(0.55, 0.33, 0.15) + clamp(n.y + 0.35, 0.0, 1.0) * vec3(0.12, 0.14, 0.19));',
+  '  vec3 r = reflect(-LM, n);',
+  '  if (kind < 0.5) c += pow(max(dot(n, normalize(LM + vec3(0.0, 0.0, 1.0))), 0.0), 14.0) * 0.07 * fur * vec3(0.9, 0.92, 1.0);',   // a soft sheen on the coat
+  '  else if (kind < 1.5) c += pow(max(r.z, 0.0), 18.0) * 0.18;',                       // antler and hoof: a satin shine
+  '  else {',                                                                             // eyes and nose: wet and glossy
+  '    c += pow(max(r.z, 0.0), kind < 2.5 ? 70.0 : 26.0) * (kind < 2.5 ? 0.95 : 0.4);',
+  '    c += shine * vec3(0.72, 0.86, 0.52) * uLamp * 0.5 * f;',                          // eyeshine: the lamps caught in the eye
+  '  }',
+  '  c *= mix(0.68, 1.0, smoothstep(0.0, 0.32, p.y));',   // darker down among the leaves
+  '  c = mix(c, uPaper, 1.0 - uStr);',
+  '  if (uNight > 0.5) c = mix(c, vec3(0.235, 0.204, 0.376), 0.06);',
+  '  c = mix(c, uMist, uHz);',
+  '  outC = vec4(clamp(c, 0.0, 1.0) * alpha, alpha);',
+  '}'
+].join('\n');
+var GLA = null;                                       // the renderer (false: no WebGL 2 here)
+function animGL() {
+  if (GLA !== null) return GLA;
+  GLA = false;
+  try {
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = 512;
+    var gl = cv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false, alpha: true, depth: false });
+    if (!gl) return GLA;
+    var compile = function (type, src) {
+      var sh = gl.createShader(type);
+      gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+      return sh;
+    };
+    var pg = gl.createProgram();
+    gl.attachShader(pg, compile(gl.VERTEX_SHADER, ANIM_VS)); gl.attachShader(pg, compile(gl.FRAGMENT_SHADER, ANIM_FS));
+    gl.linkProgram(pg);
+    if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pg));
+    var ubo = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, ubo); gl.bufferData(gl.UNIFORM_BUFFER, GL_UBO * 4, gl.DYNAMIC_DRAW);
+    gl.uniformBlockBinding(pg, gl.getUniformBlockIndex(pg, 'Scene'), 0);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubo);
+    var L = {};
+    ['uN', 'uND', 'uMap', 'uPaper', 'uMist', 'uStr', 'uNight', 'uHz', 'uLamp'].forEach(function (n) { L[n] = gl.getUniformLocation(pg, n); });
+    GLA = { cv: cv, gl: gl, pg: pg, ubo: ubo, vao: gl.createVertexArray(), L: L, data: new Float32Array(GL_UBO) };
+  } catch (e) { GLA = false; }
+  return GLA;
+}
+/* An animal as shapes and patches, in view space (setView first). Colours
+   are 0–255 arrays. o: { fur (0 … 1), kind (0 coat, 1 antler or hoof,
+   2 eye, 3 nose), griz (pale-tipped hairs), flow (the way the hair lies;
+   its length: the hair's length), shine (eyeshine) }. */
+function AnimScene() { this.p = []; this.d = []; }
+AnimScene.prototype.ell = function (c, ax, ay, r, k, top, side, bot, o) {
+  o = o || {};
+  if (this.p.length >= GL_MAXP) return;
+  var v = tv(c);
+  this.p.push({ t: 0, a: v, b: r, ax: vNorm(tv(ax)), ay: vNorm(tv(ay)), r1: 0, r2: 0, k: k, top: top, side: side, bot: bot,
+                fur: o.fur || 0, kind: o.kind || 0, griz: o.griz || 0, flow: tv(o.flow || [-1, 0, 0]), shine: o.shine || 0,
+                bc: v, bR: Math.max(r[0], r[1], r[2]) });
+};
+AnimScene.prototype.rod = function (a, b, r1, r2, k, top, bot, o) {
+  o = o || {};
+  if (this.p.length >= GL_MAXP) return;
+  var va = tv(a), vb = tv(b);
+  this.p.push({ t: 1, a: va, b: vb, ax: [1, 0, 0], ay: [0, 1, 0], r1: r1, r2: r2, k: k, top: top, side: top, bot: bot,
+                fur: o.fur || 0, kind: o.kind || 0, griz: o.griz || 0, flow: tv(o.flow || vSub(b, a)), shine: 0,
+                bc: vLerp(va, vb, 0.5), bR: Math.hypot(vb[0] - va[0], vb[1] - va[1], vb[2] - va[2]) / 2 + Math.max(r1, r2) });
+};
+AnimScene.prototype.patch = function (c, r, col, soft) { if (this.d.length < GL_MAXD) this.d.push({ c: tv(c), r: r, col: col, soft: soft }); };
+/* Draw an animal into the sprite (t: its 2D canvas, info: its size). */
+function glAnimSprite(t, info, scene, P) {
+  var G = animGL(), gl = G.gl, w = info.w, h = info.h, D = G.data, i, j, q, o;
+  if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
+  D.fill(0);
+  function put(at, x, y, z, ww) { D[at] = x; D[at + 1] = y; D[at + 2] = z; D[at + 3] = ww; }
+  var oM = GL_MAXP * 5 * 4, oD = oM + GL_MAXP * 4 * 4;
+  for (i = 0; i < scene.p.length; i++) {
+    q = scene.p[i]; o = i * 20;
+    put(o, q.a[0], q.a[1], q.a[2], q.t);
+    put(o + 4, q.b[0], q.b[1], q.b[2], q.k);
+    put(o + 8, q.ax[0], q.ax[1], q.ax[2], q.r1);
+    put(o + 12, q.ay[0], q.ay[1], q.ay[2], q.r2);
+    put(o + 16, q.bc[0], q.bc[1], q.bc[2], q.bR);
+    o = oM + i * 16;
+    put(o, q.top[0] / 255, q.top[1] / 255, q.top[2] / 255, q.fur);
+    put(o + 4, q.side[0] / 255, q.side[1] / 255, q.side[2] / 255, q.kind);
+    put(o + 8, q.bot[0] / 255, q.bot[1] / 255, q.bot[2] / 255, q.griz);
+    put(o + 12, q.flow[0], q.flow[1], q.flow[2], q.shine);
+  }
+  for (j = 0; j < scene.d.length; j++) {
+    q = scene.d[j]; o = oD + j * 8;
+    put(o, q.c[0], q.c[1], q.c[2], q.r);
+    put(o + 4, q.col[0] / 255, q.col[1] / 255, q.col[2] / 255, q.soft);
+  }
+  gl.useProgram(G.pg);
+  gl.bindBuffer(gl.UNIFORM_BUFFER, G.ubo); gl.bufferSubData(gl.UNIFORM_BUFFER, 0, D);
+  gl.uniform1i(G.L.uN, scene.p.length); gl.uniform1i(G.L.uND, scene.d.length);
+  gl.uniform4f(G.L.uMap, info.ox, info.oy, h, info.u);
+  gl.uniform3f(G.L.uPaper, PAPER[0] / 255, PAPER[1] / 255, PAPER[2] / 255);
+  gl.uniform3f(G.L.uMist, P.mist[0] / 255, P.mist[1] / 255, P.mist[2] / 255);
+  gl.uniform1f(G.L.uStr, P.str); gl.uniform1f(G.L.uNight, P.night ? 1 : 0); gl.uniform1f(G.L.uHz, P.hz); gl.uniform1f(G.L.uLamp, P.lamp);
+  gl.viewport(0, 0, w, h);
+  gl.disable(gl.BLEND);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindVertexArray(G.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  t.setTransform(1, 0, 0, 1, 0, 0);
+  t.drawImage(G.cv, 0, G.cv.height - h, w, h, 0, 0, w, h);   // WebGL draws from the bottom left
+}
+/* The sika deer as smooth shapes (the same skeleton and poses as renderDeer). */
+function buildDeer(pose, stag, P) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  var S = new AnimScene(), g = GAITS[pose.gait] || GAITS.walk, ph = pose.ph || 0, bob = 0, pitch = 0;
+  if (pose.gait === 'walk') bob = 0.012 * Math.cos(2 * ph);
+  if (pose.gait === 'run') { bob = 0.05 + 0.08 * Math.sin(ph + 0.6); pitch = 0.12 * Math.sin(ph - 0.4); }
+  var cp = Math.cos(pitch), spn = Math.sin(pitch), AX = [cp, spn, 0], AY = [-spn, cp, 0];
+  function B(x, y, z) { var yy = y - 0.95; return [x * cp - yy * spn, 0.95 + x * spn + yy * cp + bob, z]; }
+  var coatFur = { fur: 1, flow: vMul(AX, -1) };
+  // the body: chest, barrel and haunch, blended into one
+  var body = [[B(0.34, 0.97, 0), [0.33, 0.33, 0.24]], [B(0, 0.93, 0), [0.46, 0.28, 0.25]], [B(-0.4, 1.0, 0), [0.33, 0.31, 0.25]]];
+  body.forEach(function (T) { S.ell(T[0], AX, AY, T[1], 0.13, P.back, P.coat, P.belly, coatFur); });
+  // the white rump, rimmed in black
+  S.patch(B(-0.71, 1.05, 0), 0.23, P.rim, 0.22);
+  S.patch(B(-0.73, 1.05, 0), 0.19, P.rump, 0.3);
+  if (!stag) {                                        // a hind's faint pale spots along her flank, in rows
+    var dirs = owlDirs(260, 91), nS = 0;
+    for (var k = 0; k < dirs.length && nS < 22; k++) {
+      var uu = dirs[k].u, T = body[k % 2 + 1];
+      if (uu[2] < 0.3 || uu[1] < 0.05 || uu[1] > 0.62 || dirs[k].j > 0.55) continue;
+      var sn = vNorm(vAdd(vAdd(vMul(AX, uu[0] / T[1][0]), vMul(AY, uu[1] / T[1][1])), [0, 0, uu[2] / T[1][2]]));
+      S.patch(vMad(vAdd(vAdd(vMad(T[0], AX, T[1][0] * uu[0]), vMul(AY, T[1][1] * uu[1])), [0, 0, T[1][2] * uu[2]]), sn, 0.03), 0.055, mix(P.coat, P.spot, 0.55), 0.75);
+      nS++;
+    }
+  }
+  // the tail: hanging, flicked, or raised as a white flag
+  var ta = lerp(-1.75, 0.9, pose.tail || 0) + pitch, td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.7, 1.08, 0);
+  S.ell(vMad(tb, td, 0.07), td, vNorm(vCross([0, 0, 1], td)), [0.09, 0.048, 0.04], 0.035, P.rim, P.rump, P.rump, { fur: 0.6, flow: vMul(td, 0.6) });
+  // legs: the upper part blends into the body; slim lower legs; hooves
+  [[0.4, 0.11, true], [0.4, -0.11, true], [-0.44, 0.12, false], [-0.44, -0.12, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = front ? 0.45 : 0.5, l2 = front ? 0.46 : 0.45;
+    var hip = B(L[0], front ? 0.86 : 0.9, L[1]), fx, fy;
+    if (pose.gait === 'stand') { fx = L[0] + (near ? 0.03 : -0.03) * (front ? 1 : -1); fy = 0; }
+    else { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.leg : scale(P.leg, 0.85), lo = scale(col, 0.82);
+    S.rod(hip, knee, front ? 0.1 : 0.15, front ? 0.05 : 0.06, 0.08, mix(P.coat, col, 0.5), col, { fur: 0.7 });
+    S.rod(knee, vAdd(foot, [0.004, 0.055, 0]), front ? 0.042 : 0.047, 0.03, 0.035, col, lo, { fur: 0.5 });
+    S.rod(vAdd(foot, [0.005, 0.06, 0]), vAdd(foot, [0.03, 0.006, 0]), 0.031, 0.034, 0.012, P.hoof, scale(P.hoof, 0.8), { kind: 1 });
+  });
+  // the neck, along a curve to the head
+  var n = pose.neck === undefined ? 0.15 : pose.neck, nb = B(0.5, 1.12, 0);
+  var Hup = vAdd(nb, [0.2, 0.55, 0]), Hcar = vAdd(nb, [0.36, 0.36, 0]), Hdn = [0.95, 0.36, 0];
+  var H0 = n < 0.15 ? vLerp(Hup, Hcar, n / 0.15) : vLerp(Hcar, Hdn, smooth(0, 1, (n - 0.15) / 0.85));
+  var hp = n < 0.15 ? lerp(-0.25, -0.5, n / 0.15) : lerp(-0.5, -1.35, smooth(0, 1, (n - 0.15) / 0.85));
+  if (pose.chew) { hp += 0.12; H0 = vAdd(H0, [0, 0.015, 0]); }
+  var hy = 0.95 * (pose.look || 0), ears = pose.ears || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r = vNorm(vCross(f, [0, 1, 0])), u = vCross(r, f);
+  var nt = vAdd(vMad(H0, f, -0.1), vMul(u, -0.03)), nc = vAdd(vLerp(nb, nt, 0.5), [0.05, 0.1 * (1 - n), 0]);
+  [0.1, 0.32, 0.54, 0.76, 0.95].forEach(function (s) {
+    var cc = vAdd(vAdd(vMul(nb, (1 - s) * (1 - s)), vMul(nc, 2 * (1 - s) * s)), vMul(nt, s * s));
+    var tg = vNorm(vAdd(vMul(vSub(nc, nb), 2 * (1 - s)), vMul(vSub(nt, nc), 2 * s))), pr = vNorm(vCross([0, 0, 1], tg));
+    var ra = lerp(0.18, 0.11, s) * (stag ? 1.3 - 0.25 * s : 1);
+    S.ell(cc, tg, pr, [0.14, ra, ra * 0.85], 0.1, stag ? P.mane : mix(P.coat, P.back, 0.5), P.coat, mix(P.coat, P.belly, 0.55),
+          { fur: 1, flow: vMul(tg, stag ? -1.6 : -1) });
+  });
+  // the head: skull, muzzle, nose, eyes, ears, antlers
+  S.ell(H0, f, u, [0.17, 0.13, 0.105], 0.07, mix(P.coat, P.back, 0.3), P.coat, mix(P.coat, P.belly, 0.5), { fur: 0.8, flow: vMul(f, -0.7) });
+  S.ell(vAdd(vMad(H0, f, 0.19), vMul(u, -0.04)), f, u, [0.15, 0.075, 0.068], 0.06, mix(P.coat, P.back, 0.35), mix(P.coat, P.belly, 0.2), P.belly, { fur: 0.6, flow: vMul(f, -0.5) });
+  S.patch(vAdd(vMad(H0, f, 0.31), vMul(u, -0.05)), 0.06, mix(P.nose, P.coat, 0.45), 0.6);    // the dark muzzle tip
+  S.patch(vAdd(vMad(H0, f, 0.18), vMul(u, -0.1)), 0.06, P.belly, 0.5);                        // the pale chin
+  S.ell(vAdd(vMad(H0, f, 0.33), vMul(u, -0.05)), f, u, [0.034, 0.028, 0.036], 0.012, P.nose, P.nose, P.nose, { kind: 3 });
+  [-1, 1].forEach(function (s) {
+    S.ell(vAdd(vAdd(vMad(H0, f, 0.04), vMul(u, 0.04)), vMul(r, s * 0.094)), f, u, [0.03, 0.028, 0.026], 0.004, P.eye, P.eye, P.eye, { kind: 2, shine: 1 });
+    var base = vAdd(vAdd(vMad(H0, f, -0.07), vMul(u, 0.1)), vMul(r, s * 0.065));
+    var dir = vNorm(vAdd(vAdd(vMul(u, 0.7 + 0.25 * ears), vMul(f, -(0.45 - 0.35 * ears))), vMul(r, s * 0.6)));
+    var face = vNorm(vSub(vAdd(vMul(f, 0.55), vMul(r, s * 0.7)), vMul(dir, vDot(vAdd(vMul(f, 0.55), vMul(r, s * 0.7)), dir))));
+    S.ell(vMad(base, dir, 0.11), dir, face, [0.115, 0.016, 0.058], 0.03, P.ear, P.coat, P.coat, { fur: 0.5, flow: vMul(dir, 0.5) });
+    if (stag) {
+      var ab = vAdd(vAdd(vMad(H0, f, -0.03), vMul(u, 0.1)), vMul(r, s * 0.05));
+      var W = function (q) { return vAdd(vAdd(vAdd(ab, vMul(f, q[0])), vMul(u, q[1])), vMul(r, s * q[2])); };
+      var a0 = scale(P.antler, 0.6), a1 = P.antler, a2 = scale(P.antler, 1.12);
+      for (var b = 0; b < 3; b++) S.rod(W(ANTLER.beam[b]), W(ANTLER.beam[b + 1]), 0.03 - b * 0.006, 0.024 - b * 0.006, 0.01, mix(a0, a1, b / 3), mix(a0, a1, (b + 1) / 3), { kind: 1 });
+      ANTLER.tines.forEach(function (tn) { S.rod(W(tn[0]), W(tn[1]), 0.015, 0.007, 0.008, a1, a2, { kind: 1 }); });
+    }
+  });
+  return S;
+}
+/* The tanuki as smooth shapes (the same skeleton and poses as renderTanuki). */
+function buildTanuki(pose, kit, P) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  var S = new AnimScene(), g = GAITS.trot, ph = pose.ph || 0, trot = pose.gait === 'trot';
+  var bob = trot ? 0.025 * Math.cos(2 * ph) : 0, hs = kit ? 1.2 : 1, lg = kit ? 0.82 : 1;
+  function B(x, y, z) { return [x, y * lg + bob, z]; }
+  var fluff = { fur: 1, griz: kit ? 0.5 : 0.8, flow: [-0.7, -0.75, 0] };
+  var furD = mix(P.fur, P.dark, 0.35);
+  // the round, fluffy body; a dark chest and a darker cape over the shoulders
+  [[B(0.3, 0.58, 0), [0.3, 0.32, 0.3], 'chest'], [B(0, 0.56, 0), [0.5, 0.33, 0.34], 'barrel'], [B(-0.36, 0.6, 0), [0.32, 0.35, 0.32], 'rump']].forEach(function (T) {
+    var rr = kit ? [T[1][0] * 0.92, T[1][1] * 1.05, T[1][2] * 1.05] : T[1];
+    if (T[2] === 'chest') S.ell(T[0], [1, 0, 0], [0, 1, 0], rr, 0.16, mix(P.dark, P.fur, 0.45), mix(P.fur, P.dark, 0.5), P.dark, fluff);
+    else S.ell(T[0], [1, 0, 0], [0, 1, 0], rr, 0.16, furD, P.fur, P.dark, fluff);
+  });
+  S.patch(B(0.5, 0.42, 0), 0.24, P.dark, 0.5);
+  // the bushy tail, dark at the tip
+  var ta = -2.15 + (trot ? 0.18 * Math.sin(ph) : 0), td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.62, 0.54, 0);
+  S.ell(vMad(tb, td, 0.2), td, vNorm(vCross([0, 0, 1], td)), [0.28, 0.125, 0.115], 0.1, furD, P.fur, P.fur, { fur: 1, griz: 0.8, flow: vMul(td, 1.2) });
+  S.patch(vMad(tb, td, 0.42), 0.14, P.dark, 0.6);
+  // short dark legs and paws
+  [[0.34, 0.14, true], [0.34, -0.14, true], [-0.36, 0.14, false], [-0.36, -0.14, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = 0.22 * lg, l2 = 0.22 * lg, hip = B(L[0], 0.43, L[1]), fx, fy;
+    if (trot) { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    else { fx = L[0] + (near ? 0.04 : -0.06); fy = 0; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.dark : scale(P.dark, 0.8);
+    S.rod(hip, knee, 0.1, 0.068, 0.07, col, col, { fur: 0.8, flow: [0, -0.7, 0] });
+    S.rod(knee, vAdd(foot, [0, 0.03, 0]), 0.062, 0.05, 0.03, col, col, { fur: 0.6, flow: [0, -0.6, 0] });
+    S.rod(vAdd(foot, [-0.01, 0.03, 0]), vAdd(foot, [0.045, 0.02, 0]), 0.045, 0.04, 0.03, scale(col, 0.9), scale(col, 0.9), { fur: 0.3 });
+  });
+  // the head: a masked face with pale brows and cheeks, small round ears
+  var nb = B(0.5, 0.68, 0), hd = pose.head || 'up';
+  var H0 = hd === 'sniff' ? [0.74, 0.24 * lg + 0.02 * (pose.bob || 0), 0] : vAdd(nb, hd === 'up' ? [0.2, 0.12, 0] : [0.25, 0.03, 0]);
+  var hp = hd === 'sniff' ? -0.95 + 0.12 * (pose.bob || 0) : (hd === 'up' ? -0.12 : -0.3), hy = 1.05 * (pose.look || 0), tl = pose.tilt || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r0 = vNorm(vCross(f, [0, 1, 0])), u0 = vCross(r0, f);
+  var r = vAdd(vMul(r0, Math.cos(tl)), vMul(u0, Math.sin(tl))), u = vSub(vMul(u0, Math.cos(tl)), vMul(r0, Math.sin(tl)));
+  var nk = vLerp(nb, H0, 0.45), nd = vNorm(vSub(H0, nb));
+  S.ell(nk, nd, vNorm(vCross([0, 0, 1], nd)), [0.2, 0.2, 0.21], 0.12, P.fur, P.fur, mix(P.fur, P.dark, 0.6), fluff);
+  S.ell(H0, f, u, [0.21 * hs, 0.19 * hs, 0.21 * hs], 0.08, P.fur, P.fur, mix(P.pale, P.fur, 0.3), { fur: 1, griz: 0.6, flow: vSub(vMul(f, -0.8), vMul(u, 0.3)) });
+  var ms = kit ? 0.85 : 1, mz = vAdd(vMad(H0, f, 0.19 * hs), vMul(u, -0.06 * hs));
+  S.ell(mz, f, u, [0.13 * ms, 0.08 * ms, 0.085 * ms], 0.06, mix(P.pale, P.fur, 0.45), P.pale, P.pale, { fur: 0.6, flow: vMul(f, -0.5) });
+  S.patch(vMad(mz, f, 0.12 * ms), 0.06, P.dark, 0.6);                                        // dark round the nose
+  S.ell(vAdd(vMad(H0, f, (0.19 + 0.13 * ms) * hs), vMul(u, -0.05 * hs)), f, u, [0.04, 0.032, 0.042], 0.012, P.nose, P.nose, P.nose, { kind: 3 });
+  [-1, 1].forEach(function (s) {
+    var E = vAdd(vAdd(vMad(H0, f, 0.13 * hs), vMul(u, 0.03 * hs)), vMul(r, s * 0.115 * hs));
+    S.patch(vAdd(vAdd(vMad(H0, f, 0.1 * hs), vMul(u, -0.11 * hs)), vMul(r, s * 0.12 * hs)), 0.085 * hs, P.pale, 0.55);   // pale cheeks
+    S.patch(vAdd(vMad(E, u, 0.075 * hs), vMul(f, -0.02)), 0.06 * hs, P.pale, 0.5);                                       // pale brows
+    S.patch(E, 0.078 * hs, P.mask, 0.35);                                                                                 // the dark mask,
+    S.patch(vAdd(vAdd(E, vMul(u, -0.05 * hs)), vMul(f, -0.05 * hs)), 0.07 * hs, P.mask, 0.45);                            // sloping down and back
+    S.ell(vMad(E, f, 0.012), f, u, [0.034 * (kit ? 1.25 : 1), 0.032 * (kit ? 1.25 : 1), 0.03], 0.004, P.eye, P.eye, P.eye, { kind: 2, shine: 1 });
+    var base = vAdd(vAdd(vMad(H0, f, -0.04 * hs), vMul(u, 0.15 * hs)), vMul(r, s * 0.12 * hs));
+    var dir = vNorm(vAdd(vAdd(vMul(u, 0.9), vMul(r, s * (0.3 + 0.12 * (pose.ears || 0)))), vMul(f, -0.15)));
+    var fc = vAdd(vMul(f, 0.7), vMul(r, s * 0.4)), face = vNorm(vSub(fc, vMul(dir, vDot(fc, dir))));
+    S.ell(vMad(base, dir, 0.055 * hs), dir, face, [0.065 * hs, 0.018, 0.052 * hs], 0.035, mix(P.pale, P.dark, 0.35), P.dark, P.dark, { fur: 0.6, flow: vMul(dir, 0.6) });
+  });
+  return S;
+}
+/* ---------- Frames, baked per animal and depth ---------- */
+var DEER_FRAMES = (function () {
+  var L = [], i;
+  for (i = 0; i < 12; i++) L.push('walk' + i);
+  for (i = 0; i < 4; i++) L.push('stand' + i);
+  L.push('chew0', 'chew1', 'alert', 'stare', 'alarm');
+  for (i = 0; i < 8; i++) L.push('run' + i);
+  return L;
+})();
+var TANUKI_FRAMES = (function () {
+  var L = [];
+  for (var i = 0; i < 10; i++) L.push('trot' + i);
+  return L.concat(['stand', 'sniff0', 'sniff1', 'look0', 'look1']);
+})();
+function deerPose(fr) {
+  var m;
+  if ((m = /^walk(\d+)/.exec(fr))) return { gait: 'walk', ph: m[1] / 12 * TAU, neck: 0.15, ears: 0.3 };
+  if ((m = /^run(\d+)/.exec(fr))) return { gait: 'run', ph: m[1] / 8 * TAU, neck: 0.08, tail: 1, ears: 0.6 };
+  if ((m = /^stand(\d)/.exec(fr))) return { gait: 'stand', neck: [0.15, 0.45, 0.75, 1][+m[1]], ears: 0.3 };
+  if (fr === 'chew0') return { gait: 'stand', neck: 1, ears: 0.2 };
+  if (fr === 'chew1') return { gait: 'stand', neck: 1, chew: 1, tail: 0.35, ears: 0.2 };
+  if (fr === 'alert') return { gait: 'stand', neck: 0, ears: 1 };
+  if (fr === 'alarm') return { gait: 'stand', neck: 0, ears: 1, tail: 0.85 };
+  return { gait: 'stand', neck: 0.03, look: 1, ears: 1 };             // stare: looking straight at us
+}
+function tanukiPose(fr) {
+  var m;
+  if ((m = /^trot(\d+)/.exec(fr))) return { gait: 'trot', ph: m[1] / 10 * TAU, head: 'trot', ears: 0.4 };
+  if (fr === 'stand') return { gait: 'stand', head: 'up', ears: 0.5 };
+  if ((m = /^sniff(\d)/.exec(fr))) return { gait: 'stand', head: 'sniff', bob: +m[1], ears: 0.3 };
+  m = /^look(\d)/.exec(fr);
+  return { gait: 'stand', head: 'up', look: 1, ears: m && m[1] === '1' ? 1 : 0.5, tilt: m && m[1] === '1' ? 0.14 : 0 };
+}
+/* The frames for one kind of animal at (about) depth k, shared by any
+   animal of that kind standing at that depth; queued to bake. */
+function animSet(kind, variant, k) {
+  var kq = Math.round(k * 25) / 25, key = variant + '@' + kq;
+  if (!animSets[key]) {
+    var S = { key: key, kind: kind, variant: variant, k: kq, frames: {}, pend: 0 };
+    (kind === 'deer' ? DEER_FRAMES : TANUKI_FRAMES).forEach(function (fr) { S.pend++; animQueue.push([S, fr]); });
+    animSets[key] = S;
+  }
+  return animSets[key];
+}
+function bakeAnimFrame(S, fr) {
+  var u = animUnitPx(S.kind, S.variant, S.k) * PR, P = animPalette(S.variant, S.k), lod = clamp(u / 70, 0.35, 1);
+  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, animBlur(S.k), function (t, home, info) {
+    if (animGL()) {
+      try {
+        glAnimSprite(t, info, S.kind === 'deer' ? buildDeer(deerPose(fr), S.variant === 'stag', P) : buildTanuki(tanukiPose(fr), S.variant === 'kit', P), P);
+        return;
+      } catch (e) { GLA = false; home(); }           // WebGL failed: the hair-stroke drawing from now on
+    }
+    if (S.kind === 'deer') renderDeer(t, P, deerPose(fr), S.variant === 'stag', lod);
+    else renderTanuki(t, P, tanukiPose(fr), S.variant === 'kit', lod);
+  });
+  S.pend--;
+}
+function bakeAnimQueue(ms) {
+  var t0 = performance.now();
+  while (animQueue.length && performance.now() - t0 < ms) { var q = animQueue.shift(); bakeAnimFrame(q[0], q[1]); }
+}
+/* After a change (size, colours, light): bake everything again. */
+function resetAnimSets() {
+  animSets = {}; animQueue = [];
+  animals.forEach(function (a) { a.set = animSet(a.kind, a.variant, a.k); });
+}
+
+/* ---------- What they do ---------- */
+function onScreen(a) { return a.x > W * 0.08 && a.x < W * 0.92; }
+function setReady(a) { return a.set.pend === 0; }
+/* Move forward at speed (shoulder heights a second) in gait g, with the
+   legs' phase following the ground so the feet do not slide. */
+function stepOn(a, speed, g, name, nFrames, dt) {
+  a.x += a.dir * speed * a.unit * dt;
+  a.ph += TAU * speed * g.duty / g.stride * dt;
+  a.frame = name + (Math.floor((a.ph % TAU) / TAU * nFrames + 0.5) % nFrames);
+}
+/* A few leaves kicked up from under its feet (they fall back on to the far
+   ground), and (galloping, near the front) the leaves lying there lifted. */
+function kickLeaves(a, t, dt, rate) {
+  var fy = groundY(a.k), fx = a.x - a.dir * a.unit * 0.3;
+  if (Math.random() < dt * rate) {
+    var L = spawnLeaf({ species: 'koyo', x: fx + rnd(-0.3, 0.3) * a.unit, y: fy - 2, z: clamp(a.k * 0.42, 0.12, 0.45), vx: -a.dir * rnd(20, 70) * a.k, force: true });
+    if (L) L.vy = -rnd(30, 75) * a.k;
+  }
+  if (a.k > 0.85 && rate >= 3) for (var j = pile.length - 1; j >= 0; j--) {
+    var Pl = pile[j];
+    if (Math.abs(Pl.x - fx) < a.unit * 0.5 && Math.random() < dt * rate * 0.25) liftFromPile(Pl, a.dir * rnd(60, 140), -rnd(50, 110));
+  }
+}
+function spawnHerd(t) {
+  var lo = Math.min(O.herdMin, O.herdMax), hi = Math.max(O.herdMin, O.herdMax);
+  var n = Math.round(rnd(lo - 0.49, hi + 0.49)), dir = Math.random() < 0.5 ? 1 : -1;
+  var kf = Math.min(O.deerFar, O.deerNear), kn = Math.max(O.deerFar, O.deerNear), kb = rnd(kf, kn);
+  var stagAt = Math.random() < O.stagChance ? (n >= 2 ? Math.floor(Math.random() * n) : (Math.random() < 0.5 ? 0 : -1)) : -1;
+  var herd = { id: ++herdN, spookAt: Math.random() < O.runChance ? -1 : Infinity, members: [] }, x = dir > 0 ? 0 : W;
+  for (var i = 0; i < n; i++) {
+    var k = clamp(kb + rnd(-0.07, 0.07), kf, kn), variant = i === stagAt ? 'stag' : 'hind';
+    var a = { kind: 'deer', variant: variant, k: k, dir: dir, herd: herd, idx: i, state: 'prep', ph: rnd(0, TAU), neck: 0.15,
+              frame: 'walk0', t0: t, until: 0, nextStop: 0, speed: O.deerWalk * rnd(0.9, 1.1), unit: animUnitPx('deer', variant, k) };
+    x -= dir * a.unit * (i ? rnd(1.9, 2.8) : 1.5);                     // one behind the other, in a loose line
+    a.x = x;
+    a.set = animSet('deer', variant, k);
+    herd.members.push(a); animals.push(a);
+  }
+}
+function spawnTanuki(t) {
+  var dir = Math.random() < 0.5 ? 1 : -1, kf = Math.min(O.tanukiFar, O.tanukiNear), kn = Math.max(O.tanukiFar, O.tanukiNear), k = rnd(kf, kn);
+  var m = { kind: 'tanuki', variant: 'mother', k: k, dir: dir, state: 'prep', ph: 0, frame: 'stand', t0: t, until: 0, speed: O.tanukiSpeed,
+            unit: animUnitPx('tanuki', 'mother', k), seed: Math.random() * 10 };
+  m.x = dir > 0 ? -m.unit * 2 : W + m.unit * 2;
+  m.set = animSet('tanuki', 'mother', k);
+  animals.push(m);
+  if (Math.random() < O.kitChance) {
+    var kk = Math.min(k + 0.05, 1.05);                                  // a little nearer, so it shows beside her
+    var kit = { kind: 'tanuki', variant: 'kit', k: kk, dir: dir, state: 'prep', ph: 1, frame: 'stand', t0: t, until: 0, speed: O.tanukiSpeed,
+                unit: animUnitPx('tanuki', 'kit', kk), mother: m, copyAt: 0, seed: Math.random() * 10 };
+    kit.x = m.x - dir * m.unit * 2.2;
+    kit.set = animSet('tanuki', 'kit', kk);
+    m.kit = kit;
+    animals.push(kit);
+  }
+}
+function startGraze(a, t, short) {
+  a.state = 'lower';
+  a.until = t + (short ? rnd(2, 5) : rnd(Math.min(O.grazeMin, O.grazeMax), Math.max(O.grazeMin, O.grazeMax)));
+  a.lookAt = Math.random() < O.deerLook ? t + rnd(1.5, Math.max(2, (a.until - t) * 0.75)) : Infinity;
+}
+function updateDeer(a, t, dt) {
+  var ahead = a.idx > 0 ? a.herd.members[a.idx - 1] : null;
+  var gap = ahead && !ahead.gone ? (ahead.x - a.x) * a.dir : Infinity;
+  switch (a.state) {
+    case 'prep':
+      if (a.herd.members.every(setReady)) { a.state = 'walk'; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      break;
+    case 'walk':
+      if (gap < a.unit * 1.9) { startGraze(a, t, true); break; }   // caught up with the one ahead: it grazes too
+      stepOn(a, a.speed * (gap > a.unit * 4.5 && gap < Infinity ? 1.35 : 1), GAITS.walk, 'walk', 12, dt);
+      if (a.k > 0.85) kickLeaves(a, t, dt, 0.3);
+      if (onScreen(a) && t >= a.nextStop) startGraze(a, t);
+      break;
+    case 'lower':                                     // the head goes down to the leaves
+      a.neck = Math.min(1, a.neck + dt / 0.9);
+      a.frame = 'stand' + Math.round((a.neck - 0.15) / 0.85 * 3);
+      if (a.neck >= 1) { a.state = 'graze'; a.t0 = t; }
+      break;
+    case 'graze':                                     // chewing, the tail flicking now and then
+      a.frame = Math.floor((t - a.t0) / 0.42) % 2 ? 'chew1' : 'chew0';
+      if (t >= a.lookAt) { a.state = 'raise'; a.after = 'look'; }
+      else if (t >= a.until || (ahead && gap > a.unit * 5.5)) { a.state = 'raise'; a.after = 'walk'; }
+      break;
+    case 'raise':
+      a.neck = Math.max(0.15, a.neck - dt / 0.7);
+      a.frame = 'stand' + Math.round((a.neck - 0.15) / 0.85 * 3);
+      if (a.neck <= 0.15) {
+        if (a.after === 'look') { a.state = 'look'; a.frame = Math.random() < 0.5 ? 'stare' : 'alert'; a.lookUntil = t + rnd(1.5, 4); a.lookAt = Infinity; }
+        else { a.state = 'walk'; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      }
+      break;
+    case 'look':                                      // head up, ears pricked; sometimes straight at us
+      if (t >= a.lookUntil) {
+        if (a.until > t + 1.5) a.state = 'lower';
+        else { a.state = 'walk'; a.neck = 0.15; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      }
+      break;
+    case 'alarm':                                     // startled: head up, tail flared, then away
+      a.frame = 'alarm'; a.neck = 0.15;
+      if (t >= a.runAt) a.state = 'run';
+      break;
+    case 'run':
+      stepOn(a, O.deerRun * a.runSpeed, GAITS.run, 'run', 8, dt);
+      kickLeaves(a, t, dt, 6);
+      break;
+  }
+  if ((a.state === 'walk' || a.state === 'run') && (a.dir > 0 ? a.x > W + a.unit * 2 : a.x < -a.unit * 2)) a.gone = true;
+}
+function tanukiStop(a, t) {                           // at a stop: look at us, sniff the leaves, or just stand
+  var r = Math.random();
+  if (r < O.tanukiLook) { a.state = 'look'; a.until = t + O.lookTime * rnd(0.7, 1.3); }
+  else if (r < O.tanukiLook + (1 - O.tanukiLook) * 0.65) { a.state = 'sniff'; a.until = t + rnd(1, 2.6); }
+  else { a.state = 'stand'; a.until = t + rnd(0.6, 1.5); }
+}
+function updateTanuki(a, t, dt) {
+  if (a.state === 'prep') {
+    if (setReady(a) && (!a.kit || setReady(a.kit)) && (!a.mother || setReady(a.mother))) { a.state = 'trot'; a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.85, 1.15); }
+    return;
+  }
+  if (a.variant === 'kit') { updateKit(a, t, dt); return; }
+  if (a.state === 'trot') {
+    stepOn(a, a.speed, GAITS.trot, 'trot', 10, dt);
+    if (a.k > 0.85) kickLeaves(a, t, dt, 0.6);
+    if (t >= a.until) {
+      if (onScreen(a) && Math.random() < O.tanukiStops) tanukiStop(a, t);
+      else { a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.8, 1.2); }
+    }
+  } else {
+    if (a.state === 'look') a.frame = Math.floor(t / 0.8 + a.seed) % 2 ? 'look1' : 'look0';   // an ear twitches, the head tilts
+    else if (a.state === 'sniff') a.frame = Math.floor(t / 0.22) % 2 ? 'sniff1' : 'sniff0';
+    else a.frame = 'stand';
+    if (t >= a.until) {
+      if (Math.random() < 0.35) tanukiStop(a, t);
+      else { a.state = 'trot'; a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.8, 1.2); }
+    }
+  }
+  if (a.state === 'trot' && (a.dir > 0 ? a.x > W + a.unit * 3 : a.x < -a.unit * 3)) a.gone = true;
+}
+/* The kit keeps close behind its mother, hurrying to catch up, and copies
+   what she does when she stops (a moment later). */
+function updateKit(a, t, dt) {
+  var m = a.mother, mGone = !m || m.gone, gap = mGone ? Infinity : (m.x - a.x) * a.dir, want = mGone ? 0 : m.unit * 1.5;
+  var mPx = O.tanukiSpeed * (mGone ? a.unit / 0.7 : m.unit);
+  if (mGone || gap > want * 1.1 || (m.state === 'trot' && gap > want * 0.7)) {
+    var px = mPx * (gap > want * 1.8 ? 1.4 : (!mGone && m.state === 'trot' ? m.speed / O.tanukiSpeed : 1));
+    a.state = 'trot';
+    stepOn(a, px / a.unit, GAITS.trot, 'trot', 10, dt);
+    a.copyAt = t + rnd(0.3, 0.7);
+    a.sniffy = Math.random() < 0.6;
+    if (mGone && (a.dir > 0 ? a.x > W + a.unit * 3 : a.x < -a.unit * 3)) a.gone = true;
+  } else if (m.state === 'trot') { a.state = 'stand'; a.frame = 'stand'; }   // close enough: waits for her to get ahead
+  else if (t >= a.copyAt) {
+    a.state = m.state;
+    if (m.state === 'look') a.frame = Math.floor(t / 0.7 + a.seed) % 2 ? 'look1' : 'look0';
+    else if (m.state === 'sniff' && a.sniffy) a.frame = Math.floor(t / 0.2) % 2 ? 'sniff1' : 'sniff0';
+    else a.frame = 'stand';
+  }
+}
+function updateAnimals(t, dt) {
+  if (!trees.length || !H) return;
+  if (!deerNext) { deerNext = t + O.deerEvery * rnd(0.3, 0.6); tanukiNext = t + O.tanukiEvery * rnd(0.3, 0.6); }
+  var anyDeer = false, anyTanuki = false, i, a;
+  for (i = 0; i < animals.length; i++) { a = animals[i]; a.unit = animUnitPx(a.kind, a.variant, a.k); if (a.kind === 'deer') anyDeer = true; else anyTanuki = true; }
+  if (animalsActive && O.deerOn && !anyDeer && t >= deerNext) spawnHerd(t);          // only at night; those out at dawn finish their way
+  if (animalsActive && O.tanukiOn && !anyTanuki && t >= tanukiNext) spawnTanuki(t);
+  // a herd that is going to be startled: once it is all in view, some time later
+  var herds = {};
+  animals.forEach(function (x) { if (x.herd) herds[x.herd.id] = x.herd; });
+  for (var id in herds) {
+    var hd = herds[id], live = hd.members.filter(function (x) { return !x.gone; });
+    if (hd.spookAt === -1 && live.length && live.every(function (x) { return x.state !== 'prep' && onScreen(x); })) hd.spookAt = t + rnd(3, 15);
+    if (t >= hd.spookAt && hd.spookAt > 0) {
+      live.forEach(function (x, j) {
+        if (x.state === 'run' || x.state === 'alarm') return;
+        x.state = 'alarm'; x.runAt = t + rnd(0.15, 0.5) + j * rnd(0.05, 0.25); x.runSpeed = rnd(0.9, 1.1);
+      });
+      hd.spookAt = Infinity;
+    }
+  }
+  for (i = 0; i < animals.length; i++) { a = animals[i]; if (a.kind === 'deer') updateDeer(a, t, dt); else updateTanuki(a, t, dt); }
+  var before = animals.length;
+  animals = animals.filter(function (x) { return !x.gone; });
+  if (animals.length < before) {
+    var keep = {};                                    // free the frames of those that have gone
+    animals.forEach(function (x) { keep[x.set.key] = animSets[x.set.key]; });
+    animSets = keep;
+    animQueue = animQueue.filter(function (q) { return keep[q[0].key] === q[0]; });
+    if (anyDeer && !animals.some(function (x) { return x.kind === 'deer'; })) deerNext = t + O.deerEvery * rnd(0.6, 1.4);
+    if (anyTanuki && !animals.some(function (x) { return x.kind === 'tanuki'; })) tanukiNext = t + O.tanukiEvery * rnd(0.6, 1.4);
+  }
+}
+/* Those in this slot ('A' behind the far tree, 'B' between the trees, 'C'
+   in front of the near tree), further back first: a soft shadow on the
+   ground, the animal, then the leaves round its feet over its hooves. */
+function drawAnimals(c, slot) {
+  if (!animals.length) return;
+  var list = animals.filter(function (a) { return a.state !== 'prep' && owlSlot(a.k) === slot; }).sort(function (a, b) { return a.k - b.k; });
+  for (var i = 0; i < list.length; i++) {
+    var a = list[i], S = a.set, spr = S.frames[a.frame] || S.frames.stand || S.frames.stand0;
+    if (!spr) continue;
+    var fy = groundY(a.k), sc = a.unit / animUnitPx(S.kind, S.variant, S.k), deer = a.kind === 'deer';
+    var hz = animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    c.save();
+    c.translate(a.x + a.dir * a.unit * (deer ? 0.05 : 0), fy + 1); c.scale(sx, sy);
+    var g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, 'rgba(30,16,20,' + (0.3 * (1 - hz)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(30,16,20,0)');
+    c.fillStyle = g; c.fillRect(-1, -1, 2, 2);
+    c.restore();
+    c.setTransform(PR * a.dir * sc, 0, 0, PR * sc, a.x * PR, fy * PR);
+    c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
+    // the fallen leaves just in front of its feet
+    var x0 = Math.max(0, Math.floor((a.x - a.unit * 1.2) * PR)), x1 = Math.min(LS.GRDL.cnv.width, Math.ceil((a.x + a.unit * 1.2) * PR));
+    var y0 = Math.max(0, Math.floor((fy - a.unit * 0.05 - LS.grdTop) * PR)), y1 = Math.min(LS.GRDL.cnv.height, Math.ceil((fy + 4 - LS.grdTop) * PR));
+    if (x1 > x0 && y1 > y0) {
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.drawImage(LS.GRDL.cnv, x0, y0, x1 - x0, y1 - y0, x0, y0 + Math.round(LS.grdTop * PR), x1 - x0, y1 - y0);
+    }
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+/* ---------- Running it ---------- */
+var bakedFor = '', bakedLook = -1, bakedAt = -1e9;
+/* Each frame, from dynStep (autumn only): the trees of the moment, night or
+   not, the owl and the animals, and a few sprites baked. */
+function update(t, dt) {
+  trees = tree ? (farTree ? [tree, farTree] : [tree]) : [];
+  var night = ENV.scene === 'autumn' && ENV.phase === 'night' && trees.length > 0;
+  owlActive = animalsActive = night;
+  if (!trees.length) { reset(); return; }
+  var size = W + 'x' + H + '@' + PR;
+  if (night || owl || animals.length) {
+    if (size !== bakedFor) {                         // new size: everything afresh
+      bakedFor = size; bakedLook = lookVersion; bakedAt = t;
+      bakeOwlSprites(true);
+      resetAnimSets();
+    } else if (bakedLook !== lookVersion && t - bakedAt > 60) {   // the light has moved on: the owl re-baked (the animals bake as they come)
+      bakedLook = lookVersion; bakedAt = t;
+      bakeOwlSprites(false);
+    }
+  }
+  if (night && !owl) {                               // nightfall: it flies in a little later
+    startOwl(t);
+    owl.state = 'gone'; owl.until = t + rnd(4, 12); owl.alpha = 0;
+  }
+  if (owl && !night && owl.state === 'perch' && owl.until > t + 8) owl.until = t + rnd(2, 8);   // dawn: it soon leaves
+  if (owl && !night && owl.state === 'gone') { owl = null; fadeHoots(); }
+  updateOwl(t, dt);
+  updateAnimals(t, dt);
+  var scrolling = typeof _scrollActive !== 'undefined' && (_scrollActive || _swipeActive), ms = scrolling ? 1.5 : 5;
+  bakeOwlQueue(ms);
+  bakeAnimQueue(owlQueue.length ? ms * 0.4 : ms);
+}
+/* Out of autumn, or the trees gone: nothing left over. */
+function reset() {
+  if (owl) fadeHoots();
+  owl = null; owlLiveSpr = null; animals = []; animSets = {}; animQueue = [];
+  deerNext = 0; tanukiNext = 0;
+}
+function drawSlot(c, slot) {
+  drawAnimals(c, slot);
+  drawOwl(c, slot);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.globalAlpha = 1;
+}
+function busy() { return !!owl || animals.length > 0; }
+
+return { O: O, update: update, reset: reset, drawSlot: drawSlot, busy: busy, fadeHoots: fadeHoots,
+         addPerch: addPerch, drawPerch: drawPerch, drawPerchLeaves: drawPerchLeaves, owlOn: owlOn };
+})();
+
+/* ============================================================
    9. CANVAS, SPAWNING, MAIN LOOP
    ============================================================ */
 /* ============================================================
@@ -14704,6 +16861,7 @@ function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0; birdNext = 0;
   cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
+  NightLife.reset();
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
   winReset();
@@ -14846,6 +17004,7 @@ function dynStep(dt, t, want, skyWant) {
   updateBirds(dt, t);
   updateSpecks(dt, t);
   updateTree(dt, t);
+  if (ENV.scene === 'autumn') NightLife.update(t, dt); else NightLife.reset();
   if (ENV.scene === 'winter') winUpdate(dt, t);
   updateCricket(dt, t);
   if (dynFrontMul < 0.05 && cricket) { cricket = null; insectsLeaveText(); }
