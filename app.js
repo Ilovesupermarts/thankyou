@@ -10915,7 +10915,7 @@ function startGust(force) {
     str: (90 + ENV.windMs * 22) * (0.6 + S.gustiness) * (force ? 1.3 : 1)
   };
   gusts.push(g);
-  var n = 3 + Math.floor(Math.random() * 5);
+  var n = Math.round((3 + Math.floor(Math.random() * 5)) * 0.8);   // 20% fewer leaves blown in
   for (var i = 0; i < n; i++) {
     spawnLeaf({ x: dir > 0 ? -30 : W + 30, y: Math.random() * H * 0.6, vx: dir * g.str * rnd(0.5, 1), force: force });
   }
@@ -10938,15 +10938,15 @@ function updateGusts(dt) {
       if (P.gid === g.id) continue;
       if (g.dir > 0 ? P.x < g.x : P.x > g.x) {
         P.gid = g.id;
-        if (Math.random() < 0.55) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
+        if (Math.random() < 0.44) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
         else P.kick = g.dir * 0.3 * Math.min(1.5, g.str / 150);   // the rest tremble as it passes
       }
     }
     [tree, farTree].forEach(function(T) {
       if (T && T.gid !== g.id && (g.dir > 0 ? T.bx < g.x : T.bx > g.x)) {
         T.gid = g.id;
-        T.gustV += g.dir * 0.5 * (g.str / 200);
-        if (T.koyo) for (var q = 2 + Math.floor(Math.random() * 4); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
+        T.gustV += g.dir * (g.str / 400);   // push in proportion to the gust's strength
+        if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
       }
     });
     if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
@@ -12155,11 +12155,12 @@ function updateTree(dt, t) {
 function updateOneTree(T, dt, t) {
   var ns = T.nodes;
   // a gust gives the whole tree a push that springs back
-  // (damping ratio ~0.7: it settles in one swing instead of ringing, and a
-  // gust landing on a moving tree cannot stack up past the limit)
-  T.gustV += (-6 * T.gust - 3.4 * T.gustV) * dt;
-  T.gustV = clamp(T.gustV, -0.25, 0.25);
-  T.gust = clamp(T.gust + T.gustV * dt, -0.12, 0.12);
+  // A springy response (damping ratio ~0.17): a strong gust leans the tree
+  // well over, it bounces back past upright a few times and settles in about
+  // two seconds. The limits only stop several gusts stacking without bound.
+  T.gustV += (-9 * T.gust - 1.0 * T.gustV) * dt;
+  T.gustV = clamp(T.gustV, -1.1, 1.1);
+  T.gust = clamp(T.gust + T.gustV * dt, -0.35, 0.35);
   var wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
   var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway;
   var spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
