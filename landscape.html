@@ -2439,10 +2439,11 @@ function flyPose(k, view, f) {
            ph: f / OWL_FRAMES * TAU, glide: f === OWL_GLIDE, land: 0, legs: 0, perch: false, lod: owlLod(k) };
 }
 
-/* Draw into a sprite: paint(t, home) draws sharp, in units of u device
-   pixels with (0, 0) at the sprite's anchor (home() puts that transform
-   back); then it is laid down through the blur for its depth. box: the
-   bounds in those units. into: a canvas to reuse, else a new one. */
+/* Draw into a sprite: paint(t, home, info) draws sharp, in units of u
+   device pixels with (0, 0) at the sprite's anchor (home() puts that
+   transform back; info: the sprite's size w, h and anchor ox, oy in device
+   pixels, and u); then it is laid down through the blur for its depth.
+   box: the bounds in those units. into: a canvas to reuse, else a new one. */
 function spriteFrom(u, box, blur, paint, into) {
   var pad = Math.ceil(blur * 3 * PR) + 2;
   var w = Math.max(1, Math.ceil((box[2] - box[0]) * u) + pad * 2), h = Math.max(1, Math.ceil((box[3] - box[1]) * u) + pad * 2);
@@ -2451,7 +2452,7 @@ function spriteFrom(u, box, blur, paint, into) {
   if (tc.width !== w || tc.height !== h) { tc.width = w; tc.height = h; } else { t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, w, h); }
   t.setTransform(u, 0, 0, u, ox, oy);
   t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1;
-  paint(t, function () { t.setTransform(u, 0, 0, u, ox, oy); });
+  paint(t, function () { t.setTransform(u, 0, 0, u, ox, oy); }, { w: w, h: h, ox: ox, oy: oy, u: u });
   t.globalCompositeOperation = 'source-over';
   var cv2 = into || document.createElement('canvas');
   if (cv2.width !== w || cv2.height !== h) { cv2.width = w; cv2.height = h; }
@@ -2752,10 +2753,11 @@ function paintSky() {
   sctx.fillStyle = 'rgba(35,40,70,0.168)'; sctx.fillRect(0, 0, W, H);
 }
 /* ============================================================
-   12. DEER AND TANUKI — foraging among the fallen leaves, built and lit
-   the same way as the owl (3D shapes covered in hair, lit by the night
-   sky from above and the warm lamps from below; softer, paler and hazier
-   further back).
+   12. DEER AND TANUKI — foraging among the fallen leaves, in 3D and lit
+   like the owl (the night sky from above, the warm lamps from below;
+   softer, paler and hazier further back). They are drawn on the graphics
+   chip as smooth blended shapes with a fine fur grain (glAnimSprite);
+   without WebGL 2, with hair strokes instead.
    - Sika deer (シカ): a herd of 2–3 (with one stag and his antlers, the
      rest hinds) walk slowly across, one behind the other. Now and then a
      deer stops, lowers its head and grazes, chewing and flicking its
@@ -2801,11 +2803,12 @@ function animPalette(variant, k) {
     return mix(o, mist, hz);
   };
   P.lamp = night ? O.lampGlow : 0.25;
-  P.hz = hz;
+  P.hz = hz; P.str = str; P.mist = mist; P.night = night;
   return P;
 }
 
-/* ---------- Drawing helpers (units: shoulder heights; x its front, y up) ---------- */
+/* ---------- Drawing helpers (units: shoulder heights; x its front, y up) ----------
+   The hair-stroke drawing, used where there is no WebGL 2 (see glAnimSprite). */
 /* An ellipsoid covered in hair: centre o, three axis vectors ax (scaled),
    flow: the way the hair lies; colour(u, d): a hair's own colour at unit
    direction u (along the three axes). hl, hw: hair length and width;
@@ -3135,6 +3138,347 @@ function renderTanuki(c, P, pose, kit, lod) {
   for (var i = 0; i < parts.length; i++) parts[i].f();
 }
 
+/* ---------- Drawn smooth, on the graphics chip (WebGL 2) ----------
+   Each animal is a handful of smooth solid shapes — ellipsoids for the
+   body, neck, head, ears and tail, tapered rounded rods for the legs and
+   antlers — blended into one surface where they meet, so its outline is a
+   single smooth, anti-aliased contour. Every pixel finds that surface and
+   is shaded from its true slant: the night sky from above (with soft
+   shadows: the neck on the chest, the body on the far legs), the warm
+   lamps from below, a rim of light round the edge, and darker where parts
+   meet (between the legs, under the neck, near the ground). Its colour
+   comes from the part (darker back, paler belly), patches painted onto the
+   surface (the rump, the spots, the tanuki's mask), and a fine grain of
+   fur that follows the lie of the hair. Without WebGL 2 the hair-stroke
+   drawing above is used instead. */
+var GL_MAXP = 48, GL_MAXD = 32, GL_UBO = (GL_MAXP * 5 + GL_MAXP * 4 + GL_MAXD * 2) * 4;
+var ANIM_VS = '#version 300 es\nvoid main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }';
+var ANIM_FS = [
+  '#version 300 es',
+  'precision highp float; precision highp int;',
+  // per shape: 5 of G (where, size, axes, bounds), 4 of M (colours, fur, kind, the way the hair lies); per patch: 2 of D
+  'layout(std140) uniform Scene { vec4 G[' + GL_MAXP * 5 + ']; vec4 M[' + GL_MAXP * 4 + ']; vec4 D[' + GL_MAXD * 2 + ']; };',
+  'uniform int uN, uND;',
+  'uniform vec4 uMap;',                                   // anchor x, y and height of the sprite (device px), px per unit
+  'uniform vec3 uPaper, uMist;',
+  'uniform float uStr, uNight, uHz, uLamp;',
+  'out vec4 outC;',
+  'uint m0, m1;',
+  'const vec3 LM = vec3(-0.4537, 0.8066, 0.3781), LL = vec3(0.3093, -0.8248, 0.4730);',   // the sky, the lamps (as for the owl)
+  'bool on(int i) { return i < 32 ? ((m0 >> uint(i)) & 1u) == 1u : ((m1 >> uint(i - 32)) & 1u) == 1u; }',
+  'float sdEll(vec3 p, vec3 r) { float k0 = length(p / r), k1 = length(p / (r * r)); return k0 * (k0 - 1.0) / max(k1, 1e-6); }',
+  'float sdRC(vec3 p, vec3 a, vec3 b, float r1, float r2) {',
+  '  vec3 ba = b - a; float l2 = dot(ba, ba), rr = r1 - r2, a2 = l2 - rr * rr, il2 = 1.0 / l2;',
+  '  vec3 pa = p - a; float y = dot(pa, ba), z = y - l2; vec3 xv = pa * l2 - ba * y; float x2 = dot(xv, xv), y2 = y * y * l2, z2 = z * z * l2;',
+  '  float k = sign(rr) * rr * rr * x2;',
+  '  if (sign(z) * a2 * z2 > k) return sqrt(x2 + z2) * il2 - r2;',
+  '  if (sign(y) * a2 * y2 < k) return sqrt(x2 + y2) * il2 - r1;',
+  '  return (sqrt(x2 * a2 * il2) + y * rr) * il2 - r1;',
+  '}',
+  'float smin(float a, float b, float k) { if (k <= 0.0) return min(a, b); float h = max(k - abs(a - b), 0.0) / k; return min(a, b) - h * h * k * 0.25; }',
+  'float prim(int i, vec3 p) {',
+  '  vec4 g0 = G[i * 5], g1 = G[i * 5 + 1];',
+  '  if (g0.w < 0.5) { vec3 q = p - g0.xyz, ax = G[i * 5 + 2].xyz, ay = G[i * 5 + 3].xyz; return sdEll(vec3(dot(q, ax), dot(q, ay), dot(q, cross(ax, ay))), g1.xyz); }',
+  '  return sdRC(p, g0.xyz, g1.xyz, G[i * 5 + 2].w, G[i * 5 + 3].w);',
+  '}',
+  // the shapes along this pixel's line of sight (m0, m1), blended smoothly
+  'float map(vec3 p) { float d = 1e5; for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; if (!on(i)) continue; d = smin(d, prim(i, p), G[i * 5 + 1].w); } return d; }',
+  // all of them (for shadows), skipping any too far away to matter
+  'float mapAll(vec3 p) { float d = 1e5; for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; vec4 b = G[i * 5 + 4]; float k = G[i * 5 + 1].w; if (length(p - b.xyz) - b.w > d + k) continue; d = smin(d, prim(i, p), k); } return d; }',
+  'vec3 nrm(vec3 p) { const vec2 k = vec2(1.0, -1.0); float e = 0.0015; return normalize(k.xyy * map(p + k.xyy * e) + k.yyx * map(p + k.yyx * e) + k.yxy * map(p + k.yxy * e) + k.xxx * map(p + k.xxx * e)); }',
+  'float occl(vec3 p, vec3 n) { float o = 0.0, s = 1.0; for (int i = 1; i <= 4; i++) { float h = 0.035 * float(i); o += (h - map(p + n * h)) * s; s *= 0.6; } return clamp(1.0 - 2.4 * o, 0.3, 1.0); }',
+  'float shadow(vec3 p, vec3 l) { float r = 1.0, t = 0.03; for (int i = 0; i < 16; i++) { float h = mapAll(p + l * t); r = min(r, 9.0 * h / t); t += clamp(h, 0.03, 0.16); if (r < 0.02 || t > 1.4) break; } return clamp(r, 0.0, 1.0); }',
+  'float hash(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }',
+  'float vnoise(vec3 x) { vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);',
+  '  return mix(mix(mix(hash(i), hash(i + vec3(1, 0, 0)), f.x), mix(hash(i + vec3(0, 1, 0)), hash(i + vec3(1, 1, 0)), f.x), f.y),',
+  '             mix(mix(hash(i + vec3(0, 0, 1)), hash(i + vec3(1, 0, 1)), f.x), mix(hash(i + vec3(0, 1, 1)), hash(i + vec3(1, 1, 1)), f.x), f.y), f.z); }',
+  // a shape's own colour here: darker on top, paler underneath (ellipsoids); from one end to the other (rods)
+  'vec3 primCol(int i, vec3 p) {',
+  '  vec4 g0 = G[i * 5]; vec3 top = M[i * 4].rgb, side = M[i * 4 + 1].rgb, bot = M[i * 4 + 2].rgb;',
+  '  if (g0.w < 0.5) { float ly = dot(p - g0.xyz, G[i * 5 + 3].xyz) / G[i * 5 + 1].y; vec3 c = mix(bot, side, smoothstep(-0.75, -0.2, ly)); return mix(c, top, smoothstep(0.4, 0.95, ly)); }',
+  '  vec3 ba = G[i * 5 + 1].xyz - g0.xyz; return mix(top, bot, clamp(dot(p - g0.xyz, ba) / dot(ba, ba), 0.0, 1.0));',
+  '}',
+  'void material(vec3 p, out vec3 col, out float fur, out float kind, out float griz, out vec3 flow, out float shine) {',
+  '  float ds[' + GL_MAXP + ']; float dmin = 1e5;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; ds[i] = 1e5; if (!on(i)) continue; ds[i] = prim(i, p); dmin = min(dmin, ds[i]); }',
+  '  col = vec3(0.0); float ws = 0.0, wb = -1.0; fur = 0.0; kind = 0.0; griz = 0.0; flow = vec3(-1.0, 0.0, 0.0); shine = 0.0;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; if (ds[i] > 1e4) continue;',
+  '    float w = clamp(1.0 - (ds[i] - dmin) / (G[i * 5 + 1].w * 1.2 + 0.004), 0.0, 1.0); w *= w; if (w <= 0.0) continue;',
+  '    col += w * primCol(i, p); ws += w;',
+  '    if (w > wb) { wb = w; fur = M[i * 4].w; kind = M[i * 4 + 1].w; griz = M[i * 4 + 2].w; flow = M[i * 4 + 3].xyz; shine = M[i * 4 + 3].w; } }',
+  '  col /= max(ws, 1e-4);',
+  '  if (kind < 0.5) for (int j = 0; j < ' + GL_MAXD + '; j++) { if (j >= uND) break; vec4 a = D[j * 2], b = D[j * 2 + 1];',
+  '    col = mix(col, b.rgb, 1.0 - smoothstep(a.w * (1.0 - b.w), a.w, length(p - a.xyz))); }',
+  '}',
+  'void main() {',
+  '  vec2 px = vec2(gl_FragCoord.x, uMap.z - gl_FragCoord.y);',
+  '  vec3 ro = vec3((px.x - uMap.x) / uMap.w, -(px.y - uMap.y) / uMap.w, 0.0);',
+  '  m0 = 0u; m1 = 0u; float zs = -1e5;',
+  '  for (int i = 0; i < ' + GL_MAXP + '; i++) { if (i >= uN) break; vec4 b = G[i * 5 + 4]; float k = G[i * 5 + 1].w;',
+  '    if (length(ro.xy - b.xy) < b.w + k + 0.16) { if (i < 32) m0 |= (1u << uint(i)); else m1 |= (1u << uint(i - 32)); zs = max(zs, b.z + b.w + k + 0.05); } }',
+  '  if (m0 == 0u && m1 == 0u) { outC = vec4(0.0); return; }',
+  '  float pix = 1.0 / uMap.w, t = 0.0, minD = 1e5, tMin = 0.0; bool hit = false; ro.z = zs;',
+  '  for (int s = 0; s < 110; s++) { float d = map(ro - vec3(0.0, 0.0, t)); if (d < minD) { minD = d; tMin = t; } if (d < 0.0006) { hit = true; break; } t += max(d * 0.8, 0.0015); if (t > zs + 3.0) break; }',
+  '  if (!hit && minD > pix * 3.0) { outC = vec4(0.0); return; }',
+  '  vec3 p = ro - vec3(0.0, 0.0, hit ? t : tMin), n = nrm(p);',
+  '  vec3 col, flow; float fur, kind, griz, shine; material(p, col, fur, kind, griz, flow, shine);',
+  '  float hl = max(length(flow), 1e-3); vec3 fl = flow / hl; fl = fl - n * dot(fl, n); fl = dot(fl, fl) < 1e-5 ? cross(n, vec3(0.0, 0.0, 1.0)) : normalize(fl);',
+  '  vec3 s1 = normalize(cross(n, fl));',
+  '  float grain = 0.5;',
+  '  if (kind < 0.5 && fur > 0.0) {',                     // fine hair along the flow: streaks of light and dark, the hairs catching the light
+  '    vec3 q = vec3(dot(p, fl) * 7.0 / hl, dot(p, s1) * 60.0 / hl, dot(p, n) * 60.0 / hl);',
+  '    grain = vnoise(q) * 0.62 + vnoise(q * 2.07 + 3.1) * 0.38;',
+  '    col *= mix(1.0, 0.8 + 0.4 * grain, fur);',
+  '    float g2 = vnoise(q * vec3(1.6, 1.9, 1.9) + 7.7);',
+  '    col = mix(col, min(col * 1.35 + 0.05, vec3(1.0)), smoothstep(0.58, 0.9, g2) * griz * 0.55);',   // pale-tipped (grizzled) hairs
+  '    n = normalize(n + s1 * (grain - 0.5) * 0.3 * fur);',
+  '  }',
+  '  float alpha = 1.0;',
+  '  if (!hit) alpha = clamp(1.0 - (minD + (grain - 0.5) * pix * 1.8 * fur) / (pix * 1.5), 0.0, 1.0);',   // a soft, anti-aliased, slightly furry edge
+  '  float ao = occl(p, n), sh = hit ? shadow(p + n * 0.01, LM) : 1.0;',
+  '  float m = max(dot(n, LM), 0.0) * mix(0.35, 1.0, sh), l = max(dot(n, LL), 0.0), f = clamp(n.z, 0.0, 1.0), rim = pow(1.0 - f, 3.0);',
+  '  vec3 c = col * ((0.46 + 0.2 * f) * ao + 0.46 * m) + col * l * uLamp * vec3(0.62, 0.45, 0.27) * (0.5 + 0.5 * ao);',
+  '  c += rim * (clamp(0.25 - n.y, 0.0, 1.0) * uLamp * vec3(0.55, 0.33, 0.15) + clamp(n.y + 0.35, 0.0, 1.0) * vec3(0.12, 0.14, 0.19));',
+  '  vec3 r = reflect(-LM, n);',
+  '  if (kind < 0.5) c += pow(max(dot(n, normalize(LM + vec3(0.0, 0.0, 1.0))), 0.0), 14.0) * 0.07 * fur * vec3(0.9, 0.92, 1.0);',   // a soft sheen on the coat
+  '  else if (kind < 1.5) c += pow(max(r.z, 0.0), 18.0) * 0.18;',                       // antler and hoof: a satin shine
+  '  else {',                                                                             // eyes and nose: wet and glossy
+  '    c += pow(max(r.z, 0.0), kind < 2.5 ? 70.0 : 26.0) * (kind < 2.5 ? 0.95 : 0.4);',
+  '    c += shine * vec3(0.72, 0.86, 0.52) * uLamp * 0.5 * f;',                          // eyeshine: the lamps caught in the eye
+  '  }',
+  '  c *= mix(0.68, 1.0, smoothstep(0.0, 0.32, p.y));',   // darker down among the leaves
+  '  c = mix(c, uPaper, 1.0 - uStr);',
+  '  if (uNight > 0.5) c = mix(c, vec3(0.235, 0.204, 0.376), 0.06);',
+  '  c = mix(c, uMist, uHz);',
+  '  outC = vec4(clamp(c, 0.0, 1.0) * alpha, alpha);',
+  '}'
+].join('\n');
+var GLA = null;                                       // the renderer (false: no WebGL 2 here)
+function animGL() {
+  if (GLA !== null) return GLA;
+  GLA = false;
+  try {
+    var cv = document.createElement('canvas');
+    cv.width = cv.height = 512;
+    var gl = cv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false, alpha: true, depth: false });
+    if (!gl) return GLA;
+    var compile = function (type, src) {
+      var sh = gl.createShader(type);
+      gl.shaderSource(sh, src); gl.compileShader(sh);
+      if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh));
+      return sh;
+    };
+    var pg = gl.createProgram();
+    gl.attachShader(pg, compile(gl.VERTEX_SHADER, ANIM_VS)); gl.attachShader(pg, compile(gl.FRAGMENT_SHADER, ANIM_FS));
+    gl.linkProgram(pg);
+    if (!gl.getProgramParameter(pg, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(pg));
+    var ubo = gl.createBuffer();
+    gl.bindBuffer(gl.UNIFORM_BUFFER, ubo); gl.bufferData(gl.UNIFORM_BUFFER, GL_UBO * 4, gl.DYNAMIC_DRAW);
+    gl.uniformBlockBinding(pg, gl.getUniformBlockIndex(pg, 'Scene'), 0);
+    gl.bindBufferBase(gl.UNIFORM_BUFFER, 0, ubo);
+    var L = {};
+    ['uN', 'uND', 'uMap', 'uPaper', 'uMist', 'uStr', 'uNight', 'uHz', 'uLamp'].forEach(function (n) { L[n] = gl.getUniformLocation(pg, n); });
+    GLA = { cv: cv, gl: gl, pg: pg, ubo: ubo, vao: gl.createVertexArray(), L: L, data: new Float32Array(GL_UBO) };
+  } catch (e) { GLA = false; }
+  return GLA;
+}
+/* An animal as shapes and patches, in view space (setView first). Colours
+   are 0–255 arrays. o: { fur (0 … 1), kind (0 coat, 1 antler or hoof,
+   2 eye, 3 nose), griz (pale-tipped hairs), flow (the way the hair lies;
+   its length: the hair's length), shine (eyeshine) }. */
+function AnimScene() { this.p = []; this.d = []; }
+AnimScene.prototype.ell = function (c, ax, ay, r, k, top, side, bot, o) {
+  o = o || {};
+  if (this.p.length >= GL_MAXP) return;
+  var v = tv(c);
+  this.p.push({ t: 0, a: v, b: r, ax: vNorm(tv(ax)), ay: vNorm(tv(ay)), r1: 0, r2: 0, k: k, top: top, side: side, bot: bot,
+                fur: o.fur || 0, kind: o.kind || 0, griz: o.griz || 0, flow: tv(o.flow || [-1, 0, 0]), shine: o.shine || 0,
+                bc: v, bR: Math.max(r[0], r[1], r[2]) });
+};
+AnimScene.prototype.rod = function (a, b, r1, r2, k, top, bot, o) {
+  o = o || {};
+  if (this.p.length >= GL_MAXP) return;
+  var va = tv(a), vb = tv(b);
+  this.p.push({ t: 1, a: va, b: vb, ax: [1, 0, 0], ay: [0, 1, 0], r1: r1, r2: r2, k: k, top: top, side: top, bot: bot,
+                fur: o.fur || 0, kind: o.kind || 0, griz: o.griz || 0, flow: tv(o.flow || vSub(b, a)), shine: 0,
+                bc: vLerp(va, vb, 0.5), bR: Math.hypot(vb[0] - va[0], vb[1] - va[1], vb[2] - va[2]) / 2 + Math.max(r1, r2) });
+};
+AnimScene.prototype.patch = function (c, r, col, soft) { if (this.d.length < GL_MAXD) this.d.push({ c: tv(c), r: r, col: col, soft: soft }); };
+/* Draw an animal into the sprite (t: its 2D canvas, info: its size). */
+function glAnimSprite(t, info, scene, P) {
+  var G = animGL(), gl = G.gl, w = info.w, h = info.h, D = G.data, i, j, q, o;
+  if (G.cv.width < w || G.cv.height < h) { G.cv.width = Math.max(G.cv.width, w); G.cv.height = Math.max(G.cv.height, h); }
+  D.fill(0);
+  function put(at, x, y, z, ww) { D[at] = x; D[at + 1] = y; D[at + 2] = z; D[at + 3] = ww; }
+  var oM = GL_MAXP * 5 * 4, oD = oM + GL_MAXP * 4 * 4;
+  for (i = 0; i < scene.p.length; i++) {
+    q = scene.p[i]; o = i * 20;
+    put(o, q.a[0], q.a[1], q.a[2], q.t);
+    put(o + 4, q.b[0], q.b[1], q.b[2], q.k);
+    put(o + 8, q.ax[0], q.ax[1], q.ax[2], q.r1);
+    put(o + 12, q.ay[0], q.ay[1], q.ay[2], q.r2);
+    put(o + 16, q.bc[0], q.bc[1], q.bc[2], q.bR);
+    o = oM + i * 16;
+    put(o, q.top[0] / 255, q.top[1] / 255, q.top[2] / 255, q.fur);
+    put(o + 4, q.side[0] / 255, q.side[1] / 255, q.side[2] / 255, q.kind);
+    put(o + 8, q.bot[0] / 255, q.bot[1] / 255, q.bot[2] / 255, q.griz);
+    put(o + 12, q.flow[0], q.flow[1], q.flow[2], q.shine);
+  }
+  for (j = 0; j < scene.d.length; j++) {
+    q = scene.d[j]; o = oD + j * 8;
+    put(o, q.c[0], q.c[1], q.c[2], q.r);
+    put(o + 4, q.col[0] / 255, q.col[1] / 255, q.col[2] / 255, q.soft);
+  }
+  gl.useProgram(G.pg);
+  gl.bindBuffer(gl.UNIFORM_BUFFER, G.ubo); gl.bufferSubData(gl.UNIFORM_BUFFER, 0, D);
+  gl.uniform1i(G.L.uN, scene.p.length); gl.uniform1i(G.L.uND, scene.d.length);
+  gl.uniform4f(G.L.uMap, info.ox, info.oy, h, info.u);
+  gl.uniform3f(G.L.uPaper, PAPER[0] / 255, PAPER[1] / 255, PAPER[2] / 255);
+  gl.uniform3f(G.L.uMist, P.mist[0] / 255, P.mist[1] / 255, P.mist[2] / 255);
+  gl.uniform1f(G.L.uStr, P.str); gl.uniform1f(G.L.uNight, P.night ? 1 : 0); gl.uniform1f(G.L.uHz, P.hz); gl.uniform1f(G.L.uLamp, P.lamp);
+  gl.viewport(0, 0, w, h);
+  gl.disable(gl.BLEND);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.bindVertexArray(G.vao);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  t.setTransform(1, 0, 0, 1, 0, 0);
+  t.drawImage(G.cv, 0, G.cv.height - h, w, h, 0, 0, w, h);   // WebGL draws from the bottom left
+}
+/* The sika deer as smooth shapes (the same skeleton and poses as renderDeer). */
+function buildDeer(pose, stag, P) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  var S = new AnimScene(), g = GAITS[pose.gait] || GAITS.walk, ph = pose.ph || 0, bob = 0, pitch = 0;
+  if (pose.gait === 'walk') bob = 0.012 * Math.cos(2 * ph);
+  if (pose.gait === 'run') { bob = 0.05 + 0.08 * Math.sin(ph + 0.6); pitch = 0.12 * Math.sin(ph - 0.4); }
+  var cp = Math.cos(pitch), spn = Math.sin(pitch), AX = [cp, spn, 0], AY = [-spn, cp, 0];
+  function B(x, y, z) { var yy = y - 0.95; return [x * cp - yy * spn, 0.95 + x * spn + yy * cp + bob, z]; }
+  var coatFur = { fur: 1, flow: vMul(AX, -1) };
+  // the body: chest, barrel and haunch, blended into one
+  var body = [[B(0.34, 0.97, 0), [0.33, 0.33, 0.24]], [B(0, 0.93, 0), [0.46, 0.28, 0.25]], [B(-0.4, 1.0, 0), [0.33, 0.31, 0.25]]];
+  body.forEach(function (T) { S.ell(T[0], AX, AY, T[1], 0.13, P.back, P.coat, P.belly, coatFur); });
+  // the white rump, rimmed in black
+  S.patch(B(-0.71, 1.05, 0), 0.23, P.rim, 0.22);
+  S.patch(B(-0.73, 1.05, 0), 0.19, P.rump, 0.3);
+  if (!stag) {                                        // a hind's faint pale spots along her flank, in rows
+    var dirs = owlDirs(260, 91), nS = 0;
+    for (var k = 0; k < dirs.length && nS < 22; k++) {
+      var uu = dirs[k].u, T = body[k % 2 + 1];
+      if (uu[2] < 0.3 || uu[1] < 0.05 || uu[1] > 0.62 || dirs[k].j > 0.55) continue;
+      var sn = vNorm(vAdd(vAdd(vMul(AX, uu[0] / T[1][0]), vMul(AY, uu[1] / T[1][1])), [0, 0, uu[2] / T[1][2]]));
+      S.patch(vMad(vAdd(vAdd(vMad(T[0], AX, T[1][0] * uu[0]), vMul(AY, T[1][1] * uu[1])), [0, 0, T[1][2] * uu[2]]), sn, 0.03), 0.055, mix(P.coat, P.spot, 0.55), 0.75);
+      nS++;
+    }
+  }
+  // the tail: hanging, flicked, or raised as a white flag
+  var ta = lerp(-1.75, 0.9, pose.tail || 0) + pitch, td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.7, 1.08, 0);
+  S.ell(vMad(tb, td, 0.07), td, vNorm(vCross([0, 0, 1], td)), [0.09, 0.048, 0.04], 0.035, P.rim, P.rump, P.rump, { fur: 0.6, flow: vMul(td, 0.6) });
+  // legs: the upper part blends into the body; slim lower legs; hooves
+  [[0.4, 0.11, true], [0.4, -0.11, true], [-0.44, 0.12, false], [-0.44, -0.12, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = front ? 0.45 : 0.5, l2 = front ? 0.46 : 0.45;
+    var hip = B(L[0], front ? 0.86 : 0.9, L[1]), fx, fy;
+    if (pose.gait === 'stand') { fx = L[0] + (near ? 0.03 : -0.03) * (front ? 1 : -1); fy = 0; }
+    else { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.leg : scale(P.leg, 0.85), lo = scale(col, 0.82);
+    S.rod(hip, knee, front ? 0.1 : 0.15, front ? 0.05 : 0.06, 0.08, mix(P.coat, col, 0.5), col, { fur: 0.7 });
+    S.rod(knee, vAdd(foot, [0.004, 0.055, 0]), front ? 0.042 : 0.047, 0.03, 0.035, col, lo, { fur: 0.5 });
+    S.rod(vAdd(foot, [0.005, 0.06, 0]), vAdd(foot, [0.03, 0.006, 0]), 0.031, 0.034, 0.012, P.hoof, scale(P.hoof, 0.8), { kind: 1 });
+  });
+  // the neck, along a curve to the head
+  var n = pose.neck === undefined ? 0.15 : pose.neck, nb = B(0.5, 1.12, 0);
+  var Hup = vAdd(nb, [0.2, 0.55, 0]), Hcar = vAdd(nb, [0.36, 0.36, 0]), Hdn = [0.95, 0.36, 0];
+  var H0 = n < 0.15 ? vLerp(Hup, Hcar, n / 0.15) : vLerp(Hcar, Hdn, smooth(0, 1, (n - 0.15) / 0.85));
+  var hp = n < 0.15 ? lerp(-0.25, -0.5, n / 0.15) : lerp(-0.5, -1.35, smooth(0, 1, (n - 0.15) / 0.85));
+  if (pose.chew) { hp += 0.12; H0 = vAdd(H0, [0, 0.015, 0]); }
+  var hy = 0.95 * (pose.look || 0), ears = pose.ears || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r = vNorm(vCross(f, [0, 1, 0])), u = vCross(r, f);
+  var nt = vAdd(vMad(H0, f, -0.1), vMul(u, -0.03)), nc = vAdd(vLerp(nb, nt, 0.5), [0.05, 0.1 * (1 - n), 0]);
+  [0.1, 0.32, 0.54, 0.76, 0.95].forEach(function (s) {
+    var cc = vAdd(vAdd(vMul(nb, (1 - s) * (1 - s)), vMul(nc, 2 * (1 - s) * s)), vMul(nt, s * s));
+    var tg = vNorm(vAdd(vMul(vSub(nc, nb), 2 * (1 - s)), vMul(vSub(nt, nc), 2 * s))), pr = vNorm(vCross([0, 0, 1], tg));
+    var ra = lerp(0.18, 0.11, s) * (stag ? 1.3 - 0.25 * s : 1);
+    S.ell(cc, tg, pr, [0.14, ra, ra * 0.85], 0.1, stag ? P.mane : mix(P.coat, P.back, 0.5), P.coat, mix(P.coat, P.belly, 0.55),
+          { fur: 1, flow: vMul(tg, stag ? -1.6 : -1) });
+  });
+  // the head: skull, muzzle, nose, eyes, ears, antlers
+  S.ell(H0, f, u, [0.17, 0.13, 0.105], 0.07, mix(P.coat, P.back, 0.3), P.coat, mix(P.coat, P.belly, 0.5), { fur: 0.8, flow: vMul(f, -0.7) });
+  S.ell(vAdd(vMad(H0, f, 0.19), vMul(u, -0.04)), f, u, [0.15, 0.075, 0.068], 0.06, mix(P.coat, P.back, 0.35), mix(P.coat, P.belly, 0.2), P.belly, { fur: 0.6, flow: vMul(f, -0.5) });
+  S.patch(vAdd(vMad(H0, f, 0.31), vMul(u, -0.05)), 0.06, mix(P.nose, P.coat, 0.45), 0.6);    // the dark muzzle tip
+  S.patch(vAdd(vMad(H0, f, 0.18), vMul(u, -0.1)), 0.06, P.belly, 0.5);                        // the pale chin
+  S.ell(vAdd(vMad(H0, f, 0.33), vMul(u, -0.05)), f, u, [0.034, 0.028, 0.036], 0.012, P.nose, P.nose, P.nose, { kind: 3 });
+  [-1, 1].forEach(function (s) {
+    S.ell(vAdd(vAdd(vMad(H0, f, 0.04), vMul(u, 0.04)), vMul(r, s * 0.094)), f, u, [0.03, 0.028, 0.026], 0.004, P.eye, P.eye, P.eye, { kind: 2, shine: 1 });
+    var base = vAdd(vAdd(vMad(H0, f, -0.07), vMul(u, 0.1)), vMul(r, s * 0.065));
+    var dir = vNorm(vAdd(vAdd(vMul(u, 0.7 + 0.25 * ears), vMul(f, -(0.45 - 0.35 * ears))), vMul(r, s * 0.6)));
+    var face = vNorm(vSub(vAdd(vMul(f, 0.55), vMul(r, s * 0.7)), vMul(dir, vDot(vAdd(vMul(f, 0.55), vMul(r, s * 0.7)), dir))));
+    S.ell(vMad(base, dir, 0.11), dir, face, [0.115, 0.016, 0.058], 0.03, P.ear, P.coat, P.coat, { fur: 0.5, flow: vMul(dir, 0.5) });
+    if (stag) {
+      var ab = vAdd(vAdd(vMad(H0, f, -0.03), vMul(u, 0.1)), vMul(r, s * 0.05));
+      var W = function (q) { return vAdd(vAdd(vAdd(ab, vMul(f, q[0])), vMul(u, q[1])), vMul(r, s * q[2])); };
+      var a0 = scale(P.antler, 0.6), a1 = P.antler, a2 = scale(P.antler, 1.12);
+      for (var b = 0; b < 3; b++) S.rod(W(ANTLER.beam[b]), W(ANTLER.beam[b + 1]), 0.03 - b * 0.006, 0.024 - b * 0.006, 0.01, mix(a0, a1, b / 3), mix(a0, a1, (b + 1) / 3), { kind: 1 });
+      ANTLER.tines.forEach(function (tn) { S.rod(W(tn[0]), W(tn[1]), 0.015, 0.007, 0.008, a1, a2, { kind: 1 }); });
+    }
+  });
+  return S;
+}
+/* The tanuki as smooth shapes (the same skeleton and poses as renderTanuki). */
+function buildTanuki(pose, kit, P) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  var S = new AnimScene(), g = GAITS.trot, ph = pose.ph || 0, trot = pose.gait === 'trot';
+  var bob = trot ? 0.025 * Math.cos(2 * ph) : 0, hs = kit ? 1.2 : 1, lg = kit ? 0.82 : 1;
+  function B(x, y, z) { return [x, y * lg + bob, z]; }
+  var fluff = { fur: 1, griz: kit ? 0.5 : 0.8, flow: [-0.7, -0.75, 0] };
+  var furD = mix(P.fur, P.dark, 0.35);
+  // the round, fluffy body; a dark chest and a darker cape over the shoulders
+  [[B(0.3, 0.58, 0), [0.3, 0.32, 0.3], 'chest'], [B(0, 0.56, 0), [0.5, 0.33, 0.34], 'barrel'], [B(-0.36, 0.6, 0), [0.32, 0.35, 0.32], 'rump']].forEach(function (T) {
+    var rr = kit ? [T[1][0] * 0.92, T[1][1] * 1.05, T[1][2] * 1.05] : T[1];
+    if (T[2] === 'chest') S.ell(T[0], [1, 0, 0], [0, 1, 0], rr, 0.16, mix(P.dark, P.fur, 0.45), mix(P.fur, P.dark, 0.5), P.dark, fluff);
+    else S.ell(T[0], [1, 0, 0], [0, 1, 0], rr, 0.16, furD, P.fur, P.dark, fluff);
+  });
+  S.patch(B(0.5, 0.42, 0), 0.24, P.dark, 0.5);
+  // the bushy tail, dark at the tip
+  var ta = -2.15 + (trot ? 0.18 * Math.sin(ph) : 0), td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.62, 0.54, 0);
+  S.ell(vMad(tb, td, 0.2), td, vNorm(vCross([0, 0, 1], td)), [0.28, 0.125, 0.115], 0.1, furD, P.fur, P.fur, { fur: 1, griz: 0.8, flow: vMul(td, 1.2) });
+  S.patch(vMad(tb, td, 0.42), 0.14, P.dark, 0.6);
+  // short dark legs and paws
+  [[0.34, 0.14, true], [0.34, -0.14, true], [-0.36, 0.14, false], [-0.36, -0.14, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = 0.22 * lg, l2 = 0.22 * lg, hip = B(L[0], 0.43, L[1]), fx, fy;
+    if (trot) { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    else { fx = L[0] + (near ? 0.04 : -0.06); fy = 0; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.dark : scale(P.dark, 0.8);
+    S.rod(hip, knee, 0.1, 0.068, 0.07, col, col, { fur: 0.8, flow: [0, -0.7, 0] });
+    S.rod(knee, vAdd(foot, [0, 0.03, 0]), 0.062, 0.05, 0.03, col, col, { fur: 0.6, flow: [0, -0.6, 0] });
+    S.rod(vAdd(foot, [-0.01, 0.03, 0]), vAdd(foot, [0.045, 0.02, 0]), 0.045, 0.04, 0.03, scale(col, 0.9), scale(col, 0.9), { fur: 0.3 });
+  });
+  // the head: a masked face with pale brows and cheeks, small round ears
+  var nb = B(0.5, 0.68, 0), hd = pose.head || 'up';
+  var H0 = hd === 'sniff' ? [0.74, 0.24 * lg + 0.02 * (pose.bob || 0), 0] : vAdd(nb, hd === 'up' ? [0.2, 0.12, 0] : [0.25, 0.03, 0]);
+  var hp = hd === 'sniff' ? -0.95 + 0.12 * (pose.bob || 0) : (hd === 'up' ? -0.12 : -0.3), hy = 1.05 * (pose.look || 0), tl = pose.tilt || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r0 = vNorm(vCross(f, [0, 1, 0])), u0 = vCross(r0, f);
+  var r = vAdd(vMul(r0, Math.cos(tl)), vMul(u0, Math.sin(tl))), u = vSub(vMul(u0, Math.cos(tl)), vMul(r0, Math.sin(tl)));
+  var nk = vLerp(nb, H0, 0.45), nd = vNorm(vSub(H0, nb));
+  S.ell(nk, nd, vNorm(vCross([0, 0, 1], nd)), [0.2, 0.2, 0.21], 0.12, P.fur, P.fur, mix(P.fur, P.dark, 0.6), fluff);
+  S.ell(H0, f, u, [0.21 * hs, 0.19 * hs, 0.21 * hs], 0.08, P.fur, P.fur, mix(P.pale, P.fur, 0.3), { fur: 1, griz: 0.6, flow: vSub(vMul(f, -0.8), vMul(u, 0.3)) });
+  var ms = kit ? 0.85 : 1, mz = vAdd(vMad(H0, f, 0.19 * hs), vMul(u, -0.06 * hs));
+  S.ell(mz, f, u, [0.13 * ms, 0.08 * ms, 0.085 * ms], 0.06, mix(P.pale, P.fur, 0.45), P.pale, P.pale, { fur: 0.6, flow: vMul(f, -0.5) });
+  S.patch(vMad(mz, f, 0.12 * ms), 0.06, P.dark, 0.6);                                        // dark round the nose
+  S.ell(vAdd(vMad(H0, f, (0.19 + 0.13 * ms) * hs), vMul(u, -0.05 * hs)), f, u, [0.04, 0.032, 0.042], 0.012, P.nose, P.nose, P.nose, { kind: 3 });
+  [-1, 1].forEach(function (s) {
+    var E = vAdd(vAdd(vMad(H0, f, 0.13 * hs), vMul(u, 0.03 * hs)), vMul(r, s * 0.115 * hs));
+    S.patch(vAdd(vAdd(vMad(H0, f, 0.1 * hs), vMul(u, -0.11 * hs)), vMul(r, s * 0.12 * hs)), 0.085 * hs, P.pale, 0.55);   // pale cheeks
+    S.patch(vAdd(vMad(E, u, 0.075 * hs), vMul(f, -0.02)), 0.06 * hs, P.pale, 0.5);                                       // pale brows
+    S.patch(E, 0.078 * hs, P.mask, 0.35);                                                                                 // the dark mask,
+    S.patch(vAdd(vAdd(E, vMul(u, -0.05 * hs)), vMul(f, -0.05 * hs)), 0.07 * hs, P.mask, 0.45);                            // sloping down and back
+    S.ell(vMad(E, f, 0.012), f, u, [0.034 * (kit ? 1.25 : 1), 0.032 * (kit ? 1.25 : 1), 0.03], 0.004, P.eye, P.eye, P.eye, { kind: 2, shine: 1 });
+    var base = vAdd(vAdd(vMad(H0, f, -0.04 * hs), vMul(u, 0.15 * hs)), vMul(r, s * 0.12 * hs));
+    var dir = vNorm(vAdd(vAdd(vMul(u, 0.9), vMul(r, s * (0.3 + 0.12 * (pose.ears || 0)))), vMul(f, -0.15)));
+    var fc = vAdd(vMul(f, 0.7), vMul(r, s * 0.4)), face = vNorm(vSub(fc, vMul(dir, vDot(fc, dir))));
+    S.ell(vMad(base, dir, 0.055 * hs), dir, face, [0.065 * hs, 0.018, 0.052 * hs], 0.035, mix(P.pale, P.dark, 0.35), P.dark, P.dark, { fur: 0.6, flow: vMul(dir, 0.6) });
+  });
+  return S;
+}
 /* ---------- Frames, baked per animal and depth ---------- */
 var DEER_FRAMES = (function () {
   var L = [], i;
@@ -3181,7 +3525,13 @@ function animSet(kind, variant, k) {
 }
 function bakeAnimFrame(S, fr) {
   var u = animUnitPx(S.kind, S.variant, S.k) * PR, P = animPalette(S.variant, S.k), lod = clamp(u / 70, 0.35, 1);
-  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, animBlur(S.k), function (t) {
+  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, animBlur(S.k), function (t, home, info) {
+    if (animGL()) {
+      try {
+        glAnimSprite(t, info, S.kind === 'deer' ? buildDeer(deerPose(fr), S.variant === 'stag', P) : buildTanuki(tanukiPose(fr), S.variant === 'kit', P), P);
+        return;
+      } catch (e) { GLA = false; home(); }           // WebGL failed: the hair-stroke drawing from now on
+    }
     if (S.kind === 'deer') renderDeer(t, P, deerPose(fr), S.variant === 'stag', lod);
     else renderTanuki(t, P, tanukiPose(fr), S.variant === 'kit', lod);
   });
