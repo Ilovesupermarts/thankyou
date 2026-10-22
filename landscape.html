@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Owl Lab</title>
+<title>Night Forest Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -26,9 +26,10 @@
      koyo.html (the KOYO values in app.js), each now with a bare branch
      sticking out toward the middle of the screen. An owl sits on one of
      the branches, blinks, flies off into the distance at a random moment
-     and comes back after a set time to either branch (section 11). The
-     bird flocks are gone. The control panel only has owl values. Nothing
-     in app.js is used or changed.
+     and comes back after a set time to either branch (section 11). Sika
+     deer and tanuki forage among the fallen leaves (section 12). The bird
+     flocks are gone. The control panel has the owl, deer and tanuki
+     values. Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -188,7 +189,7 @@
 <!-- ============ Controls (demo only) ============ -->
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3>🦉 Owl Lab</h3>
+    <h3>🦉 Night Forest Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -287,8 +288,9 @@ var TREE = {
 };
 
 /* ============================================================
-   2. OWL LAB — every control on the panel. A change to the owl
-   re-bakes its sprites; a change to the branch rebuilds the trees.
+   2. NIGHT FOREST LAB — every control on the panel: the owl, the deer
+   and the tanuki. A change to the owl re-bakes its sprites, one to the
+   deer or tanuki their frames; a change to the branch rebuilds the trees.
    Values are kept in this browser; "Copy values" gives them in words
    and as JSON.
    ============================================================ */
@@ -301,6 +303,14 @@ var OWL_COLOURS = {
 };
 var COLOUR_NAMES = [['back', 'Back'], ['wing', 'Wings'], ['spot', 'Pale markings'], ['chest', 'Chest'], ['streak', 'Streaks'], ['face', 'Face'],
                     ['rim', 'Face rim'], ['eye', 'Eyes'], ['beak', 'Beak'], ['feet', 'Feet'], ['under', 'Under the wings']];
+/* The deer and tanuki colours (section 12). */
+var ANIMAL_COLOURS = {
+  hind:   { coat: '#8E6446', back: '#6B4A33', belly: '#DCC9B0', spot: '#EFE2CC', rump: '#F5EFE6', rim: '#2A1E18',
+            leg: '#7A5A42', hoof: '#2A221E', nose: '#1E1715', eye: '#140E0C', ear: '#D2B3A2' },
+  stag:   { coat: '#5E4636', back: '#46342A', belly: '#BFAE98', spot: '#D8C8B0', rump: '#F2ECE2', rim: '#221813',
+            leg: '#54402F', hoof: '#221C18', nose: '#1A1412', eye: '#120C0A', ear: '#B89C8C', antler: '#DCCBAA', mane: '#3A2C24' },
+  tanuki: { fur: '#86684A', tip: '#E0CCA6', dark: '#2A211C', mask: '#211915', pale: '#EDE0CB', nose: '#141010', eye: '#120D0B' }
+};
 var ODEF = {
   // look
   look: 'fukurou', size: 0.085, strength: 0.95, vivid: 1.15, lampGlow: 0.8, colours: clone(OWL_COLOURS),
@@ -315,15 +325,23 @@ var ODEF = {
   // blinking
   blinkMin: 3, blinkMax: 8, blinkTime: 0.2, doubleBlink: 0.2,
   // extras
-  headTurn: false, headEvery: 12, hoot: false, hootEvery: 40, hootVolume: 0.6, hootPitch: 0
+  headTurn: false, headEvery: 12, hoot: false, hootEvery: 40, hootVolume: 0.6, hootPitch: 0,
+  // deer
+  deerOn: true, deerEvery: 60, herdMin: 2, herdMax: 3, stagChance: 0.85, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
+  grazeMin: 4, grazeMax: 11, deerLook: 0.5, runChance: 0.5, deerRun: 4.5, deerFar: 0.42, deerNear: 0.95,
+  // tanuki
+  tanukiOn: true, tanukiEvery: 45, kitChance: 0.85, tanukiSize: 0.058, tanukiSpeed: 2, tanukiStops: 0.7, tanukiLook: 0.5,
+  lookTime: 2.5, tanukiFar: 0.7, tanukiNear: 0.9,
+  // both
+  animStrength: 0.95, animHaze: 0.5, animColours: clone(ANIMAL_COLOURS)
 };
 var STORE_KEY = 'owlLabValues2';   // 2: the 3D owl (new colours and values)
 var O = clone(ODEF);
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
   if (saved && typeof saved === 'object') for (var sk in saved) {
-    if (sk === 'colours') {
-      for (var lk in saved.colours) if (O.colours[lk]) for (var ck in saved.colours[lk]) if (ck in O.colours[lk]) O.colours[lk][ck] = saved.colours[lk][ck];
+    if (sk === 'colours' || sk === 'animColours') {
+      for (var lk in saved[sk]) if (O[sk][lk]) for (var ck in saved[sk][lk]) if (ck in O[sk][lk]) O[sk][lk][ck] = saved[sk][lk][ck];
     } else if (sk in O) O[sk] = saved[sk];
   }
 } catch (e) {}
@@ -336,8 +354,8 @@ var GROUPS = [
       hint: 'Its height sitting. On the far tree it is 0.6 of this, like the tree itself.' },
     { k: 'strength', label: 'Strength against the paper', min: 0.3, max: 1, step: 0.05, re: 'owl',
       hint: 'Lower = paler and softer, like the trunks (which are 0.5).' },
-    { k: 'vivid', label: 'Colour richness', min: 0.6, max: 1.8, step: 0.05, re: 'owl', hint: '1 = the colours as picked; higher = richer.' },
-    { k: 'lampGlow', label: 'Warm lamp light from below', min: 0, max: 1.5, step: 0.05, re: 'owl' },
+    { k: 'vivid', label: 'Colour richness', min: 0.6, max: 1.8, step: 0.05, re: 'all', hint: '1 = the colours as picked; higher = richer. The deer and tanuki too.' },
+    { k: 'lampGlow', label: 'Warm lamp light from below', min: 0, max: 1.5, step: 0.05, re: 'all', hint: 'The deer and tanuki too.' },
     { type: 'colours', re: 'owl' }
   ]},
   { title: 'The branch it sits on', ctls: [
@@ -371,7 +389,7 @@ var GROUPS = [
   ]},
   { title: 'Depth of field', ctls: [
     { k: 'farthest', label: 'Size when it disappears (× near size)', min: 0.03, max: 0.3, step: 0.01, re: 'owl' },
-    { k: 'farBlur', label: 'Blur at the far tree (px)', min: 0, max: 3, step: 0.05, re: 'owl',
+    { k: 'farBlur', label: 'Blur at the far tree (px)', min: 0, max: 3, step: 0.05, re: 'all',
       hint: 'To match the far tree\'s softness. Sharp (0) on the near tree.' },
     { k: 'maxBlur', label: 'Blur when it disappears (px)', min: 0, max: 6, step: 0.1, re: 'owl' },
     { k: 'haze', label: 'Night haze when it disappears', min: 0, max: 1, step: 0.05, re: 'owl' },
@@ -390,6 +408,41 @@ var GROUPS = [
     { k: 'hootEvery', label: 'A hoot every (s)', min: 5, max: 180, step: 5 },
     { k: 'hootVolume', label: 'Hoot volume', min: 0, max: 1.5, step: 0.05 },
     { k: 'hootPitch', label: 'Hoot pitch (cents, 100 = a semitone)', min: -1200, max: 1200, step: 25 }
+  ]},
+  { title: 'Sika deer', ctls: [
+    { k: 'deerOn', label: 'Deer come by', type: 'check' },
+    { k: 'deerEvery', label: 'A herd every (s)', min: 10, max: 300, step: 5, hint: 'On average, counted from when the last one has gone.' },
+    { k: 'herdMin', label: 'Herd size, at least', min: 1, max: 4, step: 1 },
+    { k: 'herdMax', label: 'Herd size, at most', min: 1, max: 4, step: 1 },
+    { k: 'stagChance', label: 'Chance the herd has a stag', min: 0, max: 1, step: 0.05, hint: 'Then one of them is a stag with antlers; the rest are hinds.' },
+    { k: 'deerSize', label: 'Size (shoulder height × screen height, near)', min: 0.06, max: 0.2, step: 0.005, re: 'anim' },
+    { k: 'deerWalk', label: 'Walking speed', min: 0.2, max: 1.5, step: 0.05, hint: 'In shoulder heights a second.' },
+    { k: 'grazeEvery', label: 'Stops to graze about every (s of walking)', min: 2, max: 30, step: 1 },
+    { k: 'grazeMin', label: 'Grazes for at least (s)', min: 1, max: 30, step: 1 },
+    { k: 'grazeMax', label: '… at most (s)', min: 1, max: 60, step: 1 },
+    { k: 'deerLook', label: 'Chance it looks up while grazing', min: 0, max: 1, step: 0.05, hint: 'Half of those times it stares straight at us.' },
+    { k: 'runChance', label: 'Chance something startles the herd', min: 0, max: 1, step: 0.05, hint: 'Then they bound off the screen, white tails up.' },
+    { k: 'deerRun', label: 'Running speed', min: 1, max: 9, step: 0.25 },
+    { k: 'deerFar', label: 'Furthest back (depth)', min: 0.3, max: 1.05, step: 0.01 },
+    { k: 'deerNear', label: 'Nearest (depth)', min: 0.3, max: 1.05, step: 0.01, hint: '1 = as near as the near tree. Further back = higher up the ground, smaller, hazier, behind the trees.' },
+    { type: 'animColours', re: 'anim', items: [['hind', 'coat', 'Hind'], ['stag', 'coat', 'Stag'], ['stag', 'mane', 'Stag\'s mane'], ['stag', 'antler', 'Antlers'], ['hind', 'belly', 'Belly'], ['hind', 'spot', 'Spots']] }
+  ]},
+  { title: 'Tanuki', ctls: [
+    { k: 'tanukiOn', label: 'Tanuki come by', type: 'check' },
+    { k: 'tanukiEvery', label: 'Every (s)', min: 10, max: 300, step: 5, hint: 'On average, counted from when the last one has gone.' },
+    { k: 'kitChance', label: 'Chance she has her kit with her', min: 0, max: 1, step: 0.05 },
+    { k: 'tanukiSize', label: 'Size (shoulder height × screen height, near)', min: 0.025, max: 0.1, step: 0.005, re: 'anim', hint: 'The kit is 0.7 of this.' },
+    { k: 'tanukiSpeed', label: 'Scurrying speed', min: 0.5, max: 5, step: 0.1, hint: 'In shoulder heights a second.' },
+    { k: 'tanukiStops', label: 'Chance it stops after each dash', min: 0, max: 1, step: 0.05 },
+    { k: 'tanukiLook', label: 'Chance a stop is to look at us', min: 0, max: 1, step: 0.05, hint: 'Otherwise it sniffs the leaves or just stands.' },
+    { k: 'lookTime', label: 'Looks at us for (s)', min: 0.5, max: 8, step: 0.25 },
+    { k: 'tanukiFar', label: 'Furthest back (depth)', min: 0.3, max: 1.05, step: 0.01 },
+    { k: 'tanukiNear', label: 'Nearest (depth)', min: 0.3, max: 1.05, step: 0.01 },
+    { type: 'animColours', re: 'anim', items: [['tanuki', 'fur', 'Fur'], ['tanuki', 'tip', 'Grizzled tips'], ['tanuki', 'mask', 'Mask'], ['tanuki', 'dark', 'Legs, chest'], ['tanuki', 'pale', 'Pale face']] }
+  ]},
+  { title: 'Deer and tanuki: look', ctls: [
+    { k: 'animStrength', label: 'Strength against the paper', min: 0.3, max: 1, step: 0.05, re: 'anim' },
+    { k: 'animHaze', label: 'Night haze when far back', min: 0, max: 1, step: 0.05, re: 'anim' }
   ]}
 ];
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.step < 0.01 ? 3 : 2); }
@@ -402,7 +455,17 @@ function buildControls() {
     sec.innerHTML = '<h4>' + g.title + '</h4>';
     g.ctls.forEach(function (ctl) {
       var wrap = document.createElement('div');
-      if (ctl.type === 'colours') {
+      if (ctl.type === 'animColours') {
+        wrap.className = 'lab-colours';
+        ctl.items.forEach(function (it) {
+          var lb = document.createElement('label'); lb.className = 'lab-colour';
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = O.animColours[it[0]][it[1]];
+          inp.addEventListener('input', function () { O.animColours[it[0]][it[1]] = inp.value; changed(ctl); });
+          var sp = document.createElement('span'); sp.textContent = it[2];
+          lb.appendChild(inp); lb.appendChild(sp);
+          wrap.appendChild(lb);
+        });
+      } else if (ctl.type === 'colours') {
         wrap.className = 'lab-colours';
         COLOUR_NAMES.forEach(function (cn) {
           var lb = document.createElement('label'); lb.className = 'lab-colour';
@@ -461,14 +524,21 @@ function buildControls() {
 }
 /* A change takes effect after a short pause, so dragging a slider does not
    re-bake on every step. */
-var _rb = null, _rbTrees = false;
+var _rb = null, _rbWhat = {};
 function changed(ctl) {
   save();
   if (ctl.panel) buildControls();
   if (!ctl.re) return;
-  if (ctl.re === 'trees') _rbTrees = true;
+  _rbWhat[ctl.re] = true;
   clearTimeout(_rb);
-  _rb = setTimeout(function () { if (_rbTrees) rebuildAll(); else bakeOwlSprites(); _rbTrees = false; }, 250);
+  _rb = setTimeout(function () {
+    if (_rbWhat.trees) rebuildAll();
+    else {
+      if (_rbWhat.owl || _rbWhat.all) bakeOwlSprites();
+      if (_rbWhat.anim || _rbWhat.all) resetAnimSets();
+    }
+    _rbWhat = {};
+  }, 250);
 }
 var NOW_BTNS = [
   ['Fly away now', function () { if (owl && owl.state === 'perch') owl.until = Math.min(owl.until, nowT + 0.45); }],
@@ -482,7 +552,10 @@ var NOW_BTNS = [
   ['Next: random', function () { if (owl) owl.next = undefined; }],
   ['Blink', function () { if (owl && owl.state === 'perch' && owl.blinkT0 < 0) owl.blinkAt = nowT; }],
   ['Turn head', function () { if (owl && owl.state === 'perch') { owl.headT = Math.random() < 0.5 ? -2 : 2; owl.headUntil = nowT + 2.5; } }],
-  ['Hoot', function () { hootNow(); }]
+  ['Hoot', function () { hootNow(); }],
+  ['Send deer now', function () { if (!animals.some(function (a) { return a.kind === 'deer'; })) spawnHerd(nowT); }],
+  ['Startle the deer', function () { animals.forEach(function (a) { if (a.herd && a.state !== 'prep') a.herd.spookAt = nowT; }); }],
+  ['Send tanuki now', function () { if (!animals.some(function (a) { return a.kind === 'tanuki'; })) spawnTanuki(nowT); }]
 ];
 
 document.getElementById('labToggle').addEventListener('click', function () {
@@ -495,13 +568,13 @@ document.getElementById('btnReset').addEventListener('click', function () {
 });
 
 /* ============================================================
-   3. COPY VALUES — every owl value, in words and as JSON.
+   3. COPY VALUES — every value, in words and as JSON.
    ============================================================ */
 function f2(x) { return Number(x).toFixed(2); }
 function buildCopyText() {
   var L = [], col = O.colours[O.look];
   var look = LOOKS.filter(function (l) { return l[0] === O.look; })[0];
-  L.push('/* Owl — values from landscape.html */');
+  L.push('/* Night forest — values from landscape.html */');
   L.push('');
   L.push('Look: ' + (look ? look[1] : O.look) + '; size ' + Number(O.size).toFixed(3) + ' × screen height; strength ' + f2(O.strength) +
          '; colour richness ' + f2(O.vivid) + '; lamp light ' + f2(O.lampGlow));
@@ -517,6 +590,14 @@ function buildCopyText() {
   L.push('Blinking: every ' + O.blinkMin + '–' + O.blinkMax + ' s, ' + f2(O.blinkTime) + ' s each, double ' + Math.round(O.doubleBlink * 100) + '%');
   L.push('Extras: head turn ' + (O.headTurn ? 'on, every ' + O.headEvery + ' s' : 'off') + '; hoot ' +
          (O.hoot ? 'on, every ' + O.hootEvery + ' s, volume ' + f2(O.hootVolume) + ', pitch ' + O.hootPitch + ' cents' : 'off'));
+  L.push('Deer: ' + (O.deerOn ? 'on' : 'off') + ', a herd of ' + O.herdMin + '–' + O.herdMax + ' every ' + O.deerEvery + ' s, stag ' +
+         Math.round(O.stagChance * 100) + '%, size ' + Number(O.deerSize).toFixed(3) + ', walk ' + f2(O.deerWalk) + ', grazes every ~' +
+         O.grazeEvery + ' s for ' + O.grazeMin + '–' + O.grazeMax + ' s, looks up ' + Math.round(O.deerLook * 100) + '%, startled ' +
+         Math.round(O.runChance * 100) + '%, run ' + f2(O.deerRun) + ', depth ' + f2(O.deerFar) + '–' + f2(O.deerNear));
+  L.push('Tanuki: ' + (O.tanukiOn ? 'on' : 'off') + ', every ' + O.tanukiEvery + ' s, kit ' + Math.round(O.kitChance * 100) + '%, size ' +
+         Number(O.tanukiSize).toFixed(3) + ', speed ' + f2(O.tanukiSpeed) + ', stops ' + Math.round(O.tanukiStops * 100) + '%, looks at us ' +
+         Math.round(O.tanukiLook * 100) + '% for ' + f2(O.lookTime) + ' s, depth ' + f2(O.tanukiFar) + '–' + f2(O.tanukiNear));
+  L.push('Deer and tanuki: strength ' + f2(O.animStrength) + ', haze ' + f2(O.animHaze) + '; colours ' + JSON.stringify(O.animColours));
   L.push('');
   L.push('JSON:');
   L.push(JSON.stringify(O, null, 2));
@@ -1212,12 +1293,20 @@ function bakeGround() {
                 rot: r() * TAU, sy: lerp(0.35, 0.6, r()) * lerp(0.6, 1, u), col: rgb(light(tone)) });
   }
   list.sort(function (a, b) { return a.y - b.y; });
+  var gl = GRDL.c;                                                 // every third leaf again on its own (section 12)
+  GRDL.cnv.width = GRD.cnv.width; GRDL.cnv.height = GRD.cnv.height;
   for (var j = 0; j < list.length; j++) {
     var L = list[j];
     c.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
     leafPathLo(c, L.s, L.rot);
     c.fillStyle = L.col;
     c.fill();
+    if (j % 3 === 0) {
+      gl.setTransform(PR, 0, 0, PR * L.sy, L.x * PR, (L.y - grdTop) * PR);
+      leafPathLo(gl, L.s, L.rot);
+      gl.fillStyle = L.col;
+      gl.fill();
+    }
   }
   // haze where the ground meets the mountains, so the edge melts into the mist
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
@@ -1228,6 +1317,11 @@ function bakeGround() {
   c.globalAlpha = 1;
   c.fillStyle = mz;
   c.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  gl.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  gl.globalCompositeOperation = 'source-atop';
+  gl.fillStyle = mz;
+  gl.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
+  gl.globalCompositeOperation = 'source-over';
   c.restore();
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
   groundGlow(c, H - depthPx * 0.3);
@@ -1795,9 +1889,10 @@ function tv(p) {                                     // into view space (a turn,
   return [x, p[1] * OV.ce - z * OV.se, p[1] * OV.se + z * OV.ce];
 }
 function sp(p) { var v = tv(p); return [v[0], -v[1] - 0.42]; }   // onto the sprite
-/* The flat outline of an ellipsoid (centre c, three axis vectors). */
-function projEllipse(c, A, B, C) {
-  var p = sp(c), a = tv(A), b = tv(B), d = tv(C);
+/* The flat outline of an ellipsoid (centre c, three axis vectors); pj: the
+   projection (sp for the owl, ap for the animals). */
+function projEllipse(c, A, B, C, pj) {
+  var p = (pj || sp)(c), a = tv(A), b = tv(B), d = tv(C);
   var sxx = a[0] * a[0] + b[0] * b[0] + d[0] * d[0], syy = a[1] * a[1] + b[1] * b[1] + d[1] * d[1];
   var sxy = -(a[0] * a[1] + b[0] * b[1] + d[0] * d[1]);
   var tr = (sxx + syy) / 2, df = Math.sqrt(Math.max(0, tr * tr - (sxx * syy - sxy * sxy)));
@@ -1831,11 +1926,12 @@ function owlDirs(n, seed) {                          // n directions spread even
 
 /* ---------- Feathers ----------
    One feather: a rounded blade from base b to tip t (owl space), w its
-   half-width vector. Returns the three points of its tip, for the fringe. */
-function featherPath(c, b, t, w) {
-  var d = vSub(t, b);
-  var p0 = sp(vMad(b, w, 0.5)), p1 = sp(vMad(vMad(b, w, 0.5), d, 0.6)), p2 = sp(vMad(t, w, 0.55)), pt = sp(t);
-  var q2 = sp(vMad(t, w, -0.55)), q1 = sp(vMad(vMad(b, w, -0.5), d, 0.6)), q0 = sp(vMad(b, w, -0.5));
+   half-width vector; pj: the projection (sp unless given). Returns the three
+   points of its tip, for the fringe. */
+function featherPath(c, b, t, w, pj) {
+  var d = vSub(t, b), pr = pj || sp;
+  var p0 = pr(vMad(b, w, 0.5)), p1 = pr(vMad(vMad(b, w, 0.5), d, 0.6)), p2 = pr(vMad(t, w, 0.55)), pt = pr(t);
+  var q2 = pr(vMad(t, w, -0.55)), q1 = pr(vMad(vMad(b, w, -0.5), d, 0.6)), q0 = pr(vMad(b, w, -0.5));
   c.beginPath();
   c.moveTo(p0[0], p0[1]);
   c.bezierCurveTo(p1[0], p1[1], p2[0], p2[1], pt[0], pt[1]);
@@ -2343,27 +2439,19 @@ function flyPose(k, view, f) {
            ph: f / OWL_FRAMES * TAU, glide: f === OWL_GLIDE, land: 0, legs: 0, perch: false, lod: owlLod(k) };
 }
 
-/* Draw one pose at size k into a sprite: sharp first, a touch of the lamp
-   glow and of shade over the whole owl, then laid down through the blur
-   for that depth. into: a canvas to reuse (drawing it live), else a new one. */
-function bakeOwl(k, box, P, pose, into) {
-  var u = O.size * H * k * PR, blur = owlBlur(k), pad = Math.ceil(blur * 3 * PR) + 2;
+/* Draw into a sprite: paint(t, home) draws sharp, in units of u device
+   pixels with (0, 0) at the sprite's anchor (home() puts that transform
+   back); then it is laid down through the blur for its depth. box: the
+   bounds in those units. into: a canvas to reuse, else a new one. */
+function spriteFrom(u, box, blur, paint, into) {
+  var pad = Math.ceil(blur * 3 * PR) + 2;
   var w = Math.max(1, Math.ceil((box[2] - box[0]) * u) + pad * 2), h = Math.max(1, Math.ceil((box[3] - box[1]) * u) + pad * 2);
   var ox = pad - box[0] * u, oy = pad - box[1] * u;
   var tc = OWLTMP.cnv, t = OWLTMP.c;
   if (tc.width !== w || tc.height !== h) { tc.width = w; tc.height = h; } else { t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, w, h); }
   t.setTransform(u, 0, 0, u, ox, oy);
   t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1;
-  renderOwl(t, P, pose);
-  t.setTransform(u, 0, 0, u, ox, oy);
-  t.globalCompositeOperation = 'source-atop';
-  var a = (1 - P.hz) * (isNight() ? O.lampGlow : 0);
-  if (a > 0) {
-    var g = t.createLinearGradient(0, 0.2, 0, -0.75);
-    g.addColorStop(0, 'rgba(255,184,110,' + (0.14 * a).toFixed(3) + ')');
-    g.addColorStop(1, 'rgba(255,184,110,0)');
-    t.fillStyle = g; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
-  }
+  paint(t, function () { t.setTransform(u, 0, 0, u, ox, oy); });
   t.globalCompositeOperation = 'source-over';
   var cv2 = into || document.createElement('canvas');
   if (cv2.width !== w || cv2.height !== h) { cv2.width = w; cv2.height = h; }
@@ -2373,7 +2461,24 @@ function bakeOwl(k, box, P, pose, into) {
   c.filter = blur > 0.05 && HAS_FILTER ? 'blur(' + (blur * PR).toFixed(2) + 'px)' : 'none';
   c.drawImage(tc, 0, 0);
   c.filter = 'none';
-  return { cv: cv2, ox: ox / PR, oy: oy / PR, w: w / PR, h: h / PR, k: k };
+  return { cv: cv2, ox: ox / PR, oy: oy / PR, w: w / PR, h: h / PR };
+}
+/* One owl pose at size k: drawn, then a touch of the lamp glow over it. */
+function bakeOwl(k, box, P, pose, into) {
+  var spr = spriteFrom(O.size * H * k * PR, box, owlBlur(k), function (t, home) {
+    renderOwl(t, P, pose);
+    home();
+    t.globalCompositeOperation = 'source-atop';
+    var a = (1 - P.hz) * (isNight() ? O.lampGlow : 0);
+    if (a > 0) {
+      var g = t.createLinearGradient(0, 0.2, 0, -0.75);
+      g.addColorStop(0, 'rgba(255,184,110,' + (0.14 * a).toFixed(3) + ')');
+      g.addColorStop(1, 'rgba(255,184,110,0)');
+      t.fillStyle = g; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+    }
+  }, into);
+  spr.k = k;
+  return spr;
 }
 /* The sitting poses now (needed at once); the small flying ones queued and
    baked a few each frame (bakeOwlQueue). */
@@ -2647,6 +2752,687 @@ function paintSky() {
   sctx.fillStyle = 'rgba(35,40,70,0.168)'; sctx.fillRect(0, 0, W, H);
 }
 /* ============================================================
+   12. DEER AND TANUKI — foraging among the fallen leaves, built and lit
+   the same way as the owl (3D shapes covered in hair, lit by the night
+   sky from above and the warm lamps from below; softer, paler and hazier
+   further back).
+   - Sika deer (シカ): a herd of 2–3 (with one stag and his antlers, the
+     rest hinds) walk slowly across, one behind the other. Now and then a
+     deer stops, lowers its head and grazes, chewing and flicking its
+     tail; it may look up, sometimes straight at us. Those behind stop
+     when they catch up. Sometimes something startles the herd: heads up,
+     then they bound off the screen with their white tails raised,
+     kicking up leaves.
+   - Tanuki (タヌキ): a mother, usually with her kit, scurry across in
+     short dashes. At a stop she sniffs the leaves, stands, or turns her
+     masked face to look straight at us, eyes catching the lamplight;
+     the kit keeps close and copies her.
+   They come from either side, at a random depth on the ground: further
+   back = higher up the ground, smaller, softer, hazier, and behind the
+   trees. Each animal's frames are baked for its depth, a few per frame,
+   before it comes in; the leaves round its feet are drawn over its
+   hooves and paws.
+   ============================================================ */
+var ANIM_YAW = -0.22, ANIM_ELEV = 0.16;              // seen a little from the front and from above
+var DEER_BOX = [-1.2, -2.1, 1.4, 0.14], TANUKI_BOX = [-1.25, -1.3, 1.3, 0.14];   // sprite bounds in shoulder heights
+var animals = [], animSets = {}, animQueue = [], deerNext = 0, tanukiNext = 0, herdN = 0;
+var GRDL = mk();                                     // some of the ground's fallen leaves on their own (bakeGround), laid over feet
+var FUR_MID = { j: 0.5, j2: 0.5, j3: 0.5 };
+function vLerp(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function ap(p) { var v = tv(p); return [v[0], -v[1]]; }   // onto an animal's sprite: (0, 0) is the ground under its middle
+
+/* Where an animal at depth k stands, and how big it is. */
+function groundY(k) { var hy = H * V.horizon; return hy + (H - hy) * clamp(k / 1.15, 0, 1); }
+function animUnitPx(kind, variant, k) { return (kind === 'deer' ? O.deerSize : O.tanukiSize * (variant === 'kit' ? 0.7 : 1)) * H * k; }
+function animBlur(k) {
+  if (k >= FAR_SCALE) return lerp(O.farBlur, 0, clamp((k - FAR_SCALE) / (1 - FAR_SCALE), 0, 1));
+  return lerp(O.farBlur * 1.7, O.farBlur, clamp((k - 0.3) / (FAR_SCALE - 0.3), 0, 1));
+}
+function animHaze(k) { return O.animHaze * Math.pow(clamp((1 - k) / 0.7, 0, 1), 1.4); }
+function animPalette(variant, k) {
+  var src = O.animColours[variant === 'kit' || variant === 'mother' ? 'tanuki' : variant], P = {};
+  for (var key in src) P[key] = vivid(hex(src[key]), O.vivid);
+  if (variant === 'kit') { P.fur = mix(P.fur, P.dark, 0.1); P.tip = mix(P.tip, P.fur, 0.15); }   // a little darker and fluffier
+  var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.animStrength * lerp(1, TREE.farOpacity, far * 0.7);
+  var hz = animHaze(k), mist = light(cols().mist), night = isNight();
+  P.fin = function (c) {
+    var o = mix(c, PAPER, 1 - str);
+    if (night) o = mix(o, [60, 52, 96], 0.06);
+    return mix(o, mist, hz);
+  };
+  P.lamp = night ? O.lampGlow : 0.25;
+  P.hz = hz;
+  return P;
+}
+
+/* ---------- Drawing helpers (units: shoulder heights; x its front, y up) ---------- */
+/* An ellipsoid covered in hair: centre o, three axis vectors ax (scaled),
+   flow: the way the hair lies; colour(u, d): a hair's own colour at unit
+   direction u (along the three axes). hl, hw: hair length and width;
+   twist: how far each hair strays from the flow (fluffy); rnd: the
+   shading toward the edges (roundness), 0.28 unless given. */
+function furBall(c, P, o, ax, flow, colour, hl, hw, lod, n, seed, twist, rnd) {
+  var e = projEllipse(o, ax[0], ax[1], ax[2], ap);
+  var l0 = vDot(ax[0], ax[0]), l1 = vDot(ax[1], ax[1]), l2 = vDot(ax[2], ax[2]), i;
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx, e.ry, e.rot, 0, TAU);
+  c.fillStyle = rgb(owlLit(scale(colour([0, 0.2, 0.98], FUR_MID), 0.82), [0, 0, 1], P)); c.fill();
+  var dirs = owlDirs(n, seed);
+  c.lineWidth = hw;
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i];
+    if (d.j > lod + 0.1) continue;
+    var u = d.u, p = vAdd(vAdd(vMad(o, ax[0], u[0]), vMul(ax[1], u[1])), vMul(ax[2], u[2]));
+    var nm = vNorm(vAdd(vAdd(vMul(ax[0], u[0] / l0), vMul(ax[1], u[1] / l1)), vMul(ax[2], u[2] / l2)));
+    var nv = tv(nm);
+    if (nv[2] < -0.1) continue;                        // just past the edge still shows: a soft, furry outline
+    var tt = vSub(flow, vMul(nm, vDot(flow, nm)));
+    tt = vDot(tt, tt) < 1e-6 ? vNorm(vCross(nm, [0, 0, 1])) : vNorm(tt);
+    if (twist) { var sd = vCross(nm, tt), ta = (d.j3 - 0.5) * 2 * twist; tt = vAdd(vMul(tt, Math.cos(ta)), vMul(sd, Math.sin(ta))); }
+    var len = hl * (0.8 + d.j3 * 0.4);
+    var a = ap(vMad(vMad(p, tt, -len * 0.3), nm, 0.004)), b = ap(vMad(vMad(p, tt, len * 0.7), nm, 0.02));
+    c.strokeStyle = rgb(owlLit(colour(u, d), nv[2] < 0.3 ? vNorm([nv[0], nv[1], 0.3]) : nv, P));   // gentle at the edge: no bright rim on the hairs
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  if (rnd !== 0) roundness(c, e, rnd === undefined ? 0.28 : rnd);
+  return e;
+}
+/* A rounded limb from a to b (radii ra, rb), shaded across. */
+function tube(c, P, a3, b3, ra, rb, col) {
+  var A = ap(a3), B = ap(b3), dx = B[0] - A[0], dy = B[1] - A[1], L = Math.hypot(dx, dy) || 1e-6;
+  var px = -dy / L, py = dx / L, an = Math.atan2(py, px);
+  var g = c.createLinearGradient(A[0] + px * ra, A[1] + py * ra, A[0] - px * ra, A[1] - py * ra);
+  g.addColorStop(0, rgb(owlLit(col, vNorm([px, -py, 0.5]), P)));
+  g.addColorStop(0.5, rgb(owlLit(col, [0, 0, 1], P)));
+  g.addColorStop(1, rgb(owlLit(scale(col, 0.82), vNorm([-px, py, 0.5]), P)));
+  c.fillStyle = g;
+  c.beginPath();
+  c.moveTo(A[0] + px * ra, A[1] + py * ra);
+  c.lineTo(B[0] + px * rb, B[1] + py * rb);
+  c.arc(B[0], B[1], rb, an, an - PI, true);
+  c.lineTo(A[0] - px * ra, A[1] - py * ra);
+  c.arc(A[0], A[1], ra, an + PI, an, true);
+  c.closePath();
+  c.fill();
+}
+/* An eye: dark and glossy, the lamps caught in it (eyeshine) the more it
+   faces us, and a sparkle. */
+function animEye(c, P, p, r, face) {
+  var q = ap(p), fade = 1 - P.hz * 0.6;
+  c.fillStyle = rgb(P.fin(P.eye)); c.beginPath(); c.arc(q[0], q[1], r, 0, TAU); c.fill();
+  var s = 0.8 * Math.min(1, P.lamp) * face * fade;
+  if (s > 0.02) {
+    var g = c.createRadialGradient(q[0] + r * 0.1, q[1] + r * 0.15, 0, q[0], q[1], r);
+    g.addColorStop(0, 'rgba(232,240,170,' + s.toFixed(3) + ')');
+    g.addColorStop(0.6, 'rgba(170,212,120,' + (s * 0.55).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(120,160,90,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(q[0], q[1], r, 0, TAU); c.fill();
+  }
+  c.fillStyle = 'rgba(255,252,245,' + (0.85 * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(q[0] - r * 0.32, q[1] - r * 0.32, r * 0.3, 0, TAU); c.fill();
+}
+function glossyNose(c, P, p, r) {
+  var q = ap(p);
+  c.fillStyle = rgb(P.fin(P.nose)); c.beginPath(); c.ellipse(q[0], q[1], r * 1.15, r * 0.85, 0, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,245,235,' + (0.35 * (1 - P.hz)).toFixed(3) + ')';
+  c.beginPath(); c.ellipse(q[0] - r * 0.3, q[1] - r * 0.35, r * 0.4, r * 0.22, -0.3, 0, TAU); c.fill();
+}
+/* An ear: a flat leaf from base to tip, its outer side or (facing us) its
+   paler inside. nrm: the way its inside faces. */
+function animEar(c, P, base, tip, nrm, wd, outer, inner) {
+  var w = vMul(vNorm(vCross(nrm, vSub(tip, base))), wd), nv = tv(nrm), front = nv[2] > 0, fn = front ? nv : vMul(nv, -1);
+  featherPath(c, base, tip, w, ap);
+  c.fillStyle = rgb(owlLit(outer, fn, P)); c.fill();
+  if (front) {
+    featherPath(c, vMad(base, vSub(tip, base), 0.12), vMad(tip, vSub(tip, base), -0.12), vMul(w, 0.62), ap);
+    c.fillStyle = rgb(owlLit(inner, fn, P)); c.fill();
+  }
+}
+
+/* ---------- Legs and gaits ---------- */
+/* Where a foot is in its step: phase ph, the leg's offset in the cycle,
+   the share of the cycle it is on the ground (duty), how far it travels
+   back while there (stride), how high it lifts. */
+function footAt(ph, off, duty, stride, lift) {
+  var q = ((ph / TAU + off) % 1 + 1) % 1;
+  if (q < duty) return [stride * (0.5 - q / duty), 0];
+  var s = (q - duty) / (1 - duty);
+  return [stride * (-0.5 + (1 - Math.cos(PI * s)) / 2), lift * Math.sin(PI * s)];
+}
+/* The middle joint of a two-part leg from hip h to foot f (side view),
+   bulging forward (bend 1: a deer's front knee) or back (-1: a hock). */
+function ik2(h, f, l1, l2, bend) {
+  var dx = f[0] - h[0], dy = f[1] - h[1], d = Math.max(1e-4, Math.min(Math.hypot(dx, dy), l1 + l2 - 1e-4));
+  var a = Math.atan2(dy, dx), b = Math.acos(clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1)), ang = a + b * bend;
+  return [h[0] + Math.cos(ang) * l1, h[1] + Math.sin(ang) * l1];
+}
+/* Legs: near front, far front, near hind, far hind. */
+var GAITS = {
+  walk: { offs: [0.25, 0.75, 0, 0.5], duty: 0.62, stride: 0.62, lift: 0.11 },   // a deer's slow four-beat walk
+  run:  { offs: [0.45, 0.55, 0, 0.08], duty: 0.32, stride: 0.6, lift: 0.3 },     // its bounding gallop
+  trot: { offs: [0, 0.5, 0.5, 0], duty: 0.5, stride: 0.45, lift: 0.13 }          // a tanuki's quick trot
+};
+
+/* ---------- Sika deer ----------
+   pose: gait ('walk', 'run', 'stand'), ph, neck (0 head high … 0.15 carried
+   … 1 grazing), look (0 … 1 head turned to us), chew, tail (0 down … 1 up,
+   its white flag), ears (0 … 1 pricked). */
+var ANTLER = { beam: [[0, 0, 0], [-0.05, 0.16, 0.035], [-0.11, 0.34, 0.075], [-0.09, 0.52, 0.105]],
+               tines: [[[0, 0.07, 0.015], [0.13, 0.14, 0.05]], [[-0.11, 0.34, 0.075], [0, 0.47, 0.095]],
+                       [[-0.09, 0.52, 0.105], [-0.02, 0.63, 0.12]], [[-0.09, 0.52, 0.105], [-0.18, 0.6, 0.13]]] };
+function drawAntler(c, P, base, f, u, r, s) {
+  function W(q) { return ap(vAdd(vAdd(vAdd(base, vMul(f, q[0])), vMul(u, q[1])), vMul(r, s * q[2]))); }
+  var nv = [0, 0.3, 0.95], c0 = owlLit(scale(P.antler, 0.6), nv, P), c1 = owlLit(P.antler, nv, P), c2 = owlLit(scale(P.antler, 1.15), nv, P), i, a, b;
+  for (i = 0; i < 3; i++) {
+    a = W(ANTLER.beam[i]); b = W(ANTLER.beam[i + 1]);
+    c.strokeStyle = rgb(mix(c0, c1, i / 2)); c.lineWidth = 0.05 - i * 0.011;
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  for (i = 0; i < ANTLER.tines.length; i++) {
+    a = W(ANTLER.tines[i][0]); b = W(ANTLER.tines[i][1]);
+    c.strokeStyle = rgb(c1); c.lineWidth = 0.022;
+    c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+    c.strokeStyle = rgb(c2, 0.8); c.lineWidth = 0.009;           // pale, polished tips
+    c.beginPath(); c.moveTo(lerp(a[0], b[0], 0.5), lerp(a[1], b[1], 0.5)); c.lineTo(b[0], b[1]); c.stroke();
+  }
+  a = W([0, 0, 0]);
+  c.fillStyle = rgb(c0); c.beginPath(); c.arc(a[0], a[1], 0.03, 0, TAU); c.fill();   // the burr at its base
+}
+function renderDeer(c, P, pose, stag, lod) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  var g = GAITS[pose.gait] || GAITS.walk, ph = pose.ph || 0, bob = 0, pitch = 0, parts = [];
+  if (pose.gait === 'walk') bob = 0.012 * Math.cos(2 * ph);
+  if (pose.gait === 'run') { bob = 0.05 + 0.08 * Math.sin(ph + 0.6); pitch = 0.12 * Math.sin(ph - 0.4); }
+  var cp = Math.cos(pitch), spn = Math.sin(pitch), AX = [cp, spn, 0], AY = [-spn, cp, 0], AZ = [0, 0, 1];
+  function B(x, y, z) { var yy = y - 0.95; return [x * cp - yy * spn, 0.95 + x * spn + yy * cp + bob, z]; }
+  function depth(p) { return tv(p)[2]; }
+  function coat(u, d) {
+    var col = mix(P.coat, P.back, smooth(0.45, 0.95, u[1]));
+    if (u[1] < -0.35) col = mix(col, P.belly, smooth(-0.35, -0.75, u[1]));
+    return scale(col, 0.95 + d.j2 * 0.1);
+  }
+  // the body: chest, barrel and haunch
+  [[B(0.34, 0.97, 0), [0.33, 0.33, 0.24]], [B(0, 0.93, 0), [0.46, 0.28, 0.25]], [B(-0.4, 1.0, 0), [0.33, 0.31, 0.25]]].forEach(function (T, i) {
+    parts.push({ z: depth(T[0]) + (i === 0 ? 0.002 : 0), f: function () {
+      furBall(c, P, T[0], [vMul(AX, T[1][0]), vMul(AY, T[1][1]), vMul(AZ, T[1][2])], vMul(AX, -1), function (u, d) {
+        if (i === 2 && u[0] < -0.42 && u[1] > -0.25) return u[0] < -0.55 ? scale(P.rump, 0.96 + d.j2 * 0.08) : P.rim;   // the white rump, rimmed in black
+        return coat(u, d);
+      }, 0.06, 0.022, lod, 170, 31 + i, 0.15, 0.12);
+      if (!stag && i > 0) spots(T[0], T[1]);
+    } });
+  });
+  // a hind's faint pale spots along her flank, in rows
+  function spots(o, rr) {
+    var dirs = owlDirs(70, 91), sc = rgb(owlLit(P.spot, [0, 0, 1], P), 0.5);
+    c.fillStyle = sc;
+    for (var k = 0; k < dirs.length; k++) {
+      var uu = dirs[k].u;
+      if (uu[2] < 0.3 || uu[1] < 0.05 || uu[1] > 0.62 || dirs[k].j > 0.55) continue;
+      var pp = vAdd(vAdd(vMad(o, AX, rr[0] * uu[0]), vMul(AY, rr[1] * uu[1])), vMul(AZ, rr[2] * uu[2] * 1.02));
+      var nz = tv(vNorm([uu[0] / rr[0], uu[1] / rr[1], uu[2] / rr[2]]))[2];
+      if (nz < 0.25) continue;
+      var q = ap(pp);
+      c.beginPath(); c.ellipse(q[0], q[1], 0.017 * nz, 0.013, 0, 0, TAU); c.fill();
+    }
+  }
+  // the tail: hanging, flicked, or raised as a white flag
+  var ta = lerp(-1.75, 0.9, pose.tail || 0), tb = B(-0.7, 1.08, 0), td = [Math.cos(ta + pitch), Math.sin(ta + pitch), 0];
+  parts.push({ z: depth(tb) - 0.01, f: function () {
+    furBall(c, P, vMad(tb, td, 0.07), [vMul(td, 0.08), vMul(vNorm(vCross([0, 0, 1], td)), 0.045), [0, 0, 0.035]], td, function (uu) {
+      return uu[1] > 0.55 ? P.rim : P.rump;
+    }, 0.04, 0.02, lod, 40, 77);
+  } });
+  // legs
+  [[0.4, 0.11, true], [0.4, -0.11, true], [-0.44, 0.12, false], [-0.44, -0.12, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = front ? 0.45 : 0.5, l2 = front ? 0.46 : 0.45;
+    var hip = B(L[0], front ? 0.86 : 0.9, L[1]), fx, fy;
+    if (pose.gait === 'stand') { fx = L[0] + (near ? 0.03 : -0.03) * (front ? 1 : -1); fy = 0; }
+    else { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.leg : scale(P.leg, 0.78);
+    parts.push({ z: depth(knee) + (near ? 0.05 : -0.05), f: function () {
+      tube(c, P, hip, knee, front ? 0.1 : 0.15, front ? 0.05 : 0.06, col);
+      tube(c, P, knee, foot, front ? 0.04 : 0.045, 0.028, col);
+      tube(c, P, vAdd(foot, [0.005, 0.06, 0]), vAdd(foot, [0.03, 0.004, 0]), 0.03, 0.034, P.hoof);   // the hoof
+    } });
+  });
+  // the neck: a few rounded pieces along a curve to the head
+  var n = pose.neck === undefined ? 0.15 : pose.neck, nb = B(0.5, 1.12, 0);
+  var Hup = vAdd(nb, [0.2, 0.55, 0]), Hcar = vAdd(nb, [0.36, 0.36, 0]), Hdn = [0.95, 0.36, 0];
+  var H0 = n < 0.15 ? vLerp(Hup, Hcar, n / 0.15) : vLerp(Hcar, Hdn, smooth(0, 1, (n - 0.15) / 0.85));
+  var hp = n < 0.15 ? lerp(-0.25, -0.5, n / 0.15) : lerp(-0.5, -1.35, smooth(0, 1, (n - 0.15) / 0.85));
+  if (pose.chew) { hp += 0.12; H0 = vAdd(H0, [0, 0.015, 0]); }
+  var hy = 0.95 * (pose.look || 0), ears = pose.ears || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r = vNorm(vCross(f, [0, 1, 0])), u = vCross(r, f);
+  var nt = vAdd(vMad(H0, f, -0.1), vMul(u, -0.03)), nc = vAdd(vLerp(nb, nt, 0.5), [0.05, 0.1 * (1 - n), 0]);
+  [0.08, 0.26, 0.44, 0.62, 0.8, 0.95].forEach(function (s, i) {
+    var cc = vAdd(vAdd(vMul(nb, (1 - s) * (1 - s)), vMul(nc, 2 * (1 - s) * s)), vMul(nt, s * s));
+    var tg = vNorm(vAdd(vMul(vSub(nc, nb), 2 * (1 - s)), vMul(vSub(nt, nc), 2 * s))), pr = vNorm(vCross([0, 0, 1], tg));
+    var ra = lerp(0.18, 0.11, s) * (stag ? 1.3 - 0.25 * s : 1);
+    parts.push({ z: depth(cc) + 0.01 + i * 0.001, f: function () {
+      furBall(c, P, cc, [vMul(tg, 0.13), vMul(pr, ra), [0, 0, ra * 0.85]], vMul(tg, -1), function (uu, d) {
+        var col = stag ? mix(P.coat, P.mane, smooth(-0.2, 0.6, uu[1]) * 0.85) : mix(P.coat, P.back, smooth(0.4, 1, uu[1]) * 0.6);
+        if (uu[1] < -0.5) col = mix(col, P.belly, 0.4);              // the paler throat
+        return scale(col, 0.95 + d.j2 * 0.1);
+      }, stag ? 0.09 : 0.06, 0.024, lod, 70, 41 + i, stag ? 0.3 : 0.12, 0);
+    } });
+  });
+  // the head: far ear and antler, skull, muzzle, nose, eyes, near ear and antler
+  parts.push({ z: depth(H0) + 0.06, f: function () {
+    var sides = [-1, 1].sort(function (a, b) { return tv(vMul(r, a))[2] - tv(vMul(r, b))[2]; });
+    function ear(s) {
+      var base = vAdd(vAdd(vMad(H0, f, -0.07), vMul(u, 0.1)), vMul(r, s * 0.065));
+      var dir = vNorm(vAdd(vAdd(vMul(u, 0.7 + 0.25 * ears), vMul(f, -(0.45 - 0.35 * ears))), vMul(r, s * 0.6)));
+      animEar(c, P, base, vMad(base, dir, 0.22), vNorm(vAdd(vMul(f, 0.55), vMul(r, s * 0.7))), 0.065, P.coat, P.ear);
+    }
+    function antler(s) { if (stag) drawAntler(c, P, vAdd(vAdd(vMad(H0, f, -0.03), vMul(u, 0.1)), vMul(r, s * 0.05)), f, u, r, s); }
+    ear(sides[0]); antler(sides[0]);
+    furBall(c, P, H0, [vMul(f, 0.17), vMul(u, 0.13), vMul(r, 0.105)], vMul(f, -1), function (uu, d) {
+      return scale(mix(P.coat, P.belly, uu[1] < -0.4 ? 0.45 : 0.12), 0.95 + d.j2 * 0.1);
+    }, 0.045, 0.02, lod, 80, 47, 0.1, 0.15);
+    furBall(c, P, vAdd(vMad(H0, f, 0.19), vMul(u, -0.04)), [vMul(f, 0.15), vMul(u, 0.075), vMul(r, 0.068)], vMul(f, -1), function (uu, d) {
+      return scale(mix(mix(P.coat, P.belly, 0.25), P.nose, uu[0] > 0.6 ? 0.5 : 0), 0.95 + d.j2 * 0.1);
+    }, 0.035, 0.018, lod, 50, 48, 0.1, 0.12);
+    glossyNose(c, P, vAdd(vMad(H0, f, 0.33), vMul(u, -0.05)), 0.034);
+    [-1, 1].forEach(function (s) {
+      var side = tv(vMul(r, s))[2];
+      if (side > -0.05) animEye(c, P, vAdd(vAdd(vMad(H0, f, 0.04), vMul(u, 0.04)), vMul(r, s * 0.098)), 0.029, clamp(side * 1.4 + 0.2, 0, 1));
+    });
+    ear(sides[1]); antler(sides[1]);
+  } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+
+/* ---------- Tanuki ----------
+   pose: gait ('trot' or 'stand'), ph, head ('trot', 'up', 'sniff'), bob
+   (sniffing), look (0 … 1 face turned to us), ears, tilt. kit: the young
+   one — bigger head, shorter legs, fluffier. */
+function renderTanuki(c, P, pose, kit, lod) {
+  setView(ANIM_YAW, ANIM_ELEV);
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  var g = GAITS.trot, ph = pose.ph || 0, trot = pose.gait === 'trot', parts = [];
+  var bob = trot ? 0.025 * Math.cos(2 * ph) : 0, hs = kit ? 1.2 : 1, lg = kit ? 0.82 : 1, hl = kit ? 0.12 : 0.105;
+  function B(x, y, z) { return [x, y * lg + bob, z]; }
+  function depth(p) { return tv(p)[2]; }
+  function fur(u, d) {                                   // grizzled: pale-tipped and dark hairs through the brown
+    var col = P.fur;
+    if (d.j2 > 0.6) col = mix(P.fur, P.tip, 0.42);
+    else if (d.j2 < 0.14) col = mix(P.fur, P.dark, 0.5);
+    return scale(col, 0.95 + d.j3 * 0.1);
+  }
+  // the round, fluffy body: chest, barrel, rump
+  [[B(0.3, 0.58, 0), [0.3, 0.32, 0.3], 'chest'], [B(0, 0.56, 0), [0.5, 0.33, 0.34], 'barrel'], [B(-0.36, 0.6, 0), [0.32, 0.35, 0.32], 'rump']].forEach(function (T, i) {
+    var rr = kit ? [T[1][0] * 0.92, T[1][1] * 1.05, T[1][2] * 1.05] : T[1];
+    parts.push({ z: depth(T[0]) + (i === 0 ? 0.002 : 0), f: function () {
+      furBall(c, P, T[0], [[rr[0], 0, 0], [0, rr[1], 0], [0, 0, rr[2]]], [-0.6, -0.8, 0], function (u, d) {
+        var col = fur(u, d);
+        if (u[1] < -0.45) col = mix(col, P.dark, 0.75);                                     // dark underneath
+        if (T[2] === 'chest') col = mix(col, P.dark, u[0] > 0.35 || u[1] < 0.1 ? 0.72 : (u[1] < 0.55 ? 0.38 : 0));   // dark chest, a darker cape over the shoulders
+        return col;
+      }, hl, 0.028, lod, 190, 51 + i, 0.7, 0.14);
+    } });
+  });
+  // the bushy tail, dark at the tip, swinging as it trots
+  var ta = -2.15 + (trot ? 0.18 * Math.sin(ph) : 0), td = [Math.cos(ta), Math.sin(ta), 0], tb = B(-0.62, 0.54, 0);
+  parts.push({ z: depth(tb) - 0.01, f: function () {
+    furBall(c, P, vMad(tb, td, 0.2), [vMul(td, 0.27), vMul(vNorm(vCross([0, 0, 1], td)), 0.12), [0, 0, 0.11]], td, function (uu, d) {
+      return uu[0] > 0.45 ? scale(P.dark, 0.9 + d.j2 * 0.2) : fur(uu, d);
+    }, hl * 1.1, 0.03, lod, 80, 61, 0.5, 0.12);
+  } });
+  // short dark legs
+  [[0.34, 0.14, true], [0.34, -0.14, true], [-0.36, 0.14, false], [-0.36, -0.14, false]].forEach(function (L, i) {
+    var front = L[2], near = L[1] > 0, l1 = 0.22 * lg, l2 = 0.22 * lg;
+    var hip = B(L[0], 0.43, L[1]), fx, fy;
+    if (trot) { var fp = footAt(ph, g.offs[i], g.duty, g.stride, g.lift); fx = L[0] + fp[0]; fy = fp[1]; }
+    else { fx = L[0] + (near ? 0.04 : -0.06); fy = 0; }
+    var k2 = ik2(hip, [fx, fy], l1, l2, front ? 1 : -1), knee = [k2[0], k2[1], L[1]], foot = [fx, fy, L[1]];
+    var col = near ? P.dark : scale(P.dark, 0.75);
+    parts.push({ z: depth(knee) + (near ? 0.05 : -0.05), f: function () {
+      tube(c, P, hip, knee, 0.1, 0.068, col);
+      tube(c, P, knee, foot, 0.062, 0.048, col);
+      tube(c, P, vAdd(foot, [-0.01, 0.03, 0]), vAdd(foot, [0.04, 0.012, 0]), 0.045, 0.04, scale(col, 0.85));   // the paw
+    } });
+  });
+  // the head: a masked face with pale brows and cheeks, small round ears
+  var nb = B(0.5, 0.68, 0), hd = pose.head || 'up';
+  var H0 = hd === 'sniff' ? [0.74, 0.24 * lg + 0.02 * (pose.bob || 0), 0] : vAdd(nb, hd === 'up' ? [0.2, 0.12, 0] : [0.25, 0.03, 0]);
+  var hp = hd === 'sniff' ? -0.95 + 0.12 * (pose.bob || 0) : (hd === 'up' ? -0.12 : -0.3), hy = 1.05 * (pose.look || 0), tl = pose.tilt || 0;
+  var f = [Math.cos(hp) * Math.cos(hy), Math.sin(hp), Math.cos(hp) * Math.sin(hy)], r0 = vNorm(vCross(f, [0, 1, 0])), u0 = vCross(r0, f);
+  var r = vAdd(vMul(r0, Math.cos(tl)), vMul(u0, Math.sin(tl))), u = vSub(vMul(u0, Math.cos(tl)), vMul(r0, Math.sin(tl)));
+  var nk = vLerp(nb, H0, 0.45), nd = vNorm(vSub(H0, nb));
+  parts.push({ z: depth(nk) + 0.01, f: function () {
+    furBall(c, P, nk, [vMul(nd, 0.2), vMul(vNorm(vCross([0, 0, 1], nd)), 0.2), [0, 0, 0.21]], vMul(nd, -1), function (uu, d) {
+      return uu[1] < -0.2 ? mix(fur(uu, d), P.dark, 0.6) : fur(uu, d);
+    }, hl, 0.028, lod, 80, 66, 0.6, 0);
+  } });
+  parts.push({ z: depth(H0) + 0.06, f: function () {
+    var sides = [-1, 1].sort(function (a, b) { return tv(vMul(r, a))[2] - tv(vMul(r, b))[2]; });
+    function ear(s) {
+      var base = vAdd(vAdd(vMad(H0, f, -0.04 * hs), vMul(u, 0.15 * hs)), vMul(r, s * 0.12 * hs));
+      var dir = vNorm(vAdd(vAdd(vMul(u, 0.9), vMul(r, s * (0.3 + 0.12 * (pose.ears || 0)))), vMul(f, -0.15)));
+      animEar(c, P, base, vMad(base, dir, 0.11 * hs), vNorm(vAdd(vMul(f, 0.7), vMul(r, s * 0.4))), 0.05 * hs, P.dark, P.pale);
+    }
+    ear(sides[0]);
+    furBall(c, P, H0, [vMul(f, 0.21 * hs), vMul(u, 0.19 * hs), vMul(r, 0.21 * hs)], vSub(vMul(f, -1), vMul(u, 0.3)), function (uu, d) {
+      var fwd = uu[0], up = uu[1], side = uu[2];
+      if (fwd > 0.15 && Math.abs(side) > 0.3 && up > -0.42 && up < 0.32) return scale(P.mask, 0.92 + d.j2 * 0.16);   // the dark mask
+      if (fwd > 0.05 && (up >= 0.32 || up < -0.3)) return mix(P.pale, P.fur, d.j2 * 0.35);                          // pale brows and cheeks
+      return fur(uu, d);
+    }, hl * 0.7, 0.026, lod, 130, 67, 0.35, 0.14);
+    var mz = vAdd(vMad(H0, f, 0.19 * hs), vMul(u, -0.06 * hs)), ms = kit ? 0.85 : 1;
+    furBall(c, P, mz, [vMul(f, 0.13 * ms), vMul(u, 0.08 * ms), vMul(r, 0.085 * ms)], vMul(f, -1), function (uu, d) {
+      return scale(mix(mix(P.pale, P.fur, 0.3), P.dark, uu[0] > 0.55 ? 0.65 : 0), 0.94 + d.j2 * 0.12);
+    }, 0.045, 0.026, lod, 50, 68);
+    glossyNose(c, P, vAdd(vMad(H0, f, (0.19 + 0.13 * ms) * hs), vMul(u, -0.05 * hs)), 0.036);
+    [-1, 1].forEach(function (s) {
+      var side = tv(vMul(r, s))[2], face = clamp(tv(f)[2] * 0.7 + side * 0.7 + 0.15, 0, 1);
+      if (side > -0.25 || tv(f)[2] > 0.5) animEye(c, P, vAdd(vAdd(vMad(H0, f, 0.13 * hs), vMul(u, 0.03 * hs)), vMul(r, s * 0.115 * hs)), 0.033 * (kit ? 1.25 : 1), face);
+    });
+    ear(sides[1]);
+  } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+
+/* ---------- Frames, baked per animal and depth ---------- */
+var DEER_FRAMES = (function () {
+  var L = [], i;
+  for (i = 0; i < 12; i++) L.push('walk' + i);
+  for (i = 0; i < 4; i++) L.push('stand' + i);
+  L.push('chew0', 'chew1', 'alert', 'stare', 'alarm');
+  for (i = 0; i < 8; i++) L.push('run' + i);
+  return L;
+})();
+var TANUKI_FRAMES = (function () {
+  var L = [];
+  for (var i = 0; i < 10; i++) L.push('trot' + i);
+  return L.concat(['stand', 'sniff0', 'sniff1', 'look0', 'look1']);
+})();
+function deerPose(fr) {
+  var m;
+  if ((m = /^walk(\d+)/.exec(fr))) return { gait: 'walk', ph: m[1] / 12 * TAU, neck: 0.15, ears: 0.3 };
+  if ((m = /^run(\d+)/.exec(fr))) return { gait: 'run', ph: m[1] / 8 * TAU, neck: 0.08, tail: 1, ears: 0.6 };
+  if ((m = /^stand(\d)/.exec(fr))) return { gait: 'stand', neck: [0.15, 0.45, 0.75, 1][+m[1]], ears: 0.3 };
+  if (fr === 'chew0') return { gait: 'stand', neck: 1, ears: 0.2 };
+  if (fr === 'chew1') return { gait: 'stand', neck: 1, chew: 1, tail: 0.35, ears: 0.2 };
+  if (fr === 'alert') return { gait: 'stand', neck: 0, ears: 1 };
+  if (fr === 'alarm') return { gait: 'stand', neck: 0, ears: 1, tail: 0.85 };
+  return { gait: 'stand', neck: 0.03, look: 1, ears: 1 };             // stare: looking straight at us
+}
+function tanukiPose(fr) {
+  var m;
+  if ((m = /^trot(\d+)/.exec(fr))) return { gait: 'trot', ph: m[1] / 10 * TAU, head: 'trot', ears: 0.4 };
+  if (fr === 'stand') return { gait: 'stand', head: 'up', ears: 0.5 };
+  if ((m = /^sniff(\d)/.exec(fr))) return { gait: 'stand', head: 'sniff', bob: +m[1], ears: 0.3 };
+  m = /^look(\d)/.exec(fr);
+  return { gait: 'stand', head: 'up', look: 1, ears: m && m[1] === '1' ? 1 : 0.5, tilt: m && m[1] === '1' ? 0.14 : 0 };
+}
+/* The frames for one kind of animal at (about) depth k, shared by any
+   animal of that kind standing at that depth; queued to bake. */
+function animSet(kind, variant, k) {
+  var kq = Math.round(k * 25) / 25, key = variant + '@' + kq;
+  if (!animSets[key]) {
+    var S = { key: key, kind: kind, variant: variant, k: kq, frames: {}, pend: 0 };
+    (kind === 'deer' ? DEER_FRAMES : TANUKI_FRAMES).forEach(function (fr) { S.pend++; animQueue.push([S, fr]); });
+    animSets[key] = S;
+  }
+  return animSets[key];
+}
+function bakeAnimFrame(S, fr) {
+  var u = animUnitPx(S.kind, S.variant, S.k) * PR, P = animPalette(S.variant, S.k), lod = clamp(u / 70, 0.35, 1);
+  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, animBlur(S.k), function (t) {
+    if (S.kind === 'deer') renderDeer(t, P, deerPose(fr), S.variant === 'stag', lod);
+    else renderTanuki(t, P, tanukiPose(fr), S.variant === 'kit', lod);
+  });
+  S.pend--;
+}
+function bakeAnimQueue(ms) {
+  var t0 = performance.now();
+  while (animQueue.length && performance.now() - t0 < ms) { var q = animQueue.shift(); bakeAnimFrame(q[0], q[1]); }
+}
+/* After a change (size, colours, light): bake everything again. */
+function resetAnimSets() {
+  animSets = {}; animQueue = [];
+  animals.forEach(function (a) { a.set = animSet(a.kind, a.variant, a.k); });
+}
+
+/* ---------- What they do ---------- */
+function onScreen(a) { return a.x > W * 0.08 && a.x < W * 0.92; }
+function setReady(a) { return a.set.pend === 0; }
+/* Move forward at speed (shoulder heights a second) in gait g, with the
+   legs' phase following the ground so the feet do not slide. */
+function stepOn(a, speed, g, name, nFrames, dt) {
+  a.x += a.dir * speed * a.unit * dt;
+  a.ph += TAU * speed * g.duty / g.stride * dt;
+  a.frame = name + (Math.floor((a.ph % TAU) / TAU * nFrames + 0.5) % nFrames);
+}
+/* A few leaves kicked up from under its feet, and (galloping, near the
+   front) the leaves lying there lifted. */
+function kickLeaves(a, t, dt, rate) {
+  var fy = groundY(a.k), fx = a.x - a.dir * a.unit * 0.3;
+  if (Math.random() < dt * rate && falling.length < V.falling * 1.6) {
+    var L = makeLeaf(clamp(a.k * 0.62, 0.15, 0.7), fx + rnd(-0.3, 0.3) * a.unit, fy - 2);
+    L.vy = -rnd(30, 75) * a.k; L.vx = -a.dir * rnd(20, 70) * a.k; L.land = false; L.fi = t;
+    insertFalling(L);
+  }
+  if (a.k > 0.85 && rate >= 3) for (var j = pile.length - 1; j >= 0; j--) {
+    if (Math.abs(pile[j].x - fx) < a.unit * 0.5 && Math.random() < dt * rate * 0.25) liftLeaf(j, t, a.dir * rnd(60, 140), -rnd(50, 110));
+  }
+}
+function spawnHerd(t) {
+  var lo = Math.min(O.herdMin, O.herdMax), hi = Math.max(O.herdMin, O.herdMax);
+  var n = Math.round(rnd(lo - 0.49, hi + 0.49)), dir = Math.random() < 0.5 ? 1 : -1;
+  var kf = Math.min(O.deerFar, O.deerNear), kn = Math.max(O.deerFar, O.deerNear), kb = rnd(kf, kn);
+  var stagAt = Math.random() < O.stagChance ? (n >= 2 ? Math.floor(Math.random() * n) : (Math.random() < 0.5 ? 0 : -1)) : -1;
+  var herd = { id: ++herdN, spookAt: Math.random() < O.runChance ? -1 : Infinity, members: [] }, x = dir > 0 ? 0 : W;
+  for (var i = 0; i < n; i++) {
+    var k = clamp(kb + rnd(-0.07, 0.07), kf, kn), variant = i === stagAt ? 'stag' : 'hind';
+    var a = { kind: 'deer', variant: variant, k: k, dir: dir, herd: herd, idx: i, state: 'prep', ph: rnd(0, TAU), neck: 0.15,
+              frame: 'walk0', t0: t, until: 0, nextStop: 0, speed: O.deerWalk * rnd(0.9, 1.1), unit: animUnitPx('deer', variant, k) };
+    x -= dir * a.unit * (i ? rnd(1.9, 2.8) : 1.5);                     // one behind the other, in a loose line
+    a.x = x;
+    a.set = animSet('deer', variant, k);
+    herd.members.push(a); animals.push(a);
+  }
+}
+function spawnTanuki(t) {
+  var dir = Math.random() < 0.5 ? 1 : -1, kf = Math.min(O.tanukiFar, O.tanukiNear), kn = Math.max(O.tanukiFar, O.tanukiNear), k = rnd(kf, kn);
+  var m = { kind: 'tanuki', variant: 'mother', k: k, dir: dir, state: 'prep', ph: 0, frame: 'stand', t0: t, until: 0, speed: O.tanukiSpeed,
+            unit: animUnitPx('tanuki', 'mother', k), seed: Math.random() * 10 };
+  m.x = dir > 0 ? -m.unit * 2 : W + m.unit * 2;
+  m.set = animSet('tanuki', 'mother', k);
+  animals.push(m);
+  if (Math.random() < O.kitChance) {
+    var kk = Math.min(k + 0.05, 1.05);                                  // a little nearer, so it shows beside her
+    var kit = { kind: 'tanuki', variant: 'kit', k: kk, dir: dir, state: 'prep', ph: 1, frame: 'stand', t0: t, until: 0, speed: O.tanukiSpeed,
+                unit: animUnitPx('tanuki', 'kit', kk), mother: m, copyAt: 0, seed: Math.random() * 10 };
+    kit.x = m.x - dir * m.unit * 2.2;
+    kit.set = animSet('tanuki', 'kit', kk);
+    m.kit = kit;
+    animals.push(kit);
+  }
+}
+function startGraze(a, t, short) {
+  a.state = 'lower';
+  a.until = t + (short ? rnd(2, 5) : rnd(Math.min(O.grazeMin, O.grazeMax), Math.max(O.grazeMin, O.grazeMax)));
+  a.lookAt = Math.random() < O.deerLook ? t + rnd(1.5, Math.max(2, (a.until - t) * 0.75)) : Infinity;
+}
+function updateDeer(a, t, dt) {
+  var ahead = a.idx > 0 ? a.herd.members[a.idx - 1] : null;
+  var gap = ahead && !ahead.gone ? (ahead.x - a.x) * a.dir : Infinity;
+  switch (a.state) {
+    case 'prep':
+      if (a.herd.members.every(setReady)) { a.state = 'walk'; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      break;
+    case 'walk':
+      if (gap < a.unit * 1.9) { startGraze(a, t, true); break; }   // caught up with the one ahead: it grazes too
+      stepOn(a, a.speed * (gap > a.unit * 4.5 && gap < Infinity ? 1.35 : 1), GAITS.walk, 'walk', 12, dt);
+      if (a.k > 0.85) kickLeaves(a, t, dt, 0.3);
+      if (onScreen(a) && t >= a.nextStop) startGraze(a, t);
+      break;
+    case 'lower':                                     // the head goes down to the leaves
+      a.neck = Math.min(1, a.neck + dt / 0.9);
+      a.frame = 'stand' + Math.round((a.neck - 0.15) / 0.85 * 3);
+      if (a.neck >= 1) { a.state = 'graze'; a.t0 = t; }
+      break;
+    case 'graze':                                     // chewing, the tail flicking now and then
+      a.frame = Math.floor((t - a.t0) / 0.42) % 2 ? 'chew1' : 'chew0';
+      if (t >= a.lookAt) { a.state = 'raise'; a.after = 'look'; }
+      else if (t >= a.until || (ahead && gap > a.unit * 5.5)) { a.state = 'raise'; a.after = 'walk'; }
+      break;
+    case 'raise':
+      a.neck = Math.max(0.15, a.neck - dt / 0.7);
+      a.frame = 'stand' + Math.round((a.neck - 0.15) / 0.85 * 3);
+      if (a.neck <= 0.15) {
+        if (a.after === 'look') { a.state = 'look'; a.frame = Math.random() < 0.5 ? 'stare' : 'alert'; a.lookUntil = t + rnd(1.5, 4); a.lookAt = Infinity; }
+        else { a.state = 'walk'; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      }
+      break;
+    case 'look':                                      // head up, ears pricked; sometimes straight at us
+      if (t >= a.lookUntil) {
+        if (a.until > t + 1.5) a.state = 'lower';
+        else { a.state = 'walk'; a.neck = 0.15; a.nextStop = t + O.grazeEvery * rnd(0.5, 1.5); }
+      }
+      break;
+    case 'alarm':                                     // startled: head up, tail flared, then away
+      a.frame = 'alarm'; a.neck = 0.15;
+      if (t >= a.runAt) a.state = 'run';
+      break;
+    case 'run':
+      stepOn(a, O.deerRun * a.runSpeed, GAITS.run, 'run', 8, dt);
+      kickLeaves(a, t, dt, 6);
+      break;
+  }
+  if ((a.state === 'walk' || a.state === 'run') && (a.dir > 0 ? a.x > W + a.unit * 2 : a.x < -a.unit * 2)) a.gone = true;
+}
+function tanukiStop(a, t) {                           // at a stop: look at us, sniff the leaves, or just stand
+  var r = Math.random();
+  if (r < O.tanukiLook) { a.state = 'look'; a.until = t + O.lookTime * rnd(0.7, 1.3); }
+  else if (r < O.tanukiLook + (1 - O.tanukiLook) * 0.65) { a.state = 'sniff'; a.until = t + rnd(1, 2.6); }
+  else { a.state = 'stand'; a.until = t + rnd(0.6, 1.5); }
+}
+function updateTanuki(a, t, dt) {
+  if (a.state === 'prep') {
+    if (setReady(a) && (!a.kit || setReady(a.kit)) && (!a.mother || setReady(a.mother))) { a.state = 'trot'; a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.85, 1.15); }
+    return;
+  }
+  if (a.variant === 'kit') { updateKit(a, t, dt); return; }
+  if (a.state === 'trot') {
+    stepOn(a, a.speed, GAITS.trot, 'trot', 10, dt);
+    if (a.k > 0.85) kickLeaves(a, t, dt, 0.6);
+    if (t >= a.until) {
+      if (onScreen(a) && Math.random() < O.tanukiStops) tanukiStop(a, t);
+      else { a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.8, 1.2); }
+    }
+  } else {
+    if (a.state === 'look') a.frame = Math.floor(t / 0.8 + a.seed) % 2 ? 'look1' : 'look0';   // an ear twitches, the head tilts
+    else if (a.state === 'sniff') a.frame = Math.floor(t / 0.22) % 2 ? 'sniff1' : 'sniff0';
+    else a.frame = 'stand';
+    if (t >= a.until) {
+      if (Math.random() < 0.35) tanukiStop(a, t);
+      else { a.state = 'trot'; a.until = t + rnd(1.2, 3.5); a.speed = O.tanukiSpeed * rnd(0.8, 1.2); }
+    }
+  }
+  if (a.state === 'trot' && (a.dir > 0 ? a.x > W + a.unit * 3 : a.x < -a.unit * 3)) a.gone = true;
+}
+/* The kit keeps close behind its mother, hurrying to catch up, and copies
+   what she does when she stops (a moment later). */
+function updateKit(a, t, dt) {
+  var m = a.mother, mGone = !m || m.gone, gap = mGone ? Infinity : (m.x - a.x) * a.dir, want = mGone ? 0 : m.unit * 1.5;
+  var mPx = O.tanukiSpeed * (mGone ? a.unit / 0.7 : m.unit);
+  if (mGone || gap > want * 1.1 || (m.state === 'trot' && gap > want * 0.7)) {
+    var px = mPx * (gap > want * 1.8 ? 1.4 : (!mGone && m.state === 'trot' ? m.speed / O.tanukiSpeed : 1));
+    a.state = 'trot';
+    stepOn(a, px / a.unit, GAITS.trot, 'trot', 10, dt);
+    a.copyAt = t + rnd(0.3, 0.7);
+    a.sniffy = Math.random() < 0.6;
+    if (mGone && (a.dir > 0 ? a.x > W + a.unit * 3 : a.x < -a.unit * 3)) a.gone = true;
+  } else if (m.state === 'trot') { a.state = 'stand'; a.frame = 'stand'; }   // close enough: waits for her to get ahead
+  else if (t >= a.copyAt) {
+    a.state = m.state;
+    if (m.state === 'look') a.frame = Math.floor(t / 0.7 + a.seed) % 2 ? 'look1' : 'look0';
+    else if (m.state === 'sniff' && a.sniffy) a.frame = Math.floor(t / 0.2) % 2 ? 'sniff1' : 'sniff0';
+    else a.frame = 'stand';
+  }
+}
+function updateAnimals(t, dt) {
+  if (!trees.length || !H) return;
+  if (!deerNext) { deerNext = t + 3; tanukiNext = t + 9; }   // the first ones come soon after the page opens
+  var anyDeer = false, anyTanuki = false, i, a;
+  for (i = 0; i < animals.length; i++) { a = animals[i]; a.unit = animUnitPx(a.kind, a.variant, a.k); if (a.kind === 'deer') anyDeer = true; else anyTanuki = true; }
+  if (O.deerOn && !anyDeer && t >= deerNext) spawnHerd(t);
+  if (O.tanukiOn && !anyTanuki && t >= tanukiNext) spawnTanuki(t);
+  // a herd that is going to be startled: once it is all in view, some time later
+  var herds = {};
+  animals.forEach(function (x) { if (x.herd) herds[x.herd.id] = x.herd; });
+  for (var id in herds) {
+    var hd = herds[id], live = hd.members.filter(function (x) { return !x.gone; });
+    if (hd.spookAt === -1 && live.length && live.every(function (x) { return x.state !== 'prep' && onScreen(x); })) hd.spookAt = t + rnd(3, 15);
+    if (t >= hd.spookAt && hd.spookAt > 0) {
+      live.forEach(function (x, j) {
+        if (x.state === 'run' || x.state === 'alarm') return;
+        x.state = 'alarm'; x.runAt = t + rnd(0.15, 0.5) + j * rnd(0.05, 0.25); x.runSpeed = rnd(0.9, 1.1);
+      });
+      hd.spookAt = Infinity;
+    }
+  }
+  for (i = 0; i < animals.length; i++) { a = animals[i]; if (a.kind === 'deer') updateDeer(a, t, dt); else updateTanuki(a, t, dt); }
+  var before = animals.length;
+  animals = animals.filter(function (x) { return !x.gone; });
+  if (animals.length < before) {
+    var keep = {};                                    // free the frames of those that have gone
+    animals.forEach(function (x) { keep[x.set.key] = animSets[x.set.key]; });
+    animSets = keep;
+    animQueue = animQueue.filter(function (q) { return keep[q[0].key] === q[0]; });
+    if (anyDeer && !animals.some(function (x) { return x.kind === 'deer'; })) deerNext = t + O.deerEvery * rnd(0.6, 1.4);
+    if (anyTanuki && !animals.some(function (x) { return x.kind === 'tanuki'; })) tanukiNext = t + O.tanukiEvery * rnd(0.6, 1.4);
+  }
+}
+/* Those in this slot ('A' behind the far tree, 'B' between the trees, 'C'
+   in front of the near tree), further back first: a soft shadow on the
+   ground, the animal, then the leaves round its feet over its hooves. */
+function drawAnimals(c, slot) {
+  if (!animals.length) return;
+  var list = animals.filter(function (a) { return a.state !== 'prep' && owlSlot(a.k) === slot; }).sort(function (a, b) { return a.k - b.k; });
+  for (var i = 0; i < list.length; i++) {
+    var a = list[i], S = a.set, spr = S.frames[a.frame] || S.frames.stand || S.frames.stand0;
+    if (!spr) continue;
+    var fy = groundY(a.k), sc = a.unit / animUnitPx(S.kind, S.variant, S.k), deer = a.kind === 'deer';
+    var hz = animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    c.save();
+    c.translate(a.x + a.dir * a.unit * (deer ? 0.05 : 0), fy + 1); c.scale(sx, sy);
+    var g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, 'rgba(30,16,20,' + (0.3 * (1 - hz)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(30,16,20,0)');
+    c.fillStyle = g; c.fillRect(-1, -1, 2, 2);
+    c.restore();
+    c.setTransform(PR * a.dir * sc, 0, 0, PR * sc, a.x * PR, fy * PR);
+    c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
+    // the fallen leaves just in front of its feet
+    var x0 = Math.max(0, Math.floor((a.x - a.unit * 1.2) * PR)), x1 = Math.min(GRDL.cnv.width, Math.ceil((a.x + a.unit * 1.2) * PR));
+    var y0 = Math.max(0, Math.floor((fy - a.unit * 0.05 - grdTop) * PR)), y1 = Math.min(GRDL.cnv.height, Math.ceil((fy + 4 - grdTop) * PR));
+    if (x1 > x0 && y1 > y0) {
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.drawImage(GRDL.cnv, x0, y0, x1 - x0, y1 - y0, x0, y0 + Math.round(grdTop * PR), x1 - x0, y1 - y0);
+    }
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+function animStatus() {
+  var deer = animals.filter(function (a) { return a.kind === 'deer'; }), tan = animals.filter(function (a) { return a.kind === 'tanuki'; });
+  var WORDS = { prep: 'getting ready', walk: 'walking', lower: 'grazing', graze: 'grazing', raise: 'looking up', look: 'looking',
+                alarm: 'startled', run: 'running', trot: 'scurrying', sniff: 'sniffing', stand: 'standing' };
+  function doing(list) {
+    var c = {};
+    list.forEach(function (a) { var w = WORDS[a.state] || a.state; c[w] = (c[w] || 0) + 1; });
+    return Object.keys(c).map(function (w) { return c[w] + ' ' + w; }).join(', ');
+  }
+  return 'Deer: ' + (deer.length ? doing(deer) : (O.deerOn ? 'next herd in ' + Math.max(0, Math.ceil(deerNext - nowT)) + ' s' : 'off')) +
+         ' · Tanuki: ' + (tan.length ? doing(tan) : (O.tanukiOn ? 'next in ' + Math.max(0, Math.ceil(tanukiNext - nowT)) + ' s' : 'off'));
+}
+
+/* ============================================================
    11. FRAME
    ============================================================ */
 function resize() {
@@ -2677,6 +3463,7 @@ function rebuildAll() {
   bakeNear();
   if (!pile.length) buildBed(); else placeFloor();
   bakeOwlSprites();
+  resetAnimSets();
 }
 
 var last = 0, statusT = -1;
@@ -2690,8 +3477,10 @@ function frame(now) {
   if (falling.length < V.falling && Math.random() < 0.08) spawnFalling(false);
   moveFalling(t, dt);
   updateOwl(t, dt);
+  updateAnimals(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
-  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = owlStatus(t); }
+  bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = owlStatus(t) + '  ·  ' + animStatus(); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -2717,6 +3506,7 @@ function frame(now) {
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
   // The owl when it is further away than the far tree: behind both trees.
+  drawAnimals(ctx, 'A');
   drawOwl(ctx, 'A');
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
@@ -2742,6 +3532,7 @@ function frame(now) {
   }
 
   // The owl on the far tree's branch, or flying between the two trees.
+  drawAnimals(ctx, 'B');
   drawOwl(ctx, 'B');
 
   // Leaves further back fall behind the near tree.
@@ -2764,6 +3555,7 @@ function frame(now) {
   ctx.globalAlpha = 1;
 
   // The owl on the near tree's branch, or just leaving it / about to land on it.
+  drawAnimals(ctx, 'C');
   drawOwl(ctx, 'C');
 
   // Mid-depth leaves: in front of the near tree, but still behind the text and table.
