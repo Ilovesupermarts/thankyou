@@ -294,16 +294,16 @@ var TREE = {
    ============================================================ */
 var LOOKS = [['fukurou', 'フクロウ (Ural owl): round head, dark eyes'], ['konohazuku', 'コノハズク (scops owl): ear tufts, orange eyes']];
 var OWL_COLOURS = {
-  fukurou:    { back: '#907B6A', wing: '#6F5C4F', chest: '#E2CFBC', streak: '#76604F', face: '#E2D2C3',
-                rim: '#6A5446', eye: '#2B2226', beak: '#E3C27E', feet: '#D3C5B2' },
-  konohazuku: { back: '#8F7C66', wing: '#6E5D4C', chest: '#C2B096', streak: '#544438', face: '#B5A48D',
-                rim: '#54443A', eye: '#F0A020', beak: '#5C4D44', feet: '#BBA98F' }
+  fukurou:    { back: '#8B6B52', wing: '#6A4E3C', spot: '#F1E2CC', chest: '#EFE2CF', streak: '#6A4632', face: '#DCCDB9',
+                rim: '#5A3F2E', eye: '#1C130F', beak: '#F2C661', feet: '#E6D8C2', under: '#F3E9DA' },
+  konohazuku: { back: '#8E7556', wing: '#6B563F', spot: '#E8D5B2', chest: '#D3BE9C', streak: '#3B2C20', face: '#C4AC88',
+                rim: '#3E2E22', eye: '#F7A21B', beak: '#4C4038', feet: '#CDBA98', under: '#E6D6B8' }
 };
-var COLOUR_NAMES = [['back', 'Back'], ['wing', 'Wings'], ['chest', 'Chest'], ['streak', 'Streaks'], ['face', 'Face'],
-                    ['rim', 'Face rim'], ['eye', 'Eyes'], ['beak', 'Beak'], ['feet', 'Feet']];
+var COLOUR_NAMES = [['back', 'Back'], ['wing', 'Wings'], ['spot', 'Pale markings'], ['chest', 'Chest'], ['streak', 'Streaks'], ['face', 'Face'],
+                    ['rim', 'Face rim'], ['eye', 'Eyes'], ['beak', 'Beak'], ['feet', 'Feet'], ['under', 'Under the wings']];
 var ODEF = {
   // look
-  look: 'fukurou', size: 0.075, strength: 0.85, lampGlow: 0.7, colours: clone(OWL_COLOURS),
+  look: 'fukurou', size: 0.085, strength: 0.95, vivid: 1.15, lampGlow: 0.8, colours: clone(OWL_COLOURS),
   // the branch it sits on
   branchHeight: 0.3, branchLength: 0.2, branchAngle: 8, perchAt: 0.7, branchLeaves: 3, branchBounce: 1, owlWeight: 1,
   // timing
@@ -317,7 +317,7 @@ var ODEF = {
   // extras
   headTurn: false, headEvery: 12, hoot: false, hootEvery: 40, hootVolume: 0.6, hootPitch: 0
 };
-var STORE_KEY = 'owlLabValues1';
+var STORE_KEY = 'owlLabValues2';   // 2: the 3D owl (new colours and values)
 var O = clone(ODEF);
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
@@ -336,6 +336,7 @@ var GROUPS = [
       hint: 'Its height sitting. On the far tree it is 0.6 of this, like the tree itself.' },
     { k: 'strength', label: 'Strength against the paper', min: 0.3, max: 1, step: 0.05, re: 'owl',
       hint: 'Lower = paler and softer, like the trunks (which are 0.5).' },
+    { k: 'vivid', label: 'Colour richness', min: 0.6, max: 1.8, step: 0.05, re: 'owl', hint: '1 = the colours as picked; higher = richer.' },
     { k: 'lampGlow', label: 'Warm lamp light from below', min: 0, max: 1.5, step: 0.05, re: 'owl' },
     { type: 'colours', re: 'owl' }
   ]},
@@ -480,7 +481,7 @@ var NOW_BTNS = [
   ['Next: far tree', function () { if (owl) owl.next = 1; }],
   ['Next: random', function () { if (owl) owl.next = undefined; }],
   ['Blink', function () { if (owl && owl.state === 'perch' && owl.blinkT0 < 0) owl.blinkAt = nowT; }],
-  ['Turn head', function () { if (owl && owl.state === 'perch') { owl.head = Math.random() < 0.5 ? -1 : 1; owl.headUntil = nowT + 2.5; } }],
+  ['Turn head', function () { if (owl && owl.state === 'perch') { owl.headT = Math.random() < 0.5 ? -2 : 2; owl.headUntil = nowT + 2.5; } }],
   ['Hoot', function () { hootNow(); }]
 ];
 
@@ -503,7 +504,7 @@ function buildCopyText() {
   L.push('/* Owl — values from landscape.html */');
   L.push('');
   L.push('Look: ' + (look ? look[1] : O.look) + '; size ' + Number(O.size).toFixed(3) + ' × screen height; strength ' + f2(O.strength) +
-         '; lamp light ' + f2(O.lampGlow));
+         '; colour richness ' + f2(O.vivid) + '; lamp light ' + f2(O.lampGlow));
   L.push('Colours: ' + COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + col[cn[0]]; }).join(', '));
   L.push('Branch: ' + f2(O.branchHeight) + ' up the tree, length ' + f2(O.branchLength) + ', ' + O.branchAngle + '° above level, owl at ' +
          f2(O.perchAt) + ' along it, ' + O.branchLeaves + ' leaves at the tip, bounce ' + f2(O.branchBounce) + ', sag ' + f2(O.owlWeight));
@@ -1713,22 +1714,29 @@ function drawPile(c, t) {
    sticks out of either tree (section 6, addPerch), blinks now and then,
    and at a random moment flies off into the distance; after a set time
    it comes back and lands on one of the two branches at random.
+   It is built in 3D: a body, a head, two wings, a tail and legs, each
+   covered in its own feathers (streaked chest, spotted back, barred
+   flight feathers, rows of coverts, a face disc with glossy eyes). It is
+   posed — turned, tilted, wings anywhere in the wingbeat — lit (the
+   moonlit sky from above, the warm lamps from below, a rim of light round
+   its edges) and projected flat. So it turns round for real when it
+   takes off, and its wings foreshorten and catch the light as they beat.
    Depth of field: the further away it is, the smaller, softer, hazier
    and fainter it is drawn — sharp on the near branch, as soft as the far
-   tree on the far branch, and gone over the mountains. It is drawn in
-   the same soft way as the trees (flat shapes, no outlines, mixed toward
-   the paper by its strength) and lit from below by the same warm lamps.
-   Going away it is seen from behind, coming back from the front.
-   Sprites are baked once (redone when a value changes): the sitting
-   poses at the two branch depths, the flying poses at OWL_STEPS depths.
+   tree on the far branch, and gone over the mountains.
+   Sitting poses are baked at the two branch depths; small flying poses
+   at OWL_STEPS depths, a few per frame in the background. Close up —
+   taking off, turning, landing — it is drawn afresh every frame.
    ============================================================ */
 function rnd(a, b) { return a + Math.random() * (b - a); }
 var HAS_FILTER = typeof ctx.filter === 'string';
-var OWL_FRAMES = 8, OWL_GLIDE = 8, OWL_LAND = 9;   // flying sprites: 8 wingbeat frames, a glide, wings up with legs down
-var OWL_STEPS = 14;                                  // the depths the flying sprites are baked at
-var SIT_BOX = [-0.52, -1.18, 0.52, 0.09];           // sprite bounds in owl units: height 1, feet at (0, 0)
-var FLY_BOX = [-1.22, -1.52, 1.22, 0.5];
-var owlSit = [], owlFly = [], owl = null, OWLTMP = mk();
+var OWL_FRAMES = 12, OWL_GLIDE = 12;                 // baked flying sprites: 12 wingbeat frames and a glide
+var OWL_STEPS = 9, KLIVE = 0.42;                     // smaller than KLIVE it uses sprites baked at OWL_STEPS depths
+var SIT_BOX = [-0.62, -1.3, 0.62, 0.14];            // sprite bounds in owl units: height 1, feet at (0, 0)
+var FLY_BOX = [-1.42, -1.95, 1.42, 0.85];
+var HEAD_YAWS = [-0.75, -0.38, 0, 0.38, 0.75];       // the head turns through these (radians)
+var OWL_ELEV = 0.72;                                 // in flight it is seen this far from above (going away) or below (coming back)
+var owlSit = [], owlFly = [], owlQueue = [], owl = null, OWLTMP = mk(), OWLOUT = mk(), owlPal = {}, owlLiveSpr = null, owlLiveN = 0;
 var TREE_NAMES = ['near tree', 'far tree'];
 
 /* How it looks at size k (1 on the near branch, FAR_SCALE on the far one,
@@ -1740,307 +1748,659 @@ function owlBlur(k) {
 function owlHaze(k) { return O.haze * Math.pow(clamp((1 - k) / (1 - O.farthest), 0, 1), 1.5); }
 function owlAlpha(k) { return smooth(O.farthest, Math.max(O.fadeFrom, O.farthest + 0.01), k); }
 function owlSlot(k) { return k >= 0.9 ? 'C' : (k >= FAR_SCALE * 0.97 ? 'B' : 'A'); }
+function owlLod(k) { return clamp(O.size * H * k * PR / 110, 0.25, 1); }   // fewer, simpler feathers when small
 
-/* Its colours at size k: mixed toward the paper by its strength (paler on
-   the far tree, as the far tree is), the time-of-day light, a touch of the
-   lamps, and the night haze with distance. */
+/* Its colours at size k: the chosen colours made a little more vivid, then
+   (after lighting, in fin) mixed toward the paper by its strength (paler
+   on the far tree, as the far tree is), a touch of the night, and the
+   night haze with distance. */
+function vivid(c, s) { var l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11; return [l + (c[0] - l) * s, l + (c[1] - l) * s, l + (c[2] - l) * s]; }
 function owlPalette(k) {
   var src = O.colours[O.look] || OWL_COLOURS.fukurou, P = {};
   var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.strength * lerp(1, TREE.farOpacity, far);
-  var hz = owlHaze(k), mist = light(cols().mist);
-  function tone(c) {
-    var o = light(mix(c, PAPER, 1 - str));
-    if (isNight()) o = mix(o, LAMP, O.lampGlow * 0.06);
+  var hz = owlHaze(k), mist = light(cols().mist), night = isNight();
+  for (var key in OWL_COLOURS.fukurou) P[key] = vivid(hex(src[key] || OWL_COLOURS.fukurou[key]), O.vivid);
+  P.lid = mix(scale(P.face, 0.86), [200, 150, 150], 0.18);
+  P.fin = function (c) {
+    var o = mix(c, PAPER, 1 - str);
+    if (night) o = mix(o, [60, 52, 96], 0.06);
     return mix(o, mist, hz);
-  }
-  for (var key in src) P[key] = tone(hex(src[key]));
-  P.lid = mix(P.face, P.rim, 0.3);
-  P.dark = tone(scale(hex(src.rim), 0.55));
-  P.pupil = tone([20, 16, 18]);
-  P.shine = mix([255, 246, 232], mist, hz);
+  };
+  P.lamp = night ? O.lampGlow : 0.25;
   P.hz = hz;
   return P;
 }
-
-/* ---------- Drawing, in owl units (height 1, feet at 0, 0, y down) ---------- */
-function owlBodyPath(c, tufts) {
-  c.beginPath();
-  c.moveTo(0, 0);
-  c.bezierCurveTo(0.17, 0, 0.31, -0.12, 0.31, -0.32);
-  c.bezierCurveTo(0.31, -0.5, 0.25, -0.58, 0.26, -0.66);
-  if (tufts) {                                       // コノハズク: a flatter crown between two ear tufts
-    c.bezierCurveTo(0.28, -0.78, 0.28, -0.9, 0.25, -0.97);
-    c.quadraticCurveTo(0.27, -1.06, 0.23, -1.13);
-    c.quadraticCurveTo(0.16, -1.02, 0.1, -0.97);
-    c.quadraticCurveTo(0, -0.94, -0.1, -0.97);
-    c.quadraticCurveTo(-0.16, -1.02, -0.23, -1.13);
-    c.quadraticCurveTo(-0.27, -1.06, -0.25, -0.97);
-    c.bezierCurveTo(-0.28, -0.9, -0.28, -0.78, -0.26, -0.66);
-  } else {                                           // フクロウ: a big round head
-    c.bezierCurveTo(0.29, -0.76, 0.29, -0.99, 0, -1.0);
-    c.bezierCurveTo(-0.29, -0.99, -0.29, -0.76, -0.26, -0.66);
-  }
-  c.bezierCurveTo(-0.25, -0.58, -0.31, -0.5, -0.31, -0.32);
-  c.bezierCurveTo(-0.31, -0.12, -0.17, 0, 0, 0);
-  c.closePath();
+function owlPaletteCached(k) {
+  var key = Math.round(k * 200);
+  if (!owlPal[key]) owlPal[key] = owlPalette(k);
+  return owlPal[key];
 }
-/* An eye. eyes: 0 open, 1 half shut, 2 shut (the upper lid comes down). */
-function owlEye(c, P, x, y, r, eyes, pupil) {
-  c.beginPath(); c.arc(x, y, r * 1.35, 0, TAU);       // a darker socket, so the eye reads when small
-  c.fillStyle = rgb(mix(P.face, P.rim, 0.45)); c.fill();
-  if (eyes < 2) {
-    c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = rgb(P.eye); c.fill();
-    if (pupil) { c.beginPath(); c.arc(x, y, r * 0.48, 0, TAU); c.fillStyle = rgb(P.pupil); c.fill(); }
-    c.beginPath(); c.arc(x + r * 0.3, y - r * 0.32, r * 0.24, 0, TAU); c.fillStyle = rgb(P.shine, 0.85); c.fill();
+
+/* ---------- A little 3D ----------
+   In the owl's own space x is its right, y up, z its front; owl units
+   (height 1 sitting). The view turns it (yaw) and tilts it toward us
+   (elev: + shows its top); the body centre lands at (0, -0.42) on the
+   sprite, so the feet of the sitting owl are at (0, 0). */
+function vAdd(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+function vSub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function vMul(a, k) { return [a[0] * k, a[1] * k, a[2] * k]; }
+function vMad(a, b, k) { return [a[0] + b[0] * k, a[1] + b[1] * k, a[2] + b[2] * k]; }
+function vDot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function vCross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function vNorm(a) { var l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+var OV = { cy: 1, sy: 0, ce: 1, se: 0 };
+function setView(yaw, elev) { OV.cy = Math.cos(yaw); OV.sy = Math.sin(yaw); OV.ce = Math.cos(elev); OV.se = Math.sin(elev); }
+function tv(p) {                                     // into view space (a turn, then a tilt)
+  var x = p[0] * OV.cy + p[2] * OV.sy, z = -p[0] * OV.sy + p[2] * OV.cy;
+  return [x, p[1] * OV.ce - z * OV.se, p[1] * OV.se + z * OV.ce];
+}
+function sp(p) { var v = tv(p); return [v[0], -v[1] - 0.42]; }   // onto the sprite
+/* The flat outline of an ellipsoid (centre c, three axis vectors). */
+function projEllipse(c, A, B, C) {
+  var p = sp(c), a = tv(A), b = tv(B), d = tv(C);
+  var sxx = a[0] * a[0] + b[0] * b[0] + d[0] * d[0], syy = a[1] * a[1] + b[1] * b[1] + d[1] * d[1];
+  var sxy = -(a[0] * a[1] + b[0] * b[1] + d[0] * d[1]);
+  var tr = (sxx + syy) / 2, df = Math.sqrt(Math.max(0, tr * tr - (sxx * syy - sxy * sxy)));
+  return { x: p[0], y: p[1], rx: Math.sqrt(tr + df), ry: Math.sqrt(Math.max(1e-6, tr - df)), rot: 0.5 * Math.atan2(2 * sxy, sxx - syy) };
+}
+/* Light on a surface facing nv (view space, toward us): the night sky from
+   above left, the warm lamps from below, a rim of light at the edges
+   (warm underneath, cool on top). occ < 1 darkens it (in shadow). */
+var OWL_LM = vNorm([-0.45, 0.8, 0.45]), OWL_LL = vNorm([0.3, -0.8, 0.5]);
+function owlLit(base, nv, P, occ) {
+  var m = Math.max(0, vDot(nv, OWL_LM)), l = Math.max(0, vDot(nv, OWL_LL)), f = clamp(nv[2], 0, 1);
+  var rim = Math.pow(1 - f, 3), g = P.lamp, a = (occ === undefined ? 1 : occ) * (0.5 + 0.2 * f + 0.42 * m);
+  var warm = rim * clamp(0.25 - nv[1], 0, 1) * g, cool = rim * clamp(nv[1] + 0.35, 0, 1) * 0.45;
+  return P.fin([base[0] * (a + l * g * 0.6) + warm * 150 + cool * 70,
+                base[1] * (a + l * g * 0.44) + warm * 88 + cool * 80,
+                base[2] * (a + l * g * 0.26) + warm * 40 + cool * 108]);
+}
+var owlDirSets = {};
+function owlDirs(n, seed) {                          // n directions spread evenly over a sphere, a little jittered
+  var key = n + ':' + seed;
+  if (!owlDirSets[key]) {
+    var r = rngFrom(seed), out = [], g = PI * (3 - Math.sqrt(5));
+    for (var i = 0; i < n; i++) {
+      var y = 1 - 2 * (i + 0.5) / n, rr = Math.sqrt(1 - y * y), a = g * i + (r() - 0.5) * 0.5;
+      out.push({ u: [Math.cos(a) * rr, y, Math.sin(a) * rr], j: r(), j2: r(), j3: r() });
+    }
+    owlDirSets[key] = out;
   }
+  return owlDirSets[key];
+}
+
+/* ---------- Feathers ----------
+   One feather: a rounded blade from base b to tip t (owl space), w its
+   half-width vector. Returns the three points of its tip, for the fringe. */
+function featherPath(c, b, t, w) {
+  var d = vSub(t, b);
+  var p0 = sp(vMad(b, w, 0.5)), p1 = sp(vMad(vMad(b, w, 0.5), d, 0.6)), p2 = sp(vMad(t, w, 0.55)), pt = sp(t);
+  var q2 = sp(vMad(t, w, -0.55)), q1 = sp(vMad(vMad(b, w, -0.5), d, 0.6)), q0 = sp(vMad(b, w, -0.5));
+  c.beginPath();
+  c.moveTo(p0[0], p0[1]);
+  c.bezierCurveTo(p1[0], p1[1], p2[0], p2[1], pt[0], pt[1]);
+  c.bezierCurveTo(q2[0], q2[1], q1[0], q1[1], q0[0], q0[1]);
+  c.closePath();
+  return [p2, pt, q2];
+}
+function fringe(c, tip, col, a) {                    // the paler edge at a feather's tip
+  c.strokeStyle = rgb(col, a);
+  c.beginPath(); c.moveTo(tip[0][0], tip[0][1]); c.quadraticCurveTo(tip[1][0], tip[1][1], tip[2][0], tip[2][1]); c.stroke();
+}
+/* Bands across a feather, kept inside its width. */
+function featherBars(c, b, t, w, n, col, a) {
+  c.fillStyle = rgb(col, a);
+  for (var i = 0; i < n; i++) {
+    var s0 = (i + 0.3) / (n + 0.6), s1 = s0 + 0.45 / (n + 0.6), k = s1 > 0.8 ? 0.6 : 0.88;
+    var p = [sp(vMad(vMad(b, vSub(t, b), s0), w, 0.88)), sp(vMad(vMad(b, vSub(t, b), s1), w, k)),
+             sp(vMad(vMad(b, vSub(t, b), s1), w, -k)), sp(vMad(vMad(b, vSub(t, b), s0), w, -0.88))];
+    c.beginPath(); c.moveTo(p[0][0], p[0][1]);
+    for (var k = 1; k < 4; k++) c.lineTo(p[k][0], p[k][1]);
+    c.closePath(); c.fill();
+  }
+}
+function featherShaft(c, b, t, col, a) {             // the quill down the middle
+  var p = sp(vMad(b, vSub(t, b), 0.08)), q = sp(vMad(b, vSub(t, b), 0.92));
+  c.strokeStyle = rgb(col, a);
+  c.beginPath(); c.moveTo(p[0], p[1]); c.lineTo(q[0], q[1]); c.stroke();
+}
+
+/* ---------- Body ----------
+   An egg of feathers: the pale chest with dark streaks in front, the
+   spotted back behind, and (sitting) the folded wings down the sides. The
+   feathers overlap from the head down, like real plumage. */
+function drawBody(c, P, F, lod) {
+  var tufts = O.look === 'konohazuku';
+  var e = projEllipse(F.O, vMul(F.X, F.rx), vMul(F.A, F.ra), vMul(F.D, F.rd));
+  // underneath: pale where the chest faces us, brown elsewhere, so no gap between feathers shows dark
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 0.97, e.ry * 0.97, e.rot, 0, TAU);
+  var cf = tv(F.D)[2], cp = sp(vMad(F.O, F.D, F.rd * 0.8)), back0 = rgb(owlLit(scale(P.back, 0.78), [0, 0, 1], P));
+  if (cf > 0.05) {
+    var gb = c.createRadialGradient(cp[0], cp[1], 0, cp[0], cp[1], Math.max(e.rx, e.ry) * 0.95);
+    gb.addColorStop(0, rgb(owlLit(mix(P.chest, P.back, 0.15), [0, 0, 1], P))); gb.addColorStop(0.55 * cf + 0.1, rgb(owlLit(mix(P.chest, P.back, 0.35), [0, 0, 1], P)));
+    gb.addColorStop(1, back0);
+    c.fillStyle = gb;
+  } else c.fillStyle = back0;
+  c.fill();
+  var dirs = owlDirs(270, 11), list = [], down = vMul(F.A, -1), i;
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i];
+    if (d.j > lod + 0.08) continue;
+    var u = d.u;                                     // (its right, along the body toward the head, its front)
+    var p = vAdd(vAdd(vMad(F.O, F.X, F.rx * u[0]), vMul(F.A, F.ra * u[1])), vMul(F.D, F.rd * u[2]));
+    var n = vNorm(vAdd(vAdd(vMul(F.X, u[0] / F.rx), vMul(F.A, u[1] / F.ra)), vMul(F.D, u[2] / F.rd)));
+    var nv = tv(n);
+    if (nv[2] < 0.02) continue;
+    list.push({ d: d, u: u, p: p, n: n, nv: nv });
+  }
+  list.sort(function (a, b) { return a.u[1] - b.u[1]; });   // from the tail end up: the higher feathers lie over the lower
+  var sz = 1.08 / Math.sqrt(Math.max(0.35, Math.min(1, lod + 0.08)));
+  c.lineWidth = 0.006;
+  for (i = 0; i < list.length; i++) {
+    var L = list[i], uu = L.u, side = Math.abs(uu[0]), front = uu[2], lat = uu[1];
+    var region = F.folded && side > 0.58 && front < 0.42 && lat < 0.75 ? 'wing' : (front > -0.08 ? 'chest' : 'back');
+    var fl = (region === 'wing' ? 0.16 : (region === 'chest' ? 0.13 : 0.12)) * sz, fw = fl * (region === 'wing' ? 0.7 : 0.98);
+    var t = vNorm(vSub(down, vMul(L.n, vDot(down, L.n))));
+    var w = vMul(vNorm(vCross(L.n, t)), fw * 0.5);
+    var b = vMad(vMad(L.p, t, -fl * 0.45), L.n, 0.004), tip = vMad(vMad(L.p, t, fl * 0.55), L.n, 0.014);
+    var base, occ = 1;
+    if (region === 'chest') {
+      base = mix(P.chest, P.back, clamp((0.1 - front) * 1.8, 0, 0.85));
+      if (lat < -0.45) base = mix(base, P.spot, 0.35);                   // the soft, pale belly
+      occ = 1 - 0.3 * smooth(0.4, 0.9, lat) * clamp(front * 2, 0, 1);   // in the shadow of the head
+    } else if (region === 'wing') base = mix(P.wing, P.back, L.d.j3 * 0.5);
+    else base = mix(P.back, P.wing, L.d.j3 * 0.35);
+    base = scale(base, 0.95 + L.d.j2 * 0.1);
+    featherPath(c, b, tip, w);
+    c.fillStyle = rgb(owlLit(base, L.nv, P, occ));
+    c.fill();
+    var mark = L.d.j2;
+    if (region === 'chest' && mark > 0.3 && front > 0.15) {           // a dark streak down the feather, tapered at both ends
+      featherPath(c, vMad(b, vSub(tip, b), 0.3), vMad(b, vSub(tip, b), 0.92), vMul(w, tufts ? 0.16 : 0.22));
+      c.fillStyle = rgb(owlLit(P.streak, L.nv, P, occ), 0.8); c.fill();
+      c.strokeStyle = c.fillStyle;
+      if (tufts) {                                                   // the scops owl's fine cross-bars
+        var m0 = sp(vMad(vMad(b, vSub(tip, b), 0.58), w, 0.42)), m1 = sp(vMad(vMad(b, vSub(tip, b), 0.58), w, -0.42));
+        c.strokeStyle = rgb(owlLit(P.streak, L.nv, P, occ), 0.45); c.lineWidth = fw * 0.05;
+        c.beginPath(); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]); c.stroke();
+      }
+      c.lineWidth = 0.006;
+    } else if (region !== 'chest' && mark > (region === 'wing' ? 0.45 : 0.62)) {   // a pale spot near the tip
+      var sc = sp(vMad(b, vSub(tip, b), 0.68)), sr = Math.hypot(sp(vAdd(b, w))[0] - sp(b)[0], sp(vAdd(b, w))[1] - sp(b)[1]);
+      c.fillStyle = rgb(owlLit(P.spot, L.nv, P), 0.85);
+      c.beginPath(); c.ellipse(sc[0], sc[1], sr * 0.42, sr * 0.3, 0, 0, TAU); c.fill();
+    }
+    if (lod > 0.55) fringe(c, [sp(vMad(tip, w, 0.55)), sp(tip), sp(vMad(tip, w, -0.55))], owlLit(scale(base, 1.25), L.nv, P), 0.2);
+  }
+  roundness(c, e, 0.4);
+}
+/* Shade toward the edges of an outline (e: a projected ellipse), so the
+   feathers read as one rounded form. */
+function roundness(c, e, a) {
+  c.save();
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 1.06, e.ry * 1.06, e.rot, 0, TAU); c.clip();
+  c.translate(e.x, e.y); c.rotate(e.rot); c.scale(e.rx, e.ry);
+  var g = c.createRadialGradient(-0.22, -0.25, 0.1, -0.1, -0.1, 1.25);
+  g.addColorStop(0, 'rgba(255,244,230,0.08)'); g.addColorStop(0.55, 'rgba(30,16,20,0)'); g.addColorStop(1, 'rgba(30,16,20,' + a + ')');
+  c.fillStyle = g; c.fillRect(-1.2, -1.2, 2.4, 2.4);
+  c.restore();
+}
+
+/* ---------- Head and face ---------- */
+function headFrame(F, yaw, ps) {
+  var tufts = O.look === 'konohazuku';
+  return { H: vAdd(vMad(F.O, F.A, 0.37), [0, 0.04 * ps, 0]), r: [Math.cos(yaw), 0, -Math.sin(yaw)], u: [0, 1, 0], f: [Math.sin(yaw), 0, Math.cos(yaw)],
+           rx: tufts ? 0.245 : 0.27, ry: tufts ? 0.21 : 0.23, rz: tufts ? 0.21 : 0.23 };
+}
+/* Map the face's flat plane (x right, y down, owl units) onto the sprite. */
+function faceFrame(c, Hd, depth) {
+  var o = sp(vMad(Hd.H, Hd.f, depth)), ex = tv(Hd.r), ey = tv(Hd.u);
+  c.transform(ex[0], -ex[1], -ey[0], ey[1], o[0], o[1]);
+}
+function drawHead(c, P, F, Hd, pose, lod) {
+  var tufts = O.look === 'konohazuku', i;
+  // a soft shadow under the head on the body and wings
+  var sh = projEllipse(vAdd(Hd.H, [0, -0.09, 0]), vMul(Hd.r, Hd.rx * 1.05), vMul(Hd.u, Hd.ry), vMul(Hd.f, Hd.rz));
+  c.save();
+  c.globalCompositeOperation = 'source-atop';
+  c.translate(sh.x, sh.y); c.rotate(sh.rot); c.scale(sh.rx, sh.ry);
+  var gs = c.createRadialGradient(0, 0, 0.3, 0, 0, 1.15);
+  gs.addColorStop(0, 'rgba(30,18,22,0.32)'); gs.addColorStop(1, 'rgba(30,18,22,0)');
+  c.fillStyle = gs; c.fillRect(-1.3, -1.3, 2.6, 2.6);
+  c.restore();
+  var e = projEllipse(Hd.H, vMul(Hd.r, Hd.rx), vMul(Hd.u, Hd.ry), vMul(Hd.f, Hd.rz));
+  c.beginPath(); c.ellipse(e.x, e.y, e.rx * 0.97, e.ry * 0.97, e.rot, 0, TAU);
+  c.fillStyle = rgb(owlLit(scale(P.back, 0.72), [0, 0, 1], P)); c.fill();
+  // the crown and the back of the head: small feathers flowing down and back
+  var dirs = owlDirs(200, 23), list = [], flow = vNorm(vAdd(vMul(Hd.u, -1), vMul(Hd.f, -0.55)));
+  for (i = 0; i < dirs.length; i++) {
+    var d = dirs[i], u = d.u;
+    if (d.j > lod + 0.08 || u[2] > 0.42) continue;                 // the face disc covers the front
+    var p = vAdd(vAdd(vMad(Hd.H, Hd.r, Hd.rx * u[0]), vMul(Hd.u, Hd.ry * u[1])), vMul(Hd.f, Hd.rz * u[2]));
+    var n = vNorm(vAdd(vAdd(vMul(Hd.r, u[0] / Hd.rx), vMul(Hd.u, u[1] / Hd.ry)), vMul(Hd.f, u[2] / Hd.rz)));
+    var nv = tv(n);
+    if (nv[2] < 0.02) continue;
+    list.push({ d: d, u: u, p: p, n: n, nv: nv });
+  }
+  list.sort(function (a, b) { return a.u[1] - b.u[1]; });
+  var sz = 1 / Math.sqrt(Math.max(0.35, Math.min(1, lod + 0.08)));
+  c.lineWidth = 0.005;
+  for (i = 0; i < list.length; i++) {
+    var L = list[i], fl = 0.08 * sz, fw = fl * 0.82;
+    var t = vNorm(vSub(flow, vMul(L.n, vDot(flow, L.n))));
+    var w = vMul(vNorm(vCross(L.n, t)), fw * 0.5);
+    var b = vMad(vMad(L.p, t, -fl * 0.45), L.n, 0.004), tip = vMad(vMad(L.p, t, fl * 0.55), L.n, 0.012);
+    var base = scale(mix(P.back, P.wing, L.d.j3 * 0.3), 0.95 + L.d.j2 * 0.1);
+    var tip3 = featherPath(c, b, tip, w);
+    c.fillStyle = rgb(owlLit(base, L.nv, P)); c.fill();
+    if (L.d.j2 > 0.55) {                                         // pale flecks on the crown
+      var s0 = sp(vMad(b, vSub(tip, b), 0.35)), s1 = sp(vMad(b, vSub(tip, b), 0.85));
+      c.strokeStyle = rgb(owlLit(P.spot, L.nv, P), 0.75); c.lineWidth = fw * 0.22;
+      c.beginPath(); c.moveTo(s0[0], s0[1]); c.lineTo(s1[0], s1[1]); c.stroke();
+      c.lineWidth = 0.005;
+    }
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.25), L.nv, P), 0.2);
+  }
+  roundness(c, e, 0.32);
+  if (tufts) {                                                   // ear tufts: a few long feathers each side
+    for (var s = -1; s <= 1; s += 2) for (i = 0; i < 5; i++) {
+      var bb = vAdd(vAdd(vMad(Hd.H, Hd.u, Hd.ry * 0.6), vMul(Hd.r, s * (0.08 + i * 0.022))), vMul(Hd.f, 0.05 - i * 0.008));
+      var tt = vAdd(vAdd(vMad(bb, Hd.u, 0.1 + (2 - Math.abs(i - 2)) * 0.02), vMul(Hd.r, s * (0.03 + i * 0.012))), vMul(Hd.f, -0.02));
+      var ww = vMul(vNorm(vCross(Hd.f, vSub(tt, bb))), 0.034);
+      var nt = tv(Hd.f), ntf = nt[2] < 0 ? vMul(nt, -1) : nt;
+      featherPath(c, bb, tt, ww);
+      c.fillStyle = rgb(owlLit(i % 2 ? P.streak : P.back, ntf, P)); c.fill();
+    }
+  }
+  var fz = tv(Hd.f)[2];
+  if (fz > 0.02) drawFace(c, P, Hd, pose.eyes, fz, lod);
+}
+function drawFace(c, P, Hd, eyes, fz, lod) {
+  var tufts = O.look === 'konohazuku', i, s, a;
+  var drx = tufts ? 0.19 : 0.215, dry = tufts ? 0.165 : 0.185, ex = tufts ? 0.075 : 0.08, re = tufts ? 0.056 : 0.047;
+  var fv = tv(Hd.f), lit = function (col, al) { return rgb(owlLit(col, fv, P), al); };
+  c.save();
+  faceFrame(c, Hd, Hd.rz * 0.72);
+  c.globalAlpha = smooth(0.02, 0.3, fz);
+  // the dark rim, then the disc: paler in the middle
+  c.beginPath(); c.ellipse(0, 0.004, drx + 0.02, dry + 0.018, 0, 0, TAU); c.fillStyle = lit(P.rim); c.fill();
+  var g = c.createRadialGradient(0, 0.02, 0.02, 0, 0, drx);
+  g.addColorStop(0, lit(scale(P.face, 1.04))); g.addColorStop(0.65, lit(P.face)); g.addColorStop(1, lit(scale(P.face, 0.8)));
+  c.beginPath(); c.ellipse(0, 0, drx, dry, 0, 0, TAU); c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  if (lod > 0.35) {                                               // fine feathers radiating from each eye
+    c.lineWidth = 0.0055;
+    for (s = -1; s <= 1; s += 2) for (i = 0; i < 28; i++) {
+      a = i / 28 * TAU + s * 0.1;
+      c.strokeStyle = lit(scale(P.face, 0.74 + (i % 3) * 0.06), 0.5);
+      c.beginPath(); c.moveTo(s * ex + Math.cos(a) * re * 1.6, Math.sin(a) * re * 1.6); c.lineTo(s * ex + Math.cos(a) * 0.17, Math.sin(a) * 0.15); c.stroke();
+    }
+    if (!tufts) {                                                 // フクロウ: faint rings round the eyes
+      c.strokeStyle = lit(P.rim, 0.16); c.lineWidth = 0.007;
+      for (s = -1; s <= 1; s += 2) for (i = 1; i <= 2; i++) { c.beginPath(); c.ellipse(s * ex, 0.005, re * (1.5 + i * 0.55), re * (1.4 + i * 0.5), 0, 0, TAU); c.stroke(); }
+    }
+  }
+  c.restore();
+  if (lod > 0.35) {                                               // the rim's short, dark feathers
+    c.lineWidth = 0.011;
+    for (i = 0; i < 64; i++) {
+      a = i / 64 * TAU;
+      c.strokeStyle = lit(scale(P.rim, 0.8 + (i % 4) * 0.12), 0.75);
+      c.beginPath(); c.moveTo(Math.cos(a) * drx * 0.97, Math.sin(a) * dry * 0.97); c.lineTo(Math.cos(a) * (drx + 0.026), Math.sin(a) * (dry + 0.022)); c.stroke();
+    }
+  }
+  // pale brows meeting over the beak
+  c.lineWidth = 0.012;
+  for (s = -1; s <= 1; s += 2) for (i = 0; i <= 10; i++) {
+    var q = i / 10, bx = lerp(lerp(s * 0.17, s * 0.075, q), lerp(s * 0.075, s * 0.012, q), q), by = lerp(lerp(-0.06, -0.095, q), lerp(-0.095, 0.03, q), q);
+    c.strokeStyle = lit(scale(P.spot, 0.95 + (i % 3) * 0.04), 0.9);
+    c.beginPath(); c.moveTo(bx, by); c.lineTo(bx + s * 0.018, by - 0.024); c.stroke();
+  }
+  for (s = -1; s <= 1; s += 2) drawEye(c, P, s * ex, 0.005, re, eyes, lit);
+  drawBeak(c, P, lit, lod);
+  c.restore();
+}
+/* A glossy eye: the iris, the pupil, the shadow of the brow, the warm
+   lamps reflected low, the sky as a bright window high, and a sparkle.
+   eyes: 0 open, 1 half shut, 2 shut (the upper lid comes down). */
+function drawEye(c, P, x, y, r, eyes, lit) {
+  var tufts = O.look === 'konohazuku', fade = 1 - P.hz * 0.7, i;
+  var g = c.createRadialGradient(x, y, r * 0.85, x, y, r * 1.6);   // the socket
+  g.addColorStop(0, lit(mix(P.face, P.rim, 0.8))); g.addColorStop(1, lit(mix(P.face, P.rim, 0.3), 0));
+  c.fillStyle = g; c.beginPath(); c.arc(x, y, r * 1.6, 0, TAU); c.fill();
+  c.save();
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.clip();
+  var gi = c.createRadialGradient(x - r * 0.15, y - r * 0.2, r * 0.05, x, y, r);
+  if (tufts) {
+    gi.addColorStop(0, rgb(P.fin(mix(P.eye, [255, 240, 170], 0.5)))); gi.addColorStop(0.55, rgb(P.fin(P.eye))); gi.addColorStop(1, rgb(P.fin(scale(P.eye, 0.55))));
+  } else {
+    gi.addColorStop(0, rgb(P.fin(mix(P.eye, [120, 80, 55], 0.35)))); gi.addColorStop(0.7, rgb(P.fin(P.eye))); gi.addColorStop(1, rgb(P.fin(scale(P.eye, 0.5))));
+  }
+  c.fillStyle = gi; c.fillRect(x - r, y - r, r * 2, r * 2);
+  if (tufts) {                                                   // fibres in the orange iris, and the round black pupil
+    c.lineWidth = r * 0.05;
+    for (i = 0; i < 26; i++) {
+      var a = i / 26 * TAU;
+      c.strokeStyle = rgb(P.fin(scale(P.eye, 0.6)), 0.35);
+      c.beginPath(); c.moveTo(x + Math.cos(a) * r * 0.5, y + Math.sin(a) * r * 0.5); c.lineTo(x + Math.cos(a) * r * 0.95, y + Math.sin(a) * r * 0.95); c.stroke();
+    }
+    c.beginPath(); c.arc(x, y + r * 0.02, r * 0.46, 0, TAU); c.fillStyle = rgb(P.fin([12, 8, 8])); c.fill();
+  } else {
+    c.beginPath(); c.arc(x, y + r * 0.02, r * 0.55, 0, TAU); c.fillStyle = rgb(P.fin([6, 4, 4]), 0.55); c.fill();
+  }
+  var gsh = c.createLinearGradient(0, y - r, 0, y + r * 0.1);       // the brow's shadow over the top
+  gsh.addColorStop(0, 'rgba(10,6,6,0.55)'); gsh.addColorStop(1, 'rgba(10,6,6,0)');
+  c.fillStyle = gsh; c.fillRect(x - r, y - r, r * 2, r * 1.1);
+  c.restore();
+  // reflections
+  c.lineWidth = r * 0.17;
+  c.strokeStyle = 'rgba(255,186,118,' + (0.6 * Math.min(1, P.lamp) * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(x, y, r * 0.74, 0.22 * PI, 0.78 * PI); c.stroke();
+  c.fillStyle = 'rgba(255,250,240,' + (0.88 * fade).toFixed(3) + ')';
+  c.beginPath(); c.ellipse(x - r * 0.3, y - r * 0.34, r * 0.3, r * 0.21, -0.5, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,255,255,' + (0.8 * fade).toFixed(3) + ')';
+  c.beginPath(); c.arc(x + r * 0.3, y - r * 0.1, r * 0.09, 0, TAU); c.fill();
+  c.strokeStyle = 'rgba(16,10,8,0.5)'; c.lineWidth = r * 0.1;
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.stroke();
   if (eyes > 0) {
-    var lidY = eyes === 1 ? y - r * 0.05 : y + r * 1.2;
+    var edge = eyes === 1 ? y - r * 0.05 : y + r * 1.15;
     c.save();
-    c.beginPath(); c.arc(x, y, r * 1.08, 0, TAU); c.clip();
-    c.fillStyle = rgb(P.lid); c.fillRect(x - r * 1.2, y - r * 1.2, r * 2.4, lidY - (y - r * 1.2));
+    c.beginPath(); c.arc(x, y, r * 1.14, 0, TAU); c.clip();
+    var gl = c.createLinearGradient(0, y - r, 0, edge);
+    gl.addColorStop(0, lit(scale(P.lid, 1.1))); gl.addColorStop(1, lit(scale(P.lid, 0.88)));
+    c.fillStyle = gl;
+    c.beginPath(); c.moveTo(x - r * 1.2, y - r * 1.2); c.lineTo(x + r * 1.2, y - r * 1.2); c.lineTo(x + r * 1.2, edge - r * 0.1);
+    c.quadraticCurveTo(x, edge + r * 0.28, x - r * 1.2, edge - r * 0.1); c.closePath(); c.fill();
+    c.strokeStyle = lit(scale(P.lid, 1.18), 0.5); c.lineWidth = r * 0.07;   // tiny feathers on the lid
+    for (i = -2; i <= 2; i++) { c.beginPath(); c.moveTo(x + i * r * 0.32, edge - r * 0.75); c.lineTo(x + i * r * 0.36, edge - r * 0.35); c.stroke(); }
     c.restore();
-    c.strokeStyle = rgb(P.dark, 0.8); c.lineWidth = r * 0.22;
+    c.strokeStyle = lit(scale(P.rim, 0.55)); c.lineWidth = r * 0.16;
     c.beginPath();
-    if (eyes === 1) { c.moveTo(x - r * 0.95, lidY - r * 0.1); c.quadraticCurveTo(x, lidY + r * 0.2, x + r * 0.95, lidY - r * 0.1); }
-    else { c.moveTo(x - r * 0.95, y - r * 0.05); c.quadraticCurveTo(x, y + r * 0.55, x + r * 0.95, y - r * 0.05); }
+    if (eyes === 1) { c.moveTo(x - r * 0.97, edge - r * 0.06); c.quadraticCurveTo(x, edge + r * 0.24, x + r * 0.97, edge - r * 0.06); }
+    else { c.moveTo(x - r, y + r * 0.05); c.quadraticCurveTo(x, y + r * 0.55, x + r, y + r * 0.05); }
     c.stroke();
   }
 }
-function owlBeak(c, P, x, y) {
+function drawBeak(c, P, lit, lod) {
+  var y0 = 0.035, i;
   c.beginPath();
-  c.moveTo(x - 0.026, y - 0.03);
-  c.quadraticCurveTo(x, y - 0.045, x + 0.026, y - 0.03);
-  c.quadraticCurveTo(x + 0.016, y + 0.02, x, y + 0.05);
-  c.quadraticCurveTo(x - 0.016, y + 0.02, x - 0.026, y - 0.03);
-  c.fillStyle = rgb(P.beak); c.fill();
-}
-/* Sitting, seen from the front. head: -1, 0, 1 (looking aside);
-   settle: wings still a little out, just after landing. */
-function paintSit(c, P, eyes, head, settle) {
-  var tufts = O.look === 'konohazuku', r = rngFrom(4242), i, j, s;
-  if (tufts) c.scale(0.92, 1);                       // the scops owl is slimmer
-  owlBodyPath(c, tufts);
-  c.fillStyle = rgb(P.back); c.fill();
-  // the pale chest, soft-edged, with dark streaks
-  c.save();
-  owlBodyPath(c, tufts); c.clip();
-  var g = c.createRadialGradient(0, -0.3, 0.04, 0, -0.3, 0.3);
-  g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.62, rgb(P.chest)); g.addColorStop(1, rgb(P.chest, 0));
-  c.fillStyle = g;
-  c.beginPath(); c.ellipse(0, -0.3, 0.24, 0.34, 0, 0, TAU); c.fill();
-  c.strokeStyle = rgb(P.streak, 0.75);
-  for (i = 0; i < 18; i++) {
-    var sx = (r() - 0.5) * 0.32, sy = lerp(-0.58, -0.1, r()), sl = lerp(0.04, 0.08, r()), lw = lerp(0.012, 0.02, r());
-    if ((sx * sx) / 0.029 + ((sy + 0.32) * (sy + 0.32)) / 0.09 > 1) continue;
-    c.lineWidth = lw;
-    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx * 1.08, sy + sl); c.stroke();
-    if (tufts) {                                     // fine cross-bars, like bark
-      c.lineWidth = 0.008;
-      c.beginPath(); c.moveTo(sx - 0.022, sy + sl * 0.5); c.lineTo(sx + 0.022, sy + sl * 0.5); c.stroke();
-    }
-  }
-  c.restore();
-  // the folded wings down both sides
-  var wo = settle ? 0.09 : 0;
-  for (s = -1; s <= 1; s += 2) {
-    c.beginPath();
-    c.moveTo(s * 0.2, -0.66);
-    c.bezierCurveTo(s * (0.34 + wo), -0.6, s * (0.35 + wo * 1.3), -0.24, s * (0.21 + wo * 0.6), 0.0);
-    c.bezierCurveTo(s * 0.2, -0.2, s * 0.18, -0.44, s * 0.2, -0.66);
-    c.closePath();
-    var wg = c.createLinearGradient(s * 0.2, 0, s * (0.35 + wo), 0);
-    wg.addColorStop(0, rgb(P.wing)); wg.addColorStop(1, rgb(scale(P.wing, 0.88)));
-    c.fillStyle = wg; c.fill();
-    c.save(); c.clip();
-    c.fillStyle = rgb(P.chest, 0.55);                // pale spots along the shoulder
-    for (j = 0; j < 4; j++) { c.beginPath(); c.ellipse(s * (0.27 + wo * 0.6 + (j % 2) * 0.025), -0.56 + j * 0.09, 0.017, 0.011, 0, 0, TAU); c.fill(); }
-    c.strokeStyle = rgb(P.chest, 0.3); c.lineWidth = 0.014;   // bars across the flight feathers
-    for (j = 0; j < 3; j++) { var by = -0.2 + j * 0.065; c.beginPath(); c.moveTo(s * 0.2, by + 0.02); c.lineTo(s * (0.36 + wo), by - 0.02); c.stroke(); }
-    c.restore();
-  }
-  // the face: a pale disc with a darker rim
-  var hx = head * 0.05, sq = 1 - Math.abs(head) * 0.12, fy = tufts ? -0.8 : -0.79;
-  var frx = (tufts ? 0.19 : 0.215) * sq, fry = tufts ? 0.15 : 0.17;
-  c.beginPath(); c.ellipse(hx, fy, frx + 0.028, fry + 0.024, 0, 0, TAU); c.fillStyle = rgb(P.rim, 0.6); c.fill();
-  var fg = c.createRadialGradient(hx, fy + 0.01, 0.02, hx, fy, frx);
-  fg.addColorStop(0, rgb(scale(P.face, 1.04))); fg.addColorStop(1, rgb(scale(P.face, 0.9)));
-  c.beginPath(); c.ellipse(hx, fy, frx, fry, 0, 0, TAU); c.fillStyle = fg; c.fill();
-  var er = tufts ? 0.05 : 0.042, ex = 0.075 * sq, ey = fy - 0.005;
-  if (!tufts) {                                      // フクロウ: faint rings round the eyes
-    c.strokeStyle = rgb(P.rim, 0.18); c.lineWidth = 0.008;
-    for (s = -1; s <= 1; s += 2) for (j = 1; j <= 2; j++) { c.beginPath(); c.arc(hx + s * ex, ey, er * (1.3 + j * 0.6), 0, TAU); c.stroke(); }
-  }
-  c.strokeStyle = rgb(scale(P.face, 1.1), 0.9); c.lineWidth = 0.02;   // pale brows meeting over the beak
-  for (s = -1; s <= 1; s += 2) {
-    c.beginPath(); c.moveTo(hx + s * 0.12 * sq, fy - 0.06); c.quadraticCurveTo(hx + s * 0.05, fy - 0.075, hx + s * 0.012, fy + 0.02); c.stroke();
-  }
-  for (s = -1; s <= 1; s += 2) owlEye(c, P, hx + s * ex, ey, er, eyes, tufts);
-  owlBeak(c, P, hx, fy + 0.035);
-  // feet on the branch, the talons curling over its front
-  for (s = -1; s <= 1; s += 2) {
-    c.beginPath(); c.ellipse(s * 0.075, -0.012, 0.05, 0.026, 0, 0, TAU); c.fillStyle = rgb(P.feet); c.fill();
-    c.strokeStyle = rgb(P.dark); c.lineWidth = 0.011;
-    for (j = 0; j < 3; j++) {
-      var tx = s * 0.075 + (j - 1) * 0.026;
-      c.beginPath(); c.moveTo(tx, 0.005); c.quadraticCurveTo(tx + 0.006, 0.03, tx - 0.004, 0.045); c.stroke();
-    }
-  }
-}
-/* One wing in flight, spread out from the shoulder. s: -1 left, 1 right;
-   a: 1 up … -1 down; lenK: shorter while it comes up (half folded).
-   front: its pale underside (coming toward us), else its upper side. */
-function owlWing(c, P, s, a, lenK, front) {
-  c.save();
-  c.translate(s * 0.15, -0.55);
-  c.scale(s, 1);
-  c.rotate(-a * 0.95);
-  c.scale(0.98 * lenK, 1);
-  c.beginPath();
-  c.moveTo(0, -0.07);
-  c.bezierCurveTo(0.35, -0.14, 0.7, -0.11, 0.92, -0.03);      // the broad, rounded leading edge
-  c.quadraticCurveTo(1.01, 0.02, 0.97, 0.09);
-  var tp = [[0.97, 0.09], [0.88, 0.17], [0.79, 0.21], [0.7, 0.23], [0.6, 0.245], [0.5, 0.25]];
-  for (var i = 1; i < tp.length; i++) {                        // the flight feathers, as soft scallops
-    var p0 = tp[i - 1], p1 = tp[i];
-    c.quadraticCurveTo((p0[0] + p1[0]) / 2 + 0.015, (p0[1] + p1[1]) / 2 + 0.035, p1[0], p1[1]);
-  }
-  c.bezierCurveTo(0.32, 0.27, 0.12, 0.24, 0, 0.16);
+  c.moveTo(-0.032, y0); c.quadraticCurveTo(0, y0 - 0.02, 0.032, y0);
+  c.bezierCurveTo(0.03, y0 + 0.045, 0.012, y0 + 0.085, 0, y0 + 0.1);
+  c.bezierCurveTo(-0.012, y0 + 0.085, -0.03, y0 + 0.045, -0.032, y0);
   c.closePath();
-  var g = c.createLinearGradient(0, 0, 1, 0);
-  if (front) { g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.5, rgb(mix(P.chest, P.face, 0.5))); g.addColorStop(1, rgb(scale(P.wing, 0.95))); }
-  else { g.addColorStop(0, rgb(P.back)); g.addColorStop(0.55, rgb(P.wing)); g.addColorStop(1, rgb(scale(P.wing, 0.85))); }
+  var g = c.createLinearGradient(-0.032, 0, 0.032, 0);
+  g.addColorStop(0, lit(scale(P.beak, 1.15))); g.addColorStop(0.5, lit(P.beak)); g.addColorStop(1, lit(scale(P.beak, 0.68)));
   c.fillStyle = g; c.fill();
   c.save(); c.clip();
-  c.strokeStyle = front ? rgb(P.streak, 0.4) : rgb(P.chest, 0.3); c.lineWidth = 0.03;
-  [0.62, 0.73, 0.84, 0.94].forEach(function (x) { c.beginPath(); c.moveTo(x, -0.15); c.lineTo(x - 0.05, 0.3); c.stroke(); });
-  if (front) {                                                 // the dark patch at the wrist, under the wing
-    c.fillStyle = rgb(P.streak, 0.6); c.beginPath(); c.ellipse(0.5, -0.02, 0.06, 0.035, 0, 0, TAU); c.fill();
-  } else {
-    c.fillStyle = rgb(P.chest, 0.4);
-    [[0.2, 0], [0.3, 0.06], [0.26, -0.05], [0.4, 0.02]].forEach(function (d) { c.beginPath(); c.ellipse(d[0], d[1], 0.02, 0.013, 0, 0, TAU); c.fill(); });
-  }
+  c.fillStyle = lit(scale(P.beak, 0.45), 0.5); c.fillRect(-0.04, y0 + 0.07, 0.08, 0.04);   // the darker hooked tip
   c.restore();
-  c.restore();
-}
-/* Flying: the body seen end-on (short), both wings out. view 'back' going
-   away, 'front' coming back; land: wings high and legs down for landing. */
-function paintFly(c, P, view, a, lenK, land) {
-  var tufts = O.look === 'konohazuku', front = view === 'front', s, j;
-  for (s = -1; s <= 1; s += 2) owlWing(c, P, s, a, lenK, front);
-  if (!front) {                                                // the tail, fanned
-    c.beginPath(); c.moveTo(-0.08, -0.26); c.lineTo(-0.14, -0.06); c.quadraticCurveTo(0, 0, 0.14, -0.06); c.lineTo(0.08, -0.26); c.closePath();
-    c.fillStyle = rgb(P.wing); c.fill();
-    c.save(); c.clip();
-    c.strokeStyle = rgb(P.chest, 0.3); c.lineWidth = 0.014;
-    for (j = 0; j < 3; j++) { c.beginPath(); c.moveTo(-0.2, -0.2 + j * 0.055); c.lineTo(0.2, -0.2 + j * 0.055); c.stroke(); }
-    c.restore();
-  } else {
-    c.fillStyle = rgb(P.feet); c.strokeStyle = rgb(P.feet);
-    for (s = -1; s <= 1; s += 2) {
-      if (land) {                                              // legs reaching for the branch, talons open
-        c.lineWidth = 0.06;
-        c.beginPath(); c.moveTo(s * 0.06, -0.24); c.lineTo(s * 0.09, -0.02); c.stroke();
-        c.strokeStyle = rgb(P.dark); c.lineWidth = 0.012;
-        for (j = 0; j < 3; j++) { c.beginPath(); c.moveTo(s * 0.09, -0.02); c.lineTo(s * 0.09 + (j - 1) * 0.035, 0.03); c.stroke(); }
-        c.strokeStyle = rgb(P.feet);
-      } else { c.beginPath(); c.ellipse(s * 0.055, -0.2, 0.04, 0.03, 0, 0, TAU); c.fill(); }
+  c.strokeStyle = 'rgba(255,250,240,0.5)'; c.lineWidth = 0.007;
+  c.beginPath(); c.moveTo(-0.014, y0 + 0.008); c.quadraticCurveTo(-0.016, y0 + 0.04, -0.006, y0 + 0.07); c.stroke();
+  if (lod > 0.35) {                                               // bristles over the base of the beak
+    c.lineWidth = 0.007;
+    for (i = 0; i < 11; i++) {
+      var x = (i - 5) * 0.009;
+      c.strokeStyle = lit(scale(P.spot, 0.92 + (i % 2) * 0.08), 0.85);
+      c.beginPath(); c.moveTo(x * 1.2, y0 - 0.035); c.lineTo(x * 2, y0 + 0.028 + Math.abs(x) * 0.6); c.stroke();
     }
-  }
-  c.beginPath(); c.ellipse(0, -0.44, 0.21, 0.26, 0, 0, TAU); c.fillStyle = rgb(P.back); c.fill();
-  c.save();
-  c.beginPath(); c.ellipse(0, -0.44, 0.21, 0.26, 0, 0, TAU); c.clip();
-  if (front) {
-    var g = c.createRadialGradient(0, -0.4, 0.03, 0, -0.4, 0.24);
-    g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.6, rgb(P.chest)); g.addColorStop(1, rgb(P.chest, 0));
-    c.fillStyle = g; c.fillRect(-0.3, -0.75, 0.6, 0.6);
-    c.strokeStyle = rgb(P.streak, 0.7); c.lineWidth = 0.016;
-    [[-0.08, -0.5], [0.06, -0.48], [-0.02, -0.4], [0.1, -0.36], [-0.11, -0.34], [0.02, -0.3]].forEach(function (d) {
-      c.beginPath(); c.moveTo(d[0], d[1]); c.lineTo(d[0] * 1.08, d[1] + 0.06); c.stroke();
-    });
-  } else {
-    c.fillStyle = rgb(P.chest, 0.4);
-    [[-0.08, -0.52], [0.09, -0.5], [0, -0.4], [-0.1, -0.34], [0.11, -0.33]].forEach(function (d) {
-      c.beginPath(); c.ellipse(d[0], d[1], 0.022, 0.014, 0, 0, TAU); c.fill();
-    });
-  }
-  c.restore();
-  var hy = -0.74, hr = tufts ? 0.18 : 0.2;
-  c.fillStyle = rgb(P.back);
-  c.beginPath(); c.arc(0, hy, hr, 0, TAU); c.fill();
-  if (tufts) {
-    for (s = -1; s <= 1; s += 2) { c.beginPath(); c.moveTo(s * 0.06, hy - 0.16); c.lineTo(s * 0.17, hy - 0.27); c.lineTo(s * 0.16, hy - 0.08); c.closePath(); c.fill(); }
-  }
-  if (front) {
-    c.beginPath(); c.ellipse(0, hy, hr * 0.82 + 0.022, hr * 0.7 + 0.02, 0, 0, TAU); c.fillStyle = rgb(P.rim, 0.6); c.fill();
-    c.beginPath(); c.ellipse(0, hy, hr * 0.82, hr * 0.7, 0, 0, TAU); c.fillStyle = rgb(P.face); c.fill();
-    var er = tufts ? 0.045 : 0.038;
-    for (s = -1; s <= 1; s += 2) owlEye(c, P, s * 0.066, hy - 0.005, er, 0, tufts);
-    owlBeak(c, P, 0, hy + 0.035);
-  } else {
-    c.fillStyle = rgb(P.chest, 0.35);                          // pale flecks on the nape
-    for (s = -1; s <= 1; s += 2) { c.beginPath(); c.ellipse(s * 0.06, hy + 0.1, 0.02, 0.013, 0, 0, TAU); c.fill(); }
   }
 }
 
-/* Bake one pose at size k: drawn sharp, lit (warm lamp light from below,
-   a little shade on top, only over the owl), then laid down through the
-   blur for that depth. */
-function bakeOwl(k, box, P, paint) {
+/* ---------- Wings ----------
+   An arm (shoulder to wrist) and a hand (wrist to tip). Raised by phi
+   (the arm) and phh (the hand, lagging behind in the beat), shortened by
+   fold on the way up, and twisted (twist) so the leading edge dips on the
+   downstroke and lifts high to brake when landing. */
+function wingAngles(pose) {
+  var p = pose.ph, phi, phh, fold, twist;
+  if (pose.glide) { phi = 0.12; phh = 0.04; fold = 1; twist = 0.05; }
+  else {
+    phi = 0.18 + 0.82 * Math.cos(p);
+    phh = phi + 0.42 * Math.sin(p) - 0.08;
+    fold = 1 - 0.32 * Math.max(0, -Math.sin(p));
+    twist = 0.35 * Math.sin(p);
+  }
+  var ld = pose.land || 0;
+  phi = lerp(phi, 1.18, ld); phh = lerp(phh, 0.98, ld); fold = lerp(fold, 0.96, ld); twist = lerp(twist, -1.05, ld);
+  var op = pose.spread === undefined ? 1 : pose.spread;
+  if (op < 1) { phi = lerp(-1.25, phi, op); phh = lerp(-1.4, phh, op); fold = lerp(0.32, fold, op); twist = lerp(0, twist, op); }
+  return { phi: phi, phh: phh, fold: fold, twist: twist };
+}
+function chordFor(d, twist, side) {                   // the direction from leading to trailing edge
+  var c0 = vNorm(vSub([0, 0, -1], vMul(d, -d[2])));
+  var tw = twist * side;
+  return vNorm(vAdd(vMul(c0, Math.cos(tw)), vMul(vCross(d, c0), Math.sin(tw))));
+}
+function wingGeom(F, side, pose) {
+  var g = wingAngles(pose);
+  var S = vAdd(vAdd(vMad(F.O, F.A, 0.17), vMul(F.dor, 0.05)), [side * 0.17, 0, 0]);
+  var dA = [side * Math.cos(g.phi), Math.sin(g.phi), 0], armL = 0.4;
+  var W = vMad(S, dA, armL);
+  var dH = vNorm([side * Math.cos(g.phh), Math.sin(g.phh), -0.22]), handL = 0.56 * g.fold;
+  var cA = chordFor(dA, g.twist * 0.45, side), cH = chordFor(dH, g.twist, side);
+  return { S: S, W: W, dA: dA, dH: dH, cA: cA, cH: cH, armL: armL, handL: handL, fold: g.fold,
+           nA: vMul(vNorm(vCross(dA, cA)), side), nH: vMul(vNorm(vCross(dH, cH)), side) };
+}
+function drawWing(c, P, G, side, lod) {
+  var nvA = tv(G.nA), nvH = tv(G.nH), upA = nvA[2] >= 0, upH = nvH[2] >= 0;
+  var fA = upA ? nvA : vMul(nvA, -1), fH = upH ? nvH : vMul(nvH, -1), i, f;
+  var feathers = [];
+  function add(kind, seg, b, t, wd, j) { feathers.push({ kind: kind, seg: seg, b: b, t: t, wd: wd, j: j }); }
+  // flight feathers: the secondaries along the arm, the primaries fanning from the hand
+  for (i = 0; i <= 8; i++) {
+    var ua = 0.04 + 0.96 * i / 8, bs = vMad(vMad(G.S, G.dA, G.armL * ua), G.cA, 0.1);
+    add('flight', 'A', bs, vMad(vMad(bs, G.cA, 0.33), G.dA, 0.015), 0.1, i / 8);
+  }
+  for (i = 0; i <= 9; i++) {
+    var s = i / 9, bp = vMad(vMad(G.W, G.dH, G.handL * (0.06 + 0.82 * s)), G.cH, 0.06);
+    var dir = vNorm(vAdd(vMul(G.dH, 0.15 + 0.85 * s * s), vMul(G.cH, 1 - 0.72 * s)));
+    var len = (0.38 + 0.1 * s) * (s > 0.85 ? 0.9 : 1) * lerp(0.8, 1, G.fold);
+    add('flight', 'H', bp, vMad(bp, dir, len), 0.078 - 0.022 * s, s);
+  }
+  // coverts in rows over them, smaller toward the leading edge
+  var rows = lod < 0.45 ? [[0.03, 0.18, 0.09, 12]] : [[0.03, 0.18, 0.09, 12], [-0.005, 0.12, 0.075, 13], [-0.03, 0.075, 0.06, 15]];
+  rows.forEach(function (R, ri) {
+    for (var k = 0; k < R[3]; k++) {
+      var q = (k + 0.5) / R[3], b, t;
+      if (q < 0.56) { b = vMad(vMad(G.S, G.dA, G.armL * q / 0.56), G.cA, R[0]); t = vMad(b, G.cA, R[1]); }
+      else { b = vMad(vMad(G.W, G.dH, G.handL * (q - 0.56) / 0.44 * (0.75 - ri * 0.15)), G.cH, R[0]); t = vMad(vMad(b, G.cH, R[1] * 0.9), G.dH, 0.03); }
+      add('covert' + ri, q < 0.56 ? 'A' : 'H', b, t, R[2], q);
+    }
+  });
+  // the whole wing's shape underneath, so nothing shows between the feathers
+  var tipL = vMad(G.W, G.dH, G.handL), outline = [G.S, G.W, tipL], under;
+  for (i = 18; i >= 0; i--) outline.push(feathers[i].t);
+  outline.push(vMad(G.S, G.cA, 0.4));
+  c.beginPath();
+  outline.forEach(function (p, k) { var q2 = sp(p); if (k) c.lineTo(q2[0], q2[1]); else c.moveTo(q2[0], q2[1]); });
+  c.closePath();
+  under = !upA;
+  c.fillStyle = rgb(owlLit(scale(under ? P.under : P.wing, 0.7), fA, P)); c.fill();
+  // draw order: flight feathers (inner to outer on top, the other way round underneath), then the rows of coverts
+  var flight = feathers.slice(0, 19);
+  if (!upH) flight.reverse();
+  var order = flight.concat(feathers.slice(19));
+  c.lineWidth = 0.006;
+  for (i = 0; i < order.length; i++) {
+    f = order[i];
+    var up = f.seg === 'A' ? upA : upH, nv = f.seg === 'A' ? fA : fH, nm = f.seg === 'A' ? G.nA : G.nH;
+    var w = vMul(vNorm(vCross(nm, vSub(f.t, f.b))), f.wd * 0.5), base;
+    if (f.kind === 'flight') base = up ? mix(P.wing, P.back, f.j * 0.25) : mix(P.under, P.wing, 0.08 + f.j * 0.12);
+    else if (f.kind === 'covert0') base = up ? mix(P.back, P.wing, 0.3) : P.under;
+    else base = up ? P.back : scale(P.under, 1.03);
+    var tip3 = featherPath(c, f.b, f.t, w);
+    c.fillStyle = rgb(owlLit(base, nv, P, up ? 1 : 0.92)); c.fill();
+    if (f.kind === 'flight' && lod > 0.3) {
+      featherBars(c, f.b, f.t, w, up ? (f.seg === 'H' ? 4 : 3) : 2, owlLit(up ? P.spot : scale(P.wing, 0.9), nv, P), up ? 0.42 : 0.13);
+      if (!up) {                                                    // darker tips underneath
+        var tq = sp(vMad(f.b, vSub(f.t, f.b), 0.86));
+        c.fillStyle = rgb(owlLit(P.wing, nv, P), 0.28); c.beginPath(); c.arc(tq[0], tq[1], f.wd * 0.4, 0, TAU); c.fill();
+      }
+      if (lod > 0.6 && up) featherShaft(c, f.b, f.t, owlLit(scale(P.wing, 0.7), nv, P), 0.5);
+    } else if (up && f.j * 997 % 1 > 0.45) {                      // pale spots on the upper coverts
+      var sc = sp(vMad(f.b, vSub(f.t, f.b), 0.62)), r0 = Math.hypot(sp(vAdd(f.b, w))[0] - sp(f.b)[0], sp(vAdd(f.b, w))[1] - sp(f.b)[1]);
+      c.fillStyle = rgb(owlLit(P.spot, nv, P), 0.85); c.beginPath(); c.ellipse(sc[0], sc[1], r0 * 0.4, r0 * 0.3, 0, 0, TAU); c.fill();
+    }
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.25), nv, P), up ? 0.25 : 0.12);
+  }
+  if (!upA && lod > 0.3) {                                        // the dark patch at the wrist, underneath
+    var wp = sp(vMad(G.W, G.cA, 0.05)), wr = Math.hypot(sp(vMad(G.W, G.dA, 0.05))[0] - sp(G.W)[0], sp(vMad(G.W, G.dA, 0.05))[1] - sp(G.W)[1]);
+    c.fillStyle = rgb(owlLit(P.streak, fA, P), 0.75); c.beginPath(); c.ellipse(wp[0], wp[1], Math.max(0.015, wr), Math.max(0.012, wr * 0.7), 0, 0, TAU); c.fill();
+  }
+}
+
+/* ---------- Tail, legs, feet ---------- */
+function drawTail(c, P, F, lod) {
+  var tb = vAdd(vMad(F.O, F.A, -0.28), vMul(F.dor, 0.04)), nv = tv(F.dor), up = nv[2] >= 0, fn = up ? nv : vMul(nv, -1);
+  var idx = [0, 7, 1, 6, 2, 5, 3, 4];                       // outer feathers first, the middle pair on top
+  c.lineWidth = 0.006;
+  for (var k = 0; k < 8; k++) {
+    var i = idx[k], s = (i - 3.5) / 3.5, dir = vNorm(vAdd(vAdd(vMul(F.A, -1), vMul(F.X, s * 0.42)), vMul(F.dor, 0.06)));
+    var t = vMad(tb, dir, 0.3 - Math.abs(s) * 0.03), w = vMul(vNorm(vCross(F.dor, dir)), 0.04);
+    var base = up ? mix(P.wing, P.back, 0.3) : P.under;
+    var tip3 = featherPath(c, tb, t, w);
+    c.fillStyle = rgb(owlLit(base, fn, P)); c.fill();
+    if (lod > 0.3) featherBars(c, tb, t, w, 4, owlLit(up ? P.spot : P.wing, fn, P), 0.4);
+    if (lod > 0.55) fringe(c, tip3, owlLit(scale(base, 1.3), fn, P), 0.3);
+  }
+}
+function talon(c, x0, y0, x1, y1, P) {
+  c.strokeStyle = rgb(P.fin([42, 34, 32])); c.lineWidth = 0.012;
+  c.beginPath(); c.moveTo(x0, y0); c.quadraticCurveTo(x1 + (x1 - x0) * 0.2, y0, x1, y1); c.stroke();
+  c.strokeStyle = 'rgba(255,240,225,0.35)'; c.lineWidth = 0.004;
+  c.beginPath(); c.moveTo(x0, y0 - 0.002); c.quadraticCurveTo(x1 + (x1 - x0) * 0.2, y0 - 0.002, x1, y1 - 0.004); c.stroke();
+}
+function drawLegs(c, P, F, reach) {                  // legs reaching down for the branch, talons open
+  var nv = [0, 0, 1];
+  c.lineCap = 'round';
+  for (var s = -1; s <= 1; s += 2) {
+    var hip = vAdd(vAdd(vMad(F.O, F.A, -0.12), vMul(F.D, 0.14)), [s * 0.08, 0, 0]);
+    var ank = vAdd(hip, [s * 0.02, -0.36 * reach, 0.09 * reach]);
+    var h = sp(hip), a = sp(ank);
+    c.strokeStyle = rgb(owlLit(scale(P.feet, 0.85), nv, P)); c.lineWidth = 0.058;
+    c.beginPath(); c.moveTo(h[0], h[1]); c.lineTo(a[0], a[1]); c.stroke();
+    c.strokeStyle = rgb(owlLit(P.feet, nv, P), 0.6); c.lineWidth = 0.02;
+    c.beginPath(); c.moveTo(h[0] - s * 0.012, h[1]); c.lineTo(a[0] - s * 0.012, a[1]); c.stroke();
+    for (var j = 0; j < 4; j++) {
+      var ang = j === 3 ? -PI / 2 - s * 0.4 : PI / 2 + (j - 1) * 0.55;
+      var tx = a[0] + Math.cos(ang) * 0.06, ty = a[1] + Math.sin(ang) * 0.05;
+      c.strokeStyle = rgb(owlLit(P.feet, nv, P)); c.lineWidth = 0.026;
+      c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(tx, ty); c.stroke();
+      talon(c, tx, ty, tx + Math.cos(ang) * 0.025, ty + 0.035, P);
+    }
+  }
+  c.lineCap = 'round';
+}
+function drawPerchFeet(c, P, F) {                    // feathered toes on the branch, talons curling over its front
+  var nv = [0, 0, 1];
+  for (var s = -1; s <= 1; s += 2) {
+    var p = sp(vAdd(vAdd(vMad(F.O, F.A, -0.41), vMul(F.D, 0.1)), [s * 0.085, 0, 0]));
+    for (var j = 0; j < 3; j++) {
+      var x = p[0] + (j - 1) * 0.027 + s * 0.004, y = -0.006;
+      c.beginPath(); c.ellipse(x, y, 0.017, 0.024, (j - 1) * 0.25, 0, TAU);
+      c.fillStyle = rgb(owlLit(scale(P.feet, 0.82 + j * 0.04), nv, P)); c.fill();
+      talon(c, x, y + 0.016, x - 0.004, y + 0.05, P);
+    }
+  }
+}
+
+/* ---------- The whole owl ----------
+   pose: yaw, elev (the view), pitch (0 upright … ~1.2 level in flight),
+   headYaw, eyes, spread (0 wings folded … 1 open), ph / glide (the
+   wingbeat), land (0 … 1 braking to land), legs (0 tucked … 1 reaching),
+   perch (feet on the branch), lod. */
+function renderOwl(c, P, pose) {
+  var tufts = O.look === 'konohazuku', lod = pose.lod, pc = Math.cos(pose.pitch), ps = Math.sin(pose.pitch);
+  setView(pose.yaw, pose.elev);
+  var F = { O: [0, 0, 0], X: [1, 0, 0], A: [0, pc, ps], D: [0, -ps, pc], rx: tufts ? 0.26 : 0.29, ra: 0.39, rd: tufts ? 0.25 : 0.27,
+            folded: (pose.spread || 0) < 0.5 };
+  F.dor = vMul(F.D, -1);
+  var Hd = headFrame(F, pose.headYaw || 0, ps), parts = [];
+  function depth(p) { return tv(p)[2]; }
+  parts.push({ z: depth(vMad(F.O, F.A, -0.45)) - 0.01, f: function () { drawTail(c, P, F, lod); } });
+  parts.push({ z: 0, f: function () { drawBody(c, P, F, lod); } });
+  var wa = smooth(0.35, 0.75, pose.spread || 0);
+  if (wa > 0.01) [-1, 1].forEach(function (s) {
+    var G = wingGeom(F, s, pose);
+    parts.push({ z: wa < 1 ? -1 : depth(vMad(G.W, G.dH, 0.15)), f: function () {
+      if (wa >= 1) { drawWing(c, P, G, s, lod); return; }
+      c.save(); c.globalAlpha = wa; drawWing(c, P, G, s, lod); c.restore();
+    } });
+  });
+  if (pose.legs > 0.02) parts.push({ z: depth(vMad(F.O, F.D, 0.2)) + 0.05, f: function () { drawLegs(c, P, F, pose.legs); } });
+  parts.push({ z: depth(Hd.H) + 0.05, f: function () { drawHead(c, P, F, Hd, pose, lod); } });
+  if (pose.perch) parts.push({ z: 9, f: function () { drawPerchFeet(c, P, F); } });
+  parts.sort(function (a, b) { return a.z - b.z; });
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (var i = 0; i < parts.length; i++) parts[i].f();
+}
+function sitPose(k, eyes, hi) {
+  return { yaw: 0, elev: 0.02, pitch: 0.06, headYaw: HEAD_YAWS[hi], eyes: eyes, spread: 0, ph: 0, glide: false, land: 0, legs: 0, perch: true, lod: owlLod(k) };
+}
+function flyPose(k, view, f) {
+  var front = view === 'front';
+  return { yaw: front ? 0 : PI, elev: front ? -OWL_ELEV : OWL_ELEV, pitch: 1.2, headYaw: 0, eyes: 0, spread: 1,
+           ph: f / OWL_FRAMES * TAU, glide: f === OWL_GLIDE, land: 0, legs: 0, perch: false, lod: owlLod(k) };
+}
+
+/* Draw one pose at size k into a sprite: sharp first, a touch of the lamp
+   glow and of shade over the whole owl, then laid down through the blur
+   for that depth. into: a canvas to reuse (drawing it live), else a new one. */
+function bakeOwl(k, box, P, pose, into) {
   var u = O.size * H * k * PR, blur = owlBlur(k), pad = Math.ceil(blur * 3 * PR) + 2;
   var w = Math.max(1, Math.ceil((box[2] - box[0]) * u) + pad * 2), h = Math.max(1, Math.ceil((box[3] - box[1]) * u) + pad * 2);
   var ox = pad - box[0] * u, oy = pad - box[1] * u;
   var tc = OWLTMP.cnv, t = OWLTMP.c;
-  tc.width = w; tc.height = h;                       // also clears it and resets its state
+  if (tc.width !== w || tc.height !== h) { tc.width = w; tc.height = h; } else { t.setTransform(1, 0, 0, 1, 0, 0); t.clearRect(0, 0, w, h); }
   t.setTransform(u, 0, 0, u, ox, oy);
-  t.lineCap = 'round';
-  paint(t);
+  t.globalCompositeOperation = 'source-over'; t.globalAlpha = 1;
+  renderOwl(t, P, pose);
   t.setTransform(u, 0, 0, u, ox, oy);
   t.globalCompositeOperation = 'source-atop';
   var a = (1 - P.hz) * (isNight() ? O.lampGlow : 0);
   if (a > 0) {
     var g = t.createLinearGradient(0, 0.2, 0, -0.75);
-    g.addColorStop(0, 'rgba(255,184,110,' + (0.34 * a).toFixed(3) + ')');
+    g.addColorStop(0, 'rgba(255,184,110,' + (0.14 * a).toFixed(3) + ')');
     g.addColorStop(1, 'rgba(255,184,110,0)');
     t.fillStyle = g; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
   }
-  var g2 = t.createLinearGradient(0, -1.2, 0, -0.55);
-  g2.addColorStop(0, 'rgba(36,30,52,' + (0.16 * (1 - P.hz)).toFixed(3) + ')');
-  g2.addColorStop(1, 'rgba(36,30,52,0)');
-  t.fillStyle = g2; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
   t.globalCompositeOperation = 'source-over';
-  var cv2 = document.createElement('canvas');
-  cv2.width = w; cv2.height = h;
+  var cv2 = into || document.createElement('canvas');
+  if (cv2.width !== w || cv2.height !== h) { cv2.width = w; cv2.height = h; }
   var c = cv2.getContext('2d');
-  if (blur > 0.05 && HAS_FILTER) c.filter = 'blur(' + (blur * PR).toFixed(2) + 'px)';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (into) c.clearRect(0, 0, w, h);
+  c.filter = blur > 0.05 && HAS_FILTER ? 'blur(' + (blur * PR).toFixed(2) + 'px)' : 'none';
   c.drawImage(tc, 0, 0);
+  c.filter = 'none';
   return { cv: cv2, ox: ox / PR, oy: oy / PR, w: w / PR, h: h / PR, k: k };
 }
+/* The sitting poses now (needed at once); the small flying ones queued and
+   baked a few each frame (bakeOwlQueue). */
 function bakeOwlSprites() {
   if (!H) return;
+  owlPal = {};
   owlSit = [1, FAR_SCALE].map(function (k) {
     var P = owlPalette(k), poses = {};
-    for (var e = 0; e < 3; e++) for (var hd = -1; hd <= 1; hd++) {
-      poses[e + ',' + hd] = bakeOwl(k, SIT_BOX, P, function (c) { paintSit(c, P, e, hd, false); });
-    }
-    poses.settle = bakeOwl(k, SIT_BOX, P, function (c) { paintSit(c, P, 0, 0, true); });
+    for (var e = 0; e < 3; e++) for (var hi = 0; hi < HEAD_YAWS.length; hi++) poses[e + ',' + hi] = bakeOwl(k, SIT_BOX, P, sitPose(k, e, hi));
     return { k: k, poses: poses };
   });
-  owlFly = [];
+  owlFly = []; owlQueue = [];
   for (var i = 0; i < OWL_STEPS; i++) {
-    var k = Math.exp(lerp(0, Math.log(O.farthest), i / (OWL_STEPS - 1)));
-    var P = owlPalette(k), st = { k: k, back: [], front: [] };
-    for (var f = 0; f <= OWL_LAND; f++) {
-      var ph = f / OWL_FRAMES * TAU;
-      var a = f === OWL_GLIDE ? 0.15 : (f === OWL_LAND ? 1.1 : Math.cos(ph));
-      var lenK = f >= OWL_GLIDE ? 1 : 1 - 0.25 * Math.max(0, -Math.sin(ph));
-      if (f < OWL_LAND) st.back.push(bakeOwl(k, FLY_BOX, P, function (c) { paintFly(c, P, 'back', a, lenK, false); }));
-      st.front.push(bakeOwl(k, FLY_BOX, P, function (c) { paintFly(c, P, 'front', a, lenK, f === OWL_LAND); }));
-    }
+    var k = KLIVE * Math.pow(O.farthest / KLIVE, i / (OWL_STEPS - 1)), st = { k: k, back: [], front: [] };
     owlFly.push(st);
+    for (var f = 0; f <= OWL_GLIDE; f++) { owlQueue.push([st, 'back', f]); owlQueue.push([st, 'front', f]); }
+  }
+}
+function bakeOwlQueue(ms) {
+  var t0 = performance.now();
+  while (owlQueue.length && performance.now() - t0 < ms) {
+    var q = owlQueue.shift(), st = q[0];
+    st[q[1]][q[2]] = bakeOwl(st.k, FLY_BOX, owlPaletteCached(st.k), flyPose(st.k, q[1], q[2]));
   }
 }
 function flyStep(k) {
-  var i = Math.round(Math.log(Math.max(k, O.farthest)) / Math.log(O.farthest) * (OWL_STEPS - 1));
+  var i = Math.round(Math.log(Math.max(k, O.farthest) / KLIVE) / Math.log(O.farthest / KLIVE) * (OWL_STEPS - 1));
   return clamp(i, 0, OWL_STEPS - 1);
 }
 
@@ -2053,9 +2413,9 @@ function bez(p, s) {
 }
 function startOwl(t) {
   owl = { state: 'perch', ti: nextTree(), t0: t, until: t + perchTime(), landed: false,
-          blinkAt: t + rnd(1, 3), blinkT0: -1, dbl: false, head: 0, headAt: t + O.headEvery * rnd(0.6, 1.4), headUntil: 0,
+          blinkAt: t + rnd(1, 3), blinkT0: -1, dbl: false, headT: 0, headI: 0, headStep: 0, headAt: t + O.headEvery * rnd(0.6, 1.4), headUntil: 0,
           hootAt: t + O.hootEvery * rnd(0.3, 1), x: 0, y: 0, k: 1, ph: 0, beats: 0, glide: 0, bob: 0, frame: 0,
-          lastX: 0, vx: 0, rot: 0, fx: 1, fy: 1, alpha: 1, slot: 'C', pose: 'sit', key: '0,0', view: 'front' };
+          lastX: 0, vx: 0, rot: 0, fx: 1, fy: 1, alpha: 1, slot: 'C', pose: 'sit', key: '0,2', view: 'front', live: false, pose3: null };
 }
 function owlOn(T) { return !!owl && owl.state === 'perch' && trees[owl.ti] === T; }
 function flapOwl(dt, hz) {
@@ -2070,7 +2430,7 @@ function flapOwl(dt, hz) {
       o.glide = O.glideTime * rnd(0.7, 1.3); o.ph = 0;
     }
   }
-  o.frame = o.glide > 0 ? OWL_GLIDE : Math.floor((o.ph % TAU) / TAU * OWL_FRAMES) % OWL_FRAMES;
+  o.frame = o.glide > 0 ? OWL_GLIDE : Math.floor((o.ph % TAU) / TAU * OWL_FRAMES + 0.5) % OWL_FRAMES;
   o.bob = o.glide > 0 ? 0 : -Math.sin(o.ph) * 0.035 * O.size * H * o.k;   // rises a little on each downstroke
 }
 /* A lean into turns: from how fast it is moving across the screen. */
@@ -2084,10 +2444,10 @@ function takeOff(t) {
   var o = owl, T = trees[o.ti], inward = T.left ? 1 : -1;
   T.pbV += 0.5 * O.branchBounce;                     // it pushes off: the branch dips, then springs back
   var x3 = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread), y3 = H * (V.horizon - O.vanishHeight);
-  o.state = 'leave'; o.t0 = t; o.dur = O.flyAwayTime; o.k0 = o.ti === 0 ? 1 : FAR_SCALE;
+  o.state = 'leave'; o.t0 = t; o.dur = O.flyAwayTime; o.k0 = o.ti === 0 ? 1 : FAR_SCALE; o.inward = inward;
   // it drops off the branch toward the middle of the screen, then rises away over the mountains
   o.path = [o.x, o.y, o.x + inward * W * 0.1, o.y + H * 0.03, lerp(o.x, x3, 0.6), Math.min(o.y, y3) - H * 0.06, x3, y3];
-  o.ph = 0; o.beats = O.flapBeats + 2; o.glide = 0; o.lastX = o.x; o.vx = 0; o.head = 0;
+  o.ph = PI * 0.15; o.beats = O.flapBeats + 2; o.glide = 0; o.lastX = o.x; o.vx = 0; o.headT = 0; o.headI = 0;
 }
 function comeBack(t, ti) {
   var o = owl;
@@ -2096,21 +2456,21 @@ function comeBack(t, ti) {
   o.next = undefined;
   o.state = 'return'; o.t0 = t; o.dur = O.returnTime; o.kT = o.ti === 0 ? 1 : FAR_SCALE;
   o.sx = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread); o.sy = H * (V.horizon - O.vanishHeight);
-  o.ph = 0; o.beats = O.flapBeats; o.glide = 0; o.lastX = o.sx; o.vx = 0;
+  o.ph = 0; o.beats = O.flapBeats; o.glide = 0; o.lastX = o.sx; o.vx = 0; o.yaw = 0;
 }
 function land(t) {
   var o = owl, T = trees[o.ti];
   T.pbV += 0.7 * O.branchBounce;                     // the branch dips under it and springs back
   o.state = 'perch'; o.landed = true; o.t0 = t; o.until = t + perchTime();
-  o.blinkAt = t + rnd(1, 3); o.blinkT0 = -1; o.dbl = false; o.head = 0;
+  o.blinkAt = t + rnd(1, 3); o.blinkT0 = -1; o.dbl = false; o.headT = 0; o.headI = 0;
   o.headAt = t + O.headEvery * rnd(0.6, 1.4); o.hootAt = t + O.hootEvery * rnd(0.4, 1);
 }
 function updateOwl(t, dt) {
-  if (!trees.length || !owlFly.length) return;
+  if (!trees.length || !owlSit.length) return;
   if (!owl) startOwl(t);
   var o = owl, T, inward, tt, u, s, p;
   if (o.ti >= trees.length) o.ti = 0;
-  o.fx = 1; o.fy = 1; o.alpha = 1;
+  o.fx = 1; o.fy = 1; o.alpha = 1; o.live = false;
   if (o.state === 'perch') {
     T = trees[o.ti]; inward = T.left ? 1 : -1;
     var st = seat(T);
@@ -2128,14 +2488,25 @@ function updateOwl(t, dt) {
         else { o.dbl = false; o.blinkAt = t + rnd(Math.min(O.blinkMin, O.blinkMax), Math.max(O.blinkMin, O.blinkMax)); }
       }
     }
-    // a look to one side now and then (when switched on, or from the button)
-    if (o.head !== 0 && t >= o.headUntil) { o.head = 0; o.headAt = t + O.headEvery * rnd(0.6, 1.4); }
-    else if (O.headTurn && o.head === 0 && t >= o.headAt) { o.head = Math.random() < 0.5 ? -1 : 1; o.headUntil = t + rnd(1.5, 3.5); }
+    // a look to one side now and then (when switched on, or from the button); the head swings round in steps
+    if (o.headT !== 0 && t >= o.headUntil) { o.headT = 0; o.headAt = t + O.headEvery * rnd(0.6, 1.4); }
+    else if (O.headTurn && o.headT === 0 && o.headI === 0 && t >= o.headAt) { o.headT = Math.random() < 0.5 ? -2 : 2; o.headUntil = t + rnd(1.5, 3.5); }
+    if (t >= o.headStep && o.headI !== o.headT) { o.headI += o.headI < o.headT ? 1 : -1; o.headStep = t + 0.055; }
     if (O.hoot && t >= o.hootAt) { hoot(); o.hootAt = t + O.hootEvery * rnd(0.6, 1.4); }
-    o.key = o.landed && t - o.t0 < 0.35 ? 'settle' : eyes + ',' + o.head;
-    // just before it takes off it crouches and leans toward where it will fly
-    var lean = smooth(o.until - 0.45, o.until, t);
-    o.rot = st.rot + inward * 0.18 * lean; o.fy = 1 - 0.08 * lean; o.fx = 1 + 0.04 * lean;
+    o.key = eyes + ',' + (o.headI + 2);
+    o.rot = st.rot;
+    o.fy = 1 + 0.008 * Math.sin(t * 1.7);             // breathing
+    var ts = t - o.t0, lean = smooth(o.until - 0.5, o.until, t);
+    if (o.landed && ts < 0.5) {                        // just landed: the wings come down and fold away
+      o.live = true;
+      o.pose3 = { yaw: 0, elev: lerp(-0.08, 0.02, smooth(0, 0.4, ts)), pitch: lerp(0.3, 0.06, smooth(0, 0.4, ts)), headYaw: 0, eyes: 0,
+                  spread: 1 - smooth(0.05, 0.5, ts), ph: 0, glide: true, land: 1 - smooth(0, 0.3, ts), legs: 1 - smooth(0, 0.15, ts), perch: true, lod: owlLod(o.k) };
+    } else if (lean > 0) {                             // about to go: it crouches, leans toward where it will fly, wings loosen
+      o.live = true;
+      o.pose3 = { yaw: 0, elev: 0.02, pitch: 0.06 + 0.32 * lean, headYaw: HEAD_YAWS[o.headI + 2], eyes: 0, spread: 0, ph: 0, glide: true,
+                  land: 0, legs: 0, perch: true, lod: owlLod(o.k) };
+      o.rot += inward * 0.12 * lean; o.fy = 1 - 0.06 * lean;
+    }
     if (t >= o.until) takeOff(t);
   } else if (o.state === 'leave') {
     tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = 1 - Math.pow(1 - u, 1.5);
@@ -2143,10 +2514,14 @@ function updateOwl(t, dt) {
     // it keeps its depth while it clears the tree, then goes further and further away
     o.k = Math.exp(lerp(Math.log(o.k0), Math.log(O.farthest), Math.pow(clamp((u - 0.1) / 0.9, 0, 1), 1.2)));
     flapOwl(dt, O.flapHz * (tt < 1.2 ? 1.3 : 1));
-    if (tt < 0.15) { o.frame = OWL_LAND; o.bob = 0; }  // the first moment: wings up, legs leaving the branch
-    var f = clamp((tt - 0.2) / 0.35, 0, 1);          // it turns round to fly away from us, like a card turning
-    o.view = f < 0.5 ? 'front' : 'back'; o.fx = Math.max(0.12, Math.abs(Math.cos(f * PI)));
-    if (o.view === 'back' && o.frame === OWL_LAND) o.frame = 0;
+    if (tt < 0.5) o.bob *= tt / 0.5;
+    // it turns right round to fly away from us, opening its wings as it drops off the branch
+    var yaw = o.inward * PI * smooth(0.12, 0.85, tt);
+    o.view = Math.cos(yaw) < 0 ? 'back' : 'front';
+    o.live = o.k >= KLIVE || tt < 1;
+    o.pose3 = { yaw: yaw, elev: lerp(0.02, OWL_ELEV, smooth(0.05, 0.6, tt)), pitch: lerp(0.38, 1.2, smooth(0.05, 0.7, tt)), headYaw: 0, eyes: 0,
+                spread: smooth(0, 0.25, tt), ph: o.ph, glide: o.glide > 0, land: 1 - smooth(0.05, 0.4, tt),
+                legs: 1 - smooth(0.1, 0.5, tt), perch: false, lod: owlLod(o.k) };
     o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt);
     o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
     if (u >= 1) { o.state = 'gone'; o.until = t + (o.quick ? 1 : O.awayTime); o.quick = false; }
@@ -2155,15 +2530,20 @@ function updateOwl(t, dt) {
     if (t >= o.until) comeBack(t);
   } else if (o.state === 'return') {
     T = trees[o.ti]; inward = T.left ? 1 : -1;
-    var sp = seat(T);
+    var sp2 = seat(T);
     tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = u * u * (3 - 2 * u);
     // from far over the mountains, round to the inner side of the branch, and in to land
-    p = bez([o.sx, o.sy, o.sx, o.sy - H * 0.04, sp.x + inward * W * 0.16, sp.y - H * 0.08, sp.x, sp.y], s);
+    p = bez([o.sx, o.sy, o.sx, o.sy - H * 0.04, sp2.x + inward * W * 0.16, sp2.y - H * 0.08, sp2.x, sp2.y], s);
     o.k = Math.exp(lerp(Math.log(O.farthest), Math.log(o.kT), clamp(s / 0.85, 0, 1)));
-    if (o.dur - tt < 0.55) { o.frame = OWL_LAND; o.bob = 0; }   // wings up, legs down, braking
-    else flapOwl(dt, O.flapHz);
+    var lb = smooth(o.dur - 0.8, o.dur - 0.05, tt);   // the last moment: body up, wings high and braking, legs out
+    flapOwl(dt, O.flapHz * (1 + lb * 0.4));
+    o.bob *= 1 - lb;
     o.view = 'front';
-    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt);
+    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt) * (1 - lb);
+    o.yaw = lerp(o.yaw || 0, clamp(o.vx * 0.0012, -0.45, 0.45) * smooth(KLIVE, 0.6, o.k) * (1 - lb), Math.min(1, dt * 3));
+    o.live = o.k >= KLIVE;
+    o.pose3 = { yaw: o.yaw, elev: lerp(-OWL_ELEV, -0.08, lb), pitch: lerp(1.2, 0.3, lb), headYaw: 0, eyes: 0, spread: 1, ph: o.ph, glide: o.glide > 0 && lb < 0.5,
+                land: lb, legs: smooth(o.dur - 1.0, o.dur - 0.3, tt), perch: false, lod: owlLod(o.k) };
     o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
     if (u >= 1) land(t);
   }
@@ -2171,13 +2551,21 @@ function updateOwl(t, dt) {
 /* slot 'A': further than the far tree (drawn behind it); 'B': between the
    two trees; 'C': in front of the near tree. */
 function drawOwl(c, slot) {
-  if (!owl || owl.slot !== slot || owl.alpha <= 0.003 || !owlFly.length) return;
-  var spr, sc = 1;
-  if (owl.pose === 'sit') spr = owlSit[owl.ti === 0 ? 0 : 1].poses[owl.key];
-  else {
+  if (!owl || owl.slot !== slot || owl.alpha <= 0.003 || !owlSit.length) return;
+  var spr = null, sc = 1;
+  if (owl.live && owl.pose3) {                     // drawn afresh, every other frame (the wingbeat at 30 a second)
+    owlLiveN++;
+    if (!owlLiveSpr || owlLiveN % 2) owlLiveSpr = bakeOwl(owl.k, FLY_BOX, owlPaletteCached(owl.k), owl.pose3, OWLOUT.cnv);
+    spr = owlLiveSpr;
+  } else if (owl.pose === 'sit') {
+    owlLiveSpr = null;
+    spr = owlSit[owl.ti === 0 ? 0 : 1].poses[owl.key];
+  } else {
+    owlLiveSpr = null;
     var st = owlFly[flyStep(owl.k)];
-    spr = (owl.view === 'back' ? st.back : st.front)[owl.frame] || st.front[0];
-    sc = owl.k / st.k;
+    spr = st && (owl.view === 'back' ? st.back : st.front)[owl.frame];
+    if (spr) sc = owl.k / st.k;
+    else spr = bakeOwl(owl.k, FLY_BOX, owlPaletteCached(owl.k), flyPose(owl.k, owl.view, owl.frame), OWLOUT.cnv);   // not baked yet
   }
   if (!spr) return;
   c.setTransform(PR, 0, 0, PR, owl.x * PR, owl.y * PR);
@@ -2302,6 +2690,7 @@ function frame(now) {
   if (falling.length < V.falling && Math.random() < 0.08) spawnFalling(false);
   moveFalling(t, dt);
   updateOwl(t, dt);
+  bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = owlStatus(t); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
