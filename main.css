@@ -1854,9 +1854,9 @@
      does not move when the weather text changes. Its top is level with the
      weather line; the wave rests on the bottom edge of the glass. Layout:
 
-       meta row   — ⏮ title · artist ⏭, the bullet on the card's centre line
-       control row — pause/play · mute, its bullet straight under the one
-                    above; the DL XX% pill at its right end
+       meta row   — ⏮ title • artist ⏭, in the 名古屋 colour
+       control row — pause • mute • DL XX%, all the same height, centred
+                    under the meta row
        wave stack — 6-layer fluid spectrum on a 410×44 canvas, its base
                     tucked under the glass's bright edge (.bar-edge)
        gauge bar, time row — hidden; app.js still writes to them
@@ -1915,15 +1915,20 @@
     opacity: 1;
   }
 
-  /* --- DL XX% pill: the right end of the control row. --- */
+  /* --- DL XX% pill: after the mute button, as tall as the icons' ink (the
+     pause bars are 13px, the play triangle 14px). --- */
   .hud-dl-badge {
-    margin-left: auto;
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    height: 15px;
+    box-sizing: border-box;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
-    padding: 2px 7px;
+    padding: 0 8px;
     border-radius: 8px;
-    line-height: 1.2;
+    line-height: 1;
     white-space: nowrap;
     text-shadow: none;
     transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
@@ -1954,44 +1959,50 @@
     50%      { opacity: 1; }
   }
 
-  /* --- Meta row and control row: the same three-column grid, the middle
-     column just wide enough for a bullet. The two side columns are equal,
-     so both bullets sit on the card's centre line, one under the other,
-     whatever the title and artist are. The title grows to the left of its
-     bullet and the artist to the right of its bullet.
-     Line-height 1.4 as on the weather line, so the tops of the characters
-     line up with it. --- */
-  .hud-meta-row,
-  .hud-ctrl-row {
+  /* --- Info block: the meta row and the control row, each centred on the
+     other and the pair centred on the card. Line-height 1.4 as on the
+     weather line, so the tops of the characters line up with it. --- */
+  .hud-info {
     position: absolute;
-    left: 14px; right: 14px;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
     z-index: 1;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     align-items: center;
+    width: max-content;
+    max-width: 410px;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     line-height: 1.4;
   }
+  .hud-meta-row,
+  .hud-ctrl-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 0;
+    max-width: 100%;
+  }
   .hud-meta-row {
-    top: 0;
-    column-gap: 6px;
+    gap: 6px;
     text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
   }
   .hud-ctrl-row {
-    top: 24px;
+    gap: 12px;
     height: 22px;
-    column-gap: 16px;
+    margin-top: 2px;
   }
-  .hud-side {
-    display: flex;
-    align-items: center;
-    min-width: 0;
+
+  /* --- The bullet between the pieces, on both rows: a solid dot, drawn
+     rather than typed so it is the same size and weight on both. --- */
+  .hud-dot {
+    flex: none;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-3);
   }
-  .hud-side-start { justify-content: flex-end; }
-  .hud-side-end   { justify-content: flex-start; }
-  .hud-meta-row .hud-side-start { gap: 3px; }
-  .hud-meta-row .hud-side-end   { gap: 3px; }
-  .hud-sep-off { visibility: hidden; }
+  .hud-dot-off { visibility: hidden; }
 
   /* --- The four buttons: solid flat shapes in the title's ink. The visible
      icon is small; ::before stretches the touch area to 44 × 44. Only they
@@ -2031,7 +2042,7 @@
   .hud-title {
     font-size: 15.95px;
     font-weight: 700;
-    color: var(--text-dark);
+    color: var(--accent-3);
     letter-spacing: 1.5px;
     white-space: nowrap;
     overflow: hidden;
@@ -2039,7 +2050,7 @@
     min-width: 0;
   }
   html[data-theme="autumn"] .hud-title,
-  html[data-theme="winter"] .hud-title { color: var(--text-dark); }
+  html[data-theme="winter"] .hud-title { color: var(--accent-3); }
   .hud-sep {
     font-size: 12.1px;
     color: var(--text-mute);
@@ -2055,6 +2066,7 @@
     text-overflow: ellipsis;
     min-width: 0;
   }
+  .hud-meta-row .hud-artist { color: var(--accent-3); }
 
   /* --- Wave + gauge stack --- */
   .hud-wave-gauge-stack {
