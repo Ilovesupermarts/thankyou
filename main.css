@@ -1915,43 +1915,32 @@
     opacity: 1;
   }
 
-  /* --- DL XX% pill: after the mute button, as tall as the icons' ink (the
-     pause bars are 13px, the play triangle 14px). --- */
+  /* --- DL XX%: after the mute button, as tall as the icons' ink (the pause
+     bars are 13px, the play triangle 14px). --- */
   .hud-dl-badge {
     flex: none;
     display: inline-flex;
     align-items: center;
     height: 15px;
     box-sizing: border-box;
-    font-size: 10px;
-    font-weight: 600;
+    font-size: 13px;
+    font-weight: 700;
     letter-spacing: 1px;
-    padding: 0 8px;
-    border-radius: 8px;
+    padding: 0;
     line-height: 1;
     white-space: nowrap;
     text-shadow: none;
-    transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
+    transition: opacity 0.3s ease;
   }
 
+  /* No pill: plain text in the buttons' ink and shadow. */
   .hud-dl-badge {
     font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", sans-serif;
-    background: rgba(222, 192, 172, 0.28);
-    color: var(--text-mute);
+    color: var(--text-dark);
+    filter: drop-shadow(0 1px 1px rgba(36, 28, 26, 0.25));
   }
   .hud-dl-badge.decoding {
-    background: rgba(255, 162, 89, 0.32);
-    color: #9E3B06;
     animation: statusPulse 1.2s ease-in-out infinite;
-  }
-  .hud-dl-badge.ready {
-    background: rgba(154, 62, 77, 0.12);
-    color: var(--secondary-accent, #9a3e4d);
-  }
-  html[data-theme="autumn"] .hud-dl-badge.ready,
-  html[data-theme="winter"] .hud-dl-badge.ready {
-    background: rgba(136, 46, 71, 0.12);
-    color: var(--secondary-accent, #882E47);
   }
 
   @keyframes statusPulse {
@@ -1994,14 +1983,17 @@
   }
 
   /* --- The bullet between the pieces, on both rows: a solid dot, drawn
-     rather than typed so it is the same size and weight on both. --- */
+     rather than typed so it is the same size and weight on both. It takes
+     the colour of the row it is in. --- */
   .hud-dot {
     flex: none;
-    width: 6px;
-    height: 6px;
+    width: 4px;
+    height: 4px;
     border-radius: 50%;
-    background: var(--accent-3);
+    background: currentColor;
   }
+  .hud-meta-row .hud-dot { color: var(--accent-3); }   /* the title and artist's colour */
+  .hud-ctrl-row .hud-dot { color: var(--text-dark); }  /* the buttons' ink */
   .hud-dot-off { visibility: hidden; }
 
   /* --- The four buttons: solid flat shapes in the title's ink. The visible
