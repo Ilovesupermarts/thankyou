@@ -10812,6 +10812,9 @@ function spawnLeaf(opts) {
   opts = opts || {};
   if (ENV.scene === 'winter' && !opts.hero) return null;
   if (leaves.length >= S.maxLeaves && !opts.force) return null;
+  // Gusts and puffs may add leaves past the normal cap, but never past this
+  // ceiling, so a long gust cannot pile leaves up until the frame rate drops.
+  if (leaves.length >= S.maxLeaves * 1.25) return null;
   var L = makeLeaf(opts);
   // The nearest leaves fall in front of the text (a few at a time).
   if (S.frontLeaves > 0 && L.z >= S.frontLeafMinZ && frontLeafCount < S.frontLeaves) {
@@ -10908,11 +10911,13 @@ function liftFromPile(L, vx, vy) {
    ============================================================ */
 var gusts = [], gustId = 1;
 function startGust(force) {
+  if (gusts.length >= 2 && !force) return;          // one gust at a time is plenty; never a continuous chain
   var dir = Math.abs(ENV.windPx) > 4 ? Math.sign(ENV.windPx) : (Math.random() < 0.5 ? -1 : 1);
   var g = {
     id: gustId++, dir: dir, x: dir > 0 ? -100 : W + 100,
     speed: 650 + ENV.windMs * 30,
-    str: (90 + ENV.windMs * 22) * (0.6 + S.gustiness) * (force ? 1.3 : 1)
+    str: (90 + ENV.windMs * 22) * (0.6 + S.gustiness) * (force ? 1.3 : 1),
+    lifts: 10                                       // most leaves it may lift off the ground
   };
   gusts.push(g);
   var n = Math.round((3 + Math.floor(Math.random() * 5)) * 0.8);   // 20% fewer leaves blown in
@@ -10938,14 +10943,17 @@ function updateGusts(dt) {
       if (P.gid === g.id) continue;
       if (g.dir > 0 ? P.x < g.x : P.x > g.x) {
         P.gid = g.id;
-        if (Math.random() < 0.44) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
+        if (g.lifts > 0 && leaves.length < S.maxLeaves * 1.25 && Math.random() < 0.44 && g.lifts--) liftFromPile(P, g.dir * g.str * rnd(0.6, 1.2), -rnd(60, 180));
         else P.kick = g.dir * 0.3 * Math.min(1.5, g.str / 150);   // the rest tremble as it passes
       }
     }
     [tree, farTree].forEach(function(T) {
       if (T && T.gid !== g.id && (g.dir > 0 ? T.bx < g.x : T.bx > g.x)) {
         T.gid = g.id;
-        T.gustV += g.dir * (g.str / 400);   // push in proportion to the gust's strength
+        // push in proportion to the gust's strength, but less the further the
+        // tree is already leaning that way, so gusts in a row cannot pin it bent
+        var lean = T.gust * g.dir > 0 ? 1 - Math.min(1, Math.abs(T.gust) / 0.35) : 1;
+        T.gustV += g.dir * (g.str / 400) * lean;
         if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
       }
     });
@@ -12298,7 +12306,11 @@ function updateOneTree(T, dt, t) {
   // two seconds. The limits only stop several gusts stacking without bound.
   T.gustV += (-9 * T.gust - 1.0 * T.gustV) * dt;
   T.gustV = clamp(T.gustV, -1.1, 1.1);
-  T.gust = clamp(T.gust + T.gustV * dt, -0.35, 0.35);
+  T.gust += T.gustV * dt;
+  if (Math.abs(T.gust) > 0.35) {                    // hitting the limit stops the tree there, it does not stay pushed against it
+    T.gust = 0.35 * Math.sign(T.gust);
+    if (T.gustV * T.gust > 0) T.gustV = 0;
+  }
   var wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
   var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway;
   var spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
