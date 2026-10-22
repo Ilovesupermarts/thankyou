@@ -1296,52 +1296,34 @@ var _swipeActive = false;
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 
-/* ============ TRACK METADATA (3 PHASES, 3 PHYSICAL BUFFERS) ============
-   Three Nagoya time phases, three distinct MP3 files. The
-   bufferName field is the physical soundBuffers key; for the
-   current configuration each phase resolves to a 1:1 buffer, but
-   the indirection is preserved so a future change (e.g. sharing
-   one clip across two phases, or a dedicated late-night clip
-   replacing the placeholder) does not require editing the loader
-   or the playback path.
+/* ============ TRACK METADATA (4 PHASES) ============
+   Four Nagoya time phases, the page colour theme's own
+   (getTimeOfDayInNagoya, which also sets data-time). Three of them
+   play a playlist — a folder of numbered songs on the playlist engine
+   (see PLAYLISTS & MUSIC BUTTONS below); night plays one file on the
+   buffer engine, whose bufferName is the physical soundBuffers key.
 
-     morning      05:00–16:59  Sound/morning/1.mp3, 2.mp3, … (a playlist;
-                               see MORNING PLAYLIST below)
-     earlyevening 17:00–21:59  Sound/Earlyevening.mp3  (~16 min, capped at 16:00)
-     latenight    22:00–04:59  Sound/Latenight.mp3     (18 min, full)
+     morning  05:00–10:59  playlist 'morning'  Sound/morning/1.mp3, 2.mp3, …
+     day      11:00–16:59  playlist 'morning'  (no day music yet)
+     evening  17:00–20:59  playlist 'evening'  Sound/Evening/1.m4a, 2.m4a, …
+     night    21:00–04:59  Sound/Latenight.mp3 (18 min, full)
 
-   Each play runs the buffer end-to-end — or up to maxPlaySec, if
-   set — with a linear fade-in at the head and a linear fade-out at
-   the tail, then immediately re-arms for the next cycle. The hour
-   check runs at play time, not at schedule time, so a clip that is
-   mid-flight when the wall clock crosses a bucket boundary
+   Each buffer-engine play runs the buffer end-to-end — or up to
+   maxPlaySec, if set — with a linear fade-in at the head and a linear
+   fade-out at the tail, then immediately re-arms for the next cycle.
+   The hour check runs at play time, not at schedule time, so a clip
+   that is mid-flight when the wall clock crosses a bucket boundary
    finishes naturally and the next cycle picks the correct track.
 
-   Peaks are 1.00 for all three beds. Lifecycle is shared with the
-   audio-reactive swell loop via the .active class on #mapleLeaves. */
+   Lifecycle is shared with the audio-reactive swell loop via the
+   .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
+  { name: 'morning', playlist: 'morning' },
+  { name: 'day',     playlist: 'morning' },
+  { name: 'evening', playlist: 'evening' },
   {
-    /* A folder of numbered songs on the playlist engine, not one decoded
-       buffer: no url, title or artist here. The songs are found by
-       probeMorningSongs() and their titles come from their own tags. */
-    name: 'morning',
-    bufferName: 'morning',
-    playlist: true,
-    peak: 1.00,
-    maxPlaySec: null
-  },
-  {
-    name: 'earlyevening',
-    bufferName: 'earlyevening',
-    url: 'Sound/Earlyevening.mp3',
-    title: '虹を見た日',
-    artist: '小久保隆',
-    peak: 1.00,
-    maxPlaySec: 16 * 60
-  },
-  {
-    name: 'latenight',
-    bufferName: 'latenight',
+    name: 'night',
+    bufferName: 'night',
     url: 'Sound/Latenight.mp3',
     title: 'カタライザー',
     artist: '小久保隆',
@@ -1504,20 +1486,20 @@ function _hudRenderState() {
     totalExpected += _hudBytesTotalMap[url];
     totalLoaded += (_hudBytesLoadedMap[url] || 0);
   }
-  /* 38 MB fallback (12.6 + 16.4 + 8.6) before Content-Length headers resolve */
-  if (totalExpected === 0) totalExpected = 38000000;
+  /* 30 MB fallback before Content-Length headers resolve */
+  if (totalExpected === 0) totalExpected = 30000000;
 
-  /* The morning songs are found one after another, so the byte total
-     keeps growing until the last song in the folder has been seen.
-     Hold the pill at 99% until then rather than let it reach 100%
-     and fall back. */
-  var pct = Math.min(_morningListDone ? 1.0 : 0.99, totalLoaded / totalExpected);
+  /* The songs are found one after another, so the byte total keeps
+     growing until the last song in every folder has been seen. Hold
+     the pill at 99% until then rather than let it reach 100% and
+     fall back. */
+  var pct = Math.min(_playlistsDone() ? 1.0 : 0.99, totalLoaded / totalExpected);
   var pctInt = Math.round(pct * 100);
   var isPlaying = _ambientActive();
 
   var currentTrack = getCurrentAmbientTrack();
   var slotReady = currentTrack.playlist
-    ? _morningSongs.length > 0
+    ? MUSIC_PLAYLISTS[currentTrack.playlist].songs.length > 0
     : !!(soundBuffers && soundBuffers[currentTrack.bufferName]);
   var isDecodingCurrent = !!(_ambientDecodingPromises[currentTrack.bufferName] && _ambientRawBuffers[currentTrack.url]);
 
@@ -1603,8 +1585,8 @@ function formatHudTime(sec) {
    timestamp read from a single source of truth. Returns 0 when no
    playback is active or when the timing state is unset. */
 function getPlaybackElapsed() {
-  if (_morningOn && _morningAudio) {
-    var t = _morningAudio.currentTime;
+  if (_plOn && _plAudio) {
+    var t = _plAudio.currentTime;
     if (ambientPlayDurationSec > 0 && t > ambientPlayDurationSec) t = ambientPlayDurationSec;
     return t > 0 ? t : 0;
   }
@@ -1827,7 +1809,7 @@ function decodeAmbientSlot(track) {
 /* ============ PHASE BOUNDARY SCHEDULER (v1.3) ============
    Every play cycle runs end-to-end at the current phase, so the
    only cross-boundary risk is the moment the wall clock crosses
-   one of the three Nagoya bucket edges (05:00, 17:00, 22:00 JST).
+   one of the four Nagoya phase edges (05:00, 11:00, 17:00, 21:00 JST).
    scheduleNextSlotPreDecode() arms a single timer for
    (time-until-boundary − SLOT_PRE_WINDOW_MS) so the incoming phase
    is already decoded into PCM before playAmbientSound() asks for
@@ -1898,11 +1880,8 @@ var _slotPreDecodeTimer = null;
 var SLOT_PRE_WINDOW_MS = 2 * 60 * 1000; // ms
 
 function getNextAmbientTrack() {
-  var p = nagoyaDateParts();
-  var h = p.hour;
-  if (h >= 5 && h < 17)  return AMBIENT_TRACKS[1]; // Next: 17:00 Early Evening
-  if (h >= 17 && h < 22) return AMBIENT_TRACKS[2]; // Next: 22:00 Late Night
-  return AMBIENT_TRACKS[0];                        // Next: 05:00 Morning
+  var cur = getCurrentAmbientTrack();
+  return AMBIENT_TRACKS[(AMBIENT_TRACKS.indexOf(cur) + 1) % AMBIENT_TRACKS.length];
 }
 
 function msUntilNextPhaseBoundary() {
@@ -1916,12 +1895,15 @@ function msUntilNextPhaseBoundary() {
   var targetHour;
   var addDays = 0;
 
+  /* the four phase edges: 05:00, 11:00, 17:00, 21:00 */
   if (h < 5) {
     targetHour = 5;
+  } else if (h < 11) {
+    targetHour = 11;
   } else if (h < 17) {
     targetHour = 17;
-  } else if (h < 22) {
-    targetHour = 22;
+  } else if (h < 21) {
+    targetHour = 21;
   } else {
     targetHour = 5;
     addDays = 1;
@@ -2216,7 +2198,7 @@ function initSound() {
        scheduler. */
     var currentTrack = getCurrentAmbientTrack();
     AMBIENT_TRACKS.forEach(function(t) {
-      if (t.playlist) { probeMorningSongs(); return; }
+      if (t.playlist) { probePlaylist(MUSIC_PLAYLISTS[t.playlist]); return; }
       fetchAmbientRaw(t).then(function(rawBuf) {
         if (!rawBuf) return;
         /* Decode the current slot the instant its own bytes land,
@@ -2609,15 +2591,15 @@ var _ambientBufferRetries = 0;
 var ambientPlayStartTime = -1;
 var ambientPlayDurationSec = 0;
 
-/* Three-way Nagoya hour dispatch. Function declarations hoist, so
-   referencing nagoyaDateParts here — even though it is declared
-   later in the file — is safe at runtime. */
+/* The track for the page colour theme's phase. Function declarations
+   hoist, so referencing getTimeOfDayInNagoya here — even though it is
+   declared later in the file — is safe at runtime. */
 function getCurrentAmbientTrack() {
-  var p = nagoyaDateParts();
-  var h = p.hour;
-  if (h >= 5 && h < 17)  return AMBIENT_TRACKS[0]; // 05:00–16:59 Morning
-  if (h >= 17 && h < 22) return AMBIENT_TRACKS[1]; // 17:00–21:59 Early evening
-  return AMBIENT_TRACKS[2];                        // 22:00–04:59 Late night
+  var phase = getTimeOfDayInNagoya();
+  for (var i = 0; i < AMBIENT_TRACKS.length; i++) {
+    if (AMBIENT_TRACKS[i].name === phase) return AMBIENT_TRACKS[i];
+  }
+  return AMBIENT_TRACKS[AMBIENT_TRACKS.length - 1];
 }
 
 function startAmbient() {
@@ -2651,7 +2633,7 @@ function scheduleNextAmbient(prevPlayMs) {
 function stopAmbient() {
   stopSwellLoop();
   _ambientBufferRetries = 0;
-  _morningStop();
+  _plStop();
   _bufferResumeAt = 0;
   if (ambientTimer) {
     clearTimeout(ambientTimer);
@@ -2702,8 +2684,8 @@ function playAmbientSound(offsetSec) {
 
   var track = getCurrentAmbientTrack();
 
-  /* Morning is a playlist on its own engine. */
-  if (track.playlist) return playMorningSong();
+  /* A phase with a playlist runs on the playlist engine. */
+  if (track.playlist) return playPlaylistSong();
 
   var buffer = soundBuffers[track.bufferName];
 
@@ -2808,35 +2790,47 @@ function playAmbientSound(offsetSec) {
   return remaining * 1000;
 }
 
-/* ============ MORNING PLAYLIST & MUSIC BUTTONS ============
-   The morning plays the songs in Sound/morning/, named 1.mp3, 2.mp3,
-   … in the order they play, then round again. A static site cannot
-   list a folder, so probeMorningSongs() asks for 1.mp3, 2.mp3, … one
-   after another and stops at the first the server answers 404 for.
-   Adding a song is adding the next number; nothing here changes.
+/* ============ PLAYLISTS & MUSIC BUTTONS ============
+   Morning, day and evening play folders of numbered songs; night plays one
+   file on the buffer engine above. The folders:
 
-   Each song's title and artist are read from its own ID3 tags
-   (readId3Tags) once its bytes have arrived.
+     Sound/morning/1.mp3, 2.mp3, …   plays in the morning and the day
+     Sound/Evening/1.m4a, 2.m4a, …   plays in the evening
 
-   The playlist runs on one <audio> element fed from the downloaded
-   bytes (a Blob), routed through the Web Audio graph so the HUD
-   wave and the swell loop still hear it and the mute button, which
-   sits on ambientBus, still covers it. Nothing is decoded to PCM, so
-   the three songs cost their file size in memory, not ~210 MB. The
-   other two phases keep their single-buffer engine above; the four
-   buttons drive whichever engine is playing.
+   A static site cannot list a folder, so probePlaylist() asks for 1, 2, 3
+   … one after another and stops at the first the server answers 404 for.
+   Adding a song is adding the next number; nothing here changes. A
+   folder is MP3 or M4A (AAC in an MP4 container) as its entry in
+   MUSIC_PLAYLISTS says; the title and artist come from the file's own
+   tags — ID3 in an MP3 (readId3Tags), the iTunes-style ©nam / ©ART atoms
+   in an M4A (readMp4Tags) — once its bytes have arrived.
 
-   The playlist engine is driven by the element's 'ended' event, not
-   by the timer chain: playMorningSong() returns 0, so
-   scheduleNextAmbient() does not re-arm. At the end of a song, if the
-   clock has passed into the next phase, startAmbient() hands over to
-   it — a song that is mid-flight when the hour changes still finishes.
+   The phases are the page colour theme's (getTimeOfDayInNagoya): morning
+   05:00, day 11:00, evening 17:00, night 21:00. There is no day music
+   yet, so the day carries on with the morning songs without a break.
+
+   A playlist runs on one <audio> element fed from the downloaded bytes
+   (a Blob), routed through the Web Audio graph so the HUD wave and the
+   swell loop still hear it and the mute button, which sits on
+   ambientBus, still covers it. Nothing is decoded to PCM, so a song
+   costs its file size in memory, not ~100 MB.
+
+   The engine is driven by the element's 'ended' event, not by the timer
+   chain: playPlaylistSong() returns 0, so scheduleNextAmbient() does not
+   re-arm. At the end of a song, if the clock has moved into a phase with
+   a different playlist (or the night file), startAmbient() hands over —
+   a song that is mid-flight when the hour changes still finishes.
+
+   Between songs, whether a song ran out or next / back was tapped, the
+   old one fades out and the new one fades in. Running out, the song's own
+   last seconds fade (AMBIENT_FADE_OUT); tapped, it fades over
+   PL_FADE_OUT_MS.
 
    Button behaviour:
      · back   — tap: the song starts again from the beginning; a second
                 tap within 0.45 s: the previous song. On the single-song
-                phases both just start the song again.
-     · next   — the next song (morning); the song again (other phases).
+                night phase both just start the song again.
+     · next   — the next song; the song again at night.
      · pause  — stops with a short fade and remembers the position,
                 the icon turns to ▶. Skipping or restarting while
                 paused starts playing again.
@@ -2844,24 +2838,29 @@ function playAmbientSound(offsetSec) {
                 are not on ambientBus.
    Paused and muted are kept in localStorage, so the card comes back
    in the state it was left in. */
-var MORNING_DIR = 'Sound/morning/';
-var MORNING_MAX_SONGS = 30;
-var MORNING_SKIP_MS = 130;       // the quick fade-out before a song change
+var PL_MAX_SONGS = 30;
+var PL_FADE_OUT_MS = 1000;       // the fade-out when next / back is tapped
+var PL_FADE_IN = 1.5;            // seconds, every song that follows another
+var PL_QUICK_MS = 130;           // the quick duck before a restart
 var MUSIC_DOUBLE_TAP_MS = 450;
 
-var _morningSongs = [];          // { url, title, artist }, in file order
-var _morningListDone = false;    // true once the end of the folder has been seen
-var _morningProbing = false;
-var _morningProbeN = 0;          // how many songs have been found so far
-var _morningProbeRetries = 0;
+function _makePlaylist(dir, ext, mime) {
+  return { dir: dir, ext: ext, mime: mime, songs: [], index: 0,
+           done: false, probing: false, probeN: 0, retries: 0 };
+}
+var MUSIC_PLAYLISTS = {
+  morning: _makePlaylist('Sound/morning/', 'mp3', 'audio/mpeg'),
+  evening: _makePlaylist('Sound/Evening/', 'm4a', 'audio/mp4')
+};
 
-var _morningAudio = null;        // the one <audio> element, reused for every song
-var _morningGain = null;         // fades each song in and out
-var _morningUrl = '';            // blob URL of the song loaded now
-var _morningIndex = 0;
-var _morningOn = false;          // the playlist engine holds a song (playing or paused)
-var _morningSeq = 0;             // bumped by every change of song, so late timers stand down
-var _morningErrors = 0;
+var _pl = null;                  // the playlist the engine holds
+var _plAudio = null;             // the one <audio> element, reused for every song
+var _plGain = null;              // fades each song in and out
+var _plUrl = '';                 // blob URL of the song loaded now
+var _plOn = false;               // the engine holds a song (playing or paused)
+var _plSeq = 0;                  // bumped by every change of song, so late timers stand down
+var _plTarget = -1;              // the song a pending skip is heading for
+var _plErrors = 0;
 
 var _ambientPlayingName = '';    // phase name of the buffer-engine track on air
 var _bufferResumeAt = 0;         // seconds into it when it was paused
@@ -2885,7 +2884,13 @@ var hudBtnMute = document.getElementById('hudBtnMute');
 /* True while either engine holds a track — the HUD reads this where it
    used to read ambientSource. */
 function _ambientActive() {
-  return ambientSource !== null || _morningOn;
+  return ambientSource !== null || _plOn;
+}
+
+/* True once every playlist has been walked to its end. */
+function _playlistsDone() {
+  for (var k in MUSIC_PLAYLISTS) if (!MUSIC_PLAYLISTS[k].done) return false;
+  return true;
 }
 
 /* Title and artist on the meta row. With no artist the bullet goes (it
@@ -2896,7 +2901,7 @@ function _hudSetMeta(title, artist) {
   if (hudTrackSep)    hudTrackSep.classList.toggle('hud-dot-off', !artist);
 }
 
-/* ---------- ID3 tags ---------- */
+/* ---------- tags ---------- */
 function _id3Text(bytes, enc) {
   var text = '';
   try {
@@ -2946,52 +2951,120 @@ function readId3Tags(buf) {
   return out;
 }
 
-/* An MP3 starts with an ID3 tag or a frame sync. A host that answers a
-   missing file with a 200 page is caught here, not played. */
-function _looksLikeMp3(buf) {
+/* The boxes ("atoms") of an MP4 between start and end, as
+   { type, body, end }: body is where the box's contents begin. */
+function _mp4Boxes(dv, start, end) {
+  var list = [];
+  var pos = start;
+  while (pos + 8 <= end) {
+    var size = dv.getUint32(pos);
+    var type = String.fromCharCode(dv.getUint8(pos + 4), dv.getUint8(pos + 5), dv.getUint8(pos + 6), dv.getUint8(pos + 7));
+    var head = 8;
+    if (size === 1) {   // 64-bit size
+      size = dv.getUint32(pos + 8) * 4294967296 + dv.getUint32(pos + 12);
+      head = 16;
+    } else if (size === 0) {
+      size = end - pos;
+    }
+    if (size < head || pos + size > end) break;
+    list.push({ type: type, body: pos + head, end: pos + size });
+    pos += size;
+  }
+  return list;
+}
+
+function _mp4Find(list, type) {
+  for (var i = 0; i < list.length; i++) if (list[i].type === type) return list[i];
+  return null;
+}
+
+/* Title (©nam) and artist (©ART, or aART) from the iTunes-style tags of an
+   M4A: moov › udta › meta › ilst. Anything it cannot read comes back as ''. */
+function readMp4Tags(buf) {
+  var out = { title: '', artist: '' };
+  try {
+    var dv = new DataView(buf);
+    var moov = _mp4Find(_mp4Boxes(dv, 0, buf.byteLength), 'moov');
+    if (!moov) return out;
+    var udta = _mp4Find(_mp4Boxes(dv, moov.body, moov.end), 'udta');
+    if (!udta) return out;
+    var meta = _mp4Find(_mp4Boxes(dv, udta.body, udta.end), 'meta');
+    if (!meta) return out;
+    /* meta is a "full" box (4 bytes of version and flags) in MP4, a plain
+       box in old QuickTime files: a leading zero word says which. */
+    var inner = dv.getUint32(meta.body) === 0 ? meta.body + 4 : meta.body;
+    var ilst = _mp4Find(_mp4Boxes(dv, inner, meta.end), 'ilst');
+    if (!ilst) return out;
+    var items = _mp4Boxes(dv, ilst.body, ilst.end);
+    var text = function(type) {
+      var item = _mp4Find(items, type);
+      if (!item) return '';
+      var data = _mp4Find(_mp4Boxes(dv, item.body, item.end), 'data');
+      if (!data) return '';
+      /* 1 byte version, 3 of flags (1 = UTF-8 text), 4 of locale, then the text */
+      return new TextDecoder('utf-8').decode(new Uint8Array(buf, data.body + 8, data.end - data.body - 8)).trim();
+    };
+    out.title  = text('©nam');
+    out.artist = text('©ART') || text('aART');
+  } catch (e) {}
+  return out;
+}
+
+function _readTags(buf) {
   var b = new Uint8Array(buf, 0, Math.min(buf.byteLength, 3));
+  if (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) return readId3Tags(buf);
+  return readMp4Tags(buf);
+}
+
+/* An MP3 starts with an ID3 tag or a frame sync; an M4A with an 'ftyp'
+   box. A host that answers a missing file with a 200 page is caught here,
+   not played. */
+function _looksLikeAudio(buf) {
+  if (buf.byteLength < 12) return false;
+  var b = new Uint8Array(buf, 0, 12);
   return (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) ||
-         (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0);
+         (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0) ||
+         (b[4] === 0x66 && b[5] === 0x74 && b[6] === 0x79 && b[7] === 0x70);
 }
 
 /* ---------- finding the songs ---------- */
-function probeMorningSongs() {
-  if (_morningProbing || _morningListDone) return;
-  _morningProbing = true;
+function probePlaylist(pl) {
+  if (pl.probing || pl.done) return;
+  pl.probing = true;
 
   function step() {
-    var n = _morningProbeN + 1;
-    if (n > MORNING_MAX_SONGS) {
-      _morningProbing = false;
-      _morningListDone = true;
+    var n = pl.probeN + 1;
+    if (n > PL_MAX_SONGS) {
+      pl.probing = false;
+      pl.done = true;
       _hudRenderState();
       return;
     }
-    var song = { url: MORNING_DIR + n + '.mp3', title: '', artist: '' };
+    var song = { url: pl.dir + n + '.' + pl.ext, title: '', artist: '' };
     fetchAmbientRaw(song).then(function(raw) {
-      if (!raw || !_looksLikeMp3(raw)) {
-        _morningProbing = false;
+      if (!raw || !_looksLikeAudio(raw)) {
+        pl.probing = false;
         if (raw) {
-          /* a 200 that is not an MP3: the folder has ended */
+          /* a 200 that is not audio: the folder has ended */
           delete _ambientRawBuffers[song.url];
-          _morningListDone = true;
+          pl.done = true;
         } else if (_ambientMissing[song.url]) {
-          _morningListDone = true;
-        } else if (++_morningProbeRetries <= 20) {
+          pl.done = true;
+        } else if (++pl.retries <= 20) {
           /* the network, not the folder: ask again shortly */
-          setTimeout(probeMorningSongs, 3000);
+          setTimeout(function() { probePlaylist(pl); }, 3000);
         } else {
-          _morningListDone = true;
+          pl.done = true;
         }
         _hudRenderState();
         return;
       }
-      var tags = readId3Tags(raw);
+      var tags = _readTags(raw);
       song.title  = tags.title || ('トラック ' + n);
       song.artist = tags.artist;
-      _morningSongs.push(song);
-      _morningProbeN = n;
-      _morningProbeRetries = 0;
+      pl.songs.push(song);
+      pl.probeN = n;
+      pl.retries = 0;
       step();
     });
   }
@@ -2999,48 +3072,54 @@ function probeMorningSongs() {
 }
 
 /* ---------- the playlist engine ---------- */
-function _morningEnsureGraph() {
-  if (_morningAudio) return true;
+function _plEnsureGraph() {
+  if (_plAudio) return true;
   if (!soundAudioCtx) return false;
   try {
     var a = new Audio();
     a.preload = 'auto';
     var node = soundAudioCtx.createMediaElementSource(a);
-    _morningGain = soundAudioCtx.createGain();
-    _morningGain.gain.value = 0;
-    node.connect(_morningGain);
-    _morningGain.connect(ambientBus || soundMasterGain);
+    _plGain = soundAudioCtx.createGain();
+    _plGain.gain.value = 0;
+    node.connect(_plGain);
+    _plGain.connect(ambientBus || soundMasterGain);
     a.addEventListener('ended', function() {
-      if (_morningOn) _morningStep(1, 0);
+      if (_plOn) _plStep(1, 0);
     });
-    a.addEventListener('playing', function() { _morningErrors = 0; });
+    a.addEventListener('playing', function() { _plErrors = 0; });
     a.addEventListener('error', function() {
       /* A file the browser cannot play: move on, unless every song fails. */
-      if (!_morningOn || ++_morningErrors > _morningSongs.length) return;
-      _morningStep(1, 500);
+      if (!_plOn || !_pl || ++_plErrors > _pl.songs.length) return;
+      _plStep(1, 500);
     });
-    _morningAudio = a;
+    _plAudio = a;
   } catch (e) {
     return false;
   }
   return true;
 }
 
-function _morningLoadSong(idx) {
-  var song = _morningSongs[idx];
+function _plLoadSong(idx) {
+  var song = _pl.songs[idx];
   var raw = _ambientRawBuffers[song.url];
-  if (!raw || !_morningAudio) return false;
-  var a = _morningAudio;
-  var seq = _morningSeq;
-  var old = _morningUrl;
-  _morningUrl = URL.createObjectURL(new Blob([raw], { type: 'audio/mpeg' }));
-  a.src = _morningUrl;
+  if (!raw || !_plAudio) return false;
+  var a = _plAudio;
+  var seq = _plSeq;
+  var old = _plUrl;
+  _plUrl = URL.createObjectURL(new Blob([raw], { type: _pl.mime }));
+  a.src = _plUrl;
   if (old) URL.revokeObjectURL(old);
-  _morningIndex = idx;
-  _morningOn = true;
+  _pl.index = idx;
+  _plOn = true;
+  /* Every song comes in from silence, whatever the one before ended on. */
+  try {
+    var now = soundAudioCtx.currentTime;
+    _plGain.gain.cancelScheduledValues(now);
+    _plGain.gain.setValueAtTime(0, now);
+  } catch (e) {}
   ambientPlayDurationSec = 0;
   a.onloadedmetadata = function() {
-    if (seq !== _morningSeq) return;
+    if (seq !== _plSeq) return;
     ambientPlayDurationSec = a.duration;
     _hudRenderState();
   };
@@ -3050,14 +3129,14 @@ function _morningLoadSong(idx) {
 
 /* Play the loaded song, fading in over fadeIn seconds from wherever the
    gain is, and lay down the fade-out for its last seconds. */
-function _morningStart(fadeIn) {
-  var a = _morningAudio;
-  var seq = _morningSeq;
+function _plStart(fadeIn) {
+  var a = _plAudio;
+  var seq = _plSeq;
   if (!a) return;
   var begin = function() {
-    if (seq !== _morningSeq || _musicPaused) return;
+    if (seq !== _plSeq || _musicPaused) return;
     var now = soundAudioCtx.currentTime;
-    var g = _morningGain.gain;
+    var g = _plGain.gain;
     var left = a.duration - a.currentTime;
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
@@ -3076,7 +3155,7 @@ function _morningStart(fadeIn) {
     p.then(begin, function() {
       /* The browser refused to start it: show it as paused, and do not
          remember that as the user's choice. */
-      if (seq !== _morningSeq) return;
+      if (seq !== _plSeq) return;
       _musicPaused = true;
       _musicSyncButtons();
     });
@@ -3085,51 +3164,54 @@ function _morningStart(fadeIn) {
   }
 }
 
-function _morningFadeOut() {
-  if (!_morningGain || !soundAudioCtx) return;
+/* Ramp the song's gain to nothing over sec seconds, from where it is. */
+function _plFadeOut(sec) {
+  if (!_plGain || !soundAudioCtx) return;
   var now = soundAudioCtx.currentTime;
-  var g = _morningGain.gain;
+  var g = _plGain.gain;
   try {
     g.cancelScheduledValues(now);
     g.setValueAtTime(g.value, now);
-    g.setTargetAtTime(0, now, 0.04);
+    g.linearRampToValueAtTime(0, now + sec);
   } catch (e) {}
 }
 
-function _morningPause() {
-  var a = _morningAudio;
-  var seq = _morningSeq;
+function _plPause() {
+  var a = _plAudio;
+  var seq = _plSeq;
   if (!a) return;
-  _morningFadeOut();
+  _plFadeOut(0.25);
   setTimeout(function() {
-    if (seq === _morningSeq && _musicPaused) a.pause();
+    if (seq === _plSeq && _musicPaused) a.pause();
   }, 300);
   _hudRenderState();
 }
 
 /* Release the engine (stopAmbient). The song fades out first; the
    element is emptied only if no new song has been loaded since. */
-function _morningStop() {
-  var seq = ++_morningSeq;
-  if (!_morningOn) return;
-  _morningOn = false;
-  var a = _morningAudio;
-  var url = _morningUrl;
-  _morningUrl = '';
-  _morningFadeOut();
+function _plStop() {
+  var seq = ++_plSeq;
+  _plTarget = -1;
+  if (!_plOn) return;
+  _plOn = false;
+  var a = _plAudio;
+  var url = _plUrl;
+  _plUrl = '';
+  _plFadeOut(0.25);
   setTimeout(function() {
-    if (seq === _morningSeq && a) {
+    if (seq === _plSeq && a) {
       try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {}
     }
     if (url) URL.revokeObjectURL(url);
   }, 300);
 }
 
-/* Called by playAmbientSound() while it is morning. */
-function playMorningSong() {
-  if (!_morningSongs.length) {
+/* Called by playAmbientSound() while the phase has a playlist. */
+function playPlaylistSong() {
+  var pl = MUSIC_PLAYLISTS[getCurrentAmbientTrack().playlist];
+  if (!pl.songs.length) {
     /* No song has arrived yet: keep asking, as the buffer engine does. */
-    probeMorningSongs();
+    probePlaylist(pl);
     _ambientBufferRetries++;
     if (_ambientBufferRetries > 120) {
       _ambientBufferRetries = 0;
@@ -3138,44 +3220,58 @@ function playMorningSong() {
     return 500;
   }
   _ambientBufferRetries = 0;
-  if (!_morningEnsureGraph()) return 0;
-  _morningSeq++;
-  if (_morningLoadSong(_morningIndex % _morningSongs.length) && !_musicPaused) {
-    _morningStart(1.5);
+  if (!_plEnsureGraph()) return 0;
+  _pl = pl;
+  _plSeq++;
+  _plTarget = -1;
+  if (_plLoadSong(pl.index % pl.songs.length) && !_musicPaused) {
+    _plStart(1.5);
   }
   return 0;   // song changes come from the element's 'ended' event
 }
 
-/* Move delta songs on (1 or −1), after the quick fade-out. Always plays:
-   skipping from the paused state starts the music. */
-function _morningStep(delta, delayMs) {
-  if (!_morningOn) return;
+/* Move delta songs on (1 or −1). The song on air fades out over delayMs
+   (nothing to fade when it has run out: 0), then the next fades in.
+   Always plays: skipping from the paused state starts the music. Taps
+   that come while a skip is pending count from the song it is heading
+   for. */
+function _plStep(delta, delayMs) {
+  if (!_plOn) return;
   _musicSetPaused(false);
-  /* Morning is over: the next phase takes the music. */
-  if (!getCurrentAmbientTrack().playlist) { startAmbient(); return; }
-  var n = _morningSongs.length;
+  /* The hour has moved on to a phase with other music: it takes over. */
+  var track = getCurrentAmbientTrack();
+  if (!track.playlist || MUSIC_PLAYLISTS[track.playlist] !== _pl) { startAmbient(); return; }
+  var n = _pl.songs.length;
   if (!n) return;
-  var idx = (((_morningIndex + delta) % n) + n) % n;
-  var seq = ++_morningSeq;
-  _morningFadeOut();
+  var base = _plTarget >= 0 ? _plTarget : _pl.index;
+  var idx = (((base + delta) % n) + n) % n;
+  _plTarget = idx;
+  var seq = ++_plSeq;
+  if (delayMs > 0) _plFadeOut(delayMs / 1000);
+  _hudSetMeta(_pl.songs[idx].title, _pl.songs[idx].artist);
   setTimeout(function() {
-    if (seq !== _morningSeq || !_morningOn) return;
-    if (_morningLoadSong(idx)) _morningStart(0.8);
+    if (seq !== _plSeq || !_plOn) return;
+    _plTarget = -1;
+    if (_plLoadSong(idx)) _plStart(PL_FADE_IN);
   }, delayMs);
 }
 
-function _morningRestart() {
+function _plRestart() {
   _musicSetPaused(false);
-  var seq = ++_morningSeq;
-  _morningFadeOut();
+  var seq = ++_plSeq;
+  _plTarget = -1;
+  _plFadeOut(PL_QUICK_MS / 1000);
+  /* a skip that was pending is cancelled: the card shows the song on air */
+  var song = _pl.songs[_pl.index];
+  _hudSetMeta(song.title, song.artist);
   setTimeout(function() {
-    if (seq !== _morningSeq || !_morningOn) return;
-    try { _morningAudio.currentTime = 0; } catch (e) {}
-    _morningStart(0.6);
-  }, MORNING_SKIP_MS);
+    if (seq !== _plSeq || !_plOn) return;
+    try { _plAudio.currentTime = 0; } catch (e) {}
+    _plStart(0.6);
+  }, PL_QUICK_MS);
 }
 
-/* ---------- the single-buffer phases: pause, resume, restart ---------- */
+/* ---------- the single-song phase: pause, resume, restart ---------- */
 function _bufferPause() {
   if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
   if (ambientSource === null) return;
@@ -3228,11 +3324,11 @@ function _musicSetPaused(p) {
 function musicTogglePause() {
   if (_musicPaused) {
     _musicSetPaused(false);
-    if (_morningOn) _morningStart(0.5);
+    if (_plOn) _plStart(0.5);
     else _bufferResume();
   } else {
     _musicSetPaused(true);
-    if (_morningOn) _morningPause();
+    if (_plOn) _plPause();
     else _bufferPause();
   }
 }
@@ -3249,8 +3345,8 @@ function musicToggleMute() {
   }
 }
 
-/* The single-song phases have nothing to skip to: both buttons start
-   the song again. */
+/* The single-song phase has nothing to skip to: both buttons start the
+   song again. */
 function _musicRestartTrack() {
   _musicSetPaused(false);
   _bufferResumeAt = 0;
@@ -3258,7 +3354,7 @@ function _musicRestartTrack() {
 }
 
 function musicNext() {
-  if (_morningOn) _morningStep(1, MORNING_SKIP_MS);
+  if (_plOn) _plStep(1, PL_FADE_OUT_MS);
   else _musicRestartTrack();
 }
 
@@ -3266,9 +3362,9 @@ function musicBack() {
   var now = Date.now();
   var again = now - _backTapAt < MUSIC_DOUBLE_TAP_MS;
   _backTapAt = again ? 0 : now;
-  if (!_morningOn) _musicRestartTrack();
-  else if (again) _morningStep(-1, MORNING_SKIP_MS);
-  else _morningRestart();
+  if (!_plOn) _musicRestartTrack();
+  else if (again) _plStep(-1, PL_FADE_OUT_MS);
+  else _plRestart();
 }
 
 /* Only the four buttons take touches (the card around them ignores them),
@@ -9481,7 +9577,7 @@ var GameWindow = (function() {
     if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
     if (soundAudioCtx) {
       var now = soundAudioCtx.currentTime;
-      [ambientGain, _morningGain].forEach(function (g) {
+      [ambientGain, _plGain].forEach(function (g) {
         if (!g) return;
         try {
           g.gain.cancelScheduledValues(now);
