@@ -1022,6 +1022,15 @@
     opacity: 1;
   }
   .furin-text .ko-sub .hud-artist { margin-right: 0; overflow: visible; }
+  /* The bullet in the wind line, and the ticker's, is the same 4px dot as the
+     music display's, in the line's own colour. */
+  .furin-text .hud-sep,
+  .ticker-track .hud-sep {
+    display: inline-block; flex: none; width: 4px; height: 4px; border-radius: 50%;
+    background: var(--text-med); font-size: 0; text-shadow: none;
+  }
+  .furin-text .hud-sep { align-self: center; }
+  .ticker-track .hud-sep { vertical-align: -3px; margin: 0 1px; }
   .furin-canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
   .furin-hit {
     position: absolute; top: 0; left: 0; transform-origin: 50% 0;
