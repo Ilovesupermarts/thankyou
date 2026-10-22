@@ -1257,6 +1257,7 @@ document.addEventListener('contextmenu', function(e) {
 var SOUND_ENABLED = true;
 var soundAudioCtx = null;
 var soundMasterGain = null;
+var ambientBus = null;   // every ambient source runs through this: the mute button rides on it
 var soundBuffers = {};
 var soundReady = false;
 
@@ -1304,7 +1305,8 @@ var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
    replacing the placeholder) does not require editing the loader
    or the playback path.
 
-     morning      05:00–16:59  Sound/Morning.mp3       (17 min, full)
+     morning      05:00–16:59  Sound/morning/1.mp3, 2.mp3, … (a playlist;
+                               see MORNING PLAYLIST below)
      earlyevening 17:00–21:59  Sound/Earlyevening.mp3  (~16 min, capped at 16:00)
      latenight    22:00–04:59  Sound/Latenight.mp3     (18 min, full)
 
@@ -1319,11 +1321,12 @@ var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
    audio-reactive swell loop via the .active class on #mapleLeaves. */
 var AMBIENT_TRACKS = [
   {
+    /* A folder of numbered songs on the playlist engine, not one decoded
+       buffer: no url, title or artist here. The songs are found by
+       probeMorningSongs() and their titles come from their own tags. */
     name: 'morning',
     bufferName: 'morning',
-    url: 'Sound/Morning.mp3',
-    title: '草原の風',
-    artist: '小久保隆',
+    playlist: true,
     peak: 1.00,
     maxPlaySec: null
   },
@@ -1378,21 +1381,22 @@ var AMBIENT_FADE_OUT = 4.0;  // seconds
    whenever ambientSource is non-null so the two never race.
 
    Layout (post-revamp):
-     · hudStatusBadge (top-left)  — 待機中 / 再生中 / 展開中 / 待機完了
-     · hudPctStatus   (top-right) — DL XX% / PCM展開中 / DL 100%
-     · hudTrackTitle · hudTrackArtist (centred meta row)
+     · hudTrackTitle · hudTrackArtist (meta row, back / next buttons
+       at its two ends)
+     · pause · mute buttons, and hudPctStatus at the right end of
+       that row — DL XX% / PCM展開中 / DL 100%
+       (the old 再生中 pill is gone: the pause / play icon says it)
      · hudCanvas (288×52, six-layer fluid waveform)
      · hudGaugeFill (playback progress with glowing playhead)
      · hudTimeElapsed / hudTimeTotal (split timestamps below the bar)
 
-   Status and download have independent DOM targets under the
-   revamp, so the cold-launch dual-writer race that previously
-   flapped the single label row between "DL 48%" and "00:04 /
-   17:00" is structurally closed. */
+   Status and download used to have independent DOM targets, which
+   closed the cold-launch dual-writer race that flapped the single
+   label row between "DL 48%" and "00:04 / 17:00". */
 var audioSpectrumHud = document.getElementById('audioSpectrumHud');
 var hudTrackTitle    = document.getElementById('hudTrackTitle');
 var hudTrackArtist   = document.getElementById('hudTrackArtist');
-var hudStatusBadge   = document.getElementById('hudStatusBadge');
+var hudTrackSep      = document.getElementById('hudTrackSep');
 var hudCanvas        = document.getElementById('hudCanvas');
 var hudCtx           = hudCanvas ? hudCanvas.getContext('2d') : null;
 var hudGaugeFill     = document.getElementById('hudGaugeFill');
@@ -1401,10 +1405,10 @@ var hudTimeElapsed   = document.getElementById('hudTimeElapsed');
 var hudTimeTotal     = document.getElementById('hudTimeTotal');
 
 /* Must equal .audio-spectrum-hud's content-box width in main.css:
-   318px card − 2px borders − 28px horizontal padding = 288. The
+   440px card − 2px borders − 28px horizontal padding = 410. The
    canvas backing store is sized to this constant; drift re-
    introduces the aspect stretch the v1.3 amendment closed. */
-var HUD_DISPLAY_W = 288;
+var HUD_DISPLAY_W = 410;
 var HUD_DISPLAY_H = 44;
 var HUD_WAVE_PTS  = 28;
 var HUD_LAYERS    = 6;
@@ -1492,7 +1496,7 @@ function _hudShouldDraw() {
    without the guard the badge would claim PCM展開中 while bytes
    were still on the wire. */
 function _hudRenderState() {
-  if (!hudStatusBadge || !hudGaugeFill) return;
+  if (!hudGaugeFill) return;
 
   var totalExpected = 0;
   var totalLoaded = 0;
@@ -1500,15 +1504,21 @@ function _hudRenderState() {
     totalExpected += _hudBytesTotalMap[url];
     totalLoaded += (_hudBytesLoadedMap[url] || 0);
   }
-  /* 41 MB fallback (16 + 16 + 9) before Content-Length headers resolve */
-  if (totalExpected === 0) totalExpected = 41000000;
+  /* 38 MB fallback (12.6 + 16.4 + 8.6) before Content-Length headers resolve */
+  if (totalExpected === 0) totalExpected = 38000000;
 
-  var pct = Math.min(1.0, totalLoaded / totalExpected);
+  /* The morning songs are found one after another, so the byte total
+     keeps growing until the last song in the folder has been seen.
+     Hold the pill at 99% until then rather than let it reach 100%
+     and fall back. */
+  var pct = Math.min(_morningListDone ? 1.0 : 0.99, totalLoaded / totalExpected);
   var pctInt = Math.round(pct * 100);
-  var isPlaying = (ambientSource !== null);
+  var isPlaying = _ambientActive();
 
   var currentTrack = getCurrentAmbientTrack();
-  var slotReady = !!(soundBuffers && soundBuffers[currentTrack.bufferName]);
+  var slotReady = currentTrack.playlist
+    ? _morningSongs.length > 0
+    : !!(soundBuffers && soundBuffers[currentTrack.bufferName]);
   var isDecodingCurrent = !!(_ambientDecodingPromises[currentTrack.bufferName] && _ambientRawBuffers[currentTrack.url]);
 
   /* Gauge width: during playback the swell loop's updateHudProgress()
@@ -1520,12 +1530,11 @@ function _hudRenderState() {
     hudGaugeFill.style.width = pctInt + '%';
   }
   hudGaugeFill.classList.remove('decoding', 'ready');
-  hudStatusBadge.classList.remove('loading', 'decoding', 'ready');
   if (hudPctStatus) hudPctStatus.classList.remove('decoding', 'ready');
 
-  /* DL pill, under the end of the artist name — download /
-     decompression progress. Independent of the status badge so background
-     download of Tracks 2 and 3 stays visible while Track 1 is playing. */
+  /* DL pill, at the right end of the control row — download /
+     decompression progress. Background download of the other
+     phases stays visible while the current one is playing. */
   if (hudPctStatus) {
     if (isDecodingCurrent) {
       hudPctStatus.textContent = 'PCM展開中';
@@ -1538,17 +1547,13 @@ function _hudRenderState() {
     }
   }
 
-  /* Top-left red box — playback status. Gauge fill classes carry
-     the amber→plum readiness signal; the width is owned by the
-     swell loop during playback. */
+  /* Gauge fill classes carry the amber→plum readiness signal; the
+     width is owned by the swell loop during playback. */
   if (isPlaying) {
-    hudStatusBadge.textContent = '再生中';
-    hudStatusBadge.classList.add('ready');
-
-    /* Plum fill only when all three raw MP3s are downloaded. The
+    /* Plum fill only when every raw MP3 is downloaded. The
        amber→plum transition signals background I/O completion and
        must not be short-circuited by the fact that the currently-
-       playing slot is, by definition, decoded. */
+       playing slot is, by definition, ready. */
     if (pct >= 1.0) {
       hudGaugeFill.classList.add('ready');
     }
@@ -1558,27 +1563,13 @@ function _hudRenderState() {
     if (hudTimeTotal)   hudTimeTotal.textContent   = formatHudTime(ambientPlayDurationSec);
     _hudLastRenderedSec = Math.floor(elapsed);
   } else if (!slotReady || pct < 1.0) {
-    /* Priority 2 — either the active slot is decoding, or raw
-       streams are still in flight. Both must resolve before the
-       badge may claim 待機完了, so the badge and gauge stay in
-       agreement throughout the cold-launch window. Only claim
-       PCM decompression when the raw bytes are actually resident. */
     if (isDecodingCurrent) {
       hudGaugeFill.classList.add('decoding');
-      hudStatusBadge.textContent = '展開中';
-      hudStatusBadge.classList.add('decoding');
-    } else {
-      hudStatusBadge.textContent = '待機中';
-      hudStatusBadge.classList.add('loading');
     }
     if (hudTimeElapsed) hudTimeElapsed.textContent = '00:00';
     if (hudTimeTotal)   hudTimeTotal.textContent   = '--:--';
   } else {
-    /* Priority 3 — active slot decoded AND all raw buffers
-       resident in RAM. */
     hudGaugeFill.classList.add('ready');
-    hudStatusBadge.textContent = '待機完了';
-    hudStatusBadge.classList.add('ready');
     if (hudTimeElapsed) hudTimeElapsed.textContent = '00:00';
     if (hudTimeTotal)   hudTimeTotal.textContent   = '--:--';
   }
@@ -1612,6 +1603,11 @@ function formatHudTime(sec) {
    timestamp read from a single source of truth. Returns 0 when no
    playback is active or when the timing state is unset. */
 function getPlaybackElapsed() {
+  if (_morningOn && _morningAudio) {
+    var t = _morningAudio.currentTime;
+    if (ambientPlayDurationSec > 0 && t > ambientPlayDurationSec) t = ambientPlayDurationSec;
+    return t > 0 ? t : 0;
+  }
   if (ambientSource === null) return 0;
   if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return 0;
   var elapsed = soundAudioCtx.currentTime - ambientPlayStartTime;
@@ -1640,8 +1636,8 @@ function getPlaybackElapsed() {
    no visible effect. */
 function updateHudProgress() {
   if (!hudGaugeFill) return;
-  if (ambientSource === null) return;
-  if (ambientPlayStartTime < 0 || ambientPlayDurationSec <= 0) return;
+  if (!_ambientActive()) return;
+  if (ambientPlayDurationSec <= 0) return;
 
   var elapsed = getPlaybackElapsed();
 
@@ -1675,10 +1671,15 @@ function updateHudProgress() {
    The final byte total is flushed before resolving so the gauge
    snaps to 100% for this URL and the aggregate pct updates
    immediately. */
+var _ambientMissing = {};   // urls the server answered 404 for
+
 function loadAudioBufferRaw(url) {
   return fetch(url)
     .then(function(res) {
-      if (!res.ok) throw new Error('audio fetch failed: ' + url);
+      if (!res.ok) {
+        if (res.status === 404) _ambientMissing[url] = true;
+        throw new Error('audio fetch failed: ' + url);
+      }
       var len = res.headers.get('content-length');
       _hudBytesTotalMap[url] = len ? parseInt(len, 10) : 16000000;
       _hudBytesLoadedMap[url] = 0;
@@ -1798,6 +1799,7 @@ var _ambientRawBuffers = {};
 var _ambientDecodingPromises = {};
 
 function decodeAmbientSlot(track) {
+  if (track.playlist) return Promise.resolve(null);   // streamed by the playlist engine, never decoded to PCM
   if (soundBuffers[track.bufferName]) return Promise.resolve(soundBuffers[track.bufferName]);
   if (_ambientDecodingPromises[track.bufferName]) return _ambientDecodingPromises[track.bufferName];
 
@@ -2143,6 +2145,10 @@ function initSound() {
     soundMasterGain.gain.value = 0.5;
     soundMasterGain.connect(soundAudioCtx.destination);
 
+    ambientBus = soundAudioCtx.createGain();
+    ambientBus.gain.value = _musicMuted ? 0 : 1;
+    ambientBus.connect(soundMasterGain);
+
     /* Parallel analyser tap for the audio-reactive swell system
        and the HUD spectrum. Leaf node, no destination connection. */
     swellCompensationGain = soundAudioCtx.createGain();
@@ -2210,6 +2216,7 @@ function initSound() {
        scheduler. */
     var currentTrack = getCurrentAmbientTrack();
     AMBIENT_TRACKS.forEach(function(t) {
+      if (t.playlist) { probeMorningSongs(); return; }
       fetchAmbientRaw(t).then(function(rawBuf) {
         if (!rawBuf) return;
         /* Decode the current slot the instant its own bytes land,
@@ -2644,6 +2651,8 @@ function scheduleNextAmbient(prevPlayMs) {
 function stopAmbient() {
   stopSwellLoop();
   _ambientBufferRetries = 0;
+  _morningStop();
+  _bufferResumeAt = 0;
   if (ambientTimer) {
     clearTimeout(ambientTimer);
     ambientTimer = null;
@@ -2676,7 +2685,7 @@ function stopAmbient() {
   _hudRenderState();
 }
 
-function playAmbientSound() {
+function playAmbientSound(offsetSec) {
   /* Terminal guards: sound disabled or carousel inactive. Every theme
      (autumn, winter, sakura) plays the same ambient music. Each of these states is not expected to
      flip without a fresh user gesture (or a full reload), so the
@@ -2692,6 +2701,10 @@ function playAmbientSound() {
   if (!soundAudioCtx) return 0;
 
   var track = getCurrentAmbientTrack();
+
+  /* Morning is a playlist on its own engine. */
+  if (track.playlist) return playMorningSong();
+
   var buffer = soundBuffers[track.bufferName];
 
   /* Transient guard: current slot not decoded yet. decodeAmbientSlot
@@ -2715,14 +2728,18 @@ function playAmbientSound() {
   _ambientBufferRetries = 0;
 
   /* Synchronise HUD metadata to the currently-selected phase */
-  if (hudTrackTitle)  hudTrackTitle.textContent = track.title;
-  if (hudTrackArtist) hudTrackArtist.textContent = track.artist;
+  _hudSetMeta(track.title, track.artist);
 
   /* Release every other decoded slot's PCM before we commit to
      this one. Safe: the currently-playing AudioBufferSourceNode
      (if any) holds its own strong reference to its buffer, so a
      cross-boundary fade-out is unaffected. */
   releaseNonCurrentAmbientSlots(track.bufferName);
+
+  /* Paused (now, or when the app was last closed): the card shows the
+     track, nothing plays, and no re-arm timer runs. The play button
+     starts it again through this same function. */
+  if (_musicPaused) return 0;
 
   var bufferDur = buffer.duration;
   /* Terminal guard: a successfully decoded AudioBuffer always has
@@ -2736,8 +2753,13 @@ function playAmbientSound() {
     playDur = track.maxPlaySec;
   }
 
+  /* A resume after the pause button picks up where it stopped, with a
+     short fade-in instead of the 3-second one. */
+  var startAt = (offsetSec > 0 && offsetSec < playDur - 5) ? offsetSec : 0;
+  var remaining = playDur - startAt;
+
   var maxFade = playDur * 0.10;
-  var fadeIn  = Math.min(AMBIENT_FADE_IN,  maxFade);
+  var fadeIn  = Math.min(startAt > 0 ? 0.5 : AMBIENT_FADE_IN, maxFade);
   var fadeOut = Math.min(AMBIENT_FADE_OUT, maxFade);
   var peak = track.peak;
 
@@ -2747,18 +2769,19 @@ function playAmbientSound() {
   var gain = soundAudioCtx.createGain();
   gain.gain.setValueAtTime(0, now);
   gain.gain.linearRampToValueAtTime(peak, now + fadeIn);
-  gain.gain.setValueAtTime(peak, now + playDur - fadeOut);
-  gain.gain.linearRampToValueAtTime(0, now + playDur);
+  gain.gain.setValueAtTime(peak, now + remaining - fadeOut);
+  gain.gain.linearRampToValueAtTime(0, now + remaining);
 
   src.connect(gain);
-  gain.connect(soundMasterGain);
-  src.start(now);
-  src.stop(now + playDur + 0.1);
+  gain.connect(ambientBus || soundMasterGain);
+  src.start(now, startAt);
+  src.stop(now + remaining + 0.1);
 
   ambientSource = src;
   ambientGain = gain;
-  ambientPlayStartTime = now;
+  ambientPlayStartTime = now - startAt;
   ambientPlayDurationSec = playDur;
+  _ambientPlayingName = track.name;
 
   /* Badge transitions to 再生中 via the single-authority renderer */
   _hudRenderState();
@@ -2782,8 +2805,495 @@ function playAmbientSound() {
     _hudRenderState();
   };
 
-  return playDur * 1000;
+  return remaining * 1000;
 }
+
+/* ============ MORNING PLAYLIST & MUSIC BUTTONS ============
+   The morning plays the songs in Sound/morning/, named 1.mp3, 2.mp3,
+   … in the order they play, then round again. A static site cannot
+   list a folder, so probeMorningSongs() asks for 1.mp3, 2.mp3, … one
+   after another and stops at the first the server answers 404 for.
+   Adding a song is adding the next number; nothing here changes.
+
+   Each song's title and artist are read from its own ID3 tags
+   (readId3Tags) once its bytes have arrived.
+
+   The playlist runs on one <audio> element fed from the downloaded
+   bytes (a Blob), routed through the Web Audio graph so the HUD
+   wave and the swell loop still hear it and the mute button, which
+   sits on ambientBus, still covers it. Nothing is decoded to PCM, so
+   the three songs cost their file size in memory, not ~210 MB. The
+   other two phases keep their single-buffer engine above; the four
+   buttons drive whichever engine is playing.
+
+   The playlist engine is driven by the element's 'ended' event, not
+   by the timer chain: playMorningSong() returns 0, so
+   scheduleNextAmbient() does not re-arm. At the end of a song, if the
+   clock has passed into the next phase, startAmbient() hands over to
+   it — a song that is mid-flight when the hour changes still finishes.
+
+   Button behaviour:
+     · back   — tap: the song starts again from the beginning; a second
+                tap within 0.45 s: the previous song. On the single-song
+                phases both just start the song again.
+     · next   — the next song (morning); the song again (other phases).
+     · pause  — stops with a short fade and remembers the position,
+                the icon turns to ▶. Skipping or restarting while
+                paused starts playing again.
+     · mute   — silences the music only. UI sounds and the wind chime
+                are not on ambientBus.
+   Paused and muted are kept in localStorage, so the card comes back
+   in the state it was left in. */
+var MORNING_DIR = 'Sound/morning/';
+var MORNING_MAX_SONGS = 30;
+var MORNING_SKIP_MS = 130;       // the quick fade-out before a song change
+var MUSIC_DOUBLE_TAP_MS = 450;
+
+var _morningSongs = [];          // { url, title, artist }, in file order
+var _morningListDone = false;    // true once the end of the folder has been seen
+var _morningProbing = false;
+var _morningProbeN = 0;          // how many songs have been found so far
+var _morningProbeRetries = 0;
+
+var _morningAudio = null;        // the one <audio> element, reused for every song
+var _morningGain = null;         // fades each song in and out
+var _morningUrl = '';            // blob URL of the song loaded now
+var _morningIndex = 0;
+var _morningOn = false;          // the playlist engine holds a song (playing or paused)
+var _morningSeq = 0;             // bumped by every change of song, so late timers stand down
+var _morningErrors = 0;
+
+var _ambientPlayingName = '';    // phase name of the buffer-engine track on air
+var _bufferResumeAt = 0;         // seconds into it when it was paused
+var _bufferResumeName = '';
+var _backTapAt = 0;
+
+function _musicLoadFlag(k) {
+  try { return localStorage.getItem('thankyouMusic' + k) === '1'; } catch (e) { return false; }
+}
+function _musicSaveFlag(k, v) {
+  try { localStorage.setItem('thankyouMusic' + k, v ? '1' : '0'); } catch (e) {}
+}
+var _musicPaused = _musicLoadFlag('Paused');
+var _musicMuted  = _musicLoadFlag('Muted');
+
+var hudBtnBack = document.getElementById('hudBtnBack');
+var hudBtnNext = document.getElementById('hudBtnNext');
+var hudBtnPlay = document.getElementById('hudBtnPlay');
+var hudBtnMute = document.getElementById('hudBtnMute');
+
+/* True while either engine holds a track — the HUD reads this where it
+   used to read ambientSource. */
+function _ambientActive() {
+  return ambientSource !== null || _morningOn;
+}
+
+/* Title and artist on the meta row. With no artist the bullet goes (it
+   keeps its place, so the layout does not shift). */
+function _hudSetMeta(title, artist) {
+  if (hudTrackTitle)  hudTrackTitle.textContent = title;
+  if (hudTrackArtist) hudTrackArtist.textContent = artist || '';
+  if (hudTrackSep)    hudTrackSep.classList.toggle('hud-sep-off', !artist);
+}
+
+/* ---------- ID3 tags ---------- */
+function _id3Text(bytes, enc) {
+  var text = '';
+  try {
+    if (enc === 1) {
+      var bomBE = bytes[0] === 0xFE && bytes[1] === 0xFF;
+      var bomLE = bytes[0] === 0xFF && bytes[1] === 0xFE;
+      text = new TextDecoder(bomBE ? 'utf-16be' : 'utf-16le').decode(bytes.subarray(bomBE || bomLE ? 2 : 0));
+    } else if (enc === 2) {
+      text = new TextDecoder('utf-16be').decode(bytes);
+    } else if (enc === 3) {
+      text = new TextDecoder('utf-8').decode(bytes);
+    } else {
+      text = new TextDecoder('windows-1252').decode(bytes);
+    }
+  } catch (e) { return ''; }
+  /* A frame can hold several NUL-separated values; the first is the main one. */
+  return text.split('\u0000')[0].trim();
+}
+
+/* Title (TIT2) and artist (TPE1) from an ID3v2.3 / v2.4 tag at the head
+   of an MP3. Anything it cannot read comes back as ''. */
+function readId3Tags(buf) {
+  var out = { title: '', artist: '' };
+  try {
+    var b = new Uint8Array(buf);
+    if (b.length < 10 || b[0] !== 0x49 || b[1] !== 0x44 || b[2] !== 0x33) return out;
+    var ver = b[3];
+    if (ver !== 3 && ver !== 4) return out;
+    var end = Math.min(b.length, 10 + ((b[6] << 21) | (b[7] << 14) | (b[8] << 7) | b[9]));
+    var pos = 10;
+    if (b[5] & 0x40) {   // extended header: skip it
+      pos += ver === 4
+        ? ((b[10] << 21) | (b[11] << 14) | (b[12] << 7) | b[13])
+        : (b[10] * 16777216 + (b[11] << 16) + (b[12] << 8) + b[13] + 4);
+    }
+    while (pos + 10 <= end && b[pos] !== 0) {
+      var id = String.fromCharCode(b[pos], b[pos + 1], b[pos + 2], b[pos + 3]);
+      var size = ver === 4
+        ? ((b[pos + 4] << 21) | (b[pos + 5] << 14) | (b[pos + 6] << 7) | b[pos + 7])
+        : (b[pos + 4] * 16777216 + (b[pos + 5] << 16) + (b[pos + 6] << 8) + b[pos + 7]);
+      if (size <= 1 || pos + 10 + size > end) break;
+      if (id === 'TIT2') out.title  = _id3Text(b.subarray(pos + 11, pos + 10 + size), b[pos + 10]);
+      if (id === 'TPE1') out.artist = _id3Text(b.subarray(pos + 11, pos + 10 + size), b[pos + 10]);
+      pos += 10 + size;
+    }
+  } catch (e) {}
+  return out;
+}
+
+/* An MP3 starts with an ID3 tag or a frame sync. A host that answers a
+   missing file with a 200 page is caught here, not played. */
+function _looksLikeMp3(buf) {
+  var b = new Uint8Array(buf, 0, Math.min(buf.byteLength, 3));
+  return (b[0] === 0x49 && b[1] === 0x44 && b[2] === 0x33) ||
+         (b[0] === 0xFF && (b[1] & 0xE0) === 0xE0);
+}
+
+/* ---------- finding the songs ---------- */
+function probeMorningSongs() {
+  if (_morningProbing || _morningListDone) return;
+  _morningProbing = true;
+
+  function step() {
+    var n = _morningProbeN + 1;
+    if (n > MORNING_MAX_SONGS) {
+      _morningProbing = false;
+      _morningListDone = true;
+      _hudRenderState();
+      return;
+    }
+    var song = { url: MORNING_DIR + n + '.mp3', title: '', artist: '' };
+    fetchAmbientRaw(song).then(function(raw) {
+      if (!raw || !_looksLikeMp3(raw)) {
+        _morningProbing = false;
+        if (raw) {
+          /* a 200 that is not an MP3: the folder has ended */
+          delete _ambientRawBuffers[song.url];
+          _morningListDone = true;
+        } else if (_ambientMissing[song.url]) {
+          _morningListDone = true;
+        } else if (++_morningProbeRetries <= 20) {
+          /* the network, not the folder: ask again shortly */
+          setTimeout(probeMorningSongs, 3000);
+        } else {
+          _morningListDone = true;
+        }
+        _hudRenderState();
+        return;
+      }
+      var tags = readId3Tags(raw);
+      song.title  = tags.title || ('トラック ' + n);
+      song.artist = tags.artist;
+      _morningSongs.push(song);
+      _morningProbeN = n;
+      _morningProbeRetries = 0;
+      step();
+    });
+  }
+  step();
+}
+
+/* ---------- the playlist engine ---------- */
+function _morningEnsureGraph() {
+  if (_morningAudio) return true;
+  if (!soundAudioCtx) return false;
+  try {
+    var a = new Audio();
+    a.preload = 'auto';
+    var node = soundAudioCtx.createMediaElementSource(a);
+    _morningGain = soundAudioCtx.createGain();
+    _morningGain.gain.value = 0;
+    node.connect(_morningGain);
+    _morningGain.connect(ambientBus || soundMasterGain);
+    a.addEventListener('ended', function() {
+      if (_morningOn) _morningStep(1, 0);
+    });
+    a.addEventListener('playing', function() { _morningErrors = 0; });
+    a.addEventListener('error', function() {
+      /* A file the browser cannot play: move on, unless every song fails. */
+      if (!_morningOn || ++_morningErrors > _morningSongs.length) return;
+      _morningStep(1, 500);
+    });
+    _morningAudio = a;
+  } catch (e) {
+    return false;
+  }
+  return true;
+}
+
+function _morningLoadSong(idx) {
+  var song = _morningSongs[idx];
+  var raw = _ambientRawBuffers[song.url];
+  if (!raw || !_morningAudio) return false;
+  var a = _morningAudio;
+  var seq = _morningSeq;
+  var old = _morningUrl;
+  _morningUrl = URL.createObjectURL(new Blob([raw], { type: 'audio/mpeg' }));
+  a.src = _morningUrl;
+  if (old) URL.revokeObjectURL(old);
+  _morningIndex = idx;
+  _morningOn = true;
+  ambientPlayDurationSec = 0;
+  a.onloadedmetadata = function() {
+    if (seq !== _morningSeq) return;
+    ambientPlayDurationSec = a.duration;
+    _hudRenderState();
+  };
+  _hudSetMeta(song.title, song.artist);
+  return true;
+}
+
+/* Play the loaded song, fading in over fadeIn seconds from wherever the
+   gain is, and lay down the fade-out for its last seconds. */
+function _morningStart(fadeIn) {
+  var a = _morningAudio;
+  var seq = _morningSeq;
+  if (!a) return;
+  var begin = function() {
+    if (seq !== _morningSeq || _musicPaused) return;
+    var now = soundAudioCtx.currentTime;
+    var g = _morningGain.gain;
+    var left = a.duration - a.currentTime;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(1, now + fadeIn);
+    if (isFinite(left)) {
+      var tail = Math.min(AMBIENT_FADE_OUT, a.duration * 0.10);
+      if (left > fadeIn + tail) {
+        g.setValueAtTime(1, now + left - tail);
+        g.linearRampToValueAtTime(0, now + left);
+      }
+    }
+    _hudRenderState();
+  };
+  var p = a.play();
+  if (p && p.then) {
+    p.then(begin, function() {
+      /* The browser refused to start it: show it as paused, and do not
+         remember that as the user's choice. */
+      if (seq !== _morningSeq) return;
+      _musicPaused = true;
+      _musicSyncButtons();
+    });
+  } else {
+    begin();
+  }
+}
+
+function _morningFadeOut() {
+  if (!_morningGain || !soundAudioCtx) return;
+  var now = soundAudioCtx.currentTime;
+  var g = _morningGain.gain;
+  try {
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.setTargetAtTime(0, now, 0.04);
+  } catch (e) {}
+}
+
+function _morningPause() {
+  var a = _morningAudio;
+  var seq = _morningSeq;
+  if (!a) return;
+  _morningFadeOut();
+  setTimeout(function() {
+    if (seq === _morningSeq && _musicPaused) a.pause();
+  }, 300);
+  _hudRenderState();
+}
+
+/* Release the engine (stopAmbient). The song fades out first; the
+   element is emptied only if no new song has been loaded since. */
+function _morningStop() {
+  var seq = ++_morningSeq;
+  if (!_morningOn) return;
+  _morningOn = false;
+  var a = _morningAudio;
+  var url = _morningUrl;
+  _morningUrl = '';
+  _morningFadeOut();
+  setTimeout(function() {
+    if (seq === _morningSeq && a) {
+      try { a.pause(); a.removeAttribute('src'); a.load(); } catch (e) {}
+    }
+    if (url) URL.revokeObjectURL(url);
+  }, 300);
+}
+
+/* Called by playAmbientSound() while it is morning. */
+function playMorningSong() {
+  if (!_morningSongs.length) {
+    /* No song has arrived yet: keep asking, as the buffer engine does. */
+    probeMorningSongs();
+    _ambientBufferRetries++;
+    if (_ambientBufferRetries > 120) {
+      _ambientBufferRetries = 0;
+      return 0;
+    }
+    return 500;
+  }
+  _ambientBufferRetries = 0;
+  if (!_morningEnsureGraph()) return 0;
+  _morningSeq++;
+  if (_morningLoadSong(_morningIndex % _morningSongs.length) && !_musicPaused) {
+    _morningStart(1.5);
+  }
+  return 0;   // song changes come from the element's 'ended' event
+}
+
+/* Move delta songs on (1 or −1), after the quick fade-out. Always plays:
+   skipping from the paused state starts the music. */
+function _morningStep(delta, delayMs) {
+  if (!_morningOn) return;
+  _musicSetPaused(false);
+  /* Morning is over: the next phase takes the music. */
+  if (!getCurrentAmbientTrack().playlist) { startAmbient(); return; }
+  var n = _morningSongs.length;
+  if (!n) return;
+  var idx = (((_morningIndex + delta) % n) + n) % n;
+  var seq = ++_morningSeq;
+  _morningFadeOut();
+  setTimeout(function() {
+    if (seq !== _morningSeq || !_morningOn) return;
+    if (_morningLoadSong(idx)) _morningStart(0.8);
+  }, delayMs);
+}
+
+function _morningRestart() {
+  _musicSetPaused(false);
+  var seq = ++_morningSeq;
+  _morningFadeOut();
+  setTimeout(function() {
+    if (seq !== _morningSeq || !_morningOn) return;
+    try { _morningAudio.currentTime = 0; } catch (e) {}
+    _morningStart(0.6);
+  }, MORNING_SKIP_MS);
+}
+
+/* ---------- the single-buffer phases: pause, resume, restart ---------- */
+function _bufferPause() {
+  if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
+  if (ambientSource === null) return;
+  _bufferResumeAt = getPlaybackElapsed();
+  _bufferResumeName = _ambientPlayingName;
+  try {
+    var now = soundAudioCtx.currentTime;
+    ambientGain.gain.cancelScheduledValues(now);
+    ambientGain.gain.setValueAtTime(ambientGain.gain.value, now);
+    ambientGain.gain.setTargetAtTime(0, now, 0.08);
+    ambientSource.stop(now + 0.4);
+  } catch (e) {
+    try { ambientSource.stop(); } catch (e2) {}
+  }
+  ambientSource = null;
+  ambientGain = null;
+  ambientPlayStartTime = -1;
+  ambientPlayDurationSec = 0;
+  _hudLastRenderedSec = -1;
+  _hudRenderState();
+}
+
+function _bufferResume() {
+  if (ambientTimer || ambientSource !== null) return;
+  var at = (_bufferResumeName === getCurrentAmbientTrack().name) ? _bufferResumeAt : 0;
+  _bufferResumeAt = 0;
+  var ms = playAmbientSound(at);
+  scheduleNextAmbient(ms);
+}
+
+/* ---------- the buttons ---------- */
+function _musicSyncButtons() {
+  if (hudBtnPlay) {
+    hudBtnPlay.classList.toggle('on', _musicPaused);
+    hudBtnPlay.setAttribute('aria-label', _musicPaused ? '再生' : '一時停止');
+  }
+  if (hudBtnMute) {
+    hudBtnMute.classList.toggle('on', _musicMuted);
+    hudBtnMute.setAttribute('aria-pressed', _musicMuted ? 'true' : 'false');
+  }
+}
+
+function _musicSetPaused(p) {
+  if (_musicPaused === p) return;
+  _musicPaused = p;
+  _musicSaveFlag('Paused', p);
+  _musicSyncButtons();
+}
+
+function musicTogglePause() {
+  if (_musicPaused) {
+    _musicSetPaused(false);
+    if (_morningOn) _morningStart(0.5);
+    else _bufferResume();
+  } else {
+    _musicSetPaused(true);
+    if (_morningOn) _morningPause();
+    else _bufferPause();
+  }
+}
+
+function musicToggleMute() {
+  _musicMuted = !_musicMuted;
+  _musicSaveFlag('Muted', _musicMuted);
+  _musicSyncButtons();
+  if (ambientBus && soundAudioCtx) {
+    var now = soundAudioCtx.currentTime;
+    ambientBus.gain.cancelScheduledValues(now);
+    ambientBus.gain.setValueAtTime(ambientBus.gain.value, now);
+    ambientBus.gain.setTargetAtTime(_musicMuted ? 0 : 1, now, 0.06);
+  }
+}
+
+/* The single-song phases have nothing to skip to: both buttons start
+   the song again. */
+function _musicRestartTrack() {
+  _musicSetPaused(false);
+  _bufferResumeAt = 0;
+  startAmbient();
+}
+
+function musicNext() {
+  if (_morningOn) _morningStep(1, MORNING_SKIP_MS);
+  else _musicRestartTrack();
+}
+
+function musicBack() {
+  var now = Date.now();
+  var again = now - _backTapAt < MUSIC_DOUBLE_TAP_MS;
+  _backTapAt = again ? 0 : now;
+  if (!_morningOn) _musicRestartTrack();
+  else if (again) _morningStep(-1, MORNING_SKIP_MS);
+  else _morningRestart();
+}
+
+/* Only the four buttons take touches (the card around them ignores them),
+   and a press on one must not also reach the page behind: the swipe and
+   koi handlers listen on the document. initSound() is called here
+   because the press never reaches the document's own first-touch hook. */
+(function bindMusicButtons() {
+  function bind(el, action) {
+    if (!el) return;
+    ['pointerdown', 'pointerup', 'touchstart', 'touchend'].forEach(function(type) {
+      el.addEventListener(type, function(e) { e.stopPropagation(); }, { passive: true });
+    });
+    el.addEventListener('click', function(e) {
+      e.stopPropagation();
+      initSound();
+      haptic(8);
+      action();
+    });
+  }
+  bind(hudBtnBack, musicBack);
+  bind(hudBtnNext, musicNext);
+  bind(hudBtnPlay, musicTogglePause);
+  bind(hudBtnMute, musicToggleMute);
+  _musicSyncButtons();
+})();
 
 /* ============================================================
    AUDIO-REACTIVE SWELL SYSTEM */
@@ -8962,11 +9472,14 @@ var GameWindow = (function() {
   function fadeAmbientOut() {
     if (ambientHandedOver) return;
     ambientHandedOver = true;
+    /* The music buttons sit out the game: they would start the ambient
+       music over it. */
+    if (audioSpectrumHud) audioSpectrumHud.classList.add('music-locked');
     /* No new track may start while the old one fades. */
     if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
     if (soundAudioCtx) {
       var now = soundAudioCtx.currentTime;
-      [ambientGain].forEach(function (g) {
+      [ambientGain, _morningGain].forEach(function (g) {
         if (!g) return;
         try {
           g.gain.cancelScheduledValues(now);
@@ -8980,6 +9493,7 @@ var GameWindow = (function() {
   function restoreAmbient() {
     if (!ambientHandedOver) return;
     ambientHandedOver = false;
+    if (audioSpectrumHud) audioSpectrumHud.classList.remove('music-locked');
     if (ambientStopTimer) { clearTimeout(ambientStopTimer); ambientStopTimer = 0; }
     stopAmbient();
     if (audioSpectrumHud) audioSpectrumHud.classList.add('shown');

@@ -1854,11 +1854,10 @@
      does not move when the weather text changes. Its top is level with the
      weather line; the wave rests on the bottom edge of the glass. Layout:
 
-       meta row   — title · artist, centred, 10% larger than on the old
-                    card, with a soft drop shadow; under it the two pills:
-                    再生中 lined up with the start of the title, DL XX%
-                    with the end of the artist (they move with the names)
-       wave stack — 6-layer fluid spectrum on a 288×44 canvas, its base
+       meta row   — ⏮ title · artist ⏭, the bullet on the card's centre line
+       control row — pause/play · mute, its bullet straight under the one
+                    above; the DL XX% pill at its right end
+       wave stack — 6-layer fluid spectrum on a 410×44 canvas, its base
                     tucked under the glass's bright edge (.bar-edge)
        gauge bar, time row — hidden; app.js still writes to them
 
@@ -1874,25 +1873,25 @@
      stripped. The waveform's vertical amplitude response stays
      live (state feedback); the travelling phase freezes in the
      renderer via _prefersReducedMotion. */
-  /* Content-box width is 318 − 2 (borders) − 28 (padding) = 288px.
+  /* Content-box width is 440 − 2 (borders) − 28 (padding) = 410px.
      This must match HUD_DISPLAY_W in app.js — the canvas backing
      store is sized to that constant and displayed at width: 100%,
      so any drift between the two stretches the raster horizontally.
-     159px is half of the 318px width. */
+     220px is half of the 440px width. */
   .audio-spectrum-hud {
     position: absolute;
     top: var(--bar-pt);
     /* down to 2px above the glass's bottom edge: the wave rests on the
        bright edge line (.bar-edge), which stays the same all the way across */
     height: calc(var(--pane-h) - var(--bar-pt) - 2px);
-    left: calc(83.25% - 159px);
+    left: calc(83.25% - 220px);
     display: flex;
     flex-direction: column;
     justify-content: flex-end;
     pointer-events: none;
     user-select: none;
     -webkit-user-select: none;
-    width: 318px;
+    width: 440px;
     padding: 0 14px;
     border: solid transparent;
     border-width: 0 1px;             /* sides only: the wave's base reaches the edge line */
@@ -1916,22 +1915,9 @@
     opacity: 1;
   }
 
-  /* --- Pill row, just under the title · artist (inside .hud-meta-row,
-     so it is exactly as wide as the names): 再生中 at its left end, DL XX%
-     at its right end. --- */
-  .hud-top-row {
-    position: absolute;
-    top: 100%;
-    left: 0; right: 0;
-    margin-top: 2px;
-    height: 16px;
-    text-shadow: none;
-  }
-
-  .hud-status-badge,
+  /* --- DL XX% pill: the right end of the control row. --- */
   .hud-dl-badge {
-    position: absolute;
-    top: 0;
+    margin-left: auto;
     font-size: 10px;
     font-weight: 600;
     letter-spacing: 1px;
@@ -1939,47 +1925,8 @@
     border-radius: 8px;
     line-height: 1.2;
     white-space: nowrap;
+    text-shadow: none;
     transition: background-color 0.3s ease, color 0.3s ease, opacity 0.3s ease;
-  }
-  .hud-status-badge { left: 0; }
-  .hud-dl-badge     { right: 0; }
-
-  .hud-status-badge {
-    background: rgba(176, 74, 90, 0.16);
-    color: var(--accent-3);
-  }
-  .hud-status-badge.loading {
-    background: rgba(247, 185, 60, 0.22);
-    color: #8f3f12;
-  }
-  .hud-status-badge.decoding {
-    background: rgba(247, 185, 60, 0.38);
-    color: #7a3208;
-    animation: statusPulse 1.2s ease-in-out infinite;
-  }
-  .hud-status-badge.ready {
-    background: rgba(42, 63, 26, 0.14);
-    color: #2a3f1a;
-  }
-  html[data-theme="autumn"] .hud-status-badge,
-  html[data-theme="winter"] .hud-status-badge {
-    background: rgba(230, 104, 38, 0.18);
-    color: var(--accent-3);
-  }
-  html[data-theme="autumn"] .hud-status-badge.loading,
-  html[data-theme="winter"] .hud-status-badge.loading {
-    background: rgba(255, 162, 89, 0.30);
-    color: var(--accent-3);
-  }
-  html[data-theme="autumn"] .hud-status-badge.decoding,
-  html[data-theme="winter"] .hud-status-badge.decoding {
-    background: rgba(255, 162, 89, 0.40);
-    color: #9E3B06;
-  }
-  html[data-theme="autumn"] .hud-status-badge.ready,
-  html[data-theme="winter"] .hud-status-badge.ready {
-    background: rgba(136, 46, 71, 0.14);
-    color: #882E47;
   }
 
   .hud-dl-badge {
@@ -2007,27 +1954,80 @@
     50%      { opacity: 1; }
   }
 
-  /* --- Meta row: title · artist, centred at the top of the display, only
-     as wide as the names (so the pill row under it lines up with them).
-     line-height 1.4 as on the weather line, so the tops of the characters
+  /* --- Meta row and control row: the same three-column grid, the middle
+     column just wide enough for a bullet. The two side columns are equal,
+     so both bullets sit on the card's centre line, one under the other,
+     whatever the title and artist are. The title grows to the left of its
+     bullet and the artist to the right of its bullet.
+     Line-height 1.4 as on the weather line, so the tops of the characters
      line up with it. --- */
-  .hud-meta-row {
+  .hud-meta-row,
+  .hud-ctrl-row {
     position: absolute;
-    top: 0; left: 50%;
-    transform: translateX(-50%);
-    width: max-content;
-    max-width: 288px;
+    left: 14px; right: 14px;
     z-index: 1;
-    text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
-    display: flex;
-    align-items: baseline;
-    justify-content: center;
-    gap: 6px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
     font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
     line-height: 1.4;
-    margin: 0;
+  }
+  .hud-meta-row {
+    top: 0;
+    column-gap: 6px;
+    text-shadow: 0 1px 2px rgba(36, 28, 26, 0.28);
+  }
+  .hud-ctrl-row {
+    top: 24px;
+    height: 22px;
+    column-gap: 16px;
+  }
+  .hud-side {
+    display: flex;
+    align-items: center;
     min-width: 0;
   }
+  .hud-side-start { justify-content: flex-end; }
+  .hud-side-end   { justify-content: flex-start; }
+  .hud-meta-row .hud-side-start { gap: 3px; }
+  .hud-meta-row .hud-side-end   { gap: 3px; }
+  .hud-sep-off { visibility: hidden; }
+
+  /* --- The four buttons: solid flat shapes in the title's ink. The visible
+     icon is small; ::before stretches the touch area to 44 × 44. Only they
+     take touches — the card around them still lets everything through. --- */
+  .hud-btn {
+    position: relative;
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 22px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: none;
+    color: var(--text-dark);
+    pointer-events: auto;
+    cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    filter: drop-shadow(0 1px 1px rgba(36, 28, 26, 0.25));
+    transition: opacity 0.15s ease, transform 0.15s ease;
+  }
+  .hud-btn::before {
+    content: "";
+    position: absolute;
+    inset: -11px -9px;
+  }
+  .hud-btn:active { opacity: 0.5; transform: scale(0.88); }
+  .hud-ic { display: block; fill: currentColor; }
+  .audio-spectrum-hud.music-locked .hud-btn { pointer-events: none; opacity: 0.35; }
+  .hud-btn .hud-ic-alt { display: none; }
+  .hud-btn.on .hud-ic-main { display: none; }
+  .hud-btn.on .hud-ic-alt  { display: block; }
+
   .hud-title {
     font-size: 15.95px;
     font-weight: 700;
@@ -2050,7 +2050,6 @@
     font-weight: 500;
     color: var(--text-med);
     letter-spacing: 1px;
-    margin-right: -1px;            /* no trailing letter-space: DL lines up with the last character */
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -2158,7 +2157,6 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .hud-status-badge.decoding,
     .hud-dl-badge.decoding,
     .hud-gauge-fill.decoding {
       animation: none !important;
