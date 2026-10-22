@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v180';
+const CACHE = 'thankyou-v181';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -146,9 +146,9 @@ self.addEventListener('fetch', function(e) {
      complete. It is NOT equivalent to the e.waitUntil path and
      should not be treated as a second caching strategy.
 
-     .mp3 requests are issued by app.js without a query string, so
+     .mp3 and .m4a requests are issued by app.js without a query string, so
      ignoreSearch is not required here. */
-  if (url.pathname.endsWith('.mp3')) {
+  if (/\.(mp3|m4a)$/.test(url.pathname)) {
     e.respondWith(
       caches.open(AUDIO).then(function(c) {
         return c.match(e.request).then(function(r) {
