@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn">
+<html lang="ja" data-theme="autumn" data-time="night">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Bird Sound Lab</title>
+<title>Owl Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,17 +14,21 @@
 
 <style>
   /* ============================================================
-     LANDSCAPE LAB — now the BIRD SOUND test bed. Preview only.
+     LANDSCAPE LAB — now the OWL test bed (night). Preview only.
      The page around the scene is the real app: main.css with the real
      class names (ambient wash, mist, Shippō mosaic, toolbar, the
-     one message panel) and the real #dynBack / #dynGround canvases.
-     New here: faint blurred mountains with a Fuji-like peak, mist between
-     the ridges, and a low strip of ground covered in fallen leaves (no
-     grass), with the falling leaves landing on it. The trees are the ones tuned on
-     koyo.html (the KOYO values in app.js). The scene is fixed; the control
-     panel only has bird sound values. The flocks are the app's own (copied
-     from app.js), each species with its own call. Nothing in app.js is used
-     or changed.
+     one message panel) and the real #dynSky / #dynBack / #dynGround
+     canvases, all in the night phase (data-time="night", the night text
+     colour, the app's night sky).
+     The scene: faint blurred mountains with a Fuji-like peak, mist between
+     the ridges, and a low strip of ground covered in fallen leaves, with
+     the falling leaves landing on it. The trees are the ones tuned on
+     koyo.html (the KOYO values in app.js), each now with a bare branch
+     sticking out toward the middle of the screen. An owl sits on one of
+     the branches, blinks, flies off into the distance at a random moment
+     and comes back after a set time to either branch (section 11). The
+     bird flocks are gone. The control panel only has owl values. Nothing
+     in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -33,6 +37,8 @@
   .dyn-canvas.dyn-back,
   .dyn-canvas.dyn-ground,
   .dyn-canvas.dyn-near { opacity: 1; }
+  .lab-status { font-size: 12px; color: #6E5A55; min-height: 2.8em; }
+  .lab-now button { padding: 6px 10px; }
 
   /* One message panel in this preview instead of six. */
   .track { width: 100%; }
@@ -94,7 +100,7 @@
   }
 </style>
 </head>
-<body class="info-visible">
+<body class="info-visible night-text">
 
 <!-- ============ The real ambient background (same markup as index.html) ============ -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
@@ -158,6 +164,7 @@
      #dynNear   above the page content (as in the app): the nearer falling
                 leaves, so a leaf that lands is seen landing, and one that is
                 lifted or blown away is seen leaving. -->
+<canvas class="dyn-canvas dyn-back" id="dynSky" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-near" id="dynNear" aria-hidden="true"></canvas>
@@ -181,7 +188,7 @@
 <!-- ============ Controls (demo only) ============ -->
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3>🐦 Bird Sound Lab</h3>
+    <h3>🦉 Owl Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -190,7 +197,7 @@
       <button type="button" class="primary" id="btnCopy">Copy values</button>
       <button type="button" id="btnReset">Reset</button>
     </div>
-    <div class="lab-sec"><h4>Send a flock now</h4><div class="lab-row-btns" id="labSend"></div></div>
+    <div class="lab-sec"><h4>Do it now</h4><div class="lab-row-btns lab-now" id="labNow"></div></div>
     <div id="labControls"></div>
   </div>
 </div>
@@ -212,7 +219,7 @@
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
-  timeOfDay: 'day',          // the birds fly by day in the app
+  timeOfDay: 'night',        // the owl comes out at night
   wind: 1,
   gustEvery: 9,
   gustStrength: 1,
@@ -263,7 +270,7 @@ var DEFAULTS = {
   }
 };
 function clone(o) { return JSON.parse(JSON.stringify(o)); }
-var V = clone(DEFAULTS);       // the scene is fixed; only the bird sound has controls (section 2)
+var V = clone(DEFAULTS);       // the scene is fixed; only the owl has controls (section 2)
 
 /* The trees and falling leaves exactly as tuned on koyo.html (KOYO in app.js). */
 var TREE = {
@@ -280,60 +287,111 @@ var TREE = {
 };
 
 /* ============================================================
-   2. BIRD SOUND LAB — every control on the panel. Nothing here
-   redraws the scene: a change is heard on the next call.
-   Three sets of voices (A natural, B soft, C bright and
-   chime-like) are built in section 11b; each species picks one.
+   2. OWL LAB — every control on the panel. A change to the owl
+   re-bakes its sprites; a change to the branch rebuilds the trees.
+   Values are kept in this browser; "Copy values" gives them in words
+   and as JSON.
    ============================================================ */
-var KINDS = [['onaga', 'オナガ'], ['mejiro', 'メジロ'], ['ruri', 'オオルリ']];
-var VOICE_OPTS = [['A', 'A) Natural'], ['B', 'B) Soft'], ['C', 'C) Bright, chime-like']];
-var BDEF = {
-  flocksOn: true, flockEvery: 8, flockSize: 1,
-  onagaOn: true, mejiroOn: true, ruriOn: true,
-  soundOn: true, volume: 0.8, callEvery: 2.5, farQuiet: 0.5
+var LOOKS = [['fukurou', 'フクロウ (Ural owl): round head, dark eyes'], ['konohazuku', 'コノハズク (scops owl): ear tufts, orange eyes']];
+var OWL_COLOURS = {
+  fukurou:    { back: '#907B6A', wing: '#6F5C4F', chest: '#E2CFBC', streak: '#76604F', face: '#E2D2C3',
+                rim: '#6A5446', eye: '#2B2226', beak: '#E3C27E', feet: '#D3C5B2' },
+  konohazuku: { back: '#8F7C66', wing: '#6E5D4C', chest: '#C2B096', streak: '#544438', face: '#B5A48D',
+                rim: '#54443A', eye: '#F0A020', beak: '#5C4D44', feet: '#BBA98F' }
 };
-KINDS.forEach(function (K) {
-  BDEF[K[0] + 'Voice'] = 'A'; BDEF[K[0] + 'Vol'] = 1; BDEF[K[0] + 'Pitch'] = 0;
-  BDEF[K[0] + 'Speed'] = 1; BDEF[K[0] + 'Var'] = 0.5;
-});
-var STORE_KEY = 'birdSoundLabValues1';
-var B = clone(BDEF);
+var COLOUR_NAMES = [['back', 'Back'], ['wing', 'Wings'], ['chest', 'Chest'], ['streak', 'Streaks'], ['face', 'Face'],
+                    ['rim', 'Face rim'], ['eye', 'Eyes'], ['beak', 'Beak'], ['feet', 'Feet']];
+var ODEF = {
+  // look
+  look: 'fukurou', size: 0.075, strength: 0.85, lampGlow: 0.7, colours: clone(OWL_COLOURS),
+  // the branch it sits on
+  branchHeight: 0.3, branchLength: 0.2, branchAngle: 8, perchAt: 0.7, branchLeaves: 3, branchBounce: 1, owlWeight: 1,
+  // timing
+  perchMin: 40, perchMax: 120, awayTime: 60, landNear: 0.5,
+  // flight
+  flyAwayTime: 7, returnTime: 8, flapHz: 2.4, flapBeats: 4, glideTime: 0.7, vanishHeight: 0.12, vanishSpread: 0.5,
+  // depth of field
+  farthest: 0.08, farBlur: 0.9, maxBlur: 2.6, haze: 0.55, fadeFrom: 0.2,
+  // blinking
+  blinkMin: 3, blinkMax: 8, blinkTime: 0.2, doubleBlink: 0.2,
+  // extras
+  headTurn: false, headEvery: 12, hoot: false, hootEvery: 40, hootVolume: 0.6, hootPitch: 0
+};
+var STORE_KEY = 'owlLabValues1';
+var O = clone(ODEF);
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  if (saved && typeof saved === 'object') for (var k in saved) if (k in B) B[k] = saved[k];
+  if (saved && typeof saved === 'object') for (var sk in saved) {
+    if (sk === 'colours') {
+      for (var lk in saved.colours) if (O.colours[lk]) for (var ck in saved.colours[lk]) if (ck in O.colours[lk]) O.colours[lk][ck] = saved.colours[lk][ck];
+    } else if (sk in O) O[sk] = saved[sk];
+  }
 } catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(B)); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(O)); } catch (e) {} }
 
 var GROUPS = [
-  { title: 'Flocks flying in', ctls: [
-    { k: 'flocksOn', label: 'Flocks fly in by themselves', type: 'check', hint: 'Off = only the "Send a flock now" buttons.' },
-    { k: 'flockEvery', label: 'A new flock every (seconds)', min: 2, max: 60, step: 1, hint: 'On average; each gap is 65–135% of this. The app uses 5–10.' },
-    { k: 'flockSize', label: 'Flock size (× the app\'s birds)', min: 0.5, max: 2, step: 0.1, hint: '1 = the app\'s 5–8 オナガ, 6–10 メジロ, 4–6 オオルリ.' }
+  { title: 'Look', ctls: [
+    { k: 'look', label: 'Kind of owl', type: 'select', opts: LOOKS, re: 'owl', panel: true, hint: 'Each kind keeps its own colours (below).' },
+    { k: 'size', label: 'Size on the near branch (× screen height)', min: 0.03, max: 0.15, step: 0.005, re: 'trees',
+      hint: 'Its height sitting. On the far tree it is 0.6 of this, like the tree itself.' },
+    { k: 'strength', label: 'Strength against the paper', min: 0.3, max: 1, step: 0.05, re: 'owl',
+      hint: 'Lower = paler and softer, like the trunks (which are 0.5).' },
+    { k: 'lampGlow', label: 'Warm lamp light from below', min: 0, max: 1.5, step: 0.05, re: 'owl' },
+    { type: 'colours', re: 'owl' }
   ]},
-  { title: 'Which species fly in', ctls: [
-    { k: 'onagaOn', label: 'オナガ (azure-winged magpie)', type: 'check' },
-    { k: 'mejiroOn', label: 'メジロ (white-eye)', type: 'check' },
-    { k: 'ruriOn', label: 'オオルリ (blue-and-white flycatcher)', type: 'check', hint: 'Each flock is one species, never the same as the one before.' }
+  { title: 'The branch it sits on', ctls: [
+    { k: 'branchHeight', label: 'Height on the tree (× tree height)', min: 0.15, max: 0.8, step: 0.01, re: 'trees',
+      hint: 'It grows from the limb at this height nearest the middle. Under the leaves (about 0.45 and below) the owl sits in the open.' },
+    { k: 'branchLength', label: 'Length (× tree height)', min: 0.1, max: 0.4, step: 0.01, re: 'trees',
+      hint: 'At least long enough for the owl to sit clear of the leaves.' },
+    { k: 'branchAngle', label: 'Angle (degrees above level)', min: -20, max: 35, step: 1, re: 'trees' },
+    { k: 'perchAt', label: 'Where the owl sits (0 base … 1 tip)', min: 0.3, max: 0.95, step: 0.01, re: 'trees' },
+    { k: 'branchLeaves', label: 'Leaves at the tip', min: 0, max: 6, step: 1, re: 'trees' },
+    { k: 'branchBounce', label: 'Bounce when it lands or leaves', min: 0, max: 2.5, step: 0.05 },
+    { k: 'owlWeight', label: 'Sag under the owl', min: 0, max: 3, step: 0.05 }
   ]},
-  { title: 'Sound (all birds)', ctls: [
-    { k: 'soundOn', label: 'Bird sound on', type: 'check', hint: 'The browser starts sound only after your first tap on the page.' },
-    { k: 'volume', label: 'Master volume', min: 0, max: 1.5, step: 0.05 },
-    { k: 'callEvery', label: 'Each bird calls every (seconds)', min: 0.5, max: 8, step: 0.1, hint: 'On average; every bird in a flock calls on its own timing.' },
-    { k: 'farQuiet', label: 'Far birds\' volume (× near)', min: 0, max: 1, step: 0.05, hint: 'The small far birds sound further away; the middle ones halfway.' }
+  { title: 'Timing', ctls: [
+    { k: 'perchMin', label: 'Sits for at least (s)', min: 5, max: 300, step: 5 },
+    { k: 'perchMax', label: 'Sits for at most (s)', min: 5, max: 600, step: 5, hint: 'It flies off at a random moment between the two.' },
+    { k: 'awayTime', label: 'Away for (s)', min: 5, max: 300, step: 5,
+      hint: 'The set time from when it disappears to when it appears again in the distance.' },
+    { k: 'landNear', label: 'Chance it lands on the near tree', min: 0, max: 1, step: 0.05,
+      hint: '0.5 = either tree at random; 0 = always the far tree; 1 = always the near tree.' }
+  ]},
+  { title: 'Flight', ctls: [
+    { k: 'flyAwayTime', label: 'Flying away takes (s)', min: 3, max: 15, step: 0.5 },
+    { k: 'returnTime', label: 'Coming back takes (s)', min: 3, max: 15, step: 0.5 },
+    { k: 'flapHz', label: 'Wingbeats a second', min: 1, max: 5, step: 0.1 },
+    { k: 'flapBeats', label: 'Wingbeats between glides', min: 1, max: 12, step: 1 },
+    { k: 'glideTime', label: 'Glide (s)', min: 0, max: 2, step: 0.1, hint: '0 = it never glides.' },
+    { k: 'vanishHeight', label: 'Disappears this far above the horizon (× screen height)', min: 0, max: 0.6, step: 0.01,
+      hint: 'It also comes back from there.' },
+    { k: 'vanishSpread', label: 'Spread of that spot across the middle', min: 0, max: 1, step: 0.05 }
+  ]},
+  { title: 'Depth of field', ctls: [
+    { k: 'farthest', label: 'Size when it disappears (× near size)', min: 0.03, max: 0.3, step: 0.01, re: 'owl' },
+    { k: 'farBlur', label: 'Blur at the far tree (px)', min: 0, max: 3, step: 0.05, re: 'owl',
+      hint: 'To match the far tree\'s softness. Sharp (0) on the near tree.' },
+    { k: 'maxBlur', label: 'Blur when it disappears (px)', min: 0, max: 6, step: 0.1, re: 'owl' },
+    { k: 'haze', label: 'Night haze when it disappears', min: 0, max: 1, step: 0.05, re: 'owl' },
+    { k: 'fadeFrom', label: 'Starts to fade below this size (× near size)', min: 0.05, max: 0.6, step: 0.01 }
+  ]},
+  { title: 'Blinking', ctls: [
+    { k: 'blinkMin', label: 'Blinks every … at least (s)', min: 0.5, max: 20, step: 0.5 },
+    { k: 'blinkMax', label: '… at most (s)', min: 0.5, max: 30, step: 0.5 },
+    { k: 'blinkTime', label: 'One blink takes (s)', min: 0.08, max: 0.8, step: 0.01 },
+    { k: 'doubleBlink', label: 'Chance of a double blink', min: 0, max: 1, step: 0.05 }
+  ]},
+  { title: 'Extras (off to start with)', ctls: [
+    { k: 'headTurn', label: 'Turns its head now and then', type: 'check' },
+    { k: 'headEvery', label: 'A head turn every (s)', min: 3, max: 60, step: 1 },
+    { k: 'hoot', label: 'Hoots now and then', type: 'check', hint: 'The browser starts sound only after your first tap on the page.' },
+    { k: 'hootEvery', label: 'A hoot every (s)', min: 5, max: 180, step: 5 },
+    { k: 'hootVolume', label: 'Hoot volume', min: 0, max: 1.5, step: 0.05 },
+    { k: 'hootPitch', label: 'Hoot pitch (cents, 100 = a semitone)', min: -1200, max: 1200, step: 25 }
   ]}
 ];
-KINDS.forEach(function (K) {
-  var n = K[0];
-  GROUPS.push({ title: K[1] + ' — one voice for the whole species', ctls: [
-    { k: n + 'Voice', label: 'Voice', type: 'select', opts: VOICE_OPTS },
-    { k: n + 'Vol', label: 'Volume', min: 0, max: 2, step: 0.05 },
-    { k: n + 'Pitch', label: 'Pitch (cents, 100 = a semitone)', min: -1200, max: 1200, step: 25 },
-    { k: n + 'Speed', label: 'Speed of the call', min: 0.6, max: 1.6, step: 0.05, hint: 'Higher = quicker, shorter calls.' },
-    { k: n + 'Var', label: 'Variation between calls', min: 0, max: 1, step: 0.05, hint: '0 = the same call every time; 1 = very different each time.' },
-    { type: 'button', label: '▶ Hear one ' + K[1], act: function () { previewCall(n); } }
-  ]});
-});
-function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(2); }
+function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.step < 0.01 ? 3 : 2); }
 function buildControls() {
   var host = document.getElementById('labControls');
   host.innerHTML = '';
@@ -343,18 +401,23 @@ function buildControls() {
     sec.innerHTML = '<h4>' + g.title + '</h4>';
     g.ctls.forEach(function (ctl) {
       var wrap = document.createElement('div');
-      if (ctl.type === 'button') {
-        wrap.className = 'lab-ctl';
-        var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = ctl.label;
-        bt.addEventListener('click', ctl.act);
-        wrap.appendChild(bt);
+      if (ctl.type === 'colours') {
+        wrap.className = 'lab-colours';
+        COLOUR_NAMES.forEach(function (cn) {
+          var lb = document.createElement('label'); lb.className = 'lab-colour';
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = O.colours[O.look][cn[0]];
+          inp.addEventListener('input', function () { O.colours[O.look][cn[0]] = inp.value; changed(ctl); });
+          var sp = document.createElement('span'); sp.textContent = cn[1];
+          lb.appendChild(inp); lb.appendChild(sp);
+          wrap.appendChild(lb);
+        });
       } else if (ctl.type === 'check') {
         wrap.className = 'lab-chk';
         var cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.checked = !!B[ctl.k];
-        cb.addEventListener('change', function () { B[ctl.k] = cb.checked; changed(); });
-        var lb = document.createElement('span'); lb.textContent = ctl.label;
-        wrap.appendChild(cb); wrap.appendChild(lb);
+        cb.type = 'checkbox'; cb.checked = !!O[ctl.k];
+        cb.addEventListener('change', function () { O[ctl.k] = cb.checked; changed(ctl); });
+        var lb2 = document.createElement('span'); lb2.textContent = ctl.label;
+        wrap.appendChild(cb); wrap.appendChild(lb2);
       } else {
         wrap.className = 'lab-ctl';
         var label = document.createElement('label');
@@ -366,14 +429,14 @@ function buildControls() {
           ctl.opts.forEach(function (o) {
             var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
           });
-          el.value = B[ctl.k];
-          el.addEventListener('change', function () { B[ctl.k] = el.value; changed(); });
+          el.value = O[ctl.k];
+          el.addEventListener('change', function () { O[ctl.k] = el.value; changed(ctl); });
         } else {
-          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, B[ctl.k]);
+          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, O[ctl.k]);
           label.appendChild(val);
           el = document.createElement('input');
-          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = B[ctl.k];
-          el.addEventListener('input', function () { B[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, B[ctl.k]); changed(); });
+          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = O[ctl.k];
+          el.addEventListener('input', function () { O[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, O[ctl.k]); changed(ctl); });
         }
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
@@ -387,15 +450,39 @@ function buildControls() {
     });
     host.appendChild(sec);
   });
-  var send = document.getElementById('labSend');
-  send.innerHTML = '';
-  KINDS.forEach(function (K) {
-    var b = document.createElement('button'); b.type = 'button'; b.textContent = K[1];
-    b.addEventListener('click', function () { ensureAudio(); sendBirds(K[0]); });
-    send.appendChild(b);
+  var now = document.getElementById('labNow');
+  now.innerHTML = '';
+  NOW_BTNS.forEach(function (N) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = N[0];
+    b.addEventListener('click', N[1]);
+    now.appendChild(b);
   });
 }
-function changed() { save(); applyAudio(); }
+/* A change takes effect after a short pause, so dragging a slider does not
+   re-bake on every step. */
+var _rb = null, _rbTrees = false;
+function changed(ctl) {
+  save();
+  if (ctl.panel) buildControls();
+  if (!ctl.re) return;
+  if (ctl.re === 'trees') _rbTrees = true;
+  clearTimeout(_rb);
+  _rb = setTimeout(function () { if (_rbTrees) rebuildAll(); else bakeOwlSprites(); _rbTrees = false; }, 250);
+}
+var NOW_BTNS = [
+  ['Fly away now', function () { if (owl && owl.state === 'perch') owl.until = Math.min(owl.until, nowT + 0.45); }],
+  ['Come back now', function () {
+    if (!owl) return;
+    if (owl.state === 'gone') owl.until = nowT;
+    else if (owl.state === 'leave') owl.quick = true;      // back 1 s after it disappears
+  }],
+  ['Next: near tree', function () { if (owl) owl.next = 0; }],
+  ['Next: far tree', function () { if (owl) owl.next = 1; }],
+  ['Next: random', function () { if (owl) owl.next = undefined; }],
+  ['Blink', function () { if (owl && owl.state === 'perch' && owl.blinkT0 < 0) owl.blinkAt = nowT; }],
+  ['Turn head', function () { if (owl && owl.state === 'perch') { owl.head = Math.random() < 0.5 ? -1 : 1; owl.headUntil = nowT + 2.5; } }],
+  ['Hoot', function () { hootNow(); }]
+];
 
 document.getElementById('labToggle').addEventListener('click', function () {
   var lab = document.getElementById('lab');
@@ -403,30 +490,36 @@ document.getElementById('labToggle').addEventListener('click', function () {
   this.textContent = c ? 'Show' : 'Hide';
 });
 document.getElementById('btnReset').addEventListener('click', function () {
-  B = clone(BDEF); save(); buildControls(); applyAudio(); birdNext = 0;
+  O = clone(ODEF); save(); buildControls(); rebuildAll();
 });
 
 /* ============================================================
-   3. COPY VALUES — every bird sound value, in words and as JSON.
+   3. COPY VALUES — every owl value, in words and as JSON.
    ============================================================ */
 function f2(x) { return Number(x).toFixed(2); }
 function buildCopyText() {
-  var lines = [];
-  lines.push('/* Bird sound — values from landscape.html */');
-  lines.push('');
-  lines.push('Flocks: ' + (B.flocksOn ? 'on' : 'off') + ', a new flock every ' + B.flockEvery + 's, size ×' + f2(B.flockSize));
-  lines.push('Species flying in: ' + KINDS.filter(function (K) { return B[K[0] + 'On']; }).map(function (K) { return K[1]; }).join(', '));
-  lines.push('Sound: ' + (B.soundOn ? 'on' : 'off') + ', master volume ' + f2(B.volume) + ', each bird calls every ' + f2(B.callEvery) +
-             's, far birds ×' + f2(B.farQuiet));
-  KINDS.forEach(function (K) {
-    var n = K[0];
-    lines.push(K[1] + ': voice ' + B[n + 'Voice'] + ', volume ' + f2(B[n + 'Vol']) + ', pitch ' + B[n + 'Pitch'] + ' cents, speed ×' +
-               f2(B[n + 'Speed']) + ', variation ' + f2(B[n + 'Var']));
-  });
-  lines.push('');
-  lines.push('JSON:');
-  lines.push(JSON.stringify(B, null, 2));
-  return lines.join('\n');
+  var L = [], col = O.colours[O.look];
+  var look = LOOKS.filter(function (l) { return l[0] === O.look; })[0];
+  L.push('/* Owl — values from landscape.html */');
+  L.push('');
+  L.push('Look: ' + (look ? look[1] : O.look) + '; size ' + Number(O.size).toFixed(3) + ' × screen height; strength ' + f2(O.strength) +
+         '; lamp light ' + f2(O.lampGlow));
+  L.push('Colours: ' + COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + col[cn[0]]; }).join(', '));
+  L.push('Branch: ' + f2(O.branchHeight) + ' up the tree, length ' + f2(O.branchLength) + ', ' + O.branchAngle + '° above level, owl at ' +
+         f2(O.perchAt) + ' along it, ' + O.branchLeaves + ' leaves at the tip, bounce ' + f2(O.branchBounce) + ', sag ' + f2(O.owlWeight));
+  L.push('Timing: sits ' + O.perchMin + '–' + O.perchMax + ' s, away ' + O.awayTime + ' s, lands on the near tree ' +
+         Math.round(O.landNear * 100) + '% of the time');
+  L.push('Flight: away in ' + f2(O.flyAwayTime) + ' s, back in ' + f2(O.returnTime) + ' s, ' + f2(O.flapHz) + ' wingbeats a second, ' +
+         O.flapBeats + ' beats then a ' + f2(O.glideTime) + ' s glide; disappears ' + f2(O.vanishHeight) + ' above the horizon, spread ' + f2(O.vanishSpread));
+  L.push('Depth of field: smallest ' + f2(O.farthest) + ' ×, blur ' + f2(O.farBlur) + ' px at the far tree → ' + f2(O.maxBlur) +
+         ' px, haze ' + f2(O.haze) + ', fades below ' + f2(O.fadeFrom) + ' ×');
+  L.push('Blinking: every ' + O.blinkMin + '–' + O.blinkMax + ' s, ' + f2(O.blinkTime) + ' s each, double ' + Math.round(O.doubleBlink * 100) + '%');
+  L.push('Extras: head turn ' + (O.headTurn ? 'on, every ' + O.headEvery + ' s' : 'off') + '; hoot ' +
+         (O.hoot ? 'on, every ' + O.hootEvery + ' s, volume ' + f2(O.hootVolume) + ', pitch ' + O.hootPitch + ' cents' : 'off'));
+  L.push('');
+  L.push('JSON:');
+  L.push(JSON.stringify(O, null, 2));
+  return L.join('\n');
 }
 function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
@@ -468,6 +561,7 @@ setInterval(tickClock, 30000);
 var PI = Math.PI, TAU = PI * 2;
 function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
 function lerp(a, b, t) { return a + (b - a) * t; }
+function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
 function rngFrom(seed) {
   var a = seed >>> 0;
   return function () {
@@ -487,6 +581,7 @@ function rgb(c, a) {
 }
 function cols() { var C = {}; for (var k in V.colours) C[k] = hex(V.colours[k]); return C; }
 
+var cvS = document.getElementById('dynSky'), sctx = cvS.getContext('2d');
 var cv = document.getElementById('dynBack'), ctx = cv.getContext('2d');
 var cvG = document.getElementById('dynGround'), gctx = cvG.getContext('2d');
 var cvN = document.getElementById('dynNear'), nctx = cvN.getContext('2d');
@@ -694,7 +789,123 @@ function buildTree(far) {
     top = Math.min(top, nn.ey - Cc.R); bot = Math.max(bot, nn.ey + Cc.R);
   });
   T.cx = sx2 / nC; T.cy = sy2 / nC; T.cr = Math.max(40, (bot - top) * 0.75);
+  addPerch(T, r);
   return T;
+}
+/* The owl's branch: a bare branch that grows from the limb nearest
+   O.branchHeight up the tree, on the side facing the middle of the screen,
+   and reaches out past the leaves. Its start follows the squeezed canopy
+   (X) but its own length is not squeezed, so it always sticks out. It
+   sways with the tree and has a spring of its own (T.pb): it sags a little
+   under the owl and bounces when the owl lands or takes off. */
+function addPerch(T, r) {
+  var ns = T.nodes, inward = T.left ? 1 : -1, ty = T.by - T.scale * O.branchHeight, best = -1, bestOut = -Infinity, pf = 1, i, n;
+  // the limb or trunk passing through that height furthest toward the middle; the branch grows from that point on it
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    if (n.d > 3 || (ty - n.sy) * (ty - n.ey) > 0 || n.sy === n.ey) continue;
+    var f = (n.sy - ty) / (n.sy - n.ey), out = (X(T, lerp(n.sx, n.ex, f)) - T.bx) * inward;
+    if (out > bestOut) { bestOut = out; best = i; pf = f; }
+  }
+  if (best < 0) {                                    // nothing at that height: the limb end nearest it
+    var bestS = Infinity;
+    for (i = 1; i < ns.length; i++) {
+      n = ns[i];
+      if (n.d > 3) continue;
+      if (Math.abs(n.ey - ty) < bestS) { bestS = Math.abs(n.ey - ty); best = i; }
+    }
+    pf = 1;
+  }
+  var par = ns[best], a = O.branchAngle * PI / 180;
+  var abs = inward > 0 ? -a : PI + a;
+  // long enough that the owl sits clear of the leaves at its height
+  var x0 = X(T, lerp(par.sx, par.ex, pf)), y0 = lerp(par.sy, par.ey, pf), oh = O.size * H * (T.far ? FAR_SCALE : 1), edge = 0;
+  T.clumps.forEach(function (C) {
+    var cn = ns[C.node], cy = cn.ey + C.oy;
+    if (cy + C.R < y0 - oh || cy - C.R > y0) return;
+    edge = Math.max(edge, (X(T, cn.ex + C.ox) - x0) * inward + C.R * 1.05);
+  });
+  var len = Math.max(T.scale * O.branchLength, (edge + oh * 0.35) / Math.cos(a) / O.perchAt);
+  T.perch = ns.length;
+  ns.push({ p: best, rel: abs - par.abs, abs: abs, len: len, w: Math.max(T.scale * 0.011, par.w * 0.62 * 0.9),
+            d: par.d + 1, ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0, perch: true, side: inward, pf: pf });
+  T.pb = 0; T.pbV = 0;
+  restPose(T);
+  // a few kōyō leaves at the tip and on the little twig near it
+  var F = families(), w = weights(), leaves = [];
+  for (var j = 0; j < O.branchLeaves; j++) {
+    var fam = pickFamily(r, w);
+    if (fam === 'evergreen' || fam === 'green') fam = 'orange';
+    var tone = mix(F[fam][1], F[fam][2], r());
+    if (T.far) tone = mix(tone, PAPER, TREE.farHaze);
+    var lit = light(tone);
+    if (isNight()) lit = scale(mix(lit, LAMP, TREE.nightGlow * 0.18), 1 + TREE.nightGlow * 0.06);
+    leaves.push({ at: j % 2, dx: (r() - 0.5) * 0.8, dy: (r() - 0.5) * 0.8, rot: r() * TAU,
+                  s: T.scale * 0.026 * TREE.leafSize * lerp(0.8, 1.2, r()), col: rgb(lit) });
+  }
+  T.perchLeaves = leaves;
+}
+/* The branch as a gentle upward bow (a quadratic curve) from its limb. */
+function perchCurve(T) {
+  var n = T.nodes[T.perch], par = T.nodes[n.p];
+  var x0 = X(T, lerp(par.sx, par.ex, n.pf)), y0 = lerp(par.sy, par.ey, n.pf), c = Math.cos(n.cur), s = Math.sin(n.cur), L = n.len;
+  var ux = s * n.side, uy = -c * n.side;                       // "up", across the branch
+  return { x0: x0, y0: y0, x1: x0 + c * L * 0.5 + ux * L * 0.06, y1: y0 + s * L * 0.5 + uy * L * 0.06,
+           x2: x0 + c * L, y2: y0 + s * L, L: L, n: n };
+}
+function curvePt(P, u) {
+  var a = (1 - u) * (1 - u), b = 2 * (1 - u) * u, d = u * u;
+  var tx = 2 * (1 - u) * (P.x1 - P.x0) + 2 * u * (P.x2 - P.x1), ty = 2 * (1 - u) * (P.y1 - P.y0) + 2 * u * (P.y2 - P.y1);
+  var tl = Math.hypot(tx, ty) || 1;
+  tx /= tl; ty /= tl;
+  return { x: a * P.x0 + b * P.x1 + d * P.x2, y: a * P.y0 + b * P.y1 + d * P.y2, tx: tx, ty: ty,
+           nx: ty * P.n.side, ny: -tx * P.n.side, w: lerp(P.n.w, Math.max(1.3, P.n.w * 0.3), u) };
+}
+/* Where the owl's feet go: on top of the branch at O.perchAt, and how far
+   the branch is tipped from its rest angle (the owl leans with it). */
+function seat(T) {
+  var P = perchCurve(T), q = curvePt(P, O.perchAt);
+  return { x: q.x + q.nx * q.w / 2, y: q.y + q.ny * q.w / 2, rot: (P.n.cur - P.n.abs) * 0.6 };
+}
+function perchTwig(P) {
+  var q = curvePt(P, clamp(O.perchAt + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
+  return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
+}
+/* Drawn with the tree's branches, in their colour (fillStyle already set). */
+function drawPerch(c, T) {
+  var P = perchCurve(T), N = 14, i, q, Lft = [], Rgt = [];
+  for (i = 0; i <= N; i++) {
+    q = curvePt(P, i / N);
+    Lft.push([q.x + q.nx * q.w / 2, q.y + q.ny * q.w / 2]);
+    Rgt.push([q.x - q.nx * q.w / 2, q.y - q.ny * q.w / 2]);
+  }
+  c.beginPath();
+  c.moveTo(Lft[0][0], Lft[0][1]);
+  for (i = 1; i <= N; i++) c.lineTo(Lft[i][0], Lft[i][1]);
+  c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
+  for (i = N; i >= 0; i--) c.lineTo(Rgt[i][0], Rgt[i][1]);
+  c.closePath();
+  c.fill();
+  // a short twig near the tip, angled up and out
+  var tw = perchTwig(P), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
+  c.beginPath();
+  c.moveTo(tw.q.x + px * w0, tw.q.y + py * w0);
+  c.lineTo(tw.x + px * w1, tw.y + py * w1);
+  c.lineTo(tw.x - px * w1, tw.y - py * w1);
+  c.lineTo(tw.q.x - px * w0, tw.q.y - py * w0);
+  c.closePath();
+  c.fill();
+}
+/* Its leaves, drawn with the tree's foliage. */
+function drawPerchLeaves(c, T) {
+  if (!T.perchLeaves || !T.perchLeaves.length) return;
+  var P = perchCurve(T), tip = curvePt(P, 1), tw = perchTwig(P), tilt = P.n.cur - P.n.abs;
+  for (var i = 0; i < T.perchLeaves.length; i++) {
+    var Lf = T.perchLeaves[i], x = Lf.at ? tw.x : tip.x, y = Lf.at ? tw.y : tip.y;
+    leafPath(c, x + Lf.dx * Lf.s, y + Lf.dy * Lf.s - Lf.s * 0.2, Lf.s, Lf.rot + tilt);
+    c.fillStyle = Lf.col;
+    c.fill();
+  }
 }
 function restPose(T) {
   var ns = T.nodes;
@@ -710,11 +921,16 @@ function restPose(T) {
 function swayTree(T, t, dt) {
   T.gustV += (-6 * T.gust - 1.8 * T.gustV) * dt;
   T.gust += T.gustV * dt;
+  // the owl's branch: sags a little under the owl, bounces after a landing or take-off
+  var sag = owlOn(T) ? 0.035 * O.owlWeight : 0;
+  T.pbV += (-70 * (T.pb - sag) - 4.5 * T.pbV) * dt;
+  T.pb += T.pbV * dt;
   var amp = 0.02 * V.wind, ns = T.nodes;
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i];
     var kk = Math.pow(n.d / T.maxD, 1.6) + 0.02;
     var sw = (Math.sin(t * n.f + n.ph) * amp + Math.sin(t * 0.37 + n.ph * 0.3) * amp * 0.6 + T.gust) * kk;
+    if (n.perch) sw = sw * 0.6 + T.pb * n.side;
     var par = n.p < 0 ? null : ns[n.p];
     n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
     n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
@@ -741,6 +957,7 @@ function drawBranches(c, T, strength) {
   c.beginPath();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
+    if (n.perch) continue;                       // the owl's branch is drawn by drawPerch
     var w0 = n.w / 2, w1 = endW(n);
     var x0 = X(T, n.sx), y0 = n.sy, x1 = X(T, n.ex), y1 = n.ey;
     var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
@@ -754,11 +971,13 @@ function drawBranches(c, T, strength) {
   c.beginPath();
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
+    if (n.perch) continue;
     var r = endW(n), ex = X(T, n.ex);
     c.moveTo(ex + r, n.ey);
     c.arc(ex, n.ey, r, 0, TAU);
   }
   c.fill();
+  if (T.perch !== undefined) drawPerch(c, T);
 }
 function drawClumps(c, T, t) {
   var ns = T.nodes;
@@ -772,6 +991,7 @@ function drawClumps(c, T, t) {
     c.drawImage(C.spr.cnv, -h, -h, h * 2, h * 2);
     c.restore();
   }
+  if (T.perch !== undefined) drawPerchLeaves(c, T);
 }
 function nightGlow(T, strength) {
   if (!isNight() || TREE.nightGlow <= 0 || !T.clumps.length) return;
@@ -1489,395 +1709,554 @@ function drawPile(c, t) {
 }
 
 /* ============================================================
-   11. BIRDS — the same flocks as the app (app.js: BIRD_KINDS, sendBirds,
-   updateBirds, drawBirds), each with its own call. A flock is one
-   species and never the same as the one before. The far birds (small,
-   soft) fly behind both trees; the middle and near ones between the two
-   trees. Every bird calls now and then while it is on screen.
+   11. THE OWL — one owl at night. It sits on the bare branch that
+   sticks out of either tree (section 6, addPerch), blinks now and then,
+   and at a random moment flies off into the distance; after a set time
+   it comes back and lands on one of the two branches at random.
+   Depth of field: the further away it is, the smaller, softer, hazier
+   and fainter it is drawn — sharp on the near branch, as soft as the far
+   tree on the far branch, and gone over the mountains. It is drawn in
+   the same soft way as the trees (flat shapes, no outlines, mixed toward
+   the paper by its strength) and lit from below by the same warm lamps.
+   Going away it is seen from behind, coming back from the front.
+   Sprites are baked once (redone when a value changes): the sitting
+   poses at the two branch depths, the flying poses at OWL_STEPS depths.
    ============================================================ */
 function rnd(a, b) { return a + Math.random() * (b - a); }
-function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
 var HAS_FILTER = typeof ctx.filter === 'string';
-var BIRD_KINDS = {
-  onaga: {
-    scale: 1, tail: 0.95, tailW: 0.12, span: 0.9, flock: [5, 8],
-    hz: 5.5, beats: [3, 6], glide: [0.5, 1.1], fold: false, speed: [80, 110], lift: 10, sink: 7,
-    back: '#a9a3a2', belly: '#e6e2dd', cap: '#1d1c24', capFace: true, eyeRing: null,
-    wing: '#79b4e2', wingDark: '#3f7dbf', tailCol: '#6aa6d8', tailTip: '#f4f2ee', beak: '#24222a'
-  },
-  mejiro: {
-    scale: 0.75, tail: 0.38, tailW: 0.1, span: 0.8, flock: [6, 10],
-    hz: 11, beats: [4, 8], glide: [0.15, 0.35], fold: true, speed: [90, 125], lift: 26, sink: 30,
-    back: '#879a2b', belly: '#d8d6c4', cap: '#8fa431', capFace: false, eyeRing: '#ffffff', throat: '#e3d24a',
-    wing: '#7f932a', wingDark: '#566620', tailCol: '#6e7f26', tailTip: null, beak: '#3a3330'
-  },
-  ruri: {
-    scale: 0.8, tail: 0.5, tailW: 0.12, span: 0.85, flock: [4, 6],
-    hz: 8, beats: [4, 7], glide: [0.25, 0.6], fold: false, speed: [85, 120], lift: 16, sink: 14,
-    back: '#2457b8', belly: '#f2f1ee', cap: '#3f7fe0', capFace: false, eyeRing: null, face: '#141a33',
-    wing: '#2a5fc4', wingDark: '#15306e', tailCol: '#1f4ea8', tailTip: null, beak: '#141418'
-  }
-};
-var BIRD_TIERS = [
-  { size: 36, blur: 0,   haze: 0,    speed: 1,    alpha: 1 },       // near
-  { size: 24, blur: 0.6, haze: 0.12, speed: 0.86, alpha: 0.95 },    // middle
-  { size: 14, blur: 1.1, haze: 0.25, speed: 0.72, alpha: 0.9 }     // far: behind both trees
-];
-var BIRD_FRAMES = 8, BIRD_GLIDE = 8, BIRD_FOLD = 9;
-var birds = [], birdSprites = {}, birdSpritePR = 0, birdNext = 0, birdLastKind = '', flocksSent = 0;
+var OWL_FRAMES = 8, OWL_GLIDE = 8, OWL_LAND = 9;   // flying sprites: 8 wingbeat frames, a glide, wings up with legs down
+var OWL_STEPS = 14;                                  // the depths the flying sprites are baked at
+var SIT_BOX = [-0.52, -1.18, 0.52, 0.09];           // sprite bounds in owl units: height 1, feet at (0, 0)
+var FLY_BOX = [-1.22, -1.52, 1.22, 0.5];
+var owlSit = [], owlFly = [], owl = null, OWLTMP = mk();
+var TREE_NAMES = ['near tree', 'far tree'];
 
-// One wing in bird units (x forward, y down, body length 1). a: 1 up, -1 down.
-function birdWing(c, k, a, far, fold) {
-  var sx = 0.06, sy = -0.07;
-  c.beginPath();
-  if (fold) {                                      // folded along the back
-    c.moveTo(sx + 0.1, sy + 0.02);
-    c.quadraticCurveTo(sx - 0.1, sy - 0.07, sx - 0.42, sy + 0.04);
-    c.quadraticCurveTo(sx - 0.15, sy + 0.08, sx + 0.1, sy + 0.02);
-  } else {
-    // seen a little from the side: the far wing sits further forward and looks shorter
-    var dir = a >= 0 ? -1 : 1, L = k.span * (0.2 + 0.8 * Math.abs(a)) * (far ? 0.78 : 1);
-    if (far) sx += 0.1;
-    var tx = sx - 0.12 - 0.16 * Math.abs(a), ty = sy + dir * L;
-    c.moveTo(sx + 0.16, sy);
-    c.bezierCurveTo(sx + 0.2, sy + dir * L * 0.45, tx + 0.12, ty - dir * 0.04, tx, ty);   // leading edge
-    // trailing edge with the primaries as small scallops, then the inner wing
-    var bx = sx - 0.12, by = sy + dir * L * 0.35;
-    for (var i = 1; i <= 4; i++) {
-      var f = i / 4;
-      var px = lerp(tx, bx, f), py = lerp(ty, by, f);
-      c.quadraticCurveTo(px - 0.06, py - dir * 0.06, px, py);
-    }
-    c.quadraticCurveTo(sx - 0.24, sy + dir * 0.06, sx - 0.2, sy + 0.02);
-    c.closePath();
-  }
-  var g = c.createLinearGradient(sx, sy, sx - 0.2, sy + (a >= 0 ? -1 : 1) * k.span);
-  g.addColorStop(0, far ? k.wingDark : k.wing);
-  g.addColorStop(0.55, k.wing);
-  g.addColorStop(1, k.wingDark);
-  c.fillStyle = g;
-  c.fill();
-  if (far) { c.fillStyle = 'rgba(20,24,40,0.28)'; c.fill(); }      // the far wing is in shade
+/* How it looks at size k (1 on the near branch, FAR_SCALE on the far one,
+   O.farthest where it disappears). */
+function owlBlur(k) {
+  if (k >= FAR_SCALE) return lerp(O.farBlur, 0, clamp((k - FAR_SCALE) / (1 - FAR_SCALE), 0, 1));
+  return lerp(O.maxBlur, O.farBlur, clamp((k - O.farthest) / (FAR_SCALE - O.farthest), 0, 1));
 }
-function birdBody(c, k) {
-  // tail
+function owlHaze(k) { return O.haze * Math.pow(clamp((1 - k) / (1 - O.farthest), 0, 1), 1.5); }
+function owlAlpha(k) { return smooth(O.farthest, Math.max(O.fadeFrom, O.farthest + 0.01), k); }
+function owlSlot(k) { return k >= 0.9 ? 'C' : (k >= FAR_SCALE * 0.97 ? 'B' : 'A'); }
+
+/* Its colours at size k: mixed toward the paper by its strength (paler on
+   the far tree, as the far tree is), the time-of-day light, a touch of the
+   lamps, and the night haze with distance. */
+function owlPalette(k) {
+  var src = O.colours[O.look] || OWL_COLOURS.fukurou, P = {};
+  var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.strength * lerp(1, TREE.farOpacity, far);
+  var hz = owlHaze(k), mist = light(cols().mist);
+  function tone(c) {
+    var o = light(mix(c, PAPER, 1 - str));
+    if (isNight()) o = mix(o, LAMP, O.lampGlow * 0.06);
+    return mix(o, mist, hz);
+  }
+  for (var key in src) P[key] = tone(hex(src[key]));
+  P.lid = mix(P.face, P.rim, 0.3);
+  P.dark = tone(scale(hex(src.rim), 0.55));
+  P.pupil = tone([20, 16, 18]);
+  P.shine = mix([255, 246, 232], mist, hz);
+  P.hz = hz;
+  return P;
+}
+
+/* ---------- Drawing, in owl units (height 1, feet at 0, 0, y down) ---------- */
+function owlBodyPath(c, tufts) {
   c.beginPath();
-  c.moveTo(-0.28, -0.04);
-  c.lineTo(-0.3 - k.tail, -0.02 - k.tailW * 0.4);
-  c.quadraticCurveTo(-0.34 - k.tail, 0.01, -0.3 - k.tail, 0.02 + k.tailW * 0.6);
-  c.lineTo(-0.28, 0.05);
+  c.moveTo(0, 0);
+  c.bezierCurveTo(0.17, 0, 0.31, -0.12, 0.31, -0.32);
+  c.bezierCurveTo(0.31, -0.5, 0.25, -0.58, 0.26, -0.66);
+  if (tufts) {                                       // コノハズク: a flatter crown between two ear tufts
+    c.bezierCurveTo(0.28, -0.78, 0.28, -0.9, 0.25, -0.97);
+    c.quadraticCurveTo(0.27, -1.06, 0.23, -1.13);
+    c.quadraticCurveTo(0.16, -1.02, 0.1, -0.97);
+    c.quadraticCurveTo(0, -0.94, -0.1, -0.97);
+    c.quadraticCurveTo(-0.16, -1.02, -0.23, -1.13);
+    c.quadraticCurveTo(-0.27, -1.06, -0.25, -0.97);
+    c.bezierCurveTo(-0.28, -0.9, -0.28, -0.78, -0.26, -0.66);
+  } else {                                           // フクロウ: a big round head
+    c.bezierCurveTo(0.29, -0.76, 0.29, -0.99, 0, -1.0);
+    c.bezierCurveTo(-0.29, -0.99, -0.29, -0.76, -0.26, -0.66);
+  }
+  c.bezierCurveTo(-0.25, -0.58, -0.31, -0.5, -0.31, -0.32);
+  c.bezierCurveTo(-0.31, -0.12, -0.17, 0, 0, 0);
   c.closePath();
-  c.fillStyle = k.tailCol; c.fill();
-  if (k.tailTip) {
+}
+/* An eye. eyes: 0 open, 1 half shut, 2 shut (the upper lid comes down). */
+function owlEye(c, P, x, y, r, eyes, pupil) {
+  c.beginPath(); c.arc(x, y, r * 1.35, 0, TAU);       // a darker socket, so the eye reads when small
+  c.fillStyle = rgb(mix(P.face, P.rim, 0.45)); c.fill();
+  if (eyes < 2) {
+    c.beginPath(); c.arc(x, y, r, 0, TAU); c.fillStyle = rgb(P.eye); c.fill();
+    if (pupil) { c.beginPath(); c.arc(x, y, r * 0.48, 0, TAU); c.fillStyle = rgb(P.pupil); c.fill(); }
+    c.beginPath(); c.arc(x + r * 0.3, y - r * 0.32, r * 0.24, 0, TAU); c.fillStyle = rgb(P.shine, 0.85); c.fill();
+  }
+  if (eyes > 0) {
+    var lidY = eyes === 1 ? y - r * 0.05 : y + r * 1.2;
+    c.save();
+    c.beginPath(); c.arc(x, y, r * 1.08, 0, TAU); c.clip();
+    c.fillStyle = rgb(P.lid); c.fillRect(x - r * 1.2, y - r * 1.2, r * 2.4, lidY - (y - r * 1.2));
+    c.restore();
+    c.strokeStyle = rgb(P.dark, 0.8); c.lineWidth = r * 0.22;
+    c.beginPath();
+    if (eyes === 1) { c.moveTo(x - r * 0.95, lidY - r * 0.1); c.quadraticCurveTo(x, lidY + r * 0.2, x + r * 0.95, lidY - r * 0.1); }
+    else { c.moveTo(x - r * 0.95, y - r * 0.05); c.quadraticCurveTo(x, y + r * 0.55, x + r * 0.95, y - r * 0.05); }
+    c.stroke();
+  }
+}
+function owlBeak(c, P, x, y) {
+  c.beginPath();
+  c.moveTo(x - 0.026, y - 0.03);
+  c.quadraticCurveTo(x, y - 0.045, x + 0.026, y - 0.03);
+  c.quadraticCurveTo(x + 0.016, y + 0.02, x, y + 0.05);
+  c.quadraticCurveTo(x - 0.016, y + 0.02, x - 0.026, y - 0.03);
+  c.fillStyle = rgb(P.beak); c.fill();
+}
+/* Sitting, seen from the front. head: -1, 0, 1 (looking aside);
+   settle: wings still a little out, just after landing. */
+function paintSit(c, P, eyes, head, settle) {
+  var tufts = O.look === 'konohazuku', r = rngFrom(4242), i, j, s;
+  if (tufts) c.scale(0.92, 1);                       // the scops owl is slimmer
+  owlBodyPath(c, tufts);
+  c.fillStyle = rgb(P.back); c.fill();
+  // the pale chest, soft-edged, with dark streaks
+  c.save();
+  owlBodyPath(c, tufts); c.clip();
+  var g = c.createRadialGradient(0, -0.3, 0.04, 0, -0.3, 0.3);
+  g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.62, rgb(P.chest)); g.addColorStop(1, rgb(P.chest, 0));
+  c.fillStyle = g;
+  c.beginPath(); c.ellipse(0, -0.3, 0.24, 0.34, 0, 0, TAU); c.fill();
+  c.strokeStyle = rgb(P.streak, 0.75);
+  for (i = 0; i < 18; i++) {
+    var sx = (r() - 0.5) * 0.32, sy = lerp(-0.58, -0.1, r()), sl = lerp(0.04, 0.08, r()), lw = lerp(0.012, 0.02, r());
+    if ((sx * sx) / 0.029 + ((sy + 0.32) * (sy + 0.32)) / 0.09 > 1) continue;
+    c.lineWidth = lw;
+    c.beginPath(); c.moveTo(sx, sy); c.lineTo(sx * 1.08, sy + sl); c.stroke();
+    if (tufts) {                                     // fine cross-bars, like bark
+      c.lineWidth = 0.008;
+      c.beginPath(); c.moveTo(sx - 0.022, sy + sl * 0.5); c.lineTo(sx + 0.022, sy + sl * 0.5); c.stroke();
+    }
+  }
+  c.restore();
+  // the folded wings down both sides
+  var wo = settle ? 0.09 : 0;
+  for (s = -1; s <= 1; s += 2) {
+    c.beginPath();
+    c.moveTo(s * 0.2, -0.66);
+    c.bezierCurveTo(s * (0.34 + wo), -0.6, s * (0.35 + wo * 1.3), -0.24, s * (0.21 + wo * 0.6), 0.0);
+    c.bezierCurveTo(s * 0.2, -0.2, s * 0.18, -0.44, s * 0.2, -0.66);
+    c.closePath();
+    var wg = c.createLinearGradient(s * 0.2, 0, s * (0.35 + wo), 0);
+    wg.addColorStop(0, rgb(P.wing)); wg.addColorStop(1, rgb(scale(P.wing, 0.88)));
+    c.fillStyle = wg; c.fill();
     c.save(); c.clip();
-    c.fillStyle = k.tailTip;
-    c.fillRect(-0.34 - k.tail, -0.2, 0.16, 0.4);
+    c.fillStyle = rgb(P.chest, 0.55);                // pale spots along the shoulder
+    for (j = 0; j < 4; j++) { c.beginPath(); c.ellipse(s * (0.27 + wo * 0.6 + (j % 2) * 0.025), -0.56 + j * 0.09, 0.017, 0.011, 0, 0, TAU); c.fill(); }
+    c.strokeStyle = rgb(P.chest, 0.3); c.lineWidth = 0.014;   // bars across the flight feathers
+    for (j = 0; j < 3; j++) { var by = -0.2 + j * 0.065; c.beginPath(); c.moveTo(s * 0.2, by + 0.02); c.lineTo(s * (0.36 + wo), by - 0.02); c.stroke(); }
     c.restore();
   }
-  // body
-  var g = c.createLinearGradient(0, -0.15, 0, 0.15);
-  g.addColorStop(0, k.back); g.addColorStop(0.45, k.back); g.addColorStop(0.7, k.belly); g.addColorStop(1, k.belly);
-  c.beginPath();
-  c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
-  c.fillStyle = g; c.fill();
-  if (k.throat) {                                   // メジロ: yellow throat
-    c.beginPath(); c.ellipse(0.24, 0.03, 0.12, 0.07, 0.3, 0, TAU);
-    c.fillStyle = k.throat; c.fill();
+  // the face: a pale disc with a darker rim
+  var hx = head * 0.05, sq = 1 - Math.abs(head) * 0.12, fy = tufts ? -0.8 : -0.79;
+  var frx = (tufts ? 0.19 : 0.215) * sq, fry = tufts ? 0.15 : 0.17;
+  c.beginPath(); c.ellipse(hx, fy, frx + 0.028, fry + 0.024, 0, 0, TAU); c.fillStyle = rgb(P.rim, 0.6); c.fill();
+  var fg = c.createRadialGradient(hx, fy + 0.01, 0.02, hx, fy, frx);
+  fg.addColorStop(0, rgb(scale(P.face, 1.04))); fg.addColorStop(1, rgb(scale(P.face, 0.9)));
+  c.beginPath(); c.ellipse(hx, fy, frx, fry, 0, 0, TAU); c.fillStyle = fg; c.fill();
+  var er = tufts ? 0.05 : 0.042, ex = 0.075 * sq, ey = fy - 0.005;
+  if (!tufts) {                                      // フクロウ: faint rings round the eyes
+    c.strokeStyle = rgb(P.rim, 0.18); c.lineWidth = 0.008;
+    for (s = -1; s <= 1; s += 2) for (j = 1; j <= 2; j++) { c.beginPath(); c.arc(hx + s * ex, ey, er * (1.3 + j * 0.6), 0, TAU); c.stroke(); }
   }
-  // head
-  var hx = 0.36, hy = -0.06, hr = 0.135;
-  c.beginPath(); c.arc(hx, hy, hr, 0, TAU);
-  c.fillStyle = k.face || (k.capFace ? k.belly : k.back); c.fill();
+  c.strokeStyle = rgb(scale(P.face, 1.1), 0.9); c.lineWidth = 0.02;   // pale brows meeting over the beak
+  for (s = -1; s <= 1; s += 2) {
+    c.beginPath(); c.moveTo(hx + s * 0.12 * sq, fy - 0.06); c.quadraticCurveTo(hx + s * 0.05, fy - 0.075, hx + s * 0.012, fy + 0.02); c.stroke();
+  }
+  for (s = -1; s <= 1; s += 2) owlEye(c, P, hx + s * ex, ey, er, eyes, tufts);
+  owlBeak(c, P, hx, fy + 0.035);
+  // feet on the branch, the talons curling over its front
+  for (s = -1; s <= 1; s += 2) {
+    c.beginPath(); c.ellipse(s * 0.075, -0.012, 0.05, 0.026, 0, 0, TAU); c.fillStyle = rgb(P.feet); c.fill();
+    c.strokeStyle = rgb(P.dark); c.lineWidth = 0.011;
+    for (j = 0; j < 3; j++) {
+      var tx = s * 0.075 + (j - 1) * 0.026;
+      c.beginPath(); c.moveTo(tx, 0.005); c.quadraticCurveTo(tx + 0.006, 0.03, tx - 0.004, 0.045); c.stroke();
+    }
+  }
+}
+/* One wing in flight, spread out from the shoulder. s: -1 left, 1 right;
+   a: 1 up … -1 down; lenK: shorter while it comes up (half folded).
+   front: its pale underside (coming toward us), else its upper side. */
+function owlWing(c, P, s, a, lenK, front) {
   c.save();
-  c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.clip();
-  c.fillStyle = k.cap;
-  if (k.capFace) c.fillRect(hx - hr, hy - hr, hr * 2, hr * 1.15);   // オナガ: black cap down to the eye
-  else c.fillRect(hx - hr, hy - hr, hr * 2, hr * 0.8);
-  c.restore();
-  // beak
+  c.translate(s * 0.15, -0.55);
+  c.scale(s, 1);
+  c.rotate(-a * 0.95);
+  c.scale(0.98 * lenK, 1);
   c.beginPath();
-  c.moveTo(hx + hr * 0.8, hy - 0.035); c.lineTo(hx + hr + 0.08, hy + 0.005); c.lineTo(hx + hr * 0.8, hy + 0.035);
-  c.closePath(); c.fillStyle = k.beak; c.fill();
-  // eye
-  if (k.eyeRing) { c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.042, 0, TAU); c.fillStyle = k.eyeRing; c.fill(); }
-  c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.022, 0, TAU); c.fillStyle = '#0d0c10'; c.fill();
-  // a soft light on the back
-  var hl = c.createRadialGradient(0.05, -0.1, 0, 0.05, -0.1, 0.3);
-  hl.addColorStop(0, 'rgba(255,255,255,0.22)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
-  c.beginPath(); c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
-  c.fillStyle = hl; c.fill();
-}
-function bakeBirdFrame(k, tier, frame) {
-  var u = tier.size * k.scale * PR;                 // device px per bird unit
-  var pad = (tier.blur * 2 + 1) * PR;
-  var x0 = -0.4 - k.tail, x1 = 0.62, y0 = -k.span - 0.12, y1 = k.span + 0.12;
-  var cv = document.createElement('canvas');
-  cv.width = Math.ceil((x1 - x0) * u + pad * 2);
-  cv.height = Math.ceil((y1 - y0) * u + pad * 2);
-  var c = cv.getContext('2d');
-  var a = frame === BIRD_GLIDE ? 0.12 : Math.cos(frame / BIRD_FRAMES * TAU), fold = frame === BIRD_FOLD;
-  var draw = function(dst) {
-    dst.setTransform(u, 0, 0, u, pad - x0 * u, pad - y0 * u);
-    birdWing(dst, k, a, true, fold);
-    birdBody(dst, k);
-    birdWing(dst, k, a, false, fold);
-  };
-  if (tier.blur > 0 && HAS_FILTER) {
-    var tmp = document.createElement('canvas');
-    tmp.width = cv.width; tmp.height = cv.height;
-    draw(tmp.getContext('2d'));
-    c.filter = 'blur(' + (tier.blur * PR).toFixed(2) + 'px)';
-    c.drawImage(tmp, 0, 0);
-    c.filter = 'none';
-  } else draw(c);
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  if (tier.haze > 0) {                              // distance: a little of the pale sky over it
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = 'rgba(238,230,222,' + tier.haze + ')';
-    c.fillRect(0, 0, cv.width, cv.height);
-    c.globalCompositeOperation = 'source-over';
+  c.moveTo(0, -0.07);
+  c.bezierCurveTo(0.35, -0.14, 0.7, -0.11, 0.92, -0.03);      // the broad, rounded leading edge
+  c.quadraticCurveTo(1.01, 0.02, 0.97, 0.09);
+  var tp = [[0.97, 0.09], [0.88, 0.17], [0.79, 0.21], [0.7, 0.23], [0.6, 0.245], [0.5, 0.25]];
+  for (var i = 1; i < tp.length; i++) {                        // the flight feathers, as soft scallops
+    var p0 = tp[i - 1], p1 = tp[i];
+    c.quadraticCurveTo((p0[0] + p1[0]) / 2 + 0.015, (p0[1] + p1[1]) / 2 + 0.035, p1[0], p1[1]);
   }
-  return { cv: cv, ox: (pad - x0 * u) / PR, oy: (pad - y0 * u) / PR, w: cv.width / PR, h: cv.height / PR };
-}
-function birdSpritesFor(kind, ti) {
-  if (birdSpritePR !== PR) { birdSprites = {}; birdSpritePR = PR; }
-  var key = kind + ti;
-  if (!birdSprites[key]) {
-    var list = [];
-    for (var f = 0; f <= BIRD_FOLD; f++) list.push(bakeBirdFrame(BIRD_KINDS[kind], BIRD_TIERS[ti], f));
-    birdSprites[key] = list;
+  c.bezierCurveTo(0.32, 0.27, 0.12, 0.24, 0, 0.16);
+  c.closePath();
+  var g = c.createLinearGradient(0, 0, 1, 0);
+  if (front) { g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.5, rgb(mix(P.chest, P.face, 0.5))); g.addColorStop(1, rgb(scale(P.wing, 0.95))); }
+  else { g.addColorStop(0, rgb(P.back)); g.addColorStop(0.55, rgb(P.wing)); g.addColorStop(1, rgb(scale(P.wing, 0.85))); }
+  c.fillStyle = g; c.fill();
+  c.save(); c.clip();
+  c.strokeStyle = front ? rgb(P.streak, 0.4) : rgb(P.chest, 0.3); c.lineWidth = 0.03;
+  [0.62, 0.73, 0.84, 0.94].forEach(function (x) { c.beginPath(); c.moveTo(x, -0.15); c.lineTo(x - 0.05, 0.3); c.stroke(); });
+  if (front) {                                                 // the dark patch at the wrist, under the wing
+    c.fillStyle = rgb(P.streak, 0.6); c.beginPath(); c.ellipse(0.5, -0.02, 0.06, 0.035, 0, 0, TAU); c.fill();
+  } else {
+    c.fillStyle = rgb(P.chest, 0.4);
+    [[0.2, 0], [0.3, 0.06], [0.26, -0.05], [0.4, 0.02]].forEach(function (d) { c.beginPath(); c.ellipse(d[0], d[1], 0.02, 0.013, 0, 0, TAU); c.fill(); });
   }
-  return birdSprites[key];
+  c.restore();
+  c.restore();
 }
-function sendBirds(forceKind) {
-  var kind;
-  if (forceKind) kind = forceKind;
-  else {
-    var choices = KINDS.map(function (K) { return K[0]; }).filter(function (n) { return B[n + 'On'] && n !== birdLastKind; });
-    if (!choices.length) choices = KINDS.map(function (K) { return K[0]; }).filter(function (n) { return B[n + 'On']; });
-    if (!choices.length) return;
-    kind = pick(choices);
+/* Flying: the body seen end-on (short), both wings out. view 'back' going
+   away, 'front' coming back; land: wings high and legs down for landing. */
+function paintFly(c, P, view, a, lenK, land) {
+  var tufts = O.look === 'konohazuku', front = view === 'front', s, j;
+  for (s = -1; s <= 1; s += 2) owlWing(c, P, s, a, lenK, front);
+  if (!front) {                                                // the tail, fanned
+    c.beginPath(); c.moveTo(-0.08, -0.26); c.lineTo(-0.14, -0.06); c.quadraticCurveTo(0, 0, 0.14, -0.06); c.lineTo(0.08, -0.26); c.closePath();
+    c.fillStyle = rgb(P.wing); c.fill();
+    c.save(); c.clip();
+    c.strokeStyle = rgb(P.chest, 0.3); c.lineWidth = 0.014;
+    for (j = 0; j < 3; j++) { c.beginPath(); c.moveTo(-0.2, -0.2 + j * 0.055); c.lineTo(0.2, -0.2 + j * 0.055); c.stroke(); }
+    c.restore();
+  } else {
+    c.fillStyle = rgb(P.feet); c.strokeStyle = rgb(P.feet);
+    for (s = -1; s <= 1; s += 2) {
+      if (land) {                                              // legs reaching for the branch, talons open
+        c.lineWidth = 0.06;
+        c.beginPath(); c.moveTo(s * 0.06, -0.24); c.lineTo(s * 0.09, -0.02); c.stroke();
+        c.strokeStyle = rgb(P.dark); c.lineWidth = 0.012;
+        for (j = 0; j < 3; j++) { c.beginPath(); c.moveTo(s * 0.09, -0.02); c.lineTo(s * 0.09 + (j - 1) * 0.035, 0.03); c.stroke(); }
+        c.strokeStyle = rgb(P.feet);
+      } else { c.beginPath(); c.ellipse(s * 0.055, -0.2, 0.04, 0.03, 0, 0, TAU); c.fill(); }
+    }
   }
-  var k = BIRD_KINDS[kind];
-  birdLastKind = kind; flocksSent++;
-  var dir = Math.random() < 0.5 ? -1 : 1;
-  var n = Math.max(1, Math.round((k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1))) * B.flockSize));
-  var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
-  var vr = B[kind + 'Var'], flockPitch = 1 + rnd(-0.04, 0.04) * vr;   // this flock's own touch of pitch
-  for (var i = 0; i < n; i++) {
-    var r = Math.random(), ti = r < 0.3 ? 2 : (r < 0.72 ? 1 : 0), tier = BIRD_TIERS[ti];
-    birdSpritesFor(kind, ti);
-    // a loose group: the far birds start a little ahead, as they cross the screen more slowly
-    var home = y0 + rnd(-1, 1) * H * 0.07 * (ti === 2 ? 0.6 : 1);
-    birds.push({
-      kind: kind, ti: ti, dir: dir,
-      x: (dir > 0 ? -60 : W + 60) - dir * (i * rnd(18, 34) - (ti === 2 ? 60 : 0)),
-      y: home, home: home, vy: 0,
-      vx: dir * spd * tier.speed * rnd(0.94, 1.06),
-      ph: rnd(0, TAU), hz: k.hz * rnd(0.9, 1.1),
-      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0,
-      fp: flockPitch * (1 + rnd(-0.015, 0.015) * vr), callT: rnd(0.2, 1.6)
+  c.beginPath(); c.ellipse(0, -0.44, 0.21, 0.26, 0, 0, TAU); c.fillStyle = rgb(P.back); c.fill();
+  c.save();
+  c.beginPath(); c.ellipse(0, -0.44, 0.21, 0.26, 0, 0, TAU); c.clip();
+  if (front) {
+    var g = c.createRadialGradient(0, -0.4, 0.03, 0, -0.4, 0.24);
+    g.addColorStop(0, rgb(P.chest)); g.addColorStop(0.6, rgb(P.chest)); g.addColorStop(1, rgb(P.chest, 0));
+    c.fillStyle = g; c.fillRect(-0.3, -0.75, 0.6, 0.6);
+    c.strokeStyle = rgb(P.streak, 0.7); c.lineWidth = 0.016;
+    [[-0.08, -0.5], [0.06, -0.48], [-0.02, -0.4], [0.1, -0.36], [-0.11, -0.34], [0.02, -0.3]].forEach(function (d) {
+      c.beginPath(); c.moveTo(d[0], d[1]); c.lineTo(d[0] * 1.08, d[1] + 0.06); c.stroke();
+    });
+  } else {
+    c.fillStyle = rgb(P.chest, 0.4);
+    [[-0.08, -0.52], [0.09, -0.5], [0, -0.4], [-0.1, -0.34], [0.11, -0.33]].forEach(function (d) {
+      c.beginPath(); c.ellipse(d[0], d[1], 0.022, 0.014, 0, 0, TAU); c.fill();
     });
   }
-  birds.sort(function(a, b) { return b.ti - a.ti; });   // far first, near last
-  updateStatus();
+  c.restore();
+  var hy = -0.74, hr = tufts ? 0.18 : 0.2;
+  c.fillStyle = rgb(P.back);
+  c.beginPath(); c.arc(0, hy, hr, 0, TAU); c.fill();
+  if (tufts) {
+    for (s = -1; s <= 1; s += 2) { c.beginPath(); c.moveTo(s * 0.06, hy - 0.16); c.lineTo(s * 0.17, hy - 0.27); c.lineTo(s * 0.16, hy - 0.08); c.closePath(); c.fill(); }
+  }
+  if (front) {
+    c.beginPath(); c.ellipse(0, hy, hr * 0.82 + 0.022, hr * 0.7 + 0.02, 0, 0, TAU); c.fillStyle = rgb(P.rim, 0.6); c.fill();
+    c.beginPath(); c.ellipse(0, hy, hr * 0.82, hr * 0.7, 0, 0, TAU); c.fillStyle = rgb(P.face); c.fill();
+    var er = tufts ? 0.045 : 0.038;
+    for (s = -1; s <= 1; s += 2) owlEye(c, P, s * 0.066, hy - 0.005, er, 0, tufts);
+    owlBeak(c, P, 0, hy + 0.035);
+  } else {
+    c.fillStyle = rgb(P.chest, 0.35);                          // pale flecks on the nape
+    for (s = -1; s <= 1; s += 2) { c.beginPath(); c.ellipse(s * 0.06, hy + 0.1, 0.02, 0.013, 0, 0, TAU); c.fill(); }
+  }
 }
-function updateBirds(dt, t) {
-  if (B.flocksOn) {
-    if (!birdNext) birdNext = t + rnd(0.5, 2);          // the first flock is in view within a few seconds
-    else if (t > birdNext) { sendBirds(); birdNext = t + B.flockEvery * rnd(0.65, 1.35); }
-  } else birdNext = 0;
-  for (var i = birds.length - 1; i >= 0; i--) {
-    var b = birds[i], k = BIRD_KINDS[b.kind];
-    b.x += b.vx * dt;
-    if (b.glide > 0) {                              // gliding: sinks a little
-      b.glide -= dt;
-      b.vy += (k.sink - b.vy) * dt * 3;
-      if (b.glide <= 0) { b.beats = Math.floor(rnd(k.beats[0], k.beats[1] + 1)); b.ph = 0; }
-    } else {                                        // flapping: rises a little
-      var before = b.ph;
-      b.ph += TAU * b.hz * dt;
-      b.vy += (-k.lift - b.vy) * dt * 3;
-      if (Math.floor(b.ph / TAU) > Math.floor(before / TAU) && --b.beats <= 0) {
-        b.glide = rnd(k.glide[0], k.glide[1]); b.ph = 0;
+
+/* Bake one pose at size k: drawn sharp, lit (warm lamp light from below,
+   a little shade on top, only over the owl), then laid down through the
+   blur for that depth. */
+function bakeOwl(k, box, P, paint) {
+  var u = O.size * H * k * PR, blur = owlBlur(k), pad = Math.ceil(blur * 3 * PR) + 2;
+  var w = Math.max(1, Math.ceil((box[2] - box[0]) * u) + pad * 2), h = Math.max(1, Math.ceil((box[3] - box[1]) * u) + pad * 2);
+  var ox = pad - box[0] * u, oy = pad - box[1] * u;
+  var tc = OWLTMP.cnv, t = OWLTMP.c;
+  tc.width = w; tc.height = h;                       // also clears it and resets its state
+  t.setTransform(u, 0, 0, u, ox, oy);
+  t.lineCap = 'round';
+  paint(t);
+  t.setTransform(u, 0, 0, u, ox, oy);
+  t.globalCompositeOperation = 'source-atop';
+  var a = (1 - P.hz) * (isNight() ? O.lampGlow : 0);
+  if (a > 0) {
+    var g = t.createLinearGradient(0, 0.2, 0, -0.75);
+    g.addColorStop(0, 'rgba(255,184,110,' + (0.34 * a).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(255,184,110,0)');
+    t.fillStyle = g; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+  }
+  var g2 = t.createLinearGradient(0, -1.2, 0, -0.55);
+  g2.addColorStop(0, 'rgba(36,30,52,' + (0.16 * (1 - P.hz)).toFixed(3) + ')');
+  g2.addColorStop(1, 'rgba(36,30,52,0)');
+  t.fillStyle = g2; t.fillRect(box[0], box[1], box[2] - box[0], box[3] - box[1]);
+  t.globalCompositeOperation = 'source-over';
+  var cv2 = document.createElement('canvas');
+  cv2.width = w; cv2.height = h;
+  var c = cv2.getContext('2d');
+  if (blur > 0.05 && HAS_FILTER) c.filter = 'blur(' + (blur * PR).toFixed(2) + 'px)';
+  c.drawImage(tc, 0, 0);
+  return { cv: cv2, ox: ox / PR, oy: oy / PR, w: w / PR, h: h / PR, k: k };
+}
+function bakeOwlSprites() {
+  if (!H) return;
+  owlSit = [1, FAR_SCALE].map(function (k) {
+    var P = owlPalette(k), poses = {};
+    for (var e = 0; e < 3; e++) for (var hd = -1; hd <= 1; hd++) {
+      poses[e + ',' + hd] = bakeOwl(k, SIT_BOX, P, function (c) { paintSit(c, P, e, hd, false); });
+    }
+    poses.settle = bakeOwl(k, SIT_BOX, P, function (c) { paintSit(c, P, 0, 0, true); });
+    return { k: k, poses: poses };
+  });
+  owlFly = [];
+  for (var i = 0; i < OWL_STEPS; i++) {
+    var k = Math.exp(lerp(0, Math.log(O.farthest), i / (OWL_STEPS - 1)));
+    var P = owlPalette(k), st = { k: k, back: [], front: [] };
+    for (var f = 0; f <= OWL_LAND; f++) {
+      var ph = f / OWL_FRAMES * TAU;
+      var a = f === OWL_GLIDE ? 0.15 : (f === OWL_LAND ? 1.1 : Math.cos(ph));
+      var lenK = f >= OWL_GLIDE ? 1 : 1 - 0.25 * Math.max(0, -Math.sin(ph));
+      if (f < OWL_LAND) st.back.push(bakeOwl(k, FLY_BOX, P, function (c) { paintFly(c, P, 'back', a, lenK, false); }));
+      st.front.push(bakeOwl(k, FLY_BOX, P, function (c) { paintFly(c, P, 'front', a, lenK, f === OWL_LAND); }));
+    }
+    owlFly.push(st);
+  }
+}
+function flyStep(k) {
+  var i = Math.round(Math.log(Math.max(k, O.farthest)) / Math.log(O.farthest) * (OWL_STEPS - 1));
+  return clamp(i, 0, OWL_STEPS - 1);
+}
+
+/* ---------- What it does ---------- */
+function perchTime() { return rnd(Math.min(O.perchMin, O.perchMax), Math.max(O.perchMin, O.perchMax)); }
+function nextTree() { return trees.length < 2 || Math.random() < O.landNear ? 0 : 1; }
+function bez(p, s) {
+  var a = (1 - s) * (1 - s) * (1 - s), b = 3 * (1 - s) * (1 - s) * s, c = 3 * (1 - s) * s * s, d = s * s * s;
+  return [a * p[0] + b * p[2] + c * p[4] + d * p[6], a * p[1] + b * p[3] + c * p[5] + d * p[7]];
+}
+function startOwl(t) {
+  owl = { state: 'perch', ti: nextTree(), t0: t, until: t + perchTime(), landed: false,
+          blinkAt: t + rnd(1, 3), blinkT0: -1, dbl: false, head: 0, headAt: t + O.headEvery * rnd(0.6, 1.4), headUntil: 0,
+          hootAt: t + O.hootEvery * rnd(0.3, 1), x: 0, y: 0, k: 1, ph: 0, beats: 0, glide: 0, bob: 0, frame: 0,
+          lastX: 0, vx: 0, rot: 0, fx: 1, fy: 1, alpha: 1, slot: 'C', pose: 'sit', key: '0,0', view: 'front' };
+}
+function owlOn(T) { return !!owl && owl.state === 'perch' && trees[owl.ti] === T; }
+function flapOwl(dt, hz) {
+  var o = owl;
+  if (o.glide > 0) {
+    o.glide -= dt;
+    if (o.glide <= 0) { o.beats = O.flapBeats; o.ph = 0; }
+  } else {
+    var before = o.ph;
+    o.ph += TAU * hz * dt;
+    if (Math.floor(o.ph / TAU) > Math.floor(before / TAU) && --o.beats <= 0 && O.glideTime > 0) {
+      o.glide = O.glideTime * rnd(0.7, 1.3); o.ph = 0;
+    }
+  }
+  o.frame = o.glide > 0 ? OWL_GLIDE : Math.floor((o.ph % TAU) / TAU * OWL_FRAMES) % OWL_FRAMES;
+  o.bob = o.glide > 0 ? 0 : -Math.sin(o.ph) * 0.035 * O.size * H * o.k;   // rises a little on each downstroke
+}
+/* A lean into turns: from how fast it is moving across the screen. */
+function bank(dt) {
+  var o = owl, v = (o.x - o.lastX) / Math.max(dt, 0.001);
+  o.vx += (v - o.vx) * Math.min(1, dt * 4);
+  o.lastX = o.x;
+  return clamp(o.vx * 0.0009, -0.22, 0.22);
+}
+function takeOff(t) {
+  var o = owl, T = trees[o.ti], inward = T.left ? 1 : -1;
+  T.pbV += 0.5 * O.branchBounce;                     // it pushes off: the branch dips, then springs back
+  var x3 = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread), y3 = H * (V.horizon - O.vanishHeight);
+  o.state = 'leave'; o.t0 = t; o.dur = O.flyAwayTime; o.k0 = o.ti === 0 ? 1 : FAR_SCALE;
+  // it drops off the branch toward the middle of the screen, then rises away over the mountains
+  o.path = [o.x, o.y, o.x + inward * W * 0.1, o.y + H * 0.03, lerp(o.x, x3, 0.6), Math.min(o.y, y3) - H * 0.06, x3, y3];
+  o.ph = 0; o.beats = O.flapBeats + 2; o.glide = 0; o.lastX = o.x; o.vx = 0; o.head = 0;
+}
+function comeBack(t, ti) {
+  var o = owl;
+  o.ti = ti !== undefined ? ti : (o.next !== undefined ? o.next : nextTree());
+  if (o.ti >= trees.length) o.ti = 0;
+  o.next = undefined;
+  o.state = 'return'; o.t0 = t; o.dur = O.returnTime; o.kT = o.ti === 0 ? 1 : FAR_SCALE;
+  o.sx = W * (0.5 + (Math.random() - 0.5) * O.vanishSpread); o.sy = H * (V.horizon - O.vanishHeight);
+  o.ph = 0; o.beats = O.flapBeats; o.glide = 0; o.lastX = o.sx; o.vx = 0;
+}
+function land(t) {
+  var o = owl, T = trees[o.ti];
+  T.pbV += 0.7 * O.branchBounce;                     // the branch dips under it and springs back
+  o.state = 'perch'; o.landed = true; o.t0 = t; o.until = t + perchTime();
+  o.blinkAt = t + rnd(1, 3); o.blinkT0 = -1; o.dbl = false; o.head = 0;
+  o.headAt = t + O.headEvery * rnd(0.6, 1.4); o.hootAt = t + O.hootEvery * rnd(0.4, 1);
+}
+function updateOwl(t, dt) {
+  if (!trees.length || !owlFly.length) return;
+  if (!owl) startOwl(t);
+  var o = owl, T, inward, tt, u, s, p;
+  if (o.ti >= trees.length) o.ti = 0;
+  o.fx = 1; o.fy = 1; o.alpha = 1;
+  if (o.state === 'perch') {
+    T = trees[o.ti]; inward = T.left ? 1 : -1;
+    var st = seat(T);
+    o.x = st.x; o.y = st.y; o.k = o.ti === 0 ? 1 : FAR_SCALE; o.lastX = o.x; o.vx = 0;
+    o.pose = 'sit'; o.slot = o.ti === 0 ? 'C' : 'B';
+    // blinking: half shut, shut, half shut; now and then twice in a row
+    var eyes = 0;
+    if (o.blinkT0 < 0 && t >= o.blinkAt) o.blinkT0 = t;
+    if (o.blinkT0 >= 0) {
+      var bp = (t - o.blinkT0) / Math.max(0.04, O.blinkTime);
+      eyes = bp < 0.2 ? 1 : (bp < 0.7 ? 2 : (bp < 1 ? 1 : 0));
+      if (bp >= 1) {
+        o.blinkT0 = -1;
+        if (!o.dbl && Math.random() < O.doubleBlink) { o.dbl = true; o.blinkAt = t + 0.1; }
+        else { o.dbl = false; o.blinkAt = t + rnd(Math.min(O.blinkMin, O.blinkMax), Math.max(O.blinkMin, O.blinkMax)); }
       }
     }
-    b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
-    b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
-    if (b.x > 0 && b.x < W) {                       // calls only while on screen
-      b.callT -= dt;
-      if (b.callT <= 0) { birdCall(b); b.callT = B.callEvery * rnd(0.6, 1.4); }
-    }
-    if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
+    // a look to one side now and then (when switched on, or from the button)
+    if (o.head !== 0 && t >= o.headUntil) { o.head = 0; o.headAt = t + O.headEvery * rnd(0.6, 1.4); }
+    else if (O.headTurn && o.head === 0 && t >= o.headAt) { o.head = Math.random() < 0.5 ? -1 : 1; o.headUntil = t + rnd(1.5, 3.5); }
+    if (O.hoot && t >= o.hootAt) { hoot(); o.hootAt = t + O.hootEvery * rnd(0.6, 1.4); }
+    o.key = o.landed && t - o.t0 < 0.35 ? 'settle' : eyes + ',' + o.head;
+    // just before it takes off it crouches and leans toward where it will fly
+    var lean = smooth(o.until - 0.45, o.until, t);
+    o.rot = st.rot + inward * 0.18 * lean; o.fy = 1 - 0.08 * lean; o.fx = 1 + 0.04 * lean;
+    if (t >= o.until) takeOff(t);
+  } else if (o.state === 'leave') {
+    tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = 1 - Math.pow(1 - u, 1.5);
+    p = bez(o.path, s);
+    // it keeps its depth while it clears the tree, then goes further and further away
+    o.k = Math.exp(lerp(Math.log(o.k0), Math.log(O.farthest), Math.pow(clamp((u - 0.1) / 0.9, 0, 1), 1.2)));
+    flapOwl(dt, O.flapHz * (tt < 1.2 ? 1.3 : 1));
+    if (tt < 0.15) { o.frame = OWL_LAND; o.bob = 0; }  // the first moment: wings up, legs leaving the branch
+    var f = clamp((tt - 0.2) / 0.35, 0, 1);          // it turns round to fly away from us, like a card turning
+    o.view = f < 0.5 ? 'front' : 'back'; o.fx = Math.max(0.12, Math.abs(Math.cos(f * PI)));
+    if (o.view === 'back' && o.frame === OWL_LAND) o.frame = 0;
+    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt);
+    o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
+    if (u >= 1) { o.state = 'gone'; o.until = t + (o.quick ? 1 : O.awayTime); o.quick = false; }
+  } else if (o.state === 'gone') {
+    o.alpha = 0;
+    if (t >= o.until) comeBack(t);
+  } else if (o.state === 'return') {
+    T = trees[o.ti]; inward = T.left ? 1 : -1;
+    var sp = seat(T);
+    tt = t - o.t0; u = clamp(tt / o.dur, 0, 1); s = u * u * (3 - 2 * u);
+    // from far over the mountains, round to the inner side of the branch, and in to land
+    p = bez([o.sx, o.sy, o.sx, o.sy - H * 0.04, sp.x + inward * W * 0.16, sp.y - H * 0.08, sp.x, sp.y], s);
+    o.k = Math.exp(lerp(Math.log(O.farthest), Math.log(o.kT), clamp(s / 0.85, 0, 1)));
+    if (o.dur - tt < 0.55) { o.frame = OWL_LAND; o.bob = 0; }   // wings up, legs down, braking
+    else flapOwl(dt, O.flapHz);
+    o.view = 'front';
+    o.x = p[0]; o.y = p[1] + o.bob; o.rot = bank(dt);
+    o.pose = 'fly'; o.alpha = owlAlpha(o.k); o.slot = owlSlot(o.k);
+    if (u >= 1) land(t);
   }
 }
-// layer 'far': the far birds (behind both trees); 'near': the middle and near ones
-function drawBirds(c, t, layer) {
-  if (!birds.length) return;
-  for (var i = 0; i < birds.length; i++) {
-    var b = birds[i];
-    if ((b.ti === 2) !== (layer === 'far')) continue;
-    var k = BIRD_KINDS[b.kind], frames = birdSpritesFor(b.kind, b.ti), f;
-    if (b.glide > 0) f = k.fold ? BIRD_FOLD : BIRD_GLIDE;
-    else f = Math.floor((b.ph % TAU) / TAU * BIRD_FRAMES) % BIRD_FRAMES;
-    var s = frames[f];
-    c.globalAlpha = BIRD_TIERS[b.ti].alpha;
-    c.setTransform(PR * b.dir, 0, 0, PR, b.x * PR, b.y * PR);
-    c.drawImage(s.cv, -s.ox, -s.oy, s.w, s.h);
+/* slot 'A': further than the far tree (drawn behind it); 'B': between the
+   two trees; 'C': in front of the near tree. */
+function drawOwl(c, slot) {
+  if (!owl || owl.slot !== slot || owl.alpha <= 0.003 || !owlFly.length) return;
+  var spr, sc = 1;
+  if (owl.pose === 'sit') spr = owlSit[owl.ti === 0 ? 0 : 1].poses[owl.key];
+  else {
+    var st = owlFly[flyStep(owl.k)];
+    spr = (owl.view === 'back' ? st.back : st.front)[owl.frame] || st.front[0];
+    sc = owl.k / st.k;
   }
+  if (!spr) return;
+  c.setTransform(PR, 0, 0, PR, owl.x * PR, owl.y * PR);
+  c.rotate(owl.rot);
+  c.scale(sc * owl.fx, sc * owl.fy);
+  c.globalAlpha = owl.alpha;
+  c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
 }
+function owlStatus(t) {
+  var o = owl;
+  if (!o) return '';
+  var nx = o.next === undefined ? 'either tree (random)' : 'the ' + TREE_NAMES[o.next];
+  var txt;
+  if (o.state === 'perch') txt = 'Sitting on the ' + TREE_NAMES[o.ti] + ' · flies off in ' + Math.max(0, Math.ceil(o.until - t)) + ' s';
+  else if (o.state === 'leave') txt = 'Flying away into the distance';
+  else if (o.state === 'gone') txt = 'Away · back in ' + Math.max(0, Math.ceil(o.until - t)) + ' s, to ' + nx;
+  else txt = 'Coming back to the ' + TREE_NAMES[o.ti];
+  if (o.state !== 'gone') txt += ' · next landing: ' + nx;
+  if (O.hoot && !(actx && actx.state === 'running')) txt += ' · tap the page once to hear the hoot';
+  return txt;
+}
 
-/* ============================================================
-   11b. BIRD VOICES. A voice makes the notes of one call as a list
-   {t, dur, gain, pts: [[0-1 along the note, Hz], …], …}. R() picks a
-   random value around the middle of a range; "variation" narrows or
-   widens how far it strays. The call is then scaled by the species'
-   pitch and speed and played with Web Audio on its own bird's spot
-   (left to right across the screen, quieter when far).
-   ============================================================ */
-function R(a, b, vr) { var m = (a + b) / 2; return m + (rnd(a, b) - m) * vr; }
-function RI(a, b, vr) { return Math.round(R(a - 0.49, b + 0.49, vr)); }
-var VOICES = {
-  A: {   // natural
-    onaga: function (vr) {                 // rough, nasal "gyuu, gyuu"
-      var n = RI(2, 3, vr), b = R(1500, 1800, vr), s = [], t = 0;
-      for (var i = 0; i < n; i++, t += 0.3)
-        s.push({ t: t, dur: 0.24, gain: 0.35, type: 'sawtooth', atk: 0.03, pts: [[0, b * 1.2], [0.35, b * 1.45], [1, b * 0.85]],
-                 filter: ['bandpass', b * 1.3, 2.5], vib: [38, 90] });
-      return s;
-    },
-    mejiro: function (vr) {                // thin, quick "chi-chu-chi-chi"
-      var n = RI(4, 7, vr), f = R(5800, 6800, vr), s = [], t = 0;
-      for (var i = 0; i < n; i++) {
-        var up = Math.random() < 0.5, d = R(0.05, 0.09, vr);
-        s.push({ t: t, dur: d, gain: 0.3, atk: 0.006, pts: [[0, up ? f : f * 1.15], [1, up ? f * 1.15 : f]] });
-        t += d + R(0.02, 0.07, vr);
-      }
-      return s;
-    },
-    ruri: function (vr) {                  // a singing whistle with a little trill
-      var f = R(2600, 2900, vr);
-      return [
-        { t: 0,    dur: 0.28, gain: 0.3, atk: 0.04, pts: [[0, f], [1, f * 1.3]], h2: 0.15 },
-        { t: 0.34, dur: 0.22, gain: 0.3, atk: 0.03, pts: [[0, f * 1.35], [1, f * 1.5]], h2: 0.15 },
-        { t: 0.61, dur: 0.45, gain: 0.3, atk: 0.03, pts: [[0, f * 1.6], [0.6, f * 1.45], [1, f]], vib: [24, 140], h2: 0.12 }
-      ];
-    }
-  },
-  B: {   // soft
-    onaga: function (vr) {
-      var f = R(1300, 1500, vr);
-      return [
-        { t: 0,   dur: 0.3,  gain: 0.3, atk: 0.06, pts: [[0, f], [1, f * 1.25]], filter: ['lowpass', 2500, 1] },
-        { t: 0.4, dur: 0.38, gain: 0.3, atk: 0.06, pts: [[0, f * 1.3], [1, f * 0.9]], filter: ['lowpass', 2500, 1] }
-      ];
-    },
-    mejiro: function (vr) {
-      var f = R(3800, 4400, vr), n = RI(3, 5, vr), s = [], t = 0;
-      for (var i = 0; i < n; i++, t += R(0.12, 0.18, vr)) s.push({ t: t, dur: 0.11, gain: 0.25, atk: 0.025, pts: [[0, f], [1, f * R(0.95, 1.1, vr)]] });
-      return s;
-    },
-    ruri: function (vr) {
-      var f = R(2200, 2500, vr);
-      return [
-        { t: 0,   dur: 0.4,  gain: 0.28, atk: 0.08, pts: [[0, f * 1.4], [1, f]] },
-        { t: 0.5, dur: 0.55, gain: 0.28, atk: 0.08, pts: [[0, f * 1.2], [1, f * 0.8]], vib: [6, 40] }
-      ];
-    }
-  },
-  C: {   // bright, chime-like (pentatonic notes with a ringing tail)
-    onaga: function (vr) {
-      var sc = [523, 587, 659, 784, 880], a = pick(sc) * 2, b = pick(sc) * 2;
-      if (vr === 0) { a = 1318; b = 1046; }
-      return [
-        { t: 0,    dur: 0.35, gain: 0.3, atk: 0.004, pts: [[0, a], [1, a]], h2: 0.2 },
-        { t: 0.47, dur: 0.45, gain: 0.3, atk: 0.004, pts: [[0, b], [1, b]], h2: 0.2 }
-      ];
-    },
-    mejiro: function (vr) {
-      var sc = [1568, 1760, 1976, 2349, 2637, 3136], n = RI(3, 5, vr), i0 = RI(0, 2, vr), s = [];
-      for (var k = 0; k < n; k++) { var f = sc[Math.min(5, i0 + k)]; s.push({ t: k * 0.09, dur: 0.18, gain: 0.22, atk: 0.003, pts: [[0, f], [1, f]] }); }
-      return s;
-    },
-    ruri: function (vr) {
-      var f = vr === 0 ? 1319 : pick([1175, 1319, 1568]), s = [];
-      [1, 1.25, 1.5, 2].forEach(function (r, i) { s.push({ t: i * 0.16, dur: 0.5, gain: 0.25, atk: 0.004, pts: [[0, f * r], [1, f * r]], h2: 0.15 }); });
-      return s;
-    }
-  }
-};
-
+/* ---------- The hoot (off unless switched on) ---------- */
 var actx = null, amaster = null;
 function ensureAudio() {
   if (!actx) {
     try {
       actx = new (window.AudioContext || window.webkitAudioContext)();
-      var comp = actx.createDynamicsCompressor();
-      amaster = actx.createGain(); amaster.connect(comp); comp.connect(actx.destination);
-      actx.onstatechange = updateStatus;
-      applyAudio();
+      amaster = actx.createGain(); amaster.connect(actx.destination);
     } catch (e) { actx = null; }
   }
   if (actx && actx.state === 'suspended') actx.resume();
-  updateStatus();
 }
 document.addEventListener('pointerdown', ensureAudio, true);
-function applyAudio() { if (amaster) amaster.gain.value = B.soundOn ? B.volume : 0; }
-function updateStatus() {
-  var el = document.getElementById('labStatus');
-  if (!el) return;
-  var on = actx && actx.state === 'running';
-  el.textContent = (on ? 'Sound is on.' : 'Sound is off until you tap the page once.') +
-    '  Flocks so far: ' + flocksSent + (birdLastKind ? ' (last: ' + KINDS.filter(function (K) { return K[0] === birdLastKind; })[0][1] + ')' : '');
-}
-
-/* One note of a call: a sine (or other wave) gliding through pts, with a quick attack and a falling tail. */
-function playNote(s, t0, out, p, sp) {
-  var d = Math.max(0.02, s.dur / sp), t = t0 + s.t / sp, g = s.gain;
-  var osc = actx.createOscillator(); osc.type = s.type || 'sine';
-  osc.frequency.setValueAtTime(s.pts[0][1] * p, t);
-  for (var i = 1; i < s.pts.length; i++) osc.frequency.linearRampToValueAtTime(s.pts[i][1] * p, t + s.pts[i][0] * d);
-  var env = actx.createGain();
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.linearRampToValueAtTime(g, t + Math.min(d * 0.5, Math.max(0.003, (s.atk || 0.01) / sp)));
-  env.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  var node = osc;
-  if (s.vib) {
-    var lfo = actx.createOscillator(), lg = actx.createGain();
-    lfo.frequency.value = s.vib[0]; lg.gain.value = s.vib[1] * p;
-    lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + d + 0.05);
-  }
-  if (s.filter) {
-    var f = actx.createBiquadFilter(); f.type = s.filter[0]; f.frequency.value = s.filter[1] * p; f.Q.value = s.filter[2];
-    osc.connect(f); node = f;
-  }
-  node.connect(env); env.connect(out);
-  osc.start(t); osc.stop(t + d + 0.05);
-  if (s.h2) playNote({ t: s.t, dur: s.dur, gain: g * s.h2, atk: s.atk,
-                       pts: s.pts.map(function (q) { return [q[0], q[1] * 2]; }) }, t0, out, p, sp);
-}
-function birdCall(b) {
-  if (!B.soundOn || !actx || actx.state !== 'running') return;
-  var n = b.kind, vr = B[n + 'Var'];
-  var spec = VOICES[B[n + 'Voice']][n](vr);
-  var p = Math.pow(2, B[n + 'Pitch'] / 1200) * b.fp;
-  var sp = B[n + 'Speed'] * rnd(1 - 0.08 * vr, 1 + 0.08 * vr);
-  var tierGain = b.ti === 2 ? B.farQuiet : (b.ti === 1 ? (1 + B.farQuiet) / 2 : 1);
-  var out = actx.createGain(); out.gain.value = B[n + 'Vol'] * tierGain * rnd(1 - 0.2 * vr, 1);
+/* Notes: [start s, length s, from Hz, to Hz]. */
+var HOOTS = {
+  // フクロウ: "hoo … hoo, go-ro-suke hoo-hoo", low and soft
+  fukurou: [[0, 0.42, 420, 398], [0.62, 0.42, 412, 388], [1.6, 0.15, 404, 392], [1.82, 0.15, 400, 388],
+            [2.04, 0.2, 404, 384], [2.45, 0.36, 408, 388], [2.95, 0.48, 398, 372]],
+  // コノハズク: "bu-ppō-sō" (仏法僧), higher and shorter
+  konohazuku: [[0, 0.1, 1120, 1090], [0.24, 0.17, 1290, 1240], [0.56, 0.3, 1150, 1040]]
+};
+function hoot() {
+  if (!actx || actx.state !== 'running' || !owl) return;
+  var p = Math.pow(2, O.hootPitch / 1200), t0 = actx.currentTime + 0.03;
+  var out = actx.createGain(); out.gain.value = O.hootVolume * lerp(0.35, 1, clamp(owl.k, 0, 1));
   if (actx.createStereoPanner) {
-    var pan = actx.createStereoPanner(); pan.pan.value = clamp((b.x / W) * 2 - 1, -1, 1) * 0.8;
+    var pan = actx.createStereoPanner(); pan.pan.value = clamp(owl.x / W * 2 - 1, -1, 1) * 0.8;
     out.connect(pan); pan.connect(amaster);
   } else out.connect(amaster);
-  var t0 = actx.currentTime + 0.02;
-  spec.forEach(function (s) { playNote(s, t0, out, p, sp); });
+  var lp = actx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 1800 * p; lp.connect(out);
+  (HOOTS[O.look] || HOOTS.fukurou).forEach(function (n) {
+    var t = t0 + n[0], d = n[1];
+    var osc = actx.createOscillator(); osc.type = 'sine';
+    osc.frequency.setValueAtTime(n[2] * p, t); osc.frequency.linearRampToValueAtTime(n[3] * p, t + d);
+    var env = actx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.linearRampToValueAtTime(0.4, t + Math.min(0.07, d * 0.4));
+    env.gain.setValueAtTime(0.4, t + d * 0.6);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + d + 0.12);
+    osc.connect(env); env.connect(lp);
+    osc.start(t); osc.stop(t + d + 0.2);
+  });
 }
-function previewCall(kind) {
-  ensureAudio();
-  if (!actx) return;
-  var go = function () { birdCall({ kind: kind, ti: 0, x: W / 2, fp: 1 }); };
-  if (actx.state === 'running') go(); else actx.resume().then(go);
+function hootNow() { ensureAudio(); if (actx) actx.resume().then(hoot); }
+
+/* The night sky, as the app's #dynSky draws it at night (drawSky in app.js:
+   the night tint and the darkening, sky tint 0.8). Drawn once per resize. */
+function paintSky() {
+  cvS.width = Math.max(1, Math.round(W * PR * 0.25)); cvS.height = Math.max(1, Math.round(H * PR * 0.25));
+  if (!isNight()) return;
+  sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
+  var g = sctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, 'rgba(70,85,127,0.250)');
+  g.addColorStop(1, 'rgba(70,85,127,0.125)');
+  sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
+  sctx.fillStyle = 'rgba(35,40,70,0.168)'; sctx.fillRect(0, 0, W, H);
 }
 /* ============================================================
    11. FRAME
@@ -1895,6 +2274,7 @@ function resize() {
   FL.cnv.height = FBR.cnv.height = Math.round(H * PR * FAR_RES);
   SCN.cnv.width = MTN.cnv.width = TMP.cnv.width = Math.round(W * SR);
   SCN.cnv.height = MTN.cnv.height = TMP.cnv.height = Math.round(H * SR);
+  paintSky();
 }
 function rebuildAll() {
   if (!W) resize();
@@ -1908,9 +2288,10 @@ function rebuildAll() {
   bakeGround();
   bakeNear();
   if (!pile.length) buildBed(); else placeFloor();
+  bakeOwlSprites();
 }
 
-var last = 0;
+var last = 0, statusT = -1;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t;
@@ -1920,7 +2301,8 @@ function frame(now) {
   trees.forEach(function (T) { swayTree(T, t, dt); });
   if (falling.length < V.falling && Math.random() < 0.08) spawnFalling(false);
   moveFalling(t, dt);
-  updateBirds(dt, t);
+  updateOwl(t, dt);
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = owlStatus(t); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -1945,9 +2327,8 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
-  // Far birds (small, soft): behind both trees.
-  drawBirds(ctx, t, 'far');
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // The owl when it is further away than the far tree: behind both trees.
+  drawOwl(ctx, 'A');
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
@@ -1971,9 +2352,8 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
 
-  // Middle and near birds: between the far tree and the near tree.
-  drawBirds(ctx, t, 'near');
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  // The owl on the far tree's branch, or flying between the two trees.
+  drawOwl(ctx, 'B');
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
@@ -1993,6 +2373,9 @@ function frame(now) {
   ctx.globalAlpha = TREE.nearOpacity;
   ctx.drawImage(NL.cnv, 0, 0);
   ctx.globalAlpha = 1;
+
+  // The owl on the near tree's branch, or just leaving it / about to land on it.
+  drawOwl(ctx, 'C');
 
   // Mid-depth leaves: in front of the near tree, but still behind the text and table.
   drawFalling(ctx, t, MID_Z, NEAR_Z);
