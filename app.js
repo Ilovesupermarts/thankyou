@@ -11402,7 +11402,7 @@ function drawFog(ctx, dt) {
 
 /* Birds: a small flock of one kind crosses the autumn sky now and then,
    from sunrise to 17:00 (not in rain or snow, never in winter). The next
-   flock is always a different kind, 5-10 s later (the first one a few
+   flock is always a different kind, about 35 s later (the first one a few
    seconds after the landscape is drawn), from either side. Three kinds:
    オナガ (azure-winged magpie: grey, sky-blue wings, long blue tail,
    flaps then glides), メジロ (Japanese white-eye: small, olive green,
@@ -11566,13 +11566,94 @@ function birdSpritesFor(kind, ti) {
   }
   return birdSprites[key];
 }
+/* Bird calls. Each species has one voice, chosen on landscape.html:
+   オナガ a rough, nasal "gyuu, gyuu" (voice A), メジロ soft little "pi pi pi"
+   notes (voice B), オオルリ a soft falling two-note whistle (voice B). A voice
+   returns the notes of one call as {t, dur, gain, pts: [[0-1 along the note, Hz], …]}.
+   The call is scaled by the species' pitch and speed and played on the app's
+   audio, at the bird's own place from left to right, quieter when far.
+   "variation" is how far each call strays from the middle of its ranges. */
+var BIRD_SOUND = {
+  flockEvery: 35, flockSize: 1.3, callEvery: 1, farQuiet: 0.5, volume: 1,
+  onaga:  { vol: 0.8, pitch: 425,  speed: 1,    variation: 0.8 },
+  mejiro: { vol: 0.8, pitch: -950, speed: 1,    variation: 0.75 },
+  ruri:   { vol: 0.8, pitch: 675,  speed: 1.45, variation: 0.75 }
+};
+var birdBus = null;
+function birdR(a, b, vr) { var m = (a + b) / 2; return m + (rnd(a, b) - m) * vr; }
+function birdRI(a, b, vr) { return Math.round(birdR(a - 0.49, b + 0.49, vr)); }
+var BIRD_VOICES = {
+  onaga: function(vr) {
+    var n = birdRI(2, 3, vr), b = birdR(1500, 1800, vr), s = [], t = 0;
+    for (var i = 0; i < n; i++, t += 0.3)
+      s.push({ t: t, dur: 0.24, gain: 0.35, type: 'sawtooth', atk: 0.03, pts: [[0, b * 1.2], [0.35, b * 1.45], [1, b * 0.85]],
+               filter: ['bandpass', b * 1.3, 2.5], vib: [38, 90] });
+    return s;
+  },
+  mejiro: function(vr) {
+    var f = birdR(3800, 4400, vr), n = birdRI(3, 5, vr), s = [], t = 0;
+    for (var i = 0; i < n; i++, t += birdR(0.12, 0.18, vr))
+      s.push({ t: t, dur: 0.11, gain: 0.25, atk: 0.025, pts: [[0, f], [1, f * birdR(0.95, 1.1, vr)]] });
+    return s;
+  },
+  ruri: function(vr) {
+    var f = birdR(2200, 2500, vr);
+    return [
+      { t: 0,   dur: 0.4,  gain: 0.28, atk: 0.08, pts: [[0, f * 1.4], [1, f]] },
+      { t: 0.5, dur: 0.55, gain: 0.28, atk: 0.08, pts: [[0, f * 1.2], [1, f * 0.8]], vib: [6, 40] }
+    ];
+  }
+};
+// One note of a call: a wave gliding through pts, with a quick attack and a falling tail.
+function birdNote(s, t0, out, p, sp) {
+  var ac = soundAudioCtx;
+  var d = Math.max(0.02, s.dur / sp), t = t0 + s.t / sp, g = s.gain;
+  var osc = ac.createOscillator(); osc.type = s.type || 'sine';
+  osc.frequency.setValueAtTime(s.pts[0][1] * p, t);
+  for (var i = 1; i < s.pts.length; i++) osc.frequency.linearRampToValueAtTime(s.pts[i][1] * p, t + s.pts[i][0] * d);
+  var env = ac.createGain();
+  env.gain.setValueAtTime(0.0001, t);
+  env.gain.linearRampToValueAtTime(g, t + Math.min(d * 0.5, Math.max(0.003, (s.atk || 0.01) / sp)));
+  env.gain.exponentialRampToValueAtTime(0.0001, t + d);
+  var node = osc;
+  if (s.vib) {
+    var lfo = ac.createOscillator(), lg = ac.createGain();
+    lfo.frequency.value = s.vib[0]; lg.gain.value = s.vib[1] * p;
+    lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + d + 0.05);
+  }
+  if (s.filter) {
+    var f = ac.createBiquadFilter(); f.type = s.filter[0]; f.frequency.value = s.filter[1] * p; f.Q.value = s.filter[2];
+    osc.connect(f); node = f;
+  }
+  node.connect(env); env.connect(out);
+  osc.start(t); osc.stop(t + d + 0.05);
+}
+function birdCall(b) {
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx || soundAudioCtx.state !== 'running') return;
+  try {
+    if (!birdBus) { birdBus = soundAudioCtx.createGain(); birdBus.gain.value = BIRD_SOUND.volume; birdBus.connect(soundMasterGain); }
+    var cfg = BIRD_SOUND[b.kind], vr = cfg.variation;
+    var spec = BIRD_VOICES[b.kind](vr);
+    var p = Math.pow(2, cfg.pitch / 1200) * b.fp;
+    var sp = cfg.speed * rnd(1 - 0.08 * vr, 1 + 0.08 * vr);
+    var tierGain = b.ti === 2 ? BIRD_SOUND.farQuiet : (b.ti === 1 ? (1 + BIRD_SOUND.farQuiet) / 2 : 1);
+    var out = soundAudioCtx.createGain(); out.gain.value = cfg.vol * tierGain * rnd(1 - 0.2 * vr, 1);
+    if (soundAudioCtx.createStereoPanner) {
+      var pan = soundAudioCtx.createStereoPanner(); pan.pan.value = clamp((b.x / W) * 2 - 1, -1, 1) * 0.8;
+      out.connect(pan); pan.connect(birdBus);
+    } else out.connect(birdBus);
+    var t0 = soundAudioCtx.currentTime + 0.02;
+    for (var i = 0; i < spec.length; i++) birdNote(spec[i], t0, out, p, sp);
+  } catch (e) { /* silent */ }
+}
 function sendBirds() {
   var choices = BIRD_ORDER.filter(function(n) { return n !== birdLastKind; });
   var kind = choices[Math.floor(Math.random() * choices.length)], k = BIRD_KINDS[kind];
   birdLastKind = kind;
   var dir = Math.random() < 0.5 ? -1 : 1;
-  var n = k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1));
+  var n = Math.max(1, Math.round((k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1))) * BIRD_SOUND.flockSize));
   var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
+  var bvr = BIRD_SOUND[kind].variation, flockPitch = 1 + rnd(-0.04, 0.04) * bvr;   // this flock's own touch of pitch
   for (var i = 0; i < n; i++) {
     var r = Math.random(), ti = r < 0.3 ? 2 : (r < 0.72 ? 1 : 0), tier = BIRD_TIERS[ti];
     birdSpritesFor(kind, ti);
@@ -11584,7 +11665,8 @@ function sendBirds() {
       y: home, home: home, vy: 0,
       vx: dir * spd * tier.speed * rnd(0.94, 1.06),
       ph: rnd(0, TAU), hz: k.hz * rnd(0.9, 1.1),
-      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0
+      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0,
+      fp: flockPitch * (1 + rnd(-0.015, 0.015) * bvr), callT: rnd(0.2, 1.6)
     });
   }
   birds.sort(function(a, b) { return b.ti - a.ti; });   // far first, near last
@@ -11596,7 +11678,7 @@ function updateBirds(dt, t) {
   var ready = LS.ready && !LS.step && LS.floorBuilt && !dynSetupLeft && dynMaster > 0.9;
   if (birdTime && ready) {
     if (!birdNext) birdNext = t + rnd(0.5, 2);     // the first flock is in view within a few seconds
-    else if (t > birdNext) { sendBirds(); birdNext = t + rnd(5, 10); }
+    else if (t > birdNext) { sendBirds(); birdNext = t + BIRD_SOUND.flockEvery * rnd(0.65, 1.35); }
   }
   // none in winter, and none left over when the clock is moved outside the hours
   if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) birds.length = 0;
@@ -11617,6 +11699,10 @@ function updateBirds(dt, t) {
     }
     b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
     b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
+    if (b.x > 0 && b.x < W) {                       // calls only while on screen
+      b.callT -= dt;
+      if (b.callT <= 0) { birdCall(b); b.callT = BIRD_SOUND.callEvery * rnd(0.6, 1.4); }
+    }
     if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
   }
 }
