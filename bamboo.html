@@ -370,21 +370,26 @@ var BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) };
    y × screen height), from where the line starts to the gate that faces
    you. Each point is laid on the ground in perspective, and the path
    winds smoothly through them across the ground. */
-var GATE_COLOURS = { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14' };
+var GATE_COLOURS = { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+                     gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' };
 var GATE_COLOUR_NAMES = [['vermilion', 'Vermilion (lit)'], ['shade', 'Vermilion (shade)'], ['top', 'Top of the upper beam'],
-                         ['feet', 'Black feet'], ['ground', 'Shadow on the ground']];
+                         ['feet', 'Black feet'], ['ground', 'Shadow on the ground'],
+                         ['gravel', 'Gravel path'], ['gravelLight', 'Pale pebbles'], ['gravelDark', 'Dark pebbles']];
 var GDEF = {
   show: true,
   // the path
-  path: [[0.045, 0.893], [0.22, 0.879], [0.43, 0.868], [0.6, 0.867], [0.7, 0.884], [0.815, 0.945]],
-  straightEnd: 1.5, lens: 0.8,
+  path: [[0.252027027027027, 0.862], [0.3625, 0.8766666666666667], [0.45135135135135135, 0.884],
+         [0.5253378378378378, 0.8973333333333333], [0.5689189189189189, 0.9053333333333333], [0.6608108108108108, 0.9353333333333333]],
+  straightEnd: 1.3, lens: 0.72,
   // the gates
-  gateHeight: 1.5, count: 500, width: 0.62, pillar: 0.075, lean: 1.5, overhang: 0.2, sori: 0.04,
-  nukiAt: 0.7, feet: 0.11, gakuzuka: true, colours: clone(GATE_COLOURS),
+  gateHeight: 2.78, count: 59, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
+  nukiAt: 0.69, feet: 0.125, gakuzuka: true, colours: clone(GATE_COLOURS),
   // light and shadow
-  lightFrom: -0.4, shadeDepth: 0.55, shadow: 0.35, shadowBlur: 3,
+  lightFrom: -0.3, shadeDepth: 0.45, shadow: 0.35, shadowBlur: 1.3,
   // depth of field
-  focusDepth: 0.5, blurNear: 0.2, blurFar: 1, hazeNear: 0.04, hazeFar: 0.4, strength: 1
+  focusDepth: 0.5, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4, strength: 1,
+  // the gravel path
+  gravel: true, pathWidth: 1, pebbles: 1, pebbleSize: 1, edgeSoft: 0.12, pathLeaves: 0.25
 };
 var G = clone(GDEF);
 var STORE_KEY = 'toriiLabValues1';
@@ -441,6 +446,16 @@ var GROUPS = [
     { k: 'shadeDepth', label: 'Shade on the sides away from the light', min: 0, max: 1, step: 0.05 },
     { k: 'shadow', label: 'Shadow on the ground under the gates', min: 0, max: 1, step: 0.01 },
     { k: 'shadowBlur', label: 'Shadow softness (px)', min: 0, max: 10, step: 0.1 }
+  ]},
+  { title: 'Gravel path', ctls: [
+    { k: 'gravel', label: 'Show the gravel path', type: 'check',
+      hint: 'It follows the gates and carries on straight toward you, out of the bottom of the screen. Its colours are in "The gates" (last three).' },
+    { k: 'pathWidth', label: 'Width (× the shadow of one gate on the ground)', min: 0.5, max: 2.5, step: 0.01,
+      hint: '1 = as wide as the shadow each gate throws: the pillars and their feet stand on it with a little to spare.' },
+    { k: 'pebbles', label: 'How many pebbles', min: 0, max: 2, step: 0.05 },
+    { k: 'pebbleSize', label: 'Pebble size', min: 0.4, max: 3, step: 0.05 },
+    { k: 'edgeSoft', label: 'Ragged edge (× path width)', min: 0, max: 0.4, step: 0.01, hint: 'Pebbles drift out onto the leaves.' },
+    { k: 'pathLeaves', label: 'Fallen leaves lying on the path', min: 0, max: 1.5, step: 0.05 }
   ]},
   { title: 'Depth of field', ctls: [
     { k: 'focusDepth', label: 'Sharp from this far down the ground (0 the horizon … 1 the bottom)', min: 0.1, max: 1, step: 0.01,
@@ -647,6 +662,8 @@ function buildCopyText() {
          ' (softness ' + f2(G.shadowBlur) + ' px)');
   L.push('  Depth of field: sharp from ' + f2(G.focusDepth) + ' down the ground; blur ' + f2(G.blurNear) + ' px nearest, ' +
          f2(G.blurFar) + ' px furthest; haze ' + f2(G.hazeNear) + ' nearest, ' + f2(G.hazeFar) + ' furthest; strength ' + f2(G.strength));
+  L.push('  Gravel path: ' + (G.gravel ? 'shown' : 'hidden') + ', width ' + f2(G.pathWidth) + ' × a gate\'s shadow, pebbles ' + f2(G.pebbles) +
+         ' (size ' + f2(G.pebbleSize) + '), ragged edge ' + f2(G.edgeSoft) + ', leaves on it ' + f2(G.pathLeaves));
   L.push('  Colours: ' + GATE_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + G.colours[cn[0]]; }).join(', '));
   L.push('');
   L.push('JSON:');
@@ -1573,16 +1590,120 @@ function placePieces(pieces, g) {
     return { faces: pc.faces.map(function (f) { return { tone: f.tone, p: f.p.map(w) }; }), c: w(pc.c), g: g };
   });
 }
+/* The gravel path. It is laid on the ground along the same winding path as
+   the gates, as wide as the shadow each gate throws (the same footprint
+   the shadows in bakeGates use), and after the last gate it carries on
+   straight toward you until it is off the bottom of the screen. Both
+   edges are worked out on the ground and then put through the same
+   camera as the gates, so it narrows toward the horizon and the gates
+   stand on it in proportion. It is a packed base with pebbles on it
+   (counted by how much of the screen they cover, so the far ones are
+   tiny and the near ones are not too few), a few of them drifting out
+   onto the leaves at the edges, and a few fallen leaves. The same mist
+   as the ground is laid over it, so it melts into the horizon. Baked
+   into GRAV, with the gates. */
+var GRAV = mk(), gravTop = 0;
+function bakeGravel(path) {
+  if (!W || !G.gravel || !path || path.pts.length < 2) return;
+  var hy = H * V.horizon, F = lensF(), h = G.gateHeight, r = rngFrom(97531);
+  var wu = (G.width * h / 2 + G.pillar * h * 1.5) * G.pathWidth;      // half the shadow's width
+  var C = {}; for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
+  // the middle line: the path, then straight on toward you, past the bottom of the screen
+  var mid = path.pts.map(function (p) { return { x: p.x, z: p.z }; });
+  var last = mid[mid.length - 1], zExit = F / Math.max(8, (1.08 - V.horizon) * H);
+  if (last.z > zExit) {
+    var steps = Math.max(2, Math.ceil((last.z - zExit) / 0.6));
+    for (var e = 1; e <= steps; e++) mid.push({ x: last.x, z: lerp(last.z, zExit, e / steps) });
+  }
+  // both edges at a fraction of the width (-1 … 1 across), on the screen
+  var nM = mid.length, nrm = [];
+  for (var i = 0; i < nM; i++) {
+    var a = mid[Math.max(0, i - 1)], b = mid[Math.min(nM - 1, i + 1)];
+    var tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+    nrm.push([-tz / tl, tx / tl]);
+  }
+  function across(i, v) { return toScreen(mid[i].x + nrm[i][0] * wu * v, 0, Math.max(0.3, mid[i].z + nrm[i][1] * wu * v)); }
+  gravTop = Math.max(0, Math.floor(hy - 8));
+  var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - gravTop) * PR));
+  GRAV.cnv.width = cw; GRAV.cnv.height = chh;
+  var c = GRAV.c, es = G.edgeSoft, base = 1 - es * 0.6;
+  c.setTransform(PR, 0, 0, PR, 0, -gravTop * PR);
+  // the packed base
+  var L = [], R = [];
+  for (var j = 0; j < nM; j++) { L.push(across(j, -base)); R.push(across(j, base)); }
+  c.fillStyle = rgb(light(mix(C.gravel, C.gravelDark, 0.12)));
+  c.beginPath();
+  L.forEach(function (p, k) { if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+  for (var k2 = nM - 1; k2 >= 0; k2--) c.lineTo(R[k2][0], R[k2][1]);
+  c.closePath(); c.fill();
+  // pebbles and leaves, a stretch of the path at a time (stretches under 2 px long are joined)
+  var keep = [0];
+  for (var q = 1; q < nM; q++) {
+    var kp = keep[keep.length - 1];
+    if (Math.abs(L[q][1] - L[kp][1]) + Math.abs(L[q][0] - L[kp][0]) >= 2 || q === nM - 1) keep.push(q);
+  }
+  var leafTones = [hex(TREE.colours.red), hex(TREE.colours.redOrange), hex(TREE.colours.orange), hex(TREE.colours.gold)];
+  var total = 0, MAXP = 60000, ctlP = 0.11 * G.pebbles, ctlL = 0.0007 * G.pathLeaves, ctlE = 0.0016 * G.pathLeaves;
+  var span = 1 + es;
+  for (var s = 0; s < keep.length - 1 && total < MAXP; s++) {
+    var i0 = keep[s], i1 = keep[s + 1];
+    var A0 = across(i0, -span), A1 = across(i0, span), B0 = across(i1, -span), B1 = across(i1, span);
+    if (Math.max(A0[1], A1[1], B0[1], B1[1]) < hy - 4) continue;
+    var area = Math.abs((A0[0] * A1[1] - A1[0] * A0[1]) + (A1[0] * B1[1] - B1[0] * A1[1]) + (B1[0] * B0[1] - B0[0] * B1[1]) + (B0[0] * A0[1] - A0[0] * B0[1])) / 2;
+    var zc = (mid[i0].z + mid[i1].z) / 2, pu = F / zc;                 // px per ground unit here
+    var nP = Math.min(MAXP - total, Math.round(area * ctlP)), nL = Math.round(area * ctlL + (r() < (area * ctlL) % 1 ? 1 : 0));
+    total += nP;
+    for (var m = 0; m < nP; m++) {
+      var u = r(), v = (r() * 2 - 1) * span;
+      if (Math.abs(v) > 1 && r() > (span - Math.abs(v)) / Math.max(0.001, es)) continue;   // thinning out past the edge
+      var p2 = across(i0, v), pn = across(i1, v), px = lerp(p2[0], pn[0], u), py = lerp(p2[1], pn[1], u);
+      if (py < hy - 2) continue;
+      var sz = Math.max(0.6, 0.04 * pu * G.pebbleSize * lerp(0.5, 1.5, r() * r()));
+      var tone = r() < 0.2 ? C.gravel : mix(C.gravelDark, C.gravelLight, r());
+      tone = scale(tone, lerp(0.92, 1.06, r()));
+      c.setTransform(PR, 0, 0, PR * lerp(0.4, 0.6, r()), px * PR, (py - gravTop) * PR);
+      c.fillStyle = rgb(light(tone));
+      c.beginPath(); c.arc(0, 0, sz / 2, 0, TAU); c.fill();
+    }
+    var nE = Math.round(area * ctlE + (r() < (area * ctlE) % 1 ? 1 : 0));      // leaves across the edges, to break the line
+    for (var lf = 0; lf < nL + nE; lf++) {
+      var lv = lf < nL ? (r() * 2 - 1) * (1 + es * 0.5) : (r() < 0.5 ? -1 : 1) * lerp(0.82, 1.1, r()), lu = r(), la = across(i0, lv), lb = across(i1, lv);
+      var lx = lerp(la[0], lb[0], lu), ly = lerp(la[1], lb[1], lu);
+      if (ly < hy + 2) continue;
+      var lt = leafTones[Math.floor(r() * leafTones.length)];
+      lt = scale(mix(lt, C.gravelDark, r() * 0.35), lerp(0.74, 1.05, r()));
+      c.setTransform(PR, 0, 0, PR * lerp(0.35, 0.6, r()), lx * PR, (ly - gravTop) * PR);
+      leafPathLo(c, Math.max(2, 0.2 * pu * lerp(0.7, 1.3, r())), r() * TAU);
+      c.fillStyle = rgb(light(lt)); c.fill();
+    }
+  }
+  // the same mist as the ground, lying over it: thick at the horizon, thinning toward you
+  c.setTransform(PR, 0, 0, PR, 0, -gravTop * PR);
+  var mistC = light(hex(V.colours.mist)), gh = V.groundHaze, mz = c.createLinearGradient(0, hy - 2, 0, H);
+  mz.addColorStop(0, rgb(mistC, 0.9 * gh)); mz.addColorStop(0.2, rgb(mistC, 0.4 * gh));
+  mz.addColorStop(0.55, rgb(mistC, 0.12 * gh)); mz.addColorStop(1, rgb(mistC, 0));
+  c.globalCompositeOperation = 'source-atop';
+  c.fillStyle = mz; c.fillRect(-10, hy - 10, W + 20, H - hy + 20);
+  c.globalCompositeOperation = 'source-over';
+}
+function drawGravel() {
+  if (!G.gravel || GRAV.cnv.width < 2) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(GRAV.cnv, 0, Math.round(gravTop * PR));
+}
 function bakeGates() {
   gateDirty = false;
   gateBakedAt = nowT;
   gatePath = null; gateCount = 0; gateInfo = '';
   GATE.cnv.width = 1; GATE.cnv.height = 1;
-  if (!W || !G.show) { drawEditLayer(); return; }
+  GRAV.cnv.width = 1; GRAV.cnv.height = 1;
+  if (!W) { drawEditLayer(); return; }
+  var path = gatePath = buildGatePath();
+  bakeGravel(path);
+  if (!G.show) { drawEditLayer(); return; }
   var hy = H * V.horizon, F = lensF(), C = {};
   for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
   var mistC = light(hex(V.colours.mist));
-  var path = gatePath = buildGatePath();
   var gap = Math.max(0.05, path.len / Math.max(1, G.count - 1));
   // the gates, from the end (the one facing you) back to the start
   var gates = [];
@@ -4469,6 +4590,9 @@ function frame(now) {
   // The ground of fallen leaves (baked).
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
+
+  // The gravel path through the gates (baked), lying on the ground.
+  drawGravel();
 
   // The owl when it is further away than the far tree: behind both trees.
   drawAnimals(ctx, 'A');
