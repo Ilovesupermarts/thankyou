@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Torii Gate Lab</title>
+<title>Stone Lantern Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,17 +14,20 @@
 
 <style>
   /* ============================================================
-     TORII LAB — a copy of landscape.html, used as the test bed for a
-     long line of vermilion torii gates (as at Takayama Inari) in the
-     autumn scene, in the day phase. Preview only.
+     STONE LANTERN LAB — a copy of landscape.html, used as the test bed
+     for Japanese stone lanterns (tōrō) beside the gravel path of the
+     autumn scene, one in the gap between two torii gates. Preview only.
      Everything from landscape.html is still here and runs on its
      approved values (mountains, Fuji, mist, fallen leaves, the two
-     trees, the two bamboo groves), but none of it has controls any more.
-     New: the gates wind across the ground in perspective from behind
-     the near tree, away toward the horizon, along it and back toward
-     you, ending with a gate that faces you (section 6c). Every control
-     on the panel is for the gates, and the path can be moved on screen
-     with a finger. Nothing in app.js is used or changed.
+     trees, the bamboo groves), with no controls.
+     The torii gates and the gravel path are fixed, placed and drawn
+     exactly as in the app (TORII in app.js). The lanterns are built in
+     3D with them (section 6d), so gates and lanterns overlap as they
+     really would. In the evening and at night they are lit: the paper
+     windows glow and flicker, with a soft glow around each and a pool
+     of light on the ground. Every control on the panel is for the
+     lanterns; Day / Evening / Night switch the time of day. Nothing in
+     app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -35,7 +38,6 @@
   .dyn-canvas.dyn-near { opacity: 1; }
   .lab-status { font-size: 12px; color: #6E5A55; min-height: 2.8em; }
   .lab-now button { padding: 6px 10px; }
-  #gateEdit { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 999; display: none; touch-action: none; }
 
   /* One message panel in this preview instead of six. */
   .track { width: 100%; }
@@ -185,12 +187,10 @@
 </div>
 
 <!-- ============ Controls (demo only) ============ -->
-<!-- Moving the path on screen (demo only): shown while "Move the path on screen" is on. -->
-<canvas id="gateEdit" aria-hidden="true"></canvas>
 
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3><span class="lab-grip" aria-hidden="true">⠿</span>⛩️ Torii Lab</h3>
+    <h3><span class="lab-grip" aria-hidden="true">⠿</span>🏮 Stone Lantern Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -199,7 +199,7 @@
       <button type="button" class="primary" id="btnCopy">Copy values</button>
       <button type="button" id="btnReset">Reset</button>
     </div>
-    <div class="lab-sec"><h4>Do it now</h4><div class="lab-row-btns lab-now" id="labNow"></div></div>
+    <div class="lab-sec"><h4>Time of day</h4><div class="lab-row-btns lab-now" id="labNow"></div></div>
     <div id="labControls"></div>
   </div>
 </div>
@@ -221,7 +221,7 @@
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
-  timeOfDay: 'day',          // the bamboo is for the day only
+  timeOfDay: 'day',          // set from the panel (L.timeOfDay); the bamboo is for the day only
   wind: 1,
   gustEvery: 9,
   gustStrength: 1,
@@ -334,12 +334,8 @@ var ODEF = {
 var O = clone(ODEF);
 
 /* ============================================================
-   2. TORII LAB — every control on the panel is for the line of torii
-   gates (section 6c). The gates do not move, so they are baked once;
-   any change bakes them again a moment later. Values are kept in this
-   browser; "Copy values" gives them in words and as JSON.
-   The bamboo groves (section 6b) run on their approved values below and
-   have no controls any more.
+   THE BAMBOO GROVES (section 6b) run on their approved values below
+   and have no controls any more.
    ============================================================ */
 var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
@@ -366,112 +362,114 @@ var BDEF_NEAR = clone(BDEF);
 BDEF_NEAR.seed = 21; BDEF_NEAR.blurNear = 1; BDEF_NEAR.blurFar = 2.2; BDEF_NEAR.haze = 0.22; BDEF_NEAR.depthHaze = 0.3;
 var BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) };
 
-/* The gates. The path is a row of points on the screen (x × screen width,
-   y × screen height), from where the line starts to the gate that faces
-   you. Each point is laid on the ground in perspective, and the path
-   winds smoothly through them across the ground. */
-var GATE_COLOURS = { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
-                     gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' };
-var GATE_COLOUR_NAMES = [['vermilion', 'Vermilion (lit)'], ['shade', 'Vermilion (shade)'], ['top', 'Top of the upper beam'],
-                         ['feet', 'Black feet'], ['ground', 'Shadow on the ground'],
-                         ['gravel', 'Gravel path'], ['gravelLight', 'Pale pebbles'], ['gravelDark', 'Dark pebbles']];
-var GDEF = {
+/* The gates and the gravel path: fixed, exactly as they are in the app
+   (TORII in app.js, section 8c). The path is a row of points on the
+   screen (x × screen width, y × screen height), from where the line
+   starts to the gate that faces you. They have no controls here. */
+var G = {
   show: true,
-  // the path
   path: [[0.252027027027027, 0.862], [0.3625, 0.8766666666666667], [0.45135135135135135, 0.884],
          [0.5253378378378378, 0.8973333333333333], [0.5689189189189189, 0.9053333333333333], [0.6608108108108108, 0.9353333333333333]],
   straightEnd: 1.3, lens: 0.72,
-  // the gates
   gateHeight: 2.78, count: 59, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
-  nukiAt: 0.69, feet: 0.125, gakuzuka: true, colours: clone(GATE_COLOURS),
-  // light and shadow
-  lightFrom: -0.3, shadeDepth: 0.45, shadow: 0.35, shadowBlur: 1.3,
-  // depth of field
+  nukiAt: 0.69, feet: 0.125, gakuzuka: true,
+  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+             gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
+  lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
   focusDepth: 0.5, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4, strength: 1,
-  // the gravel path
-  gravel: true, pathWidth: 1, pebbles: 1, pebbleSize: 1, edgeSoft: 0.12, pathLeaves: 0.25
+  gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
 };
-var G = clone(GDEF);
-var STORE_KEY = 'toriiLabValues1';
+
+/* ============================================================
+   2. STONE LANTERN LAB — every control on the panel is for the stone
+   lanterns (tōrō) standing beside the gravel path, one in the gap
+   between two gates (section 6d). The stone is baked with the gates;
+   the light in them (evening and night) flickers every frame. Values
+   are kept in this browser; "Copy values" gives them in words and as
+   JSON.
+   ============================================================ */
+var LANTERN_COLOURS = { stone: '#B3ADA3', stoneShade: '#5F5B56', moss: '#6E7A4C', paper: '#F4EEE2',
+                        flame: '#FFAE52', glow: '#FFD89A' };
+var LANTERN_COLOUR_NAMES = [['stone', 'Stone (lit)'], ['stoneShade', 'Stone (shade)'], ['moss', 'Moss'],
+                            ['paper', 'Paper windows (day)'], ['flame', 'Light in the windows'], ['glow', 'Glow around them']];
+var LDEF = {
+  timeOfDay: 'night',
+  show: true,
+  // where they stand
+  every: 1, side: 'right', fromEdge: 0.3,
+  // the lantern
+  size: 1.15, sides: 4, pillar: 0.07, box: 0.1, roof: 0.21, curls: true,
+  moss: 0.35, variety: 0.5, roofLeaves: 1, colours: clone(LANTERN_COLOURS),
+  // the light
+  lightEvening: 0.75, lightNight: 1, windowGlow: 1, halo: 0.7, haloSize: 1.2, pool: 0.55, poolSize: 1.6,
+  castLight: 0.7, reach: 2.2,
+  // the flicker
+  flicker: 0.3, flickerSpeed: 1, flickerVariety: 0.6, windFlicker: 1
+};
+var L = clone(LDEF);
+var STORE_KEY = 'stoneLanternLabValues1';
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
   if (saved && typeof saved === 'object') {
     for (var sk in saved) {
-      if (sk === 'colours') { for (var ck in saved.colours) if (ck in G.colours) G.colours[ck] = saved.colours[ck]; }
-      else if (sk === 'path') { if (Array.isArray(saved.path) && saved.path.length === G.path.length) G.path = saved.path; }
-      else if (sk in G) G[sk] = saved[sk];
+      if (sk === 'colours') { for (var ck in saved.colours) if (ck in L.colours) L.colours[ck] = saved.colours[ck]; }
+      else if (sk in L) L[sk] = saved[sk];
     }
   }
 } catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(G)); } catch (e) {} }
+V.timeOfDay = L.timeOfDay;
+document.documentElement.setAttribute('data-time', V.timeOfDay);
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(L)); } catch (e) {} }
 
-var POINT_NAMES = ['Start', 'Point 2', 'Point 3', 'Point 4', 'Point 5', 'End (the gate facing you)'];
-function pointCtls() {
-  var out = [];
-  POINT_NAMES.forEach(function (nm, i) {
-    out.push({ label: nm + ': across (× screen width)', min: 0, max: 1, step: 0.005,
-               get: function () { return G.path[i][0]; }, set: function (v) { G.path[i][0] = v; } });
-    out.push({ label: nm + ': down (× screen height)', min: 0.862, max: 1.05, step: 0.001,
-               get: function () { return G.path[i][1]; }, set: function (v) { G.path[i][1] = v; },
-               hint: i === 0 ? 'The horizon is at 0.86. Closer to it = further away and smaller.' : '' });
-  });
-  return out;
-}
 var GROUPS = [
-  { title: 'The path', ctls: [
-    { k: 'show', label: 'Show the gates', type: 'check' },
-    { k: 'straightEnd', label: 'Straight run toward you before the end (× gate height)', min: 0, max: 10, step: 0.1,
-      hint: 'The last gates come straight at you, so the last one faces you square on.' },
-    { k: 'lens', label: 'Camera lens (× screen width)', min: 0.4, max: 1.6, step: 0.01,
-      hint: 'Lower = wider lens: the path stretches deeper and the gates turn more across the screen.' }
+  { title: 'Where they stand', ctls: [
+    { k: 'show', label: 'Show the stone lanterns', type: 'check' },
+    { k: 'every', label: 'One lantern in every … gap between gates', min: 1, max: 6, step: 1,
+      hint: '1 = one between every two gates; 2 = every other gap, and so on.' },
+    { k: 'side', label: 'Side of the path', type: 'select',
+      options: [['right', 'Right (the near side along the far run)'], ['left', 'Left (the far side)'],
+                ['alternate', 'Changing sides each time'], ['both', 'Both sides']],
+      hint: 'Left and right as you walk along the path toward the gate that faces you.' },
+    { k: 'fromEdge', label: 'Gap from the edge of the gravel (× lantern height)', min: 0, max: 1.5, step: 0.01 }
   ]},
-  { title: 'Path points', ctls: pointCtls() },
-  { title: 'The gates', ctls: [
-    { k: 'gateHeight', label: 'Gate height (× eye height)', min: 0.6, max: 3, step: 0.01,
-      hint: 'Sets the size of every gate against the ground. 1.5 = a gate about 2.5 m tall seen from about 1.7 m.' },
-    { k: 'count', label: 'Number of gates along the whole path', min: 20, max: 900, step: 1,
-      hint: 'They stay evenly spaced along the path, so fewer gates = wider gaps, more = a denser tunnel.' },
-    { k: 'width', label: 'Width between the pillars (× gate height)', min: 0.4, max: 1, step: 0.01 },
-    { k: 'pillar', label: 'Pillar thickness (× gate height)', min: 0.03, max: 0.14, step: 0.002 },
-    { k: 'lean', label: 'Pillars lean in (degrees)', min: 0, max: 5, step: 0.1 },
-    { k: 'overhang', label: 'Upper beam reaches past the pillars (× gate height)', min: 0.05, max: 0.4, step: 0.01 },
-    { k: 'sori', label: 'Upward curve of the upper beam', min: 0, max: 0.12, step: 0.002 },
-    { k: 'nukiAt', label: 'Lower beam height (× gate height)', min: 0.5, max: 0.8, step: 0.01 },
-    { k: 'feet', label: 'Black feet height (× gate height)', min: 0, max: 0.25, step: 0.005 },
-    { k: 'gakuzuka', label: 'Short post between the two beams', type: 'check' },
+  { title: 'The lantern', ctls: [
+    { k: 'size', label: 'Height (× eye height)', min: 0.5, max: 2.2, step: 0.01,
+      hint: '1.15 = a lantern about 2 m tall, against gates of 2.78.' },
+    { k: 'sides', label: 'Sides of the light box and roof', min: 4, max: 8, step: 2, hint: '4 = square, 6 = six-sided, 8 = eight-sided.' },
+    { k: 'pillar', label: 'Pillar thickness (× height)', min: 0.04, max: 0.12, step: 0.002 },
+    { k: 'box', label: 'Light box size (× height)', min: 0.06, max: 0.16, step: 0.002 },
+    { k: 'roof', label: 'Roof width (× height)', min: 0.12, max: 0.32, step: 0.005 },
+    { k: 'curls', label: 'Curled-up roof corners', type: 'check' },
+    { k: 'moss', label: 'Moss on the stone', min: 0, max: 1, step: 0.01 },
+    { k: 'variety', label: 'How much each lantern differs (age, weathering)', min: 0, max: 1, step: 0.01 },
+    { k: 'roofLeaves', label: 'Fallen leaves on the roofs and bases', min: 0, max: 3, step: 0.05 },
     { type: 'colours' }
   ]},
-  { title: 'Light and shadow', ctls: [
-    { k: 'lightFrom', label: 'Light from (−1 left … 1 right)', min: -1, max: 1, step: 0.05, hint: 'The trees have −0.4.' },
-    { k: 'shadeDepth', label: 'Shade on the sides away from the light', min: 0, max: 1, step: 0.05 },
-    { k: 'shadow', label: 'Shadow on the ground under the gates', min: 0, max: 1, step: 0.01 },
-    { k: 'shadowBlur', label: 'Shadow softness (px)', min: 0, max: 10, step: 0.1 }
+  { title: 'The light (evening and night)', ctls: [
+    { k: 'lightEvening', label: 'Brightness in the evening', min: 0, max: 1.5, step: 0.01 },
+    { k: 'lightNight', label: 'Brightness at night', min: 0, max: 1.5, step: 0.01 },
+    { k: 'windowGlow', label: 'Glow of the paper windows', min: 0, max: 2, step: 0.01 },
+    { k: 'halo', label: 'Soft glow in the air around each lantern', min: 0, max: 2, step: 0.01 },
+    { k: 'haloSize', label: 'Size of that glow (× lantern height)', min: 0.2, max: 4, step: 0.05 },
+    { k: 'pool', label: 'Pool of light on the ground', min: 0, max: 2, step: 0.01 },
+    { k: 'poolSize', label: 'Size of the pool (× lantern height)', min: 0.3, max: 5, step: 0.05 },
+    { k: 'castLight', label: 'Light thrown on the gates and stone nearby', min: 0, max: 2, step: 0.01 },
+    { k: 'reach', label: 'How far that light reaches (× lantern height)', min: 0.5, max: 6, step: 0.05 }
   ]},
-  { title: 'Gravel path', ctls: [
-    { k: 'gravel', label: 'Show the gravel path', type: 'check',
-      hint: 'It follows the gates and carries on straight toward you, out of the bottom of the screen. Its colours are in "The gates" (last three).' },
-    { k: 'pathWidth', label: 'Width (× the shadow of one gate on the ground)', min: 0.5, max: 2.5, step: 0.01,
-      hint: '1 = as wide as the shadow each gate throws: the pillars and their feet stand on it with a little to spare.' },
-    { k: 'pebbles', label: 'How many pebbles', min: 0, max: 2, step: 0.05 },
-    { k: 'pebbleSize', label: 'Pebble size', min: 0.4, max: 3, step: 0.05 },
-    { k: 'edgeSoft', label: 'Ragged edge (× path width)', min: 0, max: 0.4, step: 0.01, hint: 'Pebbles drift out onto the leaves.' },
-    { k: 'pathLeaves', label: 'Fallen leaves lying on the path', min: 0, max: 1.5, step: 0.05 }
-  ]},
-  { title: 'Depth of field', ctls: [
-    { k: 'focusDepth', label: 'Sharp from this far down the ground (0 the horizon … 1 the bottom)', min: 0.1, max: 1, step: 0.01,
-      hint: 'Gates standing lower than this are sharp; above it they soften and haze toward the horizon.' },
-    { k: 'blurNear', label: 'Blur on the nearest gates (px)', min: 0, max: 4, step: 0.05 },
-    { k: 'blurFar', label: 'Blur on the furthest gates (px)', min: 0, max: 6, step: 0.05,
-      hint: 'The mountains have 2.5 px; the far tree is about 1 px soft.' },
-    { k: 'hazeNear', label: 'Haze on the nearest gates', min: 0, max: 0.8, step: 0.01 },
-    { k: 'hazeFar', label: 'Haze on the furthest gates', min: 0, max: 0.95, step: 0.01,
-      hint: 'Toward the mist colour, as the ground at the horizon.' },
-    { k: 'strength', label: 'Strength against the paper', min: 0.2, max: 1, step: 0.05 }
+  { title: 'Flicker', ctls: [
+    { k: 'flicker', label: 'How much the flame flickers', min: 0, max: 1, step: 0.01 },
+    { k: 'flickerSpeed', label: 'How fast', min: 0.2, max: 3, step: 0.05 },
+    { k: 'flickerVariety', label: 'How differently each lantern flickers', min: 0, max: 1, step: 0.01,
+      hint: '0 = all together, as one; 1 = each on its own.' },
+    { k: 'windFlicker', label: 'Gusts of wind make them flicker more', min: 0, max: 3, step: 0.05 }
   ]}
 ];
+/* Controls that only change the flicker or the glow drawn each frame need no bake. */
+var LIVE_KEYS = { lightEvening: 0, lightNight: 0, windowGlow: 0, halo: 1, haloSize: 1, pool: 1, poolSize: 1,
+                  flicker: 1, flickerSpeed: 1, flickerVariety: 1, windFlicker: 1 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.step < 0.01 ? 3 : 2); }
-function ctlGet(ctl) { return ctl.get ? ctl.get() : G[ctl.k]; }
-function ctlSet(ctl, v) { if (ctl.set) ctl.set(v); else G[ctl.k] = v; }
+function ctlGet(ctl) { return L[ctl.k]; }
+function ctlSet(ctl, v) { L[ctl.k] = v; }
 function buildControls() {
   var host = document.getElementById('labControls');
   host.innerHTML = '';
@@ -485,15 +483,27 @@ function buildControls() {
         wrap.className = 'lab-chk';
         var cb = document.createElement('input');
         cb.type = 'checkbox'; cb.checked = !!ctlGet(ctl);
-        cb.addEventListener('change', function () { ctlSet(ctl, cb.checked); changed(); });
+        cb.addEventListener('change', function () { ctlSet(ctl, cb.checked); changed(ctl.k); });
         var lb2 = document.createElement('span'); lb2.textContent = ctl.label;
         wrap.appendChild(cb); wrap.appendChild(lb2);
+      } else if (ctl.type === 'select') {
+        wrap.className = 'lab-ctl';
+        var lb3 = document.createElement('label'); lb3.textContent = ctl.label;
+        var sel = document.createElement('select');
+        ctl.options.forEach(function (o) {
+          var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1];
+          if (ctlGet(ctl) === o[0]) op.selected = true;
+          sel.appendChild(op);
+        });
+        sel.addEventListener('change', function () { ctlSet(ctl, sel.value); changed(ctl.k); });
+        wrap.appendChild(lb3); wrap.appendChild(sel);
+        if (ctl.hint) { var h3 = document.createElement('div'); h3.className = 'hint'; h3.textContent = ctl.hint; wrap.appendChild(h3); }
       } else if (ctl.type === 'colours') {
         wrap.className = 'lab-colours';
-        GATE_COLOUR_NAMES.forEach(function (cn) {
+        LANTERN_COLOUR_NAMES.forEach(function (cn) {
           var lb = document.createElement('label'); lb.className = 'lab-colour';
-          var inp = document.createElement('input'); inp.type = 'color'; inp.value = G.colours[cn[0]];
-          inp.addEventListener('input', function () { G.colours[cn[0]] = inp.value; changed(); });
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = L.colours[cn[0]];
+          inp.addEventListener('input', function () { L.colours[cn[0]] = inp.value; changed('colours'); });
           var sp = document.createElement('span'); sp.textContent = cn[1];
           lb.appendChild(inp); lb.appendChild(sp);
           wrap.appendChild(lb);
@@ -507,7 +517,7 @@ function buildControls() {
         label.appendChild(val);
         var el = document.createElement('input');
         el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = ctlGet(ctl);
-        el.addEventListener('input', function () { ctlSet(ctl, parseFloat(el.value)); val.textContent = fmt(ctl, ctlGet(ctl)); changed(); });
+        el.addEventListener('input', function () { ctlSet(ctl, parseFloat(el.value)); val.textContent = fmt(ctl, ctlGet(ctl)); changed(ctl.k); });
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
       }
@@ -518,19 +528,33 @@ function buildControls() {
   var now = document.getElementById('labNow');
   now.innerHTML = '';
   NOW_BTNS.forEach(function (N) {
-    var b = document.createElement('button'); b.type = 'button'; b.textContent = typeof N[0] === 'function' ? N[0]() : N[0];
-    b.addEventListener('click', function () { N[1](); b.textContent = typeof N[0] === 'function' ? N[0]() : N[0]; });
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = N[0];
+    if (N[2] && N[2]()) b.className = 'primary';
+    b.addEventListener('click', function () { N[1](); });
     now.appendChild(b);
   });
 }
-/* Any change bakes the gates again (section 6c), at most a few times a second. */
-function changed() {
+/* Any change bakes the gates and lanterns again (section 6c), at most a few
+   times a second; the brightness and flicker are used as they are, each frame. */
+function changed(k) {
   save();
-  gateDirty = true;
+  if (k === 'lightEvening' || k === 'lightNight') { if (V.timeOfDay !== 'day') gateDirty = true; return; }
+  if (!(k in LIVE_KEYS)) gateDirty = true;
+}
+/* The time of day: everything in the scene is lit for it, so it is all baked again. */
+function setTime(tod) {
+  if (V.timeOfDay === tod) return;
+  V.timeOfDay = L.timeOfDay = tod;
+  document.documentElement.setAttribute('data-time', tod);
+  save();
+  paintSky();
+  rebuildAll();
+  buildControls();
 }
 var NOW_BTNS = [
-  [function () { return editing ? 'Done moving the path' : 'Move the path on screen'; }, function () { setEditing(!editing); }],
-  ['Reset the path', function () { G.path = clone(GDEF.path); G.straightEnd = GDEF.straightEnd; save(); buildControls(); gateDirty = true; }]
+  ['Day', function () { setTime('day'); }, function () { return V.timeOfDay === 'day'; }],
+  ['Evening', function () { setTime('evening'); }, function () { return V.timeOfDay === 'evening'; }],
+  ['Night', function () { setTime('night'); }, function () { return V.timeOfDay === 'night'; }]
 ];
 
 document.getElementById('labToggle').addEventListener('click', function () {
@@ -539,7 +563,7 @@ document.getElementById('labToggle').addEventListener('click', function () {
   this.textContent = c ? 'Show' : 'Hide';
 });
 /* The panel can be dragged by its title bar (finger or mouse) to anywhere on
-   the screen, so the gates can be watched while the sliders are used. It
+   the screen, so the lanterns can be watched while the sliders are used. It
    stays where it was put, in this browser. */
 (function () {
   var lab = document.getElementById('lab'), head = lab.querySelector('.lab-head'), POS_KEY = 'bambooLabPos1';
@@ -578,68 +602,9 @@ document.getElementById('labToggle').addEventListener('click', function () {
   });
 })();
 document.getElementById('btnReset').addEventListener('click', function () {
-  G = clone(GDEF); save(); buildControls(); gateDirty = true;
+  var tod = V.timeOfDay;
+  L = clone(LDEF); L.timeOfDay = tod; save(); buildControls(); gateDirty = true;
 });
-
-/* Moving the path on screen: a layer over the scene shows the path and its
-   points; drag a point with a finger to move it. The gates follow. */
-var editing = false, EDC = document.getElementById('gateEdit'), edc = EDC.getContext('2d'), edDrag = null;
-function setEditing(on) {
-  editing = on;
-  EDC.style.display = on ? 'block' : 'none';
-  if (on) drawEditLayer();
-}
-function drawEditLayer() {
-  if (!editing) return;
-  var dpr = window.devicePixelRatio || 1;
-  EDC.width = Math.round(W * dpr); EDC.height = Math.round(H * dpr);
-  edc.setTransform(dpr, 0, 0, dpr, 0, 0);
-  edc.clearRect(0, 0, W, H);
-  edc.fillStyle = 'rgba(36,28,26,0.12)'; edc.fillRect(0, 0, W, H);
-  // the horizon
-  edc.strokeStyle = 'rgba(255,253,249,0.7)'; edc.setLineDash([6, 6]); edc.lineWidth = 1;
-  edc.beginPath(); edc.moveTo(0, H * V.horizon); edc.lineTo(W, H * V.horizon); edc.stroke(); edc.setLineDash([]);
-  // the path along the ground
-  if (gatePath && gatePath.pts.length) {
-    edc.strokeStyle = 'rgba(255,253,249,0.95)'; edc.lineWidth = 2.5;
-    edc.beginPath();
-    var first = true;
-    gatePath.pts.forEach(function (p) {
-      if (p.z < 0.3) return;
-      var s = toScreen(p.x, 0, p.z);
-      if (first) { edc.moveTo(s[0], s[1]); first = false; } else edc.lineTo(s[0], s[1]);
-    });
-    edc.stroke();
-  }
-  G.path.forEach(function (p, i) {
-    var x = p[0] * W, y = p[1] * H;
-    edc.fillStyle = i === G.path.length - 1 ? '#C44E10' : '#882E47';
-    edc.strokeStyle = '#FFFDF9'; edc.lineWidth = 2;
-    edc.beginPath(); edc.arc(x, y, 13, 0, TAU); edc.fill(); edc.stroke();
-    edc.fillStyle = '#FFFDF9'; edc.font = '700 12px sans-serif'; edc.textAlign = 'center'; edc.textBaseline = 'middle';
-    edc.fillText(String(i + 1), x, y + 0.5);
-  });
-}
-EDC.addEventListener('pointerdown', function (e) {
-  var best = -1, bd = 44;
-  G.path.forEach(function (p, i) { var d = Math.hypot(p[0] * W - e.clientX, p[1] * H - e.clientY); if (d < bd) { bd = d; best = i; } });
-  if (best < 0) return;
-  edDrag = { id: e.pointerId, i: best };
-  try { EDC.setPointerCapture(e.pointerId); } catch (er) {}
-  e.preventDefault();
-});
-EDC.addEventListener('pointermove', function (e) {
-  if (!edDrag || e.pointerId !== edDrag.id) return;
-  G.path[edDrag.i] = [clamp(e.clientX / W, 0, 1), clamp(e.clientY / H, V.horizon + 0.002, 1.05)];
-  gateDirty = true;
-  drawEditLayer();
-});
-function edEnd(e) {
-  if (!edDrag || e.pointerId !== edDrag.id) return;
-  edDrag = null; save(); buildControls();
-}
-EDC.addEventListener('pointerup', edEnd);
-EDC.addEventListener('pointercancel', edEnd);
 
 /* ============================================================
    3. COPY VALUES — every value, in words and as JSON.
@@ -647,28 +612,26 @@ EDC.addEventListener('pointercancel', edEnd);
 function f2(x) { return Number(x).toFixed(2); }
 function f3(x) { return Number(x).toFixed(3); }
 function buildCopyText() {
-  var L = [];
-  L.push('/* Torii gates — values from bamboo.html (autumn, day) */');
-  L.push('');
-  L.push('Gates: ' + (G.show ? 'shown' : 'hidden') + ', ' + gateCount + ' gates.');
-  L.push('  Path (x × screen width, y × screen height, from the start to the gate facing you): ' +
-         G.path.map(function (p) { return '(' + f3(p[0]) + ', ' + f3(p[1]) + ')'; }).join(' → ') +
-         '; straight run toward you ' + f2(G.straightEnd) + ' × gate height; camera lens ' + f2(G.lens) + ' × screen width');
-  L.push('  Gates: ' + f2(G.gateHeight) + ' × eye height tall, ' + G.count + ' along the path, ' + f2(G.width) +
-         ' wide, pillars ' + f3(G.pillar) + ' thick leaning in ' + f2(G.lean) + '°, upper beam reaching ' + f2(G.overhang) +
-         ' past the pillars with an upward curve of ' + f3(G.sori) + ', lower beam at ' + f2(G.nukiAt) + ', black feet ' + f3(G.feet) +
-         ' tall, short post ' + (G.gakuzuka ? 'on' : 'off'));
-  L.push('  Light and shadow: light from ' + f2(G.lightFrom) + ', shade ' + f2(G.shadeDepth) + ', ground shadow ' + f2(G.shadow) +
-         ' (softness ' + f2(G.shadowBlur) + ' px)');
-  L.push('  Depth of field: sharp from ' + f2(G.focusDepth) + ' down the ground; blur ' + f2(G.blurNear) + ' px nearest, ' +
-         f2(G.blurFar) + ' px furthest; haze ' + f2(G.hazeNear) + ' nearest, ' + f2(G.hazeFar) + ' furthest; strength ' + f2(G.strength));
-  L.push('  Gravel path: ' + (G.gravel ? 'shown' : 'hidden') + ', width ' + f2(G.pathWidth) + ' × a gate\'s shadow, pebbles ' + f2(G.pebbles) +
-         ' (size ' + f2(G.pebbleSize) + '), ragged edge ' + f2(G.edgeSoft) + ', leaves on it ' + f2(G.pathLeaves));
-  L.push('  Colours: ' + GATE_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + G.colours[cn[0]]; }).join(', '));
-  L.push('');
-  L.push('JSON:');
-  L.push(JSON.stringify(G, null, 2));
-  return L.join('\n');
+  var C = L.colours, out = [];
+  out.push('/* Stone lanterns — values from bamboo.html (autumn) */');
+  out.push('');
+  out.push('Lanterns: ' + (L.show ? 'shown' : 'hidden') + ', ' + lanternCount + ' on the screen, one in every ' +
+           (L.every === 1 ? 'gap' : L.every + ' gaps') + ' between the gates, ' +
+           { right: 'on the right', left: 'on the left', alternate: 'changing sides each time', both: 'on both sides' }[L.side] +
+           ', ' + f2(L.fromEdge) + ' × their height from the edge of the gravel.');
+  out.push('  The lantern: ' + f2(L.size) + ' × eye height tall, ' + L.sides + '-sided light box and roof, pillar ' + f3(L.pillar) +
+           ', light box ' + f3(L.box) + ', roof ' + f3(L.roof) + ' (× height), curled corners ' + (L.curls ? 'on' : 'off') +
+           '; moss ' + f2(L.moss) + ', variety ' + f2(L.variety) + ', leaves on them ' + f2(L.roofLeaves));
+  out.push('  The light: brightness ' + f2(L.lightEvening) + ' in the evening, ' + f2(L.lightNight) + ' at night; windows ' +
+           f2(L.windowGlow) + '; glow around them ' + f2(L.halo) + ' (size ' + f2(L.haloSize) + '); pool on the ground ' +
+           f2(L.pool) + ' (size ' + f2(L.poolSize) + '); light thrown nearby ' + f2(L.castLight) + ' reaching ' + f2(L.reach));
+  out.push('  Flicker: ' + f2(L.flicker) + ', speed ' + f2(L.flickerSpeed) + ', variety ' + f2(L.flickerVariety) +
+           ', more in gusts ' + f2(L.windFlicker));
+  out.push('  Colours: ' + LANTERN_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + C[cn[0]]; }).join(', '));
+  out.push('');
+  out.push('JSON:');
+  out.push(JSON.stringify(L, null, 2));
+  return out.join('\n');
 }
 function copyText(text) {
   if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
@@ -1691,40 +1654,175 @@ function drawGravel() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRAV.cnv, 0, Math.round(gravTop * PR));
 }
+/* ============================================================
+   6d. STONE LANTERNS (tōrō) — a Kasuga-style lantern of grey granite
+   beside the gravel path, in the gap between two gates (L.every), on
+   the side L.side. From the ground up: a plinth, a base, a round pillar
+   with two rings, the lotus platform, the light box with a paper window
+   in each side, the roof with curled-up corners, and the jewel on top.
+   Each is built in 3D like the gates (local units: u across the path,
+   y up, v along it; a window faces the path) and every lantern is put
+   in among the gate pieces as one solid, at the distance of its middle,
+   so lanterns and gates overlap as they really would. Each lantern is a
+   little different (paler or darker, more or less moss), and a few red
+   leaves lie on its roof and base.
+   Evening and night: the windows glow (baked), and the light they throw
+   on the gates and stone nearby is baked in too. Each frame then adds
+   the flicker: each lantern's visible windows brighten and dim (a mask
+   of just the parts of its windows not hidden behind a gate or another
+   lantern, made in the same bake), with a soft glow in the air around
+   it and a pool of light on the ground under it.
+   ============================================================ */
+var lanterns = [], lanternCount = 0;
+function lanternPieces(lod, rs) {
+  var h = L.size, n = Math.round(L.sides), off = PI / n, P = L.pillar * h, B = L.box * h, R = L.roof * h;
+  var round = lod > 0.5 ? 12 : lod > 0.15 ? 8 : 6;
+  var pieces = [];
+  function ring(cx, cz, y, r, k, o) {
+    var out = [];
+    for (var i = 0; i < k; i++) { var a = o + (i / k) * TAU; out.push([cx + Math.cos(a) * r, y, cz + Math.sin(a) * r]); }
+    return out;
+  }
+  // a solid from y0 to y1 with k sides, r0 at the bottom and r1 at the top; its middle can move (c0 → c1)
+  function frustum(y0, y1, r0, r1, k, o, tone, opt) {
+    opt = opt || {};
+    var c0 = opt.c0 || [0, 0], c1 = opt.c1 || c0;
+    var lo = ring(c0[0], c0[1], y0, r0, k, o), hi = ring(c1[0], c1[1], y1, r1, k, o), faces = [];
+    for (var i = 0; i < k; i++) {
+      var j = (i + 1) % k;
+      faces.push({ tone: opt.alt && i % 2 ? opt.alt : tone, p: [lo[i], lo[j], hi[j], hi[i]] });
+    }
+    if (opt.top && r1 > 1e-4) faces.push({ tone: opt.topTone || tone, p: hi.slice().reverse() });
+    if (opt.bottom && r0 > 1e-4) faces.push({ tone: tone, p: lo });
+    if (opt.windows) {                                  // a paper window set into each side, just proud of it
+      for (var w = 0; w < k; w++) {
+        var a = lo[w], b = lo[(w + 1) % k], mx = (a[0] + b[0]) / 2, mz = (a[2] + b[2]) / 2, ml = Math.hypot(mx, mz) || 1;
+        var px = mx / ml * 0.004 * h, pz = mz / ml * 0.004 * h, f = opt.windows;
+        var ya = y0 + (y1 - y0) * 0.14, yb = y1 - (y1 - y0) * 0.12;
+        var wp = function (t, y) { return [lerp(mx, lerp(a[0], b[0], t), f) + px, y, lerp(mz, lerp(a[2], b[2], t), f) + pz]; };
+        faces.push({ tone: 'w', p: [wp(0, ya), wp(1, ya), wp(1, yb), wp(0, yb)] });
+      }
+    }
+    pieces.push({ faces: faces, c: [(c0[0] + c1[0]) / 2, (y0 + y1) / 2, (c0[1] + c1[1]) / 2], part: opt.part || 's' });
+  }
+  var yPl = 0.035 * h, yBa = 0.085 * h, yNk = 0.105 * h, yR1 = 0.27 * h, yR2 = 0.3 * h, rH = 0.014 * h, yPt = 0.5 * h;
+  var yLo = 0.565 * h, yLb = 0.595 * h, yBx = 0.745 * h, yEv = 0.77 * h, yRf = 0.875 * h;
+  // plinth and base
+  frustum(0, yPl, B * 1.9, B * 1.86, n, off, 'm', { top: true });
+  frustum(yPl, yBa, B * 1.5, B * 1.2, n, off, 'm', { top: true });
+  frustum(yBa, yNk, P * 1.3, P * 1.08, round, 0, 's', { top: true });
+  // the pillar, with two rings round it
+  frustum(yNk, yR1, P, P * 0.97, round, 0, 's');
+  frustum(yR1, yR1 + rH, P * 1.13, P * 1.13, round, 0, 's', { top: true });
+  frustum(yR1 + rH, yR2, P * 0.965, P * 0.96, round, 0, 's');
+  frustum(yR2, yR2 + rH, P * 1.12, P * 1.12, round, 0, 's', { top: true });
+  frustum(yR2 + rH, yPt, P * 0.955, P * 0.92, round, 0, 's');
+  // the lotus platform: petals flaring out, then a band
+  frustum(yPt, yLo, P * 1.05, B * 1.55, Math.max(n * 3, round + 4), 0, 's', { alt: 'd' });
+  frustum(yLo, yLb, B * 1.55, B * 1.5, n, off, 's', { top: true });
+  // the light box, its windows facing the path and the other sides
+  frustum(yLb, yBx, B, B, n, off, 'b', { windows: 0.66, part: 'box' });
+  // the roof: the eaves, the slope up to the top, and the corners curling up
+  frustum(yBx, yEv, R, R * 0.97, n, off, 's', { bottom: true });
+  frustum(yEv, yRf, R * 0.97, 0.055 * h, n, off, 'r', { top: true });
+  if (L.curls && lod > 0.25) {
+    ring(0, 0, 0, R, n, off).forEach(function (v) {
+      frustum(yEv - 0.012 * h, yEv + 0.03 * h, 0.016 * h, 0.01 * h, 4, PI / 4, 'r',
+              { c0: [v[0] * 0.97, v[2] * 0.97], c1: [v[0] * 1.05, v[2] * 1.05], top: true });
+    });
+  }
+  // the jewel on top
+  var J = [[yRf, 0.035], [0.9 * h, 0.04], [0.925 * h, 0.052], [0.952 * h, 0.05], [0.976 * h, 0.032], [h, 0.002]];
+  for (var j = 0; j < J.length - 1; j++) frustum(J[j][0], J[j + 1][0], J[j][1] * h, J[j + 1][1] * h, round, 0, 's', { top: j === J.length - 2 });
+  // a few fallen leaves on the roof and the base, as in the photos
+  pieces.leaves = [];
+  var nLv = Math.round(L.roofLeaves * (lod > 0.4 ? 7 : lod > 0.12 ? 3 : 0) * lerp(0.4, 1.6, rs()));
+  for (var q = 0; q < nLv; q++) {
+    var onRoof = rs() < 0.6, a2 = rs() * TAU, rr = onRoof ? lerp(0.1, 0.75, rs()) : lerp(0.75, 0.98, rs());
+    var r2 = onRoof ? lerp(R * 0.97, 0.055 * h, rr) : B * 1.86 * rr, y2 = onRoof ? lerp(yEv, yRf, rr) + 0.004 * h : yPl + 0.003 * h;
+    pieces.leaves.push({ p: [Math.cos(a2) * r2, y2, Math.sin(a2) * r2], s: 0.022 * h * lerp(0.7, 1.3, rs()),
+                         rot: rs() * TAU, t: rs(), roof: onRoof });
+  }
+  return pieces;
+}
+/* Where the lanterns stand: in the middle of the gaps between the gates
+   (every L.every gap), beside the path, just off the gravel. */
+function placeLanterns(path, gap) {
+  var out = [];
+  if (!L.show || !path || path.len <= 0) return out;
+  var h = G.gateHeight, wu = (G.width * h / 2 + G.pillar * h * 1.5) * G.pathWidth;
+  var off = wu + L.fromEdge * L.size + L.box * L.size * 1.9;     // from the middle of the path to the middle of the lantern
+  var every = Math.max(1, Math.round(L.every)), k = 0;
+  for (var s = path.len - gap / 2; s > 0; s -= gap, k++) {
+    if (k % every) continue;
+    var q = pathAt(path, s), sides;
+    // right as you walk toward the gate facing you is (tz, -tx); the gates' across direction (ax, az) is the left
+    if (L.side === 'both') sides = [-1, 1];
+    else if (L.side === 'alternate') sides = [(k / every) % 2 ? 1 : -1];
+    else sides = [L.side === 'left' ? 1 : -1];
+    sides.forEach(function (sd) {
+      out.push({ x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
+                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 });
+    });
+  }
+  return out;
+}
+/* How bright the lanterns are now (0 by day). */
+function lanternLevel() {
+  return V.timeOfDay === 'night' ? L.lightNight : V.timeOfDay === 'evening' ? L.lightEvening : 0;
+}
+
 function bakeGates() {
   gateDirty = false;
   gateBakedAt = nowT;
-  gatePath = null; gateCount = 0; gateInfo = '';
+  gatePath = null; gateCount = 0; gateInfo = ''; lanterns = []; lanternCount = 0;
   GATE.cnv.width = 1; GATE.cnv.height = 1;
   GRAV.cnv.width = 1; GRAV.cnv.height = 1;
-  if (!W) { drawEditLayer(); return; }
+  if (!W) return;
   var path = gatePath = buildGatePath();
   bakeGravel(path);
-  if (!G.show) { drawEditLayer(); return; }
-  var hy = H * V.horizon, F = lensF(), C = {};
+  var hy = H * V.horizon, F = lensF(), C = {}, LC = {};
   for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
-  var mistC = light(hex(V.colours.mist));
+  for (var lk in L.colours) LC[lk] = hex(L.colours[lk]);
+  var mistC = light(hex(V.colours.mist)), lit = lanternLevel();
   var gap = Math.max(0.05, path.len / Math.max(1, G.count - 1));
+  function depthOf(foot) {
+    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
+    var farness = 1 - smooth(0, Math.max(0.02, G.focusDepth), depth);
+    return { haze: lerp(G.hazeNear, G.hazeFar, Math.pow(farness, 1.3)), band: Math.round(farness * (GATE_BANDS - 1)) };
+  }
   // the gates, from the end (the one facing you) back to the start
   var gates = [];
-  for (var s = path.len; s >= 0; s -= gap) {
+  if (G.show) for (var s = path.len; s >= 0; s -= gap) {
     var q = pathAt(path, s);
     if (q.z < 0.6) continue;                           // behind or right at the camera
     var foot = hy + F / q.z;                           // its foot on the screen
     var px = G.gateHeight * F / q.z;                   // its height on the screen
     var x0 = W / 2 + F * q.x / q.z;
     if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
-    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
-    var farness = 1 - smooth(0, Math.max(0.02, G.focusDepth), depth);
-    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot,
-                 haze: lerp(G.hazeNear, G.hazeFar, Math.pow(farness, 1.3)),
-                 band: Math.round(farness * (GATE_BANDS - 1)) });
+    var dq = depthOf(foot);
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band });
   }
   gateCount = gates.length;
-  if (!gates.length) { drawEditLayer(); return; }
+  // the lanterns
+  placeLanterns(path, gap).forEach(function (Lp) {
+    if (Lp.z < 0.6) return;
+    var foot = hy + F / Lp.z, px = L.size * F / Lp.z, x0 = W / 2 + F * Lp.x / Lp.z;
+    if (x0 < -px || x0 > W + px) return;
+    var dq = depthOf(foot), rs = rngFrom(Lp.seed * 31 + 17);
+    Lp.foot = foot; Lp.px = px; Lp.haze = dq.haze; Lp.band = dq.band; Lp.lantern = true;
+    Lp.tone = lerp(1 - 0.12 * L.variety, 1 + 0.08 * L.variety, rs());          // paler or darker granite
+    Lp.moss = clamp(L.moss * lerp(1 - L.variety * 0.8, 1 + L.variety * 0.6, rs()), 0, 1);
+    Lp.ly = 0.67 * L.size;                                                     // the flame, in the middle of the light box
+    Lp.flk = [rs() * TAU, rs() * TAU, rs() * TAU, lerp(0.85, 1.2, rs())];       // its own flicker
+    Lp.rs = rs;
+    lanterns.push(Lp);
+  });
+  lanternCount = lanterns.length;
+  if (!gates.length && !lanterns.length) return;
   // the light: from above, in front, and to the side G.lightFrom
   var Lx = G.lightFrom, Ly = 1.1, Lz = -0.6, Ll = Math.hypot(Lx, Ly, Lz); Lx /= Ll; Ly /= Ll; Lz /= Ll;
-  // every piece of every gate, furthest first
+  // every piece of every gate, furthest first; each lantern goes in whole, at the distance of its middle
   var all = [], minY = H;
   gates.forEach(function (g) {
     var lod = clamp(g.px / 120, 0, 1);
@@ -1735,28 +1833,92 @@ function bakeGates() {
     });
     minY = Math.min(minY, g.foot - g.px * 1.15);
   });
+  lanterns.forEach(function (Lp) {
+    var lod = clamp(Lp.px / 90, 0, 1), raw = lanternPieces(lod, Lp.rs);
+    var dy = L.size * 0.5 - 1, D = Lp.x * Lp.x + dy * dy + Lp.z * Lp.z;
+    placePieces(raw, Lp).forEach(function (pc, i) {
+      pc.dist = D - i * 1e-7;                          // its own pieces from the ground up
+      pc.part = raw[i].part;
+      all.push(pc);
+    });
+    Lp.leaves = raw.leaves.map(function (lf) {
+      var p = lf.p;
+      return { w: [Lp.x + Lp.ax * p[0] + Lp.tx * p[2], p[1], Lp.z + Lp.az * p[0] + Lp.tz * p[2]], s: lf.s, rot: lf.rot, t: lf.t, roof: lf.roof };
+    });
+    all[all.length - 1].leavesOf = Lp;                 // drawn just after its last piece
+    minY = Math.min(minY, Lp.foot - Lp.px * 1.1);
+  });
   all.sort(function (a, b) { return b.dist - a.dist; });
   gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - gateTop) * PR));
   var bands = [];
   for (var bi = 0; bi < GATE_BANDS; bi++) { var Lb = mk(); Lb.cnv.width = cw; Lb.cnv.height = chh; Lb.c.setTransform(PR, 0, 0, PR, 0, -gateTop * PR); bands.push(Lb); }
-  // the shadow of the line of gates on the ground, thrown away from the light
+  // the shadow of the line of gates (and of each lantern) on the ground, thrown away from the light
   var SH = mk(); SH.cnv.width = cw; SH.cnv.height = chh;
   var sc = SH.c;
   sc.setTransform(PR, 0, 0, PR, 0, -gateTop * PR);
+  function shadowQuad(o, wu, wv, k, alpha) {
+    var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
+      var x = o.x + o.ax * c[0] + o.tx * c[1] + shx * k, z = o.z + o.az * c[0] + o.tz * c[1] + shz * k;
+      return toScreen(x, 0, Math.max(0.3, z));
+    });
+    sc.fillStyle = rgb(C.ground, alpha);
+    sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+  }
+  var shx = -Lx / Ly * G.gateHeight * 0.35, shz = -Lz / Ly * G.gateHeight * 0.35;
   if (G.shadow > 0) {
-    var shx = -Lx / Ly * G.gateHeight * 0.35, shz = -Lz / Ly * G.gateHeight * 0.35;
     gates.forEach(function (g) {
-      var wu = G.width * G.gateHeight / 2 + G.pillar * G.gateHeight * 1.5, wv = gap * 0.52;
-      var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
-        var x = g.x + g.ax * c[0] + g.tx * c[1] + shx * 0.5, z = g.z + g.az * c[0] + g.tz * c[1] + shz * 0.5;
-        return toScreen(x, 0, Math.max(0.3, z));
-      });
-      sc.fillStyle = rgb(C.ground, G.shadow * (1 - g.haze));
-      sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+      shadowQuad(g, G.width * G.gateHeight / 2 + G.pillar * G.gateHeight * 1.5, gap * 0.52, 0.5, G.shadow * (1 - g.haze));
+    });
+    var lsk = L.size / G.gateHeight;
+    lanterns.forEach(function (Lp) {
+      var r0 = L.box * L.size * 2.2;
+      shadowQuad(Lp, r0, r0, 0.5 * lsk, G.shadow * 1.1 * (1 - Lp.haze));
     });
   }
-  // the pieces, each into the layer of its gate's blur
+  // the light the lanterns throw on what is near them (evening and night)
+  var flame = LC.flame, reach = Math.max(0.1, L.reach * L.size), cast = L.castLight * lit;
+  function lampLight(pc, cx, cy, cz, nx, ny, nz) {
+    if (cast <= 0) return 0;
+    var sum = 0;
+    for (var i = 0; i < lanterns.length; i++) {
+      var Lp = lanterns[i];
+      if (pc.g === Lp && pc.part === 'box') continue;  // its own light box is lit from inside, through the windows
+      var vx = Lp.x - cx, vy = Lp.ly - cy, vz = Lp.z - cz, d = Math.hypot(vx, vy, vz);
+      if (d >= reach || d < 1e-6) continue;
+      var lam = (nx * vx + ny * vy + nz * vz) / d;
+      if (lam <= 0) continue;
+      var fall = 1 - d / reach;
+      sum += lam * fall * fall;
+    }
+    return Math.min(1.2, sum) * cast;
+  }
+  // a mask for each lit lantern: just the parts of its windows that are not hidden
+  var masks = [];
+  if (lit > 0) lanterns.forEach(function (Lp) {
+    var hb = L.box * L.size * 1.05, y0 = 0.595 * L.size, y1 = 0.745 * L.size, xs = [], ys = [];
+    [[-hb, -hb], [hb, -hb], [hb, hb], [-hb, hb]].forEach(function (c) {
+      [y0, y1].forEach(function (y) {
+        var sp = toScreen(Lp.x + Lp.ax * c[0] + Lp.tx * c[1], y, Lp.z + Lp.az * c[0] + Lp.tz * c[1]);
+        xs.push(sp[0]); ys.push(sp[1]);
+      });
+    });
+    var pad = 2 + lerp(G.blurNear, G.blurFar, Lp.band / (GATE_BANDS - 1)) * 3;
+    var bx0 = Math.min.apply(null, xs) - pad, by0 = Math.min.apply(null, ys) - pad;
+    var bx1 = Math.max.apply(null, xs) + pad, by1 = Math.max.apply(null, ys) + pad;
+    if (bx1 < 0 || bx0 > W || by1 < 0 || by0 > H) return;
+    var M = mk(); M.cnv.width = Math.max(1, Math.ceil((bx1 - bx0) * PR)); M.cnv.height = Math.max(1, Math.ceil((by1 - by0) * PR));
+    M.c.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
+    Lp.mask = { M: M, x0: bx0, y0: by0, x1: bx1, y1: by1, on: false, area: 0, pad: pad };
+    masks.push(Lp);
+  });
+  function facePath(c, scr) {
+    c.beginPath();
+    for (var m = 0; m < scr.length; m++) { if (m) c.lineTo(scr[m][0], scr[m][1]); else c.moveTo(scr[m][0], scr[m][1]); }
+    c.closePath();
+  }
+  var glowWin = mix(LC.paper, LC.flame, 0.55), hotWin = mix(LC.flame, LC.glow, 0.6);
+  // the pieces, each into the layer of its gate's (or lantern's) blur
   all.forEach(function (pc) {
     var g = pc.g, c = bands[g.band].c;
     pc.faces.forEach(function (f) {
@@ -1773,17 +1935,69 @@ function bakeGates() {
       // only the faces turned toward the camera
       if (nx * cx + ny * (cy - 1) + nz * cz >= 0) return;
       for (var j = 0; j < n; j++) if (f.p[j][2] < 0.3) return;
-      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - G.shadeDepth * (1 - lam), col;
-      if (f.tone === 'f') col = scale(C.feet, lerp(0.75, 1.3, lam));
+      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - G.shadeDepth * (1 - lam), col, glowing = false;
+      if (g.lantern) {
+        var stone = scale(LC.stone, g.tone), shadeC = scale(LC.stoneShade, g.tone);
+        if (f.tone === 'w') {
+          if (lit > 0) { col = mix(glowWin, hotWin, clamp(lit * L.windowGlow * 0.5, 0, 1)); glowing = true; }
+          else col = mix(scale(LC.paper, 0.72), LC.paper, k);
+        } else {
+          col = mix(shadeC, stone, k);
+          if (f.tone === 'd') col = scale(col, 0.84);                          // between the lotus petals
+          var mossK = g.moss * (f.tone === 'm' ? 0.75 : f.tone === 'r' ? (ny > 0.2 ? 0.6 : 0.3) : 0.22 * clamp(1 - cy / L.size * 1.4, 0, 1));
+          col = mix(col, scale(LC.moss, lerp(0.7, 1.05, k)), mossK);
+          if (f.tone === 'b') col = scale(col, 0.92);
+        }
+      } else if (f.tone === 'f') col = scale(C.feet, lerp(0.75, 1.3, lam));
       else if (f.tone === 't' && ny > 0.3) col = mix(scale(C.top, 0.7), C.top, k);
       else col = mix(C.shade, C.vermilion, k);
-      if (ny < -0.5) col = scale(col, 0.82);                 // the undersides, in shade
-      col = light(mix(col, mistC, g.haze));
+      if (ny < -0.5 && !glowing) col = scale(col, 0.82);                 // the undersides, in shade
+      if (glowing) col = mix(col, mistC, g.haze * 0.5);
+      else {
+        col = light(mix(col, mistC, g.haze));
+        var ll = lampLight(pc, cx, cy, cz, nx, ny, nz) * (1 - g.haze * 0.7);
+        if (ll > 0) col = [col[0] + (col[0] * 0.6 + 70) * ll * flame[0] / 255, col[1] + (col[1] * 0.6 + 70) * ll * flame[1] / 255,
+                           col[2] + (col[2] * 0.6 + 70) * ll * flame[2] / 255];
+      }
+      var scr = f.p.map(function (p) { return toScreen(p[0], p[1], p[2]); });
       var st = rgb(col);
       c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
-      c.beginPath();
-      for (var m = 0; m < n; m++) { var sp = toScreen(f.p[m][0], f.p[m][1], f.p[m][2]); if (m) c.lineTo(sp[0], sp[1]); else c.moveTo(sp[0], sp[1]); }
-      c.closePath(); c.fill(); c.stroke();
+      facePath(c, scr); c.fill(); c.stroke();
+      // the lanterns' masks: its own windows are added; anything drawn later (nearer) over a window hides it
+      if (masks.length) {
+        var fx0 = 1e9, fy0 = 1e9, fx1 = -1e9, fy1 = -1e9;
+        for (var e = 0; e < n; e++) { fx0 = Math.min(fx0, scr[e][0]); fx1 = Math.max(fx1, scr[e][0]); fy0 = Math.min(fy0, scr[e][1]); fy1 = Math.max(fy1, scr[e][1]); }
+        for (var mi = 0; mi < masks.length; mi++) {
+          var Mk = masks[mi].mask, own = masks[mi] === g && f.tone === 'w';
+          if (!own && !Mk.on) continue;
+          if (fx1 < Mk.x0 || fx0 > Mk.x1 || fy1 < Mk.y0 || fy0 > Mk.y1) continue;
+          var mc = Mk.M.c;
+          if (own) {
+            mc.globalCompositeOperation = 'source-over'; mc.fillStyle = '#fff';
+            Mk.on = true;
+            var ar = 0;
+            for (var e2 = 0; e2 < n; e2++) { var p1 = scr[e2], p2 = scr[(e2 + 1) % n]; ar += p1[0] * p2[1] - p2[0] * p1[1]; }
+            Mk.area += Math.abs(ar) / 2;
+          } else { mc.globalCompositeOperation = 'destination-out'; mc.fillStyle = '#000'; }
+          facePath(mc, scr); mc.fill();
+          if (!own) { mc.lineWidth = 0.8; mc.strokeStyle = '#000'; mc.stroke(); }
+        }
+      }
+    });
+    // the leaves lying on a lantern, once all of it is drawn
+    if (pc.leavesOf) pc.leavesOf.leaves.forEach(function (lf) {
+      if (lf.w[2] < 0.3) return;
+      var sp = toScreen(lf.w[0], lf.w[1], lf.w[2]), sz = lf.s * F / lf.w[2];
+      if (sz < 0.8) return;
+      var Lq = pc.leavesOf, tones = [hex(TREE.colours.red), hex(TREE.colours.redOrange), hex(TREE.colours.orange), hex(TREE.colours.shadeDeep)];
+      var lc = tones[Math.floor(lf.t * tones.length) % tones.length];
+      lc = light(mix(lc, mistC, Lq.haze));
+      if (lit > 0 && lf.roof === false) lc = mix(lc, flame, 0.12 * lit);
+      c.save();
+      c.setTransform(PR, 0, 0, PR * 0.45, sp[0] * PR, (sp[1] - gateTop) * PR);
+      leafPathLo(c, sz, lf.rot);
+      c.fillStyle = rgb(lc); c.fill();
+      c.restore();
     });
   });
   // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
@@ -1798,16 +2012,103 @@ function bakeGates() {
     o.drawImage(bands[bj].cnv, 0, 0);
   }
   o.filter = 'none';
+  // each lantern's mask: how much of its windows can be seen, then softened as its depth of field
+  masks.forEach(function (Lp) {
+    var Mk = Lp.mask;
+    if (!Mk.on || Mk.area <= 0) { Lp.mask = null; Lp.vis = 0; return; }
+    var w = Mk.M.cnv.width, hh = Mk.M.cnv.height, data = Mk.M.c.getImageData(0, 0, w, hh).data, sum = 0;
+    for (var i = 3; i < data.length; i += 4) sum += data[i];
+    Lp.vis = clamp(sum / 255 / (PR * PR) / Mk.area, 0, 1);
+    if (Lp.vis < 0.01) { Lp.mask = null; return; }
+    var bl = lerp(G.blurNear, G.blurFar, Lp.band / (GATE_BANDS - 1)) + 0.6;
+    var Out = mk(); Out.cnv.width = w; Out.cnv.height = hh;
+    Out.c.filter = 'blur(' + (bl * PR).toFixed(2) + 'px)';
+    Out.c.drawImage(Mk.M.cnv, 0, 0);
+    Out.c.filter = 'none';
+    Mk.M.cnv.width = Mk.M.cnv.height = 1;
+    Mk.M = Out;
+  });
+  lanterns.forEach(function (Lp) {
+    var sp = toScreen(Lp.x, Lp.ly, Lp.z), ft = toScreen(Lp.x, 0, Lp.z);
+    Lp.sx = sp[0]; Lp.sy = sp[1]; Lp.fx = ft[0]; Lp.fy = ft[1];
+    if (Lp.vis === undefined) Lp.vis = 0;
+    delete Lp.rs; delete Lp.leaves;
+  });
+  bands.forEach(function (Lb) { Lb.cnv.width = Lb.cnv.height = 1; });      // the scratch layers are let go
+  SH.cnv.width = SH.cnv.height = 1;
   var nearest = gates[0], furthest = gates.reduce(function (m, g) { return g.px < m.px ? g : m; }, gates[0]);
-  gateInfo = gateCount + ' gates · the one facing you ' + Math.round(nearest.px) + ' px tall, the furthest ' + furthest.px.toFixed(1) + ' px';
-  drawEditLayer();
+  var nearL = lanterns.reduce(function (m, l) { return !m || l.px > m.px ? l : m; }, null);
+  gateInfo = (nearest ? gateCount + ' gates (the one facing you ' + Math.round(nearest.px) + ' px tall, the furthest ' + furthest.px.toFixed(1) + ' px)' : 'No gates') +
+             ' · ' + lanternCount + ' lanterns' + (nearL ? ' (the nearest ' + Math.round(nearL.px) + ' px tall)' : '') +
+             ' · ' + { day: 'day: unlit', evening: 'evening: lit', night: 'night: lit' }[V.timeOfDay];
 }
 function drawGates() {
-  if (!G.show || GATE.cnv.width < 2) return;
+  if (GATE.cnv.width < 2) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = G.strength;
   ctx.drawImage(GATE.cnv, 0, Math.round(gateTop * PR));
   ctx.globalAlpha = 1;
+}
+/* Each lantern's flame now: around 1, a few slow and quick waves of its own
+   (or all together, as L.flickerVariety goes to 0), and more in a gust. */
+function flameAt(Lp, t) {
+  if (L.flicker <= 0) return 1;
+  var v = L.flickerVariety, sp = L.flickerSpeed * lerp(1, Lp.flk[3], v);
+  var p0 = Lp.flk[0] * v, p1 = Lp.flk[1] * v, p2 = Lp.flk[2] * v;
+  var w = 0.42 * Math.sin(t * 2.3 * sp + p0) + 0.3 * Math.sin(t * 7.1 * sp + p1) + 0.18 * Math.sin(t * 13.7 * sp + p2 * 1.7) +
+          0.1 * Math.sin(t * 23.3 * sp + p0 * 2.3 + p1);
+  var gust = Math.min(1.5, Math.abs(gustAt(Lp.sx)) * L.windFlicker);
+  var dip = gust > 0.05 ? -gust * 0.35 * (0.5 + 0.5 * Math.sin(t * 17 * sp + p2)) : 0;
+  return clamp(1 + L.flicker * (w * 0.6 * (1 + gust)) + L.flicker * dip, 0.25, 1.6);
+}
+/* The pool of light on the ground under each lit lantern (drawn on the
+   ground and gravel, before the gates and lanterns stand on it). */
+function drawLanternPools(t) {
+  var lit = lanternLevel();
+  if (lit <= 0 || L.pool <= 0 || !lanterns.length) return;
+  var gc = hex(L.colours.glow), fc = hex(L.colours.flame), F = lensF();
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (var i = 0; i < lanterns.length; i++) {
+    var Lp = lanterns[i], fl = flameAt(Lp, t), rx = L.poolSize * L.size * F / Lp.z, ry = rx / Lp.z;
+    if (rx < 1.5) continue;
+    var a = L.pool * lit * 0.5 * fl * (1 - Lp.haze * 0.8);
+    ctx.setTransform(PR * rx, 0, 0, PR * Math.max(ry, rx * 0.06), Lp.fx * PR, Lp.fy * PR);
+    var g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, rgb(mix(gc, fc, 0.3), a)); g.addColorStop(0.35, rgb(fc, a * 0.45)); g.addColorStop(1, rgb(fc, 0));
+    ctx.fillStyle = g; ctx.fillRect(-1, -1, 2, 2);
+  }
+  ctx.restore();
+}
+/* The flicker in the windows and the glow in the air around each lit
+   lantern (drawn just after the gates and lanterns). */
+function drawLanternGlow(t) {
+  var lit = lanternLevel();
+  if (lit <= 0 || !lanterns.length) return;
+  var gc = hex(L.colours.glow), fc = hex(L.colours.flame);
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  for (var i = 0; i < lanterns.length; i++) {
+    var Lp = lanterns[i];
+    if (!Lp.vis) continue;
+    var fl = flameAt(Lp, t), fade = 1 - Lp.haze * 0.6;
+    if (Lp.mask && L.windowGlow > 0) {               // the windows brighten and dim
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = clamp(L.windowGlow * lit * 0.55 * fl * fade, 0, 1);
+      ctx.drawImage(Lp.mask.M.cnv, Math.round(Lp.mask.x0 * PR), Math.round(Lp.mask.y0 * PR));
+      ctx.globalAlpha = 1;
+    }
+    var r = L.haloSize * Lp.px * 0.5;
+    if (L.halo > 0 && r > 1) {                       // the glow in the air
+      var a = L.halo * lit * 0.3 * fl * Lp.vis * fade;
+      ctx.setTransform(PR * r, 0, 0, PR * r, Lp.sx * PR, Lp.sy * PR);
+      var g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+      g.addColorStop(0, rgb(gc, a)); g.addColorStop(0.18, rgb(mix(gc, fc, 0.5), a * 0.55));
+      g.addColorStop(0.5, rgb(fc, a * 0.16)); g.addColorStop(1, rgb(fc, 0));
+      ctx.fillStyle = g; ctx.fillRect(-1, -1, 2, 2);
+    }
+  }
+  ctx.restore();
 }
 
 /* ============================================================
@@ -4591,8 +4892,9 @@ function frame(now) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(GRD.cnv, 0, Math.round(grdTop * PR));
 
-  // The gravel path through the gates (baked), lying on the ground.
+  // The gravel path through the gates (baked), lying on the ground, and the lanterns' light on it.
   drawGravel();
+  drawLanternPools(t);
 
   // The owl when it is further away than the far tree: behind both trees.
   drawAnimals(ctx, 'A');
@@ -4601,8 +4903,10 @@ function frame(now) {
   // The bamboo grove behind the far tree, on soft layers of its own.
   drawBamboo('far', t);
 
-  // The line of torii gates on the ground (baked), behind both trees.
+  // The line of torii gates and the stone lanterns beside the path (baked), behind both trees,
+  // then the flicker in the lanterns' windows and the glow around them.
   drawGates();
+  drawLanternGlow(t);
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
