@@ -1319,7 +1319,7 @@ var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
    (see PLAYLISTS & MUSIC BUTTONS below); night plays one file on the
    buffer engine, whose bufferName is the physical soundBuffers key.
 
-     morning  05:00–10:59  playlist 'morning'  Sound/morning/1.mp3, 2.mp3, …
+     morning  05:00–10:59  playlist 'morning'  Sound/morning/1.m4a, 2.m4a, …
      day      11:00–16:59  playlist 'morning'  (no day music yet)
      evening  17:00–20:59  playlist 'evening'  Sound/Evening/1.m4a, 2.m4a, …
      night    21:00–04:59  Sound/Latenight.mp3 (18 min, full)
@@ -2810,14 +2810,15 @@ function playAmbientSound(offsetSec) {
    Morning, day and evening play folders of numbered songs; night plays one
    file on the buffer engine above. The folders:
 
-     Sound/morning/1.mp3, 2.mp3, …   plays in the morning and the day
+     Sound/morning/1.m4a, 2.m4a, …   plays in the morning and the day
      Sound/Evening/1.m4a, 2.m4a, …   plays in the evening
 
    A static site cannot list a folder, so probePlaylist() asks for 1, 2, 3
    … one after another and stops at the first the server answers 404 for.
    Adding a song is adding the next number; nothing here changes. A
-   folder is MP3 or M4A (AAC in an MP4 container) as its entry in
-   MUSIC_PLAYLISTS says; the title and artist come from the file's own
+   folder is M4A (AAC in an MP4 container) or MP3 as its entry in
+   MUSIC_PLAYLISTS says; a file of the other kind in the folder is
+   never asked for; the title and artist come from the file's own
    tags — ID3 in an MP3 (readId3Tags), the iTunes-style ©nam / ©ART atoms
    in an M4A (readMp4Tags) — once its bytes have arrived.
 
@@ -2865,7 +2866,7 @@ function _makePlaylist(dir, ext, mime) {
            done: false, probing: false, probeN: 0, retries: 0 };
 }
 var MUSIC_PLAYLISTS = {
-  morning: _makePlaylist('Sound/morning/', 'mp3', 'audio/mpeg'),
+  morning: _makePlaylist('Sound/morning/', 'm4a', 'audio/mp4'),
   evening: _makePlaylist('Sound/Evening/', 'm4a', 'audio/mp4')
 };
 
