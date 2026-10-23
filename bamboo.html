@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Bamboo Grove Lab</title>
+<title>Torii Gate Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,18 +14,17 @@
 
 <style>
   /* ============================================================
-     BAMBOO LAB — a copy of landscape.html, used as the test bed for
-     two bamboo groves in the autumn scene, in the day phase (the bamboo
-     is only for the day). Preview only.
+     TORII LAB — a copy of landscape.html, used as the test bed for a
+     long line of vermilion torii gates (as at Takayama Inari) in the
+     autumn scene, in the day phase. Preview only.
      Everything from landscape.html is still here and runs on its
      approved values (mountains, Fuji, mist, fallen leaves, the two
-     trees), but none of it has controls any more. There is no owl, deer
-     or tanuki on this page. New: a dense grove of bamboo shooting in
-     from the side of the screen behind each tree (the smaller one and
-     the bigger one), taller than its tree but never past the top of the
-     screen, softened and hazed for its depth, swaying in the wind and
-     pushed by the gusts (section 6b). Each grove has its own set of
-     controls. Nothing in app.js is used or changed.
+     trees, the two bamboo groves), but none of it has controls any more.
+     New: the gates wind across the ground in perspective from behind
+     the near tree, away toward the horizon, along it and back toward
+     you, ending with a gate that faces you (section 6c). Every control
+     on the panel is for the gates, and the path can be moved on screen
+     with a finger. Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -36,6 +35,7 @@
   .dyn-canvas.dyn-near { opacity: 1; }
   .lab-status { font-size: 12px; color: #6E5A55; min-height: 2.8em; }
   .lab-now button { padding: 6px 10px; }
+  #gateEdit { position: fixed; inset: 0; width: 100%; height: 100%; z-index: 999; display: none; touch-action: none; }
 
   /* One message panel in this preview instead of six. */
   .track { width: 100%; }
@@ -185,9 +185,12 @@
 </div>
 
 <!-- ============ Controls (demo only) ============ -->
+<!-- Moving the path on screen (demo only): shown while "Move the path on screen" is on. -->
+<canvas id="gateEdit" aria-hidden="true"></canvas>
+
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3><span class="lab-grip" aria-hidden="true">⠿</span>🎋 Bamboo Lab</h3>
+    <h3><span class="lab-grip" aria-hidden="true">⠿</span>⛩️ Torii Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -331,18 +334,17 @@ var ODEF = {
 var O = clone(ODEF);
 
 /* ============================================================
-   2. BAMBOO LAB — every control on the panel is for the bamboo groves
-   (section 6b). A change to the shape or colour of the groves rebuilds
-   them; the sway values and the strength work at once. Values are kept
-   in this browser; "Copy values" gives them in words and as JSON.
+   2. TORII LAB — every control on the panel is for the line of torii
+   gates (section 6c). The gates do not move, so they are baked once;
+   any change bakes them again a moment later. Values are kept in this
+   browser; "Copy values" gives them in words and as JSON.
+   The bamboo groves (section 6b) run on their approved values below and
+   have no controls any more.
    ============================================================ */
 var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
   yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
 };
-var BAMBOO_COLOUR_NAMES = [['culm', 'Stems'], ['culmLit', 'Stem highlight'], ['culmShade', 'Stem shadow'], ['node', 'Joints'],
-                           ['ring', 'Pale ring at joints'], ['yellow', 'Older stems'], ['leaf', 'Leaves'], ['leafDark', 'Shaded leaves'],
-                           ['twig', 'Twigs']];
 /* The grove behind the smaller tree: the values approved on the tablet. */
 var BDEF = {
   show: true,
@@ -362,93 +364,101 @@ var BDEF = {
    differently, and a little sharper as it is nearer. */
 var BDEF_NEAR = clone(BDEF);
 BDEF_NEAR.seed = 21; BDEF_NEAR.blurNear = 1; BDEF_NEAR.blurFar = 2.2; BDEF_NEAR.haze = 0.22; BDEF_NEAR.depthHaze = 0.3;
-var GROVES = [['far', 'Behind the smaller tree'], ['near', 'Behind the bigger tree']];
 var BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) };
-var SEL = 'far';                                  // the grove the panel is showing
-function Bs() { return BSET[SEL]; }
-var STORE_KEY = 'bambooLabValues3';   // 3: two groves
+
+/* The gates. The path is a row of points on the screen (x × screen width,
+   y × screen height), from where the line starts to the gate that faces
+   you. Each point is laid on the ground in perspective, and the path
+   winds smoothly through them across the ground. */
+var GATE_COLOURS = { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14' };
+var GATE_COLOUR_NAMES = [['vermilion', 'Vermilion (lit)'], ['shade', 'Vermilion (shade)'], ['top', 'Top of the upper beam'],
+                         ['feet', 'Black feet'], ['ground', 'Shadow on the ground']];
+var GDEF = {
+  show: true,
+  // the path
+  path: [[0.045, 0.893], [0.22, 0.879], [0.43, 0.868], [0.6, 0.867], [0.7, 0.884], [0.815, 0.945]],
+  straightEnd: 1.5, lens: 0.8,
+  // the gates
+  gateHeight: 1.5, spacing: 0.5, width: 0.62, pillar: 0.075, lean: 1.5, overhang: 0.2, sori: 0.04,
+  nukiAt: 0.7, feet: 0.11, gakuzuka: true, colours: clone(GATE_COLOURS),
+  // light and shadow
+  lightFrom: -0.4, shadeDepth: 0.55, shadow: 0.35, shadowBlur: 3,
+  // depth of field
+  focusDepth: 0.5, blurNear: 0.2, blurFar: 1, hazeNear: 0.04, hazeFar: 0.4, strength: 1
+};
+var G = clone(GDEF);
+var STORE_KEY = 'toriiLabValues1';
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  if (saved && typeof saved === 'object') GROVES.forEach(function (gk) {
-    var sv = saved[gk[0]], dst = BSET[gk[0]];
-    if (!sv) return;
-    for (var sk in sv) {
-      if (sk === 'colours') { for (var ck in sv.colours) if (ck in dst.colours) dst.colours[ck] = sv.colours[ck]; }
-      else if (sk in dst) dst[sk] = sv[sk];
+  if (saved && typeof saved === 'object') {
+    for (var sk in saved) {
+      if (sk === 'colours') { for (var ck in saved.colours) if (ck in G.colours) G.colours[ck] = saved.colours[ck]; }
+      else if (sk === 'path') { if (Array.isArray(saved.path) && saved.path.length === G.path.length) G.path = saved.path; }
+      else if (sk in G) G[sk] = saved[sk];
     }
-  });
+  }
 } catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(BSET)); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(G)); } catch (e) {} }
 
+var POINT_NAMES = ['Start', 'Point 2', 'Point 3', 'Point 4', 'Point 5', 'End (the gate facing you)'];
+function pointCtls() {
+  var out = [];
+  POINT_NAMES.forEach(function (nm, i) {
+    out.push({ label: nm + ': across (× screen width)', min: 0, max: 1, step: 0.005,
+               get: function () { return G.path[i][0]; }, set: function (v) { G.path[i][0] = v; } });
+    out.push({ label: nm + ': down (× screen height)', min: 0.862, max: 1.05, step: 0.001,
+               get: function () { return G.path[i][1]; }, set: function (v) { G.path[i][1] = v; },
+               hint: i === 0 ? 'The horizon is at 0.86. Closer to it = further away and smaller.' : '' });
+  });
+  return out;
+}
 var GROUPS = [
-  { title: 'The grove', ctls: [
-    { k: 'show', label: 'Show this grove', type: 'check', re: 'grove' },
-    { k: 'culms', label: 'Stems', min: 5, max: 90, step: 1, re: 'grove' },
-    { k: 'seed', label: 'Arrangement', min: 1, max: 99, step: 1, re: 'grove', hint: 'Each number places the stems differently.' },
-    { k: 'entryTop', label: 'Stems come in from the side between … (× screen height from the top)', min: 0.1, max: 1, step: 0.01, re: 'grove' },
-    { k: 'entryBottom', label: '… and (× screen height from the top)', min: 0.1, max: 1.1, step: 0.01, re: 'grove',
-      hint: 'Where the stems cross the edge of the screen. 1 = the bottom.' },
-    { k: 'heightMin', label: 'Lowest tops (× its tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove',
-      hint: 'Above 1 = taller than the tree in front. Measured from the tree\'s root. Where this would go past the top of the screen, the tops stop below it (see the gap).' },
-    { k: 'heightMax', label: 'Highest tops (× its tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove' },
-    { k: 'topMargin', label: 'Gap kept above the tops (× screen height)', min: 0, max: 0.3, step: 0.01, re: 'grove',
-      hint: 'Nothing, not even the leaves at the tops, goes higher than this below the top of the screen.' },
-    { k: 'lean', label: 'Lean toward the middle (degrees)', min: 0, max: 60, step: 1, re: 'grove', hint: 'More lean = they reach further in.' },
-    { k: 'leanVariety', label: 'Difference in lean between stems', min: 0, max: 1, step: 0.05, re: 'grove' },
-    { k: 'arch', label: 'How much the tops bend over', min: 0, max: 1, step: 0.05, re: 'grove',
-      hint: 'As in the photo: the tops curve in over the path.' }
+  { title: 'The path', ctls: [
+    { k: 'show', label: 'Show the gates', type: 'check' },
+    { k: 'straightEnd', label: 'Straight run toward you before the end (× gate height)', min: 0, max: 10, step: 0.1,
+      hint: 'The last gates come straight at you, so the last one faces you square on.' },
+    { k: 'lens', label: 'Camera lens (× screen width)', min: 0.4, max: 1.6, step: 0.01,
+      hint: 'Lower = wider lens: the path stretches deeper and the gates turn more across the screen.' }
   ]},
-  { title: 'Stems', ctls: [
-    { k: 'thickness', label: 'Thickness at the edge (px, nearest stems)', min: 3, max: 30, step: 0.5, re: 'grove' },
-    { k: 'taper', label: 'Thinner toward the top', min: 0, max: 0.85, step: 0.05, re: 'grove', hint: '0 = the same thickness all the way up.' },
-    { k: 'nodeSpacing', label: 'Joints every (× stem length)', min: 0.03, max: 0.2, step: 0.005, re: 'grove' },
-    { k: 'nodeMark', label: 'How clearly the joints show', min: 0, max: 1, step: 0.05, re: 'grove' },
-    { k: 'highlight', label: 'Shine down one side of each stem', min: 0, max: 1, step: 0.05, re: 'grove' },
-    { k: 'colourVariety', label: 'Difference in colour between stems', min: 0, max: 1, step: 0.05, re: 'grove',
-      hint: 'Some stems older and yellower, some darker.' },
-    { type: 'colours', re: 'grove' }
+  { title: 'Path points', ctls: pointCtls() },
+  { title: 'The gates', ctls: [
+    { k: 'gateHeight', label: 'Gate height (× eye height)', min: 0.6, max: 3, step: 0.01,
+      hint: 'Sets the size of every gate against the ground. 1.5 = a gate about 2.5 m tall seen from about 1.7 m.' },
+    { k: 'spacing', label: 'Gap from one gate to the next (× gate height)', min: 0.2, max: 2, step: 0.01 },
+    { k: 'width', label: 'Width between the pillars (× gate height)', min: 0.4, max: 1, step: 0.01 },
+    { k: 'pillar', label: 'Pillar thickness (× gate height)', min: 0.03, max: 0.14, step: 0.002 },
+    { k: 'lean', label: 'Pillars lean in (degrees)', min: 0, max: 5, step: 0.1 },
+    { k: 'overhang', label: 'Upper beam reaches past the pillars (× gate height)', min: 0.05, max: 0.4, step: 0.01 },
+    { k: 'sori', label: 'Upward curve of the upper beam', min: 0, max: 0.12, step: 0.002 },
+    { k: 'nukiAt', label: 'Lower beam height (× gate height)', min: 0.5, max: 0.8, step: 0.01 },
+    { k: 'feet', label: 'Black feet height (× gate height)', min: 0, max: 0.25, step: 0.005 },
+    { k: 'gakuzuka', label: 'Short post between the two beams', type: 'check' },
+    { type: 'colours' }
   ]},
-  { title: 'Leaves', ctls: [
-    { k: 'leafiness', label: 'How leafy', min: 0, max: 2.5, step: 0.05, re: 'grove', hint: '0 = bare stems.' },
-    { k: 'leafFrom', label: 'Leaves start this far along (0 the edge … 1 the top)', min: 0, max: 0.9, step: 0.01, re: 'grove' },
-    { k: 'leafSize', label: 'Leaf size', min: 0.4, max: 2.5, step: 0.05, re: 'grove' },
-    { k: 'leafDroop', label: 'How much the leaves hang down', min: 0.2, max: 1.8, step: 0.05, re: 'grove' }
+  { title: 'Light and shadow', ctls: [
+    { k: 'lightFrom', label: 'Light from (−1 left … 1 right)', min: -1, max: 1, step: 0.05, hint: 'The trees have −0.4.' },
+    { k: 'shadeDepth', label: 'Shade on the sides away from the light', min: 0, max: 1, step: 0.05 },
+    { k: 'shadow', label: 'Shadow on the ground under the gates', min: 0, max: 1, step: 0.01 },
+    { k: 'shadowBlur', label: 'Shadow softness (px)', min: 0, max: 10, step: 0.1 }
   ]},
   { title: 'Depth of field', ctls: [
-    { k: 'blurNear', label: 'Blur on the nearer stems (px)', min: 0, max: 6, step: 0.1,
-      hint: 'The tree in front is sharp (the bigger one) or about 1 px soft (the smaller one); the bamboo behind it should be softer.' },
-    { k: 'blurFar', label: 'Blur on the stems further back (px)', min: 0, max: 8, step: 0.1 },
-    { k: 'haze', label: 'Haze (toward the mist colour)', min: 0, max: 0.9, step: 0.01, re: 'grove',
-      hint: 'The smaller tree has 0.09. More haze sets the bamboo further back.' },
-    { k: 'depthHaze', label: 'Extra haze on the stems further back', min: 0, max: 0.8, step: 0.01, re: 'grove' },
+    { k: 'focusDepth', label: 'Sharp from this far down the ground (0 the horizon … 1 the bottom)', min: 0.1, max: 1, step: 0.01,
+      hint: 'Gates standing lower than this are sharp; above it they soften and haze toward the horizon.' },
+    { k: 'blurNear', label: 'Blur on the nearest gates (px)', min: 0, max: 4, step: 0.05 },
+    { k: 'blurFar', label: 'Blur on the furthest gates (px)', min: 0, max: 6, step: 0.05,
+      hint: 'The mountains have 2.5 px; the far tree is about 1 px soft.' },
+    { k: 'hazeNear', label: 'Haze on the nearest gates', min: 0, max: 0.8, step: 0.01 },
+    { k: 'hazeFar', label: 'Haze on the furthest gates', min: 0, max: 0.95, step: 0.01,
+      hint: 'Toward the mist colour, as the ground at the horizon.' },
     { k: 'strength', label: 'Strength against the paper', min: 0.2, max: 1, step: 0.05 }
-  ]},
-  { title: 'Swaying', ctls: [
-    { k: 'swayAmount', label: 'How far they sway', min: 0, max: 4, step: 0.05, hint: '0 = still (gusts still push them).' },
-    { k: 'swaySpeed', label: 'Sway speed', min: 0.2, max: 3, step: 0.05 },
-    { k: 'swayVariety', label: 'Each stem in its own time', min: 0, max: 1, step: 0.05, hint: '0 = the whole grove sways together.' },
-    { k: 'tipWhip', label: 'Tops move more than the rest', min: 1, max: 4, step: 0.1,
-      hint: '1 = the stem swings stiffly; higher = only the top bends.' },
-    { k: 'gustResponse', label: 'Push from each gust', min: 0, max: 4, step: 0.05 },
-    { k: 'gustSpring', label: 'Springiness after a gust', min: 0.2, max: 3, step: 0.05,
-      hint: 'Higher = rocks back faster and settles sooner.' },
-    { k: 'leafFlutter', label: 'Leaf flutter', min: 0, max: 4, step: 0.05 }
   ]}
 ];
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.step < 0.01 ? 3 : 2); }
+function ctlGet(ctl) { return ctl.get ? ctl.get() : G[ctl.k]; }
+function ctlSet(ctl, v) { if (ctl.set) ctl.set(v); else G[ctl.k] = v; }
 function buildControls() {
   var host = document.getElementById('labControls');
   host.innerHTML = '';
-  var pick = document.createElement('div');
-  pick.className = 'lab-sec';
-  pick.innerHTML = '<h4>Which grove are you changing?</h4>';
-  var ps = document.createElement('select');
-  GROVES.forEach(function (gk) { var op = document.createElement('option'); op.value = gk[0]; op.textContent = gk[1]; ps.appendChild(op); });
-  ps.value = SEL;
-  ps.style.cssText = 'width:100%;font:inherit;font-weight:700;padding:7px;border-radius:8px;border:1px solid #C44E10;background:#FFFDF9';
-  ps.addEventListener('change', function () { SEL = ps.value; buildControls(); });
-  pick.appendChild(ps);
-  host.appendChild(pick);
   GROUPS.forEach(function (g) {
     var sec = document.createElement('div');
     sec.className = 'lab-sec';
@@ -458,16 +468,16 @@ function buildControls() {
       if (ctl.type === 'check') {
         wrap.className = 'lab-chk';
         var cb = document.createElement('input');
-        cb.type = 'checkbox'; cb.checked = !!Bs()[ctl.k];
-        cb.addEventListener('change', function () { Bs()[ctl.k] = cb.checked; changed(ctl); });
+        cb.type = 'checkbox'; cb.checked = !!ctlGet(ctl);
+        cb.addEventListener('change', function () { ctlSet(ctl, cb.checked); changed(); });
         var lb2 = document.createElement('span'); lb2.textContent = ctl.label;
         wrap.appendChild(cb); wrap.appendChild(lb2);
       } else if (ctl.type === 'colours') {
         wrap.className = 'lab-colours';
-        BAMBOO_COLOUR_NAMES.forEach(function (cn) {
+        GATE_COLOUR_NAMES.forEach(function (cn) {
           var lb = document.createElement('label'); lb.className = 'lab-colour';
-          var inp = document.createElement('input'); inp.type = 'color'; inp.value = Bs().colours[cn[0]];
-          inp.addEventListener('input', function () { Bs().colours[cn[0]] = inp.value; changed(ctl); });
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = G.colours[cn[0]];
+          inp.addEventListener('input', function () { G.colours[cn[0]] = inp.value; changed(); });
           var sp = document.createElement('span'); sp.textContent = cn[1];
           lb.appendChild(inp); lb.appendChild(sp);
           wrap.appendChild(lb);
@@ -477,21 +487,11 @@ function buildControls() {
         var label = document.createElement('label');
         var name = document.createElement('span'); name.textContent = ctl.label;
         label.appendChild(name);
-        var el;
-        if (ctl.type === 'select') {
-          el = document.createElement('select');
-          ctl.opts.forEach(function (o) {
-            var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
-          });
-          el.value = Bs()[ctl.k];
-          el.addEventListener('change', function () { Bs()[ctl.k] = el.value; changed(ctl); });
-        } else {
-          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, Bs()[ctl.k]);
-          label.appendChild(val);
-          el = document.createElement('input');
-          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = Bs()[ctl.k];
-          el.addEventListener('input', function () { Bs()[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, Bs()[ctl.k]); changed(ctl); });
-        }
+        var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, ctlGet(ctl));
+        label.appendChild(val);
+        var el = document.createElement('input');
+        el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = ctlGet(ctl);
+        el.addEventListener('input', function () { ctlSet(ctl, parseFloat(el.value)); val.textContent = fmt(ctl, ctlGet(ctl)); changed(); });
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
       }
@@ -502,24 +502,19 @@ function buildControls() {
   var now = document.getElementById('labNow');
   now.innerHTML = '';
   NOW_BTNS.forEach(function (N) {
-    var b = document.createElement('button'); b.type = 'button'; b.textContent = N[0];
-    b.addEventListener('click', N[1]);
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = typeof N[0] === 'function' ? N[0]() : N[0];
+    b.addEventListener('click', function () { N[1](); b.textContent = typeof N[0] === 'function' ? N[0]() : N[0]; });
     now.appendChild(b);
   });
 }
-/* A change to the groves rebuilds them after a short pause, so dragging a
-   slider does not rebuild on every step. */
-var _rb = null;
-function changed(ctl) {
+/* Any change bakes the gates again (section 6c), at most a few times a second. */
+function changed() {
   save();
-  if (!ctl.re) return;              // the sway, blur and strength work at once
-  clearTimeout(_rb);
-  _rb = setTimeout(buildGroves, 150);
+  gateDirty = true;
 }
 var NOW_BTNS = [
-  ['Gust from the left', function () { startGust(1, 1.6); }],
-  ['Gust from the right', function () { startGust(-1, 1.6); }],
-  ['Rearrange this grove', function () { Bs().seed = Bs().seed % 99 + 1; save(); buildControls(); buildGroves(); }]
+  [function () { return editing ? 'Done moving the path' : 'Move the path on screen'; }, function () { setEditing(!editing); }],
+  ['Reset the path', function () { G.path = clone(GDEF.path); G.straightEnd = GDEF.straightEnd; save(); buildControls(); gateDirty = true; }]
 ];
 
 document.getElementById('labToggle').addEventListener('click', function () {
@@ -528,7 +523,7 @@ document.getElementById('labToggle').addEventListener('click', function () {
   this.textContent = c ? 'Show' : 'Hide';
 });
 /* The panel can be dragged by its title bar (finger or mouse) to anywhere on
-   the screen, so the bamboo can be watched while the sliders are used. It
+   the screen, so the gates can be watched while the sliders are used. It
    stays where it was put, in this browser. */
 (function () {
   var lab = document.getElementById('lab'), head = lab.querySelector('.lab-head'), POS_KEY = 'bambooLabPos1';
@@ -567,39 +562,94 @@ document.getElementById('labToggle').addEventListener('click', function () {
   });
 })();
 document.getElementById('btnReset').addEventListener('click', function () {
-  BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) }; save(); buildControls(); buildGroves();
+  G = clone(GDEF); save(); buildControls(); gateDirty = true;
 });
+
+/* Moving the path on screen: a layer over the scene shows the path and its
+   points; drag a point with a finger to move it. The gates follow. */
+var editing = false, EDC = document.getElementById('gateEdit'), edc = EDC.getContext('2d'), edDrag = null;
+function setEditing(on) {
+  editing = on;
+  EDC.style.display = on ? 'block' : 'none';
+  if (on) drawEditLayer();
+}
+function drawEditLayer() {
+  if (!editing) return;
+  var dpr = window.devicePixelRatio || 1;
+  EDC.width = Math.round(W * dpr); EDC.height = Math.round(H * dpr);
+  edc.setTransform(dpr, 0, 0, dpr, 0, 0);
+  edc.clearRect(0, 0, W, H);
+  edc.fillStyle = 'rgba(36,28,26,0.12)'; edc.fillRect(0, 0, W, H);
+  // the horizon
+  edc.strokeStyle = 'rgba(255,253,249,0.7)'; edc.setLineDash([6, 6]); edc.lineWidth = 1;
+  edc.beginPath(); edc.moveTo(0, H * V.horizon); edc.lineTo(W, H * V.horizon); edc.stroke(); edc.setLineDash([]);
+  // the path along the ground
+  if (gatePath && gatePath.pts.length) {
+    edc.strokeStyle = 'rgba(255,253,249,0.95)'; edc.lineWidth = 2.5;
+    edc.beginPath();
+    var first = true;
+    gatePath.pts.forEach(function (p) {
+      if (p.z < 0.3) return;
+      var s = toScreen(p.x, 0, p.z);
+      if (first) { edc.moveTo(s[0], s[1]); first = false; } else edc.lineTo(s[0], s[1]);
+    });
+    edc.stroke();
+  }
+  G.path.forEach(function (p, i) {
+    var x = p[0] * W, y = p[1] * H;
+    edc.fillStyle = i === G.path.length - 1 ? '#C44E10' : '#882E47';
+    edc.strokeStyle = '#FFFDF9'; edc.lineWidth = 2;
+    edc.beginPath(); edc.arc(x, y, 13, 0, TAU); edc.fill(); edc.stroke();
+    edc.fillStyle = '#FFFDF9'; edc.font = '700 12px sans-serif'; edc.textAlign = 'center'; edc.textBaseline = 'middle';
+    edc.fillText(String(i + 1), x, y + 0.5);
+  });
+}
+EDC.addEventListener('pointerdown', function (e) {
+  var best = -1, bd = 44;
+  G.path.forEach(function (p, i) { var d = Math.hypot(p[0] * W - e.clientX, p[1] * H - e.clientY); if (d < bd) { bd = d; best = i; } });
+  if (best < 0) return;
+  edDrag = { id: e.pointerId, i: best };
+  try { EDC.setPointerCapture(e.pointerId); } catch (er) {}
+  e.preventDefault();
+});
+EDC.addEventListener('pointermove', function (e) {
+  if (!edDrag || e.pointerId !== edDrag.id) return;
+  G.path[edDrag.i] = [clamp(e.clientX / W, 0, 1), clamp(e.clientY / H, V.horizon + 0.002, 1.05)];
+  gateDirty = true;
+  drawEditLayer();
+});
+function edEnd(e) {
+  if (!edDrag || e.pointerId !== edDrag.id) return;
+  edDrag = null; save(); buildControls();
+}
+EDC.addEventListener('pointerup', edEnd);
+EDC.addEventListener('pointercancel', edEnd);
 
 /* ============================================================
    3. COPY VALUES — every value, in words and as JSON.
    ============================================================ */
 function f2(x) { return Number(x).toFixed(2); }
-function groveText(title, B, tree) {
-  var L = [];
-  L.push(title + ': ' + (B.show ? 'shown' : 'hidden') + ', ' + B.culms + ' stems, arrangement ' + B.seed + ', coming in from the side between ' +
-         f2(B.entryTop) + ' and ' + f2(B.entryBottom) + ' × screen height; tops ' + f2(B.heightMin) + '–' + f2(B.heightMax) +
-         ' × the ' + tree + ' tree\'s height, at least ' + f2(B.topMargin) + ' below the top of the screen; lean ' + B.lean +
-         '° (variety ' + f2(B.leanVariety) + '), tops bend over ' + f2(B.arch));
-  L.push('  Stems: ' + f2(B.thickness) + ' px thick, taper ' + f2(B.taper) + ', joints every ' + Number(B.nodeSpacing).toFixed(3) +
-         ' (marked ' + f2(B.nodeMark) + '), shine ' + f2(B.highlight) + ', colour variety ' + f2(B.colourVariety));
-  L.push('  Leaves: leafiness ' + f2(B.leafiness) + ', from ' + f2(B.leafFrom) + ' along, size ' + f2(B.leafSize) + ', droop ' + f2(B.leafDroop));
-  L.push('  Depth of field: blur ' + f2(B.blurNear) + ' px nearer, ' + f2(B.blurFar) + ' px further back; haze ' + f2(B.haze) + ' (+' +
-         f2(B.depthHaze) + ' further back), strength ' + f2(B.strength));
-  L.push('  Swaying: amount ' + f2(B.swayAmount) + ', speed ' + f2(B.swaySpeed) + ', each in its own time ' + f2(B.swayVariety) +
-         ', tops ' + f2(B.tipWhip) + ', gust push ' + f2(B.gustResponse) + ', springiness ' + f2(B.gustSpring) + ', leaf flutter ' + f2(B.leafFlutter));
-  L.push('  Colours: ' + BAMBOO_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + B.colours[cn[0]]; }).join(', '));
-  return L.join('\n');
-}
+function f3(x) { return Number(x).toFixed(3); }
 function buildCopyText() {
   var L = [];
-  L.push('/* Bamboo groves — values from bamboo.html (day only) */');
+  L.push('/* Torii gates — values from bamboo.html (autumn, day) */');
   L.push('');
-  L.push(groveText('Grove behind the smaller tree', BSET.far, 'smaller'));
-  L.push('');
-  L.push(groveText('Grove behind the bigger tree', BSET.near, 'bigger'));
+  L.push('Gates: ' + (G.show ? 'shown' : 'hidden') + ', ' + gateCount + ' gates.');
+  L.push('  Path (x × screen width, y × screen height, from the start to the gate facing you): ' +
+         G.path.map(function (p) { return '(' + f3(p[0]) + ', ' + f3(p[1]) + ')'; }).join(' → ') +
+         '; straight run toward you ' + f2(G.straightEnd) + ' × gate height; camera lens ' + f2(G.lens) + ' × screen width');
+  L.push('  Gates: ' + f2(G.gateHeight) + ' × eye height tall, ' + f2(G.spacing) + ' × gate height apart, ' + f2(G.width) +
+         ' wide, pillars ' + f3(G.pillar) + ' thick leaning in ' + f2(G.lean) + '°, upper beam reaching ' + f2(G.overhang) +
+         ' past the pillars with an upward curve of ' + f3(G.sori) + ', lower beam at ' + f2(G.nukiAt) + ', black feet ' + f3(G.feet) +
+         ' tall, short post ' + (G.gakuzuka ? 'on' : 'off'));
+  L.push('  Light and shadow: light from ' + f2(G.lightFrom) + ', shade ' + f2(G.shadeDepth) + ', ground shadow ' + f2(G.shadow) +
+         ' (softness ' + f2(G.shadowBlur) + ' px)');
+  L.push('  Depth of field: sharp from ' + f2(G.focusDepth) + ' down the ground; blur ' + f2(G.blurNear) + ' px nearest, ' +
+         f2(G.blurFar) + ' px furthest; haze ' + f2(G.hazeNear) + ' nearest, ' + f2(G.hazeFar) + ' furthest; strength ' + f2(G.strength));
+  L.push('  Colours: ' + GATE_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + G.colours[cn[0]]; }).join(', '));
   L.push('');
   L.push('JSON:');
-  L.push(JSON.stringify(BSET, null, 2));
+  L.push(JSON.stringify(G, null, 2));
   return L.join('\n');
 }
 function copyText(text) {
@@ -1363,6 +1413,278 @@ function drawBamboo(key, t) {
   ctx.globalAlpha = B.strength;
   bambooLayerOut(G.layers[1], B.blurFar);
   bambooLayerOut(G.layers[0], B.blurNear);
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
+   6c. TORII GATES — a long line of vermilion torii (as at Takayama
+   Inari) winding across the ground of fallen leaves, from behind the
+   near tree on the left, away toward the horizon, along it, and back
+   toward you, ending with a gate that faces you square on.
+   Perspective: the scene is seen by a camera at eye height (1 unit)
+   looking level, so the horizon line (V.horizon) is the eye line. A
+   point on the ground d px below the horizon is F / d units away, and
+   a thing h units tall standing there is h × d px tall: every gate is
+   G.gateHeight × (how far its foot is below the horizon) px tall, so
+   the gates near the horizon are the smallest, the near ones the
+   biggest, and each one is in proportion to the ground it stands on.
+   Each gate is built in 3D (round pillars with black feet leaning in a
+   little, the tie beam through them, the short post, and the upper
+   beam whose ends curve up), turned to face along the path, and every
+   piece of every gate is drawn from the furthest to the nearest, so the
+   gates overlap each other as they really would.
+   Depth of field: the further a gate, the softer (blurred, in a few
+   steps) and the more hazed toward the mist colour, like the ground at
+   the horizon. The gates never move, so all of this is baked once into
+   GATE; each frame just lays it down, behind the far tree.
+   ============================================================ */
+var GATE = mk(), gateTop = 0, gateDirty = true, gateBakedAt = -1, gatePath = null, gateCount = 0, gateInfo = '';
+var GATE_BANDS = 6;
+function lensF() { return G.lens * W; }
+function toScreen(x, y, z) { var F = lensF(); return [W / 2 + F * x / z, H * V.horizon + F * (1 - y) / z]; }
+function toGround(sx, sy) {
+  var F = lensF(), d = Math.max(0.5, sy - H * V.horizon), z = F / d;
+  return { x: (sx - W / 2) * z / F, z: z };
+}
+/* The path on the ground: a smooth curve through the points, in ground
+   units. Each stretch is a cubic curve whose end directions are taken
+   from the points either side, so it winds without loops even though
+   the far stretches are far longer than the near ones. Before the end
+   it runs straight toward you for G.straightEnd × gate height. */
+function buildGatePath() {
+  var P = G.path.map(function (p) { return toGround(p[0] * W, p[1] * H); });
+  var end = P[P.length - 1], run = G.straightEnd * G.gateHeight;
+  if (run > 0.01) P.splice(P.length - 1, 0, { x: end.x, z: end.z + run });
+  var n = P.length, dir = [];
+  for (var i = 0; i < n; i++) {
+    var dx = 0, dz = 0;
+    if (i > 0) { var l0 = Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z) || 1; dx += (P[i].x - P[i - 1].x) / l0; dz += (P[i].z - P[i - 1].z) / l0; }
+    if (i < n - 1) { var l1 = Math.hypot(P[i + 1].x - P[i].x, P[i + 1].z - P[i].z) || 1; dx += (P[i + 1].x - P[i].x) / l1; dz += (P[i + 1].z - P[i].z) / l1; }
+    var ll = Math.hypot(dx, dz) || 1;
+    dir.push([dx / ll, dz / ll]);
+  }
+  // the last stretch comes straight at you
+  dir[n - 1] = [0, -1];
+  if (run > 0.01) dir[n - 2] = [0, -1];
+  // each bend reaches no further than the shorter stretch beside it, so a
+  // long far stretch cannot throw a loop into a short near one
+  var len = [];
+  for (var li = 0; li < n - 1; li++) len.push(Math.hypot(P[li + 1].x - P[li].x, P[li + 1].z - P[li].z));
+  var pts = [], acc = 0;
+  for (var s = 0; s < n - 1; s++) {
+    var A = P[s], Bp = P[s + 1], L = len[s];
+    var m1 = Math.min(L, s > 0 ? len[s - 1] : L) * 0.3, m2 = Math.min(L, s < n - 2 ? len[s + 1] : L) * 0.3;
+    var c1x = A.x + dir[s][0] * m1, c1z = A.z + dir[s][1] * m1;
+    var c2x = Bp.x - dir[s + 1][0] * m2, c2z = Bp.z - dir[s + 1][1] * m2;
+    var steps = Math.max(8, Math.min(400, Math.round(L * 3)));
+    for (var k = s === 0 ? 0 : 1; k <= steps; k++) {
+      var t = k / steps, u = 1 - t;
+      var x = u * u * u * A.x + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * Bp.x;
+      var z = u * u * u * A.z + 3 * u * u * t * c1z + 3 * u * t * t * c2z + t * t * t * Bp.z;
+      if (pts.length) acc += Math.hypot(x - pts[pts.length - 1].x, z - pts[pts.length - 1].z);
+      pts.push({ x: x, z: z, s: acc });
+    }
+  }
+  return { pts: pts, len: acc };
+}
+/* Where along the path (s ground units from its start), and which way it runs. */
+function pathAt(path, s) {
+  var p = path.pts, lo = 0, hi = p.length - 1;
+  while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (p[mid].s < s) lo = mid; else hi = mid; }
+  var a = p[lo], b = p[hi], seg = Math.max(1e-6, b.s - a.s), t = clamp((s - a.s) / seg, 0, 1);
+  var tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+  return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), tx: tx / tl, tz: tz / tl };
+}
+
+/* The pieces of one gate. Each piece is a small closed solid (a box, a
+   curved box or a many-sided pillar) given as faces of 3D points; tone
+   says how it is coloured. Local units: u across the gate, y up, v along
+   the path. */
+function gatePieces(lod) {
+  var h = G.gateHeight, half = G.width * h / 2, r = G.pillar * h / 2;
+  var kt = 0.065 * h, st = 0.05 * h, sori = G.sori * h;
+  var kTop = h - sori, kBot = kTop - kt, pTop = kBot - st;     // the upper beam's middle, and the top of the pillars
+  var lean = Math.tan(G.lean * PI / 180) * pTop;                // how far the pillar tops come in
+  var feetH = G.feet * h, nukiY = G.nukiAt * h, nt = 0.05 * h;
+  var facets = lod > 0.5 ? 10 : lod > 0.15 ? 6 : 4, segs = lod > 0.5 ? 10 : lod > 0.15 ? 4 : 2;
+  var pieces = [];
+  function pillarAt(y) { return half - lean * (y / pTop); }      // the pillar's middle, from the gate's middle, at height y
+  // a pillar (or a foot): a many-sided solid from y0 to y1
+  function prism(side, y0, y1, r0, r1, tone, cap) {
+    var faces = [];
+    var c0 = side * pillarAt(y0), c1 = side * pillarAt(y1);
+    for (var i = 0; i < facets; i++) {
+      var a0 = (i / facets) * TAU, a1 = ((i + 1) / facets) * TAU;
+      faces.push({ tone: tone, p: [[c0 + Math.cos(a0) * r0, y0, Math.sin(a0) * r0], [c0 + Math.cos(a1) * r0, y0, Math.sin(a1) * r0],
+                                   [c1 + Math.cos(a1) * r1, y1, Math.sin(a1) * r1], [c1 + Math.cos(a0) * r1, y1, Math.sin(a0) * r1]] });
+    }
+    if (cap) {
+      var ring = [];
+      for (var j = 0; j < facets; j++) { var aa = (j / facets) * TAU; ring.push([c1 + Math.cos(aa) * r1, y1, Math.sin(aa) * r1]); }
+      faces.push({ tone: tone, p: ring });
+    }
+    pieces.push({ faces: faces, c: [(c0 + c1) / 2, (y0 + y1) / 2, 0] });
+  }
+  // a beam from u0 to u1, its bottom and top following yb(u) and yt(u), d deep;
+  // cut into pieces so each sorts on its own against the gates around it
+  function beam(u0, u1, yb, yt, d, topTone, n) {
+    for (var k = 0; k < n; k++) {
+      var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
+      var q = [[a, yb(a), -d], [b, yb(b), -d], [b, yt(b), -d], [a, yt(a), -d],
+               [a, yb(a), d], [b, yb(b), d], [b, yt(b), d], [a, yt(a), d]];
+      var faces = [
+        { tone: 'v', p: [q[0], q[1], q[2], q[3]] },            // one face
+        { tone: 'v', p: [q[4], q[7], q[6], q[5]] },            // the other face
+        { tone: topTone, p: [q[3], q[2], q[6], q[7]] },        // top
+        { tone: 'v', p: [q[0], q[4], q[5], q[1]] }             // underside
+      ];
+      if (k === 0) faces.push({ tone: 'v', p: [q[0], q[3], q[7], q[4]] });
+      if (k === n - 1) faces.push({ tone: 'v', p: [q[1], q[5], q[6], q[2]] });
+      pieces.push({ faces: faces, c: [(a + b) / 2, (yb(a) + yt(b)) / 2, 0] });
+    }
+  }
+  // pillars and feet
+  [-1, 1].forEach(function (side) {
+    if (feetH > 0.001) prism(side, 0, feetH, r * 1.16, r * 1.12, 'f', true);
+    prism(side, feetH, pTop, r, r * 0.94, 'v', false);
+  });
+  // the tie beam (nuki) through the pillars, its ends showing past them
+  var nL = pillarAt(nukiY) + r + 0.1 * h, pin = pillarAt(nukiY), nd = r * 0.62;
+  var nb = function () { return nukiY - nt / 2; }, ntp = function () { return nukiY + nt / 2; };
+  beam(-nL, -pin - r * 0.9, nb, ntp, nd, 'v', 1);
+  beam(-pin + r * 0.9, pin - r * 0.9, nb, ntp, nd, 'v', Math.max(1, segs - 2));
+  beam(pin + r * 0.9, nL, nb, ntp, nd, 'v', 1);
+  // the short post in the middle
+  if (G.gakuzuka && lod > 0.08) beam(-0.035 * h, 0.035 * h, ntp, function () { return pTop; }, r * 0.55, 'v', 1);
+  // the upper beams: the shimaki, and the kasagi on it, both curving up toward the ends
+  var sL = pillarAt(pTop) + G.overhang * h * 0.82, kL = pillarAt(pTop) + G.overhang * h;
+  function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
+  var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
+  beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  return pieces;
+}
+/* One gate's pieces into the world at (x, z), its across direction (ax, az)
+   and along the path (tx, tz). */
+function placePieces(pieces, g) {
+  function w(p) { return [g.x + g.ax * p[0] + g.tx * p[2], p[1], g.z + g.az * p[0] + g.tz * p[2]]; }
+  return pieces.map(function (pc) {
+    return { faces: pc.faces.map(function (f) { return { tone: f.tone, p: f.p.map(w) }; }), c: w(pc.c), g: g };
+  });
+}
+function bakeGates() {
+  gateDirty = false;
+  gateBakedAt = nowT;
+  gatePath = null; gateCount = 0; gateInfo = '';
+  GATE.cnv.width = 1; GATE.cnv.height = 1;
+  if (!W || !G.show) { drawEditLayer(); return; }
+  var hy = H * V.horizon, F = lensF(), C = {};
+  for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
+  var mistC = light(hex(V.colours.mist));
+  var path = gatePath = buildGatePath();
+  var gap = Math.max(0.05, G.spacing * G.gateHeight);
+  // the gates, from the end (the one facing you) back to the start
+  var gates = [];
+  for (var s = path.len; s >= 0; s -= gap) {
+    var q = pathAt(path, s);
+    if (q.z < 0.6) continue;                           // behind or right at the camera
+    var foot = hy + F / q.z;                           // its foot on the screen
+    var px = G.gateHeight * F / q.z;                   // its height on the screen
+    var x0 = W / 2 + F * q.x / q.z;
+    if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
+    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
+    var farness = 1 - smooth(0, Math.max(0.02, G.focusDepth), depth);
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot,
+                 haze: lerp(G.hazeNear, G.hazeFar, Math.pow(farness, 1.3)),
+                 band: Math.round(farness * (GATE_BANDS - 1)) });
+  }
+  gateCount = gates.length;
+  if (!gates.length) { drawEditLayer(); return; }
+  // the light: from above, in front, and to the side G.lightFrom
+  var Lx = G.lightFrom, Ly = 1.1, Lz = -0.6, Ll = Math.hypot(Lx, Ly, Lz); Lx /= Ll; Ly /= Ll; Lz /= Ll;
+  // every piece of every gate, furthest first
+  var all = [], minY = H;
+  gates.forEach(function (g) {
+    var lod = clamp(g.px / 120, 0, 1);
+    placePieces(gatePieces(lod), g).forEach(function (pc) {
+      var dx = pc.c[0], dy = pc.c[1] - 1, dz = pc.c[2];
+      pc.dist = dx * dx + dy * dy + dz * dz;
+      all.push(pc);
+    });
+    minY = Math.min(minY, g.foot - g.px * 1.15);
+  });
+  all.sort(function (a, b) { return b.dist - a.dist; });
+  gateTop = Math.max(0, Math.floor(minY - 12));
+  var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - gateTop) * PR));
+  var bands = [];
+  for (var bi = 0; bi < GATE_BANDS; bi++) { var Lb = mk(); Lb.cnv.width = cw; Lb.cnv.height = chh; Lb.c.setTransform(PR, 0, 0, PR, 0, -gateTop * PR); bands.push(Lb); }
+  // the shadow of the line of gates on the ground, thrown away from the light
+  var SH = mk(); SH.cnv.width = cw; SH.cnv.height = chh;
+  var sc = SH.c;
+  sc.setTransform(PR, 0, 0, PR, 0, -gateTop * PR);
+  if (G.shadow > 0) {
+    var shx = -Lx / Ly * G.gateHeight * 0.35, shz = -Lz / Ly * G.gateHeight * 0.35;
+    gates.forEach(function (g) {
+      var wu = G.width * G.gateHeight / 2 + G.pillar * G.gateHeight * 1.5, wv = gap * 0.52;
+      var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
+        var x = g.x + g.ax * c[0] + g.tx * c[1] + shx * 0.5, z = g.z + g.az * c[0] + g.tz * c[1] + shz * 0.5;
+        return toScreen(x, 0, Math.max(0.3, z));
+      });
+      sc.fillStyle = rgb(C.ground, G.shadow * (1 - g.haze));
+      sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+    });
+  }
+  // the pieces, each into the layer of its gate's blur
+  all.forEach(function (pc) {
+    var g = pc.g, c = bands[g.band].c;
+    pc.faces.forEach(function (f) {
+      var n = f.p.length, cx = 0, cy = 0, cz = 0;
+      for (var i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
+      cx /= n; cy /= n; cz /= n;
+      // its outward normal (pointing away from the middle of its piece)
+      var a = f.p[0], b = f.p[1], d = f.p[n - 1];
+      var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, nl = Math.hypot(nx, ny, nz);
+      if (nl < 1e-9) return;
+      nx /= nl; ny /= nl; nz /= nl;
+      if (nx * (cx - pc.c[0]) + ny * (cy - pc.c[1]) + nz * (cz - pc.c[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      // only the faces turned toward the camera
+      if (nx * cx + ny * (cy - 1) + nz * cz >= 0) return;
+      for (var j = 0; j < n; j++) if (f.p[j][2] < 0.3) return;
+      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - G.shadeDepth * (1 - lam), col;
+      if (f.tone === 'f') col = scale(C.feet, lerp(0.75, 1.3, lam));
+      else if (f.tone === 't' && ny > 0.3) col = mix(scale(C.top, 0.7), C.top, k);
+      else col = mix(C.shade, C.vermilion, k);
+      if (ny < -0.5) col = scale(col, 0.82);                 // the undersides, in shade
+      col = light(mix(col, mistC, g.haze));
+      var st = rgb(col);
+      c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
+      c.beginPath();
+      for (var m = 0; m < n; m++) { var sp = toScreen(f.p[m][0], f.p[m][1], f.p[m][2]); if (m) c.lineTo(sp[0], sp[1]); else c.moveTo(sp[0], sp[1]); }
+      c.closePath(); c.fill(); c.stroke();
+    });
+  });
+  // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
+  GATE.cnv.width = cw; GATE.cnv.height = chh;
+  var o = GATE.c;
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.filter = G.shadowBlur > 0.05 ? 'blur(' + (G.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
+  o.drawImage(SH.cnv, 0, 0);
+  for (var bj = GATE_BANDS - 1; bj >= 0; bj--) {
+    var bl = lerp(G.blurNear, G.blurFar, bj / (GATE_BANDS - 1));
+    o.filter = bl > 0.05 ? 'blur(' + (bl * PR).toFixed(2) + 'px)' : 'none';
+    o.drawImage(bands[bj].cnv, 0, 0);
+  }
+  o.filter = 'none';
+  var nearest = gates[0], furthest = gates.reduce(function (m, g) { return g.px < m.px ? g : m; }, gates[0]);
+  gateInfo = gateCount + ' gates · the one facing you ' + Math.round(nearest.px) + ' px tall, the furthest ' + furthest.px.toFixed(1) + ' px';
+  drawEditLayer();
+}
+function drawGates() {
+  if (!G.show || GATE.cnv.width < 2) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = G.strength;
+  ctx.drawImage(GATE.cnv, 0, Math.round(gateTop * PR));
   ctx.globalAlpha = 1;
 }
 
@@ -4103,6 +4425,7 @@ function rebuildAll() {
   bakeOwlSprites();
   resetAnimSets();
   buildGroves();
+  bakeGates();
 }
 
 var last = 0, statusT = -1;
@@ -4120,7 +4443,8 @@ function frame(now) {
   updateAnimals(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
-  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = ''; }
+  if (gateDirty && t - gateBakedAt > 0.12) bakeGates();   // a change on the panel, at most about 8 times a second
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = gateInfo; }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -4151,6 +4475,9 @@ function frame(now) {
 
   // The bamboo grove behind the far tree, on soft layers of its own.
   drawBamboo('far', t);
+
+  // The line of torii gates on the ground (baked), behind both trees.
+  drawGates();
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
