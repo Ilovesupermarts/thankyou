@@ -1,4 +1,4 @@
-var BUILD = 'v136';
+var BUILD = 'v137';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -52,6 +52,15 @@ var BUILD = 'v136';
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
+       - Bamboo groves (autumn, by day), as tuned on bamboo.html (values in
+         BAMBOO, section 8b): a dense grove shooting in from the side of
+         the screen behind each kōyō tree, taller than its tree but below
+         the top of the screen, softened and hazed for its depth, swaying
+         and pushed by the gusts. The trees are cut out of the bamboo, so
+         none shows through their leaves. They fade in after sunrise and
+         out around sunset. The birds now fly at six depths among the
+         groves and trees (BIRD_SLOTS). No deer or tanuki come at night any
+         more (the owl still does).
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -11053,6 +11062,12 @@ function updateGusts(dt) {
         if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
       }
     });
+    bambooGroves.forEach(function(G) {              // the bamboo groves get a push as it passes them too
+      if (G.gid !== g.id && (g.dir > 0 ? G.x < g.x : G.x > g.x)) {
+        G.gid = g.id;
+        G.gustV += g.dir * (g.str / 400) * 0.6 * G.B.gustResponse;
+      }
+    });
     if (g.x < -200 || g.x > W + 200) gusts.splice(i, 1);
   }
 }
@@ -11512,11 +11527,15 @@ function drawFog(ctx, dt) {
    flaps then glides), メジロ (Japanese white-eye: small, olive green,
    white eye-ring, quick whirring wings that fold between bursts) and
    オオルリ (blue-and-white flycatcher: deep cobalt, white belly).
-   Each bird sits at one of three depths. The far ones are small, soft
-   (the depth of field) and a little hazy, and go behind both trees; the
-   middle and near ones fly between the far tree and the main tree
-   (drawKoyoTrees, which hides them fully behind the trees: birdLayer). Every pose is baked once per kind and depth (8 flap
-   frames, a glide and a folded frame), so a frame only copies images. */
+   Each bird flies in one of the depth slots of BIRD_SLOTS, among the two
+   bamboo groves (by day, see "Bamboo groves") and the two trees: behind
+   everything, behind the grove on the far tree's side but in front of
+   the other, in front of both groves but behind both trees, and so on, up
+   to between the near grove and the big tree. Its slot sets its size: the
+   far ones are small, soft (the depth of field) and a little hazy
+   (BIRD_TIERS). drawKoyoTrees hides each fully behind whatever is in
+   front of it (birdLayer). Every pose is baked once per kind and depth (8
+   flap frames, a glide and a folded frame), so a frame only copies images. */
 var BIRD_KINDS = {
   onaga: {
     scale: 1, tail: 0.95, tailW: 0.12, span: 0.9, flock: [5, 8],
@@ -11544,6 +11563,26 @@ var BIRD_TIERS = [
   { size: 24, blur: 0.6, haze: 0.12, speed: 0.86, alpha: 0.95 },    // middle
   { size: 14, blur: 1.1, haze: 0.25, speed: 0.72, alpha: 0.9 }     // far: behind both trees
 ];
+/* The depth slots, back to front. hide: what is in front of the bird ('fg' the
+   far tree's bamboo grove, 'ft' the far tree, 'ng' the near tree's grove, 'nt'
+   the near tree); the grove stands behind its tree, so a bird behind a grove
+   is behind its tree too. The far side has three places (behind its grove,
+   between grove and tree, in front of the tree), the near side two (behind
+   its grove, between grove and tree: never in front of the big tree), so six
+   slots. ti: the depth tier (size, blur); w: how often. */
+var BIRD_SLOTS = [
+  { hide: ['fg', 'ft', 'ng', 'nt'], ti: 2, w: 0.2 },    // behind both groves (and both trees)
+  { hide: ['fg', 'ft', 'nt'], ti: 1, w: 0.12 },         // behind the far grove, in front of the near grove
+  { hide: ['ft', 'ng', 'nt'], ti: 1, w: 0.12 },         // in front of the far grove (behind the far tree), behind the near grove
+  { hide: ['ft', 'nt'], ti: 1, w: 0.14 },               // in front of both groves, behind both trees
+  { hide: ['ng', 'nt'], ti: 0, w: 0.12 },               // in front of the far tree, behind the near grove
+  { hide: ['nt'], ti: 0, w: 0.3 }                       // between the near grove and the big tree
+];
+function pickBirdSlot() {
+  var r = Math.random() * BIRD_SLOTS.reduce(function(a, s) { return a + s.w; }, 0);
+  for (var i = 0; i < BIRD_SLOTS.length; i++) { r -= BIRD_SLOTS[i].w; if (r <= 0) return i; }
+  return BIRD_SLOTS.length - 1;
+}
 var BIRD_FRAMES = 8, BIRD_GLIDE = 8, BIRD_FOLD = 9;
 var birdSprites = {}, birdSpritePR = 0, birdNext = 0, birdLastKind = '';
 
@@ -11772,12 +11811,12 @@ function sendBirds() {
   var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
   var bvr = BIRD_SOUND[kind].variation, flockPitch = 1 + rnd(-0.04, 0.04) * bvr;   // this flock's own touch of pitch
   for (var i = 0; i < n; i++) {
-    var r = Math.random(), ti = r < 0.3 ? 2 : (r < 0.72 ? 1 : 0), tier = BIRD_TIERS[ti];
+    var slot = pickBirdSlot(), ti = BIRD_SLOTS[slot].ti, tier = BIRD_TIERS[ti];
     birdSpritesFor(kind, ti);
     // a loose group: the far birds start a little ahead, as they cross the screen more slowly
     var home = y0 + rnd(-1, 1) * H * 0.07 * (ti === 2 ? 0.6 : 1);
     birds.push({
-      kind: kind, ti: ti, dir: dir,
+      kind: kind, ti: ti, slot: slot, dir: dir,
       x: (dir > 0 ? -60 : W + 60) - dir * (i * rnd(18, 34) - (ti === 2 ? 60 : 0)),
       y: home, home: home, vy: 0,
       vx: dir * spd * tier.speed * rnd(0.94, 1.06),
@@ -11786,7 +11825,7 @@ function sendBirds() {
       fp: flockPitch * (1 + rnd(-0.015, 0.015) * bvr), callT: rnd(0.2, 1.6)
     });
   }
-  birds.sort(function(a, b) { return b.ti - a.ti; });   // far first, near last
+  birds.sort(function(a, b) { return a.slot - b.slot; });   // further back first
 }
 function updateBirds(dt, t) {
   var h = S.hour, sky = !ENV.rainy && !ENV.snowing && S.condition !== 'thunderstorm';
@@ -11825,12 +11864,12 @@ function updateBirds(dt, t) {
   }
   if (!birds.length) fadeBirdCalls();               // the last bird has gone: the chirping ends
 }
-// layer 'far': the far birds (behind both trees); 'near': the middle and near ones
-function drawBirds(ctx, t, layer) {
+// the birds in one depth slot (BIRD_SLOTS)
+function drawBirds(ctx, t, slot) {
   if (!birds.length) return;
   for (var i = 0; i < birds.length; i++) {
     var b = birds[i];
-    if ((b.ti === 2) !== (layer === 'far')) continue;
+    if (b.slot !== slot) continue;
     var k = BIRD_KINDS[b.kind], frames = birdSpritesFor(b.kind, b.ti), f;
     if (b.glide > 0) f = k.fold ? BIRD_FOLD : BIRD_GLIDE;
     else f = Math.floor((b.ph % TAU) / TAU * BIRD_FRAMES) % BIRD_FRAMES;
@@ -11936,6 +11975,10 @@ var ctxKL = koyoLeafLayer.getContext('2d');
 // down a little see-through). Only the box around the birds is worked on.
 var birdLayer = document.createElement('canvas');
 var ctxBL = birdLayer.getContext('2d');
+var birdSlotLayer = document.createElement('canvas');   // one depth slot's birds at a time, before they go onto birdLayer
+var ctxBS = birdSlotLayer.getContext('2d');
+var farBranchLayer = document.createElement('canvas');  // the far tree's branches (half size, as its foliage on farLayer)
+var ctxFB = farBranchLayer.getContext('2d');
 var birdBox = null;
 function birdBounds() {
   if (!birds.length) return null;
@@ -11948,15 +11991,17 @@ function birdBounds() {
   x1 = Math.min(birdLayer.width, Math.ceil((x1 + pad) * PR)); y1 = Math.min(birdLayer.height, Math.ceil((y1 + pad) * PR));
   return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
 }
-// Cut a tree layer (k: its size against the screen) out of the birds. The
-// foliage is cut three times so its soft, part see-through leaves hide them too.
-function birdsCutOut(src, k, times) {
+// Cut a layer in front (k: its size against the screen, alpha: how strongly it
+// is laid down) out of the birds on c. The foliage is cut three times so its
+// soft, part see-through leaves hide them too.
+function birdsCutOut(c, src, k, times, alpha) {
   var B = birdBox;
-  ctxBL.setTransform(1, 0, 0, 1, 0, 0);
-  ctxBL.globalAlpha = 1;
-  ctxBL.globalCompositeOperation = 'destination-out';
-  for (var i = 0; i < times; i++) ctxBL.drawImage(src, B.x * k, B.y * k, B.w * k, B.h * k, B.x, B.y, B.w, B.h);
-  ctxBL.globalCompositeOperation = 'source-over';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = alpha === undefined ? 1 : alpha;
+  c.globalCompositeOperation = 'destination-out';
+  for (var i = 0; i < times; i++) c.drawImage(src, B.x * k, B.y * k, B.w * k, B.h * k, B.x, B.y, B.w, B.h);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
 }
 /* Which birds can be seen. The birds' layer, after both trees have been cut
    out of it, holds only what shows; about ten times a second a small copy of
@@ -12330,40 +12375,21 @@ function koyoGlow(ctx, T, strength) {
 }
 function drawKoyoTrees(ctx, t) {
   birdBox = birdBounds();
-  if (birdBox) {                                  // the far birds first: behind both trees
-    ctxBL.setTransform(1, 0, 0, 1, 0, 0);
-    ctxBL.clearRect(birdBox.x, birdBox.y, birdBox.w, birdBox.h);
-    drawBirds(ctxBL, t, 'far');
-  }
-  NightLife.drawSlot(ctx, 'A');                   // the owl and the animals further back than the far tree (8b)
+  // The trees' layers first: the bamboo and the birds behind them are cut by them.
   if (farTree) {
-    koyoGlow(ctx, farTree, 0.6);
-    // The far tree's branches go down solid, at half size and scaled up (soft),
-    // then its foliage on a half-size layer laid down at the far strength.
-    ctxT.setTransform(1, 0, 0, 1, 0, 0);
-    ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
-    ctxT.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
-    fillKoyoBranches(ctxT, farTree, KOYO.branchOpacity * KOYO.farOpacity);
-    ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.imageSmoothingEnabled = true;
-    ctx.imageSmoothingQuality = 'high';
-    ctx.drawImage(treeLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+    // the far tree's branches go down solid, at half size and scaled up (soft),
+    // and its foliage on a half-size layer laid down at the far strength
+    ctxFB.setTransform(1, 0, 0, 1, 0, 0);
+    ctxFB.clearRect(0, 0, farBranchLayer.width, farBranchLayer.height);
+    ctxFB.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
+    fillKoyoBranches(ctxFB, farTree, KOYO.branchOpacity * KOYO.farOpacity);
     ctxFar.setTransform(1, 0, 0, 1, 0, 0);
     ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
     ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
     drawKoyoClumps(ctxFar, farTree, t);
-    ctx.globalAlpha = KOYO.farOpacity;
-    ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
-  }
-  NightLife.drawSlot(ctx, 'B');                   // between the two trees
-  if (birdBox) {
-    if (farTree) { birdsCutOut(treeLayer, FAR_LAYER_SCALE, 1); birdsCutOut(farLayer, FAR_LAYER_SCALE, 3); }
-    drawBirds(ctxBL, t, 'near');                  // the middle and near birds fly between the two trees
   }
   if (tree) {
-    koyoGlow(ctx, tree, 1);
-    // solid branches, then the foliage on its own layer laid down at its strength
+    // solid branches, and the foliage on its own layer laid down at its strength
     ctxT.setTransform(1, 0, 0, 1, 0, 0);
     ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
     ctxT.setTransform(PR, 0, 0, PR, 0, 0);
@@ -12372,6 +12398,31 @@ function drawKoyoTrees(ctx, t) {
     ctxKL.clearRect(0, 0, koyoLeafLayer.width, koyoLeafLayer.height);
     ctxKL.setTransform(PR, 0, 0, PR, 0, 0);
     drawKoyoClumps(ctxKL, tree, t);
+  }
+  var farCut = farTree ? [[farBranchLayer, 1], [farLayer, 3]] : [], nearCut = tree ? [[treeLayer, 1], [koyoLeafLayer, 3]] : [];
+  renderBamboo(t);
+  var gFar = bambooGrove('far'), gNear = bambooGrove('near');
+  NightLife.drawSlot(ctx, 'A');                   // the owl and the animals further back than the far tree (8b)
+  if (gFar) {                                     // the bamboo behind the far tree (and the near tree, where it reaches it)
+    var reach = (KOYO.maxWidth / 100 + 0.12) * W * PR * BAM_RES, fb = gFar.box;
+    var meets = tree && (tree.left ? fb.x < reach : fb.x + fb.w > gFar.out.cnv.width - reach);
+    bamCutOut(gFar, meets ? farCut.concat(nearCut) : farCut);
+    bamLayDown(ctx, gFar);
+  }
+  if (farTree) {
+    koyoGlow(ctx, farTree, 0.6);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(farBranchLayer, 0, 0, farBranchLayer.width, farBranchLayer.height, 0, 0, cvBack.width, cvBack.height);
+    ctx.globalAlpha = KOYO.farOpacity;
+    ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+  }
+  NightLife.drawSlot(ctx, 'B');                   // between the two trees
+  if (gNear) { bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
+  if (tree) {
+    koyoGlow(ctx, tree, 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(treeLayer, 0, 0);
@@ -12380,14 +12431,374 @@ function drawKoyoTrees(ctx, t) {
   }
   NightLife.drawSlot(ctx, 'C');                   // in front of the near tree
   if (birdBox) {
-    if (tree) { birdsCutOut(treeLayer, 1, 1); birdsCutOut(koyoLeafLayer, 1, 3); }
-    var B = birdBox;
+    // each depth slot's birds on their own, with whatever is in front of them
+    // cut out, then all of them laid down over the scene
+    var B = birdBox, front = {
+      fg: gFar ? [[gFar.out.cnv, BAM_RES, 2, gFar.a]] : [],
+      ft: farTree ? [[farBranchLayer, FAR_LAYER_SCALE, 1, 1], [farLayer, FAR_LAYER_SCALE, 3, 1]] : [],
+      ng: gNear ? [[gNear.out.cnv, BAM_RES, 2, gNear.a]] : [],
+      nt: tree ? [[treeLayer, 1, 1, 1], [koyoLeafLayer, 1, 3, 1]] : []
+    };
+    ctxBL.setTransform(1, 0, 0, 1, 0, 0);
+    ctxBL.clearRect(B.x, B.y, B.w, B.h);
+    for (var si = 0; si < BIRD_SLOTS.length; si++) {
+      if (!birds.some(function(b) { return b.slot === si; })) continue;
+      ctxBS.setTransform(1, 0, 0, 1, 0, 0);
+      ctxBS.clearRect(B.x, B.y, B.w, B.h);
+      drawBirds(ctxBS, t, si);
+      BIRD_SLOTS[si].hide.forEach(function(h) {
+        front[h].forEach(function(f) { birdsCutOut(ctxBS, f[0], f[1], f[2], f[3]); });
+      });
+      ctxBL.drawImage(birdSlotLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(birdLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
     birdVisCheck(t);
   }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+}
+/* ---------- Bamboo groves (autumn, by day) — as tuned on bamboo.html ----------
+   Two dense groves of bamboo (values in BAMBOO): 'far' behind the far
+   (smaller) tree and 'near' behind the near (bigger) tree. The stems shoot
+   in from the side of the screen on their tree's side (never seen from the
+   ground), lean in toward the middle and bend over at the top. Each top
+   ends between heightMin and heightMax × its tree's height above the
+   tree's root, so the grove is taller than its tree, but never higher than
+   topMargin below the top of the screen: a stem is shortened until its
+   leaves fit, and anything a gust still takes higher fades out. Each stem
+   has joints, a shine down one side and sprays of narrow hanging leaves
+   (12 sprites a grove, baked in the light of the moment). It sways on its
+   own and with its grove; the gusts push each grove as they pass it
+   (updateGusts) and it rocks back on a spring.
+   Depth of field: a grove is drawn at half resolution on two layers (the
+   nearer stems, those further back), each blurred (blurNear, blurFar) and
+   hazed toward the paper, into the grove's own canvas (G.out). The trees in
+   front are then cut out of G.out, so no bamboo shows through their
+   see-through foliage, and the birds use it to hide behind a grove
+   (BIRD_SLOTS). Only in daylight: they fade in after sunrise and out around
+   sunset (ENV.light.daylight). A grove is rebuilt when the trees change, and
+   at most once a minute when the light changes. */
+var BAMBOO_COLOURS = {
+  culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
+  yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
+};
+var BAMBOO = {
+  far: {
+    show: true, culms: 90, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+    lean: 24, leanVariety: 0.5, arch: 0.35,
+    thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
+    leafiness: 1.5, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
+    blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 1,
+    swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
+  },
+  near: {
+    show: true, culms: 34, seed: 45, entryTop: 0.23, entryBottom: 0.81, heightMin: 1.41, heightMax: 1.4, topMargin: 0.04,
+    lean: 29, leanVariety: 0.45, arch: 0.55,
+    thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
+    leafiness: 2.5, leafFrom: 0.22, leafSize: 1.15, leafDroop: 1.8,
+    blurNear: 0.5, blurFar: 1.3, haze: 0.22, depthHaze: 0.3, strength: 1,
+    swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 2.1
+  }
+};
+var BAM_RES = 0.5, BAM_SEG = 22;                 // half resolution (as the far tree); segments along each stem
+var bambooGroves = [], bambooKey = '', bambooLook = -1, bambooBuiltAt = -1e9;
+function bamCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
+function bambooAlpha() { return ENV.scene === 'autumn' && ENV.light ? ENV.light.daylight : 0; }
+function bamTone(c, haze) { return koyoLight(mixRgb(c, KOYO_PAPER, clamp(haze, 0, 0.95)), 0); }
+/* From a tree's root to the top of its leaves. */
+function bamTreeHeight(T) {
+  var top = T.by;
+  T.nodes.forEach(function(n) { top = Math.min(top, n.ey); });
+  T.clumps.forEach(function(C) { top = Math.min(top, T.nodes[C.node].ey + C.oy - C.R); });
+  return T.by - top;
+}
+/* One spray: a thin twig along +x with narrow leaves hanging from it, u (CSS
+   px) long, baked at k device px to the CSS px. */
+function bamBakeSpray(B, r, u, haze, k) {
+  var Cl = hexToRgb(B.colours.leaf), Cd = hexToRgb(B.colours.leafDark), Ct = hexToRgb(B.colours.twig);
+  var w = u * 1.4, h = u * 1.35, ox = u * 0.04, oy = u * 0.3;
+  var cnv = document.createElement('canvas');
+  cnv.width = Math.max(2, Math.ceil(w * k)); cnv.height = Math.max(2, Math.ceil(h * k));
+  var g = cnv.getContext('2d');
+  g.scale(k, k); g.translate(ox, oy);
+  var tx = u * lerp(0.5, 0.75, r()), ty = u * lerp(0.05, 0.2, r()) * B.leafDroop, cx = tx * 0.5, cy = -u * 0.05;
+  g.strokeStyle = rgba(bamTone(Ct, haze)); g.lineWidth = Math.max(0.6, u * 0.012); g.lineCap = 'round';
+  g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(cx, cy, tx, ty); g.stroke();
+  var n = 4 + Math.floor(r() * 4);
+  for (var i = 0; i < n; i++) {
+    var p = lerp(0.3, 1, i / (n - 1)), q = 1 - p;
+    var px = 2 * q * p * cx + p * p * tx, py = 2 * q * p * cy + p * p * ty;
+    var L = u * lerp(0.3, 0.48, r()), lw = L * lerp(0.1, 0.14, r());
+    var ang = clamp((lerp(0.25, 1.2, r()) - (i === n - 1 ? 0.2 : 0)) * B.leafDroop, -0.3, 1.5);
+    g.save(); g.translate(px, py); g.rotate(ang);
+    g.fillStyle = rgba(bamTone(mixRgb(Cd, Cl, r()), haze));
+    g.beginPath(); g.moveTo(0, 0);
+    g.bezierCurveTo(L * 0.15, -lw, L * 0.55, -lw * 0.8, L, 0);
+    g.bezierCurveTo(L * 0.55, lw * 0.8, L * 0.15, lw, 0, 0);
+    g.fill(); g.restore();
+  }
+  return { cnv: cnv, ox: ox, oy: oy, w: w, h: h };
+}
+function bamNewSpray(r, s, side, tip, cs) {
+  return { s: s, side: side, spread: tip ? lerp(0.15, 0.45, r()) : lerp(0.7, 1.2, r()),
+           sc: lerp(0.75, 1.15, r()) * lerp(0.8, 1, cs), v: Math.floor(r() * 4), ph: r() * TAU };
+}
+function buildBambooGrove(key, T, old) {
+  var B = BAMBOO[key], cw = Math.round(W * PR), ch = Math.round(H * PR);
+  var layers = [bamCanvas(), bamCanvas(), bamCanvas()];   // the nearer stems, those further back, and the two together (out)
+  layers.forEach(function(L) { L.cnv.width = Math.ceil(cw * BAM_RES); L.cnv.height = Math.ceil(ch * BAM_RES); });
+  var r = rngFrom(B.seed * 977 + 13), k = PR * BAM_RES, u = H * 0.075 * B.leafSize;
+  var sprays = [];
+  for (var band = 0; band < 3; band++) {
+    sprays.push([]);
+    for (var v = 0; v < 4; v++) sprays[band].push(bamBakeSpray(B, r, u, B.haze + B.depthHaze * band / 2, k));
+  }
+  // all twelve on one sheet, so the leaves are drawn from a single image (the graphics chip batches them)
+  var cellW = sprays[0][0].cnv.width + 2, cellH = sprays[0][0].cnv.height + 2, atlas = document.createElement('canvas');
+  atlas.width = cellW * 4; atlas.height = cellH * 3;
+  var actx = atlas.getContext('2d');
+  sprays.forEach(function(row, bi) {
+    row.forEach(function(spr, vi) {
+      actx.drawImage(spr.cnv, vi * cellW + 1, bi * cellH + 1);
+      spr.sx = vi * cellW + 1; spr.sy = bi * cellH + 1; spr.sw = spr.cnv.width; spr.sh = spr.cnv.height; spr.cnv = atlas;
+    });
+  });
+  var treeH = bamTreeHeight(T), root = T.by, left = T.left, prev = null;
+  old.forEach(function(o) { if (o.key === key) prev = o; });
+  var G = { key: key, B: B, left: left, x: left ? W * 0.15 : W * 0.85, gust: prev ? prev.gust : 0, gustV: prev ? prev.gustV : 0,
+            gid: prev ? prev.gid : -1, ph: r() * TAU, culms: [], layers: layers.slice(0, 2), out: layers[2], sprays: sprays, u: u, a: 0, box: null };
+  for (var i = 0; i < B.culms; i++) {
+    var d = r();                                   // 0 nearest … 1 furthest back
+    var lean = (B.lean * PI / 180) * (1 + (r() - 0.5) * 1.6 * B.leanVariety) + (r() - 0.5) * 0.12 * B.leanVariety;
+    var cs = lerp(1, 0.55, d);
+    // where it crosses the edge of the screen; it starts just outside
+    var y0 = H * lerp(B.entryTop, Math.max(B.entryTop, B.entryBottom), r()), out = 3 + r() * W * 0.015;
+    // where its top should end: above its tree, below the top of the screen
+    // (the tops that would go past the limit are spread a little below it instead of all on one line)
+    var want = root - treeH * lerp(B.heightMin, Math.max(B.heightMin, B.heightMax), r()), limit = H * B.topMargin;
+    var topY = want >= limit ? want : limit + r() * H * 0.1;
+    var arch = B.arch * lerp(0.7, 1.3, r());
+    var yell = r() < 0.5, shade = r();
+    var base = mixRgb(hexToRgb(B.colours.culm), hexToRgb(yell ? B.colours.yellow : B.colours.culmShade), B.colourVariety * shade * (yell ? 0.8 : 0.45));
+    var haze = B.haze + B.depthHaze * d;
+    var C = {
+      x: left ? -out : W + out, y: y0, inward: left ? 1 : -1, lean: lean, arch: arch, len: 1, d: d,
+      w: B.thickness / 2 * cs, band: Math.round(d * 2), layer: d < 0.5 ? 0 : 1,
+      body: rgba(bamTone(base, haze)),
+      lit: rgba(bamTone(mixRgb(base, hexToRgb(B.colours.culmLit), 0.7), haze)),
+      dark: rgba(bamTone(mixRgb(base, hexToRgb(B.colours.culmShade), 0.75), haze)),
+      node: rgba(bamTone(hexToRgb(B.colours.node), haze)), ring: rgba(bamTone(hexToRgb(B.colours.ring), haze)),
+      f: lerp(0.75, 1.25, r()), rp: r(), rp2: r(), gk: lerp(0.75, 1.25, r()),
+      nodes: [], sprays: [], px: new Float32Array(BAM_SEG + 1), py: new Float32Array(BAM_SEG + 1), pa: new Float32Array(BAM_SEG + 1)
+    };
+    // its length: what brings its top, standing still, up to topY
+    var rise = 0;
+    for (var si = 0; si < BAM_SEG; si++) { var sm = (si + 0.5) / BAM_SEG; rise -= Math.sin(-PI / 2 + C.inward * (lean + arch * sm * sm)) / BAM_SEG; }
+    C.len = Math.max(H * 0.06, y0 - topY) / Math.max(0.2, rise);
+    // joints, a little further apart toward the middle of the stem
+    for (var s = B.nodeSpacing * lerp(0.4, 1, r()); s < 0.99; s += B.nodeSpacing * lerp(0.85, 1.15, r()) * (0.75 + 0.5 * Math.sin(PI * s))) C.nodes.push(s);
+    // leaf sprays at the joints on the upper part, on alternating sides, and a tuft at the top
+    var sd = r() < 0.5 ? 1 : -1;
+    for (var j = 0; j < C.nodes.length; j++) {
+      var sj = C.nodes[j];
+      if (sj < B.leafFrom) continue;
+      var up = (sj - B.leafFrom) / Math.max(0.05, 1 - B.leafFrom);
+      for (var nn = B.leafiness * lerp(0.6, 1.3, up); nn > 0; nn -= 1) {
+        if (r() < nn) C.sprays.push(bamNewSpray(r, sj, sd, false, cs));
+        sd = -sd;
+      }
+    }
+    if (B.leafiness > 0) for (var tq = 0; tq < 3; tq++) C.sprays.push(bamNewSpray(r, lerp(0.95, 1, r()), tq % 2 ? 1 : -1, true, cs));
+    // then shorter, if its leaves would reach higher than topMargin
+    for (var it = 0; it < 4; it++) {
+      bamShape(C, G, 0, true);
+      var hi = bamHighest(C, u), lim = H * B.topMargin + H * 0.015;   // a little room for the sway and the blur
+      if (hi >= lim) break;
+      C.len *= Math.max(0.3, (C.y - lim) / (C.y - hi));
+    }
+    G.culms.push(C);
+  }
+  G.culms.sort(function(a, b) { return b.d - a.d; });   // further back first
+  return G;
+}
+/* Both groves, when the trees or the size change, or (at most once a minute)
+   the light. Only in daylight, and only with both trees there. */
+function ensureBamboo() {
+  if (!tree || !farTree || bambooAlpha() <= 0) return;
+  var key = tree.key + '|' + farTree.key + '|' + PR, now = performance.now() / 1000;
+  if (key === bambooKey && (bambooLook === lookVersion || now - bambooBuiltAt < 60)) return;
+  var old = bambooGroves;
+  bambooGroves = [buildBambooGrove('far', farTree, old), buildBambooGrove('near', tree, old)];
+  bambooKey = key; bambooLook = lookVersion; bambooBuiltAt = now;
+}
+function bambooGrove(key) {
+  for (var i = 0; i < bambooGroves.length; i++) if (bambooGroves[i].key === key && bambooGroves[i].a > 0 && bambooGroves[i].box) return bambooGroves[i];
+  return null;
+}
+function bamSway(dt) {
+  bambooGroves.forEach(function(G) {
+    var ks = 6 * G.B.gustSpring, cs = 1.5 * Math.sqrt(G.B.gustSpring);
+    G.gustV += (-ks * G.gust - cs * G.gustV) * dt;
+    G.gust = clamp(G.gust + G.gustV * dt, -0.3, 0.3);
+  });
+}
+/* The highest point of a stem and its leaves (roughly: how far each spray
+   reaches up from where it grows). */
+function bamHighest(C, u) {
+  var top = C.py[BAM_SEG];
+  for (var i = 0; i < C.sprays.length; i++) {
+    var S2 = C.sprays[i], q = bamAt(C, S2.s);
+    top = Math.min(top, q.y - u * S2.sc * 1.45 * Math.max(0.4, -Math.sin(q.a + S2.side * S2.spread)));
+  }
+  return top;
+}
+/* A stem's curve this frame (standing still if rest). sw is how far its top
+   swings (radians from the root); tipWhip puts that bend toward the top. */
+function bamShape(C, G, t, rest, wind) {
+  var B = G.B, A = 0.035 * B.swayAmount * (wind || 1), sp = B.swaySpeed, vr = B.swayVariety;
+  var sw = rest ? 0 : A * (Math.sin(t * 0.9 * sp * C.f + G.ph + C.rp * vr * TAU) + 0.4 * Math.sin(t * 2.1 * sp * C.f + G.ph * 1.7 + C.rp2 * vr * TAU)) +
+           A * 0.6 * Math.sin(t * 0.31 * sp + G.ph) + G.gust * C.gk;
+  var e = B.tipWhip - 1, step = C.len / BAM_SEG;
+  function ang(s) { return -PI / 2 + C.inward * (C.lean + C.arch * s * s) + sw * B.tipWhip * Math.pow(s, e); }
+  var x = C.x, y = C.y;
+  for (var i = 0; i <= BAM_SEG; i++) {
+    C.px[i] = x; C.py[i] = y; C.pa[i] = ang(i / BAM_SEG);
+    var am = ang((i + 0.5) / BAM_SEG);
+    x += Math.cos(am) * step; y += Math.sin(am) * step;
+  }
+}
+function bamAt(C, s) {
+  var f = clamp(s, 0, 1) * BAM_SEG, i = Math.min(BAM_SEG - 1, Math.floor(f)), u = f - i;
+  return { x: lerp(C.px[i], C.px[i + 1], u), y: lerp(C.py[i], C.py[i + 1], u), a: lerp(C.pa[i], C.pa[i + 1], u) };
+}
+function bamW(B, C, s) { return C.w * (1 - B.taper * s) * (s > 0.92 ? lerp(1, 0.35, (s - 0.92) / 0.08) : 1); }
+/* Fill the band between o0 and o1 across the stem (-1 its left edge … 1 its right). */
+function bamStrip(c, B, C, o0, o1) {
+  var i, w, nx, ny;
+  c.beginPath();
+  for (i = 0; i <= BAM_SEG; i++) {
+    w = bamW(B, C, i / BAM_SEG); nx = -Math.sin(C.pa[i]); ny = Math.cos(C.pa[i]);
+    c.lineTo(C.px[i] + nx * w * o1, C.py[i] + ny * w * o1);
+  }
+  for (i = BAM_SEG; i >= 0; i--) {
+    w = bamW(B, C, i / BAM_SEG); nx = -Math.sin(C.pa[i]); ny = Math.cos(C.pa[i]);
+    c.lineTo(C.px[i] + nx * w * o0, C.py[i] + ny * w * o0);
+  }
+  c.closePath();
+  c.fill();
+}
+function bamDrawCulm(c, C, G, t, wind) {
+  var B = G.B;
+  c.globalAlpha = 1; c.fillStyle = C.body; bamStrip(c, B, C, -1, 1);
+  c.globalAlpha = 0.8; c.fillStyle = C.dark; bamStrip(c, B, C, 0.35, 1);
+  if (B.highlight > 0) { c.globalAlpha = B.highlight; c.fillStyle = C.lit; bamStrip(c, B, C, -0.65, -0.15); }
+  // the joints: a dark line across, with a pale ring just under it
+  if (B.nodeMark > 0) {
+    c.lineCap = 'butt';
+    for (var i = 0; i < C.nodes.length; i++) {
+      var p = bamAt(C, C.nodes[i]), w = bamW(B, C, C.nodes[i]) * 1.08;
+      var nx = -Math.sin(p.a), ny = Math.cos(p.a), dx = Math.cos(p.a), dy = Math.sin(p.a);
+      c.globalAlpha = B.nodeMark * 0.7;
+      c.strokeStyle = C.ring; c.lineWidth = Math.max(0.5, w * 0.2);
+      c.beginPath(); c.moveTo(p.x - nx * w - dx * w * 0.35, p.y - ny * w - dy * w * 0.35);
+      c.lineTo(p.x + nx * w - dx * w * 0.35, p.y + ny * w - dy * w * 0.35); c.stroke();
+      c.globalAlpha = B.nodeMark;
+      c.strokeStyle = C.node; c.lineWidth = Math.max(0.6, w * 0.24);
+      c.beginPath(); c.moveTo(p.x - nx * w, p.y - ny * w); c.lineTo(p.x + nx * w, p.y + ny * w); c.stroke();
+    }
+  }
+  // the leaves (one transform each: the layer's scale k, then to the spray, turned and sized)
+  c.globalAlpha = 1;
+  var set = G.sprays[C.band], fl = 0.07 * B.leafFlutter * wind, sp = B.swaySpeed, k = PR * BAM_RES;
+  for (var j = 0; j < C.sprays.length; j++) {
+    var S2 = C.sprays[j], q = bamAt(C, S2.s), spr = set[S2.v];
+    var dir = q.a + S2.side * S2.spread + Math.sin(t * 2.6 * sp + S2.ph) * fl + Math.sin(t * 4.3 * sp + S2.ph * 2.3) * fl * 0.4 + G.gust * 0.4;
+    var cs = Math.cos(dir) * S2.sc * k, sn = Math.sin(dir) * S2.sc * k, fy = S2.side < 0 ? -1 : 1;
+    c.setTransform(cs, sn, -sn * fy, cs * fy, q.x * k, q.y * k);
+    c.drawImage(spr.cnv, spr.sx, spr.sy, spr.sw, spr.sh, -spr.ox, -spr.oy, spr.w, spr.h);
+  }
+  c.setTransform(k, 0, 0, k, 0, 0);
+}
+/* Each grove shown this frame drawn into its G.out (blurred, not yet cut by
+   the trees). G.a: how strongly it is laid down (0: not shown). */
+function renderBamboo(t) {
+  var a = bambooAlpha();
+  if (a > 0) ensureBamboo();
+  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10));
+  bambooGroves.forEach(function(G) {
+    var B = G.B;
+    G.a = B.show && a > 0.003 ? a * B.strength : 0;
+    // clear what was drawn last frame (all of it lies inside last frame's box)
+    if (G.box) G.layers.concat([G.out]).forEach(function(L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); });
+    G.box = null;
+    if (!G.a) return;
+    G.layers.forEach(function(L) {                // (cleared above, where it was last frame)
+      L.c.globalAlpha = 1;
+      L.c.setTransform(k, 0, 0, k, 0, 0);
+    });
+    var x0 = Infinity, x1 = -Infinity, y0 = Infinity;
+    for (var i = 0; i < G.culms.length; i++) {
+      var C = G.culms[i];
+      bamShape(C, G, t, false, wind);
+      bamDrawCulm(G.layers[C.layer].c, C, G, t, wind);
+      for (var q = 0; q <= BAM_SEG; q += 2) { x0 = Math.min(x0, C.px[q]); x1 = Math.max(x1, C.px[q]); y0 = Math.min(y0, C.py[q]); }
+    }
+    // the part of the screen it covers (with room for the leaves and the blur), in out's pixels:
+    // the trees are cut out and it is laid down only there
+    var pad = G.u * 1.8 + 4 * Math.max(B.blurNear, B.blurFar) + 4;
+    var bx0 = clamp(Math.floor((x0 - pad) * k), 0, G.out.cnv.width), bx1 = clamp(Math.ceil((x1 + pad) * k), 0, G.out.cnv.width);
+    var by0 = clamp(Math.floor((y0 - pad) * k), 0, G.out.cnv.height);
+    G.box = bx1 > bx0 && by0 < G.out.cnv.height ? { x: bx0, y: by0, w: bx1 - bx0, h: G.out.cnv.height - by0 } : null;
+    // a safety net: a gust or the biggest leaves never take it above topMargin (fades out just under it)
+    var lim = H * B.topMargin, fade = H * 0.02;
+    G.layers.forEach(function(L) {
+      L.c.globalAlpha = 1;
+      if (lim <= 0) return;
+      var g = L.c.createLinearGradient(0, lim, 0, lim + fade);
+      g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+      L.c.globalCompositeOperation = 'destination-out';
+      L.c.fillStyle = 'rgba(0,0,0,1)'; L.c.fillRect(0, 0, W, lim);
+      L.c.fillStyle = g; L.c.fillRect(0, lim, W, fade);
+      L.c.globalCompositeOperation = 'source-over';
+    });
+    // the stems further back, then the nearer ones, each blurred, into out
+    var o = G.out.c, bb = G.box;
+    o.setTransform(1, 0, 0, 1, 0, 0);
+    o.globalAlpha = 1;
+    if (!bb) return;
+    [[1, B.blurFar], [0, B.blurNear]].forEach(function(e) {
+      if (e[1] > 0) o.filter = 'blur(' + (e[1] * k).toFixed(2) + 'px)';
+      o.drawImage(G.layers[e[0]].cnv, bb.x, bb.y, bb.w, bb.h, bb.x, bb.y, bb.w, bb.h);
+      o.filter = 'none';
+    });
+  });
+}
+/* Cut the trees in front out of a grove: list of [canvas, times] (each
+   canvas covers the whole screen; foliage is cut three times, as it is a
+   little see-through). */
+function bamCutOut(G, list) {
+  var c = G.out.c, b = G.box;
+  if (!b) return;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'destination-out';
+  list.forEach(function(e) {
+    var sx = e[0].width / G.out.cnv.width, sy = e[0].height / G.out.cnv.height;
+    for (var i = 0; i < e[1]; i++) c.drawImage(e[0], b.x * sx, b.y * sy, b.w * sx, b.h * sy, b.x, b.y, b.w, b.h);
+  });
+  c.globalCompositeOperation = 'source-over';
+}
+function bamLayDown(ctx, G) {
+  var b = G.box;
+  if (!b) return;
+  var sx = cvBack.width / G.out.cnv.width, sy = cvBack.height / G.out.cnv.height;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = G.a;
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(G.out.cnv, b.x, b.y, b.w, b.h, b.x * sx, b.y * sy, b.w * sx, b.h * sy);
   ctx.globalAlpha = 1;
 }
 function ensureTree(lazy) {
@@ -12399,6 +12810,7 @@ function ensureTree(lazy) {
 function updateTree(dt, t) {
   if (farTree) updateOneTree(farTree, dt, t);
   if (tree) updateOneTree(tree, dt, t);
+  bamSway(dt);
   rebakeClumps(3);
 }
 function updateOneTree(T, dt, t) {
@@ -14484,10 +14896,10 @@ function winDrawNear(c) {
        part of the tree day and night). At nightfall an owl flies in and
        perches on one of them; it blinks, hoots now and then, flies off into
        the distance (smaller, softer and hazier as it goes) and comes back to
-       either tree. A herd of sika deer (shika) and a tanuki mother with her
-       kit cross the fallen leaves now and then: the deer walk, graze and may
-       bolt, the tanuki scurry and stop to look at us. At dawn the owl leaves
-       for good and no more animals come.
+       either tree. At dawn the owl leaves for good. The sika deer (shika)
+       and the tanuki mother and kit are switched off (O.deerOn, O.tanukiOn:
+       false); their code stays: the deer walk, graze and may bolt, the
+       tanuki scurry and stop to look at us.
        The owl is a small 3D model drawn into sprites; the animals are drawn
        with WebGL 2 (smooth shaded bodies) where it is there, or with hair
        strokes on a 2D canvas where it is not. Sprites are baked a few per
@@ -14512,10 +14924,10 @@ var O = {
   // extras (hootPitch in cents)
   headTurn: false, headEvery: 12, hoot: true, hootEvery: 10, hootVolume: 0.6, hootPitch: 850,
   // sika deer
-  deerOn: true, deerEvery: 25, herdMin: 2, herdMax: 4, stagChance: 1, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
+  deerOn: false, deerEvery: 25, herdMin: 2, herdMax: 4, stagChance: 1, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
   grazeMin: 5, grazeMax: 15, deerLook: 0.5, runChance: 0.5, deerRun: 4.5, deerFar: 0.34, deerNear: 0.61,
   // tanuki
-  tanukiOn: true, tanukiEvery: 50, kitChance: 1, tanukiSize: 0.058, tanukiSpeed: 2, tanukiStops: 0.7, tanukiLook: 0.9,
+  tanukiOn: false, tanukiEvery: 50, kitChance: 1, tanukiSize: 0.058, tanukiSpeed: 2, tanukiStops: 0.7, tanukiLook: 0.9,
   lookTime: 2.5, tanukiFar: 0.7, tanukiNear: 1.05,
   // both
   animStrength: 0.95, animHaze: 0.5
@@ -16647,10 +17059,10 @@ function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = (window.devicePixelRatio || 1) * S.renderScale;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
-  cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = birdLayer.width = cw;
-  cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = birdLayer.height = ch;
-  farLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
-  farLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
+  cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = birdLayer.width = birdSlotLayer.width = cw;
+  cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = birdLayer.height = birdSlotLayer.height = ch;
+  farLayer.width = farBranchLayer.width = Math.ceil(cw * FAR_LAYER_SCALE);
+  farLayer.height = farBranchLayer.height = Math.ceil(ch * FAR_LAYER_SCALE);
   cvGround.width = cw;
   cvGround.height = Math.round(GH * PR);
   cvSky.width = Math.max(1, Math.round(W * PR * SKY_RES));
@@ -16835,7 +17247,7 @@ function dynSetupStep(t, still) {
   }
   if (!dynSetupLeft) return;
   if (prefillLeft > 0) { prefillSome(still ? Infinity : 6); return; }
-  if (bakePendingClumps(still ? 50 : 8)) dynSetupLeft = false;
+  if (bakePendingClumps(still ? 50 : 8)) { ensureBamboo(); dynSetupLeft = false; }
 }
 /* The scene would show, but the name's setup is not finished (a slow
    moment): it carries on a little per frame and the scene's fade-in waits,
@@ -16853,6 +17265,7 @@ function dynHoldForSetup(t) {
 function dynFinishSetup() {
   prefillSome(Infinity);
   bakePendingClumps(Infinity);
+  ensureBamboo();
   dynSetupLeft = false;
 }
 /* Back at the start screen: forget everything and clear the canvases (the
@@ -16861,6 +17274,7 @@ function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0; birdNext = 0;
   cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
+  bambooGroves = []; bambooKey = '';
   NightLife.reset();
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
