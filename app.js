@@ -1,4 +1,4 @@
-var BUILD = 'v137';
+var BUILD = 'v138';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -61,6 +61,11 @@ var BUILD = 'v137';
          out around sunset. The birds now fly at six depths among the
          groves and trees (BIRD_SLOTS). No deer or tanuki come at night any
          more (the owl still does).
+       - Bamboo, lighter: the groves as re-tuned on bamboo.html (23 and 22
+         stems, leafiness 1 and 1.9). Each grove is redrawn 30 times a
+         second (BAMBOO_FPS), the two in turn, and the picture is reused in
+         between; a stem's joints are filled in two shapes instead of a
+         stroke each; a change of light re-bakes one grove a frame.
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -12404,9 +12409,11 @@ function drawKoyoTrees(ctx, t) {
   var gFar = bambooGrove('far'), gNear = bambooGrove('near');
   NightLife.drawSlot(ctx, 'A');                   // the owl and the animals further back than the far tree (8b)
   if (gFar) {                                     // the bamboo behind the far tree (and the near tree, where it reaches it)
-    var reach = (KOYO.maxWidth / 100 + 0.12) * W * PR * BAM_RES, fb = gFar.box;
-    var meets = tree && (tree.left ? fb.x < reach : fb.x + fb.w > gFar.out.cnv.width - reach);
-    bamCutOut(gFar, meets ? farCut.concat(nearCut) : farCut);
+    if (gFar.fresh) {                             // the trees are cut out when it is redrawn; in between it is laid down as it was
+      var reach = (KOYO.maxWidth / 100 + 0.12) * W * PR * BAM_RES, fb = gFar.box;
+      var meets = tree && (tree.left ? fb.x < reach : fb.x + fb.w > gFar.out.cnv.width - reach);
+      bamCutOut(gFar, meets ? farCut.concat(nearCut) : farCut);
+    }
     bamLayDown(ctx, gFar);
   }
   if (farTree) {
@@ -12420,7 +12427,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
   NightLife.drawSlot(ctx, 'B');                   // between the two trees
-  if (gNear) { bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
+  if (gNear) { if (gNear.fresh) bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
   if (tree) {
     koyoGlow(ctx, tree, 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -12479,30 +12486,35 @@ function drawKoyoTrees(ctx, t) {
    see-through foliage, and the birds use it to hide behind a grove
    (BIRD_SLOTS). Only in daylight: they fade in after sunrise and out around
    sunset (ENV.light.daylight). A grove is rebuilt when the trees change, and
-   at most once a minute when the light changes. */
+   at most once a minute when the light changes (then one grove a frame).
+   To keep the frame rate, each grove is redrawn (and cut by the trees)
+   BAMBOO_FPS times a second, the two in turn, never both in one frame once
+   they are up; in between, its last picture (G.out) is laid down again. The
+   sway is slow, so this does not show. */
 var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
   yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
 };
 var BAMBOO = {
   far: {
-    show: true, culms: 90, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+    show: true, culms: 23, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
     lean: 24, leanVariety: 0.5, arch: 0.35,
     thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
-    leafiness: 1.5, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
+    leafiness: 1, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
     blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 1,
     swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
   },
   near: {
-    show: true, culms: 34, seed: 45, entryTop: 0.23, entryBottom: 0.81, heightMin: 1.41, heightMax: 1.4, topMargin: 0.04,
+    show: true, culms: 22, seed: 45, entryTop: 0.23, entryBottom: 0.81, heightMin: 1.41, heightMax: 1.4, topMargin: 0.04,
     lean: 29, leanVariety: 0.45, arch: 0.55,
     thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
-    leafiness: 2.5, leafFrom: 0.22, leafSize: 1.15, leafDroop: 1.8,
+    leafiness: 1.9, leafFrom: 0.22, leafSize: 1.15, leafDroop: 1.8,
     blurNear: 0.5, blurFar: 1.3, haze: 0.22, depthHaze: 0.3, strength: 1,
     swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 2.1
   }
 };
 var BAM_RES = 0.5, BAM_SEG = 22;                 // half resolution (as the far tree); segments along each stem
+var BAMBOO_FPS = 30;                             // how often each grove is redrawn
 var bambooGroves = [], bambooKey = '', bambooLook = -1, bambooBuiltAt = -1e9;
 function bamCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 function bambooAlpha() { return ENV.scene === 'autumn' && ENV.light ? ENV.light.daylight : 0; }
@@ -12628,10 +12640,22 @@ function buildBambooGrove(key, T, old) {
 function ensureBamboo() {
   if (!tree || !farTree || bambooAlpha() <= 0) return;
   var key = tree.key + '|' + farTree.key + '|' + PR, now = performance.now() / 1000;
-  if (key === bambooKey && (bambooLook === lookVersion || now - bambooBuiltAt < 60)) return;
-  var old = bambooGroves;
-  bambooGroves = [buildBambooGrove('far', farTree, old), buildBambooGrove('near', tree, old)];
-  bambooKey = key; bambooLook = lookVersion; bambooBuiltAt = now;
+  if (key !== bambooKey || !bambooGroves.length) {     // new trees or a new size: both now
+    var old = bambooGroves;
+    bambooGroves = [buildBambooGrove('far', farTree, old), buildBambooGrove('near', tree, old)];
+    bambooGroves.forEach(function(G) { G.look = lookVersion; });
+    bambooKey = key; bambooLook = lookVersion; bambooBuiltAt = now;
+    return;
+  }
+  // the light has moved on: re-baked in its colours at most once a minute, one grove a frame
+  if (bambooLook !== lookVersion && now - bambooBuiltAt >= 60) { bambooLook = lookVersion; bambooBuiltAt = now; }
+  for (var i = 0; i < bambooGroves.length; i++) {
+    var G = bambooGroves[i];
+    if (G.look === bambooLook) continue;
+    bambooGroves[i] = buildBambooGrove(G.key, G.key === 'far' ? farTree : tree, bambooGroves);
+    bambooGroves[i].look = bambooLook;
+    return;
+  }
 }
 function bambooGrove(key) {
   for (var i = 0; i < bambooGroves.length; i++) if (bambooGroves[i].key === key && bambooGroves[i].a > 0 && bambooGroves[i].box) return bambooGroves[i];
@@ -12689,25 +12713,33 @@ function bamStrip(c, B, C, o0, o1) {
   c.closePath();
   c.fill();
 }
+/* One joint line into the current path: across the stem at s, back toward
+   the root by back × its width, as thick as thick × its width (at least min). */
+function bamJoint(c, B, C, s, back, thick, min) {
+  var p = bamAt(C, s), w = bamW(B, C, s) * 1.08, h = Math.max(min, w * thick) / 2;
+  var nx = -Math.sin(p.a), ny = Math.cos(p.a), dx = Math.cos(p.a), dy = Math.sin(p.a);
+  var cx = p.x - dx * w * back, cy = p.y - dy * w * back;
+  c.moveTo(cx - nx * w - dx * h, cy - ny * w - dy * h);
+  c.lineTo(cx + nx * w - dx * h, cy + ny * w - dy * h);
+  c.lineTo(cx + nx * w + dx * h, cy + ny * w + dy * h);
+  c.lineTo(cx - nx * w + dx * h, cy - ny * w + dy * h);
+  c.closePath();
+}
 function bamDrawCulm(c, C, G, t, wind) {
   var B = G.B;
   c.globalAlpha = 1; c.fillStyle = C.body; bamStrip(c, B, C, -1, 1);
   c.globalAlpha = 0.8; c.fillStyle = C.dark; bamStrip(c, B, C, 0.35, 1);
   if (B.highlight > 0) { c.globalAlpha = B.highlight; c.fillStyle = C.lit; bamStrip(c, B, C, -0.65, -0.15); }
-  // the joints: a dark line across, with a pale ring just under it
+  // the joints: a dark line across, with a pale ring just under it. Each line
+  // is the band a butt-capped stroke would cover, and all of a stem's rings,
+  // then all its dark lines, are filled as one shape (two fills a stem).
   if (B.nodeMark > 0) {
-    c.lineCap = 'butt';
-    for (var i = 0; i < C.nodes.length; i++) {
-      var p = bamAt(C, C.nodes[i]), w = bamW(B, C, C.nodes[i]) * 1.08;
-      var nx = -Math.sin(p.a), ny = Math.cos(p.a), dx = Math.cos(p.a), dy = Math.sin(p.a);
-      c.globalAlpha = B.nodeMark * 0.7;
-      c.strokeStyle = C.ring; c.lineWidth = Math.max(0.5, w * 0.2);
-      c.beginPath(); c.moveTo(p.x - nx * w - dx * w * 0.35, p.y - ny * w - dy * w * 0.35);
-      c.lineTo(p.x + nx * w - dx * w * 0.35, p.y + ny * w - dy * w * 0.35); c.stroke();
-      c.globalAlpha = B.nodeMark;
-      c.strokeStyle = C.node; c.lineWidth = Math.max(0.6, w * 0.24);
-      c.beginPath(); c.moveTo(p.x - nx * w, p.y - ny * w); c.lineTo(p.x + nx * w, p.y + ny * w); c.stroke();
-    }
+    c.globalAlpha = B.nodeMark * 0.7; c.fillStyle = C.ring; c.beginPath();
+    for (var i = 0; i < C.nodes.length; i++) bamJoint(c, B, C, C.nodes[i], 0.35, 0.2, 0.5);
+    c.fill();
+    c.globalAlpha = B.nodeMark; c.fillStyle = C.node; c.beginPath();
+    for (i = 0; i < C.nodes.length; i++) bamJoint(c, B, C, C.nodes[i], 0, 0.24, 0.6);
+    c.fill();
   }
   // the leaves (one transform each: the layer's scale k, then to the spray, turned and sized)
   c.globalAlpha = 1;
@@ -12721,20 +12753,34 @@ function bamDrawCulm(c, C, G, t, wind) {
   }
   c.setTransform(k, 0, 0, k, 0, 0);
 }
-/* Each grove shown this frame drawn into its G.out (blurred, not yet cut by
-   the trees). G.a: how strongly it is laid down (0: not shown). */
+/* G.a: how strongly each grove is laid down this frame (0: not shown). A
+   grove not drawn yet is drawn at once; otherwise the one most overdue (each
+   is due BAMBOO_FPS times a second), at most one a frame, is redrawn into its
+   G.out (blurred, not yet cut by the trees) and marked fresh. */
 function renderBamboo(t) {
   var a = bambooAlpha();
   if (a > 0) ensureBamboo();
-  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10));
+  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10)), due = null;
   bambooGroves.forEach(function(G) {
+    G.a = G.B.show && a > 0.003 ? a * G.B.strength : 0;
+    G.fresh = false;
+    if (!G.a) {
+      if (G.box) G.layers.concat([G.out]).forEach(function(L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); });
+      G.box = null; G.drawn = false;
+      return;
+    }
+    if (!G.drawn) drawGrove(G);
+    else if (t >= G.next && (!due || G.next < due.next)) due = G;
+  });
+  if (due) drawGrove(due);
+  function drawGrove(G) {
     var B = G.B;
-    G.a = B.show && a > 0.003 ? a * B.strength : 0;
-    // clear what was drawn last frame (all of it lies inside last frame's box)
+    G.fresh = G.drawn = true;
+    G.next = (G.next && t - G.next < 0.1 ? G.next : t) + 1 / BAMBOO_FPS;   // keeps its rhythm, unless it fell far behind
+    // clear what it drew last time (all of it lies inside that box)
     if (G.box) G.layers.concat([G.out]).forEach(function(L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); });
     G.box = null;
-    if (!G.a) return;
-    G.layers.forEach(function(L) {                // (cleared above, where it was last frame)
+    G.layers.forEach(function(L) {                // (cleared above, where it was last time)
       L.c.globalAlpha = 1;
       L.c.setTransform(k, 0, 0, k, 0, 0);
     });
@@ -12773,7 +12819,7 @@ function renderBamboo(t) {
       o.drawImage(G.layers[e[0]].cnv, bb.x, bb.y, bb.w, bb.h, bb.x, bb.y, bb.w, bb.h);
       o.filter = 'none';
     });
-  });
+  }
 }
 /* Cut the trees in front out of a grove: list of [canvas, times] (each
    canvas covers the whole screen; foliage is cut three times, as it is a
