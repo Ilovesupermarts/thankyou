@@ -1,4 +1,4 @@
-var BUILD = 'v142';
+var BUILD = 'v143';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -14206,13 +14206,12 @@ function torBake() {
   gates.forEach(function (g) {
     var lod = clamp(g.px / 120, 0, 1);
     torPlace(torPieces(lod), g).forEach(function (pc) {
-      var dx = pc.c[0], dy = pc.c[1] - 1, dz = pc.c[2];
-      pc.dist = dx * dx + dy * dy + dz * dz;
+      pc.dist = pc.c[2];                      // how far in front of the camera (not how far from the eye: two things side by side are as far as each other)
       all.push(pc);
     });
     minY = Math.min(minY, g.foot - g.px * 1.15);
   });
-  all.sort(function (a, b) { return b.dist - a.dist; });
+  all.sort(function (a, b) { return b.dist - a.dist; });      // furthest first
   TOR.gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - TOR.gateTop) * PR));
   // where the pillars stand on the screen: the deer will not stop right behind one
@@ -14280,8 +14279,16 @@ function torBake() {
   // The pieces, furthest first, in runs of TOR_CHUNK. Each run (and each blur of
   // it) is a picture of its own, cropped to what it covers, so a deer walking
   // among the gates can be drawn between them (torDrawGates).
-  for (var c0 = 0; c0 < all.length; c0 += TOR_CHUNK) {
-    var run = all.slice(c0, c0 + TOR_CHUNK), mid = (run[0].dist + run[run.length - 1].dist) / 2, byBand = {};
+  // A run ends after TOR_CHUNK pieces or, where the deer walk (not far away), once its pieces are more than a little
+  // apart in depth, so a deer between a gate's two pillars can be drawn between them.
+  var runs = [], cur = [];
+  all.forEach(function (pc) {
+    if (cur.length && (cur.length >= TOR_CHUNK || (pc.dist < 50 && cur[0].dist - pc.dist > 0.12 + 0.01 * pc.dist))) { runs.push(cur); cur = []; }
+    cur.push(pc);
+  });
+  if (cur.length) runs.push(cur);
+  runs.forEach(function (run) {
+    var mid = (run[0].dist + run[run.length - 1].dist) / 2, byBand = {};
     run.forEach(function (pc) {
       var bd = pc.g.band, Lr = byBand[bd] || (byBand[bd] = { band: bd, pcs: [], x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 });
       Lr.pcs.push(pc);
@@ -14311,7 +14318,7 @@ function torBake() {
       }
       TOR.slices.push({ cnv: out.cnv, dx: dx0, dy: dy0, mid: mid });
     });
-  }
+  });
   TOR.ready = true;
 }
 /* The gates, nearest last, and the deer among them (NightLife): each deer is
@@ -17787,15 +17794,14 @@ function drawAnimal(c, a) {
   }
 }
 function drawDeer(c, a) { drawAnimal(c, a); }
-/* The deer to draw among the gates, furthest first: dd is how far from the
-   eye the middle of the deer is, as the gate pieces' own distance is. */
+/* The deer to draw among the gates, furthest first: dd is how far in front of
+   the camera its feet are, as the gate pieces' own distance is. */
 function gateDeer() {
   var out = [], F = torLens();
   for (var i = 0; i < animals.length; i++) {
     var a = animals[i];
     if (a.kind !== 'deer' || a.state === 'prep') continue;
-    var z = F / Math.max(0.5, deerDepth(a.k)), x = (a.x - W / 2) * z / F;
-    out.push({ a: a, dd: x * x + 0.42 + z * z });
+    out.push({ a: a, dd: F / Math.max(0.5, deerDepth(a.k)) });
   }
   return out.sort(function (p, q) { return q.dd - p.dd; });
 }
