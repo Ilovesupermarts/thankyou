@@ -57,7 +57,9 @@
   }
   .lab.collapsed { width: auto; padding: 8px 12px; overflow: hidden; }
   .lab.collapsed .lab-body { display: none; }
-  .lab-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .lab-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: grab; touch-action: none; }
+  .lab.dragging .lab-head { cursor: grabbing; }
+  .lab-grip { color: #C9A99B; font-size: 16px; letter-spacing: -2px; margin-right: 2px; }
   .lab-head h3 { margin: 0; font-size: 15px; color: #882E47; }
   .lab button {
     font: inherit; font-weight: 600; border-radius: 10px; padding: 7px 12px; cursor: pointer;
@@ -185,7 +187,7 @@
 <!-- ============ Controls (demo only) ============ -->
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3>🎋 Bamboo Lab</h3>
+    <h3><span class="lab-grip" aria-hidden="true">⠿</span>🎋 Bamboo Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -494,6 +496,45 @@ document.getElementById('labToggle').addEventListener('click', function () {
   var c = lab.classList.toggle('collapsed');
   this.textContent = c ? 'Show' : 'Hide';
 });
+/* The panel can be dragged by its title bar (finger or mouse) to anywhere on
+   the screen, so the bamboo can be watched while the sliders are used. It
+   stays where it was put, in this browser. */
+(function () {
+  var lab = document.getElementById('lab'), head = lab.querySelector('.lab-head'), POS_KEY = 'bambooLabPos1';
+  function place(x, y) {
+    var w = lab.offsetWidth, h = lab.offsetHeight;
+    x = clamp(x, 0, Math.max(0, window.innerWidth - w)); y = clamp(y, 0, Math.max(0, window.innerHeight - Math.min(h, 60)));
+    lab.style.left = x + 'px'; lab.style.top = y + 'px'; lab.style.right = 'auto';
+    lab.style.maxHeight = Math.max(120, window.innerHeight - y - 12) + 'px';
+    return [x, y];
+  }
+  try {
+    var p = JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+    if (p && isFinite(p[0]) && isFinite(p[1])) place(p[0], p[1]);
+  } catch (e) {}
+  var drag = null;
+  head.addEventListener('pointerdown', function (e) {
+    if (e.target.closest('button')) return;                 // Hide / Show still work
+    var r = lab.getBoundingClientRect();
+    drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+    lab.classList.add('dragging');
+    try { head.setPointerCapture(e.pointerId); } catch (er) {}
+    e.preventDefault();
+  });
+  head.addEventListener('pointermove', function (e) {
+    if (drag && e.pointerId === drag.id) place(e.clientX - drag.dx, e.clientY - drag.dy);
+  });
+  function end(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    drag = null; lab.classList.remove('dragging');
+    try { localStorage.setItem(POS_KEY, JSON.stringify([parseFloat(lab.style.left), parseFloat(lab.style.top)])); } catch (er) {}
+  }
+  head.addEventListener('pointerup', end);
+  head.addEventListener('pointercancel', end);
+  window.addEventListener('resize', function () {      // keep it on the screen
+    if (lab.style.left) place(parseFloat(lab.style.left), parseFloat(lab.style.top));
+  });
+})();
 document.getElementById('btnReset').addEventListener('click', function () {
   B = clone(BDEF); save(); buildControls(); buildGroves();
 });
