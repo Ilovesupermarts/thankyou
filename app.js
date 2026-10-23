@@ -1,4 +1,4 @@
-var BUILD = 'v140';
+var BUILD = 'v141';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -13933,8 +13933,9 @@ var TORII = {
   // the gravel path
   gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
 };
-var TOR = { gate: landCanvas(), grav: landCanvas(), gateTop: 0, gravTop: 0, ready: false };
+var TOR = { shadow: landCanvas(), grav: landCanvas(), slices: [], pillars: [], gateTop: 0, gravTop: 0, ready: false };
 var TOR_BANDS = 6;
+var TOR_CHUNK = 28;           // pieces to a picture of the gates
 function torLens() { return TORII.lens * W; }
 function torScreen(x, y, z) { var F = torLens(); return [W / 2 + F * x / z, H * LAND.horizon + F * (1 - y) / z]; }
 function torGround(sx, sy) {
@@ -14170,7 +14171,9 @@ function torDrawGravel(c) {
 /* Both baked at once (the last step of a landscape bake). */
 function torBake() {
   TOR.ready = false;
-  TOR.gate.cnv.width = 1; TOR.gate.cnv.height = 1;
+  TOR.slices.forEach(function(S) { S.cnv.width = S.cnv.height = 1; });
+  TOR.slices = []; TOR.pillars = [];
+  TOR.shadow.cnv.width = 1; TOR.shadow.cnv.height = 1;
   TOR.grav.cnv.width = 1; TOR.grav.cnv.height = 1;
   if (!W) return;
   var path = torPath();
@@ -14212,9 +14215,16 @@ function torBake() {
   all.sort(function (a, b) { return b.dist - a.dist; });
   TOR.gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - TOR.gateTop) * PR));
-  var bands = [];
-  for (var bi = 0; bi < TOR_BANDS; bi++) { var Lb = landCanvas(); Lb.cnv.width = cw; Lb.cnv.height = chh; Lb.c.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR); bands.push(Lb); }
-  // the shadow of the line of gates on the ground, thrown away from the light
+  // where the pillars stand on the screen: the deer will not stop right behind one
+  gates.forEach(function (g) {
+    var half = TORII.width * TORII.gateHeight / 2, d = F / g.z;
+    [-1, 1].forEach(function (side) {
+      var x = g.x + g.ax * half * side, z = g.z + g.az * half * side;
+      if (z < 0.6) return;
+      TOR.pillars.push({ x: W / 2 + F * x / z, d: F / z, w: TORII.pillar * TORII.gateHeight * F / z });
+    });
+  });
+  // the shadow of the line of gates on the ground, thrown away from the light: a layer of its own, as the deer's feet go over it
   var SH = landCanvas(); SH.cnv.width = cw; SH.cnv.height = chh;
   var sc = SH.c;
   sc.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR);
@@ -14230,9 +14240,16 @@ function torBake() {
       sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
     });
   }
-  // the pieces, each into the layer of its gate's blur
-  all.forEach(function (pc) {
-    var g = pc.g, c = bands[g.band].c;
+  TOR.shadow.cnv.width = cw; TOR.shadow.cnv.height = chh;
+  var o = TOR.shadow.c;
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.filter = HAS_FILTER && TORII.shadowBlur > 0.05 ? 'blur(' + (TORII.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
+  o.drawImage(SH.cnv, 0, 0);
+  o.filter = 'none';
+  SH.cnv.width = SH.cnv.height = 1;
+  // one piece of a gate, into c (its transform set)
+  function paint(c, pc) {
+    var g = pc.g;
     pc.faces.forEach(function (f) {
       var n = f.p.length, cx = 0, cy = 0, cz = 0;
       for (var i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
@@ -14259,28 +14276,67 @@ function torBake() {
       for (var m = 0; m < n; m++) { var sp = torScreen(f.p[m][0], f.p[m][1], f.p[m][2]); if (m) c.lineTo(sp[0], sp[1]); else c.moveTo(sp[0], sp[1]); }
       c.closePath(); c.fill(); c.stroke();
     });
-  });
-  // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
-  TOR.gate.cnv.width = cw; TOR.gate.cnv.height = chh;
-  var o = TOR.gate.c;
-  o.setTransform(1, 0, 0, 1, 0, 0);
-  o.filter = HAS_FILTER && TORII.shadowBlur > 0.05 ? 'blur(' + (TORII.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
-  o.drawImage(SH.cnv, 0, 0);
-  for (var bj = TOR_BANDS - 1; bj >= 0; bj--) {
-    var bl = lerp(TORII.blurNear, TORII.blurFar, bj / (TOR_BANDS - 1));
-    o.filter = HAS_FILTER && bl > 0.05 ? 'blur(' + (bl * PR).toFixed(2) + 'px)' : 'none';
-    o.drawImage(bands[bj].cnv, 0, 0);
   }
-  o.filter = 'none';
-  bands.forEach(function (Lb) { Lb.cnv.width = Lb.cnv.height = 1; });      // the scratch layers are let go
-  SH.cnv.width = SH.cnv.height = 1;
+  // The pieces, furthest first, in runs of TOR_CHUNK. Each run (and each blur of
+  // it) is a picture of its own, cropped to what it covers, so a deer walking
+  // among the gates can be drawn between them (torDrawGates).
+  for (var c0 = 0; c0 < all.length; c0 += TOR_CHUNK) {
+    var run = all.slice(c0, c0 + TOR_CHUNK), mid = (run[0].dist + run[run.length - 1].dist) / 2, byBand = {};
+    run.forEach(function (pc) {
+      var bd = pc.g.band, Lr = byBand[bd] || (byBand[bd] = { band: bd, pcs: [], x0: 1e9, y0: 1e9, x1: -1e9, y1: -1e9 });
+      Lr.pcs.push(pc);
+      pc.faces.forEach(function (f) {
+        f.p.forEach(function (p) {
+          if (p[2] < 0.3) return;
+          var sp = torScreen(p[0], p[1], p[2]);
+          Lr.x0 = Math.min(Lr.x0, sp[0]); Lr.x1 = Math.max(Lr.x1, sp[0]); Lr.y0 = Math.min(Lr.y0, sp[1]); Lr.y1 = Math.max(Lr.y1, sp[1]);
+        });
+      });
+    });
+    Object.keys(byBand).map(Number).sort(function (p, q) { return q - p; }).forEach(function (bd) {   // the softest first
+      var Lr = byBand[bd], bl = lerp(TORII.blurNear, TORII.blurFar, bd / (TOR_BANDS - 1)), pad = Math.ceil(bl * 3 + 2);
+      var dx0 = Math.max(0, Math.floor((Lr.x0 - pad) * PR)), dx1 = Math.min(cw, Math.ceil((Lr.x1 + pad) * PR));
+      var dy0 = Math.max(0, Math.floor((Lr.y0 - pad) * PR)), dy1 = Math.min(Math.round(H * PR), Math.ceil((Lr.y1 + pad) * PR));
+      if (dx1 - dx0 < 1 || dy1 - dy0 < 1) return;
+      var tmp = landCanvas(); tmp.cnv.width = dx1 - dx0; tmp.cnv.height = dy1 - dy0;
+      tmp.c.setTransform(PR, 0, 0, PR, -dx0, -dy0);
+      Lr.pcs.forEach(function (pc) { paint(tmp.c, pc); });
+      var out = tmp;
+      if (HAS_FILTER && bl > 0.05) {
+        out = landCanvas(); out.cnv.width = tmp.cnv.width; out.cnv.height = tmp.cnv.height;
+        out.c.filter = 'blur(' + (bl * PR).toFixed(2) + 'px)';
+        out.c.drawImage(tmp.cnv, 0, 0);
+        out.c.filter = 'none';
+        tmp.cnv.width = tmp.cnv.height = 1;
+      }
+      TOR.slices.push({ cnv: out.cnv, dx: dx0, dy: dy0, mid: mid });
+    });
+  }
   TOR.ready = true;
 }
+/* The gates, nearest last, and the deer among them (NightLife): each deer is
+   drawn after the gate pieces further away than it and before those nearer,
+   so it goes behind a nearer gate's pillars and in front of the further
+   ones. Both are drawn behind the far tree. */
 function torDrawGates(c) {
-  if (!TOR.ready || !TORII.show || TOR.gate.cnv.width < 2 || ENV.scene !== 'autumn') return;
+  var deer = NightLife.gateDeer(), di = 0, n = deer.length;
+  if (TOR.ready && TORII.show && ENV.scene === 'autumn') {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = TORII.strength;
+    if (TOR.shadow.cnv.width > 1) c.drawImage(TOR.shadow.cnv, 0, Math.round(TOR.gateTop * PR));
+    for (var i = 0; i < TOR.slices.length; i++) {
+      var S = TOR.slices[i];
+      while (di < n && deer[di].dd >= S.mid) {
+        NightLife.drawDeer(c, deer[di++].a);
+        c.setTransform(1, 0, 0, 1, 0, 0);
+        c.globalAlpha = TORII.strength;
+      }
+      c.drawImage(S.cnv, S.dx, S.dy);
+    }
+    c.globalAlpha = 1;
+  }
+  while (di < n) NightLife.drawDeer(c, deer[di++].a);
   c.setTransform(1, 0, 0, 1, 0, 0);
-  c.globalAlpha = TORII.strength;
-  c.drawImage(TOR.gate.cnv, 0, Math.round(TOR.gateTop * PR));
   c.globalAlpha = 1;
 }
 
@@ -15583,15 +15639,21 @@ function winDrawNear(c) {
 }
 
 /* ============================================================
-   8b. NIGHT LIFE (autumn, at night) — designed on landscape.html, with the
+   8b. NIGHT LIFE (autumn, evening and night) — designed on landscape.html, with the
        values chosen there. A bare branch sticks out of each kōyō tree (it is
        part of the tree day and night). At nightfall an owl flies in and
        perches on one of them; it blinks, hoots now and then, flies off into
        the distance (smaller, softer and hazier as it goes) and comes back to
        either tree. At dawn the owl leaves for good. The sika deer (shika)
-       and the tanuki mother and kit are switched off (O.deerOn, O.tanukiOn:
-       false); their code stays: the deer walk, graze and may bolt, the
-       tanuki scurry and stop to look at us.
+       come out from dusk: a herd walks across the fallen leaves among the
+       torii gates (8c), grazes and may bolt. They are drawn between the gate
+       pieces (torDrawGates), so they pass behind and in front of the gates,
+       and their size follows the gates (DEER_PER_GATE); each herd walks at a
+       depth of its own, not the same as the last three, so it passes
+       different gates. Their colours follow the evening light and become the
+       night look as the lamps come on. The tanuki mother and kit are
+       switched off (O.tanukiOn: false); their code stays: they scurry and
+       stop to look at us.
        The owl is a small 3D model drawn into sprites; the animals are drawn
        with WebGL 2 (smooth shaded bodies) where it is there, or with hair
        strokes on a 2D canvas where it is not. Sprites are baked a few per
@@ -15615,9 +15677,10 @@ var O = {
   blinkMin: 1, blinkMax: 5, blinkTime: 0.2, doubleBlink: 0.2,
   // extras (hootPitch in cents)
   headTurn: false, headEvery: 12, hoot: true, hootEvery: 10, hootVolume: 0.6, hootPitch: 850,
-  // sika deer
-  deerOn: false, deerEvery: 25, herdMin: 2, herdMax: 4, stagChance: 1, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
-  grazeMin: 5, grazeMax: 15, deerLook: 0.5, runChance: 0.5, deerRun: 4.5, deerFar: 0.34, deerNear: 0.61,
+  // sika deer: they come out from dusk. deerFar..deerNear: the depths they walk at (0.61 is the foot of the nearest gate);
+  // their size follows the gates (DEER_PER_GATE), deerSize 0.115 being that size exactly
+  deerOn: true, deerEvery: 25, herdMin: 2, herdMax: 4, stagChance: 1, deerSize: 0.115, deerWalk: 0.55, grazeEvery: 7,
+  grazeMin: 5, grazeMax: 15, deerLook: 0.5, runChance: 0.5, deerRun: 4.5, deerFar: 0.26, deerNear: 0.85,
   // tanuki
   tanukiOn: false, tanukiEvery: 50, kitChance: 1, tanukiSize: 0.058, tanukiSpeed: 2, tanukiStops: 0.7, tanukiLook: 0.9,
   lookTime: 2.5, tanukiFar: 0.7, tanukiNear: 1.05,
@@ -15648,7 +15711,8 @@ function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.
 var TREE = { farOpacity: KOYO.farOpacity };
 var V = { horizon: LAND.horizon };
 var trees = [];                                      // [near tree, far tree], as they are this frame
-var owlActive = false, animalsActive = false;        // at night in autumn: the owl comes and the animals come out
+var owlActive = false, animalsActive = false;        // at night in autumn: the owl comes and the tanuki come out
+var deerActive = false;                              // the deer come out from dusk
 LS.GRDL = mk();                                      // every third leaf of the far ground again on its own (landBakeGround), laid over feet
 
 /* The owl's branch: a bare branch that grows from the limb nearest
@@ -16678,7 +16742,16 @@ function ap(p) { var v = tv(p); return [v[0], -v[1]]; }   // onto an animal's sp
 
 /* Where an animal at depth k stands, and how big it is. */
 function groundY(k) { var hy = H * V.horizon; return hy + (H - hy) * clamp(k / 1.15, 0, 1); }
-function animUnitPx(kind, variant, k) { return (kind === 'deer' ? O.deerSize : O.tanukiSize * (variant === 'kit' ? 0.7 : 1)) * H * k; }
+/* A deer's shoulder is 1 / DEER_PER_GATE of a torii's height. A gate whose
+   foot is d px below the horizon is TORII.gateHeight × d px tall (section 8c),
+   and a deer whose feet are there is as far down: so its size follows from
+   how far down it walks. */
+var DEER_PER_GATE = 3.6;
+function deerDepth(k) { return H * (1 - V.horizon) * clamp(k / 1.15, 0, 1); }
+function animUnitPx(kind, variant, k) {
+  if (kind === 'deer') return O.deerSize / 0.115 * deerDepth(k) * TORII.gateHeight / DEER_PER_GATE;
+  return O.tanukiSize * (variant === 'kit' ? 0.7 : 1) * H * k;
+}
 function animBlur(k) {
   if (k >= FAR_SCALE) return lerp(O.farBlur, 0, clamp((k - FAR_SCALE) / (1 - FAR_SCALE), 0, 1));
   return lerp(O.farBlur * 1.7, O.farBlur, clamp((k - 0.3) / (FAR_SCALE - 0.3), 0, 1));
@@ -16689,14 +16762,18 @@ function animPalette(variant, k) {
   for (var key in src) P[key] = vivid(hex(src[key]), O.vivid);
   if (variant === 'kit') { P.fur = mix(P.fur, P.dark, 0.1); P.tip = mix(P.tip, P.fur, 0.15); }   // a little darker and fluffier
   var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.animStrength * lerp(1, TREE.farOpacity, far * 0.7);
-  var hz = animHaze(k), mist = light(cols().mist), night = isNight();
+  var hz = animHaze(k), mist = light(cols().mist), night = isNight(), deer = variant === 'hind' || variant === 'stag', nn = koyoNight();
   P.fin = function (c) {
     var o = mix(c, PAPER, 1 - str);
+    if (deer) {                                       // evening: the scene's own dusk light, turning into the night look as the lamps come on
+      var nl = mix(o, [60, 52, 96], 0.06);
+      return mix(mix(light(o), nl, nn), mist, hz);
+    }
     if (night) o = mix(o, [60, 52, 96], 0.06);
     return mix(o, mist, hz);
   };
-  P.lamp = night ? O.lampGlow : 0.25;
-  P.hz = hz; P.str = str; P.mist = mist; P.night = night;
+  P.lamp = deer ? lerp(0.25, O.lampGlow, nn) : (night ? O.lampGlow : 0.25);
+  P.hz = hz; P.str = str; P.mist = mist; P.night = deer ? nn > 0.5 : night;
   return P;
 }
 
@@ -17408,7 +17485,7 @@ function tanukiPose(fr) {
 /* The frames for one kind of animal at (about) depth k, shared by any
    animal of that kind standing at that depth; queued to bake. */
 function animSet(kind, variant, k) {
-  var kq = Math.round(k * 25) / 25, key = variant + '@' + kq;
+  var q = kind === 'deer' ? 40 : 25, kq = Math.round(k * q) / q, key = variant + '@' + kq;
   if (!animSets[key]) {
     var S = { key: key, kind: kind, variant: variant, k: kq, frames: {}, pend: 0 };
     (kind === 'deer' ? DEER_FRAMES : TANUKI_FRAMES).forEach(function (fr) { S.pend++; animQueue.push([S, fr]); });
@@ -17463,14 +17540,26 @@ function kickLeaves(a, t, dt, rate) {
     if (Math.abs(Pl.x - fx) < a.unit * 0.5 && Math.random() < dt * rate * 0.25) liftFromPile(Pl, a.dir * rnd(60, 140), -rnd(50, 110));
   }
 }
+var deerLanes = [];                                   // the last three depths, so the next herd walks somewhere else
+function pickLane(kf, kn) {
+  var best = kf, bestSep = -1;
+  for (var i = 0; i < 8; i++) {
+    var k = rnd(kf, kn), sep = deerLanes.reduce(function (m, l) { return Math.min(m, Math.abs(k - l)); }, 9);
+    if (sep > bestSep) { bestSep = sep; best = k; }
+    if (sep >= 0.1) break;
+  }
+  deerLanes.push(best);
+  if (deerLanes.length > 3) deerLanes.shift();
+  return best;
+}
 function spawnHerd(t) {
   var lo = Math.min(O.herdMin, O.herdMax), hi = Math.max(O.herdMin, O.herdMax);
   var n = Math.round(rnd(lo - 0.49, hi + 0.49)), dir = Math.random() < 0.5 ? 1 : -1;
-  var kf = Math.min(O.deerFar, O.deerNear), kn = Math.max(O.deerFar, O.deerNear), kb = rnd(kf, kn);
+  var kf = Math.min(O.deerFar, O.deerNear), kn = Math.max(O.deerFar, O.deerNear), kb = pickLane(kf, kn);
   var stagAt = Math.random() < O.stagChance ? (n >= 2 ? Math.floor(Math.random() * n) : (Math.random() < 0.5 ? 0 : -1)) : -1;
   var herd = { id: ++herdN, spookAt: Math.random() < O.runChance ? -1 : Infinity, members: [] }, x = dir > 0 ? 0 : W;
   for (var i = 0; i < n; i++) {
-    var k = clamp(kb + rnd(-0.07, 0.07), kf, kn), variant = i === stagAt ? 'stag' : 'hind';
+    var k = clamp(kb + rnd(-0.05, 0.05) * (0.5 + kb), kf, kn), variant = i === stagAt ? 'stag' : 'hind';
     var a = { kind: 'deer', variant: variant, k: k, dir: dir, herd: herd, idx: i, state: 'prep', ph: rnd(0, TAU), neck: 0.15,
               frame: 'walk0', t0: t, until: 0, nextStop: 0, speed: O.deerWalk * rnd(0.9, 1.1), unit: animUnitPx('deer', variant, k) };
     x -= dir * a.unit * (i ? rnd(1.9, 2.8) : 1.5);                     // one behind the other, in a loose line
@@ -17496,6 +17585,12 @@ function spawnTanuki(t) {
     animals.push(kit);
   }
 }
+/* Is a gate's pillar, nearer than the deer, right across the middle of it? */
+function behindPillar(a) {
+  var d = deerDepth(a.k), ps = TOR.pillars;
+  for (var i = 0; i < ps.length; i++) if (ps[i].d > d + 1 && Math.abs(ps[i].x - a.x) < ps[i].w * 0.5 + a.unit * 0.55) return true;
+  return false;
+}
 function startGraze(a, t, short) {
   a.state = 'lower';
   a.until = t + (short ? rnd(2, 5) : rnd(Math.min(O.grazeMin, O.grazeMax), Math.max(O.grazeMin, O.grazeMax)));
@@ -17512,7 +17607,7 @@ function updateDeer(a, t, dt) {
       if (gap < a.unit * 1.9) { startGraze(a, t, true); break; }   // caught up with the one ahead: it grazes too
       stepOn(a, a.speed * (gap > a.unit * 4.5 && gap < Infinity ? 1.35 : 1), GAITS.walk, 'walk', 12, dt);
       if (a.k > 0.85) kickLeaves(a, t, dt, 0.3);
-      if (onScreen(a) && t >= a.nextStop) startGraze(a, t);
+      if (onScreen(a) && t >= a.nextStop) { if (behindPillar(a)) a.nextStop = t + 0.4; else startGraze(a, t); }   // on a bit if it would stop right behind a pillar
       break;
     case 'lower':                                     // the head goes down to the leaves
       a.neck = Math.min(1, a.neck + dt / 0.9);
@@ -17601,10 +17696,12 @@ function updateKit(a, t, dt) {
 }
 function updateAnimals(t, dt) {
   if (!trees.length || !H) return;
-  if (!deerNext) { deerNext = t + O.deerEvery * rnd(0.3, 0.6); tanukiNext = t + O.tanukiEvery * rnd(0.3, 0.6); }
+  if (!tanukiNext) tanukiNext = t + O.tanukiEvery * rnd(0.3, 0.6);
+  if (!deerActive) deerNext = 0;
+  else if (!deerNext) deerNext = t + O.deerEvery * rnd(0.3, 0.6);   // the first herd comes a little after dusk begins
   var anyDeer = false, anyTanuki = false, i, a;
   for (i = 0; i < animals.length; i++) { a = animals[i]; a.unit = animUnitPx(a.kind, a.variant, a.k); if (a.kind === 'deer') anyDeer = true; else anyTanuki = true; }
-  if (animalsActive && O.deerOn && !anyDeer && t >= deerNext) spawnHerd(t);          // only at night; those out at dawn finish their way
+  if (deerActive && O.deerOn && !anyDeer && TOR.ready && t >= deerNext) spawnHerd(t);   // from dusk; those out at dawn finish their way
   if (animalsActive && O.tanukiOn && !anyTanuki && t >= tanukiNext) spawnTanuki(t);
   // a herd that is going to be startled: once it is all in view, some time later
   var herds = {};
@@ -17632,35 +17729,59 @@ function updateAnimals(t, dt) {
     if (anyTanuki && !animals.some(function (x) { return x.kind === 'tanuki'; })) tanukiNext = t + O.tanukiEvery * rnd(0.6, 1.4);
   }
 }
-/* Those in this slot ('A' behind the far tree, 'B' between the trees, 'C'
-   in front of the near tree), further back first: a soft shadow on the
-   ground, the animal, then the leaves round its feet over its hooves. */
+/* The tanuki in this slot ('A' behind the far tree, 'B' between the trees, 'C'
+   in front of the near tree), further back first. The deer are drawn among the
+   gates (torDrawGates, with gateDeer and drawDeer). */
 function drawAnimals(c, slot) {
   if (!animals.length) return;
-  var list = animals.filter(function (a) { return a.state !== 'prep' && owlSlot(a.k) === slot; }).sort(function (a, b) { return a.k - b.k; });
-  for (var i = 0; i < list.length; i++) {
-    var a = list[i], S = a.set, spr = S.frames[a.frame] || S.frames.stand || S.frames.stand0;
-    if (!spr) continue;
-    var fy = groundY(a.k), sc = a.unit / animUnitPx(S.kind, S.variant, S.k), deer = a.kind === 'deer';
-    var hz = animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
-    c.setTransform(PR, 0, 0, PR, 0, 0);
-    c.save();
-    c.translate(a.x + a.dir * a.unit * (deer ? 0.05 : 0), fy + 1); c.scale(sx, sy);
-    var g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
-    g.addColorStop(0, 'rgba(30,16,20,' + (0.3 * (1 - hz)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(30,16,20,0)');
-    c.fillStyle = g; c.fillRect(-1, -1, 2, 2);
-    c.restore();
-    c.setTransform(PR * a.dir * sc, 0, 0, PR * sc, a.x * PR, fy * PR);
-    c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
-    // the fallen leaves just in front of its feet
-    var x0 = Math.max(0, Math.floor((a.x - a.unit * 1.2) * PR)), x1 = Math.min(LS.GRDL.cnv.width, Math.ceil((a.x + a.unit * 1.2) * PR));
-    var y0 = Math.max(0, Math.floor((fy - a.unit * 0.05 - LS.grdTop) * PR)), y1 = Math.min(LS.GRDL.cnv.height, Math.ceil((fy + 4 - LS.grdTop) * PR));
-    if (x1 > x0 && y1 > y0) {
-      c.setTransform(1, 0, 0, 1, 0, 0);
-      c.drawImage(LS.GRDL.cnv, x0, y0, x1 - x0, y1 - y0, x0, y0 + Math.round(LS.grdTop * PR), x1 - x0, y1 - y0);
-    }
-  }
+  var list = animals.filter(function (a) { return a.kind !== 'deer' && a.state !== 'prep' && owlSlot(a.k) === slot; }).sort(function (a, b) { return a.k - b.k; });
+  for (var i = 0; i < list.length; i++) drawAnimal(c, list[i]);
   c.setTransform(1, 0, 0, 1, 0, 0);
+}
+/* Part of a ground layer (the leaves, the gravel, the gate's shadow) over the
+   animal's feet: a strip of it across the ground at its feet. */
+function overLayer(c, cnv, top, a, fy) {
+  var x0 = Math.max(0, Math.floor((a.x - a.unit * 1.2) * PR)), x1 = Math.min(cnv.width, Math.ceil((a.x + a.unit * 1.2) * PR));
+  var y0 = Math.max(0, Math.floor((fy - a.unit * 0.05 - top) * PR)), y1 = Math.min(cnv.height, Math.ceil((fy + 4 - top) * PR));
+  if (x1 > x0 && y1 > y0) {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(cnv, x0, y0, x1 - x0, y1 - y0, x0, y0 + Math.round(top * PR), x1 - x0, y1 - y0);
+  }
+}
+/* A soft shadow on the ground, the animal, then the leaves round its feet over
+   its hooves (and, on the path, the gravel, and the shadow of the gates). */
+function drawAnimal(c, a) {
+  var S = a.set, spr = S.frames[a.frame] || S.frames.stand || S.frames.stand0;
+  if (!spr) return;
+  var fy = groundY(a.k), sc = a.unit / animUnitPx(S.kind, S.variant, S.k), deer = a.kind === 'deer';
+  var hz = animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.save();
+  c.translate(a.x + a.dir * a.unit * (deer ? 0.05 : 0), fy + 1); c.scale(sx, sy);
+  var g = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+  g.addColorStop(0, 'rgba(30,16,20,' + (0.3 * (1 - hz)).toFixed(3) + ')'); g.addColorStop(1, 'rgba(30,16,20,0)');
+  c.fillStyle = g; c.fillRect(-1, -1, 2, 2);
+  c.restore();
+  c.setTransform(PR * a.dir * sc, 0, 0, PR * sc, a.x * PR, fy * PR);
+  c.drawImage(spr.cv, -spr.ox, -spr.oy, spr.w, spr.h);
+  overLayer(c, LS.GRDL.cnv, LS.grdTop, a, fy);
+  if (deer && TOR.ready && TORII.show) {
+    if (TORII.gravel && TOR.grav.cnv.width > 1) overLayer(c, TOR.grav.cnv, TOR.gravTop, a, fy);
+    if (TOR.shadow.cnv.width > 1) { c.globalAlpha = TORII.strength; overLayer(c, TOR.shadow.cnv, TOR.gateTop, a, fy); c.globalAlpha = 1; }
+  }
+}
+function drawDeer(c, a) { drawAnimal(c, a); }
+/* The deer to draw among the gates, furthest first: dd is how far from the
+   eye the middle of the deer is, as the gate pieces' own distance is. */
+function gateDeer() {
+  var out = [], F = torLens();
+  for (var i = 0; i < animals.length; i++) {
+    var a = animals[i];
+    if (a.kind !== 'deer' || a.state === 'prep') continue;
+    var z = F / Math.max(0.5, deerDepth(a.k)), x = (a.x - W / 2) * z / F;
+    out.push({ a: a, dd: x * x + 0.42 + z * z });
+  }
+  return out.sort(function (p, q) { return q.dd - p.dd; });
 }
 /* ---------- Running it ---------- */
 var bakedFor = '', bakedLook = -1, bakedAt = -1e9;
@@ -17670,18 +17791,20 @@ function update(t, dt) {
   trees = tree ? (farTree ? [tree, farTree] : [tree]) : [];
   var night = ENV.scene === 'autumn' && ENV.phase === 'night' && trees.length > 0;
   owlActive = animalsActive = night;
+  deerActive = ENV.scene === 'autumn' && (ENV.phase === 'dusk' || night);
   if (!trees.length) { reset(); return; }
   var size = W + 'x' + H + '@' + PR;
-  if (night || owl || animals.length) {
+  if (night || owl || animals.length || deerActive) {
     if (size !== bakedFor) {                         // new size: everything afresh
       bakedFor = size; bakedLook = lookVersion; bakedAt = t;
-      bakeOwlSprites(true);
+      if (night || owl) bakeOwlSprites(true); else owlSit = [];
       resetAnimSets();
     } else if (bakedLook !== lookVersion && t - bakedAt > 60) {   // the light has moved on: the owl re-baked (the animals bake as they come)
       bakedLook = lookVersion; bakedAt = t;
-      bakeOwlSprites(false);
+      if (night || owl) bakeOwlSprites(false);
     }
   }
+  if (night && !owlSit.length) bakeOwlSprites(true);   // nightfall after a dusk without the owl's pictures
   if (night && !owl) {                               // nightfall: it flies in a little later
     startOwl(t);
     owl.state = 'gone'; owl.until = t + rnd(4, 12); owl.alpha = 0;
@@ -17708,7 +17831,7 @@ function drawSlot(c, slot) {
 }
 function busy() { return !!owl || animals.length > 0; }
 
-return { O: O, update: update, reset: reset, drawSlot: drawSlot, busy: busy, fadeHoots: fadeHoots,
+return { O: O, update: update, reset: reset, drawSlot: drawSlot, busy: busy, fadeHoots: fadeHoots, gateDeer: gateDeer, drawDeer: drawDeer,
          addPerch: addPerch, drawPerch: drawPerch, drawPerchLeaves: drawPerchLeaves, owlOn: owlOn };
 })();
 
