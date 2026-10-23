@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja" data-theme="autumn" data-time="night">
+<html lang="ja" data-theme="autumn" data-time="day">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -15,12 +15,14 @@
 <style>
   /* ============================================================
      BAMBOO LAB — a copy of landscape.html, used as the test bed for
-     bamboo groves in the autumn night scene. Preview only.
+     a bamboo grove in the autumn scene, in the day phase (the bamboo is
+     only for the day). Preview only.
      Everything from landscape.html is still here and runs on its
      approved values (mountains, Fuji, mist, fallen leaves, the two
      trees, the owl, the deer and the tanuki), but none of it has
-     controls any more. New: tall groves of bamboo rising from the sides
-     of the screen, behind the smaller (far) tree and taller than it,
+     controls any more. New: a dense grove of bamboo shooting in from the
+     side of the screen behind the smaller (far) tree, taller than it but
+     never past the top of the screen, softened and hazed for its depth,
      swaying in the wind and pushed by the gusts (section 6b). The
      control panel has only the bamboo values. Nothing in app.js is used
      or changed.
@@ -95,7 +97,7 @@
   }
 </style>
 </head>
-<body class="info-visible night-text">
+<body class="info-visible">
 
 <!-- ============ The real ambient background (same markup as index.html) ============ -->
 <div class="ambient-stage layer-diffuse" id="ambientStage" aria-hidden="true">
@@ -214,7 +216,7 @@
 var DEFAULTS = {
   seed: 7,
   nearSide: 'left',
-  timeOfDay: 'night',        // the owl comes out at night
+  timeOfDay: 'day',          // the bamboo is for the day only
   wind: 1,
   gustEvery: 9,
   gustStrength: 1,
@@ -332,7 +334,6 @@ var O = clone(ODEF);
    them; the sway values and the strength work at once. Values are kept
    in this browser; "Copy values" gives them in words and as JSON.
    ============================================================ */
-var SIDES = [['both', 'Both sides'], ['far', 'Only the far tree\'s side'], ['near', 'Only the near tree\'s side']];
 var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
   yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
@@ -342,17 +343,18 @@ var BAMBOO_COLOUR_NAMES = [['culm', 'Stems'], ['culmLit', 'Stem highlight'], ['c
                            ['twig', 'Twigs']];
 var BDEF = {
   // the grove
-  sides: 'both', culms: 14, reach: 0.2, seed: 1, heightMin: 1.5, heightMax: 2.1, lean: 9, leanVariety: 0.5, arch: 0.35,
+  culms: 50, seed: 1, entryTop: 0.3, entryBottom: 0.85, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+  lean: 24, leanVariety: 0.5, arch: 0.35,
   // stems
-  thickness: 16, taper: 0.45, nodeSpacing: 0.075, nodeMark: 0.7, highlight: 0.6, colourVariety: 0.45, colours: clone(BAMBOO_COLOURS),
+  thickness: 14, taper: 0.35, nodeSpacing: 0.08, nodeMark: 0.7, highlight: 0.6, colourVariety: 0.45, colours: clone(BAMBOO_COLOURS),
   // leaves
-  leafiness: 1.6, leafFrom: 0.45, leafSize: 1.3, leafDroop: 1,
-  // depth
-  haze: 0.22, depthHaze: 0.35, strength: 0.9, softness: 0.4,
+  leafiness: 1.5, leafFrom: 0.3, leafSize: 1.2, leafDroop: 1,
+  // depth of field
+  blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 0.9,
   // sway
   swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
 };
-var STORE_KEY = 'bambooLabValues1';
+var STORE_KEY = 'bambooLabValues2';   // 2: one grove, from the side, behind the far tree
 var B = clone(BDEF);
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
@@ -364,22 +366,24 @@ try {
 function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(B)); } catch (e) {} }
 
 var GROUPS = [
-  { title: 'The grove', ctls: [
-    { k: 'sides', label: 'Where the bamboo grows', type: 'select', opts: SIDES, re: 'grove' },
-    { k: 'culms', label: 'Stems on each side', min: 2, max: 30, step: 1, re: 'grove' },
-    { k: 'reach', label: 'How far in from the edge (× screen width)', min: 0.04, max: 0.45, step: 0.01, re: 'grove',
-      hint: 'The stems stand between the edge of the screen and this far in, most of them near the edge.' },
+  { title: 'The grove (behind the far tree)', ctls: [
+    { k: 'culms', label: 'Stems', min: 5, max: 90, step: 1, re: 'grove' },
     { k: 'seed', label: 'Arrangement', min: 1, max: 99, step: 1, re: 'grove', hint: 'Each number places the stems differently.' },
-    { k: 'heightMin', label: 'Shortest stem (× the far tree\'s height)', min: 1, max: 3, step: 0.05, re: 'grove',
-      hint: 'Above 1 = taller than the far tree.' },
-    { k: 'heightMax', label: 'Tallest stem (× the far tree\'s height)', min: 1, max: 3, step: 0.05, re: 'grove' },
-    { k: 'lean', label: 'Lean toward the middle (degrees)', min: 0, max: 30, step: 1, re: 'grove' },
+    { k: 'entryTop', label: 'Stems come in from the side between … (× screen height from the top)', min: 0.1, max: 1, step: 0.01, re: 'grove' },
+    { k: 'entryBottom', label: '… and (× screen height from the top)', min: 0.1, max: 1.1, step: 0.01, re: 'grove',
+      hint: 'Where the stems cross the edge of the screen. 1 = the bottom.' },
+    { k: 'heightMin', label: 'Lowest tops (× the far tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove',
+      hint: 'Above 1 = taller than the far tree. Measured from its root.' },
+    { k: 'heightMax', label: 'Highest tops (× the far tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove' },
+    { k: 'topMargin', label: 'Gap kept above the tops (× screen height)', min: 0, max: 0.3, step: 0.01, re: 'grove',
+      hint: 'Nothing, not even the leaves at the tops, goes higher than this below the top of the screen.' },
+    { k: 'lean', label: 'Lean toward the middle (degrees)', min: 0, max: 60, step: 1, re: 'grove', hint: 'More lean = they reach further in.' },
     { k: 'leanVariety', label: 'Difference in lean between stems', min: 0, max: 1, step: 0.05, re: 'grove' },
     { k: 'arch', label: 'How much the tops bend over', min: 0, max: 1, step: 0.05, re: 'grove',
       hint: 'As in the photo: the tops curve in over the path.' }
   ]},
   { title: 'Stems', ctls: [
-    { k: 'thickness', label: 'Thickness at the bottom (px, nearest stems)', min: 3, max: 30, step: 0.5, re: 'grove' },
+    { k: 'thickness', label: 'Thickness at the edge (px, nearest stems)', min: 3, max: 30, step: 0.5, re: 'grove' },
     { k: 'taper', label: 'Thinner toward the top', min: 0, max: 0.85, step: 0.05, re: 'grove', hint: '0 = the same thickness all the way up.' },
     { k: 'nodeSpacing', label: 'Joints every (× stem length)', min: 0.03, max: 0.2, step: 0.005, re: 'grove' },
     { k: 'nodeMark', label: 'How clearly the joints show', min: 0, max: 1, step: 0.05, re: 'grove' },
@@ -390,23 +394,25 @@ var GROUPS = [
   ]},
   { title: 'Leaves', ctls: [
     { k: 'leafiness', label: 'How leafy', min: 0, max: 2.5, step: 0.05, re: 'grove', hint: '0 = bare stems.' },
-    { k: 'leafFrom', label: 'Leaves start this far up (0 bottom … 1 top)', min: 0.1, max: 0.9, step: 0.01, re: 'grove' },
+    { k: 'leafFrom', label: 'Leaves start this far along (0 the edge … 1 the top)', min: 0, max: 0.9, step: 0.01, re: 'grove' },
     { k: 'leafSize', label: 'Leaf size', min: 0.4, max: 2.5, step: 0.05, re: 'grove' },
     { k: 'leafDroop', label: 'How much the leaves hang down', min: 0.2, max: 1.8, step: 0.05, re: 'grove' }
   ]},
-  { title: 'Depth', ctls: [
+  { title: 'Depth of field', ctls: [
+    { k: 'blurNear', label: 'Blur on the nearer stems (px)', min: 0, max: 6, step: 0.1,
+      hint: 'The far tree is about 1 px soft; behind it the bamboo should be softer.' },
+    { k: 'blurFar', label: 'Blur on the stems further back (px)', min: 0, max: 8, step: 0.1 },
     { k: 'haze', label: 'Haze (toward the mist colour)', min: 0, max: 0.9, step: 0.01, re: 'grove',
       hint: 'The far tree has 0.09. More haze sets the bamboo further back.' },
     { k: 'depthHaze', label: 'Extra haze on the stems further back', min: 0, max: 0.8, step: 0.01, re: 'grove' },
-    { k: 'strength', label: 'Strength against the paper', min: 0.2, max: 1, step: 0.05 },
-    { k: 'softness', label: 'Softness', min: 0, max: 1, step: 0.05, re: 'grove', hint: '0 = sharp; the far tree is about 0.7.' }
+    { k: 'strength', label: 'Strength against the paper', min: 0.2, max: 1, step: 0.05 }
   ]},
   { title: 'Swaying', ctls: [
     { k: 'swayAmount', label: 'How far they sway', min: 0, max: 4, step: 0.05, hint: '0 = still (gusts still push them).' },
     { k: 'swaySpeed', label: 'Sway speed', min: 0.2, max: 3, step: 0.05 },
     { k: 'swayVariety', label: 'Each stem in its own time', min: 0, max: 1, step: 0.05, hint: '0 = the whole grove sways together.' },
-    { k: 'tipWhip', label: 'Tops move more than the bottoms', min: 1, max: 4, step: 0.1,
-      hint: '1 = the stem swings stiffly from the root; higher = only the top bends.' },
+    { k: 'tipWhip', label: 'Tops move more than the rest', min: 1, max: 4, step: 0.1,
+      hint: '1 = the stem swings stiffly; higher = only the top bends.' },
     { k: 'gustResponse', label: 'Push from each gust', min: 0, max: 4, step: 0.05 },
     { k: 'gustSpring', label: 'Springiness after a gust', min: 0.2, max: 3, step: 0.05,
       hint: 'Higher = rocks back faster and settles sooner.' },
@@ -473,7 +479,7 @@ function buildControls() {
 var _rb = null;
 function changed(ctl) {
   save();
-  if (!ctl.re) return;
+  if (!ctl.re) return;              // the sway, blur and strength work at once
   clearTimeout(_rb);
   _rb = setTimeout(buildGroves, 150);
 }
@@ -497,16 +503,17 @@ document.getElementById('btnReset').addEventListener('click', function () {
    ============================================================ */
 function f2(x) { return Number(x).toFixed(2); }
 function buildCopyText() {
-  var L = [], side = SIDES.filter(function (x) { return x[0] === B.sides; })[0];
-  L.push('/* Bamboo groves — values from bamboo.html */');
+  var L = [];
+  L.push('/* Bamboo grove — values from bamboo.html (day only, behind the far tree) */');
   L.push('');
-  L.push('Grove: ' + (side ? side[1] : B.sides) + ', ' + B.culms + ' stems a side, up to ' + f2(B.reach) + ' × screen width in, arrangement ' +
-         B.seed + '; ' + f2(B.heightMin) + '–' + f2(B.heightMax) + ' × the far tree\'s height; lean ' + B.lean + '° (variety ' +
-         f2(B.leanVariety) + '), tops bend over ' + f2(B.arch));
+  L.push('Grove: ' + B.culms + ' stems, arrangement ' + B.seed + ', coming in from the side between ' + f2(B.entryTop) + ' and ' +
+         f2(B.entryBottom) + ' × screen height; tops ' + f2(B.heightMin) + '–' + f2(B.heightMax) + ' × the far tree\'s height, at least ' +
+         f2(B.topMargin) + ' below the top of the screen; lean ' + B.lean + '° (variety ' + f2(B.leanVariety) + '), tops bend over ' + f2(B.arch));
   L.push('Stems: ' + f2(B.thickness) + ' px thick, taper ' + f2(B.taper) + ', joints every ' + Number(B.nodeSpacing).toFixed(3) +
          ' (marked ' + f2(B.nodeMark) + '), shine ' + f2(B.highlight) + ', colour variety ' + f2(B.colourVariety));
-  L.push('Leaves: leafiness ' + f2(B.leafiness) + ', from ' + f2(B.leafFrom) + ' up, size ' + f2(B.leafSize) + ', droop ' + f2(B.leafDroop));
-  L.push('Depth: haze ' + f2(B.haze) + ' (+' + f2(B.depthHaze) + ' further back), strength ' + f2(B.strength) + ', softness ' + f2(B.softness));
+  L.push('Leaves: leafiness ' + f2(B.leafiness) + ', from ' + f2(B.leafFrom) + ' along, size ' + f2(B.leafSize) + ', droop ' + f2(B.leafDroop));
+  L.push('Depth of field: blur ' + f2(B.blurNear) + ' px nearer, ' + f2(B.blurFar) + ' px further back; haze ' + f2(B.haze) + ' (+' +
+         f2(B.depthHaze) + ' further back), strength ' + f2(B.strength));
   L.push('Swaying: amount ' + f2(B.swayAmount) + ', speed ' + f2(B.swaySpeed) + ', each in its own time ' + f2(B.swayVariety) +
          ', tops ' + f2(B.tipWhip) + ', gust push ' + f2(B.gustResponse) + ', springiness ' + f2(B.gustSpring) + ', leaf flutter ' + f2(B.leafFlutter));
   L.push('Colours: ' + BAMBOO_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + B.colours[cn[0]]; }).join(', '));
@@ -1001,22 +1008,24 @@ function nightGlow(T, strength) {
 }
 
 /* ============================================================
-   6b. BAMBOO — groves of tall bamboo rising from the sides of the
-   screen, behind the far tree and taller than it (B.heightMin–heightMax
-   × the far tree's height). Each stem is a curve from its root below the
-   screen that leans in toward the middle and bends over at the top, as
-   in the photo, with joints, a shine down one side and sprays of narrow
-   hanging leaves on its upper part (baked sprites). It sways on its own
-   and with its grove; the gusts (section 9) push each grove as they pass
-   it, and it rocks back on a spring. The groves are drawn on a layer of
-   their own (BAM), at a lower resolution for softness.
+   6b. BAMBOO — a dense grove of bamboo behind the far (smaller) tree,
+   in the day phase only. The stems shoot in from the side of the screen
+   on the far tree's side (we never see them from the ground), lean in
+   toward the middle and bend over at the top, as in the photo. Each
+   stem's top ends between B.heightMin and B.heightMax × the far tree's
+   height above its root, so the grove is taller than the tree, but never
+   higher than B.topMargin below the top of the screen. Each stem has
+   joints, a shine down one side and sprays of narrow hanging leaves
+   (baked sprites). It sways on its own and with the grove; the gusts
+   (section 9) push the grove as they pass it, and it rocks back on a
+   spring.
+   Depth of field: the grove is drawn at half resolution (as the far tree
+   is) on two layers, the nearer stems and those further back, and each
+   layer is blurred (B.blurNear, B.blurFar) and hazed toward the mist
+   colour, so it sits behind the far tree.
    ============================================================ */
-var groves = [], BAM = mk(), BAM_RES = 1, SPRAYS = [];
+var groves = [], BAMS = [mk(), mk()], BAMF = mk(), BAM_RES = 0.5, SPRAYS = [];   // BAMS: nearer, further back; BAMF: for the blur
 var SEG = 22;                                 // segments along each stem
-function bambooSides() {
-  var farSide = V.nearSide === 'left' ? 'right' : 'left';
-  return B.sides === 'both' ? ['left', 'right'] : [B.sides === 'far' ? farSide : V.nearSide];
-}
 /* From the far tree's root to the top of its leaves. */
 function farTreeHeight() {
   var T = trees[1] || trees[0];
@@ -1061,71 +1070,93 @@ function newSpray(r, s, side, tip, cs) {
 }
 function buildGroves() {
   if (!W) return;
-  BAM_RES = lerp(1, 0.3, B.softness);
-  BAM.cnv.width = Math.max(1, Math.round(W * PR * BAM_RES)); BAM.cnv.height = Math.max(1, Math.round(H * PR * BAM_RES));
+  BAMS.concat([BAMF]).forEach(function (L) {
+    L.cnv.width = Math.max(1, Math.round(W * PR * BAM_RES)); L.cnv.height = Math.max(1, Math.round(H * PR * BAM_RES));
+  });
   var r = rngFrom(B.seed * 977 + 13), k = PR * BAM_RES, u = H * 0.075 * B.leafSize;
   SPRAYS = [];
   for (var band = 0; band < 3; band++) {
     SPRAYS.push([]);
     for (var v = 0; v < 4; v++) SPRAYS[band].push(bakeSpray(r, u, B.haze + B.depthHaze * band / 2, k));
   }
-  var treeH = farTreeHeight(), old = groves;
-  groves = bambooSides().map(function (side) {
-    var left = side === 'left';
-    var G = { left: left, x: left ? W * B.reach * 0.5 : W * (1 - B.reach * 0.5), gust: 0, gustV: 0, ph: r() * TAU, culms: [] };
-    old.forEach(function (o) { if (o.left === left) { G.gust = o.gust; G.gustV = o.gustV; } });
-    for (var i = 0; i < B.culms; i++) {
-      var d = r();                                   // 0 nearest … 1 furthest back
-      var off = W * (-0.03 + B.reach * Math.pow(r(), 1.5));
-      var lean = (B.lean * PI / 180) * (1 + (r() - 0.5) * 1.6 * B.leanVariety) + (r() - 0.5) * 0.12 * B.leanVariety;
-      var cs = lerp(1, 0.55, d);
-      var len = treeH * lerp(B.heightMin, Math.max(B.heightMin, B.heightMax), r()) * (1 + 0.2 * B.arch);
-      var yell = r() < 0.5, shade = r();
-      var base = mix(hex(B.colours.culm), hex(yell ? B.colours.yellow : B.colours.culmShade), B.colourVariety * shade * (yell ? 0.8 : 0.45));
-      var haze = B.haze + B.depthHaze * d;
-      var C = {
-        x: left ? off : W - off, inward: left ? 1 : -1, lean: lean, arch: B.arch * lerp(0.7, 1.3, r()), len: len, d: d,
-        w: B.thickness / 2 * cs, band: Math.round(d * 2),
-        body: rgb(bambooTone(base, haze)),
-        lit: rgb(bambooTone(mix(base, hex(B.colours.culmLit), 0.7), haze)),
-        dark: rgb(bambooTone(mix(base, hex(B.colours.culmShade), 0.75), haze)),
-        node: rgb(bambooTone(hex(B.colours.node), haze)), ring: rgb(bambooTone(hex(B.colours.ring), haze)),
-        f: lerp(0.75, 1.25, r()), rp: r(), rp2: r(), gk: lerp(0.75, 1.25, r()),
-        nodes: [], sprays: [], px: new Float32Array(SEG + 1), py: new Float32Array(SEG + 1), pa: new Float32Array(SEG + 1)
-      };
-      // joints, a little further apart toward the middle of the stem
-      for (var s = B.nodeSpacing * lerp(0.4, 1, r()); s < 0.99; s += B.nodeSpacing * lerp(0.85, 1.15, r()) * (0.75 + 0.5 * Math.sin(PI * s))) C.nodes.push(s);
-      // leaf sprays at the joints on the upper part, on alternating sides, and a tuft at the top
-      var sd = r() < 0.5 ? 1 : -1;
-      for (var j = 0; j < C.nodes.length; j++) {
-        var sj = C.nodes[j];
-        if (sj < B.leafFrom) continue;
-        var up = (sj - B.leafFrom) / Math.max(0.05, 1 - B.leafFrom);
-        for (var nn = B.leafiness * lerp(0.6, 1.3, up); nn > 0; nn -= 1) {
-          if (r() < nn) C.sprays.push(newSpray(r, sj, sd, false, cs));
-          sd = -sd;
-        }
+  var T = trees[1] || trees[0], treeH = farTreeHeight(), root = T ? T.by : H + 6;
+  var left = T ? T.left : V.nearSide !== 'left', old = groves[0];
+  var G = { left: left, x: left ? W * 0.15 : W * 0.85, gust: old ? old.gust : 0, gustV: old ? old.gustV : 0, ph: r() * TAU, culms: [] };
+  groves = [G];
+  for (var i = 0; i < B.culms; i++) {
+    var d = r();                                   // 0 nearest … 1 furthest back
+    var lean = (B.lean * PI / 180) * (1 + (r() - 0.5) * 1.6 * B.leanVariety) + (r() - 0.5) * 0.12 * B.leanVariety;
+    var cs = lerp(1, 0.55, d);
+    // where it crosses the edge of the screen; it starts just outside
+    var y0 = H * lerp(B.entryTop, Math.max(B.entryTop, B.entryBottom), r()), out = 3 + r() * W * 0.015;
+    // where its top should end: above the far tree, below the top of the screen
+    var topY = Math.max(H * B.topMargin, root - treeH * lerp(B.heightMin, Math.max(B.heightMin, B.heightMax), r()));
+    var arch = B.arch * lerp(0.7, 1.3, r());
+    var yell = r() < 0.5, shade = r();
+    var base = mix(hex(B.colours.culm), hex(yell ? B.colours.yellow : B.colours.culmShade), B.colourVariety * shade * (yell ? 0.8 : 0.45));
+    var haze = B.haze + B.depthHaze * d;
+    var C = {
+      x: left ? -out : W + out, y: y0, inward: left ? 1 : -1, lean: lean, arch: arch, len: 1, d: d,
+      w: B.thickness / 2 * cs, band: Math.round(d * 2), layer: d < 0.5 ? 0 : 1,
+      body: rgb(bambooTone(base, haze)),
+      lit: rgb(bambooTone(mix(base, hex(B.colours.culmLit), 0.7), haze)),
+      dark: rgb(bambooTone(mix(base, hex(B.colours.culmShade), 0.75), haze)),
+      node: rgb(bambooTone(hex(B.colours.node), haze)), ring: rgb(bambooTone(hex(B.colours.ring), haze)),
+      f: lerp(0.75, 1.25, r()), rp: r(), rp2: r(), gk: lerp(0.75, 1.25, r()),
+      nodes: [], sprays: [], px: new Float32Array(SEG + 1), py: new Float32Array(SEG + 1), pa: new Float32Array(SEG + 1)
+    };
+    // its length: what brings its top, standing still, up to topY
+    var rise = 0;
+    for (var si = 0; si < SEG; si++) { var sm = (si + 0.5) / SEG; rise -= Math.sin(-PI / 2 + C.inward * (lean + arch * sm * sm)) / SEG; }
+    C.len = Math.max(H * 0.06, y0 - topY) / Math.max(0.2, rise);
+    // joints, a little further apart toward the middle of the stem
+    for (var s = B.nodeSpacing * lerp(0.4, 1, r()); s < 0.99; s += B.nodeSpacing * lerp(0.85, 1.15, r()) * (0.75 + 0.5 * Math.sin(PI * s))) C.nodes.push(s);
+    // leaf sprays at the joints on the upper part, on alternating sides, and a tuft at the top
+    var sd = r() < 0.5 ? 1 : -1;
+    for (var j = 0; j < C.nodes.length; j++) {
+      var sj = C.nodes[j];
+      if (sj < B.leafFrom) continue;
+      var up = (sj - B.leafFrom) / Math.max(0.05, 1 - B.leafFrom);
+      for (var nn = B.leafiness * lerp(0.6, 1.3, up); nn > 0; nn -= 1) {
+        if (r() < nn) C.sprays.push(newSpray(r, sj, sd, false, cs));
+        sd = -sd;
       }
-      if (B.leafiness > 0) for (var tq = 0; tq < 3; tq++) C.sprays.push(newSpray(r, lerp(0.95, 1, r()), tq % 2 ? 1 : -1, true, cs));
-      G.culms.push(C);
     }
-    G.culms.sort(function (a, b) { return b.d - a.d; });   // further back first
-    return G;
-  });
+    if (B.leafiness > 0) for (var tq = 0; tq < 3; tq++) C.sprays.push(newSpray(r, lerp(0.95, 1, r()), tq % 2 ? 1 : -1, true, cs));
+    // then shorter, if its leaves would reach higher than B.topMargin
+    for (var it = 0; it < 4; it++) {
+      shapeCulm(C, G, 0, true);
+      var hi = culmHighest(C, u), lim = H * B.topMargin + H * 0.015;   // a little room for the sway and the blur
+      if (hi >= lim) break;
+      C.len *= Math.max(0.3, (C.y - lim) / (C.y - hi));
+    }
+    G.culms.push(C);
+  }
+  G.culms.sort(function (a, b) { return b.d - a.d; });   // further back first
 }
 function swayGroves(dt) {
   var kS = 6 * B.gustSpring, cS = 1.5 * Math.sqrt(B.gustSpring);
   groves.forEach(function (G) { G.gustV += (-kS * G.gust - cS * G.gustV) * dt; G.gust += G.gustV * dt; });
 }
-/* The stem's curve this frame. sw is how far its top swings (radians
-   from the root); B.tipWhip puts that bend toward the top. */
-function shapeCulm(C, G, t) {
+/* The highest point of a stem and its leaves (roughly: how far each spray
+   reaches up from where it grows). */
+function culmHighest(C, u) {
+  var top = C.py[SEG];
+  for (var i = 0; i < C.sprays.length; i++) {
+    var S = C.sprays[i], q = culmAt(C, S.s);
+    top = Math.min(top, q.y - u * S.sc * 1.45 * Math.max(0.4, -Math.sin(q.a + S.side * S.spread)));
+  }
+  return top;
+}
+/* The stem's curve this frame (standing still if rest). sw is how far its
+   top swings (radians from the root); B.tipWhip puts that bend toward the top. */
+function shapeCulm(C, G, t, rest) {
   var A = 0.035 * B.swayAmount * V.wind, sp = B.swaySpeed, vr = B.swayVariety;
-  var sw = A * (Math.sin(t * 0.9 * sp * C.f + G.ph + C.rp * vr * TAU) + 0.4 * Math.sin(t * 2.1 * sp * C.f + G.ph * 1.7 + C.rp2 * vr * TAU)) +
+  var sw = rest ? 0 : A * (Math.sin(t * 0.9 * sp * C.f + G.ph + C.rp * vr * TAU) + 0.4 * Math.sin(t * 2.1 * sp * C.f + G.ph * 1.7 + C.rp2 * vr * TAU)) +
            A * 0.6 * Math.sin(t * 0.31 * sp + G.ph) + G.gust * C.gk;
   var e = B.tipWhip - 1, step = C.len / SEG;
   function ang(s) { return -PI / 2 + C.inward * (C.lean + C.arch * s * s) + sw * B.tipWhip * Math.pow(s, e); }
-  var x = C.x, y = H + 6;
+  var x = C.x, y = C.y;
   for (var i = 0; i <= SEG; i++) {
     C.px[i] = x; C.py[i] = y; C.pa[i] = ang(i / SEG);
     var am = ang((i + 0.5) / SEG);
@@ -1183,20 +1214,52 @@ function drawCulm(c, C, G, t) {
     c.restore();
   }
 }
+/* One layer onto the scene, blurred by blur px. */
+function bambooLayerOut(L, blur) {
+  var src = L.cnv;
+  if (blur > 0) {
+    var f = BAMF.c;
+    f.setTransform(1, 0, 0, 1, 0, 0);
+    f.clearRect(0, 0, BAMF.cnv.width, BAMF.cnv.height);
+    f.filter = 'blur(' + (blur * PR * BAM_RES).toFixed(2) + 'px)';
+    f.drawImage(src, 0, 0);
+    f.filter = 'none';
+    src = BAMF.cnv;
+  }
+  ctx.drawImage(src, 0, 0, cv.width, cv.height);
+}
 function drawBamboo(t) {
-  if (!groves.length) return;
-  var b = BAM.c, k = PR * BAM_RES;
-  b.setTransform(1, 0, 0, 1, 0, 0);
-  b.globalAlpha = 1;
-  b.clearRect(0, 0, BAM.cnv.width, BAM.cnv.height);
-  b.setTransform(k, 0, 0, k, 0, 0);
-  groves.forEach(function (G) {
-    for (var i = 0; i < G.culms.length; i++) { shapeCulm(G.culms[i], G, t); drawCulm(b, G.culms[i], G, t); }
+  if (V.timeOfDay !== 'day' || !groves.length) return;   // the bamboo is for the day only
+  var k = PR * BAM_RES;
+  BAMS.forEach(function (L) {
+    L.c.setTransform(1, 0, 0, 1, 0, 0);
+    L.c.globalAlpha = 1;
+    L.c.clearRect(0, 0, L.cnv.width, L.cnv.height);
+    L.c.setTransform(k, 0, 0, k, 0, 0);
   });
-  b.globalAlpha = 1;
+  groves.forEach(function (G) {
+    for (var i = 0; i < G.culms.length; i++) {
+      var C = G.culms[i];
+      shapeCulm(C, G, t);
+      drawCulm(BAMS[C.layer].c, C, G, t);
+    }
+  });
+  // a safety net: a gust or the biggest leaves never take it above B.topMargin (fades out just under it)
+  var lim = H * B.topMargin, fade = H * 0.02;
+  BAMS.forEach(function (L) {
+    L.c.globalAlpha = 1;
+    if (lim <= 0) return;
+    var g = L.c.createLinearGradient(0, lim, 0, lim + fade);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    L.c.globalCompositeOperation = 'destination-out';
+    L.c.fillStyle = 'rgba(0,0,0,1)'; L.c.fillRect(0, 0, W, lim);
+    L.c.fillStyle = g; L.c.fillRect(0, lim, W, fade);
+    L.c.globalCompositeOperation = 'source-over';
+  });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = B.strength;
-  ctx.drawImage(BAM.cnv, 0, 0, cv.width, cv.height);
+  bambooLayerOut(BAMS[1], B.blurFar);
+  bambooLayerOut(BAMS[0], B.blurNear);
   ctx.globalAlpha = 1;
 }
 
