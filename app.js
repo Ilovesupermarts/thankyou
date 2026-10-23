@@ -1311,6 +1311,7 @@ var _swipeActive = false;
 
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
+var BAMBOO_URL = 'Sound/morning/Windbamboo.mp3';
 
 /* ============ TRACK METADATA (4 PHASES) ============
    Four Nagoya time phases, the page colour theme's own
@@ -2195,6 +2196,10 @@ function initSound() {
       if (buf) soundBuffers.stream = makeSeamlessLoop(buf, 1.5);
     });
 
+    loadAudioBuffer(BAMBOO_URL).then(function(buf) {
+      if (buf) soundBuffers.bamboo = buf;
+    });
+
     /* AMBIENT BEDS: three raw MP3s download in parallel, but only
        the current Nagoya phase decodes. The other two sit in
        _ambientRawBuffers until their boundary arrives or the
@@ -2621,6 +2626,7 @@ function getCurrentAmbientTrack() {
 function startAmbient() {
   stopAmbient();
   _ambientBufferRetries = 0;
+  bambooStart();
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
@@ -2647,6 +2653,7 @@ function scheduleNextAmbient(prevPlayMs) {
 }
 
 function stopAmbient() {
+  bambooStop();
   stopSwellLoop();
   _ambientBufferRetries = 0;
   _plStop();
@@ -3407,6 +3414,118 @@ function musicBack() {
   bind(hudBtnMute, musicToggleMute);
   _musicSyncButtons();
 })();
+
+/* ============ WIND IN THE BAMBOO ============
+   An ambient layer for the morning and the day (the page colour theme's
+   morning and day phases, 05:00–16:59), under the music. Sound/morning/
+   Windbamboo.mp3 is a 57-second field recording; every so often a random
+   12-second piece of it is played, fading in over its first 2 seconds and
+   out over its last 2.
+
+   Timing: the next piece starts 5–15 seconds after the last one has
+   finished, at random. A strong gust — one the landscape or the winter
+   scene sends that is at least the threshold strength — starts a piece at
+   once when none is playing, so the rustle arrives with the wind; during
+   a piece, or in another phase, a gust does nothing.
+
+   It runs while the ambient music does (startAmbient / stopAmbient), and
+   keeps asking the clock, so a page left open carries on at 05:00 and
+   falls silent at 17:00 without being restarted. It is wind, not music:
+   it does not go through ambientBus, so the music's mute and pause
+   buttons leave it alone, as they do the wind chime. BAMBOO_PEAK is its
+   loudness — the recording itself is quiet (about 17 dB under the songs). */
+var BAMBOO_CLIP_SEC = 12;
+var BAMBOO_FADE = 2;               // seconds, in and out
+var BAMBOO_GAP_MIN = 5;            // seconds between one piece's end and the next's start
+var BAMBOO_GAP_MAX = 15;
+var BAMBOO_PEAK = 1.8;
+var BAMBOO_GUST_STR = 120;         // a landscape gust this strong (startGust's str) brings a piece in
+var BAMBOO_WIN_GUST_STR = 0.7;     // …and the winter scene's, on its own scale
+
+var _bambooOn = false;
+var _bambooTimer = null;
+var _bambooSrc = null;
+var _bambooGain = null;
+
+function _bambooPhaseOk() {
+  var phase = getTimeOfDayInNagoya();
+  return phase === 'morning' || phase === 'day';
+}
+
+function _bambooSchedule() {
+  if (!_bambooOn) return;
+  var gap = BAMBOO_GAP_MIN + Math.random() * (BAMBOO_GAP_MAX - BAMBOO_GAP_MIN);
+  _bambooTimer = setTimeout(function() {
+    _bambooTimer = null;
+    _bambooPlay();
+  }, gap * 1000);
+}
+
+function _bambooPlay() {
+  if (!_bambooOn || _bambooSrc) return;
+  var buf = soundBuffers.bamboo;
+  /* Not the morning or the day, or the recording has not arrived yet:
+     ask again after another gap. */
+  if (!_bambooPhaseOk() || !buf || !soundAudioCtx) { _bambooSchedule(); return; }
+
+  var len = Math.min(BAMBOO_CLIP_SEC, buf.duration);
+  var offset = Math.random() * (buf.duration - len);
+  var fade = Math.min(BAMBOO_FADE, len / 2);
+  var now = soundAudioCtx.currentTime;
+  var src = soundAudioCtx.createBufferSource();
+  src.buffer = buf;
+  var gain = soundAudioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(BAMBOO_PEAK, now + fade);
+  gain.gain.setValueAtTime(BAMBOO_PEAK, now + len - fade);
+  gain.gain.linearRampToValueAtTime(0, now + len);
+  src.connect(gain);
+  gain.connect(soundMasterGain);
+  src.start(now, offset, len);
+  _bambooSrc = src;
+  _bambooGain = gain;
+  src.onended = function() {
+    try { gain.disconnect(); } catch (e) {}
+    if (_bambooSrc === src) {
+      _bambooSrc = null;
+      _bambooGain = null;
+      _bambooSchedule();
+    }
+  };
+}
+
+function bambooStart() {
+  bambooStop();
+  if (!SOUND_ENABLED) return;
+  _bambooOn = true;
+  _bambooSchedule();
+}
+
+function bambooStop() {
+  _bambooOn = false;
+  if (_bambooTimer) { clearTimeout(_bambooTimer); _bambooTimer = null; }
+  if (_bambooSrc && _bambooGain && soundAudioCtx) {
+    try {
+      var now = soundAudioCtx.currentTime;
+      _bambooGain.gain.cancelScheduledValues(now);
+      _bambooGain.gain.setValueAtTime(_bambooGain.gain.value, now);
+      _bambooGain.gain.setTargetAtTime(0, now, 0.1);
+      _bambooSrc.stop(now + 0.5);
+    } catch (e) {
+      try { _bambooSrc.stop(); } catch (e2) {}
+    }
+  }
+  _bambooSrc = null;
+  _bambooGain = null;
+}
+
+/* A gust has started; strength is its own strength over the threshold, so
+   1 or more is a strong one. */
+function bambooGust(strength) {
+  if (strength < 1 || !_bambooOn || _bambooSrc || !_bambooPhaseOk()) return;
+  if (_bambooTimer) { clearTimeout(_bambooTimer); _bambooTimer = null; }
+  _bambooPlay();
+}
 
 /* ============================================================
    AUDIO-REACTIVE SWELL SYSTEM */
@@ -11033,6 +11152,7 @@ function startGust(force) {
     lifts: 10                                       // most leaves it may lift off the ground
   };
   gusts.push(g);
+  bambooGust(g.str / BAMBOO_GUST_STR);
   var n = Math.round((3 + Math.floor(Math.random() * 5)) * 0.8);   // 20% fewer leaves blown in
   for (var i = 0; i < n; i++) {
     spawnLeaf({ x: dir > 0 ? -30 : W + 30, y: Math.random() * H * 0.6, vx: dir * g.str * rnd(0.5, 1), force: force });
@@ -14522,8 +14642,10 @@ function winFloorY(x) {
 function winWindDir() { return ENV.windPx < -4 ? -1 : 1; }
 function winWind() { return WINT.wind * clamp(0.6 + ENV.windMs / 6, 0.6, 1.6); }
 function winStartGust(dir, k) {
+  var str = 0.5 * WINT.gustStrength * (k || 1) * (0.7 + 0.6 * Math.random());
   WS.gusts.push({ dir: dir, x: dir > 0 ? -200 : W + 200, v: 300 + Math.random() * 120,
-                  str: 0.5 * WINT.gustStrength * (k || 1) * (0.7 + 0.6 * Math.random()), hit: {} });
+                  str: str, hit: {} });
+  bambooGust(str / BAMBOO_WIN_GUST_STR);
 }
 function winUpdateField(t) {
   var FB = 10, cnt = Math.ceil(W / FB) + 2, wk = winWind() * winWindDir(), F = WS.field, G = WS.gusts;
