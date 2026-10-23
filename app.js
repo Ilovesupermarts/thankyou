@@ -8628,7 +8628,7 @@ function updateBlossomGreeting() {
 function fetchNagoyaWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
             '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation' +
-            '&wind_speed_unit=ms&timezone=Asia%2FTokyo';
+            '&wind_speed_unit=ms&models=jma_seamless&timezone=Asia%2FTokyo';
   fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (!data || !data.current) return;
     if (typeof DynBG !== 'undefined' && DynBG) DynBG.onWeather(data.current);
