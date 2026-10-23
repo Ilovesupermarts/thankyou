@@ -1,4 +1,4 @@
-var BUILD = 'v139';
+var BUILD = 'v140';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -52,13 +52,18 @@ var BUILD = 'v139';
          kōyō branches are solid and taper smoothly at the forks. In
          autumn the swipe hint and dots stay clear of the leaves (dots at
          least 136px up, hint 184px). The winter scene is unchanged.
-       - Bamboo groves (autumn, by day), as tuned on bamboo.html (values in
+       - Bamboo groves (autumn), as tuned on bamboo.html (values in
          BAMBOO, section 8b): a dense grove shooting in from the side of
          the screen behind each kōyō tree, taller than its tree but below
          the top of the screen, softened and hazed for its depth, swaying
          and pushed by the gusts. The trees are cut out of the bamboo, so
-         none shows through their leaves. They fade in after sunrise and
-         out around sunset. The birds now fly at six depths among the
+         none shows through their leaves. The grove behind the bigger tree
+         is there by day (it fades in after sunrise and out around sunset);
+         the one behind the smaller tree stays through the evening and the
+         night, lit from beneath by the same lamps as the trees (a warm
+         pool of light behind it and a warm tint rising from the ground up
+         its stems and leaves, as strong as the trees' lamps: koyoNight() ×
+         KOYO.nightGlow). The birds now fly at six depths among the
          groves and trees (BIRD_SLOTS). No deer or tanuki come at night any
          more (the owl still does).
        - Bamboo, lighter and smooth: the groves as re-tuned on bamboo.html
@@ -11667,7 +11672,8 @@ function drawFog(ctx, dt) {
    white eye-ring, quick whirring wings that fold between bursts) and
    オオルリ (blue-and-white flycatcher: deep cobalt, white belly).
    Each bird flies in one of the depth slots of BIRD_SLOTS, among the two
-   bamboo groves (by day, see "Bamboo groves") and the two trees: behind
+   bamboo groves (the one behind the bigger tree by day only, see "Bamboo
+   groves") and the two trees: behind
    everything, behind the grove on the far tree's side but in front of
    the other, in front of both groves but behind both trees, and so on, up
    to between the near grove and the big tree. Its slot sets its size: the
@@ -12543,6 +12549,7 @@ function drawKoyoTrees(ctx, t) {
   var gFar = bambooGrove('far'), gNear = bambooGrove('near');
   NightLife.drawSlot(ctx, 'A');                   // the owl and the animals further back than the far tree (8b)
   if (gFar) {                                     // the bamboo behind the far tree (and the near tree, where it reaches it)
+    bamGlow(ctx, gFar);                           // at night, the lamps' pool of light behind it
     if (gFar.fresh) {                             // the trees are cut out when it is redrawn; in between it is laid down as it was
       var reach = (KOYO.maxWidth / 100 + 0.12) * W * PR * BAM_RES, fb = gFar.box;
       var meets = tree && (tree.left ? fb.x < reach : fb.x + fb.w > gFar.out.cnv.width - reach);
@@ -12562,7 +12569,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
   }
   NightLife.drawSlot(ctx, 'B');                   // between the two trees
-  if (gNear) { if (gNear.fresh) bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
+  if (gNear) { bamGlow(ctx, gNear); if (gNear.fresh) bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
   if (tree) {
     koyoGlow(ctx, tree, 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -12601,7 +12608,7 @@ function drawKoyoTrees(ctx, t) {
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 }
-/* ---------- Bamboo groves (autumn, by day) — as tuned on bamboo.html ----------
+/* ---------- Bamboo groves (autumn) — as tuned on bamboo.html ----------
    Two dense groves of bamboo (values in BAMBOO): 'far' behind the far
    (smaller) tree and 'near' behind the near (bigger) tree. The stems shoot
    in from the side of the screen on their tree's side (never seen from the
@@ -12624,9 +12631,16 @@ function drawKoyoTrees(ctx, t) {
    is drawn at half resolution into its own canvas (G.out). The trees in
    front are then cut out of G.out, so no bamboo shows through their
    see-through foliage, and the birds use it to hide behind a grove
-   (BIRD_SLOTS). Only in daylight: they fade in after sunrise and out around
-   sunset (ENV.light.daylight). A grove is rebuilt when the trees change, and
-   at most once a minute when the light changes (then one grove a frame).
+   (BIRD_SLOTS). The grove behind the bigger tree shows by day only: it fades
+   in after sunrise and out around sunset (ENV.light.daylight); the one behind
+   the smaller tree stays up through the evening and the night. At night both
+   are lit from beneath like the trees: bamGlow lays a warm pool of lamp light
+   behind a grove, and drawGrove tints what it has drawn, strongest at the
+   bottom of the screen and fading upward (G.glow: koyoNight() ×
+   KOYO.nightGlow, so it comes on with the trees' lamps). A grove is rebuilt
+   when the trees change, and at most once a minute when the light changes
+   (then one grove a frame); one not showing (the bigger tree's at night) is
+   not built.
    Every BAMBOO_EVERY-th frame each grove is redrawn (1: every frame; 2: the
    two in turn, each at half the rate). */
 var BAMBOO_COLOURS = {
@@ -12656,8 +12670,13 @@ var BAMBOO_EVERY = 1;                            // each grove is redrawn every 
 var bambooFrame = 0;
 var bambooGroves = [], bambooKey = '', bambooLook = -1, bambooBuiltAt = -1e9;
 function bamCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
-function bambooAlpha() { return ENV.scene === 'autumn' && ENV.light ? ENV.light.daylight : 0; }
-function bamTone(c, haze) { return koyoLight(mixRgb(c, KOYO_PAPER, clamp(haze, 0, 0.95)), 0); }
+/* How strongly a grove shows: the one behind the smaller tree (far) all day
+   and night, the one behind the bigger tree (near) with the daylight. */
+function bambooAlpha(key) { return ENV.scene === 'autumn' && ENV.light ? (key === 'far' ? 1 : ENV.light.daylight) : 0; }
+/* The colours the bamboo is drawn in. At night they are lit like the far tree's
+   foliage, only a little less (the lamps' own light is laid on top, bamGlow and
+   drawGrove). */
+function bamTone(c, haze) { return koyoLight(mixRgb(c, KOYO_PAPER, clamp(haze, 0, 0.95)), KOYO.nightGlow * 0.3); }
 /* From a tree's root to the top of its leaves. */
 function bamTreeHeight(T) {
   var top = T.by;
@@ -12832,27 +12851,28 @@ function bamStemSheet(G, k) {
   });
   G.stems = sheet;
 }
-/* Both groves, when the trees or the size change, or (at most once a minute)
-   the light. Only in daylight, and only with both trees there. */
+/* The groves that show, when the trees or the size change, or (at most once a
+   minute) the light. Only with both trees there; a grove that is not showing
+   (the bigger tree's at night) is left alone. */
 function ensureBamboo() {
-  if (!tree || !farTree || bambooAlpha() <= 0) return;
+  if (!tree || !farTree || ENV.scene !== 'autumn') return;
   var key = tree.key + '|' + farTree.key + '|' + PR, now = performance.now() / 1000;
-  if (key !== bambooKey || !bambooGroves.length) {     // new trees or a new size: both now
-    var old = bambooGroves;
-    bambooGroves = [buildBambooGrove('far', farTree, old), buildBambooGrove('near', tree, old)];
-    bambooGroves.forEach(function(G) { G.look = lookVersion; });
-    bambooKey = key; bambooLook = lookVersion; bambooBuiltAt = now;
-    return;
+  if (key !== bambooKey) {                              // new trees or a new size: afresh
+    bambooKey = key; bambooGroves = []; bambooLook = lookVersion; bambooBuiltAt = now;
   }
   // the light has moved on: re-baked in its colours at most once a minute, one grove a frame
   if (bambooLook !== lookVersion && now - bambooBuiltAt >= 60) { bambooLook = lookVersion; bambooBuiltAt = now; }
-  for (var i = 0; i < bambooGroves.length; i++) {
-    var G = bambooGroves[i];
-    if (G.look === bambooLook) continue;
-    bambooGroves[i] = buildBambooGrove(G.key, G.key === 'far' ? farTree : tree, bambooGroves);
-    bambooGroves[i].look = bambooLook;
-    return;
-  }
+  var rebaked = false;
+  ['far', 'near'].forEach(function(k) {
+    if (bambooAlpha(k) <= 0) return;                    // not showing: not built
+    var at = -1, i, G;
+    for (i = 0; i < bambooGroves.length; i++) if (bambooGroves[i].key === k) at = i;
+    G = at < 0 ? null : bambooGroves[at];
+    if (G && (G.look === bambooLook || rebaked)) return;
+    var ng = buildBambooGrove(k, k === 'far' ? farTree : tree, bambooGroves);
+    ng.look = bambooLook;
+    if (at < 0) bambooGroves.push(ng); else { bambooGroves[at] = ng; rebaked = true; }
+  });
 }
 function bambooGrove(key) {
   for (var i = 0; i < bambooGroves.length; i++) if (bambooGroves[i].key === key && bambooGroves[i].a > 0 && bambooGroves[i].box) return bambooGroves[i];
@@ -12969,12 +12989,13 @@ function bamDrawCulm(c, C, G, t, wind, k) {
    grove shown is redrawn into its G.out (not yet cut by the trees) every
    BAMBOO_EVERY-th frame, and marked fresh. */
 function renderBamboo(t) {
-  var a = bambooAlpha();
-  if (a > 0) ensureBamboo();
-  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10));
+  ensureBamboo();
+  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10)), lamps = koyoNight() * KOYO.nightGlow;
   bambooFrame++;
   bambooGroves.forEach(function(G, gi) {
+    var a = bambooAlpha(G.key);
     G.a = G.B.show && a > 0.003 ? a * G.B.strength : 0;
+    G.glow = G.a ? lamps : 0;                     // how strongly the lamps light it (as the trees)
     G.fresh = false;
     if (!G.a) {                                   // not shown: what it drew is cleared
       if (G.box) { G.out.c.setTransform(1, 0, 0, 1, 0, 0); G.out.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); }
@@ -13004,6 +13025,25 @@ function renderBamboo(t) {
     var bx0 = clamp(Math.floor((x0 - pad) * k), 0, G.out.cnv.width), bx1 = clamp(Math.ceil((x1 + pad) * k), 0, G.out.cnv.width);
     var by0 = clamp(Math.floor((y0 - pad) * k), 0, G.out.cnv.height);
     G.box = bx1 > bx0 && by0 < G.out.cnv.height ? { x: bx0, y: by0, w: bx1 - bx0, h: G.out.cnv.height - by0 } : null;
+    // where its mass is (about a third of the way up its stems), for the lamps' pool of light
+    var mx = 0, my = 0;
+    for (i = 0; i < G.culms.length; i++) { mx += G.culms[i].px[7]; my += G.culms[i].py[7]; }
+    G.gx = mx / Math.max(1, G.culms.length); G.gy = my / Math.max(1, G.culms.length);
+    G.gr = Math.max(H * 0.3, G.box ? G.box.h / k * 0.55 : 0);
+    // the lamps light it from beneath: what it has drawn is tinted warm, most at the
+    // bottom of the screen and less and less higher up (the same lamp colour as the trees)
+    if (G.glow > 0.01 && G.box) {
+      var lg = c.createLinearGradient(0, H, 0, H * 0.1);
+      lg.addColorStop(0, rgba(KOYO_LAMP, 1 * G.glow));
+      lg.addColorStop(0.4, rgba(KOYO_LAMP, 0.55 * G.glow));
+      lg.addColorStop(0.75, rgba(KOYO_LAMP, 0.16 * G.glow));
+      lg.addColorStop(1, rgba(KOYO_LAMP, 0.04 * G.glow));
+      c.setTransform(k, 0, 0, k, 0, 0);
+      c.globalCompositeOperation = 'source-atop';
+      c.fillStyle = lg;
+      c.fillRect(G.box.x / k, G.box.y / k, G.box.w / k, G.box.h / k);
+      c.globalCompositeOperation = 'source-over';
+    }
     // a safety net: a gust or the biggest leaves never take it above topMargin (fades out just under it)
     var lim = H * B.topMargin, fade = H * 0.02;
     c.setTransform(k, 0, 0, k, 0, 0);
@@ -13016,6 +13056,19 @@ function renderBamboo(t) {
       c.globalCompositeOperation = 'source-over';
     }
   }
+}
+/* Night: a soft warm pool of lamp light behind a grove, as koyoGlow does for a tree. */
+function bamGlow(ctx, G) {
+  var a = G.glow * G.a;
+  if (a <= 0.01) return;
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+  var gy = G.gy + G.gr * 0.25, g = ctx.createRadialGradient(G.gx, gy, 0, G.gx, gy, G.gr * 1.3);
+  g.addColorStop(0, 'rgba(255,184,110,' + (0.34 * a).toFixed(3) + ')');
+  g.addColorStop(0.5, 'rgba(255,170,96,' + (0.15 * a).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(255,160,90,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(G.gx - G.gr * 1.4, gy - G.gr * 1.4, G.gr * 2.8, G.gr * 2.8);
 }
 /* Cut the trees in front out of a grove: list of [canvas, times] (each
    canvas covers the whole screen; foliage is cut three times, as it is a
