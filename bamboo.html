@@ -379,7 +379,7 @@ var GDEF = {
   path: [[0.045, 0.893], [0.22, 0.879], [0.43, 0.868], [0.6, 0.867], [0.7, 0.884], [0.815, 0.945]],
   straightEnd: 1.5, lens: 0.8,
   // the gates
-  gateHeight: 1.5, spacing: 0.5, width: 0.62, pillar: 0.075, lean: 1.5, overhang: 0.2, sori: 0.04,
+  gateHeight: 1.5, count: 500, width: 0.62, pillar: 0.075, lean: 1.5, overhang: 0.2, sori: 0.04,
   nukiAt: 0.7, feet: 0.11, gakuzuka: true, colours: clone(GATE_COLOURS),
   // light and shadow
   lightFrom: -0.4, shadeDepth: 0.55, shadow: 0.35, shadowBlur: 3,
@@ -424,7 +424,8 @@ var GROUPS = [
   { title: 'The gates', ctls: [
     { k: 'gateHeight', label: 'Gate height (× eye height)', min: 0.6, max: 3, step: 0.01,
       hint: 'Sets the size of every gate against the ground. 1.5 = a gate about 2.5 m tall seen from about 1.7 m.' },
-    { k: 'spacing', label: 'Gap from one gate to the next (× gate height)', min: 0.2, max: 2, step: 0.01 },
+    { k: 'count', label: 'Number of gates along the whole path', min: 20, max: 900, step: 1,
+      hint: 'They stay evenly spaced along the path, so fewer gates = wider gaps, more = a denser tunnel.' },
     { k: 'width', label: 'Width between the pillars (× gate height)', min: 0.4, max: 1, step: 0.01 },
     { k: 'pillar', label: 'Pillar thickness (× gate height)', min: 0.03, max: 0.14, step: 0.002 },
     { k: 'lean', label: 'Pillars lean in (degrees)', min: 0, max: 5, step: 0.1 },
@@ -638,7 +639,7 @@ function buildCopyText() {
   L.push('  Path (x × screen width, y × screen height, from the start to the gate facing you): ' +
          G.path.map(function (p) { return '(' + f3(p[0]) + ', ' + f3(p[1]) + ')'; }).join(' → ') +
          '; straight run toward you ' + f2(G.straightEnd) + ' × gate height; camera lens ' + f2(G.lens) + ' × screen width');
-  L.push('  Gates: ' + f2(G.gateHeight) + ' × eye height tall, ' + f2(G.spacing) + ' × gate height apart, ' + f2(G.width) +
+  L.push('  Gates: ' + f2(G.gateHeight) + ' × eye height tall, ' + G.count + ' along the path, ' + f2(G.width) +
          ' wide, pillars ' + f3(G.pillar) + ' thick leaning in ' + f2(G.lean) + '°, upper beam reaching ' + f2(G.overhang) +
          ' past the pillars with an upward curve of ' + f3(G.sori) + ', lower beam at ' + f2(G.nukiAt) + ', black feet ' + f3(G.feet) +
          ' tall, short post ' + (G.gakuzuka ? 'on' : 'off'));
@@ -1582,7 +1583,7 @@ function bakeGates() {
   for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
   var mistC = light(hex(V.colours.mist));
   var path = gatePath = buildGatePath();
-  var gap = Math.max(0.05, G.spacing * G.gateHeight);
+  var gap = Math.max(0.05, path.len / Math.max(1, G.count - 1));
   // the gates, from the end (the one facing you) back to the start
   var gates = [];
   for (var s = path.len; s >= 0; s -= gap) {
