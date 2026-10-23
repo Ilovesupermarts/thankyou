@@ -68,6 +68,17 @@ var BUILD = 'v139';
          (at the full rate, BAMBOO_EVERY) they are only placed: a stem as
          slices of its picture laid along its curve. A change of light
          re-bakes one grove a frame.
+       - Torii gates and a gravel path (autumn), as tuned on bamboo.html
+         (values in TORII, section 8c): a long line of vermilion torii
+         winds across the ground of fallen leaves, from the horizon on the
+         left, along it and back toward you, ending with a gate that faces
+         you square on. Each gate is in perspective and in proportion to
+         the ground it stands on (the furthest the smallest), with the
+         same depth of field and haze as the rest of the scene. A pale
+         gravel path, as wide as the shadow each gate throws, runs
+         through them and straight on out of the bottom of the screen. They
+         are baked with the landscape (its last step) and lit by the app's
+         light.
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -12539,6 +12550,7 @@ function drawKoyoTrees(ctx, t) {
     }
     bamLayDown(ctx, gFar);
   }
+  torDrawGates(ctx);                              // the line of torii gates, standing on the path, behind the far tree
   if (farTree) {
     koyoGlow(ctx, farTree, 0.6);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -13771,9 +13783,10 @@ function updateLandscape(t, bedBatch) {
   var win = ENV.scene === 'winter', k = landKey();
   if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
     if (LS.step === 2) { if (win) winBakeGround(); else landBakeGround(); }
+    else if (LS.step === 4) { torBake(); }                   // the torii gates and the gravel path (autumn only), once the rest is ready
     else if (win) { winBakeNear(); winBakeSprites(); LS.ready = true; }
     else { landBakeNear(); LS.ready = true; placeFloor(); }
-    LS.step = LS.step === 2 ? 3 : 0;
+    LS.step = LS.step === 2 ? 3 : (LS.step === 3 && !win ? 4 : 0);
     return;                                       // the loose leaves are laid on a later frame
   } else if (k !== LS.key) {
     var was = LS.key.split('|'), now = k.split('|');
@@ -13809,7 +13822,7 @@ function drawLandscape(c, dt) {
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
   if (ENV.scene === 'winter') winDrawGround(c, lastT);          // in slices, with the skiers between them (8d)
-  else c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
+  else { c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR)); torDrawGravel(c); }   // the gravel path lies on the ground
   c.setTransform(PR, 0, 0, PR, 0, 0);
 }
 /* The near band (leaves in autumn, the snowdrift in winter) goes under the
@@ -13822,6 +13835,400 @@ function drawNearBand(c) {
   c.globalCompositeOperation = 'destination-over';
   c.drawImage(LS.NEAR.cnv, 0, Math.round((GH - LS.nearH) * PR));
   c.globalCompositeOperation = 'source-over';
+}
+
+/* ============================================================
+   8c. TORII GATES AND GRAVEL PATH (autumn theme) — as tuned on bamboo.html
+   (values in TORII). A long line of vermilion torii (as at Takayama
+   Inari) winds across the ground of fallen leaves, from the far left of
+   the horizon, along it and back toward you, ending with a gate that
+   faces you square on. A gravel path runs through the gates, as wide as
+   the shadow each gate throws, and carries straight on past the last
+   gate and out of the bottom of the screen.
+   Perspective: the scene is seen by a camera at eye height (1 unit)
+   looking level, so the horizon (LAND.horizon) is the eye line. A point
+   on the ground d px below the horizon is lens / d units away, and a
+   thing h units tall standing there is h × d px tall: every gate is as
+   tall as its foot is far below the horizon, so the far gates are the
+   smallest and each one is in proportion to the ground it stands on.
+   Each gate is built in 3D (round pillars with black feet leaning in a
+   little, the tie beam, the short post, the upper beam with curled-up
+   ends) and every piece of every gate is drawn from the furthest to the
+   nearest, so the gates overlap as they really would.
+   Depth of field: further gates are blurred (in six steps) and hazed
+   toward the mist colour, as the ground is at the horizon. Everything is
+   lit by the app's own light (koyoLight) and baked, with the landscape,
+   as its last step (see updateLandscape): the path is drawn on the
+   ground (torDrawGravel, from drawLandscape) and the gates stand on it
+   behind the far tree (torDrawGates, from drawKoyoTrees).
+   ============================================================ */
+var TORII = {
+  show: true,
+  // the path: x × screen width, y × screen height, from the start to the gate facing you
+  path: [[0.252027027027027, 0.862], [0.3625, 0.8766666666666667], [0.45135135135135135, 0.884],
+         [0.5253378378378378, 0.8973333333333333], [0.5689189189189189, 0.9053333333333333], [0.6608108108108108, 0.9353333333333333]],
+  straightEnd: 1.3, lens: 0.72,
+  // the gates
+  gateHeight: 2.78, count: 59, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
+  nukiAt: 0.69, feet: 0.125, gakuzuka: true,
+  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+             gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
+  // light and shadow
+  lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
+  // depth of field
+  focusDepth: 0.5, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4, strength: 1,
+  // the gravel path
+  gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
+};
+var TOR = { gate: landCanvas(), grav: landCanvas(), gateTop: 0, gravTop: 0, ready: false };
+var TOR_BANDS = 6;
+function torLens() { return TORII.lens * W; }
+function torScreen(x, y, z) { var F = torLens(); return [W / 2 + F * x / z, H * LAND.horizon + F * (1 - y) / z]; }
+function torGround(sx, sy) {
+  var F = torLens(), d = Math.max(0.5, sy - H * LAND.horizon), z = F / d;
+  return { x: (sx - W / 2) * z / F, z: z };
+}
+/* The path on the ground: a smooth curve through the points, in ground
+   units. Each stretch is a cubic curve whose end directions are taken
+   from the points either side, so it winds without loops even though
+   the far stretches are far longer than the near ones. Before the end
+   it runs straight toward you for TORII.straightEnd × gate height. */
+function torPath() {
+  var P = TORII.path.map(function (p) { return torGround(p[0] * W, p[1] * H); });
+  var end = P[P.length - 1], run = TORII.straightEnd * TORII.gateHeight;
+  if (run > 0.01) P.splice(P.length - 1, 0, { x: end.x, z: end.z + run });
+  var n = P.length, dir = [];
+  for (var i = 0; i < n; i++) {
+    var dx = 0, dz = 0;
+    if (i > 0) { var l0 = Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z) || 1; dx += (P[i].x - P[i - 1].x) / l0; dz += (P[i].z - P[i - 1].z) / l0; }
+    if (i < n - 1) { var l1 = Math.hypot(P[i + 1].x - P[i].x, P[i + 1].z - P[i].z) || 1; dx += (P[i + 1].x - P[i].x) / l1; dz += (P[i + 1].z - P[i].z) / l1; }
+    var ll = Math.hypot(dx, dz) || 1;
+    dir.push([dx / ll, dz / ll]);
+  }
+  // the last stretch comes straight at you
+  dir[n - 1] = [0, -1];
+  if (run > 0.01) dir[n - 2] = [0, -1];
+  // each bend reaches no further than the shorter stretch beside it, so a
+  // long far stretch cannot throw a loop into a short near one
+  var len = [];
+  for (var li = 0; li < n - 1; li++) len.push(Math.hypot(P[li + 1].x - P[li].x, P[li + 1].z - P[li].z));
+  var pts = [], acc = 0;
+  for (var s = 0; s < n - 1; s++) {
+    var A = P[s], Bp = P[s + 1], L = len[s];
+    var m1 = Math.min(L, s > 0 ? len[s - 1] : L) * 0.3, m2 = Math.min(L, s < n - 2 ? len[s + 1] : L) * 0.3;
+    var c1x = A.x + dir[s][0] * m1, c1z = A.z + dir[s][1] * m1;
+    var c2x = Bp.x - dir[s + 1][0] * m2, c2z = Bp.z - dir[s + 1][1] * m2;
+    var steps = Math.max(8, Math.min(400, Math.round(L * 3)));
+    for (var k = s === 0 ? 0 : 1; k <= steps; k++) {
+      var t = k / steps, u = 1 - t;
+      var x = u * u * u * A.x + 3 * u * u * t * c1x + 3 * u * t * t * c2x + t * t * t * Bp.x;
+      var z = u * u * u * A.z + 3 * u * u * t * c1z + 3 * u * t * t * c2z + t * t * t * Bp.z;
+      if (pts.length) acc += Math.hypot(x - pts[pts.length - 1].x, z - pts[pts.length - 1].z);
+      pts.push({ x: x, z: z, s: acc });
+    }
+  }
+  return { pts: pts, len: acc };
+}
+/* Where along the path (s ground units from its start), and which way it runs. */
+function torPathAt(path, s) {
+  var p = path.pts, lo = 0, hi = p.length - 1;
+  while (hi - lo > 1) { var mid = (lo + hi) >> 1; if (p[mid].s < s) lo = mid; else hi = mid; }
+  var a = p[lo], b = p[hi], seg = Math.max(1e-6, b.s - a.s), t = clamp((s - a.s) / seg, 0, 1);
+  var tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+  return { x: lerp(a.x, b.x, t), z: lerp(a.z, b.z, t), tx: tx / tl, tz: tz / tl };
+}
+
+/* The pieces of one gate. Each piece is a small closed solid (a box, a
+   curved box or a many-sided pillar) given as faces of 3D points; tone
+   says how it is coloured. Local units: u across the gate, y up, v along
+   the path. */
+function torPieces(lod) {
+  var h = TORII.gateHeight, half = TORII.width * h / 2, r = TORII.pillar * h / 2;
+  var kt = 0.065 * h, st = 0.05 * h, sori = TORII.sori * h;
+  var kTop = h - sori, kBot = kTop - kt, pTop = kBot - st;     // the upper beam's middle, and the top of the pillars
+  var lean = Math.tan(TORII.lean * PI / 180) * pTop;                // how far the pillar tops come in
+  var feetH = TORII.feet * h, nukiY = TORII.nukiAt * h, nt = 0.05 * h;
+  var facets = lod > 0.5 ? 10 : lod > 0.15 ? 6 : 4, segs = lod > 0.5 ? 10 : lod > 0.15 ? 4 : 2;
+  var pieces = [];
+  function pillarAt(y) { return half - lean * (y / pTop); }      // the pillar's middle, from the gate's middle, at height y
+  // a pillar (or a foot): a many-sided solid from y0 to y1
+  function prism(side, y0, y1, r0, r1, tone, cap) {
+    var faces = [];
+    var c0 = side * pillarAt(y0), c1 = side * pillarAt(y1);
+    for (var i = 0; i < facets; i++) {
+      var a0 = (i / facets) * TAU, a1 = ((i + 1) / facets) * TAU;
+      faces.push({ tone: tone, p: [[c0 + Math.cos(a0) * r0, y0, Math.sin(a0) * r0], [c0 + Math.cos(a1) * r0, y0, Math.sin(a1) * r0],
+                                   [c1 + Math.cos(a1) * r1, y1, Math.sin(a1) * r1], [c1 + Math.cos(a0) * r1, y1, Math.sin(a0) * r1]] });
+    }
+    if (cap) {
+      var ring = [];
+      for (var j = 0; j < facets; j++) { var aa = (j / facets) * TAU; ring.push([c1 + Math.cos(aa) * r1, y1, Math.sin(aa) * r1]); }
+      faces.push({ tone: tone, p: ring });
+    }
+    pieces.push({ faces: faces, c: [(c0 + c1) / 2, (y0 + y1) / 2, 0] });
+  }
+  // a beam from u0 to u1, its bottom and top following yb(u) and yt(u), d deep;
+  // cut into pieces so each sorts on its own against the gates around it
+  function beam(u0, u1, yb, yt, d, topTone, n) {
+    for (var k = 0; k < n; k++) {
+      var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
+      var q = [[a, yb(a), -d], [b, yb(b), -d], [b, yt(b), -d], [a, yt(a), -d],
+               [a, yb(a), d], [b, yb(b), d], [b, yt(b), d], [a, yt(a), d]];
+      var faces = [
+        { tone: 'v', p: [q[0], q[1], q[2], q[3]] },            // one face
+        { tone: 'v', p: [q[4], q[7], q[6], q[5]] },            // the other face
+        { tone: topTone, p: [q[3], q[2], q[6], q[7]] },        // top
+        { tone: 'v', p: [q[0], q[4], q[5], q[1]] }             // underside
+      ];
+      if (k === 0) faces.push({ tone: 'v', p: [q[0], q[3], q[7], q[4]] });
+      if (k === n - 1) faces.push({ tone: 'v', p: [q[1], q[5], q[6], q[2]] });
+      pieces.push({ faces: faces, c: [(a + b) / 2, (yb(a) + yt(b)) / 2, 0] });
+    }
+  }
+  // pillars and feet
+  [-1, 1].forEach(function (side) {
+    if (feetH > 0.001) prism(side, 0, feetH, r * 1.16, r * 1.12, 'f', true);
+    prism(side, feetH, pTop, r, r * 0.94, 'v', false);
+  });
+  // the tie beam (nuki) through the pillars, its ends showing past them
+  var nL = pillarAt(nukiY) + r + 0.1 * h, pin = pillarAt(nukiY), nd = r * 0.62;
+  var nb = function () { return nukiY - nt / 2; }, ntp = function () { return nukiY + nt / 2; };
+  beam(-nL, -pin - r * 0.9, nb, ntp, nd, 'v', 1);
+  beam(-pin + r * 0.9, pin - r * 0.9, nb, ntp, nd, 'v', Math.max(1, segs - 2));
+  beam(pin + r * 0.9, nL, nb, ntp, nd, 'v', 1);
+  // the short post in the middle
+  if (TORII.gakuzuka && lod > 0.08) beam(-0.035 * h, 0.035 * h, ntp, function () { return pTop; }, r * 0.55, 'v', 1);
+  // the upper beams: the shimaki, and the kasagi on it, both curving up toward the ends
+  var sL = pillarAt(pTop) + TORII.overhang * h * 0.82, kL = pillarAt(pTop) + TORII.overhang * h;
+  function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
+  var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
+  beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  return pieces;
+}
+/* One gate's pieces into the world at (x, z), its across direction (ax, az)
+   and along the path (tx, tz). */
+function torPlace(pieces, g) {
+  function w(p) { return [g.x + g.ax * p[0] + g.tx * p[2], p[1], g.z + g.az * p[0] + g.tz * p[2]]; }
+  return pieces.map(function (pc) {
+    return { faces: pc.faces.map(function (f) { return { tone: f.tone, p: f.p.map(w) }; }), c: w(pc.c), g: g };
+  });
+}
+/* The gravel path. It is laid on the ground along the same winding path as
+   the gates, as wide as the shadow each gate throws (the same footprint
+   the shadows in bakeGates use), and after the last gate it carries on
+   straight toward you until it is off the bottom of the screen. Both
+   edges are worked out on the ground and then put through the same
+   camera as the gates, so it narrows toward the horizon and the gates
+   stand on it in proportion. It is a packed base with pebbles on it
+   (counted by how much of the screen they cover, so the far ones are
+   tiny and the near ones are not too few), a few of them drifting out
+   onto the leaves at the edges, and a few fallen leaves. The same mist
+   as the ground is laid over it, so it melts into the horizon. Baked
+   into GRAV, with the gates. */
+function torBakeGravel(path) {
+  if (!W || !TORII.gravel || !path || path.pts.length < 2) return;
+  var hy = H * LAND.horizon, F = torLens(), h = TORII.gateHeight, r = rngFrom(97531);
+  var wu = (TORII.width * h / 2 + TORII.pillar * h * 1.5) * TORII.pathWidth;      // half the shadow's width
+  var C = {}; for (var ck in TORII.colours) C[ck] = hexToRgb(TORII.colours[ck]);
+  // the middle line: the path, then straight on toward you, past the bottom of the screen
+  var mid = path.pts.map(function (p) { return { x: p.x, z: p.z }; });
+  var last = mid[mid.length - 1], zExit = F / Math.max(8, (1.08 - LAND.horizon) * H);
+  if (last.z > zExit) {
+    var steps = Math.max(2, Math.ceil((last.z - zExit) / 0.6));
+    for (var e = 1; e <= steps; e++) mid.push({ x: last.x, z: lerp(last.z, zExit, e / steps) });
+  }
+  // both edges at a fraction of the width (-1 … 1 across), on the screen
+  var nM = mid.length, nrm = [];
+  for (var i = 0; i < nM; i++) {
+    var a = mid[Math.max(0, i - 1)], b = mid[Math.min(nM - 1, i + 1)];
+    var tx = b.x - a.x, tz = b.z - a.z, tl = Math.hypot(tx, tz) || 1;
+    nrm.push([-tz / tl, tx / tl]);
+  }
+  function across(i, v) { return torScreen(mid[i].x + nrm[i][0] * wu * v, 0, Math.max(0.3, mid[i].z + nrm[i][1] * wu * v)); }
+  TOR.gravTop = Math.max(0, Math.floor(hy - 8));
+  var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - TOR.gravTop) * PR));
+  TOR.grav.cnv.width = cw; TOR.grav.cnv.height = chh;
+  var c = TOR.grav.c, es = TORII.edgeSoft, base = 1 - es * 0.6;
+  c.setTransform(PR, 0, 0, PR, 0, -TOR.gravTop * PR);
+  // the packed base
+  var L = [], R = [];
+  for (var j = 0; j < nM; j++) { L.push(across(j, -base)); R.push(across(j, base)); }
+  c.fillStyle = rgba(koyoLight(mixRgb(C.gravel, C.gravelDark, 0.12)));
+  c.beginPath();
+  L.forEach(function (p, k) { if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
+  for (var k2 = nM - 1; k2 >= 0; k2--) c.lineTo(R[k2][0], R[k2][1]);
+  c.closePath(); c.fill();
+  // pebbles and leaves, a stretch of the path at a time (stretches under 2 px long are joined)
+  var keep = [0];
+  for (var q = 1; q < nM; q++) {
+    var kp = keep[keep.length - 1];
+    if (Math.abs(L[q][1] - L[kp][1]) + Math.abs(L[q][0] - L[kp][0]) >= 2 || q === nM - 1) keep.push(q);
+  }
+  var leafTones = [KOYO_FAMILIES.red[1], KOYO_FAMILIES.red[2], KOYO_FAMILIES.orange[1], KOYO_FAMILIES.gold[1]];
+  var total = 0, MAXP = 60000, ctlP = 0.11 * TORII.pebbles, ctlL = 0.0007 * TORII.pathLeaves, ctlE = 0.0016 * TORII.pathLeaves;
+  var span = 1 + es;
+  for (var s = 0; s < keep.length - 1 && total < MAXP; s++) {
+    var i0 = keep[s], i1 = keep[s + 1];
+    var A0 = across(i0, -span), A1 = across(i0, span), B0 = across(i1, -span), B1 = across(i1, span);
+    if (Math.max(A0[1], A1[1], B0[1], B1[1]) < hy - 4) continue;
+    var area = Math.abs((A0[0] * A1[1] - A1[0] * A0[1]) + (A1[0] * B1[1] - B1[0] * A1[1]) + (B1[0] * B0[1] - B0[0] * B1[1]) + (B0[0] * A0[1] - A0[0] * B0[1])) / 2;
+    var zc = (mid[i0].z + mid[i1].z) / 2, pu = F / zc;                 // px per ground unit here
+    var nP = Math.min(MAXP - total, Math.round(area * ctlP)), nL = Math.round(area * ctlL + (r() < (area * ctlL) % 1 ? 1 : 0));
+    total += nP;
+    for (var m = 0; m < nP; m++) {
+      var u = r(), v = (r() * 2 - 1) * span;
+      if (Math.abs(v) > 1 && r() > (span - Math.abs(v)) / Math.max(0.001, es)) continue;   // thinning out past the edge
+      var p2 = across(i0, v), pn = across(i1, v), px = lerp(p2[0], pn[0], u), py = lerp(p2[1], pn[1], u);
+      if (py < hy - 2) continue;
+      var sz = Math.max(0.6, 0.04 * pu * TORII.pebbleSize * lerp(0.5, 1.5, r() * r()));
+      var tone = r() < 0.2 ? C.gravel : mixRgb(C.gravelDark, C.gravelLight, r());
+      tone = scaleRgb(tone, lerp(0.92, 1.06, r()));
+      c.setTransform(PR, 0, 0, PR * lerp(0.4, 0.6, r()), px * PR, (py - TOR.gravTop) * PR);
+      c.fillStyle = rgba(koyoLight(tone));
+      c.beginPath(); c.arc(0, 0, sz / 2, 0, TAU); c.fill();
+    }
+    var nE = Math.round(area * ctlE + (r() < (area * ctlE) % 1 ? 1 : 0));      // leaves across the edges, to break the line
+    for (var lf = 0; lf < nL + nE; lf++) {
+      var lv = lf < nL ? (r() * 2 - 1) * (1 + es * 0.5) : (r() < 0.5 ? -1 : 1) * lerp(0.82, 1.1, r()), lu = r(), la = across(i0, lv), lb = across(i1, lv);
+      var lx = lerp(la[0], lb[0], lu), ly = lerp(la[1], lb[1], lu);
+      if (ly < hy + 2) continue;
+      var lt = leafTones[Math.floor(r() * leafTones.length)];
+      lt = scaleRgb(mixRgb(lt, C.gravelDark, r() * 0.35), lerp(0.74, 1.05, r()));
+      c.setTransform(PR, 0, 0, PR * lerp(0.35, 0.6, r()), lx * PR, (ly - TOR.gravTop) * PR);
+      landLeafLo(c, Math.max(2, 0.2 * pu * lerp(0.7, 1.3, r())), r() * TAU);
+      c.fillStyle = rgba(koyoLight(lt)); c.fill();
+    }
+  }
+  // the same mist as the ground, lying over it: thick at the horizon, thinning toward you
+  c.setTransform(PR, 0, 0, PR, 0, -TOR.gravTop * PR);
+  var mistC = koyoLight(LAND_C.mist), gh = LAND.groundHaze, mz = c.createLinearGradient(0, hy - 2, 0, H);
+  mz.addColorStop(0, rgba(mistC, 0.9 * gh)); mz.addColorStop(0.2, rgba(mistC, 0.4 * gh));
+  mz.addColorStop(0.55, rgba(mistC, 0.12 * gh)); mz.addColorStop(1, rgba(mistC, 0));
+  c.globalCompositeOperation = 'source-atop';
+  c.fillStyle = mz; c.fillRect(-10, hy - 10, W + 20, H - hy + 20);
+  c.globalCompositeOperation = 'source-over';
+}
+function torDrawGravel(c) {
+  if (!TOR.ready || !TORII.gravel || TOR.grav.cnv.width < 2 || ENV.scene !== 'autumn') return;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(TOR.grav.cnv, 0, Math.round(TOR.gravTop * PR));
+}
+/* Both baked at once (the last step of a landscape bake). */
+function torBake() {
+  TOR.ready = false;
+  TOR.gate.cnv.width = 1; TOR.gate.cnv.height = 1;
+  TOR.grav.cnv.width = 1; TOR.grav.cnv.height = 1;
+  if (!W) return;
+  var path = torPath();
+  torBakeGravel(path);
+  if (!TORII.show) { TOR.ready = true; return; }
+  var hy = H * LAND.horizon, F = torLens(), C = {};
+  for (var ck in TORII.colours) C[ck] = hexToRgb(TORII.colours[ck]);
+  var mistC = koyoLight(LAND_C.mist);
+  var gap = Math.max(0.05, path.len / Math.max(1, TORII.count - 1));
+  // the gates, from the end (the one facing you) back to the start
+  var gates = [];
+  for (var s = path.len; s >= 0; s -= gap) {
+    var q = torPathAt(path, s);
+    if (q.z < 0.6) continue;                           // behind or right at the camera
+    var foot = hy + F / q.z;                           // its foot on the screen
+    var px = TORII.gateHeight * F / q.z;                   // its height on the screen
+    var x0 = W / 2 + F * q.x / q.z;
+    if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
+    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
+    var farness = 1 - smooth(0, Math.max(0.02, TORII.focusDepth), depth);
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot,
+                 haze: lerp(TORII.hazeNear, TORII.hazeFar, Math.pow(farness, 1.3)),
+                 band: Math.round(farness * (TOR_BANDS - 1)) });
+  }
+  if (!gates.length) { TOR.ready = true; return; }
+  // the light: from above, in front, and to the side TORII.lightFrom
+  var Lx = TORII.lightFrom, Ly = 1.1, Lz = -0.6, Ll = Math.hypot(Lx, Ly, Lz); Lx /= Ll; Ly /= Ll; Lz /= Ll;
+  // every piece of every gate, furthest first
+  var all = [], minY = H;
+  gates.forEach(function (g) {
+    var lod = clamp(g.px / 120, 0, 1);
+    torPlace(torPieces(lod), g).forEach(function (pc) {
+      var dx = pc.c[0], dy = pc.c[1] - 1, dz = pc.c[2];
+      pc.dist = dx * dx + dy * dy + dz * dz;
+      all.push(pc);
+    });
+    minY = Math.min(minY, g.foot - g.px * 1.15);
+  });
+  all.sort(function (a, b) { return b.dist - a.dist; });
+  TOR.gateTop = Math.max(0, Math.floor(minY - 12));
+  var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - TOR.gateTop) * PR));
+  var bands = [];
+  for (var bi = 0; bi < TOR_BANDS; bi++) { var Lb = landCanvas(); Lb.cnv.width = cw; Lb.cnv.height = chh; Lb.c.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR); bands.push(Lb); }
+  // the shadow of the line of gates on the ground, thrown away from the light
+  var SH = landCanvas(); SH.cnv.width = cw; SH.cnv.height = chh;
+  var sc = SH.c;
+  sc.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR);
+  if (TORII.shadow > 0) {
+    var shx = -Lx / Ly * TORII.gateHeight * 0.35, shz = -Lz / Ly * TORII.gateHeight * 0.35;
+    gates.forEach(function (g) {
+      var wu = TORII.width * TORII.gateHeight / 2 + TORII.pillar * TORII.gateHeight * 1.5, wv = gap * 0.52;
+      var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
+        var x = g.x + g.ax * c[0] + g.tx * c[1] + shx * 0.5, z = g.z + g.az * c[0] + g.tz * c[1] + shz * 0.5;
+        return torScreen(x, 0, Math.max(0.3, z));
+      });
+      sc.fillStyle = rgba(C.ground, TORII.shadow * (1 - g.haze));
+      sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+    });
+  }
+  // the pieces, each into the layer of its gate's blur
+  all.forEach(function (pc) {
+    var g = pc.g, c = bands[g.band].c;
+    pc.faces.forEach(function (f) {
+      var n = f.p.length, cx = 0, cy = 0, cz = 0;
+      for (var i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
+      cx /= n; cy /= n; cz /= n;
+      // its outward normal (pointing away from the middle of its piece)
+      var a = f.p[0], b = f.p[1], d = f.p[n - 1];
+      var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx, nl = Math.hypot(nx, ny, nz);
+      if (nl < 1e-9) return;
+      nx /= nl; ny /= nl; nz /= nl;
+      if (nx * (cx - pc.c[0]) + ny * (cy - pc.c[1]) + nz * (cz - pc.c[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      // only the faces turned toward the camera
+      if (nx * cx + ny * (cy - 1) + nz * cz >= 0) return;
+      for (var j = 0; j < n; j++) if (f.p[j][2] < 0.3) return;
+      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - TORII.shadeDepth * (1 - lam), col;
+      if (f.tone === 'f') col = scaleRgb(C.feet, lerp(0.75, 1.3, lam));
+      else if (f.tone === 't' && ny > 0.3) col = mixRgb(scaleRgb(C.top, 0.7), C.top, k);
+      else col = mixRgb(C.shade, C.vermilion, k);
+      if (ny < -0.5) col = scaleRgb(col, 0.82);                 // the undersides, in shade
+      col = koyoLight(mixRgb(col, mistC, g.haze));
+      var st = rgba(col);
+      c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
+      c.beginPath();
+      for (var m = 0; m < n; m++) { var sp = torScreen(f.p[m][0], f.p[m][1], f.p[m][2]); if (m) c.lineTo(sp[0], sp[1]); else c.moveTo(sp[0], sp[1]); }
+      c.closePath(); c.fill(); c.stroke();
+    });
+  });
+  // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
+  TOR.gate.cnv.width = cw; TOR.gate.cnv.height = chh;
+  var o = TOR.gate.c;
+  o.setTransform(1, 0, 0, 1, 0, 0);
+  o.filter = HAS_FILTER && TORII.shadowBlur > 0.05 ? 'blur(' + (TORII.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
+  o.drawImage(SH.cnv, 0, 0);
+  for (var bj = TOR_BANDS - 1; bj >= 0; bj--) {
+    var bl = lerp(TORII.blurNear, TORII.blurFar, bj / (TOR_BANDS - 1));
+    o.filter = HAS_FILTER && bl > 0.05 ? 'blur(' + (bl * PR).toFixed(2) + 'px)' : 'none';
+    o.drawImage(bands[bj].cnv, 0, 0);
+  }
+  o.filter = 'none';
+  bands.forEach(function (Lb) { Lb.cnv.width = Lb.cnv.height = 1; });      // the scratch layers are let go
+  SH.cnv.width = SH.cnv.height = 1;
+  TOR.ready = true;
+}
+function torDrawGates(c) {
+  if (!TOR.ready || !TORII.show || TOR.gate.cnv.width < 2 || ENV.scene !== 'autumn') return;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = TORII.strength;
+  c.drawImage(TOR.gate.cnv, 0, Math.round(TOR.gateTop * PR));
+  c.globalAlpha = 1;
 }
 
 /* ============================================================
@@ -17508,7 +17915,7 @@ function dynReset() {
   cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   bambooGroves = []; bambooKey = '';
   NightLife.reset();
-  LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0;
+  LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0; TOR.ready = false;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
   winReset();
   [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
@@ -17602,7 +18009,7 @@ function dynStep(dt, t, want, skyWant) {
     var k = lookKey();
     if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
-      LS.ready = false; LS.step = 0;           // the other scene's landscape is baked afresh
+      LS.ready = false; LS.step = 0; TOR.ready = false;   // the other scene's landscape is baked afresh
       if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; LS.bedN = 0; }
       else if (lastScene === 'winter') { winReset(); prefill(); }
       tree = null; farTree = null;
