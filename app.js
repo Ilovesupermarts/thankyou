@@ -1,4 +1,4 @@
-var BUILD = 'v138';
+var BUILD = 'v139';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -61,11 +61,13 @@ var BUILD = 'v138';
          out around sunset. The birds now fly at six depths among the
          groves and trees (BIRD_SLOTS). No deer or tanuki come at night any
          more (the owl still does).
-       - Bamboo, lighter: the groves as re-tuned on bamboo.html (23 and 22
-         stems, leafiness 1 and 1.9). Each grove is redrawn 30 times a
-         second (BAMBOO_FPS), the two in turn, and the picture is reused in
-         between; a stem's joints are filled in two shapes instead of a
-         stroke each; a change of light re-bakes one grove a frame.
+       - Bamboo, lighter and smooth: the groves as re-tuned on bamboo.html
+         (13 and 16 stems, leafiness 1 and 1.9). Nothing is blurred or
+         filled as a shape any more while it moves: each stem and each leaf
+         spray is drawn once, with its blur, onto a sheet, and every frame
+         (at the full rate, BAMBOO_EVERY) they are only placed: a stem as
+         slices of its picture laid along its curve. A change of light
+         re-bakes one grove a frame.
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -12475,29 +12477,32 @@ function drawKoyoTrees(ctx, t) {
    tree's root, so the grove is taller than its tree, but never higher than
    topMargin below the top of the screen: a stem is shortened until its
    leaves fit, and anything a gust still takes higher fades out. Each stem
-   has joints, a shine down one side and sprays of narrow hanging leaves
-   (12 sprites a grove, baked in the light of the moment). It sways on its
-   own and with its grove; the gusts push each grove as they pass it
-   (updateGusts) and it rocks back on a spring.
-   Depth of field: a grove is drawn at half resolution on two layers (the
-   nearer stems, those further back), each blurred (blurNear, blurFar) and
-   hazed toward the paper, into the grove's own canvas (G.out). The trees in
+   has joints, a shine down one side and sprays of narrow hanging leaves.
+   It sways on its own and with its grove; the gusts push each grove as
+   they pass it (updateGusts) and it rocks back on a spring.
+   Depth of field: the blur (blurNear for the nearer half of the stems,
+   blurFar for the rest) and the haze toward the paper are baked into the
+   pictures, once, when a grove is built (bamStemSheet, bamSpraySheet): a
+   stem is drawn straight, blurred, and kept as one strip on a sheet; each
+   frame it is laid along its curve as BAM_SEG slices of that strip, and
+   the leaf sprays (also blurred once, on their own sheet) are placed at
+   their joints. So a frame is only drawImage calls from two sheets, no
+   path fills and no filters, which is cheap on the graphics chip. A grove
+   is drawn at half resolution into its own canvas (G.out). The trees in
    front are then cut out of G.out, so no bamboo shows through their
    see-through foliage, and the birds use it to hide behind a grove
    (BIRD_SLOTS). Only in daylight: they fade in after sunrise and out around
    sunset (ENV.light.daylight). A grove is rebuilt when the trees change, and
    at most once a minute when the light changes (then one grove a frame).
-   To keep the frame rate, each grove is redrawn (and cut by the trees)
-   BAMBOO_FPS times a second, the two in turn, never both in one frame once
-   they are up; in between, its last picture (G.out) is laid down again. The
-   sway is slow, so this does not show. */
+   Every BAMBOO_EVERY-th frame each grove is redrawn (1: every frame; 2: the
+   two in turn, each at half the rate). */
 var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
   yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
 };
 var BAMBOO = {
   far: {
-    show: true, culms: 23, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+    show: true, culms: 13, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
     lean: 24, leanVariety: 0.5, arch: 0.35,
     thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
     leafiness: 1, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
@@ -12505,8 +12510,8 @@ var BAMBOO = {
     swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
   },
   near: {
-    show: true, culms: 22, seed: 45, entryTop: 0.23, entryBottom: 0.81, heightMin: 1.41, heightMax: 1.4, topMargin: 0.04,
-    lean: 29, leanVariety: 0.45, arch: 0.55,
+    show: true, culms: 16, seed: 45, entryTop: 0.23, entryBottom: 0.97, heightMin: 1.41, heightMax: 1.4, topMargin: 0.04,
+    lean: 32, leanVariety: 0.45, arch: 0.55,
     thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: BAMBOO_COLOURS,
     leafiness: 1.9, leafFrom: 0.22, leafSize: 1.15, leafDroop: 1.8,
     blurNear: 0.5, blurFar: 1.3, haze: 0.22, depthHaze: 0.3, strength: 1,
@@ -12514,7 +12519,8 @@ var BAMBOO = {
   }
 };
 var BAM_RES = 0.5, BAM_SEG = 22;                 // half resolution (as the far tree); segments along each stem
-var BAMBOO_FPS = 30;                             // how often each grove is redrawn
+var BAMBOO_EVERY = 1;                            // each grove is redrawn every this many frames (the groves in turn when above 1)
+var bambooFrame = 0;
 var bambooGroves = [], bambooKey = '', bambooLook = -1, bambooBuiltAt = -1e9;
 function bamCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 function bambooAlpha() { return ENV.scene === 'autumn' && ENV.light ? ENV.light.daylight : 0; }
@@ -12526,32 +12532,65 @@ function bamTreeHeight(T) {
   T.clumps.forEach(function(C) { top = Math.min(top, T.nodes[C.node].ey + C.oy - C.R); });
   return T.by - top;
 }
-/* One spray: a thin twig along +x with narrow leaves hanging from it, u (CSS
-   px) long, baked at k device px to the CSS px. */
-function bamBakeSpray(B, r, u, haze, k) {
-  var Cl = hexToRgb(B.colours.leaf), Cd = hexToRgb(B.colours.leafDark), Ct = hexToRgb(B.colours.twig);
-  var w = u * 1.4, h = u * 1.35, ox = u * 0.04, oy = u * 0.3;
-  var cnv = document.createElement('canvas');
-  cnv.width = Math.max(2, Math.ceil(w * k)); cnv.height = Math.max(2, Math.ceil(h * k));
-  var g = cnv.getContext('2d');
-  g.scale(k, k); g.translate(ox, oy);
-  var tx = u * lerp(0.5, 0.75, r()), ty = u * lerp(0.05, 0.2, r()) * B.leafDroop, cx = tx * 0.5, cy = -u * 0.05;
-  g.strokeStyle = rgba(bamTone(Ct, haze)); g.lineWidth = Math.max(0.6, u * 0.012); g.lineCap = 'round';
-  g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(cx, cy, tx, ty); g.stroke();
+/* One leaf spray, in two steps. Its shape (bamSprayShape) takes the random
+   numbers in the same order as ever, so every arrangement stays as tuned; it
+   is then drawn (bamSprayDraw) once for each look it is needed in. A thin
+   twig along +x with narrow leaves hanging from it, u (CSS px) long. */
+function bamSprayShape(B, r, u) {
+  var tx = u * lerp(0.5, 0.75, r()), ty = u * lerp(0.05, 0.2, r()) * B.leafDroop;
+  var S2 = { u: u, tx: tx, ty: ty, cx: tx * 0.5, cy: -u * 0.05, leaves: [] };
   var n = 4 + Math.floor(r() * 4);
   for (var i = 0; i < n; i++) {
     var p = lerp(0.3, 1, i / (n - 1)), q = 1 - p;
-    var px = 2 * q * p * cx + p * p * tx, py = 2 * q * p * cy + p * p * ty;
     var L = u * lerp(0.3, 0.48, r()), lw = L * lerp(0.1, 0.14, r());
     var ang = clamp((lerp(0.25, 1.2, r()) - (i === n - 1 ? 0.2 : 0)) * B.leafDroop, -0.3, 1.5);
-    g.save(); g.translate(px, py); g.rotate(ang);
-    g.fillStyle = rgba(bamTone(mixRgb(Cd, Cl, r()), haze));
+    S2.leaves.push({ x: 2 * q * p * S2.cx + p * p * tx, y: 2 * q * p * S2.cy + p * p * ty, L: L, lw: lw, ang: ang, t: r() });
+  }
+  return S2;
+}
+/* Drawn at k device px to the CSS px with pad device px round it, its root at
+   (ox, oy) CSS px from the top left of the image. */
+function bamSprayDraw(g, B, S2, haze, k, pad, ox, oy) {
+  var Cl = hexToRgb(B.colours.leaf), Cd = hexToRgb(B.colours.leafDark), Ct = hexToRgb(B.colours.twig);
+  g.setTransform(k, 0, 0, k, pad, pad);
+  g.translate(ox, oy);
+  g.strokeStyle = rgba(bamTone(Ct, haze)); g.lineWidth = Math.max(0.6, S2.u * 0.012); g.lineCap = 'round';
+  g.beginPath(); g.moveTo(0, 0); g.quadraticCurveTo(S2.cx, S2.cy, S2.tx, S2.ty); g.stroke();
+  for (var i = 0; i < S2.leaves.length; i++) {
+    var l = S2.leaves[i];
+    g.save(); g.translate(l.x, l.y); g.rotate(l.ang);
+    g.fillStyle = rgba(bamTone(mixRgb(Cd, Cl, l.t), haze));
     g.beginPath(); g.moveTo(0, 0);
-    g.bezierCurveTo(L * 0.15, -lw, L * 0.55, -lw * 0.8, L, 0);
-    g.bezierCurveTo(L * 0.55, lw * 0.8, L * 0.15, lw, 0, 0);
+    g.bezierCurveTo(l.L * 0.15, -l.lw, l.L * 0.55, -l.lw * 0.8, l.L, 0);
+    g.bezierCurveTo(l.L * 0.55, l.lw * 0.8, l.L * 0.15, l.lw, 0, 0);
     g.fill(); g.restore();
   }
-  return { cnv: cnv, ox: ox, oy: oy, w: w, h: h };
+}
+/* All the sprays on one sheet, each blurred for its depth. A stem is on layer
+   0 (the nearer half: blurNear) or layer 1 (blurFar) and in haze band 0-2, so
+   a spray has one of four looks: (layer 0, band 0), (0, 1), (1, 1), (1, 2),
+   look = layer * 2 + band - layer; four variants of each (shapes[band][v]).
+   sheet[look][v]: { cnv, sx, sy, sw, sh, ox, oy, w, h } to drawImage from. */
+function bamSpraySheet(B, shapes, u, k) {
+  var looks = [[0, 0], [0, 1], [1, 1], [1, 2]], ox = u * 0.04, oy = u * 0.3;
+  var pad = Math.ceil(Math.max(B.blurNear, B.blurFar) * k * 3) + 1;
+  var cw = Math.ceil(u * 1.4 * k) + 2 * pad + 1, ch = Math.ceil(u * 1.35 * k) + 2 * pad + 1;
+  var sheet = document.createElement('canvas'); sheet.width = cw * 4; sheet.height = ch * 4;
+  var sc = sheet.getContext('2d'), tmp = document.createElement('canvas'); tmp.width = cw; tmp.height = ch;
+  var tc = tmp.getContext('2d'), out = [];
+  looks.forEach(function(lk, li) {
+    var blur = (lk[0] === 0 ? B.blurNear : B.blurFar) * k, haze = B.haze + B.depthHaze * lk[1] / 2;
+    out.push([]);
+    for (var v = 0; v < 4; v++) {
+      tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(0, 0, cw, ch);
+      bamSprayDraw(tc, B, shapes[lk[1]][v], haze, k, pad, ox, oy);
+      sc.filter = blur > 0.05 ? 'blur(' + blur.toFixed(2) + 'px)' : 'none';
+      sc.drawImage(tmp, v * cw, li * ch);
+      sc.filter = 'none';
+      out[li].push({ cnv: sheet, sx: v * cw, sy: li * ch, sw: cw, sh: ch, ox: ox + pad / k, oy: oy + pad / k, w: cw / k, h: ch / k });
+    }
+  });
+  return out;
 }
 function bamNewSpray(r, s, side, tip, cs) {
   return { s: s, side: side, spread: tip ? lerp(0.15, 0.45, r()) : lerp(0.7, 1.2, r()),
@@ -12559,28 +12598,18 @@ function bamNewSpray(r, s, side, tip, cs) {
 }
 function buildBambooGrove(key, T, old) {
   var B = BAMBOO[key], cw = Math.round(W * PR), ch = Math.round(H * PR);
-  var layers = [bamCanvas(), bamCanvas(), bamCanvas()];   // the nearer stems, those further back, and the two together (out)
-  layers.forEach(function(L) { L.cnv.width = Math.ceil(cw * BAM_RES); L.cnv.height = Math.ceil(ch * BAM_RES); });
+  var out = bamCanvas();                          // the grove, as drawn (half resolution)
+  out.cnv.width = Math.ceil(cw * BAM_RES); out.cnv.height = Math.ceil(ch * BAM_RES);
   var r = rngFrom(B.seed * 977 + 13), k = PR * BAM_RES, u = H * 0.075 * B.leafSize;
-  var sprays = [];
+  var shapes = [];                                // 3 haze bands of 4 sprays, as ever
   for (var band = 0; band < 3; band++) {
-    sprays.push([]);
-    for (var v = 0; v < 4; v++) sprays[band].push(bamBakeSpray(B, r, u, B.haze + B.depthHaze * band / 2, k));
+    shapes.push([]);
+    for (var v = 0; v < 4; v++) shapes[band].push(bamSprayShape(B, r, u));
   }
-  // all twelve on one sheet, so the leaves are drawn from a single image (the graphics chip batches them)
-  var cellW = sprays[0][0].cnv.width + 2, cellH = sprays[0][0].cnv.height + 2, atlas = document.createElement('canvas');
-  atlas.width = cellW * 4; atlas.height = cellH * 3;
-  var actx = atlas.getContext('2d');
-  sprays.forEach(function(row, bi) {
-    row.forEach(function(spr, vi) {
-      actx.drawImage(spr.cnv, vi * cellW + 1, bi * cellH + 1);
-      spr.sx = vi * cellW + 1; spr.sy = bi * cellH + 1; spr.sw = spr.cnv.width; spr.sh = spr.cnv.height; spr.cnv = atlas;
-    });
-  });
   var treeH = bamTreeHeight(T), root = T.by, left = T.left, prev = null;
   old.forEach(function(o) { if (o.key === key) prev = o; });
   var G = { key: key, B: B, left: left, x: left ? W * 0.15 : W * 0.85, gust: prev ? prev.gust : 0, gustV: prev ? prev.gustV : 0,
-            gid: prev ? prev.gid : -1, ph: r() * TAU, culms: [], layers: layers.slice(0, 2), out: layers[2], sprays: sprays, u: u, a: 0, box: null };
+            gid: prev ? prev.gid : -1, ph: r() * TAU, culms: [], out: out, sprays: null, stems: null, u: u, a: 0, box: null };
   for (var i = 0; i < B.culms; i++) {
     var d = r();                                   // 0 nearest … 1 furthest back
     var lean = (B.lean * PI / 180) * (1 + (r() - 0.5) * 1.6 * B.leanVariety) + (r() - 0.5) * 0.12 * B.leanVariety;
@@ -12603,7 +12632,8 @@ function buildBambooGrove(key, T, old) {
       dark: rgba(bamTone(mixRgb(base, hexToRgb(B.colours.culmShade), 0.75), haze)),
       node: rgba(bamTone(hexToRgb(B.colours.node), haze)), ring: rgba(bamTone(hexToRgb(B.colours.ring), haze)),
       f: lerp(0.75, 1.25, r()), rp: r(), rp2: r(), gk: lerp(0.75, 1.25, r()),
-      nodes: [], sprays: [], px: new Float32Array(BAM_SEG + 1), py: new Float32Array(BAM_SEG + 1), pa: new Float32Array(BAM_SEG + 1)
+      nodes: [], sprays: [], px: new Float32Array(BAM_SEG + 1), py: new Float32Array(BAM_SEG + 1), pa: new Float32Array(BAM_SEG + 1),
+      pc: new Float32Array(BAM_SEG), ps: new Float32Array(BAM_SEG)      // cos and sin of each segment's direction
     };
     // its length: what brings its top, standing still, up to topY
     var rise = 0;
@@ -12633,7 +12663,41 @@ function buildBambooGrove(key, T, old) {
     G.culms.push(C);
   }
   G.culms.sort(function(a, b) { return b.d - a.d; });   // further back first
+  G.sprays = bamSpraySheet(B, shapes, u, k);
+  bamStemSheet(G, k);
   return G;
+}
+/* Each stem is drawn once, straight and along +x (stem, shine, joints), blurred
+   for its depth and kept as one strip on a sheet (G.stems). Every frame it is
+   laid along its curve in BAM_SEG slices of that strip (bamDrawGrove). The
+   strip is a whole number of device pixels per slice, so the slices cut
+   cleanly. */
+function bamStemSheet(G, k) {
+  var B = G.B, items = [], atW = 4, atH = 0, maxH = 4;
+  G.culms.forEach(function(C) {
+    var blur = (C.layer === 0 ? B.blurNear : B.blurFar) * k, pad = Math.ceil(blur * 3) + 2;
+    var sliceW = Math.max(3, Math.round(C.len * k / BAM_SEG)), w = sliceW * BAM_SEG + 2 * pad + 1;
+    var h = Math.ceil(2 * (C.w * 1.08 + 1) * k) + 2 * pad;
+    items.push({ C: C, blur: blur, pad: pad, sliceW: sliceW, w: w, h: h, y: atH });
+    atW = Math.max(atW, w); maxH = Math.max(maxH, h); atH += h + 1;
+  });
+  var sheet = document.createElement('canvas'); sheet.width = atW; sheet.height = Math.max(1, atH);
+  var sc = sheet.getContext('2d'), tmp = document.createElement('canvas'); tmp.width = atW; tmp.height = maxH;
+  var tc = tmp.getContext('2d');
+  items.forEach(function(it) {
+    var C = it.C, step = C.len / BAM_SEG, T = { w: C.w, nodes: C.nodes, body: C.body, dark: C.dark, lit: C.lit, node: C.node, ring: C.ring,
+      px: new Float32Array(BAM_SEG + 1), py: new Float32Array(BAM_SEG + 1), pa: new Float32Array(BAM_SEG + 1) };
+    for (var j = 0; j <= BAM_SEG; j++) T.px[j] = j * step;                  // straight, along +x
+    tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(0, 0, it.w, it.h);
+    tc.setTransform(it.sliceW * BAM_SEG / C.len, 0, 0, k, it.pad, it.h / 2);   // its length in whole slices of device pixels
+    bamDrawStem(tc, B, T);
+    sc.filter = it.blur > 0.05 ? 'blur(' + it.blur.toFixed(2) + 'px)' : 'none';
+    sc.drawImage(tmp, 0, 0, it.w, it.h, 0, it.y, it.w, it.h);
+    sc.filter = 'none';
+    C.sy = it.y; C.sPad = it.pad; C.sW = it.sliceW; C.sH = it.h;
+    C.sUx = step / it.sliceW;                                              // CSS px along the stem per picture px
+  });
+  G.stems = sheet;
 }
 /* Both groves, when the trees or the size change, or (at most once a minute)
    the light. Only in daylight, and only with both trees there. */
@@ -12689,13 +12753,17 @@ function bamShape(C, G, t, rest, wind) {
   var x = C.x, y = C.y;
   for (var i = 0; i <= BAM_SEG; i++) {
     C.px[i] = x; C.py[i] = y; C.pa[i] = ang(i / BAM_SEG);
-    var am = ang((i + 0.5) / BAM_SEG);
-    x += Math.cos(am) * step; y += Math.sin(am) * step;
+    if (i === BAM_SEG) break;
+    var am = ang((i + 0.5) / BAM_SEG), co = Math.cos(am), si = Math.sin(am);
+    C.pc[i] = co; C.ps[i] = si;
+    x += co * step; y += si * step;
   }
 }
+var BAMP = { x: 0, y: 0, a: 0 };                 // bamAt's answer, reused (nothing is made per call)
 function bamAt(C, s) {
   var f = clamp(s, 0, 1) * BAM_SEG, i = Math.min(BAM_SEG - 1, Math.floor(f)), u = f - i;
-  return { x: lerp(C.px[i], C.px[i + 1], u), y: lerp(C.py[i], C.py[i + 1], u), a: lerp(C.pa[i], C.pa[i + 1], u) };
+  BAMP.x = lerp(C.px[i], C.px[i + 1], u); BAMP.y = lerp(C.py[i], C.py[i + 1], u); BAMP.a = lerp(C.pa[i], C.pa[i + 1], u);
+  return BAMP;
 }
 function bamW(B, C, s) { return C.w * (1 - B.taper * s) * (s > 0.92 ? lerp(1, 0.35, (s - 0.92) / 0.08) : 1); }
 /* Fill the band between o0 and o1 across the stem (-1 its left edge … 1 its right). */
@@ -12725,8 +12793,8 @@ function bamJoint(c, B, C, s, back, thick, min) {
   c.lineTo(cx - nx * w + dx * h, cy - ny * w + dy * h);
   c.closePath();
 }
-function bamDrawCulm(c, C, G, t, wind) {
-  var B = G.B;
+/* A stem's body, shine and joints, on its own (it is drawn straight, once). */
+function bamDrawStem(c, B, C) {
   c.globalAlpha = 1; c.fillStyle = C.body; bamStrip(c, B, C, -1, 1);
   c.globalAlpha = 0.8; c.fillStyle = C.dark; bamStrip(c, B, C, 0.35, 1);
   if (B.highlight > 0) { c.globalAlpha = B.highlight; c.fillStyle = C.lit; bamStrip(c, B, C, -0.65, -0.15); }
@@ -12741,57 +12809,63 @@ function bamDrawCulm(c, C, G, t, wind) {
     for (i = 0; i < C.nodes.length; i++) bamJoint(c, B, C, C.nodes[i], 0, 0.24, 0.6);
     c.fill();
   }
-  // the leaves (one transform each: the layer's scale k, then to the spray, turned and sized)
   c.globalAlpha = 1;
-  var set = G.sprays[C.band], fl = 0.07 * B.leafFlutter * wind, sp = B.swaySpeed, k = PR * BAM_RES;
-  for (var j = 0; j < C.sprays.length; j++) {
+}
+/* One stem this frame, onto c (the grove's canvas, at k device px to the CSS px):
+   its slices along the curve, then its leaf sprays at their joints, each in one
+   drawImage from a sheet. */
+function bamDrawCulm(c, C, G, t, wind, k) {
+  var B = G.B, sheet = G.stems, j, step = C.len / BAM_SEG;
+  var sy = C.sy, sh = C.sH, dy = -sh / (2 * k), sw = C.sW + 1;                   // one picture pixel more, so the slices overlap a little
+  for (j = 0; j < BAM_SEG; j++) {
+    var co = C.pc[j] * k, si = C.ps[j] * k;
+    c.setTransform(co, si, -si, co, C.px[j] * k, C.py[j] * k);
+    c.drawImage(sheet, C.sPad + j * C.sW, sy, sw, sh, 0, dy, sw * C.sUx, sh / k);
+  }
+  // the leaves (one transform each: the layer's scale k, then to the spray, turned and sized)
+  var set = G.sprays[C.layer * 2 + C.band - C.layer], fl = 0.07 * B.leafFlutter * wind, sp = B.swaySpeed;
+  for (j = 0; j < C.sprays.length; j++) {
     var S2 = C.sprays[j], q = bamAt(C, S2.s), spr = set[S2.v];
     var dir = q.a + S2.side * S2.spread + Math.sin(t * 2.6 * sp + S2.ph) * fl + Math.sin(t * 4.3 * sp + S2.ph * 2.3) * fl * 0.4 + G.gust * 0.4;
     var cs = Math.cos(dir) * S2.sc * k, sn = Math.sin(dir) * S2.sc * k, fy = S2.side < 0 ? -1 : 1;
     c.setTransform(cs, sn, -sn * fy, cs * fy, q.x * k, q.y * k);
     c.drawImage(spr.cnv, spr.sx, spr.sy, spr.sw, spr.sh, -spr.ox, -spr.oy, spr.w, spr.h);
   }
-  c.setTransform(k, 0, 0, k, 0, 0);
 }
-/* G.a: how strongly each grove is laid down this frame (0: not shown). A
-   grove not drawn yet is drawn at once; otherwise the one most overdue (each
-   is due BAMBOO_FPS times a second), at most one a frame, is redrawn into its
-   G.out (blurred, not yet cut by the trees) and marked fresh. */
+/* G.a: how strongly each grove is laid down this frame (0: not shown). Each
+   grove shown is redrawn into its G.out (not yet cut by the trees) every
+   BAMBOO_EVERY-th frame, and marked fresh. */
 function renderBamboo(t) {
   var a = bambooAlpha();
   if (a > 0) ensureBamboo();
-  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10)), due = null;
-  bambooGroves.forEach(function(G) {
+  var k = PR * BAM_RES, wind = S.treeSway * (0.85 + 0.03 * Math.min(ENV.windMs, 10));
+  bambooFrame++;
+  bambooGroves.forEach(function(G, gi) {
     G.a = G.B.show && a > 0.003 ? a * G.B.strength : 0;
     G.fresh = false;
-    if (!G.a) {
-      if (G.box) G.layers.concat([G.out]).forEach(function(L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); });
+    if (!G.a) {                                   // not shown: what it drew is cleared
+      if (G.box) { G.out.c.setTransform(1, 0, 0, 1, 0, 0); G.out.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); }
       G.box = null; G.drawn = false;
       return;
     }
-    if (!G.drawn) drawGrove(G);
-    else if (t >= G.next && (!due || G.next < due.next)) due = G;
+    if (!G.drawn || (bambooFrame + gi) % BAMBOO_EVERY === 0) drawGrove(G);
   });
-  if (due) drawGrove(due);
   function drawGrove(G) {
-    var B = G.B;
+    var B = G.B, c = G.out.c;
     G.fresh = G.drawn = true;
-    G.next = (G.next && t - G.next < 0.1 ? G.next : t) + 1 / BAMBOO_FPS;   // keeps its rhythm, unless it fell far behind
     // clear what it drew last time (all of it lies inside that box)
-    if (G.box) G.layers.concat([G.out]).forEach(function(L) { L.c.setTransform(1, 0, 0, 1, 0, 0); L.c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h); });
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    if (G.box) c.clearRect(G.box.x, G.box.y, G.box.w, G.box.h);
     G.box = null;
-    G.layers.forEach(function(L) {                // (cleared above, where it was last time)
-      L.c.globalAlpha = 1;
-      L.c.setTransform(k, 0, 0, k, 0, 0);
-    });
     var x0 = Infinity, x1 = -Infinity, y0 = Infinity;
-    for (var i = 0; i < G.culms.length; i++) {
+    for (var i = 0; i < G.culms.length; i++) {      // further back first
       var C = G.culms[i];
       bamShape(C, G, t, false, wind);
-      bamDrawCulm(G.layers[C.layer].c, C, G, t, wind);
+      bamDrawCulm(c, C, G, t, wind, k);
       for (var q = 0; q <= BAM_SEG; q += 2) { x0 = Math.min(x0, C.px[q]); x1 = Math.max(x1, C.px[q]); y0 = Math.min(y0, C.py[q]); }
     }
-    // the part of the screen it covers (with room for the leaves and the blur), in out's pixels:
+    // the part of the screen it covers (with room for the leaves), in out's pixels:
     // the trees are cut out and it is laid down only there
     var pad = G.u * 1.8 + 4 * Math.max(B.blurNear, B.blurFar) + 4;
     var bx0 = clamp(Math.floor((x0 - pad) * k), 0, G.out.cnv.width), bx1 = clamp(Math.ceil((x1 + pad) * k), 0, G.out.cnv.width);
@@ -12799,26 +12873,15 @@ function renderBamboo(t) {
     G.box = bx1 > bx0 && by0 < G.out.cnv.height ? { x: bx0, y: by0, w: bx1 - bx0, h: G.out.cnv.height - by0 } : null;
     // a safety net: a gust or the biggest leaves never take it above topMargin (fades out just under it)
     var lim = H * B.topMargin, fade = H * 0.02;
-    G.layers.forEach(function(L) {
-      L.c.globalAlpha = 1;
-      if (lim <= 0) return;
-      var g = L.c.createLinearGradient(0, lim, 0, lim + fade);
+    c.setTransform(k, 0, 0, k, 0, 0);
+    if (lim > 0) {
+      var g = c.createLinearGradient(0, lim, 0, lim + fade);
       g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-      L.c.globalCompositeOperation = 'destination-out';
-      L.c.fillStyle = 'rgba(0,0,0,1)'; L.c.fillRect(0, 0, W, lim);
-      L.c.fillStyle = g; L.c.fillRect(0, lim, W, fade);
-      L.c.globalCompositeOperation = 'source-over';
-    });
-    // the stems further back, then the nearer ones, each blurred, into out
-    var o = G.out.c, bb = G.box;
-    o.setTransform(1, 0, 0, 1, 0, 0);
-    o.globalAlpha = 1;
-    if (!bb) return;
-    [[1, B.blurFar], [0, B.blurNear]].forEach(function(e) {
-      if (e[1] > 0) o.filter = 'blur(' + (e[1] * k).toFixed(2) + 'px)';
-      o.drawImage(G.layers[e[0]].cnv, bb.x, bb.y, bb.w, bb.h, bb.x, bb.y, bb.w, bb.h);
-      o.filter = 'none';
-    });
+      c.globalCompositeOperation = 'destination-out';
+      c.fillStyle = 'rgba(0,0,0,1)'; c.fillRect(0, 0, W, lim);
+      c.fillStyle = g; c.fillRect(0, lim, W, fade);
+      c.globalCompositeOperation = 'source-over';
+    }
   }
 }
 /* Cut the trees in front out of a grove: list of [canvas, times] (each
