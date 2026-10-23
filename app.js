@@ -1,4 +1,4 @@
-var BUILD = 'v141';
+var BUILD = 'v142';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -16757,12 +16757,28 @@ function animBlur(k) {
   return lerp(O.farBlur * 1.7, O.farBlur, clamp((k - 0.3) / (FAR_SCALE - 0.3), 0, 1));
 }
 function animHaze(k) { return O.animHaze * Math.pow(clamp((1 - k) / 0.7, 0, 1), 1.4); }
+/* The deer's depth of field is the gates' own (section 8c), so a deer and a
+   gate whose feet are as far down are as sharp and as hazy as each other:
+   - blur: the gates' blur at that depth, in the same six steps;
+   - haze: the gates' haze, or the mist lying on the ground under its feet
+     (the ground's own gradient and the mist where it meets the mountains,
+     landBakeGround), whichever is more. */
+function deerFarness(k) { return 1 - smooth(0, Math.max(0.02, TORII.focusDepth), clamp(k / 1.15, 0, 1)); }
+function deerBlur(k) { return lerp(TORII.blurNear, TORII.blurFar, Math.round(deerFarness(k) * (TOR_BANDS - 1)) / (TOR_BANDS - 1)); }
+function deerHaze(k) {
+  var f = clamp(k / 1.15, 0, 1), gh = LAND.groundHaze;
+  var gate = lerp(TORII.hazeNear, TORII.hazeFar, Math.pow(deerFarness(k), 1.3));
+  var base = (f < 0.35 ? lerp(0.75, 0.3, f / 0.35) : lerp(0.3, 0, (f - 0.35) / 0.65)) * gh;
+  var over = 0.85 * gh * clamp(1 - f / 0.45, 0, 1);
+  return Math.max(gate, 1 - (1 - base) * (1 - over));
+}
 function animPalette(variant, k) {
   var src = O.animColours[variant === 'kit' || variant === 'mother' ? 'tanuki' : variant], P = {};
   for (var key in src) P[key] = vivid(hex(src[key]), O.vivid);
   if (variant === 'kit') { P.fur = mix(P.fur, P.dark, 0.1); P.tip = mix(P.tip, P.fur, 0.15); }   // a little darker and fluffier
   var far = clamp((1 - k) / (1 - FAR_SCALE), 0, 1), str = O.animStrength * lerp(1, TREE.farOpacity, far * 0.7);
-  var hz = animHaze(k), mist = light(cols().mist), night = isNight(), deer = variant === 'hind' || variant === 'stag', nn = koyoNight();
+  var deer = variant === 'hind' || variant === 'stag', hz = deer ? deerHaze(k) : animHaze(k), mist = light(cols().mist), night = isNight(), nn = koyoNight();
+  if (deer) str = O.animStrength;                     // solid, not thinned out with distance: only softened and hazed, as the gates are
   P.fin = function (c) {
     var o = mix(c, PAPER, 1 - str);
     if (deer) {                                       // evening: the scene's own dusk light, turning into the night look as the lamps come on
@@ -17495,7 +17511,7 @@ function animSet(kind, variant, k) {
 }
 function bakeAnimFrame(S, fr) {
   var u = animUnitPx(S.kind, S.variant, S.k) * PR, P = animPalette(S.variant, S.k), lod = clamp(u / 70, 0.35, 1);
-  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, animBlur(S.k), function (t, home, info) {
+  S.frames[fr] = spriteFrom(u, S.kind === 'deer' ? DEER_BOX : TANUKI_BOX, S.kind === 'deer' ? deerBlur(S.k) : animBlur(S.k), function (t, home, info) {
     if (animGL()) {
       try {
         glAnimSprite(t, info, S.kind === 'deer' ? buildDeer(deerPose(fr), S.variant === 'stag', P) : buildTanuki(tanukiPose(fr), S.variant === 'kit', P), P);
@@ -17754,7 +17770,7 @@ function drawAnimal(c, a) {
   var S = a.set, spr = S.frames[a.frame] || S.frames.stand || S.frames.stand0;
   if (!spr) return;
   var fy = groundY(a.k), sc = a.unit / animUnitPx(S.kind, S.variant, S.k), deer = a.kind === 'deer';
-  var hz = animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
+  var hz = deer ? deerHaze(a.k) : animHaze(a.k), sx = a.unit * (deer ? 0.8 : 0.7), sy = a.unit * 0.08;
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.save();
   c.translate(a.x + a.dir * a.unit * (deer ? 0.05 : 0), fy + 1); c.scale(sx, sy);
