@@ -15,17 +15,17 @@
 <style>
   /* ============================================================
      BAMBOO LAB — a copy of landscape.html, used as the test bed for
-     a bamboo grove in the autumn scene, in the day phase (the bamboo is
-     only for the day). Preview only.
+     two bamboo groves in the autumn scene, in the day phase (the bamboo
+     is only for the day). Preview only.
      Everything from landscape.html is still here and runs on its
      approved values (mountains, Fuji, mist, fallen leaves, the two
-     trees, the owl, the deer and the tanuki), but none of it has
-     controls any more. New: a dense grove of bamboo shooting in from the
-     side of the screen behind the smaller (far) tree, taller than it but
-     never past the top of the screen, softened and hazed for its depth,
-     swaying in the wind and pushed by the gusts (section 6b). The
-     control panel has only the bamboo values. Nothing in app.js is used
-     or changed.
+     trees), but none of it has controls any more. There is no owl, deer
+     or tanuki on this page. New: a dense grove of bamboo shooting in
+     from the side of the screen behind each tree (the smaller one and
+     the bigger one), taller than its tree but never past the top of the
+     screen, softened and hazed for its depth, swaying in the wind and
+     pushed by the gusts (section 6b). Each grove has its own set of
+     controls. Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -343,40 +343,54 @@ var BAMBOO_COLOURS = {
 var BAMBOO_COLOUR_NAMES = [['culm', 'Stems'], ['culmLit', 'Stem highlight'], ['culmShade', 'Stem shadow'], ['node', 'Joints'],
                            ['ring', 'Pale ring at joints'], ['yellow', 'Older stems'], ['leaf', 'Leaves'], ['leafDark', 'Shaded leaves'],
                            ['twig', 'Twigs']];
+/* The grove behind the smaller tree: the values approved on the tablet. */
 var BDEF = {
+  show: true,
   // the grove
-  culms: 50, seed: 1, entryTop: 0.3, entryBottom: 0.85, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+  culms: 90, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
   lean: 24, leanVariety: 0.5, arch: 0.35,
   // stems
-  thickness: 14, taper: 0.35, nodeSpacing: 0.08, nodeMark: 0.7, highlight: 0.6, colourVariety: 0.45, colours: clone(BAMBOO_COLOURS),
+  thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: clone(BAMBOO_COLOURS),
   // leaves
-  leafiness: 1.5, leafFrom: 0.3, leafSize: 1.2, leafDroop: 1,
+  leafiness: 1.5, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
   // depth of field
-  blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 0.9,
+  blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 1,
   // sway
   swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
 };
-var STORE_KEY = 'bambooLabValues2';   // 2: one grove, from the side, behind the far tree
-var B = clone(BDEF);
+/* The grove behind the bigger tree starts from the same values, arranged
+   differently, and a little sharper as it is nearer. */
+var BDEF_NEAR = clone(BDEF);
+BDEF_NEAR.seed = 21; BDEF_NEAR.blurNear = 1; BDEF_NEAR.blurFar = 2.2; BDEF_NEAR.haze = 0.22; BDEF_NEAR.depthHaze = 0.3;
+var GROVES = [['far', 'Behind the smaller tree'], ['near', 'Behind the bigger tree']];
+var BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) };
+var SEL = 'far';                                  // the grove the panel is showing
+function Bs() { return BSET[SEL]; }
+var STORE_KEY = 'bambooLabValues3';   // 3: two groves
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
-  if (saved && typeof saved === 'object') for (var sk in saved) {
-    if (sk === 'colours') { for (var ck in saved.colours) if (ck in B.colours) B.colours[ck] = saved.colours[ck]; }
-    else if (sk in B) B[sk] = saved[sk];
-  }
+  if (saved && typeof saved === 'object') GROVES.forEach(function (gk) {
+    var sv = saved[gk[0]], dst = BSET[gk[0]];
+    if (!sv) return;
+    for (var sk in sv) {
+      if (sk === 'colours') { for (var ck in sv.colours) if (ck in dst.colours) dst.colours[ck] = sv.colours[ck]; }
+      else if (sk in dst) dst[sk] = sv[sk];
+    }
+  });
 } catch (e) {}
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(B)); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(BSET)); } catch (e) {} }
 
 var GROUPS = [
-  { title: 'The grove (behind the far tree)', ctls: [
+  { title: 'The grove', ctls: [
+    { k: 'show', label: 'Show this grove', type: 'check', re: 'grove' },
     { k: 'culms', label: 'Stems', min: 5, max: 90, step: 1, re: 'grove' },
     { k: 'seed', label: 'Arrangement', min: 1, max: 99, step: 1, re: 'grove', hint: 'Each number places the stems differently.' },
     { k: 'entryTop', label: 'Stems come in from the side between … (× screen height from the top)', min: 0.1, max: 1, step: 0.01, re: 'grove' },
     { k: 'entryBottom', label: '… and (× screen height from the top)', min: 0.1, max: 1.1, step: 0.01, re: 'grove',
       hint: 'Where the stems cross the edge of the screen. 1 = the bottom.' },
-    { k: 'heightMin', label: 'Lowest tops (× the far tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove',
-      hint: 'Above 1 = taller than the far tree. Measured from its root.' },
-    { k: 'heightMax', label: 'Highest tops (× the far tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove' },
+    { k: 'heightMin', label: 'Lowest tops (× its tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove',
+      hint: 'Above 1 = taller than the tree in front. Measured from the tree\'s root. Where this would go past the top of the screen, the tops stop below it (see the gap).' },
+    { k: 'heightMax', label: 'Highest tops (× its tree\'s height)', min: 1, max: 2, step: 0.01, re: 'grove' },
     { k: 'topMargin', label: 'Gap kept above the tops (× screen height)', min: 0, max: 0.3, step: 0.01, re: 'grove',
       hint: 'Nothing, not even the leaves at the tops, goes higher than this below the top of the screen.' },
     { k: 'lean', label: 'Lean toward the middle (degrees)', min: 0, max: 60, step: 1, re: 'grove', hint: 'More lean = they reach further in.' },
@@ -402,10 +416,10 @@ var GROUPS = [
   ]},
   { title: 'Depth of field', ctls: [
     { k: 'blurNear', label: 'Blur on the nearer stems (px)', min: 0, max: 6, step: 0.1,
-      hint: 'The far tree is about 1 px soft; behind it the bamboo should be softer.' },
+      hint: 'The tree in front is sharp (the bigger one) or about 1 px soft (the smaller one); the bamboo behind it should be softer.' },
     { k: 'blurFar', label: 'Blur on the stems further back (px)', min: 0, max: 8, step: 0.1 },
     { k: 'haze', label: 'Haze (toward the mist colour)', min: 0, max: 0.9, step: 0.01, re: 'grove',
-      hint: 'The far tree has 0.09. More haze sets the bamboo further back.' },
+      hint: 'The smaller tree has 0.09. More haze sets the bamboo further back.' },
     { k: 'depthHaze', label: 'Extra haze on the stems further back', min: 0, max: 0.8, step: 0.01, re: 'grove' },
     { k: 'strength', label: 'Strength against the paper', min: 0.2, max: 1, step: 0.05 }
   ]},
@@ -425,18 +439,35 @@ function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.
 function buildControls() {
   var host = document.getElementById('labControls');
   host.innerHTML = '';
+  var pick = document.createElement('div');
+  pick.className = 'lab-sec';
+  pick.innerHTML = '<h4>Which grove are you changing?</h4>';
+  var ps = document.createElement('select');
+  GROVES.forEach(function (gk) { var op = document.createElement('option'); op.value = gk[0]; op.textContent = gk[1]; ps.appendChild(op); });
+  ps.value = SEL;
+  ps.style.cssText = 'width:100%;font:inherit;font-weight:700;padding:7px;border-radius:8px;border:1px solid #C44E10;background:#FFFDF9';
+  ps.addEventListener('change', function () { SEL = ps.value; buildControls(); });
+  pick.appendChild(ps);
+  host.appendChild(pick);
   GROUPS.forEach(function (g) {
     var sec = document.createElement('div');
     sec.className = 'lab-sec';
     sec.innerHTML = '<h4>' + g.title + '</h4>';
     g.ctls.forEach(function (ctl) {
       var wrap = document.createElement('div');
-      if (ctl.type === 'colours') {
+      if (ctl.type === 'check') {
+        wrap.className = 'lab-chk';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.checked = !!Bs()[ctl.k];
+        cb.addEventListener('change', function () { Bs()[ctl.k] = cb.checked; changed(ctl); });
+        var lb2 = document.createElement('span'); lb2.textContent = ctl.label;
+        wrap.appendChild(cb); wrap.appendChild(lb2);
+      } else if (ctl.type === 'colours') {
         wrap.className = 'lab-colours';
         BAMBOO_COLOUR_NAMES.forEach(function (cn) {
           var lb = document.createElement('label'); lb.className = 'lab-colour';
-          var inp = document.createElement('input'); inp.type = 'color'; inp.value = B.colours[cn[0]];
-          inp.addEventListener('input', function () { B.colours[cn[0]] = inp.value; changed(ctl); });
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = Bs().colours[cn[0]];
+          inp.addEventListener('input', function () { Bs().colours[cn[0]] = inp.value; changed(ctl); });
           var sp = document.createElement('span'); sp.textContent = cn[1];
           lb.appendChild(inp); lb.appendChild(sp);
           wrap.appendChild(lb);
@@ -452,14 +483,14 @@ function buildControls() {
           ctl.opts.forEach(function (o) {
             var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; el.appendChild(op);
           });
-          el.value = B[ctl.k];
-          el.addEventListener('change', function () { B[ctl.k] = el.value; changed(ctl); });
+          el.value = Bs()[ctl.k];
+          el.addEventListener('change', function () { Bs()[ctl.k] = el.value; changed(ctl); });
         } else {
-          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, B[ctl.k]);
+          var val = document.createElement('span'); val.className = 'v'; val.textContent = fmt(ctl, Bs()[ctl.k]);
           label.appendChild(val);
           el = document.createElement('input');
-          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = B[ctl.k];
-          el.addEventListener('input', function () { B[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, B[ctl.k]); changed(ctl); });
+          el.type = 'range'; el.min = ctl.min; el.max = ctl.max; el.step = ctl.step; el.value = Bs()[ctl.k];
+          el.addEventListener('input', function () { Bs()[ctl.k] = parseFloat(el.value); val.textContent = fmt(ctl, Bs()[ctl.k]); changed(ctl); });
         }
         wrap.appendChild(label); wrap.appendChild(el);
         if (ctl.hint) { var h = document.createElement('div'); h.className = 'hint'; h.textContent = ctl.hint; wrap.appendChild(h); }
@@ -488,7 +519,7 @@ function changed(ctl) {
 var NOW_BTNS = [
   ['Gust from the left', function () { startGust(1, 1.6); }],
   ['Gust from the right', function () { startGust(-1, 1.6); }],
-  ['Rearrange', function () { B.seed = B.seed % 99 + 1; save(); buildControls(); buildGroves(); }]
+  ['Rearrange this grove', function () { Bs().seed = Bs().seed % 99 + 1; save(); buildControls(); buildGroves(); }]
 ];
 
 document.getElementById('labToggle').addEventListener('click', function () {
@@ -536,31 +567,39 @@ document.getElementById('labToggle').addEventListener('click', function () {
   });
 })();
 document.getElementById('btnReset').addEventListener('click', function () {
-  B = clone(BDEF); save(); buildControls(); buildGroves();
+  BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) }; save(); buildControls(); buildGroves();
 });
 
 /* ============================================================
    3. COPY VALUES — every value, in words and as JSON.
    ============================================================ */
 function f2(x) { return Number(x).toFixed(2); }
+function groveText(title, B, tree) {
+  var L = [];
+  L.push(title + ': ' + (B.show ? 'shown' : 'hidden') + ', ' + B.culms + ' stems, arrangement ' + B.seed + ', coming in from the side between ' +
+         f2(B.entryTop) + ' and ' + f2(B.entryBottom) + ' × screen height; tops ' + f2(B.heightMin) + '–' + f2(B.heightMax) +
+         ' × the ' + tree + ' tree\'s height, at least ' + f2(B.topMargin) + ' below the top of the screen; lean ' + B.lean +
+         '° (variety ' + f2(B.leanVariety) + '), tops bend over ' + f2(B.arch));
+  L.push('  Stems: ' + f2(B.thickness) + ' px thick, taper ' + f2(B.taper) + ', joints every ' + Number(B.nodeSpacing).toFixed(3) +
+         ' (marked ' + f2(B.nodeMark) + '), shine ' + f2(B.highlight) + ', colour variety ' + f2(B.colourVariety));
+  L.push('  Leaves: leafiness ' + f2(B.leafiness) + ', from ' + f2(B.leafFrom) + ' along, size ' + f2(B.leafSize) + ', droop ' + f2(B.leafDroop));
+  L.push('  Depth of field: blur ' + f2(B.blurNear) + ' px nearer, ' + f2(B.blurFar) + ' px further back; haze ' + f2(B.haze) + ' (+' +
+         f2(B.depthHaze) + ' further back), strength ' + f2(B.strength));
+  L.push('  Swaying: amount ' + f2(B.swayAmount) + ', speed ' + f2(B.swaySpeed) + ', each in its own time ' + f2(B.swayVariety) +
+         ', tops ' + f2(B.tipWhip) + ', gust push ' + f2(B.gustResponse) + ', springiness ' + f2(B.gustSpring) + ', leaf flutter ' + f2(B.leafFlutter));
+  L.push('  Colours: ' + BAMBOO_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + B.colours[cn[0]]; }).join(', '));
+  return L.join('\n');
+}
 function buildCopyText() {
   var L = [];
-  L.push('/* Bamboo grove — values from bamboo.html (day only, behind the far tree) */');
+  L.push('/* Bamboo groves — values from bamboo.html (day only) */');
   L.push('');
-  L.push('Grove: ' + B.culms + ' stems, arrangement ' + B.seed + ', coming in from the side between ' + f2(B.entryTop) + ' and ' +
-         f2(B.entryBottom) + ' × screen height; tops ' + f2(B.heightMin) + '–' + f2(B.heightMax) + ' × the far tree\'s height, at least ' +
-         f2(B.topMargin) + ' below the top of the screen; lean ' + B.lean + '° (variety ' + f2(B.leanVariety) + '), tops bend over ' + f2(B.arch));
-  L.push('Stems: ' + f2(B.thickness) + ' px thick, taper ' + f2(B.taper) + ', joints every ' + Number(B.nodeSpacing).toFixed(3) +
-         ' (marked ' + f2(B.nodeMark) + '), shine ' + f2(B.highlight) + ', colour variety ' + f2(B.colourVariety));
-  L.push('Leaves: leafiness ' + f2(B.leafiness) + ', from ' + f2(B.leafFrom) + ' along, size ' + f2(B.leafSize) + ', droop ' + f2(B.leafDroop));
-  L.push('Depth of field: blur ' + f2(B.blurNear) + ' px nearer, ' + f2(B.blurFar) + ' px further back; haze ' + f2(B.haze) + ' (+' +
-         f2(B.depthHaze) + ' further back), strength ' + f2(B.strength));
-  L.push('Swaying: amount ' + f2(B.swayAmount) + ', speed ' + f2(B.swaySpeed) + ', each in its own time ' + f2(B.swayVariety) +
-         ', tops ' + f2(B.tipWhip) + ', gust push ' + f2(B.gustResponse) + ', springiness ' + f2(B.gustSpring) + ', leaf flutter ' + f2(B.leafFlutter));
-  L.push('Colours: ' + BAMBOO_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + B.colours[cn[0]]; }).join(', '));
+  L.push(groveText('Grove behind the smaller tree', BSET.far, 'smaller'));
+  L.push('');
+  L.push(groveText('Grove behind the bigger tree', BSET.near, 'bigger'));
   L.push('');
   L.push('JSON:');
-  L.push(JSON.stringify(B, null, 2));
+  L.push(JSON.stringify(BSET, null, 2));
   return L.join('\n');
 }
 function copyText(text) {
@@ -1049,27 +1088,29 @@ function nightGlow(T, strength) {
 }
 
 /* ============================================================
-   6b. BAMBOO — a dense grove of bamboo behind the far (smaller) tree,
-   in the day phase only. The stems shoot in from the side of the screen
-   on the far tree's side (we never see them from the ground), lean in
-   toward the middle and bend over at the top, as in the photo. Each
-   stem's top ends between B.heightMin and B.heightMax × the far tree's
-   height above its root, so the grove is taller than the tree, but never
-   higher than B.topMargin below the top of the screen. Each stem has
-   joints, a shine down one side and sprays of narrow hanging leaves
-   (baked sprites). It sways on its own and with the grove; the gusts
-   (section 9) push the grove as they pass it, and it rocks back on a
-   spring.
-   Depth of field: the grove is drawn at half resolution (as the far tree
+   6b. BAMBOO — two dense groves of bamboo, in the day phase only: one
+   behind the far (smaller) tree and one behind the near (bigger) tree.
+   Each has its own values (BSET.far, BSET.near). The stems shoot in from
+   the side of the screen on their tree's side (we never see them from
+   the ground), lean in toward the middle and bend over at the top, as
+   in the photo. Each stem's top ends between heightMin and heightMax ×
+   its tree's height above the tree's root, so the grove is taller than
+   the tree, but never higher than topMargin below the top of the screen.
+   Each stem has joints, a shine down one side and sprays of narrow
+   hanging leaves (baked sprites). It sways on its own and with its
+   grove; the gusts (section 9) push each grove as they pass it, and it
+   rocks back on a spring.
+   Depth of field: a grove is drawn at half resolution (as the far tree
    is) on two layers, the nearer stems and those further back, and each
-   layer is blurred (B.blurNear, B.blurFar) and hazed toward the mist
-   colour, so it sits behind the far tree.
+   layer is blurred (blurNear, blurFar) and hazed toward the mist colour,
+   so it sits behind its tree. The far grove is drawn behind the far
+   tree, the near grove behind the near tree.
+   B is the set of values of the grove being built or drawn.
    ============================================================ */
-var groves = [], BAMS = [mk(), mk()], BAMF = mk(), BAM_RES = 0.5, SPRAYS = [];   // BAMS: nearer, further back; BAMF: for the blur
+var groves = [], BAMF = mk(), BAM_RES = 0.5, B = BSET.far;   // BAMF: scratch for the blur
 var SEG = 22;                                 // segments along each stem
-/* From the far tree's root to the top of its leaves. */
-function farTreeHeight() {
-  var T = trees[1] || trees[0];
+/* From a tree's root to the top of its leaves. */
+function treeHeight(T) {
   if (!T) return H * 0.5;
   var top = T.by;
   T.nodes.forEach(function (n) { top = Math.min(top, n.ey); });
@@ -1111,27 +1152,40 @@ function newSpray(r, s, side, tip, cs) {
 }
 function buildGroves() {
   if (!W) return;
-  BAMS.concat([BAMF]).forEach(function (L) {
+  BAMF.cnv.width = Math.max(1, Math.round(W * PR * BAM_RES)); BAMF.cnv.height = Math.max(1, Math.round(H * PR * BAM_RES));
+  var old = groves;
+  groves = [['far', function () { return trees[1] || trees[0]; }], ['near', function () { return trees[0]; }]].map(function (def) {
+    var G = buildGrove(def[0], def[1](), old);
+    return G;
+  });
+}
+function buildGrove(key, T, old) {
+  B = BSET[key];
+  var layers = [mk(), mk()];
+  layers.forEach(function (L) {
     L.cnv.width = Math.max(1, Math.round(W * PR * BAM_RES)); L.cnv.height = Math.max(1, Math.round(H * PR * BAM_RES));
   });
   var r = rngFrom(B.seed * 977 + 13), k = PR * BAM_RES, u = H * 0.075 * B.leafSize;
-  SPRAYS = [];
+  var sprays = [];
   for (var band = 0; band < 3; band++) {
-    SPRAYS.push([]);
-    for (var v = 0; v < 4; v++) SPRAYS[band].push(bakeSpray(r, u, B.haze + B.depthHaze * band / 2, k));
+    sprays.push([]);
+    for (var v = 0; v < 4; v++) sprays[band].push(bakeSpray(r, u, B.haze + B.depthHaze * band / 2, k));
   }
-  var T = trees[1] || trees[0], treeH = farTreeHeight(), root = T ? T.by : H + 6;
-  var left = T ? T.left : V.nearSide !== 'left', old = groves[0];
-  var G = { left: left, x: left ? W * 0.15 : W * 0.85, gust: old ? old.gust : 0, gustV: old ? old.gustV : 0, ph: r() * TAU, culms: [] };
-  groves = [G];
+  var treeH = treeHeight(T), root = T ? T.by : H + 6;
+  var left = T ? T.left : (key === 'far' ? V.nearSide !== 'left' : V.nearSide === 'left'), prev = null;
+  old.forEach(function (o) { if (o.key === key) prev = o; });
+  var G = { key: key, B: B, left: left, x: left ? W * 0.15 : W * 0.85, gust: prev ? prev.gust : 0, gustV: prev ? prev.gustV : 0,
+            ph: r() * TAU, culms: [], layers: layers, sprays: sprays, u: u };
   for (var i = 0; i < B.culms; i++) {
     var d = r();                                   // 0 nearest … 1 furthest back
     var lean = (B.lean * PI / 180) * (1 + (r() - 0.5) * 1.6 * B.leanVariety) + (r() - 0.5) * 0.12 * B.leanVariety;
     var cs = lerp(1, 0.55, d);
     // where it crosses the edge of the screen; it starts just outside
     var y0 = H * lerp(B.entryTop, Math.max(B.entryTop, B.entryBottom), r()), out = 3 + r() * W * 0.015;
-    // where its top should end: above the far tree, below the top of the screen
-    var topY = Math.max(H * B.topMargin, root - treeH * lerp(B.heightMin, Math.max(B.heightMin, B.heightMax), r()));
+    // where its top should end: above its tree, below the top of the screen
+    // (the tops that would go past the limit are spread a little below it instead of all on one line)
+    var want = root - treeH * lerp(B.heightMin, Math.max(B.heightMin, B.heightMax), r()), limit = H * B.topMargin;
+    var topY = want >= limit ? want : limit + r() * H * 0.1;
     var arch = B.arch * lerp(0.7, 1.3, r());
     var yell = r() < 0.5, shade = r();
     var base = mix(hex(B.colours.culm), hex(yell ? B.colours.yellow : B.colours.culmShade), B.colourVariety * shade * (yell ? 0.8 : 0.45));
@@ -1174,10 +1228,13 @@ function buildGroves() {
     G.culms.push(C);
   }
   G.culms.sort(function (a, b) { return b.d - a.d; });   // further back first
+  return G;
 }
 function swayGroves(dt) {
-  var kS = 6 * B.gustSpring, cS = 1.5 * Math.sqrt(B.gustSpring);
-  groves.forEach(function (G) { G.gustV += (-kS * G.gust - cS * G.gustV) * dt; G.gust += G.gustV * dt; });
+  groves.forEach(function (G) {
+    var ks = 6 * G.B.gustSpring, cs = 1.5 * Math.sqrt(G.B.gustSpring);
+    G.gustV += (-ks * G.gust - cs * G.gustV) * dt; G.gust += G.gustV * dt;
+  });
 }
 /* The highest point of a stem and its leaves (roughly: how far each spray
    reaches up from where it grows). */
@@ -1192,6 +1249,7 @@ function culmHighest(C, u) {
 /* The stem's curve this frame (standing still if rest). sw is how far its
    top swings (radians from the root); B.tipWhip puts that bend toward the top. */
 function shapeCulm(C, G, t, rest) {
+  B = G.B;
   var A = 0.035 * B.swayAmount * V.wind, sp = B.swaySpeed, vr = B.swayVariety;
   var sw = rest ? 0 : A * (Math.sin(t * 0.9 * sp * C.f + G.ph + C.rp * vr * TAU) + 0.4 * Math.sin(t * 2.1 * sp * C.f + G.ph * 1.7 + C.rp2 * vr * TAU)) +
            A * 0.6 * Math.sin(t * 0.31 * sp + G.ph) + G.gust * C.gk;
@@ -1225,6 +1283,7 @@ function culmStrip(c, C, o0, o1) {
   c.fill();
 }
 function drawCulm(c, C, G, t) {
+  B = G.B;
   c.globalAlpha = 1; c.fillStyle = C.body; culmStrip(c, C, -1, 1);
   c.globalAlpha = 0.8; c.fillStyle = C.dark; culmStrip(c, C, 0.35, 1);
   if (B.highlight > 0) { c.globalAlpha = B.highlight; c.fillStyle = C.lit; culmStrip(c, C, -0.65, -0.15); }
@@ -1245,7 +1304,7 @@ function drawCulm(c, C, G, t) {
   }
   // the leaves
   c.globalAlpha = 1;
-  var set = SPRAYS[C.band], fl = 0.07 * B.leafFlutter * V.wind, sp = B.swaySpeed;
+  var set = G.sprays[C.band], fl = 0.07 * B.leafFlutter * V.wind, sp = B.swaySpeed;
   for (var j = 0; j < C.sprays.length; j++) {
     var S = C.sprays[j], q = culmAt(C, S.s), spr = set[S.v];
     var dir = q.a + S.side * S.spread + Math.sin(t * 2.6 * sp + S.ph) * fl + Math.sin(t * 4.3 * sp + S.ph * 2.3) * fl * 0.4 + G.gust * 0.4;
@@ -1269,25 +1328,28 @@ function bambooLayerOut(L, blur) {
   }
   ctx.drawImage(src, 0, 0, cv.width, cv.height);
 }
-function drawBamboo(t) {
-  if (V.timeOfDay !== 'day' || !groves.length) return;   // the bamboo is for the day only
+/* One grove, onto the scene: key is 'far' (behind the far tree) or 'near'. */
+function drawBamboo(key, t) {
+  if (V.timeOfDay !== 'day') return;   // the bamboo is for the day only
+  var G = null;
+  groves.forEach(function (g) { if (g.key === key) G = g; });
+  if (!G || !G.B.show) return;
+  B = G.B;
   var k = PR * BAM_RES;
-  BAMS.forEach(function (L) {
+  G.layers.forEach(function (L) {
     L.c.setTransform(1, 0, 0, 1, 0, 0);
     L.c.globalAlpha = 1;
     L.c.clearRect(0, 0, L.cnv.width, L.cnv.height);
     L.c.setTransform(k, 0, 0, k, 0, 0);
   });
-  groves.forEach(function (G) {
-    for (var i = 0; i < G.culms.length; i++) {
-      var C = G.culms[i];
-      shapeCulm(C, G, t);
-      drawCulm(BAMS[C.layer].c, C, G, t);
-    }
-  });
+  for (var i = 0; i < G.culms.length; i++) {
+    var C = G.culms[i];
+    shapeCulm(C, G, t);
+    drawCulm(G.layers[C.layer].c, C, G, t);
+  }
   // a safety net: a gust or the biggest leaves never take it above B.topMargin (fades out just under it)
   var lim = H * B.topMargin, fade = H * 0.02;
-  BAMS.forEach(function (L) {
+  G.layers.forEach(function (L) {
     L.c.globalAlpha = 1;
     if (lim <= 0) return;
     var g = L.c.createLinearGradient(0, lim, 0, lim + fade);
@@ -1299,8 +1361,8 @@ function drawBamboo(t) {
   });
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = B.strength;
-  bambooLayerOut(BAMS[1], B.blurFar);
-  bambooLayerOut(BAMS[0], B.blurNear);
+  bambooLayerOut(G.layers[1], B.blurFar);
+  bambooLayerOut(G.layers[0], B.blurNear);
   ctx.globalAlpha = 1;
 }
 
@@ -1824,7 +1886,7 @@ function updateGusts(dt) {
     }
     for (var bi = 0; bi < groves.length; bi++) {
       var Gb = groves[bi];
-      if (!g.hit['b' + bi] && (g.x - Gb.x) * g.dir > 0) { g.hit['b' + bi] = 1; Gb.gustV += g.dir * g.str * 0.35 * B.gustResponse; }
+      if (!g.hit['b' + Gb.key] && (g.x - Gb.x) * g.dir > 0) { g.hit['b' + Gb.key] = 1; Gb.gustV += g.dir * g.str * 0.35 * Gb.B.gustResponse; }
     }
     if (g.x < -1400 || g.x > W + 1400) gusts.splice(i, 1);
   }
@@ -3760,7 +3822,9 @@ function bakeAnimFrame(S, fr) {
   });
   S.pend--;
 }
+var ANIMALS_OFF = true;   // no deer or tanuki on this page: none are ever sent, and their frames are never baked
 function bakeAnimQueue(ms) {
+  if (ANIMALS_OFF) return;
   var t0 = performance.now();
   while (animQueue.length && performance.now() - t0 < ms) { var q = animQueue.shift(); bakeAnimFrame(q[0], q[1]); }
 }
@@ -3930,6 +3994,7 @@ function updateKit(a, t, dt) {
   }
 }
 function updateAnimals(t, dt) {
+  if (ANIMALS_OFF) return;
   if (!trees.length || !H) return;
   if (!deerNext) { deerNext = t + 3; tanukiNext = t + 9; }   // the first ones come soon after the page opens
   var anyDeer = false, anyTanuki = false, i, a;
@@ -4055,7 +4120,7 @@ function frame(now) {
   updateAnimals(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
-  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = animStatus(); }
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = ''; }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -4084,8 +4149,8 @@ function frame(now) {
   drawAnimals(ctx, 'A');
   drawOwl(ctx, 'A');
 
-  // The bamboo groves: behind the far tree, on a soft layer of their own.
-  drawBamboo(t);
+  // The bamboo grove behind the far tree, on soft layers of its own.
+  drawBamboo('far', t);
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
@@ -4112,6 +4177,9 @@ function frame(now) {
   // The owl on the far tree's branch, or flying between the two trees.
   drawAnimals(ctx, 'B');
   drawOwl(ctx, 'B');
+
+  // The bamboo grove behind the near tree.
+  drawBamboo('near', t);
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
