@@ -2662,8 +2662,11 @@ function bakeOwl(k, box, P, pose, into) {
 }
 /* The sitting poses now (needed at once); the small flying ones queued and
    baked a few each frame (bakeOwlQueue). */
+var OWL_OFF = true;   // no owl on this page: nothing is baked, so it is never created or drawn
 function bakeOwlSprites() {
   if (!H) return;
+  owlSit = []; owlFly = []; owlQueue = []; owl = null;
+  if (OWL_OFF) return;
   owlPal = {};
   owlSit = [1, FAR_SCALE].map(function (k) {
     var P = owlPalette(k), poses = {};
@@ -4011,7 +4014,7 @@ function frame(now) {
   updateAnimals(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
-  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = owlStatus(t) + '  ·  ' + animStatus(); }
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = animStatus(); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
