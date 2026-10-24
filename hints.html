@@ -59,6 +59,7 @@
   .steps li.done .t { color: var(--side-mute); }
   .steps li.group { cursor: default; font-size: 12px; color: var(--side-mute); padding-top: 12px; border-bottom: none; }
   .detail { background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.7; }
+  .detail.extra { margin-top: 10px; background: transparent; border: 1px dashed var(--side-line); }
   .detail b { display: block; font-size: 15px; margin-bottom: 4px; }
   .detail dl { margin: 6px 0 0; }
   .detail dt { color: var(--side-mute); font-size: 12px; margin-top: 6px; }
@@ -94,10 +95,6 @@
     display: flex; align-items: center; justify-content: center; font-size: 17px; color: var(--text-med); letter-spacing: 2px;
   }
   .toolbar .sep { margin: 0 10px; color: var(--text-faint); }
-  .furin { position: absolute; z-index: 8; left: 70px; top: 10px; width: 44px; height: 110px; cursor: pointer; transform-origin: 22px 6px; }
-  .furin.swing { animation: furinSwing 1.6s ease-out; }
-  @keyframes furinSwing { 0%{transform:rotate(0)} 20%{transform:rotate(12deg)} 45%{transform:rotate(-9deg)} 70%{transform:rotate(5deg)} 100%{transform:rotate(0)} }
-  .furin-note { position: absolute; z-index: 8; left: 130px; top: 12px; font-size: 14px; color: var(--text-mute); line-height: 1.5; letter-spacing: 1px; }
 
   .hint-row { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; font-size: 18px; letter-spacing: 4px; color: var(--text-med); }
   .hint-row .arr { color: var(--accent); display: inline-block; margin: 0 6px; }
@@ -118,13 +115,8 @@
   .pond.dive .koi { opacity: 0; }
   @keyframes koiSpin { to { transform: rotate(360deg); } }
   .start-hints { position: absolute; left: 0; right: 0; top: 600px; text-align: center; font-size: 19px; line-height: 2.1; color: var(--text-mute); letter-spacing: 2px; }
-  .notice { position: absolute; inset: 0; background: rgba(36,28,26,.28); display: none; align-items: center; justify-content: center; z-index: 20; }
-  .notice.on { display: flex; }
-  .notice-box { width: 720px; background: var(--bg-base); border-radius: 18px; padding: 44px 56px; font-size: 20px; line-height: 2; color: var(--text-med); box-shadow: 0 20px 60px rgba(0,0,0,.18); text-align: center; }
-  .notice-box p { margin: 0 0 6px; }
   .btn { display: inline-block; border: none; border-radius: 999px; padding: 16px 44px; font-size: 20px; letter-spacing: 3px; background: var(--accent); color: #fff; cursor: pointer; }
   .btn.ghost { background: transparent; color: var(--text-med); border: 1.5px solid var(--border-1); }
-  .notice-box .btn { margin-top: 22px; }
 
   /* ============ 3–5 MESSAGE PAGES / 9 THANK-YOU PAGES ============ */
   .carousel { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; overflow: hidden; }
@@ -137,15 +129,7 @@
   .panel-text { max-width: 820px; font-size: 30px; line-height: 2.1; letter-spacing: 2px; color: var(--text-dark); text-align: center; }
   .panel-text .nm { font-family: "Yuji Syuku", var(--mincho); color: var(--accent-2); }
   .panel-text .small { font-size: 22px; color: var(--text-med); }
-  .ty-panel .panel-text { font-size: 26px; }
-  .ty-mark { color: var(--accent); font-size: 30px; }
 
-  .game-ring { width: 520px; height: 520px; border-radius: 50%; border: 6px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
-    box-shadow: 0 0 0 1px var(--border-1), 0 0 70px color-mix(in srgb, var(--accent) 30%, transparent);
-    background: radial-gradient(circle, rgba(255,255,255,.75), color-mix(in srgb, var(--accent) 10%, transparent)); font-size: 20px; color: var(--text-med); }
-  .game-ring .sc { font-size: 24px; }
-  .game-ring .btn { margin: 8px 0; }
-  .game-ring .how { font-size: 15px; color: var(--text-mute); }
 
   /* ============ 6 SERVICE TABLE ============ */
   .table-screen { background: var(--bg-warm); }
@@ -230,6 +214,8 @@
   .coach .glow { fill: none; stroke: var(--accent); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
   .coach.go .ink { animation: ink .9s cubic-bezier(.5,0,.3,1) forwards; }
   .coach.go .glow { animation: glow 2.4s ease-in-out .9s infinite; }
+  .coach.once.go .glow { animation: glow 2.4s ease-in-out .9s 1; }
+  .coach.once.go .ghost.tap, .coach.once.go .ghost.tap::after { animation-iteration-count: 1; }
   @keyframes ink { to { stroke-dashoffset: 0; } }
   @keyframes glow { 0%,100% { opacity: 0; } 50% { opacity: .16; } }
   .cap {
@@ -274,7 +260,7 @@
 
 <aside class="side">
   <h1>はじめてのヒント・デモ</h1>
-  <p class="sub">Each hint draws itself, then waits for you to do the action. Tap or swipe inside the tablet as she would. Leave a hint alone for 8 seconds and it redraws (at most twice).</p>
+  <p class="sub">Tap or swipe inside the tablet as she would. Hints 6a–6d play one loop and move on by themselves. The others wait for her to act, and redraw after 8 seconds of no touch (twice at most).</p>
   <div class="opts">
     <button class="chip on" data-theme-btn="autumn">秋 Autumn</button>
     <button class="chip" data-theme-btn="sakura">桜 Sakura</button>
@@ -282,6 +268,11 @@
   </div>
   <ol class="steps" id="stepList"></ol>
   <div class="detail" id="detail"></div>
+  <div class="detail extra" id="kpNote">
+    <b>＋ Keypad hint</b>
+    Not a step. It comes on only when she taps a price field, whatever step she is on: a box around the price and the keypad (料金は変更できます / 入力後「決定」を). It goes when the keypad closes, and shows the first time only.
+    <div class="try"><span id="kpState"></span> <button class="chip" id="kpReset">Show it again</button></div>
+  </div>
   <div class="replays" id="replays"></div>
   <div class="nav">
     <button id="prevBtn">← Back</button>
@@ -295,7 +286,7 @@
     <div class="frame-box" id="frameBox">
       <div class="frame" id="frame">
 
-        <!-- ===== Koi screen + opening notice (steps 1–2) ===== -->
+        <!-- ===== Koi screen (step 2) ===== -->
         <section class="screen koi-screen" id="scrKoi">
           <div class="greet"><div class="g1">こんにちは</div><div class="g2">桜庭さん</div></div>
           <div class="pond" id="pond">
@@ -310,14 +301,6 @@
             <div>水にふれると、さざなみが静かに広がります。</div>
             <div>鯉に、そっとふれてみてください。</div>
             <div>水面をゆっくり上へなぞると、はじまります。</div>
-          </div>
-          <div class="notice" id="notice">
-            <div class="notice-box">
-              <p>こちらのアプリは、コミュニケーションを少しでも円滑にするためのものです。</p>
-              <p>ご希望に沿わないことや、ご不安に感じることを無理にお願いすることはございません。</p>
-              <p>どうぞご安心くださいませ。</p>
-              <button class="btn" id="noticeBtn">確認しました</button>
-            </div>
           </div>
         </section>
 
@@ -413,38 +396,6 @@
           </div>
         </section>
 
-        <!-- ===== Thank-you pages + game + furin (steps 9–11) ===== -->
-        <section class="screen" id="scrTy">
-          <div class="toolbar"><span>名古屋市</span><span class="sep">·</span><span>14時12分</span><span class="sep">·</span><span>18°</span></div>
-          <svg class="furin" id="furin" viewBox="0 0 44 110" aria-label="風鈴">
-            <line x1="22" y1="0" x2="22" y2="10" stroke="#8A7C76" stroke-width="1.5"/>
-            <path d="M8 34 C8 16 36 16 36 34 L36 38 L8 38 Z" fill="rgba(255,255,255,.75)" stroke="#8A7C76" stroke-width="1.2"/>
-            <circle cx="16" cy="28" r="2.6" fill="#E66826"/><circle cx="27" cy="25" r="2" fill="#882E47"/>
-            <line x1="22" y1="38" x2="22" y2="60" stroke="#8A7C76" stroke-width="1"/>
-            <rect x="15" y="60" width="14" height="44" rx="1" fill="#FBECE0" stroke="#D9C4B5"/>
-          </svg>
-          <div class="furin-note">風鈴にそっとふれると、音が鳴ります<br>名古屋の風 · そよ風</div>
-          <div class="carousel" id="tCarousel">
-            <div class="peek-wrap" id="tPeek">
-              <div class="track" id="tTrack">
-                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>ありがとうございます。<br><span class="small">ただいま準備をしてまいります。（見本の文章です）</span></div></div>
-                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>その間、どうぞごゆっくりお寛ぎくださいませ。<br><span class="small">お飲み物も、どうぞお好きなタイミングで。</span></div></div>
-                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>画面は見ていただかなくても大丈夫です。<br><span class="small">スマートフォンを見たり、目を閉じたり、どうぞご自由に。</span></div></div>
-                <div class="panel ty-panel">
-                  <div class="game-ring">
-                    <div class="sc">現在のスコア：<b id="gScore">0</b></div>
-                    <div>最高スコア：0　残り時間：<span id="gTime">60</span>秒</div>
-                    <button class="btn" id="gameBtn">はじめる</button>
-                    <div class="how">小さなゲームで、ひと息どうぞ。</div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="hint-row" id="tHint"><span id="tHintIn">スワイプ<span class="arr">→</span></span></div>
-          <div class="dots" id="tDots"></div>
-        </section>
-
         <div class="coach" id="coach"><svg id="coachSvg"></svg></div>
         <div class="end" id="end">デモはここまでです<button class="btn" id="endRestart">最初から</button></div>
         <div class="tag">デモ画面（実際のアプリではありません）</div>
@@ -494,7 +445,7 @@
      an optional ghost finger. Redraws after 8s with no touch, twice. */
   var Coach = (function () {
     var layer = $('coach'), svg = $('coachSvg'), NS = 'http://www.w3.org/2000/svg';
-    var opts = null, nodes = [], idleT = null, replays = 0;
+    var opts = null, nodes = [], idleT = null, onceT = null, replays = 0;
 
     function boxPath(r, pad) {
       var x = r.x - pad, y = r.y - pad, w = r.w + pad * 2, h = r.h + pad * 2, k = Math.min(18, h / 2, w / 2);
@@ -517,8 +468,8 @@
     }
 
     function clear() {
-      clearTimeout(idleT);
-      layer.classList.remove('go');
+      clearTimeout(idleT); clearTimeout(onceT);
+      layer.classList.remove('go', 'once');
       svg.innerHTML = '';
       nodes.forEach(function (n) { if (n.cap) n.cap.remove(); });
       var g = layer.querySelector('.ghost'); if (g) g.remove();
@@ -528,6 +479,7 @@
     function show(o) {
       clear();
       opts = o;
+      if (o.once) layer.classList.add('once');
       (o.targets || []).forEach(function (t) {
         var n = { t: t };
         if (t.shape && t.shape !== 'none') {
@@ -546,6 +498,8 @@
       }
       place();
       play();
+      /* once: one loop of the animation (about 4s), then onDone moves on. */
+      if (o.once) onceT = setTimeout(function () { if (opts === o && o.onDone) o.onDone(); }, o.hold || 4000);
     }
 
     function play() {
@@ -554,14 +508,14 @@
     }
     function armIdle() {
       clearTimeout(idleT);
-      if (!opts || opts.fade) return;
+      if (!opts || opts.fade || opts.once) return;
       idleT = setTimeout(function () {
         if (!opts || replays >= 2) return;
         replays++; showReplays(); play();
       }, 8000);
     }
     function showReplays() {
-      $('replays').textContent = opts && !opts.fade ? 'Redrawn after no touch: ' + replays + ' / 2' : '';
+      $('replays').textContent = opts && !opts.fade && !opts.once ? 'Redrawn after no touch: ' + replays + ' / 2' : '';
     }
 
     function place() {
@@ -628,7 +582,7 @@
   }
 
   /* ============ SCREENS ============ */
-  var screens = ['scrKoi', 'scrPanels', 'scrTable', 'scrReceipt', 'scrTy'];
+  var screens = ['scrKoi', 'scrPanels', 'scrTable', 'scrReceipt'];
   function showScreen(id) {
     screens.forEach(function (s) { $(s).classList.toggle('on', s === id); });
     $('end').classList.remove('on');
@@ -636,13 +590,12 @@
 
   /* Koi: trace upward on the water to start */
   var pond = $('pond'), koiY = null;
-  $('scrKoi').addEventListener('pointerdown', function (e) { if (!$('notice').classList.contains('on')) koiY = e.clientY; });
+  $('scrKoi').addEventListener('pointerdown', function (e) { koiY = e.clientY; });
   window.addEventListener('pointerup', function (e) {
     if (koiY == null) return;
     var d = (e.clientY - koiY) / scale; koiY = null;
     if (d < -70) { pond.classList.add('dive'); setTimeout(function () { emit('koiDive'); }, 700); }
   });
-  $('noticeBtn').addEventListener('click', function () { $('notice').classList.remove('on'); emit('notice'); });
 
   /* Message pages */
   var pCar = new Carousel($('pCarousel'), $('pTrack'), $('pDots'), 6, function (i) {
@@ -696,13 +649,13 @@
     $('submitBtn').disabled = !(any || rejected);
     if (any || rejected) emit('canSubmit');
   }
-  function setActive(r) {
+  function setActive(r, byTap) {
     if (activeRow) activeRow.price.classList.remove('active');
     activeRow = r; freshPrice = true;
     if (r) r.price.classList.add('active');
     $('numpad').classList.toggle('on', !!r);
     setTimeout(Coach.place, 0);
-    if (r) emit('numpad');
+    if (r) emit('numpad', !!byTap);
   }
   function pending() { for (var i = 0; i < rows.length; i++) if (rows[i].on && !rows[i].v.textContent) return rows[i]; return null; }
   /* The existing shake, now with a caption saying why. */
@@ -714,6 +667,7 @@
     clearTimeout(shakeWithWords.t);
     shakeWithWords.t = setTimeout(function () {
       if (curStep !== resume) return;
+      if (kpOn) { drawKeypadHint(); return; }
       var s = steps[curStep]; if (s.leave) s.leave(); s.hint();
     }, 4200);
   }
@@ -728,7 +682,7 @@
       if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
       openTanzaku(r); return;
     }
-    if (onPrice) { setActive(r); return; }
+    if (onPrice) { setActive(r, true); return; }
     r.on = !r.on;
     if (r.on) emit('check', r);
     else { if (activeRow === r) setActive(null); emit('uncheck', r); }
@@ -777,7 +731,7 @@
     setActive(null); $('confirm').classList.add('on'); emit('submit');
   });
   $('cfNo').addEventListener('click', function () { $('confirm').classList.remove('on'); });
-  $('cfYes').addEventListener('click', function () { $('confirm').classList.remove('on'); go(idx('7')); });
+  $('cfYes').addEventListener('click', function () { $('confirm').classList.remove('on'); go(idx('8'), true); });
   $('scroller').addEventListener('scroll', function () { Coach.place(); emit('scroll'); });
 
   function fullyVisible(el) {
@@ -805,44 +759,25 @@
     if (!stamped) { setStamp(true); emit('stamp'); }
   });
   $('stampX').addEventListener('click', function () { setStamp(false); emit('unstamp'); });
-  $('rBack').addEventListener('click', function () { go(idx('6f'), true); });
+  $('rBack').addEventListener('click', function () { go(idx('T'), true); });
   $('rConfirm').addEventListener('click', function () { if (stamped) emit('receiptOk'); });
-
-  /* ============ THANK-YOU PAGES ============ */
-  var tCar = new Carousel($('tCarousel'), $('tTrack'), $('tDots'), 4, function (i) {
-    $('tHint').style.visibility = i === 3 ? 'hidden' : '';
-    emit('tyPanel', i);
-  });
-  var gameT = null;
-  $('gameBtn').addEventListener('click', function () {
-    var left = 5; clearInterval(gameT); $('gameBtn').textContent = 'ゲーム中…'; emit('game');
-    gameT = setInterval(function () {
-      left--; $('gTime').textContent = left; $('gScore').textContent = (5 - left) * 3;
-      if (left <= 0) { clearInterval(gameT); $('gameBtn').textContent = 'もう一度'; $('gTime').textContent = '60'; }
-    }, 600);
-  });
-  $('furin').addEventListener('click', function () {
-    var f = $('furin'); f.classList.remove('swing'); void f.getBoundingClientRect(); f.classList.add('swing'); emit('furin');
-  });
 
   /* ============ STEPS ============
      Each step: setup() puts the mock screen in the right state when you
-     jump to it; hint() draws it; on(evt) returns true to move on. */
+     jump to it; enterNatural() does the same when she arrives by doing
+     the action; hint() draws it; on(evt) returns true to move on.
+     once:true hints play one loop, then move on by themselves. */
   var steps = [
-    { id: '1', group: 'Start', t: '確認しました', what: 'Circle around the 確認しました button.', cap: '—', gone: 'She taps it.',
-      setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); $('notice').classList.add('on'); },
-      hint: function () { Coach.show({ targets: [{ el: $('noticeBtn'), shape: 'circle', pad: 14 }], finger: { el: $('noticeBtn'), kind: 'tap' } }); },
-      on: function (e) { return e === 'notice'; } },
-    { id: '2', t: 'Koi pond', what: 'Ghost finger traces upward on the water.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
-      setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); $('notice').classList.remove('on'); },
+    { id: '2', group: 'Start', t: 'Koi pond', what: 'Ghost finger traces upward on the water.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
+      setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); },
       hint: function () { Coach.show({ targets: [{ el: pond, shape: 'circle', pad: 26, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
       on: function (e) { return e === 'koiDive'; } },
-    { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box around スワイプ→ and the dots. Ghost finger drags left while the page slides 56px to show the next one, then springs back.', cap: '左へスワイプして、次のページへ', gone: 'First successful swipe.', try: 'Drag the page to the left.',
+    { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box around スワイプ→ only (the page dots are left out). Ghost finger drags left while the page slides 56px to show the next one, then springs back.', cap: '左へスワイプして、次のページへ', gone: 'First successful swipe.', try: 'Drag the page to the left.',
       setup: function () { showScreen('scrPanels'); pCar.go(0, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
       enterNatural: function () { this.setup(); },
       hint: function () {
         $('pPeek').classList.add('peek');
-        Coach.show({ targets: [{ els: [$('pHintSwipe'), $('pDots').firstChild, $('pDots').lastChild], shape: 'box', pad: 16, text: '左へスワイプして、次のページへ', place: 'above' }], finger: { el: $('pCarousel'), kind: 'swipe', dy: 120 } });
+        Coach.show({ targets: [{ el: $('pHintSwipe'), shape: 'box', pad: 16, text: '左へスワイプして、次のページへ', place: 'above' }], finger: { el: $('pCarousel'), kind: 'swipe', dy: 120 } });
       },
       leave: function () { $('pPeek').classList.remove('peek'); },
       on: function (e, i) { return e === 'panel' && i > 0; } },
@@ -850,133 +785,95 @@
       setup: function () { showScreen('scrPanels'); pCar.go(1, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
       hint: function () { Coach.clear(); },
       on: function (e, i) { return e === 'panel' && i === 5; } },
-    { id: '5', t: 'Scroll down', what: 'Box around ↓下へスクロール. The page nudges up and settles.', cap: '下へスクロールしてください', gone: 'She starts scrolling.', try: 'Drag up, use the mouse wheel, or tap the hint.',
+    { id: '5', t: 'Scroll down', what: 'Box around ↓下へスクロール, with a ghost finger dragging upward. No caption: just the line drawing and the gesture.', cap: '— (none)', gone: 'She starts scrolling.', try: 'Drag up, use the mouse wheel, or tap the hint.',
       setup: function () { showScreen('scrPanels'); pCar.go(5, true); $('pHintSwipe').hidden = true; $('pHintScroll').hidden = false; },
-      hint: function () { Coach.show({ targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14, text: '下へスクロールしてください', place: 'above' }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
+      hint: function () { Coach.show({ targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14 }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
       on: function (e) { return e === 'scrollDown'; } },
 
-    { id: '6a', group: 'Service table', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap.', cap: '○をタップすると選択できます', gone: 'She ticks any row.',
+    { id: '6a', group: 'Service table (6a–6d each play once, then move on)', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap. One loop, then 6b.', cap: '○をタップすると選択できます', gone: 'After one loop (or sooner if she ticks a row).',
       setup: function () { showScreen('scrTable'); buildTable(); },
       enterNatural: function () { this.setup(); },
-      hint: function () { Coach.show({ targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップすると選択できます', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } }); },
+      hint: function () {
+        var s = this;
+        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップすると選択できます', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } });
+      },
       on: function (e) { return e === 'check'; } },
-    { id: '6b', t: 'Price + keypad', what: 'First a circle around that row\'s price with a ghost tap, because ticking does not bring up the keypad. When she taps the price and the keypad appears, the hint changes to a box around the price and the keypad.',
-      cap: '料金をタップして金額を入力 → 入力後「決定」を', gone: 'She presses 決定 or taps elsewhere (the keypad closes).', try: 'Tick a row, then tap its price. Untick it and the hint goes back a step.',
+    { id: '6b', t: 'Tap the price', what: 'Circle around the price (the first ticked row, else the first row) with a ghost tap. One loop, then 6c. The keypad hint is separate: see the note under the list.', cap: '料金を変えるときは、ここをタップ（空なら「料金をタップして金額を入力」）', gone: 'After one loop.', try: 'Tap a price at any point to see the keypad hint.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
-        var r = activeRow || rows.filter(function (x) { return x.on; })[0] || rows[0];
-        if ($('numpad').classList.contains('on')) {
-          Coach.show({ targets: [{ el: r.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
-        } else {
-          var empty = !r.v.textContent;
-          Coach.show({ targets: [{ el: r.price, shape: 'circle', pad: 14, text: empty ? '料金をタップして金額を入力' : '料金を変えるときは、ここをタップ', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
-        }
+        var s = this, r = rows.filter(function (x) { return x.on; })[0] || rows[0];
+        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.price, shape: 'circle', pad: 14, text: r.v.textContent ? '料金を変えるときは、ここをタップ' : '料金をタップして金額を入力', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
       },
-      on: function (e) {
-        if (e === 'numpad') { this.hint(); return false; }
-        if (e === 'uncheck') {
-          if (!rows.some(function (x) { return x.on; })) { go(idx('6a'), true); return false; }
-          this.hint(); return false;
-        }
-        return e === 'priceDone';
-      } },
-    { id: '6c', t: 'Untick', what: 'A caption only, beside the ○ she just ticked. Fades by itself.', cap: 'もう一度タップで取り消せます', gone: 'After 4 seconds, no action needed.',
-      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
-      hint: function () {
-        var r = rows.filter(function (x) { return x.on; })[0] || rows[0];
-        Coach.show({ targets: [{ el: r.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }], fade: true });
-        this._t = setTimeout(function () { next(); }, 4200);
-      },
-      leave: function () { clearTimeout(this._t); },
       on: function () { return false; } },
-    { id: '6d', t: 'その他 rows', what: 'When she scrolls to it: box around the first その他 row.', cap: 'ご提案があれば、こちらにご記入ください', gone: 'She opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the new "in order" caption.',
+    { id: '6c', t: 'Untick', what: 'A caption beside a ○ she has ticked (skipped if she has ticked nothing). One loop, then 6d.', cap: 'もう一度タップで取り消せます', gone: 'After one loop.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
-        var r = rows.filter(function (x) { return x.custom && !x.name; })[0];
-        this._r = r;
+        var s = this, r = rows.filter(function (x) { return x.on; })[0];
         if (!r) { next(); return; }
-        this._shownAt = 0;
-        if (fullyVisible(r.el)) this._shownAt = Date.now(), Coach.show({ targets: [{ el: r.el, shape: 'box', pad: 6, text: 'ご提案があれば、こちらにご記入ください', place: 'above' }] });
-        else Coach.clear();
+        Coach.show({ once: true, fade: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }] });
+      },
+      on: function () { return false; } },
+    { id: '6d', t: 'その他 rows', what: 'When she scrolls the first その他 row fully into view: box around it. One loop, then the hints for the table are finished.', cap: 'ご提案があれば、こちらにご記入ください', gone: 'After one loop, or if she opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the "in order" caption.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
+      hint: function () {
+        var s = this, r = rows.filter(function (x) { return x.custom && !x.name; })[0];
+        this._r = r; this._shown = false;
+        if (!r) { next(); return; }
+        if (fullyVisible(r.el)) {
+          this._shown = true;
+          Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.el, shape: 'box', pad: 6, text: 'ご提案があれば、こちらにご記入ください', place: 'above' }] });
+        } else Coach.clear();
       },
       on: function (e) {
         if (e === 'openCustom') return true;
-        if (e === 'scroll') {
+        if (e === 'scroll' && !this._shown) {
           if (scrolledPast(this._r.el)) return true;
-          if (this._shownAt && Date.now() - this._shownAt > 2000 && fullyVisible($('reject'))) return true;
-          if (!$('coach').classList.contains('go') && fullyVisible(this._r.el)) this.hint();
+          if (fullyVisible(this._r.el)) this.hint();
         }
         return false;
       } },
-    { id: '6e', t: 'すべて見送る', what: 'Same box around 今回はすべて見送ります, so "no" is as easy to find as "yes".', cap: 'すべて見送る場合はこちらをタップ', gone: 'She taps it, or carries on with something else.', try: 'Scroll to the bottom of the table.',
-      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
-      hint: function () {
-        var self = this; self._shownAt = 0;
-        if (fullyVisible($('reject'))) { self._shownAt = Date.now(); Coach.show({ targets: [{ el: $('reject'), shape: 'box', pad: 8, text: 'すべて見送る場合はこちらをタップ', place: 'above' }] }); }
-        else Coach.clear();
-      },
-      on: function (e) {
-        if (e === 'reject') return true;
-        if (e === 'scroll' && !this._shownAt && fullyVisible($('reject'))) this.hint();
-        if (this._shownAt && Date.now() - this._shownAt > 2000 && (e === 'check' || e === 'uncheck' || e === 'openCustom' || e === 'submit')) return true;
-        return false;
-      } },
-    { id: '6f', t: '確認する', what: 'Box around 確認する, once something is chosen (or 見送る).', cap: '選び終えたら、こちらへ', gone: 'She taps it.',
-      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); $('scroller').scrollTop = 99999; },
-      hint: function () {
-        if ($('submitBtn').disabled) { Coach.clear(); return; }
-        Coach.show({ targets: [{ el: $('submitBtn'), shape: 'box', pad: 10, text: '選び終えたら、こちらへ', place: 'above' }], finger: { el: $('submitBtn'), kind: 'tap' } });
-      },
-      on: function (e) {
-        if (e === 'submit') { Coach.clear(); return false; }
-        if (e === 'canSubmit' && !$('coach').classList.contains('go')) this.hint();
-        return false;
-      } },
-
-    { id: '7', group: 'Receipt', t: 'Stamp', what: 'Circle around the stamp area, with a ghost tap.', cap: 'ここをタップして印を', gone: 'She stamps.',
-      setup: function () { showScreen('scrReceipt'); buildReceipt(); },
-      enterNatural: function () { showScreen('scrReceipt'); buildReceipt(); },
-      hint: function () { Coach.show({ targets: [{ el: $('stampZone'), shape: 'circle', pad: 12, text: 'ここをタップして印を', place: 'above' }], finger: { el: $('stampZone'), kind: 'tap' } }); },
-      on: function (e) { return e === 'stamp'; } },
-    { id: '8', t: 'Confirm', what: 'Box around こちらの内容でお願いいたします, and a small circle around the stamp\'s ×.', cap: '変更は印の×から', gone: 'She confirms (× takes her back a step).',
-      setup: function () { showScreen('scrReceipt'); buildReceipt(); setStamp(true); },
-      hint: function () {
-        Coach.show({ targets: [{ el: $('rConfirm'), shape: 'box', pad: 10, text: 'よろしければ、こちらをタップ', place: 'below' }, { el: $('stampX'), shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
-      },
-      on: function (e) { if (e === 'unstamp') { go(idx('7'), true); return false; } return e === 'receiptOk'; } },
-
-    { id: '9', group: 'Thank-you pages', t: 'Swipe again', what: 'The same swipe hint as step 3, reused.', cap: '左へスワイプ', gone: 'First swipe.', try: 'Drag the page to the left, then keep going to the game.',
-      setup: function () { showScreen('scrTy'); tCar.go(0, true); $('tHint').style.visibility = ''; },
-      enterNatural: function () { this.setup(); },
-      hint: function () {
-        $('tPeek').classList.add('peek');
-        Coach.show({ targets: [{ els: [$('tHintIn'), $('tDots').firstChild, $('tDots').lastChild], shape: 'box', pad: 16, text: '左へスワイプ', place: 'above' }], finger: { el: $('tCarousel'), kind: 'swipe', dy: 120 } });
-      },
-      leave: function () { $('tPeek').classList.remove('peek'); },
-      on: function (e, i) { if (e === 'tyPanel' && i === 3) { go(idx('10'), true); return false; } return e === 'tyPanel' && i > 0; } },
-    { id: '9+', t: '(free swiping)', what: 'No hint while she reads.', cap: '—', gone: '—', try: 'Swipe to the last page.',
-      setup: function () { showScreen('scrTy'); tCar.go(1, true); },
+    /* Table hints are finished: no hint until she reaches the receipt. */
+    { id: 'T', hidden: true, t: 'Table hints finished', what: 'Nothing is drawn. The table hints are done (6a–6d played, or she started something else). The only hint left is the keypad hint on a price tap, and then the receipt.', cap: '—', gone: '—',
+      setup: function () { showScreen('scrTable'); },
+      enterNatural: function () { showScreen('scrTable'); },
       hint: function () { Coach.clear(); },
-      on: function (e, i) { return e === 'tyPanel' && i === 3; } },
-    { id: '10', t: 'Game', what: 'Circle around the start button.', cap: 'タップしてはじめる', gone: 'She starts a game.',
-      setup: function () { showScreen('scrTy'); tCar.go(3, true); $('tHint').style.visibility = 'hidden'; $('gameBtn').textContent = 'はじめる'; },
-      hint: function () { Coach.show({ targets: [{ el: $('gameBtn'), shape: 'circle', pad: 16, text: 'タップしてはじめる', place: 'below' }], finger: { el: $('gameBtn'), kind: 'tap' } }); },
-      on: function (e) { return e === 'game'; } },
-    { id: '11', t: 'Wind chime', what: 'One soft circle around the 風鈴, once per session (optional).', cap: '風鈴にふれてみてください', gone: 'She touches it.',
-      setup: function () { showScreen('scrTy'); tCar.go(3, true); $('tHint').style.visibility = 'hidden'; },
-      hint: function () { var self = this; self._t = setTimeout(function () { Coach.show({ targets: [{ el: $('furin'), shape: 'circle', pad: 12, text: '風鈴にふれてみてください', place: 'right' }], finger: { el: $('furin'), kind: 'tap', dy: 20 } }); }, 1500); },
-      leave: function () { clearTimeout(this._t); },
-      on: function (e) { if (e === 'furin') { setTimeout(function () { Coach.clear(); $('end').classList.add('on'); }, 900); } return false; } }
+      on: function () { return false; } },
+
+    { id: '8', group: 'Receipt', t: 'Change the stamp', what: 'After she stamps: a small circle around the stamp\'s × with a caption. Nothing is drawn before she stamps.', cap: '変更は印の×から', gone: 'She confirms, or unstamps.', try: 'Tap the stamp area, then try the ×.',
+      setup: function () { showScreen('scrReceipt'); buildReceipt(); setStamp(true); },
+      enterNatural: function () { showScreen('scrReceipt'); buildReceipt(); },
+      hint: function () {
+        if (!stamped) { Coach.clear(); return; }
+        Coach.show({ targets: [{ el: $('stampX'), shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
+      },
+      on: function (e) {
+        if (e === 'stamp') { this.hint(); return false; }
+        if (e === 'unstamp') { Coach.clear(); return false; }
+        if (e === 'receiptOk') { Coach.clear(); $('end').classList.add('on'); }
+        return false;
+      } }
   ];
 
   var curStep = 0;
   function idx(id) { for (var i = 0; i < steps.length; i++) if (steps[i].id === id) return i; return 0; }
+
+  /* ============ KEYPAD HINT ============
+     Not a step: it comes on only when she taps a price field (the first
+     time), whatever step she is on, and goes when the keypad closes. */
+  var kpShown = false, kpOn = false;
+  function drawKeypadHint() {
+    if (!activeRow) return;
+    Coach.show({ targets: [{ el: activeRow.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
+  }
 
   /* natural: arrived by doing the action, so keep the screen as it is. */
   function go(i, natural) {
     var old = steps[curStep];
     if (old && old.leave) old.leave();
     Coach.clear();
+    kpOn = false;
+    if (!natural) kpShown = false;
+    $('end').classList.remove('on');
     curStep = Math.max(0, Math.min(steps.length - 1, i));
     var s = steps[curStep];
     if (!natural) s.setup();
@@ -987,8 +884,22 @@
   function next() { go(curStep + 1, true); }
   function emit(evt, data) {
     var s = steps[curStep];
-    /* Choosing すべて見送る drops the remaining table hints (6a–6e). */
-    if (evt === 'reject' && /^6[a-e]$/.test(s.id)) { go(idx('6f'), true); return; }
+    /* Starting a different job ends the table hints. */
+    if (/^6[a-d]$/.test(s.id) && (evt === 'submit' || evt === 'openCustom' || evt === 'reject')) { go(idx('T'), true); return; }
+
+    /* The keypad hint takes over while the keypad is up. */
+    if (kpOn) {
+      if (evt === 'priceDone') {
+        kpOn = false; Coach.clear();
+        if (s.id === '6a') go(idx('6c'), true);
+        else if (s.id === '6b') next();
+        else go(curStep, true);
+      }
+      return;
+    }
+    if (evt === 'numpad' && data === true && !kpShown && $('scrTable').classList.contains('on')) {
+      kpShown = true; kpOn = true; drawKeypadHint(); return;
+    }
     if (s.on(evt, data)) next();
   }
 
@@ -996,6 +907,7 @@
   function renderSide() {
     var list = $('stepList'); list.innerHTML = '';
     steps.forEach(function (s, i) {
+      if (s.hidden) return;
       if (s.group) { var g = document.createElement('li'); g.className = 'group'; g.textContent = s.group; list.appendChild(g); }
       var li = document.createElement('li');
       li.className = (i === curStep ? 'cur' : '') + (i < curStep ? ' done' : '');
@@ -1013,11 +925,13 @@
     if (s.try) $('detail').querySelector('.try').textContent = 'Try: ' + s.try;
     $('prevBtn').disabled = curStep === 0;
     $('nextBtn').disabled = curStep === steps.length - 1;
+    $('kpState').textContent = kpShown ? 'Already shown this session.' : 'Not shown yet.';
   }
   $('prevBtn').addEventListener('click', function () { go(curStep - 1); });
   $('nextBtn').addEventListener('click', function () { go(curStep + 1); });
   $('restartBtn').addEventListener('click', function () { go(0); });
   $('endRestart').addEventListener('click', function () { go(0); });
+  $('kpReset').addEventListener('click', function () { kpShown = false; renderSide(); });
   document.querySelectorAll('[data-theme-btn]').forEach(function (b) {
     b.addEventListener('click', function () {
       document.documentElement.setAttribute('data-theme', b.getAttribute('data-theme-btn'));
