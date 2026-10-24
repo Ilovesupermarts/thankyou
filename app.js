@@ -4906,15 +4906,44 @@ function openTanzaku(row) {
   tanzakuTargetRow = row;
   tanzakuInput.value = svcInput.value || '';
   tanzakuScreen.classList.add('visible');
-  setTimeout(function() {
-    try { tanzakuInput.focus(); } catch (e) {}
+  /* Focus (which brings up the on-screen keyboard) only once the 0.5s fade
+     has finished. Focusing during the fade made the keyboard slide in on
+     top of it and the fade dropped frames. */
+  var openId = ++tanzakuOpenId;
+  var focused = false;
+  function focusInput(e) {
+    if (e && (e.target !== tanzakuScreen || e.propertyName !== 'opacity')) return;
+    tanzakuScreen.removeEventListener('transitionend', focusInput);
+    if (focused || openId !== tanzakuOpenId || !tanzakuScreen.classList.contains('visible')) return;
+    focused = true;
+    try { tanzakuInput.focus(); } catch (e2) {}
     try {
       var len = tanzakuInput.value.length;
       tanzakuInput.setSelectionRange(len, len);
-    } catch (e) {}
-  }, 100);
+    } catch (e2) {}
+  }
+  tanzakuScreen.addEventListener('transitionend', focusInput);
+  setTimeout(focusInput, 600);
 }
+var tanzakuOpenId = 0;
+/* Decodes the card's photo (icons/1790678998862.jpg, main.css) ahead of
+   time. Otherwise it is decoded on the first frame of the fade-in, which
+   stalls it. Done again after each close in case the browser has let the
+   decoded copy go. */
+var tanzakuPhoto = null;
+function predecodeTanzakuPhoto() {
+  try {
+    if (!tanzakuPhoto) {
+      tanzakuPhoto = new Image();
+      tanzakuPhoto.src = 'icons/1790678998862.jpg';
+    }
+    if (tanzakuPhoto.decode) tanzakuPhoto.decode().catch(function() {});
+  } catch (e) {}
+}
+predecodeTanzakuPhoto();
 function closeTanzaku() {
+  tanzakuOpenId++;
+  setTimeout(predecodeTanzakuPhoto, 700);
   playPaper(false);
   tanzakuScreen.classList.remove('visible');
   try { tanzakuInput.blur(); } catch (e) {}
