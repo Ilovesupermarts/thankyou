@@ -4075,4 +4075,4 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
    removing .notice-hold lets the greeting fade in and the three hint
    lines arrive in their usual order. */
 .blossom-screen.notice-hold .blossom-greeting { opacity: 0; }
-.blossom-screen.notice-hold .start-hint-line { animation: none; opacity: 0; }
+.blossom-screen.notice-hold .start-hint-line:nth-child(n) { animation: none; opacity: 0; }
