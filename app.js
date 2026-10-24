@@ -4755,11 +4755,15 @@ function repositionHintGroup() {
   if (currentTheme === 'autumn') {
     var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
     dotsBottom += lift; hintBottom += lift;
-    // The hint then moves up to sit just under the longest message (about
-    // 40px below it), in the open sky above the torii, and never lower than
-    // just above the dots.
+    // The hint and the dots then move up together, as one group, so the hint
+    // sits just under the longest message (about 40px below it), in the open
+    // sky above the torii.
     var hintUnderText = stageHeight - textBottom - 40 - 22;
-    hintBottom = Math.max(hintUnderText, dotsBottom + dotsH + 12);
+    hintBottom = hintUnderText;
+    // The dots travel with the hint as one group, keeping their usual gap
+    // (24px) under it.
+    dotsBottom = hintBottom - spaceBetween - dotsH;
+    if (dotsBottom < 0) { hintBottom -= dotsBottom; dotsBottom = 0; }
   }
   // Winter: clear of the snowdrift (as placed on winter.html: dots at least 140px up, hint 208px).
   if (currentTheme === 'winter') {
@@ -9259,12 +9263,16 @@ var tyStageWidth = window.innerWidth;
 var tyRefWidth = Math.min(window.innerWidth, 600);
 var tyExited = false;
 
-/* Autumn: the thank-you swipe hint sits just under the longest of the four
+/* Autumn: the thank-you swipe hint and its dots (moved together) sit just under the longest of the four
    screens' text (about 40px below it), clear of the torii and lanterns. In
    the other themes the stylesheet position applies. */
 function repositionTySwipeHint() {
   if (!tySwipeHint || !thankyouScreen) return;
-  if (currentTheme !== 'autumn') { tySwipeHint.style.bottom = ''; return; }
+  if (currentTheme !== 'autumn') {
+    tySwipeHint.style.bottom = '';
+    if (tyDotsEl) tyDotsEl.style.bottom = '';
+    return;
+  }
   var screenRect = thankyouScreen.getBoundingClientRect();
   if (screenRect.height <= 0) return;
   var contents = thankyouScreen.querySelectorAll('.ty-panel-content');
@@ -9274,7 +9282,9 @@ function repositionTySwipeHint() {
     if (b > lowest) lowest = b;
   }
   if (lowest <= 0) return;
-  tySwipeHint.style.bottom = Math.max(0, screenRect.height - lowest - 40 - 22) + 'px';
+  var tyHintBottom = Math.max(0, screenRect.height - lowest - 40 - 22);
+  tySwipeHint.style.bottom = tyHintBottom + 'px';
+  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 24 - 10) + 'px';
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
