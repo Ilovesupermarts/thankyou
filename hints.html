@@ -1,0 +1,1020 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ヒントのデモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700&family=Yuji+Syuku&display=swap" rel="stylesheet">
+<!--
+  hints.html — a stand-alone demo of the planned first-use hints.
+  Not part of the app: it loads nothing from main.css or app.js.
+  The tablet frame below is 1480×924, the Tab S8 Ultra's landscape
+  screen, scaled to fit. Every hint is drawn by the Coach object in
+  the script at the bottom, which is the same shape the app version
+  would take.
+-->
+<style>
+  :root {
+    --bg-base: #FFFDF9; --bg-warm: #FBECE0; --soft-2: #FDF0E6; --soft-1: #FBF4EE;
+    --accent: #E66826; --accent-2: #882E47;
+    --text-dark: #241C1A; --text-med: #4A3F3B; --text-mute: #8A7C76; --text-faint: #B9A99F;
+    --border-1: #E9D7CB; --border-4: #F2E7DF;
+    --page: #EDE6E0; --side: #FFFFFF; --side-text: #2A2220; --side-mute: #7C6F69; --side-line: #E6DDD6;
+    --mincho: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  }
+  html[data-theme="sakura"] {
+    --bg-base: #faf7f5; --bg-warm: #f7e9e3; --soft-2: #fdf3f2; --soft-1: #faf3f1;
+    --accent: #b04a5a; --accent-2: #6b1f2a;
+    --text-dark: #1f1f1f; --text-med: #4a4542; --text-mute: #8a807c; --text-faint: #b8a8a2;
+    --border-1: #ead9d5; --border-4: #f2ece9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --page: #1E1A19; --side: #2A2523; --side-text: #F1E9E4; --side-mute: #B3A69F; --side-line: #3B3431; }
+  }
+  :root[data-theme="dark"] { --page: #1E1A19; --side: #2A2523; --side-text: #F1E9E4; --side-mute: #B3A69F; --side-line: #3B3431; }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--page); color: var(--side-text);
+    font-family: var(--mincho);
+    display: grid; grid-template-columns: 340px 1fr; height: 100vh; overflow: hidden;
+  }
+  button { font-family: inherit; }
+
+  /* ============ SIDE PANEL ============ */
+  .side { background: var(--side); border-right: 1px solid var(--side-line); padding: 20px 18px; overflow-y: auto; }
+  .side h1 { font-size: 20px; margin: 0 0 4px; }
+  .side .sub { font-size: 13px; color: var(--side-mute); margin: 0 0 14px; line-height: 1.6; }
+  .opts { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+  .chip { border: 1px solid var(--side-line); background: transparent; color: var(--side-text); border-radius: 999px; padding: 6px 12px; font-size: 13px; cursor: pointer; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .steps { list-style: none; margin: 0 0 14px; padding: 0; border-top: 1px solid var(--side-line); }
+  .steps li { display: flex; gap: 10px; align-items: baseline; padding: 7px 4px; border-bottom: 1px solid var(--side-line); cursor: pointer; font-size: 14px; }
+  .steps li .n { width: 30px; flex-shrink: 0; color: var(--side-mute); font-size: 12px; }
+  .steps li.cur { color: var(--accent); font-weight: 600; }
+  .steps li.cur .n { color: var(--accent); }
+  .steps li.done .t { color: var(--side-mute); }
+  .steps li.group { cursor: default; font-size: 12px; color: var(--side-mute); padding-top: 12px; border-bottom: none; }
+  .detail { background: color-mix(in srgb, var(--accent) 7%, transparent); border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.7; }
+  .detail b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .detail dl { margin: 6px 0 0; }
+  .detail dt { color: var(--side-mute); font-size: 12px; margin-top: 6px; }
+  .detail dd { margin: 0; }
+  .detail .try { margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--side-line); }
+  .nav { display: flex; gap: 8px; margin-top: 12px; }
+  .nav button { flex: 1; padding: 10px; border-radius: 8px; border: 1px solid var(--side-line); background: transparent; color: var(--side-text); font-size: 14px; cursor: pointer; }
+  .nav button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .replays { font-size: 12px; color: var(--side-mute); margin-top: 8px; }
+
+  /* ============ TABLET FRAME ============ */
+  .stage-wrap { position: relative; overflow: hidden; display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .bezel { position: relative; border-radius: 22px; background: #111; padding: 12px; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .frame-box { position: relative; overflow: hidden; border-radius: 12px; }
+  .frame {
+    position: absolute; left: 0; top: 0; width: 1480px; height: 924px; transform-origin: 0 0;
+    background: var(--bg-base); color: var(--text-dark); overflow: hidden;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+
+  @media (max-width: 900px) {
+    body { grid-template-columns: 1fr; grid-template-rows: auto auto; height: auto; overflow: auto; }
+    .stage-wrap { order: -1; height: 62vh; padding: 8px 16px; }
+    .side { border-right: none; border-top: 1px solid var(--side-line); padding: 16px; }
+  }
+
+  /* ============ SHARED APP LOOK ============ */
+  .screen { position: absolute; inset: 0; display: none; }
+  .screen.on { display: block; }
+  .toolbar {
+    position: absolute; left: 0; right: 0; top: 0; height: 64px; z-index: 5;
+    background: rgba(255,253,249,.82); border-bottom: 1px solid var(--border-4);
+    display: flex; align-items: center; justify-content: center; font-size: 17px; color: var(--text-med); letter-spacing: 2px;
+  }
+  .toolbar .sep { margin: 0 10px; color: var(--text-faint); }
+  .furin { position: absolute; z-index: 8; left: 70px; top: 10px; width: 44px; height: 110px; cursor: pointer; transform-origin: 22px 6px; }
+  .furin.swing { animation: furinSwing 1.6s ease-out; }
+  @keyframes furinSwing { 0%{transform:rotate(0)} 20%{transform:rotate(12deg)} 45%{transform:rotate(-9deg)} 70%{transform:rotate(5deg)} 100%{transform:rotate(0)} }
+  .furin-note { position: absolute; z-index: 8; left: 130px; top: 12px; font-size: 14px; color: var(--text-mute); line-height: 1.5; letter-spacing: 1px; }
+
+  .hint-row { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; font-size: 18px; letter-spacing: 4px; color: var(--text-med); }
+  .hint-row .arr { color: var(--accent); display: inline-block; margin: 0 6px; }
+  .dots { position: absolute; left: 0; right: 0; bottom: 78px; display: flex; justify-content: center; gap: 14px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; background: var(--border-1); }
+  .dots i.on { background: var(--accent-2); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-2) 25%, transparent); }
+  .tag { z-index: 55; position: absolute; right: 16px; bottom: 12px; font-size: 12px; color: var(--text-faint); letter-spacing: 1px; }
+
+  /* ============ 1–2 KOI SCREEN + NOTICE ============ */
+  .koi-screen { background: radial-gradient(circle at 50% 46%, var(--bg-warm), var(--bg-base) 60%); }
+  .greet { position: absolute; top: 120px; left: 0; right: 0; text-align: center; }
+  .greet .g1 { font-size: 26px; color: var(--text-med); letter-spacing: 6px; }
+  .greet .g2 { font-family: "Yuji Syuku", var(--mincho); font-size: 46px; color: var(--accent-2); margin-top: 8px; }
+  .pond { position: absolute; left: 50%; top: 440px; width: 220px; height: 220px; margin: -110px 0 0 -110px; border-radius: 50%;
+    border: 6px solid #fff; box-shadow: 0 0 0 1px var(--border-1), 0 0 60px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 0 40px color-mix(in srgb, var(--accent) 18%, transparent);
+    background: radial-gradient(circle, rgba(255,255,255,.7), color-mix(in srgb, var(--accent) 12%, transparent)); }
+  .koi { position: absolute; left: 50%; top: 50%; width: 120px; height: 120px; margin: -60px 0 0 -60px; animation: koiSpin 14s linear infinite; transition: transform .8s ease, opacity .8s ease; }
+  .pond.dive .koi { opacity: 0; }
+  @keyframes koiSpin { to { transform: rotate(360deg); } }
+  .start-hints { position: absolute; left: 0; right: 0; top: 600px; text-align: center; font-size: 19px; line-height: 2.1; color: var(--text-mute); letter-spacing: 2px; }
+  .notice { position: absolute; inset: 0; background: rgba(36,28,26,.28); display: none; align-items: center; justify-content: center; z-index: 20; }
+  .notice.on { display: flex; }
+  .notice-box { width: 720px; background: var(--bg-base); border-radius: 18px; padding: 44px 56px; font-size: 20px; line-height: 2; color: var(--text-med); box-shadow: 0 20px 60px rgba(0,0,0,.18); text-align: center; }
+  .notice-box p { margin: 0 0 6px; }
+  .btn { display: inline-block; border: none; border-radius: 999px; padding: 16px 44px; font-size: 20px; letter-spacing: 3px; background: var(--accent); color: #fff; cursor: pointer; }
+  .btn.ghost { background: transparent; color: var(--text-med); border: 1.5px solid var(--border-1); }
+  .notice-box .btn { margin-top: 22px; }
+
+  /* ============ 3–5 MESSAGE PAGES / 9 THANK-YOU PAGES ============ */
+  .carousel { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; overflow: hidden; }
+  .peek-wrap { position: absolute; inset: 0; }
+  .peek-wrap.peek { animation: peek 2.6s ease-in-out infinite; }
+  @keyframes peek { 0%,20% { transform: translateX(0); } 50% { transform: translateX(-56px); } 75%,100% { transform: translateX(0); } }
+  .track { position: absolute; top: 0; bottom: 0; left: 0; display: flex; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
+  .track.drag { transition: none; }
+  .panel { width: 1480px; height: 100%; display: flex; align-items: center; justify-content: center; }
+  .panel-text { max-width: 820px; font-size: 30px; line-height: 2.1; letter-spacing: 2px; color: var(--text-dark); text-align: center; }
+  .panel-text .nm { font-family: "Yuji Syuku", var(--mincho); color: var(--accent-2); }
+  .panel-text .small { font-size: 22px; color: var(--text-med); }
+  .ty-panel .panel-text { font-size: 26px; }
+  .ty-mark { color: var(--accent); font-size: 30px; }
+
+  .game-ring { width: 520px; height: 520px; border-radius: 50%; border: 6px solid #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+    box-shadow: 0 0 0 1px var(--border-1), 0 0 70px color-mix(in srgb, var(--accent) 30%, transparent);
+    background: radial-gradient(circle, rgba(255,255,255,.75), color-mix(in srgb, var(--accent) 10%, transparent)); font-size: 20px; color: var(--text-med); }
+  .game-ring .sc { font-size: 24px; }
+  .game-ring .btn { margin: 8px 0; }
+  .game-ring .how { font-size: 15px; color: var(--text-mute); }
+
+  /* ============ 6 SERVICE TABLE ============ */
+  .table-screen { background: var(--bg-warm); }
+  .scroller { position: absolute; left: 0; right: 0; top: 64px; bottom: 96px; overflow-y: auto; touch-action: pan-y; scrollbar-width: thin; }
+  .table-col { width: 760px; margin: 40px auto 60px; }
+  .intro { font-size: 19px; line-height: 2; color: var(--text-med); text-align: center; margin-bottom: 28px; }
+  .card { background: #fff; border-radius: 14px; box-shadow: 0 2px 16px rgba(120,90,90,.08); overflow: hidden; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 20px 22px; border-bottom: 1px solid var(--border-4); border-left: 3px solid transparent; transition: background .2s, opacity .2s; cursor: pointer; }
+  .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
+  .row.disabled { opacity: .35; pointer-events: none; }
+  .check { flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; background: #fff; border: 1.5px solid var(--border-1); display: flex; align-items: center; justify-content: center; color: #e0d3ce; font-size: 20px; }
+  .check::after { content: "❀"; opacity: .35; }
+  .check.on { background: var(--soft-2); border-color: var(--accent); color: var(--accent); animation: pop .4s cubic-bezier(.34,1.56,.64,1); }
+  .check.on::after { opacity: 1; }
+  @keyframes pop { 40% { transform: scale(1.22); } }
+  .svc { flex: 1; font-size: 21px; letter-spacing: 1px; }
+  .svc.input { color: var(--text-faint); border-bottom: 1px solid var(--border-1); padding: 4px 0; }
+  .svc.input.named { color: var(--text-dark); }
+  .price { width: 190px; display: flex; align-items: baseline; justify-content: flex-end; gap: 6px; padding: 6px 10px; border-radius: 8px; border: 1.5px solid transparent; font-size: 22px; }
+  .price .v:empty::before { content: "料金を入力"; color: var(--text-faint); font-size: 17px; }
+  .price.active { border-color: var(--accent); background: #fff; }
+  .price.active .v::after { content: ""; display: inline-block; width: 2px; height: 22px; background: var(--accent); margin-left: 2px; vertical-align: -3px; animation: blink 1s steps(1) infinite; }
+  @keyframes blink { 50% { opacity: 0; } }
+  .row.locked .price { opacity: .45; }
+  .shake { animation: shake .35s; }
+  @keyframes shake { 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }
+  .flash { animation: flash .9s; }
+  @keyframes flash { 25%,75% { background: var(--soft-2); } }
+  .sec { display: flex; align-items: center; gap: 14px; justify-content: center; margin: 34px 0 14px; color: var(--accent); font-size: 18px; letter-spacing: 4px; }
+  .sec span.l { flex: 0 0 120px; height: 1px; background: var(--border-1); }
+  .reject { margin-top: 34px; display: flex; gap: 18px; align-items: flex-start; background: #fff; border-radius: 14px; padding: 22px 26px; box-shadow: 0 2px 16px rgba(120,90,90,.08); cursor: pointer; font-size: 19px; line-height: 1.9; color: var(--text-med); }
+  .reject .box { flex-shrink: 0; width: 34px; height: 34px; border-radius: 6px; border: 1.5px solid var(--border-1); margin-top: 6px; display: flex; align-items: center; justify-content: center; color: #fff; }
+  .reject.on { background: var(--soft-2); }
+  .reject.on .box { background: var(--accent); border-color: var(--accent); }
+  .reject.on .box::after { content: "✓"; }
+  .reject .thanks { display: none; color: var(--accent-2); margin-top: 6px; }
+  .reject.on .thanks { display: block; }
+  .summary { position: absolute; left: 0; right: 0; bottom: 0; height: 96px; background: rgba(255,255,255,.97); border-top: 1px solid var(--border-4); display: flex; align-items: center; justify-content: center; gap: 40px; z-index: 6; }
+  .summary .tl { font-size: 16px; color: var(--text-mute); }
+  .summary .tv { font-size: 34px; min-width: 180px; }
+  .summary .btn[disabled] { opacity: .35; cursor: default; }
+  .numpad { position: absolute; right: 70px; top: 50%; transform: translateY(-50%); width: 270px; display: none; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 14px; background: #fff; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,.12); z-index: 7; }
+  .numpad.on { display: grid; }
+  .numpad button { height: 62px; border-radius: 10px; border: 1px solid var(--border-4); background: var(--bg-base); font-size: 24px; color: var(--text-dark); cursor: pointer; }
+  .numpad button.wide { grid-column: span 3; background: var(--accent); color: #fff; border: none; font-size: 21px; letter-spacing: 4px; }
+  .modal { position: absolute; inset: 0; background: rgba(36,28,26,.28); display: none; align-items: center; justify-content: center; z-index: 30; }
+  .modal.on { display: flex; }
+  .modal-card { width: 600px; background: var(--bg-base); border-radius: 18px; padding: 40px 44px; text-align: center; font-size: 22px; line-height: 1.9; box-shadow: 0 20px 60px rgba(0,0,0,.18); }
+  .modal-card .ms { font-size: 16px; color: var(--text-mute); }
+  .modal-card .acts { display: flex; gap: 14px; justify-content: center; margin-top: 26px; }
+  .modal-card .acts .btn, .r-acts .btn { padding: 14px 26px; white-space: nowrap; }
+  .tz-input { width: 100%; font: inherit; font-size: 24px; padding: 12px 6px; border: none; border-bottom: 1.5px solid var(--accent); background: transparent; text-align: center; outline: none; color: var(--text-dark); }
+  .tz-ex { margin-top: 12px; display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+  .tz-ex button { border: 1px solid var(--border-1); background: #fff; border-radius: 999px; padding: 6px 14px; font-size: 15px; cursor: pointer; color: var(--text-med); }
+
+  /* ============ 7–8 RECEIPT ============ */
+  .receipt-screen { background: rgba(36,28,26,.12); }
+  .paper { position: absolute; left: 50%; top: 40px; width: 640px; margin-left: -320px; bottom: 40px; background: #FFFEFB; border-radius: 6px; box-shadow: 0 12px 40px rgba(0,0,0,.14); padding: 40px 54px; text-align: center; }
+  .paper .th { font-size: 24px; letter-spacing: 2px; }
+  .paper .ts { font-size: 15px; color: var(--text-mute); margin-top: 6px; }
+  .paper .to { margin: 22px 0 14px; color: var(--accent-2); font-family: "Yuji Syuku", var(--mincho); font-size: 26px; }
+  .paper .items { border-top: 1px dashed var(--border-1); border-bottom: 1px dashed var(--border-1); padding: 12px 0; text-align: left; }
+  .paper .it { display: flex; justify-content: space-between; font-size: 20px; padding: 8px 4px; }
+  .total-line { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; font-size: 22px; }
+  .total-line .tv { font-size: 34px; }
+  .stamp-zone { position: relative; width: 150px; height: 150px; border-radius: 50%; border: 1.5px dashed var(--border-1); display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; line-height: 1.6; color: var(--text-mute); cursor: pointer; }
+  .stamp { position: absolute; inset: 12px; display: none; }
+  .stamp-zone.on .stamp { display: block; animation: stampIn .35s ease-out; }
+  .stamp-zone.on .sh { visibility: hidden; }
+  @keyframes stampIn { 0% { transform: scale(1.5); opacity: 0; } 100% { transform: scale(1); opacity: .92; } }
+  .stamp-x { position: absolute; right: 4px; top: 4px; width: 32px; height: 32px; border-radius: 50%; border: 1px solid var(--border-1); background: #fff; font-size: 18px; color: var(--text-med); display: none; cursor: pointer; }
+  .stamp-zone.on .stamp-x { display: block; }
+  .r-acts { display: flex; gap: 14px; justify-content: center; margin-top: 26px; }
+  .r-confirm { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .r-confirm small { font-size: 12px; letter-spacing: 1px; opacity: .85; }
+  .r-confirm[disabled] { opacity: .3; cursor: default; }
+
+  /* ============ COACH (the hints) ============ */
+  .coach { position: absolute; inset: 0; pointer-events: none; z-index: 50; }
+  .coach svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .coach .ink { fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; stroke-dashoffset: 1; }
+  .coach .glow { fill: none; stroke: var(--accent); stroke-width: 16; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .coach.go .ink { animation: ink .9s cubic-bezier(.5,0,.3,1) forwards; }
+  .coach.go .glow { animation: glow 2.4s ease-in-out .9s infinite; }
+  @keyframes ink { to { stroke-dashoffset: 0; } }
+  @keyframes glow { 0%,100% { opacity: 0; } 50% { opacity: .16; } }
+  .cap {
+    position: absolute; max-width: 460px; padding: 12px 20px 12px 18px; border-radius: 4px;
+    background: var(--bg-base); border-left: 4px solid var(--accent); box-shadow: 0 6px 24px rgba(60,30,20,.16);
+    font-size: 21px; line-height: 1.6; letter-spacing: 1px; color: var(--text-dark); white-space: nowrap; opacity: 0;
+  }
+  .coach.go .cap { animation: capIn .5s ease-out .55s forwards; }
+  .coach.go .cap.fade { animation: capIn .5s ease-out .1s forwards, capOut .6s ease-in 3.4s forwards; }
+  @keyframes capIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes capOut { to { opacity: 0; } }
+  .ghost { position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; opacity: 0;
+    background: radial-gradient(circle at 45% 40%, rgba(255,255,255,.95), rgba(255,255,255,.55) 60%, rgba(255,255,255,0) 72%);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 55%, transparent), 0 6px 18px rgba(0,0,0,.15); }
+  .ghost::after { content: ""; position: absolute; inset: -2px; border-radius: 50%; border: 2px solid var(--accent); opacity: 0; }
+  .coach.go .ghost.tap { animation: gTap 2.2s ease-in-out 1s infinite; }
+  .coach.go .ghost.tap::after { animation: gRip 2.2s ease-out 1s infinite; }
+  .coach.go .ghost.swipe { animation: gSwipe 2.6s ease-in-out 0s infinite; }
+  .coach.go .ghost.up { animation: gUp 2.4s ease-in-out .8s infinite; }
+  @keyframes gTap { 0% { opacity: 0; transform: scale(1.2); } 20% { opacity: .9; transform: scale(1); } 32% { transform: scale(.82); } 44% { transform: scale(1); } 70% { opacity: .9; } 100% { opacity: 0; } }
+  @keyframes gRip { 0%,30% { opacity: 0; transform: scale(.8); } 34% { opacity: .9; } 70% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; } }
+  @keyframes gSwipe { 0%,8% { opacity: 0; transform: translateX(120px); } 20% { opacity: .9; transform: translateX(120px); } 50% { opacity: .9; transform: translateX(-120px); } 62%,100% { opacity: 0; transform: translateX(-140px); } }
+  @keyframes gUp { 0% { opacity: 0; transform: translateY(80px); } 15% { opacity: .9; transform: translateY(80px); } 60% { opacity: .9; transform: translateY(-140px); } 75%,100% { opacity: 0; transform: translateY(-160px); } }
+
+  .frame.rm .coach .ink { stroke-dashoffset: 0; animation: none !important; }
+  .frame.rm .coach .glow { animation: none !important; opacity: .12; }
+  .frame.rm .coach .cap { animation: none !important; opacity: 1; }
+  .frame.rm .coach .ghost { display: none; }
+  .frame.rm .peek-wrap.peek { animation: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .coach .ink { stroke-dashoffset: 0; animation: none !important; }
+    .coach .cap { animation: none !important; opacity: 1; }
+    .coach .ghost { display: none; }
+    .peek-wrap.peek { animation: none; }
+  }
+
+  .end { position: absolute; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgba(255,253,249,.92); flex-direction: column; gap: 20px; font-size: 28px; letter-spacing: 3px; }
+  .end.on { display: flex; }
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <h1>はじめてのヒント・デモ</h1>
+  <p class="sub">Each hint draws itself, then waits for you to do the action. Tap or swipe inside the tablet as she would. Leave a hint alone for 8 seconds and it redraws (at most twice).</p>
+  <div class="opts">
+    <button class="chip on" data-theme-btn="autumn">秋 Autumn</button>
+    <button class="chip" data-theme-btn="sakura">桜 Sakura</button>
+    <button class="chip" id="rmBtn">Reduced motion</button>
+  </div>
+  <ol class="steps" id="stepList"></ol>
+  <div class="detail" id="detail"></div>
+  <div class="replays" id="replays"></div>
+  <div class="nav">
+    <button id="prevBtn">← Back</button>
+    <button id="restartBtn">Restart</button>
+    <button id="nextBtn" class="primary">Next →</button>
+  </div>
+</aside>
+
+<main class="stage-wrap" id="stageWrap">
+  <div class="bezel">
+    <div class="frame-box" id="frameBox">
+      <div class="frame" id="frame">
+
+        <!-- ===== Koi screen + opening notice (steps 1–2) ===== -->
+        <section class="screen koi-screen" id="scrKoi">
+          <div class="greet"><div class="g1">こんにちは</div><div class="g2">桜庭さん</div></div>
+          <div class="pond" id="pond">
+            <svg class="koi" viewBox="0 0 120 120" aria-hidden="true">
+              <path d="M60 18c14 10 18 26 14 42-3 12-8 22-14 30-6-8-11-18-14-30-4-16 0-32 14-42z" fill="#E66826"/>
+              <path d="M60 86l-14 18c8-2 14-4 14-4s6 2 14 4z" fill="#E66826" opacity=".85"/>
+              <circle cx="60" cy="40" r="7" fill="#fff" opacity=".85"/>
+              <circle cx="56" cy="58" r="5" fill="#fff" opacity=".7"/>
+            </svg>
+          </div>
+          <div class="start-hints">
+            <div>水にふれると、さざなみが静かに広がります。</div>
+            <div>鯉に、そっとふれてみてください。</div>
+            <div>水面をゆっくり上へなぞると、はじまります。</div>
+          </div>
+          <div class="notice" id="notice">
+            <div class="notice-box">
+              <p>こちらのアプリは、コミュニケーションを少しでも円滑にするためのものです。</p>
+              <p>ご希望に沿わないことや、ご不安に感じることを無理にお願いすることはございません。</p>
+              <p>どうぞご安心くださいませ。</p>
+              <button class="btn" id="noticeBtn">確認しました</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Message pages (steps 3–5) ===== -->
+        <section class="screen" id="scrPanels">
+          <div class="toolbar"><span>名古屋市</span><span class="sep">·</span><span>10月24日(土)</span><span class="sep">·</span><span>14時05分</span><span class="sep">·</span><span>18°</span><span class="sep">·</span><span>晴れ</span></div>
+          <div class="carousel" id="pCarousel">
+            <div class="peek-wrap" id="pPeek">
+              <div class="track" id="pTrack">
+                <div class="panel"><div class="panel-text"><span class="nm">桜庭さん</span>、初めまして。<br><span class="small">本日はどうぞよろしくお願いいたします。</span></div></div>
+                <div class="panel"><div class="panel-text">少しだけ、自己紹介をさせてください。<br><span class="small">（見本の文章です）</span></div></div>
+                <div class="panel"><div class="panel-text">いつも丁寧な施術を、ありがとうございます。<br><span class="small">（見本の文章です）</span></div></div>
+                <div class="panel"><div class="panel-text">本日は、いくつか追加のオプションについてご相談させてください。<br><span class="small">（見本の文章です）</span></div></div>
+                <div class="panel"><div class="panel-text">もちろん、ご無理のない範囲で大丈夫です。<br><span class="small">（見本の文章です）</span></div></div>
+                <div class="panel"><div class="panel-text">無理にお願いすることは一切ございません。<br><span class="small">すべてスキップしていただいても大丈夫です。いつもの施術だけでも、楽しみにしております。</span></div></div>
+              </div>
+            </div>
+          </div>
+          <div class="hint-row" id="pHint"><span id="pHintSwipe">スワイプ<span class="arr">→</span></span><span id="pHintScroll" hidden><span class="arr">↓</span>下へスクロールしてください</span></div>
+          <div class="dots" id="pDots"></div>
+        </section>
+
+        <!-- ===== Service table (steps 6a–6f) ===== -->
+        <section class="screen table-screen" id="scrTable">
+          <div class="toolbar"><span>名古屋市</span><span class="sep">·</span><span>10月24日(土)</span><span class="sep">·</span><span>14時05分</span><span class="sep">·</span><span>18°</span><span class="sep">·</span><span>晴れ</span></div>
+          <div class="scroller" id="scroller">
+            <div class="table-col">
+              <div class="intro">それでは、本日の癒しのオプションをご覧ください。<br>ご無理のない範囲で、ご対応いただけるものがございましたら、<br>横の○をタップしてお選びください。</div>
+              <div class="card" id="presetCard"></div>
+              <div class="sec"><span>❀</span><span class="l"></span>その他<span class="l"></span><span>❀</span></div>
+              <div class="card" id="customCard"></div>
+              <div class="reject" id="reject">
+                <div class="box"></div>
+                <div>今回はすべて見送ります。<br>いつものマッサージだけをお願いします。<br>お気遣いありがとうございます。
+                  <div class="thanks">かしこまりました。本日もどうぞよろしくお願いいたします。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="summary">
+            <span class="tl">合計</span><span class="tv" id="total">¥0</span>
+            <button class="btn ghost" id="resetBtn">リセット</button>
+            <button class="btn" id="submitBtn" disabled>確認する →</button>
+          </div>
+          <div class="numpad" id="numpad">
+            <button data-k="7">7</button><button data-k="8">8</button><button data-k="9">9</button>
+            <button data-k="4">4</button><button data-k="5">5</button><button data-k="6">6</button>
+            <button data-k="1">1</button><button data-k="2">2</button><button data-k="3">3</button>
+            <button data-k="0">0</button><button data-k="00">00</button><button data-k="back">⌫</button>
+            <button data-k="done" class="wide">決定</button>
+          </div>
+          <div class="modal" id="tanzaku">
+            <div class="modal-card">
+              <div class="ms">サービスの種類</div>
+              <input class="tz-input" id="tzInput" placeholder="ご記入ください" autocomplete="off">
+              <div class="tz-ex"><button>ヘッドスパ</button><button>ストレッチ</button><button>フェイシャル</button></div>
+              <div class="acts"><button class="btn ghost" id="tzCancel">キャンセル</button><button class="btn" id="tzOk">決定</button></div>
+            </div>
+          </div>
+          <div class="modal" id="confirm">
+            <div class="modal-card">
+              こちらの内容でよろしいでしょうか？
+              <div class="ms">すべてご無理のない範囲でお選びいただいた内容です。</div>
+              <div class="acts"><button class="btn ghost" id="cfNo">内容を変更する</button><button class="btn" id="cfYes">この内容で決定</button></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Receipt (steps 7–8) ===== -->
+        <section class="screen receipt-screen" id="scrReceipt">
+          <div class="paper">
+            <div class="th">ご確認いただきありがとうございます。</div>
+            <div class="ts">無理のない範囲でお選びいただき、ありがとうございます。</div>
+            <div class="to">❀ 桜庭さんへ ❀</div>
+            <div class="items" id="rItems"></div>
+            <div class="total-line">
+              <span>合計</span>
+              <span class="stamp-zone" id="stampZone">
+                <span class="sh">内容にお間違いなければ、<br>ここをタップして<br>印をお願いします</span>
+                <svg class="stamp" viewBox="0 0 100 100" aria-hidden="true">
+                  <circle cx="50" cy="50" r="45" fill="none" stroke="#C8361F" stroke-width="5"/>
+                  <circle cx="50" cy="50" r="38.5" fill="none" stroke="#C8361F" stroke-width="1.4"/>
+                  <text x="50" y="66" text-anchor="middle" font-size="44" fill="#C8361F" font-family="Shippori Mincho, serif">承</text>
+                </svg>
+                <button class="stamp-x" id="stampX" aria-label="印を外す">×</button>
+              </span>
+              <span class="tv" id="rTotal">¥0</span>
+            </div>
+            <div class="r-acts">
+              <button class="btn ghost" id="rBack">サービスの選択に戻る</button>
+              <button class="btn r-confirm" id="rConfirm" disabled><span>こちらの内容でお願いいたします</span><small>変更する場合は、印の右上の×をタップしてください</small></button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===== Thank-you pages + game + furin (steps 9–11) ===== -->
+        <section class="screen" id="scrTy">
+          <div class="toolbar"><span>名古屋市</span><span class="sep">·</span><span>14時12分</span><span class="sep">·</span><span>18°</span></div>
+          <svg class="furin" id="furin" viewBox="0 0 44 110" aria-label="風鈴">
+            <line x1="22" y1="0" x2="22" y2="10" stroke="#8A7C76" stroke-width="1.5"/>
+            <path d="M8 34 C8 16 36 16 36 34 L36 38 L8 38 Z" fill="rgba(255,255,255,.75)" stroke="#8A7C76" stroke-width="1.2"/>
+            <circle cx="16" cy="28" r="2.6" fill="#E66826"/><circle cx="27" cy="25" r="2" fill="#882E47"/>
+            <line x1="22" y1="38" x2="22" y2="60" stroke="#8A7C76" stroke-width="1"/>
+            <rect x="15" y="60" width="14" height="44" rx="1" fill="#FBECE0" stroke="#D9C4B5"/>
+          </svg>
+          <div class="furin-note">風鈴にそっとふれると、音が鳴ります<br>名古屋の風 · そよ風</div>
+          <div class="carousel" id="tCarousel">
+            <div class="peek-wrap" id="tPeek">
+              <div class="track" id="tTrack">
+                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>ありがとうございます。<br><span class="small">ただいま準備をしてまいります。（見本の文章です）</span></div></div>
+                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>その間、どうぞごゆっくりお寛ぎくださいませ。<br><span class="small">お飲み物も、どうぞお好きなタイミングで。</span></div></div>
+                <div class="panel ty-panel"><div class="panel-text"><div class="ty-mark">❀</div>画面は見ていただかなくても大丈夫です。<br><span class="small">スマートフォンを見たり、目を閉じたり、どうぞご自由に。</span></div></div>
+                <div class="panel ty-panel">
+                  <div class="game-ring">
+                    <div class="sc">現在のスコア：<b id="gScore">0</b></div>
+                    <div>最高スコア：0　残り時間：<span id="gTime">60</span>秒</div>
+                    <button class="btn" id="gameBtn">はじめる</button>
+                    <div class="how">小さなゲームで、ひと息どうぞ。</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="hint-row" id="tHint"><span id="tHintIn">スワイプ<span class="arr">→</span></span></div>
+          <div class="dots" id="tDots"></div>
+        </section>
+
+        <div class="coach" id="coach"><svg id="coachSvg"></svg></div>
+        <div class="end" id="end">デモはここまでです<button class="btn" id="endRestart">最初から</button></div>
+        <div class="tag">デモ画面（実際のアプリではありません）</div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+(function () {
+  'use strict';
+  var W = 1480, H = 924;
+  var frame = document.getElementById('frame');
+  var frameBox = document.getElementById('frameBox');
+  var stageWrap = document.getElementById('stageWrap');
+  var $ = function (id) { return document.getElementById(id); };
+  var scale = 1;
+
+  /* ============ FIT THE 1480×924 FRAME ============ */
+  function fit() {
+    var cs = getComputedStyle(stageWrap);
+    var aw = stageWrap.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) - 24;
+    var ah = stageWrap.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) - 24;
+    scale = Math.max(0.1, Math.min(aw / W, ah / H));
+    frame.style.transform = 'scale(' + scale + ')';
+    frameBox.style.width = (W * scale) + 'px';
+    frameBox.style.height = (H * scale) + 'px';
+    Coach.place();
+  }
+
+  /* Frame coordinates (1480×924) of an element. */
+  function rectOf(el) {
+    var f = frame.getBoundingClientRect(), r = el.getBoundingClientRect();
+    return { x: (r.left - f.left) / scale, y: (r.top - f.top) / scale, w: r.width / scale, h: r.height / scale };
+  }
+
+  function unionRect(els) {
+    var a = els.map(rectOf), x = Math.min.apply(null, a.map(function (q) { return q.x; })), y = Math.min.apply(null, a.map(function (q) { return q.y; }));
+    var x2 = Math.max.apply(null, a.map(function (q) { return q.x + q.w; })), y2 = Math.max.apply(null, a.map(function (q) { return q.y + q.h; }));
+    return { x: x, y: y, w: x2 - x, h: y2 - y };
+  }
+
+  /* ============ COACH ============
+     show({ targets: [{ el, shape: 'box'|'circle'|'none', pad, text, place }],
+            finger: { el, kind: 'tap'|'swipe'|'up', dx, dy }, fade })
+     Draws an ink outline around each target, a caption beside it and
+     an optional ghost finger. Redraws after 8s with no touch, twice. */
+  var Coach = (function () {
+    var layer = $('coach'), svg = $('coachSvg'), NS = 'http://www.w3.org/2000/svg';
+    var opts = null, nodes = [], idleT = null, replays = 0;
+
+    function boxPath(r, pad) {
+      var x = r.x - pad, y = r.y - pad, w = r.w + pad * 2, h = r.h + pad * 2, k = Math.min(18, h / 2, w / 2);
+      return 'M' + (x + k + 14) + ' ' + (y - 1) +
+        ' L' + (x + w - k) + ' ' + y + ' Q' + (x + w) + ' ' + y + ' ' + (x + w) + ' ' + (y + k) +
+        ' L' + (x + w + 1) + ' ' + (y + h - k) + ' Q' + (x + w) + ' ' + (y + h) + ' ' + (x + w - k) + ' ' + (y + h) +
+        ' L' + (x + k) + ' ' + (y + h + 1) + ' Q' + x + ' ' + (y + h) + ' ' + x + ' ' + (y + h - k) +
+        ' L' + (x - 1) + ' ' + (y + k) + ' Q' + x + ' ' + y + ' ' + (x + k) + ' ' + y +
+        ' L' + (x + k + 46) + ' ' + (y - 3);
+    }
+    /* An ensō: a little over one turn, slightly uneven like a brush. */
+    function circlePath(r, pad) {
+      var cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2 + pad, ry = r.h / 2 + pad, d = '';
+      var a0 = -Math.PI * 0.62, turn = Math.PI * 2 * 1.07, n = 72;
+      for (var i = 0; i <= n; i++) {
+        var t = i / n, a = a0 + turn * t, wob = 1 + 0.035 * Math.sin(a * 3 + 1) + 0.06 * Math.max(0, t - 0.9) * 10;
+        d += (i ? ' L' : 'M') + (cx + Math.cos(a) * rx * wob).toFixed(1) + ' ' + (cy + Math.sin(a) * ry * wob).toFixed(1);
+      }
+      return d;
+    }
+
+    function clear() {
+      clearTimeout(idleT);
+      layer.classList.remove('go');
+      svg.innerHTML = '';
+      nodes.forEach(function (n) { if (n.cap) n.cap.remove(); });
+      var g = layer.querySelector('.ghost'); if (g) g.remove();
+      nodes = []; opts = null; replays = 0; showReplays();
+    }
+
+    function show(o) {
+      clear();
+      opts = o;
+      (o.targets || []).forEach(function (t) {
+        var n = { t: t };
+        if (t.shape && t.shape !== 'none') {
+          n.glow = document.createElementNS(NS, 'path'); n.glow.setAttribute('class', 'glow');
+          n.ink = document.createElementNS(NS, 'path'); n.ink.setAttribute('class', 'ink'); n.ink.setAttribute('pathLength', '1');
+          svg.appendChild(n.glow); svg.appendChild(n.ink);
+        }
+        if (t.text) {
+          n.cap = document.createElement('div'); n.cap.className = 'cap' + (o.fade ? ' fade' : '');
+          n.cap.textContent = t.text; layer.appendChild(n.cap);
+        }
+        nodes.push(n);
+      });
+      if (o.finger) {
+        var g = document.createElement('div'); g.className = 'ghost ' + o.finger.kind; layer.appendChild(g);
+      }
+      place();
+      play();
+    }
+
+    function play() {
+      layer.classList.remove('go'); void layer.offsetWidth; layer.classList.add('go');
+      armIdle();
+    }
+    function armIdle() {
+      clearTimeout(idleT);
+      if (!opts || opts.fade) return;
+      idleT = setTimeout(function () {
+        if (!opts || replays >= 2) return;
+        replays++; showReplays(); play();
+      }, 8000);
+    }
+    function showReplays() {
+      $('replays').textContent = opts && !opts.fade ? 'Redrawn after no touch: ' + replays + ' / 2' : '';
+    }
+
+    function place() {
+      if (!opts) return;
+      nodes.forEach(function (n) {
+        var r = n.t.els ? unionRect(n.t.els) : rectOf(n.t.el), pad = n.t.pad != null ? n.t.pad : 10;
+        if (n.ink) {
+          var d = n.t.shape === 'circle' ? circlePath(r, pad) : boxPath(r, pad);
+          n.ink.setAttribute('d', d); n.glow.setAttribute('d', d);
+        }
+        if (n.cap) {
+          var cw = n.cap.offsetWidth, ch = n.cap.offsetHeight, gap = pad + 16, p = n.t.place || 'below', x, y;
+          if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
+          else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
+          else if (p === 'right') { x = r.x + r.w + gap; y = r.y + r.h / 2 - ch / 2; }
+          else { x = r.x - gap - cw; y = r.y + r.h / 2 - ch / 2; }
+          n.cap.style.left = Math.max(16, Math.min(W - cw - 16, x)) + 'px';
+          n.cap.style.top = Math.max(76, Math.min(H - ch - 16, y)) + 'px';
+        }
+      });
+      var g = layer.querySelector('.ghost');
+      if (g && opts.finger) {
+        var fr = rectOf(opts.finger.el);
+        g.style.left = (fr.x + fr.w / 2 + (opts.finger.dx || 0)) + 'px';
+        g.style.top = (fr.y + fr.h / 2 + (opts.finger.dy || 0)) + 'px';
+      }
+    }
+
+    frame.addEventListener('pointerdown', armIdle, true);
+    return { show: show, clear: clear, place: place };
+  })();
+
+  /* ============ CAROUSEL (message pages and thank-you pages) ============ */
+  function Carousel(viewport, track, dotsEl, count, onChange) {
+    var idx = 0, startX = null, dx = 0, self = this;
+    dotsEl.innerHTML = '';
+    for (var i = 0; i < count; i++) dotsEl.appendChild(document.createElement('i'));
+    function render() {
+      track.style.transform = 'translateX(' + (-idx * W + dx) + 'px)';
+      Array.prototype.forEach.call(dotsEl.children, function (d, i) { d.classList.toggle('on', i === idx); });
+    }
+    this.go = function (i, quiet) {
+      var prev = idx; idx = Math.max(0, Math.min(count - 1, i)); dx = 0; render();
+      if (!quiet && idx !== prev) onChange(idx, prev);
+    };
+    this.index = function () { return idx; };
+    viewport.addEventListener('pointerdown', function (e) {
+      if (e.target.closest('button')) return;
+      startX = e.clientX; dx = 0; track.classList.add('drag');
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (startX == null) return;
+      dx = (e.clientX - startX) / scale;
+      if ((idx === 0 && dx > 0) || (idx === count - 1 && dx < 0)) dx *= 0.3;
+      render();
+    });
+    window.addEventListener('pointerup', function () {
+      if (startX == null) return;
+      startX = null; track.classList.remove('drag');
+      var d = dx; dx = 0;
+      if (d < -70) self.go(idx + 1); else if (d > 70) self.go(idx - 1); else render();
+    });
+    render();
+  }
+
+  /* ============ SCREENS ============ */
+  var screens = ['scrKoi', 'scrPanels', 'scrTable', 'scrReceipt', 'scrTy'];
+  function showScreen(id) {
+    screens.forEach(function (s) { $(s).classList.toggle('on', s === id); });
+    $('end').classList.remove('on');
+  }
+
+  /* Koi: trace upward on the water to start */
+  var pond = $('pond'), koiY = null;
+  $('scrKoi').addEventListener('pointerdown', function (e) { if (!$('notice').classList.contains('on')) koiY = e.clientY; });
+  window.addEventListener('pointerup', function (e) {
+    if (koiY == null) return;
+    var d = (e.clientY - koiY) / scale; koiY = null;
+    if (d < -70) { pond.classList.add('dive'); setTimeout(function () { emit('koiDive'); }, 700); }
+  });
+  $('noticeBtn').addEventListener('click', function () { $('notice').classList.remove('on'); emit('notice'); });
+
+  /* Message pages */
+  var pCar = new Carousel($('pCarousel'), $('pTrack'), $('pDots'), 6, function (i) {
+    $('pHintSwipe').hidden = i === 5; $('pHintScroll').hidden = i !== 5;
+    emit('panel', i);
+  });
+  function goTable() { emit('scrollDown'); }
+  $('pHint').addEventListener('click', function () { if (pCar.index() === 5) goTable(); });
+  var pDownY = null;
+  $('pCarousel').addEventListener('pointerdown', function (e) { pDownY = e.clientY; });
+  window.addEventListener('pointerup', function (e) {
+    if (pDownY == null) return;
+    var d = (e.clientY - pDownY) / scale; pDownY = null;
+    if (pCar.index() === 5 && d < -70) goTable();
+  });
+  $('scrPanels').addEventListener('wheel', function (e) { if (pCar.index() === 5 && e.deltaY > 20) goTable(); });
+
+  /* ============ SERVICE TABLE ============ */
+  var PRESETS = [['アロマオイル追加', 2000], ['延長 30分', 4000], ['ホットストーン', 3000], ['フットケア', 2500]];
+  var rows = [], activeRow = null, rejected = false, freshPrice = false;
+  function makeRow(name, price, custom) {
+    var el = document.createElement('div'); el.className = 'row' + (custom ? ' locked' : '');
+    el.innerHTML = '<div class="check"></div><div class="svc' + (custom ? ' input' : '') + '"></div><div class="price"><span class="v"></span><span>円</span></div>';
+    var r = { el: el, check: el.querySelector('.check'), svc: el.querySelector('.svc'), price: el.querySelector('.price'), v: el.querySelector('.v'), custom: custom, on: false, name: name || '' };
+    r.svc.textContent = custom ? 'サービスの種類' : name;
+    r.v.textContent = price ? price.toLocaleString() : '';
+    el.addEventListener('click', function (e) { rowClick(r, e); });
+    rows.push(r);
+    return el;
+  }
+  function buildTable() {
+    rows = []; activeRow = null; rejected = false;
+    $('presetCard').innerHTML = ''; $('customCard').innerHTML = '';
+    PRESETS.forEach(function (p) { $('presetCard').appendChild(makeRow(p[0], p[1], false)); });
+    for (var i = 0; i < 3; i++) $('customCard').appendChild(makeRow('', 0, true));
+    $('reject').classList.remove('on');
+    $('numpad').classList.remove('on');
+    $('scroller').scrollTop = 0;
+    recalc();
+  }
+  function priceOf(r) { return parseInt((r.v.textContent || '').replace(/[^0-9]/g, ''), 10) || 0; }
+  function recalc() {
+    var sum = 0, any = false;
+    rows.forEach(function (r) {
+      r.el.classList.toggle('filled', r.on); r.check.classList.toggle('on', r.on);
+      r.el.classList.toggle('disabled', rejected);
+      r.el.classList.toggle('locked', r.custom && !r.name);
+      if (r.on) { sum += priceOf(r); any = true; }
+    });
+    $('total').textContent = '¥' + (rejected ? 1500 : sum).toLocaleString();
+    $('submitBtn').disabled = !(any || rejected);
+    if (any || rejected) emit('canSubmit');
+  }
+  function setActive(r) {
+    if (activeRow) activeRow.price.classList.remove('active');
+    activeRow = r; freshPrice = true;
+    if (r) r.price.classList.add('active');
+    $('numpad').classList.toggle('on', !!r);
+    setTimeout(Coach.place, 0);
+  }
+  function pending() { for (var i = 0; i < rows.length; i++) if (rows[i].on && !rows[i].v.textContent) return rows[i]; return null; }
+  /* The existing shake, now with a caption saying why. */
+  function shakeWithWords(el, words, scrollEl) {
+    el.classList.remove('shake'); void el.offsetWidth; el.classList.add('shake');
+    if (scrollEl) scrollEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    var resume = curStep;
+    Coach.show({ targets: [{ el: el, shape: 'box', pad: 6, text: words, place: 'above' }], fade: true });
+    clearTimeout(shakeWithWords.t);
+    shakeWithWords.t = setTimeout(function () {
+      if (curStep !== resume) return;
+      var s = steps[curStep]; if (s.leave) s.leave(); s.hint();
+    }, 4200);
+  }
+  function rowClick(r, e) {
+    var p = pending();
+    if (p && p !== r) { shakeWithWords(p.price, '料金をご入力ください', p.el); setActive(p); return; }
+    if (r.custom) {
+      var first = rows.filter(function (x) { return x.custom && !x.name; })[0];
+      if (!r.name) {
+        if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
+        openTanzaku(r); return;
+      }
+    }
+    if (e.target.closest('.price') && r.on) { setActive(r); return; }
+    r.on = !r.on;
+    if (r.on) { setActive(r); emit('check', r); }
+    else { if (activeRow === r) setActive(null); emit('uncheck', r); }
+    recalc();
+  }
+  $('numpad').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || !activeRow) return;
+    var k = b.getAttribute('data-k'), digits = activeRow.v.textContent.replace(/[^0-9]/g, '');
+    if (k === 'done') {
+      if (!digits) { shakeWithWords(activeRow.price, '料金をご入力ください'); return; }
+      setActive(null); emit('priceDone'); return;
+    }
+    /* Like the app, which selects the price on focus: the first key replaces it. */
+    if (freshPrice) { freshPrice = false; if (k !== 'back') digits = ''; }
+    if (k === 'back') digits = digits.slice(0, -1);
+    else digits = (digits + k).slice(0, 5);
+    activeRow.v.textContent = digits ? parseInt(digits, 10).toLocaleString() : '';
+    recalc();
+  });
+  /* Tapping away from an open price closes the keypad, as in the app. */
+  $('scrTable').addEventListener('pointerdown', function (e) {
+    if (!activeRow || e.target.closest('.numpad') || e.target.closest('.row')) return;
+    if (!activeRow.v.textContent) return;
+    setActive(null); emit('priceDone');
+  });
+
+  var tzRow = null;
+  function openTanzaku(r) { tzRow = r; $('tzInput').value = ''; $('tanzaku').classList.add('on'); emit('openCustom'); }
+  $('tanzaku').querySelector('.tz-ex').addEventListener('click', function (e) { if (e.target.tagName === 'BUTTON') $('tzInput').value = e.target.textContent; });
+  $('tzCancel').addEventListener('click', function () { $('tanzaku').classList.remove('on'); });
+  $('tzOk').addEventListener('click', function () {
+    var v = $('tzInput').value.trim(); if (!v) { $('tzInput').focus(); return; }
+    $('tanzaku').classList.remove('on');
+    tzRow.name = v; tzRow.svc.textContent = v; tzRow.svc.classList.add('named'); tzRow.on = true;
+    recalc(); setActive(tzRow);
+  });
+  $('reject').addEventListener('click', function () {
+    rejected = !rejected; $('reject').classList.toggle('on', rejected);
+    if (rejected) setActive(null);
+    recalc(); if (rejected) emit('reject');
+  });
+  $('resetBtn').addEventListener('click', function () { rows.forEach(function (r) { r.on = false; }); setActive(null); rejected = false; $('reject').classList.remove('on'); recalc(); });
+  $('submitBtn').addEventListener('click', function () {
+    var p = pending(); if (p) { shakeWithWords(p.price, '料金をご入力ください', p.el); setActive(p); return; }
+    setActive(null); $('confirm').classList.add('on'); emit('submit');
+  });
+  $('cfNo').addEventListener('click', function () { $('confirm').classList.remove('on'); });
+  $('cfYes').addEventListener('click', function () { $('confirm').classList.remove('on'); go(idx('7')); });
+  $('scroller').addEventListener('scroll', function () { Coach.place(); emit('scroll'); });
+
+  function fullyVisible(el) {
+    var s = rectOf($('scroller')), r = rectOf(el);
+    return r.y >= s.y - 1 && r.y + r.h <= s.y + s.h + 1;
+  }
+  function scrolledPast(el) { var s = rectOf($('scroller')), r = rectOf(el); return r.y + r.h < s.y; }
+
+  /* ============ RECEIPT ============ */
+  var stamped = false;
+  function buildReceipt() {
+    var list = rows.filter(function (r) { return r.on; }), html = '', sum = 0;
+    if (rejected) { html = '<div class="it"><span>今回はすべて見送り</span><span></span></div><div class="it"><span>ささやかなお礼</span><span>¥1,500</span></div>'; sum = 1500; }
+    else {
+      if (!list.length) list = [{ name: 'アロマオイル追加', p: 2000 }, { name: '延長 30分', p: 4000 }];
+      else list = list.map(function (r) { return { name: r.name, p: priceOf(r) }; });
+      list.forEach(function (i) { html += '<div class="it"><span>' + i.name + '</span><span>¥' + i.p.toLocaleString() + '</span></div>'; sum += i.p; });
+    }
+    $('rItems').innerHTML = html; $('rTotal').textContent = '¥' + sum.toLocaleString();
+    setStamp(false);
+  }
+  function setStamp(on) { stamped = on; $('stampZone').classList.toggle('on', on); $('rConfirm').disabled = !on; setTimeout(Coach.place, 0); }
+  $('stampZone').addEventListener('click', function (e) {
+    if (e.target.closest('.stamp-x')) return;
+    if (!stamped) { setStamp(true); emit('stamp'); }
+  });
+  $('stampX').addEventListener('click', function () { setStamp(false); emit('unstamp'); });
+  $('rBack').addEventListener('click', function () { go(idx('6f'), true); });
+  $('rConfirm').addEventListener('click', function () { if (stamped) emit('receiptOk'); });
+
+  /* ============ THANK-YOU PAGES ============ */
+  var tCar = new Carousel($('tCarousel'), $('tTrack'), $('tDots'), 4, function (i) {
+    $('tHint').style.visibility = i === 3 ? 'hidden' : '';
+    emit('tyPanel', i);
+  });
+  var gameT = null;
+  $('gameBtn').addEventListener('click', function () {
+    var left = 5; clearInterval(gameT); $('gameBtn').textContent = 'ゲーム中…'; emit('game');
+    gameT = setInterval(function () {
+      left--; $('gTime').textContent = left; $('gScore').textContent = (5 - left) * 3;
+      if (left <= 0) { clearInterval(gameT); $('gameBtn').textContent = 'もう一度'; $('gTime').textContent = '60'; }
+    }, 600);
+  });
+  $('furin').addEventListener('click', function () {
+    var f = $('furin'); f.classList.remove('swing'); void f.getBoundingClientRect(); f.classList.add('swing'); emit('furin');
+  });
+
+  /* ============ STEPS ============
+     Each step: setup() puts the mock screen in the right state when you
+     jump to it; hint() draws it; on(evt) returns true to move on. */
+  var steps = [
+    { id: '1', group: 'Start', t: '確認しました', what: 'Circle around the 確認しました button.', cap: '—', gone: 'She taps it.',
+      setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); $('notice').classList.add('on'); },
+      hint: function () { Coach.show({ targets: [{ el: $('noticeBtn'), shape: 'circle', pad: 14 }], finger: { el: $('noticeBtn'), kind: 'tap' } }); },
+      on: function (e) { return e === 'notice'; } },
+    { id: '2', t: 'Koi pond', what: 'Ghost finger traces upward on the water.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
+      setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); $('notice').classList.remove('on'); },
+      hint: function () { Coach.show({ targets: [{ el: pond, shape: 'circle', pad: 26, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
+      on: function (e) { return e === 'koiDive'; } },
+    { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box around スワイプ→ and the dots. Ghost finger drags left while the page slides 56px to show the next one, then springs back.', cap: '左へスワイプして、次のページへ', gone: 'First successful swipe.', try: 'Drag the page to the left.',
+      setup: function () { showScreen('scrPanels'); pCar.go(0, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
+      enterNatural: function () { this.setup(); },
+      hint: function () {
+        $('pPeek').classList.add('peek');
+        Coach.show({ targets: [{ els: [$('pHintSwipe'), $('pDots').firstChild, $('pDots').lastChild], shape: 'box', pad: 16, text: '左へスワイプして、次のページへ', place: 'above' }], finger: { el: $('pCarousel'), kind: 'swipe', dy: 120 } });
+      },
+      leave: function () { $('pPeek').classList.remove('peek'); },
+      on: function (e, i) { return e === 'panel' && i > 0; } },
+    { id: '4', t: 'Pages 2–5', what: 'No hint. The dots already show how far she is.', cap: '—', gone: '—', try: 'Keep swiping to the last page.',
+      setup: function () { showScreen('scrPanels'); pCar.go(1, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
+      hint: function () { Coach.clear(); },
+      on: function (e, i) { return e === 'panel' && i === 5; } },
+    { id: '5', t: 'Scroll down', what: 'Box around ↓下へスクロール. The page nudges up and settles.', cap: '下へスクロールしてください', gone: 'She starts scrolling.', try: 'Drag up, use the mouse wheel, or tap the hint.',
+      setup: function () { showScreen('scrPanels'); pCar.go(5, true); $('pHintSwipe').hidden = true; $('pHintScroll').hidden = false; },
+      hint: function () { Coach.show({ targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14, text: '下へスクロールしてください', place: 'above' }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
+      on: function (e) { return e === 'scrollDown'; } },
+
+    { id: '6a', group: 'Service table', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap.', cap: '○をタップすると選択できます', gone: 'She ticks any row.',
+      setup: function () { showScreen('scrTable'); buildTable(); },
+      enterNatural: function () { this.setup(); },
+      hint: function () { Coach.show({ targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップすると選択できます', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } }); },
+      on: function (e) { return e === 'check'; } },
+    { id: '6b', t: 'Price + keypad', what: 'Box around that row\'s price and around the keypad.', cap: '料金は変更できます。入力後「決定」を', gone: 'She presses 決定 or taps elsewhere.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); setActive(rows[0]); },
+      hint: function () {
+        var r = activeRow || rows.filter(function (x) { return x.on; })[0] || rows[0];
+        Coach.show({ targets: [{ el: r.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
+      },
+      on: function (e) { return e === 'priceDone'; } },
+    { id: '6c', t: 'Untick', what: 'A caption only, beside the ○ she just ticked. Fades by itself.', cap: 'もう一度タップで取り消せます', gone: 'After 4 seconds, no action needed.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
+      hint: function () {
+        var r = rows.filter(function (x) { return x.on; })[0] || rows[0];
+        Coach.show({ targets: [{ el: r.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }], fade: true });
+        this._t = setTimeout(function () { next(); }, 4200);
+      },
+      leave: function () { clearTimeout(this._t); },
+      on: function () { return false; } },
+    { id: '6d', t: 'その他 rows', what: 'When she scrolls to it: box around the first その他 row.', cap: 'ご提案があれば、こちらにご記入ください', gone: 'She opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the new "in order" caption.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
+      hint: function () {
+        var r = rows.filter(function (x) { return x.custom && !x.name; })[0];
+        this._r = r;
+        if (!r) { next(); return; }
+        this._shownAt = 0;
+        if (fullyVisible(r.el)) this._shownAt = Date.now(), Coach.show({ targets: [{ el: r.el, shape: 'box', pad: 6, text: 'ご提案があれば、こちらにご記入ください', place: 'above' }] });
+        else Coach.clear();
+      },
+      on: function (e) {
+        if (e === 'openCustom') return true;
+        if (e === 'scroll') {
+          if (scrolledPast(this._r.el)) return true;
+          if (this._shownAt && Date.now() - this._shownAt > 2000 && fullyVisible($('reject'))) return true;
+          if (!$('coach').classList.contains('go') && fullyVisible(this._r.el)) this.hint();
+        }
+        return false;
+      } },
+    { id: '6e', t: 'すべて見送る', what: 'Same box around 今回はすべて見送ります, so "no" is as easy to find as "yes".', cap: 'すべて見送る場合はこちらをタップ', gone: 'She taps it, or carries on with something else.', try: 'Scroll to the bottom of the table.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
+      hint: function () {
+        var self = this; self._shownAt = 0;
+        if (fullyVisible($('reject'))) { self._shownAt = Date.now(); Coach.show({ targets: [{ el: $('reject'), shape: 'box', pad: 8, text: 'すべて見送る場合はこちらをタップ', place: 'above' }] }); }
+        else Coach.clear();
+      },
+      on: function (e) {
+        if (e === 'reject') return true;
+        if (e === 'scroll' && !this._shownAt && fullyVisible($('reject'))) this.hint();
+        if (this._shownAt && Date.now() - this._shownAt > 2000 && (e === 'check' || e === 'uncheck' || e === 'openCustom' || e === 'submit')) return true;
+        return false;
+      } },
+    { id: '6f', t: '確認する', what: 'Box around 確認する, once something is chosen (or 見送る).', cap: '選び終えたら、こちらへ', gone: 'She taps it.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); $('scroller').scrollTop = 99999; },
+      hint: function () {
+        if ($('submitBtn').disabled) { Coach.clear(); return; }
+        Coach.show({ targets: [{ el: $('submitBtn'), shape: 'box', pad: 10, text: '選び終えたら、こちらへ', place: 'above' }], finger: { el: $('submitBtn'), kind: 'tap' } });
+      },
+      on: function (e) {
+        if (e === 'submit') { Coach.clear(); return false; }
+        if (e === 'canSubmit' && !$('coach').classList.contains('go')) this.hint();
+        return false;
+      } },
+
+    { id: '7', group: 'Receipt', t: 'Stamp', what: 'Circle around the stamp area, with a ghost tap.', cap: 'ここをタップして印を', gone: 'She stamps.',
+      setup: function () { showScreen('scrReceipt'); buildReceipt(); },
+      enterNatural: function () { showScreen('scrReceipt'); buildReceipt(); },
+      hint: function () { Coach.show({ targets: [{ el: $('stampZone'), shape: 'circle', pad: 12, text: 'ここをタップして印を', place: 'above' }], finger: { el: $('stampZone'), kind: 'tap' } }); },
+      on: function (e) { return e === 'stamp'; } },
+    { id: '8', t: 'Confirm', what: 'Box around こちらの内容でお願いいたします, and a small circle around the stamp\'s ×.', cap: '変更は印の×から', gone: 'She confirms (× takes her back a step).',
+      setup: function () { showScreen('scrReceipt'); buildReceipt(); setStamp(true); },
+      hint: function () {
+        Coach.show({ targets: [{ el: $('rConfirm'), shape: 'box', pad: 10, text: 'よろしければ、こちらをタップ', place: 'below' }, { el: $('stampX'), shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
+      },
+      on: function (e) { if (e === 'unstamp') { go(idx('7'), true); return false; } return e === 'receiptOk'; } },
+
+    { id: '9', group: 'Thank-you pages', t: 'Swipe again', what: 'The same swipe hint as step 3, reused.', cap: '左へスワイプ', gone: 'First swipe.', try: 'Drag the page to the left, then keep going to the game.',
+      setup: function () { showScreen('scrTy'); tCar.go(0, true); $('tHint').style.visibility = ''; },
+      enterNatural: function () { this.setup(); },
+      hint: function () {
+        $('tPeek').classList.add('peek');
+        Coach.show({ targets: [{ els: [$('tHintIn'), $('tDots').firstChild, $('tDots').lastChild], shape: 'box', pad: 16, text: '左へスワイプ', place: 'above' }], finger: { el: $('tCarousel'), kind: 'swipe', dy: 120 } });
+      },
+      leave: function () { $('tPeek').classList.remove('peek'); },
+      on: function (e, i) { if (e === 'tyPanel' && i === 3) { go(idx('10'), true); return false; } return e === 'tyPanel' && i > 0; } },
+    { id: '9+', t: '(free swiping)', what: 'No hint while she reads.', cap: '—', gone: '—', try: 'Swipe to the last page.',
+      setup: function () { showScreen('scrTy'); tCar.go(1, true); },
+      hint: function () { Coach.clear(); },
+      on: function (e, i) { return e === 'tyPanel' && i === 3; } },
+    { id: '10', t: 'Game', what: 'Circle around the start button.', cap: 'タップしてはじめる', gone: 'She starts a game.',
+      setup: function () { showScreen('scrTy'); tCar.go(3, true); $('tHint').style.visibility = 'hidden'; $('gameBtn').textContent = 'はじめる'; },
+      hint: function () { Coach.show({ targets: [{ el: $('gameBtn'), shape: 'circle', pad: 16, text: 'タップしてはじめる', place: 'below' }], finger: { el: $('gameBtn'), kind: 'tap' } }); },
+      on: function (e) { return e === 'game'; } },
+    { id: '11', t: 'Wind chime', what: 'One soft circle around the 風鈴, once per session (optional).', cap: '風鈴にふれてみてください', gone: 'She touches it.',
+      setup: function () { showScreen('scrTy'); tCar.go(3, true); $('tHint').style.visibility = 'hidden'; },
+      hint: function () { var self = this; self._t = setTimeout(function () { Coach.show({ targets: [{ el: $('furin'), shape: 'circle', pad: 12, text: '風鈴にふれてみてください', place: 'right' }], finger: { el: $('furin'), kind: 'tap', dy: 20 } }); }, 1500); },
+      leave: function () { clearTimeout(this._t); },
+      on: function (e) { if (e === 'furin') { setTimeout(function () { Coach.clear(); $('end').classList.add('on'); }, 900); } return false; } }
+  ];
+
+  var curStep = 0;
+  function idx(id) { for (var i = 0; i < steps.length; i++) if (steps[i].id === id) return i; return 0; }
+
+  /* natural: arrived by doing the action, so keep the screen as it is. */
+  function go(i, natural) {
+    var old = steps[curStep];
+    if (old && old.leave) old.leave();
+    Coach.clear();
+    curStep = Math.max(0, Math.min(steps.length - 1, i));
+    var s = steps[curStep];
+    if (!natural) s.setup();
+    else if (s.enterNatural) s.enterNatural();
+    renderSide();
+    setTimeout(function () { if (steps[curStep] === s) s.hint(); }, natural ? 450 : 250);
+  }
+  function next() { go(curStep + 1, true); }
+  function emit(evt, data) {
+    var s = steps[curStep];
+    /* Choosing すべて見送る drops the remaining table hints (6a–6e). */
+    if (evt === 'reject' && /^6[a-e]$/.test(s.id)) { go(idx('6f'), true); return; }
+    if (s.on(evt, data)) next();
+  }
+
+  /* ============ SIDE PANEL ============ */
+  function renderSide() {
+    var list = $('stepList'); list.innerHTML = '';
+    steps.forEach(function (s, i) {
+      if (s.group) { var g = document.createElement('li'); g.className = 'group'; g.textContent = s.group; list.appendChild(g); }
+      var li = document.createElement('li');
+      li.className = (i === curStep ? 'cur' : '') + (i < curStep ? ' done' : '');
+      li.innerHTML = '<span class="n">' + s.id + '</span><span class="t"></span>';
+      li.querySelector('.t').textContent = s.t;
+      li.addEventListener('click', function () { go(i); });
+      list.appendChild(li);
+    });
+    var s = steps[curStep];
+    $('detail').innerHTML = '<b></b><dl><dt>What is drawn</dt><dd class="a"></dd><dt>Caption</dt><dd class="b"></dd><dt>Goes away when</dt><dd class="c"></dd></dl>' + (s.try ? '<div class="try"></div>' : '');
+    $('detail').querySelector('b').textContent = s.id + '. ' + s.t;
+    $('detail').querySelector('.a').textContent = s.what;
+    $('detail').querySelector('.b').textContent = s.cap;
+    $('detail').querySelector('.c').textContent = s.gone;
+    if (s.try) $('detail').querySelector('.try').textContent = 'Try: ' + s.try;
+    $('prevBtn').disabled = curStep === 0;
+    $('nextBtn').disabled = curStep === steps.length - 1;
+  }
+  $('prevBtn').addEventListener('click', function () { go(curStep - 1); });
+  $('nextBtn').addEventListener('click', function () { go(curStep + 1); });
+  $('restartBtn').addEventListener('click', function () { go(0); });
+  $('endRestart').addEventListener('click', function () { go(0); });
+  document.querySelectorAll('[data-theme-btn]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      document.documentElement.setAttribute('data-theme', b.getAttribute('data-theme-btn'));
+      document.querySelectorAll('[data-theme-btn]').forEach(function (x) { x.classList.toggle('on', x === b); });
+    });
+  });
+  $('rmBtn').addEventListener('click', function () { $('rmBtn').classList.toggle('on', frame.classList.toggle('rm')); });
+
+  window.addEventListener('resize', fit);
+  fit();
+  go(0);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { Coach.place(); });
+})();
+</script>
+</body>
+</html>
