@@ -6692,7 +6692,34 @@ function renderIntroGlyph(text) {
 }
 
 function isBlossomInteractive() {
-  return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun;
+  return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun && !startNoticeOpen;
+}
+
+/* ============ START-SCREEN NOTICE ============
+   The start screen is shown and sounding as normal; this box simply
+   floats over it. It swallows touches until dismissed. On tap the text
+   fades, then the box. */
+var startNoticeOpen = false;
+function showStartNotice() {
+  var box = document.getElementById('startNotice');
+  var btn = document.getElementById('startNoticeBtn');
+  if (!box || !btn || startNoticeOpen) return;
+  startNoticeOpen = true;
+  ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend'].forEach(function(type) {
+    box.addEventListener(type, function(e) { e.stopPropagation(); }, { passive: true });
+  });
+  btn.addEventListener('click', function() {
+    haptic(8);
+    box.classList.add('text-out');
+    setTimeout(function() {
+      box.classList.add('closing');
+      setTimeout(function() {
+        box.classList.remove('shown', 'closing');
+        startNoticeOpen = false;
+      }, 700);
+    }, 600);
+  }, { once: true });
+  box.classList.add('shown');
 }
 
 function stopAmbientRipple() {
@@ -7269,6 +7296,7 @@ function confirmName() {
     try { nameInput.blur(); } catch (err) {}
     nameScreen.classList.add('hidden');
     blossomScreen.classList.add('visible');
+    showStartNotice();
     updateBlossomGreeting();
     tryStartBlossomStream();
     updateAllRowLocks();
