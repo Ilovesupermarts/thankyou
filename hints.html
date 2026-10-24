@@ -121,8 +121,6 @@
   /* ============ 3–5 MESSAGE PAGES / 9 THANK-YOU PAGES ============ */
   .carousel { position: absolute; left: 0; right: 0; top: 64px; bottom: 0; overflow: hidden; }
   .peek-wrap { position: absolute; inset: 0; }
-  .peek-wrap.peek { animation: peek 2.6s ease-in-out infinite; }
-  @keyframes peek { 0%,20% { transform: translateX(0); } 50% { transform: translateX(-56px); } 75%,100% { transform: translateX(0); } }
   .track { position: absolute; top: 0; bottom: 0; left: 0; display: flex; transition: transform .45s cubic-bezier(.2,.8,.2,1); }
   .track.drag { transition: none; }
   .panel { width: 1480px; height: 100%; display: flex; align-items: center; justify-content: center; }
@@ -215,7 +213,8 @@
   .coach.go .ink { animation: ink .9s cubic-bezier(.5,0,.3,1) forwards; }
   .coach.go .glow { animation: glow 2.4s ease-in-out .9s infinite; }
   .coach.once.go .glow { animation: glow 2.4s ease-in-out .9s 1; }
-  .coach.once.go .ghost.tap, .coach.once.go .ghost.tap::after { animation-iteration-count: 1; }
+  .coach.once.go .ghost, .coach.once.go .ghost::after { animation-iteration-count: 1; }
+  .coach.fading { opacity: 0; transition: opacity .6s ease; }
   @keyframes ink { to { stroke-dashoffset: 0; } }
   @keyframes glow { 0%,100% { opacity: 0; } 50% { opacity: .16; } }
   .cap {
@@ -244,12 +243,10 @@
   .frame.rm .coach .glow { animation: none !important; opacity: .12; }
   .frame.rm .coach .cap { animation: none !important; opacity: 1; }
   .frame.rm .coach .ghost { display: none; }
-  .frame.rm .peek-wrap.peek { animation: none; }
   @media (prefers-reduced-motion: reduce) {
     .coach .ink { stroke-dashoffset: 0; animation: none !important; }
     .coach .cap { animation: none !important; opacity: 1; }
     .coach .ghost { display: none; }
-    .peek-wrap.peek { animation: none; }
   }
 
   .end { position: absolute; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; background: rgba(255,253,249,.92); flex-direction: column; gap: 20px; font-size: 28px; letter-spacing: 3px; }
@@ -270,7 +267,7 @@
   <div class="detail" id="detail"></div>
   <div class="detail extra" id="kpNote">
     <b>＋ Keypad hint</b>
-    Not a step. It comes on only when she taps a price field, whatever step she is on: a box around the price and the keypad (料金は変更できます / 入力後「決定」を). It goes when the keypad closes, and shows the first time only.
+    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the price and the keypad (料金は変更できます / 入力後「決定」を). It goes when the keypad closes, and shows the first time only.
     <div class="try"><span id="kpState"></span> <button class="chip" id="kpReset">Show it again</button></div>
   </div>
   <div class="replays" id="replays"></div>
@@ -469,7 +466,7 @@
 
     function clear() {
       clearTimeout(idleT); clearTimeout(onceT);
-      layer.classList.remove('go', 'once');
+      layer.classList.remove('go', 'once', 'fading');
       svg.innerHTML = '';
       nodes.forEach(function (n) { if (n.cap) n.cap.remove(); });
       var g = layer.querySelector('.ghost'); if (g) g.remove();
@@ -479,7 +476,7 @@
     function show(o) {
       clear();
       opts = o;
-      if (o.once) layer.classList.add('once');
+      if (o.once || o.plays) layer.classList.add('once');
       (o.targets || []).forEach(function (t) {
         var n = { t: t };
         if (t.shape && t.shape !== 'none') {
@@ -500,6 +497,17 @@
       play();
       /* once: one loop of the animation (about 4s), then onDone moves on. */
       if (o.once) onceT = setTimeout(function () { if (opts === o && o.onDone) o.onDone(); }, o.hold || 4000);
+      /* plays: draw and gesture o.plays times in a row (o.cycle ms each), then fade off. */
+      if (o.plays) {
+        var n = 1;
+        (function tick() {
+          onceT = setTimeout(function () {
+            if (opts !== o) return;
+            if (n < o.plays) { n++; play(); tick(); }
+            else { layer.classList.add('fading'); onceT = setTimeout(function () { if (opts === o) clear(); }, 700); }
+          }, o.cycle);
+        })();
+      }
     }
 
     function play() {
@@ -508,14 +516,14 @@
     }
     function armIdle() {
       clearTimeout(idleT);
-      if (!opts || opts.fade || opts.once) return;
+      if (!opts || opts.fade || opts.once || opts.plays) return;
       idleT = setTimeout(function () {
         if (!opts || replays >= 2) return;
         replays++; showReplays(); play();
       }, 8000);
     }
     function showReplays() {
-      $('replays').textContent = opts && !opts.fade && !opts.once ? 'Redrawn after no touch: ' + replays + ' / 2' : '';
+      $('replays').textContent = opts && !opts.fade && !opts.once && !opts.plays ? 'Redrawn after no touch: ' + replays + ' / 2' : '';
     }
 
     function place() {
@@ -649,13 +657,13 @@
     $('submitBtn').disabled = !(any || rejected);
     if (any || rejected) emit('canSubmit');
   }
-  function setActive(r, byTap) {
+  function setActive(r) {
     if (activeRow) activeRow.price.classList.remove('active');
     activeRow = r; freshPrice = true;
     if (r) r.price.classList.add('active');
     $('numpad').classList.toggle('on', !!r);
     setTimeout(Coach.place, 0);
-    if (r) emit('numpad', !!byTap);
+    if (r) emit('numpad');
   }
   function pending() { for (var i = 0; i < rows.length; i++) if (rows[i].on && !rows[i].v.textContent) return rows[i]; return null; }
   /* The existing shake, now with a caption saying why. */
@@ -682,7 +690,7 @@
       if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
       openTanzaku(r); return;
     }
-    if (onPrice) { setActive(r, true); return; }
+    if (onPrice) { setActive(r); return; }
     r.on = !r.on;
     if (r.on) emit('check', r);
     else { if (activeRow === r) setActive(null); emit('uncheck', r); }
@@ -768,26 +776,24 @@
      the action; hint() draws it; on(evt) returns true to move on.
      once:true hints play one loop, then move on by themselves. */
   var steps = [
-    { id: '2', group: 'Start', t: 'Koi pond', what: 'Ghost finger traces upward on the water.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
+    { id: '2', group: 'Start', t: 'Koi pond', what: 'Ghost finger traces upward on the water, with the caption beside it. No circle.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
       setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); },
-      hint: function () { Coach.show({ targets: [{ el: pond, shape: 'circle', pad: 26, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
+      hint: function () { Coach.show({ targets: [{ el: pond, shape: 'none', pad: 20, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
       on: function (e) { return e === 'koiDive'; } },
-    { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box around スワイプ→ only (the page dots are left out). Ghost finger drags left while the page slides 56px to show the next one, then springs back.', cap: '左へスワイプして、次のページへ', gone: 'First successful swipe.', try: 'Drag the page to the left.',
+    { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box drawn around スワイプ→ (not the dots) while a ghost finger drags left. Played twice in a row, then it fades off. No caption, and the page does not move.', cap: '— (none)', gone: 'Fades by itself after two plays; she can swipe at any time.', try: 'Drag the page to the left.',
       setup: function () { showScreen('scrPanels'); pCar.go(0, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
       enterNatural: function () { this.setup(); },
       hint: function () {
-        $('pPeek').classList.add('peek');
-        Coach.show({ targets: [{ el: $('pHintSwipe'), shape: 'box', pad: 16, text: '左へスワイプして、次のページへ', place: 'above' }], finger: { el: $('pCarousel'), kind: 'swipe', dy: 120 } });
+        Coach.show({ plays: 2, cycle: 2800, targets: [{ el: $('pHintSwipe'), shape: 'box', pad: 16 }], finger: { el: $('pCarousel'), kind: 'swipe', dy: 120 } });
       },
-      leave: function () { $('pPeek').classList.remove('peek'); },
       on: function (e, i) { return e === 'panel' && i > 0; } },
     { id: '4', t: 'Pages 2–5', what: 'No hint. The dots already show how far she is.', cap: '—', gone: '—', try: 'Keep swiping to the last page.',
       setup: function () { showScreen('scrPanels'); pCar.go(1, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
       hint: function () { Coach.clear(); },
       on: function (e, i) { return e === 'panel' && i === 5; } },
-    { id: '5', t: 'Scroll down', what: 'Box around ↓下へスクロール, with a ghost finger dragging upward. No caption: just the line drawing and the gesture.', cap: '— (none)', gone: 'She starts scrolling.', try: 'Drag up, use the mouse wheel, or tap the hint.',
+    { id: '5', t: 'Scroll down', what: 'Box drawn around ↓下へスクロール while a ghost finger drags upward. Played twice in a row, then it fades off. No caption.', cap: '— (none)', gone: 'Fades by itself after two plays; she can scroll at any time.', try: 'Drag up, use the mouse wheel, or tap the hint.',
       setup: function () { showScreen('scrPanels'); pCar.go(5, true); $('pHintSwipe').hidden = true; $('pHintScroll').hidden = false; },
-      hint: function () { Coach.show({ targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14 }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
+      hint: function () { Coach.show({ plays: 2, cycle: 3400, targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14 }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
       on: function (e) { return e === 'scrollDown'; } },
 
     { id: '6a', group: 'Service table (6a–6d each play once, then move on)', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap. One loop, then 6b.', cap: '○をタップすると選択できます', gone: 'After one loop (or sooner if she ticks a row).',
@@ -839,12 +845,12 @@
       hint: function () { Coach.clear(); },
       on: function () { return false; } },
 
-    { id: '8', group: 'Receipt', t: 'Change the stamp', what: 'After she stamps: a small circle around the stamp\'s × with a caption. Nothing is drawn before she stamps.', cap: '変更は印の×から', gone: 'She confirms, or unstamps.', try: 'Tap the stamp area, then try the ×.',
+    { id: '8', group: 'Receipt', t: 'Change the stamp', what: 'After she stamps: a small circle around the stamp\'s × with a caption. One cycle, then it fades off. Nothing is drawn before she stamps.', cap: '変更は印の×から', gone: 'Fades by itself after one cycle (also if she unstamps).', try: 'Tap the stamp area, then try the ×.',
       setup: function () { showScreen('scrReceipt'); buildReceipt(); setStamp(true); },
       enterNatural: function () { showScreen('scrReceipt'); buildReceipt(); },
       hint: function () {
         if (!stamped) { Coach.clear(); return; }
-        Coach.show({ targets: [{ el: $('stampX'), shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
+        Coach.show({ plays: 1, cycle: 3400, targets: [{ el: $('stampX'), shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
       },
       on: function (e) {
         if (e === 'stamp') { this.hint(); return false; }
@@ -858,8 +864,9 @@
   function idx(id) { for (var i = 0; i < steps.length; i++) if (steps[i].id === id) return i; return 0; }
 
   /* ============ KEYPAD HINT ============
-     Not a step: it comes on only when she taps a price field (the first
-     time), whatever step she is on, and goes when the keypad closes. */
+     Not a step: it comes on the first time the keypad appears (a tap on
+     any price, a preset or a custom service), whatever step she is on,
+     and goes when the keypad closes. */
   var kpShown = false, kpOn = false;
   function drawKeypadHint() {
     if (!activeRow) return;
@@ -897,7 +904,7 @@
       }
       return;
     }
-    if (evt === 'numpad' && data === true && !kpShown && $('scrTable').classList.contains('on')) {
+    if (evt === 'numpad' && !kpShown && $('scrTable').classList.contains('on')) {
       kpShown = true; kpOn = true; drawKeypadHint(); return;
     }
     if (s.on(evt, data)) next();
