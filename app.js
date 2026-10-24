@@ -13210,7 +13210,13 @@ var bambooGroves = [], bambooKey = '', bambooLook = -1, bambooBuiltAt = -1e9;
 function bamCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 /* How strongly a grove shows: the one behind the smaller tree (far) all day
    and night, the one behind the bigger tree (near) with the daylight. */
-function bambooAlpha(key) { return ENV.scene === 'autumn' && ENV.light ? (key === 'far' ? 1 : ENV.light.daylight) : 0; }
+/* The grove behind the smaller tree stays through the evening and the night; the one behind the
+   bigger tree is there by day only, gone by the time the golden hour (the evening) has begun. */
+function bambooAlpha(key) {
+  if (ENV.scene !== 'autumn' || !ENV.light) return 0;
+  if (key === 'far') return 1;
+  return ENV.light.daylight * (1 - smooth(ENV.sun.set - 1.6, ENV.sun.set - 0.9, S.hour));
+}
 /* The colours the bamboo is drawn in. At night they are lit like the far tree's
    foliage, only a little less (the lamps' own light is laid on top, bamGlow and
    drawGrove). */
