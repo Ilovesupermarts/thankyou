@@ -6692,7 +6692,7 @@ function renderIntroGlyph(text) {
 }
 
 function isBlossomInteractive() {
-  return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun && !startNoticeOpen;
+  return blossomScreen && blossomScreen.classList.contains('visible') && !introHasRun;
 }
 
 /* ============ START-SCREEN NOTICE ============
@@ -6705,14 +6705,22 @@ function showStartNotice() {
   var btn = document.getElementById('startNoticeBtn');
   if (!box || !btn || startNoticeOpen) return;
   startNoticeOpen = true;
+  blossomScreen.classList.add('notice-hold');
   ['pointerdown', 'pointermove', 'pointerup', 'touchstart', 'touchmove', 'touchend'].forEach(function(type) {
     box.addEventListener(type, function(e) { e.stopPropagation(); }, { passive: true });
   });
   btn.addEventListener('click', function() {
+    /* the box swallows the press, so the document's own first-touch
+       hook never sees it: start (or wake) the sound from here */
+    initSound();
+    if (soundAudioCtx && soundAudioCtx.state === 'suspended') { try { soundAudioCtx.resume(); } catch (e) {} }
     haptic(8);
     box.classList.add('text-out');
     setTimeout(function() {
       box.classList.add('closing');
+      /* the start screen's own text arrives as the box fades */
+      blossomScreen.classList.remove('notice-hold');
+      tryStartBlossomStream();
       setTimeout(function() {
         box.classList.remove('shown', 'closing');
         startNoticeOpen = false;
