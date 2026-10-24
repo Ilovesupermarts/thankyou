@@ -547,6 +547,7 @@ function buildControls() {
    times a second; the brightness and flicker are used as they are, each frame. */
 function changed(k) {
   save();
+  gateChangedAt = nowT;
   if (k === 'lightEvening' || k === 'lightNight') { if (V.timeOfDay !== 'day') gateDirty = true; return; }
   if (!(k in LIVE_KEYS)) gateDirty = true;
 }
@@ -612,7 +613,7 @@ document.getElementById('labToggle').addEventListener('click', function () {
 })();
 document.getElementById('btnReset').addEventListener('click', function () {
   var tod = V.timeOfDay;
-  L = clone(LDEF); L.timeOfDay = tod; save(); buildControls(); gateDirty = true;
+  L = clone(LDEF); L.timeOfDay = tod; save(); buildControls(); gateDirty = true; gateChangedAt = nowT;
 });
 
 /* ============================================================
@@ -1429,7 +1430,7 @@ function drawBamboo(key, t) {
    the horizon. The gates never move, so all of this is baked once into
    GATE; each frame just lays it down, behind the far tree.
    ============================================================ */
-var GATE = mk(), gateTop = 0, gateDirty = true, gateBakedAt = -1, gatePath = null, gateCount = 0, gateInfo = '';
+var GATE = mk(), gateTop = 0, gateDirty = true, gateBakedAt = -1, gateChangedAt = -1, gatePath = null, gateCount = 0, gateInfo = '';
 var GATE_BANDS = 6;
 function lensF() { return G.lens * W; }
 function toScreen(x, y, z) { var F = lensF(); return [W / 2 + F * x / z, H * V.horizon + F * (1 - y) / z]; }
@@ -1575,7 +1576,7 @@ function placePieces(pieces, g) {
    onto the leaves at the edges, and a few fallen leaves. The same mist
    as the ground is laid over it, so it melts into the horizon. Baked
    into GRAV, with the gates. */
-var GRAV = mk(), gravTop = 0;
+var GRAV = mk(), gravTop = 0, gravDirty = true;
 function bakeGravel(path) {
   if (!W || !G.gravel || !path || path.pts.length < 2) return;
   var hy = H * V.horizon, F = lensF(), h = G.gateHeight, r = rngFrom(97531);
@@ -1683,7 +1684,7 @@ function drawGravel() {
    lantern, made in the same bake), with a soft glow in the air around
    it and a pool of light on the ground under it.
    ============================================================ */
-var lanterns = [], lanternCount = 0;
+var lanterns = [], lanternCount = 0, MASK = mk(), MASKB = mk();   // the windows' masks: drawn, then softened
 function lanternPieces(lod, rs) {
   var h = L.size, n = Math.round(L.sides), off = PI / n, P = L.pillar * h, B = L.box * h, R = L.roof * h;
   var round = lod > 0.5 ? 12 : lod > 0.15 ? 8 : 6;
@@ -1791,10 +1792,13 @@ function bakeGates() {
   gateBakedAt = nowT;
   gatePath = null; gateCount = 0; gateInfo = ''; lanterns = []; lanternCount = 0;
   GATE.cnv.width = 1; GATE.cnv.height = 1;
-  GRAV.cnv.width = 1; GRAV.cnv.height = 1;
   if (!W) return;
   var path = gatePath = buildGatePath();
-  bakeGravel(path);
+  if (gravDirty) {                                     // the gravel does not change with the lanterns: only on a resize or a new time of day
+    GRAV.cnv.width = 1; GRAV.cnv.height = 1;
+    bakeGravel(path);
+    gravDirty = false;
+  }
   var hy = H * V.horizon, F = lensF(), C = {}, LC = {};
   for (var ck in G.colours) C[ck] = hex(G.colours[ck]);
   for (var lk in L.colours) LC[lk] = hex(L.colours[lk]);
@@ -1891,11 +1895,19 @@ function bakeGates() {
   }
   // the light the lanterns throw on what is near them (evening and night)
   var flame = LC.flame, reach = Math.max(0.1, L.reach * L.size), cast = L.castLight * lit;
+  // the lanterns in squares of the ground as wide as the light reaches, so each face only looks at the ones near it
+  var lampGrid = {};
+  if (cast > 0) lanterns.forEach(function (Lp) {
+    var key = Math.floor(Lp.x / reach) + ',' + Math.floor(Lp.z / reach);
+    (lampGrid[key] || (lampGrid[key] = [])).push(Lp);
+  });
   function lampLight(pc, cx, cy, cz, nx, ny, nz) {
     if (cast <= 0) return 0;
-    var sum = 0;
-    for (var i = 0; i < lanterns.length; i++) {
-      var Lp = lanterns[i];
+    var sum = 0, gx = Math.floor(cx / reach), gz = Math.floor(cz / reach);
+    for (var q = 0; q < 9; q++) {
+     var cell = lampGrid[(gx + q % 3 - 1) + ',' + (gz + Math.floor(q / 3) - 1)];
+     if (cell) for (var i = 0; i < cell.length; i++) {
+      var Lp = cell[i];
       if (pc.g === Lp && pc.part === 'box') continue;  // its own light box is lit from inside, through the windows
       var vx = Lp.x - cx, vy = Lp.ly - cy, vz = Lp.z - cz, d = Math.hypot(vx, vy, vz);
       if (d >= reach || d < 1e-6) continue;
@@ -1903,11 +1915,14 @@ function bakeGates() {
       if (lam <= 0) continue;
       var fall = 1 - d / reach;
       sum += lam * fall * fall;
+     }
     }
     return Math.min(1.2, sum) * cast;
   }
-  // a mask for each lit lantern: just the parts of its windows that are not hidden
-  var masks = [];
+  // the windows of the lit lanterns, on one canvas (MASK) over the part of the screen they cover: each window
+  // is added as it is drawn, and any face drawn later (nearer) over it rubs it out, so just the parts of the
+  // windows that are not hidden are left. Each lantern has its own box on it, for its own flicker.
+  var masks = [], ux0 = 1e9, uy0 = 1e9, ux1 = -1e9, uy1 = -1e9;
   if (lit > 0) lanterns.forEach(function (Lp) {
     var hb = L.box * L.size * 1.05, y0 = 0.595 * L.size, y1 = 0.745 * L.size, xs = [], ys = [];
     [[-hb, -hb], [hb, -hb], [hb, hb], [-hb, hb]].forEach(function (c) {
@@ -1919,12 +1934,31 @@ function bakeGates() {
     var pad = 2 + lerp(G.blurNear, G.blurFar, Lp.band / (GATE_BANDS - 1)) * 3;
     var bx0 = Math.min.apply(null, xs) - pad, by0 = Math.min.apply(null, ys) - pad;
     var bx1 = Math.max.apply(null, xs) + pad, by1 = Math.max.apply(null, ys) + pad;
-    if (bx1 < 0 || bx0 > W || by1 < 0 || by0 > H) return;
-    var M = mk(); M.cnv.width = Math.max(1, Math.ceil((bx1 - bx0) * PR)); M.cnv.height = Math.max(1, Math.ceil((by1 - by0) * PR));
-    M.c.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
-    Lp.mask = { M: M, x0: bx0, y0: by0, x1: bx1, y1: by1, on: false, area: 0, pad: pad };
+    bx0 = Math.max(bx0, -2); by0 = Math.max(by0, -2); bx1 = Math.min(bx1, W + 2); by1 = Math.min(by1, H + 2);
+    if (bx1 <= bx0 || by1 <= by0) return;
+    Lp.mask = { x0: bx0, y0: by0, x1: bx1, y1: by1, on: false, area: 0 };
+    ux0 = Math.min(ux0, bx0); uy0 = Math.min(uy0, by0); ux1 = Math.max(ux1, bx1); uy1 = Math.max(uy1, by1);
     masks.push(Lp);
   });
+  var maskGrid = {}, MCELL = 48, MC = null, mOp = '';
+  if (masks.length) {
+    MASK.cnv.width = Math.max(1, Math.ceil((ux1 - ux0) * PR)); MASK.cnv.height = Math.max(1, Math.ceil((uy1 - uy0) * PR));
+    MC = MASK.c;
+    MC.setTransform(PR, 0, 0, PR, -ux0 * PR, -uy0 * PR);
+    MC.lineWidth = 0.8;
+    masks.forEach(function (Lp) {                    // which squares of the screen each window box covers
+      var Mk = Lp.mask;
+      Mk.ax = Math.max(0, Math.floor((Mk.x0 - ux0) * PR)); Mk.ay = Math.max(0, Math.floor((Mk.y0 - uy0) * PR));
+      Mk.aw = Math.max(1, Math.min(MASK.cnv.width - Mk.ax, Math.ceil((Mk.x1 - Mk.x0) * PR)));
+      Mk.ah = Math.max(1, Math.min(MASK.cnv.height - Mk.ay, Math.ceil((Mk.y1 - Mk.y0) * PR)));
+      Mk.sx = ux0 + Mk.ax / PR; Mk.sy = uy0 + Mk.ay / PR;
+      for (var gx = Math.floor(Mk.x0 / MCELL); gx <= Math.floor(Mk.x1 / MCELL); gx++)
+        for (var gy = Math.floor(Mk.y0 / MCELL); gy <= Math.floor(Mk.y1 / MCELL); gy++) {
+          var key = gx + ',' + gy;
+          (maskGrid[key] || (maskGrid[key] = [])).push(Lp);
+        }
+    });
+  }
   function facePath(c, scr) {
     c.beginPath();
     for (var m = 0; m < scr.length; m++) { if (m) c.lineTo(scr[m][0], scr[m][1]); else c.moveTo(scr[m][0], scr[m][1]); }
@@ -1977,23 +2011,30 @@ function bakeGates() {
       c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
       facePath(c, scr); c.fill(); c.stroke();
       // the lanterns' masks: its own windows are added; anything drawn later (nearer) over a window hides it
-      if (masks.length) {
-        var fx0 = 1e9, fy0 = 1e9, fx1 = -1e9, fy1 = -1e9;
-        for (var e = 0; e < n; e++) { fx0 = Math.min(fx0, scr[e][0]); fx1 = Math.max(fx1, scr[e][0]); fy0 = Math.min(fy0, scr[e][1]); fy1 = Math.max(fy1, scr[e][1]); }
-        for (var mi = 0; mi < masks.length; mi++) {
-          var Mk = masks[mi].mask, own = masks[mi] === g && f.tone === 'w';
-          if (!own && !Mk.on) continue;
-          if (fx1 < Mk.x0 || fx0 > Mk.x1 || fy1 < Mk.y0 || fy0 > Mk.y1) continue;
-          var mc = Mk.M.c;
-          if (own) {
-            mc.globalCompositeOperation = 'source-over'; mc.fillStyle = '#fff';
-            Mk.on = true;
-            var ar = 0;
-            for (var e2 = 0; e2 < n; e2++) { var p1 = scr[e2], p2 = scr[(e2 + 1) % n]; ar += p1[0] * p2[1] - p2[0] * p1[1]; }
-            Mk.area += Math.abs(ar) / 2;
-          } else { mc.globalCompositeOperation = 'destination-out'; mc.fillStyle = '#000'; }
-          facePath(mc, scr); mc.fill();
-          if (!own) { mc.lineWidth = 0.8; mc.strokeStyle = '#000'; mc.stroke(); }
+      if (MC) {
+        if (glowing && g.mask) {
+          if (mOp !== 'add') { MC.globalCompositeOperation = 'source-over'; MC.fillStyle = '#fff'; mOp = 'add'; }
+          g.mask.on = true;
+          var ar = 0;
+          for (var e2 = 0; e2 < n; e2++) { var p1 = scr[e2], p2 = scr[(e2 + 1) % n]; ar += p1[0] * p2[1] - p2[0] * p1[1]; }
+          g.mask.area += Math.abs(ar) / 2;
+          facePath(MC, scr); MC.fill();
+        } else {
+          // over a window already drawn? then it rubs out what it covers (once, whichever lanterns' windows those are)
+          var fx0 = 1e9, fy0 = 1e9, fx1 = -1e9, fy1 = -1e9, hit = false;
+          for (var e = 0; e < n; e++) { fx0 = Math.min(fx0, scr[e][0]); fx1 = Math.max(fx1, scr[e][0]); fy0 = Math.min(fy0, scr[e][1]); fy1 = Math.max(fy1, scr[e][1]); }
+          for (var gx2 = Math.floor(fx0 / MCELL); gx2 <= Math.floor(fx1 / MCELL) && !hit; gx2++)
+            for (var gy2 = Math.floor(fy0 / MCELL); gy2 <= Math.floor(fy1 / MCELL) && !hit; gy2++) {
+              var cellM = maskGrid[gx2 + ',' + gy2];
+              if (cellM) for (var mi = 0; mi < cellM.length; mi++) {
+                var Mk = cellM[mi].mask;
+                if (Mk.on && fx1 >= Mk.x0 && fx0 <= Mk.x1 && fy1 >= Mk.y0 && fy0 <= Mk.y1) { hit = true; break; }
+              }
+            }
+          if (hit) {
+            if (mOp !== 'cut') { MC.globalCompositeOperation = 'destination-out'; MC.fillStyle = MC.strokeStyle = '#000'; mOp = 'cut'; }
+            facePath(MC, scr); MC.fill(); MC.stroke();
+          }
         }
       }
     });
@@ -2026,21 +2067,32 @@ function bakeGates() {
   }
   o.filter = 'none';
   // each lantern's mask: how much of its windows can be seen, then softened as its depth of field
-  masks.forEach(function (Lp) {
-    var Mk = Lp.mask;
-    if (!Mk.on || Mk.area <= 0) { Lp.mask = null; Lp.vis = 0; return; }
-    var w = Mk.M.cnv.width, hh = Mk.M.cnv.height, data = Mk.M.c.getImageData(0, 0, w, hh).data, sum = 0;
-    for (var i = 3; i < data.length; i += 4) sum += data[i];
-    Lp.vis = clamp(sum / 255 / (PR * PR) / Mk.area, 0, 1);
-    if (Lp.vis < 0.01) { Lp.mask = null; return; }
-    var bl = lerp(G.blurNear, G.blurFar, Lp.band / (GATE_BANDS - 1)) + 0.6;
-    var Out = mk(); Out.cnv.width = w; Out.cnv.height = hh;
-    Out.c.filter = 'blur(' + (bl * PR).toFixed(2) + 'px)';
-    Out.c.drawImage(Mk.M.cnv, 0, 0);
-    Out.c.filter = 'none';
-    Mk.M.cnv.width = Mk.M.cnv.height = 1;
-    Mk.M = Out;
-  });
+  if (masks.length) {
+    var data = MASK.c.getImageData(0, 0, MASK.cnv.width, MASK.cnv.height).data, AWd = MASK.cnv.width;
+    MASKB.cnv.width = MASK.cnv.width; MASKB.cnv.height = MASK.cnv.height;
+    var mb = MASKB.c, byBand = {};
+    masks.forEach(function (Lp) {
+      var Mk = Lp.mask;
+      if (!Mk.on || Mk.area <= 0) { Lp.mask = null; Lp.vis = 0; return; }
+      var sum = 0;
+      for (var yy = Mk.ay; yy < Mk.ay + Mk.ah; yy++) for (var xx = Mk.ax, ii = (yy * AWd + xx) * 4 + 3; xx < Mk.ax + Mk.aw; xx++, ii += 4) sum += data[ii];
+      Lp.vis = clamp(sum / 255 / (PR * PR) / Mk.area, 0, 1);
+      if (Lp.vis < 0.01) { Lp.mask = null; return; }
+      (byBand[Lp.band] || (byBand[Lp.band] = [])).push(Mk);
+    });
+    // softened as their depth of field: one pass for all the masks of each step of blur
+    for (var bb in byBand) {
+      var bl = lerp(G.blurNear, G.blurFar, bb / (GATE_BANDS - 1)) + 0.6;
+      mb.save();
+      mb.beginPath();
+      byBand[bb].forEach(function (Mk) { mb.rect(Mk.ax, Mk.ay, Mk.aw, Mk.ah); });
+      mb.clip();
+      mb.filter = 'blur(' + (bl * PR).toFixed(2) + 'px)';
+      mb.drawImage(MASK.cnv, 0, 0);
+      mb.restore();
+    }
+    MASK.cnv.width = MASK.cnv.height = 1;
+  }
   lanterns.forEach(function (Lp) {
     var sp = toScreen(Lp.x, Lp.ly, Lp.z), ft = toScreen(Lp.x, 0, Lp.z);
     Lp.sx = sp[0]; Lp.sy = sp[1]; Lp.fx = ft[0]; Lp.fy = ft[1];
@@ -2142,7 +2194,8 @@ function drawLanternGlow(t) {
     if (Lp.mask && L.windowGlow > 0) {               // the windows brighten and dim
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = clamp(L.windowGlow * lit * 0.55 * fl * fade, 0, 1);
-      ctx.drawImage(Lp.mask.M.cnv, Math.round(Lp.mask.x0 * PR), Math.round(Lp.mask.y0 * PR));
+      var Mq = Lp.mask;
+      ctx.drawImage(MASKB.cnv, Mq.ax, Mq.ay, Mq.aw, Mq.ah, Math.round(Mq.sx * PR), Math.round(Mq.sy * PR), Mq.aw, Mq.ah);
       ctx.globalAlpha = 1;
     }
     var r = L.haloSize * Lp.px * 0.5;
@@ -4895,6 +4948,7 @@ function rebuildAll() {
   bakeOwlSprites();
   resetAnimSets();
   buildGroves();
+  gravDirty = true;
   bakeGates();
 }
 
@@ -4913,7 +4967,8 @@ function frame(now) {
   updateAnimals(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
-  if (gateDirty && t - gateBakedAt > 0.12) bakeGates();   // a change on the panel, at most about 8 times a second
+  // a change on the panel: baked once the slider has paused for a moment, or at most twice a second while it moves
+  if (gateDirty && (t - gateChangedAt > 0.18 || t - gateBakedAt > 0.5)) bakeGates();
   if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = gateInfo; }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
