@@ -1229,6 +1229,7 @@ function applyTheme(theme) {
      theme. */
   // the swipe hint and dots sit higher in autumn and winter (see repositionHintGroup)
   if (typeof panels !== 'undefined' && panels && typeof stage !== 'undefined' && stage) repositionHintGroup();
+  if (typeof repositionTySwipeHint === 'function') repositionTySwipeHint();
   var isCarouselRunning = mapleLeaves && mapleLeaves.classList.contains('active');
   if (isCarouselRunning) {
     startAmbient();
@@ -4679,6 +4680,7 @@ window.addEventListener('resize', function() {
   tyRefWidth = Math.min(window.innerWidth, 600);
   tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
   repositionHintGroup();
+  repositionTySwipeHint();
   repositionNumpad();
   updateNumpadVisibility();
 });
@@ -4721,6 +4723,11 @@ function repositionHintGroup() {
   if (currentTheme === 'autumn') {
     var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
     dotsBottom += lift; hintBottom += lift;
+    // The hint then moves up to sit just under the longest message (about
+    // 40px below it), in the open sky above the torii, and never lower than
+    // just above the dots.
+    var hintUnderText = stageHeight - textBottom - 40 - 22;
+    hintBottom = Math.max(hintUnderText, dotsBottom + dotsH + 12);
   }
   // Winter: clear of the snowdrift (as placed on winter.html: dots at least 140px up, hint 208px).
   if (currentTheme === 'winter') {
@@ -9189,8 +9196,26 @@ var tyStageWidth = window.innerWidth;
 var tyRefWidth = Math.min(window.innerWidth, 600);
 var tyExited = false;
 
+/* Autumn: the thank-you swipe hint sits just under the longest of the four
+   screens' text (about 40px below it), clear of the torii and lanterns. In
+   the other themes the stylesheet position applies. */
+function repositionTySwipeHint() {
+  if (!tySwipeHint || !thankyouScreen) return;
+  if (currentTheme !== 'autumn') { tySwipeHint.style.bottom = ''; return; }
+  var screenRect = thankyouScreen.getBoundingClientRect();
+  if (screenRect.height <= 0) return;
+  var contents = thankyouScreen.querySelectorAll('.ty-panel-content');
+  var lowest = 0;
+  for (var i = 0; i < contents.length; i++) {
+    var b = contents[i].getBoundingClientRect().bottom - screenRect.top;
+    if (b > lowest) lowest = b;
+  }
+  if (lowest <= 0) return;
+  tySwipeHint.style.bottom = Math.max(0, screenRect.height - lowest - 40 - 22) + 'px';
+}
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
+  repositionTySwipeHint();
   if (tyExited) { tySwipeHint.classList.remove('shown'); return; }
   if (tyCurrentPanel === TY_TOTAL_PANELS - 1) tySwipeHintLabel.textContent = 'もう一度スワイプ';
   else tySwipeHintLabel.textContent = 'スワイプ';
