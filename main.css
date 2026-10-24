@@ -1327,6 +1327,15 @@
   }
   .intro-overlay.finishing .name-char { animation: inkFade 1.4s cubic-bezier(0.4, 0, 0.6, 1) both; }
   .intro-overlay.finishing { pointer-events: none; }   /* the first panel is usable while the name fades */
+  /* The name written stroke by stroke (renderIntroGlyph in app.js): each
+     character is a canvas the size of the old span with its padding, so
+     the layout is the same. The script does the writing; only the
+     fade-out (inkFade, above) runs here. */
+  .name-char.name-char-drawn {
+    width: 1.6em; height: 1.6em; padding: 0;
+    opacity: 1; animation: none; text-shadow: none;
+    -webkit-mask-image: none; mask-image: none;
+  }
 
   /* ============ MAIN CAROUSEL ============ */
   .stage { position: relative; z-index: 9; height: 100vh; width: 100%; overflow: hidden; touch-action: pan-y; perspective: 1200px; }
@@ -4029,7 +4038,7 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .price-input::placeholder { font-size: 13px; }
 .reset { font-size: 14px; padding: 13px 20px; min-height: 48px; }
 .submit-btn { font-size: 16px; padding: 13px 24px; min-height: 48px; }
-:root { --build: "v146"; }
+:root { --build: "v147"; }
 
 
 /* ============ START-SCREEN NOTICE ============
