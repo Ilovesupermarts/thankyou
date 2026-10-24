@@ -1,4 +1,4 @@
-var BUILD = 'v145';
+var BUILD = 'v146';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -14230,7 +14230,9 @@ var TOR_LEAF_TONES = [KOYO_FAMILIES.red[1], KOYO_FAMILIES.red[2], KOYO_FAMILIES.
 var torLanterns = [], torLanternCount = 0;      // the lanterns on the screen, as last baked
 function torLanternPieces(lod, rs) {
   var h = LANT.size, n = Math.round(LANT.sides), off = PI / n, P = LANT.pillar * h, B = LANT.box * h, R = LANT.roof * h;
-  var round = lod > 0.5 ? 12 : lod > 0.15 ? 8 : 6;
+  // detail by size on the screen (lod: its height / 90 px): the far ones, only a few px tall, are built
+  // from far fewer faces (no rings, petals, curls or jewel detail), which cannot be seen at that size
+  var round = lod > 0.5 ? 12 : lod > 0.2 ? 8 : lod > 0.08 ? 6 : 4, full = lod > 0.3, tiny = lod <= 0.1;
   var pieces = [];
   function ring(cx, cz, y, r, k, o) {
     var out = [];
@@ -14262,18 +14264,26 @@ function torLanternPieces(lod, rs) {
   var yPl = 0.035 * h, yBa = 0.085 * h, yNk = 0.105 * h, yR1 = 0.27 * h, yR2 = 0.3 * h, rH = 0.014 * h, yPt = 0.5 * h;
   var yLo = 0.565 * h, yLb = 0.595 * h, yBx = 0.745 * h, yEv = 0.77 * h, yRf = 0.875 * h;
   // plinth and base
-  frustum(0, yPl, B * 1.9, B * 1.86, n, off, 'm', { top: true });
-  frustum(yPl, yBa, B * 1.5, B * 1.2, n, off, 'm', { top: true });
-  frustum(yBa, yNk, P * 1.3, P * 1.08, round, 0, 's', { top: true });
+  if (tiny) frustum(0, yBa, B * 1.9, B * 1.2, n, off, 'm', { top: true });
+  else {
+    frustum(0, yPl, B * 1.9, B * 1.86, n, off, 'm', { top: true });
+    frustum(yPl, yBa, B * 1.5, B * 1.2, n, off, 'm', { top: true });
+    frustum(yBa, yNk, P * 1.3, P * 1.08, round, 0, 's', { top: true });
+  }
   // the pillar, with two rings round it
-  frustum(yNk, yR1, P, P * 0.97, round, 0, 's');
-  frustum(yR1, yR1 + rH, P * 1.13, P * 1.13, round, 0, 's', { top: true });
-  frustum(yR1 + rH, yR2, P * 0.965, P * 0.96, round, 0, 's');
-  frustum(yR2, yR2 + rH, P * 1.12, P * 1.12, round, 0, 's', { top: true });
-  frustum(yR2 + rH, yPt, P * 0.955, P * 0.92, round, 0, 's');
+  if (full) {
+    frustum(yNk, yR1, P, P * 0.97, round, 0, 's');
+    frustum(yR1, yR1 + rH, P * 1.13, P * 1.13, round, 0, 's', { top: true });
+    frustum(yR1 + rH, yR2, P * 0.965, P * 0.96, round, 0, 's');
+    frustum(yR2, yR2 + rH, P * 1.12, P * 1.12, round, 0, 's', { top: true });
+    frustum(yR2 + rH, yPt, P * 0.955, P * 0.92, round, 0, 's');
+  } else frustum(tiny ? yBa : yNk, yPt, P, P * 0.92, round, 0, 's');
   // the lotus platform: petals flaring out, then a band
-  frustum(yPt, yLo, P * 1.05, B * 1.55, Math.max(n * 3, round + 4), 0, 's', { alt: 'd' });
-  frustum(yLo, yLb, B * 1.55, B * 1.5, n, off, 's', { top: true });
+  if (tiny) frustum(yPt, yLb, P * 1.05, B * 1.5, n, off, 's', { top: true });
+  else {
+    frustum(yPt, yLo, P * 1.05, B * 1.55, full ? Math.max(n * 3, round + 4) : n, full ? 0 : off, 's', full ? { alt: 'd' } : {});
+    frustum(yLo, yLb, B * 1.55, B * 1.5, n, off, 's', { top: true });
+  }
   // the light box, its windows facing the path and the other sides
   frustum(yLb, yBx, B, B, n, off, 'b', { windows: 0.66, part: 'box' });
   // the roof: the eaves, the slope up to the top, and the corners curling up
@@ -14286,7 +14296,8 @@ function torLanternPieces(lod, rs) {
     });
   }
   // the jewel on top
-  var J = [[yRf, 0.035], [0.9 * h, 0.04], [0.925 * h, 0.052], [0.952 * h, 0.05], [0.976 * h, 0.032], [h, 0.002]];
+  var J = full ? [[yRf, 0.035], [0.9 * h, 0.04], [0.925 * h, 0.052], [0.952 * h, 0.05], [0.976 * h, 0.032], [h, 0.002]]
+               : tiny ? [[yRf, 0.045], [h, 0.002]] : [[yRf, 0.035], [0.925 * h, 0.052], [h, 0.002]];
   for (var j = 0; j < J.length - 1; j++) frustum(J[j][0], J[j + 1][0], J[j][1] * h, J[j + 1][1] * h, round, 0, 's', { top: j === J.length - 2 });
   // a few fallen leaves on the roof and the base, as in the photos
   pieces.leaves = [];
@@ -14465,8 +14476,11 @@ function torBake() {
   // the windows of the lit lanterns, on one canvas (TOR.mask) over the part of the screen they cover: each window
   // is added as it is drawn, and any face drawn later (nearer) over it rubs it out, so just the parts of the
   // windows that are not hidden are left. Each lantern has its own box on it, for its own flicker.
+  // Only made from the golden hour to the morning (the lamps are out all through the morning and the day,
+  // so there is nothing to flicker), and ready before they come on.
   var masks = [], ux0 = 1e9, uy0 = 1e9, ux1 = -1e9, uy1 = -1e9;
-  torLanterns.forEach(function (Lp) {
+  var lightsSoon = lit > 0 || (ENV.light && ENV.light.phase !== 'morning' && ENV.light.phase !== 'day');
+  if (lightsSoon) torLanterns.forEach(function (Lp) {
     var hb = LANT.box * LANT.size * 1.05, y0 = 0.595 * LANT.size, y1 = 0.745 * LANT.size, xs = [], ys = [];
     [[-hb, -hb], [hb, -hb], [hb, hb], [-hb, hb]].forEach(function (c) {
       [y0, y1].forEach(function (y) {
@@ -14636,7 +14650,7 @@ function torBake() {
       mb.restore();
     }
     TOR.mask.cnv.width = TOR.mask.cnv.height = 1;
-  }
+  } else TOR.maskB.cnv.width = TOR.maskB.cnv.height = 1;   // no masks by day: last night's is let go
   torLanterns.forEach(function (Lp) {
     var sp = torScreen(Lp.x, Lp.ly, Lp.z), ft = torScreen(Lp.x, 0, Lp.z);
     Lp.sx = sp[0]; Lp.sy = sp[1]; Lp.fx = ft[0]; Lp.fy = ft[1];
