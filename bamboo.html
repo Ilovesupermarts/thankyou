@@ -5181,7 +5181,7 @@ function drawSunSky(t, dt) {
   else if (!nightNow && nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
   var eve = V.timeOfDay === 'evening';
   var top = eve ? mix(target.top, [255, 196, 160], 0.35) : target.top, shade = eve ? mix(target.shade, [170, 120, 140], 0.4) : target.shade;
-  if (nightNow) { top = scale(target.top, 0.35); shade = scale(target.shade, 0.3); }
+  if (nightNow) { top = mix(target.top, [150, 158, 196], 0.6); shade = mix(target.shade, [96, 102, 142], 0.6); }   // pale and bluish: moonlit, never a dark blot
   if (top.join() + shade.join() !== cloudColKey) bakeClouds(top, shade);
   var P = sunPlace(), X = P.x, Y = P.y, R = P.R;
   var c = ctx;
@@ -5189,7 +5189,7 @@ function drawSunSky(t, dt) {
   c.globalAlpha = 1;
 
   // the veil over the sky
-  var va = cur.veil * SUN.veil * (nightNow ? 0.4 : 1);
+  var va = nightNow ? 0 : cur.veil * SUN.veil;      // no dark sheet over the sky at night
   if (va > 0.003) {
     var vc = nightNow ? scale(cur.veilCol, 0.35) : cur.veilCol, hz = H * V.horizon;
     var vg = c.createLinearGradient(0, 0, 0, hz);
@@ -5201,7 +5201,7 @@ function drawSunSky(t, dt) {
   var shown = Math.round(cur.clouds * clouds.length), occl = 0, wind = (0.5 + 0.5 * V.wind) * SUN.cloudSpeed;
   for (var i = 0; i < clouds.length; i++) {
     var Cl = clouds[i];
-    var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) : 0;
+    var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) * (nightNow ? 0.22 : 1) : 0;   // faint at night, so the text stays readable
     Cl.a += (want - Cl.a) * (1 - Math.exp(-dt / 1.2));
     var cw = 300 * Cl.s * SUN.cloudSize * cur.cloudScale, ch = cw * 170 / 360;
     Cl.x += (5 + 9 * Cl.v) * wind * dt / W;
