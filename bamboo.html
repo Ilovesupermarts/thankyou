@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Stone Lantern Lab</title>
+<title>Sun Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,20 +14,15 @@
 
 <style>
   /* ============================================================
-     STONE LANTERN LAB — a copy of landscape.html, used as the test bed
-     for Japanese stone lanterns (tōrō) beside the gravel path of the
-     autumn scene, one in the gap between two torii gates. Preview only.
-     Everything from landscape.html is still here and runs on its
-     approved values (mountains, Fuji, mist, fallen leaves, the two
-     trees, the bamboo groves), with no controls.
-     The torii gates and the gravel path are fixed, placed and drawn
-     exactly as in the app (TORII in app.js). The lanterns are built in
-     3D with them (section 6d), so gates and lanterns overlap as they
-     really would. In the evening and at night they are lit: the paper
-     windows glow and flicker, with a soft glow around each and a pool
-     of light on the ground. Every control on the panel is for the
-     lanterns; Day / Evening / Night switch the time of day. Nothing in
-     app.js is used or changed.
+     SUN LAB — a copy of landscape.html (with the bamboo, gates and
+     stone lanterns), now the test bed for the sun. Preview only.
+     Everything else in the scene runs on its approved values, with no
+     controls. Every control on the panel is for the sun (section 13):
+     the weather it is seen through (clear, a few clouds, sun and cloud,
+     thin high cloud, cloudy, haze, rain, snow), where it is, the disc,
+     the glow, the streaks, their movement, and the lens effects.
+     Day / Evening / Night switch the time of day (no sun at night).
+     Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -190,7 +185,7 @@
 
 <div class="lab" id="lab">
   <div class="lab-head">
-    <h3><span class="lab-grip" aria-hidden="true">⠿</span>🏮 Stone Lantern Lab</h3>
+    <h3><span class="lab-grip" aria-hidden="true">⠿</span>☀️ Sun Lab</h3>
     <button type="button" id="labToggle">Hide</button>
   </div>
   <div class="lab-body" id="labBody">
@@ -381,12 +376,9 @@ var G = {
 };
 
 /* ============================================================
-   2. STONE LANTERN LAB — every control on the panel is for the stone
-   lanterns (tōrō) standing beside the gravel path, one in the gap
-   between two gates (section 6d). The stone is baked with the gates;
-   the light in them (evening and night) flickers every frame. Values
-   are kept in this browser; "Copy values" gives them in words and as
-   JSON.
+   2. THE STONE LANTERNS (tōrō) beside the gravel path, one in the gap
+   between two gates (section 6d), on the values approved on the
+   tablet. They have no controls any more: the panel is for the sun.
    ============================================================ */
 var LANTERN_COLOURS = { stone: '#B3ADA3', stoneShade: '#5F5B56', moss: '#6E7A4C', paper: '#F4EEE2',
                         flame: '#FFAE52', glow: '#FFD89A' };
@@ -406,79 +398,153 @@ var LDEF = {
   // the flicker
   flicker: 0.5, flickerEvery: 9, flickerLength: 1.2, flickerSpeed: 1, wobble: 0.35, windFlicker: 1
 };
-var L = clone(LDEF);
-var STORE_KEY = 'stoneLanternLabValues1';
+var L = clone(LDEF);           // the lanterns run on their approved values; they have no controls any more
+
+/* ============================================================
+   2b. SUN LAB — every control on the panel is for the sun (section
+   13). The sun is drawn every frame, behind the mountains: a small
+   white-hot core, a soft glow that fades out smoothly (no visible
+   rings), a wide faint brightening of the sky around it, thin streaks
+   of uneven length, fine spikes round the core, a few broad soft
+   beams, faint lens ghosts, and the weather in front of it. Values are
+   kept in this browser; "Copy values" gives them in words and as JSON.
+   ============================================================ */
+var SUN_COLOURS = { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' };
+var SUN_COLOUR_NAMES = [['core', 'Core'], ['glow', 'Glow and streaks'], ['haze', 'Wide sky glow'],
+                        ['low', 'Low sun (sunrise, sunset)'], ['ghost', 'Lens ghosts']];
+/* What each kind of weather does to the sun (multipliers on the values
+   below, so the sliders always set the look on a clear day):
+   core / blur — how much of the bright disc shows, and how much it is
+   spread into a dull patch; glow, glowSize, haze — the glows; rays — the
+   streaks, spikes and beams; clouds — how much of the sky the drifting
+   clouds cover; veil — a sheet of cloud or haze over the whole sky;
+   ring — the halo seen through thin high cloud. */
+var CONDITIONS = {
+  clear:  { jp: '快晴', en: 'Clear', core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 1, ring: 0,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
+  sunny:  { jp: '晴れ', en: 'Sunny, a few clouds', core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 0.9, ring: 0,
+            clouds: 0.3, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
+  partly: { jp: '晴れ時々曇り', en: 'Sun and cloud', core: 1, blur: 0, glow: 0.95, glowSize: 1, haze: 1, rays: 0.9, ghosts: 0.7, ring: 0,
+            clouds: 0.7, cloudScale: 1.2, cloudAlpha: 0.92, veil: 0.08, veilCol: [244, 244, 250], top: [255, 255, 255], shade: [186, 186, 204] },
+  thin:   { jp: '薄曇り', en: 'Thin high cloud', core: 0.85, blur: 0.3, glow: 1.1, glowSize: 1.4, haze: 1.4, rays: 0.2, ghosts: 0.25, ring: 1,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.32, veilCol: [244, 245, 250], top: [255, 255, 255], shade: [214, 214, 226] },
+  cloudy: { jp: '曇り', en: 'Cloudy', core: 0.4, blur: 1, glow: 0.55, glowSize: 1.8, haze: 0.8, rays: 0, ghosts: 0, ring: 0,
+            clouds: 1, cloudScale: 1.7, cloudAlpha: 0.95, veil: 0.5, veilCol: [218, 216, 226], top: [240, 238, 244], shade: [150, 148, 166] },
+  mist:   { jp: '霞', en: 'Haze or mist', core: 0.7, blur: 0.15, glow: 0.7, glowSize: 2, haze: 1.7, rays: 0.05, ghosts: 0, ring: 0,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.45, veilCol: [250, 246, 240], top: [255, 255, 255], shade: [220, 216, 220] },
+  rain:   { jp: '雨', en: 'Rain', core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0,
+            clouds: 0.85, cloudScale: 1.9, cloudAlpha: 0.95, veil: 0.75, veilCol: [178, 180, 194], top: [206, 206, 216], shade: [122, 122, 140] },
+  snow:   { jp: '雪', en: 'Snow', core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0,
+            clouds: 0.6, cloudScale: 1.5, cloudAlpha: 0.9, veil: 0.7, veilCol: [228, 230, 238], top: [244, 244, 248], shade: [172, 174, 190] }
+};
+var SDEF = {
+  timeOfDay: 'day',
+  show: true, strength: 1,
+  // where it is
+  across: 0.55, below: 18, altitude: 40, eveningAltitude: 3,
+  // the sun itself
+  coreSize: 20, coreSoftness: 0.55, coreBrightness: 1,
+  // the glow
+  glow: 1.2, glowSize: 8, glowFalloff: 1, haze: 0.45, hazeSize: 24, warmth: 0,
+  // the streaks
+  streaks: 14, streakLength: 11, streakVariety: 0.75, longStreaks: 3, streakWidth: 1.1, streakStrength: 0.7,
+  spikes: 30, spikeLength: 2.4, spikeStrength: 0.7,
+  beams: 4, beamStrength: 0.22, beamWidth: 1,
+  irregular: 0.75, seed: 3,
+  // movement
+  turn: 4, shimmer: 0.45, shimmerSpeed: 1,
+  // lens
+  ghosts: 0.35, ghostSize: 1, ring: 0.5, ringSize: 9,
+  // weather
+  condition: 'clear', cloudSpeed: 1, cloudSize: 1, cloudBlock: 0.85, veil: 1,
+  colours: clone(SUN_COLOURS)
+};
+var SUN = clone(SDEF);
+var STORE_KEY = 'sunLabValues1';
 try {
   var saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null');
   if (saved && typeof saved === 'object') {
     for (var sk in saved) {
-      if (sk === 'colours') { for (var ck in saved.colours) if (ck in L.colours) L.colours[ck] = saved.colours[ck]; }
-      else if (sk in L) L[sk] = saved[sk];
+      if (sk === 'colours') { for (var ck in saved.colours) if (ck in SUN.colours) SUN.colours[ck] = saved.colours[ck]; }
+      else if (sk in SUN) SUN[sk] = saved[sk];
     }
   }
+  if (!(SUN.condition in CONDITIONS)) SUN.condition = SDEF.condition;
 } catch (e) {}
-V.timeOfDay = L.timeOfDay;
+V.timeOfDay = L.timeOfDay = SUN.timeOfDay;
 document.documentElement.setAttribute('data-time', V.timeOfDay);
-function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(L)); } catch (e) {} }
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(SUN)); } catch (e) {} }
 
 var GROUPS = [
-  { title: 'Where they stand', ctls: [
-    { k: 'show', label: 'Show the stone lanterns', type: 'check' },
-    { k: 'every', label: 'One lantern in every … gap between gates', min: 1, max: 6, step: 1,
-      hint: '1 = one between every two gates; 2 = every other gap, and so on.' },
-    { k: 'side', label: 'Side of the path', type: 'select',
-      options: [['right', 'Right (the near side along the far run)'], ['left', 'Left (the far side)'],
-                ['alternate', 'Changing sides each time'], ['both', 'Both sides']],
-      hint: 'Left and right as you walk along the path toward the gate that faces you.' },
-    { k: 'rightAlong', label: 'Right side: where in the gap between two gates', min: 0, max: 1, step: 0.01,
-      hint: '0 = right by the gate further along the path from you, 0.5 = halfway, 1 = right by the gate nearer you.' },
-    { k: 'rightFromEdge', label: 'Right side: gap from the edge of the gravel (× lantern height)', min: 0, max: 1.5, step: 0.01 },
-    { k: 'leftAlong', label: 'Left side: where in the gap between two gates', min: 0, max: 1, step: 0.01,
-      hint: 'The same, for the lanterns on the left.' },
-    { k: 'leftFromEdge', label: 'Left side: gap from the edge of the gravel (× lantern height)', min: 0, max: 1.5, step: 0.01 }
+  { title: 'Weather', ctls: [
+    { k: 'condition', label: 'What the sky is doing', type: 'select',
+      options: Object.keys(CONDITIONS).map(function (c) { return [c, CONDITIONS[c].jp + ' — ' + CONDITIONS[c].en]; }),
+      hint: 'The sliders below set the sun on a clear day; the weather then dims, spreads or hides it. It changes over a couple of seconds, as real weather would.' },
+    { k: 'cloudSpeed', label: 'How fast the clouds drift', min: 0, max: 4, step: 0.05 },
+    { k: 'cloudSize', label: 'Size of the clouds', min: 0.4, max: 2.5, step: 0.05 },
+    { k: 'cloudBlock', label: 'How much a cloud hides the sun as it passes', min: 0, max: 1, step: 0.01,
+      hint: 'The glow still shows through a little and lights the cloud\'s edges.' },
+    { k: 'veil', label: 'Strength of the sheet of cloud or haze over the sky', min: 0, max: 2, step: 0.01,
+      hint: 'Only in thin cloud, cloud, haze, rain and snow.' }
   ]},
-  { title: 'The lantern', ctls: [
-    { k: 'size', label: 'Height (× eye height)', min: 0.5, max: 2.2, step: 0.01,
-      hint: '1.15 = a lantern about 2 m tall, against gates of 2.78.' },
-    { k: 'sides', label: 'Sides of the light box and roof', min: 4, max: 8, step: 2, hint: '4 = square, 6 = six-sided, 8 = eight-sided.' },
-    { k: 'pillar', label: 'Pillar thickness (× height)', min: 0.04, max: 0.12, step: 0.002 },
-    { k: 'box', label: 'Light box size (× height)', min: 0.06, max: 0.16, step: 0.002 },
-    { k: 'roof', label: 'Roof width (× height)', min: 0.12, max: 0.32, step: 0.005 },
-    { k: 'curls', label: 'Curled-up roof corners', type: 'check' },
-    { k: 'moss', label: 'Moss on the stone', min: 0, max: 1, step: 0.01 },
-    { k: 'variety', label: 'How much each lantern differs (age, weathering)', min: 0, max: 1, step: 0.01 },
-    { k: 'roofLeaves', label: 'Fallen leaves on the roofs and bases', min: 0, max: 3, step: 0.05 },
+  { title: 'Where it is', ctls: [
+    { k: 'show', label: 'Show the sun', type: 'check' },
+    { k: 'strength', label: 'Overall strength', min: 0, max: 1.5, step: 0.01 },
+    { k: 'across', label: 'Across the screen (0 = left, 1 = right)', min: 0, max: 1, step: 0.005,
+      hint: 'In the app this follows the real sun: east on the right in the morning, west on the left in the afternoon.' },
+    { k: 'below', label: 'Gap below the toolbar (px)', min: 0, max: 300, step: 1, hint: 'The app uses 18.' },
+    { k: 'altitude', label: 'Height above the horizon by day (°)', min: 0, max: 80, step: 1,
+      hint: 'Low = bigger, warmer and softer, as at sunrise and sunset. Nagoya at noon: about 32° in winter, 78° in summer.' },
+    { k: 'eveningAltitude', label: 'Height above the horizon in the evening (°)', min: 0, max: 15, step: 0.5 }
+  ]},
+  { title: 'The sun itself', ctls: [
+    { k: 'coreSize', label: 'Size of the bright disc (radius, px)', min: 6, max: 60, step: 0.5 },
+    { k: 'coreSoftness', label: 'Softness of its edge', min: 0, max: 1, step: 0.01, hint: '0 = a crisp disc, 1 = melts into the glow.' },
+    { k: 'coreBrightness', label: 'Brightness of the disc', min: 0, max: 1.5, step: 0.01 }
+  ]},
+  { title: 'Glow', ctls: [
+    { k: 'glow', label: 'Glow round the sun', min: 0, max: 2, step: 0.01 },
+    { k: 'glowSize', label: 'Size of the glow (× disc)', min: 2, max: 25, step: 0.1 },
+    { k: 'glowFalloff', label: 'How quickly the glow fades', min: 0.3, max: 3, step: 0.01,
+      hint: 'Low = a big soft bloom; high = bright close in, fading fast, as in the photo.' },
+    { k: 'haze', label: 'Wide, faint brightening of the sky', min: 0, max: 1.5, step: 0.01 },
+    { k: 'hazeSize', label: 'Size of that brightening (× disc)', min: 5, max: 60, step: 0.5 },
+    { k: 'warmth', label: 'Warmth of the light (by day)', min: 0, max: 1, step: 0.01,
+      hint: '0 = white with a cool edge, as in the photo; 1 = as warm as a low sun. The evening is always warm.' }
+  ]},
+  { title: 'Streaks', ctls: [
+    { k: 'streaks', label: 'Number of streaks', min: 0, max: 40, step: 1 },
+    { k: 'streakLength', label: 'Length (× disc)', min: 1, max: 30, step: 0.1 },
+    { k: 'streakVariety', label: 'How much their lengths differ', min: 0, max: 1, step: 0.01 },
+    { k: 'longStreaks', label: 'Very long, faint streaks', min: 0, max: 8, step: 1 },
+    { k: 'streakWidth', label: 'Thickness', min: 0.2, max: 3, step: 0.01 },
+    { k: 'streakStrength', label: 'Brightness', min: 0, max: 1.5, step: 0.01 },
+    { k: 'spikes', label: 'Fine spikes round the disc', min: 0, max: 80, step: 1 },
+    { k: 'spikeLength', label: 'Length of the spikes (× disc)', min: 1.1, max: 6, step: 0.05 },
+    { k: 'spikeStrength', label: 'Brightness of the spikes', min: 0, max: 1.5, step: 0.01 },
+    { k: 'beams', label: 'Broad soft beams', min: 0, max: 10, step: 1 },
+    { k: 'beamWidth', label: 'Width of the beams', min: 0.3, max: 3, step: 0.01 },
+    { k: 'beamStrength', label: 'Brightness of the beams', min: 0, max: 1, step: 0.01 },
+    { k: 'irregular', label: 'How irregular they are', min: 0, max: 1, step: 0.01,
+      hint: '0 = an even star; 1 = scattered, as real glare is.' },
+    { k: 'seed', label: 'Pattern (try another)', min: 1, max: 50, step: 1 }
+  ]},
+  { title: 'Movement', ctls: [
+    { k: 'turn', label: 'Slow turning of the streaks (° a minute)', min: 0, max: 60, step: 0.5 },
+    { k: 'shimmer', label: 'Shimmer: streaks brighten and fade', min: 0, max: 1, step: 0.01 },
+    { k: 'shimmerSpeed', label: 'Speed of the shimmer', min: 0.1, max: 4, step: 0.05 }
+  ]},
+  { title: 'Lens', ctls: [
+    { k: 'ghosts', label: 'Lens ghosts (faint discs toward the middle)', min: 0, max: 1.5, step: 0.01 },
+    { k: 'ghostSize', label: 'Size of the ghosts', min: 0.3, max: 3, step: 0.01 },
+    { k: 'ring', label: 'Ring round the sun (only in thin high cloud)', min: 0, max: 1.5, step: 0.01 },
+    { k: 'ringSize', label: 'Size of the ring (× disc)', min: 4, max: 20, step: 0.1 },
     { type: 'colours' }
-  ]},
-  { title: 'The light (evening and night)', ctls: [
-    { k: 'lightEvening', label: 'Brightness in the evening', min: 0, max: 1.5, step: 0.01 },
-    { k: 'lightNight', label: 'Brightness at night', min: 0, max: 1.5, step: 0.01 },
-    { k: 'windowGlow', label: 'Glow of the paper windows', min: 0, max: 2, step: 0.01 },
-    { k: 'halo', label: 'Soft glow in the air around each lantern', min: 0, max: 2, step: 0.01 },
-    { k: 'haloSize', label: 'Size of that glow (× lantern height)', min: 0.2, max: 4, step: 0.05 },
-    { k: 'pool', label: 'Pool of light on the ground', min: 0, max: 2, step: 0.01 },
-    { k: 'poolSize', label: 'Size of the pool (× lantern height)', min: 0.3, max: 5, step: 0.05 },
-    { k: 'castLight', label: 'Light thrown on the gates and stone nearby', min: 0, max: 2, step: 0.01 },
-    { k: 'reach', label: 'How far that light reaches (× lantern height)', min: 0.5, max: 6, step: 0.05 }
-  ]},
-  { title: 'Flicker', ctls: [
-    { k: 'flicker', label: 'How strong a flicker is', min: 0, max: 1, step: 0.01,
-      hint: 'Each lantern flickers on its own, at random moments, in its own way: a quick stutter, a dip that dims and recovers, or a sputter of short drops.' },
-    { k: 'flickerEvery', label: 'Seconds between flickers, on average, for each lantern', min: 1, max: 40, step: 0.5,
-      hint: 'The real gap is random every time, so no two lanterns keep step.' },
-    { k: 'flickerLength', label: 'How long a flicker lasts, on average (seconds)', min: 0.2, max: 4, step: 0.05 },
-    { k: 'flickerSpeed', label: 'How fast the flame moves during a flicker', min: 0.2, max: 3, step: 0.05 },
-    { k: 'wobble', label: 'Gentle unsteadiness between flickers', min: 0, max: 1, step: 0.01,
-      hint: 'A slow, uneven breathing of the light, different in every lantern.' },
-    { k: 'windFlicker', label: 'Gusts of wind make them flicker more', min: 0, max: 3, step: 0.05 }
   ]}
 ];
-/* Controls that only change the flicker or the glow drawn each frame need no bake. */
-var LIVE_KEYS = { lightEvening: 0, lightNight: 0, windowGlow: 0, halo: 1, haloSize: 1, pool: 1, poolSize: 1,
-                  flicker: 1, flickerEvery: 1, flickerLength: 1, flickerSpeed: 1, wobble: 1, windFlicker: 1 };
 function fmt(ctl, v) { return ctl.step >= 1 ? String(v) : Number(v).toFixed(ctl.step < 0.01 ? 3 : 2); }
-function ctlGet(ctl) { return L[ctl.k]; }
-function ctlSet(ctl, v) { L[ctl.k] = v; }
+function ctlGet(ctl) { return SUN[ctl.k]; }
+function ctlSet(ctl, v) { SUN[ctl.k] = v; }
 function buildControls() {
   var host = document.getElementById('labControls');
   host.innerHTML = '';
@@ -509,10 +575,10 @@ function buildControls() {
         if (ctl.hint) { var h3 = document.createElement('div'); h3.className = 'hint'; h3.textContent = ctl.hint; wrap.appendChild(h3); }
       } else if (ctl.type === 'colours') {
         wrap.className = 'lab-colours';
-        LANTERN_COLOUR_NAMES.forEach(function (cn) {
+        SUN_COLOUR_NAMES.forEach(function (cn) {
           var lb = document.createElement('label'); lb.className = 'lab-colour';
-          var inp = document.createElement('input'); inp.type = 'color'; inp.value = L.colours[cn[0]];
-          inp.addEventListener('input', function () { L.colours[cn[0]] = inp.value; changed('colours'); });
+          var inp = document.createElement('input'); inp.type = 'color'; inp.value = SUN.colours[cn[0]];
+          inp.addEventListener('input', function () { SUN.colours[cn[0]] = inp.value; changed('colours'); });
           var sp = document.createElement('span'); sp.textContent = cn[1];
           lb.appendChild(inp); lb.appendChild(sp);
           wrap.appendChild(lb);
@@ -543,18 +609,16 @@ function buildControls() {
     now.appendChild(b);
   });
 }
-/* Any change bakes the gates and lanterns again (section 6c), at most a few
-   times a second; the brightness and flicker are used as they are, each frame. */
+/* Any change bakes the sun's pieces again (section 13), at most a few times
+   a second; brightness, place and movement are used as they are, each frame. */
 function changed(k) {
   save();
-  gateChangedAt = nowT;
-  if (k === 'lightEvening' || k === 'lightNight') { if (V.timeOfDay !== 'day') gateDirty = true; return; }
-  if (!(k in LIVE_KEYS)) gateDirty = true;
+  sunDirty = true;
 }
 /* The time of day: everything in the scene is lit for it, so it is all baked again. */
 function setTime(tod) {
   if (V.timeOfDay === tod) return;
-  V.timeOfDay = L.timeOfDay = tod;
+  V.timeOfDay = L.timeOfDay = SUN.timeOfDay = tod;
   document.documentElement.setAttribute('data-time', tod);
   save();
   paintSky();
@@ -613,7 +677,7 @@ document.getElementById('labToggle').addEventListener('click', function () {
 })();
 document.getElementById('btnReset').addEventListener('click', function () {
   var tod = V.timeOfDay;
-  L = clone(LDEF); L.timeOfDay = tod; save(); buildControls(); gateDirty = true; gateChangedAt = nowT;
+  SUN = clone(SDEF); SUN.timeOfDay = tod; save(); buildControls(); sunDirty = true;
 });
 
 /* ============================================================
@@ -622,26 +686,27 @@ document.getElementById('btnReset').addEventListener('click', function () {
 function f2(x) { return Number(x).toFixed(2); }
 function f3(x) { return Number(x).toFixed(3); }
 function buildCopyText() {
-  var C = L.colours, out = [];
-  out.push('/* Stone lanterns — values from bamboo.html (autumn) */');
+  var S = SUN, C = S.colours, cd = CONDITIONS[S.condition], out = [];
+  out.push('/* The sun — values from bamboo.html (autumn) */');
   out.push('');
-  out.push('Lanterns: ' + (L.show ? 'shown' : 'hidden') + ', ' + lanternCount + ' on the screen, one in every ' +
-           (L.every === 1 ? 'gap' : L.every + ' gaps') + ' between the gates, ' +
-           { right: 'on the right', left: 'on the left', alternate: 'changing sides each time', both: 'on both sides' }[L.side] +
-           '; right side at ' + f2(L.rightAlong) + ' of the gap, ' + f2(L.rightFromEdge) + ' × their height from the gravel; left side at ' +
-           f2(L.leftAlong) + ' of the gap, ' + f2(L.leftFromEdge) + ' × their height from the gravel.');
-  out.push('  The lantern: ' + f2(L.size) + ' × eye height tall, ' + L.sides + '-sided light box and roof, pillar ' + f3(L.pillar) +
-           ', light box ' + f3(L.box) + ', roof ' + f3(L.roof) + ' (× height), curled corners ' + (L.curls ? 'on' : 'off') +
-           '; moss ' + f2(L.moss) + ', variety ' + f2(L.variety) + ', leaves on them ' + f2(L.roofLeaves));
-  out.push('  The light: brightness ' + f2(L.lightEvening) + ' in the evening, ' + f2(L.lightNight) + ' at night; windows ' +
-           f2(L.windowGlow) + '; glow around them ' + f2(L.halo) + ' (size ' + f2(L.haloSize) + '); pool on the ground ' +
-           f2(L.pool) + ' (size ' + f2(L.poolSize) + '); light thrown nearby ' + f2(L.castLight) + ' reaching ' + f2(L.reach));
-  out.push('  Flicker: strength ' + f2(L.flicker) + ', about every ' + f2(L.flickerEvery) + ' s for each lantern, lasting about ' +
-           f2(L.flickerLength) + ' s, speed ' + f2(L.flickerSpeed) + '; gentle unsteadiness ' + f2(L.wobble) + ', more in gusts ' + f2(L.windFlicker));
-  out.push('  Colours: ' + LANTERN_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + C[cn[0]]; }).join(', '));
+  out.push('Weather: ' + cd.jp + ' (' + cd.en + '); clouds drift at ' + f2(S.cloudSpeed) + ', size ' + f2(S.cloudSize) +
+           ', a passing cloud hides ' + f2(S.cloudBlock) + ' of the sun; sheet of cloud or haze ' + f2(S.veil));
+  out.push('Sun: ' + (S.show ? 'shown' : 'hidden') + ', strength ' + f2(S.strength) + '; ' + f3(S.across) + ' across the screen, ' +
+           S.below + ' px below the toolbar; ' + S.altitude + '° up by day, ' + S.eveningAltitude + '° in the evening');
+  out.push('  Disc: radius ' + f2(S.coreSize) + ' px, edge softness ' + f2(S.coreSoftness) + ', brightness ' + f2(S.coreBrightness));
+  out.push('  Glow: ' + f2(S.glow) + ' (size ' + f2(S.glowSize) + ' × disc, fading ' + f2(S.glowFalloff) + '); wide sky glow ' +
+           f2(S.haze) + ' (size ' + f2(S.hazeSize) + ' × disc); warmth by day ' + f2(S.warmth));
+  out.push('  Streaks: ' + S.streaks + ', length ' + f2(S.streakLength) + ' × disc, variety ' + f2(S.streakVariety) + ', ' +
+           S.longStreaks + ' very long ones, thickness ' + f2(S.streakWidth) + ', brightness ' + f2(S.streakStrength));
+  out.push('  Spikes: ' + S.spikes + ', length ' + f2(S.spikeLength) + ' × disc, brightness ' + f2(S.spikeStrength) +
+           '; beams: ' + S.beams + ', width ' + f2(S.beamWidth) + ', brightness ' + f2(S.beamStrength) +
+           '; irregular ' + f2(S.irregular) + ', pattern ' + S.seed);
+  out.push('  Movement: turning ' + f2(S.turn) + '° a minute, shimmer ' + f2(S.shimmer) + ' at speed ' + f2(S.shimmerSpeed));
+  out.push('  Lens: ghosts ' + f2(S.ghosts) + ' (size ' + f2(S.ghostSize) + '), ring ' + f2(S.ring) + ' (size ' + f2(S.ringSize) + ' × disc)');
+  out.push('  Colours: ' + SUN_COLOUR_NAMES.map(function (cn) { return cn[1] + ' ' + C[cn[0]]; }).join(', '));
   out.push('');
   out.push('JSON:');
-  out.push(JSON.stringify(L, null, 2));
+  out.push(JSON.stringify(S, null, 2));
   return out.join('\n');
 }
 function copyText(text) {
@@ -4916,6 +4981,312 @@ function animStatus() {
 }
 
 /* ============================================================
+   13. THE SUN — drawn every frame at the very back, behind the
+   mountains, from soft pieces baked once (and again after a change on
+   the panel). Every glow is worked out pixel by pixel with a smooth,
+   natural falloff and a touch of dither, so there are no visible rings
+   or edges; the pieces are added together as light ('lighter'), so
+   where a streak crosses the glow it is brighter, as in a photo.
+     the veil    a sheet of cloud or haze over the whole sky (weather)
+     clouds      soft clouds drifting across; one passing in front of
+                 the sun dims it, and the glow lights its edges
+     haze        a very wide, faint brightening of the sky
+     glow        the bloom round the sun: bright close in, fading fast,
+                 then a long soft tail
+     beams       a few broad, faint fans of light
+     streaks     thin rays of uneven length, a few very long and faint
+     spikes      fine short spikes all round the disc
+     disc        the white-hot core with a soft edge; in cloud it is
+                 spread into a dull bright patch
+     ghosts      faint discs on the line toward the middle of the screen
+     ring        the halo seen through thin high cloud
+   ============================================================ */
+var SPR = { core: mk(), glow: mk(), haze: mk(), soft: mk(), ray: mk(), beam: mk(), ghost: mk(), ring: mk() };
+var CLOUD_SPR = [mk(), mk(), mk(), mk()];
+var sunDirty = true, sunBakedAt = -1, sunColKey = '', cloudColKey = '', sunInfo = '';
+var rays = [], spikes = [], beams = [], clouds = [];
+var cur = null;                      // the weather as it is now, easing toward the chosen one
+var barBottom = 84, barT = -1, sunOccl = 0;
+
+/* A round sprite of radius n px: f(ρ) is the brightness at ρ (0 centre,
+   1 edge), col(ρ) its colour. Light is stored as the alpha, with dither. */
+function bakeRound(S, n, f, col) {
+  var d = n * 2, c = S.c;
+  S.cnv.width = S.cnv.height = d;
+  var img = c.createImageData(d, d), px = img.data, r = rngFrom(97);
+  for (var y = 0; y < d; y++) for (var x = 0; x < d; x++) {
+    var dx = x + 0.5 - n, dy = y + 0.5 - n, p = Math.sqrt(dx * dx + dy * dy) / n;
+    if (p >= 1) continue;
+    var I = f(p);
+    if (I <= 0) continue;
+    var C = col(p), o = (y * d + x) * 4;
+    px[o] = C[0]; px[o + 1] = C[1]; px[o + 2] = C[2];
+    px[o + 3] = clamp(Math.floor(I * 255 + r()), 0, 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+/* A ray, lying along +x from the sun's centre (x = 0) to its tip: bright
+   and narrow at the root, fading and thinning toward the tip, with a
+   soft (gaussian) cross-section. */
+function bakeRay(S, w, h, across, along, colIn, colOut) {
+  var c = S.c;
+  S.cnv.width = w; S.cnv.height = h;
+  var img = c.createImageData(w, h), px = img.data, r = rngFrom(31);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var u = (x + 0.5) / w, v = (y + 0.5 - h / 2) / (h / 2);
+    var k = v / (across * lerp(1, 0.3, u));
+    var I = along(u) * Math.exp(-k * k * 2.2);
+    if (I <= 0.0005) continue;
+    var C = mix(colIn, colOut, Math.min(1, u * 1.5)), o = (y * w + x) * 4;
+    px[o] = C[0]; px[o + 1] = C[1]; px[o + 2] = C[2];
+    px[o + 3] = clamp(Math.floor(I * 255 + r()), 0, 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+/* The sun's colours now: white with a cool edge high up, warmer and
+   more orange the lower it is (and always in the evening). */
+function sunAltitude() { return V.timeOfDay === 'evening' ? SUN.eveningAltitude : SUN.altitude; }
+function sunColours() {
+  var C = {}; for (var k in SUN.colours) C[k] = hex(SUN.colours[k]);
+  var low = Math.max(1 - smooth(2, 22, sunAltitude()), SUN.warmth * 0.6);
+  return {
+    low: low,
+    core: mix(C.core, mix(C.low, [255, 255, 255], 0.55), low),
+    glow: mix(C.glow, C.low, low),
+    haze: mix(C.haze, C.low, low * 0.9),
+    ghost: mix(C.ghost, C.low, low * 0.5)
+  };
+}
+function bakeSun() {
+  sunDirty = false; sunBakedAt = nowT;
+  var K = sunColours(), white = [255, 255, 255];
+  sunColKey = JSON.stringify(K);
+  // the disc: flat white-hot, with a soft edge (ρ 0.62 is the disc's own edge)
+  var s = SUN.coreSoftness, e0 = 0.62 * (1 - s * 0.45), e1 = 0.62 + s * 0.3;
+  bakeRound(SPR.core, 64, function (p) { return 1 - smooth(e0, e1, p) * (1 - 0.12 * Math.exp(-p * 4)); },
+            function (p) { return mix(white, K.core, smooth(0.3, 0.7, p)); });
+  // the glow: a tight bright bloom, a middle and a long tail, eased to nothing at the edge
+  var F = SUN.glowFalloff;
+  bakeRound(SPR.glow, 200, function (p) {
+    var q = p;
+    return (0.62 * Math.exp(-q * 13 * F) + 0.3 * Math.exp(-q * 5 * F) + 0.14 * Math.exp(-q * 2 * F)) * Math.pow(1 - p * p, 2);
+  }, function (p) { return mix(mix(white, K.core, 0.5), K.glow, smooth(0, 0.25, p)); });
+  // the wide sky glow: very broad and faint
+  bakeRound(SPR.haze, 160, function (p) { return Math.exp(-p * p * 3.2) * Math.pow(1 - p * p, 2); },
+            function () { return K.haze; });
+  // the disc spread out by cloud: a dull bright patch
+  bakeRound(SPR.soft, 96, function (p) { return Math.exp(-p * p * 4) * (1 - p * p); },
+            function (p) { return mix(K.core, K.glow, p); });
+  // a streak (and a spike: the same, shorter)
+  bakeRay(SPR.ray, 256, 24, 0.42, function (u) { return Math.pow(1 - u, 1.4) * (0.3 + 0.7 * Math.exp(-u * 3.5)); },
+          mix(white, K.core, 0.5), K.glow);
+  // a broad beam: soft all over, strongest a little way out from the disc
+  bakeRay(SPR.beam, 128, 48, 0.75, function (u) { return Math.pow(1 - u, 1.8) * smooth(0, 0.18, u); }, K.glow, K.glow);
+  // a lens ghost: a faint flat disc, a little brighter at the rim
+  bakeRound(SPR.ghost, 64, function (p) { return (0.55 + 0.45 * smooth(0.55, 0.92, p)) * (1 - smooth(0.88, 1, p)); },
+            function () { return K.ghost; });
+  // the ring: reddish inside, white, then bluish outside
+  bakeRound(SPR.ring, 160, function (p) { var k = (p - 0.86) / 0.045; return Math.exp(-k * k) + 0.25 * Math.exp(-p * 3) * (1 - smooth(0.7, 0.86, p)); },
+            function (p) { return p < 0.86 ? mix([255, 200, 170], white, smooth(0.78, 0.86, p)) : mix(white, [205, 222, 255], smooth(0.86, 0.95, p)); });
+  buildRays();
+}
+/* Where each streak, spike and beam points, how long and thick it is,
+   and its own shimmer. Fixed by the pattern number. */
+function buildRays() {
+  var r = rngFrom(SUN.seed * 7919 + 13), irr = SUN.irregular, i, n;
+  rays = []; spikes = []; beams = [];
+  n = SUN.streaks;
+  var off = r() * TAU;
+  for (i = 0; i < n; i++) {
+    rays.push({ a: off + (i + (r() - 0.5) * irr * 1.6) / n * TAU + (r() - 0.5) * irr * 0.25,
+                len: 1 - SUN.streakVariety * (1 - Math.pow(r(), 2.5)) * 0.8, w: lerp(1, 0.45 + r() * 1.1, irr),
+                b: lerp(1, 0.45 + r() * 0.75, irr), ph: r() * 100, sp: 0.6 + r() * 0.9, long: false });
+  }
+  for (i = 0; i < SUN.longStreaks; i++) {
+    rays.push({ a: r() * TAU, len: 2 + r() * 1.4, w: 0.55 + r() * 0.4, b: 0.35 + r() * 0.3, ph: r() * 100, sp: 0.4 + r() * 0.6, long: true });
+  }
+  n = SUN.spikes;
+  for (i = 0; i < n; i++) {
+    spikes.push({ a: (i + (r() - 0.5) * irr) / Math.max(1, n) * TAU, len: 0.55 + r() * 0.75, w: 0.4 + r() * 0.5,
+                  b: 0.4 + r() * 0.6, ph: r() * 100, sp: 1 + r() * 1.5 });
+  }
+  for (i = 0; i < SUN.beams; i++) {
+    beams.push({ a: r() * TAU, len: 0.6 + r() * 0.5, w: 0.7 + r() * 0.8, b: 0.5 + r() * 0.5, ph: r() * 100, sp: 0.2 + r() * 0.3 });
+  }
+}
+/* Slow, smooth wandering, 0..1 (a few sines out of step). */
+function wander(t, ph) {
+  return 0.5 + 0.22 * Math.sin(t * 0.9 + ph) + 0.16 * Math.sin(t * 2.3 + ph * 1.7) + 0.12 * Math.sin(t * 5.1 + ph * 0.6);
+}
+/* The clouds: four soft shapes, baked in the weather's colours. */
+function bakeClouds(top, shade) {
+  cloudColKey = top.join() + shade.join();
+  CLOUD_SPR.forEach(function (S, k) {
+    var r = rngFrom(400 + k * 17), w = 360, h = 170, c = S.c;
+    S.cnv.width = w; S.cnv.height = h;
+    c.clearRect(0, 0, w, h);
+    c.filter = 'blur(5px)';
+    for (var i = 0; i < 18; i++) {
+      var x = 50 + r() * (w - 100), mid = 1 - Math.abs(x - w / 2) / (w * 0.55);
+      var rad = (18 + r() * 34) * (0.5 + mid * 0.8), y = 128 - rad * (0.55 + r() * 0.35);
+      var g = c.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, rad, 0, TAU); c.fill();
+    }
+    c.filter = 'none';
+    // a flatter, softer base
+    c.globalCompositeOperation = 'destination-out';
+    var b = c.createLinearGradient(0, 118, 0, 150);
+    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(1, 'rgba(0,0,0,1)');
+    c.fillStyle = b; c.fillRect(0, 118, w, h - 118);
+    // lit on top, shaded underneath
+    c.globalCompositeOperation = 'source-atop';
+    var sh = c.createLinearGradient(0, 30, 0, 135);
+    sh.addColorStop(0, rgb(top, 1)); sh.addColorStop(1, rgb(shade, 1));
+    c.fillStyle = sh; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+  });
+}
+function buildClouds() {
+  var r = rngFrom(2024);
+  clouds = [];
+  for (var i = 0; i < 18; i++) {
+    clouds.push({ x: r() * 1.4 - 0.2, near: i % 2 === 0, yr: r(), s: 0.6 + r() * 0.8, v: 0.5 + r(), k: i % 4, a: 0, want: r() });
+  }
+}
+function lerpCond(a, b, k) {
+  var o = {};
+  for (var key in b) {
+    if (typeof b[key] === 'number') o[key] = lerp(a[key], b[key], k);
+    else if (Array.isArray(b[key])) o[key] = mix(a[key], b[key], k);
+    else o[key] = b[key];
+  }
+  return o;
+}
+function sunPlace() {
+  var R = SUN.coreSize * (1 + (1 - smooth(2, 22, sunAltitude())) * 0.25);
+  return { x: W * SUN.across, y: barBottom + R + SUN.below, R: R };
+}
+function drawSunSky(t, dt) {
+  if (t - barT > 1) {
+    barT = t;
+    var bar = document.getElementById('infoBar');
+    barBottom = bar && bar.offsetHeight > 0 ? Math.max(bar.getBoundingClientRect().bottom, 40) : 84;
+  }
+  var target = CONDITIONS[SUN.condition];
+  cur = cur ? lerpCond(cur, target, 1 - Math.exp(-dt / 0.8)) : lerpCond(target, target, 1);
+  if (!clouds.length) buildClouds();
+  var nightNow = isNight();
+  if (sunDirty && nowT - sunBakedAt > 0.12) bakeSun();
+  else if (!nightNow && nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
+  var eve = V.timeOfDay === 'evening';
+  var top = eve ? mix(target.top, [255, 196, 160], 0.35) : target.top, shade = eve ? mix(target.shade, [170, 120, 140], 0.4) : target.shade;
+  if (nightNow) { top = scale(target.top, 0.35); shade = scale(target.shade, 0.3); }
+  if (top.join() + shade.join() !== cloudColKey) bakeClouds(top, shade);
+  var P = sunPlace(), X = P.x, Y = P.y, R = P.R;
+  var c = ctx;
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.globalAlpha = 1;
+
+  // the veil over the sky
+  var va = cur.veil * SUN.veil * (nightNow ? 0.4 : 1);
+  if (va > 0.003) {
+    var vc = nightNow ? scale(cur.veilCol, 0.35) : cur.veilCol, hz = H * V.horizon;
+    var vg = c.createLinearGradient(0, 0, 0, hz);
+    vg.addColorStop(0, rgb(vc, clamp(va * 0.75, 0, 1))); vg.addColorStop(1, rgb(vc, clamp(va * 0.45, 0, 1)));
+    c.fillStyle = vg; c.fillRect(0, 0, W, hz);
+  }
+
+  // the clouds, and how much of the sun they hide
+  var shown = Math.round(cur.clouds * clouds.length), occl = 0, wind = (0.5 + 0.5 * V.wind) * SUN.cloudSpeed;
+  for (var i = 0; i < clouds.length; i++) {
+    var Cl = clouds[i];
+    var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) : 0;
+    Cl.a += (want - Cl.a) * (1 - Math.exp(-dt / 1.2));
+    var cw = 300 * Cl.s * SUN.cloudSize * cur.cloudScale, ch = cw * 170 / 360;
+    Cl.x += (5 + 9 * Cl.v) * wind * dt / W;
+    if (Cl.x * W - cw / 2 > W + 20) { Cl.x = (-cw / 2 - 20) / W; }
+    if (Cl.a < 0.005) continue;
+    var cx = Cl.x * W, cy = Cl.near ? Y + (Cl.yr - 0.5) * ch * 1.2 : H * (0.05 + Cl.yr * 0.4);
+    c.globalAlpha = Cl.a;
+    c.drawImage(CLOUD_SPR[Cl.k].cnv, cx - cw / 2, cy - ch * 0.62, cw, ch);
+    var dx = (X - cx) / (cw * 0.4), dy = (Y - cy + ch * 0.1) / (ch * 0.3), d = Math.sqrt(dx * dx + dy * dy);
+    occl = 1 - (1 - occl) * (1 - Cl.a * (1 - smooth(0.5, 1, d)));
+  }
+  c.globalAlpha = 1;
+  sunOccl = occl;
+  var tod = { day: 'Day', evening: 'Evening', night: 'Night' }[V.timeOfDay];
+  document.getElementById('infoWeather').textContent = target.jp;
+  if (nightNow || !SUN.show) {
+    sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · ' + (nightNow ? 'no sun at night' : 'sun hidden');
+    return;
+  }
+  var alt = sunAltitude();
+  var vis = SUN.strength * smooth(-1, 3, alt);
+  var block = occl * SUN.cloudBlock;
+  var clear = vis * cur.rays * (1 - block);
+  sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · sun ' + alt + '° up, disc ' + Math.round(R) + ' px' +
+            (occl > 0.02 ? ' · behind a cloud: ' + Math.round(occl * 100) + '%' : '');
+  if (vis < 0.005) return;
+
+  c.globalCompositeOperation = 'lighter';
+  function round(S, r, a) { if (a > 0.002) { c.globalAlpha = clamp(a, 0, 1); c.drawImage(S.cnv, X - r, Y - r, r * 2, r * 2); } }
+  // tR: the radius on the sprite is the disc's own edge at ρ 0.62
+  var spin = t * SUN.turn / 60 * PI / 180, shim = SUN.shimmer, ss = SUN.shimmerSpeed;
+  function ray(S, a, len, wid, alpha, root) {
+    if (alpha < 0.003 || len < 1) return;
+    var co = Math.cos(a), si = Math.sin(a);
+    c.setTransform(PR * co, PR * si, -PR * si, PR * co, PR * X, PR * Y);
+    c.globalAlpha = clamp(alpha, 0, 1);
+    c.drawImage(S.cnv, root, -wid / 2, len, wid);
+  }
+  var breathe = 1 + shim * 0.06 * (wander(t * 0.3 * ss, 1.3) - 0.5);
+  round(SPR.haze, R * SUN.hazeSize * Math.sqrt(cur.glowSize), SUN.haze * cur.haze * 0.4 * vis * (1 - block * 0.3));
+  var gR = R * SUN.glowSize * cur.glowSize * breathe, gA = SUN.glow * cur.glow * vis * (1 - block * 0.55);
+  round(SPR.glow, gR, gA);
+  // the bright bloom just round the disc
+  round(SPR.soft, R * 3.4 * Math.sqrt(cur.glowSize) * breathe, gA * 0.8 * (1 - cur.blur * 0.75));
+  // beams
+  for (i = 0; i < beams.length; i++) {
+    var Bm = beams[i], fl = 1 - shim * (1 - wander(t * Bm.sp * ss, Bm.ph));
+    ray(SPR.beam, Bm.a + spin * 0.5, R * SUN.streakLength * 0.9 * Bm.len, R * 3.2 * SUN.beamWidth * Bm.w,
+        SUN.beamStrength * Bm.b * fl * clear, R * 0.6);
+  }
+  // streaks
+  for (i = 0; i < rays.length; i++) {
+    var Ry = rays[i], f2_ = 1 - shim * (1 - wander(t * Ry.sp * ss, Ry.ph));
+    var rl = R * SUN.streakLength * Ry.len, rw = R * 0.42 * SUN.streakWidth * Ry.w * (Ry.long ? 0.6 : 1), ra = SUN.streakStrength * Ry.b * f2_ * clear;
+    ray(SPR.ray, Ry.a + spin, rl * 0.85, rw * 4, ra * 0.3, 0);     // a soft glow along it
+    ray(SPR.ray, Ry.a + spin, rl, rw, ra, 0);
+  }
+  // spikes (turning the other way, a little)
+  for (i = 0; i < spikes.length; i++) {
+    var Sp = spikes[i], f3_ = 1 - shim * (1 - wander(t * Sp.sp * ss, Sp.ph));
+    ray(SPR.ray, Sp.a - spin * 0.7, R * SUN.spikeLength * Sp.len, R * 0.22 * SUN.streakWidth * Sp.w,
+        SUN.spikeStrength * Sp.b * f3_ * clear, 0);
+  }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  // the disc, sharp, and spread into a patch by cloud
+  var coreA = SUN.coreBrightness * cur.core * vis;
+  round(SPR.core, R / 0.62, coreA * (1 - cur.blur) * (1 - block));
+  round(SPR.soft, R * 3.2 * (1 + cur.blur * 0.8), coreA * cur.blur * 0.6 * (1 - block * 0.6));
+  // the ring (thin high cloud)
+  round(SPR.ring, R * SUN.ringSize, SUN.ring * cur.ring * 0.22 * vis);
+  // lens ghosts on the line through the middle of the screen
+  var ga = SUN.ghosts * cur.ghosts * clear;
+  if (ga > 0.003) {
+    var mx = W * 0.5, my = H * 0.5;
+    [[0.45, 0.7, 0.10], [0.9, 1.6, 0.06], [1.35, 0.9, 0.09], [1.75, 4.2, 0.05]].forEach(function (gh) {
+      var gx = X + (mx - X) * gh[0], gy = Y + (my - Y) * gh[0], gr = R * gh[1] * SUN.ghostSize;
+      c.globalAlpha = clamp(ga * gh[2], 0, 1);
+      c.drawImage(SPR.ghost.cnv, gx - gr, gy - gr, gr * 2, gr * 2);
+    });
+  }
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+
+/* ============================================================
    11. FRAME
    ============================================================ */
 function resize() {
@@ -4969,11 +5340,15 @@ function frame(now) {
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
   // a change on the panel: baked once the slider has paused for a moment, or at most twice a second while it moves
   if (gateDirty && (t - gateChangedAt > 0.18 || t - gateBakedAt > 0.5)) bakeGates();
-  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = gateInfo; }
+  if (t - statusT > 0.25) { statusT = t; document.getElementById('labStatus').textContent = sunInfo; }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cv.width, cv.height);
+
+  // The sun, the weather in front of it and the sky round it (section 13), at the very back.
+  drawSunSky(t, dt);
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Mountains and Fuji (baked), then the mist drifting along the ridges.
   ctx.drawImage(SCN.cnv, 0, 0, cv.width, cv.height);
