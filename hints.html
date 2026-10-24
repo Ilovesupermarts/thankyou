@@ -702,6 +702,7 @@
     if (r) r.price.classList.add('active');
     $('numpad').classList.toggle('on', !!r);
     setTimeout(Coach.place, 0);
+    if (r) emit('numpad');
   }
   function pending() { for (var i = 0; i < rows.length; i++) if (rows[i].on && !rows[i].v.textContent) return rows[i]; return null; }
   /* The existing shake, now with a caption saying why. */
@@ -716,19 +717,20 @@
       var s = steps[curStep]; if (s.leave) s.leave(); s.hint();
     }, 4200);
   }
+  /* As in the app: ticking a ○ only selects the row. The keypad appears
+     when a price field is tapped (focused). */
   function rowClick(r, e) {
+    var onPrice = !!e.target.closest('.price');
     var p = pending();
     if (p && p !== r) { shakeWithWords(p.price, '料金をご入力ください', p.el); setActive(p); return; }
-    if (r.custom) {
+    if (r.custom && !r.name) {
       var first = rows.filter(function (x) { return x.custom && !x.name; })[0];
-      if (!r.name) {
-        if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
-        openTanzaku(r); return;
-      }
+      if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
+      openTanzaku(r); return;
     }
-    if (e.target.closest('.price') && r.on) { setActive(r); return; }
+    if (onPrice) { setActive(r); return; }
     r.on = !r.on;
-    if (r.on) { setActive(r); emit('check', r); }
+    if (r.on) emit('check', r);
     else { if (activeRow === r) setActive(null); emit('uncheck', r); }
     recalc();
   }
@@ -744,17 +746,18 @@
     if (k === 'back') digits = digits.slice(0, -1);
     else digits = (digits + k).slice(0, 5);
     activeRow.v.textContent = digits ? parseInt(digits, 10).toLocaleString() : '';
+    if (digits && !activeRow.on) activeRow.on = true;
     recalc();
   });
   /* Tapping away from an open price closes the keypad, as in the app. */
   $('scrTable').addEventListener('pointerdown', function (e) {
-    if (!activeRow || e.target.closest('.numpad') || e.target.closest('.row')) return;
+    if (!activeRow || e.target.closest('.numpad') || e.target.closest('.price')) return;
     if (!activeRow.v.textContent) return;
     setActive(null); emit('priceDone');
   });
 
   var tzRow = null;
-  function openTanzaku(r) { tzRow = r; $('tzInput').value = ''; $('tanzaku').classList.add('on'); emit('openCustom'); }
+  function openTanzaku(r) { setActive(null); tzRow = r; $('tzInput').value = ''; $('tanzaku').classList.add('on'); emit('openCustom'); }
   $('tanzaku').querySelector('.tz-ex').addEventListener('click', function (e) { if (e.target.tagName === 'BUTTON') $('tzInput').value = e.target.textContent; });
   $('tzCancel').addEventListener('click', function () { $('tanzaku').classList.remove('on'); });
   $('tzOk').addEventListener('click', function () {
@@ -857,13 +860,26 @@
       enterNatural: function () { this.setup(); },
       hint: function () { Coach.show({ targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップすると選択できます', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } }); },
       on: function (e) { return e === 'check'; } },
-    { id: '6b', t: 'Price + keypad', what: 'Box around that row\'s price and around the keypad.', cap: '料金は変更できます。入力後「決定」を', gone: 'She presses 決定 or taps elsewhere.',
-      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); setActive(rows[0]); },
+    { id: '6b', t: 'Price + keypad', what: 'First a circle around that row\'s price with a ghost tap, because ticking does not bring up the keypad. When she taps the price and the keypad appears, the hint changes to a box around the price and the keypad.',
+      cap: '料金をタップして金額を入力 → 入力後「決定」を', gone: 'She presses 決定 or taps elsewhere (the keypad closes).', try: 'Tick a row, then tap its price. Untick it and the hint goes back a step.',
+      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
         var r = activeRow || rows.filter(function (x) { return x.on; })[0] || rows[0];
-        Coach.show({ targets: [{ el: r.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
+        if ($('numpad').classList.contains('on')) {
+          Coach.show({ targets: [{ el: r.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
+        } else {
+          var empty = !r.v.textContent;
+          Coach.show({ targets: [{ el: r.price, shape: 'circle', pad: 14, text: empty ? '料金をタップして金額を入力' : '料金を変えるときは、ここをタップ', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
+        }
       },
-      on: function (e) { return e === 'priceDone'; } },
+      on: function (e) {
+        if (e === 'numpad') { this.hint(); return false; }
+        if (e === 'uncheck') {
+          if (!rows.some(function (x) { return x.on; })) { go(idx('6a'), true); return false; }
+          this.hint(); return false;
+        }
+        return e === 'priceDone';
+      } },
     { id: '6c', t: 'Untick', what: 'A caption only, beside the ○ she just ticked. Fades by itself.', cap: 'もう一度タップで取り消せます', gone: 'After 4 seconds, no action needed.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
