@@ -10630,7 +10630,7 @@ var S = {
   depthSpread: 0.9, farBlur: 2.75, nearBlur: 1.0, farOpacity: 0.6, nearOpacity: 0.9,
   rainStreaks: 1, rainContrast: 1, splashes: true, lightRays: 1, sunFlicker: 0.5, cloudShadows: 1, fogHaze: 1,
   lightning: true, frost: true, snowMix: true,
-  sun: true, sunSize: 1, sunGlow: 1, moon: true, moonSize: 1.05, moonPath: 'arc',
+  sun: true, sunSize: 1, moon: true, moonSize: 1.05, moonPath: 'arc',
   birds: true, nightSpecks: true, fireflyLand: true, fireflyMax: 4, dawnGlow: true,
   figureSide: 'auto',
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
@@ -10741,7 +10741,7 @@ function updateToolbarLight() {
     str = smooth(-1.5, 1.5, a.sun.alt) * clamp(1 - S.cloudCover / 100 * 0.75, 0.15, 1) *
           (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
     sx = skyToScreen(a.sun.alt, a.sun.az).x;
-    sy = skyBandY(24 * S.sunSize * (1 + low * 0.35));
+    sy = skyBandY(sunRadius(a.sun.alt));
   } else if (a && S.moon) {
     var P = moonPlacement(28 * S.moonSize);
     if (P) { str = P.fade * 0.3 * clamp(1 - S.cloudCover / 100 * 0.7, 0.2, 1); sx = P.x; sy = P.y; }
@@ -11744,64 +11744,302 @@ function drawSky(ctx, t) {
   }
 }
 
-function drawSun(ctx, t) {
-  var a = ENV.astro.sun;
-  if (!S.sun || a.alt < -1.5) return;
-  var vis = smooth(-1.5, 1.5, a.alt) * clamp(1 - S.cloudCover / 100 * 0.75, 0.15, 1) *
-            (ENV.rainy ? 0.35 : 1) * (S.condition === 'snow' ? 0.4 : 1) * (1 - ENV.fog * 0.5);
-  if (vis < 0.01) return;
-  var clear = vis * clamp(1 - S.cloudCover / 100 * 0.8, 0, 1) * (1 - ENV.fog * 0.8);
-  var low = 1 - smooth(2, 18, a.alt);            // near the horizon: bigger, more orange
-  var size = 24 * S.sunSize * (1 + low * 0.35);
-  var x = skyToScreen(a.alt, a.az).x, y = skyBandY(size);
-  var warm = mixRgb([255, 214, 160], [255, 140, 80], low);
-  // wide bloom
-  var R = size * 9 * Math.max(0.2, S.sunGlow);
-  var g = ctx.createRadialGradient(x, y, 0, x, y, R);
-  g.addColorStop(0, rgba([255, 252, 244], 0.9 * vis));
-  g.addColorStop(0.08, rgba(warm, 0.55 * vis * S.sunGlow));
-  g.addColorStop(0.35, rgba(warm, 0.18 * vis * S.sunGlow));
-  g.addColorStop(1, rgba(warm, 0));
-  ctx.fillStyle = g;
-  ctx.fillRect(x - R, y - R, 2 * R, 2 * R);
-  if (clear > 0.02) {
-    // starburst: thin tapering rays that slowly turn and shimmer
-    for (var i = 0; i < 16; i++) {
-      var ang = i / 16 * TAU + t * 0.015 + (hash1(i) - 0.5) * 0.3;
-      var len = size * (3 + 6 * hash1(i + 9)) * (0.85 + 0.15 * Math.sin(t * 1.3 + i * 2.1)) * S.sunGlow;
-      var w = size * 0.1 * (0.5 + hash1(i + 3));
-      var nx = -Math.sin(ang) * w, ny = Math.cos(ang) * w;
-      var ex = x + Math.cos(ang) * len, ey = y + Math.sin(ang) * len;
-      var rg = ctx.createLinearGradient(x, y, ex, ey);
-      rg.addColorStop(0, rgba([255, 255, 255], 0.8 * clear));
-      rg.addColorStop(0.3, rgba(warm, 0.4 * clear));
-      rg.addColorStop(1, rgba(warm, 0));
-      ctx.fillStyle = rg;
-      ctx.beginPath();
-      ctx.moveTo(x + nx, y + ny);
-      ctx.lineTo(ex, ey);
-      ctx.lineTo(x - nx, y - ny);
-      ctx.closePath();
-      ctx.fill();
+/* ============================================================
+   THE SUN AND THE SKY AROUND IT — the look tuned on bamboo.html (Sun Lab).
+   The sun is drawn every frame at the very back, from soft pieces baked
+   once: a white-hot disc with a soft edge, a smooth glow that fades with no
+   visible rings, a wide faint brightening of the sky, thin streaks of uneven
+   length, fine spikes, a few broad soft beams, and faint lens ghosts, added
+   together as light. The weather changes how it is seen (clear, a few
+   clouds, sun and cloud, thin high cloud, cloudy, haze, rain, snow): the
+   weather eases from one to the next, soft clouds drift across and dim the
+   sun as they pass, and a sheet of cloud or haze lies over the sky. At night
+   the clouds are faint, pale and bluish so the message stays readable.
+   ============================================================ */
+var SUN_LOOK = {
+  strength: 0.93, below: 18,
+  coreSize: 19, coreSoftness: 0.7, coreBrightness: 0.92,
+  glow: 1.54, glowSize: 20.5, glowFalloff: 2.46, haze: 1.07, hazeSize: 25.5, warmth: 0.53,
+  streaks: 14, streakLength: 11, streakVariety: 0.75, longStreaks: 3, streakWidth: 1.1, streakStrength: 0.7,
+  spikes: 30, spikeLength: 2.4, spikeStrength: 0.96, beams: 4, beamStrength: 0.22, beamWidth: 1,
+  irregular: 0.75, seed: 3, turn: 4, shimmer: 0.45, shimmerSpeed: 1,
+  ghosts: 0.35, ghostSize: 1, ring: 0.5, ringSize: 9,
+  cloudSpeed: 0.85, cloudSize: 2.3, cloudBlock: 0.75, veil: 0.99,
+  colours: { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' }
+};
+/* What each weather does to the sun (multipliers on the look above):
+   core / blur — how much of the bright disc shows, and how much it is spread
+   into a dull patch; glow, glowSize, haze — the glows; rays — streaks, spikes
+   and beams; clouds / cloudScale — how many clouds and how big; veil — a sheet
+   of cloud or haze over the sky; ring — the halo seen through thin cloud. */
+var SUN_WEATHER = {
+  clear:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 1, ring: 0,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
+  sunny:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 0.9, ring: 0,
+            clouds: 0.3, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
+  partly: { core: 1, blur: 0, glow: 0.95, glowSize: 1, haze: 1, rays: 0.9, ghosts: 0.7, ring: 0,
+            clouds: 0.7, cloudScale: 1.2, cloudAlpha: 0.92, veil: 0.08, veilCol: [244, 244, 250], top: [255, 255, 255], shade: [186, 186, 204] },
+  thin:   { core: 0.85, blur: 0.3, glow: 1.1, glowSize: 1.4, haze: 1.4, rays: 0.2, ghosts: 0.25, ring: 1,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.32, veilCol: [244, 245, 250], top: [255, 255, 255], shade: [214, 214, 226] },
+  cloudy: { core: 0.4, blur: 1, glow: 0.55, glowSize: 1.8, haze: 0.8, rays: 0, ghosts: 0, ring: 0,
+            clouds: 1, cloudScale: 1.7, cloudAlpha: 0.95, veil: 0.5, veilCol: [218, 216, 226], top: [240, 238, 244], shade: [150, 148, 166] },
+  mist:   { core: 0.7, blur: 0.15, glow: 0.7, glowSize: 2, haze: 1.7, rays: 0.05, ghosts: 0, ring: 0,
+            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.45, veilCol: [250, 246, 240], top: [255, 255, 255], shade: [220, 216, 220] },
+  rain:   { core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0,
+            clouds: 0.85, cloudScale: 1.9, cloudAlpha: 0.95, veil: 0.75, veilCol: [178, 180, 194], top: [206, 206, 216], shade: [122, 122, 140] },
+  snow:   { core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0,
+            clouds: 0.6, cloudScale: 1.5, cloudAlpha: 0.9, veil: 0.7, veilCol: [228, 230, 238], top: [244, 244, 248], shade: [172, 174, 190] }
+};
+function sunCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
+var SUN_SPR = { core: sunCanvas(), glow: sunCanvas(), haze: sunCanvas(), soft: sunCanvas(), ray: sunCanvas(),
+                beam: sunCanvas(), ghost: sunCanvas(), ring: sunCanvas() };
+var SUN_CLOUD_SPR = [sunCanvas(), sunCanvas(), sunCanvas(), sunCanvas()];
+var sunBakedKey = '', sunBakedAt = -99, sunCloudKey = '', sunCloudAt = -99, sunLastT = 0;
+var sunRays = [], sunSpikes = [], sunBeams = [], sunClouds = [], sunCur = null;
+
+/* The weather the sun is seen through, from the real weather. */
+function sunWeatherKey() {
+  var c = S.condition, cc = S.cloudCover;
+  if (c === 'fog' || ENV.fog > 0.5) return 'mist';
+  if (c === 'snow') return 'snow';
+  if (ENV.rainy) return 'rain';
+  if (cc < 12) return 'clear';
+  if (cc < 32) return 'sunny';
+  if (cc < 55) return 'partly';
+  if (cc < 75) return 'thin';
+  return 'cloudy';
+}
+function sunLerpWeather(a, b, k) {
+  var o = {};
+  for (var key in b) o[key] = Array.isArray(b[key]) ? mixRgb(a[key], b[key], k) : lerp(a[key], b[key], k);
+  return o;
+}
+function sunRadius(alt) { return SUN_LOOK.coreSize * S.sunSize * (1 + (1 - smooth(2, 22, alt)) * 0.25); }
+/* The sun's colours now: white with a cool edge high up, warmer and more
+   orange the lower it is. */
+function sunColours(low) {
+  var C = {}; for (var k in SUN_LOOK.colours) C[k] = hexToRgb(SUN_LOOK.colours[k]);
+  return {
+    core: mixRgb(C.core, mixRgb(C.low, [255, 255, 255], 0.55), low),
+    glow: mixRgb(C.glow, C.low, low), haze: mixRgb(C.haze, C.low, low * 0.9), ghost: mixRgb(C.ghost, C.low, low * 0.5)
+  };
+}
+/* A round sprite of radius n px: f(p) is the brightness at p (0 centre, 1 edge). */
+function sunBakeRound(Sp, n, f, col) {
+  var d = n * 2, c = Sp.c;
+  Sp.cnv.width = Sp.cnv.height = d;
+  var img = c.createImageData(d, d), px = img.data, r = rngFrom(97);
+  for (var y = 0; y < d; y++) for (var x = 0; x < d; x++) {
+    var dx = x + 0.5 - n, dy = y + 0.5 - n, p = Math.sqrt(dx * dx + dy * dy) / n;
+    if (p >= 1) continue;
+    var I = f(p);
+    if (I <= 0) continue;
+    var C = col(p), o = (y * d + x) * 4;
+    px[o] = C[0]; px[o + 1] = C[1]; px[o + 2] = C[2];
+    px[o + 3] = clamp(Math.floor(I * 255 + r()), 0, 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+/* A ray lying along +x from the sun's centre to its tip: bright and narrow at
+   the root, fading and thinning toward the tip, with a soft cross-section. */
+function sunBakeRay(Sp, w, h, across, along, colIn, colOut) {
+  var c = Sp.c;
+  Sp.cnv.width = w; Sp.cnv.height = h;
+  var img = c.createImageData(w, h), px = img.data, r = rngFrom(31);
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var u = (x + 0.5) / w, v = (y + 0.5 - h / 2) / (h / 2);
+    var k = v / (across * lerp(1, 0.3, u));
+    var I = along(u) * Math.exp(-k * k * 2.2);
+    if (I <= 0.0005) continue;
+    var C = mixRgb(colIn, colOut, Math.min(1, u * 1.5)), o = (y * w + x) * 4;
+    px[o] = C[0]; px[o + 1] = C[1]; px[o + 2] = C[2];
+    px[o + 3] = clamp(Math.floor(I * 255 + r()), 0, 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+function sunBake(low) {
+  var K = sunColours(low), white = [255, 255, 255], L = SUN_LOOK;
+  var s = L.coreSoftness, e0 = 0.62 * (1 - s * 0.45), e1 = 0.62 + s * 0.3;
+  sunBakeRound(SUN_SPR.core, 64, function(p) { return 1 - smooth(e0, e1, p) * (1 - 0.12 * Math.exp(-p * 4)); },
+               function(p) { return mixRgb(white, K.core, smooth(0.3, 0.7, p)); });
+  var F = L.glowFalloff;
+  sunBakeRound(SUN_SPR.glow, 200, function(p) {
+    return (0.62 * Math.exp(-p * 13 * F) + 0.3 * Math.exp(-p * 5 * F) + 0.14 * Math.exp(-p * 2 * F)) * Math.pow(1 - p * p, 2);
+  }, function(p) { return mixRgb(mixRgb(white, K.core, 0.5), K.glow, smooth(0, 0.25, p)); });
+  sunBakeRound(SUN_SPR.haze, 160, function(p) { return Math.exp(-p * p * 3.2) * Math.pow(1 - p * p, 2); }, function() { return K.haze; });
+  sunBakeRound(SUN_SPR.soft, 96, function(p) { return Math.exp(-p * p * 4) * (1 - p * p); }, function(p) { return mixRgb(K.core, K.glow, p); });
+  sunBakeRay(SUN_SPR.ray, 256, 24, 0.42, function(u) { return Math.pow(1 - u, 1.4) * (0.3 + 0.7 * Math.exp(-u * 3.5)); },
+             mixRgb(white, K.core, 0.5), K.glow);
+  sunBakeRay(SUN_SPR.beam, 128, 48, 0.75, function(u) { return Math.pow(1 - u, 1.8) * smooth(0, 0.18, u); }, K.glow, K.glow);
+  sunBakeRound(SUN_SPR.ghost, 64, function(p) { return (0.55 + 0.45 * smooth(0.55, 0.92, p)) * (1 - smooth(0.88, 1, p)); },
+               function() { return K.ghost; });
+  sunBakeRound(SUN_SPR.ring, 160, function(p) { var k = (p - 0.86) / 0.045; return Math.exp(-k * k) + 0.25 * Math.exp(-p * 3) * (1 - smooth(0.7, 0.86, p)); },
+               function(p) { return p < 0.86 ? mixRgb([255, 200, 170], white, smooth(0.78, 0.86, p)) : mixRgb(white, [205, 222, 255], smooth(0.86, 0.95, p)); });
+}
+/* Where each streak, spike and beam points, how long and thick it is, and its
+   own shimmer. Fixed by the pattern number. */
+function sunBuildRays() {
+  var L = SUN_LOOK, r = rngFrom(L.seed * 7919 + 13), irr = L.irregular, i, n = L.streaks;
+  sunRays = []; sunSpikes = []; sunBeams = [];
+  var off = r() * TAU;
+  for (i = 0; i < n; i++) {
+    sunRays.push({ a: off + (i + (r() - 0.5) * irr * 1.6) / n * TAU + (r() - 0.5) * irr * 0.25,
+                   len: 1 - L.streakVariety * (1 - Math.pow(r(), 2.5)) * 0.8, w: lerp(1, 0.45 + r() * 1.1, irr),
+                   b: lerp(1, 0.45 + r() * 0.75, irr), ph: r() * 100, sp: 0.6 + r() * 0.9, long: false });
+  }
+  for (i = 0; i < L.longStreaks; i++) {
+    sunRays.push({ a: r() * TAU, len: 2 + r() * 1.4, w: 0.55 + r() * 0.4, b: 0.35 + r() * 0.3, ph: r() * 100, sp: 0.4 + r() * 0.6, long: true });
+  }
+  for (i = 0; i < L.spikes; i++) {
+    sunSpikes.push({ a: (i + (r() - 0.5) * irr) / Math.max(1, L.spikes) * TAU, len: 0.55 + r() * 0.75, w: 0.4 + r() * 0.5,
+                     b: 0.4 + r() * 0.6, ph: r() * 100, sp: 1 + r() * 1.5 });
+  }
+  for (i = 0; i < L.beams; i++) {
+    sunBeams.push({ a: r() * TAU, len: 0.6 + r() * 0.5, w: 0.7 + r() * 0.8, b: 0.5 + r() * 0.5, ph: r() * 100, sp: 0.2 + r() * 0.3 });
+  }
+}
+/* Slow, smooth wandering, 0..1 (a few sines out of step). */
+function sunWander(t, ph) {
+  return 0.5 + 0.22 * Math.sin(t * 0.9 + ph) + 0.16 * Math.sin(t * 2.3 + ph * 1.7) + 0.12 * Math.sin(t * 5.1 + ph * 0.6);
+}
+/* The clouds: four soft shapes, baked in the sky's colours. */
+function sunBakeClouds(top, shade) {
+  SUN_CLOUD_SPR.forEach(function(Sp, k) {
+    var r = rngFrom(400 + k * 17), w = 360, h = 170, c = Sp.c;
+    Sp.cnv.width = w; Sp.cnv.height = h;
+    c.clearRect(0, 0, w, h);
+    c.filter = 'blur(5px)';
+    for (var i = 0; i < 18; i++) {
+      var x = 50 + r() * (w - 100), mid = 1 - Math.abs(x - w / 2) / (w * 0.55);
+      var rad = (18 + r() * 34) * (0.5 + mid * 0.8), y = 128 - rad * (0.55 + r() * 0.35);
+      var g = c.createRadialGradient(x, y, 0, x, y, rad);
+      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+      c.fillStyle = g; c.beginPath(); c.arc(x, y, rad, 0, TAU); c.fill();
     }
-    // faint lens ghosts on the line toward the centre of the screen
-    var cx = W * 0.5, cy = H * 0.5;
-    [[0.55, 26, [255, 190, 140]], [0.95, 14, [255, 220, 170]], [1.35, 40, [190, 205, 255]]].forEach(function(gh) {
-      var gx = x + (cx - x) * gh[0], gy = y + (cy - y) * gh[0], gr = gh[1] * S.sunSize;
-      var gg = ctx.createRadialGradient(gx, gy, 0, gx, gy, gr);
-      gg.addColorStop(0, rgba(gh[2], 0.1 * clear));
-      gg.addColorStop(0.7, rgba(gh[2], 0.06 * clear));
-      gg.addColorStop(1, rgba(gh[2], 0));
-      ctx.fillStyle = gg;
-      ctx.beginPath(); ctx.arc(gx, gy, gr, 0, TAU); ctx.fill();
+    c.filter = 'none';
+    c.globalCompositeOperation = 'destination-out';
+    var b = c.createLinearGradient(0, 118, 0, 150);
+    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(1, 'rgba(0,0,0,1)');
+    c.fillStyle = b; c.fillRect(0, 118, w, h - 118);
+    c.globalCompositeOperation = 'source-atop';
+    var sh = c.createLinearGradient(0, 30, 0, 135);
+    sh.addColorStop(0, rgba(top, 1)); sh.addColorStop(1, rgba(shade, 1));
+    c.fillStyle = sh; c.fillRect(0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+  });
+}
+function sunBuildClouds() {
+  var r = rngFrom(2024);
+  sunClouds = [];
+  for (var i = 0; i < 18; i++) {
+    sunClouds.push({ x: r() * 1.4 - 0.2, near: i % 2 === 0, yr: r(), s: 0.6 + r() * 0.8, v: 0.5 + r(), k: i % 4, a: 0, want: r() });
+  }
+}
+
+/* Clouds, the veil over the sky, and the sun. Called once a frame, first. */
+function drawSun(ctx, t) {
+  var dt = sunLastT ? clamp(t - sunLastT, 0, 0.1) : 0.016;
+  sunLastT = t;
+  var L = SUN_LOOK, a = ENV.astro.sun;
+  var wk = sunWeatherKey(), target = SUN_WEATHER[wk];
+  sunCur = sunCur ? sunLerpWeather(sunCur, target, 1 - Math.exp(-dt / 0.8)) : sunLerpWeather(target, target, 1);
+  var cur = sunCur;
+  if (!sunClouds.length) { sunBuildClouds(); sunBuildRays(); }
+  var night = 1 - smooth(0.05, 0.5, ENV.light.daylight);          // 0 by day, 1 in the dark
+  var low = 1 - smooth(2, 22, a.alt);                              // 1 as the sun nears the horizon
+  var lowK = Math.round(Math.max(low, L.warmth * 0.6) * 12) / 12;
+
+  // the sun's pieces, baked again only when its colour has really changed (and not more than once in a while)
+  var bk = String(lowK);
+  if (bk !== sunBakedKey && (t - sunBakedAt > 1.5 || !sunBakedKey)) { sunBakedKey = bk; sunBakedAt = t; sunBake(lowK); }
+  // the clouds' colours: pale and bluish at night, a warm tint at sunrise and sunset
+  var nK = Math.round(night * 8) / 8, eK = Math.round(low * (1 - night) * 8) / 8;
+  var top = mixRgb(mixRgb(target.top, [255, 196, 160], eK * 0.35), [150, 158, 196], nK * 0.6);
+  var shade = mixRgb(mixRgb(target.shade, [170, 120, 140], eK * 0.4), [96, 102, 142], nK * 0.6);
+  var ck = wk + '|' + nK + '|' + eK;
+  if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) { sunCloudKey = ck; sunCloudAt = t; sunBakeClouds(top, shade); }
+
+  var P = { x: skyToScreen(a.alt, a.az).x }, R = sunRadius(a.alt);
+  P.y = skyBandY(R); var X = P.x, Y = P.y;
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+
+  // the veil: a sheet of cloud or haze over the sky (none in the dark)
+  var va = cur.veil * L.veil * (1 - night);
+  if (va > 0.003) {
+    var hz = H * 0.9, vg = ctx.createLinearGradient(0, 0, 0, hz);
+    vg.addColorStop(0, rgba(cur.veilCol, clamp(va * 0.75, 0, 1))); vg.addColorStop(1, rgba(cur.veilCol, clamp(va * 0.45, 0, 1)));
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, hz);
+  }
+  // the clouds, and how much of the sun they hide
+  var shown = Math.round(cur.clouds * sunClouds.length), occl = 0;
+  var wind = L.cloudSpeed * (0.6 + 0.4 * clamp(S.windSpeed / 2.5, 0, 2.5));
+  for (var i = 0; i < sunClouds.length; i++) {
+    var Cl = sunClouds[i];
+    var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) * lerp(1, 0.22, night) : 0;
+    Cl.a += (want - Cl.a) * (1 - Math.exp(-dt / 1.2));
+    var cw = 300 * Cl.s * L.cloudSize * cur.cloudScale, ch = cw * 170 / 360;
+    Cl.x += (5 + 9 * Cl.v) * wind * dt / W;
+    if (Cl.x * W - cw / 2 > W + 20) Cl.x = (-cw / 2 - 20) / W;
+    if (Cl.a < 0.005) continue;
+    var cx = Cl.x * W, cy = Cl.near ? Y + (Cl.yr - 0.5) * ch * 1.2 : H * (0.05 + Cl.yr * 0.4);
+    ctx.globalAlpha = Cl.a;
+    ctx.drawImage(SUN_CLOUD_SPR[Cl.k].cnv, cx - cw / 2, cy - ch * 0.62, cw, ch);
+    var dx = (X - cx) / (cw * 0.4), dy = (Y - cy + ch * 0.1) / (ch * 0.3), d = Math.sqrt(dx * dx + dy * dy);
+    occl = 1 - (1 - occl) * (1 - Cl.a * (1 - smooth(0.5, 1, d)));
+  }
+  ctx.globalAlpha = 1;
+
+  if (!S.sun || a.alt < -1.5) return;
+  var vis = L.strength * smooth(-1.5, 1.5, a.alt);
+  if (vis < 0.005) return;
+  var block = occl * L.cloudBlock, clear = vis * cur.rays * (1 - block);
+  var c = ctx;
+  c.globalCompositeOperation = 'lighter';
+  function round(Sp, r, al) { if (al > 0.002) { c.globalAlpha = clamp(al, 0, 1); c.drawImage(Sp.cnv, X - r, Y - r, r * 2, r * 2); } }
+  var spin = t * L.turn / 60 * PI / 180, shim = L.shimmer, ss = L.shimmerSpeed;
+  function ray(Sp, ang, len, wid, al, root) {
+    if (al < 0.003 || len < 1) return;
+    var co = Math.cos(ang), si = Math.sin(ang);
+    c.setTransform(PR * co, PR * si, -PR * si, PR * co, PR * X, PR * Y);
+    c.globalAlpha = clamp(al, 0, 1);
+    c.drawImage(Sp.cnv, root, -wid / 2, len, wid);
+  }
+  var breathe = 1 + shim * 0.06 * (sunWander(t * 0.3 * ss, 1.3) - 0.5);
+  round(SUN_SPR.haze, R * L.hazeSize * Math.sqrt(cur.glowSize), L.haze * cur.haze * 0.4 * vis * (1 - block * 0.3));
+  var gA = L.glow * cur.glow * vis * (1 - block * 0.55);
+  round(SUN_SPR.glow, R * L.glowSize * cur.glowSize * breathe, gA);
+  round(SUN_SPR.soft, R * 3.4 * Math.sqrt(cur.glowSize) * breathe, gA * 0.8 * (1 - cur.blur * 0.75));
+  for (i = 0; i < sunBeams.length; i++) {
+    var Bm = sunBeams[i], fl = 1 - shim * (1 - sunWander(t * Bm.sp * ss, Bm.ph));
+    ray(SUN_SPR.beam, Bm.a + spin * 0.5, R * L.streakLength * 0.9 * Bm.len, R * 3.2 * L.beamWidth * Bm.w, L.beamStrength * Bm.b * fl * clear, R * 0.6);
+  }
+  for (i = 0; i < sunRays.length; i++) {
+    var Ry = sunRays[i], f1 = 1 - shim * (1 - sunWander(t * Ry.sp * ss, Ry.ph));
+    var rl = R * L.streakLength * Ry.len, rw = R * 0.42 * L.streakWidth * Ry.w * (Ry.long ? 0.6 : 1), ra = L.streakStrength * Ry.b * f1 * clear;
+    ray(SUN_SPR.ray, Ry.a + spin, rl * 0.85, rw * 4, ra * 0.3, 0);
+    ray(SUN_SPR.ray, Ry.a + spin, rl, rw, ra, 0);
+  }
+  for (i = 0; i < sunSpikes.length; i++) {
+    var Sp = sunSpikes[i], f2 = 1 - shim * (1 - sunWander(t * Sp.sp * ss, Sp.ph));
+    ray(SUN_SPR.ray, Sp.a - spin * 0.7, R * L.spikeLength * Sp.len, R * 0.22 * L.streakWidth * Sp.w, L.spikeStrength * Sp.b * f2 * clear, 0);
+  }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  var coreA = L.coreBrightness * cur.core * vis;
+  round(SUN_SPR.core, R / 0.62, coreA * (1 - cur.blur) * (1 - block));
+  round(SUN_SPR.soft, R * 3.2 * (1 + cur.blur * 0.8), coreA * cur.blur * 0.6 * (1 - block * 0.6));
+  round(SUN_SPR.ring, R * L.ringSize, L.ring * cur.ring * 0.22 * vis);
+  var ga = L.ghosts * cur.ghosts * clear;
+  if (ga > 0.003) {
+    var mx = W * 0.5, my = H * 0.5;
+    [[0.45, 0.7, 0.10], [0.9, 1.6, 0.06], [1.35, 0.9, 0.09], [1.75, 4.2, 0.05]].forEach(function(gh) {
+      var gx = X + (mx - X) * gh[0], gy = Y + (my - Y) * gh[0], gr = R * gh[1] * L.ghostSize;
+      c.globalAlpha = clamp(ga * gh[2], 0, 1);
+      c.drawImage(SUN_SPR.ghost.cnv, gx - gr, gy - gr, gr * 2, gr * 2);
     });
   }
-  var cg = ctx.createRadialGradient(x, y, 0, x, y, size);
-  cg.addColorStop(0, rgba([255, 255, 255], vis));
-  cg.addColorStop(0.7, rgba([255, 253, 246], 0.95 * vis));
-  cg.addColorStop(1, rgba([255, 245, 225], 0));
-  ctx.fillStyle = cg;
-  ctx.beginPath(); ctx.arc(x, y, size, 0, TAU); ctx.fill();
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
 }
 
 /* The moon at its real place and real phase. The lit side always
@@ -11918,7 +12156,7 @@ function drawRays(ctx, t) {
   var ox = lerp(-0.15, 1.15, u) * W, oy = -0.25 * H;
   if (S.sun && ENV.astro.sun.alt > 0) {
     ox = skyToScreen(ENV.astro.sun.alt, ENV.astro.sun.az).x;
-    oy = skyBandY(24 * S.sunSize);
+    oy = skyBandY(sunRadius(ENV.astro.sun.alt));
   }
   var ang0 = Math.atan2(H * 0.9 - oy, W * 0.5 - ox);
   var len = Math.sqrt(W * W + H * H) * 1.4;
