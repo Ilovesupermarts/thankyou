@@ -267,7 +267,7 @@
   <div class="detail" id="detail"></div>
   <div class="detail extra" id="kpNote">
     <b>＋ Keypad hint</b>
-    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the price and the keypad (料金は変更できます / 入力後「決定」を). It goes when the keypad closes, and shows the first time only.
+    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the keypad with 入力後「決定」を underneath it. It goes when the keypad closes, and shows the first time only.
     <div class="try"><span id="kpState"></span> <button class="chip" id="kpReset">Show it again</button></div>
   </div>
   <div class="replays" id="replays"></div>
@@ -811,14 +811,19 @@
         Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.price, shape: 'circle', pad: 14, text: r.v.textContent ? '料金を変えるときは、ここをタップ' : '料金をタップして金額を入力', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
       },
       on: function () { return false; } },
-    { id: '6c', t: 'Untick', what: 'A caption beside a ○ she has ticked (skipped if she has ticked nothing). One loop, then 6d.', cap: 'もう一度タップで取り消せます', gone: 'After one loop.',
-      setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
+    { id: '6c', t: 'Untick', what: 'Waits for the first service she ticks, then a caption beside that ○. One loop, then 6d. If she has not ticked anything but scrolls to the その他 rows, it moves on to 6d.', cap: 'もう一度タップで取り消せます', gone: 'After one loop.', try: 'Tick any service.',
+      setup: function () { showScreen('scrTable'); buildTable(); },
       hint: function () {
         var s = this, r = rows.filter(function (x) { return x.on; })[0];
-        if (!r) { next(); return; }
-        Coach.show({ once: true, fade: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }] });
+        if (tickShown) { next(); return; }
+        if (!r) { Coach.clear(); return; }
+        drawTickHint(r, function () { if (steps[curStep] === s) next(); });
       },
-      on: function () { return false; } },
+      on: function (e) {
+        if (e === 'check') { this.hint(); return false; }
+        if (e === 'scroll') { var c = rows.filter(function (x) { return x.custom && !x.name; })[0]; return !!(c && fullyVisible(c.el)); }
+        return false;
+      } },
     { id: '6d', t: 'その他 rows', what: 'When she scrolls the first その他 row fully into view: box around it. One loop, then the hints for the table are finished.', cap: 'ご提案があれば、こちらにご記入ください', gone: 'After one loop, or if she opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the "in order" caption.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
@@ -867,10 +872,15 @@
      Not a step: it comes on the first time the keypad appears (a tap on
      any price, a preset or a custom service), whatever step she is on,
      and goes when the keypad closes. */
-  var kpShown = false, kpOn = false;
+  var kpShown = false, kpOn = false, tickShown = false;
   function drawKeypadHint() {
-    if (!activeRow) return;
-    Coach.show({ targets: [{ el: activeRow.price, shape: 'box', pad: 8, text: '料金は変更できます', place: 'below' }, { el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'left' }] });
+    Coach.show({ targets: [{ el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'below' }] });
+  }
+
+  /* The 「もう一度タップで取り消せます」 caption for the first service she ticks. */
+  function drawTickHint(row, done) {
+    tickShown = true;
+    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }] });
   }
 
   /* natural: arrived by doing the action, so keep the screen as it is. */
@@ -879,7 +889,7 @@
     if (old && old.leave) old.leave();
     Coach.clear();
     kpOn = false;
-    if (!natural) kpShown = false;
+    if (!natural) { kpShown = false; tickShown = false; }
     $('end').classList.remove('on');
     curStep = Math.max(0, Math.min(steps.length - 1, i));
     var s = steps[curStep];
@@ -902,6 +912,11 @@
         else if (s.id === '6b') next();
         else go(curStep, true);
       }
+      return;
+    }
+    /* Her first tick after the guided hints (6d or finished) still gets its caption. */
+    if (evt === 'check' && !tickShown && (s.id === '6d' || s.id === 'T') && $('scrTable').classList.contains('on')) {
+      drawTickHint(data, function () { if (steps[curStep] === s) go(curStep, true); });
       return;
     }
     if (evt === 'numpad' && !kpShown && $('scrTable').classList.contains('on')) {
