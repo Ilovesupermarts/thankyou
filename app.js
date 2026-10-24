@@ -1,4 +1,4 @@
-var BUILD = 'v144';
+var BUILD = 'v145';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -13894,6 +13894,8 @@ function drawNearBand(c) {
    little, the tie beam, the short post, the upper beam with curled-up
    ends) and every piece of every gate is drawn from the furthest to the
    nearest, so the gates overlap as they really would.
+   Stone lanterns stand beside the path, lit and flickering after dusk (see
+   "Stone lanterns" below, values in LANT).
    Depth of field: further gates are blurred (in six steps) and hazed
    toward the mist colour, as the ground is at the horizon. Everything is
    lit by the app's own light (koyoLight) and baked, with the landscape,
@@ -13919,7 +13921,24 @@ var TORII = {
   // the gravel path
   gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
 };
-var TOR = { gate: landCanvas(), grav: landCanvas(), gateTop: 0, gravTop: 0, ready: false };
+/* The stone lanterns, as set on bamboo.html. */
+var LANT = {
+  show: true,
+  // where they stand: one in every gap between two gates, on both sides; "along" is where in the
+  // gap (0 by the gate further from you, 1 by the nearer), "fromEdge" the gap from the gravel (× lantern height)
+  every: 1, side: 'both', rightAlong: 0.89, rightFromEdge: 0.3, leftAlong: 0.38, leftFromEdge: 0.3,
+  // the lantern
+  size: 1.38, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
+  moss: 0.53, variety: 0.78, roofLeaves: 1.75,
+  colours: { stone: '#B3ADA3', stoneShade: '#5F5B56', moss: '#6E7A4C', paper: '#F4EEE2', flame: '#FFAE52', glow: '#FFD89A' },
+  // the light
+  lightEvening: 1.3, lightNight: 1.34, windowGlow: 0.43, halo: 0.7, haloSize: 2.05, pool: 1.1, poolSize: 1.25,
+  castLight: 0.7, reach: 2.2,
+  // the flicker: strength, seconds between flickers and how long one lasts (on average, for each lantern),
+  // speed, the gentle unsteadiness between flickers, and the extra flicker in a gust
+  flicker: 0.77, flickerEvery: 1, flickerLength: 1.2, flickerSpeed: 1, wobble: 0.58, windFlicker: 1
+};
+var TOR = { gate: landCanvas(), grav: landCanvas(), mask: landCanvas(), maskB: landCanvas(), gateTop: 0, gravTop: 0, ready: false };
 var TOR_BANDS = 6;
 function torLens() { return TORII.lens * W; }
 function torScreen(x, y, z) { var F = torLens(); return [W / 2 + F * x / z, H * LAND.horizon + F * (1 - y) / z]; }
@@ -14152,39 +14171,182 @@ function torDrawGravel(c) {
   if (!TOR.ready || !TORII.gravel || TOR.grav.cnv.width < 2 || ENV.scene !== 'autumn') return;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.drawImage(TOR.grav.cnv, 0, Math.round(TOR.gravTop * PR));
+  torDrawPools(c, lastT);                                   // the lanterns' pools of light on it, after dusk
 }
+/* ---------- Stone lanterns (tōrō) beside the gravel path ----------
+   As tuned on bamboo.html (values in LANT). A Kasuga-style lantern of grey
+   granite stands beside the path in the gap between two gates, on both
+   sides: a plinth and base, a round pillar with two rings, a lotus platform,
+   a six-sided light box with a paper window in each side, a roof with
+   curled-up corners, and a jewel on top. Each is a little different (paler or
+   darker, more or less moss) and has a few red leaves on its roof and base.
+   Each is built in 3D like the gates and drawn in among their pieces, so
+   gates and lanterns overlap as they really would.
+   From sunset the windows glow (LANT.lightEvening, then LANT.lightNight at
+   night, following the app's own light, torLampLevel). The light they throw
+   on the nearby gate pillars and stone is baked in, and the rest is added each
+   frame: the windows brighten and dim (a mask of just the parts of each window
+   that are not hidden behind a gate or another lantern), a soft glow in the
+   air around each, and a pool of light on the ground under it. Every lantern
+   flickers on its own, at random moments, and never keeps step with another
+   (torFlameAt). With reduced motion on, the light stays steady. */
+var TOR_LEAF_TONES = [KOYO_FAMILIES.red[1], KOYO_FAMILIES.red[2], KOYO_FAMILIES.orange[1], KOYO_FAMILIES.red[0]];
+var torLanterns = [], torLanternCount = 0;      // the lanterns on the screen, as last baked
+function torLanternPieces(lod, rs) {
+  var h = LANT.size, n = Math.round(LANT.sides), off = PI / n, P = LANT.pillar * h, B = LANT.box * h, R = LANT.roof * h;
+  var round = lod > 0.5 ? 12 : lod > 0.15 ? 8 : 6;
+  var pieces = [];
+  function ring(cx, cz, y, r, k, o) {
+    var out = [];
+    for (var i = 0; i < k; i++) { var a = o + (i / k) * TAU; out.push([cx + Math.cos(a) * r, y, cz + Math.sin(a) * r]); }
+    return out;
+  }
+  // a solid from y0 to y1 with k sides, r0 at the bottom and r1 at the top; its middle can move (c0 → c1)
+  function frustum(y0, y1, r0, r1, k, o, tone, opt) {
+    opt = opt || {};
+    var c0 = opt.c0 || [0, 0], c1 = opt.c1 || c0;
+    var lo = ring(c0[0], c0[1], y0, r0, k, o), hi = ring(c1[0], c1[1], y1, r1, k, o), faces = [];
+    for (var i = 0; i < k; i++) {
+      var j = (i + 1) % k;
+      faces.push({ tone: opt.alt && i % 2 ? opt.alt : tone, p: [lo[i], lo[j], hi[j], hi[i]] });
+    }
+    if (opt.top && r1 > 1e-4) faces.push({ tone: opt.topTone || tone, p: hi.slice().reverse() });
+    if (opt.bottom && r0 > 1e-4) faces.push({ tone: tone, p: lo });
+    if (opt.windows) {                                  // a paper window set into each side, just proud of it
+      for (var w = 0; w < k; w++) {
+        var a = lo[w], b = lo[(w + 1) % k], mx = (a[0] + b[0]) / 2, mz = (a[2] + b[2]) / 2, ml = Math.hypot(mx, mz) || 1;
+        var px = mx / ml * 0.004 * h, pz = mz / ml * 0.004 * h, f = opt.windows;
+        var ya = y0 + (y1 - y0) * 0.14, yb = y1 - (y1 - y0) * 0.12;
+        var wp = function (t, y) { return [lerp(mx, lerp(a[0], b[0], t), f) + px, y, lerp(mz, lerp(a[2], b[2], t), f) + pz]; };
+        faces.push({ tone: 'w', p: [wp(0, ya), wp(1, ya), wp(1, yb), wp(0, yb)] });
+      }
+    }
+    pieces.push({ faces: faces, c: [(c0[0] + c1[0]) / 2, (y0 + y1) / 2, (c0[1] + c1[1]) / 2], part: opt.part || 's' });
+  }
+  var yPl = 0.035 * h, yBa = 0.085 * h, yNk = 0.105 * h, yR1 = 0.27 * h, yR2 = 0.3 * h, rH = 0.014 * h, yPt = 0.5 * h;
+  var yLo = 0.565 * h, yLb = 0.595 * h, yBx = 0.745 * h, yEv = 0.77 * h, yRf = 0.875 * h;
+  // plinth and base
+  frustum(0, yPl, B * 1.9, B * 1.86, n, off, 'm', { top: true });
+  frustum(yPl, yBa, B * 1.5, B * 1.2, n, off, 'm', { top: true });
+  frustum(yBa, yNk, P * 1.3, P * 1.08, round, 0, 's', { top: true });
+  // the pillar, with two rings round it
+  frustum(yNk, yR1, P, P * 0.97, round, 0, 's');
+  frustum(yR1, yR1 + rH, P * 1.13, P * 1.13, round, 0, 's', { top: true });
+  frustum(yR1 + rH, yR2, P * 0.965, P * 0.96, round, 0, 's');
+  frustum(yR2, yR2 + rH, P * 1.12, P * 1.12, round, 0, 's', { top: true });
+  frustum(yR2 + rH, yPt, P * 0.955, P * 0.92, round, 0, 's');
+  // the lotus platform: petals flaring out, then a band
+  frustum(yPt, yLo, P * 1.05, B * 1.55, Math.max(n * 3, round + 4), 0, 's', { alt: 'd' });
+  frustum(yLo, yLb, B * 1.55, B * 1.5, n, off, 's', { top: true });
+  // the light box, its windows facing the path and the other sides
+  frustum(yLb, yBx, B, B, n, off, 'b', { windows: 0.66, part: 'box' });
+  // the roof: the eaves, the slope up to the top, and the corners curling up
+  frustum(yBx, yEv, R, R * 0.97, n, off, 's', { bottom: true });
+  frustum(yEv, yRf, R * 0.97, 0.055 * h, n, off, 'r', { top: true });
+  if (LANT.curls && lod > 0.25) {
+    ring(0, 0, 0, R, n, off).forEach(function (v) {
+      frustum(yEv - 0.012 * h, yEv + 0.03 * h, 0.016 * h, 0.01 * h, 4, PI / 4, 'r',
+              { c0: [v[0] * 0.97, v[2] * 0.97], c1: [v[0] * 1.05, v[2] * 1.05], top: true });
+    });
+  }
+  // the jewel on top
+  var J = [[yRf, 0.035], [0.9 * h, 0.04], [0.925 * h, 0.052], [0.952 * h, 0.05], [0.976 * h, 0.032], [h, 0.002]];
+  for (var j = 0; j < J.length - 1; j++) frustum(J[j][0], J[j + 1][0], J[j][1] * h, J[j + 1][1] * h, round, 0, 's', { top: j === J.length - 2 });
+  // a few fallen leaves on the roof and the base, as in the photos
+  pieces.leaves = [];
+  var nLv = Math.round(LANT.roofLeaves * (lod > 0.4 ? 7 : lod > 0.12 ? 3 : 0) * lerp(0.4, 1.6, rs()));
+  for (var q = 0; q < nLv; q++) {
+    var onRoof = rs() < 0.6, a2 = rs() * TAU, rr = onRoof ? lerp(0.1, 0.75, rs()) : lerp(0.75, 0.98, rs());
+    var r2 = onRoof ? lerp(R * 0.97, 0.055 * h, rr) : B * 1.86 * rr, y2 = onRoof ? lerp(yEv, yRf, rr) + 0.004 * h : yPl + 0.003 * h;
+    pieces.leaves.push({ p: [Math.cos(a2) * r2, y2, Math.sin(a2) * r2], s: 0.022 * h * lerp(0.7, 1.3, rs()),
+                         rot: rs() * TAU, t: rs(), roof: onRoof });
+  }
+  return pieces;
+}
+/* Where the lanterns stand: in the gaps between the gates (every LANT.every
+   gap), beside the path, just off the gravel. Each side has its own place
+   in the gap (LANT.rightAlong, LANT.leftAlong) and its own gap from the gravel. */
+function torPlaceLanterns(path, gap) {
+  var out = [];
+  if (!LANT.show || !path || path.len <= 0) return out;
+  var h = TORII.gateHeight, wu = (TORII.width * h / 2 + TORII.pillar * h * 1.5) * TORII.pathWidth;
+  var every = Math.max(1, Math.round(LANT.every)), k = 0;
+  for (var s = path.len - gap; s > -1e-6; s -= gap, k++) {          // s: the gate at the start of this gap (further from you)
+    if (k % every) continue;
+    var sides;
+    // right as you walk toward the gate facing you is (tz, -tx); the gates' across direction (ax, az) is the left
+    if (LANT.side === 'both') sides = [-1, 1];
+    else if (LANT.side === 'alternate') sides = [(k / every) % 2 ? 1 : -1];
+    else sides = [LANT.side === 'left' ? 1 : -1];
+    sides.forEach(function (sd) {
+      var right = sd < 0, along = right ? LANT.rightAlong : LANT.leftAlong;
+      // from the middle of the path to the middle of the lantern
+      var off = wu + (right ? LANT.rightFromEdge : LANT.leftFromEdge) * LANT.size + LANT.box * LANT.size * 1.9;
+      var q = torPathAt(path, clamp(s + along * gap, 0, path.len));
+      out.push({ x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
+                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 });
+    });
+  }
+  return out;
+}
+/* How bright the lanterns are now: 0 by day, coming on as the light dims at
+   sunset (LANT.lightEvening) and full at night (LANT.lightNight), and going
+   out again after sunrise. It follows the app's own light, so it changes
+   smoothly with the time of day. */
+function torLampLevel() {
+  var d = ENV.light ? ENV.light.dark : 0;
+  return smooth(0.04, 0.2, d) * lerp(LANT.lightEvening, LANT.lightNight, koyoNight());
+}
+
 /* Both baked at once (the last step of a landscape bake). */
 function torBake() {
   TOR.ready = false;
+  torLanterns = []; torLanternCount = 0;
   TOR.gate.cnv.width = 1; TOR.gate.cnv.height = 1;
   TOR.grav.cnv.width = 1; TOR.grav.cnv.height = 1;
   if (!W) return;
   var path = torPath();
   torBakeGravel(path);
-  if (!TORII.show) { TOR.ready = true; return; }
-  var hy = H * LAND.horizon, F = torLens(), C = {};
+  var hy = H * LAND.horizon, F = torLens(), C = {}, LC = {};
   for (var ck in TORII.colours) C[ck] = hexToRgb(TORII.colours[ck]);
-  var mistC = koyoLight(LAND_C.mist);
+  for (var lk in LANT.colours) LC[lk] = hexToRgb(LANT.colours[lk]);
+  var mistC = koyoLight(LAND_C.mist), lit = torLampLevel();
   var gap = Math.max(0.05, path.len / Math.max(1, TORII.count - 1));
+  function depthOf(foot) {
+    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
+    var farness = 1 - smooth(0, Math.max(0.02, TORII.focusDepth), depth);
+    return { haze: lerp(TORII.hazeNear, TORII.hazeFar, Math.pow(farness, 1.3)), band: Math.round(farness * (TOR_BANDS - 1)) };
+  }
   // the gates, from the end (the one facing you) back to the start
   var gates = [];
-  for (var s = path.len; s >= 0; s -= gap) {
+  if (TORII.show) for (var s = path.len; s >= 0; s -= gap) {
     var q = torPathAt(path, s);
     if (q.z < 0.6) continue;                           // behind or right at the camera
     var foot = hy + F / q.z;                           // its foot on the screen
     var px = TORII.gateHeight * F / q.z;                   // its height on the screen
     var x0 = W / 2 + F * q.x / q.z;
     if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
-    var depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);       // 0 at the horizon … 1 at the bottom
-    var farness = 1 - smooth(0, Math.max(0.02, TORII.focusDepth), depth);
-    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot,
-                 haze: lerp(TORII.hazeNear, TORII.hazeFar, Math.pow(farness, 1.3)),
-                 band: Math.round(farness * (TOR_BANDS - 1)) });
+    var dq = depthOf(foot);
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band });
   }
-  if (!gates.length) { TOR.ready = true; return; }
+  // the lanterns
+  torPlaceLanterns(path, gap).forEach(function (Lp) {
+    if (Lp.z < 0.6) return;
+    var foot = hy + F / Lp.z, px = LANT.size * F / Lp.z, x0 = W / 2 + F * Lp.x / Lp.z;
+    if (x0 < -px || x0 > W + px) return;
+    var dq = depthOf(foot), rs = rngFrom(Lp.seed * 31 + 17);
+    Lp.foot = foot; Lp.px = px; Lp.haze = dq.haze; Lp.band = dq.band; Lp.lantern = true;
+    Lp.tone = lerp(1 - 0.12 * LANT.variety, 1 + 0.08 * LANT.variety, rs());          // paler or darker granite
+    Lp.moss = clamp(LANT.moss * lerp(1 - LANT.variety * 0.8, 1 + LANT.variety * 0.6, rs()), 0, 1);
+    Lp.ly = 0.67 * LANT.size;                                                     // the flame, in the middle of the light box
+    Lp.rs = rs;
+    torLanterns.push(Lp);
+  });
+  torLanternCount = torLanterns.length;
+  if (!gates.length && !torLanterns.length) { TOR.ready = true; return; }
   // the light: from above, in front, and to the side TORII.lightFrom
   var Lx = TORII.lightFrom, Ly = 1.1, Lz = -0.6, Ll = Math.hypot(Lx, Ly, Lz); Lx /= Ll; Ly /= Ll; Lz /= Ll;
-  // every piece of every gate, furthest first
+  // every piece of every gate, furthest first; each lantern goes in whole, at the distance of its middle
   var all = [], minY = H;
   gates.forEach(function (g) {
     var lod = clamp(g.px / 120, 0, 1);
@@ -14195,28 +14357,122 @@ function torBake() {
     });
     minY = Math.min(minY, g.foot - g.px * 1.15);
   });
+  torLanterns.forEach(function (Lp) {
+    var lod = clamp(Lp.px / 90, 0, 1), raw = torLanternPieces(lod, Lp.rs);
+    var dy = LANT.size * 0.5 - 1, D = Lp.x * Lp.x + dy * dy + Lp.z * Lp.z;
+    torPlace(raw, Lp).forEach(function (pc, i) {
+      pc.dist = D - i * 1e-7;                          // its own pieces from the ground up
+      pc.part = raw[i].part;
+      all.push(pc);
+    });
+    Lp.leaves = raw.leaves.map(function (lf) {
+      var p = lf.p;
+      return { w: [Lp.x + Lp.ax * p[0] + Lp.tx * p[2], p[1], Lp.z + Lp.az * p[0] + Lp.tz * p[2]], s: lf.s, rot: lf.rot, t: lf.t, roof: lf.roof };
+    });
+    all[all.length - 1].leavesOf = Lp;                 // drawn just after its last piece
+    minY = Math.min(minY, Lp.foot - Lp.px * 1.1);
+  });
   all.sort(function (a, b) { return b.dist - a.dist; });
   TOR.gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - TOR.gateTop) * PR));
   var bands = [];
   for (var bi = 0; bi < TOR_BANDS; bi++) { var Lb = landCanvas(); Lb.cnv.width = cw; Lb.cnv.height = chh; Lb.c.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR); bands.push(Lb); }
-  // the shadow of the line of gates on the ground, thrown away from the light
+  // the shadow of the line of gates (and of each lantern) on the ground, thrown away from the light
   var SH = landCanvas(); SH.cnv.width = cw; SH.cnv.height = chh;
   var sc = SH.c;
   sc.setTransform(PR, 0, 0, PR, 0, -TOR.gateTop * PR);
+  function shadowQuad(o, wu, wv, k, alpha) {
+    var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
+      var x = o.x + o.ax * c[0] + o.tx * c[1] + shx * k, z = o.z + o.az * c[0] + o.tz * c[1] + shz * k;
+      return torScreen(x, 0, Math.max(0.3, z));
+    });
+    sc.fillStyle = rgba(C.ground, alpha);
+    sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+  }
+  var shx = -Lx / Ly * TORII.gateHeight * 0.35, shz = -Lz / Ly * TORII.gateHeight * 0.35;
   if (TORII.shadow > 0) {
-    var shx = -Lx / Ly * TORII.gateHeight * 0.35, shz = -Lz / Ly * TORII.gateHeight * 0.35;
     gates.forEach(function (g) {
-      var wu = TORII.width * TORII.gateHeight / 2 + TORII.pillar * TORII.gateHeight * 1.5, wv = gap * 0.52;
-      var corners = [[-wu, -wv], [wu, -wv], [wu, wv], [-wu, wv]].map(function (c) {
-        var x = g.x + g.ax * c[0] + g.tx * c[1] + shx * 0.5, z = g.z + g.az * c[0] + g.tz * c[1] + shz * 0.5;
-        return torScreen(x, 0, Math.max(0.3, z));
-      });
-      sc.fillStyle = rgba(C.ground, TORII.shadow * (1 - g.haze));
-      sc.beginPath(); corners.forEach(function (p, i) { if (i) sc.lineTo(p[0], p[1]); else sc.moveTo(p[0], p[1]); }); sc.closePath(); sc.fill();
+      shadowQuad(g, TORII.width * TORII.gateHeight / 2 + TORII.pillar * TORII.gateHeight * 1.5, gap * 0.52, 0.5, TORII.shadow * (1 - g.haze));
+    });
+    var lsk = LANT.size / TORII.gateHeight;
+    torLanterns.forEach(function (Lp) {
+      var r0 = LANT.box * LANT.size * 2.2;
+      shadowQuad(Lp, r0, r0, 0.5 * lsk, TORII.shadow * 1.1 * (1 - Lp.haze));
     });
   }
-  // the pieces, each into the layer of its gate's blur
+  // the light the lanterns throw on what is near them (evening and night)
+  var flame = LC.flame, reach = Math.max(0.1, LANT.reach * LANT.size), cast = LANT.castLight * lit;
+  // the lanterns in squares of the ground as wide as the light reaches, so each face only looks at the ones near it
+  var lampGrid = {};
+  if (cast > 0) torLanterns.forEach(function (Lp) {
+    var key = Math.floor(Lp.x / reach) + ',' + Math.floor(Lp.z / reach);
+    (lampGrid[key] || (lampGrid[key] = [])).push(Lp);
+  });
+  function lampLight(pc, cx, cy, cz, nx, ny, nz) {
+    if (cast <= 0) return 0;
+    var sum = 0, gx = Math.floor(cx / reach), gz = Math.floor(cz / reach);
+    for (var q = 0; q < 9; q++) {
+     var cell = lampGrid[(gx + q % 3 - 1) + ',' + (gz + Math.floor(q / 3) - 1)];
+     if (cell) for (var i = 0; i < cell.length; i++) {
+      var Lp = cell[i];
+      if (pc.g === Lp && pc.part === 'box') continue;  // its own light box is lit from inside, through the windows
+      var vx = Lp.x - cx, vy = Lp.ly - cy, vz = Lp.z - cz, d = Math.hypot(vx, vy, vz);
+      if (d >= reach || d < 1e-6) continue;
+      var lam = (nx * vx + ny * vy + nz * vz) / d;
+      if (lam <= 0) continue;
+      var fall = 1 - d / reach;
+      sum += lam * fall * fall;
+     }
+    }
+    return Math.min(1.2, sum) * cast;
+  }
+  // the windows of the lit lanterns, on one canvas (TOR.mask) over the part of the screen they cover: each window
+  // is added as it is drawn, and any face drawn later (nearer) over it rubs it out, so just the parts of the
+  // windows that are not hidden are left. Each lantern has its own box on it, for its own flicker.
+  var masks = [], ux0 = 1e9, uy0 = 1e9, ux1 = -1e9, uy1 = -1e9;
+  torLanterns.forEach(function (Lp) {
+    var hb = LANT.box * LANT.size * 1.05, y0 = 0.595 * LANT.size, y1 = 0.745 * LANT.size, xs = [], ys = [];
+    [[-hb, -hb], [hb, -hb], [hb, hb], [-hb, hb]].forEach(function (c) {
+      [y0, y1].forEach(function (y) {
+        var sp = torScreen(Lp.x + Lp.ax * c[0] + Lp.tx * c[1], y, Lp.z + Lp.az * c[0] + Lp.tz * c[1]);
+        xs.push(sp[0]); ys.push(sp[1]);
+      });
+    });
+    var pad = 2 + lerp(TORII.blurNear, TORII.blurFar, Lp.band / (TOR_BANDS - 1)) * 3;
+    var bx0 = Math.min.apply(null, xs) - pad, by0 = Math.min.apply(null, ys) - pad;
+    var bx1 = Math.max.apply(null, xs) + pad, by1 = Math.max.apply(null, ys) + pad;
+    bx0 = Math.max(bx0, -2); by0 = Math.max(by0, -2); bx1 = Math.min(bx1, W + 2); by1 = Math.min(by1, H + 2);
+    if (bx1 <= bx0 || by1 <= by0) return;
+    Lp.mask = { x0: bx0, y0: by0, x1: bx1, y1: by1, on: false, area: 0 };
+    ux0 = Math.min(ux0, bx0); uy0 = Math.min(uy0, by0); ux1 = Math.max(ux1, bx1); uy1 = Math.max(uy1, by1);
+    masks.push(Lp);
+  });
+  var maskGrid = {}, MCELL = 48, MC = null, mOp = '';
+  if (masks.length) {
+    TOR.mask.cnv.width = Math.max(1, Math.ceil((ux1 - ux0) * PR)); TOR.mask.cnv.height = Math.max(1, Math.ceil((uy1 - uy0) * PR));
+    MC = TOR.mask.c;
+    MC.setTransform(PR, 0, 0, PR, -ux0 * PR, -uy0 * PR);
+    MC.lineWidth = 0.8;
+    masks.forEach(function (Lp) {                    // which squares of the screen each window box covers
+      var Mk = Lp.mask;
+      Mk.ax = Math.max(0, Math.floor((Mk.x0 - ux0) * PR)); Mk.ay = Math.max(0, Math.floor((Mk.y0 - uy0) * PR));
+      Mk.aw = Math.max(1, Math.min(TOR.mask.cnv.width - Mk.ax, Math.ceil((Mk.x1 - Mk.x0) * PR)));
+      Mk.ah = Math.max(1, Math.min(TOR.mask.cnv.height - Mk.ay, Math.ceil((Mk.y1 - Mk.y0) * PR)));
+      Mk.sx = ux0 + Mk.ax / PR; Mk.sy = uy0 + Mk.ay / PR;
+      for (var gx = Math.floor(Mk.x0 / MCELL); gx <= Math.floor(Mk.x1 / MCELL); gx++)
+        for (var gy = Math.floor(Mk.y0 / MCELL); gy <= Math.floor(Mk.y1 / MCELL); gy++) {
+          var key = gx + ',' + gy;
+          (maskGrid[key] || (maskGrid[key] = [])).push(Lp);
+        }
+    });
+  }
+  function facePath(c, scr) {
+    c.beginPath();
+    for (var m = 0; m < scr.length; m++) { if (m) c.lineTo(scr[m][0], scr[m][1]); else c.moveTo(scr[m][0], scr[m][1]); }
+    c.closePath();
+  }
+  var glowWin = mixRgb(LC.paper, LC.flame, 0.55), hotWin = mixRgb(LC.flame, LC.glow, 0.6);
+  // the pieces, each into the layer of its gate's (or lantern's) blur
   all.forEach(function (pc) {
     var g = pc.g, c = bands[g.band].c;
     pc.faces.forEach(function (f) {
@@ -14233,41 +14489,260 @@ function torBake() {
       // only the faces turned toward the camera
       if (nx * cx + ny * (cy - 1) + nz * cz >= 0) return;
       for (var j = 0; j < n; j++) if (f.p[j][2] < 0.3) return;
-      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - TORII.shadeDepth * (1 - lam), col;
-      if (f.tone === 'f') col = scaleRgb(C.feet, lerp(0.75, 1.3, lam));
+      var lam = Math.max(0, nx * Lx + ny * Ly + nz * Lz), k = 1 - TORII.shadeDepth * (1 - lam), col, done = false;
+      if (g.lantern) {
+        var stone = scaleRgb(LC.stone, g.tone), shadeC = scaleRgb(LC.stoneShade, g.tone);
+        if (f.tone === 'w') {                    // the paper window: plain by day, glowing (as far as it is lit) after dusk
+          var wk = clamp(lit * 2, 0, 1);
+          var plain = koyoLight(mixRgb(mixRgb(scaleRgb(LC.paper, 0.72), LC.paper, k), mistC, g.haze));
+          var glow = mixRgb(mixRgb(glowWin, hotWin, clamp(lit * LANT.windowGlow * 0.5, 0, 1)), mistC, g.haze * 0.5);
+          col = mixRgb(plain, glow, wk); done = true;
+        } else {
+          col = mixRgb(shadeC, stone, k);
+          if (f.tone === 'd') col = scaleRgb(col, 0.84);                          // between the lotus petals
+          var mossK = g.moss * (f.tone === 'm' ? 0.75 : f.tone === 'r' ? (ny > 0.2 ? 0.6 : 0.3) : 0.22 * clamp(1 - cy / LANT.size * 1.4, 0, 1));
+          col = mixRgb(col, scaleRgb(LC.moss, lerp(0.7, 1.05, k)), mossK);
+          if (f.tone === 'b') col = scaleRgb(col, 0.92);
+        }
+      } else if (f.tone === 'f') col = scaleRgb(C.feet, lerp(0.75, 1.3, lam));
       else if (f.tone === 't' && ny > 0.3) col = mixRgb(scaleRgb(C.top, 0.7), C.top, k);
       else col = mixRgb(C.shade, C.vermilion, k);
-      if (ny < -0.5) col = scaleRgb(col, 0.82);                 // the undersides, in shade
-      col = koyoLight(mixRgb(col, mistC, g.haze));
+      if (!done) {
+        if (ny < -0.5) col = scaleRgb(col, 0.82);                 // the undersides, in shade
+        col = koyoLight(mixRgb(col, mistC, g.haze));
+        var ll = lampLight(pc, cx, cy, cz, nx, ny, nz) * (1 - g.haze * 0.7);
+        if (ll > 0) col = [col[0] + (col[0] * 0.6 + 70) * ll * flame[0] / 255, col[1] + (col[1] * 0.6 + 70) * ll * flame[1] / 255,
+                           col[2] + (col[2] * 0.6 + 70) * ll * flame[2] / 255];
+      }
+      var scr = f.p.map(function (p) { return torScreen(p[0], p[1], p[2]); });
       var st = rgba(col);
       c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
-      c.beginPath();
-      for (var m = 0; m < n; m++) { var sp = torScreen(f.p[m][0], f.p[m][1], f.p[m][2]); if (m) c.lineTo(sp[0], sp[1]); else c.moveTo(sp[0], sp[1]); }
-      c.closePath(); c.fill(); c.stroke();
+      facePath(c, scr); c.fill(); c.stroke();
+      // the lanterns' masks: its own windows are added; anything drawn later (nearer) over a window hides it
+      if (MC) {
+        if (f.tone === 'w' && g.lantern && g.mask) {
+          if (mOp !== 'add') { MC.globalCompositeOperation = 'source-over'; MC.fillStyle = '#fff'; mOp = 'add'; }
+          g.mask.on = true;
+          var ar = 0;
+          for (var e2 = 0; e2 < n; e2++) { var p1 = scr[e2], p2 = scr[(e2 + 1) % n]; ar += p1[0] * p2[1] - p2[0] * p1[1]; }
+          g.mask.area += Math.abs(ar) / 2;
+          facePath(MC, scr); MC.fill();
+        } else {
+          // over a window already drawn? then it rubs out what it covers (once, whichever lanterns' windows those are)
+          var fx0 = 1e9, fy0 = 1e9, fx1 = -1e9, fy1 = -1e9, hit = false;
+          for (var e = 0; e < n; e++) { fx0 = Math.min(fx0, scr[e][0]); fx1 = Math.max(fx1, scr[e][0]); fy0 = Math.min(fy0, scr[e][1]); fy1 = Math.max(fy1, scr[e][1]); }
+          for (var gx2 = Math.floor(fx0 / MCELL); gx2 <= Math.floor(fx1 / MCELL) && !hit; gx2++)
+            for (var gy2 = Math.floor(fy0 / MCELL); gy2 <= Math.floor(fy1 / MCELL) && !hit; gy2++) {
+              var cellM = maskGrid[gx2 + ',' + gy2];
+              if (cellM) for (var mi = 0; mi < cellM.length; mi++) {
+                var Mk = cellM[mi].mask;
+                if (Mk.on && fx1 >= Mk.x0 && fx0 <= Mk.x1 && fy1 >= Mk.y0 && fy0 <= Mk.y1) { hit = true; break; }
+              }
+            }
+          if (hit) {
+            if (mOp !== 'cut') { MC.globalCompositeOperation = 'destination-out'; MC.fillStyle = MC.strokeStyle = '#000'; mOp = 'cut'; }
+            facePath(MC, scr); MC.fill(); MC.stroke();
+          }
+        }
+      }
+    });
+    // the leaves lying on a lantern, once all of it is drawn
+    if (pc.leavesOf) pc.leavesOf.leaves.forEach(function (lf) {
+      if (lf.w[2] < 0.3) return;
+      var sp = torScreen(lf.w[0], lf.w[1], lf.w[2]), sz = lf.s * F / lf.w[2];
+      if (sz < 0.8) return;
+      var Lq = pc.leavesOf, tones = TOR_LEAF_TONES;
+      var lc = tones[Math.floor(lf.t * tones.length) % tones.length];
+      lc = koyoLight(mixRgb(lc, mistC, Lq.haze));
+      if (lit > 0 && lf.roof === false) lc = mixRgb(lc, flame, 0.12 * lit);
+      c.save();
+      c.setTransform(PR, 0, 0, PR * 0.45, sp[0] * PR, (sp[1] - TOR.gateTop) * PR);
+      landLeafLo(c, sz, lf.rot);
+      c.fillStyle = rgba(lc); c.fill();
+      c.restore();
     });
   });
-  // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
+  // all of it into the gate picture: the shadow, then the layers from the softest (furthest) to the sharpest
   TOR.gate.cnv.width = cw; TOR.gate.cnv.height = chh;
   var o = TOR.gate.c;
   o.setTransform(1, 0, 0, 1, 0, 0);
-  o.filter = HAS_FILTER && TORII.shadowBlur > 0.05 ? 'blur(' + (TORII.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
+  o.filter = TORII.shadowBlur > 0.05 ? 'blur(' + (TORII.shadowBlur * PR).toFixed(2) + 'px)' : 'none';
   o.drawImage(SH.cnv, 0, 0);
   for (var bj = TOR_BANDS - 1; bj >= 0; bj--) {
     var bl = lerp(TORII.blurNear, TORII.blurFar, bj / (TOR_BANDS - 1));
-    o.filter = HAS_FILTER && bl > 0.05 ? 'blur(' + (bl * PR).toFixed(2) + 'px)' : 'none';
+    o.filter = bl > 0.05 ? 'blur(' + (bl * PR).toFixed(2) + 'px)' : 'none';
     o.drawImage(bands[bj].cnv, 0, 0);
   }
   o.filter = 'none';
+  // each lantern's mask: how much of its windows can be seen, then softened as its depth of field
+  if (masks.length) {
+    var data = TOR.mask.c.getImageData(0, 0, TOR.mask.cnv.width, TOR.mask.cnv.height).data, AWd = TOR.mask.cnv.width;
+    TOR.maskB.cnv.width = TOR.mask.cnv.width; TOR.maskB.cnv.height = TOR.mask.cnv.height;
+    var mb = TOR.maskB.c, byBand = {};
+    masks.forEach(function (Lp) {
+      var Mk = Lp.mask;
+      if (!Mk.on || Mk.area <= 0) { Lp.mask = null; Lp.vis = 0; return; }
+      var sum = 0;
+      for (var yy = Mk.ay; yy < Mk.ay + Mk.ah; yy++) for (var xx = Mk.ax, ii = (yy * AWd + xx) * 4 + 3; xx < Mk.ax + Mk.aw; xx++, ii += 4) sum += data[ii];
+      Lp.vis = clamp(sum / 255 / (PR * PR) / Mk.area, 0, 1);
+      if (Lp.vis < 0.01) { Lp.mask = null; return; }
+      (byBand[Lp.band] || (byBand[Lp.band] = [])).push(Mk);
+    });
+    // softened as their depth of field: one pass for all the masks of each step of blur
+    for (var bb in byBand) {
+      var bl = lerp(TORII.blurNear, TORII.blurFar, bb / (TOR_BANDS - 1)) + 0.6;
+      mb.save();
+      mb.beginPath();
+      byBand[bb].forEach(function (Mk) { mb.rect(Mk.ax, Mk.ay, Mk.aw, Mk.ah); });
+      mb.clip();
+      mb.filter = 'blur(' + (bl * PR).toFixed(2) + 'px)';
+      mb.drawImage(TOR.mask.cnv, 0, 0);
+      mb.restore();
+    }
+    TOR.mask.cnv.width = TOR.mask.cnv.height = 1;
+  }
+  torLanterns.forEach(function (Lp) {
+    var sp = torScreen(Lp.x, Lp.ly, Lp.z), ft = torScreen(Lp.x, 0, Lp.z);
+    Lp.sx = sp[0]; Lp.sy = sp[1]; Lp.fx = ft[0]; Lp.fy = ft[1];
+    if (Lp.vis === undefined) Lp.vis = 0;
+    delete Lp.rs; delete Lp.leaves;
+  });
   bands.forEach(function (Lb) { Lb.cnv.width = Lb.cnv.height = 1; });      // the scratch layers are let go
   SH.cnv.width = SH.cnv.height = 1;
   TOR.ready = true;
 }
+/* The gates and lanterns, nearest last, then the flicker in the lanterns'
+   windows and the glow in the air around them. */
 function torDrawGates(c) {
-  if (!TOR.ready || !TORII.show || TOR.gate.cnv.width < 2 || ENV.scene !== 'autumn') return;
+  if (!TOR.ready || TOR.gate.cnv.width < 2 || ENV.scene !== 'autumn') return;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = TORII.strength;
   c.drawImage(TOR.gate.cnv, 0, Math.round(TOR.gateTop * PR));
   c.globalAlpha = 1;
+  torDrawGlow(c, lastT);
+}
+/* How hard the wind is blowing at x just now, from the app's own gusts: a
+   gust's front is felt just ahead of it and fades away behind. */
+function torGustAt(x) {
+  var s = 0;
+  for (var i = 0; i < gusts.length; i++) {
+    var g = gusts[i], d = (g.x - x) * g.dir;
+    s += g.dir * (g.str / 300) * (d < 0 ? Math.exp(-(d * d) / 8100) : Math.exp(-d / 260));
+  }
+  return s;
+}
+/* Each lantern's flame now. Every lantern has its own flicker, kept from
+   bake to bake (TOR_FLAMES, by the lantern's seed), and none keeps step with
+   another:
+   - between flickers, a slow uneven breathing (smooth random noise, its
+     own for each lantern, never repeating);
+   - now and then, at a random moment (on average every LANT.flickerEvery
+     seconds, the gap drawn afresh each time), a flicker of a random
+     length and strength, in one of three ways: a quick stutter, a dip
+     that dims and recovers, or a sputter of short drops;
+   - and in a gust of wind, more stutter (LANT.windFlicker). */
+var TOR_FLAMES = {};
+function torHash(i, seed) {
+  var h = Math.imul(i ^ Math.imul(seed, 0x27D4EB2D), 0x9E3779B1);
+  h ^= h >>> 15; h = Math.imul(h, 0x85EBCA77); h ^= h >>> 13;
+  return ((h >>> 0) / 4294967295) * 2 - 1;
+}
+function torNoise(x, seed) {                     // smooth random noise, -1 … 1
+  var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  return lerp(torHash(i, seed), torHash(i + 1, seed), u);
+}
+function torNextGap() { return -Math.log(1 - Math.random() * 0.98) * LANT.flickerEvery; }   // random, about LANT.flickerEvery on average
+function torFlameAt(Lp, t) {
+  if (Lp.flT === t) return Lp.fl;                // worked out once a frame
+  Lp.flT = t; Lp.fl = 1;
+  if (dynReduceMotion || (LANT.flicker <= 0 && LANT.wobble <= 0)) return 1;
+  var st = TOR_FLAMES[Lp.seed];
+  if (!st) st = TOR_FLAMES[Lp.seed] = { n: (Math.random() * 1e9) | 0, rate: lerp(0.7, 1.4, Math.random()), next: t + Math.random() * LANT.flickerEvery * 1.5, end: -1 };
+  var sp = LANT.flickerSpeed * st.rate, v = 0;
+  // the gentle breathing
+  v += LANT.wobble * 0.14 * (0.65 * torNoise(t * 0.9 * st.rate, st.n) + 0.35 * torNoise(t * 3.1 * st.rate, st.n + 7));
+  // a flicker: start one when it is due
+  if (t > st.end && t >= st.next) {
+    st.start = t; st.len = LANT.flickerLength * lerp(0.4, 1.7, Math.random());
+    st.end = t + st.len; st.next = st.end + torNextGap();
+    st.kind = Math.floor(Math.random() * 3); st.amp = lerp(0.55, 1.2, Math.random()); st.k = (Math.random() * 1e9) | 0;
+  }
+  if (st.next - t > LANT.flickerEvery * 6) st.next = t + torNextGap();     // the timing was turned down on the panel
+  if (t < st.end) {
+    var u = (t - st.start) / st.len, env = Math.sin(PI * clamp(u, 0, 1)), A = st.amp * LANT.flicker;
+    if (st.kind === 0) v += A * env * 0.55 * torNoise(t * 16 * sp, st.k);                                  // a quick stutter
+    else if (st.kind === 1) v += A * (-0.6 * env * env + 0.12 * env * torNoise(t * 11 * sp, st.k));       // a dip, and back
+    else v += A * env * (torNoise(t * 9 * sp, st.k) > 0.15 ? -0.55 : 0.06);                             // a sputter of short drops
+  }
+  // a gust of wind
+  var gust = Math.min(1.5, Math.abs(torGustAt(Lp.sx)) * LANT.windFlicker);
+  if (gust > 0.02) v += LANT.flicker * gust * 0.35 * torNoise(t * 14 * sp, st.n + 13);
+  return (Lp.fl = clamp(1 + v, 0.2, 1.5));
+}
+/* The soft round lights, drawn once and laid down scaled (all the same
+   colour, so each lantern only changes how strongly). */
+var TOR_SPR = null;
+function torSprites() {
+  if (TOR_SPR) return TOR_SPR;
+  var gc = hexToRgb(LANT.colours.glow), fc = hexToRgb(LANT.colours.flame);
+  function make(stops) {
+    var o = landCanvas(); o.cnv.width = o.cnv.height = 128;
+    var g = o.c.createRadialGradient(64, 64, 0, 64, 64, 64);
+    stops.forEach(function (st) { g.addColorStop(st[0], rgba(st[1], st[2])); });
+    o.c.fillStyle = g; o.c.fillRect(0, 0, 128, 128);
+    return o.cnv;
+  }
+  TOR_SPR = {
+    pool: make([[0, mixRgb(gc, fc, 0.3), 1], [0.35, fc, 0.45], [1, fc, 0]]),
+    halo: make([[0, gc, 1], [0.18, mixRgb(gc, fc, 0.5), 0.55], [0.5, fc, 0.16], [1, fc, 0]])
+  };
+  return TOR_SPR;
+}
+/* The pool of light on the ground under each lit lantern (laid on the ground
+   and the gravel, before the gates and lanterns stand on it). */
+function torDrawPools(c, t) {
+  var lit = torLampLevel();
+  if (lit <= 0 || LANT.pool <= 0 || !torLanterns.length || !TOR.ready) return;
+  var F = torLens(), spr = torSprites().pool;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  for (var i = 0; i < torLanterns.length; i++) {
+    var Lp = torLanterns[i], rx = LANT.poolSize * LANT.size * F / Lp.z, ry = rx / Lp.z;
+    if (rx < 1.5) continue;
+    if (Lp.fx + rx < 0 || Lp.fx - rx > W) continue;
+    var a = LANT.pool * lit * 0.5 * torFlameAt(Lp, t) * (1 - Lp.haze * 0.8);
+    c.globalAlpha = clamp(a, 0, 1);
+    c.setTransform(PR * rx, 0, 0, PR * Math.max(ry, rx * 0.06), Lp.fx * PR, Lp.fy * PR);
+    c.drawImage(spr, -1, -1, 2, 2);
+  }
+  c.restore();
+}
+/* The flicker in the windows (just the parts of them that can be seen) and the
+   glow in the air around each lit lantern, drawn just after the gates. */
+function torDrawGlow(c, t) {
+  var lit = torLampLevel();
+  if (lit <= 0 || !torLanterns.length) return;
+  var spr = torSprites().halo;
+  c.save();
+  c.globalCompositeOperation = 'lighter';
+  for (var i = 0; i < torLanterns.length; i++) {
+    var Lp = torLanterns[i];
+    if (!Lp.vis) continue;
+    var fl = torFlameAt(Lp, t), fade = 1 - Lp.haze * 0.6;
+    if (Lp.mask && LANT.windowGlow > 0) {               // the windows brighten and dim
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.globalAlpha = clamp(LANT.windowGlow * lit * 0.55 * fl * fade, 0, 1);
+      var Mq = Lp.mask;
+      c.drawImage(TOR.maskB.cnv, Mq.ax, Mq.ay, Mq.aw, Mq.ah, Math.round(Mq.sx * PR), Math.round(Mq.sy * PR), Mq.aw, Mq.ah);
+    }
+    var r = LANT.haloSize * Lp.px * 0.5;
+    if (LANT.halo > 0 && r > 1) {                       // the glow in the air
+      c.globalAlpha = clamp(LANT.halo * lit * 0.3 * fl * Lp.vis * fade, 0, 1);
+      c.setTransform(PR * r, 0, 0, PR * r, Lp.sx * PR, Lp.sy * PR);
+      c.drawImage(spr, -1, -1, 2, 2);
+    }
+  }
+  c.restore();
 }
 
 /* ============================================================
