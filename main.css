@@ -4048,7 +4048,8 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
 .start-notice.shown { opacity: 1; pointer-events: auto; }
 .start-notice.closing { opacity: 0; pointer-events: none; transition: opacity 0.7s ease; }
 .start-notice-box {
-  max-width: 560px; width: 100%; padding: 36px 32px 28px; border-radius: 22px;
+  width: 31.5vw; min-height: 26.5vh; box-sizing: border-box; padding: 2.4vw 2.4vw 1.8vw; border-radius: 22px;
+  display: flex; align-items: center;
   background: rgba(34, 44, 72, 0.86);
   -webkit-backdrop-filter: blur(4px) saturate(1.2);
   backdrop-filter: blur(4px) saturate(1.2);
@@ -4056,16 +4057,22 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
   box-shadow: 0 12px 36px rgba(20, 24, 40, 0.28);
   color: #FFF6E8;
 }
-.start-notice-text { transition: opacity 0.6s ease; }
+.start-notice-text { width: 100%; transition: opacity 0.6s ease; }
 .start-notice.text-out .start-notice-text { opacity: 0; }
 .start-notice-text p {
-  margin: 0 0 18px; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
-  font-size: 17px; font-weight: 500; line-height: 1.9; letter-spacing: 1.5px;
+  margin: 0 0 0.7vw; font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  font-size: 0.88vw; font-weight: 500; line-height: 1.7; letter-spacing: 0.1vw;
 }
 .start-notice-btn {
-  display: block; margin: 8px auto 0; padding: 12px 36px; border-radius: 999px;
+  display: block; margin: 0.6vw auto 0; padding: 0.7vw 2.4vw; border-radius: 999px;
   border: 1px solid rgba(255, 246, 232, 0.55); background: rgba(255, 246, 232, 0.14);
-  color: #FFF6E8; font-family: inherit; font-size: 16px; font-weight: 600; letter-spacing: 3px;
+  color: #FFF6E8; font-family: inherit; font-size: 1vw; font-weight: 600; letter-spacing: 0.2vw;
   -webkit-appearance: none; appearance: none; cursor: pointer;
 }
 .start-notice-btn:active { background: rgba(255, 246, 232, 0.28); transform: scale(0.97); }
+
+/* While the notice is up, the start screen's own text stays hidden;
+   removing .notice-hold lets the greeting fade in and the three hint
+   lines arrive in their usual order. */
+.blossom-screen.notice-hold .blossom-greeting { opacity: 0; }
+.blossom-screen.notice-hold .start-hint-line { animation: none; opacity: 0; }
