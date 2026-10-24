@@ -4015,6 +4015,38 @@ var tanzakuCancel = document.getElementById('tanzakuCancel');
 var tanzakuConfirm = document.getElementById('tanzakuConfirm');
 var tanzakuTargetRow = null;
 
+/* The on-screen keyboard the tanzaku brings up changes the screen's height
+   on this tablet, and every resize handler then runs: the scene rebuilds
+   all its canvases and re-bakes its trees, the lanterns are rebuilt, and so
+   on. Doing that while the tanzaku fades in or out dropped frames and left
+   the table half drawn. So while the tanzaku is open, and for a moment
+   after it closes, height-only resizes are held back here (this listener is
+   added before all the others, so stopping it stops them). When the hold
+   ends, one resize is sent if the size really changed. */
+var keyboardResizeHold = null;     /* the size before the keyboard, while held */
+var keyboardResizeTimer = null;
+window.addEventListener('resize', function(e) {
+  if (!keyboardResizeHold) return;
+  if (window.innerWidth !== keyboardResizeHold.w) return;
+  e.stopImmediatePropagation();
+});
+function holdKeyboardResizes() {
+  if (keyboardResizeTimer) { clearTimeout(keyboardResizeTimer); keyboardResizeTimer = null; }
+  if (!keyboardResizeHold) keyboardResizeHold = { w: window.innerWidth, h: window.innerHeight };
+}
+function releaseKeyboardResizes() {
+  if (keyboardResizeTimer) clearTimeout(keyboardResizeTimer);
+  /* the 0.5s fade-out plus time for the keyboard to finish going down */
+  keyboardResizeTimer = setTimeout(function() {
+    keyboardResizeTimer = null;
+    var held = keyboardResizeHold;
+    keyboardResizeHold = null;
+    if (held && (window.innerWidth !== held.w || window.innerHeight !== held.h)) {
+      window.dispatchEvent(new Event('resize'));
+    }
+  }, 1200);
+}
+
 var nameConfirmed = false;
 var therapistDisplayName = '桜庭さん';
 var tableUnlocked = false;
@@ -4903,6 +4935,7 @@ function openTanzaku(row) {
   var svcInput = row.querySelector('.service-input');
   if (!svcInput) return;
   playPaper(true);
+  holdKeyboardResizes();
   tanzakuTargetRow = row;
   tanzakuInput.value = svcInput.value || '';
   tanzakuScreen.classList.add('visible');
@@ -4947,6 +4980,7 @@ function closeTanzaku() {
   playPaper(false);
   tanzakuScreen.classList.remove('visible');
   try { tanzakuInput.blur(); } catch (e) {}
+  releaseKeyboardResizes();
   tanzakuTargetRow = null;
   numpadSuppressed = false;
   updateNumpadVisibility();
