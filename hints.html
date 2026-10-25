@@ -218,7 +218,7 @@
   @keyframes ink { to { stroke-dashoffset: 0; } }
   @keyframes glow { 0%,100% { opacity: 0; } 50% { opacity: .16; } }
   .cap {
-    position: absolute; max-width: 460px; padding: 12px 20px 12px 18px; border-radius: 4px;
+    position: absolute; max-width: 760px; padding: 12px 20px 12px 18px; border-radius: 4px;
     background: var(--bg-base); border-left: 4px solid var(--accent); box-shadow: 0 6px 24px rgba(60,30,20,.16);
     font-size: 21px; line-height: 1.6; letter-spacing: 1px; color: var(--text-dark); white-space: nowrap; opacity: 0;
   }
@@ -267,12 +267,12 @@
   <div class="detail" id="detail"></div>
   <div class="detail extra" id="kpNote">
     <b>＋ Keypad hint</b>
-    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the keypad with 入力後「決定」を underneath it. It goes when the keypad closes, and shows the first time only.
+    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the keypad with 入力後、「決定」をタップ underneath it. It goes when the keypad closes, and shows the first time only.
     <div class="try"><span id="kpState"></span> <button class="chip" id="kpReset">Show it again</button></div>
   </div>
   <div class="detail extra" id="tickNote">
     <b>＋ 6c Untick caption</b>
-    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップで取り消せます beside that ○, for one loop. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
+    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップすると解除できます beside that ○, for one loop. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
     <div class="try"><span id="tickState"></span> <button class="chip" id="tickReset">Show it again</button></div>
   </div>
   <div class="replays" id="replays"></div>
@@ -692,7 +692,7 @@
     if (p && p !== r) { shakeWithWords(p.price, '料金をご入力ください', p.el); setActive(p); return; }
     if (r.custom && !r.name) {
       var first = rows.filter(function (x) { return x.custom && !x.name; })[0];
-      if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご記入ください', first.el); return; }
+      if (r !== first) { first.el.classList.remove('flash'); void first.el.offsetWidth; first.el.classList.add('flash'); shakeWithWords(first.svc, '上の欄から順にご入力ください', first.el); return; }
       openTanzaku(r); return;
     }
     if (onPrice) { setActive(r); return; }
@@ -806,22 +806,22 @@
       hint: function () { Coach.show({ plays: 1, cycle: 3400, targets: [{ el: $('pHintScroll'), shape: 'box', pad: 14 }], finger: { el: $('pHintScroll'), kind: 'up', dy: -150 } }); },
       on: function (e) { return e === 'scrollDown'; } },
 
-    { id: '6a', group: 'Service table (each plays once, then moves on)', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap. One loop, then 6b.', cap: '○をタップすると選択できます', gone: 'After one loop. If she ticks a row meanwhile, the 6c caption shows first, then 6b.',
+    { id: '6a', group: 'Service table (each plays once, then moves on)', t: 'Tick a ○', what: 'Circle around the first row\'s ○, with a ghost tap. One loop, then 6b.', cap: '○をタップして選択', gone: 'After one loop. If she ticks a row meanwhile, the 6c caption shows first, then 6b.',
       setup: function () { showScreen('scrTable'); buildTable(); },
       enterNatural: function () { this.setup(); },
       hint: function () {
         var s = this;
-        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップすると選択できます', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } });
+        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: rows[0].check, shape: 'circle', pad: 12, text: '○をタップして選択', place: 'left' }], finger: { el: rows[0].check, kind: 'tap' } });
       },
       on: function () { return false; } },
-    { id: '6b', t: 'Tap the price', what: 'Circle around the price (the first ticked row, else the first row) with a ghost tap. One loop, then 6d. The keypad hint and the untick caption (6c) are separate: see the notes under the list.', cap: '料金を変えるときは、ここをタップ（空なら「料金をタップして金額を入力」）', gone: 'After one loop.', try: 'Tap a price at any point to see the keypad hint.',
+    { id: '6b', t: 'Tap the price', what: 'Circle around the price (the first ticked row, else the first row) with a ghost tap. One loop, then 6d. The keypad hint and the untick caption (6c) are separate: see the notes under the list.', cap: '料金を変更するには、ここをタップ（空なら「ここをタップして料金を入力」）', gone: 'After one loop.', try: 'Tap a price at any point to see the keypad hint.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
         var s = this, r = rows.filter(function (x) { return x.on; })[0] || rows[0];
-        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.price, shape: 'circle', pad: 14, text: r.v.textContent ? '料金を変えるときは、ここをタップ' : '料金をタップして金額を入力', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
+        Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.price, shape: 'circle', pad: 14, text: r.v.textContent ? '料金を変更するには、ここをタップ' : 'ここをタップして料金を入力', place: 'below' }], finger: { el: r.price, kind: 'tap' } });
       },
       on: function () { return false; } },
-    { id: '6d', t: 'その他 rows', what: 'When she scrolls the first その他 row fully into view: box around it. One loop, then the hints for the table are finished.', cap: 'ご提案があれば、こちらにご記入ください', gone: 'After one loop, or if she opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the "in order" caption.',
+    { id: '6d', t: 'その他 rows', what: 'When she scrolls the first その他 row fully into view: box around it. One loop, then the hints for the table are finished.', cap: '一覧にない対応可能なオプションがあれば、こちらにご記入ください', gone: 'After one loop, or if she opens it or scrolls past.', try: 'Scroll the table down. Tapping the second その他 row first shows the "in order" caption.',
       setup: function () { showScreen('scrTable'); buildTable(); rows[0].on = true; recalc(); },
       hint: function () {
         var s = this, r = rows.filter(function (x) { return x.custom && !x.name; })[0];
@@ -829,7 +829,7 @@
         if (!r) { next(); return; }
         if (fullyVisible(r.el)) {
           this._shown = true;
-          Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.el, shape: 'box', pad: 6, text: 'ご提案があれば、こちらにご記入ください', place: 'above' }] });
+          Coach.show({ once: true, onDone: function () { if (steps[curStep] === s) next(); }, targets: [{ el: r.el, shape: 'box', pad: 6, text: '一覧にない対応可能なオプションがあれば、こちらにご記入ください', place: 'above' }] });
         } else Coach.clear();
       },
       on: function (e) {
@@ -872,15 +872,15 @@
   var kpShown = false, kpOn = false, tickShown = false, tickRow = null;
   function drawKeypadHint(tickRow) {
     var t = [];
-    if (tickRow) t.push({ el: tickRow.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left', fade: true });
-    t.push({ el: $('numpad'), shape: 'box', pad: 10, text: '入力後「決定」を', place: 'below' });
+    if (tickRow) t.push({ el: tickRow.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left', fade: true });
+    t.push({ el: $('numpad'), shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
     Coach.show({ still: !!tickRow, targets: t });
   }
 
-  /* The 「もう一度タップで取り消せます」 caption for the first service she ticks. */
+  /* The 「もう一度タップすると解除できます」 caption for the first service she ticks. */
   function drawTickHint(row, done) {
     tickShown = true;
-    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.check, shape: 'none', pad: 6, text: 'もう一度タップで取り消せます', place: 'left' }] });
+    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left' }] });
   }
 
   /* natural: arrived by doing the action, so keep the screen as it is. */
