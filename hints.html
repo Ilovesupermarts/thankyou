@@ -503,7 +503,9 @@
         nodes.push(n);
       });
       if (o.finger) {
-        var g = document.createElement('div'); g.className = 'ghost ' + o.finger.kind; layer.appendChild(g);
+        var g = document.createElement('div'); g.className = 'ghost ' + o.finger.kind;
+        if (o.loops) g.style.animationIterationCount = o.loops;
+        layer.appendChild(g);
       }
       place();
       play();
@@ -793,9 +795,9 @@
      the action; hint() draws it; on(evt) returns true to move on.
      once:true hints play one loop, then move on by themselves. */
   var steps = [
-    { id: '2', group: 'Start', t: 'Koi pond', what: 'Ghost finger traces upward on the water, with the caption beside it. No circle.', cap: '水面を上へなぞると、はじまります', gone: 'The koi dives.', try: 'Drag upward on the pond.',
+    { id: '2', group: 'Start', t: 'Koi pond', what: 'Ghost finger traces upward on the water three times, with the caption beside it the whole time. Then it all fades off, once. No circle.', cap: '水面を上へなぞると、はじまります', gone: 'Fades by itself after about 8 seconds and does not repeat; the pond still works.', try: 'Drag upward on the pond.',
       setup: function () { showScreen('scrKoi'); pond.classList.remove('dive'); },
-      hint: function () { Coach.show({ targets: [{ el: pond, shape: 'none', pad: 20, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
+      hint: function () { Coach.show({ plays: 1, cycle: 8000, loops: 3, targets: [{ el: pond, shape: 'none', pad: 20, text: '水面を上へなぞると、はじまります', place: 'right' }], finger: { el: pond, kind: 'up' } }); },
       on: function (e) { return e === 'koiDive'; } },
     { id: '3', group: 'Message pages', t: 'Swipe hint', what: 'Box drawn around スワイプ→ (not the dots) while a ghost finger drags left. One cycle, then it fades off. No caption, and the page does not move.', cap: '— (none)', gone: 'Fades by itself after one cycle; she can swipe at any time.', try: 'Drag the page to the left.',
       setup: function () { showScreen('scrPanels'); pCar.go(0, true); $('pHintSwipe').hidden = false; $('pHintScroll').hidden = true; },
