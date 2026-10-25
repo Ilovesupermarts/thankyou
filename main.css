@@ -1548,8 +1548,29 @@
     white-space: nowrap;
   }
 
+  /* The body text is set like the main message panel (.panel-content): same
+     font, weight, size, spacing and glow, the muted brown by day and the
+     darker brown at night (see body.night-text below). The sizes follow
+     .panel-content at every breakpoint. */
+  .transition-line-body {
+    font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--text-mute);
+    line-height: 1.60;
+    letter-spacing: 0.8px;
+    transition: color 1.2s ease;
+    text-shadow:
+      0 0 6px var(--bg-base),
+      0 0 14px rgba(255, 253, 249, 0.90),
+      0 0 28px rgba(251, 236, 224, 0.60);
+  }
+  html[data-theme="autumn"] .transition-line-body,
+  html[data-theme="winter"] .transition-line-body {
+    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
+  }
   .transition-line-body p {
-    margin: 0 0 0.35em 0;
+    margin: 0 0 1.1em 0;
     opacity: 1;
     transform: none;
     transform-origin: 50% 50%;
@@ -2988,6 +3009,8 @@
      keeps its burgundy. */
   html[data-theme="autumn"] body.night-text .panel-content,
   html[data-theme="winter"] body.night-text .panel-content,
+  html[data-theme="autumn"] body.night-text .transition-line-body,
+  html[data-theme="winter"] body.night-text .transition-line-body,
   html[data-theme="autumn"] body.night-text .ty-line:not(.accent),
   html[data-theme="winter"] body.night-text .ty-line:not(.accent) { color: var(--text-dark); }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
@@ -3186,6 +3209,7 @@
     .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 20px; max-width: 600px; }
+    .transition-line-body { font-size: 20px; }
     .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
     .action-hint.global-hint { bottom: 148px; }
@@ -3217,6 +3241,7 @@
     .panel { padding: 88px 32px 170px 32px; }
     .panel-content { font-size: 22px; }
     .transition-line { font-size: 22px; max-width: 660px; }
+    .transition-line-body { font-size: 22px; }
     .privacy-note-inline { font-size: 16px; }
     .blossom-greeting { margin-bottom: 56px; }
     .blossom-greeting-time { font-size: 18px; letter-spacing: 5px; margin-bottom: 12px; }
@@ -3255,6 +3280,7 @@
     .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 1.9; }
     .transition-line { font-size: 17px; }
+    .transition-line-body { font-size: 17px; line-height: 1.9; }
     .stage-spacer { height: 50px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 17px; line-height: 1.9; }
@@ -3300,6 +3326,7 @@
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 1.85; }
     .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
+    .transition-line-body { font-size: 16px; line-height: 1.85; }
     .stage-spacer { height: 40px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
