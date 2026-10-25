@@ -4145,13 +4145,14 @@ html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
 .coach-casing { stroke: var(--coach-casing); stroke-width: 9; opacity: 0.92; stroke-dasharray: 1; stroke-dashoffset: 1; }
 .coach-glow { stroke: var(--coach-ink); stroke-width: 16; opacity: 0; }
 .coach-layer.go .coach-ink, .coach-layer.go .coach-casing { animation: coachInk 0.9s cubic-bezier(0.5, 0, 0.3, 1) forwards; }
-.coach-layer.go .coach-glow { animation: coachGlow 2.4s ease-in-out 0.9s infinite; }
+/* the glow eases in once the line is drawn and then holds steady until the hint fades: a glow
+   that pulsed (up, then back down) made the line look as if it blinked just before fading */
+.coach-layer.go .coach-glow { animation: coachGlow 0.8s ease-out 0.9s forwards; }
 @keyframes coachInk { to { stroke-dashoffset: 0; } }
-@keyframes coachGlow { 0%, 100% { opacity: 0; } 50% { opacity: 0.16; } }
+@keyframes coachGlow { from { opacity: 0; } to { opacity: 0.14; } }
 
-/* Hints that play once: one glow, and the finger makes one pass (a hint can
-   ask for more with an inline animation-iteration-count). */
-.coach-layer.once.go .coach-glow { animation: coachGlow 2.4s ease-in-out 0.9s 1; }
+/* Hints that play once: the finger makes one pass (a hint can ask for more
+   with an inline animation-iteration-count). */
 .coach-layer.once.go .coach-ghost.tap, .coach-layer.once.go .coach-ghost.swipe, .coach-layer.once.go .coach-ghost.up,
 .coach-layer.once.go .coach-ghost.tap::after { animation-iteration-count: 1; }
 
