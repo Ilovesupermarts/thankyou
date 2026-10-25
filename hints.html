@@ -279,7 +279,7 @@
   </div>
   <div class="detail extra" id="tickNote">
     <b>＋ 6c Untick caption</b>
-    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップすると解除できます beside that ○, for one loop. A service ticked by keying in its price counts too: the caption shows when she closes the keypad. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
+    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップすると解除できます just below that row, for one loop. A service ticked by keying in its price counts too: the caption shows when she closes the keypad. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
     <div class="try"><span id="tickState"></span> <button class="chip" id="tickReset">Show it again</button></div>
   </div>
   <div class="replays" id="replays"></div>
@@ -558,7 +558,12 @@
             var avail = p === 'left' ? r.x - gap - 16 : W - 16 - (r.x + r.w + gap);
             if (cw > avail) { n.cap.style.whiteSpace = 'normal'; n.cap.style.width = Math.max(160, avail) + 'px'; cw = n.cap.offsetWidth; ch = n.cap.offsetHeight; }
           }
-          if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
+          if (p === 'belowLeft') {
+            x = r.x; y = r.y + r.h + 6;
+            var sc = $('scroller') ? rectOf($('scroller')) : null, limit = sc ? sc.y + sc.h : H;
+            if (y + ch > limit) y = r.y - 6 - ch;
+          }
+          else if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
           else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
           else if (p === 'right') { x = r.x + r.w + gap; y = r.y + r.h / 2 - ch / 2; }
           else { x = r.x - gap - cw; y = r.y + r.h / 2 - ch / 2; }
@@ -904,7 +909,7 @@
   var kpShown = false, kpOn = false, kpPending = false, tickShown = false, tickRow = null;
   function drawKeypadHint(tickRow) {
     var t = [];
-    if (tickRow) t.push({ el: tickRow.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left', fade: true });
+    if (tickRow) t.push({ el: tickRow.el, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft', fade: true });
     t.push({ el: $('numpad'), shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
     kpPending = true;
     Coach.show({ still: true, targets: t });
@@ -913,7 +918,7 @@
   /* The 「もう一度タップすると解除できます」 caption for the first service she ticks. */
   function drawTickHint(row, done) {
     tickShown = true;
-    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left' }] });
+    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.el, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
   }
 
   /* natural: arrived by doing the action, so keep the screen as it is. */
