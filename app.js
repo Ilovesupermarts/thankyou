@@ -3699,9 +3699,9 @@ var panel3DefaultHtml = '';
 var panel3NoHtml = '';
 var transitionBodyDefault = '';
 var transitionBodyNoPresets =
-  'それでは、本日は少し特別な癒しのオプションについてご相談がございます。<br><br>' +
-  'もし、ご自身からご提案いただけるサービスなどがございましたら、下の空欄にご自由にご記入いただき、ご希望の料金をご入力ください。<br><br>' +
-  'もちろん、もしご提案が難しい場合は、無理にご提案いただかなくても大丈夫です。すべて見送っていただいても構いません。<br><br>' +
+  'それでは、本日は少し特別な癒しのオプションについて、ご相談がございます。<br><br>' +
+  'もし、ご自身で対応可能なサービスなどがございましたら、下の空欄にご自由にご記入いただき、ご希望の料金をご入力ください。<br><br>' +
+  'もちろん、ご提案が難しい場合は、無理にご提案いただく必要はございません。すべて見送っていただいても大丈夫です。<br><br>' +
   'ありがとうございます。';
 
 function convertPanelText(raw) {
@@ -4855,6 +4855,7 @@ function numpadShake(input) {
     void wrap.offsetWidth;
     wrap.classList.add('shake');
     setTimeout(function() { wrap.classList.remove('shake'); }, 350);
+    if (wrap.classList.contains('price-wrap')) Hints && Hints.say(wrap, '料金をご入力ください');
   }
   haptic(15);
 }
@@ -4871,7 +4872,7 @@ function handleNumpadKey(key) {
     return;
   }
   if (key === 'back') { numpadBackspace(target); haptic(8); }
-  else { numpadAppend(target, key); haptic(8); }
+  else { numpadAppend(target, key); haptic(8); Hints && Hints.onDigit(); }
 }
 for (var nb = 0; nb < numpadBtns.length; nb++) {
   (function(btn) {
@@ -4885,7 +4886,12 @@ for (var nb = 0; nb < numpadBtns.length; nb++) {
     btn.addEventListener('contextmenu', function(e) { e.preventDefault(); });
   })(numpadBtns[nb]);
 }
+/* Works out whether the keypad shows; the hints are told whenever that changes. */
 function updateNumpadVisibility() {
+  updateNumpadVisibilityNow();
+  Hints && Hints.syncNumpad();
+}
+function updateNumpadVisibilityNow() {
   if (!numpad) return;
   if (tanzakuScreen && tanzakuScreen.classList.contains('visible')) {
     numpad.classList.remove('visible');
@@ -4938,6 +4944,7 @@ function openTanzaku(row) {
   if (!row) return;
   var svcInput = row.querySelector('.service-input');
   if (!svcInput) return;
+  Hints && Hints.interrupt();
   playPaper(true);
   holdKeyboardResizes();
   tanzakuTargetRow = row;
@@ -5551,6 +5558,8 @@ function returnToStartScreen() {
   tryStartBlossomStream();
   scheduleAmbientRipple();
   startPondLife();
+  /* back at the start: the next pass through the app gets its hints again */
+  if (Hints) { Hints.reset(); Hints.onStartScreen(); }
 }
 
 function updateGlobalHint() {
@@ -5592,6 +5601,7 @@ function goToPanel(index, noGust) {
   track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
   for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
   activatePanel(currentPanel);
+  Hints && Hints.onPanelChange(currentPanel);
   if (currentPanel === totalPanels - 1) {
     unlockTable();
   } else if (!tableVisited) {
@@ -5697,6 +5707,7 @@ function isAllowedCustomRow(row) {
 }
 function flashCustomRowHint(row) {
   if (!row) return;
+  Hints && Hints.say(row.querySelector('.service-input'), '上の欄から順にご入力ください');
   row.classList.remove('service-hint');
   void row.offsetWidth;
   row.classList.add('service-hint');
@@ -5825,6 +5836,7 @@ function scheduleEmptyBlurShake(row, input, box) {
       setTimeout(function() { wrap.classList.remove('shake'); }, 350);
     }
     haptic(6);
+    Hints && Hints.say(wrap, '料金をご入力ください');
     var active = document.activeElement;
     var otherInputFocused = active && active.tagName === 'INPUT';
     if (!otherInputFocused) { try { input.focus(); } catch (e) {} }
@@ -5858,6 +5870,7 @@ function shakeAndRefocusPending(row) {
     setTimeout(function() { wrap.classList.remove('shake'); }, 350);
   }
   haptic(6);
+  Hints && Hints.say(wrap, '料金をご入力ください');
   try { input.focus(); } catch (e) {}
 }
 function refuseIfPending(row) {
@@ -6224,6 +6237,7 @@ tableCard.addEventListener('click', function(e) {
     }
   }
   recalc();
+  if (box.classList.contains('checked')) Hints && Hints.onTick(row);
 });
 tableCard.addEventListener('click', function(e) {
   var svcInput = e.target.closest('.service-input');
@@ -6282,6 +6296,7 @@ tableCard.addEventListener('input', function(e) {
         if (serviceConditionMet && !box.classList.contains('checked')) {
           box.classList.add('checked');
           box.setAttribute('aria-checked', 'true');
+          Hints && Hints.onAutoTick(row, false);
         }
       } else {
         box.removeAttribute('data-saved-price');
@@ -6312,6 +6327,7 @@ tableCard.addEventListener('input', function(e) {
         if (!box.classList.contains('checked')) {
           box.classList.add('checked');
           box.setAttribute('aria-checked', 'true');
+          Hints && Hints.onAutoTick(row, true);
         }
       } else {
         box.classList.remove('checked');
@@ -7066,6 +7082,7 @@ function showStartNotice() {
       setTimeout(function() {
         box.classList.remove('shown', 'closing');
         startNoticeOpen = false;
+        Hints && Hints.onStartScreen();
       }, 700);
     }, 600);
   }, { once: true });
@@ -7457,6 +7474,7 @@ function triggerKoiStart() {
   stopAmbientRipple();
   stopPondLife();
   stopBlossomStream();
+  Hints && Hints.onKoiStart();
   if (koiGestureState === 'diving' || koiGestureState === 'done' || koiGestureState === 'startling') return;
   koiGestureState = 'startling';
   introHasRun = true;
@@ -7536,6 +7554,7 @@ function triggerKoiStart() {
           repositionHintGroupAfterLayout();
           repositionNumpad();
           koiGestureState = 'done';
+          Hints && Hints.onPanelsReady();
         }, 1400));
       }, arrivalTime + holdTime));
     }, 420));
@@ -7563,6 +7582,7 @@ function confirmName() {
     return;
   }
   nameConfirmed = true;
+  Hints && Hints.reset();
 
   therapistDisplayName = entered + 'さん';
   confirmedTipAmount = getTipValue();
@@ -8032,6 +8052,7 @@ function scrollToFirstUnpricedRow() {
 submitBtn.addEventListener('click', function(e) {
   e.preventDefault();
   haptic(10);
+  Hints && Hints.interrupt();
   cancelPendingShake();
   var missing = findUnpricedServices();
   if (missing.length > 0) {
@@ -8325,6 +8346,7 @@ if (receiptStampZone) {
     receiptStampTimers.push(setTimeout(function() {
       receiptStampX.classList.add('on');
       receiptScreen.classList.add('stamp-confirm');
+      Hints && Hints.onStamp();
     }, reduced ? 150 : 1100));
     receiptStampTimers.push(setTimeout(scrollReceiptConfirmIntoView, reduced ? 250 : 1800));
   });
@@ -8343,6 +8365,7 @@ if (receiptStampX) {
     if (receiptStampBusy || !receiptStamped) return;
     haptic(8);
     playPaper(false);
+    Hints && Hints.clear();
     receiptStamped = false;
     receiptStampMemo = null;
     receiptStampX.classList.remove('on');
@@ -8360,6 +8383,7 @@ receiptConfirmBtn.addEventListener('click', function(e) {
   e.preventDefault();
   if (receiptStampBusy) return;
   haptic(8);
+  Hints && Hints.clear();
   cancelPendingReceiptShake();
 
   if (countActiveReceiptItems() === 0) {
@@ -8474,6 +8498,7 @@ function returnToTable() {
 }
 receiptBackBtn.addEventListener('click', function(e) {
   e.preventDefault();
+  Hints && Hints.clear();
   /* While the seal is on, going back is on hold until she lifts it. */
   if (receiptStamped || receiptStampBusy) { wiggleReceiptStampX(); return; }
   haptic(10);
@@ -8680,6 +8705,7 @@ var lastScrollDirection = null;
 function revealTableSection() {
   if (!tableEnteredView) {
     tableEnteredView = true;
+    Hints && Hints.onTableReveal();
     document.body.classList.add('warm-background');
     divider.classList.add('active');
     rejectRow.classList.add('active');
@@ -8836,6 +8862,7 @@ updateAllRowLocks();
 /* ============ REJECT ROW ============ */
 rejectRow.addEventListener('click', function() {
   haptic(10);
+  Hints && Hints.interrupt();
   rejected = !rejected;
   if (rejected) {
     rejectRow.classList.add('selected');
@@ -18422,4 +18449,526 @@ var NAME_STROKE_DATA = "!P3P8P]Pa PjOjOjOkOlOlPlQlQlQkQjQjPj,.3j1j0k0l0m1n3n4n5m
 /* ============ BOOTSTRAP ============ */
 applyTimeTheme();
 setInterval(applyTimeTheme, 5 * 60 * 1000);
+/* ============================================================
+   FIRST-USE HINTS
+   ------------------------------------------------------------
+   Short, quiet hints that teach the therapist the app as she meets
+   each part of it. They are drawn into #hintLayer (see main.css):
+   a line drawn around something like a brush stroke, a ghost
+   finger showing the gesture, and a small caption.
+
+   Each hint shows once per session (a session starts when the name
+   is confirmed, or when the start screen is returned to), plays and
+   fades by itself, and is never waited on: she can ignore it, or do
+   the thing at any moment, and it simply goes.
+
+     Start screen    a finger traces up the water, three times,
+                     with a caption beside it.
+     Message pages   a line around the スワイプ hint and a finger
+                     swiping left, once; on the last page, a line
+                     around the scroll hint and a finger dragging up.
+     Table           three hints that follow one another, each
+                     playing once:
+                       6a  a circle round the first ○ and a tapping finger
+                       6b  a circle round the price and a tapping finger
+                       6d  a box round the first その他 row, when she
+                           has scrolled to it
+                     and, whenever they happen:
+                       6c  the first service she selects gets a caption
+                           just under its row saying how to undo it
+                           (a service selected by keying in its price, or
+                           a custom one, gets it when the keypad closes
+                           or the writing screen has closed)
+                       keypad  the first time the keypad appears, a box
+                           round it with a caption under it, until she
+                           keys in her first digit
+                     plus a caption on the shake when a price is
+                     missing or the custom rows are filled out of order.
+     Receipt         after the stamp, a circle round the ✕ with a caption.
+
+   The rest of the app only calls the small functions returned at the
+   bottom of this block. Nothing here changes what the app does.
+   ============================================================ */
+var Hints = (function () {
+  var layer = document.getElementById('hintLayer');
+  var svg = document.getElementById('hintSvg');
+  if (!layer || !svg) return null;
+  var NS = 'http://www.w3.org/2000/svg';
+
+  /* ---------- the drawing layer ----------
+     show({ targets: [{ el, shape: 'box' | 'circle' | 'none', pad, text, place, fade }],
+            finger: { el, kind: 'tap' | 'swipe' | 'up', dx, dy },
+            hold: ms the hint stays before done() runs (and it plays one pass),
+            fadeAfter: fade it off once held, done: function, loops: finger passes,
+            fade: caption fades by itself, kind: a tag for clearing it later })
+     Positions are read from the page every frame while a hint is up, so a
+     line keeps following its target as the page scrolls or moves. */
+  var opts = null, nodes = [], ghostEl = null, ghostLast = '', holdT = null, fadeT = null, rafId = 0;
+
+  function mk(cls) {
+    var p = document.createElementNS(NS, 'path');
+    p.setAttribute('class', cls);
+    p.setAttribute('pathLength', '1');
+    return p;
+  }
+  /* Where an element is on screen. With content: true, the box of what is inside it instead
+     (the app's swipe and scroll hints are as wide as the page, but their text is small).
+     That is measured from where the children are laid out, not where they are drawn, so
+     the swipe arrow sliding to and fro does not make the box breathe. */
+  function rectOf(el, content) {
+    if (!el || !el.isConnected) return null;
+    var r = el.getBoundingClientRect();
+    if (!(r.width > 0 || r.height > 0)) return null;
+    if (content && el.children.length) {
+      var l = 1e9, t = 1e9, rt = -1e9, bt = -1e9;
+      for (var i = 0; i < el.children.length; i++) {
+        var k = el.children[i];
+        l = Math.min(l, k.offsetLeft); t = Math.min(t, k.offsetTop);
+        rt = Math.max(rt, k.offsetLeft + k.offsetWidth); bt = Math.max(bt, k.offsetTop + k.offsetHeight);
+      }
+      return { x: r.left + l, y: r.top + t, w: rt - l, h: bt - t };
+    }
+    return { x: r.left, y: r.top, w: r.width, h: r.height };
+  }
+
+  /* A rounded box, drawn clockwise from the top-left with a small overlap. */
+  function boxPath(r, pad) {
+    var x = r.x - pad, y = r.y - pad, w = r.w + pad * 2, h = r.h + pad * 2, k = Math.min(18, h / 2, w / 2);
+    return 'M' + (x + k + 14) + ' ' + (y - 1) +
+      ' L' + (x + w - k) + ' ' + y + ' Q' + (x + w) + ' ' + y + ' ' + (x + w) + ' ' + (y + k) +
+      ' L' + (x + w + 1) + ' ' + (y + h - k) + ' Q' + (x + w) + ' ' + (y + h) + ' ' + (x + w - k) + ' ' + (y + h) +
+      ' L' + (x + k) + ' ' + (y + h + 1) + ' Q' + x + ' ' + (y + h) + ' ' + x + ' ' + (y + h - k) +
+      ' L' + (x - 1) + ' ' + (y + k) + ' Q' + x + ' ' + y + ' ' + (x + k) + ' ' + y +
+      ' L' + (x + k + 46) + ' ' + (y - 3);
+  }
+  /* A circle that goes a little over one turn and wobbles slightly, like a brush. */
+  function circlePath(r, pad) {
+    var cx = r.x + r.w / 2, cy = r.y + r.h / 2, rx = r.w / 2 + pad, ry = r.h / 2 + pad, d = '';
+    var a0 = -Math.PI * 0.62, turn = Math.PI * 2 * 1.07, n = 72;
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, a = a0 + turn * t;
+      var wob = 1 + 0.035 * Math.sin(a * 3 + 1) + 0.06 * Math.max(0, t - 0.9) * 10;
+      d += (i ? ' L' : 'M') + (cx + Math.cos(a) * rx * wob).toFixed(1) + ' ' + (cy + Math.sin(a) * ry * wob).toFixed(1);
+    }
+    return d;
+  }
+
+  /* The part of the screen the table can use: under the toolbar, above the summary bar. */
+  function bounds() {
+    var top = 0, bottom = window.innerHeight;
+    if (infoBar && infoBar.classList.contains('shown') && !infoBar.classList.contains('hidden')) {
+      top = infoBar.getBoundingClientRect().bottom;
+    }
+    if (summaryBar && summaryBar.classList.contains('visible')) {
+      bottom = summaryBar.getBoundingClientRect().top;
+    }
+    return { top: top, bottom: bottom };
+  }
+  function fullyVisible(el) {
+    if (!el) return false;
+    var r = el.getBoundingClientRect(), b = bounds();
+    return r.height > 0 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
+  }
+
+  function clear() {
+    clearTimeout(holdT);
+    clearTimeout(fadeT);
+    if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
+    layer.classList.remove('on', 'go', 'once', 'fading');
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].cap && nodes[i].cap.parentNode) nodes[i].cap.parentNode.removeChild(nodes[i].cap);
+    }
+    if (ghostEl && ghostEl.parentNode) ghostEl.parentNode.removeChild(ghostEl);
+    nodes = []; ghostEl = null; ghostLast = ''; opts = null;
+  }
+
+  function fadeOut() {
+    if (!opts) return;
+    var o = opts;
+    clearTimeout(holdT);
+    clearTimeout(fadeT);
+    layer.classList.add('fading');
+    fadeT = setTimeout(function () { if (opts === o) clear(); }, 700);
+  }
+
+  function setHidden(n, hide) {
+    n.hidden = hide;
+    var v = hide ? 'hidden' : '';
+    if (n.ink) { n.ink.style.visibility = v; n.casing.style.visibility = v; n.glow.style.visibility = v; }
+    if (n.cap) n.cap.style.visibility = v;
+  }
+
+  /* A caption sits beside, above or below its target. Beside it, a caption that
+     would not fit on one line wraps instead. 'belowLeft' floats over the line
+     under a table row (about a third of it above the line), with its left edge
+     poking out of the table so it does not read as part of it; with no room
+     below, it sits over the line above the row instead. */
+  function placeCaption(n, r, pad, W, H) {
+    var cap = n.cap, gap = pad + 16, p = n.t.place || 'below', x, y;
+    cap.style.whiteSpace = '';
+    cap.style.width = '';
+    var cw = cap.offsetWidth, ch = cap.offsetHeight;
+    if (p === 'left' || p === 'right') {
+      var avail = p === 'left' ? r.x - gap - 8 : W - 8 - (r.x + r.w + gap);
+      if (cw > avail) {
+        cap.style.whiteSpace = 'normal';
+        cap.style.width = Math.max(160, avail) + 'px';
+        cw = cap.offsetWidth; ch = cap.offsetHeight;
+      }
+    }
+    if (p === 'belowLeft') {
+      x = r.x - 14; y = r.y + r.h - Math.round(ch * 0.37);
+      if (y + ch > bounds().bottom) y = r.y - Math.round(ch * 0.63);
+    } else if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
+    else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
+    else if (p === 'right') { x = r.x + r.w + gap; y = r.y + r.h / 2 - ch / 2; }
+    else { x = r.x - gap - cw; y = r.y + r.h / 2 - ch / 2; }
+    cap.style.left = Math.max(8, Math.min(W - cw - 8, x)) + 'px';
+    cap.style.top = Math.max(8, Math.min(H - ch - 8, y)) + 'px';
+  }
+
+  /* Re-reads where everything is. Skips anything that has not moved. */
+  function place(force) {
+    if (!opts) return;
+    var W = window.innerWidth, H = window.innerHeight;
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i], t = n.t, r = rectOf(t.el, t.content);
+      if (!r) { if (!n.hidden) setHidden(n, true); continue; }
+      var key = r.x.toFixed(1) + ',' + r.y.toFixed(1) + ',' + r.w.toFixed(1) + ',' + r.h.toFixed(1) + ',' + W + ',' + H;
+      if (!force && key === n.key && !n.hidden) continue;
+      n.key = key;
+      if (n.hidden) setHidden(n, false);
+      var pad = t.pad != null ? t.pad : 10;
+      if (n.ink) {
+        var d = t.shape === 'circle' ? circlePath(r, pad) : boxPath(r, pad);
+        n.ink.setAttribute('d', d);
+        n.casing.setAttribute('d', d);
+        n.glow.setAttribute('d', d);
+      }
+      if (n.cap) placeCaption(n, r, pad, W, H);
+    }
+    if (ghostEl && opts.finger) {
+      var fr = rectOf(opts.finger.el);
+      if (fr) {
+        var gx = fr.x + fr.w / 2 + (opts.finger.dx || 0), gy = fr.y + fr.h / 2 + (opts.finger.dy || 0);
+        var gk = gx.toFixed(1) + ',' + gy.toFixed(1);
+        if (force || gk !== ghostLast) {
+          ghostEl.style.left = gx + 'px';
+          ghostEl.style.top = gy + 'px';
+          ghostLast = gk;
+        }
+      }
+    }
+  }
+  function frame() {
+    rafId = 0;
+    if (!opts) return;
+    place(false);
+    rafId = requestAnimationFrame(frame);
+  }
+
+  function show(o) {
+    clear();
+    opts = o;
+    layer.classList.add('on');
+    if (o.hold) layer.classList.add('once');
+    var targets = o.targets || [];
+    for (var i = 0; i < targets.length; i++) {
+      var t = targets[i], n = { t: t, key: '', hidden: false };
+      if (t.shape && t.shape !== 'none') {
+        n.glow = mk('coach-glow'); n.casing = mk('coach-casing'); n.ink = mk('coach-ink');
+        svg.appendChild(n.glow); svg.appendChild(n.casing); svg.appendChild(n.ink);
+      }
+      if (t.text) {
+        n.cap = document.createElement('div');
+        n.cap.className = 'coach-cap' + ((o.fade || t.fade) ? ' fade' : '');
+        n.cap.textContent = t.text;
+        layer.appendChild(n.cap);
+      }
+      nodes.push(n);
+    }
+    if (o.finger) {
+      ghostEl = document.createElement('div');
+      ghostEl.className = 'coach-ghost ' + o.finger.kind;
+      if (o.loops) ghostEl.style.animationIterationCount = o.loops;
+      layer.appendChild(ghostEl);
+    }
+    place(true);
+    layer.classList.remove('go');
+    void layer.offsetWidth;
+    layer.classList.add('go');
+    if (o.hold) {
+      holdT = setTimeout(function () {
+        if (opts !== o) return;
+        if (o.fadeAfter) fadeOut();
+        if (o.done) o.done();
+      }, o.hold);
+    }
+    if (!rafId) rafId = requestAnimationFrame(frame);
+  }
+
+  /* ---------- what has been shown this session ---------- */
+  var seenKoi = false, seenSwipe = false, seenScroll = false;
+  var kpShown = false, kpOn = false, kpPending = false, numpadWas = false;
+  var tickShown = false, pendingTick = null;
+  var seq = 'off', revealAt = 0, pollT = 0, done6d = false;
+  var timers = [];
+
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function clearTimers() { for (var i = 0; i < timers.length; i++) clearTimeout(timers[i]); timers = []; }
+  function modalOpen() {
+    var screens = [tanzakuScreen, alertScreen, confirmScreen, receiptScreen, thankyouScreen];
+    for (var i = 0; i < screens.length; i++) {
+      if (screens[i] && screens[i].classList.contains('visible')) return true;
+    }
+    return false;
+  }
+
+  /* A new session: forget everything that has been shown. */
+  function reset() {
+    clear(); clearTimers();
+    clearInterval(pollT); pollT = 0;
+    seenKoi = seenSwipe = seenScroll = false;
+    kpShown = kpOn = kpPending = numpadWas = false;
+    tickShown = false; pendingTick = null;
+    seq = 'off'; done6d = false;
+  }
+  /* She started something else (the writing screen, 確認する, すべて見送る): the table hints are over. */
+  function interrupt() {
+    clear();
+    kpOn = false; kpPending = false; pendingTick = null;
+    endSeq();
+  }
+
+  /* ---------- start screen ---------- */
+  function onStartScreen() {
+    if (seenKoi) return;
+    later(function () {
+      if (seenKoi || introHasRun || !blossomScreen || !blossomScreen.classList.contains('visible') ||
+          blossomScreen.classList.contains('notice-hold')) return;
+      var ring = document.querySelector('#startBtn .gold-band') || startBtn;
+      seenKoi = true;
+      /* the finger traces up three times (0.8s to start, 2.4s each), the caption stays, then it fades */
+      show({ kind: 'koi', hold: 8000, fadeAfter: true, loops: 3,
+        targets: [{ el: ring, shape: 'none', pad: 20, text: '水面を上へなぞると、はじまります', place: 'right' }],
+        finger: { el: ring, kind: 'up' } });
+    }, 2600);
+  }
+  function onKoiStart() {
+    seenKoi = true;
+    clearTimers();
+    clear();
+  }
+
+  /* ---------- message pages ---------- */
+  function onPanelsReady() {
+    if (seenSwipe || currentPanel !== 0) return;
+    later(function () {
+      if (seenSwipe || currentPanel !== 0 || !globalHint || !globalHint.classList.contains('shown')) return;
+      seenSwipe = true;
+      show({ kind: 'swipe', hold: 2800, fadeAfter: true,
+        targets: [{ el: globalHintLayerSwipe, content: true, shape: 'box', pad: 16 }],
+        finger: { el: stage, kind: 'swipe', dy: 120 } });
+    }, 900);
+  }
+  function onPanelChange(index) {
+    if (index !== 0) seenSwipe = true;
+    if (opts && (opts.kind === 'swipe' || opts.kind === 'scroll')) clear();
+    if (index === totalPanels - 1 && !seenScroll) {
+      later(function () {
+        if (seenScroll || currentPanel !== totalPanels - 1 || (window.scrollY || 0) > 4) return;
+        seenScroll = true;
+        show({ kind: 'scroll', hold: 3400, fadeAfter: true,
+          targets: [{ el: globalHintLayerScroll, content: true, shape: 'box', pad: 14 }],
+          finger: { el: globalHintLayerScroll, kind: 'up', dy: -150 } });
+      }, 900);
+    }
+  }
+  /* Once she starts scrolling, the scroll hint has done its job. */
+  window.addEventListener('scroll', function () {
+    if (opts && opts.kind === 'scroll' && (window.scrollY || 0) > 4) clear();
+  }, { passive: true });
+
+  /* ---------- table: 6a, 6b, 6d one after another ---------- */
+  function endSeq() { seq = 'T'; clearInterval(pollT); pollT = 0; }
+  function onTableReveal() {
+    if (seq !== 'off') return;
+    seq = 'wait';
+    revealAt = Date.now();
+    if (!pollT) pollT = setInterval(poll, 300);
+  }
+  function firstTickedRow() {
+    var rows = getRows();
+    for (var i = 0; i < rows.length; i++) {
+      var box = rows[i].querySelector('.row-check');
+      if (box && box.classList.contains('checked')) return rows[i];
+    }
+    return null;
+  }
+
+  function poll() {
+    if (seq !== 'wait' && seq !== '6d') { clearInterval(pollT); pollT = 0; return; }
+    if (opts || numpadWas || modalOpen() || rejected) return;
+    if (seq === 'wait') {
+      var rows = getRows();
+      if (!rows.length || !tableCard.classList.contains('active') || Date.now() - revealAt < 1300) return;
+      /* wait until the first row is whole on screen and well up the page, so the hint has her attention */
+      if (!fullyVisible(rows[0]) || rows[0].getBoundingClientRect().top > window.innerHeight * 0.72) return;
+      /* with no services picked on the name screen the first row is a custom one: go straight to 6d */
+      if (rows[0].querySelector('.service-input')) runStep('6d');
+      else runStep(tickShown ? '6b' : '6a');
+    } else {
+      check6d();
+    }
+  }
+
+  function runStep(id) {
+    seq = id;
+    var rows = getRows(), row;
+    if (id === '6a') {
+      if (tickShown) { runStep('6b'); return; }
+      row = rows[0];
+      if (!row) { endSeq(); return; }
+      var check = row.querySelector('.row-check');
+      show({ kind: '6a', hold: 4000, done: function () { if (seq === '6a') runStep('6b'); },
+        targets: [{ el: check, shape: 'circle', pad: 12, text: '○をタップして選択', place: 'left' }],
+        finger: { el: check, kind: 'tap' } });
+    } else if (id === '6b') {
+      if (kpShown) { runStep('6d'); return; }
+      row = firstTickedRow() || rows[0];
+      if (!row) { endSeq(); return; }
+      var price = row.querySelector('.price-wrap'), input = row.querySelector('.price-input');
+      var filled = !!(input && (input.value || '').trim() !== '');
+      show({ kind: '6b', hold: 4000, done: function () { if (seq === '6b') runStep('6d'); },
+        targets: [{ el: price, shape: 'circle', pad: 14, text: filled ? '料金を変更するには、ここをタップ' : 'ここをタップして料金を入力', place: 'below' }],
+        finger: { el: price, kind: 'tap' } });
+    } else {
+      /* 6d waits until the first その他 row is fully on screen */
+      clear();
+      if (!pollT) pollT = setInterval(poll, 300);
+      check6d();
+    }
+  }
+  function check6d() {
+    if (done6d) { endSeq(); return; }
+    var row = firstUnnamedCustomRow();
+    if (!row) { endSeq(); return; }
+    if (opts || numpadWas) return;
+    if (row.getBoundingClientRect().bottom < bounds().top) { endSeq(); return; }   /* scrolled past it */
+    if (!fullyVisible(row)) return;
+    show({ kind: '6d', hold: 4000,
+      done: function () { if (seq === '6d') { done6d = true; clear(); endSeq(); } },
+      targets: [{ el: row, shape: 'box', pad: 6, text: '一覧にない対応可能なオプションがあれば、こちらにご記入ください', place: 'above' }] });
+  }
+
+  /* ---------- 6c: the first service she selects ---------- */
+  function drawTick(row, done) {
+    tickShown = true;
+    show({ kind: 'tick', hold: 4000, fade: true, done: done,
+      targets: [{ el: row, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
+  }
+  /* After a caption or the keypad hint, the guided hints carry on. Tapping a price skips 6b. */
+  function afterTick() {
+    if (seq === '6a') runStep('6b');
+    else if (seq === '6b' || seq === '6d') runStep(seq);
+    else clear();
+  }
+  function afterKeypad() {
+    if (seq === '6a' || seq === '6b' || seq === '6d') runStep('6d');
+    else clear();
+  }
+  /* She tapped a ○. (The app also puts the cursor in that row's price, which brings the keypad
+     up straight away: then the keypad hint carries the caption too.) */
+  function onTick(row) {
+    if (tickShown || !row || rejected) return;
+    if (kpOn) { tickShown = true; drawKeypadHint(row); return; }
+    drawTick(row, afterTick);
+  }
+  /* A row was selected by keying in its price, or by writing a custom service's name.
+     The caption waits for the keypad to close, or for the keypad to come up. */
+  function onAutoTick(row, custom) {
+    if (tickShown || !row) return;
+    pendingTick = { row: row, custom: !!custom };
+  }
+
+  /* ---------- keypad hint ---------- */
+  function drawKeypadHint(tickRow) {
+    var t = [];
+    if (tickRow) t.push({ el: tickRow, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft', fade: true });
+    t.push({ el: numpad, shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
+    kpPending = true;
+    show({ kind: 'kp', targets: t });
+  }
+  function onNumpadShown() {
+    if (!tableCard.classList.contains('active') || modalOpen() || rejected) return;
+    var custom = (pendingTick && pendingTick.custom && !tickShown) ? pendingTick.row : null;
+    if (!kpShown) {
+      kpShown = true; kpOn = true;
+      if (custom) { pendingTick = null; tickShown = true; }
+      drawKeypadHint(custom);
+    } else if (custom) {
+      pendingTick = null;
+      drawTick(custom, function () { clear(); });
+    }
+  }
+  function onNumpadHidden() {
+    var wasKp = kpOn;
+    kpOn = false; kpPending = false;
+    var keyed = (pendingTick && !pendingTick.custom && !tickShown) ? pendingTick.row : null;
+    if (keyed) { pendingTick = null; clear(); drawTick(keyed, afterKeypad); return; }
+    if (wasKp) { clear(); afterKeypad(); }
+  }
+  /* Called every time the app works out whether the keypad shows. Acts only when that changes. */
+  function syncNumpad() {
+    var vis = !!numpad && numpad.classList.contains('visible') && !numpad.classList.contains('receipt-mode');
+    if (vis === numpadWas) return;
+    numpadWas = vis;
+    if (vis) onNumpadShown(); else onNumpadHidden();
+  }
+  /* The first digit she keys in ends the keypad hint (backspace does not count). */
+  function onDigit() {
+    if (kpOn && kpPending) { kpPending = false; fadeOut(); }
+  }
+
+  /* ---------- a caption on the shake ---------- */
+  function say(el, text) {
+    if (!el || modalOpen()) return;
+    show({ kind: 'say', hold: 4200, fade: true,
+      done: function () {
+        if (kpOn && kpPending) { drawKeypadHint(null); return; }
+        if (seq === '6a' || seq === '6b' || seq === '6d') { runStep(seq); return; }
+        clear();
+      },
+      targets: [{ el: el, shape: 'box', pad: 6, text: text, place: 'above' }] });
+  }
+
+  /* ---------- receipt ---------- */
+  function onStamp() {
+    if (!receiptStampX) return;
+    show({ kind: 'stamp', hold: 3400, fadeAfter: true,
+      targets: [{ el: receiptStampX, shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
+  }
+
+  var api = {
+    reset: reset, clear: clear, interrupt: interrupt,
+    onStartScreen: onStartScreen, onKoiStart: onKoiStart,
+    onPanelsReady: onPanelsReady, onPanelChange: onPanelChange,
+    onTableReveal: onTableReveal,
+    onTick: onTick, onAutoTick: onAutoTick,
+    syncNumpad: syncNumpad, onDigit: onDigit,
+    say: say, onStamp: onStamp
+  };
+  /* The app calls these from inside its own handlers. If a hint ever went wrong it must
+     not take the app down with it: any error is swallowed and the hint is cleared. */
+  function safely(fn) {
+    return function () {
+      try { return fn.apply(null, arguments); }
+      catch (e) { try { clear(); } catch (e2) { /* silent */ } }
+    };
+  }
+  for (var name in api) api[name] = safely(api[name]);
+  return api;
+})();
+
 updateGlobalHint();

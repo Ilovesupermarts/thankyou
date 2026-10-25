@@ -1548,8 +1548,29 @@
     white-space: nowrap;
   }
 
+  /* The body text is set like the main message panel (.panel-content): same
+     font, weight, size, spacing and glow, the muted brown by day and the
+     darker brown at night (see body.night-text below). The sizes follow
+     .panel-content at every breakpoint. */
+  .transition-line-body {
+    font-family: "Noto Serif JP", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif CJK JP", serif;
+    font-size: 19px;
+    font-weight: 600;
+    color: var(--text-mute);
+    line-height: 1.60;
+    letter-spacing: 0.8px;
+    transition: color 1.2s ease;
+    text-shadow:
+      0 0 6px var(--bg-base),
+      0 0 14px rgba(255, 253, 249, 0.90),
+      0 0 28px rgba(251, 236, 224, 0.60);
+  }
+  html[data-theme="autumn"] .transition-line-body,
+  html[data-theme="winter"] .transition-line-body {
+    text-shadow: 0 1px 12px rgba(136, 46, 71, 0.25), 0 2px 20px rgba(253, 232, 218, 0.60);
+  }
   .transition-line-body p {
-    margin: 0 0 0.35em 0;
+    margin: 0 0 1.1em 0;
     opacity: 1;
     transform: none;
     transform-origin: 50% 50%;
@@ -2988,6 +3009,8 @@
      keeps its burgundy. */
   html[data-theme="autumn"] body.night-text .panel-content,
   html[data-theme="winter"] body.night-text .panel-content,
+  html[data-theme="autumn"] body.night-text .transition-line-body,
+  html[data-theme="winter"] body.night-text .transition-line-body,
   html[data-theme="autumn"] body.night-text .ty-line:not(.accent),
   html[data-theme="winter"] body.night-text .ty-line:not(.accent) { color: var(--text-dark); }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
@@ -3186,6 +3209,7 @@
     .panel { padding: 83px 32px 170px 32px; }
     .panel-content { font-size: 20px; }
     .transition-line { font-size: 20px; max-width: 600px; }
+    .transition-line-body { font-size: 20px; }
     .privacy-note-inline { font-size: 15px; }
     .action-hint { font-size: 15px; letter-spacing: 5px; }
     .action-hint.global-hint { bottom: 148px; }
@@ -3217,6 +3241,7 @@
     .panel { padding: 88px 32px 170px 32px; }
     .panel-content { font-size: 22px; }
     .transition-line { font-size: 22px; max-width: 660px; }
+    .transition-line-body { font-size: 22px; }
     .privacy-note-inline { font-size: 16px; }
     .blossom-greeting { margin-bottom: 56px; }
     .blossom-greeting-time { font-size: 18px; letter-spacing: 5px; margin-bottom: 12px; }
@@ -3255,6 +3280,7 @@
     .panel { padding: 65px 20px 138px 20px; }
     .panel-content { font-size: 17px; line-height: 1.9; }
     .transition-line { font-size: 17px; }
+    .transition-line-body { font-size: 17px; line-height: 1.9; }
     .stage-spacer { height: 50px; }
     .ty-panel { padding: 60px 20px 100px 20px; }
     .ty-line { font-size: 17px; line-height: 1.9; }
@@ -3300,6 +3326,7 @@
     .panel-inner { max-width: 560px; }
     .panel-content { font-size: 16px; line-height: 1.85; }
     .transition-line { font-size: 16px; padding: 0 24px 24px 24px; letter-spacing: 0.5px; }
+    .transition-line-body { font-size: 16px; line-height: 1.85; }
     .stage-spacer { height: 40px; }
     .action-hint { margin-top: 0; }
     .action-hint.global-hint { bottom: 96px; }
@@ -4085,3 +4112,78 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
    lines arrive in their usual order. */
 .blossom-screen.notice-hold .blossom-greeting { opacity: 0; }
 .blossom-screen.notice-hold .start-hint-line:nth-child(n) { animation: none; opacity: 0; }
+
+/* ============================================================
+   FIRST-USE HINTS
+   ------------------------------------------------------------
+   A layer over the whole page (it takes no touches) that draws,
+   one at a time:
+     - a line around something, as if with a brush (.coach-ink),
+       with a white edge under it (.coach-casing) and a soft glow
+       (.coach-glow);
+     - a ghost finger showing a tap, a swipe or an upward drag;
+     - a short caption on a paper-like card.
+   The line is a deep plum with a white edge so it stays visible on
+   the peach table, the orange-tinted start screen, and next to the
+   red stamp (about 3:1 or better against every background it sits
+   on). Everything is drawn by Hints in app.js.
+   ============================================================ */
+.coach-layer {
+  --coach-ink: #882E47;
+  --coach-casing: #FFFFFF;
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 440; pointer-events: none; display: none;
+}
+html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
+.coach-layer.on { display: block; }
+.coach-layer svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; }
+.coach-ink, .coach-casing, .coach-glow { fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.coach-ink { stroke: var(--coach-ink); stroke-width: 4; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.coach-casing { stroke: var(--coach-casing); stroke-width: 9; opacity: 0.92; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.coach-glow { stroke: var(--coach-ink); stroke-width: 16; opacity: 0; }
+.coach-layer.go .coach-ink, .coach-layer.go .coach-casing { animation: coachInk 0.9s cubic-bezier(0.5, 0, 0.3, 1) forwards; }
+.coach-layer.go .coach-glow { animation: coachGlow 2.4s ease-in-out 0.9s infinite; }
+@keyframes coachInk { to { stroke-dashoffset: 0; } }
+@keyframes coachGlow { 0%, 100% { opacity: 0; } 50% { opacity: 0.16; } }
+
+/* Hints that play once: one glow, and the finger makes one pass (a hint can
+   ask for more with an inline animation-iteration-count). */
+.coach-layer.once.go .coach-glow { animation: coachGlow 2.4s ease-in-out 0.9s 1; }
+.coach-layer.once.go .coach-ghost.tap, .coach-layer.once.go .coach-ghost.swipe, .coach-layer.once.go .coach-ghost.up,
+.coach-layer.once.go .coach-ghost.tap::after { animation-iteration-count: 1; }
+.coach-layer.fading { opacity: 0; transition: opacity 0.6s ease; }
+
+.coach-cap {
+  position: absolute; max-width: 760px; padding: 12px 20px 12px 18px; border-radius: 4px;
+  background: var(--bg-base); border-left: 4px solid var(--coach-ink); box-shadow: 0 6px 24px rgba(60, 30, 20, 0.16);
+  font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+  font-size: 21px; font-weight: 500; line-height: 1.6; letter-spacing: 1px; color: var(--text-dark);
+  white-space: nowrap; opacity: 0; word-break: auto-phrase; line-break: strict;
+}
+.coach-layer.go .coach-cap { animation: coachCapIn 0.5s ease-out 0.55s forwards; }
+.coach-layer.go .coach-cap.fade { animation: coachCapIn 0.5s ease-out 0.1s forwards, coachCapOut 0.6s ease-in 3.4s forwards; }
+@keyframes coachCapIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes coachCapOut { to { opacity: 0; } }
+
+.coach-ghost {
+  position: absolute; width: 58px; height: 58px; margin: -29px 0 0 -29px; border-radius: 50%; opacity: 0;
+  background: radial-gradient(circle at 45% 40%, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.55) 60%, rgba(255, 255, 255, 0) 72%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--coach-ink) 55%, transparent), 0 6px 18px rgba(0, 0, 0, 0.15);
+}
+.coach-ghost::after { content: ""; position: absolute; top: -2px; left: -2px; right: -2px; bottom: -2px; border-radius: 50%; border: 2px solid var(--coach-ink); opacity: 0; }
+.coach-layer.go .coach-ghost.tap { animation: coachTap 2.2s ease-in-out 1s infinite; }
+.coach-layer.go .coach-ghost.tap::after { animation: coachRipple 2.2s ease-out 1s infinite; }
+.coach-layer.go .coach-ghost.swipe { animation: coachSwipe 2.6s ease-in-out 0s infinite; }
+.coach-layer.go .coach-ghost.up { animation: coachUp 2.4s ease-in-out 0.8s infinite; }
+@keyframes coachTap { 0% { opacity: 0; transform: scale(1.2); } 20% { opacity: 0.9; transform: scale(1); } 32% { transform: scale(0.82); } 44% { transform: scale(1); } 70% { opacity: 0.9; } 100% { opacity: 0; } }
+@keyframes coachRipple { 0%, 30% { opacity: 0; transform: scale(0.8); } 34% { opacity: 0.9; } 70% { opacity: 0; transform: scale(2.2); } 100% { opacity: 0; } }
+@keyframes coachSwipe { 0%, 8% { opacity: 0; transform: translateX(120px); } 20% { opacity: 0.9; transform: translateX(120px); } 50% { opacity: 0.9; transform: translateX(-120px); } 62%, 100% { opacity: 0; transform: translateX(-140px); } }
+@keyframes coachUp { 0% { opacity: 0; transform: translateY(80px); } 15% { opacity: 0.9; transform: translateY(80px); } 60% { opacity: 0.9; transform: translateY(-140px); } 75%, 100% { opacity: 0; transform: translateY(-160px); } }
+
+/* Reduced motion: the outline and caption just appear, with no finger. */
+@media (prefers-reduced-motion: reduce) {
+  .coach-ink, .coach-casing { stroke-dashoffset: 0; animation: none !important; }
+  .coach-glow { animation: none !important; opacity: 0.12; }
+  .coach-cap { animation: none !important; opacity: 1; }
+  .coach-ghost { display: none; }
+}
