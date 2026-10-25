@@ -559,9 +559,12 @@
             if (cw > avail) { n.cap.style.whiteSpace = 'normal'; n.cap.style.width = Math.max(160, avail) + 'px'; cw = n.cap.offsetWidth; ch = n.cap.offsetHeight; }
           }
           if (p === 'belowLeft') {
-            x = r.x - 14; y = r.y + r.h + 6;   /* its left edge pokes out of the table so it does not read as part of it */
+            /* Floats over the line under the row: about a third of the box above the line, the rest below it.
+               Its left edge pokes out of the table so it does not read as part of it. */
+            x = r.x - 14; y = r.y + r.h - Math.round(ch * 0.37);
             var sc = $('scroller') ? rectOf($('scroller')) : null, limit = sc ? sc.y + sc.h : H;
-            if (y + ch > limit) y = r.y - 6 - ch;
+            /* No room below: the same over the line above the row instead. */
+            if (y + ch > limit) y = r.y - Math.round(ch * 0.63);
           }
           else if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
           else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
