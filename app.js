@@ -6557,7 +6557,8 @@ var DRIFT_CONFIG = {
   GLOBAL_DRIFT_FACTOR: 0.08,
   HORIZONTAL_SWAY_PX: 20,
   CORE_ZONE_PX: 180,
-  MAX_ZONE_PX: 420
+  MAX_ZONE_PX: 420,
+  LAST_LINE_MAX_DOWN_PX: 6
 };
 var _tlDriftActive = false;
 
@@ -6604,15 +6605,24 @@ function updateTransitionBodyEffects() {
   var globalShift = -d * DRIFT_CONFIG.GLOBAL_DRIFT_FACTOR * envelope;
   var normalizedD = Math.max(-1, Math.min(1, d / (vh / 2)));
 
+  function itemShiftY(idx) {
+    var distFromCenter = idx - centerIdx;
+    var maxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(distFromCenter) / centerIdx);
+    var spread = distFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
+    return globalShift + Math.max(-maxSpread, Math.min(maxSpread, spread)) * envelope;
+  }
+
+  /* The divider below the block does not drift, and the gap to it is
+     small, so the last line may only travel down a few pixels. Anything
+     beyond that moves the whole block up, which keeps the spacing
+     between the lines and stops the last line sliding under the divider. */
+  var blockLift = Math.max(0, itemShiftY(totalItems - 1) - DRIFT_CONFIG.LAST_LINE_MAX_DOWN_PX);
+
   for (var i = 0; i < totalItems; i++) {
     var item = driftItems[i];
     var lineDistFromCenter = i - centerIdx;
 
-    var itemMaxSpread = DRIFT_CONFIG.MAX_LINE_SPREAD_PX * (Math.abs(lineDistFromCenter) / centerIdx);
-    var rawSpread = lineDistFromCenter * (absDist * DRIFT_CONFIG.LINE_SPREAD_FACTOR);
-    var relativeSeparation = Math.max(-itemMaxSpread, Math.min(itemMaxSpread, rawSpread)) * envelope;
-
-    var totalY = globalShift + relativeSeparation;
+    var totalY = itemShiftY(i) - blockLift;
 
     var swayMultiplier = (dividerEl && i === 0) ? 0.35 : 1.0;
     var swayDir = (i % 2 === 0) ? 1 : -1;
