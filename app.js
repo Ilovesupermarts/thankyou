@@ -18496,14 +18496,23 @@ var Hints = (function () {
   var NS = 'http://www.w3.org/2000/svg';
 
   /* ---------- the drawing layer ----------
-     show({ targets: [{ el, shape: 'box' | 'circle' | 'none', pad, text, place, fade }],
+     show({ targets: [{ el, shape: 'box' | 'circle' | 'none', pad, text, place, fade, content }],
             finger: { el, kind: 'tap' | 'swipe' | 'up', dx, dy },
             hold: ms the hint stays before done() runs (and it plays one pass),
-            fadeAfter: fade it off once held, done: function, loops: finger passes,
-            fade: caption fades by itself, kind: a tag for clearing it later })
-     Positions are read from the page every frame while a hint is up, so a
-     line keeps following its target as the page scrolls or moves. */
-  var opts = null, nodes = [], ghostEl = null, ghostLast = '', holdT = null, fadeT = null, rafId = 0;
+            fadeAfter: fade it away once held, done: function, loops: finger passes,
+            fade: caption fades by itself, kind: a tag for clearing it later,
+            watch: let it go if its target leaves the screen, urgent: replace what is showing quickly })
+
+     A hint's life: it fades in, plays, then fades away. Only one is ever on screen, and
+     the next one waits until the one before has fully faded, so nothing ever pops in or out.
+     Positions are read from the page every frame while a hint is up, so a line keeps
+     following its target as the page scrolls or moves. */
+  var FADE_IN = 400;          /* ms for a hint to fade in */
+  var FADE_OUT = 450;         /* ms for a hint to fade away when it has simply finished */
+  var FADE_QUICK = 180;       /* ms when something she did makes the hint beside the point */
+  var opts = null, nodes = [], ghostEl = null, ghostLast = '', holdT = null, outT = null, rafId = 0;
+  var phase = 'idle';         /* 'idle': nothing showing, 'in': showing, 'out': fading away */
+  var queued = null;          /* the next hint, shown once the current one has faded away */
 
   function mk(cls) {
     var p = document.createElementNS(NS, 'path');
@@ -18570,27 +18579,58 @@ var Hints = (function () {
     return r.height > 0 && r.top >= b.top - 1 && r.bottom <= b.bottom + 1;
   }
 
-  function clear() {
+  /* Takes everything down at once. Only used between sessions, when nothing is on screen anyway
+     or a fresh start is wanted; everything else goes through end() so it fades. */
+  function teardown() {
     clearTimeout(holdT);
-    clearTimeout(fadeT);
+    clearTimeout(outT);
     if (rafId) { cancelAnimationFrame(rafId); rafId = 0; }
-    layer.classList.remove('on', 'go', 'once', 'fading');
+    layer.classList.remove('on', 'go', 'once', 'seen');
+    layer.style.transitionDuration = '';
+    layer.style.transition = '';
     while (svg.firstChild) svg.removeChild(svg.firstChild);
     for (var i = 0; i < nodes.length; i++) {
       if (nodes[i].cap && nodes[i].cap.parentNode) nodes[i].cap.parentNode.removeChild(nodes[i].cap);
     }
     if (ghostEl && ghostEl.parentNode) ghostEl.parentNode.removeChild(ghostEl);
-    nodes = []; ghostEl = null; ghostLast = ''; opts = null;
+    nodes = []; ghostEl = null; ghostLast = ''; opts = null; phase = 'idle';
   }
+  function clearNow() { queued = null; teardown(); }
 
-  function fadeOut() {
-    if (!opts) return;
-    var o = opts;
+  /* Fades the current hint away, then starts whatever is waiting. It is taken down only once
+     the browser says the fade has really finished (the page can be slow to start a fade, and
+     going by a timer cut it off half way, so the next hint appeared at half strength); the
+     timer is only a safety net. */
+  function end(ms) {
+    if (phase === 'idle') { startQueued(); return; }
+    if (phase === 'out') return;
+    phase = 'out';
     clearTimeout(holdT);
-    clearTimeout(fadeT);
-    layer.classList.add('fading');
-    fadeT = setTimeout(function () { if (opts === o) clear(); }, 700);
+    var finished = false;
+    function finish() {
+      if (finished) return;
+      finished = true;
+      layer.removeEventListener('transitionend', onEnd);
+      clearTimeout(outT);
+      teardown();
+      startQueued();
+    }
+    function onEnd(e) { if (e.target === layer && e.propertyName === 'opacity') finish(); }
+    layer.addEventListener('transitionend', onEnd);
+    layer.style.transitionDuration = ms + 'ms';
+    layer.classList.remove('seen');
+    outT = setTimeout(finish, ms + 1500);
+    /* already invisible (it was taken down before it had faded in): nothing to wait for */
+    if (parseFloat(getComputedStyle(layer).opacity) < 0.01) finish();
   }
+  function startQueued() {
+    var q = queued;
+    queued = null;
+    if (q) start(q);
+  }
+  /* Lets the current hint go (and cancels any that was waiting). */
+  function clear(ms) { queued = null; end(ms == null ? FADE_OUT : ms); }
+  function fadeOut() { end(FADE_OUT); }
 
   function setHidden(n, hide) {
     n.hidden = hide;
@@ -18603,23 +18643,30 @@ var Hints = (function () {
      would not fit on one line wraps instead. 'belowLeft' floats over the line
      under a table row (about a third of it above the line), with its left edge
      poking out of the table so it does not read as part of it; with no room
-     below, it sits over the line above the row instead. */
-  function placeCaption(n, r, pad, W, H) {
+     below, it sits over the line above the row instead. The caption's size is
+     measured once when it is made, so following a target costs no layout. */
+  function placeCaption(n, r, pad, W, H, b) {
     var cap = n.cap, gap = pad + 16, p = n.t.place || 'below', x, y;
-    cap.style.whiteSpace = '';
-    cap.style.width = '';
-    var cw = cap.offsetWidth, ch = cap.offsetHeight;
+    var cw = n.nat.w, ch = n.nat.h;
     if (p === 'left' || p === 'right') {
       var avail = p === 'left' ? r.x - gap - 8 : W - 8 - (r.x + r.w + gap);
       if (cw > avail) {
-        cap.style.whiteSpace = 'normal';
-        cap.style.width = Math.max(160, avail) + 'px';
-        cw = cap.offsetWidth; ch = cap.offsetHeight;
+        var w = Math.max(160, Math.round(avail));
+        if (n.wrapW !== w) {
+          cap.style.whiteSpace = 'normal';
+          cap.style.width = w + 'px';
+          n.wrapW = w; n.wrapH = cap.offsetHeight;
+        }
+        cw = w; ch = n.wrapH;
+      } else if (n.wrapW) {
+        cap.style.whiteSpace = '';
+        cap.style.width = '';
+        n.wrapW = 0;
       }
     }
     if (p === 'belowLeft') {
       x = r.x - 14; y = r.y + r.h - Math.round(ch * 0.37);
-      if (y + ch > bounds().bottom) y = r.y - Math.round(ch * 0.63);
+      if (y + ch > b.bottom) y = r.y - Math.round(ch * 0.63);
     } else if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
     else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
     else if (p === 'right') { x = r.x + r.w + gap; y = r.y + r.h / 2 - ch / 2; }
@@ -18628,14 +18675,19 @@ var Hints = (function () {
     cap.style.top = Math.max(8, Math.min(H - ch - 8, y)) + 'px';
   }
 
-  /* Re-reads where everything is. Skips anything that has not moved. */
+  /* Re-reads where everything is (all the reads first, then all the writes, so the page is
+     never made to lay out twice). Skips anything that has not moved. */
   function place(force) {
     if (!opts) return;
-    var W = window.innerWidth, H = window.innerHeight;
-    for (var i = 0; i < nodes.length; i++) {
-      var n = nodes[i], t = n.t, r = rectOf(t.el, t.content);
+    var W = window.innerWidth, H = window.innerHeight, i, n;
+    var b = bounds();
+    for (i = 0; i < nodes.length; i++) nodes[i].r = rectOf(nodes[i].t.el, nodes[i].t.content);
+    var fr = (ghostEl && opts.finger) ? rectOf(opts.finger.el) : null;
+    for (i = 0; i < nodes.length; i++) {
+      n = nodes[i];
+      var r = n.r, t = n.t;
       if (!r) { if (!n.hidden) setHidden(n, true); continue; }
-      var key = r.x.toFixed(1) + ',' + r.y.toFixed(1) + ',' + r.w.toFixed(1) + ',' + r.h.toFixed(1) + ',' + W + ',' + H;
+      var key = r.x.toFixed(1) + ',' + r.y.toFixed(1) + ',' + r.w.toFixed(1) + ',' + r.h.toFixed(1) + ',' + W + ',' + H + ',' + Math.round(b.bottom);
       if (!force && key === n.key && !n.hidden) continue;
       n.key = key;
       if (n.hidden) setHidden(n, false);
@@ -18646,18 +18698,27 @@ var Hints = (function () {
         n.casing.setAttribute('d', d);
         n.glow.setAttribute('d', d);
       }
-      if (n.cap) placeCaption(n, r, pad, W, H);
+      if (n.cap) placeCaption(n, r, pad, W, H, b);
     }
-    if (ghostEl && opts.finger) {
-      var fr = rectOf(opts.finger.el);
-      if (fr) {
-        var gx = fr.x + fr.w / 2 + (opts.finger.dx || 0), gy = fr.y + fr.h / 2 + (opts.finger.dy || 0);
-        var gk = gx.toFixed(1) + ',' + gy.toFixed(1);
-        if (force || gk !== ghostLast) {
-          ghostEl.style.left = gx + 'px';
-          ghostEl.style.top = gy + 'px';
-          ghostLast = gk;
-        }
+    if (fr) {
+      var gx = fr.x + fr.w / 2 + (opts.finger.dx || 0), gy = fr.y + fr.h / 2 + (opts.finger.dy || 0);
+      var gk = gx.toFixed(1) + ',' + gy.toFixed(1);
+      if (force || gk !== ghostLast) {
+        ghostEl.style.left = gx + 'px';
+        ghostEl.style.top = gy + 'px';
+        ghostLast = gk;
+      }
+    }
+    /* A hint about something in the table lets go once that thing has scrolled out of view
+       (having once been in view), instead of hanging at the edge of the screen. */
+    if (opts.watch && phase === 'in' && nodes.length && nodes[0].r) {
+      var c = nodes[0].r.y + nodes[0].r.h / 2;
+      if (c >= b.top && c <= b.bottom) opts.inView = true;
+      else if (opts.inView && !opts.gone) {
+        var o = opts;
+        o.gone = true;
+        clearTimeout(holdT);
+        if (o.done) o.done(); else end(FADE_OUT);
       }
     }
   }
@@ -18665,17 +18726,22 @@ var Hints = (function () {
     rafId = 0;
     if (!opts) return;
     place(false);
-    rafId = requestAnimationFrame(frame);
+    if (opts) rafId = requestAnimationFrame(frame);
   }
 
-  function show(o) {
-    clear();
+  function start(o) {
+    phase = 'in';
     opts = o;
+    /* always begin fully transparent: with no fade in progress, and not carrying over any
+       opacity left by the hint before */
+    layer.style.transition = 'none';
+    layer.classList.remove('seen');
     layer.classList.add('on');
     if (o.hold) layer.classList.add('once');
-    var targets = o.targets || [];
-    for (var i = 0; i < targets.length; i++) {
-      var t = targets[i], n = { t: t, key: '', hidden: false };
+    var targets = o.targets || [], i, n;
+    for (i = 0; i < targets.length; i++) {
+      var t = targets[i];
+      n = { t: t, key: '', hidden: false, r: null, nat: null, wrapW: 0, wrapH: 0 };
       if (t.shape && t.shape !== 'none') {
         n.glow = mk('coach-glow'); n.casing = mk('coach-casing'); n.ink = mk('coach-ink');
         svg.appendChild(n.glow); svg.appendChild(n.casing); svg.appendChild(n.ink);
@@ -18694,18 +18760,33 @@ var Hints = (function () {
       if (o.loops) ghostEl.style.animationIterationCount = o.loops;
       layer.appendChild(ghostEl);
     }
+    /* measure each caption once, as one line */
+    for (i = 0; i < nodes.length; i++) {
+      n = nodes[i];
+      if (n.cap) n.nat = { w: n.cap.offsetWidth, h: n.cap.offsetHeight };
+    }
     place(true);
-    layer.classList.remove('go');
+    /* the layer is on the page at full transparency: now let it fade in and start drawing */
     void layer.offsetWidth;
-    layer.classList.add('go');
+    layer.style.transition = '';
+    layer.style.transitionDuration = FADE_IN + 'ms';
+    void layer.offsetWidth;
+    layer.classList.add('go', 'seen');
     if (o.hold) {
       holdT = setTimeout(function () {
-        if (opts !== o) return;
-        if (o.fadeAfter) fadeOut();
+        if (opts !== o || phase !== 'in' || o.gone) return;
+        if (o.fadeAfter) end(FADE_OUT);
         if (o.done) o.done();
       }, o.hold);
     }
     if (!rafId) rafId = requestAnimationFrame(frame);
+  }
+
+  /* Shows a hint. If one is showing, it fades away first and this one follows it. */
+  function show(o) {
+    if (phase === 'idle') { start(o); return; }
+    queued = o;
+    if (phase === 'in') end(o.urgent ? FADE_QUICK : FADE_OUT);
   }
 
   /* ---------- what has been shown this session ---------- */
@@ -18727,7 +18808,7 @@ var Hints = (function () {
 
   /* A new session: forget everything that has been shown. */
   function reset() {
-    clear(); clearTimers();
+    clearNow(); clearTimers();
     clearInterval(pollT); pollT = 0;
     seenKoi = seenSwipe = seenScroll = false;
     kpShown = kpOn = kpPending = numpadWas = false;
@@ -18736,7 +18817,7 @@ var Hints = (function () {
   }
   /* She started something else (the writing screen, 確認する, すべて見送る): the table hints are over. */
   function interrupt() {
-    clear();
+    clear(FADE_QUICK);
     kpOn = false; kpPending = false; pendingTick = null;
     endSeq();
   }
@@ -18758,7 +18839,7 @@ var Hints = (function () {
   function onKoiStart() {
     seenKoi = true;
     clearTimers();
-    clear();
+    clear(300);
   }
 
   /* ---------- message pages ---------- */
@@ -18774,7 +18855,7 @@ var Hints = (function () {
   }
   function onPanelChange(index) {
     if (index !== 0) seenSwipe = true;
-    if (opts && (opts.kind === 'swipe' || opts.kind === 'scroll')) clear();
+    if (opts && (opts.kind === 'swipe' || opts.kind === 'scroll')) clear(300);
     if (index === totalPanels - 1 && !seenScroll) {
       later(function () {
         if (seenScroll || currentPanel !== totalPanels - 1 || (window.scrollY || 0) > 4) return;
@@ -18787,7 +18868,7 @@ var Hints = (function () {
   }
   /* Once she starts scrolling, the scroll hint has done its job. */
   window.addEventListener('scroll', function () {
-    if (opts && opts.kind === 'scroll' && (window.scrollY || 0) > 4) clear();
+    if (opts && opts.kind === 'scroll' && (window.scrollY || 0) > 4) clear(300);
   }, { passive: true });
 
   /* ---------- table: 6a, 6b, 6d one after another ---------- */
@@ -18831,7 +18912,7 @@ var Hints = (function () {
       row = rows[0];
       if (!row) { endSeq(); return; }
       var check = row.querySelector('.row-check');
-      show({ kind: '6a', hold: 4000, done: function () { if (seq === '6a') runStep('6b'); },
+      show({ kind: '6a', hold: 4000, watch: true, done: function () { if (seq === '6a') runStep('6b'); },
         targets: [{ el: check, shape: 'circle', pad: 12, text: '○をタップして選択', place: 'left' }],
         finger: { el: check, kind: 'tap' } });
     } else if (id === '6b') {
@@ -18840,7 +18921,7 @@ var Hints = (function () {
       if (!row) { endSeq(); return; }
       var price = row.querySelector('.price-wrap'), input = row.querySelector('.price-input');
       var filled = !!(input && (input.value || '').trim() !== '');
-      show({ kind: '6b', hold: 4000, done: function () { if (seq === '6b') runStep('6d'); },
+      show({ kind: '6b', hold: 4000, watch: true, done: function () { if (seq === '6b') runStep('6d'); },
         targets: [{ el: price, shape: 'circle', pad: 14, text: filled ? '料金を変更するには、ここをタップ' : 'ここをタップして料金を入力', place: 'below' }],
         finger: { el: price, kind: 'tap' } });
     } else {
@@ -18857,7 +18938,7 @@ var Hints = (function () {
     if (opts || numpadWas) return;
     if (row.getBoundingClientRect().bottom < bounds().top) { endSeq(); return; }   /* scrolled past it */
     if (!fullyVisible(row)) return;
-    show({ kind: '6d', hold: 4000,
+    show({ kind: '6d', hold: 4000, watch: true,
       done: function () { if (seq === '6d') { done6d = true; clear(); endSeq(); } },
       targets: [{ el: row, shape: 'box', pad: 6, text: '一覧にない対応可能なオプションがあれば、こちらにご記入ください', place: 'above' }] });
   }
@@ -18865,7 +18946,7 @@ var Hints = (function () {
   /* ---------- 6c: the first service she selects ---------- */
   function drawTick(row, done) {
     tickShown = true;
-    show({ kind: 'tick', hold: 4000, fade: true, done: done,
+    show({ kind: 'tick', hold: 4000, watch: true, urgent: true, done: done,
       targets: [{ el: row, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
   }
   /* After a caption or the keypad hint, the guided hints carry on. Tapping a price skips 6b. */
@@ -18898,7 +18979,7 @@ var Hints = (function () {
     if (tickRow) t.push({ el: tickRow, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft', fade: true });
     t.push({ el: numpad, shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
     kpPending = true;
-    show({ kind: 'kp', targets: t });
+    show({ kind: 'kp', urgent: true, targets: t });
   }
   function onNumpadShown() {
     if (!tableCard.classList.contains('active') || modalOpen() || rejected) return;
@@ -18916,8 +18997,8 @@ var Hints = (function () {
     var wasKp = kpOn;
     kpOn = false; kpPending = false;
     var keyed = (pendingTick && !pendingTick.custom && !tickShown) ? pendingTick.row : null;
-    if (keyed) { pendingTick = null; clear(); drawTick(keyed, afterKeypad); return; }
-    if (wasKp) { clear(); afterKeypad(); }
+    if (keyed) { pendingTick = null; drawTick(keyed, afterKeypad); return; }
+    if (wasKp) { clear(FADE_QUICK); afterKeypad(); }
   }
   /* Called every time the app works out whether the keypad shows. Acts only when that changes. */
   function syncNumpad() {
@@ -18934,7 +19015,10 @@ var Hints = (function () {
   /* ---------- a caption on the shake ---------- */
   function say(el, text) {
     if (!el || modalOpen()) return;
-    show({ kind: 'say', hold: 4200, fade: true,
+    /* the same caption is already up (or on its way): leave it alone rather than restart it */
+    if (opts && opts.kind === 'say' && opts.sayText === text && opts.sayEl === el && phase === 'in') return;
+    if (queued && queued.kind === 'say' && queued.sayText === text && queued.sayEl === el) return;
+    show({ kind: 'say', sayText: text, sayEl: el, hold: 4200, watch: true, urgent: true,
       done: function () {
         if (kpOn && kpPending) { drawKeypadHint(null); return; }
         if (seq === '6a' || seq === '6b' || seq === '6d') { runStep(seq); return; }
@@ -18964,7 +19048,7 @@ var Hints = (function () {
   function safely(fn) {
     return function () {
       try { return fn.apply(null, arguments); }
-      catch (e) { try { clear(); } catch (e2) { /* silent */ } }
+      catch (e) { try { clearNow(); } catch (e2) { /* silent */ } }
     };
   }
   for (var name in api) api[name] = safely(api[name]);

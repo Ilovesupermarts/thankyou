@@ -4133,7 +4133,10 @@ html[data-theme="autumn"], html[data-theme="winter"] { --text-placeholder: #9575
   --coach-casing: #FFFFFF;
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   z-index: 440; pointer-events: none; display: none;
+  /* every hint fades in (.seen) and fades away; the length of each is set from app.js */
+  opacity: 0; transition: opacity 0.4s ease; will-change: opacity;
 }
+.coach-layer.seen { opacity: 1; }
 html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
 .coach-layer.on { display: block; }
 .coach-layer svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; overflow: visible; }
@@ -4151,7 +4154,6 @@ html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
 .coach-layer.once.go .coach-glow { animation: coachGlow 2.4s ease-in-out 0.9s 1; }
 .coach-layer.once.go .coach-ghost.tap, .coach-layer.once.go .coach-ghost.swipe, .coach-layer.once.go .coach-ghost.up,
 .coach-layer.once.go .coach-ghost.tap::after { animation-iteration-count: 1; }
-.coach-layer.fading { opacity: 0; transition: opacity 0.6s ease; }
 
 .coach-cap {
   position: absolute; max-width: 760px; padding: 12px 20px 12px 18px; border-radius: 4px;
