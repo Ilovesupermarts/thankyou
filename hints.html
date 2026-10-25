@@ -559,7 +559,7 @@
             if (cw > avail) { n.cap.style.whiteSpace = 'normal'; n.cap.style.width = Math.max(160, avail) + 'px'; cw = n.cap.offsetWidth; ch = n.cap.offsetHeight; }
           }
           if (p === 'belowLeft') {
-            x = r.x; y = r.y + r.h + 6;
+            x = r.x - 14; y = r.y + r.h + 6;   /* its left edge pokes out of the table so it does not read as part of it */
             var sc = $('scroller') ? rectOf($('scroller')) : null, limit = sc ? sc.y + sc.h : H;
             if (y + ch > limit) y = r.y - 6 - ch;
           }
