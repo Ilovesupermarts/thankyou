@@ -18790,7 +18790,7 @@ var Hints = (function () {
   }
 
   /* ---------- what has been shown this session ---------- */
-  var seenKoi = false, seenSwipe = false, seenScroll = false;
+  var seenKoi = false, seenSwipe = false, seenScroll = false, seenStamp = false;
   var kpShown = false, kpOn = false, kpPending = false, numpadWas = false;
   var tickShown = false, pendingTick = null;
   var seq = 'off', revealAt = 0, pollT = 0, done6d = false;
@@ -18810,7 +18810,7 @@ var Hints = (function () {
   function reset() {
     clearNow(); clearTimers();
     clearInterval(pollT); pollT = 0;
-    seenKoi = seenSwipe = seenScroll = false;
+    seenKoi = seenSwipe = seenScroll = seenStamp = false;
     kpShown = kpOn = kpPending = numpadWas = false;
     tickShown = false; pendingTick = null;
     seq = 'off'; done6d = false;
@@ -19029,7 +19029,8 @@ var Hints = (function () {
 
   /* ---------- receipt ---------- */
   function onStamp() {
-    if (!receiptStampX) return;
+    if (!receiptStampX || seenStamp) return;
+    seenStamp = true;
     show({ kind: 'stamp', hold: 3400, fadeAfter: true,
       targets: [{ el: receiptStampX, shape: 'circle', pad: 8, text: '変更は印の×から', place: 'right' }] });
   }
