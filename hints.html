@@ -273,7 +273,7 @@
   <div class="detail" id="detail"></div>
   <div class="detail extra" id="kpNote">
     <b>＋ Keypad hint</b>
-    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the keypad with 入力後、「決定」をタップ underneath it. It goes when the keypad closes, and shows the first time only.
+    Not a step. It comes on the first time the keypad appears, for any service (a preset, or a custom one after she writes its name), whatever step she is on: a box around the keypad with 入力後、「決定」をタップ underneath it. It stays on until she keys in the first digit, then fades off (or goes when the keypad closes, if she never types). It shows the first time only.
     <div class="try"><span id="kpState"></span> <button class="chip" id="kpReset">Show it again</button></div>
   </div>
   <div class="detail extra" id="tickNote">
@@ -567,7 +567,14 @@
     }
 
     frame.addEventListener('pointerdown', armIdle, true);
-    return { show: show, clear: clear, place: place };
+    function fadeOut() {
+      if (!opts) return;
+      var o = opts;
+      clearTimeout(idleT); clearTimeout(onceT);
+      layer.classList.add('fading');
+      onceT = setTimeout(function () { if (opts === o) clear(); }, 700);
+    }
+    return { show: show, clear: clear, place: place, fadeOut: fadeOut };
   })();
 
   /* ============ CAROUSEL (message pages and thank-you pages) ============ */
@@ -689,7 +696,7 @@
     clearTimeout(shakeWithWords.t);
     shakeWithWords.t = setTimeout(function () {
       if (curStep !== resume) return;
-      if (kpOn) { drawKeypadHint(); return; }
+      if (kpOn) { if (kpPending) drawKeypadHint(); return; }
       var s = steps[curStep]; if (s.leave) s.leave(); s.hint();
     }, 4200);
   }
@@ -724,6 +731,7 @@
     activeRow.v.textContent = digits ? parseInt(digits, 10).toLocaleString() : '';
     if (digits && !activeRow.on) activeRow.on = true;
     recalc();
+    if (k !== 'back') emit('digit');
   });
   /* Tapping away from an open price closes the keypad, as in the app. */
   $('scrTable').addEventListener('pointerdown', function (e) {
@@ -878,12 +886,13 @@
      Not a step: it comes on the first time the keypad appears (a tap on
      any price, a preset or a custom service), whatever step she is on,
      and goes when the keypad closes. */
-  var kpShown = false, kpOn = false, tickShown = false, tickRow = null;
+  var kpShown = false, kpOn = false, kpPending = false, tickShown = false, tickRow = null;
   function drawKeypadHint(tickRow) {
     var t = [];
     if (tickRow) t.push({ el: tickRow.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left', fade: true });
     t.push({ el: $('numpad'), shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
-    Coach.show({ still: !!tickRow, targets: t });
+    kpPending = true;
+    Coach.show({ still: true, targets: t });
   }
 
   /* The 「もう一度タップすると解除できます」 caption for the first service she ticks. */
@@ -898,7 +907,7 @@
     if (old && old.leave) old.leave();
     Coach.clear();
     clearTimeout(shakeWithWords.t);
-    kpOn = false;
+    kpOn = false; kpPending = false;
     if (!natural) { kpShown = false; tickShown = false; }
     $('end').classList.remove('on');
     curStep = Math.max(0, Math.min(steps.length - 1, i));
@@ -916,8 +925,12 @@
 
     /* The keypad hint takes over while the keypad is up. */
     if (kpOn) {
+      if (evt === 'digit') {
+        if (kpPending) { kpPending = false; Coach.fadeOut(); }
+        return;
+      }
       if (evt === 'priceDone') {
-        kpOn = false; Coach.clear();
+        kpOn = false; kpPending = false; Coach.clear();
         if (s.id === '6a') go(idx('6d'), true);
         else if (s.id === '6b') next();
         else go(curStep, true);
