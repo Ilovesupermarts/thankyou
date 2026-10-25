@@ -227,6 +227,7 @@
     position: absolute; max-width: 760px; padding: 12px 20px 12px 18px; border-radius: 4px;
     background: var(--bg-base); border-left: 4px solid var(--ink); box-shadow: 0 6px 24px rgba(60,30,20,.16);
     font-size: 21px; line-height: 1.6; letter-spacing: 1px; color: var(--text-dark); white-space: nowrap; opacity: 0;
+    word-break: auto-phrase; line-break: strict;
   }
   .coach.go .cap { animation: capIn .5s ease-out .55s forwards; }
   .coach.go .cap.fade { animation: capIn .5s ease-out .1s forwards, capOut .6s ease-in 3.4s forwards; }
@@ -278,7 +279,7 @@
   </div>
   <div class="detail extra" id="tickNote">
     <b>＋ 6c Untick caption</b>
-    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップすると解除できます beside that ○, for one loop. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
+    Not a step. It appears for the first service she ticks, whenever that happens: もう一度タップすると解除できます just below that row, for one loop. A service ticked by keying in its price counts too: the caption shows when she closes the keypad. For a custom service it appears when the writing screen closes (with the keypad hint if that is also due).
     <div class="try"><span id="tickState"></span> <button class="chip" id="tickReset">Show it again</button></div>
   </div>
   <div class="replays" id="replays"></div>
@@ -549,8 +550,23 @@
           n.ink.setAttribute('d', d); n.casing.setAttribute('d', d); n.glow.setAttribute('d', d);
         }
         if (n.cap) {
-          var cw = n.cap.offsetWidth, ch = n.cap.offsetHeight, gap = pad + 16, p = n.t.place || 'below', x, y;
-          if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
+          var gap = pad + 16, p = n.t.place || 'below', x, y;
+          /* A caption beside its target wraps onto two lines when it would not fit on one line there. */
+          n.cap.style.whiteSpace = ''; n.cap.style.width = '';
+          var cw = n.cap.offsetWidth, ch = n.cap.offsetHeight;
+          if (p === 'left' || p === 'right') {
+            var avail = p === 'left' ? r.x - gap - 16 : W - 16 - (r.x + r.w + gap);
+            if (cw > avail) { n.cap.style.whiteSpace = 'normal'; n.cap.style.width = Math.max(160, avail) + 'px'; cw = n.cap.offsetWidth; ch = n.cap.offsetHeight; }
+          }
+          if (p === 'belowLeft') {
+            /* Floats over the line under the row: about a third of the box above the line, the rest below it.
+               Its left edge pokes out of the table so it does not read as part of it. */
+            x = r.x - 14; y = r.y + r.h - Math.round(ch * 0.37);
+            var sc = $('scroller') ? rectOf($('scroller')) : null, limit = sc ? sc.y + sc.h : H;
+            /* No room below: the same over the line above the row instead. */
+            if (y + ch > limit) y = r.y - Math.round(ch * 0.63);
+          }
+          else if (p === 'below') { x = r.x + r.w / 2 - cw / 2; y = r.y + r.h + gap; }
           else if (p === 'above') { x = r.x + r.w / 2 - cw / 2; y = r.y - gap - ch; }
           else if (p === 'right') { x = r.x + r.w + gap; y = r.y + r.h / 2 - ch / 2; }
           else { x = r.x - gap - cw; y = r.y + r.h / 2 - ch / 2; }
@@ -644,7 +660,7 @@
 
   /* ============ SERVICE TABLE ============ */
   var PRESETS = [['アロマオイル追加', 2000], ['延長 30分', 4000], ['ホットストーン', 3000], ['フットケア', 2500]];
-  var rows = [], activeRow = null, rejected = false, freshPrice = false;
+  var rows = [], activeRow = null, rejected = false, freshPrice = false, autoTick = null;
   function makeRow(name, price, custom) {
     var el = document.createElement('div'); el.className = 'row' + (custom ? ' locked' : '');
     el.innerHTML = '<div class="check"></div><div class="svc' + (custom ? ' input' : '') + '"></div><div class="price"><span class="v"></span><span>円</span></div>';
@@ -717,19 +733,26 @@
     else { if (activeRow === r) setActive(null); emit('uncheck', r); }
     recalc();
   }
+  /* Closing the keypad: if keying in the price just ticked the row, tell the hints which row. */
+  function closeKeypad() {
+    var r = activeRow, auto = (r && autoTick === r) ? r : null;
+    autoTick = null;
+    setActive(null);
+    emit('priceDone', auto);
+  }
   $('numpad').addEventListener('click', function (e) {
     var b = e.target.closest('button'); if (!b || !activeRow) return;
     var k = b.getAttribute('data-k'), digits = activeRow.v.textContent.replace(/[^0-9]/g, '');
     if (k === 'done') {
       if (!digits) { shakeWithWords(activeRow.price, '料金をご入力ください'); return; }
-      setActive(null); emit('priceDone'); return;
+      closeKeypad(); return;
     }
     /* Like the app, which selects the price on focus: the first key replaces it. */
     if (freshPrice) { freshPrice = false; if (k !== 'back') digits = ''; }
     if (k === 'back') digits = digits.slice(0, -1);
     else digits = (digits + k).slice(0, 5);
     activeRow.v.textContent = digits ? parseInt(digits, 10).toLocaleString() : '';
-    if (digits && !activeRow.on) activeRow.on = true;
+    if (digits && !activeRow.on) { activeRow.on = true; autoTick = activeRow; }
     recalc();
     if (k !== 'back') emit('digit');
   });
@@ -737,7 +760,7 @@
   $('scrTable').addEventListener('pointerdown', function (e) {
     if (!activeRow || e.target.closest('.numpad') || e.target.closest('.price')) return;
     if (!activeRow.v.textContent) return;
-    setActive(null); emit('priceDone');
+    closeKeypad();
   });
 
   var tzRow = null;
@@ -889,7 +912,7 @@
   var kpShown = false, kpOn = false, kpPending = false, tickShown = false, tickRow = null;
   function drawKeypadHint(tickRow) {
     var t = [];
-    if (tickRow) t.push({ el: tickRow.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left', fade: true });
+    if (tickRow) t.push({ el: tickRow.el, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft', fade: true });
     t.push({ el: $('numpad'), shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
     kpPending = true;
     Coach.show({ still: true, targets: t });
@@ -898,7 +921,7 @@
   /* The 「もう一度タップすると解除できます」 caption for the first service she ticks. */
   function drawTickHint(row, done) {
     tickShown = true;
-    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.check, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'left' }] });
+    Coach.show({ once: true, fade: true, onDone: done, targets: [{ el: row.el, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
   }
 
   /* natural: arrived by doing the action, so keep the screen as it is. */
@@ -907,7 +930,7 @@
     if (old && old.leave) old.leave();
     Coach.clear();
     clearTimeout(shakeWithWords.t);
-    kpOn = false; kpPending = false;
+    kpOn = false; kpPending = false; autoTick = null;
     if (!natural) { kpShown = false; tickShown = false; }
     $('end').classList.remove('on');
     curStep = Math.max(0, Math.min(steps.length - 1, i));
@@ -923,18 +946,24 @@
     /* Starting a different job ends the table hints. */
     if (/^6[a-d]$/.test(s.id) && (evt === 'submit' || evt === 'openCustom' || evt === 'reject')) { go(idx('T'), true); return; }
 
+    /* After the keypad closes the step carries on; she tapped a price, so 6a skips ahead to 6d. */
+    function resumeAfterKeypad() {
+      if (steps[curStep] !== s) return;
+      if (s.id === '6a') go(idx('6d'), true);
+      else if (s.id === '6b') next();
+      else go(curStep, true);
+    }
+    /* Keying in a price ticks the row. If it is the first service ticked, it gets the 6c caption now. */
+    if (evt === 'priceDone') {
+      var wasKp = kpOn;
+      kpOn = false; kpPending = false;
+      if (data && !tickShown) { Coach.clear(); drawTickHint(data, resumeAfterKeypad); return; }
+      if (wasKp) { Coach.clear(); resumeAfterKeypad(); return; }
+    }
+
     /* The keypad hint takes over while the keypad is up. */
     if (kpOn) {
-      if (evt === 'digit') {
-        if (kpPending) { kpPending = false; Coach.fadeOut(); }
-        return;
-      }
-      if (evt === 'priceDone') {
-        kpOn = false; kpPending = false; Coach.clear();
-        if (s.id === '6a') go(idx('6d'), true);
-        else if (s.id === '6b') next();
-        else go(curStep, true);
-      }
+      if (evt === 'digit' && kpPending) { kpPending = false; Coach.fadeOut(); }
       return;
     }
     /* 6c: the first service she ticks gets the caption, whatever step she is on. */
