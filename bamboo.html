@@ -294,7 +294,7 @@
   </div>
 
   <!-- The button (in place of the old swipe / scroll lines). -->
-  <div class="nav-demo" id="navDemo" data-look="clear" data-arrow="right" data-mode="swipe">
+  <div class="nav-demo" id="navDemo" data-look="plain" data-arrow="right" data-mode="swipe">
     <button type="button" class="nb" id="navBtn" aria-label="次へ">
       <span class="nb-side nb-word"><span>次へ</span><span>下へ</span></span>
       <span class="nb-press"><span class="nb-glass" id="navGlass">
@@ -339,7 +339,6 @@
       <button type="button" data-a="right">→ Right</button>
       <button type="button" data-a="left">← Left</button>
     </div>
-    <h4>Spring</h4>
     <div id="spCtls"></div>
     <canvas class="sp-curve" id="spCurve"></canvas>
     <div class="sp-zeta" id="spZeta"></div>
@@ -5374,9 +5373,10 @@ var N = panels.length, cur = 0;
    Response and damping work as in Apple's SwiftUI springs:
    response = how long one swing takes (seconds);
    damping  = 1 settles with no swing past rest, lower swings more. */
-var DEF = { response: 0.42, damping: 0.32, pull: 9, pullTime: 380, kick: 0, stretch: 0.06, pause: 3.0 };
+var DEF = { gap: 14, response: 0.2, damping: 0.05, pull: 12.5, pullTime: 680, kick: 190, stretch: 0, pause: 2 };
 var CTLS = [
-  { k: 'response', label: 'Response (s)', min: 0.12, max: 1.5, step: 0.01, note: 'How long one swing takes. Lower = quicker, stiffer spring.' },
+  { k: 'gap', label: 'Space: button to dots (px)', min: 0, max: 60, step: 1, group: 'Layout', note: 'The gap between the button and the page dots.' },
+  { k: 'response', label: 'Response (s)', min: 0.12, max: 1.5, step: 0.01, group: 'Spring', note: 'How long one swing takes. Lower = quicker, stiffer spring.' },
   { k: 'damping', label: 'Damping', min: 0.05, max: 1, step: 0.01, note: '1 = settles without swinging past. Lower = more swings (bouncier).' },
   { k: 'pull', label: 'Draw back (px)', min: 0, max: 30, step: 0.5, note: 'How far it is drawn back before it is let go.' },
   { k: 'pullTime', label: 'Draw-back time (ms)', min: 80, max: 1200, step: 10 },
@@ -5384,7 +5384,7 @@ var CTLS = [
   { k: 'stretch', label: 'Stretch with speed', min: 0, max: 0.25, step: 0.005, note: 'Like soft glass: longer when moving fast, squashed when drawn back.' },
   { k: 'pause', label: 'Pause between (s)', min: 0.5, max: 10, step: 0.1 }
 ];
-var KEY = 'nbSpring1';
+var KEY = 'nbSpring2';
 var S = {};
 for (var dk in DEF) S[dk] = DEF[dk];
 try {
@@ -5430,7 +5430,7 @@ function apply(x, v, phase) {
   if (phase === 'pull') s = -S.stretch * 0.6 * Math.min(1, Math.abs(x) / Math.max(1, S.pull));   // squashed as it is drawn back
   else s = S.stretch * Math.min(1, Math.abs(v) / 700);                                            // longer as it flies
   var along = 1 + s, across = 1 - s * 0.5;
-  if (!down && demo.getAttribute('data-arrow') === 'left') x = -x;        // drawn back to the right, let go to the left
+  if (down || demo.getAttribute('data-arrow') !== 'left') x = -x;        // drawn out the way the arrow points first (right, or down), then let go
   btn.style.transform = down
     ? 'translateY(' + x.toFixed(2) + 'px) scale(' + across.toFixed(4) + ',' + along.toFixed(4) + ')'
     : 'translateX(' + x.toFixed(2) + 'px) scale(' + along.toFixed(4) + ',' + across.toFixed(4) + ')';
@@ -5475,7 +5475,7 @@ function place() {
   var top = stage.getBoundingClientRect().top, low = 0;
   for (var i = 0; i < N; i++) low = Math.max(low, panels[i].querySelector('.panel-content').getBoundingClientRect().bottom - top);
   demo.style.top = (low + 18) + 'px';
-  dotsEl.style.top = (low + 18 + demo.offsetHeight + 14) + 'px';
+  dotsEl.style.top = (low + 18 + demo.offsetHeight + S.gap) + 'px';
   dotsEl.style.bottom = 'auto';
 }
 function go(i) {
@@ -5546,12 +5546,15 @@ function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFi
 function buildCtls() {
   host.innerHTML = '';
   CTLS.forEach(function (c) {
+    if (c.group) { var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh); }
     var wrap = document.createElement('div'); wrap.className = 'sp-ctl';
     var lab = document.createElement('label'); lab.textContent = c.label;
     var val = document.createElement('span'); val.textContent = fmt(c, S[c.k]); lab.appendChild(val);
     var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = S[c.k];
     inp.addEventListener('input', function () {
-      S[c.k] = parseFloat(inp.value); val.textContent = fmt(c, S[c.k]); save(); drawCurve();
+      S[c.k] = parseFloat(inp.value); val.textContent = fmt(c, S[c.k]); save();
+      if (c.k === 'gap') { place(); return; }
+      drawCurve();
       clearTimeout(replay); replay = setTimeout(play, 350);       // try it straight away
     });
     wrap.appendChild(lab); wrap.appendChild(inp);
@@ -5597,7 +5600,7 @@ document.getElementById('spCopy').addEventListener('click', function () {
 var LOOKS = ['clear', 'tint', 'disc', 'orb', 'plain'];
 var seg = document.getElementById('spLook');
 function choose(s) {
-  if (LOOKS.indexOf(s) < 0) s = 'clear';
+  if (LOOKS.indexOf(s) < 0) s = 'plain';
   demo.setAttribute('data-look', s);
   var all = seg.querySelectorAll('button');
   for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-s') === s);
@@ -5615,7 +5618,7 @@ function chooseArrow(a) {
   demo.setAttribute('data-arrow', a);
   var all = arrowSeg.querySelectorAll('button');
   for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-a') === a);
-  try { localStorage.setItem('nbArrow1', a); } catch (e) {}
+  try { localStorage.setItem('nbArrow2', a); } catch (e) {}
   buildLens();
 }
 arrowSeg.addEventListener('click', function (e) {
@@ -5623,9 +5626,9 @@ arrowSeg.addEventListener('click', function (e) {
   if (b) { chooseArrow(b.getAttribute('data-a')); play(); }
 });
 var savedArrow = 'right';
-try { savedArrow = localStorage.getItem('nbArrow1') || 'right'; } catch (e) {}
+try { savedArrow = localStorage.getItem('nbArrow2') || 'right'; } catch (e) {}
 chooseArrow(savedArrow);
-choose(location.hash.slice(1));
+choose(location.hash.slice(1) || 'plain');
 go(0);
 buildCtls();
 place();
