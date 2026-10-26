@@ -13048,6 +13048,27 @@ function buildKoyoTree(key, far, lazy) {
     T.clumps.push({ node: j, R: R, fam: fam, back: mid || r() < 0.3, seed: (r() * 4294967296) >>> 0,
                     ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU, bakedV: -1 });
   }
+  // No holes: the dice above can leave a gap that the bare twigs show through.
+  // Walk along every twig and, wherever no clump covers a point, add one there.
+  var fillR = sc * 0.095 * lerp(0.75, 1.1, KOYO.fullness);
+  for (var g = 1; g < nodes.length; g++) {
+    var GN = nodes[g];
+    if (GN.d < 2) continue;
+    for (var s = 0; s < 3; s++) {
+      var gf = (s + 1) / 3, gx = lerp(GN.sx, GN.ex, gf), gy = lerp(GN.sy, GN.ey, gf), covered = false;
+      for (var h = 0; h < T.clumps.length && !covered; h++) {
+        var HC = T.clumps[h], hn = nodes[HC.node];
+        covered = Math.hypot(hn.ex + HC.ox - gx, hn.ey + HC.oy - gy) < HC.R * 0.8;
+      }
+      if (covered) continue;
+      var gk = Math.floor(GN.ex / cell) + ',' + Math.floor(GN.ey / cell);
+      if (!cellFam[gk]) cellFam[gk] = koyoFamily(r);
+      var gfam = r() < KOYO.patchiness ? cellFam[gk] : koyoFamily(r);
+      if (gfam === 'evergreen' && GN.d >= maxD - 1) gfam = 'red';
+      T.clumps.push({ node: g, R: fillR, fam: gfam, back: GN.d < maxD - 1, seed: (r() * 4294967296) >>> 0,
+                      ox: gx - GN.ex, oy: gy - GN.ey - fillR * 0.2, ph: r() * TAU, bakedV: -1 });
+    }
+  }
   // back clumps first, then low to high so the top of the canopy sits in front
   T.clumps.sort(function(a, b) {
     if (a.back !== b.back) return a.back ? -1 : 1;
@@ -16817,10 +16838,18 @@ function addPerch(T, r) {
     if (cy + C.R < y0 - oh || cy - C.R > y0) return;
     edge = Math.max(edge, (koyoX(T, cn.ex + C.ox) - x0) * inward + C.R * 1.05);
   });
-  var len = Math.max(T.scale * O.branchLength, (edge + oh * 0.35) / Math.cos(a) / O.perchAt);
+  var len = Math.max(T.scale * O.branchLength, (edge + oh * 0.35) / Math.cos(a) / O.perchAt), at = O.perchAt;
+  // never reach past the tree's width limit (KOYO.maxWidth), so the branch stays out of the message area;
+  // when it has to be shorter, the owl sits further out along it instead
+  var limitX = KOYO.maxWidth / 100 * W, capX = T.left ? limitX : W - limitX, margin = T.scale * 0.03;
+  var maxLen = Math.max(T.scale * 0.08, ((capX - x0) * inward - margin) / Math.cos(a));
+  if (len > maxLen) {
+    at = clamp((edge + oh * 0.35) / Math.cos(a) / maxLen, O.perchAt, 0.9);
+    len = maxLen;
+  }
   T.perch = ns.length;
   ns.push({ p: best, rel: abs - par.abs, abs: abs, len: len, w: Math.max(T.scale * 0.011, par.w * 0.62 * 0.9),
-            d: par.d + 1, ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0, perch: true, side: inward, pf: pf });
+            d: par.d + 1, ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0, perch: true, side: inward, pf: pf, at: at });
   T.pb = 0; T.pbV = 0;
   // a few kōyō leaves at the tip and on the little twig near it
   var leaves = [];
@@ -16851,11 +16880,11 @@ function curvePt(P, u) {
 /* Where the owl's feet go: on top of the branch at O.perchAt, and how far
    the branch is tipped from its rest angle (the owl leans with it). */
 function seat(T) {
-  var P = perchCurve(T), q = curvePt(P, O.perchAt);
+  var P = perchCurve(T), q = curvePt(P, P.n.at);
   return { x: q.x + q.nx * q.w / 2, y: q.y + q.ny * q.w / 2, rot: (P.n.cur - P.n.abs) * 0.6 };
 }
 function perchTwig(P) {
-  var q = curvePt(P, clamp(O.perchAt + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
+  var q = curvePt(P, clamp(P.n.at + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
   return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
 }
 /* Drawn with the tree's branches, in their colour (fillStyle already set). */
