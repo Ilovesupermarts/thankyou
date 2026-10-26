@@ -13082,7 +13082,7 @@ function buildKoyoTree(key, far, lazy) {
     var cn = nodes[C.node];
     over = Math.max(over, (left ? cn.ex : W - cn.ex) + C.R * 1.25 - limit);
   });
-  var slide = Math.min(over, (left ? bx : W - bx) + W * 0.08);
+  var slide = Math.min(over, Math.max(0, (left ? bx : W - bx) - W * 0.03));   // the trunk's foot always stays on the screen
   if (slide > 0) {
     bx += left ? -slide : slide;
     T.bx = bx;
@@ -13156,32 +13156,50 @@ function fillKoyoBranches(c, T, strength) {
   var bark = T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK;
   bark = koyoLight(mixRgb(bark, KOYO_PAPER, 1 - strength));
   bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
-  c.fillStyle = rgba(bark);
   var ns = T.nodes, i, n;
   function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
-  c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
-    var w0 = n.w / 2, w1 = endW(n);
-    var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
-    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
-    c.moveTo(x0 + px * w0, y0 + py * w0);
-    c.lineTo(x1 + px * w1, y1 + py * w1);
-    c.lineTo(x1 - px * w1, y1 - py * w1);
-    c.lineTo(x0 - px * w0, y0 - py * w0);
-    c.closePath();
+  // Round bark: each branch is drawn in three bands across its width, a dark
+  // band on the side away from the light, the base colour, and a lighter band
+  // on the side facing it (the same light as the leaves: above and to the side).
+  var night = koyoNight(), lx = KOYO.lightFrom * lerp(1, 0.5, night), ly = lerp(-0.85, 0.8, night), ll = Math.hypot(lx, ly);
+  lx /= ll; ly /= ll;
+  var bands = [
+    { col: bark, a: -1, b: 1 },                                          // the whole width
+    { col: scaleRgb(bark, 0.62), a: 0.1, b: 1, dark: true },            // shaded side
+    { col: mixRgb(scaleRgb(bark, 1.25), KOYO_PAPER, 0.18), a: -0.85, b: -0.3 }   // highlight
+  ];
+  for (var bi = 0; bi < bands.length; bi++) {
+    var B = bands[bi];
+    c.fillStyle = rgba(B.col);
+    c.beginPath();
+    for (i = 0; i < ns.length; i++) {
+      n = ns[i];
+      if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
+      var w0 = n.w / 2, w1 = endW(n);
+      var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
+      var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+      var sd = (px * lx + py * ly) >= 0 ? -1 : 1;   // which way across the branch faces the light
+      var oa = B.a * sd, ob = B.b * sd;
+      c.moveTo(x0 + px * w0 * oa, y0 + py * w0 * oa);
+      c.lineTo(x1 + px * w1 * oa, y1 + py * w1 * oa);
+      c.lineTo(x1 + px * w1 * ob, y1 + py * w1 * ob);
+      c.lineTo(x0 + px * w0 * ob, y0 + py * w0 * ob);
+      c.closePath();
+    }
+    c.fill();
+    if (bi === 0) {                                 // round joints at the forks, in the base colour, under the shading
+      c.beginPath();
+      for (i = 0; i < ns.length; i++) {
+        n = ns[i];
+        if (n.d >= T.maxD || n.perch) continue;     // a twig's tip has no fork, so no joint
+        var r = endW(n), ex = koyoX(T, n.ex);
+        c.moveTo(ex + r, n.ey);
+        c.arc(ex, n.ey, r, 0, TAU);
+      }
+      c.fill();
+    }
   }
-  c.fill();
-  c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.d >= T.maxD || n.perch) continue;       // a twig's tip has no fork, so no joint
-    var r = endW(n), ex = koyoX(T, n.ex);
-    c.moveTo(ex + r, n.ey);
-    c.arc(ex, n.ey, r, 0, TAU);
-  }
-  c.fill();
+  c.fillStyle = rgba(bark);
   if (T.perch !== undefined) NightLife.drawPerch(c, T);
 }
 function drawKoyoClumps(c, T, t) {
