@@ -19088,7 +19088,8 @@ var Hints = (function () {
 
    When it bounces:
    - the swipe button bounces on the first message until the therapist swipes
-     (the panel changes). On the later messages it waits quietly, and starts
+     (the panel changes). It starts 5 seconds after all the text of the first
+     message has appeared, not before. On the later messages it waits quietly, and starts
      bouncing again only after 10 seconds with no touch while she is still on that
      message; the next swipe stops it again. The thank-you screens work the same way.
    - the scroll button bounces until she scrolls, then stops for good. */
@@ -19096,6 +19097,8 @@ var NavSpring = (function () {
   var SET = { response: 0.2, damping: 0.05, pull: 11.5, pullTime: 300, kick: 180, pause: 0.9 };
   var AFTER_TOUCH = 1400;                    // a touch anywhere holds the swing back this long (ms)
   var QUIET = 10000;                         // no touch for this long on a later message: bounce again (ms)
+  var INTRO_WAIT = 5000;                     // the first message: bounce this long after all its text has appeared (ms)
+  var introPending = true, textReadyAt = 0;  // still on the first message, and when its text will have been up for INTRO_WAIT
   var path = null, startT = 0, raf = 0, timer = 0, moving = null, movingBtn = null, down = false, lastTouch = -1e9;
   var quietUntil = { msg: 0, ty: 0 };        // the swipe buttons stay still until this time
   var lastIndex = { msg: 0, ty: 0 };
@@ -19122,10 +19125,23 @@ var NavSpring = (function () {
     if (btn.id === 'tySwipeBtn') return 'ty';
     return btn.getAttribute('data-dir') === 'down' ? 'scroll' : 'msg';
   }
+  /* every phrase of the first message is on show (they fade in a few at a time) */
+  function firstTextShown() {
+    var list = document.querySelectorAll('.panel[data-panel="0"] .panel-phrase');
+    if (!list.length) return false;
+    for (var i = 0; i < list.length; i++) if (!list[i].classList.contains('shown')) return false;
+    return true;
+  }
   function mayBounce(btn) {
-    var g = groupOf(btn);
+    var g = groupOf(btn), now = performance.now();
     if (g === 'scroll') return !scrolled;
-    return performance.now() >= quietUntil[g];
+    if (g === 'msg' && introPending) {
+      /* the last phrase takes PANEL_PHRASE_DURATION to fade in; the 5 seconds count from when it is fully up */
+      if (!firstTextShown()) { textReadyAt = 0; return false; }
+      if (!textReadyAt) textReadyAt = now + PANEL_PHRASE_DURATION + INTRO_WAIT;
+      return now >= textReadyAt;
+    }
+    return now >= quietUntil[g];
   }
   function stopSwing() {
     if (raf) cancelAnimationFrame(raf);
@@ -19161,7 +19177,7 @@ var NavSpring = (function () {
   function play() {
     clearTimeout(timer); timer = 0;
     var btn = visibleButton();
-    if (!btn || !mayBounce(btn)) { timer = setTimeout(play, 500); return; }      // nothing to bounce just now: look again shortly
+    if (!btn || !mayBounce(btn)) { timer = setTimeout(play, 250); return; }      // nothing to bounce just now: look again shortly
     movingBtn = btn;
     moving = btn.querySelector('.nav-move');
     down = btn.getAttribute('data-dir') === 'down';
@@ -19182,6 +19198,7 @@ var NavSpring = (function () {
   function panelChanged(group, index) {
     if (index === lastIndex[group]) return;
     lastIndex[group] = index;
+    if (group === 'msg') introPending = false;
     quietUntil[group] = performance.now() + QUIET;
     if (group === 'msg') scrolled = false;                    // the scroll button starts afresh on the last message
     if (raf) stopSwing();
@@ -19196,7 +19213,7 @@ var NavSpring = (function () {
   }, { passive: true });
   /* back at the start: everything bounces from the first message again */
   function reset(which) {
-    if (!which || which === 'msg') { quietUntil.msg = 0; lastIndex.msg = 0; scrolled = false; }
+    if (!which || which === 'msg') { quietUntil.msg = 0; lastIndex.msg = 0; scrolled = false; introPending = true; textReadyAt = 0; }
     if (!which || which === 'ty') { quietUntil.ty = 0; lastIndex.ty = 0; }
   }
   if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) timer = setTimeout(play, 1200);
