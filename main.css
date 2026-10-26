@@ -1484,8 +1484,7 @@
   .action-hint.global-hint.shown .hint-layer.active .nav-btn,
   .action-hint.ty-swipe-hint.shown .nav-btn { pointer-events: auto; }
   .nav-move { display: inline-flex; align-items: center; gap: 7px; will-change: transform; }
-  .nav-arrow { display: block; width: 17px; height: 17px; filter: drop-shadow(0 0 3px rgba(255, 253, 249, 1)); }
-  .nav-arrow.down { transform: rotate(90deg); }
+  .nav-arrow { display: block; font-size: 12px; line-height: 1; letter-spacing: 0; text-shadow: 0 0 3px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
 
   /* the page counter dots: small and quiet */
   #dots { gap: 9px; }

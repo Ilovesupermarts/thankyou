@@ -9326,8 +9326,8 @@ function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
   repositionTySwipeHint();
   if (tyExited) { tySwipeHint.classList.remove('shown'); return; }
-  if (tyCurrentPanel === TY_TOTAL_PANELS - 1) tySwipeHintLabel.textContent = 'もう一度スワイプ';
-  else tySwipeHintLabel.textContent = 'スワイプ';
+  if (tyCurrentPanel === TY_TOTAL_PANELS - 1) tySwipeHintLabel.textContent = 'もう一度左にスワイプ';
+  else tySwipeHintLabel.textContent = '左にスワイプ';
   tySwipeHint.classList.add('shown');
 }
 /* Panel-1 content is derived from the live receipt DOM at paint
