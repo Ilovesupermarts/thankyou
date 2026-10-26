@@ -13199,8 +13199,7 @@ function fillKoyoBranches(c, T, strength) {
       c.fill();
     }
   }
-  c.fillStyle = rgba(bark);
-  if (T.perch !== undefined) NightLife.drawPerch(c, T);
+  if (T.perch !== undefined) NightLife.drawPerch(c, T, bands, lx, ly);
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -16905,23 +16904,30 @@ function perchTwig(P) {
   var q = curvePt(P, clamp(P.n.at + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
   return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
 }
-/* Drawn with the tree's branches, in their colour (fillStyle already set). */
-function drawPerch(c, T) {
-  var P = perchCurve(T), N = 14, i, q, Lft = [], Rgt = [];
-  for (i = 0; i <= N; i++) {
-    q = curvePt(P, i / N);
-    Lft.push([q.x + q.nx * q.w / 2, q.y + q.ny * q.w / 2]);
-    Rgt.push([q.x - q.nx * q.w / 2, q.y - q.ny * q.w / 2]);
+/* Drawn with the tree's branches, shaded like them: the same bands (dark side,
+   base, lit side) across its width, lit from (lx, ly). */
+function drawPerch(c, T, bands, lx, ly) {
+  var P = perchCurve(T), N = 14, i, q, bi;
+  var mid = curvePt(P, 0.5), sd = (mid.nx * lx + mid.ny * ly) >= 0 ? -1 : 1;   // which way across the branch faces the light
+  for (bi = 0; bi < bands.length; bi++) {
+    var B = bands[bi], oa = B.a * sd, ob = B.b * sd, A = [], D = [];
+    for (i = 0; i <= N; i++) {
+      q = curvePt(P, i / N);
+      A.push([q.x + q.nx * q.w / 2 * oa, q.y + q.ny * q.w / 2 * oa]);
+      D.push([q.x + q.nx * q.w / 2 * ob, q.y + q.ny * q.w / 2 * ob]);
+    }
+    c.fillStyle = rgba(B.col);
+    c.beginPath();
+    c.moveTo(A[0][0], A[0][1]);
+    for (i = 1; i <= N; i++) c.lineTo(A[i][0], A[i][1]);
+    if (bi === 0) c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
+    for (i = N; i >= 0; i--) c.lineTo(D[i][0], D[i][1]);
+    c.closePath();
+    c.fill();
   }
-  c.beginPath();
-  c.moveTo(Lft[0][0], Lft[0][1]);
-  for (i = 1; i <= N; i++) c.lineTo(Lft[i][0], Lft[i][1]);
-  c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
-  for (i = N; i >= 0; i--) c.lineTo(Rgt[i][0], Rgt[i][1]);
-  c.closePath();
-  c.fill();
   // a short twig near the tip, angled up and out
   var tw = perchTwig(P), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
+  c.fillStyle = rgba(bands[0].col);
   c.beginPath();
   c.moveTo(tw.q.x + px * w0, tw.q.y + py * w0);
   c.lineTo(tw.x + px * w1, tw.y + py * w1);
