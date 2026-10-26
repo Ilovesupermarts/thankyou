@@ -5384,7 +5384,7 @@ function drawBird(c, F, B, cam, col) {
   }
 }
 var BIRD_HAZE = hex('#E9CDBF');                       // the pale, warm air the far birds are seen through
-/* The flocks at one depth: 0 far, 1 middle, 2 near. */
+/* The flocks at one depth (FLOCK_TIERS): 0 near, 1 middle, 2 far. */
 function drawBirds(c, tier) {
   if (!flocks.length) return;
   var cam = bCam(), base = hex(BIRD.colour);
@@ -5496,7 +5496,7 @@ function frame(now) {
   drawOwl(ctx, 'A');
 
   // The far birds (section 14): behind everything, the far grove too.
-  drawBirds(ctx, 0);
+  drawBirds(ctx, 2);
 
   // The bamboo grove behind the far tree, on soft layers of its own.
   drawBamboo('far', t);
@@ -5539,7 +5539,7 @@ function frame(now) {
   drawBamboo('near', t);
 
   // The near birds: in front of the near grove, behind the big tree.
-  drawBirds(ctx, 2);
+  drawBirds(ctx, 0);
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
