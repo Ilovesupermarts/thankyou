@@ -46,7 +46,7 @@
   .nav-demo {
     position: absolute; left: 0; right: 0; top: 70%; z-index: 11;
     display: flex; justify-content: center; align-items: center;
-    height: 44px; pointer-events: none;
+    height: 32px; pointer-events: none;
   }
   .nb {
     --ink: #2A201D;
@@ -61,8 +61,8 @@
   .nb:active .nb-press { transform: scale(1.07); transition-duration: 0.18s; }
 
   .nb-glass {
-    position: relative; display: inline-flex; align-items: center; gap: 10px;
-    height: 44px; padding: 0 18px 0 22px; border-radius: 22px; color: var(--ink);
+    position: relative; display: inline-flex; align-items: center; gap: 7px;
+    height: 32px; padding: 0 12px 0 16px; border-radius: 16px; color: var(--ink);
     -webkit-backdrop-filter: url(#nbLens); backdrop-filter: url(#nbLens);
     background: rgba(255, 255, 255, 0.16);
     box-shadow: 0 8px 22px rgba(68, 52, 48, 0.16), 0 1px 3px rgba(68, 52, 48, 0.12),
@@ -86,16 +86,22 @@
   /* the two words: 次へ on panels 1–5, 下へ on the last */
   .nb-word {
     position: relative; display: inline-block; height: 1.4em; line-height: 1.4em; overflow: hidden;
-    font-size: 17px; font-weight: 600; letter-spacing: 0.06em;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.05em;
   }
   .nb-word span { display: block; transition: transform 0.55s cubic-bezier(0.3, 1.3, 0.5, 1), opacity 0.35s ease; }
   .nb-word span + span { position: absolute; left: 0; top: 0; transform: translateY(100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span:first-child { transform: translateY(-100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span + span { transform: translateY(0); opacity: 1; }
   /* the arrow (like SF Symbols' arrow.right) turns to point down on the last panel */
-  .nb-dir { display: flex; align-items: center; justify-content: center; width: 22px; height: 22px; transition: transform 0.6s cubic-bezier(0.3, 1.35, 0.5, 1); }
+  .nb-dir { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; transition: transform 0.6s cubic-bezier(0.3, 1.35, 0.5, 1); }
+  /* the arrow can point left (the way the finger swipes) instead of right; the arrow then comes first */
+  .nav-demo[data-arrow="left"] .nb-dir { transform: rotate(180deg); }
+  .nav-demo[data-arrow="left"] .nb-glass { flex-direction: row-reverse; padding: 0 16px 0 12px; }
+  .nav-demo[data-arrow="left"][data-look="disc"] .nb-glass { padding: 0 14px 0 4px; }
+  .nav-demo[data-arrow="left"] .nb { flex-direction: row-reverse; }
+  .nav-demo[data-arrow="left"] .nb-side { margin: 0 0 0 9px; }
   .nav-demo[data-mode="scroll"] .nb-dir { transform: rotate(90deg); }
-  .nb-dir svg { display: block; width: 22px; height: 22px; }
+  .nb-dir svg { display: block; width: 17px; height: 17px; }
 
   /* ---- 1. クリア: clear glass ---- */
   .nav-demo[data-look="clear"] .nb-dir { color: var(--accent-2); }
@@ -111,20 +117,20 @@
   .nav-demo[data-look="tint"] .nb-glass::before { opacity: 0.6; }
 
   /* ---- 3. ディスク: clear glass capsule with a solid orange disc ---- */
-  .nav-demo[data-look="disc"] .nb-glass { padding: 0 6px 0 20px; gap: 12px; }
+  .nav-demo[data-look="disc"] .nb-glass { padding: 0 4px 0 14px; gap: 9px; }
   .nav-demo[data-look="disc"] .nb-dir {
-    width: 32px; height: 32px; border-radius: 50%; color: #FFFFFF;
+    width: 24px; height: 24px; border-radius: 50%; color: #FFFFFF;
     background: linear-gradient(180deg, #F08A4B, var(--accent) 60%, var(--accent-2));
     box-shadow: 0 2px 6px rgba(196, 78, 16, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   }
-  .nav-demo[data-look="disc"] .nb-dir svg { width: 19px; height: 19px; }
+  .nav-demo[data-look="disc"] .nb-dir svg { width: 14px; height: 14px; }
 
   /* ---- 4. オーブ: a round glass button, the word beside it ---- */
-  .nav-demo[data-look="orb"] .nb-glass { width: 48px; height: 48px; padding: 0; border-radius: 24px; justify-content: center; }
+  .nav-demo[data-look="orb"] .nb-glass { width: 34px; height: 34px; padding: 0; border-radius: 17px; justify-content: center; }
   .nav-demo[data-look="orb"] .nb-glass .nb-word { display: none; }
-  .nav-demo[data-look="orb"] .nb-dir { color: var(--accent-2); width: 24px; height: 24px; }
-  .nav-demo[data-look="orb"] .nb-dir svg { width: 24px; height: 24px; }
-  .nb-side { display: none; margin-right: 12px; color: var(--text-med); text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
+  .nav-demo[data-look="orb"] .nb-dir { color: var(--accent-2); width: 18px; height: 18px; }
+  .nav-demo[data-look="orb"] .nb-dir svg { width: 18px; height: 18px; }
+  .nb-side { display: none; margin-right: 9px; color: var(--text-med); text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
   .nav-demo[data-look="orb"] .nb-side { display: inline-block; }
 
   /* ---- 5. テキスト: an iOS text button, no glass ---- */
@@ -133,8 +139,13 @@
     text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1);
   }
   .nav-demo[data-look="plain"] .nb-glass::before, .nav-demo[data-look="plain"] .nb-glass::after { display: none; }
-  .nav-demo[data-look="plain"] .nb-word { font-size: 18px; }
+  .nav-demo[data-look="plain"] .nb-word { font-size: 15px; }
   .nav-demo[data-look="plain"] .nb-dir svg { filter: drop-shadow(0 0 3px rgba(255, 253, 249, 1)); }
+
+  /* the page counter dots: smaller than the app's */
+  #dots { gap: 9px; }
+  #dots .dot { width: 6px; height: 6px; box-shadow: none; }
+  #dots .dot.active { transform: scale(1.3); box-shadow: 0 0 0 3px var(--dot-active-ring); }
 
   /* ---------- The panel (test bed only), in the same glass style ---------- */
   .sp {
@@ -154,6 +165,7 @@
   .sp button.primary { background: var(--accent); color: #FFFFFF; }
   .sp h4 { margin: 14px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(60, 60, 67, 0.6); }
   .sp-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 2px; border-radius: 10px; background: rgba(120, 120, 128, 0.14); }
+  .sp-seg2 { grid-template-columns: repeat(2, 1fr); }
   .sp-seg button { padding: 6px 0; border-radius: 8px; background: none; font-size: 12px; font-weight: 500; }
   .sp-seg button.on { background: #FFFFFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); font-weight: 600; }
   .sp-ctl { margin: 10px 0; }
@@ -282,7 +294,7 @@
   </div>
 
   <!-- The button (in place of the old swipe / scroll lines). -->
-  <div class="nav-demo" id="navDemo" data-look="clear" data-mode="swipe">
+  <div class="nav-demo" id="navDemo" data-look="clear" data-arrow="right" data-mode="swipe">
     <button type="button" class="nb" id="navBtn" aria-label="次へ">
       <span class="nb-side nb-word"><span>次へ</span><span>下へ</span></span>
       <span class="nb-press"><span class="nb-glass" id="navGlass">
@@ -321,6 +333,11 @@
       <button type="button" data-s="disc">Disc</button>
       <button type="button" data-s="orb">Orb</button>
       <button type="button" data-s="plain">Text</button>
+    </div>
+    <h4>Arrow points</h4>
+    <div class="sp-seg sp-seg2" id="spArrow">
+      <button type="button" data-a="right">→ Right</button>
+      <button type="button" data-a="left">← Left</button>
     </div>
     <h4>Spring</h4>
     <div id="spCtls"></div>
@@ -5413,6 +5430,7 @@ function apply(x, v, phase) {
   if (phase === 'pull') s = -S.stretch * 0.6 * Math.min(1, Math.abs(x) / Math.max(1, S.pull));   // squashed as it is drawn back
   else s = S.stretch * Math.min(1, Math.abs(v) / 700);                                            // longer as it flies
   var along = 1 + s, across = 1 - s * 0.5;
+  if (!down && demo.getAttribute('data-arrow') === 'left') x = -x;        // drawn back to the right, let go to the left
   btn.style.transform = down
     ? 'translateY(' + x.toFixed(2) + 'px) scale(' + across.toFixed(4) + ',' + along.toFixed(4) + ')'
     : 'translateX(' + x.toFixed(2) + 'px) scale(' + along.toFixed(4) + ',' + across.toFixed(4) + ')';
@@ -5456,8 +5474,8 @@ window.addEventListener('pointerdown', function (e) {
 function place() {
   var top = stage.getBoundingClientRect().top, low = 0;
   for (var i = 0; i < N; i++) low = Math.max(low, panels[i].querySelector('.panel-content').getBoundingClientRect().bottom - top);
-  demo.style.top = (low + 32) + 'px';
-  dotsEl.style.top = (low + 32 + demo.offsetHeight + 22) + 'px';
+  demo.style.top = (low + 18) + 'px';
+  dotsEl.style.top = (low + 18 + demo.offsetHeight + 14) + 'px';
   dotsEl.style.bottom = 'auto';
 }
 function go(i) {
@@ -5567,9 +5585,9 @@ document.getElementById('spReset').addEventListener('click', function () {
   save(); buildCtls(); play();
 });
 document.getElementById('spCopy').addEventListener('click', function () {
-  var look = demo.getAttribute('data-look');
-  var text = 'Button look: ' + look + '\nSpring: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, S[c.k]); }).join(', ') +
-             '\n' + JSON.stringify({ look: look, spring: S });
+  var look = demo.getAttribute('data-look'), arrow = demo.getAttribute('data-arrow');
+  var text = 'Button look: ' + look + ', arrow ' + arrow + '\nSpring: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, S[c.k]); }).join(', ') +
+             '\n' + JSON.stringify({ look: look, arrow: arrow, spring: S });
   var out = document.getElementById('spOut');
   out.textContent = text; out.classList.add('shown');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
@@ -5591,6 +5609,22 @@ seg.addEventListener('click', function (e) {
   if (b) { choose(b.getAttribute('data-s')); play(); }
 });
 
+var arrowSeg = document.getElementById('spArrow');
+function chooseArrow(a) {
+  if (a !== 'left') a = 'right';
+  demo.setAttribute('data-arrow', a);
+  var all = arrowSeg.querySelectorAll('button');
+  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-a') === a);
+  try { localStorage.setItem('nbArrow1', a); } catch (e) {}
+  buildLens();
+}
+arrowSeg.addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (b) { chooseArrow(b.getAttribute('data-a')); play(); }
+});
+var savedArrow = 'right';
+try { savedArrow = localStorage.getItem('nbArrow1') || 'right'; } catch (e) {}
+chooseArrow(savedArrow);
 choose(location.hash.slice(1));
 go(0);
 buildCtls();
