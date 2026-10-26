@@ -11732,63 +11732,116 @@ function makeSprites() {
   sp.fillRect(0, 0, 32, 32);
 }
 
+/* Rain like the Samsung Weather app: long thin glassy streaks that fall
+   almost straight down, very fast. Each streak is a soft white line that
+   fades in from its tail and is brightest just above its tip, with a faint
+   cool-grey edge so it still shows on the pale page. Streaks are drawn from
+   three pre-made sprites (far, middle, near), stretched to each length. */
+var RAIN_TIERS = [
+  { w: 1.0, halo: 2.2, core: 0.75, edge: 0.14 },   // far: hair-thin, faint
+  { w: 1.4, halo: 3.0, core: 0.9,  edge: 0.2 },
+  { w: 1.9, halo: 3.8, core: 1.0,  edge: 0.26 }    // near: a little wider, brighter
+];
+var rainSprites = [], rainSpritePR = 0;
+function makeRainSprites() {
+  rainSpritePR = PR;
+  rainSprites = RAIN_TIERS.map(function(tr) {
+    var c = document.createElement('canvas');
+    var hw = Math.ceil(tr.halo * 2 * PR) + 4, h = 128;
+    c.width = hw; c.height = h;
+    var x = c.getContext('2d'), mid = hw / 2;
+    // the cool-grey edge, a soft wide line under the white
+    var ge = x.createLinearGradient(0, 0, 0, h);
+    ge.addColorStop(0, 'rgba(90,108,132,0)');
+    ge.addColorStop(0.55, 'rgba(90,108,132,' + (tr.edge * 0.6) + ')');
+    ge.addColorStop(0.9, 'rgba(90,108,132,' + tr.edge + ')');
+    ge.addColorStop(1, 'rgba(90,108,132,0)');
+    x.fillStyle = ge;
+    if (HAS_FILTER) x.filter = 'blur(' + (0.8 * PR).toFixed(1) + 'px)';
+    x.fillRect(mid - tr.halo * PR / 2, 2, tr.halo * PR, h - 4);
+    x.filter = 'none';
+    // the white core: clear at the tail, brightest just above the tip
+    var gc = x.createLinearGradient(0, 0, 0, h);
+    gc.addColorStop(0, 'rgba(255,255,255,0)');
+    gc.addColorStop(0.45, 'rgba(255,255,255,' + (tr.core * 0.45) + ')');
+    gc.addColorStop(0.88, 'rgba(255,255,255,' + tr.core + ')');
+    gc.addColorStop(1, 'rgba(255,255,255,0.2)');
+    x.fillStyle = gc;
+    x.fillRect(mid - tr.w * PR / 2, 0, tr.w * PR, h);
+    return c;
+  });
+}
+function rainTier(z) { return z < 0.45 ? 0 : (z < 0.75 ? 1 : 2); }
+function newStreak(s, top) {
+  s.z = Math.pow(Math.random(), 0.8) * 0.8 + 0.2;
+  s.a = rnd(0.45, 1);                                  // some streaks bright, many faint
+  s.len = (22 + 70 * s.z) * rnd(0.7, 1.3);
+  s.x = Math.random() * (W + 200) - 100;
+  s.y = top ? -s.len - Math.random() * H * 0.4 : Math.random() * H;
+  s.age = top ? 0 : 1;
+  return s;
+}
+
 function updateRain(dt) {
   var c = S.condition;
   var drizzle = c === 'drizzle';
   var target = 0;
-  if (ENV.rainy) target = drizzle ? 110 * S.rainStreaks : Math.min(450, (40 + S.rainMm * 30) * S.rainStreaks);
+  if (ENV.rainy) target = drizzle ? 90 * S.rainStreaks : Math.min(320, (70 + S.rainMm * 25) * S.rainStreaks);
   target = Math.round(target);
-  while (streaks.length < target) {
-    var z = rnd(0.2, 1);
-    streaks.push({ x: Math.random() * W, y: Math.random() * H, z: z });
-  }
+  while (streaks.length < target) streaks.push(newStreak({}, false));
   if (streaks.length > target) streaks.length = target;
-  var vx = ENV.windPx * 2.5;
+  var vx = ENV.windPx * 1.2;
   for (var i = 0; i < streaks.length; i++) {
     var s = streaks[i];
-    var spd = (700 + 600 * s.z) * (drizzle ? 0.6 : 1);
+    var spd = (1100 + 1200 * s.z) * (drizzle ? 0.55 : 1);
     s.y += spd * dt;
     s.x += vx * dt;
-    if (s.y > H) {
-      if (S.splashes && s.z > 0.6 && Math.random() < 0.5) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
-      s.y = -30 - Math.random() * 60;
-      s.x = Math.random() * (W + 200) - 100 - vx * 0.5;
+    s.age += dt;
+    if (s.y - s.len > H) {
+      if (S.splashes && s.z > 0.6 && Math.random() < 0.35) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
+      newStreak(s, true);
+      s.x -= vx * 0.5;
     }
     if (s.x < -100) s.x += W + 200;
     if (s.x > W + 100) s.x -= W + 200;
   }
   for (var j = splashes.length - 1; j >= 0; j--) {
     splashes[j].t += dt;
-    if (splashes[j].t > 0.35) splashes.splice(j, 1);
+    if (splashes[j].t > 0.3) splashes.splice(j, 1);
   }
 }
 function drawRain(ctx) {
   if (!streaks.length && !splashes.length) return;
+  if (rainSpritePR !== PR || !rainSprites.length) makeRainSprites();
   var drizzle = S.condition === 'drizzle';
-  var lenMul = (drizzle ? 0.75 : 1) * (1 + S.rainMm / 10);
-  var ang = Math.atan2(700, ENV.windPx * 2.5);
-  var cx = Math.cos(ang), cy = Math.sin(ang);
-  for (var pass = 0; pass < 2; pass++) {
-    ctx.beginPath();
+  var lenMul = (drizzle ? 0.6 : 1) * (1 + S.rainMm / 20);
+  var aMul = (drizzle ? 0.7 : 1) * Math.min(1.5, S.rainContrast);
+  // the slight lean in the wind: a shear, so each sprite stays one drawImage
+  var lean = -ENV.windPx * 1.2 / 1700;
+  ctx.setTransform(PR, 0, lean * PR, PR, 0, 0);
+  for (var tier = 0; tier < 3; tier++) {
+    var spr = rainSprites[tier], sw = spr.width / PR;
     for (var i = 0; i < streaks.length; i++) {
       var s = streaks[i];
-      if ((s.z >= 0.6) !== (pass === 1)) continue;
-      var len = (10 + 18 * s.z) * lenMul;
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - cx * len, s.y - cy * len);
+      if (rainTier(s.z) !== tier) continue;
+      var len = s.len * lenMul;
+      ctx.globalAlpha = Math.min(1, s.a * aMul * Math.min(1, s.age / 0.06));
+      ctx.drawImage(spr, s.x - lean * s.y - sw / 2, s.y - len, sw, len);
     }
-    // Dark plum-grey streaks: pale rain vanished on the silk-white page.
-    var ra = pass === 0 ? (drizzle ? 0.16 : 0.22) : (drizzle ? 0.26 : 0.38);
-    ctx.strokeStyle = rgba([70, 60, 95], ra * S.rainContrast);
-    ctx.lineWidth = pass === 0 ? (drizzle ? 0.8 : 1.0) : (drizzle ? 1.1 : 1.5);
-    ctx.stroke();
   }
-  ctx.lineWidth = 0.9;
+  ctx.globalAlpha = 1;
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  // tiny pale splashes where near drops land
+  ctx.lineWidth = 0.8;
   for (var j = 0; j < splashes.length; j++) {
-    var sp = splashes[j], k = sp.t / 0.35, r = (7 + 5 * sp.z) * k;
-    ctx.strokeStyle = rgba([70, 60, 95], 0.5 * (1 - k) * S.rainContrast);
+    var sp = splashes[j], k = sp.t / 0.3, r = (5 + 4 * sp.z) * k;
+    ctx.strokeStyle = rgba([255, 255, 255], 0.7 * (1 - k) * aMul);
     ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y, r, r * 0.35, 0, 0, TAU);
+    ctx.ellipse(sp.x, sp.y, r, r * 0.3, 0, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = rgba([90, 108, 132], 0.18 * (1 - k) * aMul);
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y + 0.8, r, r * 0.3, 0, 0, TAU);
     ctx.stroke();
   }
 }
