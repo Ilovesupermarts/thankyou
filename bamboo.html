@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Next Button Lab</title>
+<title>Bird Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -14,12 +14,13 @@
 
 <style>
   /* ============================================================
-     NEXT BUTTON LAB — a copy of landscape.html (with the bamboo, gates,
-     stone lanterns and the sun), now the test bed for the button that
-     moves to the next message (and, on the last message, down to the
-     table). The scene runs on its approved values, with no controls.
-     The look of the button and its spring are set on the panel.
-     Nothing in app.js is used or changed.
+     BIRD LAB — a copy of landscape.html (with the bamboo, gates, stone
+     lanterns and the sun), now the test bed for the new birds: small
+     dark birds that wheel over the scene like the ones in the screen
+     recordings (section 14 of the script). Their values are set on the
+     panel and kept in this browser; "Copy values" gives them to move
+     into the app. The next / down button runs as in the app, with no
+     controls. Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -30,18 +31,10 @@
   .dyn-canvas.dyn-near { opacity: 1; }
 
   /* ============================================================
-     NEXT / DOWN BUTTON (test bed only). It takes the place of the old
-     「スワイプ →」 and 「↓ 下へスクロールしてください」 lines and of the
-     first-use hints, in the narrow strip between the message and the
-     dots, so a long message is never covered.
-     Five looks in the style of Apple's Liquid Glass (chosen on the
-     panel): clear glass, tinted glass, glass with an orange disc, a
-     glass orb, and a plain text button. The glass really bends what is
-     behind it along its rim (the SVG filter #nbLens, drawn for the
-     button's exact shape by the script), like the toolbar's #barGlass.
-     Every few seconds the button is drawn back a little and let go on
-     a spring; the spring is set on the panel.
-     On the last panel it reads 下へ, points down, and springs up and down.
+     NEXT / DOWN BUTTON, as in the app: the text button (テキスト),
+     the arrow pointing right. Every few seconds it is drawn back a
+     little and let go on a spring. On the last panel it reads 下へ,
+     points down, and springs up and down.
      ============================================================ */
   .nav-demo {
     position: absolute; left: 0; right: 0; top: 70%; z-index: 11;
@@ -49,41 +42,15 @@
     height: 32px; pointer-events: none;
   }
   .nb {
-    --ink: #2A201D;
     position: relative; display: inline-flex; align-items: center; justify-content: center;
     margin: 0; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
     font-family: -apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
     will-change: transform;
   }
-  /* iOS glass grows a little and brightens under the finger */
   .nb-press { display: inline-flex; transition: transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
   .nb:active .nb-press { transform: scale(1.07); transition-duration: 0.18s; }
-
-  .nb-glass {
-    position: relative; display: inline-flex; align-items: center; gap: 7px;
-    height: 32px; padding: 0 12px 0 16px; border-radius: 16px; color: var(--ink);
-    -webkit-backdrop-filter: url(#nbLens); backdrop-filter: url(#nbLens);
-    background: rgba(255, 255, 255, 0.16);
-    box-shadow: 0 8px 22px rgba(68, 52, 48, 0.16), 0 1px 3px rgba(68, 52, 48, 0.12),
-                inset 0 1px 1px rgba(255, 255, 255, 0.75), inset 0 -1px 1px rgba(255, 255, 255, 0.25);
-  }
-  /* the soft light on the glass, and the bright rim; both lean a little as it moves */
-  .nb-glass::before, .nb-glass::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
-  .nb-glass::before {
-    background: radial-gradient(120% 100% at var(--lx, 30%) -10%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 55%, rgba(255, 255, 255, 0) 70%);
-    transition: opacity 0.3s ease;
-  }
-  .nb:active .nb-glass::before { filter: brightness(1.35); }
-  .nb-glass::after {
-    padding: 1px;
-    background: linear-gradient(var(--ang, 125deg), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.15) 35%, rgba(255, 255, 255, 0.05) 60%, rgba(255, 255, 255, 0.75));
-    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
-            mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-  }
-  .nb-glass > * { position: relative; z-index: 1; }
-
-  /* the two words: 次へ on panels 1–5, 下へ on the last */
+  .nb-glass { position: relative; display: inline-flex; align-items: center; gap: 7px; height: 32px; }
   .nb-word {
     position: relative; display: inline-block; height: 1.4em; line-height: 1.4em; overflow: hidden;
     font-size: 14px; font-weight: 600; letter-spacing: 0.05em;
@@ -92,55 +59,13 @@
   .nb-word span + span { position: absolute; left: 0; top: 0; transform: translateY(100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span:first-child { transform: translateY(-100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span + span { transform: translateY(0); opacity: 1; }
-  /* the arrow (like SF Symbols' arrow.right) turns to point down on the last panel */
   .nb-dir { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; transition: transform 0.6s cubic-bezier(0.3, 1.35, 0.5, 1); }
-  /* the arrow can point left (the way the finger swipes) instead of right; the arrow then comes first */
-  .nav-demo[data-arrow="left"] .nb-dir { transform: rotate(180deg); }
-  .nav-demo[data-arrow="left"] .nb-glass { flex-direction: row-reverse; padding: 0 16px 0 12px; }
-  .nav-demo[data-arrow="left"][data-look="disc"] .nb-glass { padding: 0 14px 0 4px; }
-  .nav-demo[data-arrow="left"] .nb { flex-direction: row-reverse; }
-  .nav-demo[data-arrow="left"] .nb-side { margin: 0 0 0 9px; }
   .nav-demo[data-mode="scroll"] .nb-dir { transform: rotate(90deg); }
   .nb-dir svg { display: block; width: 17px; height: 17px; }
 
-  /* ---- 1. クリア: clear glass ---- */
-  .nav-demo[data-look="clear"] .nb-dir { color: var(--accent-2); }
-
-  /* ---- 2. ティント: glass tinted with the theme's orange, white text ---- */
-  .nav-demo[data-look="tint"] .nb { --ink: #FFFFFF; }
-  .nav-demo[data-look="tint"] .nb-glass {
-    background: linear-gradient(180deg, rgba(240, 125, 64, 0.70), rgba(214, 88, 24, 0.78));
-    box-shadow: 0 8px 22px rgba(196, 78, 16, 0.30), 0 1px 3px rgba(68, 52, 48, 0.14),
-                inset 0 1px 1px rgba(255, 255, 255, 0.55), inset 0 -1px 1px rgba(255, 255, 255, 0.18);
-    text-shadow: 0 1px 2px rgba(120, 40, 0, 0.25);
-  }
-  .nav-demo[data-look="tint"] .nb-glass::before { opacity: 0.6; }
-
-  /* ---- 3. ディスク: clear glass capsule with a solid orange disc ---- */
-  .nav-demo[data-look="disc"] .nb-glass { padding: 0 4px 0 14px; gap: 9px; }
-  .nav-demo[data-look="disc"] .nb-dir {
-    width: 24px; height: 24px; border-radius: 50%; color: #FFFFFF;
-    background: linear-gradient(180deg, #F08A4B, var(--accent) 60%, var(--accent-2));
-    box-shadow: 0 2px 6px rgba(196, 78, 16, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  }
-  .nav-demo[data-look="disc"] .nb-dir svg { width: 14px; height: 14px; }
-
-  /* ---- 4. オーブ: a round glass button, the word beside it ---- */
-  .nav-demo[data-look="orb"] .nb-glass { width: 34px; height: 34px; padding: 0; border-radius: 17px; justify-content: center; }
-  .nav-demo[data-look="orb"] .nb-glass .nb-word { display: none; }
-  .nav-demo[data-look="orb"] .nb-dir { color: var(--accent-2); width: 18px; height: 18px; }
-  .nav-demo[data-look="orb"] .nb-dir svg { width: 18px; height: 18px; }
-  .nb-side { display: none; margin-right: 9px; color: var(--text-med); text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
-  .nav-demo[data-look="orb"] .nb-side { display: inline-block; }
-
-  /* ---- 5. テキスト: an iOS text button, no glass ---- */
-  .nav-demo[data-look="plain"] .nb-glass {
-    -webkit-backdrop-filter: none; backdrop-filter: none; background: none; box-shadow: none; padding: 0 10px; color: var(--accent-2);
-    text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1);
-  }
-  .nav-demo[data-look="plain"] .nb-glass::before, .nav-demo[data-look="plain"] .nb-glass::after { display: none; }
-  .nav-demo[data-look="plain"] .nb-word { font-size: 15px; }
-  .nav-demo[data-look="plain"] .nb-dir svg { filter: drop-shadow(0 0 3px rgba(255, 253, 249, 1)); }
+  .nb-glass { padding: 0 10px; color: var(--accent-2); text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
+  .nb-word { font-size: 15px; }
+  .nb-dir svg { filter: drop-shadow(0 0 3px rgba(255, 253, 249, 1)); }
 
   /* the page counter dots: smaller than the app's */
   #dots { gap: 9px; }
@@ -164,17 +89,15 @@
   .sp button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 7px 12px; background: rgba(120, 120, 128, 0.14); color: #1D1D1F; cursor: pointer; }
   .sp button.primary { background: var(--accent); color: #FFFFFF; }
   .sp h4 { margin: 14px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(60, 60, 67, 0.6); }
-  .sp-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 2px; border-radius: 10px; background: rgba(120, 120, 128, 0.14); }
-  .sp-seg2 { grid-template-columns: repeat(2, 1fr); }
-  .sp-seg button { padding: 6px 0; border-radius: 8px; background: none; font-size: 12px; font-weight: 500; }
-  .sp-seg button.on { background: #FFFFFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); font-weight: 600; }
+ background: #FFFFFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); font-weight: 600; }
   .sp-ctl { margin: 10px 0; }
   .sp-ctl label { display: flex; justify-content: space-between; gap: 8px; font-weight: 500; }
   .sp-ctl label span { font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 600; }
   .sp-ctl input { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
   .sp-ctl small { display: block; color: rgba(60, 60, 67, 0.6); font-size: 11px; line-height: 1.35; margin-top: 2px; }
-  .sp-curve { display: block; width: 100%; height: 84px; margin-top: 6px; border-radius: 12px; background: rgba(255, 255, 255, 0.55); }
-  .sp-zeta { margin-top: 4px; color: rgba(60, 60, 67, 0.7); font-size: 11px; }
+  .sp-colour { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: 500; }
+  .sp-colour input { width: 44px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; }
+  .sp-count { margin-top: 8px; color: rgba(60, 60, 67, 0.7); font-size: 11px; font-variant-numeric: tabular-nums; }
   .sp-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .sp pre { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.7); font-size: 11px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; display: none; }
   .sp pre.shown { display: block; }
@@ -294,10 +217,9 @@
   </div>
 
   <!-- The button (in place of the old swipe / scroll lines). -->
-  <div class="nav-demo" id="navDemo" data-look="plain" data-arrow="right" data-mode="swipe">
+  <div class="nav-demo" id="navDemo" data-mode="swipe">
     <button type="button" class="nb" id="navBtn" aria-label="次へ">
-      <span class="nb-side nb-word"><span>次へ</span><span>下へ</span></span>
-      <span class="nb-press"><span class="nb-glass" id="navGlass">
+      <span class="nb-press"><span class="nb-glass">
         <span class="nb-word"><span>次へ</span><span>下へ</span></span>
         <span class="nb-dir"><svg viewBox="0 0 24 24"><path d="M4.5 12h14.2M13 6.2l5.8 5.8-5.8 5.8" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
       </span></span>
@@ -310,43 +232,20 @@
   </div>
 </div>
 
-<!-- The glass lens: bends what is behind the button along its rim.
-     The map is drawn by the script for the button's exact size and shape. -->
-<svg width="0" height="0" style="position:fixed" aria-hidden="true" focusable="false"><defs>
-  <filter id="nbLens" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
-    <feImage id="nbLensMap" preserveAspectRatio="none" result="map"/>
-    <feDisplacementMap in="SourceGraphic" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G" result="bent"/>
-    <feGaussianBlur in="bent" stdDeviation="1.6" edgeMode="duplicate" result="soft"/>
-    <feColorMatrix in="soft" type="saturate" values="1.7" result="sat"/>
-    <feComponentTransfer in="sat"><feFuncR type="linear" slope="1.04" intercept="0.03"/><feFuncG type="linear" slope="1.04" intercept="0.03"/><feFuncB type="linear" slope="1.04" intercept="0.03"/></feComponentTransfer>
-  </filter>
-</defs></svg>
-
-<!-- The panel (test bed only): the look, and the spring -->
+<!-- The panel (test bed only): the birds -->
 <div class="sp" id="sp">
-  <div class="sp-head"><b>ボタン · Button</b><button type="button" id="spToggle">Hide</button></div>
+  <div class="sp-head"><b>鳥 · Birds</b><button type="button" id="spToggle">Hide</button></div>
   <div class="sp-body">
-    <h4>Look</h4>
-    <div class="sp-seg" id="spLook">
-      <button type="button" data-s="clear">Clear</button>
-      <button type="button" data-s="tint">Tint</button>
-      <button type="button" data-s="disc">Disc</button>
-      <button type="button" data-s="orb">Orb</button>
-      <button type="button" data-s="plain">Text</button>
-    </div>
-    <h4>Arrow points</h4>
-    <div class="sp-seg sp-seg2" id="spArrow">
-      <button type="button" data-a="right">→ Right</button>
-      <button type="button" data-a="left">← Left</button>
-    </div>
     <div id="spCtls"></div>
-    <canvas class="sp-curve" id="spCurve"></canvas>
-    <div class="sp-zeta" id="spZeta"></div>
     <div class="sp-row">
-      <button type="button" class="primary" id="spPlay">Play now</button>
+      <button type="button" class="primary" id="spSend">Send a flock</button>
+      <button type="button" id="spClear">Clear the sky</button>
+    </div>
+    <div class="sp-row">
       <button type="button" id="spReset">Reset</button>
       <button type="button" id="spCopy">Copy values</button>
     </div>
+    <div class="sp-count" id="spCount"></div>
     <pre id="spOut"></pre>
   </div>
 </div>
@@ -5164,6 +5063,332 @@ function drawSunSky(t, dt) {
 }
 
 /* ============================================================
+   14. BIRDS — small dark birds wheeling over the scene, after the
+   screen recordings (swallows / swifts seen against a grey sky).
+   What makes them look alive, and what this copies:
+   - They are only silhouettes: near-black, swept-back pointed wings,
+     a short body and a forked tail. The shape keeps changing as they
+     bank and beat (a "T", a "V", an "r", a thin line), because each
+     bird is posed in 3D every frame — turned, banked into its turns,
+     wings anywhere in the beat — and seen a little from below.
+   - They beat their wings fast in short bursts, then glide for a
+     moment with the wings swept back, each bird on its own timing.
+   - A flock follows one leader path that sweeps across the sky and
+     wheels round in big flat circles (seen from below they look like
+     flattened loops). Every bird traces the same path a moment later,
+     a little off to one side, so the flock stretches out and bunches
+     up; now and then one darts off and catches up again.
+   - Several flocks at different depths: the near ones are bigger and
+     cross the screen faster, the far ones are tiny, paler and slower,
+     and keep lower, over the mountains.
+   Depths among the trees: far birds behind everything (the far grove
+   too), middle ones in front of the far tree but behind the near
+   grove, near ones in front of the near grove but behind the big tree.
+   Everything is in metres and seconds; BIRD holds every value on the
+   panel (BIRD_DEFAULTS are the starting values).
+   ============================================================ */
+var BIRD_DEFAULTS = {
+  // the flocks
+  flocks: 2,          // flocks in the sky at once
+  flockMin: 4,        // birds in a flock
+  flockMax: 8,
+  stay: 30,           // seconds a flock wheels round before it flies off
+  pause: 4,           // seconds before the next flock comes in
+  nearW: 0.45,        // how often a flock is near / middle / far
+  midW: 0.3,
+  farW: 0.25,
+  // how they fly
+  size: 13,           // a near bird's body length on screen (px); the wings are about twice that
+  speed: 4.5,         // flying speed (m/s)
+  turn: 1.4,          // how sharply the leader can wheel round (rad/s)
+  loops: 0.55,        // how often it wheels right round instead of heading on
+  swoop: 0.5,         // how much they rise and dip
+  spread: 2.6,        // how loosely the flock holds together (m)
+  trail: 0.3,         // how far each bird lags behind the one ahead on the path (s)
+  wander: 0.6,        // how much each bird drifts about its own place
+  dart: 0.35,         // how often one darts off on its own
+  bank: 1,            // how far they lean into turns
+  // the wings
+  flapHz: 8,          // wingbeats a second
+  flapAmp: 40,        // how far the wings swing up and down (degrees)
+  beatsMin: 2,        // wingbeats in a burst
+  beatsMax: 7,
+  glideMin: 0.25,     // seconds of gliding between bursts
+  glideMax: 1.1,
+  wingLen: 1.05,      // wing length (body lengths, each wing)
+  sweep: 0.4,         // how far back the wingtips sweep
+  tail: 0.5,          // tail length (body lengths), forked
+  // the look
+  colour: '#1E1D22',
+  haze: 0.45,         // how pale the far birds are
+  view: 30            // how far we look up at them (degrees): the loops look this flat
+};
+var BIRD_KEY = 'birdLab1';
+var BIRD = clone(BIRD_DEFAULTS);
+try {
+  var savedB = JSON.parse(localStorage.getItem(BIRD_KEY) || 'null');
+  if (savedB) for (var bk in savedB) if (bk in BIRD_DEFAULTS && typeof savedB[bk] === typeof BIRD_DEFAULTS[bk]) BIRD[bk] = savedB[bk];
+} catch (e) { /* private window: the defaults */ }
+function saveBirds() { try { localStorage.setItem(BIRD_KEY, JSON.stringify(BIRD)); } catch (e) { /* silent */ } }
+
+var BODY_M = 0.17;                                    // a swallow's body length (m)
+// depth tiers: size on screen (× BIRD.size), how far away (m, for the gentle perspective
+// within a flock), how pale, the screen band its leader keeps to (fractions of the height)
+var FLOCK_TIERS = [
+  { k: 1,    dist: 22, haze: 0,    top: 0.07, bot: 0.5 },    // near
+  { k: 0.62, dist: 36, haze: 0.45, top: 0.1,  bot: 0.58 },   // middle
+  { k: 0.36, dist: 62, haze: 1,    top: 0.3,  bot: 0.7 }     // far: low, over the mountains
+];
+var flocks = [], flockNext = 1.5;
+var BIRD_UP = [0, 1, 0];
+
+function bWrap(a) { while (a > PI) a -= TAU; while (a < -PI) a += TAU; return a; }
+function bCam() { var e = BIRD.view * PI / 180; return { c: Math.cos(e), s: Math.sin(e) }; }
+function pxPerM(F) { return BIRD.size * FLOCK_TIERS[F.tier].k / BODY_M; }
+/* World (X right, Y up, Z away, metres from the flock's middle) onto the screen. */
+function bScreen(F, p, cam) {
+  var m = pxPerM(F) * F.dist / (F.dist + p[2] * cam.c + (p[1] - F.y0) * cam.s);
+  return [W / 2 + p[0] * m, H * V.horizon - (p[1] * cam.c - p[2] * cam.s) * m, m];
+}
+/* A goal for the leader: a random place in its band of sky. */
+function newGoal(F, cam, middle) {
+  var T = FLOCK_TIERS[F.tier], m = pxPerM(F), mx = middle ? 0.3 : 0.12;
+  var gx = W * rnd(mx, 1 - mx), gy = H * rnd(T.top, T.bot), gz = rnd(-5, 5);
+  F.goal = [(gx - W / 2) / m, ((H * V.horizon - gy) / m + gz * cam.s) / cam.c, gz];
+  F.goalT = rnd(3, 7);
+}
+function pickTier() {
+  var w = [BIRD.nearW, BIRD.midW, BIRD.farW], used = flocks.map(function (f) { return f.tier; });
+  // a depth no flock is at yet, if there is one
+  var free = w.map(function (x, i) { return used.indexOf(i) < 0 ? x : x * 0.15; });
+  var sum = free[0] + free[1] + free[2];
+  if (sum <= 0) return 0;
+  var r = Math.random() * sum;
+  for (var i = 0; i < 3; i++) { r -= free[i]; if (r <= 0) return i; }
+  return 2;
+}
+function sendFlock(t) {
+  var cam = bCam(), tier = pickTier(), T = FLOCK_TIERS[tier];
+  var F = { tier: tier, dist: T.dist, born: t, life: BIRD.stay * rnd(0.7, 1.3), leaving: false, birds: [], hist: [], loopT: 0, loopDir: 1, w: 0, vy: 0 };
+  var m = pxPerM(F), side = Math.random() < 0.5 ? -1 : 1;
+  var sy = H * rnd(T.top + 0.05, T.bot - 0.05);
+  F.y0 = (H * V.horizon - sy) / m / cam.c;
+  // the leader comes in from off one side, heading inward and a little up or down
+  F.p = [side * (W / 2 + 60) / m, F.y0, rnd(-4, 4)];
+  F.yaw = (side < 0 ? 0 : PI) + rnd(-0.35, 0.35);
+  F.v = BIRD.speed;
+  newGoal(F, cam);
+  // its path so far, straight in from further out, so the birds behind it have somewhere to be
+  for (var k = 60; k >= 1; k--) {
+    var back = k / 20;
+    F.hist.push({ t: t - back, p: [F.p[0] - Math.cos(F.yaw) * F.v * back, F.p[1], F.p[2] - Math.sin(F.yaw) * F.v * back],
+                  v: [Math.cos(F.yaw) * F.v, 0, Math.sin(F.yaw) * F.v] });
+  }
+  var n = Math.round(rnd(Math.min(BIRD.flockMin, BIRD.flockMax), Math.max(BIRD.flockMin, BIRD.flockMax)));
+  var order = [];
+  for (var i = 0; i < n; i++) order.push(i);
+  order.sort(function () { return Math.random() - 0.5; });
+  for (var j = 0; j < n; j++) {
+    var B = {
+      lag: order[j] * BIRD.trail * rnd(0.6, 1.4) + rnd(0, 0.15),
+      off: [rnd(-1, 1) * BIRD.spread, rnd(-0.6, 0.6) * BIRD.spread, rnd(-1, 1) * BIRD.spread],
+      wph: [rnd(0, TAU), rnd(0, TAU), rnd(0, TAU)], wf: rnd(0.25, 0.6),
+      dartV: [0, 0, 0], acc: [0, 0, 0],
+      hz: BIRD.flapHz * rnd(0.85, 1.15), ph: rnd(0, TAU), beats: Math.round(rnd(BIRD.beatsMin, BIRD.beatsMax)), glide: 0,
+      wing: 0, ext: 1, sw: 0, roll: 0
+    };
+    var tg = flockTarget(F, B, t);
+    B.p = tg.p.slice(); B.v = tg.v.slice();
+    F.birds.push(B);
+  }
+  flocks.push(F);
+}
+/* Where the leader was lag seconds ago. */
+function histAt(F, tt) {
+  var h = F.hist, i = h.length - 1;
+  while (i > 0 && h[i].t > tt) i--;
+  var a = h[i], b = h[Math.min(i + 1, h.length - 1)];
+  var u = b.t > a.t ? clamp((tt - a.t) / (b.t - a.t), 0, 1) : 0;
+  return { p: [lerp(a.p[0], b.p[0], u), lerp(a.p[1], b.p[1], u), lerp(a.p[2], b.p[2], u)],
+           v: [lerp(a.v[0], b.v[0], u), lerp(a.v[1], b.v[1], u), lerp(a.v[2], b.v[2], u)] };
+}
+/* Where one bird wants to be: on the leader's path a moment back, off to its own side. */
+function flockTarget(F, B, t) {
+  var h = histAt(F, t - B.lag), wa = BIRD.wander * BIRD.spread * 0.6;
+  for (var a = 0; a < 3; a++) h.p[a] += B.off[a] + Math.sin(t * B.wf * (1 + a * 0.3) + B.wph[a]) * wa * (a === 1 ? 0.6 : 1);
+  return h;
+}
+function updateLeader(F, t, dt, cam) {
+  var s = bScreen(F, F.p, cam), T = FLOCK_TIERS[F.tier];
+  var out = s[0] < W * 0.06 || s[0] > W * 0.94 || s[1] < H * (T.top - 0.05) || s[1] > H * (T.bot + 0.08);
+  if (!F.leaving && t - F.born > F.life) {
+    F.leaving = true;
+    var side = s[0] < W / 2 ? -1 : 1, m = pxPerM(F);
+    F.goal = [side * (W / 2 + 400) / m, F.p[1] + rnd(0, 4), F.p[2]];
+    F.loopT = 0;
+  }
+  if (!F.leaving) {
+    F.goalT -= dt;
+    var dx = F.goal[0] - F.p[0], dz = F.goal[2] - F.p[2];
+    if (F.goalT <= 0 || dx * dx + dz * dz < 4) newGoal(F, cam);
+    else if (out && !F.wasOut) newGoal(F, cam, true);   // drifting off the screen: back toward the middle
+    // now and then it wheels right round (not when near the edges)
+    if (F.loopT <= 0 && !out && Math.random() < dt * BIRD.loops * 0.35) {
+      F.loopT = rnd(0.6, 1.25) * TAU / Math.max(0.2, BIRD.turn);
+      F.loopDir = Math.random() < 0.5 ? -1 : 1;
+    }
+  }
+  var wantW;
+  if (F.loopT > 0 && !out && !F.leaving) { F.loopT -= dt; wantW = F.loopDir * BIRD.turn; }
+  else {
+    F.loopT = 0;
+    var gy = Math.atan2(F.goal[2] - F.p[2], F.goal[0] - F.p[0]);
+    wantW = clamp(bWrap(gy - F.yaw) * 1.6, -BIRD.turn, BIRD.turn);
+  }
+  F.w += (wantW - F.w) * Math.min(1, dt * 1.8);
+  F.yaw = bWrap(F.yaw + F.w * dt);
+  // speed: a little faster when diving, slower when climbing
+  F.v += (BIRD.speed * (1 - F.vy * 0.04) - F.v) * Math.min(1, dt);
+  // up and down: toward the goal's height, with swoops
+  var wantVy = clamp((F.goal[1] - F.p[1]) * (out ? 1 : 0.5), -3, 3) + (out ? 0 : 1) * BIRD.swoop * 3.2 * Math.sin(t * 0.7 + F.born) * Math.sin(t * 0.31 + F.born * 2);
+  F.vy += (wantVy - F.vy) * Math.min(1, dt * 1.5);
+  var vel = [Math.cos(F.yaw) * F.v, F.vy, Math.sin(F.yaw) * F.v];
+  for (var a = 0; a < 3; a++) F.p[a] += vel[a] * dt;
+  F.wasOut = out;
+  F.hist.push({ t: t, p: F.p.slice(), v: vel });
+  while (F.hist.length > 2 && F.hist[1].t < t - 8) F.hist.shift();
+}
+function updateBird(F, B, t, dt) {
+  var tg = flockTarget(F, B, t);
+  // follows its place: pulled toward it, matching its speed (and any dart dies away)
+  for (var a = 0; a < 3; a++) {
+    var acc = (tg.p[a] - B.p[a]) * 3.2 + (tg.v[a] + B.dartV[a] - B.v[a]) * 2.6;
+    B.acc[a] = clamp(acc, -30, 30);
+  }
+  for (var c = 0; c < 3; c++) { B.v[c] += B.acc[c] * dt; B.p[c] += B.v[c] * dt; B.dartV[c] *= Math.max(0, 1 - dt * 1.4); }
+  // now and then it darts off to one side, up or down, and comes back
+  if (Math.random() < dt * BIRD.dart * 0.12) {
+    var ang = rnd(0, TAU), sp = rnd(3, 6);
+    B.dartV = [Math.cos(ang) * sp, rnd(-1, 1) * sp * 0.7, Math.sin(ang) * sp];
+    B.beats = Math.max(B.beats, 3); B.glide = 0;                  // and beats hard to do it
+  }
+  // leans into its turns: the sideways pull against gravity
+  var f = vNorm(B.v), r = vNorm(vCross(BIRD_UP, f));
+  var want = -Math.atan(vDot(B.acc, r) / 9.8) * BIRD.bank;
+  B.roll += (clamp(want, -1.3, 1.3) - B.roll) * Math.min(1, dt * 6);
+  // wings: a burst of beats, then a glide
+  var far = Math.hypot(tg.p[0] - B.p[0], tg.p[1] - B.p[1], tg.p[2] - B.p[2]);
+  if (B.glide > 0) {
+    B.glide -= dt;
+    if (B.v[1] > 1.2 || far > BIRD.spread * 1.6) B.glide = 0;    // climbing or falling behind: back to beating
+    if (B.glide <= 0) { B.beats = Math.round(rnd(BIRD.beatsMin, BIRD.beatsMax)); B.ph = -PI / 2; }
+    B.wing += (-0.06 - B.wing) * Math.min(1, dt * 10);           // held level, a touch down
+    B.ext += (1 - B.ext) * Math.min(1, dt * 8);
+    B.sw += (1 - B.sw) * Math.min(1, dt * 6);                    // swept back
+  } else {
+    var before = B.ph;
+    B.ph += TAU * B.hz * dt;
+    if (Math.floor((B.ph + PI / 2) / TAU) > Math.floor((before + PI / 2) / TAU) && --B.beats <= 0) {
+      B.glide = rnd(Math.min(BIRD.glideMin, BIRD.glideMax), Math.max(BIRD.glideMin, BIRD.glideMax));
+    }
+    var amp = BIRD.flapAmp * PI / 180;
+    B.wing = Math.sin(B.ph) * amp;
+    B.ext = 0.78 + 0.22 * Math.cos(B.ph - PI / 2 + 0.6);        // spread wide on the downstroke, drawn in on the way up
+    B.sw += (0.35 - B.sw) * Math.min(1, dt * 8);
+  }
+}
+function updateBirds(t, dt) {
+  if (dt <= 0) return;
+  var cam = bCam();
+  var target = isNight() ? 0 : Math.round(BIRD.flocks);
+  var live = flocks.filter(function (f) { return !f.leaving; }).length;
+  if (live < target && t > flockNext) { sendFlock(t); flockNext = t + BIRD.pause * rnd(0.6, 1.4); }
+  if (live > target) for (var q = 0; q < flocks.length && live > target; q++) if (!flocks[q].leaving) { flocks[q].life = 0; live--; }
+  for (var i = flocks.length - 1; i >= 0; i--) {
+    var F = flocks[i];
+    updateLeader(F, t, dt, cam);
+    var anyIn = false;
+    for (var j = 0; j < F.birds.length; j++) {
+      updateBird(F, F.birds[j], t, dt);
+      var s = bScreen(F, F.birds[j].p, cam);
+      if (s[0] > -80 && s[0] < W + 80 && s[1] > -80) anyIn = true;
+    }
+    if (F.leaving && !anyIn) { flocks.splice(i, 1); flockNext = Math.max(flockNext, t + BIRD.pause * rnd(0.6, 1.4)); }
+  }
+}
+
+/* One bird, posed in 3D and drawn flat as a dark silhouette. */
+function drawBird(c, F, B, cam, col) {
+  var s = bScreen(F, B.p, cam), m = s[2] * BODY_M;        // px per body length
+  if (s[0] < -60 || s[0] > W + 60 || s[1] < -60 || s[1] > H) return;
+  var f = vNorm(B.v), u0 = vNorm(vSub(BIRD_UP, vMul(f, vDot(BIRD_UP, f))));
+  var r0 = vCross(u0, f), cr = Math.cos(B.roll), sr = Math.sin(B.roll);
+  var r = vAdd(vMul(r0, cr), vMul(u0, sr)), u = vSub(vMul(u0, cr), vMul(r0, sr));
+  var ox = s[0], oy = s[1];
+  function P(v) { return [ox + v[0] * m, oy - (v[1] * cam.c - v[2] * cam.s) * m]; }
+  c.fillStyle = col; c.strokeStyle = col;
+  // the wings
+  var sweep = BIRD.sweep * (0.75 + 0.6 * B.sw), L = BIRD.wingLen * B.ext;
+  for (var side = -1; side <= 1; side += 2) {
+    var ca = Math.cos(B.wing), sa = Math.sin(B.wing);
+    var dir = vAdd(vMul(r, side * ca), vMul(u, sa));
+    var rf = P(vAdd(vMul(f, 0.2), vMul(dir, 0.03)));
+    var rb = P(vAdd(vMul(f, -0.14), vMul(dir, 0.03)));
+    var wr = P(vAdd(vMul(dir, 0.42 * L), vMul(f, 0.13)));
+    var tip = P(vAdd(vMul(dir, L), vMul(f, -sweep)));
+    var t1 = P(vAdd(vMul(dir, 0.62 * L), vMul(f, -sweep * 0.4)));
+    var t2 = P(vAdd(vMul(dir, 0.2 * L), vMul(f, -0.2)));
+    c.beginPath();
+    c.moveTo(rf[0], rf[1]);
+    c.quadraticCurveTo(wr[0], wr[1], tip[0], tip[1]);               // leading edge, bowed forward at the wrist
+    c.bezierCurveTo(t1[0], t1[1], t2[0], t2[1], rb[0], rb[1]);      // trailing edge: narrow at the tip, broad by the body
+    c.closePath(); c.fill();
+  }
+  // the body: a tapered spindle, from the head to the base of the tail
+  var hd = P(vMul(f, 0.5)), mid = P(vMul(f, 0.12)), tb = P(vMul(f, -0.32));
+  var dx = hd[0] - tb[0], dy = hd[1] - tb[1], dl = Math.hypot(dx, dy) || 1, nx = -dy / dl, ny = dx / dl;
+  var bw = Math.max(0.6, 0.1 * m);
+  c.beginPath();
+  c.moveTo(hd[0], hd[1]);
+  c.quadraticCurveTo(mid[0] + nx * bw * 1.6, mid[1] + ny * bw * 1.6, tb[0] + nx * bw * 0.4, tb[1] + ny * bw * 0.4);
+  c.lineTo(tb[0] - nx * bw * 0.4, tb[1] - ny * bw * 0.4);
+  c.quadraticCurveTo(mid[0] - nx * bw * 1.6, mid[1] - ny * bw * 1.6, hd[0], hd[1]);
+  c.fill();
+  c.beginPath(); c.arc(mid[0], mid[1], bw, 0, TAU); c.fill();
+  // the forked tail, in the plane of the wings: broad where it starts, two thin points
+  if (BIRD.tail > 0) {
+    var tl = BIRD.tail, fl = P(vAdd(vMul(f, -0.3), vMul(r, 0.07))), fr = P(vAdd(vMul(f, -0.3), vMul(r, -0.07)));
+    var notch = P(vMul(f, -0.32 - tl * 0.45));
+    var pl = P(vAdd(vMul(f, -0.32 - tl), vMul(r, tl * 0.28))), pr = P(vAdd(vMul(f, -0.32 - tl), vMul(r, -tl * 0.28)));
+    c.beginPath();
+    c.moveTo(fl[0], fl[1]); c.lineTo(pl[0], pl[1]); c.lineTo(notch[0], notch[1]); c.lineTo(pr[0], pr[1]); c.lineTo(fr[0], fr[1]);
+    c.closePath(); c.fill();
+    c.lineWidth = Math.max(0.5, 0.035 * m); c.lineJoin = 'round';
+    c.stroke();
+  }
+}
+var BIRD_HAZE = hex('#E9CDBF');                       // the pale, warm air the far birds are seen through
+/* The flocks at one depth: 0 far, 1 middle, 2 near. */
+function drawBirds(c, tier) {
+  if (!flocks.length) return;
+  var cam = bCam(), base = hex(BIRD.colour);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = 0; i < flocks.length; i++) {
+    var F = flocks[i];
+    if (F.tier !== tier) continue;
+    var col = rgb(mix(base, BIRD_HAZE, BIRD.haze * FLOCK_TIERS[tier].haze));
+    for (var j = 0; j < F.birds.length; j++) drawBird(c, F, F.birds[j], cam, col);
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+}
+window.birdLab = {
+  values: BIRD, defaults: BIRD_DEFAULTS, save: saveBirds,
+  send: function () { sendFlock(nowT); },
+  clear: function () { flocks.length = 0; flockNext = nowT + 0.5; },
+  count: function () { var n = 0; flocks.forEach(function (f) { n += f.birds.length; }); return flocks.length + ' flocks, ' + n + ' birds'; }
+};
+
+/* ============================================================
    11. FRAME
    ============================================================ */
 function resize() {
@@ -5213,6 +5438,7 @@ function frame(now) {
   moveFalling(t, dt);
   updateOwl(t, dt);
   updateAnimals(t, dt);
+  updateBirds(t, dt);
   bakeOwlQueue(6);                              // the small flying owl sprites, a few at a time
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
   // a change on the panel: baked once the slider has paused for a moment, or at most twice a second while it moves
@@ -5253,6 +5479,9 @@ function frame(now) {
   drawAnimals(ctx, 'A');
   drawOwl(ctx, 'A');
 
+  // The far birds (section 14): behind everything, the far grove too.
+  drawBirds(ctx, 0);
+
   // The bamboo grove behind the far tree, on soft layers of its own.
   drawBamboo('far', t);
 
@@ -5287,8 +5516,14 @@ function frame(now) {
   drawAnimals(ctx, 'B');
   drawOwl(ctx, 'B');
 
+  // The middle birds: in front of the far tree, behind the near grove.
+  drawBirds(ctx, 1);
+
   // The bamboo grove behind the near tree.
   drawBamboo('near', t);
+
+  // The near birds: in front of the near grove, behind the big tree.
+  drawBirds(ctx, 2);
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
@@ -5352,10 +5587,10 @@ requestAnimationFrame(frame);
 </script>
 <script>
 /* ============================================================
-   The six panels, the button and its spring (test bed only).
+   The six panels and the button, on the values chosen for the app.
    Tap the button, or swipe, to move on. On the last panel the button
    turns to point down; tapping it then goes back to the first panel
-   here (in the app it would scroll down to the table).
+   here (in the app it scrolls down to the table).
    ============================================================ */
 (function () {
 'use strict';
@@ -5366,102 +5601,49 @@ var dotsEl = document.getElementById('dots');
 var dots = dotsEl.querySelectorAll('.dot');
 var demo = document.getElementById('navDemo');
 var btn = document.getElementById('navBtn');
-var glass = document.getElementById('navGlass');
 var N = panels.length, cur = 0;
 
-/* ---------- the spring's settings (kept in this browser) ----------
-   Response and damping work as in Apple's SwiftUI springs:
-   response = how long one swing takes (seconds);
-   damping  = 1 settles with no swing past rest, lower swings more. */
-var DEF = { gap: 14, response: 0.2, damping: 0.05, pull: 12.5, pullTime: 680, kick: 190, stretch: 0, pause: 2 };
-var CTLS = [
-  { k: 'gap', label: 'Space: button to dots (px)', min: 0, max: 60, step: 1, group: 'Layout', note: 'The gap between the button and the page dots.' },
-  { k: 'response', label: 'Response (s)', min: 0.12, max: 1.5, step: 0.01, group: 'Spring', note: 'How long one swing takes. Lower = quicker, stiffer spring.' },
-  { k: 'damping', label: 'Damping', min: 0.05, max: 1, step: 0.01, note: '1 = settles without swinging past. Lower = more swings (bouncier).' },
-  { k: 'pull', label: 'Draw back (px)', min: 0, max: 30, step: 0.5, note: 'How far it is drawn back before it is let go.' },
-  { k: 'pullTime', label: 'Draw-back time (ms)', min: 80, max: 1200, step: 10 },
-  { k: 'kick', label: 'Push when let go (px/s)', min: 0, max: 1500, step: 10, note: 'Extra speed forward at the moment it is let go.' },
-  { k: 'stretch', label: 'Stretch with speed', min: 0, max: 0.25, step: 0.005, note: 'Like soft glass: longer when moving fast, squashed when drawn back.' },
-  { k: 'pause', label: 'Pause between (s)', min: 0.5, max: 10, step: 0.1 }
-];
-var KEY = 'nbSpring2';
-var S = {};
-for (var dk in DEF) S[dk] = DEF[dk];
-try {
-  var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
-  if (saved) for (var sk in saved) if (sk in DEF && isFinite(saved[sk])) S[sk] = saved[sk];
-} catch (e) {}
-function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
-
-/* ---------- the spring itself ----------
-   A damped spring, worked out in small steps (1/240 s):
-   acceleration = -stiffness × offset - friction × speed. */
-function springConsts() {
-  var w = 2 * Math.PI / S.response;
-  return { k: w * w, c: 2 * S.damping * w };
-}
+/* ---------- the spring, as chosen (response and damping as in SwiftUI) ---------- */
+var S = { gap: 14, response: 0.2, damping: 0.05, pull: 12.5, pullTime: 680, kick: 190, pause: 2 };
 function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
-/* The whole movement as a list of [offset, speed] for each 1/240 s step,
-   starting at rest: drawn back, let go, and swinging until it stops. */
+/* The whole movement as a list of offsets, one for each 1/240 s: drawn back, let go, swinging until it stops. */
 function simulate() {
   var out = [], dt = 1 / 240, n = Math.round(S.pullTime / 1000 / dt), i;
-  var prev = 0;
-  for (i = 1; i <= n; i++) {
-    var x = -S.pull * easeOut(i / n);
-    out.push([x, (x - prev) / dt, 'pull']);
-    prev = x;
-  }
-  var sc = springConsts(), x2 = -S.pull, v = S.kick;
+  for (i = 1; i <= n; i++) out.push(-S.pull * easeOut(i / n));
+  var w = 2 * Math.PI / S.response, k = w * w, c = 2 * S.damping * w, x = -S.pull, v = S.kick;
   for (i = 0; i < 240 * 8; i++) {
-    v += (-sc.k * x2 - sc.c * v) * dt;
-    x2 += v * dt;
-    out.push([x2, v, 'spring']);
-    if (Math.abs(x2) < 0.03 && Math.abs(v) < 0.6) break;
+    v += (-k * x - c * v) * dt;
+    x += v * dt;
+    out.push(x);
+    if (Math.abs(x) < 0.03 && Math.abs(v) < 0.6) break;
   }
-  out.push([0, 0, 'spring']);
+  out.push(0);
   return out;
 }
-
-/* ---------- playing it ---------- */
-var path = null, startT = 0, raf = 0, timer = 0;
-function apply(x, v, phase) {
-  var down = demo.getAttribute('data-mode') === 'scroll';
-  var s;
-  if (phase === 'pull') s = -S.stretch * 0.6 * Math.min(1, Math.abs(x) / Math.max(1, S.pull));   // squashed as it is drawn back
-  else s = S.stretch * Math.min(1, Math.abs(v) / 700);                                            // longer as it flies
-  var along = 1 + s, across = 1 - s * 0.5;
-  if (down || demo.getAttribute('data-arrow') !== 'left') x = -x;        // drawn out the way the arrow points first (right, or down), then let go
-  btn.style.transform = down
-    ? 'translateY(' + x.toFixed(2) + 'px) scale(' + across.toFixed(4) + ',' + along.toFixed(4) + ')'
-    : 'translateX(' + x.toFixed(2) + 'px) scale(' + along.toFixed(4) + ',' + across.toFixed(4) + ')';
-  // the light on the glass leans with the movement
-  glass.style.setProperty('--lx', (30 + x * 1.5).toFixed(1) + '%');
-  glass.style.setProperty('--ang', (125 + x * 2.5).toFixed(1) + 'deg');
+var path = simulate(), startT = 0, raf = 0, timer = 0;
+function apply(x) {
+  btn.style.transform = demo.getAttribute('data-mode') === 'scroll'
+    ? 'translateY(' + (-x).toFixed(2) + 'px)' : 'translateX(' + (-x).toFixed(2) + 'px)';
 }
 function frame(now) {
   var i = Math.max(0, Math.floor((now - startT) / 1000 * 240));
   if (i >= path.length) {
-    apply(0, 0, 'spring'); btn.style.transform = ''; raf = 0;
+    btn.style.transform = ''; raf = 0;
     timer = setTimeout(play, Math.max(S.pause * 1000, lastTouch + 1400 - now));
     return;
   }
-  apply(path[i][0], path[i][1], path[i][2]);
+  apply(path[i]);
   raf = requestAnimationFrame(frame);
 }
-function stop() {
-  clearTimeout(timer); timer = 0;
-  if (raf) cancelAnimationFrame(raf); raf = 0;
-  btn.style.transform = '';
-}
 function play() {
-  stop();
+  clearTimeout(timer); timer = 0;
+  if (raf) cancelAnimationFrame(raf);
+  raf = 0; btn.style.transform = '';
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  path = simulate();
   startT = performance.now();
   raf = requestAnimationFrame(frame);
 }
-/* After a touch it waits a moment before the next swing. A swing already
-   under way is let finish, so the button never jumps away from the finger. */
+/* After a touch it waits a moment before the next swing. */
 var lastTouch = -1e9;
 window.addEventListener('pointerdown', function (e) {
   if (e.target.closest('.sp')) return;
@@ -5505,136 +5687,99 @@ window.addEventListener('pointerup', function (e) {
     else if (dx > 0 && cur > 0) go(cur - 1);
   }
 });
-
-/* ---------- the glass lens ----------
-   A map the size of the button: inside a band along the rim, each
-   point is shifted outward, more so nearer the edge, so the scene
-   behind bends round the rim as through thick glass. */
-function buildLens() {
-  var w = Math.round(glass.offsetWidth), h = Math.round(glass.offsetHeight);
-  if (!w || !h) return;
-  var r = Math.min(h / 2, w / 2, parseFloat(getComputedStyle(glass).borderTopLeftRadius) || h / 2);
-  var band = Math.min(r, 14);
-  var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
-  var g = cv.getContext('2d'), img = g.createImageData(w, h), d = img.data;
-  function sdf(px, py) {           // distance from the rounded edge (negative inside)
-    var qx = Math.abs(px - w / 2) - (w / 2 - r), qy = Math.abs(py - h / 2) - (h / 2 - r);
-    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
-  }
-  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-    var px = x + 0.5, py = y + 0.5, sd = sdf(px, py), o = (y * w + x) * 4, dx = 0, dy = 0;
-    if (sd < 0 && -sd < band) {
-      var nx = sdf(px + 0.5, py) - sdf(px - 0.5, py), ny = sdf(px, py + 0.5) - sdf(px, py - 0.5);
-      var l = Math.hypot(nx, ny) || 1, t = 1 - (-sd) / band, m = t * t;
-      dx = nx / l * m; dy = ny / l * m;
-    }
-    d[o] = 128 + dx * 127; d[o + 1] = 128 + dy * 127; d[o + 2] = 128; d[o + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  var fe = document.getElementById('nbLensMap');
-  fe.setAttribute('href', cv.toDataURL());
-  fe.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', cv.toDataURL());
-}
-
-/* ---------- the panel ---------- */
+go(0);
+place();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(place);
+window.addEventListener('resize', function () { setTimeout(place, 250); });
+timer = setTimeout(play, 1200);
+})();
+</script>
+<script>
+/* ============================================================
+   The panel (test bed only): every value of the birds (BIRD in
+   section 14). A change takes effect at once; the size of a flock,
+   its spread and the wingbeat show fully on the next flock.
+   ============================================================ */
+(function () {
+'use strict';
+var lab = window.birdLab;
+if (!lab) return;
+var B = lab.values;
+var CTLS = [
+  { k: 'flocks', label: 'Flocks at once', min: 0, max: 4, step: 1, group: 'Flocks' },
+  { k: 'flockMin', label: 'Birds in a flock: fewest', min: 1, max: 20, step: 1 },
+  { k: 'flockMax', label: 'Birds in a flock: most', min: 1, max: 20, step: 1 },
+  { k: 'stay', label: 'Stays in view (s)', min: 5, max: 120, step: 1, note: 'How long a flock wheels round before it flies off.' },
+  { k: 'pause', label: 'Next flock after (s)', min: 0, max: 60, step: 0.5 },
+  { k: 'nearW', label: 'Near flocks', min: 0, max: 1, step: 0.05, note: 'How often a new flock is near, in the middle or far. Near: big and fast, behind the big tree.' },
+  { k: 'midW', label: 'Middle flocks', min: 0, max: 1, step: 0.05 },
+  { k: 'farW', label: 'Far flocks', min: 0, max: 1, step: 0.05, note: 'Far: tiny, pale and slow, low over the mountains, behind both groves.' },
+  { k: 'size', label: 'Size (px, near bird’s body)', min: 4, max: 30, step: 0.5, group: 'Flight', note: 'The wings are about twice this across.' },
+  { k: 'speed', label: 'Speed (m/s)', min: 2, max: 15, step: 0.1 },
+  { k: 'turn', label: 'Wheeling (how sharp the turns)', min: 0.2, max: 3, step: 0.05, note: 'Higher = tighter loops.' },
+  { k: 'loops', label: 'Loops', min: 0, max: 2, step: 0.05, note: 'How often the flock wheels right round instead of heading on.' },
+  { k: 'swoop', label: 'Swoops up and down', min: 0, max: 2, step: 0.05 },
+  { k: 'spread', label: 'Spread (m)', min: 0.3, max: 8, step: 0.1, note: 'How loosely the flock holds together.' },
+  { k: 'trail', label: 'Strung out (s)', min: 0, max: 1.2, step: 0.01, note: 'How far each bird lags behind the one ahead on the same path.' },
+  { k: 'wander', label: 'Drift', min: 0, max: 2, step: 0.05, note: 'Each bird drifting about its own place.' },
+  { k: 'dart', label: 'Darting off', min: 0, max: 3, step: 0.05, note: 'How often one breaks away for a moment.' },
+  { k: 'bank', label: 'Lean into turns', min: 0, max: 2, step: 0.05 },
+  { k: 'flapHz', label: 'Wingbeats a second', min: 2, max: 16, step: 0.5, group: 'Wings' },
+  { k: 'flapAmp', label: 'Wingbeat size (°)', min: 5, max: 70, step: 1 },
+  { k: 'beatsMin', label: 'Beats in a burst: fewest', min: 1, max: 20, step: 1 },
+  { k: 'beatsMax', label: 'Beats in a burst: most', min: 1, max: 20, step: 1 },
+  { k: 'glideMin', label: 'Glide: shortest (s)', min: 0, max: 4, step: 0.05 },
+  { k: 'glideMax', label: 'Glide: longest (s)', min: 0, max: 4, step: 0.05 },
+  { k: 'wingLen', label: 'Wing length', min: 0.5, max: 2, step: 0.01, note: 'Each wing, in body lengths.' },
+  { k: 'sweep', label: 'Wings swept back', min: 0, max: 1, step: 0.01 },
+  { k: 'tail', label: 'Forked tail', min: 0, max: 1.2, step: 0.01 },
+  { k: 'haze', label: 'Far birds paler', min: 0, max: 1, step: 0.01, group: 'Look' },
+  { k: 'view', label: 'Looking up at them (°)', min: 0, max: 70, step: 1, note: 'Low = their loops look flat, high = round, as from right underneath.' }
+];
 var sp = document.getElementById('sp');
 document.getElementById('spToggle').addEventListener('click', function () {
   this.textContent = sp.classList.toggle('closed') ? 'Show' : 'Hide';
 });
-var host = document.getElementById('spCtls'), replay = 0;
-function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(c.step < 0.01 ? 3 : 2); }
-function buildCtls() {
+var host = document.getElementById('spCtls');
+function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(c.step < 0.1 ? 2 : 1); }
+function build() {
   host.innerHTML = '';
   CTLS.forEach(function (c) {
-    if (c.group) { var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh); }
+    if (c.group) {
+      var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh);
+      if (c.group === 'Look') {                       // the colour comes first in its group
+        var row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = 'Colour';
+        var ci = document.createElement('input'); ci.type = 'color'; ci.value = B.colour;
+        ci.addEventListener('input', function () { B.colour = ci.value; lab.save(); });
+        row.appendChild(ci); host.appendChild(row);
+      }
+    }
     var wrap = document.createElement('div'); wrap.className = 'sp-ctl';
-    var lab = document.createElement('label'); lab.textContent = c.label;
-    var val = document.createElement('span'); val.textContent = fmt(c, S[c.k]); lab.appendChild(val);
-    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = S[c.k];
-    inp.addEventListener('input', function () {
-      S[c.k] = parseFloat(inp.value); val.textContent = fmt(c, S[c.k]); save();
-      if (c.k === 'gap') { place(); return; }
-      drawCurve();
-      clearTimeout(replay); replay = setTimeout(play, 350);       // try it straight away
-    });
-    wrap.appendChild(lab); wrap.appendChild(inp);
+    var l = document.createElement('label'); l.textContent = c.label;
+    var val = document.createElement('span'); val.textContent = fmt(c, B[c.k]); l.appendChild(val);
+    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = B[c.k];
+    inp.addEventListener('input', function () { B[c.k] = parseFloat(inp.value); val.textContent = fmt(c, B[c.k]); lab.save(); });
+    wrap.appendChild(l); wrap.appendChild(inp);
     if (c.note) { var n = document.createElement('small'); n.textContent = c.note; wrap.appendChild(n); }
     host.appendChild(wrap);
   });
-  drawCurve();
 }
-/* the movement drawn as a line: across = time, up and down = offset */
-function drawCurve() {
-  var cv = document.getElementById('spCurve'), pr = window.devicePixelRatio || 1;
-  var w = cv.clientWidth, h = cv.clientHeight;
-  cv.width = w * pr; cv.height = h * pr;
-  var g = cv.getContext('2d'); g.scale(pr, pr);
-  var p = simulate(), max = 1;
-  p.forEach(function (q) { max = Math.max(max, Math.abs(q[0])); });
-  var mid = h / 2, sy = (h / 2 - 8) / max, sx = (w - 16) / p.length;
-  g.strokeStyle = 'rgba(60, 60, 67, 0.25)'; g.lineWidth = 1;
-  g.beginPath(); g.moveTo(8, mid); g.lineTo(w - 8, mid); g.stroke();
-  g.strokeStyle = '#E66826'; g.lineWidth = 2; g.lineJoin = 'round';
-  g.beginPath();
-  p.forEach(function (q, i) { var X = 8 + i * sx, Y = mid - q[0] * sy; i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
-  g.stroke();
-  var secs = (p.length / 240).toFixed(2), swings = 0;
-  for (var i = 1; i < p.length; i++) if (p[i][2] === 'spring' && p[i - 1][0] * p[i][0] < 0) swings++;
-  document.getElementById('spZeta').textContent = 'Lasts ' + secs + ' s · crosses the rest point ' + swings + ' times';
-}
-document.getElementById('spPlay').addEventListener('click', play);
+document.getElementById('spSend').addEventListener('click', lab.send);
+document.getElementById('spClear').addEventListener('click', lab.clear);
 document.getElementById('spReset').addEventListener('click', function () {
-  for (var k in DEF) S[k] = DEF[k];
-  save(); buildCtls(); play();
+  for (var k in lab.defaults) B[k] = lab.defaults[k];
+  lab.save(); build();
 });
 document.getElementById('spCopy').addEventListener('click', function () {
-  var look = demo.getAttribute('data-look'), arrow = demo.getAttribute('data-arrow');
-  var text = 'Button look: ' + look + ', arrow ' + arrow + '\nSpring: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, S[c.k]); }).join(', ') +
-             '\n' + JSON.stringify({ look: look, arrow: arrow, spring: S });
+  var text = 'Birds: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, B[c.k]); }).join(', ') +
+             ', colour ' + B.colour + '\n' + JSON.stringify(B);
   var out = document.getElementById('spOut');
   out.textContent = text; out.classList.add('shown');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
 });
-
-/* the look: clear, tint, disc, orb or plain (also kept in the address, e.g. bamboo.html#orb) */
-var LOOKS = ['clear', 'tint', 'disc', 'orb', 'plain'];
-var seg = document.getElementById('spLook');
-function choose(s) {
-  if (LOOKS.indexOf(s) < 0) s = 'plain';
-  demo.setAttribute('data-look', s);
-  var all = seg.querySelectorAll('button');
-  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-s') === s);
-  try { history.replaceState(null, '', '#' + s); } catch (e) {}
-  buildLens();
-}
-seg.addEventListener('click', function (e) {
-  var b = e.target.closest('button');
-  if (b) { choose(b.getAttribute('data-s')); play(); }
-});
-
-var arrowSeg = document.getElementById('spArrow');
-function chooseArrow(a) {
-  if (a !== 'left') a = 'right';
-  demo.setAttribute('data-arrow', a);
-  var all = arrowSeg.querySelectorAll('button');
-  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-a') === a);
-  try { localStorage.setItem('nbArrow2', a); } catch (e) {}
-  buildLens();
-}
-arrowSeg.addEventListener('click', function (e) {
-  var b = e.target.closest('button');
-  if (b) { chooseArrow(b.getAttribute('data-a')); play(); }
-});
-var savedArrow = 'right';
-try { savedArrow = localStorage.getItem('nbArrow2') || 'right'; } catch (e) {}
-chooseArrow(savedArrow);
-choose(location.hash.slice(1) || 'plain');
-go(0);
-buildCtls();
-place();
-if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { place(); buildLens(); });
-window.addEventListener('resize', function () { setTimeout(function () { place(); buildLens(); }, 250); });
-timer = setTimeout(play, 1200);
+var count = document.getElementById('spCount');
+setInterval(function () { count.textContent = 'In the sky now: ' + lab.count(); }, 500);
+build();
 })();
 </script>
 </body>
