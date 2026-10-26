@@ -63,8 +63,8 @@ var BUILD = 'v147';
          night, lit from beneath by the same lamps as the trees (a warm
          pool of light behind it and a warm tint rising from the ground up
          its stems and leaves, as strong as the trees' lamps: koyoNight() ×
-         KOYO.nightGlow). The birds now fly at six depths among the
-         groves and trees (BIRD_SLOTS). The owl still comes at night.
+         KOYO.nightGlow). The birds now fly at three depths among the
+         groves and trees (BIRD_HIDE). The owl still comes at night.
        - Bamboo, lighter and smooth: the groves as re-tuned on bamboo.html
          (13 and 16 stems, leafiness 1 and 1.9). Nothing is blurred or
          filled as a shape any more while it moves: each stem and each leaf
@@ -11689,7 +11689,7 @@ function strikeLightning() {
 /* ============================================================
    8. WEATHER & TIME-OF-DAY LAYERS
    ============================================================ */
-var streaks = [], splashes = [], flakes = [], specks = [], birds = [];
+var streaks = [], splashes = [], flakes = [], specks = [];
 var cloudSprite = null, fogSprite = null, speckSprite = null;
 var cloudShadowsPos = [{ x: 0, y: 0.1 }, { x: 0.55, y: 0.45 }, { x: 1.1, y: 0.2 }];
 var fogBands = [{ x: 0, y: 0.25, s: 1 }, { x: 0.4, y: 0.55, s: 0.7 }, { x: 0.8, y: 0.8, s: 1.2 }];
@@ -12646,368 +12646,320 @@ function drawFog(ctx, dt) {
   ctx.globalAlpha = 1;
 }
 
-/* Birds: a small flock of one kind crosses the autumn sky now and then,
-   from sunrise to 17:00 (not in rain or snow, never in winter). The next
-   flock is always a different kind, about 35 s later (the first one a few
-   seconds after the landscape is drawn), from either side. Three kinds:
-   オナガ (azure-winged magpie: grey, sky-blue wings, long blue tail,
-   flaps then glides), メジロ (Japanese white-eye: small, olive green,
-   white eye-ring, quick whirring wings that fold between bursts) and
-   オオルリ (blue-and-white flycatcher: deep cobalt, white belly).
-   Each bird flies in one of the depth slots of BIRD_SLOTS, among the two
-   bamboo groves (the one behind the bigger tree by day only, see "Bamboo
-   groves") and the two trees: behind
-   everything, behind the grove on the far tree's side but in front of
-   the other, in front of both groves but behind both trees, and so on, up
-   to between the near grove and the big tree. Its slot sets its size: the
-   far ones are small, soft (the depth of field) and a little hazy
-   (BIRD_TIERS). drawKoyoTrees hides each fully behind whatever is in
-   front of it (birdLayer). Every pose is baked once per kind and depth (8
-   flap frames, a glide and a folded frame), so a frame only copies images. */
-var BIRD_KINDS = {
-  onaga: {
-    scale: 1, tail: 0.95, tailW: 0.12, span: 0.9, flock: [5, 8],
-    hz: 5.5, beats: [3, 6], glide: [0.5, 1.1], fold: false, speed: [80, 110], lift: 10, sink: 7,
-    back: '#a9a3a2', belly: '#e6e2dd', cap: '#1d1c24', capFace: true, eyeRing: null,
-    wing: '#79b4e2', wingDark: '#3f7dbf', tailCol: '#6aa6d8', tailTip: '#f4f2ee', beak: '#24222a'
-  },
-  mejiro: {
-    scale: 0.75, tail: 0.38, tailW: 0.1, span: 0.8, flock: [6, 10],
-    hz: 11, beats: [4, 8], glide: [0.15, 0.35], fold: true, speed: [90, 125], lift: 26, sink: 30,
-    back: '#879a2b', belly: '#d8d6c4', cap: '#8fa431', capFace: false, eyeRing: '#ffffff', throat: '#e3d24a',
-    wing: '#7f932a', wingDark: '#566620', tailCol: '#6e7f26', tailTip: null, beak: '#3a3330'
-  },
-  ruri: {
-    scale: 0.8, tail: 0.5, tailW: 0.12, span: 0.85, flock: [4, 6],
-    hz: 8, beats: [4, 7], glide: [0.25, 0.6], fold: false, speed: [85, 120], lift: 16, sink: 14,
-    back: '#2457b8', belly: '#f2f1ee', cap: '#3f7fe0', capFace: false, eyeRing: null, face: '#141a33',
-    wing: '#2a5fc4', wingDark: '#15306e', tailCol: '#1f4ea8', tailTip: null, beak: '#141418'
-  }
+/* Birds: small dark swallow-like birds wheel in loose flocks across the
+   autumn sky, from sunrise to 17:00 (not in rain or snow, never in winter),
+   as tuned on bamboo.html. They are only silhouettes: near-black, with
+   swept-back pointed wings, a short body and a forked tail, but each bird
+   is posed in 3D every frame (turned, leaning into its turns, wings
+   anywhere in the beat) and seen a little from below, so its outline keeps
+   changing (a "T", a "V", an "r", a thin line) as it beats and glides.
+   - They beat their wings fast in short bursts, then glide with the wings
+     swept back, each bird on its own timing.
+   - A flock follows one leader that sweeps across the sky and wheels round
+     in big flat loops. Every bird follows the same path a moment later, a
+     little off to one side, so the flock strings out and bunches up; now
+     and then one darts off and catches up.
+   - A bird keeps well above the ground line: it climbs away from it long
+     before it gets low and can never go below a hard limit.
+   - Three depths (FLOCK_TIERS): the near flocks are bigger and cross the
+     screen faster, the far ones tiny, paler and low over the mountains. Each
+     depth sits among the groves and trees (BIRD_HIDE): the far one behind
+     everything, the middle one in front of the far tree but behind the near
+     grove, the near one in front of the near grove but behind the big tree.
+     drawKoyoTrees hides each fully behind whatever is in front of it
+     (birdLayer).
+   Everything is in metres and seconds. BIRD holds the values approved on
+   bamboo.html; the birds make no sound. */
+var BIRD = {
+  flocks: 2, flockMin: 4, flockMax: 7, stay: 30, pause: 2.5,   // flocks in the sky at once, birds in a flock, seconds in view, seconds before the next flock
+  nearW: 0.4, midW: 0.3, farW: 0.3,                            // how often a flock is near, middle or far
+  size: 14, speed: 2.4, turn: 1.4, loops: 0.55, swoop: 0.5,    // a near bird's body length (px), flying speed, how sharply the leader wheels, how often it loops, rises and dips
+  spread: 2.6, trail: 0.2, wander: 0.6, dart: 0.5, bank: 1.25, // how loosely the flock holds together (m), how far each bird lags on the path (s), drift, darting off, leaning into turns
+  flapHz: 8, flapAmp: 40, beatsMin: 2, beatsMax: 7,            // wingbeats a second, how far the wings swing (degrees), beats in a burst
+  glideMin: 0.25, glideMax: 1.1, wingLen: 1.05, sweep: 0.4, tail: 0.5,   // seconds of gliding between bursts, wing length, wingtips swept back, forked tail (body lengths)
+  colour: '#1E1D22', haze: 0.5, view: 43,                      // the far birds' paleness, how far we look up at them (degrees)
+  floorSoft: 0.16, floorHard: 0.1                              // how far above the ground line (fraction of the screen height) they start to climb away, and the lowest they can go
 };
-var BIRD_ORDER = ['onaga', 'mejiro', 'ruri'];
-// depth tiers: body length in CSS px, blur (CSS px), haze, screen speed, opacity
-var BIRD_TIERS = [
-  { size: 36, blur: 0,   haze: 0,    speed: 1,    alpha: 1 },       // near
-  { size: 24, blur: 0.6, haze: 0.12, speed: 0.86, alpha: 0.95 },    // middle
-  { size: 14, blur: 1.1, haze: 0.25, speed: 0.72, alpha: 0.9 }     // far: behind both trees
+var BIRD_HIDE = [['nt'], ['ng', 'nt'], ['fg', 'ft', 'ng', 'nt']];   // what is in front of each depth: near, middle, far
+var BODY_M = 0.17;                                    // a swallow's body length (m)
+// depth tiers: size on screen (× BIRD.size), how far away (m, for the gentle perspective
+// within a flock), how pale, the screen band its leader keeps to (fractions of the height)
+var FLOCK_TIERS = [
+  { k: 1,    dist: 22, haze: 0,    top: 0.07, bot: 0.5 },    // near
+  { k: 0.62, dist: 36, haze: 0.45, top: 0.1,  bot: 0.58 },   // middle
+  { k: 0.36, dist: 62, haze: 1,    top: 0.3,  bot: 0.7 }     // far: low, over the mountains
 ];
-/* The depth slots, back to front. hide: what is in front of the bird ('fg' the
-   far tree's bamboo grove, 'ft' the far tree, 'ng' the near tree's grove, 'nt'
-   the near tree); the grove stands behind its tree, so a bird behind a grove
-   is behind its tree too. The far side has three places (behind its grove,
-   between grove and tree, in front of the tree), the near side two (behind
-   its grove, between grove and tree: never in front of the big tree), so six
-   slots. ti: the depth tier (size, blur); w: how often. */
-var BIRD_SLOTS = [
-  { hide: ['fg', 'ft', 'ng', 'nt'], ti: 2, w: 0.2 },    // behind both groves (and both trees)
-  { hide: ['fg', 'ft', 'nt'], ti: 1, w: 0.12 },         // behind the far grove, in front of the near grove
-  { hide: ['ft', 'ng', 'nt'], ti: 1, w: 0.12 },         // in front of the far grove (behind the far tree), behind the near grove
-  { hide: ['ft', 'nt'], ti: 1, w: 0.14 },               // in front of both groves, behind both trees
-  { hide: ['ng', 'nt'], ti: 0, w: 0.12 },               // in front of the far tree, behind the near grove
-  { hide: ['nt'], ti: 0, w: 0.3 }                       // between the near grove and the big tree
-];
-function pickBirdSlot() {
-  var r = Math.random() * BIRD_SLOTS.reduce(function(a, s) { return a + s.w; }, 0);
-  for (var i = 0; i < BIRD_SLOTS.length; i++) { r -= BIRD_SLOTS[i].w; if (r <= 0) return i; }
-  return BIRD_SLOTS.length - 1;
-}
-var BIRD_FRAMES = 8, BIRD_GLIDE = 8, BIRD_FOLD = 9;
-var birdSprites = {}, birdSpritePR = 0, birdNext = 0, birdLastKind = '';
+var flocks = [], flockNext = 0;
+var BIRD_UP = [0, 1, 0];
 
-// One wing in bird units (x forward, y down, body length 1). a: 1 up, -1 down.
-function birdWing(c, k, a, far, fold) {
-  var sx = 0.06, sy = -0.07;
-  c.beginPath();
-  if (fold) {                                      // folded along the back
-    c.moveTo(sx + 0.1, sy + 0.02);
-    c.quadraticCurveTo(sx - 0.1, sy - 0.07, sx - 0.42, sy + 0.04);
-    c.quadraticCurveTo(sx - 0.15, sy + 0.08, sx + 0.1, sy + 0.02);
-  } else {
-    // seen a little from the side: the far wing sits further forward and looks shorter
-    var dir = a >= 0 ? -1 : 1, L = k.span * (0.2 + 0.8 * Math.abs(a)) * (far ? 0.78 : 1);
-    if (far) sx += 0.1;
-    var tx = sx - 0.12 - 0.16 * Math.abs(a), ty = sy + dir * L;
-    c.moveTo(sx + 0.16, sy);
-    c.bezierCurveTo(sx + 0.2, sy + dir * L * 0.45, tx + 0.12, ty - dir * 0.04, tx, ty);   // leading edge
-    // trailing edge with the primaries as small scallops, then the inner wing
-    var bx = sx - 0.12, by = sy + dir * L * 0.35;
-    for (var i = 1; i <= 4; i++) {
-      var f = i / 4;
-      var px = lerp(tx, bx, f), py = lerp(ty, by, f);
-      c.quadraticCurveTo(px - 0.06, py - dir * 0.06, px, py);
+// small vector helpers for the birds (x right, y up, z away)
+function bVAdd(a, b) { return [a[0] + b[0], a[1] + b[1], a[2] + b[2]]; }
+function bVSub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
+function bVMul(a, k) { return [a[0] * k, a[1] * k, a[2] * k]; }
+function bVDot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+function bVCross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function bVNorm(a) { var l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+function bWrap(a) { while (a > PI) a -= TAU; while (a < -PI) a += TAU; return a; }
+function bCam() { var e = BIRD.view * PI / 180; return { c: Math.cos(e), s: Math.sin(e) }; }
+function pxPerM(F) { return BIRD.size * FLOCK_TIERS[F.tier].k / BODY_M; }
+/* World (X right, Y up, Z away, metres from the flock's middle) onto the screen. */
+function bScreen(F, p, cam) {
+  // a bird can come no nearer than a third of the flock's distance, so the perspective never breaks down
+  var m = pxPerM(F) * F.dist / Math.max(F.dist * 0.35, F.dist + p[2] * cam.c + (p[1] - F.y0) * cam.s);
+  return [W / 2 + p[0] * m, H * LAND.horizon - (p[1] * cam.c - p[2] * cam.s) * m, m];
+}
+/* A goal for the leader: a random place in its band of sky. */
+function newGoal(F, cam, middle) {
+  var T = FLOCK_TIERS[F.tier], m = pxPerM(F), mx = middle ? 0.3 : 0.12;
+  var gx = W * rnd(mx, 1 - mx), gy = H * rnd(T.top, T.bot), gz = rnd(-5, 5);
+  F.goal = [(gx - W / 2) / m, ((H * LAND.horizon - gy) / m + gz * cam.s) / cam.c, gz];
+  F.goalT = rnd(3, 7);
+}
+function pickTier() {
+  var w = [BIRD.nearW, BIRD.midW, BIRD.farW], used = flocks.map(function (f) { return f.tier; });
+  // a depth no flock is at yet, if there is one
+  var free = w.map(function (x, i) { return used.indexOf(i) < 0 ? x : x * 0.15; });
+  var sum = free[0] + free[1] + free[2];
+  if (sum <= 0) return 0;
+  var r = Math.random() * sum;
+  for (var i = 0; i < 3; i++) { r -= free[i]; if (r <= 0) return i; }
+  return 2;
+}
+function sendFlock(t) {
+  var cam = bCam(), tier = pickTier(), T = FLOCK_TIERS[tier];
+  var F = { tier: tier, dist: T.dist, born: t, life: BIRD.stay * rnd(0.7, 1.3), leaving: false, birds: [], hist: [], loopT: 0, loopDir: 1, w: 0, vy: 0 };
+  var m = pxPerM(F), side = Math.random() < 0.5 ? -1 : 1;
+  var sy = H * rnd(T.top + 0.05, T.bot - 0.05);
+  F.y0 = (H * LAND.horizon - sy) / m / cam.c;
+  // the leader comes in from off one side, heading inward and a little up or down
+  F.p = [side * (W / 2 + 60) / m, F.y0, rnd(-4, 4)];
+  F.yaw = (side < 0 ? 0 : PI) + rnd(-0.35, 0.35);
+  F.v = BIRD.speed;
+  newGoal(F, cam);
+  // its path so far, straight in from further out, so the birds behind it have somewhere to be
+  for (var k = 60; k >= 1; k--) {
+    var back = k / 20;
+    F.hist.push({ t: t - back, p: [F.p[0] - Math.cos(F.yaw) * F.v * back, F.p[1], F.p[2] - Math.sin(F.yaw) * F.v * back],
+                  v: [Math.cos(F.yaw) * F.v, 0, Math.sin(F.yaw) * F.v] });
+  }
+  var n = Math.round(rnd(Math.min(BIRD.flockMin, BIRD.flockMax), Math.max(BIRD.flockMin, BIRD.flockMax)));
+  var order = [];
+  for (var i = 0; i < n; i++) order.push(i);
+  order.sort(function () { return Math.random() - 0.5; });
+  for (var j = 0; j < n; j++) {
+    var B = {
+      lag: order[j] * BIRD.trail * rnd(0.6, 1.4) + rnd(0, 0.15),
+      off: [rnd(-1, 1) * BIRD.spread, rnd(-0.6, 0.6) * BIRD.spread, rnd(-1, 1) * BIRD.spread],
+      wph: [rnd(0, TAU), rnd(0, TAU), rnd(0, TAU)], wf: rnd(0.25, 0.6),
+      dartV: [0, 0, 0], acc: [0, 0, 0],
+      hz: BIRD.flapHz * rnd(0.85, 1.15), ph: rnd(0, TAU), beats: Math.round(rnd(BIRD.beatsMin, BIRD.beatsMax)), glide: 0,
+      wing: 0, ext: 1, sw: 0, roll: 0
+    };
+    var tg = flockTarget(F, B, t);
+    B.p = tg.p.slice(); B.v = tg.v.slice();
+    F.birds.push(B);
+  }
+  flocks.push(F);
+}
+/* Where the leader was lag seconds ago. */
+function histAt(F, tt) {
+  var h = F.hist, i = h.length - 1;
+  while (i > 0 && h[i].t > tt) i--;
+  var a = h[i], b = h[Math.min(i + 1, h.length - 1)];
+  var u = b.t > a.t ? clamp((tt - a.t) / (b.t - a.t), 0, 1) : 0;
+  return { p: [lerp(a.p[0], b.p[0], u), lerp(a.p[1], b.p[1], u), lerp(a.p[2], b.p[2], u)],
+           v: [lerp(a.v[0], b.v[0], u), lerp(a.v[1], b.v[1], u), lerp(a.v[2], b.v[2], u)] };
+}
+/* Where one bird wants to be: on the leader's path a moment back, off to its own side. */
+function flockTarget(F, B, t) {
+  var h = histAt(F, t - B.lag), wa = BIRD.wander * BIRD.spread * 0.6;
+  for (var a = 0; a < 3; a++) h.p[a] += B.off[a] + Math.sin(t * B.wf * (1 + a * 0.3) + B.wph[a]) * wa * (a === 1 ? 0.6 : 1);
+  return h;
+}
+function updateLeader(F, t, dt, cam) {
+  var s = bScreen(F, F.p, cam), T = FLOCK_TIERS[F.tier];
+  var out = s[0] < W * 0.06 || s[0] > W * 0.94 || s[1] < H * (T.top - 0.05) || s[1] > H * (T.bot + 0.08);
+  if (!F.leaving && t - F.born > F.life) {
+    F.leaving = true;
+    var side = s[0] < W / 2 ? -1 : 1, m = pxPerM(F);
+    F.goal = [side * (W / 2 + 400) / m, F.p[1] + rnd(0, 4), F.p[2]];
+    F.loopT = 0;
+  }
+  if (!F.leaving) {
+    F.goalT -= dt;
+    var dx = F.goal[0] - F.p[0], dz = F.goal[2] - F.p[2];
+    if (F.goalT <= 0 || dx * dx + dz * dz < 4) newGoal(F, cam);
+    else if (out && !F.wasOut) newGoal(F, cam, true);   // drifting off the screen: back toward the middle
+    // now and then it wheels right round (not when near the edges)
+    if (F.loopT <= 0 && !out && Math.random() < dt * BIRD.loops * 0.35) {
+      F.loopT = rnd(0.6, 1.25) * TAU / Math.max(0.2, BIRD.turn);
+      F.loopDir = Math.random() < 0.5 ? -1 : 1;
     }
-    c.quadraticCurveTo(sx - 0.24, sy + dir * 0.06, sx - 0.2, sy + 0.02);
-    c.closePath();
   }
-  var g = c.createLinearGradient(sx, sy, sx - 0.2, sy + (a >= 0 ? -1 : 1) * k.span);
-  g.addColorStop(0, far ? k.wingDark : k.wing);
-  g.addColorStop(0.55, k.wing);
-  g.addColorStop(1, k.wingDark);
-  c.fillStyle = g;
-  c.fill();
-  if (far) { c.fillStyle = 'rgba(20,24,40,0.28)'; c.fill(); }      // the far wing is in shade
+  var wantW;
+  if (F.loopT > 0 && !out && !F.leaving) { F.loopT -= dt; wantW = F.loopDir * BIRD.turn; }
+  else {
+    F.loopT = 0;
+    var gy = Math.atan2(F.goal[2] - F.p[2], F.goal[0] - F.p[0]);
+    wantW = clamp(bWrap(gy - F.yaw) * 1.6, -BIRD.turn, BIRD.turn);
+  }
+  F.w += (wantW - F.w) * Math.min(1, dt * 1.8);
+  F.yaw = bWrap(F.yaw + F.w * dt);
+  // speed: a little faster when diving, slower when climbing
+  F.v += (BIRD.speed * (1 - F.vy * 0.04) - F.v) * Math.min(1, dt);
+  // up and down: toward the goal's height, with swoops
+  var wantVy = clamp((F.goal[1] - F.p[1]) * (out ? 1 : 0.5), -3, 3) + (out ? 0 : 1) * BIRD.swoop * 3.2 * Math.sin(t * 0.7 + F.born) * Math.sin(t * 0.31 + F.born * 2);
+  F.vy += (wantVy - F.vy) * Math.min(1, dt * 1.5);
+  var vel = [Math.cos(F.yaw) * F.v, F.vy, Math.sin(F.yaw) * F.v];
+  for (var a = 0; a < 3; a++) F.p[a] += vel[a] * dt;
+  F.wasOut = out;
+  F.hist.push({ t: t, p: F.p.slice(), v: vel });
+  while (F.hist.length > 2 && F.hist[1].t < t - 8) F.hist.shift();
 }
-function birdBody(c, k) {
-  // tail
-  c.beginPath();
-  c.moveTo(-0.28, -0.04);
-  c.lineTo(-0.3 - k.tail, -0.02 - k.tailW * 0.4);
-  c.quadraticCurveTo(-0.34 - k.tail, 0.01, -0.3 - k.tail, 0.02 + k.tailW * 0.6);
-  c.lineTo(-0.28, 0.05);
-  c.closePath();
-  c.fillStyle = k.tailCol; c.fill();
-  if (k.tailTip) {
-    c.save(); c.clip();
-    c.fillStyle = k.tailTip;
-    c.fillRect(-0.34 - k.tail, -0.2, 0.16, 0.4);
-    c.restore();
+function updateBird(F, B, t, dt) {
+  var tg = flockTarget(F, B, t);
+  // follows its place: pulled toward it, matching its speed (and any dart dies away)
+  for (var a = 0; a < 3; a++) {
+    var acc = (tg.p[a] - B.p[a]) * 3.2 + (tg.v[a] + B.dartV[a] - B.v[a]) * 2.6;
+    B.acc[a] = clamp(acc, -30, 30);
   }
-  // body
-  var g = c.createLinearGradient(0, -0.15, 0, 0.15);
-  g.addColorStop(0, k.back); g.addColorStop(0.45, k.back); g.addColorStop(0.7, k.belly); g.addColorStop(1, k.belly);
-  c.beginPath();
-  c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
-  c.fillStyle = g; c.fill();
-  if (k.throat) {                                   // メジロ: yellow throat
-    c.beginPath(); c.ellipse(0.24, 0.03, 0.12, 0.07, 0.3, 0, TAU);
-    c.fillStyle = k.throat; c.fill();
+  for (var c = 0; c < 3; c++) { B.v[c] += B.acc[c] * dt; B.p[c] += B.v[c] * dt; B.dartV[c] *= Math.max(0, 1 - dt * 1.4); }
+  // the ground: it pulls itself up well before it gets low, and can never go below the hard limit
+  var cam = bCam(), sc = bScreen(F, B.p, cam), soft = H * (LAND.horizon - BIRD.floorSoft), hard = H * (LAND.horizon - BIRD.floorHard);
+  if (sc[1] > soft) {
+    var depth = (sc[1] - soft) / sc[2];                              // metres into the soft zone
+    B.v[1] += depth * 14 * dt + 6 * dt;                              // a firm lift, stronger the lower it is
+    if (B.dartV[1] < 0) B.dartV[1] = 0;
+    if (B.v[1] < 0) B.v[1] *= Math.max(0, 1 - dt * 5);               // a dive is checked
+    if (sc[1] > hard) {                                              // nudged back up until it is above the limit (the perspective shifts as it rises)
+      for (var it = 0; it < 6 && sc[1] > hard; it++) { B.p[1] += (sc[1] - hard) / sc[2] / cam.c + 0.02; sc = bScreen(F, B.p, cam); }
+      B.v[1] = Math.max(B.v[1], 0.5);
+    }
   }
-  // head
-  var hx = 0.36, hy = -0.06, hr = 0.135;
-  c.beginPath(); c.arc(hx, hy, hr, 0, TAU);
-  c.fillStyle = k.face || (k.capFace ? k.belly : k.back); c.fill();
-  c.save();
-  c.beginPath(); c.arc(hx, hy, hr, 0, TAU); c.clip();
-  c.fillStyle = k.cap;
-  if (k.capFace) c.fillRect(hx - hr, hy - hr, hr * 2, hr * 1.15);   // オナガ: black cap down to the eye
-  else c.fillRect(hx - hr, hy - hr, hr * 2, hr * 0.8);
-  c.restore();
-  // beak
-  c.beginPath();
-  c.moveTo(hx + hr * 0.8, hy - 0.035); c.lineTo(hx + hr + 0.08, hy + 0.005); c.lineTo(hx + hr * 0.8, hy + 0.035);
-  c.closePath(); c.fillStyle = k.beak; c.fill();
-  // eye
-  if (k.eyeRing) { c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.042, 0, TAU); c.fillStyle = k.eyeRing; c.fill(); }
-  c.beginPath(); c.arc(hx + 0.04, hy - 0.015, 0.022, 0, TAU); c.fillStyle = '#0d0c10'; c.fill();
-  // a soft light on the back
-  var hl = c.createRadialGradient(0.05, -0.1, 0, 0.05, -0.1, 0.3);
-  hl.addColorStop(0, 'rgba(255,255,255,0.22)'); hl.addColorStop(1, 'rgba(255,255,255,0)');
-  c.beginPath(); c.ellipse(0, 0, 0.36, 0.15, -0.06, 0, TAU);
-  c.fillStyle = hl; c.fill();
-}
-function bakeBirdFrame(k, tier, frame) {
-  var u = tier.size * k.scale * PR;                 // device px per bird unit
-  var pad = (tier.blur * 2 + 1) * PR;
-  var x0 = -0.4 - k.tail, x1 = 0.62, y0 = -k.span - 0.12, y1 = k.span + 0.12;
-  var cv = document.createElement('canvas');
-  cv.width = Math.ceil((x1 - x0) * u + pad * 2);
-  cv.height = Math.ceil((y1 - y0) * u + pad * 2);
-  var c = cv.getContext('2d');
-  var a = frame === BIRD_GLIDE ? 0.12 : Math.cos(frame / BIRD_FRAMES * TAU), fold = frame === BIRD_FOLD;
-  var draw = function(dst) {
-    dst.setTransform(u, 0, 0, u, pad - x0 * u, pad - y0 * u);
-    birdWing(dst, k, a, true, fold);
-    birdBody(dst, k);
-    birdWing(dst, k, a, false, fold);
-  };
-  if (tier.blur > 0 && HAS_FILTER) {
-    var tmp = document.createElement('canvas');
-    tmp.width = cv.width; tmp.height = cv.height;
-    draw(tmp.getContext('2d'));
-    c.filter = 'blur(' + (tier.blur * PR).toFixed(2) + 'px)';
-    c.drawImage(tmp, 0, 0);
-    c.filter = 'none';
-  } else draw(c);
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  if (tier.haze > 0) {                              // distance: a little of the pale sky over it
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = 'rgba(238,230,222,' + tier.haze + ')';
-    c.fillRect(0, 0, cv.width, cv.height);
-    c.globalCompositeOperation = 'source-over';
+  // now and then it darts off to one side, up or down, and comes back
+  if (Math.random() < dt * BIRD.dart * 0.12) {
+    var ang = rnd(0, TAU), sp = rnd(3, 6);
+    B.dartV = [Math.cos(ang) * sp, rnd(-1, 1) * sp * 0.7, Math.sin(ang) * sp];
+    if (bScreen(F, B.p, bCam())[1] > H * (LAND.horizon - BIRD.floorSoft - 0.1)) B.dartV[1] = Math.abs(B.dartV[1]);   // not downward when already low
+    B.beats = Math.max(B.beats, 3); B.glide = 0;                  // and beats hard to do it
   }
-  return { cv: cv, ox: (pad - x0 * u) / PR, oy: (pad - y0 * u) / PR, w: cv.width / PR, h: cv.height / PR };
-}
-function birdSpritesFor(kind, ti) {
-  if (birdSpritePR !== PR) { birdSprites = {}; birdSpritePR = PR; }
-  var key = kind + ti;
-  if (!birdSprites[key]) {
-    var list = [];
-    for (var f = 0; f <= BIRD_FOLD; f++) list.push(bakeBirdFrame(BIRD_KINDS[kind], BIRD_TIERS[ti], f));
-    birdSprites[key] = list;
+  // leans into its turns: the sideways pull against gravity
+  var f = bVNorm(B.v), r = bVNorm(bVCross(BIRD_UP, f));
+  var want = -Math.atan(bVDot(B.acc, r) / 9.8) * BIRD.bank;
+  B.roll += (clamp(want, -1.3, 1.3) - B.roll) * Math.min(1, dt * 6);
+  // wings: a burst of beats, then a glide
+  var far = Math.hypot(tg.p[0] - B.p[0], tg.p[1] - B.p[1], tg.p[2] - B.p[2]);
+  if (B.glide > 0) {
+    B.glide -= dt;
+    if (B.v[1] > 1.2 || far > BIRD.spread * 1.6) B.glide = 0;    // climbing or falling behind: back to beating
+    if (B.glide <= 0) { B.beats = Math.round(rnd(BIRD.beatsMin, BIRD.beatsMax)); B.ph = -PI / 2; }
+    B.wing += (-0.06 - B.wing) * Math.min(1, dt * 10);           // held level, a touch down
+    B.ext += (1 - B.ext) * Math.min(1, dt * 8);
+    B.sw += (1 - B.sw) * Math.min(1, dt * 6);                    // swept back
+  } else {
+    var before = B.ph;
+    B.ph += TAU * B.hz * dt;
+    if (Math.floor((B.ph + PI / 2) / TAU) > Math.floor((before + PI / 2) / TAU) && --B.beats <= 0) {
+      B.glide = rnd(Math.min(BIRD.glideMin, BIRD.glideMax), Math.max(BIRD.glideMin, BIRD.glideMax));
+    }
+    var amp = BIRD.flapAmp * PI / 180;
+    B.wing = Math.sin(B.ph) * amp;
+    B.ext = 0.78 + 0.22 * Math.cos(B.ph - PI / 2 + 0.6);        // spread wide on the downstroke, drawn in on the way up
+    B.sw += (0.35 - B.sw) * Math.min(1, dt * 8);
   }
-  return birdSprites[key];
-}
-/* Bird calls. Each species has one voice, chosen on landscape.html:
-   オナガ a rough, nasal "gyuu, gyuu" (voice A), メジロ soft little "pi pi pi"
-   notes (voice B), オオルリ a soft falling two-note whistle (voice B). A voice
-   returns the notes of one call as {t, dur, gain, pts: [[0-1 along the note, Hz], …]}.
-   The call is scaled by the species' pitch and speed and played on the app's
-   audio, at the bird's own place from left to right, quieter when far.
-   "variation" is how far each call strays from the middle of its ranges. */
-var BIRD_SOUND = {
-  flockEvery: 35, flockSize: 1.3, callEvery: 1, farQuiet: 0.5, volume: 1,
-  onaga:  { vol: 0.8, pitch: 425,  speed: 1,    variation: 0.8 },
-  mejiro: { vol: 0.8, pitch: -950, speed: 1,    variation: 0.75 },
-  ruri:   { vol: 0.8, pitch: 675,  speed: 1.45, variation: 0.75 }
-};
-var birdBus = null;
-function birdR(a, b, vr) { var m = (a + b) / 2; return m + (rnd(a, b) - m) * vr; }
-function birdRI(a, b, vr) { return Math.round(birdR(a - 0.49, b + 0.49, vr)); }
-var BIRD_VOICES = {
-  onaga: function(vr) {
-    var n = birdRI(2, 3, vr), b = birdR(1500, 1800, vr), s = [], t = 0;
-    for (var i = 0; i < n; i++, t += 0.3)
-      s.push({ t: t, dur: 0.24, gain: 0.35, type: 'sawtooth', atk: 0.03, pts: [[0, b * 1.2], [0.35, b * 1.45], [1, b * 0.85]],
-               filter: ['bandpass', b * 1.3, 2.5], vib: [38, 90] });
-    return s;
-  },
-  mejiro: function(vr) {
-    var f = birdR(3800, 4400, vr), n = birdRI(3, 5, vr), s = [], t = 0;
-    for (var i = 0; i < n; i++, t += birdR(0.12, 0.18, vr))
-      s.push({ t: t, dur: 0.11, gain: 0.25, atk: 0.025, pts: [[0, f], [1, f * birdR(0.95, 1.1, vr)]] });
-    return s;
-  },
-  ruri: function(vr) {
-    var f = birdR(2200, 2500, vr);
-    return [
-      { t: 0,   dur: 0.4,  gain: 0.28, atk: 0.08, pts: [[0, f * 1.4], [1, f]] },
-      { t: 0.5, dur: 0.55, gain: 0.28, atk: 0.08, pts: [[0, f * 1.2], [1, f * 0.8]], vib: [6, 40] }
-    ];
-  }
-};
-// One note of a call: a wave gliding through pts, with a quick attack and a falling tail.
-function birdNote(s, t0, out, p, sp) {
-  var ac = soundAudioCtx;
-  var d = Math.max(0.02, s.dur / sp), t = t0 + s.t / sp, g = s.gain;
-  var osc = ac.createOscillator(); osc.type = s.type || 'sine';
-  osc.frequency.setValueAtTime(s.pts[0][1] * p, t);
-  for (var i = 1; i < s.pts.length; i++) osc.frequency.linearRampToValueAtTime(s.pts[i][1] * p, t + s.pts[i][0] * d);
-  var env = ac.createGain();
-  env.gain.setValueAtTime(0.0001, t);
-  env.gain.linearRampToValueAtTime(g, t + Math.min(d * 0.5, Math.max(0.003, (s.atk || 0.01) / sp)));
-  env.gain.exponentialRampToValueAtTime(0.0001, t + d);
-  var node = osc;
-  if (s.vib) {
-    var lfo = ac.createOscillator(), lg = ac.createGain();
-    lfo.frequency.value = s.vib[0]; lg.gain.value = s.vib[1] * p;
-    lfo.connect(lg); lg.connect(osc.frequency); lfo.start(t); lfo.stop(t + d + 0.05);
-  }
-  if (s.filter) {
-    var f = ac.createBiquadFilter(); f.type = s.filter[0]; f.frequency.value = s.filter[1] * p; f.Q.value = s.filter[2];
-    osc.connect(f); node = f;
-  }
-  node.connect(env); env.connect(out);
-  osc.start(t); osc.stop(t + d + 0.05);
-}
-var birdCalls = [];     // the calls still sounding, so they can be faded out at once
-function fadeBirdCalls() {
-  if (!birdCalls.length || !soundAudioCtx) { birdCalls.length = 0; return; }
-  var now = soundAudioCtx.currentTime;
-  for (var i = 0; i < birdCalls.length; i++) {
-    if (birdCalls[i].end < now) continue;
-    try { birdCalls[i].g.gain.cancelScheduledValues(now); birdCalls[i].g.gain.setTargetAtTime(0, now, 0.03); } catch (e) { /* silent */ }
-  }
-  birdCalls.length = 0;
-}
-function birdCall(b) {
-  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx || soundAudioCtx.state !== 'running') return;
-  try {
-    var nowC = soundAudioCtx.currentTime;
-    while (birdCalls.length && birdCalls[0].end < nowC) birdCalls.shift();
-    if (!birdBus) { birdBus = soundAudioCtx.createGain(); birdBus.gain.value = BIRD_SOUND.volume; birdBus.connect(soundMasterGain); }
-    var cfg = BIRD_SOUND[b.kind], vr = cfg.variation;
-    var spec = BIRD_VOICES[b.kind](vr);
-    var p = Math.pow(2, cfg.pitch / 1200) * b.fp;
-    var sp = cfg.speed * rnd(1 - 0.08 * vr, 1 + 0.08 * vr);
-    var tierGain = b.ti === 2 ? BIRD_SOUND.farQuiet : (b.ti === 1 ? (1 + BIRD_SOUND.farQuiet) / 2 : 1);
-    var out = soundAudioCtx.createGain(); out.gain.value = cfg.vol * tierGain * rnd(1 - 0.2 * vr, 1);
-    if (soundAudioCtx.createStereoPanner) {
-      var pan = soundAudioCtx.createStereoPanner(); pan.pan.value = clamp((b.x / W) * 2 - 1, -1, 1) * 0.8;
-      out.connect(pan); pan.connect(birdBus);
-    } else out.connect(birdBus);
-    var t0 = soundAudioCtx.currentTime + 0.02, tEnd = t0;
-    for (var i = 0; i < spec.length; i++) { birdNote(spec[i], t0, out, p, sp); tEnd = Math.max(tEnd, t0 + (spec[i].t + spec[i].dur) / sp); }
-    birdCalls.push({ g: out, end: tEnd + 0.1 });
-  } catch (e) { /* silent */ }
-}
-function sendBirds() {
-  var choices = BIRD_ORDER.filter(function(n) { return n !== birdLastKind; });
-  var kind = choices[Math.floor(Math.random() * choices.length)], k = BIRD_KINDS[kind];
-  birdLastKind = kind;
-  var dir = Math.random() < 0.5 ? -1 : 1;
-  var n = Math.max(1, Math.round((k.flock[0] + Math.floor(Math.random() * (k.flock[1] - k.flock[0] + 1))) * BIRD_SOUND.flockSize));
-  var y0 = H * rnd(0.08, 0.3), spd = rnd(k.speed[0], k.speed[1]);
-  var bvr = BIRD_SOUND[kind].variation, flockPitch = 1 + rnd(-0.04, 0.04) * bvr;   // this flock's own touch of pitch
-  for (var i = 0; i < n; i++) {
-    var slot = pickBirdSlot(), ti = BIRD_SLOTS[slot].ti, tier = BIRD_TIERS[ti];
-    birdSpritesFor(kind, ti);
-    // a loose group: the far birds start a little ahead, as they cross the screen more slowly
-    var home = y0 + rnd(-1, 1) * H * 0.07 * (ti === 2 ? 0.6 : 1);
-    birds.push({
-      kind: kind, ti: ti, slot: slot, dir: dir,
-      x: (dir > 0 ? -60 : W + 60) - dir * (i * rnd(18, 34) - (ti === 2 ? 60 : 0)),
-      y: home, home: home, vy: 0,
-      vx: dir * spd * tier.speed * rnd(0.94, 1.06),
-      ph: rnd(0, TAU), hz: k.hz * rnd(0.9, 1.1),
-      beats: Math.floor(rnd(k.beats[0], k.beats[1] + 1)), glide: 0,
-      fp: flockPitch * (1 + rnd(-0.015, 0.015) * bvr), callT: rnd(0.2, 1.6)
-    });
-  }
-  birds.sort(function(a, b) { return a.slot - b.slot; });   // further back first
 }
 function updateBirds(dt, t) {
+  if (dt <= 0) return;
   var h = S.hour, sky = !ENV.rainy && !ENV.snowing && S.condition !== 'thunderstorm';
   var birdTime = S.birds && ENV.scene === 'autumn' && sky && h >= ENV.sun.rise && h < 17;
   // the landscape and trees fully drawn and the scene faded in
   var ready = LS.ready && !LS.step && LS.floorBuilt && !dynSetupLeft && dynMaster > 0.9;
+  var cam = bCam(), target = birdTime ? BIRD.flocks : 0;
+  var live = 0, q;
+  for (q = 0; q < flocks.length; q++) if (!flocks[q].leaving) live++;
   if (birdTime && ready) {
-    if (!birdNext) birdNext = t + rnd(0.5, 2);     // the first flock is in view within a few seconds
-    else if (t > birdNext) { sendBirds(); birdNext = t + BIRD_SOUND.flockEvery * rnd(0.65, 1.35); }
+    if (!flockNext) flockNext = t + rnd(0.5, 2);     // the first flock is in view within a few seconds
+    else if (live < target && t > flockNext) { sendFlock(t); flockNext = t + BIRD.pause * rnd(0.6, 1.4); live++; }
   }
-  // none in winter, and none left over when the clock is moved outside the hours
-  if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) birds.length = 0;
-  for (var i = birds.length - 1; i >= 0; i--) {
-    var b = birds[i], k = BIRD_KINDS[b.kind];
-    b.x += b.vx * dt;
-    if (b.glide > 0) {                              // gliding: sinks a little
-      b.glide -= dt;
-      b.vy += (k.sink - b.vy) * dt * 3;
-      if (b.glide <= 0) { b.beats = Math.floor(rnd(k.beats[0], k.beats[1] + 1)); b.ph = 0; }
-    } else {                                        // flapping: rises a little
-      var before = b.ph;
-      b.ph += TAU * b.hz * dt;
-      b.vy += (-k.lift - b.vy) * dt * 3;
-      if (Math.floor(b.ph / TAU) > Math.floor(before / TAU) && --b.beats <= 0) {
-        b.glide = rnd(k.glide[0], k.glide[1]); b.ph = 0;
-      }
+  // the weather turns or the day ends: the flocks fly off. None in winter, and none left over when the clock is moved outside the hours.
+  for (q = 0; q < flocks.length && live > target; q++) if (!flocks[q].leaving) { flocks[q].life = 0; live--; }
+  if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) flocks.length = 0;
+  for (var i = flocks.length - 1; i >= 0; i--) {
+    var F = flocks[i];
+    updateLeader(F, t, dt, cam);
+    var anyIn = false;
+    for (var j = 0; j < F.birds.length; j++) {
+      updateBird(F, F.birds[j], t, dt);
+      var s = bScreen(F, F.birds[j].p, cam);
+      if (s[0] > -80 && s[0] < W + 80 && s[1] > -80) anyIn = true;
     }
-    b.vy += (b.home - b.y) * dt * 1.2;              // keeps to the flock's line
-    b.y += b.vy * dt * (b.ti === 2 ? 0.6 : 1);
-    if (b.vis) {                                    // calls only while it can be seen (not behind a tree)
-      if (!b.wasVis) { b.wasVis = true; b.callT = rnd(0.05, 0.6); }   // just came out: calls within a moment
-      b.callT -= dt;
-      if (b.callT <= 0) { birdCall(b); b.callT = BIRD_SOUND.callEvery * rnd(0.6, 1.4); }
-    } else b.wasVis = false;
-    if (b.x < -160 || b.x > W + 160) birds.splice(i, 1);
+    if (F.leaving && !anyIn) { flocks.splice(i, 1); flockNext = Math.max(flockNext, t + BIRD.pause * rnd(0.6, 1.4)); }
   }
-  if (!birds.length) fadeBirdCalls();               // the last bird has gone: the chirping ends
 }
-// the birds in one depth slot (BIRD_SLOTS)
-function drawBirds(ctx, t, slot) {
-  if (!birds.length) return;
-  for (var i = 0; i < birds.length; i++) {
-    var b = birds[i];
-    if (b.slot !== slot) continue;
-    var k = BIRD_KINDS[b.kind], frames = birdSpritesFor(b.kind, b.ti), f;
-    if (b.glide > 0) f = k.fold ? BIRD_FOLD : BIRD_GLIDE;
-    else f = Math.floor((b.ph % TAU) / TAU * BIRD_FRAMES) % BIRD_FRAMES;
-    var s = frames[f];
-    ctx.globalAlpha = BIRD_TIERS[b.ti].alpha;
-    ctx.setTransform(PR * b.dir, 0, 0, PR, b.x * PR, b.y * PR);
-    ctx.drawImage(s.cv, -s.ox, -s.oy, s.w, s.h);
+
+/* One bird, posed in 3D and drawn flat as a dark silhouette. */
+function drawBird(c, F, B, cam, col) {
+  var s = bScreen(F, B.p, cam), m = s[2] * BODY_M;        // px per body length
+  if (s[0] < -60 || s[0] > W + 60 || s[1] < -60 || s[1] > H) return;
+  var f = bVNorm(B.v), u0 = bVNorm(bVSub(BIRD_UP, bVMul(f, bVDot(BIRD_UP, f))));
+  var r0 = bVCross(u0, f), cr = Math.cos(B.roll), sr = Math.sin(B.roll);
+  var r = bVAdd(bVMul(r0, cr), bVMul(u0, sr)), u = bVSub(bVMul(u0, cr), bVMul(r0, sr));
+  var ox = s[0], oy = s[1];
+  function P(v) { return [ox + v[0] * m, oy - (v[1] * cam.c - v[2] * cam.s) * m]; }
+  c.fillStyle = col; c.strokeStyle = col;
+  // the wings
+  var sweep = BIRD.sweep * (0.75 + 0.6 * B.sw), L = BIRD.wingLen * B.ext;
+  for (var side = -1; side <= 1; side += 2) {
+    var ca = Math.cos(B.wing), sa = Math.sin(B.wing);
+    var dir = bVAdd(bVMul(r, side * ca), bVMul(u, sa));
+    var rf = P(bVAdd(bVMul(f, 0.2), bVMul(dir, 0.03)));
+    var rb = P(bVAdd(bVMul(f, -0.14), bVMul(dir, 0.03)));
+    var wr = P(bVAdd(bVMul(dir, 0.42 * L), bVMul(f, 0.13)));
+    var tip = P(bVAdd(bVMul(dir, L), bVMul(f, -sweep)));
+    var t1 = P(bVAdd(bVMul(dir, 0.62 * L), bVMul(f, -sweep * 0.4)));
+    var t2 = P(bVAdd(bVMul(dir, 0.2 * L), bVMul(f, -0.2)));
+    c.beginPath();
+    c.moveTo(rf[0], rf[1]);
+    c.quadraticCurveTo(wr[0], wr[1], tip[0], tip[1]);               // leading edge, bowed forward at the wrist
+    c.bezierCurveTo(t1[0], t1[1], t2[0], t2[1], rb[0], rb[1]);      // trailing edge: narrow at the tip, broad by the body
+    c.closePath(); c.fill();
   }
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  ctx.globalAlpha = 1;
+  // the body: a tapered spindle, from the head to the base of the tail
+  var hd = P(bVMul(f, 0.5)), mid = P(bVMul(f, 0.12)), tb = P(bVMul(f, -0.32));
+  var dx = hd[0] - tb[0], dy = hd[1] - tb[1], dl = Math.hypot(dx, dy) || 1, nx = -dy / dl, ny = dx / dl;
+  var bw = Math.max(0.6, 0.1 * m);
+  c.beginPath();
+  c.moveTo(hd[0], hd[1]);
+  c.quadraticCurveTo(mid[0] + nx * bw * 1.6, mid[1] + ny * bw * 1.6, tb[0] + nx * bw * 0.4, tb[1] + ny * bw * 0.4);
+  c.lineTo(tb[0] - nx * bw * 0.4, tb[1] - ny * bw * 0.4);
+  c.quadraticCurveTo(mid[0] - nx * bw * 1.6, mid[1] - ny * bw * 1.6, hd[0], hd[1]);
+  c.fill();
+  c.beginPath(); c.arc(mid[0], mid[1], bw, 0, TAU); c.fill();
+  // the forked tail, in the plane of the wings: broad where it starts, two thin points
+  if (BIRD.tail > 0) {
+    var tl = BIRD.tail, fl = P(bVAdd(bVMul(f, -0.3), bVMul(r, 0.07))), fr = P(bVAdd(bVMul(f, -0.3), bVMul(r, -0.07)));
+    var notch = P(bVMul(f, -0.32 - tl * 0.45));
+    var pl = P(bVAdd(bVMul(f, -0.32 - tl), bVMul(r, tl * 0.28))), pr = P(bVAdd(bVMul(f, -0.32 - tl), bVMul(r, -tl * 0.28)));
+    c.beginPath();
+    c.moveTo(fl[0], fl[1]); c.lineTo(pl[0], pl[1]); c.lineTo(notch[0], notch[1]); c.lineTo(pr[0], pr[1]); c.lineTo(fr[0], fr[1]);
+    c.closePath(); c.fill();
+    c.lineWidth = Math.max(0.5, 0.035 * m); c.lineJoin = 'round';
+    c.stroke();
+  }
+}
+var BIRD_HAZE = hexToRgb('#E9CDBF');                       // the pale, warm air the far birds are seen through
+/* The flocks at one depth (FLOCK_TIERS): 0 near, 1 middle, 2 far. */
+function drawBirds(c, tier) {
+  if (!flocks.length) return;
+  var cam = bCam(), base = hexToRgb(BIRD.colour);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = 0; i < flocks.length; i++) {
+    var F = flocks[i];
+    if (F.tier !== tier) continue;
+    var col = rgba(mixRgb(base, BIRD_HAZE, BIRD.haze * FLOCK_TIERS[tier].haze));
+    for (var j = 0; j < F.birds.length; j++) drawBird(c, F, F.birds[j], cam, col);
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 /* Fireflies: most drift behind the text; now and then some fly to a
@@ -13109,12 +13061,16 @@ var farBranchLayer = document.createElement('canvas');  // the far tree's branch
 var ctxFB = farBranchLayer.getContext('2d');
 var birdBox = null;
 function birdBounds() {
-  if (!birds.length) return null;
-  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, pad = 80;
-  for (var i = 0; i < birds.length; i++) {
-    var b = birds[i];
-    x0 = Math.min(x0, b.x); x1 = Math.max(x1, b.x); y0 = Math.min(y0, b.y); y1 = Math.max(y1, b.y);
+  if (!flocks.length) return null;
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity, pad = 80, cam = bCam();
+  for (var i = 0; i < flocks.length; i++) {
+    var F = flocks[i];
+    for (var k = 0; k < F.birds.length; k++) {
+      var s = bScreen(F, F.birds[k].p, cam);
+      x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]);
+    }
   }
+  if (x0 === Infinity) return null;
   x0 = Math.max(0, Math.floor((x0 - pad) * PR)); y0 = Math.max(0, Math.floor((y0 - pad) * PR));
   x1 = Math.min(birdLayer.width, Math.ceil((x1 + pad) * PR)); y1 = Math.min(birdLayer.height, Math.ceil((y1 + pad) * PR));
   return x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null;
@@ -13130,42 +13086,6 @@ function birdsCutOut(c, src, k, times, alpha) {
   for (var i = 0; i < times; i++) c.drawImage(src, B.x * k, B.y * k, B.w * k, B.h * k, B.x, B.y, B.w, B.h);
   c.globalCompositeOperation = 'source-over';
   c.globalAlpha = 1;
-}
-/* Which birds can be seen. The birds' layer, after both trees have been cut
-   out of it, holds only what shows; about ten times a second a small copy of
-   it is read and each bird's body is checked for visible pixels. The calls use
-   this (birdCall, updateBirds): none while every bird is behind a tree. */
-var birdVisT = -1, birdNoneSeen = 0;
-var birdVisCv = document.createElement('canvas');
-var birdVisCtx = birdVisCv.getContext('2d', { willReadFrequently: true });
-function birdVisCheck(t) {
-  if (t - birdVisT < 0.1 || !birdBox) return;
-  birdVisT = t;
-  var B = birdBox, sc = 0.4, w = Math.max(1, Math.ceil(B.w * sc)), h = Math.max(1, Math.ceil(B.h * sc)), d = null, i;
-  try {
-    if (birdVisCv.width !== w || birdVisCv.height !== h) { birdVisCv.width = w; birdVisCv.height = h; }
-    else birdVisCtx.clearRect(0, 0, w, h);
-    birdVisCtx.drawImage(birdLayer, B.x, B.y, B.w, B.h, 0, 0, w, h);
-    d = birdVisCtx.getImageData(0, 0, w, h).data;
-  } catch (e) { d = null; }
-  var any = false;
-  for (i = 0; i < birds.length; i++) {
-    var b = birds[i], seen = false;
-    if (!d) seen = b.x > 0 && b.x < W;              // cannot be read: treat the ones on screen as seen
-    else {
-      var u = BIRD_TIERS[b.ti].size * BIRD_KINDS[b.kind].scale * PR;
-      var xa = b.x * PR - (b.dir > 0 ? 0.4 : -0.55) * u, xb = b.x * PR + (b.dir > 0 ? 0.55 : -0.4) * u;
-      var x0 = Math.floor((Math.min(xa, xb) - B.x) * sc), x1 = Math.ceil((Math.max(xa, xb) - B.x) * sc);
-      var y0 = Math.floor((b.y * PR - 0.2 * u - B.y) * sc), y1 = Math.ceil((b.y * PR + 0.2 * u - B.y) * sc);
-      x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(w - 1, x1); y1 = Math.min(h - 1, y1);
-      for (var y = y0; y <= y1 && !seen; y++)
-        for (var x = x0; x <= x1; x++) if (d[(y * w + x) * 4 + 3] > 40) { seen = true; break; }
-    }
-    b.vis = seen;
-    if (seen) any = true;
-  }
-  if (any) birdNoneSeen = 0;
-  else if (++birdNoneSeen === 2) fadeBirdCalls();   // the last bird is hidden: the chirping ends at once
 }
 var TREE_DEPTH = 7;
 var FAR_TREE_SCALE = 0.6;     // far tree height as a share of the near tree
@@ -13611,12 +13531,12 @@ function drawKoyoTrees(ctx, t) {
     };
     ctxBL.setTransform(1, 0, 0, 1, 0, 0);
     ctxBL.clearRect(B.x, B.y, B.w, B.h);
-    for (var si = 0; si < BIRD_SLOTS.length; si++) {
-      if (!birds.some(function(b) { return b.slot === si; })) continue;
+    for (var si = 2; si >= 0; si--) {                // far first, then the middle, then the near flocks
+      if (!flocks.some(function(f) { return f.tier === si; })) continue;
       ctxBS.setTransform(1, 0, 0, 1, 0, 0);
       ctxBS.clearRect(B.x, B.y, B.w, B.h);
-      drawBirds(ctxBS, t, si);
-      BIRD_SLOTS[si].hide.forEach(function(h) {
+      drawBirds(ctxBS, si);
+      BIRD_HIDE[si].forEach(function(h) {
         front[h].forEach(function(f) { birdsCutOut(ctxBS, f[0], f[1], f[2], f[3]); });
       });
       ctxBL.drawImage(birdSlotLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
@@ -13624,7 +13544,6 @@ function drawKoyoTrees(ctx, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(birdLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
-    birdVisCheck(t);
   }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
@@ -18463,7 +18382,7 @@ function dynFinishSetup() {
    sky colour stays: the koi screen shows it). */
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
-  streaks.length = 0; splashes.length = 0; flakes.length = 0; birds.length = 0; specks.length = 0; birdNext = 0;
+  streaks.length = 0; splashes.length = 0; flakes.length = 0; flocks.length = 0; specks.length = 0; flockNext = 0;
   cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   bambooGroves = []; bambooKey = '';
   NightLife.reset();

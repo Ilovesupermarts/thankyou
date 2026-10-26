@@ -5121,6 +5121,8 @@ var BIRD_DEFAULTS = {
   // the look
   colour: '#1E1D22',
   haze: 0.45,         // how pale the far birds are
+  floorSoft: 0.16,    // how far above the ground line (fraction of the screen height) they start to climb away from it
+  floorHard: 0.1,     // and the lowest they can ever go
   view: 30            // how far we look up at them (degrees): the loops look this flat
 };
 var BIRD_KEY = 'birdLab1';
@@ -5147,7 +5149,8 @@ function bCam() { var e = BIRD.view * PI / 180; return { c: Math.cos(e), s: Math
 function pxPerM(F) { return BIRD.size * FLOCK_TIERS[F.tier].k / BODY_M; }
 /* World (X right, Y up, Z away, metres from the flock's middle) onto the screen. */
 function bScreen(F, p, cam) {
-  var m = pxPerM(F) * F.dist / (F.dist + p[2] * cam.c + (p[1] - F.y0) * cam.s);
+  // a bird can come no nearer than a third of the flock's distance, so the perspective never breaks down
+  var m = pxPerM(F) * F.dist / Math.max(F.dist * 0.35, F.dist + p[2] * cam.c + (p[1] - F.y0) * cam.s);
   return [W / 2 + p[0] * m, H * V.horizon - (p[1] * cam.c - p[2] * cam.s) * m, m];
 }
 /* A goal for the leader: a random place in its band of sky. */
@@ -5266,10 +5269,23 @@ function updateBird(F, B, t, dt) {
     B.acc[a] = clamp(acc, -30, 30);
   }
   for (var c = 0; c < 3; c++) { B.v[c] += B.acc[c] * dt; B.p[c] += B.v[c] * dt; B.dartV[c] *= Math.max(0, 1 - dt * 1.4); }
+  // the ground: it pulls itself up well before it gets low, and can never go below the hard limit
+  var cam = bCam(), sc = bScreen(F, B.p, cam), soft = H * (V.horizon - BIRD.floorSoft), hard = H * (V.horizon - BIRD.floorHard);
+  if (sc[1] > soft) {
+    var depth = (sc[1] - soft) / sc[2];                              // metres into the soft zone
+    B.v[1] += depth * 14 * dt + 6 * dt;                              // a firm lift, stronger the lower it is
+    if (B.dartV[1] < 0) B.dartV[1] = 0;
+    if (B.v[1] < 0) B.v[1] *= Math.max(0, 1 - dt * 5);               // a dive is checked
+    if (sc[1] > hard) {                                              // nudged back up until it is above the limit (the perspective shifts as it rises)
+      for (var it = 0; it < 6 && sc[1] > hard; it++) { B.p[1] += (sc[1] - hard) / sc[2] / cam.c + 0.02; sc = bScreen(F, B.p, cam); }
+      B.v[1] = Math.max(B.v[1], 0.5);
+    }
+  }
   // now and then it darts off to one side, up or down, and comes back
   if (Math.random() < dt * BIRD.dart * 0.12) {
     var ang = rnd(0, TAU), sp = rnd(3, 6);
     B.dartV = [Math.cos(ang) * sp, rnd(-1, 1) * sp * 0.7, Math.sin(ang) * sp];
+    if (bScreen(F, B.p, bCam())[1] > H * (V.horizon - BIRD.floorSoft - 0.1)) B.dartV[1] = Math.abs(B.dartV[1]);   // not downward when already low
     B.beats = Math.max(B.beats, 3); B.glide = 0;                  // and beats hard to do it
   }
   // leans into its turns: the sideways pull against gravity
@@ -5368,7 +5384,7 @@ function drawBird(c, F, B, cam, col) {
   }
 }
 var BIRD_HAZE = hex('#E9CDBF');                       // the pale, warm air the far birds are seen through
-/* The flocks at one depth: 0 far, 1 middle, 2 near. */
+/* The flocks at one depth (FLOCK_TIERS): 0 near, 1 middle, 2 far. */
 function drawBirds(c, tier) {
   if (!flocks.length) return;
   var cam = bCam(), base = hex(BIRD.colour);
@@ -5480,7 +5496,7 @@ function frame(now) {
   drawOwl(ctx, 'A');
 
   // The far birds (section 14): behind everything, the far grove too.
-  drawBirds(ctx, 0);
+  drawBirds(ctx, 2);
 
   // The bamboo grove behind the far tree, on soft layers of its own.
   drawBamboo('far', t);
@@ -5523,7 +5539,7 @@ function frame(now) {
   drawBamboo('near', t);
 
   // The near birds: in front of the near grove, behind the big tree.
-  drawBirds(ctx, 2);
+  drawBirds(ctx, 0);
 
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
@@ -5733,6 +5749,8 @@ var CTLS = [
   { k: 'wingLen', label: 'Wing length', min: 0.5, max: 2, step: 0.01, note: 'Each wing, in body lengths.' },
   { k: 'sweep', label: 'Wings swept back', min: 0, max: 1, step: 0.01 },
   { k: 'tail', label: 'Forked tail', min: 0, max: 1.2, step: 0.01 },
+  { k: 'floorSoft', label: 'Climb away from the ground below (screen height)', min: 0.05, max: 0.4, step: 0.01, group: 'Ground', note: 'How far above the ground line they start to climb away from it.' },
+  { k: 'floorHard', label: 'Lowest they can go (screen height)', min: 0.02, max: 0.3, step: 0.01, note: 'A bird can never go lower than this above the ground line. Keep it smaller than the setting above.' },
   { k: 'haze', label: 'Far birds paler', min: 0, max: 1, step: 0.01, group: 'Look' },
   { k: 'view', label: 'Looking up at them (°)', min: 0, max: 70, step: 1, note: 'Low = their loops look flat, high = round, as from right underneath.' }
 ];
