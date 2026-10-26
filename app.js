@@ -11854,7 +11854,7 @@ function drawRain(ctx) {
    hangs, and once it is heavy enough it drips off. Everything else dries.
 
    The timings follow real water on glass, with the pane at a scale of
-   1px = 0.25mm:
+   1px = 0.2mm:
      - how often drops land: the rain rate (mm/h) turned into raindrops
        per square metre per second, over the pane's area;
      - evaporation: a drop's radius² shrinks at a steady rate that depends
@@ -11865,7 +11865,7 @@ function drawRain(ctx) {
      - running drops move at a few cm/s, faster the bigger they are.
    Drying uses the real clock, so drops keep drying while the scene is
    paused. */
-var GLASS_MM = 0.25;                       // mm of glass per CSS px
+var GLASS_MM = 0.2;                        // mm of glass per CSS px
 var GLASS_HANG = 36;                       // px of canvas under the pane, for hanging drops
 var glassCv = document.getElementById('barRain');
 var glassCtx = glassCv ? glassCv.getContext('2d') : null;
@@ -11955,15 +11955,16 @@ function updateGlassRain(dt) {
   // raindrops landing
   if (ENV.rainy && S.condition !== 'snow') {
     var drizzle = S.condition === 'drizzle';
-    var R = Math.max(S.rainMm, drizzle ? 0.2 : 0.8);                 // mm/h
-    var dMean = drizzle ? 0.35 : Math.min(2.6, 1.3 + 0.06 * R);       // mm
+    // light rain would leave a few specks nobody can see on a tablet: the pane counts it as at least 1.5 (drizzle) or 3 (rain) mm/h
+    var R = Math.max(S.rainMm, drizzle ? 1.5 : 3);                    // mm/h
+    var dMean = drizzle ? 0.8 : Math.min(2.6, 1.3 + 0.06 * R);        // mm
     var vol = Math.PI / 6 * dMean * dMean * dMean;                    // mm³
     var area = (gW * GLASS_MM / 1000) * (gPaneH * GLASS_MM / 1000);    // m²
-    var exposure = 0.35 + Math.min(1, Math.abs(S.windSpeed) / 6.5);   // the slanting rain that reaches the pane
+    var exposure = 0.7 + 0.6 * Math.min(1, Math.abs(S.windSpeed) / 6.5);   // the slanting rain that reaches the pane
     gImpactAcc += R / 3600 * 1e6 / vol * area * exposure * dt;
     while (gImpactAcc >= 1) {
       gImpactAcc -= 1;
-      gImpact(drizzle ? rnd(0.2, 0.5) : clamp(0.5 - Math.log(1 - Math.random()) * (dMean - 0.5), 0.5, 4.5));
+      gImpact(drizzle ? rnd(0.5, 1.1) : clamp(0.5 - Math.log(1 - Math.random()) * (dMean - 0.5), 0.5, 4.5));
     }
   } else gImpactAcc = 0;
 
@@ -12041,7 +12042,7 @@ function gMakeSprite() {
   var b = x.createRadialGradient(m, m + R * 0.25, R * 0.2, m, m, R);
   b.addColorStop(0, 'rgba(255,255,255,0.28)');
   b.addColorStop(0.7, 'rgba(225,232,240,0.22)');
-  b.addColorStop(1, 'rgba(70,85,105,0.5)');
+  b.addColorStop(1, 'rgba(70,85,105,0.65)');
   x.fillStyle = b; x.beginPath(); x.arc(m, m, R, 0, TAU); x.fill();
   var top = x.createLinearGradient(0, m - R, 0, m + R);
   top.addColorStop(0, 'rgba(55,68,88,0.45)'); top.addColorStop(0.45, 'rgba(55,68,88,0)');
