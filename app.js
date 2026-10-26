@@ -13393,7 +13393,7 @@ function buildKoyoTree(key, far, lazy) {
     var cn = nodes[C.node];
     over = Math.max(over, (left ? cn.ex : W - cn.ex) + C.R * 1.25 - limit);
   });
-  var slide = Math.min(over, (left ? bx : W - bx) + W * 0.08);
+  var slide = Math.min(over, Math.max(0, (left ? bx : W - bx) - W * 0.03));   // the trunk's foot always stays on the screen
   if (slide > 0) {
     bx += left ? -slide : slide;
     T.bx = bx;
@@ -13467,33 +13467,50 @@ function fillKoyoBranches(c, T, strength) {
   var bark = T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK;
   bark = koyoLight(mixRgb(bark, KOYO_PAPER, 1 - strength));
   bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
-  c.fillStyle = rgba(bark);
   var ns = T.nodes, i, n;
   function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
-  c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
-    var w0 = n.w / 2, w1 = endW(n);
-    var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
-    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
-    c.moveTo(x0 + px * w0, y0 + py * w0);
-    c.lineTo(x1 + px * w1, y1 + py * w1);
-    c.lineTo(x1 - px * w1, y1 - py * w1);
-    c.lineTo(x0 - px * w0, y0 - py * w0);
-    c.closePath();
+  // Round bark: each branch is drawn in three bands across its width, a dark
+  // band on the side away from the light, the base colour, and a lighter band
+  // on the side facing it (the same light as the leaves: above and to the side).
+  var night = koyoNight(), lx = KOYO.lightFrom * lerp(1, 0.5, night), ly = lerp(-0.85, 0.8, night), ll = Math.hypot(lx, ly);
+  lx /= ll; ly /= ll;
+  var bands = [
+    { col: bark, a: -1, b: 1 },                                          // the whole width
+    { col: scaleRgb(bark, 0.62), a: 0.1, b: 1, dark: true },            // shaded side
+    { col: mixRgb(scaleRgb(bark, 1.25), KOYO_PAPER, 0.18), a: -0.85, b: -0.3 }   // highlight
+  ];
+  for (var bi = 0; bi < bands.length; bi++) {
+    var B = bands[bi];
+    c.fillStyle = rgba(B.col);
+    c.beginPath();
+    for (i = 0; i < ns.length; i++) {
+      n = ns[i];
+      if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
+      var w0 = n.w / 2, w1 = endW(n);
+      var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
+      var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
+      var sd = (px * lx + py * ly) >= 0 ? -1 : 1;   // which way across the branch faces the light
+      var oa = B.a * sd, ob = B.b * sd;
+      c.moveTo(x0 + px * w0 * oa, y0 + py * w0 * oa);
+      c.lineTo(x1 + px * w1 * oa, y1 + py * w1 * oa);
+      c.lineTo(x1 + px * w1 * ob, y1 + py * w1 * ob);
+      c.lineTo(x0 + px * w0 * ob, y0 + py * w0 * ob);
+      c.closePath();
+    }
+    c.fill();
+    if (bi === 0) {                                 // round joints at the forks, in the base colour, under the shading
+      c.beginPath();
+      for (i = 0; i < ns.length; i++) {
+        n = ns[i];
+        if (n.d >= T.maxD || n.perch) continue;     // a twig's tip has no fork, so no joint
+        var r = endW(n), ex = koyoX(T, n.ex);
+        c.moveTo(ex + r, n.ey);
+        c.arc(ex, n.ey, r, 0, TAU);
+      }
+      c.fill();
+    }
   }
-  c.fill();
-  c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.d >= T.maxD || n.perch) continue;       // a twig's tip has no fork, so no joint
-    var r = endW(n), ex = koyoX(T, n.ex);
-    c.moveTo(ex + r, n.ey);
-    c.arc(ex, n.ey, r, 0, TAU);
-  }
-  c.fill();
-  if (T.perch !== undefined) NightLife.drawPerch(c, T);
+  if (T.perch !== undefined) NightLife.drawPerch(c, T, bands, lx, ly);
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -17198,23 +17215,30 @@ function perchTwig(P) {
   var q = curvePt(P, clamp(P.n.at + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
   return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
 }
-/* Drawn with the tree's branches, in their colour (fillStyle already set). */
-function drawPerch(c, T) {
-  var P = perchCurve(T), N = 14, i, q, Lft = [], Rgt = [];
-  for (i = 0; i <= N; i++) {
-    q = curvePt(P, i / N);
-    Lft.push([q.x + q.nx * q.w / 2, q.y + q.ny * q.w / 2]);
-    Rgt.push([q.x - q.nx * q.w / 2, q.y - q.ny * q.w / 2]);
+/* Drawn with the tree's branches, shaded like them: the same bands (dark side,
+   base, lit side) across its width, lit from (lx, ly). */
+function drawPerch(c, T, bands, lx, ly) {
+  var P = perchCurve(T), N = 14, i, q, bi;
+  var mid = curvePt(P, 0.5), sd = (mid.nx * lx + mid.ny * ly) >= 0 ? -1 : 1;   // which way across the branch faces the light
+  for (bi = 0; bi < bands.length; bi++) {
+    var B = bands[bi], oa = B.a * sd, ob = B.b * sd, A = [], D = [];
+    for (i = 0; i <= N; i++) {
+      q = curvePt(P, i / N);
+      A.push([q.x + q.nx * q.w / 2 * oa, q.y + q.ny * q.w / 2 * oa]);
+      D.push([q.x + q.nx * q.w / 2 * ob, q.y + q.ny * q.w / 2 * ob]);
+    }
+    c.fillStyle = rgba(B.col);
+    c.beginPath();
+    c.moveTo(A[0][0], A[0][1]);
+    for (i = 1; i <= N; i++) c.lineTo(A[i][0], A[i][1]);
+    if (bi === 0) c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
+    for (i = N; i >= 0; i--) c.lineTo(D[i][0], D[i][1]);
+    c.closePath();
+    c.fill();
   }
-  c.beginPath();
-  c.moveTo(Lft[0][0], Lft[0][1]);
-  for (i = 1; i <= N; i++) c.lineTo(Lft[i][0], Lft[i][1]);
-  c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
-  for (i = N; i >= 0; i--) c.lineTo(Rgt[i][0], Rgt[i][1]);
-  c.closePath();
-  c.fill();
   // a short twig near the tip, angled up and out
   var tw = perchTwig(P), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
+  c.fillStyle = rgba(bands[0].col);
   c.beginPath();
   c.moveTo(tw.q.x + px * w0, tw.q.y + py * w0);
   c.lineTo(tw.x + px * w1, tw.y + py * w1);
