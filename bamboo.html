@@ -18,7 +18,7 @@
      stone lanterns and the sun), now the test bed for the button that
      moves to the next message (and, on the last message, down to the
      table). The scene runs on its approved values, with no controls.
-     Four designs can be tried with the chooser on the right.
+     The look of the button and its spring are set on the panel.
      Nothing in app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
@@ -30,196 +30,154 @@
   .dyn-canvas.dyn-near { opacity: 1; }
 
   /* ============================================================
-     NEXT / DOWN BUTTONS — four designs to choose from (test bed only).
-     They take the place of the old 「スワイプ →」 and
-     「↓ 下へスクロールしてください」 lines and of the first-use hints:
-     the button shows itself what to do, and can be tapped.
-     On panels 1–5 it means "next panel"; on the last panel it turns
-     to point down ("scroll down to the table").
+     NEXT / DOWN BUTTON (test bed only). It takes the place of the old
+     「スワイプ →」 and 「↓ 下へスクロールしてください」 lines and of the
+     first-use hints, in the narrow strip between the message and the
+     dots, so a long message is never covered.
+     Five looks in the style of Apple's Liquid Glass (chosen on the
+     panel): clear glass, tinted glass, glass with an orange disc, a
+     glass orb, and a plain text button. The glass really bends what is
+     behind it along its rim (the SVG filter #nbLens, drawn for the
+     button's exact shape by the script), like the toolbar's #barGlass.
+     Every few seconds the button is drawn back a little and let go on
+     a spring; the spring is set on the panel.
+     On the last panel it reads 下へ, points down, and springs up and down.
      ============================================================ */
   .nav-demo {
-    position: absolute; left: 0; right: 0; bottom: 158px; z-index: 11;
+    position: absolute; left: 0; right: 0; top: 70%; z-index: 11;
     display: flex; justify-content: center; align-items: center;
-    height: 96px; pointer-events: none;
+    height: 32px; pointer-events: none;
   }
   .nb {
-    position: relative; display: none; pointer-events: auto;
-    border: 0; padding: 0; margin: 0; background: none; cursor: pointer;
-    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Noto Serif JP", serif;
-    color: var(--text-med);
+    --ink: #2A201D;
+    position: relative; display: inline-flex; align-items: center; justify-content: center;
+    margin: 0; padding: 0; border: 0; background: none; cursor: pointer; pointer-events: auto;
+    font-family: -apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", system-ui, sans-serif;
     -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
-    transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.4s ease;
+    will-change: transform;
   }
-  .nav-demo[data-style="a"] .nb-a,
-  .nav-demo[data-style="b"] .nb-b,
-  .nav-demo[data-style="c"] .nb-c,
-  .nav-demo[data-style="d"] .nb-d { display: inline-flex; }
-  .nb:active, .nb.pressed { transform: scale(0.93); transition-duration: 0.12s; }
-  .nb svg { display: block; }
-  /* the direction: everything inside .nb-dir points right, and turns a
-     quarter turn to point down on the last panel */
-  .nb-dir { display: flex; align-items: center; justify-content: center; transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1); }
-  .nav-demo[data-mode="scroll"] .nb-dir { transform: rotate(90deg); }
+  /* iOS glass grows a little and brightens under the finger */
+  .nb-press { display: inline-flex; transition: transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1); }
+  .nb:active .nb-press { transform: scale(1.07); transition-duration: 0.18s; }
+
+  .nb-glass {
+    position: relative; display: inline-flex; align-items: center; gap: 7px;
+    height: 32px; padding: 0 12px 0 16px; border-radius: 16px; color: var(--ink);
+    -webkit-backdrop-filter: url(#nbLens); backdrop-filter: url(#nbLens);
+    background: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 22px rgba(68, 52, 48, 0.16), 0 1px 3px rgba(68, 52, 48, 0.12),
+                inset 0 1px 1px rgba(255, 255, 255, 0.75), inset 0 -1px 1px rgba(255, 255, 255, 0.25);
+  }
+  /* the soft light on the glass, and the bright rim; both lean a little as it moves */
+  .nb-glass::before, .nb-glass::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; }
+  .nb-glass::before {
+    background: radial-gradient(120% 100% at var(--lx, 30%) -10%, rgba(255, 255, 255, 0.55), rgba(255, 255, 255, 0.08) 55%, rgba(255, 255, 255, 0) 70%);
+    transition: opacity 0.3s ease;
+  }
+  .nb:active .nb-glass::before { filter: brightness(1.35); }
+  .nb-glass::after {
+    padding: 1px;
+    background: linear-gradient(var(--ang, 125deg), rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.15) 35%, rgba(255, 255, 255, 0.05) 60%, rgba(255, 255, 255, 0.75));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor;
+            mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  }
+  .nb-glass > * { position: relative; z-index: 1; }
+
   /* the two words: 次へ on panels 1–5, 下へ on the last */
-  .nb-word { position: relative; display: inline-block; height: 1.5em; line-height: 1.5em; overflow: hidden; }
-  .nb-word span { display: block; transition: transform 0.6s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.45s ease; }
+  .nb-word {
+    position: relative; display: inline-block; height: 1.4em; line-height: 1.4em; overflow: hidden;
+    font-size: 14px; font-weight: 600; letter-spacing: 0.05em;
+  }
+  .nb-word span { display: block; transition: transform 0.55s cubic-bezier(0.3, 1.3, 0.5, 1), opacity 0.35s ease; }
   .nb-word span + span { position: absolute; left: 0; top: 0; transform: translateY(100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span:first-child { transform: translateY(-100%); opacity: 0; }
   .nav-demo[data-mode="scroll"] .nb-word span + span { transform: translateY(0); opacity: 1; }
-  /* a ring that spreads out from the button when it is tapped */
-  .nb-burst {
-    position: absolute; left: 50%; top: 50%; width: 64px; height: 64px; margin: -32px 0 0 -32px;
-    border-radius: 50%; border: 1.5px solid rgba(230, 104, 38, 0.6); pointer-events: none;
-    animation: nbBurst 0.7s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
-  }
-  @keyframes nbBurst { from { transform: scale(0.6); opacity: 0.9; } to { transform: scale(2.6); opacity: 0; } }
-  /* a small word under the round buttons */
-  .nb-cap {
-    position: absolute; left: 50%; top: calc(100% + 10px); transform: translateX(-50%); white-space: nowrap;
-    width: 3em; text-align: center; font-size: 14px; font-weight: 600; letter-spacing: 0.35em; padding-left: 0.35em; color: var(--text-med);
-    text-shadow: 0 0 10px rgba(255, 253, 249, 1), 0 0 4px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1);
-  }
+  /* the arrow (like SF Symbols' arrow.right) turns to point down on the last panel */
+  .nb-dir { display: flex; align-items: center; justify-content: center; width: 17px; height: 17px; transition: transform 0.6s cubic-bezier(0.3, 1.35, 0.5, 1); }
+  /* the arrow can point left (the way the finger swipes) instead of right; the arrow then comes first */
+  .nav-demo[data-arrow="left"] .nb-dir { transform: rotate(180deg); }
+  .nav-demo[data-arrow="left"] .nb-glass { flex-direction: row-reverse; padding: 0 16px 0 12px; }
+  .nav-demo[data-arrow="left"][data-look="disc"] .nb-glass { padding: 0 14px 0 4px; }
+  .nav-demo[data-arrow="left"] .nb { flex-direction: row-reverse; }
+  .nav-demo[data-arrow="left"] .nb-side { margin: 0 0 0 9px; }
+  .nav-demo[data-mode="scroll"] .nb-dir { transform: rotate(90deg); }
+  .nb-dir svg { display: block; width: 17px; height: 17px; }
 
-  /* ---- A · 硝子 Glass: a frosted capsule; light passes across the glass,
-     and the arrow keeps slipping out and coming back in ---- */
-  .nb-a {
-    align-items: center; gap: 16px; height: 60px; padding: 0 9px 0 28px; border-radius: 999px; overflow: hidden;
-    background: linear-gradient(135deg, rgba(255, 253, 249, 0.78), rgba(255, 247, 242, 0.46));
-    backdrop-filter: blur(16px) saturate(1.5); -webkit-backdrop-filter: blur(16px) saturate(1.5);
-    border: 1px solid rgba(255, 255, 255, 0.8);
-    box-shadow: 0 10px 28px rgba(68, 52, 48, 0.13), 0 2px 6px rgba(68, 52, 48, 0.06),
-                inset 0 1px 0 rgba(255, 255, 255, 0.95), inset 0 -1px 0 rgba(222, 192, 172, 0.4);
-  }
-  .nb-a::before {
-    content: ""; position: absolute; inset: 0; pointer-events: none;
-    background: linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.85) 48%, rgba(255, 236, 220, 0.5) 54%, transparent 70%);
-    transform: translateX(-130%); animation: nbSheen 4.2s cubic-bezier(0.45, 0, 0.25, 1) infinite;
-  }
-  @keyframes nbSheen { 0%, 58% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
-  .nb-a .nb-word { font-size: 18px; letter-spacing: 0.3em; font-weight: 500; }
-  .nb-a .nb-disc {
-    position: relative; width: 42px; height: 42px; border-radius: 50%; overflow: hidden; color: #FFFDF9;
-    display: flex; align-items: center; justify-content: center;
-    background: linear-gradient(145deg, #F28C4E 0%, var(--accent) 55%, var(--accent-2) 100%);
-    box-shadow: 0 4px 12px rgba(230, 104, 38, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  }
-  .nb-a .nb-disc svg { width: 20px; height: 20px; animation: nbSlip 2.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
-  @keyframes nbSlip {
-    0%, 35% { transform: translateX(0); opacity: 1; }
-    62% { transform: translateX(18px); opacity: 0; }
-    63% { transform: translateX(-18px); opacity: 0; }
-    90%, 100% { transform: translateX(0); opacity: 1; }
-  }
+  /* ---- 1. クリア: clear glass ---- */
+  .nav-demo[data-look="clear"] .nb-dir { color: var(--accent-2); }
 
-  /* ---- B · 円相 Ensō: a round glass stone with a brushed ring that turns
-     slowly, and ripples spreading from it like the koi pond ---- */
-  .nb-b {
-    width: 76px; height: 76px; border-radius: 50%; align-items: center; justify-content: center; color: var(--accent-2);
-    background: radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.92), rgba(255, 247, 242, 0.6) 55%, rgba(251, 236, 224, 0.45));
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    box-shadow: 0 10px 26px rgba(68, 52, 48, 0.15), inset 0 1px 1px rgba(255, 255, 255, 0.95), inset 0 -2px 6px rgba(222, 192, 172, 0.3);
+  /* ---- 2. ティント: glass tinted with the theme's orange, white text ---- */
+  .nav-demo[data-look="tint"] .nb { --ink: #FFFFFF; }
+  .nav-demo[data-look="tint"] .nb-glass {
+    background: linear-gradient(180deg, rgba(240, 125, 64, 0.70), rgba(214, 88, 24, 0.78));
+    box-shadow: 0 8px 22px rgba(196, 78, 16, 0.30), 0 1px 3px rgba(68, 52, 48, 0.14),
+                inset 0 1px 1px rgba(255, 255, 255, 0.55), inset 0 -1px 1px rgba(255, 255, 255, 0.18);
+    text-shadow: 0 1px 2px rgba(120, 40, 0, 0.25);
   }
-  .nb-b .nb-ring { position: absolute; inset: -9px; width: 94px; height: 94px; animation: nbTurn 16s linear infinite; }
-  .nb-b .nb-ring .r1 { stroke-dasharray: 230 47; stroke-dashoffset: 0; }
-  .nb-b .nb-ring .r2 { stroke-dasharray: 150 127; opacity: 0.45; }
-  .nb-b.redraw .nb-ring .r1 { animation: nbDraw 1.1s cubic-bezier(0.65, 0, 0.35, 1); }
-  @keyframes nbTurn { to { transform: rotate(360deg); } }
-  @keyframes nbDraw { from { stroke-dashoffset: 277; } to { stroke-dashoffset: 0; } }
-  .nb-b .nb-ripple {
-    position: absolute; inset: 0; border-radius: 50%; pointer-events: none;
-    border: 1.5px solid rgba(230, 104, 38, 0.42);
-    animation: nbRipple 3.6s cubic-bezier(0.2, 0.6, 0.35, 1) infinite;
-  }
-  .nb-b .nb-ripple + .nb-ripple { animation-delay: 1.8s; }
-  @keyframes nbRipple { 0% { transform: scale(1); opacity: 0.8; } 100% { transform: scale(2); opacity: 0; } }
-  .nb-b .nb-dir svg { width: 30px; height: 30px; animation: nbNudge 2.4s ease-in-out infinite; }
-  @keyframes nbNudge { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(5px); } }
+  .nav-demo[data-look="tint"] .nb-glass::before { opacity: 0.6; }
 
-  /* ---- C · 紅葉 Momiji: just the word and a fine line; a small maple
-     leaf drifts along the line, and falls down it on the last panel ---- */
-  .nb-c { width: 200px; height: 72px; }
-  .nb-c .nb-word {
-    position: absolute; left: 38px; top: 50%; margin-top: -0.75em;
-    font-size: 19px; letter-spacing: 0.32em; font-weight: 500;
-    text-shadow: 0 0 10px rgba(255, 253, 249, 0.95), 0 0 3px rgba(255, 253, 249, 0.9);
-    transition: transform 0.75s cubic-bezier(0.65, 0, 0.35, 1);
+  /* ---- 3. ディスク: clear glass capsule with a solid orange disc ---- */
+  .nav-demo[data-look="disc"] .nb-glass { padding: 0 4px 0 14px; gap: 9px; }
+  .nav-demo[data-look="disc"] .nb-dir {
+    width: 24px; height: 24px; border-radius: 50%; color: #FFFFFF;
+    background: linear-gradient(180deg, #F08A4B, var(--accent) 60%, var(--accent-2));
+    box-shadow: 0 2px 6px rgba(196, 78, 16, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.45);
   }
-  .nb-c .nb-line {
-    position: absolute; left: 104px; top: 50%; width: 72px; height: 20px; margin-top: -10px;
-    transform-origin: 0 50%; transition: transform 0.75s cubic-bezier(0.65, 0, 0.35, 1);
-  }
-  .nb-c .nb-line::before {
-    content: ""; position: absolute; left: 0; right: 4px; top: 50%; height: 1.5px; margin-top: -0.75px; border-radius: 1px;
-    background: linear-gradient(90deg, rgba(230, 104, 38, 0), rgba(230, 104, 38, 0.75));
-  }
-  .nb-c .nb-head { position: absolute; right: -3px; top: 50%; width: 14px; height: 14px; margin-top: -7px; color: var(--accent); }
-  .nb-c .nb-leaf {
-    position: absolute; left: 0; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; color: var(--accent);
-    filter: drop-shadow(0 1px 2px rgba(196, 78, 16, 0.35));
-    animation: nbLeafRun 3.6s cubic-bezier(0.45, 0.05, 0.4, 1) infinite;
-  }
-  .nb-c .nb-leaf svg { width: 16px; height: 16px; animation: nbLeafSway 1.2s ease-in-out infinite alternate; }
-  @keyframes nbLeafRun {
-    0% { transform: translateX(0) rotate(-30deg); opacity: 0; }
-    15% { opacity: 1; }
-    75% { opacity: 1; }
-    100% { transform: translateX(62px) rotate(200deg); opacity: 0; }
-  }
-  @keyframes nbLeafSway { from { transform: translateY(-3px); } to { transform: translateY(3px); } }
-  .nav-demo[data-mode="scroll"] .nb-c .nb-word { transform: translate(40px, -20px); }
-  .nav-demo[data-mode="scroll"] .nb-c .nb-line { transform: translate(-4px, 4px) rotate(90deg) scaleX(0.72); }
-  .nav-demo[data-mode="scroll"] .nb-c .nb-leaf svg { animation-duration: 0.8s; }
+  .nav-demo[data-look="disc"] .nb-dir svg { width: 14px; height: 14px; }
 
-  /* ---- D · 灯 Tōrō: a warm lit orb like the stone lanterns; it breathes
-     and flickers, and three small arrows light up one after another ---- */
-  .nb-d {
-    width: 68px; height: 68px; border-radius: 50%; align-items: center; justify-content: center; color: var(--accent-3);
-    background: radial-gradient(circle at 50% 40%, #FFF6EA 0%, #FFD6A6 30%, #F7A061 62%, var(--accent) 88%, var(--accent-2) 100%);
-    animation: nbBreathe 4.2s ease-in-out infinite;
-  }
-  .nb-d::before {
-    content: ""; position: absolute; inset: -14px; border-radius: 50%; pointer-events: none;
-    background: radial-gradient(circle, rgba(255, 190, 120, 0.55) 0%, rgba(255, 162, 89, 0.22) 45%, rgba(255, 162, 89, 0) 70%);
-    animation: nbFlicker 3.3s steps(1, end) infinite;
-  }
-  .nb-d::after {
-    content: ""; position: absolute; inset: 3px; border-radius: 50%; pointer-events: none;
-    border: 1px solid rgba(255, 253, 249, 0.55);
-  }
-  @keyframes nbBreathe {
-    0%, 100% { box-shadow: 0 0 0 5px rgba(255, 162, 89, 0.14), 0 0 22px 4px rgba(255, 162, 89, 0.38), 0 8px 18px rgba(196, 78, 16, 0.28); }
-    50%      { box-shadow: 0 0 0 9px rgba(255, 162, 89, 0.10), 0 0 36px 10px rgba(255, 162, 89, 0.5), 0 8px 18px rgba(196, 78, 16, 0.28); }
-  }
-  @keyframes nbFlicker {
-    0% { opacity: 0.9; } 12% { opacity: 0.75; } 18% { opacity: 1; } 41% { opacity: 0.82; }
-    47% { opacity: 0.95; } 63% { opacity: 0.7; } 70% { opacity: 1; } 88% { opacity: 0.85; }
-  }
-  .nb-d .nb-dir { position: relative; z-index: 1; }
-  .nb-d .nb-dir svg { width: 19px; height: 19px; margin: 0 -5px; filter: drop-shadow(0 0 4px rgba(255, 246, 234, 0.9)); animation: nbCascade 1.8s ease-in-out infinite; }
-  .nb-d .nb-dir svg:nth-child(2) { animation-delay: 0.22s; }
-  .nb-d .nb-dir svg:nth-child(3) { animation-delay: 0.44s; }
-  @keyframes nbCascade { 0%, 100% { opacity: 0.4; transform: translateX(0); } 30% { opacity: 1; transform: translateX(2px); } 60% { opacity: 0.4; transform: translateX(0); } }
-  .nb-d .nb-cap { top: calc(100% + 14px); }
+  /* ---- 4. オーブ: a round glass button, the word beside it ---- */
+  .nav-demo[data-look="orb"] .nb-glass { width: 34px; height: 34px; padding: 0; border-radius: 17px; justify-content: center; }
+  .nav-demo[data-look="orb"] .nb-glass .nb-word { display: none; }
+  .nav-demo[data-look="orb"] .nb-dir { color: var(--accent-2); width: 18px; height: 18px; }
+  .nav-demo[data-look="orb"] .nb-dir svg { width: 18px; height: 18px; }
+  .nb-side { display: none; margin-right: 9px; color: var(--text-med); text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
+  .nav-demo[data-look="orb"] .nb-side { display: inline-block; }
 
-  /* the chooser for the four designs (test bed only) */
-  .nb-pick {
-    position: fixed; right: 18px; top: 50%; transform: translateY(-50%); z-index: 1000;
-    display: flex; flex-direction: column; gap: 8px; padding: 8px; border-radius: 18px;
-    background: rgba(255, 253, 249, 0.6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-    border: 1px solid rgba(255, 255, 255, 0.7); box-shadow: 0 8px 24px rgba(68, 52, 48, 0.12);
+  /* ---- 5. テキスト: an iOS text button, no glass ---- */
+  .nav-demo[data-look="plain"] .nb-glass {
+    -webkit-backdrop-filter: none; backdrop-filter: none; background: none; box-shadow: none; padding: 0 10px; color: var(--accent-2);
+    text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1);
   }
-  .nb-pick button {
-    font-family: "Shippori Mincho", "Noto Serif JP", serif; font-size: 14px; letter-spacing: 0.08em;
-    border: 1px solid transparent; background: transparent; color: var(--text-mute);
-    border-radius: 12px; padding: 8px 12px; text-align: left; cursor: pointer; -webkit-tap-highlight-color: transparent;
-    transition: background 0.3s ease, color 0.3s ease, border-color 0.3s ease;
-  }
-  .nb-pick button b { display: inline-block; width: 1.3em; color: var(--accent); font-weight: 600; }
-  .nb-pick button.on { background: rgba(255, 255, 255, 0.85); color: var(--text-dark); border-color: rgba(222, 192, 172, 0.6); }
+  .nav-demo[data-look="plain"] .nb-glass::before, .nav-demo[data-look="plain"] .nb-glass::after { display: none; }
+  .nav-demo[data-look="plain"] .nb-word { font-size: 15px; }
+  .nav-demo[data-look="plain"] .nb-dir svg { filter: drop-shadow(0 0 3px rgba(255, 253, 249, 1)); }
 
-  @media (prefers-reduced-motion: reduce) {
-    .nb *, .nb::before, .nb::after, .nb { animation: none !important; }
+  /* the page counter dots: smaller than the app's */
+  #dots { gap: 9px; }
+  #dots .dot { width: 6px; height: 6px; box-shadow: none; }
+  #dots .dot.active { transform: scale(1.3); box-shadow: 0 0 0 3px var(--dot-active-ring); }
+
+  /* ---------- The panel (test bed only), in the same glass style ---------- */
+  .sp {
+    position: fixed; top: 92px; right: 16px; z-index: 1000; width: 300px; max-height: calc(100vh - 110px); overflow-y: auto;
+    padding: 14px 16px 16px; border-radius: 22px; color: #1D1D1F;
+    font-family: -apple-system, "SF Pro Text", "Hiragino Sans", "Noto Sans JP", "Noto Sans CJK JP", system-ui, sans-serif; font-size: 13px;
+    background: rgba(255, 255, 255, 0.62); backdrop-filter: blur(24px) saturate(1.8); -webkit-backdrop-filter: blur(24px) saturate(1.8);
+    border: 0.5px solid rgba(255, 255, 255, 0.8);
+    box-shadow: 0 12px 36px rgba(68, 52, 48, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    -webkit-user-select: none; user-select: none; touch-action: pan-y;
   }
+  .sp.closed { width: auto; padding: 8px 14px; overflow: hidden; }
+  .sp.closed .sp-body { display: none; }
+  .sp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .sp-head b { font-size: 15px; }
+  .sp button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 7px 12px; background: rgba(120, 120, 128, 0.14); color: #1D1D1F; cursor: pointer; }
+  .sp button.primary { background: var(--accent); color: #FFFFFF; }
+  .sp h4 { margin: 14px 0 6px; font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(60, 60, 67, 0.6); }
+  .sp-seg { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2px; padding: 2px; border-radius: 10px; background: rgba(120, 120, 128, 0.14); }
+  .sp-seg2 { grid-template-columns: repeat(2, 1fr); }
+  .sp-seg button { padding: 6px 0; border-radius: 8px; background: none; font-size: 12px; font-weight: 500; }
+  .sp-seg button.on { background: #FFFFFF; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12); font-weight: 600; }
+  .sp-ctl { margin: 10px 0; }
+  .sp-ctl label { display: flex; justify-content: space-between; gap: 8px; font-weight: 500; }
+  .sp-ctl label span { font-variant-numeric: tabular-nums; color: var(--accent-2); font-weight: 600; }
+  .sp-ctl input { width: 100%; margin: 6px 0 0; accent-color: var(--accent); }
+  .sp-ctl small { display: block; color: rgba(60, 60, 67, 0.6); font-size: 11px; line-height: 1.35; margin-top: 2px; }
+  .sp-curve { display: block; width: 100%; height: 84px; margin-top: 6px; border-radius: 12px; background: rgba(255, 255, 255, 0.55); }
+  .sp-zeta { margin-top: 4px; color: rgba(60, 60, 67, 0.7); font-size: 11px; }
+  .sp-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .sp pre { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.7); font-size: 11px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; display: none; }
+  .sp pre.shown { display: block; }
 
 </style>
 </head>
@@ -335,37 +293,14 @@
     </div>
   </div>
 
-  <!-- The button (in place of the old swipe / scroll lines). Only the
-       design picked on the right is shown. -->
-  <div class="nav-demo" id="navDemo" data-style="a" data-mode="swipe">
-    <button type="button" class="nb nb-a" aria-label="次へ">
-      <span class="nb-word"><span>次へ</span><span>下へ</span></span>
-      <span class="nb-disc"><span class="nb-dir"><svg viewBox="0 0 24 24"><use href="#nbChev"/></svg></span></span>
-    </button>
-
-    <button type="button" class="nb nb-b" aria-label="次へ">
-      <svg class="nb-ring" viewBox="0 0 94 94" aria-hidden="true">
-        <circle class="r1" cx="47" cy="47" r="44" fill="none" stroke="url(#nbInk)" stroke-width="2.6" stroke-linecap="round"/>
-        <circle class="r2" cx="47" cy="47" r="41" fill="none" stroke="url(#nbInk)" stroke-width="1" stroke-linecap="round" transform="rotate(140 47 47)"/>
-      </svg>
-      <span class="nb-ripple"></span><span class="nb-ripple"></span>
-      <span class="nb-dir"><svg viewBox="0 0 24 24"><use href="#nbChev"/></svg></span>
-      <span class="nb-cap nb-word"><span>次へ</span><span>下へ</span></span>
-    </button>
-
-    <button type="button" class="nb nb-c" aria-label="次へ">
-      <span class="nb-word"><span>次へ</span><span>下へ</span></span>
-      <span class="nb-line">
-        <span class="nb-leaf"><svg viewBox="0 0 24 24"><use href="#nbLeaf"/></svg></span>
-        <span class="nb-head"><svg viewBox="0 0 24 24" width="14" height="14"><use href="#nbChev"/></svg></span>
-      </span>
-    </button>
-
-    <button type="button" class="nb nb-d" aria-label="次へ">
-      <span class="nb-dir">
-        <svg viewBox="0 0 24 24"><use href="#nbChev"/></svg><svg viewBox="0 0 24 24"><use href="#nbChev"/></svg><svg viewBox="0 0 24 24"><use href="#nbChev"/></svg>
-      </span>
-      <span class="nb-cap nb-word"><span>次へ</span><span>下へ</span></span>
+  <!-- The button (in place of the old swipe / scroll lines). -->
+  <div class="nav-demo" id="navDemo" data-look="plain" data-arrow="right" data-mode="swipe">
+    <button type="button" class="nb" id="navBtn" aria-label="次へ">
+      <span class="nb-side nb-word"><span>次へ</span><span>下へ</span></span>
+      <span class="nb-press"><span class="nb-glass" id="navGlass">
+        <span class="nb-word"><span>次へ</span><span>下へ</span></span>
+        <span class="nb-dir"><svg viewBox="0 0 24 24"><path d="M4.5 12h14.2M13 6.2l5.8 5.8-5.8 5.8" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+      </span></span>
     </button>
   </div>
 
@@ -375,21 +310,45 @@
   </div>
 </div>
 
-<!-- Shapes the buttons share: the arrow, the maple leaf, the ring's ink. -->
+<!-- The glass lens: bends what is behind the button along its rim.
+     The map is drawn by the script for the button's exact size and shape. -->
 <svg width="0" height="0" style="position:fixed" aria-hidden="true" focusable="false"><defs>
-  <symbol id="nbChev" viewBox="0 0 24 24"><path d="M9 5.5l6.5 6.5L9 18.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></symbol>
-  <symbol id="nbLeaf" viewBox="0 0 24 24"><path fill="currentColor" d="M12 1.8l1.5 4.6 2.9-2.1-.4 4 4.3-1.1-2.3 3.5 3.9 1.3-3.8 1.9 1.6 2.9-3.6-.6.4 3.1-3.3-2.2-.6 2.6h-1.2l-.6-2.6-3.3 2.2.4-3.1-3.6.6 1.6-2.9-3.8-1.9 3.9-1.3-2.3-3.5 4.3 1.1-.4-4 2.9 2.1z"/><path d="M12 20v2.6" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></symbol>
-  <linearGradient id="nbInk" x1="0" y1="0" x2="1" y2="1">
-    <stop offset="0" stop-color="#F7A061"/><stop offset="0.5" stop-color="#E66826"/><stop offset="1" stop-color="#882E47"/>
-  </linearGradient>
+  <filter id="nbLens" x="0" y="0" width="1" height="1" color-interpolation-filters="sRGB">
+    <feImage id="nbLensMap" preserveAspectRatio="none" result="map"/>
+    <feDisplacementMap in="SourceGraphic" in2="map" scale="26" xChannelSelector="R" yChannelSelector="G" result="bent"/>
+    <feGaussianBlur in="bent" stdDeviation="1.6" edgeMode="duplicate" result="soft"/>
+    <feColorMatrix in="soft" type="saturate" values="1.7" result="sat"/>
+    <feComponentTransfer in="sat"><feFuncR type="linear" slope="1.04" intercept="0.03"/><feFuncG type="linear" slope="1.04" intercept="0.03"/><feFuncB type="linear" slope="1.04" intercept="0.03"/></feComponentTransfer>
+  </filter>
 </defs></svg>
 
-<!-- The chooser for the four designs (test bed only) -->
-<div class="nb-pick" id="nbPick">
-  <button type="button" data-s="a" class="on"><b>A</b>硝子</button>
-  <button type="button" data-s="b"><b>B</b>円相</button>
-  <button type="button" data-s="c"><b>C</b>紅葉</button>
-  <button type="button" data-s="d"><b>D</b>灯</button>
+<!-- The panel (test bed only): the look, and the spring -->
+<div class="sp" id="sp">
+  <div class="sp-head"><b>ボタン · Button</b><button type="button" id="spToggle">Hide</button></div>
+  <div class="sp-body">
+    <h4>Look</h4>
+    <div class="sp-seg" id="spLook">
+      <button type="button" data-s="clear">Clear</button>
+      <button type="button" data-s="tint">Tint</button>
+      <button type="button" data-s="disc">Disc</button>
+      <button type="button" data-s="orb">Orb</button>
+      <button type="button" data-s="plain">Text</button>
+    </div>
+    <h4>Arrow points</h4>
+    <div class="sp-seg sp-seg2" id="spArrow">
+      <button type="button" data-a="right">→ Right</button>
+      <button type="button" data-a="left">← Left</button>
+    </div>
+    <div id="spCtls"></div>
+    <canvas class="sp-curve" id="spCurve"></canvas>
+    <div class="sp-zeta" id="spZeta"></div>
+    <div class="sp-row">
+      <button type="button" class="primary" id="spPlay">Play now</button>
+      <button type="button" id="spReset">Reset</button>
+      <button type="button" id="spCopy">Copy values</button>
+    </div>
+    <pre id="spOut"></pre>
+  </div>
 </div>
 
 <script>
@@ -5393,20 +5352,132 @@ requestAnimationFrame(frame);
 </script>
 <script>
 /* ============================================================
-   The six panels, the button and the chooser (test bed only).
+   The six panels, the button and its spring (test bed only).
    Tap the button, or swipe, to move on. On the last panel the button
    turns to point down; tapping it then goes back to the first panel
    here (in the app it would scroll down to the table).
    ============================================================ */
 (function () {
 'use strict';
+var stage = document.getElementById('stage');
 var track = document.getElementById('track');
 var panels = track.querySelectorAll('.panel');
-var dots = document.querySelectorAll('#dots .dot');
+var dotsEl = document.getElementById('dots');
+var dots = dotsEl.querySelectorAll('.dot');
 var demo = document.getElementById('navDemo');
-var btns = demo.querySelectorAll('.nb');
+var btn = document.getElementById('navBtn');
+var glass = document.getElementById('navGlass');
 var N = panels.length, cur = 0;
 
+/* ---------- the spring's settings (kept in this browser) ----------
+   Response and damping work as in Apple's SwiftUI springs:
+   response = how long one swing takes (seconds);
+   damping  = 1 settles with no swing past rest, lower swings more. */
+var DEF = { gap: 14, response: 0.2, damping: 0.05, pull: 12.5, pullTime: 680, kick: 190, stretch: 0, pause: 2 };
+var CTLS = [
+  { k: 'gap', label: 'Space: button to dots (px)', min: 0, max: 60, step: 1, group: 'Layout', note: 'The gap between the button and the page dots.' },
+  { k: 'response', label: 'Response (s)', min: 0.12, max: 1.5, step: 0.01, group: 'Spring', note: 'How long one swing takes. Lower = quicker, stiffer spring.' },
+  { k: 'damping', label: 'Damping', min: 0.05, max: 1, step: 0.01, note: '1 = settles without swinging past. Lower = more swings (bouncier).' },
+  { k: 'pull', label: 'Draw back (px)', min: 0, max: 30, step: 0.5, note: 'How far it is drawn back before it is let go.' },
+  { k: 'pullTime', label: 'Draw-back time (ms)', min: 80, max: 1200, step: 10 },
+  { k: 'kick', label: 'Push when let go (px/s)', min: 0, max: 1500, step: 10, note: 'Extra speed forward at the moment it is let go.' },
+  { k: 'stretch', label: 'Stretch with speed', min: 0, max: 0.25, step: 0.005, note: 'Like soft glass: longer when moving fast, squashed when drawn back.' },
+  { k: 'pause', label: 'Pause between (s)', min: 0.5, max: 10, step: 0.1 }
+];
+var KEY = 'nbSpring2';
+var S = {};
+for (var dk in DEF) S[dk] = DEF[dk];
+try {
+  var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
+  if (saved) for (var sk in saved) if (sk in DEF && isFinite(saved[sk])) S[sk] = saved[sk];
+} catch (e) {}
+function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+
+/* ---------- the spring itself ----------
+   A damped spring, worked out in small steps (1/240 s):
+   acceleration = -stiffness × offset - friction × speed. */
+function springConsts() {
+  var w = 2 * Math.PI / S.response;
+  return { k: w * w, c: 2 * S.damping * w };
+}
+function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+/* The whole movement as a list of [offset, speed] for each 1/240 s step,
+   starting at rest: drawn back, let go, and swinging until it stops. */
+function simulate() {
+  var out = [], dt = 1 / 240, n = Math.round(S.pullTime / 1000 / dt), i;
+  var prev = 0;
+  for (i = 1; i <= n; i++) {
+    var x = -S.pull * easeOut(i / n);
+    out.push([x, (x - prev) / dt, 'pull']);
+    prev = x;
+  }
+  var sc = springConsts(), x2 = -S.pull, v = S.kick;
+  for (i = 0; i < 240 * 8; i++) {
+    v += (-sc.k * x2 - sc.c * v) * dt;
+    x2 += v * dt;
+    out.push([x2, v, 'spring']);
+    if (Math.abs(x2) < 0.03 && Math.abs(v) < 0.6) break;
+  }
+  out.push([0, 0, 'spring']);
+  return out;
+}
+
+/* ---------- playing it ---------- */
+var path = null, startT = 0, raf = 0, timer = 0;
+function apply(x, v, phase) {
+  var down = demo.getAttribute('data-mode') === 'scroll';
+  var s;
+  if (phase === 'pull') s = -S.stretch * 0.6 * Math.min(1, Math.abs(x) / Math.max(1, S.pull));   // squashed as it is drawn back
+  else s = S.stretch * Math.min(1, Math.abs(v) / 700);                                            // longer as it flies
+  var along = 1 + s, across = 1 - s * 0.5;
+  if (down || demo.getAttribute('data-arrow') !== 'left') x = -x;        // drawn out the way the arrow points first (right, or down), then let go
+  btn.style.transform = down
+    ? 'translateY(' + x.toFixed(2) + 'px) scale(' + across.toFixed(4) + ',' + along.toFixed(4) + ')'
+    : 'translateX(' + x.toFixed(2) + 'px) scale(' + along.toFixed(4) + ',' + across.toFixed(4) + ')';
+  // the light on the glass leans with the movement
+  glass.style.setProperty('--lx', (30 + x * 1.5).toFixed(1) + '%');
+  glass.style.setProperty('--ang', (125 + x * 2.5).toFixed(1) + 'deg');
+}
+function frame(now) {
+  var i = Math.max(0, Math.floor((now - startT) / 1000 * 240));
+  if (i >= path.length) {
+    apply(0, 0, 'spring'); btn.style.transform = ''; raf = 0;
+    timer = setTimeout(play, Math.max(S.pause * 1000, lastTouch + 1400 - now));
+    return;
+  }
+  apply(path[i][0], path[i][1], path[i][2]);
+  raf = requestAnimationFrame(frame);
+}
+function stop() {
+  clearTimeout(timer); timer = 0;
+  if (raf) cancelAnimationFrame(raf); raf = 0;
+  btn.style.transform = '';
+}
+function play() {
+  stop();
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  path = simulate();
+  startT = performance.now();
+  raf = requestAnimationFrame(frame);
+}
+/* After a touch it waits a moment before the next swing. A swing already
+   under way is let finish, so the button never jumps away from the finger. */
+var lastTouch = -1e9;
+window.addEventListener('pointerdown', function (e) {
+  if (e.target.closest('.sp')) return;
+  lastTouch = performance.now();
+  if (!raf) { clearTimeout(timer); timer = setTimeout(play, 1400); }
+}, true);
+
+/* ---------- the panels ---------- */
+/* As in the app: the button sits under the longest message, the dots under the button. */
+function place() {
+  var top = stage.getBoundingClientRect().top, low = 0;
+  for (var i = 0; i < N; i++) low = Math.max(low, panels[i].querySelector('.panel-content').getBoundingClientRect().bottom - top);
+  demo.style.top = (low + 18) + 'px';
+  dotsEl.style.top = (low + 18 + demo.offsetHeight + S.gap) + 'px';
+  dotsEl.style.bottom = 'auto';
+}
 function go(i) {
   cur = (i + N) % N;
   track.style.transform = 'translateX(' + (-cur * 100 / N) + '%)';
@@ -5415,28 +5486,13 @@ function go(i) {
     dots[k].classList.toggle('active', k === cur);
   }
   var mode = cur === N - 1 ? 'scroll' : 'swipe';
-  if (demo.getAttribute('data-mode') !== mode) {
-    demo.setAttribute('data-mode', mode);
-    for (var b = 0; b < btns.length; b++) btns[b].setAttribute('aria-label', mode === 'scroll' ? '下へ' : '次へ');
-    // the ensō ring draws itself again when the button turns
-    var enso = demo.querySelector('.nb-b');
-    enso.classList.remove('redraw'); void enso.offsetWidth; enso.classList.add('redraw');
-  }
+  demo.setAttribute('data-mode', mode);
+  btn.setAttribute('aria-label', mode === 'scroll' ? '下へ' : '次へ');
 }
-
-function burst(btn) {
-  var r = document.createElement('span');
-  r.className = 'nb-burst';
-  btn.appendChild(r);
-  setTimeout(function () { r.remove(); }, 750);
-}
-for (var b = 0; b < btns.length; b++) {
-  btns[b].addEventListener('click', function () { burst(this); go(cur + 1); });
-}
-
+btn.addEventListener('click', function () { go(cur + 1); });
 /* a swipe across the screen still works, as in the app */
 var sx = null, sy = 0;
-document.getElementById('stage').addEventListener('pointerdown', function (e) {
+stage.addEventListener('pointerdown', function (e) {
   if (e.target.closest('.nb')) return;
   sx = e.clientX; sy = e.clientY;
 });
@@ -5450,21 +5506,135 @@ window.addEventListener('pointerup', function (e) {
   }
 });
 
-/* the chooser: A, B, C or D (also kept in the address, e.g. bamboo.html#c) */
-var pick = document.getElementById('nbPick');
+/* ---------- the glass lens ----------
+   A map the size of the button: inside a band along the rim, each
+   point is shifted outward, more so nearer the edge, so the scene
+   behind bends round the rim as through thick glass. */
+function buildLens() {
+  var w = Math.round(glass.offsetWidth), h = Math.round(glass.offsetHeight);
+  if (!w || !h) return;
+  var r = Math.min(h / 2, w / 2, parseFloat(getComputedStyle(glass).borderTopLeftRadius) || h / 2);
+  var band = Math.min(r, 14);
+  var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  var g = cv.getContext('2d'), img = g.createImageData(w, h), d = img.data;
+  function sdf(px, py) {           // distance from the rounded edge (negative inside)
+    var qx = Math.abs(px - w / 2) - (w / 2 - r), qy = Math.abs(py - h / 2) - (h / 2 - r);
+    return Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - r;
+  }
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var px = x + 0.5, py = y + 0.5, sd = sdf(px, py), o = (y * w + x) * 4, dx = 0, dy = 0;
+    if (sd < 0 && -sd < band) {
+      var nx = sdf(px + 0.5, py) - sdf(px - 0.5, py), ny = sdf(px, py + 0.5) - sdf(px, py - 0.5);
+      var l = Math.hypot(nx, ny) || 1, t = 1 - (-sd) / band, m = t * t;
+      dx = nx / l * m; dy = ny / l * m;
+    }
+    d[o] = 128 + dx * 127; d[o + 1] = 128 + dy * 127; d[o + 2] = 128; d[o + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+  var fe = document.getElementById('nbLensMap');
+  fe.setAttribute('href', cv.toDataURL());
+  fe.setAttributeNS('http://www.w3.org/1999/xlink', 'xlink:href', cv.toDataURL());
+}
+
+/* ---------- the panel ---------- */
+var sp = document.getElementById('sp');
+document.getElementById('spToggle').addEventListener('click', function () {
+  this.textContent = sp.classList.toggle('closed') ? 'Show' : 'Hide';
+});
+var host = document.getElementById('spCtls'), replay = 0;
+function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(c.step < 0.01 ? 3 : 2); }
+function buildCtls() {
+  host.innerHTML = '';
+  CTLS.forEach(function (c) {
+    if (c.group) { var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh); }
+    var wrap = document.createElement('div'); wrap.className = 'sp-ctl';
+    var lab = document.createElement('label'); lab.textContent = c.label;
+    var val = document.createElement('span'); val.textContent = fmt(c, S[c.k]); lab.appendChild(val);
+    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = S[c.k];
+    inp.addEventListener('input', function () {
+      S[c.k] = parseFloat(inp.value); val.textContent = fmt(c, S[c.k]); save();
+      if (c.k === 'gap') { place(); return; }
+      drawCurve();
+      clearTimeout(replay); replay = setTimeout(play, 350);       // try it straight away
+    });
+    wrap.appendChild(lab); wrap.appendChild(inp);
+    if (c.note) { var n = document.createElement('small'); n.textContent = c.note; wrap.appendChild(n); }
+    host.appendChild(wrap);
+  });
+  drawCurve();
+}
+/* the movement drawn as a line: across = time, up and down = offset */
+function drawCurve() {
+  var cv = document.getElementById('spCurve'), pr = window.devicePixelRatio || 1;
+  var w = cv.clientWidth, h = cv.clientHeight;
+  cv.width = w * pr; cv.height = h * pr;
+  var g = cv.getContext('2d'); g.scale(pr, pr);
+  var p = simulate(), max = 1;
+  p.forEach(function (q) { max = Math.max(max, Math.abs(q[0])); });
+  var mid = h / 2, sy = (h / 2 - 8) / max, sx = (w - 16) / p.length;
+  g.strokeStyle = 'rgba(60, 60, 67, 0.25)'; g.lineWidth = 1;
+  g.beginPath(); g.moveTo(8, mid); g.lineTo(w - 8, mid); g.stroke();
+  g.strokeStyle = '#E66826'; g.lineWidth = 2; g.lineJoin = 'round';
+  g.beginPath();
+  p.forEach(function (q, i) { var X = 8 + i * sx, Y = mid - q[0] * sy; i ? g.lineTo(X, Y) : g.moveTo(X, Y); });
+  g.stroke();
+  var secs = (p.length / 240).toFixed(2), swings = 0;
+  for (var i = 1; i < p.length; i++) if (p[i][2] === 'spring' && p[i - 1][0] * p[i][0] < 0) swings++;
+  document.getElementById('spZeta').textContent = 'Lasts ' + secs + ' s · crosses the rest point ' + swings + ' times';
+}
+document.getElementById('spPlay').addEventListener('click', play);
+document.getElementById('spReset').addEventListener('click', function () {
+  for (var k in DEF) S[k] = DEF[k];
+  save(); buildCtls(); play();
+});
+document.getElementById('spCopy').addEventListener('click', function () {
+  var look = demo.getAttribute('data-look'), arrow = demo.getAttribute('data-arrow');
+  var text = 'Button look: ' + look + ', arrow ' + arrow + '\nSpring: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, S[c.k]); }).join(', ') +
+             '\n' + JSON.stringify({ look: look, arrow: arrow, spring: S });
+  var out = document.getElementById('spOut');
+  out.textContent = text; out.classList.add('shown');
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
+});
+
+/* the look: clear, tint, disc, orb or plain (also kept in the address, e.g. bamboo.html#orb) */
+var LOOKS = ['clear', 'tint', 'disc', 'orb', 'plain'];
+var seg = document.getElementById('spLook');
 function choose(s) {
-  if (!/^[abcd]$/.test(s)) s = 'a';
-  demo.setAttribute('data-style', s);
-  var all = pick.querySelectorAll('button');
+  if (LOOKS.indexOf(s) < 0) s = 'plain';
+  demo.setAttribute('data-look', s);
+  var all = seg.querySelectorAll('button');
   for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-s') === s);
   try { history.replaceState(null, '', '#' + s); } catch (e) {}
+  buildLens();
 }
-pick.addEventListener('click', function (e) {
+seg.addEventListener('click', function (e) {
   var b = e.target.closest('button');
-  if (b) choose(b.getAttribute('data-s'));
+  if (b) { choose(b.getAttribute('data-s')); play(); }
 });
-choose(location.hash.slice(1));
+
+var arrowSeg = document.getElementById('spArrow');
+function chooseArrow(a) {
+  if (a !== 'left') a = 'right';
+  demo.setAttribute('data-arrow', a);
+  var all = arrowSeg.querySelectorAll('button');
+  for (var i = 0; i < all.length; i++) all[i].classList.toggle('on', all[i].getAttribute('data-a') === a);
+  try { localStorage.setItem('nbArrow2', a); } catch (e) {}
+  buildLens();
+}
+arrowSeg.addEventListener('click', function (e) {
+  var b = e.target.closest('button');
+  if (b) { chooseArrow(b.getAttribute('data-a')); play(); }
+});
+var savedArrow = 'right';
+try { savedArrow = localStorage.getItem('nbArrow2') || 'right'; } catch (e) {}
+chooseArrow(savedArrow);
+choose(location.hash.slice(1) || 'plain');
 go(0);
+buildCtls();
+place();
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { place(); buildLens(); });
+window.addEventListener('resize', function () { setTimeout(function () { place(); buildLens(); }, 250); });
+timer = setTimeout(play, 1200);
 })();
 </script>
 </body>

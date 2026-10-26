@@ -4754,14 +4754,14 @@ function repositionHintGroup() {
   if (currentTheme === 'autumn') {
     var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
     dotsBottom += lift; hintBottom += lift;
-    // The hint and the dots then move up together, as one group, so the hint
-    // sits just under the longest message (about 40px below it), in the open
-    // sky above the torii.
-    var hintUnderText = stageHeight - textBottom - 40 - 22;
+    // The button and the dots then move up together, as one group, so the
+    // button sits just under the longest message (18px below it, the button
+    // is 32px tall), in the open sky above the torii.
+    var hintUnderText = stageHeight - textBottom - 18 - 32;
     hintBottom = hintUnderText;
-    // The dots travel with the hint as one group, keeping their usual gap
-    // (24px) under it.
-    dotsBottom = hintBottom - spaceBetween - dotsH;
+    // The dots travel with the button as one group, 7px under it (the dots
+    // are 6px).
+    dotsBottom = hintBottom - 7 - 6;
     if (dotsBottom < 0) { hintBottom -= dotsBottom; dotsBottom = 0; }
   }
   // Winter: clear of the snowdrift (as placed on winter.html: dots at least 140px up, hint 208px).
@@ -5559,6 +5559,7 @@ function returnToStartScreen() {
   startPondLife();
   /* back at the start: the next pass through the app gets its hints again */
   if (Hints) { Hints.reset(); Hints.onStartScreen(); }
+  NavSpring && NavSpring.reset();
 }
 
 function updateGlobalHint() {
@@ -5597,6 +5598,7 @@ function goToPanel(index, noGust) {
     gustWind(KEYBOARD_GUST * dir);
   }
   currentPanel = newPanel;
+  NavSpring && NavSpring.panelChanged('msg', currentPanel);
   track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
   for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
   activatePanel(currentPanel);
@@ -7592,6 +7594,7 @@ function confirmName() {
   }
   nameConfirmed = true;
   Hints && Hints.reset();
+  NavSpring && NavSpring.reset();
 
   therapistDisplayName = entered + 'さん';
   confirmedTipAmount = getTipValue();
@@ -9175,7 +9178,7 @@ function updateBlossomGreeting() {
 
 function fetchNagoyaWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
-            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation' +
+            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation,relative_humidity_2m' +
             '&wind_speed_unit=ms&models=jma_seamless&timezone=Asia%2FTokyo';
   fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (!data || !data.current) return;
@@ -9300,7 +9303,7 @@ var tyRefWidth = Math.min(window.innerWidth, 600);
 var tyExited = false;
 
 /* Autumn: the thank-you swipe hint and its dots (moved together) sit just under the longest of the four
-   screens' text (about 40px below it), clear of the torii and lanterns. In
+   screens' text (18px below it), clear of the torii and lanterns. In
    the other themes the stylesheet position applies. */
 function repositionTySwipeHint() {
   if (!tySwipeHint || !thankyouScreen) return;
@@ -9318,16 +9321,16 @@ function repositionTySwipeHint() {
     if (b > lowest) lowest = b;
   }
   if (lowest <= 0) return;
-  var tyHintBottom = Math.max(0, screenRect.height - lowest - 40 - 22);
+  var tyHintBottom = Math.max(0, screenRect.height - lowest - 18 - 32);
   tySwipeHint.style.bottom = tyHintBottom + 'px';
-  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 24 - 10) + 'px';
+  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 7 - 6) + 'px';
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
   repositionTySwipeHint();
   if (tyExited) { tySwipeHint.classList.remove('shown'); return; }
-  if (tyCurrentPanel === TY_TOTAL_PANELS - 1) tySwipeHintLabel.textContent = 'もう一度スワイプ';
-  else tySwipeHintLabel.textContent = 'スワイプ';
+  if (tyCurrentPanel === TY_TOTAL_PANELS - 1) tySwipeHintLabel.textContent = 'もう一度左にスワイプ';
+  else tySwipeHintLabel.textContent = '左にスワイプ';
   tySwipeHint.classList.add('shown');
 }
 /* Panel-1 content is derived from the live receipt DOM at paint
@@ -9391,6 +9394,7 @@ function activateTyPanel(index) {
 function goToTyPanel(index) {
   var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
   tyCurrentPanel = clamped;
+  NavSpring && NavSpring.panelChanged('ty', tyCurrentPanel);
   tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
   for (var i = 0; i < tyDots.length; i++) tyDots[i].classList.toggle('active', i === tyCurrentPanel);
   activateTyPanel(tyCurrentPanel);
@@ -10625,6 +10629,7 @@ function startThankyouSequence() {
   GameWindow.newVisit();                 /* the top score is for this visit only */
   tyReceiptBtn.classList.add('shown');
   tyCurrentPanel = 0;
+  NavSpring && NavSpring.reset('ty');
   tyTrack.style.transform = 'translateX(0%)';
   for (var i = 0; i < tyDots.length; i++) tyDots[i].classList.toggle('active', i === 0);
   activateTyPanel(0);
@@ -10756,7 +10761,7 @@ function tokyoNow() {
 var S = {
   hour: 12, date: '2026-01-01',
   condition: 'clear', windSpeed: 2.5, windDir: 300, gustiness: 0.35,
-  temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
+  temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0, humidity: 75,
   density: 0.4, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
   shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
   speciesMode: 'koyo', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
@@ -11727,64 +11732,370 @@ function makeSprites() {
   sp.fillRect(0, 0, 32, 32);
 }
 
+/* Rain like the Samsung Weather app: long thin glassy streaks that fall
+   almost straight down, very fast. Each streak is a soft white line that
+   fades in from its tail and is brightest just above its tip, with a faint
+   cool-grey edge so it still shows on the pale page. Streaks are drawn from
+   three pre-made sprites (far, middle, near), stretched to each length. */
+var RAIN_TIERS = [
+  { w: 1.0, halo: 2.2, core: 0.75, edge: 0.14 },   // far: hair-thin, faint
+  { w: 1.4, halo: 3.0, core: 0.9,  edge: 0.2 },
+  { w: 1.9, halo: 3.8, core: 1.0,  edge: 0.26 }    // near: a little wider, brighter
+];
+var rainSprites = [], rainSpritePR = 0;
+function makeRainSprites() {
+  rainSpritePR = PR;
+  rainSprites = RAIN_TIERS.map(function(tr) {
+    var c = document.createElement('canvas');
+    var hw = Math.ceil(tr.halo * 2 * PR) + 4, h = 128;
+    c.width = hw; c.height = h;
+    var x = c.getContext('2d'), mid = hw / 2;
+    // the cool-grey edge, a soft wide line under the white
+    var ge = x.createLinearGradient(0, 0, 0, h);
+    ge.addColorStop(0, 'rgba(90,108,132,0)');
+    ge.addColorStop(0.55, 'rgba(90,108,132,' + (tr.edge * 0.6) + ')');
+    ge.addColorStop(0.9, 'rgba(90,108,132,' + tr.edge + ')');
+    ge.addColorStop(1, 'rgba(90,108,132,0)');
+    x.fillStyle = ge;
+    if (HAS_FILTER) x.filter = 'blur(' + (0.8 * PR).toFixed(1) + 'px)';
+    x.fillRect(mid - tr.halo * PR / 2, 2, tr.halo * PR, h - 4);
+    x.filter = 'none';
+    // the white core: clear at the tail, brightest just above the tip
+    var gc = x.createLinearGradient(0, 0, 0, h);
+    gc.addColorStop(0, 'rgba(255,255,255,0)');
+    gc.addColorStop(0.45, 'rgba(255,255,255,' + (tr.core * 0.45) + ')');
+    gc.addColorStop(0.88, 'rgba(255,255,255,' + tr.core + ')');
+    gc.addColorStop(1, 'rgba(255,255,255,0.2)');
+    x.fillStyle = gc;
+    x.fillRect(mid - tr.w * PR / 2, 0, tr.w * PR, h);
+    return c;
+  });
+}
+function rainTier(z) { return z < 0.45 ? 0 : (z < 0.75 ? 1 : 2); }
+function newStreak(s, top) {
+  s.z = Math.pow(Math.random(), 0.8) * 0.8 + 0.2;
+  s.a = rnd(0.45, 1);                                  // some streaks bright, many faint
+  s.len = (22 + 70 * s.z) * rnd(0.7, 1.3);
+  s.x = Math.random() * (W + 200) - 100;
+  s.y = top ? -s.len - Math.random() * H * 0.4 : Math.random() * H;
+  s.age = top ? 0 : 1;
+  return s;
+}
+
 function updateRain(dt) {
   var c = S.condition;
   var drizzle = c === 'drizzle';
   var target = 0;
-  if (ENV.rainy) target = drizzle ? 110 * S.rainStreaks : Math.min(450, (40 + S.rainMm * 30) * S.rainStreaks);
+  if (ENV.rainy) target = drizzle ? 90 * S.rainStreaks : Math.min(320, (70 + S.rainMm * 25) * S.rainStreaks);
   target = Math.round(target);
-  while (streaks.length < target) {
-    var z = rnd(0.2, 1);
-    streaks.push({ x: Math.random() * W, y: Math.random() * H, z: z });
-  }
+  while (streaks.length < target) streaks.push(newStreak({}, false));
   if (streaks.length > target) streaks.length = target;
-  var vx = ENV.windPx * 2.5;
+  var vx = ENV.windPx * 1.2;
   for (var i = 0; i < streaks.length; i++) {
     var s = streaks[i];
-    var spd = (700 + 600 * s.z) * (drizzle ? 0.6 : 1);
+    var spd = (1100 + 1200 * s.z) * (drizzle ? 0.55 : 1);
     s.y += spd * dt;
     s.x += vx * dt;
-    if (s.y > H) {
-      if (S.splashes && s.z > 0.6 && Math.random() < 0.5) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
-      s.y = -30 - Math.random() * 60;
-      s.x = Math.random() * (W + 200) - 100 - vx * 0.5;
+    s.age += dt;
+    if (s.y - s.len > H) {
+      if (S.splashes && s.z > 0.6 && Math.random() < 0.35) splashes.push({ x: s.x, y: H - 4 - Math.random() * 24, t: 0, z: s.z });
+      newStreak(s, true);
+      s.x -= vx * 0.5;
     }
     if (s.x < -100) s.x += W + 200;
     if (s.x > W + 100) s.x -= W + 200;
   }
   for (var j = splashes.length - 1; j >= 0; j--) {
     splashes[j].t += dt;
-    if (splashes[j].t > 0.35) splashes.splice(j, 1);
+    if (splashes[j].t > 0.3) splashes.splice(j, 1);
   }
 }
 function drawRain(ctx) {
   if (!streaks.length && !splashes.length) return;
+  if (rainSpritePR !== PR || !rainSprites.length) makeRainSprites();
   var drizzle = S.condition === 'drizzle';
-  var lenMul = (drizzle ? 0.75 : 1) * (1 + S.rainMm / 10);
-  var ang = Math.atan2(700, ENV.windPx * 2.5);
-  var cx = Math.cos(ang), cy = Math.sin(ang);
-  for (var pass = 0; pass < 2; pass++) {
-    ctx.beginPath();
+  var lenMul = (drizzle ? 0.6 : 1) * (1 + S.rainMm / 20);
+  var aMul = (drizzle ? 0.7 : 1) * Math.min(1.5, S.rainContrast);
+  // the slight lean in the wind: a shear, so each sprite stays one drawImage
+  var lean = -ENV.windPx * 1.2 / 1700;
+  ctx.setTransform(PR, 0, lean * PR, PR, 0, 0);
+  for (var tier = 0; tier < 3; tier++) {
+    var spr = rainSprites[tier], sw = spr.width / PR;
     for (var i = 0; i < streaks.length; i++) {
       var s = streaks[i];
-      if ((s.z >= 0.6) !== (pass === 1)) continue;
-      var len = (10 + 18 * s.z) * lenMul;
-      ctx.moveTo(s.x, s.y);
-      ctx.lineTo(s.x - cx * len, s.y - cy * len);
+      if (rainTier(s.z) !== tier) continue;
+      var len = s.len * lenMul;
+      ctx.globalAlpha = Math.min(1, s.a * aMul * Math.min(1, s.age / 0.06));
+      ctx.drawImage(spr, s.x - lean * s.y - sw / 2, s.y - len, sw, len);
     }
-    // Dark plum-grey streaks: pale rain vanished on the silk-white page.
-    var ra = pass === 0 ? (drizzle ? 0.16 : 0.22) : (drizzle ? 0.26 : 0.38);
-    ctx.strokeStyle = rgba([70, 60, 95], ra * S.rainContrast);
-    ctx.lineWidth = pass === 0 ? (drizzle ? 0.8 : 1.0) : (drizzle ? 1.1 : 1.5);
+  }
+  ctx.globalAlpha = 1;
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  // tiny pale splashes where near drops land
+  ctx.lineWidth = 0.8;
+  for (var j = 0; j < splashes.length; j++) {
+    var sp = splashes[j], k = sp.t / 0.3, r = (5 + 4 * sp.z) * k;
+    ctx.strokeStyle = rgba([255, 255, 255], 0.7 * (1 - k) * aMul);
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y, r, r * 0.3, 0, 0, TAU);
+    ctx.stroke();
+    ctx.strokeStyle = rgba([90, 108, 132], 0.18 * (1 - k) * aMul);
+    ctx.beginPath();
+    ctx.ellipse(sp.x, sp.y + 0.8, r, r * 0.3, 0, 0, TAU);
     ctx.stroke();
   }
-  ctx.lineWidth = 0.9;
-  for (var j = 0; j < splashes.length; j++) {
-    var sp = splashes[j], k = sp.t / 0.35, r = (7 + 5 * sp.z) * k;
-    ctx.strokeStyle = rgba([70, 60, 95], 0.5 * (1 - k) * S.rainContrast);
-    ctx.beginPath();
-    ctx.ellipse(sp.x, sp.y, r, r * 0.35, 0, 0, TAU);
-    ctx.stroke();
+}
+
+/* Rain on the glass toolbar (#barRain). Raindrops hit the pane with a
+   small splash and leave a drop behind, plus a few tiny droplets thrown
+   out from the splash. Drops that touch join into one. A drop wider than
+   about 1.3mm (radius) can no longer hold on and runs down,
+   leaving a wet trail and a line of tiny droplets; at the bottom edge it
+   hangs, and once it is heavy enough it drips off. Everything else dries.
+
+   The timings follow real water on glass, with the pane at a scale of
+   1px = 0.2mm:
+     - how often drops land: the rain rate (mm/h) turned into raindrops
+       per square metre per second, over the pane's area;
+     - evaporation: a drop's radius² shrinks at a steady rate that depends
+       on the temperature, the humidity and the wind. While it rains the
+       air at the glass is saturated, so nothing dries. Afterwards a tiny
+       droplet is gone in a minute or two and a big drop lingers for
+       twenty minutes or more (longer on a humid, still day);
+     - running drops move at a few cm/s, faster the bigger they are.
+   Drying uses the real clock, so drops keep drying while the scene is
+   paused. */
+var GLASS_MM = 0.2;                        // mm of glass per CSS px
+var GLASS_HANG = 36;                       // px of canvas under the pane, for hanging drops
+var glassCv = document.getElementById('barRain');
+var glassCtx = glassCv ? glassCv.getContext('2d') : null;
+var gDrops = [], gSplats = [], gTrails = [];
+var gW = 0, gPaneH = 0, gSizeT = 0, gImpactAcc = 0, gWallMs = 0, gDrawn = false;
+var gSpr = null, gSprPR = 0;
+
+function gSatVapour(T) {                   // water vapour at saturation, kg/m³ (Magnus)
+  return 611.2 * Math.exp(17.62 * T / (243.12 + T)) / (461.5 * (T + 273.15));
+}
+/* how fast a drop's radius² shrinks, in px²/s */
+function gEvapRate() {
+  var T = S.temperature, rh = clamp((S.humidity || 75) / 100, 0, 1);
+  if (ENV.rainy) rh = Math.max(rh, 0.995);
+  var D = 2.5e-5 * Math.pow((T + 273.15) / 293.15, 1.75);       // vapour diffusion in air, m²/s
+  var flow = 1 + 1.7 * Math.sqrt(Math.max(0, S.windSpeed));        // wind carries the damp air away
+  var k = 2 * D * gSatVapour(T) * (1 - rh) / 1000 * 1.5 * flow;   // m²/s (×1.5: flat drops on glass)
+  var px = GLASS_MM / 1000;
+  return k / (px * px);
+}
+function gVol(r) { return r * r * r; }
+function gAddDrop(x, y, r) {
+  var d = { x: x, y: y, r: r, vy: 0, vx: 0, run: false, hang: false, trailAt: y, wob: rnd(0, TAU) };
+  gMerge(d);
+  gDrops.push(d);
+  return d;
+}
+/* join every drop that touches d into d */
+function gMerge(d) {
+  for (var i = gDrops.length - 1; i >= 0; i--) {
+    var o = gDrops[i];
+    if (o === d || o.drip) continue;
+    var dx = o.x - d.x, dy = o.y - d.y, rr = (o.r + d.r) * 0.85;
+    if (dx * dx + dy * dy > rr * rr) continue;
+    var v1 = gVol(d.r), v2 = gVol(o.r), v = v1 + v2;
+    d.x = (d.x * v1 + o.x * v2) / v;
+    if (!o.hang) d.y = (d.y * v1 + o.y * v2) / v;
+    d.r = Math.cbrt(v);
+    d.hang = d.hang || o.hang;
+    if (d.hang) d.y = gPaneH;
+    if (o.run && !d.run) { d.run = true; d.vy = o.vy; d.trailAt = d.y; }
+    gDrops.splice(i, 1);
+  }
+}
+/* one raindrop hitting the pane: diameter in mm */
+function gImpact(dmm) {
+  var x = Math.random() * gW, y = Math.random() * (gPaneH - 4) + 2;
+  var r = dmm / 2 * 0.84 * 1.4 / GLASS_MM;          // 60% stays and spreads out on the glass
+  if (gDrops.length < 600) gAddDrop(x, y, r);
+  if (dmm > 0.9) {                                    // big drops splash
+    gSplats.push({ x: x, y: y, r: r, t: 0 });
+    var n = Math.round(dmm * 2.5 * Math.random());
+    for (var i = 0; i < n && gDrops.length < 600; i++) {
+      var a = rnd(-0.2, Math.PI + 0.2) + (Math.random() < 0.3 ? Math.PI : 0), dist = r * rnd(1.8, 4.5);
+      var sx = x + Math.cos(a) * dist, sy = y + Math.sin(a) * dist * 0.8;
+      if (sy > 1 && sy < gPaneH - 1) gAddDrop(sx, sy, rnd(0.1, 0.3) / GLASS_MM);
+    }
+  }
+}
+function gSizeCanvas() {
+  if (!glassCv) return;
+  var w = glassCv.clientWidth, h = glassCv.clientHeight;
+  if (w < 1 || h < 1) return;
+  var pane = h - GLASS_HANG;
+  if (gW && (w !== gW || Math.abs(pane - gPaneH) > 0.5)) {        // the pane changed size: keep drops on it
+    for (var i = gDrops.length - 1; i >= 0; i--) {
+      var d = gDrops[i];
+      if (d.x > w) { gDrops.splice(i, 1); continue; }
+      if (d.hang) d.y = pane; else if (d.y > pane - 1) d.y = pane - 1;
+    }
+  }
+  gW = w; gPaneH = pane;
+  if (glassCv.width !== Math.round(w * PR) || glassCv.height !== Math.round(h * PR)) {
+    glassCv.width = Math.round(w * PR); glassCv.height = Math.round(h * PR);
+    gDrawn = true;                                   // resized canvas: draw again
+  }
+}
+
+function updateGlassRain(dt) {
+  if (!glassCtx) return;
+  gSizeT -= dt;
+  if (gSizeT <= 0) { gSizeCanvas(); gSizeT = 0.5; }
+  if (!gW || gPaneH < 10) return;
+  var now = Date.now(), wall = gWallMs ? Math.min(3600, Math.max(0, (now - gWallMs) / 1000)) : 0;
+  gWallMs = now;
+
+  // raindrops landing
+  if (ENV.rainy && S.condition !== 'snow') {
+    var drizzle = S.condition === 'drizzle';
+    // light rain would leave a few specks nobody can see on a tablet: the pane counts it as at least 1.5 (drizzle) or 3 (rain) mm/h
+    var R = Math.max(S.rainMm, drizzle ? 1.5 : 3);                    // mm/h
+    var dMean = drizzle ? 0.8 : Math.min(2.6, 1.3 + 0.06 * R);        // mm
+    var vol = Math.PI / 6 * dMean * dMean * dMean;                    // mm³
+    var area = (gW * GLASS_MM / 1000) * (gPaneH * GLASS_MM / 1000);    // m²
+    var exposure = 0.7 + 0.6 * Math.min(1, Math.abs(S.windSpeed) / 6.5);   // the slanting rain that reaches the pane
+    gImpactAcc += R / 3600 * 1e6 / vol * area * exposure * dt;
+    while (gImpactAcc >= 1) {
+      gImpactAcc -= 1;
+      gImpact(drizzle ? rnd(0.5, 1.1) : clamp(0.5 - Math.log(1 - Math.random()) * (dMean - 0.5), 0.5, 4.5));
+    }
+  } else gImpactAcc = 0;
+
+  var evap = gEvapRate() * wall;
+  var runR = 1.3 / GLASS_MM;                        // a drop this wide (1.3mm radius) starts to run
+  var dripR = 1.8 / GLASS_MM;                       // a hanging drop this big drips off
+  var g = 9.81 * 1000 / GLASS_MM;                   // px/s²
+  for (var i = gDrops.length - 1; i >= 0; i--) {
+    var d = gDrops[i];
+    if (!d) continue;                               // merges removed drops further down the list
+    if (evap) {
+      var r2 = d.r * d.r - evap;
+      if (r2 < 0.09) { gDrops.splice(i, 1); continue; }
+      d.r = Math.sqrt(r2);
+    }
+    if (d.drip) {                                   // falling away under the pane
+      d.vy += g * dt; d.y += d.vy * dt;
+      if (d.y - d.r > gPaneH + GLASS_HANG) gDrops.splice(i, 1);
+      continue;
+    }
+    if (d.hang) {
+      if (d.r > dripR) {                            // too heavy: it lets go and a small drop stays
+        var keep = d.r * 0.55;
+        d.r = Math.cbrt(gVol(d.r) - gVol(keep));
+        d.drip = true; d.hang = false; d.vy = 40;
+        gDrops.push({ x: d.x, y: gPaneH, r: keep, vy: 0, vx: 0, run: false, hang: true, wob: 0 });
+      }
+      continue;
+    }
+    if (!d.run && d.r > runR) { d.run = true; d.vy = 0; d.trailAt = d.y; }
+    if (d.run) {
+      // a few cm/s, faster for bigger drops; it wanders a little and the wind pushes it
+      var vT = (12 + 40 * (d.r / runR - 1)) / GLASS_MM;
+      vT = Math.min(vT, 150 / GLASS_MM);
+      d.wob += dt * rnd(2, 5);
+      d.vy += (vT * (0.7 + 0.3 * Math.sin(d.wob * 1.7)) - d.vy) * Math.min(1, dt * 6);
+      d.vx = Math.sin(d.wob) * 6 + ENV.windPx * 0.15;
+      var y0 = d.y, x0 = d.x;
+      d.y += d.vy * dt; d.x += d.vx * dt;
+      gTrails.push({ x1: x0, y1: y0, x2: d.x, y2: d.y, w: d.r * 0.5, t: 0 });
+      // it leaves a line of tiny droplets behind
+      if (d.y - d.trailAt > rnd(5, 12)) {
+        d.trailAt = d.y;
+        var tr = d.r * rnd(0.12, 0.22);
+        d.r = Math.cbrt(gVol(d.r) - gVol(tr));
+        gDrops.push({ x: x0 + rnd(-0.5, 0.5), y: y0, r: tr, vy: 0, vx: 0, run: false, hang: false, wob: 0 });
+      }
+      gMerge(d);
+      if (d.r < runR * 0.75) { d.run = false; d.vy = 0; }        // too small now: it sticks again
+      if (d.y + d.r * 0.3 >= gPaneH) {              // reached the bottom edge: it hangs there
+        d.run = false; d.hang = true; d.y = gPaneH; d.vy = 0;
+        gMerge(d);
+      }
+      if (d.x < -10 || d.x > gW + 10) { gDrops.splice(gDrops.indexOf(d), 1); continue; }
+    }
+  }
+  for (var j = gSplats.length - 1; j >= 0; j--) { gSplats[j].t += dt; if (gSplats[j].t > 0.12) gSplats.splice(j, 1); }
+  for (var k = gTrails.length - 1; k >= 0; k--) { gTrails[k].t += dt; if (gTrails[k].t > 2.5) gTrails.splice(k, 1); }
+}
+
+/* One drop, drawn once large and stretched to size: a clear lens of
+   water. The glass behind it shows through upside down, so the drop is
+   dark along its top edge and bright low down, with a small glint near
+   the top and a faint shadow below. */
+function gMakeSprite() {
+  gSprPR = PR;
+  var c = document.createElement('canvas'), n = 64, m = n / 2, R = 24;
+  c.width = c.height = n;
+  var x = c.getContext('2d');
+  // the faint shadow it casts on the frosted glass
+  var sh = x.createRadialGradient(m + 1.5, m + 3, R * 0.6, m + 1.5, m + 3, R * 1.15);
+  sh.addColorStop(0, 'rgba(60,70,85,0.16)'); sh.addColorStop(1, 'rgba(60,70,85,0)');
+  x.fillStyle = sh; x.fillRect(0, 0, n, n);
+  // the body: clearer in the middle, darker at the top edge
+  var b = x.createRadialGradient(m, m + R * 0.25, R * 0.2, m, m, R);
+  b.addColorStop(0, 'rgba(255,255,255,0.28)');
+  b.addColorStop(0.7, 'rgba(225,232,240,0.22)');
+  b.addColorStop(1, 'rgba(70,85,105,0.65)');
+  x.fillStyle = b; x.beginPath(); x.arc(m, m, R, 0, TAU); x.fill();
+  var top = x.createLinearGradient(0, m - R, 0, m + R);
+  top.addColorStop(0, 'rgba(55,68,88,0.45)'); top.addColorStop(0.45, 'rgba(55,68,88,0)');
+  x.fillStyle = top; x.beginPath(); x.arc(m, m, R, 0, TAU); x.fill();
+  // the bright low crescent, where light comes through the lens
+  var lo = x.createRadialGradient(m, m + R * 0.55, 0, m, m + R * 0.55, R * 0.7);
+  lo.addColorStop(0, 'rgba(255,255,255,0.75)'); lo.addColorStop(1, 'rgba(255,255,255,0)');
+  x.save(); x.beginPath(); x.arc(m, m, R * 0.92, 0, TAU); x.clip();
+  x.fillStyle = lo; x.fillRect(0, 0, n, n); x.restore();
+  // the glint
+  var gl = x.createRadialGradient(m - R * 0.35, m - R * 0.45, 0, m - R * 0.35, m - R * 0.45, R * 0.28);
+  gl.addColorStop(0, 'rgba(255,255,255,0.95)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gl; x.fillRect(0, 0, n, n);
+  gSpr = c;
+}
+function drawGlassRain() {
+  if (!glassCtx || !gW) return;
+  if (!gDrops.length && !gSplats.length && !gTrails.length) {
+    if (gDrawn) { glassCtx.setTransform(1, 0, 0, 1, 0, 0); glassCtx.clearRect(0, 0, glassCv.width, glassCv.height); gDrawn = false; }
+    return;
+  }
+  if (!gSpr || gSprPR !== PR) gMakeSprite();
+  var x = glassCtx;
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  x.clearRect(0, 0, glassCv.width, glassCv.height);
+  x.setTransform(PR, 0, 0, PR, 0, 0);
+  gDrawn = true;
+  // wet trails: a thin film that breaks up and dries within a few seconds
+  x.lineCap = 'round';
+  for (var k = 0; k < gTrails.length; k++) {
+    var tr = gTrails[k], f = 1 - tr.t / 2.5;
+    x.strokeStyle = 'rgba(255,255,255,' + (0.3 * f).toFixed(3) + ')';
+    x.lineWidth = Math.max(0.6, tr.w * (0.6 + 0.4 * f));
+    x.beginPath(); x.moveTo(tr.x1, tr.y1); x.lineTo(tr.x2, tr.y2); x.stroke();
+  }
+  var s = 64 / 48;                                  // sprite size per drop diameter
+  for (var i = 0; i < gDrops.length; i++) {
+    var d = gDrops[i], w = d.r * 2 * s, h = w;
+    if (d.run) h *= 1 + Math.min(0.35, d.vy * GLASS_MM / 400);   // a running drop stretches
+    if (d.drip) h *= 1.6;
+    if (d.hang) h *= 1.15;                                         // hanging drops sag
+    x.globalAlpha = Math.min(1, d.r / 1.2);
+    x.drawImage(gSpr, d.x - w / 2, d.y - h / 2 - (d.run ? (h - w) * 0.3 : 0), w, h);
+  }
+  x.globalAlpha = 1;
+  // splashes: a quick bright ring as a raindrop bursts on the glass
+  x.lineWidth = 0.8;
+  for (var j = 0; j < gSplats.length; j++) {
+    var sp = gSplats[j], q = sp.t / 0.12, rr = sp.r * (1 + 2.2 * q);
+    x.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - q)).toFixed(3) + ')';
+    x.beginPath(); x.arc(sp.x, sp.y, rr, 0, TAU); x.stroke();
+    x.strokeStyle = 'rgba(70,85,105,' + (0.25 * (1 - q)).toFixed(3) + ')';
+    x.beginPath(); x.arc(sp.x, sp.y + 0.7, rr, 0, TAU); x.stroke();
   }
 }
 
@@ -18294,6 +18605,7 @@ function dynStep(dt, t, want, skyWant) {
     if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
   }
   updateRain(dt);
+  updateGlassRain(dt);
   updateSnow(dt, t);
   updateBirds(dt, t);
   updateSpecks(dt, t);
@@ -18336,6 +18648,7 @@ function dynStep(dt, t, want, skyWant) {
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'near');
   drawRain(ctx);
+  drawGlassRain();
   drawSpecks(ctx, t, false);
 
   var flashA = 0;
@@ -18466,6 +18779,7 @@ function onWeather(c) {
   }
   if (typeof c.cloud_cover === 'number') S.cloudCover = Math.round(c.cloud_cover / 5) * 5;
   if (typeof c.precipitation === 'number') S.rainMm = Math.round(c.precipitation * 5) / 5;
+  if (typeof c.relative_humidity_2m === 'number') S.humidity = c.relative_humidity_2m;
   S.fogDensity = S.condition === 'fog' ? 0.7 : 0;
   envTimer = 0;
 }
@@ -18905,33 +19219,13 @@ var Hints = (function () {
   }
 
   /* ---------- message pages ---------- */
-  function onPanelsReady() {
-    if (seenSwipe || currentPanel !== 0) return;
-    later(function () {
-      if (seenSwipe || currentPanel !== 0 || !globalHint || !globalHint.classList.contains('shown')) return;
-      seenSwipe = true;
-      show({ kind: 'swipe', hold: 2800, fadeAfter: true,
-        targets: [{ el: globalHintLayerSwipe, content: true, shape: 'box', pad: 16 }],
-        finger: { el: stage, kind: 'swipe', dy: 120 } });
-    }, 900);
-  }
+  /* The swipe and scroll lines are now a button that shows what to do by itself
+     (NavSpring below), so they no longer get an outline and a ghost finger. */
+  function onPanelsReady() { seenSwipe = true; }
   function onPanelChange(index) {
-    if (index !== 0) seenSwipe = true;
+    seenSwipe = true;
     if (opts && (opts.kind === 'swipe' || opts.kind === 'scroll')) clear(300);
-    if (index === totalPanels - 1 && !seenScroll) {
-      later(function () {
-        if (seenScroll || currentPanel !== totalPanels - 1 || (window.scrollY || 0) > 4) return;
-        seenScroll = true;
-        show({ kind: 'scroll', hold: 3400, fadeAfter: true,
-          targets: [{ el: globalHintLayerScroll, content: true, shape: 'box', pad: 14 }],
-          finger: { el: globalHintLayerScroll, kind: 'up', dy: -150 } });
-      }, 900);
-    }
   }
-  /* Once she starts scrolling, the scroll hint has done its job. */
-  window.addEventListener('scroll', function () {
-    if (opts && opts.kind === 'scroll' && (window.scrollY || 0) > 4) clear(300);
-  }, { passive: true });
 
   /* ---------- table: 6a, 6b, 6d one after another ---------- */
   function endSeq() { seq = 'T'; clearInterval(pollT); pollT = 0; }
@@ -19116,6 +19410,162 @@ var Hints = (function () {
   }
   for (var name in api) api[name] = safely(api[name]);
   return api;
+})();
+
+/* ============ NEXT / DOWN BUTTON ============
+   Tapping it does what the old line described: the next message, or down to
+   the table (and, on the thank-you screens, the next screen, or on to the games).
+   Every so often the button is drawn out the way its arrow points (right, or down
+   for the table) and let go on a spring, so the word and the arrow swing together
+   until they settle. These are the numbers chosen on bamboo.html.
+
+   When it bounces:
+   - the swipe button bounces on the first message until the therapist swipes
+     (the panel changes). It starts 5 seconds after all the text of the first
+     message has appeared, not before. On the later messages it waits quietly, and starts
+     bouncing again only after 10 seconds with no touch while she is still on that
+     message; the next swipe stops it again. The thank-you screens work the same way.
+   - the scroll button bounces until she scrolls, then stops for good. */
+var NavSpring = (function () {
+  var SET = { response: 0.2, damping: 0.05, pull: 11.5, pullTime: 300, kick: 180, pause: 0.9 };
+  var AFTER_TOUCH = 1400;                    // a touch anywhere holds the swing back this long (ms)
+  var QUIET = 10000;                         // no touch for this long on a later message: bounce again (ms)
+  var INTRO_WAIT = 5000;                     // the first message: bounce this long after all its text has appeared (ms)
+  var introPending = true, textReadyAt = 0;  // still on the first message, and when its text will have been up for INTRO_WAIT
+  var path = null, startT = 0, raf = 0, timer = 0, moving = null, movingBtn = null, down = false, lastTouch = -1e9;
+  var quietUntil = { msg: 0, ty: 0 };        // the swipe buttons stay still until this time
+  var lastIndex = { msg: 0, ty: 0 };
+  var scrolled = false;                      // she has scrolled: the scroll button is done
+
+  function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+  /* [offset, ...] every 1/240 s: drawn out, let go, then a damped spring until it stops. */
+  function simulate() {
+    var out = [], dt = 1 / 240, n = Math.round(SET.pullTime / 1000 / dt), i;
+    for (i = 1; i <= n; i++) out.push(-SET.pull * easeOut(i / n));
+    var w = 2 * Math.PI / SET.response, k = w * w, c = 2 * SET.damping * w;
+    var x = -SET.pull, v = SET.kick;
+    for (i = 0; i < 240 * 8; i++) {
+      v += (-k * x - c * v) * dt;
+      x += v * dt;
+      out.push(x);
+      if (Math.abs(x) < 0.03 && Math.abs(v) < 0.6) break;
+    }
+    out.push(0);
+    return out;
+  }
+  /* which rule a button follows */
+  function groupOf(btn) {
+    if (btn.id === 'tySwipeBtn') return 'ty';
+    return btn.getAttribute('data-dir') === 'down' ? 'scroll' : 'msg';
+  }
+  /* every phrase of the first message is on show (they fade in a few at a time) */
+  function firstTextShown() {
+    var list = document.querySelectorAll('.panel[data-panel="0"] .panel-phrase');
+    if (!list.length) return false;
+    for (var i = 0; i < list.length; i++) if (!list[i].classList.contains('shown')) return false;
+    return true;
+  }
+  function mayBounce(btn) {
+    var g = groupOf(btn), now = performance.now();
+    if (g === 'scroll') return !scrolled;
+    if (g === 'msg' && introPending) {
+      /* the last phrase takes PANEL_PHRASE_DURATION to fade in; the 5 seconds count from when it is fully up */
+      if (!firstTextShown()) { textReadyAt = 0; return false; }
+      if (!textReadyAt) textReadyAt = now + PANEL_PHRASE_DURATION + INTRO_WAIT;
+      return now >= textReadyAt;
+    }
+    return now >= quietUntil[g];
+  }
+  function stopSwing() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    if (moving) moving.style.transform = '';
+    moving = movingBtn = null;
+    clearTimeout(timer);
+    timer = setTimeout(play, 600);
+  }
+  /* the button that is on show right now, if any */
+  function visibleButton() {
+    var list = document.querySelectorAll('.nav-btn');
+    for (var i = 0; i < list.length; i++) {
+      var hint = list[i].closest('.action-hint'), layer = list[i].closest('.hint-layer');
+      if (!hint || !hint.classList.contains('shown')) continue;
+      if (layer && !layer.classList.contains('active')) continue;
+      if (list[i].offsetParent === null) continue;
+      return list[i];
+    }
+    return null;
+  }
+  function frame(now) {
+    var i = Math.max(0, Math.floor((now - startT) / 1000 * 240));
+    if (i >= path.length) {
+      moving.style.transform = ''; raf = 0; moving = null;
+      timer = setTimeout(play, Math.max(SET.pause * 1000, lastTouch + AFTER_TOUCH - now));
+      return;
+    }
+    var x = -path[i];                         // positive = the way the arrow points
+    moving.style.transform = down ? 'translateY(' + x.toFixed(2) + 'px)' : 'translateX(' + x.toFixed(2) + 'px)';
+    raf = requestAnimationFrame(frame);
+  }
+  function play() {
+    clearTimeout(timer); timer = 0;
+    var btn = visibleButton();
+    if (!btn || !mayBounce(btn)) { timer = setTimeout(play, 250); return; }      // nothing to bounce just now: look again shortly
+    movingBtn = btn;
+    moving = btn.querySelector('.nav-move');
+    down = btn.getAttribute('data-dir') === 'down';
+    path = simulate();
+    startT = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+  /* After a touch it waits a moment before the next swing. A swing already under way is
+     let finish, so the button never jumps away from the finger. */
+  window.addEventListener('pointerdown', function () {
+    var now = performance.now();
+    lastTouch = now;
+    /* on a later message, every touch starts the 10 seconds again */
+    for (var g in quietUntil) if (now < quietUntil[g]) quietUntil[g] = now + QUIET;
+    if (!raf) { clearTimeout(timer); timer = setTimeout(play, AFTER_TOUCH); }
+  }, true);
+  /* a swipe moves her on to another message: the bouncing stops, and waits 10 quiet seconds */
+  function panelChanged(group, index) {
+    if (index === lastIndex[group]) return;
+    lastIndex[group] = index;
+    if (group === 'msg') introPending = false;
+    quietUntil[group] = performance.now() + QUIET;
+    if (group === 'msg') scrolled = false;                    // the scroll button starts afresh on the last message
+    if (raf) stopSwing();
+  }
+  /* once she scrolls, the scroll button has done its job */
+  window.addEventListener('scroll', function () {
+    if (scrolled || (window.scrollY || window.pageYOffset || 0) <= 4) return;
+    var btn = visibleButton();
+    if (!btn || groupOf(btn) !== 'scroll') return;
+    scrolled = true;
+    if (raf) stopSwing();
+  }, { passive: true });
+  /* back at the start: everything bounces from the first message again */
+  function reset(which) {
+    if (!which || which === 'msg') { quietUntil.msg = 0; lastIndex.msg = 0; scrolled = false; introPending = true; textReadyAt = 0; }
+    if (!which || which === 'ty') { quietUntil.ty = 0; lastIndex.ty = 0; }
+  }
+  if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) timer = setTimeout(play, 1200);
+
+  /* what a tap does */
+  var swipeBtn = globalHintLayerSwipe && globalHintLayerSwipe.querySelector('.nav-btn');
+  var scrollBtn = globalHintLayerScroll && globalHintLayerScroll.querySelector('.nav-btn');
+  var tyBtn = document.getElementById('tySwipeBtn');
+  if (swipeBtn) swipeBtn.addEventListener('click', function () { goToPanel(currentPanel + 1); });
+  if (scrollBtn) scrollBtn.addEventListener('click', function () {
+    try { tableCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (e) { window.scrollTo(0, tableCard.getBoundingClientRect().top + (window.pageYOffset || 0) - 100); }
+  });
+  if (tyBtn) tyBtn.addEventListener('click', function () {
+    if (tyExited) return;
+    if (tyCurrentPanel === TY_TOTAL_PANELS - 1) exitTyToGames();
+    else goToTyPanel(tyCurrentPanel + 1);
+  });
+  return { play: play, panelChanged: panelChanged, reset: reset };
 })();
 
 updateGlobalHint();

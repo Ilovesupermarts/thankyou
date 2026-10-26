@@ -104,6 +104,8 @@
 <div class="info-bar" id="infoBar">
   <!-- The bending rim along the bottom of the glass pane (see #barGlass). -->
   <div class="bar-rim" aria-hidden="true"></div>
+  <!-- Rain on the glass: drops, splashes and runs (drawn by app.js). -->
+  <canvas class="bar-rain" id="barRain" aria-hidden="true"></canvas>
   <div class="info-inner">
     <div class="info-line" id="infoLine">
       <span class="city" id="infoCity">名古屋市</span>
@@ -437,14 +439,14 @@
 
   </div>
 
+  <!-- The next / down button (it replaces the swipe and scroll hint lines). The word
+       and the arrow swing together on a spring (NavSpring in app.js). -->
   <div class="action-hint global-hint" id="globalHint">
     <span class="hint-layer active" id="globalHintLayerSwipe">
-      <span>スワイプ</span>
-      <span class="hint-arrow right">→</span>
+      <button type="button" class="nav-btn" aria-label="次のメッセージへ"><span class="nav-move"><span>左にスワイプ</span><span class="nav-arrow" aria-hidden="true">▶︎▶︎</span></span></button>
     </span>
     <span class="hint-layer" id="globalHintLayerScroll">
-      <span class="hint-arrow down">↓</span>
-      <span>下へスクロールしてください</span>
+      <button type="button" class="nav-btn" data-dir="down" aria-label="下の表へ"><span class="nav-move"><span class="nav-arrow" aria-hidden="true">▼</span><span>上にスクロールしてください</span><span class="nav-arrow" aria-hidden="true">▼</span></span></button>
     </span>
   </div>
 
@@ -763,8 +765,7 @@
     </div>
 
     <div class="action-hint ty-swipe-hint" id="tySwipeHint">
-      <span id="tySwipeHintLabel">スワイプ</span>
-      <span class="hint-arrow right">→</span>
+      <button type="button" class="nav-btn" id="tySwipeBtn" aria-label="次へ"><span class="nav-move"><span id="tySwipeHintLabel">左にスワイプ</span><span class="nav-arrow" aria-hidden="true">▶︎▶︎</span></span></button>
     </div>
 
     <div class="ty-dots" id="tyDots">

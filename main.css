@@ -866,6 +866,18 @@
       linear-gradient(to right, transparent 0, #000 6px, #000 calc(100% - 6px), transparent 100%);
     mask-composite: intersect;
   }
+  /* Rain on the glass (#barRain, drawn by app.js): drops that land on the
+     pane, run down and drip off its bottom edge, or dry up. It sits on the
+     frosted pane, under the text, and reaches 36px below the pane so a
+     drop hanging from the edge can bulge out under it. */
+  .bar-rain {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+    height: calc(var(--pane-h) + 36px);
+    z-index: -1;
+    pointer-events: none;
+  }
   /* The bright bottom edge of the glass and the glow of its thickness, on
      their own layer above the music display and the 七十二候, so the line
      is unbroken across the screen and the wave's base tucks under it. */
@@ -1452,18 +1464,11 @@
   }
   html[data-theme="autumn"] .action-hint,
   html[data-theme="winter"] .action-hint { color: var(--text-med); }
-  .action-hint .hint-arrow { display: inline-block; color: var(--accent); font-size: 16px; line-height: 1; }
-  html[data-theme="autumn"] .action-hint .hint-arrow,
-  html[data-theme="winter"] .action-hint .hint-arrow { color: var(--accent); }
-  .action-hint .hint-arrow.right { animation: swipeArrow 2s ease-in-out infinite; }
-  .action-hint .hint-arrow.down { animation: gentleBounce 2s ease-in-out infinite; }
-  @keyframes swipeArrow { 0%, 100% { transform: translateX(0); opacity: 0.6; } 50% { transform: translateX(8px); opacity: 1; } }
-  @keyframes gentleBounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(6px); } }
 
   .action-hint.global-hint {
     position: absolute; left: 0; right: 0; bottom: 138px; margin-top: 0;
     z-index: 9; justify-content: center; opacity: 0; pointer-events: none;
-    transition: opacity 0.7s ease; min-height: 22px;
+    transition: opacity 0.7s ease; min-height: 32px;
   }
   .action-hint.global-hint.shown { opacity: 1; pointer-events: auto; }
   .action-hint.global-hint .hint-layer {
@@ -1472,6 +1477,34 @@
     opacity: 0; transition: opacity 0.55s ease; pointer-events: none;
   }
   .action-hint.global-hint .hint-layer.active { opacity: 1; }
+
+  /* ============ NEXT / DOWN BUTTON ============
+     Takes the place of the old swipe and scroll hint lines. A plain text
+     button: the word and a bold arrow, which swing together on a spring
+     (NavSpring in app.js). Tapping it does what the line used to describe:
+     the next message, or down to the table. */
+  .nav-btn {
+    display: inline-flex; align-items: center; justify-content: center; height: 32px; margin: 0; padding: 0 10px;
+    border: 0; background: none; cursor: pointer; pointer-events: none;
+    font-family: -apple-system, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Noto Sans CJK JP", system-ui, sans-serif;
+    font-size: 15px; font-weight: 600; letter-spacing: 0.05em; color: var(--accent-2);
+    text-shadow: 0 0 8px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1);
+    -webkit-tap-highlight-color: transparent; -webkit-user-select: none; user-select: none;
+    transition: transform 0.45s cubic-bezier(0.3, 1.5, 0.5, 1);
+  }
+  .nav-btn:active { transform: scale(1.07); transition-duration: 0.18s; }
+  .action-hint.global-hint.shown .hint-layer.active .nav-btn,
+  .action-hint.ty-swipe-hint.shown .nav-btn { pointer-events: auto; }
+  .nav-move { display: inline-flex; align-items: center; gap: 7px; will-change: transform; }
+  .nav-arrow { display: block; font-size: 12px; line-height: 1; letter-spacing: 0; text-shadow: 0 0 3px rgba(255, 253, 249, 1), 0 0 2px rgba(255, 253, 249, 1); }
+
+  /* the page counter dots: small and quiet */
+  #dots { gap: 9px; }
+  #dots .dot { width: 6px; height: 6px; box-shadow: none; }
+  #dots .dot.active { transform: scale(1.3); box-shadow: 0 0 0 3px var(--dot-active-ring); }
+  #tyDots { gap: 9px; }
+  #tyDots .ty-dot { width: 6px; height: 6px; box-shadow: none; }
+  #tyDots .ty-dot.active { transform: scale(1.3); box-shadow: 0 0 0 3px var(--dot-active-ring); }
 
   .dots { position: absolute; bottom: 100px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.8s ease; }
   .dots.visible { opacity: 1; pointer-events: auto; }
@@ -3015,7 +3048,7 @@
   html[data-theme="autumn"] body.night-text .ty-line:not(.accent),
   html[data-theme="winter"] body.night-text .ty-line:not(.accent) { color: var(--text-dark); }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
-  .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 22px; }
+  .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 32px; }
   .action-hint.ty-swipe-hint.shown { opacity: 1; }
   .ty-dots { position: absolute; bottom: 68px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; z-index: 10; transition: opacity 0.6s ease; }
   .ty-dots.hidden { opacity: 0; pointer-events: none; }
