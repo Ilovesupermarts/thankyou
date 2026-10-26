@@ -866,6 +866,18 @@
       linear-gradient(to right, transparent 0, #000 6px, #000 calc(100% - 6px), transparent 100%);
     mask-composite: intersect;
   }
+  /* Rain on the glass (#barRain, drawn by app.js): drops that land on the
+     pane, run down and drip off its bottom edge, or dry up. It sits on the
+     frosted pane, under the text, and reaches 36px below the pane so a
+     drop hanging from the edge can bulge out under it. */
+  .bar-rain {
+    position: absolute;
+    left: 0; top: 0;
+    width: 100%;
+    height: calc(var(--pane-h) + 36px);
+    z-index: -1;
+    pointer-events: none;
+  }
   /* The bright bottom edge of the glass and the glow of its thickness, on
      their own layer above the music display and the 七十二候, so the line
      is unbroken across the screen and the wave's base tucks under it. */

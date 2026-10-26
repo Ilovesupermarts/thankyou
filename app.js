@@ -9178,7 +9178,7 @@ function updateBlossomGreeting() {
 
 function fetchNagoyaWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + NAGOYA.lat + '&longitude=' + NAGOYA.lon +
-            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation' +
+            '&current=temperature_2m,weather_code,wind_speed_10m,wind_direction_10m,wind_gusts_10m,cloud_cover,precipitation,relative_humidity_2m' +
             '&wind_speed_unit=ms&models=jma_seamless&timezone=Asia%2FTokyo';
   fetch(url).then(function(r) { return r.json(); }).then(function(data) {
     if (!data || !data.current) return;
@@ -10761,7 +10761,7 @@ function tokyoNow() {
 var S = {
   hour: 12, date: '2026-01-01',
   condition: 'clear', windSpeed: 2.5, windDir: 300, gustiness: 0.35,
-  temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0,
+  temperature: 18, cloudCover: 15, rainMm: 0, fogDensity: 0, humidity: 75,
   density: 0.4, maxLeaves: 70, sizeScale: 0.6, fallSpeed: 1, sway: 1, flip3d: 0.8,
   shapeVariation: 0.6, wear: 0.35, flurries: 0.5, lulls: 0.5,
   speciesMode: 'koyo', wMomiji: 0.6, wGinkgo: 0.5, wOak: 0.25, wKeyaki: 0.3,
@@ -11843,6 +11843,258 @@ function drawRain(ctx) {
     ctx.beginPath();
     ctx.ellipse(sp.x, sp.y + 0.8, r, r * 0.3, 0, 0, TAU);
     ctx.stroke();
+  }
+}
+
+/* Rain on the glass toolbar (#barRain). Raindrops hit the pane with a
+   small splash and leave a drop behind, plus a few tiny droplets thrown
+   out from the splash. Drops that touch join into one. A drop wider than
+   about 1.3mm (radius) can no longer hold on and runs down,
+   leaving a wet trail and a line of tiny droplets; at the bottom edge it
+   hangs, and once it is heavy enough it drips off. Everything else dries.
+
+   The timings follow real water on glass, with the pane at a scale of
+   1px = 0.25mm:
+     - how often drops land: the rain rate (mm/h) turned into raindrops
+       per square metre per second, over the pane's area;
+     - evaporation: a drop's radius² shrinks at a steady rate that depends
+       on the temperature, the humidity and the wind. While it rains the
+       air at the glass is saturated, so nothing dries. Afterwards a tiny
+       droplet is gone in a minute or two and a big drop lingers for
+       twenty minutes or more (longer on a humid, still day);
+     - running drops move at a few cm/s, faster the bigger they are.
+   Drying uses the real clock, so drops keep drying while the scene is
+   paused. */
+var GLASS_MM = 0.25;                       // mm of glass per CSS px
+var GLASS_HANG = 36;                       // px of canvas under the pane, for hanging drops
+var glassCv = document.getElementById('barRain');
+var glassCtx = glassCv ? glassCv.getContext('2d') : null;
+var gDrops = [], gSplats = [], gTrails = [];
+var gW = 0, gPaneH = 0, gSizeT = 0, gImpactAcc = 0, gWallMs = 0, gDrawn = false;
+var gSpr = null, gSprPR = 0;
+
+function gSatVapour(T) {                   // water vapour at saturation, kg/m³ (Magnus)
+  return 611.2 * Math.exp(17.62 * T / (243.12 + T)) / (461.5 * (T + 273.15));
+}
+/* how fast a drop's radius² shrinks, in px²/s */
+function gEvapRate() {
+  var T = S.temperature, rh = clamp((S.humidity || 75) / 100, 0, 1);
+  if (ENV.rainy) rh = Math.max(rh, 0.995);
+  var D = 2.5e-5 * Math.pow((T + 273.15) / 293.15, 1.75);       // vapour diffusion in air, m²/s
+  var flow = 1 + 1.7 * Math.sqrt(Math.max(0, S.windSpeed));        // wind carries the damp air away
+  var k = 2 * D * gSatVapour(T) * (1 - rh) / 1000 * 1.5 * flow;   // m²/s (×1.5: flat drops on glass)
+  var px = GLASS_MM / 1000;
+  return k / (px * px);
+}
+function gVol(r) { return r * r * r; }
+function gAddDrop(x, y, r) {
+  var d = { x: x, y: y, r: r, vy: 0, vx: 0, run: false, hang: false, trailAt: y, wob: rnd(0, TAU) };
+  gMerge(d);
+  gDrops.push(d);
+  return d;
+}
+/* join every drop that touches d into d */
+function gMerge(d) {
+  for (var i = gDrops.length - 1; i >= 0; i--) {
+    var o = gDrops[i];
+    if (o === d || o.drip) continue;
+    var dx = o.x - d.x, dy = o.y - d.y, rr = (o.r + d.r) * 0.85;
+    if (dx * dx + dy * dy > rr * rr) continue;
+    var v1 = gVol(d.r), v2 = gVol(o.r), v = v1 + v2;
+    d.x = (d.x * v1 + o.x * v2) / v;
+    if (!o.hang) d.y = (d.y * v1 + o.y * v2) / v;
+    d.r = Math.cbrt(v);
+    d.hang = d.hang || o.hang;
+    if (d.hang) d.y = gPaneH;
+    if (o.run && !d.run) { d.run = true; d.vy = o.vy; d.trailAt = d.y; }
+    gDrops.splice(i, 1);
+  }
+}
+/* one raindrop hitting the pane: diameter in mm */
+function gImpact(dmm) {
+  var x = Math.random() * gW, y = Math.random() * (gPaneH - 4) + 2;
+  var r = dmm / 2 * 0.84 * 1.4 / GLASS_MM;          // 60% stays and spreads out on the glass
+  if (gDrops.length < 600) gAddDrop(x, y, r);
+  if (dmm > 0.9) {                                    // big drops splash
+    gSplats.push({ x: x, y: y, r: r, t: 0 });
+    var n = Math.round(dmm * 2.5 * Math.random());
+    for (var i = 0; i < n && gDrops.length < 600; i++) {
+      var a = rnd(-0.2, Math.PI + 0.2) + (Math.random() < 0.3 ? Math.PI : 0), dist = r * rnd(1.8, 4.5);
+      var sx = x + Math.cos(a) * dist, sy = y + Math.sin(a) * dist * 0.8;
+      if (sy > 1 && sy < gPaneH - 1) gAddDrop(sx, sy, rnd(0.1, 0.3) / GLASS_MM);
+    }
+  }
+}
+function gSizeCanvas() {
+  if (!glassCv) return;
+  var w = glassCv.clientWidth, h = glassCv.clientHeight;
+  if (w < 1 || h < 1) return;
+  var pane = h - GLASS_HANG;
+  if (gW && (w !== gW || Math.abs(pane - gPaneH) > 0.5)) {        // the pane changed size: keep drops on it
+    for (var i = gDrops.length - 1; i >= 0; i--) {
+      var d = gDrops[i];
+      if (d.x > w) { gDrops.splice(i, 1); continue; }
+      if (d.hang) d.y = pane; else if (d.y > pane - 1) d.y = pane - 1;
+    }
+  }
+  gW = w; gPaneH = pane;
+  if (glassCv.width !== Math.round(w * PR) || glassCv.height !== Math.round(h * PR)) {
+    glassCv.width = Math.round(w * PR); glassCv.height = Math.round(h * PR);
+    gDrawn = true;                                   // resized canvas: draw again
+  }
+}
+
+function updateGlassRain(dt) {
+  if (!glassCtx) return;
+  gSizeT -= dt;
+  if (gSizeT <= 0) { gSizeCanvas(); gSizeT = 0.5; }
+  if (!gW || gPaneH < 10) return;
+  var now = Date.now(), wall = gWallMs ? Math.min(3600, Math.max(0, (now - gWallMs) / 1000)) : 0;
+  gWallMs = now;
+
+  // raindrops landing
+  if (ENV.rainy && S.condition !== 'snow') {
+    var drizzle = S.condition === 'drizzle';
+    var R = Math.max(S.rainMm, drizzle ? 0.2 : 0.8);                 // mm/h
+    var dMean = drizzle ? 0.35 : Math.min(2.6, 1.3 + 0.06 * R);       // mm
+    var vol = Math.PI / 6 * dMean * dMean * dMean;                    // mm³
+    var area = (gW * GLASS_MM / 1000) * (gPaneH * GLASS_MM / 1000);    // m²
+    var exposure = 0.35 + Math.min(1, Math.abs(S.windSpeed) / 6.5);   // the slanting rain that reaches the pane
+    gImpactAcc += R / 3600 * 1e6 / vol * area * exposure * dt;
+    while (gImpactAcc >= 1) {
+      gImpactAcc -= 1;
+      gImpact(drizzle ? rnd(0.2, 0.5) : clamp(0.5 - Math.log(1 - Math.random()) * (dMean - 0.5), 0.5, 4.5));
+    }
+  } else gImpactAcc = 0;
+
+  var evap = gEvapRate() * wall;
+  var runR = 1.3 / GLASS_MM;                        // a drop this wide (1.3mm radius) starts to run
+  var dripR = 1.8 / GLASS_MM;                       // a hanging drop this big drips off
+  var g = 9.81 * 1000 / GLASS_MM;                   // px/s²
+  for (var i = gDrops.length - 1; i >= 0; i--) {
+    var d = gDrops[i];
+    if (!d) continue;                               // merges removed drops further down the list
+    if (evap) {
+      var r2 = d.r * d.r - evap;
+      if (r2 < 0.09) { gDrops.splice(i, 1); continue; }
+      d.r = Math.sqrt(r2);
+    }
+    if (d.drip) {                                   // falling away under the pane
+      d.vy += g * dt; d.y += d.vy * dt;
+      if (d.y - d.r > gPaneH + GLASS_HANG) gDrops.splice(i, 1);
+      continue;
+    }
+    if (d.hang) {
+      if (d.r > dripR) {                            // too heavy: it lets go and a small drop stays
+        var keep = d.r * 0.55;
+        d.r = Math.cbrt(gVol(d.r) - gVol(keep));
+        d.drip = true; d.hang = false; d.vy = 40;
+        gDrops.push({ x: d.x, y: gPaneH, r: keep, vy: 0, vx: 0, run: false, hang: true, wob: 0 });
+      }
+      continue;
+    }
+    if (!d.run && d.r > runR) { d.run = true; d.vy = 0; d.trailAt = d.y; }
+    if (d.run) {
+      // a few cm/s, faster for bigger drops; it wanders a little and the wind pushes it
+      var vT = (12 + 40 * (d.r / runR - 1)) / GLASS_MM;
+      vT = Math.min(vT, 150 / GLASS_MM);
+      d.wob += dt * rnd(2, 5);
+      d.vy += (vT * (0.7 + 0.3 * Math.sin(d.wob * 1.7)) - d.vy) * Math.min(1, dt * 6);
+      d.vx = Math.sin(d.wob) * 6 + ENV.windPx * 0.15;
+      var y0 = d.y, x0 = d.x;
+      d.y += d.vy * dt; d.x += d.vx * dt;
+      gTrails.push({ x1: x0, y1: y0, x2: d.x, y2: d.y, w: d.r * 0.5, t: 0 });
+      // it leaves a line of tiny droplets behind
+      if (d.y - d.trailAt > rnd(5, 12)) {
+        d.trailAt = d.y;
+        var tr = d.r * rnd(0.12, 0.22);
+        d.r = Math.cbrt(gVol(d.r) - gVol(tr));
+        gDrops.push({ x: x0 + rnd(-0.5, 0.5), y: y0, r: tr, vy: 0, vx: 0, run: false, hang: false, wob: 0 });
+      }
+      gMerge(d);
+      if (d.r < runR * 0.75) { d.run = false; d.vy = 0; }        // too small now: it sticks again
+      if (d.y + d.r * 0.3 >= gPaneH) {              // reached the bottom edge: it hangs there
+        d.run = false; d.hang = true; d.y = gPaneH; d.vy = 0;
+        gMerge(d);
+      }
+      if (d.x < -10 || d.x > gW + 10) { gDrops.splice(gDrops.indexOf(d), 1); continue; }
+    }
+  }
+  for (var j = gSplats.length - 1; j >= 0; j--) { gSplats[j].t += dt; if (gSplats[j].t > 0.12) gSplats.splice(j, 1); }
+  for (var k = gTrails.length - 1; k >= 0; k--) { gTrails[k].t += dt; if (gTrails[k].t > 2.5) gTrails.splice(k, 1); }
+}
+
+/* One drop, drawn once large and stretched to size: a clear lens of
+   water. The glass behind it shows through upside down, so the drop is
+   dark along its top edge and bright low down, with a small glint near
+   the top and a faint shadow below. */
+function gMakeSprite() {
+  gSprPR = PR;
+  var c = document.createElement('canvas'), n = 64, m = n / 2, R = 24;
+  c.width = c.height = n;
+  var x = c.getContext('2d');
+  // the faint shadow it casts on the frosted glass
+  var sh = x.createRadialGradient(m + 1.5, m + 3, R * 0.6, m + 1.5, m + 3, R * 1.15);
+  sh.addColorStop(0, 'rgba(60,70,85,0.16)'); sh.addColorStop(1, 'rgba(60,70,85,0)');
+  x.fillStyle = sh; x.fillRect(0, 0, n, n);
+  // the body: clearer in the middle, darker at the top edge
+  var b = x.createRadialGradient(m, m + R * 0.25, R * 0.2, m, m, R);
+  b.addColorStop(0, 'rgba(255,255,255,0.28)');
+  b.addColorStop(0.7, 'rgba(225,232,240,0.22)');
+  b.addColorStop(1, 'rgba(70,85,105,0.5)');
+  x.fillStyle = b; x.beginPath(); x.arc(m, m, R, 0, TAU); x.fill();
+  var top = x.createLinearGradient(0, m - R, 0, m + R);
+  top.addColorStop(0, 'rgba(55,68,88,0.45)'); top.addColorStop(0.45, 'rgba(55,68,88,0)');
+  x.fillStyle = top; x.beginPath(); x.arc(m, m, R, 0, TAU); x.fill();
+  // the bright low crescent, where light comes through the lens
+  var lo = x.createRadialGradient(m, m + R * 0.55, 0, m, m + R * 0.55, R * 0.7);
+  lo.addColorStop(0, 'rgba(255,255,255,0.75)'); lo.addColorStop(1, 'rgba(255,255,255,0)');
+  x.save(); x.beginPath(); x.arc(m, m, R * 0.92, 0, TAU); x.clip();
+  x.fillStyle = lo; x.fillRect(0, 0, n, n); x.restore();
+  // the glint
+  var gl = x.createRadialGradient(m - R * 0.35, m - R * 0.45, 0, m - R * 0.35, m - R * 0.45, R * 0.28);
+  gl.addColorStop(0, 'rgba(255,255,255,0.95)'); gl.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = gl; x.fillRect(0, 0, n, n);
+  gSpr = c;
+}
+function drawGlassRain() {
+  if (!glassCtx || !gW) return;
+  if (!gDrops.length && !gSplats.length && !gTrails.length) {
+    if (gDrawn) { glassCtx.setTransform(1, 0, 0, 1, 0, 0); glassCtx.clearRect(0, 0, glassCv.width, glassCv.height); gDrawn = false; }
+    return;
+  }
+  if (!gSpr || gSprPR !== PR) gMakeSprite();
+  var x = glassCtx;
+  x.setTransform(1, 0, 0, 1, 0, 0);
+  x.clearRect(0, 0, glassCv.width, glassCv.height);
+  x.setTransform(PR, 0, 0, PR, 0, 0);
+  gDrawn = true;
+  // wet trails: a thin film that breaks up and dries within a few seconds
+  x.lineCap = 'round';
+  for (var k = 0; k < gTrails.length; k++) {
+    var tr = gTrails[k], f = 1 - tr.t / 2.5;
+    x.strokeStyle = 'rgba(255,255,255,' + (0.3 * f).toFixed(3) + ')';
+    x.lineWidth = Math.max(0.6, tr.w * (0.6 + 0.4 * f));
+    x.beginPath(); x.moveTo(tr.x1, tr.y1); x.lineTo(tr.x2, tr.y2); x.stroke();
+  }
+  var s = 64 / 48;                                  // sprite size per drop diameter
+  for (var i = 0; i < gDrops.length; i++) {
+    var d = gDrops[i], w = d.r * 2 * s, h = w;
+    if (d.run) h *= 1 + Math.min(0.35, d.vy * GLASS_MM / 400);   // a running drop stretches
+    if (d.drip) h *= 1.6;
+    if (d.hang) h *= 1.15;                                         // hanging drops sag
+    x.globalAlpha = Math.min(1, d.r / 1.2);
+    x.drawImage(gSpr, d.x - w / 2, d.y - h / 2 - (d.run ? (h - w) * 0.3 : 0), w, h);
+  }
+  x.globalAlpha = 1;
+  // splashes: a quick bright ring as a raindrop bursts on the glass
+  x.lineWidth = 0.8;
+  for (var j = 0; j < gSplats.length; j++) {
+    var sp = gSplats[j], q = sp.t / 0.12, rr = sp.r * (1 + 2.2 * q);
+    x.strokeStyle = 'rgba(255,255,255,' + (0.8 * (1 - q)).toFixed(3) + ')';
+    x.beginPath(); x.arc(sp.x, sp.y, rr, 0, TAU); x.stroke();
+    x.strokeStyle = 'rgba(70,85,105,' + (0.25 * (1 - q)).toFixed(3) + ')';
+    x.beginPath(); x.arc(sp.x, sp.y + 0.7, rr, 0, TAU); x.stroke();
   }
 }
 
@@ -18328,6 +18580,7 @@ function dynStep(dt, t, want, skyWant) {
     if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
   }
   updateRain(dt);
+  updateGlassRain(dt);
   updateSnow(dt, t);
   updateBirds(dt, t);
   updateSpecks(dt, t);
@@ -18370,6 +18623,7 @@ function dynStep(dt, t, want, skyWant) {
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'near');
   drawRain(ctx);
+  drawGlassRain();
   drawSpecks(ctx, t, false);
 
   var flashA = 0;
@@ -18500,6 +18754,7 @@ function onWeather(c) {
   }
   if (typeof c.cloud_cover === 'number') S.cloudCover = Math.round(c.cloud_cover / 5) * 5;
   if (typeof c.precipitation === 'number') S.rainMm = Math.round(c.precipitation * 5) / 5;
+  if (typeof c.relative_humidity_2m === 'number') S.humidity = c.relative_humidity_2m;
   S.fogDensity = S.condition === 'fog' ? 0.7 : 0;
   envTimer = 0;
 }
