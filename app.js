@@ -4754,14 +4754,14 @@ function repositionHintGroup() {
   if (currentTheme === 'autumn') {
     var lift = Math.max(0, 136 - dotsBottom, 184 - hintBottom);
     dotsBottom += lift; hintBottom += lift;
-    // The hint and the dots then move up together, as one group, so the hint
-    // sits just under the longest message (about 40px below it), in the open
-    // sky above the torii.
-    var hintUnderText = stageHeight - textBottom - 40 - 22;
+    // The button and the dots then move up together, as one group, so the
+    // button sits just under the longest message (18px below it, the button
+    // is 32px tall), in the open sky above the torii.
+    var hintUnderText = stageHeight - textBottom - 18 - 32;
     hintBottom = hintUnderText;
-    // The dots travel with the hint as one group, keeping their usual gap
-    // (24px) under it.
-    dotsBottom = hintBottom - spaceBetween - dotsH;
+    // The dots travel with the button as one group, 7px under it (the dots
+    // are 6px).
+    dotsBottom = hintBottom - 7 - 6;
     if (dotsBottom < 0) { hintBottom -= dotsBottom; dotsBottom = 0; }
   }
   // Winter: clear of the snowdrift (as placed on winter.html: dots at least 140px up, hint 208px).
@@ -9300,7 +9300,7 @@ var tyRefWidth = Math.min(window.innerWidth, 600);
 var tyExited = false;
 
 /* Autumn: the thank-you swipe hint and its dots (moved together) sit just under the longest of the four
-   screens' text (about 40px below it), clear of the torii and lanterns. In
+   screens' text (18px below it), clear of the torii and lanterns. In
    the other themes the stylesheet position applies. */
 function repositionTySwipeHint() {
   if (!tySwipeHint || !thankyouScreen) return;
@@ -9318,9 +9318,9 @@ function repositionTySwipeHint() {
     if (b > lowest) lowest = b;
   }
   if (lowest <= 0) return;
-  var tyHintBottom = Math.max(0, screenRect.height - lowest - 40 - 22);
+  var tyHintBottom = Math.max(0, screenRect.height - lowest - 18 - 32);
   tySwipeHint.style.bottom = tyHintBottom + 'px';
-  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 24 - 10) + 'px';
+  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 7 - 6) + 'px';
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
@@ -18881,33 +18881,13 @@ var Hints = (function () {
   }
 
   /* ---------- message pages ---------- */
-  function onPanelsReady() {
-    if (seenSwipe || currentPanel !== 0) return;
-    later(function () {
-      if (seenSwipe || currentPanel !== 0 || !globalHint || !globalHint.classList.contains('shown')) return;
-      seenSwipe = true;
-      show({ kind: 'swipe', hold: 2800, fadeAfter: true,
-        targets: [{ el: globalHintLayerSwipe, content: true, shape: 'box', pad: 16 }],
-        finger: { el: stage, kind: 'swipe', dy: 120 } });
-    }, 900);
-  }
+  /* The swipe and scroll lines are now a button that shows what to do by itself
+     (NavSpring below), so they no longer get an outline and a ghost finger. */
+  function onPanelsReady() { seenSwipe = true; }
   function onPanelChange(index) {
-    if (index !== 0) seenSwipe = true;
+    seenSwipe = true;
     if (opts && (opts.kind === 'swipe' || opts.kind === 'scroll')) clear(300);
-    if (index === totalPanels - 1 && !seenScroll) {
-      later(function () {
-        if (seenScroll || currentPanel !== totalPanels - 1 || (window.scrollY || 0) > 4) return;
-        seenScroll = true;
-        show({ kind: 'scroll', hold: 3400, fadeAfter: true,
-          targets: [{ el: globalHintLayerScroll, content: true, shape: 'box', pad: 14 }],
-          finger: { el: globalHintLayerScroll, kind: 'up', dy: -150 } });
-      }, 900);
-    }
   }
-  /* Once she starts scrolling, the scroll hint has done its job. */
-  window.addEventListener('scroll', function () {
-    if (opts && opts.kind === 'scroll' && (window.scrollY || 0) > 4) clear(300);
-  }, { passive: true });
 
   /* ---------- table: 6a, 6b, 6d one after another ---------- */
   function endSeq() { seq = 'T'; clearInterval(pollT); pollT = 0; }
@@ -19092,6 +19072,91 @@ var Hints = (function () {
   }
   for (var name in api) api[name] = safely(api[name]);
   return api;
+})();
+
+/* ============ NEXT / DOWN BUTTON ============
+   Tapping it does what the old line described: the next message, or down to
+   the table (and, on the thank-you screens, the next screen, or on to the games).
+   Every so often the button is drawn out the way its arrow points (right, or down
+   for the table) and let go on a spring, so the word and the arrow swing together
+   until they settle. These are the numbers chosen on bamboo.html. */
+var NavSpring = (function () {
+  var SET = { response: 0.2, damping: 0.05, pull: 11.5, pullTime: 300, kick: 180, pause: 0.9 };
+  var AFTER_TOUCH = 1400;                    // a touch anywhere holds the swing back this long (ms)
+  var path = null, startT = 0, raf = 0, timer = 0, moving = null, down = false, lastTouch = -1e9;
+
+  function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
+  /* [offset, ...] every 1/240 s: drawn out, let go, then a damped spring until it stops. */
+  function simulate() {
+    var out = [], dt = 1 / 240, n = Math.round(SET.pullTime / 1000 / dt), i;
+    for (i = 1; i <= n; i++) out.push(-SET.pull * easeOut(i / n));
+    var w = 2 * Math.PI / SET.response, k = w * w, c = 2 * SET.damping * w;
+    var x = -SET.pull, v = SET.kick;
+    for (i = 0; i < 240 * 8; i++) {
+      v += (-k * x - c * v) * dt;
+      x += v * dt;
+      out.push(x);
+      if (Math.abs(x) < 0.03 && Math.abs(v) < 0.6) break;
+    }
+    out.push(0);
+    return out;
+  }
+  /* the button that is on show right now, if any */
+  function visibleButton() {
+    var list = document.querySelectorAll('.nav-btn');
+    for (var i = 0; i < list.length; i++) {
+      var hint = list[i].closest('.action-hint'), layer = list[i].closest('.hint-layer');
+      if (!hint || !hint.classList.contains('shown')) continue;
+      if (layer && !layer.classList.contains('active')) continue;
+      if (list[i].offsetParent === null) continue;
+      return list[i];
+    }
+    return null;
+  }
+  function frame(now) {
+    var i = Math.max(0, Math.floor((now - startT) / 1000 * 240));
+    if (i >= path.length) {
+      moving.style.transform = ''; raf = 0; moving = null;
+      timer = setTimeout(play, Math.max(SET.pause * 1000, lastTouch + AFTER_TOUCH - now));
+      return;
+    }
+    var x = -path[i];                         // positive = the way the arrow points
+    moving.style.transform = down ? 'translateY(' + x.toFixed(2) + 'px)' : 'translateX(' + x.toFixed(2) + 'px)';
+    raf = requestAnimationFrame(frame);
+  }
+  function play() {
+    clearTimeout(timer); timer = 0;
+    var btn = visibleButton();
+    if (!btn) { timer = setTimeout(play, 600); return; }      // nothing on show: look again shortly
+    moving = btn.querySelector('.nav-move');
+    down = btn.getAttribute('data-dir') === 'down';
+    path = simulate();
+    startT = performance.now();
+    raf = requestAnimationFrame(frame);
+  }
+  /* After a touch it waits a moment before the next swing. A swing already under way is
+     let finish, so the button never jumps away from the finger. */
+  window.addEventListener('pointerdown', function () {
+    lastTouch = performance.now();
+    if (!raf) { clearTimeout(timer); timer = setTimeout(play, AFTER_TOUCH); }
+  }, true);
+  if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) timer = setTimeout(play, 1200);
+
+  /* what a tap does */
+  var swipeBtn = globalHintLayerSwipe && globalHintLayerSwipe.querySelector('.nav-btn');
+  var scrollBtn = globalHintLayerScroll && globalHintLayerScroll.querySelector('.nav-btn');
+  var tyBtn = document.getElementById('tySwipeBtn');
+  if (swipeBtn) swipeBtn.addEventListener('click', function () { goToPanel(currentPanel + 1); });
+  if (scrollBtn) scrollBtn.addEventListener('click', function () {
+    try { tableCard.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+    catch (e) { window.scrollTo(0, tableCard.getBoundingClientRect().top + (window.pageYOffset || 0) - 100); }
+  });
+  if (tyBtn) tyBtn.addEventListener('click', function () {
+    if (tyExited) return;
+    if (tyCurrentPanel === TY_TOTAL_PANELS - 1) exitTyToGames();
+    else goToTyPanel(tyCurrentPanel + 1);
+  });
+  return { play: play };
 })();
 
 updateGlobalHint();
