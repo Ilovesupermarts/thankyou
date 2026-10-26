@@ -5559,6 +5559,7 @@ function returnToStartScreen() {
   startPondLife();
   /* back at the start: the next pass through the app gets its hints again */
   if (Hints) { Hints.reset(); Hints.onStartScreen(); }
+  NavSpring && NavSpring.reset();
 }
 
 function updateGlobalHint() {
@@ -5597,6 +5598,7 @@ function goToPanel(index, noGust) {
     gustWind(KEYBOARD_GUST * dir);
   }
   currentPanel = newPanel;
+  NavSpring && NavSpring.panelChanged('msg', currentPanel);
   track.style.transform = 'translateX(-' + (currentPanel * (100 / totalPanels)) + '%)';
   for (var i = 0; i < dots.length; i++) dots[i].classList.toggle('active', i === currentPanel);
   activatePanel(currentPanel);
@@ -7592,6 +7594,7 @@ function confirmName() {
   }
   nameConfirmed = true;
   Hints && Hints.reset();
+  NavSpring && NavSpring.reset();
 
   therapistDisplayName = entered + 'さん';
   confirmedTipAmount = getTipValue();
@@ -9391,6 +9394,7 @@ function activateTyPanel(index) {
 function goToTyPanel(index) {
   var clamped = Math.max(0, Math.min(TY_TOTAL_PANELS - 1, index));
   tyCurrentPanel = clamped;
+  NavSpring && NavSpring.panelChanged('ty', tyCurrentPanel);
   tyTrack.style.transform = 'translateX(-' + (tyCurrentPanel * (100 / TY_TOTAL_PANELS)) + '%)';
   for (var i = 0; i < tyDots.length; i++) tyDots[i].classList.toggle('active', i === tyCurrentPanel);
   activateTyPanel(tyCurrentPanel);
@@ -10625,6 +10629,7 @@ function startThankyouSequence() {
   GameWindow.newVisit();                 /* the top score is for this visit only */
   tyReceiptBtn.classList.add('shown');
   tyCurrentPanel = 0;
+  NavSpring && NavSpring.reset('ty');
   tyTrack.style.transform = 'translateX(0%)';
   for (var i = 0; i < tyDots.length; i++) tyDots[i].classList.toggle('active', i === 0);
   activateTyPanel(0);
@@ -19079,11 +19084,22 @@ var Hints = (function () {
    the table (and, on the thank-you screens, the next screen, or on to the games).
    Every so often the button is drawn out the way its arrow points (right, or down
    for the table) and let go on a spring, so the word and the arrow swing together
-   until they settle. These are the numbers chosen on bamboo.html. */
+   until they settle. These are the numbers chosen on bamboo.html.
+
+   When it bounces:
+   - the swipe button bounces on the first message until the therapist swipes
+     (the panel changes). On the later messages it waits quietly, and starts
+     bouncing again only after 10 seconds with no touch while she is still on that
+     message; the next swipe stops it again. The thank-you screens work the same way.
+   - the scroll button bounces until she scrolls, then stops for good. */
 var NavSpring = (function () {
   var SET = { response: 0.2, damping: 0.05, pull: 11.5, pullTime: 300, kick: 180, pause: 0.9 };
   var AFTER_TOUCH = 1400;                    // a touch anywhere holds the swing back this long (ms)
-  var path = null, startT = 0, raf = 0, timer = 0, moving = null, down = false, lastTouch = -1e9;
+  var QUIET = 10000;                         // no touch for this long on a later message: bounce again (ms)
+  var path = null, startT = 0, raf = 0, timer = 0, moving = null, movingBtn = null, down = false, lastTouch = -1e9;
+  var quietUntil = { msg: 0, ty: 0 };        // the swipe buttons stay still until this time
+  var lastIndex = { msg: 0, ty: 0 };
+  var scrolled = false;                      // she has scrolled: the scroll button is done
 
   function easeOut(p) { return 1 - Math.pow(1 - p, 3); }
   /* [offset, ...] every 1/240 s: drawn out, let go, then a damped spring until it stops. */
@@ -19100,6 +19116,24 @@ var NavSpring = (function () {
     }
     out.push(0);
     return out;
+  }
+  /* which rule a button follows */
+  function groupOf(btn) {
+    if (btn.id === 'tySwipeBtn') return 'ty';
+    return btn.getAttribute('data-dir') === 'down' ? 'scroll' : 'msg';
+  }
+  function mayBounce(btn) {
+    var g = groupOf(btn);
+    if (g === 'scroll') return !scrolled;
+    return performance.now() >= quietUntil[g];
+  }
+  function stopSwing() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    if (moving) moving.style.transform = '';
+    moving = movingBtn = null;
+    clearTimeout(timer);
+    timer = setTimeout(play, 600);
   }
   /* the button that is on show right now, if any */
   function visibleButton() {
@@ -19127,7 +19161,8 @@ var NavSpring = (function () {
   function play() {
     clearTimeout(timer); timer = 0;
     var btn = visibleButton();
-    if (!btn) { timer = setTimeout(play, 600); return; }      // nothing on show: look again shortly
+    if (!btn || !mayBounce(btn)) { timer = setTimeout(play, 500); return; }      // nothing to bounce just now: look again shortly
+    movingBtn = btn;
     moving = btn.querySelector('.nav-move');
     down = btn.getAttribute('data-dir') === 'down';
     path = simulate();
@@ -19137,9 +19172,33 @@ var NavSpring = (function () {
   /* After a touch it waits a moment before the next swing. A swing already under way is
      let finish, so the button never jumps away from the finger. */
   window.addEventListener('pointerdown', function () {
-    lastTouch = performance.now();
+    var now = performance.now();
+    lastTouch = now;
+    /* on a later message, every touch starts the 10 seconds again */
+    for (var g in quietUntil) if (now < quietUntil[g]) quietUntil[g] = now + QUIET;
     if (!raf) { clearTimeout(timer); timer = setTimeout(play, AFTER_TOUCH); }
   }, true);
+  /* a swipe moves her on to another message: the bouncing stops, and waits 10 quiet seconds */
+  function panelChanged(group, index) {
+    if (index === lastIndex[group]) return;
+    lastIndex[group] = index;
+    quietUntil[group] = performance.now() + QUIET;
+    if (group === 'msg') scrolled = false;                    // the scroll button starts afresh on the last message
+    if (raf) stopSwing();
+  }
+  /* once she scrolls, the scroll button has done its job */
+  window.addEventListener('scroll', function () {
+    if (scrolled || (window.scrollY || window.pageYOffset || 0) <= 4) return;
+    var btn = visibleButton();
+    if (!btn || groupOf(btn) !== 'scroll') return;
+    scrolled = true;
+    if (raf) stopSwing();
+  }, { passive: true });
+  /* back at the start: everything bounces from the first message again */
+  function reset(which) {
+    if (!which || which === 'msg') { quietUntil.msg = 0; lastIndex.msg = 0; scrolled = false; }
+    if (!which || which === 'ty') { quietUntil.ty = 0; lastIndex.ty = 0; }
+  }
   if (!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) timer = setTimeout(play, 1200);
 
   /* what a tap does */
@@ -19156,7 +19215,7 @@ var NavSpring = (function () {
     if (tyCurrentPanel === TY_TOTAL_PANELS - 1) exitTyToGames();
     else goToTyPanel(tyCurrentPanel + 1);
   });
-  return { play: play };
+  return { play: play, panelChanged: panelChanged, reset: reset };
 })();
 
 updateGlobalHint();
