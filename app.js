@@ -1330,6 +1330,7 @@ var _swipeActive = false;
 var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 var BAMBOO_URL = 'Sound/morning/Windbamboo.mp3';
+var CHIRP_URL = 'Sound/Chirping2.mp3';
 
 /* ============ TRACK METADATA (4 PHASES) ============
    Four Nagoya time phases, the page colour theme's own
@@ -2218,6 +2219,10 @@ function initSound() {
       if (buf) soundBuffers.bamboo = buf;
     });
 
+    loadAudioBuffer(CHIRP_URL).then(function(buf) {
+      if (buf) soundBuffers.chirp = buf;
+    });
+
     /* AMBIENT BEDS: three raw MP3s download in parallel, but only
        the current Nagoya phase decodes. The other two sit in
        _ambientRawBuffers until their boundary arrives or the
@@ -2672,6 +2677,7 @@ function scheduleNextAmbient(prevPlayMs) {
 
 function stopAmbient() {
   bambooStop();
+  chirpStop();
   stopSwellLoop();
   _ambientBufferRetries = 0;
   _plStop();
@@ -3481,6 +3487,9 @@ function _bambooSchedule() {
 
 function _bambooPlay() {
   if (!_bambooOn || _bambooSrc) return;
+  /* The birds' chirping is playing, or has only just stopped (see "Birds
+     chirping"): the two never sound together, so wait for another gap. */
+  if (_chirpBusy()) { _bambooSchedule(); return; }
   var buf = soundBuffers.bamboo;
   /* Not the morning or the day, or the recording has not arrived yet:
      ask again after another gap. */
@@ -3540,9 +3549,144 @@ function bambooStop() {
 /* A gust has started; strength is its own strength over the threshold, so
    1 or more is a strong one. */
 function bambooGust(strength) {
-  if (strength < 1 || !_bambooOn || _bambooSrc || !_bambooPhaseOk()) return;
+  if (strength < 1 || !_bambooOn || _bambooSrc || _chirpBusy() || !_bambooPhaseOk()) return;
   if (_bambooTimer) { clearTimeout(_bambooTimer); _bambooTimer = null; }
   _bambooPlay();
+}
+
+/* ============ BIRDS CHIRPING ============
+   While birds are in the scene (see "Birds"), a random 10-second piece of
+   Sound/Chirping2.mp3 (36 seconds of small birds) is played, fading in over
+   its first 1.5 seconds and out over its last 1.5. The first one starts
+   1–3 seconds after the first bird comes on screen; while birds stay, the
+   next piece starts 4–12 seconds after the last has finished (or 1.5–3
+   seconds after a bamboo piece, if that is later). If the birds
+   have all gone, the piece in the air fades out at once, over 1.5 seconds.
+
+   It is blended in under the music and next to the wind in the bamboo:
+   - Level: the recording is steady (about -32.6 LUFS) and the songs run at
+     about -19 LUFS, so at CHIRP_PEAK 1 it sits some 13 dB under the music,
+     just under the bamboo piece (which BAMBOO_PEAK lifts to about -31 LUFS).
+   - Tone: the birds are all in the upper voice (1–8 kHz) and the wind in
+     the low (mostly under 300 Hz), so the two do not mask each other; the
+     birds' own faint low rumble is cut (CHIRP_LOW_CUT) so it does not pile
+     onto the wind's.
+   - Time: they never sound together. The chirping waits for a bamboo piece
+     to finish, and a bamboo piece (or a gust) waits for the chirping.
+   Like the wind, it is nature, not music: it does not go through
+   ambientBus, so the music's mute and pause buttons leave it alone. */
+var CHIRP_CLIP_SEC = 10;
+var CHIRP_FADE = 1.5;              // seconds, in and out
+var CHIRP_LEAVE_FADE = 1.5;        // seconds, when the birds have gone
+var CHIRP_PEAK = 1.0;
+var CHIRP_LOW_CUT = 450;           // Hz
+var CHIRP_FIRST_MIN = 1;           // seconds from the first bird on screen to the first piece
+var CHIRP_FIRST_MAX = 3;
+var CHIRP_GAP_MIN = 4;             // seconds between one piece's end and the next's start
+var CHIRP_GAP_MAX = 12;
+var CHIRP_BREATH_MIN = 1.5;          // seconds of quiet between the end of a bamboo piece and a chirping piece
+var CHIRP_BREATH_MAX = 3;
+
+var _chirpSrc = null;
+var _chirpGain = null;
+var _chirpNextAt = 0;              // the clock of the birds (updateBirds' t)
+var _chirpT = 0;
+var _chirpHadBirds = false;
+var _chirpLastOffset = -99;
+var _chirpSawBamboo = false;
+var _chirpEndCtx = -99;            // the audio clock when the last piece ended
+
+/* A piece is playing, or ended less than a breath ago. */
+function _chirpBusy() {
+  return !!_chirpSrc || (!!soundAudioCtx && soundAudioCtx.currentTime - _chirpEndCtx < CHIRP_BREATH_MIN);
+}
+
+/* Called every frame by updateBirds: present is true while a bird is on screen. */
+function chirpBirds(present, t) {
+  _chirpT = t;
+  /* After a bamboo piece it takes a short breath (not a whole gap, or the
+     wind would crowd the birds out) so the two do not run on with no pause. */
+  if (_bambooSrc) _chirpSawBamboo = true;
+  else if (_chirpSawBamboo) {
+    _chirpSawBamboo = false;
+    _chirpNextAt = Math.max(_chirpNextAt, t + CHIRP_BREATH_MIN + Math.random() * (CHIRP_BREATH_MAX - CHIRP_BREATH_MIN));
+  }
+  if (!present) {
+    _chirpHadBirds = false;
+    if (_chirpSrc) _chirpFade(CHIRP_LEAVE_FADE);
+    return;
+  }
+  if (!_chirpHadBirds) {
+    _chirpHadBirds = true;
+    _chirpNextAt = Math.max(_chirpNextAt, t + CHIRP_FIRST_MIN + Math.random() * (CHIRP_FIRST_MAX - CHIRP_FIRST_MIN));
+  }
+  if (_chirpSrc || t < _chirpNextAt) return;
+  /* Sound off, not ready, or the wind in the bamboo is playing: look again in a moment. */
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx || soundAudioCtx.state !== 'running' || _bambooSrc) { _chirpNextAt = t + 1; return; }
+  var buf = soundBuffers.chirp;
+  if (!buf) { _chirpNextAt = t + 2; return; }
+  _chirpPlay(buf);
+}
+
+function _chirpPlay(buf) {
+  var len = Math.min(CHIRP_CLIP_SEC, buf.duration);
+  /* Not the very start (it fades in from silence) or the last second; and
+     not nearly the same piece as the last. */
+  var lo = Math.min(2, buf.duration - len), hi = Math.max(lo, buf.duration - len - 1), offset = lo;
+  for (var k = 0; k < 8; k++) {
+    offset = lo + Math.random() * (hi - lo);
+    if (Math.abs(offset - _chirpLastOffset) > len / 2) break;
+  }
+  _chirpLastOffset = offset;
+  var fade = Math.min(CHIRP_FADE, len / 2);
+  var now = soundAudioCtx.currentTime;
+  var src = soundAudioCtx.createBufferSource();
+  src.buffer = buf;
+  var hp = soundAudioCtx.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = CHIRP_LOW_CUT;
+  hp.Q.value = 0.7;
+  var gain = soundAudioCtx.createGain();
+  gain.gain.setValueAtTime(0, now);
+  gain.gain.linearRampToValueAtTime(CHIRP_PEAK, now + fade);
+  gain.gain.setValueAtTime(CHIRP_PEAK, now + len - fade);
+  gain.gain.linearRampToValueAtTime(0, now + len);
+  src.connect(hp);
+  hp.connect(gain);
+  gain.connect(soundMasterGain);
+  src.start(now, offset, len);
+  _chirpSrc = src;
+  _chirpGain = gain;
+  src.onended = function() {
+    try { gain.disconnect(); hp.disconnect(); } catch (e) {}
+    if (_chirpSrc === src) {
+      _chirpSrc = null;
+      _chirpGain = null;
+      _chirpEndCtx = soundAudioCtx.currentTime;
+      _chirpNextAt = Math.max(_chirpNextAt, _chirpT + CHIRP_GAP_MIN + Math.random() * (CHIRP_GAP_MAX - CHIRP_GAP_MIN));
+    }
+  };
+}
+
+/* The piece in the air fades out over sec seconds, from wherever it is. */
+function _chirpFade(sec) {
+  if (!_chirpSrc || !_chirpGain || !soundAudioCtx) return;
+  try {
+    var now = soundAudioCtx.currentTime, g = _chirpGain.gain;
+    g.cancelScheduledValues(now);
+    g.setValueAtTime(g.value, now);
+    g.linearRampToValueAtTime(0, now + sec);
+    _chirpSrc.stop(now + sec + 0.05);
+  } catch (e) {
+    try { _chirpSrc.stop(); } catch (e2) {}
+  }
+}
+
+/* Back at the start screen: silence at once. */
+function chirpStop() {
+  _chirpHadBirds = false;
+  _chirpNextAt = 0;
+  _chirpFade(0.3);
 }
 
 /* ============================================================
@@ -12683,7 +12827,8 @@ function drawFog(ctx, dt) {
      drawKoyoTrees hides each fully behind whatever is in front of it
      (birdLayer).
    Everything is in metres and seconds. BIRD holds the values approved on
-   bamboo.html; the birds make no sound. */
+   bamboo.html. While birds are on the screen a random piece of
+   Chirping2.mp3 plays (see "Birds chirping"). */
 var BIRD = {
   flocks: 2, flockMin: 4, flockMax: 7, stay: 30, pause: 2.5,   // flocks in the sky at once, birds in a flock, seconds in view, seconds before the next flock
   nearW: 0.4, midW: 0.3, farW: 0.3,                            // how often a flock is near, middle or far
@@ -12981,6 +13126,7 @@ function updateBirds(dt, t) {
   // the weather turns or the day ends: the flocks fly off. None in winter, and none left over when the clock is moved outside the hours.
   for (q = 0; q < flocks.length && live > target; q++) if (!flocks[q].leaving) { flocks[q].life = 0; flocks[q].dismissed = true; live--; }
   if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) flocks.length = 0;
+  var birdsOn = false;                               // a bird is on the screen: the chirping plays (chirpBirds)
   for (var i = flocks.length - 1; i >= 0; i--) {
     var F = flocks[i];
     perchFlock(F, t, dt, cam);
@@ -12990,9 +13136,11 @@ function updateBirds(dt, t) {
       updateBird(F, F.birds[j], t, dt);
       var s = birdXY(F, F.birds[j], cam);
       if (s[0] > -80 && s[0] < W + 80 && s[1] > -80) anyIn = true;
+      if (s[0] > 0 && s[0] < W && s[1] > 0 && s[1] < H) birdsOn = true;
     }
     if (F.leaving && !anyIn) { flocks.splice(i, 1); flockNext = Math.max(flockNext, t + BIRD.pause * rnd(0.6, 1.4)); }
   }
+  chirpBirds(birdsOn, t);
 }
 
 /* One bird, posed in 3D and drawn flat as a dark silhouette. */
