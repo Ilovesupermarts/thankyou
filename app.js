@@ -14127,10 +14127,13 @@ function paintBark(c, S, roundEnd, mid, hi, lo, lx, ly) {
     band(function (q) { return 1 - (0.12 + 0.6 * Math.max(0, -t(q))) * k; }, function () { return 1; }, lo, 0.22);
     band(function (q) { return -1 + (0.12 + 0.6 * Math.max(0, t(q))) * k; }, function () { return -1; }, lo, 0.22);
   }
-  // a soft highlight just in from the lit edge
-  for (i = 0; i < 2; i++) {
-    var w = 0.16 - i * 0.07;
-    band(function (q) { return 0.5 * t(q) - w; }, function (q) { return 0.5 * t(q) + w; }, hi, 0.2);
+  // a soft highlight on the lit side, close to its edge (never along the middle: a stripe
+  // down the middle of a trunk looks like a seam). It narrows away to nothing where the limb
+  // runs along the light, so it never has to jump from one side to the other.
+  function lean(q) { return clamp(t(q) * 4, -1, 1); }
+  for (i = 0; i < 3; i++) {
+    var w = 0.26 - i * 0.08;
+    band(function (q) { return 0.6 * lean(q) - w * Math.abs(lean(q)); }, function (q) { return 0.6 * lean(q) + w * Math.abs(lean(q)); }, hi, 0.14);
   }
 }
 function drawKoyoClumps(c, T, t) {
