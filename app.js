@@ -13977,48 +13977,19 @@ function fillKoyoBranches(c, T, strength) {
   bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
   var ns = T.nodes, i, n;
   function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
-  // Round bark: across its width every thick branch fades smoothly from a
-  // lighter side (facing the light, the same as the leaves: above and to the
-  // side) to a darker side. A smooth fade has no edges to line up, so the
-  // forks stay clean. Thin twigs are too small to show it and stay flat.
   var night = koyoNight(), lx = KOYO.lightFrom * lerp(1, 0.5, night), ly = lerp(-0.85, 0.8, night), ll = Math.hypot(lx, ly);
-  lx /= ll; ly /= ll;
-  var hi = rgba(mixRgb(scaleRgb(bark, 1.25), KOYO_PAPER, 0.18)), mid = rgba(bark), lo = rgba(scaleRgb(bark, 0.6));
-  function paint(cx, cy, px, py, hw) {            // (px, py): across the branch; hw: half its width
-    var sd = (px * lx + py * ly) >= 0 ? 1 : -1;   // which way across faces the light
-    var g = c.createLinearGradient(cx + px * hw * sd, cy + py * hw * sd, cx - px * hw * sd, cy - py * hw * sd);
-    g.addColorStop(0, hi); g.addColorStop(0.4, mid); g.addColorStop(1, lo);
-    c.fillStyle = g;
-  }
-  var THICK = Math.max(5, T.scale * 0.012), thin = [];
-  // thick branches, parents before children: each with its round joint at the fork, filled in the same fade
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.perch) continue;                        // the owl's branch is drawn by drawPerch (8b)
-    if (n.w < THICK) { thin.push(n); continue; }
-    var w0 = n.w / 2, w1 = endW(n);
-    var x0 = koyoX(T, n.sx), y0 = n.sy, x1 = koyoX(T, n.ex), y1 = n.ey;
-    var dx = x1 - x0, dy = y1 - y0, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len;
-    paint((x0 + x1) / 2, (y0 + y1) / 2, px, py, (w0 + w1) / 2);
-    c.beginPath();
-    c.moveTo(x0 + px * w0, y0 + py * w0);
-    c.lineTo(x1 + px * w1, y1 + py * w1);
-    c.lineTo(x1 - px * w1, y1 - py * w1);
-    c.lineTo(x0 - px * w0, y0 - py * w0);
-    c.closePath();
-    c.fill();
-    if (n.d < T.maxD) {
-      c.beginPath();
-      c.arc(x1, y1, w1, 0, TAU);
-      c.fill();
-    }
-  }
-  // thin twigs: flat, in one path (a fill each for the tapers and the joints: where they overlap with
+  lx /= ll; ly /= ll;                              // towards the light: the same as for the leaves
+  var mid = rgba(bark), hi = scaleRgb(mixRgb(scaleRgb(bark, 1.25), KOYO_PAPER, 0.18), 1), lo = scaleRgb(bark, 0.55);
+  if (!T.limbs) T.limbs = koyoLimbs(T);
+  var THICK = Math.max(5, T.scale * 0.0075), thin = [];
+  // thin twigs first: flat, in one path (a fill each for the tapers and the joints: where they overlap with
   // opposite winding the canvas would leave a hole)
   c.fillStyle = mid;
   c.beginPath();
-  for (i = 0; i < thin.length; i++) {
-    n = thin[i];
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    if (n.perch || n.w >= THICK) continue;       // the owl's branch is drawn by drawPerch (8b)
+    thin.push(n);
     var v0 = n.w / 2, v1 = endW(n);
     var ax = koyoX(T, n.sx), ay = n.sy, bx = koyoX(T, n.ex), by = n.ey;
     var ex = bx - ax, ey = by - ay, el = Math.hypot(ex, ey) || 1, qx = -ey / el, qy = ex / el;
@@ -14038,7 +14009,129 @@ function fillKoyoBranches(c, T, strength) {
     c.arc(jx, n.ey, r, 0, TAU);
   }
   c.fill();
-  if (T.perch !== undefined) NightLife.drawPerch(c, T, paint);
+  // The thick limbs are each one smooth, tapering curve (see koyoLimbs). The
+  // owl's branch goes under them and the thinner limbs under the thicker ones,
+  // so every branch comes out from behind the one it grows from, with no
+  // joints or flat ends showing.
+  function paintLimb(S, roundEnd) { paintBark(c, S, roundEnd, mid, hi, lo, lx, ly); }
+  if (T.perch !== undefined) NightLife.drawPerch(c, T, paintLimb, mid);
+  for (var li = 0; li < T.limbs.length; li++) {
+    var L = T.limbs[li], vx = [], vy = [], hw = [];
+    for (var k = 0; k < L.length; k++) {
+      n = ns[L[k]];
+      if (k === 0) { vx.push(koyoX(T, n.sx)); vy.push(n.sy); hw.push(n.w / 2); }
+      vx.push(koyoX(T, n.ex)); vy.push(n.ey); hw.push(endW(n));
+    }
+    paintLimb(smoothLimb(vx, vy, hw), true);
+  }
+}
+/* The thick part of the tree as limbs: from each fork the "leader" (the child
+   running most nearly straight on) carries the limb on; the other children
+   start limbs of their own. Deepest first, so the trunk is drawn last. The
+   tree's shape never changes (only its sway), so this is made once. */
+function koyoLimbs(T) {
+  var ns = T.nodes, THICK = Math.max(5, T.scale * 0.0075), kids = [], limbs = [], i;
+  for (i = 0; i < ns.length; i++) kids[i] = [];
+  for (i = 0; i < ns.length; i++) if (ns[i].p >= 0 && !ns[i].perch) kids[ns[i].p].push(i);
+  function lead(list, par) {
+    var best = -1, bd = Infinity;
+    list.forEach(function (j) {
+      if (ns[j].w < THICK) return;
+      var d = Math.abs(Math.atan2(Math.sin(ns[j].abs - par.abs), Math.cos(ns[j].abs - par.abs)));
+      if (d < bd) { bd = d; best = j; }
+    });
+    return best;
+  }
+  function walk(start) {
+    var limb = [start], cur = start;
+    for (;;) {
+      var nx = lead(kids[cur], ns[cur]);
+      kids[cur].forEach(function (j) { if (j !== nx && ns[j].w >= THICK) walk(j); });
+      if (nx < 0) break;
+      limb.push(nx); cur = nx;
+    }
+    limbs.push(limb);
+  }
+  for (i = 0; i < ns.length; i++) if (ns[i].p < 0 && ns[i].w >= THICK) walk(i);
+  limbs.sort(function (a, b) { return ns[b[0]].d - ns[a[0]].d; });
+  return limbs;
+}
+/* A smooth curve through the corners of a limb: it follows the straight pieces
+   but rounds each corner off (quadratic curves between the pieces' middles).
+   The half-width is given at each corner and fades smoothly along the curve.
+   Returns samples { x, y, hw, nx, ny }. */
+function smoothLimb(vx, vy, hw) {
+  var m = vx.length - 1, px = [vx[0]], py = [vy[0]], k, j;
+  function mid2(a, b) { return (a + b) / 2; }
+  if (m >= 2) {
+    px.push(mid2(vx[0], vx[1])); py.push(mid2(vy[0], vy[1]));
+    for (k = 1; k < m; k++) {
+      var sx = mid2(vx[k - 1], vx[k]), sy = mid2(vy[k - 1], vy[k]), ex = mid2(vx[k], vx[k + 1]), ey = mid2(vy[k], vy[k + 1]);
+      for (j = 1; j <= 6; j++) {
+        var t = j / 6, u = 1 - t;
+        px.push(u * u * sx + 2 * u * t * vx[k] + t * t * ex);
+        py.push(u * u * sy + 2 * u * t * vy[k] + t * t * ey);
+      }
+    }
+  } else {
+    px.push(mid2(vx[0], vx[1])); py.push(mid2(vy[0], vy[1]));
+  }
+  px.push(vx[m]); py.push(vy[m]);
+  // where along the curve each corner is (by the length of the straight pieces), to fade the width
+  var pos = [0], tot = 0;
+  for (k = 1; k <= m; k++) { tot += Math.hypot(vx[k] - vx[k - 1], vy[k] - vy[k - 1]); pos.push(tot); }
+  var cum = [0], clen = 0, S = [];
+  for (k = 1; k < px.length; k++) { clen += Math.hypot(px[k] - px[k - 1], py[k] - py[k - 1]); cum.push(clen); }
+  var seg = 1;
+  for (k = 0; k < px.length; k++) {
+    var d = clen > 0 ? cum[k] / clen * tot : 0;
+    while (seg < m && pos[seg] < d) seg++;
+    var f = pos[seg] > pos[seg - 1] ? clamp((d - pos[seg - 1]) / (pos[seg] - pos[seg - 1]), 0, 1) : 0;
+    var dx = (px[Math.min(k + 1, px.length - 1)] - px[Math.max(k - 1, 0)]), dy = (py[Math.min(k + 1, px.length - 1)] - py[Math.max(k - 1, 0)]), dl = Math.hypot(dx, dy) || 1;
+    S.push({ x: px[k], y: py[k], hw: lerp(hw[seg - 1], hw[seg], f), nx: -dy / dl, ny: dx / dl });
+  }
+  return S;
+}
+/* One limb: its outline in the bark colour, then soft shading laid on in a few
+   thin layers. Which edge is dark and which is lit follows the direction the
+   limb is running at that point (no switching, so nothing jumps along it). */
+function paintBark(c, S, roundEnd, mid, hi, lo, lx, ly) {
+  var i, n = S.length, e = S[n - 1];
+  function edge(off, rev) {
+    for (var q = 0; q < n; q++) {
+      var P = S[rev ? n - 1 - q : q], o = off(rev ? n - 1 - q : q);
+      c.lineTo(P.x + P.nx * P.hw * o, P.y + P.ny * P.hw * o);
+    }
+  }
+  function band(o0, o1, col, alpha) {
+    c.beginPath();
+    c.moveTo(S[0].x + S[0].nx * S[0].hw * o0(0), S[0].y + S[0].ny * S[0].hw * o0(0));
+    edge(o0, false);
+    edge(o1, true);
+    c.closePath();
+    c.fillStyle = rgba(col, alpha);
+    c.fill();
+  }
+  c.fillStyle = mid;
+  c.beginPath();
+  c.moveTo(S[0].x + S[0].nx * S[0].hw, S[0].y + S[0].ny * S[0].hw);
+  edge(function () { return 1; }, false);
+  if (roundEnd) c.arc(e.x, e.y, e.hw, Math.atan2(e.ny, e.nx), Math.atan2(-e.ny, -e.nx), true);
+  edge(function () { return -1; }, true);
+  c.closePath();
+  c.fill();
+  function t(q) { return S[q].nx * lx + S[q].ny * ly; }   // 1: the +normal side faces the light
+  // dark edges: wider on the side away from the light
+  for (i = 0; i < 3; i++) {
+    var k = 1 - i * 0.3;
+    band(function (q) { return 1 - (0.12 + 0.6 * Math.max(0, -t(q))) * k; }, function () { return 1; }, lo, 0.22);
+    band(function (q) { return -1 + (0.12 + 0.6 * Math.max(0, t(q))) * k; }, function () { return -1; }, lo, 0.22);
+  }
+  // a soft highlight just in from the lit edge
+  for (i = 0; i < 2; i++) {
+    var w = 0.16 - i * 0.07;
+    band(function (q) { return 0.5 * t(q) - w; }, function (q) { return 0.5 * t(q) + w; }, hi, 0.2);
+  }
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -17846,26 +17939,12 @@ function perchTwig(P) {
   var q = curvePt(P, clamp(P.n.at + 0.15, 0.82, 0.95)), a = Math.atan2(q.ty, q.tx) - 0.6 * P.n.side, l = P.L * 0.22;   // just past the owl
   return { q: q, x: q.x + Math.cos(a) * l, y: q.y + Math.sin(a) * l, a: a };
 }
-/* Drawn with the tree's branches, shaded like them: paint(x, y, nx, ny, halfWidth)
-   sets the same light-to-dark fade across the branch's width. */
-function drawPerch(c, T, paint) {
-  var P = perchCurve(T), N = 14, i, q, Lft = [], Rgt = [];
-  for (i = 0; i <= N; i++) {
-    q = curvePt(P, i / N);
-    Lft.push([q.x + q.nx * q.w / 2, q.y + q.ny * q.w / 2]);
-    Rgt.push([q.x - q.nx * q.w / 2, q.y - q.ny * q.w / 2]);
-  }
-  var m = curvePt(P, 0.5);
-  paint(m.x, m.y, m.nx, m.ny, P.n.w / 2 * 0.7);
-  c.beginPath();
-  c.moveTo(Lft[0][0], Lft[0][1]);
-  for (i = 1; i <= N; i++) c.lineTo(Lft[i][0], Lft[i][1]);
-  c.arc(q.x, q.y, q.w / 2, Math.atan2(q.ny, q.nx), Math.atan2(-q.ny, -q.nx), P.n.side < 0);   // round tip
-  for (i = N; i >= 0; i--) c.lineTo(Rgt[i][0], Rgt[i][1]);
-  c.closePath();
-  c.fill();
+/* Drawn with the tree's branches, shaded like them: paintLimb(samples, roundEnd)
+   draws a shaded limb (see paintBark); flat is the plain bark colour. */
+function drawPerch(c, T, paintLimb, flat) {
+  var P = curveSamples(T), tw = perchTwig(perchCurve(T)), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
   // a short twig near the tip, angled up and out
-  var tw = perchTwig(P), w0 = tw.q.w * 0.55, w1 = 0.7, px = -Math.sin(tw.a), py = Math.cos(tw.a);
+  c.fillStyle = flat;
   c.beginPath();
   c.moveTo(tw.q.x + px * w0, tw.q.y + py * w0);
   c.lineTo(tw.x + px * w1, tw.y + py * w1);
@@ -17873,6 +17952,16 @@ function drawPerch(c, T, paint) {
   c.lineTo(tw.q.x - px * w0, tw.q.y - py * w0);
   c.closePath();
   c.fill();
+  paintLimb(P, true);
+}
+/* The branch as samples along its curve, with its normals. */
+function curveSamples(T) {
+  var P = perchCurve(T), N = 14, S = [], i, q;
+  for (i = 0; i <= N; i++) {
+    q = curvePt(P, i / N);
+    S.push({ x: q.x, y: q.y, hw: q.w / 2, nx: -q.ty, ny: q.tx });   // the same side convention as smoothLimb
+  }
+  return S;
 }
 /* Its leaves, drawn with the tree's foliage, in the light of the moment (the
    lamps catch them at night, as they do the clumps). */
