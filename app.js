@@ -12661,6 +12661,11 @@ function drawFog(ctx, dt) {
      and then one darts off and catches up.
    - A bird keeps well above the ground line: it climbs away from it long
      before it gets low and can never go below a hard limit.
+   - The near birds skirt round the message text: they never aim for the
+     sky behind the words, and a bird about to fly over them swerves over,
+     under or round the side, whichever is nearest. The box round the words
+     is read from the page, so a short message leaves more open sky than a
+     long one, and it moves with a panel as it slides.
    - Three depths (FLOCK_TIERS): the near flocks are bigger and cross the
      screen faster, the far ones tiny, paler and low over the mountains. Each
      depth sits among the groves and trees (BIRD_HIDE): the far one behind
@@ -12678,7 +12683,8 @@ var BIRD = {
   flapHz: 8, flapAmp: 40, beatsMin: 2, beatsMax: 7,            // wingbeats a second, how far the wings swing (degrees), beats in a burst
   glideMin: 0.25, glideMax: 1.1, wingLen: 1.05, sweep: 0.4, tail: 0.5,   // seconds of gliding between bursts, wing length, wingtips swept back, forked tail (body lengths)
   colour: '#1E1D22', haze: 0.5, view: 43,                      // the far birds' paleness, how far we look up at them (degrees)
-  floorSoft: 0.16, floorHard: 0.1                              // how far above the ground line (fraction of the screen height) they start to climb away, and the lowest they can go
+  floorSoft: 0.16, floorHard: 0.1,                             // how far above the ground line (fraction of the screen height) they start to climb away, and the lowest they can go
+  textPad: 22, textLook: 0.7                                   // the near birds skirt the message text: how far clear of the words they keep (px), and how far ahead they look (s)
 };
 var BIRD_HIDE = [['nt'], ['ng', 'nt'], ['fg', 'ft', 'ng', 'nt']];   // what is in front of each depth: near, middle, far
 var BODY_M = 0.17;                                    // a swallow's body length (m)
@@ -12709,9 +12715,55 @@ function bScreen(F, p, cam) {
   return [W / 2 + p[0] * m, H * LAND.horizon - (p[1] * cam.c - p[2] * cam.s) * m, m];
 }
 /* A goal for the leader: a random place in its band of sky. */
+/* The message text: the box round the words of each message panel on the
+   screen, padded by BIRD.textPad (CSS px, as the birds'). Read from the page
+   about four times a second. */
+var birdText = [], birdTextT = -1, birdTextRange = document.createRange();
+function birdTextBoxes(t) {
+  if (t >= birdTextT && t - birdTextT < 0.25) return birdText;
+  birdTextT = t; birdText = [];
+  var cs = document.querySelectorAll('#track .panel-content'), pad = BIRD.textPad;
+  for (var i = 0; i < cs.length; i++) {
+    // the words themselves (each piece of text), not the full-width paragraphs round them
+    var l = Infinity, tp = Infinity, rr = -Infinity, bt = -Infinity, n;
+    var walk = document.createTreeWalker(cs[i], NodeFilter.SHOW_TEXT, null);
+    while ((n = walk.nextNode())) {
+      if (!/\S/.test(n.nodeValue)) continue;
+      birdTextRange.selectNodeContents(n);
+      var r = birdTextRange.getBoundingClientRect();
+      if (r.width < 1 || r.height < 1) continue;
+      l = Math.min(l, r.left); tp = Math.min(tp, r.top); rr = Math.max(rr, r.right); bt = Math.max(bt, r.bottom);
+    }
+    if (l === Infinity || rr < 0 || l > W || bt < 0 || tp > H) continue;   // hidden, or a panel off the screen
+    birdText.push({ l: l - pad, r: rr + pad, t: tp - pad, b: bt + pad });
+  }
+  return birdText;
+}
+function inBirdText(x, y, extra) {
+  for (var i = 0; i < birdText.length; i++) {
+    var b = birdText[i];
+    if (x > b.l - extra && x < b.r + extra && y > b.t - extra && y < b.b + extra) return b;
+  }
+  return null;
+}
+/* For a near bird at p flying at v: if now or `look` seconds ahead it is over
+   the text, the way out — the nearest edge of the box from where it is
+   heading — as a screen direction (ux, uy), and how far in that point is (px). */
+function textEscape(F, p, v, cam) {
+  if (F.tier !== 0 || !birdText.length) return null;
+  var L = BIRD.textLook, q = [p[0] + v[0] * L, p[1] + v[1] * L, p[2] + v[2] * L];
+  var a = bScreen(F, p, cam), s = bScreen(F, q, cam), b = inBirdText(s[0], s[1], 0);
+  if (!b) { b = inBirdText(a[0], a[1], 0); s = a; }
+  if (!b) return null;
+  var d = [s[1] - b.t, b.b - s[1], s[0] - b.l, b.r - s[0]], k = 0;     // to the top, bottom, left and right edges
+  for (var i = 1; i < 4; i++) if (d[i] < d[k]) k = i;
+  return { ux: k === 2 ? -1 : (k === 3 ? 1 : 0), uy: k === 0 ? -1 : (k === 1 ? 1 : 0), depth: d[k], m: a[2] };
+}
 function newGoal(F, cam, middle) {
   var T = FLOCK_TIERS[F.tier], m = pxPerM(F), mx = middle ? 0.3 : 0.12;
   var gx = W * rnd(mx, 1 - mx), gy = H * rnd(T.top, T.bot), gz = rnd(-5, 5);
+  // a near flock never aims for the sky behind the words
+  for (var n = 0; n < 12 && F.tier === 0 && inBirdText(gx, gy, 40); n++) { gx = W * rnd(mx, 1 - mx); gy = H * rnd(T.top, T.bot); }
   F.goal = [(gx - W / 2) / m, ((H * LAND.horizon - gy) / m + gz * cam.s) / cam.c, gz];
   F.goalT = rnd(3, 7);
 }
@@ -12796,8 +12848,12 @@ function updateLeader(F, t, dt, cam) {
       F.loopDir = Math.random() < 0.5 ? -1 : 1;
     }
   }
+  // about to fly over the message text: round the side, or over or under it
+  var esc = textEscape(F, F.p, [Math.cos(F.yaw) * F.v, F.vy, Math.sin(F.yaw) * F.v], cam);
+  if (esc) F.loopT = 0;
   var wantW;
-  if (F.loopT > 0 && !out && !F.leaving) { F.loopT -= dt; wantW = F.loopDir * BIRD.turn; }
+  if (esc && esc.ux) wantW = clamp(bWrap((esc.ux < 0 ? PI : 0) - F.yaw) * 3, -BIRD.turn * 1.5, BIRD.turn * 1.5);
+  else if (F.loopT > 0 && !out && !F.leaving) { F.loopT -= dt; wantW = F.loopDir * BIRD.turn; }
   else {
     F.loopT = 0;
     var gy = Math.atan2(F.goal[2] - F.p[2], F.goal[0] - F.p[0]);
@@ -12809,7 +12865,8 @@ function updateLeader(F, t, dt, cam) {
   F.v += (BIRD.speed * (1 - F.vy * 0.04) - F.v) * Math.min(1, dt);
   // up and down: toward the goal's height, with swoops
   var wantVy = clamp((F.goal[1] - F.p[1]) * (out ? 1 : 0.5), -3, 3) + (out ? 0 : 1) * BIRD.swoop * 3.2 * Math.sin(t * 0.7 + F.born) * Math.sin(t * 0.31 + F.born * 2);
-  F.vy += (wantVy - F.vy) * Math.min(1, dt * 1.5);
+  if (esc && esc.uy) wantVy = -esc.uy * 3.5;                    // screen up is world up
+  F.vy += (wantVy - F.vy) * Math.min(1, dt * (esc ? 3 : 1.5));
   var vel = [Math.cos(F.yaw) * F.v, F.vy, Math.sin(F.yaw) * F.v];
   for (var a = 0; a < 3; a++) F.p[a] += vel[a] * dt;
   F.wasOut = out;
@@ -12822,6 +12879,15 @@ function updateBird(F, B, t, dt) {
   for (var a = 0; a < 3; a++) {
     var acc = (tg.p[a] - B.p[a]) * 3.2 + (tg.v[a] + B.dartV[a] - B.v[a]) * 2.6;
     B.acc[a] = clamp(acc, -30, 30);
+  }
+  // a near bird heading over the message text swerves away to the nearest edge, harder the further in
+  var esc = textEscape(F, B.p, B.v, bCam());
+  if (esc) {
+    var push = 12 + Math.min(30, esc.depth / esc.m * 25), cc = bCam().c;
+    B.acc[0] += esc.ux * push;
+    B.acc[1] -= esc.uy * push / cc;
+    if (esc.ux * B.dartV[0] < 0) B.dartV[0] = 0;                    // and no dart carries it in
+    if (-esc.uy * B.dartV[1] < 0) B.dartV[1] = 0;
   }
   for (var c = 0; c < 3; c++) { B.v[c] += B.acc[c] * dt; B.p[c] += B.v[c] * dt; B.dartV[c] *= Math.max(0, 1 - dt * 1.4); }
   // the ground: it pulls itself up well before it gets low, and can never go below the hard limit
@@ -12875,6 +12941,7 @@ function updateBirds(dt, t) {
   // the landscape and trees fully drawn and the scene faded in
   var ready = LS.ready && !LS.step && LS.floorBuilt && !dynSetupLeft && dynMaster > 0.9;
   var cam = bCam(), target = birdTime ? BIRD.flocks : 0;
+  if (flocks.length) birdTextBoxes(t);
   var live = 0, q;
   for (q = 0; q < flocks.length; q++) if (!flocks[q].leaving) live++;
   if (birdTime && ready) {
