@@ -83,6 +83,14 @@ var BUILD = 'v147';
          through them and straight on out of the bottom of the screen. They
          are baked with the landscape (its last step) and lit by the app's
          light.
+       - 3D mountains (autumn), as tuned on bamboo.html (values in
+         MTN3D, section 8c): mountains.js draws real 3D ranges and the
+         Fuji-like peak on the graphics chip, once per bake, in place of
+         the painted ridges and Fuji. They are lit by the app's sun (low
+         and warm near sunrise and sunset, moonlit at night, softer under
+         cloud) with shadows, snow on the high ground, autumn forest
+         below a tree line, haze, and mist in the valleys and along their
+         foot. Without WebGL 2 the painted ridges are drawn as before.
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -14904,6 +14912,30 @@ var LAND_C = (function() {
   return { mtnFar: h('#B4B8CC'), mtnMid: h('#9198B2'), mtnNear: h('#737C95'), fujiSnow: h('#F7F3EC'),
            mist: h('#FBECE0'), treeLine: h('#5F6B48'), soil: h('#4A2A20'), litterBrown: h('#7E4A30'), litterTan: h('#B7814F') };
 })();
+/* The 3D mountains (mountains.js), as tuned on bamboo.html: they replace the
+   painted ridges and Fuji in the autumn landscape. Real 3D ranges and the
+   Fuji-like peak, lit by the app's sun with shadows, snow on the high
+   ground, autumn forest, haze and mist in the valleys; drawn once into the
+   baked scenery, so nothing extra is drawn per frame. Where WebGL 2 is
+   missing the painted ridges are drawn as before. */
+var MTN3D = {
+  on: true, seed: 7,
+  // the ranges
+  rangeHeight: 0.08, featureKm: 9.5, sharpness: 0.6, layering: 0.94, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  // Fuji
+  fujiX: 0.78, fujiHeight: 0.46, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.1, fujiSnow: 0.4, fujiTongues: 0.6, fujiClear: 0.9,
+  // snow and forest
+  snowLine: 1.05, snow: 0.35, treeLine: 0.94, autumn: 1,
+  // the light (the sun moves from eveningElevation to sunElevation over the
+  // two hours after sunrise, and back before sunset)
+  sunAzimuth: -100, sunElevation: 22, eveningElevation: 4.5, sunStrength: 1.15, ambient: 0.55, shadows: 0.85,
+  // the air
+  haze: 0.53, hazeKm: 34, mist: 0.6, mistHeightKm: 0.3, fadeToSky: 0.22, footMist: 0.6,
+  // the picture
+  strength: 1, softness: 0.4, resolution: 0.85, treeDots: true,
+  colours: { rock: '#968476', fujiRock: '#544850', forestRed: '#B04A2C', forestGold: '#D49A44',
+             evergreen: '#4A5A3E', snow: '#F6F6FA', haze: '#DCCDD2' }
+};
 var LAND_REBAKE = 90;                 // seconds between light-driven re-bakes
 var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are baked at 0.6 resolution
 var KOYO_FALL1 = SPECIES.koyo.size * 1.05 * S.sizeScale;   // size of the nearest falling kōyō leaf
@@ -15022,11 +15054,18 @@ function landFuji(c, hy) {
 }
 function landBakeScenery() {
   var C = LAND_C, hy = H * LAND.horizon, mistC = koyoLight(C.mist);
-  LAND_SR = PR * LAND_SCN_RES;
+  var try3d = MTN3D.on && typeof Mountains !== 'undefined';
+  LAND_SR = PR * (try3d ? MTN3D.resolution : LAND_SCN_RES);   // the 3D mountains are sharp, so they are baked finer
   [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
   var m = LS.MTN.c, s = LS.SCN.c;
-  landBlurInto(m, LAND.mtnBlur * 1.3, function(c) { landFuji(c, hy); });   // the furthest: palest, softest
-  var r = rngFrom(LAND.seed * 131 + 17), R = LAND.ridges;
+  var is3d = try3d && landDrawMountains3d(m, hy);
+  if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
+    LAND_SR = PR * LAND_SCN_RES;
+    [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
+  }
+  // the painted ridges and Fuji, when the 3D mountains can't be drawn
+  if (!is3d) landBlurInto(m, LAND.mtnBlur * 1.3, function(c) { landFuji(c, hy); });   // the furthest: palest, softest
+  var r = rngFrom(LAND.seed * 131 + 17), R = is3d ? 0 : LAND.ridges;
   for (var i = 0; i < R; i++) {
     var d = R === 1 ? 0.6 : i / (R - 1);                                   // 0 far … 1 near
     var top = LAND.mtnHeight * H * lerp(1, 0.5, d);
@@ -15051,7 +15090,7 @@ function landBakeScenery() {
       m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
     }
   }
-  if (LAND.treeLine) {
+  if (is3d ? MTN3D.treeDots : LAND.treeLine) {
     var r2 = rngFrom(LAND.seed * 53 + 9), tl = rgba(koyoLight(mixRgb(C.treeLine, C.mist, 0.3 + LAND.mtnHaze * 0.3)));
     landBlurInto(m, Math.max(0.6, LAND.mtnBlur * 0.35), function(c) {
       c.fillStyle = tl;
@@ -15069,12 +15108,14 @@ function landBakeScenery() {
     });
   }
   s.setTransform(1, 0, 0, 1, 0, 0);
-  s.globalAlpha = LAND.mtnStrength;
+  s.globalAlpha = is3d ? MTN3D.strength : LAND.mtnStrength;
   s.drawImage(LS.MTN.cnv, 0, 0);
   s.globalAlpha = 1;
   // the top of the highest peak (with room for its blur and the drifting mist):
-  // only the scenery below it is drawn each frame
-  LS.scnTop = Math.max(0, Math.floor(hy - Math.max(LAND.fujiHeight, LAND.mtnHeight) * H - 40));
+  // only the scenery below it is drawn each frame. The 3D ranges stand at
+  // most about four times rangeHeight (the far ones rise), Fuji at fujiHeight.
+  var peak = is3d ? Math.max(MTN3D.fujiHeight, MTN3D.rangeHeight * 4) : Math.max(LAND.fujiHeight, LAND.mtnHeight);
+  LS.scnTop = Math.max(0, Math.floor(hy - peak * H - 40));
   // one soft mist blob, drawn a few times per frame drifting along the ridges
   var mc = LS.MIST.c; LS.MIST.cnv.width = LS.MIST.cnv.height = 128;
   var rg = mc.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -15087,6 +15128,56 @@ function landBakeScenery() {
                      v: lerp(4, 10, r4()) * (r4() < 0.8 ? 1 : -1) });
     }
   }
+}
+
+/* ---------- the 3D mountains (MTN3D) ---------- */
+/* Everything mountains.js needs, for the app's light now. */
+function mtnOptions(hy) {
+  var M = MTN3D, col = {}, k;
+  for (k in M.colours) col[k] = hexToRgb(M.colours[k]);
+  var n = koyoNight(), sun = ENV.sun;
+  // how far into the day: 0 at sunrise and sunset, 1 two hours or more from them
+  var t = smooth(0, 2.2, Math.min(S.hour - sun.rise, sun.set - S.hour));
+  // how clear the sky is: cloud softens the sunlight and the shadows
+  var clear = ENV.light.daylight > 0.01 ? clamp(ENV.sunAmt / ENV.light.daylight, 0, 1) : 1;
+  var sunC = mixRgb([255, 168, 102], [255, 247, 236], t), sky = mixRgb([176, 160, 196], [178, 196, 226], t);
+  var o = {};
+  for (k in M) if (k !== 'colours') o[k] = M[k];
+  o.width = LS.MTN.cnv.width; o.height = LS.MTN.cnv.height; o.screenW = W; o.screenH = H; o.horizon = hy;
+  o.fuji = true;
+  o.sunElevation = lerp(lerp(M.eveningElevation, M.sunElevation, t), 38, n);
+  o.sunColour = mixRgb(sunC, [150, 165, 220], n);
+  o.skyColour = mixRgb(sky, [80, 92, 140], n);
+  o.sunStrength = M.sunStrength * lerp(1, 0.3, n) * lerp(0.6, 1, clear);
+  o.ambient = M.ambient * lerp(1, 0.7, n);
+  o.shadows = M.shadows * lerp(0.4, 1, clear);
+  o.hazeColour = koyoLight(col.haze); o.mistColour = koyoLight(LAND_C.mist);
+  o.colours = { rock: col.rock, fujiRock: col.fujiRock, forestRed: col.forestRed, forestGold: col.forestGold,
+                evergreen: col.evergreen, snow: col.snow };
+  return o;
+}
+/* The 3D mountains into LS.MTN, softened a little, with mist along their
+   foot. False when they can't be drawn here (no WebGL 2). */
+function landDrawMountains3d(m, hy) {
+  if (!MTN3D.on || typeof Mountains === 'undefined') return false;
+  var g3 = Mountains.render(mtnOptions(hy));
+  if (!g3) return false;
+  m.save();
+  m.setTransform(1, 0, 0, 1, 0, 0);
+  var px = MTN3D.softness * LAND_SR;
+  m.filter = HAS_FILTER && px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
+  m.drawImage(g3, 0, 0, LS.MTN.cnv.width, LS.MTN.cnv.height);
+  m.restore();
+  if (MTN3D.footMist > 0) {
+    var mistC = koyoLight(LAND_C.mist), y0 = hy - H * 0.07, y1 = hy + 6;
+    m.setTransform(LAND_SR, 0, 0, LAND_SR, 0, 0);
+    var g = m.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, rgba(mistC, 0));
+    g.addColorStop(0.7, rgba(mistC, MTN3D.footMist * 0.55));
+    g.addColorStop(1, rgba(mistC, MTN3D.footMist * 0.85));
+    m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
+  }
+  return true;
 }
 
 /* ---------- the ground of fallen leaves, behind the trees ---------- */
