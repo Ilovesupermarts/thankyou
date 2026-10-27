@@ -12697,7 +12697,7 @@ var BIRD = {
   // perching on the front torii gate (near flocks only): the chance a second that a flock goes down to it, how long
   // it must have flown first and between visits (s), how long it stays (s), the seconds over which the birds come
   // in, a perched bird's body length (× the gate's height on the screen), and the pause between one bird's actions (s)
-  perch: 0.07, perchAfter: 8, perchAgain: 30, perchStay: [20, 45], perchArrive: 2.5, perchSize: 0.07, perchIdle: [1, 4.5]
+  perch: 0.07, perchAfter: 8, perchAgain: 30, perchStay: [20, 45], perchArrive: 2.5, perchSize: 0.08, perchIdle: [1, 4.5]
 };
 /* What a perched bird does now and then, and how often (weights) and how long (s). */
 var PERCH_ACTS = {
@@ -13273,7 +13273,7 @@ function perchPose(B, t) {
       }
       break;
     case 'stretchOne':
-      if (A.v) { Q.wingN = 0.12 - 0.45 * e; Q.spreadN = e; } else { Q.wingF = 0.12 - 0.45 * e; Q.spreadF = e; }
+      if (A.v) { Q.wingN = 0.12 + 0.35 * e; Q.spreadN = e; } else { Q.wingF = 0.12 + 0.35 * e; Q.spreadF = e; }   // out, down and back, spread
       Q.tilt = -0.15 * e; break;
     case 'stretchBoth': Q.wingN = 0.12 + 1.75 * e; Q.wingF = 0.12 + 1.35 * e; Q.spreadN = Q.spreadF = 0.85 * e; Q.tilt = 0.15 * e; Q.beak = -0.2 * e; break;
     case 'flap':
@@ -13292,60 +13292,88 @@ function perchPose(B, t) {
   }
   return Q;
 }
-/* A perched bird, seen from the side, as a dark silhouette: body tilted up,
-   head, beak, forked tail hanging down behind, the wings folded along the
-   back (or raised, spread or stretched), and its feet on the beam. */
+/* A perched bird, seen from the side, as a dark silhouette, shaped like a
+   small songbird on a branch: a plump, upright, egg-shaped body sitting on
+   the beam, a round head on top with a short beak, the tail hanging straight
+   down behind the beam, the folded wings tucked into the body (only their
+   tips show, crossing the base of the tail), and short legs. Raised, the
+   wings are broad with the long flight feathers spread at their ends, and
+   the tail fans out. Units: body lengths (L px), x forward, y up, the feet
+   at (0, 0). */
 function drawPerched(c, B, col) {
   if (!TOR.perch) return;
   var t = birdNow, Q = perchPose(B, t), L = perchL(), at = perchAt(Q.u), f = Q.face;
   var x0 = at[0] + Q.jit * L, y0 = at[1] - Q.lift * L;
   function S(x, y) { return [x0 + x * f * L, y0 - y * L]; }
-  var th = 0.82 + Q.tilt, ax = Math.cos(th), ay = Math.sin(th), nx = -ay, ny = ax;   // sitting up, the tail hanging down behind the beam
-  var cx = 0.02, cy = 0.31 + 0.03 * (Q.puff - 1);
+  function mv(p) { c.moveTo(p[0], p[1]); }
+  function ln(p) { c.lineTo(p[0], p[1]); }
+  function qd(p, q) { c.quadraticCurveTo(p[0], p[1], q[0], q[1]); }
+  var th = 1.15 + Q.tilt * 0.6, ax = Math.cos(th), ay = Math.sin(th);   // the body's long axis: up, a little forward
+  var bx = -ay, by = ax;                                                // toward its back
+  var pf = Q.puff, cx = -0.03, cy = 0.35 + 0.05 * (pf - 1);              // the middle of the body
+  var spread = Math.max(Q.spreadN, Q.spreadF);
   c.fillStyle = col; c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round';
-  function wing(raise, spread, off) {
-    var dx = -ax * Math.cos(raise) + nx * Math.sin(raise), dy = -ay * Math.cos(raise) + ny * Math.sin(raise);
-    var px = dy, py = -dx;                                           // toward the leading edge
-    var sx = cx + ax * (0.1 + off) + nx * 0.05, sy = cy + ay * (0.1 + off) + ny * 0.05;
-    var lw = 0.75 + 0.3 * spread, ww = 0.07 + 0.14 * spread;
-    var p0 = S(sx + px * ww * 0.5, sy + py * ww * 0.5), p1 = S(sx + dx * lw * 0.45 + px * ww, sy + dy * lw * 0.45 + py * ww);
-    var tip = S(sx + dx * lw, sy + dy * lw), p2 = S(sx + dx * lw * 0.4 - px * ww * 0.7, sy + dy * lw * 0.4 - py * ww * 0.7);
-    var p3 = S(sx - px * ww * 0.4, sy - py * ww * 0.4);
-    c.beginPath(); c.moveTo(p0[0], p0[1]);
-    c.quadraticCurveTo(p1[0], p1[1], tip[0], tip[1]);
-    c.quadraticCurveTo(p2[0], p2[1], p3[0], p3[1]);
+  // a wing at angle `raise` (as perchPose gives it: about 0.1 folded, 1.9 straight up over the back)
+  function wing(raise, sp, off) {
+    if (raise < 0.3 && sp < 0.08) return;                              // folded: inside the body's outline
+    var ang = -1.92 - raise * 1.6, dx = Math.cos(ang), dy = Math.sin(ang), px = dy, py = -dx;
+    var len = 0.62 + 0.28 * sp, w = 0.12 + 0.14 * sp;
+    var sx = cx + ax * 0.12 + bx * (0.07 + off), sy = cy + ay * 0.12 + by * (0.07 + off);
+    function P(a, b) { return S(sx + dx * a + px * b, sy + dy * a + py * b); }
+    c.beginPath();
+    mv(P(0, w * 0.6));
+    qd(P(len * 0.45, w * 1.1), P(len, w * 0.15));                      // the leading edge out to the tip
+    var n = sp > 0.3 ? 4 : 1;                                          // the long flight feathers at the end, spread
+    for (var i = 0; i < n; i++) {
+      var k0 = len * (1 - 0.1 * i), k1 = len * (0.93 - 0.1 * i);
+      ln(P(k0 - 0.02, -w * (0.15 + 0.22 * i)));
+      if (i < n - 1) ln(P(k1 - 0.05, -w * (0.2 + 0.22 * i)));
+    }
+    qd(P(len * 0.35, -w * 1.05), P(0, -w * 0.55));                     // the inner trailing edge back to the body
     c.closePath(); c.fill();
   }
-  wing(Q.wingF, Q.spreadF, 0.03);                                     // the far wing, behind
-  // the forked tail
-  var tw = Q.tail, tdx = -ax * Math.cos(tw) + ay * Math.sin(tw), tdy = -ax * Math.sin(tw) - ay * Math.cos(tw);
-  var rx = cx - ax * 0.26, ry = cy - ay * 0.26, tl = 0.25 + BIRD.tail * 0.75;
-  function tp(rot, len) { var cr = Math.cos(rot), sr = Math.sin(rot); return S(rx + (tdx * cr - tdy * sr) * len, ry + (tdx * sr + tdy * cr) * len); }
-  var c1 = S(rx - tdy * 0.045, ry + tdx * 0.045), c2 = S(rx + tdy * 0.045, ry - tdx * 0.045);
-  var q1 = tp(0.1, tl), q2 = tp(-0.1, tl), nt = tp(0, tl * 0.55);
-  c.beginPath(); c.moveTo(c1[0], c1[1]); c.lineTo(q1[0], q1[1]); c.lineTo(nt[0], nt[1]); c.lineTo(q2[0], q2[1]); c.lineTo(c2[0], c2[1]); c.closePath(); c.fill();
-  c.lineWidth = Math.max(0.5, 0.03 * L); c.stroke();
-  // the body
-  var bc = S(cx, cy);
-  c.beginPath(); c.ellipse(bc[0], bc[1], 0.3 * L, 0.12 * Q.puff * L, Math.atan2(-ay, ax * f), 0, TAU); c.fill();
-  // the head: forward, turned back onto its back (preening), or down to its breast
-  var hx = cx + ax * 0.28 + nx * 0.06, hy = cy + ay * 0.28 + ny * 0.06;
-  hx = lerp(hx, cx - ax * 0.02 + nx * 0.15, Q.headBack); hy = lerp(hy, cy - ay * 0.02 + ny * 0.15, Q.headBack);
-  hx = lerp(hx, cx + ax * 0.18 - nx * 0.02, Q.headDown); hy = lerp(hy, cy + ay * 0.18 - ny * 0.02, Q.headDown);
-  var hr = 0.115 * Math.sqrt(Q.puff), hc = S(hx, hy);
+  wing(Q.wingF, Q.spreadF, 0.02);                                       // the far wing, behind
+  // the tail: hanging down behind the beam, fanned out when the wings open
+  var ta = -1.82 + Q.tail, tdx = Math.cos(ta), tdy = Math.sin(ta), tpx = -tdy, tpy = tdx;
+  var tbx = cx - ax * 0.24 + bx * 0.05, tby = cy - ay * 0.24 + by * 0.05;
+  var tl = 0.32 + BIRD.tail * 0.25, w0 = 0.05, w1 = 0.065 + 0.14 * spread;
+  function T(a, b) { return S(tbx + tdx * a + tpx * b, tby + tdy * a + tpy * b); }
+  c.beginPath(); mv(T(0, w0)); ln(T(tl, w1)); ln(T(tl * 0.9, 0)); ln(T(tl, -w1)); ln(T(0, -w0)); c.closePath(); c.fill();
+  // the body: an egg, round at the breast, narrowing to the tail
+  var rl = 0.3, rw = 0.23 * pf;
+  function E(a, b) { return S(cx + ax * a + bx * b, cy + ay * a + by * b); }
+  c.beginPath();
+  mv(E(rl, 0));
+  c.bezierCurveTo.apply(c, E(rl, -rw * 1.05).concat(E(0, -rw * 1.15), E(-rl * 0.75, -rw * 0.6)));   // the breast and belly
+  qd(E(-rl * 1.05, -rw * 0.1), E(-rl * 0.95, rw * 0.35));                                            // the vent, round to the tail
+  c.bezierCurveTo.apply(c, E(-rl * 0.4, rw * 0.95).concat(E(rl * 0.7, rw * 1.0), E(rl, 0)));        // the back
+  c.closePath(); c.fill();
+  // the folded wingtips, crossing the base of the tail
+  if (Q.wingN < 0.3 && Q.spreadN < 0.08) {
+    c.beginPath(); mv(E(0.02, rw * 0.9)); qd(E(-rl * 0.9, rw * 0.85), E(-rl * 1.4, rw * 0.4)); ln(E(-rl * 0.6, rw * 0.25)); c.closePath(); c.fill();
+  }
+  // the head: on top of the body (turned back and down onto its back to preen, or bent to its breast)
+  var hx = cx + ax * 0.33 - bx * 0.03, hy = cy + ay * 0.33 - by * 0.03;
+  hx = lerp(hx, cx + ax * 0.18 + bx * 0.1, Q.headBack); hy = lerp(hy, cy + ay * 0.18 + by * 0.1, Q.headBack);
+  hx = lerp(hx, cx + ax * 0.22 - bx * 0.14, Q.headDown); hy = lerp(hy, cy + ay * 0.22 - by * 0.14, Q.headDown);
+  var hr = 0.125 * Math.sqrt(pf), hc = S(hx, hy);
   c.beginPath(); c.arc(hc[0], hc[1], hr * L, 0, TAU); c.fill();
-  var ba = -0.15 + Q.beak, bx = Math.cos(ba), by = Math.sin(ba);
-  var bt = S(hx + bx * (hr + 0.09), hy + by * (hr + 0.09)), b1 = S(hx + bx * 0.06 - by * 0.035, hy + by * 0.06 + bx * 0.035), b2 = S(hx + bx * 0.06 + by * 0.035, hy + by * 0.06 - bx * 0.035);
-  c.beginPath(); c.moveTo(b1[0], b1[1]); c.lineTo(bt[0], bt[1]); c.lineTo(b2[0], b2[1]); c.closePath(); c.fill();
-  wing(Q.wingN, Q.spreadN, 0);                                        // the near wing
-  // the feet on the beam (tucked up in a hop)
+  var nk = S(cx + ax * 0.15, cy + ay * 0.15);                           // the neck, so the head sits on the body smoothly
+  c.lineWidth = hr * 1.6 * L; c.beginPath(); mv(nk); ln(hc); c.stroke();
+  // a short pointed beak
+  var ba = -0.08 + Q.beak, bcx = Math.cos(ba), bcy = Math.sin(ba);
+  c.beginPath();
+  mv(S(hx + bcx * hr * 0.6 - bcy * 0.045, hy + bcy * hr * 0.6 + bcx * 0.045));
+  ln(S(hx + bcx * (hr + 0.11), hy + bcy * (hr + 0.11)));
+  ln(S(hx + bcx * hr * 0.6 + bcy * 0.045, hy + bcy * hr * 0.6 - bcx * 0.045));
+  c.closePath(); c.fill();
+  wing(Q.wingN, Q.spreadN, 0);                                          // the near wing
+  // short legs to the beam, the toes round it (tucked up in a hop)
   if (Q.lift < 0.4) {
     c.lineWidth = Math.max(0.6, 0.045 * L);
     c.beginPath();
-    for (var s = -1; s <= 1; s += 2) {
-      var l0 = S(cx + s * 0.03, cy - 0.1), l1 = S(cx + s * 0.04 + 0.01, -Q.lift);   // the beam is Q.lift below
-      c.moveTo(l0[0], l0[1]); c.lineTo(l1[0], l1[1]);
-    }
+    for (var s = -1; s <= 1; s += 2) { mv(S(cx + 0.04 + s * 0.035, cy - 0.16)); ln(S(0.03 + s * 0.04, -Q.lift)); }
+    mv(S(-0.05, -Q.lift)); ln(S(0.11, -Q.lift));
     c.stroke();
   }
 }
