@@ -22,6 +22,8 @@
 
    Use:
      var cnv = Mountains.render(o);   // a canvas, or null (no WebGL 2)
+     var ref = Mountains.reflectance(o);   // how strongly each point reflects
+                                           // light from in front (the same canvas)
    o (screen values are CSS px; the picture is o.width × o.height px,
    drawn for a screen of o.screenW × o.screenH CSS px):
      width, height        size of the picture (px)
@@ -194,6 +196,7 @@ HEIGHT_GLSL,
 'uniform vec3 uRock, uFujiRock, uRed, uGold, uEver, uSnowCol;',
 'uniform float uSnowLine, uSnow, uTreeLine, uAutumn, uFujiSnow, uTongues;',
 'uniform float uShadows, uAmbient, uHaze, uHazeKm, uMist, uMistH, uFade;',
+'uniform float uMode;          // 0 the picture, 1 how strongly each point reflects light from in front (see reflectance())',
 'in vec3 vPos;',
 'out vec4 outCol;',
 'float shadowAt(vec3 p, float e) {',
@@ -249,6 +252,16 @@ HEIGHT_GLSL,
 '    snowR = mix(snowR, max(fSnow, snowR * 0.3), onFuji);',
 '  }',
 '  alb = mix(alb, uSnowCol, clamp(snowR, 0.0, 1.0));',
+'  if (uMode > 0.5) {',
+'    // how much light from fireworks over the range comes back to us: bright surfaces',
+'    // (snow far more than rock or forest), facing up and toward us, less through the haze',
+'    float lum = dot(alb, vec3(0.3, 0.55, 0.15));',
+'    float face = 0.3 + 0.7 * clamp(n.y * 0.6 - n.z * 0.4, 0.0, 1.0);',
+'    float haze = 1.0 - 0.6 * (1.0 - exp(-dist / uHazeKm)) * uHaze;',
+'    float r = clamp(pow(lum, 1.6) * face * haze, 0.0, 1.0);',
+'    outCol = vec4(r, r, r, r);',
+'    return;',
+'  }',
 '  // --- light',
 '  float sh = mix(1.0, shadowAt(p + n * e * 2.0, e), uShadows);',
 '  float dif = max(dot(n, uSunDir), 0.0) * sh;',
@@ -323,7 +336,7 @@ function buildGrid(cols, rows) {
 function c3(c) { return [c[0] / 255, c[1] / 255, c[2] / 255]; }
 function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
 
-function render(o) {
+function render(o, mode) {
   if (!init()) return null;
   var W = o.screenW, H = o.screenH;
   if (cnv.width !== o.width || cnv.height !== o.height) { cnv.width = o.width; cnv.height = o.height; }
@@ -409,10 +422,20 @@ function render(o) {
   u1('uMistH', d(o, 'mistHeightKm', 0.35));
   u1('uFade', d(o, 'fadeToSky', 0.3));
 
+  u1('uMode', mode || 0);
+
   gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));   // waits for the drawing to finish, so it is timed truly
   return cnv;
 }
 
-return { render: render, supported: function () { return init(); } };
+/* The same mountains as render(o), as a map of how strongly each point
+   reflects light shone on it from the sky in front of them (the light of
+   fireworks): its alpha is high on snow, lower on rock, low on forest,
+   higher on faces turned up and toward us, weaker through the far haze,
+   and 0 off the mountains. It comes back on the same canvas as render(),
+   so draw that one away first. */
+function reflectance(o) { return render(o, 1); }
+
+return { render: render, reflectance: reflectance, supported: function () { return init(); } };
 })();

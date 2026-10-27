@@ -47,8 +47,12 @@
                                             // through them. Make one with
                                             // Fireworks.silhouette(). Nothing
                                             // is drawn below the ground line.
-     show.drawFront(ctx);                   // in front of the mountains:
-                                            // the light of the bursts on them
+     show.drawFront(ctx, refl);             // in front of the mountains:
+                                            // the light of the bursts on them.
+                                            // refl (optional): the mountains'
+                                            // Mountains.reflectance() picture,
+                                            // so the colours fall on the faces
+                                            // toward us, most on the snow
      show.launch(kind, o);                  // fire one now ('starmine',
                                             // 'phoenix' or a shell above); o, if
                                             // given: x (0 … 1), height (fraction of
@@ -187,10 +191,13 @@ function create(values) {
   var cloudTex = null, cloudBody = null, cloudKey = '';
   // the show is drawn on a layer of its own, so that what stands in front of it can be cut out
   var layerCv = document.createElement('canvas'), layerC = layerCv.getContext('2d');
+  // the light of the bursts on the mountains (half the screen's resolution, so the snow's edges stay sharp)
+  var reflCv = document.createElement('canvas'), reflC = reflCv.getContext('2d');
 
   function resize(w, h, pr, horizon) {
     W = w; H = h; PR = pr; hy = horizon;
     layerCv.width = Math.max(1, Math.round(W * PR)); layerCv.height = Math.max(1, Math.round(H * PR));
+    reflCv.width = Math.max(1, Math.round(W * PR / 2)); reflCv.height = Math.max(1, Math.round(H * PR / 2));
     glowCv.width = Math.max(1, Math.round(W * PR / 4)); glowCv.height = Math.max(1, Math.round(H * PR / 4));
     litCv.width = maskCv.width = Math.max(1, Math.round(W / 8)); litCv.height = maskCv.height = Math.max(1, Math.round(H / 8));
   }
@@ -735,8 +742,9 @@ function create(values) {
   }
 
   /* ---------- drawing, in front of the mountains: the light of the bursts on them ---------- */
-  function drawFront(ctx) {
-    if (!W || V.mountainLight <= 0) return;
+  function drawFront(ctx, refl) {
+    if (!W || V.mountainLight <= 0 || !flashes.length) return;
+    if (refl) { drawReflected(ctx, refl); return; }
     ctx.save();
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
@@ -751,6 +759,52 @@ function create(values) {
       ctx.fillStyle = g; ctx.fillRect(F.x - r, hy - r, r * 2, r * 1.2);
     }
     ctx.restore();
+  }
+
+  /* The light of the bursts on the mountains, through their reflectance map
+     (Mountains.reflectance): each burst's colour falls on the faces turned up
+     and toward us, much more on the snow than on rock or forest, strongest
+     close to the burst. Painted on a small sheet, kept where the map lets it
+     through, and added over the mountains. */
+  /* How much light a burst throws onto the mountains now: the flash, then as
+     long as its stars burn (they light the snow far longer than the flash). */
+  function shineNow(F) {
+    var a = now - F.t0;
+    return F.s * (Math.exp(-a / 0.2) + 0.75 * smooth(F.linger + 1.2, F.linger * 0.4, a));
+  }
+  function drawReflected(main, refl) {
+    var c = reflC, w = reflCv.width, h = reflCv.height, sum = 0, i;
+    for (i = 0; i < flashes.length; i++) sum += shineNow(flashes[i]);
+    var cap = sum > 2 ? 2 / sum : 1, any = false;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalAlpha = 1;
+    c.globalCompositeOperation = 'source-over';
+    c.clearRect(0, 0, w, h);
+    c.setTransform(w / W, 0, 0, h / H, 0, 0);
+    c.globalCompositeOperation = 'lighter';
+    for (i = 0; i < flashes.length; i++) {
+      var F = flashes[i], I = shineNow(F) * cap;
+      if (I < 0.01) continue;
+      any = true;
+      var r = F.R * 5 + H * 0.15, g = c.createRadialGradient(F.x, F.y, 0, F.x, F.y, r);
+      g.addColorStop(0, css(mix(F.c, WHITE, 0.2), Math.min(1, 1.2 * I)));
+      g.addColorStop(0.35, css(F.c, Math.min(1, 0.65 * I)));
+      g.addColorStop(1, css(F.c, 0));
+      c.fillStyle = g; c.fillRect(F.x - r, F.y - r, r * 2, r * 2);
+    }
+    if (!any) return;
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = 'destination-in';
+    c.drawImage(refl, 0, 0, w, h);
+    c.globalCompositeOperation = 'source-over';
+    main.save();
+    main.setTransform(1, 0, 0, 1, 0, 0);
+    main.globalCompositeOperation = 'lighter';
+    for (var amt = V.mountainLight * 1.15; amt > 0.005; amt -= 1) {      // above 1, laid down again
+      main.globalAlpha = Math.min(1, amt);
+      main.drawImage(reflCv, 0, 0, W * PR, H * PR);
+    }
+    main.restore();
   }
 
   return {
