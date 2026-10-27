@@ -12666,6 +12666,15 @@ function drawFog(ctx, dt) {
      under or round the side, whichever is nearest. The box round the words
      is read from the page, so a short message leaves more open sky than a
      long one, and it moves with a panel as it slides.
+   - Now and then a near flock flies down and perches along the top of the
+     front torii gate, the birds coming in one after another, each to its
+     own spot, braking with their wings up. While they sit, each bird does
+     things of its own now and then (PERCH_ACTS): looks back over its
+     shoulder or up at the sky, preens under a wing or its breast, stretches
+     one wing or both, beats its wings, fluffs up and shakes, sidles along
+     the beam, hops, turns round, flicks its tail. Then they take off, all
+     at once or one by one, and the flock flies on. On the gate they are at
+     the gate's depth: behind the far tree and the near grove and tree.
    - Three depths (FLOCK_TIERS): the near flocks are bigger and cross the
      screen faster, the far ones tiny, paler and low over the mountains. Each
      depth sits among the groves and trees (BIRD_HIDE): the far one behind
@@ -12684,9 +12693,27 @@ var BIRD = {
   glideMin: 0.25, glideMax: 1.1, wingLen: 1.05, sweep: 0.4, tail: 0.5,   // seconds of gliding between bursts, wing length, wingtips swept back, forked tail (body lengths)
   colour: '#1E1D22', haze: 0.5, view: 43,                      // the far birds' paleness, how far we look up at them (degrees)
   floorSoft: 0.16, floorHard: 0.1,                             // how far above the ground line (fraction of the screen height) they start to climb away, and the lowest they can go
-  textPad: 22, textLook: 0.7                                   // the near birds skirt the message text: how far clear of the words they keep (px), and how far ahead they look (s)
+  textPad: 22, textLook: 0.7,                                  // the near birds skirt the message text: how far clear of the words they keep (px), and how far ahead they look (s)
+  // perching on the front torii gate (near flocks only): the chance a second that a flock goes down to it, how long
+  // it must have flown first and between visits (s), how long it stays (s), the seconds over which the birds come
+  // in, a perched bird's body length (× the gate's height on the screen), and the pause between one bird's actions (s)
+  perch: 0.07, perchAfter: 8, perchAgain: 30, perchStay: [20, 45], perchArrive: 2.5, perchSize: 0.07, perchIdle: [1, 4.5]
 };
-var BIRD_HIDE = [['nt'], ['ng', 'nt'], ['fg', 'ft', 'ng', 'nt']];   // what is in front of each depth: near, middle, far
+/* What a perched bird does now and then, and how often (weights) and how long (s). */
+var PERCH_ACTS = {
+  look:        { w: 3,   dur: [0.8, 2] },     // turns its head to look back over its shoulder
+  glance:      { w: 1.5, dur: [0.4, 0.8] },   // a quick look up at the sky
+  preen:       { w: 3,   dur: [2, 5] },       // cleans itself: under the wing and along the back, or the breast
+  stretchOne:  { w: 1.2, dur: [1.2, 1.8] },   // stretches one wing out, down and back
+  stretchBoth: { w: 0.8, dur: [0.9, 1.3] },   // raises both wings high over its back
+  flap:        { w: 1.2, dur: [0.6, 1.4] },   // beats its wings without letting go
+  fluff:       { w: 1,   dur: [0.8, 1.1] },   // puffs up its feathers and shakes them down
+  shuffle:     { w: 1,   dur: [0.6, 1] },     // sidles a step along the beam
+  hop:         { w: 0.5, dur: [0.8, 1.1] },   // flutters up and lands again, sometimes facing the other way
+  turn:        { w: 1,   dur: [0.3, 0.4] },   // turns round to face the other way
+  wag:         { w: 1,   dur: [0.5, 0.8] }    // flicks its tail
+};
+var BIRD_HIDE = [['nt'], ['ng', 'nt'], ['fg', 'ft', 'ng', 'nt'], ['ft', 'ng', 'nt']];   // what is in front of each depth: near, middle, far, and on the gate (as the gates)
 var BODY_M = 0.17;                                    // a swallow's body length (m)
 // depth tiers: size on screen (× BIRD.size), how far away (m, for the gentle perspective
 // within a flock), how pale, the screen band its leader keeps to (fractions of the height)
@@ -12831,7 +12858,7 @@ function flockTarget(F, B, t) {
 function updateLeader(F, t, dt, cam) {
   var s = bScreen(F, F.p, cam), T = FLOCK_TIERS[F.tier];
   var out = s[0] < W * 0.06 || s[0] > W * 0.94 || s[1] < H * (T.top - 0.05) || s[1] > H * (T.bot + 0.08);
-  if (!F.leaving && t - F.born > F.life) {
+  if (!F.leaving && !F.perch && t - F.born > F.life) {
     F.leaving = true;
     var side = s[0] < W / 2 ? -1 : 1, m = pxPerM(F);
     F.goal = [side * (W / 2 + 400) / m, F.p[1] + rnd(0, 4), F.p[2]];
@@ -12874,6 +12901,8 @@ function updateLeader(F, t, dt, cam) {
   while (F.hist.length > 2 && F.hist[1].t < t - 8) F.hist.shift();
 }
 function updateBird(F, B, t, dt) {
+  if (B.mode && B.mode !== 'fly') { perchBird(F, B, t, dt); return; }
+  if (F.perch && F.perch.state === 'landing' && t > B.landAt) { startLanding(F, B, t, bCam()); return; }
   var tg = flockTarget(F, B, t);
   // follows its place: pulled toward it, matching its speed (and any dart dies away)
   for (var a = 0; a < 3; a++) {
@@ -12941,6 +12970,7 @@ function updateBirds(dt, t) {
   // the landscape and trees fully drawn and the scene faded in
   var ready = LS.ready && !LS.step && LS.floorBuilt && !dynSetupLeft && dynMaster > 0.9;
   var cam = bCam(), target = birdTime ? BIRD.flocks : 0;
+  birdNow = t;
   if (flocks.length) birdTextBoxes(t);
   var live = 0, q;
   for (q = 0; q < flocks.length; q++) if (!flocks[q].leaving) live++;
@@ -12949,15 +12979,16 @@ function updateBirds(dt, t) {
     else if (live < target && t > flockNext) { sendFlock(t); flockNext = t + BIRD.pause * rnd(0.6, 1.4); live++; }
   }
   // the weather turns or the day ends: the flocks fly off. None in winter, and none left over when the clock is moved outside the hours.
-  for (q = 0; q < flocks.length && live > target; q++) if (!flocks[q].leaving) { flocks[q].life = 0; live--; }
+  for (q = 0; q < flocks.length && live > target; q++) if (!flocks[q].leaving) { flocks[q].life = 0; flocks[q].dismissed = true; live--; }
   if (!S.birds || ENV.scene !== 'autumn' || h < ENV.sun.rise - 0.1 || h > 17.5) flocks.length = 0;
   for (var i = flocks.length - 1; i >= 0; i--) {
     var F = flocks[i];
-    updateLeader(F, t, dt, cam);
+    perchFlock(F, t, dt, cam);
+    if (!F.perch || F.perch.state !== 'perched') updateLeader(F, t, dt, cam);   // the leader waits while they all sit
     var anyIn = false;
     for (var j = 0; j < F.birds.length; j++) {
       updateBird(F, F.birds[j], t, dt);
-      var s = bScreen(F, F.birds[j].p, cam);
+      var s = birdXY(F, F.birds[j], cam);
       if (s[0] > -80 && s[0] < W + 80 && s[1] > -80) anyIn = true;
     }
     if (F.leaving && !anyIn) { flocks.splice(i, 1); flockNext = Math.max(flockNext, t + BIRD.pause * rnd(0.6, 1.4)); }
@@ -12966,13 +12997,16 @@ function updateBirds(dt, t) {
 
 /* One bird, posed in 3D and drawn flat as a dark silhouette. */
 function drawBird(c, F, B, cam, col) {
-  var s = bScreen(F, B.p, cam), m = s[2] * BODY_M;        // px per body length
+  var s = bScreen(F, B.p, cam);
   if (s[0] < -60 || s[0] > W + 60 || s[1] < -60 || s[1] > H) return;
-  var f = bVNorm(B.v), u0 = bVNorm(bVSub(BIRD_UP, bVMul(f, bVDot(BIRD_UP, f))));
+  drawBirdShape(c, s[0], s[1], s[2] * BODY_M, B.v, B, cam, col);
+}
+/* The flying shape at (ox, oy), m px per body length, flying along v (world). */
+function drawBirdShape(c, ox, oy, m, v, B, cam, col) {
+  var f = bVNorm(v), u0 = bVNorm(bVSub(BIRD_UP, bVMul(f, bVDot(BIRD_UP, f))));
   var r0 = bVCross(u0, f), cr = Math.cos(B.roll), sr = Math.sin(B.roll);
   var r = bVAdd(bVMul(r0, cr), bVMul(u0, sr)), u = bVSub(bVMul(u0, cr), bVMul(r0, sr));
-  var ox = s[0], oy = s[1];
-  function P(v) { return [ox + v[0] * m, oy - (v[1] * cam.c - v[2] * cam.s) * m]; }
+  function P(w) { return [ox + w[0] * m, oy - (w[1] * cam.c - w[2] * cam.s) * m]; }
   c.fillStyle = col; c.strokeStyle = col;
   // the wings
   var sweep = BIRD.sweep * (0.75 + 0.6 * B.sw), L = BIRD.wingLen * B.ext;
@@ -13015,19 +13049,307 @@ function drawBird(c, F, B, cam, col) {
   }
 }
 var BIRD_HAZE = hexToRgb('#E9CDBF');                       // the pale, warm air the far birds are seen through
-/* The flocks at one depth (FLOCK_TIERS): 0 near, 1 middle, 2 far. */
-function drawBirds(c, tier) {
+/* Which depth slot a bird is drawn in (BIRD_HIDE): its flock's depth (0 near,
+   1 middle, 2 far) while it flies, 3 (the gate's) on the gate and on the
+   nearer part of the way down to it or up from it. */
+function birdSlot(F, B) { return B.mode && B.mode !== 'fly' && B.gate ? 3 : F.tier; }
+function birdSlotUsed(slot) {
+  for (var i = 0; i < flocks.length; i++)
+    for (var j = 0; j < flocks[i].birds.length; j++) if (birdSlot(flocks[i], flocks[i].birds[j]) === slot) return true;
+  return false;
+}
+/* Where a bird is on the screen. */
+function birdXY(F, B, cam) { return B.mode && B.mode !== 'fly' ? [B.sx, B.sy] : bScreen(F, B.p, cam); }
+/* The birds in one depth slot. */
+function drawBirds(c, slot) {
   if (!flocks.length) return;
   var cam = bCam(), base = hexToRgb(BIRD.colour);
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < flocks.length; i++) {
     var F = flocks[i];
-    if (F.tier !== tier) continue;
-    var col = rgba(mixRgb(base, BIRD_HAZE, BIRD.haze * FLOCK_TIERS[tier].haze));
-    for (var j = 0; j < F.birds.length; j++) drawBird(c, F, F.birds[j], cam, col);
+    var col = rgba(mixRgb(base, BIRD_HAZE, BIRD.haze * FLOCK_TIERS[F.tier].haze));
+    for (var j = 0; j < F.birds.length; j++) {
+      var B = F.birds[j];
+      if (birdSlot(F, B) !== slot) continue;
+      if (B.mode === 'perch') drawPerched(c, B, col);
+      else if (B.mode === 'land' || B.mode === 'takeoff') drawBirdShape(c, B.sx, B.sy, B.sm, B.v3, B, cam, col);
+      else drawBird(c, F, B, cam, col);
+    }
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
 }
+/* ---------- Perching on the front torii gate ----------
+   TOR.perch (torBake) is the top edge of the front gate's upper beam on the
+   screen, end to end. A perched bird stands on it at its own place u (0 the
+   left end … 1 the right); the way down and the way up are drawn as the
+   flying bird, along a smooth curve on the screen that starts and ends with
+   the bird's own speed, growing or shrinking to the size it is on the gate. */
+var birdNow = 0;                                                    // the time of the last update (the perched poses are drawn for it)
+function perchL() { return TOR.perch.px * BIRD.perchSize; }   // a perched bird's body length (px)
+function perchAt(u) {
+  var P = TOR.perch.pts, k = clamp(u, 0, 1) * (P.length - 1), i = Math.min(P.length - 2, Math.floor(k)), f = k - i;
+  return [lerp(P[i][0], P[i + 1][0], f), lerp(P[i][1], P[i + 1][1], f)];
+}
+/* A cubic (Hermite) curve from p0 to p1 over dur s, leaving at v0 and arriving at v1 (px/s). */
+function hermAt(sg, k) {
+  var k2 = k * k, k3 = k2 * k, d = sg.dur;
+  var h00 = 2 * k3 - 3 * k2 + 1, h10 = k3 - 2 * k2 + k, h01 = -2 * k3 + 3 * k2, h11 = k3 - k2;
+  var g00 = 6 * k2 - 6 * k, g10 = 3 * k2 - 4 * k + 1, g01 = -6 * k2 + 6 * k, g11 = 3 * k2 - 2 * k;
+  var out = [];
+  for (var a = 0; a < 2; a++) {
+    out.push(h00 * sg.p0[a] + h10 * d * sg.v0[a] + h01 * sg.p1[a] + h11 * d * sg.v1[a]);
+  }
+  for (var b = 0; b < 2; b++) out.push((g00 * sg.p0[b] + g10 * d * sg.v0[b] + g01 * sg.p1[b] + g11 * d * sg.v1[b]) / d);
+  return out;                                                       // x, y, vx, vy
+}
+function hermSeg(p0, v0, p1, v1, speed) {
+  return { p0: p0, v0: v0, p1: p1, v1: v1, dur: clamp(Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) / speed, 0.6, 3) };
+}
+/* A flock goes down to the gate: each bird gets its own place along the beam, with gaps here and there. */
+function startPerch(F, t) {
+  var n = F.birds.length, slots = n + 2 + Math.floor(rnd(0, 2)), us = [];
+  for (var k = 0; k < slots; k++) us.push(lerp(0.1, 0.9, (k + 0.5) / slots) + rnd(-0.2, 0.2) / slots);
+  us.sort(function () { return Math.random() - 0.5; });
+  for (var i = 0; i < n; i++) { F.birds[i].pu = us[i]; F.birds[i].landAt = t + rnd(0, BIRD.perchArrive); }
+  F.perch = { state: 'landing' };
+}
+function perchFlock(F, t, dt, cam) {
+  if (!F.perch) {
+    if (F.tier === 0 && !F.leaving && !F.dismissed && TOR.perch && t - F.born > BIRD.perchAfter &&
+        t - (F.lastPerch || -1e9) > BIRD.perchAgain && Math.random() < dt * BIRD.perch &&
+        !flocks.some(function (o) { return o !== F && o.perch; })) startPerch(F, t);
+    return;
+  }
+  var st = F.perch;
+  if (!TOR.perch && st.state !== 'takeoff') { beginTakeoff(F, t, cam, true); return; }   // the gate is gone (the scene changed)
+  if (st.state === 'landing') {
+    if (F.dismissed) beginTakeoff(F, t, cam, true);
+    else if (F.birds.every(function (b) { return b.mode === 'perch'; })) { st.state = 'perched'; st.until = t + rnd(BIRD.perchStay[0], BIRD.perchStay[1]); }
+  } else if (st.state === 'perched') {
+    if (t > st.until || F.dismissed) beginTakeoff(F, t, cam, F.dismissed);
+  } else if (F.birds.every(function (b) { return !b.mode || b.mode === 'fly'; })) {
+    F.perch = null; F.lastPerch = t;
+    if (!F.dismissed) F.life = Math.max(F.life, t - F.born + rnd(8, 20));   // they fly on for a while before leaving
+  }
+}
+/* One bird leaves the flock and comes down to its place on the beam. If the
+   message text is in the way it goes round the side of it first. */
+function startLanding(F, B, t, cam) {
+  var s = bScreen(F, B.p, cam), s2 = bScreen(F, bVAdd(B.p, bVMul(B.v, 0.05)), cam), L = perchL();
+  var p0 = [s[0], s[1]], v0 = [(s2[0] - s[0]) / 0.05, (s2[1] - s[1]) / 0.05];
+  var end = perchAt(B.pu); end = [end[0], end[1] - 0.3 * L];
+  var side = end[0] >= p0[0] ? 1 : -1, v1 = [side * 35, 60];        // comes in gently, from a little above
+  var one = hermSeg(p0, v0, end, v1, 240), segs = [one], box = null;
+  for (var k = 1; k < 12 && !box; k++) { var h = hermAt(one, k / 12); box = inBirdText(h[0], h[1], 0); }
+  if (box) {
+    var wx = end[0] > (box.l + box.r) / 2 ? box.r + 40 : box.l - 40, way = [wx, box.b - 10];
+    var dx = end[0] - way[0], dy = end[1] - way[1], dl = Math.hypot(dx, dy) || 1, wv = [dx / dl * 200, dy / dl * 200];
+    segs = [hermSeg(p0, v0, way, wv, 260), hermSeg(way, wv, end, v1, 240)];
+  }
+  B.mode = 'land'; B.gate = false; B.roll = 0;
+  B.fl = { t0: t, segs: segs, m0: s[2] * BODY_M, dur: segs.reduce(function (d, g) { return d + g.dur; }, 0) };
+  B.sx = p0[0]; B.sy = p0[1]; B.sm = B.fl.m0; B.v3 = B.v.slice();
+}
+/* Time to go: the leader starts again just above the gate, climbing away
+   toward the middle of the sky, and the birds take off after it — all at
+   once (startled, or sent off) or one by one. */
+function beginTakeoff(F, t, cam, now) {
+  F.perch.state = 'takeoff';
+  var gx = 0, gy = 0, n = 0;                                          // where they are: the middle of those down at the gate
+  for (var i = 0; i < F.birds.length; i++) if (F.birds[i].mode && F.birds[i].mode !== 'fly') { gx += F.birds[i].sx; gy += F.birds[i].sy; n++; }
+  if (n) { gx /= n; gy /= n; } else { gx = W / 2; gy = H * 0.6; }
+  var m = pxPerM(F), dir = gx > W / 2 ? -1 : 1;
+  F.y0 = ((H * LAND.horizon - (gy - 40)) / m) / cam.c;
+  F.p = [(gx - W / 2) / m, F.y0, 0];
+  F.yaw = (dir > 0 ? 0 : PI) + dir * rnd(-0.5, -0.2); F.v = BIRD.speed; F.vy = 2.5; F.w = 0; F.loopT = 0;
+  F.hist = [];
+  for (var k = 40; k >= 0; k--) {
+    var back = k / 20, vel = [Math.cos(F.yaw) * F.v, F.vy, Math.sin(F.yaw) * F.v];
+    F.hist.push({ t: t - back, p: [F.p[0] - vel[0] * back, F.p[1] - vel[1] * back, F.p[2] - vel[2] * back], v: vel });
+  }
+  newGoal(F, cam, true);
+  var together = now || Math.random() < 0.55;
+  for (var j = 0; j < F.birds.length; j++) F.birds[j].offAt = t + (together ? rnd(0, 0.5) : rnd(0, 3));
+}
+function startTakeoff(F, B, t) {
+  var face = B.per ? B.per.face : 1;
+  B.mode = 'takeoff'; B.gate = true; B.roll = 0;
+  var dur = rnd(0.9, 1.3);                                            // up and away, toward its place in the flock (perchBird)
+  B.fl = { t0: t, segs: [{ p0: [B.sx, B.sy], v0: [face * 90, -260], p1: [B.sx, B.sy], v1: [0, 0], dur: dur }], m0: TOR.perch ? perchL() : B.sm, dur: dur };
+  B.glide = 0; B.ph = 0;
+}
+/* A bird on its way down, on the gate, or on its way up. */
+function perchBird(F, B, t, dt) {
+  var cam = bCam();
+  if (B.mode === 'perch') {
+    if (!TOR.perch || (F.perch && F.perch.state === 'takeoff' && t > B.offAt)) { startTakeoff(F, B, t); return; }
+    perchActs(F, B, t);
+    var at = perchAt(B.pu), L = perchL();
+    B.sx = at[0]; B.sy = at[1] - 0.3 * L; B.sm = L; B.gate = true;
+    return;
+  }
+  var fl = B.fl, el = t - fl.t0, k = clamp(el / fl.dur, 0, 1), sg = fl.segs[0], e0 = 0;
+  for (var i = 0; i < fl.segs.length - 1 && el > e0 + fl.segs[i].dur; i++) e0 += fl.segs[i].dur;
+  sg = fl.segs[i];
+  var m1 = fl.m0;
+  if (B.mode === 'land') {
+    if (!TOR.perch) { B.mode = 'perch'; startTakeoff(F, B, t); return; }
+    var end = perchAt(B.pu);
+    fl.segs[fl.segs.length - 1].p1 = [end[0], end[1] - 0.3 * perchL()];
+    m1 = perchL();
+  } else {                                                           // taking off: heading for its place in the flock as it is now
+    var tg = flockTarget(F, B, t), s = bScreen(F, tg.p, cam), s2 = bScreen(F, bVAdd(tg.p, bVMul(tg.v, 0.05)), cam);
+    sg.p1 = [s[0], s[1]]; sg.v1 = [(s2[0] - s[0]) / 0.05, (s2[1] - s[1]) / 0.05]; m1 = s[2] * BODY_M;
+    if (k >= 1) {
+      B.mode = 'fly'; B.gate = false; B.p = tg.p.slice(); B.v = tg.v.slice(); B.dartV = [0, 0, 0];
+      B.beats = Math.max(B.beats, 4); B.per = null;
+      return;
+    }
+  }
+  var h = hermAt(sg, clamp((el - e0) / sg.dur, 0, 1));
+  B.sx = h[0]; B.sy = h[1];
+  B.sm = lerp(fl.m0, m1, k * k * (3 - 2 * k));
+  B.gate = B.mode === 'land' ? k > 0.35 : k < 0.5;                  // at the gate's depth near the gate
+  // facing the way it moves (screen down is world down), pitching up to brake at the end of the way down
+  var v3 = [h[2], -h[3] / cam.c, 0], flare = B.mode === 'land' ? smooth(0.7, 1, k) : 0;
+  if (Math.hypot(v3[0], v3[1]) < 1) v3 = [B.v3 ? B.v3[0] : 1, 0.2, 0];
+  var vl = Math.hypot(v3[0], v3[1]);
+  B.v3 = [v3[0] / vl * (1 - flare * 0.7), v3[1] / vl * (1 - flare * 0.7) + flare * 0.9, 0.15];
+  // beating hard all the way, the wings held high and spread to brake as it touches down
+  B.ph += TAU * B.hz * 1.2 * dt;
+  B.wing = lerp(Math.sin(B.ph) * BIRD.flapAmp * PI / 180 * 1.2, 0.95, flare);
+  B.ext = lerp(0.8 + 0.2 * Math.cos(B.ph - PI / 2 + 0.6), 1, flare);
+  B.sw = lerp(B.sw, 0.2, Math.min(1, dt * 4));
+  B.roll *= Math.max(0, 1 - dt * 6);
+  if (B.mode === 'land' && k >= 1) {
+    B.mode = 'perch'; B.gate = true;
+    B.per = { face: h[2] < 0 ? -1 : 1, act: null, next: t + rnd(0.3, 1.5), seed: rnd(0, TAU) };
+    B.sx = h[0]; B.sy = h[1]; B.sm = m1;
+  }
+}
+/* What a perched bird is doing: an action now and then, from PERCH_ACTS. */
+function perchActs(F, B, t) {
+  var P = B.per;
+  if (P.act) {
+    if (t < P.act.t0 + P.act.dur) return;
+    if (P.act.kind === 'shuffle') B.pu = P.act.to;
+    if (P.act.flip) P.face = -P.face;
+    P.act = null; P.next = t + rnd(BIRD.perchIdle[0], BIRD.perchIdle[1]);
+    return;
+  }
+  if (t < P.next || (F.perch && F.perch.state === 'takeoff')) return;
+  var sum = 0, r, kind, kk;
+  for (kk in PERCH_ACTS) sum += PERCH_ACTS[kk].w;
+  r = Math.random() * sum;
+  for (kk in PERCH_ACTS) { r -= PERCH_ACTS[kk].w; if (r <= 0) { kind = kk; break; } }
+  kind = kind || 'look';
+  var D = PERCH_ACTS[kind], act = { kind: kind, t0: t, dur: rnd(D.dur[0], D.dur[1]), v: Math.random() < 0.5 ? 0 : 1 };
+  if (kind === 'shuffle') {
+    // a step along the beam, if there is room beside it
+    var gapU = 1.3 * perchL() / Math.max(1, TOR.perch.x1 - TOR.perch.x0), to = clamp(B.pu + (Math.random() < 0.5 ? -1 : 1) * rnd(0.03, 0.07), 0.08, 0.92);
+    var free = F.birds.every(function (o) { return o === B || o.mode !== 'perch' || (Math.abs(o.pu - to) > gapU && !(o.per && o.per.act && o.per.act.to !== undefined && Math.abs(o.per.act.to - to) < gapU)); });
+    if (!free) { act.kind = 'turn'; act.dur = rnd(PERCH_ACTS.turn.dur[0], PERCH_ACTS.turn.dur[1]); }
+    else { act.from = B.pu; act.to = to; P.face = to > B.pu ? 1 : -1; }
+  }
+  if (act.kind === 'turn' || (act.kind === 'hop' && act.v)) act.flip = true;
+  P.act = act;
+}
+function perchEnv(k) { return smooth(0, 0.2, k) * (1 - smooth(0.75, 1, k)); }
+/* The pose of a perched bird now. Angles in radians; lengths in body lengths. */
+function perchPose(B, t) {
+  var P = B.per, A = P.act, Q = { u: B.pu, face: P.face, tilt: 0, puff: 1, headBack: 0, headDown: 0, beak: 0,
+    wingN: 0.12, spreadN: 0, wingF: 0.12, spreadF: 0, lift: 0, jit: 0, tail: 0.05 * Math.sin(t * 1.3 + P.seed) };
+  if (!A) return Q;
+  var k = clamp((t - A.t0) / A.dur, 0, 1), e = perchEnv(k), osc;
+  if (A.flip && k > 0.5) Q.face = -P.face;
+  switch (A.kind) {
+    case 'look': Q.beak = PI * 0.85 * e; Q.headBack = 0.25 * e; break;
+    case 'glance': Q.beak = -0.6 * e; break;
+    case 'preen':
+      if (A.v) { Q.headDown = e; Q.beak = -0.9 * e + 0.15 * Math.sin(t * TAU * 3) * e; }        // the breast
+      else {                                                                                   // under the wing and along the back
+        Q.headBack = e; Q.beak = (PI * 0.75 + 0.25 * Math.sin(t * TAU * 3)) * e;
+        Q.wingN = 0.12 + 0.35 * e; Q.spreadN = 0.25 * e;
+      }
+      break;
+    case 'stretchOne':
+      if (A.v) { Q.wingN = 0.12 - 0.45 * e; Q.spreadN = e; } else { Q.wingF = 0.12 - 0.45 * e; Q.spreadF = e; }
+      Q.tilt = -0.15 * e; break;
+    case 'stretchBoth': Q.wingN = 0.12 + 1.75 * e; Q.wingF = 0.12 + 1.35 * e; Q.spreadN = Q.spreadF = 0.85 * e; Q.tilt = 0.15 * e; Q.beak = -0.2 * e; break;
+    case 'flap':
+    case 'hop':
+      if (A.kind === 'hop') { e = Math.sin(PI * k); Q.lift = 1.3 * e; } else Q.lift = 0.12 * e;
+      osc = 0.5 + 0.5 * Math.sin(t * TAU * 9 + P.seed);
+      Q.wingN = 0.12 + e * (0.35 + 1.2 * osc); Q.wingF = 0.12 + e * (0.15 + 1.4 * osc); Q.spreadN = Q.spreadF = 0.8 * e; Q.tilt = 0.25 * e; break;
+    case 'fluff':
+      Q.puff = 1 + 0.35 * e; Q.headBack = 0.1 * e;
+      if (k > 0.45 && k < 0.8) Q.jit = 0.05 * Math.sin(t * TAU * 18);
+      break;
+    case 'shuffle':
+      Q.u = lerp(A.from, A.to, smooth(0, 1, k)); Q.lift = 0.08 * Math.abs(Math.sin(k * PI * 3)); break;
+    case 'turn': Q.lift = 0.25 * Math.sin(PI * k); break;
+    case 'wag': Q.tail = 0.3 * Math.sin(k * TAU * 3) * e; break;
+  }
+  return Q;
+}
+/* A perched bird, seen from the side, as a dark silhouette: body tilted up,
+   head, beak, forked tail hanging down behind, the wings folded along the
+   back (or raised, spread or stretched), and its feet on the beam. */
+function drawPerched(c, B, col) {
+  if (!TOR.perch) return;
+  var t = birdNow, Q = perchPose(B, t), L = perchL(), at = perchAt(Q.u), f = Q.face;
+  var x0 = at[0] + Q.jit * L, y0 = at[1] - Q.lift * L;
+  function S(x, y) { return [x0 + x * f * L, y0 - y * L]; }
+  var th = 0.82 + Q.tilt, ax = Math.cos(th), ay = Math.sin(th), nx = -ay, ny = ax;   // sitting up, the tail hanging down behind the beam
+  var cx = 0.02, cy = 0.31 + 0.03 * (Q.puff - 1);
+  c.fillStyle = col; c.strokeStyle = col; c.lineCap = 'round'; c.lineJoin = 'round';
+  function wing(raise, spread, off) {
+    var dx = -ax * Math.cos(raise) + nx * Math.sin(raise), dy = -ay * Math.cos(raise) + ny * Math.sin(raise);
+    var px = dy, py = -dx;                                           // toward the leading edge
+    var sx = cx + ax * (0.1 + off) + nx * 0.05, sy = cy + ay * (0.1 + off) + ny * 0.05;
+    var lw = 0.75 + 0.3 * spread, ww = 0.07 + 0.14 * spread;
+    var p0 = S(sx + px * ww * 0.5, sy + py * ww * 0.5), p1 = S(sx + dx * lw * 0.45 + px * ww, sy + dy * lw * 0.45 + py * ww);
+    var tip = S(sx + dx * lw, sy + dy * lw), p2 = S(sx + dx * lw * 0.4 - px * ww * 0.7, sy + dy * lw * 0.4 - py * ww * 0.7);
+    var p3 = S(sx - px * ww * 0.4, sy - py * ww * 0.4);
+    c.beginPath(); c.moveTo(p0[0], p0[1]);
+    c.quadraticCurveTo(p1[0], p1[1], tip[0], tip[1]);
+    c.quadraticCurveTo(p2[0], p2[1], p3[0], p3[1]);
+    c.closePath(); c.fill();
+  }
+  wing(Q.wingF, Q.spreadF, 0.03);                                     // the far wing, behind
+  // the forked tail
+  var tw = Q.tail, tdx = -ax * Math.cos(tw) + ay * Math.sin(tw), tdy = -ax * Math.sin(tw) - ay * Math.cos(tw);
+  var rx = cx - ax * 0.26, ry = cy - ay * 0.26, tl = 0.25 + BIRD.tail * 0.75;
+  function tp(rot, len) { var cr = Math.cos(rot), sr = Math.sin(rot); return S(rx + (tdx * cr - tdy * sr) * len, ry + (tdx * sr + tdy * cr) * len); }
+  var c1 = S(rx - tdy * 0.045, ry + tdx * 0.045), c2 = S(rx + tdy * 0.045, ry - tdx * 0.045);
+  var q1 = tp(0.1, tl), q2 = tp(-0.1, tl), nt = tp(0, tl * 0.55);
+  c.beginPath(); c.moveTo(c1[0], c1[1]); c.lineTo(q1[0], q1[1]); c.lineTo(nt[0], nt[1]); c.lineTo(q2[0], q2[1]); c.lineTo(c2[0], c2[1]); c.closePath(); c.fill();
+  c.lineWidth = Math.max(0.5, 0.03 * L); c.stroke();
+  // the body
+  var bc = S(cx, cy);
+  c.beginPath(); c.ellipse(bc[0], bc[1], 0.3 * L, 0.12 * Q.puff * L, Math.atan2(-ay, ax * f), 0, TAU); c.fill();
+  // the head: forward, turned back onto its back (preening), or down to its breast
+  var hx = cx + ax * 0.28 + nx * 0.06, hy = cy + ay * 0.28 + ny * 0.06;
+  hx = lerp(hx, cx - ax * 0.02 + nx * 0.15, Q.headBack); hy = lerp(hy, cy - ay * 0.02 + ny * 0.15, Q.headBack);
+  hx = lerp(hx, cx + ax * 0.18 - nx * 0.02, Q.headDown); hy = lerp(hy, cy + ay * 0.18 - ny * 0.02, Q.headDown);
+  var hr = 0.115 * Math.sqrt(Q.puff), hc = S(hx, hy);
+  c.beginPath(); c.arc(hc[0], hc[1], hr * L, 0, TAU); c.fill();
+  var ba = -0.15 + Q.beak, bx = Math.cos(ba), by = Math.sin(ba);
+  var bt = S(hx + bx * (hr + 0.09), hy + by * (hr + 0.09)), b1 = S(hx + bx * 0.06 - by * 0.035, hy + by * 0.06 + bx * 0.035), b2 = S(hx + bx * 0.06 + by * 0.035, hy + by * 0.06 - bx * 0.035);
+  c.beginPath(); c.moveTo(b1[0], b1[1]); c.lineTo(bt[0], bt[1]); c.lineTo(b2[0], b2[1]); c.closePath(); c.fill();
+  wing(Q.wingN, Q.spreadN, 0);                                        // the near wing
+  // the feet on the beam (tucked up in a hop)
+  if (Q.lift < 0.4) {
+    c.lineWidth = Math.max(0.6, 0.045 * L);
+    c.beginPath();
+    for (var s = -1; s <= 1; s += 2) {
+      var l0 = S(cx + s * 0.03, cy - 0.1), l1 = S(cx + s * 0.04 + 0.01, -Q.lift);   // the beam is Q.lift below
+      c.moveTo(l0[0], l0[1]); c.lineTo(l1[0], l1[1]);
+    }
+    c.stroke();
+  }
+}
+
 
 /* Fireflies: most drift behind the text; now and then some fly to a
    message character, land on it and glow there for a while, then lift
@@ -13133,7 +13455,7 @@ function birdBounds() {
   for (var i = 0; i < flocks.length; i++) {
     var F = flocks[i];
     for (var k = 0; k < F.birds.length; k++) {
-      var s = bScreen(F, F.birds[k].p, cam);
+      var s = birdXY(F, F.birds[k], cam);
       x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]);
     }
   }
@@ -13598,8 +13920,9 @@ function drawKoyoTrees(ctx, t) {
     };
     ctxBL.setTransform(1, 0, 0, 1, 0, 0);
     ctxBL.clearRect(B.x, B.y, B.w, B.h);
-    for (var si = 2; si >= 0; si--) {                // far first, then the middle, then the near flocks
-      if (!flocks.some(function(f) { return f.tier === si; })) continue;
+    for (var so = 0; so < 4; so++) {                 // far first, then those on the gate, then the middle and the near flocks
+      var si = [2, 3, 1, 0][so];
+      if (!birdSlotUsed(si)) continue;
       ctxBS.setTransform(1, 0, 0, 1, 0, 0);
       ctxBS.clearRect(B.x, B.y, B.w, B.h);
       drawBirds(ctxBS, si);
@@ -14952,7 +15275,7 @@ var LANT = {
   // speed, the gentle unsteadiness between flickers, and the extra flicker in a gust
   flicker: 0.77, flickerEvery: 1, flickerLength: 1.2, flickerSpeed: 1, wobble: 0.58, windFlicker: 1
 };
-var TOR = { gate: landCanvas(), grav: landCanvas(), mask: landCanvas(), maskB: landCanvas(), gateTop: 0, gravTop: 0, ready: false };
+var TOR = { gate: landCanvas(), grav: landCanvas(), mask: landCanvas(), maskB: landCanvas(), gateTop: 0, gravTop: 0, ready: false, perch: null };
 var TOR_BANDS = 6;
 function torLens() { return TORII.lens * W; }
 function torScreen(x, y, z) { var F = torLens(); return [W / 2 + F * x / z, H * LAND.horizon + F * (1 - y) / z]; }
@@ -15324,8 +15647,24 @@ function torLampLevel() {
 }
 
 /* Both baked at once (the last step of a landscape bake). */
+/* The top edge of a gate's upper beam (kasagi) on the screen, end to end, as
+   torPieces builds it: where the birds perch (see "Birds"). Its front edge,
+   which is the top of the beam as it is seen from below. */
+function torPerchLine(g) {
+  var h = TORII.gateHeight, half = TORII.width * h / 2, r = TORII.pillar * h / 2, sori = TORII.sori * h;
+  var kTop = h - sori, pTop = kTop - 0.065 * h - 0.05 * h;
+  var kL = half - Math.tan(TORII.lean * PI / 180) * pTop + TORII.overhang * h, d = r * 1.25, pts = [];
+  for (var i = 0; i <= 32; i++) {
+    var u = lerp(-kL, kL, i / 32), x = Math.abs(u) / kL, y = kTop + sori * x * x * (0.6 + 0.4 * x);
+    pts.push(torScreen(g.x + g.ax * u + g.tx * d, y, g.z + g.az * u + g.tz * d));
+  }
+  if (pts[0][0] > pts[32][0]) pts.reverse();
+  if (pts[0][0] < 0 || pts[32][0] > W || pts[16][1] < 0) return null;   // only a gate whose top is all on the screen
+  return { pts: pts, px: g.px, x0: pts[0][0], x1: pts[32][0] };
+}
 function torBake() {
   TOR.ready = false;
+  TOR.perch = null;
   torLanterns = []; torLanternCount = 0;
   TOR.gate.cnv.width = 1; TOR.gate.cnv.height = 1;
   TOR.grav.cnv.width = 1; TOR.grav.cnv.height = 1;
@@ -15368,6 +15707,10 @@ function torBake() {
     torLanterns.push(Lp);
   });
   torLanternCount = torLanterns.length;
+  // the birds perch on the nearest gate
+  var front = null;
+  gates.forEach(function (g) { if (!front || g.foot > front.foot) front = g; });
+  if (front) TOR.perch = torPerchLine(front);
   if (!gates.length && !torLanterns.length) { TOR.ready = true; return; }
   // the light: from above, in front, and to the side TORII.lightFrom
   var Lx = TORII.lightFrom, Ly = 1.1, Lz = -0.6, Ll = Math.hypot(Lx, Ly, Lz); Lx /= Ll; Ly /= Ll; Lz /= Ll;
