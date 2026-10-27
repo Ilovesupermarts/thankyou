@@ -557,6 +557,7 @@ var nowT = 0;                                 // the frame time, for leaves that
 function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 var NB = mk(), NL = mk(), FL = mk(), FBR = mk(); // near branches, near leaves, far foliage, far branches
 var SCN = mk(), MTN = mk(), TMP = mk();       // baked scenery, mountains, scratch
+var SIL = mk(), OCC = mk();                   // the mountains' outline (baked), and what stands in front of the fireworks (each frame)
 var GL = mk();                                // the back grass and susuki, redrawn each frame
 var MIST = mk();                              // one soft mist blob
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
@@ -2177,6 +2178,7 @@ function bakeScenery() {
   var m = MTN.c, s = SCN.c;
   m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MTN.cnv.width, MTN.cnv.height);
   s.setTransform(1, 0, 0, 1, 0, 0); s.clearRect(0, 0, SCN.cnv.width, SCN.cnv.height);
+  SIL.c.setTransform(1, 0, 0, 1, 0, 0); SIL.c.clearRect(0, 0, SIL.cnv.width, SIL.cnv.height);
 
   if (V.showMountains) {
     mtn3d = drawMountains3d(m, C, hy);
@@ -2228,6 +2230,9 @@ function bakeScenery() {
     s.globalAlpha = mtn3d ? MT.strength : V.mtnStrength;
     s.drawImage(MTN.cnv, 0, 0);
     s.restore();
+    // the mountains' outline, for the fireworks behind them: the haze makes them
+    // see-through, and the fireworks must not show through
+    Fireworks.silhouette(MTN.cnv, SIL.cnv, 0.55, 0.85);
   }
 
   // One soft mist blob, drawn a few times per frame drifting along the ridges.
@@ -5491,7 +5496,7 @@ function drawBirds(c, tier) {
 }
 window.fwLab = {
   values: FW, defaults: FW_DEFAULTS, save: saveFireworks,
-  launch: function (k) { show.launch(k); },
+  launch: function (k, o) { show.launch(k, o); },
   clear: function () { show.clear(); },
   restart: function () { show.restart(); },
   info: function () { return show.info(); }
@@ -5520,6 +5525,8 @@ function resize() {
   SCN.cnv.width = MTN.cnv.width = TMP.cnv.width = Math.round(W * SR);
   SCN.cnv.height = MTN.cnv.height = TMP.cnv.height = Math.round(H * SR);
   show.resize(W, H, PR, H * V.horizon);
+  SIL.cnv.width = OCC.cnv.width = Math.max(1, Math.round(W * PR / 2));       // the occluder is half the screen's resolution
+  SIL.cnv.height = OCC.cnv.height = Math.max(1, Math.round(H * PR / 2));
   paintSky();
 }
 function rebuildAll() {
@@ -5539,6 +5546,30 @@ function rebuildAll() {
   buildGroves();
   gravDirty = true;
   bakeGates();
+}
+
+/* The far tree's layers: foliage and branches on half-size sheets (FL, FBR). */
+function buildFarTree(far, t) {
+  var fl = FL.c;
+  fl.setTransform(1, 0, 0, 1, 0, 0);
+  fl.clearRect(0, 0, FL.cnv.width, FL.cnv.height);
+  fl.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
+  drawClumps(fl, far, t);
+  var fb = FBR.c;
+  fb.setTransform(1, 0, 0, 1, 0, 0);
+  fb.clearRect(0, 0, FBR.cnv.width, FBR.cnv.height);
+  fb.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
+  drawBranches(fb, far, TREE.branchOpacity * TREE.farOpacity);
+}
+/* The near tree's layers: branches on one sheet (NB), foliage on another (NL). */
+function buildNearTree(near, t) {
+  var nb = NB.c, nl2 = NL.c;
+  nb.setTransform(1, 0, 0, 1, 0, 0); nb.clearRect(0, 0, NB.cnv.width, NB.cnv.height);
+  nb.setTransform(PR, 0, 0, PR, 0, 0);
+  drawBranches(nb, near, TREE.branchOpacity);
+  nl2.setTransform(1, 0, 0, 1, 0, 0); nl2.clearRect(0, 0, NL.cnv.width, NL.cnv.height);
+  nl2.setTransform(PR, 0, 0, PR, 0, 0);
+  drawClumps(nl2, near, t);
 }
 
 var last = 0;
@@ -5570,9 +5601,31 @@ function frame(now) {
   drawSunSky(t, dt);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // The fireworks (section 7c), behind the mountains.
+  // The trees' layers are built first (they are laid down further on): the fireworks
+  // are cut out wherever a tree or the mountains stand in front of them.
+  var far = trees[1], near = trees[0];
+  if (far) buildFarTree(far, t);
+  buildNearTree(near, t);
+
+  // The fireworks (section 7c), behind the mountains and the trees.
   show.update(dt, t);
-  show.drawSky(ctx);
+  if (show.active()) {
+    var oc = OCC.c, ow = OCC.cnv.width, oh = OCC.cnv.height;
+    oc.setTransform(1, 0, 0, 1, 0, 0);
+    oc.globalCompositeOperation = 'source-over';
+    oc.globalAlpha = 1;
+    oc.clearRect(0, 0, ow, oh);
+    oc.drawImage(SIL.cnv, 0, 0);                                   // the mountains
+    // the trees, each laid down a few times so that thin or see-through parts (the
+    // branches, the leaves at their opacity) block the fireworks fully
+    if (far) {
+      for (var oi = 0; oi < 3; oi++) oc.drawImage(FBR.cnv, 0, 0, ow, oh);
+      for (oi = 0; oi < 2; oi++) oc.drawImage(FL.cnv, 0, 0, ow, oh);
+    }
+    for (oi = 0; oi < 3; oi++) oc.drawImage(NB.cnv, 0, 0, ow, oh);
+    for (oi = 0; oi < 2; oi++) oc.drawImage(NL.cnv, 0, 0, ow, oh);
+  }
+  show.drawSky(ctx, OCC.cnv);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Mountains and Fuji (baked), then the mist drifting along the ridges.
@@ -5617,20 +5670,10 @@ function frame(now) {
 
   // Far tree: branches and foliage on half-size layers, scaled up (soft).
   // The branches are solid; only the foliage is laid down weaker.
-  var far = trees[1];
+  // (The layers were built at the top of the frame.)
   if (far) {
     nightGlow(far, 0.6);
-    var fl = FL.c;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    fl.setTransform(1, 0, 0, 1, 0, 0);
-    fl.clearRect(0, 0, FL.cnv.width, FL.cnv.height);
-    fl.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
-    drawClumps(fl, far, t);
-    var fb = FBR.c;
-    fb.setTransform(1, 0, 0, 1, 0, 0);
-    fb.clearRect(0, 0, FBR.cnv.width, FBR.cnv.height);
-    fb.setTransform(PR * FAR_RES, 0, 0, PR * FAR_RES, 0, 0);
-    drawBranches(fb, far, TREE.branchOpacity * TREE.farOpacity);
     ctx.drawImage(FBR.cnv, 0, 0, cv.width, cv.height);
     ctx.globalAlpha = TREE.farOpacity;
     ctx.drawImage(FL.cnv, 0, 0, cv.width, cv.height);
@@ -5653,16 +5696,8 @@ function frame(now) {
   // Leaves further back fall behind the near tree.
   drawFalling(ctx, t, -1, MID_Z);
 
-  // Near tree: branches on one layer, foliage on another.
-  var near = trees[0];
+  // Near tree: branches on one layer, foliage on another (built at the top of the frame).
   nightGlow(near, 1);
-  var nb = NB.c, nl2 = NL.c;
-  nb.setTransform(1, 0, 0, 1, 0, 0); nb.clearRect(0, 0, NB.cnv.width, NB.cnv.height);
-  nb.setTransform(PR, 0, 0, PR, 0, 0);
-  drawBranches(nb, near, TREE.branchOpacity);
-  nl2.setTransform(1, 0, 0, 1, 0, 0); nl2.clearRect(0, 0, NL.cnv.width, NL.cnv.height);
-  nl2.setTransform(PR, 0, 0, PR, 0, 0);
-  drawClumps(nl2, near, t);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(NB.cnv, 0, 0);
   ctx.globalAlpha = TREE.nearOpacity;
