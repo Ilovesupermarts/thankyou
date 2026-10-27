@@ -19458,7 +19458,10 @@ setInterval(applyTimeTheme, 5 * 60 * 1000);
                            or the writing screen has closed)
                        keypad  the first time the keypad appears, a box
                            round it with a caption under it, until she
-                           keys in her first digit
+                           keys in her first digit. When the keypad opens
+                           at the same moment as her first selection, the
+                           caption goes first, stays 6.5 seconds, and the
+                           keypad hint follows it
                      plus a caption on the shake when a price is
                      missing or the custom rows are filled out of order.
      Receipt         after the stamp, a circle round the ✕ with a caption.
@@ -19901,9 +19904,12 @@ var Hints = (function () {
   }
 
   /* ---------- 6c: the first service she selects ---------- */
-  function drawTick(row, done) {
+  /* How long the caption stays when the keypad hint is waiting behind it: time to notice it,
+     read its 16 characters and take them in, with the fades included. */
+  var TICK_FIRST_HOLD = 6500;
+  function drawTick(row, done, hold) {
     tickShown = true;
-    show({ kind: 'tick', hold: 4000, watch: true, urgent: true, done: done,
+    show({ kind: 'tick', hold: hold || 4000, watch: true, urgent: true, done: done,
       targets: [{ el: row, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft' }] });
   }
   /* After a caption or the keypad hint, the guided hints carry on. Tapping a price skips 6b. */
@@ -19916,11 +19922,17 @@ var Hints = (function () {
     if (seq === '6a' || seq === '6b' || seq === '6d') runStep('6d');
     else clear();
   }
+  /* The caption came first because the keypad opened at the same moment: once it has had its
+     time, the keypad hint follows (unless she has started keying in, or closed the keypad). */
+  function afterFirstTick() {
+    if (kpOn && kpPending) drawKeypadHint();
+    else afterTick();
+  }
   /* She tapped a ○. (The app also puts the cursor in that row's price, which brings the keypad
-     up straight away: then the keypad hint carries the caption too.) */
+     up straight away: then the caption goes first and the keypad hint follows it.) */
   function onTick(row) {
     if (tickShown || !row || rejected) return;
-    if (kpOn) { tickShown = true; drawKeypadHint(row); return; }
+    if (kpOn) { kpPending = true; drawTick(row, afterFirstTick, TICK_FIRST_HOLD); return; }
     drawTick(row, afterTick);
   }
   /* A row was selected by keying in its price, or by writing a custom service's name.
@@ -19931,20 +19943,29 @@ var Hints = (function () {
   }
 
   /* ---------- keypad hint ---------- */
-  function drawKeypadHint(tickRow) {
-    var t = [];
-    if (tickRow) t.push({ el: tickRow, shape: 'none', pad: 6, text: 'もう一度タップすると解除できます', place: 'belowLeft', fade: true });
-    t.push({ el: numpad, shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' });
+  function drawKeypadHint() {
     kpPending = true;
-    show({ kind: 'kp', urgent: true, targets: t });
+    show({ kind: 'kp', urgent: true,
+      targets: [{ el: numpad, shape: 'box', pad: 10, text: '入力後、「決定」をタップ', place: 'below' }] });
   }
   function onNumpadShown() {
     if (!tableCard.classList.contains('active') || modalOpen() || rejected) return;
     var custom = (pendingTick && pendingTick.custom && !tickShown) ? pendingTick.row : null;
     if (!kpShown) {
-      kpShown = true; kpOn = true;
-      if (custom) { pendingTick = null; tickShown = true; }
-      drawKeypadHint(custom);
+      kpShown = true; kpOn = true; kpPending = true;
+      if (custom) {
+        /* a custom service just written: its caption first, then the keypad hint */
+        pendingTick = null;
+        drawTick(custom, afterFirstTick, TICK_FIRST_HOLD);
+      } else {
+        /* a ○ tap brings the keypad up before the caption is asked for (a moment later in the
+           same tap): let that happen first, so the keypad hint is not drawn only to be replaced */
+        setTimeout(function () {
+          if (!kpOn || !kpPending) return;
+          if ((opts && opts.kind === 'tick') || (queued && queued.kind === 'tick')) return;
+          drawKeypadHint();
+        }, 0);
+      }
     } else if (custom) {
       pendingTick = null;
       drawTick(custom, function () { clear(); });
@@ -19955,7 +19976,12 @@ var Hints = (function () {
     kpOn = false; kpPending = false;
     var keyed = (pendingTick && !pendingTick.custom && !tickShown) ? pendingTick.row : null;
     if (keyed) { pendingTick = null; drawTick(keyed, afterKeypad); return; }
-    if (wasKp) { clear(FADE_QUICK); afterKeypad(); }
+    if (wasKp) {
+      /* she closed the keypad while the caption was up: let the caption finish */
+      if (opts && opts.kind === 'tick') return;
+      clear(FADE_QUICK);
+      afterKeypad();
+    }
   }
   /* Called every time the app works out whether the keypad shows. Acts only when that changes. */
   function syncNumpad() {
@@ -19966,7 +19992,12 @@ var Hints = (function () {
   }
   /* The first digit she keys in ends the keypad hint (backspace does not count). */
   function onDigit() {
-    if (kpOn && kpPending) { kpPending = false; fadeOut(); }
+    if (kpOn && kpPending) {
+      kpPending = false;
+      /* if the caption is still up (the keypad hint is waiting behind it), the keypad hint
+         simply never comes; the caption carries on to the end */
+      if (opts && opts.kind === 'kp') fadeOut();
+    }
   }
 
   /* ---------- a caption on the shake ---------- */
@@ -19977,7 +20008,7 @@ var Hints = (function () {
     if (queued && queued.kind === 'say' && queued.sayText === text && queued.sayEl === el) return;
     show({ kind: 'say', sayText: text, sayEl: el, hold: 4200, watch: true, urgent: true,
       done: function () {
-        if (kpOn && kpPending) { drawKeypadHint(null); return; }
+        if (kpOn && kpPending) { drawKeypadHint(); return; }
         if (seq === '6a' || seq === '6b' || seq === '6d') { runStep(seq); return; }
         clear();
       },
