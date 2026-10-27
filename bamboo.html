@@ -4,23 +4,25 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="theme-color" content="#FFFDF9">
-<title>Bird Lab</title>
+<title>Mountain Lab</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="main.css">
+<script src="mountains.js"></script>
 
 <style>
   /* ============================================================
-     BIRD LAB — a copy of landscape.html (with the bamboo, gates, stone
-     lanterns and the sun), now the test bed for the new birds: small
-     dark birds that wheel over the scene like the ones in the screen
-     recordings (section 14 of the script). Their values are set on the
-     panel and kept in this browser; "Copy values" gives them to move
-     into the app. The next / down button runs as in the app, with no
-     controls. Nothing in app.js is used or changed.
+     MOUNTAIN LAB — a copy of landscape.html (with the bamboo, gates,
+     stone lanterns, the sun and the birds), now the test bed for
+     realistic 3D mountains with the Fuji-like peak, drawn by
+     mountains.js (section 7b of the script). Their values are set on
+     the panel and kept in this browser; "Copy values" gives them to
+     move into the app. The birds fly on their approved values. The
+     next / down button runs as in the app, with no controls. Nothing in
+     app.js is used or changed.
      ============================================================ */
   html, body { overflow: hidden; height: 100%; }
   body { padding-bottom: 0; }
@@ -97,6 +99,7 @@
   .sp-ctl small { display: block; color: rgba(60, 60, 67, 0.6); font-size: 11px; line-height: 1.35; margin-top: 2px; }
   .sp-colour { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: 500; }
   .sp-colour input { width: 44px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; }
+  .sp-colour select { font: inherit; border: 0; border-radius: 8px; padding: 4px 8px; background: rgba(120, 120, 128, 0.14); }
   .sp-count { margin-top: 8px; color: rgba(60, 60, 67, 0.7); font-size: 11px; font-variant-numeric: tabular-nums; }
   .sp-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .sp pre { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.7); font-size: 11px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; display: none; }
@@ -234,12 +237,11 @@
 
 <!-- The panel (test bed only): the birds -->
 <div class="sp" id="sp">
-  <div class="sp-head"><b>鳥 · Birds</b><button type="button" id="spToggle">Hide</button></div>
+  <div class="sp-head"><b>山 · Mountains</b><button type="button" id="spToggle">Hide</button></div>
   <div class="sp-body">
     <div id="spCtls"></div>
     <div class="sp-row">
-      <button type="button" class="primary" id="spSend">Send a flock</button>
-      <button type="button" id="spClear">Clear the sky</button>
+      <button type="button" class="primary" id="spSeed">New shape</button>
     </div>
     <div class="sp-row">
       <button type="button" id="spReset">Reset</button>
@@ -2082,6 +2084,91 @@ function ridgeFn(r) {
   };
 }
 var mistBlobs = [];
+
+/* ============================================================
+   7b. 3D MOUNTAINS — drawn by mountains.js on the graphics chip: a
+   height map of eroded ranges with the Fuji-like peak, lit by the sun
+   with real shadows, snow above a snow line where the ground is gentle
+   enough to hold it, autumn forest below a tree line, far haze and low
+   mist in the valleys. The picture is laid into MTN like the painted
+   ridges were, so it costs nothing per frame. With style 'painted', or
+   where WebGL 2 is missing, the painted ridges are drawn as before.
+   MT holds every value on the panel (MT_DEFAULTS are the starting
+   values); they are kept in this browser.
+   ============================================================ */
+var MT_DEFAULTS = {
+  style: '3d',               // '3d' or 'painted' (the old ridges)
+  seed: 7,
+  // the ranges
+  rangeHeight: 0.26, featureKm: 12, sharpness: 0.6, layering: 0.5, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  // Fuji
+  fujiX: 0.73, fujiHeight: 0.34, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.6, fujiSnow: 0.25, fujiTongues: 0.6, fujiClear: 0.9,
+  // snow and forest
+  snowLine: 0.85, snow: 0.6, treeLine: 0.8, autumn: 0.75,
+  // the light
+  sunAzimuth: -100, sunElevation: 22, eveningElevation: 5, sunStrength: 1.15, ambient: 0.55, shadows: 0.85,
+  // the air
+  haze: 0.72, hazeKm: 24, mist: 0.6, mistHeightKm: 0.35, fadeToSky: 0.3, footMist: 0.6,
+  // the picture
+  strength: 1, softness: 0.4, resolution: 0.85, treeDots: true,
+  colours: { rock: '#968476', fujiRock: '#544850', forestRed: '#B04A2C', forestGold: '#D49A44',
+             evergreen: '#4A5A3E', snow: '#F6F6FA', haze: '#DCCDD2' }
+};
+var MT_KEY = 'mountainLab1';
+var MT = clone(MT_DEFAULTS);
+try {
+  var savedM = JSON.parse(localStorage.getItem(MT_KEY) || 'null');
+  if (savedM) for (var mk2 in savedM) {
+    if (mk2 === 'colours') { for (var ck in savedM.colours) if (ck in MT.colours) MT.colours[ck] = savedM.colours[ck]; }
+    else if (mk2 in MT_DEFAULTS && typeof savedM[mk2] === typeof MT_DEFAULTS[mk2]) MT[mk2] = savedM[mk2];
+  }
+} catch (e) { /* private window: the defaults */ }
+function saveMountains() { try { localStorage.setItem(MT_KEY, JSON.stringify(MT)); } catch (e) { /* silent */ } }
+var mtnDirty = false, mtnChangedAt = -1, mtnMs = 0, mtn3d = false;
+
+/* Everything mountains.js needs, for the time of day now. */
+function mtnOptions(C, hy) {
+  var col = {}; for (var k in MT.colours) col[k] = hex(MT.colours[k]);
+  var sun = [255, 247, 236], sky = [178, 196, 226], el = MT.sunElevation, sS = MT.sunStrength, amb = MT.ambient;
+  if (V.timeOfDay === 'evening') { sun = [255, 168, 102]; sky = [176, 160, 196]; el = MT.eveningElevation; }
+  else if (isNight()) { sun = [150, 165, 220]; sky = [80, 92, 140]; el = 38; sS *= 0.3; amb *= 0.7; }
+  var o = {};
+  for (var key in MT) if (key !== 'colours') o[key] = MT[key];
+  o.width = MTN.cnv.width; o.height = MTN.cnv.height; o.screenW = W; o.screenH = H; o.horizon = hy;
+  o.fuji = V.showFuji;
+  o.sunElevation = el; o.sunStrength = sS; o.ambient = amb;
+  o.sunColour = sun; o.skyColour = sky;
+  o.hazeColour = light(col.haze); o.mistColour = light(C.mist);
+  o.colours = { rock: col.rock, fujiRock: col.fujiRock, forestRed: col.forestRed, forestGold: col.forestGold,
+                evergreen: col.evergreen, snow: col.snow };
+  return o;
+}
+/* The 3D mountains into MTN, softened a little. False when they can't be drawn here. */
+function drawMountains3d(m, C, hy) {
+  if (MT.style !== '3d' || typeof Mountains === 'undefined') return false;
+  var t0 = performance.now();
+  var g3 = Mountains.render(mtnOptions(C, hy));
+  if (!g3) return false;
+  m.save();
+  m.setTransform(1, 0, 0, 1, 0, 0);
+  var px = MT.softness * SR;
+  m.filter = px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
+  m.drawImage(g3, 0, 0, MTN.cnv.width, MTN.cnv.height);
+  m.restore();
+  // mist lying along the foot of the mountains, where they meet the ground
+  if (MT.footMist > 0) {
+    var mistC = light(C.mist), y0 = hy - H * 0.07, y1 = hy + 6;
+    m.setTransform(SR, 0, 0, SR, 0, 0);
+    var g = m.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, rgb(mistC, 0));
+    g.addColorStop(0.7, rgb(mistC, MT.footMist * 0.55));
+    g.addColorStop(1, rgb(mistC, MT.footMist * 0.85));
+    m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
+  }
+  mtnMs = performance.now() - t0;
+  return true;
+}
+
 function bakeScenery() {
   var C = cols(), hy = H * V.horizon, mistC = light(C.mist);
   var m = MTN.c, s = SCN.c;
@@ -2089,9 +2176,11 @@ function bakeScenery() {
   s.setTransform(1, 0, 0, 1, 0, 0); s.clearRect(0, 0, SCN.cnv.width, SCN.cnv.height);
 
   if (V.showMountains) {
+    mtn3d = drawMountains3d(m, C, hy);
+    // The painted ridges, when the 3D mountains are off or can't be drawn.
     // The Fuji-like peak is the furthest thing: palest, softest.
-    if (V.showFuji) blurInto(m, V.mtnBlur * 1.3, function (c) { drawFuji(c, C, hy); });
-    var r = rngFrom(V.seed * 131 + 17), R = V.ridges;
+    if (!mtn3d && V.showFuji) blurInto(m, V.mtnBlur * 1.3, function (c) { drawFuji(c, C, hy); });
+    var r = rngFrom(V.seed * 131 + 17), R = mtn3d ? 0 : V.ridges;
     for (var i = 0; i < R; i++) {
       var d = R === 1 ? 0.6 : i / (R - 1);                       // 0 far … 1 near
       var top = V.mtnHeight * H * lerp(1, 0.5, d);
@@ -2115,7 +2204,7 @@ function bakeScenery() {
         m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
       }
     }
-    if (V.treeLine) {
+    if (mtn3d ? MT.treeDots : V.treeLine) {
       var r2 = rngFrom(V.seed * 53 + 9), tl = rgb(light(mix(C.treeLine, C.mist, 0.3 + V.mtnHaze * 0.3)));
       blurInto(m, Math.max(0.6, V.mtnBlur * 0.35), function (c) {
         c.fillStyle = tl;
@@ -2133,7 +2222,7 @@ function bakeScenery() {
       });
     }
     s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
-    s.globalAlpha = V.mtnStrength;
+    s.globalAlpha = mtn3d ? MT.strength : V.mtnStrength;
     s.drawImage(MTN.cnv, 0, 0);
     s.restore();
   }
@@ -2153,7 +2242,7 @@ function bakeScenery() {
 /* The Fuji-like cone: a narrow flat summit and concave slopes that flatten
    toward the base, with a snow cap whose lower edge runs down in gullies. */
 function drawFuji(c, C, hy) {
-  var Hf = V.fujiHeight * H, fx = V.fujiX * W, top = hy - Hf, bh = Hf * V.fujiWidth, sh = Hf * 0.1;
+  var Hf = MT.fujiHeight * H, fx = MT.fujiX * W, top = hy - Hf, bh = Hf * MT.fujiWidth, sh = Hf * 0.1;
   function py(x) {
     var dx = Math.abs(x - fx);
     if (dx <= sh) return top + Hf * 0.008 * Math.sin(dx * 0.35);
@@ -5397,6 +5486,23 @@ function drawBirds(c, tier) {
   }
   c.setTransform(1, 0, 0, 1, 0, 0);
 }
+window.mtnLab = {
+  values: MT, defaults: MT_DEFAULTS,
+  changed: function () { saveMountains(); mtnDirty = true; mtnChangedAt = nowT; },
+  restyle: function () { saveMountains(); resize(); bakeScenery(); },
+  time: function () { return V.timeOfDay; },
+  setTime: function (tod) {
+    V.timeOfDay = L.timeOfDay = SUN.timeOfDay = tod;
+    document.documentElement.setAttribute('data-time', tod);
+    sunDirty = true; gateDirty = true;
+    resize(); rebuildAll();
+  },
+  info: function () {
+    if (!V.showMountains) return 'Mountains off';
+    return mtn3d ? '3D mountains, drawn in ' + Math.round(mtnMs) + ' ms' :
+           MT.style === '3d' ? 'Painted ridges (no WebGL 2 here)' : 'Painted ridges';
+  }
+};
 window.birdLab = {
   values: BIRD, defaults: BIRD_DEFAULTS, save: saveBirds,
   send: function () { sendFlock(nowT); },
@@ -5410,7 +5516,7 @@ window.birdLab = {
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;   // the app renders at 0.75
-  SR = PR * SCN_RES;
+  SR = PR * (MT.style === '3d' ? MT.resolution : SCN_RES);   // the 3D mountains are sharp, so they are baked finer
   cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
   GH = cvG.clientHeight || 150;
   cvG.width = Math.round(W * PR); cvG.height = Math.round(GH * PR);
@@ -5459,6 +5565,8 @@ function frame(now) {
   bakeAnimQueue(owlQueue.length ? 2 : 6);       // the deer and tanuki frames, the same way
   // a change on the panel: baked once the slider has paused for a moment, or at most twice a second while it moves
   if (gateDirty && (t - gateChangedAt > 0.18 || t - gateBakedAt > 0.5)) bakeGates();
+  // the mountains: baked again once the slider has paused for a moment
+  if (mtnDirty && t - mtnChangedAt > 0.25) { mtnDirty = false; bakeScenery(); }
 
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
@@ -5712,91 +5820,114 @@ timer = setTimeout(play, 1200);
 </script>
 <script>
 /* ============================================================
-   The panel (test bed only): every value of the birds (BIRD in
-   section 14). A change takes effect at once; the size of a flock,
-   its spread and the wingbeat show fully on the next flock.
+   The panel (test bed only): every value of the 3D mountains (MT in
+   section 7b). A change is drawn a moment after the slider stops.
    ============================================================ */
 (function () {
 'use strict';
-var lab = window.birdLab;
+var lab = window.mtnLab;
 if (!lab) return;
-var B = lab.values;
+var M = lab.values;
 var CTLS = [
-  { k: 'flocks', label: 'Flocks at once', min: 0, max: 4, step: 1, group: 'Flocks' },
-  { k: 'flockMin', label: 'Birds in a flock: fewest', min: 1, max: 20, step: 1 },
-  { k: 'flockMax', label: 'Birds in a flock: most', min: 1, max: 20, step: 1 },
-  { k: 'stay', label: 'Stays in view (s)', min: 5, max: 120, step: 1, note: 'How long a flock wheels round before it flies off.' },
-  { k: 'pause', label: 'Next flock after (s)', min: 0, max: 60, step: 0.5 },
-  { k: 'nearW', label: 'Near flocks', min: 0, max: 1, step: 0.05, note: 'How often a new flock is near, in the middle or far. Near: big and fast, behind the big tree.' },
-  { k: 'midW', label: 'Middle flocks', min: 0, max: 1, step: 0.05 },
-  { k: 'farW', label: 'Far flocks', min: 0, max: 1, step: 0.05, note: 'Far: tiny, pale and slow, low over the mountains, behind both groves.' },
-  { k: 'size', label: 'Size (px, near bird’s body)', min: 4, max: 30, step: 0.5, group: 'Flight', note: 'The wings are about twice this across.' },
-  { k: 'speed', label: 'Speed (m/s)', min: 2, max: 15, step: 0.1 },
-  { k: 'turn', label: 'Wheeling (how sharp the turns)', min: 0.2, max: 3, step: 0.05, note: 'Higher = tighter loops.' },
-  { k: 'loops', label: 'Loops', min: 0, max: 2, step: 0.05, note: 'How often the flock wheels right round instead of heading on.' },
-  { k: 'swoop', label: 'Swoops up and down', min: 0, max: 2, step: 0.05 },
-  { k: 'spread', label: 'Spread (m)', min: 0.3, max: 8, step: 0.1, note: 'How loosely the flock holds together.' },
-  { k: 'trail', label: 'Strung out (s)', min: 0, max: 1.2, step: 0.01, note: 'How far each bird lags behind the one ahead on the same path.' },
-  { k: 'wander', label: 'Drift', min: 0, max: 2, step: 0.05, note: 'Each bird drifting about its own place.' },
-  { k: 'dart', label: 'Darting off', min: 0, max: 3, step: 0.05, note: 'How often one breaks away for a moment.' },
-  { k: 'bank', label: 'Lean into turns', min: 0, max: 2, step: 0.05 },
-  { k: 'flapHz', label: 'Wingbeats a second', min: 2, max: 16, step: 0.5, group: 'Wings' },
-  { k: 'flapAmp', label: 'Wingbeat size (°)', min: 5, max: 70, step: 1 },
-  { k: 'beatsMin', label: 'Beats in a burst: fewest', min: 1, max: 20, step: 1 },
-  { k: 'beatsMax', label: 'Beats in a burst: most', min: 1, max: 20, step: 1 },
-  { k: 'glideMin', label: 'Glide: shortest (s)', min: 0, max: 4, step: 0.05 },
-  { k: 'glideMax', label: 'Glide: longest (s)', min: 0, max: 4, step: 0.05 },
-  { k: 'wingLen', label: 'Wing length', min: 0.5, max: 2, step: 0.01, note: 'Each wing, in body lengths.' },
-  { k: 'sweep', label: 'Wings swept back', min: 0, max: 1, step: 0.01 },
-  { k: 'tail', label: 'Forked tail', min: 0, max: 1.2, step: 0.01 },
-  { k: 'floorSoft', label: 'Climb away from the ground below (screen height)', min: 0.05, max: 0.4, step: 0.01, group: 'Ground', note: 'How far above the ground line they start to climb away from it.' },
-  { k: 'floorHard', label: 'Lowest they can go (screen height)', min: 0.02, max: 0.3, step: 0.01, note: 'A bird can never go lower than this above the ground line. Keep it smaller than the setting above.' },
-  { k: 'haze', label: 'Far birds paler', min: 0, max: 1, step: 0.01, group: 'Look' },
-  { k: 'view', label: 'Looking up at them (°)', min: 0, max: 70, step: 1, note: 'Low = their loops look flat, high = round, as from right underneath.' }
+  { k: 'rangeHeight', label: 'Height of the ranges', min: 0.05, max: 0.5, step: 0.01, group: 'The ranges', note: 'For a range 20 km away, as a fraction of the screen height.' },
+  { k: 'featureKm', label: 'Size of the mountains (km)', min: 3, max: 30, step: 0.5, note: 'Small = many small peaks, large = big broad mountains.' },
+  { k: 'sharpness', label: 'Sharp crests', min: 0, max: 1, step: 0.01, note: '0 rounded and worn down, 1 sharp, jagged crests.' },
+  { k: 'layering', label: 'Ranges one behind another', min: 0, max: 1, step: 0.01, note: '0 one continuous range, 1 distinct ranges with mist between them.' },
+  { k: 'rangeSpacing', label: 'Space between the ranges (km)', min: 3, max: 25, step: 0.5 },
+  { k: 'nearestKm', label: 'Nearest range (km)', min: 3, max: 25, step: 0.5 },
+  { k: 'farRise', label: 'Far ranges stand higher', min: 0, max: 2, step: 0.05, note: 'Low foothills in front, high ranges behind.' },
+  { k: 'lens', label: 'Lens (°)', min: 10, max: 50, step: 1, note: 'Small = telephoto: the far mountains look big and close together.' },
+  { k: 'fujiX', label: 'Across the screen', min: 0, max: 1, step: 0.01, group: 'Fuji' },
+  { k: 'fujiHeight', label: 'Height', min: 0.1, max: 0.6, step: 0.01, note: 'Its summit above the ground line, as a fraction of the screen height.' },
+  { k: 'fujiWidth', label: 'Width', min: 1.5, max: 4, step: 0.05, note: 'Half its base, in its own heights.' },
+  { k: 'fujiKm', label: 'Distance (km)', min: 15, max: 100, step: 1, note: 'Further = paler and hazier.' },
+  { k: 'fujiGullies', label: 'Gullies', min: 0, max: 1.5, step: 0.05 },
+  { k: 'fujiSnow', label: 'Snow cap', min: 0, max: 0.8, step: 0.01, note: 'How far down its height the snow reaches.' },
+  { k: 'fujiTongues', label: 'Snow down the gullies', min: 0, max: 1.5, step: 0.05 },
+  { k: 'fujiClear', label: 'Ranges keep clear of it', min: 0, max: 1, step: 0.05 },
+  { k: 'snow', label: 'Snow on the ranges', min: 0, max: 1, step: 0.01, group: 'Snow and forest' },
+  { k: 'snowLine', label: 'Snow line', min: 0.2, max: 1.2, step: 0.01, note: 'Higher = only the highest peaks.' },
+  { k: 'treeLine', label: 'Tree line', min: 0, max: 1.2, step: 0.01, note: 'Forest below it, bare rock above.' },
+  { k: 'autumn', label: 'Autumn colour', min: 0, max: 1, step: 0.01, note: '0 green, 1 full red and gold.' },
+  { k: 'sunAzimuth', label: 'Light from (°)', min: -180, max: 180, step: 1, group: 'The light', note: '-90 from the left, 0 from straight ahead (behind the mountains), 90 from the right, 180 from behind you.' },
+  { k: 'sunElevation', label: 'Sun height, day (°)', min: 2, max: 70, step: 1 },
+  { k: 'eveningElevation', label: 'Sun height, evening (°)', min: 1, max: 20, step: 0.5 },
+  { k: 'sunStrength', label: 'Sunlight', min: 0.2, max: 2, step: 0.05 },
+  { k: 'ambient', label: 'Light from the sky', min: 0, max: 1.5, step: 0.05, note: 'How light the shaded sides are.' },
+  { k: 'shadows', label: 'Shadows', min: 0, max: 1, step: 0.05 },
+  { k: 'haze', label: 'Haze', min: 0, max: 1, step: 0.01, group: 'The air' },
+  { k: 'hazeKm', label: 'Haze distance (km)', min: 8, max: 120, step: 1, note: 'Smaller = thicker air: the haze starts nearer.' },
+  { k: 'mist', label: 'Mist in the valleys', min: 0, max: 1, step: 0.01 },
+  { k: 'mistHeightKm', label: 'Mist depth (km)', min: 0.05, max: 1.5, step: 0.05 },
+  { k: 'footMist', label: 'Mist along the foot', min: 0, max: 1, step: 0.01, note: 'Where the mountains meet the ground in front.' },
+  { k: 'fadeToSky', label: 'Far ranges fade into the sky', min: 0, max: 1, step: 0.01 },
+  { k: 'strength', label: 'Strength', min: 0, max: 1, step: 0.01, group: 'The picture' },
+  { k: 'softness', label: 'Softness (px)', min: 0, max: 4, step: 0.1 },
+  { k: 'resolution', label: 'Resolution', min: 0.4, max: 1.2, step: 0.05, note: 'Lower = softer and quicker to draw.', restyle: true }
 ];
+var COLOURS = [['rock', 'Rock'], ['fujiRock', 'Fuji'], ['forestRed', 'Forest: red'], ['forestGold', 'Forest: gold'],
+               ['evergreen', 'Forest: evergreen'], ['snow', 'Snow'], ['haze', 'Haze']];
 var sp = document.getElementById('sp');
 document.getElementById('spToggle').addEventListener('click', function () {
   this.textContent = sp.classList.toggle('closed') ? 'Show' : 'Hide';
 });
 var host = document.getElementById('spCtls');
 function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(c.step < 0.1 ? 2 : 1); }
+function select(label, opts, value, onChange) {
+  var row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = label;
+  var sel = document.createElement('select');
+  opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+  sel.value = value;
+  sel.addEventListener('change', function () { onChange(sel.value); });
+  row.appendChild(sel); host.appendChild(row);
+}
 function build() {
   host.innerHTML = '';
+  select('Mountains', [['3d', '3D'], ['painted', 'Painted (as before)']], M.style, function (v) { M.style = v; lab.restyle(); });
+  select('Time of day', [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']], lab.time(), function (v) { lab.setTime(v); });
   CTLS.forEach(function (c) {
-    if (c.group) {
-      var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh);
-      if (c.group === 'Look') {                       // the colour comes first in its group
-        var row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = 'Colour';
-        var ci = document.createElement('input'); ci.type = 'color'; ci.value = B.colour;
-        ci.addEventListener('input', function () { B.colour = ci.value; lab.save(); });
-        row.appendChild(ci); host.appendChild(row);
-      }
-    }
+    if (c.group) { var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh); }
     var wrap = document.createElement('div'); wrap.className = 'sp-ctl';
     var l = document.createElement('label'); l.textContent = c.label;
-    var val = document.createElement('span'); val.textContent = fmt(c, B[c.k]); l.appendChild(val);
-    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = B[c.k];
-    inp.addEventListener('input', function () { B[c.k] = parseFloat(inp.value); val.textContent = fmt(c, B[c.k]); lab.save(); });
+    var val = document.createElement('span'); val.textContent = fmt(c, M[c.k]); l.appendChild(val);
+    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = M[c.k];
+    inp.addEventListener('input', function () {
+      M[c.k] = parseFloat(inp.value); val.textContent = fmt(c, M[c.k]);
+      if (c.restyle) lab.restyle(); else lab.changed();
+    });
     wrap.appendChild(l); wrap.appendChild(inp);
     if (c.note) { var n = document.createElement('small'); n.textContent = c.note; wrap.appendChild(n); }
     host.appendChild(wrap);
   });
+  var tr = document.createElement('label'); tr.className = 'sp-colour'; tr.textContent = 'Row of trees along the foot';
+  var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = M.treeDots;
+  cb.addEventListener('change', function () { M.treeDots = cb.checked; lab.changed(); });
+  tr.appendChild(cb); host.appendChild(tr);
+  var gh2 = document.createElement('h4'); gh2.textContent = 'Colours'; host.appendChild(gh2);
+  COLOURS.forEach(function (cc) {
+    var row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = cc[1];
+    var ci = document.createElement('input'); ci.type = 'color'; ci.value = M.colours[cc[0]];
+    ci.addEventListener('input', function () { M.colours[cc[0]] = ci.value; lab.changed(); });
+    row.appendChild(ci); host.appendChild(row);
+  });
 }
-document.getElementById('spSend').addEventListener('click', lab.send);
-document.getElementById('spClear').addEventListener('click', lab.clear);
+document.getElementById('spSeed').addEventListener('click', function () { M.seed = (M.seed % 997) + 1; lab.changed(); });
 document.getElementById('spReset').addEventListener('click', function () {
-  for (var k in lab.defaults) B[k] = lab.defaults[k];
-  lab.save(); build();
+  var D = JSON.parse(JSON.stringify(lab.defaults));
+  for (var k in D) M[k] = D[k];
+  lab.restyle(); build();
 });
 document.getElementById('spCopy').addEventListener('click', function () {
-  var text = 'Birds: ' + CTLS.map(function (c) { return c.label + ' ' + fmt(c, B[c.k]); }).join(', ') +
-             ', colour ' + B.colour + '\n' + JSON.stringify(B);
+  var text = 'Mountains: ' + M.style + ', shape ' + M.seed + ', ' +
+             CTLS.map(function (c) { return c.label + ' ' + fmt(c, M[c.k]); }).join(', ') +
+             ', colours ' + COLOURS.map(function (cc) { return cc[1] + ' ' + M.colours[cc[0]]; }).join(', ') +
+             '\n' + JSON.stringify(M);
   var out = document.getElementById('spOut');
   out.textContent = text; out.classList.add('shown');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
 });
 var count = document.getElementById('spCount');
-setInterval(function () { count.textContent = 'In the sky now: ' + lab.count(); }, 500);
+setInterval(function () { count.textContent = lab.info() + ' · shape ' + M.seed; }, 500);
 build();
 })();
 </script>
