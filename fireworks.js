@@ -86,6 +86,8 @@ var PALETTES = {
   pastel:  [[255, 166, 214], [240, 255, 156], [156, 240, 255], [208, 180, 255], [255, 240, 222]]
 };
 var GOLD = [255, 178, 70], WHITE = [255, 248, 236], SPARK = [255, 150, 64];
+var TRAIL_K = 20;                          // pieces in a star's trail
+var trailX = new Float32Array(0), trailY = new Float32Array(0);   // the points along the trails of one group of stars
 
 var DEFAULTS = {
   // the show
@@ -528,7 +530,7 @@ function create(values) {
     main.restore();
   }
   function drawShells(ctx, bright) {
-    var i, S, u, p, K = 8, tailT = 0.3;
+    var i, S, u, p, K = 16, tailT = 0.3;
     // falling sparks
     ctx.fillStyle = css(mix(GOLD, WHITE, 0.3));
     for (i = 0; i < sparks.length; i++) {
@@ -536,7 +538,8 @@ function create(values) {
       ctx.globalAlpha = clamp((1 - a) * 0.7 * bright * V.tail, 0, 1) * (0.5 + Math.random() * 0.5);
       ctx.fillRect(sp.x - 0.6, sp.y - 0.6, 1.2, 1.2);
     }
-    ctx.lineCap = 'round';
+    ctx.lineCap = 'butt';                    // flat ends: the pieces of a trail meet without overlapping, so no dot at each joint
+    ctx.lineJoin = 'round';
     for (i = 0; i < shells.length; i++) {
       S = shells[i]; u = (now - S.t0) / S.rise;
       var du = tailT / S.rise;
@@ -544,9 +547,10 @@ function create(values) {
         var u0 = u - du * k / K, u1 = u - du * (k + 1) / K;
         if (u0 <= 0) break;
         var p0 = shellAt(S, u0), p1 = shellAt(S, Math.max(0, u1));
-        ctx.globalAlpha = clamp(bright * V.tail * Math.pow(1 - k / K, 1.6) * 0.9, 0, 1);
-        ctx.strokeStyle = css(mix(WHITE, GOLD, k / K));
-        ctx.lineWidth = 1.8 * (1 - k / K * 0.6);
+        var kt = (k + 0.5) / K;
+        ctx.globalAlpha = clamp(bright * V.tail * Math.pow(1 - kt, 1.6) * 0.9, 0, 1);
+        ctx.strokeStyle = css(mix(WHITE, GOLD, kt));
+        ctx.lineWidth = 1.8 * (1 - kt * 0.6);
         ctx.beginPath(); ctx.moveTo(p0[0], p0[1]); ctx.lineTo(p1[0], p1[1]); ctx.stroke();
       }
       p = shellAt(S, u);
@@ -574,40 +578,40 @@ function create(values) {
       if (!groups[key]) { groups[key] = []; keys.push(key); }
       groups[key].push(s);
     }
-    var K = 6;
+    var K = TRAIL_K;
     for (var g = 0; g < keys.length; g++) {
       var G = groups[keys[g]], s0 = G[0];
       var u = a / s0.T, col = s0.c2 ? mix(s0.c1, s0.c2, smooth(s0.f, s0.f + 0.06, u)) : s0.c1;
       var b = smooth(0, 0.06, a) * (1 - smooth(0.7, 1, u)) * bright;
-      // the tails: the spark trail behind each star, fading back along its path
+      // the tails: the spark trail behind each star, fading back along its path. Each
+      // is TRAIL_K short pieces with flat ends that meet exactly (round ends would
+      // overlap at every joint and show as a bright dot), fading smoothly. The points
+      // along each star's path are worked out once and used by the pieces either side.
       if (s0.tr > 0.02 && b > 0.01) {
-        var tc = s0.tc || col;
+        var tc = s0.tc || col, m = G.length, W1 = K + 1, nb = K;
+        if (trailX.length < m * W1) { trailX = new Float32Array(m * W1 * 2); trailY = new Float32Array(m * W1 * 2); }
+        for (var j = 0; j <= K; j++) {
+          var aj = a - s0.tr * j / K;
+          if (aj <= 0) { aj = 0; nb = j; }
+          for (i = 0; i < m; i++) {
+            var qj = at(B, G[i], aj);
+            trailX[i * W1 + j] = qj[0]; trailY[i * W1 + j] = qj[1];
+          }
+          if (nb === j && aj === 0) break;
+        }
         ctx.strokeStyle = css(tc);
-        for (var k = 0; k < K; k++) {
-          var a0 = a - s0.tr * k / K, a1 = a - s0.tr * (k + 1) / K;
-          if (a0 <= 0) break;
-          a1 = Math.max(0, a1);
-          ctx.globalAlpha = clamp(b * Math.pow(1 - k / K, 1.1) * 0.85, 0, 1);
-          ctx.lineWidth = Math.max(0.6, s0.sz * 0.9 * (1 - 0.55 * k / K));
+        ctx.lineCap = 'butt';
+        ctx.lineJoin = 'round';
+        for (var k = 0; k < nb; k++) {
+          var kt = (k + 0.5) / K;
+          ctx.globalAlpha = clamp(b * Math.pow(1 - kt, 1.1) * 0.85, 0, 1);
+          ctx.lineWidth = Math.max(0.6, s0.sz * 0.9 * (1 - 0.55 * kt));
           ctx.beginPath();
-          for (i = 0; i < G.length; i++) {
-            var q0 = at(B, G[i], a0), q1 = at(B, G[i], a1);
-            ctx.moveTo(q0[0], q0[1]); ctx.lineTo(q1[0], q1[1]);
+          for (i = 0; i < m; i++) {
+            ctx.moveTo(trailX[i * W1 + k], trailY[i * W1 + k]);
+            ctx.lineTo(trailX[i * W1 + k + 1], trailY[i * W1 + k + 1]);
           }
           ctx.stroke();
-        }
-      }
-      // glittering tails (kamuro, palm): sparkles hanging along the trail
-      if (s0.glit && s0.tr > 0.3 && b > 0.01) {
-        ctx.fillStyle = css(mix(GOLD, WHITE, 0.5));
-        for (i = 0; i < G.length; i++) {
-          for (var m = 0; m < 3; m++) {
-            var am = a - s0.tr * Math.random();
-            if (am <= 0) continue;
-            var qm = at(B, G[i], am);
-            ctx.globalAlpha = clamp(b * Math.random() * 0.9, 0, 1);
-            ctx.fillRect(qm[0] - 0.7, qm[1] - 0.7, 1.4, 1.4);
-          }
         }
       }
       // the heads
