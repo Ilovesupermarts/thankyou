@@ -35,13 +35,30 @@
      var show = Fireworks.create(values);   // values: see DEFAULTS
      show.resize(W, H, PR, horizon);        // CSS px; horizon: y of the ground line
      show.update(dt, t);                    // every frame
-     show.drawSky(ctx);                     // behind the mountains: the
+     show.drawSky(ctx, occluder);           // behind the mountains: the
                                             // darker sky, the fireworks,
-                                            // their smoke and the clouds
+                                            // their smoke and the clouds.
+                                            // occluder: a canvas the size of
+                                            // the screen (any resolution) whose
+                                            // opaque parts are what stands in
+                                            // front of the show (the mountains,
+                                            // the trees): the show is cut out
+                                            // there, so it is never seen
+                                            // through them. Make one with
+                                            // Fireworks.silhouette(). Nothing
+                                            // is drawn below the ground line.
      show.drawFront(ctx);                   // in front of the mountains:
                                             // the light of the bursts on them
-     show.launch(kind);                     // fire one now ('starmine',
-                                            // 'phoenix' or a shell above)
+     show.launch(kind, o);                  // fire one now ('starmine',
+                                            // 'phoenix' or a shell above); o, if
+                                            // given: x (0 … 1), height (fraction of
+                                            // the screen height), scale
+     show.active();                         // false when there is nothing to draw
+                                            // (no shells, smoke or cloud): the
+                                            // occluder need not be made then
+     Fireworks.silhouette(src, dst, lo, hi) // dst (a canvas, any size) = the shape
+                                            // of src's alpha: nothing below alpha
+                                            // lo, solid above hi, as an occluder
    The values are read every frame, so they can be changed at any time.
    ============================================================ */
 var Fireworks = (function () {
@@ -166,9 +183,12 @@ function create(values) {
   var litCv = document.createElement('canvas'), litC = litCv.getContext('2d');
   var maskCv = document.createElement('canvas'), maskC = maskCv.getContext('2d');
   var cloudTex = null, cloudBody = null, cloudKey = '';
+  // the show is drawn on a layer of its own, so that what stands in front of it can be cut out
+  var layerCv = document.createElement('canvas'), layerC = layerCv.getContext('2d');
 
   function resize(w, h, pr, horizon) {
     W = w; H = h; PR = pr; hy = horizon;
+    layerCv.width = Math.max(1, Math.round(W * PR)); layerCv.height = Math.max(1, Math.round(H * PR));
     glowCv.width = Math.max(1, Math.round(W * PR / 4)); glowCv.height = Math.max(1, Math.round(H * PR / 4));
     litCv.width = maskCv.width = Math.max(1, Math.round(W / 8)); litCv.height = maskCv.height = Math.max(1, Math.round(H / 8));
   }
@@ -329,10 +349,10 @@ function create(values) {
     V.palette = keep;
     return sweep + 6;
   }
-  function launch(kind) {
+  function launch(kind, o) {
     if (kind === 'starmine') return starmine();
     if (kind === 'phoenix') return phoenix();
-    shell(kind || pickKind());
+    shell(kind || pickKind(), o);
     return 0;
   }
 
@@ -432,20 +452,32 @@ function create(values) {
   }
 
   /* ---------- drawing, behind the mountains ---------- */
-  function drawSky(ctx) {
+  function active() {
+    return !!(W && (shells.length || bursts.length || flashes.length || smokes.length || V.cloudCover > 0.01));
+  }
+  function drawSky(main, occ) {
     if (!W) return;
     var dim = 1 - V.haze * 0.5, bright = V.brightness * dim;
-    ctx.save();
-    ctx.setTransform(PR, 0, 0, PR, 0, 0);
-    ctx.globalAlpha = 1;
-    ctx.globalCompositeOperation = 'source-over';
     // the night sky, darkened behind the show
     if (V.skyDark > 0) {
-      var sg = ctx.createLinearGradient(0, 0, 0, hy);
+      main.save();
+      main.setTransform(PR, 0, 0, PR, 0, 0);
+      main.globalAlpha = 1;
+      main.globalCompositeOperation = 'source-over';
+      var sg = main.createLinearGradient(0, 0, 0, hy);
       sg.addColorStop(0, css([8, 10, 28], V.skyDark * 0.85));
       sg.addColorStop(1, css([20, 22, 44], V.skyDark * 0.5));
-      ctx.fillStyle = sg; ctx.fillRect(0, 0, W, hy + 4);
+      main.fillStyle = sg; main.fillRect(0, 0, W, hy + 4);
+      main.restore();
     }
+    if (!active()) return;
+    // the show, on its layer
+    var ctx = layerC;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.clearRect(0, 0, layerCv.width, layerCv.height);
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
     ctx.globalCompositeOperation = 'lighter';
     // the light of each burst on the sky round it; many bursts at once
     // brighten the sky more, but never wash it out
@@ -479,7 +511,21 @@ function create(values) {
     }
     ctx.globalCompositeOperation = 'source-over';
     drawClouds(ctx);
-    ctx.restore();
+    // what stands in front of it (the mountains, the trees) is cut out, and everything
+    // below the ground line: the show is never seen through them
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'destination-out';
+    if (occ) ctx.drawImage(occ, 0, 0, layerCv.width, layerCv.height);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, Math.round(hy * PR), layerCv.width, layerCv.height);
+    ctx.globalCompositeOperation = 'source-over';
+    main.save();
+    main.setTransform(1, 0, 0, 1, 0, 0);
+    main.globalAlpha = 1;
+    main.globalCompositeOperation = 'source-over';
+    main.drawImage(layerCv, 0, 0);
+    main.restore();
   }
   function drawShells(ctx, bright) {
     var i, S, u, p, K = 8, tailT = 0.3;
@@ -705,7 +751,7 @@ function create(values) {
 
   return {
     values: V,
-    resize: resize, update: update, drawSky: drawSky, drawFront: drawFront,
+    resize: resize, update: update, drawSky: drawSky, drawFront: drawFront, active: active,
     launch: launch,
     clear: function () { shells.length = bursts.length = sparks.length = smokes.length = flashes.length = queue.length = 0; starCount = 0; timers = null; },
     restart: function () { timers = null; },
@@ -713,5 +759,23 @@ function create(values) {
   };
 }
 
-return { create: create, DEFAULTS: DEFAULTS, PALETTES: PALETTES };
+/* dst = the shape of src's alpha, as an occluder for drawSky: transparent
+   where src's alpha is under lo, solid where it is over hi. Read back from
+   the canvas, so make it once (when src is baked), not every frame. */
+function silhouette(src, dst, lo, hi) {
+  var w = dst.width, h = dst.height, c = dst.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-over';
+  c.globalAlpha = 1;
+  c.clearRect(0, 0, w, h);
+  c.drawImage(src, 0, 0, w, h);
+  var img = c.getImageData(0, 0, w, h), d = img.data;
+  for (var i = 3; i < d.length; i += 4) {
+    d[i - 3] = d[i - 2] = d[i - 1] = 0;
+    d[i] = Math.round(smooth(lo, hi, d[i] / 255) * 255);
+  }
+  c.putImageData(img, 0, 0);
+}
+
+return { create: create, DEFAULTS: DEFAULTS, PALETTES: PALETTES, silhouette: silhouette };
 })();
