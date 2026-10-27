@@ -579,7 +579,7 @@ var nowT = 0;                                 // the frame time, for leaves that
 function mk() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 var NB = mk(), NL = mk(), FL = mk(), FBR = mk(); // near branches, near leaves, far foliage, far branches
 var SCN = mk(), MTN = mk(), TMP = mk();       // baked scenery, mountains, scratch
-var SIL = mk(), OCC = mk();                   // the mountains' outline (baked), and what stands in front of the fireworks (each frame)
+var SIL = mk(), OCC = mk(), REFL = mk();      // REFL: how strongly the mountains reflect the fireworks' light (baked)                   // the mountains' outline (baked), and what stands in front of the fireworks (each frame)
 var GL = mk();                                // the back grass and susuki, redrawn each frame
 var MIST = mk();                              // one soft mist blob
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
@@ -2155,8 +2155,8 @@ function mtnOptions(C, hy) {
 /* The 3D mountains into MTN, softened a little. False when they can't be drawn here. */
 function drawMountains3d(m, C, hy) {
   if (MT.style !== '3d' || typeof Mountains === 'undefined') return false;
-  var t0 = performance.now();
-  var g3 = Mountains.render(mtnOptions(C, hy));
+  var t0 = performance.now(), o3 = mtnOptions(C, hy);
+  var g3 = Mountains.render(o3);
   if (!g3) return false;
   m.save();
   m.setTransform(1, 0, 0, 1, 0, 0);
@@ -2164,6 +2164,11 @@ function drawMountains3d(m, C, hy) {
   m.filter = px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
   m.drawImage(g3, 0, 0, MTN.cnv.width, MTN.cnv.height);
   m.restore();
+  // how strongly each point reflects the fireworks' light (the snow most), for show.drawFront
+  var rf = Mountains.reflectance(o3), rc = REFL.c;
+  rc.setTransform(1, 0, 0, 1, 0, 0);
+  rc.clearRect(0, 0, REFL.cnv.width, REFL.cnv.height);
+  if (rf) rc.drawImage(rf, 0, 0, REFL.cnv.width, REFL.cnv.height);
   // mist lying along the foot of the mountains, where they meet the ground
   if (MT.footMist > 0) {
     var mistC = light(C.mist), y0 = hy - H * 0.07, y1 = hy + 6;
@@ -5549,6 +5554,7 @@ function resize() {
   show.resize(W, H, PR, H * V.horizon);
   SIL.cnv.width = OCC.cnv.width = Math.max(1, Math.round(W * PR / 2));       // the occluder is half the screen's resolution
   SIL.cnv.height = OCC.cnv.height = Math.max(1, Math.round(H * PR / 2));
+  REFL.cnv.width = Math.max(1, Math.round(W * PR / 2)); REFL.cnv.height = Math.max(1, Math.round(H * PR / 2));
   paintSky();
 }
 function rebuildAll() {
@@ -5665,7 +5671,7 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
   // The light of the bursts on the mountains.
-  show.drawFront(ctx);
+  show.drawFront(ctx, mtn3d ? REFL.cnv : null);
 
   // The ground of fallen leaves (baked).
   ctx.setTransform(1, 0, 0, 1, 0, 0);
