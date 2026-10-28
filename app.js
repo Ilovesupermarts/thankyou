@@ -15244,7 +15244,7 @@ var FIREWORKS = (function() {
     flash: 1.25, mountainLight: 2, smoke: 0.9, wind: 0.3, haze: 0.15, skyDark: 0.65,
     // the sound
     sound: true, volume: 0.03, whistleVolume: 1.5, whistleChance: 1, boomVolume: 1.25, soundDelay: 0.4,
-    echo: 0.75, muffle: 0, launchThump: 0.75
+    echo: 0.75, muffle: 0, launchThump: 0.75, whistleBelowBang: 6
   };
   for (var k in approved) v[k] = approved[k];
   return v;
@@ -15255,9 +15255,12 @@ if (typeof Fireworks !== 'undefined') {
   FIREWORKS.program = 'off';
   fwShow = Fireworks.create(FIREWORKS);
   // whistling2.mp3: the whistle sounds from 0.42 to 3.4 s; the recording is quiet with a
-  // low rumble under it, so it is cut below 900 Hz and raised 60 times (as on fireworks.html; 30 was barely heard on the tablet, 120 was too loud)
+  // low rumble under it, so it is cut below 900 Hz and raised 60 times (as on fireworks.html; 30 was barely heard on the tablet, 120 was too loud).
+  // The bang is nearly all deep rumble, which a tablet's speakers and the ear hardly notice (as heard it was
+  // 16 dB under the whistle), so it is raised 16 times, to sit about 7 dB over it; both are measured when
+  // loaded and a whistle is never allowed to be within whistleBelowBang dB of its bang.
   fwShow.enableSound({ whistle: 'Sound/whistling2.mp3', boom: 'Sound/big-boom-14752.mp3',
-                       whistleFrom: 0.42, whistleTo: 3.4, whistleGain: 60, whistleHighpass: 900 });
+                       whistleFrom: 0.42, whistleTo: 3.4, whistleGain: 60, whistleHighpass: 900, boomGain: 16 });
 }
 var LAND_REBAKE = 90;                 // seconds between light-driven re-bakes
 var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are baked at 0.6 resolution
