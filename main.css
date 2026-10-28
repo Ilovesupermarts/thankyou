@@ -3077,6 +3077,14 @@
   html[data-time="night"] .info-line .temp { color: var(--bg-base); }
   html[data-time="night"] .hud-meta-row .hud-dot { color: var(--bg-base); }
   html[data-time="night"] .info-line .sep { background: var(--bg-base); }
+  /* NIGHT TICKER AND WIND LINE, data-time="night" only. The scrolling weather
+     line and the wind line under the 風鈴 take the same ink as "DL 100%"
+     (--text-dark), with their dots. Colour only. */
+  html[data-time="night"] .ticker-track,
+  html[data-time="night"] .ticker-track * ,
+  html[data-time="night"] .furin-text .ko-sub .hud-artist { color: var(--text-dark); }
+  html[data-time="night"] .furin-text .hud-sep,
+  html[data-time="night"] .ticker-track .hud-sep { background: var(--text-dark); }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
   .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 32px; }
   .action-hint.ty-swipe-hint.shown { opacity: 1; }
