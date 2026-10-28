@@ -60,7 +60,10 @@
      show.active();                         // false when there is nothing to draw
                                             // (no shells, smoke or cloud): the
                                             // occluder need not be made then
-     show.enableSound({ whistle: url, boom: url });
+     show.enableSound({ whistle: url, boom: url,
+                        whistleFrom: s, whistleTo: s,   // where the whistle sounds in its file
+                        whistleGain: k,                 // how much to raise (or lower) it
+                        whistleHighpass: Hz });         // cut anything below this (rumble)
                                             // the whistle of a rising shell (it is
                                             // sped up or slowed down to end just as
                                             // the shell bursts) and the bang, heard
@@ -428,19 +431,21 @@ function create(values) {
   }
 
   /* ---------- the sound ----------
-     Whistling.mp3: the whistle sounds from WH_FROM to WH_TO s (a falling
-     tone, about 2,300 Hz down to 1,000 Hz). It is played faster or slower so
+     The whistle sounds from whistleFrom to whistleTo s in its file (given to
+     enableSound; for Sound/Whistling.mp3, the defaults, 0.08 to 2.85 s, a falling
+     tone from about 2,300 Hz down to 1,000 Hz). It is played faster or slower so
      that it ends just as the shell bursts: a quick climb whistles higher, a
      slow one lower, as real shells do. The bang (big-boom) is heard
      soundDelay s after the flash, a little later for higher bursts; bigger
      shells boom lower and louder, distance muffles it, and it echoes back
      off the mountains. Each sound comes from the side its firework is on.
      A limiter keeps a star mine or a finale from distorting. */
-  var WH_FROM = 0.08, WH_TO = 2.85;
   var snd = null;
   function enableSound(urls) {
     if (snd) return;
-    snd = { ac: null, out: null, whistle: null, boom: null, whistles: [], lastPop: 0, state: 'Tap anywhere to turn the sound on' };
+    snd = { ac: null, out: null, whistle: null, boom: null, whistles: [], lastPop: 0, state: 'Tap anywhere to turn the sound on',
+            whFrom: urls.whistleFrom !== undefined ? urls.whistleFrom : 0.08, whTo: urls.whistleTo !== undefined ? urls.whistleTo : 2.85,
+            whGain: urls.whistleGain || 1, whHighpass: urls.whistleHighpass || 0 };
     function start() {
       if (snd.ac) { if (snd.ac.state === 'suspended' && !document.hidden) snd.ac.resume(); return; }
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -470,11 +475,17 @@ function create(values) {
     return !!(snd && snd.ac && snd.whistle && snd.boom && V.sound && snd.ac.state === 'running');
   }
   /* One sound: buf from offset, at time at, played at rate, through a low-pass
-     filter (if lowpass, Hz), from the side of the screen x is on. */
-  function voice(buf, at, rate, gain, x, lowpass, offset) {
+     filter (if lowpass, Hz) and a high-pass one (if highpass, Hz), from the side
+     of the screen x is on. */
+  function voice(buf, at, rate, gain, x, lowpass, offset, highpass) {
     var ac = snd.ac, src = ac.createBufferSource(), node = src;
     src.buffer = buf;
     src.playbackRate.value = rate;
+    if (highpass) {
+      var hpf = ac.createBiquadFilter();
+      hpf.type = 'highpass'; hpf.frequency.value = highpass; hpf.Q.value = 0.9;
+      node.connect(hpf); node = hpf;
+    }
     if (lowpass) {
       var f = ac.createBiquadFilter();
       f.type = 'lowpass'; f.frequency.value = lowpass;
@@ -502,11 +513,11 @@ function create(values) {
     snd.whistles = snd.whistles.filter(function (w) { return w.end > t; });
     if (snd.whistles.length >= 4) return;                // a star mine: not every shell at once
     // the whistle, sped up or slowed down so that it ends just as the shell bursts
-    var len = WH_TO - WH_FROM, rate = len / S.rise, start = t, from = WH_FROM;
-    if (rate < 0.6) { rate = 0.6; start = t + S.rise - len / rate; }    // a very slow climb: it starts a little later
-    else if (rate > 2.2) { rate = 2.2; from = WH_TO - S.rise * rate; }  // a very quick one: only its end
-    var end = start + (WH_TO - from) / rate, gv = 0.5 * V.whistleVolume;
-    var v = voice(snd.whistle, start, rate, 0, S.x0, 0, from);
+    var len = snd.whTo - snd.whFrom, rate = len / S.rise, start = t, from = snd.whFrom;
+    if (rate < 0.6) { rate = 0.6; start = t + S.rise - len / rate; }       // a very slow climb: it starts a little later
+    else if (rate > 2.2) { rate = 2.2; from = snd.whTo - S.rise * rate; }  // a very quick one: only its end
+    var end = start + (snd.whTo - from) / rate, gv = 0.5 * V.whistleVolume * snd.whGain;
+    var v = voice(snd.whistle, start, rate, 0, S.x0, 0, from, snd.whHighpass);
     v.g.gain.setValueAtTime(0, start);
     v.g.gain.linearRampToValueAtTime(gv, start + 0.06);
     v.g.gain.setValueAtTime(gv, Math.max(start + 0.06, end - 0.07));
