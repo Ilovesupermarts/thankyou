@@ -91,6 +91,16 @@ var BUILD = 'v147';
          cloud) with shadows, snow on the high ground, autumn forest
          below a tree line, haze, and mist in the valleys and along their
          foot. Without WebGL 2 the painted ridges are drawn as before.
+       - Fireworks (autumn, at night), as tuned on fireworks.html (values
+         in FIREWORKS, section 8c): fireworks.js draws a show after the
+         Nagaoka festival. Single shells (chrysanthemum, peony, double
+         pistil, kamuro) rise from behind the ridges and burst high in the
+         sky; the bursts light the sky, Fuji's snow cap and the clouds, and
+         are hidden behind the mountains, the trees and the bamboo. Each
+         rising shell whistles (whistling2.mp3, timed to end as it bursts)
+         and the bang (big-boom-14752.mp3) follows 0.4 s after the flash,
+         echoing off the mountains. It comes on as night falls and stops
+         launching at dawn; the sound starts on the first tap.
        - Winter landscape, as tuned on winter.html (values in WINT,
          section 8d), replacing the bare winter tree, the snowman and the
          snow bank: Fuji with a big snow cap (rounded tongues down the
@@ -14163,9 +14173,9 @@ function koyoGlow(ctx, T, strength) {
   ctx.fillStyle = g;
   ctx.fillRect(T.cx - T.cr * 1.4, gy - T.cr * 1.4, T.cr * 2.8, T.cr * 2.8);
 }
-function drawKoyoTrees(ctx, t) {
-  birdBox = birdBounds();
-  // The trees' layers first: the bamboo and the birds behind them are cut by them.
+/* The trees' layers, built at the top of the frame (before the sky): the
+   fireworks, the bamboo and the birds behind them are cut by them. */
+function buildKoyoLayers(t) {
   if (farTree) {
     // the far tree's branches go down solid, at half size and scaled up (soft),
     // and its foliage on a half-size layer laid down at the far strength
@@ -14189,6 +14199,10 @@ function drawKoyoTrees(ctx, t) {
     ctxKL.setTransform(PR, 0, 0, PR, 0, 0);
     drawKoyoClumps(ctxKL, tree, t);
   }
+}
+function drawKoyoTrees(ctx, t) {
+  birdBox = birdBounds();
+  // (The trees' layers were built at the top of the frame, buildKoyoLayers.)
   var farCut = farTree ? [[farBranchLayer, 1], [farLayer, 3]] : [], nearCut = tree ? [[treeLayer, 1], [koyoLeafLayer, 3]] : [];
   renderBamboo(t);
   var gFar = bambooGrove('far'), gNear = bambooGrove('near');
@@ -15052,12 +15066,56 @@ var MTN3D = {
   colours: { rock: '#968476', fujiRock: '#544850', forestRed: '#B04A2C', forestGold: '#D49A44',
              evergreen: '#4A5A3E', snow: '#F6F6FA', haze: '#DCCDD2' }
 };
+/* The fireworks (fireworks.js), as tuned on fireworks.html: a show after the
+   Nagaoka festival in the autumn scene at night. Shells rise from behind the
+   ridges with a whistle timed to the rise, burst into flowers of stars, and
+   the bang follows soundDelay s after the flash, echoing off the mountains.
+   The show is cut out wherever the mountains, the trees or the bamboo stand
+   in front of it, and its colours fall on Fuji's snow cap. It comes on as
+   the night falls (fireworksUpdate) and stops launching at dawn, letting the
+   last shells finish. The sound starts on the first tap. */
+var FIREWORKS = (function() {
+  var v = typeof Fireworks !== 'undefined' ? JSON.parse(JSON.stringify(Fireworks.DEFAULTS)) : {};
+  var approved = {
+    // the show
+    program: 'singles', pace: 0.5,
+    // the clouds
+    cloudCover: 0.35, cloudThickness: 0.75, cloudHeight: 0.3, cloudDepth: 0.32, cloudGlow: 1, cloudLight: 0.38, cloudSpeed: 1,
+    // where and how big
+    size: 0.225, sizeVariety: 0.41, heightLow: 0.77, heightHigh: 0.9, spreadLeft: 0.06, spreadRight: 0.94,
+    // the rise
+    riseTime: 1, tail: 1.3, tailSparks: 2.2, wobble: 2.6,
+    // the stars
+    density: 1.55, starSize: 1.8, trail: 1.15, burn: 1.5, gravity: 1.7, expand: 1, brightness: 0.5, glow: 1.6,
+    colourChange: 0.39, glitter: 0.56, saturation: 1, palette: 'nagaoka',
+    // the mix of shells
+    kiku: 1, botan: 1.4, yaeshin: 0.9, kamuro: 0.6, senrin: 0, ring: 0, yashi: 0,
+    // the air
+    flash: 1.25, mountainLight: 2, smoke: 0.9, wind: 0.3, haze: 0.15, skyDark: 0.65,
+    // the sound
+    sound: true, volume: 0.03, whistleVolume: 1.5, whistleChance: 1, boomVolume: 1.25, soundDelay: 0.4,
+    echo: 0.75, muffle: 0, launchThump: 0.75
+  };
+  for (var k in approved) v[k] = approved[k];
+  return v;
+})();
+var FW_PROGRAM = FIREWORKS.program;   // the programme at night; 'off' by day
+var fwShow = null, fwNight = 0, fwSize = '';
+if (typeof Fireworks !== 'undefined') {
+  FIREWORKS.program = 'off';
+  fwShow = Fireworks.create(FIREWORKS);
+  // whistling2.mp3: the whistle sounds from 0.42 to 3.4 s; the recording is quiet with a
+  // low rumble under it, so it is cut below 900 Hz and raised 30 times (as on fireworks.html)
+  fwShow.enableSound({ whistle: 'Sound/whistling2.mp3', boom: 'Sound/big-boom-14752.mp3',
+                       whistleFrom: 0.42, whistleTo: 3.4, whistleGain: 30, whistleHighpass: 900 });
+}
 var LAND_REBAKE = 90;                 // seconds between light-driven re-bakes
 var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are baked at 0.6 resolution
 var KOYO_FALL1 = SPECIES.koyo.size * 1.05 * S.sizeScale;   // size of the nearest falling kōyō leaf
 var KOYO_LEAF_LO = koyoOutline(23, 0);  // a lighter maple outline for the thousands of leaves on the ground
 function landCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
-var LS = { ready: false, key: '', at: -1e9, step: 0, grdTop: 0, scnTop: 0, mist: [], bornN: 0, floorBuilt: false, bedN: 0,
+var LS = { refl3d: false, SIL: landCanvas(), REFL: landCanvas(), OCC: landCanvas(),   // for the fireworks (8c)
+           ready: false, key: '', at: -1e9, step: 0, grdTop: 0, scnTop: 0, mist: [], bornN: 0, floorBuilt: false, bedN: 0,
            SCN: landCanvas(), MTN: landCanvas(), TMP: landCanvas(), GRD: landCanvas(), MIST: landCanvas(),
            NEAR: landCanvas(), NEART: landCanvas(), nearH: 0, surf: null, sr: 2, nearTop: 0 };
 
@@ -15174,7 +15232,12 @@ function landBakeScenery() {
   LAND_SR = PR * (try3d ? MTN3D.resolution : LAND_SCN_RES);   // the 3D mountains are sharp, so they are baked finer
   [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
   var m = LS.MTN.c, s = LS.SCN.c;
+  // the fireworks' canvases, at half the screen's resolution
+  [LS.SIL, LS.REFL, LS.OCC].forEach(function(o) {
+    o.cnv.width = Math.max(1, Math.round(W * PR / 2)); o.cnv.height = Math.max(1, Math.round(H * PR / 2));
+  });
   var is3d = try3d && landDrawMountains3d(m, hy);
+  LS.refl3d = is3d;
   if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
     LAND_SR = PR * LAND_SCN_RES;
     [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
@@ -15227,6 +15290,9 @@ function landBakeScenery() {
   s.globalAlpha = is3d ? MTN3D.strength : LAND.mtnStrength;
   s.drawImage(LS.MTN.cnv, 0, 0);
   s.globalAlpha = 1;
+  // the mountains' outline, for the fireworks behind them: the haze makes them see-through,
+  // and the fireworks must not show through
+  if (fwShow) Fireworks.silhouette(LS.MTN.cnv, LS.SIL.cnv, 0.55, 0.85);
   // the top of the highest peak (with room for its blur and the drifting mist):
   // only the scenery below it is drawn each frame. The 3D ranges stand at
   // most about four times rangeHeight (the far ones rise), Fuji at fujiHeight.
@@ -15276,7 +15342,7 @@ function mtnOptions(hy) {
    foot. False when they can't be drawn here (no WebGL 2). */
 function landDrawMountains3d(m, hy) {
   if (!MTN3D.on || typeof Mountains === 'undefined') return false;
-  var g3 = Mountains.render(mtnOptions(hy));
+  var o3 = mtnOptions(hy), g3 = Mountains.render(o3);
   if (!g3) return false;
   m.save();
   m.setTransform(1, 0, 0, 1, 0, 0);
@@ -15284,6 +15350,13 @@ function landDrawMountains3d(m, hy) {
   m.filter = HAS_FILTER && px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
   m.drawImage(g3, 0, 0, LS.MTN.cnv.width, LS.MTN.cnv.height);
   m.restore();
+  // how strongly each point reflects the fireworks' light (Fuji's snow cap most)
+  if (fwShow && Mountains.reflectance) {
+    var rf = Mountains.reflectance(o3), rc = LS.REFL.c;
+    rc.setTransform(1, 0, 0, 1, 0, 0);
+    rc.clearRect(0, 0, LS.REFL.cnv.width, LS.REFL.cnv.height);
+    if (rf) rc.drawImage(rf, 0, 0, LS.REFL.cnv.width, LS.REFL.cnv.height);
+  }
   if (MTN3D.footMist > 0) {
     var mistC = koyoLight(LAND_C.mist), y0 = hy - H * 0.07, y1 = hy + 6;
     m.setTransform(LAND_SR, 0, 0, LAND_SR, 0, 0);
@@ -15579,6 +15652,7 @@ function drawLandscape(c, dt) {
   var P = ENV.scene === 'winter' ? WINT : LAND;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
+  if (ENV.scene === 'autumn') fireworksDrawSky(c);                     // the fireworks, behind the mountains (8c)
   var sy0 = Math.floor(LS.scnTop * LAND_SR), sh0 = LS.SCN.cnv.height - sy0;   // the empty sky above the peaks is skipped
   c.drawImage(LS.SCN.cnv, 0, sy0, LS.SCN.cnv.width, sh0, 0, sy0 / LAND_SR * PR, cvBack.width, sh0 / LAND_SR * PR);
   if (P.mistDrift > 0) {                                                   // mist drifting along the ridges
@@ -15594,11 +15668,61 @@ function drawLandscape(c, dt) {
     }
     c.globalAlpha = 1;
   }
+  if (ENV.scene === 'autumn' && fwShow) fwShow.drawFront(c, LS.refl3d ? LS.REFL.cnv : null);   // the bursts' light on the mountains
   c.setTransform(1, 0, 0, 1, 0, 0);
   if (ENV.scene === 'winter') winDrawGround(c, lastT);          // in slices, with the skiers between them (8d)
   else { c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR)); torDrawGravel(c); }   // the gravel path lies on the ground
   c.setTransform(PR, 0, 0, PR, 0, 0);
 }
+/* ---------- the fireworks (FIREWORKS) ---------- */
+/* Every frame: the show comes on as the night falls (autumn only, once the
+   landscape is ready) and stops launching by day, letting the last shells finish. */
+function fireworksUpdate(dt, t) {
+  if (!fwShow) return;
+  var on = ENV.scene === 'autumn' && LS.ready && ENV.light;
+  fwNight += ((on ? smooth(0.5, 0.9, koyoNight()) : 0) - fwNight) * (1 - Math.exp(-dt / 3));
+  FIREWORKS.program = fwNight > 0.5 ? FW_PROGRAM : 'off';
+  var size = W + 'x' + H + '@' + PR;
+  if (size !== fwSize) { fwSize = size; fwShow.resize(W, H, PR, H * LAND.horizon); }
+  fwShow.update(dt, t);
+}
+/* The darker night sky behind the show, under the sun and the moon. */
+function fireworksDrawDark(c) {
+  if (fwShow && ENV.scene === 'autumn' && fwNight > 0.01) fwShow.drawDark(c, fwNight);
+}
+/* The show behind the mountains, cut out wherever something stands in front of
+   it: the mountains' outline, the trees (their layers are built at the top of the
+   frame, buildKoyoLayers) and the bamboo (as it was last drawn). Thin or
+   see-through parts are laid down a few times so they block it fully. */
+function fireworksDrawSky(c) {
+  if (!fwShow || !fwShow.active()) return;
+  var O = LS.OCC, oc = O.c, ow = O.cnv.width, oh = O.cnv.height, i;
+  oc.setTransform(1, 0, 0, 1, 0, 0);
+  oc.globalCompositeOperation = 'source-over';
+  oc.globalAlpha = 1;
+  oc.clearRect(0, 0, ow, oh);
+  oc.drawImage(LS.SIL.cnv, 0, 0, ow, oh);                         // the mountains
+  if (farTree) {
+    for (i = 0; i < 3; i++) oc.drawImage(farBranchLayer, 0, 0, ow, oh);
+    for (i = 0; i < 2; i++) oc.drawImage(farLayer, 0, 0, ow, oh);
+  }
+  if (tree) {
+    for (i = 0; i < 3; i++) oc.drawImage(treeLayer, 0, 0, ow, oh);
+    for (i = 0; i < 2; i++) oc.drawImage(koyoLeafLayer, 0, 0, ow, oh);
+  }
+  ['far', 'near'].forEach(function(key) {
+    var g = bambooGrove(key);
+    if (!g) return;
+    oc.globalAlpha = g.a;
+    for (var j = 0; j < 2; j++) oc.drawImage(g.out.cnv, 0, 0, ow, oh);
+    oc.globalAlpha = 1;
+  });
+  fwShow.drawSky(c, O.cnv, true);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'source-over';
+}
+
 /* The near band (leaves in autumn, the snowdrift in winter) goes under the
    leaves or flakes already drawn on the ground strip (it has its own night
    glow baked in). */
@@ -19343,11 +19467,16 @@ function dynStep(dt, t, want, skyWant) {
   }
   rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
 
+  if (ENV.scene === 'autumn') buildKoyoLayers(t);   // the trees' layers first: the fireworks are cut out behind them
+  fireworksUpdate(dt, t);
+
   // ---- back canvas ----
   drawOffsetY = 0;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cvBack.width, cvBack.height);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  fireworksDrawDark(ctx);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   drawSun(ctx, t);
   drawMoon(ctx, t);
