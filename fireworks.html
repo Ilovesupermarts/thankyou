@@ -2190,7 +2190,25 @@ function drawMountains3d(m, C, hy) {
    panel (FW_DEFAULTS are the starting values); they are kept in this
    browser.
    ============================================================ */
+/* The values approved on the tablet (the sound keeps the defaults in fireworks.js). */
+var FW_APPROVED = {
+  // the show
+  program: 'singles', pace: 0.5,
+  // the clouds
+  cloudCover: 0.35, cloudThickness: 0.75, cloudHeight: 0.3, cloudDepth: 0.32, cloudGlow: 1, cloudLight: 0.38, cloudSpeed: 1,
+  // where and how big
+  size: 0.225, sizeVariety: 0.41, heightLow: 0.77, heightHigh: 0.9, spreadLeft: 0.06, spreadRight: 0.94,
+  // the rise
+  riseTime: 1, tail: 1.3, tailSparks: 2.2, wobble: 2.6,
+  // the stars
+  density: 1.55, starSize: 1.8, trail: 1.15, burn: 1.5, gravity: 1.7, expand: 1, brightness: 0.5, glow: 1.6, colourChange: 0.79, glitter: 0.56, saturation: 1, palette: 'nagaoka',
+  // the mix of shells
+  kiku: 1, botan: 1.4, yaeshin: 0.9, kamuro: 0.6, senrin: 0, ring: 0, yashi: 0,
+  // the air
+  flash: 1.25, mountainLight: 2, smoke: 0.9, wind: 0.3, haze: 0.15, skyDark: 0.65
+};
 var FW_DEFAULTS = clone(Fireworks.DEFAULTS);
+for (var fa in FW_APPROVED) FW_DEFAULTS[fa] = FW_APPROVED[fa];
 var FW_KEY = 'fireworksLab1';
 var FW = clone(FW_DEFAULTS);
 try {
@@ -2199,6 +2217,8 @@ try {
 } catch (e) { /* private window: the defaults */ }
 function saveFireworks() { try { localStorage.setItem(FW_KEY, JSON.stringify(FW)); } catch (e) { /* silent */ } }
 var show = Fireworks.create(FW);
+// the whistle of the rising shells and the bang of the bursts (they start on the first tap)
+show.enableSound({ whistle: 'Sound/Whistling.mp3', boom: 'Sound/big-boom-14752.mp3' });
 
 function bakeScenery() {
   var C = cols(), hy = H * V.horizon, mistC = light(C.mist);
@@ -5526,7 +5546,7 @@ window.fwLab = {
   launch: function (k, o) { show.launch(k, o); },
   clear: function () { show.clear(); },
   restart: function () { show.restart(); },
-  info: function () { return show.info(); }
+  info: function () { return show.info() + ' · ' + show.soundInfo(); }
 };
 window.birdLab = {
   values: BIRD, defaults: BIRD_DEFAULTS, save: saveBirds,
@@ -5934,7 +5954,15 @@ var CTLS = [
   { k: 'smoke', label: 'Smoke', min: 0, max: 2, step: 0.05 },
   { k: 'wind', label: 'Wind (← left, right →)', min: -2, max: 2, step: 0.05 },
   { k: 'haze', label: 'Distance haze', min: 0, max: 1, step: 0.01 },
-  { k: 'skyDark', label: 'Darker night sky', min: 0, max: 1, step: 0.01 }
+  { k: 'skyDark', label: 'Darker night sky', min: 0, max: 1, step: 0.01 },
+  { k: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01, group: 'Sound', note: 'The sound starts on the first tap anywhere on the page.' },
+  { k: 'whistleVolume', label: 'Whistle', min: 0, max: 1.5, step: 0.05, note: 'Each whistle is sped up or slowed down to end just as its shell bursts.' },
+  { k: 'whistleChance', label: 'Shells that whistle', min: 0, max: 1, step: 0.05 },
+  { k: 'boomVolume', label: 'Bang', min: 0, max: 1.5, step: 0.05 },
+  { k: 'soundDelay', label: 'Bang after the flash (s)', min: 0, max: 3, step: 0.05, note: 'Sound is slower than light: about 1 s for every 340 m away.' },
+  { k: 'echo', label: 'Echo off the mountains', min: 0, max: 1, step: 0.05 },
+  { k: 'muffle', label: 'Muffled by distance', min: 0, max: 1, step: 0.05 },
+  { k: 'launchThump', label: 'Thud of the launch', min: 0, max: 1, step: 0.05 }
 ];
 var KINDS = [['kiku', '菊'], ['botan', '牡丹'], ['yaeshin', '八重芯'], ['kamuro', '冠菊'], ['senrin', '千輪'], ['ring', '型物'],
              ['yashi', 'ヤシ'], ['sanshaku', '正三尺玉'], ['starmine', 'スターマイン'], ['phoenix', 'フェニックス']];
@@ -5977,6 +6005,9 @@ function build() {
         select('Programme', [['mixed', 'Mixed (as at Nagaoka)'], ['singles', 'Single shells'], ['starmine', 'スターマイン only'],
                              ['phoenix', 'フェニックス only'], ['sanshaku', '正三尺玉 only'], ['off', 'Off (buttons only)']],
                F.program, function (v) { F.program = v; lab.save(); lab.restart(); });
+      }
+      if (c.group === 'Sound') {
+        select('Sound', [['on', 'On'], ['off', 'Off']], F.sound ? 'on' : 'off', function (v) { F.sound = v === 'on'; lab.save(); });
       }
       if (c.group === 'The stars') {
         select('Colours', [['nagaoka', 'Nagaoka (every colour)'], ['gold', 'Gold and silver'], ['warm', 'Warm'], ['cool', 'Cool'], ['pastel', 'Pastel']],
