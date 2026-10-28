@@ -2199,6 +2199,8 @@ try {
 } catch (e) { /* private window: the defaults */ }
 function saveFireworks() { try { localStorage.setItem(FW_KEY, JSON.stringify(FW)); } catch (e) { /* silent */ } }
 var show = Fireworks.create(FW);
+// the whistle of the rising shells and the bang of the bursts (they start on the first tap)
+show.enableSound({ whistle: 'Sound/Whistling.mp3', boom: 'Sound/big-boom-14752.mp3' });
 
 function bakeScenery() {
   var C = cols(), hy = H * V.horizon, mistC = light(C.mist);
@@ -5526,7 +5528,7 @@ window.fwLab = {
   launch: function (k, o) { show.launch(k, o); },
   clear: function () { show.clear(); },
   restart: function () { show.restart(); },
-  info: function () { return show.info(); }
+  info: function () { return show.info() + ' · ' + show.soundInfo(); }
 };
 window.birdLab = {
   values: BIRD, defaults: BIRD_DEFAULTS, save: saveBirds,
@@ -5934,7 +5936,15 @@ var CTLS = [
   { k: 'smoke', label: 'Smoke', min: 0, max: 2, step: 0.05 },
   { k: 'wind', label: 'Wind (← left, right →)', min: -2, max: 2, step: 0.05 },
   { k: 'haze', label: 'Distance haze', min: 0, max: 1, step: 0.01 },
-  { k: 'skyDark', label: 'Darker night sky', min: 0, max: 1, step: 0.01 }
+  { k: 'skyDark', label: 'Darker night sky', min: 0, max: 1, step: 0.01 },
+  { k: 'volume', label: 'Volume', min: 0, max: 1, step: 0.01, group: 'Sound', note: 'The sound starts on the first tap anywhere on the page.' },
+  { k: 'whistleVolume', label: 'Whistle', min: 0, max: 1.5, step: 0.05, note: 'Each whistle is sped up or slowed down to end just as its shell bursts.' },
+  { k: 'whistleChance', label: 'Shells that whistle', min: 0, max: 1, step: 0.05 },
+  { k: 'boomVolume', label: 'Bang', min: 0, max: 1.5, step: 0.05 },
+  { k: 'soundDelay', label: 'Bang after the flash (s)', min: 0, max: 3, step: 0.05, note: 'Sound is slower than light: about 1 s for every 340 m away.' },
+  { k: 'echo', label: 'Echo off the mountains', min: 0, max: 1, step: 0.05 },
+  { k: 'muffle', label: 'Muffled by distance', min: 0, max: 1, step: 0.05 },
+  { k: 'launchThump', label: 'Thud of the launch', min: 0, max: 1, step: 0.05 }
 ];
 var KINDS = [['kiku', '菊'], ['botan', '牡丹'], ['yaeshin', '八重芯'], ['kamuro', '冠菊'], ['senrin', '千輪'], ['ring', '型物'],
              ['yashi', 'ヤシ'], ['sanshaku', '正三尺玉'], ['starmine', 'スターマイン'], ['phoenix', 'フェニックス']];
@@ -5977,6 +5987,9 @@ function build() {
         select('Programme', [['mixed', 'Mixed (as at Nagaoka)'], ['singles', 'Single shells'], ['starmine', 'スターマイン only'],
                              ['phoenix', 'フェニックス only'], ['sanshaku', '正三尺玉 only'], ['off', 'Off (buttons only)']],
                F.program, function (v) { F.program = v; lab.save(); lab.restart(); });
+      }
+      if (c.group === 'Sound') {
+        select('Sound', [['on', 'On'], ['off', 'Off']], F.sound ? 'on' : 'off', function (v) { F.sound = v === 'on'; lab.save(); });
       }
       if (c.group === 'The stars') {
         select('Colours', [['nagaoka', 'Nagaoka (every colour)'], ['gold', 'Gold and silver'], ['warm', 'Warm'], ['cool', 'Cool'], ['pastel', 'Pastel']],

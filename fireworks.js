@@ -60,6 +60,14 @@
      show.active();                         // false when there is nothing to draw
                                             // (no shells, smoke or cloud): the
                                             // occluder need not be made then
+     show.enableSound({ whistle: url, boom: url });
+                                            // the whistle of a rising shell (it is
+                                            // sped up or slowed down to end just as
+                                            // the shell bursts) and the bang, heard
+                                            // soundDelay s after the flash, with an
+                                            // echo off the mountains. Sound starts on
+                                            // the first tap (browsers require one).
+     show.soundInfo();                      // what the sound is doing, in words
      Fireworks.silhouette(src, dst, lo, hi) // dst (a canvas, any size) = the shape
                                             // of src's alpha: nothing below alpha
                                             // lo, solid above hi, as an occluder
@@ -138,7 +146,17 @@ var DEFAULTS = {
   cloudDepth: 0.32,      // how deep the layer is
   cloudGlow: 1,          // how much the bursts light the clouds from inside
   cloudLight: 0.35,      // moonlight on the clouds
-  cloudSpeed: 1
+  cloudSpeed: 1,
+  // the sound (after show.enableSound; it starts on the first tap, as browsers require)
+  sound: true,
+  volume: 0.8,
+  whistleVolume: 0.6,
+  whistleChance: 0.8,    // how many shells whistle on the way up
+  boomVolume: 1,
+  soundDelay: 0.7,       // s the bang comes after the flash: sound is slower than light
+  echo: 0.5,             // the bang echoing back off the mountains (山びこ)
+  muffle: 0.4,           // distance takes the edge off the bang
+  launchThump: 0.3       // the dull thud of a shell leaving the mortar, heard a moment later
 };
 
 /* ---------- sprites: a star's head (white-hot core, coloured edge) and a soft glow ---------- */
@@ -313,6 +331,7 @@ function create(values) {
       kind: kind, x0: x, y0: hy + 6, xb: x + rnd(-0.02, 0.02) * W, yb: yb, R: R,
       t0: now, rise: V.riseTime * (o.rise || 1) * (0.9 + 2.2 * (hy + 6 - yb) / H), wob: rnd(0, 10), sp: 0
     });
+    soundLaunch(shells[shells.length - 1]);
   }
   function later(dtS, fn) { queue.push({ at: now + dtS, fn: fn }); }
   /* スターマイン: a barrage from two or three sites close together. Returns its length (s). */
@@ -405,6 +424,122 @@ function create(values) {
     var big = S.kind === 'sanshaku' ? 2.2 : S.kind === 'mini' ? 0.25 : 1;
     flashes.push({ x: B.x, y: B.y, R: S.R, c: B.stars.length ? B.stars[0].c1 : WHITE, s: big, t0: now, linger: B.life * 0.6 });
     if (S.kind !== 'mini') smokes.push({ x: B.x, y: B.y, r: S.R * 0.6, t0: now, life: 26, d: rnd(0.8, 1.2) });
+    soundBurst(B, S);
+  }
+
+  /* ---------- the sound ----------
+     Whistling.mp3: the whistle sounds from WH_FROM to WH_TO s (a falling
+     tone, about 2,300 Hz down to 1,000 Hz). It is played faster or slower so
+     that it ends just as the shell bursts: a quick climb whistles higher, a
+     slow one lower, as real shells do. The bang (big-boom) is heard
+     soundDelay s after the flash, a little later for higher bursts; bigger
+     shells boom lower and louder, distance muffles it, and it echoes back
+     off the mountains. Each sound comes from the side its firework is on.
+     A limiter keeps a star mine or a finale from distorting. */
+  var WH_FROM = 0.08, WH_TO = 2.85;
+  var snd = null;
+  function enableSound(urls) {
+    if (snd) return;
+    snd = { ac: null, out: null, whistle: null, boom: null, whistles: [], lastPop: 0, state: 'Tap anywhere to turn the sound on' };
+    function start() {
+      if (snd.ac) { if (snd.ac.state === 'suspended' && !document.hidden) snd.ac.resume(); return; }
+      var AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) { snd.state = 'No sound in this browser'; return; }
+      var ac = snd.ac = new AC();
+      var comp = ac.createDynamicsCompressor();       // many bangs at once never distort
+      comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.25;
+      snd.out = ac.createGain();
+      snd.out.connect(comp); comp.connect(ac.destination);
+      snd.state = 'Loading the sounds…';
+      function load(url) {
+        return fetch(url).then(function (r) { if (!r.ok) throw new Error(url); return r.arrayBuffer(); })
+          .then(function (b) { return new Promise(function (res, rej) { ac.decodeAudioData(b, res, rej); }); });
+      }
+      Promise.all([load(urls.whistle), load(urls.boom)])
+        .then(function (bs) { snd.whistle = bs[0]; snd.boom = bs[1]; snd.state = 'on'; })
+        .catch(function () { snd.state = 'The sounds could not be loaded'; });
+    }
+    window.addEventListener('pointerdown', start, true);
+    window.addEventListener('keydown', start, true);
+    document.addEventListener('visibilitychange', function () {   // silent while the page is hidden
+      if (!snd.ac) return;
+      if (document.hidden) snd.ac.suspend(); else snd.ac.resume();
+    });
+  }
+  function soundReady() {
+    return !!(snd && snd.ac && snd.whistle && snd.boom && V.sound && snd.ac.state === 'running');
+  }
+  /* One sound: buf from offset, at time at, played at rate, through a low-pass
+     filter (if lowpass, Hz), from the side of the screen x is on. */
+  function voice(buf, at, rate, gain, x, lowpass, offset) {
+    var ac = snd.ac, src = ac.createBufferSource(), node = src;
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    if (lowpass) {
+      var f = ac.createBiquadFilter();
+      f.type = 'lowpass'; f.frequency.value = lowpass;
+      node.connect(f); node = f;
+    }
+    var g = ac.createGain();
+    g.gain.value = gain;
+    node.connect(g); node = g;
+    if (ac.createStereoPanner) {
+      var p = ac.createStereoPanner();
+      p.pan.value = clamp(x / Math.max(1, W) * 2 - 1, -1, 1) * 0.7;
+      node.connect(p); node = p;
+    }
+    node.connect(snd.out);
+    src.start(Math.max(at, ac.currentTime), offset || 0);
+    return { src: src, g: g };
+  }
+  function soundLaunch(S) {
+    if (!soundReady()) return;
+    var ac = snd.ac, t = ac.currentTime;
+    snd.out.gain.value = V.volume;
+    // the dull thud of the shell leaving the mortar, heard a moment later
+    if (V.launchThump > 0) voice(snd.boom, t + V.soundDelay, rnd(1.5, 1.8), 0.25 * V.launchThump * V.boomVolume, S.x0, 380);
+    if (V.whistleVolume <= 0 || Math.random() >= V.whistleChance) return;
+    snd.whistles = snd.whistles.filter(function (w) { return w.end > t; });
+    if (snd.whistles.length >= 4) return;                // a star mine: not every shell at once
+    // the whistle, sped up or slowed down so that it ends just as the shell bursts
+    var len = WH_TO - WH_FROM, rate = len / S.rise, start = t, from = WH_FROM;
+    if (rate < 0.6) { rate = 0.6; start = t + S.rise - len / rate; }    // a very slow climb: it starts a little later
+    else if (rate > 2.2) { rate = 2.2; from = WH_TO - S.rise * rate; }  // a very quick one: only its end
+    var end = start + (WH_TO - from) / rate, gv = 0.5 * V.whistleVolume;
+    var v = voice(snd.whistle, start, rate, 0, S.x0, 0, from);
+    v.g.gain.setValueAtTime(0, start);
+    v.g.gain.linearRampToValueAtTime(gv, start + 0.06);
+    v.g.gain.setValueAtTime(gv, Math.max(start + 0.06, end - 0.07));
+    v.g.gain.linearRampToValueAtTime(0, end);
+    v.src.stop(end + 0.02);
+    snd.whistles.push({ end: end, src: v.src });
+  }
+  function soundBurst(B, S) {
+    if (!soundReady()) return;
+    var ac = snd.ac, t = ac.currentTime, hFrac = clamp((hy - B.y) / H, 0, 1);
+    snd.out.gain.value = V.volume;
+    if (S.kind === 'mini') {                             // a senrin's small flower: a quick, high crackle
+      if (t - snd.lastPop < 0.035) return;
+      snd.lastPop = t;
+      voice(snd.boom, t + V.soundDelay * (0.85 + 0.5 * hFrac), rnd(2.2, 2.9), 0.16 * V.boomVolume, B.x, 6000);
+      return;
+    }
+    var size = S.R / (H * 0.2), big = S.kind === 'sanshaku';
+    var at = t + V.soundDelay * (0.85 + 0.5 * hFrac);    // higher bursts are a little further away
+    var rate = rnd(0.92, 1.08) * Math.pow(1 / Math.max(0.3, size), 0.25) * (big ? 0.72 : 1);
+    var gain = Math.min(1.6, 0.55 * Math.sqrt(size)) * (big ? 1.5 : 1) * V.boomVolume;
+    var lp = lerp(9000, 1400, clamp(V.muffle, 0, 1));
+    voice(snd.boom, at, rate, gain, B.x, lp);
+    if (V.echo > 0) {                                    // echoing back off the mountains (山びこ)
+      voice(snd.boom, at + rnd(0.35, 0.55), rate * 0.97, gain * 0.3 * V.echo, W - B.x * 0.6, lp * 0.45);
+      voice(snd.boom, at + rnd(0.9, 1.3), rate * 0.95, gain * 0.15 * V.echo, B.x, lp * 0.3);
+    }
+  }
+  function soundInfo() {
+    if (!snd) return 'no sound';
+    if (!V.sound) return 'sound off';
+    if (snd.ac && snd.ac.state !== 'running' && snd.whistle) return 'Tap anywhere to turn the sound on';
+    return snd.state === 'on' ? 'sound on' : snd.state;
   }
 
   /* ---------- every frame ---------- */
@@ -442,6 +577,7 @@ function create(values) {
           for (var m = 0; m < M.stars.length; m++) M.life = Math.max(M.life, M.stars[m].T + M.stars[m].tr);
           starCount += M.stars.length - 1;
           flashes.push({ x: pp[0], y: pp[1], R: r * 2, c: M.stars[0].c1, s: 0.25, t0: now, linger: 0.4 });
+          soundBurst(M, { kind: 'mini', R: r });
           B.stars.splice(j, 1);
         }
       }
@@ -811,7 +947,11 @@ function create(values) {
     values: V,
     resize: resize, update: update, drawSky: drawSky, drawFront: drawFront, active: active,
     launch: launch,
-    clear: function () { shells.length = bursts.length = sparks.length = smokes.length = flashes.length = queue.length = 0; starCount = 0; timers = null; },
+    clear: function () {
+      shells.length = bursts.length = sparks.length = smokes.length = flashes.length = queue.length = 0; starCount = 0; timers = null;
+      if (snd) { snd.whistles.forEach(function (w) { try { w.src.stop(); } catch (e) { /* already stopped */ } }); snd.whistles = []; }
+    },
+    enableSound: enableSound, soundInfo: soundInfo,
     restart: function () { timers = null; },
     info: function () { return shells.length + ' rising, ' + bursts.length + ' flowers, ' + starCount + ' stars'; }
   };
