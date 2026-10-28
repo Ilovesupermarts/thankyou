@@ -5463,7 +5463,20 @@ function playPanel1SpecialSequence(panelEl) {
     el.classList.add('shown');
   }
 
-  fireBeat(beat1);
+  /* The greeting waits for the background: on the first visit the scene
+     (dynMaster) is still fading in when this panel opens, so the name would
+     appear on a blank screen. Poll until the scene is mostly visible, or
+     give up after 4 s (or at once when no scene is drawn at all). */
+  function sceneVisible() {
+    if (dynReduceMotion || document.hidden) return true;
+    if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return true;
+    return dynMaster > 0.6;
+  }
+  var greetWaitStart = performance.now();
+  function fireBeat1WhenSceneReady() {
+    if (sceneVisible() || performance.now() - greetWaitStart > 4000) { fireBeat(beat1); runBeatChain(); return; }
+    panelPhraseTimers.push(setTimeout(fireBeat1WhenSceneReady, 60));
+  }
 
   function startBodyReveal() {
     if (!body) return;
@@ -5489,6 +5502,7 @@ function playPanel1SpecialSequence(panelEl) {
     }
   }
 
+  function runBeatChain() {
   if (beat2 && beat2.textContent !== '') {
     var started = false;
     function onBeat2Start() {
@@ -5522,6 +5536,8 @@ function playPanel1SpecialSequence(panelEl) {
     var tid0 = setTimeout(startBodyReveal, PANEL_PHRASE_DURATION + PANEL_1_POST_BEAT_DELAY);
     panelPhraseTimers.push(tid0);
   }
+  }
+  fireBeat1WhenSceneReady();
 }
 
 /* ============================================================
