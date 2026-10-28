@@ -3064,6 +3064,19 @@
   html[data-theme="winter"] body.night-text .transition-line-body,
   html[data-theme="autumn"] body.night-text .ty-line:not(.accent),
   html[data-theme="winter"] body.night-text .ty-line:not(.accent) { color: var(--text-dark); }
+  /* NIGHT HEADER, data-time="night" only. The burgundy/brown (--accent-2,
+     --accent-3) top-bar text (the 風鈴 line, the city/date/time/temperature,
+     the music title and artist, and the dots between them) is hard to read
+     over the dark night scene. At night they take the palette's pale cream
+     (--bg-base) instead. Other times of day are untouched. */
+  html[data-time="night"] .hud-title,
+  html[data-time="night"] .hud-meta-row .hud-artist,
+  html[data-time="night"] .info-line .city,
+  html[data-time="night"] .info-line .date,
+  html[data-time="night"] .info-line .time,
+  html[data-time="night"] .info-line .temp { color: var(--bg-base); }
+  html[data-time="night"] .hud-meta-row .hud-dot { color: var(--bg-base); }
+  html[data-time="night"] .info-line .sep { background: var(--bg-base); }
   .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
   .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 32px; }
   .action-hint.ty-swipe-hint.shown { opacity: 1; }
