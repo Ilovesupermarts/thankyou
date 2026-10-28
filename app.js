@@ -15105,9 +15105,9 @@ if (typeof Fireworks !== 'undefined') {
   FIREWORKS.program = 'off';
   fwShow = Fireworks.create(FIREWORKS);
   // whistling2.mp3: the whistle sounds from 0.42 to 3.4 s; the recording is quiet with a
-  // low rumble under it, so it is cut below 900 Hz and raised 30 times (as on fireworks.html)
+  // low rumble under it, so it is cut below 900 Hz and raised 120 times (as on fireworks.html)
   fwShow.enableSound({ whistle: 'Sound/whistling2.mp3', boom: 'Sound/big-boom-14752.mp3',
-                       whistleFrom: 0.42, whistleTo: 3.4, whistleGain: 30, whistleHighpass: 900 });
+                       whistleFrom: 0.42, whistleTo: 3.4, whistleGain: 120, whistleHighpass: 900 });
 }
 var LAND_REBAKE = 90;                 // seconds between light-driven re-bakes
 var LAND_SCN_RES = 0.6;               // the mountains are blurred, so they are baked at 0.6 resolution

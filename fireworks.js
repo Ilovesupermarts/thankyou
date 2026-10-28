@@ -454,8 +454,8 @@ function create(values) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) { snd.state = 'No sound in this browser'; return; }
       var ac = snd.ac = new AC();
-      var comp = ac.createDynamicsCompressor();       // many bangs at once never distort
-      comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.25;
+      var comp = ac.createDynamicsCompressor();       // a limiter: many bangs at once, or a loud whistle, never distort
+      comp.threshold.value = -10; comp.knee.value = 6; comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.25;
       snd.out = ac.createGain();
       snd.out.connect(comp); comp.connect(ac.destination);
       snd.state = 'Loading the sounds…';
