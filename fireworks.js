@@ -35,7 +35,7 @@
      var show = Fireworks.create(values);   // values: see DEFAULTS
      show.resize(W, H, PR, horizon);        // CSS px; horizon: y of the ground line
      show.update(dt, t);                    // every frame
-     show.drawSky(ctx, occluder);           // behind the mountains: the
+     show.drawSky(ctx, occluder, noDark);   // behind the mountains: the
                                             // darker sky, the fireworks,
                                             // their smoke and the clouds.
                                             // occluder: a canvas the size of
@@ -57,6 +57,9 @@
                                             // 'phoenix' or a shell above); o, if
                                             // given: x (0 … 1), height (fraction of
                                             // the screen height), scale
+     show.drawDark(ctx, amount);            // only the darker sky (skyDark × amount):
+                                            // drawn first, under the moon, with
+                                            // drawSky(…, true) for the rest
      show.active();                         // false when there is nothing to draw
                                             // (no shells, smoke or cloud): the
                                             // occluder need not be made then
@@ -451,8 +454,8 @@ function create(values) {
       var AC = window.AudioContext || window.webkitAudioContext;
       if (!AC) { snd.state = 'No sound in this browser'; return; }
       var ac = snd.ac = new AC();
-      var comp = ac.createDynamicsCompressor();       // many bangs at once never distort
-      comp.threshold.value = -14; comp.knee.value = 12; comp.ratio.value = 6; comp.attack.value = 0.003; comp.release.value = 0.25;
+      var comp = ac.createDynamicsCompressor();       // a limiter: many bangs at once, or a loud whistle, never distort
+      comp.threshold.value = -10; comp.knee.value = 6; comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.25;
       snd.out = ac.createGain();
       snd.out.connect(comp); comp.connect(ac.destination);
       snd.state = 'Loading the sounds…';
@@ -611,21 +614,24 @@ function create(values) {
   function active() {
     return !!(W && (shells.length || bursts.length || flashes.length || smokes.length || V.cloudCover > 0.01));
   }
-  function drawSky(main, occ) {
+  /* The night sky, darkened behind the show (skyDark × amount, amount 1 if not given). */
+  function drawDark(main, amount) {
+    var k = V.skyDark * (amount === undefined ? 1 : amount);
+    if (!W || k <= 0.002) return;
+    main.save();
+    main.setTransform(PR, 0, 0, PR, 0, 0);
+    main.globalAlpha = 1;
+    main.globalCompositeOperation = 'source-over';
+    var sg = main.createLinearGradient(0, 0, 0, hy);
+    sg.addColorStop(0, css([8, 10, 28], k * 0.85));
+    sg.addColorStop(1, css([20, 22, 44], k * 0.5));
+    main.fillStyle = sg; main.fillRect(0, 0, W, hy + 4);
+    main.restore();
+  }
+  function drawSky(main, occ, noDark) {
     if (!W) return;
     var dim = 1 - V.haze * 0.5, bright = V.brightness * dim;
-    // the night sky, darkened behind the show
-    if (V.skyDark > 0) {
-      main.save();
-      main.setTransform(PR, 0, 0, PR, 0, 0);
-      main.globalAlpha = 1;
-      main.globalCompositeOperation = 'source-over';
-      var sg = main.createLinearGradient(0, 0, 0, hy);
-      sg.addColorStop(0, css([8, 10, 28], V.skyDark * 0.85));
-      sg.addColorStop(1, css([20, 22, 44], V.skyDark * 0.5));
-      main.fillStyle = sg; main.fillRect(0, 0, W, hy + 4);
-      main.restore();
-    }
+    if (!noDark) drawDark(main);
     if (!active()) return;
     // the show, on its layer
     var ctx = layerC;
@@ -956,7 +962,7 @@ function create(values) {
 
   return {
     values: V,
-    resize: resize, update: update, drawSky: drawSky, drawFront: drawFront, active: active,
+    resize: resize, update: update, drawSky: drawSky, drawDark: drawDark, drawFront: drawFront, active: active,
     launch: launch,
     clear: function () {
       shells.length = bursts.length = sparks.length = smokes.length = flashes.length = queue.length = 0; starCount = 0; timers = null;
