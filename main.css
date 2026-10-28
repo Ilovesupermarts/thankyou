@@ -3077,6 +3077,7 @@
   html[data-time="night"] .info-line .temp { color: var(--bg-base); }
   html[data-time="night"] .hud-meta-row .hud-dot { color: var(--bg-base); }
   html[data-time="night"] .info-line .sep { background: var(--bg-base); }
+  html[data-time="night"] .info-line .weather { color: var(--bg-base); }   /* the weather symbol beside the temperature */
   /* NIGHT TICKER AND WIND LINE, data-time="night" only. The scrolling weather
      line and the wind line under the 風鈴 take the same ink as "DL 100%"
      (--text-dark), with their dots. Colour only. */
