@@ -1506,6 +1506,23 @@
   #tyDots .ty-dot { width: 6px; height: 6px; box-shadow: none; }
   #tyDots .ty-dot.active { transform: scale(1.3); box-shadow: 0 0 0 3px var(--dot-active-ring); }
 
+  /* In the autumn and winter scenes the dots sit over Mt Fuji and the sky,
+     whose colour changes through the day, so no single flat colour can be
+     seen on all of it. Each dot is silk white (絹白) with a plum (葡萄染)
+     outline, so it shows on dark backgrounds by its fill and on pale ones by
+     its outline; the current page is plum with a silk-white and plum double
+     ring. Plum is not the orange of the Next button's text above them. */
+  html[data-theme="autumn"] #dots .dot, html[data-theme="winter"] #dots .dot,
+  html[data-theme="autumn"] #tyDots .ty-dot, html[data-theme="winter"] #tyDots .ty-dot {
+    background: #FFFDF9;
+    box-shadow: 0 0 0 1.5px #882E47, 0 1px 5px 1px rgba(36, 28, 26, 0.40);
+  }
+  html[data-theme="autumn"] #dots .dot.active, html[data-theme="winter"] #dots .dot.active,
+  html[data-theme="autumn"] #tyDots .ty-dot.active, html[data-theme="winter"] #tyDots .ty-dot.active {
+    background: #882E47;
+    box-shadow: 0 0 0 2px #FFFDF9, 0 0 0 3.5px #882E47, 0 1px 7px 3px rgba(36, 28, 26, 0.35);
+  }
+
   .dots { position: absolute; bottom: 100px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.8s ease; }
   .dots.visible { opacity: 1; pointer-events: auto; }
   .dot {
