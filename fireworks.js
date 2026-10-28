@@ -66,7 +66,14 @@
      show.enableSound({ whistle: url, boom: url,
                         whistleFrom: s, whistleTo: s,   // where the whistle sounds in its file
                         whistleGain: k,                 // how much to raise (or lower) it
-                        whistleHighpass: Hz });         // cut anything below this (rumble)
+                        whistleHighpass: Hz,            // cut anything below this (rumble)
+                        boomGain: k });                 // how much to raise (or lower) the bang
+                                            // The bang is always louder than the whistle:
+                                            // both recordings are measured when loaded
+                                            // (A-weighted: how loud they sound, where a deep
+                                            // rumble counts for far less than a bright
+                                            // whistle), and a whistle is never allowed to be
+                                            // within whistleBelowBang dB of its shell's bang.
                                             // the whistle of a rising shell (it is
                                             // sped up or slowed down to end just as
                                             // the shell bursts) and the bang, heard
@@ -162,7 +169,8 @@ var DEFAULTS = {
   soundDelay: 0.7,       // s the bang comes after the flash: sound is slower than light
   echo: 0.5,             // the bang echoing back off the mountains (山びこ)
   muffle: 0.4,           // distance takes the edge off the bang
-  launchThump: 0.3       // the dull thud of a shell leaving the mortar, heard a moment later
+  launchThump: 0.3,      // the dull thud of a shell leaving the mortar, heard a moment later
+  whistleBelowBang: 6    // dB: the whistle is never louder than its shell's bang minus this (as heard, A-weighted)
 };
 
 /* ---------- sprites: a star's head (white-hot core, coloured edge) and a soft glow ---------- */
@@ -200,6 +208,63 @@ function vnoise(x, y, px, s) {
   var x0 = ((ix % px) + px) % px, x1 = (x0 + 1) % px;
   var a = hash2(x0, iy, s), b = hash2(x1, iy, s), c = hash2(x0, iy + 1, s), d = hash2(x1, iy + 1, s);
   return lerp(lerp(a, b, ux), lerp(c, d, ux), uy);
+}
+
+/* How loud a sound is to the ear: an FFT of the part of buf between t0 and t1
+   s (a Hann window), each frequency weighted by the A curve (a deep rumble
+   counts for far less than a tone at 2–3 kHz, as to the ear and to a tablet's
+   speakers), with anything under hpHz cut. dB, relative: use differences. */
+function fftInPlace(re, im) {
+  var n = re.length, i, j, k, t, bit;
+  for (i = 1, j = 0; i < n; i++) {
+    for (bit = n >> 1; j & bit; bit >>= 1) j ^= bit;
+    j ^= bit;
+    if (i < j) { t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; }
+  }
+  for (var len = 2; len <= n; len <<= 1) {
+    var half = len >> 1, ang = -2 * PI / len, wr = Math.cos(ang), wi = Math.sin(ang);
+    for (i = 0; i < n; i += len) {
+      var cr = 1, ci = 0;
+      for (k = 0; k < half; k++) {
+        var a = i + k, b = a + half;
+        var vr = re[b] * cr - im[b] * ci, vi = re[b] * ci + im[b] * cr;
+        re[b] = re[a] - vr; im[b] = im[a] - vi;
+        re[a] += vr; im[a] += vi;
+        var nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr;
+      }
+    }
+  }
+}
+function aWeight(f) {                                  // linear, 1 at 1 kHz
+  var f2 = f * f;
+  return 1.2589 * 12194 * 12194 * f2 * f2 /
+         ((f2 + 20.6 * 20.6) * Math.sqrt((f2 + 107.7 * 107.7) * (f2 + 737.9 * 737.9)) * (f2 + 12194 * 12194));
+}
+function aLevel(buf, t0, t1, hpHz) {
+  var sr = buf.sampleRate, i0 = Math.max(0, Math.floor(t0 * sr)), i1 = Math.min(buf.length, Math.floor(t1 * sr)), n = i1 - i0;
+  if (n < 64) return -120;
+  var N = 1; while (N < n) N <<= 1;
+  var re = new Float64Array(N), im = new Float64Array(N), ch = buf.numberOfChannels, c, i;
+  for (c = 0; c < ch; c++) {
+    var d = buf.getChannelData(c);
+    for (i = 0; i < n; i++) re[i] += d[i0 + i] / ch;
+  }
+  for (i = 0; i < n; i++) re[i] *= 0.5 - 0.5 * Math.cos(TAU * i / (n - 1));
+  fftInPlace(re, im);
+  var sum = 0, df = sr / N;
+  for (i = 1; i < N / 2; i++) {
+    var f = i * df;
+    if (f < hpHz) continue;
+    var w = aWeight(f);
+    sum += (re[i] * re[i] + im[i] * im[i]) * w * w;
+  }
+  return 10 * Math.log10(Math.max(1e-20, 2 * sum / (N * n) / 0.375));
+}
+/* The loudest 0.4 s of a sound (stepping 0.1 s), as it sounds. */
+function aLoudest(buf) {
+  var best = -120, dur = buf.length / buf.sampleRate;
+  for (var t = 0; t + 0.2 <= dur; t += 0.1) best = Math.max(best, aLevel(buf, t, Math.min(dur, t + 0.4), 0));
+  return best;
 }
 
 function create(values) {
@@ -448,7 +513,8 @@ function create(values) {
     if (snd) return;
     snd = { ac: null, out: null, whistle: null, boom: null, whistles: [], lastPop: 0, state: 'Tap anywhere to turn the sound on',
             whFrom: urls.whistleFrom !== undefined ? urls.whistleFrom : 0.08, whTo: urls.whistleTo !== undefined ? urls.whistleTo : 2.85,
-            whGain: urls.whistleGain || 1, whHighpass: urls.whistleHighpass || 0 };
+            whGain: urls.whistleGain || 1, whHighpass: urls.whistleHighpass || 0, boomGain: urls.boomGain || 1,
+            bangA: null, whistleA: null };
     function start() {
       if (snd.ac) { if (snd.ac.state === 'suspended' && !document.hidden) snd.ac.resume(); return; }
       var AC = window.AudioContext || window.webkitAudioContext;
@@ -456,15 +522,27 @@ function create(values) {
       var ac = snd.ac = new AC();
       var comp = ac.createDynamicsCompressor();       // a limiter: many bangs at once, or a loud whistle, never distort
       comp.threshold.value = -10; comp.knee.value = 6; comp.ratio.value = 20; comp.attack.value = 0.001; comp.release.value = 0.25;
+      // and a soft limit after it, so that a very loud bang (a giant shell) rounds off instead of clipping
+      var pre = ac.createGain(), shaper = ac.createWaveShaper(), curve = new Float32Array(2049);
+      pre.gain.value = 0.5;
+      for (var ci = 0; ci < curve.length; ci++) curve[ci] = Math.tanh(2 * (ci / 1024 - 1));
+      shaper.curve = curve;
       snd.out = ac.createGain();
-      snd.out.connect(comp); comp.connect(ac.destination);
+      snd.out.connect(comp); comp.connect(pre); pre.connect(shaper); shaper.connect(ac.destination);
       snd.state = 'Loading the sounds…';
       function load(url) {
         return fetch(url).then(function (r) { if (!r.ok) throw new Error(url); return r.arrayBuffer(); })
           .then(function (b) { return new Promise(function (res, rej) { ac.decodeAudioData(b, res, rej); }); });
       }
       Promise.all([load(urls.whistle), load(urls.boom)])
-        .then(function (bs) { snd.whistle = bs[0]; snd.boom = bs[1]; snd.state = 'on'; })
+        .then(function (bs) {
+          snd.whistle = bs[0]; snd.boom = bs[1];
+          try {                                       // how loud each really sounds, so the bang can always be louder
+            snd.bangA = aLoudest(snd.boom);
+            snd.whistleA = aLevel(snd.whistle, snd.whFrom, snd.whTo, snd.whHighpass);
+          } catch (e) { snd.bangA = snd.whistleA = null; }
+          snd.state = 'on';
+        })
         .catch(function () { snd.state = 'The sounds could not be loaded'; });
     }
     window.addEventListener('pointerdown', start, true);
@@ -506,6 +584,11 @@ function create(values) {
     src.start(Math.max(at, ac.currentTime), offset || 0);
     return { src: src, g: g };
   }
+  /* The gain of a shell's bang: bigger shells are louder (the 3-shaku most). */
+  function bangGain(kind, R) {
+    var size = R / (H * 0.2);
+    return Math.min(1.6, 0.55 * Math.sqrt(size)) * (kind === 'sanshaku' ? 1.5 : 1) * V.boomVolume * snd.boomGain;
+  }
   function soundLaunch(S) {
     if (!soundReady()) return;
     var ac = snd.ac, t = ac.currentTime;
@@ -520,6 +603,11 @@ function create(values) {
     if (rate < 0.6) { rate = 0.6; start = t + S.rise - len / rate; }       // a very slow climb: it starts a little later
     else if (rate > 2.2) { rate = 2.2; from = snd.whTo - S.rise * rate; }  // a very quick one: only its end
     var end = start + (snd.whTo - from) / rate, gv = 0.5 * V.whistleVolume * snd.whGain;
+    // never louder than this shell's own bang, less whistleBelowBang dB (as heard)
+    if (snd.bangA !== null && snd.whistleA !== null) {
+      var bangDb = snd.bangA + 20 * Math.log10(Math.max(1e-6, bangGain(S.kind, S.R)));
+      gv = Math.min(gv, Math.pow(10, (bangDb - V.whistleBelowBang - snd.whistleA) / 20));
+    }
     var v = voice(snd.whistle, start, rate, 0, S.x0, 0, from, snd.whHighpass);
     v.g.gain.setValueAtTime(0, start);
     v.g.gain.linearRampToValueAtTime(gv, start + 0.06);
@@ -541,7 +629,7 @@ function create(values) {
     var size = S.R / (H * 0.2), big = S.kind === 'sanshaku';
     var at = t + V.soundDelay * (0.85 + 0.5 * hFrac);    // higher bursts are a little further away
     var rate = rnd(0.92, 1.08) * Math.pow(1 / Math.max(0.3, size), 0.25) * (big ? 0.72 : 1);
-    var gain = Math.min(1.6, 0.55 * Math.sqrt(size)) * (big ? 1.5 : 1) * V.boomVolume;
+    var gain = bangGain(S.kind, S.R);
     var lp = lerp(9000, 1400, clamp(V.muffle, 0, 1));
     voice(snd.boom, at, rate, gain, B.x, lp);
     if (V.echo > 0) {                                    // echoing back off the mountains (山びこ)
@@ -553,7 +641,8 @@ function create(values) {
     if (!snd) return 'no sound';
     if (!V.sound) return 'sound off';
     if (snd.ac && snd.ac.state !== 'running' && snd.whistle) return 'Tap anywhere to turn the sound on';
-    return snd.state === 'on' ? 'sound on' : snd.state;
+    if (snd.state !== 'on') return snd.state;
+    return 'sound on' + (snd.bangA !== null ? ' · bang ' + Math.round(snd.bangA + 20 * Math.log10(bangGain('kiku', H * V.size)) - snd.whistleA - 20 * Math.log10(0.5 * V.whistleVolume * snd.whGain)) + ' dB over the whistle' : '');
   }
 
   /* ---------- every frame ---------- */
@@ -992,5 +1081,5 @@ function silhouette(src, dst, lo, hi) {
   c.putImageData(img, 0, 0);
 }
 
-return { create: create, DEFAULTS: DEFAULTS, PALETTES: PALETTES, silhouette: silhouette };
+return { create: create, DEFAULTS: DEFAULTS, PALETTES: PALETTES, silhouette: silhouette, aLevel: aLevel, aLoudest: aLoudest };
 })();
