@@ -24,6 +24,7 @@
    Use:
      var sh = Clouds.shape(kind, seed, o);   // build a cloud (no colours yet)
      Clouds.paint(sh, o);                    // paint it; the picture is sh.cnv
+     Clouds.free(sh);                        // give back its memory when it is replaced
      Clouds.build(kind, seed, o, function(sh) { … });
                                              // the same as shape(), built in the
                                              // background (a worker) where it can be
@@ -282,10 +283,27 @@ var Clouds = (function() {
       AO[i] = Math.round(clamp((ZB[i] - Z[i]) / (R0 * 0.22), 0, 1) * 255);
       HG[i] = Math.round(clamp((baseY - y) / (R0 * 2.5), 0, 1) * 255);
     }
-    var cnv = typeof document !== 'undefined' ? document.createElement('canvas') : null;
-    if (cnv) { cnv.width = W; cnv.height = H; }
-    return { kind: kind, w: W, h: H, base: baseY / H, size: K.size, R0: R0,
-             N: NI, A: A, A0: A0, T: TH, AO: AO, HG: HG, cnv: cnv, img: null };
+    var sh = { kind: kind, w: W, h: H, base: baseY / H, size: K.size, R0: R0,
+               N: NI, A: A, A0: A0, T: TH, AO: AO, HG: HG, cnv: null, img: null };
+    if (typeof document !== 'undefined') addCanvas(sh);
+    return sh;
+  }
+  /* The shape's picture. If the tablet runs short of graphics memory, Chrome
+     may wipe it; it is then marked unpainted (painted = '', ready = false)
+     so the scene paints it again. */
+  function addCanvas(sh) {
+    var cnv = document.createElement('canvas');
+    cnv.width = sh.w; cnv.height = sh.h;
+    cnv.addEventListener('contextrestored', function() { sh.painted = ''; sh.ready = false; });
+    sh.cnv = cnv;
+    return sh;
+  }
+  /* Give back a shape's memory at once (its picture and buffers), when it is
+     no longer used. */
+  function free(sh) {
+    if (!sh) return;
+    if (sh.cnv) { sh.cnv.width = sh.cnv.height = 0; }
+    sh.img = null; sh.SH = null; sh.ready = false;
   }
 
   /* Paint a cloud in the light and colours of o, into sh.cnv. */
@@ -307,7 +325,9 @@ var Clouds = (function() {
     var px = sh.img.data, NI = sh.N, A = sh.A, A0 = sh.A0, T = sh.T, AO = sh.AO, HG = sh.HG;
     var wrap = o.wrap, crev = o.crevices, bD = o.baseDark, silver = o.silver;
     // how much cloud lies between each point and the sun (softened, as the light scatters)
-    var SH = new Float32Array(W * H), x, y, i;
+    if (!sh.SH) sh.SH = new Float32Array(W * H);
+    var SH = sh.SH, x, y, i;
+    SH.fill(0);
     for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
       i = y * W + x;
       if (!A[i]) continue;
@@ -366,8 +386,7 @@ var Clouds = (function() {
           var d = e.data, jb = jobs[d.id];
           if (!jb) return;
           delete jobs[d.id];
-          d.cnv = document.createElement('canvas'); d.cnv.width = d.w; d.cnv.height = d.h;
-          jb.cb(d);
+          jb.cb(addCanvas(d));
         };
         worker.onerror = function(e) {
           if (e && e.preventDefault) e.preventDefault();
@@ -383,7 +402,7 @@ var Clouds = (function() {
     worker.postMessage({ id: id, kind: kind, seed: seed, o: o });
   }
 
-  return { DEFAULTS: DEFAULTS, KINDS: KINDS, shape: shape, paint: paint, build: build };
+  return { DEFAULTS: DEFAULTS, KINDS: KINDS, shape: shape, paint: paint, build: build, free: free };
 })();
 if (typeof module !== 'undefined') module.exports = Clouds;
 /* Running as the worker for Clouds.build: build the shape and send it back. */
