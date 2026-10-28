@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Lab</title>
+<!-- The test bed for clouds.js: the day clouds in a summer sky, with sliders
+     to tune them. The values used by the app are in CLOUD_LOOK in app.js. -->
+<style>
+  html, body { margin: 0; height: 100%; background: #2f5f9f; font: 13px sans-serif; color: #fff; overflow: hidden; }
+  canvas#sky { position: fixed; inset: 0; width: 100%; height: 100%; }
+  #panel { position: fixed; top: 8px; right: 8px; width: 270px; max-height: calc(100% - 16px); overflow: auto;
+           background: rgba(10, 20, 40, 0.72); border-radius: 10px; padding: 10px 12px; }
+  #panel.hidden { display: none; }
+  #toggle { position: fixed; top: 8px; left: 8px; z-index: 2; padding: 6px 12px; border: 0; border-radius: 8px;
+            background: rgba(10, 20, 40, 0.72); color: #fff; font: inherit; }
+  label { display: grid; grid-template-columns: 96px 1fr 40px; align-items: center; gap: 6px; margin: 3px 0; }
+  input[type=range] { width: 100%; }
+  input[type=color] { width: 100%; height: 22px; border: 0; padding: 0; background: none; }
+  h3 { margin: 10px 0 4px; font-size: 13px; opacity: 0.8; }
+  button.act { margin: 6px 4px 0 0; padding: 5px 10px; border: 0; border-radius: 6px; background: #fff; color: #123; font: inherit; }
+  #info { opacity: 0.7; margin-top: 6px; }
+</style>
+</head>
+<body>
+<canvas id="sky"></canvas>
+<button id="toggle">設定</button>
+<div id="panel">
+  <div id="controls"></div>
+  <button class="act" id="seed">別の雲</button>
+  <button class="act" id="dump">値をコピー</button>
+  <div id="info"></div>
+</div>
+<script src="clouds.js"></script>
+<script>
+var V = JSON.parse(JSON.stringify(Clouds.DEFAULTS));
+V.seed = 1; V.count = 9; V.size = 1; V.speed = 1;
+var SHAPE = ['resolution', 'detail', 'billows', 'billowLight', 'smoothSeams', 'flatBase', 'edge', 'wisp', 'grain', 'seed'];
+var SLIDERS = [
+  ['形', [['count', 1, 20, 1], ['size', 0.3, 2, 0.05], ['speed', 0, 6, 0.1], ['seed', 1, 50, 1],
+          ['resolution', 0.5, 2, 0.1], ['detail', 0, 4, 1], ['billows', 0.3, 2, 0.05], ['billowLight', 0, 1, 0.05], ['smoothSeams', 0, 1, 0.05], ['flatBase', 0, 1, 0.05],
+          ['edge', 0, 1, 0.05], ['wisp', 0, 1, 0.05], ['grain', 0, 1.5, 0.05]]],
+  ['光', [['sunElevation', 0, 90, 1], ['sunSide', -1, 1, 0.05], ['sunFront', 0, 1, 0.05], ['wrap', 0, 1, 0.05],
+          ['shadow', 0, 2, 0.05], ['crevices', 0, 1, 0.05], ['baseDark', 0, 1, 0.05], ['silver', 0, 1, 0.05], ['exposure', 0.5, 2, 0.05]]]
+];
+var box = document.getElementById('controls'), reshape = true, repaint = true;
+SLIDERS.forEach(function(sec) {
+  var h = document.createElement('h3'); h.textContent = sec[0]; box.appendChild(h);
+  sec[1].forEach(function(s) {
+    var l = document.createElement('label'), i = document.createElement('input'), o = document.createElement('span');
+    l.textContent = s[0]; i.type = 'range'; i.min = s[1]; i.max = s[2]; i.step = s[3]; i.value = V[s[0]]; o.textContent = V[s[0]];
+    i.oninput = function() { V[s[0]] = +i.value; o.textContent = i.value;
+                             if (SHAPE.indexOf(s[0]) >= 0) reshape = true; else repaint = true; };
+    l.appendChild(i); l.appendChild(o); box.appendChild(l);
+  });
+});
+var h3 = document.createElement('h3'); h3.textContent = '色'; box.appendChild(h3);
+['lit', 'shade', 'base', 'sky'].forEach(function(k) {
+  var l = document.createElement('label'), i = document.createElement('input'), o = document.createElement('span');
+  l.textContent = k; i.type = 'color'; i.value = V.colours[k];
+  i.oninput = function() { V.colours[k] = i.value; repaint = true; };
+  l.appendChild(i); l.appendChild(o); box.appendChild(l);
+});
+document.getElementById('toggle').onclick = function() { document.getElementById('panel').classList.toggle('hidden'); };
+document.getElementById('seed').onclick = function() { V.seed = 1 + Math.floor(Math.random() * 50); reshape = true; };
+document.getElementById('dump').onclick = function() {
+  var t = JSON.stringify(V);
+  if (navigator.clipboard) navigator.clipboard.writeText(t);
+  document.getElementById('info').textContent = t;
+};
+
+var cv = document.getElementById('sky'), ctx = cv.getContext('2d'), PR = window.devicePixelRatio || 1, W, H;
+function size() { W = innerWidth; H = innerHeight; cv.width = W * PR; cv.height = H * PR; }
+addEventListener('resize', size); size();
+var KINDS = ['tower', 'heap', 'puff', 'flat', 'heap', 'puff', 'tower', 'puff'];
+var shapes = [], clouds = [];
+function build() {
+  var t0 = performance.now();
+  shapes = KINDS.map(function(k, i) { return Clouds.shape(k, V.seed * 13 + i, V); });
+  var t1 = performance.now();
+  shapes.forEach(function(s) { Clouds.paint(s, V); });
+  document.getElementById('info').textContent = 'shape ' + Math.round(t1 - t0) + ' ms, paint ' + Math.round(performance.now() - t1) + ' ms';
+  var r = 1;
+  function rnd() { r = (r * 16807) % 2147483647; return r / 2147483647; }
+  clouds = [];
+  for (var i = 0; i < 20; i++) clouds.push({ x: rnd(), y: rnd(), s: 0.6 + rnd() * 0.8, v: 0.5 + rnd(), k: i % KINDS.length });
+}
+var last = 0;
+function frame(t) {
+  var dt = last ? Math.min(0.1, (t - last) / 1000) : 0; last = t;
+  if (reshape) { reshape = false; repaint = false; build(); }
+  else if (repaint) { repaint = false; shapes.forEach(function(s) { Clouds.paint(s, V); }); }
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0, '#2B5596'); g.addColorStop(0.6, '#3E6EB2'); g.addColorStop(1, '#6E95C8');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  if (location.hash === '#one') {   // each shape on its own, big
+    shapes.slice(0, 4).forEach(function(S, i) {
+      var cw = W * 0.48, ch = cw * S.h / S.w;
+      ctx.drawImage(S.cnv, (i % 2) * W * 0.5, Math.floor(i / 2) * H * 0.5 + H * 0.45 - ch, cw, ch);
+    });
+    requestAnimationFrame(frame); return;
+  }
+  // the far, small clouds first (high in the sky), the big near ones last (low)
+  var list = clouds.slice(0, V.count).sort(function(a, b) { return a.y - b.y; });
+  list.forEach(function(c) {
+    var S = shapes[c.k], depth = 0.25 + c.y * 0.75;
+    var cw = W * 0.42 * c.s * V.size * S.size * depth, ch = cw * S.h / S.w;
+    c.x += (6 + 10 * c.v) * V.speed * depth * dt / W;
+    if (c.x * W - cw / 2 > W + 20) c.x = (-cw / 2 - 20) / W;
+    var cy = H * (0.12 + c.y * 0.8);
+    ctx.drawImage(S.cnv, c.x * W - cw / 2, cy - ch * S.base, cw, ch);
+  });
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

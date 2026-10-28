@@ -12541,7 +12541,40 @@ function sunBuildRays() {
 function sunWander(t, ph) {
   return 0.5 + 0.22 * Math.sin(t * 0.9 + ph) + 0.16 * Math.sin(t * 2.3 + ph * 1.7) + 0.12 * Math.sin(t * 5.1 + ph * 0.6);
 }
-/* The clouds: four soft shapes, baked in the sky's colours. */
+/* The clouds (clouds.js), as tuned on clouds.html: real-looking cumulus,
+   white heaped tops, blue-grey shaded sides and flat grey bases, lit from
+   the sun's side of the sky. Each shape is built once in the background and
+   painted again (one a frame) when the light or the weather changes. The
+   colours are for a clear day (lighter than on clouds.html, to suit this
+   pale sky); the weather's shade colours darken them. */
+var CLOUD_LOOK = {
+  kinds: ['heap', 'tower', 'heap', 'puff', 'flat', 'heap'],
+  resolution: 1.2, detail: 3, billows: 1, billowLight: 0.45, smoothSeams: 0.4, flatBase: 0.55,
+  edge: 0.35, wisp: 0.35, grain: 0.5,
+  sunFront: 0.7, wrap: 0.3, shadow: 1.3, crevices: 0.5, baseDark: 0.6, silver: 0.35, exposure: 1.4,
+  colours: { lit: '#FFFFFF', shade: '#B9C2D4', base: '#9DA7BB', sky: '#8FA9D0' }
+};
+var cloudShapes = [], cloudPaint = null, cloudsAsked = false;
+function sunCloudSprite(k) {
+  if (typeof Clouds === 'undefined') return SUN_CLOUD_SPR[k % SUN_CLOUD_SPR.length];
+  return cloudShapes.length ? cloudShapes[k % cloudShapes.length] || null : null;
+}
+/* Paint the clouds in the light and colours now: one shape a frame. */
+function sunPaintClouds(look) {
+  if (typeof Clouds === 'undefined') return;
+  if (!cloudsAsked) {
+    cloudsAsked = true;
+    CLOUD_LOOK.kinds.forEach(function(kind, i) {
+      Clouds.build(kind, 300 + i * 37, CLOUD_LOOK, function(sh) { sh.painted = ''; cloudShapes[i] = sh; });
+    });
+  }
+  cloudPaint = look;
+  for (var i = 0; i < cloudShapes.length; i++) {
+    var sh = cloudShapes[i];
+    if (sh && sh.painted !== look.key) { Clouds.paint(sh, look.o); sh.painted = look.key; sh.ready = true; return; }
+  }
+}
+/* The old clouds, where clouds.js is missing: four soft shapes, baked in the sky's colours. */
 function sunBakeClouds(top, shade) {
   SUN_CLOUD_SPR.forEach(function(Sp, k) {
     var r = rngFrom(400 + k * 17), w = 360, h = 170, c = Sp.c;
@@ -12571,7 +12604,7 @@ function sunBuildClouds() {
   var r = rngFrom(2024);
   sunClouds = [];
   for (var i = 0; i < 18; i++) {
-    sunClouds.push({ x: r() * 1.4 - 0.2, near: i % 2 === 0, yr: r(), s: 0.6 + r() * 0.8, v: 0.5 + r(), k: i % 4, a: 0, want: r() });
+    sunClouds.push({ x: r() * 1.4 - 0.2, near: i % 2 === 0, yr: r(), s: 0.6 + r() * 0.8, v: 0.5 + r(), k: i % 6, a: 0, want: r() });
   }
 }
 
@@ -12595,11 +12628,29 @@ function drawSun(ctx, t) {
   var nK = Math.round(night * 8) / 8, eK = Math.round(low * (1 - night) * 8) / 8;
   var top = mixRgb(mixRgb(target.top, [255, 196, 160], eK * 0.35), [150, 158, 196], nK * 0.6);
   var shade = mixRgb(mixRgb(target.shade, [170, 120, 140], eK * 0.4), [96, 102, 142], nK * 0.6);
-  var ck = wk + '|' + nK + '|' + eK;
-  if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) { sunCloudKey = ck; sunCloudAt = t; sunBakeClouds(top, shade); }
-
   var P = { x: skyToScreen(a.alt, a.az).x }, R = sunRadius(a.alt);
   P.y = skyBandY(R); var X = P.x, Y = P.y;
+  // the side of the sky the sun is on, and how high (the clouds are lit from there; flat light at night)
+  var sideK = Math.round(clamp((X - W / 2) / (W / 2), -1, 1) * 4) / 4, elK = Math.round(clamp(a.alt, 8, 70) / 10) * 10;
+  if (nK >= 0.5) { sideK = 0; elK = 60; }
+  var ck = wk + '|' + nK + '|' + eK + '|' + sideK + '|' + elK;
+  if (typeof Clouds !== 'undefined') {
+    if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) {
+      sunCloudKey = ck; sunCloudAt = t;
+      var CC = CLOUD_LOOK.colours, k0 = 1 / 207;   // the weather's shade, next to a clear day's
+      var dim = [target.shade[0] * k0 * 1.03, target.shade[1] * k0 * 1.03, target.shade[2] * k0 * 0.97];
+      function tint(c, warm, cool) { return mixRgb(mixRgb(c, warm, eK * 0.35), cool, nK * 0.6); }
+      var o = {}; for (var lk in CLOUD_LOOK) if (lk !== 'kinds' && lk !== 'colours') o[lk] = CLOUD_LOOK[lk];
+      var cs = hexToRgb(CC.shade), cb = hexToRgb(CC.base);
+      o.sunSide = sideK; o.sunElevation = elK;
+      o.colours = { lit: tint(top, [255, 196, 160], [150, 158, 196]),
+                    shade: tint([cs[0] * dim[0], cs[1] * dim[1], cs[2] * dim[2]], [170, 120, 140], [96, 102, 142]),
+                    base: tint([cb[0] * dim[0], cb[1] * dim[1], cb[2] * dim[2]], [150, 100, 120], [80, 86, 124]),
+                    sky: mixRgb(hexToRgb(CC.sky), [40, 50, 90], nK) };
+      cloudPaint = { key: ck, o: o };
+    }
+    if (cloudPaint) sunPaintClouds(cloudPaint);
+  } else if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) { sunCloudKey = ck; sunCloudAt = t; sunBakeClouds(top, shade); }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 
@@ -12617,13 +12668,18 @@ function drawSun(ctx, t) {
     var Cl = sunClouds[i];
     var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) * lerp(1, 0.22, night) : 0;
     Cl.a += (want - Cl.a) * (1 - Math.exp(-dt / 1.2));
-    var cw = 300 * Cl.s * L.cloudSize * cur.cloudScale, ch = cw * 170 / 360;
+    var Spr = sunCloudSprite(Cl.k), sz = Spr && Spr.size ? Spr.size : 1;
+    var cw = 300 * Cl.s * L.cloudSize * cur.cloudScale * sz, ch = cw * 170 / 360;
     Cl.x += (5 + 9 * Cl.v) * wind * dt / W;
     if (Cl.x * W - cw / 2 > W + 20) Cl.x = (-cw / 2 - 20) / W;
-    if (Cl.a < 0.005) continue;
+    if (Cl.a < 0.005 || !Spr || (Spr.base && !Spr.ready)) continue;
     var cx = Cl.x * W, cy = Cl.near ? Y + (Cl.yr - 0.5) * ch * 1.2 : H * (0.05 + Cl.yr * 0.4);
     ctx.globalAlpha = Cl.a;
-    ctx.drawImage(SUN_CLOUD_SPR[Cl.k].cnv, cx - cw / 2, cy - ch * 0.62, cw, ch);
+    if (Spr.base) {
+      ctx.globalAlpha = Math.min(1, Cl.a * 1.15);   // solid, so one cloud's base does not show through another   // a clouds.js cloud: its base sits where the old cloud's base was
+      var sh2 = cw * Spr.h / Spr.w;
+      ctx.drawImage(Spr.cnv, cx - cw / 2, cy + ch * 0.18 - sh2 * Spr.base, cw, sh2);
+    } else ctx.drawImage(Spr.cnv, cx - cw / 2, cy - ch * 0.62, cw, ch);
     var dx = (X - cx) / (cw * 0.4), dy = (Y - cy + ch * 0.1) / (ch * 0.3), d = Math.sqrt(dx * dx + dy * dy);
     occl = 1 - (1 - occl) * (1 - Cl.a * (1 - smooth(0.5, 1, d)));
   }
