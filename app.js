@@ -5484,6 +5484,8 @@ function playPanel1SpecialSequence(panelEl) {
     var phrases = body.querySelectorAll('.panel-phrase');
     if (!phrases.length) return;
     var baseDelay = 0;
+    var navId = setTimeout(revealNavControls, PANEL_PHRASE_STAGGER_MAX + PANEL_PHRASE_DURATION + 300);
+    panelPhraseTimers.push(navId);
     void body.offsetWidth;
     for (var k = 0; k < phrases.length; k++) {
       (function(el) {
@@ -5629,6 +5631,7 @@ function activatePanel(index) {
     void targetPanel.offsetWidth;
     playPanel1SpecialSequence(targetPanel);
   } else {
+    revealNavControls();
     resetPanelPhrases(targetPanel);
     void targetPanel.offsetWidth;
     playPanelPhraseReveal(targetPanel);
@@ -5741,7 +5744,17 @@ function returnToStartScreen() {
   NavSpring && NavSpring.reset();
 }
 
+/* After the name animation the swipe text and the page dots are held back
+   until the scenery and the greeting text are in. */
+var navControlsHeld = false;
+function revealNavControls() {
+  if (!navControlsHeld) return;
+  navControlsHeld = false;
+  if (dotsEl) dotsEl.classList.add('visible');
+  updateGlobalHint();
+}
 function updateGlobalHint() {
+  if (navControlsHeld) { if (globalHint) globalHint.classList.remove('shown'); return; }
   if (!globalHint || !globalHintLayerSwipe || !globalHintLayerScroll) return;
   if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
   if (currentPanel === totalPanels - 1) {
@@ -5756,6 +5769,7 @@ function updateGlobalHint() {
 }
 function updateIntroHintVisibility(scrollY, vh) {
   if (!globalHint) return;
+  if (navControlsHeld) { globalHint.classList.remove('shown'); return; }
   if (!nameConfirmed) { globalHint.classList.remove('shown'); return; }
   if (blossomScreen && blossomScreen.classList.contains('visible')) {
     globalHint.classList.remove('shown');
@@ -7725,7 +7739,11 @@ function triggerKoiStart() {
           if (nameColumn) nameColumn.innerHTML = '';
           if (introOverlay) introOverlay.classList.remove('active', 'finishing');
         }, Math.max(1400, exitTime)));
-        if (dotsEl) dotsEl.classList.add('visible');
+        /* The swipe text and the page dots wait: they come last, after the
+           scenery and the greeting text (revealNavControls, below). The
+           timer is a fallback so they always come. */
+        navControlsHeld = true;
+        koiPushTimer(setTimeout(revealNavControls, 9000));
         if (blossomScreen) {
           blossomScreen.classList.remove('visible');
           blossomScreen.style.opacity = '';
