@@ -1,24 +1,29 @@
 /* ============================================================
-   CLOUDS — realistic cumulus clouds for the day sky (like a summer
-   sky in a photo: bright white heaped tops, blue-grey shaded sides and
-   flat, darker bases). Each cloud is built once as a little 3D shape
-   and baked into a picture; the scene only moves the pictures about.
+   CLOUDS — soft, realistic clouds for the sky and for the mountains:
+   big soft heaps with bright tops and grey, shaded undersides, and low
+   banks of cloud lying across the slopes, as in a photo of mountains in
+   changing weather. Each cloud is built once and baked into a picture;
+   the scene only moves the pictures about.
 
-   What makes them look real:
-   - The shape: a row of big round puffs along a flat base, piled up
-     into towers and heaps, and every puff covered in smaller puffs,
-     and those in smaller ones again (billows on billows), so the
-     outline is the crisp "cauliflower" edge of a real cumulus. The
-     bottom is cut flat where the air is too warm for cloud.
-   - Every point knows which way it faces, so it is lit by the sun like
-     a 3D object: bright where it faces the sun, blue-grey where it
-     turns away. Puffs lower down are shaded by the cloud above them,
-     the gaps between billows are darker, and the base is a darker grey.
-   - The outline is thin where the cloud is thin, so the edges fade
-     softly, with a few ragged wisps.
+   How it is made (as in real clouds, there are no hard edges anywhere):
+   - The cloud is a density of water droplets, not a solid surface. Its
+     rough form (a heap, a tower, a long bank …) is a smooth field, highest
+     inside and falling to nothing at the edges.
+   - Layers of swirling noise eat into that field, so the edges break up
+     into soft billows, ragged wisps and holes, and the inside is thicker
+     in some places and thinner in others.
+   - How much of it you see (its opacity) follows the density: thick parts
+     are solid white or grey, thin parts are see-through, so a mountain
+     behind a thin edge still shows faintly.
+   - The light: for every point, the cloud lying between it and the sun
+     is added up; the more cloud, the less sunlight reaches it (as light
+     is scattered away inside a real cloud). So the sunny side and the
+     tops are bright, the far side and the bottom are grey, with soft
+     shading in between. Light from the sky fills in the shade, thin
+     edges glow, and the base is a darker grey.
 
-   The shape is baked once (slow, about a tenth of a second); painting
-   it in new colours or a new sun direction is quick, so the app paints
+   The density is built once (in the background); painting it in new
+   colours or for a new sun direction is quick, so the scene paints
    again as the light changes through the day.
 
    Use:
@@ -29,29 +34,29 @@
                                              // the same as shape(), built in the
                                              // background (a worker) where it can be
    kind: 'tower' (a tall heaped cloud), 'heap' (a wide cumulus),
-         'puff' (a small fair-weather cloud), 'flat' (a wide, low layer)
+         'puff' (a small fair-weather cloud), 'flat' (a wide, low layer),
+         'mass' (a big, soft mass of cloud), 'bank' (a long, low bank of
+         cloud that lies across a mountain's slopes or in a valley)
    sh.w, sh.h   size of the picture (px)
-   sh.base      where the flat base is (fraction of the height from the top)
+   sh.base      where the base is (fraction of the height from the top)
    sh.size      how wide this kind is drawn, next to the others (heap = 1)
    o (anything left out comes from Clouds.DEFAULTS):
-     resolution   picture pixels per unit (the shapes are about 300–860
-                  units wide)
-     detail       levels of billows on billows (1 … 4)
-     billows      how many billows on each puff
-     flatBase     0 a rounded bottom … 1 a flat, cut base
-     edge         0 a crisp outline … 1 a soft one
-     wisp         ragged, thin edges
-     grain        a fine texture on the surface
-     smoothSeams  how softly one puff runs into the next
-     billowLight  0 lit as one smooth shape … 1 every billow lit as a ball
+     resolution   picture pixels per unit (the shapes are about 300–900
+                  units wide); the clouds are soft, so a low one is fine
+     detail       how fine the smallest billows and wisps are (3 … 7)
+     billows      0 smooth, misty … 1 heaped, puffy billows
+     edge         0 a firmer outline … 1 very soft, fading edges
+     wisp         how much the edges break up into wisps and holes
+     swirl        how much the billows and wisps swirl
+     flatBase     0 a soft, rounded bottom … 1 a flat base
+     density      how thick: low = thin and see-through
      sunElevation degrees above the horizon the light comes from
      sunSide      -1 from the left … 1 from the right
      sunFront     0 from the side … 1 from behind you (the cloud's face lit)
-     wrap         how far the light wraps round into the shade
-     shadow       how much the upper cloud shades the lower
-     crevices     how dark the gaps between billows are
+     shadow       how much sunlight the cloud soaks up: high = darker undersides
+     ambient      light from the sky in the shade
      baseDark     how dark the base is
-     silver       a brighter rim on the thin edges
+     silver       a glow on the thin edges
      exposure     more than 1: more of the cloud in full sunlight (for a pale sky)
      colours      { lit, shade, base, sky } '#rrggbb' or [r, g, b]
    ============================================================ */
@@ -59,30 +64,39 @@ var Clouds = (function() {
   'use strict';
 
   var DEFAULTS = {
-    resolution: 1.2, detail: 3, billows: 1, billowLight: 0.45, smoothSeams: 0.4, flatBase: 0.85, edge: 0.35, wisp: 0.35, grain: 0.5,
+    resolution: 0.7, detail: 5, billows: 0.5, edge: 0.6, wisp: 0.55, swirl: 0.45, flatBase: 0.4, density: 1.2,
     sunElevation: 40, sunSide: -0.35, sunFront: 0.6,
-    wrap: 0.2, shadow: 1.8, crevices: 0.6, baseDark: 0.75, silver: 0.35, exposure: 1,
-    colours: { lit: '#FFFFFF', shade: '#909DB6', base: '#78839A', sky: '#3F6DB4' }
+    shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, exposure: 1,
+    colours: { lit: '#FFFFFF', shade: '#9AA6BD', base: '#7F8AA2', sky: '#3F6DB4' }
   };
 
   /* The kinds of cloud: picture size (units), where the base is, the size
-     of the big puffs (fraction of the width), and the shape of the top:
-     bumps [where across 0 … 1, how high 0 … 1, how wide]. */
+     of its features (fraction of the width), how thick the base layer is
+     (fraction of the height), and the shape of the top: bumps [where
+     across 0 … 1, how high 0 … 1, how wide]. */
   var KINDS = {
-    tower: { w: 640, h: 500, base: 0.88, r: 0.085, size: 1,
-             bumps: function(r) { var c = 0.4 + r() * 0.2, b = [[c, 1, 0.16 + r() * 0.05]];
-                                  for (var i = 0; i < 4; i++) b.push([0.15 + r() * 0.7, 0.18 + r() * 0.3, 0.08 + r() * 0.08]);
+    tower: { w: 640, h: 520, base: 0.84, r: 0.1, size: 1,
+             bumps: function(r) { var c = 0.4 + r() * 0.2, b = [[c, 1, 0.15 + r() * 0.05]];
+                                  for (var i = 0; i < 4; i++) b.push([0.18 + r() * 0.64, 0.2 + r() * 0.3, 0.1 + r() * 0.08]);
                                   return b; } },
-    heap:  { w: 760, h: 360, base: 0.86, r: 0.07, size: 1,
+    heap:  { w: 760, h: 380, base: 0.82, r: 0.085, size: 1,
              bumps: function(r) { var b = [], n = 3 + Math.floor(r() * 3);
-                                  for (var i = 0; i < n; i++) b.push([0.12 + (i + r() * 0.8) / n * 0.76, 0.3 + r() * 0.7, 0.07 + r() * 0.08]);
+                                  for (var i = 0; i < n; i++) b.push([0.18 + (i + r() * 0.8) / n * 0.64, 0.35 + r() * 0.65, 0.09 + r() * 0.08]);
                                   return b; } },
-    puff:  { w: 320, h: 200, base: 0.82, r: 0.11, size: 0.4,
-             bumps: function(r) { return [[0.38 + r() * 0.24, 0.8 + r() * 0.2, 0.2 + r() * 0.08],
-                                          [0.2 + r() * 0.6, 0.45 + r() * 0.3, 0.14]]; } },
-    flat:  { w: 860, h: 260, base: 0.84, r: 0.05, size: 1.15,
+    puff:  { w: 340, h: 220, base: 0.78, r: 0.13, size: 0.42,
+             bumps: function(r) { return [[0.4 + r() * 0.2, 0.8 + r() * 0.2, 0.18 + r() * 0.06],
+                                          [0.25 + r() * 0.5, 0.45 + r() * 0.3, 0.13]]; } },
+    flat:  { w: 900, h: 280, base: 0.8, r: 0.06, size: 1.15,
              bumps: function(r) { var b = [], n = 6 + Math.floor(r() * 4);
-                                  for (var i = 0; i < n; i++) b.push([0.06 + (i + r()) / n * 0.88, 0.35 + r() * 0.65, 0.05 + r() * 0.05]);
+                                  for (var i = 0; i < n; i++) b.push([0.12 + (i + r()) / n * 0.76, 0.35 + r() * 0.65, 0.06 + r() * 0.05]);
+                                  return b; } },
+    mass:  { w: 820, h: 620, base: 0.86, r: 0.11, size: 1.3,
+             bumps: function(r) { var b = [[0.45 + r() * 0.15, 1, 0.24 + r() * 0.06]];
+                                  for (var i = 0; i < 4; i++) b.push([0.15 + r() * 0.7, 0.4 + r() * 0.45, 0.12 + r() * 0.1]);
+                                  return b; } },
+    bank:  { w: 1000, h: 240, base: 0.82, r: 0.05, size: 1.3,
+             bumps: function(r) { var b = [], n = 7 + Math.floor(r() * 4);
+                                  for (var i = 0; i < n; i++) b.push([0.08 + (i + r()) / n * 0.84, 0.25 + r() * 0.5, 0.05 + r() * 0.06]);
                                   return b; } }
   };
 
@@ -109,7 +123,7 @@ var Clouds = (function() {
     for (k in DEFAULTS.colours) v.colours[k] = DEFAULTS.colours[k];
     if (o) for (k in o) {
       if (k === 'colours') { for (var j in o.colours) v.colours[j] = o.colours[j]; }
-      else if (o[k] !== undefined) v[k] = o[k];
+      else if (o[k] !== undefined && k in DEFAULTS) v[k] = o[k];
     }
     return v;
   }
@@ -125,166 +139,76 @@ var Clouds = (function() {
       var a = g[y0 * N + x0], b = g[y0 * N + x1], c = g[y1 * N + x0], d = g[y1 * N + x1];
       return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
     }
-    return function(x, y, oct) {
+    return function(x, y, oct, billow) {
       var s = 0, amp = 0.5, tot = 0;
-      for (var o = 0; o < oct; o++) { s += n(x, y) * amp; tot += amp; x = x * 2.03 + 17.1; y = y * 2.03 + 5.3; amp *= 0.5; }
+      for (var o = 0; o < oct; o++) {
+        var v = n(x, y);
+        if (billow) v = v + ((1 - Math.abs(v * 2 - 1)) - v) * billow;   // rounded, heaped billows
+        s += v * amp; tot += amp;
+        x = x * 2.03 + 17.1; y = y * 2.03 + 5.3; amp *= 0.5;
+      }
       return s / tot;
     };
   }
 
-  /* A blur of a float picture (box blur three times ≈ a gaussian). */
-  function blur(src, w, h, rad) {
-    rad = Math.max(1, Math.round(rad));
-    var a = new Float32Array(src), b = new Float32Array(src.length), x, y, i, s, k;
-    for (var pass = 0; pass < 3; pass++) {
-      for (y = 0; y < h; y++) {
-        var row = y * w; s = 0;
-        for (k = -rad; k <= rad; k++) s += a[row + clamp(k, 0, w - 1)];
-        for (x = 0; x < w; x++) {
-          b[row + x] = s / (rad * 2 + 1);
-          s += a[row + Math.min(x + rad + 1, w - 1)] - a[row + Math.max(x - rad, 0)];
-        }
-      }
-      for (x = 0; x < w; x++) {
-        s = 0;
-        for (k = -rad; k <= rad; k++) s += b[clamp(k, 0, h - 1) * w + x];
-        for (y = 0; y < h; y++) {
-          a[y * w + x] = s / (rad * 2 + 1);
-          s += b[Math.min(y + rad + 1, h - 1) * w + x] - b[Math.max(y - rad, 0) * w + x];
-        }
-      }
-    }
-    return a;
-  }
-
-  /* Build a cloud: its puffs, then the surface seen from the front. */
+  /* Build a cloud: its density, how high each point is above the base, and
+     how much of it is seen. */
   function shape(kind, seed, o) {
     o = merged(o);
     var K = KINDS[kind] || KINDS.heap, res = o.resolution, r = rng(seed * 7919 + 101);
-    var W = Math.round(K.w * res), H = Math.round(K.h * res), R0 = K.r * W;
-    var baseY = K.base * H, topY = R0 * 1.3, tall = baseY - topY;
-    var bumps = K.bumps(r), nz = noise(seed * 31 + 7);
+    var W = Math.max(8, Math.round(K.w * res)), H = Math.max(8, Math.round(K.h * res)), R = K.r * W;
+    var baseY = K.base * H, tall = baseY - R * 2.4;
+    var bumps = K.bumps(r), nz = noise(seed * 31 + 7), nw = noise(seed * 57 + 3);
+    var ox = r() * 200, oy = r() * 200;
     function env(u) {
       var e = 0;
-      for (var i = 0; i < bumps.length; i++) { var d = (u - bumps[i][0]) / bumps[i][2]; e = Math.max(e, bumps[i][1] * Math.exp(-d * d)); }
-      var m = Math.min(u, 1 - u) / 0.3; return e * (m >= 1 ? 1 : Math.sqrt(Math.max(0, m)));
-    }
-
-    // the big puffs: columns along the base, piled up to the shape of the top
-    var P = [];   // [x, y, z, radius, level]
-    var x = R0 * 2.8;
-    while (x < W - R0 * 2.8) {
-      var top = baseY - env(x / W) * tall;
-      var rr = R0 * (0.75 + r() * 0.5), y = baseY - rr * 0.35;
-      if (env(x / W) > 0.04) {
-        for (var guard = 0; guard < 40; guard++) {
-          P.push([x + (r() - 0.5) * R0 * 0.7, y, (r() - 0.5) * R0 * 1.2, rr, 0]);
-          if (y - rr <= top) break;
-          y -= rr * (0.75 + r() * 0.25);
-          rr = Math.min(R0 * (0.7 + r() * 0.55), Math.max(R0 * 0.45, (y - top) * 0.9 + R0 * 0.3));
-        }
+      // each bump is a rounded dome; where domes meet they blend softly
+      for (var i = 0; i < bumps.length; i++) {
+        var d = (u - bumps[i][0]) / (bumps[i][2] * 1.7), k = 1 - d * d;
+        if (k > 0) e += Math.pow(bumps[i][1] * Math.sqrt(k), 2.5);
       }
-      x += R0 * (0.55 + r() * 0.35);
+      return Math.pow(e, 0.4) * smooth(0.08, 0.26, Math.min(u, 1 - u));
     }
-    // billows on billows
-    var counts = [6, 5, 4, 3], ratio = [0.5, 0.45, 0.45, 0.45];
-    var levels = clamp(Math.round(o.detail), 0, 4), from = 0;
-    for (var lv = 0; lv < levels; lv++) {
-      var to = P.length;
-      for (var p = from; p < to; p++) {
-        var Q = P[p], n = Math.round(counts[lv] * o.billows * (0.7 + r() * 0.6));
-        for (var c = 0; c < n; c++) {
-          // a direction on the puff, mostly up, out to the sides and toward us
-          var dx = r() * 2 - 1, dy = r() * 2 - 1, dz = r() * 2 - 1, dl = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-          dx /= dl; dy /= dl; dz /= dl;
-          if (dy > 0.25) dy = -dy * 0.6;
-          dz = Math.abs(dz) * 0.8;
-          var cr = Q[3] * ratio[lv] * (0.65 + r() * 0.6), reach = Q[3] - cr * 0.35;
-          var cy = Q[1] + dy * reach, cx = Q[0] + dx * reach;
-          if (cy - cr > baseY || cx - cr < 1 || cx + cr > W - 1 || cy - cr < 1) continue;
-          P.push([cx, cy, Q[2] + dz * reach, cr, lv + 1]);
-        }
-      }
-      from = to;
+    var top = new Float32Array(W), baseL = new Float32Array(W);
+    for (var x = 0; x < W; x++) {
+      // the cloud's height here: the domes, rolling up and down in broad billows
+      top[x] = env(x / W) * tall * (0.75 + 0.5 * nw(x / (R * 2.4) + 7.7, 3.3, 3));
+      baseL[x] = baseY + (nz(x / R * 0.7 + 3.1, 9.7, 3) - 0.5) * R * (1.4 - o.flatBase);
     }
-
-    // the surface: for every pixel the nearest point of any puff, which way it faces, and how thick the cloud is
-    var N = W * H, Z = new Float32Array(N).fill(-1e9), T = new Float32Array(N);
-    var NX = new Float32Array(N), NY = new Float32Array(N), NZ = new Float32Array(N);
-    // the same for the big puffs alone (the lobes of the cloud, which carry its light and shade)
-    var ZC = new Float32Array(N).fill(-1e9), CX = new Float32Array(N), CY = new Float32Array(N), CZ = new Float32Array(N);
-    var baseLine = new Float32Array(W), soft = (1 - o.flatBase) * R0 * 1.4 + R0 * 0.12;
-    for (x = 0; x < W; x++) baseLine[x] = baseY + (nz(x / R0 * 0.8, 3.7, 3) - 0.5) * R0 * 0.25 * (1.2 - o.flatBase) + soft * 0.5;
-    var zMin = 1e9;
-    for (p = 0; p < P.length; p++) {
-      Q = P[p];
-      var qx = Q[0], qy = Q[1], qz = Q[2], qr = Q[3], qr2 = qr * qr;
-      var x0 = Math.max(0, Math.floor(qx - qr)), x1 = Math.min(W - 1, Math.ceil(qx + qr));
-      var y0 = Math.max(0, Math.floor(qy - qr)), y1 = Math.min(H - 1, Math.ceil(qy + qr));
-      if (qz - qr < zMin) zMin = qz - qr;
-      for (y = y0; y <= y1; y++) {
-        var ddy = y + 0.5 - qy, ry = qr2 - ddy * ddy;
-        if (ry <= 0) continue;
-        for (var px = x0; px <= x1; px++) {
-          var ddx = px + 0.5 - qx, d2 = ry - ddx * ddx;
-          if (d2 <= 0) continue;
-          var hgt = Math.sqrt(d2), i = y * W + px;
-          // below the base the cloud thins out quickly (flatBase: how sharply)
-          var cut = y > baseLine[px] - soft ? 1 - smooth(baseLine[px] - soft, baseLine[px] + soft * 0.3, y) : 1;
-          if (cut <= 0) continue;
-          T[i] += hgt * 2 * cut;
-          var zf = qz + hgt;
-          if (zf > Z[i]) { Z[i] = zf; NX[i] = ddx / qr; NY[i] = ddy / qr; NZ[i] = hgt / qr; }
-          if (Q[4] <= 1 && zf > ZC[i]) { ZC[i] = zf; CX[i] = ddx / qr; CY[i] = ddy / qr; CZ[i] = hgt / qr; }
-        }
-      }
+    // how far each column is from the body of the cloud (in feature sizes), so the wisps along
+    // the base fade out beside it and never reach the edge of the picture
+    var gap = new Float32Array(W), g = 99;
+    for (x = 0; x < W; x++) { g = top[x] > R * 0.35 ? 0 : g + 1 / R; gap[x] = g; }
+    for (g = 99, x = W - 1; x >= 0; x--) { g = top[x] > R * 0.35 ? 0 : g + 1 / R; gap[x] = Math.min(gap[x], g); }
+    var N = W * H, D = new Uint8Array(N), A = new Uint8Array(N), HG = new Uint8Array(N);
+    var f = 1 / (R * 1.1), wf = 1 / (R * 2.2), sw = o.swirl * R * 1.6;
+    var ramp = 0.18 + o.edge * 1.1;                          // how far in from the edge the cloud is fully thick
+    var baseSoft = R * (0.25 + (1 - o.flatBase) * 1.4);
+    var oct = clamp(Math.round(o.detail), 2, 8), bil = clamp(o.billows, 0, 1), dens = o.density;
+    for (var y = 0; y < H; y++) for (x = 0; x < W; x++) {
+      var e = top[x];
+      var bl = baseL[x];
+      // how far inside the rough form this point is, in feature sizes (negative: outside)
+      var dt = (y - (bl - e)) / R, db = (bl - y) / baseSoft * 1.2;
+      var m = Math.min(dt, db, e / R * 0.9, gap[x] > 0 ? 0.6 - gap[x] * 1.5 : 99, Math.min(x, W - 1 - x, y, H - 1 - y) / R - 1.3);
+      if (m < -1.6) continue;
+      // swirl, then the billows and wisps eating into the edge
+      var qx = (nw(x * wf + ox, y * wf + oy, 3) - 0.5) * sw, qy = (nw(x * wf + oy + 31, y * wf + ox, 3) - 0.5) * sw;
+      var n = nz((x + qx) * f + ox, (y + qy) * f * 1.15 + oy, oct, bil);
+      // the noise breaks up the edges; deep inside, the cloud stays whole
+      var d = (m + (n - 0.5) * 2.4 * (0.35 + o.wisp) * (0.3 + 0.7 * smooth(2.2, 0.3, m))) / ramp;
+      if (d <= 0) continue;
+      var i = y * W + x;
+      // how much is seen: thin at the edges, solid inside; the light inside varies with thicker
+      // and thinner parts
+      var a = 1 - Math.exp(-d * dens * 1.6);
+      d = d * (0.65 + 0.7 * n);
+      D[i] = Math.min(255, Math.round(d * 40));
+      A[i] = Math.round(a * 255);
+      HG[i] = Math.round(clamp((bl - y) / (R * 3), 0, 1) * 255);
     }
-
-    // crevices: where the surface lies behind the surface around it
-    for (i = 0; i < N; i++) if (Z[i] < -1e8) Z[i] = zMin;
-    var ZB = blur(Z, W, H, R0 * 0.18);
-    // soften the seams where one puff runs into another
-    var sf = R0 * 0.03 * (1 + o.smoothSeams * 3);
-    NX = blur(NX, W, H, sf * 0.3); NY = blur(NY, W, H, sf * 0.3); NZ = blur(NZ, W, H, sf * 0.3);
-    for (i = 0; i < N; i++) if (ZC[i] < -1e8) { CX[i] = NX[i]; CY[i] = NY[i]; CZ[i] = NZ[i]; }
-    CX = blur(CX, W, H, sf); CY = blur(CY, W, H, sf); CZ = blur(CZ, W, H, sf);
-
-    var A = new Uint8Array(N), A0 = new Uint8Array(N), TH = new Uint8Array(N), AO = new Uint8Array(N), HG = new Uint8Array(N);
-    var NI = new Int8Array(N * 3);
-    var kEdge = R0 * (0.03 + o.edge * 0.5), gS = 1 / (R0 * 0.09), wS = 1 / (R0 * 0.35), e = 1.5;
-    var dm = o.billowLight;
-    function lerpN(a, b) { return a + (b - a) * dm; }
-    var cloudTop = H;
-    for (i = 0; i < N; i++) if (T[i] > 0) { cloudTop = Math.floor(i / W); break; }
-    var span = Math.max(1, baseY - cloudTop);
-    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
-      i = y * W + x;
-      if (T[i] <= 0) continue;
-      var a0 = 1 - Math.exp(-T[i] / kEdge);
-      var wn = nz(x * wS, y * wS, 3);
-      var a = clamp(a0 - o.wisp * (1 - a0) * (0.4 + wn) * 1.4 + (1 - a0) * 0.1, 0, 1);
-      if (a < 0.004) continue;
-      // the fine texture tilts the surface a little
-      // the light falls on the cloud's lobes; the small billows only add to it
-      var nx, ny, nzv;
-      nx = lerpN(CX[i], NX[i]); ny = lerpN(CY[i], NY[i]); nzv = lerpN(CZ[i], NZ[i]);
-      var nl0 = Math.sqrt(nx * nx + ny * ny + nzv * nzv) || 1;
-      nx /= nl0; ny /= nl0; nzv /= nl0;
-      if (o.grain > 0) {
-        var gx = (nz((x + e) * gS, y * gS, 2) - nz((x - e) * gS, y * gS, 2)) / (2 * e * gS);
-        var gy = (nz(x * gS, (y + e) * gS, 2) - nz(x * gS, (y - e) * gS, 2)) / (2 * e * gS);
-        nx += gx * o.grain * 0.45; ny += gy * o.grain * 0.45;
-        var nl = Math.sqrt(nx * nx + ny * ny + nzv * nzv) || 1;
-        nx /= nl; ny /= nl; nzv /= nl;
-      }
-      NI[i * 3] = Math.round(nx * 127); NI[i * 3 + 1] = Math.round(ny * 127); NI[i * 3 + 2] = Math.round(nzv * 127);
-      A[i] = Math.round(a * 255); A0[i] = Math.round(a0 * 255);
-      TH[i] = Math.round((1 - Math.exp(-T[i] / (R0 * 1.2))) * 255);
-      AO[i] = Math.round(clamp((ZB[i] - Z[i]) / (R0 * 0.22), 0, 1) * 255);
-      HG[i] = Math.round(clamp((baseY - y) / (R0 * 2.5), 0, 1) * 255);
-    }
-    var sh = { kind: kind, w: W, h: H, base: baseY / H, size: K.size, R0: R0,
-               N: NI, A: A, A0: A0, T: TH, AO: AO, HG: HG, cnv: null, img: null };
+    var sh = { kind: kind, w: W, h: H, base: baseY / H, size: K.size, R0: R,
+               D: D, A: A, HG: HG, cnv: null, img: null };
     if (typeof document !== 'undefined') addCanvas(sh);
     return sh;
   }
@@ -303,72 +227,55 @@ var Clouds = (function() {
   function free(sh) {
     if (!sh) return;
     if (sh.cnv) { sh.cnv.width = sh.cnv.height = 0; }
-    sh.img = null; sh.SH = null; sh.ready = false;
+    sh.img = null; sh.ready = false;
   }
 
   /* Paint a cloud in the light and colours of o, into sh.cnv. */
   function paint(sh, o) {
     o = merged(o);
-    var W = sh.w, H = sh.h, C = o.colours;
+    var W = sh.w, H = sh.h, C = o.colours, R = sh.R0;
     var lit = col(C.lit), shade = col(C.shade), base = col(C.base), sky = col(C.sky);
-    // the direction toward the sun (x right, y down, z toward us)
+    // the direction toward the sun on the picture (x right, y down), and how much it comes from in front
     var el = o.sunElevation * Math.PI / 180, side = clamp(o.sunSide, -1, 1), front = clamp(o.sunFront, 0, 1);
-    var hz = Math.cos(el), lx = side * hz * (1 - front * 0.6), lz = front * hz + 0.15, ly = -Math.sin(el);
-    var ll = Math.sqrt(lx * lx + ly * ly + lz * lz); lx /= ll; ly /= ll; lz /= ll;
-    var sl = Math.sqrt(lx * lx + ly * ly) || 1, sx = lx / sl, sy = ly / sl;
-    // the shade of the cloud above: how far a ray toward the sun runs inside the cloud
-    var step = Math.max(1, sh.R0 * 0.08), steps = 22, mx = sx * step, my = sy * step;
-    var shK = o.shadow * step / (sh.R0 * 0.9) * (1 - lz * 0.6);
-    var j;
+    var lx = side * Math.cos(el) * (1 - front * 0.6), ly = -Math.sin(el), ll = Math.sqrt(lx * lx + ly * ly) || 1;
+    var sx = lx / ll, sy = ly / ll;
+    // a ray toward the sun, its steps longer the further it goes (fine near the point, reaching
+    // right through a tall cloud); light from in front passes through less cloud
+    var steps = 16, offs = [], wts = [], dist = 0, j;
+    for (j = 0; j < steps; j++) {
+      var st = R * 0.08 * Math.pow(1.22, j);
+      dist += st; offs.push([sx * dist, sy * dist]); wts.push(st / R);
+    }
+    var absorb = o.shadow * 0.012 * (1 - front * 0.55);
     var ctx = sh.cnv.getContext('2d');
-    if (!sh.img) sh.img = ctx.createImageData(W, H);
-    var px = sh.img.data, NI = sh.N, A = sh.A, A0 = sh.A0, T = sh.T, AO = sh.AO, HG = sh.HG;
-    var wrap = o.wrap, crev = o.crevices, bD = o.baseDark, silver = o.silver;
-    // how much cloud lies between each point and the sun (softened, as the light scatters)
-    if (!sh.SH) sh.SH = new Float32Array(W * H);
-    var SH = sh.SH, x, y, i;
-    SH.fill(0);
-    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
-      i = y * W + x;
-      if (!A[i]) continue;
-      var s = 0, fx = x + 0.5, fy = y + 0.5;
-      for (j = 0; j < steps; j++) {
-        fx += mx; fy += my;
-        var ix = fx | 0, iy = fy | 0;
-        if (ix < 0 || ix >= W || iy < 0 || iy >= H) break;
-        var tq = T[iy * W + ix];
-        if (!tq) break;
-        s += tq / 255;
-      }
-      SH[i] = s;
-    }
-    SH = blurF(SH, W, H, sh.R0 * 0.12);
-    for (y = 0; y < H; y++) for (x = 0; x < W; x++) {
-      i = y * W + x; var q = i * 4;
+    var img = sh.img || ctx.createImageData(W, H);
+    var px = img.data, D = sh.D, A = sh.A, HG = sh.HG;
+    var amb = o.ambient, bD = o.baseDark, silver = o.silver, expo = o.exposure;
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      var i = y * W + x, q = i * 4;
       if (!A[i]) { px[q + 3] = 0; continue; }
-      var nx = NI[i * 3] / 127, ny = NI[i * 3 + 1] / 127, nzv = NI[i * 3 + 2] / 127;
-      var d = nx * lx + ny * ly + nzv * lz, lam = clamp((d + wrap) / (1 + wrap), 0, 1);
-      var s = SH[i];
-      var hg = HG[i] / 255, ao = AO[i] / 255, a0 = A0[i] / 255;
-      var light = lam * Math.exp(-s * shK) * (1 - crev * ao);
-      light = clamp((light + (1 - a0) * 0.35) * o.exposure, 0, 1);    // thin edges let the light through
-      var r = shade[0] + (lit[0] - shade[0]) * light, g = shade[1] + (lit[1] - shade[1]) * light, b = shade[2] + (lit[2] - shade[2]) * light;
-      // the base: the lowest part, facing down, is a darker grey
-      var under = bD * (1 - smooth(0, 0.5, hg)) * (0.55 + 0.45 * clamp(ny, 0, 1)) * (1 - light * 0.6);
-      r += (base[0] - r) * under; g += (base[1] - g) * under; b += (base[2] - b) * under;
-      // the blue sky lights the shaded parts that face up
-      var sk = 0.16 * (1 - light) * clamp(-ny + 0.3, 0, 1);
-      r += (sky[0] - r) * sk; g += (sky[1] - g) * sk; b += (sky[2] - b) * sk;
-      // a brighter rim on the thin edges
-      var rim = silver * (1 - a0) * (0.4 + 0.6 * lam);
-      r += (lit[0] - r) * rim; g += (lit[1] - g) * rim; b += (lit[2] - b) * rim;
-      px[q] = r; px[q + 1] = g; px[q + 2] = b; px[q + 3] = A[i];
+      // how much cloud lies between this point and the sun
+      var s = D[i] * 0.05;
+      for (j = 0; j < steps; j++) {
+        var ix = (x + 0.5 + offs[j][0]) | 0, iy = (y + 0.5 + offs[j][1]) | 0;
+        if (ix < 0 || ix >= W || iy < 0 || iy >= H) break;
+        s += D[iy * W + ix] * wts[j];
+      }
+      var sun = Math.exp(-s * absorb), a = A[i] / 255, hg = HG[i] / 255;
+      var light = clamp((sun * 0.85 + amb * 0.3 * (0.6 + 0.4 * hg) + silver * (1 - a) * sun * 0.8) * expo, 0, 1);
+      var rr = shade[0] + (lit[0] - shade[0]) * light, gg = shade[1] + (lit[1] - shade[1]) * light, bb = shade[2] + (lit[2] - shade[2]) * light;
+      // the bottom of the cloud: a darker grey
+      var under = bD * (1 - smooth(0, 0.45, hg)) * (1 - light * 0.5);
+      rr += (base[0] - rr) * under; gg += (base[1] - gg) * under; bb += (base[2] - bb) * under;
+      // the blue sky in the shade
+      var sk = 0.12 * amb * (1 - light);
+      rr += (sky[0] - rr) * sk; gg += (sky[1] - gg) * sk; bb += (sky[2] - bb) * sk;
+      px[q] = rr; px[q + 1] = gg; px[q + 2] = bb; px[q + 3] = A[i];
     }
-    ctx.putImageData(sh.img, 0, 0);
+    ctx.putImageData(img, 0, 0);
+    sh.img = img;
     return sh.cnv;
   }
-
-  var blurF = blur;
 
   /* Build a cloud in the background (a worker running this same file), so
      the animation does not stop while it is built; cb(shape) when it is
@@ -410,6 +317,6 @@ if (typeof document === 'undefined' && typeof importScripts === 'function') {
   self.onmessage = function(e) {
     var d = e.data, sh = Clouds.shape(d.kind, d.seed, d.o);
     sh.id = d.id;
-    self.postMessage(sh, [sh.N.buffer, sh.A.buffer, sh.A0.buffer, sh.T.buffer, sh.AO.buffer, sh.HG.buffer]);
+    self.postMessage(sh, [sh.D.buffer, sh.A.buffer, sh.HG.buffer]);
   };
 }

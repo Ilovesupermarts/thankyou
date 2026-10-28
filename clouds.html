@@ -35,13 +35,13 @@
 <script>
 var V = JSON.parse(JSON.stringify(Clouds.DEFAULTS));
 V.seed = 1; V.count = 9; V.size = 1; V.speed = 1;
-var SHAPE = ['resolution', 'detail', 'billows', 'billowLight', 'smoothSeams', 'flatBase', 'edge', 'wisp', 'grain', 'seed'];
+var SHAPE = ['resolution', 'detail', 'billows', 'edge', 'wisp', 'swirl', 'flatBase', 'density', 'seed'];
 var SLIDERS = [
   ['形', [['count', 1, 20, 1], ['size', 0.3, 2, 0.05], ['speed', 0, 6, 0.1], ['seed', 1, 50, 1],
-          ['resolution', 0.5, 2, 0.1], ['detail', 0, 4, 1], ['billows', 0.3, 2, 0.05], ['billowLight', 0, 1, 0.05], ['smoothSeams', 0, 1, 0.05], ['flatBase', 0, 1, 0.05],
-          ['edge', 0, 1, 0.05], ['wisp', 0, 1, 0.05], ['grain', 0, 1.5, 0.05]]],
-  ['光', [['sunElevation', 0, 90, 1], ['sunSide', -1, 1, 0.05], ['sunFront', 0, 1, 0.05], ['wrap', 0, 1, 0.05],
-          ['shadow', 0, 2, 0.05], ['crevices', 0, 1, 0.05], ['baseDark', 0, 1, 0.05], ['silver', 0, 1, 0.05], ['exposure', 0.5, 2, 0.05]]]
+          ['resolution', 0.3, 1.5, 0.05], ['detail', 2, 8, 1], ['billows', 0, 1, 0.05], ['edge', 0, 1, 0.05],
+          ['wisp', 0, 1, 0.05], ['swirl', 0, 1, 0.05], ['flatBase', 0, 1, 0.05], ['density', 0.2, 4, 0.05]]],
+  ['光', [['sunElevation', 0, 90, 1], ['sunSide', -1, 1, 0.05], ['sunFront', 0, 1, 0.05], ['shadow', 0, 3, 0.05],
+          ['ambient', 0, 1.5, 0.05], ['baseDark', 0, 1, 0.05], ['silver', 0, 1, 0.05], ['exposure', 0.5, 2, 0.05]]]
 ];
 var box = document.getElementById('controls'), reshape = true, repaint = true;
 SLIDERS.forEach(function(sec) {
@@ -72,7 +72,7 @@ document.getElementById('dump').onclick = function() {
 var cv = document.getElementById('sky'), ctx = cv.getContext('2d'), PR = window.devicePixelRatio || 1, W, H;
 function size() { W = innerWidth; H = innerHeight; cv.width = W * PR; cv.height = H * PR; }
 addEventListener('resize', size); size();
-var KINDS = ['tower', 'heap', 'puff', 'flat', 'heap', 'puff', 'tower', 'puff'];
+var KINDS = ['mass', 'heap', 'bank', 'tower', 'flat', 'puff', 'heap', 'puff'];
 var shapes = [], clouds = [];
 function build() {
   var t0 = performance.now();
