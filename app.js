@@ -12541,17 +12541,16 @@ function sunBuildRays() {
 function sunWander(t, ph) {
   return 0.5 + 0.22 * Math.sin(t * 0.9 + ph) + 0.16 * Math.sin(t * 2.3 + ph * 1.7) + 0.12 * Math.sin(t * 5.1 + ph * 0.6);
 }
-/* The clouds (clouds.js), as tuned on clouds.html: real-looking cumulus,
-   white heaped tops, blue-grey shaded sides and flat grey bases, lit from
+/* The clouds (clouds.js), as tuned on clouds.html: soft, real-looking
+   clouds with wispy edges, white tops and grey shaded undersides, lit from
    the sun's side of the sky. Each shape is built once in the background and
    painted again (one a frame) when the light or the weather changes. The
    colours are for a clear day (lighter than on clouds.html, to suit this
    pale sky); the weather's shade colours darken them. */
 var CLOUD_LOOK = {
-  kinds: ['heap', 'tower', 'heap', 'puff', 'flat', 'heap'],
-  resolution: 1.2, detail: 3, billows: 1, billowLight: 0.45, smoothSeams: 0.4, flatBase: 0.55,
-  edge: 0.35, wisp: 0.35, grain: 0.5,
-  sunFront: 0.7, wrap: 0.3, shadow: 1.3, crevices: 0.5, baseDark: 0.6, silver: 0.35, exposure: 1.4,
+  kinds: ['heap', 'mass', 'heap', 'puff', 'flat', 'tower'],
+  resolution: 0.7, detail: 5, billows: 0.5, edge: 0.6, wisp: 0.55, swirl: 0.45, flatBase: 0.4, density: 1.2,
+  sunFront: 0.7, shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, exposure: 1.4,
   colours: { lit: '#FFFFFF', shade: '#B9C2D4', base: '#9DA7BB', sky: '#8FA9D0' }
 };
 var cloudShapes = [], cloudPaint = null, cloudsAsked = false;
