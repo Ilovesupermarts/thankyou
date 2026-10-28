@@ -5468,9 +5468,10 @@ function playPanel1SpecialSequence(panelEl) {
      appear on a blank screen. Poll until the scene is mostly visible, or
      give up after 4 s (or at once when no scene is drawn at all). */
   function sceneVisible() {
-    if (dynReduceMotion || document.hidden) return true;
-    if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return true;
-    return dynMaster > 0.6;
+    if (document.hidden || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return true;
+    if (typeof DynBG === 'undefined' || !DynBG || !DynBG.sceneShown) return true;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+    return DynBG.sceneShown() > 0.6;
   }
   var greetWaitStart = performance.now();
   function fireBeat1WhenSceneReady() {
@@ -19672,7 +19673,7 @@ function furinGust(x) {
   }
   return gs;
 }
-return { onWeather: onWeather, furinGust: furinGust };
+return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return dynMaster; } };
 
 })();
 
