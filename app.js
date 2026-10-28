@@ -12403,36 +12403,27 @@ var SUN_LOOK = {
   spikes: 30, spikeLength: 2.4, spikeStrength: 0.96, beams: 4, beamStrength: 0.22, beamWidth: 1,
   irregular: 0.75, seed: 3, turn: 4, shimmer: 0.45, shimmerSpeed: 1,
   ghosts: 0.35, ghostSize: 1, ring: 0.5, ringSize: 9,
-  cloudSpeed: 0.85, cloudSize: 2.3, cloudBlock: 0.75, veil: 0.99,
+  veil: 0.99,
   colours: { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' }
 };
 /* What each weather does to the sun (multipliers on the look above):
    core / blur — how much of the bright disc shows, and how much it is spread
    into a dull patch; glow, glowSize, haze — the glows; rays — streaks, spikes
-   and beams; clouds / cloudScale — how many clouds and how big; veil — a sheet
-   of cloud or haze over the sky; ring — the halo seen through thin cloud. */
+   and beams; veil — a sheet of cloud or haze over the sky; ring — the halo
+   seen through thin cloud. The clouds themselves are in CLOUD_LOOK. */
 var SUN_WEATHER = {
-  clear:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 1, ring: 0,
-            clouds: 0, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
-  sunny:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 0.9, ring: 0,
-            clouds: 0.3, cloudScale: 1, cloudAlpha: 0.9, veil: 0, veilCol: [255, 255, 255], top: [255, 255, 255], shade: [200, 200, 214] },
-  partly: { core: 1, blur: 0, glow: 0.95, glowSize: 1, haze: 1, rays: 0.9, ghosts: 0.7, ring: 0,
-            clouds: 0.7, cloudScale: 1.2, cloudAlpha: 0.92, veil: 0.08, veilCol: [244, 244, 250], top: [255, 255, 255], shade: [186, 186, 204] },
-  thin:   { core: 0.85, blur: 0.3, glow: 1.1, glowSize: 1.4, haze: 1.4, rays: 0.2, ghosts: 0.25, ring: 1,
-            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.32, veilCol: [244, 245, 250], top: [255, 255, 255], shade: [214, 214, 226] },
-  cloudy: { core: 0.4, blur: 1, glow: 0.55, glowSize: 1.8, haze: 0.8, rays: 0, ghosts: 0, ring: 0,
-            clouds: 1, cloudScale: 1.7, cloudAlpha: 0.95, veil: 0.5, veilCol: [218, 216, 226], top: [240, 238, 244], shade: [150, 148, 166] },
-  mist:   { core: 0.7, blur: 0.15, glow: 0.7, glowSize: 2, haze: 1.7, rays: 0.05, ghosts: 0, ring: 0,
-            clouds: 0, cloudScale: 1, cloudAlpha: 0.7, veil: 0.45, veilCol: [250, 246, 240], top: [255, 255, 255], shade: [220, 216, 220] },
-  rain:   { core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0,
-            clouds: 0.85, cloudScale: 1.9, cloudAlpha: 0.95, veil: 0.75, veilCol: [178, 180, 194], top: [206, 206, 216], shade: [122, 122, 140] },
-  snow:   { core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0,
-            clouds: 0.6, cloudScale: 1.5, cloudAlpha: 0.9, veil: 0.7, veilCol: [228, 230, 238], top: [244, 244, 248], shade: [172, 174, 190] }
+  clear:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 1, ring: 0, veil: 0, veilCol: [255, 255, 255] },
+  sunny:  { core: 1, blur: 0, glow: 1, glowSize: 1, haze: 1, rays: 1, ghosts: 0.9, ring: 0, veil: 0, veilCol: [255, 255, 255] },
+  partly: { core: 1, blur: 0, glow: 0.95, glowSize: 1, haze: 1, rays: 0.9, ghosts: 0.7, ring: 0, veil: 0.08, veilCol: [244, 244, 250] },
+  thin:   { core: 0.85, blur: 0.3, glow: 1.1, glowSize: 1.4, haze: 1.4, rays: 0.2, ghosts: 0.25, ring: 1, veil: 0.32, veilCol: [244, 245, 250] },
+  cloudy: { core: 0.4, blur: 1, glow: 0.55, glowSize: 1.8, haze: 0.8, rays: 0, ghosts: 0, ring: 0, veil: 0.5, veilCol: [218, 216, 226] },
+  mist:   { core: 0.7, blur: 0.15, glow: 0.7, glowSize: 2, haze: 1.7, rays: 0.05, ghosts: 0, ring: 0, veil: 0.45, veilCol: [250, 246, 240] },
+  rain:   { core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0, veil: 0.75, veilCol: [178, 180, 194] },
+  snow:   { core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0, veil: 0.7, veilCol: [228, 230, 238] }
 };
 function sunCanvas() { var c = document.createElement('canvas'); return { cnv: c, c: c.getContext('2d') }; }
 var SUN_SPR = { core: sunCanvas(), glow: sunCanvas(), haze: sunCanvas(), soft: sunCanvas(), ray: sunCanvas(),
                 beam: sunCanvas(), ghost: sunCanvas(), ring: sunCanvas() };
-var SUN_CLOUD_SPR = [sunCanvas(), sunCanvas(), sunCanvas(), sunCanvas()];
 var sunBakedKey = '', sunBakedAt = -99, sunCloudKey = '', sunCloudAt = -99, sunLastT = 0;
 var sunRays = [], sunSpikes = [], sunBeams = [], sunClouds = [], sunCur = null;
 
@@ -12541,70 +12532,146 @@ function sunBuildRays() {
 function sunWander(t, ph) {
   return 0.5 + 0.22 * Math.sin(t * 0.9 + ph) + 0.16 * Math.sin(t * 2.3 + ph * 1.7) + 0.12 * Math.sin(t * 5.1 + ph * 0.6);
 }
-/* The clouds (clouds.js), as tuned on clouds.html: soft, real-looking
-   clouds with wispy edges, white tops and grey shaded undersides, lit from
-   the sun's side of the sky. Each shape is built once in the background and
-   painted again (one a frame) when the light or the weather changes. The
-   colours are for a clear day (lighter than on clouds.html, to suit this
-   pale sky); the weather's shade colours darken them. */
+/* The clouds (clouds.js), as approved on bamboo-clouds.html (the Cloud
+   Lab): soft clouds with wispy edges, white tops and grey shaded
+   undersides, lit from the sun's side of the sky. The shapes are built
+   once in the background and painted again (one a frame) when the light,
+   the time of day or the weather changes. The values for each time of day
+   are blended as the light changes (day → evening → night), and those for
+   each weather follow the real weather (sunWeatherKey). Low banks of cloud
+   drift in front of Fuji in the cloudier weathers (drawFrontClouds). */
 var CLOUD_LOOK = {
-  kinds: ['heap', 'mass', 'heap', 'puff', 'flat', 'tower'],
-  resolution: 0.7, detail: 5, billows: 0.5, edge: 0.6, wisp: 0.55, swirl: 0.45, flatBase: 0.4, density: 1.2,
-  sunFront: 0.7, shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, exposure: 1.4,
-  colours: { lit: '#FFFFFF', shade: '#B9C2D4', base: '#9DA7BB', sky: '#8FA9D0' }
+  // the shapes: how many of each kind, and how they are built
+  seed: 1, heaps: 2, masses: 1, towers: 1, puffs: 1, flats: 1, banks: 3,
+  resolution: 0.7, detail: 3, billows: 0.5, edge: 1, wisp: 0.55, swirl: 0.75, flatBase: 0.4, density: 1.2,
+  // in the sky: how many in a fully clouded sky, their size, drift, the share near the sun,
+  // the band the rest are spread across (fractions of the screen height from the top), and how
+  // much they hide the sun
+  count: 18, size: 2.3, sizeVariety: 0.8, speed: 0.85, nearSun: 0.5, highest: 0.05, lowest: 0.45, block: 0.75,
+  // in front of Fuji: how many at most, their size (next to Fuji), drift, the band of the
+  // mountain they cross (0 summit … 1 foot), how far either side of the summit (in Fuji
+  // heights), how solid, and how much and how often they thin out to show its outline
+  front: { count: 12, size: 1, speed: 0.1, high: 0.15, low: 0.8, spread: 0.95, opacity: 0.59,
+           thinning: 0.15, thinEvery: 1 },
+  // the light (the side it comes from follows the sun)
+  shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, sky: '#8FA9D0',
+  // each time of day: the light's height and how much it comes from in front, how bright,
+  // a tint over the colours (lit, shade, base) and how strong it is, and how solid the clouds are
+  times: {
+    day:     { elevation: 40, front: 0.7, exposure: 1.4, tint: 0, lit: '#FFFFFF', shade: '#FFFFFF', base: '#FFFFFF', opacity: 1 },
+    evening: { elevation: 8, front: 0.5, exposure: 1.3, tint: 0.4, lit: '#FFC4A0', shade: '#AA788C', base: '#966478', opacity: 1 },
+    night:   { elevation: 60, front: 1, exposure: 1.2, tint: 0.6, lit: '#969EC4', shade: '#60668E', base: '#50567C', opacity: 0.22 }
+  },
+  // each kind of weather: how much of the sky the clouds cover, how big and solid they are, how
+  // fast they move, the share of the clouds in front of Fuji, and their colours
+  weather: {
+    clear:  { cover: 0,    size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    sunny:  { cover: 0.3,  size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    partly: { cover: 0.7,  size: 1.2, opacity: 0.92, speed: 1,   front: 0.5,  lit: '#FFFFFF', shade: '#ABB3CB', base: '#919AB3' },
+    thin:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#C5CFE0', base: '#A7B2C6' },
+    cloudy: { cover: 1,    size: 1.7, opacity: 0.95, speed: 1.2, front: 0.9,  lit: '#F0EEF4', shade: '#8A8FA5', base: '#757B92' },
+    mist:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 0.6, front: 0.8,  lit: '#FFFFFF', shade: '#CAD1DA', base: '#ACB4C1' },
+    rain:   { cover: 0.85, size: 1.9, opacity: 0.95, speed: 1.5, front: 1,    lit: '#CECED8', shade: '#70768B', base: '#5F657B' },
+    snow:   { cover: 0.6,  size: 1.5, opacity: 0.9,  speed: 0.8, front: 0.85, lit: '#F4F4F8', shade: '#9EA8BD', base: '#8691A7' }
+  }
 };
-var cloudShapes = [], cloudPaint = null, cloudsAsked = false;
-function sunCloudSprite(k) {
-  if (typeof Clouds === 'undefined') return SUN_CLOUD_SPR[k % SUN_CLOUD_SPR.length];
-  return cloudShapes.length ? cloudShapes[k % cloudShapes.length] || null : null;
+var CLOUD_SHAPE_KEYS = ['resolution', 'detail', 'billows', 'edge', 'wisp', 'swirl', 'flatBase', 'density'];
+var cloudShapes = [], cloudPaint = null, cloudsAsked = false, cloudW = null, frontClouds = [];
+/* The kinds of shape, as on the Cloud Lab (the same order and seeds, so the
+   clouds are the ones approved there). */
+function cloudKinds() {
+  var C = CLOUD_LOOK, k = [], n = { heap: C.heaps, mass: C.masses, tower: C.towers, puff: C.puffs, flat: C.flats, bank: C.banks };
+  for (var i = 0; i < 4; i++) for (var name in n) if (i < n[name]) k.push(name);
+  return k.length ? k : ['heap'];
 }
-/* Paint the clouds in the light and colours now: one shape a frame. */
+/* The shapes for the sky (all but the low banks), or for in front of Fuji (the banks, else the flat ones). */
+function cloudIdx(front) {
+  var idx = [];
+  cloudShapes.forEach(function(sh, i) { if (sh && (sh.kind === 'bank') === !!front) idx.push(i); });
+  if (!idx.length && front) cloudShapes.forEach(function(sh, i) { if (sh && sh.kind === 'flat') idx.push(i); });
+  return idx;
+}
+/* The weather's cloud values, easing toward the weather now (the colours change at once: they are painted). */
+function cloudLerpWeather(a, b, k) {
+  var o = {};
+  for (var key in b) o[key] = typeof b[key] === 'number' ? lerp(a[key], b[key], k) : b[key];
+  return o;
+}
+/* The time of day's values, blended: day → evening (eK) → night (nK). */
+function cloudTime(eK, nK) {
+  var T = CLOUD_LOOK.times, o = {};
+  for (var key in T.day) {
+    if (typeof T.day[key] === 'number') o[key] = lerp(lerp(T.day[key], T.evening[key], eK), T.night[key], nK);
+    else o[key] = mixRgb(mixRgb(hexToRgb(T.day[key]), hexToRgb(T.evening[key]), eK), hexToRgb(T.night[key]), nK);
+  }
+  return o;
+}
+/* Build the shapes (once, in the background), then paint them in the light now: one a frame. */
 function sunPaintClouds(look) {
-  if (typeof Clouds === 'undefined') return;
   if (!cloudsAsked) {
     cloudsAsked = true;
-    CLOUD_LOOK.kinds.forEach(function(kind, i) {
-      Clouds.build(kind, 300 + i * 37, CLOUD_LOOK, function(sh) { sh.painted = ''; cloudShapes[i] = sh; });
+    var o = {}, kinds = cloudKinds(), got = 0;
+    CLOUD_SHAPE_KEYS.forEach(function(k) { o[k] = CLOUD_LOOK[k]; });
+    kinds.forEach(function(kind, i) {
+      Clouds.build(kind, CLOUD_LOOK.seed * 1000 + 300 + i * 37, o, function(sh) {
+        sh.painted = ''; cloudShapes[i] = sh;
+        if (++got === kinds.length) { sunBuildClouds(); frontClouds = []; }
+      });
     });
   }
   cloudPaint = look;
   for (var i = 0; i < cloudShapes.length; i++) {
     var sh = cloudShapes[i];
-    if (sh && sh.painted !== look.key) { Clouds.paint(sh, look.o); sh.painted = look.key; sh.ready = true; return; }
+    if (sh && sh.painted !== look.key) { Clouds.paint(sh, look.o); sh.painted = look.key; sh.ready = true; sh.img = null; return; }
   }
 }
-/* The old clouds, where clouds.js is missing: four soft shapes, baked in the sky's colours. */
-function sunBakeClouds(top, shade) {
-  SUN_CLOUD_SPR.forEach(function(Sp, k) {
-    var r = rngFrom(400 + k * 17), w = 360, h = 170, c = Sp.c;
-    Sp.cnv.width = w; Sp.cnv.height = h;
-    c.clearRect(0, 0, w, h);
-    c.filter = 'blur(5px)';
-    for (var i = 0; i < 18; i++) {
-      var x = 50 + r() * (w - 100), mid = 1 - Math.abs(x - w / 2) / (w * 0.55);
-      var rad = (18 + r() * 34) * (0.5 + mid * 0.8), y = 128 - rad * (0.55 + r() * 0.35);
-      var g = c.createRadialGradient(x, y, 0, x, y, rad);
-      g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.6, 'rgba(255,255,255,0.8)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-      c.fillStyle = g; c.beginPath(); c.arc(x, y, rad, 0, TAU); c.fill();
-    }
-    c.filter = 'none';
-    c.globalCompositeOperation = 'destination-out';
-    var b = c.createLinearGradient(0, 118, 0, 150);
-    b.addColorStop(0, 'rgba(0,0,0,0)'); b.addColorStop(1, 'rgba(0,0,0,1)');
-    c.fillStyle = b; c.fillRect(0, 118, w, h - 118);
-    c.globalCompositeOperation = 'source-atop';
-    var sh = c.createLinearGradient(0, 30, 0, 135);
-    sh.addColorStop(0, rgba(top, 1)); sh.addColorStop(1, rgba(shade, 1));
-    c.fillStyle = sh; c.fillRect(0, 0, w, h);
-    c.globalCompositeOperation = 'source-over';
-  });
-}
+/* The clouds in the sky: where each one is, its size, speed and shape. */
 function sunBuildClouds() {
-  var r = rngFrom(2024);
+  var C = CLOUD_LOOK, r = rngFrom(2024 + C.seed), sky = cloudIdx(false), old = sunClouds;
   sunClouds = [];
-  for (var i = 0; i < 18; i++) {
-    sunClouds.push({ x: r() * 1.4 - 0.2, near: i % 2 === 0, yr: r(), s: 0.6 + r() * 0.8, v: 0.5 + r(), k: i % 6, a: 0, want: r() });
+  if (!sky.length) return;
+  for (var i = 0; i < C.count; i++) {
+    sunClouds.push({ x: r() * 1.4 - 0.2, near: r() < C.nearSun, yr: r(), s: r(), v: 0.5 + r(),
+                     k: sky[i % sky.length], a: old[i] ? old[i].a : 0, want: r() });
   }
+}
+/* The clouds in front of Fuji: low banks drifting across the mountain's
+   flanks, as clouds catch on a high peak. They form and fade at the ends of
+   their path, and now and then thin out, so Fuji's outline shows through
+   for a while before it is hidden again. Drawn over the mountains, under
+   the ground and everything in front of it (drawLandscape). */
+function buildFrontClouds() {
+  var F = CLOUD_LOOK.front, r = rngFrom(4049 + CLOUD_LOOK.seed), idx = cloudIdx(true);
+  frontClouds = [];
+  if (!idx.length) return;
+  for (var i = 0; i < F.count; i++) {
+    frontClouds.push({ u: r() * 2 - 1, yr: r(), s: r(), v: 0.6 + r() * 0.8, k: idx[i % idx.length], ph: r() * 100, a: 0, want: r() });
+  }
+}
+function drawFrontClouds(c, t, dt) {
+  if (!cloudW || !cloudShapes.length || ENV.scene !== 'autumn') return;
+  if (!frontClouds.length) buildFrontClouds();
+  var F = CLOUD_LOOK.front, M = LS.is3d ? MTN3D : LAND, night = 1 - smooth(0.05, 0.5, ENV.light.daylight);
+  var hy = H * LAND.horizon, Hf = M.fujiHeight * H, fx = M.fujiX * W, top = hy - Hf, reach = Hf * F.spread;
+  var shown = Math.round(cloudW.front * frontClouds.length), wind = (0.6 + 0.4 * clamp(S.windSpeed / 2.5, 0, 2.5)) * cloudW.speed;
+  var op = lerp(1, CLOUD_LOOK.times.night.opacity, night);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  for (var i = 0; i < frontClouds.length; i++) {
+    var Fc = frontClouds[i], Spr = cloudShapes[Fc.k];
+    Fc.u += F.speed * Fc.v * wind * dt * 9 / reach;
+    if (Fc.u > 1.15) { Fc.u = -1.15; Fc.yr = Math.random(); }
+    // it thins out now and then, then thickens again (slowly, out of step with the others)
+    var thin = 1 - F.thinning * smooth(0.45, 0.8, sunWander(t * 0.05 * F.thinEvery, Fc.ph));
+    var ends = smooth(1.15, 0.75, Math.abs(Fc.u));                 // forming and fading at the ends
+    var want = i < shown ? F.opacity * (0.7 + 0.3 * Fc.want) * op : 0;
+    Fc.a += (want - Fc.a) * (1 - Math.exp(-dt / 1.5));
+    var al = Fc.a * thin * ends;
+    if (!Spr || !Spr.ready || al < 0.005) continue;
+    var cw = Hf * 1.3 * F.size * (0.6 + 0.8 * Fc.s) * Spr.size, ch = cw * Spr.h / Spr.w;
+    c.globalAlpha = Math.min(1, al);
+    c.drawImage(Spr.cnv, fx + Fc.u * reach - cw / 2, top + Hf * lerp(F.high, F.low, Fc.yr) - ch * Spr.base, cw, ch);
+  }
+  c.globalAlpha = 1;
 }
 
 /* Clouds, the veil over the sky, and the sun. Called once a frame, first. */
@@ -12615,7 +12682,7 @@ function drawSun(ctx, t) {
   var wk = sunWeatherKey(), target = SUN_WEATHER[wk];
   sunCur = sunCur ? sunLerpWeather(sunCur, target, 1 - Math.exp(-dt / 0.8)) : sunLerpWeather(target, target, 1);
   var cur = sunCur;
-  if (!sunClouds.length) { sunBuildClouds(); sunBuildRays(); }
+  if (!sunRays.length) sunBuildRays();
   var night = 1 - smooth(0.05, 0.5, ENV.light.daylight);          // 0 by day, 1 in the dark
   var low = 1 - smooth(2, 22, a.alt);                              // 1 as the sun nears the horizon
   var lowK = Math.round(Math.max(low, L.warmth * 0.6) * 12) / 12;
@@ -12623,33 +12690,28 @@ function drawSun(ctx, t) {
   // the sun's pieces, baked again only when its colour has really changed (and not more than once in a while)
   var bk = String(lowK);
   if (bk !== sunBakedKey && (t - sunBakedAt > 1.5 || !sunBakedKey)) { sunBakedKey = bk; sunBakedAt = t; sunBake(lowK); }
-  // the clouds' colours: pale and bluish at night, a warm tint at sunrise and sunset
-  var nK = Math.round(night * 8) / 8, eK = Math.round(low * (1 - night) * 8) / 8;
-  var top = mixRgb(mixRgb(target.top, [255, 196, 160], eK * 0.35), [150, 158, 196], nK * 0.6);
-  var shade = mixRgb(mixRgb(target.shade, [170, 120, 140], eK * 0.4), [96, 102, 142], nK * 0.6);
   var P = { x: skyToScreen(a.alt, a.az).x }, R = sunRadius(a.alt);
   P.y = skyBandY(R); var X = P.x, Y = P.y;
-  // the side of the sky the sun is on, and how high (the clouds are lit from there; flat light at night)
-  var sideK = Math.round(clamp((X - W / 2) / (W / 2), -1, 1) * 4) / 4, elK = Math.round(clamp(a.alt, 8, 70) / 10) * 10;
-  if (nK >= 0.5) { sideK = 0; elK = 60; }
-  var ck = wk + '|' + nK + '|' + eK + '|' + sideK + '|' + elK;
+  // the clouds: the weather's values ease in; the time of day is blended (in steps, so they are
+  // not painted again every frame); the light comes from the sun's side of the sky (flat at night)
+  var CL = CLOUD_LOOK, Wt = CL.weather[wk];
+  cloudW = cloudW ? cloudLerpWeather(cloudW, Wt, 1 - Math.exp(-dt / 0.8)) : cloudLerpWeather(Wt, Wt, 1);
+  var nK = Math.round(night * 8) / 8, eK = Math.round(low * (1 - night) * 8) / 8;
+  var sideK = nK >= 0.5 ? 0 : Math.round(clamp((X - W / 2) / (W / 2), -1, 1) * 4) / 4;
+  var ck = wk + '|' + nK + '|' + eK + '|' + sideK;
   if (typeof Clouds !== 'undefined') {
     if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) {
       sunCloudKey = ck; sunCloudAt = t;
-      var CC = CLOUD_LOOK.colours, k0 = 1 / 207;   // the weather's shade, next to a clear day's
-      var dim = [target.shade[0] * k0 * 1.03, target.shade[1] * k0 * 1.03, target.shade[2] * k0 * 0.97];
-      function tint(c, warm, cool) { return mixRgb(mixRgb(c, warm, eK * 0.35), cool, nK * 0.6); }
-      var o = {}; for (var lk in CLOUD_LOOK) if (lk !== 'kinds' && lk !== 'colours') o[lk] = CLOUD_LOOK[lk];
-      var cs = hexToRgb(CC.shade), cb = hexToRgb(CC.base);
-      o.sunSide = sideK; o.sunElevation = elK;
-      o.colours = { lit: tint(top, [255, 196, 160], [150, 158, 196]),
-                    shade: tint([cs[0] * dim[0], cs[1] * dim[1], cs[2] * dim[2]], [170, 120, 140], [96, 102, 142]),
-                    base: tint([cb[0] * dim[0], cb[1] * dim[1], cb[2] * dim[2]], [150, 100, 120], [80, 86, 124]),
-                    sky: mixRgb(hexToRgb(CC.sky), [40, 50, 90], nK) };
+      var T = cloudTime(eK, nK), o = {};
+      var tinted = function(c, tc) { return mixRgb(hexToRgb(c), tc, T.tint); };
+      ['shadow', 'ambient', 'baseDark', 'silver'].forEach(function(k) { o[k] = CL[k]; });
+      o.sunSide = sideK; o.sunElevation = T.elevation; o.sunFront = T.front; o.exposure = T.exposure;
+      o.colours = { lit: tinted(Wt.lit, T.lit), shade: tinted(Wt.shade, T.shade), base: tinted(Wt.base, T.base),
+                    sky: mixRgb(hexToRgb(CL.sky), [40, 50, 90], nK) };
       cloudPaint = { key: ck, o: o };
     }
     if (cloudPaint) sunPaintClouds(cloudPaint);
-  } else if (ck !== sunCloudKey && (t - sunCloudAt > 2 || !sunCloudKey)) { sunCloudKey = ck; sunCloudAt = t; sunBakeClouds(top, shade); }
+  }
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 
@@ -12661,24 +12723,22 @@ function drawSun(ctx, t) {
     ctx.fillStyle = vg; ctx.fillRect(0, 0, W, hz);
   }
   // the clouds, and how much of the sun they hide
-  var shown = Math.round(cur.clouds * sunClouds.length), occl = 0;
-  var wind = L.cloudSpeed * (0.6 + 0.4 * clamp(S.windSpeed / 2.5, 0, 2.5));
+  var shown = Math.round(cloudW.cover * sunClouds.length), occl = 0;
+  var wind = CL.speed * cloudW.speed * (0.6 + 0.4 * clamp(S.windSpeed / 2.5, 0, 2.5));
+  var op = lerp(1, CL.times.night.opacity, night);                // faint at night, so the text stays readable
   for (var i = 0; i < sunClouds.length; i++) {
-    var Cl = sunClouds[i];
-    var want = i < shown ? cur.cloudAlpha * (0.75 + 0.25 * Cl.want) * lerp(1, 0.22, night) : 0;
+    var Cl = sunClouds[i], Spr = cloudShapes[Cl.k];
+    var want = i < shown ? cloudW.opacity * (0.75 + 0.25 * Cl.want) * op : 0;
     Cl.a += (want - Cl.a) * (1 - Math.exp(-dt / 1.2));
-    var Spr = sunCloudSprite(Cl.k), sz = Spr && Spr.size ? Spr.size : 1;
-    var cw = 300 * Cl.s * L.cloudSize * cur.cloudScale * sz, ch = cw * 170 / 360;
+    if (!Spr) continue;
+    var cw = 300 * (1 + (Cl.s - 0.5) * CL.sizeVariety) * CL.size * cloudW.size * Spr.size, ch = cw * 170 / 360;
     Cl.x += (5 + 9 * Cl.v) * wind * dt / W;
     if (Cl.x * W - cw / 2 > W + 20) Cl.x = (-cw / 2 - 20) / W;
-    if (Cl.a < 0.005 || !Spr || (Spr.base && !Spr.ready)) continue;
-    var cx = Cl.x * W, cy = Cl.near ? Y + (Cl.yr - 0.5) * ch * 1.2 : H * (0.05 + Cl.yr * 0.4);
-    ctx.globalAlpha = Cl.a;
-    if (Spr.base) {
-      ctx.globalAlpha = Math.min(1, Cl.a * 1.15);   // solid, so one cloud's base does not show through another   // a clouds.js cloud: its base sits where the old cloud's base was
-      var sh2 = cw * Spr.h / Spr.w;
-      ctx.drawImage(Spr.cnv, cx - cw / 2, cy + ch * 0.18 - sh2 * Spr.base, cw, sh2);
-    } else ctx.drawImage(Spr.cnv, cx - cw / 2, cy - ch * 0.62, cw, ch);
+    if (Cl.a < 0.005 || !Spr.ready) continue;
+    var cx = Cl.x * W, cy = Cl.near ? Y + (Cl.yr - 0.5) * ch * 1.2 : H * lerp(CL.highest, CL.lowest, Cl.yr);
+    var sh2 = cw * Spr.h / Spr.w;
+    ctx.globalAlpha = Math.min(1, Cl.a * 1.15);   // solid, so one cloud's base does not show through another
+    ctx.drawImage(Spr.cnv, cx - cw / 2, cy + ch * 0.18 - sh2 * Spr.base, cw, sh2);
     var dx = (X - cx) / (cw * 0.4), dy = (Y - cy + ch * 0.1) / (ch * 0.3), d = Math.sqrt(dx * dx + dy * dy);
     occl = 1 - (1 - occl) * (1 - Cl.a * (1 - smooth(0.5, 1, d)));
   }
@@ -12687,7 +12747,7 @@ function drawSun(ctx, t) {
   if (!S.sun || a.alt < -1.5) return;
   var vis = L.strength * smooth(-1.5, 1.5, a.alt);
   if (vis < 0.005) return;
-  var block = occl * L.cloudBlock, clear = vis * cur.rays * (1 - block);
+  var block = occl * CL.block, clear = vis * cur.rays * (1 - block);
   var c = ctx;
   c.globalCompositeOperation = 'lighter';
   function round(Sp, r, al) { if (al > 0.002) { c.globalAlpha = clamp(al, 0, 1); c.drawImage(Sp.cnv, X - r, Y - r, r * 2, r * 2); } }
@@ -15309,7 +15369,7 @@ function landBakeScenery() {
     o.cnv.width = Math.max(1, Math.round(W * PR / 2)); o.cnv.height = Math.max(1, Math.round(H * PR / 2));
   });
   var is3d = try3d && landDrawMountains3d(m, hy);
-  LS.refl3d = is3d;
+  LS.refl3d = LS.is3d = is3d;
   if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
     LAND_SR = PR * LAND_SCN_RES;
     [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
@@ -15741,6 +15801,7 @@ function drawLandscape(c, dt) {
     c.globalAlpha = 1;
   }
   if (ENV.scene === 'autumn' && fwShow) fwShow.drawFront(c, LS.refl3d ? LS.REFL.cnv : null);   // the bursts' light on the mountains
+  drawFrontClouds(c, lastT, dt);                                       // the clouds drifting in front of Fuji
   c.setTransform(1, 0, 0, 1, 0, 0);
   if (ENV.scene === 'winter') winDrawGround(c, lastT);          // in slices, with the skiers between them (8d)
   else { c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR)); torDrawGravel(c); }   // the gravel path lies on the ground
