@@ -51,6 +51,12 @@
      snow                 0 … 1, how much snow lies there
      treeLine             forest below this fraction of the ranges' height
      autumn               0 green … 1 full autumn colour in the forest
+     winter               0 … 1: snow down to the valleys (0, the default,
+                          leaves the mountains as they were)
+     forestSnow           0 … 1: in winter, how much snow lies on and between
+                          the trees (the rest shows as dark conifers)
+     snowSlope            0 … 1: in winter, how steep the ground can be and
+                          still hold snow (higher = only cliffs stay dark)
      sunAzimuth           degrees: 0 = the sun straight ahead, -90 from the
                           left, 90 from the right, 180 from behind you
      sunElevation         degrees above the horizon
@@ -195,6 +201,7 @@ HEIGHT_GLSL,
 'uniform vec3 uSunDir, uSunCol, uSkyCol, uHazeCol, uMistCol;',
 'uniform vec3 uRock, uFujiRock, uRed, uGold, uEver, uSnowCol;',
 'uniform float uSnowLine, uSnow, uTreeLine, uAutumn, uFujiSnow, uTongues;',
+'uniform float uWinter, uForestSnow, uSnowSlope;   // winter: snow down to the valleys (see winter, forestSnow, snowSlope)',
 'uniform float uShadows, uAmbient, uHaze, uHazeKm, uMist, uMistH, uFade;',
 'uniform float uMode;          // 0 the picture, 1 how strongly each point reflects light from in front (see reflectance())',
 'in vec3 vPos;',
@@ -238,7 +245,21 @@ HEIGHT_GLSL,
 '  forestC *= 0.82 + 0.25 * m2;',
 '  forestC = mix(forestC, vec3(dot(forestC, vec3(0.3, 0.55, 0.15))), 0.3) * 0.85;',
 '  vec3 rockC = uRock * (0.86 + 0.22 * n1 + 0.1 * noised(vec2(p.y * 40.0, p.x * 2.0)).x);',
+'  // --- winter: the forest is dark conifers and bare grey trees standing in snow; snow lies on all',
+'  // the ground gentle enough to hold it, so only the steep faces show dark rock',
+'  float hold = 0.0;',
+'  if (uWinter > 0.0) {',
+'    float sl = mix(0.86, 0.52, uSnowSlope);',
+'    hold = smoothstep(sl - 0.07, sl + 0.07, slope + brk * 0.12);',
+'    vec3 bare = mix(uRock, vec3(0.34, 0.29, 0.28), 0.55);',
+'    vec3 dark = mix(bare, uEver * 0.75, 0.35 + 0.65 * ever);',
+'    float spk = noised(p.xz * 34.0 + 13.0).x * 0.5 + 0.5;',
+'    float res = 1.0 - smoothstep(0.012, 0.045, e);             // the single trees show only where they are big enough',
+'    float cover = uForestSnow * mix(0.6, mix(0.6, smoothstep(0.25, 0.8, spk), 0.6), res) * mix(0.55, 1.0, hold);',
+'    forestC = mix(forestC, mix(dark, uSnowCol * 0.93, cover), uWinter);',
+'  }',
 '  vec3 alb = mix(rockC, forestC, forest);',
+'  alb = mix(alb, uSnowCol * (0.94 + 0.06 * n2), hold * (1.0 - forest) * uWinter);',
 '  float snowR = smoothstep(uSnowLine - 0.06, uSnowLine + 0.06, hr + brk * 0.1) * smoothstep(0.5, 0.75, slope + brk * 0.08) * uSnow;',
 '  // --- Fuji: dark volcanic slopes, forest at its foot, the snow cap with tongues down the gullies',
 '  if (uFujiOn > 0.5) {',
@@ -414,6 +435,9 @@ function render(o, mode) {
   u1('uAutumn', d(o, 'autumn', 0.75));
   u1('uFujiSnow', d(o, 'fujiSnow', 0.25));
   u1('uTongues', d(o, 'fujiTongues', 0.6));
+  u1('uWinter', d(o, 'winter', 0));
+  u1('uForestSnow', d(o, 'forestSnow', 0.7));
+  u1('uSnowSlope', d(o, 'snowSlope', 0.5));
   u1('uShadows', d(o, 'shadows', 0.85));
   u1('uAmbient', d(o, 'ambient', 0.55));
   u1('uHaze', d(o, 'haze', 0.72));
