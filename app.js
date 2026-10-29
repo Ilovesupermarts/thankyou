@@ -8290,7 +8290,38 @@ submitBtn.addEventListener('click', function(e) {
   }
   copyCustomServices();
   confirmScreen.classList.add('visible');
+  callMe();
 });
+
+/* ============ 呼び出し (NTFY) ============
+   Tapping 確認する tells me on my phone that she has finished choosing,
+   through ntfy (ntfy.sh): the phone runs the ntfy app subscribed to
+   CALL.topic. The message says only that she is ready, never what she
+   chose or how much, so the privacy note on the table stays true. Sent as
+   JSON to the root URL with no custom headers, so the browser needs no
+   preflight and the Japanese title needs no header encoding. A second tap
+   within CALL.cooldown ms (内容を変更する, then 確認する again) sends
+   nothing more. Offline or a failed send is silent: she never sees an
+   error. */
+var CALL = {
+  topic: 'thankyou-call-653e1e512b6b6caf',
+  title: '確認するが押されました',
+  message: 'お選びいただけました。お戻りください。',
+  cooldown: 60000
+};
+var lastCall = -Infinity;
+function callMe() {
+  var now = Date.now();
+  if (now - lastCall < CALL.cooldown) return;
+  lastCall = now;
+  try {
+    fetch('https://ntfy.sh/', {
+      method: 'POST',
+      keepalive: true,
+      body: JSON.stringify({ topic: CALL.topic, title: CALL.title, message: CALL.message, priority: 5, tags: ['bell'] })
+    }).catch(function() { lastCall = -Infinity; });
+  } catch (err) { lastCall = -Infinity; }
+}
 
 alertOk.addEventListener('click', function(e) {
   e.preventDefault();
