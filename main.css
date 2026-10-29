@@ -3064,30 +3064,46 @@
   html[data-theme="winter"] body.night-text .transition-line-body,
   html[data-theme="autumn"] body.night-text .ty-line:not(.accent),
   html[data-theme="winter"] body.night-text .ty-line:not(.accent) { color: var(--text-dark); }
-  /* NIGHT HEADER, data-time="night" only. The burgundy/brown (--accent-2,
+  /* NIGHT HEADER, data-time="evening" and "night". The burgundy/brown (--accent-2,
      --accent-3) top-bar text (the 風鈴 line, the city/date/time/temperature,
      the music title and artist, and the dots between them) is hard to read
      over the dark night scene. At night they take the palette's soft oatmeal
      (--bg-warm-night): light enough to read, but not as glaring as pure
-     cream. Other times of day are untouched. */
-  html[data-time="night"] .hud-title,
-  html[data-time="night"] .hud-meta-row .hud-artist,
-  html[data-time="night"] .info-line .city,
-  html[data-time="night"] .info-line .date,
-  html[data-time="night"] .info-line .time,
-  html[data-time="night"] .info-line .temp { color: var(--bg-warm-night); }
-  html[data-time="night"] .hud-meta-row .hud-dot { color: var(--bg-warm-night); }
-  html[data-time="night"] .info-line .sep { background: var(--bg-warm-night); }
-  html[data-time="night"] .info-line .weather { color: var(--bg-warm-night); }   /* the weather symbol beside the temperature */
-  /* NIGHT TICKER AND WIND LINE, data-time="night" only. The scrolling weather
+     cream. The morning and the day are untouched. */
+  html:is([data-time="evening"], [data-time="night"]) .hud-title,
+  html:is([data-time="evening"], [data-time="night"]) .hud-meta-row .hud-artist,
+  html:is([data-time="evening"], [data-time="night"]) .info-line .city,
+  html:is([data-time="evening"], [data-time="night"]) .info-line .date,
+  html:is([data-time="evening"], [data-time="night"]) .info-line .time,
+  html:is([data-time="evening"], [data-time="night"]) .info-line .temp { color: var(--bg-warm-night); }
+  html:is([data-time="evening"], [data-time="night"]) .hud-meta-row .hud-dot { color: var(--bg-warm-night); }
+  html:is([data-time="evening"], [data-time="night"]) .info-line .sep { background: var(--bg-warm-night); }
+  html:is([data-time="evening"], [data-time="night"]) .info-line .weather { color: var(--bg-warm-night); }   /* the weather symbol beside the temperature */
+  /* NIGHT TICKER AND WIND LINE, data-time="evening" and "night". The scrolling weather
      line and the wind line under the 風鈴 take a warm taupe (--border-6),
      with their dots: a step quieter than the oatmeal line above. Colour only. */
-  html[data-time="night"] .ticker-track,
-  html[data-time="night"] .ticker-track * ,
-  html[data-time="night"] .furin-text .ko-sub .hud-artist { color: var(--border-6); }
-  html[data-time="night"] .furin-text .hud-sep,
-  html[data-time="night"] .ticker-track .hud-sep { background: var(--border-6); }
-  .ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
+  html:is([data-time="evening"], [data-time="night"]) .ticker-track,
+  html:is([data-time="evening"], [data-time="night"]) .ticker-track * ,
+  html:is([data-time="evening"], [data-time="night"]) .furin-text .ko-sub .hud-artist { color: var(--border-6); }
+  html:is([data-time="evening"], [data-time="night"]) .furin-text .hud-sep,
+  html:is([data-time="evening"], [data-time="night"]) .ticker-track .hud-sep { background: var(--border-6); }
+    /* EVENING AND NIGHT BODY TEXT, data-time="evening" and "night" (17:00-05:00).
+     The dark ink was lost on the dusky purple-brown scene, so the message and
+     thank-you text take the palette's soft oatmeal (--bg-warm-night, the same as
+     the top line), about 6:1 against the scene. The cream glow that helps dark
+     text by day only muddies light text, so it gives way to a faint dark shadow.
+     Colour and shadow only; the highlighted line (.ty-line.accent) keeps its
+     burgundy. */
+  html[data-theme="autumn"]:is([data-time="evening"], [data-time="night"]) .panel-content,
+  html[data-theme="winter"]:is([data-time="evening"], [data-time="night"]) .panel-content,
+  html[data-theme="autumn"]:is([data-time="evening"], [data-time="night"]) .transition-line-body,
+  html[data-theme="winter"]:is([data-time="evening"], [data-time="night"]) .transition-line-body,
+  html[data-theme="autumn"]:is([data-time="evening"], [data-time="night"]) .ty-line:not(.accent),
+  html[data-theme="winter"]:is([data-time="evening"], [data-time="night"]) .ty-line:not(.accent) {
+    color: var(--bg-warm-night);
+    text-shadow: 0 1px 8px rgba(36, 28, 26, 0.55), 0 0 2px rgba(36, 28, 26, 0.35);
+  }
+.ty-rule { width: 44px; height: 1px; background: var(--border-1); margin: 30px auto; }
   .action-hint.ty-swipe-hint { position: absolute; left: 0; right: 0; bottom: 98px; z-index: 11; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.7s ease; min-height: 32px; }
   .action-hint.ty-swipe-hint.shown { opacity: 1; }
   .ty-dots { position: absolute; bottom: 68px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; z-index: 10; transition: opacity 0.6s ease; }
