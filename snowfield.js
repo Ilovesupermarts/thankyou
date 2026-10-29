@@ -28,6 +28,7 @@
                                          // (no WebGL 2). Copy it away before the
                                          // next call: the same canvas is reused.
      Snowfield.state()                   // 'ok', 'lost' (try again soon) or 'none'
+     Snowfield.losses()                  // how many times the context was taken away
      var map = Snowfield.sunMap(o);      // the same picture, as how much sun
                                          // falls on each point (its alpha)
    o (screen values are CSS px; the picture is drawn for a screen of
@@ -194,7 +195,7 @@ function compile(type, src) {
    and buffers are then made again on it. A new context is never asked for
    in its place: after a loss Chrome may refuse new ones. While it is lost,
    render() returns null and state() says 'lost': try again a moment later. */
-var lost = false, ready = false;
+var lost = false, ready = false, losses = 0;   // losses: how many times the context was taken away
 function create() {
   if (cnv) return !!gl;
   try {
@@ -202,7 +203,7 @@ function create() {
     gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: false, alpha: true, depth: false });
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
-  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); lost = true; ready = false; U = {}; lastUp = null; });
+  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); lost = true; ready = false; losses++; U = {}; lastUp = null; });
   cnv.addEventListener('webglcontextrestored', function () { lost = false; });
   return true;
 }
@@ -312,6 +313,7 @@ return {
   render: function (o, i, y0, y1) { return render(o, i, 0, y0, y1); },
   sunMap: function (o) { return render(o, -1, 1); },
   supported: function () { return init(); },
-  state: state
+  state: state,
+  losses: function () { return losses; }
 };
 })();
