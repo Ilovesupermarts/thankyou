@@ -22,10 +22,12 @@
    Use:
      var cnv = Snowfield.render(o, i, y0, y1);   // swell i alone (everything below
                                          // its crest), or all of them for i = -1;
-                                         // only the rows y0 … y1 (CSS px) if given;
+                                         // only the rows y0 … y1 (CSS px) if given
+                                         // (then the canvas is only that tall);
                                          // a canvas o.width × o.height, or null
                                          // (no WebGL 2). Copy it away before the
                                          // next call: the same canvas is reused.
+     Snowfield.state()                   // 'ok', 'lost' (try again soon) or 'none'
      var map = Snowfield.sunMap(o);      // the same picture, as how much sun
                                          // falls on each point (its alpha)
    o (screen values are CSS px; the picture is drawn for a screen of
@@ -79,7 +81,7 @@ var FS = [
 'uniform int   uN, uOnly, uNx, uMode;',
 'uniform vec4  uSw[' + MAXS + '];   // u, haze, -, -',
 'uniform vec2  uScreen;          // CSS px',
-'uniform float uScale, uHorizon, uLens, uSeed;',
+'uniform float uScale, uHorizon, uLens, uSeed, uTop, uPicH;   // uTop: the picture\'s top on the screen (CSS px), uPicH its height (px)',
 'uniform vec3  uSunDir, uSunCol, uSkyCol, uHazeCol, uSnow;',
 'uniform float uAmbient, uRelief, uRoll, uDrifts, uRipples, uRipSize, uRipAng, uGrain, uHollows, uSheen;',
 'out vec4 outCol;',
@@ -112,7 +114,7 @@ var FS = [
 '}',
 'void main() {',
 '  float x = gl_FragCoord.x / uScale;',
-'  float y = uScreen.y - gl_FragCoord.y / uScale;',
+'  float y = uTop + (uPicH - gl_FragCoord.y) / uScale;',
 '  // which swell this point is on: the nearest one whose crest is above it (or only uOnly)',
 '  int own = -1; float yc = 0.0;',
 '  if (uOnly >= 0) { yc = crest(uOnly, x); if (y >= yc - 1.0) own = uOnly; }',
@@ -186,29 +188,52 @@ function compile(type, src) {
   if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn('Snowfield: shader', gl.getShaderInfoLog(s)); return null; }
   return s;
 }
-function init() {
-  if (gl || failed) return !!gl;
+/* One canvas and one WebGL context for the whole life of the page. When
+   the tablet runs short of graphics memory, Chrome may take the context
+   away for a moment ("lost") and give it back ("restored"); the program
+   and buffers are then made again on it. A new context is never asked for
+   in its place: after a loss Chrome may refuse new ones. While it is lost,
+   render() returns null and state() says 'lost': try again a moment later. */
+var lost = false, ready = false;
+function create() {
+  if (cnv) return !!gl;
   try {
     cnv = document.createElement('canvas');
-    gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: false, alpha: true, depth: false });
+    gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: false, alpha: true, depth: false });
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
+  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); lost = true; ready = false; U = {}; lastUp = null; });
+  cnv.addEventListener('webglcontextrestored', function () { lost = false; });
+  return true;
+}
+function setup() {
   var vs = compile(gl.VERTEX_SHADER, VS), fs = compile(gl.FRAGMENT_SHADER, FS);
-  if (!vs || !fs) { failed = true; gl = null; return false; }
+  if (!vs || !fs) { if (!gl.isContextLost()) failed = true; return false; }
   prog = gl.createProgram();
   gl.attachShader(prog, vs); gl.attachShader(prog, fs);
   gl.bindAttribLocation(prog, 0, 'aPos');
   gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn('Snowfield: link', gl.getProgramInfoLog(prog)); failed = true; gl = null; return false; }
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+    if (!gl.isContextLost()) { console.warn('Snowfield: link', gl.getProgramInfoLog(prog)); failed = true; }
+    return false;
+  }
+  U = {};
   var n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
   for (var i = 0; i < n; i++) { var name = gl.getActiveUniform(prog, i).name; U[name.replace(/\[0\]$/, '')] = gl.getUniformLocation(prog, name); }
   vbo = gl.createBuffer();
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   tex = gl.createTexture();
-  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); gl = null; failed = false; U = {}; lastUp = null; });
+  lastUp = null;
+  ready = true;
   return true;
 }
+function init() {
+  if (failed || !create()) return false;
+  if (lost || gl.isContextLost()) return false;
+  return ready || setup();
+}
+function state() { return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok'; }
 function c3(c) { return [c[0] / 255, c[1] / 255, c[2] / 255]; }
 function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
 
@@ -229,17 +254,14 @@ function upload(o) {
 
 function render(o, only, mode, y0, y1) {
   if (!init() || !o.swells || !o.swells.length) return null;
-  if (cnv.width !== o.width || cnv.height !== o.height) { cnv.width = o.width; cnv.height = o.height; }
+  // the picture: the whole screen, or only the rows y0 … y1 (CSS px) when they are given
+  var sc = o.width / o.screenW, top = y0 === undefined ? 0 : Math.max(0, y0);
+  var ph = y0 === undefined ? o.height : Math.max(1, Math.round((Math.min(o.screenH, y1) - top) * sc));
+  if (cnv.width !== o.width || cnv.height !== ph) { cnv.width = o.width; cnv.height = ph; }
   gl.viewport(0, 0, cnv.width, cnv.height);
   gl.clearColor(0, 0, 0, 0);
-  gl.disable(gl.SCISSOR_TEST);
   gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
-  if (y0 !== undefined) {                       // only the rows asked for (the picture's y runs up)
-    var sc = o.width / o.screenW, b = Math.max(0, Math.floor(o.height - y1 * sc)), t = Math.min(o.height, Math.ceil(o.height - y0 * sc));
-    gl.enable(gl.SCISSOR_TEST);
-    gl.scissor(0, b, cnv.width, Math.max(0, t - b));
-  }
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND); gl.disable(gl.SCISSOR_TEST);
   gl.useProgram(prog);
   if (lastKey !== o.swells || !lastUp) { lastKey = o.swells; lastUp = upload(o); }
   var up = lastUp;
@@ -254,7 +276,9 @@ function render(o, only, mode, y0, y1) {
   for (var i = 0; i < up.N; i++) { sw[i * 4] = d(o.swells[i], 'u', i / Math.max(1, up.N - 1)); sw[i * 4 + 1] = d(o.swells[i], 'haze', 0); }
   if (U.uSw) gl.uniform4fv(U.uSw, sw);
   if (U.uScreen) gl.uniform2f(U.uScreen, o.screenW, o.screenH);
-  u1('uScale', o.width / o.screenW);
+  u1('uScale', sc);
+  u1('uTop', top);
+  u1('uPicH', ph);
   u1('uHorizon', o.horizon);
   u1('uLens', o.screenH * 1.2);
   u1('uSeed', d(o, 'seed', 7) % 997);
@@ -280,12 +304,14 @@ function render(o, only, mode, y0, y1) {
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  if (gl.isContextLost()) return null;
   return cnv;
 }
 
 return {
   render: function (o, i, y0, y1) { return render(o, i, 0, y0, y1); },
   sunMap: function (o) { return render(o, -1, 1); },
-  supported: function () { return init(); }
+  supported: function () { return init(); },
+  state: state
 };
 })();

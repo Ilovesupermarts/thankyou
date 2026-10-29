@@ -22,6 +22,8 @@
 
    Use:
      var cnv = Mountains.render(o);   // a canvas, or null (no WebGL 2)
+     Mountains.state()                // 'ok', 'lost' (the graphics chip took the context
+                                      // away for a moment: try again soon) or 'none'
      var ref = Mountains.reflectance(o);   // how strongly each point reflects
                                            // light from in front (the same canvas)
    o (screen values are CSS px; the picture is o.width × o.height px,
@@ -310,31 +312,56 @@ function compile(type, src) {
   }
   return s;
 }
-function init() {
-  if (gl || failed) return !!gl;
+/* One canvas and one WebGL context for the whole life of the page. When
+   the tablet runs short of graphics memory, Chrome may take the context
+   away for a moment ("lost"); it is then given back ("restored") and the
+   program and buffers are made again on it. A new context is never asked
+   for in its place: after a loss Chrome may refuse new ones. While it is
+   lost, render() returns null and state() says 'lost', so the caller can
+   try again a moment later. */
+var lost = false, ready = false;
+function create() {
+  if (cnv) return !!gl;
   try {
     cnv = document.createElement('canvas');
     gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: true, antialias: true, alpha: true, depth: true });
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
+  cnv.addEventListener('webglcontextlost', function (ev) {
+    ev.preventDefault();
+    lost = true; ready = false; prog = null; U = {};
+    grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
+  });
+  cnv.addEventListener('webglcontextrestored', function () { lost = false; });
+  return true;
+}
+function setup() {
   var vs = compile(gl.VERTEX_SHADER, VS), fs = compile(gl.FRAGMENT_SHADER, FS);
-  if (!vs || !fs) { failed = true; gl = null; return false; }
+  if (!vs || !fs) { if (!gl.isContextLost()) failed = true; return false; }
   prog = gl.createProgram();
   gl.attachShader(prog, vs); gl.attachShader(prog, fs);
   gl.bindAttribLocation(prog, 0, 'aGrid');
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    console.warn('Mountains: link', gl.getProgramInfoLog(prog));
-    failed = true; gl = null; return false;
+    if (!gl.isContextLost()) { console.warn('Mountains: link', gl.getProgramInfoLog(prog)); failed = true; }
+    return false;
   }
+  U = {};
   var n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
   for (var i = 0; i < n; i++) {
     var name = gl.getActiveUniform(prog, i).name;
     U[name] = gl.getUniformLocation(prog, name);
   }
-  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); gl = null; grid.cols = 0; });
+  grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
+  ready = true;
   return true;
 }
+function init() {
+  if (failed || !create()) return false;
+  if (lost || gl.isContextLost()) return false;
+  return ready || setup();
+}
+function state() { return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok'; }
 /* The ground is one grid: columns across the screen, rows spaced evenly
    in 1 / distance, so each row is about the same height on the screen. */
 function buildGrid(cols, rows) {
@@ -450,6 +477,7 @@ function render(o, mode) {
 
   gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);
   gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));   // waits for the drawing to finish, so it is timed truly
+  if (gl.isContextLost()) return null;                // lost while drawing: nothing was drawn
   return cnv;
 }
 
@@ -461,5 +489,5 @@ function render(o, mode) {
    so draw that one away first. */
 function reflectance(o) { return render(o, 1); }
 
-return { render: render, reflectance: reflectance, supported: function () { return init(); } };
+return { render: render, reflectance: reflectance, supported: function () { return init(); }, state: state };
 })();

@@ -537,7 +537,7 @@ function watchCanvas(c) {
     restoreTimer = setTimeout(function () { resize(); rebuildAll(); cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
   });
 }
-var SCN = mk(), MTN = mk(), TMP = mk(), MIST = mk(), GTMP = mk(), SHD = mk(), SKS = mk(), FTMP = mk(), NEAR = mk(), NEART = mk(), SMAP = mk();
+var MTN = mk(), MIST = mk(), GTMP = mk(), SHD = mk(), SKS = mk(), FTMP = mk(), NEAR = mk(), NEART = mk(), SMAP = mk();
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
 
 /* The time of day's tint, for colours that are not lit one by one (the mist, the blossoms, the flakes). */
@@ -586,7 +586,7 @@ function withLight(o, haze) { var L = lightFor(haze); for (var k in L) o[k] = L[
 function nightLights() { return isNight() ? V.lightNight : V.timeOfDay === 'evening' ? V.lightEvening : 0; }
 
 /* ============================================================
-   7. MOUNTAINS — mountains.js in its winter mode, baked into SCN with
+   7. MOUNTAINS — mountains.js in its winter mode, baked into MTN with
    the mist along their foot. Without WebGL 2, soft painted ridges.
    ============================================================ */
 var mtnMs = 0, mtn3d = false, mistBlobs = [], fieldMs = 0;
@@ -617,12 +617,17 @@ function ridgeFn(r) {
   };
 }
 function bakeScenery() {
-  var C = cols(), hy = H * V.horizon, mistC = light(C.mist), m = MTN.c, s = SCN.c;
-  m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MTN.cnv.width, MTN.cnv.height);
-  s.setTransform(1, 0, 0, 1, 0, 0); s.clearRect(0, 0, SCN.cnv.width, SCN.cnv.height);
-  mtn3d = false;
+  var C = cols(), hy = H * V.horizon, mistC = light(C.mist), m = MTN.c;
+  var want = Math.round(W * SR), wantH = Math.round(H * SR);
+  if (MTN.cnv.width !== want || MTN.cnv.height !== wantH) { MTN.cnv.width = want; MTN.cnv.height = wantH; }
   if (V.showMountains) {
     var t0 = performance.now(), g3 = typeof Mountains !== 'undefined' ? Mountains.render(mtnOptions(hy)) : null;
+    // the graphics chip took the context away for a moment: keep the old picture and try again soon
+    if (!g3 && typeof Mountains !== 'undefined' && Mountains.state && Mountains.state() === 'lost') { glRetry.mtn = true; return; }
+  }
+  m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MTN.cnv.width, MTN.cnv.height);
+  mtn3d = false;
+  if (V.showMountains) {
     if (g3) {
       mtn3d = true;
       m.save();
@@ -649,10 +654,6 @@ function bakeScenery() {
       m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
     }
     mtnMs = performance.now() - t0;
-    s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
-    s.globalAlpha = MT.strength;
-    s.drawImage(MTN.cnv, 0, 0);
-    s.restore();
   }
   var mc2 = MIST.c; MIST.cnv.width = MIST.cnv.height = 128;
   var rg = mc2.createRadialGradient(64, 64, 0, 64, 64, 64);
@@ -1251,7 +1252,7 @@ function crestY(S, x) { return S.yk - S.amp * S.f(x); }
 function bakeGround() {
   var t0 = performance.now(), C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), N = Math.max(2, Math.round(V.swells));
   var depthPx = Math.max(1, H - hy), k, b, NX = 256;
-  WS.sparkles = []; WS.torii = null; WS.slabs = []; WS.lights = [];
+  WS.sparkles = []; WS.torii = null; WS.lights = [];
   var things = plan(rngFrom(V.seed * 313 + 11)), swells = WS.swells = [];
   for (k = 0; k < N; k++) {
     var u0 = k / (N - 1);
@@ -1274,19 +1275,23 @@ function bakeGround() {
               relief: V.relief, roll: V.roll, drifts: V.drifts, ripples: V.ripples, rippleSize: V.rippleSize,
               rippleAngle: V.rippleAngle, grain: V.grain, hollows: V.hollows, sheen: V.sheen, seed: V.seed };
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
+  if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') { glRetry.ground = true; if (WS.slabs.length) return; }
+  var old = WS.slabs; WS.slabs = [];
   for (k = 0; k < N; k++) {
     var S0 = swells[k], top = S0.yk - S0.amp - 8;
     for (b = 0; b < S0.things.length; b++) top = Math.min(top, thingTop(S0.things[b]) - 12);
     top = Math.max(0, Math.floor(top));
     var bottom = k < N - 1 ? Math.min(H, Math.ceil(swells[k + 1].yk + swells[k + 1].amp + 14)) : H;
-    var slab = mk(), cw = Math.round(W * PR), ch = Math.max(1, Math.round((bottom - top) * PR));
+    var slab = old[k] || mk(), cw = Math.round(W * PR), ch = Math.max(1, Math.round((bottom - top) * PR));
     slab.top = top; slab.k = k;
-    slab.cnv.width = GTMP.cnv.width = cw;
-    slab.cnv.height = GTMP.cnv.height = ch;
+    if (slab.cnv.width !== cw || slab.cnv.height !== ch) { slab.cnv.width = cw; slab.cnv.height = ch; }
+    else { slab.c.setTransform(1, 0, 0, 1, 0, 0); slab.c.clearRect(0, 0, cw, ch); }
+    GTMP.cnv.width = cw; GTMP.cnv.height = ch;
     var tg = GTMP.c;
     tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, cw, ch);
     var sf = gl3 ? Snowfield.render(sfo, k, top, bottom) : null;
-    if (sf) tg.drawImage(sf, 0, Math.round(top * PR), cw, ch, 0, 0, cw, ch);
+    if (gl3 && !sf) glRetry.ground = true;                       // lost on the way: plain swells for now, the real ones soon
+    if (sf) tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch);
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) flatSwell(tg, S0, S0.haze);
     for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
@@ -1305,6 +1310,8 @@ function bakeGround() {
     WS.slabs.push(slab);
   }
   GTMP.cnv.width = GTMP.cnv.height = 1;
+  SHD.cnv.width = SHD.cnv.height = 1;
+  for (k = N; k < old.length; k++) old[k].cnv.width = old[k].cnv.height = 1;   // swells no longer there: give back their memory
   // the points that glint: where the sun falls on the snow (read once from a small map of the sunlight)
   if (V.sparkle > 0 && gl3) {
     var so = {}; for (var key in sfo) so[key] = sfo[key];
@@ -2223,7 +2230,7 @@ window.winterLab = {
     V.timeOfDay = SUN.timeOfDay = tod;
     document.documentElement.setAttribute('data-time', tod);
     sunDirty = true; saveAll();
-    resize(); rebuildAll();
+    paintSkyTint(); rebuildAll();
   },
   reset: function () {
     [['V', V_DEFAULTS, V], ['MT', MT_DEFAULTS, MT], ['CLOUD', CLOUD_DEFAULTS, CLOUD], ['SUN', SDEF, SUN]].forEach(function (x) {
@@ -2234,6 +2241,7 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  busy: function () { return stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · snowfield ' + Math.round(fieldMs) + ' ms · ' + WS.skiers.length + ' skiers · ' + sunInfo;
@@ -2251,41 +2259,62 @@ function resize() {
   GH = cvG.clientHeight || 150;
   cvG.width = Math.round(W * PR); cvG.height = Math.round(GH * PR);
   cvN.width = cv.width; cvN.height = cv.height;
-  SCN.cnv.width = MTN.cnv.width = TMP.cnv.width = Math.round(W * SR);
-  SCN.cnv.height = MTN.cnv.height = TMP.cnv.height = Math.round(H * SR);
   cvS.width = Math.max(1, Math.round(W * PR * 0.25)); cvS.height = Math.max(1, Math.round(H * PR * 0.25));
-  if (isNight()) {                                              // the night sky colour, as in the app
+  paintSkyTint();
+}
+/* The night sky colour, as in the app (nothing by day). */
+function paintSkyTint() {
+  sctx.setTransform(1, 0, 0, 1, 0, 0);
+  sctx.clearRect(0, 0, cvS.width, cvS.height);
+  if (isNight()) {
     sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
     var g = sctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, 'rgba(52,66,118,0.42)'); g.addColorStop(1, 'rgba(70,85,127,0.16)');
     sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
   }
 }
+/* Everything is baked again in steps, one heavy step a frame (the
+   mountains, the snowdrift, the snowfield, the sprites), so the graphics
+   chip is never asked for all of it at once: asked for too much at once,
+   the tablet runs short of graphics memory and Chrome takes the WebGL
+   contexts away. The old pictures stay on the screen until their new
+   ones are ready. */
+var stages = [], glRetry = {}, retryAt = 0;
 function rebuildAll() {
   if (!W) resize();
-  LT = sceneLight();
-  SHADE = shadeColour();
-  bakeScenery();
-  bakeNear();
-  bakeGround();
-  umeBakeBlooms();
-  bakeFlakes();
-  var key = W + 'x' + H;
-  if (WS.bKey !== key) { WS.bKey = key; umeBuildAll(); }
   buildSky();
   measureDots();
   dirty = {};
+  stages = ['mtn', 'near', 'ground', 'sprites'];
 }
-function rebake() {
+function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
-  if (dirty.mtn) { if (Math.round(W * PR * MT.resolution) !== SCN.cnv.width) resize(); bakeScenery(); }
-  if (dirty.near) bakeNear();
-  if (dirty.ground) { bakeGround(); WS.skiers.forEach(function (K) { if (K.k >= WS.swells.length) K.k = WS.swells.length - 1; }); }
+  if (st === 'mtn') bakeScenery();
+  else if (st === 'near') bakeNear();
+  else if (st === 'ground') { bakeGround(); WS.skiers.forEach(function (K) { if (K.k >= WS.swells.length) K.k = WS.swells.length - 1; }); }
+  else if (st === 'sprites') {
+    umeBakeBlooms(); bakeFlakes();
+    var key = W + 'x' + H;
+    if (WS.bKey !== key) { WS.bKey = key; umeBuildAll(); }
+  }
+}
+function rebake() {
+  SR = PR * MT.resolution;
+  if (dirty.mtn) stages.push('mtn');
+  if (dirty.near) stages.push('near');
+  if (dirty.ground) stages.push('ground');
   if (dirty.branches) umeBuildAll();
-  if (dirty.sprites || dirty.branches) { umeBakeBlooms(); bakeFlakes(); }
+  if (dirty.sprites || dirty.branches) stages.push('sprites');
   if (dirty.sun) sunDirty = true;
   dirty = {};
+}
+/* When the graphics chip took a context away, the mountains or the snowfield are baked again once it is back. */
+function checkRetry(t) {
+  if (t < retryAt) return;
+  retryAt = t + 1;
+  if (glRetry.mtn && typeof Mountains !== 'undefined' && Mountains.state() === 'ok') { glRetry.mtn = false; stages.push('mtn'); }
+  if (glRetry.ground && typeof Snowfield !== 'undefined' && Snowfield.state() === 'ok') { glRetry.ground = false; stages.push('ground'); }
 }
 
 var last = 0, barTimer = 0;
@@ -2293,6 +2322,8 @@ function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t; nowT = t;
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
+  if (stages.length) { var st = stages.shift(); if (stages.indexOf(st) < 0) runStage(st); }   // one step a frame (a step asked for twice runs once)
+  else checkRetry(t);
   barTimer -= dt;
   if (barTimer <= 0) { measureDots(); barTimer = 0.5; }
   updateGusts(dt);
@@ -2312,7 +2343,7 @@ function frame(now) {
   drawSunSky(t, dt);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   // the mountains (baked), the mist drifting along them and the clouds in front of Fuji
-  ctx.drawImage(SCN.cnv, 0, 0, cv.width, cv.height);
+  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
   if (V.showMountains && V.mistDrift > 0) {
     ctx.setTransform(PR, 0, 0, PR, 0, 0);
     ctx.globalAlpha = V.mistDrift * 0.5;
