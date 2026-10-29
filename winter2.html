@@ -635,6 +635,13 @@ function bakeScenery() {
       m.filter = px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
       m.drawImage(g3, 0, 0, MTN.cnv.width, MTN.cnv.height);
       m.restore();
+      WS.mtnLoss = Mountains.losses();
+      // Chrome can take the context away just after the drawing, leaving the picture blank without
+      // saying so: look along the mountains' foot, and if nothing is there, draw them again soon
+      var row = m.getImageData(0, Math.max(0, Math.round((hy - H * MT.rangeHeight * 0.25) * SR)), MTN.cnv.width, 1).data, seen = 0;
+      for (var q = 3; q < row.length; q += 16) if (row[q] > 8) seen++;
+      if (seen < 3) { glRetry.mtn = true; glRetry.mtnTries = (glRetry.mtnTries || 0) + 1; }
+      else glRetry.mtnTries = 0;
     } else {                                                    // no WebGL 2: three soft pale ridges
       var r = rngFrom(V.seed * 131 + 17), mc = hex(MT.colours.haze);
       for (var i = 0; i < 3; i++) {
@@ -1344,6 +1351,7 @@ function bakeGround() {
   var e = Math.max(2.5, LT.el) * PI / 180, az = V.sunAzimuth * PI / 180, cot = Math.min(7, 1 / Math.tan(e)) * V.shadowLength;
   WS.shadow = { sx: clamp(-Math.sin(az) * cot, -3.5, 3.5), sy: clamp(-Math.cos(az) * cot * 0.35, -0.9, 0.9), col: rgb(SHADE), k: V.skiShadow * LT.vis };
   WS.trackLo = rgb(mix(SHADE, lit(C.snow, 0, 0.6, 0.8, 0), 0.3)); WS.trackHi = rgb(lit(C.snow, LT.dir[0] * 0.5, 1, 0.3, 1));
+  if (gl3) WS.sfLoss = Snowfield.losses();
   fieldMs = performance.now() - t0;
 }
 /* #dynBack: each slice, then on it the tracks, the skiers, the powder they kick up and the lights. */
@@ -2279,7 +2287,15 @@ function paintSkyTint() {
    the tablet runs short of graphics memory and Chrome takes the WebGL
    contexts away. The old pictures stay on the screen until their new
    ones are ready. */
-var stages = [], glRetry = {}, retryAt = 0;
+var stages = [], glRetry = {}, retryAt = 0, wipeAt = 0;
+/* True when one row of a kept picture has (almost) nothing in it. */
+function blankRow(P, y) {
+  var w = P.cnv.width;
+  if (w < 2) return false;
+  var row = P.c.getImageData(0, clamp(Math.round(y), 0, P.cnv.height - 1), w, 1).data, seen = 0;
+  for (var q = 3; q < row.length; q += 16) if (row[q] > 8 && ++seen >= 3) return false;
+  return true;
+}
 function rebuildAll() {
   if (!W) resize();
   buildSky();
@@ -2313,8 +2329,23 @@ function rebake() {
 function checkRetry(t) {
   if (t < retryAt) return;
   retryAt = t + 1;
-  if (glRetry.mtn && typeof Mountains !== 'undefined' && Mountains.state() === 'ok') { glRetry.mtn = false; stages.push('mtn'); }
-  if (glRetry.ground && typeof Snowfield !== 'undefined' && Snowfield.state() === 'ok') { glRetry.ground = false; stages.push('ground'); }
+  if (typeof Mountains !== 'undefined' && Mountains.state() === 'ok') {
+    // drawn while lost, drawn blank (at most 6 times in a row), or lost since it was drawn
+    if ((glRetry.mtn && (glRetry.mtnTries || 0) <= 6) || (mtn3d && WS.mtnLoss !== undefined && Mountains.losses() !== WS.mtnLoss)) {
+      glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn');
+    }
+  }
+  if (typeof Snowfield !== 'undefined' && Snowfield.state() === 'ok') {
+    if (glRetry.ground || (WS.sfLoss !== undefined && Snowfield.losses() !== WS.sfLoss)) {
+      glRetry.ground = false; WS.sfLoss = Snowfield.losses(); stages.push('ground');
+    }
+  }
+  // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
+  if (t < wipeAt) return;
+  wipeAt = t + 3;
+  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizon - H * MT.rangeHeight * 0.25) * SR)) stages.push('mtn');
+  var SL = WS.slabs[WS.slabs.length - 1];
+  if (SL && SL.cnv.height > 2 && blankRow(SL, SL.cnv.height - 2)) stages.push('ground');
 }
 
 var last = 0, barTimer = 0;

@@ -24,6 +24,9 @@
      var cnv = Mountains.render(o);   // a canvas, or null (no WebGL 2)
      Mountains.state()                // 'ok', 'lost' (the graphics chip took the context
                                       // away for a moment: try again soon) or 'none'
+     Mountains.losses()               // how many times it was taken away: if this has gone
+                                      // up since a picture was drawn, that picture may be
+                                      // blank (the loss can come just after the drawing)
      var ref = Mountains.reflectance(o);   // how strongly each point reflects
                                            // light from in front (the same canvas)
    o (screen values are CSS px; the picture is o.width × o.height px,
@@ -319,7 +322,7 @@ function compile(type, src) {
    for in its place: after a loss Chrome may refuse new ones. While it is
    lost, render() returns null and state() says 'lost', so the caller can
    try again a moment later. */
-var lost = false, ready = false;
+var lost = false, ready = false, losses = 0;   // losses: how many times the context was taken away
 function create() {
   if (cnv) return !!gl;
   try {
@@ -329,7 +332,7 @@ function create() {
   if (!gl) { failed = true; return false; }
   cnv.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
-    lost = true; ready = false; prog = null; U = {};
+    lost = true; ready = false; losses++; prog = null; U = {};
     grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
   });
   cnv.addEventListener('webglcontextrestored', function () { lost = false; });
@@ -489,5 +492,6 @@ function render(o, mode) {
    so draw that one away first. */
 function reflectance(o) { return render(o, 1); }
 
-return { render: render, reflectance: reflectance, supported: function () { return init(); }, state: state };
+return { render: render, reflectance: reflectance, supported: function () { return init(); }, state: state,
+         losses: function () { return losses; } };
 })();
