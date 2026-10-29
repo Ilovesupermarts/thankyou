@@ -15237,6 +15237,7 @@ var FIREWORKS = (function() {
   return v;
 })();
 var FW_PROGRAM = FIREWORKS.program;   // the programme at night; 'off' by day
+var FW_CLOUDS = FIREWORKS.cloudThickness;   // the show's dark night clouds, faded in with the night (fireworksUpdate)
 var fwShow = null, fwNight = 0, fwSize = '';
 if (typeof Fireworks !== 'undefined') {
   FIREWORKS.program = 'off';
@@ -15823,6 +15824,8 @@ function fireworksUpdate(dt, t) {
   var on = ENV.scene === 'autumn' && LS.ready && ENV.light;
   fwNight += ((on ? smooth(0.5, 0.9, koyoNight()) : 0) - fwNight) * (1 - Math.exp(-dt / 3));
   FIREWORKS.program = fwNight > 0.5 ? FW_PROGRAM : 'off';
+  // the show's own clouds are night clouds (dark, lit by the moon and the bursts): none by day
+  FIREWORKS.cloudThickness = FW_CLOUDS * fwNight;
   var size = W + 'x' + H + '@' + PR;
   if (size !== fwSize) { fwSize = size; fwShow.resize(W, H, PR, H * LAND.horizon); }
   fwShow.update(dt, t);
@@ -15836,7 +15839,7 @@ function fireworksDrawDark(c) {
    frame, buildKoyoLayers) and the bamboo (as it was last drawn). Thin or
    see-through parts are laid down a few times so they block it fully. */
 function fireworksDrawSky(c) {
-  if (!fwShow || !fwShow.active()) return;
+  if (!fwShow || fwNight < 0.01 || !fwShow.active()) return;   // by day, nothing (not even its night clouds)
   var O = LS.OCC, oc = O.c, ow = O.cnv.width, oh = O.cnv.height, i;
   oc.setTransform(1, 0, 0, 1, 0, 0);
   oc.globalCompositeOperation = 'source-over';
