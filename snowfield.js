@@ -31,6 +31,11 @@
      Snowfield.losses()                  // how many times the context was taken away
      var map = Snowfield.sunMap(o);      // the same picture, as how much sun
                                          // falls on each point (its alpha)
+     var lit = Snowfield.material(mask, height, m);   // snow lying on something
+                                         // (the torii, the branches): see MATERIAL
+                                         // below; { img, sx, sy, w, h }: the picture is
+                                         // that part of img (copy it away before the next
+                                         // call), or null
    o (screen values are CSS px; the picture is drawn for a screen of
    o.screenW × o.screenH CSS px):
      width, height       size of the picture (px)
@@ -182,6 +187,71 @@ var FS = [
 '}'
 ].join('\n');
 
+/* ---------- MATERIAL — snow lying on things (the torii's beams, the branches) ----------
+   The caller draws where the snow is (mask: its alpha, soft at the edges) and the same
+   drawn blurred (height: its alpha); the blur turns the flat outline into a rounded
+   pillow, highest in the middle and curving down to its edges, so every pixel has a
+   slope. The pillow faces mostly up (it lies on top of something) and a little toward
+   you. Each pixel is then lit as the snowfield is: soft-edged sunlight on the side
+   turned to the sun, blue sky light in the shade, and less of both underneath where it
+   sits on the wood (contact). Light shows through the thin edges when the sun is behind
+   it (glow); a fine bumpiness catches the light (grain), and here and there a crystal
+   glints (sparkle). m (screen values; directions with x right, y up, z toward you):
+     sunDir, sunColour (0 … 1.5), skyColour (0 … 1), ambient, blue (0 … 1),
+     snow [r, g, b] 0 … 255, thick (how round: the slope at the edges), grain, glow,
+     contact, sparkle (0 … 1), haze (0 … 1), hazeColour [r, g, b] 0 … 255, seed */
+var MAT_FS = [
+'#version 300 es',
+'precision highp float;',
+'uniform sampler2D uMask, uHeight;',
+'uniform vec2  uSize;',
+'uniform float uThick, uGrain, uGlow, uContact, uSparkle, uAmbient, uHaze, uSeed;',
+'uniform vec3  uSunDir, uSunCol, uSkyCol, uSnow, uHazeCol;',
+'out vec4 outCol;',
+'float hash(vec2 p) { p = fract(p * vec2(443.897, 441.423) + uSeed * 0.013); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }',
+'float vnoise(vec2 x) {',
+'  vec2 p = floor(x), w = fract(x), u = w * w * (3.0 - 2.0 * w);',
+'  return mix(mix(hash(p), hash(p + vec2(1, 0)), u.x), mix(hash(p + vec2(0, 1)), hash(p + vec2(1, 1)), u.x), u.y) * 2.0 - 1.0;',
+'}',
+'float body(vec2 px) { return texture(uHeight, px / uSize).a; }',
+'// the surface: the rounded pillow, with a fine bumpiness on it',
+'float hgt(vec2 px) {',
+'  float b = body(px);',
+'  return pow(b, 0.75) + uGrain * 0.006 * (0.75 * vnoise(px * 0.22) + 0.25 * vnoise(px * 0.6 + 7.0)) * smoothstep(0.0, 0.3, b);',
+'}',
+'void main() {',
+'  vec2 px = gl_FragCoord.xy;',
+'  float a = texture(uMask, px / uSize).a;',
+'  if (a < 0.004) discard;',
+'  float hx = hgt(px + vec2(1.0, 0.0)) - hgt(px - vec2(1.0, 0.0));',
+'  float hy = hgt(px + vec2(0.0, 1.0)) - hgt(px - vec2(0.0, 1.0));',
+'  // snow lying on something faces mostly up, to the sky, and a little toward you; the rounding',
+'  // tips it toward its edges (over the top, down at its foot, out at its ends)',
+'  vec3 n = normalize(vec3(-hx * uThick, -hy * uThick, 0.0) + vec3(0.0, 0.8, 0.6));',
+'  float core = body(px);                                   // 0 at the edge ... 1 deep inside',
+'  // sunlight: soft-edged, as light goes a little way into snow',
+'  float ndl = dot(n, uSunDir);',
+'  float dif = clamp((ndl + 0.25) / 1.25, 0.0, 1.0);',
+'  dif = dif * dif * (3.0 - 2.0 * dif) * smoothstep(-0.05, 0.1, uSunDir.y + 0.08);',
+'  // underneath, where it sits on the wood, it gets less of the sun and the sky',
+'  float under = clamp(-n.y, 0.0, 1.0) * (1.0 - 0.5 * core);',
+'  float occ = 1.0 - uContact * 0.65 * under;',
+'  float sky = (0.62 + 0.38 * n.y) * occ;',
+'  vec3 col = uSnow * (uSunCol * dif * mix(1.0, occ, 0.6) + uSkyCol * sky * uAmbient);',
+'  // light through the thin edges, when the sun is low and in front of you (behind the snow)',
+'  float thin = pow(1.0 - clamp(core * 1.5, 0.0, 1.0), 2.0);',
+'  col += uSnow * uSunCol * uGlow * 0.55 * thin * clamp(-uSunDir.z + 0.25, 0.0, 1.0) * smoothstep(-0.02, 0.12, uSunDir.y);',
+'  // here and there a crystal glints toward you',
+'  vec3 hv = normalize(uSunDir + vec3(0.0, 0.0, 1.0));',
+'  float gl = step(1.0 - 0.025 * uSparkle, hash(floor(px / 2.0))) * pow(max(dot(n, hv), 0.0), 24.0) * dif;',
+'  col += uSunCol * gl * 1.2;',
+'  col = mix(col, 0.82 + 0.18 * (1.0 - exp(-(col - 0.82) / 0.18)), step(0.82, col));   // a soft shoulder, not flat white',
+'  col = mix(col, uHazeCol, uHaze);',
+'  outCol = vec4(clamp(col, 0.0, 1.0) * a, a);',
+'}'
+].join('\n');
+var prog2 = null, U2 = {}, texM = null, texH = null;
+
 function compile(type, src) {
   var s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -225,6 +295,21 @@ function setup() {
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   tex = gl.createTexture();
+  // the material's program
+  var vs2 = compile(gl.VERTEX_SHADER, VS), fs2 = compile(gl.FRAGMENT_SHADER, MAT_FS);
+  if (!vs2 || !fs2) { if (!gl.isContextLost()) failed = true; return false; }
+  prog2 = gl.createProgram();
+  gl.attachShader(prog2, vs2); gl.attachShader(prog2, fs2);
+  gl.bindAttribLocation(prog2, 0, 'aPos');
+  gl.linkProgram(prog2);
+  if (!gl.getProgramParameter(prog2, gl.LINK_STATUS)) {
+    if (!gl.isContextLost()) { console.warn('Snowfield: material link', gl.getProgramInfoLog(prog2)); failed = true; }
+    return false;
+  }
+  U2 = {};
+  var n2 = gl.getProgramParameter(prog2, gl.ACTIVE_UNIFORMS);
+  for (var i2 = 0; i2 < n2; i2++) { var nm = gl.getActiveUniform(prog2, i2).name; U2[nm] = gl.getUniformLocation(prog2, nm); }
+  texM = gl.createTexture(); texH = gl.createTexture();
   lastUp = null;
   ready = true;
   return true;
@@ -314,7 +399,61 @@ function render(o, only, mode, y0, y1) {
   return cnv;
 }
 
+function material(mask, height, m) {
+  if (!init() || !mask || mask.width < 1 || mask.height < 1) return null;
+  var w = mask.width, h = mask.height;
+  // the canvas only grows (many small pictures in a row): the picture is drawn in its corner (see .rect)
+  if (cnv.width < w || cnv.height < h) { cnv.width = Math.max(cnv.width, w); cnv.height = Math.max(cnv.height, h); }
+  gl.viewport(0, 0, w, h);
+  gl.enable(gl.SCISSOR_TEST); gl.scissor(0, 0, w, h);
+  gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+  gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.disable(gl.SCISSOR_TEST);
+  gl.useProgram(prog2);
+  function put(t, unit, src) {
+    gl.activeTexture(gl.TEXTURE0 + unit);
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);              // the picture's top row at the top
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  }
+  put(texM, 0, mask); put(texH, 1, height);
+  function u1(n, v) { if (U2[n]) gl.uniform1f(U2[n], v); }
+  function u3(n, c) { if (U2[n]) gl.uniform3f(U2[n], c[0], c[1], c[2]); }
+  if (U2.uMask) gl.uniform1i(U2.uMask, 0);
+  if (U2.uHeight) gl.uniform1i(U2.uHeight, 1);
+  if (U2.uSize) gl.uniform2f(U2.uSize, w, h);
+  var L = d(m, 'sunDir', [-0.6, 0.4, 0.5]), ll = Math.hypot(L[0], L[1], L[2]) || 1;
+  u3('uSunDir', [L[0] / ll, L[1] / ll, L[2] / ll]);
+  u3('uSunCol', d(m, 'sunColour', [1, 0.97, 0.92]));
+  var sky = d(m, 'skyColour', [0.7, 0.77, 0.89]), bl = d(m, 'blue', 0.5), Lm = (sky[0] + sky[1] + sky[2]) / 3;
+  u3('uSkyCol', [sky[0] + (Lm * 0.8 - sky[0]) * bl, sky[1] + (Lm * 0.94 - sky[1]) * bl, sky[2] + (Lm * 1.2 - sky[2]) * bl]);
+  u3('uSnow', c3(d(m, 'snow', [250, 250, 252])));
+  u3('uHazeCol', c3(d(m, 'hazeColour', [246, 238, 232])));
+  u1('uAmbient', d(m, 'ambient', 0.9));
+  u1('uThick', d(m, 'thick', 6));
+  u1('uGrain', d(m, 'grain', 0.5));
+  u1('uGlow', d(m, 'glow', 0.5));
+  u1('uContact', d(m, 'contact', 0.6));
+  u1('uSparkle', d(m, 'sparkle', 0.5));
+  u1('uHaze', d(m, 'haze', 0));
+  u1('uSeed', d(m, 'seed', 1) % 997);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  gl.activeTexture(gl.TEXTURE0);
+  if (gl.isContextLost()) return null;
+  return { img: cnv, sx: 0, sy: cnv.height - h, w: w, h: h };   // the picture is this part of img; copy it away before the next call
+}
+
 return {
+  material: material,
   render: function (o, i, y0, y1) { return render(o, i, 0, y0, y1); },
   sunMap: function (o) { return render(o, -1, 1); },
   supported: function () { return init(); },

@@ -28,6 +28,10 @@
      colours       { vermilion, top, feet, snow } [r, g, b] 0 … 255
      haze, hazeColour   how much it fades into the mist, and its colour
      snow          0 … 2: how much snow lies on it
+     snowMask      optional: a 2D context set up like ctx; the snow on the
+                   beams and at the feet is then only drawn there, in white
+                   (where it is), for the caller to light (snowheaps.js);
+                   the icicles are drawn as before
      icicles       0 … 1
      width, pillar, lean, overhang, sori, nukiAt, feet   its proportions
                    (as TORII in app.js; heights are fractions of h)
@@ -168,6 +172,7 @@ function draw(c, o) {
   var snowLit = lit(snowC, [L[0] * 0.3, 1, 0.2], 1), snowTop = lit(snowC, [0, 1, 0], 1);
   var snowFront = lit(snowC, [0, 0.35, 0.94], 0.95), snowUnder = lit(snowC, [0, -0.3, 0.95], 0.75);
   var minY = Infinity, minX = Infinity, maxX = -Infinity;
+  var SM = o.snowMask || null;                          // given: the snow is only drawn there, in white, to be lit by the caller
   // a heap along a beam: its front top edge from u0 to u1 at height yt(u), depth dd, heaped hgt high.
   // Its top is lumpy and its front edge one continuous lip that droops over the beam here and there,
   // with a soft shade under the overhang and a fine grain over all of it.
@@ -177,21 +182,27 @@ function draw(c, o) {
     var p1 = r() * TAU, p2 = r() * TAU, p3 = r() * TAU, p4 = r() * TAU;
     for (i = 0; i <= n; i++) {
       var u = lerp(u0, u1, i / n), s = i / n, env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, s)), 0.45);
-      var lump = 1 + 0.16 * Math.sin(s * 13 + p1) + 0.1 * Math.sin(s * 37 + p2) + (r() - 0.5) * 0.08;
-      var droop = Math.max(0, 0.45 * Math.sin(s * 21 + p3) + 0.3 * Math.sin(s * 8 + p4) + 0.15);
+      var lump = 1 + 0.14 * Math.sin(s * 11 + p1) + 0.04 * Math.sin(s * 29 + p2) + (r() - 0.5) * 0.03;
+      var fq = clamp((u1 - u0) / 0.8, 0.3, 1);              // a short heap droops in fewer places
+      var droop = Math.max(0, 0.45 * Math.sin(s * 21 * fq + p3) + 0.3 * Math.sin(s * 8 * fq + p4) + 0.15);
       droop = Math.pow(droop, 1.4) * Math.pow(env, 2);
       var y = yt(u), f = proj([u, y, dd * 1.12]);
       crest.push(proj([u, y + hgt * env * lump, dd * 0.15]));
       lip.push([f[0], f[1] + H0 * (0.08 + 0.55 * droop) * (0.6 + 0.4 * env)]);
     }
-    function body() {
-      c.beginPath();
-      c.moveTo(lip[0][0], lip[0][1]);
-      for (i = 0; i <= n; i++) c.lineTo(crest[i][0], crest[i][1]);
-      c.lineTo(lip[n][0], lip[n][1]);
-      for (i = n - 1; i > 0; i--) c.quadraticCurveTo(lip[i][0], lip[i][1], (lip[i][0] + lip[i - 1][0]) / 2, (lip[i][1] + lip[i - 1][1]) / 2);
-      c.closePath();
+    function body(cc) {
+      cc = cc || c;
+      cc.beginPath();
+      cc.moveTo(lip[0][0], lip[0][1]);
+      cc.lineTo(crest[0][0], crest[0][1]);
+      for (i = 1; i < n; i++) cc.quadraticCurveTo(crest[i][0], crest[i][1], (crest[i][0] + crest[i + 1][0]) / 2, (crest[i][1] + crest[i + 1][1]) / 2);   // a smooth top
+      cc.lineTo(crest[n][0], crest[n][1]);
+      cc.lineTo(lip[n][0], lip[n][1]);
+      for (i = n - 1; i > 0; i--) cc.quadraticCurveTo(lip[i][0], lip[i][1], (lip[i][0] + lip[i - 1][0]) / 2, (lip[i][1] + lip[i - 1][1]) / 2);
+      cc.closePath();
     }
+    crest.forEach(function (q) { minY = Math.min(minY, q[1]); minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); });
+    if (SM) { body(SM); SM.fillStyle = '#FFFFFF'; SM.fill(); return; }   // only where the snow is: the caller lights it (snowheaps.js)
     var y0 = Math.min.apply(null, crest.map(function (q) { return q[1]; })), y1 = Math.max.apply(null, lip.map(function (q) { return q[1]; }));
     body();
     var g = c.createLinearGradient(0, y0, 0, y1);
@@ -215,16 +226,15 @@ function draw(c, o) {
     for (i = 1; i <= n; i++) c.lineTo(crest[i][0], crest[i][1] + H0 * 0.06);
     c.stroke();
     c.filter = 'none';
-    // the grain: tiny bright and cool flecks
-    var nF = Math.round((x1 - x0) * Math.max(0.6, H0 * 0.08));
+    // the grain: a few tiny, faint bright and cool flecks
+    var nF = Math.round((x1 - x0) * Math.max(0.3, H0 * 0.04));
     for (i = 0; i < nF; i++) {
       var k = Math.floor(r() * n), q = r(), fx = lerp(crest[k][0], lip[k][0], q), fy = lerp(crest[k][1], lip[k][1], q);
       var bright = r() < 0.55;
-      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.25, 0.6, r()).toFixed(2) + ')' : rgb(snowUnder, lerp(0.12, 0.3, r()));
-      c.beginPath(); c.arc(fx + (r() - 0.5) * 2, fy, Math.max(0.35, H0 * lerp(0.015, 0.05, r())), 0, TAU); c.fill();
+      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.1, 0.25, r()).toFixed(2) + ')' : rgb(snowUnder, lerp(0.05, 0.12, r()));
+      c.beginPath(); c.arc(fx + (r() - 0.5) * 2, fy, Math.max(0.25, H0 * lerp(0.008, 0.022, r())), 0, TAU); c.fill();
     }
     c.restore();
-    crest.forEach(function (q) { minY = Math.min(minY, q[1]); minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); });
   }
   // icicles under a beam's front lower edge
   function icicles(u0, u1, yb, dd, amt, maxLen) {
@@ -253,10 +263,14 @@ function draw(c, o) {
   // drifts banked round the feet
   [-1, 1].forEach(function (side) {
     var p = proj([side * P.pillarAt(0), 0, 0.02]), rw = P.pr * h * lerp(2.2, 3, r()) * (0.6 + 0.4 * sAmt), rh = P.pr * h * 0.9 * (0.5 + 0.5 * sAmt);
-    var g = c.createLinearGradient(0, p[1] - rh, 0, p[1] + rh * 0.4);
-    g.addColorStop(0, rgb(snowTop)); g.addColorStop(1, rgb(snowFront));
-    c.fillStyle = g;
-    c.beginPath(); c.ellipse(p[0], p[1] + rh * 0.15, rw, rh, 0, PI, TAU); c.closePath(); c.fill();
+    var dc = SM || c;
+    if (SM) dc.fillStyle = '#FFFFFF';
+    else {
+      var g = c.createLinearGradient(0, p[1] - rh, 0, p[1] + rh * 0.4);
+      g.addColorStop(0, rgb(snowTop)); g.addColorStop(1, rgb(snowFront));
+      c.fillStyle = g;
+    }
+    dc.beginPath(); dc.ellipse(p[0], p[1] + rh * 0.15, rw, rh, 0, PI, TAU); dc.closePath(); dc.fill();
   });
   return { top: Math.min(minY, o.y - h), left: Math.min(minX, o.x - h * 0.6), right: Math.max(maxX, o.x + h * 0.6) };
 }

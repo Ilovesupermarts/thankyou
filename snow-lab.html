@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Snow Lab</title>
+<script src="snowfield.js"></script>
+<script src="torii.js"></script>
+<script src="snowheaps.js"></script>
+<style>
+  /* ============================================================
+     SNOW LAB — the test bed for the snow lying on things: the torii's
+     beams and the plum branches, seen large. The snow is lit by the
+     snow material in snowfield.js (a rounded pillow for every heap, lit
+     pixel by pixel like the snowfield), with the shapes from torii.js
+     and snowheaps.js. "Plain shading" shows them with a plain fade from
+     top to bottom instead, to compare. Values are kept in this browser; "Copy values"
+     gives them to move into winter2.html.
+     ============================================================ */
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #E9DCD6; }
+  canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+  .sp {
+    position: fixed; top: 12px; right: 12px; width: 290px; max-height: calc(100vh - 24px); overflow-y: auto; z-index: 5;
+    padding: 12px 14px; border-radius: 18px; font: 13px -apple-system, system-ui, sans-serif; color: #1D1D1F;
+    background: rgba(255, 255, 255, 0.72); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    box-shadow: 0 10px 30px rgba(60, 40, 40, 0.18);
+  }
+  .sp.closed .sp-body { display: none; }
+  .sp-head { display: flex; justify-content: space-between; align-items: center; }
+  .sp button { font: inherit; font-weight: 600; border: 0; border-radius: 9px; padding: 6px 11px; background: rgba(120, 120, 128, 0.15); cursor: pointer; }
+  .sp h4 { margin: 12px 0 4px; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(60, 60, 67, 0.6); }
+  .row { margin: 8px 0; }
+  .row label { display: flex; justify-content: space-between; font-weight: 500; }
+  .row label span { color: #B4532A; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .row input[type=range] { width: 100%; accent-color: #D96A3A; }
+  .row small { display: block; color: rgba(60, 60, 67, 0.6); font-size: 11px; }
+  .pair { display: flex; justify-content: space-between; align-items: center; margin: 8px 0; font-weight: 500; }
+  .pair select { font: inherit; border: 0; border-radius: 8px; padding: 4px 6px; background: rgba(120, 120, 128, 0.15); }
+  pre { white-space: pre-wrap; font-size: 11px; background: rgba(255, 255, 255, 0.7); padding: 8px; border-radius: 9px; display: none; user-select: text; }
+  pre.shown { display: block; }
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div class="sp" id="sp">
+  <div class="sp-head"><b>雪 · Snow Lab</b><button type="button" id="spToggle">Hide</button></div>
+  <div class="sp-body">
+    <div id="ctls"></div>
+    <div class="pair">Plain shading (to compare)<input type="checkbox" id="old"></div>
+    <div class="pair"><button type="button" id="reset">Reset</button><button type="button" id="copy">Copy values</button></div>
+    <div id="info" style="font-size:11px;color:rgba(60,60,67,.7)"></div>
+    <pre id="out"></pre>
+  </div>
+</div>
+<script>
+(function () {
+'use strict';
+var DEF = {
+  timeOfDay: 'day', sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blue: 0.6, moonLight: 0.45,
+  // the snow material
+  round: 0.45, thick: 1.1, grain: 0.5, glow: 0.9, contact: 0.6, sparkle: 0.5,
+  // the branches
+  dust: 0.6, forks: true,
+  snow: '#FAFAFC'
+};
+var KEY = 'snowLab1', V = JSON.parse(JSON.stringify(DEF));
+try { var sv = JSON.parse(localStorage.getItem(KEY) || 'null'); if (sv) for (var k in sv) if (k in DEF) V[k] = sv[k]; } catch (e) { /* silent */ }
+function save() { try { localStorage.setItem(KEY, JSON.stringify(V)); } catch (e) { /* silent */ } }
+
+var PI = Math.PI, TAU = PI * 2;
+function lerp(a, b, t) { return a + (b - a) * t; }
+function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+function hex(h) { var n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
+function mix(a, b, t) { return [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)]; }
+function rgb(c, a) { return 'rgba(' + Math.round(clamp(c[0], 0, 255)) + ',' + Math.round(clamp(c[1], 0, 255)) + ',' + Math.round(clamp(c[2], 0, 255)) + ',' + (a === undefined ? 1 : a) + ')'; }
+function rngFrom(seed) {
+  var a = seed >>> 0;
+  return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+}
+
+/* The light, as in winter2.html (sceneLight). */
+function sceneLight() {
+  var tod = V.timeOfDay, el = V.sunElevation, sun = [255, 247, 236], sky = [178, 196, 226], sS = V.sunStrength, amb = V.ambient;
+  if (tod === 'evening') { sun = [255, 156, 96]; sky = [164, 152, 198]; el = V.eveningElevation; }
+  else if (tod === 'night') { sun = [150, 168, 225]; sky = [64, 76, 124]; el = 36; sS *= V.moonLight; amb *= 0.8; }
+  sS *= 0.85; amb *= lerp(1.15, 1, 0.85); sky = mix(sky, tod === 'night' ? [80, 84, 110] : [214, 214, 226], 0.09);
+  var a = V.sunAzimuth * PI / 180, e = el * PI / 180;
+  return { el: el, dir: [Math.sin(a) * Math.cos(e), Math.sin(e), -Math.cos(a) * Math.cos(e)], sun: [sun[0] * sS / 255, sun[1] * sS / 255, sun[2] * sS / 255],
+           sky: [sky[0] / 255, sky[1] / 255, sky[2] / 255], amb: amb };
+}
+function lit(base, nx, ny, nz, LT, occ) {
+  var l = Math.hypot(nx, ny, nz) || 1, L = LT.dir, k = occ === undefined ? 1 : occ;
+  nx /= l; ny /= l; nz /= l;
+  var dl = Math.max(0, nx * L[0] + ny * L[1] + nz * L[2]) * k, sk = (0.6 + 0.4 * ny) * LT.amb * lerp(0.75, 1, k);
+  return [base[0] * (LT.sun[0] * dl + LT.sky[0] * sk), base[1] * (LT.sun[1] * dl + LT.sky[1] * sk), base[2] * (LT.sun[2] * dl + LT.sky[2] * sk)];
+}
+function matOpts(LT, dir) {
+  return { sunDir: dir || LT.dir, sunColour: LT.sun, skyColour: LT.sky, ambient: LT.amb, blue: V.blue, snow: hex(V.snow),
+           grain: V.grain, glow: V.glow, contact: V.contact, sparkle: V.sparkle, haze: 0, seed: 3 };
+}
+
+var cv = document.getElementById('cv'), ctx = cv.getContext('2d'), W = 0, H = 0, PR = 1, info = '';
+var MASK = document.createElement('canvas'), mctx = MASK.getContext('2d');
+
+/* ---------- the sky behind ---------- */
+function sky(LT) {
+  var g = ctx.createLinearGradient(0, 0, 0, H);
+  if (V.timeOfDay === 'night') { g.addColorStop(0, '#3E4870'); g.addColorStop(1, '#8A7E98'); }
+  else if (V.timeOfDay === 'evening') { g.addColorStop(0, '#C9A9B8'); g.addColorStop(1, '#F2B996'); }
+  else { g.addColorStop(0, '#D8DEEA'); g.addColorStop(1, '#F3DDD3'); }
+  ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+  ctx.fillStyle = rgb(lit(hex(V.snow), 0, 1, 0.3, LT, 0.4));
+  ctx.fillRect(0, H * 0.86, W, H * 0.14);
+}
+
+/* ---------- the torii ---------- */
+function torii(LT, old) {
+  var o = { x: W * 0.27, y: H * 0.9, h: H * 0.62, yaw: 26, view: 0.15, snow: 1.2, icicles: 0.5, seed: 3,
+            sunDir: LT.dir, sunColour: LT.sun, skyColour: LT.sky, ambient: LT.amb, haze: 0,
+            colours: { vermilion: [228, 70, 42], top: [60, 36, 34], feet: [42, 34, 32], snow: hex(V.snow) } };
+  if (old) { Torii.draw(ctx, o); return; }
+  MASK.width = cv.width; MASK.height = cv.height;
+  mctx.setTransform(PR, 0, 0, PR, 0, 0);
+  o.snowMask = mctx;
+  Torii.draw(ctx, o);
+  var R = o.h * 0.09 * o.snow * V.round * PR, m = matOpts(LT);
+  m.thick = R * V.thick;
+  var t0 = performance.now(), L = SnowHeaps.light(MASK, R, m);
+  info += 'torii snow ' + Math.round(performance.now() - t0) + ' ms';
+  if (L) SnowHeaps.put(ctx, L, 0, 0);
+  else info += ' (no WebGL 2)';
+}
+
+/* ---------- a plum branch ---------- */
+/* A limb coming in from the right and drooping across, with side shoots, as the branches in
+   winter2.html are built (fixed here, so the look can be compared). */
+function buildBranch() {
+  var r = rngFrom(11), nodes = [], sc = Math.min(W * 0.5, H * 0.75);
+  function add(parent, abs, len, w) {
+    var lump = [], sag = [], q1 = r() * TAU, q2 = r() * TAU, f1 = lerp(1.2, 2.6, r()), f2 = lerp(3.5, 6.5, r());
+    for (var i = 0; i <= 12; i++) {
+      var qq = i / 12;
+      lump.push(clamp(1 + 0.16 * Math.sin(qq * f1 * TAU + q1) + 0.06 * Math.sin(qq * f2 * TAU + q2) + (r() - 0.5) * 0.04, 0.6, 1.4));
+      sag.push(Math.pow(r(), 3) * 0.7);
+    }
+    var P = parent < 0 ? { ex: W + 10, ey: H * 0.12 } : nodes[parent];
+    var n = { p: parent, abs: abs, len: len, w: w, sx: P.ex, sy: P.ey, lump: lump, sag: sag, sa: r() < 0.2 ? r() * 0.3 : 0, sb: 1, seed: Math.floor(r() * 1e6) };
+    n.ex = n.sx + Math.cos(abs) * len; n.ey = n.sy + Math.sin(abs) * len;
+    nodes.push(n);
+    return nodes.length - 1;
+  }
+  var prev = -1, a = PI - 0.25, mains = [];
+  for (var i = 0; i < 7; i++) {
+    a += 0.11 + (i % 2 ? 1 : -1) * lerp(0.12, 0.26, r());
+    prev = add(prev, a, sc * 0.95 / 7 * lerp(0.85, 1.15, r()), lerp(sc * 0.05, sc * 0.012, i / 6));
+    mains.push(prev);
+  }
+  for (i = 1; i < 6; i++) {
+    var up = i % 2 === 0, la = up ? lerp(-2.4, -1.8, r()) : a + lerp(0.5, 0.9, r()), p0 = mains[i];
+    for (var s = 0; s < 2; s++) { p0 = add(p0, la, sc * lerp(0.09, 0.14, r()), lerp(sc * 0.014, sc * 0.007, s / 2)); la += (r() - 0.5) * 0.4; }
+  }
+  nodes.forEach(function (n, j) {
+    n.endW = n.w * 0.3; n.kids = 0;
+    for (var q = j + 1; q < nodes.length; q++) if (nodes[q].p === j) { n.kids++; if (n.endW === n.w * 0.3) n.endW = nodes[q].w / 2; }
+  });
+  return nodes;
+}
+var branch = null;
+function drawBranch(LT, old) {
+  if (!branch) branch = buildBranch();
+  var ns = branch, C = hex('#3B2B2A'), i, n;
+  var wood = lit(C, 0, 0.2, 1, LT, 0.3), woodLit = mix(lit(C, LT.dir[0], 0.8, 0.3, LT, 1), [255, 236, 210], 0.12);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.fillStyle = rgb(wood);
+  ctx.beginPath();
+  ns.forEach(function (n) {
+    var dx = n.ex - n.sx, dy = n.ey - n.sy, len = Math.hypot(dx, dy) || 1, px = -dy / len, py = dx / len, w0 = n.w / 2, w1 = n.endW;
+    ctx.moveTo(n.sx + px * w0, n.sy + py * w0); ctx.lineTo(n.ex + px * w1, n.ey + py * w1); ctx.lineTo(n.ex - px * w1, n.ey - py * w1); ctx.lineTo(n.sx - px * w0, n.sy - py * w0); ctx.closePath();
+  });
+  ctx.fill();
+  ctx.beginPath();                                          // the round joints, on their own (in the same path they could cancel out)
+  ns.forEach(function (n) { ctx.moveTo(n.ex + n.endW, n.ey); ctx.arc(n.ex, n.ey, n.endW, 0, TAU); });
+  ctx.fill();
+  ctx.strokeStyle = rgb(woodLit, 0.33); ctx.lineCap = 'round';
+  ns.forEach(function (n) {
+    if (n.w < 1.6) return;
+    var dx = n.ex - n.sx, dy = n.ey - n.sy, L = Math.hypot(dx, dy) || 1, nx = -dy / L, ny = dx / L;
+    if (nx * LT.dir[0] + ny * -LT.dir[1] < 0) { nx = -nx; ny = -ny; }
+    ctx.lineWidth = n.w * 0.28;
+    ctx.beginPath(); ctx.moveTo(n.sx + nx * n.w * 0.28, n.sy + ny * n.w * 0.28); ctx.lineTo(n.ex + nx * n.endW * 0.55, n.ey + ny * n.endW * 0.55); ctx.stroke();
+  });
+  // the snow, piece by piece, each in its own frame
+  var t0 = performance.now(), RS = PR * 1.25, sc = Math.min(W * 0.5, H * 0.75);
+  for (i = 0; i < ns.length; i++) {
+    n = ns[i];
+    var dx = n.ex - n.sx, dy = n.ey - n.sy, LL = Math.hypot(dx, dy) || 1, ux = dx / LL, uy = dy / LL, mx = uy, my = -ux;
+    if (my > 0) { mx = -mx; my = -my; }
+    var hS = (n.w * 0.5 + 1.2 + sc * 0.005) * 1.35 * 1.22 * Math.pow(Math.abs(ux), 0.8);
+    var p = { len: n.len, w0: n.w / 2, w1: n.endW, sa: n.sa, sb: n.sb, lump: n.lump, sag: n.sag, hS: hS, joins: n.kids > 0,
+              fork: V.forks && n.kids > 1, dust: V.dust, seed: n.seed };
+    var sh = SnowHeaps.shape(p), pad = 4 + hS * 0.8;
+    var x0 = sh.x0 - pad, y0 = sh.minY - pad, w = sh.x1 - sh.x0 + pad * 2, h = sh.maxY - sh.minY + pad * 2;
+    var cnv = document.createElement('canvas');
+    cnv.width = Math.max(1, Math.ceil(w * RS)); cnv.height = Math.max(1, Math.ceil(h * RS));
+    var c = cnv.getContext('2d');
+    c.setTransform(RS, 0, 0, RS, -x0 * RS, -y0 * RS);
+    var pic = null;
+    if (old) {
+      if (hS < 0.4) continue;
+      var top = lit(hex(V.snow), 0, 1, 0, LT, 1), under = lit(hex(V.snow), 0, -0.3, 0.95, LT, 0.75);
+      c.beginPath(); c.moveTo(sh.bs[0][0], sh.bs[0][1]); SnowHeaps.smoothTo(c, sh.ts, 0, sh.NS); SnowHeaps.smoothTo(c, sh.bs, sh.NS, 0); c.closePath();
+      var g = c.createLinearGradient(0, sh.minY, 0, sh.maxY); g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(under));
+      c.fillStyle = g; c.fill();
+      pic = cnv;
+    } else {
+      SnowHeaps.draw(c, sh, p);
+      // the light in the piece's own frame (x along it, y up = toward m)
+      var Ld = LT.dir, ld = [Ld[0] * ux + Ld[1] * -uy, Ld[0] * mx + Ld[1] * -my, Ld[2]];
+      var m = matOpts(LT, ld), R = Math.max(1, hS * V.round) * RS;
+      m.thick = R * V.thick;
+      var L2 = SnowHeaps.light(cnv, R, m);
+      if (L2) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cnv.width, cnv.height); SnowHeaps.put(c, L2, 0, 0); }
+      pic = cnv;
+    }
+    ctx.setTransform(PR * ux, PR * uy, -PR * mx, -PR * my, PR * n.sx, PR * n.sy);
+    ctx.drawImage(pic, x0, y0, w, h);
+  }
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  // a few blossoms, for scale
+  var rb = rngFrom(5);
+  ns.forEach(function (n, j) {
+    if (j < 3 || rb() < 0.4) return;
+    var t = rb(), x = lerp(n.sx, n.ex, t), y = lerp(n.sy, n.ey, t) + (rb() - 0.5) * n.w * 2, s = sc * 0.02;
+    ctx.fillStyle = rgb(mix(lit([217, 59, 59], 0, 0.3, 1, LT, 0.8), [217, 59, 59], 0.5));
+    for (var q = 0; q < 5; q++) { var aa = q * TAU / 5; ctx.beginPath(); ctx.arc(x + Math.cos(aa) * s * 0.5, y + Math.sin(aa) * s * 0.5, s * 0.45, 0, TAU); ctx.fill(); }
+  });
+  info += ' · branch snow ' + Math.round(performance.now() - t0) + ' ms';
+}
+
+function draw() {
+  W = window.innerWidth; H = window.innerHeight; PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;
+  cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  var LT = sceneLight(), old = document.getElementById('old').checked;
+  info = '';
+  sky(LT);
+  torii(LT, old);
+  drawBranch(LT, old);
+  document.getElementById('info').textContent = info;
+}
+
+/* ---------- the panel ---------- */
+var CTLS = [
+  { k: 'round', label: 'How round the heaps are', min: 0.15, max: 1, step: 0.01, note: 'Low = flatter, sharper edges; high = soft, pillowy heaps.' },
+  { k: 'thick', label: 'Relief', min: 0.2, max: 3, step: 0.05, note: 'How strongly the rounding shows in the light.' },
+  { k: 'contact', label: 'Shade where it sits on the wood', min: 0, max: 1.5, step: 0.05 },
+  { k: 'glow', label: 'Light through the thin edges', min: 0, max: 2, step: 0.05, note: 'When the sun is low and in front of you (evening).' },
+  { k: 'grain', label: 'Grain (fine bumps)', min: 0, max: 2, step: 0.05 },
+  { k: 'sparkle', label: 'Glints', min: 0, max: 2, step: 0.05 },
+  { k: 'blue', label: 'Blue in the shade', min: 0, max: 1, step: 0.01, group: 'The light' },
+  { k: 'sunAzimuth', label: 'Light from (°)', min: -180, max: 180, step: 1 },
+  { k: 'sunElevation', label: 'Sun height, day (°)', min: 3, max: 60, step: 1 },
+  { k: 'eveningElevation', label: 'Sun height, evening (°)', min: 1, max: 15, step: 0.5 },
+  { k: 'dust', label: 'Dusting along the twigs', min: 0, max: 1.5, step: 0.05, group: 'The branches' }
+];
+var host = document.getElementById('ctls');
+function fmt(c, v) { return c.step >= 1 ? String(Math.round(v)) : Number(v).toFixed(2); }
+function build() {
+  host.innerHTML = '';
+  var p = document.createElement('div'); p.className = 'pair'; p.textContent = 'Time of day';
+  var sel = document.createElement('select');
+  [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']].forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
+  sel.value = V.timeOfDay; sel.addEventListener('change', function () { V.timeOfDay = sel.value; save(); draw(); });
+  p.appendChild(sel); host.appendChild(p);
+  var h0 = document.createElement('h4'); h0.textContent = 'The snow'; host.appendChild(h0);
+  CTLS.forEach(function (c) {
+    if (c.group) { var gh = document.createElement('h4'); gh.textContent = c.group; host.appendChild(gh); }
+    var row = document.createElement('div'); row.className = 'row';
+    var l = document.createElement('label'); l.textContent = c.label;
+    var vs = document.createElement('span'); vs.textContent = fmt(c, V[c.k]); l.appendChild(vs);
+    var inp = document.createElement('input'); inp.type = 'range'; inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = V[c.k];
+    var tm = 0;
+    inp.addEventListener('input', function () { V[c.k] = parseFloat(inp.value); vs.textContent = fmt(c, V[c.k]); save(); clearTimeout(tm); tm = setTimeout(draw, 120); });
+    row.appendChild(l); row.appendChild(inp);
+    if (c.note) { var n = document.createElement('small'); n.textContent = c.note; row.appendChild(n); }
+    host.appendChild(row);
+  });
+  var f = document.createElement('div'); f.className = 'pair'; f.textContent = 'Snow caught in the forks';
+  var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = V.forks;
+  cb.addEventListener('change', function () { V.forks = cb.checked; save(); draw(); });
+  f.appendChild(cb); host.appendChild(f);
+}
+document.getElementById('old').addEventListener('change', draw);
+document.getElementById('spToggle').addEventListener('click', function () { this.textContent = document.getElementById('sp').classList.toggle('closed') ? 'Show' : 'Hide'; });
+document.getElementById('reset').addEventListener('click', function () { V = JSON.parse(JSON.stringify(DEF)); save(); build(); draw(); });
+document.getElementById('copy').addEventListener('click', function () {
+  var t = JSON.stringify(V), out = document.getElementById('out'); out.textContent = t; out.classList.add('shown');
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(t).catch(function () {});
+});
+window.addEventListener('resize', function () { branch = null; draw(); });
+window.snowLab = { V: V, draw: function () { draw(); }, set: function (o) { for (var k in o) V[k] = o[k]; draw(); } };
+build();
+draw();
+})();
+</script>
+</body>
+</html>
