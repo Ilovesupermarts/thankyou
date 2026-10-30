@@ -168,42 +168,62 @@ function draw(c, o) {
   var snowLit = lit(snowC, [L[0] * 0.3, 1, 0.2], 1), snowTop = lit(snowC, [0, 1, 0], 1);
   var snowFront = lit(snowC, [0, 0.35, 0.94], 0.95), snowUnder = lit(snowC, [0, -0.3, 0.95], 0.75);
   var minY = Infinity, minX = Infinity, maxX = -Infinity;
-  // a heap along a beam: its front top edge from u0 to u1 at height yt(u), depth dd, heaped hgt high
+  // a heap along a beam: its front top edge from u0 to u1 at height yt(u), depth dd, heaped hgt high.
+  // Its top is lumpy and its front edge one continuous lip that droops over the beam here and there,
+  // with a soft shade under the overhang and a fine grain over all of it.
   function heap(u0, u1, yt, dd, hgt) {
     if (hgt <= 0.001) return;
-    var n = 26, front = [], back = [], crest = [], i;
+    var n = 48, crest = [], lip = [], i, H0 = hgt * h;
+    var p1 = r() * TAU, p2 = r() * TAU, p3 = r() * TAU, p4 = r() * TAU;
     for (i = 0; i <= n; i++) {
-      var u = lerp(u0, u1, i / n), s = i / n, env = Math.pow(Math.sin(PI * lerp(0.03, 0.97, s)), 0.45);
-      var lump = 1 + 0.22 * Math.sin(s * 19 + r() * 0.6) + (r() - 0.5) * 0.18;
-      var y = yt(u);
-      front.push(proj([u, y, dd * 1.12]));
-      back.push(proj([u, y, -dd * 1.05]));
+      var u = lerp(u0, u1, i / n), s = i / n, env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, s)), 0.45);
+      var lump = 1 + 0.16 * Math.sin(s * 13 + p1) + 0.1 * Math.sin(s * 37 + p2) + (r() - 0.5) * 0.08;
+      var droop = Math.max(0, 0.45 * Math.sin(s * 21 + p3) + 0.3 * Math.sin(s * 8 + p4) + 0.15);
+      droop = Math.pow(droop, 1.4) * Math.pow(env, 2);
+      var y = yt(u), f = proj([u, y, dd * 1.12]);
       crest.push(proj([u, y + hgt * env * lump, dd * 0.15]));
+      lip.push([f[0], f[1] + H0 * (0.08 + 0.55 * droop) * (0.6 + 0.4 * env)]);
     }
-    // the body: from the front edge up over the crest
-    c.beginPath();
-    c.moveTo(front[0][0], front[0][1]);
-    for (i = 0; i <= n; i++) c.lineTo(crest[i][0], crest[i][1]);
-    for (i = n; i >= 0; i--) c.lineTo(front[i][0], front[i][1] + hgt * h * 0.12);
-    c.closePath();
-    var y0 = Math.min.apply(null, crest.map(function (p) { return p[1]; })), y1 = Math.max.apply(null, front.map(function (p) { return p[1]; }));
-    var g = c.createLinearGradient(0, y0, 0, y1 + hgt * h * 0.15);
-    g.addColorStop(0, rgb(snowTop)); g.addColorStop(0.45, rgb(snowLit)); g.addColorStop(0.8, rgb(snowFront)); g.addColorStop(1, rgb(snowUnder));
+    function body() {
+      c.beginPath();
+      c.moveTo(lip[0][0], lip[0][1]);
+      for (i = 0; i <= n; i++) c.lineTo(crest[i][0], crest[i][1]);
+      c.lineTo(lip[n][0], lip[n][1]);
+      for (i = n - 1; i > 0; i--) c.quadraticCurveTo(lip[i][0], lip[i][1], (lip[i][0] + lip[i - 1][0]) / 2, (lip[i][1] + lip[i - 1][1]) / 2);
+      c.closePath();
+    }
+    var y0 = Math.min.apply(null, crest.map(function (q) { return q[1]; })), y1 = Math.max.apply(null, lip.map(function (q) { return q[1]; }));
+    body();
+    var g = c.createLinearGradient(0, y0, 0, y1);
+    g.addColorStop(0, rgb(snowTop)); g.addColorStop(0.4, rgb(snowLit)); g.addColorStop(0.78, rgb(snowFront)); g.addColorStop(1, rgb(mix(snowFront, snowUnder, 0.6)));
     c.fillStyle = g; c.fill();
+    c.save(); body(); c.clip();
     // the side away from the sun is cooler
-    var lx = L[0] < 0 ? 1 : -1, x0 = front[0][0], x1 = front[n][0];
+    var lx = L[0] < 0 ? 1 : -1, x0 = lip[0][0], x1 = lip[n][0];
     var sg = c.createLinearGradient(lx > 0 ? x0 : x1, 0, lx > 0 ? x1 : x0, 0);
-    sg.addColorStop(0, rgb(snowUnder, 0)); sg.addColorStop(0.6, rgb(snowUnder, 0)); sg.addColorStop(1, rgb(snowUnder, 0.35));
-    c.fillStyle = sg; c.fill();
-    // lumps hanging over the front edge
-    for (i = 2; i < n - 1; i += 2) {
-      if (r() > 0.55) continue;
-      var p = front[i], rw = hgt * h * lerp(0.18, 0.32, r()), rh = hgt * h * lerp(0.2, 0.42, r());
-      var lg = c.createLinearGradient(0, p[1] - rh * 0.2, 0, p[1] + rh);
-      lg.addColorStop(0, rgb(snowFront)); lg.addColorStop(1, rgb(snowUnder));
-      c.fillStyle = lg;
-      c.beginPath(); c.ellipse(p[0], p[1] + rh * 0.25, rw, rh, 0, 0, TAU); c.fill();
+    sg.addColorStop(0, rgb(snowUnder, 0)); sg.addColorStop(0.6, rgb(snowUnder, 0)); sg.addColorStop(1, rgb(snowUnder, 0.3));
+    c.fillStyle = sg; c.fillRect(x0 - 20, y0 - 20, x1 - x0 + 40, y1 - y0 + 40);
+    // a soft shade along the underside of the overhang, deeper where it droops most
+    c.filter = 'blur(' + Math.max(0.6, H0 * 0.12).toFixed(1) + 'px)';
+    c.strokeStyle = rgb(snowUnder, 0.55); c.lineWidth = Math.max(1, H0 * 0.32); c.lineJoin = 'round'; c.lineCap = 'round';
+    c.beginPath(); c.moveTo(lip[0][0], lip[0][1]);
+    for (i = 1; i <= n; i++) c.lineTo(lip[i][0], lip[i][1]);
+    c.stroke();
+    // and a faint bright rim along the top where the light catches it
+    c.strokeStyle = rgb(mix(snowTop, [255, 255, 255], 0.4), 0.5); c.lineWidth = Math.max(0.6, H0 * 0.1);
+    c.beginPath(); c.moveTo(crest[0][0], crest[0][1] + H0 * 0.06);
+    for (i = 1; i <= n; i++) c.lineTo(crest[i][0], crest[i][1] + H0 * 0.06);
+    c.stroke();
+    c.filter = 'none';
+    // the grain: tiny bright and cool flecks
+    var nF = Math.round((x1 - x0) * Math.max(0.6, H0 * 0.08));
+    for (i = 0; i < nF; i++) {
+      var k = Math.floor(r() * n), q = r(), fx = lerp(crest[k][0], lip[k][0], q), fy = lerp(crest[k][1], lip[k][1], q);
+      var bright = r() < 0.55;
+      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.25, 0.6, r()).toFixed(2) + ')' : rgb(snowUnder, lerp(0.12, 0.3, r()));
+      c.beginPath(); c.arc(fx + (r() - 0.5) * 2, fy, Math.max(0.35, H0 * lerp(0.015, 0.05, r())), 0, TAU); c.fill();
     }
+    c.restore();
     crest.forEach(function (q) { minY = Math.min(minY, q[1]); minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); });
   }
   // icicles under a beam's front lower edge

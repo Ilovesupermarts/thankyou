@@ -1269,6 +1269,15 @@ function flatSwell(t, S, haze) {
   t.fillStyle = g; t.fill();
 }
 function crestY(S, x) { return S.yk - S.amp * S.f(x); }
+/* What snowfield.js needs, for these swells (the snowfield's, or the snowdrift's). */
+function sfOptions(sw) {
+  var C = cols();
+  return { width: Math.round(W * PR), height: Math.round(H * PR), screenW: W, screenH: H, horizon: H * V.horizon, swells: sw,
+           sunAzimuth: V.sunAzimuth, sunElevation: LT.el, sunColour: LT.sunRGB, skyColour: LT.skyRGB,
+           sunStrength: LT.sS, ambient: LT.amb, hazeColour: light(C.mist), snow: C.snow, blue: V.blueShade,
+           relief: V.relief, roll: V.roll, drifts: V.drifts, ripples: V.ripples, rippleSize: V.rippleSize,
+           rippleAngle: V.rippleAngle, grain: V.grain, hollows: V.hollows, sheen: V.sheen, seed: V.seed };
+}
 function bakeGround() {
   var t0 = performance.now(), C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), N = Math.max(2, Math.round(V.swells));
   var depthPx = Math.max(1, H - hy), k, b, NX = 256;
@@ -1288,12 +1297,7 @@ function bakeGround() {
     Sb.things.push(B);
     if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: thingH(B) }; WS.toriiK = kb; }
   }
-  var sfo = { width: Math.round(W * PR), height: Math.round(H * PR), screenW: W, screenH: H, horizon: hy,
-              swells: swells.map(function (S) { return { crest: S.crest, u: S.u, haze: S.haze }; }),
-              sunAzimuth: V.sunAzimuth, sunElevation: LT.el, sunColour: LT.sunRGB, skyColour: LT.skyRGB,
-              sunStrength: LT.sS, ambient: LT.amb, hazeColour: light(C.mist), snow: C.snow, blue: V.blueShade,
-              relief: V.relief, roll: V.roll, drifts: V.drifts, ripples: V.ripples, rippleSize: V.rippleSize,
-              rippleAngle: V.rippleAngle, grain: V.grain, hollows: V.hollows, sheen: V.sheen, seed: V.seed };
+  var sfo = sfOptions(swells.map(function (S) { return { crest: S.crest, u: S.u, haze: S.haze }; }));
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
   if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') { glRetry.ground = true; if (WS.slabs.length) { WS.waited = true; return; } }
   var old = WS.slabs; WS.slabs = []; WS.sfGL = false;
@@ -1723,6 +1727,20 @@ function bakeNear() {
   g.addColorStop(0, rgb(litC)); g.addColorStop(1, rgb(mix(litC, sh, V.nearShade * 0.5)));
   outline(); t.fillStyle = g; t.fill();
   t.restore();
+  // its surface drawn by snowfield.js as one more swell (the nearest), so it matches the field behind it
+  var sfOk = typeof Snowfield !== 'undefined' && Snowfield.supported();
+  if (sfOk) {
+    var NX = 256, cr = new Float32Array(NX);
+    for (var j = 0; j < NX; j++) cr[j] = H - hh + surf[clamp(Math.round((-20 + j / (NX - 1) * (W + 40)) * CR), 0, nC - 1)];
+    var pic = Snowfield.render(sfOptions([{ crest: cr, u: 1, haze: 0 }]), 0, H - hh, H);
+    if (pic) {
+      t.save(); outline(); t.clip();
+      t.setTransform(1, 0, 0, 1, 0, 0);
+      t.drawImage(pic, 0, 0, NEART.cnv.width, NEART.cnv.height);
+      t.restore();
+      t.setTransform(PR, 0, 0, PR, 0, 0);
+    } else glRetry.ground = true;
+  } else if (typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') glRetry.ground = true;
   if (V.nearShade > 0) {
     var bl = Math.max(3, nH * 0.22), bottom = [];
     t.save(); outline(); t.clip();
@@ -1813,7 +1831,7 @@ window.addEventListener('pointerup', function (e) {
    branches bright on top and blue underneath; the branches further in
    (behind the main limbs) are a little softer and paler.
    ============================================================ */
-var UME_S0 = 20;
+var UME_S0 = 20, UME_SN = 12;                // blossom sprites are drawn for a 20px flower; UME_SN points along each piece's snow
 function umeBakeBlooms() {
   var C = cols(), RS = 2, red = light(C.blossom), deep = light(C.blossomDeep), st = light(C.stamen);
   WS.blooms = [];
@@ -1853,7 +1871,11 @@ function umeBakeBlooms() {
   WS.wood = [rgb(wood), rgb(mix(wood, mistC, back * 0.5))];
   WS.woodLit = [rgb(woodLit, V.barkLight * 0.55), rgb(mix(woodLit, mistC, back * 0.5), V.barkLight * 0.4)];
   WS.snow = [rgb(snowTop), rgb(mix(snowTop, mistC, back * 0.3))];
-  WS.shade = [rgb(snowUnder, 0.6), rgb(mix(snowUnder, mistC, back * 0.4), 0.5)];
+  WS.shade = [rgb(snowUnder, 0.3), rgb(mix(snowUnder, mistC, back * 0.4), 0.25)];
+  var snowHi = mix(lit(C.snow, LT.dir[0] * 0.6, 1, 0.2, 1), [255, 255, 255], 0.35);
+  WS.snowHi = [rgb(snowHi, 0.55), rgb(mix(snowHi, mistC, back * 0.3), 0.45)];
+  WS.fleckLt = [rgb([255, 255, 255], 0.55), rgb(mix([255, 255, 255], mistC, back * 0.3), 0.4)];
+  WS.fleckDk = [rgb(snowUnder, 0.3), rgb(mix(snowUnder, mistC, back * 0.4), 0.22)];
   WS.petal = rgb(light(C.blossom)); WS.petalDk = rgb(light(C.blossomDeep));
 }
 function umeBuild(left, idx) {
@@ -1862,11 +1884,20 @@ function umeBuild(left, idx) {
   var sc = Math.min(W * 0.42, H * 0.62) * V.branchSize * [1, 0.62, 0.5][idx];
   var nodes = [], springs = [], blooms = [], groups = [];
   function add(parent, abs, len, w, flex, sp, g) {
-    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [];
-    for (var i = 0; i < 7; i++) lump.push(lerp(0.7, 1.25, r()));
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, lump = [], sag = [], sp = [];
+    // the snow on it: a lumpy top (two waves and a little noise), places where it wraps over the
+    // edge (sag), now and then a bare stretch at either end, and flecks of texture
+    var q1 = r() * TAU, q2 = r() * TAU, f1 = lerp(1.2, 2.6, r()), f2 = lerp(3.5, 6.5, r());
+    for (var i = 0; i <= UME_SN; i++) {
+      var qq = i / UME_SN;
+      lump.push(clamp(1 + 0.3 * Math.sin(qq * f1 * TAU + q1) + 0.17 * Math.sin(qq * f2 * TAU + q2) + (r() - 0.5) * 0.22, 0.3, 1.7));
+      sag.push(Math.pow(r(), 2.2));
+    }
+    for (i = 0; i < 4 + Math.floor(r() * 6); i++) sp.push({ t: r(), h: lerp(0.15, 0.85, r()), s: lerp(0.35, 1, r()), lt: r() < 0.6 });
     nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, flex: flex, sp: sp === undefined ? -1 : sp, g: g,
                  ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0,
-                 snow: V.branchSnow * lerp(0.7, 1, r()), lump: lump });
+                 snow: V.branchSnow * lerp(0.7, 1, r()), lump: lump, sag: sag, sp: sp,
+                 sa: r() < 0.3 ? r() * 0.35 : 0, sb: r() < 0.3 ? 1 - r() * 0.3 : 1 });
     groups[g].nodes.push(nodes.length - 1);
     return nodes.length - 1;
   }
@@ -2012,6 +2043,12 @@ function umeUpdatePetals(t, dt) {
     if (P.y > H + 20 || P.x < -60 || P.x > W + 60) WS.petals.splice(i, 1);
   }
 }
+/* A smooth line through the points, from k0 to k1, onto the path P. */
+function smoothTo(P, pts, k0, k1) {
+  var st = k1 > k0 ? 1 : -1;
+  for (var k = k0; k !== k1; k += st) P.quadraticCurveTo(pts[k][0], pts[k][1], (pts[k][0] + pts[k + st][0]) / 2, (pts[k][1] + pts[k + st][1]) / 2);
+  P.lineTo(pts[k1][0], pts[k1][1]);
+}
 function umeDraw(c, T) {
   var ns = T.nodes, i, n, b = T.idx > 0 ? 1 : 0;
   c.setTransform(PR, 0, 0, PR, 0, 0);
@@ -2045,32 +2082,49 @@ function umeDraw(c, T) {
       c.beginPath(); c.moveTo(n.sx + nx * o, n.sy + ny * o); c.lineTo(n.ex + nx * T.endW[i] * 0.55, n.ey + ny * T.endW[i] * 0.55); c.stroke();
     }
   }
-  var top = new Path2D(), band = new Path2D();
+  // the snow: an uneven mound along the upper side of each piece, its top smooth but lumpy, wrapping
+  // over the edge here and there; shaded softly toward its foot, a brighter crest, and flecks of grain
+  var top = new Path2D(), sh1 = new Path2D(), sh2 = new Path2D(), hi = new Path2D(), fl = new Path2D(), fd = new Path2D(), NS = UME_SN;
   for (i = 0; i < ns.length; i++) {
     n = ns[i];
     if (n.snow < 0.03) continue;
     var ex = n.ex - n.sx, ey = n.ey - n.sy, LL = Math.hypot(ex, ey) || 1, ux = ex / LL, uy = ey / LL;
     var mx = uy, my = -ux;
-    if (my > 0) { mx = -mx; my = -my; }
+    if (my > 0) { mx = -mx; my = -my; }                    // the side facing up
     var hS = (n.w * 0.5 + 1.2 + T.sc * 0.005) * n.snow * Math.pow(Math.abs(ux), 0.8);
     if (hS < 0.4) continue;
     var bs = [], ts = [], j;
-    for (j = 0; j <= 6; j++) {
-      var tt = j / 6, wA = lerp(n.w / 2, T.endW[i], tt) * 0.8, env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, tt)), 0.22);
-      var bxp = n.sx + ex * tt + mx * wA, byp = n.sy + ey * tt + my * wA;
-      bs.push([bxp, byp]); ts.push([bxp + mx * hS * env * n.lump[j], byp + my * hS * env * n.lump[j], env]);
+    for (j = 0; j <= NS; j++) {
+      var tt = lerp(n.sa, n.sb, j / NS), wA = lerp(n.w / 2, T.endW[i], tt), env = Math.pow(Math.sin(PI * lerp(0.02, 0.98, j / NS)), 0.3);
+      var down = wA * (0.8 - 1.1 * n.sag[j] * env);            // wraps down over the edge where it sags
+      var bxp = n.sx + ex * tt + mx * down, byp = n.sy + ey * tt + my * down, hh = hS * env * n.lump[j];
+      bs.push([bxp, byp, hh]); ts.push([bxp + mx * hh, byp + my * hh]);
     }
     top.moveTo(bs[0][0], bs[0][1]);
-    for (j = 0; j <= 6; j++) top.lineTo(ts[j][0], ts[j][1]);
-    for (j = 6; j >= 0; j--) top.lineTo(bs[j][0], bs[j][1]);
+    smoothTo(top, ts, 0, NS);
+    smoothTo(top, bs, NS, 0);
     top.closePath();
-    band.moveTo(bs[0][0], bs[0][1]);
-    for (j = 0; j <= 6; j++) band.lineTo(bs[j][0] + mx * hS * 0.4 * ts[j][2], bs[j][1] + my * hS * 0.4 * ts[j][2]);
-    for (j = 6; j >= 0; j--) band.lineTo(bs[j][0], bs[j][1]);
-    band.closePath();
+    // the shade: two soft steps up from its foot, so it fades instead of a hard band
+    [[sh1, 0.5], [sh2, 0.25]].forEach(function (S) {
+      var P = S[0], f = S[1], up = bs.map(function (q) { return [q[0] + mx * q[2] * f, q[1] + my * q[2] * f]; });
+      P.moveTo(bs[0][0], bs[0][1]); smoothTo(P, up, 0, NS); smoothTo(P, bs, NS, 0); P.closePath();
+    });
+    // the crest catching the light
+    var crest = ts.map(function (q, k) { return [q[0] - mx * bs[k][2] * 0.22, q[1] - my * bs[k][2] * 0.22]; });
+    hi.moveTo(ts[0][0], ts[0][1]); smoothTo(hi, ts, 0, NS); smoothTo(hi, crest, NS, 0); hi.closePath();
+    // flecks of grain
+    for (j = 0; j < n.sp.length; j++) {
+      var F = n.sp[j], k2 = Math.min(NS, Math.round(F.t * NS)), rr = Math.max(0.45, hS * 0.16 * F.s);
+      if (bs[k2][2] < rr * 2) continue;
+      var fx = lerp(bs[k2][0], ts[k2][0], F.h), fy = lerp(bs[k2][1], ts[k2][1], F.h), P2 = F.lt ? fl : fd;
+      P2.moveTo(fx + rr, fy); P2.arc(fx, fy, rr, 0, TAU);
+    }
   }
   c.fillStyle = WS.snow[b]; c.fill(top);
-  c.fillStyle = WS.shade[b]; c.fill(band);
+  c.fillStyle = WS.shade[b]; c.fill(sh1); c.fill(sh2);
+  c.fillStyle = WS.snowHi[b]; c.fill(hi);
+  c.fillStyle = WS.fleckLt[b]; c.fill(fl);
+  c.fillStyle = WS.fleckDk[b]; c.fill(fd);
   for (i = 0; i < T.blooms.length; i++) {
     var B = T.blooms[i], p = umeBloomPos(T, B), S0 = WS.blooms[B.spr], k = B.size / UME_S0;
     var cs = Math.cos(p.rot) * k * PR, sn = Math.sin(p.rot) * k * PR;
@@ -2384,7 +2438,7 @@ function checkRetry(t) {
     var lostS = WS.sfLoss !== undefined && Snowfield.losses() !== WS.sfLoss;
     if (glRetry.ground || lostS) {
       note('snowfield again: ' + (lostS ? 'its context was lost after it was drawn' : 'the last try did not work'));
-      glRetry.ground = false; WS.sfLoss = Snowfield.losses(); stages.push('ground');
+      glRetry.ground = false; WS.sfLoss = Snowfield.losses(); stages.push('near', 'ground');
     }
   }
   // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
