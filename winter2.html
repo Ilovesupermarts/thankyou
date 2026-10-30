@@ -17,6 +17,7 @@
 <script src="torii.js"></script>
 <script src="conifers.js"></script>
 <script src="snowlights.js"></script>
+<script src="snowheaps.js"></script>
 
 <style>
   /* ============================================================
@@ -321,6 +322,7 @@ var V_DEFAULTS = {
   torchFlakes: 1,
   branchCount: 3, branchSize: 0.9, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22, sway: 2.5, swayRandom: 1.7,
   shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75, barkLight: 0.6, branchDepth: 0.35,
+  snowRound: 0.45, snowRelief: 1.1, snowContact: 0.6, snowGlow: 0.9, snowGrain: 0.5, snowSparkle: 0.5, branchDust: 0.6, branchForks: true,
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17, landShare: 0.7,
   meltTime: 16.5, bokeh: 6, backlight: 0.6,
   nearHeight: 33, nearLumps: 0.09, nearShade: 0.36, nearShadow: 0.05, nearShadowSize: 19,
@@ -1262,8 +1264,28 @@ function drawThing(c, B, haze) {
     Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
                                 snow: V.firSnow, droop: V.firDroop, fullness: V.firFull, width: V.firWidth }, haze));
   } else if (B.type === 'torii') {
-    var res = Torii.draw(c, withLight({ x: B.x, y: B.yb, h: h, yaw: V.toriiTurn, view: V.toriiView, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
-                                        colours: { vermilion: C.vermilion, top: C.toriiTop, feet: C.toriiFeet, snow: C.snow } }, haze));
+    var to = withLight({ x: B.x, y: B.yb, h: h, yaw: V.toriiTurn, view: V.toriiView, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
+                         colours: { vermilion: C.vermilion, top: C.toriiTop, feet: C.toriiFeet, snow: C.snow } }, haze);
+    // its snow: drawn where it is (a mask, over the box round the gate), then lit by the snow material
+    var useMat = !B.plain && typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
+    if (useMat) {
+      var T0 = c.getTransform(), bx0 = B.x - h * 1.1, by0 = Torii.top(to) - 10, bx1 = B.x + h * 1.1, by1 = B.yb + h * 0.12;
+      var dx = Math.floor(T0.a * bx0 + T0.e), dy = Math.floor(T0.d * by0 + T0.f);
+      if (!WS.tmask) WS.tmask = mk();
+      var TM = WS.tmask;
+      TM.cnv.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); TM.cnv.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
+      TM.c.setTransform(T0.a, 0, 0, T0.d, T0.e - dx, T0.f - dy);
+      to.snowMask = TM.c;
+    }
+    var res = Torii.draw(c, to);
+    if (useMat) {
+      var R = h * 0.09 * V.toriiSnow * V.snowRound * T0.a, m = snowMat(null, haze);
+      m.thick = R * V.snowRelief;
+      var lit = SnowHeaps.light(TM.cnv, R, m);
+      if (lit) SnowHeaps.put(c, lit, dx, dy);
+      else { to.snowMask = null; Torii.draw(c, to); }          // WebGL away: the plain snow, drawn over
+      TM.cnv.width = TM.cnv.height = 1;
+    }
     WS.torii = { x: B.x, y: B.yb, h: h, top: res.top };
   } else {
     var Lb = Snowlights.body(c, withLight({ kind: B.kind, x: B.x, y: B.yb, s: h, seed: B.seed, lit: nightLights(),
@@ -1287,9 +1309,9 @@ function castShadow(tg, B, haze) {
   SHD.cnv.width = cw; SHD.cnv.height = ch;
   var s = SHD.c;
   s.setTransform(PR, 0, 0, PR, -bx0 * PR, -by0 * PR);
-  var rec = B.record; B.record = false;
+  var rec = B.record; B.record = false; B.plain = true;
   drawThing(s, B, 0);
-  B.record = rec;
+  B.record = rec; B.plain = false;
   s.setTransform(1, 0, 0, 1, 0, 0);
   s.globalCompositeOperation = 'source-in';
   s.fillStyle = rgb(mix(SHADE, light(hex(V.colours.mist)), haze)); s.fillRect(0, 0, cw, ch);
@@ -2086,74 +2108,62 @@ function umeBuildAll() {
   for (var idx = V.branchCount - 1; idx >= 0; idx--) { WS.branches.push(umeBuild(true, idx)); WS.branches.push(umeBuild(false, idx)); }
   WS.branches.forEach(umeBakeSnow);
 }
-/* The snow on the branches, drawn as the snow on the torii is (torii.js): a lumpy mound along
-   the upper side of each piece, bright on top and cooler toward where it wraps over the edge,
-   a soft shade under its lip, a gentle bright crest and a faint grain. The light on it is worked
-   out the same way. Each piece's snow is drawn once, at its fullest, as a small picture in the
-   piece's own frame (x along it, y down into it); umeDraw lays it along the piece every frame. */
+/* The snow on the branches and on the torii: the shapes from snowheaps.js and torii.js, lit
+   by the snow material (snowfield.js): a rounded pillow for every heap, lit pixel by pixel
+   like the snowfield (warm in the sun, blue in the shade, darker where it sits on the wood,
+   light through its thin edges when the sun is low in front, a fine grain and the odd
+   glint). Tuned on snow-lab.html. Each branch piece's snow is drawn once, at its fullest, as
+   a small picture in the piece's own frame (x along it, y down into it); umeDraw lays it
+   along the piece every frame. Without WebGL 2 the heaps are shaded with a plain fade. */
 function snowTone(base, n, ao) {                          // the colour of snow facing n, as torii.js works it out
   var L = LT.dir, dl = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]), sk = (0.6 + 0.4 * n[1]) * LT.amb * ao;
   return [base[0] * (LT.sun[0] * dl + LT.sky[0] * sk), base[1] * (LT.sun[1] * dl + LT.sky[1] * sk), base[2] * (LT.sun[2] * dl + LT.sky[2] * sk)];
 }
+/* What the snow material needs: the light (in a piece's own frame when given), the snow's values, and the haze. */
+function snowMat(dir, haze) {
+  return { sunDir: dir || LT.dir, sunColour: LT.sun, skyColour: LT.sky, ambient: LT.amb, blue: V.blueShade, snow: hex(V.colours.snow),
+           grain: V.snowGrain, glow: V.snowGlow, contact: V.snowContact, sparkle: V.snowSparkle,
+           haze: haze || 0, hazeColour: light(hex(V.colours.mist)), seed: V.seed };
+}
 function umeBakeSnow(T) {
   if (!LT) return;
-  var C = cols(), sn = C.snow, L = LT.dir, back = T.idx > 0 ? V.branchDepth : 0, mistC = light(C.mist);
-  function tone(n, ao) { return mix(snowTone(sn, n, ao), mistC, back * 0.35); }
-  var top = tone([0, 1, 0], 1), litC = tone([L[0] * 0.3, 1, 0.2], 1), front = tone([0, 0.35, 0.94], 0.95), under = tone([0, -0.3, 0.95], 0.75);
-  var NS = UME_SN, RS = PR * 1.25, r = rngFrom(T.idx * 131 + (T.left ? 7 : 71)), kids = {};
-  T.nodes.forEach(function (n) { if (n.p >= 0) kids[n.p] = true; });
+  var C = cols(), back = T.idx > 0 ? V.branchDepth : 0, RS = PR * 1.25, kids = {}, L = LT.dir;
+  T.nodes.forEach(function (n) { if (n.p >= 0) kids[n.p] = (kids[n.p] || 0) + 1; });
+  var useMat = typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
   T.snow = T.nodes.map(function (n, i) {
-    var ux0 = Math.abs(Math.cos(n.abs));
+    var ca = Math.cos(n.abs), sa = Math.sin(n.abs), ux0 = Math.abs(ca);
     var hS = (n.w * 0.5 + 1.2 + T.sc * 0.005) * 1.35 * V.branchSnow * Math.pow(ux0, 0.8);
-    if (hS < 0.4 || n.len < 1) return null;
-    var bs = [], ts = [], j, minY = Infinity, maxY = -Infinity;
-    for (j = 0; j <= NS; j++) {
-      // rounded at both ends, like the heaps on the torii; at a joint the snow reaches just over it,
-      // so it meets the next piece's snow with a gentle dip (not past a twig's tip, nor where a bare
-      // stretch begins; further would stick out into the air where the branch bends)
-      var tj = j / NS, ext = Math.min(n.w * 0.45, n.len * 0.15);
-      var e0 = n.sa > 0 ? 0 : ext, e1 = n.sb < 1 || !kids[i] ? 0 : ext;
-      var x = lerp(n.len * n.sa - e0, n.len * n.sb + e1, tj), tt = clamp(x / n.len, 0, 1), wA = lerp(n.w / 2, T.endW[i], tt);
-      var env = Math.pow(Math.sin(PI * lerp(0.03, 0.97, tj)), 0.45);
-      var down = wA * (0.8 - 1.1 * n.sag[j] * env), hh = hS * env * n.lump[j];
-      bs.push([x, -down, hh]); ts.push([x, -down - hh]);
-      minY = Math.min(minY, -down - hh); maxY = Math.max(maxY, -down);
-    }
-    var pad = 3 + hS * 0.3, x0 = bs[0][0] - pad, y0 = minY - pad, w = bs[NS][0] - bs[0][0] + pad * 2, h = maxY - minY + pad * 2;
+    if ((hS < 0.4 && V.branchDust <= 0) || n.len < 1) return null;
+    var p = { len: n.len, w0: n.w / 2, w1: T.endW[i], sa: n.sa, sb: n.sb, lump: n.lump, sag: n.sag, hS: hS, joins: !!kids[i],
+              fork: V.branchForks && kids[i] > 1, dust: V.branchDust * V.branchSnow / 1.22, seed: V.seed * 7 + i * 31 + T.idx };
+    var sh = SnowHeaps.shape(p), pad = 4 + hS * 0.8;
+    var x0 = sh.x0 - pad, y0 = sh.minY - pad, w = sh.x1 - sh.x0 + pad * 2, h = sh.maxY - sh.minY + pad * 2;
     var cnv = document.createElement('canvas');
     cnv.width = Math.max(1, Math.ceil(w * RS)); cnv.height = Math.max(1, Math.ceil(h * RS));
     var c = cnv.getContext('2d');
     c.setTransform(RS, 0, 0, RS, -x0 * RS, -y0 * RS);
-    function body() {
-      c.beginPath(); c.moveTo(bs[0][0], bs[0][1]);
-      smoothTo(c, ts, 0, NS); smoothTo(c, bs, NS, 0); c.closePath();
+    var done = false;
+    if (useMat) {
+      SnowHeaps.draw(c, sh, p);
+      // the light in the piece's own frame: x along it, y up (away from the wood)
+      var mx = sa, my = -ca;
+      if (my > 0) { mx = -mx; my = -my; }
+      var ld = [L[0] * ca + L[1] * -sa, L[0] * mx + L[1] * -my, L[2]], R = Math.max(1, hS * V.snowRound) * RS;
+      var m = snowMat(ld, back * 0.35);
+      m.thick = R * V.snowRelief;
+      var lit = SnowHeaps.light(cnv, R, m);
+      if (lit) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cnv.width, cnv.height); SnowHeaps.put(c, lit, 0, 0); done = true; }
+      else { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, cnv.width, cnv.height); c.setTransform(RS, 0, 0, RS, -x0 * RS, -y0 * RS); }
     }
-    // the body: bright on top, lit, then cooler toward the lip where it wraps over the edge
-    body();
-    var g = c.createLinearGradient(0, minY, 0, maxY);
-    g.addColorStop(0, rgb(top)); g.addColorStop(0.4, rgb(litC)); g.addColorStop(0.8, rgb(front)); g.addColorStop(1, rgb(mix(front, under, 0.6)));
-    c.fillStyle = g; c.fill();
-    c.save(); body(); c.clip();
-    // a soft shade along the underside of the lip
-    c.filter = 'blur(' + Math.max(0.5, hS * 0.18).toFixed(1) + 'px)';
-    c.strokeStyle = rgb(under, 0.5); c.lineWidth = Math.max(0.8, hS * 0.45); c.lineJoin = 'round'; c.lineCap = 'round';
-    c.beginPath(); c.moveTo(bs[0][0], bs[0][1]);
-    for (j = 1; j <= NS; j++) c.lineTo(bs[j][0], bs[j][1]);
-    c.stroke();
-    // a gentle bright crest where the light catches it
-    c.strokeStyle = rgb(mix(top, [255, 255, 255], 0.4), 0.45); c.lineWidth = Math.max(0.5, hS * 0.14);
-    c.beginPath(); c.moveTo(ts[0][0], ts[0][1] + hS * 0.08);
-    for (j = 1; j <= NS; j++) c.lineTo(ts[j][0], ts[j][1] + hS * 0.08);
-    c.stroke();
-    c.filter = 'none';
-    // a faint grain
-    var nF = Math.round(n.len * Math.max(0.3, hS * 0.06));
-    for (j = 0; j < nF; j++) {
-      var k = Math.floor(r() * NS), q = r(), fx = lerp(ts[k][0], bs[k][0], q), fy = lerp(ts[k][1], bs[k][1], q), bright = r() < 0.55;
-      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.1, 0.25, r()).toFixed(2) + ')' : rgb(under, lerp(0.05, 0.12, r()));
-      c.beginPath(); c.arc(fx, fy, Math.max(0.25, hS * lerp(0.01, 0.03, r())), 0, TAU); c.fill();
+    if (!done) {                                           // no WebGL 2 (or it is away): a plain fade, top to bottom
+      if (hS < 0.4) return null;
+      var mistC = light(C.mist), top = mix(snowTone(C.snow, [0, 1, 0], 1), mistC, back * 0.35), under = mix(snowTone(C.snow, [0, -0.3, 0.95], 0.75), mistC, back * 0.35);
+      c.beginPath(); c.moveTo(sh.bs[0][0], sh.bs[0][1]);
+      SnowHeaps.smoothTo(c, sh.ts, 0, sh.NS); SnowHeaps.smoothTo(c, sh.bs, sh.NS, 0); c.closePath();
+      var g = c.createLinearGradient(0, sh.minY, 0, sh.maxY);
+      g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(under));
+      c.fillStyle = g; c.fill();
     }
-    c.restore();
     return { cnv: cnv, x0: x0, y0: y0, w: w, h: h, piv: (n.w / 2 + T.endW[i]) / 2 * 0.8, ux: Math.max(0.05, Math.pow(ux0, 0.8)) };
   });
 }
@@ -2998,6 +3008,15 @@ var G = [
     { o: 'V', k: 'torchBob', label: 'Beam bobbing with the stride', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'torchFlakes', label: 'Snowflakes lit in the beam', min: 0, max: 2, step: 0.05, re: 'live' },
     { col: 'V', keys: [['torch', 'Light']], re: 'sprites' } ] },
+  { name: 'Snow on the torii and branches', file: 'snowfield.js · snowheaps.js', note: 'Tuned on snow-lab.html.', ctls: [
+    { o: 'V', k: 'snowRound', label: 'How round the heaps are', min: 0.15, max: 1, step: 0.01, re: 'ground sprites', note: 'Low = flatter, sharper edges; high = soft, pillowy heaps.' },
+    { o: 'V', k: 'snowRelief', label: 'Relief', min: 0.2, max: 3, step: 0.05, re: 'ground sprites', note: 'How strongly the rounding shows in the light.' },
+    { o: 'V', k: 'snowContact', label: 'Shade where it sits on the wood', min: 0, max: 1.5, step: 0.05, re: 'ground sprites' },
+    { o: 'V', k: 'snowGlow', label: 'Light through the thin edges', min: 0, max: 2, step: 0.05, re: 'ground sprites', note: 'When the sun is low and in front of you (evening).' },
+    { o: 'V', k: 'snowGrain', label: 'Grain (fine bumps)', min: 0, max: 2, step: 0.05, re: 'ground sprites' },
+    { o: 'V', k: 'snowSparkle', label: 'Glints', min: 0, max: 2, step: 0.05, re: 'ground sprites' },
+    { o: 'V', k: 'branchDust', label: 'Dusting along the twigs', min: 0, max: 1.5, step: 0.05, re: 'sprites' },
+    { chk: 'V', k: 'branchForks', label: 'Snow caught in the forks', re: 'sprites' } ] },
   { name: 'Plum branches', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
