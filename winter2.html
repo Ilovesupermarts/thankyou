@@ -302,52 +302,62 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
    1. VALUES — the scene (V) and the mountains (MT). The sun and the
    clouds (SUN, CLOUD, section 2b and 2c) follow.
    ============================================================ */
+/* The values chosen on the tablet (the panel's "Copy values"). */
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
-  wind: 1.85, gustEvery: 6, gustStrength: 1.4,
-  // the light on everything on the ground (the mountains have their own strength in MT)
+  wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
-  // the snowfield (snowfield.js)
-  horizon: 0.79, swells: 5, swellHeight: 1.05, relief: 1, roll: 1, drifts: 0.5, ripples: 0.6, rippleSize: 0.35,
-  rippleAngle: 72, grain: 0.5, hollows: 0.6, sheen: 0.4, groundHaze: 0.85, groundSoft: 1, sparkle: 0.7, mistDrift: 0.7,
-  // the shadows cast on the snow
-  shadows: 0.65, shadowLength: 1, shadowSoft: 1.5,
-  // the torii (torii.js)
-  toriiX: 0.03, toriiDepth: 0.18, toriiSize: 0.2, toriiTurn: 14, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
-  // the firs and frosted trees (conifers.js)
-  firs: 2, firX: 0.96, firSize: 0.95, firSnow: 1, firDroop: 1, firFull: 0.6, firWidth: 1,
-  frostTrees: 9, frostSize: 1.35, rime: 1, frostTwigs: 0.6,
-  // the lights (snowlights.js)
-  lanterns: 9, lanternSize: 1, kamakura: 2, yukimi: true, lightEvening: 0.6, lightNight: 1, flicker: 0.5, halo: 1, pool: 1,
-  // the sky
+  horizon: 0.79, swells: 7, swellHeight: 0.65, relief: 0.45, roll: 0.75, drifts: 0.25, ripples: 0.1, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
+  hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
+  shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
+  toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
+  firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
+  frostTwigs: 0.3,
+  lanterns: 14, lanternSize: 1, kamakura: 0, yukimi: false, lightEvening: 1.15, lightNight: 1.15, flicker: 0.7, halo: 2.45, pool: 1.6,
   stars: 0.7, moon: true, moonSize: 1, diamondDust: 0.6,
-  // the skiers
-  maxSkiers: 5, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1,
-  skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33, scarfLength: 1.25, scarfFlutter: 0.5,
-  skiShadow: 0.6, tracks: 0.6, trackFade: 40, powder: 0.6,
-  // the plum branches
-  branchCount: 3, branchSize: 0.9, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22,
-  sway: 2.5, swayRandom: 1.7, shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75, barkLight: 0.6, branchDepth: 0.35,
-  // the falling snow
-  flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 5.3, nearBlur: 0.3, fallSpeed: 0.6, flakeSway: 2.05,
-  frontShare: 0.17, landShare: 0.7, meltTime: 16.5, bokeh: 6, backlight: 0.6,
-  // the snowdrift in front of the text and table
-  nearHeight: 53, nearLumps: 0.25, nearShade: 0.3, nearShadow: 1, nearShadowSize: 14,
+  maxSkiers: 5, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1, skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33,
+  scarfLength: 1.25, scarfFlutter: 0.5, skiShadow: 0.6, tracks: 0.6, trackFade: 40, powder: 0.9,
+  torch: true, torchNight: 1, torchEvening: 0.5, torchBeam: 0.7, torchReach: 2.4, torchWidth: 0.35, torchSpill: 1, torchGlow: 0.85, torchBob: 0.5,
+  torchFlakes: 1,
+  branchCount: 3, branchSize: 0.9, branchDroop: 1.7, branchTop: 73, blossoms: 0.9, blossomSize: 1.05, branchSnow: 1.22, sway: 2.5, swayRandom: 1.7,
+  shedEvery: 3, shedAmount: 1, regrow: 2.35, petals: 2.75, barkLight: 0.6, branchDepth: 0.35,
+  flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17, landShare: 0.7,
+  meltTime: 16.5, bokeh: 6, backlight: 0.6,
+  nearHeight: 33, nearLumps: 0.09, nearShade: 0.36, nearShadow: 0.05, nearShadowSize: 19,
   colours: {
-    snow: '#FAFAFC', mist: '#F3EEEC', vermilion: '#E4462A', toriiTop: '#3C2422', toriiFeet: '#2A2220',
-    needle: '#33493D', trunk: '#3C2E2A', bark: '#5E5558', rime: '#FAFAFC', stone: '#9A958E', flame: '#FFAA5A',
-    branch: '#3B2B2A', blossom: '#D93B3B', blossomDeep: '#A8212E', stamen: '#F4D27A'
+    snow: '#FAFAFC',
+    mist: '#F3EEEC',
+    vermilion: '#E4462A',
+    toriiTop: '#3C2422',
+    toriiFeet: '#2A2220',
+    needle: '#33493D',
+    trunk: '#3C2E2A',
+    bark: '#5E5558',
+    rime: '#FAFAFC',
+    stone: '#9A958E',
+    flame: '#FFAA5A',
+    branch: '#3B2B2A',
+    blossom: '#D93B3B',
+    blossomDeep: '#A8212E',
+    stamen: '#F4D27A',
+    torch: '#FFF3D6'
   }
 };
 var MT_DEFAULTS = {
   seed: 7,
-  rangeHeight: 0.14, featureKm: 9.5, sharpness: 0.6, layering: 0.8, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
-  fujiX: 0.77, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.6, fujiSnow: 0.55, fujiTongues: 0.8, fujiClear: 0.9,
-  snowLine: 0.5, snow: 0.9, treeLine: 0.9, forestSnow: 0.7, snowSlope: 0.55,
-  sunStrength: 1.15, ambient: 0.6, shadows: 0.85, alpenglow: 0.6,
-  haze: 0.5, hazeKm: 30, mist: 0.6, mistHeightKm: 0.3, fadeToSky: 0.25, footMist: 0.7,
+  rangeHeight: 0.05, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  fujiX: 0.87, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
+  snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.65, snowSlope: 0.55,
+  sunStrength: 1.15, ambient: 0.65, shadows: 0.7, alpenglow: 0.6,
+  haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
   strength: 1, softness: 0.4, resolution: 0.85,
-  colours: { rock: '#7C7473', fujiRock: '#4E4A55', evergreen: '#33473C', snow: '#F6F7FB', haze: '#DCD8E2' }
+  colours: {
+    rock: '#7C7473',
+    fujiRock: '#4E4A55',
+    evergreen: '#33473C',
+    snow: '#F6F7FB',
+    haze: '#DCD8E2'
+  }
 };
 var V = clone(V_DEFAULTS), MT = clone(MT_DEFAULTS);
 
@@ -464,6 +474,15 @@ function saveClouds() { try { localStorage.setItem(CLOUD_KEY, JSON.stringify(CLO
 CLOUD_DEFAULTS.towers = 0; CLOUD_DEFAULTS.heaps = 1; CLOUD_DEFAULTS.puffs = 2; CLOUD_DEFAULTS.flats = 2; CLOUD_DEFAULTS.banks = 2;
 CLOUD_DEFAULTS.weather.snow.cover = 0.85; CLOUD_DEFAULTS.weather.snow.front = 1;
 SDEF.across = 0.2; SDEF.altitude = 22; SDEF.eveningAltitude = 4;
+/* The values chosen on the tablet, over the defaults above. */
+function deepSet(dst, src) {
+  for (var k in src) {
+    if (src[k] && typeof src[k] === 'object' && !Array.isArray(src[k]) && dst[k] && typeof dst[k] === 'object') deepSet(dst[k], src[k]);
+    else dst[k] = src[k];
+  }
+}
+deepSet(CLOUD_DEFAULTS, {"seed":1,"heaps":1,"masses":1,"towers":0,"puffs":2,"flats":2,"banks":2,"resolution":0.7,"detail":5,"billows":0.5,"edge":0.6,"wisp":0.55,"swirl":0.45,"flatBase":0.4,"density":1.2,"count":18,"size":2.3,"sizeVariety":0.8,"speed":0.85,"nearSun":0.5,"highest":0.05,"lowest":0.45,"block":0.75,"front":{"count":7,"size":1,"speed":0.5,"high":0.15,"low":0.8,"spread":1.6,"opacity":0.92,"thinning":0.7,"thinEvery":1},"shadow":1.6,"ambient":0.5,"baseDark":0.5,"silver":0.4,"sky":"#8FA9D0","times":{"day":{"elevation":40,"front":0.7,"exposure":1.4,"tint":0,"lit":"#FFFFFF","shade":"#FFFFFF","base":"#FFFFFF","opacity":1},"evening":{"elevation":8,"front":0.5,"exposure":1.3,"tint":0.4,"lit":"#FFC4A0","shade":"#AA788C","base":"#966478","opacity":1},"night":{"elevation":60,"front":1,"exposure":1.2,"tint":0.6,"lit":"#969EC4","shade":"#60668E","base":"#50567C","opacity":0.22}},"weather":{"clear":{"cover":0,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"sunny":{"cover":0.3,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"partly":{"cover":0.7,"size":1.2,"opacity":0.92,"speed":1,"front":0.5,"lit":"#FFFFFF","shade":"#ABB3CB","base":"#919AB3"},"thin":{"cover":0,"size":1,"opacity":0.7,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#C5CFE0","base":"#A7B2C6"},"cloudy":{"cover":1,"size":1.7,"opacity":0.95,"speed":1.2,"front":0.9,"lit":"#F0EEF4","shade":"#8A8FA5","base":"#757B92"},"mist":{"cover":0,"size":1,"opacity":0.7,"speed":0.6,"front":0.8,"lit":"#FFFFFF","shade":"#CAD1DA","base":"#ACB4C1"},"rain":{"cover":0.85,"size":1.9,"opacity":0.95,"speed":1.5,"front":1,"lit":"#CECED8","shade":"#70768B","base":"#5F657B"},"snow":{"cover":0.85,"size":1.5,"opacity":0.9,"speed":0.8,"front":1,"lit":"#F4F4F8","shade":"#9EA8BD","base":"#8691A7"}}});
+deepSet(SDEF, {"timeOfDay":"day","show":true,"strength":1,"across":0.2,"below":18,"altitude":22,"eveningAltitude":4,"coreSize":20,"coreSoftness":0.55,"coreBrightness":1,"glow":1.2,"glowSize":8,"glowFalloff":1,"haze":0.45,"hazeSize":24,"warmth":0,"streaks":14,"streakLength":11,"streakVariety":0.75,"longStreaks":3,"streakWidth":1.1,"streakStrength":0.7,"spikes":30,"spikeLength":2.4,"spikeStrength":0.7,"beams":4,"beamStrength":0.22,"beamWidth":1,"irregular":0.75,"seed":3,"turn":4,"shimmer":0.45,"shimmerSpeed":1,"ghosts":0.35,"ghostSize":1,"ring":0.5,"ringSize":9,"condition":"partly","veil":1,"colours":{"core":"#FFFFFF","glow":"#F2FAFF","haze":"#E4F1FF","low":"#FFB47E","ghost":"#D2E2FF"}});
 CLOUD = clone(CLOUD_DEFAULTS); SUN = clone(SDEF);
 
 /* Everything on the panel is kept in this browser. */
@@ -1670,6 +1689,63 @@ function paintSkier(K, t) {
   g.fillStyle = col(K.col.pom); g.beginPath(); g.arc(head[0] - 0.02 * h, head[1] - hr - 0.03 * h, 0.032 * h, 0, TAU); g.fill();
   K.blit = [K.x - ox, gy0 - oy, bw, bh];
   K.feet = gy0;
+  K.head = [head[0], head[1], hr];                         // where the head is, for the torch (feet at 0, 0; up is -y)
+}
+/* ---------- the head torch ----------
+   After dusk each skier wears a lamp on the forehead. By day it is nothing. The light: a small
+   bright lamp with a glow round it, a faint cone of light in the cold air running forward and down
+   from the lamp to the snow, and where the cone meets the snow a soft pool of light. The beam bobs
+   a little with every stride (torchBob), it fades with the distance (haze), and the snowflakes
+   that fall through it are lit (torchFlakes, see drawFlakes). op: how it is laid down ('lighter'
+   on the scene; 'source-over' on a skier's own layer). */
+var torchCol = { key: '', rgb: [255, 243, 214] };
+function torchLevel() {
+  if (!V.torch) return 0;
+  return isNight() ? V.torchNight : V.timeOfDay === 'evening' ? V.torchEvening : 0;
+}
+function torchSpot(K, t) {
+  var h = K.h, bob = Math.sin(K.ph * 2) * 0.5 + 0.5, hx = K.x + K.dir * K.head[0] + K.dir * 0.03 * h;
+  var hy = K.feet + K.head[1] - 0.012 * h;
+  var d0 = V.torchReach * h * (1 + (bob - 0.5) * 0.35 * V.torchBob);               // where the middle of the beam meets the snow
+  return { x: hx, y: hy, d0: d0, gx: hx + K.dir * d0, gy: K.feet + 0.012 * h, bob: bob };
+}
+function drawTorch(c, K, t, ox, oy, op) {
+  var lv = torchLevel();
+  if (lv <= 0.005 || !K.head) return;
+  if (torchCol.key !== V.colours.torch) { torchCol.key = V.colours.torch; torchCol.rgb = hex(V.colours.torch); }
+  var col = torchCol.rgb, h = K.h, S = torchSpot(K, t), haze = V.groundHaze * Math.pow(1 - K.u, 2) * 0.9;
+  var k = lv * (1 - haze * 0.55) * lerp(0.7, 1, K.u);
+  var hx = S.x, hy = S.y, d0 = S.d0, w = V.torchWidth, x1 = hx + K.dir * d0 * (1 - w), x2 = hx + K.dir * d0 * (1 + w);
+  c.save();
+  c.setTransform(PR, 0, 0, PR, -(ox || 0) * PR, -(oy || 0) * PR);
+  c.globalCompositeOperation = op || 'lighter';
+  // the pool of light on the snow where the beam lands: wide and flat, brightest in the middle
+  var pw = Math.abs(x2 - x1) * 0.75 + h * 0.2, ph = pw * 0.2;
+  if (V.torchSpill > 0) {
+    c.save();
+    c.translate((x1 + x2) / 2, S.gy); c.scale(1, ph / pw);
+    var pg = c.createRadialGradient(0, 0, 0, 0, 0, pw);
+    pg.addColorStop(0, rgb(col, 0.55 * V.torchSpill * k)); pg.addColorStop(0.4, rgb(col, 0.25 * V.torchSpill * k)); pg.addColorStop(1, rgb(col, 0));
+    c.fillStyle = pg; c.fillRect(-pw, -pw, pw * 2, pw * 2);
+    c.restore();
+  }
+  // the cone in the air: from the lamp to the snow; three layers, each narrower, so its edges are soft
+  if (V.torchBeam > 0) {
+    var bg = c.createLinearGradient(hx, hy, (x1 + x2) / 2, S.gy);
+    bg.addColorStop(0, rgb(col, 0.5 * V.torchBeam * k)); bg.addColorStop(0.6, rgb(col, 0.16 * V.torchBeam * k)); bg.addColorStop(1, rgb(col, 0.05 * V.torchBeam * k));
+    c.fillStyle = bg;
+    [1, 0.66, 0.36].forEach(function (f) {
+      var a = hx + K.dir * d0 * (1 - w * f), b = hx + K.dir * d0 * (1 + w * f);
+      c.beginPath(); c.moveTo(hx, hy); c.lineTo(a, S.gy + ph * 0.3); c.lineTo(b, S.gy + ph * 0.3); c.closePath(); c.fill();
+    });
+  }
+  // the lamp: a bright point with a glow round it
+  if (V.torchGlow > 0) {
+    var gr = h * 0.2 * V.torchGlow, lg = c.createRadialGradient(hx, hy, 0, hx, hy, gr);
+    lg.addColorStop(0, rgb([255, 255, 255], 0.95 * k)); lg.addColorStop(0.18, rgb(col, 0.7 * k)); lg.addColorStop(1, rgb(col, 0));
+    c.fillStyle = lg; c.fillRect(hx - gr, hy - gr, gr * 2, gr * 2);
+  }
+  c.restore();
 }
 /* The skier's shadow: its outline, laid on the snow away from the sun (ox, oy: where c's own origin is, CSS px). */
 function skierShadow(c, K, ox, oy) {
@@ -1696,6 +1772,7 @@ function drawSkier(c, K, t) {
   c.setTransform(PR, 0, 0, PR, 0, 0);
   c.imageSmoothingEnabled = true;
   c.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
+  drawTorch(c, K, t);
 }
 /* #dynNear: the skiers that pass the page dots (as in the app), with their shadows and powder: on a
    small layer of their own, hidden where the nearer swells cover them and washed by the low mist. */
@@ -1712,6 +1789,7 @@ function drawFrontSkiers(c, t) {
     f.setTransform(PR, 0, 0, PR, -bx * PR, -by * PR);
     f.imageSmoothingEnabled = true;
     f.drawImage(K.cnv, K.blit[0], K.blit[1], K.blit[2], K.blit[3]);
+    drawTorch(f, K, t, bx, by, 'source-over');
     f.setTransform(1, 0, 0, 1, 0, 0);
     f.globalCompositeOperation = 'destination-out';
     for (var j = 0; j < WS.slabs.length; j++) {
@@ -2193,6 +2271,11 @@ function bakeFlakes() {
   wg.addColorStop(0, rgb(mix(fl, [255, 255, 255], 0.5), 1)); wg.addColorStop(0.4, rgb(fl, 0.6)); wg.addColorStop(1, rgb(fl, 0));
   w.fillStyle = wg; w.fillRect(0, 0, 64, 64);
   WS.warmSpr = wc;
+  var tc = document.createElement('canvas'); tc.width = tc.height = 64;
+  var tt = tc.getContext('2d'), tg2 = tt.createRadialGradient(32, 32, 0, 32, 32, 32), tcol = hex(V.colours.torch);
+  tg2.addColorStop(0, rgb(mix(tcol, [255, 255, 255], 0.5), 1)); tg2.addColorStop(0.4, rgb(tcol, 0.6)); tg2.addColorStop(1, rgb(tcol, 0));
+  tt.fillStyle = tg2; tt.fillRect(0, 0, 64, 64);
+  WS.torchSpr = tc;
 }
 function flake(c, x, y, rad, blurPx) {
   var lv = Math.round(clamp(blurPx / Math.max(0.3, rad) / WIN_QMAX, 0, 1) * (WIN_LEVELS - 1));
@@ -2249,6 +2332,8 @@ function drawFlakes(c, from, to) {
   var F = WS.flakes, bl = V.backlight;
   var sunOn = bl > 0 && !isNight() && SUN.show ? (1 - sunOccl) * COND_SUN[SUN.condition] : 0, P = sunPlace();
   var lamps = bl > 0 ? nightLights() : 0, LL = WS.lights;
+  var tl = V.torchFlakes > 0 ? torchLevel() : 0, TS = [];
+  if (tl > 0) for (var q = 0; q < WS.skiers.length; q++) if (WS.skiers[q].head) { var Sq = torchSpot(WS.skiers[q], 0); Sq.r = WS.skiers[q].h; Sq.dir = WS.skiers[q].dir; TS.push(Sq); }
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < F.length; i++) {
     var f = F[i];
@@ -2263,6 +2348,23 @@ function drawFlakes(c, from, to) {
       for (var j = 0; j < LL.length; j++) {
         var Lj = LL[j], dl = Math.hypot(f.x - Lj.x, f.y - Lj.y) / (Lj.r * 5);
         if (dl < 1.5) { var gl = lamps * Math.exp(-dl * dl * 2); if (gl > g) { g = gl; warm = true; } }
+      }
+    }
+    if (TS.length) {                                           // lit by a skier's head torch: inside the cone
+      var gt = 0;
+      for (var j2 = 0; j2 < TS.length; j2++) {
+        var T2 = TS[j2], fx = (f.x - T2.x) * T2.dir;
+        if (fx < 0 || fx > T2.d0 * 1.45) continue;
+        var u2 = fx / (T2.d0 * 1.2), cy = lerp(T2.y, T2.gy, Math.min(1, u2)), half = (T2.r * 0.05 + fx * 0.4 * V.torchWidth) + 2;
+        var off = Math.abs(f.y - cy) / half;
+        if (off < 1) gt = Math.max(gt, tl * V.torchFlakes * (1 - off * off) * (1 - u2 * 0.5));
+      }
+      if (gt > 0.03) {
+        var tr = (rad + blr) * 1.8;
+        c.globalCompositeOperation = 'lighter';
+        c.globalAlpha = clamp(gt * a, 0, 1);
+        c.drawImage(WS.torchSpr, f.x - tr, f.y - tr, tr * 2, tr * 2);
+        c.globalCompositeOperation = 'source-over';
       }
     }
     if (g * bl > 0.03) {
@@ -2350,6 +2452,7 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  skier: function () { spawnSkier(); },
   report: function () {
     return 'Winter Lab 2 report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
@@ -2801,6 +2904,7 @@ var G = [
     { o: 'V', k: 'pool', label: 'Light on the snow', min: 0, max: 3, step: 0.05, re: 'live' },
     { col: 'V', keys: [['flame', 'Candlelight'], ['stone', 'Stone']], re: 'ground' } ] },
   { name: 'Skiers', ctls: [
+    { btn: 'skier', label: 'Send a skier' },
     { o: 'V', k: 'maxSkiers', label: 'At most at once', min: 0, max: 10, step: 1, re: 'live' },
     { o: 'V', k: 'skiGapMin', label: 'A new one after at least (s)', min: 0.5, max: 20, step: 0.5, re: 'live' },
     { o: 'V', k: 'skiGapMax', label: '… and at most (s)', min: 1, max: 40, step: 0.5, re: 'live' },
@@ -2817,6 +2921,18 @@ var G = [
     { o: 'V', k: 'tracks', label: 'Ski tracks', min: 0, max: 1, step: 0.01, re: 'live' },
     { o: 'V', k: 'trackFade', label: 'Tracks fade after (s)', min: 3, max: 180, step: 1, re: 'live' },
     { o: 'V', k: 'powder', label: 'Powder kicked up', min: 0, max: 1.5, step: 0.05, re: 'live' } ] },
+  { name: 'Skiers\' head torches', note: 'Lit after dusk: try Evening or Night.', ctls: [
+    { chk: 'V', k: 'torch', label: 'Head torches', re: 'live' },
+    { o: 'V', k: 'torchNight', label: 'Brightness at night', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'torchEvening', label: 'Brightness in the evening', min: 0, max: 2.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'torchBeam', label: 'Beam in the air', min: 0, max: 3, step: 0.05, re: 'live', note: 'The faint cone of light from the lamp to the snow.' },
+    { o: 'V', k: 'torchReach', label: 'How far ahead it lands', min: 0.8, max: 5, step: 0.05, re: 'live', note: 'In body heights: further = the beam is flatter.' },
+    { o: 'V', k: 'torchWidth', label: 'Beam width', min: 0.05, max: 0.8, step: 0.01, re: 'live' },
+    { o: 'V', k: 'torchSpill', label: 'Light on the snow', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'torchGlow', label: 'Glow round the lamp', min: 0, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'torchBob', label: 'Beam bobbing with the stride', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'torchFlakes', label: 'Snowflakes lit in the beam', min: 0, max: 2, step: 0.05, re: 'live' },
+    { col: 'V', keys: [['torch', 'Light']], re: 'sprites' } ] },
   { name: 'Plum branches', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
@@ -2915,7 +3031,7 @@ function control(c) {
   if (c.btn) {
     row = document.createElement('div'); row.className = 'sp-row';
     var b = document.createElement('button'); b.type = 'button'; b.textContent = c.label;
-    b.addEventListener('click', function () { lab.gust(); });
+    b.addEventListener('click', function () { lab[c.btn](); });
     row.appendChild(b);
     return row;
   }
