@@ -215,13 +215,13 @@ function draw(c, o) {
     for (i = 1; i <= n; i++) c.lineTo(crest[i][0], crest[i][1] + H0 * 0.06);
     c.stroke();
     c.filter = 'none';
-    // the grain: tiny bright and cool flecks
-    var nF = Math.round((x1 - x0) * Math.max(0.6, H0 * 0.08));
+    // the grain: a few tiny, faint bright and cool flecks
+    var nF = Math.round((x1 - x0) * Math.max(0.3, H0 * 0.04));
     for (i = 0; i < nF; i++) {
       var k = Math.floor(r() * n), q = r(), fx = lerp(crest[k][0], lip[k][0], q), fy = lerp(crest[k][1], lip[k][1], q);
       var bright = r() < 0.55;
-      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.25, 0.6, r()).toFixed(2) + ')' : rgb(snowUnder, lerp(0.12, 0.3, r()));
-      c.beginPath(); c.arc(fx + (r() - 0.5) * 2, fy, Math.max(0.35, H0 * lerp(0.015, 0.05, r())), 0, TAU); c.fill();
+      c.fillStyle = bright ? 'rgba(255,255,255,' + lerp(0.1, 0.25, r()).toFixed(2) + ')' : rgb(snowUnder, lerp(0.05, 0.12, r()));
+      c.beginPath(); c.arc(fx + (r() - 0.5) * 2, fy, Math.max(0.25, H0 * lerp(0.008, 0.022, r())), 0, TAU); c.fill();
     }
     c.restore();
     crest.forEach(function (q) { minY = Math.min(minY, q[1]); minX = Math.min(minX, q[0]); maxX = Math.max(maxX, q[0]); });
