@@ -22,6 +22,9 @@
 
    Use:
      var cnv = Mountains.render(o);   // a canvas, or null (no WebGL 2)
+     var job = Mountains.start(o, 8); // the same picture a band at a time: call job.step()
+                                      // once a frame; it returns null until the last band,
+                                      // then a 2D canvas (false if the context was lost)
      Mountains.state()                // 'ok', 'lost' (the graphics chip took the context
                                       // away for a moment: try again soon) or 'none'
      Mountains.losses()               // how many times it was taken away: if this has gone
@@ -322,7 +325,7 @@ function compile(type, src) {
    for in its place: after a loss Chrome may refuse new ones. While it is
    lost, render() returns null and state() says 'lost', so the caller can
    try again a moment later. */
-var lost = false, ready = false, losses = 0;   // losses: how many times the context was taken away
+var lost = false, ready = false, losses = 0, lostAt = 0, renewals = 0;   // losses: how many times the context was taken away
 function create() {
   if (cnv) return !!gl;
   try {
@@ -332,10 +335,11 @@ function create() {
   if (!gl) { failed = true; return false; }
   cnv.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
-    lost = true; ready = false; losses++; prog = null; U = {};
+    if (this !== cnv) return;                        // an old canvas, given up on (see init)
+    lost = true; ready = false; losses++; gen++; lostAt = performance.now(); prog = null; U = {};
     grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
   });
-  cnv.addEventListener('webglcontextrestored', function () { lost = false; });
+  cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
   return true;
 }
 function setup() {
@@ -361,10 +365,15 @@ function setup() {
 }
 function init() {
   if (failed || !create()) return false;
+  // after a reset of the graphics chip Chrome may never give the context back: after 8 s, ask for a fresh one (at most 3 times)
+  if (lost && renewals < 3 && performance.now() - lostAt > 8000) { renewals++; cnv = null; gl = null; lost = false; ready = false; if (!create()) return false; }
   if (lost || gl.isContextLost()) return false;
   return ready || setup();
 }
-function state() { return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok'; }
+function state() {
+  if (lost && renewals < 3 && performance.now() - lostAt > 8000) init();   // time to ask for a fresh context
+  return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok';
+}
 /* The ground is one grid: columns across the screen, rows spaced evenly
    in 1 / distance, so each row is about the same height on the screen. */
 function buildGrid(cols, rows) {
@@ -389,8 +398,17 @@ function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
 
 function render(o, mode) {
   if (!init()) return null;
-  var W = o.screenW, H = o.screenH;
   if (cnv.width !== o.width || cnv.height !== o.height) { cnv.width = o.width; cnv.height = o.height; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  drawInto(o, mode, cnv.width, cnv.height, true, null);
+  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));   // waits for the drawing to finish, so it is timed truly
+  if (gl.isContextLost()) return null;                // lost while drawing: nothing was drawn
+  return cnv;
+}
+/* The drawing itself, into whatever is bound, PW × PH px; clear: start afresh; band: [y0, y1) px
+   from the bottom, or null for all of it. */
+function drawInto(o, mode, PW, PH, clear, band) {
+  var W = o.screenW, H = o.screenH;
 
   // The camera: a little above the ground, looking level. Its eye line sits
   // just above where the ground in front starts, so the far valleys show.
@@ -406,17 +424,21 @@ function render(o, mode) {
   var fR = fH * d(o, 'fujiWidth', 2.6);
   var seed = d(o, 'seed', 7);
 
-  gl.viewport(0, 0, cnv.width, cnv.height);
-  gl.clearColor(0, 0, 0, 0);
-  gl.clearDepth(1);
-  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.viewport(0, 0, PW, PH);
+  gl.disable(gl.SCISSOR_TEST);
+  if (clear) {
+    gl.clearColor(0, 0, 0, 0);
+    gl.clearDepth(1);
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  }
+  if (band) { gl.enable(gl.SCISSOR_TEST); gl.scissor(0, band[0], PW, band[1] - band[0]); }
   gl.enable(gl.DEPTH_TEST);
   gl.depthFunc(gl.LESS);
   gl.disable(gl.CULL_FACE);
   gl.useProgram(prog);
 
-  var cols = Math.min(1600, Math.max(200, Math.round(cnv.width / 1.5)));
-  var rows = Math.min(900, Math.max(150, Math.round(cnv.height / 1.2)));
+  var cols = Math.min(1600, Math.max(200, Math.round(PW / 1.5)));
+  var rows = Math.min(900, Math.max(150, Math.round(PH / 1.2)));
   buildGrid(cols, rows);
   gl.bindBuffer(gl.ARRAY_BUFFER, grid.vbo);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, grid.ibo);
@@ -479,9 +501,64 @@ function render(o, mode) {
   u1('uMode', mode || 0);
 
   gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);
-  gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array(4));   // waits for the drawing to finish, so it is timed truly
-  if (gl.isContextLost()) return null;                // lost while drawing: nothing was drawn
-  return cnv;
+  gl.disable(gl.SCISSOR_TEST);
+}
+
+/* Drawing the whole picture at once can keep the graphics chip busy for
+   seconds (with a low sun the shadows cost the most), and on the tablet
+   that resets the chip: every picture on the page is wiped. start(o)
+   draws the same picture a band at a time instead: each step() draws one
+   band (call it once a frame) into a buffer of its own, and the last one
+   gives the picture back as a 2D canvas. step() returns null while it is
+   not done yet, and false if the context was lost on the way. */
+var gen = 0;                                          // goes up with every loss, so a job from before one stops
+function start(o, bands) {
+  if (!init()) return null;
+  var PW = o.width, PH = o.height, n = Math.max(1, bands || 8), k = 0, myGen = gen;
+  var fb = gl.createFramebuffer(), tx = gl.createTexture(), db = gl.createRenderbuffer();
+  gl.bindTexture(gl.TEXTURE_2D, tx);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PW, PH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.bindRenderbuffer(gl.RENDERBUFFER, db);
+  gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, PW, PH);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+  gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, db);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  function free() {
+    if (gen !== myGen || !gl) return;
+    gl.deleteFramebuffer(fb); gl.deleteTexture(tx); gl.deleteRenderbuffer(db);
+  }
+  function step() {
+    if (gen !== myGen || !init()) return false;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    var y0 = Math.floor(PH * k / n), y1 = Math.floor(PH * (k + 1) / n);
+    drawInto(o, 0, PW, PH, k === 0, [y0, y1]);
+    k++;
+    if (k < n) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.flush(); return gl.isContextLost() ? false : null; }
+    // done: read it back (premultiplied, upside down) into a 2D canvas
+    var px = new Uint8Array(PW * PH * 4);
+    gl.readPixels(0, 0, PW, PH, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    var lostNow = gl.isContextLost();
+    free();
+    if (lostNow) return false;
+    var out = document.createElement('canvas'); out.width = PW; out.height = PH;
+    var c2 = out.getContext('2d'), img = c2.createImageData(PW, PH), d2 = img.data, row = PW * 4;
+    for (var y = 0; y < PH; y++) {
+      var src = (PH - 1 - y) * row, dst = y * row;
+      for (var x = 0; x < row; x += 4) {
+        var a = px[src + x + 3];
+        if (!a) continue;
+        var m = 255 / a;
+        d2[dst + x] = px[src + x] * m; d2[dst + x + 1] = px[src + x + 1] * m; d2[dst + x + 2] = px[src + x + 2] * m; d2[dst + x + 3] = a;
+      }
+    }
+    c2.putImageData(img, 0, 0);
+    return out;
+  }
+  return { step: step, bands: n, cancel: free };
 }
 
 /* The same mountains as render(o), as a map of how strongly each point
@@ -492,6 +569,6 @@ function render(o, mode) {
    so draw that one away first. */
 function reflectance(o) { return render(o, 1); }
 
-return { render: render, reflectance: reflectance, supported: function () { return init(); }, state: state,
+return { render: render, reflectance: reflectance, start: start, supported: function () { return init(); }, state: state,
          losses: function () { return losses; } };
 })();
