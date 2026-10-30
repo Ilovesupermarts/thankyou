@@ -123,6 +123,7 @@
   .sp-group h4::after { content: '▾'; font-size: 12px; }
   .sp-group.folded h4::after { content: '▸'; }
   .sp-group.folded .sp-gbody { display: none; }
+  .sp-report { max-height: 180px; overflow-y: auto; font-size: 10px !important; line-height: 1.35; }
   .sp-gnote { display: block; color: rgba(60, 60, 67, 0.6); font-size: 11px; line-height: 1.35; margin-bottom: 4px; }
 
 </style>
@@ -531,8 +532,20 @@ function mk() { var c = document.createElement('canvas'); watchCanvas(c); return
    pictures that are drawn once and kept. When it gives a canvas back,
    everything is baked again, once. */
 var restoreTimer = 0;
+/* A report of what happens on the tablet (shown on the panel, "Copy report"): the graphics
+   contexts being taken away and given back, each bake step and how it went, and any error. */
+var REPORT = [], t00 = performance.now();
+function note(msg) {
+  var line = ((performance.now() - t00) / 1000).toFixed(1) + 's ' + msg;
+  REPORT.push(line);
+  if (REPORT.length > 120) REPORT.shift();
+}
+window.addEventListener('error', function (e) { note('ERROR ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'); });
+var lost2d = 0;
 function watchCanvas(c) {
+  c.addEventListener('contextlost', function () { lost2d++; note('a 2D picture was wiped (' + c.width + '×' + c.height + ')'); });
   c.addEventListener('contextrestored', function () {
+    note('a 2D picture was given back: baking everything again');
     clearTimeout(restoreTimer);
     restoreTimer = setTimeout(function () { resize(); rebuildAll(); cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
   });
@@ -623,7 +636,7 @@ function bakeScenery() {
   if (V.showMountains) {
     var t0 = performance.now(), g3 = typeof Mountains !== 'undefined' ? Mountains.render(mtnOptions(hy)) : null;
     // the graphics chip took the context away for a moment: keep the old picture and try again soon
-    if (!g3 && typeof Mountains !== 'undefined' && Mountains.state && Mountains.state() === 'lost') { glRetry.mtn = true; return; }
+    if (!g3 && typeof Mountains !== 'undefined' && Mountains.state && Mountains.state() === 'lost') { glRetry.mtn = true; WS.waited = true; return; }
   }
   m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MTN.cnv.width, MTN.cnv.height);
   mtn3d = false;
@@ -635,12 +648,12 @@ function bakeScenery() {
       m.filter = px > 0.05 ? 'blur(' + px.toFixed(2) + 'px)' : 'none';
       m.drawImage(g3, 0, 0, MTN.cnv.width, MTN.cnv.height);
       m.restore();
-      WS.mtnLoss = Mountains.losses();
+      if (typeof Mountains.losses === 'function') WS.mtnLoss = Mountains.losses();
       // Chrome can take the context away just after the drawing, leaving the picture blank without
       // saying so: look along the mountains' foot, and if nothing is there, draw them again soon
       var row = m.getImageData(0, Math.max(0, Math.round((hy - H * MT.rangeHeight * 0.25) * SR)), MTN.cnv.width, 1).data, seen = 0;
       for (var q = 3; q < row.length; q += 16) if (row[q] > 8) seen++;
-      if (seen < 3) { glRetry.mtn = true; glRetry.mtnTries = (glRetry.mtnTries || 0) + 1; }
+      if (seen < 3) { glRetry.mtn = true; glRetry.mtnTries = (glRetry.mtnTries || 0) + 1; note('the mountains came out blank (try ' + glRetry.mtnTries + ')'); }
       else glRetry.mtnTries = 0;
     } else {                                                    // no WebGL 2: three soft pale ridges
       var r = rngFrom(V.seed * 131 + 17), mc = hex(MT.colours.haze);
@@ -1282,8 +1295,8 @@ function bakeGround() {
               relief: V.relief, roll: V.roll, drifts: V.drifts, ripples: V.ripples, rippleSize: V.rippleSize,
               rippleAngle: V.rippleAngle, grain: V.grain, hollows: V.hollows, sheen: V.sheen, seed: V.seed };
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
-  if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') { glRetry.ground = true; if (WS.slabs.length) return; }
-  var old = WS.slabs; WS.slabs = [];
+  if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') { glRetry.ground = true; if (WS.slabs.length) { WS.waited = true; return; } }
+  var old = WS.slabs; WS.slabs = []; WS.sfGL = false;
   for (k = 0; k < N; k++) {
     var S0 = swells[k], top = S0.yk - S0.amp - 8;
     for (b = 0; b < S0.things.length; b++) top = Math.min(top, thingTop(S0.things[b]) - 12);
@@ -1298,7 +1311,7 @@ function bakeGround() {
     tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, cw, ch);
     var sf = gl3 ? Snowfield.render(sfo, k, top, bottom) : null;
     if (gl3 && !sf) glRetry.ground = true;                       // lost on the way: plain swells for now, the real ones soon
-    if (sf) tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch);
+    if (sf) { tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch); WS.sfGL = true; }
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) flatSwell(tg, S0, S0.haze);
     for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
@@ -1351,7 +1364,7 @@ function bakeGround() {
   var e = Math.max(2.5, LT.el) * PI / 180, az = V.sunAzimuth * PI / 180, cot = Math.min(7, 1 / Math.tan(e)) * V.shadowLength;
   WS.shadow = { sx: clamp(-Math.sin(az) * cot, -3.5, 3.5), sy: clamp(-Math.cos(az) * cot * 0.35, -0.9, 0.9), col: rgb(SHADE), k: V.skiShadow * LT.vis };
   WS.trackLo = rgb(mix(SHADE, lit(C.snow, 0, 0.6, 0.8, 0), 0.3)); WS.trackHi = rgb(lit(C.snow, LT.dir[0] * 0.5, 1, 0.3, 1));
-  if (gl3) WS.sfLoss = Snowfield.losses();
+  if (gl3 && typeof Snowfield.losses === 'function') WS.sfLoss = Snowfield.losses();
   fieldMs = performance.now() - t0;
 }
 /* #dynBack: each slice, then on it the tracks, the skiers, the powder they kick up and the lights. */
@@ -2235,6 +2248,7 @@ window.winterLab = {
     dirtyAt = nowT;
   },
   setTime: function (tod) {
+    note('time of day: ' + tod);
     V.timeOfDay = SUN.timeOfDay = tod;
     document.documentElement.setAttribute('data-time', tod);
     sunDirty = true; saveAll();
@@ -2249,6 +2263,10 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  report: function () {
+    return 'Winter Lab 2 report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
+           ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
+  },
   busy: function () { return stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
@@ -2303,6 +2321,29 @@ function rebuildAll() {
   dirty = {};
   stages = ['mtn', 'near', 'ground', 'sprites'];
 }
+var stageAt = 0, glSeen = '';
+/* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
+function safeStage(st) {
+  var t0 = performance.now();
+  WS.waited = false;
+  try { runStage(st); }
+  catch (e) { note('ERROR in ' + st + ': ' + e.message); glRetry[st === 'mtn' ? 'mtn' : 'ground'] = true; return; }
+  var ms = Math.round(performance.now() - t0);
+  if (WS.waited) { note((st === 'mtn' ? 'mountains' : 'snowfield') + ': its WebGL context is away, the old picture is kept until it is back'); return; }
+  if (st === 'mtn') note('mountains: ' + (mtn3d ? '3D' : V.showMountains ? 'not drawn (WebGL: ' + glState('M') + ')' : 'off') + ', ' + ms + ' ms' + (glRetry.mtn ? ', again soon' : ''));
+  else if (st === 'ground') note('snowfield: ' + (WS.sfGL ? 'lit' : 'plain (WebGL: ' + glState('S') + ')') + ', ' + ms + ' ms' + (glRetry.ground ? ', again soon' : ''));
+  else note(st + ': ' + ms + ' ms');
+}
+function glState(w) {
+  var M = w === 'M' ? (typeof Mountains !== 'undefined' ? Mountains : null) : (typeof Snowfield !== 'undefined' ? Snowfield : null);
+  if (!M) return 'missing file';
+  return typeof M.state === 'function' ? M.state() + (typeof M.losses === 'function' ? ', lost ' + M.losses() + '×' : '') : 'old file';
+}
+/* Every change in the two WebGL contexts goes into the report. */
+function watchGL() {
+  var k = glState('M') + ' / ' + glState('S');
+  if (k !== glSeen) { glSeen = k; note('WebGL mountains: ' + glState('M') + ' · snowfield: ' + glState('S')); }
+}
 function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
@@ -2329,23 +2370,29 @@ function rebake() {
 function checkRetry(t) {
   if (t < retryAt) return;
   retryAt = t + 1;
-  if (typeof Mountains !== 'undefined' && Mountains.state() === 'ok') {
+  var hasM = typeof Mountains !== 'undefined' && typeof Mountains.state === 'function';
+  var hasS = typeof Snowfield !== 'undefined' && typeof Snowfield.state === 'function';
+  if (hasM && Mountains.state() === 'ok') {
     // drawn while lost, drawn blank (at most 6 times in a row), or lost since it was drawn
-    if ((glRetry.mtn && (glRetry.mtnTries || 0) <= 6) || (mtn3d && WS.mtnLoss !== undefined && Mountains.losses() !== WS.mtnLoss)) {
+    var lostSince = mtn3d && WS.mtnLoss !== undefined && Mountains.losses() !== WS.mtnLoss;
+    if ((glRetry.mtn && (glRetry.mtnTries || 0) <= 6) || lostSince) {
+      note('mountains again: ' + (lostSince ? 'their context was lost after they were drawn' : 'the last try did not work'));
       glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn');
     }
   }
-  if (typeof Snowfield !== 'undefined' && Snowfield.state() === 'ok') {
-    if (glRetry.ground || (WS.sfLoss !== undefined && Snowfield.losses() !== WS.sfLoss)) {
+  if (hasS && Snowfield.state() === 'ok') {
+    var lostS = WS.sfLoss !== undefined && Snowfield.losses() !== WS.sfLoss;
+    if (glRetry.ground || lostS) {
+      note('snowfield again: ' + (lostS ? 'its context was lost after it was drawn' : 'the last try did not work'));
       glRetry.ground = false; WS.sfLoss = Snowfield.losses(); stages.push('ground');
     }
   }
   // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
   if (t < wipeAt) return;
   wipeAt = t + 3;
-  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizon - H * MT.rangeHeight * 0.25) * SR)) stages.push('mtn');
+  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizon - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn'); }
   var SL = WS.slabs[WS.slabs.length - 1];
-  if (SL && SL.cnv.height > 2 && blankRow(SL, SL.cnv.height - 2)) stages.push('ground');
+  if (SL && SL.cnv.height > 2 && blankRow(SL, SL.cnv.height - 2)) { note('the snowfield picture is empty: drawing it again'); stages.push('ground'); }
 }
 
 var last = 0, barTimer = 0;
@@ -2353,8 +2400,10 @@ function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
   last = t; nowT = t;
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
-  if (stages.length) { var st = stages.shift(); if (stages.indexOf(st) < 0) runStage(st); }   // one step a frame (a step asked for twice runs once)
-  else checkRetry(t);
+  // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
+  if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
+  else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
+  watchGL();
   barTimer -= dt;
   if (barTimer <= 0) { measureDots(); barTimer = 0.5; }
   updateGusts(dt);
@@ -2544,6 +2593,8 @@ if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
 var G = [
+  { name: 'Report', note: 'What happened on this tablet. After changing the time of day, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
+    { report: true } ] },
   { name: 'Time and weather', ctls: [
     { sel: 'time' }, { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
@@ -2755,6 +2806,21 @@ function control(c) {
       else { OBJ.SUN.condition = sel.value; lab.changed('all'); }
     });
     row.appendChild(sel);
+    return row;
+  }
+  if (c.report) {
+    row = document.createElement('div');
+    var pre = document.createElement('pre'); pre.className = 'shown sp-report';
+    var cp = document.createElement('button'); cp.type = 'button'; cp.textContent = 'Copy report';
+    function show() { var t = lab.report().split('\n'); pre.textContent = t.slice(Math.max(1, t.length - 12)).join('\n'); }
+    show(); setInterval(show, 1000);
+    cp.addEventListener('click', function () {
+      var text = lab.report();
+      var out = document.getElementById('spOut'); out.textContent = text; out.classList.add('shown');
+      if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(function () { cp.textContent = 'Copied'; setTimeout(function () { cp.textContent = 'Copy report'; }, 1500); }).catch(function () {});
+    });
+    var rr = document.createElement('div'); rr.className = 'sp-row'; rr.appendChild(cp);
+    row.appendChild(pre); row.appendChild(rr);
     return row;
   }
   if (c.btn) {
