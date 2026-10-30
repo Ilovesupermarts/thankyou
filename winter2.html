@@ -1704,7 +1704,8 @@ function torchLevel() {
   return isNight() ? V.torchNight : V.timeOfDay === 'evening' ? V.torchEvening : 0;
 }
 /* One soft cone, lying along +x from its point (left, middle) to its wide end (right), in the
-   light's colour: it fades along its length and fades smoothly to nothing toward its sides. */
+   light's colour: it widens from a point at the lamp, fades along its length and fades smoothly
+   to nothing toward its sides. */
 var torchBeamSpr = null, torchBeamKey = '';
 function torchBeamSprite(col) {
   var key = col.join(',');
@@ -1714,8 +1715,9 @@ function torchBeamSprite(col) {
   cnv.width = w; cnv.height = h;
   var c = cnv.getContext('2d'), img = c.createImageData(w, h), d = img.data;
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
-    var u = (x + 0.5) / w, v = ((y + 0.5) / h - 0.5) * 2;                  // 0 … 1 along it, -1 … 1 across
-    var across = Math.exp(-v * v * 2.6) * Math.pow(1 - Math.min(1, v * v), 1.5);
+    var u = (x + 0.5) / w, v = ((y + 0.5) / h - 0.5) * 2;                  // 0 … 1 along it, -1 … 1 across the full width
+    var vn = v / (0.02 + 0.98 * u);                                          // across the cone's own width here: a point at the lamp
+    var across = Math.abs(vn) >= 1 ? 0 : Math.exp(-vn * vn * 2.4) * Math.pow(1 - vn * vn, 1.5);
     var along = Math.pow(1 - u, 1.1) * (1 - Math.exp(-u * 40)) + 0.18 * (1 - u);   // bright at the lamp, fading toward the snow
     var a = across * along, o = (y * w + x) * 4;
     d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = Math.min(255, Math.floor(a * 255 + Math.random()));
@@ -1725,8 +1727,8 @@ function torchBeamSprite(col) {
   return cnv;
 }
 function torchSpot(K, t) {
-  var h = K.h, bob = Math.sin(K.ph * 2) * 0.5 + 0.5, hx = K.x + K.dir * K.head[0] + K.dir * 0.03 * h;
-  var hy = K.feet + K.head[1] - 0.012 * h;
+  var h = K.h, bob = Math.sin(K.ph * 2) * 0.5 + 0.5, hx = K.x + K.dir * (K.head[0] + K.head[2] * 0.95);   // on the forehead, at the front of the head
+  var hy = K.feet + K.head[1] - K.head[2] * 0.15;
   var d0 = V.torchReach * h * (1 + (bob - 0.5) * 0.35 * V.torchBob);               // where the middle of the beam meets the snow
   return { x: hx, y: hy, d0: d0, gx: hx + K.dir * d0, gy: K.feet + 0.012 * h, bob: bob };
 }
@@ -1763,8 +1765,8 @@ function drawTorch(c, K, t, ox, oy, op) {
   }
   // the lamp: a bright point with a glow round it
   if (V.torchGlow > 0) {
-    var gr = h * 0.2 * V.torchGlow, lg = c.createRadialGradient(hx, hy, 0, hx, hy, gr);
-    lg.addColorStop(0, rgb([255, 255, 255], 0.95 * k)); lg.addColorStop(0.18, rgb(col, 0.7 * k)); lg.addColorStop(1, rgb(col, 0));
+    var gr = h * 0.1 * V.torchGlow, lg = c.createRadialGradient(hx, hy, 0, hx, hy, gr);
+    lg.addColorStop(0, rgb([255, 255, 255], 0.95 * k)); lg.addColorStop(0.25, rgb(col, 0.55 * k)); lg.addColorStop(0.6, rgb(col, 0.15 * k)); lg.addColorStop(1, rgb(col, 0));
     c.fillStyle = lg; c.fillRect(hx - gr, hy - gr, gr * 2, gr * 2);
   }
   c.restore();
@@ -1803,7 +1805,9 @@ function drawFrontSkiers(c, t) {
     var K = WS.skiers[i];
     if (!K.dots) continue;
     paintSkier(K, t);
-    var bx = K.blit[0] - K.h * 2, by = K.blit[1] - K.h * 0.5, bw = K.blit[2] + K.h * 4, bh = K.blit[3] + K.h;
+    // the layer holds the skier and, after dusk, the whole of its beam and the pool of light on the snow
+    var ext = Math.max(K.h * 2, torchLevel() > 0.005 ? K.h * (V.torchReach * (1 + V.torchWidth) * 1.15 + 0.7) : 0);
+    var bx = K.blit[0] - ext, by = K.blit[1] - K.h * 0.5, bw = K.blit[2] + ext * 2, bh = K.blit[3] + K.h;
     var fw = Math.ceil(bw * PR), fh = Math.ceil(bh * PR), F = FTMP, f = F.c;
     if (F.cnv.width !== fw || F.cnv.height !== fh) { F.cnv.width = fw; F.cnv.height = fh; }
     f.setTransform(1, 0, 0, 1, 0, 0); f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, fw, fh);
