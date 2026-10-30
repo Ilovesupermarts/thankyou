@@ -1703,6 +1703,27 @@ function torchLevel() {
   if (!V.torch) return 0;
   return isNight() ? V.torchNight : V.timeOfDay === 'evening' ? V.torchEvening : 0;
 }
+/* One soft cone, lying along +x from its point (left, middle) to its wide end (right), in the
+   light's colour: it fades along its length and fades smoothly to nothing toward its sides. */
+var torchBeamSpr = null, torchBeamKey = '';
+function torchBeamSprite(col) {
+  var key = col.join(',');
+  if (torchBeamSpr && torchBeamKey === key) return torchBeamSpr;
+  torchBeamKey = key;
+  var w = 256, h = 128, cnv = torchBeamSpr || document.createElement('canvas');
+  cnv.width = w; cnv.height = h;
+  var c = cnv.getContext('2d'), img = c.createImageData(w, h), d = img.data;
+  for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+    var u = (x + 0.5) / w, v = ((y + 0.5) / h - 0.5) * 2;                  // 0 … 1 along it, -1 … 1 across
+    var across = Math.exp(-v * v * 2.6) * Math.pow(1 - Math.min(1, v * v), 1.5);
+    var along = Math.pow(1 - u, 1.1) * (1 - Math.exp(-u * 40)) + 0.18 * (1 - u);   // bright at the lamp, fading toward the snow
+    var a = across * along, o = (y * w + x) * 4;
+    d[o] = col[0]; d[o + 1] = col[1]; d[o + 2] = col[2]; d[o + 3] = Math.min(255, Math.floor(a * 255 + Math.random()));
+  }
+  c.putImageData(img, 0, 0);
+  torchBeamSpr = cnv;
+  return cnv;
+}
 function torchSpot(K, t) {
   var h = K.h, bob = Math.sin(K.ph * 2) * 0.5 + 0.5, hx = K.x + K.dir * K.head[0] + K.dir * 0.03 * h;
   var hy = K.feet + K.head[1] - 0.012 * h;
@@ -1729,15 +1750,16 @@ function drawTorch(c, K, t, ox, oy, op) {
     c.fillStyle = pg; c.fillRect(-pw, -pw, pw * 2, pw * 2);
     c.restore();
   }
-  // the cone in the air: from the lamp to the snow; three layers, each narrower, so its edges are soft
+  // the cone in the air: one smooth beam from the lamp to the snow, laid down from a soft picture of a
+  // cone (bright at the lamp, fading along its length, and fading to nothing toward its sides)
   if (V.torchBeam > 0) {
-    var bg = c.createLinearGradient(hx, hy, (x1 + x2) / 2, S.gy);
-    bg.addColorStop(0, rgb(col, 0.5 * V.torchBeam * k)); bg.addColorStop(0.6, rgb(col, 0.16 * V.torchBeam * k)); bg.addColorStop(1, rgb(col, 0.05 * V.torchBeam * k));
-    c.fillStyle = bg;
-    [1, 0.66, 0.36].forEach(function (f) {
-      var a = hx + K.dir * d0 * (1 - w * f), b = hx + K.dir * d0 * (1 + w * f);
-      c.beginPath(); c.moveTo(hx, hy); c.lineTo(a, S.gy + ph * 0.3); c.lineTo(b, S.gy + ph * 0.3); c.closePath(); c.fill();
-    });
+    var mx = (x1 + x2) / 2, base = Math.abs(x2 - x1);
+    c.save();
+    c.transform(mx - hx, S.gy - hy, base, 0, hx, hy);
+    c.globalAlpha = clamp(0.62 * V.torchBeam * k, 0, 1);
+    c.imageSmoothingEnabled = true;
+    c.drawImage(torchBeamSprite(col), 0, -0.5, 1, 1);
+    c.restore();
   }
   // the lamp: a bright point with a glow round it
   if (V.torchGlow > 0) {
