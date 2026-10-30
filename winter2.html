@@ -535,19 +535,22 @@ var restoreTimer = 0;
 /* A report of what happens on the tablet (shown on the panel, "Copy report"): the graphics
    contexts being taken away and given back, each bake step and how it went, and any error. */
 var REPORT = [], t00 = performance.now();
+var lastNote = '', lastNoteN = 0;
 function note(msg) {
   var line = ((performance.now() - t00) / 1000).toFixed(1) + 's ' + msg;
+  if (msg === lastNote && REPORT.length) { REPORT[REPORT.length - 1] = line + ' (×' + (++lastNoteN) + ')'; return; }   // the same again: counted on one line
+  lastNote = msg; lastNoteN = 1;
   REPORT.push(line);
   if (REPORT.length > 120) REPORT.shift();
 }
 window.addEventListener('error', function (e) { note('ERROR ' + e.message + ' (' + (e.filename || '').split('/').pop() + ':' + e.lineno + ')'); });
 var lost2d = 0;
 function watchCanvas(c) {
-  c.addEventListener('contextlost', function () { lost2d++; note('a 2D picture was wiped (' + c.width + '×' + c.height + ')'); });
+  c.addEventListener('contextlost', function () { lost2d++; note('2D pictures were wiped'); });
   c.addEventListener('contextrestored', function () {
     note('a 2D picture was given back: baking everything again');
     clearTimeout(restoreTimer);
-    restoreTimer = setTimeout(function () { resize(); rebuildAll(); cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
+    restoreTimer = setTimeout(function () { resize(); rebuildAll(); sunDirty = true; cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
   });
 }
 var MTN = mk(), MIST = mk(), GTMP = mk(), SHD = mk(), SKS = mk(), FTMP = mk(), NEAR = mk(), NEART = mk(), SMAP = mk();
@@ -629,14 +632,39 @@ function ridgeFn(r) {
     return s / 1.8;
   };
 }
-function bakeScenery() {
+/* The mountains are drawn by mountains.js a band at a time, one band a frame (a picture drawn
+   in one go kept the tablet's graphics chip busy for seconds with a low sun, and it reset itself,
+   wiping every picture on the page). bakeScenery() starts the job; stepScenery() runs it each
+   frame and calls bakeScenery(picture) at the end, or bakeScenery(false) if the context was lost. */
+var mtnJob = null, mtnT0 = 0;
+function stepScenery() {
+  var r = mtnJob.job.step();
+  if (r === null) return;
+  mtnJob = null;
+  bakeScenery(r);
+  note('mountains: ' + (r ? (mtn3d ? '3D' : 'not drawn') : 'the context was lost while drawing (WebGL: ' + glState('M') + ')') +
+       ', ' + Math.round(mtnMs) + ' ms' + (glRetry.mtn ? ', again soon' : ''));
+}
+function bakeScenery(result) {
   var C = cols(), hy = H * V.horizon, mistC = light(C.mist), m = MTN.c;
   var want = Math.round(W * SR), wantH = Math.round(H * SR);
   if (MTN.cnv.width !== want || MTN.cnv.height !== wantH) { MTN.cnv.width = want; MTN.cnv.height = wantH; }
-  if (V.showMountains) {
-    var t0 = performance.now(), g3 = typeof Mountains !== 'undefined' ? Mountains.render(mtnOptions(hy)) : null;
-    // the graphics chip took the context away for a moment: keep the old picture and try again soon
-    if (!g3 && typeof Mountains !== 'undefined' && Mountains.state && Mountains.state() === 'lost') { glRetry.mtn = true; WS.waited = true; return; }
+  var g3 = null, t0 = mtnT0;
+  if (V.showMountains && typeof Mountains !== 'undefined') {
+    if (result === undefined) {
+      t0 = mtnT0 = performance.now();
+      if (typeof Mountains.start === 'function') {
+        var job = Mountains.start(mtnOptions(hy), 8);
+        if (job) { mtnJob = { job: job }; return; }            // finished over the next frames
+      } else g3 = Mountains.render(mtnOptions(hy));
+    } else g3 = result || null;
+    // the graphics chip took the context away: keep the old picture and try again soon, unless the
+    // old picture was wiped too, then the plain painted ridges stand in meanwhile
+    if (!g3 && (result === false || (Mountains.state && Mountains.state() === 'lost'))) {
+      glRetry.mtn = true; WS.waited = true;
+      if (!blankRow(MTN, (hy - H * MT.rangeHeight * 0.25) * SR)) return;
+      note('the mountains picture was wiped too: painted ridges until WebGL is back');
+    }
   }
   m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MTN.cnv.width, MTN.cnv.height);
   mtn3d = false;
@@ -1299,7 +1327,12 @@ function bakeGround() {
   }
   var sfo = sfOptions(swells.map(function (S) { return { crest: S.crest, u: S.u, haze: S.haze }; }));
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
-  if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') { glRetry.ground = true; if (WS.slabs.length) { WS.waited = true; return; } }
+  if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') {
+    glRetry.ground = true;
+    var lastSl = WS.slabs[WS.slabs.length - 1];
+    if (lastSl && !blankRow(lastSl, lastSl.cnv.height - 2)) { WS.waited = true; return; }
+    if (lastSl) note('the snowfield picture was wiped too: plain snow until WebGL is back');
+  }
   var old = WS.slabs; WS.slabs = []; WS.sfGL = false;
   for (k = 0; k < N; k++) {
     var S0 = swells[k], top = S0.yk - S0.amp - 8;
@@ -2321,7 +2354,7 @@ window.winterLab = {
     return 'Winter Lab 2 report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  busy: function () { return stages.length > 0 || Object.keys(dirty).length > 0; },
+  busy: function () { return !!mtnJob || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · snowfield ' + Math.round(fieldMs) + ' ms · ' + WS.skiers.length + ' skiers · ' + sunInfo;
@@ -2370,6 +2403,7 @@ function blankRow(P, y) {
 }
 function rebuildAll() {
   if (!W) resize();
+  if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
   buildSky();
   measureDots();
   dirty = {};
@@ -2384,7 +2418,7 @@ function safeStage(st) {
   catch (e) { note('ERROR in ' + st + ': ' + e.message); glRetry[st === 'mtn' ? 'mtn' : 'ground'] = true; return; }
   var ms = Math.round(performance.now() - t0);
   if (WS.waited) { note((st === 'mtn' ? 'mountains' : 'snowfield') + ': its WebGL context is away, the old picture is kept until it is back'); return; }
-  if (st === 'mtn') note('mountains: ' + (mtn3d ? '3D' : V.showMountains ? 'not drawn (WebGL: ' + glState('M') + ')' : 'off') + ', ' + ms + ' ms' + (glRetry.mtn ? ', again soon' : ''));
+  if (st === 'mtn') { if (!mtnJob) note('mountains: ' + (mtn3d ? '3D' : V.showMountains ? 'not drawn (WebGL: ' + glState('M') + ')' : 'off') + ', ' + ms + ' ms' + (glRetry.mtn ? ', again soon' : '')); }
   else if (st === 'ground') note('snowfield: ' + (WS.sfGL ? 'lit' : 'plain (WebGL: ' + glState('S') + ')') + ', ' + ms + ' ms' + (glRetry.ground ? ', again soon' : ''));
   else note(st + ': ' + ms + ' ms');
 }
@@ -2455,7 +2489,8 @@ function frame(now) {
   last = t; nowT = t;
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
-  if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
+  if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
+  else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
   barTimer -= dt;

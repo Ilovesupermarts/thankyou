@@ -195,7 +195,7 @@ function compile(type, src) {
    and buffers are then made again on it. A new context is never asked for
    in its place: after a loss Chrome may refuse new ones. While it is lost,
    render() returns null and state() says 'lost': try again a moment later. */
-var lost = false, ready = false, losses = 0;   // losses: how many times the context was taken away
+var lost = false, ready = false, losses = 0, lostAt = 0, renewals = 0;   // losses: how many times the context was taken away
 function create() {
   if (cnv) return !!gl;
   try {
@@ -203,8 +203,8 @@ function create() {
     gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: false, alpha: true, depth: false });
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
-  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); lost = true; ready = false; losses++; U = {}; lastUp = null; });
-  cnv.addEventListener('webglcontextrestored', function () { lost = false; });
+  cnv.addEventListener('webglcontextlost', function (ev) { ev.preventDefault(); if (this !== cnv) return; lost = true; ready = false; losses++; lostAt = performance.now(); U = {}; lastUp = null; });
+  cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
   return true;
 }
 function setup() {
@@ -231,10 +231,15 @@ function setup() {
 }
 function init() {
   if (failed || !create()) return false;
+  // after a reset of the graphics chip Chrome may never give the context back: after 8 s, ask for a fresh one (at most 3 times)
+  if (lost && renewals < 3 && performance.now() - lostAt > 8000) { renewals++; cnv = null; gl = null; lost = false; ready = false; lastUp = null; if (!create()) return false; }
   if (lost || gl.isContextLost()) return false;
   return ready || setup();
 }
-function state() { return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok'; }
+function state() {
+  if (lost && renewals < 3 && performance.now() - lostAt > 8000) init();   // time to ask for a fresh context
+  return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok';
+}
 function c3(c) { return [c[0] / 255, c[1] / 255, c[2] / 255]; }
 function d(o, k, v) { return o[k] === undefined ? v : o[k]; }
 
