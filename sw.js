@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v251';
+const CACHE = 'thankyou-v252';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -8,6 +8,7 @@ const ASSETS = [
   './app.js',
   './strokes.js',
   './mountains.js',
+  './trunks.js',
   './fireworks.js',
   './clouds.js',
   './snowfield.js',

@@ -11285,6 +11285,14 @@ var KOYO = {
   patchiness: 0.39, shadeDepth: 0.55, lightFrom: -0.4, nearOpacity: 0.88, farOpacity: 0.76,
   farHaze: 0.09, branchOpacity: 0.5, nightGlow: 0.7, fallTop: 0.6
 };
+/* The trunk and branches (trunks.js), as tuned on bamboo.html (TRUNK there). */
+var TRUNK = {
+  girth: 1.65, bend: 1.2, depth: 0.95, rootFlare: 1.35, roots: 5, twigCut: 4,
+  relief: 0.45, streaks: 0.79, fissures: 0.5, lichen: 0.37, moss: 0.51, mossHeight: 0.14, wet: 0.42,
+  sun: 1.15, sky: 0.6, bounce: 0.45, rim: 0.5, canopyShade: 0.7, komorebi: 0.57, crotch: 1.2,
+  air: 0.08, farAir: 0.3,
+  colours: { bark: '#6A5850', dark: '#2F2421', light: '#9C8C82', lichen: '#A9AE95', moss: '#5E6E2C' }
+};
 var KOYO_SHARES = { red: 0.55, orange: 0.25, gold: 0.12, green: 0.05, evergreen: 0.03 };
 var KOYO_FAMILIES = (function() {
   var h = hexToRgb;
@@ -14140,6 +14148,7 @@ function buildKoyoTree(key, far, lazy) {
   });
   var nc = T.clumps.length || 1;
   T.cx = sx / nc; T.cy = sy / nc; T.cr = Math.max(40, (bot - top) * 0.75);
+  buildKoyoTrunk(T);
   if (!lazy) T.clumps.forEach(function(C) { bakeClump(C, far); });   // lazy (during the name): baked a few per frame by bakePendingClumps
   return T;
 }
@@ -14182,175 +14191,65 @@ function bakePendingClumps(ms) {
   });
   return done;
 }
-/* The branches, solid: their soft look comes from mixing the bark toward the
-   paper colour by the strength they used to be laid down at, so nothing (the
-   mountains) shows through the trunk. Each branch tapers from its own
-   thickness to the thickness of the branches that grow from it, with a round
-   joint at the fork, so there are no steps (notches) at the forks. The tapers
-   and the joints are two fills: in one path, where they overlap with opposite
-   winding the canvas would leave a hole. */
-function fillKoyoBranches(c, T, strength) {
-  var bark = T.far ? mixRgb(KOYO_BARK, KOYO_PAPER, KOYO.farHaze) : KOYO_BARK;
-  bark = koyoLight(mixRgb(bark, KOYO_PAPER, 1 - strength));
-  bark = mixRgb(bark, [150, 96, 70], koyoNight() * KOYO.nightGlow * 0.4);   // trunks catch the lamp light
-  var ns = T.nodes, i, n;
-  function endW(n) { return (n.d >= T.maxD ? n.w * 0.55 : Math.max(0.8, n.w * 0.62)) / 2; }
-  var night = koyoNight(), lx = KOYO.lightFrom * lerp(1, 0.5, night), ly = lerp(-0.85, 0.8, night), ll = Math.hypot(lx, ly);
-  lx /= ll; ly /= ll;                              // towards the light: the same as for the leaves
-  var mid = rgba(bark), hi = scaleRgb(mixRgb(scaleRgb(bark, 1.25), KOYO_PAPER, 0.18), 1), lo = scaleRgb(bark, 0.55);
-  if (!T.limbs) T.limbs = koyoLimbs(T);
-  var THICK = Math.max(5, T.scale * 0.0075), thin = [];
-  // thin twigs first: flat, in one path (a fill each for the tapers and the joints: where they overlap with
-  // opposite winding the canvas would leave a hole)
-  c.fillStyle = mid;
-  c.beginPath();
-  for (i = 0; i < ns.length; i++) {
-    n = ns[i];
-    if (n.w >= THICK) continue;
-    thin.push(n);
-    var v0 = n.w / 2, v1 = endW(n);
-    var ax = koyoX(T, n.sx), ay = n.sy, bx = koyoX(T, n.ex), by = n.ey;
-    var ex = bx - ax, ey = by - ay, el = Math.hypot(ex, ey) || 1, qx = -ey / el, qy = ex / el;
-    c.moveTo(ax + qx * v0, ay + qy * v0);
-    c.lineTo(bx + qx * v1, by + qy * v1);
-    c.lineTo(bx - qx * v1, by - qy * v1);
-    c.lineTo(ax - qx * v0, ay - qy * v0);
-    c.closePath();
-  }
-  c.fill();
-  c.beginPath();
-  for (i = 0; i < thin.length; i++) {
-    n = thin[i];
-    if (n.d >= T.maxD) continue;                  // a twig's tip has no fork, so no joint
-    var r = endW(n), jx = koyoX(T, n.ex);
-    c.moveTo(jx + r, n.ey);
-    c.arc(jx, n.ey, r, 0, TAU);
-  }
-  c.fill();
-  // The thick limbs are each one smooth, tapering curve (see koyoLimbs). The
-  // thinner limbs go under the thicker ones, so every branch comes out from
-  // behind the one it grows from, with no joints or flat ends showing.
-  function paintLimb(S, roundEnd) { paintBark(c, S, roundEnd, mid, hi, lo, lx, ly); }
-  for (var li = 0; li < T.limbs.length; li++) {
-    var L = T.limbs[li], vx = [], vy = [], hw = [];
-    for (var k = 0; k < L.length; k++) {
-      n = ns[L[k]];
-      if (k === 0) { vx.push(koyoX(T, n.sx)); vy.push(n.sy); hw.push(n.w / 2); }
-      vx.push(koyoX(T, n.ex)); vy.push(n.ey); hw.push(endW(n));
-    }
-    paintLimb(smoothLimb(vx, vy, hw), true);
-  }
+/* The trunk and branches' 3D shape (trunks.js), from the tree at rest and its
+   foliage (which shades the limbs under it). The tree's shape never changes
+   (only its sway), so this is made once. */
+function buildKoyoTrunk(T) {
+  if (typeof Trunks === 'undefined') return;
+  var ns = T.nodes;
+  T.trunk = Trunks.build({
+    nodes: ns, seed: strSeed(T.key) % 100000, X: function(x) { return koyoX(T, x); },
+    clumps: T.clumps.map(function(C) { var cn = ns[C.node]; return { x: koyoX(T, cn.ex + C.ox), y: cn.ey + C.oy, R: C.R, back: C.back }; }),
+    look: TRUNK
+  });
 }
-/* The thick part of the tree as limbs: from each fork the "leader" (the child
-   running most nearly straight on) carries the limb on; the other children
-   start limbs of their own. Deepest first, so the trunk is drawn last. The
-   tree's shape never changes (only its sway), so this is made once. */
-function koyoLimbs(T) {
-  var ns = T.nodes, THICK = Math.max(5, T.scale * 0.0075), kids = [], limbs = [], i;
-  for (i = 0; i < ns.length; i++) kids[i] = [];
-  for (i = 0; i < ns.length; i++) if (ns[i].p >= 0) kids[ns[i].p].push(i);
-  function lead(list, par) {
-    var best = -1, bd = Infinity;
-    list.forEach(function (j) {
-      if (ns[j].w < THICK) return;
-      var d = Math.abs(Math.atan2(Math.sin(ns[j].abs - par.abs), Math.cos(ns[j].abs - par.abs)));
-      if (d < bd) { bd = d; best = j; }
-    });
-    return best;
-  }
-  function walk(start) {
-    var limb = [start], cur = start;
-    for (;;) {
-      var nx = lead(kids[cur], ns[cur]);
-      kids[cur].forEach(function (j) { if (j !== nx && ns[j].w >= THICK) walk(j); });
-      if (nx < 0) break;
-      limb.push(nx); cur = nx;
+/* The light on the bark, for the app's time of day and weather: the sun low and
+   warm near sunrise and sunset, softer under cloud, and at night the lamps
+   below the trees (as on the leaves). */
+function koyoTrunkLight() {
+  var n = koyoNight(), sun = ENV.sun, lx = KOYO.lightFrom, g = KOYO.nightGlow;
+  var t = smooth(0, 2.2, Math.min(S.hour - sun.rise, sun.set - S.hour));          // 0 at sunrise and sunset … 1 midday
+  var clear = ENV.light.daylight > 0.01 ? clamp(ENV.sunAmt / ENV.light.daylight, 0, 1) : 1;
+  var k = TRUNK.sun * lerp(0.35, 1, clear), ks = TRUNK.sky, kb = TRUNK.bounce;
+  function pick(low, high) { return [lerp(low[0], high[0], t), lerp(low[1], high[1], t), lerp(low[2], high[2], t)]; }
+  var dir = pick([lx * 1.8 - 0.3, -0.35, 0.45], [lx, -0.85, 0.5]);
+  var sunC = pick([1.05 * k, 0.68 * k, 0.42 * k], [1.0 * k, 0.94 * k, 0.85 * k]);
+  var sky = pick([0.5 * ks, 0.44 * ks, 0.56 * ks], [0.62 * ks, 0.6 * ks, 0.66 * ks]);
+  var bounce = pick([0.62 * kb, 0.28 * kb, 0.16 * kb], [0.6 * kb, 0.27 * kb, 0.15 * kb]);
+  var leaf = [0.75 * ks, 0.3 * ks, 0.2 * ks];
+  if (n > 0) {
+    var nd = [lx * 0.3, 0.75, 0.6], ns = [1.1 * g, 0.77 * g, 0.46 * g], nk = [0.12, 0.13, 0.24], nb = [0.42 * g, 0.22 * g, 0.12 * g], nl = [0.2, 0.1, 0.08];
+    for (var i = 0; i < 3; i++) {
+      dir[i] = lerp(dir[i], nd[i], n); sunC[i] = lerp(sunC[i], ns[i], n); sky[i] = lerp(sky[i], nk[i], n);
+      bounce[i] = lerp(bounce[i], nb[i], n); leaf[i] = lerp(leaf[i], nl[i], n);
     }
-    limbs.push(limb);
   }
-  for (i = 0; i < ns.length; i++) if (ns[i].p < 0 && ns[i].w >= THICK) walk(i);
-  limbs.sort(function (a, b) { return ns[b[0]].d - ns[a[0]].d; });
-  return limbs;
+  return { dir: dir, sun: sunC, sky: sky, bounce: bounce, leaf: leaf, air: koyoLight(KOYO_PAPER) };
 }
-/* A smooth curve through the corners of a limb: it follows the straight pieces
-   but rounds each corner off (quadratic curves between the pieces' middles).
-   The half-width is given at each corner and fades smoothly along the curve.
-   Returns samples { x, y, hw, nx, ny }. */
-function smoothLimb(vx, vy, hw) {
-  var m = vx.length - 1, px = [vx[0]], py = [vy[0]], k, j;
-  function mid2(a, b) { return (a + b) / 2; }
-  if (m >= 2) {
-    px.push(mid2(vx[0], vx[1])); py.push(mid2(vy[0], vy[1]));
-    for (k = 1; k < m; k++) {
-      var sx = mid2(vx[k - 1], vx[k]), sy = mid2(vy[k - 1], vy[k]), ex = mid2(vx[k], vx[k + 1]), ey = mid2(vy[k], vy[k + 1]);
-      for (j = 1; j <= 6; j++) {
-        var t = j / 6, u = 1 - t;
-        px.push(u * u * sx + 2 * u * t * vx[k] + t * t * ex);
-        py.push(u * u * sy + 2 * u * t * vy[k] + t * t * ey);
-      }
-    }
-  } else {
-    px.push(mid2(vx[0], vx[1])); py.push(mid2(vy[0], vy[1]));
+var TRUNK_COLS = null, TRUNK_COLS_KEY = '', KOYO_BARK_FLAT = hexToRgb('#5A4842');
+/* The trunk and branches, drawn on the graphics chip into c (a layer the size of
+   the canvas, or half of it for the far tree). If they can't be drawn there,
+   they go down flat in one bark colour. */
+function fillKoyoBranches(c, T) {
+  if (!T.trunk) return;
+  if (TRUNK_COLS_KEY !== JSON.stringify(TRUNK.colours)) {
+    TRUNK_COLS_KEY = JSON.stringify(TRUNK.colours); TRUNK_COLS = {};
+    for (var ck in TRUNK.colours) TRUNK_COLS[ck] = hexToRgb(TRUNK.colours[ck]);
   }
-  px.push(vx[m]); py.push(vy[m]);
-  // where along the curve each corner is (by the length of the straight pieces), to fade the width
-  var pos = [0], tot = 0;
-  for (k = 1; k <= m; k++) { tot += Math.hypot(vx[k] - vx[k - 1], vy[k] - vy[k - 1]); pos.push(tot); }
-  var cum = [0], clen = 0, S = [];
-  for (k = 1; k < px.length; k++) { clen += Math.hypot(px[k] - px[k - 1], py[k] - py[k - 1]); cum.push(clen); }
-  var seg = 1;
-  for (k = 0; k < px.length; k++) {
-    var d = clen > 0 ? cum[k] / clen * tot : 0;
-    while (seg < m && pos[seg] < d) seg++;
-    var f = pos[seg] > pos[seg - 1] ? clamp((d - pos[seg - 1]) / (pos[seg] - pos[seg - 1]), 0, 1) : 0;
-    var dx = (px[Math.min(k + 1, px.length - 1)] - px[Math.max(k - 1, 0)]), dy = (py[Math.min(k + 1, px.length - 1)] - py[Math.max(k - 1, 0)]), dl = Math.hypot(dx, dy) || 1;
-    S.push({ x: px[k], y: py[k], hw: lerp(hw[seg - 1], hw[seg], f), nx: -dy / dl, ny: dx / dl });
-  }
-  return S;
-}
-/* One limb: its outline in the bark colour, then soft shading laid on in a few
-   thin layers. Which edge is dark and which is lit follows the direction the
-   limb is running at that point (no switching, so nothing jumps along it). */
-function paintBark(c, S, roundEnd, mid, hi, lo, lx, ly) {
-  var i, n = S.length, e = S[n - 1];
-  function edge(off, rev) {
-    for (var q = 0; q < n; q++) {
-      var P = S[rev ? n - 1 - q : q], o = off(rev ? n - 1 - q : q);
-      c.lineTo(P.x + P.nx * P.hw * o, P.y + P.ny * P.hw * o);
-    }
-  }
-  function band(o0, o1, col, alpha) {
-    c.beginPath();
-    c.moveTo(S[0].x + S[0].nx * S[0].hw * o0(0), S[0].y + S[0].ny * S[0].hw * o0(0));
-    edge(o0, false);
-    edge(o1, true);
-    c.closePath();
-    c.fillStyle = rgba(col, alpha);
-    c.fill();
-  }
-  c.fillStyle = mid;
-  c.beginPath();
-  c.moveTo(S[0].x + S[0].nx * S[0].hw, S[0].y + S[0].ny * S[0].hw);
-  edge(function () { return 1; }, false);
-  if (roundEnd) c.arc(e.x, e.y, e.hw, Math.atan2(e.ny, e.nx), Math.atan2(-e.ny, -e.nx), true);
-  edge(function () { return -1; }, true);
-  c.closePath();
-  c.fill();
-  function t(q) { return S[q].nx * lx + S[q].ny * ly; }   // 1: the +normal side faces the light
-  // dark edges: wider on the side away from the light
-  for (i = 0; i < 3; i++) {
-    var k = 1 - i * 0.3;
-    band(function (q) { return 1 - (0.12 + 0.6 * Math.max(0, -t(q))) * k; }, function () { return 1; }, lo, 0.22);
-    band(function (q) { return -1 + (0.12 + 0.6 * Math.max(0, t(q))) * k; }, function () { return -1; }, lo, 0.22);
-  }
-  // a soft highlight on the lit side, close to its edge (never along the middle: a stripe
-  // down the middle of a trunk looks like a seam). It narrows away to nothing where the limb
-  // runs along the light, so it never has to jump from one side to the other.
-  function lean(q) { return clamp(t(q) * 4, -1, 1); }
-  for (i = 0; i < 3; i++) {
-    var w = 0.26 - i * 0.08;
-    band(function (q) { return 0.6 * lean(q) - w * Math.abs(lean(q)); }, function (q) { return 0.6 * lean(q) + w * Math.abs(lean(q)); }, hi, 0.14);
-  }
+  var res = PR * (T.far ? FAR_LAYER_SCALE : 1), n = koyoNight(), look = {}, k;
+  for (k in TRUNK) look[k] = TRUNK[k];
+  look.air = T.far ? Math.min(1, TRUNK.farAir + KOYO.farHaze) : TRUNK.air;
+  look.wet = clamp(TRUNK.wet + (1 - TRUNK.wet) * ENV.wet * 0.8, 0, 1);               // rain darkens it and gives it a sheen
+  look.komorebi = TRUNK.komorebi * (1 - n);                                           // at night the lamps are under the leaves
+  look.canopyShade = TRUNK.canopyShade * lerp(1, 0.3, n);
+  var o = { model: T.trunk, nodes: T.nodes, X: function(x) { return koyoX(T, x); }, extra: [],
+            width: c.canvas.width, height: c.canvas.height, W: W, H: H, px: res, time: performance.now() / 1000,
+            wind: clamp(ENV.windMs / 10, 0, 1), ground: H - 20, look: look, colours: TRUNK_COLS, light: koyoTrunkLight() };
+  var g = Trunks.draw(o);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  if (g) { c.drawImage(g, 0, 0, o.width, o.height, 0, 0, o.width, o.height); return; }
+  c.setTransform(res, 0, 0, res, 0, 0);
+  Trunks.flat(c, rgba(koyoLight(T.far ? mixRgb(KOYO_BARK_FLAT, KOYO_PAPER, look.air) : KOYO_BARK_FLAT)));
 }
 function drawKoyoClumps(c, T, t) {
   var ns = T.nodes;
@@ -14387,7 +14286,7 @@ function buildKoyoLayers(t) {
     ctxFB.setTransform(1, 0, 0, 1, 0, 0);
     ctxFB.clearRect(0, 0, farBranchLayer.width, farBranchLayer.height);
     ctxFB.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
-    fillKoyoBranches(ctxFB, farTree, KOYO.branchOpacity * KOYO.farOpacity);
+    fillKoyoBranches(ctxFB, farTree);
     ctxFar.setTransform(1, 0, 0, 1, 0, 0);
     ctxFar.clearRect(0, 0, farLayer.width, farLayer.height);
     ctxFar.setTransform(PR * FAR_LAYER_SCALE, 0, 0, PR * FAR_LAYER_SCALE, 0, 0);
@@ -14398,7 +14297,7 @@ function buildKoyoLayers(t) {
     ctxT.setTransform(1, 0, 0, 1, 0, 0);
     ctxT.clearRect(0, 0, treeLayer.width, treeLayer.height);
     ctxT.setTransform(PR, 0, 0, PR, 0, 0);
-    fillKoyoBranches(ctxT, tree, KOYO.branchOpacity);
+    fillKoyoBranches(ctxT, tree);
     ctxKL.setTransform(1, 0, 0, 1, 0, 0);
     ctxKL.clearRect(0, 0, koyoLeafLayer.width, koyoLeafLayer.height);
     ctxKL.setTransform(PR, 0, 0, PR, 0, 0);
