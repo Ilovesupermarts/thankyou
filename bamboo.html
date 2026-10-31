@@ -2234,9 +2234,9 @@ var MT_DEFAULTS = {
   style: '3d',               // '3d' or 'painted' (the old ridges)
   seed: 7,
   // the ranges
-  rangeHeight: 0.012, featureKm: 9.5, sharpness: 0.6, layering: 0.94, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  rangeHeight: 0.03, featureKm: 6, sharpness: 0.6, layering: 0.94, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
   // Fuji
-  fujiX: 0.735, fujiHeight: 0.225, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.6, fujiSnow: 0.4, fujiTongues: 0.6, fujiClear: 0.9,
+  fujiX: 0.735, fujiHeight: 0.225, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.1, fujiSnow: 0.4, fujiTongues: 0.6, fujiClear: 0.9,
   // snow and forest
   snowLine: 1.05, snow: 0.35, treeLine: 0.94, autumn: 1,
   // the light
@@ -2248,7 +2248,7 @@ var MT_DEFAULTS = {
   colours: { rock: '#968476', fujiRock: '#544850', forestRed: '#B04A2C', forestGold: '#D49A44',
              evergreen: '#4A5A3E', snow: '#F6F6FA', haze: '#DCCDD2' }
 };
-var MT_KEY = 'mountainLab6';          // new key: the lake scene's values replace the ones kept from before
+var MT_KEY = 'mountainLab7';          // new key: the lake scene's values replace the ones kept from before
 var MT = clone(MT_DEFAULTS);
 try {
   var savedM = JSON.parse(localStorage.getItem(MT_KEY) || 'null');
@@ -2366,7 +2366,7 @@ function bakeScenery() {
   bakeHead(landPath);
   bakeWater(C);
   bakeGrove(landPath);
-  bakeBank();
+  bakeBank(landPath);
   s.save(); s.setTransform(SR, 0, 0, SR, 0, 0); veilOver(s, false); s.restore();
   if (headBox) { HEADC.c.setTransform(SR, 0, 0, SR, -headBox.x0 * SR, -headBox.y0 * SR); veilOver(HEADC.c, true); }
   bakeRipples();
@@ -2463,10 +2463,10 @@ var LK_DEFAULTS = {
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
   pagoda: true, pagodaX: 0.285, pagodaSize: 0.215, hall: true, grove: false,
-  // the trees on the right bank: one straight row along the shore, parallel to it, the same distance apart
-  // (bankStep × the screen width), the same size (bankH × the screen height), starting across at bankX0, and
-  // bankDown × the screen height below the water's edge (nearer)
-  bankTrees: true, bankX0: 0.7, bankStep: 0.075, bankH: 0.13, bankDown: 0.09,
+  // the trees on the right bank: planted ON the bank (the water's edge on the right), the same distance apart
+  // along it (bankGap, in eye heights, measured on the ground), all the same height in the world (bankH, in eye
+  // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
+  bankTrees: true, bankX0: 0.5, bankGap: 1.95, bankH: 1.3, bankIn: 1,
   // the water torii
   waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
@@ -2474,7 +2474,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab11';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab13';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2780,31 +2780,37 @@ function bakeGrove(path) {
    alternating (ginkgo, maple). Each tree is baked once into its own picture; each frame it is laid down leaning with the wind
    field and the gusts (the top moves more than the foot), so a gust passes along the row. */
 var bankT = [], bankEdge = [];
-function bakeBank() {
+function bakeBank(path) {
   bankT = [];
-  if (!LK.bankTrees || !landLo || !bankEdge.length) return;
-  function edgeY(x) {                                     // the right shore's edge at x (the row runs parallel to it)
-    for (var i = 1; i < bankEdge.length; i++) if (bankEdge[i][0] >= x) {
-      var a = bankEdge[i - 1], b = bankEdge[i], u = (x - a[0]) / Math.max(1e-6, b[0] - a[0]);
-      return lerp(a[1], b[1], clamp(u, 0, 1));
-    }
-    return bankEdge[bankEdge.length - 1][1];
-  }
-  var h = LK.bankH * H * LK.treeSize, k = 0, step = LK.bankStep * W;
-  for (var x = LK.bankX0 * W; x < W + h * 0.4; x += step, k++) {
-    var kind = k % 2 ? 'momiji' : 'ginkgo';               // always the same two, one after the other
-    var y = edgeY(x) + LK.bankDown * H;
-    var w = h * 0.95, cw = Math.ceil(w * 1.5), chh = Math.ceil(h * 1.15) + 6, T = mk();
+  if (!LK.bankTrees || !landLo || !bankEdge.length || !path) return;
+  var F = lensF(), wu = gravelHalf();
+  // the bank (the water's edge on the right) in ground units, from where it leaves the gravel to the screen's edge
+  var pts = bankEdge.map(function (p) { var g = toGround(p[0], p[1]); return { x: g.x, z: g.z, sx: p[0] }; }).filter(function (p) { return p.sx >= LK.bankX0 * W - 1; });
+  if (pts.length < 2) return;
+  var cum = [0];
+  for (var i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
+  var k = 0, j = 1;
+  for (var d = LK.bankGap * 0.5; d <= cum[cum.length - 1]; d += LK.bankGap, k++) {      // the same distance apart along the bank, on the ground
+    while (j < pts.length - 1 && cum[j] < d) j++;
+    var u = (d - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]);
+    var gx = lerp(pts[j - 1].x, pts[j].x, u), gz = lerp(pts[j - 1].z, pts[j].z, u);
+    if (gz < 1.5 || fromPath(gx, gz) < wu * 1.35) continue;                              // not on the gravel
+    var sp = toScreen(gx, 0, gz);
+    if (sp[0] > W + 60) break;
+    var kind = k % 2 ? 'momiji' : 'ginkgo';                                               // always the same two, one after the other
+    var h = LK.bankH * F / gz * LK.treeSize;                                              // the same height in the world: smaller the further away
+    var cw = Math.ceil(h * 1.5), chh = Math.ceil(h * 1.1) + 6, T = mk();
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (k % 2) * 13, lx: -0.7, fin: finish(0.1) });
-    // the middle of the crown (the trees are not quite symmetrical): each is placed by it, so the crowns, not the
-    // trunks, are exactly the same distance apart
+    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (k % 2) * 13, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), stout: true });
+    // placed by the middle of its crown (the trees are not quite symmetrical), so the crowns are the same distance apart
     var px = T.c.getImageData(0, 0, T.cnv.width, Math.round((chh * 0.75) * PR)).data, sum = 0, cnt = 0, wpx = T.cnv.width;
     for (var iy = 0; iy < px.length / 4 / wpx; iy++) for (var ix = 0; ix < wpx; ix++) { var al = px[(iy * wpx + ix) * 4 + 3]; if (al > 40) { sum += ix * al; cnt += al; } }
     var mid = cnt ? sum / cnt / PR : cw / 2;
-    bankT.push({ x: x + (cw / 2 - mid), y: y, cw: cw, ch: chh, spr: T, stiff: 1, ph: k * 1.7, z: y });
+    bankT.push({ x: sp[0] + (cw / 2 - mid), y: sp[1] + LK.bankIn, cw: cw, ch: chh, spr: T, stiff: 1, ph: k * 1.7, z: gz });
   }
+  bankT.sort(function (a, b) { return b.z - a.z; });          // further first
 }
 function drawBank(t) {
   if (!bankT.length) return;
@@ -2971,7 +2977,7 @@ function composeWater() {
 /* A soft brightening behind the message text (mist in the middle distance), so the words stay easy to read. */
 function veilOver(c, atop) {
   if (LK.veil <= 0) return;
-  var mist = light(hex(V.colours.mist)), cx = W * 0.5, cy = H * 0.46, rx = W * 0.3, ry = H * 0.21;
+  var mist = light(hex(V.colours.mist)), cx = W * 0.5, cy = H * 0.4, rx = W * 0.3, ry = H * 0.17;
   c.save();
   if (atop) c.globalCompositeOperation = 'source-atop';
   c.translate(cx, cy); c.scale(rx / ry, 1);
@@ -7014,10 +7020,9 @@ var LAKE_CTLS = [
   { k: 'wtX', label: 'Water torii across', min: 0.05, max: 0.5, step: 0.005, group: 'The torii in the water' },
   { k: 'wtY', label: 'Water torii down', min: 0.63, max: 0.9, step: 0.002 },
   { k: 'wtSize', label: 'Water torii size', min: 0.6, max: 2.5, step: 0.05, note: 'Against the gates of the line.' },
-  { k: 'bankX0', label: 'Row starts at (across)', min: 0.4, max: 0.95, step: 0.005, group: 'Trees on the right bank' },
-  { k: 'bankStep', label: 'Distance between trees', min: 0.03, max: 0.15, step: 0.0025, note: 'As a share of the screen width: the same between every pair.' },
-  { k: 'bankH', label: 'Tree height', min: 0.04, max: 0.15, step: 0.0025, note: 'As a share of the screen height: every tree the same.' },
-  { k: 'bankDown', label: 'Nearer than the water by', min: 0, max: 0.2, step: 0.005, note: 'The row runs parallel to the water\'s edge, this far below it.' },
+  { k: 'bankX0', label: 'Row starts at (across)', min: 0.3, max: 0.95, step: 0.005, group: 'Trees on the right bank', note: 'Planted on the bank itself (the water\'s edge on the right).' },
+  { k: 'bankGap', label: 'Distance between trees', min: 0.8, max: 5, step: 0.05, note: 'In eye heights, measured along the bank on the ground: the same between every pair.' },
+  { k: 'bankH', label: 'Tree height', min: 0.6, max: 5, step: 0.05, note: 'In eye heights: every tree the same in the world, so smaller further away.' },
   { k: 'rocks', label: 'Mossy rocks', min: 0, max: 2, step: 0.05, group: 'The shore' },
   { k: 'lilies', label: 'Spider lilies', min: 0, max: 2, step: 0.05 },
   { k: 'susuki', label: 'Susuki', min: 0, max: 1, step: 1, note: '0 off, 1 on.' },
