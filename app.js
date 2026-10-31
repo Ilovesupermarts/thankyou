@@ -14911,6 +14911,30 @@ function updateOneTree(T, dt, t) {
     n.ey = n.sy + Math.sin(n.cur) * n.len;
   }
 }
+/* A log of what the graphics did, for tree-check.html (see Trunks.log in trunks.js):
+   when the mountains were drawn and in what way, every change in the state of the
+   mountains' and the trees' graphics, whether the page was hidden, and a heartbeat. */
+function gfxNote(msg) { if (typeof Trunks !== 'undefined' && Trunks.log) Trunks.log(msg); }
+var gfxKey = '', gfxBeat = 0, gfxStarted = false;
+function gfxState() {
+  var mt = typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() + '/' + (Mountains.losses ? Mountains.losses() : '-') : 'none';
+  var tr = typeof Trunks !== 'undefined' ? Trunks.state() + '/' + Trunks.losses() : 'none';
+  return 'mountains ' + mt + ' · trees ' + tr;
+}
+function gfxPoll(dt) {
+  if (!gfxStarted) {
+    gfxStarted = true;
+    gfxNote('APP STARTED, ' + innerWidth + '×' + innerHeight + ' at pixel ratio ' + (window.devicePixelRatio || 1) + ', render scale ' + S.renderScale);
+    document.addEventListener('visibilitychange', function() { gfxNote('page ' + document.visibilityState); });
+  }
+  gfxBeat -= dt;
+  if (gfxBeat > 0) return;
+  gfxBeat = 1;
+  var k = gfxState();
+  if (k !== gfxKey) { gfxKey = k; gfxNote('changed: ' + k); }
+  else if (++gfxBeats % 30 === 0) gfxNote('still running: ' + k + (performance.memory ? ', script memory ' + Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : ''));
+}
+var gfxBeats = 0;
 function drawTree(ctx, t) {
   if (ENV.scene === 'autumn') drawKoyoTrees(ctx, t);
 }
@@ -15340,6 +15364,7 @@ function landBakeScenery() {
     o.cnv.width = Math.max(1, Math.round(W * PR / 2)); o.cnv.height = Math.max(1, Math.round(H * PR / 2));
   });
   var is3d = try3d && landDrawMountains3d(m, hy);
+  gfxNote('mountains drawn ' + (is3d ? 'in 3D' : try3d ? 'PAINTED (3D failed)' : 'painted (3D off)') + ', Mountains.state ' + (typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() : '-'));
   LS.refl3d = LS.is3d = is3d;
   if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
     LAND_SR = PR * LAND_SCN_RES;
@@ -18740,6 +18765,7 @@ function dynStep(dt, t, want, skyWant) {
     insectsLeaveText();
     _glyphsReadyAt = performance.now() + 1800;
   }
+  gfxPoll(dt);
   envTimer -= dt;
   if (envTimer <= 0) {
     computeEnv();

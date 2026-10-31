@@ -480,7 +480,21 @@ var FS = [
 var cnv = null, gl = null, prog = null, U = {}, vbo = null, ibo = null, vao = null, failed = false;
 var lost = false, ready = false, lostAt = 0, renewals = 0, losses = 0;
 var vCap = 0, iCap = 0;            // how much the graphics chip's two buffers hold (bytes)
-var lastError = '', frames = 0;
+var lastError = '', frames = 0, lastDrawAt = -1e9;
+/* A short log of what the graphics did, kept in this browser (localStorage) so the
+   check page can show it after the app has run: the last LOG_MAX events, each with
+   the time and which page wrote it. */
+var LOG_KEY = 'gfxLog', LOG_MAX = 80, T0 = Date.now();
+function log(msg) {
+  try {
+    var list = JSON.parse(localStorage.getItem(LOG_KEY) || '[]');
+    list.push({ at: Date.now(), s: Math.round((Date.now() - T0) / 100) / 10, page: location.pathname.split('/').pop() || 'index', m: String(msg) });
+    if (list.length > LOG_MAX) list = list.slice(list.length - LOG_MAX);
+    localStorage.setItem(LOG_KEY, JSON.stringify(list));
+  } catch (e) { /* private window */ }
+}
+function readLog() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch (e) { return []; } }
+function clearLog() { try { localStorage.removeItem(LOG_KEY); } catch (e) { /* silent */ } }
 /* The safety latch. If the tree ever loses its graphics context, the
    tablet remembers it (in this browser) for OFF_HOURS: the tree is then
    drawn flat and WebGL is not touched for it, so it can never keep taking
@@ -511,11 +525,15 @@ function create() {
     if (this !== cnv) return;
     lost = true; ready = false; lostAt = performance.now(); prog = null; U = {}; vCap = 0; iCap = 0;
     losses++;
-    // never again on this tablet for a while (see the safety latch above)
-    failed = true;
-    switchOff('context lost after ' + frames + ' frames');
+    var idle = performance.now() - lastDrawAt > 3000;
+    log('trees: graphics context LOST after ' + frames + ' draws, ' + (idle ? 'while idle (not drawing for ' + Math.round((performance.now() - lastDrawAt) / 1000) + ' s)' : 'while drawing'));
+    // While the tree is being drawn: never again on this tablet for a while (see the safety latch
+    // above). While it is idle the cause is elsewhere (an idle page is just caught in a reset),
+    // so it only waits for the context to come back.
+    if (!idle) { failed = true; switchOff('context lost after ' + frames + ' frames'); }
   });
-  cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
+  cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) { lost = false; log('trees: graphics context restored'); } });
+  log('trees: graphics context made (' + (gl.getParameter(gl.VERSION) || '') + ')');
   return true;
 }
 function setup() {
@@ -641,6 +659,7 @@ function draw(o) {
   gl.bindVertexArray(null);
   if (gl.isContextLost()) return null;
   frames++;
+  lastDrawAt = performance.now();
   return { cnv: cnv, x: bx, y: by, w: bw, h: bh };
 }
 /* The last tree, flat, when it can't be drawn on the graphics chip. */
@@ -663,5 +682,6 @@ function flat(c, colour) {
   }
 }
 
-return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state, info: info, clearOff: clearOff };
+return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state, info: info, clearOff: clearOff,
+         log: log, readLog: readLog, clearLog: clearLog, losses: function () { return losses; } };
 })();

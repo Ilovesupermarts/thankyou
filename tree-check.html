@@ -42,6 +42,11 @@
     <button type="button" id="go">Start drawing test</button>
     <button type="button" class="plain" id="unlatch">Switch the trees back on</button>
   </section>
+  <section style="grid-column: 1 / -1">
+    <h2 style="font-size:19px;margin:0 0 6px">Graphics log (kept from the app and this page)</h2>
+    <table id="log"></table>
+    <button type="button" class="plain" id="clearLog">Clear the log</button>
+  </section>
   <section>
     <canvas id="view"></canvas>
     <table id="live"></table>
@@ -90,6 +95,15 @@ function showFacts() {
   ].concat(glFacts()).concat([latchText()]));
 }
 showFacts();
+function showLog() {
+  var L = Trunks.readLog().slice(-40);
+  rows(document.getElementById('log'), L.length ? L.map(function (e) {
+    var bad = /LOST|FAIL|none|lost/.test(e.m) && !/restored/.test(e.m);
+    return [new Date(e.at).toLocaleTimeString() + ' · ' + e.page + ' · ' + e.s + ' s', e.m, bad ? 'bad' : ''];
+  }) : [['', 'nothing logged yet: open the app, let it run, then open this page again']]);
+}
+showLog();
+document.getElementById('clearLog').addEventListener('click', function () { Trunks.clearLog(); showLog(); });
 document.getElementById('unlatch').addEventListener('click', function () { Trunks.clearOff(); location.reload(); });
 
 /* ---------- 2. A tree like the app's (the same branching), swaying ---------- */
@@ -178,7 +192,7 @@ document.getElementById('go').addEventListener('click', function () {
       ['Tree picture / buffers', I.canvas + ' px · ' + I.buffers],
       ['Script memory', mem]
     ]);
-    if (done) { showFacts(); return; }
+    if (done) { showFacts(); showLog(); return; }
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
