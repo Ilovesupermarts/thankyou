@@ -991,7 +991,7 @@ function drawBranches(c, T) {
   var t0 = performance.now(), g = Trunks.draw(o);
   trunkMs = lerp(trunkMs, performance.now() - t0, 0.1);
   c.setTransform(1, 0, 0, 1, 0, 0);
-  if (g) { c.drawImage(g, 0, 0, o.width, o.height, 0, 0, o.width, o.height); return; }
+  if (g) { c.drawImage(g.cnv, 0, 0, g.w, g.h, g.x, g.y, g.w, g.h); return; }
   c.setTransform(res, 0, 0, res, 0, 0);
   Trunks.flat(c, rgb(light(T.far ? mix(BARK_FLAT, PAPER, look.air) : BARK_FLAT)));
 }
