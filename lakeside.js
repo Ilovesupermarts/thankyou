@@ -177,36 +177,50 @@ function crown(c, o, P, r, kind) {
   var w = o.w || h * (ginkgo ? 0.62 : blob ? 0.7 : 0.95);
   var cy = y - h * (ginkgo ? 0.56 : 0.58), rx = w * 0.5, ry = h * (ginkgo ? 0.44 : 0.4);
   // the trunk (and for a maple, a fork showing under the crown)
+  if (o.bush) { cy = y - h * 0.42; ry = h * 0.45; }
   var tw = Math.max(0.8, h * 0.035);
   c.strokeStyle = rgb(fin(P.trunk)); c.lineCap = 'round';
   c.lineWidth = tw;
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + (r() - 0.5) * tw, cy + ry * 0.2); c.stroke();
-  if (!ginkgo && !blob && h > 20) {
+  if (!ginkgo && !blob && !o.bush && h > 20) {
     c.lineWidth = tw * 0.6;
     c.beginPath(); c.moveTo(x, cy + ry * 0.75); c.lineTo(x - rx * 0.45, cy + ry * 0.1); c.moveTo(x, cy + ry * 0.7); c.lineTo(x + rx * 0.4, cy + ry * 0.05); c.stroke();
   }
-  // a lumpy outline: a few big lobes in the shade colour
-  var lobes = 5 + Math.floor(r() * 4);
-  c.fillStyle = rgb(fin(P.deep));
-  for (var b = 0; b < lobes; b++) {
-    var a = (b / lobes) * TAU + r() * 0.5, d = lerp(0.35, 0.55, r());
-    c.beginPath(); c.ellipse(x + Math.cos(a) * rx * d, cy + Math.sin(a) * ry * d, rx * lerp(0.45, 0.6, r()), ry * lerp(0.42, 0.55, r()), 0, 0, TAU); c.fill();
+  // the crown as a cloud of clumps (as the big maples are made): each clump lit on its own upper side and
+  // shaded below, the clumps toward the light brighter, gaps of shade between them
+  var nCl = o.bush ? 4 + Math.floor(r() * 3) : clamp(Math.round(h / 8), 7, 14), cl = [];
+  for (var q = 0; q < nCl; q++) {
+    var a = q === 0 ? 0 : r() * TAU, d = q === 0 ? 0 : lerp(0.35, 0.72, Math.sqrt(r()));
+    var ux = Math.cos(a) * d, uy = Math.sin(a) * d * (ginkgo ? 1.05 : 0.85) - 0.03;
+    cl.push({ x: x + ux * rx, y: cy + uy * ry, R: Math.min(rx, ry) * lerp(0.42, 0.6, r()) * (1 - 0.25 * Math.abs(uy)), ux: ux, uy: uy });
   }
-  // the dabs
-  var n = clamp(Math.round(h * h / (ginkgo ? 32 : 40)), 8, ginkgo ? 190 : 150), list = [];
-  for (var k = 0; k < n; k++) {
-    var a2 = r() * TAU, d2 = Math.sqrt(r()) * 0.98;
-    var u = Math.cos(a2) * d2, v = Math.sin(a2) * d2;
-    var lumpy = 1 + 0.12 * Math.sin(a2 * 3 + o.seed);
-    list.push({ x: x + u * rx * lumpy, y: cy + v * ry * lumpy, s: h * lerp(0.05, 0.09, r()), k: litAt(u, v, lx, (r() - 0.5) * 0.35), rot: r() * TAU });
-  }
-  list.sort(function (a, b) { return a.k - b.k; });
+  cl.sort(function (A, B) { return (A.y - A.R * 0.3) - (B.y - B.R * 0.3); });   // the ones higher up first: the lower ones hang in front
   var shapes = h > 60 && !blob;
-  for (var m = 0; m < list.length; m++) {
-    var D = list[m], col = rgb(fin(tone(P, D.k)));
-    if (shapes && m % 3 === 0) { if (ginkgo) fan(c, D.x, D.y, D.s * 1.1, D.rot, col); else star(c, D.x, D.y, D.s * 1.05, D.rot, col); }
-    else dab(c, D.x, D.y, D.s, D.s * 0.8, 0, col);
-  }
+  cl.forEach(function (C) {
+    var glob = litAt(C.ux, C.uy, lx, 0);                                      // where it is in the whole crown
+    // its shadowed body
+    c.fillStyle = rgb(fin(mix(P.deep, P.mid, glob * 0.35)));
+    c.beginPath();
+    for (var i = 0; i <= 14; i++) {
+      var aa = (i / 14) * TAU, rr = C.R * lerp(0.85, 1.1, r());
+      var px = C.x + Math.cos(aa) * rr, py = C.y + Math.sin(aa) * rr * 0.82;
+      if (i) c.lineTo(px, py); else c.moveTo(px, py);
+    }
+    c.closePath(); c.fill();
+    // its leaves: dabs lit by where they are in the clump (and the clump in the crown)
+    var n = clamp(Math.round(C.R * C.R / (o.bush ? 5 : 7)), 6, 70), list = [];
+    for (var k = 0; k < n; k++) {
+      var a2 = r() * TAU, d2 = Math.sqrt(r()) * 0.95, u = Math.cos(a2) * d2, v = Math.sin(a2) * d2;
+      var kk = clamp(litAt(u, v, lx, (r() - 0.5) * 0.3) * 0.6 + glob * 0.55 - 0.1, 0, 1);
+      list.push({ x: C.x + u * C.R, y: C.y + v * C.R * 0.82, s: C.R * lerp(0.13, 0.24, r()), k: kk, rot: r() * TAU });
+    }
+    list.sort(function (A, B) { return A.k - B.k; });
+    for (var m = 0; m < list.length; m++) {
+      var D = list[m], col = rgb(fin(tone(P, D.k)));
+      if ((shapes || o.bush) && m % 3 === 0) { if (ginkgo) fan(c, D.x, D.y, D.s * 1.1, D.rot, col); else star(c, D.x, D.y, D.s * 1.05, D.rot, col); }
+      else dab(c, D.x, D.y, D.s, D.s * 0.78, D.rot, col);
+    }
+  });
 }
 
 function tree(c, kind, o) {
@@ -347,41 +361,151 @@ function renderFaces(c, faces, o) {
 }
 
 /* ---------------- THE SHORE ---------------- */
-/* A rounded rock, lit on one side, with moss on top. */
+/* A mossy boulder (苔むした石): an irregular weathered outline, a little
+   buried, lit from one side with real volume (a soft core shadow, a darker
+   foot where it meets the ground), a few faces and cracks, granite grain,
+   and a velvet cap of moss on top that creeps down the cracks, its edge
+   soft and broken. o: x, y (the middle of its foot), w, h, seed, lx, fin,
+   stone, mossCol, moss (0 … 1), water (true: it stands in the shallows). */
 function rock(c, o) {
-  var r = rng((o.seed || 1) * 40503), x = o.x, y = o.y, w = o.w, h = o.h || w * 0.55, fin = o.fin || same, lx = o.lx === undefined ? -0.7 : o.lx;
-  var stone = o.stone || [138, 130, 120], moss = o.mossCol || [96, 112, 62];
-  var n = 9, pts = [];
+  var r = rng((o.seed || 1) * 40503), x = o.x, y = o.y, w = o.w, h = o.h || w * 0.6, fin = o.fin || same, lx = o.lx === undefined ? -0.7 : o.lx;
+  var stone = o.stone || [138, 130, 120], moss = o.mossCol || [96, 112, 62], mk = o.moss === undefined ? 0.6 : o.moss;
+  var rx = w / 2, ry = h * 0.62, cx = x, cy = y - h * 0.48;
+  // the outline: an egg squashed by the ground, with lumps and a few flat faces
+  var n = w > 14 ? 34 : 18, ph = [r() * TAU, r() * TAU, r() * TAU], amp = [lerp(0.06, 0.14, r()), lerp(0.03, 0.08, r()), 0.025];
+  var pts = [];
   for (var i = 0; i < n; i++) {
-    var a = PI + (i / (n - 1)) * PI;                      // the top half: from the left foot over to the right
-    var rr = lerp(0.8, 1.08, r());
-    pts.push([x + Math.cos(a) * w * 0.5 * rr, y + Math.sin(a) * h * rr]);
+    var a = (i / n) * TAU;
+    var k = 1 + amp[0] * Math.sin(a * 2 + ph[0]) + amp[1] * Math.sin(a * 3 + ph[1]) + amp[2] * Math.sin(a * 7 + ph[2]) + (r() - 0.5) * 0.04;
+    var px = cx + Math.cos(a) * rx * k, py = cy + Math.sin(a) * ry * k;
+    if (Math.sin(a) < -0.2) py -= (1 - Math.abs(Math.cos(a))) * h * 0.06;     // a fuller, rounder top
+    pts.push([px, Math.min(py, y + h * 0.04)]);                                 // the bottom sits in the ground
   }
-  function outline() {
-    c.beginPath(); c.moveTo(x - w * 0.52, y);
-    for (var k = 0; k < pts.length; k++) c.lineTo(pts[k][0], pts[k][1]);
-    c.lineTo(x + w * 0.52, y); c.closePath();
+  function outline() { c.beginPath(); for (var j = 0; j < n; j++) { if (j) c.lineTo(pts[j][0], pts[j][1]); else c.moveTo(pts[j][0], pts[j][1]); } c.closePath(); }
+  function col(cc, a2) { return rgb(fin(cc), a2); }
+  // its shadow on the ground, thrown away from the light
+  var sg = c.createRadialGradient(x - lx * w * 0.18, y, 0, x - lx * w * 0.18, y, w * 0.75);
+  sg.addColorStop(0, 'rgba(18,12,8,0.5)'); sg.addColorStop(1, 'rgba(18,12,8,0)');
+  c.save(); c.translate(0, y); c.scale(1, 0.22); c.translate(0, -y);
+  c.fillStyle = sg; c.fillRect(x - w * 1.2, y - w * 0.8, w * 2.4, w * 1.6); c.restore();
+  c.save();
+  outline(); c.fillStyle = col(stone); c.fill();
+  outline(); c.clip();
+  // volume: lit toward the light and from above, a core shadow on the far side, darker at the foot
+  var gx = cx + lx * rx * 0.5, gy = cy - ry * 0.55;
+  var g = c.createRadialGradient(gx, gy, 0, gx, gy, Math.max(rx, ry) * 1.9);
+  g.addColorStop(0, col(mix(scale(stone, 1.32), [255, 244, 225], 0.12)));
+  g.addColorStop(0.35, col(scale(stone, 1.04)));
+  g.addColorStop(0.7, col(scale(stone, 0.66)));
+  g.addColorStop(1, col(scale(stone, 0.38)));
+  c.fillStyle = g; c.fillRect(cx - rx * 1.5, cy - ry * 1.6, rx * 3, ry * 3.2);
+  // a few faces: broad planes a shade lighter or darker
+  var nf = w > 10 ? 2 + Math.floor(r() * 3) : 0;
+  for (var f = 0; f < nf; f++) {
+    var a0 = r() * TAU, a1 = a0 + lerp(0.9, 2, r());
+    var p0 = [cx + Math.cos(a0) * rx * 1.2, cy + Math.sin(a0) * ry * 1.2], p1 = [cx + Math.cos(a1) * rx * 1.2, cy + Math.sin(a1) * ry * 1.2];
+    var mid = [lerp(p0[0], p1[0], 0.5) * 0.6 + cx * 0.4 + (r() - 0.5) * rx * 0.3, lerp(p0[1], p1[1], 0.5) * 0.6 + cy * 0.4];
+    var facing = -(Math.cos((a0 + a1) / 2) * lx) - Math.sin((a0 + a1) / 2) * 0.6;
+    c.fillStyle = facing > 0 ? col(scale(stone, 1.3), 0.22) : col(scale(stone, 0.5), 0.28);
+    c.beginPath(); c.moveTo(p0[0], p0[1]); c.lineTo(mid[0], mid[1]); c.lineTo(p1[0], p1[1]); c.closePath(); c.fill();
   }
-  // shadow under it
-  c.fillStyle = 'rgba(20,14,10,0.35)';
-  c.beginPath(); c.ellipse(x - lx * w * 0.12, y, w * 0.6, Math.max(1, h * 0.18), 0, 0, TAU); c.fill();
-  var g = c.createLinearGradient(x + lx * w * 0.5, y - h, x - lx * w * 0.5, y);
-  g.addColorStop(0, rgb(fin(scale(stone, 1.15))));
-  g.addColorStop(0.6, rgb(fin(stone)));
-  g.addColorStop(1, rgb(fin(scale(stone, 0.55))));
-  outline(); c.fillStyle = g; c.fill();
-  // the moss on the top
-  var mk = o.moss === undefined ? 0.6 : o.moss;
-  if (mk > 0) {
-    c.save(); outline(); c.clip();
-    var nm = Math.max(3, Math.round(w / 3));
-    for (var j = 0; j < nm; j++) {
-      var u = r() * 2 - 1, mx = x + u * w * 0.45, my = y - h * lerp(0.75, 1.05, r()) * Math.sqrt(1 - u * u * 0.7);
-      var ms = w * lerp(0.1, 0.22, r()) * mk;
-      c.fillStyle = rgb(fin(scale(moss, lerp(0.75, 1.2, r()) * (u * lx < 0 ? 1.08 : 0.85))));
-      c.beginPath(); c.ellipse(mx, my, ms, ms * 0.55, 0, 0, TAU); c.fill();
+  // cracks, each with a lit lip above it
+  var nc = w > 12 ? 1 + Math.floor(r() * 3) : 0, cracks = [];
+  for (var q = 0; q < nc; q++) {
+    var sx = cx + (r() - 0.5) * rx * 1.2, sy = cy - ry * lerp(0.2, 0.9, r()), ex = sx + (r() - 0.5) * rx * 0.8, ey = sy + ry * lerp(0.6, 1.3, r());
+    var bx = (sx + ex) / 2 + (r() - 0.5) * rx * 0.4, by = (sy + ey) / 2;
+    cracks.push([sx, sy, bx, by, ex, ey]);
+    c.lineCap = 'round';
+    c.strokeStyle = col(scale(stone, 1.35), 0.35); c.lineWidth = Math.max(0.4, w * 0.018);
+    c.beginPath(); c.moveTo(sx - lx * 0.8, sy - 0.6); c.quadraticCurveTo(bx - lx * 0.8, by - 0.6, ex - lx * 0.8, ey - 0.6); c.stroke();
+    c.strokeStyle = col(scale(stone, 0.3), 0.7); c.lineWidth = Math.max(0.5, w * 0.022);
+    c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(bx, by, ex, ey); c.stroke();
+  }
+  // granite grain
+  var ng = clamp(Math.round(w * h / 5), 10, 700);
+  for (var d = 0; d < ng; d++) {
+    var gx2 = cx + (r() * 2 - 1) * rx, gy2 = cy + (r() * 2 - 1) * ry, light = r() < 0.45, s2 = Math.max(0.35, w * lerp(0.004, 0.014, r()));
+    c.fillStyle = light ? col(mix(stone, [240, 236, 228], 0.5), lerp(0.12, 0.35, r())) : col(scale(stone, 0.35), lerp(0.12, 0.35, r()));
+    c.fillRect(gx2, gy2, s2, s2);
+  }
+  // weathering: broad darker and paler blotches, and pale rings of lichen
+  var nb = w > 10 ? 4 + Math.floor(r() * 5) : 0;
+  for (var bl = 0; bl < nb; bl++) {
+    var bxp = cx + (r() * 2 - 1) * rx * 0.8, byp = cy + (r() * 2 - 1) * ry * 0.7, br = Math.max(rx, ry) * lerp(0.2, 0.45, r());
+    var dark = r() < 0.6, bgr = c.createRadialGradient(bxp, byp, 0, bxp, byp, br);
+    bgr.addColorStop(0, dark ? col(scale(stone, 0.55), 0.3) : col(mix(stone, [200, 200, 180], 0.4), 0.25));
+    bgr.addColorStop(1, dark ? col(scale(stone, 0.55), 0) : col(mix(stone, [200, 200, 180], 0.4), 0));
+    c.fillStyle = bgr; c.fillRect(bxp - br, byp - br, br * 2, br * 2);
+  }
+  var nl = w > 14 ? Math.floor(r() * 5) : 0;
+  for (var li = 0; li < nl; li++) {
+    var lxp = cx + (r() * 2 - 1) * rx * 0.7, lyp = cy + lerp(-0.2, 0.6, r()) * ry, lr = w * lerp(0.015, 0.04, r());
+    c.fillStyle = col([170, 174, 150], 0.22); c.beginPath(); c.ellipse(lxp, lyp, lr, lr * 0.8, 0, 0, TAU); c.fill();
+    c.strokeStyle = col([196, 198, 176], 0.25); c.lineWidth = Math.max(0.3, lr * 0.25); c.stroke();
+  }
+  // the moss: a cap over the top, thicker on the shaded, damper side, creeping down the cracks
+  if (mk > 0.02) {
+    var mossLit = mix(scale(moss, 1.45), [214, 220, 96], 0.25), mossDeep = scale(moss, 0.55);
+    var depth = ry * lerp(0.55, 1.05, mk);
+    function mossLine(xx) {
+      var u = (xx - cx) / rx;
+      var topY = cy - ry * Math.sqrt(Math.max(0, 1 - u * u)) * 1.02;
+      var wob = 0.62 * Math.sin(xx / Math.max(1, w * 0.09) + ph[1]) + 0.28 * Math.sin(xx / Math.max(1, w * 0.035) + ph[2]) + 0.1 * Math.sin(xx / Math.max(1, w * 0.015) + ph[0]);
+      return topY + depth * (0.62 + 0.38 * wob) * (1 - 0.35 * u * lx) * (0.55 + 0.45 * Math.sqrt(Math.max(0, 1 - u * u)));
     }
-    c.restore();
+    var mg = c.createLinearGradient(cx + lx * rx, cy - ry, cx - lx * rx, cy + ry * 0.2);
+    mg.addColorStop(0, col(mossLit)); mg.addColorStop(0.55, col(moss)); mg.addColorStop(1, col(mossDeep));
+    c.fillStyle = mg;
+    c.beginPath(); c.moveTo(cx - rx * 1.3, cy - ry * 1.6);
+    for (var xx = cx - rx * 1.2; xx <= cx + rx * 1.2; xx += Math.max(0.6, w / 40)) c.lineTo(xx, mossLine(xx));
+    c.lineTo(cx + rx * 1.3, cy - ry * 1.6); c.closePath(); c.fill();
+    // down the cracks
+    cracks.forEach(function (C) {
+      c.strokeStyle = col(mossDeep, 0.45); c.lineWidth = Math.max(0.4, w * 0.014);
+      c.beginPath(); c.moveTo(C[0], C[1]); c.quadraticCurveTo(lerp(C[0], C[2], 0.6), lerp(C[1], C[3], 0.6), C[2], C[3]); c.stroke();
+    });
+    // its broken, soft edge and its velvet: small tufts, bright where the light catches them
+    var nt = clamp(Math.round(w * mk * 6), 8, 600);
+    for (var tq = 0; tq < nt; tq++) {
+      var tx = cx + (r() * 2 - 1) * rx, edgeY = mossLine(tx), ty = edgeY + (r() - 0.7) * Math.max(1.5, w * 0.05);
+      var ts = Math.max(0.4, w * lerp(0.005, 0.014, r())), u2 = (tx - cx) / rx;
+      var kk = clamp(0.5 - 0.5 * u2 * lx + (r() - 0.5) * 0.4, 0, 1);
+      c.fillStyle = col(kk > 0.5 ? mix(moss, mossLit, (kk - 0.5) * 2) : mix(mossDeep, moss, kk * 2), lerp(0.6, 1, r()));
+      c.beginPath(); c.arc(tx, ty, ts, 0, TAU); c.fill();
+    }
+    var ns = clamp(Math.round(w * w * mk * 0.25), 8, 1200);
+    for (var sp = 0; sp < ns; sp++) {
+      var sx2 = cx + (r() * 2 - 1) * rx, top2 = mossLine(sx2), sy2 = lerp(cy - ry * 1.05, top2, r());
+      c.fillStyle = r() < 0.6 ? col(mix(mossLit, [240, 236, 150], 0.3), 0.55) : col(mossDeep, 0.5);
+      var ss = Math.max(0.35, w * 0.006);
+      c.fillRect(sx2, sy2, ss, ss);
+    }
+  }
+  // darker at the foot, where it meets the ground (and damp)
+  var fg = c.createLinearGradient(0, y - h * 0.35, 0, y + 1);
+  fg.addColorStop(0, 'rgba(20,14,10,0)'); fg.addColorStop(1, 'rgba(20,14,10,0.55)');
+  c.fillStyle = fg; c.fillRect(cx - rx * 1.4, y - h * 0.35, rx * 2.8, h * 0.4);
+  c.restore();
+  // a sunlit rim on its lit shoulder
+  if (w > 8) {
+    c.save();
+    c.strokeStyle = col(mix(mk > 0.3 ? mix(moss, [230, 230, 140], 0.5) : stone, [255, 248, 230], 0.45), 0.45);
+    c.lineWidth = Math.max(0.5, w * 0.012);
+    c.beginPath();
+    var first = true;
+    for (var e = 0; e < n; e++) {
+      var aa = (e / n) * TAU, nxv = Math.cos(aa), nyv = Math.sin(aa);
+      if (nxv * lx + nyv * -0.8 > 0.55) { if (first) { c.moveTo(pts[e][0], pts[e][1]); first = false; } else c.lineTo(pts[e][0], pts[e][1]); }
+      else first = true;
+    }
+    c.stroke(); c.restore();
+  }
+  // in the shallows: the water laps round its foot
+  if (o.water) {
+    c.strokeStyle = 'rgba(255,250,240,0.4)'; c.lineWidth = Math.max(0.5, w * 0.012);
+    c.beginPath(); c.ellipse(x, y + h * 0.02, rx * 1.08, Math.max(0.8, h * 0.08), 0, 0, PI); c.stroke();
+    c.strokeStyle = 'rgba(255,250,240,0.18)';
+    c.beginPath(); c.ellipse(x, y + h * 0.05, rx * 1.3, Math.max(1, h * 0.13), 0, 0.1, PI - 0.1); c.stroke();
   }
 }
 /* 彼岸花 — a red spider lily: a bare green stem with a ring of narrow

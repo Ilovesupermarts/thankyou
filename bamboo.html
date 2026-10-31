@@ -2029,6 +2029,7 @@ function bakeGates() {
       rc.globalAlpha = 0.35; rc.drawImage(soft.cnv, 0, 2 * PR); rc.globalAlpha = 1;   // a little smeared downward
     }
   }
+  composeWater();
   // all of it into GATE: the shadow, then the layers from the softest (furthest) to the sharpest
   GATE.cnv.width = cw; GATE.cnv.height = chh;
   var o = GATE.c;
@@ -2359,11 +2360,11 @@ function bakeScenery() {
     s.restore();
   }
   // The lake (section 7c): the far shore's forest, the headland, then the water with everything mirrored in it.
-  var lakePath = buildLand();
+  var landPath = buildLand();
   s.save(); s.setTransform(SR, 0, 0, SR, 0, 0); drawFarShore(s); s.restore();
-  bakeHead(lakePath);
+  bakeHead(landPath);
   bakeWater(C);
-  bakeGrove(lakePath);
+  bakeGrove(landPath);
   s.save(); s.setTransform(SR, 0, 0, SR, 0, 0); veilOver(s, false); s.restore();
   if (headBox) { HEADC.c.setTransform(SR, 0, 0, SR, -headBox.x0 * SR, -headBox.y0 * SR); veilOver(HEADC.c, true); }
   bakeRipples();
@@ -2451,20 +2452,23 @@ function drawFuji(c, C, hy) {
    stems (one curve and one baked plume each).
    ============================================================ */
 var LK_DEFAULTS = {
-  horizon: 0.62,
+  horizon: 0.68,
+  // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
+  gates: 22, pathX: 0.395, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
   // the water
-  farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, glint: 0.55, lakeMist: 0.5, veil: 0.24,
-  // the headland and its forest
-  headland: true, headTip: 0.48, headTop: 0.4, headZ: 40, forest: 1, treeSize: 1, evergreen: 0.62, ginkgo: 0.16,
-  pagoda: true, pagodaX: 0.312, pagodaSize: 0.215, hall: true, grove: true,
+  farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.24,
+  nearBank: 0.86, floating: 1,
+  // the headland and its forest (near you now, framing the left)
+  headland: true, headTip: 0.42, headTop: 0.47, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
+  pagoda: true, pagodaX: 0.3, pagodaSize: 0.19, hall: true, grove: false, bankTrees: true,
   // the water torii
-  waterTorii: true, wtX: 0.2, wtY: 0.688, wtSize: 1.35,
+  waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
-  colours: { water: '#2F5A6A', waterEvening: '#4C4560', waterNight: '#121A2E', moss: '#5E6E3A', stone: '#8E8678',
+  colours: { water: '#2F5A6A', waterEvening: '#4C4560', waterNight: '#121A2E', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab1';
+var LK_KEY = 'lakeLab2';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2509,6 +2513,19 @@ function besidePath(path, s, k) {
   var q = pathAt(path, clamp(s, 0, path.len));
   return { x: q.x - q.tz * k, z: q.z + q.tx * k };
 }
+/* The torii line from the lake values: it starts at the headland's foot (LK.pathX) and winds toward you
+   to the gate facing you (LK.gateEndX, LK.gateEndY); evenly spaced in depth, so the far stretch is long. */
+function lakePath() {
+  var hy = V.horizon, y0 = Math.max(hy + 0.004, LK.pathY), y1 = Math.max(y0 + 0.02, LK.gateEndY);
+  var d0 = y0 - hy, d1 = y1 - hy, pts = [];
+  [0, 0.2, 0.42, 0.62, 0.8, 1].forEach(function (u) {
+    var x = lerp(LK.pathX, LK.gateEndX, Math.pow(u, 1.3)) - 0.03 * Math.sin(u * PI);
+    pts.push([x, hy + d0 * Math.pow(d1 / d0, u)]);
+  });
+  G.path = pts;
+  G.count = Math.max(2, Math.round(LK.gates));
+  L.every = Math.max(1, Math.round(G.count / 7));
+}
 function gravelHalf() { var h = G.gateHeight; return (G.width * h / 2 + G.pillar * h * 1.5) * G.pathWidth; }
 
 /* ---------- the land: the peninsula, the near bank, the right shore ---------- */
@@ -2519,9 +2536,9 @@ function buildLand() {
   var zExit = F / Math.max(8, (1.1 - V.horizon) * H), endQ = pathAt(path, len);
   // across the path: the near (left, the basin) side stays close to the gravel, so the gates stand
   // at the water's edge; the far side widens in the middle for the grove
-  function kL(s) { var u = s / len; return wu * (1.45 + 0.35 * vnoise(u * 7, 11) + 0.5 * u); }
-  function kR(s) { var u = s / len; return wu * (1.6 + 0.3 * vnoise(u * 6, 23) + 5.2 * Math.exp(-Math.pow((u - 0.45) / 0.17, 2))); }
-  var N = 90, left = [], right = [];
+  function kL(s) { var u = s / len; return wu * (1.5 + 0.35 * vnoise(u * 7, 11) + 0.18 * vnoise(u * 23, 12) + 0.07 * vnoise(u * 71, 13) + 0.6 * u); }
+  function kR(s) { var u = s / len; return wu * (1.7 + 0.3 * vnoise(u * 6, 23) + 0.16 * vnoise(u * 21, 24) + 0.06 * vnoise(u * 67, 25) + (LK.grove ? 5.2 * Math.exp(-Math.pow((u - 0.45) / 0.17, 2)) : 1.2 * Math.exp(-Math.pow((u - 0.5) / 0.2, 2)))); }
+  var N = 240, left = [], right = [];
   for (var i = 0; i <= N; i++) {
     var s = len * i / N;
     left.push(scr(besidePath(path, s, -kL(s))));
@@ -2542,9 +2559,10 @@ function buildLand() {
   edges.push(right.slice(0, sa + 1));
   // the right foreground: from the peninsula's far side out to the right edge of the screen
   var rs = [], ph = r() * TAU;
-  for (var x = ra[0]; x <= W + 30; x += 8) {
+  for (var x = ra[0]; x <= W + 30; x += 3) {
     var u = clamp((x - ra[0]) / Math.max(1, W - ra[0]), 0, 1);
-    rs.push([x, lerp(ra[1] + 2, H * 0.765, Math.pow(u, 0.75)) + H * 0.006 * Math.sin(x * 0.019 + ph) * u]);
+    var dd = lerp(ra[1] + 2, hy + (H - hy) * 0.24, Math.pow(u, 0.75)), kd = (dd - hy) / Math.max(1, H - hy);
+    rs.push([x, dd + (H - hy) * kd * (0.05 * vnoise(x / W * 9, 31) + 0.025 * vnoise(x / W * 31, 32) + 0.01 * vnoise(x / W * 90, 33))]);
   }
   edges.push(rs);
   var centre = [];
@@ -2552,7 +2570,10 @@ function buildLand() {
   polys.push(rs.concat([[W + 40, rs[rs.length - 1][1]], [W + 40, H + 40], [exitX + 40, H + 40]]).concat(centre.reverse()));
   // the near bank along the bottom
   var nb = [], ph2 = r() * TAU;
-  for (var xb = -30; xb <= exitX + 60; xb += 8) nb.push([xb, H * 0.926 + H * 0.01 * Math.sin(xb * 0.009 + ph2) + H * 0.005 * Math.sin(xb * 0.027 + ph2 * 2)]);
+  for (var xb = -30; xb <= exitX + 60; xb += 3) {
+    var pt = 0.03 * Math.exp(-Math.pow((xb / W - 0.3) / 0.07, 2)) - 0.018 * Math.exp(-Math.pow((xb / W - 0.47) / 0.05, 2));   // a point of land, then a little inlet
+    nb.push([xb, H * (LK.nearBank - pt) + H * (0.016 * vnoise(xb / W * 4, 41) + 0.007 * vnoise(xb / W * 15, 42) + 0.003 * vnoise(xb / W * 50, 43))]);
+  }
   edges.push(nb);
   polys.push(nb.concat([[exitX + 60, H + 40], [-30, H + 40]]));
   // a little ground round the start, under the headland's foot
@@ -2619,7 +2640,10 @@ function bakeHead(path) {
   if (!LK.headland) { lakeMs.head = performance.now() - t0; return; }
   var tip = LK.headTip * W, ph = r() * TAU;
   // its shore (where it meets the water) and the line of its hillside
-  function yS(x) { var u = smooth(tip - 0.1 * W, tip, x); return lerp(headAxis + 2 * Math.sin(x * 0.03 + ph), hy + lensF() / 95, u); }
+  function yS(x) {
+    var u = smooth(tip - 0.1 * W, tip, x), d = headAxis - hy;
+    return lerp(headAxis + d * (0.1 * vnoise(x / W * 8, 51) + 0.04 * vnoise(x / W * 27, 52) + 0.015 * vnoise(x / W * 80, 53)), hy + lensF() / 95, u);
+  }
   function yR(x) {
     var u = clamp(x / tip, 0, 1);
     return lerp(H * LK.headTop, yS(x) - 2, Math.pow(u, 2.3)) + H * 0.014 * vnoise(x / W * 8, 3) * (1 - u);
@@ -2680,16 +2704,34 @@ function bakeHead(path) {
     }
   }
   // the bank at the water: a strip of moss and stones
-  var moss = finish(0.25)(lkCol('moss'));
-  c.fillStyle = rgb(scale(moss, 0.75));
-  c.beginPath(); c.moveTo(x0 - 5, yS(x0) - 3);
-  for (var xs = x0 - 5; xs <= tip; xs += 6) c.lineTo(xs, yS(xs) - 2.5 + Math.sin(xs * 0.2) * 0.8);
-  for (var xs2 = tip; xs2 >= x0 - 5; xs2 -= 6) c.lineTo(xs2, yS(xs2) + 1);
+  // (damp dark earth under the trees, moss in patches, pebbles and mossy stones at the water)
+  var moss = finish(0.2)(lkCol('moss')), mud = finish(0.2)(hex('#2E241C')), edge = [], bandH = F / LK.headZ * 0.22;
+  for (var xe = x0 - 5; xe <= tip + 2; xe += 3) edge.push([xe, yS(xe)]);
+  c.fillStyle = rgb(mud);
+  c.beginPath(); c.moveTo(edge[0][0], edge[0][1] - bandH);
+  edge.forEach(function (p) { c.lineTo(p[0], p[1] - bandH * (0.6 + 0.4 * Math.sin(p[0] * 0.07))); });
+  for (var e2 = edge.length - 1; e2 >= 0; e2--) c.lineTo(edge[e2][0], edge[e2][1] + 0.5);
   c.closePath(); c.fill();
-  if (LK.rocks > 0) for (var xr = x0 + r() * 30; xr < tip - 10; xr += lerp(18, 60, r()) / LK.rocks) {
-    var rw = lerp(4, 10, r()) * F / LK.headZ / 26;
-    Lakeside.rock(c, { x: xr, y: yS(xr) + 1, w: rw * 3, h: rw * 1.4, seed: Math.round(xr), fin: finish(0.3), stone: lkCol('stone'), mossCol: lkCol('moss'), moss: 0.7 });
+  edge.forEach(function (p, j) {
+    if (r() < 0.18) {
+      var mr = bandH * lerp(0.8, 2.4, r()), mx = p[0], my = p[1] - bandH * lerp(0.4, 1.2, r());
+      var mg = c.createRadialGradient(mx, my, 0, mx, my, mr);
+      mg.addColorStop(0, rgb(mix(moss, [170, 180, 80], 0.3), 0.85)); mg.addColorStop(1, rgb(moss, 0));
+      c.save(); c.translate(mx, my); c.scale(1, 0.45); c.translate(-mx, -my);
+      c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill(); c.restore();
+    }
+    if (r() < 0.4) {
+      var ps = bandH * lerp(0.15, 0.4, r()), pc = finish(0.2)(mix([110, 104, 96], [160, 152, 140], r()));
+      c.fillStyle = rgb(pc); c.beginPath(); c.ellipse(p[0], p[1] - ps * 0.3, ps, ps * 0.45, 0, 0, TAU); c.fill();
+    }
+  });
+  if (LK.rocks > 0) for (var xr = x0 + r() * 30; xr < tip - 10; xr += lerp(25, 80, r()) / LK.rocks) {
+    var rw = F / LK.headZ * lerp(0.25, 0.6, r());
+    Lakeside.rock(c, { x: xr, y: yS(xr) + rw * 0.05, w: rw, h: rw * lerp(0.5, 0.7, r()), seed: Math.round(xr * 3), fin: finish(0.2), stone: lkCol('stone'),
+                       mossCol: lkCol('moss'), moss: lerp(0.4, 0.9, r()), water: r() < 0.4 });
   }
+  edge.head = true;
+  landEdges.push(edge);              // so the water draws its shallows and floating leaves along this shore too
   // mist lying on the water at its foot (霞), thinning up the hillside
   var mist = light(hex(V.colours.mist));
   c.save();
@@ -2705,11 +2747,11 @@ function bakeHead(path) {
 /* The grove behind the middle gates, on the far side of the peninsula (drawn into the headland's
    picture after its reflection was taken: it stands on land, not over the water). */
 function bakeGrove(path) {
-  if (!LK.grove || !path) return;
+  if (!path || !headBox) return;
   var c = HEADC.c, F = lensF(), r = rngFrom(V.seed * 4241 + 9), wu = gravelHalf(), len = path.len;
   c.setTransform(SR, 0, 0, SR, -headBox.x0 * SR, -headBox.y0 * SR);
   var list = [];
-  var defs = [['sugi', 0.36, 3.6, 3.0], ['ginkgo', 0.4, 2.7, 1.9], ['momiji', 0.46, 2.2, 1.5], ['sugi', 0.43, 3.2, 3.6],
+  var defs = !LK.grove ? [] : [['sugi', 0.36, 3.6, 3.0], ['ginkgo', 0.4, 2.7, 1.9], ['momiji', 0.46, 2.2, 1.5], ['sugi', 0.43, 3.2, 3.6],
               ['kaede', 0.51, 2.0, 1.6], ['ginkgo', 0.48, 2.4, 3.0], ['momiji', 0.55, 1.9, 1.3], ['matsu', 0.33, 2.1, 1.7]];
   defs.forEach(function (d, i) {
     var p = besidePath(path, d[1] * len, wu * d[3] + wu * 0.4 * r());
@@ -2719,7 +2761,7 @@ function bakeGrove(path) {
     list.push({ kind: d[0], z: p.z, x: sp[0], y: sp[1], h: d[2] * F / p.z * LK.treeSize, seed: 7001 + i * 13 });
   });
   // a few trees along the right bank, the lake behind them
-  [['ginkgo', 0.665, 1.25], ['momiji', 0.8, 1.15]].forEach(function (d, i) {
+  if (LK.bankTrees) [['ginkgo', 0.77, 1.2], ['momiji', 0.87, 1.1]].forEach(function (d, i) {
     var bx = d[1] * W, y = farShoreY() + 2;
     while (y < H && !inLand(bx, y)) y += 2;
     y += lerp(4, 14, r());
@@ -2735,64 +2777,189 @@ function bakeGrove(path) {
   });
 }
 
-/* ---------- the water, baked into SCN under the land ---------- */
+/* ---------- the water ----------
+   Baked into WATERB (from the far shore down, a little wider than the screen so it can sway):
+   the sky, the mountains, the far shore and the headland mirrored in it (softened and smeared
+   sideways, as on water that is never quite still), patches where a breath of wind roughens it,
+   its own deep colour where you look down into it, wavelets (a lit crest over a darker trough),
+   the shallows along every shore (the lake bed showing through, the bank's dark lip, a broken
+   bright edge), and fallen leaves floating on it. composeWater adds the gates' reflection
+   (WATERC), and each frame lays WATERC down in bands that sway a little from side to side. */
+var WATERB = mk(), WATERC = mk(), WPAD = 10;
 function bakeWater(C) {
   var t0 = performance.now();
-  var s = SCN.c, hy = H * V.horizon, yf = farShoreY();
-  s.save();
-  s.setTransform(SR, 0, 0, SR, 0, 0);
-  s.beginPath(); s.rect(-10, yf, W + 20, H - yf + 10); s.clip();
+  var hy = H * V.horizon, yf = farShoreY(), F = lensF(), hh = H - yf;
+  WATERB.cnv.width = Math.round((W + WPAD * 2) * SR); WATERB.cnv.height = Math.max(1, Math.round(hh * SR));
+  var s = WATERB.c, X0 = WPAD * SR;
+  function css() { s.setTransform(SR, 0, 0, SR, X0, -yf * SR); }
+  css();
   // the sky's reflection (row y mirrors the sky at 2·hy − y)
   var g = s.createLinearGradient(0, yf, 0, H);
   for (var k = 0; k <= 6; k++) { var y = lerp(yf, H, k / 6); g.addColorStop(k / 6, rgb(skyAt(2 * hy - y))); }
-  s.fillStyle = g; s.fillRect(-10, yf, W + 20, H - yf + 10);
-  // the mountains, mirrored about the eye line; the far shore about its own line; the headland about its foot
-  s.globalAlpha = LK.reflect;
-  var soft = 1.2 * SR;
-  s.filter = 'blur(' + soft.toFixed(2) + 'px)';
+  s.fillStyle = g; s.fillRect(-WPAD, yf, W + WPAD * 2, hh + 2);
+  // the mirrored picture, softened and smeared sideways
+  var R = mk(); R.cnv.width = WATERB.cnv.width; R.cnv.height = WATERB.cnv.height;
+  var rc = R.c;
   if (V.showMountains) {
-    s.setTransform(SR, 0, 0, -SR, 0, 2 * hy * SR);
-    s.drawImage(MTN.cnv, 0, 0, W, H);
+    rc.setTransform(SR, 0, 0, -SR, X0, (2 * hy - yf) * SR);
+    rc.filter = 'blur(' + (1.2 * SR).toFixed(2) + 'px)';
+    rc.drawImage(MTN.cnv, 0, 0, W, H);
+    rc.filter = 'none';
   }
-  s.filter = 'none';
-  s.setTransform(SR, 0, 0, -SR, 0, 2 * yf * SR);
-  drawFarShore(s);
+  rc.setTransform(SR, 0, 0, -SR, X0, yf * SR);
+  drawFarShore(rc);
   if (headBox && LK.headland) {
-    s.filter = 'blur(' + (0.8 * SR).toFixed(2) + 'px)';
-    s.setTransform(1, 0, 0, -1, 0, 2 * headAxis * SR);
-    s.drawImage(HEADC.cnv, headBox.x0 * SR, headBox.y0 * SR);
-    s.filter = 'none';
+    rc.setTransform(1, 0, 0, -1, X0, (2 * headAxis - yf) * SR);
+    rc.filter = 'blur(' + (0.7 * SR).toFixed(2) + 'px)';
+    rc.drawImage(HEADC.cnv, headBox.x0 * SR, headBox.y0 * SR);
+    rc.filter = 'none';
   }
-  s.globalAlpha = 1;
-  s.setTransform(SR, 0, 0, SR, 0, 0);
+  s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
+  [-2.2, -0.8, 0.8, 2.2].forEach(function (dx, i) { s.globalAlpha = LK.reflect * (i === 1 || i === 2 ? 0.34 : 0.16) / 0.5 * 0.5; s.drawImage(R.cnv, dx * SR, 0); });
+  s.restore();
+  R.cnv.width = R.cnv.height = 1;
+  css();
+  var wc = waterCol(), r = rngFrom(V.seed * 1499 + 5);
+  // patches where a breath of wind roughens the surface: they mirror the brighter sky higher up, so they read lighter
+  for (var p = 0; p < 9; p++) {
+    var u = Math.pow(r(), 1.3), py = lerp(yf + 2, H, u), kd = (py - hy) / Math.max(1, H - hy);
+    var prx = W * lerp(0.12, 0.35, r()) * (0.6 + kd), pry = prx * lerp(0.04, 0.08, r()) * (0.6 + kd * 2);
+    var px = r() * W, light2 = r() < 0.65;
+    s.save(); s.translate(px, py); s.scale(1, pry / prx);
+    var pg = s.createRadialGradient(0, 0, 0, 0, 0, prx);
+    var pc = light2 ? mix(skyAt(hy * 0.15), [250, 248, 245], 0.2) : scale(wc, 0.8);
+    pg.addColorStop(0, rgb(pc, light2 ? 0.2 : 0.16)); pg.addColorStop(1, rgb(pc, 0));
+    s.fillStyle = pg; s.fillRect(-prx, -prx, prx * 2, prx * 2);
+    s.restore();
+  }
   // looking down into the water near you: its own deep colour shows through (less of a mirror)
-  var wc = waterCol(), gd = s.createLinearGradient(0, yf, 0, H);
-  gd.addColorStop(0, rgb(wc, 0.1 * LK.deep));
-  gd.addColorStop(0.35, rgb(wc, 0.45 * LK.deep));
-  gd.addColorStop(1, rgb(wc, 0.95 * LK.deep));
-  s.fillStyle = gd; s.fillRect(-10, yf, W + 20, H - yf + 10);
-  // still ripples: fine lines, close together toward the far shore
-  var r = rngFrom(V.seed * 1499 + 5), n = Math.round(W * 0.35);
+  var gd = s.createLinearGradient(0, yf, 0, H);
+  gd.addColorStop(0, rgb(wc, 0.08 * LK.deep));
+  gd.addColorStop(0.35, rgb(wc, 0.42 * LK.deep));
+  gd.addColorStop(1, rgb(wc, 0.92 * LK.deep));
+  s.fillStyle = gd; s.fillRect(-WPAD, yf, W + WPAD * 2, hh + 2);
+  // wavelets: a lit crest (the sky) over a darker trough, close together and fine toward the far shore
+  var n = Math.round(W * 0.9);
   for (var i = 0; i < n; i++) {
-    var u = Math.pow(r(), 1.6), yy = lerp(yf + 1, H, u), len = lerp(8, 160, u) * lerp(0.4, 1.4, r()), xx = r() * W;
-    var bright = r() < 0.55, th = lerp(0.35, 1.6, u);
-    s.fillStyle = bright ? rgb(mix(skyAt(2 * hy - yy - 40), [255, 250, 240], 0.3), 0.16 * (1 - u * 0.4))
-                         : rgb(scale(wc, 0.7), 0.14);
+    var uu = Math.pow(r(), 1.7), yy = lerp(yf + 1, H, uu), kk = (yy - hy) / Math.max(1, H - hy);
+    var len = lerp(4, 90, kk) * lerp(0.4, 1.5, r()), xx = r() * (W + WPAD * 2) - WPAD, th = lerp(0.3, 1.8, kk);
+    s.fillStyle = rgb(mix(skyAt(Math.max(0, 2 * hy - yy - 60)), [255, 252, 246], 0.35), lerp(0.22, 0.12, kk) * lerp(0.5, 1.2, r()));
     s.fillRect(xx, yy, len, th);
+    s.fillStyle = rgb(scale(wc, 0.62), lerp(0.1, 0.2, kk));
+    s.fillRect(xx + len * 0.1, yy + th, len * 0.85, th * 1.2);
   }
+  // nearer, the wavelets become small lit crescents with a shadowed hollow, reflecting the sky above
+  var nc = Math.round(W * 0.5);
+  for (var ci = 0; ci < nc; ci++) {
+    var uc = Math.pow(r(), 0.7), yc = lerp(yf + (H - yf) * 0.15, H, uc), kc = (yc - hy) / Math.max(1, H - hy);
+    var wl = lerp(5, 34, kc) * lerp(0.6, 1.4, r()), hc = wl * lerp(0.08, 0.16, r()), xc = r() * (W + WPAD * 2) - WPAD;
+    s.strokeStyle = rgb(scale(wc, 0.55), lerp(0.12, 0.28, kc)); s.lineWidth = Math.max(0.5, hc * 0.7);
+    s.beginPath(); s.moveTo(xc - wl / 2, yc + hc * 0.6); s.quadraticCurveTo(xc, yc + hc * 1.6, xc + wl / 2, yc + hc * 0.6); s.stroke();
+    s.strokeStyle = rgb(mix(skyAt(Math.max(0, 2 * hy - yc - 120)), [255, 253, 248], 0.4), lerp(0.18, 0.4, kc)); s.lineWidth = Math.max(0.4, hc * 0.5);
+    s.beginPath(); s.moveTo(xc - wl / 2, yc); s.quadraticCurveTo(xc, yc - hc, xc + wl / 2, yc); s.stroke();
+  }
+  // the shallows along every shore, and the bank's dark lip and a broken bright edge
+  if (landEdges.length) {
+    var SH = mk(); SH.cnv.width = WATERB.cnv.width; SH.cnv.height = WATERB.cnv.height;
+    var sc = SH.c; sc.setTransform(SR, 0, 0, SR, X0, -yf * SR);
+    sc.lineJoin = 'round'; sc.lineCap = 'round';
+    var bed = light(mix(hex('#8C7A56'), wc, 0.2));
+    landEdges.forEach(function (E) {
+      var k2 = edgeDepth(E);
+      sc.strokeStyle = rgb(bed, 0.55); sc.lineWidth = lerp(6, 64, k2);
+      polyline(sc, E, 0); sc.stroke();
+      sc.strokeStyle = rgb(mix(bed, [190, 170, 130], 0.3), 0.6); sc.lineWidth = lerp(3, 26, k2);
+      polyline(sc, E, 0); sc.stroke();
+      // stones lying in the shallows, under the water
+      for (var j = 0; j < E.length; j += 2) {
+        if (r() > 0.25) continue;
+        var P = E[j], kk = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1), sz = lerp(1, 7, kk) * lerp(0.6, 1.5, r());
+        sc.fillStyle = rgb(scale(bed, lerp(0.55, 0.85, r())), 0.8);
+        sc.beginPath(); sc.ellipse(P[0] + (r() - 0.5) * 10 * kk, P[1] + (r() < 0.5 ? 1 : -1) * lerp(2, 18, kk) * r(), sz, sz * 0.45, 0, 0, TAU); sc.fill();
+      }
+    });
+    s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
+    s.filter = 'blur(' + (2.2 * SR).toFixed(2) + 'px)';
+    s.globalAlpha = 0.8;
+    s.drawImage(SH.cnv, 0, 0);
+    s.restore();
+    sc.setTransform(1, 0, 0, 1, 0, 0); sc.clearRect(0, 0, SH.cnv.width, SH.cnv.height);
+    sc.setTransform(SR, 0, 0, SR, X0, -yf * SR);
+    landEdges.forEach(function (E) {
+      var k2 = edgeDepth(E);
+      sc.strokeStyle = 'rgba(22,20,16,0.6)'; sc.lineWidth = lerp(1.2, 7, k2);
+      polyline(sc, E, (E.head ? 1 : bankH(E[0][1] * 0 + E[Math.floor(E.length / 2)][1])) + lerp(0.6, 3, k2)); sc.stroke();
+    });
+    s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
+    s.filter = 'blur(' + (1.2 * SR).toFixed(2) + 'px)';
+    s.drawImage(SH.cnv, 0, 0);
+    s.restore();
+    SH.cnv.width = SH.cnv.height = 1;
+    css();
+    var edgeLight = mix(skyAt(hy * 0.4), [255, 254, 250], 0.5);
+    landEdges.forEach(function (E) {
+      var k2 = edgeDepth(E), j = Math.floor(r() * 4);
+      while (j < E.length - 2) {
+        var run = 2 + Math.floor(r() * lerp(4, 10, k2));
+        s.strokeStyle = rgb(edgeLight, lerp(0.35, 0.7, r())); s.lineWidth = lerp(0.5, 1.6, k2);
+        s.beginPath();
+        for (var q = j; q < Math.min(E.length, j + run); q++) { var off = (E.head ? 1 : bankH(E[q][1])) + 0.8; if (q === j) s.moveTo(E[q][0], E[q][1] + off); else s.lineTo(E[q][0], E[q][1] + off); }
+        s.stroke();
+        j += run + 1 + Math.floor(r() * 6);
+      }
+    });
+  }
+  // fallen leaves floating on the water: most drift near the shores, a few further out
+  floatLeaves(s, r, hy, yf);
   // the bright line where the water meets the far shore, and mist lying on it
   s.fillStyle = rgb(mix(skyAt(hy), [255, 255, 255], 0.35), 0.55);
-  s.fillRect(-10, yf, W + 20, 0.9);
-  var mist = light(hex(V.colours.mist)), gm = s.createLinearGradient(0, yf - H * 0.02, 0, yf + H * 0.06);
-  gm.addColorStop(0, rgb(mist, LK.lakeMist * 0.5));
-  gm.addColorStop(0.3, rgb(mist, LK.lakeMist * 0.42));
+  s.fillRect(-WPAD, yf, W + WPAD * 2, 0.9);
+  var mist = light(hex(V.colours.mist)), gm = s.createLinearGradient(0, yf, 0, yf + H * 0.06);
+  gm.addColorStop(0, rgb(mist, LK.lakeMist * 0.42));
   gm.addColorStop(1, rgb(mist, 0));
-  s.restore();
-  s.save();
-  s.setTransform(SR, 0, 0, SR, 0, 0);
-  s.fillStyle = gm; s.fillRect(-10, yf - H * 0.02, W + 20, H * 0.08);
-  s.restore();
+  s.fillStyle = gm; s.fillRect(-WPAD, yf, W + WPAD * 2, H * 0.06);
+  composeWater();
   lakeMs.water = performance.now() - t0;
+}
+function bankH(y) { var hy = H * V.horizon; return lerp(0.6, 7, clamp((y - hy) / Math.max(1, H - hy), 0, 1)); }   // the bank's face, px
+function edgeDepth(E) { var hy = H * V.horizon, ya = 0; E.forEach(function (p) { ya += p[1]; }); return clamp((ya / E.length - hy) / Math.max(1, H - hy), 0.03, 1); }
+function polyline(c, E, dy) { c.beginPath(); E.forEach(function (p, j) { if (j) c.lineTo(p[0], p[1] + dy); else c.moveTo(p[0], p[1] + dy); }); }
+function floatLeaves(s, r, hy, yf) {
+  var n = Math.round(150 * LK.floating);
+  if (n <= 0) return;
+  var tones = ['red', 'redOrange', 'orange', 'gold', 'shadeDeep'].map(function (k) { return hex(TREE.colours[k]); });
+  var wc = waterCol();
+  for (var i = 0; i < n; i++) {
+    var x, y;
+    if (landEdges.length && r() < 0.7) {
+      var E = landEdges[Math.floor(r() * landEdges.length)], P = E[Math.floor(r() * E.length)], k0 = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1);
+      x = P[0] + (r() - 0.5) * 30 * k0; y = P[1] + lerp(2, 40, k0) * Math.pow(r(), 1.5) * (r() < 0.5 ? 1 : -1);
+    } else { x = r() * W; y = lerp(yf + 3, H, Math.pow(r(), 0.9)); }
+    if (y < yf + 2 || inLand(x, y) || inLand(x, y - 3)) continue;
+    var kd = clamp((y - hy) / Math.max(1, H - hy), 0.02, 1), sz = lerp(1.2, 11, kd) * lerp(0.7, 1.3, r());
+    if (sz < 1) continue;
+    var col = tones[Math.floor(r() * tones.length)];
+    col = light(mix(col, wc, lerp(0.05, 0.4, r())));                // wet ones darken toward the water
+    var rot = r() * TAU, sy = lerp(0.28, 0.45, kd);
+    s.save(); s.translate(x, y); s.scale(1, sy);
+    s.fillStyle = 'rgba(16,20,24,0.25)'; s.translate(sz * 0.12, sz * 0.25); leafPathLo(s, sz, rot); s.fill();
+    s.translate(-sz * 0.12, -sz * 0.25);
+    s.fillStyle = rgb(col); leafPathLo(s, sz, rot); s.fill();
+    s.restore();
+  }
+}
+/* The baked water and the gates' reflection together, for each frame to sway. */
+function composeWater() {
+  if (WATERB.cnv.width < 2) return;
+  WATERC.cnv.width = WATERB.cnv.width; WATERC.cnv.height = WATERB.cnv.height;
+  var c = WATERC.c, yf = farShoreY();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.drawImage(WATERB.cnv, 0, 0);
+  if (GREF.cnv.width > 2) {
+    c.globalAlpha = LK.reflect * 0.85;
+    c.drawImage(GREF.cnv, WPAD * SR, (grefTop - yf) * SR, GREF.cnv.width * SR / PR, GREF.cnv.height * SR / PR);
+    c.globalAlpha = 1;
+  }
 }
 /* A soft brightening behind the message text (mist in the middle distance), so the words stay easy to read. */
 function veilOver(c, atop) {
@@ -2882,11 +3049,21 @@ function bakeFore(path) {
     }
   }
   // mossy rocks on the shore
+  // (along the shore, every few metres on the ground, often two or three together, some out in the shallows)
   if (LK.rocks > 0) landEdges.forEach(function (E, ei) {
-    for (var q = Math.floor(r() * 6); q < E.length; q += Math.max(2, Math.round(lerp(4, 12, r()) / LK.rocks))) {
+    if (E.head) return;
+    var acc = 0, next = lerp(0.5, 3, r()) / LK.rocks, prev = null;
+    for (var q = 0; q < E.length; q++) {
       var gq2 = toGround(E[q][0], E[q][1]);
-      if (gq2.z > 40) continue;
-      items.push({ kind: 'rock', x: gq2.x, z: gq2.z, seed: ei * 1000 + q });
+      if (prev) acc += Math.hypot(gq2.x - prev.x, gq2.z - prev.z);
+      prev = gq2;
+      if (acc < next || gq2.z > 40) continue;
+      acc = 0; next = lerp(1.2, 5, r()) / LK.rocks;
+      var group = r() < 0.4 ? 2 + Math.floor(r() * 2) : 1;
+      for (var gi = 0; gi < group; gi++) {
+        var out = r() < 0.3 ? lerp(0.05, 0.25, r()) : -lerp(0, 0.12, r());   // + out into the water
+        items.push({ kind: 'rock', x: gq2.x + (r() - 0.5) * 0.4, z: gq2.z - out, seed: ei * 1000 + q * 7 + gi, big: gi === 0 });
+      }
     }
   });
   // susuki clumps: beside the gravel near you, on the near bank, and on the right shore
@@ -2908,7 +3085,7 @@ function bakeFore(path) {
     }
   }
   // low shrubs (maple, dodan, a little green) on the open land on the right and along the near bank
-  for (var bu = 0; bu < 14; bu++) {
+  for (var bu = 0; bu < 0; bu++) {          // (no shrubs: the open bank is leaves, lilies and susuki)
     var gq5 = bu < 12 ? openSpot(0.62, 1.02, 0.72, 0.93, 2.6) : openSpot(0.0, 0.3, 0.94, 0.97, 0.5);
     if (gq5) items.push({ kind: 'bush', x: gq5.x, z: gq5.z, seed: 300 + bu });
   }
@@ -2929,14 +3106,16 @@ function bakeFore(path) {
     var into = it.z < endZ * 1.02 ? c : GRD.c;
     if (into === GRD.c) GRD.c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
     if (it.kind === 'bush') {
-      var rb = Lakeside.rng(it.seed * 53 + 7), bh = Math.min(unit * lerp(0.28, 0.5, rb()), H * (sp[1] > H * 0.92 ? 0.035 : 0.055)), pk = rb();
+      var rb = Lakeside.rng(it.seed * 53 + 7), bh = Math.min(unit * lerp(0.2, 0.36, rb()), H * (sp[1] > H * 0.92 ? 0.03 : 0.042)), pk = rb();
       if (bh < 3) return;
       var pal = pk < 0.45 ? Lakeside.PAL.momiji : pk < 0.7 ? Lakeside.PAL.kaede : pk < 0.85 ? Lakeside.PAL.blob : Lakeside.PAL.ginkgo;
-      Lakeside.tree(into, 'momiji', { x: sp[0], y: sp[1] + bh * 0.08, h: bh, w: bh * lerp(1.5, 2.1, rb()), seed: it.seed, fin: fin, pal: pal });
+      Lakeside.tree(into, 'momiji', { x: sp[0], y: sp[1] + bh * 0.15, h: bh, w: bh * lerp(1.8, 2.6, rb()), seed: it.seed, fin: fin, pal: pal, bush: true });
     } else if (it.kind === 'rock') {
-      var rw = unit * lerp(0.18, 0.5, Lakeside.rng(it.seed * 7 + 1)());
+      var rr0 = Lakeside.rng(it.seed * 7 + 1), rw = unit * (it.big ? lerp(0.22, 0.55, rr0()) : lerp(0.1, 0.28, rr0()));
       if (rw < 1.5) return;
-      Lakeside.rock(into, { x: sp[0], y: sp[1] + rw * 0.12, w: rw, h: rw * 0.55, seed: it.seed, fin: fin, stone: stone, mossCol: moss, moss: 0.75 });
+      var wet = !inLand(sp[0], sp[1]);
+      Lakeside.rock(into, { x: sp[0], y: sp[1] + rw * 0.08, w: rw, h: rw * lerp(0.5, 0.75, rr0()), seed: it.seed, fin: fin, stone: stone, mossCol: moss,
+                            moss: wet ? lerp(0.25, 0.55, rr0()) : lerp(0.45, 0.95, rr0()), water: wet });
     } else if (it.kind === 'lilies') {
       var rr = Lakeside.rng(it.seed * 131 + 5);
       for (var j = 0; j < it.n; j++) {
@@ -2991,16 +3170,24 @@ function drawSusuki(c, t, front) {
 /* ---------- each frame ---------- */
 /* Over the water (after SCN): the gates' reflection, the ripples, the glitter. */
 function drawWaterLive(t) {
-  var yf = farShoreY(), hh = H - yf;
-  if (GREF.cnv.width > 2) {
+  var yf = farShoreY(), hh = H - yf, hy = H * V.horizon, F = lensF();
+  // the water, in bands from the far shore down, each swaying a little (more near you, slower far away)
+  if (WATERC.cnv.width > 2) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    ctx.globalAlpha = LK.reflect * 0.85;
-    ctx.drawImage(GREF.cnv, 0, Math.round(grefTop * PR));
+    var NB = 34, amp = LK.waves * (0.55 + 0.45 * clamp(V.wind, 0, 2)), sw = WATERC.cnv.width, sch = WATERC.cnv.height;
+    for (var b = 0; b < NB; b++) {
+      var u0 = Math.pow(b / NB, 1.7), u1 = Math.pow((b + 1) / NB, 1.7);
+      var y0 = yf + hh * u0, y1 = yf + hh * u1, ym = (y0 + y1) / 2, kd = (ym - hy) / Math.max(1, H - hy), zz = F / Math.max(1, ym - hy);
+      var dx = amp * lerp(0.3, 3.2, kd) * (0.7 * Math.sin(t * 0.9 + zz * 0.8) + 0.3 * Math.sin(t * 1.7 - zz * 2.1 + b));
+      var sy0 = Math.floor((y0 - yf) * SR), sy1 = Math.min(sch, Math.ceil((y1 - yf) * SR) + 1);
+      if (sy1 <= sy0) continue;
+      ctx.drawImage(WATERC.cnv, 0, sy0, sw, sy1 - sy0, (dx - WPAD) * PR, (yf + sy0 / SR) * PR, (W + WPAD * 2) * PR, (sy1 - sy0) / SR * PR);
+    }
   }
   if (LK.ripples > 0 && RIP[0].cnv.width > 1) {
     var mixK = 0.5 + 0.5 * Math.sin(t * 0.45), wind = 0.65 + 0.35 * clamp(V.wind, 0, 2);
     for (var k = 0; k < 2; k++) {
-      var a = LK.ripples * wind * 0.55 * (k ? mixK : 1 - mixK);
+      var a = LK.ripples * wind * 0.75 * (k ? mixK : 1 - mixK);
       if (a < 0.01) continue;
       var off = ((t * (k ? -5 : 7) * LK.rippleSpeed) % W + W) % W;
       ctx.globalAlpha = a;
@@ -3098,6 +3285,8 @@ function bakeGround() {
   for (var i = 0; i < n; i++) {
     var u = r(), fam = pickFamily(r, w), lxp = r() * (W + 40) - 20, lyp = hy + 2 + (depthPx - 2) * u;
     if (!inLand(lxp, lyp) && !inLand(lxp, lyp - 12)) { r(); r(); r(); r(); r(); r(); continue; }   // only on the land, not the lake
+    var dEd = lerp(3, 26, u);                                       // and fewer right at the water, so the damp earth shows
+    if ((!inLand(lxp, lyp - dEd) || !inLand(lxp, lyp + dEd * 0.6)) && r() < 0.8) { r(); r(); r(); r(); r(); continue; }
     if (fam === 'evergreen') fam = 'red';                          // evergreens don't shed onto the ground
     var tones = F[fam];
     var tone = mix(tones[0], tones[2], r());
@@ -3139,38 +3328,78 @@ function bakeGround() {
   gl.fillRect(-10, hy - 10, W + 20, depthPx * 0.45 + 12);
   gl.globalCompositeOperation = 'source-over';
   c.restore();
-  // the water's edge: a band of moss on the land, darker and wet right at the water
-  var moss = light(hex(LK.colours.moss));
+  // the water's edge: the leaves thin out onto damp, dark earth with pebbles, and moss grows in patches
+  var moss = light(hex(LK.colours.moss)), mud = light(hex('#3A2A20')), pr = rngFrom(V.seed * 6007 + 1);
   c.save();
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
   c.lineJoin = 'round'; c.lineCap = 'round';
   landEdges.forEach(function (E) {
-    var yAvg = 0; E.forEach(function (p) { yAvg += p[1]; }); yAvg /= E.length;
-    var k = clamp((yAvg - hy) / Math.max(1, H - hy), 0.05, 1);
-    function line(wd, col) {
-      c.lineWidth = wd; c.strokeStyle = col;
-      c.beginPath(); E.forEach(function (p, j) { if (j) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.stroke();
+    if (E.head) return;
+    var k = edgeDepth(E);
+    // damp earth, fading up into the leaves
+    c.globalAlpha = 0.5; c.strokeStyle = rgb(mud); c.lineWidth = lerp(4, 30, k); polyline(c, E, 0); c.stroke();
+    c.globalAlpha = 0.65; c.lineWidth = lerp(2, 14, k); polyline(c, E, 0); c.stroke();
+    c.globalAlpha = 1;
+    for (var j = 0; j < E.length; j++) {
+      var P = E[j], kk = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1);
+      // pebbles in the wet band
+      if (pr() < 0.55) {
+        var ps = lerp(0.6, 4.5, kk) * lerp(0.5, 1.4, pr()), off = -lerp(1, 12, kk) * pr();
+        var pc = light(mix([118, 112, 104], [170, 160, 146], pr()));
+        c.fillStyle = rgb(scale(pc, 0.6)); c.beginPath(); c.ellipse(P[0] + (pr() - 0.5) * 6 * kk, P[1] + off + ps * 0.2, ps, ps * 0.5, 0, 0, TAU); c.fill();
+        c.fillStyle = rgb(pc); c.beginPath(); c.ellipse(P[0] + (pr() - 0.5) * 6 * kk, P[1] + off, ps * 0.9, ps * 0.42, 0, 0, TAU); c.fill();
+      }
+      // moss, in patches along the bank (not a line)
+      if (pr() < 0.12) {
+        var mr = lerp(3, 26, kk) * lerp(0.6, 1.5, pr()), my = P[1] - lerp(1, 10, kk) * pr(), mx = P[0];
+        var mg = c.createRadialGradient(mx - mr * 0.2, my - mr * 0.1, 0, mx, my, mr);
+        mg.addColorStop(0, rgb(mix(moss, [178, 186, 84], 0.35), 0.9)); mg.addColorStop(0.6, rgb(moss, 0.7)); mg.addColorStop(1, rgb(moss, 0));
+        c.save(); c.translate(mx, my); c.scale(1, 0.4); c.translate(-mx, -my);
+        c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill();
+        c.restore();
+      }
     }
-    line(lerp(3, 22, k), rgb(mix(moss, light(hex(V.colours.mist)), V.groundHaze * (1 - k) * 0.6), 0.75));
-    line(lerp(1.5, 9, k), rgb(scale(moss, 0.72), 0.85));
-    line(lerp(0.8, 3, k), rgb(scale(moss, 0.45), 0.9));
   });
   c.restore();
-  // only the land: the lake shows through everywhere else
+  // only the land: the lake shows through everywhere else (a soft, slightly uneven edge)
   [c, gl].forEach(function (cc) {
     cc.save(); cc.setTransform(1, 0, 0, 1, 0, 0);
     cc.globalCompositeOperation = 'destination-in';
-    cc.filter = 'blur(' + (0.6 * PR).toFixed(2) + 'px)';
+    cc.filter = 'blur(' + (1.1 * PR).toFixed(2) + 'px)';
     cc.drawImage(LANDM.cnv, 0, Math.round((grdTop - landLo.top) * PR));
     cc.restore();
   });
-  // a bright rim where the water meets the land
+  // the bank's low face of dark earth, where the water lies below the edge (seen from above, so only those)
   c.save();
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
-  c.globalCompositeOperation = 'destination-over';
   landEdges.forEach(function (E) {
-    c.lineWidth = 1.6; c.strokeStyle = rgb(mix(skyAt(hy * 0.6), [255, 255, 255], 0.3), 0.5);
-    c.beginPath(); E.forEach(function (p, j) { if (j) c.lineTo(p[0], p[1] + 1.2); else c.moveTo(p[0], p[1] + 1.2); }); c.stroke();
+    if (E.head) return;
+    for (var j = 0; j < E.length - 1; j++) {
+      var P = E[j], Q = E[j + 1];
+      if (inLand(P[0], P[1] + 5) || inLand(Q[0], Q[1] + 5)) continue;
+      var kk = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1), bh = bankH(P[1]);
+      var fg = c.createLinearGradient(0, P[1], 0, P[1] + bh);
+      fg.addColorStop(0, rgb(scale(mud, 1.25))); fg.addColorStop(1, rgb(scale(mud, 0.55)));
+      c.fillStyle = fg;
+      c.beginPath(); c.moveTo(P[0], P[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] + bankH(Q[1])); c.lineTo(P[0], P[1] + bh); c.closePath(); c.fill();
+      if (pr() < 0.25 * kk + 0.05) {                     // a root or a pebble in it
+        c.fillStyle = rgb(light(mix([120, 112, 100], [90, 70, 52], pr())), 0.9);
+        c.beginPath(); c.ellipse(P[0], P[1] + bh * lerp(0.3, 0.8, pr()), Math.max(0.5, bh * 0.3), Math.max(0.4, bh * 0.18), 0, 0, TAU); c.fill();
+      }
+    }
+  });
+  c.restore();
+  // reeds and grass in tufts here and there along the water
+  c.save();
+  c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
+  landEdges.forEach(function (E) {
+    if (E.head) return;
+    for (var j = Math.floor(pr() * 20); j < E.length; j += 8 + Math.floor(pr() * 30)) {
+      var P = E[j], kk = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1), th = lerp(4, 40, kk) * lerp(0.6, 1.3, pr());
+      if (th < 3) continue;
+      Lakeside.blades(c, { x: P[0], y: P[1] - 1, h: th, seed: j * 31 + 7, fin: finish(clamp(0.35 - kk * 0.4, 0, 0.35)),
+                            green: [96, 112, 58], tan: [168, 146, 90] });
+    }
   });
   c.restore();
   c.setTransform(PR, 0, 0, PR, 0, -grdTop * PR);
@@ -6338,6 +6567,7 @@ window.birdLab = {
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   V.horizon = LK.horizon;
+  lakePath();
   PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;   // the app renders at 0.75
   SR = PR * (MT.style === '3d' ? MT.resolution : SCN_RES);   // the 3D mountains are sharp, so they are baked finer
   cv.width = Math.round(W * PR); cv.height = Math.round(H * PR);
@@ -6681,18 +6911,26 @@ var lab = window.mtnLab, tlab = window.treeLab, klab = window.lakeLab;
 if (!lab || !tlab || !klab) return;
 var M = lab.values, TV = tlab.values, KV = klab.values, page = 'lake';
 var LAKE_CTLS = [
-  { k: 'horizon', label: 'Eye line', min: 0.5, max: 0.86, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = less lake (0.86 was the old flat ground).' },
+  { k: 'gates', label: 'Number of torii', min: 2, max: 60, step: 1, group: 'The torii', note: 'How many gates stand in the line (the lanterns follow: about one every seventh of the line).' },
+  { k: 'gateEndY', label: 'Nearest torii: how near', min: 0.7, max: 0.95, step: 0.005, note: 'Where the gate facing you stands, down the screen. Higher up = further away and smaller.' },
+  { k: 'gateEndX', label: 'Nearest torii: across', min: 0.3, max: 0.9, step: 0.005 },
+  { k: 'pathX', label: 'Line starts at (across)', min: 0.05, max: 0.7, step: 0.005, note: 'Far away, by the headland\'s tip.' },
+  { k: 'pathY', label: 'Line starts at (down)', min: 0.6, max: 0.85, step: 0.002, note: 'Nearer the eye line = further away.' },
+  { k: 'horizon', label: 'Eye line', min: 0.55, max: 0.86, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = a smaller lake.' },
+  { k: 'nearBank', label: 'Near bank', min: 0.78, max: 0.98, step: 0.005, note: 'Where the bank along the bottom starts. Higher up = a smaller lake.' },
   { k: 'reflect', label: 'Reflections', min: 0, max: 1, step: 0.01, group: 'The water', note: 'How clearly the lake mirrors the sky, the mountains, the headland and the gates.' },
   { k: 'deep', label: 'Deep water colour', min: 0, max: 1, step: 0.01, note: 'Looking down into the lake near you: its own blue shows through.' },
   { k: 'farShore', label: 'Far shore distance', min: 60, max: 400, step: 5, note: 'Further = a thinner band of forest along the foot of the mountains.' },
+  { k: 'waves', label: 'Swaying reflections', min: 0, max: 2, step: 0.05, note: 'The water sways gently from side to side in bands (drawn each frame), more in the wind.' },
   { k: 'ripples', label: 'Ripples', min: 0, max: 2, step: 0.05, note: 'The drifting ripples (drawn each frame), stronger in the wind.' },
+  { k: 'floating', label: 'Floating leaves', min: 0, max: 3, step: 0.05 },
   { k: 'rippleSpeed', label: 'Ripple speed', min: 0, max: 3, step: 0.05 },
   { k: 'glint', label: 'Sun glitter', min: 0, max: 1.5, step: 0.05, note: 'On the water under the sun (day and evening).' },
   { k: 'lakeMist', label: 'Mist on the lake', min: 0, max: 1, step: 0.01 },
   { k: 'veil', label: 'Soft light behind the text', min: 0, max: 1, step: 0.01, note: 'Mist in the middle distance, so the words stay easy to read.' },
   { k: 'headTip', label: 'Headland reaches to', min: 0.3, max: 0.6, step: 0.01, group: 'The headland', note: 'Across the screen.' },
   { k: 'headTop', label: 'Headland top', min: 0.25, max: 0.6, step: 0.01, note: 'The top of its hillside at the left edge (fraction of the screen height).' },
-  { k: 'headZ', label: 'Headland distance', min: 20, max: 90, step: 1, note: 'Further = smaller trees and a lower shore.' },
+  { k: 'headZ', label: 'Headland distance', min: 10, max: 90, step: 1, note: 'Nearer = bigger trees and a shore lower on the screen.' },
   { k: 'forest', label: 'Forest density', min: 0.3, max: 1.5, step: 0.05 },
   { k: 'treeSize', label: 'Tree size', min: 0.5, max: 1.6, step: 0.05 },
   { k: 'evergreen', label: 'Cedar and pine', min: 0, max: 1, step: 0.01, note: 'The share of deep green; the rest is ginkgo and maple.' },
@@ -6707,7 +6945,8 @@ var LAKE_CTLS = [
   { k: 'susuki', label: 'Susuki', min: 0, max: 1, step: 1, note: '0 off, 1 on.' },
   { k: 'susukiSize', label: 'Susuki size', min: 0.4, max: 1.8, step: 0.05 }
 ];
-var LAKE_SWITCHES = [['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates'], ['waterTorii', 'Torii in the water']];
+var LAKE_SWITCHES = [['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
+                     ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
 var LAKE_COLOURS = [['water', 'Water (day)'], ['waterEvening', 'Water (evening)'], ['waterNight', 'Water (night)'], ['moss', 'Moss'],
                     ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki']];
 var TREE_CTLS = [
