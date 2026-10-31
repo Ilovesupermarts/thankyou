@@ -2237,9 +2237,9 @@ var MT_DEFAULTS = {
   style: '3d',               // '3d' or 'painted' (the old ridges)
   seed: 7,
   // the ranges
-  rangeHeight: 0.13, featureKm: 10, sharpness: 0.55, layering: 0.8, rangeSpacing: 9, nearestKm: 10, farRise: 1.4, lens: 22,
+  rangeHeight: 0.095, featureKm: 10, sharpness: 0.55, layering: 0.8, rangeSpacing: 9, nearestKm: 10, farRise: 1.4, lens: 22,
   // Fuji
-  fujiX: 0.7, fujiHeight: 0.3, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.6, fujiSnow: 0.4, fujiTongues: 0.6, fujiClear: 0.9,
+  fujiX: 0.735, fujiHeight: 0.225, fujiWidth: 2.6, fujiKm: 45, fujiGullies: 0.6, fujiSnow: 0.4, fujiTongues: 0.6, fujiClear: 0.9,
   // snow and forest
   snowLine: 0.9, snow: 0.45, treeLine: 0.85, autumn: 0.85,
   // the light
@@ -2251,7 +2251,7 @@ var MT_DEFAULTS = {
   colours: { rock: '#968476', fujiRock: '#544850', forestRed: '#B04A2C', forestGold: '#D49A44',
              evergreen: '#4A5A3E', snow: '#F6F6FA', haze: '#DCCDD2' }
 };
-var MT_KEY = 'mountainLab2';          // new key: the lake scene's values replace the ones kept from before
+var MT_KEY = 'mountainLab3';          // new key: the lake scene's values replace the ones kept from before
 var MT = clone(MT_DEFAULTS);
 try {
   var savedM = JSON.parse(localStorage.getItem(MT_KEY) || 'null');
@@ -2458,13 +2458,13 @@ function drawFuji(c, C, hy) {
 var LK_DEFAULTS = {
   horizon: 0.68,
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 22, pathX: 0.395, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
+  gates: 22, pathX: 0.345, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
   // the water
-  farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.24,
+  farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
   nearBank: 0.86, floating: 1,
   // the headland and its forest (near you now, framing the left)
-  headland: true, headTip: 0.42, headTop: 0.47, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
-  pagoda: true, pagodaX: 0.3, pagodaSize: 0.19, hall: true, grove: false, bankTrees: true,
+  headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
+  pagoda: true, pagodaX: 0.185, pagodaSize: 0.17, hall: true, grove: false, bankTrees: true,
   // the water torii
   waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
@@ -2472,7 +2472,7 @@ var LK_DEFAULTS = {
   colours: { water: '#2F5A6A', waterEvening: '#4C4560', waterNight: '#121A2E', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab2';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab3';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2968,7 +2968,7 @@ function composeWater() {
 /* A soft brightening behind the message text (mist in the middle distance), so the words stay easy to read. */
 function veilOver(c, atop) {
   if (LK.veil <= 0) return;
-  var mist = light(hex(V.colours.mist)), cx = W * 0.5, cy = H * 0.42, rx = W * 0.3, ry = H * 0.13;
+  var mist = light(hex(V.colours.mist)), cx = W * 0.5, cy = H * 0.46, rx = W * 0.3, ry = H * 0.21;
   c.save();
   if (atop) c.globalCompositeOperation = 'source-atop';
   c.translate(cx, cy); c.scale(rx / ry, 1);
