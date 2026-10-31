@@ -1349,17 +1349,18 @@ var CHIRP_URL = 'Sound/Chirping2.mp3';
 
 /* ============ TRACK METADATA (4 PHASES) ============
    Four Nagoya time phases, the page colour theme's own
-   (getTimeOfDayInNagoya, which also sets data-time). Three of them
-   play a playlist — a folder of numbered songs on the playlist engine
-   (see PLAYLISTS & MUSIC BUTTONS below); night plays one file on the
-   buffer engine, whose bufferName is the physical soundBuffers key.
+   (getTimeOfDayInNagoya, which also sets data-time). Every phase plays
+   a playlist — a folder of numbered songs on the playlist engine (see
+   PLAYLISTS & MUSIC BUTTONS below).
 
      morning  05:00–10:59  playlist 'morning'  Sound/morning/1.m4a, 2.m4a, …
      day      11:00–16:59  playlist 'morning'  (no day music yet)
      evening  17:00–20:59  playlist 'evening'  Sound/Evening/1.m4a, 2.m4a, …
-     night    21:00–04:59  Sound/Latenight.mp3 (18 min, full)
+     night    21:00–04:59  playlist 'night'    Sound/Night/1.m4a, 2.m4a, …
 
-   Each buffer-engine play runs the buffer end-to-end — or up to
+   The single-buffer engine below (playAmbientSound) plays a track that
+   carries a url instead of a playlist; no phase uses it at present.
+   Each of its plays runs the buffer end-to-end — or up to
    maxPlaySec, if set — with a linear fade-in at the head and a linear
    fade-out at the tail, then immediately re-arms for the next cycle.
    The hour check runs at play time, not at schedule time, so a clip
@@ -1372,15 +1373,7 @@ var AMBIENT_TRACKS = [
   { name: 'morning', playlist: 'morning' },
   { name: 'day',     playlist: 'morning' },
   { name: 'evening', playlist: 'evening' },
-  {
-    name: 'night',
-    bufferName: 'night',
-    url: 'Sound/Latenight.mp3',
-    title: 'カタライザー',
-    artist: '小久保隆',
-    peak: 1.00,
-    maxPlaySec: null
-  }
+  { name: 'night',   playlist: 'night' }
 ];
 
 var AMBIENT_FADE_IN  = 3.0;  // seconds
@@ -2853,11 +2846,11 @@ function playAmbientSound(offsetSec) {
 }
 
 /* ============ PLAYLISTS & MUSIC BUTTONS ============
-   Morning, day and evening play folders of numbered songs; night plays one
-   file on the buffer engine above. The folders:
+   Every phase plays a folder of numbered songs. The folders:
 
      Sound/morning/1.m4a, 2.m4a, …   plays in the morning and the day
      Sound/Evening/1.m4a, 2.m4a, …   plays in the evening
+     Sound/Night/1.m4a, 2.m4a, …     plays at night
 
    A static site cannot list a folder, so probePlaylist() asks for 1, 2, 3
    … one after another and stops at the first the server answers 404 for.
@@ -2881,7 +2874,7 @@ function playAmbientSound(offsetSec) {
    The engine is driven by the element's 'ended' event, not by the timer
    chain: playPlaylistSong() returns 0, so scheduleNextAmbient() does not
    re-arm. At the end of a song, if the clock has moved into a phase with
-   a different playlist (or the night file), startAmbient() hands over —
+   a different playlist, startAmbient() hands over —
    a song that is mid-flight when the hour changes still finishes.
 
    Between songs, whether a song ran out or next / back was tapped, the
@@ -2891,9 +2884,9 @@ function playAmbientSound(offsetSec) {
 
    Button behaviour:
      · back   — tap: the song starts again from the beginning; a second
-                tap within 0.45 s: the previous song. On the single-song
-                night phase both just start the song again.
-     · next   — the next song; the song again at night.
+                tap within 0.45 s: the previous song. With a single song
+                in the folder both just start it again.
+     · next   — the next song; the song again if it is the only one.
      · pause  — stops with a short fade and remembers the position,
                 the icon turns to ▶. Skipping or restarting while
                 paused starts playing again.
@@ -2913,7 +2906,8 @@ function _makePlaylist(dir, ext, mime) {
 }
 var MUSIC_PLAYLISTS = {
   morning: _makePlaylist('Sound/morning/', 'm4a', 'audio/mp4'),
-  evening: _makePlaylist('Sound/Evening/', 'm4a', 'audio/mp4')
+  evening: _makePlaylist('Sound/Evening/', 'm4a', 'audio/mp4'),
+  night:   _makePlaylist('Sound/Night/', 'm4a', 'audio/mp4')
 };
 
 var _pl = null;                  // the playlist the engine holds
@@ -3334,7 +3328,8 @@ function _plRestart() {
   }, PL_QUICK_MS);
 }
 
-/* ---------- the single-song phase: pause, resume, restart ---------- */
+/* ---------- the single-buffer engine: pause, resume, restart ----------
+   (for a phase that plays one file instead of a playlist; none does now) */
 function _bufferPause() {
   if (ambientTimer) { clearTimeout(ambientTimer); ambientTimer = null; }
   if (ambientSource === null) return;
@@ -3408,7 +3403,7 @@ function musicToggleMute() {
   }
 }
 
-/* The single-song phase has nothing to skip to: both buttons start the
+/* The single-buffer engine has nothing to skip to: both buttons start the
    song again. */
 function _musicRestartTrack() {
   _musicSetPaused(false);
