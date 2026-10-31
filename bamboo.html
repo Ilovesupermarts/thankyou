@@ -424,25 +424,27 @@ var BAMBOO_COLOURS = {
   culm: '#9DBE78', culmLit: '#DDEBB4', culmShade: '#4E6E3C', node: '#55703F', ring: '#E9F0D2',
   yellow: '#C9C98A', leaf: '#6FA83E', leafDark: '#355F2A', twig: '#7C8F55'
 };
-/* The grove behind the smaller tree: the values approved on the tablet. */
+/* The groves exactly as they are in the app (BAMBOO in app.js, section 8b): 'far' behind the smaller
+   tree and 'near' behind the bigger one. */
 var BDEF = {
   show: true,
   // the grove
-  culms: 90, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
+  culms: 13, seed: 48, entryTop: 0.52, entryBottom: 0.92, heightMin: 1.15, heightMax: 1.5, topMargin: 0.04,
   lean: 24, leanVariety: 0.5, arch: 0.35,
   // stems
   thickness: 12.5, taper: 0.6, nodeSpacing: 0.08, nodeMark: 0.8, highlight: 0.1, colourVariety: 1, colours: clone(BAMBOO_COLOURS),
   // leaves
-  leafiness: 1.5, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
+  leafiness: 1, leafFrom: 0.3, leafSize: 1.15, leafDroop: 1.6,
   // depth of field
   blurNear: 1.6, blurFar: 3, haze: 0.28, depthHaze: 0.32, strength: 1,
   // sway
   swayAmount: 1, swaySpeed: 1, swayVariety: 0.6, tipWhip: 2, gustResponse: 1, gustSpring: 1, leafFlutter: 1
 };
-/* The grove behind the bigger tree starts from the same values, arranged
-   differently, and a little sharper as it is nearer. */
 var BDEF_NEAR = clone(BDEF);
-BDEF_NEAR.seed = 21; BDEF_NEAR.blurNear = 1; BDEF_NEAR.blurFar = 2.2; BDEF_NEAR.haze = 0.22; BDEF_NEAR.depthHaze = 0.3;
+BDEF_NEAR.culms = 16; BDEF_NEAR.seed = 45; BDEF_NEAR.entryTop = 0.23; BDEF_NEAR.entryBottom = 0.97;
+BDEF_NEAR.heightMin = 1.41; BDEF_NEAR.heightMax = 1.4; BDEF_NEAR.lean = 32; BDEF_NEAR.leanVariety = 0.45; BDEF_NEAR.arch = 0.55;
+BDEF_NEAR.leafiness = 1.9; BDEF_NEAR.leafFrom = 0.22; BDEF_NEAR.leafDroop = 1.8;
+BDEF_NEAR.blurNear = 0.5; BDEF_NEAR.blurFar = 1.3; BDEF_NEAR.haze = 0.22; BDEF_NEAR.depthHaze = 0.3; BDEF_NEAR.leafFlutter = 2.1;
 var BSET = { far: clone(BDEF), near: clone(BDEF_NEAR) };
 
 /* The gates and the gravel path: fixed, exactly as they are in the app
