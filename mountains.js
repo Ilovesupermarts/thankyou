@@ -22,7 +22,8 @@
 
    Use:
      var cnv = Mountains.render(o);   // a canvas, or null (no WebGL 2)
-     var job = Mountains.start(o, 8); // the same picture a band at a time: call job.step()
+     var job = Mountains.start(o, 8); // the same picture a band at a time (mode 1: the
+                                      // reflectance map, as reflectance()): call job.step()
                                       // once a frame; it returns null until the last band,
                                       // then a 2D canvas (false if the context was lost)
      Mountains.state()                // 'ok', 'lost' (the graphics chip took the context
@@ -512,7 +513,7 @@ function drawInto(o, mode, PW, PH, clear, band) {
    gives the picture back as a 2D canvas. step() returns null while it is
    not done yet, and false if the context was lost on the way. */
 var gen = 0;                                          // goes up with every loss, so a job from before one stops
-function start(o, bands) {
+function start(o, bands, mode) {
   if (!init()) return null;
   var PW = o.width, PH = o.height, n = Math.max(1, bands || 8), k = 0, myGen = gen;
   var fb = gl.createFramebuffer(), tx = gl.createTexture(), db = gl.createRenderbuffer();
@@ -534,7 +535,7 @@ function start(o, bands) {
     if (gen !== myGen || !init()) return false;
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     var y0 = Math.floor(PH * k / n), y1 = Math.floor(PH * (k + 1) / n);
-    drawInto(o, 0, PW, PH, k === 0, [y0, y1]);
+    drawInto(o, mode || 0, PW, PH, k === 0, [y0, y1]);
     k++;
     if (k < n) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.flush(); return gl.isContextLost() ? false : null; }
     // done: read it back (premultiplied, upside down) into a 2D canvas

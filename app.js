@@ -15357,13 +15357,57 @@ function landBakeScenery() {
   var C = LAND_C, hy = H * LAND.horizon, mistC = koyoLight(C.mist);
   var try3d = MTN3D.on && typeof Mountains !== 'undefined';
   LAND_SR = PR * (try3d ? MTN3D.resolution : LAND_SCN_RES);   // the 3D mountains are sharp, so they are baked finer
-  [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) { o.cnv.width = Math.round(W * LAND_SR); o.cnv.height = Math.round(H * LAND_SR); });
-  var m = LS.MTN.c, s = LS.SCN.c;
+  // (resized only when the size changes: resizing wipes them, and the old scenery stays up while the new is drawn)
+  [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) {
+    var w = Math.round(W * LAND_SR), h = Math.round(H * LAND_SR);
+    if (o.cnv.width !== w || o.cnv.height !== h) { o.cnv.width = w; o.cnv.height = h; }
+  });
   // the fireworks' canvases, at half the screen's resolution
   [LS.SIL, LS.REFL, LS.OCC].forEach(function(o) {
-    o.cnv.width = Math.max(1, Math.round(W * PR / 2)); o.cnv.height = Math.max(1, Math.round(H * PR / 2));
+    var w = Math.max(1, Math.round(W * PR / 2)), h = Math.max(1, Math.round(H * PR / 2));
+    if (o.cnv.width !== w || o.cnv.height !== h) { o.cnv.width = w; o.cnv.height = h; }
   });
-  var is3d = try3d && landDrawMountains3d(m, hy);
+  // The 3D mountains are drawn a band a frame (landStepScenery), never in one go: with a
+  // low sun (late afternoon, evening) one go takes over 2 s on the tablet, and its graphics
+  // chip then resets, taking every WebGL picture on the page with it (the winter scene
+  // found this first, 8d). Until they are done the old scenery stays on the screen.
+  if (LAND_MTN.job) LAND_MTN.job.cancel();
+  LAND_MTN.job = null; LAND_MTN.pic = null;
+  if (try3d && Mountains.start) {
+    var o3 = mtnOptions(hy), job = Mountains.start(o3, 8);
+    if (job) { LAND_MTN.job = job; LAND_MTN.o3 = o3; LAND_MTN.refl = false; return; }
+  }
+  landFinishScenery(null, null);
+}
+var LAND_MTN = { job: null, o3: null, pic: null, refl: false };
+/* One band of the 3D mountains (then of their reflectance map, when the fireworks
+   need it); true once the scenery is finished. */
+function landStepScenery() {
+  var J = LAND_MTN, r = J.job.step();
+  if (r === null) return false;
+  J.job = null;
+  if (r === false) {                                          // the context was lost on the way: painted ridges for now
+    gfxNote('mountains: graphics lost while drawing ' + (J.refl ? 'the reflectance' : 'band by band'));
+    landFinishScenery(null, null);
+    return true;
+  }
+  if (!J.refl && fwShow && Mountains.reflectance) {           // then how strongly each point reflects the fireworks
+    J.pic = r; J.refl = true;
+    J.job = Mountains.start(J.o3, 8, 1);
+    if (J.job) return false;
+  }
+  if (J.refl) landFinishScenery(J.pic, r === J.pic ? null : r);
+  else landFinishScenery(r, null);
+  return true;
+}
+/* The rest of the autumn scenery, once the 3D mountains' picture g3 (and their
+   reflectance map rf) are ready, or with the painted ridges (g3 null). */
+function landFinishScenery(g3, rf) {
+  var C = LAND_C, hy = H * LAND.horizon, mistC = koyoLight(C.mist);
+  var try3d = MTN3D.on && typeof Mountains !== 'undefined';
+  var m = LS.MTN.c, s = LS.SCN.c;
+  [LS.MTN, LS.SCN, LS.TMP].forEach(function(o) { o.c.setTransform(1, 0, 0, 1, 0, 0); o.c.clearRect(0, 0, o.cnv.width, o.cnv.height); });
+  var is3d = !!g3 && landDrawMountains3d(m, hy, g3, rf);
   gfxNote('mountains drawn ' + (is3d ? 'in 3D' : try3d ? 'PAINTED (3D failed)' : 'painted (3D off)') + ', Mountains.state ' + (typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() : '-'));
   LS.refl3d = LS.is3d = is3d;
   if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
@@ -15466,12 +15510,11 @@ function mtnOptions(hy) {
                 evergreen: col.evergreen, snow: col.snow };
   return o;
 }
-/* The 3D mountains into LS.MTN, softened a little, with mist along their
-   foot. False when they can't be drawn here (no WebGL 2). */
-function landDrawMountains3d(m, hy) {
-  if (!MTN3D.on || typeof Mountains === 'undefined') return false;
-  var o3 = mtnOptions(hy), g3 = Mountains.render(o3);
-  if (!g3) return false;
+/* The 3D mountains' picture g3 (drawn a band at a time, landStepScenery) into
+   LS.MTN, softened a little, with mist along their foot, and their reflectance
+   map rf (or null) for the fireworks. False without a picture. */
+function landDrawMountains3d(m, hy, g3, rf) {
+  if (!MTN3D.on || typeof Mountains === 'undefined' || !g3) return false;
   m.save();
   m.setTransform(1, 0, 0, 1, 0, 0);
   var px = MTN3D.softness * LAND_SR;
@@ -15479,8 +15522,8 @@ function landDrawMountains3d(m, hy) {
   m.drawImage(g3, 0, 0, LS.MTN.cnv.width, LS.MTN.cnv.height);
   m.restore();
   // how strongly each point reflects the fireworks' light (Fuji's snow cap most)
-  if (fwShow && Mountains.reflectance) {
-    var rf = Mountains.reflectance(o3), rc = LS.REFL.c;
+  if (fwShow) {
+    var rc = LS.REFL.c;
     rc.setTransform(1, 0, 0, 1, 0, 0);
     rc.clearRect(0, 0, LS.REFL.cnv.width, LS.REFL.cnv.height);
     if (rf) rc.drawImage(rf, 0, 0, LS.REFL.cnv.width, LS.REFL.cnv.height);
@@ -15758,6 +15801,7 @@ function updateLandscape(t, bedBatch) {
   var win = ENV.scene === 'winter', k = landKey();
   if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
     if (win && WIN_MTN.job) { winStepScenery(); return; }   // the winter mountains: a band a frame, first (8d)
+    if (!win && LAND_MTN.job) { landStepScenery(); return; } // the autumn mountains: the same (8c)
     if (LS.step === 2) { if (win) winBakeGround(); else landBakeGround(); }
     else if (LS.step === 4) { torBake(); }                   // the torii gates and the gravel path (autumn only), once the rest is ready
     else if (win) { winBakeNear(); winBakeSprites(); LS.ready = true; }
