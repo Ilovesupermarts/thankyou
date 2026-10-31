@@ -2019,18 +2019,7 @@ function bakeGates() {
           }
         });
       });
-      // softened, darkened and tinted by the water
-      rc.setTransform(1, 0, 0, 1, 0, 0);
-      rc.globalCompositeOperation = 'source-atop';
-      rc.fillStyle = rgb(waterCol(), 0.32 * LK.deep + 0.08);
-      rc.fillRect(0, 0, GREF.cnv.width, GREF.cnv.height);
-      rc.globalCompositeOperation = 'source-over';
-      var soft = mk(); soft.cnv.width = GREF.cnv.width; soft.cnv.height = GREF.cnv.height;
-      soft.c.filter = 'blur(' + (0.9 * PR).toFixed(2) + 'px)';
-      soft.c.drawImage(GREF.cnv, 0, 0);
-      rc.clearRect(0, 0, GREF.cnv.width, GREF.cnv.height);
-      rc.drawImage(soft.cnv, 0, 0);
-      rc.globalAlpha = 0.35; rc.drawImage(soft.cnv, 0, 2 * PR); rc.globalAlpha = 1;   // a little smeared downward
+      // kept crisp: the water tints it with everything else (composeWater), and each frame's rippling breaks it up
     }
   }
   composeWater();
@@ -2460,7 +2449,7 @@ var LK_DEFAULTS = {
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
   gates: 22, pathX: 0.3, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
   // the water
-  farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
+  farShore: 160, reflect: 0.9, deep: 0.85, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
   nearBank: 0.86, floating: 1,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
@@ -2469,10 +2458,10 @@ var LK_DEFAULTS = {
   waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
-  colours: { water: '#2F5A6A', waterEvening: '#4C4560', waterNight: '#121A2E', moss: '#56683A', stone: '#77716A',
+  colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab5';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab6';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2483,7 +2472,7 @@ try {
 } catch (e) { /* private window: the defaults */ }
 V.horizon = LK.horizon;
 function saveLake() { try { localStorage.setItem(LK_KEY, JSON.stringify(LK)); } catch (e) { /* silent */ } }
-var lakeDirty = false, lakeChangedAt = -1, lakeMs = { head: 0, water: 0, ground: 0, fore: 0 }, lakeFrameMs = 0;
+var waterRows = 0, lakeDirty = false, lakeChangedAt = -1, lakeMs = { head: 0, water: 0, ground: 0, fore: 0 }, lakeFrameMs = 0;
 
 var HEADC = mk(), headBox = null, headAxis = 0;     // the headland (and the grove), and where its reflection turns over
 var GREF = mk(), grefTop = 0;                       // the gates' reflection in the water
@@ -2803,7 +2792,7 @@ function bakeGrove(path) {
    the shallows along every shore (the lake bed showing through, the bank's dark lip, a broken
    bright edge), and fallen leaves floating on it. composeWater adds the gates' reflection
    (WATERC), and each frame lays WATERC down in bands that sway a little from side to side. */
-var WATERB = mk(), WATERC = mk(), WPAD = 10;
+var WATERB = mk(), WATERC = mk(), WSTAT = mk(), WPAD = 10;
 function bakeWater(C) {
   var t0 = performance.now();
   var hy = H * V.horizon, yf = farShoreY(), F = lensF(), hh = H - yf;
@@ -2815,67 +2804,22 @@ function bakeWater(C) {
   var g = s.createLinearGradient(0, yf, 0, H);
   for (var k = 0; k <= 6; k++) { var y = lerp(yf, H, k / 6); g.addColorStop(k / 6, rgb(skyAt(2 * hy - y))); }
   s.fillStyle = g; s.fillRect(-WPAD, yf, W + WPAD * 2, hh + 2);
-  // the mirrored picture, softened and smeared sideways
-  var R = mk(); R.cnv.width = WATERB.cnv.width; R.cnv.height = WATERB.cnv.height;
-  var rc = R.c;
+  // the mirrored picture: crisp, as on still water (each frame's rippling breaks it up, see drawWaterLive)
   if (V.showMountains) {
-    rc.setTransform(SR, 0, 0, -SR, X0, (2 * hy - yf) * SR);
-    rc.filter = 'blur(' + (1.2 * SR).toFixed(2) + 'px)';
-    rc.drawImage(MTN.cnv, 0, 0, W, H);
-    rc.filter = 'none';
+    s.setTransform(SR, 0, 0, -SR, X0, (2 * hy - yf) * SR);
+    s.drawImage(MTN.cnv, 0, 0, W, H);
   }
-  rc.setTransform(SR, 0, 0, -SR, X0, yf * SR);
-  drawFarShore(rc);
+  s.setTransform(SR, 0, 0, -SR, X0, yf * SR);
+  drawFarShore(s);
   if (headBox && LK.headland) {
-    rc.setTransform(1, 0, 0, -1, X0, (2 * headAxis - yf) * SR);
-    rc.filter = 'blur(' + (0.7 * SR).toFixed(2) + 'px)';
-    rc.drawImage(HEADC.cnv, headBox.x0 * SR, headBox.y0 * SR);
-    rc.filter = 'none';
+    s.setTransform(1, 0, 0, -1, X0, (2 * headAxis - yf) * SR);
+    s.drawImage(HEADC.cnv, headBox.x0 * SR, headBox.y0 * SR);
   }
-  s.save(); s.setTransform(1, 0, 0, 1, 0, 0);
-  [-2.2, -0.8, 0.8, 2.2].forEach(function (dx, i) { s.globalAlpha = LK.reflect * (i === 1 || i === 2 ? 0.34 : 0.16) / 0.5 * 0.5; s.drawImage(R.cnv, dx * SR, 0); });
-  s.restore();
-  R.cnv.width = R.cnv.height = 1;
+  // the still things on the water (WSTAT): they float on it, so they are not broken up by the ripples
+  WSTAT.cnv.width = WATERB.cnv.width; WSTAT.cnv.height = WATERB.cnv.height;
+  s = WSTAT.c;
   css();
   var wc = waterCol(), r = rngFrom(V.seed * 1499 + 5);
-  // patches where a breath of wind roughens the surface: they mirror the brighter sky higher up, so they read lighter
-  for (var p = 0; p < 9; p++) {
-    var u = Math.pow(r(), 1.3), py = lerp(yf + 2, H, u), kd = (py - hy) / Math.max(1, H - hy);
-    var prx = W * lerp(0.12, 0.35, r()) * (0.6 + kd), pry = prx * lerp(0.04, 0.08, r()) * (0.6 + kd * 2);
-    var px = r() * W, light2 = r() < 0.65;
-    s.save(); s.translate(px, py); s.scale(1, pry / prx);
-    var pg = s.createRadialGradient(0, 0, 0, 0, 0, prx);
-    var pc = light2 ? mix(skyAt(hy * 0.15), [250, 248, 245], 0.2) : scale(wc, 0.8);
-    pg.addColorStop(0, rgb(pc, light2 ? 0.2 : 0.16)); pg.addColorStop(1, rgb(pc, 0));
-    s.fillStyle = pg; s.fillRect(-prx, -prx, prx * 2, prx * 2);
-    s.restore();
-  }
-  // looking down into the water near you: its own deep colour shows through (less of a mirror)
-  var gd = s.createLinearGradient(0, yf, 0, H);
-  gd.addColorStop(0, rgb(wc, 0.08 * LK.deep));
-  gd.addColorStop(0.35, rgb(wc, 0.42 * LK.deep));
-  gd.addColorStop(1, rgb(wc, 0.92 * LK.deep));
-  s.fillStyle = gd; s.fillRect(-WPAD, yf, W + WPAD * 2, hh + 2);
-  // wavelets: a lit crest (the sky) over a darker trough, close together and fine toward the far shore
-  var n = Math.round(W * 0.9);
-  for (var i = 0; i < n; i++) {
-    var uu = Math.pow(r(), 1.7), yy = lerp(yf + 1, H, uu), kk = (yy - hy) / Math.max(1, H - hy);
-    var len = lerp(4, 90, kk) * lerp(0.4, 1.5, r()), xx = r() * (W + WPAD * 2) - WPAD, th = lerp(0.3, 1.8, kk);
-    s.fillStyle = rgb(mix(skyAt(Math.max(0, 2 * hy - yy - 60)), [255, 252, 246], 0.35), lerp(0.22, 0.12, kk) * lerp(0.5, 1.2, r()));
-    s.fillRect(xx, yy, len, th);
-    s.fillStyle = rgb(scale(wc, 0.62), lerp(0.1, 0.2, kk));
-    s.fillRect(xx + len * 0.1, yy + th, len * 0.85, th * 1.2);
-  }
-  // nearer, the wavelets become small lit crescents with a shadowed hollow, reflecting the sky above
-  var nc = Math.round(W * 0.5);
-  for (var ci = 0; ci < nc; ci++) {
-    var uc = Math.pow(r(), 0.7), yc = lerp(yf + (H - yf) * 0.15, H, uc), kc = (yc - hy) / Math.max(1, H - hy);
-    var wl = lerp(5, 34, kc) * lerp(0.6, 1.4, r()), hc = wl * lerp(0.08, 0.16, r()), xc = r() * (W + WPAD * 2) - WPAD;
-    s.strokeStyle = rgb(scale(wc, 0.55), lerp(0.12, 0.28, kc)); s.lineWidth = Math.max(0.5, hc * 0.7);
-    s.beginPath(); s.moveTo(xc - wl / 2, yc + hc * 0.6); s.quadraticCurveTo(xc, yc + hc * 1.6, xc + wl / 2, yc + hc * 0.6); s.stroke();
-    s.strokeStyle = rgb(mix(skyAt(Math.max(0, 2 * hy - yc - 120)), [255, 253, 248], 0.4), lerp(0.18, 0.4, kc)); s.lineWidth = Math.max(0.4, hc * 0.5);
-    s.beginPath(); s.moveTo(xc - wl / 2, yc); s.quadraticCurveTo(xc, yc - hc, xc + wl / 2, yc); s.stroke();
-  }
   // the shallows along every shore, and the bank's dark lip and a broken bright edge
   if (landEdges.length) {
     var SH = mk(); SH.cnv.width = WATERB.cnv.width; SH.cnv.height = WATERB.cnv.height;
@@ -2936,6 +2880,7 @@ function bakeWater(C) {
   gm.addColorStop(0, rgb(mist, LK.lakeMist * 0.42));
   gm.addColorStop(1, rgb(mist, 0));
   s.fillStyle = gm; s.fillRect(-WPAD, yf, W + WPAD * 2, H * 0.06);
+  s = WATERB.c;
   composeWater();
   lakeMs.water = performance.now() - t0;
 }
@@ -2973,11 +2918,20 @@ function composeWater() {
   var c = WATERC.c, yf = farShoreY();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.drawImage(WATERB.cnv, 0, 0);
-  if (GREF.cnv.width > 2) {
-    c.globalAlpha = LK.reflect * 0.85;
-    c.drawImage(GREF.cnv, WPAD * SR, (grefTop - yf) * SR, GREF.cnv.width * SR / PR, GREF.cnv.height * SR / PR);
-    c.globalAlpha = 1;
+  if (GREF.cnv.width > 2) c.drawImage(GREF.cnv, WPAD * SR, (grefTop - yf) * SR, GREF.cnv.width * SR / PR, GREF.cnv.height * SR / PR);
+  // the water's own colour: a mirror seen at a glancing angle far away, its deep colour more and more
+  // as you look down into it near you (Fresnel); everything mirrored in it a little darker and bluer
+  var hy = H * V.horizon, wc = waterCol(), hh = H - yf, cw = c.canvas.width, ch = c.canvas.height;
+  c.globalCompositeOperation = 'multiply';
+  c.fillStyle = rgb(mix(wc, [255, 255, 255], 0.62));
+  c.fillRect(0, 0, cw, ch);
+  c.globalCompositeOperation = 'source-over';
+  var g = c.createLinearGradient(0, 0, 0, ch), far = 0.1 + (1 - LK.reflect) * 0.5;
+  for (var k = 0; k <= 8; k++) {
+    var u = k / 8, y = yf + hh * u, kd = clamp((y - hy) / Math.max(1, H - hy), 0, 1);
+    g.addColorStop(u, rgb(wc, clamp(lerp(far, 0.82 * LK.deep, Math.pow(kd, 0.75)), 0, 1)));
   }
+  c.fillStyle = g; c.fillRect(0, 0, cw, ch);
 }
 /* A soft brightening behind the message text (mist in the middle distance), so the words stay easy to read. */
 function veilOver(c, atop) {
@@ -2997,18 +2951,38 @@ function veilOver(c, atop) {
 /* ---------- the moving water: ripples and the sun's glitter (baked here, drawn each frame) ---------- */
 function bakeRipples() {
   var hy = H * V.horizon, yf = farShoreY(), hh = H - yf, res = PR * 0.5, wc = waterCol();
+  // soft rolling waves: rows of long, lit crests (the sky above) over darker troughs, their spacing set by the
+  // perspective (a wave on the water is closer together, thinner and fainter the further away it is)
+  var F = lensF(), hi = mix(skyAt(hy * 0.25), [255, 252, 246], 0.35);
   RIP.forEach(function (L, k) {
     L.cnv.width = Math.max(1, Math.round(W * res)); L.cnv.height = Math.max(1, Math.round(hh * res));
-    var c = L.c, r = rngFrom(V.seed * 733 + k * 97);
-    c.setTransform(res, 0, 0, res, 0, 0);
-    var n = Math.round(W * 0.42);
-    for (var i = 0; i < n; i++) {
-      var u = Math.pow(r(), 1.5), y = u * hh, len = lerp(6, 120, u) * lerp(0.4, 1.4, r()), x = r() * W, th = lerp(0.4, 2.2, u);
-      var bright = r() < 0.6;
-      c.fillStyle = bright ? rgb(mix(skyAt(2 * hy - (yf + y) - 60), [255, 250, 242], 0.45), lerp(0.5, 0.3, u))
-                           : rgb(scale(wc, 0.6), lerp(0.25, 0.4, u));
-      c.fillRect(x, y, len, th); c.fillRect(x - W, y, len, th);
+    var c = L.c, r = rngFrom(V.seed * 733 + k * 97), T = mk();
+    T.cnv.width = L.cnv.width; T.cnv.height = L.cnv.height;
+    var tc = T.c; tc.setTransform(res, 0, 0, res, 0, -yf * res);
+    var y = yf + 1;
+    while (y < H) {
+      var d = Math.max(1, y - hy), sp = Math.max(1.6, d * d / F * lerp(0.35, 0.6, r())), kd = clamp(d / Math.max(1, H - hy), 0, 1);
+      var x = -r() * 200;
+      while (x < W) {
+        var len = lerp(30, 360, kd) * lerp(0.35, 1.3, r()), th = sp * lerp(0.28, 0.42, r());
+        if (r() < 0.78) {
+          var cxw = x + len / 2;
+          [[0, hi, lerp(0.22, 0.42, kd)], [th * 1.1, scale(wc, 0.5), lerp(0.2, 0.42, kd)]].forEach(function (b) {
+            tc.save(); tc.translate(cxw, y + b[0]); tc.scale(len / 2, th / 2);
+            var gg = tc.createRadialGradient(0, 0, 0, 0, 0, 1);
+            gg.addColorStop(0, rgb(b[1], b[2] * lerp(0.6, 1.2, r()))); gg.addColorStop(1, rgb(b[1], 0));
+            tc.fillStyle = gg; tc.beginPath(); tc.arc(0, 0, 1, 0, TAU); tc.fill();
+            tc.restore();
+          });
+        }
+        x += len * lerp(0.7, 1.2, r());
+      }
+      y += sp;
     }
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.drawImage(T.cnv, 0, 0);
+    c.drawImage(T.cnv, -T.cnv.width + 1, 0);      // so it wraps round as it drifts
+    T.cnv.width = T.cnv.height = 1;
   });
   // the glitter under the sun: short bright flecks, the path widening toward you
   var gw = W * 0.16;
@@ -3189,29 +3163,40 @@ function drawSusuki(c, t, front) {
 /* Over the water (after SCN): the gates' reflection, the ripples, the glitter. */
 function drawWaterLive(t) {
   var yf = farShoreY(), hh = H - yf, hy = H * V.horizon, F = lensF();
-  // the water, in bands from the far shore down, each swaying a little (more near you, slower far away)
+  // the mirror, in thin rows from the far shore down, each shifted sideways by three waves of different
+  // lengths travelling over the water: the reflections break into fine zig-zags at their edges, as on a lake
+  // in a light breeze (fine and quick far away, larger and slower near you)
   if (WATERC.cnv.width > 2) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    var NB = 34, amp = LK.waves * (0.55 + 0.45 * clamp(V.wind, 0, 2)), sw = WATERC.cnv.width, sch = WATERC.cnv.height;
-    for (var b = 0; b < NB; b++) {
-      var u0 = Math.pow(b / NB, 1.7), u1 = Math.pow((b + 1) / NB, 1.7);
-      var y0 = yf + hh * u0, y1 = yf + hh * u1, ym = (y0 + y1) / 2, kd = (ym - hy) / Math.max(1, H - hy), zz = F / Math.max(1, ym - hy);
-      var dx = amp * lerp(0.3, 3.2, kd) * (0.7 * Math.sin(t * 0.9 + zz * 0.8) + 0.3 * Math.sin(t * 1.7 - zz * 2.1 + b));
-      var sy0 = Math.floor((y0 - yf) * SR), sy1 = Math.min(sch, Math.ceil((y1 - yf) * SR) + 1);
-      if (sy1 <= sy0) continue;
-      ctx.drawImage(WATERC.cnv, 0, sy0, sw, sy1 - sy0, (dx - WPAD) * PR, (yf + sy0 / SR) * PR, (W + WPAD * 2) * PR, (sy1 - sy0) / SR * PR);
+    var amp = LK.waves * (0.6 + 0.4 * clamp(V.wind, 0, 2)), sw = WATERC.cnv.width, sch = WATERC.cnv.height, sy0 = 0, rows = 0;
+    // a solid base first, so no gap between the rows can let the sky through
+    ctx.drawImage(WATERC.cnv, 0, 0, sw, sch, -WPAD * PR, yf * PR, (W + WPAD * 2) * PR, hh * PR);
+    while (sy0 < sch) {
+      var y0 = yf + sy0 / SR, kd = clamp((y0 - hy) / Math.max(1, H - hy), 0, 1), zz = F / Math.max(1, y0 - hy);
+      var rh = Math.max(1, Math.round(lerp(1, 5.5, Math.pow(kd, 0.8)) * SR));
+      var sy1 = Math.min(sch, sy0 + rh);
+      var dx = amp * lerp(0.5, 4.2, kd) * (0.5 * Math.sin(zz * 9.0 - t * 1.6) + 0.32 * Math.sin(zz * 21.0 + t * 2.3 + 1.7) + 0.18 * Math.sin(zz * 47.0 - t * 3.1 + 4.1));
+      var dy0 = Math.round((yf + sy0 / SR) * PR), dy1 = Math.round((yf + sy1 / SR) * PR);     // whole pixels: no seams
+      if (dy1 > dy0) ctx.drawImage(WATERC.cnv, 0, sy0, sw, sy1 - sy0, Math.round((dx - WPAD) * PR), dy0, (W + WPAD * 2) * PR, dy1 - dy0);
+      sy0 = sy1; rows++;
     }
+    waterRows = rows;
   }
   if (LK.ripples > 0 && RIP[0].cnv.width > 1) {
     var mixK = 0.5 + 0.5 * Math.sin(t * 0.45), wind = 0.65 + 0.35 * clamp(V.wind, 0, 2);
     for (var k = 0; k < 2; k++) {
-      var a = LK.ripples * wind * 0.75 * (k ? mixK : 1 - mixK);
+      var a = LK.ripples * wind * 0.9 * (k ? mixK : 1 - mixK);
       if (a < 0.01) continue;
-      var off = ((t * (k ? -5 : 7) * LK.rippleSpeed) % W + W) % W;
+      var off = ((t * (k ? -3 : 4) * LK.rippleSpeed) % W + W) % W;
       ctx.globalAlpha = a;
       ctx.drawImage(RIP[k].cnv, off * PR, yf * PR, W * PR, hh * PR);
       ctx.drawImage(RIP[k].cnv, (off - W) * PR, yf * PR, W * PR, hh * PR);
     }
+  }
+  // what floats on the water and the shallows (not rippled)
+  if (WSTAT.cnv.width > 2) {
+    ctx.globalAlpha = 1;
+    ctx.drawImage(WSTAT.cnv, -WPAD * PR, yf * PR, (W + WPAD * 2) * PR, hh * PR);
   }
   if (LK.glint > 0 && !isNight() && GLN.cnv.width > 1) {
     var sx = sunPlace().x, gw = W * 0.16;
@@ -6556,7 +6541,7 @@ window.lakeLab = {
   info: function () {
     return 'Lake: baked in ' + Math.round(lakeMs.head + lakeMs.water + lakeMs.ground + lakeMs.fore) + ' ms (headland ' + Math.round(lakeMs.head) +
            ', water ' + Math.round(lakeMs.water) + ', ground ' + Math.round(lakeMs.ground) + ', shore ' + Math.round(lakeMs.fore) + ')' +
-           ' · each frame ' + lakeFrameMs.toFixed(2) + ' ms (ripples, reflection, mist, susuki: ' + susuki.reduce(function (n, Cl) { return n + Cl.stems.length; }, 0) + ' stems)' +
+           ' · each frame ' + lakeFrameMs.toFixed(2) + ' ms (water in ' + waterRows + ' rows, waves, mist, susuki: ' + susuki.reduce(function (n, Cl) { return n + Cl.stems.length; }, 0) + ' stems)' +
            ' · ' + gateInfo;
   }
 };
