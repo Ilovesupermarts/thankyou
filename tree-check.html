@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Tree Check</title>
+<script src="trunks.js"></script>
+<style>
+  /* ============================================================
+     TREE CHECK — open on the tablet to see why the 3D trees
+     (trunks.js) can't be drawn there. It shows what the graphics chip
+     says about itself, whether the trees' safety latch is on, and then
+     draws a tree like the app's (near and far, every frame) for a
+     minute, counting frames and watching for the graphics chip being
+     taken away. Take a screenshot of the page when it is done.
+     Nothing in the app is used or changed (except the latch, by its
+     button).
+     ============================================================ */
+  :root { --ink: #2A211F; --soft: #6B5D58; --ok: #2F7A3B; --bad: #B3261E; --paper: #FBF4EE; --line: #E6D8CF; }
+  html, body { margin: 0; background: var(--paper); color: var(--ink);
+    font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif; font-size: 17px; }
+  main { max-width: 1400px; margin: 0 auto; padding: 20px 24px 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  h1 { margin: 0 0 4px; font-size: 24px; grid-column: 1 / -1; }
+  .lead { grid-column: 1 / -1; margin: 0; color: var(--soft); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { color: var(--soft); width: 40%; }
+  .ok { color: var(--ok); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 12px; padding: 12px 18px; margin: 12px 8px 0 0;
+    background: #E66826; color: #fff; }
+  button.plain { background: #E9DDD5; color: var(--ink); }
+  canvas { width: 100%; background: linear-gradient(#F3C9A8, #E9B9A3 70%, #B9775A); border-radius: 12px; display: block; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>木 Tree check</h1>
+  <p class="lead">Press “Start drawing test”, wait for it to finish (one minute), then take a screenshot of the whole page.</p>
+  <section>
+    <table id="facts"></table>
+    <button type="button" id="go">Start drawing test</button>
+    <button type="button" class="plain" id="unlatch">Switch the trees back on</button>
+  </section>
+  <section>
+    <canvas id="view"></canvas>
+    <table id="live"></table>
+  </section>
+</main>
+<script>
+(function () {
+'use strict';
+var facts = document.getElementById('facts'), live = document.getElementById('live');
+function rows(table, list) {
+  table.innerHTML = list.map(function (r) {
+    return '<tr><td>' + r[0] + '</td><td class="' + (r[2] || '') + '">' + String(r[1]).replace(/</g, '&lt;') + '</td></tr>';
+  }).join('');
+}
+
+/* ---------- 1. What the tablet and its graphics chip say ---------- */
+function glFacts() {
+  var out = [];
+  try {
+    var c = document.createElement('canvas'), gl = c.getContext('webgl2');
+    if (!gl) return [['WebGL 2', 'not available (Chrome has turned 3D off: close Chrome fully and open it again)', 'bad']];
+    var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+    out.push(['WebGL 2', 'available', 'ok']);
+    out.push(['Graphics chip', dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)]);
+    out.push(['Driver', dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) + ' · ' + gl.getParameter(gl.VERSION) : gl.getParameter(gl.VERSION)]);
+    out.push(['Largest picture', gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) + ' px']);
+    out.push(['Fragment uniforms', gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS)]);
+    var lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();                     // give it back at once
+  } catch (e) { out.push(['WebGL 2', 'error: ' + e.message, 'bad']); }
+  return out;
+}
+function latchText() {
+  var I = Trunks.info();
+  if (Date.now() < I.offUntil) {
+    var why = ''; try { why = localStorage.getItem('trunksOffWhy') || ''; } catch (e) { /* silent */ }
+    return ['Trees in the app', 'drawn flat until ' + new Date(I.offUntil).toLocaleTimeString() + ' (' + why + ')', 'bad'];
+  }
+  return ['Trees in the app', 'drawn in 3D', 'ok'];
+}
+function showFacts() {
+  rows(facts, [
+    ['Browser', navigator.userAgent.replace(/^Mozilla\/5\.0 /, '')],
+    ['Screen', screen.width + '×' + screen.height + ' CSS px, pixel ratio ' + (window.devicePixelRatio || 1)],
+    ['Memory (device)', navigator.deviceMemory ? navigator.deviceMemory + ' GB or more' : '-']
+  ].concat(glFacts()).concat([latchText()]));
+}
+showFacts();
+document.getElementById('unlatch').addEventListener('click', function () { Trunks.clearOff(); location.reload(); });
+
+/* ---------- 2. A tree like the app's (the same branching), swaying ---------- */
+function rng(seed) { var a = seed >>> 0; return function () { a = (a + 0x6D2B79F5) >>> 0; var t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function makeTree(W, H, far) {
+  var r = rng(far ? 11 : 7), nodes = [], maxD = 6, sc = H * 0.94 * (far ? 0.6 : 1), left = !far, dir = left ? 1 : -1;
+  var bx = left ? W * 0.12 : W * 0.84, by = H + 6;
+  function grow(p, abs, len, w, d) {
+    var pAbs = p < 0 ? -Math.PI / 2 : nodes[p].abs, i = nodes.length;
+    nodes.push({ p: p, rel: abs - pAbs, abs: abs, len: len, w: w, d: d, ph: r() * 6.28, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= maxD) return;
+    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2), spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1), shrink = 0.68 + r() * 0.14;
+    for (var k = 0; k < n; k++) {
+      var ca = abs + (k - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      grow(i, ca + (-Math.PI / 2 - ca) * 0.1, len * shrink, Math.max(0.8, w * 0.62), d + 1);
+    }
+  }
+  grow(-1, -Math.PI / 2 + dir * 0.15, sc * 0.26, Math.max(far ? 4 : 7, sc * 0.034), 0);
+  var T = { nodes: nodes, bx: bx, by: by, maxD: maxD, far: far };
+  sway(T, 0);
+  var clumps = [];
+  nodes.forEach(function (n) { if (n.d >= 3 && r() < 0.6) clumps.push({ x: n.ex, y: n.ey, R: sc * 0.09, back: n.d < 5 }); });
+  T.model = Trunks.build({ nodes: nodes, seed: far ? 3 : 1, X: function (x) { return x; }, clumps: clumps,
+    look: { girth: 1.65, bend: 1.2, depth: 0.95, rootFlare: 1.35, roots: 5 } });
+  return T;
+}
+function sway(T, t) {
+  var ns = T.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i], par = n.p < 0 ? null : ns[n.p], k = (Math.pow(n.d / T.maxD, 1.6) + 0.02) * 0.34;
+    n.cur = (par ? par.cur : -Math.PI / 2) + n.rel + Math.sin(t * n.f + n.ph) * 0.02 * k;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+
+/* ---------- 3. The drawing test: near and far tree every frame, as in the app ---------- */
+var LOOK = { girth: 1.65, relief: 0.45, streaks: 0.79, fissures: 0.5, lichen: 0.37, moss: 0.51, mossHeight: 0.14, wet: 0.42,
+             rim: 0.5, canopyShade: 0.7, komorebi: 0.57, crotch: 1.2, air: 0.08, twigCut: 4, rootFlare: 1.35 };
+var COLS = { bark: [106, 88, 80], dark: [47, 36, 33], light: [156, 140, 130], lichen: [169, 174, 149], moss: [94, 110, 44] };
+var LIGHT = { dir: [-0.4, -0.85, 0.5], sun: [1.15, 1.08, 0.98], sky: [0.37, 0.36, 0.4], bounce: [0.27, 0.12, 0.07],
+              leaf: [0.45, 0.18, 0.12], air: [251, 236, 224] };
+document.getElementById('go').addEventListener('click', function () {
+  this.disabled = true;
+  Trunks.clearOff();                                  // the test itself always tries 3D
+  // the same sizes as the app: the screen at 0.75 of its pixel ratio, the far tree at half that
+  var W = window.innerWidth, H = window.innerHeight, PR = (window.devicePixelRatio || 1) * 0.75;
+  var near = document.createElement('canvas'), farC = document.createElement('canvas'), view = document.getElementById('view');
+  near.width = Math.round(W * PR); near.height = Math.round(H * PR);
+  farC.width = Math.ceil(near.width * 0.5); farC.height = Math.ceil(near.height * 0.5);
+  view.width = near.width; view.height = near.height;
+  var nc = near.getContext('2d'), fc = farC.getContext('2d'), vc = view.getContext('2d');
+  var trees = [makeTree(W, H, false), makeTree(W, H, true)];
+  var t0 = performance.now(), n = 0, ms = 0, worst = 0, flat = 0, firstFail = '', DURATION = 60000;
+  function drawOne(c, T, px, t) {
+    var o = { model: T.model, nodes: T.nodes, X: function (x) { return x; }, extra: [], width: c.canvas.width, height: c.canvas.height,
+              W: W, H: H, px: px, time: t, wind: 0.3, ground: H - 20, look: LOOK, colours: COLS, light: LIGHT };
+    var g = Trunks.draw(o);
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+    if (g) { c.drawImage(g.cnv, 0, 0, g.w, g.h, g.x, g.y, g.w, g.h); return true; }
+    c.setTransform(px, 0, 0, px, 0, 0);
+    Trunks.flat(c, '#5A4842');
+    return false;
+  }
+  function frame() {
+    var now = performance.now(), t = (now - t0) / 1000;
+    trees.forEach(function (T) { sway(T, t); });
+    var a = performance.now();
+    var okF = drawOne(fc, trees[1], PR * 0.5, t), okN = drawOne(nc, trees[0], PR, t);
+    var d = performance.now() - a;
+    n++; ms += d; worst = Math.max(worst, d);
+    if (!okF || !okN) { flat++; if (!firstFail) firstFail = 'frame ' + n + ', after ' + t.toFixed(1) + ' s'; }
+    vc.clearRect(0, 0, view.width, view.height);
+    vc.drawImage(farC, 0, 0, view.width, view.height);
+    vc.drawImage(near, 0, 0);
+    var I = Trunks.info(), mem = performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : '-';
+    var done = now - t0 >= DURATION;
+    rows(live, [
+      ['Test', done ? 'finished' : 'running… ' + Math.ceil((DURATION - (now - t0)) / 1000) + ' s left', done ? 'ok' : ''],
+      ['3D state', I.state + (I.error ? ' — ' + I.error : ''), I.state === 'ok' ? 'ok' : 'bad'],
+      ['Frames drawn', n + ' (' + (n / Math.max(t, 0.001)).toFixed(0) + ' a second)'],
+      ['Drawing time', (ms / n).toFixed(1) + ' ms a frame, worst ' + worst.toFixed(0) + ' ms'],
+      ['Frames drawn flat', flat + (firstFail ? ' (first: ' + firstFail + ')' : ''), flat ? 'bad' : 'ok'],
+      ['Graphics context lost', I.losses + ' times', I.losses ? 'bad' : 'ok'],
+      ['Tree picture / buffers', I.canvas + ' px · ' + I.buffers],
+      ['Script memory', mem]
+    ]);
+    if (done) { showFacts(); return; }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+});
+})();
+</script>
+</body>
+</html>

@@ -38,6 +38,8 @@
      Trunks.axisAt(M, nodes, X, i, f)   // [x, y, z]: a point on node i's centre line,
                                         // f = 0 its start … 1 its end
      Trunks.state()                // 'ok', 'lost' or 'none'
+     Trunks.info()                 // for tree-check.html: state, error, frames, sizes
+     Trunks.clearOff()             // switch the safety latch off again (see section 5)
    s:
      nodes      the branches: { p (parent, -1 for the trunk), w (thickness, px),
                 len, abs (angle at rest), sx, sy, ex, ey (rest pose) }; a node
@@ -477,27 +479,41 @@ var FS = [
    ============================================================ */
 var cnv = null, gl = null, prog = null, U = {}, vbo = null, ibo = null, vao = null, failed = false;
 var lost = false, ready = false, lostAt = 0, renewals = 0, losses = 0;
+var vCap = 0, iCap = 0;            // how much the graphics chip's two buffers hold (bytes)
+var lastError = '', frames = 0;
+/* The safety latch. If the tree ever loses its graphics context, the
+   tablet remembers it (in this browser) for OFF_HOURS: the tree is then
+   drawn flat and WebGL is not touched for it, so it can never keep taking
+   the graphics chip away from the mountains and the rest of the page. */
+var OFF_KEY = 'trunksOff', OFF_HOURS = 12;
+function offUntil() { try { return +(localStorage.getItem(OFF_KEY) || 0); } catch (e) { return 0; } }
+function switchOff(why) {
+  lastError = why;
+  try { localStorage.setItem(OFF_KEY, String(Date.now() + OFF_HOURS * 3600e3)); localStorage.setItem(OFF_KEY + 'Why', why); } catch (e) { /* private window */ }
+}
 function compile(type, src) {
   var s = gl.createShader(type);
   gl.shaderSource(s, src);
   gl.compileShader(s);
-  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { console.warn('Trunks: shader', gl.getShaderInfoLog(s)); return null; }
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) { lastError = 'shader: ' + gl.getShaderInfoLog(s); console.warn('Trunks:', lastError); return null; }
   return s;
 }
 function create() {
   if (cnv) return !!gl;
+  if (Date.now() < offUntil()) { failed = true; lastError = 'switched off after a lost context (' + (localStorage.getItem(OFF_KEY + 'Why') || '?') + ')'; return false; }
   try {
     cnv = document.createElement('canvas');
     gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: false, alpha: true, depth: true });
   } catch (e) { gl = null; }
-  if (!gl) { failed = true; return false; }
+  if (!gl) { failed = true; lastError = 'no WebGL 2'; return false; }
   cnv.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
     if (this !== cnv) return;
-    lost = true; ready = false; lostAt = performance.now(); prog = null; U = {};
-    // Taken away twice: the tablet is short of graphics memory. Stay flat from now
-    // on, so the tree never takes the mountains down with it.
-    if (++losses >= 2) failed = true;
+    lost = true; ready = false; lostAt = performance.now(); prog = null; U = {}; vCap = 0; iCap = 0;
+    losses++;
+    // never again on this tablet for a while (see the safety latch above)
+    failed = true;
+    switchOff('context lost after ' + frames + ' frames');
   });
   cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
   return true;
@@ -509,7 +525,7 @@ function setup() {
   gl.attachShader(prog, vs); gl.attachShader(prog, fs);
   gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-    if (!gl.isContextLost()) { console.warn('Trunks: link', gl.getProgramInfoLog(prog)); failed = true; }
+    if (!gl.isContextLost()) { lastError = 'link: ' + gl.getProgramInfoLog(prog); console.warn('Trunks:', lastError); failed = true; }
     return false;
   }
   U = {};
@@ -517,7 +533,7 @@ function setup() {
   for (var i = 0; i < nu; i++) { var name = gl.getActiveUniform(prog, i).name; U[name.replace(/\[0\]$/, '')] = gl.getUniformLocation(prog, name); }
   vao = gl.createVertexArray();
   gl.bindVertexArray(vao);
-  vbo = gl.createBuffer(); ibo = gl.createBuffer();
+  vbo = gl.createBuffer(); ibo = gl.createBuffer(); vCap = 0; iCap = 0;
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
   var st = FL * 4;
@@ -536,6 +552,13 @@ function init() {
   return ready || setup();
 }
 function state() { return failed ? 'none' : (lost || (gl && gl.isContextLost())) ? 'lost' : 'ok'; }
+/* For the check page (tree-check.html): what went wrong, how big the canvas
+   and buffers are, and switching the latch off again. */
+function info() {
+  return { state: state(), error: lastError, frames: frames, losses: losses, canvas: cnv ? cnv.width + '×' + cnv.height : '-',
+           buffers: Math.round((vCap + iCap) / 1024) + ' KB', offUntil: offUntil() };
+}
+function clearOff() { try { localStorage.removeItem(OFF_KEY); localStorage.removeItem(OFF_KEY + 'Why'); } catch (e) { /* silent */ } }
 
 function c3(c) { return [c[0] / 255, c[1] / 255, c[2] / 255]; }
 function draw(o) {
@@ -574,9 +597,14 @@ function draw(o) {
   gl.useProgram(prog);
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-  gl.bufferData(gl.ARRAY_BUFFER, vbuf.subarray(0, nv * FL), gl.DYNAMIC_DRAW);
+  // The buffers are made once (and again only when the tree needs more room) and then
+  // only overwritten: a new buffer every frame, twice a frame, is storage some Android
+  // graphics drivers never give back for a canvas that is not on the screen.
+  if (nv * FL * 4 > vCap) { vCap = vbuf.byteLength; gl.bufferData(gl.ARRAY_BUFFER, vCap, gl.DYNAMIC_DRAW); }
+  gl.bufferSubData(gl.ARRAY_BUFFER, 0, vbuf, 0, nv * FL);
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ibuf.subarray(0, ni), gl.DYNAMIC_DRAW);
+  if (ni * 4 > iCap) { iCap = ibuf.byteLength; gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, iCap, gl.DYNAMIC_DRAW); }
+  gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, ibuf, 0, ni);
   var lk = o.look || {}, C = o.colours, Lt = o.light;
   gl.uniform2f(U.uScreen, bw / px, bh / px);
   gl.uniform2f(U.uOrigin, bx / px, by / px);
@@ -612,6 +640,7 @@ function draw(o) {
   gl.drawElements(gl.TRIANGLES, ni, gl.UNSIGNED_INT, 0);
   gl.bindVertexArray(null);
   if (gl.isContextLost()) return null;
+  frames++;
   return { cnv: cnv, x: bx, y: by, w: bw, h: bh };
 }
 /* The last tree, flat, when it can't be drawn on the graphics chip. */
@@ -634,5 +663,5 @@ function flat(c, colour) {
   }
 }
 
-return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state };
+return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state, info: info, clearOff: clearOff };
 })();
