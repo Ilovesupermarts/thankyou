@@ -2081,8 +2081,12 @@ function drawHudSpectrum() {
     for (var i = 0; i < HUD_WAVE_PTS; i++) {
       var target;
       if (swellAnalyserNode && swellFreqData && swellIsRunning) {
-        var t = i / lastIdx;
-        var binIdx = binStart + Math.floor(t * (binEnd - binStart));
+        /* Mirrored: the band's low end in the middle, under the
+           controls, its high end at both edges. Music carries most of
+           its energy low, so a left-to-right spectrum piled the wave up
+           on the left of the card. */
+        var t = Math.abs(i / lastIdx * 2 - 1);
+        var binIdx = binStart + Math.round(t * (binEnd - binStart));
         /* 1.35× boost brings ambient program material up into the
            visible range, clamped at 1.0. */
         target = Math.max(0.08, Math.min(1.0, (swellFreqData[binIdx] / 255) * 1.35));
@@ -14247,7 +14251,7 @@ function fillKoyoBranches(c, T) {
             wind: clamp(ENV.windMs / 10, 0, 1), ground: H - 20, look: look, colours: TRUNK_COLS, light: koyoTrunkLight() };
   var g = Trunks.draw(o);
   c.setTransform(1, 0, 0, 1, 0, 0);
-  if (g) { c.drawImage(g, 0, 0, o.width, o.height, 0, 0, o.width, o.height); return; }
+  if (g) { c.drawImage(g.cnv, 0, 0, g.w, g.h, g.x, g.y, g.w, g.h); return; }
   c.setTransform(res, 0, 0, res, 0, 0);
   Trunks.flat(c, rgba(koyoLight(T.far ? mixRgb(KOYO_BARK_FLAT, KOYO_PAPER, look.air) : KOYO_BARK_FLAT)));
 }

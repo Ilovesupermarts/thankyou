@@ -29,9 +29,10 @@
 
    Use:
      var M = Trunks.build(s);      // the tree's shape, once (rest pose)
-     var cnv = Trunks.draw(o);     // a WebGL canvas, or null (no WebGL 2,
-                                   // or the context was lost for a moment):
-                                   // the picture is its top-left o.width × o.height px
+     var P = Trunks.draw(o);       // { cnv, x, y, w, h }, or null (no WebGL 2, or the
+                                   // context was lost): only the box round the tree is
+                                   // drawn, into the top-left w × h px of cnv; it goes at
+                                   // x, y (device px) in the o.width × o.height picture
      Trunks.flat(c, colour)        // the last tree, flat in one colour, into a 2D
                                    // context set up for CSS px (when draw gave null)
      Trunks.axisAt(M, nodes, X, i, f)   // [x, y, z]: a point on node i's centre line,
@@ -370,11 +371,11 @@ var VS = [
 'layout(location = 1) in vec3 aN;',
 'layout(location = 2) in vec2 aUV;',
 'layout(location = 3) in vec4 aX;',
-'uniform vec2 uScreen;',
+'uniform vec2 uScreen, uOrigin;',
 'out vec3 vP; out vec3 vN; out vec2 vUV; out vec4 vX;',
 'void main() {',
 '  vP = aPos; vN = aN; vUV = aUV; vX = aX;',
-'  gl_Position = vec4(aPos.x / uScreen.x * 2.0 - 1.0, 1.0 - aPos.y / uScreen.y * 2.0, -aPos.z / 6000.0, 1.0);',
+'  gl_Position = vec4((aPos.x - uOrigin.x) / uScreen.x * 2.0 - 1.0, 1.0 - (aPos.y - uOrigin.y) / uScreen.y * 2.0, -aPos.z / 6000.0, 1.0);',
 '}'
 ].join('\n');
 
@@ -460,7 +461,12 @@ var FS = [
 '  col += uSunCol * pow(max(dot(n, hv), 0.0), 36.0) * uWet * 0.35 * sunVis * (1.0 - fis);',
 '  col = pow(max(col, vec3(0.0)), vec3(1.0 / 2.2));',
 '  col = mix(col, uAirCol, uAir);',
-'  outCol = vec4(col, 1.0);',
+'  // a soft outline (no multisampling: it would cost too much graphics memory on the tablet).',
+'  // At the outline the surface turns away from you (z of the normal falls to 0).',
+'  float nz = normalize(vN).z;',
+'  float cover = clamp(nz / max(fwidth(nz), 1e-4) * 0.8, 0.0, 1.0);',
+'  cover = max(cover, clamp(1.6 - R * uPx, 0.0, 0.8));               // thin twigs: never fade away',
+'  outCol = vec4(col * cover, cover);',
 '}'
 ].join('\n');
 
@@ -470,7 +476,7 @@ var FS = [
    moment (as in mountains.js).
    ============================================================ */
 var cnv = null, gl = null, prog = null, U = {}, vbo = null, ibo = null, vao = null, failed = false;
-var lost = false, ready = false, lostAt = 0, renewals = 0;
+var lost = false, ready = false, lostAt = 0, renewals = 0, losses = 0;
 function compile(type, src) {
   var s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -482,13 +488,16 @@ function create() {
   if (cnv) return !!gl;
   try {
     cnv = document.createElement('canvas');
-    gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: true, alpha: true, depth: true });
+    gl = cnv.getContext('webgl2', { premultipliedAlpha: true, preserveDrawingBuffer: false, antialias: false, alpha: true, depth: true });
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
   cnv.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
     if (this !== cnv) return;
     lost = true; ready = false; lostAt = performance.now(); prog = null; U = {};
+    // Taken away twice: the tablet is short of graphics memory. Stay flat from now
+    // on, so the tree never takes the mountains down with it.
+    if (++losses >= 2) failed = true;
   });
   cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
   return true;
@@ -534,12 +543,25 @@ function draw(o) {
   nv = 0; ni = 0;
   for (var t = 0; t < tubes.length; t++) meshTube(tubes[t], o);
   forkBalls(o);
-  if (!init()) return null;
-  // the canvas only grows (a new size each frame would be slow); the picture is its top-left corner
-  if (cnv.width < o.width || cnv.height < o.height) { cnv.width = Math.max(cnv.width, o.width); cnv.height = Math.max(cnv.height, o.height); }
-  gl.viewport(0, cnv.height - o.height, o.width, o.height);
+  if (!init() || !nv) return null;
+  // Only the box round the tree is drawn (in device px of the picture), not the whole screen.
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (var q = 0; q < nv; q++) {
+    var vx = vbuf[q * FL], vy = vbuf[q * FL + 1];
+    if (vx < x0) x0 = vx; if (vx > x1) x1 = vx; if (vy < y0) y0 = vy; if (vy > y1) y1 = vy;
+  }
+  var px = o.px;
+  var bx = clamp(Math.floor((x0 - 2) * px), 0, o.width), by = clamp(Math.floor((y0 - 2) * px), 0, o.height);
+  var bw = clamp(Math.ceil((x1 + 2) * px), 0, o.width) - bx, bh = clamp(Math.ceil((y1 + 2) * px), 0, o.height) - by;
+  if (bw < 1 || bh < 1) return null;
+  // the canvas only grows, in steps (a new size each frame would be slow); the picture is its top-left corner
+  if (cnv.width < bw || cnv.height < bh) {
+    cnv.width = Math.max(cnv.width, Math.ceil(bw * 1.1 / 64) * 64);
+    cnv.height = Math.max(cnv.height, Math.ceil(bh * 1.1 / 64) * 64);
+  }
+  gl.viewport(0, cnv.height - bh, bw, bh);
   gl.enable(gl.SCISSOR_TEST);
-  gl.scissor(0, cnv.height - o.height, o.width, o.height);
+  gl.scissor(0, cnv.height - bh, bw, bh);
   gl.clearColor(0, 0, 0, 0);
   gl.clearDepth(1);
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
@@ -547,7 +569,8 @@ function draw(o) {
   gl.enable(gl.DEPTH_TEST);
   gl.depthFunc(gl.LEQUAL);
   gl.disable(gl.CULL_FACE);
-  gl.disable(gl.BLEND);
+  gl.enable(gl.BLEND);                                // the soft outlines (premultiplied)
+  gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
   gl.useProgram(prog);
   gl.bindVertexArray(vao);
   gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
@@ -555,7 +578,8 @@ function draw(o) {
   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ibo);
   gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ibuf.subarray(0, ni), gl.DYNAMIC_DRAW);
   var lk = o.look || {}, C = o.colours, Lt = o.light;
-  gl.uniform2f(U.uScreen, o.W, o.H);
+  gl.uniform2f(U.uScreen, bw / px, bh / px);
+  gl.uniform2f(U.uOrigin, bx / px, by / px);
   gl.uniform3fv(U.uSunDir, Lt.dir);
   gl.uniform3fv(U.uSunCol, Lt.sun);
   gl.uniform3fv(U.uSkyCol, Lt.sky);
@@ -588,7 +612,7 @@ function draw(o) {
   gl.drawElements(gl.TRIANGLES, ni, gl.UNSIGNED_INT, 0);
   gl.bindVertexArray(null);
   if (gl.isContextLost()) return null;
-  return cnv;
+  return { cnv: cnv, x: bx, y: by, w: bw, h: bh };
 }
 /* The last tree, flat, when it can't be drawn on the graphics chip. */
 function flat(c, colour) {
