@@ -2458,13 +2458,13 @@ function drawFuji(c, C, hy) {
 var LK_DEFAULTS = {
   horizon: 0.68,
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 22, pathX: 0.345, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
+  gates: 22, pathX: 0.3, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
   // the water
   farShore: 160, reflect: 0.86, deep: 0.62, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
   nearBank: 0.86, floating: 1,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
-  pagoda: true, pagodaX: 0.185, pagodaSize: 0.17, hall: true, grove: false, bankTrees: true,
+  pagoda: true, pagodaX: 0.285, pagodaSize: 0.215, hall: true, grove: false, bankTrees: true,
   // the water torii
   waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
@@ -2472,7 +2472,7 @@ var LK_DEFAULTS = {
   colours: { water: '#2F5A6A', waterEvening: '#4C4560', waterNight: '#121A2E', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab3';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab5';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2671,7 +2671,7 @@ function bakeHead(path) {
     var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: xw, y: Y, z: z, size: size * H * z / F, yaw: yaw })
                                   : Lakeside.hall({ x: xw, y: Y, z: z, size: size * W * z / F, yaw: yaw });
     var fin = finish(haze);
-    Lakeside.renderFaces(c, faces, { proj: toScreen, cam: cam, light: lt, shade: 0.5, colour: function (t) { return BC[t] || BC.wall; },
+    Lakeside.renderFaces(c, faces, { proj: toScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
                                      fin: function (col) { return fin(col); } });
     pzW = size;
   }
@@ -2682,7 +2682,7 @@ function bakeHead(path) {
       pagodaDone = true;
     }
     if (!hallDone && f > fh) {
-      var hx = px - 0.085 * W;
+      var hx = px - 0.11 * W;
       building('hall', hx, lerp(yR(hx) + H * 0.02, yS(hx), fh + 0.04), lerp(zBack, LK.headZ, fh), 0.075, -0.35, lerp(0.34, 0.1, fh) * 0.85);
       hallDone = true;
     }
@@ -2699,7 +2699,7 @@ function bakeHead(path) {
       else { kind = 'matsu'; hu = lerp(2.2, 3, r()); }
       var h = hu * unit;
       // a clearing in front of the pagoda, so it shows to its foot
-      if (LK.pagoda && f > fp && Math.abs(xx - px) < LK.pagodaSize * H * 0.42) h *= lerp(0.35, 0.55, r());
+      if (LK.pagoda && f > fp && Math.abs(xx - px) < LK.pagodaSize * H * 0.5) h *= lerp(0.28, 0.45, r());
       if (Math.abs(xx - px) < LK.pagodaSize * H * 0.2 && f > fp - 0.2 && f <= fp && kind === 'sugi') h *= 0.8;
       if (LK.forest > r() * 1.0 + 0.001) {
         Lakeside.tree(c, kind, { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal, lean: kind === 'matsu' ? 0.3 : 0 });
@@ -2764,15 +2764,29 @@ function bakeGrove(path) {
     if (!inLand(sp[0], sp[1] - 2)) return;
     list.push({ kind: d[0], z: p.z, x: sp[0], y: sp[1], h: d[2] * F / p.z * LK.treeSize, seed: 7001 + i * 13 });
   });
-  // a few trees along the right bank, the lake behind them
-  if (LK.bankTrees) [['ginkgo', 0.77, 1.2], ['momiji', 0.87, 1.1]].forEach(function (d, i) {
-    var bx = d[1] * W, y = farShoreY() + 2;
-    while (y < H && !inLand(bx, y)) y += 2;
-    y += lerp(4, 14, r());
-    if (y >= H * 0.95) return;
-    var g = toGround(bx, y);
-    list.push({ kind: d[0], z: g.z, x: bx, y: y, h: d[2] * F / g.z * LK.treeSize, seed: 8101 + i * 17 });
-  });
+  // trees along the right bank: a row at the water, and a second row back on the leaves (cedar and pine
+  // behind, ginkgo and maple in front), in groups with gaps, so the bank is wooded and not barren
+  if (LK.bankTrees) {
+    var bk = [], seedB = 8101;
+    function bankTree(kind, xf, yf, hu) {
+      var bx = xf * W, y = yf * H;
+      if (yf < 0.5) { y = farShoreY() + 2; while (y < H && !inLand(bx, y)) y += 2; y += lerp(3, 12, r()); }
+      if (!inLand(bx, y - 2) || y >= H * 0.93) return;
+      var g = toGround(bx, y);
+      if (g.z < 2.5) return;
+      list.push({ kind: kind, z: g.z, x: bx, y: y, h: hu * F / g.z * LK.treeSize, seed: seedB += 17 });
+    }
+    // row 1: at the water's edge, small, in the haze
+    for (var bxf = 0.64; bxf < 1.02; bxf += lerp(0.035, 0.07, r())) {
+      var pk = r();
+      bankTree(pk < 0.35 ? 'sugi' : pk < 0.55 ? 'matsu' : pk < 0.75 ? 'ginkgo' : pk < 0.9 ? 'momiji' : 'kaede', bxf, 0.1, lerp(1.2, 2.2, r()));
+    }
+    // row 2: on the open ground, bigger, in groups of two or three
+    [[0.745, 0.765, 'ginkgo', 1.4], [0.775, 0.78, 'sugi', 1.9], [0.81, 0.77, 'momiji', 1.3], [0.9, 0.765, 'kaede', 1.4],
+     [0.945, 0.79, 'ginkgo', 1.6], [0.975, 0.76, 'sugi', 2.0], [0.7, 0.745, 'matsu', 1.2]].forEach(function (t) {
+      bankTree(t[2], t[0] + (r() - 0.5) * 0.02, t[1] + (r() - 0.5) * 0.015, t[3] * lerp(0.9, 1.1, r()));
+    });
+  }
   list.sort(function (a, b) { return b.z - a.z; });
   list.forEach(function (T) {
     var haze = clamp(0.08 + T.z / 120, 0, 0.4), kind = T.kind === 'kaede' ? 'momiji' : T.kind;

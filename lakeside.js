@@ -236,7 +236,16 @@ function tree(c, kind, o) {
 
 /* ---------------- 3D BUILDINGS ----------------
    Faces in world units: { p: [[x, y, z] …], tone, c: [x, y, z] (the middle of
-   its solid, to know which way is out) }. */
+   its solid, to know which way is out), det, q }. A face with a `det` has its
+   surface drawn by renderFaces after it is filled (planks, posts, doors,
+   tile courses …), over the quad q = [bottom-left, bottom-right, top-right,
+   top-left] (indexes into p), in the face's own (s across, t up) space. */
+var BPAL = {
+  plaster: hex('#E6DAC4'), post: hex('#C5402A'), door: hex('#3A2A22'), lattice: hex('#8A6A4A'), wood: hex('#7A3A26'),
+  bracket: hex('#A23A26'), bracketLit: hex('#D8B27A'), roof: hex('#4B4A52'), tileLine: hex('#2E2D34'), tileLit: hex('#8C8B96'),
+  ridge: hex('#BEB8AE'), fascia: hex('#E2D6C0'), soffit: hex('#8A5C44'), stone: hex('#9A948A'), stoneLine: hex('#5C5852'),
+  bronze: hex('#7A6234'), bronzeLit: hex('#C9A24A')
+};
 function boxFaces(out, cx, cy, cz, hx, hy, hz, yaw, tones, ox, oz) {
   var cs = Math.cos(yaw), sn = Math.sin(yaw);
   function W(x, y, z) { return [ox + x * cs - z * sn, y, oz + x * sn + z * cs]; }
@@ -244,7 +253,8 @@ function boxFaces(out, cx, cy, cz, hx, hy, hz, yaw, tones, ox, oz) {
   for (var i = 0; i < 8; i++) v.push(W(cx + (i & 1 ? hx : -hx), cy + (i & 2 ? hy : -hy), cz + (i & 4 ? hz : -hz)));
   var mid = W(cx, cy, cz), q = [[0, 1, 3, 2], [4, 6, 7, 5], [0, 4, 5, 1], [2, 3, 7, 6], [0, 2, 6, 4], [1, 5, 7, 3]];
   var tn = [tones.side, tones.side, tones.bottom || tones.side, tones.top || tones.side, tones.side, tones.side];
-  for (var f = 0; f < 6; f++) out.push({ p: q[f].map(function (k) { return v[k]; }), tone: tn[f], c: mid });
+  var quad = [[0, 1, 2, 3], [0, 3, 2, 1], null, null, [0, 3, 2, 1], [0, 1, 2, 3]];     // bottom-left, bottom-right, top-right, top-left
+  for (var f = 0; f < 6; f++) out.push({ p: q[f].map(function (k) { return v[k]; }), tone: tn[f], c: mid, det: quad[f] ? tones.det : null, q: quad[f], bays: tones.bays });
 }
 /* A hipped roof with upturned corners (反り): eaves at y, half-widths ex, ez,
    rising to a ridge (or a point) at y + rise. */
@@ -279,52 +289,170 @@ function roofFaces(out, y, ex, ez, rise, ridge, lift, thick, yaw, ox, oz, seg) {
       var u0 = -1 + 2 * s / seg, u1 = -1 + 2 * (s + 1) / seg;
       var a = eave(u0, side), b = eave(u1, side), A = top(u0, side), B = top(u1, side);
       var a2 = [a[0] * 0.985, a[1] - thick, a[2] * 0.985], b2 = [b[0] * 0.985, b[1] - thick, b[2] * 0.985];
-      out.push({ p: [W(a[0], a[1], a[2]), W(b[0], b[1], b[2]), W(B[0], B[1], B[2]), W(A[0], A[1], A[2])], tone: 'roof', c: mid });
-      out.push({ p: [W(a2[0], a2[1], a2[2]), W(b2[0], b2[1], b2[2]), W(b[0], b[1], b[2]), W(a[0], a[1], a[2])], tone: 'fascia', c: mid });
-      // the underside of the eaves, back to the wall
+      out.push({ p: [W(a[0], a[1], a[2]), W(b[0], b[1], b[2]), W(B[0], B[1], B[2]), W(A[0], A[1], A[2])], tone: 'roof', c: mid,
+                 det: 'tile', q: [0, 1, 2, 3], hipL: s === 0, hipR: s === seg - 1 });
+      out.push({ p: [W(a2[0], a2[1], a2[2]), W(b2[0], b2[1], b2[2]), W(b[0], b[1], b[2]), W(a[0], a[1], a[2])], tone: 'fascia', c: mid, det: 'fascia', q: [0, 1, 2, 3] });
+      // the underside of the eaves, back to the wall: rafters
       var ia = [a2[0] * 0.55, a2[1] - thick * 0.6, a2[2] * 0.55], ib = [b2[0] * 0.55, b2[1] - thick * 0.6, b2[2] * 0.55];
-      out.push({ p: [W(a2[0], a2[1], a2[2]), W(ia[0], ia[1], ia[2]), W(ib[0], ib[1], ib[2]), W(b2[0], b2[1], b2[2])], tone: 'soffit', c: W(0, y + rise, 0) });
+      out.push({ p: [W(a2[0], a2[1], a2[2]), W(ia[0], ia[1], ia[2]), W(ib[0], ib[1], ib[2]), W(b2[0], b2[1], b2[2])], tone: 'soffit', c: W(0, y + rise, 0),
+                 det: 'rafters', q: [0, 3, 2, 1] });
     }
   }
 }
-/* 五重塔 — five storeys, each a little narrower, each under a wide roof with
-   upturned corners, on a stone base, with the bronze spire (相輪) on top.
-   o: x, y (the foot, world), z, size (the height to the top of the spire), yaw. */
+/* 五重塔 — a stone base, a skirt roof (裳階) round the first storey, then five storeys,
+   each a little narrower, each under a wide roof with upturned corners, bells hanging at
+   the corners, and the bronze spire (相輪) on top. o: x, y (the foot, world), z, size
+   (the height to the top of the spire), yaw. */
 function pagoda(o) {
   var out = [], S = o.size, yaw = o.yaw || 0.5, X = o.x, Z = o.z, Y = o.y;
   var b0 = 0.13 * S, y = Y;
-  boxFaces(out, 0, y + 0.012 * S, 0, b0 * 1.55, 0.012 * S, b0 * 1.55, yaw, { side: 'stone', top: 'stone' }, X, Z);
-  boxFaces(out, 0, y + 0.03 * S, 0, b0 * 1.35, 0.008 * S, b0 * 1.35, yaw, { side: 'stone', top: 'stone' }, X, Z);
+  var cs = Math.cos(yaw), sn = Math.sin(yaw);
+  function corner(x, yy, z) { return [X + x * cs - z * sn, yy, Z + x * sn + z * cs]; }
+  function bells(ey, e, lift) {
+    [[-1, -1], [1, -1], [1, 1], [-1, 1]].forEach(function (c4) {
+      var lx = c4[0] * (e * 0.97), lz = c4[1] * (e * 0.97), by = ey + lift - 0.012 * S;
+      boxFaces(out, lx, by, lz, 0.0055 * S, 0.0075 * S, 0.0055 * S, yaw, { side: 'bronze', top: 'bronze' }, X, Z);
+    });
+  }
+  // the stone base: two steps, with the joints of the blocks
+  boxFaces(out, 0, y + 0.012 * S, 0, b0 * 1.85, 0.012 * S, b0 * 1.85, yaw, { side: 'stone', top: 'stone', det: 'stone' }, X, Z);
+  boxFaces(out, 0, y + 0.03 * S, 0, b0 * 1.62, 0.008 * S, b0 * 1.62, yaw, { side: 'stone', top: 'stone', det: 'stone' }, X, Z);
   y += 0.038 * S;
+  // the porch of the first storey (red posts, a dark rail) under its skirt roof
+  var porch = 0.05 * S;
+  boxFaces(out, 0, y + porch / 2, 0, b0 * 1.5, porch / 2, b0 * 1.5, yaw, { side: 'plaster', top: 'plaster', det: 'wall', bays: 5 }, X, Z);
+  roofFaces(out, y + porch + 0.006 * S, b0 * 1.82, b0 * 1.82, 0.022 * S, -(b0 * 1.04) / (b0 * 1.82), 0.014 * S, 0.01 * S, yaw, X, Z, 5);
+  bells(y + porch + 0.006 * S, b0 * 1.82, 0.014 * S);
+  y += porch + 0.012 * S;
   for (var i = 0; i < 5; i++) {
-    var b = b0 * (1 - 0.085 * i), bh = (i === 0 ? 0.088 : 0.07) * S;
-    boxFaces(out, 0, y + bh / 2, 0, b, bh / 2, b, yaw, { side: 'wall', top: 'wall' }, X, Z);
-    // the band of brackets under the eaves
-    boxFaces(out, 0, y + bh + 0.008 * S, 0, b * 1.12, 0.008 * S, b * 1.12, yaw, { side: 'bracket', bottom: 'soffit' }, X, Z);
-    var ey = y + bh + 0.022 * S, e = b * (i === 4 ? 2.05 : 1.95);
+    var b = b0 * (1 - 0.085 * i), bh = (i === 0 ? 0.078 : 0.066) * S;
+    boxFaces(out, 0, y + bh / 2, 0, b, bh / 2, b, yaw, { side: 'plaster', top: 'plaster', det: 'wall', bays: 3 }, X, Z);
+    // the brackets under the eaves: two stepped layers, deeper than the wall
+    boxFaces(out, 0, y + bh + 0.004 * S, 0, b * 1.1, 0.0075 * S, b * 1.1, yaw, { side: 'bracket', bottom: 'soffit', det: 'bracket' }, X, Z);
+    boxFaces(out, 0, y + bh + 0.0135 * S, 0, b * 1.28, 0.0075 * S, b * 1.28, yaw, { side: 'bracket', bottom: 'soffit', det: 'bracket' }, X, Z);
+    var ey = y + bh + 0.026 * S, e = b * (i === 4 ? 2.05 : 1.95), lift = 0.024 * S;
     var rise = i === 4 ? 0.075 * S : 0.034 * S, ridge = i === 4 ? -0.03 : -(b0 * (1 - 0.085 * (i + 1))) / e;
-    roofFaces(out, ey, e, e, rise, ridge, 0.024 * S, 0.012 * S, yaw, X, Z, 5);
+    roofFaces(out, ey, e, e, rise, ridge, lift, 0.012 * S, yaw, X, Z, 5);
+    bells(ey, e, lift);
     y = ey + (i === 4 ? rise : 0.012 * S);
   }
-  // the spire: a pole with nine rings and a finial
+  // the spire: a pole with the nine rings, the water flame (水煙) and the jewel
   var py = y, ph = 0.2 * S;
   boxFaces(out, 0, py + ph / 2, 0, 0.007 * S, ph / 2, 0.007 * S, yaw, { side: 'bronze' }, X, Z);
+  boxFaces(out, 0, py + 0.014 * S, 0, 0.026 * S, 0.01 * S, 0.026 * S, yaw, { side: 'bronze', top: 'bronze' }, X, Z);      // the base bowl
   for (var k = 0; k < 9; k++) {
-    var ry = py + 0.035 * S + k * 0.012 * S;
-    boxFaces(out, 0, ry, 0, 0.022 * S, 0.0035 * S, 0.022 * S, yaw, { side: 'bronze', top: 'bronze' }, X, Z);
+    var ry = py + 0.04 * S + k * 0.0115 * S;
+    boxFaces(out, 0, ry, 0, 0.022 * S * (1 - 0.03 * k), 0.0035 * S, 0.022 * S * (1 - 0.03 * k), yaw, { side: 'bronze', top: 'bronze' }, X, Z);
   }
-  boxFaces(out, 0, py + ph * 0.96, 0, 0.012 * S, 0.012 * S, 0.012 * S, yaw, { side: 'bronze' }, X, Z);
+  boxFaces(out, 0, py + 0.158 * S, 0, 0.017 * S, 0.012 * S, 0.017 * S, yaw, { side: 'bronze', top: 'bronze' }, X, Z);     // the water flame
+  boxFaces(out, 0, py + 0.178 * S, 0, 0.011 * S, 0.01 * S, 0.011 * S, yaw, { side: 'bronze', top: 'bronze' }, X, Z);
+  boxFaces(out, 0, py + ph * 0.99, 0, 0.007 * S, 0.012 * S, 0.007 * S, yaw, { side: 'bronzeLit' }, X, Z);
   return out;
 }
 /* 拝殿 — a low hall with a big hipped roof. o: x, y, z, size (its width), yaw. */
 function hall(o) {
   var out = [], S = o.size, yaw = o.yaw || -0.3, X = o.x, Z = o.z, y = o.y;
-  boxFaces(out, 0, y + 0.03 * S, 0, 0.55 * S, 0.03 * S, 0.36 * S, yaw, { side: 'stone', top: 'stone' }, X, Z);
-  boxFaces(out, 0, y + 0.06 * S + 0.13 * S, 0, 0.46 * S, 0.13 * S, 0.29 * S, yaw, { side: 'wall', top: 'wall' }, X, Z);
-  boxFaces(out, 0, y + 0.33 * S, 0, 0.5 * S, 0.012 * S, 0.33 * S, yaw, { side: 'bracket', bottom: 'soffit' }, X, Z);
+  boxFaces(out, 0, y + 0.03 * S, 0, 0.55 * S, 0.03 * S, 0.36 * S, yaw, { side: 'stone', top: 'stone', det: 'stone' }, X, Z);
+  boxFaces(out, 0, y + 0.06 * S + 0.13 * S, 0, 0.46 * S, 0.13 * S, 0.29 * S, yaw, { side: 'plaster', top: 'plaster', det: 'wall', bays: 5 }, X, Z);
+  boxFaces(out, 0, y + 0.33 * S, 0, 0.5 * S, 0.012 * S, 0.33 * S, yaw, { side: 'bracket', bottom: 'soffit', det: 'bracket' }, X, Z);
   roofFaces(out, y + 0.35 * S, 0.66 * S, 0.47 * S, 0.3 * S, 0.45, 0.04 * S, 0.022 * S, yaw, X, Z, 6);
   return out;
 }
+/* The surfaces: each is drawn in (s across 0 … 1, t up 0 … 1) over its face. X: w, h (px), tint(rgb, k) → css colour. */
+var DET = {
+  wall: function (c, P, X, f) {
+    if (X.w < 5 || X.h < 4) return;
+    function quad(s0, s1, t0, t1, st) {
+      c.fillStyle = st; c.beginPath(); var a = P(s0, t0), b = P(s1, t0), d = P(s1, t1), e = P(s0, t1);
+      c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.lineTo(e[0], e[1]); c.closePath(); c.fill();
+    }
+    var bays = f.bays || 3, pw = clamp(0.05 * 3 / bays, 0.022, 0.05), post = X.tint(BPAL.post), mid = Math.floor(bays / 2);
+    var wood = X.tint(BPAL.wood);
+    quad(0, 1, 0, 0.1, wood);                                       // the base rail
+    quad(0, 1, 0.8, 0.9, post);                                     // the tie beam
+    for (var j = 0; j < bays; j++) {
+      var s0 = j / bays + pw / 2, s1 = (j + 1) / bays - pw / 2;
+      if (j === mid) {                                              // a door of lattice
+        quad(s0, s1, 0.1, 0.8, X.tint(BPAL.door));
+        var nv = Math.max(2, Math.round(X.w * (s1 - s0) / 4));
+        c.strokeStyle = X.tint(BPAL.lattice, 0.9); c.lineWidth = Math.max(0.4, X.w * 0.004);
+        c.beginPath();
+        for (var v = 1; v < nv; v++) { var sv = lerp(s0, s1, v / nv), a = P(sv, 0.12), b = P(sv, 0.78); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+        for (var hh = 1; hh < 4; hh++) { var th = lerp(0.12, 0.78, hh / 4), l = P(s0, th), r = P(s1, th); c.moveTo(l[0], l[1]); c.lineTo(r[0], r[1]); }
+        c.stroke();
+      } else {                                                      // a small latticed window in the plaster
+        var ws0 = lerp(s0, s1, 0.25), ws1 = lerp(s0, s1, 0.75);
+        quad(ws0, ws1, 0.36, 0.7, X.tint(BPAL.door));
+        c.strokeStyle = X.tint(BPAL.lattice, 0.8); c.lineWidth = Math.max(0.35, X.w * 0.003);
+        c.beginPath();
+        for (var w2 = 1; w2 < 3; w2++) { var sw = lerp(ws0, ws1, w2 / 3), a2 = P(sw, 0.38), b2 = P(sw, 0.68); c.moveTo(a2[0], a2[1]); c.lineTo(b2[0], b2[1]); }
+        c.stroke();
+      }
+    }
+    for (var i = 0; i <= bays; i++) {                               // the posts
+      var s = i / bays; quad(Math.max(0, s - pw / 2), Math.min(1, s + pw / 2), 0, 1, post);
+    }
+    // the shadow of the eave above
+    var g = c.createLinearGradient(P(0.5, 1)[0], P(0.5, 1)[1], P(0.5, 0.45)[0], P(0.5, 0.45)[1]);
+    g.addColorStop(0, 'rgba(20,10,6,0.5)'); g.addColorStop(1, 'rgba(20,10,6,0)');
+    c.fillStyle = g; quad(0, 1, 0.45, 1, g);
+  },
+  bracket: function (c, P, X) {
+    if (X.w < 6 || X.h < 3) return;
+    var n = clamp(Math.round(X.w / 5), 5, 40), lit = X.tint(BPAL.bracketLit, 0.95), dark = X.tint(BPAL.soffit);
+    for (var row = 0; row < 2; row++) {
+      var t0 = row ? 0.55 : 0.08, t1 = row ? 0.92 : 0.46;
+      for (var i = 0; i < n; i++) {
+        var s0 = (i + 0.12 + (row ? 0.4 : 0)) / (n + 0.4), s1 = s0 + 0.62 / (n + 0.4);
+        c.fillStyle = (i + row) % 2 ? lit : X.tint(BPAL.bracket, 1.1);
+        c.beginPath(); var a = P(s0, t0), b = P(s1, t0), d = P(s1, t1), e = P(s0, t1);
+        c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.lineTo(d[0], d[1]); c.lineTo(e[0], e[1]); c.closePath(); c.fill();
+      }
+    }
+    c.strokeStyle = dark; c.lineWidth = Math.max(0.4, X.h * 0.06);
+    var m0 = P(0, 0.5), m1 = P(1, 0.5); c.beginPath(); c.moveTo(m0[0], m0[1]); c.lineTo(m1[0], m1[1]); c.stroke();
+  },
+  tile: function (c, P, X, f) {
+    if (X.h < 3) return;
+    var rows = clamp(Math.round(X.h / 3), 2, 16), cols = clamp(Math.round(X.w / 4), 2, 8);
+    c.lineWidth = Math.max(0.35, X.h * 0.018);
+    c.strokeStyle = X.tint(BPAL.tileLine); c.globalAlpha = 0.5; c.beginPath();
+    for (var r = 1; r < rows; r++) { var t = r / rows, a = P(0, t), b = P(1, t); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    for (var q = 1; q < cols; q++) { var s = q / cols, a2 = P(s, 0.04), b2 = P(s, 1); c.moveTo(a2[0], a2[1]); c.lineTo(b2[0], b2[1]); }
+    c.stroke();
+    c.strokeStyle = X.tint(BPAL.tileLit); c.globalAlpha = 0.22; c.beginPath();
+    for (var r2 = 0; r2 < rows; r2++) { var t2 = (r2 + 0.55) / rows, c0 = P(0, t2), c1 = P(1, t2); c.moveTo(c0[0], c0[1]); c.lineTo(c1[0], c1[1]); }
+    c.stroke();
+    c.globalAlpha = 1;
+    // the pale end tiles along the eave, and the hip ridges where two slopes meet
+    c.strokeStyle = X.tint(BPAL.ridge, 0.9); c.lineWidth = Math.max(0.5, X.h * 0.05);
+    var e0 = P(0, 0.02), e1 = P(1, 0.02); c.beginPath(); c.moveTo(e0[0], e0[1]); c.lineTo(e1[0], e1[1]); c.stroke();
+    c.lineWidth = Math.max(0.6, X.h * 0.07);
+    c.beginPath();
+    if (f.hipL) { var h0 = P(0, 0), h1 = P(0, 1); c.moveTo(h0[0], h0[1]); c.lineTo(h1[0], h1[1]); }
+    if (f.hipR) { var h2 = P(1, 0), h3 = P(1, 1); c.moveTo(h2[0], h2[1]); c.lineTo(h3[0], h3[1]); }
+    c.stroke();
+  },
+  fascia: function (c, P, X) {
+    if (X.h < 2) return;
+    c.strokeStyle = X.tint(BPAL.soffit, 0.9); c.lineWidth = Math.max(0.3, X.h * 0.18);
+    var a = P(0, 0.12), b = P(1, 0.12); c.beginPath(); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); c.stroke();
+  },
+  rafters: function (c, P, X) {
+    if (X.w < 8) return;
+    var n = clamp(Math.round(X.w / 3.2), 4, 40);
+    c.strokeStyle = X.tint(BPAL.wood, 0.7); c.lineWidth = Math.max(0.3, X.w * 0.004); c.beginPath();
+    for (var i = 1; i < n; i++) { var s = i / n, a = P(s, 0), b = P(s, 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    c.stroke();
+  },
+  stone: function (c, P, X) {
+    if (X.h < 3 || X.w < 6) return;
+    c.strokeStyle = X.tint(BPAL.stoneLine, 1); c.globalAlpha = 0.45; c.lineWidth = Math.max(0.3, X.h * 0.05);
+    var n = clamp(Math.round(X.w / 9), 3, 24); c.beginPath();
+    for (var i = 1; i < n; i++) { var s = i / n, a = P(s, 0), b = P(s, 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
+    c.stroke(); c.globalAlpha = 1;
+  }
+};
 /* Faces, furthest first, only those turned toward the camera, each lit by
    how it faces the light. */
 function renderFaces(c, faces, o) {
@@ -346,17 +474,33 @@ function renderFaces(c, faces, o) {
   }
   list.sort(function (A, B) { return B.d - A.d; });
   c.lineJoin = 'round';
+  function pal(tone) { return (o.colour && o.colour(tone)) || BPAL[tone] || BPAL.plaster; }
   for (var k = 0; k < list.length; k++) {
-    var L = list[k], base = o.colour(L.f.tone), lit = 1 - shade * (1 - L.lam);
-    var col = scale(base, lit);
-    if (L.ny < -0.5) col = scale(col, 0.8);
-    col = o.fin(col, L.z);
+    var L = list[k], base = pal(L.f.tone), lit = 1 - shade * (1 - L.lam);
+    if (L.ny < -0.5) lit *= 0.8;
+    var col = o.fin(scale(base, lit), L.z);
     var scr = L.f.p.map(function (q) { return o.proj(q[0], q[1], q[2]); });
     var st = rgb(col);
     c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.5;
     c.beginPath();
     for (var m = 0; m < scr.length; m++) { if (m) c.lineTo(scr[m][0], scr[m][1]); else c.moveTo(scr[m][0], scr[m][1]); }
     c.closePath(); c.fill(); c.stroke();
+    var det = L.f.det && DET[L.f.det];
+    if (det && L.f.q) {
+      var qi = L.f.q, A0 = scr[qi[0]], B0 = scr[qi[1]], C0 = scr[qi[2]], D0 = scr[qi[3]];
+      var P = function (s, t) {
+        var x0 = A0[0] + (B0[0] - A0[0]) * s, y0 = A0[1] + (B0[1] - A0[1]) * s, x1 = D0[0] + (C0[0] - D0[0]) * s, y1 = D0[1] + (C0[1] - D0[1]) * s;
+        return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
+      };
+      var X = { w: Math.hypot(B0[0] - A0[0], B0[1] - A0[1]), h: Math.hypot(D0[0] - A0[0], D0[1] - A0[1]),
+                tint: function (rgbv, kk) { return rgb(o.fin(scale(rgbv, lit * (kk || 1)), L.z)); } };
+      c.save();
+      c.beginPath();
+      for (var m2 = 0; m2 < scr.length; m2++) { if (m2) c.lineTo(scr[m2][0], scr[m2][1]); else c.moveTo(scr[m2][0], scr[m2][1]); }
+      c.closePath(); c.clip();
+      det(c, P, X, L.f);
+      c.restore();
+    }
   }
 }
 
@@ -600,6 +744,6 @@ function stem(c, o) {
   c.restore();
 }
 
-return { tree: tree, pagoda: pagoda, hall: hall, renderFaces: renderFaces, rock: rock, lily: lily,
+return { tree: tree, pagoda: pagoda, hall: hall, renderFaces: renderFaces, BPAL: BPAL, rock: rock, lily: lily,
          plume: plume, blades: blades, stem: stem, PAL: PAL, rng: rng };
 })();
