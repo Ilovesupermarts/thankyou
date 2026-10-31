@@ -5641,6 +5641,15 @@ function relockTable() {
   document.body.classList.add('table-locked');
 }
 
+/* The start screen and the name animation are not part of the scrolling
+   page: with the page unlocked, swiping up there scrolled it and showed the
+   message panels and table underneath. The page is locked from the start
+   screen on (it stays locked until the table is opened). */
+function lockPageForIntro() {
+  window.scrollTo(0, 0);
+  document.body.classList.add('table-locked');
+}
+
 function returnToStartScreen() {
   if (!nameConfirmed) return;
   if (receiptScreen && receiptScreen.classList.contains('visible')) return;
@@ -5726,6 +5735,7 @@ function returnToStartScreen() {
   if (rejectRow) rejectRow.classList.remove('active');
   document.body.classList.remove('warm-background');
 
+  lockPageForIntro();
   if (blossomScreen) blossomScreen.classList.add('visible');
   updateBlossomGreeting();
   tryStartBlossomStream();
@@ -7877,6 +7887,7 @@ function confirmName() {
   setTimeout(function() {
     try { nameInput.blur(); } catch (err) {}
     nameScreen.classList.add('hidden');
+    lockPageForIntro();
     blossomScreen.classList.add('visible');
     showStartNotice();
     updateBlossomGreeting();
