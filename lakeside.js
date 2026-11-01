@@ -16,6 +16,8 @@
    screen (-1 the left, 1 the right).
 
    Use (all sizes in CSS px, on a context already scaled to CSS px):
+     Lakeside.sugiLook(o)         how the cedars look: tiers, width, curve, scallop, shade, light,
+                                  specks, outline, trunk, variety, rust, colours { deep, mid, lit, hi, trunk }
      Lakeside.tree(c, kind, o)    kind 'sugi' | 'matsu' | 'ginkgo' | 'momiji' | 'blob'
                                   o: x, y (the foot), h (height), w (width, optional),
                                      seed, lx, fin, pal (optional, see PAL)
@@ -93,38 +95,175 @@ function tone(P, k) {
   return k < 0.5 ? mix(P.deep, P.mid, k * 2) : k < 0.85 ? mix(P.mid, P.lit, (k - 0.5) / 0.35) : mix(P.lit, P.hi, (k - 0.85) / 0.15);
 }
 
-/* 杉 — Japanese cedar: tall and narrow, a rounded point at the top, its
-   foliage in dense spiky clumps that stand out from the cone. */
-function sugi(c, o, P, r) {
-  var x = o.x, y = o.y, h = o.h, w = o.w || h * 0.3, fin = o.fin, lx = o.lx;
-  var top = y - h, foot = y - h * 0.1;                       // the foliage, from the top down to just above the foot
-  // the trunk, where it shows below the branches
-  c.fillStyle = rgb(fin(scale(P.trunk, 0.8)));
-  c.fillRect(x - w * 0.06, foot - h * 0.04, w * 0.12, y - foot + h * 0.04);
-  var rust = r() < 0.3 ? 0.25 * r() : 0;                    // a few cedars turn a little rusty in autumn
-  function hw(t) { return w * (0.08 + 0.92 * Math.pow(t, 0.85)) * 0.5; }   // half-width t of the way down
-  // the dark body
-  c.fillStyle = rgb(fin(P.deep));
-  c.beginPath(); c.moveTo(x, top);
-  var steps = Math.max(6, Math.round(h / 7));
-  for (var i = 1; i <= steps; i++) { var t = i / steps; c.lineTo(x + hw(t) * lerp(0.75, 1.05, r()), lerp(top, foot, t)); }
-  for (var j = steps; j >= 1; j--) { var t2 = j / steps; c.lineTo(x - hw(t2) * lerp(0.75, 1.05, r()), lerp(top, foot, t2)); }
-  c.closePath(); c.fill();
-  // the clumps, back to front: darker first, the lit ones on top
-  var n = clamp(Math.round(h * h / 40), 10, 170), list = [];
-  for (var k = 0; k < n; k++) {
-    var tt = Math.pow(r(), 0.85), u = r() * 2 - 1;
-    var cx = x + u * hw(tt) * 0.9, cy = lerp(top + h * 0.03, foot, tt);
-    var s = w * lerp(0.1, 0.19, r()) * lerp(0.6, 1.1, tt);
-    var lit = litAt(u, tt * 2 - 1, lx, (r() - 0.5) * 0.3) * lerp(1, 0.8, tt);
-    list.push({ x: cx, y: cy, s: s, k: lit });
+/* 杉 — the cedar: a tall cone of stacked tiers of foliage, each tier a skirt
+   that hangs over the one below. Each tier has a scalloped lower edge (soft
+   rounded tufts), a shadow cast onto the tier under it, a darker shaded side,
+   pale "finger" patches of light on its lit side, a few bright specks and a
+   thin dark outline. A short trunk with a root flare shows under the lowest
+   tier. How they look is set by the scene with Lakeside.sugiLook (see SUGI). */
+var SUGI = {
+  tiers: 7,        // how many tiers of foliage (fewer on small, far trees)
+  width: 0.42,     // the width of the cone at its foot, × the tree's height
+  curve: 0.5,      // how much each tier's lower edge curves (its outer tips higher than its middle)
+  scallop: 0.6,    // how deep the rounded tufts along the tiers' edges are
+  shade: 0.7,      // the shadow each tier casts on the one below, and the dark of the shaded side
+  light: 0.8,      // the patches of light on the lit side
+  specks: 0.5,     // small bright specks among them
+  outline: 0.5,    // the thin dark outline of each tier
+  trunk: 0.07,     // how much trunk shows under the lowest tier, × the height
+  variety: 0.5,    // how much one cedar differs from the next
+  rust: 0.3,       // the share of cedars turned a little rusty in autumn
+  pal: null        // the colours (deep, mid, lit, hi, trunk); null = PAL.sugi
+};
+function sugiLook(o) {
+  for (var k in o) {
+    if (k === 'colours') {
+      var C = o.colours, B = PAL.sugi;
+      SUGI.pal = { deep: C.deep ? hex(C.deep) : B.deep, mid: C.mid ? hex(C.mid) : B.mid, lit: C.lit ? hex(C.lit) : B.lit,
+                   hi: C.hi ? hex(C.hi) : B.hi, trunk: C.trunk ? hex(C.trunk) : B.trunk, rust: B.rust };
+    } else if (k in SUGI) SUGI[k] = o[k];
   }
-  list.sort(function (a, b) { return a.k - b.k; });
-  var under = rgb(fin(scale(P.deep, 0.85)));
-  for (var m = 0; m < list.length; m++) {
-    var D = list[m], col = tone(P, D.k);
-    if (rust) col = mix(col, P.rust, rust);
-    dab(c, D.x, D.y, D.s, D.s * 0.62, (r() - 0.5) * 0.5, rgb(fin(col)), D.s > 2 ? under : null);
+}
+/* One tier's outline as a Path2D: from (xa − wt, yTop) down its left side to its left tip, along its
+   scalloped lower edge, up its right side. */
+function tierPath(xa, yTop, yBot, wt, wbL, wbR, sag, lobe, r) {
+  var th = yBot - yTop, p = new Path2D(), M = clamp(Math.round(th / 2), 5, 30);
+  var nS = th > 12 ? 3 : 2, phL = r() * PI, phR = r() * PI, side = lobe * th * 0.08;
+  p.moveTo(xa - wt, yTop);
+  for (var i = 1; i <= M; i++) {
+    var s = i / M, bump = side * Math.abs(Math.sin(s * nS * PI + phL)) * 4 * s * (1 - s);
+    p.lineTo(xa - lerp(wt, wbL, Math.pow(s, 0.8)) - bump, lerp(yTop, yBot - sag, s));
+  }
+  // the lower edge: rounded tufts of uneven widths and depths
+  var nB = Math.max(2, Math.round((wbL + wbR) / Math.max(1.5, th * 0.3))), ws = [], tot = 0;
+  for (var a = 0; a < nB; a++) { var wa = lerp(0.6, 1.4, r()); ws.push(wa); tot += wa; }
+  for (var a2 = 0, u0 = 0; a2 < nB; a2++) {
+    var du = ws[a2] / tot, amp = lobe * th * 0.16 * lerp(0.55, 1.2, r()) * Math.sqrt(ws[a2]), K = Math.max(3, Math.round(du * (wbL + wbR) / 1.5));
+    K = Math.min(K, 16);
+    for (var j = 1; j <= K; j++) {
+      var v = j / K, u = u0 + du * v, uu = u * 2 - 1;
+      p.lineTo(lerp(xa - wbL, xa + wbR, u), yBot - sag * uu * uu + amp * Math.pow(Math.sin(v * PI), 0.7));
+    }
+    u0 += du;
+  }
+  for (var i2 = M - 1; i2 >= 0; i2--) {
+    var s2 = i2 / M, bump2 = side * Math.abs(Math.sin(s2 * nS * PI + phR)) * 4 * s2 * (1 - s2);
+    p.lineTo(xa + lerp(wt, wbR, Math.pow(s2, 0.8)) + bump2, lerp(yTop, yBot - sag, s2));
+  }
+  p.closePath();
+  return p;
+}
+function sugi(c, o, P, r) {
+  var S = SUGI, x = o.x, y = o.y, h = o.h, fin = o.fin, lx = o.lx, vr = S.variety;
+  var w = h * S.width * (1 + (r() - 0.5) * 0.3 * vr);
+  var ls = lx < 0 ? -1 : 1;                                     // the side the light comes from
+  var trunkH = h * S.trunk * lerp(0.8, 1.2, r());
+  var top = y - h, bot = y - trunkH, fh = bot - top;            // the foliage, from the tip down to bot
+  var lean = (r() - 0.5) * 0.08 * vr * w;                       // the tip a little off the axis
+  var rust = r() < S.rust ? lerp(0.08, 0.2, r()) : 0;
+  function col(k) { var cc = tone(P, k); return rust ? mix(cc, P.rust, rust * (1 - 0.5 * k)) : cc; }
+  function ax(t) { return x + lean * (1 - t) * (1 - t); }
+  function hw(t) { return w * 0.5 * (0.05 + 0.95 * Math.pow(t, 0.95)); }
+  var deep = fin(scale(col(0), 0.85)), detail = h >= 24;
+  // the trunk, flaring into its roots
+  var tw = Math.max(0.8, w * 0.07), fl = tw * (0.9 + 1.3 * Math.min(1, h / 80)), ty = bot - fh * 0.06;
+  c.fillStyle = rgb(fin(scale(P.trunk, 0.62)));
+  c.beginPath(); c.moveTo(x - tw * 0.5, ty); c.lineTo(x + tw * 0.5, ty);
+  c.quadraticCurveTo(x + tw * 0.42, y - trunkH * 0.2, x + fl, y + 0.5); c.lineTo(x - fl, y + 0.5);
+  c.quadraticCurveTo(x - tw * 0.42, y - trunkH * 0.2, x - tw * 0.5, ty); c.fill();
+  if (detail) {
+    c.fillStyle = rgb(fin(P.trunk));
+    c.beginPath(); c.moveTo(x + ls * tw * 0.5, ty); c.lineTo(x + ls * tw * 0.02, ty);
+    c.lineTo(x + ls * tw * 0.1, y - trunkH * 0.25); c.quadraticCurveTo(x + ls * tw * 0.3, y, x + ls * fl * 0.8, y + 0.5);
+    c.quadraticCurveTo(x + ls * tw * 0.42, y - trunkH * 0.2, x + ls * tw * 0.5, ty); c.fill();
+  }
+  // where the tiers end: the first (the spire) longer, the rest about the same, each a little different
+  var N = Math.max(2, Math.round(S.tiers * (1 + (r() - 0.5) * 0.3 * vr)));
+  if (h < 48) N = Math.max(2, Math.min(N, Math.round(h / 7)));
+  var b = [0], tot = 0, len = [];
+  for (var k = 0; k < N; k++) { var L = (k === 0 ? 1.6 : 1) * (1 + (r() - 0.5) * 0.3 * vr); len.push(L); tot += L; }
+  for (var k2 = 0, acc = 0; k2 < N; k2++) { acc += len[k2]; b.push(acc / tot); }
+  var tiers = [];
+  for (var t = 0; t < N; t++) {
+    var tTop = t === 0 ? 0 : b[t] - (b[t + 1] - b[t]) * 0.55, tBot = b[t + 1];
+    var yTop = top + fh * tTop, yBot = top + fh * tBot, th = yBot - yTop, xa = ax(tBot);
+    var flare = 1 + S.curve * 0.2 + (t === N - 1 ? 0.06 : 0);
+    var wbL = hw(tBot) * flare * lerp(1 - 0.12 * vr, 1 + 0.06 * vr, r()), wbR = hw(tBot) * flare * lerp(1 - 0.12 * vr, 1 + 0.06 * vr, r());
+    var wt = t === 0 ? w * 0.012 : hw(tTop) * 0.62, sag = th * 0.24 * S.curve;
+    tiers.push({ p: tierPath(ax(tTop), yTop, yBot, wt, wbL, wbR, sag, S.scallop, r), xa: xa, yTop: yTop, yBot: yBot, th: th,
+                 wb: (wbL + wbR) / 2, sag: sag, k: t });
+  }
+  // the tiers from the lowest up: each hangs over the one below and casts its shadow onto it
+  var lw = clamp(h * 0.012 * S.outline, 0.3, 2.4);
+  for (var q = N - 1; q >= 0; q--) {
+    var T = tiers[q], wb = T.wb;
+    if (q < N - 1 && S.shade > 0) {
+      c.save();
+      c.clip(tiers[q + 1].p);
+      c.globalAlpha = clamp(S.shade, 0, 1) * 0.85;
+      c.translate(T.xa, T.th * (0.08 + 0.12 * S.shade)); c.scale(0.94, 1); c.translate(-T.xa, 0);
+      c.fillStyle = rgb(deep); c.fill(T.p);
+      c.restore();
+    }
+    var down = T.k / Math.max(1, N - 1);                          // lower tiers a little darker, under the others
+    c.fillStyle = rgb(fin(col(lerp(0.5, 0.42, down)))); c.fill(T.p);
+    // the shaded side, and a little light on the lit side
+    var g = c.createLinearGradient(T.xa + ls * wb, 0, T.xa - ls * wb, 0);
+    g.addColorStop(0, rgb(fin(col(0.68)), 0.45 * Math.min(1, S.light)));
+    g.addColorStop(0.42, rgb(fin(col(0.5)), 0));
+    g.addColorStop(1, rgb(deep, clamp(0.15 + 0.7 * S.shade, 0, 1)));
+    c.fillStyle = g; c.fill(T.p);
+    // the top of the tier, tucked under the one above, darker
+    var gv = c.createLinearGradient(0, T.yTop, 0, T.yBot);
+    gv.addColorStop(0, rgb(deep, 0.5 * clamp(S.shade, 0, 1))); gv.addColorStop(0.55, rgb(deep, 0));
+    c.fillStyle = gv; c.fill(T.p);
+    if (detail) {
+      c.save(); c.clip(T.p);
+      // a fainter layer within the tier: a scalloped dark line about halfway up
+      if (S.outline > 0 && T.th > 10) {
+        var nb = Math.max(2, Math.round(wb * 2 / (T.th * 0.3))), yl = T.yBot - T.th * 0.42;
+        c.strokeStyle = rgb(deep, 0.4 * Math.min(1, S.outline * 1.4)); c.lineWidth = lw * 0.8;
+        c.beginPath();
+        for (var m = 0; m <= nb * 5; m++) {
+          var u = m / (nb * 5), uu = u * 2 - 1, xx = T.xa + uu * wb * 0.72;
+          var yy = yl - T.sag * 0.6 * uu * uu + T.th * 0.1 * S.scallop * Math.abs(Math.sin(u * nb * PI));
+          if (m) c.lineTo(xx, yy); else c.moveTo(xx, yy);
+        }
+        c.stroke();
+      }
+      // patches of light: rows of rounded "fingers" on the lit side, the brightest toward the light
+      if (S.light > 0) {
+        c.globalAlpha = Math.min(1, S.light);
+        var nF = clamp(Math.round(wb / (T.th * 0.2)), 2, 8), xc = T.xa + ls * wb * lerp(0.1, 0.3, r()), yc = T.yBot - T.th * lerp(0.3, 0.4, r());
+        var span = wb * lerp(0.75, 1.05, r()), fing = [];
+        for (var f = 0; f < nF; f++) {
+          var fx = xc + ((f + 0.5) / nF - 0.5) * span + (r() - 0.5) * wb * 0.06;
+          var near = 1 - Math.abs(fx - T.xa - ls * wb * 0.25) / (wb * 1.1);   // fuller toward the light
+          if (r() > 0.25 + near) continue;
+          fing.push({ x: fx, y: yc + (r() - 0.5) * T.th * 0.16, rx: span / nF * lerp(0.42, 0.62, r()) * (0.75 + 0.25 * near), ry: T.th * lerp(0.15, 0.25, r()) * (0.65 + 0.35 * near), a: (r() - 0.5) * 0.7, n: near });
+        }
+        c.fillStyle = rgb(fin(col(0.8)));
+        fing.forEach(function (F) { c.beginPath(); c.ellipse(F.x, F.y, F.rx, F.ry, F.a, 0, TAU); c.fill(); });
+        // the lit band joining them, low in the tier
+        if (fing.length > 1) {
+          c.beginPath(); c.ellipse(xc, yc + T.th * 0.06, span * 0.44, T.th * 0.12, 0, 0, TAU); c.fill();
+        }
+        c.fillStyle = rgb(fin(col(0.97)));
+        fing.forEach(function (F) {
+          if (F.n < 0.35 || r() < 0.3) return;
+          c.beginPath(); c.ellipse(F.x - ls * F.rx * 0.12, F.y + F.ry * 0.05, F.rx * 0.62, F.ry * 0.66, F.a, 0, TAU); c.fill();
+        });
+        // bright specks
+        var ns = Math.round(S.specks * lerp(1, 4, r()) * Math.min(1, wb / 12));
+        for (var sp = 0; sp < ns; sp++) {
+          var sx = T.xa + ls * wb * lerp(-0.2, 0.7, r()), sy = T.yBot - T.th * lerp(0.25, 0.6, r()), sr = Math.max(0.5, wb * lerp(0.02, 0.04, r()));
+          c.beginPath(); c.ellipse(sx, sy, sr, sr * 1.4, 0.3, 0, TAU); c.fill();
+        }
+        c.globalAlpha = 1;
+      }
+      c.restore();
+    }
+    if (S.outline > 0) { c.strokeStyle = rgb(scale(deep, 0.8), Math.min(1, S.outline * 1.4)); c.lineWidth = lw; c.lineJoin = 'round'; c.stroke(T.p); }
   }
 }
 
@@ -226,7 +365,7 @@ function crown(c, o, P, r, kind) {
 
 function tree(c, kind, o) {
   var r = rng((o.seed || 1) * 2654435761);
-  var P = o.pal || PAL[kind] || PAL.blob;
+  var P = o.pal || (kind === 'sugi' && SUGI.pal) || PAL[kind] || PAL.blob;
   o.fin = o.fin || same; o.lx = o.lx === undefined ? -0.7 : o.lx;
   c.save();
   if (kind === 'sugi') sugi(c, o, P, r);
@@ -746,5 +885,5 @@ function stem(c, o) {
 }
 
 return { tree: tree, pagoda: pagoda, hall: hall, renderFaces: renderFaces, BPAL: BPAL, rock: rock, lily: lily,
-         plume: plume, blades: blades, stem: stem, PAL: PAL, rng: rng };
+         plume: plume, blades: blades, stem: stem, PAL: PAL, rng: rng, sugiLook: sugiLook, SUGI: SUGI };
 })();

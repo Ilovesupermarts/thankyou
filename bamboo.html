@@ -470,7 +470,7 @@ var G = {
   colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
              gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
   lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
-  focusDepth: 0.19, blurNear: 0.2, blurFar: 0.4, hazeNear: 0.04, hazeFar: 0.1, strength: 1,
+  focusDepth: 0.12, blurNear: 0.2, blurFar: 1, hazeNear: 0.04, hazeFar: 0.1, strength: 1,
   gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
 };
 
@@ -487,9 +487,9 @@ var LDEF = {
   timeOfDay: 'night',
   show: true,
   // where they stand
-  every: 1, side: 'both', rightAlong: 0.88, rightFromEdge: 0.72, leftAlong: 0.38, leftFromEdge: 0.43,      // the app's values (LANT), sides swapped: the line bends the other way here
+  every: 1, side: 'both', rightAlong: 0.81, rightFromEdge: 0.49, leftAlong: 0.38, leftFromEdge: 0.43,      // the app's values (LANT), sides swapped: the line bends the other way here
   // the lantern
-  size: 0.58, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
+  size: 0.82, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
   moss: 0.53, variety: 0.78, roofLeaves: 1.75, colours: clone(LANTERN_COLOURS),
   // the light
   lightEvening: 1.3, lightNight: 1.34, windowGlow: 0.43, halo: 0.7, haloSize: 2.05, pool: 1.1, poolSize: 1.25,
@@ -2413,6 +2413,7 @@ function bakeScenery() {
     s.restore();
   }
   // The lake (section 7c): the far shore's forest, the headland, then the water with everything mirrored in it.
+  cedarLook();
   var landPath = buildLand();
   s.save(); s.setTransform(SR, 0, 0, SR, 0, 0); drawFarShore(s); s.restore();
   bakeHead(landPath);
@@ -2513,13 +2514,16 @@ var LK_DEFAULTS = {
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
-  farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
+  farShore: 160, reflect: 0.37, deep: 0.67, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
   // the swipe button (次へ) and the page dots, as a group: how far down the page its middle is (a share of the page's height)
   navY: 0.86,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
+  // the cedars (杉, drawn by lakeside.js): stacked tiers of foliage, each hanging over the one below
+  cdTiers: 7, cdWidth: 0.42, cdHeight: 1, cdCurve: 0.5, cdScallop: 0.6, cdShade: 0.7, cdLight: 0.8, cdSpecks: 0.5,
+  cdOutline: 0.5, cdTrunk: 0.07, cdVariety: 0.5, cdRust: 0.3,
   // the trees on the right bank: planted ON the bank (the water's edge on the right), the same distance apart
   // along it (bankGap, in eye heights, measured on the ground), all the same height in the world (bankH, in eye
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
@@ -2529,7 +2533,8 @@ var LK_DEFAULTS = {
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
-             lily: '#D21E22', susuki: '#E6C894' }
+             lily: '#D21E22', susuki: '#E6C894',
+             cedarDeep: '#21381C', cedarMid: '#365A28', cedarLit: '#4E7235', cedarHi: '#739552', cedarTrunk: '#625545' }
 };
 var LK_KEY = 'lakeLab23';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
@@ -2695,6 +2700,14 @@ function buildLand() {
   return path;
 }
 
+/* How the cedars look (the cd… values and the cedar colours), handed to lakeside.js before the lake is baked. */
+function cedarLook() {
+  var C = LK.colours;
+  Lakeside.sugiLook({ tiers: LK.cdTiers, width: LK.cdWidth, curve: LK.cdCurve, scallop: LK.cdScallop, shade: LK.cdShade,
+                      light: LK.cdLight, specks: LK.cdSpecks, outline: LK.cdOutline, trunk: LK.cdTrunk, variety: LK.cdVariety,
+                      rust: LK.cdRust,
+                      colours: { deep: C.cedarDeep, mid: C.cedarMid, lit: C.cedarLit, hi: C.cedarHi, trunk: C.cedarTrunk } });
+}
 /* ---------- the far shore: a band of forest along the foot of the mountains ---------- */
 function drawFarShore(c) {
   var hy = H * V.horizon, yf = farShoreY(), F = lensF(), z = LK.farShore, r = rngFrom(V.seed * 911 + 3);
@@ -2710,7 +2723,7 @@ function drawFarShore(c) {
     if (pick < 0.66) { kind = 'sugi'; pal = null; }
     else if (pick < 0.86) { kind = 'blob'; pal = Lakeside.PAL.ginkgo; }        // gold, never red or orange behind the gates
     else { kind = 'blob'; pal = null; }
-    var h = unit * lerp(1.2, 3.2, r()) * (kind === 'sugi' ? 1.2 : 0.9) * (1 + 0.5 * Math.max(0, vnoise(xx / W * 4, 9)));
+    var h = unit * lerp(1.2, 3.2, r()) * (kind === 'sugi' ? 1.2 * LK.cdHeight : 0.9) * (1 + 0.5 * Math.max(0, vnoise(xx / W * 4, 9)));
     Lakeside.tree(c, kind, { x: xx, y: yf + 0.5, h: h, w: kind === 'sugi' ? h * 0.32 : h * 0.8, seed: Math.round(xx * 7 + 13), lx: -0.7, fin: fin, pal: pal });
     xx += h * lerp(0.18, 0.4, r());
   }
@@ -2798,7 +2811,7 @@ function bakeHead(path) {
       if (0.6 * n + 0.4 * r() > 1 - colourful) {
         if (r() < LK.ginkgo / Math.max(0.05, 1 - LK.evergreen)) { kind = 'ginkgo'; hu = lerp(2.6, 3.4, r()); }
         else { kind = 'momiji'; pal = r() < 0.6 ? Lakeside.PAL.momiji : Lakeside.PAL.kaede; hu = lerp(2, 2.8, r()); }
-      } else if (r() < 0.72) { kind = 'sugi'; hu = lerp(3.2, 4.6, r()); }
+      } else if (r() < 0.72) { kind = 'sugi'; hu = lerp(3.2, 4.6, r()) * LK.cdHeight; }
       else { kind = 'matsu'; hu = lerp(2.2, 3, r()); }
       var h = hu * unit;
       // a clearing in front of the pagoda, so it shows to its foot
@@ -2865,7 +2878,7 @@ function bakeGrove(path) {
     if (p.z < 1) return;
     var sp = toScreen(p.x, 0, p.z);
     if (!inLand(sp[0], sp[1] - 2)) return;
-    list.push({ kind: d[0], z: p.z, x: sp[0], y: sp[1], h: d[2] * F / p.z * LK.treeSize, seed: 7001 + i * 13 });
+    list.push({ kind: d[0], z: p.z, x: sp[0], y: sp[1], h: d[2] * F / p.z * LK.treeSize * (d[0] === 'sugi' ? LK.cdHeight : 1), seed: 7001 + i * 13 });
   });
   list.sort(function (a, b) { return b.z - a.z; });
   list.forEach(function (T) {
@@ -7177,6 +7190,18 @@ var LAKE_CTLS = [
   { k: 'treeSize', label: 'Tree size', min: 0.5, max: 1.6, step: 0.05 },
   { k: 'evergreen', label: 'Cedar and pine', min: 0, max: 1, step: 0.01, note: 'The share of deep green; the rest is ginkgo and maple.' },
   { k: 'ginkgo', label: 'Ginkgo gold', min: 0, max: 0.6, step: 0.01 },
+  { k: 'cdTiers', label: 'Tiers', min: 3, max: 14, step: 1, group: 'The cedars (杉)', note: 'How many tiers of foliage, stacked from the tip down (fewer on the small, far trees).' },
+  { k: 'cdWidth', label: 'Width', min: 0.2, max: 0.8, step: 0.01, note: 'Across the lowest tier, × the tree\'s height.' },
+  { k: 'cdHeight', label: 'Height', min: 0.5, max: 1.6, step: 0.05, note: 'Against the other trees.' },
+  { k: 'cdCurve', label: 'Curve of the tiers', min: 0, max: 1.5, step: 0.05, note: 'How much each tier\'s lower edge curves: its outer tips higher than its middle, and flaring out.' },
+  { k: 'cdScallop', label: 'Tufts along the edges', min: 0, max: 1.5, step: 0.05, note: 'How deep the rounded tufts along the edges of the tiers are.' },
+  { k: 'cdShade', label: 'Shadow under each tier', min: 0, max: 1, step: 0.01, note: 'The shadow each tier casts on the one below, and the dark of the shaded side.' },
+  { k: 'cdLight', label: 'Patches of light', min: 0, max: 1.5, step: 0.05, note: 'The paler patches on the side toward the light.' },
+  { k: 'cdSpecks', label: 'Bright specks', min: 0, max: 2, step: 0.05 },
+  { k: 'cdOutline', label: 'Outline', min: 0, max: 1.5, step: 0.05, note: 'The thin dark line round each tier.' },
+  { k: 'cdTrunk', label: 'Trunk showing', min: 0, max: 0.2, step: 0.005, note: '× the tree\'s height, under the lowest tier.' },
+  { k: 'cdVariety', label: 'Variety', min: 0, max: 1, step: 0.01, note: 'How much one cedar differs from the next.' },
+  { k: 'cdRust', label: 'Rusty cedars', min: 0, max: 1, step: 0.01, note: 'The share of cedars turned a little rusty in autumn.' },
   { k: 'pagodaX', label: 'Pagoda across', min: 0.05, max: 0.5, step: 0.005 },
   { k: 'pagodaSize', label: 'Pagoda height', min: 0.08, max: 0.35, step: 0.005 },
   { k: 'wtX', label: 'Water torii across', min: 0.05, max: 0.5, step: 0.005, group: 'The torii in the water' },
@@ -7212,7 +7237,9 @@ var LANT_CTLS = [
 var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
                      ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
 var LAKE_COLOURS = [['water', 'Water (day)'], ['waterEvening', 'Water (evening)'], ['waterNight', 'Water (night)'], ['moss', 'Moss'],
-                    ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki']];
+                    ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki'],
+                    ['cedarDeep', 'Cedar: shade'], ['cedarMid', 'Cedar: body'], ['cedarLit', 'Cedar: light'], ['cedarHi', 'Cedar: brightest'],
+                    ['cedarTrunk', 'Cedar: trunk']];
 var TREE_CTLS = [
   { k: 'girth', label: 'Thickness', min: 0.6, max: 2, step: 0.05, group: 'The shape', note: 'How thick the trunk and limbs are.' },
   { k: 'bend', label: 'Curving limbs', min: 0, max: 1.5, step: 0.05, note: 'How much the limbs bend between their forks.' },
