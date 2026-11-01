@@ -487,7 +487,7 @@ var LDEF = {
   timeOfDay: 'night',
   show: true,
   // where they stand
-  every: 1, side: 'both', rightAlong: 0.38, rightFromEdge: 0.3, leftAlong: 0.89, leftFromEdge: 0.3,      // the app's values (LANT), sides swapped: the line bends the other way here
+  every: 1, side: 'both', rightAlong: 0.88, rightFromEdge: 0.72, leftAlong: 0.38, leftFromEdge: 0.43,      // the app's values (LANT), sides swapped: the line bends the other way here
   // the lantern
   size: 0.58, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
   moss: 0.53, variety: 0.78, roofLeaves: 1.75, colours: clone(LANTERN_COLOURS),
@@ -1692,7 +1692,7 @@ function placeLanterns(path, gap) {
       var off = wu + (right ? L.rightFromEdge : L.leftFromEdge) * L.size + L.box * L.size * 1.9;
       var q = pathAt(path, clamp(s + along * gap, 0, path.len));
       out.push({ x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
-                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 });
+                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0, s: clamp(s + along * gap, 0, path.len) });
     });
   }
   return out;
@@ -1735,7 +1735,7 @@ function bakeGates() {
     var x0 = W / 2 + F * q.x / q.z;
     if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
     var dq = depthOf(foot);
-    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band });
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band, s: s });
   }
   gateCount = gates.length;
   // the torii standing in the lake (水上鳥居), facing you, a little turned
@@ -1744,7 +1744,7 @@ function bakeGates() {
     var wtx = Math.sin(wyaw), wtz = -Math.cos(wyaw), wfoot = hy + F / wq.z;
     var wdq = depthOf(wfoot);
     gates.push({ x: wq.x, z: wq.z, tx: wtx, tz: wtz, ax: -wtz, az: wtx, px: G.gateHeight * LK.wtSize * F / wq.z, foot: wfoot,
-                 haze: wdq.haze, band: wdq.band, water: true });
+                 haze: wdq.haze, band: wdq.band, water: true, s: -1 });       // out in the lake, beyond the line: drawn first
   }
   // the lanterns
   placeLanterns(path, gap).forEach(function (Lp) {
@@ -1795,7 +1795,10 @@ function bakeGates() {
     all[all.length - 1].leavesOf = Lp;                 // drawn just after its last piece
     minY = Math.min(minY, Lp.foot - Lp.px * 1.1);
   });
-  all.sort(function (a, b) { return b.dist - a.dist; });
+  // whole gates and whole lanterns, furthest along the path first (everything stands along the path, which comes
+  // toward you, so this is their true order: a lantern in a gap is behind the gate nearer to you and in front of the
+  // one further away, wherever it stands across the path); the pieces of each one by their distance
+  all.sort(function (a, b) { return (a.g.s - b.g.s) || (b.dist - a.dist); });
   gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - gateTop) * PR));
   // one layer for each step of blur of the gates, and one for each of the lanterns (so each has its own blur)
@@ -1930,7 +1933,9 @@ function bakeGates() {
   }
   // the pieces, each into the layer of its gate's (or lantern's) blur
   all.forEach(function (pc) {
-    var g = pc.g, c = bandLayer((g.lantern ? GATE_BANDS : 0) + g.band).c;
+    var g = pc.g, li = (g.lantern ? GATE_BANDS : 0) + g.band, c = bandLayer(li).c;
+    // the layers are laid down in this order: the gates' then the lanterns' of each blur step, furthest step first
+    var ord = (GATE_BANDS - 1 - g.band) * 2 + (g.lantern ? 1 : 0);
     pc.faces.forEach(function (f) {
       var n = f.p.length, cx = 0, cy = 0, cz = 0;
       for (var i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
@@ -1950,6 +1955,18 @@ function bakeGates() {
       var st = rgb(col);
       c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
       facePath(c, scr); c.fill(); c.stroke();
+      // everything already drawn is behind this face: cut it out of the layers laid down after this one, so
+      // nothing behind it (a lantern behind a gate, in a sharper layer) can show over it
+      for (var lj = 0; lj < GATE_BANDS * 2; lj++) {
+        var Lb2 = bands[lj];
+        if (!Lb2 || lj === li) continue;
+        var bLan = lj >= GATE_BANDS, bB = lj % GATE_BANDS, ord2 = (GATE_BANDS - 1 - bB) * 2 + (bLan ? 1 : 0);
+        if (ord2 <= ord) continue;
+        var e = Lb2.c;
+        e.save(); e.globalCompositeOperation = 'destination-out'; e.fillStyle = e.strokeStyle = '#000'; e.lineWidth = 0.6; e.lineJoin = 'round';
+        facePath(e, scr); e.fill(); e.stroke();
+        e.restore();
+      }
       // the lanterns' masks: its own windows are added; anything drawn later (nearer) over a window hides it
       if (MC) {
         if (glowing && g.mask) {
@@ -2489,7 +2506,7 @@ function drawFuji(c, C, hy) {
    stems (one curve and one baked plume each).
    ============================================================ */
 var LK_DEFAULTS = {
-  horizon: 0.76,             // low enough that every torii (and the far shore) stands below the text on the tablet
+  horizon: 0.76,             // low enough that every torii stands below the text on the tablet
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
   gates: 29, pathX: 0.3, pathY: 0.768, gateEndX: 0.735, gateEndY: 0.88,
   // the water
@@ -2498,6 +2515,8 @@ var LK_DEFAULTS = {
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
   farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
+  // the swipe button (次へ) and the page dots, as a group: how far down the page its middle is (a share of the page's height)
+  navY: 0.86,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
@@ -2512,7 +2531,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab20';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab23';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -6717,29 +6736,19 @@ window.mtnLab = {
 window.lakeLab = {
   values: LK, defaults: LK_DEFAULTS,
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
+  nav: function () { applyNav(); },
   gates: G, lanterns: L, resetLanternsGates: function () { resetLanternsGates(); },
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
-  // how many of the lanterns big enough to read (14 px tall and up) are seen inside the opening of a nearer gate
-  // (between its pillars, under its beams), which looks as if they stood on the path: [water side, land side, of]
-  lanternCheck: function (vals) {
-    if (vals) { for (var k in vals) { if (k === 'straightEnd') G.straightEnd = vals[k]; else if (k in L) L[k] = vals[k]; else LK[k] = vals[k]; } lakePath(); }
-    var path = buildGatePath(), gap = Math.max(0.05, path.len / Math.max(1, G.count - 1)), F = lensF(), hy = H * V.horizon, h = G.gateHeight;
-    var gr = [];
+  // the highest point of the gates on the screen between x0 and x1 (CSS px), for checking what they stand behind
+  gatesTop: function (x0, x1) {
+    var path = buildGatePath(), gap = Math.max(0.05, path.len / Math.max(1, G.count - 1)), F = lensF(), hy = H * V.horizon, h = G.gateHeight, top = 1e9;
     for (var sg = path.len; sg >= -1e-6; sg -= gap) {
-      var g = pathAt(path, Math.max(0, sg)), xs = [];
-      [-1, 1].forEach(function (pd) { var pz = g.z + g.tx * (G.width * h / 2) * pd, px = g.x - g.tz * (G.width * h / 2) * pd; xs.push(W / 2 + F * px / pz); });
-      var r = G.pillar * h * F / g.z;
-      gr.push([Math.min(xs[0], xs[1]) - r, hy + F / g.z - h * F / g.z, Math.max(xs[0], xs[1]) + r, hy + F / g.z, g.z]);
+      var g = pathAt(path, Math.max(0, sg)), hw = G.width * h / 2 + G.overhang * h;
+      var xa = W / 2 + F * (g.x - hw) / g.z, xb = W / 2 + F * (g.x + hw) / g.z;
+      if (xb < x0 || xa > x1) continue;
+      top = Math.min(top, hy + F / g.z - h * F / g.z);
     }
-    var bad = [0, 0], big = 0;
-    placeLanterns(path, gap).forEach(function (c) {
-      var sx = W / 2 + F * c.x / c.z, foot = hy + F / c.z, lh = L.size * F / c.z, hw = L.box * L.size * 1.5 * F / c.z;
-      if (lh < 14) return;
-      big++;
-      var side = c.ax * (-c.tz) + c.az * c.tx > 0 ? 1 : 0;           // 0: the water (left) side, 1: the land (right) side
-      for (var i = 0; i < gr.length; i++) { var R = gr[i]; if (R[4] < c.z && sx + hw > R[0] && sx - hw < R[2] && foot > R[1]) { bad[side]++; return; } }
-    });
-    return [bad[0], bad[1], big];
+    return Math.round(top);
   },
   waterState: function () { return typeof Water === 'undefined' ? 'none' : Water.state(); },
   waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
@@ -6775,9 +6784,20 @@ window.birdLab = {
 /* ============================================================
    11. FRAME
    ============================================================ */
+/* The swipe button and the page dots as one group: the button's middle at LK.navY of the page's height, the dots
+   33 px below it (as they are in the app). */
+function applyNav() {
+  var st = document.getElementById('stage'), nd = document.getElementById('navDemo'), dt = document.getElementById('dots');
+  if (!st || !nd || !dt) return;
+  var top = st.getBoundingClientRect().top, mid = LK.navY * innerHeight - top;
+  nd.style.top = (mid - nd.offsetHeight / 2) + 'px';
+  dt.style.bottom = 'auto';
+  dt.style.top = (mid + 33 - dt.offsetHeight / 2) + 'px';
+}
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   V.horizon = LK.horizon;
+  applyNav();
   lakePath();
   PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;   // the app renders at 0.75
   SR = PR * (MT.style === '3d' ? MT.resolution : SCN_RES);   // the 3D mountains are sharp, so they are baked finer
@@ -7078,6 +7098,8 @@ function place() {
   demo.style.top = (low + 18) + 'px';
   dotsEl.style.top = (low + 18 + demo.offsetHeight + S.gap) + 'px';
   dotsEl.style.bottom = 'auto';
+  // on the lake page the group stands where the Lake panel puts it (LK.navY), not under the text
+  if (window.lakeLab && window.lakeLab.nav) window.lakeLab.nav();
 }
 function go(i) {
   cur = (i + N) % N;
@@ -7132,6 +7154,7 @@ var LAKE_CTLS = [
   { k: 'gateEndX', label: 'Nearest torii: across', min: 0.3, max: 0.9, step: 0.005 },
   { k: 'pathX', label: 'Line starts at (across)', min: 0.05, max: 0.7, step: 0.005, note: 'Far away, by the headland\'s tip.' },
   { k: 'pathY', label: 'Line starts at (down)', min: 0.6, max: 0.85, step: 0.002, note: 'Nearer the eye line = further away.' },
+  { k: 'navY', label: 'Swipe button and dots: how far down', min: 0.6, max: 0.98, step: 0.005, group: 'The swipe button (次へ) and page dots', note: 'The middle of the button, as a share of the page\'s height; the dots stand just under it.' },
   { k: 'horizon', label: 'Eye line', min: 0.55, max: 0.9, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = a smaller lake.' },
   { k: 'nearBank', label: 'Near bank', min: 0.78, max: 0.98, step: 0.005, note: 'Where the bank along the bottom starts. Higher up = a smaller lake.' },
   { k: 'reflect', label: 'Reflections', min: 0, max: 1, step: 0.01, group: 'The water', note: 'How clearly the lake mirrors the sky, the mountains, the headland and the gates.' },
