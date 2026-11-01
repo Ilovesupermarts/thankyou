@@ -2479,30 +2479,30 @@ function drawFuji(c, C, hy) {
    stems (one curve and one baked plume each).
    ============================================================ */
 var LK_DEFAULTS = {
-  horizon: 0.68,
+  horizon: 0.76,             // low enough that every torii (and the far shore) stands below the text on the tablet
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 29, pathX: 0.3, pathY: 0.69, gateEndX: 0.735, gateEndY: 0.85,
+  gates: 29, pathX: 0.3, pathY: 0.768, gateEndX: 0.735, gateEndY: 0.88,
   // the water
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
   farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
-  nearBank: 0.86, floating: 1,
+  nearBank: 0.92, floating: 1,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
-  pagoda: true, pagodaX: 0.285, pagodaSize: 0.215, hall: true, grove: false,
+  pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
   // the trees on the right bank: planted ON the bank (the water's edge on the right), the same distance apart
   // along it (bankGap, in eye heights, measured on the ground), all the same height in the world (bankH, in eye
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
   bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 1.3, bankIn: 1,
   // the water torii
-  waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
+  waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab16';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab17';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -7054,7 +7054,7 @@ var LAKE_CTLS = [
   { k: 'gateEndX', label: 'Nearest torii: across', min: 0.3, max: 0.9, step: 0.005 },
   { k: 'pathX', label: 'Line starts at (across)', min: 0.05, max: 0.7, step: 0.005, note: 'Far away, by the headland\'s tip.' },
   { k: 'pathY', label: 'Line starts at (down)', min: 0.6, max: 0.85, step: 0.002, note: 'Nearer the eye line = further away.' },
-  { k: 'horizon', label: 'Eye line', min: 0.55, max: 0.86, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = a smaller lake.' },
+  { k: 'horizon', label: 'Eye line', min: 0.55, max: 0.9, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = a smaller lake.' },
   { k: 'nearBank', label: 'Near bank', min: 0.78, max: 0.98, step: 0.005, note: 'Where the bank along the bottom starts. Higher up = a smaller lake.' },
   { k: 'reflect', label: 'Reflections', min: 0, max: 1, step: 0.01, group: 'The water', note: 'How clearly the lake mirrors the sky, the mountains, the headland and the gates.' },
   { k: 'deep', label: 'Deep water colour', min: 0, max: 1, step: 0.01, note: 'Looking down into the lake near you: its own blue shows through.' },
