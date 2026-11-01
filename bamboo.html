@@ -1933,7 +1933,9 @@ function bakeGates() {
   }
   // the pieces, each into the layer of its gate's (or lantern's) blur
   all.forEach(function (pc) {
-    var g = pc.g, c = bandLayer((g.lantern ? GATE_BANDS : 0) + g.band).c;
+    var g = pc.g, li = (g.lantern ? GATE_BANDS : 0) + g.band, c = bandLayer(li).c;
+    // the layers are laid down in this order: the gates' then the lanterns' of each blur step, furthest step first
+    var ord = (GATE_BANDS - 1 - g.band) * 2 + (g.lantern ? 1 : 0);
     pc.faces.forEach(function (f) {
       var n = f.p.length, cx = 0, cy = 0, cz = 0;
       for (var i = 0; i < n; i++) { cx += f.p[i][0]; cy += f.p[i][1]; cz += f.p[i][2]; }
@@ -1953,6 +1955,18 @@ function bakeGates() {
       var st = rgb(col);
       c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.6; c.lineJoin = 'round';
       facePath(c, scr); c.fill(); c.stroke();
+      // everything already drawn is behind this face: cut it out of the layers laid down after this one, so
+      // nothing behind it (a lantern behind a gate, in a sharper layer) can show over it
+      for (var lj = 0; lj < GATE_BANDS * 2; lj++) {
+        var Lb2 = bands[lj];
+        if (!Lb2 || lj === li) continue;
+        var bLan = lj >= GATE_BANDS, bB = lj % GATE_BANDS, ord2 = (GATE_BANDS - 1 - bB) * 2 + (bLan ? 1 : 0);
+        if (ord2 <= ord) continue;
+        var e = Lb2.c;
+        e.save(); e.globalCompositeOperation = 'destination-out'; e.fillStyle = e.strokeStyle = '#000'; e.lineWidth = 0.6; e.lineJoin = 'round';
+        facePath(e, scr); e.fill(); e.stroke();
+        e.restore();
+      }
       // the lanterns' masks: its own windows are added; anything drawn later (nearer) over a window hides it
       if (MC) {
         if (glowing && g.mask) {
