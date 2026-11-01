@@ -93,18 +93,45 @@ function tone(P, k) {
   return k < 0.5 ? mix(P.deep, P.mid, k * 2) : k < 0.85 ? mix(P.mid, P.lit, (k - 0.5) / 0.35) : mix(P.lit, P.hi, (k - 0.85) / 0.15);
 }
 
-/* 杉 — Japanese cedar (Cryptomeria): a tall, narrow cone with a pointed top. Its foliage hangs in
-   drooping sprays tier on tier, so the edge is a ragged saw of downward-pointing tips (not a stack of
-   rounded lumps), and every spray is a brush of fine needles. The sun's side is lighter, the far side
-   and the underside of the tiers dark. Small ones (under 14 px) are two-tone cones. */
+/* 杉 — Japanese cedar (Cryptomeria): a tall, narrow cone with a pointed top, its foliage in sprays that
+   leave the stem tier on tier, arch out and hang down at the tips. There is no hard outline: the body is a
+   smooth cone drawn smaller than the tree, and the edge is the tips of the sprays themselves (each a bundle
+   of fine needle strokes), which are different lengths and heights on each side. The sun's side is lit, the
+   far side and the underside of the tiers dark. It stands on a small soft shadow. Under 14 px: a cone. */
 function sugi(c, o, P, r) {
   var x = o.x, y = o.y, h = o.h, w = o.w || h * 0.3, fin = o.fin, lx = o.lx;
-  var top = y - h, foot = y - h * 0.06;
+  // The winter scene's fir (conifers.js), without snow: built branch by branch, a skirt of drooping needles on every
+  // tier with a ragged hem, lit on the sun's side, in its own shade on the other. o.lit: only the time of day's light
+  // (not the haze, which the fir applies itself, o.haze toward o.hazeCol).
+  if (typeof Conifers !== 'undefined' && h >= 8) {
+    var lit = o.lit || fin, rr = r;
+    // drawn alike on both sides on a canvas of its own, then lit across with one smooth gradient (the sun's side
+    // warm and light, the far side deep), so there is no edge down the tree where the light changes
+    var pw = Math.ceil(h * 0.5) + 8, ph = Math.ceil(h * 1.08) + 6, T = document.createElement('canvas'), res = o.res || 1;
+    T.width = Math.ceil(pw * res); T.height = Math.ceil(ph * res);
+    var tc = T.getContext('2d'); tc.setTransform(res, 0, 0, res, 0, 0);
+    Conifers.fir(tc, { x: pw / 2, y: ph - 3, h: h, seed: Math.floor(rr() * 1e6) + 1, snow: 0, droop: 1, tiers: clamp(Math.round(h / 6), 14, 36), skirt: 1.7, soften: 1,
+                       width: o.fat || 0.5, colours: { needle: lit(P.mid), trunk: lit(P.trunk), snow: [255, 255, 255] },
+                       sunDir: [lx < 0 ? -0.8 : 0.8, 0.45, 0.3], sunColour: [1.04, 1.0, 0.94], skyColour: [0.74, 0.8, 0.86], ambient: 0.95,
+                       haze: o.haze || 0, hazeColour: o.hazeCol || [246, 238, 232] });
+    var gx = lx < 0 ? 0 : pw, g2 = tc.createLinearGradient(gx, 0, pw - gx, 0), hz = clamp(o.haze || 0, 0, 0.9);
+    tc.globalCompositeOperation = 'source-atop';
+    g2.addColorStop(0, rgb(lit(P.hi), 0.30 * (1 - hz))); g2.addColorStop(0.45, rgb(lit(P.lit), 0.06)); g2.addColorStop(1, rgb(lit(P.deep), 0.38 * (1 - hz)));
+    tc.setTransform(1, 0, 0, 1, 0, 0); tc.fillStyle = g2; tc.fillRect(0, 0, T.width, T.height);
+    // the soft shadow at its foot, then the tree
+    c.fillStyle = rgb(lit([14, 22, 12]), 0.3);
+    c.beginPath(); c.ellipse(x, y, h * 0.2, Math.max(0.8, h * 0.02), 0, 0, TAU); c.fill();
+    c.drawImage(T, x - pw / 2, y - ph + 3, pw, ph);
+    return;
+  }
+  var top = y - h, foot = y - h * 0.05;
   var rust = r() < 0.3 ? 0.25 * r() : 0;                    // a few cedars turn a little rusty in autumn
   function col(k) { var cc = tone(P, k); if (rust) cc = mix(cc, P.rust, rust); return rgb(fin(cc)); }
-  // the trunk, where it shows under the lowest tier
+  // it stands on the ground: a soft shadow at its foot, and the trunk where it shows under the lowest spray
+  c.fillStyle = rgb(fin([14, 22, 12]), 0.38);
+  c.beginPath(); c.ellipse(x - lx * w * 0.05, y, w * 0.62, Math.max(0.8, h * 0.028), 0, 0, TAU); c.fill();
   c.fillStyle = rgb(fin(scale(P.trunk, 0.8)));
-  c.fillRect(x - Math.max(0.4, w * 0.035), foot - h * 0.03, Math.max(0.8, w * 0.07), y - foot + h * 0.03);
+  c.fillRect(x - Math.max(0.4, w * 0.035), foot - h * 0.04, Math.max(0.8, w * 0.07), y - foot + h * 0.04);
   if (h < 14) {                                             // too small for spray: a cone, lit on the sun's side
     c.fillStyle = col(0.3);
     c.beginPath(); c.moveTo(x, top); c.lineTo(x + w * 0.5, foot); c.lineTo(x - w * 0.5, foot); c.closePath(); c.fill();
@@ -112,54 +139,47 @@ function sugi(c, o, P, r) {
     c.beginPath(); c.moveTo(x, top); c.lineTo(x + (lx < 0 ? -1 : 1) * w * 0.5, foot); c.lineTo(x, foot); c.closePath(); c.fill();
     return;
   }
-  function hw(t) { return w * 0.5 * Math.pow(t, 0.82); }    // half the width a fraction t of the way down
-  var tiers = clamp(Math.round(h / 5.5), 7, 30), tierH = (foot - top) / tiers;
-  // the silhouette: each tier a branch that reaches out and droops, its tip lower than where it starts
-  function edge(sign) {
-    var pts = [];
-    for (var i = 0; i < tiers; i++) {
-      var t0 = i / tiers, yi = top + (foot - top) * t0, hwi = hw((i + 0.6) / tiers);
-      pts.push([x + sign * hwi * (0.62 + 0.14 * r()), yi + tierH * 0.1]);                 // where the branch leaves the stem
-      pts.push([x + sign * hwi * (1.0 + 0.16 * r()), yi + tierH * (0.85 + 0.35 * r())]);  // its drooping tip
-    }
-    return pts;
-  }
-  var L = edge(-1), R = edge(1);
-  c.beginPath(); c.moveTo(x + (r() - 0.5) * w * 0.05, top - h * 0.01);
-  for (var i = 0; i < R.length; i++) c.lineTo(R[i][0], R[i][1]);
-  c.lineTo(x + w * 0.1, foot); c.lineTo(x - w * 0.1, foot);
-  for (var j = L.length - 1; j >= 0; j--) c.lineTo(L[j][0], L[j][1]);
+  function hw(t) { return w * 0.5 * Math.pow(t, 0.85); }    // half the width a fraction t of the way down
+  var ph1 = r() * TAU, ph2 = r() * TAU;
+  // the body: a smooth cone, smaller than the tree (the sprays' tips make its edge), gently wavy
+  c.beginPath(); c.moveTo(x, top + h * 0.01);
+  var steps = clamp(Math.round(h / 4), 8, 60), i, t;
+  for (i = 1; i <= steps; i++) { t = i / steps; c.lineTo(x + hw(t) * 0.7 * (1 + 0.06 * Math.sin(t * 11 + ph1)), top + t * (foot - top)); }
+  for (i = steps; i >= 1; i--) { t = i / steps; c.lineTo(x - hw(t) * 0.7 * (1 + 0.06 * Math.sin(t * 11 + ph2)), top + t * (foot - top)); }
   c.closePath();
-  c.fillStyle = col(0.08); c.fill();                        // the dark body
+  c.fillStyle = col(0.08); c.fill();
   c.save(); c.clip();
-  // the light across the cone: the sun's side lit, the far side in its own shade
-  var g = c.createLinearGradient(x + lx * w * 0.5, 0, x - lx * w * 0.5, 0);
-  g.addColorStop(0, rgb(fin(P.lit), 0.7)); g.addColorStop(0.5, rgb(fin(P.mid), 0.28)); g.addColorStop(1, rgb(fin(P.deep), 0.5));
+  var g = c.createLinearGradient(x + lx * w * 0.4, 0, x - lx * w * 0.4, 0);
+  g.addColorStop(0, rgb(fin(P.lit), 0.55)); g.addColorStop(0.5, rgb(fin(P.mid), 0.2)); g.addColorStop(1, rgb(fin(P.deep), 0.45));
   c.fillStyle = g; c.fillRect(x - w, top - 2, w * 2, h + 4);
-  // the shade under every tier
-  c.fillStyle = rgb(fin(scale(P.deep, 0.8)), 0.45);
-  for (var q = 1; q < tiers; q++) {
-    var yq = top + (foot - top) * (q / tiers) + tierH * 0.15, hq = hw((q + 0.3) / tiers);
-    c.beginPath(); c.moveTo(x - hq * 1.1, yq + tierH * 0.8); c.quadraticCurveTo(x, yq - tierH * 0.15, x + hq * 1.1, yq + tierH * 0.8);
-    c.lineTo(x + hq * 1.1, yq + tierH * 1.0); c.quadraticCurveTo(x, yq + tierH * 0.45, x - hq * 1.1, yq + tierH * 1.0); c.closePath(); c.fill();
-  }
   c.restore();
-  // the needles: short brushed strokes drooping down and out along every spray, pale ones on the sun's side;
-  // some start at the edge and reach out past it, so the edge is feathery
-  var n = clamp(Math.round(h * w / 4.5), 30, 650), list = [];
-  for (var k = 0; k < n; k++) {
-    var t = Math.pow(r(), 0.8), u = r() * 2 - 1, px = x + u * hw(t) * 1.02, py = top + t * (foot - top);
-    var kk = litAt(u, t * 2 - 1, lx, (r() - 0.5) * 0.4) * lerp(1, 0.85, t);
-    list.push({ x: px, y: py, u: u, k: kk, len: h * lerp(0.03, 0.06, r()) });
-  }
-  list.sort(function (A, B) { return A.k - B.k; });
+  // the sprays, from the top down so each tier hangs over the one above
+  var tiers = clamp(Math.round(h / 5), 6, 44), tierH = (foot - top) / tiers;
   c.lineCap = 'round';
-  for (var m = 0; m < list.length; m++) {
-    var D = list[m];
-    c.strokeStyle = col(D.k); c.globalAlpha = 0.9; c.lineWidth = Math.max(0.5, h * 0.011);
-    c.beginPath(); c.moveTo(D.x, D.y); c.lineTo(D.x + D.u * D.len * 0.55, D.y + D.len); c.stroke();
+  c.lineWidth = Math.max(0.5, h * 0.0085);
+  for (var ti = 0; ti < tiers; ti++) {
+    for (var sd = -1; sd <= 1; sd += 2) {
+      var nSp = r() < 0.55 ? 2 : 1;
+      for (var sp = 0; sp < nSp; sp++) {
+        var yi = top + (ti + 0.2 + r() * 0.7) * tierH, tt = (yi - top) / (foot - top), reach = hw(tt) * lerp(0.9, 1.18, r());
+        if (reach < 0.8) continue;
+        var rx = x + sd * reach * 0.12, ry = yi;                                      // where it leaves the stem
+        var tx = x + sd * reach, ty = yi + tierH * lerp(0.9, 1.9, r()) * (0.6 + 0.6 * tt);   // its drooping tip
+        var cx = x + sd * reach * 0.62, cy = yi - tierH * 0.15;                        // it arches first
+        var m = clamp(Math.round(Math.hypot(tx - rx, ty - ry) / 2.6), 4, 11), spread = tierH * lerp(0.5, 0.9, r());
+        var base = litAt(sd, tt * 2 - 1, lx, 0) * lerp(1, 0.85, tt);
+        for (var q = 0; q < m; q++) {
+          var u = m > 1 ? q / (m - 1) - 0.5 : 0;
+          var ex = tx + u * spread * 0.55 * sd, ey = ty + Math.abs(u) * spread * 0.5;     // the strands fan out at the tip
+          c.strokeStyle = col(clamp(base + (r() - 0.5) * 0.35 - Math.abs(u) * 0.12, 0, 1));
+          c.beginPath(); c.moveTo(rx, ry); c.quadraticCurveTo(cx, cy + u * spread * 0.3, ex, ey); c.stroke();
+        }
+      }
+    }
   }
-  c.globalAlpha = 1;
+  // the leader at the top
+  c.strokeStyle = col(0.45); c.lineWidth = Math.max(0.6, h * 0.012);
+  c.beginPath(); c.moveTo(x, top + h * 0.04); c.lineTo(x + (r() - 0.5) * w * 0.05, top - h * 0.012); c.stroke();
 }
 
 /* 松 — Japanese red pine: a leaning, curving reddish trunk and flat

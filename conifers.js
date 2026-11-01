@@ -28,8 +28,10 @@
      sunColour, skyColour  [r, g, b] 0 … 1.5
      ambient
      haze, hazeColour
-     fir:   colours { needle, trunk, snow }, snow (0 … 2), droop (0 … 2),
-            fullness (0 … 1: how many tiers), width (0.5 … 1.5)
+     fir:   colours { needle, trunk, snow }, snow (0 … 2; 0: none, and no ring or heap at the foot), droop (0 … 2),
+            fullness (0 … 1: how many tiers), width (0.5 … 1.5),
+            tiers (a number of tiers of its own), skirt (the depth of the needles under each branch, 1 as it is),
+            soften (0 … 1: how much the sun's side and the far side blend, 0 as it is)
      frost: colours { bark, rime }, rime (0 … 2), spread (0.5 … 1.5),
             twigs (0 … 1: how finely it branches)
    ============================================================ */
@@ -74,15 +76,17 @@ function fir(c, o) {
   var C = o.colours || {}, needle = C.needle || [52, 74, 62], trunk = C.trunk || [60, 46, 42], snowC = C.snow || [252, 251, 250];
   var load = d(o, 'snow', 1), droop = d(o, 'droop', 1), full = d(o, 'fullness', 0.6), wk = d(o, 'width', 1);
   var sunSide = L[0] < 0 ? -1 : 1;                              // the side the sun is on
-  var wMax = h * 0.3 * wk, tiers = Math.round(lerp(9, 17, full));
+  var wMax = h * 0.3 * wk, tiers = o.tiers || Math.round(lerp(9, 17, full)), skirt = d(o, 'skirt', 1), soften = d(o, 'soften', 0);   // tiers, skirt: more tiers and deeper needles (no snow)
   // the trunk, mostly hidden
   c.fillStyle = rgb(S(trunk, sunSide * 0.3, 0.1, 1, 0.5));
   c.beginPath(); c.moveTo(x - h * 0.016, yb); c.lineTo(x + h * 0.016, yb); c.lineTo(x + h * 0.003, yb - h); c.lineTo(x - h * 0.003, yb - h); c.closePath(); c.fill();
   // the tree well: a soft blue hollow round the foot
-  var wg = c.createRadialGradient(x, yb, 0, x, yb, wMax * 1.2);
-  wg.addColorStop(0, rgb(S(snowC, 0, 0.6, 0.6, 0.25), 0.6)); wg.addColorStop(1, rgb(S(snowC, 0, 0.6, 0.6, 0.25), 0));
-  c.fillStyle = wg;
-  c.beginPath(); c.ellipse(x, yb, wMax * 1.2, h * 0.04, 0, 0, TAU); c.fill();
+  if (load > 0.02) {
+    var wg = c.createRadialGradient(x, yb, 0, x, yb, wMax * 1.2);
+    wg.addColorStop(0, rgb(S(snowC, 0, 0.6, 0.6, 0.25), 0.6)); wg.addColorStop(1, rgb(S(snowC, 0, 0.6, 0.6, 0.25), 0));
+    c.fillStyle = wg;
+    c.beginPath(); c.ellipse(x, yb, wMax * 1.2, h * 0.04, 0, 0, TAU); c.fill();
+  }
   // one branch: from the trunk at (x, y) out to side s (-1 / 1), length len; k: 0 behind … 1 in front
   function branch(y, s, len, k, tierT) {
     var sag = len * (0.18 + 0.22 * droop) * lerp(0.7, 1.2, r());
@@ -91,10 +95,11 @@ function fir(c, o) {
       var u = i / n;
       top.push([x + s * len * u, y - len * 0.06 * Math.sin(PI * u * 0.8) + sag * u * u]);
     }
-    var thick = len * lerp(0.36, 0.5, r()) * (0.7 + 0.3 * tierT);
+    var thick = len * lerp(0.36, 0.5, r()) * (0.7 + 0.3 * tierT) * skirt;
     var lit = s === sunSide;                                     // this branch is on the sunny side
     var occ = lit ? lerp(0.75, 1, k) : lerp(0.1, 0.3, k);        // how much sun reaches its needles
-    var nc = S(needle, s * 0.6, 0.15, 0.7, occ);
+    if (soften > 0) occ = lerp(occ, 0.8, soften);                 // without snow to hide it, the two sides are alike (at 1, the same: no split down the trunk)
+    var nc = S(needle, s * 0.6 * (1 - 0.9 * soften), 0.15 + 0.25 * soften, 0.7 + 0.2 * soften, occ);     // soften: each branch faces toward you, so both sides get the same light
     // the needles hanging from it, the hem ragged
     c.fillStyle = rgb(nc);
     c.beginPath(); c.moveTo(top[0][0], top[0][1]);
@@ -184,10 +189,12 @@ function fir(c, o) {
     c.quadraticCurveTo(tx, ty + h * 0.075, tx - cw * 1.1, ty + h * 0.055); c.quadraticCurveTo(tx - cw, ty + h * 0.02, tx, ty - h * 0.025); c.fill();
   }
   // a heap of snow at its foot, over the lowest needles
-  var fg = c.createLinearGradient(0, yb - h * 0.03, 0, yb + h * 0.02);
-  fg.addColorStop(0, rgb(S(snowC, 0, 1, 0.3, 0.8))); fg.addColorStop(1, rgb(S(snowC, 0, 0.2, 1, 0.6)));
-  c.fillStyle = fg;
-  c.beginPath(); c.ellipse(x, yb, wMax * 0.95, h * 0.028, 0, PI, TAU); c.closePath(); c.fill();
+  if (load > 0.02) {
+    var fg = c.createLinearGradient(0, yb - h * 0.03, 0, yb + h * 0.02);
+    fg.addColorStop(0, rgb(S(snowC, 0, 1, 0.3, 0.8))); fg.addColorStop(1, rgb(S(snowC, 0, 0.2, 1, 0.6)));
+    c.fillStyle = fg;
+    c.beginPath(); c.ellipse(x, yb, wMax * 0.95, h * 0.028, 0, PI, TAU); c.closePath(); c.fill();
+  }
   return yb - h * 1.04;
 }
 
