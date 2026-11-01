@@ -2506,15 +2506,15 @@ function drawFuji(c, C, hy) {
    stems (one curve and one baked plume each).
    ============================================================ */
 var LK_DEFAULTS = {
-  horizon: 0.76,             // low enough that every torii (and the far shore) stands below the text on the tablet
+  horizon: 0.8,              // low enough that every torii stands below the text, the 次へ button and the page dots on the tablet
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 29, pathX: 0.3, pathY: 0.768, gateEndX: 0.735, gateEndY: 0.88,
+  gates: 29, pathX: 0.3, pathY: 0.808, gateEndX: 0.735, gateEndY: 0.9,
   // the water
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
   farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
-  nearBank: 0.92, floating: 1,
+  nearBank: 0.95, floating: 1,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
@@ -2523,13 +2523,13 @@ var LK_DEFAULTS = {
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
   bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 1.3, bankIn: 1,
   // the water torii
-  waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
+  waterTorii: true, wtX: 0.43, wtY: 0.818, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab21';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab22';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -6736,6 +6736,17 @@ window.lakeLab = {
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
   gates: G, lanterns: L, resetLanternsGates: function () { resetLanternsGates(); },
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
+  // the highest point of the gates on the screen between x0 and x1 (CSS px), for checking what they stand behind
+  gatesTop: function (x0, x1) {
+    var path = buildGatePath(), gap = Math.max(0.05, path.len / Math.max(1, G.count - 1)), F = lensF(), hy = H * V.horizon, h = G.gateHeight, top = 1e9;
+    for (var sg = path.len; sg >= -1e-6; sg -= gap) {
+      var g = pathAt(path, Math.max(0, sg)), hw = G.width * h / 2 + G.overhang * h;
+      var xa = W / 2 + F * (g.x - hw) / g.z, xb = W / 2 + F * (g.x + hw) / g.z;
+      if (xb < x0 || xa > x1) continue;
+      top = Math.min(top, hy + F / g.z - h * F / g.z);
+    }
+    return Math.round(top);
+  },
   waterState: function () { return typeof Water === 'undefined' ? 'none' : Water.state(); },
   waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
   info: function () {
