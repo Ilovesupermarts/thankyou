@@ -13,7 +13,6 @@
 <link rel="stylesheet" href="main.css">
 <script src="mountains.js"></script>
 <script src="trunks.js"></script>
-<script src="conifers.js"></script>
 <script src="lakeside.js"></script>
 <script src="water.js"></script>
 
@@ -2532,7 +2531,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab25';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab26';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2711,9 +2710,8 @@ function drawFarShore(c) {
     if (n < 0.12) kind = 'sugi';
     else { kind = 'blob'; pal = vnoise(xx / W * 13 + 3, 6) > 0 ? Lakeside.PAL.ginkgo : null; }       // gold, never red or orange behind the gates
     var h = unit * lerp(1.2, 3.2, r()) * (kind === 'sugi' ? 1.2 : 0.9) * (1 + 0.5 * Math.max(0, vnoise(xx / W * 4, 9)));
-    Lakeside.tree(c, kind, { x: xx, y: yf + 0.5, h: h, w: kind === 'sugi' ? h * 0.32 : h * 0.8, seed: Math.round(xx * 7 + 13), lx: -0.7, fin: fin, pal: pal,
-                              lit: light, haze: 0.4, hazeCol: light(hex(V.colours.mist)), res: SR });
-    xx += h * (kind === 'sugi' ? lerp(0.08, 0.2, r()) : lerp(0.2, 0.4, r()));
+    Lakeside.tree(c, kind, { x: xx, y: yf + 0.5, h: h, w: kind === 'sugi' ? h * 0.42 : h * 0.8, seed: Math.round(xx * 7 + 13), lx: -0.7, fin: fin, pal: pal });
+    xx += h * (kind === 'sugi' ? lerp(0.14, 0.3, r()) : lerp(0.2, 0.4, r()));
   }
 }
 
@@ -2809,7 +2807,7 @@ function bakeHead(path) {
       }
       if (Math.abs(xx - px) < LK.pagodaSize * H * 0.2 && f > fp - 0.2 && f <= fp && kind === 'sugi') h *= 0.8;
       rowT.push({ x: xx, base: base, h: h, kind: kind, pal: pal, draw: LK.forest > r() * 1.0 + 0.001, seed: Math.round(xx * 31 + row * 977) });
-      xx += h * (kind === 'sugi' ? lerp(0.16, 0.26, r()) : lerp(0.35, 0.5, r())) / Math.max(0.3, LK.forest);
+      xx += h * (kind === 'sugi' ? lerp(0.24, 0.36, r()) : lerp(0.35, 0.5, r())) / Math.max(0.3, LK.forest);
     }
     // no cedar stands alone: a run of fewer than three cedars becomes ginkgo, so every cedar is in a grove
     for (var ri = 0; ri < rowT.length; ri++) {
@@ -2819,8 +2817,7 @@ function bakeHead(path) {
       ri = rj;
     }
     rowT.forEach(function (T) {
-      if (T.draw) Lakeside.tree(c, T.kind, { x: T.x, y: T.base, h: T.h, seed: T.seed, lx: -0.7, fin: fin, pal: T.pal,
-                                              lit: light, haze: haze, hazeCol: light(hex(V.colours.mist)), res: SR });
+      if (T.draw) Lakeside.tree(c, T.kind, { x: T.x, y: T.base, h: T.h, seed: T.seed, lx: -0.7, fin: fin, pal: T.pal });
     });
   }
   // the bank at the water: a strip of moss and stones
@@ -2884,7 +2881,7 @@ function bakeGrove(path) {
   list.forEach(function (T) {
     var haze = clamp(0.08 + T.z / 120, 0, 0.4), kind = T.kind === 'kaede' ? 'momiji' : T.kind;
     Lakeside.tree(c, kind, { x: T.x, y: T.y, h: T.h, seed: T.seed, lx: -0.7, fin: finish(haze),
-                              pal: T.kind === 'kaede' ? Lakeside.PAL.kaede : null, lit: light, haze: haze, hazeCol: light(hex(V.colours.mist)), res: SR });
+                              pal: T.kind === 'kaede' ? Lakeside.PAL.kaede : null });
   });
 }
 
