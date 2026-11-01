@@ -2512,7 +2512,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab19';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab20';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2522,7 +2522,32 @@ try {
   }
 } catch (e) { /* private window: the defaults */ }
 V.horizon = LK.horizon;
-function saveLake() { try { localStorage.setItem(LK_KEY, JSON.stringify(LK)); } catch (e) { /* silent */ } }
+var LANT_KEYS = ['every', 'leftAlong', 'leftFromEdge', 'rightAlong', 'rightFromEdge', 'size', 'roof', 'box', 'pillar', 'sides',
+                 'focusDepth', 'blurNear', 'blurFar', 'hazeNear', 'hazeFar'];
+var GATE_KEYS = ['focusDepth', 'blurNear', 'blurFar', 'hazeNear', 'hazeFar'];
+var LANT_DEF = {}, GATE_DEF = {};
+LANT_KEYS.forEach(function (k) { LANT_DEF[k] = L[k]; });
+GATE_KEYS.forEach(function (k) { GATE_DEF[k] = G[k]; });
+try {
+  var savedLG = JSON.parse(localStorage.getItem(LK_KEY + '-lg') || 'null');
+  if (savedLG) {
+    LANT_KEYS.forEach(function (k) { if (savedLG.lant && typeof savedLG.lant[k] === 'number') L[k] = savedLG.lant[k]; });
+    GATE_KEYS.forEach(function (k) { if (savedLG.gate && typeof savedLG.gate[k] === 'number') G[k] = savedLG.gate[k]; });
+  }
+} catch (e) { /* private window: the defaults */ }
+function saveLake() {
+  try {
+    localStorage.setItem(LK_KEY, JSON.stringify(LK));
+    var lg = { lant: {}, gate: {} };
+    LANT_KEYS.forEach(function (k) { lg.lant[k] = L[k]; });
+    GATE_KEYS.forEach(function (k) { lg.gate[k] = G[k]; });
+    localStorage.setItem(LK_KEY + '-lg', JSON.stringify(lg));
+  } catch (e) { /* silent */ }
+}
+function resetLanternsGates() {
+  LANT_KEYS.forEach(function (k) { L[k] = LANT_DEF[k]; });
+  GATE_KEYS.forEach(function (k) { G[k] = GATE_DEF[k]; });
+}
 var waterRows = 0, lakeDirty = false, lakeChangedAt = -1, lakeMs = { head: 0, water: 0, ground: 0, fore: 0 }, lakeFrameMs = 0;
 
 var HEADC = mk(), headBox = null, headAxis = 0;     // the headland (and the grove), and where its reflection turns over
@@ -2664,7 +2689,7 @@ function drawFarShore(c) {
     var n = vnoise(xx / W * 9, 5), kind, pal;
     var pick = r();
     if (pick < 0.66) { kind = 'sugi'; pal = null; }
-    else if (pick < 0.86) { kind = 'blob'; pal = n > 0.1 ? Lakeside.PAL.ginkgo : Lakeside.PAL.kaede; }
+    else if (pick < 0.86) { kind = 'blob'; pal = Lakeside.PAL.ginkgo; }        // gold, never red or orange behind the gates
     else { kind = 'blob'; pal = null; }
     var h = unit * lerp(1.2, 3.2, r()) * (kind === 'sugi' ? 1.2 : 0.9) * (1 + 0.5 * Math.max(0, vnoise(xx / W * 4, 9)));
     Lakeside.tree(c, kind, { x: xx, y: yf + 0.5, h: h, w: kind === 'sugi' ? h * 0.32 : h * 0.8, seed: Math.round(xx * 7 + 13), lx: -0.7, fin: fin, pal: pal });
@@ -2855,11 +2880,13 @@ function bakeBank(path) {
     var sp = toScreen(gx, 0, gz);
     if (sp[0] > W + 60) break;
     var kind = k % 2 ? 'momiji' : 'ginkgo';                                               // always the same two, one after the other
+    var evergreen = k % 2 === 1;                                                          // gold ginkgo and deep green, never red behind the vermilion gates
     var h = LK.bankH * F / gz * LK.treeSize;                                              // the same height in the world: smaller the further away
     var cw = Math.ceil(h * 1.5), chh = Math.ceil(h * 1.1) + 6, T = mk();
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (k % 2) * 13, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), stout: true });
+    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (k % 2) * 13, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), stout: true,
+                               pal: evergreen ? Lakeside.PAL.blob : null });
     // placed by the middle of its crown (the trees are not quite symmetrical), so the crowns are the same distance apart
     var px = T.c.getImageData(0, 0, T.cnv.width, Math.round((chh * 0.75) * PR)).data, sum = 0, cnt = 0, wpx = T.cnv.width;
     for (var iy = 0; iy < px.length / 4 / wpx; iy++) for (var ix = 0; ix < wpx; ix++) { var al = px[(iy * wpx + ix) * 4 + 3]; if (al > 40) { sum += ix * al; cnt += al; } }
@@ -6690,7 +6717,7 @@ window.mtnLab = {
 window.lakeLab = {
   values: LK, defaults: LK_DEFAULTS,
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
-  gates: G, lanterns: L,
+  gates: G, lanterns: L, resetLanternsGates: function () { resetLanternsGates(); },
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
   // how many of the lanterns big enough to read (14 px tall and up) are seen inside the opening of a nearer gate
   // (between its pillars, under its beams), which looks as if they stood on the path: [water side, land side, of]
@@ -7149,10 +7176,15 @@ var DOF_CTLS = [
 ];
 var LANT_CTLS = [
   { k: 'every', label: 'A pair of lanterns in every … gap', min: 1, max: 6, step: 1, note: '1 = in every gap between two gates.' },
-  { k: 'leftAlong', label: 'Land side: place in the gap', min: 0, max: 1, step: 0.01, note: '0 by the further gate, 1 by the nearer one. The row seen behind the gates stands just behind the nearer gate (0.89), so it is never seen inside a gate.' },
-  { k: 'rightAlong', label: 'Water side: place in the gap', min: 0, max: 1, step: 0.01 },
-  { k: 'leftFromEdge', label: 'Land side: from the gravel', min: 0, max: 2, step: 0.05, note: '× a lantern\'s height (as in the app: 0.3).' },
-  { k: 'rightFromEdge', label: 'Water side: from the gravel', min: 0, max: 2, step: 0.05 }
+  { k: 'leftAlong', label: 'Land side: place in the gap', min: 0, max: 1, step: 0.005, note: '0 by the further gate, 1 by the nearer one. At 0.89 the row seen behind the gates stands just behind the nearer gate, so it is never seen inside a gate.' },
+  { k: 'leftFromEdge', label: 'Land side: from the gravel', min: 0, max: 3, step: 0.01, note: '× a lantern\'s height.' },
+  { k: 'rightAlong', label: 'Water side: place in the gap', min: 0, max: 1, step: 0.005 },
+  { k: 'rightFromEdge', label: 'Water side: from the gravel', min: 0, max: 3, step: 0.01 },
+  { k: 'size', label: 'Lantern height', min: 0.2, max: 1.5, step: 0.01, group: 'The lantern', note: 'In eye heights (a gate is ' + klab.gates.gateHeight + ').' },
+  { k: 'roof', label: 'Roof width', min: 0.15, max: 0.45, step: 0.005, note: 'Half its width, × the lantern\'s height.' },
+  { k: 'box', label: 'Light box width', min: 0.06, max: 0.16, step: 0.005 },
+  { k: 'pillar', label: 'Pillar thickness', min: 0.04, max: 0.12, step: 0.005 },
+  { k: 'sides', label: 'Sides', min: 4, max: 8, step: 2, note: '4 square, 6 hexagonal, 8 octagonal.' }
 ];
 var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
                      ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
@@ -7264,10 +7296,11 @@ function build() {
   if (page === 'lake') {
     LAKE_CTLS.forEach(function (c) { slider(c, KV, function () { klab.changed(); }); });
     var gt = document.createElement('h4'); gt.textContent = 'Torii: depth of field'; host.appendChild(gt);
-    DOF_CTLS.forEach(function (c) { slider(c, klab.gates, function () { klab.regate(); }); });
-    var gl2 = document.createElement('h4'); gl2.textContent = 'Stone lanterns: depth of field'; host.appendChild(gl2);
-    LANT_CTLS.forEach(function (c) { slider(c, klab.lanterns, function () { klab.regate(); }); });
-    DOF_CTLS.forEach(function (c) { slider(c, klab.lanterns, function () { klab.regate(); }); });
+    DOF_CTLS.forEach(function (c) { slider(c, klab.gates, function () { klab.changed(); }); });
+    var gl2 = document.createElement('h4'); gl2.textContent = 'Stone lanterns: where they stand'; host.appendChild(gl2);
+    LANT_CTLS.forEach(function (c) { slider(c, klab.lanterns, function () { klab.changed(); }); });
+    var gl3 = document.createElement('h4'); gl3.textContent = 'Stone lanterns: depth of field'; host.appendChild(gl3);
+    DOF_CTLS.forEach(function (c) { slider(c, klab.lanterns, function () { klab.changed(); }); });
     var gs = document.createElement('h4'); gs.textContent = 'Show'; host.appendChild(gs);
     LAKE_SWITCHES.forEach(function (sw) {
       var row = document.createElement('label'); row.className = 'sp-colour'; row.textContent = sw[1];
@@ -7320,6 +7353,7 @@ document.getElementById('spReset').addEventListener('click', function () {
   if (page === 'lake') {
     var DK = JSON.parse(JSON.stringify(klab.defaults));
     for (var kk in DK) KV[kk] = DK[kk];
+    klab.resetLanternsGates();
     klab.changed(); build();
     return;
   }
