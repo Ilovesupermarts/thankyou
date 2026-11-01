@@ -809,7 +809,8 @@ function buildTree(far) {
     top = Math.min(top, nn.ey - Cc.R); bot = Math.max(bot, nn.ey + Cc.R);
   });
   T.cx = sx2 / nC; T.cy = sy2 / nC; T.cr = Math.max(40, (bot - top) * 0.75);
-  addPerch(T, r);
+  // (no owl on this page, so no perching branch: addPerch(T, r) is left out; the spring it set up stays at rest)
+  T.pb = 0; T.pbV = 0;
   buildTrunk(T);
   return T;
 }
