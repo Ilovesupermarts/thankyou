@@ -2506,15 +2506,17 @@ function drawFuji(c, C, hy) {
    stems (one curve and one baked plume each).
    ============================================================ */
 var LK_DEFAULTS = {
-  horizon: 0.8,              // low enough that every torii stands below the text, the 次へ button and the page dots on the tablet
+  horizon: 0.76,             // low enough that every torii stands below the text on the tablet
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 29, pathX: 0.3, pathY: 0.808, gateEndX: 0.735, gateEndY: 0.9,
+  gates: 29, pathX: 0.3, pathY: 0.768, gateEndX: 0.735, gateEndY: 0.88,
   // the water
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
   farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
-  nearBank: 0.95, floating: 1,
+  nearBank: 0.92, floating: 1,
+  // the swipe button (次へ) and the page dots, as a group: how far down the page its middle is (a share of the page's height)
+  navY: 0.86,
   // the headland and its forest (near you now, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
@@ -2523,13 +2525,13 @@ var LK_DEFAULTS = {
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
   bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 1.3, bankIn: 1,
   // the water torii
-  waterTorii: true, wtX: 0.43, wtY: 0.818, wtSize: 1.35,
+  waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab22';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab23';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -6734,6 +6736,7 @@ window.mtnLab = {
 window.lakeLab = {
   values: LK, defaults: LK_DEFAULTS,
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
+  nav: function () { applyNav(); },
   gates: G, lanterns: L, resetLanternsGates: function () { resetLanternsGates(); },
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
   // the highest point of the gates on the screen between x0 and x1 (CSS px), for checking what they stand behind
@@ -6781,9 +6784,20 @@ window.birdLab = {
 /* ============================================================
    11. FRAME
    ============================================================ */
+/* The swipe button and the page dots as one group: the button's middle at LK.navY of the page's height, the dots
+   33 px below it (as they are in the app). */
+function applyNav() {
+  var st = document.getElementById('stage'), nd = document.getElementById('navDemo'), dt = document.getElementById('dots');
+  if (!st || !nd || !dt) return;
+  var top = st.getBoundingClientRect().top, mid = LK.navY * innerHeight - top;
+  nd.style.top = (mid - nd.offsetHeight / 2) + 'px';
+  dt.style.bottom = 'auto';
+  dt.style.top = (mid + 33 - dt.offsetHeight / 2) + 'px';
+}
 function resize() {
   W = window.innerWidth; H = window.innerHeight;
   V.horizon = LK.horizon;
+  applyNav();
   lakePath();
   PR = Math.min(window.devicePixelRatio || 1, 2.5) * 0.75;   // the app renders at 0.75
   SR = PR * (MT.style === '3d' ? MT.resolution : SCN_RES);   // the 3D mountains are sharp, so they are baked finer
@@ -7084,6 +7098,8 @@ function place() {
   demo.style.top = (low + 18) + 'px';
   dotsEl.style.top = (low + 18 + demo.offsetHeight + S.gap) + 'px';
   dotsEl.style.bottom = 'auto';
+  // on the lake page the group stands where the Lake panel puts it (LK.navY), not under the text
+  if (window.lakeLab && window.lakeLab.nav) window.lakeLab.nav();
 }
 function go(i) {
   cur = (i + N) % N;
@@ -7138,6 +7154,7 @@ var LAKE_CTLS = [
   { k: 'gateEndX', label: 'Nearest torii: across', min: 0.3, max: 0.9, step: 0.005 },
   { k: 'pathX', label: 'Line starts at (across)', min: 0.05, max: 0.7, step: 0.005, note: 'Far away, by the headland\'s tip.' },
   { k: 'pathY', label: 'Line starts at (down)', min: 0.6, max: 0.85, step: 0.002, note: 'Nearer the eye line = further away.' },
+  { k: 'navY', label: 'Swipe button and dots: how far down', min: 0.6, max: 0.98, step: 0.005, group: 'The swipe button (次へ) and page dots', note: 'The middle of the button, as a share of the page\'s height; the dots stand just under it.' },
   { k: 'horizon', label: 'Eye line', min: 0.55, max: 0.9, step: 0.01, group: 'The view', note: 'Where the far shore meets the sky, as a fraction of the screen height. Lower on the screen = a smaller lake.' },
   { k: 'nearBank', label: 'Near bank', min: 0.78, max: 0.98, step: 0.005, note: 'Where the bank along the bottom starts. Higher up = a smaller lake.' },
   { k: 'reflect', label: 'Reflections', min: 0, max: 1, step: 0.01, group: 'The water', note: 'How clearly the lake mirrors the sky, the mountains, the headland and the gates.' },
