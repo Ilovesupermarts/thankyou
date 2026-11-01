@@ -487,7 +487,7 @@ var LDEF = {
   timeOfDay: 'night',
   show: true,
   // where they stand
-  every: 1, side: 'both', rightAlong: 0.65, rightFromEdge: 0.3, leftAlong: 0.5, leftFromEdge: 0.3,      // a pair in every gap between two gates
+  every: 1, fromEdge: 0.75,      // a pair in every gap, halfway between the gates; fromEdge: the gap from the gravel to a lantern (× its height)
   // the lantern
   size: 0.58, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
   moss: 0.53, variety: 0.78, roofLeaves: 1.75, colours: clone(LANTERN_COLOURS),
@@ -1667,66 +1667,22 @@ function lanternPieces(lod, rs) {
 /* Where the lanterns stand: in the gaps between the gates (every L.every
    gap), beside the path, just off the gravel. Each side has its own place
    in the gap (L.rightAlong, L.leftAlong) and its own gap from the gravel. */
+function lanternOff() {          // from the middle of the path to the middle of a lantern (the same for every lantern)
+  var h = G.gateHeight, wu = (G.width * h / 2 + G.pillar * h * 1.5) * G.pathWidth;
+  return wu + L.fromEdge * L.size + L.box * L.size * 1.9;
+}
+/* One lantern on each side of the path, exactly halfway between two gates, every one the same distance from
+   the path (lanternOff). Every L.every-th gap (1: every gap). Nothing else. */
 function placeLanterns(path, gap) {
   var out = [];
   if (!L.show || !path || path.len <= 0) return out;
-  var h = G.gateHeight, wu = (G.width * h / 2 + G.pillar * h * 1.5) * G.pathWidth;
-  var F = lensF(), hy = H * V.horizon, pillars = [], gatesR = [], placed = [];
-  // every gate on the screen: its two pillars [left, top, right, bottom, depth], and the whole gate (with its depth)
-  for (var sg = path.len; sg >= -1e-6; sg -= gap) {
-    var g = pathAt(path, Math.max(0, sg));
-    if (g.z < 0.6) continue;
-    var gr = [1e9, 1e9, -1e9, -1e9, g.z];
-    [-1, 1].forEach(function (pd) {
-      var pz = g.z + g.tx * (G.width * h / 2) * pd, px = g.x - g.tz * (G.width * h / 2) * pd;
-      if (pz < 0.6) return;
-      var sx = W / 2 + F * px / pz, foot = hy + F / pz, ph = h * F / pz, pr = G.pillar * h * 0.65 * F / pz + 1.5;
-      var R = [sx - pr, foot - ph, sx + pr, foot + 1, pz];
-      pillars.push(R);
-      gr = [Math.min(gr[0], R[0] - G.overhang * h * F / pz), Math.min(gr[1], R[1]), Math.max(gr[2], R[2] + G.overhang * h * F / pz), Math.max(gr[3], R[3]), g.z];
-    });
-    if (gr[2] > gr[0]) gatesR.push(gr);
-  }
-  function lanternClear(c) {
-    if (c.z < 0.6) return false;
-    var sx = W / 2 + F * c.x / c.z, foot = hy + F / c.z, lh = L.size * F / c.z;
-    if (lh < 14) return true;                                         // far away and small: in its place (they crowd there, as real ones do)
-    if (landLo && !inLand(sx, foot - 1)) return false;                // not in the water
-    var hw = L.roof * L.size * F / c.z * 1.1 + 1.5, box = [sx - hw, foot - lh, sx + hw, foot];
-    function hit(R) { return box[2] > R[0] && box[0] < R[2] && box[3] > R[1] && box[1] < R[3]; }
-    // not seen through or behind a gate nearer to you (it would look as if it stood on the path, or on the gate)
-    for (var j = 0; j < gatesR.length; j++) if (gatesR[j][4] < c.z && hit(gatesR[j])) return false;
-    // and not over the pillars of the gates behind it, nor over another lantern
-    for (var i = 0; i < pillars.length; i++) if (hit(pillars[i])) return false;
-    for (var m = 0; m < placed.length; m++) if (hit(placed[m])) return false;
-    c.box = box;
-    return true;
-  }
-  var every = Math.max(1, Math.round(L.every)), k = 0;
+  var every = Math.max(1, Math.round(L.every)), k = 0, off = lanternOff();
   for (var s = path.len - gap; s > -1e-6; s -= gap, k++) {          // s: the gate at the start of this gap (further from you)
     if (k % every) continue;
-    var sides;
-    // right as you walk toward the gate facing you is (tz, -tx); the gates' across direction (ax, az) is the left
-    if (L.side === 'both') sides = [-1, 1];
-    else if (L.side === 'alternate') sides = [(k / every) % 2 ? 1 : -1];
-    else sides = [L.side === 'left' ? 1 : -1];
-    sides.forEach(function (sd) {
-      var right = sd < 0, along = right ? L.rightAlong : L.leftAlong;
-      // from the middle of the path to the middle of the lantern
-      var off0 = wu + (right ? L.rightFromEdge : L.leftFromEdge) * L.size + L.box * L.size * 1.9;
-      // it must stand clear of every gate's pillars on the screen (one just behind a pillar looks as if it stood on
-      // the gate): if it would overlap one, it moves out from the path a little, or along its gap, but stays on land
-      var alongs = [along, 0.5, 0.35, 0.65, 0.2, 0.8, 0.1, 0.9], pick = null;
-      for (var ai = 0; ai < alongs.length && !pick; ai++) {
-        for (var ei = 0; ei < 11 && !pick; ei++) {
-          var off = off0 + ei * 0.15 * L.size, q = pathAt(path, clamp(s + alongs[ai] * gap, 0, path.len));
-          var cand = { x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
-                       seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 };
-          if (lanternClear(cand)) pick = cand;
-        }
-      }
-      // no clear place in this gap (the gates crowd it on the screen): left out rather than put where it looks wrong
-      if (pick) { out.push(pick); if (pick.box) placed.push(pick.box); }
+    var q = pathAt(path, clamp(s + 0.5 * gap, 0, path.len));
+    [-1, 1].forEach(function (sd) {
+      out.push({ x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
+                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 });
     });
   }
   return out;
@@ -2546,7 +2502,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab17';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab18';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2614,8 +2570,9 @@ function buildLand() {
   var zExit = F / Math.max(8, (1.1 - V.horizon) * H), endQ = pathAt(path, len);
   // across the path: the near (left, the basin) side stays close to the gravel, so the gates stand
   // at the water's edge; the far side widens in the middle for the grove
-  function kL(s) { var u = s / len; return wu * (1.5 + 0.35 * vnoise(u * 7, 11) + 0.18 * vnoise(u * 23, 12) + 0.07 * vnoise(u * 71, 13) + 0.6 * u); }
-  function kR(s) { var u = s / len; return wu * (1.7 + 0.3 * vnoise(u * 6, 23) + 0.16 * vnoise(u * 21, 24) + 0.06 * vnoise(u * 67, 25) + (LK.grove ? 5.2 * Math.exp(-Math.pow((u - 0.45) / 0.17, 2)) : 1.2 * Math.exp(-Math.pow((u - 0.5) / 0.2, 2)))); }
+  var keepL = lanternOff() + L.size * 0.6;                       // the lanterns stand on ground, well back from the water
+  function kL(s) { var u = s / len; return Math.max(keepL, wu * (1.5 + 0.35 * vnoise(u * 7, 11) + 0.18 * vnoise(u * 23, 12) + 0.07 * vnoise(u * 71, 13) + 0.6 * u)) + wu * 0.25 * vnoise(u * 9, 14); }
+  function kR(s) { var u = s / len; return Math.max(keepL, wu * (1.7 + 0.3 * vnoise(u * 6, 23) + 0.16 * vnoise(u * 21, 24) + 0.06 * vnoise(u * 67, 25) + (LK.grove ? 5.2 * Math.exp(-Math.pow((u - 0.45) / 0.17, 2)) : 1.2 * Math.exp(-Math.pow((u - 0.5) / 0.2, 2))))) + wu * 0.25 * vnoise(u * 9, 24); }
   var N = 240, left = [], right = [];
   for (var i = 0; i <= N; i++) {
     var s = len * i / N;
@@ -3191,7 +3148,7 @@ function bakeFore(path) {
     placeLanterns(path, gap2).forEach(function (Lp) {
       if (Lp.z < 0.6) return;
       var f3 = toScreen(Lp.x, 0, Lp.z), lpx = L.size * F / Lp.z;
-      keepOut.push([f3[0] - lpx * 0.25, f3[1] - lpx * 0.5, f3[0] + lpx * 0.25, f3[1] + 4]);
+      keepOut.push([f3[0] - lpx * 0.5, f3[1] - lpx * 0.5, f3[0] + lpx * 0.5, f3[1] + 4]);
     });
   })();
   // mossy rocks on the shore
@@ -3204,6 +3161,7 @@ function bakeFore(path) {
       if (prev) acc += Math.hypot(gq2.x - prev.x, gq2.z - prev.z);
       prev = gq2;
       if (acc < next || gq2.z > 40) continue;
+      if (fromPath(gq2.x, gq2.z) < lanternOff() + L.size * 1.2) continue;   // no stones along the line of gates and lanterns
       acc = 0; next = lerp(1.2, 5, r()) / LK.rocks;
       var group = r() < 0.4 ? 2 + Math.floor(r() * 2) : 1;
       for (var gi = 0; gi < group; gi++) {
@@ -7159,8 +7117,7 @@ var DOF_CTLS = [
 ];
 var LANT_CTLS = [
   { k: 'every', label: 'A pair of lanterns in every … gap', min: 1, max: 6, step: 1, note: '1 = in every gap between two gates.' },
-  { k: 'leftAlong', label: 'Water side: place in the gap', min: 0, max: 1, step: 0.05, note: '0 by the further gate, 1 by the nearer one, 0.5 in the middle.' },
-  { k: 'rightAlong', label: 'Land side: place in the gap', min: 0, max: 1, step: 0.05 }
+  { k: 'fromEdge', label: 'Distance from the gravel', min: 0, max: 2, step: 0.05, note: 'The same for every lantern, on both sides (× a lantern\'s height). Each stands halfway between two gates.' }
 ];
 var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
                      ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
