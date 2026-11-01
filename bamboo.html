@@ -2524,7 +2524,7 @@ var LK_DEFAULTS = {
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: false,
   // the cedars (杉, drawn by lakeside.js): stacked tiers of foliage, each hanging over the one below
   cdTiers: 7, cdWidth: 0.5, cdHeight: 1, cdCurve: 0.5, cdScallop: 1, cdRagged: 0.6, cdShade: 0.7, cdLight: 0.8, cdSpecks: 1.2,
-  cdOutline: 0.5, cdTrunk: 0.07, cdVariety: 0.6, cdRust: 0.3,
+  cdLine: 0, cdTrunk: 0.07, cdVariety: 0.6, cdRust: 0.3,
   // the trees on the right bank: planted ON the bank (the water's edge on the right), the same distance apart
   // along it (bankGap, in eye heights, measured on the ground), all the same height in the world (bankH, in eye
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
@@ -2705,7 +2705,7 @@ function buildLand() {
 function cedarLook() {
   var C = LK.colours;
   Lakeside.sugiLook({ tiers: LK.cdTiers, width: LK.cdWidth, curve: LK.cdCurve, scallop: LK.cdScallop, ragged: LK.cdRagged, shade: LK.cdShade,
-                      light: LK.cdLight, specks: LK.cdSpecks, outline: LK.cdOutline, trunk: LK.cdTrunk, variety: LK.cdVariety,
+                      light: LK.cdLight, specks: LK.cdSpecks, outline: LK.cdLine, trunk: LK.cdTrunk, variety: LK.cdVariety,
                       rust: LK.cdRust,
                       colours: { deep: C.cedarDeep, mid: C.cedarMid, lit: C.cedarLit, hi: C.cedarHi, trunk: C.cedarTrunk } });
 }
@@ -2818,7 +2818,8 @@ function bakeHead(path) {
       // a clearing in front of the pagoda, so it shows to its foot
       if (LK.pagoda && f > fp && Math.abs(xx - px) < LK.pagodaSize * H * 0.5) h *= lerp(0.28, 0.45, r());
       if (Math.abs(xx - px) < LK.pagodaSize * H * 0.2 && f > fp - 0.2 && f <= fp && kind === 'sugi') h *= 0.8;
-      if (LK.forest > r() * 1.0 + 0.001) {
+      // no pines in the two front rows: a lone thin pine trunk there stood in front of the cedars
+      if (LK.forest > r() * 1.0 + 0.001 && !(kind === 'matsu' && row >= rows - 2)) {
         Lakeside.tree(c, kind, { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal, lean: kind === 'matsu' ? 0.3 : 0 });
       }
       xx += h * (kind === 'sugi' ? lerp(0.16, 0.26, r()) : kind === 'matsu' ? lerp(0.35, 0.55, r()) : lerp(0.35, 0.5, r())) / Math.max(0.3, LK.forest);
@@ -7200,7 +7201,7 @@ var LAKE_CTLS = [
   { k: 'cdShade', label: 'Dark underside', min: 0, max: 1.5, step: 0.05, note: 'How wide the dark band is along the lower edge and down the shaded side of each tier, and the shadow it casts on the tier below.' },
   { k: 'cdLight', label: 'Lighter area', min: 0, max: 1.5, step: 0.05, note: 'The lighter green on the side toward the light.' },
   { k: 'cdSpecks', label: 'Bright patches and dots', min: 0, max: 3, step: 0.05, note: 'The bright wavy patches and dots in the lighter area (on the nearer, larger cedars).' },
-  { k: 'cdOutline', label: 'Outline', min: 0, max: 1.5, step: 0.05, note: 'The thin, very dark line round each tier.' },
+  { k: 'cdLine', label: 'Dark outline', min: 0, max: 1.5, step: 0.05, note: 'A thin, very dark line round each tier. 0 = none.' },
   { k: 'cdTrunk', label: 'Trunk showing', min: 0, max: 0.2, step: 0.005, note: '× the tree\'s height, under the lowest tier.' },
   { k: 'cdVariety', label: 'Variety', min: 0, max: 1, step: 0.01, note: 'How much one cedar differs from the next: the number and height of its tiers, its width, its lean. Every cedar is made from its own seed, so no two are the same.' },
   { k: 'cdRust', label: 'Rusty cedars', min: 0, max: 1, step: 0.01, note: 'The share of cedars turned a little rusty in autumn.' },
