@@ -487,7 +487,7 @@ var LDEF = {
   timeOfDay: 'night',
   show: true,
   // where they stand
-  every: 1, side: 'both', rightAlong: 0.38, rightFromEdge: 0.3, leftAlong: 0.89, leftFromEdge: 0.3,      // the app's values (LANT), sides swapped: the line bends the other way here
+  every: 1, side: 'both', rightAlong: 0.88, rightFromEdge: 0.72, leftAlong: 0.38, leftFromEdge: 0.43,      // the app's values (LANT), sides swapped: the line bends the other way here
   // the lantern
   size: 0.58, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
   moss: 0.53, variety: 0.78, roofLeaves: 1.75, colours: clone(LANTERN_COLOURS),
@@ -1692,7 +1692,7 @@ function placeLanterns(path, gap) {
       var off = wu + (right ? L.rightFromEdge : L.leftFromEdge) * L.size + L.box * L.size * 1.9;
       var q = pathAt(path, clamp(s + along * gap, 0, path.len));
       out.push({ x: q.x - q.tz * off * sd, z: q.z + q.tx * off * sd, tx: q.tx, tz: q.tz, ax: -q.tz * sd, az: q.tx * sd,
-                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0 });
+                 seed: (k * 7919 + (sd > 0 ? 3 : 0)) >>> 0, s: clamp(s + along * gap, 0, path.len) });
     });
   }
   return out;
@@ -1735,7 +1735,7 @@ function bakeGates() {
     var x0 = W / 2 + F * q.x / q.z;
     if (x0 < -px * 2 || x0 > W + px * 2) continue;     // well off the screen
     var dq = depthOf(foot);
-    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band });
+    gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band, s: s });
   }
   gateCount = gates.length;
   // the torii standing in the lake (水上鳥居), facing you, a little turned
@@ -1744,7 +1744,7 @@ function bakeGates() {
     var wtx = Math.sin(wyaw), wtz = -Math.cos(wyaw), wfoot = hy + F / wq.z;
     var wdq = depthOf(wfoot);
     gates.push({ x: wq.x, z: wq.z, tx: wtx, tz: wtz, ax: -wtz, az: wtx, px: G.gateHeight * LK.wtSize * F / wq.z, foot: wfoot,
-                 haze: wdq.haze, band: wdq.band, water: true });
+                 haze: wdq.haze, band: wdq.band, water: true, s: -1 });       // out in the lake, beyond the line: drawn first
   }
   // the lanterns
   placeLanterns(path, gap).forEach(function (Lp) {
@@ -1795,7 +1795,10 @@ function bakeGates() {
     all[all.length - 1].leavesOf = Lp;                 // drawn just after its last piece
     minY = Math.min(minY, Lp.foot - Lp.px * 1.1);
   });
-  all.sort(function (a, b) { return b.dist - a.dist; });
+  // whole gates and whole lanterns, furthest along the path first (everything stands along the path, which comes
+  // toward you, so this is their true order: a lantern in a gap is behind the gate nearer to you and in front of the
+  // one further away, wherever it stands across the path); the pieces of each one by their distance
+  all.sort(function (a, b) { return (a.g.s - b.g.s) || (b.dist - a.dist); });
   gateTop = Math.max(0, Math.floor(minY - 12));
   var cw = Math.round(W * PR), chh = Math.max(1, Math.round((H - gateTop) * PR));
   // one layer for each step of blur of the gates, and one for each of the lanterns (so each has its own blur)
@@ -2512,7 +2515,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab20';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab21';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -6719,28 +6722,6 @@ window.lakeLab = {
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
   gates: G, lanterns: L, resetLanternsGates: function () { resetLanternsGates(); },
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
-  // how many of the lanterns big enough to read (14 px tall and up) are seen inside the opening of a nearer gate
-  // (between its pillars, under its beams), which looks as if they stood on the path: [water side, land side, of]
-  lanternCheck: function (vals) {
-    if (vals) { for (var k in vals) { if (k === 'straightEnd') G.straightEnd = vals[k]; else if (k in L) L[k] = vals[k]; else LK[k] = vals[k]; } lakePath(); }
-    var path = buildGatePath(), gap = Math.max(0.05, path.len / Math.max(1, G.count - 1)), F = lensF(), hy = H * V.horizon, h = G.gateHeight;
-    var gr = [];
-    for (var sg = path.len; sg >= -1e-6; sg -= gap) {
-      var g = pathAt(path, Math.max(0, sg)), xs = [];
-      [-1, 1].forEach(function (pd) { var pz = g.z + g.tx * (G.width * h / 2) * pd, px = g.x - g.tz * (G.width * h / 2) * pd; xs.push(W / 2 + F * px / pz); });
-      var r = G.pillar * h * F / g.z;
-      gr.push([Math.min(xs[0], xs[1]) - r, hy + F / g.z - h * F / g.z, Math.max(xs[0], xs[1]) + r, hy + F / g.z, g.z]);
-    }
-    var bad = [0, 0], big = 0;
-    placeLanterns(path, gap).forEach(function (c) {
-      var sx = W / 2 + F * c.x / c.z, foot = hy + F / c.z, lh = L.size * F / c.z, hw = L.box * L.size * 1.5 * F / c.z;
-      if (lh < 14) return;
-      big++;
-      var side = c.ax * (-c.tz) + c.az * c.tx > 0 ? 1 : 0;           // 0: the water (left) side, 1: the land (right) side
-      for (var i = 0; i < gr.length; i++) { var R = gr[i]; if (R[4] < c.z && sx + hw > R[0] && sx - hw < R[2] && foot > R[1]) { bad[side]++; return; } }
-    });
-    return [bad[0], bad[1], big];
-  },
   waterState: function () { return typeof Water === 'undefined' ? 'none' : Water.state(); },
   waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
   info: function () {

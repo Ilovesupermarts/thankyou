@@ -57,7 +57,7 @@ function unlatch() { try { localStorage.removeItem(LATCH_KEY); } catch (e) { /* 
 
 var VS = '#version 300 es\n' +
   'out vec2 vUv;\n' +
-  'void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = vec2(p.x * 0.5, 1.0 - p.y * 0.5); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }';
+  'void main() { vec2 p = vec2((gl_VertexID << 1) & 2, gl_VertexID & 2); vUv = vec2(p.x, 1.0 - p.y); gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0); }';
 var FS = [
 '#version 300 es',
 'precision highp float;',
