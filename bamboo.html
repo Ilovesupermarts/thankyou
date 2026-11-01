@@ -809,7 +809,7 @@ function buildTree(far) {
     top = Math.min(top, nn.ey - Cc.R); bot = Math.max(bot, nn.ey + Cc.R);
   });
   T.cx = sx2 / nC; T.cy = sy2 / nC; T.cr = Math.max(40, (bot - top) * 0.75);
-  addPerch(T, r);
+  T.pb = 0; T.pbV = 0;       // no branch for the owl to perch on: the app's trees have none
   buildTrunk(T);
   return T;
 }
@@ -2799,13 +2799,13 @@ function bakeHead(path) {
         if (r() < LK.ginkgo / Math.max(0.05, 1 - LK.evergreen)) { kind = 'ginkgo'; hu = lerp(2.6, 3.4, r()); }
         else { kind = 'momiji'; pal = r() < 0.6 ? Lakeside.PAL.momiji : Lakeside.PAL.kaede; hu = lerp(2, 2.8, r()); }
       } else if (r() < 0.72) { kind = 'sugi'; hu = lerp(3.2, 4.6, r()); }
-      else { kind = 'matsu'; hu = lerp(2.2, 3, r()); }
+      else { kind = 'sugi'; hu = lerp(2.2, 3, r()); }                 // a shorter cedar (the pines stood out as lone stacks)
       var h = hu * unit;
       // a clearing in front of the pagoda, so it shows to its foot
       if (LK.pagoda && f > fp && Math.abs(xx - px) < LK.pagodaSize * H * 0.5) h *= lerp(0.28, 0.45, r());
       if (Math.abs(xx - px) < LK.pagodaSize * H * 0.2 && f > fp - 0.2 && f <= fp && kind === 'sugi') h *= 0.8;
       if (LK.forest > r() * 1.0 + 0.001) {
-        Lakeside.tree(c, kind, { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal, lean: kind === 'matsu' ? 0.3 : 0 });
+        Lakeside.tree(c, kind, { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal });
       }
       xx += h * (kind === 'sugi' ? lerp(0.16, 0.26, r()) : kind === 'matsu' ? lerp(0.35, 0.55, r()) : lerp(0.35, 0.5, r())) / Math.max(0.3, LK.forest);
     }

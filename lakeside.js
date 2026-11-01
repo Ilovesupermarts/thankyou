@@ -93,39 +93,73 @@ function tone(P, k) {
   return k < 0.5 ? mix(P.deep, P.mid, k * 2) : k < 0.85 ? mix(P.mid, P.lit, (k - 0.5) / 0.35) : mix(P.lit, P.hi, (k - 0.85) / 0.15);
 }
 
-/* 杉 — Japanese cedar: tall and narrow, a rounded point at the top, its
-   foliage in dense spiky clumps that stand out from the cone. */
+/* 杉 — Japanese cedar (Cryptomeria): a tall, narrow cone with a pointed top. Its foliage hangs in
+   drooping sprays tier on tier, so the edge is a ragged saw of downward-pointing tips (not a stack of
+   rounded lumps), and every spray is a brush of fine needles. The sun's side is lighter, the far side
+   and the underside of the tiers dark. Small ones (under 14 px) are two-tone cones. */
 function sugi(c, o, P, r) {
   var x = o.x, y = o.y, h = o.h, w = o.w || h * 0.3, fin = o.fin, lx = o.lx;
-  var top = y - h, foot = y - h * 0.1;                       // the foliage, from the top down to just above the foot
-  // the trunk, where it shows below the branches
-  c.fillStyle = rgb(fin(scale(P.trunk, 0.8)));
-  c.fillRect(x - w * 0.06, foot - h * 0.04, w * 0.12, y - foot + h * 0.04);
+  var top = y - h, foot = y - h * 0.06;
   var rust = r() < 0.3 ? 0.25 * r() : 0;                    // a few cedars turn a little rusty in autumn
-  function hw(t) { return w * (0.08 + 0.92 * Math.pow(t, 0.85)) * 0.5; }   // half-width t of the way down
-  // the dark body
-  c.fillStyle = rgb(fin(P.deep));
-  c.beginPath(); c.moveTo(x, top);
-  var steps = Math.max(6, Math.round(h / 7));
-  for (var i = 1; i <= steps; i++) { var t = i / steps; c.lineTo(x + hw(t) * lerp(0.75, 1.05, r()), lerp(top, foot, t)); }
-  for (var j = steps; j >= 1; j--) { var t2 = j / steps; c.lineTo(x - hw(t2) * lerp(0.75, 1.05, r()), lerp(top, foot, t2)); }
-  c.closePath(); c.fill();
-  // the clumps, back to front: darker first, the lit ones on top
-  var n = clamp(Math.round(h * h / 40), 10, 170), list = [];
+  function col(k) { var cc = tone(P, k); if (rust) cc = mix(cc, P.rust, rust); return rgb(fin(cc)); }
+  // the trunk, where it shows under the lowest tier
+  c.fillStyle = rgb(fin(scale(P.trunk, 0.8)));
+  c.fillRect(x - Math.max(0.4, w * 0.035), foot - h * 0.03, Math.max(0.8, w * 0.07), y - foot + h * 0.03);
+  if (h < 14) {                                             // too small for spray: a cone, lit on the sun's side
+    c.fillStyle = col(0.3);
+    c.beginPath(); c.moveTo(x, top); c.lineTo(x + w * 0.5, foot); c.lineTo(x - w * 0.5, foot); c.closePath(); c.fill();
+    c.fillStyle = col(0.6);
+    c.beginPath(); c.moveTo(x, top); c.lineTo(x + (lx < 0 ? -1 : 1) * w * 0.5, foot); c.lineTo(x, foot); c.closePath(); c.fill();
+    return;
+  }
+  function hw(t) { return w * 0.5 * Math.pow(t, 0.82); }    // half the width a fraction t of the way down
+  var tiers = clamp(Math.round(h / 5.5), 7, 30), tierH = (foot - top) / tiers;
+  // the silhouette: each tier a branch that reaches out and droops, its tip lower than where it starts
+  function edge(sign) {
+    var pts = [];
+    for (var i = 0; i < tiers; i++) {
+      var t0 = i / tiers, yi = top + (foot - top) * t0, hwi = hw((i + 0.6) / tiers);
+      pts.push([x + sign * hwi * (0.62 + 0.14 * r()), yi + tierH * 0.1]);                 // where the branch leaves the stem
+      pts.push([x + sign * hwi * (1.0 + 0.16 * r()), yi + tierH * (0.85 + 0.35 * r())]);  // its drooping tip
+    }
+    return pts;
+  }
+  var L = edge(-1), R = edge(1);
+  c.beginPath(); c.moveTo(x + (r() - 0.5) * w * 0.05, top - h * 0.01);
+  for (var i = 0; i < R.length; i++) c.lineTo(R[i][0], R[i][1]);
+  c.lineTo(x + w * 0.1, foot); c.lineTo(x - w * 0.1, foot);
+  for (var j = L.length - 1; j >= 0; j--) c.lineTo(L[j][0], L[j][1]);
+  c.closePath();
+  c.fillStyle = col(0.08); c.fill();                        // the dark body
+  c.save(); c.clip();
+  // the light across the cone: the sun's side lit, the far side in its own shade
+  var g = c.createLinearGradient(x + lx * w * 0.5, 0, x - lx * w * 0.5, 0);
+  g.addColorStop(0, rgb(fin(P.lit), 0.7)); g.addColorStop(0.5, rgb(fin(P.mid), 0.28)); g.addColorStop(1, rgb(fin(P.deep), 0.5));
+  c.fillStyle = g; c.fillRect(x - w, top - 2, w * 2, h + 4);
+  // the shade under every tier
+  c.fillStyle = rgb(fin(scale(P.deep, 0.8)), 0.45);
+  for (var q = 1; q < tiers; q++) {
+    var yq = top + (foot - top) * (q / tiers) + tierH * 0.15, hq = hw((q + 0.3) / tiers);
+    c.beginPath(); c.moveTo(x - hq * 1.1, yq + tierH * 0.8); c.quadraticCurveTo(x, yq - tierH * 0.15, x + hq * 1.1, yq + tierH * 0.8);
+    c.lineTo(x + hq * 1.1, yq + tierH * 1.0); c.quadraticCurveTo(x, yq + tierH * 0.45, x - hq * 1.1, yq + tierH * 1.0); c.closePath(); c.fill();
+  }
+  c.restore();
+  // the needles: short brushed strokes drooping down and out along every spray, pale ones on the sun's side;
+  // some start at the edge and reach out past it, so the edge is feathery
+  var n = clamp(Math.round(h * w / 4.5), 30, 650), list = [];
   for (var k = 0; k < n; k++) {
-    var tt = Math.pow(r(), 0.85), u = r() * 2 - 1;
-    var cx = x + u * hw(tt) * 0.9, cy = lerp(top + h * 0.03, foot, tt);
-    var s = w * lerp(0.1, 0.19, r()) * lerp(0.6, 1.1, tt);
-    var lit = litAt(u, tt * 2 - 1, lx, (r() - 0.5) * 0.3) * lerp(1, 0.8, tt);
-    list.push({ x: cx, y: cy, s: s, k: lit });
+    var t = Math.pow(r(), 0.8), u = r() * 2 - 1, px = x + u * hw(t) * 1.02, py = top + t * (foot - top);
+    var kk = litAt(u, t * 2 - 1, lx, (r() - 0.5) * 0.4) * lerp(1, 0.85, t);
+    list.push({ x: px, y: py, u: u, k: kk, len: h * lerp(0.03, 0.06, r()) });
   }
-  list.sort(function (a, b) { return a.k - b.k; });
-  var under = rgb(fin(scale(P.deep, 0.85)));
+  list.sort(function (A, B) { return A.k - B.k; });
+  c.lineCap = 'round';
   for (var m = 0; m < list.length; m++) {
-    var D = list[m], col = tone(P, D.k);
-    if (rust) col = mix(col, P.rust, rust);
-    dab(c, D.x, D.y, D.s, D.s * 0.62, (r() - 0.5) * 0.5, rgb(fin(col)), D.s > 2 ? under : null);
+    var D = list[m];
+    c.strokeStyle = col(D.k); c.globalAlpha = 0.9; c.lineWidth = Math.max(0.5, h * 0.011);
+    c.beginPath(); c.moveTo(D.x, D.y); c.lineTo(D.x + D.u * D.len * 0.55, D.y + D.len); c.stroke();
   }
+  c.globalAlpha = 1;
 }
 
 /* 松 — Japanese red pine: a leaning, curving reddish trunk and flat
