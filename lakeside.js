@@ -113,7 +113,7 @@ var SUGI = {
   shade: 0.7,      // how wide the dark band along the underside and the shaded side is
   light: 0.8,      // the lighter area on the lit side
   specks: 1.2,     // the bright wavy patches and dots in it
-  outline: 0.5,    // the thin dark outline
+  outline: 0,      // the thin dark outline (0 = none)
   trunk: 0.07,     // how much trunk shows under the lowest tier, × the height
   variety: 0.6,    // how much one cedar differs from the next (height of the tiers, width, lean)
   rust: 0.3,       // the share of cedars turned a little rusty in autumn
@@ -233,12 +233,11 @@ function sugi(c, o, P, r) {
       c.restore();
     }
     if (lw > 0) { c.fillStyle = cOut; c.fill(tierShape(T, lw, 0, 0, 1)); }
-    c.fillStyle = cDeep; c.fill(sil);
+    c.fillStyle = cDm; c.fill(sil);          // the dark-mid shows only along the lower edge and the shaded side, not all round
     T.sil = sil;
     c.save(); c.clip(sil);
     // flat bands: dark-mid, then the body, each moved up and toward the light, so the dark shows along the
     // lower edge and down the shaded side
-    c.fillStyle = cDm; c.fill(tierShape(T, 0, ls * rB * 0.12 * rim, -rB * 0.3 * rim, 0.94));
     c.fillStyle = cMid; c.fill(tierShape(T, 0, ls * rB * 0.4 * rim, -rB * 0.6 * rim, 0.86));
     if (S.light > 0) {
       // the lighter area: a cloud of rounded clumps in the tier, toward the light, its own lumpy lower edge
