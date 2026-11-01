@@ -1765,14 +1765,17 @@ function bakeGates() {
     G.gateHeight = gh0;
     placePieces(gp, g).forEach(function (pc) {
       var dx = pc.c[0], dy = pc.c[1] - 1, dz = pc.c[2];
-      pc.dist = dx * dx + dy * dy + dz * dz;
+      // furthest first by depth along the line of sight (z), with the straight-line distance only to break ties
+      // within a gate: sorting by the straight-line distance alone drew a lantern off to the side of the path in
+      // front of a gate's pillar even when it stood behind it
+      pc.dist = dz + 0.04 * Math.sqrt(dx * dx + dy * dy + dz * dz);
       all.push(pc);
     });
     minY = Math.min(minY, g.foot - g.px * 1.15);
   });
   lanterns.forEach(function (Lp) {
     var lod = clamp(Lp.px / 90, 0, 1), raw = lanternPieces(lod, Lp.rs);
-    var dy = L.size * 0.5 - 1, D = Lp.x * Lp.x + dy * dy + Lp.z * Lp.z;
+    var dy = L.size * 0.5 - 1, D = Lp.z + 0.04 * Math.sqrt(Lp.x * Lp.x + dy * dy + Lp.z * Lp.z);
     placePieces(raw, Lp).forEach(function (pc, i) {
       pc.dist = D - i * 1e-7;                          // its own pieces from the ground up
       pc.part = raw[i].part;
@@ -2665,7 +2668,9 @@ function drawFarShore(c) {
 function bakeHead(path) {
   var t0 = performance.now();
   var hy = H * V.horizon, F = lensF(), r = rngFrom(V.seed * 577 + 41);
-  var x0 = -0.03 * W, x1 = 1.03 * W, y0 = 0.18 * H, y1 = 0.8 * H;
+  // the picture reaches below the headland's shore, wherever the eye line puts it (it was cut off at 0.8 × H,
+  // which sliced through the trees once the eye line came down, and left its shoreline drawn out on the water)
+  var x0 = -0.03 * W, x1 = 1.03 * W, y0 = 0.18 * H, y1 = Math.min(H + 20, H * V.horizon + F / LK.headZ + H * 0.06);
   headBox = { x0: x0, y0: y0, x1: x1, y1: y1 };
   HEADC.cnv.width = Math.round((x1 - x0) * SR); HEADC.cnv.height = Math.round((y1 - y0) * SR);
   var c = HEADC.c;
@@ -2690,6 +2695,21 @@ function bakeHead(path) {
   for (var x = x0 - 5; x <= tip + 2; x += 6) c.lineTo(x, yR(x));
   for (var xb = tip + 2; xb >= x0 - 5; xb -= 6) c.lineTo(xb, yS(xb) + 1);
   c.closePath(); c.fill();
+  // the forest floor seen through the gaps: a close canopy of small clumps (dark cedar, a little gold and red) over
+  // the whole hillside, so no gap between the trees in front shows the flat colour of the hill
+  (function () {
+    var deep = finish(0.3)(hex('#1C2C22')), mid = finish(0.28)(hex('#2E4632')), lit = finish(0.26)(hex('#4B6741')),
+        gold = finish(0.26)(hex('#D8A030')), red = finish(0.26)(hex('#B8442A'));
+    for (var cy2 = H * LK.headTop - 6; cy2 < yS(0) + 2; cy2 += 3) {
+      for (var cx2 = x0 - 4 + r() * 4; cx2 < tip; cx2 += lerp(3, 7, r())) {
+        if (cy2 < yR(cx2) - 2 || cy2 > yS(cx2) - 1) continue;
+        var dd = (cy2 - yR(cx2)) / Math.max(1, yS(cx2) - yR(cx2)), sz = lerp(3, 7, dd) * lerp(0.7, 1.3, r()) * (F / LK.headZ / 48);
+        var pick = r(), colr = pick < 0.5 ? deep : pick < 0.8 ? mid : pick < 0.9 ? lit : pick < 0.96 ? gold : red;
+        c.fillStyle = rgb(colr);
+        c.beginPath(); c.ellipse(cx2, cy2, sz, sz * 0.8, 0, 0, TAU); c.fill();
+      }
+    }
+  })();
   // rows of trees, from the ridge to the shore
   var rows = 8, fp = 0.46, fh = 0.6, pagodaDone = !LK.pagoda, hallDone = !LK.hall;
   var px = LK.pagodaX * W, pzW = 0;
