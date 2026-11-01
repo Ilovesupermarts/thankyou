@@ -174,11 +174,12 @@ function matsu(c, o, P, r) {
 function crown(c, o, P, r, kind) {
   var x = o.x, y = o.y, h = o.h, fin = o.fin, lx = o.lx;
   var ginkgo = kind === 'ginkgo', blob = kind === 'blob';
-  var w = o.w || h * (ginkgo ? 0.62 : blob ? 0.7 : 0.95);
-  var cy = y - h * (ginkgo ? 0.56 : 0.58), rx = w * 0.5, ry = h * (ginkgo ? 0.44 : 0.4);
+  var stout = !!o.stout;                                      // a grown tree: a broad crown low on a short, thick trunk
+  var w = o.w || h * (stout ? (ginkgo ? 0.92 : 1.08) : ginkgo ? 0.62 : blob ? 0.7 : 0.95);
+  var cy = y - h * (stout ? 0.55 : ginkgo ? 0.56 : 0.58), rx = w * 0.5, ry = h * (stout ? 0.45 : ginkgo ? 0.44 : 0.4);
   // the trunk (and for a maple, a fork showing under the crown)
   if (o.bush) { cy = y - h * 0.42; ry = h * 0.45; }
-  var tw = Math.max(0.8, h * 0.035);
+  var tw = Math.max(0.8, h * (stout ? 0.07 : 0.035));
   c.strokeStyle = rgb(fin(P.trunk)); c.lineCap = 'round';
   c.lineWidth = tw;
   c.beginPath(); c.moveTo(x, y); c.lineTo(x + (r() - 0.5) * tw, cy + ry * 0.2); c.stroke();
@@ -188,11 +189,11 @@ function crown(c, o, P, r, kind) {
   }
   // the crown as a cloud of clumps (as the big maples are made): each clump lit on its own upper side and
   // shaded below, the clumps toward the light brighter, gaps of shade between them
-  var nCl = o.bush ? 4 + Math.floor(r() * 3) : clamp(Math.round(h / 8), 7, 14), cl = [];
+  var nCl = o.bush ? 4 + Math.floor(r() * 3) : stout ? 9 + Math.floor(r() * 3) : clamp(Math.round(h / 8), 7, 14), cl = [];
   for (var q = 0; q < nCl; q++) {
     var a = q === 0 ? 0 : r() * TAU, d = q === 0 ? 0 : lerp(0.35, 0.72, Math.sqrt(r()));
     var ux = Math.cos(a) * d, uy = Math.sin(a) * d * (ginkgo ? 1.05 : 0.85) - 0.03;
-    cl.push({ x: x + ux * rx, y: cy + uy * ry, R: Math.min(rx, ry) * lerp(0.42, 0.6, r()) * (1 - 0.25 * Math.abs(uy)), ux: ux, uy: uy });
+    cl.push({ x: x + ux * rx, y: cy + uy * ry, R: Math.min(rx, ry) * (stout ? lerp(0.52, 0.7, r()) : lerp(0.42, 0.6, r())) * (1 - 0.25 * Math.abs(uy)), ux: ux, uy: uy });
   }
   cl.sort(function (A, B) { return (A.y - A.R * 0.3) - (B.y - B.R * 0.3); });   // the ones higher up first: the lower ones hang in front
   var shapes = h > 60 && !blob;
