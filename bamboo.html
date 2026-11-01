@@ -14,6 +14,7 @@
 <script src="mountains.js"></script>
 <script src="trunks.js"></script>
 <script src="lakeside.js"></script>
+<script src="water.js"></script>
 
 <style>
   /* ============================================================
@@ -89,6 +90,10 @@
   .sp.closed { width: auto; padding: 8px 14px; overflow: hidden; }
   .sp.closed .sp-body { display: none; }
   .sp-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .sp-head { cursor: grab; touch-action: none; margin: -4px -6px 0; padding: 4px 6px 6px; border-radius: 14px; }
+  .sp.dragging { opacity: 0.92; }
+  .sp.dragging .sp-head { cursor: grabbing; background: rgba(120, 120, 128, 0.1); }
+  .sp-head b::before { content: '⠿ '; color: rgba(60, 60, 67, 0.4); font-weight: 400; }
   .sp-head b { font-size: 15px; }
   .sp button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 7px 12px; background: rgba(120, 120, 128, 0.14); color: #1D1D1F; cursor: pointer; }
   .sp button.primary { background: var(--accent); color: #FFFFFF; }
@@ -2458,6 +2463,9 @@ var LK_DEFAULTS = {
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
   gates: 22, pathX: 0.3, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
   // the water
+  // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
+  // resolution), the size of the waves, and the sun's sparkle
+  shader: true, waterRes: 0.75, waveSize: 1, sparkle: 1,
   farShore: 160, reflect: 0.9, deep: 0.85, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
   nearBank: 0.86, floating: 1,
   // the headland and its forest (near you now, framing the left)
@@ -2474,7 +2482,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab13';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab15';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -2833,7 +2841,7 @@ function drawBank(t) {
    the shallows along every shore (the lake bed showing through, the bank's dark lip, a broken
    bright edge), and fallen leaves floating on it. composeWater adds the gates' reflection
    (WATERC), and each frame lays WATERC down in bands that sway a little from side to side. */
-var WATERB = mk(), WATERC = mk(), WSTAT = mk(), WPAD = 10;
+var WATERB = mk(), WATERC = mk(), WSTAT = mk(), WMIR = mk(), WPAD = 10;
 function bakeWater(C) {
   var t0 = performance.now();
   var hy = H * V.horizon, yf = farShoreY(), F = lensF(), hh = H - yf;
@@ -2960,6 +2968,10 @@ function composeWater() {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.drawImage(WATERB.cnv, 0, 0);
   if (GREF.cnv.width > 2) c.drawImage(GREF.cnv, WPAD * SR, (grefTop - yf) * SR, GREF.cnv.width * SR / PR, GREF.cnv.height * SR / PR);
+  // the plain mirror (no tint) for the water drawn on the graphics chip (water.js), which does its own colour
+  WMIR.cnv.width = WATERC.cnv.width; WMIR.cnv.height = WATERC.cnv.height;
+  WMIR.c.drawImage(WATERC.cnv, 0, 0);
+  if (typeof Water !== 'undefined') Water.setMirror(WMIR.cnv);
   // the water's own colour: a mirror seen at a glancing angle far away, its deep colour more and more
   // as you look down into it near you (Fresnel); everything mirrored in it a little darker and bluer
   var hy = H * V.horizon, wc = waterCol(), hh = H - yf, cw = c.canvas.width, ch = c.canvas.height;
@@ -3233,8 +3245,26 @@ function drawSusuki(c, t, front) {
 
 /* ---------- each frame ---------- */
 /* Over the water (after SCN): the gates' reflection, the ripples, the glitter. */
+function waterShaderOn() { return LK.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
 function drawWaterLive(t) {
   var yf = farShoreY(), hh = H - yf, hy = H * V.horizon, F = lensF();
+  // the water drawn on the graphics chip (water.js): the mirror rippled pixel by pixel by the waves of a
+  // normal map, its deep colour near you, the sun's sparkle; then what floats on it and the shallows
+  if (waterShaderOn()) {
+    var sp0 = sunPlace(), sunK = isNight() ? 0 : (V.timeOfDay === 'evening' ? 1.4 : 1) * LK.sparkle;
+    var pic = Water.render({ w: W * PR * LK.waterRes, h: hh * PR * LK.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
+                             time: t * LK.rippleSpeed, distort: LK.waves * 7 * (0.65 + 0.35 * clamp(V.wind, 0, 2)), waveSize: LK.waveSize,
+                             reflect: LK.reflect, water: scale(waterCol(), lerp(1.15, 0.8, LK.deep)), sun: sunK, sunX: sp0.x, sunY: sp0.y,
+                             sunColour: V.timeOfDay === 'evening' ? [255, 196, 130] : [255, 248, 232] });
+    if (pic) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.drawImage(pic, 0, Math.round(yf * PR), Math.round(W * PR), Math.round(hh * PR) + 1);
+      if (WSTAT.cnv.width > 2) ctx.drawImage(WSTAT.cnv, -WPAD * PR, yf * PR, (W + WPAD * 2) * PR, hh * PR);
+      waterRows = -1;
+      return;
+    }
+  }
   // the mirror, in thin rows from the far shore down, each shifted sideways by three waves of different
   // lengths travelling over the water: the reflections break into fine zig-zags at their edges, as on a lake
   // in a light breeze (fine and quick far away, larger and slower near you)
@@ -6612,10 +6642,15 @@ window.lakeLab = {
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
   gates: G, lanterns: L,
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
+  waterState: function () { return typeof Water === 'undefined' ? 'none' : Water.state(); },
+  waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
   info: function () {
-    return 'Lake: baked in ' + Math.round(lakeMs.head + lakeMs.water + lakeMs.ground + lakeMs.fore) + ' ms (headland ' + Math.round(lakeMs.head) +
+    var ws = typeof Water === 'undefined' ? 'none' : Water.state();
+    return 'Water: ' + (!LK.shader ? '2D (switched off)' : ws === 'ok' ? 'graphics chip (WebGL 2)' : ws === 'loading' ? 'loading the wave map' :
+                        ws === 'latched' ? '2D: the graphics chip dropped it, so it stays 2D for 12 hours (button below)' : ws === 'lost' ? '2D: the graphics chip dropped it' : '2D (no WebGL 2 here)') +
+           ' · Lake: baked in ' + Math.round(lakeMs.head + lakeMs.water + lakeMs.ground + lakeMs.fore) + ' ms (headland ' + Math.round(lakeMs.head) +
            ', water ' + Math.round(lakeMs.water) + ', ground ' + Math.round(lakeMs.ground) + ', shore ' + Math.round(lakeMs.fore) + ')' +
-           ' · each frame ' + lakeFrameMs.toFixed(2) + ' ms (water in ' + waterRows + ' rows, waves, mist, susuki: ' + susuki.reduce(function (n, Cl) { return n + Cl.stems.length; }, 0) + ' stems)' +
+           ' · each frame ' + lakeFrameMs.toFixed(2) + ' ms (water ' + (waterRows < 0 ? 'on the graphics chip' : 'in 2D, ' + waterRows + ' rows') + ', mist, susuki: ' + susuki.reduce(function (n, Cl) { return n + Cl.stems.length; }, 0) + ' stems)' +
            ' · ' + gateInfo;
   }
 };
@@ -6863,6 +6898,7 @@ window.addEventListener('resize', function () {
   _rz = setTimeout(function () { resize(); pile = []; rebuildAll(); }, 200);
 });
 
+if (typeof Water !== 'undefined') Water.init('textures/waternormals.jpg');
 resize();
 rebuildAll();
 requestAnimationFrame(frame);
@@ -6991,7 +7027,7 @@ var lab = window.mtnLab, tlab = window.treeLab, klab = window.lakeLab;
 if (!lab || !tlab || !klab) return;
 var M = lab.values, TV = tlab.values, KV = klab.values, page = 'lake';
 var LAKE_CTLS = [
-  { k: 'gates', label: 'Number of torii', min: 2, max: 60, step: 1, group: 'The torii', note: 'How many gates stand in the line (the lanterns follow: about one every seventh of the line).' },
+  { k: 'gates', label: 'Number of torii', min: 2, max: 60, step: 1, group: 'The torii', note: 'How many gates stand in the line (a pair of lanterns stands in the gaps between them, see below).' },
   { k: 'gateEndY', label: 'Nearest torii: how near', min: 0.7, max: 0.95, step: 0.005, note: 'Where the gate facing you stands, down the screen. Higher up = further away and smaller.' },
   { k: 'gateEndX', label: 'Nearest torii: across', min: 0.3, max: 0.9, step: 0.005 },
   { k: 'pathX', label: 'Line starts at (across)', min: 0.05, max: 0.7, step: 0.005, note: 'Far away, by the headland\'s tip.' },
@@ -7001,7 +7037,10 @@ var LAKE_CTLS = [
   { k: 'reflect', label: 'Reflections', min: 0, max: 1, step: 0.01, group: 'The water', note: 'How clearly the lake mirrors the sky, the mountains, the headland and the gates.' },
   { k: 'deep', label: 'Deep water colour', min: 0, max: 1, step: 0.01, note: 'Looking down into the lake near you: its own blue shows through.' },
   { k: 'farShore', label: 'Far shore distance', min: 60, max: 400, step: 5, note: 'Further = a thinner band of forest along the foot of the mountains.' },
-  { k: 'waves', label: 'Swaying reflections', min: 0, max: 2, step: 0.05, note: 'The water sways gently from side to side in bands (drawn each frame), more in the wind.' },
+  { k: 'waves', label: 'Ripple in the reflections', min: 0, max: 3, step: 0.05, note: 'How far the waves move the reflections (drawn each frame), more in the wind.' },
+  { k: 'waveSize', label: 'Size of the waves', min: 0.3, max: 3, step: 0.05 },
+  { k: 'sparkle', label: 'Sun sparkle on the waves', min: 0, max: 3, step: 0.05 },
+  { k: 'waterRes', label: 'Water picture resolution', min: 0.25, max: 1, step: 0.05, note: 'A share of the screen\'s resolution. Lower = cheaper for the graphics chip, softer.' },
   { k: 'ripples', label: 'Ripples', min: 0, max: 2, step: 0.05, note: 'The drifting ripples (drawn each frame), stronger in the wind.' },
   { k: 'floating', label: 'Floating leaves', min: 0, max: 3, step: 0.05 },
   { k: 'rippleSpeed', label: 'Ripple speed', min: 0, max: 3, step: 0.05 },
@@ -7040,7 +7079,7 @@ var LANT_CTLS = [
   { k: 'leftAlong', label: 'Water side: place in the gap', min: 0, max: 1, step: 0.05, note: '0 by the further gate, 1 by the nearer one, 0.5 in the middle.' },
   { k: 'rightAlong', label: 'Land side: place in the gap', min: 0, max: 1, step: 0.05 }
 ];
-var LAKE_SWITCHES = [['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
+var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
                      ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
 var LAKE_COLOURS = [['water', 'Water (day)'], ['waterEvening', 'Water (evening)'], ['waterNight', 'Water (night)'], ['moss', 'Moss'],
                     ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki']];
@@ -7161,6 +7200,8 @@ function build() {
       cbx.addEventListener('change', function () { KV[sw[0]] = cbx.checked; klab.changed(); });
       row.appendChild(cbx); host.appendChild(row);
     });
+    var wb = document.createElement('button'); wb.type = 'button'; wb.textContent = 'Water: switch the graphics chip back on';
+    wb.addEventListener('click', function () { klab.waterOn(); }); host.appendChild(wb);
     var gc = document.createElement('h4'); gc.textContent = 'Colours'; host.appendChild(gc);
     colours(LAKE_COLOURS, KV.colours, function () { klab.changed(); });
     return;
@@ -7249,6 +7290,36 @@ document.getElementById('spCopy').addEventListener('click', function () {
   out.textContent = text; out.classList.add('shown');
   if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).catch(function () {});
 });
+/* ---------- moving the panel: drag it by its title bar (kept where you left it) ---------- */
+var POS_KEY = 'mountainLab-panel', head = sp.querySelector('.sp-head'), drag = null;
+function placePanel(x, y) {
+  var w = sp.offsetWidth;
+  x = Math.max(4 - w + 60, Math.min(window.innerWidth - 60, x));
+  y = Math.max(4, Math.min(window.innerHeight - 40, y));
+  sp.style.left = x + 'px'; sp.style.top = y + 'px'; sp.style.right = 'auto';
+}
+try { var pos = JSON.parse(localStorage.getItem(POS_KEY) || 'null'); if (pos) placePanel(pos[0], pos[1]); } catch (e) { /* silent */ }
+head.addEventListener('pointerdown', function (e) {
+  if (e.target.closest('button')) return;
+  var r = sp.getBoundingClientRect();
+  drag = { id: e.pointerId, dx: e.clientX - r.left, dy: e.clientY - r.top };
+  head.setPointerCapture(e.pointerId);
+  sp.classList.add('dragging');
+  e.preventDefault();
+});
+head.addEventListener('pointermove', function (e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  placePanel(e.clientX - drag.dx, e.clientY - drag.dy);
+});
+function endDrag(e) {
+  if (!drag || e.pointerId !== drag.id) return;
+  drag = null; sp.classList.remove('dragging');
+  try { localStorage.setItem(POS_KEY, JSON.stringify([parseFloat(sp.style.left) || 0, parseFloat(sp.style.top) || 0])); } catch (er) { /* silent */ }
+}
+head.addEventListener('pointerup', endDrag);
+head.addEventListener('pointercancel', endDrag);
+window.addEventListener('resize', function () { if (sp.style.left) placePanel(parseFloat(sp.style.left), parseFloat(sp.style.top)); });
+
 var count = document.getElementById('spCount');
 setInterval(function () { count.textContent = page === 'tree' ? tlab.info() : page === 'lake' ? klab.info() : lab.info() + ' · shape ' + M.seed; }, 500);
 build();
