@@ -6682,6 +6682,28 @@ window.lakeLab = {
   changed: function () { saveLake(); lakeDirty = true; lakeChangedAt = nowT; },
   gates: G, lanterns: L,
   regate: function () { gateDirty = true; gateChangedAt = nowT; },
+  // how many of the lanterns big enough to read (14 px tall and up) are seen inside the opening of a nearer gate
+  // (between its pillars, under its beams), which looks as if they stood on the path: [water side, land side, of]
+  lanternCheck: function (vals) {
+    if (vals) { for (var k in vals) { if (k === 'straightEnd') G.straightEnd = vals[k]; else if (k === 'fromEdge') L.fromEdge = vals[k]; else LK[k] = vals[k]; } lakePath(); }
+    var path = buildGatePath(), gap = Math.max(0.05, path.len / Math.max(1, G.count - 1)), F = lensF(), hy = H * V.horizon, h = G.gateHeight;
+    var gr = [];
+    for (var sg = path.len; sg >= -1e-6; sg -= gap) {
+      var g = pathAt(path, Math.max(0, sg)), xs = [];
+      [-1, 1].forEach(function (pd) { var pz = g.z + g.tx * (G.width * h / 2) * pd, px = g.x - g.tz * (G.width * h / 2) * pd; xs.push(W / 2 + F * px / pz); });
+      var r = G.pillar * h * F / g.z;
+      gr.push([Math.min(xs[0], xs[1]) - r, hy + F / g.z - h * F / g.z, Math.max(xs[0], xs[1]) + r, hy + F / g.z, g.z]);
+    }
+    var bad = [0, 0], big = 0;
+    placeLanterns(path, gap).forEach(function (c) {
+      var sx = W / 2 + F * c.x / c.z, foot = hy + F / c.z, lh = L.size * F / c.z, hw = L.box * L.size * 1.5 * F / c.z;
+      if (lh < 14) return;
+      big++;
+      var side = c.ax * (-c.tz) + c.az * c.tx > 0 ? 1 : 0;           // 0: the water (left) side, 1: the land (right) side
+      for (var i = 0; i < gr.length; i++) { var R = gr[i]; if (R[4] < c.z && sx + hw > R[0] && sx - hw < R[2] && foot > R[1]) { bad[side]++; return; } }
+    });
+    return [bad[0], bad[1], big];
+  },
   waterState: function () { return typeof Water === 'undefined' ? 'none' : Water.state(); },
   waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
   info: function () {
