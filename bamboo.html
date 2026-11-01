@@ -470,7 +470,7 @@ var G = {
   colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
              gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
   lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
-  focusDepth: 0.5, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4, strength: 1,
+  focusDepth: 0.19, blurNear: 0.2, blurFar: 0.4, hazeNear: 0.04, hazeFar: 0.1, strength: 1,
   gravel: true, pathWidth: 1.06, pebbles: 1, pebbleSize: 1.8, edgeSoft: 0.14, pathLeaves: 1.1
 };
 
@@ -487,7 +487,7 @@ var LDEF = {
   timeOfDay: 'night',
   show: true,
   // where they stand
-  every: 1, side: 'both', rightAlong: 0.5, rightFromEdge: 0.3, leftAlong: 0.5, leftFromEdge: 0.3,      // a pair in the middle of every gap between two gates
+  every: 1, side: 'both', rightAlong: 0.65, rightFromEdge: 0.3, leftAlong: 0.5, leftFromEdge: 0.3,      // a pair in every gap between two gates
   // the lantern
   size: 0.58, sides: 6, pillar: 0.07, box: 0.1, roof: 0.28, curls: true,
   moss: 0.53, variety: 0.78, roofLeaves: 1.75, colours: clone(LANTERN_COLOURS),
@@ -496,7 +496,7 @@ var LDEF = {
   castLight: 0.7, reach: 2.2,
   // depth of field of the lanterns (the torii have their own, in G): sharp nearer than focusDepth (a share of
   // the way from the horizon to the bottom of the screen), then blurred (px) and hazed toward the mist
-  focusDepth: 0.5, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4,
+  focusDepth: 0.17, blurNear: 0.2, blurFar: 1.85, hazeNear: 0.04, hazeFar: 0.4,
   // the flicker
   flicker: 0.77, flickerEvery: 1, flickerLength: 1.2, flickerSpeed: 1, wobble: 0.58, windFlicker: 1
 };
@@ -2264,6 +2264,20 @@ try {
 } catch (e) { /* private window: the defaults */ }
 function saveMountains() { try { localStorage.setItem(MT_KEY, JSON.stringify(MT)); } catch (e) { /* silent */ } }
 var mtnDirty = false, mtnChangedAt = -1, mtnMs = 0, mtn3d = false;
+/* The 3D mountains are drawn a band a frame (as in the app, Mountains.start): drawn in one go with a low sun
+   (the evening) they take over 2 s on the tablet, and its graphics chip then resets, taking every WebGL picture
+   on the page with it (the trees go flat, the water goes 2D). Until the new picture is done, the last one stays. */
+var mtnPic = null, mtnPicKey = '', mtnJob = null, mtnFailKey = '';
+function stepMountains() {
+  if (!mtnJob) return;
+  var t0 = performance.now(), res = mtnJob.job ? mtnJob.job.step() : false;
+  mtnJob.ms += performance.now() - t0; mtnJob.bands++;
+  if (res === null) return;                                   // more bands to draw
+  if (res) { mtnPic = res; mtnPicKey = mtnJob.key; mtnMs = mtnJob.ms; }
+  else mtnFailKey = mtnJob.key;                               // the graphics chip took it away: not again for these values
+  mtnJob = null;
+  bakeScenery();                                              // the scenery again, with the new mountains
+}
 
 /* Everything mountains.js needs, for the time of day now. */
 function mtnOptions(C, hy) {
@@ -2284,9 +2298,16 @@ function mtnOptions(C, hy) {
 }
 /* The 3D mountains into MTN, softened a little. False when they can't be drawn here. */
 function drawMountains3d(m, C, hy) {
-  if (MT.style !== '3d' || typeof Mountains === 'undefined') return false;
-  var t0 = performance.now();
-  var g3 = Mountains.render(mtnOptions(C, hy));
+  if (MT.style !== '3d' || typeof Mountains === 'undefined' || !Mountains.start) return false;
+  var o = mtnOptions(C, hy), key = JSON.stringify(o), g3 = null;
+  if (mtnPic && mtnPicKey === key) g3 = mtnPic;               // already drawn for these values
+  else {
+    if ((!mtnJob || mtnJob.key !== key) && key !== mtnFailKey) {
+      var job = Mountains.start(o, 8);
+      mtnJob = job ? { job: job, key: key, ms: 0, bands: 0 } : null;
+    }
+    g3 = mtnPic;                                              // the last picture, until the new one is done
+  }
   if (!g3) return false;
   m.save();
   m.setTransform(1, 0, 0, 1, 0, 0);
@@ -2304,7 +2325,6 @@ function drawMountains3d(m, C, hy) {
     g.addColorStop(1, rgb(mistC, MT.footMist * 0.85));
     m.fillStyle = g; m.fillRect(-20, y0, W + 40, y1 - y0);
   }
-  mtnMs = performance.now() - t0;
   return true;
 }
 
@@ -2461,20 +2481,20 @@ function drawFuji(c, C, hy) {
 var LK_DEFAULTS = {
   horizon: 0.68,
   // the torii line: how many gates, where it starts (at the headland's foot) and where the nearest gate stands
-  gates: 22, pathX: 0.3, pathY: 0.697, gateEndX: 0.6, gateEndY: 0.8,
+  gates: 29, pathX: 0.3, pathY: 0.69, gateEndX: 0.735, gateEndY: 0.85,
   // the water
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
-  shader: true, waterRes: 0.75, waveSize: 1, sparkle: 1,
-  farShore: 160, reflect: 0.9, deep: 0.85, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.5, veil: 0.34,
+  shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
+  farShore: 160, reflect: 0.61, deep: 0.18, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.86, floating: 1,
   // the headland and its forest (near you now, framing the left)
-  headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.62, ginkgo: 0.16,
+  headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1, treeSize: 0.95, evergreen: 0.46, ginkgo: 0.41,
   pagoda: true, pagodaX: 0.285, pagodaSize: 0.215, hall: true, grove: false,
   // the trees on the right bank: planted ON the bank (the water's edge on the right), the same distance apart
   // along it (bankGap, in eye heights, measured on the ground), all the same height in the world (bankH, in eye
   // heights), so each is drawn smaller or larger with its distance; the row starts across at bankX0
-  bankTrees: true, bankX0: 0.5, bankGap: 1.95, bankH: 1.3, bankIn: 1,
+  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 1.3, bankIn: 1,
   // the water torii
   waterTorii: true, wtX: 0.43, wtY: 0.703, wtSize: 1.35,
   // the shore
@@ -2482,7 +2502,7 @@ var LK_DEFAULTS = {
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
              lily: '#D21E22', susuki: '#E6C894' }
 };
-var LK_KEY = 'lakeLab15';          // new key: the new layout replaces the values kept from the first try
+var LK_KEY = 'lakeLab16';          // new key: the new layout replaces the values kept from the first try
 var LK = clone(LK_DEFAULTS);
 try {
   var savedLk = JSON.parse(localStorage.getItem(LK_KEY) || 'null');
@@ -6633,7 +6653,8 @@ window.mtnLab = {
   },
   info: function () {
     if (!V.showMountains) return 'Mountains off';
-    return mtn3d ? '3D mountains, drawn in ' + Math.round(mtnMs) + ' ms' :
+    return mtnJob ? '3D mountains: drawing the new picture, band ' + mtnJob.bands + ' of 8' :
+           mtn3d ? '3D mountains, drawn in ' + Math.round(mtnMs) + ' ms (8 bands, one a frame)' :
            MT.style === '3d' ? 'Painted ridges (no WebGL 2 here)' : 'Painted ridges';
   }
 };
@@ -6733,6 +6754,7 @@ function frame(now) {
   if (gateDirty && (t - gateChangedAt > 0.18 || t - gateBakedAt > 0.5)) bakeGates();
   // the mountains: baked again once the slider has paused for a moment
   if (mtnDirty && t - mtnChangedAt > 0.25) { mtnDirty = false; bakeScenery(); }
+  stepMountains();
   // the lake: everything is baked again once the slider has paused
   if (lakeDirty && t - lakeChangedAt > 0.3) { lakeDirty = false; resize(); rebuildAll(); }
 
@@ -7202,7 +7224,6 @@ function build() {
     });
     var wb = document.createElement('button'); wb.type = 'button'; wb.textContent = 'Water: switch the graphics chip back on';
     wb.addEventListener('click', function () { klab.waterOn(); }); host.appendChild(wb);
-    var gc = document.createElement('h4'); gc.textContent = 'Colours'; host.appendChild(gc);
     colours(LAKE_COLOURS, KV.colours, function () { klab.changed(); });
     return;
   }
