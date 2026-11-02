@@ -11275,7 +11275,9 @@ function computeEnv() {
     snowAmt: c === 'snow' ? clamp(0.4 + S.rainMm / 3, 0.4, 1.6) : (S.snowMix && S.temperature < 3 ? 0.12 : 0),
     astro: astro(p, S.hour),
     scene: sceneFor(p),
-    side: S.figureSide === 'auto' ? (dayOfYear(p) % 2 ? 'left' : 'right') : S.figureSide
+    // the bigger tree's side: by the lake it always stands on the left (the smaller one, on the right, would
+    // otherwise block the pagoda on alternate days); the winter scene keeps alternating by the day
+    side: S.figureSide === 'auto' ? (sceneFor(p) === 'autumn' ? 'left' : (dayOfYear(p) % 2 ? 'left' : 'right')) : S.figureSide
   };
 }
 
