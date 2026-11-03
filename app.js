@@ -20258,8 +20258,8 @@ function rvDraw(ids, c, fn) {
   if (!RV.started) { fn(c); return; }
   var st = InkReveal.state(ids);
   if (st === 0) return;
-  if (st === 2) { rvFlush(); fn(ctx); return; }
   var one = typeof ids === 'string' ? ids : null;
+  if (st === 2 && !rvEdgeWaits(one || ids.join('+'))) { rvFlush(); fn(ctx); return; }
   if (one && RV_KIND[one] === 'fade') {             // faded: every alpha it sets is scaled (see rvFadeAlpha)
     rvFlush();
     rvMul = Math.max(0.001, InkReveal.alpha(one));
@@ -20273,21 +20273,46 @@ function rvDraw(ids, c, fn) {
     if (!RVL) { var cv = document.createElement('canvas'); RVL = { cnv: cv, c: cv.getContext('2d') }; }
     if (RVL.cnv.width !== cvBack.width || RVL.cnv.height !== cvBack.height) { RVL.cnv.width = cvBack.width; RVL.cnv.height = cvBack.height; }
     var l = RVL.c;
+    rvOpenRect = rvRect(k);
     l.setTransform(1, 0, 0, 1, 0, 0); l.globalAlpha = 1; l.globalCompositeOperation = 'source-over';
-    l.clearRect(0, 0, RVL.cnv.width, RVL.cnv.height);
+    l.clearRect(rvOpenRect.x, rvOpenRect.y, rvOpenRect.w, rvOpenRect.h);
     l.setTransform(PR, 0, 0, PR, 0, 0);
     rvOpen = k; rvOpenIds = one ? [one] : ids;
   }
   fn(RVL.c);
+}
+/* A part that is in, but whose straight edge must stay soft until the part across it is in too: the
+   mountains' foot until the lake is in, the lake's far shore until the ridges are. It is still drawn
+   through the layer (its ink is full, so only the softening is done). */
+function rvEdgeWaits(k) {
+  if (k === 'fuji+ridges') return InkReveal.state('lake') < 2;
+  if (k === 'lake') return InkReveal.state(['fuji', 'ridges']) < 2;
+  return false;
 }
 /* The part on RVL, cut to its ink and laid on the screen. */
 function rvFlush() {
   if (!rvOpen) return;
   rvOpen = null;
   if (rvOpenIds.length === 1 && rvOpenIds[0] === 'lake') rvSoftShore();
-  InkReveal.composite(ctx, RVL.cnv, rvOpenIds, PR);
+  if (rvOpenIds.length === 2 && rvOpenIds[0] === 'fuji') rvSoftFoot();
+  InkReveal.composite(ctx, RVL.cnv, rvOpenIds, PR, rvOpenRect);
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
+}
+/* The band of the screen a part can be in (device px, full width, down to the bottom): the layer is
+   cleared, cut and laid down only there, which is most of what each appearing part costs a frame. */
+var rvOpenRect = null;
+function rvRect(k) {
+  var hy = H * LAND.horizon, yf = lakeFarShoreY(), top = 0;
+  if (k === 'fuji+ridges') top = Math.min(LS.scnTop || 0, hy - H * 0.35) - 30;
+  else if (k === 'lake') top = Math.min(yf, LS.grdTop || yf) - 24;
+  else if (k === 'headland') top = Math.min(LK.headBox ? LK.headBox.y0 : 0, yf) - 40;
+  else if (k === 'bank') top = (LK.bankT || []).reduce(function(m, B) { return Math.min(m, B.y - B.ch); }, yf) - 30;
+  else if (k === 'torii') top = Math.min(TOR.gateTop || 0, yf) - 40;
+  else if (k === 'shore') top = Math.min(LS.grdTop || yf, LK.foreTop || yf) - H * 0.22;
+  if (!(top > 0)) top = 0;                         // (anything unknown: the whole screen)
+  var y = Math.min(cvBack.height, Math.floor(top * PR));
+  return { x: 0, y: y, w: cvBack.width, h: cvBack.height - y };
 }
 /* A fading part: the screen's alpha is scaled by rvMul while it draws (the screen's own context only). */
 (function rvFadeAlpha() {
@@ -20300,45 +20325,65 @@ function rvFlush() {
 })();
 
 /* ---------- soft edges ----------
-   Two edges of the picture are straight lines: the far shore (the top of the lake) and the top of
-   the ground strip along the bottom (a canvas of its own, with the near band in it). While their
-   part is still coming in, the part next to them is still faint, and nothing in a wash painting is
-   that hard, so they are dissolved into uneven tongues, easing away over the part's last fill. */
+   Nothing in a wash painting has a straight hard edge, so no two parts may meet along one while only
+   one of them is in. The ground strip along the bottom (a canvas of its own: the foot of the ground
+   the lake's part draws above it) is revealed by the lake's ink as well as the near shore's, so the two
+   are one ink where they meet. The far shore (the straight top of the lake, against the ridges, which
+   come in by their own ink) is dissolved into uneven tongues while the lake comes in, easing away over
+   its last fill. */
 function rvNoise(x, seed) {
   var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
   function h(n) { var s = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }
   return h(i) + (h(i + 1) - h(i)) * u;
 }
+var rvTongueCache = {};
 function rvTongues(c, y0, band, k, seed, maxDepth) {
-  var cols = Math.ceil(W / 12);
+  var up = band < 0;
+  band = Math.abs(band);
+  var key = [W, PR, Math.round(band), seed, Math.round(maxDepth)].join('|'), T = rvTongueCache[key];
+  if (!T) {                                        // the band's shape, made once: a fade, and a different depth in every column
+    var cv = document.createElement('canvas');
+    cv.width = Math.max(1, Math.round(W * PR)); cv.height = Math.max(1, Math.round(band * PR));
+    var g0 = cv.getContext('2d');
+    var g = g0.createLinearGradient(0, 0, 0, cv.height);
+    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.45, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    g0.fillStyle = g; g0.fillRect(0, 0, cv.width, cv.height);
+    for (var x = 0, cols = Math.ceil(W / 12); x < cols; x++) {
+      var n = 0.5 + 0.5 * (rvNoise(x * 0.7, seed) * 0.65 + rvNoise(x * 2.1, seed + 17) * 0.35);
+      var depth = Math.min(maxDepth, band * (0.25 + 1.0 * n));
+      var g2 = g0.createLinearGradient(0, 0, 0, depth * PR);
+      g2.addColorStop(0, 'rgba(0,0,0,0.92)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
+      g0.fillStyle = g2;
+      g0.fillRect(x * 12 * PR, 0, 12.5 * PR, depth * PR);
+    }
+    rvTongueCache[key] = T = cv;
+  }
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalCompositeOperation = 'destination-out';
-  var g = c.createLinearGradient(0, y0 * PR, 0, (y0 + band) * PR);
-  g.addColorStop(0, 'rgba(0,0,0,' + k.toFixed(3) + ')');
-  g.addColorStop(0.45, 'rgba(0,0,0,' + (k * 0.42).toFixed(3) + ')');
-  g.addColorStop(1, 'rgba(0,0,0,0)');
-  c.fillStyle = g;
-  c.fillRect(0, y0 * PR, c.canvas.width, band * PR);
-  for (var x = 0; x < cols; x++) {                // a different depth in every column
-    var n = 0.5 + 0.5 * (rvNoise(x * 0.7, seed) * 0.65 + rvNoise(x * 2.1, seed + 17) * 0.35);
-    var depth = Math.min(maxDepth, band * (0.25 + 1.0 * n)) * k;
-    var g2 = c.createLinearGradient(0, y0 * PR, 0, (y0 + depth) * PR);
-    g2.addColorStop(0, 'rgba(0,0,0,' + (0.92 * k).toFixed(3) + ')');
-    g2.addColorStop(1, 'rgba(0,0,0,0)');
-    c.fillStyle = g2;
-    c.fillRect(x * 12 * PR, y0 * PR, 12.5 * PR, depth * PR);
-  }
+  c.globalAlpha = Math.min(1, k);
+  if (up) { c.translate(0, Math.round(y0 * PR)); c.scale(1, -1); c.drawImage(T, 0, 0); }   // (y0 is then its lower edge)
+  else c.drawImage(T, 0, Math.round(y0 * PR));
   c.restore();
 }
-function rvSoftShore() {
-  var k = InkReveal.soft('lake');
-  if (k > 0.01) rvTongues(RVL.c, lakeFarShoreY() - 4, H * 0.11, k, 91, H);
+/* The mountains' picture carries on a little below the far shore (the lake covers it in the finished
+   scene). The ridges can come in before the lake is baked, and then that band's straight lower edge
+   shows: while the reveal runs, the picture melts away below the far shore in uneven tongues instead
+   (under the water, so it is never seen once the lake is in). */
+function rvSoftFoot() {
+  var yf = lakeFarShoreY(), band = H * 0.08, l = RVL.c;
+  rvTongues(l, yf + band, -band, 1, 77, band);      // (a negative band: the tongues reach up from below)
+  l.save();
+  l.setTransform(1, 0, 0, 1, 0, 0);
+  l.globalCompositeOperation = 'destination-out';
+  l.globalAlpha = 1;
+  l.fillStyle = '#000';                             // (an opaque fill: what it covers is taken away)
+  l.fillRect(0, Math.round((yf + band) * PR) - 1, RVL.cnv.width, RVL.cnv.height);
+  l.restore();
 }
-function rvSoftStrip(c, k) {
-  if (k <= 0.01) return;
-  rvTongues(c, 0, Math.min(H * 0.1, GH), k, 51, GH);
-  if (LS.nearH && GH - LS.nearH > 3) rvTongues(c, GH - LS.nearH, Math.min(H * 0.1, LS.nearH), k, 58, LS.nearH);
+function rvSoftShore() {
+  var k = InkReveal.state(['fuji', 'ridges']) < 2 ? 1 : InkReveal.soft('lake');   // (full while the ridges above it are not all in)
+  if (k > 0.01) rvTongues(RVL.c, lakeFarShoreY() - 4, H * 0.11, k, 91, H);
 }
 
 /* ---------- where each part's drops fall, in the order they are laid (CSS px, s) ----------
@@ -20468,7 +20513,10 @@ function dynStep(dt, t, want, skyWant) {
   if (!want || hold) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
   if (rvOn && !RV.started) rvStart(t);
-  if (rvOn && dynSetupLeft) dynSetupStep(t, false);     // what the name left to set up is carried on a little each frame, the parts coming in as it is made
+  if (rvOn && dynSetupLeft) {                     // what the name left to set up is carried on a little each frame, the parts coming in as it is made;
+    if (dt > 0.024 && !RV.gave) RV.gave = true;     // after a slow frame it gives the next one to the reveal (never two in a row)
+    else { RV.gave = false; dynSetupStep(t, false); }
+  }
   updateSkyLayer(dt, t);
 
   dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -20611,7 +20659,7 @@ function dynStep(dt, t, want, skyWant) {
   ctxG.globalAlpha = 1;
   ctxG.clearRect(0, 0, cvGround.width, cvGround.height);
   ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
-  var shSt = rvState('shore');                     // the ink reveal (8e): the strip is part of the near shore
+  var shSt = rvState(['lake', 'shore']);           // the ink reveal (8e): the strip is the foot of the ground above it, so the lake's ink shows it too
   if (shSt > 0) for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
   drawOffsetY = 0;
   if (ENV.scene === 'autumn') {
@@ -20620,7 +20668,7 @@ function dynStep(dt, t, want, skyWant) {
       ctxG.globalAlpha = 1;
       landGlow(ctxG, H);
       drawNearBand(ctxG);
-      if (shSt === 1) { InkReveal.maskInPlace(ctxG, 'shore', PR, H - GH); rvSoftStrip(ctxG, InkReveal.soft('shore')); }
+      if (shSt === 1) InkReveal.maskInPlace(ctxG, ['lake', 'shore'], PR, H - GH);   // (one ink with the ground above it: no edge where they meet)
     }
   } else if (ENV.scene === 'winter') {
     ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);

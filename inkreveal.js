@@ -436,10 +436,10 @@ function update(t, dt) {
 
 /* Cut a canvas to its parts' wet paper and ink it: a part that is done shows whole, one
    not started not at all, one appearing where its paper has been wet. */
-function cut(c, ids, pr, oy) {
+function cut(c, ids, pr, oy, rect) {
   var sts = ids.map(function (id) { var P = byId[id]; return P && P.kind === 'wash' ? partState(P) : 2; });
   if (sts.every(function (s) { return s === 2; })) return;
-  if (gpu) { cutGpu(c, ids, sts, pr, oy); return; }
+  if (gpu) { cutGpu(c, ids, sts, pr, oy, rect); return; }
   var sw = gw * cs * pr, sh = gh * cs * pr, dy = -(oy || 0) * pr, M, live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
   if (ids.length === 1) M = live.length ? live[0].mask.cnv : null;
@@ -457,6 +457,7 @@ function cut(c, ids, pr, oy) {
   }
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
+  if (rect) { c.beginPath(); c.rect(rect.x, rect.y, rect.w, rect.h); c.clip(); }   // only where the part can be (device px): less to do
   c.globalAlpha = 1;
   c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
   c.globalCompositeOperation = 'destination-in';
@@ -466,7 +467,7 @@ function cut(c, ids, pr, oy) {
   live.forEach(function (P) { c.drawImage(P.tint.cnv, 0, 0, gw, gh, 0, dy, sw, sh); });
   c.restore();
 }
-function cutGpu(c, ids, sts, pr, oy) {
+function cutGpu(c, ids, sts, pr, oy, rect) {
   var F = InkFluid.canvas, tw = InkFluid.tileW, th = InkFluid.tileH, dy = -(oy || 0) * pr, dw = W * pr, dh = H * pr;
   var live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
@@ -475,6 +476,7 @@ function cutGpu(c, ids, sts, pr, oy) {
   }
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
+  if (rect) { c.beginPath(); c.rect(rect.x, rect.y, rect.w, rect.h); c.clip(); }   // only where the part can be (device px): less to do
   c.globalAlpha = 1;
   c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
   c.globalCompositeOperation = 'destination-in';
@@ -498,17 +500,19 @@ function cutGpu(c, ids, sts, pr, oy) {
   c.restore();
 }
 /* A layer (the size of dst) cut to its parts' wet paper and inked, then drawn onto dst.
-   (The caller leaves out the drawing of parts not started.) A fading part is drawn faded. */
-function composite(dst, layer, ids, pr) {
+   (The caller leaves out the drawing of parts not started.) A fading part is drawn faded.
+   rect (device px, optional): the part is known to lie inside it, so only that much is worked on. */
+function composite(dst, layer, ids, pr, rect) {
   var c0 = performance.now();
   if (typeof ids === 'string') ids = [ids];
   var fade = ids.length === 1 && byId[ids[0]] && byId[ids[0]].kind === 'fade';
-  if (!fade) cut(layer.getContext('2d'), ids, pr, 0);
+  if (!fade) cut(layer.getContext('2d'), ids, pr, 0, rect);
   dst.save();
   dst.setTransform(1, 0, 0, 1, 0, 0);
   dst.globalCompositeOperation = 'source-over';
   dst.globalAlpha = fade ? alpha(ids[0]) : 1;
-  dst.drawImage(layer, 0, 0);
+  if (rect) dst.drawImage(layer, rect.x, rect.y, rect.w, rect.h, rect.x, rect.y, rect.w, rect.h);
+  else dst.drawImage(layer, 0, 0);
   dst.restore();
   compMs = compMs ? compMs + (performance.now() - c0 - compMs) * 0.1 : performance.now() - c0;
 }
