@@ -54,31 +54,31 @@ var LOOK = {
   engine: 'gpu',     // 'gpu': the fluid on the graphics chip (inkfluid.js, wet on wet); 'cpu': the simple wet paper below
   speed: 0.5,          // the whole reveal faster or slower
   // --- on the graphics chip (as in Inkwash) ---
-  flow: 0.78,         // how long the water keeps moving (Inkwash's FLOW)
-  swirl: 33.5,         // how strongly swirls are kept alive (vorticity)
-  push: 0.64,        // how hard the brush pushes the water (share of its own speed)
-  stir: 30,          // how hard a resting brush stirs the water (px a second)
-  bleed: 0.79,        // how much the ink bleeds into the wet paper round it
-  creep: 0.3,       // how fast the water creeps outward
-  wetSize: 3.4,      // the water brush × the ink brush
-  prewet: 0.35,      // the water goes down this long before the ink (s): wet on wet
-  load: 2,           // how much ink each brush carries
+  flow: 0.84,         // how long the water keeps moving (Inkwash's FLOW)
+  swirl: 41,         // how strongly swirls are kept alive (vorticity)
+  push: 0.88,        // how hard the brush pushes the water (share of its own speed)
+  stir: 49,          // how hard a resting brush stirs the water (px a second)
+  bleed: 1.05,        // how much the ink bleeds into the wet paper round it
+  creep: 0.33,       // how fast the water creeps outward
+  wetSize: 3.7,      // the water brush × the ink brush
+  prewet: 0.7,      // the water goes down this long before the ink (s): wet on wet
+  load: 2.55,           // how much ink each brush carries
   show: 1.15,         // how much ink it takes for the scene to show fully (less = shows sooner)
   edge: 0.25,         // darker ink where it gathers at the edges and in the swirls
-  random: 1.35,       // how much each play differs: brush paths, timing, sizes
+  random: 1.5,       // how much each play differs: brush paths, timing, sizes
   detail: 384,       // the ink's resolution (its short side)
   simRes: 192,       // the flow's resolution (its short side)
   // --- both ---
-  drop: 1.25,         // the brush and drops' size
+  drop: 0.65,         // the brush and drops' size
   water: 1,          // how much water each drop carries
   spread: 4,         // how fast the water spreads (× 60 spreading steps a second)
   ragged: 1,         // how ragged the wet edges are
   fall: 0.06,        // how much the water runs downward
-  dry: 2.3,          // drying time (s)
+  dry: 2.85,          // drying time (s)
   ink: 0.1,         // how dark the ink is while the paper is wet
   rim: 0.6,          // the darker rim at the wet edge
   grain: 0.83,        // paper grain in the ink
-  finish: 0.45,       // the last soft fill of a part (s)
+  finish: 2.05,       // the last soft fill of a part (s)
   cell: 8,           // the wet paper's cells (CSS px): smaller = finer edges, more work
   inkColour: '#262830'
 };

@@ -6819,21 +6819,21 @@ var RV_SPOT = {};                                   // where the pagoda and the 
 var RV_PARTS = [
   // id, name on the panel, kind, starts at (s), lasts (s)
   ['sky', 'Sun, moon and clouds', 'fade', 0, 1.6],
-  ['fuji', 'Mt Fuji', 'wash', 0, 2.2],
-  ['ridges', 'The ridges', 'wash', 0, 2.95],
+  ['fuji', 'Mt Fuji', 'wash', 0, 1.3],
+  ['ridges', 'The ridges', 'wash', 0, 2.4],
   ['lake', 'The lake and its shores', 'wash', 0, 2.4],
   ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 0, 2.4],
   ['torii', 'The torii line and stone lanterns', 'wash', 0, 2.4],
   ['lights', 'The lanterns\' light', 'fade', 1.45, 1.4],
-  ['bank', 'Trees on the right bank', 'wash', 2.45, 2],
-  ['maples', 'The maples', 'wash', 3.25, 2.6],
-  ['bamboo', 'The bamboo', 'wash', 3.5, 2.2],
-  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 3.45, 2.2],
-  ['creatures', 'Birds and animals', 'fade', 5.6, 1.5],
-  ['leaves', 'Falling leaves', 'fade', 5.4, 1.8],
-  ['text', 'The text, button and toolbar', 'fade', 6.4, 1.2]
+  ['bank', 'Trees on the right bank', 'wash', 0.8, 1.35],
+  ['maples', 'The maples', 'wash', 2.15, 2.6],
+  ['bamboo', 'The bamboo', 'wash', 2.75, 2.2],
+  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 1.4, 1.85],
+  ['creatures', 'Birds and animals', 'fade', 3.05, 1.5],
+  ['leaves', 'Falling leaves', 'fade', 3.95, 1],
+  ['text', 'The text, button and toolbar', 'fade', 4.1, 1.2]
 ];
-var RV_KEY = 'inkRevealLab4';
+var RV_KEY = 'inkRevealLab5';
 var RV_LOOK_DEF = JSON.parse(JSON.stringify(InkReveal.look));
 var RVS = { look: JSON.parse(JSON.stringify(InkReveal.look)), parts: {} };
 RV_PARTS.forEach(function (p) { RVS.parts[p[0]] = { on: true, at: p[3], dur: p[4] }; });
@@ -7053,6 +7053,37 @@ function rvSoftShore() {
     l.fillRect(x * 12 * PR, yf * PR, 12.5 * PR, depth * PR);
   }
   l.restore();
+}
+/* The ground strip along the bottom is a canvas of its own, so while the near shore is still coming in
+   (and especially through its long last fill, which is even over the whole strip) its top edge, and the top
+   of the near band inside it, are straight lines against the lake above. They are dissolved into uneven
+   tongues the same way as the far shore, easing away as the fill finishes. */
+function rvSoftStrip(c, k) {
+  if (k <= 0.01) return;
+  var cols = Math.ceil(W / 12), tops = [0], x, i;
+  if (NEAR.h && GH - NEAR.h > 3) tops.push(GH - NEAR.h);
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'destination-out';
+  for (i = 0; i < tops.length; i++) {
+    var y0 = tops[i], band = Math.min(H * 0.1, GH - y0);
+    if (band < 4) continue;
+    var g = c.createLinearGradient(0, y0 * PR, 0, (y0 + band) * PR);
+    g.addColorStop(0, 'rgba(0,0,0,' + k.toFixed(3) + ')');
+    g.addColorStop(0.5, 'rgba(0,0,0,' + (k * 0.4).toFixed(3) + ')');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g;
+    c.fillRect(0, y0 * PR, c.canvas.width, band * PR);
+    for (x = 0; x < cols; x++) {                  // uneven tongues, a different depth in every column
+      var n = 0.5 + 0.5 * (vnoise(x * 0.7, 51 + i * 7) * 0.65 + vnoise(x * 2.1, 29 + i * 7) * 0.35), depth = Math.min(GH - y0, band * (0.3 + 1.0 * n)) * k;
+      var g2 = c.createLinearGradient(0, y0 * PR, 0, (y0 + depth) * PR);
+      g2.addColorStop(0, 'rgba(0,0,0,' + (0.95 * k).toFixed(3) + ')');
+      g2.addColorStop(1, 'rgba(0,0,0,0)');
+      c.fillStyle = g2;
+      c.fillRect(x * 12 * PR, y0 * PR, 12.5 * PR, depth * PR);
+    }
+  }
+  c.restore();
 }
 function rvFlush() {
   if (!rvOpen) return;
@@ -7318,7 +7349,7 @@ function frame(now) {
       gctx.drawImage(NEAR.cnv, 0, Math.round((GH - NEAR.h) * PR));
       gctx.globalCompositeOperation = 'source-over';
     }
-    if (shSt === 1) InkReveal.maskInPlace(gctx, 'shore', PR, H - GH);
+    if (shSt === 1) { InkReveal.maskInPlace(gctx, 'shore', PR, H - GH); rvSoftStrip(gctx, InkReveal.soft('shore')); }
   }
 
   requestAnimationFrame(frame);
