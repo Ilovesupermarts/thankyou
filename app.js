@@ -5492,7 +5492,7 @@ function playPanel1SpecialSequence(panelEl) {
   }
   var greetWaitStart = performance.now();
   function fireBeat1WhenSceneReady() {
-    // the ink reveal is still painting the scene in: the message waits for all of it (the 4 s only count from when it has finished)
+    // the ink reveal is still painting the scene in: the message waits until the bamboo, its last part, has finished appearing (the 4 s only count from then)
     if (typeof DynBG !== 'undefined' && DynBG && DynBG.sceneBusy && DynBG.sceneBusy()) greetWaitStart = performance.now();
     if (sceneVisible() || performance.now() - greetWaitStart > 4000) { fireBeat(beat1); runBeatChain(); return; }
     panelPhraseTimers.push(setTimeout(fireBeat1WhenSceneReady, 60));
@@ -20154,8 +20154,8 @@ function dynPrelude(dt, t, skyWant) {
    part waits (rvReady) only until what it shows has been baked (the
    landscape's steps, the trees' clumps), then starts at its own time or
    straight away; its drops are worked out then, from the scene as it is.
-   The first message waits for all of it (DynBG.sceneShown is 0 until the
-   reveal has ended). If the graphics chip can't be used, the simple wet
+   The first message waits until the bamboo, the last part, has finished
+   appearing (DynBG.sceneShown is 0 until then). If the graphics chip can't be used, the simple wet
    paper on the main processor is used instead; a safety stop after 40 s
    shows whatever is left.
    ============================================================ */
@@ -20852,7 +20852,11 @@ function dynWarmGpu() {
 }
 window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
 
-return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return RV.started ? 0 : dynMaster; }, sceneBusy: function() { return RV.started; } };
+/* The bamboo is the last part the reveal paints in: once it has finished appearing the scene is all there
+   (what is left is only the birds and the falling leaves fading in), so the message comes then, not when the
+   reveal's last clean-up has ended. */
+function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
+return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); } };
 
 })();
 
