@@ -6820,20 +6820,20 @@ var RV_PARTS = [
   // id, name on the panel, kind, starts at (s), lasts (s)
   ['sky', 'Sun, moon and clouds', 'fade', 0, 1.6],
   ['fuji', 'Mt Fuji', 'wash', 0, 2.2],
-  ['ridges', 'The ridges', 'wash', 0, 2.2],
+  ['ridges', 'The ridges', 'wash', 0, 2.95],
   ['lake', 'The lake and its shores', 'wash', 0, 2.4],
   ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 0, 2.4],
   ['torii', 'The torii line and stone lanterns', 'wash', 0, 2.4],
-  ['lights', 'The lanterns\' light', 'fade', 4.6, 1.4],
-  ['bank', 'Trees on the right bank', 'wash', 3.5, 2],
-  ['maples', 'The maples', 'wash', 3.9, 2.6],
-  ['bamboo', 'The bamboo', 'wash', 4.4, 2.2],
-  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 4.8, 2.2],
+  ['lights', 'The lanterns\' light', 'fade', 1.45, 1.4],
+  ['bank', 'Trees on the right bank', 'wash', 2.45, 2],
+  ['maples', 'The maples', 'wash', 3.25, 2.6],
+  ['bamboo', 'The bamboo', 'wash', 3.5, 2.2],
+  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 3.45, 2.2],
   ['creatures', 'Birds and animals', 'fade', 5.6, 1.5],
   ['leaves', 'Falling leaves', 'fade', 5.4, 1.8],
   ['text', 'The text, button and toolbar', 'fade', 6.4, 1.2]
 ];
-var RV_KEY = 'inkRevealLab3';
+var RV_KEY = 'inkRevealLab4';
 var RV_LOOK_DEF = JSON.parse(JSON.stringify(InkReveal.look));
 var RVS = { look: JSON.parse(JSON.stringify(InkReveal.look)), parts: {} };
 RV_PARTS.forEach(function (p) { RVS.parts[p[0]] = { on: true, at: p[3], dur: p[4] }; });
