@@ -6819,13 +6819,13 @@ var RV_SPOT = {};                                   // where the pagoda and the 
 var RV_PARTS = [
   // id, name on the panel, kind, starts at (s), lasts (s)
   ['sky', 'Sun, moon and clouds', 'fade', 0, 1.6],
-  ['fuji', 'Mt Fuji', 'wash', 0.2, 2.2],
-  ['ridges', 'The ridges', 'wash', 0.9, 2.2],
-  ['lake', 'The lake and its shores', 'wash', 1.6, 2.4],
-  ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 2.3, 2.4],
-  ['torii', 'The torii line and stone lanterns', 'wash', 3.0, 2.4],
+  ['fuji', 'Mt Fuji', 'wash', 0, 2.2],
+  ['ridges', 'The ridges', 'wash', 0, 2.2],
+  ['lake', 'The lake and its shores', 'wash', 0, 2.4],
+  ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 0, 2.4],
+  ['torii', 'The torii line and stone lanterns', 'wash', 0, 2.4],
   ['lights', 'The lanterns\' light', 'fade', 4.6, 1.4],
-  ['bank', 'Trees on the right bank', 'wash', 3.5, 2.0],
+  ['bank', 'Trees on the right bank', 'wash', 3.5, 2],
   ['maples', 'The maples', 'wash', 3.9, 2.6],
   ['bamboo', 'The bamboo', 'wash', 4.4, 2.2],
   ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 4.8, 2.2],
@@ -6833,7 +6833,7 @@ var RV_PARTS = [
   ['leaves', 'Falling leaves', 'fade', 5.4, 1.8],
   ['text', 'The text, button and toolbar', 'fade', 6.4, 1.2]
 ];
-var RV_KEY = 'inkRevealLab2';
+var RV_KEY = 'inkRevealLab3';
 var RV_LOOK_DEF = JSON.parse(JSON.stringify(InkReveal.look));
 var RVS = { look: JSON.parse(JSON.stringify(InkReveal.look)), parts: {} };
 RV_PARTS.forEach(function (p) { RVS.parts[p[0]] = { on: true, at: p[3], dur: p[4] }; });
@@ -7025,9 +7025,39 @@ function rv(ids, fn) {
   }
   fn();
 }
+/* The far shore is a straight, sharp line in the finished picture, and where the lake's wash reaches it
+   the ridges above are still faint: nothing in a wash painting is that hard. While the lake is appearing
+   its top edge is dissolved over a band (in ragged, unequal tongues, as water bleeds into mist), and the
+   softening eases away over the last fill. */
+function rvSoftShore() {
+  var k = InkReveal.soft('lake');
+  if (k <= 0.01) return;
+  var l = RVL.c, yf = farShoreY(), band = H * 0.11, x, w = Math.ceil(W / 12);
+  l.save();
+  l.setTransform(1, 0, 0, 1, 0, 0);
+  l.globalCompositeOperation = 'destination-out';
+  // a smooth fade over the band, strongest at the shore line
+  var g = l.createLinearGradient(0, (yf - 6) * PR, 0, (yf + band) * PR);
+  g.addColorStop(0, 'rgba(0,0,0,' + k.toFixed(3) + ')');
+  g.addColorStop(0.45, 'rgba(0,0,0,' + (k * 0.45).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  l.fillStyle = g;
+  l.fillRect(0, (yf - 6) * PR, RVL.cnv.width, (band + 6) * PR);
+  // uneven tongues of water running up into the mist: a different depth at every column
+  for (x = 0; x < w; x++) {
+    var n = 0.5 + 0.5 * (vnoise(x * 0.7, 91) * 0.65 + vnoise(x * 2.1, 17) * 0.35), depth = band * (0.2 + 0.9 * n) * k;
+    var g2 = l.createLinearGradient(0, yf * PR, 0, (yf + depth) * PR);
+    g2.addColorStop(0, 'rgba(0,0,0,' + (0.9 * k).toFixed(3) + ')');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    l.fillStyle = g2;
+    l.fillRect(x * 12 * PR, yf * PR, 12.5 * PR, depth * PR);
+  }
+  l.restore();
+}
 function rvFlush() {
   if (!rvOpen) return;
   ctx = rvMain; rvOpen = null;
+  if (rvOpenIds.length === 1 && rvOpenIds[0] === 'lake') rvSoftShore();
   InkReveal.composite(ctx, RVL.cnv, rvOpenIds, PR);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
