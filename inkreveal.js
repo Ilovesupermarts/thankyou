@@ -133,10 +133,10 @@ function makeWash(def) {
 function plan(list) {
   parts = []; byId = {}; nWash = 0;
   list.forEach(function (d) {
-    var P = { def: d, id: d.id, kind: d.kind || 'wash', at: d.at || 0, dur: d.dur || 1, off: !!d.off,
+    var P = { def: d, id: d.id, kind: d.kind || 'wash', at: d.at || 0, nominal: d.at || 0, dur: d.dur || 1, off: !!d.off, hold: !!d.hold,
               washes: [], mask: null, tint: null, img: null, timg: null, live: false, Rc: null, Wc: null };
     if (P.kind === 'wash' && gw) {
-      P.washes = (d.washes || []).map(makeWash);
+      P.washes = typeof d.washes === 'function' ? [] : (d.washes || []).map(makeWash);      // (a function: made when the part is released)
       P.mask = canvas(gw, gh); P.tint = canvas(gw, gh);
       P.img = P.mask.c.createImageData(gw, gh); P.timg = P.tint.c.createImageData(gw, gh);
       P.Rc = new Float32Array(gw * gh); P.Wc = new Float32Array(gw * gh);
@@ -153,7 +153,7 @@ function play(t) {
     InkFluid.clear();
     if (InkFluid.state() !== 'ok') gpu = false;
     else scratchG = canvas(InkFluid.tileW, InkFluid.tileH);
-    parts.forEach(function (P) { if (P.kind === 'wash') P.strokes = strokes(P); });
+    parts.forEach(function (P) { if (P.kind === 'wash' && !P.hold) P.strokes = strokes(P); });
   }
   parts.forEach(function (P) {
     P.washes.forEach(function (Wsh) { Wsh.w.fill(0); Wsh.r.fill(0); Wsh.box = null; Wsh.ever = null; });
@@ -162,10 +162,26 @@ function play(t) {
   });
 }
 function stop() { on = false; }
+/* A part that was planned with hold: true waits (not drawn, not started) until it is released, which
+   is when what it shows has been made. It then starts at its own time, or at once if that has gone by
+   (so the reveal never waits for a slow part, and a slow part never makes the others wait). Its drops
+   (washes given as a function) are worked out at that moment, from the scene as it then is. */
+function release(id) {
+  var P = byId[id];
+  if (!P || !P.hold) return;
+  P.hold = false;
+  P.at = Math.max(P.nominal, on ? clock() : 0);
+  if (P.kind === 'wash' && gw) {
+    if (typeof P.def.washes === 'function') P.washes = (P.def.washes() || []).map(makeWash);
+    if (gpu) P.strokes = strokes(P);
+  }
+}
+function held() { return parts.filter(function (P) { return P.hold && !P.off; }).map(function (P) { return P.id; }); }
 /* Seconds since the start, on the reveal's own clock. */
 function clock() { return on ? (tNow - t0) * LOOK.speed : 1e9; }
 function partState(P) {
   if (!P || P.off) return 2;
+  if (P.hold) return 0;
   var tl = clock() - P.at;
   if (tl < 0) return 0;
   if (tl < P.dur + (P.kind === 'wash' ? LOOK.finish : 0)) return 1;
@@ -180,13 +196,14 @@ function state(ids) {
 function alpha(id) {
   var P = byId[id];
   if (!P || P.off || !on) return 1;
+  if (P.hold) return 0;
   return smooth(0, 1, (clock() - P.at) / Math.max(0.05, P.dur));
 }
 /* 1 while a part is appearing, easing to 0 over its last soft fill: for softening a hard edge of the
    picture (the far shore) only as long as the wash is still working there, so nothing pops at the end. */
 function soft(id) {
   var P = byId[id];
-  if (!P || P.off || !on) return 0;
+  if (!P || P.off || !on || P.hold) return 0;
   var tl = clock() - P.at;
   if (tl < 0) return 0;
   return 1 - smooth(P.dur * 0.6, P.dur + LOOK.finish, tl);
@@ -505,5 +522,5 @@ function stats() {
 }
 
 window.InkReveal = { look: LOOK, setup: setup, plan: plan, play: play, stop: stop, update: update, state: state, alpha: alpha,
-                     composite: composite, maskInPlace: maskInPlace, soft: soft, running: running, clock: clock, stats: stats };
+                     composite: composite, maskInPlace: maskInPlace, soft: soft, release: release, held: held, running: running, clock: clock, stats: stats };
 })();

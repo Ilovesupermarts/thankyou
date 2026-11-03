@@ -5492,6 +5492,8 @@ function playPanel1SpecialSequence(panelEl) {
   }
   var greetWaitStart = performance.now();
   function fireBeat1WhenSceneReady() {
+    // the ink reveal is still painting the scene in: the message waits for all of it (the 4 s only count from when it has finished)
+    if (typeof DynBG !== 'undefined' && DynBG && DynBG.sceneBusy && DynBG.sceneBusy()) greetWaitStart = performance.now();
     if (sceneVisible() || performance.now() - greetWaitStart > 4000) { fireBeat(beat1); runBeatChain(); return; }
     panelPhraseTimers.push(setTimeout(fireBeat1WhenSceneReady, 60));
   }
@@ -7770,7 +7772,7 @@ function triggerKoiStart() {
            scenery and the greeting text (revealNavControls, below). The
            timer is a fallback so they always come. */
         navControlsHeld = true;
-        koiPushTimer(setTimeout(revealNavControls, 9000));
+        koiPushTimer(setTimeout(revealNavControls, 45000));
         if (blossomScreen) {
           blossomScreen.classList.remove('visible');
           blossomScreen.style.opacity = '';
@@ -14961,7 +14963,7 @@ function gfxPoll(dt) {
 }
 var gfxBeats = 0;
 function drawTree(ctx, t) {
-  if (ENV.scene === 'autumn') drawKoyoTrees(ctx, t);
+  if (ENV.scene === 'autumn' && !(RV.started && dynSetupLeft)) drawKoyoTrees(ctx, t);
 }
 
 /* ============================================================
@@ -15861,7 +15863,7 @@ function updateLandscape(t, bedBatch) {
   if (!win && LS.ready && !LS.floorBuilt) buildBed(bedBatch);
 }
 function drawLandscape(c, dt) {
-  if ((ENV.scene !== 'autumn' && ENV.scene !== 'winter') || !LS.ready) return;
+  if ((ENV.scene !== 'autumn' && ENV.scene !== 'winter') || !(LS.ready || RV.started)) return;    // (the ink reveal, 8e, shows each part once it is baked)
   var P = ENV.scene === 'winter' ? WINT : LAND;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
@@ -15885,6 +15887,7 @@ function drawLandscape(c, dt) {
   }
   });
   rvDraw('sky', c, function(c) {
+    if (RV.started && (!LS.key || LAND_MTN.job)) return;               // (the mountains are not baked yet: Fuji's place is not known)
     c.setTransform(1, 0, 0, 1, 0, 0);
     if (ENV.scene === 'autumn' && fwShow) fwShow.drawFront(c, LS.refl3d ? LS.REFL.cnv : null);   // the bursts' light on the mountains
     drawFrontClouds(c, lastT, dt);                                     // the clouds drifting in front of Fuji
@@ -20093,7 +20096,7 @@ function dynPrelude(dt, t, skyWant) {
     if (naming && nowMs >= nameLandsAt) {
       if (!dynBegun) dynBegin(true);
       else dynSetupStep(t, nowMs < nameLeavesAt);
-      if (dynBegun && !dynSetupLeft && nowMs < nameLeavesAt) rvPrepare();   // the ink reveal's fluid, set up while the name stands still
+      if (dynBegun && nowMs < nameLeavesAt) rvPrepare();   // the ink reveal's fluid, set up while the name stands still
     }
     updateSkyLayer(dt, t);
   }
@@ -20120,9 +20123,15 @@ function dynPrelude(dt, t, skyWant) {
    and clouds, the birds, the falling leaves) is drawn with its alpha
    scaled. The fluid's graphics context is set up while the name stands
    still (rvPrepare), so the first frame of the reveal has no set-up to
-   do. If the graphics chip can't be used, the simple wet paper on the
-   main processor is used instead; if the scene isn't ready within 3 s,
-   or anything else goes wrong, the scene simply fades in as before.
+   do. The reveal starts on the first frame after the name begins to fade,
+   so there is no pause: the sun and sky come in at once, and every other
+   part waits (rvReady) only until what it shows has been baked (the
+   landscape's steps, the trees' clumps), then starts at its own time or
+   straight away; its drops are worked out then, from the scene as it is.
+   The first message waits for all of it (DynBG.sceneShown is 0 until the
+   reveal has ended). If the graphics chip can't be used, the simple wet
+   paper on the main processor is used instead; a safety stop after 40 s
+   shows whatever is left.
    ============================================================ */
 var RV_LOOK = { engine: 'gpu', speed: 0.5, flow: 0.84, swirl: 41, push: 0.88, stir: 49, bleed: 1.05, creep: 0.33, wetSize: 3.7,
                 prewet: 0.7, load: 2.55, show: 1.15, edge: 0.25, random: 1.5, detail: 384, simRes: 192, drop: 0.65, water: 1,
@@ -20145,7 +20154,9 @@ var RV_PARTS = [
 var RV_KIND = {};
 RV_PARTS.forEach(function(p) { RV_KIND[p[0]] = p[1]; });
 var RV_SPOT = {};                                  // where the pagoda and the hall stand (set as the headland is baked)
-var RV = { started: false, done: false, waitFrom: 0, prepared: false, W: 0, H: 0 };
+var RV = { started: false, done: false, waitFrom: 0, prepared: false, W: 0, H: 0, log: [] };
+window.RVDebug = RV;                              // for looking at its timeline in the console
+function rvLog(what) { RV.log.push(Math.round(performance.now()) + ' ' + what); }
 
 function rvAvailable() { return typeof InkReveal !== 'undefined' && !dynReduceMotion; }
 function rvLookIn() { for (var k in RV_LOOK) InkReveal.look[k] = RV_LOOK[k]; }
@@ -20153,6 +20164,7 @@ function rvLookIn() { for (var k in RV_LOOK) InkReveal.look[k] = RV_LOOK[k]; }
 function rvPrepare() {
   if (RV.prepared || !rvAvailable() || ENV.scene !== 'autumn') return;
   RV.prepared = true;
+  rvLog('prepare');
   rvLookIn();
   if (RV_LOOK.engine === 'gpu' && typeof InkFluid !== 'undefined' && InkFluid.init()) {
     var nWash = RV_PARTS.filter(function(p) { return p[1] === 'wash'; }).length;
@@ -20160,15 +20172,35 @@ function rvPrepare() {
   }
   gfxNote('ink reveal ready: ' + (typeof InkFluid !== 'undefined' ? InkFluid.state() : 'no inkfluid.js'));
 }
-/* True while the scene should wait for the reveal to start it (dynStep holds its fade meanwhile). */
-function rvWaiting(t) {
+/* Whether the reveal is to bring the scene in (this session, in autumn). Once the scene is wanted it
+   starts at once, on the first frame after the name begins to fade: the sun and sky come in while the
+   rest is still being baked, and every other part waits (rvReady) until what it shows has been made, then
+   starts at its own time or straight away. So there is no pause after the name, whatever the baking has
+   left to do. Returns true while the old one-picture fade should stay on hold (never now). */
+function rvWanted(t) {
   if (RV.started || RV.done) return false;
   if (!rvAvailable() || ENV.scene !== 'autumn') { RV.done = true; return false; }   // the scene came in some other way: not this session
-  if (!RV.waitFrom) RV.waitFrom = t;
-  if (LS.ready && !LS.step && LK.ready && TOR.ready && !dynSetupLeft) { rvStart(t); return false; }
-  if (t - RV.waitFrom > 3) { RV.done = true; gfxNote('ink reveal skipped: the scene was not ready'); return false; }   // the plain fade
-  updateLandscape(t);                             // (the frame is held back meanwhile, so the bake is carried on here)
   return true;
+}
+/* Which step of the landscape's bake (updateLandscape: 5, 6, 8, 2, 7, 3, 4) has been done. */
+var RV_STEPS = [5, 6, 8, 2, 7, 3, 4];
+function rvStepDone(n) {
+  if (!LS.key) return false;                       // not started
+  if (LAND_MTN.job) return false;                  // (the mountains first)
+  if (!LS.step) return !!LS.ready;
+  return RV_STEPS.indexOf(LS.step) > RV_STEPS.indexOf(n);
+}
+/* Has what a part shows been made? */
+function rvReady(id) {
+  switch (id) {
+    case 'fuji': case 'ridges': return !!LS.key && !LAND_MTN.job;
+    case 'headland': return rvStepDone(5);
+    case 'lake': return rvStepDone(6) && rvStepDone(2);
+    case 'bank': return rvStepDone(8);
+    case 'shore': return rvStepDone(7) && rvStepDone(3);
+    case 'torii': return rvStepDone(4);
+    default: return !dynSetupLeft && rvStepDone(4);   // the maples, the bamboo, the birds and the falling leaves: the trees' clumps, the first leaves
+  }
 }
 function rvStart(t) {
   try {
@@ -20176,10 +20208,12 @@ function rvStart(t) {
     rvLookIn();
     InkReveal.setup(W, H);
     InkReveal.plan(RV_PARTS.map(function(p) {
-      return { id: p[0], kind: p[1], at: p[2], dur: p[3], washes: p[1] === 'wash' ? rvSeeds(p[0]) : [] };
+      return { id: p[0], kind: p[1], at: p[2], dur: p[3], hold: p[0] !== 'sky',
+               washes: p[1] === 'wash' ? function() { return rvSeeds(p[0]); } : [] };
     }));
     InkReveal.play(t);
-    RV.started = true; RV.W = W; RV.H = H;
+    RV.started = true; RV.W = W; RV.H = H; RV.t0 = t; RV.shown = {};
+    rvLog('started');
   } catch (e) {
     RV.done = true; RV.started = false;
     gfxNote('ink reveal failed: ' + (e && e.message));
@@ -20202,7 +20236,12 @@ function rvRunning() { return RV.started; }
 /* Once a frame, before the drawing. It ends when the last part is in (or if the theme or the size changes). */
 function rvTick(t, dt) {
   if (!RV.started) return;
-  if (ENV.scene !== 'autumn' || W !== RV.W || H !== RV.H || !InkReveal.running()) { rvStop(); return; }
+  if (ENV.scene !== 'autumn' || W !== RV.W || H !== RV.H) { rvStop(); return; }
+  var held = InkReveal.held();
+  for (var i = 0; i < held.length; i++) {
+    if (rvReady(held[i])) { InkReveal.release(held[i]); rvLog('released ' + held[i]); }
+  }
+  if (!InkReveal.running() || t - RV.t0 > 40) { rvStop(); return; }     // (40 s: whatever is wrong, the scene is shown in the end)
   InkReveal.update(t, dt);
 }
 /* 0 not started, 1 appearing, 2 shown (and 2 whenever the reveal isn't running). */
@@ -20396,9 +20435,11 @@ function rvSeeds(id) {
     return [{ seeds: out, fall: 0.5 }];
   }
   if (id === 'bamboo') {                                           // each stem from its foot upward
+    renderBamboo(lastT);                                           // (so the groves are made)
     bambooGroves.forEach(function(Gr, gi) {
-      if (!(Gr.a > 0)) return;
+      if (!Gr.B.show) return;
       Gr.culms.forEach(function(C, ci) {
+        bamShape(C, Gr, lastT, true, 1);                           // its curve standing still: it may not have been drawn yet, and then it has none
         var m = C.px.length - 1;
         for (var j = 0; j <= 4; j++) {
           var i = Math.round(m * j / 4);
@@ -20419,13 +20460,15 @@ function rvSeeds(id) {
 }
 
 function dynStep(dt, t, want, skyWant) {
-  var hold = want && dynBegun && dynHoldForSetup(t);
-  if (want && !hold && rvWaiting(t)) hold = true;      // the ink reveal (8e) brings the scene in: the fade waits for it
+  var rvOn = want && (RV.started || rvWanted(t));     // the ink reveal (8e) brings the scene in, not the fade or the hold below
+  var hold = want && dynBegun && !rvOn && dynHoldForSetup(t);
   dynMaster += ((want && !hold ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
-  if (want && rvRunning()) dynMaster = 1;            // the ink brings the scene in, not the fade
+  if (rvOn) dynMaster = 1;
   skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
   if (!want || hold) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
+  if (rvOn && !RV.started) rvStart(t);
+  if (rvOn && dynSetupLeft) dynSetupStep(t, false);     // what the name left to set up is carried on a little each frame, the parts coming in as it is made
   updateSkyLayer(dt, t);
 
   dynScrollY = window.pageYOffset || document.documentElement.scrollTop || 0;
@@ -20459,7 +20502,7 @@ function dynStep(dt, t, want, skyWant) {
     ensureTree();
   }
 
-  updateLandscape(t);
+  if (!(rvOn && dynSetupLeft)) updateLandscape(t);      // (the set-up step above does it meanwhile)
   spawnTick(dt, t);
   updateGusts(dt);
   var nFront = 0;
@@ -20512,7 +20555,7 @@ function dynStep(dt, t, want, skyWant) {
   }
   rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
 
-  if (ENV.scene === 'autumn') buildKoyoLayers(t);   // the trees' layers first: the fireworks are cut out behind them
+  if (ENV.scene === 'autumn' && !(rvOn && dynSetupLeft)) buildKoyoLayers(t);   // the trees' layers first: the fireworks are cut out behind them (not before their clumps are baked)
   fireworksUpdate(dt, t);
 
   // ---- back canvas ----
@@ -20713,7 +20756,9 @@ function furinGust(x) {
   }
   return gs;
 }
-return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return dynMaster; } };
+/* sceneShown: how much of the scene is in (the first message waits for it); sceneBusy: the ink reveal is
+   still bringing it in, so the message waits for all of it. */
+return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return RV.started ? 0 : dynMaster; }, sceneBusy: function() { return RV.started; } };
 
 })();
 
