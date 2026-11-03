@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v256';
+const CACHE = 'thankyou-v257';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -18,6 +18,8 @@ const ASSETS = [
   './snowheaps.js',
   './lakeside.js',
   './water.js',
+  './inkfluid.js',
+  './inkreveal.js',
   './textures/waternormals.jpg',
   './manifest.json',
   './presets.json',

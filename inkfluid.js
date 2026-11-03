@@ -197,6 +197,14 @@ function size(w, h, simBase, dyeBase, nSlots) {
   shown = [0, 1, 2].map(function () { return double(dye.w, dye.h, gl.RGBA16F, gl.RGBA, gl.LINEAR); });
   cnv.width = dye.w * 2; cnv.height = dye.h * slots;
 }
+/* Let go of the pictures (after the reveal): the context stays, tiny, so it is quick to size again. */
+function release() {
+  if (st !== 'ok') return;
+  [vel, div, curl, pres, wet].concat(ink, shown).forEach(function (t) { if (t) t.free(); });
+  vel = div = curl = pres = wet = null; ink = []; shown = [];
+  cnv.width = 1; cnv.height = 1;
+  sizeKey = '';
+}
 function clear() {
   if (st !== 'ok') return;
   [vel, pres, wet].concat(ink, shown).forEach(function (d) {
@@ -343,7 +351,7 @@ function draw(list, L) {
 }
 
 window.InkFluid = {
-  init: init, size: size, clear: clear, step: step, draw: draw,
+  init: init, size: size, release: release, clear: clear, step: step, draw: draw,
   wet: putWet, push: push, ink: putInk,
   get canvas() { return cnv; }, get tileW() { return dye.w; }, get tileH() { return dye.h; },
   slotY: function (s) { return s * dye.h; },

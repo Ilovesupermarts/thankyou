@@ -78,7 +78,7 @@ var LOOK = {
   ink: 0.1,         // how dark the ink is while the paper is wet
   rim: 0.6,          // the darker rim at the wet edge
   grain: 0.83,        // paper grain in the ink
-  finish: 2.05,       // the last soft fill of a part (s)
+  finish: 0.95,       // the last soft fill of a part (s)
   cell: 8,           // the wet paper's cells (CSS px): smaller = finer edges, more work
   inkColour: '#262830'
 };

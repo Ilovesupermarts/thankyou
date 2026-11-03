@@ -6818,22 +6818,22 @@ window.birdLab = {
 var RV_SPOT = {};                                   // where the pagoda and the hall stand (set as the headland is baked)
 var RV_PARTS = [
   // id, name on the panel, kind, starts at (s), lasts (s)
-  ['sky', 'Sun, moon and clouds', 'fade', 0, 1.6],
-  ['fuji', 'Mt Fuji', 'wash', 0, 1.3],
-  ['ridges', 'The ridges', 'wash', 0, 2.4],
-  ['lake', 'The lake and its shores', 'wash', 0, 2.4],
-  ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 0, 2.4],
-  ['torii', 'The torii line and stone lanterns', 'wash', 0, 2.4],
-  ['lights', 'The lanterns\' light', 'fade', 1.45, 1.4],
-  ['bank', 'Trees on the right bank', 'wash', 0.8, 1.35],
-  ['maples', 'The maples', 'wash', 2.15, 2.6],
-  ['bamboo', 'The bamboo', 'wash', 2.75, 2.2],
-  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 1.4, 1.85],
-  ['creatures', 'Birds and animals', 'fade', 3.05, 1.5],
-  ['leaves', 'Falling leaves', 'fade', 3.95, 1],
+  ['sky', 'Sun, moon and clouds', 'fade', 0, 1],
+  ['fuji', 'Mt Fuji', 'wash', 0, 2],
+  ['ridges', 'The ridges', 'wash', 0, 1.3],
+  ['lake', 'The lake and its shores', 'wash', 0, 1],
+  ['headland', 'Headland: pagoda, shrine, cedars', 'wash', 0, 1.8],
+  ['torii', 'The torii line and stone lanterns', 'wash', 0, 1.8],
+  ['lights', 'The lanterns\' light', 'fade', 0, 1.8],
+  ['bank', 'Trees on the right bank', 'wash', 0, 1.5],
+  ['maples', 'The maples', 'wash', 1.9, 2],
+  ['bamboo', 'The bamboo', 'wash', 3.5, 1.5],
+  ['shore', 'The near shore: susuki, lilies, leaves', 'wash', 0, 0.9],
+  ['creatures', 'Birds and animals', 'fade', 3.5, 1],
+  ['leaves', 'Falling leaves', 'fade', 3.5, 1],
   ['text', 'The text, button and toolbar', 'fade', 4.1, 1.2]
 ];
-var RV_KEY = 'inkRevealLab5';
+var RV_KEY = 'inkRevealLab6';
 var RV_LOOK_DEF = JSON.parse(JSON.stringify(InkReveal.look));
 var RVS = { look: JSON.parse(JSON.stringify(InkReveal.look)), parts: {} };
 RV_PARTS.forEach(function (p) { RVS.parts[p[0]] = { on: true, at: p[3], dur: p[4] }; });
