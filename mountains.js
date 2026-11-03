@@ -26,6 +26,9 @@
                                       // reflectance map, as reflectance()): call job.step()
                                       // once a frame; it returns null until the last band,
                                       // then a 2D canvas (false if the context was lost)
+     Mountains.start(o, 8, mode, 6)   // the same, but each step() keeps the graphics chip
+                                      // busy only about 6 ms (bands sized as it goes)
+     Mountains.warm()                 // compile the shaders now (a pause that does not show)
      Mountains.state()                // 'ok', 'lost' (the graphics chip took the context
                                       // away for a moment: try again soon) or 'none'
      Mountains.losses()               // how many times it was taken away: if this has gone
@@ -513,7 +516,13 @@ function drawInto(o, mode, PW, PH, clear, band) {
    gives the picture back as a 2D canvas. step() returns null while it is
    not done yet, and false if the context was lost on the way. */
 var gen = 0;                                          // goes up with every loss, so a job from before one stops
-function start(o, bands, mode) {
+/* budget (ms, optional): instead of `bands` even bands, each step() draws only as many rows as
+   take about this long on the graphics chip (timed as it goes: a few rows to begin with, then
+   more or fewer as each band turns out quicker or slower than that), and the picture is read
+   back a strip a step as well. Nothing then holds the chip up for more than a few ms at a time,
+   so the page goes on moving smoothly while the mountains are drawn. The picture is the same.
+   step(ms) can give that step a budget of its own (a frame where a long one does not show). */
+function start(o, bands, mode, budget) {
   if (!init()) return null;
   var PW = o.width, PH = o.height, n = Math.max(1, bands || 8), k = 0, myGen = gen;
   var fb = gl.createFramebuffer(), tx = gl.createTexture(), db = gl.createRenderbuffer();
@@ -527,28 +536,20 @@ function start(o, bands, mode) {
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
   gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, db);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  // the timed way (budget): rows drawn so far (from the bottom), the next band's rows, rows read back so far
+  var drawn = 0, rows = Math.max(4, Math.ceil(PH / 48)), minRows = Math.max(4, Math.ceil(PH / 64)), maxRows = Math.ceil(PH / 4);
+  var readN = 0, readRows = Math.max(8, Math.ceil(PH / 16)), out = null, c2 = null, one = new Uint8Array(4);
   function free() {
     if (gen !== myGen || !gl) return;
     gl.deleteFramebuffer(fb); gl.deleteTexture(tx); gl.deleteRenderbuffer(db);
   }
-  function step() {
-    if (gen !== myGen || !init()) return false;
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-    var y0 = Math.floor(PH * k / n), y1 = Math.floor(PH * (k + 1) / n);
-    drawInto(o, mode || 0, PW, PH, k === 0, [y0, y1]);
-    k++;
-    if (k < n) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.flush(); return gl.isContextLost() ? false : null; }
-    // done: read it back (premultiplied, upside down) into a 2D canvas
-    var px = new Uint8Array(PW * PH * 4);
-    gl.readPixels(0, 0, PW, PH, gl.RGBA, gl.UNSIGNED_BYTE, px);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-    var lostNow = gl.isContextLost();
-    free();
-    if (lostNow) return false;
-    var out = document.createElement('canvas'); out.width = PW; out.height = PH;
-    var c2 = out.getContext('2d'), img = c2.createImageData(PW, PH), d2 = img.data, row = PW * 4;
-    for (var y = 0; y < PH; y++) {
-      var src = (PH - 1 - y) * row, dst = y * row;
+  /* Rows [y0, y1) (from the bottom) of the finished picture, un-premultiplied, into out (top down). */
+  function readBack(y0, y1) {
+    var h = y1 - y0, px = new Uint8Array(PW * h * 4);
+    gl.readPixels(0, y0, PW, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var img = c2.createImageData(PW, h), d2 = img.data, row = PW * 4;
+    for (var y = 0; y < h; y++) {
+      var src = (h - 1 - y) * row, dst = y * row;
       for (var x = 0; x < row; x += 4) {
         var a = px[src + x + 3];
         if (!a) continue;
@@ -556,10 +557,62 @@ function start(o, bands, mode) {
         d2[dst + x] = px[src + x] * m; d2[dst + x + 1] = px[src + x + 1] * m; d2[dst + x + 2] = px[src + x + 2] * m; d2[dst + x + 3] = a;
       }
     }
-    c2.putImageData(img, 0, 0);
+    c2.putImageData(img, 0, PH - y1);
+  }
+  function makeOut() { out = document.createElement('canvas'); out.width = PW; out.height = PH; c2 = out.getContext('2d'); }
+  function stepTimed(B) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    var t0 = performance.now(), ms;
+    if (drawn < PH) {                                   // a band, as many rows as fit the budget
+      var y0 = drawn, y1 = Math.min(PH, y0 + rows);
+      drawInto(o, mode || 0, PW, PH, y0 === 0, [y0, y1]);
+      gl.readPixels(0, y0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, one);   // waits for it, so it is timed truly
+      ms = performance.now() - t0;
+      drawn = y1;
+      // the next band: scaled to the budget, but growing at most by half again (the rows above may cost more)
+      rows = Math.round(Math.max(minRows, Math.min(maxRows, (y1 - y0) * Math.max(0.4, Math.min(1.5, B / Math.max(ms, 0.25))))));
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      return gl.isContextLost() ? false : null;
+    }
+    if (!out) makeOut();                                // then the read-back, a strip a step
+    var r0 = readN, r1 = Math.min(PH, r0 + readRows);
+    readBack(r0, r1);
+    ms = performance.now() - t0;
+    readN = r1;
+    readRows = Math.round(Math.max(8, Math.min(PH, (r1 - r0) * Math.max(0.5, Math.min(2, B / Math.max(ms, 0.25))))));
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (gl.isContextLost()) { free(); return false; }
+    if (readN < PH) return null;
+    free();
+    return out;
+  }
+  function step(ms) {
+    if (gen !== myGen || !init()) return false;
+    var B = ms || budget;
+    if (B) return stepTimed(B);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    var y0 = Math.floor(PH * k / n), y1 = Math.floor(PH * (k + 1) / n);
+    drawInto(o, mode || 0, PW, PH, k === 0, [y0, y1]);
+    k++;
+    if (k < n) { gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.flush(); return gl.isContextLost() ? false : null; }
+    // done: read it back (premultiplied, upside down) into a 2D canvas
+    if (!out) makeOut();
+    var lostNow = gl.isContextLost();
+    if (!lostNow) readBack(0, PH);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    lostNow = lostNow || gl.isContextLost();
+    free();
+    if (lostNow) return false;
     return out;
   }
   return { step: step, bands: n, cancel: free };
+}
+/* Makes the graphics context and its program, and draws a tiny picture once, so the slow first
+   compiling of the shaders is done now (at a moment when a pause does not show) and not when the
+   mountains are first wanted. */
+function warm() {
+  if (!init()) return false;
+  return !!render({ width: 8, height: 8, screenW: 400, screenH: 300, horizon: 180 });
 }
 
 /* The same mountains as render(o), as a map of how strongly each point
@@ -570,6 +623,6 @@ function start(o, bands, mode) {
    so draw that one away first. */
 function reflectance(o) { return render(o, 1); }
 
-return { render: render, reflectance: reflectance, start: start, supported: function () { return init(); }, state: state,
+return { render: render, reflectance: reflectance, start: start, warm: warm, supported: function () { return init(); }, state: state,
          losses: function () { return losses; } };
 })();
