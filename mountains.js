@@ -88,7 +88,8 @@ var Mountains = (function () {
 
 var gl = null, cnv = null, prog = null, failed = false;
 var grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
-var U = {};
+var U = {}, UM = {};
+var progG = null, UG = {}, progS = null, US = {}, zTex = null;   // the two passes of a timed job (see start)
 
 /* ---------- shared GLSL: the height of the ground at any (x, z) ---------- */
 var HEIGHT_GLSL = [
@@ -312,6 +313,40 @@ HEIGHT_GLSL,
 '}'
 ].join('\n');
 
+/* The two passes of a timed job (start with a budget). Drawing the mesh is the same work for every
+   band, so the picture is made in two passes: first the mesh once, keeping for each pixel only the
+   distance of the point of the ground it shows (FS_G: its 32 bits packed into the 4 bytes of a
+   picture); then the light, the colours and the shadows (the costly part), band by band over the
+   screen (FS_S, the same FS as above, finding that point again from the pixel and its distance).
+   Each pixel is then lit once, where drawing the mesh lit every face behind it too. */
+var FS_G = [
+'#version 300 es',
+'precision highp float;',
+'precision highp int;',
+'in vec3 vPos;',
+'out vec4 outZ;',
+'void main() {',
+'  uint b = floatBitsToUint(vPos.z);',
+'  outZ = vec4(uvec4(b & 255u, (b >> 8) & 255u, (b >> 16) & 255u, b >> 24)) / 255.0;',
+'}'
+].join('\n');
+var VS_Q = [
+'#version 300 es',
+'void main() {',
+'  vec2 p = vec2(float((gl_VertexID << 1) & 2), float(gl_VertexID & 2));',
+'  gl_Position = vec4(p * 2.0 - 1.0, 0.0, 1.0);',
+'}'
+].join('\n');
+var FS_S = FS.replace('in vec3 vPos;', 'uniform highp sampler2D uZ;\nuniform vec2 uScreen, uPix;\nuniform float uEye;')
+  .replace('void main() {\n  vec3 p = vPos;', [
+'void main() {',
+'  uvec4 q = uvec4(round(texelFetch(uZ, ivec2(gl_FragCoord.xy), 0) * 255.0));',
+'  float z = uintBitsToFloat(q.x | (q.y << 8) | (q.z << 16) | (q.w << 24));',
+'  if (!(z > 0.0)) discard;                                   // nothing of the mountains here',
+'  vec2 ndc = gl_FragCoord.xy / uPix * 2.0 - 1.0;              // (the same camera as VS)',
+'  vec3 vPos = vec3(ndc.x * z * uScreen.x / (2.0 * uF), (ndc.y - (1.0 - 2.0 * uEye / uScreen.y)) * z * uScreen.y / (2.0 * uF) + uCamH, z);',
+'  vec3 p = vPos;'].join('\n'));
+
 function compile(type, src) {
   var s = gl.createShader(type);
   gl.shaderSource(s, src);
@@ -340,7 +375,7 @@ function create() {
   cnv.addEventListener('webglcontextlost', function (ev) {
     ev.preventDefault();
     if (this !== cnv) return;                        // an old canvas, given up on (see init)
-    lost = true; ready = false; losses++; gen++; lostAt = performance.now(); prog = null; U = {};
+    lost = true; ready = false; losses++; gen++; lostAt = performance.now(); prog = null; U = UM = {}; progG = progS = null; UG = US = {};
     grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
   });
   cnv.addEventListener('webglcontextrestored', function () { if (this === cnv) lost = false; });
@@ -357,15 +392,30 @@ function setup() {
     if (!gl.isContextLost()) { console.warn('Mountains: link', gl.getProgramInfoLog(prog)); failed = true; }
     return false;
   }
-  U = {};
-  var n = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
-  for (var i = 0; i < n; i++) {
-    var name = gl.getActiveUniform(prog, i).name;
-    U[name] = gl.getUniformLocation(prog, name);
+  U = UM = uniforms(prog);
+  // the two passes of a timed job; without them a timed job draws the mesh band by band as before
+  progG = progS = null; UG = US = {};
+  var fg = compile(gl.FRAGMENT_SHADER, FS_G), vq = compile(gl.VERTEX_SHADER, VS_Q), fsS = compile(gl.FRAGMENT_SHADER, FS_S);
+  if (fg && vq && fsS) {
+    var pg = link(vs, fg, true), ps = link(vq, fsS, false);
+    if (pg && ps) { progG = pg; UG = uniforms(pg); progS = ps; US = uniforms(ps); }
   }
   grid = { cols: 0, rows: 0, vbo: null, ibo: null, count: 0 };
   ready = true;
   return true;
+}
+function link(v, f, withGrid) {
+  var p = gl.createProgram();
+  gl.attachShader(p, v); gl.attachShader(p, f);
+  if (withGrid) gl.bindAttribLocation(p, 0, 'aGrid');
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) { if (!gl.isContextLost()) console.warn('Mountains: link', gl.getProgramInfoLog(p)); return null; }
+  return p;
+}
+function uniforms(p) {
+  var m = {}, n = gl.getProgramParameter(p, gl.ACTIVE_UNIFORMS);
+  for (var i = 0; i < n; i++) { var name = gl.getActiveUniform(p, i).name; m[name] = gl.getUniformLocation(p, name); }
+  return m;
 }
 function init() {
   if (failed || !create()) return false;
@@ -410,8 +460,9 @@ function render(o, mode) {
   return cnv;
 }
 /* The drawing itself, into whatever is bound, PW × PH px; clear: start afresh; band: [y0, y1) px
-   from the bottom, or null for all of it. */
-function drawInto(o, mode, PW, PH, clear, band) {
+   from the bottom, or null for all of it. pass: none, the whole drawing; 'g' the mesh's distances
+   only; 's' the light and colours from those distances (zTex), over the band only (see start). */
+function drawInto(o, mode, PW, PH, clear, band, pass) {
   var W = o.screenW, H = o.screenH;
 
   // The camera: a little above the ground, looking level. Its eye line sits
@@ -436,10 +487,12 @@ function drawInto(o, mode, PW, PH, clear, band) {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
   }
   if (band) { gl.enable(gl.SCISSOR_TEST); gl.scissor(0, band[0], PW, band[1] - band[0]); }
-  gl.enable(gl.DEPTH_TEST);
-  gl.depthFunc(gl.LESS);
+  if (pass === 's') gl.disable(gl.DEPTH_TEST);
+  else { gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LESS); }
   gl.disable(gl.CULL_FACE);
-  gl.useProgram(prog);
+  var P = pass === 'g' ? progG : pass === 's' ? progS : prog;
+  U = pass === 'g' ? UG : pass === 's' ? US : UM;
+  gl.useProgram(P);
 
   var cols = Math.min(1600, Math.max(200, Math.round(PW / 1.5)));
   var rows = Math.min(900, Math.max(150, Math.round(PH / 1.2)));
@@ -504,7 +557,12 @@ function drawInto(o, mode, PW, PH, clear, band) {
 
   u1('uMode', mode || 0);
 
-  gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);
+  if (pass === 's') {
+    u2('uScreen', W, H); u2('uPix', PW, PH); u1('uEye', eye);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, zTex);
+    if (U.uZ) gl.uniform1i(U.uZ, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  } else gl.drawElements(gl.TRIANGLES, grid.count, gl.UNSIGNED_INT, 0);
   gl.disable(gl.SCISSOR_TEST);
 }
 
@@ -524,6 +582,7 @@ var gen = 0;                                          // goes up with every loss
    step(ms) can give that step a budget of its own (a frame where a long one does not show). */
 function start(o, bands, mode, budget) {
   if (!init()) return null;
+  if (budget && progG && progS) return startTwoPass(o, mode, budget);
   var PW = o.width, PH = o.height, n = Math.max(1, bands || 8), k = 0, myGen = gen;
   var fb = gl.createFramebuffer(), tx = gl.createTexture(), db = gl.createRenderbuffer();
   gl.bindTexture(gl.TEXTURE_2D, tx);
@@ -607,12 +666,120 @@ function start(o, bands, mode, budget) {
   }
   return { step: step, bands: n, cancel: free };
 }
+/* A timed job in two passes (see FS_G, FS_S): its first step draws the mesh once, keeping each
+   pixel's distance (the mesh is all the same work, so it cannot be split, but it is the cheap part);
+   every later step lights as many bands of rows as fit in the budget (timed as it goes), and then
+   the picture is read back a strip at a time. The picture is the same as drawing the mesh lit. */
+function startTwoPass(o, mode, budget) {
+  var PW = o.width, PH = o.height, myGen = gen;
+  function tex() {
+    var t = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, PW, PH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    return t;
+  }
+  var zt = null, tx = null, fb = null, db = null, phase = 0, drawn = 0, rows = Math.max(4, Math.ceil(PH / 64));
+  var readN = 0, readRows = Math.max(8, Math.ceil(PH / 32)), out = null, c2 = null, one = new Uint8Array(4);
+  function free() {
+    if (gen !== myGen || !gl) return;
+    if (fb) gl.deleteFramebuffer(fb); if (zt) gl.deleteTexture(zt); if (tx) gl.deleteTexture(tx); if (db) gl.deleteRenderbuffer(db);
+    fb = zt = tx = db = null;
+  }
+  function readBack(y0, y1) {
+    var h = y1 - y0, px = new Uint8Array(PW * h * 4);
+    gl.readPixels(0, y0, PW, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    var img = c2.createImageData(PW, h), d2 = img.data, row = PW * 4;
+    for (var y = 0; y < h; y++) {
+      var src = (h - 1 - y) * row, dst = y * row;
+      for (var x = 0; x < row; x += 4) {
+        var a = px[src + x + 3];
+        if (!a) continue;
+        var m = 255 / a;
+        d2[dst + x] = px[src + x] * m; d2[dst + x + 1] = px[src + x + 1] * m; d2[dst + x + 2] = px[src + x + 2] * m; d2[dst + x + 3] = a;
+      }
+    }
+    c2.putImageData(img, 0, PH - y1);
+  }
+  function step(ms) {
+    if (gen !== myGen || !init() || !progG || !progS) { free(); return false; }
+    var B = ms || budget, t0 = performance.now();
+    if (phase === 0) {                                  // the mesh, once: each pixel's distance
+      zt = tex(); db = gl.createRenderbuffer();
+      gl.bindRenderbuffer(gl.RENDERBUFFER, db);
+      gl.renderbufferStorage(gl.RENDERBUFFER, gl.DEPTH_COMPONENT24, PW, PH);
+      fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, zt, 0);
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, db);
+      drawInto(o, mode || 0, PW, PH, true, null, 'g');
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, one);
+      // the depth is not needed any more: let it go before the picture's own buffer is made
+      gl.framebufferRenderbuffer(gl.FRAMEBUFFER, gl.DEPTH_ATTACHMENT, gl.RENDERBUFFER, null);
+      gl.deleteRenderbuffer(db); db = null;
+      tx = tex();
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tx, 0);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      phase = 1;
+      if (gl.isContextLost()) { free(); return false; }
+      return null;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    if (phase === 1) {                                  // the light: bands, as many as fit in the budget
+      zTex = zt;
+      var spent = 0, last = 0;
+      while (drawn < PH) {
+        var y0 = drawn, y1 = Math.min(PH, y0 + rows), tb = performance.now();
+        drawInto(o, mode || 0, PW, PH, y0 === 0, [y0, y1], 's');
+        gl.readPixels(0, y0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, one);   // waits for it, so it is timed truly
+        last = performance.now() - tb;
+        drawn = y1;
+        // the next band aims at half the budget; it grows by half again at most (the rows above may cost more)
+        var nr = Math.round(Math.max(2, Math.min(PH, (y1 - y0) * Math.max(0.3, Math.min(1.5, B * 0.5 / Math.max(last, 0.1))))));
+        spent = performance.now() - t0;
+        var next = last * nr / Math.max(1, y1 - y0);
+        rows = nr;
+        if (spent + next > B) break;
+      }
+      zTex = null;
+      if (drawn >= PH) {
+        phase = 2;
+        gl.deleteTexture(zt); zt = null;              // the distances are not needed any more
+      }
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      if (gl.isContextLost()) { free(); return false; }
+      return null;
+    }
+    if (!out) { out = document.createElement('canvas'); out.width = PW; out.height = PH; c2 = out.getContext('2d'); }
+    while (readN < PH) {                                // the read-back, strips as fit in the budget
+      var r0 = readN, r1 = Math.min(PH, r0 + readRows), tr = performance.now();
+      readBack(r0, r1);
+      var lr = performance.now() - tr;
+      readN = r1;
+      readRows = Math.round(Math.max(8, Math.min(PH, (r1 - r0) * Math.max(0.5, Math.min(2, B * 0.5 / Math.max(lr, 0.1))))));
+      if (performance.now() - t0 + lr * readRows / Math.max(1, r1 - r0) > B) break;
+    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (gl.isContextLost()) { free(); return false; }
+    if (readN < PH) return null;
+    free();
+    return out;
+  }
+  return { step: step, bands: 0, cancel: free };
+}
 /* Makes the graphics context and its program, and draws a tiny picture once, so the slow first
    compiling of the shaders is done now (at a moment when a pause does not show) and not when the
    mountains are first wanted. */
 function warm() {
   if (!init()) return false;
-  return !!render({ width: 8, height: 8, screenW: 400, screenH: 300, horizon: 180 });
+  var o = { width: 8, height: 8, screenW: 400, screenH: 300, horizon: 180 };
+  if (!render(o)) return false;
+  var j = start(o, 1, 0, 1000), r = null, guard = 0;   // and the two passes of a timed job
+  while (j && (r = j.step()) === null && guard++ < 20) {}
+  return !!r;
 }
 
 /* The same mountains as render(o), as a map of how strongly each point
