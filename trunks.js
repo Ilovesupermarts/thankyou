@@ -682,6 +682,10 @@ function flat(c, colour) {
   }
 }
 
-return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state, info: info, clearOff: clearOff,
+/* Makes the graphics context and compiles the shaders now (the app does it on the name screen, where the
+   pause does not show), instead of on the first frame the trees are drawn. */
+function warm() { return init(); }
+
+return { build: build, draw: draw, flat: flat, axisAt: axisAt, state: state, info: info, clearOff: clearOff, warm: warm,
          log: log, readLog: readLog, clearLog: clearLog, losses: function () { return losses; } };
 })();

@@ -5492,7 +5492,7 @@ function playPanel1SpecialSequence(panelEl) {
   }
   var greetWaitStart = performance.now();
   function fireBeat1WhenSceneReady() {
-    // the ink reveal is still painting the scene in: the message waits for all of it (the 4 s only count from when it has finished)
+    // the ink reveal is still painting the scene in: the message waits until the bamboo, its last part, has finished appearing (the 4 s only count from then)
     if (typeof DynBG !== 'undefined' && DynBG && DynBG.sceneBusy && DynBG.sceneBusy()) greetWaitStart = performance.now();
     if (sceneVisible() || performance.now() - greetWaitStart > 4000) { fireBeat(beat1); runBeatChain(); return; }
     panelPhraseTimers.push(setTimeout(fireBeat1WhenSceneReady, 60));
@@ -7965,9 +7965,6 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 window.addEventListener('load', function() {
   refreshTransitionGeometry();
   loadNameStrokes();
-  /* The 3D mountains' shaders are compiled now, on the name screen, so that slow first compile is
-     not a pause later, when the scene is being made (mountains.js). */
-  setTimeout(function() { try { if (typeof Mountains !== 'undefined' && Mountains.warm) Mountains.warm(); } catch (err) {} }, 1500);
   startInfoUpdates();
   loadPresetsFromServer().then(function() {
     buildNameScreenRows();
@@ -15410,10 +15407,11 @@ function landBakeScenery() {
   landFinishScenery(null, null);
 }
 var LAND_MTN = { job: null, o3: null, pic: null, refl: false };
-/* How long each band may keep the graphics chip busy (ms). The bands are sized as they go (mountains.js),
-   so the drawing never holds a frame up: 8 even bands took 100-250 ms each, which showed as jerks while the
-   scene came in. While the name stands still a long frame does not show, so there each band does more. */
-var MTN_BUDGET = 6, MTN_BUDGET_STILL = 40;
+/* How long the mountains may keep the graphics chip busy each frame (ms). They are drawn in two passes
+   (mountains.js): the mesh once, then the light in bands sized as they go, as many a frame as fit, so the
+   drawing never holds a frame up (8 even bands took 100-250 ms each, which showed as jerks while the scene
+   came in). While the name stands still a long frame does not show, so there each frame does more. */
+var MTN_BUDGET = 8, MTN_BUDGET_STILL = 40;
 function mtnStepBudget() {
   var n = performance.now();
   return (typeof dynNaming === 'function' && dynNaming() && n >= nameLandsAt && n < nameLeavesAt) ? MTN_BUDGET_STILL : MTN_BUDGET;
@@ -15424,6 +15422,7 @@ function landStepScenery() {
   var J = LAND_MTN, r = J.job.step(mtnStepBudget());
   if (r === null) return false;
   J.job = null;
+  if (r === 'go') { landFinishScenery(J.held[0], J.held[1]); J.held = null; return true; }   // (held back while the name was written, below)
   if (r === false) {                                          // the context was lost on the way: painted ridges for now
     gfxNote('mountains: graphics lost while drawing ' + (J.refl ? 'the reflectance' : 'band by band'));
     landFinishScenery(null, null);
@@ -15434,9 +15433,17 @@ function landStepScenery() {
     J.job = Mountains.start(J.o3, 8, 1, MTN_BUDGET);
     if (J.job) return false;
   }
-  if (J.refl) landFinishScenery(J.pic, r === J.pic ? null : r);
-  else landFinishScenery(r, null);
+  var g3 = J.refl ? J.pic : r, rf = J.refl && r !== J.pic ? r : null;
+  if (mtnWriting()) {                                        // the rest of the scenery is drawn on the main processor:
+    J.held = [g3, rf];                                       // not while the name is being written, but as soon as it stands still
+    J.job = { step: function() { return mtnWriting() ? null : 'go'; }, cancel: function() { J.held = null; } };
+    return false;
+  }
+  landFinishScenery(g3, rf);
   return true;
+}
+function mtnWriting() {
+  return typeof dynNaming === 'function' && dynNaming() && performance.now() < nameLandsAt;
 }
 /* The rest of the autumn scenery, once the 3D mountains' picture g3 (and their
    reflectance map rf) are ready, or with the painted ridges (g3 null). */
@@ -20147,8 +20154,8 @@ function dynPrelude(dt, t, skyWant) {
    part waits (rvReady) only until what it shows has been baked (the
    landscape's steps, the trees' clumps), then starts at its own time or
    straight away; its drops are worked out then, from the scene as it is.
-   The first message waits for all of it (DynBG.sceneShown is 0 until the
-   reveal has ended). If the graphics chip can't be used, the simple wet
+   The first message waits until the bamboo, the last part, has finished
+   appearing (DynBG.sceneShown is 0 until then). If the graphics chip can't be used, the simple wet
    paper on the main processor is used instead; a safety stop after 40 s
    shows whatever is left.
    ============================================================ */
@@ -20533,7 +20540,8 @@ function dynStep(dt, t, want, skyWant) {
   if (!dynBegun) dynBegin();
   if (rvOn && !RV.started) rvStart(t);
   if (rvOn && dynSetupLeft) {                     // what the name left to set up is carried on a little each frame, the parts coming in as it is made;
-    if (dt > 0.024 && !RV.gave) RV.gave = true;     // after a slow frame it gives the next one to the reveal (never two in a row)
+    if (LAND_MTN.job) dynSetupStep(t, false);       // (the mountains every frame: their steps are timed to a few ms)
+    else if (dt > 0.024 && !RV.gave) RV.gave = true;     // after a slow frame it gives the next one to the reveal (never two in a row)
     else { RV.gave = false; dynSetupStep(t, false); }
   }
   updateSkyLayer(dt, t);
@@ -20825,7 +20833,30 @@ function furinGust(x) {
 }
 /* sceneShown: how much of the scene is in (the first message waits for it); sceneBusy: the ink reveal is
    still bringing it in, so the message waits for all of it. */
-return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return RV.started ? 0 : dynMaster; }, sceneBusy: function() { return RV.started; } };
+/* On the name screen, a moment after the page has loaded: the graphics contexts of the 3D mountains, the
+   maples' trunks, the lake's water and the ink reveal's fluid are made and their shaders compiled. Each
+   takes a pause the first time (a tenth of a second or more on the tablet); here nothing moves, where
+   otherwise each came as a jerk just as its part of the scene appeared. */
+function dynWarmGpu() {
+  var jobs = [
+    function() { if (typeof Mountains !== 'undefined' && Mountains.warm && MTN3D.on) Mountains.warm(); },
+    function() { if (typeof Trunks !== 'undefined' && Trunks.warm) Trunks.warm(); },
+    function() { if (!lakeWaterInit && typeof Water !== 'undefined' && LAKE.shader) { lakeWaterInit = true; Water.init('textures/waternormals.jpg'); } },
+    function() { if (typeof InkFluid !== 'undefined' && RV_LOOK.engine === 'gpu') InkFluid.init(); }
+  ];
+  (function next(i) {                              // one a frame or so, so no single long pause
+    if (i >= jobs.length) return;
+    try { jobs[i](); } catch (e) { gfxNote('warm-up ' + i + ' failed: ' + (e && e.message)); }
+    setTimeout(function() { next(i + 1); }, 120);
+  })(0);
+}
+window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
+
+/* The bamboo is the last part the reveal paints in: once it has finished appearing the scene is all there
+   (what is left is only the birds and the falling leaves fading in), so the message comes then, not when the
+   reveal's last clean-up has ended. */
+function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
+return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); } };
 
 })();
 
