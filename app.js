@@ -16994,6 +16994,9 @@ var LAKE = {
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
   farShore: 160, reflect: 0.37, deep: 0.67, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
+  // how round the lake's near-right corner is, where the left bank comes down to the near bank (a share of the screen's
+  // width: 0 leaves the sharp corner)
+  cornerRound: 0.14,
   // the swipe hint and the page dots, as a group: how far down the page the hint's middle is (repositionHintGroup)
   navY: 0.86,
   // the headland and its forest (near you, framing the left)
@@ -17158,6 +17161,45 @@ function lakeBuildLand() {
   }
   edges.push(nb);
   polys.push(nb.concat([[exitX + 60, H + 40], [-30, H + 40]]));
+  // the lake's corner: the left bank and the near bank meet at a narrow sharp wedge of water, where the shore line
+  // used to stop short. Round it off with a smooth curve that flows from one bank into the other.
+  if (LAKE.cornerRound > 0) {
+    var nbY = function (x) { var f = (x + 30) / 3, i0 = clamp(Math.floor(f), 0, nb.length - 2); return lerp(nb[i0][1], nb[i0 + 1][1], clamp(f - i0, 0, 1)); };
+    var ic = -1;
+    for (var q = 1; q < left.length; q++) if (left[q][1] >= nbY(left[q][0]) && left[q - 1][1] < nbY(left[q - 1][0])) { ic = q; break; }
+    if (ic > 0) {
+      var p0 = left[ic - 1], p1 = left[ic], da = nbY(p0[0]) - p0[1], db = p1[1] - nbY(p1[0]), tc = da / Math.max(1e-6, da + db);
+      var C = [lerp(p0[0], p1[0], tc), lerp(p0[1], p1[1], tc)], R = LAKE.cornerRound * W;
+      // A: back up the left bank by R; B: back along the near bank by R
+      var A = null, prev = C, acc = 0, sideL = [];       // sideL: the left bank's own points from C back to A
+      for (var k = ic - 1; k >= 0 && !A; k--) {
+        var dseg = Math.hypot(left[k][0] - prev[0], left[k][1] - prev[1]);
+        if (acc + dseg >= R || k === 0) { var ta = clamp((R - acc) / Math.max(1e-6, dseg), 0, 1); A = [lerp(prev[0], left[k][0], ta), lerp(prev[1], left[k][1], ta)]; }
+        else { acc += dseg; prev = left[k]; sideL.push(left[k]); }
+      }
+      var B = null, sideN = []; prev = C; acc = 0;
+      for (var m2 = Math.min(nb.length - 1, Math.floor((C[0] + 30) / 3)); m2 >= 0 && !B; m2--) {
+        var dsg = Math.hypot(nb[m2][0] - prev[0], nb[m2][1] - prev[1]);
+        if (acc + dsg >= R || m2 === 0) { var tb = clamp((R - acc) / Math.max(1e-6, dsg), 0, 1); B = [lerp(prev[0], nb[m2][0], tb), lerp(prev[1], nb[m2][1], tb)]; }
+        else { acc += dsg; prev = nb[m2]; sideN.push(nb[m2]); }
+      }
+      if (A && B) {
+        // a smooth curve from A to B, leaving A in the direction the left bank is going and arriving at B along the
+        // near bank (the bank's own direction at each end, so it flows on without a kink)
+        var nxA = sideL.length ? sideL[sideL.length - 1] : C, nxB = sideN.length ? sideN[sideN.length - 1] : C;
+        function unit(a, b) { var dx = b[0] - a[0], dy = b[1] - a[1], l = Math.hypot(dx, dy) || 1; return [dx / l, dy / l]; }
+        var dA = unit(A, nxA), dB = unit(B, nxB), kc = 0.8 * Math.hypot(A[0] - C[0], A[1] - C[1]), kd = 0.8 * Math.hypot(B[0] - C[0], B[1] - C[1]);
+        var P1 = [A[0] + dA[0] * kc, A[1] + dA[1] * kc], P2 = [B[0] + dB[0] * kd, B[1] + dB[1] * kd], fil = [];
+        for (var u2 = 0; u2 <= 28; u2++) {
+          var tt = u2 / 28, mt = 1 - tt;
+          fil.push([mt * mt * mt * A[0] + 3 * mt * mt * tt * P1[0] + 3 * mt * tt * tt * P2[0] + tt * tt * tt * B[0],
+                    mt * mt * mt * A[1] + 3 * mt * mt * tt * P1[1] + 3 * mt * tt * tt * P2[1] + tt * tt * tt * B[1]]);
+        }
+        polys.push([A].concat(sideL.slice().reverse(), [C], sideN, [B], fil.slice().reverse()));     // the land that fills the corner (along the banks' real points)
+        edges.push(fil);                                          // and its water's edge, with the same earth, pebbles and bank face
+      }
+    }
+  }
   // a little ground round the start, under the headland's foot
   polys.push([[st[0] - 40, hy + 1], [st[0] + 70, hy + 1], [st[0] + 40, st[1] + 6], [st[0] - 30, st[1] + 8]]);
   // the land into LANDM (the size of the ground picture) and a small copy of it to look up
@@ -17875,11 +17917,17 @@ function lakeGroundEdges(c, grdTop) {
     for (var j = 0; j < E.length - 1; j++) {
       var P = E[j], Q = E[j + 1];
       if (lakeInLand(P[0], P[1] + 5) || lakeInLand(Q[0], Q[1] + 5)) continue;
-      var bh = lakeBankH(P[1]);
+      // the face shrinks smoothly to nothing as the edge turns away from you (water no longer below it), so it
+      // fades out round a corner instead of stopping short
+      var sx = Q[0] - P[0], sy = Q[1] - P[1], sl = Math.hypot(sx, sy) || 1, nx = -sy / sl, ny = sx / sl, mx2 = (P[0] + Q[0]) / 2, my2 = (P[1] + Q[1]) / 2;
+      if (lakeInLand(mx2 + nx * 6, my2 + ny * 6)) ny = -ny;
+      var fk = clamp(ny * 1.4, 0, 1);
+      if (fk <= 0.02) continue;
+      var bh = lakeBankH(P[1]) * fk;
       var fg = c.createLinearGradient(0, P[1], 0, P[1] + bh);
       fg.addColorStop(0, rgba(scaleRgb(mud, 1.25))); fg.addColorStop(1, rgba(scaleRgb(mud, 0.55)));
       c.fillStyle = fg;
-      c.beginPath(); c.moveTo(P[0], P[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] + lakeBankH(Q[1])); c.lineTo(P[0], P[1] + bh); c.closePath(); c.fill();
+      c.beginPath(); c.moveTo(P[0], P[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] - 0.6); c.lineTo(Q[0] + 0.4, Q[1] + lakeBankH(Q[1]) * fk); c.lineTo(P[0], P[1] + bh); c.closePath(); c.fill();
       var kk = clamp((P[1] - hy) / Math.max(1, H - hy), 0.03, 1);
       if (pr() < 0.25 * kk + 0.05) {                     // a root or a pebble in it
         c.fillStyle = rgba(koyoLight(mixRgb([120, 112, 100], [90, 70, 52], pr())), 0.9);
