@@ -1531,6 +1531,9 @@
 
   .dots { position: absolute; bottom: 100px; left: 0; right: 0; display: flex; justify-content: center; align-items: center; gap: 14px; z-index: 10; opacity: 0; pointer-events: none; transition: opacity 0.8s ease; }
   .dots.visible { opacity: 1; pointer-events: auto; }
+  /* The dots get their own graphics layer, so the bouncing swipe text next to them
+     (which is redrawn every frame) can't make them blink. */
+  .dots, .ty-dots { will-change: opacity; transform: translateZ(0); backface-visibility: hidden; }
   .dot {
     width: 10px; height: 10px; border-radius: 50%; background: var(--text-placeholder);
     box-shadow: 0 1px 3px var(--shadow-rose);
