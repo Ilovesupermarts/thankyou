@@ -14336,17 +14336,19 @@ function drawKoyoTrees(ctx, t) {
   renderBamboo(t);
   var gFar = bambooGrove('far'), gNear = bambooGrove('near');
   if (gFar) {                                     // the bamboo behind the far tree (and the near tree, where it reaches it)
-    bamGlow(ctx, gFar);                           // at night, the lamps' pool of light behind it
     if (gFar.fresh) {                             // the trees are cut out when it is redrawn; in between it is laid down as it was
       var reach = (KOYO.maxWidth / 100 + 0.12) * W * PR * BAM_RES, fb = gFar.box;
       var meets = tree && (tree.left ? fb.x < reach : fb.x + fb.w > gFar.out.cnv.width - reach);
       bamCutOut(gFar, meets ? farCut.concat(nearCut) : farCut);
     }
-    bamLayDown(ctx, gFar);
+    rvDraw('bamboo', ctx, function(c) {           // (each part goes through the ink reveal, 8e)
+      bamGlow(c, gFar);                           // at night, the lamps' pool of light behind it
+      bamLayDown(c, gFar);
+    });
   }
-  torDrawGates(ctx);                              // the line of torii gates, standing on the path, behind the far tree
-  lakeDrawFore(ctx, t);                           // the near shore in front of them, and its susuki (8c, the lake)
-  if (farTree) {
+  rvDraw('torii', ctx, function(c) { torDrawGates(c); });   // the line of torii gates, standing on the path, behind the far tree
+  rvDraw('shore', ctx, function(c) { lakeDrawFore(c, t); }); // the near shore in front of them, and its susuki (8c, the lake)
+  if (farTree) rvDraw('maples', ctx, function(ctx) {
     koyoGlow(ctx, farTree, 0.6);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
@@ -14355,17 +14357,22 @@ function drawKoyoTrees(ctx, t) {
     ctx.drawImage(farBranchLayer, 0, 0, farBranchLayer.width, farBranchLayer.height, 0, 0, cvBack.width, cvBack.height);
     ctx.globalAlpha = KOYO.farOpacity;
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
+    ctx.globalAlpha = 1;
+  });
+  if (gNear) {                                    // the bamboo behind the near tree
+    if (gNear.fresh) bamCutOut(gNear, nearCut);
+    rvDraw('bamboo', ctx, function(c) { bamGlow(c, gNear); bamLayDown(c, gNear); });
   }
-  if (gNear) { bamGlow(ctx, gNear); if (gNear.fresh) bamCutOut(gNear, nearCut); bamLayDown(ctx, gNear); }   // the bamboo behind the near tree
-  if (tree) {
+  if (tree) rvDraw('maples', ctx, function(ctx) {
     koyoGlow(ctx, tree, 1);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(treeLayer, 0, 0);
     ctx.globalAlpha = KOYO.nearOpacity;
     ctx.drawImage(koyoLeafLayer, 0, 0);
-  }
-  if (birdBox) {
+    ctx.globalAlpha = 1;
+  });
+  if (birdBox) rvDraw('creatures', ctx, function(ctx) {
     // each depth slot's birds on their own, with whatever is in front of them
     // cut out, then all of them laid down over the scene
     var B = birdBox, front = {
@@ -14390,7 +14397,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(birdLayer, B.x, B.y, B.w, B.h, B.x, B.y, B.w, B.h);
-  }
+  });
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 }
@@ -15858,7 +15865,9 @@ function drawLandscape(c, dt) {
   var P = ENV.scene === 'winter' ? WINT : LAND;
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1;
-  if (ENV.scene === 'autumn') fireworksDrawSky(c);                     // the fireworks, behind the mountains (8c)
+  if (ENV.scene === 'autumn') rvDraw('sky', c, function(c) { fireworksDrawSky(c); });   // the fireworks, behind the mountains (8c)
+  rvDraw(['fuji', 'ridges'], c, function(c) {                           // (the ink reveal, 8e: Fuji and the ridges are one picture)
+  c.setTransform(1, 0, 0, 1, 0, 0);
   var sy0 = Math.floor(LS.scnTop * LAND_SR), sh0 = LS.SCN.cnv.height - sy0;   // the empty sky above the peaks is skipped
   c.drawImage(LS.SCN.cnv, 0, sy0, LS.SCN.cnv.width, sh0, 0, sy0 / LAND_SR * PR, cvBack.width, sh0 / LAND_SR * PR);
   if (P.mistDrift > 0) {                                                   // mist drifting along the ridges
@@ -15874,17 +15883,24 @@ function drawLandscape(c, dt) {
     }
     c.globalAlpha = 1;
   }
-  if (ENV.scene === 'autumn' && fwShow) fwShow.drawFront(c, LS.refl3d ? LS.REFL.cnv : null);   // the bursts' light on the mountains
-  drawFrontClouds(c, lastT, dt);                                       // the clouds drifting in front of Fuji
+  });
+  rvDraw('sky', c, function(c) {
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    if (ENV.scene === 'autumn' && fwShow) fwShow.drawFront(c, LS.refl3d ? LS.REFL.cnv : null);   // the bursts' light on the mountains
+    drawFrontClouds(c, lastT, dt);                                     // the clouds drifting in front of Fuji
+  });
   c.setTransform(1, 0, 0, 1, 0, 0);
   if (ENV.scene === 'winter') winDrawGround(c, lastT);          // in slices, with the skiers between them (8d)
   else {
-    lakeDrawWater(c, lastT, dt);                                       // the lake, under the land (8c, the lake)
-    c.setTransform(1, 0, 0, 1, 0, 0);
-    c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
-    lakeDrawHeadland(c, lastT, dt);                                    // the wooded headland, mist on the water, the bank trees
-    torDrawGravel(c);                                                  // the gravel path lies on the ground
-    lakeDrawShore(c, lastT);                                           // the stones at the water's edge, the further susuki
+    rvDraw('lake', c, function(c) {
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      lakeDrawWater(c, lastT, dt);                                     // the lake, under the land (8c, the lake)
+      c.setTransform(1, 0, 0, 1, 0, 0);
+      c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
+    });
+    rvDraw('headland', c, function(c) { lakeDrawHeadland(c, lastT, dt); });   // the wooded headland, mist on the water, the bank trees
+    rvDraw('torii', c, function(c) { torDrawGravel(c); });             // the gravel path lies on the ground
+    rvDraw('shore', c, function(c) { lakeDrawShore(c, lastT); });      // the stones at the water's edge, the further susuki
   }
   c.setTransform(PR, 0, 0, PR, 0, 0);
 }
@@ -17313,6 +17329,7 @@ function lakeBakeHead() {
     var fin = lakeFin(haze);
     Lakeside.renderFaces(c, faces, { proj: torScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
                                      fin: function (col) { return fin(col); } });
+    RV_SPOT[kind] = { x: bx, y: byScr, h: kind === 'pagoda' ? size * H : size * W * 0.6 };   // for the ink reveal (8e)
   }
   function treeRow(row) {
     css();
@@ -18088,7 +18105,7 @@ function lakeDrawHeadland(c, t, dt) {
     }
     c.globalAlpha = 1;
   }
-  lakeDrawBank(c, t);
+  rvDraw('bank', c, function(c) { lakeDrawBank(c, t); });   // (its own part of the ink reveal, 8e)
 }
 /* After the gravel: the stones at the water's edge, and the susuki further away than the gate facing you. */
 function lakeDrawShore(c, t) {
@@ -20015,6 +20032,7 @@ function dynReset() {
   bambooGroves = []; bambooKey = '';
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0; TOR.ready = false;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
+  rvReset();
   winReset();
   [ctx, ctxG, ctxF, ctxN].forEach(function(c) { c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, c.canvas.width, c.canvas.height); });
   dynBegun = false;
@@ -20023,8 +20041,9 @@ function dynApplyOpacity() {
   cvSky.style.opacity = skyMaster.toFixed(3);
   cvBack.style.opacity = dynMaster.toFixed(3);
   cvGround.style.opacity = dynMaster.toFixed(3);
-  cvFront.style.opacity = (dynMaster * dynFrontMul).toFixed(3);
-  cvNear.style.opacity = (dynMaster * dynNearMul).toFixed(3);
+  var lv = rvAlpha('leaves');                       // the ink reveal (8e): they fade in with the falling leaves
+  cvFront.style.opacity = (dynMaster * dynFrontMul * lv).toFixed(3);
+  cvNear.style.opacity = (dynMaster * dynNearMul * lv).toFixed(3);
 }
 
 /* The time-of-day sky colour on its own quarter-size canvas. It changes
@@ -20074,14 +20093,336 @@ function dynPrelude(dt, t, skyWant) {
     if (naming && nowMs >= nameLandsAt) {
       if (!dynBegun) dynBegin(true);
       else dynSetupStep(t, nowMs < nameLeavesAt);
+      if (dynBegun && !dynSetupLeft && nowMs < nameLeavesAt) rvPrepare();   // the ink reveal's fluid, set up while the name stands still
     }
     updateSkyLayer(dt, t);
   }
   dynApplyOpacity();
 }
+/* ============================================================
+   8e. THE INK REVEAL — as tuned on reveal-lab.html (inkreveal.js with
+   inkfluid.js: wet on wet, after Inkwash by Jonathan Whitaker, MIT
+   licence). Autumn only. When the scene first comes in after the name,
+   it is not faded in as one picture: it is painted in, part by part, by
+   wet ink washes. Each part's drops become brush strokes (clear water
+   first, then the ink pushed into it); the water swirls and carries the
+   ink, which feathers out through the wet paper, and the part shows
+   wherever its ink has been. Every time it is a little different.
+   Values: RV_LOOK (the panel's "The ink" and "Wet paper" values) and
+   RV_PARTS (its "The order"; the lanterns' light comes with the torii,
+   as it was tuned, and the text, button and toolbar keep the app's own
+   timing). Move new values from the panel's "Copy values" into them.
+   How it works here: the scene's drawing goes through rvDraw(part, c,
+   fn). A part not started yet is not drawn; a part that is done is drawn
+   straight onto the screen (so once the reveal is over it costs
+   nothing); a part appearing is drawn onto a layer of its own (RVL), cut
+   to its ink and laid on the screen; a part that fades (the sun, moon
+   and clouds, the birds, the falling leaves) is drawn with its alpha
+   scaled. The fluid's graphics context is set up while the name stands
+   still (rvPrepare), so the first frame of the reveal has no set-up to
+   do. If the graphics chip can't be used, the simple wet paper on the
+   main processor is used instead; if the scene isn't ready within 3 s,
+   or anything else goes wrong, the scene simply fades in as before.
+   ============================================================ */
+var RV_LOOK = { engine: 'gpu', speed: 0.5, flow: 0.84, swirl: 41, push: 0.88, stir: 49, bleed: 1.05, creep: 0.33, wetSize: 3.7,
+                prewet: 0.7, load: 2.55, show: 1.15, edge: 0.25, random: 1.5, detail: 384, simRes: 192, drop: 0.65, water: 1,
+                spread: 4, ragged: 1, fall: 0.06, dry: 2.85, ink: 0.1, rim: 0.6, grain: 0.83, finish: 0.95, cell: 8, inkColour: '#262830' };
+var RV_PARTS = [
+  // id, kind, starts at (s), lasts (s)
+  ['sky', 'fade', 0, 1.0],
+  ['fuji', 'wash', 0, 2.0],
+  ['ridges', 'wash', 0, 1.3],
+  ['lake', 'wash', 0, 1.0],
+  ['headland', 'wash', 0, 1.8],
+  ['torii', 'wash', 0, 1.8],            // with the lanterns and their light (tuned at 0 s for 1.8 s too)
+  ['bank', 'wash', 0, 1.5],
+  ['maples', 'wash', 1.9, 2.0],
+  ['bamboo', 'wash', 3.5, 1.5],
+  ['shore', 'wash', 0, 0.9],
+  ['creatures', 'fade', 3.5, 1.0],
+  ['leaves', 'fade', 3.5, 1.0]
+];
+var RV_KIND = {};
+RV_PARTS.forEach(function(p) { RV_KIND[p[0]] = p[1]; });
+var RV_SPOT = {};                                  // where the pagoda and the hall stand (set as the headland is baked)
+var RV = { started: false, done: false, waitFrom: 0, prepared: false, W: 0, H: 0 };
+
+function rvAvailable() { return typeof InkReveal !== 'undefined' && !dynReduceMotion; }
+function rvLookIn() { for (var k in RV_LOOK) InkReveal.look[k] = RV_LOOK[k]; }
+/* While the name stands still: the fluid's graphics context and its pictures, made once. */
+function rvPrepare() {
+  if (RV.prepared || !rvAvailable() || ENV.scene !== 'autumn') return;
+  RV.prepared = true;
+  rvLookIn();
+  if (RV_LOOK.engine === 'gpu' && typeof InkFluid !== 'undefined' && InkFluid.init()) {
+    var nWash = RV_PARTS.filter(function(p) { return p[1] === 'wash'; }).length;
+    InkFluid.size(W, H, Math.round(RV_LOOK.simRes), Math.round(RV_LOOK.detail), Math.max(1, Math.min(nWash, 8)));
+  }
+  gfxNote('ink reveal ready: ' + (typeof InkFluid !== 'undefined' ? InkFluid.state() : 'no inkfluid.js'));
+}
+/* True while the scene should wait for the reveal to start it (dynStep holds its fade meanwhile). */
+function rvWaiting(t) {
+  if (RV.started || RV.done) return false;
+  if (!rvAvailable() || ENV.scene !== 'autumn') { RV.done = true; return false; }   // the scene came in some other way: not this session
+  if (!RV.waitFrom) RV.waitFrom = t;
+  if (LS.ready && !LS.step && LK.ready && TOR.ready && !dynSetupLeft) { rvStart(t); return false; }
+  if (t - RV.waitFrom > 3) { RV.done = true; gfxNote('ink reveal skipped: the scene was not ready'); return false; }   // the plain fade
+  updateLandscape(t);                             // (the frame is held back meanwhile, so the bake is carried on here)
+  return true;
+}
+function rvStart(t) {
+  try {
+    rvPrepare();
+    rvLookIn();
+    InkReveal.setup(W, H);
+    InkReveal.plan(RV_PARTS.map(function(p) {
+      return { id: p[0], kind: p[1], at: p[2], dur: p[3], washes: p[1] === 'wash' ? rvSeeds(p[0]) : [] };
+    }));
+    InkReveal.play(t);
+    RV.started = true; RV.W = W; RV.H = H;
+  } catch (e) {
+    RV.done = true; RV.started = false;
+    gfxNote('ink reveal failed: ' + (e && e.message));
+  }
+}
+function rvStop() {
+  rvFlush();
+  RV.started = false; RV.done = true;
+  if (typeof InkReveal !== 'undefined') InkReveal.stop();
+  if (typeof InkFluid !== 'undefined' && InkFluid.release) InkFluid.release();   // its pictures are let go (the context stays, small)
+  RV.prepared = false;
+  if (RVL) { RVL.cnv.width = RVL.cnv.height = 1; }
+  dynApplyOpacity();
+}
+function rvReset() {
+  if (RV.started) rvStop();
+  RV.started = false; RV.done = false; RV.waitFrom = 0;
+}
+function rvRunning() { return RV.started; }
+/* Once a frame, before the drawing. It ends when the last part is in (or if the theme or the size changes). */
+function rvTick(t, dt) {
+  if (!RV.started) return;
+  if (ENV.scene !== 'autumn' || W !== RV.W || H !== RV.H || !InkReveal.running()) { rvStop(); return; }
+  InkReveal.update(t, dt);
+}
+/* 0 not started, 1 appearing, 2 shown (and 2 whenever the reveal isn't running). */
+function rvState(ids) { return RV.started ? InkReveal.state(ids) : 2; }
+function rvAlpha(id) {
+  if (!RV.started) return 1;
+  var st = InkReveal.state(id);
+  return st === 0 ? 0 : st === 2 ? 1 : InkReveal.alpha(id);
+}
+
+/* ---------- the drawing goes through here, a part at a time ---------- */
+var RVL = null, rvOpen = null, rvOpenIds = null, rvMul = 1;
+function rvDraw(ids, c, fn) {
+  if (!RV.started) { fn(c); return; }
+  var st = InkReveal.state(ids);
+  if (st === 0) return;
+  if (st === 2) { rvFlush(); fn(ctx); return; }
+  var one = typeof ids === 'string' ? ids : null;
+  if (one && RV_KIND[one] === 'fade') {             // faded: every alpha it sets is scaled (see rvFadeAlpha)
+    rvFlush();
+    rvMul = Math.max(0.001, InkReveal.alpha(one));
+    ctx.globalAlpha = 1;
+    try { fn(ctx); } finally { rvMul = 1; ctx.globalAlpha = 1; }
+    return;
+  }
+  var k = one || ids.join('+');
+  if (rvOpen !== k) {
+    rvFlush();
+    if (!RVL) { var cv = document.createElement('canvas'); RVL = { cnv: cv, c: cv.getContext('2d') }; }
+    if (RVL.cnv.width !== cvBack.width || RVL.cnv.height !== cvBack.height) { RVL.cnv.width = cvBack.width; RVL.cnv.height = cvBack.height; }
+    var l = RVL.c;
+    l.setTransform(1, 0, 0, 1, 0, 0); l.globalAlpha = 1; l.globalCompositeOperation = 'source-over';
+    l.clearRect(0, 0, RVL.cnv.width, RVL.cnv.height);
+    l.setTransform(PR, 0, 0, PR, 0, 0);
+    rvOpen = k; rvOpenIds = one ? [one] : ids;
+  }
+  fn(RVL.c);
+}
+/* The part on RVL, cut to its ink and laid on the screen. */
+function rvFlush() {
+  if (!rvOpen) return;
+  rvOpen = null;
+  if (rvOpenIds.length === 1 && rvOpenIds[0] === 'lake') rvSoftShore();
+  InkReveal.composite(ctx, RVL.cnv, rvOpenIds, PR);
+  ctx.setTransform(PR, 0, 0, PR, 0, 0);
+  ctx.globalAlpha = 1;
+}
+/* A fading part: the screen's alpha is scaled by rvMul while it draws (the screen's own context only). */
+(function rvFadeAlpha() {
+  if (!ctx || typeof CanvasRenderingContext2D === 'undefined') return;
+  var d = Object.getOwnPropertyDescriptor(CanvasRenderingContext2D.prototype, 'globalAlpha');
+  if (!d || !d.set) return;
+  Object.defineProperty(ctx, 'globalAlpha', { configurable: true,
+    get: function() { return d.get.call(this) / rvMul; },
+    set: function(v) { d.set.call(this, Math.max(0, Math.min(1, v)) * rvMul); } });
+})();
+
+/* ---------- soft edges ----------
+   Two edges of the picture are straight lines: the far shore (the top of the lake) and the top of
+   the ground strip along the bottom (a canvas of its own, with the near band in it). While their
+   part is still coming in, the part next to them is still faint, and nothing in a wash painting is
+   that hard, so they are dissolved into uneven tongues, easing away over the part's last fill. */
+function rvNoise(x, seed) {
+  var i = Math.floor(x), f = x - i, u = f * f * (3 - 2 * f);
+  function h(n) { var s = Math.sin(n * 127.1 + seed * 311.7) * 43758.5453; return (s - Math.floor(s)) * 2 - 1; }
+  return h(i) + (h(i + 1) - h(i)) * u;
+}
+function rvTongues(c, y0, band, k, seed, maxDepth) {
+  var cols = Math.ceil(W / 12);
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'destination-out';
+  var g = c.createLinearGradient(0, y0 * PR, 0, (y0 + band) * PR);
+  g.addColorStop(0, 'rgba(0,0,0,' + k.toFixed(3) + ')');
+  g.addColorStop(0.45, 'rgba(0,0,0,' + (k * 0.42).toFixed(3) + ')');
+  g.addColorStop(1, 'rgba(0,0,0,0)');
+  c.fillStyle = g;
+  c.fillRect(0, y0 * PR, c.canvas.width, band * PR);
+  for (var x = 0; x < cols; x++) {                // a different depth in every column
+    var n = 0.5 + 0.5 * (rvNoise(x * 0.7, seed) * 0.65 + rvNoise(x * 2.1, seed + 17) * 0.35);
+    var depth = Math.min(maxDepth, band * (0.25 + 1.0 * n)) * k;
+    var g2 = c.createLinearGradient(0, y0 * PR, 0, (y0 + depth) * PR);
+    g2.addColorStop(0, 'rgba(0,0,0,' + (0.92 * k).toFixed(3) + ')');
+    g2.addColorStop(1, 'rgba(0,0,0,0)');
+    c.fillStyle = g2;
+    c.fillRect(x * 12 * PR, y0 * PR, 12.5 * PR, depth * PR);
+  }
+  c.restore();
+}
+function rvSoftShore() {
+  var k = InkReveal.soft('lake');
+  if (k > 0.01) rvTongues(RVL.c, lakeFarShoreY() - 4, H * 0.11, k, 91, H);
+}
+function rvSoftStrip(c, k) {
+  if (k <= 0.01) return;
+  rvTongues(c, 0, Math.min(H * 0.1, GH), k, 51, GH);
+  if (LS.nearH && GH - LS.nearH > 3) rvTongues(c, GH - LS.nearH, Math.min(H * 0.1, LS.nearH), k, 58, LS.nearH);
+}
+
+/* ---------- where each part's drops fall, in the order they are laid (CSS px, s) ----------
+   The same as on reveal-lab.html, from the app's own scene. */
+function rvSeeds(id) {
+  var hy = H * LAND.horizon, out = [], M = MTN3D.on ? MTN3D : LAND;
+  function drop(x, y, r, at) { out.push({ x: x, y: y, r: Math.max(4, r), at: at }); }
+  if (id === 'fuji') {
+    var fx = M.fujiX * W, fh = M.fujiHeight * H, top = hy - fh, hb = M.fujiWidth * fh;
+    drop(fx, top + fh * 0.06, fh * 0.16, 0);                       // the summit first,
+    for (var k = 1; k <= 6; k++) {                                 // then down both flanks
+      var f = k / 6;
+      drop(fx - hb * f * 0.8, top + fh * f * 0.95, fh * (0.12 + 0.06 * f), 0.12 * k);
+      drop(fx + hb * f * 0.8, top + fh * f * 0.95, fh * (0.12 + 0.06 * f), 0.12 * k + 0.06);
+    }
+    return [{ seeds: out, fall: 1, region: function(x, y) {       // (the simple paper only) its water stays on the mountain
+      if (y < top - 10 || y > hy + 24) return 0;
+      return Math.abs(x - fx) < (y - top + 12) * hb / fh * 1.25 + 10 ? 1 : 0;
+    } }];
+  }
+  if (id === 'ridges') {                                           // along the ridges, outward from Fuji
+    var fx2 = M.fujiX * W, rh = Math.max(30, (MTN3D.on ? MTN3D.rangeHeight : 0.1) * H), st = W * 0.07;
+    for (var d = 0, n = 0; d < W * 1.05; d += st, n++) {
+      [fx2 - d - st * 0.5, fx2 + d + st * 0.5].forEach(function(x, side) {
+        if (x < -st || x > W + st) return;
+        drop(x, hy - rh * 0.55, rh * 0.65, n * 0.1 + side * 0.05);
+        drop(x + st * 0.4, hy - rh * 0.12, rh * 0.38, n * 0.1 + 0.35);
+      });
+    }
+    return [{ seeds: out, fall: 0.5 }];
+  }
+  if (id === 'lake') {                                             // broad strokes across, from the far shore down
+    var yf = lakeFarShoreY(), yb = H * LAKE.nearBank, rows = [lerp(yf, yb, 0.12), lerp(yf, yb, 0.5), lerp(yf, yb, 0.88), lerp(yb, H, 0.6)];
+    rows.forEach(function(y, ri) {
+      for (var c = 0; c <= 10; c++) drop(W * (0.02 + c * 0.096), y, H * 0.075, ri * 0.3 + c * 0.1);
+    });
+    return [{ seeds: out, fall: 0.2 }];
+  }
+  if (id === 'headland') {                                         // the pagoda, the shrine hall, then the cedars round them
+    var P = RV_SPOT.pagoda, Hl = RV_SPOT.hall, px = P ? P.x : LAKE.pagodaX * W, hb2 = LK.headBox;
+    if (P && LAKE.pagoda) for (var pk = 0; pk < 3; pk++) drop(P.x, P.y - P.h * (0.15 + pk * 0.33), P.h * 0.24, pk * 0.12);
+    if (Hl && LAKE.hall) drop(Hl.x, Hl.y - Hl.h * 0.3, Hl.h * 0.45, 0.35);
+    if (hb2) {
+      var bw = hb2.x1 - hb2.x0, bh = hb2.y1 - hb2.y0;
+      [0.3, 0.62, 0.88].forEach(function(fy, ri) {
+        for (var c = 0; c <= 7; c++) {
+          var x = hb2.x0 + bw * (c + 0.5) / 8;
+          drop(x, hb2.y0 + bh * fy, Math.max(bh * 0.22, bw * 0.07), 0.5 + Math.abs(x - px) / W * 1.6 + ri * 0.15);
+        }
+      });
+    }
+    return [{ seeds: out, fall: 0.4 }];
+  }
+  if (id === 'torii') {                                            // gate by gate, from the far end of the line toward you
+    var path = torPath(), F = torLens(), h = TORII.gateHeight, n2 = Math.max(2, TORII.count), list = [];
+    if (path && path.pts && path.pts.length > 1) {
+      for (var g = 0; g < n2; g++) {
+        var q = torPathAt(path, path.len * g / (n2 - 1));
+        if (q.z <= 0.05) continue;
+        list.push({ x: W / 2 + F * q.x / q.z, foot: hy + F / q.z, ph: h * F / q.z, z: q.z });
+      }
+    }
+    list.sort(function(a, b) { return b.z - a.z; });
+    list.forEach(function(q, i) {
+      var at = i / Math.max(1, list.length - 1) * 1.4;
+      drop(q.x, q.foot - q.ph * 0.5, q.ph * 0.62, at);
+      drop(q.x, q.foot, q.ph * 0.45, at + 0.08);                   // the gravel and the lanterns at its foot
+    });
+    return [{ seeds: out, fall: 0.3 }];
+  }
+  if (id === 'bank') {
+    (LK.bankT || []).slice().sort(function(a, b) { return a.ch - b.ch; }).forEach(function(B, i) {
+      drop(B.x, B.y - B.ch * 0.25, Math.max(B.cw, B.ch) * 0.3, i * 0.12);
+      drop(B.x, B.y - B.ch * 0.65, Math.max(B.cw, B.ch) * 0.35, i * 0.12 + 0.15);
+    });
+    return [{ seeds: out, fall: 0.6 }];
+  }
+  if (id === 'maples') {                                           // the far tree, then the near one: trunk, limbs, then the leaves
+    [farTree, tree].forEach(function(T, ti) {
+      if (!T) return;
+      var t0 = ti * 0.55, trunkTop = T.by;
+      T.nodes.forEach(function(n) {
+        if (n.d > 2) return;
+        drop(koyoX(T, (n.sx + n.ex) / 2), (n.sy + n.ey) / 2, Math.max(8, n.w * 1.4), t0 + n.d * 0.18);
+        trunkTop = Math.min(trunkTop, n.ey);
+      });
+      T.clumps.forEach(function(C) {
+        var cn = T.nodes[C.node];
+        if (!cn) return;
+        var x = koyoX(T, cn.ex + C.ox), y = cn.ey + C.oy, dd = Math.hypot(x - T.bx, y - trunkTop) / H;
+        drop(x, y, C.R * 0.8, t0 + 0.5 + dd * 1.1);
+      });
+    });
+    return [{ seeds: out, fall: 0.5 }];
+  }
+  if (id === 'bamboo') {                                           // each stem from its foot upward
+    bambooGroves.forEach(function(Gr, gi) {
+      if (!(Gr.a > 0)) return;
+      Gr.culms.forEach(function(C, ci) {
+        var m = C.px.length - 1;
+        for (var j = 0; j <= 4; j++) {
+          var i = Math.round(m * j / 4);
+          drop(C.px[i], C.py[i], H * 0.05, gi * 0.4 + ci * 0.03 + j * 0.16);
+        }
+      });
+    });
+    return [{ seeds: out, fall: 0.3 }];
+  }
+  if (id === 'shore') {                                            // along the near shore, left to right
+    for (var c2 = 0; c2 <= 12; c2++) {
+      drop(W * c2 / 12, H * 0.9, H * 0.07, c2 * 0.07);
+      drop(W * (c2 + 0.5) / 12, H * 0.98, H * 0.06, c2 * 0.07 + 0.2);
+    }
+    return [{ seeds: out, fall: 0.2 }];
+  }
+  return [];
+}
+
 function dynStep(dt, t, want, skyWant) {
   var hold = want && dynBegun && dynHoldForSetup(t);
+  if (want && !hold && rvWaiting(t)) hold = true;      // the ink reveal (8e) brings the scene in: the fade waits for it
   dynMaster += ((want && !hold ? 1 : 0) - dynMaster) * (1 - Math.exp(-dt * 2.2));
+  if (want && rvRunning()) dynMaster = 1;            // the ink brings the scene in, not the fade
   skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
   if (!want || hold) { dynApplyOpacity(); return; }
   if (!dynBegun) dynBegin();
@@ -20179,24 +20520,32 @@ function dynStep(dt, t, want, skyWant) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.globalAlpha = 1;
   ctx.clearRect(0, 0, cvBack.width, cvBack.height);
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  fireworksDrawDark(ctx);
-  ctx.setTransform(PR, 0, 0, PR, 0, 0);
-  drawSun(ctx, t);
-  drawMoon(ctx, t);
+  rvTick(t, dt);                                   // the ink reveal (8e): its water this frame
+  rvDraw('sky', ctx, function(c) {
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    fireworksDrawDark(c);
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    drawSun(c, t);
+    drawMoon(c, t);
+  });
   drawLandscape(ctx, dt);
   if (ENV.scene === 'winter') winDrawSparkles(ctx, t);
-  drawCloudShadows(ctx, dt);
-  drawRays(ctx, t);
+  rvDraw('sky', ctx, function(c) {
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    drawCloudShadows(c, dt);
+    drawRays(c, t);
+  });
   var split = 0;
   while (split < leaves.length && leaves[split].z < 0.5) split++;
-  for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false);
+  rvDraw('leaves', ctx, function() { for (var f = 0; f < split; f++) if (!isFrontLeaf(leaves[f])) drawLeaf(leaves[f], t, false); });
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'far');
   drawTree(ctx, t);
+  rvFlush();
+  ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawFog(ctx, dt);
   if (ENV.scene === 'winter') winDrawBack(ctx, t);
-  for (var n = split; n < leaves.length; n++) if (!isFrontLeaf(leaves[n])) drawLeaf(leaves[n], t, false);
+  rvDraw('leaves', ctx, function() { for (var n = split; n < leaves.length; n++) if (!isFrontLeaf(leaves[n])) drawLeaf(leaves[n], t, false); });
   ctx.setTransform(PR, 0, 0, PR, 0, 0); ctx.globalAlpha = 1;
   drawSnow(ctx, 'near');
   drawRain(ctx);
@@ -20219,13 +20568,17 @@ function dynStep(dt, t, want, skyWant) {
   ctxG.globalAlpha = 1;
   ctxG.clearRect(0, 0, cvGround.width, cvGround.height);
   ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
-  for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
+  var shSt = rvState('shore');                     // the ink reveal (8e): the strip is part of the near shore
+  if (shSt > 0) for (var p = 0; p < pile.length; p++) drawLeaf(pile[p], t, true, ctxG);
   drawOffsetY = 0;
   if (ENV.scene === 'autumn') {
-    ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
-    ctxG.globalAlpha = 1;
-    landGlow(ctxG, H);
-    drawNearBand(ctxG);
+    if (shSt > 0) {
+      ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
+      ctxG.globalAlpha = 1;
+      landGlow(ctxG, H);
+      drawNearBand(ctxG);
+      if (shSt === 1) { InkReveal.maskInPlace(ctxG, 'shore', PR, H - GH); rvSoftStrip(ctxG, InkReveal.soft('shore')); }
+    }
   } else if (ENV.scene === 'winter') {
     ctxG.setTransform(PR, 0, 0, PR, 0, -(H - GH) * PR);
     winDrawLanded(ctxG, t);
