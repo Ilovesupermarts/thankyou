@@ -52,33 +52,33 @@
 
 var LOOK = {
   engine: 'gpu',     // 'gpu': the fluid on the graphics chip (inkfluid.js, wet on wet); 'cpu': the simple wet paper below
-  speed: 1,          // the whole reveal faster or slower
+  speed: 0.5,          // the whole reveal faster or slower
   // --- on the graphics chip (as in Inkwash) ---
-  flow: 0.6,         // how long the water keeps moving (Inkwash's FLOW)
-  swirl: 18,         // how strongly swirls are kept alive (vorticity)
-  push: 0.25,        // how hard the brush pushes the water (share of its own speed)
+  flow: 0.78,         // how long the water keeps moving (Inkwash's FLOW)
+  swirl: 33.5,         // how strongly swirls are kept alive (vorticity)
+  push: 0.64,        // how hard the brush pushes the water (share of its own speed)
   stir: 30,          // how hard a resting brush stirs the water (px a second)
-  bleed: 0.5,        // how much the ink bleeds into the wet paper round it
-  creep: 0.12,       // how fast the water creeps outward
-  wetSize: 1.9,      // the water brush × the ink brush
+  bleed: 0.79,        // how much the ink bleeds into the wet paper round it
+  creep: 0.3,       // how fast the water creeps outward
+  wetSize: 3.4,      // the water brush × the ink brush
   prewet: 0.35,      // the water goes down this long before the ink (s): wet on wet
-  load: 1,           // how much ink each brush carries
-  show: 0.3,         // how much ink it takes for the scene to show fully (less = shows sooner)
-  edge: 0.7,         // darker ink where it gathers at the edges and in the swirls
-  random: 0.7,       // how much each play differs: brush paths, timing, sizes
+  load: 2,           // how much ink each brush carries
+  show: 1.15,         // how much ink it takes for the scene to show fully (less = shows sooner)
+  edge: 0.25,         // darker ink where it gathers at the edges and in the swirls
+  random: 1.35,       // how much each play differs: brush paths, timing, sizes
   detail: 384,       // the ink's resolution (its short side)
-  simRes: 160,       // the flow's resolution (its short side)
+  simRes: 192,       // the flow's resolution (its short side)
   // --- both ---
-  drop: 1.4,         // the brush and drops' size
+  drop: 1.25,         // the brush and drops' size
   water: 1,          // how much water each drop carries
   spread: 4,         // how fast the water spreads (× 60 spreading steps a second)
   ragged: 1,         // how ragged the wet edges are
   fall: 0.06,        // how much the water runs downward
-  dry: 2.4,          // drying time (s)
-  ink: 0.32,         // how dark the ink is while the paper is wet
+  dry: 2.3,          // drying time (s)
+  ink: 0.1,         // how dark the ink is while the paper is wet
   rim: 0.6,          // the darker rim at the wet edge
-  grain: 0.5,        // paper grain in the ink
-  finish: 0.9,       // the last soft fill of a part (s)
+  grain: 0.83,        // paper grain in the ink
+  finish: 0.45,       // the last soft fill of a part (s)
   cell: 8,           // the wet paper's cells (CSS px): smaller = finer edges, more work
   inkColour: '#262830'
 };
@@ -181,6 +181,15 @@ function alpha(id) {
   var P = byId[id];
   if (!P || P.off || !on) return 1;
   return smooth(0, 1, (clock() - P.at) / Math.max(0.05, P.dur));
+}
+/* 1 while a part is appearing, easing to 0 over its last soft fill: for softening a hard edge of the
+   picture (the far shore) only as long as the wash is still working there, so nothing pops at the end. */
+function soft(id) {
+  var P = byId[id];
+  if (!P || P.off || !on) return 0;
+  var tl = clock() - P.at;
+  if (tl < 0) return 0;
+  return 1 - smooth(P.dur * 0.6, P.dur + LOOK.finish, tl);
 }
 function running() { return on && parts.some(function (P) { return partState(P) < 2; }); }
 
@@ -496,5 +505,5 @@ function stats() {
 }
 
 window.InkReveal = { look: LOOK, setup: setup, plan: plan, play: play, stop: stop, update: update, state: state, alpha: alpha,
-                     composite: composite, maskInPlace: maskInPlace, running: running, clock: clock, stats: stats };
+                     composite: composite, maskInPlace: maskInPlace, soft: soft, running: running, clock: clock, stats: stats };
 })();
