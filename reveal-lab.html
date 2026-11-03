@@ -15,14 +15,16 @@
 <script src="trunks.js"></script>
 <script src="lakeside.js"></script>
 <script src="water.js"></script>
+<script src="inkfluid.js"></script>
 <script src="inkreveal.js"></script>
 
 <style>
   /* ============================================================
      INK REVEAL LAB — a copy of bamboo.html (the autumn lake scene,
      drawn as it is there), the test bed for bringing the scene in with
-     wet ink washes, one part after another (inkreveal.js, after Inkwash
-     by Jonathan Whitaker, MIT licence). Section 10b of the script holds
+     wet ink washes, one part after another (inkreveal.js, with the
+     wet-on-wet fluid of inkfluid.js on the graphics chip, a port of
+     Inkwash by Jonathan Whitaker, MIT licence). Section 10b of the script holds
      the parts and where their drops fall; the panel holds only the
      reveal's own values ("Copy values" gives them). The scene itself
      uses bamboo.html's values as they are saved in this browser, and is
@@ -6831,7 +6833,7 @@ var RV_PARTS = [
   ['leaves', 'Falling leaves', 'fade', 5.4, 1.8],
   ['text', 'The text, button and toolbar', 'fade', 6.4, 1.2]
 ];
-var RV_KEY = 'inkRevealLab';
+var RV_KEY = 'inkRevealLab2';
 var RV_LOOK_DEF = JSON.parse(JSON.stringify(InkReveal.look));
 var RVS = { look: JSON.parse(JSON.stringify(InkReveal.look)), parts: {} };
 RV_PARTS.forEach(function (p) { RVS.parts[p[0]] = { on: true, at: p[3], dur: p[4] }; });
@@ -6879,7 +6881,7 @@ function rvSeeds(id) {
   if (id === 'lake') {                                             // broad strokes across, from the far shore down
     var yf = farShoreY(), yb = H * LK.nearBank, rows = [lerp(yf, yb, 0.12), lerp(yf, yb, 0.5), lerp(yf, yb, 0.88), lerp(yb, H, 0.6)];
     rows.forEach(function (y, ri) {
-      for (var c = 0; c <= 10; c++) drop(W * (0.02 + c * 0.096), y, H * 0.075, ri * 0.32 + c * 0.05);
+      for (var c = 0; c <= 10; c++) drop(W * (0.02 + c * 0.096), y, H * 0.075, ri * 0.3 + c * 0.1);
     });
     return [{ seeds: out, fall: 0.2 }];
   }
@@ -7429,18 +7431,32 @@ var lab = window.revealLab;
 if (!lab) return;
 var R = lab.values;
 var LOOK_CTLS = [
-  { k: 'speed', label: 'Speed', min: 0.25, max: 2, step: 0.05, note: 'The whole reveal faster (higher) or slower.' },
-  { k: 'drop', label: 'Drop size', min: 0.4, max: 2.5, step: 0.05, note: 'How big each drop of water is where it lands.' },
-  { k: 'water', label: 'Water in each drop', min: 0.3, max: 3, step: 0.05, note: 'More water spreads further before it stops.' },
-  { k: 'spread', label: 'How fast the water spreads', min: 1, max: 12, step: 1 },
-  { k: 'ragged', label: 'Ragged edges', min: 0, max: 2.5, step: 0.05, note: 'How much the paper\'s fibres hold the water back, so the wet edge is uneven. 0 = smooth round blots.' },
-  { k: 'fall', label: 'Runs downward', min: 0, max: 0.5, step: 0.01, note: 'The water running down the paper a little, as on a tilted board.' },
-  { k: 'dry', label: 'Drying time (s)', min: 0.3, max: 4, step: 0.05, note: 'How long the paper stays wet: the ink darkness fades as it dries and the colour comes through.' },
-  { k: 'ink', label: 'Ink darkness while wet', min: 0, max: 1, step: 0.01 },
-  { k: 'rim', label: 'Dark rim at the wet edge', min: 0, max: 1.5, step: 0.01 },
-  { k: 'grain', label: 'Paper grain in the ink', min: 0, max: 1, step: 0.01 },
-  { k: 'finish', label: 'Last soft fill (s)', min: 0.2, max: 3, step: 0.05, note: 'At the end of its time, whatever of a part its washes did not reach fills in softly over this long.' },
-  { k: 'cell', label: 'Detail of the wet edge (px)', min: 3, max: 12, step: 1, note: 'The size of the wet paper\'s cells. Smaller = finer edges, more work for the tablet.' }
+  { k: 'speed', label: 'Speed', min: 0.25, max: 2, step: 0.05, group: 'The reveal', note: 'The whole reveal faster (higher) or slower.' },
+  { k: 'drop', label: 'Brush size', min: 0.4, max: 2.5, step: 0.05, note: 'How wide each brush (or drop) is.' },
+  { k: 'random', label: 'Randomness', min: 0, max: 1.5, step: 0.05, note: 'How much each play differs: the brush paths bend, the drops move, the timing and sizes change. 0 = the same every time.', gpu: true },
+  { k: 'dry', label: 'Drying time (s)', min: 0.3, max: 6, step: 0.05, note: 'How long the paper stays wet. While it is wet the ink moves and the scene is darkened by it; as it dries the ink stops and the colour comes through.' },
+  { k: 'finish', label: 'Last soft fill (s)', min: 0.2, max: 3, step: 0.05, note: 'At the end of its time, whatever of a part the ink did not reach fills in softly over this long.' },
+  { k: 'flow', label: 'Water keeps moving', min: 0, max: 1, step: 0.01, group: 'Wet on wet (graphics chip, as in Inkwash)', note: 'How long the water keeps flowing after the brush has pushed it (Inkwash\'s Flow).', gpu: true },
+  { k: 'swirl', label: 'Swirls', min: 0, max: 50, step: 0.5, note: 'How strongly the water\'s little whirlpools are kept alive: the curls and tendrils in the ink.', gpu: true },
+  { k: 'push', label: 'Brush pushes the water', min: 0, max: 1.2, step: 0.01, note: 'As a share of the brush\'s own speed.', gpu: true },
+  { k: 'stir', label: 'Resting brush stirs (px/s)', min: 0, max: 150, step: 1, note: 'Where a brush rests (a drop), it stirs the water so the ink blooms.', gpu: true },
+  { k: 'bleed', label: 'Ink bleeds into the wet', min: 0, max: 1.5, step: 0.01, note: 'Feathering: how much the ink spreads into the wet paper round it.', gpu: true },
+  { k: 'creep', label: 'Water creeps outward', min: 0, max: 0.5, step: 0.01, gpu: true },
+  { k: 'prewet', label: 'Water goes down first (s)', min: 0, max: 1.5, step: 0.05, note: 'Each stroke is laid as clear water this long before the ink goes into it: wet on wet. 0 = ink straight onto dry paper.', gpu: true },
+  { k: 'wetSize', label: 'Water brush × ink brush', min: 1, max: 4, step: 0.05, note: 'How much wider the clear water is than the ink: the ink feathers out into it.', gpu: true },
+  { k: 'load', label: 'Ink in the brush', min: 0.1, max: 4, step: 0.05, gpu: true },
+  { k: 'show', label: 'Ink needed to show the scene', min: 0.05, max: 1.5, step: 0.01, note: 'Less = the scene shows through even where the ink is thin; more = only where it is dense (pale parts stay faint until the last fill).', gpu: true },
+  { k: 'ink', label: 'Ink darkness while wet', min: 0, max: 1, step: 0.01, group: 'The ink' },
+  { k: 'edge', label: 'Darker where the ink gathers', min: 0, max: 3, step: 0.05, note: 'At the edges and along the swirls, as in Inkwash.', gpu: true },
+  { k: 'grain', label: 'Paper grain', min: 0, max: 1.5, step: 0.01 },
+  { k: 'detail', label: 'Ink resolution', min: 192, max: 768, step: 32, note: 'Higher = finer feathering, more work for the graphics chip.', gpu: true, replay: true },
+  { k: 'simRes', label: 'Water flow resolution', min: 96, max: 256, step: 16, note: 'Higher = smaller swirls, more work.', gpu: true, replay: true },
+  { k: 'water', label: 'Water in each drop', min: 0.3, max: 3, step: 0.05, group: 'Simple wet paper (main processor, when the graphics chip is not used)', cpu: true },
+  { k: 'spread', label: 'How fast the water spreads', min: 1, max: 12, step: 1, cpu: true },
+  { k: 'ragged', label: 'Ragged edges', min: 0, max: 2.5, step: 0.05, cpu: true },
+  { k: 'fall', label: 'Runs downward', min: 0, max: 0.5, step: 0.01, cpu: true },
+  { k: 'rim', label: 'Dark rim at the wet edge', min: 0, max: 1.5, step: 0.01, cpu: true },
+  { k: 'cell', label: 'Detail of the wet edge (px)', min: 3, max: 12, step: 1, cpu: true, replay: true }
 ];
 var sp = document.getElementById('sp');
 document.getElementById('spToggle').addEventListener('click', function () {
@@ -7471,8 +7487,17 @@ function build() {
   sel.addEventListener('change', function () { lab.setTime(sel.value); });
   row.appendChild(sel); host.appendChild(row);
 
-  head('The ink');
-  LOOK_CTLS.forEach(function (c) { slider(c, R.look, function () { lab.changed(c.k === 'cell'); }); });
+  var er = document.createElement('label'); er.className = 'sp-colour'; er.textContent = 'Wet paper';
+  var es = document.createElement('select');
+  [['gpu', 'Graphics chip: wet on wet'], ['cpu', 'Main processor: simple']].forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; es.appendChild(op); });
+  es.value = R.look.engine;
+  es.addEventListener('change', function () { R.look.engine = es.value; lab.changed(true); build(); });
+  er.appendChild(es); host.appendChild(er);
+  LOOK_CTLS.forEach(function (c) {
+    if ((c.cpu && R.look.engine === 'gpu') || (c.gpu && R.look.engine !== 'gpu')) return;
+    if (c.group) head(c.group);
+    slider(c, R.look, function () { if (c.replay) replaySoon(); else lab.changed(false); });
+  });
   var cr = document.createElement('label'); cr.className = 'sp-colour'; cr.textContent = 'Ink colour';
   var ci = document.createElement('input'); ci.type = 'color'; ci.value = R.look.inkColour;
   ci.addEventListener('input', function () { R.look.inkColour = ci.value; lab.changed(false); });
@@ -7498,7 +7523,7 @@ document.getElementById('spReset').addEventListener('click', function () {
   lab.changed(true); build();
 });
 document.getElementById('spCopy').addEventListener('click', function () {
-  var text = 'Ink reveal: ' + LOOK_CTLS.map(function (c) { return c.label + ' ' + fmt(c, R.look[c.k]); }).join(', ') + ', ink colour ' + R.look.inkColour +
+  var text = 'Ink reveal (' + R.look.engine + '): ' + LOOK_CTLS.map(function (c) { return c.label + ' ' + fmt(c, R.look[c.k]); }).join(', ') + ', ink colour ' + R.look.inkColour +
              '\nOrder: ' + lab.parts.map(function (p) { var S = R.parts[p[0]]; return p[1] + (S.on ? ' at ' + S.at.toFixed(2) + ' s for ' + S.dur.toFixed(2) + ' s' : ' off'); }).join(', ') +
              '\n' + JSON.stringify(R);
   var out = document.getElementById('spOut');
