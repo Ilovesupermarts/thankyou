@@ -11,14 +11,20 @@
    is up, whatever its washes did not reach fills in softly and the part
    is drawn normally again (no mask, no extra cost).
 
-   The ideas come from Inkwash by Jonathan Whitaker
-   (https://github.com/johnowhitaker/inkwash, MIT licence, copyright 2026
-   Jonathan Whitaker): water that is carried and spreads only over wet
-   paper and evaporates; ink that can move only where the paper is wet;
-   the darker edge of a wet blot; paper grain. Inkwash runs a full fluid
-   simulation on the graphics chip; here it is a much smaller version on
-   the main processor (a grid of cells a few pixels across), so it needs
-   no graphics context of its own. The water spreads from wetter cells to
+   Two ways of doing the wet paper (LOOK.engine):
+   'gpu' (the default) — wet on wet, with the real fluid of Inkwash by
+   Jonathan Whitaker (https://github.com/johnowhitaker/inkwash, MIT
+   licence, copyright 2026 Jonathan Whitaker), ported in inkfluid.js. The
+   drops become brush strokes: clear water goes down first, wider, and
+   the ink brush follows into it, pushing the water along; the water
+   swirls, the ink is carried by it and feathers out through the wet
+   paper and stops at the dry edge, and every play is a little different
+   (LOOK.random). A part shows where its ink is (thin ink = faintly).
+   'cpu' — the simple version, used when the graphics chip can't be: a
+   much smaller wet paper on the main processor (a grid of cells a few
+   pixels across) with the same ideas: water that spreads only over wet
+   paper and evaporates, the darker edge of a wet blot, paper grain.
+   There the water spreads from wetter cells to
    drier ones, but a dry cell only takes water once its wetter neighbour
    is wetter than that cell's paper fibre allows ("pinning"), which is
    what gives the fronts their ragged, crisp watercolour edges.
@@ -45,24 +51,41 @@
 'use strict';
 
 var LOOK = {
+  engine: 'gpu',     // 'gpu': the fluid on the graphics chip (inkfluid.js, wet on wet); 'cpu': the simple wet paper below
   speed: 1,          // the whole reveal faster or slower
-  drop: 1,           // the drops' size
+  // --- on the graphics chip (as in Inkwash) ---
+  flow: 0.6,         // how long the water keeps moving (Inkwash's FLOW)
+  swirl: 18,         // how strongly swirls are kept alive (vorticity)
+  push: 0.25,        // how hard the brush pushes the water (share of its own speed)
+  stir: 30,          // how hard a resting brush stirs the water (px a second)
+  bleed: 0.5,        // how much the ink bleeds into the wet paper round it
+  creep: 0.12,       // how fast the water creeps outward
+  wetSize: 1.9,      // the water brush × the ink brush
+  prewet: 0.35,      // the water goes down this long before the ink (s): wet on wet
+  load: 1,           // how much ink each brush carries
+  show: 0.3,         // how much ink it takes for the scene to show fully (less = shows sooner)
+  edge: 0.7,         // darker ink where it gathers at the edges and in the swirls
+  random: 0.7,       // how much each play differs: brush paths, timing, sizes
+  detail: 384,       // the ink's resolution (its short side)
+  simRes: 160,       // the flow's resolution (its short side)
+  // --- both ---
+  drop: 1.4,         // the brush and drops' size
   water: 1,          // how much water each drop carries
   spread: 4,         // how fast the water spreads (× 60 spreading steps a second)
   ragged: 1,         // how ragged the wet edges are
   fall: 0.06,        // how much the water runs downward
-  dry: 1.4,          // drying time (s)
-  ink: 0.55,         // how dark the ink is while the paper is wet
+  dry: 2.4,          // drying time (s)
+  ink: 0.32,         // how dark the ink is while the paper is wet
   rim: 0.6,          // the darker rim at the wet edge
   grain: 0.5,        // paper grain in the ink
   finish: 0.9,       // the last soft fill of a part (s)
   cell: 8,           // the wet paper's cells (CSS px): smaller = finer edges, more work
-  inkColour: '#2A2420'
+  inkColour: '#262830'
 };
 var LAY = 0.35;      // a drop is laid over this long (s)
 
 var W = 0, H = 0, gw = 0, gh = 0, cs = 6, fib = null, parts = [], byId = {}, t0 = -1, tNow = 0, on = false;
-var simMs = 0, compMs = 0, scratch = null;
+var simMs = 0, compMs = 0, scratch = null, scratchG = null, gpu = false, nWash = 0, nSlots = 1;
 
 function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
 function smooth(e0, e1, x) { var t = clamp((x - e0) / (e1 - e0), 0, 1); return t * t * (3 - 2 * t); }
@@ -90,6 +113,7 @@ function makeFibres() {
 
 function setup(w, h) {
   W = w; H = h; cs = Math.max(2, LOOK.cell);
+  gpu = LOOK.engine === 'gpu' && typeof InkFluid !== 'undefined' && InkFluid.init();
   gw = Math.ceil(W / cs) + 2; gh = Math.ceil(H / cs) + 2;
   fib = makeFibres();
   scratch = canvas(gw, gh);
@@ -107,7 +131,7 @@ function makeWash(def) {
   return Wsh;
 }
 function plan(list) {
-  parts = []; byId = {};
+  parts = []; byId = {}; nWash = 0;
   list.forEach(function (d) {
     var P = { def: d, id: d.id, kind: d.kind || 'wash', at: d.at || 0, dur: d.dur || 1, off: !!d.off,
               washes: [], mask: null, tint: null, img: null, timg: null, live: false, Rc: null, Wc: null };
@@ -117,11 +141,20 @@ function plan(list) {
       P.img = P.mask.c.createImageData(gw, gh); P.timg = P.tint.c.createImageData(gw, gh);
       P.Rc = new Float32Array(gw * gh); P.Wc = new Float32Array(gw * gh);
     }
+    if (P.kind === 'wash') P.ch = nWash++;                // its ink's channel on the graphics chip
     parts.push(P); byId[P.id] = P;
   });
+  nSlots = Math.max(1, Math.min(nWash, 8));
 }
 function play(t) {
   t0 = t; tNow = t; on = true;
+  if (gpu) {
+    InkFluid.size(W, H, Math.round(LOOK.simRes), Math.round(LOOK.detail), nSlots);
+    InkFluid.clear();
+    if (InkFluid.state() !== 'ok') gpu = false;
+    else scratchG = canvas(InkFluid.tileW, InkFluid.tileH);
+    parts.forEach(function (P) { if (P.kind === 'wash') P.strokes = strokes(P); });
+  }
   parts.forEach(function (P) {
     P.washes.forEach(function (Wsh) { Wsh.w.fill(0); Wsh.r.fill(0); Wsh.box = null; Wsh.ever = null; });
     if (P.img) { P.img.data.fill(0); P.timg.data.fill(0); P.Rc.fill(0); P.Wc.fill(0); P.mask.c.clearRect(0, 0, gw, gh); P.tint.c.clearRect(0, 0, gw, gh); }
@@ -249,8 +282,97 @@ function paint(P, fin) {
   P.tint.c.putImageData(P.timg, 0, 0, bx0, by0, bx1 - bx0 + 1, by1 - by0 + 1);
 }
 
+/* ---------- on the graphics chip: the drops become brush strokes ----------
+   A part's drops, in the order they fall, are joined into strokes where one lands near the
+   last (else a new stroke starts). Each play shakes them up a little (LOOK.random): the
+   points move, the timing and sizes change, and the path bends, so no two plays are alike.
+   Each stroke has two brushes: clear water a little ahead (LOOK.prewet), wider (LOOK.wetSize),
+   then the ink brush into the wet: wet on wet. */
+function strokes(P) {
+  var seeds = [], out = [], R = LOOK.random;
+  P.washes.forEach(function (Wsh) { seeds = seeds.concat(Wsh.seeds); });
+  seeds = seeds.map(function (S) {
+    return { x: S.x + (Math.random() - 0.5) * S.r * 0.8 * R, y: S.y + (Math.random() - 0.5) * S.r * 0.8 * R,
+             r: S.r * LOOK.drop * (1 + (Math.random() - 0.5) * 0.5 * R), at: Math.max(0, S.at + (Math.random() - 0.5) * 0.16 * R) };
+  }).sort(function (a, b) { return a.at - b.at; });
+  seeds.forEach(function (S) {
+    var best = null, bd = 1e9;
+    out.forEach(function (K) {
+      var L = K.pts[K.pts.length - 1], d = Math.hypot(S.x - L.x, S.y - L.y);
+      if (d < Math.max(S.r, L.r) * 3.2 && S.at - L.at < 0.5 && S.at > L.at && d < bd) { bd = d; best = K; }
+    });
+    if (best) best.pts.push(S);
+    else out.push({ pts: [S], ph: Math.random() * 6.28, bend: (Math.random() - 0.5) * R, prev: [null, null] });
+  });
+  return out;
+}
+var DWELL = 0.3;
+/* Where a stroke's brush is at time tl (null before it starts or once it has finished). */
+function brushAt(K, tl) {
+  var p = K.pts, n = p.length;
+  if (tl < p[0].at || tl > p[n - 1].at + DWELL) return null;
+  if (n === 1 || tl >= p[n - 1].at) return { x: p[n - 1].x, y: p[n - 1].y, r: p[n - 1].r };
+  var k = 0;
+  while (k < n - 2 && tl >= p[k + 1].at) k++;
+  var a = p[k], b = p[k + 1], u = clamp((tl - a.at) / Math.max(1e-3, b.at - a.at), 0, 1);
+  // the path bends a little to one side between its points
+  var dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, bow = Math.sin(u * Math.PI) * K.bend * l * 0.35;
+  return { x: a.x + dx * u - dy / l * bow, y: a.y + dy * u + dx / l * bow, r: a.r + (b.r - a.r) * u };
+}
+function brush(P, K, which, tl, dt) {
+  var inkB = which === 1, cur = brushAt(K, inkB ? tl : tl + LOOK.prewet), prev = K.prev[which];
+  K.prev[which] = cur;
+  if (!cur) return;
+  if (!prev) prev = cur;
+  var r = cur.r * (inkB ? 1 : LOOK.wetSize), dx = cur.x - prev.x, dy = cur.y - prev.y, dist = Math.hypot(dx, dy);
+  var wAmp = inkB ? 0.9 : 0.75, vmax = 0.3 * W;            // a fast stroke pushes no harder than this
+  if (dist < r * 0.25) {                                   // resting: the ink pools and the water is stirred
+    InkFluid.wet(cur.x, cur.y, r, wAmp);
+    var a = Math.random() * 6.283, jm = LOOK.stir * (inkB ? 1 : 0.4);
+    InkFluid.push(cur.x, cur.y, r * 0.9, Math.cos(a) * jm, Math.sin(a) * jm);
+    if (inkB) InkFluid.ink(P.ch, cur.x, cur.y, r * 0.8, LOOK.load * 0.6 * dt);
+    return;
+  }
+  var vx = dx / Math.max(dt, 1e-3) * LOOK.push, vy = dy / Math.max(dt, 1e-3) * LOOK.push, vm = Math.hypot(vx, vy);
+  if (vm > vmax) { vx *= vmax / vm; vy *= vmax / vm; }
+  var steps = Math.min(Math.ceil(dist / (r * 0.6)), 12);
+  for (var i = 1; i <= steps; i++) {
+    var x = prev.x + dx * i / steps, y = prev.y + dy * i / steps;
+    InkFluid.wet(x, y, r, wAmp);
+    InkFluid.push(x, y, r * 1.15, vx, vy);
+    if (inkB) InkFluid.ink(P.ch, x, y, r * 0.8, LOOK.load * 0.15);
+  }
+}
+var drawList = [];
+function updateGpu(dt) {
+  var sdt = dt * LOOK.speed, list = [], slot = 0;
+  for (var p = 0; p < parts.length; p++) {
+    var P = parts[p];
+    P.slot = -1;
+    if (P.kind !== 'wash' || P.off || P.ch >= 12) continue;
+    var st = partState(P);
+    P.live = st === 1;
+    if (st !== 1) continue;
+    var tl = clock() - P.at;
+    (P.strokes || []).forEach(function (K) { brush(P, K, 0, tl, sdt); brush(P, K, 1, tl, sdt); });
+    if (slot < nSlots) { P.slot = slot++; list.push({ slot: P.slot, part: P.ch, fin: smooth(0, 1, (tl - P.dur) / Math.max(0.05, LOOK.finish)) }); }
+  }
+  InkFluid.step(Math.min(sdt, 1 / 30), { flow: LOOK.flow, swirl: LOOK.swirl, bleed: LOOK.bleed, creep: LOOK.creep, dry: LOOK.dry,
+                                         iterations: 20, used: nWash, lo: LOOK.show * 0.08, hi: LOOK.show, grain: LOOK.grain });
+  drawList = list;
+  if (list.length) InkFluid.draw(list, { ink: LOOK.ink * 2, edge: LOOK.edge, grain: LOOK.grain,
+                                         col: hex(LOOK.inkColour).map(function (v) { return v / 255; }) });
+}
+
 function update(t, dt) {
   tNow = t;
+  if (on && gpu && InkFluid.state() !== 'ok') gpu = false;     // the graphics chip took it back: the simple paper from now on
+  if (on && gpu) {
+    var g0 = performance.now();
+    updateGpu(dt);
+    simMs = simMs ? simMs + (performance.now() - g0 - simMs) * 0.1 : performance.now() - g0;
+    return;
+  }
   if (!on || !gw) return;
   var s0 = performance.now(), decay = Math.exp(-dt / Math.max(0.1, LOOK.dry));
   var steps = clamp(Math.round(LOOK.spread * 60 * dt), 1, 8);      // spreading steps a second, not a frame (at most 8 a frame)
@@ -291,6 +413,7 @@ function update(t, dt) {
 function cut(c, ids, pr, oy) {
   var sts = ids.map(function (id) { var P = byId[id]; return P && P.kind === 'wash' ? partState(P) : 2; });
   if (sts.every(function (s) { return s === 2; })) return;
+  if (gpu) { cutGpu(c, ids, sts, pr, oy); return; }
   var sw = gw * cs * pr, sh = gh * cs * pr, dy = -(oy || 0) * pr, M, live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
   if (ids.length === 1) M = live.length ? live[0].mask.cnv : null;
@@ -317,6 +440,37 @@ function cut(c, ids, pr, oy) {
   live.forEach(function (P) { c.drawImage(P.tint.cnv, 0, 0, gw, gh, 0, dy, sw, sh); });
   c.restore();
 }
+function cutGpu(c, ids, sts, pr, oy) {
+  var F = InkFluid.canvas, tw = InkFluid.tileW, th = InkFluid.tileH, dy = -(oy || 0) * pr, dw = W * pr, dh = H * pr;
+  var live = [];
+  ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
+  function tile(P, col, dst, x, y, w, h) {
+    if (P.slot >= 0) dst.drawImage(F, col * tw, InkFluid.slotY(P.slot), tw, th, x, y, w, h);
+  }
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  c.globalCompositeOperation = 'destination-in';
+  if (ids.length === 1) {
+    if (live.length && live[0].slot >= 0) tile(live[0], 0, c, 0, dy, dw, dh);
+    else c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+  } else {
+    var s = scratchG.c;
+    s.setTransform(1, 0, 0, 1, 0, 0);
+    s.globalCompositeOperation = 'source-over'; s.clearRect(0, 0, tw, th);
+    s.globalCompositeOperation = 'lighter';
+    ids.forEach(function (id, k) {
+      if (sts[k] === 2) { s.fillStyle = '#fff'; s.fillRect(0, 0, tw, th); }
+      else if (sts[k] === 1) tile(byId[id], 0, s, 0, 0, tw, th);
+    });
+    s.globalCompositeOperation = 'source-over';
+    c.drawImage(scratchG.cnv, 0, 0, tw, th, 0, dy, dw, dh);
+  }
+  c.globalCompositeOperation = 'source-atop';
+  live.forEach(function (P) { tile(P, 1, c, 0, dy, dw, dh); });
+  c.restore();
+}
 /* A layer (the size of dst) cut to its parts' wet paper and inked, then drawn onto dst.
    (The caller leaves out the drawing of parts not started.) A fading part is drawn faded. */
 function composite(dst, layer, ids, pr) {
@@ -335,7 +489,9 @@ function composite(dst, layer, ids, pr) {
 function maskInPlace(c, ids, pr, oy) { cut(c, typeof ids === 'string' ? [ids] : ids, pr, oy); }
 function stats() {
   var live = parts.filter(function (P) { return partState(P) === 1; }).map(function (P) { return P.id; });
-  return 'Wet paper ' + gw + '×' + gh + ' cells · water ' + simMs.toFixed(1) + ' ms, masks ' + compMs.toFixed(1) + ' ms a frame' +
+  var where = gpu ? 'Wet paper on the graphics chip (' + InkFluid.info() + ')' :
+              'Wet paper on the main processor' + (LOOK.engine === 'gpu' ? ' (the graphics chip is not available: ' + (typeof InkFluid === 'undefined' ? 'none' : InkFluid.state()) + ')' : '') + ', ' + gw + '×' + gh + ' cells';
+  return where + ' · water ' + simMs.toFixed(1) + ' ms, masks ' + compMs.toFixed(1) + ' ms a frame' +
          (live.length ? ' · appearing: ' + live.join(', ') : on ? ' · all shown' : '');
 }
 
