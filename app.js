@@ -17874,7 +17874,20 @@ function lakeGroundEdges(c, grdTop) {
     if (E.head) return;
     for (var j = 0; j < E.length - 1; j++) {
       var P = E[j], Q = E[j + 1];
-      if (lakeInLand(P[0], P[1] + 5) || lakeInLand(Q[0], Q[1] + 5)) continue;
+      if (lakeInLand(P[0], P[1] + 5) || lakeInLand(Q[0], Q[1] + 5)) {
+        // Where the bank turns to run straight toward you, the water is beside it, not below it: carry the bank's dark
+        // face on sideways, into the water, so the lip doesn't stop short before it meets the near bank.
+        var sx = Q[0] - P[0], sy = Q[1] - P[1];
+        if (Math.abs(sx) > Math.abs(sy) * 1.2 || sy < 0.2) continue;
+        var side = !lakeInLand(P[0] - 5, P[1]) && !lakeInLand(Q[0] - 5, Q[1]) ? -1 : (!lakeInLand(P[0] + 5, P[1]) && !lakeInLand(Q[0] + 5, Q[1]) ? 1 : 0);
+        if (!side) continue;
+        var sw = lakeBankH(P[1]) * 0.8, sw2 = lakeBankH(Q[1]) * 0.8;
+        var sg = c.createLinearGradient(P[0], 0, P[0] + side * sw, 0);
+        sg.addColorStop(0, rgba(scaleRgb(mud, 1.25))); sg.addColorStop(1, rgba(scaleRgb(mud, 0.55)));
+        c.fillStyle = sg;
+        c.beginPath(); c.moveTo(P[0] - side * 0.6, P[1]); c.lineTo(Q[0] - side * 0.6, Q[1] + 0.4); c.lineTo(Q[0] + side * sw2, Q[1] + 0.4); c.lineTo(P[0] + side * sw, P[1]); c.closePath(); c.fill();
+        continue;
+      }
       var bh = lakeBankH(P[1]);
       var fg = c.createLinearGradient(0, P[1], 0, P[1] + bh);
       fg.addColorStop(0, rgba(scaleRgb(mud, 1.25))); fg.addColorStop(1, rgba(scaleRgb(mud, 0.55)));
