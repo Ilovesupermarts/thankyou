@@ -7965,6 +7965,9 @@ document.getElementById('resetBtn').addEventListener('click', resetAll);
 window.addEventListener('load', function() {
   refreshTransitionGeometry();
   loadNameStrokes();
+  /* The 3D mountains' shaders are compiled now, on the name screen, so that slow first compile is
+     not a pause later, when the scene is being made (mountains.js). */
+  setTimeout(function() { try { if (typeof Mountains !== 'undefined' && Mountains.warm) Mountains.warm(); } catch (err) {} }, 1500);
   startInfoUpdates();
   loadPresetsFromServer().then(function() {
     buildNameScreenRows();
@@ -15401,16 +15404,24 @@ function landBakeScenery() {
   if (LAND_MTN.job) LAND_MTN.job.cancel();
   LAND_MTN.job = null; LAND_MTN.pic = null;
   if (try3d && Mountains.start) {
-    var o3 = mtnOptions(hy), job = Mountains.start(o3, 8);
+    var o3 = mtnOptions(hy), job = Mountains.start(o3, 8, 0, MTN_BUDGET);
     if (job) { LAND_MTN.job = job; LAND_MTN.o3 = o3; LAND_MTN.refl = false; return; }
   }
   landFinishScenery(null, null);
 }
 var LAND_MTN = { job: null, o3: null, pic: null, refl: false };
+/* How long each band may keep the graphics chip busy (ms). The bands are sized as they go (mountains.js),
+   so the drawing never holds a frame up: 8 even bands took 100-250 ms each, which showed as jerks while the
+   scene came in. While the name stands still a long frame does not show, so there each band does more. */
+var MTN_BUDGET = 6, MTN_BUDGET_STILL = 40;
+function mtnStepBudget() {
+  var n = performance.now();
+  return (typeof dynNaming === 'function' && dynNaming() && n >= nameLandsAt && n < nameLeavesAt) ? MTN_BUDGET_STILL : MTN_BUDGET;
+}
 /* One band of the 3D mountains (then of their reflectance map, when the fireworks
    need it); true once the scenery is finished. */
 function landStepScenery() {
-  var J = LAND_MTN, r = J.job.step();
+  var J = LAND_MTN, r = J.job.step(mtnStepBudget());
   if (r === null) return false;
   J.job = null;
   if (r === false) {                                          // the context was lost on the way: painted ridges for now
@@ -15420,7 +15431,7 @@ function landStepScenery() {
   }
   if (!J.refl && fwShow && Mountains.reflectance) {           // then how strongly each point reflects the fireworks
     J.pic = r; J.refl = true;
-    J.job = Mountains.start(J.o3, 8, 1);
+    J.job = Mountains.start(J.o3, 8, 1, MTN_BUDGET);
     if (J.job) return false;
   }
   if (J.refl) landFinishScenery(J.pic, r === J.pic ? null : r);
@@ -20079,13 +20090,13 @@ function dynSkyWanted() {
 }
 function dynPrelude(dt, t, skyWant) {
   skyMaster += ((skyWant ? 1 : 0) - skyMaster) * (1 - Math.exp(-dt * 2.2));
-  var naming = dynNaming();
-  if (dynBegun && !naming && !dynIntroDone()) dynReset();   // back at the koi screen: the scene starts afresh next time
+  var naming = dynNaming(), diving = typeof koiGestureState !== 'undefined' && koiGestureState === 'diving';
+  if (dynBegun && !naming && !diving && !dynIntroDone()) dynReset();   // back at the koi screen: the scene starts afresh next time
   if (skyWant) {
     clockTimer -= dt;
     if (clockTimer <= 0) { advanceClock(); clockTimer = 1; }
     envTimer -= dt;
-    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; if (dynBegun) ensureTree(naming); }
+    if (envTimer <= 0) { computeEnv(); envTimer = 0.25; if (dynBegun) ensureTree(naming || diving); }
     // During the name the scene is set up and the landscape baked, so that work
     // is done before it shows (not on the koi screen, where it could make the
     // koi stutter while someone touches the water). It is spread out, one small
@@ -20093,6 +20104,14 @@ function dynPrelude(dt, t, skyWant) {
     // Nothing heavy while the characters are still arriving: it waits until
     // they have landed and the name stands still.
     var nowMs = performance.now();
+    // The 3D mountains take the longest to make, and everything else waits for them, so they are
+    // started earlier: the scene is set up while the koi dives (the dive is a CSS animation, so a
+    // pause there does not show), and the mountains are drawn in thin bands of a few ms each while
+    // the name is written (too little to disturb it), so they are mostly done before the name lands.
+    if (ENV.scene === 'autumn' && (diving || (naming && nowMs < nameLandsAt))) {
+      if (!dynBegun) dynBegin(true);
+      else if (!LS.key || LAND_MTN.job) updateLandscape(t);
+    }
     if (naming && nowMs >= nameLandsAt) {
       if (!dynBegun) dynBegin(true);
       else dynSetupStep(t, nowMs < nameLeavesAt);
