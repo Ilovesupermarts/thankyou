@@ -467,7 +467,7 @@ var G = {
   // the eye is a little higher (gate heights are in eye heights): we look out over the lake
   gateHeight: 1.15, count: 36, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
   nukiAt: 0.69, feet: 0.125, gakuzuka: true,
-  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', cap: '#241E1D', feet: '#2A2220', ground: '#3A1C14',
              gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
   lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
   focusDepth: 0.12, blurNear: 0.2, blurFar: 1, hazeNear: 0.04, hazeFar: 0.1, strength: 1,
@@ -1428,19 +1428,20 @@ function gatePieces(lod) {
   }
   // a beam from u0 to u1, its bottom and top following yb(u) and yt(u), d deep;
   // cut into pieces so each sorts on its own against the gates around it
-  function beam(u0, u1, yb, yt, d, topTone, n) {
+  function beam(u0, u1, yb, yt, d, topTone, n, sideTone, underTone) {
+    sideTone = sideTone || 'v'; underTone = underTone || 'v';
     for (var k = 0; k < n; k++) {
       var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
       var q = [[a, yb(a), -d], [b, yb(b), -d], [b, yt(b), -d], [a, yt(a), -d],
                [a, yb(a), d], [b, yb(b), d], [b, yt(b), d], [a, yt(a), d]];
       var faces = [
-        { tone: 'v', p: [q[0], q[1], q[2], q[3]] },            // one face
-        { tone: 'v', p: [q[4], q[7], q[6], q[5]] },            // the other face
+        { tone: sideTone, p: [q[0], q[1], q[2], q[3]] },       // one face
+        { tone: sideTone, p: [q[4], q[7], q[6], q[5]] },       // the other face
         { tone: topTone, p: [q[3], q[2], q[6], q[7]] },        // top
-        { tone: 'v', p: [q[0], q[4], q[5], q[1]] }             // underside
+        { tone: underTone, p: [q[0], q[4], q[5], q[1]] }       // underside
       ];
-      if (k === 0) faces.push({ tone: 'v', p: [q[0], q[3], q[7], q[4]] });
-      if (k === n - 1) faces.push({ tone: 'v', p: [q[1], q[5], q[6], q[2]] });
+      if (k === 0) faces.push({ tone: sideTone, p: [q[0], q[3], q[7], q[4]] });
+      if (k === n - 1) faces.push({ tone: sideTone, p: [q[1], q[5], q[6], q[2]] });
       pieces.push({ faces: faces, c: [(a + b) / 2, (yb(a) + yt(b)) / 2, 0] });
     }
   }
@@ -1462,7 +1463,11 @@ function gatePieces(lod) {
   function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
   var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
   beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
-  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  // the kasagi: a red beam whose underside is lit like the rest of it (so no dark line shows between it and the shimaki),
+  // capped with a black cap a little longer and deeper than it, as on a real torii
+  var capT = kt * 0.55, kLc = kL + 0.014 * h;
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop - capT + ck(u); }, r * 1.25, 'v', segs, 'v', 'u');
+  beam(-kLc, kLc, function (u) { return kTop - capT + ck(u * kL / kLc); }, function (u) { return kTop + ck(u * kL / kLc); }, r * 1.38, 'k', segs, 'k', 'k');
   return pieces;
 }
 /* One gate's pieces into the world at (x, z), its across direction (ax, az)
@@ -1910,9 +1915,11 @@ function bakeGates() {
         if (f.tone === 'b') col = scale(col, 0.92);
       }
     } else if (f.tone === 'f') col = scale(C.feet, lerp(0.75, 1.3, lam));
+    else if (f.tone === 'k') col = scale(C.cap, lerp(0.8, 1.45, lam));                // the black cap of the kasagi
+    else if (f.tone === 'u') col = mix(C.shade, C.vermilion, Math.max(k, 0.78));      // the kasagi's underside: lit like its faces
     else if (f.tone === 't' && ny > 0.3) col = mix(scale(C.top, 0.7), C.top, k);
     else col = mix(C.shade, C.vermilion, k);
-    if (ny < -0.5 && !glowing) col = scale(col, 0.82);                 // the undersides, in shade
+    if (ny < -0.5 && !glowing && f.tone !== 'u' && f.tone !== 'k') col = scale(col, 0.82);                 // the undersides, in shade
     if (glowing) col = mix(col, mistC, g.haze * 0.5);
     else {
       col = light(mix(col, mistC, g.haze));
@@ -3078,12 +3085,12 @@ function autumnTree(c, o) {
     c.closePath(); c.fill();
     if (w0 < tw * 0.34) { c.beginPath(); c.arc(x0, y0, w0 / 2, 0, TAU); c.fill(); }   // a rounded start, so it grows smoothly out of its parent
     if (depth <= 0) return;
-    var kids = depth >= 2 ? 2 + (r() < 0.4 ? 1 : 0) : 1 + (r() < 0.5 ? 1 : 0);
+    var kids = 1 + (r() < 0.5 ? 1 : 0);                                // only a branch or two off each main branch: no twigs
     for (var k = 0; k < kids; k++) {
       var f = lerp(0.28, 0.78, (k + 0.25 + r() * 0.5) / kids), p2 = cubicAt(Q, f), p3 = cubicAt(Q, Math.min(1, f + 0.02));
       var tang = Math.atan2(p3[0] - p2[0], -(p3[1] - p2[1]));            // the parent's direction there
       var outward = (k % 2 ? -1 : 1) * (a0 >= 0 ? 1 : -1);               // alternately to the outside and the inside
-      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.6, depth - 1);
+      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.7, depth - 1);
     }
   }
   var inner = new Path2D(); (function () { for (var i = 0; i <= 90; i++) { var t = i / 90; inner[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1) * 0.88, yB - t * Hc * 0.97); } for (var j = 90; j >= 0; j--) { var t2 = j / 90; inner.lineTo(x + halfAt(t2, 1) * 0.88, yB - t2 * Hc * 0.97); } inner.lineTo(x + tw, y); inner.lineTo(x - tw, y); inner.closePath(); })();
@@ -3094,18 +3101,18 @@ function autumnTree(c, o) {
   if (r() < 0.5) {
     // one leader up the middle, gently swaying, with limbs off it at different heights
     var leadA = (r() < 0.5 ? -1 : 1) * lerp(0.04, 0.1, r());
-    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 2, -0.6);
+    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 1, -0.6);
     var nL = 3 + Math.floor(r() * 2), s0 = r() < 0.5 ? -1 : 1;
     for (var li2 = 0; li2 < nL; li2++) {
       var fy = lerp(0.02, 0.4, li2 / Math.max(1, nL - 1)), sd2 = (li2 % 2 ? 1 : -1) * s0;
-      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.24, 0.3, r()) * (1 - 0.5 * fy), 3);
+      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.3, 0.36, r()) * (1 - 0.5 * fy), 1);
     }
   } else {
     // a low fork into two or three big limbs, each curving out and up
     var nF = r() < 0.55 ? 2 : 3;
     for (var fk = 0; fk < nF; fk++) {
       var aF = nF === 2 ? (fk ? 1 : -1) * lerp(0.32, 0.48, r()) : lerp(-0.55, 0.55, fk / 2) + (r() - 0.5) * 0.08;
-      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 3, 0.2);
+      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 1, 0.2);
     }
   }
   c.restore();
