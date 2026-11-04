@@ -47,7 +47,10 @@
           fft              (optional, needs fftwaves.js) the waves simulated instead of the
                            normal map: FFTWaves's values (wind, dir, fetch, …), plus
                            eye (m: the eye's height above the water, which sets how big
-                           the simulated waves look), height and chop. waveSize is not used then.
+                           the simulated waves look), height and chop, detail (0.05 … 1: how
+                           sharp the far waves stay, 1 = as a plain mipmap), far (0 … 1: how far
+                           the waves still push the reflections far away) and shade (how much
+                           each wave lightens or darkens the reflection). waveSize is not used then.
      Water.fftState()           'ok', 'none' (no fftwaves.js, or the chip can't draw float pictures)
      Water.fftInfo()            { ms, rebuilt, size }: the time to submit a frame's FFT, and the last rebuild
    ============================================================ */
@@ -69,7 +72,7 @@ var FS = [
 'precision highp float;',
 'uniform sampler2D uMirror, uNormal;',
 'uniform vec2 uSize;            // the water on the screen (CSS px)',
-'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun;',
+'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun, uFarK, uShade;',
 'uniform vec3 uWater, uSunCol, uSunDir;',
 'in vec2 vUv;',
 'out vec4 outColor;',
@@ -93,9 +96,11 @@ var FS = [
 '  float fres = clamp((0.02 + 0.98 * pow(1.0 - cosT, 5.0)) * uReflect * 1.3, 0.0, 1.0);',
 '  // the mirrored picture, moved by the slope of the waves (more near you, where they look bigger)',
 '  float near = clamp(d / max(1.0, uSize.y + uTop - uHy), 0.0, 1.0);',
-'  vec2 disp = vec2(n.x, n.z) * uDistort * (0.2 + 0.8 * near);',
+'  vec2 disp = vec2(n.x, n.z) * uDistort * (uFarK + (1.0 - uFarK) * near);',
 '  vec2 m = vec2((x + uPad + disp.x) / uMirrorW, (yIn + disp.y) / uSize.y);',
 '  vec3 refl = texture(uMirror, clamp(m, vec2(0.0005), vec2(0.9995))).rgb;',
+'  // each wave turned toward you shows a lighter patch of sky, turned away a darker one: the surface reads everywhere, not just in the sun',
+'  refl *= 1.0 + uShade * clamp(-3.0 * n.z + 1.5 * n.x, -1.0, 1.0);',
 '  // the water\'s own colour, a little lighter on the slopes turned up to the sky',
 '  vec3 body = uWater * (0.82 + 0.3 * (n.y - 0.9));',
 '  vec3 col = mix(body, refl, fres);',
@@ -110,10 +115,12 @@ var FS = [
 // two tiles (large and small), in metres on the water (the eye uEye metres above it)
 var FS_FFT = FS.replace(/vec3 waves\(vec2 p\) \{[\s\S]*?\n\}\n/, [
 'uniform sampler2D uSlope;',
-'uniform float uEye, uL0, uL1;',
+'uniform float uEye, uL0, uL1, uDetail;',
 'vec3 waves(vec2 p) {',
 '  vec2 q = p * uEye;',
-'  vec2 s = texture(uSlope, q / uL0).xy + texture(uSlope, q / uL1).zw;',
+'  vec2 a = q / uL0, b = q / uL1;',
+'  // uDetail < 1: sample a sharper mip than the distance asks for, so far waves are not averaged to flat',
+'  vec2 s = textureGrad(uSlope, a, dFdx(a) * uDetail, dFdy(a) * uDetail).xy + textureGrad(uSlope, b, dFdx(b) * uDetail, dFdy(b) * uDetail).zw;',
 '  return normalize(vec3(-s.x, 1.0, -s.y));',
 '}', ''].join('\n'));
 
@@ -143,7 +150,7 @@ function setup() {
   texM = gl.createTexture(); texN = gl.createTexture();
   return true;
 }
-var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir'];
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade'];
 /* The simulated waves (fftwaves.js), made the first time a page asks for them. */
 function fftSetup() {
   if (fftSim) return true;
@@ -153,7 +160,7 @@ function fftSetup() {
   if (!vs || !fs) { fftFailed = true; fftSim = null; return false; }
   progF = gl.createProgram(); gl.attachShader(progF, vs); gl.attachShader(progF, fs); gl.linkProgram(progF);
   if (!gl.getProgramParameter(progF, gl.LINK_STATUS)) { console.warn('water (fft):', gl.getProgramInfoLog(progF)); fftFailed = true; fftSim = null; return false; }
-  NAMES.concat(['uSlope', 'uEye', 'uL0', 'uL1']).forEach(function (k) { UF[k] = gl.getUniformLocation(progF, k); });
+  NAMES.concat(['uSlope', 'uEye', 'uL0', 'uL1', 'uDetail']).forEach(function (k) { UF[k] = gl.getUniformLocation(progF, k); });
   return true;
 }
 /* The normal map: the page's copy of three.js's waternormals.jpg. If it can't be loaded, one is made here
@@ -224,13 +231,14 @@ function render(o) {
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texN); gl.uniform1i(u.uNormal, 1);
   if (useFft) {
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fftSim.texture); gl.uniform1i(u.uSlope, 2);
-    gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
+    gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uDetail, o.fft.detail !== undefined ? o.fft.detail : 0.2); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
   }
   gl.uniform2f(u.uSize, o.cssW, o.cssH);
   gl.uniform1f(u.uTop, o.top); gl.uniform1f(u.uHy, o.horizon); gl.uniform1f(u.uF, o.lens);
   gl.uniform1f(u.uPad, o.pad); gl.uniform1f(u.uMirrorW, o.cssW + o.pad * 2);
   gl.uniform1f(u.uTime, o.time); gl.uniform1f(u.uDistort, o.distort); gl.uniform1f(u.uWave, o.waveSize || 1);
   gl.uniform1f(u.uReflect, o.reflect);
+  gl.uniform1f(u.uFarK, useFft && o.fft.far !== undefined ? o.fft.far : 0.2); gl.uniform1f(u.uShade, useFft && o.fft.shade !== undefined ? o.fft.shade : 0);
   gl.uniform3f(u.uWater, o.water[0] / 255, o.water[1] / 255, o.water[2] / 255);
   gl.uniform1f(u.uSun, o.sun || 0);
   var sc = o.sunColour || [255, 245, 225];
