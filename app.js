@@ -17096,8 +17096,16 @@ var LAKE = {
   gates: 29, pathX: 0.3, pathY: 0.768, gateEndX: 0.735, gateEndY: 0.88,
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
-  shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
-  farShore: 160, reflect: 0.37, deep: 0.67, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
+  shader: true, waterRes: 0.75, waveSize: 1.4, sparkle: 1.55,
+  // the simulated waves (fftwaves.js, after FFT-Ocean), used instead of the wave map when on: the wind over the lake
+  // (m/s, for the app's wind of 1; it follows the wind), where it blows (degrees: 0 left to right, 90 away from you), how
+  // far it has blown over the water (m), how lined up the waves are, the eye's height above the water (m: bigger = the
+  // waves look smaller), how steep the waves are, how sharp their crests, the two tiles (m) and the grid, how sharp the
+  // far waves stay (lower = sharper), how far they still push the far reflections, and how much each wave lightens
+  // or darkens the reflection
+  fft: true, fftWind: 1, fftDir: 120, fftFetch: 1340, fftSpread: 0.53, fftEye: 0.9, fftHeight: 0.94, fftChop: 0.85,
+  fftL0: 132, fftL1: 16.5, fftSize: 256, fftDetail: 0.28, fftFar: 0.28, fftShade: 0.47,
+  farShore: 85, reflect: 0.19, deep: 0.84, ripples: 1, rippleSpeed: 0.25, waves: 0.7, glint: 1.3, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
   // how round the lake's near-right corner is, where the left bank comes down to the near bank (a share of the screen's
   // width: 0 leaves the sharp corner)
@@ -18177,6 +18185,13 @@ function lakeBakeGroveStep() {
 function lakeBakeForeStep() { if (lakeOn() && LK.path) lakeBakeFore(LK.path); }
 
 /* ---------- each frame ---------- */
+/* the simulated waves (fftwaves.js), or null for the wave map */
+function lakeFftParams() {
+  if (!LAKE.fft) return null;
+  return { size: LAKE.fftSize, wind: LAKE.fftWind * (0.4 + 0.6 * clamp(lakeWind(), 0, 2)), dir: LAKE.fftDir, fetch: LAKE.fftFetch, spread: LAKE.fftSpread,
+           L0: LAKE.fftL0, L1: LAKE.fftL1, eye: LAKE.fftEye, height: LAKE.fftHeight, chop: LAKE.fftChop,
+           detail: LAKE.fftDetail, far: LAKE.fftFar, shade: LAKE.fftShade };
+}
 function lakeShaderOn() { return LAKE.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
 /* The water, after the scenery and before the ground. */
 function lakeDrawWater(c, t, dt) {
@@ -18190,7 +18205,7 @@ function lakeDrawWater(c, t, dt) {
     var pic = Water.render({ w: W * PR * LAKE.waterRes, h: hh * PR * LAKE.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
                              time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)), waveSize: LAKE.waveSize,
                              reflect: LAKE.reflect, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
-                             sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e) });
+                             sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e), fft: lakeFftParams() });
     if (pic) {
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalAlpha = 1;
