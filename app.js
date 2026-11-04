@@ -96,7 +96,7 @@ var BUILD = 'v148';
          wooded headland on the left (cedars drawn as stacked tiers, pines,
          ginkgo and maples, a five-storey pagoda and a shrine hall), the far
          shore's forest along the foot of the mountains (now lower, with
-         Fuji smaller), a torii in the water, a row of trees on the right
+         Fuji smaller), a row of trees on the right
          bank that sway in the gusts, mossy rocks, red spider lilies and
          susuki along the shores. The torii line starts at the headland's
          foot and winds along a peninsula toward you (29 gates, lanterns in
@@ -16479,14 +16479,6 @@ function torBake() {
     var dq = depthOf(foot);
     gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band, s: s });
   }
-  // the torii standing in the lake (水上鳥居), facing you, a little turned
-  if (TORII.show && LAKE.waterTorii) {
-    var wq = torGround(LAKE.wtX * W, LAKE.wtY * H), wyaw = 0.32;
-    var wtx = Math.sin(wyaw), wtz = -Math.cos(wyaw), wfoot = hy + F / wq.z;
-    var wdq = depthOf(wfoot);
-    gates.push({ x: wq.x, z: wq.z, tx: wtx, tz: wtz, ax: -wtz, az: wtx, px: TORII.gateHeight * LAKE.wtSize * F / wq.z, foot: wfoot,
-                 haze: wdq.haze, band: wdq.band, water: true, s: -1 });       // out in the lake, beyond the line: drawn first
-  }
   // the lanterns
   torPlaceLanterns(path, gap).forEach(function (Lp) {
     if (Lp.z < 0.6) return;
@@ -16503,7 +16495,7 @@ function torBake() {
   torLanternCount = torLanterns.length;
   // the birds perch on the nearest gate of the line
   var front = null;
-  gates.forEach(function (g) { if (!g.water && (!front || g.foot > front.foot)) front = g; });
+  gates.forEach(function (g) { if (!front || g.foot > front.foot) front = g; });
   if (front) TOR.perch = torPerchLine(front);
   if (!gates.length && !torLanterns.length) { TOR.ready = true; lakeComposeWater(); return; }
   // the light: from above, in front, and to the side TORII.lightFrom
@@ -16512,7 +16504,6 @@ function torBake() {
   var all = [], minY = H;
   gates.forEach(function (g) {
     var lod = clamp(g.px / 120, 0, 1), gh0 = TORII.gateHeight;
-    if (g.water) TORII.gateHeight = gh0 * LAKE.wtSize;     // the water torii is bigger than the gates of the line
     var gp = torPieces(lod);
     TORII.gateHeight = gh0;
     torPlace(gp, g).forEach(function (pc) {
@@ -16567,7 +16558,6 @@ function torBake() {
   var shx = -Lx / Ly * TORII.gateHeight * 0.35, shz = -Lz / Ly * TORII.gateHeight * 0.35;
   if (TORII.shadow > 0) {
     gates.forEach(function (g) {
-      if (g.water) return;                             // no shadow on the water
       shadowQuad(g, TORII.width * TORII.gateHeight / 2 + TORII.pillar * TORII.gateHeight * 1.5, gap * 0.52, 0.5, TORII.shadow * (1 - g.haze));
     });
     var lsk = LANT.size / TORII.gateHeight;
@@ -16794,19 +16784,6 @@ function torBake() {
           rc.closePath(); rc.fill(); rc.stroke();
         });
       });
-      // rings on the water round the water torii's feet
-      gates.forEach(function (g) {
-        if (!g.water) return;
-        var hw = TORII.width * TORII.gateHeight * LAKE.wtSize / 2;
-        [-1, 1].forEach(function (sd) {
-          var fx = g.x + g.ax * hw * sd, fz = g.z + g.az * hw * sd, p0 = torScreen(fx, 0, fz), rr = 0.12 * F / fz;
-          for (var q = 1; q <= 3; q++) {
-            rc.strokeStyle = rgba(mixRgb(lakeSkyAt(hy * 0.5), [255, 255, 255], 0.3), 0.35 / q);
-            rc.lineWidth = 0.8;
-            rc.beginPath(); rc.ellipse(p0[0], p0[1] + 0.5, rr * (1 + q * 0.9), rr * (1 + q * 0.9) * 0.22, 0, 0, TAU); rc.stroke();
-          }
-        });
-      });
     }
   }
   lakeComposeWater();
@@ -17014,7 +16991,6 @@ function torDrawGlow(c, t) {
      reeds and mossy rocks at the water's edge;
    - a grove behind the middle gates (ginkgo, maples, cedars);
    - a row of trees planted on the right bank, swaying with the gusts;
-   - a single torii standing in the water (水上鳥居);
    - red spider lilies (彼岸花) beside the gravel, and susuki (ススキ)
      that sways with the wind and the gusts.
    The water is drawn on the graphics chip when it can be (water.js:
@@ -17054,8 +17030,6 @@ var LAKE = {
   // water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
   bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
-  // the torii in the water
-  waterTorii: true, wtX: 0.26, wtY: 0.82, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -17517,11 +17491,11 @@ function lakeBakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  // 2. every tree is its own: a kind (gold ginkgo or a green broadleaf, one after the other), its own seed (so its
-  //    own shape), and its own height and width
+  // 2. every tree is its own: a colour (red, orange or gold, never the same twice running), its own seed (so its own
+  //    shape), and its own height and width; all drawn as flat painted autumn trees (Lakeside.tree 'autumn')
   var R = Lakeside.rng(7311), last = '';
-  var KINDS = [['ginkgo', 0.5], ['broad', 0.5]];
-  var NOM = { ginkgo: [0.5, 0.5], broad: [0.55, 0.55] };       // (a first guess at its width either side of the trunk)
+  var KINDS = [['red', 0.3], ['orange', 0.38], ['gold', 0.32]];
+  var NOM = { red: [0.34, 0.34], orange: [0.34, 0.34], gold: [0.34, 0.34] };       // (a first guess at its width either side of the trunk)
   function pick(k) {
     var kind, t, acc, n;
     do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
@@ -17533,10 +17507,7 @@ function lakeBakeBank(path) {
     var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    var o = { x: cw / 2, y: chh - 3, h: hh, seed: sp.seed, lx: -0.7, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)) };
-    if (sp.kind === 'ginkgo') { o.stout = true; o.w = hh * 0.92 * sp.wm; }
-    else if (sp.kind === 'broad') { o.pal = Lakeside.PAL.blob; o.w = hh * 0.95 * sp.wm; }
-    Lakeside.tree(T.c, sp.kind === 'broad' ? 'momiji' : sp.kind, o);
+    Lakeside.tree(T.c, 'autumn', { x: cw / 2, y: chh - 3, h: hh, w: hh * 0.6 * sp.wm, seed: sp.seed, lx: -0.7, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)), tone: sp.kind });
     // how far its crown reaches either side of the trunk (px)
     var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
     for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 2) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
