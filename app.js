@@ -16028,7 +16028,7 @@ var TORII = {
   // the gates (heights in eye heights: the eye is higher by the lake, looking out over the water); count from LAKE.gates
   gateHeight: 1.15, count: 29, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
   nukiAt: 0.69, feet: 0.125, gakuzuka: true,
-  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', cap: '#241E1D', feet: '#2A2220', ground: '#3A1C14',
              gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
   // light and shadow
   lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
@@ -16148,19 +16148,20 @@ function torPieces(lod) {
   }
   // a beam from u0 to u1, its bottom and top following yb(u) and yt(u), d deep;
   // cut into pieces so each sorts on its own against the gates around it
-  function beam(u0, u1, yb, yt, d, topTone, n) {
+  function beam(u0, u1, yb, yt, d, topTone, n, sideTone, underTone) {
+    sideTone = sideTone || 'v'; underTone = underTone || 'v';
     for (var k = 0; k < n; k++) {
       var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
       var q = [[a, yb(a), -d], [b, yb(b), -d], [b, yt(b), -d], [a, yt(a), -d],
                [a, yb(a), d], [b, yb(b), d], [b, yt(b), d], [a, yt(a), d]];
       var faces = [
-        { tone: 'v', p: [q[0], q[1], q[2], q[3]] },            // one face
-        { tone: 'v', p: [q[4], q[7], q[6], q[5]] },            // the other face
+        { tone: sideTone, p: [q[0], q[1], q[2], q[3]] },       // one face
+        { tone: sideTone, p: [q[4], q[7], q[6], q[5]] },       // the other face
         { tone: topTone, p: [q[3], q[2], q[6], q[7]] },        // top
-        { tone: 'v', p: [q[0], q[4], q[5], q[1]] }             // underside
+        { tone: underTone, p: [q[0], q[4], q[5], q[1]] }       // underside
       ];
-      if (k === 0) faces.push({ tone: 'v', p: [q[0], q[3], q[7], q[4]] });
-      if (k === n - 1) faces.push({ tone: 'v', p: [q[1], q[5], q[6], q[2]] });
+      if (k === 0) faces.push({ tone: sideTone, p: [q[0], q[3], q[7], q[4]] });
+      if (k === n - 1) faces.push({ tone: sideTone, p: [q[1], q[5], q[6], q[2]] });
       pieces.push({ faces: faces, c: [(a + b) / 2, (yb(a) + yt(b)) / 2, 0] });
     }
   }
@@ -16182,7 +16183,11 @@ function torPieces(lod) {
   function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
   var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
   beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
-  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  // the kasagi: a red beam whose underside is lit like the rest of it (so no dark line shows between it and the shimaki),
+  // capped with a black cap a little longer and deeper than it, as on a real torii
+  var capT = kt * 0.55, kLc = kL + 0.014 * h;
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop - capT + ck(u); }, r * 1.25, 'v', segs, 'v', 'u');
+  beam(-kLc, kLc, function (u) { return kTop - capT + ck(u * kL / kLc); }, function (u) { return kTop + ck(u * kL / kLc); }, r * 1.38, 'k', segs, 'k', 'k');
   return pieces;
 }
 /* One gate's pieces into the world at (x, z), its across direction (ax, az)
@@ -16659,10 +16664,12 @@ function torBake() {
         if (f.tone === 'b') col = scaleRgb(col, 0.92);
       }
     } else if (f.tone === 'f') col = scaleRgb(C.feet, lerp(0.75, 1.3, lam));
+    else if (f.tone === 'k') col = scaleRgb(C.cap, lerp(0.8, 1.45, lam));                // the black cap of the kasagi
+    else if (f.tone === 'u') col = mixRgb(C.shade, C.vermilion, Math.max(k, 0.78));      // the kasagi's underside: lit like its faces
     else if (f.tone === 't' && ny > 0.3) col = mixRgb(scaleRgb(C.top, 0.7), C.top, k);
     else col = mixRgb(C.shade, C.vermilion, k);
     if (!done) {
-      if (ny < -0.5) col = scaleRgb(col, 0.82);                 // the undersides, in shade
+      if (ny < -0.5 && f.tone !== 'u' && f.tone !== 'k') col = scaleRgb(col, 0.82);                 // the undersides, in shade
       col = koyoLight(mixRgb(col, mistC, g.haze));
       var ll = lampLight(pc, cx, cy, cz, nx, ny, nz) * (1 - g.haze * 0.7);
       if (ll > 0) col = [col[0] + (col[0] * 0.6 + 70) * ll * flame[0] / 255, col[1] + (col[1] * 0.6 + 70) * ll * flame[1] / 255,
@@ -17029,7 +17036,7 @@ var LAKE = {
   // the ground; the edge runs alongside the path, larger = further right, less lake); bankBack: how far back from the
   // water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
-  bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
+  bankTrees: true, bankX0: 0.7, bankGap: 0.45, bankH: 3.35, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -17491,23 +17498,30 @@ function lakeBakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  // 2. every tree is its own: a colour (red, orange or gold, never the same twice running), its own seed (so its own
-  //    shape), and its own height and width; all drawn as flat painted autumn trees (Lakeside.tree 'autumn')
+  // 2. every tree is its own: a colour (red, orange or gold) and a build (slim, classic or broad), neither the same as
+  //    the one before it, its own seed (so its own crown, limbs and fork), and its own height and width; all drawn as
+  //    flat painted autumn trees (Lakeside.tree 'autumn')
   var R = Lakeside.rng(7311), last = '';
   var KINDS = [['red', 0.3], ['orange', 0.38], ['gold', 0.32]];
-  var NOM = { red: [0.34, 0.34], orange: [0.34, 0.34], gold: [0.34, 0.34] };       // (a first guess at its width either side of the trunk)
+  // the build of a tree: slim and tall, classic, or broad and round (its crown's width against its height, and a
+  // first guess at how far it reaches either side of the trunk, in heights)
+  var SHAPES = [{ name: 'slim', w: 0.46, hm: 1.1, reach: 0.27 }, { name: 'classic', w: 0.54, hm: 1, reach: 0.31 }, { name: 'broad', w: 0.64, hm: 0.9, reach: 0.37 }];
+  var lastShape = '', used = {};
   function pick(k) {
-    var kind, t, acc, n;
+    var kind, t, acc, n, shp;
     do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
     last = kind;
-    return { kind: kind, seed: 9100 + k * 37 + Math.floor(R() * 997),
-             hm: lerp(0.84, 1.2, R()), wm: lerp(0.84, 1.16, R()) };
+    do { shp = SHAPES[Math.floor(R() * SHAPES.length)]; } while (shp.name === lastShape);
+    lastShape = shp.name;
+    var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);       // a seed of its own: a shape of its own
+    used[seed] = 1;
+    return { kind: kind, shape: shp, seed: seed, hm: lerp(0.86, 1.18, R()) * shp.hm, wm: lerp(0.9, 1.12, R()), light: lerp(-0.8, 0.2, R()) };
   }
   function draw(T, sp, h, gz) {
     var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    Lakeside.tree(T.c, 'autumn', { x: cw / 2, y: chh - 3, h: hh, w: hh * 0.6 * sp.wm, seed: sp.seed, lx: -0.7, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)), tone: sp.kind });
+    Lakeside.tree(T.c, 'autumn', { x: cw / 2, y: chh - 3, h: hh, w: hh * sp.shape.w * sp.wm, seed: sp.seed, light: sp.light, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)), tone: sp.kind });
     // how far its crown reaches either side of the trunk (px)
     var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
     for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 2) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
@@ -17517,8 +17531,8 @@ function lakeBakeBank(path) {
   //    on the ground (so every gap looks the same, near or far), whatever the trees' widths
   var k = 0, s = 0;
   for (var guard = 0; guard < 300; guard++, k++) {
-    var sp = pick(k), nom = NOM[sp.kind], g1 = k ? gap : gap * 0.5;
-    var sc = s + g1 + nom[0] * hw * sp.hm * sp.wm, res = null, gp = null;
+    var sp = pick(k), g1 = k ? gap : gap * 0.5;
+    var sc = s + g1 + sp.shape.reach * hw * sp.hm * sp.wm, res = null, gp = null;
     if (sc > cum[cum.length - 1]) break;
     for (var pass = 0; pass < 2; pass++) {
       gp = at(sc);
