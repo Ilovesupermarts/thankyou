@@ -226,12 +226,22 @@ var Clouds = (function() {
      no longer used. */
   function free(sh) {
     if (!sh) return;
+    if (worker && sh.wid) { try { worker.postMessage({ free: sh.wid }); } catch (e) { /* silent */ } }
     if (sh.cnv) { sh.cnv.width = sh.cnv.height = 0; }
     sh.img = null; sh.ready = false;
   }
 
   /* Paint a cloud in the light and colours of o, into sh.cnv. */
   function paint(sh, o) {
+    var ctx = sh.cnv.getContext('2d');
+    var img = sh.img || ctx.createImageData(sh.w, sh.h);
+    pixels(sh, o, img.data);
+    ctx.putImageData(img, 0, 0);
+    sh.img = img;
+    return sh.cnv;
+  }
+  /* The painting itself, into px (RGBA, sh.w × sh.h): the same here and in the worker. */
+  function pixels(sh, o, px) {
     o = merged(o);
     var W = sh.w, H = sh.h, C = o.colours, R = sh.R0;
     var lit = col(C.lit), shade = col(C.shade), base = col(C.base), sky = col(C.sky);
@@ -247,9 +257,7 @@ var Clouds = (function() {
       dist += st; offs.push([sx * dist, sy * dist]); wts.push(st / R);
     }
     var absorb = o.shadow * 0.012 * (1 - front * 0.55);
-    var ctx = sh.cnv.getContext('2d');
-    var img = sh.img || ctx.createImageData(W, H);
-    var px = img.data, D = sh.D, A = sh.A, HG = sh.HG;
+    var D = sh.D, A = sh.A, HG = sh.HG;
     var amb = o.ambient, bD = o.baseDark, silver = o.silver, expo = o.exposure;
     for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
       var i = y * W + x, q = i * 4;
@@ -272,9 +280,19 @@ var Clouds = (function() {
       rr += (sky[0] - rr) * sk; gg += (sky[1] - gg) * sk; bb += (sky[2] - bb) * sk;
       px[q] = rr; px[q + 1] = gg; px[q + 2] = bb; px[q + 3] = A[i];
     }
-    ctx.putImageData(img, 0, 0);
-    sh.img = img;
-    return sh.cnv;
+    return px;
+  }
+  /* The same as paint(), but worked out in the background (the worker that built the shape keeps its
+     density), so the animation never waits for it: the old picture stays until the new one is laid in,
+     then cb(sh). Painting a cloud is a few million small steps (a ray toward the sun from every pixel);
+     done here, a frame at a time, each one was a jerk, again whenever the light moved on. Where there is
+     no worker (or it does not know the shape) it is painted here, as before. */
+  var paintJobs = {};
+  function paintAsync(sh, o, cb) {
+    if (!worker || !sh.wid) { paint(sh, o); setTimeout(function() { cb(sh); }, 0); return; }
+    var id = nextId++;
+    paintJobs[id] = { sh: sh, o: o, cb: cb };
+    worker.postMessage({ paint: sh.wid, id: id, o: o });
   }
 
   /* Build a cloud in the background (a worker running this same file), so
@@ -290,7 +308,21 @@ var Clouds = (function() {
       try {
         worker = new Worker(SRC);
         worker.onmessage = function(e) {
-          var d = e.data, jb = jobs[d.id];
+          var d = e.data;
+          if (d.painted) {                          // a picture painted in the background
+            var pj = paintJobs[d.id];
+            if (!pj) return;
+            delete paintJobs[d.id];
+            if (!d.px || !pj.sh.cnv || !pj.sh.cnv.width) { if (pj.sh.cnv && pj.sh.cnv.width) paint(pj.sh, pj.o); pj.cb(pj.sh); return; }
+            try {
+              var c2 = pj.sh.cnv.getContext('2d');
+              c2.putImageData(new ImageData(new Uint8ClampedArray(d.px), pj.sh.w, pj.sh.h), 0, 0);
+              pj.sh.img = null;
+            } catch (er) { paint(pj.sh, pj.o); }
+            pj.cb(pj.sh);
+            return;
+          }
+          var jb = jobs[d.id];
           if (!jb) return;
           delete jobs[d.id];
           jb.cb(addCanvas(d));
@@ -300,6 +332,8 @@ var Clouds = (function() {
           worker = null;
           for (var id in jobs) here(jobs[id]);
           jobs = {};
+          for (var pid in paintJobs) { var pj = paintJobs[pid]; paint(pj.sh, pj.o); pj.cb(pj.sh); }
+          paintJobs = {};
         };
       } catch (err) { worker = null; }
     }
@@ -309,14 +343,27 @@ var Clouds = (function() {
     worker.postMessage({ id: id, kind: kind, seed: seed, o: o });
   }
 
-  return { DEFAULTS: DEFAULTS, KINDS: KINDS, shape: shape, paint: paint, build: build, free: free };
+  return { DEFAULTS: DEFAULTS, KINDS: KINDS, shape: shape, paint: paint, paintAsync: paintAsync, pixels: pixels, build: build, free: free };
 })();
 if (typeof module !== 'undefined') module.exports = Clouds;
 /* Running as the worker for Clouds.build: build the shape and send it back. */
 if (typeof document === 'undefined' && typeof importScripts === 'function') {
+  var kept = {};                                   // the shapes built here, kept so they can be painted here too
   self.onmessage = function(e) {
-    var d = e.data, sh = Clouds.shape(d.kind, d.seed, d.o);
-    sh.id = d.id;
-    self.postMessage(sh, [sh.D.buffer, sh.A.buffer, sh.HG.buffer]);
+    var d = e.data;
+    if (d.free) { delete kept[d.free]; return; }
+    if (d.paint) {
+      var k = kept[d.paint];
+      if (!k) { self.postMessage({ painted: true, id: d.id, px: null }); return; }
+      var px = new Uint8ClampedArray(k.w * k.h * 4);
+      Clouds.pixels(k, d.o, px);
+      self.postMessage({ painted: true, id: d.id, px: px.buffer }, [px.buffer]);
+      return;
+    }
+    var sh = Clouds.shape(d.kind, d.seed, d.o);
+    kept[d.id] = sh;
+    // a copy goes back to the page (this one stays, for painting)
+    self.postMessage({ id: d.id, wid: d.id, kind: sh.kind, w: sh.w, h: sh.h, base: sh.base, size: sh.size, R0: sh.R0,
+                       D: sh.D.slice(), A: sh.A.slice(), HG: sh.HG.slice() });
   };
 }
