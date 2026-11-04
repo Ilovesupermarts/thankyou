@@ -2949,17 +2949,17 @@ function bakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  // 2. every tree is its own: a kind (gold ginkgo, a green broadleaf, a cedar, a pine; never the same twice running),
-  //    its own seed (so its own shape), and its own height and width
+  // 2. every tree is its own: a kind (gold ginkgo or a green broadleaf, one after the other), its own seed (so its
+  //    own shape), and its own height and width
   var R = Lakeside.rng(7311), last = '';
-  var KINDS = [['ginkgo', 0.3], ['broad', 0.3], ['sugi', 0.24], ['matsu', 0.16]];
-  var NOM = { ginkgo: [0.5, 0.5], broad: [0.55, 0.55], sugi: [0.25, 0.25], matsu: [0.5, 0.5] };       // (a first guess at its width either side of the trunk)
+  var KINDS = [['ginkgo', 0.5], ['broad', 0.5]];
+  var NOM = { ginkgo: [0.5, 0.5], broad: [0.55, 0.55] };       // (a first guess at its width either side of the trunk)
   function pick(k) {
     var kind, t, acc, n;
     do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
     last = kind;
     return { kind: kind, seed: 9100 + k * 37 + Math.floor(R() * 997),
-             hm: lerp(0.84, 1.2, R()) * (kind === 'sugi' ? 1.3 : kind === 'matsu' ? 0.92 : 1), wm: lerp(0.84, 1.16, R()) };
+             hm: lerp(0.84, 1.2, R()), wm: lerp(0.84, 1.16, R()) };
   }
   function draw(T, sp, h, gz) {
     var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
@@ -2968,7 +2968,6 @@ function bakeBank(path) {
     var o = { x: cw / 2, y: chh - 3, h: hh, seed: sp.seed, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)) };
     if (sp.kind === 'ginkgo') { o.stout = true; o.w = hh * 0.92 * sp.wm; }
     else if (sp.kind === 'broad') { o.pal = Lakeside.PAL.blob; o.w = hh * 0.95 * sp.wm; }
-    else if (sp.kind === 'matsu') o.w = hh * 0.9 * sp.wm;
     Lakeside.tree(T.c, sp.kind === 'broad' ? 'momiji' : sp.kind, o);
     // how far its crown reaches either side of the trunk (px)
     var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
