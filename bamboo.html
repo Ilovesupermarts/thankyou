@@ -467,7 +467,7 @@ var G = {
   // the eye is a little higher (gate heights are in eye heights): we look out over the lake
   gateHeight: 1.15, count: 36, width: 0.57, pillar: 0.068, lean: 1.8, overhang: 0.23, sori: 0.038,
   nukiAt: 0.69, feet: 0.125, gakuzuka: true,
-  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', feet: '#2A2220', ground: '#3A1C14',
+  colours: { vermilion: '#E4462A', shade: '#8C2316', top: '#B8341F', cap: '#241E1D', feet: '#2A2220', ground: '#3A1C14',
              gravel: '#D8C3A0', gravelLight: '#F4E8D0', gravelDark: '#A88F6E' },
   lightFrom: -0.8, shadeDepth: 0.45, shadow: 0.31, shadowBlur: 2.8,
   focusDepth: 0.12, blurNear: 0.2, blurFar: 1, hazeNear: 0.04, hazeFar: 0.1, strength: 1,
@@ -1428,19 +1428,20 @@ function gatePieces(lod) {
   }
   // a beam from u0 to u1, its bottom and top following yb(u) and yt(u), d deep;
   // cut into pieces so each sorts on its own against the gates around it
-  function beam(u0, u1, yb, yt, d, topTone, n) {
+  function beam(u0, u1, yb, yt, d, topTone, n, sideTone, underTone) {
+    sideTone = sideTone || 'v'; underTone = underTone || 'v';
     for (var k = 0; k < n; k++) {
       var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
       var q = [[a, yb(a), -d], [b, yb(b), -d], [b, yt(b), -d], [a, yt(a), -d],
                [a, yb(a), d], [b, yb(b), d], [b, yt(b), d], [a, yt(a), d]];
       var faces = [
-        { tone: 'v', p: [q[0], q[1], q[2], q[3]] },            // one face
-        { tone: 'v', p: [q[4], q[7], q[6], q[5]] },            // the other face
+        { tone: sideTone, p: [q[0], q[1], q[2], q[3]] },       // one face
+        { tone: sideTone, p: [q[4], q[7], q[6], q[5]] },       // the other face
         { tone: topTone, p: [q[3], q[2], q[6], q[7]] },        // top
-        { tone: 'v', p: [q[0], q[4], q[5], q[1]] }             // underside
+        { tone: underTone, p: [q[0], q[4], q[5], q[1]] }       // underside
       ];
-      if (k === 0) faces.push({ tone: 'v', p: [q[0], q[3], q[7], q[4]] });
-      if (k === n - 1) faces.push({ tone: 'v', p: [q[1], q[5], q[6], q[2]] });
+      if (k === 0) faces.push({ tone: sideTone, p: [q[0], q[3], q[7], q[4]] });
+      if (k === n - 1) faces.push({ tone: sideTone, p: [q[1], q[5], q[6], q[2]] });
       pieces.push({ faces: faces, c: [(a + b) / 2, (yb(a) + yt(b)) / 2, 0] });
     }
   }
@@ -1462,7 +1463,11 @@ function gatePieces(lod) {
   function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
   var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
   beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
-  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  // the kasagi: a red beam whose underside is lit like the rest of it (so no dark line shows between it and the shimaki),
+  // capped with a black cap a little longer and deeper than it, as on a real torii
+  var capT = kt * 0.55, kLc = kL + 0.014 * h;
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop - capT + ck(u); }, r * 1.25, 'v', segs, 'v', 'u');
+  beam(-kLc, kLc, function (u) { return kTop - capT + ck(u * kL / kLc); }, function (u) { return kTop + ck(u * kL / kLc); }, r * 1.38, 'k', segs, 'k', 'k');
   return pieces;
 }
 /* One gate's pieces into the world at (x, z), its across direction (ax, az)
@@ -1910,9 +1915,11 @@ function bakeGates() {
         if (f.tone === 'b') col = scale(col, 0.92);
       }
     } else if (f.tone === 'f') col = scale(C.feet, lerp(0.75, 1.3, lam));
+    else if (f.tone === 'k') col = scale(C.cap, lerp(0.8, 1.45, lam));                // the black cap of the kasagi
+    else if (f.tone === 'u') col = mix(C.shade, C.vermilion, Math.max(k, 0.78));      // the kasagi's underside: lit like its faces
     else if (f.tone === 't' && ny > 0.3) col = mix(scale(C.top, 0.7), C.top, k);
     else col = mix(C.shade, C.vermilion, k);
-    if (ny < -0.5 && !glowing) col = scale(col, 0.82);                 // the undersides, in shade
+    if (ny < -0.5 && !glowing && f.tone !== 'u' && f.tone !== 'k') col = scale(col, 0.82);                 // the undersides, in shade
     if (glowing) col = mix(col, mistC, g.haze * 0.5);
     else {
       col = light(mix(col, mistC, g.haze));
