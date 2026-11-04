@@ -14,6 +14,7 @@
 <script src="mountains.js"></script>
 <script src="trunks.js"></script>
 <script src="lakeside.js"></script>
+<script src="fftwaves.js"></script>
 <script src="water.js"></script>
 
 <style>
@@ -2498,6 +2499,12 @@ var LK_DEFAULTS = {
   // the water on the graphics chip (water.js): on/off, the size of its picture (share of the screen's
   // resolution), the size of the waves, and the sun's sparkle
   shader: true, waterRes: 0.75, waveSize: 0.55, sparkle: 1,
+  // the simulated waves (fftwaves.js, after FFT-Ocean): on/off (off = the normal map), the wind over the lake (m/s,
+  // for the page's wind 1; it follows the wind), where it blows (degrees: 0 left to right, 90 away from you), how far
+  // it has blown over the water (m), how lined up the waves are, the eye's height above the water (m: bigger = the
+  // waves look smaller), how steep the waves are, how sharp their crests, the two tiles (m) and the grid
+  fft: true, fftWind: 3, fftDir: 60, fftFetch: 400, fftSpread: 0.85, fftEye: 1.6, fftHeight: 0.45, fftChop: 0.8,
+  fftL0: 40, fftL1: 4, fftSize: 256,
   farShore: 160, reflect: 0.37, deep: 0.67, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
   // the swipe button (次へ) and the page dots, as a group: how far down the page its middle is (a share of the page's height)
@@ -3635,6 +3642,12 @@ function drawSusuki(c, t, front) {
 
 /* ---------- each frame ---------- */
 /* Over the water (after SCN): the gates' reflection, the ripples, the glitter. */
+/* the simulated waves (fftwaves.js), or null for the normal map */
+function fftParams() {
+  if (!LK.fft) return null;
+  return { size: LK.fftSize, wind: LK.fftWind * (0.4 + 0.6 * clamp(V.wind, 0, 2)), dir: LK.fftDir, fetch: LK.fftFetch, spread: LK.fftSpread,
+           L0: LK.fftL0, L1: LK.fftL1, eye: LK.fftEye, height: LK.fftHeight, chop: LK.fftChop };
+}
 function waterShaderOn() { return LK.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
 function drawWaterLive(t) {
   var yf = farShoreY(), hh = H - yf, hy = H * V.horizon, F = lensF();
@@ -3645,7 +3658,7 @@ function drawWaterLive(t) {
     var pic = Water.render({ w: W * PR * LK.waterRes, h: hh * PR * LK.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
                              time: t * LK.rippleSpeed, distort: LK.waves * 7 * (0.65 + 0.35 * clamp(V.wind, 0, 2)), waveSize: LK.waveSize,
                              reflect: LK.reflect, water: scale(waterCol(), lerp(1.15, 0.8, LK.deep)), sun: sunK, sunX: sp0.x, sunY: sp0.y,
-                             sunColour: V.timeOfDay === 'evening' ? [255, 196, 130] : [255, 248, 232] });
+                             sunColour: V.timeOfDay === 'evening' ? [255, 196, 130] : [255, 248, 232], fft: fftParams() });
     if (pic) {
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.globalAlpha = 1;
@@ -7049,7 +7062,11 @@ window.lakeLab = {
   waterOn: function () { if (typeof Water !== 'undefined') { Water.unlatch(); Water.init('textures/waternormals.jpg'); composeWater(); } },
   info: function () {
     var ws = typeof Water === 'undefined' ? 'none' : Water.state();
-    return 'Water: ' + (!LK.shader ? '2D (switched off)' : ws === 'ok' ? 'graphics chip (WebGL 2)' : ws === 'loading' ? 'loading the wave map' :
+    var fi = typeof Water !== 'undefined' && Water.fftInfo ? Water.fftInfo() : null;
+    var fs = !LK.shader || ws !== 'ok' ? '' : !LK.fft ? ', waves from the normal map' :
+             fi ? ', simulated waves (FFT ' + fi.size + '×' + fi.size + ', ' + fi.ms.toFixed(2) + ' ms a frame to send; last rebuilt in ' + Math.round(fi.rebuilt) + ' ms)' :
+             ', simulated waves not available here (normal map instead)';
+    return 'Water: ' + (!LK.shader ? '2D (switched off)' : ws === 'ok' ? 'graphics chip (WebGL 2)' + fs : ws === 'loading' ? 'loading the wave map' :
                         ws === 'latched' ? '2D: the graphics chip dropped it, so it stays 2D for 12 hours (button below)' : ws === 'lost' ? '2D: the graphics chip dropped it' : '2D (no WebGL 2 here)') +
            ' · Lake: baked in ' + Math.round(lakeMs.head + lakeMs.water + lakeMs.ground + lakeMs.fore) + ' ms (headland ' + Math.round(lakeMs.head) +
            ', water ' + Math.round(lakeMs.water) + ', ground ' + Math.round(lakeMs.ground) + ', shore ' + Math.round(lakeMs.fore) + ')' +
@@ -7456,7 +7473,7 @@ var LAKE_CTLS = [
   { k: 'deep', label: 'Deep water colour', min: 0, max: 1, step: 0.01, note: 'Looking down into the lake near you: its own blue shows through.' },
   { k: 'farShore', label: 'Far shore distance', min: 60, max: 400, step: 5, note: 'Further = a thinner band of forest along the foot of the mountains.' },
   { k: 'waves', label: 'Ripple in the reflections', min: 0, max: 3, step: 0.05, note: 'How far the waves move the reflections (drawn each frame), more in the wind.' },
-  { k: 'waveSize', label: 'Size of the waves', min: 0.3, max: 3, step: 0.05 },
+  { k: 'waveSize', label: 'Size of the waves', min: 0.3, max: 3, step: 0.05, note: 'For the normal map only (the simulated waves: see "Eye height" below).' },
   { k: 'sparkle', label: 'Sun sparkle on the waves', min: 0, max: 3, step: 0.05 },
   { k: 'waterRes', label: 'Water picture resolution', min: 0.25, max: 1, step: 0.05, note: 'A share of the screen\'s resolution. Lower = cheaper for the graphics chip, softer.' },
   { k: 'ripples', label: 'Ripples', min: 0, max: 2, step: 0.05, note: 'The drifting ripples (drawn each frame), stronger in the wind.' },
@@ -7465,6 +7482,16 @@ var LAKE_CTLS = [
   { k: 'glint', label: 'Sun glitter', min: 0, max: 1.5, step: 0.05, note: 'On the water under the sun (day and evening).' },
   { k: 'lakeMist', label: 'Mist on the lake', min: 0, max: 1, step: 0.01 },
   { k: 'veil', label: 'Soft light behind the text', min: 0, max: 1, step: 0.01, note: 'Mist in the middle distance, so the words stay easy to read.' },
+  { k: 'fftWind', label: 'Wind over the lake (m/s)', min: 0.5, max: 10, step: 0.1, group: 'Simulated waves (FFT)', note: 'Switch them on under "Show". At the page\'s wind 1; they follow the wind. Light air 1, a light breeze 2–3, a gentle breeze 4–5. Stronger = longer, steeper waves.' },
+  { k: 'fftDir', label: 'Wind direction (°)', min: 0, max: 180, step: 1, note: '0 = from left to right across the screen, 90 = away from you, 180 = from right to left.' },
+  { k: 'fftFetch', label: 'Fetch (m)', min: 20, max: 3000, step: 10, note: 'How far the wind has blown over the water before it reaches here. A small lake: a few hundred metres. Longer = bigger waves.' },
+  { k: 'fftSpread', label: 'Waves lined up with the wind', min: 0, max: 1, step: 0.01, note: '0 = waves from many ways (choppy, criss-crossed), 1 = long crests across the wind.' },
+  { k: 'fftEye', label: 'Eye height (m)', min: 0.5, max: 10, step: 0.1, note: 'How high you stand above the water. Higher = the same waves look smaller.' },
+  { k: 'fftHeight', label: 'Wave steepness', min: 0, max: 2, step: 0.01, note: '1 = as the wind makes them; lower = calmer, glassier water.' },
+  { k: 'fftChop', label: 'Sharp crests', min: 0, max: 2, step: 0.05, note: 'Pointed crests and flat troughs, as on real wind waves. 0 = smooth, rounded waves.' },
+  { k: 'fftL0', label: 'Large tile (m)', min: 10, max: 200, step: 1, note: 'The waves repeat every this many metres (the long waves, far out). Bigger = less repeating, but coarser.' },
+  { k: 'fftL1', label: 'Small tile (m)', min: 1, max: 20, step: 0.5, note: 'The ripples near you (down to a few cm).' },
+  { k: 'fftSize', label: 'Grid', min: 128, max: 256, step: 128, note: '128 or 256 waves across each tile. 128 = a quarter of the work.' },
   { k: 'headTip', label: 'Headland reaches to', min: 0.3, max: 0.6, step: 0.01, group: 'The headland', note: 'Across the screen.' },
   { k: 'headTop', label: 'Headland top', min: 0.25, max: 0.6, step: 0.01, note: 'The top of its hillside at the left edge (fraction of the screen height).' },
   { k: 'headZ', label: 'Headland distance', min: 10, max: 90, step: 1, note: 'Nearer = bigger trees and a shore lower on the screen.' },
@@ -7516,7 +7543,7 @@ var LANT_CTLS = [
   { k: 'pillar', label: 'Pillar thickness', min: 0.04, max: 0.12, step: 0.005 },
   { k: 'sides', label: 'Sides', min: 4, max: 8, step: 2, note: '4 square, 6 hexagonal, 8 octagonal.' }
 ];
-var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
+var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['fft', 'Simulated waves (FFT) instead of the wave map'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
                      ['bankTrees', 'Trees on the right bank']];
 var LAKE_COLOURS = [['water', 'Water (day)'], ['waterEvening', 'Water (evening)'], ['waterNight', 'Water (night)'], ['moss', 'Moss'],
                     ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki'],

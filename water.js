@@ -44,11 +44,17 @@
           water            the water's own colour, [r, g, b] 0 … 255
           sun              the sparkle's strength (0: none); sunX, sunY: the sun on the
                            screen (CSS px); sunColour [r, g, b]
+          fft              (optional, needs fftwaves.js) the waves simulated instead of the
+                           normal map: FFTWaves's values (wind, dir, fetch, …), plus
+                           eye (m: the eye's height above the water, which sets how big
+                           the simulated waves look), height and chop. waveSize is not used then.
+     Water.fftState()           'ok', 'none' (no fftwaves.js, or the chip can't draw float pictures)
+     Water.fftInfo()            { ms, rebuilt, size }: the time to submit a frame's FFT, and the last rebuild
    ============================================================ */
 var Water = (function () {
 'use strict';
 var LATCH_KEY = 'waterLatch1', LATCH_MS = 12 * 3600 * 1000;
-var cnv = null, gl = null, prog = null, U = {}, texM = null, texN = null, normalReady = false, lost = false, failed = false, mirrorW = 1, mirrorH = 1;
+var cnv = null, gl = null, prog = null, U = {}, progF = null, UF = {}, fftSim = null, fftFailed = false, texM = null, texN = null, normalReady = false, lost = false, failed = false, mirrorW = 1, mirrorH = 1;
 
 function latched() {
   try { var t = parseFloat(localStorage.getItem(LATCH_KEY) || '0'); return t > 0 && Date.now() - t < LATCH_MS; } catch (e) { return false; }
@@ -100,6 +106,16 @@ var FS = [
 '  outColor = vec4(col, 1.0);',
 '}'
 ].join('\n');
+// the same, with the slopes of the simulated waves (fftwaves.js) instead of the normal map:
+// two tiles (large and small), in metres on the water (the eye uEye metres above it)
+var FS_FFT = FS.replace(/vec3 waves\(vec2 p\) \{[\s\S]*?\n\}\n/, [
+'uniform sampler2D uSlope;',
+'uniform float uEye, uL0, uL1;',
+'vec3 waves(vec2 p) {',
+'  vec2 q = p * uEye;',
+'  vec2 s = texture(uSlope, q / uL0).xy + texture(uSlope, q / uL1).zw;',
+'  return normalize(vec3(-s.x, 1.0, -s.y));',
+'}', ''].join('\n'));
 
 function compile(type, src) {
   var s = gl.createShader(type);
@@ -123,9 +139,21 @@ function setup() {
   if (!vs || !fs) { failed = true; gl = null; return false; }
   prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn('water:', gl.getProgramInfoLog(prog)); failed = true; gl = null; return false; }
-  ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir']
-    .forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
+  NAMES.forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
   texM = gl.createTexture(); texN = gl.createTexture();
+  return true;
+}
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir'];
+/* The simulated waves (fftwaves.js), made the first time a page asks for them. */
+function fftSetup() {
+  if (fftSim) return true;
+  if (fftFailed || typeof FFTWaves === 'undefined' || !gl) return false;
+  fftSim = FFTWaves.create(gl);
+  var vs = fftSim && compile(gl.VERTEX_SHADER, VS), fs = fftSim && compile(gl.FRAGMENT_SHADER, FS_FFT);
+  if (!vs || !fs) { fftFailed = true; fftSim = null; return false; }
+  progF = gl.createProgram(); gl.attachShader(progF, vs); gl.attachShader(progF, fs); gl.linkProgram(progF);
+  if (!gl.getProgramParameter(progF, gl.LINK_STATUS)) { console.warn('water (fft):', gl.getProgramInfoLog(progF)); fftFailed = true; fftSim = null; return false; }
+  NAMES.concat(['uSlope', 'uEye', 'uL0', 'uL1']).forEach(function (k) { UF[k] = gl.getUniformLocation(progF, k); });
   return true;
 }
 /* The normal map: the page's copy of three.js's waternormals.jpg. If it can't be loaded, one is made here
@@ -183,28 +211,38 @@ function setMirror(src) {
   mirrorW = src.width; mirrorH = src.height;
 }
 function render(o) {
-  if (!gl || lost || !normalReady || mirrorW < 2 || gl.isContextLost()) return null;
+  if (!gl || lost || mirrorW < 2 || gl.isContextLost()) return null;
+  var useFft = !!(o.fft && fftSetup() && fftSim.update(o.fft, o.time));
+  if (!useFft && !normalReady) return null;
   var w = Math.max(2, Math.round(o.w)), h = Math.max(2, Math.round(o.h));
   if (cnv.width !== w || cnv.height !== h) { cnv.width = w; cnv.height = h; }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   gl.viewport(0, 0, w, h);
-  gl.useProgram(prog);
-  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texM); gl.uniform1i(U.uMirror, 0);
-  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texN); gl.uniform1i(U.uNormal, 1);
-  gl.uniform2f(U.uSize, o.cssW, o.cssH);
-  gl.uniform1f(U.uTop, o.top); gl.uniform1f(U.uHy, o.horizon); gl.uniform1f(U.uF, o.lens);
-  gl.uniform1f(U.uPad, o.pad); gl.uniform1f(U.uMirrorW, o.cssW + o.pad * 2);
-  gl.uniform1f(U.uTime, o.time); gl.uniform1f(U.uDistort, o.distort); gl.uniform1f(U.uWave, o.waveSize || 1);
-  gl.uniform1f(U.uReflect, o.reflect);
-  gl.uniform3f(U.uWater, o.water[0] / 255, o.water[1] / 255, o.water[2] / 255);
-  gl.uniform1f(U.uSun, o.sun || 0);
+  var u = useFft ? UF : U;
+  gl.useProgram(useFft ? progF : prog);
+  gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texM); gl.uniform1i(u.uMirror, 0);
+  gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texN); gl.uniform1i(u.uNormal, 1);
+  if (useFft) {
+    gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fftSim.texture); gl.uniform1i(u.uSlope, 2);
+    gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
+  }
+  gl.uniform2f(u.uSize, o.cssW, o.cssH);
+  gl.uniform1f(u.uTop, o.top); gl.uniform1f(u.uHy, o.horizon); gl.uniform1f(u.uF, o.lens);
+  gl.uniform1f(u.uPad, o.pad); gl.uniform1f(u.uMirrorW, o.cssW + o.pad * 2);
+  gl.uniform1f(u.uTime, o.time); gl.uniform1f(u.uDistort, o.distort); gl.uniform1f(u.uWave, o.waveSize || 1);
+  gl.uniform1f(u.uReflect, o.reflect);
+  gl.uniform3f(u.uWater, o.water[0] / 255, o.water[1] / 255, o.water[2] / 255);
+  gl.uniform1f(u.uSun, o.sun || 0);
   var sc = o.sunColour || [255, 245, 225];
-  gl.uniform3f(U.uSunCol, sc[0] / 255, sc[1] / 255, sc[2] / 255);
+  gl.uniform3f(u.uSunCol, sc[0] / 255, sc[1] / 255, sc[2] / 255);
   // toward the sun, from the water: across from where it is on the screen, up by its height above the eye line
   var sx = ((o.sunX || o.cssW / 2) - o.cssW / 2) / o.lens, sy = Math.max(0.02, (o.horizon - (o.sunY || 0)) / o.lens), sl = Math.hypot(sx, sy, 1);
-  gl.uniform3f(U.uSunDir, sx / sl, sy / sl, 1 / sl);
+  gl.uniform3f(u.uSunDir, sx / sl, sy / sl, 1 / sl);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return cnv;
 }
+function fftState() { return fftSim ? 'ok' : (typeof FFTWaves === 'undefined' || fftFailed ? 'none' : 'waiting'); }
+function fftInfo() { return fftSim ? { ms: fftSim.ms, rebuilt: fftSim.rebuilt, size: fftSim.size() } : null; }
 function state() {
   if (latched()) return 'latched';
   if (lost) return 'lost';
@@ -212,5 +250,5 @@ function state() {
   if (!gl) return 'none';
   return normalReady ? 'ok' : 'loading';
 }
-return { init: init, state: state, setMirror: setMirror, render: render, unlatch: unlatch };
+return { init: init, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
 })();
