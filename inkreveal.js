@@ -161,7 +161,7 @@ function play(t) {
     P.live = false;
   });
 }
-function stop() { on = false; }
+function stop() { on = false; if (snap) { snap.cnv.width = snap.cnv.height = 1; snap = null; } }   // (its copy of the tiles let go)
 /* A part that was planned with hold: true waits (not drawn, not started) until it is released, which
    is when what it shows has been made. It then starts at its own time, or at once if that has gone by
    (so the reveal never waits for a slow part, and a slow part never makes the others wait). Its drops
@@ -386,8 +386,27 @@ function updateGpu(dt) {
   InkFluid.step(Math.min(sdt, 1 / 30), { flow: LOOK.flow, swirl: LOOK.swirl, bleed: LOOK.bleed, creep: LOOK.creep, dry: LOOK.dry,
                                          iterations: 20, used: nWash, lo: LOOK.show * 0.08, hi: LOOK.show, grain: LOOK.grain });
   drawList = list;
-  if (list.length) InkFluid.draw(list, { ink: LOOK.ink * 2, edge: LOOK.edge, grain: LOOK.grain,
-                                         col: hex(LOOK.inkColour).map(function (v) { return v / 255; }) });
+  if (list.length) {
+    InkFluid.draw(list, { ink: LOOK.ink * 2, edge: LOOK.edge, grain: LOOK.grain,
+                          col: hex(LOOK.inkColour).map(function (v) { return v / 255; }) });
+    snapTiles(list.length);
+  }
+}
+/* The fluid's tiles, copied once a frame into an ordinary canvas (snap), which the parts' masks are then
+   cut from. Drawing a WebGL canvas into a 2D one makes the browser copy that whole canvas every time, and
+   each appearing part takes two or three tiles a frame (and the ground strip more): a dozen or more full
+   copies a frame. Now there is one, of only the rows in use. */
+var snap = null;
+function snapTiles(rows) {
+  var F = InkFluid.canvas, w = InkFluid.tileW * 2, h = InkFluid.tileH * rows;
+  if (!snap) snap = canvas(w, InkFluid.tileH * nSlots);
+  if (snap.cnv.width !== w || snap.cnv.height < h) { snap.cnv.width = w; snap.cnv.height = InkFluid.tileH * nSlots; }
+  var c = snap.c;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1;
+  c.globalCompositeOperation = 'copy';
+  c.drawImage(F, 0, 0, w, h, 0, 0, w, h);
+  c.globalCompositeOperation = 'source-over';
 }
 
 function update(t, dt) {
@@ -468,7 +487,7 @@ function cut(c, ids, pr, oy, rect) {
   c.restore();
 }
 function cutGpu(c, ids, sts, pr, oy, rect) {
-  var F = InkFluid.canvas, tw = InkFluid.tileW, th = InkFluid.tileH, dy = -(oy || 0) * pr, dw = W * pr, dh = H * pr;
+  var F = snap ? snap.cnv : InkFluid.canvas, tw = InkFluid.tileW, th = InkFluid.tileH, dy = -(oy || 0) * pr, dw = W * pr, dh = H * pr;
   var live = [];
   ids.forEach(function (id, k) { if (sts[k] === 1) live.push(byId[id]); });
   function tile(P, col, dst, x, y, w, h) {
