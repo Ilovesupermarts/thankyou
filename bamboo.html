@@ -3078,12 +3078,12 @@ function autumnTree(c, o) {
     c.closePath(); c.fill();
     if (w0 < tw * 0.34) { c.beginPath(); c.arc(x0, y0, w0 / 2, 0, TAU); c.fill(); }   // a rounded start, so it grows smoothly out of its parent
     if (depth <= 0) return;
-    var kids = depth >= 2 ? 2 + (r() < 0.4 ? 1 : 0) : 1 + (r() < 0.5 ? 1 : 0);
+    var kids = 1 + (r() < 0.5 ? 1 : 0);                                // only a branch or two off each main branch: no twigs
     for (var k = 0; k < kids; k++) {
       var f = lerp(0.28, 0.78, (k + 0.25 + r() * 0.5) / kids), p2 = cubicAt(Q, f), p3 = cubicAt(Q, Math.min(1, f + 0.02));
       var tang = Math.atan2(p3[0] - p2[0], -(p3[1] - p2[1]));            // the parent's direction there
       var outward = (k % 2 ? -1 : 1) * (a0 >= 0 ? 1 : -1);               // alternately to the outside and the inside
-      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.6, depth - 1);
+      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.7, depth - 1);
     }
   }
   var inner = new Path2D(); (function () { for (var i = 0; i <= 90; i++) { var t = i / 90; inner[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1) * 0.88, yB - t * Hc * 0.97); } for (var j = 90; j >= 0; j--) { var t2 = j / 90; inner.lineTo(x + halfAt(t2, 1) * 0.88, yB - t2 * Hc * 0.97); } inner.lineTo(x + tw, y); inner.lineTo(x - tw, y); inner.closePath(); })();
@@ -3094,18 +3094,18 @@ function autumnTree(c, o) {
   if (r() < 0.5) {
     // one leader up the middle, gently swaying, with limbs off it at different heights
     var leadA = (r() < 0.5 ? -1 : 1) * lerp(0.04, 0.1, r());
-    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 2, -0.6);
+    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 1, -0.6);
     var nL = 3 + Math.floor(r() * 2), s0 = r() < 0.5 ? -1 : 1;
     for (var li2 = 0; li2 < nL; li2++) {
       var fy = lerp(0.02, 0.4, li2 / Math.max(1, nL - 1)), sd2 = (li2 % 2 ? 1 : -1) * s0;
-      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.24, 0.3, r()) * (1 - 0.5 * fy), 3);
+      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.3, 0.36, r()) * (1 - 0.5 * fy), 1);
     }
   } else {
     // a low fork into two or three big limbs, each curving out and up
     var nF = r() < 0.55 ? 2 : 3;
     for (var fk = 0; fk < nF; fk++) {
       var aF = nF === 2 ? (fk ? 1 : -1) * lerp(0.32, 0.48, r()) : lerp(-0.55, 0.55, fk / 2) + (r() - 0.5) * 0.08;
-      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 3, 0.2);
+      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 1, 0.2);
     }
   }
   c.restore();
