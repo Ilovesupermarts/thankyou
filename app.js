@@ -1516,6 +1516,10 @@ function _hudShouldDraw() {
   if (!audioSpectrumHud) return false;
   if (!document.body.classList.contains('info-visible')) return false;
   if (document.body.classList.contains('receipt-locked')) return false;
+  /* The HUD sits inside the toolbar, which stays invisible until it gets
+     .shown (1.4 s after the name starts to fade). Until then the waveform
+     would be drawn for nobody, just as the scene comes in. */
+  if (infoBar && !infoBar.classList.contains('shown')) return false;
   if (!audioSpectrumHud.classList.contains('shown')) return false;
   return true;
 }
