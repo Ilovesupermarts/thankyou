@@ -20717,10 +20717,10 @@ function rvSeeds(id) {
     });
     return [{ seeds: out, fall: 0.6 }];
   }
-  if (id === 'maples') {                                           // the far tree, then the near one: trunk, limbs, then the leaves
-    [farTree, tree].forEach(function(T, ti) {
+  if (id === 'maples') {                                           // the far and the near tree together: trunk, limbs, then the leaves
+    [farTree, tree].forEach(function(T) {
       if (!T) return;
-      var t0 = ti * 0.55, trunkTop = T.by;
+      var t0 = 0, trunkTop = T.by;
       T.nodes.forEach(function(n) {
         if (n.d > 2) return;
         drop(koyoX(T, (n.sx + n.ex) / 2), (n.sy + n.ey) / 2, Math.max(8, n.w * 1.4), t0 + n.d * 0.18);
