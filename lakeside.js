@@ -368,126 +368,231 @@ function crown(c, o, P, r, kind) {
   });
 }
 
-/* ---------------- THE FLAT AUTUMN TREE (the bank trees) ----------------
-   A painted, flat-coloured broadleaf: an oval crown built of overlapping leafy clumps with notched edges, in a few
-   flat tones of one colour (dark on the shaded side and underneath, light toward the light and the top), the
-   dark branches showing through the crown, on a straight dark trunk. o.tone: 'red' | 'orange' | 'gold'. */
-var AUT = {
-  // five tones each, from the lightest (the top, toward the light) to the darkest (the underside)
-  red:    ['#FF7430', '#FF4A22', '#F02D1C', '#D61C1A', '#B11318'],
-  orange: ['#FFC51E', '#FFAA16', '#FC8F17', '#F57818', '#E25D13'],
-  gold:   ['#FFE444', '#FFD22C', '#FFBD1E', '#FBA61A', '#F08C16'],
-  wood:   '#3A1E19'
+/* ---------------- THE FLAT AUTUMN TREE (the bank trees) ---------------- */
+/* ---------- the flat painted autumn tree of the bank ----------
+   Drawn after the reference pictures: a symmetrical-looking but lobed crown of leaf clusters (each side its own
+   lobes, the top two or three uneven ones, small ragged leaf points all round), in five flat tones of one colour
+   (deepest low down, lightest at the top) that meet in rounded scallops, with lighter and deeper leafy patches
+   scattered through it; and curved, tapering branches that leave their parent like veins, kept inside the crown.
+   Some trees keep one leader up the middle, others split low into two or three big limbs. Every tree is made from
+   its seed, so no two are the same. o: x, y (the foot), h (height), w (crown width), seed, tone ('red' | 'orange' |
+   'gold'), light (-1 left … 1 right), fin (the distance haze, as in Lakeside.tree). */
+var AUTUMN_PAL = {
+  red:    ['#C3121B', '#E5201C', '#F63B1F', '#FF5A26', '#FF7A3A'],
+  orange: ['#E9601A', '#F68019', '#FDA21A', '#FFC21F', '#FFD84A'],
+  gold:   ['#EE9016', '#FBAA19', '#FFC425', '#FFDA3C', '#FFEA72']
 };
-function autumn(c, o, r) {
-  var x = o.x, y = o.y, h = o.h, fin = o.fin, lx = o.lx;
-  var T = (AUT[o.tone] || AUT.orange).map(function (hx) { return hex(hx); });
-  var tone = function (i, a) { return rgb(fin(T[clamp(i, 0, 4)]), a); };
-  var wood = rgb(fin(hex(AUT.wood)));
-  var W2 = (o.w || h * 0.54) / 2;                                   // half the crown's widest width
-  var yB = y - h * lerp(0.27, 0.33, r()), yT = y - h, Hc = yB - yT;  // the crown's bottom and top
-  var cx = x + (r() - 0.5) * W2 * 0.08;
-  // the crown's outline as a half-width at each height (t: 0 its bottom, 1 its top): a rounded oval, widest a
-  // little below the middle, a broad round top; each tree a little different (and lopsided)
-  var pw = lerp(1.9, 2.4, r()), pwB = lerp(3, 4.5, r()), mid0 = lerp(0.3, 0.38, r()), sk = (r() - 0.5) * 0.1, topF = lerp(0.88, 1, r());
-  function half(t) {
-    t = clamp(t, 0, 1);
-    var below = t < mid0, d = below ? (mid0 - t) / mid0 : (t - mid0) / (1 - mid0) / topF, p = below ? pwB : pw;   // a broad, flatter bottom, a rounded top
-    return W2 * Math.pow(Math.max(0, 1 - Math.pow(Math.min(1, d), p)), 1 / p);
+function autumn(c, o) {
+  var r = rng((o.seed || 1) * 2654435761), P = (AUTUMN_PAL[o.tone] || AUTUMN_PAL.orange).map(hex);
+  var FIN = o.fin || function (c3) { return c3; };
+  function css(c3) { return rgb(FIN(c3)); }
+  var WOOD = css(hex('#3B1F1A'));
+  var x = o.x, y = o.y, h = o.h, W2 = (o.w || h * 0.54) / 2, lit = o.light === undefined ? -0.5 : o.light;
+  var yB = y - h * lerp(0.3, 0.34, r()), yT = y - h, Hc = yB - yT;
+  var peak = lerp(0.3, 0.36, r()), base = lerp(0.55, 0.65, r()), topP = lerp(1.7, 2.3, r());
+
+  // the outline at each height (t: 0 the crown's bottom, 1 its top): a bell, widest low down, rounding over at the
+  // top; lobes of leaf clusters on its edge (the same on both sides), each lobe's edge finely toothed like leaves
+  function bell(t) {
+    if (t < peak) return lerp(base, 1, Math.sin((t / peak) * PI / 2));
+    return Math.pow(Math.max(0, 1 - Math.pow((t - peak) / (1 - peak), topP)), 0.5);
   }
-  function axis(t) { return cx + sk * W2 * t; }
-  function inside(px, py, m) {
-    var t = (yB - py) / Hc; if (t < 0 || t > 1) return false;
-    return Math.abs(px - axis(t)) <= half(t) * (m || 1);
+  function makeEdge(nLob, amp, ph) {
+    var teeth = [];
+    for (var i = 0; i < 400; i++) teeth.push(r());
+    return function (t) {
+      var lobe = Math.pow(Math.abs(Math.sin(nLob * PI * t + ph)), 0.55);
+      var tooth = 0.022 * (teeth[Math.floor(t * 399)] - 0.5) + 0.016 * Math.abs(Math.sin(t * 170 + teeth[0] * 9));
+      return 1 - amp + amp * lobe + tooth;
+    };
   }
-  // a cluster of leaves: a rounded shape with soft little bumps round its edge
-  function cluster(px, py, R, fill) {
-    var n = Math.max(16, Math.min(44, Math.round(R * 1.6))), a0 = r() * TAU, lob = 3 + Math.floor(r() * 4), lp = r() * TAU;
-    c.fillStyle = fill;
+  // a lobed crown shape: scale s of the width, its top at the crown's top shifted down by `drop`, its bottom at yBot
+  function crownShape(sx, yTop, yBot, xoff, edge) {
+    var H2 = yBot - yTop, N = 160;
     c.beginPath();
-    for (var i = 0; i < n; i++) {                        // rounded lobes, their edges ragged with small uneven points
-      var a = a0 + (i / n) * TAU, rr = R * (0.88 + 0.13 * Math.abs(Math.sin(a * lob * 0.5 + lp))) * (i % 2 ? lerp(0.9, 0.97, r()) : lerp(0.99, 1.06, r()));
-      var qx = px + Math.cos(a) * rr, qy = py + Math.sin(a) * rr * 0.9;
-      if (i) c.lineTo(qx, qy); else c.moveTo(qx, qy);
+    for (var i = 0; i <= N; i++) { var t = i / N; c[i ? 'lineTo' : 'moveTo'](x + xoff - W2 * sx * bell(t) * edge(t), yBot - t * H2); }
+    for (var j = N; j >= 0; j--) { var t2 = j / N; c.lineTo(x + xoff + W2 * sx * bell(t2) * edge(t2), yBot - t2 * H2); }
+    var nb = 14, b0 = W2 * sx * bell(0) * edge(0);                       // the bottom: small hanging scallops
+    for (var b = 1; b < nb; b++) { var f = b / nb; c.lineTo(x + xoff + b0 * (1 - 2 * f), yBot + (b % 2 ? H2 * 0.016 : H2 * 0.002) + Math.sin(f * PI) * H2 * 0.012); }
+    c.closePath();
+  }
+
+  // the outline as round lobes: up each side, a column of round leaf clusters whose outer edge follows the bell,
+  // and a round lobe on top; the outline is their union (so it steps in and out with notches between lobes),
+  // mirrored about the trunk, with fine leafy teeth all round
+  var LOB = [];
+  [-1, 1].forEach(function (sd) {                                        // each side its own lobes, not a mirror image
+    var nLob = 4 + Math.floor(r() * 2);
+    for (var li = 0; li < nLob; li++) {
+      var tl = lerp(0.12, 0.74, li / (nLob - 1)) + (r() - 0.5) * 0.07, rl = Hc * lerp(0.12, 0.2, r()) * (1 - 0.2 * tl);
+      LOB.push({ sd: sd, y: yB - tl * Hc, R: rl, xo: W2 * bell(tl) * lerp(0.9, 1.07, r()) - rl });
     }
-    c.closePath(); c.fill();
+  });
+  var nTop = 2 + Math.floor(r() * 2);                                    // the top: two or three lobes, uneven
+  for (var tk = 0; tk < nTop; tk++) {
+    var fx = nTop === 1 ? 0 : lerp(-0.32, 0.32, tk / (nTop - 1)) + (r() - 0.5) * 0.12, rt = Hc * lerp(0.11, 0.17, r());
+    var ty = yT + rt + Hc * (Math.abs(fx) * 0.25 + r() * 0.05);
+    LOB.push({ sd: fx < 0 ? -1 : 1, y: ty, R: rt, xo: Math.abs(fx) * W2 });
+    LOB.push({ sd: fx < 0 ? 1 : -1, y: ty, R: rt, xo: -Math.abs(fx) * W2 });   // (its other side, toward the middle)
   }
-  // how light a cluster is: lighter toward the top and the light (lx), darker underneath; in broad patches
-  var pA = r() * TAU, pB = r() * TAU;
-  function shadeAt(px, py) {
-    var t = clamp((yB - py) / Hc, 0, 1), u = (px - cx) / W2;
-    var patchy = 0.16 * Math.sin(u * 3.1 + pA) * Math.cos(t * 4.2 + pB);
-    return clamp(0.18 + t * 0.72 - 0.16 * lx * u + patchy + (r() - 0.5) * 0.22, 0, 1);       // 1 = lightest
+  var teeth = []; for (var ti = 0; ti < 500; ti++) teeth.push(r());
+  function edge0() { return 1; }
+  function halfAt(t, sd) {                                               // the outline's distance from the axis at height t, on side sd
+    var yy = yB - t * Hc, best = W2 * bell(t) * 0.7;
+    LOB.forEach(function (Lb) {
+      if (Lb.sd !== sd) return;
+      var dy = yy - Lb.y; if (Math.abs(dy) < Lb.R) best = Math.max(best, Lb.xo + Math.sqrt(Lb.R * Lb.R - dy * dy));
+    });
+    var tooth = 1 + 0.045 * (teeth[Math.floor(clamp(t, 0, 0.999) * 499) + (sd > 0 ? 0 : 0)] - 0.5) + 0.03 * (Math.abs(((t * 70 + (sd > 0 ? 0.37 : 0)) % 1) - 0.5) - 0.25);
+    return Math.max(0, best * tooth);
   }
-  function toneOf(k) { return k > 0.84 ? 0 : k > 0.62 ? 1 : k > 0.36 ? 2 : k > 0.16 ? 3 : 4; }
-  // 1. the trunk: straight, dark, slim, a little flared at the foot, on up into the crown
-  var tw = Math.max(1.1, h * 0.04), tTop = yB - Hc * 0.08;
-  c.fillStyle = wood;
+  // ---- 1. the trunk: one smooth taper from the foot up into the crown
+  var tw = h * 0.042, tTop = yB - Hc * 0.1;
+  c.fillStyle = WOOD;
   c.beginPath();
-  c.moveTo(x - tw * 0.62, y); c.lineTo(x - tw * 0.5, y - h * 0.035); c.lineTo(x - tw * 0.4, tTop); c.lineTo(x + tw * 0.4, tTop);
-  c.lineTo(x + tw * 0.5, y - h * 0.035); c.lineTo(x + tw * 0.62, y); c.closePath(); c.fill();
-  // 2. the crown: the oval itself in the middle tone, then leaf clusters round its edge (so the outline is all soft
-  //    lumps) and all through it, the darkest first and the lightest last
-  c.fillStyle = tone(2);
-  c.beginPath();
-  for (var bi = 0; bi <= 48; bi++) { var tb = bi / 48; c[bi ? 'lineTo' : 'moveTo'](axis(tb) - half(tb) * 0.88, yB - tb * Hc); }
-  for (var bj = 48; bj >= 0; bj--) { var tc = bj / 48; c.lineTo(axis(tc) + half(tc) * 0.88, yB - tc * Hc); }
+  c.moveTo(x - tw * 0.62, y);
+  c.bezierCurveTo(x - tw * 0.5, y - h * 0.06, x - tw * 0.44, tTop + Hc * 0.2, x - tw * 0.36, tTop);
+  c.lineTo(x + tw * 0.36, tTop);
+  c.bezierCurveTo(x + tw * 0.44, tTop + Hc * 0.2, x + tw * 0.5, y - h * 0.06, x + tw * 0.62, y);
   c.closePath(); c.fill();
-  var L = [], nE = Math.round(lerp(20, 26, r()));
-  for (var e = 0; e < nE; e++) {
-    var ang = (e + r() * 0.7) / nE * TAU, t = clamp(mid0 - Math.sin(ang) * (Math.sin(ang) > 0 ? mid0 : (1 - mid0)) , 0, 1);
-    var px = axis(t) + Math.cos(ang) * half(t) * lerp(0.9, 1.04, r()), py = yB - t * Hc - Math.max(0, Math.sin(-ang)) * W2 * 0.04;
-    L.push({ x: px, y: py, R: W2 * lerp(0.18, 0.28, r()), k: shadeAt(px, py) });
+
+  // ---- 2. the crown: its lobed outline (a symmetrical bell), filled in its deepest tone; then each lighter tone
+  //      fills the crown above a line across it made of rounded scallops pushing upward (the tops of the leaf
+  //      clusters below rising into the colour above), each line higher than the last and gently domed. The
+  //      light gathers in the top; the shade lies low. A few leafy patches of a lighter and a deeper tone break
+  //      up the larger areas.
+  var outline = new Path2D(), N = 180;
+  var topY = yT + Hc * 0.0;
+  for (var i = 0; i <= N; i++) { var t = i / N; outline[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1), yB - t * Hc); }
+  for (var j = N; j >= 0; j--) { var t2 = j / N; outline.lineTo(x + halfAt(t2, 1), yB - t2 * Hc); }
+  var bR = halfAt(0, 1), bL = halfAt(0, -1), nbl = 6;
+  for (var bq = 0; bq < nbl; bq++) {                                    // the underside: a row of shallow round lobes
+    var xa = lerp(x + bR, x - bL, bq / nbl), xb = lerp(x + bR, x - bL, (bq + 1) / nbl), sag = Hc * 0.05 * Math.sin(((bq + 0.5) / nbl) * PI);
+    outline.quadraticCurveTo((xa + xb) / 2, yB + sag + Hc * 0.05, xb, yB + Hc * 0.05 * Math.sin(((bq + 1) / nbl) * PI) * 0.6);
   }
-  var nI = Math.round(lerp(42, 56, r()));
-  for (var q = 0; q < nI; q++) {
-    var t2 = r(), qx = axis(t2) + (r() * 2 - 1) * half(t2) * 0.8, qy = yB - t2 * Hc;
-    L.push({ x: qx, y: qy, R: W2 * lerp(0.18, 0.3, r()), k: shadeAt(qx, qy) });
-  }
-  L.sort(function (A, B) { return A.k - B.k; });
-  var cut = Math.floor(L.length * 0.8);
-  for (var i = 0; i < cut; i++) cluster(L[i].x, L[i].y, L[i].R, tone(toneOf(L[i].k)));
-  // 3. the branches: the trunk runs on up the middle as one leader, tapering, with side branches leaving it at
-  //    different heights, angled up and out, each forking into thin twigs that reach toward the edge of the crown
-  c.save();
-  c.beginPath();                                                     // the branches stay inside the crown
-  for (var ci = 0; ci <= 48; ci++) { var tq = ci / 48; c[ci ? 'lineTo' : 'moveTo'](axis(tq) - half(tq) * 0.94, yB - tq * Hc); }
-  for (var cj = 48; cj >= 0; cj--) { var tr = cj / 48; c.lineTo(axis(tr) + half(tr) * 0.94, yB - tr * Hc); }
-  c.lineTo(x + tw, y); c.lineTo(x - tw, y);
-  c.closePath(); c.clip();
-  c.strokeStyle = wood; c.lineCap = 'round'; c.lineJoin = 'round';
-  function twig(sx, sy, ang, len, wd, depth) {
-    var ex = sx + Math.sin(ang) * len, ey = sy - Math.cos(ang) * len, k = inside(ex, ey, 1.08) ? 1 : 0;
-    var bend = (r() - 0.5) * len * 0.3;
-    c.lineWidth = Math.max(0.3, wd);
-    c.beginPath(); c.moveTo(sx, sy);
-    c.quadraticCurveTo((sx + ex) / 2 + Math.cos(ang) * bend, (sy + ey) / 2 + Math.sin(ang) * bend, ex, ey); c.stroke();
-    if (depth <= 0 || !k) return;                    // (past the edge of the crown: no more forks)
-    var n = 2 + (r() < 0.3 ? 1 : 0);
-    for (var b2 = 0; b2 < n; b2++) {
-      var f = b2 === 0 ? 1 : lerp(0.4, 0.8, r()), bx = lerp(sx, ex, f), by = lerp(sy, ey, f);
-      var spread = lerp(0.18, 0.42, r()) * (b2 % 2 ? 1 : -1);
-      twig(bx, by, ang * 0.75 + spread, len * lerp(0.55, 0.75, r()), wd * lerp(0.52, 0.62, r()), depth - 1);
+  outline.closePath();
+  c.fillStyle = css(P[0]); c.fill(outline);
+  c.save(); c.clip(outline);
+  var levels = [0.1, 0.34, 0.56, 0.78];
+  levels.forEach(function (lv, k) {
+    var nS = 4 + Math.floor(r() * 2) + (k < 2 ? 1 : 0), segW = (W2 * 2.2) / nS, x0 = x - W2 * 1.1 + (r() - 0.5) * segW * 0.4;
+    c.beginPath();
+    c.moveTo(x - W2 * 1.3, yT - 10);
+    var yL = function (xx) { var u = (xx - x) / W2; return yB - Hc * (lv + 0.1 * (1 - u * u)) + lit * u * Hc * 0.03; };
+    c.lineTo(x - W2 * 1.3, yL(x - W2 * 1.3));
+    c.lineTo(x0, yL(x0));
+    for (var sI = 0; sI < nS + 1; sI++) {                                // each scallop a rounded arc bulging up
+      var xa = x0 + sI * segW, xb = xa + segW * lerp(0.85, 1.15, r()), xm = (xa + xb) / 2, amp = Hc * lerp(0.06, 0.09, r());
+      for (var q = 1; q <= 16; q++) {                                  // sampled, with small ragged leaf points along it
+        var tq = q / 16, mq = 1 - tq, bx = mq * mq * mq * xa + 3 * mq * mq * tq * xa + 3 * mq * tq * tq * xb + tq * tq * tq * xb;
+        var by = mq * mq * mq * yL(xa) + 3 * mq * mq * tq * (yL(xa) - amp * 1.3) + 3 * mq * tq * tq * (yL(xb) - amp * 1.3) + tq * tq * tq * yL(xb);
+        c.lineTo(bx, by + (q % 2 ? -1 : 1) * Hc * 0.006 * (0.5 + r()));
+      }
     }
+    c.lineTo(x + W2 * 1.3, yT - 10);
+    c.closePath();
+    c.fillStyle = css(P[k + 1]); c.fill();
+  });
+  function leaf(px, py, R, col, alpha) {                               // a leafy patch: rounded lobes, finely edged
+    var lob = 4 + Math.floor(r() * 3), n = 72, a0 = r() * TAU;
+    c.beginPath();
+    for (var i = 0; i <= n; i++) {
+      var a = a0 + (i / n) * TAU, bump = Math.pow(Math.abs(Math.cos(((a - a0) * lob) / 2)), 0.5);
+      var rr = R * (0.78 + 0.22 * bump) * (i % 2 ? lerp(0.9, 0.96, r()) : lerp(1, 1.05, r()));
+      c[i ? 'lineTo' : 'moveTo'](px + Math.cos(a) * rr, py + Math.sin(a) * rr * 0.86);
+    }
+    c.closePath(); c.globalAlpha = alpha; c.fillStyle = css(col); c.fill(); c.globalAlpha = 1;
   }
-  var leadTop = yB - Hc * lerp(0.75, 0.86, r()), segs = 10, lxp = x, lyp = tTop + 1;
-  for (var sI = 1; sI <= segs; sI++) {                               // the leader, gently wavering, thinning as it goes
-    var f2 = sI / segs, ny = lerp(tTop, leadTop, f2), nx = axis((yB - ny) / Hc) + (r() - 0.5) * tw * 0.5;
-    c.lineWidth = Math.max(0.4, tw * lerp(0.55, 0.14, f2));
-    c.beginPath(); c.moveTo(lxp, lyp); c.lineTo(nx, ny); c.stroke();
-    lxp = nx; lyp = ny;
+  function shadeAt(t) {                                                // the band colour at height t
+    var lv = [0, 0.1, 0.34, 0.56, 0.78], k = 0;
+    for (var i = 0; i < lv.length; i++) if (t >= lv[i]) k = i;
+    return k;
   }
-  twig(lxp, lyp, (r() - 0.5) * 0.3, Hc * 0.16, tw * 0.15, 2);
-  var nBr = Math.round(lerp(7, 10, r())), side0 = r() < 0.5 ? -1 : 1;
-  for (var bI = 0; bI < nBr; bI++) {
-    var fb = lerp(0.02, 0.8, (bI + r() * 0.6) / nBr), byy = lerp(tTop, leadTop, fb), tB = (yB - byy) / Hc;
-    var sd = (bI % 2 ? 1 : -1) * side0, angB = sd * lerp(0.4, 0.75, r()) * (1 - 0.3 * fb);
-    var reach = half(clamp(tB + 0.12, 0, 1)) * lerp(0.5, 0.68, r()) / Math.max(0.35, Math.sin(Math.abs(angB)));
-    twig(axis(tB), byy, angB, reach, tw * lerp(0.17, 0.23, r()) * (1 - 0.45 * fb), fb > 0.5 ? 3 : 4);
+  var nP = 5 + Math.floor(r() * 3);                                     // lighter leaf patches scattered through the middle
+  for (var d = 0; d < nP; d++) {
+    var tL = lerp(0.18, 0.82, r()), sideL = r() < 0.5 ? -1 : 1, kk = shadeAt(tL);
+    var cA = P[kk], cB = P[Math.min(4, kk + 1)];
+    leaf(x + sideL * halfAt(tL, sideL) * lerp(0.05, 0.6, r()), yB - tL * Hc, W2 * lerp(0.17, 0.28, r()) * (1 - 0.3 * tL), [lerp(cA[0], cB[0], 0.65), lerp(cA[1], cB[1], 0.65), lerp(cA[2], cB[2], 0.65)], 1);
+  }
+  for (var e = 0; e < 3; e++) {                                         // and a few deeper ones, low and to the shaded side
+    var tD = lerp(0.08, 0.45, r()), kD = shadeAt(tD);
+    leaf(x - lit * halfAt(tD, -lit < 0 ? -1 : 1) * lerp(0.15, 0.65, r()), yB - tD * Hc, W2 * lerp(0.1, 0.17, r()), (function () { var cA = P[kD], cB = P[Math.max(0, kD - 1)]; return [lerp(cA[0], cB[0], 0.6), lerp(cA[1], cB[1], 0.6), lerp(cA[2], cB[2], 0.6)]; })(), 1);
   }
   c.restore();
-  // 4. the lightest clusters last, over the branches here and there, so the twigs go in and out of the leaves
-  for (var j = cut; j < L.length; j++) if (r() < 0.6) cluster(L[j].x, L[j].y, L[j].R * 0.85, tone(toneOf(L[j].k)));
+
+  // ---- 3. the branches, like veins: each one a smooth curve that leaves its parent almost along it, swings out and
+  //      then turns upward, tapering all the way; it gives off a few smaller ones the same way, at points along it.
+  //      Some trees keep one leader up the middle; others split low in the crown into two or three big limbs.
+  function insideCrown(px, py) {                                       // inside the crown, a little in from its edge
+    var t = (yB - py) / Hc; if (t < -0.05 || t > 0.97) return false;
+    return Math.abs(px - x) <= halfAt(clamp(t, 0, 1), px < x ? -1 : 1) * 0.86;
+  }
+  function cubicAt(Q, t) { var m = 1 - t; return [m * m * m * Q[0][0] + 3 * m * m * t * Q[1][0] + 3 * m * t * t * Q[2][0] + t * t * t * Q[3][0], m * m * m * Q[0][1] + 3 * m * m * t * Q[1][1] + 3 * m * t * t * Q[2][1] + t * t * t * Q[3][1]]; }
+  function vein(x0, y0, a0, len, w0, depth, upTurn, endW) {
+    // starting along a0 (0 straight up, + to the right), ending turned up toward a1
+    var a1 = a0 * (upTurn === undefined ? lerp(0.1, 0.25, r()) : upTurn), am = a0 * 0.62 + (r() - 0.5) * 0.08;
+    var P3 = [x0 + Math.sin(am) * len, y0 - Math.cos(am) * len];
+    function build(L2) {
+      var E = [x0 + Math.sin(am) * L2, y0 - Math.cos(am) * L2];
+      return [[x0, y0], [x0 + Math.sin(a0) * L2 * 0.5, y0 - Math.cos(a0) * L2 * 0.5], [E[0] - Math.sin(a1) * L2 * 0.36, E[1] + Math.cos(a1) * L2 * 0.36], E];
+    }
+    var Q = build(len);
+    // the whole branch stays inside the crown: if it would leave it, it is shortened to end before the edge (so no
+    // piece of it, or of its twigs, is ever cut off and left floating)
+    for (var tc = 0.05; tc <= 1.0001; tc += 0.05) {
+      var pc = cubicAt(Q, Math.min(1, tc));
+      if (!insideCrown(pc[0], pc[1])) { len *= Math.max(0, tc - 0.08); Q = build(len); break; }
+    }
+    if (len < Hc * 0.015) return;
+    P3 = Q[3];
+    var n = 24, L = [], Rt = [], w1 = Math.max(0.35, w0 * (endW || 0.2));
+    for (var i = 0; i <= n; i++) {
+      var t = i / n, p = cubicAt(Q, t), q = cubicAt(Q, Math.min(1, t + 0.02)), pq = cubicAt(Q, Math.max(0, t - 0.02));
+      var dx = q[0] - pq[0], dy = q[1] - pq[1], dl = Math.hypot(dx, dy) || 1, nx = -dy / dl, ny = dx / dl;
+      var w = lerp(w0, w1, Math.pow(t, 0.8)) / 2;
+      L.push([p[0] + nx * w, p[1] + ny * w]); Rt.push([p[0] - nx * w, p[1] - ny * w]);
+    }
+    c.fillStyle = WOOD; c.beginPath();
+    L.forEach(function (p, i) { c[i ? 'lineTo' : 'moveTo'](p[0], p[1]); });
+    for (var j = Rt.length - 1; j >= 0; j--) c.lineTo(Rt[j][0], Rt[j][1]);
+    c.closePath(); c.fill();
+    if (w0 < tw * 0.34) { c.beginPath(); c.arc(x0, y0, w0 / 2, 0, TAU); c.fill(); }   // a rounded start, so it grows smoothly out of its parent
+    if (depth <= 0) return;
+    var kids = 1 + (r() < 0.5 ? 1 : 0);                                // only a branch or two off each main branch: no twigs
+    for (var k = 0; k < kids; k++) {
+      var f = lerp(0.28, 0.78, (k + 0.25 + r() * 0.5) / kids), p2 = cubicAt(Q, f), p3 = cubicAt(Q, Math.min(1, f + 0.02));
+      var tang = Math.atan2(p3[0] - p2[0], -(p3[1] - p2[1]));            // the parent's direction there
+      var outward = (k % 2 ? -1 : 1) * (a0 >= 0 ? 1 : -1);               // alternately to the outside and the inside
+      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.7, depth - 1);
+    }
+  }
+  var inner = new Path2D(); (function () { for (var i = 0; i <= 90; i++) { var t = i / 90; inner[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1) * 0.88, yB - t * Hc * 0.97); } for (var j = 90; j >= 0; j--) { var t2 = j / 90; inner.lineTo(x + halfAt(t2, 1) * 0.88, yB - t2 * Hc * 0.97); } inner.lineTo(x + tw, y); inner.lineTo(x - tw, y); inner.closePath(); })();
+  c.save(); c.clip(inner);
+  var forkT = lerp(0.04, 0.14, r()), forkY = yB - forkT * Hc;
+  // the trunk on up to the fork, tapering
+  vein(x, tTop + 2, (r() - 0.5) * 0.04, (tTop + 2 - forkY) + Hc * 0.02, tw * 0.74, 0, 1, 0.85);
+  if (r() < 0.5) {
+    // one leader up the middle, gently swaying, with limbs off it at different heights
+    var leadA = (r() < 0.5 ? -1 : 1) * lerp(0.04, 0.1, r());
+    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 1, -0.6);
+    var nL = 3 + Math.floor(r() * 2), s0 = r() < 0.5 ? -1 : 1;
+    for (var li2 = 0; li2 < nL; li2++) {
+      var fy = lerp(0.02, 0.4, li2 / Math.max(1, nL - 1)), sd2 = (li2 % 2 ? 1 : -1) * s0;
+      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.3, 0.36, r()) * (1 - 0.5 * fy), 1);
+    }
+  } else {
+    // a low fork into two or three big limbs, each curving out and up
+    var nF = r() < 0.55 ? 2 : 3;
+    for (var fk = 0; fk < nF; fk++) {
+      var aF = nF === 2 ? (fk ? 1 : -1) * lerp(0.32, 0.48, r()) : lerp(-0.55, 0.55, fk / 2) + (r() - 0.5) * 0.08;
+      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 1, 0.2);
+    }
+  }
+  c.restore();
+  // ---- 4. a few of the lower clusters again, in front of the branches, so the limbs pass behind the leaves
+  c.save(); c.clip(outline);
+  for (var f3 = 0; f3 < 4; f3++) { var tF = lerp(0.1, 0.5, r()); leaf(x + (f3 % 2 ? 1 : -1) * W2 * bell(tF) * lerp(0.15, 0.5, r()), yB - tF * Hc, W2 * lerp(0.1, 0.16, r()), P[Math.min(4, Math.floor(tF * 4))], 0.9); }
+  c.restore();
 }
 
 function tree(c, kind, o) {
@@ -497,7 +602,7 @@ function tree(c, kind, o) {
   c.save();
   if (kind === 'sugi') sugi(c, o, P, r);
   else if (kind === 'matsu') matsu(c, o, P, r);
-  else if (kind === 'autumn') autumn(c, o, r);
+  else if (kind === 'autumn') autumn(c, o);
   else crown(c, o, P, r, kind);
   c.restore();
 }
