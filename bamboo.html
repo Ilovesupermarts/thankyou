@@ -2504,7 +2504,7 @@ var LK_DEFAULTS = {
   // it has blown over the water (m), how lined up the waves are, the eye's height above the water (m: bigger = the
   // waves look smaller), how steep the waves are, how sharp their crests, the two tiles (m) and the grid
   fft: true, fftWind: 3, fftDir: 60, fftFetch: 400, fftSpread: 0.85, fftEye: 1.6, fftHeight: 0.45, fftChop: 0.8,
-  fftL0: 40, fftL1: 4, fftSize: 256,
+  fftL0: 40, fftL1: 4, fftSize: 256, fftDetail: 0.2, fftFar: 0.6, fftShade: 0.5,
   farShore: 160, reflect: 0.37, deep: 0.67, ripples: 1, rippleSpeed: 1, waves: 1, glint: 0.55, lakeMist: 0.64, veil: 0.34,
   nearBank: 0.92, floating: 1,
   // the swipe button (次へ) and the page dots, as a group: how far down the page its middle is (a share of the page's height)
@@ -3646,7 +3646,7 @@ function drawSusuki(c, t, front) {
 function fftParams() {
   if (!LK.fft) return null;
   return { size: LK.fftSize, wind: LK.fftWind * (0.4 + 0.6 * clamp(V.wind, 0, 2)), dir: LK.fftDir, fetch: LK.fftFetch, spread: LK.fftSpread,
-           L0: LK.fftL0, L1: LK.fftL1, eye: LK.fftEye, height: LK.fftHeight, chop: LK.fftChop };
+           L0: LK.fftL0, L1: LK.fftL1, eye: LK.fftEye, height: LK.fftHeight, chop: LK.fftChop, detail: LK.fftDetail, far: LK.fftFar, shade: LK.fftShade };
 }
 function waterShaderOn() { return LK.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
 function drawWaterLive(t) {
@@ -7489,6 +7489,9 @@ var LAKE_CTLS = [
   { k: 'fftEye', label: 'Eye height (m)', min: 0.5, max: 10, step: 0.1, note: 'How high you stand above the water. Higher = the same waves look smaller.' },
   { k: 'fftHeight', label: 'Wave steepness', min: 0, max: 2, step: 0.01, note: '1 = as the wind makes them; lower = calmer, glassier water.' },
   { k: 'fftChop', label: 'Sharp crests', min: 0, max: 2, step: 0.05, note: 'Pointed crests and flat troughs, as on real wind waves. 0 = smooth, rounded waves.' },
+  { k: 'fftShade', label: 'Light and dark on the waves', min: 0, max: 1.5, step: 0.01, note: 'Each wave turned toward you lightens the reflection, turned away darkens it: this is what shows the waves away from the sun. 0 = only the sun\'s sparkle shows them.' },
+  { k: 'fftFar', label: 'Waves moving the far reflections', min: 0, max: 1, step: 0.01, note: 'How far the waves still push the reflections far away, against near you (1 = the same everywhere).' },
+  { k: 'fftDetail', label: 'Detail far away', min: 0.02, max: 1, step: 0.01, note: 'Lower = the far waves stay sharp (and a little shimmery); 1 = they blur to flat in the distance.' },
   { k: 'fftL0', label: 'Large tile (m)', min: 10, max: 200, step: 1, note: 'The waves repeat every this many metres (the long waves, far out). Bigger = less repeating, but coarser.' },
   { k: 'fftL1', label: 'Small tile (m)', min: 1, max: 20, step: 0.5, note: 'The ripples near you (down to a few cm).' },
   { k: 'fftSize', label: 'Grid', min: 128, max: 256, step: 128, note: '128 or 256 waves across each tile. 128 = a quarter of the work.' },
