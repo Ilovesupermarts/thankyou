@@ -2532,9 +2532,9 @@ var LK_DEFAULTS = {
   // the ground; the edge runs alongside the path, larger = further right, less lake); bankBack: how far back from
   // the water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
-  bankTrees: true, bankX0: 0.39, bankGap: 0.3, bankH: 2.3, bankIn: 1, bankOff: 3.6, bankBack: 0.2,
+  bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
   // the water torii
-  waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
+  waterTorii: true, wtX: 0.26, wtY: 0.82, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -2681,7 +2681,7 @@ function buildLand() {
   }
   rs.bank = true;                                       // (no mossy rocks along this shore)
   edges.push(rs);
-  bankEdge = rs;
+  bankEdge = right.slice(0, sa).concat(rs);               // (the peninsula's right side, then the bank: trees all the way to the far end)
   var centre = [];
   for (var c2 = sa; c2 <= N; c2++) centre.push(scr(pathAt(path, len * c2 / N)));
   polys.push(rs.concat([[W + 40, rs[rs.length - 1][1]], [W + 40, H + 40], [exitX + 40, H + 40]]).concat(centre.reverse()));
@@ -2920,9 +2920,9 @@ function bakeBank(path) {
   bankT = [];
   if (!LK.bankTrees || !landLo || !bankEdge.length || !path) return;
   var F = lensF(), wu = gravelHalf();
-  var back = LK.bankBack == null ? 0.2 : LK.bankBack, gap = LK.bankGap == null ? 0.3 : LK.bankGap;
-  var hw = LK.bankH * LK.treeSize;                                       // every tree's height in the world (eye heights)
-  // the bank's water's edge on the screen, from where it leaves the gravel to the screen's edge
+  var back = LK.bankBack == null ? 0.16 : LK.bankBack, gap = LK.bankGap == null ? 2.8 : LK.bankGap;
+  var hw = LK.bankH * LK.treeSize;                                       // a tree's height in the world (eye heights)
+  // the bank's water's edge on the screen, from the far end of the peninsula to the screen's edge
   var E = bankEdge.filter(function (p) { return p[0] >= LK.bankX0 * W - 1; });
   if (E.length < 3) return;
   // 1. the planting line: from each point of the edge, straight down the screen onto the land (the side the land is on)
@@ -2935,6 +2935,10 @@ function bakeBank(path) {
     if (ny < 0) { nx = -nx; ny = -ny; }
     var g0 = toGround(E[i][0], E[i][1]), hpx = LK.bankH * F / Math.max(1, g0.z) * LK.treeSize;
     var q = toGround(E[i][0] + nx * back * hpx, E[i][1] + ny * back * hpx);
+    // far away the strip of land between the water and the gravel is only a sliver, so never go further back than
+    // the middle of it
+    var dq = Math.hypot(q.x - g0.x, q.z - g0.z), cap = 0.45 * fromPath(g0.x, g0.z);
+    if (dq > cap && dq > 0) q = { x: g0.x + (q.x - g0.x) * cap / dq, z: g0.z + (q.z - g0.z) * cap / dq };
     G.push({ x: q.x, z: q.z });
   }
   var cum = [0];
@@ -2945,37 +2949,54 @@ function bakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  var kinds = ['ginkgo', 'momiji'];
-  function draw(T, kind, cw, chh, h, gz) {
+  // 2. every tree is its own: a kind (gold ginkgo, a green broadleaf, a cedar, a pine; never the same twice running),
+  //    its own seed (so its own shape), and its own height and width
+  var R = Lakeside.rng(7311), last = '';
+  var KINDS = [['ginkgo', 0.3], ['broad', 0.3], ['sugi', 0.24], ['matsu', 0.16]];
+  var NOM = { ginkgo: [0.5, 0.5], broad: [0.55, 0.55], sugi: [0.25, 0.25], matsu: [0.5, 0.5] };       // (a first guess at its width either side of the trunk)
+  function pick(k) {
+    var kind, t, acc, n;
+    do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
+    last = kind;
+    return { kind: kind, seed: 9100 + k * 37 + Math.floor(R() * 997),
+             hm: lerp(0.84, 1.2, R()) * (kind === 'sugi' ? 1.3 : kind === 'matsu' ? 0.92 : 1), wm: lerp(0.84, 1.16, R()) };
+  }
+  function draw(T, sp, h, gz) {
+    var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (kind === 'momiji' ? 13 : 0), lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), stout: true,
-                               pal: kind === 'momiji' ? Lakeside.PAL.blob : null });
+    var o = { x: cw / 2, y: chh - 3, h: hh, seed: sp.seed, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)) };
+    if (sp.kind === 'ginkgo') { o.stout = true; o.w = hh * 0.92 * sp.wm; }
+    else if (sp.kind === 'broad') { o.pal = Lakeside.PAL.blob; o.w = hh * 0.95 * sp.wm; }
+    else if (sp.kind === 'matsu') o.w = hh * 0.9 * sp.wm;
+    Lakeside.tree(T.c, sp.kind === 'broad' ? 'momiji' : sp.kind, o);
+    // how far its crown reaches either side of the trunk (px)
+    var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
+    for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 2) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
+    return { cw: cw, ch: chh, l: (wpx / 2 - lo) / PR, r: (hi - wpx / 2) / PR };
   }
-  // 2. how wide each kind's crown is either side of its trunk, as a share of its height (measured once, large)
-  var ext = {};
-  kinds.forEach(function (kind) {
-    var hh = 120, cw0 = Math.ceil(hh * 1.5), ch0 = Math.ceil(hh * 1.1) + 6, S = mk();
-    draw(S, kind, cw0, ch0, hh, 20);
-    var d = S.c.getImageData(0, 0, S.cnv.width, Math.max(1, Math.round(ch0 * 0.8 * PR))).data, wpx = S.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
-    for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 3) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
-    ext[kind] = { l: (wpx / 2 - lo) / PR / hh, r: (hi - wpx / 2) / PR / hh };
-  });
-  // 3. plant them along the line, one after the other: the gap between one crown's edge and the next one's is the same
+  // 3. plant them along the line, one after another: the gap between one crown's edge and the next one's is the same
   //    on the ground (so every gap looks the same, near or far), whatever the trees' widths
   var k = 0, s = 0;
-  for (var guard = 0; guard < 200; guard++, k++) {
-    var kind = kinds[k % 2], e = ext[kind], wl = e.l * hw, wr = e.r * hw;
-    var sc = s + (k ? gap : gap * 0.5) + wl;
+  for (var guard = 0; guard < 300; guard++, k++) {
+    var sp = pick(k), nom = NOM[sp.kind], g1 = k ? gap : gap * 0.5;
+    var sc = s + g1 + nom[0] * hw * sp.hm * sp.wm, res = null, gp = null;
     if (sc > cum[cum.length - 1]) break;
-    s = sc + wr;
-    var gp = at(sc);
-    if (gp.z < 1.5 || fromPath(gp.x, gp.z) < wu * 1.35) continue;                          // not on the gravel
-    var sp = toScreen(gp.x, 0, gp.z);
-    if (sp[0] > W + 60) break;
-    var h = hw * F / gp.z, cw = Math.ceil(h * 1.5), chh = Math.ceil(h * 1.1) + 6, T = mk();
-    draw(T, kind, cw, chh, h, gp.z);
-    bankT.push({ x: sp[0], y: sp[1] + LK.bankIn, cw: cw, ch: chh, spr: T, stiff: 1,  ph: k * 1.7, z: gp.z });
+    for (var pass = 0; pass < 2; pass++) {
+      gp = at(sc);
+      if (gp.z < 1.5) break;
+      var h = hw * F / gp.z, T = mk();
+      res = draw(T, sp, h, gp.z); res.spr = T;
+      var sc2 = s + g1 + res.l * gp.z / F;                                  // its real left edge, in ground units
+      if (Math.abs(sc2 - sc) < 0.02 * hw || sc2 > cum[cum.length - 1]) { sc = Math.min(sc2, cum[cum.length - 1]); break; }
+      sc = sc2;
+    }
+    if (!res || gp.z < 1.5) { s = sc; continue; }
+    s = sc + res.r * gp.z / F;
+    if (fromPath(gp.x, gp.z) < wu * 1.35) continue;                          // not on the gravel
+    var spt = toScreen(gp.x, 0, gp.z);
+    if (spt[0] > W + 60) break;
+    bankT.push({ x: spt[0], y: spt[1] + LK.bankIn, cw: res.cw, ch: res.ch, spr: res.spr, stiff: 1,  ph: k * 1.7, z: gp.z });
   }
   bankT.sort(function (a, b) { return b.z - a.z; });          // further first
 }
