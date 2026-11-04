@@ -14168,18 +14168,16 @@ function buildKoyoTree(key, far, lazy) {
   T.clumps.forEach(function(C) {
     var cn = nodes[C.node];
     domeSpan = Math.max(domeSpan, Math.abs(cn.ex + C.ox - bx));
+    domeBase = Math.max(domeBase, cn.ey + C.oy);
     domeTop = Math.min(domeTop, cn.ey + C.oy - C.R);
   });
-  T.clumps.forEach(function(C) {
-    var cn = nodes[C.node];
-    if (Math.abs(cn.ex + C.ox - bx) < domeSpan * 0.35) domeBase = Math.max(domeBase, cn.ey + C.oy);
-  });
-  var domeDrop = (domeBase - domeTop) * 0.5;
-  function domeLowest(x) { return domeBase - domeDrop * clamp(Math.abs(x - bx) / domeSpan, 0, 1); }
+  var domeDrop = (domeBase - domeTop) * 0.3;
+  // (the canopy keeps its full shape; only the outermost 30% of its width is pulled up)
+  function domeLowest(x) { return domeBase - domeDrop * clamp((Math.abs(x - bx) / domeSpan - 0.7) / 0.3, 0, 1); }
   T.clumps = T.clumps.filter(function(C) {
     var cn = nodes[C.node], over = cn.ey + C.oy - domeLowest(cn.ex + C.ox);
     if (over <= 0) return true;
-    if (over > C.R * 1.1) return false;
+    if (over > C.R * 0.6) return false;
     C.oy -= over;
     return true;
   });
