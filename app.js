@@ -11915,7 +11915,9 @@ function startGust(force) {
     spawnLeaf({ x: dir > 0 ? -30 : W + 30, y: Math.random() * H * 0.6, vx: dir * g.str * rnd(0.5, 1), force: force });
   }
 }
+var gustDrops = [];
 function updateGusts(dt) {
+  if (gustDrops.length) { var gd = gustDrops.shift(); if (gd.T === tree || gd.T === farTree) dropKoyoLeaf(gd.T, gd.vx); }
   for (var i = gusts.length - 1; i >= 0; i--) {
     var g = gusts[i];
     g.x += g.dir * g.speed * dt;
@@ -11944,7 +11946,9 @@ function updateGusts(dt) {
         // tree is already leaning that way, so gusts in a row cannot pin it bent
         var lean = T.gust * g.dir > 0 ? 1 - Math.min(1, Math.abs(T.gust) / 0.35) : 1;
         T.gustV += g.dir * (g.str / 400) * lean;
-        if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) dropKoyoLeaf(T, g.dir * g.str * rnd(0.2, 0.5));
+        // the leaves it shakes off: let go one a frame (gustDrops), not all in this frame (each new leaf is drawn
+        // into sprites of its own, and a gust shook off up to ten at once, a jerk just as the bamboo swings)
+        if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) gustDrops.push({ T: T, vx: g.dir * g.str * rnd(0.2, 0.5) });
       }
     });
     bambooGroves.forEach(function(G) {              // the bamboo groves get a push as it passes them too
@@ -12753,9 +12757,18 @@ function sunPaintClouds(look) {
     });
   }
   cloudPaint = look;
+  // each cloud painted in the new light in the background (clouds.js's worker): the old picture stays until the
+  // new one is laid in, so the frames never wait for it (painted here, a cloud a frame, it was a jerk each time
+  // the light moved on)
   for (var i = 0; i < cloudShapes.length; i++) {
     var sh = cloudShapes[i];
-    if (sh && sh.painted !== look.key) { Clouds.paint(sh, look.o); sh.painted = look.key; sh.ready = true; sh.img = null; return; }
+    if (!sh || sh.painted === look.key || sh.painting === look.key) continue;
+    if (!Clouds.paintAsync) { Clouds.paint(sh, look.o); sh.painted = look.key; sh.ready = true; sh.img = null; return; }
+    sh.painting = look.key;
+    Clouds.paintAsync(sh, look.o, (function(sh, key) { return function() {
+      if (sh.painting === key) sh.painting = '';
+      sh.painted = key; sh.ready = true;
+    }; })(sh, look.key));
   }
 }
 /* The clouds in the sky: where each one is, its size, speed and shape. */
@@ -14680,10 +14693,11 @@ function ensureBamboo() {
   if (!tree || !farTree || ENV.scene !== 'autumn') return;
   var key = tree.key + '|' + farTree.key + '|' + PR, now = performance.now() / 1000;
   if (key !== bambooKey) {                              // new trees or a new size: afresh
-    bambooKey = key; bambooGroves = []; bambooLook = lookVersion; bambooBuiltAt = now;
+    bambooKey = key; bambooGroves = []; bambooLook = bigLightV; bambooBuiltAt = now;
   }
-  // the light has moved on: re-baked in its colours at most once a minute, one grove a frame
-  if (bambooLook !== lookVersion && now - bambooBuiltAt >= 60) { bambooLook = lookVersion; bambooBuiltAt = now; }
+  // the light has really moved on (bigLightV, not every small change): re-baked in its colours at most once a
+  // minute, one grove a frame
+  if (bambooLook !== bigLightV && now - bambooBuiltAt >= 60) { bambooLook = bigLightV; bambooBuiltAt = now; }
   var rebaked = false;
   ['far', 'near'].forEach(function(k) {
     if (bambooAlpha(k) <= 0) return;                    // not showing: not built
@@ -15872,7 +15886,7 @@ function buildBed(batch) {
 
 /* ---------- bake when needed, draw each frame ---------- */
 function landKey() {
-  return [lookVersion, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : '', ENV.scene].join('|');
+  return [bigLightV, W, H, PR, tree ? tree.key : '', farTree ? farTree.key : '', ENV.scene].join('|');
 }
 /* Both scenes bake this way: the autumn one here (8c), the winter one in 8d.
    bedBatch: during the name the fallen leaves are laid a few per frame. */
@@ -15901,6 +15915,7 @@ function updateLandscape(t, bedBatch) {
     if (!LS.ready || sized || (!scrolling && t - LS.at > LAND_REBAKE)) {
       if (win) winBakeScenery(); else landBakeScenery();
       LS.key = k; LS.at = t; LS.step = win ? 2 : 5;
+      bigLit = bigLightNow();                     // (the light it is made in: the next re-make waits for a real change from this)
     }
   }
   if (!win && LS.ready && !LS.floorBuilt) buildBed(bedBatch);
@@ -19926,7 +19941,7 @@ function resize() {
   cvSky.width = Math.max(1, Math.round(W * PR * SKY_RES));
   cvSky.height = Math.max(1, Math.round(H * PR * SKY_RES));
   skyTimer = 0;
-  lookVersion++;
+  lookVersion++; bigLightV++;
 }
 
 var flurryQueue = [];
@@ -20036,6 +20051,24 @@ var dynMaster = 0, dynScrollY = 0, dynLastMs = 0, dynBegun = false, _lastPanel =
 var skyMaster = 0, skyTimer = 0;
 var dynReduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
+/* The light the landscape and the bamboo were last made in, and a version that moves on only when the light
+   has really changed since (a new part of the day, or a clear change of brightness or colour). The leaves and
+   the trees' clumps follow every small change of the light (lookVersion), a few a frame; but the landscape and
+   the bamboo are made in big pieces, so re-making them for every small change (as before, every 90 s or so as
+   the light drifted) made the scene, and above all the swaying bamboo, jerk again and again. */
+var bigLightV = 1, bigLit = null, BIG_LIGHT_STEP = 0.18;
+function bigLightNow() {
+  var Lt = ENV.light;
+  return { phase: Lt.phase, amt: Lt.amt, dark: Lt.dark, col: Lt.col.slice(), wet: ENV.wet, frost: ENV.frost, fog: ENV.fog, season: ENV.season };
+}
+function bigLightCheck() {
+  var n = bigLightNow(), o = bigLit;
+  if (!o) { bigLit = n; return; }
+  var d = Math.abs(n.amt - o.amt) + Math.abs(n.dark - o.dark) +
+          (Math.abs(n.col[0] - o.col[0]) + Math.abs(n.col[1] - o.col[1]) + Math.abs(n.col[2] - o.col[2])) / 255 +
+          Math.abs(n.wet - o.wet) + Math.abs(n.frost - o.frost) + Math.abs(n.fog - o.fog) + Math.abs(n.season - o.season) * 2;
+  if (n.phase !== o.phase || d > BIG_LIGHT_STEP) { bigLit = n; bigLightV++; }
+}
 function lookKey() {
   var Lt = ENV.light;
   return [Math.round(Lt.amt * 40), Math.round(Lt.dark * 40), Lt.col.map(function(v) { return Math.round(v / 12); }).join('.'),
@@ -20147,7 +20180,7 @@ function dynFinishSetup() {
 /* Back at the start screen: forget everything and clear the canvases (the
    sky colour stays: the koi screen shows it). */
 function dynReset() {
-  leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0;
+  leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0; gustDrops.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; flocks.length = 0; specks.length = 0; flockNext = 0;
   cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   bambooGroves = []; bambooKey = '';
@@ -20717,7 +20750,7 @@ function dynStep(dt, t, want, skyWant) {
     computeEnv();
     envTimer = 0.25;
     var k = lookKey();
-    if (k !== lastLookKey) { lastLookKey = k; lookVersion++; }
+    if (k !== lastLookKey) { lastLookKey = k; lookVersion++; bigLightCheck(); }
     if (ENV.scene !== lastScene) {           // theme toggled between autumn and winter
       LS.ready = false; LS.step = 0; TOR.ready = false;   // the other scene's landscape is baked afresh
       if (ENV.scene === 'winter') { leaves.length = 0; pile.length = 0; hero = null; LS.floorBuilt = false; LS.bedN = 0; }
@@ -20773,14 +20806,14 @@ function dynStep(dt, t, want, skyWant) {
   updateCricket(dt, t);
   if (dynFrontMul < 0.05 && cricket) { cricket = null; insectsLeaveText(); }
 
-  // re-draw a few leaf sprites per frame when the look changed
-  var budget = 10, all = leaves.concat(pile);
+  // re-draw a few leaf sprites per frame when the look changed (3: spread thin, so it never adds up to a jerk)
+  var budget = 3, all = leaves.concat(pile);
   if (hero) all.push(hero);
   for (var b = 0; b < all.length && budget > 0; b++) {
     var Lb = all[(rebakeIdx + b) % all.length];
     if (Lb.bakedV !== lookVersion || Lb.geomV !== geomVersion) { bakeLeaf(Lb); budget--; }
   }
-  rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
+  rebakeIdx = all.length ? (rebakeIdx + 3) % all.length : 0;
 
   // the trees' layers first: the fireworks are cut out behind them (not before their clumps are baked, and not
   // while the ink reveal has still to start bringing the maples in: nothing of them shows yet, so the work waits)
