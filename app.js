@@ -7024,6 +7024,7 @@ function spawnRipples(clientX, clientY, intensity) {
    On the way out each character fades NAME_EXIT_STAGGER s after the one
    above it, over NAME_EXIT s. */
 var NAME_STAGGER = 0.42, NAME_ARRIVE = 1.7, NAME_EXIT_STAGGER = 0.24, NAME_EXIT = 1.4;
+var NAME_WAIT_MAX = 6000;     // ms: the longest the name waits, standing still, for the scene behind it to be ready
 var NAME_LEAD_IN = 0.25, NAME_STROKE_BASE = 0.14, NAME_STROKE_PER_LEN = 0.24,
     NAME_PEN_LIFT = 0.07, NAME_CHAR_GAP = 0.2, NAME_WRITE_MAX = 4.2,
     NAME_BRUSH = 0.1, NAME_WET = 0.55, NAME_SETTLE = 0.4;
@@ -7759,7 +7760,23 @@ function triggerKoiStart() {
       nameLandsAt = performance.now() + arrivalTime;
       nameLeavesAt = nameLandsAt + holdTime;
 
-      koiPushTimer(setTimeout(function() {
+      /* The name stays standing still until the scene behind it is ready (dynSceneReady): the landscape
+         baked, the trees' clumps and the first leaves made, the ink reveal's drops worked out. That work
+         is heavy, and while the name stands still a long frame does not show; once the scene starts
+         coming in, every frame must be quick. (At most NAME_WAIT_MAX longer, so it always goes on.) */
+      function whenSceneReady(go) {
+        var until = performance.now() + NAME_WAIT_MAX;
+        (function check() {
+          var now = performance.now();
+          var ready = true;
+          try { ready = typeof DynBG === 'undefined' || !DynBG || !DynBG.sceneReady || DynBG.sceneReady(); } catch (e) { ready = true; }
+          if (now >= until || ready) { nameLeavesAt = now; go(); return; }
+          nameLeavesAt = now + 1000;                     // (still standing still: the set-up keeps its big steps)
+          koiPushTimer(setTimeout(check, 40));
+        })();
+      }
+
+      koiPushTimer(setTimeout(function() { whenSceneReady(function() {
         var fadingChars = nameColumn ? nameColumn.querySelectorAll('.name-char') : [];
         for (var f = 0; f < fadingChars.length; f++) {
           fadingChars[f].style.animationDelay = (f * NAME_EXIT_STAGGER) + 's';
@@ -7811,7 +7828,7 @@ function triggerKoiStart() {
           koiGestureState = 'done';
           Hints && Hints.onPanelsReady();
         }, 1400));
-      }, arrivalTime + holdTime));
+      }); }, arrivalTime + holdTime));
     }, 420));
   }, 200));
 }
@@ -12831,12 +12848,16 @@ function drawSun(ctx, t) {
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   ctx.globalAlpha = 1;
 
-  // the veil: a sheet of cloud or haze over the sky (none in the dark)
+  // the veil: a sheet of cloud or haze over the sky (none in the dark). It covers the whole screen, easing
+  // down to the bottom: it used to stop at 90 % of the height, a straight line that showed whenever the near
+  // shore was not there to hide it (while the ink reveal brings the scene in)
   var va = cur.veil * L.veil * (1 - night);
   if (va > 0.003) {
-    var hz = H * 0.9, vg = ctx.createLinearGradient(0, 0, 0, hz);
-    vg.addColorStop(0, rgba(cur.veilCol, clamp(va * 0.75, 0, 1))); vg.addColorStop(1, rgba(cur.veilCol, clamp(va * 0.45, 0, 1)));
-    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, hz);
+    var vg = ctx.createLinearGradient(0, 0, 0, H);
+    vg.addColorStop(0, rgba(cur.veilCol, clamp(va * 0.75, 0, 1)));
+    vg.addColorStop(0.9, rgba(cur.veilCol, clamp(va * 0.45, 0, 1)));
+    vg.addColorStop(1, rgba(cur.veilCol, clamp(va * 0.4, 0, 1)));
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
   }
   // the clouds, and how much of the sun they hide
   var shown = Math.round(cloudW.cover * sunClouds.length), occl = 0;
@@ -20086,6 +20107,24 @@ function dynSetupStep(t, still) {
   if (prefillLeft > 0) { prefillSome(still ? Infinity : 6); return; }
   if (bakePendingClumps(still ? 50 : 8)) { ensureBamboo(); dynSetupLeft = false; }
 }
+/* Whether dynBegin(true) has left anything to do: the landscape (and its fallen leaves), the first leaves,
+   the trees' clumps. */
+function dynSetupBusy() {
+  if (ENV.scene === 'autumn' || ENV.scene === 'winter') {
+    if (!LS.ready || LS.step || (ENV.scene === 'autumn' && !LS.floorBuilt)) return true;
+  }
+  return !!dynSetupLeft;
+}
+/* The name waits, standing still, until this is true (whenSceneReady, at the name animation): the scene
+   behind it set up, so that once it starts coming in no frame has heavy work to do. (True at once when
+   there is no scene to wait for.) */
+function dynSceneReady() {
+  if (dynReduceMotion || document.hidden) return true;
+  if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return true;
+  if (!dynBegun || dynSetupBusy()) return false;
+  if (ENV.scene === 'autumn' && rvAvailable() && !RV.done) return RV.prepared && rvPrecompute(performance.now());
+  return true;
+}
 /* The scene would show, but the name's setup is not finished (a slow
    moment): it carries on a little per frame and the scene's fade-in waits,
    for at most 1.5 s; then whatever is left is done at once. True while
@@ -20181,9 +20220,15 @@ function dynPrelude(dt, t, skyWant) {
       else if (!LS.key || LAND_MTN.job) updateLandscape(t);
     }
     if (naming && nowMs >= nameLandsAt) {
+      var still = nowMs < nameLeavesAt;
       if (!dynBegun) dynBegin(true);
-      else dynSetupStep(t, nowMs < nameLeavesAt);
-      if (dynBegun && nowMs < nameLeavesAt) rvPrepare();   // the ink reveal's fluid, set up while the name stands still
+      else if (still) {                                 // standing still: as much as fits in about 30 ms (a long frame does not show here)
+        do { dynSetupStep(t, true); } while (dynSetupBusy() && performance.now() - nowMs < 30);
+      } else dynSetupStep(t, false);
+      if (dynBegun && still) {
+        rvPrepare();                                    // the ink reveal's fluid, set up while the name stands still
+        if (!dynSetupBusy()) rvPrecompute(nowMs);       // and each part's drops, once what it shows has been made
+      }
     }
     updateSkyLayer(dt, t);
   }
@@ -20289,6 +20334,21 @@ function rvReady(id) {
     default: return !dynSetupLeft && rvStepDone(4);   // the maples, the bamboo, the birds and the falling leaves: the trees' clumps, the first leaves
   }
 }
+/* While the name stands still, after the set-up: each wash's drops worked out ahead (rvSeeds, as many as fit
+   in about 20 ms a frame), so that releasing the parts on the reveal's first frames costs nothing. True when
+   all are done. */
+function rvPrecompute(t0) {
+  if (!rvAvailable() || ENV.scene !== 'autumn') return true;
+  if (!RV.pre) { RV.pre = {}; rvMakeTongues(); return false; }    // (the soft edges' bands first, on a frame of their own)
+  var all = true;
+  for (var i = 0; i < RV_PARTS.length; i++) {
+    var id = RV_PARTS[i][0];
+    if (RV_PARTS[i][1] !== 'wash' || RV.pre[id]) continue;
+    if (!rvReady(id) || performance.now() - t0 > 20) { all = false; continue; }
+    try { RV.pre[id] = rvSeeds(id); } catch (e) { RV.pre[id] = []; gfxNote('ink reveal drops failed: ' + (e && e.message)); }   // (no drops: it comes in with its last soft fill)
+  }
+  return all;
+}
 function rvStart(t) {
   try {
     rvPrepare();
@@ -20296,10 +20356,10 @@ function rvStart(t) {
     InkReveal.setup(W, H);
     InkReveal.plan(RV_PARTS.map(function(p) {
       return { id: p[0], kind: p[1], at: p[2], dur: p[3], hold: p[0] !== 'sky',
-               washes: p[1] === 'wash' ? function() { return rvSeeds(p[0]); } : [] };
+               washes: p[1] === 'wash' ? function() { return (RV.pre && RV.pre[p[0]]) || rvSeeds(p[0]); } : [] };
     }));
     InkReveal.play(t);
-    RV.started = true; RV.W = W; RV.H = H; RV.t0 = t; RV.shown = {};
+    RV.started = true; RV.W = W; RV.H = H; RV.t0 = t; RV.shown = {}; RV.shoreK = 1;
     rvLog('started');
   } catch (e) {
     RV.done = true; RV.started = false;
@@ -20311,13 +20371,13 @@ function rvStop() {
   RV.started = false; RV.done = true;
   if (typeof InkReveal !== 'undefined') InkReveal.stop();
   if (typeof InkFluid !== 'undefined' && InkFluid.release) InkFluid.release();   // its pictures are let go (the context stays, small)
-  RV.prepared = false;
+  RV.prepared = false; RV.pre = null;
   if (RVL) { RVL.cnv.width = RVL.cnv.height = 1; }
   dynApplyOpacity();
 }
 function rvReset() {
   if (RV.started) rvStop();
-  RV.started = false; RV.done = false; RV.waitFrom = 0;
+  RV.started = false; RV.done = false; RV.waitFrom = 0; RV.pre = null;
 }
 function rvRunning() { return RV.started; }
 /* Once a frame, before the drawing. It ends when the last part is in (or if the theme or the size changes). */
@@ -20328,7 +20388,10 @@ function rvTick(t, dt) {
   for (var i = 0; i < held.length; i++) {
     if (rvReady(held[i])) { InkReveal.release(held[i]); rvLog('released ' + held[i]); }
   }
-  if (!InkReveal.running() || t - RV.t0 > 40) { rvStop(); return; }     // (40 s: whatever is wrong, the scene is shown in the end)
+  var sk = rvShoreTarget();                        // the far shore's softening: on at once, easing off over about a second
+  RV.shoreK = sk >= RV.shoreK ? sk : RV.shoreK + (sk - RV.shoreK) * (1 - Math.exp(-dt / 0.45));
+  if (RV.shoreK < 0.01) RV.shoreK = 0;
+  if ((!InkReveal.running() && !RV.shoreK) || t - RV.t0 > 40) { rvStop(); return; }   // (40 s: whatever is wrong, the scene is shown in the end)
   InkReveal.update(t, dt);
 }
 /* 0 not started, 1 appearing, 2 shown (and 2 whenever the reveal isn't running). */
@@ -20372,8 +20435,8 @@ function rvDraw(ids, c, fn) {
    mountains' foot until the lake is in, the lake's far shore until the ridges are. It is still drawn
    through the layer (its ink is full, so only the softening is done). */
 function rvEdgeWaits(k) {
-  if (k === 'fuji+ridges') return InkReveal.state('lake') < 2;
-  if (k === 'lake') return InkReveal.state(['fuji', 'ridges']) < 2;
+  if (k === 'fuji+ridges') return InkReveal.state('lake') < 2 || RV.shoreK > 0.01;
+  if (k === 'lake') return InkReveal.state(['fuji', 'ridges']) < 2 || RV.shoreK > 0.01;
   return false;
 }
 /* The part on RVL, cut to its ink and laid on the screen. */
@@ -20398,8 +20461,11 @@ function rvRect(k) {
   else if (k === 'torii') top = Math.min(TOR.gateTop || 0, yf) - 40;
   else if (k === 'shore') top = Math.min(LS.grdTop || yf, LK.foreTop || yf) - H * 0.22;
   if (!(top > 0)) top = 0;                         // (anything unknown: the whole screen)
-  var y = Math.min(cvBack.height, Math.floor(top * PR));
-  return { x: 0, y: y, w: cvBack.width, h: cvBack.height - y };
+  var y = Math.min(cvBack.height, Math.floor(top * PR)), y1 = cvBack.height;
+  // Fuji and the ridges: nothing of them is left below the far shore's band (rvSoftFoot takes it away), so
+  // their layer is worked on only down to there, not to the bottom of the screen (much less to do a frame)
+  if (k === 'fuji+ridges') y1 = Math.max(y, Math.min(y1, Math.ceil((lakeFarShoreY() + H * 0.08) * PR) + 2));
+  return { x: 0, y: y, w: cvBack.width, h: Math.max(1, y1 - y) };
 }
 /* A fading part: the screen's alpha is scaled by rvMul while it draws (the screen's own context only). */
 (function rvFadeAlpha() {
@@ -20427,24 +20493,7 @@ var rvTongueCache = {};
 function rvTongues(c, y0, band, k, seed, maxDepth) {
   var up = band < 0;
   band = Math.abs(band);
-  var key = [W, PR, Math.round(band), seed, Math.round(maxDepth)].join('|'), T = rvTongueCache[key];
-  if (!T) {                                        // the band's shape, made once: a fade, and a different depth in every column
-    var cv = document.createElement('canvas');
-    cv.width = Math.max(1, Math.round(W * PR)); cv.height = Math.max(1, Math.round(band * PR));
-    var g0 = cv.getContext('2d');
-    var g = g0.createLinearGradient(0, 0, 0, cv.height);
-    g.addColorStop(0, 'rgba(0,0,0,1)'); g.addColorStop(0.45, 'rgba(0,0,0,0.42)'); g.addColorStop(1, 'rgba(0,0,0,0)');
-    g0.fillStyle = g; g0.fillRect(0, 0, cv.width, cv.height);
-    for (var x = 0, cols = Math.ceil(W / 12); x < cols; x++) {
-      var n = 0.5 + 0.5 * (rvNoise(x * 0.7, seed) * 0.65 + rvNoise(x * 2.1, seed + 17) * 0.35);
-      var depth = Math.min(maxDepth, band * (0.25 + 1.0 * n));
-      var g2 = g0.createLinearGradient(0, 0, 0, depth * PR);
-      g2.addColorStop(0, 'rgba(0,0,0,0.92)'); g2.addColorStop(1, 'rgba(0,0,0,0)');
-      g0.fillStyle = g2;
-      g0.fillRect(x * 12 * PR, 0, 12.5 * PR, depth * PR);
-    }
-    rvTongueCache[key] = T = cv;
-  }
+  var T = rvTongueMask(band, seed, maxDepth);
   c.save();
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalCompositeOperation = 'destination-out';
@@ -20452,6 +20501,40 @@ function rvTongues(c, y0, band, k, seed, maxDepth) {
   if (up) { c.translate(0, Math.round(y0 * PR)); c.scale(1, -1); c.drawImage(T, 0, 0); }   // (y0 is then its lower edge)
   else c.drawImage(T, 0, Math.round(y0 * PR));
   c.restore();
+}
+/* The two bands used (the far shore's and the mountains' foot), with the values rvSoftShore and rvSoftFoot
+   give: made while the name stands still (rvPrecompute), so none is made on a frame of the reveal. */
+function rvShoreBand() { var yf = lakeFarShoreY(), top = Math.min(yf - 4, LS.grdTop || yf); return { top: top, band: (yf - top) + H * 0.11 }; }
+function rvMakeTongues() { rvTongueMask(rvShoreBand().band, 91, H); rvTongueMask(H * 0.08, 77, H * 0.08); }
+function rvTongueMask(band, seed, maxDepth) {
+  var key = [W, PR, Math.round(band), seed, Math.round(maxDepth)].join('|'), T = rvTongueCache[key];
+  if (!T) {                                        // the band's shape, made once: a fade, and a different depth in every column
+    // Worked out pixel by pixel (it used to be 12 px columns, each with its own depth, which showed as hard
+    // vertical blocks): the depth wanders smoothly from one pixel column to the next, never deeper than the
+    // band (so no column is cut off flat at its foot), and every column eases to nothing at its tip.
+    var cv = document.createElement('canvas');
+    var cw = Math.max(1, Math.round(W * PR)), chh = Math.max(1, Math.round(band * PR));
+    cv.width = cw; cv.height = chh;
+    var g0 = cv.getContext('2d'), img = g0.createImageData(cw, chh), d = img.data;
+    var base = new Float32Array(chh);
+    for (var y = 0; y < chh; y++) {                // the fade down the band: 1, 0.42 at 45 %, 0 at the foot
+      var v = (y + 0.5) / chh;
+      base[y] = v < 0.45 ? 1 - (1 - 0.42) * v / 0.45 : 0.42 * (1 - (v - 0.45) / 0.55);
+    }
+    for (var x = 0; x < cw; x++) {
+      var xc = x / PR / 12;                        // (the same wander as before, now smooth across the columns)
+      var n = 0.5 + 0.5 * (rvNoise(xc * 0.7, seed) * 0.65 + rvNoise(xc * 2.1, seed + 17) * 0.35);
+      var depth = Math.max(1, Math.min(maxDepth, band, band * (0.25 + 1.0 * n)) * PR);
+      for (var y2 = 0; y2 < chh; y2++) {
+        var u = y2 / depth, tg = u < 1 ? 0.92 * (1 - u * u * (3 - 2 * u)) : 0;   // the tongue, easing out at its tip
+        var a = base[y2] + tg * (1 - base[y2]);
+        d[(y2 * cw + x) * 4 + 3] = Math.round(Math.min(1, a) * 255);
+      }
+    }
+    g0.putImageData(img, 0, 0);
+    rvTongueCache[key] = T = cv;
+  }
+  return T;
 }
 /* The mountains' picture carries on a little below the far shore (the lake covers it in the finished
    scene). The ridges can come in before the lake is baked, and then that band's straight lower edge
@@ -20468,9 +20551,17 @@ function rvSoftFoot() {
   l.fillRect(0, Math.round((yf + band) * PR) - 1, RVL.cnv.width, RVL.cnv.height);
   l.restore();
 }
+/* The lake's part starts at the top of the ground picture (the far shore's strip of land, above the water),
+   whose straight top edge lies against the ridges: the tongues start there, so neither that edge nor the
+   water's edge below it shows as a line. k (RV.shoreK, rvTick) eases away instead of stopping at once. */
+function rvShoreTarget() {
+  return InkReveal.state(['fuji', 'ridges']) < 2 ? 1 : InkReveal.soft('lake');    // (full while the ridges above it are not all in)
+}
 function rvSoftShore() {
-  var k = InkReveal.state(['fuji', 'ridges']) < 2 ? 1 : InkReveal.soft('lake');   // (full while the ridges above it are not all in)
-  if (k > 0.01) rvTongues(RVL.c, lakeFarShoreY() - 4, H * 0.11, k, 91, H);
+  var k = RV.shoreK || 0;
+  if (k <= 0.01) return;
+  var B = rvShoreBand();
+  rvTongues(RVL.c, B.top, B.band, k, 91, H);
 }
 
 /* ---------- where each part's drops fall, in the order they are laid (CSS px, s) ----------
@@ -20691,7 +20782,9 @@ function dynStep(dt, t, want, skyWant) {
   }
   rebakeIdx = all.length ? (rebakeIdx + 10) % all.length : 0;
 
-  if (ENV.scene === 'autumn' && !(rvOn && dynSetupLeft)) buildKoyoLayers(t);   // the trees' layers first: the fireworks are cut out behind them (not before their clumps are baked)
+  // the trees' layers first: the fireworks are cut out behind them (not before their clumps are baked, and not
+  // while the ink reveal has still to start bringing the maples in: nothing of them shows yet, so the work waits)
+  if (ENV.scene === 'autumn' && !(rvOn && (dynSetupLeft || rvState('maples') === 0))) buildKoyoLayers(t);
   fireworksUpdate(dt, t);
 
   // ---- back canvas ----
@@ -20917,7 +21010,8 @@ window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
    (what is left is only the birds and the falling leaves fading in), so the message comes then, not when the
    reveal's last clean-up has ended. */
 function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
-return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); } };
+return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
+         sceneReady: dynSceneReady };
 
 })();
 
