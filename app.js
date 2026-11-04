@@ -14158,6 +14158,11 @@ function buildKoyoTree(key, far, lazy) {
     if (fam === 'evergreen' && upper) fam = 'red';                  // evergreen only low and behind
     T.clumps.push({ node: j, R: R, fam: fam, back: mid || r() < 0.3, seed: (r() * 4294967296) >>> 0,
                     ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU, bakedV: -1 });
+    if (mid && r() < 0.8) {                                         // a second, lower clump beside it: the lower canopy is full and hangs a little
+      var R2 = R * lerp(0.8, 0.95, r());
+      T.clumps.push({ node: j, R: R2, fam: fam, back: true, seed: (r() * 4294967296) >>> 0,
+                      ox: (r() - 0.5) * R * 1.1, oy: R * lerp(0.35, 0.6, r()), ph: r() * TAU, bakedV: -1 });
+    }
   }
   // No overhanging lobe: outer twigs droop, so a tail of clumps can trail down the
   // outer side of the canopy and end in a blob hanging below it. The underside of
