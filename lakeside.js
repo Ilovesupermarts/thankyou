@@ -368,6 +368,110 @@ function crown(c, o, P, r, kind) {
   });
 }
 
+/* ---------------- THE FLAT AUTUMN TREE (the bank trees) ----------------
+   A painted, flat-coloured broadleaf: an oval crown built of overlapping leafy clumps with notched edges, in a few
+   flat tones of one colour (dark on the shaded side and underneath, light toward the light and the top), the
+   dark branches showing through the crown, on a straight dark trunk. o.tone: 'red' | 'orange' | 'gold'. */
+var AUT = {
+  red:    { deep: hex('#8A1A1E'), mid: hex('#B92A22'), lit: hex('#DC4426'), hi: hex('#EE6A32') },
+  orange: { deep: hex('#C24A18'), mid: hex('#E26A1C'), lit: hex('#F28C24'), hi: hex('#F9AE3A') },
+  gold:   { deep: hex('#D27C14'), mid: hex('#EC9E1E'), lit: hex('#F6BE2E'), hi: hex('#FCD957') },
+  wood:   hex('#3A2620')
+};
+function autumn(c, o, r) {
+  var x = o.x, y = o.y, h = o.h, fin = o.fin, lx = o.lx, P = AUT[o.tone] || AUT.orange;
+  var w = o.w || h * 0.6;
+  var crownBot = y - h * lerp(0.26, 0.33, r()), crownTop = y - h;
+  var rx = w / 2, ry = (crownBot - crownTop) / 2, cy = crownTop + ry, cx = x + (r() - 0.5) * rx * 0.1;
+  var wood = rgb(fin(AUT.wood));
+  var deep = rgb(fin(P.deep)), mid = rgb(fin(P.mid)), lit = rgb(fin(P.lit)), hi = rgb(fin(P.hi));
+  // the outline: an oval, fuller above, with a few broad bulges (so no two trees match), its edge made of small
+  // rounded lobes, each with a little point, as painted leaves are
+  var bul = [];
+  for (var b = 0; b < 4; b++) bul.push({ a: r() * TAU, k: lerp(0.06, 0.16, r()) * (r() < 0.5 ? 1 : -0.6) });
+  function rad(a) {
+    var e = Math.sin(a) < 0 ? 1.02 : 0.97;
+    bul.forEach(function (B) { var d = Math.cos(a - B.a); if (d > 0) e += B.k * Math.pow(d, 4); });
+    return e;
+  }
+  // two scales of lumps: leaf clusters sticking out round the edge (with notches between them), and small points
+  var nM = Math.round(lerp(11, 15, r())), ph = r() * TAU, amp = [];
+  for (var m = 0; m < nM; m++) amp.push(lerp(0.05, 0.13, r()));
+  var nS = nM * 7, ser = [];
+  for (var sI = 0; sI < nS; sI++) ser.push(sI % 2 ? -lerp(0.012, 0.03, r()) : lerp(0.0, 0.018, r()));
+  function crownPath() {
+    c.beginPath();
+    for (var i = 0; i < nS; i++) {
+      var a = (i / nS) * TAU, f = (a * nM / TAU + ph) % nM, lobe = Math.floor(f), t = f - lobe;
+      var e = rad(a) * (1 - 0.06 + amp[lobe % nM] * Math.pow(Math.sin(t * PI), 0.6)) * (1 + ser[i]);
+      var qx = cx + Math.cos(a) * rx * e, qy = cy + Math.sin(a) * ry * e;
+      if (i) c.lineTo(qx, qy); else c.moveTo(qx, qy);
+    }
+    c.closePath();
+  }
+  // a flat patch of leaves inside the crown: an irregular rounded shape, a little notched
+  function patch(px, py, R, col) {
+    var n = 12 + Math.floor(r() * 5), a0 = r() * TAU, P2 = [], sq = lerp(0.82, 1.05, r());
+    for (var i = 0; i < n; i++) { var a = a0 + (i / n) * TAU + (r() - 0.5) * 0.2, rr = R * (i % 2 ? lerp(0.8, 0.9, r()) : lerp(0.98, 1.12, r())) * (1 + 0.18 * Math.sin(a * 2 + a0)); P2.push([px + Math.cos(a) * rr, py + Math.sin(a) * rr * sq]); }
+    c.fillStyle = col;
+    c.beginPath();
+    for (var j = 0; j < n; j++) {
+      var A = P2[j], B = P2[(j + 1) % n], mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+      if (!j) c.moveTo(mx, my); else c.quadraticCurveTo(A[0], A[1], mx, my);
+    }
+    var A0 = P2[0], B0 = P2[1 % n];
+    c.quadraticCurveTo(A0[0], A0[1], (A0[0] + B0[0]) / 2, (A0[1] + B0[1]) / 2);
+    c.closePath(); c.fill();
+  }
+  // how lit a point of the crown is: toward the light (lx) and the top
+  function light(u, v) { return 0.5 - 0.34 * lx * u - 0.4 * v; }
+  // 1. the trunk, tapering up into the crown
+  var tw = Math.max(1, h * 0.036), tTop = cy + ry * 0.05;
+  c.fillStyle = wood;
+  c.beginPath();
+  c.moveTo(x - tw * 0.62, y); c.lineTo(x - tw * 0.3, tTop); c.lineTo(x + tw * 0.3, tTop); c.lineTo(x + tw * 0.62, y);
+  c.closePath(); c.fill();
+  // 2. the crown in its shade colour, then everything else painted inside it
+  crownPath(); c.fillStyle = deep; c.fill();
+  c.save();
+  crownPath(); c.clip();
+  var pt = [], nP = Math.round(lerp(30, 40, r()));
+  for (var q = 0; q < nP; q++) {
+    var a = r() * TAU, d = Math.sqrt(r()) * 1.05, u = Math.cos(a) * d, v = Math.sin(a) * d;
+    pt.push({ u: u, v: v, R: Math.min(rx, ry) * lerp(0.26, 0.42, r()), k: light(u, v) + (r() - 0.5) * 0.28 });
+  }
+  function X(P1) { return cx + P1.u * rx; }
+  function Y(P1) { return cy + P1.v * ry; }
+  pt.sort(function (A, B) { return A.k - B.k; });
+  pt.forEach(function (P1) { if (P1.k > 0.28) patch(X(P1), Y(P1), P1.R, mid); });
+  pt.forEach(function (P1) { if (P1.k > 0.55) patch(X(P1) - lx * P1.R * 0.1, Y(P1) - P1.R * 0.1, P1.R * 0.85, lit); });
+  // 3. the branches showing through the shade: limbs forking up and out, and their twigs
+  c.strokeStyle = wood; c.lineCap = 'round'; c.lineJoin = 'round';
+  function limb(sx, sy, ang, len, wd, depth) {
+    var ex = sx + Math.sin(ang) * len * (rx / ry) * 0.9, ey = sy - Math.cos(ang) * len;
+    var bx = (sx + ex) / 2 + Math.cos(ang) * len * (r() - 0.5) * 0.18, by = (sy + ey) / 2;
+    c.lineWidth = Math.max(0.35, wd);
+    c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo(bx, by, ex, ey); c.stroke();
+    if (depth <= 0 || wd < 0.4) return;
+    var nb = 2 + (r() < 0.4 ? 1 : 0);
+    for (var i = 0; i < nb; i++) {
+      var f = lerp(0.45, 0.95, r()), qx = lerp(sx, ex, f), qy = lerp(sy, ey, f);
+      limb(qx, qy, ang + (i % 2 ? 1 : -1) * lerp(0.25, 0.6, r()), len * lerp(0.4, 0.6, r()), wd * 0.6, depth - 1);
+    }
+  }
+  var limbs = 3 + Math.floor(r() * 2), fork = cy + ry * lerp(0.25, 0.45, r()), fx = x + (r() - 0.5) * tw;
+  c.lineWidth = tw * 0.6;
+  c.beginPath(); c.moveTo(x, crownBot + 2); c.lineTo(fx, fork); c.stroke();   // the trunk on up into the crown to where it forks
+  for (var l = 0; l < limbs; l++) {
+    var t = l / (limbs - 1), ang = lerp(-0.85, 0.85, t) + (r() - 0.5) * 0.3;
+    limb(fx, fork, ang, ry * lerp(0.95, 1.25, r()) * (1 - 0.25 * Math.abs(ang)), tw * lerp(0.34, 0.46, r()), 2);
+  }
+  // 4. a few patches in front of the branches (so they pass in and out of the leaves), then the brightest patches
+  pt.forEach(function (P1) { if (P1.k > 0.55 && r() < 0.3) patch(X(P1) - lx * P1.R * 0.1, Y(P1) - P1.R * 0.1, P1.R * 0.6, lit); else if (P1.k > 0.28 && P1.k <= 0.55 && r() < 0.2) patch(X(P1), Y(P1), P1.R * 0.55, mid); });
+  pt.forEach(function (P1) { if (P1.k > 0.76) patch(X(P1) - lx * P1.R * 0.22, Y(P1) - P1.R * 0.22, P1.R * 0.5, hi); });
+  c.restore();
+}
+
 function tree(c, kind, o) {
   var r = rng((o.seed || 1) * 2654435761);
   var P = o.pal || (kind === 'sugi' && SUGI.pal) || PAL[kind] || PAL.blob;
@@ -375,6 +479,7 @@ function tree(c, kind, o) {
   c.save();
   if (kind === 'sugi') sugi(c, o, P, r);
   else if (kind === 'matsu') matsu(c, o, P, r);
+  else if (kind === 'autumn') autumn(c, o, r);
   else crown(c, o, P, r, kind);
   c.restore();
 }

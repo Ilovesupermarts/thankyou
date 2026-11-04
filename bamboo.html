@@ -1739,14 +1739,6 @@ function bakeGates() {
     gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band, s: s });
   }
   gateCount = gates.length;
-  // the torii standing in the lake (水上鳥居), facing you, a little turned
-  if (G.show && LK.waterTorii) {
-    var wq = toGround(LK.wtX * W, LK.wtY * H), wyaw = 0.32;
-    var wtx = Math.sin(wyaw), wtz = -Math.cos(wyaw), wfoot = hy + F / wq.z;
-    var wdq = depthOf(wfoot);
-    gates.push({ x: wq.x, z: wq.z, tx: wtx, tz: wtz, ax: -wtz, az: wtx, px: G.gateHeight * LK.wtSize * F / wq.z, foot: wfoot,
-                 haze: wdq.haze, band: wdq.band, water: true, s: -1 });       // out in the lake, beyond the line: drawn first
-  }
   // the lanterns
   placeLanterns(path, gap).forEach(function (Lp) {
     if (Lp.z < 0.6) return;
@@ -1768,7 +1760,6 @@ function bakeGates() {
   var all = [], minY = H;
   gates.forEach(function (g) {
     var lod = clamp(g.px / 120, 0, 1), gh0 = G.gateHeight;
-    if (g.water) G.gateHeight = gh0 * LK.wtSize;          // the water torii is bigger than the gates of the line
     var gp = gatePieces(lod);
     G.gateHeight = gh0;
     placePieces(gp, g).forEach(function (pc) {
@@ -1823,7 +1814,6 @@ function bakeGates() {
   var shx = -Lx / Ly * G.gateHeight * 0.35, shz = -Lz / Ly * G.gateHeight * 0.35;
   if (G.shadow > 0) {
     gates.forEach(function (g) {
-      if (g.water) return;                             // no shadow on the water
       shadowQuad(g, G.width * G.gateHeight / 2 + G.pillar * G.gateHeight * 1.5, gap * 0.52, 0.5, G.shadow * (1 - g.haze));
     });
     var lsk = L.size / G.gateHeight;
@@ -2017,7 +2007,7 @@ function bakeGates() {
   GREF.cnv.width = 1; GREF.cnv.height = 1;
   if (LK.reflect > 0) {
     var rTop = H, rBot = hy;
-    gates.forEach(function (g) { rTop = Math.min(rTop, g.foot); rBot = Math.max(rBot, g.foot + g.px * (g.water ? LK.wtSize : 1) * 1.2); });
+    gates.forEach(function (g) { rTop = Math.min(rTop, g.foot); rBot = Math.max(rBot, g.foot + g.px * 1.2); });
     lanterns.forEach(function (Lp) { rTop = Math.min(rTop, Lp.foot); rBot = Math.max(rBot, Lp.foot + Lp.px * 1.2); });
     grefTop = Math.max(0, Math.floor(rTop - 4)); rBot = Math.min(H, rBot + 4);
     if (rBot > grefTop + 2) {
@@ -2045,19 +2035,6 @@ function bakeGates() {
           rc.beginPath();
           for (var m = 0; m < n; m++) { var sp = toScreen(f.p[m][0], -f.p[m][1], f.p[m][2]); if (m) rc.lineTo(sp[0], sp[1]); else rc.moveTo(sp[0], sp[1]); }
           rc.closePath(); rc.fill(); rc.stroke();
-        });
-      });
-      // rings on the water round the water torii's feet
-      gates.forEach(function (g) {
-        if (!g.water) return;
-        var hw = G.width * G.gateHeight * LK.wtSize / 2;
-        [-1, 1].forEach(function (sd) {
-          var fx = g.x + g.ax * hw * sd, fz = g.z + g.az * hw * sd, p0 = toScreen(fx, 0, fz), rr = 0.12 * F / fz;
-          for (var q = 1; q <= 3; q++) {
-            rc.strokeStyle = rgb(mix(skyAt(hy * 0.5), [255, 255, 255], 0.3), 0.35 / q);
-            rc.lineWidth = 0.8;
-            rc.beginPath(); rc.ellipse(p0[0], p0[1] + 0.5, rr * (1 + q * 0.9), rr * (1 + q * 0.9) * 0.22, 0, 0, TAU); rc.stroke();
-          }
         });
       });
       // kept crisp: the water tints it with everything else (composeWater), and each frame's rippling breaks it up
@@ -2498,7 +2475,6 @@ function drawFuji(c, C, hy) {
    - the peninsula the gates stand on, winding toward you, and the near
      bank along the bottom: fallen leaves, a mossy edge, mossy rocks;
    - a grove behind the middle gates (ginkgo, maples, a cedar);
-   - a single torii standing in the water (水上鳥居);
    - red spider lilies (彼岸花) beside the gravel, and susuki (ススキ)
      that sways with the wind field and the gusts.
    All of it is baked with the scenery, the ground or the gates. Each
@@ -2533,8 +2509,6 @@ var LK_DEFAULTS = {
   // the water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
   bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
-  // the water torii
-  waterTorii: true, wtX: 0.26, wtY: 0.82, wtSize: 1.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -2949,11 +2923,11 @@ function bakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  // 2. every tree is its own: a kind (gold ginkgo or a green broadleaf, one after the other), its own seed (so its
-  //    own shape), and its own height and width
+  // 2. every tree is its own: a colour (red, orange or gold, never the same twice running), its own seed (so its own
+  //    shape), and its own height and width; all drawn as flat painted autumn trees (Lakeside.tree 'autumn')
   var R = Lakeside.rng(7311), last = '';
-  var KINDS = [['ginkgo', 0.5], ['broad', 0.5]];
-  var NOM = { ginkgo: [0.5, 0.5], broad: [0.55, 0.55] };       // (a first guess at its width either side of the trunk)
+  var KINDS = [['red', 0.3], ['orange', 0.38], ['gold', 0.32]];
+  var NOM = { red: [0.34, 0.34], orange: [0.34, 0.34], gold: [0.34, 0.34] };       // (a first guess at its width either side of the trunk)
   function pick(k) {
     var kind, t, acc, n;
     do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
@@ -2965,10 +2939,7 @@ function bakeBank(path) {
     var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    var o = { x: cw / 2, y: chh - 3, h: hh, seed: sp.seed, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)) };
-    if (sp.kind === 'ginkgo') { o.stout = true; o.w = hh * 0.92 * sp.wm; }
-    else if (sp.kind === 'broad') { o.pal = Lakeside.PAL.blob; o.w = hh * 0.95 * sp.wm; }
-    Lakeside.tree(T.c, sp.kind === 'broad' ? 'momiji' : sp.kind, o);
+    Lakeside.tree(T.c, 'autumn', { x: cw / 2, y: chh - 3, h: hh, w: hh * 0.6 * sp.wm, seed: sp.seed, lx: -0.7, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), tone: sp.kind });
     // how far its crown reaches either side of the trunk (px)
     var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
     for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 2) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
@@ -7277,9 +7248,6 @@ var LAKE_CTLS = [
   { k: 'cdRust', label: 'Rusty cedars', min: 0, max: 1, step: 0.01, note: 'The share of cedars turned a little rusty in autumn.' },
   { k: 'pagodaX', label: 'Pagoda across', min: 0.05, max: 0.5, step: 0.005 },
   { k: 'pagodaSize', label: 'Pagoda height', min: 0.08, max: 0.35, step: 0.005 },
-  { k: 'wtX', label: 'Water torii across', min: 0.05, max: 0.5, step: 0.005, group: 'The torii in the water' },
-  { k: 'wtY', label: 'Water torii down', min: 0.63, max: 0.9, step: 0.002 },
-  { k: 'wtSize', label: 'Water torii size', min: 0.6, max: 2.5, step: 0.05, note: 'Against the gates of the line.' },
   { k: 'bankX0', label: 'Row starts at (across)', min: 0.3, max: 0.95, step: 0.005, group: 'Trees on the right bank', note: 'Planted on the bank itself (the water\'s edge on the right).' },
   { k: 'bankGap', label: 'Gap between tree crowns', min: -0.5, max: 3, step: 0.05, note: 'In eye heights, along the bank on the ground, from one crown\'s edge to the next one\'s: the same between every pair, whatever the trees\' widths. Below 0 they overlap.' },
   { k: 'bankH', label: 'Tree height', min: 0.6, max: 5, step: 0.05, note: 'In eye heights: every tree the same in the world, so smaller further away.' },
@@ -7310,7 +7278,7 @@ var LANT_CTLS = [
   { k: 'sides', label: 'Sides', min: 4, max: 8, step: 2, note: '4 square, 6 hexagonal, 8 octagonal.' }
 ];
 var LAKE_SWITCHES = [['shader', 'Water on the graphics chip (WebGL 2)'], ['headland', 'Headland'], ['pagoda', 'Pagoda'], ['hall', 'Shrine hall'], ['grove', 'Grove behind the gates (in the middle)'],
-                     ['bankTrees', 'Trees on the right bank'], ['waterTorii', 'Torii in the water']];
+                     ['bankTrees', 'Trees on the right bank']];
 var LAKE_COLOURS = [['water', 'Water (day)'], ['waterEvening', 'Water (evening)'], ['waterNight', 'Water (night)'], ['moss', 'Moss'],
                     ['stone', 'Rocks'], ['lily', 'Spider lilies'], ['susuki', 'Susuki'],
                     ['cedarDeep', 'Cedar: shade'], ['cedarMid', 'Cedar: body'], ['cedarLit', 'Cedar: light'], ['cedarHi', 'Cedar: brightest'],
