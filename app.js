@@ -14150,7 +14150,7 @@ function buildKoyoTree(key, far, lazy) {
   for (var j = 1; j < nodes.length; j++) {
     var N = nodes[j], upper = N.d >= maxD - 1, mid = N.d >= 2 && N.d < maxD - 1;
     if (!upper && !mid) continue;
-    if (r() > (upper ? keep : keep * 0.6)) continue;
+    if (r() > (upper ? keep : Math.min(1, keep * 1.15))) continue;   // (the mid branches, low and behind, are nearly all kept: a full lower canopy)
     var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, KOYO.fullness);
     var ck = Math.floor(N.ex / cell) + ',' + Math.floor(N.ey / cell);
     if (!cellFam[ck]) cellFam[ck] = koyoFamily(r);
@@ -14168,18 +14168,16 @@ function buildKoyoTree(key, far, lazy) {
   T.clumps.forEach(function(C) {
     var cn = nodes[C.node];
     domeSpan = Math.max(domeSpan, Math.abs(cn.ex + C.ox - bx));
+    domeBase = Math.max(domeBase, cn.ey + C.oy);
     domeTop = Math.min(domeTop, cn.ey + C.oy - C.R);
   });
-  T.clumps.forEach(function(C) {
-    var cn = nodes[C.node];
-    if (Math.abs(cn.ex + C.ox - bx) < domeSpan * 0.35) domeBase = Math.max(domeBase, cn.ey + C.oy);
-  });
-  var domeDrop = (domeBase - domeTop) * 0.5;
-  function domeLowest(x) { return domeBase - domeDrop * clamp(Math.abs(x - bx) / domeSpan, 0, 1); }
+  var domeDrop = (domeBase - domeTop) * 0.3;
+  // (the canopy keeps its full shape; only the outermost 30% of its width is pulled up)
+  function domeLowest(x) { return domeBase - domeDrop * clamp((Math.abs(x - bx) / domeSpan - 0.7) / 0.3, 0, 1); }
   T.clumps = T.clumps.filter(function(C) {
     var cn = nodes[C.node], over = cn.ey + C.oy - domeLowest(cn.ex + C.ox);
     if (over <= 0) return true;
-    if (over > C.R * 1.1) return false;
+    if (over > C.R * 0.6) return false;
     C.oy -= over;
     return true;
   });
