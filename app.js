@@ -17046,12 +17046,14 @@ var LAKE = {
   // the cedars (杉): stacked tiers of foliage, each hanging over the one below (lakeside.js, Lakeside.sugiLook)
   cdTiers: 6, cdWidth: 0.43, cdHeight: 0.95, cdCurve: 0.5, cdScallop: 1.2, cdRagged: 0.95, cdShade: 1.1, cdLight: 1, cdSpecks: 2.35,
   cdLine: 0, cdTrunk: 0.11, cdVariety: 0.94, cdRust: 0.91,
-  // the trees on the right bank: planted ON the bank, the same distance apart along it (bankGap, in eye heights,
-  // on the ground), all the same height in the world (bankH, in eye heights); the row starts across at bankX0
+  // the trees on the right bank: planted on the land just back from the water, all the same height in the world (bankH,
+  // in eye heights) with the same gap between one crown and the next on the ground (bankGap, in eye heights); the row
+  // starts across at bankX0
   // bankOff: how far the bank's water's edge is from the middle of the path by the nearest gate (in eye heights, on
   // the ground; the edge runs alongside the path, larger = further right, less lake); bankBack: how far back from the
-  // water's edge the trees are planted, onto the land (in eye heights)
-  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 2.3, bankIn: 1, bankOff: 3.6, bankBack: 0.55,
+  // water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
+  // from the water, near or far)
+  bankTrees: true, bankX0: 0.39, bankGap: 0.3, bankH: 2.3, bankIn: 1, bankOff: 3.6, bankBack: 0.2,
   // the torii in the water
   waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
   // the shore
@@ -17486,36 +17488,62 @@ function lakeBakeBank(path) {
   LK.bankT = [];
   if (!LAKE.bankTrees || !LK.landLo || !LK.bankEdge.length || !path) return;
   var F = torLens(), wu = lakeGravelHalf();
-  // the bank (the water's edge on the right) in ground units, from where it leaves the gravel to the screen's edge
-  var pts = LK.bankEdge.map(function (p) { var g = torGround(p[0], p[1]); return { x: g.x, z: g.z, sx: p[0] }; }).filter(function (p) { return p.sx >= LAKE.bankX0 * W - 1; });
-  if (pts.length < 2) return;
+  var back = LAKE.bankBack == null ? 0.2 : LAKE.bankBack, gap = LAKE.bankGap == null ? 0.3 : LAKE.bankGap;
+  var hw = LAKE.bankH * LAKE.treeSize;                                       // every tree's height in the world (eye heights)
+  // the bank's water's edge on the screen, from where it leaves the gravel to the screen's edge
+  var E = LK.bankEdge.filter(function (p) { return p[0] >= LAKE.bankX0 * W - 1; });
+  if (E.length < 3) return;
+  // 1. the planting line: from each point of the edge, straight down the screen onto the land (the side the land is on)
+  //    by the same SHARE OF THE TREE'S OWN HEIGHT, so every trunk stands the same visible distance back from the water
+  //    whether near or far, then turned into ground units
+  var G = [];
+  for (var i = 0; i < E.length; i++) {
+    var a = E[Math.max(0, i - 4)], b = E[Math.min(E.length - 1, i + 4)], tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+    var nx = -ty / tl, ny = tx / tl;
+    if (ny < 0) { nx = -nx; ny = -ny; }
+    var g0 = torGround(E[i][0], E[i][1]), hpx = LAKE.bankH * F / Math.max(1, g0.z) * LAKE.treeSize;
+    var q = torGround(E[i][0] + nx * back * hpx, E[i][1] + ny * back * hpx);
+    G.push({ x: q.x, z: q.z });
+  }
   var cum = [0];
-  for (var i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  for (var i2 = 1; i2 < G.length; i2++) cum.push(cum[i2 - 1] + Math.hypot(G[i2].x - G[i2 - 1].x, G[i2].z - G[i2 - 1].z));
+  function at(s) {
+    var j = 1; while (j < G.length - 1 && cum[j] < s) j++;
+    var u = clamp((s - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]), 0, 1);
+    return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
+  }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  var k = 0, j = 1;
-  for (var d = LAKE.bankGap * 0.5; d <= cum[cum.length - 1]; d += LAKE.bankGap, k++) {   // the same distance apart along the bank, on the ground
-    while (j < pts.length - 1 && cum[j] < d) j++;
-    var u = (d - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]);
-    var gx = lerp(pts[j - 1].x, pts[j].x, u), gz = lerp(pts[j - 1].z, pts[j].z, u);
-    // set back from the water's edge onto the land (the side toward the path), so the trunk stands on the bank
-    var tx = pts[j].x - pts[j - 1].x, tz = pts[j].z - pts[j - 1].z, tl = Math.hypot(tx, tz) || 1, nx = -tz / tl, nz = tx / tl;
-    var sl = torScreen(gx + nx * 0.3, 0, gz + nz * 0.3); if (!lakeInLand(sl[0], sl[1])) { nx = -nx; nz = -nz; }
-    gx += nx * LAKE.bankBack; gz += nz * LAKE.bankBack;
-    if (gz < 1.5 || fromPath(gx, gz) < wu * 1.35) continue;                             // not on the gravel
-    var sp = torScreen(gx, 0, gz);
-    if (sp[0] > W + 60) break;
-    var kind = k % 2 ? 'momiji' : 'ginkgo', evergreen = k % 2 === 1;
-    var h = LAKE.bankH * F / gz * LAKE.treeSize;                                         // the same height in the world: smaller the further away
-    var cw = Math.ceil(h * 1.5), chh = Math.ceil(h * 1.1) + 6, T = landCanvas();
+  var kinds = ['ginkgo', 'momiji'];
+  function draw(T, kind, cw, chh, h, gz) {
     T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
     T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (k % 2) * 13, lx: -0.7, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)), stout: true,
-                               pal: evergreen ? Lakeside.PAL.blob : null });
-    // placed by the middle of its crown (the trees are not quite symmetrical), so the crowns are the same distance apart
-    var px = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round((chh * 0.75) * PR))).data, sum = 0, cnt = 0, wpx = T.cnv.width;
-    for (var iy = 0; iy < px.length / 4 / wpx; iy++) for (var ix = 0; ix < wpx; ix++) { var al = px[(iy * wpx + ix) * 4 + 3]; if (al > 40) { sum += ix * al; cnt += al; } }
-    var mid = cnt ? sum / cnt / PR : cw / 2;
-    LK.bankT.push({ x: sp[0] + (cw / 2 - mid), y: sp[1] + LAKE.bankIn, cw: cw, ch: chh, spr: T, ph: k * 1.7, z: gz });
+    Lakeside.tree(T.c, kind, { x: cw / 2, y: chh - 3, h: h, seed: 9100 + (kind === 'momiji' ? 13 : 0), lx: -0.7, fin: lakeFin(clamp(0.04 + gz / 200, 0, 0.3)), stout: true,
+                               pal: kind === 'momiji' ? Lakeside.PAL.blob : null });
+  }
+  // 2. how wide each kind's crown is either side of its trunk, as a share of its height (measured once, large)
+  var ext = {};
+  kinds.forEach(function (kind) {
+    var hh = 120, cw0 = Math.ceil(hh * 1.5), ch0 = Math.ceil(hh * 1.1) + 6, S = landCanvas();
+    draw(S, kind, cw0, ch0, hh, 20);
+    var d = S.c.getImageData(0, 0, S.cnv.width, Math.max(1, Math.round(ch0 * 0.8 * PR))).data, wpx = S.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
+    for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 3) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
+    ext[kind] = { l: (wpx / 2 - lo) / PR / hh, r: (hi - wpx / 2) / PR / hh };
+  });
+  // 3. plant them along the line, one after the other: the gap between one crown's edge and the next one's is the same
+  //    on the ground (so every gap looks the same, near or far), whatever the trees' widths
+  var k = 0, s = 0;
+  for (var guard = 0; guard < 200; guard++, k++) {
+    var kind = kinds[k % 2], e = ext[kind], wl = e.l * hw, wr = e.r * hw;
+    var sc = s + (k ? gap : gap * 0.5) + wl;
+    if (sc > cum[cum.length - 1]) break;
+    s = sc + wr;
+    var gp = at(sc);
+    if (gp.z < 1.5 || fromPath(gp.x, gp.z) < wu * 1.35) continue;                          // not on the gravel
+    var sp = torScreen(gp.x, 0, gp.z);
+    if (sp[0] > W + 60) break;
+    var h = hw * F / gp.z, cw = Math.ceil(h * 1.5), chh = Math.ceil(h * 1.1) + 6, T = landCanvas();
+    draw(T, kind, cw, chh, h, gp.z);
+    LK.bankT.push({ x: sp[0], y: sp[1] + LAKE.bankIn, cw: cw, ch: chh, spr: T,  ph: k * 1.7, z: gp.z });
   }
   LK.bankT.sort(function (a, b) { return b.z - a.z; });          // further first
 }
