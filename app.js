@@ -14159,6 +14159,30 @@ function buildKoyoTree(key, far, lazy) {
     T.clumps.push({ node: j, R: R, fam: fam, back: mid || r() < 0.3, seed: (r() * 4294967296) >>> 0,
                     ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU, bakedV: -1 });
   }
+  // No overhanging lobe: outer twigs droop, so a tail of clumps can trail down the
+  // outer side of the canopy and end in a blob hanging below it. The underside of
+  // the canopy is kept a dome: the lowest a clump's centre may sit rises the further
+  // it is from the trunk. A clump below that line is lifted onto the canopy; one that
+  // would have to be lifted a long way is dropped.
+  var domeSpan = 1, domeBase = -1e9, domeTop = 1e9;
+  T.clumps.forEach(function(C) {
+    var cn = nodes[C.node];
+    domeSpan = Math.max(domeSpan, Math.abs(cn.ex + C.ox - bx));
+    domeTop = Math.min(domeTop, cn.ey + C.oy - C.R);
+  });
+  T.clumps.forEach(function(C) {
+    var cn = nodes[C.node];
+    if (Math.abs(cn.ex + C.ox - bx) < domeSpan * 0.35) domeBase = Math.max(domeBase, cn.ey + C.oy);
+  });
+  var domeDrop = (domeBase - domeTop) * 0.5;
+  function domeLowest(x) { return domeBase - domeDrop * clamp(Math.abs(x - bx) / domeSpan, 0, 1); }
+  T.clumps = T.clumps.filter(function(C) {
+    var cn = nodes[C.node], over = cn.ey + C.oy - domeLowest(cn.ex + C.ox);
+    if (over <= 0) return true;
+    if (over > C.R * 1.1) return false;
+    C.oy -= over;
+    return true;
+  });
   // No holes: the dice above can leave a gap that the bare twigs show through.
   // Walk along every twig and, wherever no clump covers a point, add one there.
   var fillR = sc * 0.095 * lerp(0.75, 1.1, KOYO.fullness);
@@ -14171,7 +14195,7 @@ function buildKoyoTree(key, far, lazy) {
         var HC = T.clumps[h], hn = nodes[HC.node];
         covered = Math.hypot(hn.ex + HC.ox - gx, hn.ey + HC.oy - gy) < HC.R * 0.8;
       }
-      if (covered) continue;
+      if (covered || gy - fillR * 0.2 > domeLowest(gx)) continue;   // (nothing below the dome)
       var gk = Math.floor(GN.ex / cell) + ',' + Math.floor(GN.ey / cell);
       if (!cellFam[gk]) cellFam[gk] = koyoFamily(r);
       var gfam = r() < KOYO.patchiness ? cellFam[gk] : koyoFamily(r);
@@ -14179,6 +14203,24 @@ function buildKoyoTree(key, far, lazy) {
       T.clumps.push({ node: g, R: fillR, fam: gfam, back: GN.d < maxD - 1, seed: (r() * 4294967296) >>> 0,
                       ox: gx - GN.ex, oy: gy - GN.ey - fillR * 0.2, ph: r() * TAU, bakedV: -1 });
     }
+  }
+  // Branches left with no foliage anywhere beyond them (their clumps were dropped
+  // above) are cut off, so no bare twigs stick out of the canopy.
+  var leafy = nodes.map(function() { return false; });
+  T.clumps.forEach(function(C) { for (var u = C.node; u >= 0 && !leafy[u]; u = nodes[u].p) leafy[u] = true; });
+  leafy[0] = true;
+  var remap = [], kept = [];
+  for (var nI = 0; nI < nodes.length; nI++) {
+    if (!leafy[nI]) continue;
+    remap[nI] = kept.length; kept.push(nodes[nI]);
+  }
+  if (kept.length < nodes.length) {
+    kept.forEach(function(nd) { nd.p = nd.p < 0 ? -1 : remap[nd.p]; });
+    T.clumps.forEach(function(C) { C.node = remap[C.node]; });
+    nodes.length = 0;
+    kept.forEach(function(nd) { nodes.push(nd); });
+    byDepth.length = 0;
+    for (var q2 = 0; q2 < nodes.length; q2++) (byDepth[nodes[q2].d] = byDepth[nodes[q2].d] || []).push(q2);
   }
   // back clumps first, then low to high so the top of the canopy sits in front
   T.clumps.sort(function(a, b) {
