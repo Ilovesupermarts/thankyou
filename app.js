@@ -17048,7 +17048,9 @@ var LAKE = {
   cdLine: 0, cdTrunk: 0.11, cdVariety: 0.94, cdRust: 0.91,
   // the trees on the right bank: planted ON the bank, the same distance apart along it (bankGap, in eye heights,
   // on the ground), all the same height in the world (bankH, in eye heights); the row starts across at bankX0
-  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 2.3, bankIn: 1,
+  // bankNear: how far down the bank comes at the right edge of the screen (a share of the ground below the eye line;
+  // larger = nearer you, more lake showing behind its trees)
+  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 2.3, bankIn: 1, bankNear: 0.5,
   // the torii in the water
   waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
   // the shore
@@ -17183,9 +17185,12 @@ function lakeBuildLand() {
   // the right foreground: from the peninsula's far side out to the right edge of the screen
   var rs = [];
   r();
+  // it leaves the peninsula gently, runs on behind the nearest gates, then sweeps down toward you and levels off
+  // along the right edge (LAKE.bankNear), so more of the lake shows behind the bank trees
   for (var x = ra[0]; x <= W + 30; x += 3) {
     var u = clamp((x - ra[0]) / Math.max(1, W - ra[0]), 0, 1);
-    var dd = lerp(ra[1] + 2, hy + (H - hy) * 0.24, Math.pow(u, 0.75)), kd = (dd - hy) / Math.max(1, H - hy);
+    var sw = 0.28 * smooth(0, 0.5, u) + 0.72 * smooth(0.5, 0.97, u);
+    var dd = lerp(ra[1] + 2, hy + (H - hy) * LAKE.bankNear, sw), kd = (dd - hy) / Math.max(1, H - hy);
     rs.push([x, dd + (H - hy) * kd * (0.05 * torNoise(x / W * 9, 31) + 0.025 * torNoise(x / W * 31, 32) + 0.01 * torNoise(x / W * 90, 33))]);
   }
   edges.push(rs);
