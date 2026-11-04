@@ -17048,9 +17048,10 @@ var LAKE = {
   cdLine: 0, cdTrunk: 0.11, cdVariety: 0.94, cdRust: 0.91,
   // the trees on the right bank: planted ON the bank, the same distance apart along it (bankGap, in eye heights,
   // on the ground), all the same height in the world (bankH, in eye heights); the row starts across at bankX0
-  // bankNear: how far down the bank comes at the right edge of the screen (a share of the ground below the eye line;
-  // larger = nearer you, more lake showing behind its trees)
-  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 2.3, bankIn: 1, bankNear: 0.5,
+  // bankOff: how far the bank's water's edge is from the middle of the path by the nearest gate (in eye heights, on
+  // the ground; the edge runs alongside the path, larger = further right, less lake); bankBack: how far back from the
+  // water's edge the trees are planted, onto the land (in eye heights)
+  bankTrees: true, bankX0: 0.39, bankGap: 1.55, bankH: 2.3, bankIn: 1, bankOff: 3.6, bankBack: 0.55,
   // the torii in the water
   waterTorii: true, wtX: 0.43, wtY: 0.778, wtSize: 1.35,
   // the shore
@@ -17182,17 +17183,31 @@ function lakeBuildLand() {
   edges.push(left);
   var sa = Math.round(N * 0.6), ra = right[sa];
   edges.push(right.slice(0, sa + 1));
-  // the right foreground: from the peninsula's far side out to the right edge of the screen
+  // the right foreground: from the peninsula's far side out to the right edge of the screen. Its water's edge runs
+  // alongside the gravel path's right side on the ground, so it curves the way the path does: it leaves the
+  // peninsula, widens out to LAKE.bankOff from the middle of the path by the nearest gate, then runs on with the
+  // path toward you until it leaves the screen
   var rs = [];
   r();
-  // it leaves the peninsula gently, runs on behind the nearest gates, then sweeps down toward you and levels off
-  // along the right edge (LAKE.bankNear), so more of the lake shows behind the bank trees
-  for (var x = ra[0]; x <= W + 30; x += 3) {
-    var u = clamp((x - ra[0]) / Math.max(1, W - ra[0]), 0, 1);
-    var sw = 0.28 * smooth(0, 0.5, u) + 0.72 * smooth(0.5, 0.97, u);
-    var dd = lerp(ra[1] + 2, hy + (H - hy) * LAKE.bankNear, sw), kd = (dd - hy) / Math.max(1, H - hy);
-    rs.push([x, dd + (H - hy) * kd * (0.05 * torNoise(x / W * 9, 31) + 0.025 * torNoise(x / W * 31, 32) + 0.01 * torNoise(x / W * 90, 33))]);
+  var sA = len * sa / N, K0 = kR(sA), Kend = Math.max(K0, LAKE.bankOff);
+  function kB(s) {
+    var u = s / len, wob = smooth(sA, sA + len * 0.12, s) * (0.12 * torNoise(u * 7, 31) + 0.05 * torNoise(u * 23, 32) + 0.02 * torNoise(u * 61, 33));
+    return Math.max(kR(s), lerp(K0, Kend, smooth(sA, len, s)) + wob * Kend);
   }
+  for (var ib = sa; ib <= N; ib++) {
+    var sb = len * ib / N, pb = scr(lakeBeside(path, sb, kB(sb)));
+    rs.push(pb);
+    if (pb[0] > W + 30) break;
+  }
+  if (rs[rs.length - 1][0] <= W + 30) {
+    var kE = kB(len);
+    for (var zb = endQ.z - 0.2; zb > zExit; zb -= Math.max(0.08, zb * 0.03)) {
+      var pz = torScreen(endQ.x + kE, 0, zb);
+      rs.push(pz);
+      if (pz[0] > W + 30) break;
+    }
+  }
+  rs.bank = true;                                       // (no mossy rocks along this shore)
   edges.push(rs);
   LK.bankEdge = rs;
   var centre = [];
@@ -17268,9 +17283,9 @@ function lakeBuildLand() {
       var a = E[Math.max(0, k - 1)], b = E[Math.min(E.length - 1, k + 1)], p = E[k];
       var tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1, nx = -ty / tl, ny = tx / tl;
       var wet = (!lakeInLand(p[0] + nx * 6, p[1] + ny * 6) || !lakeInLand(p[0] - nx * 6, p[1] - ny * 6)) && p[1] > hy + 2 && p[1] < H + 4;
-      if (wet) run.push(p); else if (run.length) { if (run.length > 1) landEdges.push(run); run = []; }
+      if (wet) run.push(p); else if (run.length) { if (run.length > 1) { run.bank = E.bank; landEdges.push(run); } run = []; }
     }
-    if (run.length > 1) landEdges.push(run);
+    if (run.length > 1) { run.bank = E.bank; landEdges.push(run); }
   });
   LK.landEdges = landEdges;
   LK.path = path;
@@ -17482,6 +17497,10 @@ function lakeBakeBank(path) {
     while (j < pts.length - 1 && cum[j] < d) j++;
     var u = (d - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]);
     var gx = lerp(pts[j - 1].x, pts[j].x, u), gz = lerp(pts[j - 1].z, pts[j].z, u);
+    // set back from the water's edge onto the land (the side toward the path), so the trunk stands on the bank
+    var tx = pts[j].x - pts[j - 1].x, tz = pts[j].z - pts[j - 1].z, tl = Math.hypot(tx, tz) || 1, nx = -tz / tl, nz = tx / tl;
+    var sl = torScreen(gx + nx * 0.3, 0, gz + nz * 0.3); if (!lakeInLand(sl[0], sl[1])) { nx = -nx; nz = -nz; }
+    gx += nx * LAKE.bankBack; gz += nz * LAKE.bankBack;
     if (gz < 1.5 || fromPath(gx, gz) < wu * 1.35) continue;                             // not on the gravel
     var sp = torScreen(gx, 0, gz);
     if (sp[0] > W + 60) break;
@@ -17787,7 +17806,7 @@ function lakeBakeFore(path) {
   })();
   // mossy rocks along the shore, every few metres on the ground, often two or three together, some out in the shallows
   if (LAKE.rocks > 0) LK.landEdges.forEach(function (E, ei) {
-    if (E.head) return;
+    if (E.head || E.bank) return;                        // none on the right bank
     var acc = 0, next = lerp(0.5, 3, r()) / LAKE.rocks, prev = null;
     for (var q = 0; q < E.length; q++) {
       var gq2 = torGround(E[q][0], E[q][1]);
