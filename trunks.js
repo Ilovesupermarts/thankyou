@@ -47,7 +47,7 @@
      X          function (x) → x: the canopy's squeeze toward its trunk
      clumps     [{ x, y, R, back }] the foliage at rest (squeezed): what shades the limbs
      seed
-     look       { girth, bend, depth, rootFlare, roots }
+     look       { girth, bend, depth, rootFlare, roots, rootLen (× the roots' length) }
    o:
      model, nodes, X        (nodes as they are now)
      extra      more tubes: [{ parent, f, pts: [[x, y]...], r: [...], shade, z }] —
@@ -153,7 +153,7 @@ function build(s) {
   for (i = 0; i < nr; i++) {
     var side = i % 2 ? 1 : -1;
     if (r() < 0.25) side = -side;
-    roots.push({ side: side, drop: lerp(0.18, 0.5, r()), len: r0 * lerp(3, 6, r()), r: r0 * lerp(0.3, 0.45, r()),
+    roots.push({ side: side, drop: lerp(0.18, 0.5, r()), len: r0 * lerp(3, 6, r()) * d(L, 'rootLen', 1), r: r0 * lerp(0.3, 0.45, r()),
                  z: (r() - 0.5) * r0 * 3.5, h: r0 * lerp(1.4, 2.6, r()), bend: (r() - 0.5) * 0.5, seed: r() * 300 });
   }
   return { kids: kids, lead: lead, rEnd: rEnd, limbs: limbs, z0: z0, z1: z1, b1: b1, b2: b2, sh: sh,
