@@ -7765,12 +7765,35 @@ function triggerKoiStart() {
          is heavy, and while the name stands still a long frame does not show; once the scene starts
          coming in, every frame must be quick. (At most NAME_WAIT_MAX longer, so it always goes on.) */
       function whenSceneReady(go) {
-        var until = performance.now() + NAME_WAIT_MAX;
+        var t0 = performance.now(), until = t0 + NAME_WAIT_MAX;
+        /* A thin progress line under the name, only if the wait turns out long (over 0.5 s after the name
+           has landed). We cannot measure the work exactly, so it eases toward 92% with time and jumps to
+           the end when the scene is ready. */
+        var bar = document.getElementById('introProgress');
+        var barFill = bar ? bar.firstElementChild : null;
+        var barShown = false;
+        function barUpdate(now) {
+          if (!bar || !barFill || now - t0 < 500) return;
+          if (!barShown) {
+            barShown = true;
+            var nc = document.getElementById('nameColumn');
+            if (nc) { bar.style.top = Math.min(window.innerHeight - 20, nc.getBoundingClientRect().bottom + 28) + 'px'; }
+            bar.classList.add('show');
+          }
+          var f = 0.92 * (1 - Math.exp(-(now - t0 - 500) / 2200));
+          barFill.style.transform = 'scaleX(' + f.toFixed(3) + ')';
+        }
+        function barDone() {
+          if (!bar) return;
+          if (barShown && barFill) barFill.style.transform = 'scaleX(1)';
+          bar.classList.remove('show');
+        }
         (function check() {
           var now = performance.now();
           var ready = true;
           try { ready = typeof DynBG === 'undefined' || !DynBG || !DynBG.sceneReady || DynBG.sceneReady(); } catch (e) { ready = true; }
-          if (now >= until || ready) { nameLeavesAt = now; go(); return; }
+          if (now >= until || ready) { barDone(); nameLeavesAt = now; go(); return; }
+          barUpdate(now);
           nameLeavesAt = now + 1000;                     // (still standing still: the set-up keeps its big steps)
           koiPushTimer(setTimeout(check, 40));
         })();

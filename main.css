@@ -1304,6 +1304,14 @@
   }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
+  /* A thin ink line under the name that fills while the scene behind it is made (shown only if the wait is long). */
+  .intro-progress {
+    position: absolute; left: 50%; top: 70%; width: min(220px, 40vw); height: 3px; margin-left: calc(min(220px, 40vw) / -2);
+    border-radius: 2px; background: rgba(60, 40, 30, 0.14); overflow: hidden;
+    opacity: 0; transition: opacity 0.5s ease; pointer-events: none;
+  }
+  .intro-progress.show { opacity: 1; }
+  .intro-progress i { display: block; height: 100%; width: 100%; background: rgba(60, 40, 30, 0.7); border-radius: 2px; transform: scaleX(0); transform-origin: left center; }
   /* The name is written like ink on washi (墨のにじみ): each character is
      brushed in from the top down behind a soft edge (inkBrush), while its
      ink, wet at first, spreads into the paper with a pale bloom and then
