@@ -14256,7 +14256,7 @@ function buildKoyoTree(key, far, lazy) {
   // ends before it reaches the edge on the trunk's side, add clumps out to the edge.
   // (This is a rule of the build, so every tree and every size obeys it.)
   (function fillTrunkSide() {
-    var step = fillR * 0.9, top2 = 1e9, bot2 = -1e9, pos = [], added = 0;
+    var step = fillR * 0.5, top2 = 1e9, bot2 = -1e9, pos = [], added = 0;
     T.clumps.forEach(function(C) {
       var cn = nodes[C.node], px = bx + (cn.ex + C.ox - bx) * k, py = cn.ey + C.oy;
       pos.push({ x: px, y: py, R: C.R, fam: C.fam });
@@ -14266,13 +14266,13 @@ function buildKoyoTree(key, far, lazy) {
     function edgeDist(x) { return left ? x : W - x; }               // distance from the screen edge on the trunk side
     var anchors = [];
     for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
-    for (var y = top2; y <= bot2 + step * 0.5 && added < 80; y += step) {
-      var row = pos.filter(function(p) { return Math.abs(p.y - y) < p.R * 0.9; });
+    for (var y = top2; y <= bot2 + step && added < 260; y += step) {
+      var row = pos.filter(function(p) { return Math.abs(p.y - y) < p.R * 0.5; });
       if (!row.length) continue;
       var cur = 1e9, famRef = row[0];
-      row.forEach(function(p) { var e = edgeDist(p.x) - p.R; if (e < cur) { cur = e; famRef = p; } });
-      while (cur > 0 && added < 80) {                                // the foliage stops short of the edge here
-        var d = cur + fillR * 0.5, wx = left ? d : W - d;            // new clump centre, overlapping what is there
+      row.forEach(function(p) { var e = edgeDist(p.x); if (e < cur) { cur = e; famRef = p; } });   // the outermost clump's centre
+      while (cur > -fillR * 0.5 && added < 260) {                    // its centre must lie off the screen, so the edge is covered
+        var d = cur - fillR * 1.0, wx = left ? d : W - d;            // new clump centre, overlapping the last
         var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;           // (back to the unsqueezed spot, for its branch)
         for (var q = 0; q < anchors.length; q++) {
           var an = nodes[anchors[q]], dd = Math.hypot(an.ex - rx, an.ey - y);
@@ -14284,7 +14284,7 @@ function buildKoyoTree(key, far, lazy) {
                         ox: rx - bn.ex, oy: y - bn.ey, ph: r() * TAU, bakedV: -1 });
         pos.push({ x: wx, y: y, R: fillR, fam: famRef.fam });
         added++;
-        cur = d - fillR;
+        cur = d;
       }
     }
     T.clumps.sort(function(a, b) {
