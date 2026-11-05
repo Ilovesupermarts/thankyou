@@ -7765,12 +7765,37 @@ function triggerKoiStart() {
          is heavy, and while the name stands still a long frame does not show; once the scene starts
          coming in, every frame must be quick. (At most NAME_WAIT_MAX longer, so it always goes on.) */
       function whenSceneReady(go) {
-        var until = performance.now() + NAME_WAIT_MAX;
+        var t0 = performance.now(), until = t0 + NAME_WAIT_MAX;
+        /* The loading card under the name (text, bar, text), only if the wait turns out long (over 0.5 s).
+           The bar follows the real work (DynBG.setupProgress), never going backward. */
+        var bar = document.getElementById('introProgress');
+        var barFill = bar ? bar.querySelector('.ip-track i') : null;
+        var barShown = false, barVal = 0;
+        function barUpdate(now) {
+          if (!bar || !barFill || now - t0 < 500) return;
+          if (!barShown) {
+            barShown = true;
+            var nc = document.getElementById('nameColumn');
+            var top = nc ? nc.getBoundingClientRect().bottom + 24 : window.innerHeight * 0.7;
+            bar.style.top = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight - 16, top)) + 'px';
+            bar.classList.add('show');
+          }
+          var v = 0;
+          try { v = DynBG.setupProgress(); } catch (e) { v = 0; }
+          barVal = Math.max(barVal, Math.min(0.98, barVal + (v - barVal) * 0.4));
+          barFill.style.transform = 'scaleX(' + barVal.toFixed(3) + ')';
+        }
+        function barDone() {
+          if (!bar) return;
+          if (barShown && barFill) barFill.style.transform = 'scaleX(1)';
+          bar.classList.remove('show');
+        }
         (function check() {
           var now = performance.now();
           var ready = true;
           try { ready = typeof DynBG === 'undefined' || !DynBG || !DynBG.sceneReady || DynBG.sceneReady(); } catch (e) { ready = true; }
-          if (now >= until || ready) { nameLeavesAt = now; go(); return; }
+          if (now >= until || ready) { barDone(); nameLeavesAt = now; go(); return; }
+          barUpdate(now);
           nameLeavesAt = now + 1000;                     // (still standing still: the set-up keeps its big steps)
           koiPushTimer(setTimeout(check, 40));
         })();
@@ -20184,9 +20209,10 @@ function advanceClock() {
   S.hour = n.hour; S.date = n.date;
 }
 
-var prefillLeft = 0, dynSetupLeft = false;
+var prefillLeft = 0, prefillTotal = 0, dynSetupLeft = false;
 function prefill(later) {
   prefillLeft = Math.min(S.maxLeaves * 0.6, spawnRate(0) * 25);
+  prefillTotal = prefillLeft;
   if (!later) prefillSome(Infinity);
 }
 function prefillSome(max) {
@@ -20253,6 +20279,44 @@ function dynSetupBusy() {
 /* The name waits, standing still, until this is true (whenSceneReady, at the name animation): the scene
    behind it set up, so that once it starts coming in no frame has heavy work to do. (True at once when
    there is no scene to wait for.) */
+/* How far the name's wait has got, 0 to 1, from the real work: the landscape (the mountains, then each baked
+   part, then the fallen leaves), the first leaves, the trees' clumps, the ink reveal's drops. */
+function dynSetupProgress() {
+  if (dynSceneReady()) return 1;
+  var parts = [], busyLand = !LS.ready || LS.step || (ENV.scene === 'autumn' && !LS.floorBuilt);
+  var land = 0;
+  if (LS.key) {
+    land = 0.12;
+    if (!(ENV.scene === 'autumn' && LAND_MTN.job)) {
+      var steps = ENV.scene === 'autumn' ? RV_STEPS : [2, 3], done = steps.length;
+      if (LS.step) done = Math.max(0, steps.indexOf(LS.step));
+      land = 0.12 + 0.88 * done / steps.length;
+    }
+  }
+  if (!LS.step && LS.ready) land = 1;
+  parts.push([0.5, land]);
+  if (ENV.scene === 'autumn') parts.push([0.08, LAND.bedLeaves ? Math.min(1, LS.bedN / LAND.bedLeaves) : (LS.floorBuilt ? 1 : 0)]);
+  if (!busyLand) {
+    parts.push([0.04, prefillTotal > 0 ? 1 - Math.max(0, prefillLeft) / prefillTotal : 1]);
+    var nC = 0, nB = 0;
+    [tree, farTree].forEach(function(T) {
+      if (!T || !T.koyo) return;
+      T.clumps.forEach(function(C) { nC++; if (C.bakedV === lookVersion) nB++; });
+    });
+    parts.push([0.2, nC ? nB / nC : (dynSetupLeft ? 0 : 1)]);
+    if (ENV.scene === 'autumn' && rvAvailable() && !RV.done) {
+      var nW = 0, nP = 0;
+      for (var i = 0; i < RV_PARTS.length; i++) if (RV_PARTS[i][1] === 'wash') { nW++; if (RV.pre && RV.pre[RV_PARTS[i][0]]) nP++; }
+      parts.push([0.18, RV.pre && nW ? nP / nW : 0]);
+    }
+  } else {
+    parts.push([0.04, 0], [0.2, 0]);
+    if (ENV.scene === 'autumn' && rvAvailable() && !RV.done) parts.push([0.18, 0]);
+  }
+  var sum = 0, got = 0;
+  parts.forEach(function(p) { sum += p[0]; got += p[0] * p[1]; });
+  return sum ? Math.max(0, Math.min(1, got / sum)) : 0;
+}
 function dynSceneReady() {
   if (dynReduceMotion || document.hidden) return true;
   if (typeof currentTheme !== 'string' || (currentTheme !== 'autumn' && currentTheme !== 'winter')) return true;
@@ -21146,7 +21210,7 @@ window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
    reveal's last clean-up has ended. */
 function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
-         sceneReady: dynSceneReady };
+         sceneReady: dynSceneReady, setupProgress: dynSetupProgress };
 
 })();
 
