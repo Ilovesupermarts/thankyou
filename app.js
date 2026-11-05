@@ -14250,6 +14250,48 @@ function buildKoyoTree(key, far, lazy) {
     if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
   });
   T.k = k;
+  // No bald side: the trunk stands at the screen edge, so the canopy must carry on
+  // past that edge (it may bleed off the screen, but must not stop short of it and
+  // show a flat, bare cut with the scenery behind). Row by row, wherever the foliage
+  // ends before it reaches the edge on the trunk's side, add clumps out to the edge.
+  // (This is a rule of the build, so every tree and every size obeys it.)
+  (function fillTrunkSide() {
+    var step = fillR * 0.9, top2 = 1e9, bot2 = -1e9, pos = [], added = 0;
+    T.clumps.forEach(function(C) {
+      var cn = nodes[C.node], px = bx + (cn.ex + C.ox - bx) * k, py = cn.ey + C.oy;
+      pos.push({ x: px, y: py, R: C.R, fam: C.fam });
+      top2 = Math.min(top2, py); bot2 = Math.max(bot2, py);
+    });
+    if (!pos.length) return;
+    function edgeDist(x) { return left ? x : W - x; }               // distance from the screen edge on the trunk side
+    var anchors = [];
+    for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
+    for (var y = top2; y <= bot2 + step * 0.5 && added < 80; y += step) {
+      var row = pos.filter(function(p) { return Math.abs(p.y - y) < p.R * 0.9; });
+      if (!row.length) continue;
+      var cur = 1e9, famRef = row[0];
+      row.forEach(function(p) { var e = edgeDist(p.x) - p.R; if (e < cur) { cur = e; famRef = p; } });
+      while (cur > 0 && added < 80) {                                // the foliage stops short of the edge here
+        var d = cur + fillR * 0.5, wx = left ? d : W - d;            // new clump centre, overlapping what is there
+        var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;           // (back to the unsqueezed spot, for its branch)
+        for (var q = 0; q < anchors.length; q++) {
+          var an = nodes[anchors[q]], dd = Math.hypot(an.ex - rx, an.ey - y);
+          if (dd < bd) { bd = dd; best = anchors[q]; }
+        }
+        if (best < 0) return;
+        var bn = nodes[best];
+        T.clumps.push({ node: best, R: fillR, fam: famRef.fam, back: true, seed: (r() * 4294967296) >>> 0,
+                        ox: rx - bn.ex, oy: y - bn.ey, ph: r() * TAU, bakedV: -1 });
+        pos.push({ x: wx, y: y, R: fillR, fam: famRef.fam });
+        added++;
+        cur = d - fillR;
+      }
+    }
+    T.clumps.sort(function(a, b) {
+      if (a.back !== b.back) return a.back ? -1 : 1;
+      return nodes[b.node].ey - nodes[a.node].ey;
+    });
+  })();
   // where the canopy sits, for the night glow
   var sx = 0, sy = 0, top = H, bot = 0;
   T.clumps.forEach(function(C) {
