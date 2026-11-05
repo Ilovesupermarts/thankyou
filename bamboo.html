@@ -833,7 +833,7 @@ function buildTrunk(T) {
   T.trunk = Trunks.build({
     nodes: ns, seed: T.seed || V.seed * 7919 + (T.far ? 211 : 0), X: function (x) { return X(T, x); },
     clumps: T.clumps.map(function (C) { var cn = ns[C.node]; return { x: X(T, cn.ex + C.ox), y: cn.ey + C.oy, R: C.R, back: C.back }; }),
-    look: TRUNK
+    look: T.bank ? Object.assign({}, TRUNK, { roots: 0 }) : TRUNK      // (a small bank tree has no roots showing)
   });
 }
 /* The owl's branch: a bare branch that grows from the limb nearest
@@ -1009,11 +1009,12 @@ function drawBranches(c, T) {
   if (!T.trunk) return;
   var res = T.bank ? T.bank.res : PR * (T.far ? FAR_RES : 1), look = {}, k;
   for (k in TRUNK) look[k] = TRUNK[k];
+  if (T.bank) look.rootFlare = Math.min(look.rootFlare, 0.2);       // the foot hardly spreads
   look.air = T.bank ? T.bank.air : T.far ? Math.min(1, TRUNK.farAir + TREE.farHaze) : TRUNK.air;
   if (isNight()) { look.komorebi = 0; look.canopyShade = TRUNK.canopyShade * 0.3; }   // the lamps are under the leaves
   var o = { model: T.trunk, nodes: T.nodes, X: function (x) { return X(T, x); }, extra: T.perch !== undefined ? perchTubes(T) : [],
             width: T.bank ? Math.ceil(T.bank.w * res) : c.canvas.width, height: T.bank ? Math.ceil(T.bank.h * res) : c.canvas.height,
-            W: W, H: T.bank ? T.bank.refH : H, px: res, time: nowT, wind: V.wind,
+            W: W, H: T.bank ? T.bank.refH : H, px: res, time: T.bank ? 0 : nowT, wind: V.wind,    // (a bank tree's bark light doesn't drift: that read as the texture changing)
             ground: T.bank ? T.by - T.bank.groundUp : H - (V.nearHeight || 30) * 0.6, look: look, colours: trunkColours(), light: trunkLight() };
   var t0 = performance.now(), g = Trunks.draw(o);
   trunkMs = lerp(trunkMs, performance.now() - t0, 0.1);
