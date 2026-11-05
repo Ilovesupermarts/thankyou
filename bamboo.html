@@ -2533,8 +2533,8 @@ var LK_DEFAULTS = {
   // the water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
   bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
-  // bankLastGate: the nearest tree stands no nearer than this torii counting from the front (1 = the gate facing you,
-  // 2 = the one behind it)
+  // bankLastGate: the row's far end is this torii counting from the front (1 = the gate facing you, 2 = the one behind it);
+  // it runs from there forward to the screen's edge
   // their depth of field, as for the gates: sharp nearer than bankFocus (a share of the way from the eye line down
   // to the bottom of the screen), blurred (px) and hazed more the further they stand
   bankLastGate: 2, bankFocus: 0.3, bankBlurNear: 0, bankBlurFar: 1.4, bankHazeNear: 0.05, bankHazeFar: 0.35,
@@ -2929,8 +2929,8 @@ function bankDof(foot) {                                       // how out of foc
   var farness = 1 - smooth(0, Math.max(0.02, LK.bankFocus), depth);
   return { farness: farness, haze: lerp(LK.bankHazeNear, LK.bankHazeFar, Math.pow(farness, 1.3)), blur: lerp(LK.bankBlurNear, LK.bankBlurFar, farness) };
 }
-/* How far away (on the ground) the torii that ends the row of trees stands: the LK.bankLastGate-th gate counting from the
-   front (the one facing you is 1st). No tree stands nearer than this. */
+/* How far away (on the ground) the torii where the row of trees begins stands: the LK.bankLastGate-th gate counting from the
+   front (the one facing you is 1st). No tree stands further away than this; the row comes forward from here to the screen. */
 function bankLimitZ() {
   var gp = buildGatePath(), gap = Math.max(0.05, gp.len / Math.max(1, G.count - 1));
   return pathAt(gp, Math.max(0, gp.len - gap * (Math.max(1, Math.round(LK.bankLastGate)) - 1))).z;
@@ -2938,7 +2938,7 @@ function bankLimitZ() {
 function bakeBank(path) {
   bankT = [];
   if (!LK.bankTrees || !landLo || !bankEdge.length || !path) return;
-  var F = lensF(), wu = gravelHalf(), zMin = Math.max(1.5, bankLimitZ());
+  var F = lensF(), wu = gravelHalf(), zMax = bankLimitZ();
   var back = LK.bankBack == null ? 0.16 : LK.bankBack, gap = LK.bankGap == null ? 2.8 : LK.bankGap;
   var hw = LK.bankH * LK.treeSize;                                       // a tree's height in the world (eye heights)
   // the bank's water's edge on the screen, from the far end of the peninsula to the screen's edge
@@ -3010,21 +3010,22 @@ function bakeBank(path) {
   }
   // 3. plant them along the line, one after another: the gap between one crown's edge and the next one's is the same
   //    on the ground (so every gap looks the same, near or far), whatever the trees' widths
+  // the row starts at the far torii (see bankLimitZ) and comes forward to the screen's edge
   var k = 0, s = 0;
+  for (var j0 = 0; j0 < G.length; j0++) if (G[j0].z <= zMax) { s = cum[j0]; break; }
   for (var guard = 0; guard < 300; guard++, k++) {
     var sp = pick(k), g1 = k ? gap : gap * 0.5;
-    var sc0 = s + g1 + 0.31 * hw * sp.hm, T = null, gp = null;
+    var sc0 = k ? s + g1 + 0.31 * hw * sp.hm : s, T = null, gp = null;   // (the first tree stands right at the far torii)
     if (sc0 > cum[cum.length - 1]) break;
     for (var pass = 0; pass < 2; pass++) {                               // its shape only, to find how far its crown reaches
       gp = at(sc0);
-      if (gp.z < zMin) break;
+      if (gp.z < 1.5) break;
       T = build(sp, hw * sp.hm * F / gp.z, toScreen(gp.x, 0, gp.z)[1], true);
-      var sc2 = s + g1 + T.reachL * gp.z / F;                            // its real left edge, in ground units
+      var sc2 = k ? s + g1 + T.reachL * gp.z / F : s;                            // its real left edge, in ground units
       if (Math.abs(sc2 - sc0) < 0.02 * hw || sc2 > cum[cum.length - 1]) { sc0 = Math.min(sc2, cum[cum.length - 1]); break; }
       sc0 = sc2;
     }
-    if (gp && gp.z < zMin) break;                                        // reached the last torii: no more trees
-    if (!T) { s = sc0; continue; }
+    if (!T || gp.z < 1.5) { s = sc0; continue; }
     s = sc0 + T.reachR * gp.z / F;
     if (fromPath(gp.x, gp.z) < wu * 1.35) continue;                      // not on the gravel
     var spt = toScreen(gp.x, 0, gp.z);
@@ -7415,7 +7416,7 @@ var LAKE_CTLS = [
   { k: 'bankGap', label: 'Gap between tree crowns', min: -0.5, max: 3, step: 0.05, note: 'In eye heights, along the bank on the ground, from one crown\'s edge to the next one\'s: the same between every pair, whatever the trees\' widths. Below 0 they overlap.' },
   { k: 'bankH', label: 'Tree height', min: 0.6, max: 5, step: 0.05, note: 'In eye heights: every tree the same in the world, so smaller further away.' },
   { k: 'bankOff', label: 'Bank: distance from the path', min: 1, max: 8, step: 0.05, note: 'The right bank runs alongside the gravel path. In eye heights on the ground, by the nearest gate: smaller = the bank closer to the path, more lake.' },
-  { k: 'bankLastGate', label: 'Last tree stops at torii no.', min: 1, max: 8, step: 1, note: 'Counting from the front: 1 is the gate facing you, 2 the one behind it. No tree stands nearer than this gate, so there are fewer (and lighter) trees to draw.' },
+  { k: 'bankLastGate', label: 'Row ends (far end) at torii no.', min: 1, max: 8, step: 1, note: 'Counting from the front: 1 is the gate facing you, 2 the one behind it. The row of trees comes forward from this gate to the edge of the screen; no tree stands further back, so there are fewer (and lighter) trees to draw.' },
   { k: 'bankBack', label: 'Trees: set back from the water', min: 0, max: 0.6, step: 0.01, note: 'As a share of each tree\'s own height: how far down the screen from the water\'s edge the trunk stands. The same for every tree.' },
   { k: 'bankFocus', label: 'Bank trees in focus nearer than', min: 0.02, max: 1, step: 0.01, group: 'Trees on the right bank: depth of field', note: 'A share of the way from the eye line down to the bottom of the screen: trees whose foot is nearer than this are sharp, further ones are blurred and hazed.' },
   { k: 'bankBlurNear', label: 'Blur, in focus (px)', min: 0, max: 4, step: 0.05 },
