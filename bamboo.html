@@ -108,6 +108,9 @@
   .sp-colour { display: flex; justify-content: space-between; align-items: center; margin: 10px 0; font-weight: 500; }
   .sp-colour input { width: 44px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: none; }
   .sp-colour select { font: inherit; border: 0; border-radius: 8px; padding: 4px 8px; background: rgba(120, 120, 128, 0.14); }
+  .sp-jump { position: sticky; top: -14px; z-index: 3; margin: 0 -8px 4px; padding: 8px 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.82); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); }
+  .sp-jump select { max-width: 62%; }
+  .sp h4 { scroll-margin-top: 52px; }
   .sp-count { margin-top: 8px; color: rgba(60, 60, 67, 0.7); font-size: 11px; font-variant-numeric: tabular-nums; }
   .sp-row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .sp pre { margin: 10px 0 0; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, 0.7); font-size: 11px; white-space: pre-wrap; -webkit-user-select: text; user-select: text; display: none; }
@@ -683,7 +686,7 @@ function leafPath(c, x, y, size, rot) {
   }
   c.closePath();
 }
-function bakeClump(R, fam, back, far, r, res) {
+function bakeClump(R, fam, back, far, r, res, hz) {
   var F = families();
   var tones = F[fam];
   var side = Math.ceil(R * 2.6 * res);
@@ -696,7 +699,7 @@ function bakeClump(R, fam, back, far, r, res) {
   function col(c0) {
     var o = c0;
     if (back) o = mix(o, F.plum, 0.2 + shade * 0.25);
-    if (far) o = mix(o, PAPER, TREE.farHaze);
+    if (far) o = mix(o, PAPER, hz === undefined ? TREE.farHaze : hz);
     return light(o);
   }
   var coreCol = col(scale(tones[0], 1 - shade * 0.25));
@@ -743,12 +746,16 @@ function bakeClump(R, fam, back, far, r, res) {
   }
   return { cnv: cnv, half: side / (2 * res) };
 }
-function buildTree(far) {
-  var r = rngFrom(V.seed * 7919 + (far ? 101 : 0));
-  var side = far ? (V.nearSide === 'left' ? 'right' : 'left') : V.nearSide;
+/* P (only for the trees on the right bank, section 7c): the same tree on a small scale, standing at the origin of a
+   layer of its own: { seed, sc (size), left (which way it leans), lean, maxD (fewer twigs when it is small),
+   res (device px per px), hz (haze), w (leaf colour weights), full (fullness), dry (shape only: no leaf pictures) }.
+   It sways, sheds leaves and is drawn exactly like the far tree; only its size, colours and shape differ. */
+function buildTree(far, P) {
+  var r = rngFrom(P ? P.seed : V.seed * 7919 + (far ? 101 : 0));
+  var side = P ? (P.left ? 'left' : 'right') : far ? (V.nearSide === 'left' ? 'right' : 'left') : V.nearSide;
   var left = side === 'left', dir = left ? 1 : -1;
-  var sc = H * TREE.treeSize * (far ? FAR_SCALE : 1);
-  var maxD = TREE.twigDepth;
+  var sc = P ? P.sc : H * TREE.treeSize * (far ? FAR_SCALE : 1);
+  var maxD = P ? P.maxD : TREE.twigDepth;
   var nodes = [];
   function grow(parent, abs, len, w, d) {
     var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs;
@@ -757,7 +764,7 @@ function buildTree(far) {
                  ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
     if (d >= maxD) return;
     var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
-    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1);
+    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1) * (P ? P.spreadK : 1);
     var shrink = (0.68 + r() * 0.14) * lerp(1.1, 1, (maxD - 4) / 3);
     for (var i = 0; i < n; i++) {
       var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
@@ -766,17 +773,19 @@ function buildTree(far) {
     }
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
-  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12), sc * 0.26, Math.max(far ? 4 : 7, sc * 0.034), 0);
+  if (P) bx = 0;
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + (P ? P.lean : 0), sc * 0.26, Math.max(P ? 2 : far ? 4 : 7, sc * (P ? 0.04 : 0.034)), 0);
   var byDepth = [];
   for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
-  var T = { far: far, left: left, bx: bx, by: H + 6, nodes: nodes, byDepth: byDepth, scale: sc, maxD: maxD,
+  var T = { far: far, left: left, bx: bx, by: P ? 0 : H + 6, nodes: nodes, byDepth: byDepth, scale: sc, maxD: maxD,
             clumps: [], k: 1, gust: 0, gustV: 0 };
   restPose(T);
   var thin = lerp(1, 0.5, clamp((TREE.season - 0.85) / 0.15, 0, 1));
-  var keep = clamp(TREE.fullness * thin, 0.05, 1);
-  var w = weights();
+  var keep = clamp((P ? P.full : TREE.fullness) * thin, 0.05, 1);
+  var w = P ? P.w : weights();
   var cell = sc * 0.16, cellFam = {};
-  var res = PR * (far ? FAR_RES : 1);
+  var res = P ? P.res : PR * (far ? FAR_RES : 1);
+  var rb = P ? rngFrom(P.seed + 17) : r;                    // the leaf pictures have a stream of their own, so a shape-only copy matches the real one
   for (var j = 1; j < nodes.length; j++) {
     var nd = nodes[j];
     var upper = nd.d >= maxD - 1, mid = nd.d >= 2 && nd.d < maxD - 1;
@@ -788,7 +797,7 @@ function buildTree(far) {
     var fam = r() < TREE.patchiness ? cellFam[ck] : pickFamily(r, w);
     if (fam === 'evergreen' && upper) fam = 'red';
     var back = mid || r() < 0.3;
-    var spr = bakeClump(R, fam, back, far, r, res);
+    var spr = P && P.dry ? { cnv: null, half: R * 1.3 } : bakeClump(R, fam, back, far, rb, res, P ? P.hz : undefined);
     T.clumps.push({ node: j, R: R, fam: fam, back: back, spr: spr,
                     ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU });
   }
@@ -797,7 +806,7 @@ function buildTree(far) {
     return nodes[b.node].ey - nodes[a.node].ey;
   });
   var limit = TREE.maxWidth / 100 * W, k = 1;
-  for (var m = 0; m < T.clumps.length; m++) {
+  for (var m = 0; !P && m < T.clumps.length; m++) {
     var cn = nodes[T.clumps[m].node], edge = T.clumps[m].R * 1.25;
     var dx = left ? cn.ex - bx : bx - cn.ex;
     var room = left ? limit - bx - edge : limit - (W - bx) - edge;
@@ -812,7 +821,7 @@ function buildTree(far) {
   T.cx = sx2 / nC; T.cy = sy2 / nC; T.cr = Math.max(40, (bot - top) * 0.75);
   // (no owl on this page, so no perching branch: addPerch(T, r) is left out; the spring it set up stays at rest)
   T.pb = 0; T.pbV = 0;
-  buildTrunk(T);
+  if (!P) buildTrunk(T);                                   // (a bank tree is moved into its layer first, see bakeBank)
   return T;
 }
 /* The trunk and branches' 3D shape (trunks.js), from the tree at rest and
@@ -822,7 +831,7 @@ function buildTrunk(T) {
   if (typeof Trunks === 'undefined') return;
   var ns = T.nodes;
   T.trunk = Trunks.build({
-    nodes: ns, seed: V.seed * 7919 + (T.far ? 211 : 0), X: function (x) { return X(T, x); },
+    nodes: ns, seed: T.seed || V.seed * 7919 + (T.far ? 211 : 0), X: function (x) { return X(T, x); },
     clumps: T.clumps.map(function (C) { var cn = ns[C.node]; return { x: X(T, cn.ex + C.ox), y: cn.ey + C.oy, R: C.R, back: C.back }; }),
     look: TRUNK
   });
@@ -998,13 +1007,14 @@ function trunkColours() {
 }
 function drawBranches(c, T) {
   if (!T.trunk) return;
-  var res = PR * (T.far ? FAR_RES : 1), look = {}, k;
+  var res = T.bank ? T.bank.res : PR * (T.far ? FAR_RES : 1), look = {}, k;
   for (k in TRUNK) look[k] = TRUNK[k];
-  look.air = T.far ? Math.min(1, TRUNK.farAir + TREE.farHaze) : TRUNK.air;
+  look.air = T.bank ? T.bank.air : T.far ? Math.min(1, TRUNK.farAir + TREE.farHaze) : TRUNK.air;
   if (isNight()) { look.komorebi = 0; look.canopyShade = TRUNK.canopyShade * 0.3; }   // the lamps are under the leaves
   var o = { model: T.trunk, nodes: T.nodes, X: function (x) { return X(T, x); }, extra: T.perch !== undefined ? perchTubes(T) : [],
-            width: c.canvas.width, height: c.canvas.height, W: W, H: H, px: res, time: nowT, wind: V.wind,
-            ground: H - (V.nearHeight || 30) * 0.6, look: look, colours: trunkColours(), light: trunkLight() };
+            width: T.bank ? Math.ceil(T.bank.w * res) : c.canvas.width, height: T.bank ? Math.ceil(T.bank.h * res) : c.canvas.height,
+            W: W, H: T.bank ? T.bank.refH : H, px: res, time: nowT, wind: V.wind,
+            ground: T.bank ? T.by - T.bank.groundUp : H - (V.nearHeight || 30) * 0.6, look: look, colours: trunkColours(), light: trunkLight() };
   var t0 = performance.now(), g = Trunks.draw(o);
   trunkMs = lerp(trunkMs, performance.now() - t0, 0.1);
   c.setTransform(1, 0, 0, 1, 0, 0);
@@ -2523,6 +2533,9 @@ var LK_DEFAULTS = {
   // the water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
   bankTrees: true, bankX0: 0.355, bankGap: 2.8, bankH: 2.3, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
+  // their depth of field, as for the gates: sharp nearer than bankFocus (a share of the way from the eye line down
+  // to the bottom of the screen), blurred (px) and hazed more the further they stand
+  bankFocus: 0.3, bankBlurNear: 0, bankBlurFar: 1.4, bankHazeNear: 0.05, bankHazeFar: 0.35,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -2899,236 +2912,21 @@ function bakeGrove(path) {
   });
 }
 
-/* ---------- the right bank: two orderly rows of trees that sway in the wind ----------
-   One straight row, parallel to the right shore, the same distance apart and the same size, two kinds
-   alternating (ginkgo, maple). Each tree is baked once into its own picture; each frame it is laid down leaning with the wind
-   field and the gusts (the top moves more than the foot), so a gust passes along the row. */
-/* ---------- the flat painted autumn tree of the bank ----------
-   Drawn after the reference pictures: a symmetrical-looking but lobed crown of leaf clusters (each side its own
-   lobes, the top two or three uneven ones, small ragged leaf points all round), in five flat tones of one colour
-   (deepest low down, lightest at the top) that meet in rounded scallops, with lighter and deeper leafy patches
-   scattered through it; and curved, tapering branches that leave their parent like veins, kept inside the crown.
-   Some trees keep one leader up the middle, others split low into two or three big limbs. Every tree is made from
-   its seed, so no two are the same. o: x, y (the foot), h (height), w (crown width), seed, tone ('red' | 'orange' |
-   'gold'), light (-1 left … 1 right), fin (the distance haze, as in Lakeside.tree). */
-var AUTUMN_PAL = {
-  red:    ['#C3121B', '#E5201C', '#F63B1F', '#FF5A26', '#FF7A3A'],
-  orange: ['#E9601A', '#F68019', '#FDA21A', '#FFC21F', '#FFD84A'],
-  gold:   ['#EE9016', '#FBAA19', '#FFC425', '#FFDA3C', '#FFEA72']
-};
-function autumnTree(c, o) {
-  var r = Lakeside.rng((o.seed || 1) * 2654435761), P = (AUTUMN_PAL[o.tone] || AUTUMN_PAL.orange).map(hex);
-  var FIN = o.fin || function (c3) { return c3; };
-  function css(c3) { return rgb(FIN(c3)); }
-  var WOOD = css(hex('#3B1F1A'));
-  var x = o.x, y = o.y, h = o.h, W2 = (o.w || h * 0.54) / 2, lit = o.light === undefined ? -0.5 : o.light;
-  var yB = y - h * lerp(0.3, 0.34, r()), yT = y - h, Hc = yB - yT;
-  var peak = lerp(0.3, 0.36, r()), base = lerp(0.55, 0.65, r()), topP = lerp(1.7, 2.3, r());
-
-  // the outline at each height (t: 0 the crown's bottom, 1 its top): a bell, widest low down, rounding over at the
-  // top; lobes of leaf clusters on its edge (the same on both sides), each lobe's edge finely toothed like leaves
-  function bell(t) {
-    if (t < peak) return lerp(base, 1, Math.sin((t / peak) * PI / 2));
-    return Math.pow(Math.max(0, 1 - Math.pow((t - peak) / (1 - peak), topP)), 0.5);
-  }
-  function makeEdge(nLob, amp, ph) {
-    var teeth = [];
-    for (var i = 0; i < 400; i++) teeth.push(r());
-    return function (t) {
-      var lobe = Math.pow(Math.abs(Math.sin(nLob * PI * t + ph)), 0.55);
-      var tooth = 0.022 * (teeth[Math.floor(t * 399)] - 0.5) + 0.016 * Math.abs(Math.sin(t * 170 + teeth[0] * 9));
-      return 1 - amp + amp * lobe + tooth;
-    };
-  }
-  // a lobed crown shape: scale s of the width, its top at the crown's top shifted down by `drop`, its bottom at yBot
-  function crownShape(sx, yTop, yBot, xoff, edge) {
-    var H2 = yBot - yTop, N = 160;
-    c.beginPath();
-    for (var i = 0; i <= N; i++) { var t = i / N; c[i ? 'lineTo' : 'moveTo'](x + xoff - W2 * sx * bell(t) * edge(t), yBot - t * H2); }
-    for (var j = N; j >= 0; j--) { var t2 = j / N; c.lineTo(x + xoff + W2 * sx * bell(t2) * edge(t2), yBot - t2 * H2); }
-    var nb = 14, b0 = W2 * sx * bell(0) * edge(0);                       // the bottom: small hanging scallops
-    for (var b = 1; b < nb; b++) { var f = b / nb; c.lineTo(x + xoff + b0 * (1 - 2 * f), yBot + (b % 2 ? H2 * 0.016 : H2 * 0.002) + Math.sin(f * PI) * H2 * 0.012); }
-    c.closePath();
-  }
-
-  // the outline as round lobes: up each side, a column of round leaf clusters whose outer edge follows the bell,
-  // and a round lobe on top; the outline is their union (so it steps in and out with notches between lobes),
-  // mirrored about the trunk, with fine leafy teeth all round
-  var LOB = [];
-  [-1, 1].forEach(function (sd) {                                        // each side its own lobes, not a mirror image
-    var nLob = 4 + Math.floor(r() * 2);
-    for (var li = 0; li < nLob; li++) {
-      var tl = lerp(0.12, 0.74, li / (nLob - 1)) + (r() - 0.5) * 0.07, rl = Hc * lerp(0.12, 0.2, r()) * (1 - 0.2 * tl);
-      LOB.push({ sd: sd, y: yB - tl * Hc, R: rl, xo: W2 * bell(tl) * lerp(0.9, 1.07, r()) - rl });
-    }
-  });
-  var nTop = 2 + Math.floor(r() * 2);                                    // the top: two or three lobes, uneven
-  for (var tk = 0; tk < nTop; tk++) {
-    var fx = nTop === 1 ? 0 : lerp(-0.32, 0.32, tk / (nTop - 1)) + (r() - 0.5) * 0.12, rt = Hc * lerp(0.11, 0.17, r());
-    var ty = yT + rt + Hc * (Math.abs(fx) * 0.25 + r() * 0.05);
-    LOB.push({ sd: fx < 0 ? -1 : 1, y: ty, R: rt, xo: Math.abs(fx) * W2 });
-    LOB.push({ sd: fx < 0 ? 1 : -1, y: ty, R: rt, xo: -Math.abs(fx) * W2 });   // (its other side, toward the middle)
-  }
-  var teeth = []; for (var ti = 0; ti < 500; ti++) teeth.push(r());
-  function edge0() { return 1; }
-  function halfAt(t, sd) {                                               // the outline's distance from the axis at height t, on side sd
-    var yy = yB - t * Hc, best = W2 * bell(t) * 0.7;
-    LOB.forEach(function (Lb) {
-      if (Lb.sd !== sd) return;
-      var dy = yy - Lb.y; if (Math.abs(dy) < Lb.R) best = Math.max(best, Lb.xo + Math.sqrt(Lb.R * Lb.R - dy * dy));
-    });
-    var tooth = 1 + 0.045 * (teeth[Math.floor(clamp(t, 0, 0.999) * 499) + (sd > 0 ? 0 : 0)] - 0.5) + 0.03 * (Math.abs(((t * 70 + (sd > 0 ? 0.37 : 0)) % 1) - 0.5) - 0.25);
-    return Math.max(0, best * tooth);
-  }
-  // ---- 1. the trunk: one smooth taper from the foot up into the crown
-  var tw = h * 0.042, tTop = yB - Hc * 0.1;
-  c.fillStyle = WOOD;
-  c.beginPath();
-  c.moveTo(x - tw * 0.62, y);
-  c.bezierCurveTo(x - tw * 0.5, y - h * 0.06, x - tw * 0.44, tTop + Hc * 0.2, x - tw * 0.36, tTop);
-  c.lineTo(x + tw * 0.36, tTop);
-  c.bezierCurveTo(x + tw * 0.44, tTop + Hc * 0.2, x + tw * 0.5, y - h * 0.06, x + tw * 0.62, y);
-  c.closePath(); c.fill();
-
-  // ---- 2. the crown: its lobed outline (a symmetrical bell), filled in its deepest tone; then each lighter tone
-  //      fills the crown above a line across it made of rounded scallops pushing upward (the tops of the leaf
-  //      clusters below rising into the colour above), each line higher than the last and gently domed. The
-  //      light gathers in the top; the shade lies low. A few leafy patches of a lighter and a deeper tone break
-  //      up the larger areas.
-  var outline = new Path2D(), N = 180;
-  var topY = yT + Hc * 0.0;
-  for (var i = 0; i <= N; i++) { var t = i / N; outline[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1), yB - t * Hc); }
-  for (var j = N; j >= 0; j--) { var t2 = j / N; outline.lineTo(x + halfAt(t2, 1), yB - t2 * Hc); }
-  var bR = halfAt(0, 1), bL = halfAt(0, -1), nbl = 6;
-  for (var bq = 0; bq < nbl; bq++) {                                    // the underside: a row of shallow round lobes
-    var xa = lerp(x + bR, x - bL, bq / nbl), xb = lerp(x + bR, x - bL, (bq + 1) / nbl), sag = Hc * 0.05 * Math.sin(((bq + 0.5) / nbl) * PI);
-    outline.quadraticCurveTo((xa + xb) / 2, yB + sag + Hc * 0.05, xb, yB + Hc * 0.05 * Math.sin(((bq + 1) / nbl) * PI) * 0.6);
-  }
-  outline.closePath();
-  c.fillStyle = css(P[0]); c.fill(outline);
-  c.save(); c.clip(outline);
-  var levels = [0.1, 0.34, 0.56, 0.78];
-  levels.forEach(function (lv, k) {
-    var nS = 4 + Math.floor(r() * 2) + (k < 2 ? 1 : 0), segW = (W2 * 2.2) / nS, x0 = x - W2 * 1.1 + (r() - 0.5) * segW * 0.4;
-    c.beginPath();
-    c.moveTo(x - W2 * 1.3, yT - 10);
-    var yL = function (xx) { var u = (xx - x) / W2; return yB - Hc * (lv + 0.1 * (1 - u * u)) + lit * u * Hc * 0.03; };
-    c.lineTo(x - W2 * 1.3, yL(x - W2 * 1.3));
-    c.lineTo(x0, yL(x0));
-    for (var sI = 0; sI < nS + 1; sI++) {                                // each scallop a rounded arc bulging up
-      var xa = x0 + sI * segW, xb = xa + segW * lerp(0.85, 1.15, r()), xm = (xa + xb) / 2, amp = Hc * lerp(0.06, 0.09, r());
-      for (var q = 1; q <= 16; q++) {                                  // sampled, with small ragged leaf points along it
-        var tq = q / 16, mq = 1 - tq, bx = mq * mq * mq * xa + 3 * mq * mq * tq * xa + 3 * mq * tq * tq * xb + tq * tq * tq * xb;
-        var by = mq * mq * mq * yL(xa) + 3 * mq * mq * tq * (yL(xa) - amp * 1.3) + 3 * mq * tq * tq * (yL(xb) - amp * 1.3) + tq * tq * tq * yL(xb);
-        c.lineTo(bx, by + (q % 2 ? -1 : 1) * Hc * 0.006 * (0.5 + r()));
-      }
-    }
-    c.lineTo(x + W2 * 1.3, yT - 10);
-    c.closePath();
-    c.fillStyle = css(P[k + 1]); c.fill();
-  });
-  function leaf(px, py, R, col, alpha) {                               // a leafy patch: rounded lobes, finely edged
-    var lob = 4 + Math.floor(r() * 3), n = 72, a0 = r() * TAU;
-    c.beginPath();
-    for (var i = 0; i <= n; i++) {
-      var a = a0 + (i / n) * TAU, bump = Math.pow(Math.abs(Math.cos(((a - a0) * lob) / 2)), 0.5);
-      var rr = R * (0.78 + 0.22 * bump) * (i % 2 ? lerp(0.9, 0.96, r()) : lerp(1, 1.05, r()));
-      c[i ? 'lineTo' : 'moveTo'](px + Math.cos(a) * rr, py + Math.sin(a) * rr * 0.86);
-    }
-    c.closePath(); c.globalAlpha = alpha; c.fillStyle = css(col); c.fill(); c.globalAlpha = 1;
-  }
-  function shadeAt(t) {                                                // the band colour at height t
-    var lv = [0, 0.1, 0.34, 0.56, 0.78], k = 0;
-    for (var i = 0; i < lv.length; i++) if (t >= lv[i]) k = i;
-    return k;
-  }
-  var nP = 5 + Math.floor(r() * 3);                                     // lighter leaf patches scattered through the middle
-  for (var d = 0; d < nP; d++) {
-    var tL = lerp(0.18, 0.82, r()), sideL = r() < 0.5 ? -1 : 1, kk = shadeAt(tL);
-    var cA = P[kk], cB = P[Math.min(4, kk + 1)];
-    leaf(x + sideL * halfAt(tL, sideL) * lerp(0.05, 0.6, r()), yB - tL * Hc, W2 * lerp(0.17, 0.28, r()) * (1 - 0.3 * tL), [lerp(cA[0], cB[0], 0.65), lerp(cA[1], cB[1], 0.65), lerp(cA[2], cB[2], 0.65)], 1);
-  }
-  for (var e = 0; e < 3; e++) {                                         // and a few deeper ones, low and to the shaded side
-    var tD = lerp(0.08, 0.45, r()), kD = shadeAt(tD);
-    leaf(x - lit * halfAt(tD, -lit < 0 ? -1 : 1) * lerp(0.15, 0.65, r()), yB - tD * Hc, W2 * lerp(0.1, 0.17, r()), (function () { var cA = P[kD], cB = P[Math.max(0, kD - 1)]; return [lerp(cA[0], cB[0], 0.6), lerp(cA[1], cB[1], 0.6), lerp(cA[2], cB[2], 0.6)]; })(), 1);
-  }
-  c.restore();
-
-  // ---- 3. the branches, like veins: each one a smooth curve that leaves its parent almost along it, swings out and
-  //      then turns upward, tapering all the way; it gives off a few smaller ones the same way, at points along it.
-  //      Some trees keep one leader up the middle; others split low in the crown into two or three big limbs.
-  function insideCrown(px, py) {                                       // inside the crown, a little in from its edge
-    var t = (yB - py) / Hc; if (t < -0.05 || t > 0.97) return false;
-    return Math.abs(px - x) <= halfAt(clamp(t, 0, 1), px < x ? -1 : 1) * 0.86;
-  }
-  function cubicAt(Q, t) { var m = 1 - t; return [m * m * m * Q[0][0] + 3 * m * m * t * Q[1][0] + 3 * m * t * t * Q[2][0] + t * t * t * Q[3][0], m * m * m * Q[0][1] + 3 * m * m * t * Q[1][1] + 3 * m * t * t * Q[2][1] + t * t * t * Q[3][1]]; }
-  function vein(x0, y0, a0, len, w0, depth, upTurn, endW) {
-    // starting along a0 (0 straight up, + to the right), ending turned up toward a1
-    var a1 = a0 * (upTurn === undefined ? lerp(0.1, 0.25, r()) : upTurn), am = a0 * 0.62 + (r() - 0.5) * 0.08;
-    var P3 = [x0 + Math.sin(am) * len, y0 - Math.cos(am) * len];
-    function build(L2) {
-      var E = [x0 + Math.sin(am) * L2, y0 - Math.cos(am) * L2];
-      return [[x0, y0], [x0 + Math.sin(a0) * L2 * 0.5, y0 - Math.cos(a0) * L2 * 0.5], [E[0] - Math.sin(a1) * L2 * 0.36, E[1] + Math.cos(a1) * L2 * 0.36], E];
-    }
-    var Q = build(len);
-    // the whole branch stays inside the crown: if it would leave it, it is shortened to end before the edge (so no
-    // piece of it, or of its twigs, is ever cut off and left floating)
-    for (var tc = 0.05; tc <= 1.0001; tc += 0.05) {
-      var pc = cubicAt(Q, Math.min(1, tc));
-      if (!insideCrown(pc[0], pc[1])) { len *= Math.max(0, tc - 0.08); Q = build(len); break; }
-    }
-    if (len < Hc * 0.015) return;
-    P3 = Q[3];
-    var n = 24, L = [], Rt = [], w1 = Math.max(0.35, w0 * (endW || 0.2));
-    for (var i = 0; i <= n; i++) {
-      var t = i / n, p = cubicAt(Q, t), q = cubicAt(Q, Math.min(1, t + 0.02)), pq = cubicAt(Q, Math.max(0, t - 0.02));
-      var dx = q[0] - pq[0], dy = q[1] - pq[1], dl = Math.hypot(dx, dy) || 1, nx = -dy / dl, ny = dx / dl;
-      var w = lerp(w0, w1, Math.pow(t, 0.8)) / 2;
-      L.push([p[0] + nx * w, p[1] + ny * w]); Rt.push([p[0] - nx * w, p[1] - ny * w]);
-    }
-    c.fillStyle = WOOD; c.beginPath();
-    L.forEach(function (p, i) { c[i ? 'lineTo' : 'moveTo'](p[0], p[1]); });
-    for (var j = Rt.length - 1; j >= 0; j--) c.lineTo(Rt[j][0], Rt[j][1]);
-    c.closePath(); c.fill();
-    if (w0 < tw * 0.34) { c.beginPath(); c.arc(x0, y0, w0 / 2, 0, TAU); c.fill(); }   // a rounded start, so it grows smoothly out of its parent
-    if (depth <= 0) return;
-    var kids = 1 + (r() < 0.5 ? 1 : 0);                                // only a branch or two off each main branch: no twigs
-    for (var k = 0; k < kids; k++) {
-      var f = lerp(0.28, 0.78, (k + 0.25 + r() * 0.5) / kids), p2 = cubicAt(Q, f), p3 = cubicAt(Q, Math.min(1, f + 0.02));
-      var tang = Math.atan2(p3[0] - p2[0], -(p3[1] - p2[1]));            // the parent's direction there
-      var outward = (k % 2 ? -1 : 1) * (a0 >= 0 ? 1 : -1);               // alternately to the outside and the inside
-      vein(p2[0], p2[1], tang + outward * lerp(0.45, 0.75, r()), len * lerp(0.42, 0.58, r()) * (1 - 0.25 * f), lerp(w0, w1, f) * 0.7, depth - 1);
-    }
-  }
-  var inner = new Path2D(); (function () { for (var i = 0; i <= 90; i++) { var t = i / 90; inner[i ? 'lineTo' : 'moveTo'](x - halfAt(t, -1) * 0.88, yB - t * Hc * 0.97); } for (var j = 90; j >= 0; j--) { var t2 = j / 90; inner.lineTo(x + halfAt(t2, 1) * 0.88, yB - t2 * Hc * 0.97); } inner.lineTo(x + tw, y); inner.lineTo(x - tw, y); inner.closePath(); })();
-  c.save(); c.clip(inner);
-  var forkT = lerp(0.04, 0.14, r()), forkY = yB - forkT * Hc;
-  // the trunk on up to the fork, tapering
-  vein(x, tTop + 2, (r() - 0.5) * 0.04, (tTop + 2 - forkY) + Hc * 0.02, tw * 0.74, 0, 1, 0.85);
-  if (r() < 0.5) {
-    // one leader up the middle, gently swaying, with limbs off it at different heights
-    var leadA = (r() < 0.5 ? -1 : 1) * lerp(0.04, 0.1, r());
-    vein(x, forkY, leadA, Hc * lerp(0.7, 0.8, r()), tw * 0.5, 1, -0.6);
-    var nL = 3 + Math.floor(r() * 2), s0 = r() < 0.5 ? -1 : 1;
-    for (var li2 = 0; li2 < nL; li2++) {
-      var fy = lerp(0.02, 0.4, li2 / Math.max(1, nL - 1)), sd2 = (li2 % 2 ? 1 : -1) * s0;
-      vein(x + Math.sin(leadA) * fy * Hc * 0.6, forkY - fy * Hc, sd2 * lerp(0.75, 1.05, r()), Hc * lerp(0.42, 0.55, r()) * (1 - 0.4 * fy), tw * lerp(0.3, 0.36, r()) * (1 - 0.5 * fy), 1);
-    }
-  } else {
-    // a low fork into two or three big limbs, each curving out and up
-    var nF = r() < 0.55 ? 2 : 3;
-    for (var fk = 0; fk < nF; fk++) {
-      var aF = nF === 2 ? (fk ? 1 : -1) * lerp(0.32, 0.48, r()) : lerp(-0.55, 0.55, fk / 2) + (r() - 0.5) * 0.08;
-      vein(x, forkY, aF, Hc * lerp(0.62, 0.74, r()) * (1 - 0.2 * Math.abs(aF)), tw * (nF === 2 ? 0.56 : 0.5), 1, 0.2);
-    }
-  }
-  c.restore();
-  // ---- 4. a few of the lower clusters again, in front of the branches, so the limbs pass behind the leaves
-  c.save(); c.clip(outline);
-  for (var f3 = 0; f3 < 4; f3++) { var tF = lerp(0.1, 0.5, r()); leaf(x + (f3 % 2 ? 1 : -1) * W2 * bell(tF) * lerp(0.15, 0.5, r()), yB - tF * Hc, W2 * lerp(0.1, 0.16, r()), P[Math.min(4, Math.floor(tF * 4))], 0.9); }
-  c.restore();
+/* ---------- the right bank: a row of the smaller main tree ----------
+   The trees along the bank are the smaller (far) main tree: the same branching, the same round 3D trunk and limbs
+   (trunks.js), the same clumps of maple leaves, and the same behaviour: every limb sways with the wind (swayTree),
+   every gust pushes them, and each sheds leaves that drift down on the wind field (bankShed). Each one is its own
+   tree, made from its own seed: its own limbs, fullness, lean and leaf colours (red, orange or gold in turn).
+   All the behaviour is scaled by the tree's size on the screen (size = its size ÷ the far tree's): the sway is an angle,
+   so the tips move in proportion to its height; its leaves are drawn, fall, sway and drift in proportion, and a gust
+   sheds fewer from a smaller tree. Each tree stands in a small layer of its own and is drawn each frame (limbs, then
+   foliage), blurred and hazed by its distance (depth of field: LK.bankFocus … bankHazeFar). */
+var bankT = [], bankEdge = [], BTL = mk();
+function bankDof(foot) {                                       // how out of focus a tree is, from where its foot is on the screen
+  var hy = H * V.horizon, depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);
+  var farness = 1 - smooth(0, Math.max(0.02, LK.bankFocus), depth);
+  return { farness: farness, haze: lerp(LK.bankHazeNear, LK.bankHazeFar, Math.pow(farness, 1.3)), blur: lerp(LK.bankBlurNear, LK.bankBlurFar, farness) };
 }
-var bankT = [], bankEdge = [];
 function bakeBank(path) {
   bankT = [];
   if (!LK.bankTrees || !landLo || !bankEdge.length || !path) return;
@@ -3162,69 +2960,147 @@ function bakeBank(path) {
     return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
   }
   function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
-  // 2. every tree is its own: a colour (red, orange or gold) and a build (slim, classic or broad), neither the same as
-  //    the one before it, its own seed (so its own crown, limbs and fork), and its own height and width; all drawn as
-  //    flat painted autumn trees (autumnTree)
-  var R = Lakeside.rng(7311), last = '';
-  var KINDS = [['red', 0.3], ['orange', 0.38], ['gold', 0.32]];
-  // the build of a tree: slim and tall, classic, or broad and round (its crown's width against its height, and a
-  // first guess at how far it reaches either side of the trunk, in heights)
-  var SHAPES = [{ name: 'slim', w: 0.46, hm: 1.1, reach: 0.27 }, { name: 'classic', w: 0.54, hm: 1, reach: 0.31 }, { name: 'broad', w: 0.64, hm: 0.9, reach: 0.37 }];
-  var lastShape = '', used = {};
+  // 2. every tree is its own: a leaf colour (red, orange or gold, never the same as the one before it), its own seed
+  //    (so its own limbs and forks), fullness, lean and height
+  var R = Lakeside.rng(7311), lastFam = '', used = {}, FAMS = ['red', 'orange', 'gold'];
   function pick(k) {
-    var kind, t, acc, n, shp;
-    do { t = R(); acc = 0; kind = KINDS[0][0]; for (n = 0; n < KINDS.length; n++) { acc += KINDS[n][1]; if (t < acc) { kind = KINDS[n][0]; break; } } } while (kind === last);
-    last = kind;
-    do { shp = SHAPES[Math.floor(R() * SHAPES.length)]; } while (shp.name === lastShape);
-    lastShape = shp.name;
-    var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);       // a seed of its own: a shape of its own
+    var fam;
+    do { fam = FAMS[Math.floor(R() * FAMS.length)]; } while (fam === lastFam);
+    lastFam = fam;
+    var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);
     used[seed] = 1;
-    return { kind: kind, shape: shp, seed: seed, hm: lerp(0.86, 1.18, R()) * shp.hm, wm: lerp(0.9, 1.12, R()), light: lerp(-0.8, 0.2, R()) };
+    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.68, 0.98, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
   }
-  function draw(T, sp, h, gz) {
-    var hh = h * sp.hm, cw = Math.ceil(h * 1.9), chh = Math.ceil(h * 1.6) + 6;
-    T.cnv.width = Math.round(cw * PR); T.cnv.height = Math.round(chh * PR);
-    T.c.setTransform(PR, 0, 0, PR, 0, 0);
-    autumnTree(T.c, { x: cw / 2, y: chh - 3, h: hh, w: hh * sp.shape.w * sp.wm, seed: sp.seed, light: sp.light, fin: finish(clamp(0.04 + gz / 200, 0, 0.3)), tone: sp.kind });
-    // how far its crown reaches either side of the trunk (px)
-    var d = T.c.getImageData(0, 0, T.cnv.width, Math.max(1, Math.round(chh * 0.85 * PR))).data, wpx = T.cnv.width, rows = d.length / 4 / wpx, lo = wpx, hi = 0;
-    for (var ix = 0; ix < wpx; ix++) { var n = 0; for (var iy = 0; iy < rows; iy++) if (d[(iy * wpx + ix) * 4 + 3] > 40) n++; if (n >= 2) { if (ix < lo) lo = ix; if (ix > hi) hi = ix; } }
-    return { cw: cw, ch: chh, l: (wpx / 2 - lo) / PR, r: (hi - wpx / 2) / PR };
+  function build(sp, hpx, foot, dry) {                                   // hpx: its height on the screen
+    var d = bankDof(foot), w = weights(), tot = 0, kk;
+    w[sp.fam] += 2.2;                                                    // mostly its own colour, with a few leaves of the others
+    for (kk in w) tot += w[kk];
+    for (kk in w) w[kk] /= tot;
+    var maxD = hpx < 25 ? 4 : hpx < 60 ? 5 : TREE.twigDepth;
+    var res = PR / (1 + d.blur * 1.1);                                   // out of focus = drawn on a coarser layer and scaled up: soft, and cheaper                // twigs a pixel wide are not worth making
+    function make(sc, dry2) {
+      var T = buildTree(true, { seed: sp.seed, sc: sc, left: sp.left, lean: sp.lean, maxD: maxD, res: res, hz: d.haze, w: w, full: sp.full, dry: dry2, spreadK: 1 + 0.14 * (TREE.twigDepth - maxD) });
+      var l = 0, r2 = 0, up = 0, nodes = T.nodes;
+      T.clumps.forEach(function (C) {
+        var cn = nodes[C.node], x = cn.ex + C.ox, y = cn.ey + C.oy;
+        l = Math.min(l, x - C.R * 1.3); r2 = Math.max(r2, x + C.R * 1.3); up = Math.min(up, y - C.R * 1.3);
+      });
+      nodes.forEach(function (n) { l = Math.min(l, n.ex - n.w); r2 = Math.max(r2, n.ex + n.w); up = Math.min(up, n.ey); });
+      T.sc = sc; T.dof = d; T.ext = [l, r2, up];
+      return T;
+    }
+    var sc1 = hpx / 1.05, T = make(sc1, true);                           // its shape first, to see how tall it comes out
+    var sc = sc1 * hpx / Math.max(1, -T.ext[2]);                         // then its size set so it stands exactly hpx high
+    T = make(sc, dry);
+    var l = T.ext[0], r2 = T.ext[1], up = T.ext[2], m = sc * 0.3, low = Math.ceil(sc * 0.1) + 3;
+    T.reachL = -l; T.reachR = r2;
+    // the box round it at rest (px from its foot), with room for the sway and the gusts
+    T.bank = { w: Math.ceil(r2 - l + m * 2), h: Math.ceil(-up + m * 0.6 + low), low: low, ox: -l + m, res: res, air: clamp(d.haze, 0, 0.9),
+               refH: sc / (TREE.treeSize * FAR_SCALE),                                  // (so the moss climbs as high as on the far tree)
+               groundUp: 24 * sc / Math.max(1, H * TREE.treeSize * FAR_SCALE) };
+    return T;
   }
   // 3. plant them along the line, one after another: the gap between one crown's edge and the next one's is the same
   //    on the ground (so every gap looks the same, near or far), whatever the trees' widths
   var k = 0, s = 0;
   for (var guard = 0; guard < 300; guard++, k++) {
     var sp = pick(k), g1 = k ? gap : gap * 0.5;
-    var sc = s + g1 + sp.shape.reach * hw * sp.hm * sp.wm, res = null, gp = null;
-    if (sc > cum[cum.length - 1]) break;
-    for (var pass = 0; pass < 2; pass++) {
-      gp = at(sc);
+    var sc0 = s + g1 + 0.31 * hw * sp.hm, T = null, gp = null;
+    if (sc0 > cum[cum.length - 1]) break;
+    for (var pass = 0; pass < 2; pass++) {                               // its shape only, to find how far its crown reaches
+      gp = at(sc0);
       if (gp.z < 1.5) break;
-      var h = hw * F / gp.z, T = mk();
-      res = draw(T, sp, h, gp.z); res.spr = T;
-      var sc2 = s + g1 + res.l * gp.z / F;                                  // its real left edge, in ground units
-      if (Math.abs(sc2 - sc) < 0.02 * hw || sc2 > cum[cum.length - 1]) { sc = Math.min(sc2, cum[cum.length - 1]); break; }
-      sc = sc2;
+      T = build(sp, hw * sp.hm * F / gp.z, toScreen(gp.x, 0, gp.z)[1], true);
+      var sc2 = s + g1 + T.reachL * gp.z / F;                            // its real left edge, in ground units
+      if (Math.abs(sc2 - sc0) < 0.02 * hw || sc2 > cum[cum.length - 1]) { sc0 = Math.min(sc2, cum[cum.length - 1]); break; }
+      sc0 = sc2;
     }
-    if (!res || gp.z < 1.5) { s = sc; continue; }
-    s = sc + res.r * gp.z / F;
-    if (fromPath(gp.x, gp.z) < wu * 1.35) continue;                          // not on the gravel
+    if (!T || gp.z < 1.5) { s = sc0; continue; }
+    s = sc0 + T.reachR * gp.z / F;
+    if (fromPath(gp.x, gp.z) < wu * 1.35) continue;                      // not on the gravel
     var spt = toScreen(gp.x, 0, gp.z);
     if (spt[0] > W + 60) break;
-    bankT.push({ x: spt[0], y: spt[1] + LK.bankIn, cw: res.cw, ch: res.ch, spr: res.spr, stiff: 1,  ph: k * 1.7, z: gp.z });
+    // now the real one, with its leaves, moved into the layer it is drawn in
+    T = build(sp, hw * sp.hm * F / gp.z, spt[1], false);
+    T.bx = T.bank.ox; T.by = T.bank.h - T.bank.low;
+    restPose(T);
+    buildTrunk(T);
+    T.sx = spt[0]; T.sy = spt[1] + LK.bankIn; T.z = gp.z;
+    T.size = T.sc / (H * TREE.treeSize * FAR_SCALE);                     // its size against the far tree's: scales all its behaviour
+    T.leaves = [];
+    bankT.push(T);
   }
   bankT.sort(function (a, b) { return b.z - a.z; });          // further first
 }
+/* A leaf comes off a bank tree: the far tree's leaf, scaled by this tree's size. */
+function bankShed(T) {
+  if (!T || !T.clumps.length || !fallSprites.length || T.leaves.length > 7) return;
+  var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n = T.nodes[C.node], k = T.size;
+  var vy = (34 + Math.random() * 24) * (0.45 + 0.55 * 0.3) * k;
+  T.leaves.push({ x: T.sx + (X(T, n.ex + C.ox) - T.bx), y: T.sy + (n.ey + C.oy - T.by), vx: 0, vy: vy, vyT: vy, sway: 30 * 0.65 * k,
+                  ph: Math.random() * TAU, f: 0.8 + Math.random() * 1.2, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 2.4,
+                  s: 0.85 + Math.random() * 0.3, si: Math.floor(Math.random() * fallSprites.length),
+                  tier: clamp(Math.round((1 - T.dof.farness) * 2), 0, 2), fi: nowT, endY: T.sy + (Math.random() - 0.3) * 4 * k });
+}
+function updateBank(t, dt) {
+  var total = 0, i, j;
+  for (i = 0; i < bankT.length; i++) total += bankT[i].leaves.length;
+  for (i = 0; i < bankT.length; i++) {
+    var T = bankT[i], k = T.size;
+    swayTree(T, t, dt);                                        // the far tree's sway
+    if (total < 36 && Math.random() < dt * 0.35 * Math.sqrt(k)) { bankShed(T); total++; }
+    for (j = T.leaves.length - 1; j >= 0; j--) {               // the far tree's leaf, moved as it moves, in proportion to its size
+      var L = T.leaves[j];
+      if (L.fade === undefined && L.y >= L.endY) { L.fade = 1; L.vyT = 0; }
+      if (L.fade !== undefined) {                              // reached the foot of the tree: comes to rest and fades
+        var damp = Math.exp(-dt * 5);
+        L.vx *= damp; L.vy *= damp; L.sway *= damp; L.vr *= damp;
+        L.fade -= dt / 1.8;
+        if (L.fade <= 0) { T.leaves.splice(j, 1); continue; }
+      } else {
+        L.vy += (L.vyT - L.vy) * (1 - Math.exp(-dt * 1.2));
+        var tx = (12 * V.wind * 0.65 + fieldAt(L.x) * 140 * 0.65) * k;
+        L.vx += (tx - L.vx) * (1 - Math.exp(-dt * 1.6));
+      }
+      L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
+      L.y += L.vy * dt;
+      L.rot += L.vr * dt;
+      if (L.x < -100 || L.x > W + 100 || L.y > H + 30) T.leaves.splice(j, 1);
+    }
+  }
+}
 function drawBank(t) {
   if (!bankT.length) return;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
   for (var i = 0; i < bankT.length; i++) {
-    var B = bankT[i];
-    var lean = (fieldAt(B.x) * 0.16 + gustAt(B.x) * 0.22) * B.stiff + 0.014 * Math.sin(t * (1.1 + 0.4 * B.stiff) + B.ph) * (0.5 + V.wind);
-    ctx.setTransform(PR, 0, 0, PR, 0, 0);
-    ctx.translate(B.x, B.y);
-    ctx.transform(1, 0, -lean, 1, 0, 0);                      // the top moves, the foot stays
-    ctx.drawImage(B.spr.cnv, -B.cw / 2, -(B.ch - 3), B.cw, B.ch);
+    var T = bankT[i], B = T.bank, res = B.res, pw = Math.ceil(B.w * res), ph = Math.ceil(B.h * res), c = BTL.c;
+    if (BTL.cnv.width < pw || BTL.cnv.height < ph) { BTL.cnv.width = Math.max(BTL.cnv.width, pw); BTL.cnv.height = Math.max(BTL.cnv.height, ph); }
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.clearRect(0, 0, pw + 2, ph + 2);
+    c.setTransform(res, 0, 0, res, 0, 0);
+    drawBranches(c, T);                                        // the limbs (solid) …
+    c.setTransform(res, 0, 0, res, 0, 0);
+    c.globalAlpha = TREE.farOpacity;                           // … then the foliage, as for the far tree
+    drawClumps(c, T, t);
+    c.globalAlpha = 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(BTL.cnv, 0, 0, pw, ph, Math.round((T.sx - T.bx) * PR), Math.round((T.sy - T.by) * PR), pw / res * PR, ph / res * PR);
+    // its falling leaves: in front of it, behind the next tree. Drawn at the size of the far tree's leaf × this tree's size.
+    if (T.leaves.length) {
+      ctx.setTransform(PR, 0, 0, PR, 0, 0);
+      var leafPx = fallSize(0.3) * T.size;
+      for (var j = 0; j < T.leaves.length; j++) {
+        var L = T.leaves[j], spr = fallSprites[L.si][L.tier];
+        var h = spr.half * L.s * leafPx / fallSize(FALL_TIERS[L.tier]), a = 0.68;
+        if (L.fade !== undefined) a *= L.fade;
+        ctx.globalAlpha = a * clamp((t - L.fi) / 0.5, 0, 1);
+        ctx.save();
+        ctx.translate(L.x, L.y); ctx.rotate(L.rot); ctx.scale(Math.cos(t * L.f * 1.3 + L.ph), 1);
+        ctx.drawImage(spr.cnv, -h, -h, h * 2, h * 2);
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
   }
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
@@ -4194,6 +4070,14 @@ function updateGusts(dt) {
         g.hit[ti] = 1;
         T.gustV += g.dir * g.str * 0.45 * (T.far ? 0.7 : 1);
         for (var d = 0, nd = Math.round(g.str * 6); d < nd; d++) spawnFromTree(T);
+      }
+    }
+    for (var bk = 0; bk < bankT.length; bk++) {                  // the trees on the bank get the same push, a little less for the small ones
+      var Bk = bankT[bk];
+      if (!g.hit['k' + bk] && (g.x - Bk.sx) * g.dir > 0) {
+        g.hit['k' + bk] = 1;
+        Bk.gustV += g.dir * g.str * 0.45 * 0.7;
+        for (var dk = 0, nk = Math.round(g.str * 6 * Math.min(1, Bk.size)); dk < nk; dk++) bankShed(Bk);
       }
     }
     for (var bi = 0; bi < groves.length; bi++) {
@@ -7078,7 +6962,7 @@ function saveTrunk() { try { localStorage.setItem(TRUNK_KEY, JSON.stringify(TRUN
 window.treeLab = {
   values: TRUNK, defaults: TRUNK_DEFAULTS,
   // the shape values build the tree's 3D shape again; the rest are read every frame
-  changed: function (k) { saveTrunk(); if (!k || k === 'bend' || k === 'depth' || k === 'roots') trees.forEach(buildTrunk); },
+  changed: function (k) { saveTrunk(); if (!k || k === 'bend' || k === 'depth' || k === 'roots') { trees.forEach(buildTrunk); bankT.forEach(buildTrunk); } },
   newShape: function () { V.seed = (V.seed % 997) + 1; rebuildAll(); },
   info: function () {
     var st = typeof Trunks === 'undefined' ? 'none' : Trunks.state();
@@ -7152,6 +7036,7 @@ function frame(now) {
   updateGusts(dt);
   updateField(t);
   trees.forEach(function (T) { swayTree(T, t, dt); });
+  updateBank(t, dt);
   swayGroves(dt);
   if (falling.length < V.falling && Math.random() < 0.08) spawnFalling(false);
   moveFalling(t, dt);
@@ -7522,6 +7407,11 @@ var LAKE_CTLS = [
   { k: 'bankH', label: 'Tree height', min: 0.6, max: 5, step: 0.05, note: 'In eye heights: every tree the same in the world, so smaller further away.' },
   { k: 'bankOff', label: 'Bank: distance from the path', min: 1, max: 8, step: 0.05, note: 'The right bank runs alongside the gravel path. In eye heights on the ground, by the nearest gate: smaller = the bank closer to the path, more lake.' },
   { k: 'bankBack', label: 'Trees: set back from the water', min: 0, max: 0.6, step: 0.01, note: 'As a share of each tree\'s own height: how far down the screen from the water\'s edge the trunk stands. The same for every tree.' },
+  { k: 'bankFocus', label: 'Bank trees in focus nearer than', min: 0.02, max: 1, step: 0.01, group: 'Trees on the right bank: depth of field', note: 'A share of the way from the eye line down to the bottom of the screen: trees whose foot is nearer than this are sharp, further ones are blurred and hazed.' },
+  { k: 'bankBlurNear', label: 'Blur, in focus (px)', min: 0, max: 4, step: 0.05 },
+  { k: 'bankBlurFar', label: 'Blur, furthest (px)', min: 0, max: 6, step: 0.05 },
+  { k: 'bankHazeNear', label: 'Haze, in focus', min: 0, max: 1, step: 0.01, note: 'How much the leaves and bark fade into the mist colour.' },
+  { k: 'bankHazeFar', label: 'Haze, furthest', min: 0, max: 1, step: 0.01 },
   { k: 'rocks', label: 'Mossy rocks', min: 0, max: 2, step: 0.05, group: 'The shore' },
   { k: 'lilies', label: 'Spider lilies', min: 0, max: 2, step: 0.05 },
   { k: 'susuki', label: 'Susuki', min: 0, max: 1, step: 1, note: '0 off, 1 on.' },
@@ -7651,6 +7541,26 @@ function colours(list, vals, onChange) {
   });
 }
 function build() {
+  buildPage();
+  addJump();
+}
+/* A drop-down at the top of the panel: pick a section and the panel scrolls to it. It stays at the top while you scroll. */
+function addJump() {
+  var heads = host.querySelectorAll('h4');
+  if (!heads.length) return;
+  var row = document.createElement('label'); row.className = 'sp-colour sp-jump'; row.textContent = 'Jump to section';
+  var sel = document.createElement('select');
+  var o0 = document.createElement('option'); o0.value = ''; o0.textContent = '— choose —'; sel.appendChild(o0);
+  for (var i = 0; i < heads.length; i++) { var op = document.createElement('option'); op.value = i; op.textContent = heads[i].textContent; sel.appendChild(op); }
+  sel.addEventListener('change', function () {
+    if (sel.value === '') return;
+    heads[+sel.value].scrollIntoView({ block: 'start', behavior: 'smooth' });
+    sel.value = '';
+  });
+  row.appendChild(sel);
+  host.insertBefore(row, host.firstChild);
+}
+function buildPage() {
   host.innerHTML = '';
   document.getElementById('spTitle').textContent = page === 'tree' ? '木 · Tree' : page === 'lake' ? '湖 · Lake' : '山 · Mountains';
   select('Panel', [['lake', '湖 Lake'], ['tree', '木 Tree'], ['mountains', '山 Mountains']], page, function (v) { page = v; build(); });
