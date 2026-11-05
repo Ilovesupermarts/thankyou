@@ -1,4 +1,4 @@
-var BUILD = 'v148';
+var BUILD = 'v149';
 (function () {
   var m = document.querySelector('meta[name="build"]');
   var css = getComputedStyle(document.documentElement).getPropertyValue('--build').replace(/["'\s]/g, '');
@@ -11979,6 +11979,7 @@ function updateGusts(dt) {
         if (T.koyo) for (var q = Math.round((2 + Math.floor(Math.random() * 4)) * 0.8); q > 0; q--) gustDrops.push({ T: T, vx: g.dir * g.str * rnd(0.2, 0.5) });
       }
     });
+    if (typeof BankTrees !== 'undefined' && ENV.scene === 'autumn') BankTrees.gust(g);   // and the trees on the lake's right bank
     bambooGroves.forEach(function(G) {              // the bamboo groves get a push as it passes them too
       if (G.gid !== g.id && (g.dir > 0 ? G.x < g.x : G.x > g.x)) {
         G.gid = g.id;
@@ -14484,6 +14485,9 @@ function buildKoyoLayers(t) {
     drawKoyoClumps(ctxKL, tree, t);
   }
 }
+/* How strongly a main tree's leaves are laid down: the tree on the right-hand side (on the lake's right bank, over the
+   bank trees) is fully opaque; the one on the left keeps its own strength. (The trees change sides from day to day.) */
+function koyoLeafAlpha(T, own) { return T && !T.left ? 1 : own; }
 function drawKoyoTrees(ctx, t) {
   birdBox = birdBounds();
   // (The trees' layers were built at the top of the frame, buildKoyoLayers.)
@@ -14510,7 +14514,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(farBranchLayer, 0, 0, farBranchLayer.width, farBranchLayer.height, 0, 0, cvBack.width, cvBack.height);
-    ctx.globalAlpha = KOYO.farOpacity;
+    ctx.globalAlpha = koyoLeafAlpha(farTree, KOYO.farOpacity);
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
     ctx.globalAlpha = 1;
   });
@@ -14523,7 +14527,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(treeLayer, 0, 0);
-    ctx.globalAlpha = KOYO.nearOpacity;
+    ctx.globalAlpha = koyoLeafAlpha(tree, KOYO.nearOpacity);
     ctx.drawImage(koyoLeafLayer, 0, 0);
     ctx.globalAlpha = 1;
   });
@@ -15058,6 +15062,7 @@ function updateTree(dt, t) {
   if (tree) updateOneTree(tree, dt, t);
   bamSway(dt);
   rebakeClumps(3);
+  if (typeof BankTrees !== 'undefined' && ENV.scene === 'autumn' && LK.ready) BankTrees.update(dt, t);   // the trees on the lake's right bank
 }
 function updateOneTree(T, dt, t) {
   var ns = T.nodes;
@@ -17195,7 +17200,12 @@ var LAKE = {
   // the ground; the edge runs alongside the path, larger = further right, less lake); bankBack: how far back from the
   // water's edge the trees stand, as a share of each tree's own height (so every trunk is the same visible distance
   // from the water, near or far)
-  bankTrees: true, bankX0: 0.7, bankGap: 0.45, bankH: 3.35, bankIn: 1, bankOff: 4.8, bankBack: 0.16,
+  // The trees themselves are the smaller main tree on a small scale (BankTrees, below; as tuned on bamboo.html).
+  // bankLastGate: the row's far end is this torii counting from the front (1 = the gate facing you); it runs from
+  // there forward to the screen's edge. Their depth of field, as for the gates: sharp nearer than bankFocus (a share
+  // of the way from the eye line down to the bottom of the screen), blurred (px) and hazed more the further they stand.
+  bankTrees: true, bankX0: 0.3, bankGap: 1.3, bankH: 3.15, bankIn: 1, bankOff: 4.8, bankBack: 0.16, bankLastGate: 4,
+  bankFocus: 0.3, bankBlurNear: 0, bankBlurFar: 0.2, bankHazeNear: 0.01, bankHazeFar: 0.12,
   // the shore
   rocks: 1, lilies: 1, susuki: 1, susukiSize: 1,
   colours: { water: '#235C7E', waterEvening: '#3C4C6E', waterNight: '#0F1A30', moss: '#56683A', stone: '#77716A',
@@ -17620,11 +17630,597 @@ function lakeBakeGrove(path) {
   });
 }
 
+/* ============================================================
+   BANK TREES — the row of maples on the right bank of the autumn lake (section 8c).
+
+   Each one is the smaller (far) main tree on a small scale, as tuned on bamboo.html: the same branching,
+   the same round 3D trunk and limbs (trunks.js) with a spreading foot and short roots, the same clumps of
+   maple leaves, the same sway as the main trees, the same push from every gust, and leaves that drift down
+   from it. Every tree is its own (its own seed: limbs, fullness, lean, height, leaf colour), and all its
+   behaviour is scaled by its size on the screen. They are blurred and hazed by their distance (depth of
+   field). The row runs from the screen's edge back to the LAKE.bankLastGate-th torii from the front.
+
+   Made to cost as little as possible each frame:
+   - A tree is drawn into a picture of its own only now and then. In between, that picture is laid down
+     leaning with the tree's sway (a shear about its foot), which is how a small tree moves anyway. It is
+     drawn afresh only when its limbs have moved further than the lean can show (more than about half a
+     pixel), when the light has changed, or the first time it is seen; a few a frame at most (about
+     BUDGET_MS of work), the trees that have moved most first.
+   - Trees off the screen or hidden behind the right-hand main tree's leaves are not drawn at all (nor drawn
+     afresh, nor do they shed leaves).
+   - The leaf clumps are not drawn for every tree: a small shared set of clump pictures (by colour, size,
+     front or back, and a few variants) serves all of them, made again a few a frame when the light changes.
+   - The blur of the far ones is done by drawing them on a coarser picture and scaling it up (no filter).
+   - The row is planted again only when what decides it changes (the screen, the settings, the path), not
+     when the light changes.
+
+   (Inside DynBG, so it uses the scene's own names: KOYO, TRUNK, LAKE, LK, farTree, koyoLight and the rest.)
+   Use (from the lake code below):
+     BankTrees.bake(path)        // plant the row (step 8 of the landscape); sets LK.bankT
+     BankTrees.update(dt, t)     // each frame: sway, falling leaves, clump pictures after a change of light
+     BankTrees.draw(c, t)        // each frame, after the headland
+     BankTrees.gust(g)           // from updateGusts, for each gust
+     BankTrees.info()            // counts, for checking
+   ============================================================ */
+var BankTrees = (function () {
+'use strict';
+
+var BUDGET_MS = 2.2;                 // at most about this long a frame drawing trees afresh
+var MOVE_PX = 0.55;                  // drawn afresh when a limb is this far (CSS px) from where the lean puts it
+var trees = [], layoutKey = '', frameN = 0, lightV = -1, trunkLight = null, trunkLightV = -1;
+var sprites = {}, spriteList = [], leafSpr = [], coverage = null;
+var stats = { drawn: 0, hidden: 0, fresh: 0, ms: 0, renderMs: 0, renders: 0, layMs: 0, frames: 0, trunks: 0 };
+
+/* ---------- small helpers ---------- */
+function hazeColour() { return koyoLight(KOYO_PAPER); }
+function sizeRef() { return Math.max(1, H * KOYO.treeSize * FAR_TREE_SCALE); }          // the far main tree's size
+function dofAt(foot) {                                     // how out of focus a tree is, from where its foot is
+  var hy = H * LAND.horizon, depth = clamp((foot - hy) / Math.max(1, H - hy), 0, 1);
+  var farness = 1 - smooth(0, Math.max(0.02, LAKE.bankFocus), depth);
+  return { farness: farness, haze: lerp(LAKE.bankHazeNear, LAKE.bankHazeFar, Math.pow(farness, 1.3)),
+           blur: lerp(LAKE.bankBlurNear, LAKE.bankBlurFar, farness) };
+}
+/* How far away (on the ground) the torii where the row begins stands: the bankLastGate-th from the front. */
+function limitZ() {
+  var gp = torPath(), gap = Math.max(0.05, gp.len / Math.max(1, TORII.count - 1));
+  return torPathAt(gp, Math.max(0, gp.len - gap * (Math.max(1, Math.round(LAKE.bankLastGate)) - 1))).z;
+}
+
+/* ---------- the shared clump pictures ----------
+   By leaf colour, front or back, size (radius in device px, the next size up, drawn smaller) and variant. */
+var BUCKETS = [3, 5, 8, 13, 20, 32];
+function spriteKey(fam, back, R, res, v) {
+  var rp = R * res, b = 0;
+  while (b < BUCKETS.length - 1 && BUCKETS[b] < rp) b++;
+  return fam + (back ? 'b' : 'f') + b + '.' + v;
+}
+function needSprite(key) {
+  if (sprites[key]) return sprites[key];
+  var p = key.match(/^([a-z]+)([bf])(\d+)\.(\d+)$/);
+  var S2 = { key: key, fam: p[1], back: p[2] === 'b', Rb: BUCKETS[+p[3]], v: +p[4], cnv: document.createElement('canvas'), bakedV: -1 };
+  sprites[key] = S2; spriteList.push(S2);
+  bakeSprite(S2);
+  return S2;
+}
+/* As the main trees' clumps (bakeClump in app.js): a lumpy darker core, then the small maple leaves, shade first
+   and the lit ones on top, in the app's light. Drawn at Rb device px. */
+function bakeSprite(S2) {
+  var r = rngFrom(((S2.Rb * 7919) ^ (S2.v * 104729) ^ (S2.fam.length * 31 + (S2.back ? 7 : 0))) >>> 0);
+  var tones = KOYO_FAMILIES[S2.fam] || KOYO_FAMILIES.red, R = S2.Rb, side = Math.ceil(R * 2.6);
+  if (S2.cnv.width !== side) { S2.cnv.width = S2.cnv.height = side; }
+  var c = S2.cnv.getContext('2d');
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, side, side);
+  c.setTransform(1, 0, 0, 1, side / 2, side / 2);
+  var n = koyoNight(), glow = KOYO.nightGlow * n, shade = KOYO.shadeDepth;
+  var lx = KOYO.lightFrom * lerp(1, 0.5, n), ly = lerp(-0.85, 0.8, n), ll = Math.hypot(lx, ly); lx /= ll; ly /= ll;
+  function col(c0) { return koyoLight(S2.back ? mixRgb(c0, KOYO_PLUM, 0.2 + shade * 0.25) : c0); }
+  c.fillStyle = rgba(mixRgb(col(scaleRgb(tones[0], 1 - shade * 0.25)), col(tones[1]), glow * 0.45));
+  for (var b = 0; b < 9; b++) {
+    var ba = r() * TAU, bd = r() * 0.4;
+    c.beginPath(); c.arc(Math.cos(ba) * bd * R, Math.sin(ba) * bd * R * 0.75 + R * 0.05, R * (0.32 + r() * 0.18), 0, TAU); c.fill();
+  }
+  // (fewer, the same size, on the smallest: they are only a few pixels across)
+  var count = Math.round(85 * KOYO.leafDensity * clamp(R / 13, 0.35, 1)), dabs = [];
+  for (var i = 0; i < count; i++) {
+    var a = r() * TAU, d = Math.sqrt(r()), edge = r() < 0.28;
+    if (edge) d = 0.85 + r() * 0.2;
+    var x = Math.cos(a) * d * R * 0.95, y = Math.sin(a) * d * R * 0.78;
+    if (y > R * 0.45) y *= 0.8;
+    dabs.push({ x: x, y: y, t: (x * lx + y * ly) / R + (r() - 0.5) * 0.5, s: R * (edge ? 0.3 : 0.24) * KOYO.leafSize * (0.7 + r() * 0.6),
+                rot: (r() - 0.5) * 1.6 + (x / R) * 0.6, j: r() });
+  }
+  dabs.sort(function (p, q) { return p.t - q.t; });
+  for (var k = 0; k < dabs.length; k++) {
+    var D = dabs[k], tone;
+    if (D.t < -0.25) tone = mixRgb(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
+    else if (D.t < 0.35) tone = mixRgb(tones[1], tones[0], clamp((0.35 - D.t) / 0.6, 0, 1) * 0.35);
+    else tone = mixRgb(tones[1], tones[2], clamp((D.t - 0.35) / 0.5, 0, 1));
+    tone = scaleRgb(tone, 1 - shade * 0.3 * clamp(-D.t, 0, 1) + (D.j - 0.5) * 0.1);
+    var lit = col(tone);
+    if (glow > 0) lit = scaleRgb(mixRgb(lit, KOYO_LAMP, glow * 0.22 * clamp(D.t + 0.3, 0, 1.3)), 1 + glow * 0.12 * clamp(D.t, 0, 1));
+    koyoLeafPath(c, D.x, D.y, D.s, D.rot);
+    c.fillStyle = rgba(lit); c.fill();
+  }
+  S2.half = side / 2;                                      // (device px of the picture, for a clump of radius Rb)
+  S2.bakedV = lookVersion;
+}
+/* The falling and fallen leaves: one small leaf picture for each colour, in the app's light. */
+function bakeLeafSprites() {
+  var fams = ['red', 'orange', 'gold', 'red', 'orange'];
+  leafSpr = fams.map(function (f, i) {
+    var cnv = document.createElement('canvas'), sz = 16; cnv.width = cnv.height = sz + 4;
+    var c = cnv.getContext('2d'), t = KOYO_FAMILIES[f], g = c.createLinearGradient(0, sz, 0, 0);
+    g.addColorStop(0, rgba(koyoLight(scaleRgb(t[0], 0.92)))); g.addColorStop(0.55, rgba(koyoLight(t[1]))); g.addColorStop(1, rgba(koyoLight(t[i > 2 ? 1 : 2])));
+    c.setTransform(1, 0, 0, 1, (sz + 4) / 2, (sz + 4) / 2);
+    koyoLeafPath(c, 0, 0, sz, 0); c.fillStyle = g; c.fill();
+    return { cnv: cnv, half: (sz + 4) / 2, leaf: sz };
+  });
+  leafSpr.bakedV = lookVersion;
+}
+
+/* ---------- one tree's shape (as bamboo.html's buildTree with its bank-tree settings) ----------
+   sp: { seed, fam, full, lean, left }; sc: its size; maxD: how many levels of branches. Standing at (0, 0). */
+function shape(sp, sc, maxD, res, withSprites) {
+  var r = rngFrom(sp.seed), rv = rngFrom(sp.seed + 17), dir = sp.left ? 1 : -1, nodes = [];
+  var spreadK = 1 + 0.14 * (KOYO.twigDepth - maxD);
+  function grow(parent, abs, len, w, d) {
+    var pAbs = parent < 0 ? -PI / 2 : nodes[parent].abs, idx = nodes.length;
+    nodes.push({ p: parent, rel: abs - pAbs, abs: abs, len: len, w: w, d: d, ph: r() * TAU, f: 0.6 + r() * 0.8, cur: abs, sx: 0, sy: 0, ex: 0, ey: 0 });
+    if (d >= maxD) return;
+    var n = d === 0 ? 2 : (r() < 0.3 ? 3 : 2);
+    var spread = (0.42 + r() * 0.3) * (n === 3 ? 0.8 : 1) * spreadK;
+    var shrink = (0.68 + r() * 0.14) * lerp(1.1, 1, (maxD - 4) / 3);
+    for (var i = 0; i < n; i++) {
+      var ca = abs + (i - (n - 1) / 2) * spread + (r() - 0.5) * 0.35 + dir * (d < 3 ? 0.1 : 0.04);
+      grow(idx, lerp(ca, -PI / 2, 0.1), len * shrink, Math.max(0.8, w * 0.62), d + 1);
+    }
+  }
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + sp.lean, sc * 0.2, Math.max(2.2, sc * 0.058), 0);   // a short, sturdy trunk
+  var T = { nodes: nodes, maxD: maxD, bx: 0, by: 0, clumps: [], sc: sc, gust: 0, gustV: 0, gid: 0 };
+  rest(T);
+  // the leaf colours: mostly its own colour, with a few of the others
+  var w = {}, tot = 0, kk;
+  for (kk in KOYO_SHARES) { w[kk] = KOYO_SHARES[kk] + (kk === sp.fam ? 2.2 : 0); tot += w[kk]; }
+  for (kk in w) w[kk] /= tot;
+  function fam() { var x = r(), acc = 0; for (var k in w) { acc += w[k]; if (x <= acc) return k; } return sp.fam; }
+  var keep = clamp(sp.full, 0.05, 1), cell = sc * 0.16, cellFam = {};
+  for (var j = 1; j < nodes.length; j++) {
+    var nd = nodes[j], upper = nd.d >= maxD - 1, mid = nd.d >= 1 && nd.d < maxD - 1;   // leaves low down too: a full crown
+    if (!upper && !mid) continue;
+    if (r() > (upper ? keep : keep * 0.9)) continue;
+    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, KOYO.fullness) * 1.3;
+    var ck = Math.floor(nd.ex / cell) + ',' + Math.floor(nd.ey / cell);
+    if (!cellFam[ck]) cellFam[ck] = fam();
+    var f = r() < KOYO.patchiness ? cellFam[ck] : fam();
+    if (f === 'evergreen' && upper) f = 'red';
+    var back = mid || r() < 0.3, C = { node: j, R: R, fam: f, back: back, ox: (r() - 0.5) * R * 0.5, oy: (r() - 0.5) * R * 0.4 - R * 0.2, ph: r() * TAU };
+    C.key = spriteKey(f, back, R, res, Math.floor(rv() * 3));
+    if (withSprites) needSprite(C.key);
+    T.clumps.push(C);
+  }
+  T.clumps.sort(function (a, b) { if (a.back !== b.back) return a.back ? -1 : 1; return nodes[b.node].ey - nodes[a.node].ey; });
+  // its reach at rest (px from its foot)
+  var l = 0, r2 = 0, up = 0;
+  T.clumps.forEach(function (C) {
+    var cn = nodes[C.node], x = cn.ex + C.ox, y = cn.ey + C.oy;
+    l = Math.min(l, x - C.R * 1.3); r2 = Math.max(r2, x + C.R * 1.3); up = Math.min(up, y - C.R * 1.3);
+  });
+  nodes.forEach(function (n) { l = Math.min(l, n.ex - n.w); r2 = Math.max(r2, n.ex + n.w); up = Math.min(up, n.ey); });
+  T.reachL = -l; T.reachR = r2; T.height = -up;
+  return T;
+}
+function rest(T) {
+  var ns = T.nodes;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i], par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+/* A tree hpx high on the screen, its foot at y = foot: its shape built, then sized so it stands exactly hpx high. */
+function make(sp, hpx, foot, full) {
+  var d = dofAt(foot), res = PR / (1 + d.blur * 1.1);                    // out of focus: a coarser picture, scaled up
+  var maxD = hpx < 25 ? 4 : hpx < 60 ? 5 : KOYO.twigDepth;                // twigs a pixel wide are not worth making
+  var sc1 = hpx / 1.05, T = shape(sp, sc1, maxD, res, false);
+  var sc = sc1 * hpx / Math.max(1, T.height);
+  T = full ? shape(sp, sc, maxD, res, true) : shape(sp, sc, maxD, res, false);
+  T.dof = d; T.res = res; T.seed = sp.seed;
+  return T;
+}
+/* The real tree: moved into its own picture, its 3D trunk made, its sample points chosen. */
+function finish(T, sx, sy, z, seed) {
+  var m = T.sc * 0.3, low = Math.ceil(T.sc * 0.1) + 3;
+  T.w = Math.ceil(T.reachL + T.reachR + m * 2); T.h = Math.ceil(T.height + m * 0.6 + low);
+  T.bx = T.reachL + m; T.by = T.h - low;
+  rest(T);
+  T.sx = sx; T.sy = sy; T.z = z;
+  T.size = T.sc / sizeRef();                                            // against the far main tree: scales all its behaviour
+  T.cnv = document.createElement('canvas');
+  T.cnv.width = Math.max(1, Math.ceil(T.w * T.res)); T.cnv.height = Math.max(1, Math.ceil(T.h * T.res));
+  T.c = T.cnv.getContext('2d');
+  T.rendered = false; T.lookV = -1; T.leaves = []; T.shed = 0; T.hidden = false;
+  // (what app.js and the ink reveal read: where it stands and how big it is)
+  T.x = sx; T.y = sy; T.cw = T.reachL + T.reachR; T.ch = T.height;
+  // the points that tell how far the tree has moved: the ends of up to 10 limbs that carry leaves, spread over the crown
+  var cand = [];
+  T.clumps.forEach(function (C) { if (cand.indexOf(C.node) < 0) cand.push(C.node); });
+  cand.sort(function (a, b) { return T.nodes[a].ex - T.nodes[b].ex; });
+  T.samples = [];
+  for (var i = 0; i < Math.min(10, cand.length); i++) T.samples.push(cand[Math.floor(i * cand.length / Math.min(10, cand.length))]);
+  T.ref = T.samples.map(function () { return [0, 0]; });
+  T.refLean = 0;
+  // and for the trunk and main limbs, which have a picture of their own (drawn again only when they have moved)
+  T.tSamples = [];
+  for (var ti = 0; ti < T.nodes.length && T.tSamples.length < 8; ti++) if (T.nodes[ti].d <= 2) T.tSamples.push(ti);
+  T.tRef = T.tSamples.map(function () { return [0, 0]; });
+  T.tCnv = document.createElement('canvas'); T.tCnv.width = T.cnv.width; T.tCnv.height = T.cnv.height;
+  T.tc = T.tCnv.getContext('2d'); T.tDone = false; T.tLookV = -1; T.tRefLean = 0;
+  // fallen leaves lying over its foot (so it stands in the leaf litter, not on it)
+  var rl = rngFrom(seed + 5); T.litter = [];
+  for (var li = 0; li < 7; li++) T.litter.push({ dx: (rl() - 0.5) * 2.6, dy: (rl() - 0.35) * 0.5, rot: rl() * TAU, s: lerp(0.7, 1.2, rl()), si: Math.floor(rl() * 5) });
+  if (typeof Trunks !== 'undefined') {
+    var ns = T.nodes;
+    T.trunk = Trunks.build({ nodes: ns, seed: seed % 100000, X: function (x) { return x; },
+      clumps: T.clumps.map(function (C) { var cn = ns[C.node]; return { x: cn.ex + C.ox, y: cn.ey + C.oy, R: C.R, back: C.back }; }),
+      look: Object.assign({}, TRUNK, { roots: 4, rootLen: 0.5 }) });            // a spreading foot with short, stubby roots
+  }
+  return T;
+}
+
+/* ---------- planting the row (as bamboo.html's bakeBank) ---------- */
+function bake(path) {
+  var key = [W, H, PR, LAND.horizon, KOYO.twigDepth, KOYO.treeSize, LAKE.treeSize, LAKE.bankTrees, LAKE.bankX0, LAKE.bankGap, LAKE.bankH,
+             LAKE.bankIn, LAKE.bankOff, LAKE.bankBack, LAKE.bankLastGate, LAKE.bankFocus, LAKE.bankBlurNear, LAKE.bankBlurFar,
+             LAKE.bankHazeNear, LAKE.bankHazeFar, TORII.count, path ? path.len : 0, LK.bankEdge.length,
+             LK.bankEdge.length ? LK.bankEdge[0].join() + LK.bankEdge[LK.bankEdge.length - 1].join() : ''].join('|');
+  if (key === layoutKey) { LK.bankT = trees; return; }                    // (only the light changed: the same trees)
+  layoutKey = key;
+  trees = []; LK.bankT = trees; coverage = null;
+  if (!LAKE.bankTrees || !LK.landLo || !LK.bankEdge.length || !path) return;
+  if (leafSpr.bakedV !== lookVersion) bakeLeafSprites();
+  var F = torLens(), wu = lakeGravelHalf(), zMax = limitZ();
+  var back = LAKE.bankBack, gap = LAKE.bankGap, hw = LAKE.bankH * LAKE.treeSize;
+  var E = LK.bankEdge.filter(function (p) { return p[0] >= LAKE.bankX0 * W - 1; });
+  if (E.length < 3) return;
+  function fromPath(x, z) { var best = Infinity; for (var q = 0; q < path.pts.length; q += 2) best = Math.min(best, Math.hypot(path.pts[q].x - x, path.pts[q].z - z)); return best; }
+  // 1. the planting line: from each point of the water's edge, down onto the land by the same share of a tree's own height
+  var G = [];
+  for (var i = 0; i < E.length; i++) {
+    var a = E[Math.max(0, i - 4)], b = E[Math.min(E.length - 1, i + 4)], tx = b[0] - a[0], ty = b[1] - a[1], tl = Math.hypot(tx, ty) || 1;
+    var nx = -ty / tl, ny = tx / tl;
+    if (ny < 0) { nx = -nx; ny = -ny; }
+    var g0 = torGround(E[i][0], E[i][1]), hpx = LAKE.bankH * F / Math.max(1, g0.z) * LAKE.treeSize;
+    var q = torGround(E[i][0] + nx * back * hpx, E[i][1] + ny * back * hpx);
+    var dq = Math.hypot(q.x - g0.x, q.z - g0.z), cap = 0.45 * fromPath(g0.x, g0.z);
+    if (dq > cap && dq > 0) q = { x: g0.x + (q.x - g0.x) * cap / dq, z: g0.z + (q.z - g0.z) * cap / dq };
+    G.push({ x: q.x, z: q.z });
+  }
+  var cum = [0];
+  for (var i2 = 1; i2 < G.length; i2++) cum.push(cum[i2 - 1] + Math.hypot(G[i2].x - G[i2 - 1].x, G[i2].z - G[i2 - 1].z));
+  function at(s) {
+    var j = 1; while (j < G.length - 1 && cum[j] < s) j++;
+    var u = clamp((s - cum[j - 1]) / Math.max(1e-6, cum[j] - cum[j - 1]), 0, 1);
+    return { x: lerp(G[j - 1].x, G[j].x, u), z: lerp(G[j - 1].z, G[j].z, u) };
+  }
+  // 2. every tree its own: a leaf colour never the same as the one before, its own seed, fullness, lean, height
+  var R = rngFrom(7311), lastFam = '', used = {}, FAMS = ['red', 'orange', 'gold'];
+  function pick(k) {
+    var fam; do { fam = FAMS[Math.floor(R() * FAMS.length)]; } while (fam === lastFam);
+    lastFam = fam;
+    var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);
+    used[seed] = 1;
+    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.85, 1, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
+  }
+  // 3. from the far torii forward to the screen's edge, the same gap on the ground between one crown and the next
+  var k = 0, s = 0;
+  for (var j0 = 0; j0 < G.length; j0++) if (G[j0].z <= zMax) { s = cum[j0]; break; }
+  for (var guard = 0; guard < 300; guard++, k++) {
+    var sp = pick(k), g1 = k ? gap : gap * 0.5;
+    var sc0 = k ? s + g1 + 0.31 * hw * sp.hm : s, T = null, gp = null;   // (the first stands right at the far torii)
+    if (sc0 > cum[cum.length - 1]) break;
+    for (var pass = 0; pass < 2; pass++) {                               // its shape only, to find how far its crown reaches
+      gp = at(sc0);
+      if (gp.z < 1.5) break;
+      T = make(sp, hw * sp.hm * F / gp.z, torScreen(gp.x, 0, gp.z)[1], false);
+      var sc2 = k ? s + g1 + T.reachL * gp.z / F : s;
+      if (Math.abs(sc2 - sc0) < 0.02 * hw || sc2 > cum[cum.length - 1]) { sc0 = Math.min(sc2, cum[cum.length - 1]); break; }
+      sc0 = sc2;
+    }
+    if (!T || gp.z < 1.5) { s = sc0; continue; }
+    s = sc0 + T.reachR * gp.z / F;
+    if (fromPath(gp.x, gp.z) < wu * 1.35) continue;                      // not on the gravel
+    var spt = torScreen(gp.x, 0, gp.z);
+    if (spt[0] - T.reachL > W + 10) break;                                // past the screen's edge: no more (none drawn that can't be seen)
+    T = finish(make(sp, hw * sp.hm * F / gp.z, spt[1], true), spt[0], spt[1] + LAKE.bankIn, gp.z, sp.seed);
+    if (spt[0] + T.reachR < -10) continue;
+    trees.push(T);
+  }
+  trees.sort(function (a, b) { return b.z - a.z; });                     // further first
+  LK.bankT = trees;
+  // each one's first picture now (this is baked while the name stands still), so the scene's first frame has none to make
+  lightV = lookVersion;
+  for (var fi = 0; fi < trees.length; fi++) render(trees[fi], 0);
+}
+
+/* ---------- each frame ---------- */
+/* The main trees' sway (updateOneTree in app.js): a springy push from the gusts, and every limb swinging in the wind
+   on top of its parent. For a tree that is not seen, only its spring is kept going. */
+function sway(T, dt, t, seen) {
+  T.gustV += (-9 * T.gust - 1.0 * T.gustV) * dt;
+  T.gustV = clamp(T.gustV, -1.1, 1.1);
+  T.gust += T.gustV * dt;
+  if (Math.abs(T.gust) > 0.35) { T.gust = 0.35 * Math.sign(T.gust); if (T.gustV * T.gust > 0) T.gustV = 0; }
+  if (!seen) return;
+  var ns = T.nodes, wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
+  var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway, spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
+  for (var i = 0; i < ns.length; i++) {
+    var n = ns[i], kd = (Math.pow(n.d / T.maxD, 1.6) + 0.02) * 0.34;
+    var sw = (wind + Math.sin(t * n.f * spd + n.ph) * amp + Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * kd;
+    var par = n.p < 0 ? null : ns[n.p];
+    n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
+    n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
+    n.ex = n.sx + Math.cos(n.cur) * n.len; n.ey = n.sy + Math.sin(n.cur) * n.len;
+  }
+}
+/* How much the crown leans now (the lean the picture is laid down with), and how far a limb is from where that
+   lean puts it, against when the picture was drawn. */
+function leanNow(T, list) {
+  var L2 = list || T.samples, sx = 0, sy = 0, n = L2.length;
+  for (var i = 0; i < n; i++) { var nd = T.nodes[L2[i]]; sx += nd.ex - T.bx; sy += T.by - nd.ey; }
+  return n ? sx / Math.max(1, sy) : 0;
+}
+function moved(T, lean) {
+  var dl = lean - T.refLean, worst = 0;
+  for (var i = 0; i < T.samples.length; i++) {
+    var nd = T.nodes[T.samples[i]], h = T.by - T.ref[i][1];
+    var d = Math.hypot(nd.ex - (T.ref[i][0] + dl * h), nd.ey - T.ref[i][1]);
+    if (d > worst) worst = d;
+  }
+  return worst;
+}
+/* The right-hand main tree's leaves (opaque), as a coarse grid of what they surely cover (each clump a little smaller than it is,
+   so a swaying canopy still covers it): a bank tree wholly inside is not drawn. Made again every few frames. */
+function buildCoverage() {
+  var T = farTree && !farTree.left ? farTree : tree && !tree.left ? tree : null;   // the main tree on the right (its leaves are opaque)
+  if (!T || !T.clumps || !T.clumps.length) { coverage = null; return; }
+  var cell = 10, gw = Math.ceil(W / cell) + 1, gh = Math.ceil(H / cell) + 1, g = coverage && coverage.g.length === gw * gh ? coverage.g : new Uint8Array(gw * gh);
+  g.fill(0);
+  for (var i = 0; i < T.clumps.length; i++) {
+    var C = T.clumps[i], n = T.nodes[C.node], cx = koyoX(T, n.ex + C.ox), cy = n.ey + C.oy, rr = C.R * 0.62 - cell * 0.72;
+    if (rr <= 0) continue;
+    var x0 = Math.max(0, Math.floor((cx - rr) / cell)), x1 = Math.min(gw - 1, Math.ceil((cx + rr) / cell));
+    var y0 = Math.max(0, Math.floor((cy - rr) / cell)), y1 = Math.min(gh - 1, Math.ceil((cy + rr) / cell));
+    for (var y = y0; y <= y1; y++) for (var x = x0; x <= x1; x++) {
+      var dx = (x + 0.5) * cell - cx, dy = (y + 0.5) * cell - cy;
+      if (dx * dx + dy * dy <= rr * rr) g[y * gw + x] = 1;
+    }
+  }
+  coverage = { g: g, gw: gw, gh: gh, cell: cell };
+}
+function covered(x0, y0, x1, y1) {
+  if (!coverage) return false;
+  var cv = coverage, c = cv.cell;
+  var a = Math.floor(x0 / c), b = Math.floor(x1 / c), p = Math.floor(y0 / c), q = Math.floor(y1 / c);
+  if (a < 0 || p < 0 || b >= cv.gw || q >= cv.gh) return false;
+  for (var y = p; y <= q; y++) for (var x = a; x <= b; x++) if (!cv.g[y * cv.gw + x]) return false;
+  return true;
+}
+function shed(T) {
+  if (!T.clumps.length || T.leaves.length > 7 || !leafSpr.length) return;
+  var C = T.clumps[Math.floor(Math.random() * T.clumps.length)], n = T.nodes[C.node], k = T.size;
+  var vy = (34 + Math.random() * 24) * 0.615 * k;
+  T.leaves.push({ x: T.sx + (n.ex + C.ox - T.bx), y: T.sy + (n.ey + C.oy - T.by), vx: 0, vy: vy, vyT: vy, sway: 19.5 * k,
+                  ph: Math.random() * TAU, f: 0.8 + Math.random() * 1.2, rot: Math.random() * TAU, vr: (Math.random() - 0.5) * 2.4,
+                  s: 0.85 + Math.random() * 0.3, si: Math.floor(Math.random() * leafSpr.length), born: 0, endY: T.sy + (Math.random() - 0.3) * 4 * k });
+}
+function update(dt, t) {
+  if (!trees.length) return;
+  frameN++;
+  if (frameN % 12 === 1) buildCoverage();
+  // the clump and leaf pictures, a few a frame after the light has changed (as the main trees' clumps)
+  if (lightV !== lookVersion) {                                           // (about 0.8 ms of it a frame, at least one)
+    var s0 = performance.now(), busy = false;
+    for (var i = 0; i < spriteList.length; i++) {
+      if (spriteList[i].bakedV === lookVersion) continue;
+      if (performance.now() - s0 > 0.8) { busy = true; break; }
+      bakeSprite(spriteList[i]);
+    }
+    if (!busy && leafSpr.bakedV !== lookVersion) { bakeLeafSprites(); busy = true; }
+    if (!busy) lightV = lookVersion;                                     // all done: the trees are drawn again with them
+  }
+  var total = 0, damp = Math.exp(-dt * 5), eY = 1 - Math.exp(-dt * 1.2), eX = 1 - Math.exp(-dt * 1.6);
+  for (var j = 0; j < trees.length; j++) total += trees[j].leaves.length;
+  for (var k = 0; k < trees.length; k++) {
+    var T = trees[k], z = T.size, seen = !T.hidden;
+    sway(T, dt, t, seen);
+    if (seen && T.shed > 0 && Math.random() < 0.5) { T.shed--; shed(T); total++; }    // a gust's leaves, one at a time
+    if (seen && total < 36 && Math.random() < dt * 0.35 * Math.sqrt(z)) { shed(T); total++; }
+    for (var q = T.leaves.length - 1; q >= 0; q--) {
+      var L = T.leaves[q];
+      L.born += dt;
+      if (L.fade === undefined && L.y >= L.endY) { L.fade = 1; L.vyT = 0; }
+      if (L.fade !== undefined) {                                          // at the foot of the tree: comes to rest and fades
+        L.vx *= damp; L.vy *= damp; L.sway *= damp; L.vr *= damp;
+        L.fade -= dt / 1.8;
+        if (L.fade <= 0) { T.leaves.splice(q, 1); continue; }
+      } else {
+        L.vy += (L.vyT - L.vy) * eY;
+        var tx = (ENV.windPx * 0.25 + lakeFieldAt(L.x, t) * 90) * z;
+        L.vx += (tx - L.vx) * eX;
+      }
+      L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
+      L.y += L.vy * dt;
+      L.rot += L.vr * dt;
+      if (L.x < -100 || L.x > W + 100 || L.y > H + 30) T.leaves.splice(q, 1);
+    }
+  }
+}
+/* A gust reaches the trees: the main trees' push (less the further one already leans), and a few leaves shaken off. */
+function gust(g) {
+  for (var i = 0; i < trees.length; i++) {
+    var T = trees[i];
+    if (T.gid === g.id || !(g.dir > 0 ? T.sx < g.x : T.sx > g.x)) continue;
+    T.gid = g.id;
+    var lean = T.gust * g.dir > 0 ? 1 - Math.min(1, Math.abs(T.gust) / 0.35) : 1;
+    T.gustV += g.dir * (g.str / 400) * lean;
+    if (!T.hidden) T.shed += Math.round((2 + Math.random() * 3) * 0.8 * Math.min(1, T.size));
+  }
+}
+
+/* ---------- drawing ---------- */
+/* The tree drawn afresh into its own picture, as it stands now: the shade on the ground under it, the trunk and
+   limbs (trunks.js), the clumps over them, the fallen leaves over its foot, then the haze of its distance. */
+function drawTrunk(T, lean) {
+  var tc = T.tc, res = T.res, pw = T.tCnv.width, ph = T.tCnv.height;
+  tc.setTransform(1, 0, 0, 1, 0, 0); tc.globalAlpha = 1; tc.clearRect(0, 0, pw, ph);
+  tc.setTransform(res, 0, 0, res, 0, 0);
+  var tw = Math.max(2.2, T.sc * 0.058) * 1.2, sg = tc.createRadialGradient(T.bx, T.by, 0, T.bx, T.by, tw * 3.2);
+  sg.addColorStop(0, 'rgba(30,14,10,0.5)'); sg.addColorStop(1, 'rgba(30,14,10,0)');
+  tc.save(); tc.translate(T.bx, T.by); tc.scale(1, 0.32); tc.translate(-T.bx, -T.by);
+  tc.fillStyle = sg; tc.fillRect(T.bx - tw * 3.2, T.by - tw * 3.2, tw * 6.4, tw * 6.4); tc.restore();
+  if (T.trunk) {
+    if (trunkLightV !== frameN) { trunkLight = koyoTrunkLight(); trunkLightV = frameN; }
+    var n = koyoNight(), look = {}, kk;
+    for (kk in TRUNK) look[kk] = TRUNK[kk];
+    look.air = 0;                                                       // (the haze goes over the whole tree)
+    look.rootFlare = Math.max(TRUNK.rootFlare, 0.9);
+    look.wet = clamp(TRUNK.wet + (1 - TRUNK.wet) * ENV.wet * 0.8, 0, 1);
+    look.komorebi = TRUNK.komorebi * (1 - n);
+    look.canopyShade = TRUNK.canopyShade * lerp(1, 0.3, n);
+    if (!TRUNK_COLS || TRUNK_COLS_KEY !== JSON.stringify(TRUNK.colours)) {
+      TRUNK_COLS_KEY = JSON.stringify(TRUNK.colours); TRUNK_COLS = {};
+      for (var ck in TRUNK.colours) TRUNK_COLS[ck] = hexToRgb(TRUNK.colours[ck]);
+    }
+    var g = Trunks.draw({ model: T.trunk, nodes: T.nodes, X: function (x) { return x; }, extra: [], width: pw, height: ph,
+                          W: W, H: T.sc / (KOYO.treeSize * FAR_TREE_SCALE), px: res, time: 0, wind: clamp(ENV.windMs / 10, 0, 1),
+                          ground: T.by - 24 * T.size, look: look, colours: TRUNK_COLS, light: trunkLight });
+    tc.setTransform(1, 0, 0, 1, 0, 0);
+    if (g) tc.drawImage(g.cnv, 0, 0, g.w, g.h, g.x, g.y, g.w, g.h);
+    else { tc.setTransform(res, 0, 0, res, 0, 0); Trunks.flat(tc, rgba(koyoLight(KOYO_BARK_FLAT))); }
+  }
+  // fallen leaves lying over its foot (so it stands in the leaf litter, not on it)
+  tc.globalAlpha = 0.92;
+  var fl = 12.5 * KOYO.leafSize * T.size;
+  for (var q = 0; q < T.litter.length; q++) {
+    var Lt = T.litter[q], ls = leafSpr[Lt.si], hl = ls.half * Lt.s * fl / ls.leaf;
+    tc.setTransform(res, 0, 0, res, 0, 0);
+    tc.translate(T.bx + Lt.dx * tw, T.by + Lt.dy * tw); tc.rotate(Lt.rot); tc.scale(1, 0.55);
+    tc.drawImage(ls.cnv, -hl, -hl, hl * 2, hl * 2);
+  }
+  tc.globalAlpha = 1;
+  for (var tr = 0; tr < T.tSamples.length; tr++) { var trn = T.nodes[T.tSamples[tr]]; T.tRef[tr][0] = trn.ex; T.tRef[tr][1] = trn.ey; }
+  T.tRefLean = lean; T.tDone = true; T.tLookV = bigLightV; stats.trunks++;
+}
+function render(T, t) {
+  var c = T.c, res = T.res, pw = T.cnv.width, ph = T.cnv.height, lean = leanNow(T, T.tSamples);   // (the trunk's own lean)
+  // The trunk's own picture (with the shade on the ground under it and the fallen leaves over its foot), laid down
+  // leaning with the sway since it was drawn. The 3D trunk (the costly part, on the graphics chip) is drawn again only
+  // when a limb has moved more than the lean shows, or the light has really changed (bigLightV, as the landscape).
+  var tMoved = 0, dl = lean - T.tRefLean;
+  for (var ts = 0; ts < T.tSamples.length && T.tDone; ts++) {
+    var tn = T.nodes[T.tSamples[ts]], hT = T.by - T.tRef[ts][1];
+    tMoved = Math.max(tMoved, Math.hypot(tn.ex - (T.tRef[ts][0] + dl * hT), tn.ey - T.tRef[ts][1]));
+  }
+  if (!T.tDone || T.tLookV !== bigLightV || tMoved > 0.4 * (1 + T.dof.blur * 2)) drawTrunk(T, lean);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  c.clearRect(0, 0, pw, ph);
+  var st = lean - T.tRefLean;
+  c.setTransform(1, 0, 0, 1, T.bx * res, T.by * res);
+  c.transform(1, 0, -st, 1, 0, 0);
+  c.drawImage(T.tCnv, -T.bx * res, -T.by * res);
+  // the clumps, at the far tree's strength
+  c.globalAlpha = KOYO.farOpacity;
+  var ns = T.nodes;
+  for (var i = 0; i < T.clumps.length; i++) {
+    var C = T.clumps[i], nd = ns[C.node], sp = sprites[C.key];
+    if (!sp) continue;
+    var rot = (nd.cur - nd.abs) * 0.6 + Math.sin(t * 0.9 + C.ph) * 0.015 * S.treeSway, hh = sp.half * C.R / sp.Rb;   // (CSS px)
+    c.setTransform(res, 0, 0, res, 0, 0);
+    c.translate(nd.ex + C.ox, nd.ey + C.oy); c.rotate(rot);
+    c.drawImage(sp.cnv, -hh, -hh, hh * 2, hh * 2);
+  }
+  c.globalAlpha = 1;
+  if (T.dof.haze > 0.005) {                                               // the haze of its distance, over what is drawn
+    c.setTransform(1, 0, 0, 1, 0, 0);
+    c.globalCompositeOperation = 'source-atop';
+    c.globalAlpha = clamp(T.dof.haze, 0, 0.9);
+    c.fillStyle = rgba(hazeColour()); c.fillRect(0, 0, pw, ph);
+    c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+  }
+  for (var s2 = 0; s2 < T.samples.length; s2++) { var sn = ns[T.samples[s2]]; T.ref[s2][0] = sn.ex; T.ref[s2][1] = sn.ey; }
+  T.refLean = leanNow(T);
+  T.rendered = true; T.lookV = lightV;
+}
+function draw(c, t) {
+  if (!trees.length) return;
+  var t0 = performance.now(), due = [], i, T;
+  stats.drawn = 0; stats.hidden = 0; stats.fresh = 0;
+  // which can be seen: on the screen, and not wholly behind the right-hand main tree's leaves (with room for the sway)
+  for (i = 0; i < trees.length; i++) {
+    T = trees[i];
+    var m = T.sc * 0.12, x0 = T.sx - T.reachL - m, x1 = T.sx + T.reachR + m, y0 = T.sy - T.height - m, y1 = T.sy + 2;
+    T.hidden = x1 < 0 || x0 > W || covered(x0, y0, x1, y1);
+    if (T.hidden) { stats.hidden++; continue; }
+    T.lean = leanNow(T);
+    var mv = T.rendered ? moved(T, T.lean) : 1e9;
+    if (!T.rendered || mv > MOVE_PX * (1 + T.dof.blur * 2) || T.lookV !== lightV) due.push({ T: T, p: !T.rendered ? 1e9 : mv * T.size + (T.lookV !== lightV ? 0.2 : 0) });
+  }
+  // drawn afresh: those that moved most first, a few a frame (all of those never drawn yet)
+  due.sort(function (a, b) { return b.p - a.p; });
+  for (i = 0; i < due.length; i++) {
+    if (i > 0 && due[i].T.rendered && performance.now() - t0 > BUDGET_MS) break;
+    var r0 = performance.now();
+    render(due[i].T, t); due[i].T.lean = due[i].T.refLean; stats.fresh++;
+    stats.renderMs += performance.now() - r0; stats.renders++;
+  }
+  var l0 = performance.now();
+  // laid down, leaning with the sway since each was drawn, far ones first, each with its falling leaves in front
+  var q0 = c.imageSmoothingQuality;
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'low';       // (the pictures are at about their own size: the plain filter is enough, and much cheaper)
+  for (i = 0; i < trees.length; i++) {
+    T = trees[i];
+    if (T.hidden || !T.rendered) continue;
+    var s = T.lean - T.refLean;
+    c.setTransform(PR, 0, 0, PR, T.sx * PR, T.sy * PR);
+    c.transform(1, 0, -s, 1, 0, 0);                                      // the top moves, the foot stays
+    c.drawImage(T.cnv, -T.bx, -T.by, T.w, T.h);
+    stats.drawn++;
+    if (T.leaves.length) {
+      c.setTransform(PR, 0, 0, PR, 0, 0);
+      var leafPx = 12.5 * KOYO.leafSize * T.size;
+      for (var j = 0; j < T.leaves.length; j++) {
+        var L = T.leaves[j], ls = leafSpr[L.si], h = ls.half * L.s * leafPx / ls.leaf, a = 0.85 * clamp(L.born / 0.5, 0, 1);
+        if (L.fade !== undefined) a *= L.fade;
+        c.globalAlpha = a;
+        c.setTransform(PR, 0, 0, PR, L.x * PR, L.y * PR);
+        c.rotate(L.rot); c.scale(Math.cos(t * L.f * 1.3 + L.ph), 1);
+        c.drawImage(ls.cnv, -h, -h, h * 2, h * 2);
+      }
+      c.globalAlpha = 1;
+    }
+  }
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.imageSmoothingQuality = q0 || 'low';
+  stats.layMs += performance.now() - l0; stats.frames++;
+  stats.ms = lerp(stats.ms, performance.now() - t0, 0.1);
+}
+function info() {
+  return trees.length + ' bank trees: ' + stats.drawn + ' drawn, ' + stats.hidden + ' not seen, ' + stats.fresh + ' drawn afresh this frame, ' +
+         stats.ms.toFixed(2) + ' ms a frame, ' + spriteList.length + ' clump pictures; drawn afresh ' + (stats.renders / Math.max(1, stats.frames)).toFixed(2) +
+         ' a frame at ' + (stats.renderMs / Math.max(1, stats.renders)).toFixed(2) + ' ms each (' + stats.trunks + ' trunks drawn in all); laying down ' + (stats.layMs / Math.max(1, stats.frames)).toFixed(2) + ' ms a frame';
+}
+return { bake: bake, update: update, draw: draw, gust: gust, info: info, trees: function () { return trees; } };
+})();
+
 /* ---------- the right bank: a straight row of trees that sway in the wind ----------
    Planted on the bank, the same distance apart and the same size in the world, two kinds alternating (gold
    ginkgo and deep green, never red behind the vermilion gates). Each tree is baked once into its own picture;
    each frame it is laid down leaning with the wind and the gusts (the top moves more than the foot). */
 function lakeBakeBank(path) {
+  if (typeof BankTrees !== 'undefined') { BankTrees.bake(path); return; }   // the smaller main tree, many times over (BankTrees)
   LK.bankT = [];
   if (!LAKE.bankTrees || !LK.landLo || !LK.bankEdge.length || !path) return;
   var F = torLens(), wu = lakeGravelHalf();
@@ -17712,6 +18308,7 @@ function lakeBakeBank(path) {
   LK.bankT.sort(function (a, b) { return b.z - a.z; });          // further first
 }
 function lakeDrawBank(c, t) {
+  if (typeof BankTrees !== 'undefined') { BankTrees.draw(c, t); return; }
   var B = LK.bankT;
   if (!B.length) return;
   for (var i = 0; i < B.length; i++) {
@@ -21213,7 +21810,8 @@ window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
    reveal's last clean-up has ended. */
 function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
-         sceneReady: dynSceneReady, setupProgress: dynSetupProgress };
+         sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
+         bankInfo: function() { return BankTrees.info(); } };          // (for checking: how the bank trees are doing)
 
 })();
 
