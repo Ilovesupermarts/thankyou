@@ -788,10 +788,10 @@ function buildTree(far, P) {
   var rb = P ? rngFrom(P.seed + 17) : r;                    // the leaf pictures have a stream of their own, so a shape-only copy matches the real one
   for (var j = 1; j < nodes.length; j++) {
     var nd = nodes[j];
-    var upper = nd.d >= maxD - 1, mid = nd.d >= 2 && nd.d < maxD - 1;
+    var upper = nd.d >= maxD - 1, mid = nd.d >= (P ? 1 : 2) && nd.d < maxD - 1;   // (a bank tree carries leaves lower down: a fuller crown)
     if (!upper && !mid) continue;
-    if (r() > (upper ? keep : keep * 0.6)) continue;
-    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, TREE.fullness);
+    if (r() > (upper ? keep : keep * (P ? 0.9 : 0.6))) continue;
+    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, TREE.fullness) * (P ? 1.3 : 1);
     var ck = Math.floor(nd.ex / cell) + ',' + Math.floor(nd.ey / cell);
     if (!cellFam[ck]) cellFam[ck] = pickFamily(r, w);
     var fam = r() < TREE.patchiness ? cellFam[ck] : pickFamily(r, w);
@@ -2978,7 +2978,7 @@ function bakeBank(path) {
     lastFam = fam;
     var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);
     used[seed] = 1;
-    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.68, 0.98, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
+    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.85, 1, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
   }
   function build(sp, hpx, foot, dry) {                                   // hpx: its height on the screen
     var d = bankDof(foot), w = weights(), tot = 0, kk;
