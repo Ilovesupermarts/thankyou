@@ -774,7 +774,7 @@ function buildTree(far, P) {
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
   if (P) bx = 0;
-  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + (P ? P.lean : 0), sc * 0.26, Math.max(P ? 2 : far ? 4 : 7, sc * (P ? 0.04 : 0.034)), 0);
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + (P ? P.lean : 0), sc * (P ? 0.17 : 0.26), Math.max(P ? 2.5 : far ? 4 : 7, sc * (P ? 0.085 : 0.034)), 0);   // (a bank tree: a shorter, sturdier trunk)
   var byDepth = [];
   for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
   var T = { far: far, left: left, bx: bx, by: P ? 0 : H + 6, nodes: nodes, byDepth: byDepth, scale: sc, maxD: maxD,
