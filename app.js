@@ -17856,7 +17856,7 @@ function finish(T, sx, sy, z, seed) {
   for (var ti = 0; ti < T.nodes.length && T.tSamples.length < 8; ti++) if (T.nodes[ti].d <= 2) T.tSamples.push(ti);
   T.tRef = T.tSamples.map(function () { return [0, 0]; });
   T.tCnv = document.createElement('canvas'); T.tCnv.width = T.cnv.width; T.tCnv.height = T.cnv.height;
-  T.tc = T.tCnv.getContext('2d'); T.tDone = false; T.tLookV = -1;
+  T.tc = T.tCnv.getContext('2d'); T.tDone = false; T.tLookV = -1; T.tRefLean = 0;
   // fallen leaves lying over its foot (so it stands in the leaf litter, not on it)
   var rl = rngFrom(seed + 5); T.litter = [];
   for (var li = 0; li < 7; li++) T.litter.push({ dx: (rl() - 0.5) * 2.6, dy: (rl() - 0.35) * 0.5, rot: rl() * TAU, s: lerp(0.7, 1.2, rl()), si: Math.floor(rl() * 5) });
@@ -17966,9 +17966,9 @@ function sway(T, dt, t, seen) {
 }
 /* How much the crown leans now (the lean the picture is laid down with), and how far a limb is from where that
    lean puts it, against when the picture was drawn. */
-function leanNow(T) {
-  var sx = 0, sy = 0, n = T.samples.length;
-  for (var i = 0; i < n; i++) { var nd = T.nodes[T.samples[i]]; sx += nd.ex - T.bx; sy += T.by - nd.ey; }
+function leanNow(T, list) {
+  var L2 = list || T.samples, sx = 0, sy = 0, n = L2.length;
+  for (var i = 0; i < n; i++) { var nd = T.nodes[L2[i]]; sx += nd.ex - T.bx; sy += T.by - nd.ey; }
   return n ? sx / Math.max(1, sy) : 0;
 }
 function moved(T, lean) {
@@ -18020,13 +18020,17 @@ function update(dt, t) {
   frameN++;
   if (frameN % 12 === 1) buildCoverage();
   // the clump and leaf pictures, a few a frame after the light has changed (as the main trees' clumps)
-  if (lightV !== lookVersion) {
-    var left = 3;
-    for (var i = 0; i < spriteList.length && left > 0; i++) if (spriteList[i].bakedV !== lookVersion) { bakeSprite(spriteList[i]); left--; }
-    if (left > 0 && leafSpr.bakedV !== lookVersion) { bakeLeafSprites(); left--; }
-    if (left > 0) lightV = lookVersion;                                   // all done: the trees are drawn again with them
+  if (lightV !== lookVersion) {                                           // (about 0.8 ms of it a frame, at least one)
+    var s0 = performance.now(), busy = false;
+    for (var i = 0; i < spriteList.length; i++) {
+      if (spriteList[i].bakedV === lookVersion) continue;
+      if (performance.now() - s0 > 0.8) { busy = true; break; }
+      bakeSprite(spriteList[i]);
+    }
+    if (!busy && leafSpr.bakedV !== lookVersion) { bakeLeafSprites(); busy = true; }
+    if (!busy) lightV = lookVersion;                                     // all done: the trees are drawn again with them
   }
-  var total = 0;
+  var total = 0, damp = Math.exp(-dt * 5), eY = 1 - Math.exp(-dt * 1.2), eX = 1 - Math.exp(-dt * 1.6);
   for (var j = 0; j < trees.length; j++) total += trees[j].leaves.length;
   for (var k = 0; k < trees.length; k++) {
     var T = trees[k], z = T.size, seen = !T.hidden;
@@ -18038,14 +18042,13 @@ function update(dt, t) {
       L.born += dt;
       if (L.fade === undefined && L.y >= L.endY) { L.fade = 1; L.vyT = 0; }
       if (L.fade !== undefined) {                                          // at the foot of the tree: comes to rest and fades
-        var damp = Math.exp(-dt * 5);
         L.vx *= damp; L.vy *= damp; L.sway *= damp; L.vr *= damp;
         L.fade -= dt / 1.8;
         if (L.fade <= 0) { T.leaves.splice(q, 1); continue; }
       } else {
-        L.vy += (L.vyT - L.vy) * (1 - Math.exp(-dt * 1.2));
+        L.vy += (L.vyT - L.vy) * eY;
         var tx = (ENV.windPx * 0.25 + lakeFieldAt(L.x, t) * 90) * z;
-        L.vx += (tx - L.vx) * (1 - Math.exp(-dt * 1.6));
+        L.vx += (tx - L.vx) * eX;
       }
       L.x += (L.vx + Math.sin(t * L.f + L.ph) * L.sway) * dt;
       L.y += L.vy * dt;
@@ -18069,28 +18072,19 @@ function gust(g) {
 /* ---------- drawing ---------- */
 /* The tree drawn afresh into its own picture, as it stands now: the shade on the ground under it, the trunk and
    limbs (trunks.js), the clumps over them, the fallen leaves over its foot, then the haze of its distance. */
-function render(T, t) {
-  var c = T.c, res = T.res, pw = T.cnv.width, ph = T.cnv.height;
-  c.setTransform(1, 0, 0, 1, 0, 0);
-  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
-  c.clearRect(0, 0, pw, ph);
-  c.setTransform(res, 0, 0, res, 0, 0);
-  var tw = Math.max(2.2, T.sc * 0.058) * 1.2, sg = c.createRadialGradient(T.bx, T.by, 0, T.bx, T.by, tw * 3.2);
+function drawTrunk(T, lean) {
+  var tc = T.tc, res = T.res, pw = T.tCnv.width, ph = T.tCnv.height;
+  tc.setTransform(1, 0, 0, 1, 0, 0); tc.globalAlpha = 1; tc.clearRect(0, 0, pw, ph);
+  tc.setTransform(res, 0, 0, res, 0, 0);
+  var tw = Math.max(2.2, T.sc * 0.058) * 1.2, sg = tc.createRadialGradient(T.bx, T.by, 0, T.bx, T.by, tw * 3.2);
   sg.addColorStop(0, 'rgba(30,14,10,0.5)'); sg.addColorStop(1, 'rgba(30,14,10,0)');
-  c.save(); c.translate(T.bx, T.by); c.scale(1, 0.32); c.translate(-T.bx, -T.by);
-  c.fillStyle = sg; c.fillRect(T.bx - tw * 3.2, T.by - tw * 3.2, tw * 6.4, tw * 6.4); c.restore();
-  var tMoved = 0;
-  for (var ts = 0; ts < T.tSamples.length && T.tDone; ts++) {
-    var tn = T.nodes[T.tSamples[ts]];
-    tMoved = Math.max(tMoved, Math.hypot(tn.ex - T.tRef[ts][0], tn.ey - T.tRef[ts][1]));
-  }
-  if (T.trunk && (!T.tDone || T.tLookV !== lightV || tMoved > 0.4)) {   // the 3D trunk again (the costly part) only when it has moved
-    var tc = T.tc;
-    tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(0, 0, pw, ph);
+  tc.save(); tc.translate(T.bx, T.by); tc.scale(1, 0.32); tc.translate(-T.bx, -T.by);
+  tc.fillStyle = sg; tc.fillRect(T.bx - tw * 3.2, T.by - tw * 3.2, tw * 6.4, tw * 6.4); tc.restore();
+  if (T.trunk) {
     if (trunkLightV !== frameN) { trunkLight = koyoTrunkLight(); trunkLightV = frameN; }
     var n = koyoNight(), look = {}, kk;
     for (kk in TRUNK) look[kk] = TRUNK[kk];
-    look.air = 0;                                                       // (the haze goes over the whole tree below)
+    look.air = 0;                                                       // (the haze goes over the whole tree)
     look.rootFlare = Math.max(TRUNK.rootFlare, 0.9);
     look.wet = clamp(TRUNK.wet + (1 - TRUNK.wet) * ENV.wet * 0.8, 0, 1);
     look.komorebi = TRUNK.komorebi * (1 - n);
@@ -18102,12 +18096,41 @@ function render(T, t) {
     var g = Trunks.draw({ model: T.trunk, nodes: T.nodes, X: function (x) { return x; }, extra: [], width: pw, height: ph,
                           W: W, H: T.sc / (KOYO.treeSize * FAR_TREE_SCALE), px: res, time: 0, wind: clamp(ENV.windMs / 10, 0, 1),
                           ground: T.by - 24 * T.size, look: look, colours: TRUNK_COLS, light: trunkLight });
+    tc.setTransform(1, 0, 0, 1, 0, 0);
     if (g) tc.drawImage(g.cnv, 0, 0, g.w, g.h, g.x, g.y, g.w, g.h);
     else { tc.setTransform(res, 0, 0, res, 0, 0); Trunks.flat(tc, rgba(koyoLight(KOYO_BARK_FLAT))); }
-    for (var tr = 0; tr < T.tSamples.length; tr++) { var trn = T.nodes[T.tSamples[tr]]; T.tRef[tr][0] = trn.ex; T.tRef[tr][1] = trn.ey; }
-    T.tDone = true; T.tLookV = lightV; stats.trunks++;
   }
-  if (T.tDone) { c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(T.tCnv, 0, 0); }
+  // fallen leaves lying over its foot (so it stands in the leaf litter, not on it)
+  tc.globalAlpha = 0.92;
+  var fl = 12.5 * KOYO.leafSize * T.size;
+  for (var q = 0; q < T.litter.length; q++) {
+    var Lt = T.litter[q], ls = leafSpr[Lt.si], hl = ls.half * Lt.s * fl / ls.leaf;
+    tc.setTransform(res, 0, 0, res, 0, 0);
+    tc.translate(T.bx + Lt.dx * tw, T.by + Lt.dy * tw); tc.rotate(Lt.rot); tc.scale(1, 0.55);
+    tc.drawImage(ls.cnv, -hl, -hl, hl * 2, hl * 2);
+  }
+  tc.globalAlpha = 1;
+  for (var tr = 0; tr < T.tSamples.length; tr++) { var trn = T.nodes[T.tSamples[tr]]; T.tRef[tr][0] = trn.ex; T.tRef[tr][1] = trn.ey; }
+  T.tRefLean = lean; T.tDone = true; T.tLookV = bigLightV; stats.trunks++;
+}
+function render(T, t) {
+  var c = T.c, res = T.res, pw = T.cnv.width, ph = T.cnv.height, lean = leanNow(T, T.tSamples);   // (the trunk's own lean)
+  // The trunk's own picture (with the shade on the ground under it and the fallen leaves over its foot), laid down
+  // leaning with the sway since it was drawn. The 3D trunk (the costly part, on the graphics chip) is drawn again only
+  // when a limb has moved more than the lean shows, or the light has really changed (bigLightV, as the landscape).
+  var tMoved = 0, dl = lean - T.tRefLean;
+  for (var ts = 0; ts < T.tSamples.length && T.tDone; ts++) {
+    var tn = T.nodes[T.tSamples[ts]], hT = T.by - T.tRef[ts][1];
+    tMoved = Math.max(tMoved, Math.hypot(tn.ex - (T.tRef[ts][0] + dl * hT), tn.ey - T.tRef[ts][1]));
+  }
+  if (!T.tDone || T.tLookV !== bigLightV || tMoved > 0.4 * (1 + T.dof.blur * 2)) drawTrunk(T, lean);
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+  c.clearRect(0, 0, pw, ph);
+  var st = lean - T.tRefLean;
+  c.setTransform(1, 0, 0, 1, T.bx * res, T.by * res);
+  c.transform(1, 0, -st, 1, 0, 0);
+  c.drawImage(T.tCnv, -T.bx * res, -T.by * res);
   // the clumps, at the far tree's strength
   c.globalAlpha = KOYO.farOpacity;
   var ns = T.nodes;
@@ -18118,14 +18141,6 @@ function render(T, t) {
     c.setTransform(res, 0, 0, res, 0, 0);
     c.translate(nd.ex + C.ox, nd.ey + C.oy); c.rotate(rot);
     c.drawImage(sp.cnv, -hh, -hh, hh * 2, hh * 2);
-  }
-  c.globalAlpha = 0.92;
-  var fl = 12.5 * KOYO.leafSize * T.size;
-  for (var q = 0; q < T.litter.length; q++) {
-    var Lt = T.litter[q], ls = leafSpr[Lt.si], hl = ls.half * Lt.s * fl / ls.leaf;
-    c.setTransform(res, 0, 0, res, 0, 0);
-    c.translate(T.bx + Lt.dx * tw, T.by + Lt.dy * tw); c.rotate(Lt.rot); c.scale(1, 0.55);
-    c.drawImage(ls.cnv, -hl, -hl, hl * 2, hl * 2);
   }
   c.globalAlpha = 1;
   if (T.dof.haze > 0.005) {                                               // the haze of its distance, over what is drawn
