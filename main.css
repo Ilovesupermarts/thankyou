@@ -1304,20 +1304,21 @@
   }
   .intro-overlay.active { opacity: 1; pointer-events: auto; }
   .name-column { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; }
-  /* The loading card under the name: shown only if the wait is long, with a bar that fills as the scene behind is really made.
-     It has its own warm paper colour, so it reads well on every time of day and weather. */
+  /* The loading text and bar under the name: no box, in the name's own cream and shadow so they read on every
+     time of day and weather. They fade in as the name lands. */
   .intro-progress {
     position: absolute; left: 50%; top: 70%; width: min(520px, 72vw); transform: translateX(-50%);
-    box-sizing: border-box; padding: 22px 36px 20px; text-align: center;
-    background: var(--bg-warm); border-radius: 28px; box-shadow: 0 4px 24px rgba(60, 40, 30, 0.18);
-    opacity: 0; transition: opacity 0.5s ease; pointer-events: none;
+    box-sizing: border-box; text-align: center;
+    font-family: "Shippori Mincho", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", "Noto Serif CJK JP", serif;
+    color: #FFFDF9; text-shadow: 0 2px 14px rgba(80, 40, 10, 0.45);
+    opacity: 0; transition: opacity 0.9s ease; pointer-events: none;
   }
   .intro-progress.show { opacity: 1; }
-  .intro-progress p { margin: 0; color: var(--text-med); letter-spacing: 0.04em; line-height: 1.5; }
-  .intro-progress .ip-title { font-size: 20px; }
-  .intro-progress .ip-sub { font-size: 16px; color: var(--text-mute); }
-  .intro-progress .ip-track { height: 10px; margin: 16px 0 14px; border-radius: 5px; background: rgba(176, 74, 90, 0.16); overflow: hidden; }
-  .intro-progress .ip-track i { display: block; height: 100%; width: 100%; background: var(--accent); border-radius: 5px; transform: scaleX(0); transform-origin: left center; transition: transform 0.3s ease-out; }
+  .intro-progress p { margin: 0; letter-spacing: 0.12em; line-height: 1.6; font-weight: 500; }
+  .intro-progress .ip-title { font-size: 22px; }
+  .intro-progress .ip-sub { font-size: 16px; opacity: 0.85; }
+  .intro-progress .ip-track { height: 6px; margin: 18px 0 16px; border-radius: 3px; background: rgba(255, 253, 249, 0.3); box-shadow: 0 1px 10px rgba(80, 40, 10, 0.3); overflow: hidden; }
+  .intro-progress .ip-track i { display: block; height: 100%; width: 100%; background: #FFFDF9; border-radius: 3px; transform: scaleX(0); transform-origin: left center; transition: transform 0.3s ease-out; }
   /* The name is written like ink on washi (墨のにじみ): each character is
      brushed in from the top down behind a soft edge (inkBrush), while its
      ink, wet at first, spreads into the paper with a pale bloom and then
