@@ -774,7 +774,7 @@ function buildTree(far, P) {
   }
   var bx = left ? W * (0.04 + r() * 0.06) : W * (0.9 + r() * 0.06);
   if (P) bx = 0;
-  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + (P ? P.lean : 0), sc * 0.26, Math.max(P ? 2 : far ? 4 : 7, sc * (P ? 0.04 : 0.034)), 0);
+  grow(-1, -PI / 2 + dir * (0.1 + r() * 0.12) + (P ? P.lean : 0), sc * (P ? 0.2 : 0.26), Math.max(P ? 2.2 : far ? 4 : 7, sc * (P ? 0.058 : 0.034)), 0);   // (a bank tree: a shorter, sturdier trunk)
   var byDepth = [];
   for (var q = 0; q < nodes.length; q++) (byDepth[nodes[q].d] = byDepth[nodes[q].d] || []).push(q);
   var T = { far: far, left: left, bx: bx, by: P ? 0 : H + 6, nodes: nodes, byDepth: byDepth, scale: sc, maxD: maxD,
@@ -788,10 +788,10 @@ function buildTree(far, P) {
   var rb = P ? rngFrom(P.seed + 17) : r;                    // the leaf pictures have a stream of their own, so a shape-only copy matches the real one
   for (var j = 1; j < nodes.length; j++) {
     var nd = nodes[j];
-    var upper = nd.d >= maxD - 1, mid = nd.d >= 2 && nd.d < maxD - 1;
+    var upper = nd.d >= maxD - 1, mid = nd.d >= (P ? 1 : 2) && nd.d < maxD - 1;   // (a bank tree carries leaves lower down: a fuller crown)
     if (!upper && !mid) continue;
-    if (r() > (upper ? keep : keep * 0.6)) continue;
-    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, TREE.fullness);
+    if (r() > (upper ? keep : keep * (P ? 0.9 : 0.6))) continue;
+    var R = sc * (upper ? lerp(0.07, 0.1, r()) : lerp(0.09, 0.12, r())) * lerp(0.75, 1.1, TREE.fullness) * (P ? 1.3 : 1);
     var ck = Math.floor(nd.ex / cell) + ',' + Math.floor(nd.ey / cell);
     if (!cellFam[ck]) cellFam[ck] = pickFamily(r, w);
     var fam = r() < TREE.patchiness ? cellFam[ck] : pickFamily(r, w);
@@ -833,7 +833,7 @@ function buildTrunk(T) {
   T.trunk = Trunks.build({
     nodes: ns, seed: T.seed || V.seed * 7919 + (T.far ? 211 : 0), X: function (x) { return X(T, x); },
     clumps: T.clumps.map(function (C) { var cn = ns[C.node]; return { x: X(T, cn.ex + C.ox), y: cn.ey + C.oy, R: C.R, back: C.back }; }),
-    look: T.bank ? Object.assign({}, TRUNK, { roots: 0 }) : TRUNK      // (a small bank tree has no roots showing)
+    look: T.bank ? Object.assign({}, TRUNK, { roots: 4, rootLen: 0.5 }) : TRUNK      // (a small bank tree: a spreading foot with short, stubby roots)
   });
 }
 /* The owl's branch: a bare branch that grows from the limb nearest
@@ -1009,7 +1009,7 @@ function drawBranches(c, T) {
   if (!T.trunk) return;
   var res = T.bank ? T.bank.res : PR * (T.far ? FAR_RES : 1), look = {}, k;
   for (k in TRUNK) look[k] = TRUNK[k];
-  if (T.bank) look.rootFlare = Math.min(look.rootFlare, 0.2);       // the foot hardly spreads
+  if (T.bank) look.rootFlare = Math.max(look.rootFlare, 0.9);       // the foot spreads into the ground
   look.air = T.bank ? T.bank.air : T.far ? Math.min(1, TRUNK.farAir + TREE.farHaze) : TRUNK.air;
   if (isNight()) { look.komorebi = 0; look.canopyShade = TRUNK.canopyShade * 0.3; }   // the lamps are under the leaves
   var o = { model: T.trunk, nodes: T.nodes, X: function (x) { return X(T, x); }, extra: T.perch !== undefined ? perchTubes(T) : [],
@@ -2978,7 +2978,7 @@ function bakeBank(path) {
     lastFam = fam;
     var seed; do { seed = 9100 + k * 37 + Math.floor(R() * 99991); } while (used[seed]);
     used[seed] = 1;
-    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.68, 0.98, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
+    return { fam: fam, seed: seed, hm: lerp(0.82, 1.2, R()), full: lerp(0.85, 1, R()), lean: lerp(-0.16, 0.16, R()), left: R() < 0.5 };
   }
   function build(sp, hpx, foot, dry) {                                   // hpx: its height on the screen
     var d = bankDof(foot), w = weights(), tot = 0, kk;
@@ -3039,6 +3039,9 @@ function bakeBank(path) {
     T.sx = spt[0]; T.sy = spt[1] + LK.bankIn; T.z = gp.z;
     T.size = T.sc / (H * TREE.treeSize * FAR_SCALE);                     // its size against the far tree's: scales all its behaviour
     T.leaves = [];
+    T.litter = [];                                                       // fallen leaves lying over its foot, so it stands in the leaf litter
+    var rl = Lakeside.rng(sp.seed + 5);
+    for (var li = 0; li < 7; li++) T.litter.push({ dx: (rl() - 0.5) * 2.6, dy: (rl() - 0.35) * 0.5, rot: rl() * TAU, s: lerp(0.7, 1.2, rl()), si: Math.floor(rl() * fallSprites.length) });
     bankT.push(T);
   }
   bankT.sort(function (a, b) { return b.z - a.z; });          // further first
@@ -3094,8 +3097,24 @@ function drawBank(t) {
     c.globalAlpha = TREE.farOpacity;                           // … then the foliage, as for the far tree
     drawClumps(c, T, t);
     c.globalAlpha = 1;
+    // the shade on the ground under it, soft, so the foot sits in the ground
+    var tw = Math.max(2.2, T.sc * 0.058) * 1.2;
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    var sg = ctx.createRadialGradient(T.sx, T.sy, 0, T.sx, T.sy, tw * 3.2);
+    sg.addColorStop(0, 'rgba(30,14,10,0.5)'); sg.addColorStop(1, 'rgba(30,14,10,0)');
+    ctx.save(); ctx.translate(T.sx, T.sy); ctx.scale(1, 0.32); ctx.translate(-T.sx, -T.sy);
+    ctx.fillStyle = sg; ctx.fillRect(T.sx - tw * 3.2, T.sy - tw * 3.2, tw * 6.4, tw * 6.4); ctx.restore();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.drawImage(BTL.cnv, 0, 0, pw, ph, Math.round((T.sx - T.bx) * PR), Math.round((T.sy - T.by) * PR), pw / res * PR, ph / res * PR);
+    // fallen leaves lying over its foot (the same leaves as the ground's), hiding where the trunk meets the litter
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    var fl = fallSize(0.3) * T.size * 0.9;
+    for (var q = 0; q < T.litter.length; q++) {
+      var Lt = T.litter[q], sp2 = fallSprites[Lt.si][1], hh = sp2.half * Lt.s * fl / fallSize(FALL_TIERS[1]);
+      ctx.save(); ctx.translate(T.sx + Lt.dx * tw, T.sy + Lt.dy * tw); ctx.rotate(Lt.rot); ctx.scale(1, 0.55);
+      ctx.globalAlpha = 0.92; ctx.drawImage(sp2.cnv, -hh, -hh, hh * 2, hh * 2); ctx.restore();
+    }
+    ctx.globalAlpha = 1;
     // its falling leaves: in front of it, behind the next tree. Drawn at the size of the far tree's leaf × this tree's size.
     if (T.leaves.length) {
       ctx.setTransform(PR, 0, 0, PR, 0, 0);
