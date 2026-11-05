@@ -7764,38 +7764,41 @@ function triggerKoiStart() {
          baked, the trees' clumps and the first leaves made, the ink reveal's drops worked out. That work
          is heavy, and while the name stands still a long frame does not show; once the scene starts
          coming in, every frame must be quick. (At most NAME_WAIT_MAX longer, so it always goes on.) */
+      /* The loading text and bar fade in right as the name lands, and follow the real set-up work
+         (DynBG.setupProgress; never going backward) until the name starts to fade (barDone). */
+      var bar = document.getElementById('introProgress');
+      var barFill = bar ? bar.querySelector('.ip-track i') : null;
+      var barVal = 0, barOn = true;
+      function barDone() {
+        barOn = false;
+        if (!bar) return;
+        if (barFill) barFill.style.transform = 'scaleX(1)';
+        bar.classList.remove('show');
+      }
+      function barTick() {
+        if (!barOn || !barFill) return;
+        var v = 0;
+        try { v = DynBG.setupProgress(); } catch (e) { v = 0; }
+        barVal = Math.max(barVal, Math.min(0.98, barVal + (v - barVal) * 0.4));
+        barFill.style.transform = 'scaleX(' + barVal.toFixed(3) + ')';
+        koiPushTimer(setTimeout(barTick, 80));
+      }
+      koiPushTimer(setTimeout(function() {
+        if (!bar || !barOn) return;
+        var nc = document.getElementById('nameColumn');
+        var top = nc ? nc.getBoundingClientRect().bottom + 24 : window.innerHeight * 0.7;
+        bar.style.top = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight - 16, top)) + 'px';
+        bar.classList.add('show');
+        barTick();
+      }, arrivalTime));
+
       function whenSceneReady(go) {
         var t0 = performance.now(), until = t0 + NAME_WAIT_MAX;
-        /* The loading card under the name (text, bar, text), only if the wait turns out long (over 0.5 s).
-           The bar follows the real work (DynBG.setupProgress), never going backward. */
-        var bar = document.getElementById('introProgress');
-        var barFill = bar ? bar.querySelector('.ip-track i') : null;
-        var barShown = false, barVal = 0;
-        function barUpdate(now) {
-          if (!bar || !barFill || now - t0 < 500) return;
-          if (!barShown) {
-            barShown = true;
-            var nc = document.getElementById('nameColumn');
-            var top = nc ? nc.getBoundingClientRect().bottom + 24 : window.innerHeight * 0.7;
-            bar.style.top = Math.max(0, Math.min(window.innerHeight - bar.offsetHeight - 16, top)) + 'px';
-            bar.classList.add('show');
-          }
-          var v = 0;
-          try { v = DynBG.setupProgress(); } catch (e) { v = 0; }
-          barVal = Math.max(barVal, Math.min(0.98, barVal + (v - barVal) * 0.4));
-          barFill.style.transform = 'scaleX(' + barVal.toFixed(3) + ')';
-        }
-        function barDone() {
-          if (!bar) return;
-          if (barShown && barFill) barFill.style.transform = 'scaleX(1)';
-          bar.classList.remove('show');
-        }
         (function check() {
           var now = performance.now();
           var ready = true;
           try { ready = typeof DynBG === 'undefined' || !DynBG || !DynBG.sceneReady || DynBG.sceneReady(); } catch (e) { ready = true; }
           if (now >= until || ready) { barDone(); nameLeavesAt = now; go(); return; }
-          barUpdate(now);
           nameLeavesAt = now + 1000;                     // (still standing still: the set-up keeps its big steps)
           koiPushTimer(setTimeout(check, 40));
         })();
