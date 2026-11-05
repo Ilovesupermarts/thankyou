@@ -14485,6 +14485,9 @@ function buildKoyoLayers(t) {
     drawKoyoClumps(ctxKL, tree, t);
   }
 }
+/* How strongly a main tree's leaves are laid down: the tree on the right-hand side (on the lake's right bank, over the
+   bank trees) is fully opaque; the one on the left keeps its own strength. (The trees change sides from day to day.) */
+function koyoLeafAlpha(T, own) { return T && !T.left ? 1 : own; }
 function drawKoyoTrees(ctx, t) {
   birdBox = birdBounds();
   // (The trees' layers were built at the top of the frame, buildKoyoLayers.)
@@ -14511,7 +14514,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
     ctx.drawImage(farBranchLayer, 0, 0, farBranchLayer.width, farBranchLayer.height, 0, 0, cvBack.width, cvBack.height);
-    ctx.globalAlpha = KOYO.farOpacity;
+    ctx.globalAlpha = koyoLeafAlpha(farTree, KOYO.farOpacity);
     ctx.drawImage(farLayer, 0, 0, farLayer.width, farLayer.height, 0, 0, cvBack.width, cvBack.height);
     ctx.globalAlpha = 1;
   });
@@ -14524,7 +14527,7 @@ function drawKoyoTrees(ctx, t) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
     ctx.drawImage(treeLayer, 0, 0);
-    ctx.globalAlpha = KOYO.nearOpacity;
+    ctx.globalAlpha = koyoLeafAlpha(tree, KOYO.nearOpacity);
     ctx.drawImage(koyoLeafLayer, 0, 0);
     ctx.globalAlpha = 1;
   });
@@ -17643,7 +17646,7 @@ function lakeBakeGrove(path) {
      drawn afresh only when its limbs have moved further than the lean can show (more than about half a
      pixel), when the light has changed, or the first time it is seen; a few a frame at most (about
      BUDGET_MS of work), the trees that have moved most first.
-   - Trees off the screen or hidden behind the far main tree's leaves are not drawn at all (nor drawn
+   - Trees off the screen or hidden behind the right-hand main tree's leaves are not drawn at all (nor drawn
      afresh, nor do they shed leaves).
    - The leaf clumps are not drawn for every tree: a small shared set of clump pictures (by colour, size,
      front or back, and a few variants) serves all of them, made again a few a frame when the light changes.
@@ -17977,10 +17980,10 @@ function moved(T, lean) {
   }
   return worst;
 }
-/* The far main tree's leaves, as a coarse grid of what they surely cover (each clump a little smaller than it is,
+/* The right-hand main tree's leaves (opaque), as a coarse grid of what they surely cover (each clump a little smaller than it is,
    so a swaying canopy still covers it): a bank tree wholly inside is not drawn. Made again every few frames. */
 function buildCoverage() {
-  var T = typeof farTree !== 'undefined' ? farTree : null;
+  var T = farTree && !farTree.left ? farTree : tree && !tree.left ? tree : null;   // the main tree on the right (its leaves are opaque)
   if (!T || !T.clumps || !T.clumps.length) { coverage = null; return; }
   var cell = 10, gw = Math.ceil(W / cell) + 1, gh = Math.ceil(H / cell) + 1, g = coverage && coverage.g.length === gw * gh ? coverage.g : new Uint8Array(gw * gh);
   g.fill(0);
@@ -18140,7 +18143,7 @@ function draw(c, t) {
   if (!trees.length) return;
   var t0 = performance.now(), due = [], i, T;
   stats.drawn = 0; stats.hidden = 0; stats.fresh = 0;
-  // which can be seen: on the screen, and not wholly behind the far main tree's leaves (with room for the sway)
+  // which can be seen: on the screen, and not wholly behind the right-hand main tree's leaves (with room for the sway)
   for (i = 0; i < trees.length; i++) {
     T = trees[i];
     var m = T.sc * 0.12, x0 = T.sx - T.reachL - m, x1 = T.sx + T.reachR + m, y0 = T.sy - T.height - m, y1 = T.sy + 2;
