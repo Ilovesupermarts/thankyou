@@ -14161,7 +14161,9 @@ function bakeClump(C, far) {
 }
 function buildKoyoTree(key, far, lazy) {
   var r = rngFrom(strSeed(key));
-  var side = far ? (ENV.side === 'left' ? 'right' : 'left') : ENV.side;
+  // The big (near) maple always stands on the left and the small (far) one on the right (the user's rule;
+  // not the daily ENV.side), so the small one never stands in front of the pagoda and shrine hall.
+  var side = far ? 'right' : 'left';
   var left = side === 'left', dir = left ? 1 : -1;
   var sc = H * KOYO.treeSize * (far ? FAR_TREE_SCALE : 1), maxD = KOYO.twigDepth, nodes = [];
   function grow(parent, abs, len, w, d) {
@@ -14467,6 +14469,7 @@ function buildKoyoTree(key, far, lazy) {
     cl.splice(base, fills.length);
     T.clumps = fills.concat(cl);                                     // the fillers go underneath
   })();
+  koyoKeepLandmarks(T);                                              // (last of all: Fuji, the pagoda and the hall are never hidden)
   // where the canopy sits, for the night glow
   var sx = 0, sy = 0, top = H, bot = 0;
   T.clumps.forEach(function(C) {
@@ -14480,6 +14483,65 @@ function buildKoyoTree(key, far, lazy) {
   return T;
 }
 function koyoX(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
+/* ---------- the landmarks the two main maples may never hide completely (the user's rule) ----------
+   A crown may cover Fuji, the pagoda or the shrine hall in part, but never the whole of one: of a short
+   upright line down the middle of each, from its top, at least KOYO_LANDMARK_SHOW must stay clear of the
+   leaves (with a little room for the sway); a tree that covers more must clear that line entirely. koyoKeepLandmarks is the last step of buildKoyoTree, so this holds whatever the other
+   rules of the build do, for both trees, at every screen size. A tree that would hide one is first moved
+   toward its own screen edge (its trunk's foot stays on the screen), then, if that is not enough, its
+   crown is squeezed toward its trunk. Do not remove, bypass or weaken this. */
+var KOYO_LANDMARK_GAP = 0.008;   // the room left between the leaves and each line (share of the screen width)
+var KOYO_LANDMARK_SHOW = 0.25;   // at least this share of each line must show; a tree covering more must clear that line
+function koyoLandmarks() {
+  var out = [], hy = H * LAND.horizon, M = MTN3D.on ? MTN3D : LAND, fh = M.fujiHeight * H, top = hy - fh;
+  out.push({ name: 'fuji', x: M.fujiX * W, y0: top, y1: top + fh * 0.6 });   // (its summit and the snow cap below it)
+  var sp = lakeLandmarkSpots();
+  if (LAKE.pagoda) out.push({ name: 'pagoda', x: sp.pagoda.x, y0: sp.pagoda.y - sp.pagoda.h, y1: sp.pagoda.y - sp.pagoda.h * 0.5 });
+  if (LAKE.hall) out.push({ name: 'hall', x: sp.hall.x, y0: sp.hall.y - sp.hall.h, y1: sp.hall.y - sp.hall.h * 0.5 });
+  return out;
+}
+function koyoKeepLandmarks(T) {
+  if (!T || !T.clumps.length) return;
+  var nodes = T.nodes, gap = W * KOYO_LANDMARK_GAP;
+  // Covering part of a landmark is allowed: only a line that is covered over more than
+  // 1 - KOYO_LANDMARK_SHOW of its length counts as hidden, and only those are then cleared.
+  var lms = koyoLandmarks().filter(function(L) {
+    var clear = 0;
+    for (var s = 0; s <= 20; s++) {
+      var py = lerp(L.y0, L.y1, s / 20), hit = false;
+      for (var i = 0; i < T.clumps.length && !hit; i++) {
+        var C = T.clumps[i], cn = nodes[C.node];
+        hit = Math.hypot(koyoX(T, cn.ex + C.ox) - L.x, cn.ey + C.oy - py) < C.R * 1.25;   // (the leaves as they stand)
+      }
+      if (!hit) clear++;
+    }
+    return clear / 21 < KOYO_LANDMARK_SHOW;
+  });
+  if (!lms.length) return;
+  function overlap() {                                               // how far the leaves reach over a line (0: all clear)
+    var worst = 0;
+    T.clumps.forEach(function(C) {
+      var cn = nodes[C.node], x = koyoX(T, cn.ex + C.ox), y = cn.ey + C.oy, rr = C.R * 1.25 + gap;
+      lms.forEach(function(L) {
+        var dy = y < L.y0 ? L.y0 - y : (y > L.y1 ? y - L.y1 : 0);
+        if (dy >= rr) return;
+        var half = Math.sqrt(rr * rr - dy * dy), o = T.left ? x + half - L.x : L.x - (x - half);
+        if (o > worst) worst = o;
+      });
+    });
+    return worst;
+  }
+  var o = overlap();
+  if (o <= 0) return;
+  var room = Math.max(0, T.left ? T.bx - W * 0.03 : W * 0.97 - T.bx);   // (the trunk's foot stays on the screen)
+  var sh = Math.min(o, room) * (T.left ? -1 : 1);
+  if (sh) {
+    T.bx += sh;
+    nodes.forEach(function(nd) { nd.sx += sh; nd.ex += sh; });
+    if (T.axis !== undefined) T.axis += sh;
+  }
+  for (var i = 0; i < 300 && overlap() > 0; i++) T.k *= 0.98;       // still over a line: squeeze the crown toward the trunk
+}
 /* A leaf drops from a random clump; it falls at that tree's depth. */
 function dropKoyoLeaf(T, vx) {
   if (!T || !T.clumps.length) return;
@@ -17661,6 +17723,28 @@ function lakeFarShore(c) {
   }
 }
 
+/* The headland's shore (yS: where it meets the water) and the line of its hillside (yR), on the screen;
+   and where the pagoda and the shrine hall stand on it (their foot and screen height). Shared by the bake
+   below and by the maples' landmark rule (koyoLandmarks, 8b), so the two always agree. */
+var LAKE_ROW_PAGODA = 0.46, LAKE_ROW_HALL = 0.6;   // how far down the hillside (0 ridge … 1 shore) each stands
+function lakeHeadLines() {
+  var hy = H * LAND.horizon, F = torLens(), headAxis = hy + F / LAKE.headZ, tip = LAKE.headTip * W;
+  function yS(x) {
+    var u = smooth(tip - 0.1 * W, tip, x), d = headAxis - hy;
+    return lerp(headAxis + d * (0.1 * torNoise(x / W * 8, 51) + 0.04 * torNoise(x / W * 27, 52) + 0.015 * torNoise(x / W * 80, 53)), hy + F / 95, u);
+  }
+  function yR(x) {
+    var u = clamp(x / tip, 0, 1);
+    return lerp(H * LAKE.headTop, yS(x) - 2, Math.pow(u, 2.3)) + H * 0.014 * torNoise(x / W * 8, 3) * (1 - u);
+  }
+  return { yS: yS, yR: yR };
+}
+function lakeLandmarkSpots() {
+  var L = lakeHeadLines(), px = LAKE.pagodaX * W, hx = px - 0.11 * W;
+  return { pagoda: { x: px, y: lerp(L.yR(px) + H * 0.02, L.yS(px), LAKE_ROW_PAGODA + 0.06), h: LAKE.pagodaSize * H },
+           hall: { x: hx, y: lerp(L.yR(hx) + H * 0.02, L.yS(hx), LAKE_ROW_HALL + 0.04), h: 0.075 * W * 0.6 } };
+}
+
 /* ---------- the wooded headland, the pagoda, the hall ----------
    Drawn into HEADN in parts, one a frame (lakeBakeHeadStep): the hill and its canopy, the rows of trees two at
    a time, then the bank at the water. It is swapped in for HEAD once the water and the grove are done too. */
@@ -17680,14 +17764,7 @@ function lakeBakeHead() {
   var headAxis = LK.headAxis, tip = LAKE.headTip * W;
   r();
   // its shore (where it meets the water) and the line of its hillside
-  function yS(x) {
-    var u = smooth(tip - 0.1 * W, tip, x), d = headAxis - hy;
-    return lerp(headAxis + d * (0.1 * torNoise(x / W * 8, 51) + 0.04 * torNoise(x / W * 27, 52) + 0.015 * torNoise(x / W * 80, 53)), hy + F / 95, u);
-  }
-  function yR(x) {
-    var u = clamp(x / tip, 0, 1);
-    return lerp(H * LAKE.headTop, yS(x) - 2, Math.pow(u, 2.3)) + H * 0.014 * torNoise(x / W * 8, 3) * (1 - u);
-  }
+  var HL = lakeHeadLines(), yS = HL.yS, yR = HL.yR;
   parts.push(function () {
   css();
   // the hill's body, in the dark of the forest
@@ -17713,7 +17790,7 @@ function lakeBakeHead() {
   })();
   });
   // rows of trees, from the ridge to the shore
-  var rows = 8, fp = 0.46, fh = 0.6, pagodaDone = !LAKE.pagoda, hallDone = !LAKE.hall;
+  var rows = 8, fp = LAKE_ROW_PAGODA, fh = LAKE_ROW_HALL, pagodaDone = !LAKE.pagoda, hallDone = !LAKE.hall;
   var px = LAKE.pagodaX * W, zBack = LAKE.headZ * 1.55;
   var cam = [0, 1, 0], lt = (function () { var v = [-0.62, 0.62, -0.48], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
   function building(kind, bx, byScr, z, size, yaw, haze) {
@@ -17733,12 +17810,12 @@ function lakeBakeHead() {
     css();
     var f = row / (rows - 1), z = lerp(zBack, LAKE.headZ, f), unit = F / z * LAKE.treeSize, haze = lerp(0.34, 0.1, f);
     if (!pagodaDone && f > fp) {
-      building('pagoda', px, lerp(yR(px) + H * 0.02, yS(px), fp + 0.06), lerp(zBack, LAKE.headZ, fp), LAKE.pagodaSize, 0.55, lerp(0.34, 0.1, fp) * 0.8);
+      building('pagoda', px, lakeLandmarkSpots().pagoda.y, lerp(zBack, LAKE.headZ, fp), LAKE.pagodaSize, 0.55, lerp(0.34, 0.1, fp) * 0.8);
       pagodaDone = true;
     }
     if (!hallDone && f > fh) {
-      var hx = px - 0.11 * W;
-      building('hall', hx, lerp(yR(hx) + H * 0.02, yS(hx), fh + 0.04), lerp(zBack, LAKE.headZ, fh), 0.075, -0.35, lerp(0.34, 0.1, fh) * 0.85);
+      var HS = lakeLandmarkSpots().hall, hx = HS.x;
+      building('hall', hx, HS.y, lerp(zBack, LAKE.headZ, fh), 0.075, -0.35, lerp(0.34, 0.1, fh) * 0.85);
       hallDone = true;
     }
     var fin = lakeFin(haze), xx = x0 - r() * 20;
