@@ -14098,13 +14098,18 @@ function bakeClump(C, far) {
     if (far) o = mixRgb(o, KOYO_PAPER, KOYO.farHaze);
     return koyoLight(o);
   }
-  // a lumpy darker core so the clump reads as one mass
+  // a lumpy darker core so the clump reads as one mass; each disc is feathered (solid in the middle,
+  // fading to nothing at its rim, drawn a little larger to keep the same mass) so no hard edge shows
   var core = mixRgb(col(scaleRgb(tones[0], 1 - shade * 0.25)), col(tones[1]), glow * 0.45);
-  c.fillStyle = rgba(core);
+  var coreA = rgba(core, 0), coreB = rgba(core);
   for (var b = 0; b < 9; b++) {
     var ba = r() * TAU, bd = r() * 0.4;
+    var bx = Math.cos(ba) * bd * R, by = Math.sin(ba) * bd * R * 0.75 + R * 0.05, br = R * (0.32 + r() * 0.18) * 1.35;
+    var g = c.createRadialGradient(bx, by, 0, bx, by, br);
+    g.addColorStop(0, coreB); g.addColorStop(0.45, coreB); g.addColorStop(1, coreA);
+    c.fillStyle = g;
     c.beginPath();
-    c.arc(Math.cos(ba) * bd * R, Math.sin(ba) * bd * R * 0.75 + R * 0.05, R * (0.32 + r() * 0.18), 0, TAU);
+    c.arc(bx, by, br, 0, TAU);
     c.fill();
   }
   var count = Math.round(85 * KOYO.leafDensity), dabs = [];
