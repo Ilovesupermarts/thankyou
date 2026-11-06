@@ -14117,7 +14117,7 @@ function bakeClump(C, far) {
   var count = Math.round(85 * KOYO.leafDensity), dabs = [];
   for (var i = 0; i < count; i++) {
     var a = r() * TAU, d = Math.sqrt(r()), edge = r() < 0.28;     // bigger leaves round the rim
-    if (edge) d = 0.85 + r() * 0.2;
+    if (edge) d = 0.78 + r() * 0.14;                               // (kept inside the mass so no leaf floats off it)
     var x = Math.cos(a) * d * R * 0.95, y = Math.sin(a) * d * R * 0.78;
     if (y > R * 0.45) y *= 0.8;                                    // flatter underside
     dabs.push({ x: x, y: y, t: (x * lx + y * ly) / R + (r() - 0.5) * 0.5,
@@ -14125,6 +14125,14 @@ function bakeClump(C, far) {
                 rot: (r() - 0.5) * 1.6 + (x / R) * 0.6, j: r() });
   }
   dabs.sort(function(p, q) { return p.t - q.t; });                // shade first, lit leaves on top
+  // a solid backing under the leaves (each leaf's own colour, a little darker, a little larger), so the
+  // clump has no see-through gaps and every leaf sits on the mass
+  for (var kb = 0; kb < dabs.length; kb++) {
+    var DB = dabs[kb], tb = DB.t < -0.25 ? mixRgb(tones[0], tones[1], 0.25) : DB.t < 0.35 ? tones[1] : mixRgb(tones[1], tones[0], 0.3);
+    koyoLeafPath(c, DB.x, DB.y, DB.s * 1.4, DB.rot);
+    c.fillStyle = rgba(scaleRgb(col(tb), 0.94));
+    c.fill();
+  }
   for (var k = 0; k < dabs.length; k++) {
     var D = dabs[k], tone;
     if (D.t < -0.25) tone = mixRgb(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
@@ -14426,6 +14434,35 @@ function buildKoyoTree(key, far, lazy) {
       }
     }
     T.axis = bx + axOff;                                              // (for checking: where the trunk enters the crown)
+  })();
+  // Close the holes inside the canopy: wherever a spot is not covered by any clump but is ringed by
+  // clumps on (nearly) every side, put a small clump beneath the others. Spots near the outline are
+  // left alone, so the tree's shape does not grow. (Its own random stream: the tree is otherwise the same.)
+  (function closeCanopyHoles() {
+    var rg = rngFrom(strSeed(key + '|holes')), base = T.clumps.length, cl = T.clumps, fills = [];
+    if (!base) return;
+    function centre(C) { var cn = nodes[C.node]; return [cn.ex + C.ox, cn.ey + C.oy]; }
+    var cs = cl.map(centre), x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+    cs.forEach(function(p, i) { x0 = Math.min(x0, p[0] - cl[i].R); x1 = Math.max(x1, p[0] + cl[i].R); y0 = Math.min(y0, p[1] - cl[i].R); y1 = Math.max(y1, p[1] + cl[i].R); });
+    var step = fillR * 0.35, reach = 0.5;
+    function covered(px, py) { for (var i = 0; i < cl.length; i++) if (Math.hypot(cs[i][0] - px, cs[i][1] - py) < cl[i].R * reach) return true; return false; }
+    for (var py = y0; py < y1; py += step) for (var px = x0; px < x1; px += step) {
+      if (covered(px, py)) continue;
+      var ring = 0;
+      var above = covered(px, py - fillR * 1.4);
+      for (var q = 0; q < 8; q++) { var qa = q * TAU / 8; if (covered(px + Math.cos(qa) * fillR * 1.4, py + Math.sin(qa) * fillR * 1.4)) ring++; }
+      if (ring < 3 || !above || !covered(px, py + fillR * 0.9)) continue;                              // (it must be buried: covered above and on most sides)
+      var bi = 0, bd = 1e9;                                          // the nearest twig end carries it (so it sways with the tree)
+      for (var gi = 1; gi < nodes.length; gi++) { if (nodes[gi].d < 2) continue; var dd = Math.hypot(nodes[gi].ex - px, nodes[gi].ey - py); if (dd < bd) { bd = dd; bi = gi; } }
+      if (!bi) continue;
+      var ni = 0, nd = 1e9;                                          // colour like the nearest clump
+      for (var ci = 0; ci < base; ci++) { var d2 = Math.hypot(cs[ci][0] - px, cs[ci][1] - py); if (d2 < nd) { nd = d2; ni = ci; } }
+      var F = { node: bi, R: fillR * 0.55, fam: cl[ni].fam, back: true, seed: (rg() * 4294967296) >>> 0,
+                ox: px - nodes[bi].ex, oy: py - nodes[bi].ey, ph: rg() * TAU, bakedV: -1 };
+      fills.push(F); cl.push(F); cs.push([px, py]);                  // (counts as covering from now on)
+    }
+    cl.splice(base, fills.length);
+    T.clumps = fills.concat(cl);                                     // the fillers go underneath
   })();
   // where the canopy sits, for the night glow
   var sx = 0, sy = 0, top = H, bot = 0;
@@ -17879,13 +17916,21 @@ function bakeSprite(S2) {
   var count = Math.round(85 * KOYO.leafDensity * clamp(R / 13, 0.35, 1)), dabs = [];
   for (var i = 0; i < count; i++) {
     var a = r() * TAU, d = Math.sqrt(r()), edge = r() < 0.28;
-    if (edge) d = 0.85 + r() * 0.2;
+    if (edge) d = 0.78 + r() * 0.14;                               // (kept inside the mass so no leaf floats off it)
     var x = Math.cos(a) * d * R * 0.95, y = Math.sin(a) * d * R * 0.78;
     if (y > R * 0.45) y *= 0.8;
     dabs.push({ x: x, y: y, t: (x * lx + y * ly) / R + (r() - 0.5) * 0.5, s: R * (edge ? 0.3 : 0.24) * KOYO.leafSize * (0.7 + r() * 0.6),
                 rot: (r() - 0.5) * 1.6 + (x / R) * 0.6, j: r() });
   }
   dabs.sort(function (p, q) { return p.t - q.t; });
+  // a solid backing under the leaves (each leaf's own colour, a little darker, a little larger), so the
+  // clump has no see-through gaps and every leaf sits on the mass
+  for (var kb = 0; kb < dabs.length; kb++) {
+    var DB = dabs[kb], tb = DB.t < -0.25 ? mixRgb(tones[0], tones[1], 0.25) : DB.t < 0.35 ? tones[1] : mixRgb(tones[1], tones[0], 0.3);
+    koyoLeafPath(c, DB.x, DB.y, DB.s * 1.4, DB.rot);
+    c.fillStyle = rgba(scaleRgb(col(tb), 0.94));
+    c.fill();
+  }
   for (var k = 0; k < dabs.length; k++) {
     var D = dabs[k], tone;
     if (D.t < -0.25) tone = mixRgb(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
