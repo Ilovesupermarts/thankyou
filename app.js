@@ -21256,7 +21256,7 @@ function rvRect(k) {
   if (k === 'fuji+ridges') top = Math.min(LS.scnTop || 0, hy - H * 0.35) - 30;
   else if (k === 'lake') top = Math.min(yf, LS.grdTop || yf) - 24;
   else if (k === 'headland') top = Math.min(LK.headBox ? LK.headBox.y0 : 0, yf) - 40;
-  else if (k === 'bank') top = (LK.bankT || []).reduce(function(m, B) { return Math.min(m, B.y - B.ch); }, yf) - 30;
+  else if (k === 'bank') top = (LK.bankT || []).reduce(function(m, T) { return T.height > 0 ? Math.min(m, T.sy - T.height) : m; }, yf) - 30;
   else if (k === 'torii') top = Math.min(TOR.gateTop || 0, yf) - 40;
   else if (k === 'shore') top = Math.min(LS.grdTop || yf, LK.foreTop || yf) - H * 0.22;
   if (!(top > 0)) top = 0;                         // (anything unknown: the whole screen)
@@ -21431,10 +21431,13 @@ function rvSeeds(id) {
     });
     return [{ seeds: out, fall: 0.3 }];
   }
-  if (id === 'bank') {
-    (LK.bankT || []).slice().sort(function(a, b) { return a.ch - b.ch; }).forEach(function(B, i) {
-      drop(B.x, B.y - B.ch * 0.25, Math.max(B.cw, B.ch) * 0.3, i * 0.12);
-      drop(B.x, B.y - B.ch * 0.65, Math.max(B.cw, B.ch) * 0.35, i * 0.12 + 0.15);
+  if (id === 'bank') {                                             // the far trees first, coming forward: the trunk, then the crown
+    var BT = (LK.bankT || []).slice().sort(function(a, b) { return b.z - a.z; }), nB = Math.max(1, BT.length - 1);
+    BT.forEach(function(T, i) {
+      var h = T.height || 0, w = (T.reachL || 0) + (T.reachR || 0), cx = T.sx + ((T.reachR || 0) - (T.reachL || 0)) / 2, t0 = 0.9 * i / nB;
+      if (!(h > 0) || !isFinite(T.sx)) return;
+      drop(T.sx, T.sy - h * 0.22, Math.max(6, h * 0.22), t0);
+      drop(cx, T.sy - h * 0.62, Math.max(w, h) * 0.38, t0 + 0.15);
     });
     return [{ seeds: out, fall: 0.6 }];
   }
