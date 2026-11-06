@@ -21075,13 +21075,14 @@ var RV_PARTS = [
   ['lake', 'wash', 0, 1.0],
   ['headland', 'wash', 0, 1.8],
   ['torii', 'wash', 0, 1.8],            // with the lanterns and their light (tuned at 0 s for 1.8 s too)
-  ['bank', 'wash', 0, 1.5],
-  ['maples', 'wash', 1.9, 2.0],
-  ['bamboo', 'wash', 3.5, 1.5],
+  ['bank', 'wash', 1.85, 1.5],
+  ['maples', 'wash', 1.9, 1.5],
+  ['bamboo', 'wash', 3.0, 1.5],
   ['shore', 'wash', 0, 0.9],
-  ['creatures', 'fade', 3.5, 1.0],
-  ['leaves', 'fade', 3.5, 1.0]
+  ['creatures', 'fade', 3.0, 1.0],
+  ['leaves', 'fade', 3.0, 1.0]
 ];
+var RV_MESSAGE_AT = 4.0;                         // the first message panel starts at this time on the reveal's clock (reveal-lab's "The first message panel")
 var RV_KIND = {};
 RV_PARTS.forEach(function(p) { RV_KIND[p[0]] = p[1]; });
 var RV_SPOT = {};                                  // where the pagoda and the hall stand (set as the headland is baked)
@@ -21811,7 +21812,7 @@ window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
 /* The bamboo is the last part the reveal paints in: once it has finished appearing the scene is all there
    (what is left is only the birds and the falling leaves fading in), so the message comes then, not when the
    reveal's last clean-up has ended. */
-function rvBambooIn() { return !RV.started || InkReveal.state('bamboo') === 2; }
+function rvBambooIn() { return !RV.started || InkReveal.clock() >= RV_MESSAGE_AT; }   // (the first message's time has come)
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
          sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
          bankInfo: function() { return BankTrees.info(); } };          // (for checking: how the bank trees are doing)
