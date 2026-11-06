@@ -14278,6 +14278,26 @@ function buildKoyoTree(key, far, lazy) {
     var room = (left ? limit - bx : limit - (W - bx)) - C.R * 1.25;
     if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
   });
+  // Keep the trunk under the crown: the crown must not mostly hang off the screen on the trunk's side.
+  // If the trunk is too near the edge for the crown's reach, move the tree in (squeezing the crown a
+  // little if the width limit needs it), so most of the mirrored crown shows on both sides of the trunk.
+  (function balanceTrunk() {
+    var reach = 0;
+    T.clumps.forEach(function(C) {
+      var cn = nodes[C.node], d = (left ? cn.ex - bx : bx - cn.ex) * k + C.R * 1.25;
+      if (d > reach) reach = d;
+    });
+    var foot = left ? bx : W - bx, want = 0.7;
+    if (reach <= 0 || foot >= want * reach) return;
+    var f = clamp(limit / ((1 + want) * reach), 0.75, 1);
+    k *= f; reach *= f;
+    var shift = Math.max(0, want * reach - foot);
+    if (shift > 0) {
+      bx += left ? shift : -shift;
+      T.bx = bx;
+      nodes.forEach(function(nd) { nd.sx += left ? shift : -shift; nd.ex += left ? shift : -shift; });
+    }
+  })();
   T.k = k;
   // No bald side: the trunk stands at the screen edge, so the canopy must carry on
   // past that edge (it may bleed off the screen, but must not stop short of it and
