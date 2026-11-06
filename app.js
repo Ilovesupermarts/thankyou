@@ -14356,20 +14356,42 @@ function buildKoyoTree(key, far, lazy) {
   })();
   // The small tree only: the crown's two sides reach equally far from the trunk, and the
   // whole crown is on the screen (measured at the leaves' outer edge, ~1.25 R).
-  // The small tree only: its crown is made symmetric about the trunk. The clumps on the
-  // trunk's side are replaced by a mirror image of those on the outer side (same outline,
-  // their own colours), then the tree is moved in so the whole crown is on the screen.
+  // The small tree only: its crown is made symmetric about the point where the trunk
+  // enters it (the trunk leans, so its foot is not the middle). The clumps on the outer
+  // side of that line are kept and mirrored onto the other side (their own colours).
+  // Then the tree is moved toward the screen edge so the crown stops short of the pagoda
+  // (its far side may run off the screen).
   if (far) (function evenSmallCrown() {
     function cx(C) { var cn = nodes[C.node]; return bx + (cn.ex + C.ox - bx) * k; }
+    function cy(C) { return nodes[C.node].ey + C.oy; }
+    // where the trunk enters the crown: up the trunk, then the thickest limb at each fork,
+    // the first point that lies inside a clump
+    var path = [0], axis = bx;
+    for (var pd = 0; pd < 3; pd++) {
+      var last = path[path.length - 1], kid = -1;
+      for (var ki = 0; ki < nodes.length; ki++) if (nodes[ki].p === last && (kid < 0 || nodes[ki].w > nodes[kid].w)) kid = ki;
+      if (kid < 0) break;
+      path.push(kid);
+    }
+    found: for (var pi = 0; pi < path.length; pi++) {
+      var pn = nodes[path[pi]];
+      for (var st = 0; st <= 20; st++) {
+        var px0 = bx + (lerp(pn.sx, pn.ex, st / 20) - bx) * k, py0 = lerp(pn.sy, pn.ey, st / 20);
+        for (var ci = 0; ci < T.clumps.length; ci++) {
+          var C0 = T.clumps[ci];
+          if (Math.hypot(cx(C0) - px0, cy(C0) - py0) < C0.R) { axis = px0; break found; }
+        }
+      }
+    }
     var anchors = [];
     for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
-    var outer = T.clumps.filter(function(C) { return (left ? cx(C) - bx : bx - cx(C)) >= 0; });
+    var outer = T.clumps.filter(function(C) { return (left ? cx(C) - axis : axis - cx(C)) >= 0; });
     if (!outer.length || !anchors.length) return;
     var mirrored = [];
     outer.forEach(function(C) {
-      var x = cx(C), o = Math.abs(x - bx);
-      if (o < C.R * 0.25) return;                                    // (on the trunk line: no copy needed)
-      var mx = 2 * bx - x, rx = bx + (mx - bx) / k, y = nodes[C.node].ey + C.oy;
+      var x = cx(C);
+      if (Math.abs(x - axis) < C.R * 0.25) return;                   // (on the line: no copy needed)
+      var mx = 2 * axis - x, rx = bx + (mx - bx) / k, y = cy(C);
       var best = anchors[0], bd = 1e18;
       for (var q = 0; q < anchors.length; q++) {
         var an = nodes[anchors[q]], dd = Math.hypot(an.ex - rx, an.ey - y);
@@ -14385,14 +14407,18 @@ function buildKoyoTree(key, far, lazy) {
       if (a.back !== b.back) return a.back ? -1 : 1;
       return nodes[b.node].ey - nodes[a.node].ey;
     });
-    var side = 0;
-    T.clumps.forEach(function(C) { side = Math.max(side, Math.abs(cx(C) - bx) + C.R * 1.25); });
-    var gap = (left ? bx : W - bx) - side - W * 0.01;                // keep the crown off the screen edge
-    if (gap < 0) {
-      var sh = left ? -gap : gap;
-      bx += sh; T.bx = bx;
-      nodes.forEach(function(nd) { nd.sx += sh; nd.ex += sh; });
+    var axOff = axis - bx;
+    if (left && LAKE.pagoda) {                                        // stop short of the pagoda (it stands on the left)
+      var edge = -1e9;
+      T.clumps.forEach(function(C) { edge = Math.max(edge, cx(C) + C.R * 1.25); });
+      var sh = Math.min(0, LAKE.pagodaX * W - W * 0.005 - edge);        // (a little gap, for the sway)
+      sh = Math.max(sh, W * 0.03 - bx);                              // (the trunk's foot stays on the screen)
+      if (sh < 0) {
+        bx += sh; T.bx = bx;
+        nodes.forEach(function(nd) { nd.sx += sh; nd.ex += sh; });
+      }
     }
+    T.axis = bx + axOff;                                              // (for checking: where the trunk enters the crown)
   })();
   // where the canopy sits, for the night glow
   var sx = 0, sy = 0, top = H, bot = 0;
