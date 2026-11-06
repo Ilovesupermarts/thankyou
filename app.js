@@ -14278,6 +14278,26 @@ function buildKoyoTree(key, far, lazy) {
     var room = (left ? limit - bx : limit - (W - bx)) - C.R * 1.25;
     if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
   });
+  // Keep the trunk under the crown: the crown must not mostly hang off the screen on the trunk's side.
+  // If the trunk is too near the edge for the crown's reach, move the tree in (squeezing the crown a
+  // little if the width limit needs it), so most of the mirrored crown shows on both sides of the trunk.
+  (function balanceTrunk() {
+    var reach = 0;
+    T.clumps.forEach(function(C) {
+      var cn = nodes[C.node], d = (left ? cn.ex - bx : bx - cn.ex) * k + C.R * 1.25;
+      if (d > reach) reach = d;
+    });
+    var foot = left ? bx : W - bx, want = 0.7;
+    if (!far || reach <= 0 || foot >= want * reach) return;   // (the small tree only)
+    var f = clamp(limit / ((1 + want) * reach), 0.75, 1);
+    k *= f; reach *= f;
+    var shift = Math.max(0, want * reach - foot);
+    if (shift > 0) {
+      bx += left ? shift : -shift;
+      T.bx = bx;
+      nodes.forEach(function(nd) { nd.sx += left ? shift : -shift; nd.ex += left ? shift : -shift; });
+    }
+  })();
   T.k = k;
   // No bald side: the trunk stands at the screen edge, so the canopy must carry on
   // past that edge (it may bleed off the screen, but must not stop short of it and
@@ -14285,7 +14305,7 @@ function buildKoyoTree(key, far, lazy) {
   // ends before it reaches the edge on the trunk's side, add clumps out to the edge.
   // (This is a rule of the build, so every tree and every size obeys it.)
   (function fillTrunkSide() {
-    var step = fillR * 0.5, top2 = 1e9, bot2 = -1e9, pos = [], added = 0;
+    var step = fillR * 0.5, top2 = 1e9, bot2 = -1e9, pos = [], added = 0, cap = far ? 420 : 260;
     T.clumps.forEach(function(C) {
       var cn = nodes[C.node], px = bx + (cn.ex + C.ox - bx) * k, py = cn.ey + C.oy;
       pos.push({ x: px, y: py, R: C.R, fam: C.fam });
@@ -14295,7 +14315,7 @@ function buildKoyoTree(key, far, lazy) {
     function edgeDist(x) { return left ? x : W - x; }               // distance from the screen edge on the trunk side
     var anchors = [];
     for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
-    for (var y = top2; y <= bot2 + step && added < 420; y += step) {
+    for (var y = top2; y <= bot2 + step && added < cap; y += step) {
       var row = pos.filter(function(p) { return Math.abs(p.y - y) < p.R * 0.5; });
       if (!row.length) continue;
       var cur = 1e9, famRef = row[0];
@@ -14304,8 +14324,8 @@ function buildKoyoTree(key, far, lazy) {
       // so the crown is never lopsided (the edge rule below is the minimum).
       var outD = 0;
       row.forEach(function(p) { outD = Math.max(outD, left ? p.x - bx : bx - p.x); });
-      var target = Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD);
-      while (cur > target && added < 420) {                    // its centre must lie off the screen, so the edge is covered
+      var target = far ? Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD) : -fillR * 0.5;   // (the mirror rule is for the small tree only)
+      while (cur > target && added < cap) {                    // its centre must lie off the screen, so the edge is covered
         var d = cur - fillR * 1.0, wx = left ? d : W - d;            // new clump centre, overlapping the last
         var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;           // (back to the unsqueezed spot, for its branch)
         for (var q = 0; q < anchors.length; q++) {

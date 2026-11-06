@@ -840,6 +840,28 @@ function buildTree(far, P) {
     var room = left ? limit - bx - edge : limit - (W - bx) - edge;
     if (dx > 0 && dx * k > room) k = Math.max(0.3, room / dx);
   }
+  if (!P) {
+  // Keep the trunk under the crown: the crown must not mostly hang off the screen on the trunk's side.
+  // If the trunk is too near the edge for the crown's reach, move the tree in (squeezing the crown a
+  // little if the width limit needs it), so most of the mirrored crown shows on both sides of the trunk.
+  (function balanceTrunk() {
+    var reach = 0;
+    T.clumps.forEach(function (C) {
+      var cn = nodes[C.node], d = (left ? cn.ex - bx : bx - cn.ex) * k + C.R * 1.25;
+      if (d > reach) reach = d;
+    });
+    var foot = left ? bx : W - bx, want = 0.7;
+    if (!far || reach <= 0 || foot >= want * reach) return;   // (the small tree only)
+    var f = clamp(limit / ((1 + want) * reach), 0.75, 1);
+    k *= f; reach *= f;
+    var shift = Math.max(0, want * reach - foot);
+    if (shift > 0) {
+      bx += left ? shift : -shift;
+      T.bx = bx;
+      nodes.forEach(function (nd) { nd.sx += left ? shift : -shift; nd.ex += left ? shift : -shift; });
+    }
+  })();
+  }
   T.k = k;
   if (!P) fillTrunkSide(T, r, rb, res);
   var sx2 = 0, sy2 = 0, top = H, bot = 0, nC = T.clumps.length || 1;
@@ -919,7 +941,7 @@ function shapeCanopy(T, r, rb, res, w, cell, cellFam) {
    added out to (and past) the edge. */
 function fillTrunkSide(T, r, rb, res) {
   var nodes = T.nodes, bx = T.bx, k = T.k, left = T.left, fillR = T.fillR || T.scale * 0.095;
-  var step = fillR * 0.5, top2 = 1e9, bot2 = -1e9, pos = [], added = 0;
+  var step = fillR * 0.5, top2 = 1e9, bot2 = -1e9, pos = [], added = 0, far = T.far, cap = far ? 420 : 260;
   T.clumps.forEach(function (C) {
     var cn = nodes[C.node], px = bx + (cn.ex + C.ox - bx) * k, py = cn.ey + C.oy;
     pos.push({ x: px, y: py, R: C.R, fam: C.fam });
@@ -929,7 +951,7 @@ function fillTrunkSide(T, r, rb, res) {
   function edgeDist(x) { return left ? x : W - x; }
   var anchors = [];
   for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
-  for (var y = top2; y <= bot2 + step && added < 420; y += step) {
+  for (var y = top2; y <= bot2 + step && added < cap; y += step) {
     var row = pos.filter(function (p) { return Math.abs(p.y - y) < p.R * 0.5; });
     if (!row.length) continue;
     var cur = 1e9, famRef = row[0];
@@ -938,8 +960,8 @@ function fillTrunkSide(T, r, rb, res) {
     // so the crown is never lopsided (the edge rule below is the minimum).
     var outD = 0;
     row.forEach(function (p) { outD = Math.max(outD, left ? p.x - bx : bx - p.x); });
-    var target = Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD);
-    while (cur > target && added < 420) {
+    var target = far ? Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD) : -fillR * 0.5;   // (the mirror rule is for the small tree only)
+    while (cur > target && added < cap) {
       var d = cur - fillR * 1.0, wx = left ? d : W - d;
       var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;
       for (var q = 0; q < anchors.length; q++) {
