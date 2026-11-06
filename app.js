@@ -14484,13 +14484,14 @@ function buildKoyoTree(key, far, lazy) {
 }
 function koyoX(T, x) { return T.bx + (x - T.bx) * T.k; }   // the width squeeze
 /* ---------- the landmarks the two main maples may never hide completely (the user's rule) ----------
-   A crown may cover Fuji, the pagoda or the shrine hall in part, but never the whole of one: a short
-   upright line down the middle of each, from its top, must stay clear of the leaves (with a little room
-   for the sway). koyoKeepLandmarks is the last step of buildKoyoTree, so this holds whatever the other
+   A crown may cover Fuji, the pagoda or the shrine hall in part, but never the whole of one: of a short
+   upright line down the middle of each, from its top, at least KOYO_LANDMARK_SHOW must stay clear of the
+   leaves (with a little room for the sway); a tree that covers more must clear that line entirely. koyoKeepLandmarks is the last step of buildKoyoTree, so this holds whatever the other
    rules of the build do, for both trees, at every screen size. A tree that would hide one is first moved
    toward its own screen edge (its trunk's foot stays on the screen), then, if that is not enough, its
    crown is squeezed toward its trunk. Do not remove, bypass or weaken this. */
 var KOYO_LANDMARK_GAP = 0.008;   // the room left between the leaves and each line (share of the screen width)
+var KOYO_LANDMARK_SHOW = 0.25;   // at least this share of each line must show; a tree covering more must clear that line
 function koyoLandmarks() {
   var out = [], hy = H * LAND.horizon, M = MTN3D.on ? MTN3D : LAND, fh = M.fujiHeight * H, top = hy - fh;
   out.push({ name: 'fuji', x: M.fujiX * W, y0: top, y1: top + fh * 0.6 });   // (its summit and the snow cap below it)
@@ -14501,7 +14502,22 @@ function koyoLandmarks() {
 }
 function koyoKeepLandmarks(T) {
   if (!T || !T.clumps.length) return;
-  var lms = koyoLandmarks(), nodes = T.nodes, gap = W * KOYO_LANDMARK_GAP;
+  var nodes = T.nodes, gap = W * KOYO_LANDMARK_GAP;
+  // Covering part of a landmark is allowed: only a line that is covered over more than
+  // 1 - KOYO_LANDMARK_SHOW of its length counts as hidden, and only those are then cleared.
+  var lms = koyoLandmarks().filter(function(L) {
+    var clear = 0;
+    for (var s = 0; s <= 20; s++) {
+      var py = lerp(L.y0, L.y1, s / 20), hit = false;
+      for (var i = 0; i < T.clumps.length && !hit; i++) {
+        var C = T.clumps[i], cn = nodes[C.node];
+        hit = Math.hypot(koyoX(T, cn.ex + C.ox) - L.x, cn.ey + C.oy - py) < C.R * 1.25;   // (the leaves as they stand)
+      }
+      if (!hit) clear++;
+    }
+    return clear / 21 < KOYO_LANDMARK_SHOW;
+  });
+  if (!lms.length) return;
   function overlap() {                                               // how far the leaves reach over a line (0: all clear)
     var worst = 0;
     T.clumps.forEach(function(C) {
