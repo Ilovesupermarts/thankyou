@@ -14282,12 +14282,20 @@ function buildKoyoTree(key, far, lazy) {
   // If the trunk is too near the edge for the crown's reach, move the tree in (squeezing the crown a
   // little if the width limit needs it), so most of the mirrored crown shows on both sides of the trunk.
   (function balanceTrunk() {
+    if (far) {                                                       // (the small tree: the trunk side may not reach farther than the outer side)
+      var outMax = 0;
+      T.clumps.forEach(function(C0) { var c0 = nodes[C0.node], x0 = bx + (c0.ex + C0.ox - bx) * k; outMax = Math.max(outMax, left ? x0 - bx : bx - x0); });
+      T.clumps.forEach(function(C0) {
+        var c0 = nodes[C0.node], x0 = bx + (c0.ex + C0.ox - bx) * k, o0 = left ? x0 - bx : bx - x0;
+        if (o0 < -outMax) C0.ox += (left ? (-outMax - o0) : (o0 + outMax)) / k;
+      });
+    }
     var reach = 0;
     T.clumps.forEach(function(C) {
       var cn = nodes[C.node], d = (left ? cn.ex - bx : bx - cn.ex) * k + C.R * 1.25;
       if (d > reach) reach = d;
     });
-    var foot = left ? bx : W - bx, want = 0.7;
+    var foot = left ? bx : W - bx, want = 1.03;   // (the whole crown on the screen, the trunk in its middle)
     if (!far || reach <= 0 || foot >= want * reach) return;   // (the small tree only)
     var f = clamp(limit / ((1 + want) * reach), 0.75, 1);
     k *= f; reach *= f;
@@ -14324,7 +14332,7 @@ function buildKoyoTree(key, far, lazy) {
       // so the crown is never lopsided (the edge rule below is the minimum).
       var outD = 0;
       row.forEach(function(p) { outD = Math.max(outD, left ? p.x - bx : bx - p.x); });
-      var target = far ? Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD) : -fillR * 0.5;   // (the mirror rule is for the small tree only)
+      var target = far ? (left ? bx : W - bx) - outD : -fillR * 0.5;   // (the mirror rule is for the small tree only)
       while (cur > target && added < cap) {                    // its centre must lie off the screen, so the edge is covered
         var d = cur - fillR * 1.0, wx = left ? d : W - d;            // new clump centre, overlapping the last
         var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;           // (back to the unsqueezed spot, for its branch)
