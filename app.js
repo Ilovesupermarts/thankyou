@@ -14295,12 +14295,17 @@ function buildKoyoTree(key, far, lazy) {
     function edgeDist(x) { return left ? x : W - x; }               // distance from the screen edge on the trunk side
     var anchors = [];
     for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
-    for (var y = top2; y <= bot2 + step && added < 260; y += step) {
+    for (var y = top2; y <= bot2 + step && added < 420; y += step) {
       var row = pos.filter(function(p) { return Math.abs(p.y - y) < p.R * 0.5; });
       if (!row.length) continue;
       var cur = 1e9, famRef = row[0];
       row.forEach(function(p) { var e = edgeDist(p.x); if (e < cur) { cur = e; famRef = p; } });   // the outermost clump's centre
-      while (cur > -fillR * 0.5 && added < 260) {                    // its centre must lie off the screen, so the edge is covered
+      // Mirror rule: the trunk side must reach as far from the trunk as the outer side does on this row,
+      // so the crown is never lopsided (the edge rule below is the minimum).
+      var outD = 0;
+      row.forEach(function(p) { outD = Math.max(outD, left ? p.x - bx : bx - p.x); });
+      var target = Math.min(-fillR * 0.5, (left ? bx : W - bx) - outD);
+      while (cur > target && added < 420) {                    // its centre must lie off the screen, so the edge is covered
         var d = cur - fillR * 1.0, wx = left ? d : W - d;            // new clump centre, overlapping the last
         var best = -1, bd = 1e18, rx = bx + (wx - bx) / k;           // (back to the unsqueezed spot, for its branch)
         for (var q = 0; q < anchors.length; q++) {
