@@ -14098,6 +14098,17 @@ function bakeClump(C, far) {
     if (far) o = mixRgb(o, KOYO_PAPER, KOYO.farHaze);
     return koyoLight(o);
   }
+  // the inside of the clump filled in the shade colour, so no sky shows between the leaves; it stops
+  // (feathered) inside the ring of rim leaves, so its edge is never seen and it never shows past them
+  var fillC = col(mixRgb(tones[0], tones[1], 0.35)), fc = Math.round(clamp(fillC[0], 0, 255)) + ',' + Math.round(clamp(fillC[1], 0, 255)) + ',' + Math.round(clamp(fillC[2], 0, 255));
+  c.save();
+  c.translate(0, -R * 0.04);
+  c.scale(R * 0.74, R * 0.56);
+  var fg = c.createRadialGradient(0, 0, 0, 0, 0, 1);
+  fg.addColorStop(0, 'rgba(' + fc + ',1)'); fg.addColorStop(0.88, 'rgba(' + fc + ',1)'); fg.addColorStop(1, 'rgba(' + fc + ',0)');
+  c.fillStyle = fg;
+  c.beginPath(); c.arc(0, 0, 1, 0, TAU); c.fill();
+  c.restore();
   // a lumpy darker core so the clump reads as one mass; each disc is feathered over its whole radius
   // (strongest at the centre, easing out to nothing at the rim) and no larger than the leaves reach,
   // so no hard edge shows and nothing soft sticks out past the tree's outline
@@ -14125,14 +14136,6 @@ function bakeClump(C, far) {
                 rot: (r() - 0.5) * 1.6 + (x / R) * 0.6, j: r() });
   }
   dabs.sort(function(p, q) { return p.t - q.t; });                // shade first, lit leaves on top
-  // a solid backing under the leaves (each leaf's own colour, a little darker, a little larger), so the
-  // clump has no see-through gaps and every leaf sits on the mass
-  for (var kb = 0; kb < dabs.length; kb++) {
-    var DB = dabs[kb], tb = DB.t < -0.25 ? mixRgb(tones[0], tones[1], 0.25) : DB.t < 0.35 ? tones[1] : mixRgb(tones[1], tones[0], 0.3);
-    koyoLeafPath(c, DB.x, DB.y, DB.s * 1.4, DB.rot);
-    c.fillStyle = rgba(scaleRgb(col(tb), 0.94));
-    c.fill();
-  }
   for (var k = 0; k < dabs.length; k++) {
     var D = dabs[k], tone;
     if (D.t < -0.25) tone = mixRgb(tones[0], tones[1], clamp((D.t + 1) / 0.75, 0, 1) * 0.5);
