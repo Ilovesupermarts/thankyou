@@ -15656,6 +15656,7 @@ function landBakeScenery() {
   // low sun (late afternoon, evening) one go takes over 2 s on the tablet, and its graphics
   // chip then resets, taking every WebGL picture on the page with it (the winter scene
   // found this first, 8d). Until they are done the old scenery stays on the screen.
+  gfxNote('mountains: baking at ' + LS.MTN.cnv.width + '×' + LS.MTN.cnv.height + ' (screen ' + W + '×' + H + ')' + (LAND_MTN.job ? ', the last one unfinished' : ''));
   if (LAND_MTN.job) LAND_MTN.job.cancel();
   LAND_MTN.job = null; LAND_MTN.pic = null;
   if (try3d && Mountains.start) {
@@ -15704,6 +15705,14 @@ function landStepScenery() {
    back empty, or (every 3 s) when the kept scenery was wiped (Chrome may drop it while the page is
    hidden behind a screenshot or the share sheet). At most 3 times in a row. */
 function landCheck(t) {
+  if (LS.visSeen !== document.visibilityState) {           // (for the graphics log: how things stand each time the page comes back)
+    LS.visSeen = document.visibilityState;
+    if (LS.visSeen === 'visible' && LS.SCN.cnv.width > 1) {
+      var vy = clamp(Math.round((H * LAND.horizon - H * 0.02) * LAND_SR), 0, LS.SCN.cnv.height - 1), vr = LS.SCN.c.getImageData(0, vy, LS.SCN.cnv.width, 1).data, vn = 0;
+      for (var q = 3; q < vr.length; q += 16) if (vr[q] > 8) vn++;
+      gfxNote('mountains: page back; scenery row ' + vn + '/' + Math.ceil(vr.length / 16) + ' filled, bake step ' + LS.step + (LAND_MTN.job ? ' (mountains drawing)' : '') + ', 3D ' + !!LS.is3d + ', tries ' + (LS.mtnTries || 0) + ', reveal ' + (RV.started ? 'on' : 'off'));
+    }
+  }
   if (t < (LS.checkAt || 0) || LS.step || !LS.ready || !LS.key || RV.started) return;
   LS.checkAt = t + 1;
   if ((LS.mtnTries || 0) >= 3) return;
