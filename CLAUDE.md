@@ -18,3 +18,4 @@
 - Always explain changes in plain English.
 - Other files may be added or changed when it helps, for example splitting code out of `app.js` into its own `.js` file.
 - When adding a file the app uses, add it to the `ASSETS` list in `sw.js` and bump the `CACHE` version so the tablet picks it up.
+- The maples' crowns are kept balanced: `fillTrunkSide` (in `buildKoyoTree` in `app.js`, and in `reveal-lab.html`) mirrors each row, so the trunk side reaches as far from the trunk as the outer side does (at least to the screen edge). It is a rule of the build, so every tree obeys it.
