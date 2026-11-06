@@ -15700,6 +15700,26 @@ function landStepScenery() {
   landFinishScenery(g3, rf);
   return true;
 }
+/* Once a second, after the ink reveal: the autumn mountains are baked again when their 3D picture came
+   back empty, or (every 3 s) when the kept scenery was wiped (Chrome may drop it while the page is
+   hidden behind a screenshot or the share sheet). At most 3 times in a row. */
+function landCheck(t) {
+  if (t < (LS.checkAt || 0) || LS.step || !LS.ready || !LS.key || RV.started) return;
+  LS.checkAt = t + 1;
+  if ((LS.mtnTries || 0) >= 3) return;
+  var lost = MTN3D.on && typeof Mountains !== 'undefined' && Mountains.state && Mountains.state() === 'lost';
+  if (lost) { LS.lostFor = (LS.lostFor || 0) + 1; if (LS.lostFor < 10) return; }   // the graphics chip is away: wait for it (10 s at most)
+  LS.lostFor = 0;
+  var redo = LS.mtnRetry;
+  if (!redo && t >= (LS.wipeAt || 0)) {
+    LS.wipeAt = t + 3;
+    redo = winBlankRow(LS.SCN, (H * LAND.horizon - H * 0.02) * LAND_SR);
+    if (redo) gfxNote('mountains: the scenery was wiped');
+  }
+  if (!redo) return;
+  LS.mtnRetry = false; LS.mtnTries = (LS.mtnTries || 0) + 1;
+  LS.key = ''; LS.at = -1e9;                                   // baked again from the next frame (the old picture stays up meanwhile)
+}
 function mtnWriting() {
   return typeof dynNaming === 'function' && dynNaming() && performance.now() < nameLandsAt;
 }
@@ -15710,6 +15730,12 @@ function landFinishScenery(g3, rf) {
   var try3d = MTN3D.on && typeof Mountains !== 'undefined';
   var m = LS.MTN.c, s = LS.SCN.c;
   [LS.MTN, LS.SCN, LS.TMP].forEach(function(o) { o.c.setTransform(1, 0, 0, 1, 0, 0); o.c.clearRect(0, 0, o.cnv.width, o.cnv.height); });
+  // Chrome can take the graphics chip away (a screenshot, the share sheet) and hand back an empty
+  // picture without saying so: then the painted ridges for now, and the 3D ones are tried again (landCheck)
+  if (g3 && winBlankRow({ cnv: g3, c: g3.getContext('2d') }, (hy - H * 0.02) * LAND_SR)) {
+    gfxNote('mountains: the 3D picture came back empty');
+    LS.mtnRetry = true; g3 = rf = null;
+  } else if (g3) LS.mtnTries = 0;
   var is3d = !!g3 && landDrawMountains3d(m, hy, g3, rf);
   gfxNote('mountains drawn ' + (is3d ? 'in 3D' : try3d ? 'PAINTED (3D failed)' : 'painted (3D off)') + ', Mountains.state ' + (typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() : '-'));
   LS.refl3d = LS.is3d = is3d;
@@ -21687,6 +21713,7 @@ function dynStep(dt, t, want, skyWant) {
   updateSpecks(dt, t);
   updateTree(dt, t);
     if (ENV.scene === 'winter') winUpdate(dt, t);
+  if (ENV.scene === 'autumn') landCheck(t);
   updateCricket(dt, t);
   if (dynFrontMul < 0.05 && cricket) { cricket = null; insectsLeaveText(); }
 
