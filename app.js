@@ -15643,6 +15643,14 @@ function landBakeScenery() {
   var try3d = MTN3D.on && typeof Mountains !== 'undefined';
   LAND_SR = PR * (try3d ? MTN3D.resolution : LAND_SCN_RES);   // the 3D mountains are sharp, so they are baked finer
   // (resized only when the size changes: resizing wipes them, and the old scenery stays up while the new is drawn)
+  // A new size (the screenshot toolbar makes the page shorter, for one): the scenery on the screen is kept
+  // aside and shown, stretched to the new size, until the new mountains are finished (drawLandscape)
+  var nw = Math.round(W * LAND_SR), nh = Math.round(H * LAND_SR);
+  if (LS.ready && LS.SCN.cnv.width > 1 && (LS.SCN.cnv.width !== nw || LS.SCN.cnv.height !== nh)) {
+    if (!LS.HOLD) LS.HOLD = { cnv: LS.SCN.cnv };      // (a second new size while it waits: the first, full picture is kept)
+    LS.SCN = landCanvas();
+  }
+  LS.bakeAt = performance.now();
   [LS.SCN, LS.MTN, LS.TMP].forEach(function(o) {
     var w = Math.round(W * LAND_SR), h = Math.round(H * LAND_SR);
     if (o.cnv.width !== w || o.cnv.height !== h) { o.cnv.width = w; o.cnv.height = h; }
@@ -15746,7 +15754,8 @@ function landFinishScenery(g3, rf) {
     LS.mtnRetry = true; g3 = rf = null;
   } else if (g3) LS.mtnTries = 0;
   var is3d = !!g3 && landDrawMountains3d(m, hy, g3, rf);
-  gfxNote('mountains drawn ' + (is3d ? 'in 3D' : try3d ? 'PAINTED (3D failed)' : 'painted (3D off)') + ', Mountains.state ' + (typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() : '-'));
+  gfxNote('mountains drawn ' + (is3d ? 'in 3D' : try3d ? 'PAINTED (3D failed)' : 'painted (3D off)') + ', Mountains.state ' + (typeof Mountains !== 'undefined' && Mountains.state ? Mountains.state() : '-') +
+          (LS.bakeAt ? ', in ' + ((performance.now() - LS.bakeAt) / 1000).toFixed(1) + ' s' : '') + (LS.HOLD ? ' (the old scenery was shown meanwhile)' : ''));
   LS.refl3d = LS.is3d = is3d;
   if (try3d && !is3d) {                           // no WebGL 2 after all: the painted ridges, at their own resolution
     LAND_SR = PR * LAND_SCN_RES;
@@ -15805,6 +15814,7 @@ function landFinishScenery(g3, rf) {
   // the mountains' outline, for the fireworks behind them: the haze makes them see-through,
   // and the fireworks must not show through
   if (fwShow) Fireworks.silhouette(LS.MTN.cnv, LS.SIL.cnv, 0.55, 0.85);
+  LS.HOLD = null;                                 // the new scenery is ready: the old one kept aside is let go
   // the top of the highest peak (with room for its blur and the drifting mist):
   // only the scenery below it is drawn each frame. The 3D ranges stand at
   // most about four times rangeHeight (the far ones rise), Fuji at fujiHeight.
@@ -16182,8 +16192,12 @@ function drawLandscape(c, dt) {
   if (ENV.scene === 'autumn') rvDraw('sky', c, function(c) { fireworksDrawSky(c); });   // the fireworks, behind the mountains (8c)
   rvDraw(['fuji', 'ridges'], c, function(c) {                           // (the ink reveal, 8e: Fuji and the ridges are one picture)
   c.setTransform(1, 0, 0, 1, 0, 0);
+  if (LS.HOLD && ENV.scene === 'autumn' && LAND_MTN.job) c.drawImage(LS.HOLD.cnv, 0, 0, cvBack.width, cvBack.height);   // (the old scenery while the new size's is made)
+  else {
+  if (LS.HOLD) LS.HOLD = null;
   var sy0 = Math.floor(LS.scnTop * LAND_SR), sh0 = LS.SCN.cnv.height - sy0;   // the empty sky above the peaks is skipped
   c.drawImage(LS.SCN.cnv, 0, sy0, LS.SCN.cnv.width, sh0, 0, sy0 / LAND_SR * PR, cvBack.width, sh0 / LAND_SR * PR);
+  }
   if (P.mistDrift > 0) {                                                   // mist drifting along the ridges
     var hy = H * P.horizon, drift = 0.5 + 0.5 * Math.min(2, ENV.windMs / 3);
     c.setTransform(PR, 0, 0, PR, 0, 0);
