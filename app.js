@@ -14354,6 +14354,46 @@ function buildKoyoTree(key, far, lazy) {
       return nodes[b.node].ey - nodes[a.node].ey;
     });
   })();
+  // The small tree only: the crown's two sides reach equally far from the trunk, and the
+  // whole crown is on the screen (measured at the leaves' outer edge, ~1.25 R).
+  // The small tree only: its crown is made symmetric about the trunk. The clumps on the
+  // trunk's side are replaced by a mirror image of those on the outer side (same outline,
+  // their own colours), then the tree is moved in so the whole crown is on the screen.
+  if (far) (function evenSmallCrown() {
+    function cx(C) { var cn = nodes[C.node]; return bx + (cn.ex + C.ox - bx) * k; }
+    var anchors = [];
+    for (var ai = 1; ai < nodes.length; ai++) if (nodes[ai].d >= 2) anchors.push(ai);
+    var outer = T.clumps.filter(function(C) { return (left ? cx(C) - bx : bx - cx(C)) >= 0; });
+    if (!outer.length || !anchors.length) return;
+    var mirrored = [];
+    outer.forEach(function(C) {
+      var x = cx(C), o = Math.abs(x - bx);
+      if (o < C.R * 0.25) return;                                    // (on the trunk line: no copy needed)
+      var mx = 2 * bx - x, rx = bx + (mx - bx) / k, y = nodes[C.node].ey + C.oy;
+      var best = anchors[0], bd = 1e18;
+      for (var q = 0; q < anchors.length; q++) {
+        var an = nodes[anchors[q]], dd = Math.hypot(an.ex - rx, an.ey - y);
+        if (dd < bd) { bd = dd; best = anchors[q]; }
+      }
+      var bn = nodes[best], fam = r() < 0.5 ? C.fam : koyoFamily(r);
+      if (fam === 'evergreen' && !C.back) fam = 'red';
+      mirrored.push({ node: best, R: C.R, fam: fam, back: C.back, seed: (r() * 4294967296) >>> 0,
+                      ox: rx - bn.ex, oy: y - bn.ey, ph: r() * TAU, bakedV: -1 });
+    });
+    T.clumps = outer.concat(mirrored);
+    T.clumps.sort(function(a, b) {
+      if (a.back !== b.back) return a.back ? -1 : 1;
+      return nodes[b.node].ey - nodes[a.node].ey;
+    });
+    var side = 0;
+    T.clumps.forEach(function(C) { side = Math.max(side, Math.abs(cx(C) - bx) + C.R * 1.25); });
+    var gap = (left ? bx : W - bx) - side - W * 0.01;                // keep the crown off the screen edge
+    if (gap < 0) {
+      var sh = left ? -gap : gap;
+      bx += sh; T.bx = bx;
+      nodes.forEach(function(nd) { nd.sx += sh; nd.ex += sh; });
+    }
+  })();
   // where the canopy sits, for the night glow
   var sx = 0, sy = 0, top = H, bot = 0;
   T.clumps.forEach(function(C) {
