@@ -17765,7 +17765,7 @@ var BankTrees = (function () {
 'use strict';
 
 var BUDGET_MS = 2.2;                 // at most about this long a frame drawing trees afresh
-var MOVE_PX = 0.55;                  // drawn afresh when a limb is this far (CSS px) from where the lean puts it
+var MOVE_PX = 0.3;                   // drawn afresh when a limb is this far (CSS px) from where the lean puts it
 var trees = [], layoutKey = '', frameN = 0, lightV = -1, trunkLight = null, trunkLightV = -1;
 var sprites = {}, spriteList = [], leafSpr = [], coverage = null;
 var stats = { drawn: 0, hidden: 0, fresh: 0, ms: 0, renderMs: 0, renders: 0, layMs: 0, frames: 0, trunks: 0 };
@@ -17940,6 +17940,13 @@ function finish(T, sx, sy, z, seed) {
   T.cnv.width = Math.max(1, Math.ceil(T.w * T.res)); T.cnv.height = Math.max(1, Math.ceil(T.h * T.res));
   T.c = T.cnv.getContext('2d');
   T.rendered = false; T.lookV = -1; T.leaves = []; T.shed = 0; T.hidden = false;
+  // its own wind: how strongly and how fast it sways, its own rhythm (three slow swings that never line up) and
+  // its own rise and fall of the wind, so no two trees move alike
+  var rw = rngFrom(seed + 29);
+  T.wv = { a: lerp(0.65, 1.35, rw()), sp: lerp(0.8, 1.25, rw()), fl: lerp(0.75, 1.3, rw()),
+           f: [lerp(0.38, 0.55, rw()), lerp(0.71, 0.97, rw()), lerp(1.3, 1.75, rw())],
+           p: [rw() * TAU, rw() * TAU, rw() * TAU], fe: lerp(0.09, 0.16, rw()), pe: rw() * TAU, fe2: lerp(0.21, 0.33, rw()), pe2: rw() * TAU };
+  T.windLean = 0;
   // (what app.js and the ink reveal read: where it stands and how big it is)
   T.x = sx; T.y = sy; T.cw = T.reachL + T.reachR; T.ch = T.height;
   // the points that tell how far the tree has moved: the ends of up to 10 limbs that carry leaves, spread over the crown
@@ -18044,19 +18051,27 @@ function bake(path) {
 }
 
 /* ---------- each frame ---------- */
-/* The main trees' sway (updateOneTree in app.js): a springy push from the gusts, and every limb swinging in the wind
-   on top of its parent. For a tree that is not seen, only its spring is kept going. */
+/* The sway. The whole tree bends with the wind as one (T.windLean): laid down as a lean of its picture each frame,
+   so it moves smoothly by fractions of a pixel and never needs the tree drawn again. Each tree has its own strength,
+   speed, rhythm and rise and fall of the wind (T.wv), which also comes and goes along the row as it passes.
+   On top of that its limbs flutter a little on their own and the gusts push it (springy), as before.
+   For a tree that is not seen, only its spring is kept going. */
 function sway(T, dt, t, seen) {
   T.gustV += (-9 * T.gust - 1.0 * T.gustV) * dt;
   T.gustV = clamp(T.gustV, -1.1, 1.1);
   T.gust += T.gustV * dt;
   if (Math.abs(T.gust) > 0.35) { T.gust = 0.35 * Math.sign(T.gust); if (T.gustV * T.gust > 0) T.gustV = 0; }
   if (!seen) return;
-  var ns = T.nodes, wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
-  var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway, spd = 1 + Math.min(ENV.windMs, 10) * 0.08;
+  var ns = T.nodes, V = T.wv, wind = clamp(ENV.windPx * 0.0012, -0.07, 0.07) * S.treeSway;
+  var amp = (0.015 + 0.01 * Math.min(ENV.windMs, 10)) * S.treeSway, spd = (1 + Math.min(ENV.windMs, 10) * 0.08) * V.sp;
+  var tw = t - T.sx / Math.max(1, W) * 6;                                  // (the wind's rise and fall travels along the row)
+  var env = 0.55 + 0.3 * Math.sin(tw * V.fe + V.pe) + 0.15 * Math.sin(tw * V.fe2 + V.pe2);
+  T.windLean = amp * V.a * 1.1 * env * (Math.sin(t * V.f[0] * spd + V.p[0]) * 0.6 + Math.sin(t * V.f[1] * spd + V.p[1]) * 0.3 +
+                                        Math.sin(t * V.f[2] * spd + V.p[2]) * 0.12);
+  var fa = amp * 0.45 * (0.6 + 0.4 * env);
   for (var i = 0; i < ns.length; i++) {
     var n = ns[i], kd = (Math.pow(n.d / T.maxD, 1.6) + 0.02) * 0.34;
-    var sw = (wind + Math.sin(t * n.f * spd + n.ph) * amp + Math.sin(t * 0.37 * spd + n.ph * 0.3) * amp * 0.6 + T.gust) * kd;
+    var sw = (wind + Math.sin(t * n.f * spd * V.fl + n.ph) * fa + T.gust) * kd;
     var par = n.p < 0 ? null : ns[n.p];
     n.cur = (par ? par.cur : -PI / 2) + n.rel + sw;
     n.sx = par ? par.ex : T.bx; n.sy = par ? par.ey : T.by;
@@ -18222,7 +18237,7 @@ function render(T, t) {
     var tn = T.nodes[T.tSamples[ts]], hT = T.by - T.tRef[ts][1];
     tMoved = Math.max(tMoved, Math.hypot(tn.ex - (T.tRef[ts][0] + dl * hT), tn.ey - T.tRef[ts][1]));
   }
-  if (!T.tDone || T.tLookV !== bigLightV || tMoved > 0.4 * (1 + T.dof.blur * 2)) drawTrunk(T, lean);
+  if (!T.tDone || T.tLookV !== bigLightV || tMoved > 0.3 * (1 + T.dof.blur)) drawTrunk(T, lean);
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
   c.clearRect(0, 0, pw, ph);
@@ -18260,12 +18275,12 @@ function draw(c, t) {
   // which can be seen: on the screen, and not wholly behind the right-hand main tree's leaves (with room for the sway)
   for (i = 0; i < trees.length; i++) {
     T = trees[i];
-    var m = T.sc * 0.12, x0 = T.sx - T.reachL - m, x1 = T.sx + T.reachR + m, y0 = T.sy - T.height - m, y1 = T.sy + 2;
+    var m = T.sc * 0.12 + Math.abs(T.windLean) * T.height, x0 = T.sx - T.reachL - m, x1 = T.sx + T.reachR + m, y0 = T.sy - T.height - m, y1 = T.sy + 2;
     T.hidden = x1 < 0 || x0 > W || covered(x0, y0, x1, y1);
     if (T.hidden) { stats.hidden++; continue; }
     T.lean = leanNow(T);
     var mv = T.rendered ? moved(T, T.lean) : 1e9;
-    if (!T.rendered || mv > MOVE_PX * (1 + T.dof.blur * 2) || T.lookV !== lightV) due.push({ T: T, p: !T.rendered ? 1e9 : mv * T.size + (T.lookV !== lightV ? 0.2 : 0) });
+    if (!T.rendered || mv > MOVE_PX * (1 + T.dof.blur) || T.lookV !== lightV) due.push({ T: T, p: !T.rendered ? 1e9 : mv * T.size + (T.lookV !== lightV ? 0.2 : 0) });
   }
   // drawn afresh: those that moved most first, a few a frame (all of those never drawn yet)
   due.sort(function (a, b) { return b.p - a.p; });
@@ -18282,7 +18297,7 @@ function draw(c, t) {
   for (i = 0; i < trees.length; i++) {
     T = trees[i];
     if (T.hidden || !T.rendered) continue;
-    var s = T.lean - T.refLean;
+    var s = T.lean - T.refLean + T.windLean;                             // (and the whole tree's bend in the wind)
     c.setTransform(PR, 0, 0, PR, T.sx * PR, T.sy * PR);
     c.transform(1, 0, -s, 1, 0, 0);                                      // the top moves, the foot stays
     c.drawImage(T.cnv, -T.bx, -T.by, T.w, T.h);
