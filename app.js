@@ -14098,15 +14098,17 @@ function bakeClump(C, far) {
     if (far) o = mixRgb(o, KOYO_PAPER, KOYO.farHaze);
     return koyoLight(o);
   }
-  // a lumpy darker core so the clump reads as one mass; each disc is feathered (solid in the middle,
-  // fading to nothing at its rim, drawn a little larger to keep the same mass) so no hard edge shows
+  // a lumpy darker core so the clump reads as one mass; each disc is feathered over its whole radius
+  // (strongest at the centre, easing out to nothing at the rim) and no larger than the leaves reach,
+  // so no hard edge shows and nothing soft sticks out past the tree's outline
   var core = mixRgb(col(scaleRgb(tones[0], 1 - shade * 0.25)), col(tones[1]), glow * 0.45);
-  var coreA = rgba(core, 0), coreB = rgba(core);
+  var cr = Math.round(clamp(core[0], 0, 255)) + ',' + Math.round(clamp(core[1], 0, 255)) + ',' + Math.round(clamp(core[2], 0, 255));
   for (var b = 0; b < 9; b++) {
     var ba = r() * TAU, bd = r() * 0.4;
-    var bx = Math.cos(ba) * bd * R, by = Math.sin(ba) * bd * R * 0.75 + R * 0.05, br = R * (0.32 + r() * 0.18) * 1.35;
+    var bx = Math.cos(ba) * bd * R, by = Math.sin(ba) * bd * R * 0.75 + R * 0.05, br = R * (0.32 + r() * 0.18) * 1.15;
+    br = Math.max(R * 0.1, Math.min(br, R * 0.36 - by, R * 0.7 - Math.abs(bx), R * 0.6 + by));   // stay inside the leaves' reach (the flatter underside especially)
     var g = c.createRadialGradient(bx, by, 0, bx, by, br);
-    g.addColorStop(0, coreB); g.addColorStop(0.45, coreB); g.addColorStop(1, coreA);
+    for (var gs = 0; gs <= 8; gs++) { var gt = gs / 8, ga = Math.pow(1 - gt, 1.6); g.addColorStop(gt, 'rgba(' + cr + ',' + ga.toFixed(3) + ')'); }
     c.fillStyle = g;
     c.beginPath();
     c.arc(bx, by, br, 0, TAU);
