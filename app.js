@@ -17385,6 +17385,8 @@ var LAKE = {
   // the headland and its forest (near you, framing the left)
   headland: true, headTip: 0.285, headTop: 0.5, headZ: 22, forest: 1.15, treeSize: 0.5, evergreen: 0.49, ginkgo: 0.3,
   pagoda: true, pagodaX: 0.265, pagodaSize: 0.215, hall: true, grove: true,
+  // the pagoda and the hall lit up from below whenever the stone lanterns are lit (strength, colour of the light)
+  floodLight: 1, floodColour: '#FFA552',
   // the cedars (杉): stacked tiers of foliage, each hanging over the one below (lakeside.js, Lakeside.sugiLook)
   cdTiers: 6, cdWidth: 0.43, cdHeight: 0.95, cdCurve: 0.5, cdScallop: 1.2, cdRagged: 0.95, cdShade: 1.1, cdLight: 1, cdSpecks: 2.35,
   cdLine: 0, cdTrunk: 0.11, cdVariety: 0.94, cdRust: 0.91,
@@ -17719,8 +17721,12 @@ function lakeBakeHead() {
     var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: xw, y: Y, z: z, size: size * H * z / F, yaw: yaw })
                                   : Lakeside.hall({ x: xw, y: Y, z: z, size: size * W * z / F, yaw: yaw });
     var fin = lakeFin(haze);
+    // lit up with the stone lanterns (LAKE.floodLight, LAKE.floodColour): a warm light from the ground in front
+    var fk = LANT.show ? Math.min(1, torLampLevel()) * LAKE.floodLight * (1 - haze * 0.6) : 0;
+    var bh = kind === 'pagoda' ? size * H * z / F : size * W * z / F * 0.65;
     Lakeside.renderFaces(c, faces, { proj: torScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
-                                     fin: function (col) { return fin(col); } });
+                                     fin: function (col) { return fin(col); },
+                                     flood: { k: fk, col: hexToRgb(LAKE.floodColour), y0: Y, h: bh } });
     RV_SPOT[kind] = { x: bx, y: byScr, h: kind === 'pagoda' ? size * H : size * W * 0.6 };   // for the ink reveal (8e)
   }
   function treeRow(row) {

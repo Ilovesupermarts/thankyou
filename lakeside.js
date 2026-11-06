@@ -767,7 +767,7 @@ var DET = {
     }
     // the shadow of the eave above
     var g = c.createLinearGradient(P(0.5, 1)[0], P(0.5, 1)[1], P(0.5, 0.45)[0], P(0.5, 0.45)[1]);
-    g.addColorStop(0, 'rgba(20,10,6,0.5)'); g.addColorStop(1, 'rgba(20,10,6,0)');
+    g.addColorStop(0, 'rgba(20,10,6,' + (0.5 * (1 - 0.75 * (X.flood || 0))) + ')'); g.addColorStop(1, 'rgba(20,10,6,0)');   // lit from below at night: little shadow
     c.fillStyle = g; quad(0, 1, 0.45, 1, g);
   },
   bracket: function (c, P, X) {
@@ -831,6 +831,27 @@ var DET = {
 function renderFaces(c, faces, o) {
   var cam = o.cam, Lt = o.light, shade = o.shade === undefined ? 0.5 : o.shade;
   var list = [];
+  // the night floodlight (o.flood: k 0 … 1, col, y0 and h the building's foot and height in the world): lamps on
+  // the ground in front throw a warm light up the building, so the red posts and the brackets and the undersides
+  // of the eaves glow, the eave edges catch a bright line, the tiles stay dark and the spire shines gold
+  var FL = o.flood && o.flood.k > 0 ? o.flood : null;
+  function floodAt(nx, ny, nz, y) {
+    var lx = 0, ly = -0.62, lz = -0.78;                                       // toward the lamps: down and toward you
+    var dir = Math.max(0, nx * lx + ny * ly + nz * lz);
+    var hgt = clamp((y - FL.y0) / Math.max(1e-9, FL.h), 0, 1);
+    return FL.k * (0.3 + 0.7 * dir) * lerp(1, 0.78, hgt);
+  }
+  var FLOOD_GAIN = { roof: 0.12, tileLine: 0.08, tileLit: 0.15, ridge: 0.5, fascia: 1.25, soffit: 1.3, bracket: 1.15, bracketLit: 1.2,
+                     post: 1.1, wood: 1, plaster: 0.9, door: 0.55, lattice: 0.9, stone: 0.55, stoneLine: 0.4, bronze: 1.7, bronzeLit: 1.9 };
+  function floodAdd(col, base, tone, I) {
+    if (!FL || I <= 0) return col;
+    var g = (FLOOD_GAIN[tone] === undefined ? 0.8 : FLOOD_GAIN[tone]) * I, fc = FL.col;
+    if (tone === 'bronze' || tone === 'bronzeLit') fc = mix(fc, [255, 228, 170], 0.4);   // the spire, a paler gold
+    else if (tone === 'plaster') fc = [fc[0], fc[1] * 0.62, fc[2] * 0.42];               // the walls take on the red glow
+    return [Math.min(255, col[0] + base[0] * fc[0] / 255 * g), Math.min(255, col[1] + base[1] * fc[1] / 255 * g),
+            Math.min(255, col[2] + base[2] * fc[2] / 255 * g)];
+  }
+  function toneOf(rgbv) { for (var t in BPAL) if (BPAL[t] === rgbv) return t; return ''; }
   for (var i = 0; i < faces.length; i++) {
     var f = faces[i], p = f.p, n = p.length, cx = 0, cy = 0, cz = 0;
     for (var j = 0; j < n; j++) { cx += p[j][0]; cy += p[j][1]; cz += p[j][2]; }
@@ -843,7 +864,8 @@ function renderFaces(c, faces, o) {
     if (nx * (cx - f.c[0]) + ny * (cy - f.c[1]) + nz * (cz - f.c[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
     if (nx * (cam[0] - cx) + ny * (cam[1] - cy) + nz * (cam[2] - cz) <= 0) continue;
     var dx = cx - cam[0], dy = cy - cam[1], dz = cz - cam[2];
-    list.push({ f: f, d: dx * dx + dy * dy + dz * dz, lam: Math.max(0, nx * Lt[0] + ny * Lt[1] + nz * Lt[2]), ny: ny, z: cz });
+    list.push({ f: f, d: dx * dx + dy * dy + dz * dz, lam: Math.max(0, nx * Lt[0] + ny * Lt[1] + nz * Lt[2]), ny: ny, z: cz,
+                up: FL ? floodAt(nx, ny, nz, cy) : 0 });
   }
   list.sort(function (A, B) { return B.d - A.d; });
   c.lineJoin = 'round';
@@ -851,7 +873,7 @@ function renderFaces(c, faces, o) {
   for (var k = 0; k < list.length; k++) {
     var L = list[k], base = pal(L.f.tone), lit = 1 - shade * (1 - L.lam);
     if (L.ny < -0.5) lit *= 0.8;
-    var col = o.fin(scale(base, lit), L.z);
+    var col = floodAdd(o.fin(scale(base, lit), L.z), base, L.f.tone, L.up);
     var scr = L.f.p.map(function (q) { return o.proj(q[0], q[1], q[2]); });
     var st = rgb(col);
     c.fillStyle = st; c.strokeStyle = st; c.lineWidth = 0.5;
@@ -866,7 +888,8 @@ function renderFaces(c, faces, o) {
         return [x0 + (x1 - x0) * t, y0 + (y1 - y0) * t];
       };
       var X = { w: Math.hypot(B0[0] - A0[0], B0[1] - A0[1]), h: Math.hypot(D0[0] - A0[0], D0[1] - A0[1]),
-                tint: function (rgbv, kk) { return rgb(o.fin(scale(rgbv, lit * (kk || 1)), L.z)); } };
+                flood: FL ? FL.k : 0,
+                tint: function (rgbv, kk) { return rgb(floodAdd(o.fin(scale(rgbv, lit * (kk || 1)), L.z), rgbv, toneOf(rgbv), L.up * (kk || 1))); } };
       c.save();
       c.beginPath();
       for (var m2 = 0; m2 < scr.length; m2++) { if (m2) c.lineTo(scr[m2][0], scr[m2][1]); else c.moveTo(scr[m2][0], scr[m2][1]); }
