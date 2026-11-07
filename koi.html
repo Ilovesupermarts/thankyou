@@ -228,7 +228,11 @@
       name: 'B 錦・自由に', note: 'Kohaku and gold ogon swim the pond like real koi: to the edge and back, around each other, one diving now and then, one coming up for air.',
       look: 'nishiki', path: 'pool', count: 2,
       length: 0.88, girth: 1, orbit: 0.48, speed: 1.7, wave: 1.2, fins: 0.8, shadow: 1.75, wanderSpread: 0.78,
-      eventEvery: 5, airShare: 0.45, deepTime: 7, deepSize: 0.57, deepBlur: 3, deepFade: 0.35
+      eventEvery: 5, airShare: 0.45, deepTime: 7, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
+      // ring 1.5: measured as the best size (the swimming stops improving
+      // there, and on the tablet's 1232 x 740-770 screen the hints keep
+      // 39-54 px clear of the bottom edge)
+      ring: 1.5
     },
     C: {
       name: 'C 墨と朱', note: 'Sumi-e: ink-brush koi with a vermilion crown, matching the ink reveal.',
@@ -278,7 +282,18 @@
       for (var k in saved.styles || {}) if (STYLES[k]) for (var f in saved.styles[k]) STYLES[k][f] = saved.styles[k][f];
     }
   } catch (e) {}
-  ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key].ring === undefined) STYLES[key].ring = 1; });
+  ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key].ring === undefined) STYLES[key].ring = DEF[key].ring || 1; });
+  // once: a ring size saved before 1.5 became the default moves to 1.5
+  try {
+    if (!localStorage.getItem(STORE + '.ring15')) {
+      if (+STYLES.B.ring === 1) {
+        STYLES.B.ring = 1.5;
+        var st = JSON.parse(localStorage.getItem(STORE) || 'null');
+        if (st && st.styles && st.styles.B) { st.styles.B.ring = 1.5; localStorage.setItem(STORE, JSON.stringify(st)); }
+      }
+      localStorage.setItem(STORE + '.ring15', '1');
+    }
+  } catch (e) {}
   ['eventEvery', 'airShare', 'deepTime', 'deepSize', 'deepBlur', 'deepFade'].forEach(function (id) {
     ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key][id] === undefined) STYLES[key][id] = DEF.B[id]; });
   });
@@ -457,6 +472,12 @@
                reach: 0.45,    // this close to its spot (× length) counts as there
                goalMaxT: 6,    // after this long (s) chasing one spot it picks another
                across: 0.9,    // a cruising koi's next spot is at least this far away (× the pool's radius)
+               dipDepth: 0.38, // how far a koi dips under another it is about to meet (0 = never)
+               dipAhead: 1.4,  // it dips when they would meet within this many seconds
+               dipClose: 0.42, // … coming closer than this (× length)
+               dipTime: 1.6,   // it stays under at least this long (s)
+               dipNear: 0.12,  // … or when their bodies come this close (× length)
+               dipClear: 0.25, // it comes back up once their bodies are this far apart (× length)
                wallFace: 0.35, // nose this much into the edge (0 along it, 1 straight at it): it stops and turns
                stuckAfter: 1.2,// stuck at the edge this long (s): it turns the other way round
                brakeAt: 1.1,   // it brakes to turn when its spot is more than this far round (radians)
@@ -478,7 +499,7 @@
     // what it feels like doing (cruise, slow, rest, dart, sudden turn):
     // picked at random, each for a random time, so it is never the same
     this.actT -= dt;
-    var free = this.mode === 'cruise' || (this.mode === 'dive' && !this.diveDown);
+    var free = this.mode === 'cruise' || this.mode === 'dip' || (this.mode === 'dive' && !this.diveDown);
     if (!this.act || this.actT <= 0) this.pickAct(free ? null : 'cruise');
     if (!free && (this.act === 'dart' || this.act === 'rest' || this.act === 'snap')) this.pickAct('cruise');
     var A = MOODS[this.act];
@@ -657,6 +678,24 @@
 
     // depth: a soft spring toward the depth it wants
     this.modeT -= dt;
+    // about to meet another koi at the same depth: the one that cruises a
+    // little deeper dips under it, and comes back up once they have passed
+    // (the one that is deeper now dips: so a koi coming back up stays under)
+    if (this.mode === 'cruise' && TUNE.dipDepth > 0) {
+      for (j = 0; j < p.fish.length; j++) {
+        o = p.fish[j];
+        if (o === this || o.mode === 'dip' || Math.abs(o.z - this.z) > 0.25) continue;
+        var deeper = this.z > o.z + 0.03 || (Math.abs(this.z - o.z) <= 0.03 && (this.zHome > o.zHome || (this.zHome === o.zHome && this.idx > o.idx)));
+        if (!deeper) continue;
+        if (this.bodyGap(o) < L * TUNE.dipNear || this.meeting(o) < TUNE.dipAhead) {
+          this.mode = 'dip'; this.dipFrom = o; this.zT = Math.max(this.z, this.zHome) + TUNE.dipDepth; this.modeT = TUNE.dipTime; break;
+        }
+      }
+    }
+    if (this.mode === 'dip') {
+      // (stays under while their bodies are still close)
+      if (this.modeT <= 0 && this.bodyGap(this.dipFrom) > L * TUNE.dipClear) { this.mode = 'cruise'; this.zT = this.zHome; this.dipFrom = null; }
+    }
     if (this.mode === 'dive') {
       // swims about down there, its depth drifting a little, then comes up
       this.diveT = (this.diveT || 0) + dt;
@@ -687,6 +726,8 @@
     if (this.gulpT !== undefined) { this.gulpT += dt; this.mouth = Math.max(0, Math.sin(Math.min(1, this.gulpT / 0.45) * Math.PI)); }
     var leavingDown = (this.mode === 'exit' && this.exitT >= 0) || (this.mode === 'dive' && this.diveDown);
     var zk = leavingDown ? 3.2 : 2.4, zc = leavingDown ? 2.6 : 2.9;
+    if (this.mode === 'dip' || (this.mode === 'cruise' && this.zT === this.zHome && this.z > this.zHome + 0.05 && this.wasDip)) { zk = 5; zc = 4.4; }   // a quick dip
+    this.wasDip = this.mode === 'dip' || (this.wasDip && this.z > this.zHome + 0.05);
     this.zv += ((this.zT - this.z) * zk - this.zv * zc) * dt;
     this.z += this.zv * dt;
 
@@ -777,6 +818,32 @@
       if (d < far) { if (d > bestD) { bestD = d; best = { x: gx, y: gy }; } continue; }
       if (t < 24 && this.pathBlocked(gx, gy)) continue;
       return { x: gx, y: gy };
+    }
+    return best;
+  };
+  // the gap between this koi's body and another's (edge to edge, in pixels)
+  Koi.prototype.bodyGap = function (o) {
+    var g = 1e9;
+    for (var a = 0; a < N; a += 3) for (var c = 0; c < N; c += 3)
+      g = Math.min(g, Math.hypot(this.P[a].x - o.P[c].x, this.P[a].y - o.P[c].y) - this.W[a] - o.W[c]);
+    return g;
+  };
+  // In how many seconds will this koi's head and another koi pass close
+  // (within about a body width), going as they are? (9 when they will not.)
+  Koi.prototype.meeting = function (o) {
+    var L = this.pond.L, best = 9;
+    var vx = Math.cos(this.heading) * this.v, vy = Math.sin(this.heading) * this.v;
+    var ux = Math.cos(o.heading) * o.v, uy = Math.sin(o.heading) * o.v;
+    // against the other's head and the middle of its body
+    var pts = [{ x: o.x, y: o.y }, o.P[8], o.P[14]];
+    for (var q = 0; q < pts.length; q++) {
+      var dx = pts[q].x - this.x, dy = pts[q].y - this.y, rx = ux - vx, ry = uy - vy, rv = rx * rx + ry * ry;
+      if (Math.hypot(dx, dy) < L * TUNE.dipClose) return 0;
+      if (rv < 1e-6) continue;
+      var tc = -(dx * rx + dy * ry) / rv;
+      if (tc <= 0) continue;
+      var cx = dx + rx * tc, cy = dy + ry * tc;
+      if (Math.hypot(cx, cy) < L * TUNE.dipClose) best = Math.min(best, tc);
     }
     return best;
   };
