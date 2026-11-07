@@ -3758,10 +3758,18 @@ function chirpStop() {
 
    Like the wind in the bamboo it is the scene, not music: it does not go
    through ambientBus, so the music's mute and pause buttons leave it
-   alone. The recording is loud (about -14.6 LUFS, the songs about -19). */
+   alone. The recording is loud (about -14.6 LUFS, the songs about -19), but at
+   the hall's distance it would sit under the music, so it is lifted over it
+   for each phase (BELL_LIFT_DB). */
 var BELL_GAP_MIN = 15;             // seconds between one ring's end and the next's start
 var BELL_GAP_MAX = 30;
-var BELL_LEVEL = 0.6;              // gain at BELL_REF_DIST
+var BELL_LEVEL = 0.6;              // gain at BELL_REF_DIST, before the lift over the music below
+/* The lift over the music, in dB, for each phase. Measured (EBU R128 short-term loudness, 3 s windows): the bell's
+   strike with its echo peaks at -13.0 LUFS at gain 1, so at the hall's distance (gain 0.20, -13.9 dB) it reached
+   only -26.9 LUFS, while the songs' median is -20.8 LUFS in the morning (Sound/morning) and -18.3 in the evening
+   (Sound/Evening): 6–8.6 dB under, and lost. The lift puts the strike 2 dB over each phase's median music, so it
+   is heard clearly, and its hum sinks back under the music within a few seconds. */
+var BELL_LIFT_DB = { morning: 8.1, evening: 10.6 };
 var BELL_REF_DIST = 10;            // eye heights
 var BELL_ECHO_DELAY = 0.42;        // seconds between repeats
 var BELL_ECHO_FEEDBACK = 0.38;     // each repeat's share of the last
@@ -3778,6 +3786,12 @@ var _bellNodes = null;
 function _bellOk() {
   var phase = getTimeOfDayInNagoya();
   return (phase === 'morning' || phase === 'evening') && currentTheme === 'autumn';
+}
+
+/* The lift over the music for the phase now, as a gain. */
+function _bellLift() {
+  var db = BELL_LIFT_DB[getTimeOfDayInNagoya()] || 0;
+  return Math.pow(10, db / 20);
 }
 
 /* From the eye to the shrine hall, in eye heights (0: no hall in the scene). */
@@ -3803,7 +3817,7 @@ function _bellPlay() {
   if (!dist || !buf || !soundAudioCtx || soundAudioCtx.state !== 'running') { _bellSchedule(); return; }
 
   var ac = soundAudioCtx, now = ac.currentTime;
-  var level = BELL_LEVEL * BELL_REF_DIST / dist;
+  var level = BELL_LEVEL * BELL_REF_DIST / dist * _bellLift();
   var src = ac.createBufferSource();
   src.buffer = buf;
   var gain = ac.createGain();
