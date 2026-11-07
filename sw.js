@@ -1,4 +1,4 @@
-const CACHE = 'thankyou-v313';
+const CACHE = 'thankyou-v314';
 const AUDIO = 'thankyou-audio-v1';
 
 const ASSETS = [
@@ -21,6 +21,7 @@ const ASSETS = [
   './water.js',
   './inkfluid.js',
   './inkreveal.js',
+  './koi.js',
   './textures/waternormals.jpg',
   './manifest.json',
   './presets.json',
@@ -37,8 +38,7 @@ const ASSETS = [
   './icons/favicon-48x48.png',
   './icons/apple-touch-icon.png',
   './icons/1790678998862.jpg',
-  './icons/1790835034553.jpg',
-  './icons/44173_0c6eff.png'
+  './icons/1790835034553.jpg'
 ];
 
 self.addEventListener('install', function(e) {

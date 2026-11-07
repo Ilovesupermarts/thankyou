@@ -4422,6 +4422,52 @@ var blossomGreetingTimeEl = document.getElementById('blossomGreetingTime');
 var blossomGreetingNameEl = document.getElementById('blossomGreetingName');
 
 var koiDiveWrap = document.getElementById('koiDiveWrap');
+
+/* The koi on the start button, drawn by koi.js (no image). Tuned in
+   koi.html (style B, swimming as in a pool); move its "Copy values" here.
+     count        how many koi
+     speed        swimming speed
+     wanderSpread how far from the middle they swim (the pool's edge)
+     wave, fins   how much the body bends; fin and tail movement
+     eventEvery   a koi dives or comes up for air about every (s)
+     airShare     the share of those that come up for air (rest dive)
+     deepTime     time swimming about down deep (s)
+     deepSize, deepBlur, deepFade   size, blur (px) and fade at the deepest
+     length, girth  koi length (share of the pond), plumpness
+     shadow       the shadow on the pond floor
+   (orbit is not used by the pool swimming; kept so the copied values match.) */
+var KOI_LOOK = {
+  count: 2,
+  speed: 1.7,
+  orbit: 0.48,
+  wanderSpread: 0.78,
+  wave: 1.2,
+  fins: 0.8,
+  eventEvery: 5,
+  airShare: 0.45,
+  deepTime: 10,
+  deepSize: 0.57,
+  deepBlur: 3,
+  deepFade: 0.35,
+  length: 0.88,
+  girth: 1,
+  shadow: 1.75
+};
+var koiPond = null;
+try {
+  var _koiCanvas = document.getElementById('koiCanvas');
+  if (_koiCanvas && window.KoiPond) {
+    koiPond = KoiPond.create(_koiCanvas, KOI_LOOK, function () {
+      return blossomScreen && blossomScreen.classList.contains('visible');
+    });
+  }
+} catch (e) { koiPond = null; }
+/* New koi, swimming, each time the start screen is shown. */
+function startKoiSwim() {
+  if (!koiPond) return;
+  koiPond.reset();
+  koiPond.start();
+}
 var rippleLayer = document.getElementById('rippleLayer');
 
 var stageLattice = document.getElementById('stageLattice');
@@ -5935,6 +5981,7 @@ function returnToStartScreen() {
   tryStartBlossomStream();
   scheduleAmbientRipple();
   startPondLife();
+  startKoiSwim();
   /* back at the start: the next pass through the app gets its hints again */
   if (Hints) { Hints.reset(); Hints.onStartScreen(); }
   NavSpring && NavSpring.reset();
@@ -7767,11 +7814,13 @@ window.addEventListener('resize', function() {
 
 /* ============================================================
    KOI FLINCH */
-function triggerKoiFlinch() {
-  if (!koiDiveWrap) return;
-  if (koiFlinchActive) return;
+function triggerKoiFlinch(x, y) {
   if (!isBlossomInteractive()) return;
   if (koiGestureState !== 'idle') return;
+  /* Drawn koi: the one under the finger darts off (and the other startles). */
+  if (koiPond) { koiPond.startle(x, y); return; }
+  if (!koiDiveWrap) return;
+  if (koiFlinchActive) return;
 
   koiFlinchActive = true;
 
@@ -7810,7 +7859,8 @@ function onKoiPointerDown(e) {
   koiTapStartX = e.clientX;
   koiTapStartY = e.clientY;
   koiTapStartTime = Date.now();
-  koiTapOnKoi = !!(e.target && e.target.closest && e.target.closest('.koi-image'));
+  koiTapOnKoi = koiPond ? koiPond.hit(e.clientX, e.clientY)
+                        : !!(e.target && e.target.closest && e.target.closest('.koi-image'));
 
   spawnRipples(e.clientX, e.clientY, 'strong');
 
@@ -7868,7 +7918,7 @@ function onKoiPointerUp(e) {
     if (koiDiveWrap) koiDiveWrap.style.setProperty('--koi-rise-y', '0px');
     if (startBtn) startBtn.classList.remove('ready');
     koiGestureState = 'idle';
-    if (koiTapOnKoi) triggerKoiFlinch();
+    if (koiTapOnKoi) triggerKoiFlinch(koiTapStartX, koiTapStartY);
     return;
   }
 
@@ -7903,6 +7953,8 @@ function triggerKoiStart() {
   repositionNumpad();
 
   if (startBtn) startBtn.classList.add('startling');
+  /* The drawn koi swim forward and down, and fade away. */
+  if (koiPond) koiPond.leave();
 
   koiPushTimer(setTimeout(function() {
     if (startBtn) {
@@ -7914,6 +7966,8 @@ function triggerKoiStart() {
 
     blossomScreen.style.transition = 'opacity 0.6s ease';
     blossomScreen.style.opacity = '0';
+    /* the koi are out of sight once the screen has faded: stop drawing them */
+    koiPushTimer(setTimeout(function() { if (koiPond) koiPond.stop(); }, 700));
 
     koiPushTimer(setTimeout(function() {
       var nameText = (therapistDisplayName || '心').replace(/さん$/, '');
@@ -8135,6 +8189,7 @@ function confirmName() {
     recalc();
     scheduleAmbientRipple();
     startPondLife();
+    startKoiSwim();
   }, 420);
 }
 

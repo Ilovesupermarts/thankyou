@@ -4304,3 +4304,25 @@ html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
   .coach-cap { animation: none !important; opacity: 1; }
   .coach-ghost { display: none; }
 }
+
+/* ============================================================
+   DRAWN KOI (koi.js)
+   ------------------------------------------------------------
+   The koi are drawn from code on #koiCanvas (no image). The pond
+   inside the ring is 174px across; the canvas is 240px so nothing
+   near the edge is cut off square (koi.js keeps the pond at 174px).
+   Each koi has its own depth, so the button's breath that sank and
+   blurred the whole picture is off, and the old picture's depth pool
+   is hidden. On swipe up the koi swim down and away on the canvas,
+   so the koi layer no longer slides down.
+   ============================================================ */
+.koi-canvas {
+  position: absolute; z-index: 1;
+  left: 50%; top: 50%;
+  width: 240px; height: 240px;
+  margin: -120px 0 0 -120px;
+  pointer-events: none;
+}
+.blossom-screen.visible .blossom-char { animation: none; }
+.koi-shadow { display: none; }
+.start-btn.diving .koi-dive-wrap { transform: none; opacity: 1; }
