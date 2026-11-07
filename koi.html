@@ -60,6 +60,17 @@
     pointer-events: none;
   }
   .koi-image.hidden, .koi-canvas.hidden { display: none; }
+
+  /* Ring size (test bed only): the ring, glow, pond light and ripples
+     are scaled together by --kl-ring; the button's box grows with them
+     so the text around it makes room; the koi canvas grows too, but the
+     koi stay the same size (more water, not bigger koi). */
+  .blossom-screen .icon-wrapper { width: calc(200px * var(--kl-ring, 1)); height: calc(200px * var(--kl-ring, 1)); }
+  .kl-ringscale { position: absolute; inset: 0; transform: scale(var(--kl-ring, 1)); transform-origin: 50% 50%; pointer-events: none; }
+  .blossom-screen .koi-canvas {
+    width: calc(240px * var(--kl-ring, 1)); height: calc(240px * var(--kl-ring, 1));
+    margin: calc(-120px * var(--kl-ring, 1)) 0 0 calc(-120px * var(--kl-ring, 1));
+  }
   html.kl-own-depth .blossom-screen.visible .blossom-char { animation: none; }
   html.kl-own-depth .koi-shadow { display: none; }
   html.kl-own-depth .start-btn.diving .koi-dive-wrap { transform: none; opacity: 1; }
@@ -140,6 +151,7 @@
 
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
+      <div class="kl-ringscale">
       <div class="soft-glow" aria-hidden="true"></div>
       <div class="pond-surface" aria-hidden="true">
         <div class="pond-caustic"></div>
@@ -158,6 +170,7 @@
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
       <div class="pond-bubbles" aria-hidden="true"></div>
+      </div>
       <div class="koi-dive-wrap" id="koiDiveWrap">
         <div class="blossom-char">
           <div class="koi-shadow" aria-hidden="true"></div>
@@ -251,7 +264,8 @@
     { id: 'deepBlur', label: 'Blur at the deepest (px)', min: 0, max: 6, step: 0.25, pool: true },
     { id: 'deepFade', label: 'Fade at the deepest', min: 0, max: 0.7, step: 0.05, pool: true },
     { group: 'Look' },
-    { id: 'length', label: 'Koi length (share of the pond)', min: 0.6, max: 1.2, step: 0.01 },
+    { id: 'ring',   label: 'Ring size (× today\'s; the koi stay the same size)', min: 1, max: 1.8, step: 0.05 },
+    { id: 'length', label: 'Koi length (share of today\'s pond)', min: 0.6, max: 1.2, step: 0.01 },
     { id: 'girth',  label: 'Koi plumpness', min: 0.75, max: 1.3, step: 0.01 },
     { id: 'shadow', label: 'Shadow on the pond floor', min: 0, max: 2, step: 0.05 }
   ];
@@ -264,6 +278,7 @@
       for (var k in saved.styles || {}) if (STYLES[k]) for (var f in saved.styles[k]) STYLES[k][f] = saved.styles[k][f];
     }
   } catch (e) {}
+  ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key].ring === undefined) STYLES[key].ring = 1; });
   ['eventEvery', 'airShare', 'deepTime', 'deepSize', 'deepBlur', 'deepFade'].forEach(function (id) {
     ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key][id] === undefined) STYLES[key][id] = DEF.B[id]; });
   });
@@ -1193,11 +1208,11 @@
     this.dpr = dpr;
     this.half = this.size / 2;          // canvas centre
     this.R = this.half / PAD;           // the pond's radius (inside the ring)
-    this.L = this.R * (this.s.length || 0.9);
+    this.L = this.R / (this.ringScale || 1) * (this.s.length || 0.9);
   };
   Pond.prototype.rebuild = function () {
     this.s = STYLES[this.key];
-    this.L = this.R * this.s.length;
+    this.L = this.R / (this.ringScale || 1) * this.s.length;
     this.fish = [];
     for (var i = 0; i < (this.s.count || 2); i++) this.fish.push(new Koi(this, i, 1234 + i * 777));
     var look = LOOKS[this.s.look];
@@ -1292,7 +1307,7 @@
   };
   Pond.prototype.frame = function (dt) {
     var s = this.s, ctx = this.ctx, look = LOOKS[s.look];
-    this.L = this.R * s.length;
+    this.L = this.R / (this.ringScale || 1) * s.length;
     dt = Math.min(dt, 0.1);
     this.acc += dt;
     var steps = 0;
@@ -1333,6 +1348,7 @@
   function showCurrent() {
     var isPng = current === 'P';
     ownDepth();
+    applyRing();
     png.classList.toggle('hidden', !isPng);
     mainCanvas.classList.toggle('hidden', isPng);
     if (!isPng) { mainPond.key = current; mainPond.resize(); mainPond.rebuild(); }
@@ -1411,7 +1427,7 @@
         var out = document.createElement('output'); out.textContent = S[c.id];
         inp.addEventListener('input', function () {
           S[c.id] = +inp.value; out.textContent = inp.value; save();
-          refreshPonds(c.id === 'count' || c.id === 'length');
+          refreshPonds(c.id === 'count' || c.id === 'length' || c.id === 'ring');
         });
         row.appendChild(inp); row.appendChild(out);
       }
@@ -1423,8 +1439,16 @@
   function ownDepth() {
     document.documentElement.classList.toggle('kl-own-depth', current !== 'P' && STYLES[current].path === 'pool');
   }
+  // ring size: scales the main button's ring and pond; the koi keep their size
+  function applyRing() {
+    var g = current === 'P' ? 1 : (+STYLES[current].ring || 1);
+    document.documentElement.style.setProperty('--kl-ring', g);
+    mainPond.ringScale = g;
+    mainPond.resize();
+  }
   function refreshPonds(rebuild) {
     ownDepth();
+    applyRing();
     ponds.forEach(function (p) { p.s = STYLES[p.key]; if (rebuild && p.key === current) p.rebuild(); });
   }
   function selectStyle(key) {
