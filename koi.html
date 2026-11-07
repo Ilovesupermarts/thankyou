@@ -1094,16 +1094,80 @@
     draw: drawSolidKoi
   };
 
-  // B — a kohaku (white with red) and a gold ogon (metallic, scaled).
+  // B — a kohaku (white with red), a gold ogon (metallic, scaled), and
+  // after them a different variety for every further koi.
+  var NISHIKI_MORE = ['tancho', 'showa', 'sanke', 'platinum'];
   LOOKS.nishiki = {
     setup: function (k) {
       var r = k.r;
-      if (k.idx % 2 === 0) {
+      // every koi in the pond a different variety: the first two as they
+      // always were (a kohaku and a gold ogon), then tancho, showa, sanke
+      // and platinum ogon; from the seventh on the varieties repeat, but
+      // each pattern is laid out from the koi's own seed, so none match
+      var kind = k.idx === 0 ? 'kohaku' : k.idx === 1 ? 'ogon' : NISHIKI_MORE[(k.idx - 2) % NISHIKI_MORE.length];
+      var own = k.idx >= 2;      // (the first two keep their fixed patterns)
+      function spot(x, y, rx, ry, col) {
+        if (own) { x += (r() - 0.5) * 0.12; y += (r() - 0.5) * 0.5; rx *= 0.8 + r() * 0.45; ry *= 0.8 + r() * 0.45; }
+        return makePatch(r, x, y, rx, ry, col);
+      }
+      k.sheen = false; k.scales = null;
+      if (kind === 'kohaku') {
         k.body = '#FFF8F1';
         k.patches = [
-          makePatch(r, 0.12, 0.05, 0.13, 0.75, '#E04A2C'),
-          makePatch(r, 0.42, -0.25, 0.14, 0.75, '#DD4428'),
-          makePatch(r, 0.66, 0.35, 0.1, 0.6, '#E0502E')
+          spot(0.12, 0.05, 0.13, 0.75, '#E04A2C'),
+          spot(0.42, -0.25, 0.14, 0.75, '#DD4428'),
+          spot(0.66, 0.35, 0.1, 0.6, '#E0502E')
+        ];
+        k.back = 'rgba(255, 255, 255, 0.0)';
+        k.finCol = 'rgba(255, 250, 244, 0.78)';
+        k.finRay = 'rgba(214, 196, 186, 0.6)';
+        k.finEdge = 'rgba(190, 160, 150, 0.35)';
+        k.eye = '#3A2A26'; k.edge = 'rgba(150, 120, 110, 0.35)'; k.rim = 'rgba(255,255,255,0.9)';
+        k.scales = 'rgba(200, 160, 150, 0.22)';
+      } else if (kind === 'ogon') {
+        k.body = '#F3B640';
+        k.patches = [ spot(0.5, 0, 0.5, 0.35, '#F8CC66') ];
+        k.back = 'rgba(214, 140, 30, 0.35)';
+        k.finCol = 'rgba(250, 214, 130, 0.78)';
+        k.finRay = 'rgba(255, 246, 210, 0.85)';
+        k.finEdge = 'rgba(205, 140, 40, 0.4)';
+        k.eye = '#4A3010'; k.edge = 'rgba(170, 110, 20, 0.5)'; k.rim = 'rgba(255, 246, 214, 0.95)';
+        k.scales = 'rgba(160, 96, 10, 0.32)';
+        k.sheen = true;
+      } else if (kind === 'tancho') {
+        // white, with one round red crown on the head
+        k.body = '#FFFAF5';
+        k.patches = [ spot(0.12, 0, 0.075, 0.5, '#D93F28') ];
+        k.back = 'rgba(255, 255, 255, 0.0)';
+        k.finCol = 'rgba(255, 252, 248, 0.8)';
+        k.finRay = 'rgba(210, 198, 192, 0.6)';
+        k.finEdge = 'rgba(185, 165, 158, 0.35)';
+        k.eye = '#3A2A26'; k.edge = 'rgba(150, 128, 120, 0.32)'; k.rim = 'rgba(255,255,255,0.92)';
+        k.scales = 'rgba(190, 165, 158, 0.2)';
+      } else if (kind === 'showa') {
+        // black, with red and white
+        k.body = '#2B2523';
+        k.patches = [
+          spot(0.14, 0.1, 0.12, 0.7, '#D9472B'),
+          spot(0.38, -0.35, 0.1, 0.55, '#FFF6EE'),
+          spot(0.5, 0.3, 0.13, 0.6, '#D44528'),
+          spot(0.72, -0.2, 0.09, 0.5, '#FFF6EE')
+        ];
+        k.back = 'rgba(0, 0, 0, 0.25)';
+        k.finCol = 'rgba(70, 60, 58, 0.72)';
+        k.finRay = 'rgba(255, 244, 236, 0.55)';
+        k.finEdge = 'rgba(30, 24, 22, 0.45)';
+        k.eye = '#0E0A09'; k.edge = 'rgba(0, 0, 0, 0.45)'; k.rim = 'rgba(255, 236, 226, 0.55)';
+        k.scales = 'rgba(255, 240, 230, 0.12)';
+      } else if (kind === 'sanke') {
+        // white, with red and small black spots
+        k.body = '#FFF8F1';
+        k.patches = [
+          spot(0.16, 0.1, 0.12, 0.7, '#E04A2C'),
+          spot(0.52, -0.2, 0.15, 0.7, '#DD4428'),
+          spot(0.34, 0.55, 0.05, 0.25, '#2A2321'),
+          spot(0.6, 0.45, 0.06, 0.28, '#2A2321'),
+          spot(0.74, -0.45, 0.04, 0.22, '#2A2321')
         ];
         k.back = 'rgba(255, 255, 255, 0.0)';
         k.finCol = 'rgba(255, 250, 244, 0.78)';
@@ -1112,14 +1176,15 @@
         k.eye = '#3A2A26'; k.edge = 'rgba(150, 120, 110, 0.35)'; k.rim = 'rgba(255,255,255,0.9)';
         k.scales = 'rgba(200, 160, 150, 0.22)';
       } else {
-        k.body = '#F3B640';
-        k.patches = [ makePatch(r, 0.5, 0, 0.5, 0.35, '#F8CC66') ];
-        k.back = 'rgba(214, 140, 30, 0.35)';
-        k.finCol = 'rgba(250, 214, 130, 0.78)';
-        k.finRay = 'rgba(255, 246, 210, 0.85)';
-        k.finEdge = 'rgba(205, 140, 40, 0.4)';
-        k.eye = '#4A3010'; k.edge = 'rgba(170, 110, 20, 0.5)'; k.rim = 'rgba(255, 246, 214, 0.95)';
-        k.scales = 'rgba(160, 96, 10, 0.32)';
+        // platinum ogon: shining silver-white
+        k.body = '#E6EAEC';
+        k.patches = [ spot(0.5, 0, 0.5, 0.35, '#F6F8F9') ];
+        k.back = 'rgba(150, 160, 168, 0.3)';
+        k.finCol = 'rgba(236, 240, 242, 0.8)';
+        k.finRay = 'rgba(255, 255, 255, 0.9)';
+        k.finEdge = 'rgba(150, 160, 168, 0.4)';
+        k.eye = '#2E3236'; k.edge = 'rgba(120, 130, 140, 0.45)'; k.rim = 'rgba(255, 255, 255, 0.95)';
+        k.scales = 'rgba(110, 122, 134, 0.3)';
         k.sheen = true;
       }
     },
