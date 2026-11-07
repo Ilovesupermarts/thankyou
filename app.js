@@ -3735,9 +3735,8 @@ function chirpStop() {
 }
 
 /* ============ TEMPLE BELL ============
-   In the autumn lake scene, in the morning and the evening (the page
-   colour theme's morning and evening phases, 05:00–10:59 and
-   17:00–20:59), the bell of the shrine hall on the headland rings now
+   In the autumn lake scene, from 06:00 to 17:59 Nagoya time (BELL_FROM_HOUR,
+   BELL_TO_HOUR), the bell of the shrine hall on the headland rings now
    and then: Sound/668647__tec_studio__temple_bell_002.mp3 (13 seconds),
    played from start to end every time.
 
@@ -3769,7 +3768,9 @@ var BELL_LEVEL = 0.6;              // gain at BELL_REF_DIST, before the lift ove
    only -26.9 LUFS, while the songs' median is -20.8 LUFS in the morning (Sound/morning) and -18.3 in the evening
    (Sound/Evening): 6–8.6 dB under, and lost. The lift puts the strike 2 dB over each phase's median music, so it
    is heard clearly, and its hum sinks back under the music within a few seconds. */
-var BELL_LIFT_DB = { morning: 8.1, evening: 10.6 };
+var BELL_LIFT_DB = { morning: 8.1, day: 8.1, evening: 10.6 };   // (the day plays the morning songs)
+var BELL_FROM_HOUR = 6;            // Nagoya hour the bell starts ringing
+var BELL_TO_HOUR = 18;             // …and the hour it stops (it rings until 17:59)
 var BELL_REF_DIST = 10;            // eye heights
 var BELL_ECHO_DELAY = 0.52;        // seconds between repeats
 var BELL_ECHO_FEEDBACK = 0.5;      // each repeat's share of the last
@@ -3784,8 +3785,8 @@ var _bellGain = null;
 var _bellNodes = null;
 
 function _bellOk() {
-  var phase = getTimeOfDayInNagoya();
-  return (phase === 'morning' || phase === 'evening') && currentTheme === 'autumn';
+  var h = nagoyaDateParts().hour;
+  return h >= BELL_FROM_HOUR && h < BELL_TO_HOUR && currentTheme === 'autumn';
 }
 
 /* The lift over the music for the phase now, as a gain. */
@@ -3811,7 +3812,7 @@ function _bellSchedule() {
 function _bellPlay() {
   if (!_bellOn || _bellSrc) return;
   var buf = soundBuffers.bell;
-  /* Not the morning or the evening, not the autumn scene, or the recording
+  /* Outside 06:00–17:59, not the autumn scene, or the recording
      has not arrived yet: ask again after another gap. */
   var dist = _bellOk() ? _bellDistance() : 0;
   if (!dist || !buf || !soundAudioCtx || soundAudioCtx.state !== 'running') { _bellSchedule(); return; }
