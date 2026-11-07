@@ -21,7 +21,7 @@
      the koi's breath (rise and sink, blur at depth) are the app's.
 
      The style is settled (錦, swimming as in a pool). The panel's tiles
-     choose which koi are in the pond (up to 3, each a different
+     choose which koi are in the pond (up to 4, each a different
      variety): kohaku, yamabuki ogon, showa, tancho, sanke, platinum.
 
      Touch a koi: it darts away (faster beats, sharp turn).
@@ -183,7 +183,7 @@
     <button class="kl-btn" id="klFold" type="button">–</button>
   </div>
   <div class="kl-body">
-    <div class="kl-group">Koi in the pond <small class="kl-hint">tap to add or take out, up to 3</small></div>
+    <div class="kl-group">Koi in the pond <small class="kl-hint">tap to add or take out, up to 4</small></div>
     <div class="kl-kinds" id="klKinds"></div>
     <div id="klControls"></div>
     <div class="kl-foot">
@@ -208,13 +208,11 @@
   var STYLES = {
     B: {
       name: 'B 錦・自由に',
-      look: 'nishiki', path: 'pool', count: 2, kinds: ['kohaku', 'ogon'],
-      length: 0.88, girth: 1, orbit: 0.48, speed: 1.7, wave: 1.2, fins: 0.8, shadow: 1.75, wanderSpread: 0.78,
-      eventEvery: 5, airShare: 0.45, deepTime: 7, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
-      // ring 1.5: measured as the best size (the swimming stops improving
-      // there, and on the tablet's 1232 x 740-770 screen the hints keep
-      // 39-54 px clear of the bottom edge)
-      ring: 1.5
+      // koi2.html's defaults (chosen by the user on the tablet)
+      look: 'nishiki', path: 'pool', count: 3, kinds: ['kohaku', 'ogon', 'sanke'],
+      length: 0.95, girth: 0.9, orbit: 0.48, speed: 1.7, wave: 1.2, fins: 0.8, shadow: 1.75, wanderSpread: 0.78,
+      eventEvery: 5, airShare: 0.45, deepTime: 10, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
+      ring: 1.45
     },
   };
   var ORDER = ['B'];
@@ -230,7 +228,7 @@
     { id: 'platinum', name: 'プラチナ Platinum ogon', note: 'Shining silver',                 sw: 'linear-gradient(90deg,#E6EAEC,#F6F8F9,#E6EAEC)' }
   ];
   var KINDS_ORDER = KINDS.map(function (k) { return k.id; });
-  var KINDS_MAX = 3;
+  var KINDS_MAX = 4;
 
   var CONTROLS = [
     { group: 'Swimming' },
@@ -254,7 +252,9 @@
     { id: 'shadow', label: 'Shadow on the pond floor', min: 0, max: 2, step: 0.05 }
   ];
 
-  var STORE = 'koiLab.v1';
+  // koi2.html keeps its own saved values (not koi.html's), so the defaults
+  // above are what a fresh tablet starts with
+  var STORE = 'koiLab2.v1';
   var DEF = JSON.parse(JSON.stringify(STYLES));
   try {
     var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
@@ -263,17 +263,6 @@
     }
   } catch (e) {}
   ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key].ring === undefined) STYLES[key].ring = DEF[key].ring || 1; });
-  // once: a ring size saved before 1.5 became the default moves to 1.5
-  try {
-    if (!localStorage.getItem(STORE + '.ring15')) {
-      if (+STYLES.B.ring === 1) {
-        STYLES.B.ring = 1.5;
-        var st = JSON.parse(localStorage.getItem(STORE) || 'null');
-        if (st && st.styles && st.styles.B) { st.styles.B.ring = 1.5; localStorage.setItem(STORE, JSON.stringify(st)); }
-      }
-      localStorage.setItem(STORE + '.ring15', '1');
-    }
-  } catch (e) {}
   ['eventEvery', 'airShare', 'deepTime', 'deepSize', 'deepBlur', 'deepFade'].forEach(function (id) {
     ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key][id] === undefined) STYLES[key][id] = DEF.B[id]; });
   });
