@@ -59,6 +59,8 @@
     pointer-events: none;
   }
   .koi-image.hidden, .koi-canvas.hidden { display: none; }
+  html.kl-own-depth .blossom-screen.visible .blossom-char { animation: none; }
+  html.kl-own-depth .koi-shadow { display: none; }
 
   /* ---------- panel ---------- */
   .kl-panel {
@@ -208,9 +210,10 @@
       length: 1, girth: 1, orbit: 0.38, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
     },
     B: {
-      name: 'B 錦・自由に', note: 'A kohaku and a gold ogon wander the pond, turning and passing each other.',
-      look: 'nishiki', path: 'wander', count: 2,
-      length: 0.88, girth: 1, orbit: 0.36, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
+      name: 'B 錦・自由に', note: 'Kohaku and gold ogon swim the pond like real koi: to the edge and back, around each other, one diving now and then, one coming up for air.',
+      look: 'nishiki', path: 'pool', count: 3,
+      length: 0.88, girth: 1, orbit: 0.36, speed: 1, wave: 2, fins: 2, shadow: 1.75, wanderSpread: 0.7,
+      eventEvery: 5, airShare: 0.45, deepSize: 0.72, deepBlur: 3, deepFade: 0.35
     },
     C: {
       name: 'C 墨と朱', note: 'Sumi-e: ink-brush koi with a vermilion crown, matching the ink reveal.',
@@ -231,13 +234,19 @@
 
   var CONTROLS = [
     { group: 'Swimming' },
-    { id: 'path',   label: 'Path', type: 'seg', opts: [['orbit', '円 Circle'], ['wander', '自由 Free']] },
+    { id: 'path',   label: 'Path', type: 'seg', opts: [['orbit', '円 Circle'], ['wander', '自由 Free'], ['pool', '池 Pool']] },
     { id: 'count',  label: 'How many koi', min: 1, max: 3, step: 1 },
     { id: 'speed',  label: 'Speed (1 = a lap in about 12 s)', min: 0.3, max: 2.5, step: 0.05 },
     { id: 'orbit',  label: 'Circle size (share of the pond)', min: 0.2, max: 0.5, step: 0.01 },
-    { id: 'wanderSpread', label: 'Free swim: how far from the middle', min: 0.3, max: 0.7, step: 0.01 },
+    { id: 'wanderSpread', label: 'Free / Pool: how far from the middle (the pool\'s edge)', min: 0.3, max: 0.85, step: 0.01 },
     { id: 'wave',   label: 'Body wave (how much it bends)', min: 0, max: 2, step: 0.05 },
     { id: 'fins',   label: 'Fin and tail movement', min: 0, max: 2, step: 0.05 },
+    { group: 'Pool: diving and air', pool: true },
+    { id: 'eventEvery', label: 'A koi dives or comes up about every (s), 0 = never', min: 0, max: 20, step: 0.5, pool: true },
+    { id: 'airShare', label: 'Share that come up for air (rest dive)', min: 0, max: 1, step: 0.05, pool: true },
+    { id: 'deepSize', label: 'Size at the deepest', min: 0.5, max: 1, step: 0.01, pool: true },
+    { id: 'deepBlur', label: 'Blur at the deepest (px)', min: 0, max: 6, step: 0.25, pool: true },
+    { id: 'deepFade', label: 'Fade at the deepest', min: 0, max: 0.7, step: 0.05, pool: true },
     { group: 'Look' },
     { id: 'length', label: 'Koi length (share of the pond)', min: 0.6, max: 1.2, step: 0.01 },
     { id: 'girth',  label: 'Koi plumpness', min: 0.75, max: 1.3, step: 0.01 },
@@ -252,6 +261,10 @@
       for (var k in saved.styles || {}) if (STYLES[k]) for (var f in saved.styles[k]) STYLES[k][f] = saved.styles[k][f];
     }
   } catch (e) {}
+  ['eventEvery', 'airShare', 'deepSize', 'deepBlur', 'deepFade'].forEach(function (id) {
+    ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key][id] === undefined) STYLES[key][id] = DEF.B[id]; });
+  });
+  if (STYLES.B.path === 'wander') STYLES.B.path = 'pool';
   var current = 'A';
   try { var c0 = localStorage.getItem(STORE + '.cur'); if (STYLES[c0]) current = c0; } catch (e) {}
   function save() {
@@ -324,6 +337,11 @@
     for (var i = 0; i < N; i++) { this.P.push({ x: 0, y: 0 }); this.T.push({ x: 1, y: 0 }); this.Nn.push({ x: 0, y: 1 }); this.W.push(0); }
     this.patches = [];
     this.wake = [];
+    // pool swimming
+    this.v = 0; this.kick = this.r() < 0.5; this.gaitT = this.r(); this.beat = 1;
+    this.wTurn = 0; this.pref = this.r() < 0.5 ? -1 : 1;
+    this.z = 0.2; this.zv = 0; this.zHome = 0.12 + this.r() * 0.18; this.zT = this.zHome;
+    this.mode = 'cruise'; this.modeT = 0; this.gulps = 0; this.mouth = 0;
   }
 
   Koi.prototype.reset = function () {
@@ -333,8 +351,10 @@
     var R = s.wanderSpread * p.R;
     this.x = Math.cos(this.theta) * R * 0.5; this.y = Math.sin(this.theta) * R * 0.5;
     this.heading = this.theta + Math.PI / 2;
-    // warm up so the body has a trail to lie on
-    for (var i = 0; i < 500; i++) this.step(1 / 120, i / 120);
+    if (s.path === 'pool') {
+      this.heading = this.theta + (this.r() - 0.5) * 2;
+      this.v = p.L * 0.3; this.z = this.zT = this.zHome; this.mode = 'cruise';
+    }
   };
 
   Koi.prototype.step = function (dt, t) {
@@ -349,6 +369,9 @@
       this.theta += w * dt * boost;
       var rr = R * (1 + 0.05 * Math.sin(t * 0.7 + this.n1) + 0.03 * Math.sin(t * 1.9 + this.n2));
       hx = Math.cos(this.theta) * rr; hy = Math.sin(this.theta) * rr;
+    } else if (s.path === 'pool') {
+      this.stepPool(dt, boost);
+      hx = this.x; hy = this.y;
     } else {
       // free swim: a wandering heading, steered back from the pond edge
       // and gently away from the other koi
@@ -370,9 +393,11 @@
       hx = this.x; hy = this.y;
     }
     if (s.path === 'orbit') { this.x = hx; this.y = hy; }
-    // tail beat: faster when the koi goes faster
-    this.phase += dt * TAU * (0.75 + 0.5 * s.speed) * (1 + 1.3 * this.burst);
-    this.finPhase += dt * TAU * 0.45 * (1 + this.burst);
+    // tail beat: faster when the koi goes faster (the pool sets its own)
+    if (s.path !== 'pool') {
+      this.phase += dt * TAU * (0.75 + 0.5 * s.speed) * (1 + 1.3 * this.burst);
+      this.finPhase += dt * TAU * 0.45 * (1 + this.burst);
+    }
     // the newest point is the live head; a new point is fixed each
     // time the head has moved a little way past the one before it
     var tr = this.trail, n = tr.length;
@@ -388,6 +413,144 @@
       acc += Math.hypot(tr[k].x - tr[k - 1].x, tr[k].y - tr[k - 1].y);
       if (acc > need) { if (k > 1) tr.splice(0, k - 1); break; }
     }
+  };
+
+  /* ------------------------------------------------------------
+     POOL SWIMMING (style B)
+     Like real koi: a few tail beats, then a glide; a slow wander in
+     heading; they look ahead and turn back along the pool's edge, and
+     steer round the other koi (looking ahead at where they will be).
+     Each has its own depth: it cruises just under the surface, and now
+     and then one dives (smaller, blurred, fainter) or comes up to the
+     surface for air (gulps, with rings on the water), then returns.
+     ------------------------------------------------------------ */
+  // steering constants for the pool (tuned with the overlap checks)
+  var TUNE = { la0: 0.3, la1: 0.5, wall: 0.85, wallGain: 7, avoid: 6, clear: 0.3, bump: 0.35,
+               backAt: 0.8, backSpread: 1.0, backRate: 2.2, yield: 0.35 };
+  // how far apart two koi are in depth, counting the depth each is
+  // heading for (so one coming back up already counts as at that depth)
+  function depthGap(a, b) {
+    return Math.min(Math.abs(a.z - b.z), Math.abs(a.zT - b.z), Math.abs(a.z - b.zT));
+  }
+  function gauss(r) { return (r() + r() + r() + r() - 2) * 1.7; }
+
+  Koi.prototype.stepPool = function (dt, boost) {
+    var p = this.pond, s = p.s, L = p.L, r = this.r;
+    var lim = s.wanderSpread * p.R;
+    // gait: kick (a few strong beats) then glide
+    this.gaitT -= dt;
+    if (this.gaitT <= 0) {
+      this.kick = !this.kick;
+      this.gaitT = this.kick ? 0.5 + r() * 0.7 : 0.7 + r() * 1.8;
+    }
+    var modeV = this.mode === 'air' ? 0.55 : this.mode === 'dive' ? 0.8 : 1;
+    var vT = L * (this.kick ? 0.5 : 0.22) * s.speed * modeV + L * 1.3 * this.burst;
+    this.v += (vT - this.v) * (this.kick || this.burst > 0 ? 2.2 : 0.7) * dt;
+    this.beat += ((this.kick || this.burst > 0.05 ? 1 : 0.35) - this.beat) * 3 * dt;
+
+    // slow, smooth wander of the heading
+    this.wTurn += -this.wTurn * 0.9 * dt + gauss(r) * 1.1 * Math.sqrt(dt);
+    var turn = this.wTurn * 0.55;
+    var hx = Math.cos(this.heading), hy = Math.sin(this.heading);
+
+    // the pool's edge: look ahead; if that point is past the edge, turn
+    // away from the wall (the way the koi is already angled), harder the
+    // closer it gets, so it swims up to the edge and turns back
+    var la = L * TUNE.la0 + this.v * TUNE.la1;
+    var fx = this.x + hx * la, fy = this.y + hy * la, fd = Math.hypot(fx, fy);
+    var wall = lim * TUNE.wall;
+    var out = Math.atan2(this.y, this.x);
+    if (fd > wall) {
+      var d = angDiff(out, this.heading);
+      var sg = Math.abs(d) > 0.08 ? (d > 0 ? 1 : -1) : this.pref;
+      turn += sg * (1.6 + TUNE.wallGain * (fd - wall) / la);
+      // at the edge it decides on a way back across the pool, a little
+      // different each time, and keeps turning until it faces that way
+      if (this.turnTo === undefined && Math.hypot(this.x, this.y) > lim * TUNE.backAt)
+        this.turnTo = out + Math.PI + (r() - 0.5) * TUNE.backSpread;
+    }
+    if (this.turnTo !== undefined) {
+      var td = angDiff(this.heading, this.turnTo);
+      turn += clamp(td * 2.4, -TUNE.backRate, TUNE.backRate);
+      if (Math.abs(td) < 0.3) this.turnTo = undefined;
+    }
+
+    // the other koi: steer round where they are and where they are going
+    var clear = L * (0.3 * s.girth + TUNE.clear), slow = 0;
+    var probes = [0, 0.35, 0.7, 1.05];
+    for (var j = 0; j < p.fish.length; j++) {
+      var o = p.fish[j]; if (o === this) continue;
+      var wz = 1 - clamp((depthGap(this, o) - 0.35) / 0.4, 0, 1) * 0.75; // one far below: less need
+      var tr = o.trail;
+      for (var q = tr.length - 1; q >= 0; q -= 8) {
+        var pt = tr[q];
+        var dx2 = pt.x - this.x, dy2 = pt.y - this.y;
+        var rel = angDiff(this.heading, Math.atan2(dy2, dx2));
+        if (Math.abs(rel) > 2.0) continue;          // behind me: not my problem
+        for (var pi = 0; pi < probes.length; pi++) {
+          var ax = this.x + hx * la * probes[pi], ay = this.y + hy * la * probes[pi];
+          var near = Math.hypot(pt.x - ax, pt.y - ay);
+          if (near < clear) {
+            var push = (1 - near / clear) * (TUNE.avoid - pi * 0.8) * wz;
+            turn += (rel > 0 ? -1 : 1) * push;
+            if (Math.abs(rel) < 0.9) slow = Math.max(slow, push * TUNE.yield);
+          }
+        }
+      }
+    }
+    this.v *= 1 - clamp(slow, 0, 0.8) * dt * 4;
+
+    turn += this.turnKick; this.turnKick *= Math.pow(0.02, dt);
+    var maxTurn = 2.4 + 2.2 * clamp(this.v / (L * 0.5), 0, 1.5);
+    this.heading += clamp(turn, -maxTurn, maxTurn) * dt;
+    this.x += Math.cos(this.heading) * this.v * dt;
+    this.y += Math.sin(this.heading) * this.v * dt;
+    // a soft bump: if the head is touching another koi at about the same
+    // depth, it is nudged off (and turns away), as koi slide past each other
+    var headR = L * 0.14 * s.girth;
+    for (j = 0; j < p.fish.length; j++) {
+      o = p.fish[j]; if (o === this || depthGap(this, o) > 0.4) continue;
+      tr = o.trail;
+      var n = tr.length;
+      for (q = n - 1; q >= 0; q -= 4) {
+        var along = (n - 1 - q) / Math.max(1, n - 1) * 1.25;   // 0 head … 1 tail root
+        var touch = headR * 0.9 + L * 0.14 * s.girth * bodyW(clamp(along, 0.05, 1));
+        var ex = this.x - tr[q].x, ey = this.y - tr[q].y, ed = Math.hypot(ex, ey);
+        if (ed < touch && ed > 0.001) {
+          var k2 = (touch - ed) * TUNE.bump;
+          this.x += ex / ed * k2; this.y += ey / ed * k2;
+          var away = angDiff(this.heading, Math.atan2(ey, ex));
+          this.heading += clamp(away, -1, 1) * 2.5 * dt;
+        }
+      }
+    }
+    var dc = Math.hypot(this.x, this.y);
+    if (dc > lim) { this.x *= lim / dc; this.y *= lim / dc; }
+
+    // depth: a soft spring toward the depth it wants
+    this.modeT -= dt;
+    if (this.mode === 'dive' && this.modeT <= 0) { this.mode = 'cruise'; this.zT = this.zHome; }
+    if (this.mode === 'air') {
+      if (this.z < -0.06 && this.gulps > 0 && this.modeT <= 0) {
+        this.gulps--; this.modeT = 0.55 + r() * 0.35; this.gulpT = 0;
+        var m = this.at(0, 0); p.rings.push({ x: m.x, y: m.y, t: 0 });
+      }
+      if (this.gulps === 0 && this.modeT <= 0) { this.mode = 'cruise'; this.zT = this.zHome; }
+    }
+    if (this.gulpT !== undefined) { this.gulpT += dt; this.mouth = Math.max(0, Math.sin(Math.min(1, this.gulpT / 0.45) * Math.PI)); }
+    this.zv += ((this.zT - this.z) * 2.4 - this.zv * 2.9) * dt;
+    this.z += this.zv * dt;
+
+    // tail beats: faster in a kick, slow in a glide
+    this.phase += dt * TAU * (0.55 + 1.1 * this.beat * s.speed) * (1 + 1.2 * this.burst);
+    this.finPhase += dt * TAU * (0.3 + 0.35 * (1 - this.beat)) * (1 + this.burst);
+  };
+
+  Koi.prototype.startMode = function (mode) {
+    var r = this.r;
+    this.mode = mode;
+    if (mode === 'dive') { this.zT = 1; this.modeT = 2.5 + r() * 2.5; }
+    else { this.zT = -0.12; this.gulps = 2 + Math.floor(r() * 2); this.modeT = 1.6; }
   };
 
   /* Lay the spine along the trail and add the swimming wave. */
@@ -411,7 +574,7 @@
       } else { acc += d; k--; a = b; }
     }
     // normals of the plain spine, then the wave along them
-    var amp = L * 0.055 * s.wave * (1 + 0.6 * this.burst);
+    var amp = L * 0.055 * s.wave * (1 + 0.6 * this.burst) * (s.path === 'pool' ? 0.45 + 0.55 * this.beat : 1);
     var tmp = this._tmp || (this._tmp = []);
     for (i = 0; i < N; i++) {
       var i0 = Math.max(0, i - 1), i1 = Math.min(N - 1, i + 1);
@@ -647,6 +810,13 @@
     ctx.strokeStyle = k.rim; ctx.lineWidth = L * 0.01; ctx.stroke();
     // eyes
     drawEyes(ctx, k, k.eye, L * 0.022);
+    // the mouth opening at the surface (coming up for air)
+    if (k.mouth > 0.02) {
+      var m = k.at(0.012, 0);
+      ctx.beginPath(); ctx.arc(m.x, m.y, L * 0.032 * k.mouth, 0, TAU);
+      ctx.fillStyle = 'rgba(70, 30, 26, ' + (0.75 * k.mouth).toFixed(3) + ')'; ctx.fill();
+      ctx.lineWidth = L * 0.008; ctx.strokeStyle = 'rgba(255, 220, 205, ' + (0.8 * k.mouth).toFixed(3) + ')'; ctx.stroke();
+    }
   }
 
   function drawEyes(ctx, k, color, rad) {
@@ -786,7 +956,8 @@
   function Pond(canvas, styleKey) {
     this.canvas = canvas; this.ctx = canvas.getContext('2d');
     this.key = styleKey; this.s = STYLES[styleKey];
-    this.fish = []; this.t = 0; this.acc = 0;
+    this.fish = []; this.t = 0; this.acc = 0; this.rings = []; this.eventT = 3;
+    this.off = document.createElement('canvas'); this.offCtx = this.off.getContext('2d');
     this.resize(); this.rebuild();
     ponds.push(this);
   }
@@ -795,6 +966,7 @@
     this.size = r.width || 174;
     var dpr = Math.min(3, window.devicePixelRatio || 1);
     this.canvas.width = Math.round(this.size * dpr); this.canvas.height = Math.round(this.size * dpr);
+    this.off.width = this.canvas.width; this.off.height = this.canvas.height;
     this.dpr = dpr;
     this.R = this.size / 2;
     this.L = this.R * (this.s.length || 0.9);
@@ -807,6 +979,83 @@
     var look = LOOKS[this.s.look];
     this.fish.forEach(function (k) { look.setup(k); });
     this.fish.forEach(function (k) { k.reset(); });
+    // warm up together, so the koi already have trails (and keep apart)
+    this.rings = []; this.t = 0; this.eventT = 2 + Math.random() * 2;
+    for (var w = 0; w < 500; w++) {
+      this.t += 1 / 120;
+      for (i = 0; i < this.fish.length; i++) this.fish[i].step(1 / 120, this.t);
+    }
+    this.rings = [];
+  };
+
+  /* Pool: now and then one koi (only one at a time) dives or comes up
+     for air; the others stay at their own cruising depth. */
+  Pond.prototype.events = function (dt) {
+    var s = this.s;
+    for (var i = this.rings.length - 1; i >= 0; i--) { this.rings[i].t += dt; if (this.rings[i].t > 1.6) this.rings.splice(i, 1); }
+    if (!(s.eventEvery > 0)) return;
+    var busy = this.fish.some(function (k) { return k.mode !== 'cruise' || Math.abs(k.z - k.zHome) > 0.08; });
+    if (busy) return;
+    this.eventT -= dt;
+    if (this.eventT > 0) return;
+    this.eventT = s.eventEvery * (0.6 + Math.random() * 0.8);
+    var k = this.fish[Math.floor(Math.random() * this.fish.length)];
+    k.startMode(Math.random() < s.airShare ? 'air' : 'dive');
+  };
+
+  /* Pool: draw each koi at its own depth — deeper is smaller, blurrier
+     and fainter; the deepest are drawn first, so nearer koi pass over. */
+  Pond.prototype.drawPool = function (ctx, look, s) {
+    var oc = this.offCtx, dpr = this.dpr, R = this.R, fish = this.fish.slice();
+    fish.sort(function (a, b) { return b.z - a.z; });
+    for (var i = 0; i < fish.length; i++) {
+      // measured from the koi's own cruising depth: every koi that is
+      // just cruising is drawn at full size, sharp and solid
+      var k = fish[i], z = k.z;
+      var zd = clamp((z - k.zHome) / (1 - k.zHome), 0, 1);
+      var up = clamp((k.zHome - z) / (k.zHome + 0.12), 0, 1);
+      var sc = up > 0 ? 1 + 0.05 * up : 1 - (1 - s.deepSize) * zd;
+      var se = Object.create(s);
+      se.shadow = s.shadow * (1 + 0.4 * up - 0.7 * zd);
+      var c = k.P[9];
+      if (zd < 0.01) {           // not diving: drawn straight onto the pond
+        ctx.save();
+        ctx.translate(c.x, c.y); ctx.scale(sc, sc); ctx.translate(-c.x, -c.y);
+        look.draw(ctx, k, se);
+        ctx.restore();
+        continue;
+      }
+      // diving: drawn on its own layer, then laid down blurred and faded;
+      // only the square around the koi is cleared and copied
+      var half = this.L * 0.95, bx = Math.max(0, Math.floor((R + c.x - half) * dpr)), by = Math.max(0, Math.floor((R + c.y - half) * dpr));
+      var bw = Math.min(this.off.width - bx, Math.ceil(half * 2 * dpr)), bh = Math.min(this.off.height - by, Math.ceil(half * 2 * dpr));
+      if (bw <= 0 || bh <= 0) continue;
+      oc.setTransform(1, 0, 0, 1, 0, 0);
+      oc.clearRect(bx, by, bw, bh);
+      oc.setTransform(dpr, 0, 0, dpr, 0, 0);
+      oc.translate(R + c.x, R + c.y); oc.scale(sc, sc); oc.translate(-c.x, -c.y);
+      oc.save(); look.draw(oc, k, se); oc.restore();
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      var blur = s.deepBlur * zd * dpr;
+      if (blur > 0.15) ctx.filter = 'blur(' + blur.toFixed(2) + 'px)';
+      ctx.globalAlpha = 1 - s.deepFade * zd;
+      ctx.drawImage(this.off, bx, by, bw, bh, bx, by, bw, bh);
+      ctx.restore();
+    }
+    // rings on the water where a koi gulped air
+    for (i = 0; i < this.rings.length; i++) {
+      var g = this.rings[i];
+      for (var j = 0; j < 2; j++) {
+        var t = g.t - j * 0.28; if (t <= 0) continue;
+        var f = t / 1.6, rad = this.L * (0.05 + 0.32 * (1 - Math.pow(1 - f, 2.2)));
+        ctx.beginPath(); ctx.arc(g.x, g.y, rad, 0, TAU);
+        ctx.lineWidth = this.L * 0.03 * (1 - f) + 0.4;
+        ctx.strokeStyle = 'rgba(196, 96, 40, ' + (0.18 * (1 - f)).toFixed(3) + ')'; ctx.stroke();
+        ctx.lineWidth = this.L * 0.016 * (1 - f) + 0.3;
+        ctx.strokeStyle = 'rgba(255, 253, 249, ' + (0.9 * (1 - f)).toFixed(3) + ')'; ctx.stroke();
+      }
+    }
   };
   Pond.prototype.frame = function (dt) {
     var s = this.s, ctx = this.ctx, look = LOOKS[s.look];
@@ -817,11 +1066,13 @@
     while (this.acc >= 1 / 120 && steps < 16) {
       this.t += 1 / 120; this.acc -= 1 / 120; steps++;
       for (var i = 0; i < this.fish.length; i++) this.fish[i].step(1 / 120, this.t);
+      if (s.path === 'pool') this.events(1 / 120);
     }
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     ctx.clearRect(0, 0, this.size, this.size);
     ctx.translate(this.R, this.R);
     for (i = 0; i < this.fish.length; i++) this.fish[i].build();
+    if (s.path === 'pool') { this.drawPool(ctx, look, s); return; }
     for (i = 0; i < this.fish.length; i++) { ctx.save(); look.draw(ctx, this.fish[i], s); ctx.restore(); }
   };
   Pond.prototype.startle = function (px, py) {
@@ -844,6 +1095,7 @@
   var mainPond = new Pond(mainCanvas, current === 'P' ? 'A' : current);
   function showCurrent() {
     var isPng = current === 'P';
+    ownDepth();
     png.classList.toggle('hidden', !isPng);
     mainCanvas.classList.toggle('hidden', isPng);
     if (!isPng) { mainPond.key = current; mainPond.resize(); mainPond.rebuild(); }
@@ -899,6 +1151,7 @@
     if (current === 'P') { ctlEl.innerHTML = '<div class="kl-group">Today\'s picture has no settings here.</div>'; return; }
     var S = STYLES[current];
     CONTROLS.forEach(function (c) {
+      if (c.pool && S.path !== 'pool') return;
       if (c.group) { var g = document.createElement('div'); g.className = 'kl-group'; g.textContent = c.group; ctlEl.appendChild(g); return; }
       var row = document.createElement('div'); row.className = 'kl-row';
       var lab = document.createElement('label'); lab.textContent = c.label; row.appendChild(lab);
@@ -909,6 +1162,7 @@
           b.classList.toggle('on', S[c.id] === o[0]);
           b.addEventListener('click', function () {
             S[c.id] = o[0]; save(); refreshPonds(true);
+            if (c.id === 'path') { buildControls(); return; }
             seg.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
           });
           seg.appendChild(b);
@@ -927,7 +1181,13 @@
       ctlEl.appendChild(row);
     });
   }
+  // In the pool each koi has its own depth, so the button's breath that
+  // sinks and blurs all the koi together is switched off there.
+  function ownDepth() {
+    document.documentElement.classList.toggle('kl-own-depth', current !== 'P' && STYLES[current].path === 'pool');
+  }
   function refreshPonds(rebuild) {
+    ownDepth();
     ponds.forEach(function (p) { p.s = STYLES[p.key]; if (rebuild && p.key === current) p.rebuild(); });
   }
   function selectStyle(key) {
@@ -1026,7 +1286,7 @@
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
-  window.KoiLab = { STYLES: STYLES, ponds: ponds };
+  window.KoiLab = { STYLES: STYLES, ponds: ponds, TUNE: TUNE };
 })();
 </script>
 </body>
