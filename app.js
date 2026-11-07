@@ -3771,11 +3771,11 @@ var BELL_LEVEL = 0.6;              // gain at BELL_REF_DIST, before the lift ove
    is heard clearly, and its hum sinks back under the music within a few seconds. */
 var BELL_LIFT_DB = { morning: 8.1, evening: 10.6 };
 var BELL_REF_DIST = 10;            // eye heights
-var BELL_ECHO_DELAY = 0.42;        // seconds between repeats
-var BELL_ECHO_FEEDBACK = 0.38;     // each repeat's share of the last
-var BELL_ECHO_TONE = 2200;         // Hz: the repeats lose their top above this
-var BELL_ECHO_WET = 0.45;          // how loud the echo is beside the bell
-var BELL_ECHO_TAIL = 4;            // seconds the echo is let ring on after the recording ends
+var BELL_ECHO_DELAY = 0.52;        // seconds between repeats
+var BELL_ECHO_FEEDBACK = 0.5;      // each repeat's share of the last
+var BELL_ECHO_TONE = 1700;         // Hz: the repeats lose their top above this
+var BELL_ECHO_WET = 0.55;          // how loud the echo is beside the bell
+var BELL_ECHO_TAIL = 6;            // seconds the echo is let ring on after the recording ends
 
 var _bellOn = false;
 var _bellTimer = null;
