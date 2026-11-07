@@ -7150,8 +7150,9 @@ var KOI_RISE_MAX = 40;
 var KOI_RISE_FACTOR = 0.35;
 var KOI_SWIPE_THRESHOLD = 60;
 /* After a swipe the start screen stays up this long (ms) before it fades, so the koi can be seen
-   swimming away (they need about 0.9 s); the name animation follows the fade. It was 200. */
-var KOI_AWAY_MS = 700;
+   swimming away and are completely gone when the fade begins (both koi are gone 1.53–1.78 s after
+   the swipe: measured over 40 runs); the name animation follows the fade. It was 200. */
+var KOI_AWAY_MS = 1850;
 var KOI_TRAIL_INTERVAL = 90;
 var KOI_TRAIL_MIN_TRAVEL = 18;
 var KOI_TAP_MAX_TRAVEL = 8;
