@@ -325,6 +325,10 @@
                        app.js; tuned in koi.html) -->
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
+      <!-- the ring, glow, pond light, ripples and bubbles, enlarged together
+           by --koi-ring (KOI_LOOK.ring in app.js); the koi canvas grows too,
+           but the koi keep their size -->
+      <div class="koi-ring-scale">
       <div class="soft-glow" aria-hidden="true"></div>
       <div class="pond-surface" aria-hidden="true">
         <div class="pond-caustic"></div>
@@ -343,6 +347,7 @@
         <circle cx="180" cy="180" r="90" class="gold-band" />
       </svg>
       <div class="pond-bubbles" id="pondBubbles" aria-hidden="true"></div>
+      </div>
       <div class="koi-dive-wrap" id="koiDiveWrap">
         <div class="blossom-char">
           <div class="koi-shadow" aria-hidden="true"></div>

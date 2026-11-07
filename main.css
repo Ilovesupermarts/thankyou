@@ -4319,10 +4319,15 @@ html[data-theme="default"] .coach-layer { --coach-ink: #6b1f2a; }
 .koi-canvas {
   position: absolute; z-index: 1;
   left: 50%; top: 50%;
-  width: 240px; height: 240px;
-  margin: -120px 0 0 -120px;
+  width: calc(240px * var(--koi-ring, 1)); height: calc(240px * var(--koi-ring, 1));
+  margin: calc(-120px * var(--koi-ring, 1)) 0 0 calc(-120px * var(--koi-ring, 1));
   pointer-events: none;
 }
+/* Ring size (--koi-ring, set from KOI_LOOK.ring in app.js): the ring, glow,
+   pond light, ripples and bubbles are scaled together, and the button's box
+   grows with them so the greeting and the hints make room. */
+.blossom-screen .icon-wrapper { width: calc(200px * var(--koi-ring, 1)); height: calc(200px * var(--koi-ring, 1)); }
+.koi-ring-scale { position: absolute; inset: 0; transform: scale(var(--koi-ring, 1)); transform-origin: 50% 50%; pointer-events: none; }
 .blossom-screen.visible .blossom-char { animation: none; }
 .koi-shadow { display: none; }
 .start-btn.diving .koi-dive-wrap { transform: none; opacity: 1; }
