@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="ja" data-theme="autumn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#FFFDF9">
+<title>Koi Start Button Lab</title>
+
+<!-- ============================================================
+     koi.html — test bed for a new koi start button with no bitmap.
+
+     The koi are drawn from code every frame on a small canvas (no
+     image files): each fish has a spine of 24 points that follows the
+     path its head swims, with a travelling wave down the body, so it
+     bends into turns, its tail beats, its pectoral fins paddle and its
+     tail fin trails behind. Colour patches are painted onto the body
+     and bend with it.
+
+     The button around it is the app's own (main.css and the real
+     start-button markup), so the ring, halo, ripples, pond light and
+     the koi's breath (rise and sink, blur at depth) are the app's.
+
+     Four styles (plus the current PNG to compare):
+       A 紅白・ふたり   two orange koi chasing in a circle, like today's picture
+       B 錦・自由に     a kohaku and a gold ogon swimming freely in the pond
+       C 墨と朱         sumi-e: ink-brush koi with a vermilion crown
+       D 光の線         line drawing in the ring's own white, with a light wake
+
+     Touch a koi: it darts away (faster beats, sharp turn).
+     Swipe up on the water: the koi dives, as in the app.
+
+     Not part of the app: not linked from index.html and not in the
+     service worker's ASSETS list.
+     ============================================================ -->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="main.css">
+
+<style>
+  html, body { height: 100%; }
+  body {
+    overflow: hidden; height: 100vh; padding-bottom: 0;
+    background:
+      radial-gradient(ellipse 70% 40% at 30% 42%, rgba(230, 104, 38, 0.10), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 72% 62%, rgba(136, 46, 71, 0.08), transparent 70%),
+      var(--bg-base);
+  }
+
+  /* The koi canvas replaces the PNG. It is wider than the 125px koi box
+     so fins and tails can reach the edge of the pond (174px). The
+     swimming is drawn, so the PNG's 30s rotation is switched off. */
+  .koi-canvas {
+    position: absolute; z-index: 1;
+    left: 50%; top: 50%;
+    width: 174px; height: 174px;
+    margin: -87px 0 0 -87px;
+    pointer-events: none;
+  }
+  .koi-image.hidden, .koi-canvas.hidden { display: none; }
+
+  /* ---------- panel ---------- */
+  .kl-panel {
+    position: fixed; top: 16px; right: 16px; z-index: 1000;
+    width: 330px; max-width: calc(100vw - 32px);
+    max-height: calc(100vh - 32px); overflow-y: auto;
+    background: rgba(255, 253, 249, 0.96);
+    border: 1px solid var(--border-1); border-radius: 18px;
+    box-shadow: 0 10px 40px rgba(68, 52, 48, 0.14);
+    font: 13px/1.5 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+    color: var(--text-med);
+    -webkit-user-select: none; user-select: none;
+    touch-action: pan-y;
+  }
+  .kl-panel.collapsed .kl-body { display: none; }
+  .kl-head {
+    position: sticky; top: 0; z-index: 1; cursor: move;
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 14px; background: rgba(255, 253, 249, 0.98);
+    border-bottom: 1px solid var(--border-4); border-radius: 18px 18px 0 0;
+    touch-action: none;
+  }
+  .kl-title { flex: 1; font-weight: 600; color: var(--text-dark); }
+  .kl-btn {
+    border: 1px solid var(--border-2); background: transparent; border-radius: 999px;
+    padding: 5px 12px; font: inherit; color: var(--text-med); cursor: pointer;
+  }
+  .kl-btn.on { background: var(--accent); border-color: var(--accent); color: #FFFDF9; }
+  .kl-body { padding: 10px 14px 14px; }
+  .kl-opts { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 10px; }
+  .kl-opt {
+    text-align: left; border: 1px solid var(--border-2); background: #fff;
+    border-radius: 12px; padding: 8px 10px; font: inherit; color: var(--text-med); cursor: pointer;
+  }
+  .kl-opt b { color: var(--text-dark); font-weight: 600; }
+  .kl-opt small { display: block; color: var(--text-mute); font-size: 12px; line-height: 1.4; }
+  .kl-opt.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(176, 74, 90, 0.18); }
+  .kl-group { margin: 12px 0 4px; font-weight: 600; color: var(--text-dark); }
+  .kl-row { display: grid; grid-template-columns: 1fr 48px; gap: 2px 8px; align-items: center; margin: 6px 0; }
+  .kl-row label { grid-column: 1 / 3; font-size: 12px; color: var(--text-mute); }
+  .kl-row input[type=range] { width: 100%; }
+  .kl-row output { text-align: right; font-variant-numeric: tabular-nums; }
+  .kl-seg { display: inline-flex; border: 1px solid var(--border-2); border-radius: 999px; overflow: hidden; }
+  .kl-seg button { border: 0; background: transparent; padding: 5px 12px; font: inherit; color: var(--text-mute); cursor: pointer; }
+  .kl-seg button.on { background: var(--accent); color: #FFFDF9; }
+  .kl-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .kl-fps { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
+
+  /* ---------- side-by-side view ---------- */
+  .kl-grid {
+    position: fixed; inset: 0; z-index: 500; display: none;
+    align-items: center; justify-content: center; gap: 28px 40px; flex-wrap: wrap;
+    padding: 40px 380px 40px 40px; box-sizing: border-box;
+  }
+  .kl-grid.on { display: flex; }
+  .kl-tile { display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .kl-pond {
+    position: relative; width: 230px; height: 230px; border-radius: 50%;
+    background: radial-gradient(circle at 50% 42%, rgba(255, 253, 249, 0.75) 0%, rgba(253, 232, 218, 0.55) 58%, rgba(240, 125, 64, 0.18) 100%);
+    box-shadow: 0 0 0 6px #FFFDF9, 0 0 22px 8px rgba(255, 190, 139, 0.45), 0 0 0 1px rgba(196, 78, 16, 0.12);
+  }
+  .kl-pond canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .kl-pond img { position: absolute; left: 14%; top: 14%; width: 72%; height: 72%; object-fit: contain; animation: swimCircle 30s linear infinite; }
+  .kl-tile p { margin: 0; font-family: "Shippori Mincho", serif; font-size: 16px; color: var(--text-dark); letter-spacing: 1px; }
+  .kl-grid-on .blossom-screen { visibility: hidden; }
+</style>
+</head>
+<body>
+
+<div class="blossom-screen visible" id="blossomScreen">
+  <div class="blossom-greeting">
+    <div class="blossom-greeting-time">こんばんは</div>
+    <div class="blossom-greeting-name">桜庭さん</div>
+  </div>
+
+  <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
+    <div class="icon-wrapper">
+      <div class="soft-glow" aria-hidden="true"></div>
+      <div class="pond-surface" aria-hidden="true">
+        <div class="pond-caustic"></div>
+        <div class="pond-caustic c2"></div>
+      </div>
+      <svg class="rings-svg" viewBox="0 0 360 360" aria-hidden="true">
+        <defs>
+          <filter id="bandShadowBlur" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="3.5"/>
+          </filter>
+        </defs>
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-1" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-2" />
+        <circle cx="180" cy="180" r="90" class="pulse-ring ripple-3" />
+        <circle cx="180" cy="180" r="91" class="gold-band-shadow" />
+        <circle cx="180" cy="180" r="90" class="gold-band" />
+      </svg>
+      <div class="pond-bubbles" aria-hidden="true"></div>
+      <div class="koi-dive-wrap" id="koiDiveWrap">
+        <div class="blossom-char">
+          <div class="koi-shadow" aria-hidden="true"></div>
+          <img src="icons/44173_0c6eff.png" class="koi-image hidden" id="koiPng" alt="">
+          <canvas class="koi-canvas" id="koiCanvas" aria-hidden="true"></canvas>
+        </div>
+      </div>
+    </div>
+  </button>
+
+  <div class="start-hints">
+    <p class="start-hint-line">水にふれると、さざなみが静かに広がります。</p>
+    <p class="start-hint-line">鯉に、そっとふれてみてください。</p>
+    <p class="start-hint-line">水面をゆっくり上へなぞると、はじまります。</p>
+  </div>
+</div>
+
+<div class="kl-grid" id="klGrid"></div>
+
+<div class="kl-panel" id="klPanel">
+  <div class="kl-head" id="klHead">
+    <span class="kl-title">鯉 Koi button</span>
+    <button class="kl-btn" id="klCompare" type="button">並べる</button>
+    <button class="kl-btn" id="klFold" type="button">–</button>
+  </div>
+  <div class="kl-body">
+    <div class="kl-opts" id="klOpts"></div>
+    <div id="klControls"></div>
+    <div class="kl-foot">
+      <button class="kl-btn" id="klStartle" type="button">Touch the koi</button>
+      <button class="kl-btn" id="klDive" type="button">Dive</button>
+      <button class="kl-btn" id="klReset" type="button">Reset this style</button>
+      <button class="kl-btn" id="klCopy" type="button">Copy values</button>
+    </div>
+    <div class="kl-fps" id="klFps"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ============================================================
+     1. STYLES
+     Each style is a set of values. The panel's sliders change the
+     chosen style's values; they are saved per style in localStorage.
+     ============================================================ */
+  var STYLES = {
+    A: {
+      name: 'A 紅白・ふたり', note: 'Two orange koi chasing in a circle, like today\'s picture, but swimming.',
+      look: 'pair', path: 'orbit', count: 2,
+      length: 1, girth: 1, orbit: 0.38, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
+    },
+    B: {
+      name: 'B 錦・自由に', note: 'A kohaku and a gold ogon wander the pond, turning and passing each other.',
+      look: 'nishiki', path: 'wander', count: 2,
+      length: 0.88, girth: 1, orbit: 0.36, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
+    },
+    C: {
+      name: 'C 墨と朱', note: 'Sumi-e: ink-brush koi with a vermilion crown, matching the ink reveal.',
+      look: 'sumi', path: 'orbit', count: 2,
+      length: 1, girth: 0.95, orbit: 0.38, speed: 0.8, wave: 1, fins: 1, shadow: 0, wanderSpread: 0.55
+    },
+    D: {
+      name: 'D 光の線', note: 'Line drawing in the ring\'s own white, leaving a faint trail of light.',
+      look: 'line', path: 'orbit', count: 2,
+      length: 1, girth: 1, orbit: 0.38, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
+    },
+    P: {
+      name: '現在 Current (PNG)', note: 'Today\'s bitmap, turning once every 30 s. For comparison only.',
+      look: 'png'
+    }
+  };
+  var ORDER = ['A', 'B', 'C', 'D', 'P'];
+
+  var CONTROLS = [
+    { group: 'Swimming' },
+    { id: 'path',   label: 'Path', type: 'seg', opts: [['orbit', '円 Circle'], ['wander', '自由 Free']] },
+    { id: 'count',  label: 'How many koi', min: 1, max: 3, step: 1 },
+    { id: 'speed',  label: 'Speed (1 = a lap in about 12 s)', min: 0.3, max: 2.5, step: 0.05 },
+    { id: 'orbit',  label: 'Circle size (share of the pond)', min: 0.2, max: 0.5, step: 0.01 },
+    { id: 'wanderSpread', label: 'Free swim: how far from the middle', min: 0.3, max: 0.7, step: 0.01 },
+    { id: 'wave',   label: 'Body wave (how much it bends)', min: 0, max: 2, step: 0.05 },
+    { id: 'fins',   label: 'Fin and tail movement', min: 0, max: 2, step: 0.05 },
+    { group: 'Look' },
+    { id: 'length', label: 'Koi length (share of the pond)', min: 0.6, max: 1.2, step: 0.01 },
+    { id: 'girth',  label: 'Koi plumpness', min: 0.75, max: 1.3, step: 0.01 },
+    { id: 'shadow', label: 'Shadow on the pond floor', min: 0, max: 2, step: 0.05 }
+  ];
+
+  var STORE = 'koiLab.v1';
+  var DEF = JSON.parse(JSON.stringify(STYLES));
+  try {
+    var saved = JSON.parse(localStorage.getItem(STORE) || 'null');
+    if (saved) {
+      for (var k in saved.styles || {}) if (STYLES[k]) for (var f in saved.styles[k]) STYLES[k][f] = saved.styles[k][f];
+    }
+  } catch (e) {}
+  var current = 'A';
+  try { var c0 = localStorage.getItem(STORE + '.cur'); if (STYLES[c0]) current = c0; } catch (e) {}
+  function save() {
+    var out = { styles: {} };
+    ORDER.forEach(function (k) {
+      if (k === 'P') return;
+      out.styles[k] = {};
+      CONTROLS.forEach(function (c) { if (c.id) out.styles[k][c.id] = STYLES[k][c.id]; });
+    });
+    try { localStorage.setItem(STORE, JSON.stringify(out)); localStorage.setItem(STORE + '.cur', current); } catch (e) {}
+  }
+
+  /* ============================================================
+     2. SMALL HELPERS
+     ============================================================ */
+  var TAU = Math.PI * 2;
+  function clamp(x, a, b) { return x < a ? a : x > b ? b : x; }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function angDiff(a, b) { var d = (b - a) % TAU; if (d > Math.PI) d -= TAU; if (d < -Math.PI) d += TAU; return d; }
+  function rng(seed) { var s = seed >>> 0 || 1; return function () { s = (s * 1664525 + 1013904223) >>> 0; return s / 4294967296; }; }
+
+  /* Body half-width along the fish, x = 0 nose … 1 tail root. Blunt
+     rounded head, widest at about a quarter, tapering to a slim
+     tail root, as a koi seen from above. */
+  function bodyW(x) {
+    if (x <= 0) return 0;
+    if (x < 0.27) return 0.5 + 0.5 * Math.sin(Math.PI / 2 * x / 0.27);
+    if (x < 0.88) return 0.2 + 0.8 * (Math.cos(Math.PI * (x - 0.27) / 0.61) + 1) / 2;
+    return 0.2 - 0.04 * (x - 0.88) / 0.12;
+  }
+
+  /* Smooth closed curve through points (midpoint quadratic splines). */
+  function smoothClosed(ctx, pts) {
+    var n = pts.length, a = pts[n - 1], b = pts[0];
+    ctx.moveTo((a.x + b.x) / 2, (a.y + b.y) / 2);
+    for (var i = 0; i < n; i++) {
+      var p = pts[i], q = pts[(i + 1) % n];
+      ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+    }
+    ctx.closePath();
+  }
+  function smoothOpen(ctx, pts) {
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (var i = 1; i < pts.length - 1; i++) {
+      var p = pts[i], q = pts[i + 1];
+      ctx.quadraticCurveTo(p.x, p.y, (p.x + q.x) / 2, (p.y + q.y) / 2);
+    }
+    var l = pts[pts.length - 1]; ctx.lineTo(l.x, l.y);
+  }
+
+  /* ============================================================
+     3. ONE KOI
+     The head swims along a path; the body is laid along the trail
+     the head has left (so it bends into turns like a real fish),
+     then a travelling wave is added that grows toward the tail.
+     ============================================================ */
+  var N = 24;
+
+  function Koi(pond, idx, seed) {
+    this.pond = pond; this.idx = idx;
+    this.r = rng(seed);
+    this.trail = [];        // head positions, newest last
+    this.phase = this.r() * TAU;
+    this.finPhase = this.r() * TAU;
+    this.heading = this.r() * TAU;
+    this.burst = 0;         // startle: extra speed, decays
+    this.turnKick = 0;
+    this.n1 = this.r() * 100; this.n2 = this.r() * 100; this.n3 = this.r() * 100;
+    this.P = []; this.T = []; this.Nn = []; this.W = [];
+    for (var i = 0; i < N; i++) { this.P.push({ x: 0, y: 0 }); this.T.push({ x: 1, y: 0 }); this.Nn.push({ x: 0, y: 1 }); this.W.push(0); }
+    this.patches = [];
+    this.wake = [];
+  }
+
+  Koi.prototype.reset = function () {
+    this.trail.length = 0;
+    var p = this.pond, s = p.s;
+    this.theta = this.idx / p.fish.length * TAU;
+    var R = s.wanderSpread * p.R;
+    this.x = Math.cos(this.theta) * R * 0.5; this.y = Math.sin(this.theta) * R * 0.5;
+    this.heading = this.theta + Math.PI / 2;
+    // warm up so the body has a trail to lie on
+    for (var i = 0; i < 500; i++) this.step(1 / 120, i / 120);
+  };
+
+  Koi.prototype.step = function (dt, t) {
+    var p = this.pond, s = p.s, L = p.L;
+    var boost = 1 + 2.4 * this.burst;
+    this.burst = Math.max(0, this.burst - dt * 1.3);
+    var hx, hy;
+    if (s.path === 'orbit') {
+      // even chase around the circle, the radius breathing a little
+      var R = s.orbit * p.R;
+      var w = TAU / 12 * s.speed;
+      this.theta += w * dt * boost;
+      var rr = R * (1 + 0.05 * Math.sin(t * 0.7 + this.n1) + 0.03 * Math.sin(t * 1.9 + this.n2));
+      hx = Math.cos(this.theta) * rr; hy = Math.sin(this.theta) * rr;
+    } else {
+      // free swim: a wandering heading, steered back from the pond edge
+      // and gently away from the other koi
+      var lim = s.wanderSpread * p.R;
+      var d = Math.hypot(this.x, this.y);
+      var turn = 0.55 * Math.sin(t * 0.31 + this.n1) + 0.35 * Math.sin(t * 0.73 + this.n2) + 0.2 * Math.sin(t * 1.37 + this.n3);
+      var home = Math.atan2(-this.y, -this.x);
+      var edge = clamp((d - lim * 0.55) / (lim * 0.45), 0, 1);
+      turn = turn * (1 - edge * 0.7) + angDiff(this.heading, home) * edge * 2.2;
+      for (var j = 0; j < p.fish.length; j++) {
+        var o = p.fish[j]; if (o === this) continue;
+        var dx = this.x - o.x, dy = this.y - o.y, dd = Math.hypot(dx, dy);
+        if (dd < L * 0.7 && dd > 0.01) turn += angDiff(this.heading, Math.atan2(dy, dx)) * (1 - dd / (L * 0.7)) * 0.9;
+      }
+      turn += this.turnKick; this.turnKick *= Math.pow(0.02, dt);
+      this.heading += clamp(turn, -2.4, 2.4) * dt * (0.8 + 0.4 * s.speed);
+      var v = L * 0.42 * s.speed * (0.85 + 0.25 * Math.sin(t * 0.5 + this.n3)) * boost;
+      this.x += Math.cos(this.heading) * v * dt; this.y += Math.sin(this.heading) * v * dt;
+      hx = this.x; hy = this.y;
+    }
+    if (s.path === 'orbit') { this.x = hx; this.y = hy; }
+    // tail beat: faster when the koi goes faster
+    this.phase += dt * TAU * (0.75 + 0.5 * s.speed) * (1 + 1.3 * this.burst);
+    this.finPhase += dt * TAU * 0.45 * (1 + this.burst);
+    // the newest point is the live head; a new point is fixed each
+    // time the head has moved a little way past the one before it
+    var tr = this.trail, n = tr.length;
+    if (n < 2) { tr.push({ x: hx, y: hy }); if (n === 0) tr.push({ x: hx, y: hy }); }
+    else {
+      var prev = tr[n - 2];
+      tr[n - 1].x = hx; tr[n - 1].y = hy;
+      if (Math.hypot(hx - prev.x, hy - prev.y) > L * 0.012) tr.push({ x: hx, y: hy });
+    }
+    // keep just over one body length of trail
+    var need = L * 1.25, acc = 0;
+    for (var k = tr.length - 1; k > 0; k--) {
+      acc += Math.hypot(tr[k].x - tr[k - 1].x, tr[k].y - tr[k - 1].y);
+      if (acc > need) { if (k > 1) tr.splice(0, k - 1); break; }
+    }
+  };
+
+  /* Lay the spine along the trail and add the swimming wave. */
+  Koi.prototype.build = function () {
+    var p = this.pond, s = p.s, L = p.L, tr = this.trail, P = this.P;
+    var seg = L / (N - 1), k = tr.length - 1, want = 0, acc = 0;
+    var a = tr[k];
+    P[0].x = a.x; P[0].y = a.y;
+    var i = 1;
+    while (i < N) {
+      want = i * seg;
+      if (k <= 0) { // ran out: continue straight
+        var px = P[i - 1], pq = P[Math.max(0, i - 2)];
+        var dx = px.x - pq.x, dy = px.y - pq.y, dl = Math.hypot(dx, dy) || 1;
+        P[i].x = px.x + dx / dl * seg; P[i].y = px.y + dy / dl * seg; i++; continue;
+      }
+      var b = tr[k - 1], d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (acc + d >= want) {
+        var f = d > 0 ? (want - acc) / d : 0;
+        P[i].x = lerp(a.x, b.x, f); P[i].y = lerp(a.y, b.y, f); i++;
+      } else { acc += d; k--; a = b; }
+    }
+    // normals of the plain spine, then the wave along them
+    var amp = L * 0.055 * s.wave * (1 + 0.6 * this.burst);
+    var tmp = this._tmp || (this._tmp = []);
+    for (i = 0; i < N; i++) {
+      var i0 = Math.max(0, i - 1), i1 = Math.min(N - 1, i + 1);
+      var tx = P[i1].x - P[i0].x, ty = P[i1].y - P[i0].y, tl = Math.hypot(tx, ty) || 1;
+      var x = i / (N - 1);
+      var A = amp * (0.12 + 0.88 * x * x);
+      var off = A * Math.sin(this.phase - x * TAU * 0.95);
+      tmp[i] = { x: P[i].x - ty / tl * off, y: P[i].y + tx / tl * off };
+    }
+    for (i = 0; i < N; i++) { P[i].x = tmp[i].x; P[i].y = tmp[i].y; }
+    for (i = 0; i < N; i++) {
+      var j0 = Math.max(0, i - 1), j1 = Math.min(N - 1, i + 1);
+      var ux = P[j1].x - P[j0].x, uy = P[j1].y - P[j0].y, ul = Math.hypot(ux, uy) || 1;
+      this.T[i].x = ux / ul; this.T[i].y = uy / ul;        // points toward the tail
+      this.Nn[i].x = -uy / ul; this.Nn[i].y = ux / ul;      // left side
+      this.W[i] = bodyW(i / (N - 1)) * L * 0.14 * s.girth;
+    }
+  };
+
+  /* A point on the body: x along (0 nose, 1 tail root), y across (-1..1). */
+  Koi.prototype.at = function (x, y) {
+    var f = clamp(x, 0, 1) * (N - 1), i = Math.min(N - 2, Math.floor(f)), t = f - i;
+    var P = this.P, Nn = this.Nn;
+    var cx = lerp(P[i].x, P[i + 1].x, t), cy = lerp(P[i].y, P[i + 1].y, t);
+    var nx = lerp(Nn[i].x, Nn[i + 1].x, t), ny = lerp(Nn[i].y, Nn[i + 1].y, t);
+    var w = bodyW(clamp(x, 0.02, 1)) * this.pond.L * 0.14 * this.pond.s.girth;
+    return { x: cx + nx * y * w, y: cy + ny * y * w };
+  };
+
+  Koi.prototype.outline = function () {
+    var P = this.P, Nn = this.Nn, W = this.W, pts = [];
+    pts.push({ x: P[0].x - this.T[0].x * W[1] * 0.25, y: P[0].y - this.T[0].y * W[1] * 0.25 });
+    for (var i = 1; i < N; i++) pts.push({ x: P[i].x + Nn[i].x * W[i], y: P[i].y + Nn[i].y * W[i] });
+    for (i = N - 1; i >= 1; i--) pts.push({ x: P[i].x - Nn[i].x * W[i], y: P[i].y - Nn[i].y * W[i] });
+    return pts;
+  };
+
+  /* Pectoral (front) and pelvic fins: paddle in and out. */
+  Koi.prototype.fin = function (x, side, len, spread, flap) {
+    var L = this.pond.L, f = clamp(x, 0, 1) * (N - 1), i = Math.round(f);
+    var P = this.P[i], T = this.T[i], Nn = this.Nn[i], w = this.W[i];
+    var rx = P.x + Nn.x * side * w * 0.8, ry = P.y + Nn.y * side * w * 0.8;
+    var a = spread + flap;
+    var dx = T.x * Math.cos(a) + Nn.x * side * Math.sin(a), dy = T.y * Math.cos(a) + Nn.y * side * Math.sin(a);
+    var l = len * L;
+    function rot(ang) { var c = Math.cos(ang), s = Math.sin(ang) * side; return { x: dx * c - dy * s, y: dx * s + dy * c }; }
+    var e1 = rot(-0.38), e2 = rot(0.42), m = rot(0.02);
+    return {
+      root: { x: rx, y: ry },
+      a: { x: rx + e1.x * l, y: ry + e1.y * l },
+      b: { x: rx + e2.x * l * 0.9, y: ry + e2.y * l * 0.9 },
+      tip: { x: rx + m.x * l * 1.22, y: ry + m.y * l * 1.22 },
+      rays: [rot(-0.3), rot(-0.1), rot(0.1), rot(0.3)].map(function (r) { return { x: rx + r.x * l * 1.05, y: ry + r.y * l * 1.05 }; })
+    };
+  };
+  function finPath(ctx, F) {
+    ctx.moveTo(F.root.x, F.root.y);
+    ctx.quadraticCurveTo((F.root.x + F.a.x) / 2 + (F.a.x - F.b.x) * 0.15, (F.root.y + F.a.y) / 2 + (F.a.y - F.b.y) * 0.15, F.a.x, F.a.y);
+    ctx.quadraticCurveTo(F.tip.x, F.tip.y, F.b.x, F.b.y);
+    ctx.quadraticCurveTo((F.root.x + F.b.x) / 2, (F.root.y + F.b.y) / 2, F.root.x, F.root.y);
+  }
+
+  /* Tail fin: a soft two-lobed fan that trails and flutters. */
+  Koi.prototype.tail = function () {
+    var s = this.pond.s, L = this.pond.L, e = N - 1;
+    var P = this.P[e], T = this.T[e], Nn = this.Nn[e];
+    var flick = 0.35 * s.fins * Math.sin(this.phase - TAU * 1.05) * (1 + 0.5 * this.burst);
+    var lag = 0.25 * s.fins * Math.sin(this.phase - TAU * 1.25);
+    function dir(a) { return { x: T.x * Math.cos(a) + Nn.x * Math.sin(a), y: T.y * Math.cos(a) + Nn.y * Math.sin(a) }; }
+    var tl = L * 0.36, bw = this.W[e] * 1.1;
+    var spread = 0.5 + 0.08 * Math.sin(this.finPhase * 1.3);
+    var d1 = dir(flick + lag + spread), d2 = dir(flick + lag - spread), d0 = dir(flick), dm = dir(flick + lag * 1.4);
+    var bl = { x: P.x + Nn.x * bw, y: P.y + Nn.y * bw }, br = { x: P.x - Nn.x * bw, y: P.y - Nn.y * bw };
+    var t1 = { x: P.x + d1.x * tl, y: P.y + d1.y * tl }, t2 = { x: P.x + d2.x * tl, y: P.y + d2.y * tl };
+    var notch = { x: P.x + dm.x * tl * 0.62, y: P.y + dm.y * tl * 0.62 };
+    var c1 = { x: P.x + dir(flick + lag * 0.5 + spread * 0.55).x * tl * 0.75, y: P.y + dir(flick + lag * 0.5 + spread * 0.55).y * tl * 0.75 };
+    var c2 = { x: P.x + dir(flick + lag * 0.5 - spread * 0.55).x * tl * 0.75, y: P.y + dir(flick + lag * 0.5 - spread * 0.55).y * tl * 0.75 };
+    var rays = [];
+    for (var r = -2; r <= 2; r++) {
+      var dd = dir(flick + lag * (0.6 + Math.abs(r) * 0.15) + spread * r / 2.2);
+      rays.push({ x: P.x + dd.x * tl * (0.82 - 0.12 * (r === 0)), y: P.y + dd.y * tl * (0.82 - 0.12 * (r === 0)) });
+    }
+    return { base: P, bl: bl, br: br, t1: t1, t2: t2, notch: notch, c1: c1, c2: c2, d0: d0, rays: rays };
+  };
+  function tailPath(ctx, F) {
+    ctx.moveTo(F.bl.x, F.bl.y);
+    ctx.quadraticCurveTo(F.c1.x, F.c1.y, F.t1.x, F.t1.y);
+    ctx.quadraticCurveTo((F.t1.x + F.notch.x) / 2 + (F.notch.x - F.base.x) * 0.12, (F.t1.y + F.notch.y) / 2 + (F.notch.y - F.base.y) * 0.12, F.notch.x, F.notch.y);
+    ctx.quadraticCurveTo((F.t2.x + F.notch.x) / 2 + (F.notch.x - F.base.x) * 0.12, (F.t2.y + F.notch.y) / 2 + (F.notch.y - F.base.y) * 0.12, F.t2.x, F.t2.y);
+    ctx.quadraticCurveTo(F.c2.x, F.c2.y, F.br.x, F.br.y);
+    ctx.closePath();
+  }
+
+  /* Colour patches, in body space, with uneven organic edges. */
+  function makePatch(r, x, y, rx, ry, color) {
+    var pts = [], n = 14;
+    for (var i = 0; i < n; i++) {
+      var a = i / n * TAU, j = 0.78 + r() * 0.4;
+      pts.push({ x: x + Math.cos(a) * rx * j, y: y + Math.sin(a) * ry * j });
+    }
+    return { pts: pts, color: color };
+  }
+
+  /* ============================================================
+     4. LOOKS
+     ============================================================ */
+  var LOOKS = {};
+
+  // A — the current picture's colours: orange body, peach fins, a
+  // darker band down the back, pale cheeks and sides.
+  LOOKS.pair = {
+    setup: function (k) {
+      var r = k.r;
+      k.body = '#F08549';
+      k.patches = [
+        makePatch(r, 0.1, 0.55, 0.09, 0.45, '#F9C29C'),
+        makePatch(r, 0.1, -0.55, 0.09, 0.45, '#F9C29C'),
+        makePatch(r, 0.55, 0.95, 0.3, 0.35, '#F6A577'),
+        makePatch(r, 0.55, -0.95, 0.3, 0.35, '#F6A577')
+      ];
+      k.back = 'rgba(214, 86, 34, 0.55)';
+      k.finCol = 'rgba(250, 205, 182, 0.82)';
+      k.finRay = 'rgba(255, 255, 255, 0.75)';
+      k.finEdge = 'rgba(232, 128, 84, 0.45)';
+      k.eye = '#5A2A1A';
+      k.edge = 'rgba(180, 70, 30, 0.45)';
+      k.rim = 'rgba(255, 238, 222, 0.9)';
+    },
+    draw: drawSolidKoi
+  };
+
+  // B — a kohaku (white with red) and a gold ogon (metallic, scaled).
+  LOOKS.nishiki = {
+    setup: function (k) {
+      var r = k.r;
+      if (k.idx % 2 === 0) {
+        k.body = '#FFF8F1';
+        k.patches = [
+          makePatch(r, 0.12, 0.05, 0.13, 0.75, '#E04A2C'),
+          makePatch(r, 0.42, -0.25, 0.14, 0.75, '#DD4428'),
+          makePatch(r, 0.66, 0.35, 0.1, 0.6, '#E0502E')
+        ];
+        k.back = 'rgba(255, 255, 255, 0.0)';
+        k.finCol = 'rgba(255, 250, 244, 0.78)';
+        k.finRay = 'rgba(214, 196, 186, 0.6)';
+        k.finEdge = 'rgba(190, 160, 150, 0.35)';
+        k.eye = '#3A2A26'; k.edge = 'rgba(150, 120, 110, 0.35)'; k.rim = 'rgba(255,255,255,0.9)';
+        k.scales = 'rgba(200, 160, 150, 0.22)';
+      } else {
+        k.body = '#F3B640';
+        k.patches = [ makePatch(r, 0.5, 0, 0.5, 0.35, '#F8CC66') ];
+        k.back = 'rgba(214, 140, 30, 0.35)';
+        k.finCol = 'rgba(250, 214, 130, 0.78)';
+        k.finRay = 'rgba(255, 246, 210, 0.85)';
+        k.finEdge = 'rgba(205, 140, 40, 0.4)';
+        k.eye = '#4A3010'; k.edge = 'rgba(170, 110, 20, 0.5)'; k.rim = 'rgba(255, 246, 214, 0.95)';
+        k.scales = 'rgba(160, 96, 10, 0.32)';
+        k.sheen = true;
+      }
+    },
+    draw: drawSolidKoi
+  };
+
+  function drawSolidKoi(ctx, k, s) {
+    var L = k.pond.L, out = k.outline(), tail = k.tail();
+    var fl = 0.32 * s.fins;
+    var fins = [
+      k.fin(0.2, 1, 0.24, 0.95, fl * Math.sin(k.finPhase)),
+      k.fin(0.2, -1, 0.24, 0.95, fl * Math.sin(k.finPhase + 0.6)),
+      k.fin(0.52, 1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.3)),
+      k.fin(0.52, -1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.9))
+    ];
+    // shadow on the pond floor
+    if (s.shadow > 0) {
+      ctx.save();
+      ctx.translate(L * 0.035 * s.shadow, L * 0.075 * s.shadow);
+      ctx.filter = 'blur(' + (L * 0.035 * s.shadow).toFixed(1) + 'px)';
+      ctx.fillStyle = 'rgba(176, 72, 22, ' + (0.16 + 0.04 * s.shadow).toFixed(3) + ')';
+      ctx.beginPath(); smoothClosed(ctx, out); tailPath(ctx, tail);
+      fins.forEach(function (F) { finPath(ctx, F); });
+      ctx.fill();
+      ctx.restore();
+    }
+    // fins and tail, under the body
+    ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    fins.concat([null]).forEach(function (F) {
+      ctx.beginPath();
+      if (F) finPath(ctx, F); else tailPath(ctx, tail);
+      ctx.fillStyle = k.finCol; ctx.fill();
+      ctx.lineWidth = L * 0.008; ctx.strokeStyle = k.finEdge; ctx.stroke();
+      ctx.beginPath();
+      var root = F ? F.root : tail.base, rays = F ? F.rays : tail.rays;
+      rays.forEach(function (p) { ctx.moveTo(root.x, root.y); ctx.lineTo(p.x, p.y); });
+      ctx.lineWidth = L * 0.007; ctx.strokeStyle = k.finRay; ctx.stroke();
+    });
+    // body
+    ctx.save();
+    ctx.beginPath(); smoothClosed(ctx, out);
+    ctx.fillStyle = k.body; ctx.fill();
+    ctx.clip();
+    k.patches.forEach(function (pt) {
+      ctx.beginPath(); smoothClosed(ctx, pt.pts.map(function (q) { return k.at(q.x, q.y); }));
+      ctx.fillStyle = pt.color; ctx.fill();
+    });
+    // a darker band down the back
+    var spine = [];
+    for (var i = 2; i < N - 1; i++) spine.push(k.P[i]);
+    ctx.beginPath(); smoothOpen(ctx, spine);
+    ctx.strokeStyle = k.back; ctx.lineWidth = L * 0.05; ctx.lineCap = 'round'; ctx.stroke();
+    // scales
+    if (k.scales) {
+      ctx.strokeStyle = k.scales; ctx.lineWidth = L * 0.006;
+      ctx.beginPath();
+      for (var sx = 0.26, row = 0; sx < 0.9; sx += 0.055, row++) {
+        for (var sy = -0.75 + (row % 2) * 0.25; sy <= 0.76; sy += 0.5) {
+          var c = k.at(sx, sy), ii = Math.round(sx * (N - 1)), T = k.T[ii];
+          var ang = Math.atan2(T.y, T.x), rr = L * 0.03 * bodyW(sx);
+          ctx.moveTo(c.x + Math.cos(ang - 1.2) * rr, c.y + Math.sin(ang - 1.2) * rr);
+          ctx.arc(c.x, c.y, rr, ang - 1.2, ang + 1.2);
+        }
+      }
+      ctx.stroke();
+    }
+    // light along the top of the back, shade at the sides
+    ctx.beginPath(); smoothOpen(ctx, spine);
+    ctx.strokeStyle = k.sheen ? 'rgba(255, 250, 225, 0.55)' : 'rgba(255, 255, 255, 0.22)';
+    ctx.lineWidth = L * (k.sheen ? 0.04 : 0.025); ctx.stroke();
+    ctx.beginPath(); smoothClosed(ctx, out);
+    ctx.strokeStyle = k.edge; ctx.lineWidth = L * 0.05; ctx.stroke();
+    ctx.restore();
+    // rim
+    ctx.beginPath(); smoothClosed(ctx, out);
+    ctx.strokeStyle = k.rim; ctx.lineWidth = L * 0.01; ctx.stroke();
+    // eyes
+    drawEyes(ctx, k, k.eye, L * 0.022);
+  }
+
+  function drawEyes(ctx, k, color, rad) {
+    ctx.fillStyle = color;
+    [1, -1].forEach(function (sd) {
+      var e = k.at(0.075, sd * 0.68);
+      ctx.beginPath(); ctx.arc(e.x, e.y, rad, 0, TAU); ctx.fill();
+    });
+  }
+
+  // C — sumi-e: soft ink wash body, brushed outline that swells and
+  // thins, vermilion crown, fins as brush flicks.
+  LOOKS.sumi = {
+    setup: function (k) {
+      k.crown = makePatch(k.r, 0.13, 0, 0.09, 0.55, '#D8452B');
+      k.mark = makePatch(k.r, 0.55, 0.3 * (k.idx % 2 ? 1 : -1), 0.12, 0.45, 'rgba(42, 34, 32, 0.55)');
+    },
+    draw: function (ctx, k, s) {
+      var L = k.pond.L, P = k.P, Nn = k.Nn, W = k.W, tail = k.tail();
+      var ink = 'rgba(38, 30, 28, ';
+      var fl = 0.3 * s.fins;
+      // wash
+      ctx.save();
+      ctx.filter = 'blur(' + (L * 0.012).toFixed(1) + 'px)';
+      ctx.beginPath(); smoothClosed(ctx, k.outline());
+      ctx.fillStyle = 'rgba(90, 76, 70, 0.16)'; ctx.fill();
+      ctx.beginPath(); tailPath(ctx, tail); ctx.fillStyle = 'rgba(90, 76, 70, 0.10)'; ctx.fill();
+      ctx.restore();
+      // fins: a few tapered flicks
+      ctx.lineCap = 'round';
+      [[0.2, 1, 0.24, 0], [0.2, -1, 0.24, 0.6], [0.52, 1, 0.14, 1.3], [0.52, -1, 0.14, 1.9]].forEach(function (f) {
+        var F = k.fin(f[0], f[1], f[2], 0.95, fl * Math.sin(k.finPhase + f[3]));
+        F.rays.forEach(function (p, j) { brushLine(ctx, F.root, p, L * (0.016 - j * 0.002), ink + '0.55)'); });
+      });
+      tail.rays.forEach(function (p, j) { brushLine(ctx, tail.base, p, L * 0.02, ink + (0.35 + 0.1 * (j % 2)) + ')'); });
+      // the two sides of the body, each one brush stroke that swells and thins
+      [1, -1].forEach(function (sd) {
+        var outer = [], inner = [];
+        for (var i = 1; i < N; i++) {
+          var x = i / (N - 1), bw = L * (0.004 + 0.02 * Math.sin(Math.PI * Math.pow(x, 0.7)));
+          var ex = P[i].x + Nn[i].x * W[i] * sd, ey = P[i].y + Nn[i].y * W[i] * sd;
+          outer.push({ x: ex + Nn[i].x * sd * bw * 0.35, y: ey + Nn[i].y * sd * bw * 0.35 });
+          inner.push({ x: ex - Nn[i].x * sd * bw * 0.65, y: ey - Nn[i].y * sd * bw * 0.65 });
+        }
+        ctx.beginPath(); smoothClosed(ctx, outer.concat(inner.reverse()));
+        ctx.fillStyle = ink + '0.82)'; ctx.fill();
+      });
+      // nose cap
+      var nose = k.at(0.0, 0), c = k.at(0.05, 0);
+      var nl = k.at(0.05, 1), nr = k.at(0.05, -1);
+      ctx.beginPath(); ctx.moveTo(nl.x, nl.y); ctx.quadraticCurveTo(nose.x * 2 - c.x, nose.y * 2 - c.y, nr.x, nr.y);
+      ctx.lineWidth = L * 0.016; ctx.strokeStyle = ink + '0.85)'; ctx.stroke();
+      // dark mark and vermilion crown, soft edged
+      ctx.save();
+      ctx.beginPath(); smoothClosed(ctx, k.outline()); ctx.clip();
+      ctx.filter = 'blur(' + (L * 0.012).toFixed(1) + 'px)';
+      ctx.beginPath(); smoothClosed(ctx, k.mark.pts.map(function (q) { return k.at(q.x, q.y); }));
+      ctx.fillStyle = k.mark.color; ctx.fill();
+      ctx.beginPath(); smoothClosed(ctx, k.crown.pts.map(function (q) { return k.at(q.x, q.y); }));
+      ctx.fillStyle = 'rgba(216, 69, 43, 0.92)'; ctx.fill();
+      ctx.restore();
+      // spine: a dry-brush line
+      var sp = [];
+      for (var i2 = 4; i2 < N - 3; i2++) sp.push(P[i2]);
+      ctx.beginPath(); smoothOpen(ctx, sp);
+      ctx.lineWidth = L * 0.012; ctx.strokeStyle = ink + '0.35)'; ctx.stroke();
+      drawEyes(ctx, k, ink + '0.95)', L * 0.017);
+    }
+  };
+  function brushLine(ctx, a, b, w, col) {
+    // a tapered stroke: thick at the root, thin at the end
+    var dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * w / 2, a.y + ny * w / 2);
+    ctx.quadraticCurveTo(a.x + dx * 0.6 + nx * w * 0.3, a.y + dy * 0.6 + ny * w * 0.3, b.x, b.y);
+    ctx.quadraticCurveTo(a.x + dx * 0.6 - nx * w * 0.3, a.y + dy * 0.6 - ny * w * 0.3, a.x - nx * w / 2, a.y - ny * w / 2);
+    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
+  }
+
+  // D — outline only, in the ring's white with a warm shadow so it
+  // reads on cream, and a fading trail of light behind each koi.
+  LOOKS.line = {
+    setup: function (k) { k.wake = []; },
+    draw: function (ctx, k, s) {
+      var L = k.pond.L, out = k.outline(), tail = k.tail();
+      var fl = 0.32 * s.fins;
+      var fins = [
+        k.fin(0.2, 1, 0.24, 0.95, fl * Math.sin(k.finPhase)),
+        k.fin(0.2, -1, 0.24, 0.95, fl * Math.sin(k.finPhase + 0.6)),
+        k.fin(0.52, 1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.3)),
+        k.fin(0.52, -1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.9))
+      ];
+      // the wake: where the tail has been
+      var tp = { x: k.P[N - 1].x, y: k.P[N - 1].y };
+      k.wake.push(tp); if (k.wake.length > 40) k.wake.shift();
+      for (var i = 1; i < k.wake.length; i++) {
+        var f = i / k.wake.length;
+        ctx.beginPath(); ctx.moveTo(k.wake[i - 1].x, k.wake[i - 1].y); ctx.lineTo(k.wake[i].x, k.wake[i].y);
+        ctx.strokeStyle = 'rgba(255, 253, 249, ' + (0.55 * f * f).toFixed(3) + ')';
+        ctx.lineWidth = L * 0.03 * f; ctx.lineCap = 'round'; ctx.stroke();
+      }
+      function shape() {
+        ctx.beginPath(); smoothClosed(ctx, out); tailPath(ctx, tail);
+        fins.forEach(function (F) { finPath(ctx, F); });
+      }
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      // soft warm shadow so the white line reads on cream
+      if (s.shadow > 0) {
+        ctx.save();
+        ctx.translate(0, L * 0.02 * s.shadow);
+        ctx.filter = 'blur(' + (L * 0.02 * s.shadow).toFixed(1) + 'px)';
+        shape(); ctx.strokeStyle = 'rgba(196, 78, 16, ' + (0.42 * s.shadow).toFixed(3) + ')';
+        ctx.lineWidth = L * 0.05; ctx.stroke();
+        ctx.restore();
+      }
+      // a faint body fill, fins and tail rays
+      ctx.beginPath(); smoothClosed(ctx, out);
+      ctx.fillStyle = 'rgba(255, 253, 249, 0.45)'; ctx.fill();
+      ctx.beginPath();
+      fins.forEach(function (F) { F.rays.forEach(function (p) { ctx.moveTo(F.root.x, F.root.y); ctx.lineTo(p.x, p.y); }); });
+      tail.rays.forEach(function (p) { ctx.moveTo(tail.base.x, tail.base.y); ctx.lineTo(p.x, p.y); });
+      ctx.strokeStyle = 'rgba(255, 253, 249, 0.75)'; ctx.lineWidth = L * 0.007; ctx.stroke();
+      shape();
+      ctx.strokeStyle = '#FFFDF9'; ctx.lineWidth = L * 0.03; ctx.stroke();
+      // a single vermilion mark on the head, and the eyes
+      var c = k.at(0.14, 0);
+      ctx.beginPath(); ctx.arc(c.x, c.y, L * 0.03, 0, TAU);
+      ctx.fillStyle = 'rgba(224, 92, 50, 0.85)'; ctx.fill();
+      drawEyes(ctx, k, 'rgba(196, 92, 50, 0.9)', L * 0.014);
+    }
+  };
+
+  /* ============================================================
+     5. THE POND (one canvas, its koi, its own loop)
+     ============================================================ */
+  var ponds = [];
+  function Pond(canvas, styleKey) {
+    this.canvas = canvas; this.ctx = canvas.getContext('2d');
+    this.key = styleKey; this.s = STYLES[styleKey];
+    this.fish = []; this.t = 0; this.acc = 0;
+    this.resize(); this.rebuild();
+    ponds.push(this);
+  }
+  Pond.prototype.resize = function () {
+    var r = this.canvas.getBoundingClientRect();
+    this.size = r.width || 174;
+    var dpr = Math.min(3, window.devicePixelRatio || 1);
+    this.canvas.width = Math.round(this.size * dpr); this.canvas.height = Math.round(this.size * dpr);
+    this.dpr = dpr;
+    this.R = this.size / 2;
+    this.L = this.R * (this.s.length || 0.9);
+  };
+  Pond.prototype.rebuild = function () {
+    this.s = STYLES[this.key];
+    this.L = this.R * this.s.length;
+    this.fish = [];
+    for (var i = 0; i < (this.s.count || 2); i++) this.fish.push(new Koi(this, i, 1234 + i * 777));
+    var look = LOOKS[this.s.look];
+    this.fish.forEach(function (k) { look.setup(k); });
+    this.fish.forEach(function (k) { k.reset(); });
+  };
+  Pond.prototype.frame = function (dt) {
+    var s = this.s, ctx = this.ctx, look = LOOKS[s.look];
+    this.L = this.R * s.length;
+    dt = Math.min(dt, 0.1);
+    this.acc += dt;
+    var steps = 0;
+    while (this.acc >= 1 / 120 && steps < 16) {
+      this.t += 1 / 120; this.acc -= 1 / 120; steps++;
+      for (var i = 0; i < this.fish.length; i++) this.fish[i].step(1 / 120, this.t);
+    }
+    ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+    ctx.clearRect(0, 0, this.size, this.size);
+    ctx.translate(this.R, this.R);
+    for (i = 0; i < this.fish.length; i++) this.fish[i].build();
+    for (i = 0; i < this.fish.length; i++) { ctx.save(); look.draw(ctx, this.fish[i], s); ctx.restore(); }
+  };
+  Pond.prototype.startle = function (px, py) {
+    var best = null, bd = 1e9;
+    this.fish.forEach(function (k) {
+      var d = px === undefined ? 0 : Math.hypot(k.P[6].x - px, k.P[6].y - py);
+      if (d < bd) { bd = d; best = k; }
+    });
+    this.fish.forEach(function (k) {
+      k.burst = k === best ? 1 : 0.5;
+      k.turnKick = (k.r() < 0.5 ? -1 : 1) * 3;
+    });
+  };
+
+  /* ============================================================
+     6. PAGE: main button, side-by-side view, panel
+     ============================================================ */
+  var mainCanvas = document.getElementById('koiCanvas');
+  var png = document.getElementById('koiPng');
+  var mainPond = new Pond(mainCanvas, current === 'P' ? 'A' : current);
+  function showCurrent() {
+    var isPng = current === 'P';
+    png.classList.toggle('hidden', !isPng);
+    mainCanvas.classList.toggle('hidden', isPng);
+    if (!isPng) { mainPond.key = current; mainPond.resize(); mainPond.rebuild(); }
+  }
+
+  var grid = document.getElementById('klGrid');
+  var gridPonds = [];
+  function buildGrid() {
+    grid.innerHTML = '';
+    gridPonds = gridPonds.filter(function () { return false; });
+    ORDER.forEach(function (key) {
+      var tile = document.createElement('div'); tile.className = 'kl-tile';
+      var pond = document.createElement('div'); pond.className = 'kl-pond';
+      if (key === 'P') {
+        var im = document.createElement('img'); im.src = 'icons/44173_0c6eff.png'; im.alt = '';
+        pond.appendChild(im);
+      } else {
+        var cv = document.createElement('canvas'); pond.appendChild(cv);
+      }
+      var lab = document.createElement('p'); lab.textContent = STYLES[key].name;
+      tile.appendChild(pond); tile.appendChild(lab); grid.appendChild(tile);
+      tile.addEventListener('click', function () { selectStyle(key); });
+      if (key !== 'P') {
+        var gp = new Pond(cv, key);
+        pond.addEventListener('pointerdown', function (e) {
+          var r = cv.getBoundingClientRect();
+          gp.startle(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
+        });
+        gridPonds.push(gp);
+      }
+    });
+  }
+  var comparing = false;
+  document.getElementById('klCompare').addEventListener('click', function () {
+    comparing = !comparing;
+    this.classList.toggle('on', comparing);
+    grid.classList.toggle('on', comparing);
+    document.documentElement.classList.toggle('kl-grid-on', comparing);
+    if (comparing) buildGrid();
+    else { gridPonds.forEach(function (gp) { var i = ponds.indexOf(gp); if (i >= 0) ponds.splice(i, 1); }); gridPonds = []; grid.innerHTML = ''; }
+  });
+
+  // panel
+  var optsEl = document.getElementById('klOpts'), ctlEl = document.getElementById('klControls');
+  ORDER.forEach(function (key) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'kl-opt'; b.dataset.key = key;
+    b.innerHTML = '<b>' + STYLES[key].name + '</b><small>' + STYLES[key].note + '</small>';
+    b.addEventListener('click', function () { selectStyle(key); });
+    optsEl.appendChild(b);
+  });
+  function buildControls() {
+    ctlEl.innerHTML = '';
+    if (current === 'P') { ctlEl.innerHTML = '<div class="kl-group">Today\'s picture has no settings here.</div>'; return; }
+    var S = STYLES[current];
+    CONTROLS.forEach(function (c) {
+      if (c.group) { var g = document.createElement('div'); g.className = 'kl-group'; g.textContent = c.group; ctlEl.appendChild(g); return; }
+      var row = document.createElement('div'); row.className = 'kl-row';
+      var lab = document.createElement('label'); lab.textContent = c.label; row.appendChild(lab);
+      if (c.type === 'seg') {
+        var seg = document.createElement('div'); seg.className = 'kl-seg';
+        c.opts.forEach(function (o) {
+          var b = document.createElement('button'); b.type = 'button'; b.textContent = o[1];
+          b.classList.toggle('on', S[c.id] === o[0]);
+          b.addEventListener('click', function () {
+            S[c.id] = o[0]; save(); refreshPonds(true);
+            seg.querySelectorAll('button').forEach(function (x) { x.classList.toggle('on', x === b); });
+          });
+          seg.appendChild(b);
+        });
+        row.appendChild(seg);
+      } else {
+        var inp = document.createElement('input'); inp.type = 'range';
+        inp.min = c.min; inp.max = c.max; inp.step = c.step; inp.value = S[c.id];
+        var out = document.createElement('output'); out.textContent = S[c.id];
+        inp.addEventListener('input', function () {
+          S[c.id] = +inp.value; out.textContent = inp.value; save();
+          refreshPonds(c.id === 'count' || c.id === 'length');
+        });
+        row.appendChild(inp); row.appendChild(out);
+      }
+      ctlEl.appendChild(row);
+    });
+  }
+  function refreshPonds(rebuild) {
+    ponds.forEach(function (p) { p.s = STYLES[p.key]; if (rebuild && p.key === current) p.rebuild(); });
+  }
+  function selectStyle(key) {
+    current = key; save();
+    optsEl.querySelectorAll('.kl-opt').forEach(function (b) { b.classList.toggle('on', b.dataset.key === key); });
+    buildControls(); showCurrent();
+  }
+  selectStyle(current);
+
+  document.getElementById('klReset').addEventListener('click', function () {
+    if (current === 'P') return;
+    var d = DEF[current];
+    CONTROLS.forEach(function (c) { if (c.id) STYLES[current][c.id] = d[c.id]; });
+    save(); buildControls(); refreshPonds(true);
+  });
+  document.getElementById('klCopy').addEventListener('click', function () {
+    var S = STYLES[current], o = { style: current, look: S.look };
+    CONTROLS.forEach(function (c) { if (c.id && S[c.id] !== undefined) o[c.id] = S[c.id]; });
+    var txt = 'var KOI_LOOK = ' + JSON.stringify(o, null, 2) + ';';
+    var btn = this;
+    (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject()).then(function () {
+      btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = 'Copy values'; }, 1200);
+    }, function () { window.prompt('Copy:', txt); });
+  });
+  document.getElementById('klFold').addEventListener('click', function () {
+    var p = document.getElementById('klPanel'); p.classList.toggle('collapsed');
+    this.textContent = p.classList.contains('collapsed') ? '+' : '–';
+  });
+  // drag the panel by its title bar
+  (function () {
+    var head = document.getElementById('klHead'), panel = document.getElementById('klPanel'), sx, sy, ox, oy, on = false;
+    head.addEventListener('pointerdown', function (e) {
+      if (e.target.tagName === 'BUTTON') return;
+      on = true; sx = e.clientX; sy = e.clientY;
+      var r = panel.getBoundingClientRect(); ox = r.left; oy = r.top;
+      head.setPointerCapture(e.pointerId);
+    });
+    head.addEventListener('pointermove', function (e) {
+      if (!on) return;
+      panel.style.left = (ox + e.clientX - sx) + 'px'; panel.style.top = (oy + e.clientY - sy) + 'px'; panel.style.right = 'auto';
+    });
+    head.addEventListener('pointerup', function () { on = false; });
+  })();
+
+  /* Touch the koi / swipe up to dive (a small copy of the app's gesture). */
+  var screen = document.getElementById('blossomScreen'), btn = document.getElementById('startBtn');
+  var downY = null, downX = 0, downT = 0;
+  function startleMain(clientX, clientY) {
+    if (current === 'P') {
+      btn.classList.remove('startling'); void btn.offsetWidth; btn.classList.add('startling');
+      setTimeout(function () { btn.classList.remove('startling'); }, 260);
+      return;
+    }
+    var r = mainCanvas.getBoundingClientRect();
+    mainPond.startle(clientX === undefined ? undefined : clientX - r.left - r.width / 2,
+                     clientY === undefined ? undefined : clientY - r.top - r.height / 2);
+  }
+  function dive() {
+    btn.classList.add('diving'); screen.classList.add('diving');
+    setTimeout(function () {
+      btn.classList.remove('diving'); screen.classList.remove('diving');
+      showCurrent();
+    }, 1600);
+  }
+  screen.addEventListener('pointerdown', function (e) { downY = e.clientY; downX = e.clientX; downT = performance.now(); });
+  screen.addEventListener('pointerup', function (e) {
+    if (downY === null) return;
+    var dy = downY - e.clientY, dx = e.clientX - downX;
+    if (dy > 60) dive();
+    else if (Math.hypot(dx, dy) < 10 && performance.now() - downT < 400) {
+      var r = mainCanvas.getBoundingClientRect();
+      if (Math.hypot(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2)) < r.width / 2) startleMain(e.clientX, e.clientY);
+    }
+    downY = null;
+  });
+  document.getElementById('klStartle').addEventListener('click', function () { startleMain(); });
+  document.getElementById('klDive').addEventListener('click', dive);
+  window.addEventListener('resize', function () { ponds.forEach(function (p) { p.resize(); }); });
+
+  /* ============================================================
+     7. LOOP
+     ============================================================ */
+  var last = performance.now(), fpsEl = document.getElementById('klFps'), frames = 0, fpsT = last, costAcc = 0;
+  function loop(now) {
+    var dt = (now - last) / 1000; last = now;
+    var t0 = performance.now();
+    ponds.forEach(function (p) {
+      if (p === mainPond && (current === 'P' || comparing)) return;
+      p.frame(dt);
+    });
+    costAcc += performance.now() - t0; frames++;
+    if (now - fpsT > 1000) {
+      fpsEl.textContent = frames + ' fps · drawing ' + (costAcc / frames).toFixed(2) + ' ms a frame';
+      frames = 0; costAcc = 0; fpsT = now;
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
+  window.KoiLab = { STYLES: STYLES, ponds: ponds };
+})();
+</script>
+</body>
+</html>
