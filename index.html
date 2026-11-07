@@ -37,6 +37,7 @@
 <script src="water.js" defer></script>
 <script src="inkfluid.js" defer></script>
 <script src="inkreveal.js" defer></script>
+<script src="koi.js" defer></script>
 <script src="app.js" defer></script>
 </head>
 <body>
@@ -317,11 +318,11 @@
                           Spawned by startPondLife() in app.js.
 
        Koi stack (inside .koi-dive-wrap):
-         .koi-shadow — static elliptical depth pool, opacity-faded
-                       in lockstep with koiDive
-         .koi-image  — the fish PNG, rotating continuously on its
-                       own layer above the shadow. The koi blurs as
-                       it sinks and is sharp at the surface -->
+         .koi-shadow — the old picture's depth pool; hidden now
+         .koi-canvas — the koi, drawn from code by koi.js (no image):
+                       a kohaku and a gold ogon swimming the pond,
+                       each at its own depth (settings in KOI_LOOK in
+                       app.js; tuned in koi.html) -->
   <button type="button" class="start-btn" id="startBtn" aria-label="上へスワイプしてはじめる">
     <div class="icon-wrapper">
       <div class="soft-glow" aria-hidden="true"></div>
@@ -345,7 +346,7 @@
       <div class="koi-dive-wrap" id="koiDiveWrap">
         <div class="blossom-char">
           <div class="koi-shadow" aria-hidden="true"></div>
-          <img src="icons/44173_0c6eff.png" class="koi-image" alt="">
+          <canvas class="koi-canvas" id="koiCanvas" aria-hidden="true"></canvas>
         </div>
       </div>
     </div>
