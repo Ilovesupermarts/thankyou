@@ -1366,6 +1366,7 @@ var DROP_SOUND_URL = 'Sound/cave-water-drop-echo-a053fcdf.mp3';
 var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 var BAMBOO_URL = 'Sound/morning/Windbamboo.mp3';
 var CHIRP_URL = 'Sound/Chirping2.mp3';
+var BELL_URL = 'Sound/668647__tec_studio__temple_bell_002.mp3';
 
 /* ============ TRACK METADATA (4 PHASES) ============
    Four Nagoya time phases, the page colour theme's own
@@ -2259,6 +2260,10 @@ function initSound() {
       if (buf) soundBuffers.chirp = buf;
     });
 
+    loadAudioBuffer(BELL_URL).then(function(buf) {
+      if (buf) soundBuffers.bell = buf;
+    });
+
     /* AMBIENT BEDS: three raw MP3s download in parallel, but only
        the current Nagoya phase decodes. The other two sit in
        _ambientRawBuffers until their boundary arrives or the
@@ -2686,6 +2691,7 @@ function startAmbient() {
   stopAmbient();
   _ambientBufferRetries = 0;
   bambooStart();
+  bellStart();
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
@@ -2713,6 +2719,7 @@ function scheduleNextAmbient(prevPlayMs) {
 
 function stopAmbient() {
   bambooStop();
+  bellStop();
   chirpStop();
   stopSwellLoop();
   _ambientBufferRetries = 0;
@@ -3725,6 +3732,147 @@ function chirpStop() {
   _chirpHadBirds = false;
   _chirpNextAt = 0;
   _chirpFade(0.3);
+}
+
+/* ============ TEMPLE BELL ============
+   In the autumn lake scene, in the morning and the evening (the page
+   colour theme's morning and evening phases, 05:00–10:59 and
+   17:00–20:59), the bell of the shrine hall on the headland rings now
+   and then: Sound/668647__tec_studio__temple_bell_002.mp3 (13 seconds),
+   played from start to end every time.
+
+   Timing: the next ring starts 15–30 seconds after the last one has
+   finished, at random. It keeps asking the clock and the theme at each
+   ring, so it falls silent outside those hours or in another theme
+   without being restarted.
+
+   Loudness: by the distance from the screen (your eye) to the hall, in
+   the scene's own units (eye heights; the hall stands a little behind
+   the headland's front, lakeBakeHead's row LAKE_ROW_HALL): the level
+   falls as 1 / distance, BELL_LEVEL at BELL_REF_DIST. So moving the
+   headland (LAKE.headZ) or the hall changes it on its own.
+
+   Echo: a delay with its repeats fed back, each one a little duller
+   (BELL_ECHO_*), mixed in beside the bell itself, as if it came back off
+   the hills across the lake.
+
+   Like the wind in the bamboo it is the scene, not music: it does not go
+   through ambientBus, so the music's mute and pause buttons leave it
+   alone. The recording is loud (about -14.6 LUFS, the songs about -19). */
+var BELL_GAP_MIN = 15;             // seconds between one ring's end and the next's start
+var BELL_GAP_MAX = 30;
+var BELL_LEVEL = 0.6;              // gain at BELL_REF_DIST
+var BELL_REF_DIST = 10;            // eye heights
+var BELL_ECHO_DELAY = 0.42;        // seconds between repeats
+var BELL_ECHO_FEEDBACK = 0.38;     // each repeat's share of the last
+var BELL_ECHO_TONE = 2200;         // Hz: the repeats lose their top above this
+var BELL_ECHO_WET = 0.45;          // how loud the echo is beside the bell
+var BELL_ECHO_TAIL = 4;            // seconds the echo is let ring on after the recording ends
+
+var _bellOn = false;
+var _bellTimer = null;
+var _bellSrc = null;
+var _bellGain = null;
+var _bellNodes = null;
+
+function _bellOk() {
+  var phase = getTimeOfDayInNagoya();
+  return (phase === 'morning' || phase === 'evening') && currentTheme === 'autumn';
+}
+
+/* From the eye to the shrine hall, in eye heights (0: no hall in the scene). */
+function _bellDistance() {
+  try { return DynBG.hallDistance(); } catch (e) { return 0; }
+}
+
+function _bellSchedule() {
+  if (!_bellOn) return;
+  var gap = BELL_GAP_MIN + Math.random() * (BELL_GAP_MAX - BELL_GAP_MIN);
+  _bellTimer = setTimeout(function() {
+    _bellTimer = null;
+    _bellPlay();
+  }, gap * 1000);
+}
+
+function _bellPlay() {
+  if (!_bellOn || _bellSrc) return;
+  var buf = soundBuffers.bell;
+  /* Not the morning or the evening, not the autumn scene, or the recording
+     has not arrived yet: ask again after another gap. */
+  var dist = _bellOk() ? _bellDistance() : 0;
+  if (!dist || !buf || !soundAudioCtx || soundAudioCtx.state !== 'running') { _bellSchedule(); return; }
+
+  var ac = soundAudioCtx, now = ac.currentTime;
+  var level = BELL_LEVEL * BELL_REF_DIST / dist;
+  var src = ac.createBufferSource();
+  src.buffer = buf;
+  var gain = ac.createGain();
+  gain.gain.value = level;
+  // the echo: delay -> duller -> back into the delay, and out to the mix
+  var delay = ac.createDelay(2);
+  delay.delayTime.value = BELL_ECHO_DELAY;
+  var tone = ac.createBiquadFilter();
+  tone.type = 'lowpass';
+  tone.frequency.value = BELL_ECHO_TONE;
+  tone.Q.value = 0.5;
+  var fb = ac.createGain();
+  fb.gain.value = BELL_ECHO_FEEDBACK;
+  var wet = ac.createGain();
+  wet.gain.value = BELL_ECHO_WET;
+  src.connect(gain);
+  gain.connect(soundMasterGain);                 // the bell itself
+  gain.connect(delay);
+  delay.connect(tone);
+  tone.connect(fb);
+  fb.connect(delay);
+  tone.connect(wet);
+  wet.connect(soundMasterGain);                  // its echo
+  src.start(now);
+  _bellSrc = src;
+  _bellGain = gain;
+  var nodes = [gain, delay, tone, fb, wet];
+  _bellNodes = nodes;
+  src.onended = function() {
+    if (_bellSrc !== src) return;
+    _bellSrc = null;
+    _bellGain = null;
+    /* let the echo die away, then take the nodes down */
+    setTimeout(function() {
+      nodes.forEach(function(n) { try { n.disconnect(); } catch (e) {} });
+      if (_bellNodes === nodes) _bellNodes = null;
+    }, BELL_ECHO_TAIL * 1000);
+    _bellSchedule();
+  };
+}
+
+function bellStart() {
+  bellStop();
+  if (!SOUND_ENABLED) return;
+  _bellOn = true;
+  _bellSchedule();
+}
+
+function bellStop() {
+  _bellOn = false;
+  if (_bellTimer) { clearTimeout(_bellTimer); _bellTimer = null; }
+  var src = _bellSrc, gain = _bellGain, nodes = _bellNodes;
+  _bellSrc = null;
+  _bellGain = null;
+  _bellNodes = null;
+  if (src && gain && soundAudioCtx) {
+    try {
+      var now = soundAudioCtx.currentTime;
+      gain.gain.cancelScheduledValues(now);
+      gain.gain.setValueAtTime(gain.gain.value, now);
+      gain.gain.setTargetAtTime(0, now, 0.1);
+      src.stop(now + 0.5);
+    } catch (e) {
+      try { src.stop(); } catch (e2) {}
+    }
+  }
+  if (nodes) setTimeout(function() {
+    nodes.forEach(function(n) { try { n.disconnect(); } catch (e) {} });
+  }, BELL_ECHO_TAIL * 1000);
 }
 
 /* ============================================================
@@ -22114,10 +22262,20 @@ window.addEventListener('load', function() { setTimeout(dynWarmGpu, 1500); });
 /* The bamboo is the last part the reveal paints in: once it has finished appearing the scene is all there
    (what is left is only the birds and the falling leaves fading in), so the message comes then, not when the
    reveal's last clean-up has ended. */
+/* From the eye to the shrine hall on the headland, in eye heights (0: the scene has no hall). Its depth is
+   lakeBakeHead's (lerp(zBack, headZ, LAKE_ROW_HALL)); its place across, lakeLandmarkSpots'. For the temple bell. */
+function lakeHallDistance() {
+  if (!LAKE.headland || !LAKE.hall) return 0;
+  var z = lerp(LAKE.headZ * 1.55, LAKE.headZ, LAKE_ROW_HALL), x = 0;
+  if (W > 0) x = (lakeLandmarkSpots().hall.x - W / 2) * z / torLens();
+  return Math.max(1, Math.hypot(x, z));
+}
+
 function rvBambooIn() { return !RV.started || InkReveal.clock() >= RV_MESSAGE_AT; }   // (the first message's time has come)
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
          sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
-         bankInfo: function() { return BankTrees.info(); } };          // (for checking: how the bank trees are doing)
+         bankInfo: function() { return BankTrees.info(); },            // (for checking: how the bank trees are doing)
+         hallDistance: lakeHallDistance };                              // (for the temple bell)
 
 })();
 
