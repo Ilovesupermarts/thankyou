@@ -552,7 +552,7 @@
       // swims about down there, its depth drifting a little, then comes up
       this.diveT = (this.diveT || 0) + dt;
       this.zT = this.deepZ + 0.07 * Math.sin(this.diveT * 0.7 + this.n2);
-      this.diveDown = this.diveDown && this.z < this.deepZ - 0.15;   // once down, it stays down
+      this.diveDown = this.diveDown && this.z < this.zHome + (this.deepZ - this.zHome) * 0.8;   // once down, it stays down
       // strong beats on the way down, easing off once it is there
       this.wrig += ((this.diveDown ? 0.45 : 0) - (this.wrig || 0)) * Math.min(1, 3 * dt);
       if (this.modeT <= 0) { this.mode = 'cruise'; this.zT = this.zHome; this.diveDown = false; }
@@ -594,7 +594,12 @@
     var r = this.r;
     this.mode = mode;
     if (mode === 'dive') {
-      this.deepZ = 0.88 + r() * 0.1; this.zT = this.deepZ; this.diveT = 0; this.diveDown = true; this.wrig = this.wrig || 0;
+      // a different depth each time: anywhere from just under the
+      // surface to the deepest, and clearly apart from its last dive
+      var lo = this.zHome + 0.2, hi = 0.98, dz = lo + r() * (hi - lo);
+      if (this.lastDeep !== undefined && Math.abs(dz - this.lastDeep) < 0.2) dz = dz < this.lastDeep ? Math.max(lo, this.lastDeep - 0.2 - r() * 0.25) : Math.min(hi, this.lastDeep + 0.2 + r() * 0.25);
+      if (this.lastDeep !== undefined && Math.abs(dz - this.lastDeep) < 0.2) dz = this.lastDeep > (lo + hi) / 2 ? lo + r() * 0.1 : hi - r() * 0.1;
+      this.deepZ = this.lastDeep = dz; this.zT = this.deepZ; this.diveT = 0; this.diveDown = true; this.wrig = this.wrig || 0;
       this.turnKick = (r() < 0.5 ? -1 : 1) * (0.4 + r() * 0.4);   // a gentle curve as it heads down
       this.modeT = this.pond.s.deepTime * (0.7 + r() * 0.6) + 2;   // + the time to get down
     }
