@@ -452,11 +452,17 @@
                avoidMax: 4.5,  // the strongest push to steer round another koi
                pathClear: 0.45,// a koi does not choose a way that passes closer than this to another (× length)
                bumpTurn: 1.5,  // how quickly a koi that bumps another turns away (radians per second)
+               bumpMax: 0.25,  // the fastest a bump moves a koi aside (× length per second)
+               minTurnR: 0.35, // its path is never tighter than this (× length), however slowly it swims
+               reach: 0.45,    // this close to its spot (× length) counts as there
+               goalMaxT: 6,    // after this long (s) chasing one spot it picks another
+               across: 0.9,    // a cruising koi's next spot is at least this far away (× the pool's radius)
+               wallFace: 0.35, // nose this much into the edge (0 along it, 1 straight at it): it stops and turns
                stuckAfter: 1.2,// stuck at the edge this long (s): it turns the other way round
                brakeAt: 1.1,   // it brakes to turn when its spot is more than this far round (radians)
                brake: 0.45,    // … down to this share of its speed
                turnEase: 4,    // how quickly a turn builds and eases off
-               bendR: 0.55,    // tightest bend of the body near the head (× length); the tail may bend twice as tight
+               bendR: 0.4,     // tightest bend of the body near the head (× length); the tail may bend twice as tight
                pitch: 1.1,     // how much a koi tilts nose-down / nose-up when it changes depth
                exitV: 0.8 };   // swimming speed when it swims away (× length per second)
   // how far apart two koi are in depth, counting the depth each is
@@ -502,7 +508,7 @@
       var hx0 = Math.cos(this.heading), hy0 = Math.sin(this.heading), la0 = L * TUNE.la0 + this.v * TUNE.la1;
       var gdiff = this.goal ? Math.abs(angDiff(this.heading, Math.atan2(this.goal.y - this.y, this.goal.x - this.x))) : 0;
       var edgeNear = Math.hypot(this.x + hx0 * la0, this.y + hy0 * la0) > lim * TUNE.wall;
-      if (gdiff > TUNE.brakeAt || edgeNear) { vT *= TUNE.brake; acc = Math.max(acc, 2); }
+      if (gdiff > TUNE.brakeAt || edgeNear || this.orbiting) { vT *= TUNE.brake; acc = Math.max(acc, 2); }
     }
     vT += L * 1.3 * this.burst;
     if (this.burst > 0.05) { beatT = 1; acc = 2.2; }
@@ -514,12 +520,23 @@
     // heading: toward the spot it has in mind, with a little wander
     var hx = Math.cos(this.heading), hy = Math.sin(this.heading);
     this.wTurn += -this.wTurn * 0.9 * dt + gauss(r) * 1.1 * Math.sqrt(dt);
-    var turn = this.wTurn * (this.act === 'rest' ? 0.25 : 0.4);
+    var turn = this.wTurn * (this.act === 'rest' ? 0.06 : 0.4);   // resting: it hardly turns, so it stays put
     if (this.goal) {
       var gx = this.goal.x - this.x, gy = this.goal.y - this.y;
       turn += clamp(this.goalTurn(Math.atan2(gy, gx)) * A.steer, -3, 3);
       // there: pick the next spot (or, when slow, just drift on)
-      if (Math.hypot(gx, gy) < L * 0.3) this.goal = this.act === 'cruise' || this.act === 'slow' ? this.newGoal(0, Math.PI) : null;
+      var gDist = Math.hypot(gx, gy), gOff = Math.abs(angDiff(this.heading, Math.atan2(gy, gx)));
+      this.goalAge = (this.goalAge || 0) + dt;
+      // the spot inside its turning circle (it would only circle round it),
+      // or chased too long: it gives up and picks another, either side
+      // the spot inside its turning circle: it brakes to turn tighter
+      // (rather than circle round it); chased too long: it picks another
+      var turnCircle = Math.max(this.v, L * 0.12) / Math.max(0.2, Math.abs(this.omega || 0.2));
+      this.orbiting = gOff > 1.2 && gDist < turnCircle * 1.3;
+      if (gDist < L * TUNE.reach || this.goalAge > TUNE.goalMaxT) {
+        this.goal = this.act === 'cruise' || this.act === 'slow' ? this.goalAcross() : null;
+        this.goalAge = 0; this.turnSign = 0;
+      }
     }
 
     // the pool's edge: when it is about to reach it, it picks a new spot
@@ -529,7 +546,8 @@
     var wall = lim * TUNE.wall;
     if (fd > wall) {
       // (it keeps that spot until it gets there, so it does not keep changing its mind)
-      if (!this.goal || Math.hypot(this.goal.x, this.goal.y) > wall * 0.8) this.goal = this.newGoal(0, Math.PI, true);
+      // (only if its spot is outside the area spots are picked from)
+      if (!this.goal || Math.hypot(this.goal.x, this.goal.y) > lim * 0.82) this.goal = this.goalAcross();
       var gx2 = this.goal.x - this.x, gy2 = this.goal.y - this.y;
       turn += clamp(this.goalTurn(Math.atan2(gy2, gx2)) * 2.5, -3, 3) * clamp((fd - wall) / (la * 0.5), 0.3, 1.5);
     }
@@ -581,6 +599,12 @@
     if (Math.abs(turn) > maxTurn * 0.8 && !this.kick && this.act === 'cruise') { this.kick = true; this.gaitT = 0.4 + r() * 0.3; }
     this.omega = (this.omega || 0) + (clamp(turn, -maxTurn, maxTurn) - (this.omega || 0)) * Math.min(1, TUNE.turnEase * A.ease * dt);
     this.heading += this.omega * dt;
+    // fish drift forward as they turn: never slower than the turn needs to
+    // keep its path no tighter than minTurnR (so the path can not double
+    // back in a hairpin, which would make the tail flip from side to side)
+    var vMin = Math.abs(this.omega) * L * TUNE.minTurnR;
+    if (this.v < vMin) this.v += (vMin - this.v) * Math.min(1, 6 * dt);
+    var ox0 = this.x, oy0 = this.y;
     this.x += Math.cos(this.heading) * this.v * dt;
     this.y += Math.sin(this.heading) * this.v * dt;
     // a soft bump: if the head is touching another koi at about the same
@@ -596,7 +620,9 @@
         var ex = this.x - tr[q].x, ey = this.y - tr[q].y, ed = Math.hypot(ex, ey);
         if (ed < touch && ed > 0.001) {
           // nudged sideways only (never pushed back into its own body)
-          var k2 = (touch - ed) * TUNE.bump;
+          // (capped: two koi that find themselves overlapping, say one coming
+          // up from under the other, ease apart instead of jumping)
+          var k2 = Math.min((touch - ed) * TUNE.bump, L * TUNE.bumpMax * dt);
           var nx2 = -Math.sin(this.heading), ny2 = Math.cos(this.heading);
           var side = (ex * nx2 + ey * ny2) / ed;
           // nose to nose there is no side to slide off: it picks one
@@ -609,8 +635,25 @@
       }
     }
     this.bumpGoalT = (this.bumpGoalT || 0) - dt;
+    // the pool's edge: a step that would take the head past it loses only
+    // its outward part, so the koi glides along the edge the way it is
+    // facing (a snap straight back inward could move it backwards, fold
+    // its path back on itself and flip its tail)
     var dc = Math.hypot(this.x, this.y);
-    if (dc > lim) { this.x *= lim / dc; this.y *= lim / dc; }
+    if (dc > lim) {
+      var sx = this.x - ox0, sy = this.y - oy0, ux = this.x / dc, uy = this.y / dc;
+      // nose into the edge: it stops and turns first (as a fish does at a wall)
+      if (Math.cos(this.heading) * ux + Math.sin(this.heading) * uy > TUNE.wallFace) {
+        sx = 0; sy = 0; this.v *= 1 - Math.min(1, 6 * dt);
+        // (a dart or a sudden turn ends there: it slows, and swims on calmly)
+        if (this.act === 'dart' || this.act === 'snap') this.pickAct('slow');
+      }
+      var outward = sx * ux + sy * uy;
+      if (outward > 0) { sx -= ux * outward; sy -= uy * outward; }
+      this.x = ox0 + sx; this.y = oy0 + sy;
+      dc = Math.hypot(this.x, this.y);
+      if (dc > lim) { this.x *= lim / dc; this.y *= lim / dc; }   // (the last hair, along the curve)
+    }
 
     // depth: a soft spring toward the depth it wants
     this.modeT -= dt;
@@ -679,9 +722,9 @@
   var MOODS = {
     cruise: { v: 0.36, beat: 0.6,  acc: 1.2, steer: 1.4, turnR: 1,    ease: 1,   w: 0.34, t: [3, 8] },
     slow:   { v: 0.12, beat: 0.28, acc: 0.8, steer: 0.9, turnR: 1,    ease: 0.8, w: 0.26, t: [3, 7] },
-    rest:   { v: 0.015, beat: 0.12, acc: 1.1, steer: 0.4, turnR: 1,   ease: 0.6, w: 0.18, t: [1.5, 5] },
-    dart:   { v: 1.25, beat: 1,    acc: 6,   steer: 3.5, turnR: 0.45, ease: 3,   w: 0.12, t: [0.9, 1.6] },
-    snap:   { v: 0.42, beat: 0.9,  acc: 3,   steer: 3,   turnR: 0.55, ease: 2.5, w: 0.10, t: [0.8, 1.3] }
+    rest:   { v: 0.015, beat: 0.12, acc: 3,   steer: 0.4, turnR: 1,   ease: 0.6, w: 0.18, t: [1.5, 5] },
+    dart:   { v: 1.25, beat: 1,    acc: 6,   steer: 3,   turnR: 0.65, ease: 2,   w: 0.12, t: [0.9, 1.6] },
+    snap:   { v: 0.42, beat: 0.9,  acc: 3,   steer: 2.5, turnR: 0.75, ease: 1.6, w: 0.10, t: [0.8, 1.3] }
   };
   Koi.prototype.pickAct = function (force) {
     var r = this.r, name = force;
@@ -696,13 +739,13 @@
       }
     }
     var M = MOODS[name];
-    this.act = name; this.actAge = 0;
+    this.act = name; this.actAge = 0; this.goalAge = 0;
     this.actT = this.actLen = M.t[0] + r() * (M.t[1] - M.t[0]);
     // where it has in mind to go
     if (name === 'dart') this.goal = this.newGoal(1.0, 2.8);        // off at a sharp angle
     else if (name === 'snap') this.goal = this.newGoal(1.6, 3.1);   // a sudden change of direction
     else if (name === 'rest') this.goal = null;                     // stays put
-    else this.goal = this.newGoal(0, Math.PI);
+    else this.goal = this.goalAcross();
   };
   /* A spot in the pool, at a turn of minA–maxA (radians, either way) from
      where the koi is heading, as far off as there is room for. */
@@ -721,6 +764,21 @@
     // no room that way: anywhere in the pool, spread evenly (not at the rim)
     var ra = r() * TAU, rr = lim * 0.85 * Math.sqrt(r());
     return { x: Math.cos(ra) * rr, y: Math.sin(ra) * rr };
+  };
+  /* A spot somewhere across the pool (anywhere, evenly spread, but well
+     away from where the koi is). Heading across the pool every time makes
+     it pass through the middle and arrive facing the far edge, where its
+     next spot is as likely to its left as to its right: no circling. */
+  Koi.prototype.goalAcross = function () {
+    var p = this.pond, lim = p.s.wanderSpread * p.R * 0.8, r = this.r, far = lim * TUNE.across, best = null, bestD = -1;
+    for (var t = 0; t < 30; t++) {
+      var a = r() * TAU, rr = lim * Math.sqrt(r()), gx = Math.cos(a) * rr, gy = Math.sin(a) * rr;
+      var d = Math.hypot(gx - this.x, gy - this.y);
+      if (d < far) { if (d > bestD) { bestD = d; best = { x: gx, y: gy }; } continue; }
+      if (t < 24 && this.pathBlocked(gx, gy)) continue;
+      return { x: gx, y: gy };
+    }
+    return best;
   };
   // does the way from here to (gx, gy) pass close to another koi?
   Koi.prototype.pathBlocked = function (gx, gy) {
@@ -771,9 +829,11 @@
       var pitch = clamp((this.zv || 0) * TUNE.pitch, -0.7, 0.9);
       seg *= Math.cos(pitch);
     }
-    var a = tr[k];
+    var a = tr[k], i = 1;
+    // (pool: the path is used only once, to lay the body out at the start;
+    // after that the body follows the head like a rope, below)
+    if (!pool || !this.C) {
     P[0].x = a.x; P[0].y = a.y;
-    var i = 1;
     while (i < N) {
       want = i * seg;
       if (k <= 0) { // ran out: continue straight
@@ -786,6 +846,29 @@
         var f = d > 0 ? (want - acc) / d : 0;
         P[i].x = lerp(a.x, b.x, f); P[i].y = lerp(a.y, b.y, f); i++;
       } else { acc += d; k--; a = b; }
+    }
+      if (pool) this.C = P.map(function (q) { return { x: q.x, y: q.y }; });
+    }
+    if (pool) {
+      // The body follows the head like a rope: each point is pulled along
+      // behind the one in front, at a fixed spacing, and may bend from the
+      // one before only so much (a soft limit, tighter toward the tail).
+      // Nothing depends on the old path, so however the head turns, stops
+      // or is nudged, the body can not tangle, fold back or jump.
+      var C = this.C, seg0 = L / (N - 1), head = tr[tr.length - 1], pa = 0;
+      C[0].x = head.x; C[0].y = head.y;
+      for (i = 1; i < N; i++) {
+        var ang = Math.atan2(C[i].y - C[i - 1].y, C[i].x - C[i - 1].x);
+        if (i > 1) { var lim3 = seg0 / (L * TUNE.bendR) * (1 + i / (N - 1)); ang = pa + lim3 * Math.tanh(angDiff(pa, ang) / lim3); }
+        C[i].x = C[i - 1].x + Math.cos(ang) * seg0; C[i].y = C[i - 1].y + Math.sin(ang) * seg0;
+        pa = ang;
+      }
+      // drawn from the rope (shorter while it tilts to change depth)
+      P[0].x = C[0].x; P[0].y = C[0].y;
+      for (i = 1; i < N; i++) {
+        var cx = C[i].x - C[i - 1].x, cy = C[i].y - C[i - 1].y, cl = Math.hypot(cx, cy) || 1;
+        P[i].x = P[i - 1].x + cx / cl * seg; P[i].y = P[i - 1].y + cy / cl * seg;
+      }
     }
     // normals of the plain spine, then the wave along them
     var amp = L * 0.055 * s.wave * (1 + 0.6 * this.burst) * (s.path === 'pool' ? (0.45 + 0.55 * this.beat) * (1 + 1.1 * (this.wrig || 0)) : 1);
@@ -807,7 +890,18 @@
         var aA = Math.atan2(P[i].y - P[i - 1].y, P[i].x - P[i - 1].x);
         var lim2 = seg / (L * TUNE.bendR) * (1 + i / (N - 1));
         var dA = angDiff(prevA, aA);
-        if (i > 1) aA = prevA + clamp(dA, -lim2, lim2);
+        // where the path doubles back, the bend could go either way: it
+        // keeps the way it bent last frame, so the tail never flips sides
+        var pb = this._bend || (this._bend = []);
+        if (Math.abs(dA) > 2.0) {
+          // the way it bent here last frame (else the way the body just ahead bends)
+          var want = pb[i] ? pb[i] : pb[i - 1];
+          if (want && (dA > 0) !== (want > 0)) dA -= (dA > 0 ? 1 : -1) * TAU;
+        }
+        pb[i] = dA;
+        // a soft limit: the bend eases in toward it (a hard stop makes the
+        // tail twitch each time the swimming wave pushes it to the limit)
+        if (i > 1) aA = prevA + lim2 * Math.tanh(dA / lim2);
         P[i].x = P[i - 1].x + Math.cos(aA) * seg; P[i].y = P[i - 1].y + Math.sin(aA) * seg;
         prevA = aA;
       }
