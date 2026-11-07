@@ -20,11 +20,9 @@
      start-button markup), so the ring, halo, ripples, pond light and
      the koi's breath (rise and sink, blur at depth) are the app's.
 
-     Four styles (plus the current PNG to compare):
-       A 紅白・ふたり   two orange koi chasing in a circle, like today's picture
-       B 錦・自由に     a kohaku and a gold ogon swimming freely in the pond
-       C 墨と朱         sumi-e: ink-brush koi with a vermilion crown
-       D 光の線         line drawing in the ring's own white, with a light wake
+     The style is settled (錦, swimming as in a pool). The panel's tiles
+     choose which koi are in the pond (up to 3, each a different
+     variety): kohaku, yamabuki ogon, showa, tancho, sanke, platinum.
 
      Touch a koi: it darts away (faster beats, sharp turn).
      Swipe up on the water: the koi dives, as in the app.
@@ -103,14 +101,22 @@
   }
   .kl-btn.on { background: var(--accent); border-color: var(--accent); color: #FFFDF9; }
   .kl-body { padding: 10px 14px 14px; }
-  .kl-opts { display: grid; grid-template-columns: 1fr; gap: 6px; margin-bottom: 10px; }
-  .kl-opt {
-    text-align: left; border: 1px solid var(--border-2); background: #fff;
-    border-radius: 12px; padding: 8px 10px; font: inherit; color: var(--text-med); cursor: pointer;
+  .kl-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 6px 0 10px; }
+  .kl-kind {
+    position: relative; display: flex; align-items: center; gap: 8px; text-align: left;
+    border: 1px solid var(--border-2); background: #fff; border-radius: 12px;
+    padding: 7px 8px; font: inherit; color: var(--text-med); cursor: pointer;
   }
-  .kl-opt b { color: var(--text-dark); font-weight: 600; }
-  .kl-opt small { display: block; color: var(--text-mute); font-size: 12px; line-height: 1.4; }
-  .kl-opt.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(176, 74, 90, 0.18); }
+  .kl-kind b { display: block; color: var(--text-dark); font-weight: 600; font-size: 13px; }
+  .kl-kind small { display: block; color: var(--text-mute); font-size: 11px; line-height: 1.3; }
+  .kl-kind .sw { flex: none; width: 26px; height: 14px; border-radius: 7px; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08) inset; }
+  .kl-kind .no {
+    position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--accent); color: #FFFDF9; font-size: 11px; line-height: 18px; text-align: center; display: none;
+  }
+  .kl-kind.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(176, 74, 90, 0.18); }
+  .kl-kind.on .no { display: block; }
+  .kl-hint { font-weight: 400; color: var(--text-mute); font-size: 11px; margin-left: 4px; }
   .kl-group { margin: 12px 0 4px; font-weight: 600; color: var(--text-dark); }
   .kl-row { display: grid; grid-template-columns: 1fr 48px; gap: 2px 8px; align-items: center; margin: 6px 0; }
   .kl-row label { grid-column: 1 / 3; font-size: 12px; color: var(--text-mute); }
@@ -122,23 +128,6 @@
   .kl-foot { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
   .kl-fps { font-size: 11px; color: var(--text-faint); margin-top: 8px; }
 
-  /* ---------- side-by-side view ---------- */
-  .kl-grid {
-    position: fixed; inset: 0; z-index: 500; display: none;
-    align-items: center; justify-content: center; gap: 28px 40px; flex-wrap: wrap;
-    padding: 40px 380px 40px 40px; box-sizing: border-box;
-  }
-  .kl-grid.on { display: flex; }
-  .kl-tile { display: flex; flex-direction: column; align-items: center; gap: 14px; }
-  .kl-pond {
-    position: relative; width: 230px; height: 230px; border-radius: 50%;
-    background: radial-gradient(circle at 50% 42%, rgba(255, 253, 249, 0.75) 0%, rgba(253, 232, 218, 0.55) 58%, rgba(240, 125, 64, 0.18) 100%);
-    box-shadow: 0 0 0 6px #FFFDF9, 0 0 22px 8px rgba(255, 190, 139, 0.45), 0 0 0 1px rgba(196, 78, 16, 0.12);
-  }
-  .kl-pond canvas { position: absolute; left: -18.97%; top: -18.97%; width: 137.93%; height: 137.93%; }
-  .kl-pond img { position: absolute; left: 14%; top: 14%; width: 72%; height: 72%; object-fit: contain; animation: swimCircle 30s linear infinite; }
-  .kl-tile p { margin: 0; font-family: "Shippori Mincho", serif; font-size: 16px; color: var(--text-dark); letter-spacing: 1px; }
-  .kl-grid-on .blossom-screen { visibility: hidden; }
 </style>
 </head>
 <body>
@@ -174,7 +163,6 @@
       <div class="koi-dive-wrap" id="koiDiveWrap">
         <div class="blossom-char">
           <div class="koi-shadow" aria-hidden="true"></div>
-          <img src="icons/44173_0c6eff.png" class="koi-image hidden" id="koiPng" alt="">
           <canvas class="koi-canvas" id="koiCanvas" aria-hidden="true"></canvas>
         </div>
       </div>
@@ -188,21 +176,20 @@
   </div>
 </div>
 
-<div class="kl-grid" id="klGrid"></div>
 
 <div class="kl-panel" id="klPanel">
   <div class="kl-head" id="klHead">
     <span class="kl-title">鯉 Koi button</span>
-    <button class="kl-btn" id="klCompare" type="button">並べる</button>
     <button class="kl-btn" id="klFold" type="button">–</button>
   </div>
   <div class="kl-body">
-    <div class="kl-opts" id="klOpts"></div>
+    <div class="kl-group">Koi in the pond <small class="kl-hint">tap to add or take out, up to 3</small></div>
+    <div class="kl-kinds" id="klKinds"></div>
     <div id="klControls"></div>
     <div class="kl-foot">
       <button class="kl-btn" id="klStartle" type="button">Touch the koi</button>
       <button class="kl-btn" id="klDive" type="button">Dive</button>
-      <button class="kl-btn" id="klReset" type="button">Reset this style</button>
+      <button class="kl-btn" id="klReset" type="button">Reset</button>
       <button class="kl-btn" id="klCopy" type="button">Copy values</button>
     </div>
     <div class="kl-fps" id="klFps"></div>
@@ -219,14 +206,9 @@
      chosen style's values; they are saved per style in localStorage.
      ============================================================ */
   var STYLES = {
-    A: {
-      name: 'A 紅白・ふたり', note: 'Two orange koi chasing in a circle, like today\'s picture, but swimming.',
-      look: 'pair', path: 'orbit', count: 2,
-      length: 1, girth: 1, orbit: 0.38, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
-    },
     B: {
-      name: 'B 錦・自由に', note: 'Kohaku and gold ogon swim the pond like real koi: to the edge and back, around each other, one diving now and then, one coming up for air.',
-      look: 'nishiki', path: 'pool', count: 2,
+      name: 'B 錦・自由に',
+      look: 'nishiki', path: 'pool', count: 2, kinds: ['kohaku', 'ogon'],
       length: 0.88, girth: 1, orbit: 0.48, speed: 1.7, wave: 1.2, fins: 0.8, shadow: 1.75, wanderSpread: 0.78,
       eventEvery: 5, airShare: 0.45, deepTime: 7, deepSize: 0.57, deepBlur: 3, deepFade: 0.35,
       // ring 1.5: measured as the best size (the swimming stops improving
@@ -234,27 +216,25 @@
       // 39-54 px clear of the bottom edge)
       ring: 1.5
     },
-    C: {
-      name: 'C 墨と朱', note: 'Sumi-e: ink-brush koi with a vermilion crown, matching the ink reveal.',
-      look: 'sumi', path: 'orbit', count: 2,
-      length: 1, girth: 0.95, orbit: 0.38, speed: 0.8, wave: 1, fins: 1, shadow: 0, wanderSpread: 0.55
-    },
-    D: {
-      name: 'D 光の線', note: 'Line drawing in the ring\'s own white, leaving a faint trail of light.',
-      look: 'line', path: 'orbit', count: 2,
-      length: 1, girth: 1, orbit: 0.38, speed: 1, wave: 1, fins: 1, shadow: 1, wanderSpread: 0.55
-    },
-    P: {
-      name: '現在 Current (PNG)', note: 'Today\'s bitmap, turning once every 30 s. For comparison only.',
-      look: 'png'
-    }
   };
-  var ORDER = ['A', 'B', 'C', 'D', 'P'];
+  var ORDER = ['B'];
+
+  /* The koi varieties to choose from (the panel's tiles). sw: the colours
+     of its little swatch. */
+  var KINDS = [
+    { id: 'kohaku',   name: '紅白 Kohaku',          note: 'White with red',                 sw: 'linear-gradient(90deg,#FFF8F1 0 30%,#E04A2C 30% 60%,#FFF8F1 60% 75%,#E04A2C 75%)' },
+    { id: 'ogon',     name: '山吹黄金 Yamabuki ogon', note: 'Shining gold',                   sw: 'linear-gradient(90deg,#F3B640,#F8CC66,#F3B640)' },
+    { id: 'showa',    name: '昭和三色 Showa',        note: 'Black with red and white',       sw: 'linear-gradient(90deg,#2B2523 0 25%,#D9472B 25% 50%,#FFF6EE 50% 65%,#2B2523 65%)' },
+    { id: 'tancho',   name: '丹頂 Tancho',           note: 'White with a red crown',         sw: 'radial-gradient(circle at 25% 50%,#D93F28 0 30%,#FFFAF5 32%)' },
+    { id: 'sanke',    name: '大正三色 Sanke',        note: 'White, red and small black spots', sw: 'linear-gradient(90deg,#FFF8F1 0 20%,#E04A2C 20% 50%,#2A2321 50% 58%,#FFF8F1 58% 70%,#E04A2C 70%)' },
+    { id: 'platinum', name: 'プラチナ Platinum ogon', note: 'Shining silver',                 sw: 'linear-gradient(90deg,#E6EAEC,#F6F8F9,#E6EAEC)' }
+  ];
+  var KINDS_ORDER = KINDS.map(function (k) { return k.id; });
+  var KINDS_MAX = 3;
 
   var CONTROLS = [
     { group: 'Swimming' },
     { id: 'path',   label: 'Path', type: 'seg', opts: [['orbit', '円 Circle'], ['wander', '自由 Free'], ['pool', '池 Pool']] },
-    { id: 'count',  label: 'How many koi', min: 1, max: 3, step: 1 },
     { id: 'speed',  label: 'Speed (1 = a lap in about 12 s)', min: 0.3, max: 2.5, step: 0.05 },
     { id: 'orbit',  label: 'Circle size (share of the pond)', min: 0.2, max: 0.5, step: 0.01 },
     { id: 'wanderSpread', label: 'Free / Pool: how far from the middle (the pool\'s edge)', min: 0.3, max: 0.85, step: 0.01 },
@@ -298,14 +278,18 @@
     ORDER.forEach(function (key) { if (key !== 'P' && STYLES[key][id] === undefined) STYLES[key][id] = DEF.B[id]; });
   });
   if (STYLES.B.path === 'wander') STYLES.B.path = 'pool';
-  var current = 'A';
-  try { var c0 = localStorage.getItem(STORE + '.cur'); if (STYLES[c0]) current = c0; } catch (e) {}
+  var current = 'B';
+  // the koi chosen for the pond (none saved yet: as many as were in it, in the old order)
+  if (!Array.isArray(STYLES.B.kinds) || !STYLES.B.kinds.length || (saved && saved.styles && saved.styles.B && !saved.styles.B.kinds))
+    STYLES.B.kinds = KINDS_ORDER.slice(0, Math.max(1, Math.min(KINDS_MAX, +STYLES.B.count || 2)));
+  STYLES.B.count = STYLES.B.kinds.length;
   function save() {
     var out = { styles: {} };
     ORDER.forEach(function (k) {
       if (k === 'P') return;
       out.styles[k] = {};
       CONTROLS.forEach(function (c) { if (c.id) out.styles[k][c.id] = STYLES[k][c.id]; });
+      out.styles[k].kinds = STYLES[k].kinds.slice(); out.styles[k].count = STYLES[k].kinds.length;
     });
     try { localStorage.setItem(STORE, JSON.stringify(out)); localStorage.setItem(STORE + '.cur', current); } catch (e) {}
   }
@@ -1071,29 +1055,6 @@
      ============================================================ */
   var LOOKS = {};
 
-  // A — the current picture's colours: orange body, peach fins, a
-  // darker band down the back, pale cheeks and sides.
-  LOOKS.pair = {
-    setup: function (k) {
-      var r = k.r;
-      k.body = '#F08549';
-      k.patches = [
-        makePatch(r, 0.1, 0.55, 0.09, 0.45, '#F9C29C'),
-        makePatch(r, 0.1, -0.55, 0.09, 0.45, '#F9C29C'),
-        makePatch(r, 0.55, 0.95, 0.3, 0.35, '#F6A577'),
-        makePatch(r, 0.55, -0.95, 0.3, 0.35, '#F6A577')
-      ];
-      k.back = 'rgba(214, 86, 34, 0.55)';
-      k.finCol = 'rgba(250, 205, 182, 0.82)';
-      k.finRay = 'rgba(255, 255, 255, 0.75)';
-      k.finEdge = 'rgba(232, 128, 84, 0.45)';
-      k.eye = '#5A2A1A';
-      k.edge = 'rgba(180, 70, 30, 0.45)';
-      k.rim = 'rgba(255, 238, 222, 0.9)';
-    },
-    draw: drawSolidKoi
-  };
-
   // B — a kohaku (white with red), a gold ogon (metallic, scaled), and
   // after them a different variety for every further koi.
   var NISHIKI_MORE = ['showa', 'tancho', 'sanke', 'platinum'];
@@ -1104,7 +1065,9 @@
       // always were (a kohaku and a gold ogon), then showa sanshoku, tancho,
       // sanke and platinum ogon; from the seventh on the varieties repeat, but
       // each pattern is laid out from the koi's own seed, so none match
-      var kind = k.idx === 0 ? 'kohaku' : k.idx === 1 ? 'ogon' : NISHIKI_MORE[(k.idx - 2) % NISHIKI_MORE.length];
+      var kinds = k.pond.s.kinds;
+      var kind = kinds && kinds[k.idx] ? kinds[k.idx]
+               : k.idx === 0 ? 'kohaku' : k.idx === 1 ? 'ogon' : NISHIKI_MORE[(k.idx - 2) % NISHIKI_MORE.length];
       var own = k.idx >= 2;      // (the first two keep their fixed patterns)
       function spot(x, y, rx, ry, col) {
         if (own) { x += (r() - 0.5) * 0.12; y += (r() - 0.5) * 0.5; rx *= 0.8 + r() * 0.45; ry *= 0.8 + r() * 0.45; }
@@ -1290,128 +1253,6 @@
     });
   }
 
-  // C — sumi-e: soft ink wash body, brushed outline that swells and
-  // thins, vermilion crown, fins as brush flicks.
-  LOOKS.sumi = {
-    setup: function (k) {
-      k.crown = makePatch(k.r, 0.13, 0, 0.09, 0.55, '#D8452B');
-      k.mark = makePatch(k.r, 0.55, 0.3 * (k.idx % 2 ? 1 : -1), 0.12, 0.45, 'rgba(42, 34, 32, 0.55)');
-    },
-    draw: function (ctx, k, s) {
-      var L = k.pond.L, P = k.P, Nn = k.Nn, W = k.W, tail = k.tail();
-      var ink = 'rgba(38, 30, 28, ';
-      var fl = 0.3 * s.fins;
-      // wash
-      ctx.save();
-      ctx.filter = 'blur(' + (L * 0.012).toFixed(1) + 'px)';
-      ctx.beginPath(); smoothClosed(ctx, k.outline());
-      ctx.fillStyle = 'rgba(90, 76, 70, 0.16)'; ctx.fill();
-      ctx.beginPath(); tailPath(ctx, tail); ctx.fillStyle = 'rgba(90, 76, 70, 0.10)'; ctx.fill();
-      ctx.restore();
-      // fins: a few tapered flicks
-      ctx.lineCap = 'round';
-      [[0.2, 1, 0.24, 0], [0.2, -1, 0.24, 0.6], [0.52, 1, 0.14, 1.3], [0.52, -1, 0.14, 1.9]].forEach(function (f) {
-        var F = k.fin(f[0], f[1], f[2], 0.95, fl * Math.sin(k.finPhase + f[3]));
-        F.rays.forEach(function (p, j) { brushLine(ctx, F.root, p, L * (0.016 - j * 0.002), ink + '0.55)'); });
-      });
-      tail.rays.forEach(function (p, j) { brushLine(ctx, tail.base, p, L * 0.02, ink + (0.35 + 0.1 * (j % 2)) + ')'); });
-      // the two sides of the body, each one brush stroke that swells and thins
-      [1, -1].forEach(function (sd) {
-        var outer = [], inner = [];
-        for (var i = 1; i < N; i++) {
-          var x = i / (N - 1), bw = L * (0.004 + 0.02 * Math.sin(Math.PI * Math.pow(x, 0.7)));
-          var ex = P[i].x + Nn[i].x * W[i] * sd, ey = P[i].y + Nn[i].y * W[i] * sd;
-          outer.push({ x: ex + Nn[i].x * sd * bw * 0.35, y: ey + Nn[i].y * sd * bw * 0.35 });
-          inner.push({ x: ex - Nn[i].x * sd * bw * 0.65, y: ey - Nn[i].y * sd * bw * 0.65 });
-        }
-        ctx.beginPath(); smoothClosed(ctx, outer.concat(inner.reverse()));
-        ctx.fillStyle = ink + '0.82)'; ctx.fill();
-      });
-      // nose cap
-      var nose = k.at(0.0, 0), c = k.at(0.05, 0);
-      var nl = k.at(0.05, 1), nr = k.at(0.05, -1);
-      ctx.beginPath(); ctx.moveTo(nl.x, nl.y); ctx.quadraticCurveTo(nose.x * 2 - c.x, nose.y * 2 - c.y, nr.x, nr.y);
-      ctx.lineWidth = L * 0.016; ctx.strokeStyle = ink + '0.85)'; ctx.stroke();
-      // dark mark and vermilion crown, soft edged
-      ctx.save();
-      ctx.beginPath(); smoothClosed(ctx, k.outline()); ctx.clip();
-      ctx.filter = 'blur(' + (L * 0.012).toFixed(1) + 'px)';
-      ctx.beginPath(); smoothClosed(ctx, k.mark.pts.map(function (q) { return k.at(q.x, q.y); }));
-      ctx.fillStyle = k.mark.color; ctx.fill();
-      ctx.beginPath(); smoothClosed(ctx, k.crown.pts.map(function (q) { return k.at(q.x, q.y); }));
-      ctx.fillStyle = 'rgba(216, 69, 43, 0.92)'; ctx.fill();
-      ctx.restore();
-      // spine: a dry-brush line
-      var sp = [];
-      for (var i2 = 4; i2 < N - 3; i2++) sp.push(P[i2]);
-      ctx.beginPath(); smoothOpen(ctx, sp);
-      ctx.lineWidth = L * 0.012; ctx.strokeStyle = ink + '0.35)'; ctx.stroke();
-      drawEyes(ctx, k, ink + '0.95)', L * 0.017);
-    }
-  };
-  function brushLine(ctx, a, b, w, col) {
-    // a tapered stroke: thick at the root, thin at the end
-    var dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy) || 1, nx = -dy / l, ny = dx / l;
-    ctx.beginPath();
-    ctx.moveTo(a.x + nx * w / 2, a.y + ny * w / 2);
-    ctx.quadraticCurveTo(a.x + dx * 0.6 + nx * w * 0.3, a.y + dy * 0.6 + ny * w * 0.3, b.x, b.y);
-    ctx.quadraticCurveTo(a.x + dx * 0.6 - nx * w * 0.3, a.y + dy * 0.6 - ny * w * 0.3, a.x - nx * w / 2, a.y - ny * w / 2);
-    ctx.closePath(); ctx.fillStyle = col; ctx.fill();
-  }
-
-  // D — outline only, in the ring's white with a warm shadow so it
-  // reads on cream, and a fading trail of light behind each koi.
-  LOOKS.line = {
-    setup: function (k) { k.wake = []; },
-    draw: function (ctx, k, s) {
-      var L = k.pond.L, out = k.outline(), tail = k.tail();
-      var fl = 0.32 * s.fins;
-      var fins = [
-        k.fin(0.2, 1, 0.24, 0.95, fl * Math.sin(k.finPhase)),
-        k.fin(0.2, -1, 0.24, 0.95, fl * Math.sin(k.finPhase + 0.6)),
-        k.fin(0.52, 1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.3)),
-        k.fin(0.52, -1, 0.13, 0.8, fl * 0.7 * Math.sin(k.finPhase + 1.9))
-      ];
-      // the wake: where the tail has been
-      var tp = { x: k.P[N - 1].x, y: k.P[N - 1].y };
-      k.wake.push(tp); if (k.wake.length > 40) k.wake.shift();
-      for (var i = 1; i < k.wake.length; i++) {
-        var f = i / k.wake.length;
-        ctx.beginPath(); ctx.moveTo(k.wake[i - 1].x, k.wake[i - 1].y); ctx.lineTo(k.wake[i].x, k.wake[i].y);
-        ctx.strokeStyle = 'rgba(255, 253, 249, ' + (0.55 * f * f).toFixed(3) + ')';
-        ctx.lineWidth = L * 0.03 * f; ctx.lineCap = 'round'; ctx.stroke();
-      }
-      function shape() {
-        ctx.beginPath(); smoothClosed(ctx, out); tailPath(ctx, tail);
-        fins.forEach(function (F) { finPath(ctx, F); });
-      }
-      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
-      // soft warm shadow so the white line reads on cream
-      if (s.shadow > 0) {
-        ctx.save();
-        ctx.translate(0, L * 0.02 * s.shadow);
-        ctx.filter = 'blur(' + (L * 0.02 * s.shadow).toFixed(1) + 'px)';
-        shape(); ctx.strokeStyle = 'rgba(196, 78, 16, ' + (0.42 * s.shadow).toFixed(3) + ')';
-        ctx.lineWidth = L * 0.05; ctx.stroke();
-        ctx.restore();
-      }
-      // a faint body fill, fins and tail rays
-      ctx.beginPath(); smoothClosed(ctx, out);
-      ctx.fillStyle = 'rgba(255, 253, 249, 0.45)'; ctx.fill();
-      ctx.beginPath();
-      fins.forEach(function (F) { F.rays.forEach(function (p) { ctx.moveTo(F.root.x, F.root.y); ctx.lineTo(p.x, p.y); }); });
-      tail.rays.forEach(function (p) { ctx.moveTo(tail.base.x, tail.base.y); ctx.lineTo(p.x, p.y); });
-      ctx.strokeStyle = 'rgba(255, 253, 249, 0.75)'; ctx.lineWidth = L * 0.007; ctx.stroke();
-      shape();
-      ctx.strokeStyle = '#FFFDF9'; ctx.lineWidth = L * 0.03; ctx.stroke();
-      // a single vermilion mark on the head, and the eyes
-      var c = k.at(0.14, 0);
-      ctx.beginPath(); ctx.arc(c.x, c.y, L * 0.03, 0, TAU);
-      ctx.fillStyle = 'rgba(224, 92, 50, 0.85)'; ctx.fill();
-      drawEyes(ctx, k, 'rgba(196, 92, 50, 0.9)', L * 0.014);
-    }
-  };
-
   /* ============================================================
      5. THE POND (one canvas, its koi, its own loop)
      ============================================================ */
@@ -1569,65 +1410,37 @@
      6. PAGE: main button, side-by-side view, panel
      ============================================================ */
   var mainCanvas = document.getElementById('koiCanvas');
-  var png = document.getElementById('koiPng');
-  var mainPond = new Pond(mainCanvas, current === 'P' ? 'A' : current);
+  var mainPond = new Pond(mainCanvas, 'B');
   function showCurrent() {
-    var isPng = current === 'P';
     ownDepth();
     applyRing();
-    png.classList.toggle('hidden', !isPng);
-    mainCanvas.classList.toggle('hidden', isPng);
-    if (!isPng) { mainPond.key = current; mainPond.resize(); mainPond.rebuild(); }
+    mainPond.key = current; mainPond.resize(); mainPond.rebuild();
   }
-
-  var grid = document.getElementById('klGrid');
-  var gridPonds = [];
-  function buildGrid() {
-    grid.innerHTML = '';
-    gridPonds = gridPonds.filter(function () { return false; });
-    ORDER.forEach(function (key) {
-      var tile = document.createElement('div'); tile.className = 'kl-tile';
-      var pond = document.createElement('div'); pond.className = 'kl-pond';
-      if (key === 'P') {
-        var im = document.createElement('img'); im.src = 'icons/44173_0c6eff.png'; im.alt = '';
-        pond.appendChild(im);
-      } else {
-        var cv = document.createElement('canvas'); pond.appendChild(cv);
-      }
-      var lab = document.createElement('p'); lab.textContent = STYLES[key].name;
-      tile.appendChild(pond); tile.appendChild(lab); grid.appendChild(tile);
-      tile.addEventListener('click', function () { selectStyle(key); });
-      if (key !== 'P') {
-        var gp = new Pond(cv, key);
-        pond.addEventListener('pointerdown', function (e) {
-          var r = cv.getBoundingClientRect();
-          gp.startle(e.clientX - r.left - r.width / 2, e.clientY - r.top - r.height / 2);
-        });
-        gridPonds.push(gp);
-      }
-    });
-  }
-  var comparing = false;
-  document.getElementById('klCompare').addEventListener('click', function () {
-    comparing = !comparing;
-    this.classList.toggle('on', comparing);
-    grid.classList.toggle('on', comparing);
-    document.documentElement.classList.toggle('kl-grid-on', comparing);
-    if (comparing) buildGrid();
-    else { gridPonds.forEach(function (gp) { var i = ponds.indexOf(gp); if (i >= 0) ponds.splice(i, 1); }); gridPonds = []; grid.innerHTML = ''; }
-  });
 
   // panel
-  var optsEl = document.getElementById('klOpts'), ctlEl = document.getElementById('klControls');
-  ORDER.forEach(function (key) {
-    var b = document.createElement('button'); b.type = 'button'; b.className = 'kl-opt'; b.dataset.key = key;
-    b.innerHTML = '<b>' + STYLES[key].name + '</b><small>' + STYLES[key].note + '</small>';
-    b.addEventListener('click', function () { selectStyle(key); });
-    optsEl.appendChild(b);
-  });
+  var ctlEl = document.getElementById('klControls'), kindsEl = document.getElementById('klKinds');
+  // the variety tiles: tap to put a koi of that kind in the pond (up to
+  // KINDS_MAX), tap again to take it out; the number is its place
+  function buildKinds() {
+    var S = STYLES.B;
+    kindsEl.innerHTML = '';
+    KINDS.forEach(function (K) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'kl-kind'; b.dataset.kind = K.id;
+      var at = S.kinds.indexOf(K.id);
+      b.classList.toggle('on', at >= 0);
+      b.innerHTML = '<span class="sw" style="background:' + K.sw + '"></span><span><b>' + K.name + '</b><small>' + K.note + '</small></span><span class="no">' + (at + 1) + '</span>';
+      b.addEventListener('click', function () {
+        var i = S.kinds.indexOf(K.id);
+        if (i >= 0) { if (S.kinds.length > 1) S.kinds.splice(i, 1); }     // (at least one koi stays)
+        else if (S.kinds.length < KINDS_MAX) S.kinds.push(K.id);
+        S.count = S.kinds.length;
+        save(); buildKinds(); refreshPonds(true);
+      });
+      kindsEl.appendChild(b);
+    });
+  }
   function buildControls() {
     ctlEl.innerHTML = '';
-    if (current === 'P') { ctlEl.innerHTML = '<div class="kl-group">Today\'s picture has no settings here.</div>'; return; }
     var S = STYLES[current];
     CONTROLS.forEach(function (c) {
       if (c.pool && S.path !== 'pool') return;
@@ -1663,11 +1476,11 @@
   // In the pool each koi has its own depth, so the button's breath that
   // sinks and blurs all the koi together is switched off there.
   function ownDepth() {
-    document.documentElement.classList.toggle('kl-own-depth', current !== 'P' && STYLES[current].path === 'pool');
+    document.documentElement.classList.toggle('kl-own-depth', STYLES[current].path === 'pool');
   }
   // ring size: scales the main button's ring and pond; the koi keep their size
   function applyRing() {
-    var g = current === 'P' ? 1 : (+STYLES[current].ring || 1);
+    var g = +STYLES[current].ring || 1;
     document.documentElement.style.setProperty('--kl-ring', g);
     mainPond.ringScale = g;
     mainPond.resize();
@@ -1677,21 +1490,16 @@
     applyRing();
     ponds.forEach(function (p) { p.s = STYLES[p.key]; if (rebuild && p.key === current) p.rebuild(); });
   }
-  function selectStyle(key) {
-    current = key; save();
-    optsEl.querySelectorAll('.kl-opt').forEach(function (b) { b.classList.toggle('on', b.dataset.key === key); });
-    buildControls(); showCurrent();
-  }
-  selectStyle(current);
+  buildKinds(); buildControls(); showCurrent();
 
   document.getElementById('klReset').addEventListener('click', function () {
-    if (current === 'P') return;
     var d = DEF[current];
     CONTROLS.forEach(function (c) { if (c.id) STYLES[current][c.id] = d[c.id]; });
-    save(); buildControls(); refreshPonds(true);
+    STYLES[current].kinds = d.kinds.slice(); STYLES[current].count = d.kinds.length;
+    save(); buildKinds(); buildControls(); refreshPonds(true);
   });
   document.getElementById('klCopy').addEventListener('click', function () {
-    var S = STYLES[current], o = { style: current, look: S.look };
+    var S = STYLES[current], o = { style: current, look: S.look, kinds: S.kinds.slice(), count: S.kinds.length };
     CONTROLS.forEach(function (c) { if (c.id && S[c.id] !== undefined) o[c.id] = S[c.id]; });
     var txt = 'var KOI_LOOK = ' + JSON.stringify(o, null, 2) + ';';
     var btn = this;
@@ -1723,11 +1531,6 @@
   var screen = document.getElementById('blossomScreen'), btn = document.getElementById('startBtn');
   var downY = null, downX = 0, downT = 0;
   function startleMain(clientX, clientY) {
-    if (current === 'P') {
-      btn.classList.remove('startling'); void btn.offsetWidth; btn.classList.add('startling');
-      setTimeout(function () { btn.classList.remove('startling'); }, 260);
-      return;
-    }
     var r = mainCanvas.getBoundingClientRect();
     mainPond.startle(clientX === undefined ? undefined : clientX - r.left - r.width / 2,
                      clientY === undefined ? undefined : clientY - r.top - r.height / 2);
@@ -1738,7 +1541,7 @@
     diving = true;
     // pool: the koi themselves wriggle and dive away (drawn), instead of
     // the whole koi layer sliding down and fading
-    var pool = current !== 'P' && STYLES[current].path === 'pool';
+    var pool = STYLES[current].path === 'pool';
     if (pool) mainPond.leave();
     btn.classList.add('diving'); screen.classList.add('diving');
     setTimeout(function () {
@@ -1770,10 +1573,7 @@
   function loop(now) {
     var dt = (now - last) / 1000; last = now;
     var t0 = performance.now();
-    ponds.forEach(function (p) {
-      if (p === mainPond && (current === 'P' || comparing)) return;
-      p.frame(dt);
-    });
+    ponds.forEach(function (p) { p.frame(dt); });
     costAcc += performance.now() - t0; frames++;
     if (now - fpsT > 1000) {
       fpsEl.textContent = frames + ' fps · drawing ' + (costAcc / frames).toFixed(2) + ' ms a frame';
