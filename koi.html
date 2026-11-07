@@ -1096,13 +1096,13 @@
 
   // B — a kohaku (white with red), a gold ogon (metallic, scaled), and
   // after them a different variety for every further koi.
-  var NISHIKI_MORE = ['tancho', 'showa', 'sanke', 'platinum'];
+  var NISHIKI_MORE = ['showa', 'tancho', 'sanke', 'platinum'];
   LOOKS.nishiki = {
     setup: function (k) {
       var r = k.r;
       // every koi in the pond a different variety: the first two as they
-      // always were (a kohaku and a gold ogon), then tancho, showa, sanke
-      // and platinum ogon; from the seventh on the varieties repeat, but
+      // always were (a kohaku and a gold ogon), then showa sanshoku, tancho,
+      // sanke and platinum ogon; from the seventh on the varieties repeat, but
       // each pattern is laid out from the koi's own seed, so none match
       var kind = k.idx === 0 ? 'kohaku' : k.idx === 1 ? 'ogon' : NISHIKI_MORE[(k.idx - 2) % NISHIKI_MORE.length];
       var own = k.idx >= 2;      // (the first two keep their fixed patterns)
