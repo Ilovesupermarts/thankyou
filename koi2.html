@@ -451,6 +451,11 @@
                dipTime: 1.6,   // it stays under at least this long (s)
                dipNear: 0.12,  // … or when their bodies come this close (× length)
                dipClear: 0.25, // it comes back up once their bodies are this far apart (× length)
+               layer: 0.06,    // a koi this much deeper or shallower counts as above or below (not beside)
+               blockGap: 0.12, // a koi above or below closer than this (body gap, × length) is in the way of going up or down
+               clearGap: 0.3,  // … and once held, it goes on only when that gap is this big
+               clearAway: 1.1, // how far it swims off to find a clear spot (× length)
+               clearRetry: 2,  // still not clear after this long (s): it heads for a fresh spot
                wallFace: 0.35, // nose this much into the edge (0 along it, 1 straight at it): it stops and turns
                stuckAfter: 1.2,// stuck at the edge this long (s): it turns the other way round
                brakeAt: 1.1,   // it brakes to turn when its spot is more than this far round (radians)
@@ -701,7 +706,27 @@
     var zk = leavingDown ? 3.2 : 2.4, zc = leavingDown ? 2.6 : 2.9;
     if (this.mode === 'dip' || (this.mode === 'cruise' && this.zT === this.zHome && this.z > this.zHome + 0.05 && this.wasDip)) { zk = 5; zc = 4.4; }   // a quick dip
     this.wasDip = this.mode === 'dip' || (this.wasDip && this.z > this.zHome + 0.05);
-    this.zv += ((this.zT - this.z) * zk - this.zv * zc) * dt;
+    // Never through another koi: while a koi is directly above or below it,
+    // between its depth now and the depth it is heading for, it holds its
+    // depth and swims off to a clear spot; then it carries on up or down.
+    var zGoal = this.zT, blocker = null;
+    if (this.mode !== 'exit' && Math.abs(this.zT - this.z) > 0.03) blocker = this.depthBlocker(this.zT);
+    if (blocker) {
+      this.holdT = this.holdZ === undefined ? 0 : (this.holdT || 0) + dt;
+      // (a fresh spot every couple of seconds, in case the other koi keeps up with it)
+      if (this.holdZ === undefined || this.holdT > TUNE.clearRetry) {
+        if (this.holdZ === undefined) this.holdZ = this.z;
+        this.holdT = 0;
+        // head for a spot well away from the koi in the way
+        var bm = blocker.P[10], ax = this.x - bm.x, ay = this.y - bm.y, al = Math.hypot(ax, ay) || 1;
+        var glim = s.wanderSpread * p.R * 0.8, gx = this.x + ax / al * L * TUNE.clearAway, gy = this.y + ay / al * L * TUNE.clearAway, gd = Math.hypot(gx, gy);
+        if (gd > glim) { gx *= glim / gd; gy *= glim / gd; }
+        if (this.act === 'rest') this.pickAct('slow');
+        this.goal = { x: gx, y: gy }; this.goalAge = 0; this.turnSign = 0;
+      }
+      zGoal = this.holdZ;
+    } else this.holdZ = undefined;
+    this.zv += ((zGoal - this.z) * zk - this.zv * zc) * dt;
     this.z += this.zv * dt;
 
     // tail beats: faster in a kick, slow in a glide (and fast in a wriggle)
@@ -795,6 +820,24 @@
     return best;
   };
   // the gap between this koi's body and another's (edge to edge, in pixels)
+  /* A koi in the way of this one changing depth to zTo: one whose depth is
+     between this koi's depth and zTo (not one beside it at the same depth)
+     and whose body is under or over this one's, seen from above. Once held,
+     the way must be properly clear before it goes on (so it does not keep
+     starting and stopping). */
+  Koi.prototype.depthBlocker = function (zTo) {
+    var p = this.pond, L = p.L, down = zTo > this.z, edge = TUNE.layer;
+    var near = L * (this.holdZ !== undefined ? TUNE.clearGap : TUNE.blockGap);
+    for (var j = 0; j < p.fish.length; j++) {
+      var o = p.fish[j];
+      if (o === this || o.mode === 'exit') continue;
+      if (down && this.mode === 'dip' && o === this.dipFrom && o.z <= this.z + 0.03) continue;   // (the one it is dipping under)
+      // anywhere from level with it to just past where it is heading, on the side it is going
+      var between = down ? (o.z >= this.z - 0.005 && o.z < zTo + edge) : (o.z <= this.z + 0.005 && o.z > zTo - edge);
+      if (between && this.bodyGap(o) < near) return o;
+    }
+    return null;
+  };
   Koi.prototype.bodyGap = function (o) {
     var g = 1e9;
     for (var a = 0; a < N; a += 3) for (var c = 0; c < N; c += 3)
