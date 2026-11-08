@@ -6072,7 +6072,7 @@ function getRows() { return tableCard.querySelectorAll('.row'); }
 /* Option rules for the service table. Rows made from presets.json carry
    data-option (1 = first preset ... 5 = fifth). Option 1 greys 3,4,5;
    option 3 greys 1,2,4; option 4 greys 1,2,3; option 2 is grey unless
-   option 1 is ticked; option 5 is grey unless option 3 or 4 is ticked. */
+   option 1 is ticked (or option 1 is not in the table); option 5 is grey unless option 3 or 4 is ticked. */
 function applyOptionRules() {
   var byOption = {};
   var rows = tableCard.querySelectorAll('.row[data-option]');
@@ -6087,7 +6087,7 @@ function applyOptionRules() {
     var s1 = ticked('1'), s3 = ticked('3'), s4 = ticked('4');
     var grey = {
       '1': s3 || s4,
-      '2': !s1,
+      '2': !!byOption['1'] && !s1,
       '3': s1 || s4,
       '4': s1 || s3,
       '5': s1 || !(s3 || s4)
