@@ -1762,6 +1762,32 @@
     scroll-margin-top: 100px; scroll-margin-bottom: 100px;
   }
   .row:last-child { border-bottom: none; }
+  /* Sub options (option 2 under 1, option 5 under 3 and 4): a line from
+     the main option's circle runs down and curves into the indented sub
+     row, like a reply thread. Circle centre: 12px padding + 14px. */
+  .row.link-from, .row.link-sub { position: relative; }
+  .row.link-from::after {
+    content: ""; position: absolute; left: 25.25px; width: 0;
+    top: calc(50% + 15px); bottom: -1px; border-left: 1.5px solid var(--border-2);
+    pointer-events: none;
+  }
+  .row.link-through::before {
+    content: ""; position: absolute; left: 25.25px; width: 0;
+    top: 0; height: calc(50% - 15px); border-left: 1.5px solid var(--border-2);
+    pointer-events: none;
+  }
+  .row.link-sub { padding-left: 46px; }
+  .row.link-sub::before {
+    content: ""; position: absolute; left: 25.25px; top: 0; width: 15px;
+    border-left: 1.5px solid var(--border-2);
+    border-bottom: 1.5px solid var(--border-2); border-bottom-left-radius: 12px;
+    box-sizing: border-box; height: calc(50% + 0.75px); pointer-events: none;
+  }
+  /* A greyed-out sub option fades its contents but not the link line. */
+  .row.link-sub.disabled { opacity: 1; }
+  .row.link-sub.disabled > .row-check,
+  .row.link-sub.disabled > .service-display,
+  .row.link-sub.disabled > .price-wrap { opacity: 0.35; }
   .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
   .row.disabled { opacity: 0.35; pointer-events: none; }
 

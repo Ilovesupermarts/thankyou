@@ -6122,6 +6122,30 @@ function applyOptionRules() {
   }
 }
 
+/* Sub options in the main service table: option 2 hangs off option 1,
+   option 5 off options 3 and 4. The sub row is indented and a curved line
+   (main.css, .link-*) runs from its main option's circle down into it.
+   With none of its main options in the table it stays an ordinary row. */
+var SUB_OPTION_PARENTS = { '2': ['1'], '5': ['3', '4'] };
+function linkSubOptionRows(container) {
+  var byOption = {};
+  var rows = container.querySelectorAll('.row[data-option]');
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].classList.remove('link-sub', 'link-from', 'link-through');
+    byOption[rows[i].getAttribute('data-option')] = rows[i];
+  }
+  for (var sub in SUB_OPTION_PARENTS) {
+    if (!byOption[sub]) continue;
+    var parents = SUB_OPTION_PARENTS[sub].filter(function (n) { return byOption[n]; });
+    if (!parents.length) continue;
+    byOption[sub].classList.add('link-sub');
+    for (var k = 0; k < parents.length; k++) {
+      byOption[parents[k]].classList.add('link-from');
+      if (k > 0) byOption[parents[k]].classList.add('link-through');
+    }
+  }
+}
+
 function recalc() {
   applyOptionRules();
   var rows = getRows();
@@ -8281,10 +8305,18 @@ function confirmName() {
   dynamicRows.innerHTML = '';
   var nameRows = nameScreenRows.querySelectorAll('.row');
   var anyPresetSelected = false;
+  /* Option 5 only goes into the table when option 3 or 4 is in it too. */
+  var has3or4 = false;
+  for (var j = 0; j < nameRows.length; j++) {
+    var o = nameRows[j].getAttribute('data-option');
+    var ob = nameRows[j].querySelector('.row-check');
+    if ((o === '3' || o === '4') && ob && ob.classList.contains('checked')) has3or4 = true;
+  }
   for (var i = 0; i < nameRows.length; i++) {
     var row = nameRows[i];
     var box = row.querySelector('.row-check');
     if (!box || !box.classList.contains('checked')) continue;
+    if (row.getAttribute('data-option') === '5' && !has3or4) continue;
     var display = row.querySelector('.service-display');
     var priceInput = row.querySelector('.price-input');
     var nameVal = display ? (display.textContent || '').trim() : '';
@@ -8322,6 +8354,7 @@ function confirmName() {
     dynamicRows.appendChild(rowDiv);
     anyPresetSelected = true;
   }
+  linkSubOptionRows(dynamicRows);
 
   var panel3Anchor = document.getElementById('panel3Body');
   if (panel3Anchor) {
