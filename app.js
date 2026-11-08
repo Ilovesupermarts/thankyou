@@ -6221,7 +6221,62 @@ function tryOpenCustomService(row, withHint) {
     setTimeout(function() { row.classList.remove('service-hint'); }, 1000);
     haptic(6);
   }
-  openTanzaku(row);
+  focusServiceField(row);
+}
+
+/* ---- Typing straight into the サービスの種類 field (no dialogue) ---- */
+var svcEditing = null;          /* the service field being typed in */
+var svcTapPending = null;
+var svcSwallowClickUntil = 0;
+
+function scrollServiceFieldIntoView(svc) {
+  var row = svc.closest('.row') || svc;
+  function go() {
+    if (document.activeElement !== svc) return;
+    var vv = window.visualViewport;
+    var visTop = vv ? vv.offsetTop : 0;
+    var visH = vv ? vv.height : window.innerHeight;
+    var r = row.getBoundingClientRect();
+    var margin = 24;
+    if (r.bottom + margin > visTop + visH || r.top - margin < visTop) {
+      var delta = (r.top + r.height / 2) - (visTop + visH / 2);
+      try { window.scrollBy({ top: delta, behavior: 'smooth' }); }
+      catch (e) { window.scrollBy(0, delta); }
+    }
+  }
+  /* the keyboard takes a moment to come up, so look again as it does */
+  setTimeout(go, 120);
+  setTimeout(go, 450);
+  setTimeout(go, 900);
+  if (window.visualViewport) {
+    var onVv = function() { go(); };
+    window.visualViewport.addEventListener('resize', onVv);
+    setTimeout(function() { window.visualViewport.removeEventListener('resize', onVv); }, 1500);
+  }
+}
+function focusServiceField(row) {
+  var svc = row && row.querySelector('.service-input');
+  if (!svc) return;
+  Hints && Hints.interrupt();
+  if (document.activeElement !== svc) {
+    try { svc.focus({ preventScroll: true }); } catch (e) { try { svc.focus(); } catch (e2) {} }
+  }
+  try { var len = svc.value.length; svc.setSelectionRange(len, len); } catch (e3) {}
+  scrollServiceFieldIntoView(svc);
+}
+/* Enter, or a tap outside: with a service typed, go on to its price field;
+   with nothing typed, just close the keyboard (the row stays unticked). */
+function finishServiceField(row) {
+  var svc = row && row.querySelector('.service-input');
+  if (!svc) return;
+  var val = (svc.value || '').trim();
+  if (val === '') { try { svc.blur(); } catch (e) {} return; }
+  if (svc.value !== val) { svc.value = val; fireInputEvent(svc); }
+  updateRowLock(row);
+  haptic(10);
+  var price = row.querySelector('.price-input');
+  if (price && !price.disabled) { try { price.focus(); } catch (e2) {} }
+  else { try { svc.blur(); } catch (e3) {} }
 }
 function flashServiceInput(row) {
   if (!row) return;
@@ -6679,8 +6734,14 @@ tableCard.addEventListener('click', function(e) {
   if (!box) return;
   var tappedCheckbox = !!e.target.closest('.row-check');
   var isCustomRow = !!row.querySelector('.service-input');
+  if (isCustomRow && !tappedCheckbox) {
+    if (!customRowHasName(row)) {
+      if (refuseIfPending(row)) return;
+      tryOpenCustomService(row, false);
+    }
+    return;
+  }
   if (row.classList.contains('locked') && !tappedCheckbox) return;
-  if (isCustomRow && !tappedCheckbox) return;
   if (refuseIfPending(row)) return;
   if (pendingShakeRow === row) cancelPendingShake();
   var priceInput = row.querySelector('.price-input');
@@ -6731,15 +6792,56 @@ tableCard.addEventListener('click', function(e) {
   recalc();
   if (box.classList.contains('checked')) Hints && Hints.onTick(row);
 });
-tableCard.addEventListener('click', function(e) {
-  var svcInput = e.target.closest('.service-input');
-  if (!svcInput) return;
-  if (rejected) return;
-  var row = svcInput.closest('.row');
-  if (!row) return;
-  if (refuseIfPending(row)) return;
-  tryOpenCustomService(row, false);
+/* Tapping the service field itself just focuses it; the checks (order of the
+   rows, a price still owed) are in the focusin handler below. */
+tableCard.addEventListener('focusin', function(e) {
+  var t = e.target;
+  if (!t || !t.classList || !t.classList.contains('service-input')) return;
+  var row = t.closest('.row');
+  if (rejected || !row || refuseIfPending(row)) { try { t.blur(); } catch (err) {} return; }
+  if (!isAllowedCustomRow(row)) {
+    try { t.blur(); } catch (err2) {}
+    var first = firstUnnamedCustomRow();
+    if (first) { flashCustomRowHint(first); haptic(15); }
+    return;
+  }
+  Hints && Hints.interrupt();
+  svcEditing = t;
+  holdKeyboardResizes();
+  scrollServiceFieldIntoView(t);
 });
+tableCard.addEventListener('focusout', function(e) {
+  var t = e.target;
+  if (!t || !t.classList || !t.classList.contains('service-input')) return;
+  if (svcEditing === t) { svcEditing = null; releaseKeyboardResizes(); }
+});
+/* A tap anywhere outside the field (with a service typed) goes to the price
+   field instead of doing what it landed on; the tap is used up. */
+document.addEventListener('pointerdown', function(e) {
+  svcTapPending = null;
+  var a = svcEditing;
+  if (!a || document.activeElement !== a) return;
+  if (e.target === a) return;
+  if ((a.value || '').trim() === '') return;
+  e.preventDefault();
+  svcTapPending = { x: e.clientX, y: e.clientY, id: e.pointerId, row: a.closest('.row') };
+}, true);
+document.addEventListener('pointerup', function(e) {
+  var p = svcTapPending;
+  svcTapPending = null;
+  if (!p || e.pointerId !== p.id) return;
+  if (Math.abs(e.clientX - p.x) > 12 || Math.abs(e.clientY - p.y) > 12) return;
+  svcSwallowClickUntil = performance.now() + 700;
+  finishServiceField(p.row);
+}, true);
+document.addEventListener('pointercancel', function() { svcTapPending = null; }, true);
+document.addEventListener('click', function(e) {
+  if (performance.now() < svcSwallowClickUntil) {
+    svcSwallowClickUntil = 0;
+    e.preventDefault();
+    e.stopPropagation();
+  }
+}, true);
 tableCard.addEventListener('click', function(e) {
   var row = e.target.closest('.row');
   if (!row) return;
@@ -6833,9 +6935,9 @@ tableCard.addEventListener('keydown', function(e) {
   if (e.key === 'Enter' || e.keyCode === 13) {
     if (rejected) return;
     if (e.target.classList.contains('service-input')) {
+      if (e.isComposing || e.keyCode === 229) return;
       e.preventDefault();
-      var row = e.target.closest('.row');
-      if (row) tryOpenCustomService(row, false);
+      finishServiceField(e.target.closest('.row'));
     } else if (e.target.classList.contains('price-input')) {
       if (e.target.disabled) return;
       if (e.target.value.trim() === '') {
