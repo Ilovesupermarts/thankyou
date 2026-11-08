@@ -8597,9 +8597,50 @@ submitBtn.addEventListener('click', function(e) {
     return;
   }
   copyCustomServices();
+  fillConfirmSummary();
   confirmScreen.classList.add('visible');
   callMe();
 });
+
+/* The confirm screen lists what was chosen and the total (same rules as
+   the receipt: checked rows only; the thank-you tip if nothing is checked
+   and she rejected). */
+function fillConfirmSummary() {
+  var list = document.getElementById('confirmList');
+  var totalEl = document.getElementById('confirmTotal');
+  if (!list || !totalEl) return;
+  list.innerHTML = '';
+  var sum = 0;
+  function addRow(name, price) {
+    var r = document.createElement('div');
+    r.className = 'confirm-row';
+    var n = document.createElement('span');
+    n.textContent = name;
+    var p = document.createElement('span');
+    p.className = 'confirm-row-price';
+    p.textContent = formatWithComma(price) + '円';
+    r.appendChild(n);
+    r.appendChild(p);
+    list.appendChild(r);
+    sum += price;
+  }
+  var rows = getRows();
+  var count = 0;
+  for (var i = 0; i < rows.length; i++) {
+    var row = rows[i];
+    var priceInput = row.querySelector('.price-input');
+    var check = row.querySelector('.row-check');
+    if (!priceInput || !(check && check.classList.contains('checked'))) continue;
+    var display = row.querySelector('.service-display');
+    var textInput = row.querySelector('.service-input');
+    var name = display ? (display.textContent || '').trim() : (textInput ? (textInput.value || '').trim() : '');
+    if (!name) name = 'サービス ' + (i + 1);
+    addRow(name, parseFormatted(priceInput.value));
+    count++;
+  }
+  if (count === 0 && rejected) addRow('ささやかなお礼', confirmedTipAmount);
+  totalEl.textContent = formatWithComma(sum) + '円';
+}
 
 /* ============ 呼び出し (NTFY) ============
    Tapping 確認する tells me on my phone that she has finished choosing,

@@ -2319,8 +2319,15 @@
     transform: scale(0.94); transition: transform 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   }
   .confirm-screen.visible .confirm-card { transform: scale(1); }
-  .confirm-title { font-size: 18px; font-weight: 600; color: var(--accent); line-height: 1.9; letter-spacing: 0.5px; margin-bottom: 28px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; }
-  .confirm-title .confirm-sub { display: block; margin-top: 14px; font-size: 13px; font-weight: 500; color: var(--text-mute); letter-spacing: 0.4px; line-height: 2; text-wrap: balance; }
+  .confirm-title { font-size: 18px; font-weight: 600; color: var(--accent); line-height: 1.9; letter-spacing: 0.5px; margin-bottom: 18px; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; text-wrap: balance; }
+  .confirm-sub { margin: 0 0 24px; font-size: 13px; font-weight: 500; color: var(--text-mute); letter-spacing: 0.4px; line-height: 2; text-wrap: balance; word-break: auto-phrase; overflow-wrap: break-word; line-break: strict; }
+  .confirm-summary { border-top: 1px solid var(--border-3); border-bottom: 1px solid var(--border-3); margin-bottom: 20px; padding: 14px 0; text-align: left; }
+  .confirm-list { max-height: 40vh; overflow-y: auto; }
+  .confirm-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; font-size: 15px; color: var(--text-mute); line-height: 1.6; }
+  .confirm-row-price { flex-shrink: 0; font-weight: 700; color: #111; font-family: "Roboto", "Noto Sans JP", sans-serif; }
+  .confirm-total { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--border-3); }
+  .confirm-total-label { font-size: 15px; font-weight: 700; color: #111; }
+  .confirm-total-value { font-size: 22px; font-weight: 700; color: var(--accent); font-family: "Roboto", "Noto Sans JP", sans-serif; }
   .confirm-actions { display: flex; justify-content: center; gap: 10px; }
   .confirm-btn { flex: 1; min-width: 0; border-radius: 22px; padding: 14px 10px; font-size: 13.5px; font-weight: 600; font-family: inherit; letter-spacing: 0.5px; cursor: pointer; -webkit-appearance: none; appearance: none; transition: background 0.2s, color 0.2s, transform 0.15s, border-color 0.2s; white-space: nowrap; }
   .confirm-btn:active { transform: scale(0.97); }
