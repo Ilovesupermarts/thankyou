@@ -4424,8 +4424,11 @@ var blossomGreetingNameEl = document.getElementById('blossomGreetingName');
 var koiDiveWrap = document.getElementById('koiDiveWrap');
 
 /* The koi on the start button, drawn by koi.js (no image). Tuned in
-   koi.html (style B, swimming as in a pool); move its "Copy values" here.
-     count        how many koi
+   koi2.html; move its "Copy values" here.
+     kinds        the koi in the pond, each a different variety (up to 4):
+                  kohaku, ogon (yamabuki ogon), showa, tancho, sanke, platinum
+     count        how many koi (the number of kinds)
+     ring         ring size (× the original); the ring, glow and pond grow, the koi keep their size
      speed        swimming speed
      wanderSpread how far from the middle they swim (the pool's edge)
      wave, fins   how much the body bends; fin and tail movement
@@ -4437,7 +4440,8 @@ var koiDiveWrap = document.getElementById('koiDiveWrap');
      shadow       the shadow on the pond floor
    (orbit is not used by the pool swimming; kept so the copied values match.) */
 var KOI_LOOK = {
-  count: 2,
+  kinds: ['kohaku', 'ogon', 'sanke', 'showa'],
+  count: 4,
   speed: 1.7,
   orbit: 0.48,
   wanderSpread: 0.78,
@@ -4449,10 +4453,13 @@ var KOI_LOOK = {
   deepSize: 0.57,
   deepBlur: 3,
   deepFade: 0.35,
-  length: 0.88,
-  girth: 1,
+  ring: 1.45,
+  length: 0.95,
+  girth: 0.9,
   shadow: 1.75
 };
+/* the ring size: main.css scales the ring, glow and pond by --koi-ring */
+try { document.documentElement.style.setProperty('--koi-ring', KOI_LOOK.ring || 1); } catch (e) {}
 var koiPond = null;
 try {
   var _koiCanvas = document.getElementById('koiCanvas');
@@ -7150,9 +7157,9 @@ var KOI_RISE_MAX = 40;
 var KOI_RISE_FACTOR = 0.35;
 var KOI_SWIPE_THRESHOLD = 60;
 /* After a swipe the start screen stays up this long (ms) before it fades, so the koi can be seen
-   swimming away and are completely gone when the fade begins (both koi are gone 1.53–1.78 s after
-   the swipe: measured over 40 runs); the name animation follows the fade. It was 200. */
-var KOI_AWAY_MS = 1850;
+   swimming away and are completely gone when the fade begins (with KOI_LOOK's four koi, all are gone
+   1.92 s after the swipe: measured over 40 runs); the name animation follows the fade. It was 200. */
+var KOI_AWAY_MS = 2000;
 var KOI_TRAIL_INTERVAL = 90;
 var KOI_TRAIL_MIN_TRAVEL = 18;
 var KOI_TAP_MAX_TRAVEL = 8;
