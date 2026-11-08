@@ -10119,23 +10119,12 @@ var tyExited = false;
    the other themes the stylesheet position applies. */
 function repositionTySwipeHint() {
   if (!tySwipeHint || !thankyouScreen) return;
-  if (currentTheme !== 'autumn') {
-    tySwipeHint.style.bottom = '';
-    if (tyDotsEl) tyDotsEl.style.bottom = '';
-    return;
-  }
-  var screenRect = thankyouScreen.getBoundingClientRect();
-  if (screenRect.height <= 0) return;
-  var contents = thankyouScreen.querySelectorAll('.ty-panel-content');
-  var lowest = 0;
-  for (var i = 0; i < contents.length; i++) {
-    var b = contents[i].getBoundingClientRect().bottom - screenRect.top;
-    if (b > lowest) lowest = b;
-  }
-  if (lowest <= 0) return;
-  var tyHintBottom = Math.max(0, screenRect.height - lowest - 18 - 32);
-  tySwipeHint.style.bottom = tyHintBottom + 'px';
-  if (tyDotsEl) tyDotsEl.style.bottom = Math.max(0, tyHintBottom - 7 - 6) + 'px';
+  // The main message panel's swipe hint and dots are the standard: the
+  // thank-you screens use exactly the same distance from the bottom.
+  repositionHintGroup();
+  if (globalHint && globalHint.style.bottom) tySwipeHint.style.bottom = globalHint.style.bottom;
+  else tySwipeHint.style.bottom = '';
+  if (tyDotsEl) tyDotsEl.style.bottom = (dotsEl && dotsEl.style.bottom) ? dotsEl.style.bottom : '';
 }
 function updateTySwipeHint() {
   if (!tySwipeHint || !tySwipeHintLabel) return;
