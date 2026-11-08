@@ -6146,23 +6146,26 @@ function linkSubOptionRows(container) {
   }
 }
 
-/* Fades the whole link line of a group when every main option of it is
-   greyed out (so a greyed-out main option and its sub option match). */
+/* Fades each stretch of a link line whose main option is greyed out:
+   dim-out = the stretch leaving a main option downward, dim-in = the
+   stretch arriving at a row from the main option above it. */
 function updateLinkDim() {
   var rows = tableCard.querySelectorAll('.row[data-option]');
   var byOption = {};
   for (var i = 0; i < rows.length; i++) {
-    rows[i].classList.remove('link-dim');
+    rows[i].classList.remove('dim-in', 'dim-out');
     byOption[rows[i].getAttribute('data-option')] = rows[i];
   }
+  function off(r) { return r.classList.contains('disabled'); }
   for (var sub in SUB_OPTION_PARENTS) {
     var subRow = byOption[sub];
     if (!subRow || !subRow.classList.contains('link-sub')) continue;
-    var parents = SUB_OPTION_PARENTS[sub].filter(function (n) { return byOption[n]; });
-    var allOff = parents.length > 0 && parents.every(function (n) { return byOption[n].classList.contains('disabled'); });
-    if (!allOff) continue;
-    subRow.classList.add('link-dim');
-    parents.forEach(function (n) { byOption[n].classList.add('link-dim'); });
+    var parents = SUB_OPTION_PARENTS[sub].filter(function (n) { return byOption[n]; }).map(function (n) { return byOption[n]; });
+    for (var k = 0; k < parents.length; k++) {
+      if (off(parents[k])) parents[k].classList.add('dim-out');
+      if (k > 0 && off(parents[k - 1])) parents[k].classList.add('dim-in');
+    }
+    if (parents.length && off(parents[parents.length - 1])) subRow.classList.add('dim-in');
   }
 }
 

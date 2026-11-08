@@ -1784,8 +1784,9 @@
     box-sizing: border-box; height: calc(50% + 0.75px); pointer-events: none;
   }
   /* A greyed-out row in a linked group fades its contents but not the link
-     line. The whole line fades together (.link-dim) only when every main
-     option of the group is greyed out as well. */
+     line. Each stretch of the line fades only when the main option it
+     leaves from is greyed out: .dim-out fades the stretch leaving a row
+     downward, .dim-in the stretch arriving from the main option above. */
   .row.link-sub.disabled, .row.link-from.disabled { opacity: 1; }
   .row.link-sub.disabled > .row-check,
   .row.link-sub.disabled > .service-display,
@@ -1793,7 +1794,7 @@
   .row.link-from.disabled > .row-check,
   .row.link-from.disabled > .service-display,
   .row.link-from.disabled > .price-wrap { opacity: 0.35; }
-  .row.link-dim::before, .row.link-dim::after { opacity: 0.35; }
+  .row.dim-in::before, .row.dim-out::after { opacity: 0.35; }
   .row.filled { background: var(--soft-2); border-left-color: var(--accent); }
   .row.disabled { opacity: 0.35; pointer-events: none; }
 
