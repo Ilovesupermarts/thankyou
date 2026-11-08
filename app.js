@@ -21600,7 +21600,7 @@ var RV_LOOK = { engine: 'gpu', speed: 0.5, flow: 0.84, swirl: 41, push: 0.88, st
 var RV_PARTS = [
   // id, kind, starts at (s), lasts (s)
   ['sky', 'fade', 0, 1.0],
-  ['fuji', 'wash', 0, 2.0],
+  ['fuji', 'wash', 0, 3.2],             // (longer, so its whole slope is brushed in)
   ['ridges', 'wash', 0, 1.3],
   ['lake', 'wash', 0, 1.0],
   ['headland', 'wash', 0, 1.8],
@@ -21902,10 +21902,13 @@ function rvSeeds(id) {
   if (id === 'fuji') {
     var fx = M.fujiX * W, fh = M.fujiHeight * H, top = hy - fh, hb = M.fujiWidth * fh;
     drop(fx, top + fh * 0.06, fh * 0.16, 0);                       // the summit first,
-    for (var k = 1; k <= 6; k++) {                                 // then down both flanks
-      var f = k / 6;
-      drop(fx - hb * f * 0.8, top + fh * f * 0.95, fh * (0.12 + 0.06 * f), 0.12 * k);
-      drop(fx + hb * f * 0.8, top + fh * f * 0.95, fh * (0.12 + 0.06 * f), 0.12 * k + 0.06);
+    for (var k = 1; k <= 9; k++) {                                 // then row by row down the whole mountain, from the middle out to
+      var f = k / 9, yk = top + fh * (0.04 + f * 0.94), half = hb * f * 1.05, rk = fh * (0.13 + 0.05 * f), stp = rk * 1.1;
+      for (var dx = 0; dx <= half; dx += stp) {                    // both flanks, the drops close enough that the strokes overlap
+        var at = 0.2 * k + dx / Math.max(1, hb) * 0.6;
+        drop(fx - dx, yk, rk, at);
+        if (dx > 0) drop(fx + dx, yk, rk, at + 0.04);
+      }
     }
     return [{ seeds: out, fall: 1, region: function(x, y) {       // (the simple paper only) its water stays on the mountain
       if (y < top - 10 || y > hy + 24) return 0;
