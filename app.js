@@ -6069,7 +6069,53 @@ function bounceToCurrentPanel() {
 /* ============ TABLE ============ */
 function getRows() { return tableCard.querySelectorAll('.row'); }
 
+/* Option rules for the service table. Rows made from presets.json carry
+   data-option (1 = first preset ... 5 = fifth). Option 1 greys 3,4,5;
+   option 3 greys 1,2,4; option 4 greys 1,2,3; option 2 is grey unless
+   option 1 is ticked; option 5 is grey unless option 3 or 4 is ticked. */
+function applyOptionRules() {
+  var byOption = {};
+  var rows = tableCard.querySelectorAll('.row[data-option]');
+  for (var i = 0; i < rows.length; i++) byOption[rows[i].getAttribute('data-option')] = rows[i];
+  function ticked(n) {
+    var r = byOption[n];
+    var b = r && r.querySelector('.row-check');
+    return !!(b && b.classList.contains('checked'));
+  }
+  for (var pass = 0; pass < 4; pass++) {
+    var changed = false;
+    var s1 = ticked('1'), s3 = ticked('3'), s4 = ticked('4');
+    var grey = {
+      '1': s3 || s4,
+      '2': !s1,
+      '3': s1 || s4,
+      '4': s1 || s3,
+      '5': s1 || !(s3 || s4)
+    };
+    for (var n in byOption) {
+      var row = byOption[n];
+      var box = row.querySelector('.row-check');
+      var off = !!grey[n];
+      row.classList.toggle('disabled', off);
+      if (off && box && box.classList.contains('checked')) {
+        var pi = row.querySelector('.price-input');
+        if (pi) {
+          if (pi.value !== '') box.setAttribute('data-saved-price', pi.value);
+          pi.value = '';
+          try { pi.blur(); } catch (err) {}
+        }
+        box.classList.remove('checked');
+        box.setAttribute('aria-checked', 'false');
+        row.classList.remove('filled');
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+}
+
 function recalc() {
+  applyOptionRules();
   var rows = getRows();
   var sum = 0;
   for (var i = 0; i < rows.length; i++) {
@@ -6540,6 +6586,7 @@ function buildNameScreenRows() {
     var preset = PRESETS[i];
     var rowDiv = document.createElement('div');
     rowDiv.className = 'row';
+    rowDiv.setAttribute('data-option', String(i + 1));
     var boxDiv = document.createElement('div');
     boxDiv.className = 'row-check';
     boxDiv.setAttribute('role', 'checkbox');
@@ -8136,6 +8183,8 @@ function confirmName() {
 
     var rowDiv = document.createElement('div');
     rowDiv.className = 'row';
+    var optionNo = row.getAttribute('data-option');
+    if (optionNo) rowDiv.setAttribute('data-option', optionNo);
     var boxDiv = document.createElement('div');
     boxDiv.className = 'row-check';
     boxDiv.setAttribute('role', 'checkbox');
