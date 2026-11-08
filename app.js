@@ -6146,8 +6146,29 @@ function linkSubOptionRows(container) {
   }
 }
 
+/* Fades the whole link line of a group when every main option of it is
+   greyed out (so a greyed-out main option and its sub option match). */
+function updateLinkDim() {
+  var rows = tableCard.querySelectorAll('.row[data-option]');
+  var byOption = {};
+  for (var i = 0; i < rows.length; i++) {
+    rows[i].classList.remove('link-dim');
+    byOption[rows[i].getAttribute('data-option')] = rows[i];
+  }
+  for (var sub in SUB_OPTION_PARENTS) {
+    var subRow = byOption[sub];
+    if (!subRow || !subRow.classList.contains('link-sub')) continue;
+    var parents = SUB_OPTION_PARENTS[sub].filter(function (n) { return byOption[n]; });
+    var allOff = parents.length > 0 && parents.every(function (n) { return byOption[n].classList.contains('disabled'); });
+    if (!allOff) continue;
+    subRow.classList.add('link-dim');
+    parents.forEach(function (n) { byOption[n].classList.add('link-dim'); });
+  }
+}
+
 function recalc() {
   applyOptionRules();
+  updateLinkDim();
   var rows = getRows();
   var sum = 0;
   for (var i = 0; i < rows.length; i++) {
