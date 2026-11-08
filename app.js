@@ -6161,11 +6161,15 @@ function updateLinkDim() {
     var subRow = byOption[sub];
     if (!subRow || !subRow.classList.contains('link-sub')) continue;
     var parents = SUB_OPTION_PARENTS[sub].filter(function (n) { return byOption[n]; }).map(function (n) { return byOption[n]; });
+    /* Once a main option higher up the line is available, the rest of the
+       line below it stays full strength, even through a greyed-out one. */
+    var allOffSoFar = true;
     for (var k = 0; k < parents.length; k++) {
-      if (off(parents[k])) parents[k].classList.add('dim-out');
       if (k > 0 && off(parents[k - 1])) parents[k].classList.add('dim-in');
+      allOffSoFar = allOffSoFar && off(parents[k]);
+      if (allOffSoFar) parents[k].classList.add('dim-out');
     }
-    if (parents.length && off(parents[parents.length - 1])) subRow.classList.add('dim-in');
+    if (parents.length && allOffSoFar) subRow.classList.add('dim-in');
   }
 }
 
