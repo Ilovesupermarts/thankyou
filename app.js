@@ -8305,10 +8305,18 @@ function confirmName() {
   dynamicRows.innerHTML = '';
   var nameRows = nameScreenRows.querySelectorAll('.row');
   var anyPresetSelected = false;
+  /* Option 5 only goes into the table when option 3 or 4 is in it too. */
+  var has3or4 = false;
+  for (var j = 0; j < nameRows.length; j++) {
+    var o = nameRows[j].getAttribute('data-option');
+    var ob = nameRows[j].querySelector('.row-check');
+    if ((o === '3' || o === '4') && ob && ob.classList.contains('checked')) has3or4 = true;
+  }
   for (var i = 0; i < nameRows.length; i++) {
     var row = nameRows[i];
     var box = row.querySelector('.row-check');
     if (!box || !box.classList.contains('checked')) continue;
+    if (row.getAttribute('data-option') === '5' && !has3or4) continue;
     var display = row.querySelector('.service-display');
     var priceInput = row.querySelector('.price-input');
     var nameVal = display ? (display.textContent || '').trim() : '';
