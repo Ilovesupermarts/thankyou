@@ -5094,12 +5094,19 @@ var TY_PANEL1_DEFAULT_HTML =
   '<div class="ty-rule"></div>' +
   '<div class="ty-line">シャワーは10分ほどで済ませます。</div>';
 
-var TY_PANEL1_MICROBIKINI_HTML =
+var TY_PANEL1_OPTION2_HTML =
   '<div class="ty-mark">❀</div>' +
   '<div class="ty-line">ありがとうございます。</div>' +
   '<div class="ty-line">それでは、シャワーを浴びてまいります。どうぞごゆっくりお待ちください。本日はよろしくお願いいたします。</div>' +
   '<div class="ty-rule"></div>' +
-  '<div class="ty-line accent">シャワーは10分ほどで済ませます。マイクロビキニへのお着替えは、私がシャワーから戻ってきてからお願いできますでしょうか。</div>';
+  '<div class="ty-line accent">シャワーは10分ほどで済ませます。<br>もしよろしければ、マイクロビキニ、またはランジェリーへのお着替えは、私が戻ってきてからにしていただけますと嬉しいです。</div>';
+
+var TY_PANEL1_OPTION5_HTML =
+  '<div class="ty-mark">❀</div>' +
+  '<div class="ty-line">ありがとうございます。</div>' +
+  '<div class="ty-line">それでは、シャワーを浴びてまいります。どうぞごゆっくりお待ちください。本日はよろしくお願いいたします。</div>' +
+  '<div class="ty-rule"></div>' +
+  '<div class="ty-line accent">シャワーは10分ほどで済ませます。<br>もしよろしければ、お着替え（脱衣）の瞬間は、私が戻ってきてから鑑賞させていただけますと幸いです。</div>';
 
 window.addEventListener('resize', function() {
   stageWidth = window.innerWidth;
@@ -10107,23 +10114,27 @@ function applyTyPanel1Content() {
     return;
   }
 
-  var preset0Name = (PRESETS[0] && PRESETS[0].name) ? PRESETS[0].name : '';
-  var firstMatches = false;
-  if (preset0Name !== '' && receiptItems) {
+  var opt2Name = (PRESETS[1] && PRESETS[1].name) ? PRESETS[1].name : '';
+  var opt5Name = (PRESETS[4] && PRESETS[4].name) ? PRESETS[4].name : '';
+  var hasOpt2 = false, hasOpt5 = false;
+  if (receiptItems) {
     var items = receiptItems.querySelectorAll('.receipt-item');
     for (var i = 0; i < items.length; i++) {
       var el = items[i];
       if (el.getAttribute('data-removing') === 'true') continue;
       if (el.classList.contains('removing')) continue;
       var nameEl = el.querySelector('.receipt-item-name');
-      firstMatches = !!(nameEl && nameEl.textContent.trim() === preset0Name);
-      break;
+      var nm = nameEl ? nameEl.textContent.trim() : '';
+      if (opt2Name !== '' && nm === opt2Name) hasOpt2 = true;
+      if (opt5Name !== '' && nm === opt5Name) hasOpt5 = true;
     }
   }
-  firstServiceInReceipt = firstMatches;
+  firstServiceInReceipt = hasOpt2 || hasOpt5;
 
-  if (firstServiceInReceipt) {
-    tyPanel1Content.innerHTML = TY_PANEL1_MICROBIKINI_HTML;
+  if (hasOpt2) {
+    tyPanel1Content.innerHTML = TY_PANEL1_OPTION2_HTML;
+  } else if (hasOpt5) {
+    tyPanel1Content.innerHTML = TY_PANEL1_OPTION5_HTML;
   } else {
     tyPanel1Content.innerHTML = TY_PANEL1_DEFAULT_HTML;
   }
