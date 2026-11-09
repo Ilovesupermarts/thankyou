@@ -6061,6 +6061,9 @@ function goToPanel(index, noGust) {
   if (transitionLine && currentPanel !== totalPanels - 1) {
     summaryBar.classList.remove('visible');
     if (numpad) numpad.classList.remove('visible');
+    /* tell the hints the keypad has gone, so its hint goes with it (the price box can still
+       have the cursor, so the keypad's visibility is not worked out again here) */
+    Hints && Hints.syncNumpad();
   }
   updateGlobalHint();
   setTimeout(repositionHintGroup, 30);
