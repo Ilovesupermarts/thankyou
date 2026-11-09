@@ -5318,6 +5318,12 @@ function updateNumpadVisibilityNow() {
   var isPriceFocused = activeEl && activeEl.classList &&
     (activeEl.classList.contains('price-input') ||
      activeEl.classList.contains('receipt-price-input'));
+  /* a table price box scrolled down past the summary bar's top edge: the keypad fades away
+     (and its hint with it); it comes back if the box is scrolled up above that edge again */
+  if (isPriceFocused && activeEl.classList.contains('price-input') && summaryBar) {
+    var barTop = window.innerHeight - summaryBar.offsetHeight;
+    if (activeEl.getBoundingClientRect().top >= barTop) isPriceFocused = false;
+  }
   if (isPriceFocused) {
     repositionNumpad();
     numpad.classList.add('visible');
