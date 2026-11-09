@@ -14533,7 +14533,7 @@ function freeGlyphFor(t) {
   return null;
 }
 function updateSpecks(dt, t) {
-  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk') && S.hour >= 22) ? 24 : 0;   // only after the fireworks end (10pm)
+  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk') && (S.hour >= 22 || S.hour < 4)) ? 24 : 0;   // only after the fireworks end: 10pm until 4am
   while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11), state: 'drift' });
   if (specks.length > target) specks.length = target;
   var landed = 0;
