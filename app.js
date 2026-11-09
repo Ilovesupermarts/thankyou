@@ -16973,6 +16973,7 @@ function drawLandscape(c, dt) {
       lakeDrawWater(c, lastT, dt);                                     // the lake, under the land (8c, the lake)
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.drawImage(LS.GRD.cnv, 0, Math.round(LS.grdTop * PR));
+      rainDrawGround(c, 'g');                                          // the rain landing on the ground (8c, rain)
     });
     rvDraw('headland', c, function(c) { lakeDrawHeadland(c, lastT, dt); });   // the wooded headland, mist on the water, the bank trees
     rvDraw('torii', c, function(c) { torDrawGravel(c); });             // the gravel path lies on the ground
@@ -17535,6 +17536,7 @@ function torBake() {
     var dq = depthOf(foot);
     gates.push({ x: q.x, z: q.z, tx: q.tx, tz: q.tz, ax: -q.tz, az: q.tx, px: px, foot: foot, haze: dq.haze, band: dq.band, s: s });
   }
+  rainToriiCapture(gates);                         // the gates' top beams, for the rain on them (8c, rain)
   // the lanterns
   torPlaceLanterns(path, gap).forEach(function (Lp) {
     if (Lp.z < 0.6) return;
@@ -17904,6 +17906,7 @@ function torDrawGates(c) {
   c.drawImage(TOR.gate.cnv, 0, Math.round(TOR.gateTop * PR));
   c.globalAlpha = 1;
   torDrawGlow(c, lastT);
+  rainDrawTorii(c);                                // the rain on the gates' top beams (8c, rain)
 }
 /* How hard the wind is blowing at x just now, from the app's own gusts: a
    gust's front is felt just ahead of it and fades away behind. */
@@ -18392,6 +18395,7 @@ function lakeBakeHead() {
   var x0 = -0.03 * W, x1 = 1.03 * W, y0 = 0.18 * H, y1 = Math.min(H + 20, H * LAND.horizon + F / LAKE.headZ + H * 0.06);
   var HC = LK.HEADN, parts = [];
   LK.headBoxN = { x0: x0, y0: y0, x1: x1, y1: y1 };
+  RN_ROOF_N = [];
   HC.cnv.width = Math.round((x1 - x0) * SR); HC.cnv.height = Math.round((y1 - y0) * SR);
   var c = HC.c;
   function css() { c.setTransform(SR, 0, 0, SR, -x0 * SR, -y0 * SR); }
@@ -18442,6 +18446,7 @@ function lakeBakeHead() {
     Lakeside.renderFaces(c, faces, { proj: torScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
                                      fin: function (col) { return fin(col); },
                                      flood: { k: fk, col: hexToRgb(LAKE.floodColour), y0: Y, h: bh } });
+    rainRoofCapture(faces, HC, LK.headBoxN, F, z);   // where the rain can land on its roofs (8c, rain)
     RV_SPOT[kind] = { x: bx, y: byScr, h: kind === 'pagoda' ? size * H : size * W * 0.6 };   // for the ink reveal (8e)
   }
   function treeRow(row) {
@@ -19779,11 +19784,13 @@ function lakeBakeGroveStep() {
   if (!lakeOn() || !LK.path) return;
   lakeBakeGrove(LK.path);
   lakeBakeBank(LK.path);
+  var roofs = rainRoofFinish(LK.HEADN);            // (before the veil of haze: what of the roofs the trees leave showing)
   if (LK.headBoxN && LK.HEADN.cnv.width > 1) {
     LK.HEADN.c.setTransform(LAND_SR, 0, 0, LAND_SR, -LK.headBoxN.x0 * LAND_SR, -LK.headBoxN.y0 * LAND_SR);
     lakeVeil(LK.HEADN.c, true);
   }
   var old = LK.HEAD; LK.HEAD = LK.HEADN; LK.HEADN = old; LK.headBox = LK.headBoxN;   // the new headland in, the old picture kept for next time
+  RN_ROOF = roofs;
   lakeBakeRipples();
   if (!lakeWaterInit && typeof Water !== 'undefined' && LAKE.shader) { lakeWaterInit = true; Water.init('textures/waternormals.jpg'); }
   LK.ready = true;
@@ -19809,15 +19816,18 @@ function lakeDrawWater(c, t, dt) {
   if (lakeShaderOn()) {
     var sunK = (1 - T.n) * lerp(1, 1.4, T.e) * LAKE.sparkle;
     var pic = Water.render({ w: W * PR * LAKE.waterRes, h: hh * PR * LAKE.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
-                             time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)), waveSize: LAKE.waveSize,
+                             time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)) * (1 - 0.45 * RN.lvl), waveSize: LAKE.waveSize,   // (rain calms the small waves)
                              reflect: LAKE.reflect, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
-                             sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e), fft: lakeFftParams() });
+                             sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e), fft: lakeFftParams(),
+                             rain: RN.lvl, rainT: RN.t, rainSky: RN.col });
     if (pic) {
       c.setTransform(1, 0, 0, 1, 0, 0);
       c.globalAlpha = 1;
       c.drawImage(pic, 0, Math.round(yf * PR), Math.round(W * PR), Math.round(hh * PR) + 1);
       if (LK.WSTAT.cnv.width > 2) c.drawImage(LK.WSTAT.cnv, -WPAD * PR, yf * PR, (W + WPAD * 2) * PR, hh * PR);
       LK.waterRows = -1;
+      rainDrawLake(c, false);                        // the jets where the rain lands (8c, rain)
+      c.setTransform(1, 0, 0, 1, 0, 0);
       return;
     }
   }
@@ -19866,6 +19876,8 @@ function lakeDrawWater(c, t, dt) {
     c.drawImage(LK.GLN.cnv, (sx - gw / 2 + 2) * PR, (yf + 1) * PR, gw * PR, hh * PR);
   }
   c.globalAlpha = 1;
+  rainDrawLake(c, true);                           // the rain's rings and jets (8c, rain)
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 /* After the ground: the wooded headland with the pagoda and the grove, the mist drifting low over the water, and
    the trees on the right bank. */
@@ -19875,6 +19887,7 @@ function lakeDrawHeadland(c, t, dt) {
   if (hb && LK.HEAD.cnv.width > 1) {
     c.setTransform(1, 0, 0, 1, 0, 0);
     c.drawImage(LK.HEAD.cnv, hb.x0 * PR, hb.y0 * PR, (hb.x1 - hb.x0) * PR, (hb.y1 - hb.y0) * PR);
+    rainDrawRoofs(c, t);                                             // the rain on the roofs (8c, rain)
   }
   if (LAKE.lakeMist > 0 && LS.MIST.cnv.width > 1) {
     c.setTransform(PR, 0, 0, PR, 0, 0);
@@ -19903,7 +19916,480 @@ function lakeDrawFore(c, t) {
   c.setTransform(1, 0, 0, 1, 0, 0);
   c.drawImage(LK.FORE.cnv, 0, Math.round(LK.foreTop * PR));
   lakeDrawSusuki(c, t, true);
+  rainDrawGround(c, 'f');                         // the rain landing on the near shore (8c, rain)
   c.setTransform(PR, 0, 0, PR, 0, 0);
+}
+
+/* ============================================================
+   8c. RAIN ON THE SCENE (autumn) — while it rains, the rain is seen landing
+   on the scenery, not only falling in front of it. Each surface shows it as
+   it really does:
+   - The lake (rainDrawLake, and the rings in water.js's shader): every drop
+     sends out a ring of small waves that spreads and dies away, bending the
+     reflection; near you a little jet of water jumps up where a drop lands
+     and falls back. Far off, where the rings are too small to see, the
+     water is a fine shimmer of flecks, and its mirror goes a little dull.
+     The drops land at the same spots and moments as the shader's (rainHash,
+     the same hash), so each jet sits at the middle of its ring.
+   - The ground (rainDrawGround): no rings. A drop bursts into a few tiny
+     droplets that fly out and fall back, with a puff of spray, on the
+     fallen leaves, the earth and the gravel, smaller further away.
+   - The roofs of the pagoda and the shrine hall (rainDrawRoofs): drops
+     bounce off the tiles as specks of spray, the tiles carry a faint mist
+     of bouncing rain, and water drips from the eaves, most from the
+     upturned corners. Only where the roof can be seen: rainRoofCapture
+     draws each building's roof again as a mask (its own storeys in front
+     hide parts of it), and rainRoofFinish leaves out what the trees in
+     front of it cover.
+   - The torii (rainDrawTorii): drops bounce off the black cap of each
+     gate's top beam, and water drips off the ends of the beam, on each gate
+     big enough to show it and only where its top is not hidden behind a
+     nearer gate.
+   How hard it rains (RN.lvl) eases toward the weather (rain, drizzle or a
+   thunderstorm, and how many mm), over a few seconds as it starts and
+   longer as it stops. The values are in RAIN_SCENE.
+   ============================================================ */
+var RAIN_SCENE = {
+  groundRate: 420,      // splashes a second on the ground, at full rain
+  roofRate: 5,          // splashes a second for each 100 px² of roof that shows, at full rain
+  roofMist: 0.45,       // the mist of bouncing rain over the tiles
+  eaveDrips: 2.5,       // drips a second from each 10 px of eave
+  toriiRate: 0.7,       // splashes a second for each px of beam top
+  toriiDrips: 4,        // drips a second from each end of a beam
+  farSplash: 90,        // far away a splash is drawn as big as at this many px to an eye height, or it could not be seen
+  jetMaxZ: 30           // the lake's jets out to this far (eye heights)
+};
+var RN = { lvl: 0, t: 0, col: [220, 224, 232], colT: 0, sp: [], drips: [], maskAt: null, gm: null, fm: null, gate: 0, gateBake: -1 };
+var RAIN_WRAP = 4096;
+/* The hash the water shader uses (water.js: rh, rh3), the same to the bit. */
+function rainRh(x) {
+  x >>>= 0;
+  x ^= x >>> 16; x = Math.imul(x, 0x7feb352d) >>> 0; x ^= x >>> 15; x = Math.imul(x, 0x846ca68b) >>> 0; x ^= x >>> 16;
+  return x >>> 0;
+}
+function rainHash(a, b, c) {
+  var inner = rainRh((c + 0x9e3779b9) >>> 0);
+  var mid = rainRh((Math.imul(b, 3812015801) ^ inner) >>> 0);
+  return rainRh((Math.imul(a, 1597334677) ^ mid) >>> 0) / 4294967295;
+}
+/* The drop now in the cell (ci, cj) of drop size L (as the shader's rainLayer), or null. */
+var RAIN_LAYERS = [{ cs: 0.8, P: 2.6, v: 0.28, life: 0.55, dens: 0.85 }, { cs: 0.32, P: 1.3, v: 0.18, life: 0.3, dens: 1 }];
+function rainDropAt(L, ci, cj, t, lvl) {
+  var Ly = RAIN_LAYERS[L], cx = ci + 32768, cz = cj + 32768;
+  var N = Math.max(1, Math.floor(RAIN_WRAP / (Ly.P * (0.7 + 0.6 * rainHash(cx, cz, L * 8 + 1))) + 0.5)), Pc = RAIN_WRAP / N;
+  var tt = t + rainHash(cx, cz, L * 8 + 2) * Pc, n = Math.floor(tt / Pc), age = tt - n * Pc, k = ((n % N) + N) % N;
+  if (rainHash(cx, cz, L * 8 + 3 + k * 64) > Ly.dens * lvl) return null;
+  return { x: (ci + 0.2 + 0.6 * rainHash(cx, cz, L * 8 + 4 + k * 64)) * Ly.cs, z: (cj + 0.2 + 0.6 * rainHash(cx, cz, L * 8 + 5 + k * 64)) * Ly.cs,
+           s: 0.55 + 0.9 * rainHash(cx, cz, L * 8 + 6 + k * 64), age: age };
+}
+function rainTarget() {
+  if (ENV.scene !== 'autumn' || !ENV.rainy || S.condition === 'snow') return 0;
+  if (S.condition === 'drizzle') return 0.35;
+  if (S.condition === 'thunderstorm') return 1;
+  return clamp(0.55 + S.rainMm / 8, 0.55, 1);
+}
+/* Every frame. */
+function rainSceneUpdate(dt, t) {
+  var tg = rainTarget();
+  RN.lvl += (tg - RN.lvl) * (1 - Math.exp(-dt / (tg > RN.lvl ? 3 : 6)));
+  if (tg === 0 && RN.lvl < 0.003) RN.lvl = 0;
+  RN.t = (RN.t + dt) % RAIN_WRAP;
+  var i, sp;
+  for (i = RN.sp.length - 1; i >= 0; i--) { sp = RN.sp[i]; sp.age += dt; if (sp.age > sp.life) RN.sp.splice(i, 1); }
+  for (i = RN.drips.length - 1; i >= 0; i--) {
+    var dp = RN.drips[i];
+    dp.age += dt; dp.vy += 6.1 * dp.u * dt; dp.y += dp.vy * dt;     // 6.1 eye heights a second² (9.8 m/s² at 1.6 m)
+    if (dp.y > dp.yEnd || dp.age > 1.2) RN.drips.splice(i, 1);
+  }
+  if (!RN.lvl || ENV.scene !== 'autumn' || !LS.ready || !LK.ready) return;
+  if (t - RN.colT > 0.5) {                          // the light of the sky, which the water drops catch
+    RN.colT = t;
+    RN.col = mixRgb(lakeSkyAt(H * 0.2), [255, 255, 255], 0.35 * (1 - koyoNight()));
+  }
+  rainMasks();
+  rainSpawnGround(dt);
+  rainSpawnRoofs(dt);
+  rainSpawnTorii(dt);
+}
+
+/* ---------- the lake ---------- */
+/* After the water (before the land is laid over it): the little jets where the near drops land (the rings
+   are the shader's), or, on the 2D water, the rings too. */
+function rainDrawLake(c, rings) {
+  if (!RN.lvl || ENV.scene !== 'autumn') return;
+  var F = torLens(), hy = H * LAND.horizon, yf = lakeFarShoreY(), zFar = Math.min(RAIN_SCENE.jetMaxZ, F / Math.max(1, yf - hy));
+  var zNear = F / Math.max(1, H - hy);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  var col = RN.col, css = rgba(col), dark = rgba(scaleRgb(lakeWaterCol(), 0.7));
+  c.fillStyle = css; c.strokeStyle = css;
+  for (var L = 0; L < 2; L++) {
+    var Ly = RAIN_LAYERS[L], zMax = L ? Math.min(zFar, 14) : zFar;
+    if (rings && L) continue;
+    var j0 = Math.floor(zNear / Ly.cs), j1 = Math.floor(zMax / Ly.cs);
+    for (var cj = j0; cj <= j1; cj++) {
+      var zc = (cj + 0.5) * Ly.cs, half = (W / 2 + 10) * zc / F;
+      var i0 = Math.floor(-half / Ly.cs), i1 = Math.floor(half / Ly.cs);
+      for (var ci = i0; ci <= i1; ci++) {
+        var D = rainDropAt(L, ci, cj, RN.t, RN.lvl);
+        if (!D) continue;
+        if (D.z < zNear || D.z > zMax) continue;
+        var u = F / D.z, sx = W / 2 + D.x * u, sy = hy + u;
+        if (sy < yf || sx < -4 || sx > W + 4) continue;
+        if (rings) {                                // 2D water: the rings as thin ellipses (in the shader, they are waves)
+          var R = Ly.v * D.age * (0.8 + 0.4 * D.s), env = Math.exp(-D.age / (Ly.life * D.s));
+          if (env < 0.04 || R * u < 1) continue;
+          c.globalAlpha = Math.min(0.7, env * 0.9);
+          c.lineWidth = 0.8;
+          c.beginPath(); c.ellipse(sx, sy, R * u, Math.max(0.5, R * u * u / F), 0, 0, TAU); c.stroke();
+          if (R * u > 6) { c.globalAlpha *= 0.5; c.beginPath(); c.ellipse(sx, sy, R * u * 0.7, Math.max(0.4, R * u * 0.7 * u / F), 0, 0, TAU); c.stroke(); }
+        }
+        // the jet: a thin column thrown up where the drop went in (a Worthington jet), a droplet breaking off its
+        // top and falling back; and the little dark dimple of the crater for a moment
+        var a = D.age, hJ = 0.07 * D.s * (L ? 0.6 : 1) * u;
+        if (a > 0.42 || hJ < 0.8) continue;
+        var w = Math.max(0.7, 0.008 * D.s * u);
+        if (a < 0.06) {
+          c.globalAlpha = 0.5 * (1 - a / 0.06);
+          c.fillStyle = dark;
+          c.fillRect(sx - w * 2, sy - 0.4, w * 4, Math.max(0.8, w * 0.8));
+          c.fillStyle = css;
+        }
+        if (a < 0.16) {                            // the column rises
+          var hc = hJ * Math.sin(a / 0.16 * PI / 2);
+          c.globalAlpha = 0.75;
+          c.fillRect(sx - w / 2, sy - hc, w, hc);
+        } else {                                   // it sinks back; the droplet flies up a little further and falls
+          var k = (a - 0.16) / 0.26, hc2 = hJ * (1 - k) * 0.8;
+          c.globalAlpha = 0.6 * (1 - k * 0.5);
+          if (hc2 > 0.4) c.fillRect(sx - w / 2, sy - hc2, w, hc2);
+          var dy = hJ * (1.15 + 1.2 * k - 2.35 * k * k);
+          if (dy > 0) { c.globalAlpha = 0.85; c.fillRect(sx - w * 0.7, sy - dy - w * 0.7, w * 1.4, w * 1.4); }
+        }
+      }
+    }
+  }
+  c.globalAlpha = 1;
+}
+
+/* ---------- where the ground is ---------- */
+/* The ground (LS.GRD) and the near shore (LK.FORE), each as a grid of 4 px squares: true where it is solid.
+   Made again after each bake. */
+function rainMasks() {
+  if (LS.step || !LS.GRD.cnv || LS.GRD.cnv.width < 2) return;
+  var key = LS.key + '|' + LS.at;
+  if (RN.maskAt === key) return;
+  RN.maskAt = key;
+  function grid(cnv, top) {
+    var gw = Math.ceil(W / 4), gh = Math.ceil((H - top) / 4);
+    if (gw < 1 || gh < 1 || !cnv || cnv.width < 2) return null;
+    var o = { cnv: document.createElement('canvas') }; o.cnv.width = gw; o.cnv.height = gh;
+    o.c = o.cnv.getContext('2d', { willReadFrequently: true });
+    o.c.drawImage(cnv, 0, 0, gw, gh);
+    var d = o.c.getImageData(0, 0, gw, gh).data, m = new Uint8Array(gw * gh);
+    for (var i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 230 ? 1 : 0;
+    return { m: m, w: gw, h: gh, top: top };
+  }
+  RN.gm = grid(LS.GRD.cnv, LS.grdTop);
+  RN.fm = LK.FORE && LK.FORE.cnv.width > 2 ? grid(LK.FORE.cnv, LK.foreTop) : null;
+}
+function rainOnMask(M, x, y) {
+  if (!M) return false;
+  var gx = Math.floor(x / 4), gy = Math.floor((y - M.top) / 4);
+  return gx >= 0 && gy >= 0 && gx < M.w && gy < M.h && M.m[gy * M.w + gx] === 1;
+}
+
+/* ---------- splashes (the ground, the roofs, the torii) ---------- */
+/* A drop bursting at (x, y), u px to an eye height there: a few droplets thrown out and up, falling back. */
+function rainSplash(x, y, u, layer, big) {
+  var n = 3 + Math.floor(Math.random() * (big ? 5 : 3)), dr = [];
+  u = Math.max(u, RAIN_SCENE.farSplash * (big ? 0.5 : 1));
+  for (var i = 0; i < n; i++) {
+    var a = Math.random() * TAU, hs = rnd(0.3, 0.9) * (big ? 1 : 0.7), vy = rnd(0.35, 1.0) * (big ? 1 : 0.6);
+    dr.push({ vx: Math.cos(a) * hs, vz: Math.sin(a) * hs, vy: vy, t1: 2 * vy / 6.1 });
+  }
+  var life = 0;
+  for (var j = 0; j < n; j++) life = Math.max(life, dr[j].t1);
+  RN.sp.push({ x: x, y: y, u: u, dr: dr, age: 0, life: Math.max(0.12, life), layer: layer });
+}
+function rainSpawnGround(dt) {
+  var hy = H * LAND.horizon, F = torLens(), want = RAIN_SCENE.groundRate * RN.lvl * dt;
+  var n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
+  for (var i = 0, tries = 0; i < n && tries < n * 6; tries++) {
+    var x = Math.random() * W, y = hy + 3 + Math.random() * (H - hy - 3);
+    var onF = rainOnMask(RN.fm, x, y), onG = !onF && rainOnMask(RN.gm, x, y);
+    if (!onF && !onG) continue;
+    i++;
+    rainSplash(x, y, y - hy, onF ? 'f' : 'g', true);
+  }
+}
+/* layer: 'g' the ground (before what stands on it), 'f' the near shore, 'r' the roofs, 't' the torii */
+function rainDrawSplashes(c, layer) {
+  var col = RN.col, F = torLens();
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.fillStyle = rgba(col);
+  for (var i = 0; i < RN.sp.length; i++) {
+    var sp = RN.sp[i];
+    if (sp.layer !== layer) continue;
+    var u = sp.u, t = sp.age, fade = 1 - t / sp.life;
+    // the crown the drop throws up as it bursts (a ring of short jets, open upward), then a puff of spray
+    if (t < 0.07) {
+      var k0 = t / 0.07, cr = (0.012 + 0.03 * k0) * u, ch = 0.035 * u * Math.sin(k0 * PI);
+      c.globalAlpha = 0.75 * (1 - k0 * 0.6);
+      var cw = Math.max(0.6, 0.006 * u);
+      for (var q = -2; q <= 2; q++) c.fillRect(sp.x + q * cr / 2 - cw / 2 + q * 0.4 * ch / 2, sp.y - ch * (1 - Math.abs(q) * 0.25), cw, ch * (1 - Math.abs(q) * 0.25));
+    }
+    var pr = (0.015 + 0.04 * t / sp.life) * u;
+    if (t < 0.16 && pr > 0.4) {
+      c.globalAlpha = 0.35 * (1 - t / 0.16);
+      c.fillRect(sp.x - pr, sp.y - pr * 0.5, pr * 2, pr * 0.7);
+    }
+    var w = Math.max(0.7, 0.01 * u);
+    for (var j = 0; j < sp.dr.length; j++) {
+      var d = sp.dr[j];
+      if (t > d.t1) continue;
+      var x = sp.x + d.vx * t * u, y = sp.y - (d.vy * t - 3.05 * t * t) * u - d.vz * t * u * u / F;
+      c.globalAlpha = 0.85 * Math.min(1, fade + 0.4);
+      c.fillRect(x - w / 2, y - w / 2, w, w * 1.6);
+    }
+  }
+  c.globalAlpha = 1;
+}
+function rainDrawGround(c, layer) {
+  if (!RN.lvl && !RN.sp.length) return;
+  rainDrawSplashes(c, layer);
+}
+
+/* The pixels of a part of a picture, copied first into a small canvas of its own: reading a picture that is drawn
+   every frame (the headland, the gates) straight back would make Chrome keep it off the graphics chip. */
+var RN_READ = null;
+function rainRead(cnv, sx, sy, w, h) {
+  if (!RN_READ) { RN_READ = document.createElement('canvas'); RN_READ.c = RN_READ.getContext('2d', { willReadFrequently: true }); }
+  if (RN_READ.width < w || RN_READ.height < h) { RN_READ.width = Math.max(RN_READ.width, w); RN_READ.height = Math.max(RN_READ.height, h); }
+  var c = RN_READ.c;
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'copy';
+  c.drawImage(cnv, sx, sy, w, h, 0, 0, w, h);
+  c.globalCompositeOperation = 'source-over';
+  return c.getImageData(0, 0, w, h).data;
+}
+
+/* ---------- the roofs of the pagoda and the hall ---------- */
+/* In the headland's bake, just after a building is drawn: its roof again, white on black, in a mask the size of the
+   building (its storeys hide parts of the roofs below, as in the picture), and the picture as it is now there (to
+   see later what the trees in front cover). The eaves that face you, for the drips. */
+function rainRoofCapture(faces, HC, box, F, z) {
+  try {
+    var SR = LAND_SR, cam = [0, 1, 0], pts = [], eaves = [];
+    faces.forEach(function (f) { f.p.forEach(function (p) { pts.push(torScreen(p[0], p[1], p[2])); }); });
+    var x0 = Math.max(box.x0, Math.min.apply(null, pts.map(function (p) { return p[0]; })) - 2);
+    var x1 = Math.min(box.x1, Math.max.apply(null, pts.map(function (p) { return p[0]; })) + 2);
+    var y0 = Math.max(box.y0, Math.min.apply(null, pts.map(function (p) { return p[1]; })) - 2);
+    var y1 = Math.min(box.y1, Math.max.apply(null, pts.map(function (p) { return p[1]; })) + 2);
+    var w = Math.round((x1 - x0) * SR), h = Math.round((y1 - y0) * SR);
+    if (w < 2 || h < 2) return;
+    var M = { cnv: document.createElement('canvas') }; M.cnv.width = w; M.cnv.height = h;
+    M.c = M.cnv.getContext('2d', { willReadFrequently: true });
+    M.c.setTransform(SR, 0, 0, SR, -x0 * SR, -y0 * SR);
+    var plain = faces.map(function (f) { return { p: f.p, tone: f.tone, c: f.c }; });
+    Lakeside.renderFaces(M.c, plain, { proj: torScreen, cam: cam, light: [0, 1, 0], shade: 0,
+                                      colour: function (tone) { return tone === 'roof' ? [255, 255, 255] : [0, 0, 0]; },
+                                      fin: function (col) { return col; } });
+    // the eaves turned toward you: along each roof face's lower edge
+    faces.forEach(function (f) {
+      if (f.tone !== 'roof') return;
+      var p = f.p, n = p.length, cx = 0, cy = 0, cz = 0;
+      for (var j = 0; j < n; j++) { cx += p[j][0]; cy += p[j][1]; cz += p[j][2]; }
+      cx /= n; cy /= n; cz /= n;
+      var a = p[0], b = p[1], d = p[n - 1];
+      var ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2], vx = d[0] - a[0], vy = d[1] - a[1], vz = d[2] - a[2];
+      var nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      if (nx * (cx - f.c[0]) + ny * (cy - f.c[1]) + nz * (cz - f.c[2]) < 0) { nx = -nx; ny = -ny; nz = -nz; }
+      if (nx * (cam[0] - cx) + ny * (cam[1] - cy) + nz * (cam[2] - cz) <= 0) return;
+      var A = torScreen(a[0], a[1], a[2]), B = torScreen(b[0], b[1], b[2]);
+      eaves.push({ a: A, b: B, corA: !!f.hipL, corB: !!f.hipR });
+    });
+    RN_ROOF_N.push({ x0: x0, y0: y0, w: w, h: h, mask: M.c.getImageData(0, 0, w, h).data,
+                     snap: rainRead(HC.cnv, Math.round((x0 - box.x0) * SR), Math.round((y0 - box.y0) * SR), w, h),
+                     eaves: eaves, u: F / z, box: box });
+  } catch (e) { /* silent: no rain on this roof */ }
+}
+var RN_ROOF_N = [], RN_ROOF = [];
+/* After the trees of the headland are drawn (before its veil of haze): what of each roof can still be seen. */
+function rainRoofFinish(HC) {
+  var out = [];
+  RN_ROOF_N.forEach(function (R) {
+    try {
+      var SR = LAND_SR, cur = rainRead(HC.cnv, Math.round((R.x0 - R.box.x0) * SR), Math.round((R.y0 - R.box.y0) * SR), R.w, R.h);
+      var vis = new Uint8Array(R.w * R.h), pts = [], area = 0;
+      for (var i = 0, p = 0; i < vis.length; i++, p += 4) {
+        if (R.mask[p] < 150 || R.mask[p + 3] < 200) continue;
+        if (Math.abs(cur[p] - R.snap[p]) + Math.abs(cur[p + 1] - R.snap[p + 1]) + Math.abs(cur[p + 2] - R.snap[p + 2]) > 30) continue;
+        vis[i] = 1; area++;
+        pts.push(R.x0 + (i % R.w + 0.5) / SR, R.y0 + (Math.floor(i / R.w) + 0.5) / SR);
+      }
+      if (!area) return;
+      var seen = function (x, y) {
+        var gx = Math.floor((x - R.x0) * SR), gy = Math.floor((y - R.y0) * SR);
+        return gx >= 0 && gy >= 0 && gx < R.w && gy < R.h && vis[gy * R.w + gx] === 1;
+      };
+      // drip points along the eaves that show (just above the eave line is roof)
+      var drips = [];
+      R.eaves.forEach(function (E) {
+        var len = Math.hypot(E.b[0] - E.a[0], E.b[1] - E.a[1]), n = Math.max(1, Math.round(len / 1.5));
+        for (var k = 0; k <= n; k++) {
+          var s = k / n, x = lerp(E.a[0], E.b[0], s), y = lerp(E.a[1], E.b[1], s);
+          if (!seen(x, y - 1.2)) continue;
+          var corner = (E.corA && s < 0.12) || (E.corB && s > 0.88);
+          drips.push(x, y + 0.6, corner ? 5 : 1);
+        }
+      });
+      // the mist of bouncing rain over the tiles: the roof that shows, softened, lifted a hair
+      var MI = landCanvas(); MI.cnv.width = R.w; MI.cnv.height = R.h;
+      var id = MI.c.createImageData(R.w, R.h);
+      for (var q = 0; q < vis.length; q++) if (vis[q]) { id.data[q * 4] = id.data[q * 4 + 1] = id.data[q * 4 + 2] = 255; id.data[q * 4 + 3] = 255; }
+      MI.c.putImageData(id, 0, 0);
+      var MB = landCanvas(); MB.cnv.width = R.w; MB.cnv.height = R.h;
+      if (HAS_FILTER) MB.c.filter = 'blur(' + (1.1 * SR).toFixed(1) + 'px)';
+      MB.c.drawImage(MI.cnv, 0, -0.8 * SR);
+      MB.c.filter = 'none';
+      var dw = 0;
+      for (var d = 2; d < drips.length; d += 3) dw += drips[d];
+      out.push({ x0: R.x0, y0: R.y0, w: R.w / SR, h: R.h / SR, pts: pts, n: area / (SR * SR), drips: drips, dw: dw, mist: MB.cnv, u: R.u });
+    } catch (e) { /* silent */ }
+  });
+  RN_ROOF_N = [];
+  return out;
+}
+function rainSpawnRoofs(dt) {
+  if (!LAKE.headland) return;
+  RN_ROOF.forEach(function (R) {
+    var want = RAIN_SCENE.roofRate * RN.lvl * dt * R.n / 100, n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
+    for (var i = 0; i < n; i++) {
+      var k = Math.floor(Math.random() * R.pts.length / 2) * 2;
+      rainSplash(R.pts[k], R.pts[k + 1], R.u, 'r', false);
+    }
+    var wd = RAIN_SCENE.eaveDrips * RN.lvl * dt * R.drips.length / 3 / 6.7, m = Math.floor(wd) + (Math.random() < wd % 1 ? 1 : 0);
+    for (var j = 0; j < m; j++) {
+      var pick = Math.random() * R.dw, q = 2;
+      for (; q < R.drips.length; q += 3) { pick -= R.drips[q]; if (pick <= 0) break; }
+      q = Math.min(q, R.drips.length - 1) - 2;
+      RN.drips.push({ x: R.drips[q], y: R.drips[q + 1], vy: 0.05 * R.u, u: R.u, age: 0, yEnd: R.drips[q + 1] + 0.3 * R.u * rnd(0.6, 1.2), layer: 'r' });
+    }
+  });
+}
+function rainDrawDrips(c, layer) {
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  c.strokeStyle = rgba(RN.col);
+  c.lineCap = 'round';
+  for (var i = 0; i < RN.drips.length; i++) {
+    var d = RN.drips[i];
+    if (d.layer !== layer) continue;
+    var len = Math.max(1.2, d.vy * 0.035);
+    c.globalAlpha = 0.85 * Math.min(1, (d.yEnd - d.y) / 4 + 0.25);
+    c.lineWidth = Math.max(0.8, 0.006 * d.u);
+    c.beginPath(); c.moveTo(d.x, d.y - len); c.lineTo(d.x, d.y); c.stroke();
+  }
+  c.globalAlpha = 1;
+  c.lineCap = 'butt';
+}
+/* Over the headland's picture (and under its mist): the rain on the roofs. */
+function rainDrawRoofs(c, t) {
+  if (!RN.lvl && !RN.sp.length && !RN.drips.length) return;
+  if (RN.lvl > 0) {
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    for (var i = 0; i < RN_ROOF.length; i++) {
+      var R = RN_ROOF[i];
+      c.globalAlpha = RAIN_SCENE.roofMist * RN.lvl * (0.8 + 0.2 * Math.sin(t * 7.3 + i * 2) * Math.sin(t * 3.1 + i));
+      c.globalCompositeOperation = 'screen';
+      c.drawImage(R.mist, R.x0, R.y0, R.w, R.h);
+      c.globalCompositeOperation = 'source-over';
+    }
+    c.globalAlpha = 1;
+  }
+  rainDrawSplashes(c, 'r');
+  rainDrawDrips(c, 'r');
+}
+
+/* ---------- the torii ---------- */
+/* In the gates' bake: the top beam of every gate big enough to show the rain (its front top edge end to end, as
+   torPerchLine, and where its ends are). Which parts of it can be seen is looked up afterwards, a gate a frame,
+   in the finished picture of the gates (rainToriiCheck). */
+function rainToriiCapture(gates) {
+  var h = TORII.gateHeight, half = TORII.width * h / 2, r = TORII.pillar * h / 2, sori = TORII.sori * h;
+  var kTop = h - sori, pTop = kTop - 0.065 * h - 0.05 * h;
+  var kL = half - Math.tan(TORII.lean * PI / 180) * pTop + TORII.overhang * h, dd = r * 1.25;
+  TOR.rain = [];
+  gates.forEach(function (g) {
+    if (g.px < 16) return;
+    var pts = [];
+    for (var i = 0; i <= 32; i++) {
+      var uu = lerp(-kL, kL, i / 32), x = Math.abs(uu) / kL, y = kTop + sori * x * x * (0.6 + 0.4 * x);
+      pts.push(torScreen(g.x + g.ax * uu + g.tx * dd, y, g.z + g.az * uu + g.tz * dd));
+    }
+    TOR.rain.push({ pts: pts, u: g.px / h, foot: g.foot, beam: 0.065 * g.px, vis: null });
+  });
+  RN.gate = 0; RN.gateBake++;
+}
+/* One gate a frame: which points along its top show its black cap (not a nearer gate's red pillar or beam). */
+function rainToriiCheck() {
+  if (!TOR.ready || !TOR.rain || RN.gate >= TOR.rain.length || TOR.gate.cnv.width < 2) return;
+  var G = TOR.rain[RN.gate++];
+  try {
+    var xs = G.pts.map(function (p) { return p[0]; }), ys = G.pts.map(function (p) { return p[1]; });
+    var x0 = Math.max(0, Math.floor(Math.min.apply(null, xs))), x1 = Math.min(W, Math.ceil(Math.max.apply(null, xs)));
+    var y0 = Math.floor(Math.min.apply(null, ys)), y1 = Math.ceil(Math.max.apply(null, ys)) + 3;
+    var gx = Math.round(x0 * PR), gy = Math.round((y0 - TOR.gateTop) * PR), gw = Math.round((x1 - x0) * PR), gh = Math.round((y1 - y0) * PR);
+    G.vis = [];
+    if (gw < 1 || gh < 1 || gy < 0) return;
+    var d = rainRead(TOR.gate.cnv, gx, gy, gw, gh);
+    for (var i = 0; i <= 32; i++) {
+      var p = G.pts[i], px = Math.round((p[0] - x0) * PR), py = Math.round((p[1] + Math.max(1.2, G.beam * 0.3) - y0) * PR);
+      if (px < 0 || py < 0 || px >= gw || py >= gh) continue;
+      var o = (py * gw + px) * 4, R = d[o], Gc = d[o + 1], A = d[o + 3];
+      if (A > 200 && R - Gc < Math.max(40, R * 0.3)) G.vis.push(i);      // the black cap, not the vermilion of another gate
+    }
+  } catch (e) { G.vis = []; }
+}
+function rainSpawnTorii(dt) {
+  if (!TOR.rain) return;
+  rainToriiCheck();
+  TOR.rain.forEach(function (G) {
+    if (!G.vis || !G.vis.length) return;
+    var len = Math.hypot(G.pts[32][0] - G.pts[0][0], G.pts[32][1] - G.pts[0][1]) * G.vis.length / 33;
+    var want = RAIN_SCENE.toriiRate * RN.lvl * dt * len, n = Math.floor(want) + (Math.random() < want % 1 ? 1 : 0);
+    for (var i = 0; i < n; i++) {
+      var k = G.vis[Math.floor(Math.random() * G.vis.length)], s = Math.random();
+      var a = G.pts[k], b = G.pts[Math.min(32, k + 1)];
+      rainSplash(lerp(a[0], b[0], s), lerp(a[1], b[1], s), G.u, 't', false);
+    }
+    // the drips off the ends of the beam (and now and then along its underside)
+    var wd = RAIN_SCENE.toriiDrips * RN.lvl * dt, ends = [0, 32];
+    ends.forEach(function (e) {
+      if (G.vis.indexOf(e) < 0 && G.vis.indexOf(e ? 31 : 1) < 0) return;
+      if (Math.random() >= wd) return;
+      var p = G.pts[e];
+      RN.drips.push({ x: p[0] + (e ? -1 : 1) * 0.02 * G.u, y: p[1] + G.beam, vy: 0.05 * G.u, u: G.u, age: 0,
+                      yEnd: lerp(p[1] + G.beam, G.foot, rnd(0.55, 1)), layer: 't' });
+    });
+    if (Math.random() < wd * 0.6) {
+      var k2 = G.vis[Math.floor(Math.random() * G.vis.length)], p2 = G.pts[k2];
+      RN.drips.push({ x: p2[0], y: p2[1] + G.beam, vy: 0.05 * G.u, u: G.u, age: 0, yEnd: p2[1] + G.beam + 0.3 * G.u * rnd(0.6, 1.2), layer: 't' });
+    }
+  });
+}
+/* For checking in the console (DynBG.rainInfo()). */
+function rainInfo() {
+  var cnt = {};
+  RN.sp.forEach(function (sp) { cnt[sp.layer] = (cnt[sp.layer] || 0) + 1; });
+  return { level: +RN.lvl.toFixed(3), splashes: cnt, drips: RN.drips.length, groundMask: !!RN.gm, shoreMask: !!RN.fm,
+           roofs: RN_ROOF.map(function (R) { return { px: Math.round(R.n), eavePoints: R.drips.length / 3, u: Math.round(R.u) }; }),
+           gates: TOR.rain ? TOR.rain.map(function (G) { return G.vis ? G.vis.length : -1; }) : null };
+}
+function rainDrawTorii(c) {
+  if (!RN.lvl && !RN.sp.length && !RN.drips.length) return;
+  rainDrawSplashes(c, 't');
+  rainDrawDrips(c, 't');
+  c.setTransform(1, 0, 0, 1, 0, 0);
 }
 
 /* ============================================================
@@ -22509,6 +22995,7 @@ function dynStep(dt, t, want, skyWant) {
     if (hero.y > H + hero.size * 1.5 || hero.x < -400 || hero.x > W + 400) hero = null;
   }
   updateRain(dt);
+  rainSceneUpdate(dt, t);
   updateGlassRain(dt);
   updateSnow(dt, t);
   updateBirds(dt, t);
@@ -22768,6 +23255,7 @@ function rvBambooIn() { return !RV.started || InkReveal.clock() >= RV_MESSAGE_AT
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
          sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
          bankInfo: function() { return BankTrees.info(); },            // (for checking: how the bank trees are doing)
+         rainInfo: function() { return rainInfo(); },                  // (for checking: the rain on the scenery)
          hallDistance: lakeHallDistance,                                // (for the temple bell)
          rainy: function() { var c = S.condition; return c === 'rain' || c === 'drizzle' || c === 'thunderstorm'; } };   // (for the rain sound: ENV.rainy's test)
 

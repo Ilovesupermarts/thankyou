@@ -51,6 +51,8 @@
                            sharp the far waves stay, 1 = as a plain mipmap), far (0 … 1: how far
                            the waves still push the reflections far away) and shade (how much
                            each wave lightens or darkens the reflection). waveSize is not used then.
+          rain             (optional) 0 … 1: rain on the water, rings where the drops land; rainT
+                           its clock (s, 0 … 4096, wrapping), rainSky [r, g, b] the sky's light in them
      Water.fftState()           'ok', 'none' (no fftwaves.js, or the chip can't draw float pictures)
      Water.fftInfo()            { ms, rebuilt, size }: the time to submit a frame's FFT, and the last rebuild
    ============================================================ */
@@ -74,6 +76,8 @@ var FS = [
 'uniform vec2 uSize;            // the water on the screen (CSS px)',
 'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun, uFarK, uShade;',
 'uniform vec3 uWater, uSunCol, uSunDir;',
+'uniform float uRain, uRainT, uPx;   // rain: how hard (0 none … 1), its clock (s, wraps at RAIN_WRAP), CSS px per pixel drawn',
+'uniform vec3 uRainSky;              // the light of the sky the rain-roughened water shows',
 'in vec2 vUv;',
 'out vec4 outColor;',
 '// the slope of the water at p (eye heights on the ground): the normal map four times, each its own size and drift',
@@ -87,10 +91,59 @@ var FS = [
 '  n = n * 0.5 - 1.0;',
 '  return normalize(vec3(n.x * 1.5, n.z, n.y * 1.5));        // y is up',
 '}',
+'// RAIN ON THE WATER. Each raindrop that lands sends out a ring of small waves (two or three crests, the',
+'// short ones leading) that spreads at a walking pace and dies away in a second or two; the rings bend the',
+'// reflection like any wave. They are worked out on the water itself (eye heights), so they are ellipses in',
+'// perspective. Drops land in cells of a grid, one now and then in each, at a random spot and moment (the',
+'// same hash as rainDrops in app.js, which draws the little jets thrown up where the near ones land).',
+'uint rh(uint x) { x ^= x >> 16u; x *= 0x7feb352du; x ^= x >> 15u; x *= 0x846ca68bu; x ^= x >> 16u; return x; }',
+'float rh3(int a, int b, int c) { return float(rh(uint(a) * 1597334677u ^ rh(uint(b) * 3812015801u ^ rh(uint(c) + 0x9e3779b9u)))) / 4294967295.0; }',
+'// one size of drop: cs the cell, P the time between drops in a cell, v how fast the ring spreads, lam its',
+'// wavelength, life how fast it dies away. fx, fz: the water under one pixel, across and in depth. g: the slope',
+'// (d/dx, d/dz); blip: where a ring is too small to see as a ring, the fleck of light of its splash.',
+'void rainLayer(vec2 p, float fx, float fz, int L, float cs, float P, float v, float lam, float life, float dens, float reach, inout vec2 g, inout float blip) {',
+'  ivec2 c0 = ivec2(floor(p / cs));',
+'  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++) {',
+'    ivec2 c = c0 + ivec2(i, j);',
+'    // a cell whose drops all land further off than a ring reaches: nothing from it here',
+'    vec2 lo = (vec2(c) + 0.2) * cs, hi = (vec2(c) + 0.8) * cs;',
+'    vec2 gap = max(max(lo - p, p - hi), 0.0);',
+'    if (gap.x > reach + 2.0 * fx || gap.y > reach + 2.0 * fz) continue;',
+'    int cx = c.x + 32768, cz = c.y + 32768;',
+'    float N = max(1.0, floor(4096.0 / (P * (0.7 + 0.6 * rh3(cx, cz, L * 8 + 1))) + 0.5)), Pc = 4096.0 / N;',
+'    float tt = uRainT + rh3(cx, cz, L * 8 + 2) * Pc, n = floor(tt / Pc), age = tt - n * Pc;',
+'    int k = int(mod(n, N));',
+'    if (rh3(cx, cz, L * 8 + 3 + k * 64) > dens) continue;',
+'    vec2 ctr = (vec2(c) + 0.2 + 0.6 * vec2(rh3(cx, cz, L * 8 + 4 + k * 64), rh3(cx, cz, L * 8 + 5 + k * 64))) * cs;',
+'    float s = 0.55 + 0.9 * rh3(cx, cz, L * 8 + 6 + k * 64);',
+'    vec2 dv = p - ctr; float r = length(dv);',
+'    float env = exp(-age / (life * s)) * smoothstep(0.0, 0.05, age);',
+'    // the splash itself: a fleck of light, the first moments',
+'    vec2 q = dv / vec2(fx, fz);',
+'    blip += s * exp(-age / 0.12) * exp(-dot(q, q) / 2.0);',
+'    if (r < 1e-4 || env < 0.01) continue;',
+'    vec2 dir = dv / r;',
+'    float fr = length(dir * vec2(fx, fz));',
+'    // a ring too fine for the pixels is drawn as fine as they allow, and fainter',
+'    float lw = lam * s, lamE = max(lw, 3.6 * fr), w = lamE * 1.15;',
+'    float x = r - v * age * (0.8 + 0.4 * s);',
+'    if (abs(x) > 3.0 * w) continue;',
+'    float kk = 6.2831853 / lamE, ga = exp(-x * x / (w * w));',
+'    float dh = ga * (cos(kk * x) - 2.0 * x / (kk * w * w) * sin(kk * x));',
+'    g += dir * (0.9 * s * env * dh * sqrt(lw / lamE));',
+'  }',
+'}',
 'void main() {',
 '  float x = vUv.x * uSize.x, yIn = vUv.y * uSize.y, y = uTop + yIn;',
 '  float d = max(0.6, y - uHy), z = uF / d, wx = (x - uSize.x * 0.5) * z / uF;',
 '  vec3 n = waves(vec2(wx, z));',
+'  vec2 rg = vec2(0.0); float blip = 0.0;',
+'  if (uRain > 0.001) {',
+'    float fx = z / uF * uPx, fz = z * z / uF * uPx;',
+'    rainLayer(vec2(wx, z), fx, fz, 0, 0.8, 2.6, 0.28, 0.06, 0.55, 0.85 * uRain, 0.7, rg, blip);         // big drops',
+'    if (z < 16.0) rainLayer(vec2(wx, z), fx, fz, 1, 0.32, 1.3, 0.18, 0.035, 0.3, uRain, 0.28, rg, blip);   // small drops (further off, too small to see)',
+'    n = normalize(vec3(n.x - rg.x, n.y, n.z - rg.y));',
+'  }',
 '  vec3 V = normalize(vec3(-wx, 1.0, -z));                    // from the water toward the eye (at height 1)',
 '  float cosT = clamp(dot(V, n), 0.0, 1.0);',
 '  float fres = clamp((0.02 + 0.98 * pow(1.0 - cosT, 5.0)) * uReflect * 1.3, 0.0, 1.0);',
@@ -108,6 +161,15 @@ var FS = [
 '  vec3 Rr = reflect(-uSunDir, n);',
 '  float spec = pow(max(0.0, dot(Rr, V)), 180.0) * uSun;',
 '  col += uSunCol * spec;',
+'  if (uRain > 0.001) {',
+'    // a crest turned toward you shows the sky higher up (lighter), one turned away the water (darker);',
+'    // the splashes are flecks of the sky\'s light; and the whole surface, roughened, reflects a little less',
+'    // sharply, more so far away where the rings are too small to tell apart',
+'    float tilt = clamp(rg.y * 4.0 - rg.x * 0.6, -0.7, 1.0);',
+'    col = mix(col, tilt > 0.0 ? uRainSky : col * 0.7, abs(tilt) * 0.7);',
+'    col = mix(col, uRainSky, clamp(blip, 0.0, 1.0) * 0.75);',
+'    col = mix(col, uRainSky * 0.92 + body * 0.08, uRain * 0.16 * (1.0 - near));',
+'  }',
 '  outColor = vec4(col, 1.0);',
 '}'
 ].join('\n');
@@ -150,7 +212,7 @@ function setup() {
   texM = gl.createTexture(); texN = gl.createTexture();
   return true;
 }
-var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade'];
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky'];
 /* The simulated waves (fftwaves.js), made the first time a page asks for them. */
 function fftSetup() {
   if (fftSim) return true;
@@ -246,6 +308,9 @@ function render(o) {
   // toward the sun, from the water: across from where it is on the screen, up by its height above the eye line
   var sx = ((o.sunX || o.cssW / 2) - o.cssW / 2) / o.lens, sy = Math.max(0.02, (o.horizon - (o.sunY || 0)) / o.lens), sl = Math.hypot(sx, sy, 1);
   gl.uniform3f(u.uSunDir, sx / sl, sy / sl, 1 / sl);
+  gl.uniform1f(u.uRain, o.rain || 0); gl.uniform1f(u.uRainT, o.rainT || 0); gl.uniform1f(u.uPx, o.cssW / w);
+  var rs = o.rainSky || [200, 204, 212];
+  gl.uniform3f(u.uRainSky, rs[0] / 255, rs[1] / 255, rs[2] / 255);
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return cnv;
 }
