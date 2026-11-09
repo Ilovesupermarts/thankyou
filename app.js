@@ -19806,15 +19806,25 @@ function lakeFftParams() {
            detail: LAKE.fftDetail, far: LAKE.fftFar, shade: LAKE.fftShade };
 }
 function lakeShaderOn() { return LAKE.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
+/* How much of the sun's glitter the water shows: dimmed under a heavy cloud cover (from half covered to
+   overcast) and in rain (as the rain on the scene, RN.lvl, comes in), eased so it never jumps when the weather
+   is read again. */
+var LAKE_GLITTER = { k: 1, overcast: 0.85, rain: 0.9 };
+function lakeGlitter(dt) {
+  var cloud = clamp((S.cloudCover - 50) / 45, 0, 1);
+  var target = (1 - LAKE_GLITTER.overcast * cloud) * (1 - LAKE_GLITTER.rain * clamp(RN.lvl / 0.35, 0, 1));
+  LAKE_GLITTER.k += (target - LAKE_GLITTER.k) * (1 - Math.exp(-(dt || 0) / 3));
+  return LAKE_GLITTER.k;
+}
 /* The water, after the scenery and before the ground. */
 function lakeDrawWater(c, t, dt) {
   if (!LK.ready) return;
   var yf = lakeFarShoreY(), hh = H - yf, hy = H * LAND.horizon, F = torLens(), SR = LAND_SR, WPAD = LK.WPAD;
-  var T = lakeTimes(), wind = lakeWind();
+  var T = lakeTimes(), wind = lakeWind(), glit = lakeGlitter(dt);
   // on the graphics chip (water.js): the mirror rippled pixel by pixel by the waves of a normal map, its deep colour
   // near you, the sun's sparkle; then what floats on it and the shallows
   if (lakeShaderOn()) {
-    var sunK = (1 - T.n) * lerp(1, 1.4, T.e) * LAKE.sparkle;
+    var sunK = (1 - T.n) * lerp(1, 1.4, T.e) * LAKE.sparkle * glit;
     var pic = Water.render({ w: W * PR * LAKE.waterRes, h: hh * PR * LAKE.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
                              time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)) * (1 - 0.45 * RN.lvl), waveSize: LAKE.waveSize,   // (rain calms the small waves)
                              reflect: LAKE.reflect, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
@@ -19867,12 +19877,12 @@ function lakeDrawWater(c, t, dt) {
     c.drawImage(LK.WSTAT.cnv, -WPAD * PR, yf * PR, (W + WPAD * 2) * PR, hh * PR);
   }
   var day = 1 - T.n;
-  if (LAKE.glint > 0 && day > 0.05 && LK.GLN.cnv.width > 1) {
+  if (LAKE.glint > 0 && day * glit > 0.05 && LK.GLN.cnv.width > 1) {
     var sx = lakeSunX(), gw = W * 0.16;
     var tw = 0.65 + 0.35 * Math.sin(t * 2.3) * Math.sin(t * 3.7 + 1);
-    c.globalAlpha = LAKE.glint * tw * lerp(0.85, 1.15, T.e) * day;
+    c.globalAlpha = LAKE.glint * tw * lerp(0.85, 1.15, T.e) * day * glit;
     c.drawImage(LK.GLN.cnv, (sx - gw / 2) * PR, yf * PR, gw * PR, hh * PR);
-    c.globalAlpha = LAKE.glint * (1 - tw) * 0.8 * day;
+    c.globalAlpha = LAKE.glint * (1 - tw) * 0.8 * day * glit;
     c.drawImage(LK.GLN.cnv, (sx - gw / 2 + 2) * PR, (yf + 1) * PR, gw * PR, hh * PR);
   }
   c.globalAlpha = 1;
