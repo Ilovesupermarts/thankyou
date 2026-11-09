@@ -19966,7 +19966,9 @@ var RAIN_SCENE = {
   eaveDrips: 2.5,       // drips a second from each 10 px of eave
   toriiRate: 0.7,       // splashes a second for each px of beam top
   toriiDrips: 4,        // drips a second from each end of a beam
-  farSplash: 90,        // far away a splash is drawn as big as at this many px to an eye height, or it could not be seen
+  farSplash: 60,        // a splash on a roof or a beam is drawn at least as big as at this many px to an eye height
+  nearPx: 170,          // px to an eye height at which a splash is at its full strength; further off it is fainter
+  farFaint: 0.15,       // and how faint it gets, at the furthest
   jetMaxZ: 30           // the lake's jets out to this far (eye heights)
 };
 var RN = { lvl: 0, t: 0, col: [220, 224, 232], colT: 0, sp: [], drips: [], maskAt: null, gm: null, fm: null, gate: 0, gateBake: -1 };
@@ -20057,23 +20059,23 @@ function rainDrawLake(c, rings) {
         // top and falling back; and the little dark dimple of the crater for a moment
         var a = D.age, hJ = 0.07 * D.s * (L ? 0.6 : 1) * u;
         if (a > 0.42 || hJ < 0.8) continue;
-        var w = Math.max(0.7, 0.008 * D.s * u);
+        var w = Math.max(0.7, 0.008 * D.s * u), nk = rainNearK(u);
         if (a < 0.06) {
-          c.globalAlpha = 0.5 * (1 - a / 0.06);
+          c.globalAlpha = 0.5 * (1 - a / 0.06) * nk;
           c.fillStyle = dark;
           c.fillRect(sx - w * 2, sy - 0.4, w * 4, Math.max(0.8, w * 0.8));
           c.fillStyle = css;
         }
         if (a < 0.16) {                            // the column rises
           var hc = hJ * Math.sin(a / 0.16 * PI / 2);
-          c.globalAlpha = 0.75;
+          c.globalAlpha = 0.75 * nk;
           c.fillRect(sx - w / 2, sy - hc, w, hc);
         } else {                                   // it sinks back; the droplet flies up a little further and falls
           var k = (a - 0.16) / 0.26, hc2 = hJ * (1 - k) * 0.8;
-          c.globalAlpha = 0.6 * (1 - k * 0.5);
+          c.globalAlpha = 0.6 * (1 - k * 0.5) * nk;
           if (hc2 > 0.4) c.fillRect(sx - w / 2, sy - hc2, w, hc2);
           var dy = hJ * (1.15 + 1.2 * k - 2.35 * k * k);
-          if (dy > 0) { c.globalAlpha = 0.85; c.fillRect(sx - w * 0.7, sy - dy - w * 0.7, w * 1.4, w * 1.4); }
+          if (dy > 0) { c.globalAlpha = 0.85 * nk; c.fillRect(sx - w * 0.7, sy - dy - w * 0.7, w * 1.4, w * 1.4); }
         }
       }
     }
@@ -20110,16 +20112,18 @@ function rainOnMask(M, x, y) {
 
 /* ---------- splashes (the ground, the roofs, the torii) ---------- */
 /* A drop bursting at (x, y), u px to an eye height there: a few droplets thrown out and up, falling back. */
+/* How strongly a splash shows, by its distance (u: px to an eye height there): full near you, fainter far off. */
+function rainNearK(u) { return clamp(Math.pow(u / RAIN_SCENE.nearPx, 0.9), RAIN_SCENE.farFaint, 1); }
 function rainSplash(x, y, u, layer, big) {
-  var n = 3 + Math.floor(Math.random() * (big ? 5 : 3)), dr = [];
-  u = Math.max(u, RAIN_SCENE.farSplash * (big ? 0.5 : 1));
+  var n = 3 + Math.floor(Math.random() * (big ? 5 : 3)), dr = [], k = rainNearK(u);
+  if (!big) u = Math.max(u, RAIN_SCENE.farSplash);
   for (var i = 0; i < n; i++) {
     var a = Math.random() * TAU, hs = rnd(0.3, 0.9) * (big ? 1 : 0.7), vy = rnd(0.35, 1.0) * (big ? 1 : 0.6);
     dr.push({ vx: Math.cos(a) * hs, vz: Math.sin(a) * hs, vy: vy, t1: 2 * vy / 6.1 });
   }
   var life = 0;
   for (var j = 0; j < n; j++) life = Math.max(life, dr[j].t1);
-  RN.sp.push({ x: x, y: y, u: u, dr: dr, age: 0, life: Math.max(0.12, life), layer: layer });
+  RN.sp.push({ x: x, y: y, u: u, k: k, dr: dr, age: 0, life: Math.max(0.12, life), layer: layer });
 }
 function rainSpawnGround(dt) {
   var hy = H * LAND.horizon, F = torLens(), want = RAIN_SCENE.groundRate * RN.lvl * dt;
@@ -20129,6 +20133,7 @@ function rainSpawnGround(dt) {
     var onF = rainOnMask(RN.fm, x, y), onG = !onF && rainOnMask(RN.gm, x, y);
     if (!onF && !onG) continue;
     i++;
+    if (Math.random() > 0.3 + 0.7 * rainNearK(y - hy)) continue;     // fewer far off
     rainSplash(x, y, y - hy, onF ? 'f' : 'g', true);
   }
 }
@@ -20144,13 +20149,13 @@ function rainDrawSplashes(c, layer) {
     // the crown the drop throws up as it bursts (a ring of short jets, open upward), then a puff of spray
     if (t < 0.07) {
       var k0 = t / 0.07, cr = (0.012 + 0.03 * k0) * u, ch = 0.035 * u * Math.sin(k0 * PI);
-      c.globalAlpha = 0.75 * (1 - k0 * 0.6);
+      c.globalAlpha = 0.75 * (1 - k0 * 0.6) * sp.k;
       var cw = Math.max(0.6, 0.006 * u);
       for (var q = -2; q <= 2; q++) c.fillRect(sp.x + q * cr / 2 - cw / 2 + q * 0.4 * ch / 2, sp.y - ch * (1 - Math.abs(q) * 0.25), cw, ch * (1 - Math.abs(q) * 0.25));
     }
     var pr = (0.015 + 0.04 * t / sp.life) * u;
     if (t < 0.16 && pr > 0.4) {
-      c.globalAlpha = 0.35 * (1 - t / 0.16);
+      c.globalAlpha = 0.35 * (1 - t / 0.16) * sp.k;
       c.fillRect(sp.x - pr, sp.y - pr * 0.5, pr * 2, pr * 0.7);
     }
     var w = Math.max(0.7, 0.01 * u);
@@ -20158,7 +20163,7 @@ function rainDrawSplashes(c, layer) {
       var d = sp.dr[j];
       if (t > d.t1) continue;
       var x = sp.x + d.vx * t * u, y = sp.y - (d.vy * t - 3.05 * t * t) * u - d.vz * t * u * u / F;
-      c.globalAlpha = 0.85 * Math.min(1, fade + 0.4);
+      c.globalAlpha = 0.85 * Math.min(1, fade + 0.4) * sp.k;
       c.fillRect(x - w / 2, y - w / 2, w, w * 1.6);
     }
   }
@@ -20295,7 +20300,7 @@ function rainDrawDrips(c, layer) {
     var d = RN.drips[i];
     if (d.layer !== layer) continue;
     var len = Math.max(1.2, d.vy * 0.035);
-    c.globalAlpha = 0.85 * Math.min(1, (d.yEnd - d.y) / 4 + 0.25);
+    c.globalAlpha = 0.85 * Math.min(1, (d.yEnd - d.y) / 4 + 0.25) * Math.max(0.35, rainNearK(d.u));
     c.lineWidth = Math.max(0.8, 0.006 * d.u);
     c.beginPath(); c.moveTo(d.x, d.y - len); c.lineTo(d.x, d.y); c.stroke();
   }
