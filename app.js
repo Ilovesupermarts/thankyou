@@ -17950,9 +17950,10 @@ var LAKE = {
   // or darkens the reflection
   fft: true, fftWind: 1, fftDir: 120, fftFetch: 1340, fftSpread: 0.53, fftEye: 0.9, fftHeight: 0.94, fftChop: 0.85,
   fftL0: 132, fftL1: 16.5, fftSize: 256, fftDetail: 0.28, fftFar: 0.28, fftShade: 0.47,
-  // shoreReflect: how strongly the water mirrors the far shore, the headland and the torii (by the true angle: far
-  // away almost a mirror, near you much less; on the graphics chip only), where reflect is for the sky and the mountains
-  shoreReflect: 0.9,
+  // mirror: how strongly the water mirrors everything (the sky, the mountains, the shores, the headland, the torii), by
+  // the true angle as real water does: far away almost a mirror, near you mostly its own deep colour (on the graphics
+  // chip; 0 = the older damped mirror, set by reflect, which the 2D water still uses)
+  mirror: 0.9,
   // how strongly the lit stone lanterns' light shows mirrored in the water at night (lakeDrawLightRefl; times the
   // water's Fresnel there, so never brighter than the lantern itself)
   lightReflect: 1.3,
@@ -18001,7 +18002,6 @@ var LK = {
   FORE: landCanvas(), foreTop: 0,                                   // the near shore in front of the gates: lilies, rocks, the susuki
   LANDM: landCanvas(),                                              // the land (white), the size of the ground picture
   WATERB: landCanvas(), WATERC: landCanvas(), WSTAT: landCanvas(), WMIR: landCanvas(), WPAD: 10,
-  WSHB: landCanvas(), WSH: landCanvas(),                            // where the mirror shows the shores and the headland (+ the torii): water.js's setShore
   waterRows: 0, ready: false
 };
 var lakeWaterInit = false;
@@ -19163,17 +19163,12 @@ function lakeBakeWater() {
   // the mirrored picture: crisp, as on still water (each frame's rippling breaks it up, see lakeDrawWater)
   s.setTransform(SR, 0, 0, -SR, X0, (2 * hy - yf) * SR);
   s.drawImage(LS.MTN.cnv, 0, 0, W, H);
-  // the far shore and the headland are drawn on a layer of their own first (WSHB), then laid on the mirror: its
-  // opacity tells the water where the shores are, which it mirrors as strongly as the angle allows (water.js)
-  var SB = LK.WSHB; SB.cnv.width = LK.WATERB.cnv.width; SB.cnv.height = LK.WATERB.cnv.height;
-  SB.c.setTransform(SR, 0, 0, -SR, X0, yf * SR);
-  lakeFarShore(SB.c);
+  s.setTransform(SR, 0, 0, -SR, X0, yf * SR);
+  lakeFarShore(s);
   if (LK.headBoxN && LAKE.headland) {
-    SB.c.setTransform(1, 0, 0, -1, X0, (2 * LK.headAxis - yf) * SR);
-    SB.c.drawImage(LK.HEADN.cnv, LK.headBoxN.x0 * SR, LK.headBoxN.y0 * SR);
+    s.setTransform(1, 0, 0, -1, X0, (2 * LK.headAxis - yf) * SR);
+    s.drawImage(LK.HEADN.cnv, LK.headBoxN.x0 * SR, LK.headBoxN.y0 * SR);
   }
-  s.setTransform(1, 0, 0, 1, 0, 0);
-  s.drawImage(SB.cnv, 0, 0);
   // the still things on the water (WSTAT): they float on it, so they are not broken up by the ripples
   LK.WSTAT.cnv.width = LK.WATERB.cnv.width; LK.WSTAT.cnv.height = LK.WATERB.cnv.height;
   s = LK.WSTAT.c;
@@ -19279,12 +19274,6 @@ function lakeComposeWater() {
   LK.WMIR.cnv.width = WC.cnv.width; LK.WMIR.cnv.height = WC.cnv.height;
   LK.WMIR.c.drawImage(WC.cnv, 0, 0);
   if (typeof Water !== 'undefined') Water.setMirror(LK.WMIR.cnv);
-  // where it shows the shores, the headland and the torii (with their lanterns), for the water to mirror them strongly
-  var SH = LK.WSH; SH.cnv.width = WC.cnv.width; SH.cnv.height = WC.cnv.height;
-  if (LK.WSHB.cnv.width === WC.cnv.width && LK.WSHB.cnv.height === WC.cnv.height) SH.c.drawImage(LK.WSHB.cnv, 0, 0);
-  if (TOR.refl.cnv.width > 2) SH.c.drawImage(TOR.refl.cnv, WPAD * SR, (TOR.reflTop - yf) * SR, TOR.refl.cnv.width * SR / PR, TOR.refl.cnv.height * SR / PR);
-  if (typeof Water !== 'undefined' && Water.setShore) Water.setShore(SH.cnv);
-  SH.cnv.width = SH.cnv.height = 1;                // (uploaded: let go)
   // the water's own colour: a mirror seen at a glancing angle far away, its deep colour more and more as you look
   // down into it near you (Fresnel); everything mirrored in it a little darker and bluer
   var hy = H * LAND.horizon, wc = lakeWaterCol(), hh = H - yf, cw = c.canvas.width, ch = c.canvas.height;
@@ -19717,7 +19706,7 @@ function lakeDrawWater(c, t, dt) {
     var sunK = (1 - T.n) * lerp(1, 1.4, T.e) * LAKE.sparkle * glit;
     var pic = Water.render({ w: W * PR * LAKE.waterRes, h: hh * PR * LAKE.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
                              time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)) * (1 - 0.45 * RN.lvl), waveSize: LAKE.waveSize,   // (rain calms the small waves)
-                             reflect: LAKE.reflect, shore: LAKE.shoreReflect, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
+                             reflect: LAKE.reflect, mirror: LAKE.mirror, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
                              sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e), fft: lakeFftParams(),
                              rain: RN.lvl, rainT: RN.t, rainSky: RN.col });
     if (pic) {
@@ -19784,7 +19773,7 @@ function lakeDrawWater(c, t, dt) {
 /* The lit lanterns' light mirrored in the water: under each one, where its light is seen turned over at the water,
    a soft column of light drawn out downward (the ripples stretch a light on water into a streak), made of a few
    short bright dashes that shimmer and break up as the waves move, flickering with its flame. As bright as the
-   water mirrors at that spot (the same Fresnel as the shore's reflections in water.js: strong far away, weak near
+   water mirrors at that spot (the same Fresnel as the water's mirror in water.js: strong far away, weak near
    you). It is drawn with the water, under the land, so it shows only on the water. Where each reflection falls,
    whether it is on the water and how strongly it is mirrored are worked out once per bake (torLanterns is made
    afresh each bake). LAKE.lightReflect: how strong. */
@@ -19796,7 +19785,7 @@ function lakeLightReflSpot(Lp, yf) {
   for (var q = 0; q < 3 && !wet; q++) { var yy = rp[1] + r * 0.6 * q; if (yy < H && !lakeInLand(rp[0], yy)) wet = true; }
   if (!wet) return null;
   var z = F / Math.max(0.6, rp[1] - hy), wx = (rp[0] - W / 2) * z / F, cosT = 1 / Math.sqrt(wx * wx + 1 + z * z);
-  var fres = clamp((0.02 + 0.98 * Math.pow(1 - cosT, 5)) * LAKE.shoreReflect, 0, 1);
+  var fres = clamp((0.02 + 0.98 * Math.pow(1 - cosT, 5)) * (LAKE.mirror || LAKE.reflect * 1.3), 0, 1);
   return { x: rp[0], y: rp[1], r: r, k: fres * (1 - Lp.haze * 0.6), n: clamp(Math.round(r / 8), 1, 5) };   // (fewer dashes the smaller it is: a far one is a single fleck)
 }
 function lakeDrawLightRefl(c, t) {
