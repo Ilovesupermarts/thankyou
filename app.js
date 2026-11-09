@@ -1367,6 +1367,7 @@ var STREAM_SOUND_URL = 'Sound/alex_jauk-calm-zen-river-flowing-228223.mp3';
 var BAMBOO_URL = 'Sound/morning/Windbamboo.mp3';
 var CHIRP_URL = 'Sound/Chirping2.mp3';
 var BELL_URL = 'Sound/668647__tec_studio__temple_bell_002.mp3';
+var RAIN_URL = 'Sound/rain-loop.mp3';
 
 /* ============ TRACK METADATA (4 PHASES) ============
    Four Nagoya time phases, the page colour theme's own
@@ -2264,6 +2265,10 @@ function initSound() {
       if (buf) soundBuffers.bell = buf;
     });
 
+    loadAudioBuffer(RAIN_URL).then(function(buf) {
+      if (buf) soundBuffers.rain = makeRainLoop(buf, RAIN_CROSSFADE);
+    });
+
     /* AMBIENT BEDS: three raw MP3s download in parallel, but only
        the current Nagoya phase decodes. The other two sit in
        _ambientRawBuffers until their boundary arrives or the
@@ -2692,6 +2697,7 @@ function startAmbient() {
   _ambientBufferRetries = 0;
   bambooStart();
   bellStart();
+  rainStart();
   ambientTimer = setTimeout(function() {
     ambientTimer = null;
     var playMs = playAmbientSound();
@@ -2719,6 +2725,7 @@ function scheduleNextAmbient(prevPlayMs) {
 
 function stopAmbient() {
   bambooStop();
+  rainStop();
   bellStop();
   chirpStop();
   stopSwellLoop();
@@ -3597,6 +3604,151 @@ function bambooGust(strength) {
   if (strength < 1 || !_bambooOn || _bambooSrc || _chirpBusy() || !_bambooPhaseOk()) return;
   if (_bambooTimer) { clearTimeout(_bambooTimer); _bambooTimer = null; }
   _bambooPlay();
+}
+
+/* ============ RAIN ============
+   While the weather is rain (rain, drizzle or a thunderstorm: the same test
+   as the scene's rain, DynBG.rainy), the sound of rain on a lake plays under
+   the music, round and round with no break. When the rain stops, it fades
+   out softly (RAIN_FADE_OUT); when it starts, it fades in (RAIN_FADE_IN).
+
+   The recording (Sound/572429__trp__180723-rain-on-water-lake-modulating-
+   light-to-med-cottage-ontario.mp3, 5 min 49 s) begins as very light rain,
+   swells and eases, and fades out over its last few seconds. Sound/rain-
+   loop.mp3 is the steady stretch from 4:14 to 5:44 cut out of it (90 s,
+   before the fade, with the same loudness and tone at both ends: within
+   about 2 dB in every band). makeRainLoop crossfades its end into its start
+   over RAIN_CROSSFADE seconds (equal power, as two takes of rain are
+   unrelated noise), so the loop has no seam and no dip.
+
+   Level: the loop is about -31.8 LUFS. It is set RAIN_UNDER_DB under the
+   music of the phase (the songs' median loudness, RAIN_MUSIC_LUFS), so it
+   is heard but never over the music; it follows the phase as the hour
+   turns. Like the wind in the bamboo it is nature, not music: it does not go
+   through ambientBus, so the music's mute and pause buttons leave it alone.
+   It runs while the ambient music does (startAmbient / stopAmbient). */
+var RAIN_CROSSFADE = 6;            // seconds, the loop's join
+var RAIN_FADE_IN = 4;              // seconds, when the rain starts
+var RAIN_FADE_OUT = 10;            // seconds, when the rain stops
+var RAIN_LEAVE_FADE = 1;           // seconds, back at the start screen
+var RAIN_FILE_LUFS = -31.8;
+var RAIN_UNDER_DB = 12;            // how far under the music
+var RAIN_MUSIC_LUFS = { morning: -20.8, day: -20.8, evening: -18.3, night: -14.2 };   // (the day plays the morning songs)
+var RAIN_TICK_MS = 1000;
+
+var _rainOn = false;
+var _rainTimer = null;
+var _rainSrc = null;
+var _rainGain = null;
+var _rainLevel = 0;                // the level now aimed at (0 while fading out)
+var _rainStopTimer = null;
+
+/* The buffer, less a little at each end (the MP3's own padding), with its
+   last crossfadeSec seconds laid over its start, equal power. */
+function makeRainLoop(buffer, crossfadeSec) {
+  var sr = buffer.sampleRate;
+  var trim = Math.floor(sr * 0.1);
+  var fade = Math.floor(sr * crossfadeSec);
+  var usable = buffer.length - trim * 2;
+  if (usable <= fade * 2) return buffer;
+  var len = usable - fade;
+  var out = soundAudioCtx.createBuffer(buffer.numberOfChannels, len, sr);
+  for (var ch = 0; ch < buffer.numberOfChannels; ch++) {
+    var src = buffer.getChannelData(ch).subarray(trim, trim + usable);
+    var dst = out.getChannelData(ch);
+    dst.set(src.subarray(0, len));
+    for (var j = 0; j < fade; j++) {
+      var a = (j / fade) * Math.PI / 2;
+      dst[j] = src[j] * Math.sin(a) + src[len + j] * Math.cos(a);
+    }
+  }
+  return out;
+}
+
+function _rainTarget() {
+  var music = RAIN_MUSIC_LUFS[getTimeOfDayInNagoya()];
+  if (typeof music !== 'number') music = RAIN_MUSIC_LUFS.morning;
+  return Math.pow(10, (music - RAIN_UNDER_DB - RAIN_FILE_LUFS) / 20);
+}
+
+function _rainIsRaining() {
+  try { return typeof DynBG !== 'undefined' && !!DynBG && typeof DynBG.rainy === 'function' && DynBG.rainy(); }
+  catch (e) { return false; }
+}
+
+function _rainTick() {
+  if (!_rainOn) return;
+  if (!SOUND_ENABLED || !soundReady || !soundAudioCtx) return;
+  var now = soundAudioCtx.currentTime;
+  if (_rainIsRaining()) {
+    var level = _rainTarget();
+    if (!_rainSrc) {
+      var buf = soundBuffers.rain;
+      if (!buf) return;
+      var src = soundAudioCtx.createBufferSource();
+      src.buffer = buf;
+      src.loop = true;
+      var gain = soundAudioCtx.createGain();
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(level, now + RAIN_FADE_IN);
+      src.connect(gain);
+      gain.connect(soundMasterGain);
+      /* Somewhere in the loop, so it is not always the same rain that begins. */
+      src.start(now, Math.random() * buf.duration);
+      _rainSrc = src;
+      _rainGain = gain;
+      _rainLevel = level;
+    } else if (_rainLevel === 0) {
+      /* The rain came back while it was fading out: bring it up again. */
+      if (_rainStopTimer) { clearTimeout(_rainStopTimer); _rainStopTimer = null; }
+      _rainGain.gain.cancelScheduledValues(now);
+      _rainGain.gain.setValueAtTime(_rainGain.gain.value, now);
+      _rainGain.gain.linearRampToValueAtTime(level, now + RAIN_FADE_IN);
+      _rainLevel = level;
+    } else if (Math.abs(level - _rainLevel) > 0.001) {
+      /* A new phase of the day: ease to its level. */
+      _rainGain.gain.cancelScheduledValues(now);
+      _rainGain.gain.setValueAtTime(_rainGain.gain.value, now);
+      _rainGain.gain.linearRampToValueAtTime(level, now + RAIN_FADE_IN);
+      _rainLevel = level;
+    }
+  } else if (_rainSrc && _rainLevel !== 0) {
+    _rainFade(RAIN_FADE_OUT);
+  }
+}
+
+/* Fade the rain out over sec seconds, from wherever it is, and then stop it. */
+function _rainFade(sec) {
+  if (!_rainSrc || !_rainGain || !soundAudioCtx) return;
+  var src = _rainSrc, gain = _rainGain;
+  _rainLevel = 0;
+  try {
+    var now = soundAudioCtx.currentTime;
+    gain.gain.cancelScheduledValues(now);
+    gain.gain.setValueAtTime(gain.gain.value, now);
+    gain.gain.linearRampToValueAtTime(0, now + sec);
+  } catch (e) { /* silent */ }
+  if (_rainStopTimer) clearTimeout(_rainStopTimer);
+  _rainStopTimer = setTimeout(function() {
+    _rainStopTimer = null;
+    try { src.stop(); } catch (e) {}
+    try { gain.disconnect(); } catch (e) {}
+    if (_rainSrc === src) { _rainSrc = null; _rainGain = null; }
+  }, (sec + 0.2) * 1000);
+}
+
+function rainStart() {
+  rainStop();
+  if (!SOUND_ENABLED) return;
+  _rainOn = true;
+  _rainTick();
+  _rainTimer = setInterval(_rainTick, RAIN_TICK_MS);
+}
+
+function rainStop() {
+  _rainOn = false;
+  if (_rainTimer) { clearInterval(_rainTimer); _rainTimer = null; }
+  if (_rainSrc && _rainLevel !== 0) _rainFade(RAIN_LEAVE_FADE);
 }
 
 /* ============ BIRDS CHIRPING ============
@@ -22616,7 +22768,8 @@ function rvBambooIn() { return !RV.started || InkReveal.clock() >= RV_MESSAGE_AT
 return { onWeather: onWeather, furinGust: furinGust, sceneShown: function() { return rvBambooIn() ? dynMaster : 0; }, sceneBusy: function() { return !rvBambooIn(); },
          sceneReady: dynSceneReady, setupProgress: dynSetupProgress,
          bankInfo: function() { return BankTrees.info(); },            // (for checking: how the bank trees are doing)
-         hallDistance: lakeHallDistance };                              // (for the temple bell)
+         hallDistance: lakeHallDistance,                                // (for the temple bell)
+         rainy: function() { var c = S.condition; return c === 'rain' || c === 'drizzle' || c === 'thunderstorm'; } };   // (for the rain sound: ENV.rainy's test)
 
 })();
 
