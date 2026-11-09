@@ -11649,7 +11649,7 @@ tyReceiptBtn.addEventListener('click', function(e) {
    and moon over Nagoya; weather from the app's own Open-Meteo request
    (wind, rain, cloud, fog, snow); kōyō trees and an autumn landscape in
    the autumn theme (8b, 8c) and a snowy landscape with plum branches in
-   the winter theme (8d); and a cricket and fireflies
+   the winter theme (8d); and fireflies
    that land on the message text. It was tuned on dynamic.html and the
    values there are the ones baked into S below.
    Wrapped in a function so none of its names can clash with the app's.
@@ -11741,7 +11741,7 @@ var S = {
   tree: true, treeSize: 0.82, treeSway: 1, treeOpacity: 0.5,
   frontLeaves: 20, frontLeafOpacity: 1, frontLeafMinZ: 0.8, nearShare: 0.2, snowFront: 0.25,
   heroLeaf: true, heroEvery: 3, pile: true, pileMax: 60,
-  cricket: true, insectSize: 1, tapWind: true, tapStrength: 1,
+  insectSize: 1, tapWind: true, tapStrength: 1,
   renderScale: 0.75
 };
 
@@ -14533,7 +14533,7 @@ function freeGlyphFor(t) {
   return null;
 }
 function updateSpecks(dt, t) {
-  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk')) ? 24 : 0;
+  var target = (S.nightSpecks && (ENV.phase === 'night' || ENV.phase === 'dusk') && S.hour >= 22) ? 24 : 0;   // only after the fireworks end (10pm)
   while (specks.length < target) specks.push({ x: Math.random() * W, y: Math.random() * H, s: Math.random() * 1000, r: rnd(5, 11), state: 'drift' });
   if (specks.length > target) specks.length = target;
   var landed = 0;
@@ -15978,8 +15978,7 @@ function drawTree(ctx, t) {
 }
 
 /* ============================================================
-   8c. VISITORS — a cricket at night (the red dragonfly was removed).
-       It perches on the characters of the message text.
+   8c. VISITORS — the message text's characters, where the fireflies perch.
    ============================================================ */
 var _glyphsReadyAt = 0;   // characters are still sliding in until this time
 function glyphSpots() {
@@ -16033,139 +16032,6 @@ function insectsLeaveText() {
   for (var i = 0; i < specks.length; i++) {
     if (specks[i].state !== 'drift') { specks[i].state = 'drift'; specks[i].target = null; }
   }
-  if (cricket) {
-    cricket.seq = cricket.seq.filter(function(sp) { return !sp.glyph; });
-    if (cricket.state === 'rest') cricket.rest = Math.min(cricket.rest, 0.3);
-  }
-}
-
-/* Cricket (コオロギ): hops from character to character, sometimes
-   chirps, then hops off the screen. */
-var cricket = null, cricketNext = 0;
-function sendCricket() {
-  var seq = [], last = null, n = 3 + Math.floor(Math.random() * 5);
-  for (var i = 0; i < n; i++) {
-    var p = pickPerch(last, true);     // crickets only use the text, never the tree
-    seq.push(p);
-    last = spotPos(p);
-  }
-  var fromLeft = Math.random() < 0.5;
-  cricket = { x: fromLeft ? -30 : W + 30, y: H * rnd(0.6, 0.9), seq: seq, i: 0, state: 'rest', rest: 0,
-              exiting: false, facing: fromLeft ? 1 : -1, t: 0, hop: null, cur: null, chirpT: 0, u: 0 };
-}
-function crHop(c, to) {
-  var tp = spotPos(to), dx = tp.x - c.x, dy = tp.y - c.y, dist = Math.sqrt(dx * dx + dy * dy);
-  c.hop = { fx: c.x, fy: c.y, to: to, t: 0, dur: 0.3 + dist / 1100, h: 30 + dist * 0.3 };
-  c.state = 'hop';
-  c.u = 0;
-  if (Math.abs(dx) > 2) c.facing = dx > 0 ? 1 : -1;
-}
-function updateCricket(dt, t) {
-  var night = ENV.phase === 'night' || ENV.phase === 'dusk';
-  if (!cricket && S.cricket && night && dynFrontMul > 0.5 && ENV.scene !== 'winter' && !(ENV.rainy && S.rainMm > 2) && S.condition !== 'snow' && t > cricketNext) {
-    if (cricketNext > 0) sendCricket();
-    cricketNext = t + rnd(60, 180);
-  }
-  var c = cricket;
-  if (!c) return;
-  c.t += dt;
-  if (c.state === 'rest') {
-    if (c.cur) { var p = spotPos(c.cur); c.x = p.x; c.y = p.y; }
-    c.rest -= dt;
-    if (c.chirpT > 0) c.chirpT -= dt;
-    else if (night && c.cur && Math.random() < dt * 0.6) c.chirpT = rnd(0.6, 1.4);
-    if (c.rest <= 0) {
-      c.chirpT = 0;
-      if (c.i < c.seq.length) crHop(c, c.seq[c.i++]);
-      else if (!c.exiting) { c.exiting = true; crHop(c, { x: c.x < W / 2 ? -60 : W + 60, y: c.y + rnd(-40, 80) }); }
-      else cricket = null;
-    }
-  } else {
-    var h = c.hop;
-    h.t += dt;
-    var u = Math.min(1, h.t / h.dur), tp = spotPos(h.to);
-    c.x = lerp(h.fx, tp.x, u);
-    c.y = lerp(h.fy, tp.y, u) - h.h * 4 * u * (1 - u);
-    c.u = u;
-    if (u >= 1) {
-      if (c.exiting) { cricket = null; return; }
-      c.state = 'rest';
-      c.cur = h.to;
-      c.rest = rnd(0.6, 2.2);
-    }
-  }
-}
-function drawCricket(ctx, t) {
-  var c = cricket;
-  if (!c) return;
-  var k = 1.15 * S.insectSize;
-  var hopping = c.state === 'hop', u = hopping ? c.u : 0;
-  ctx.save();
-  ctx.translate(c.x, c.y);
-  if (!hopping) {
-    ctx.fillStyle = 'rgba(40,25,20,0.18)';
-    ctx.beginPath(); ctx.ellipse(0, 1, 10 * k, 2.2 * k, 0, 0, TAU); ctx.fill();
-  }
-  ctx.scale(c.facing * k, k);
-  if (hopping) ctx.rotate(lerp(-0.5, 0.45, u));    // nose up on take-off, down for landing
-  // hind legs stretch out on take-off and fold again for landing
-  var ext = hopping ? Math.sin(Math.min(1, u * 3) * PI / 2) * (1 - smooth(0.6, 1, u)) : 0;
-  var knee = [lerp(-8, -12, ext), lerp(-12, -5, ext)], foot = [lerp(-13, -21, ext), lerp(0, -1, ext)];
-  ctx.lineCap = 'round';
-  // far hind leg
-  ctx.strokeStyle = '#6b5040';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath(); ctx.moveTo(0.5, -5); ctx.lineTo(knee[0] + 1.5, knee[1] + 0.5); ctx.stroke();
-  ctx.lineWidth = 0.9;
-  ctx.beginPath(); ctx.moveTo(knee[0] + 1.5, knee[1] + 0.5); ctx.lineTo(foot[0] + 1.5, foot[1]); ctx.stroke();
-  // front and middle legs
-  ctx.strokeStyle = '#3a2a20';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  if (hopping) { ctx.moveTo(6, -4); ctx.lineTo(9, -2); ctx.moveTo(2, -4); ctx.lineTo(1, -1.5); }
-  else { ctx.moveTo(6, -4); ctx.lineTo(8.5, 0); ctx.moveTo(2, -4); ctx.lineTo(0.5, 0); }
-  ctx.stroke();
-  // body
-  ctx.fillStyle = '#3a2a20';
-  ctx.beginPath(); ctx.ellipse(-2, -6, 8, 3.6, 0, 0, TAU); ctx.fill();
-  var chirping = c.chirpT > 0 && !hopping;
-  ctx.fillStyle = '#5a4330';
-  ctx.beginPath(); ctx.ellipse(-3, -7.6, 7, 2.6, chirping ? -0.12 + Math.sin(t * 40) * 0.06 : 0, 0, TAU); ctx.fill();
-  ctx.strokeStyle = 'rgba(200,170,120,0.25)';
-  ctx.lineWidth = 0.4;
-  ctx.beginPath(); ctx.moveTo(-9, -7.6); ctx.lineTo(3, -7.8); ctx.moveTo(-7, -6.4); ctx.lineTo(1, -8.8); ctx.stroke();
-  ctx.fillStyle = '#2e211a';
-  ctx.beginPath(); ctx.ellipse(4.5, -6.8, 3, 3, 0, 0, TAU); ctx.fill();
-  ctx.fillStyle = '#2a1d16';
-  ctx.beginPath(); ctx.arc(8.5, -6, 3, 0, TAU); ctx.fill();
-  ctx.fillStyle = 'rgba(210,180,130,0.8)';
-  ctx.beginPath(); ctx.arc(9.6, -6.8, 0.8, 0, TAU); ctx.fill();
-  // tail feelers (cerci) and long twitching antennae
-  ctx.strokeStyle = '#3a2a20';
-  ctx.lineWidth = 0.6;
-  var tw = Math.sin(t * 7) * 2 + Math.sin(t * 13 + 1);
-  ctx.beginPath();
-  ctx.moveTo(-10, -6); ctx.lineTo(-15, -8.5);
-  ctx.moveTo(-10, -5.5); ctx.lineTo(-15, -4.5);
-  ctx.moveTo(10.5, -8); ctx.quadraticCurveTo(17, -18, 26, -16 + tw);
-  ctx.moveTo(10, -8); ctx.quadraticCurveTo(14, -20, 22, -22 + tw * 0.7);
-  ctx.stroke();
-  // near hind leg: big jumping leg
-  ctx.strokeStyle = '#2e211a';
-  ctx.lineWidth = 2.6;
-  ctx.beginPath(); ctx.moveTo(-1, -5); ctx.lineTo(knee[0], knee[1]); ctx.stroke();
-  ctx.lineWidth = 1.1;
-  ctx.beginPath(); ctx.moveTo(knee[0], knee[1]); ctx.lineTo(foot[0], foot[1]); ctx.stroke();
-  // chirp: little sound arcs
-  if (chirping) {
-    for (var j = 0; j < 3; j++) {
-      var rr = 4 + j * 3 + (t * 12) % 3;
-      ctx.strokeStyle = 'rgba(120,90,60,' + (0.35 * (1 - j / 3)).toFixed(3) + ')';
-      ctx.lineWidth = 0.7;
-      ctx.beginPath(); ctx.arc(-4, -12, rr, -PI * 0.8, -PI * 0.2); ctx.stroke();
-    }
-  }
-  ctx.restore();
 }
 
 /* ============================================================
@@ -16992,7 +16858,7 @@ function drawLandscape(c, dt) {
    landscape is ready) and stops launching by day, letting the last shells finish. */
 function fireworksUpdate(dt, t) {
   if (!fwShow) return;
-  var on = ENV.scene === 'autumn' && LS.ready && ENV.light;
+  var on = ENV.scene === 'autumn' && LS.ready && ENV.light && S.hour >= 19 && S.hour < 22;   // the show runs 7pm to 10pm
   fwNight += ((on ? smooth(0.5, 0.9, koyoNight()) : 0) - fwNight) * (1 - Math.exp(-dt / 3));
   FIREWORKS.program = fwNight > 0.5 ? FW_PROGRAM : 'off';
   // the show's own clouds are night clouds (dark, lit by the moon and the bursts): none by day
@@ -22079,7 +21945,7 @@ function winDrawSparkles(c, t) {
                  text and the table scroll in behind them. The summary bar
                  (z 50) still covers it.
      #dynFront   full screen above the message text (z 10): the nearest
-                 leaves and flakes, the cricket and fireflies on
+                 leaves and flakes, the fireflies on
                  the characters. It fades out on the table and thank-you
                  pages.
    ============================================================ */
@@ -22394,7 +22260,7 @@ function dynFinishSetup() {
 function dynReset() {
   leaves.length = 0; pile.length = 0; hero = null; gusts.length = 0; flurryQueue.length = 0; gustDrops.length = 0;
   streaks.length = 0; splashes.length = 0; flakes.length = 0; flocks.length = 0; specks.length = 0; flockNext = 0;
-  cricket = null; tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
+  tree = null; farTree = null; frontLeafCount = 0; heroNext = 0;
   bambooGroves = []; bambooKey = '';
   LS.ready = false; LS.key = ''; LS.step = 0; LS.floorBuilt = false; LS.bedN = 0; TOR.ready = false;
   prefillLeft = 0; dynSetupLeft = false; dynHoldUntil = 0;
@@ -23024,8 +22890,7 @@ function dynStep(dt, t, want, skyWant) {
   updateTree(dt, t);
     if (ENV.scene === 'winter') winUpdate(dt, t);
   if (ENV.scene === 'autumn') landCheck(t);
-  updateCricket(dt, t);
-  if (dynFrontMul < 0.05 && cricket) { cricket = null; insectsLeaveText(); }
+  if (dynFrontMul < 0.05) insectsLeaveText();
 
   // re-draw a few leaf sprites per frame when the look changed (3: spread thin, so it never adds up to a jerk)
   var budget = 3, all = leaves.concat(pile);
@@ -23120,7 +22985,6 @@ function dynStep(dt, t, want, skyWant) {
     if (hero) drawLeaf(hero, t, false, ctxF);
     ctxF.setTransform(PR, 0, 0, PR, 0, 0); ctxF.globalAlpha = 1;
     drawSpecks(ctxF, t, true);
-    drawCricket(ctxF, t);
     frontCleared = false;
   } else if (!frontCleared) {
     ctxF.setTransform(1, 0, 0, 1, 0, 0);
