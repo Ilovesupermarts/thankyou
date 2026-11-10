@@ -426,22 +426,22 @@ function slabPoly(c, P0, S, sc, seed) {
   var rr = rng(seed + 11);
   // a soft blue shadow on the snow round it
   c.save(); c.filter = 'blur(' + Math.max(0.6, th * 1.5).toFixed(1) + 'px)';
-  path(th * 0.8, 1.05); c.fillStyle = rgb(sc.shade, 0.4); c.fill(); c.restore();
+  path(th * 0.4, 1.03); c.fillStyle = rgb(sc.shade, 0.3); c.fill(); c.restore();
   grime(c, P, cx, cy, len, wid, rng(seed + 7));
-  // its side face: the stone's thickness, darker, streaked with wet and grime
-  var sideH = Math.max(2.5, th * 2.6);
-  c.save();
-  path(sideH, 1); c.fillStyle = rgb(col(slate, 0.72)); c.fill();
-  c.clip();
-  for (var v = 0; v < Math.round(len / 4); v++) {
-    var vx = lerp(x0, x1, rr()), vy = lerp(cy, y1 + sideH, rr());
-    c.fillStyle = rgb(rr() < 0.5 ? col(slate, 0.55) : col([130, 118, 106], 0.8), lerp(0.2, 0.4, rr()));
-    c.fillRect(vx, vy, Math.max(0.6, th * 0.25), sideH * lerp(0.4, 1, rr()));
+  // its side face: only along its front edge, hanging below it, tapering to nothing at both ends (so it can
+  // never poke out beyond the stone), the stone's own slate a little darker, not black
+  var sideH = Math.max(1.5, th * 1.3), FR = frontRun(P, cy, wid);
+  if (FR.length > 2) {
+    var hAt = function (j) { return sideH * Math.pow(Math.sin(j / (FR.length - 1) * PI), 0.7); };
+    c.beginPath(); c.moveTo(FR[0][0], FR[0][1]);
+    for (var fj = 1; fj < FR.length; fj++) c.lineTo(FR[fj][0], FR[fj][1]);
+    for (fj = FR.length - 1; fj >= 0; fj--) c.lineTo(FR[fj][0], FR[fj][1] + hAt(fj));
+    c.closePath();
+    c.fillStyle = rgb(col(slate, 0.88)); c.fill();
   }
-  c.restore();
 
   c.save();
-  path(-th * 0.4, 1);
+  path(0, 1);
   var g = c.createLinearGradient(0, y0, 0, y1);
   g.addColorStop(0, rgb(col(slate, 1.1))); g.addColorStop(0.6, rgb(col(slate, 0.98))); g.addColorStop(1, rgb(col(slate, 0.86)));
   c.fillStyle = g; c.fill();
@@ -452,11 +452,11 @@ function slabPoly(c, P0, S, sc, seed) {
   // the soft light rim along the far (upper) edge
   c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(0.7, th * 0.9);
   c.beginPath(); var st = false;
-  P.forEach(function (p) { if (p[1] < cy) { st ? c.lineTo(p[0], p[1] - th * 0.4) : c.moveTo(p[0], p[1] - th * 0.4); st = true; } else st = false; });
+  P.forEach(function (p) { if (p[1] < cy) { st ? c.lineTo(p[0], p[1] + th * 0.3) : c.moveTo(p[0], p[1] + th * 0.3); st = true; } else st = false; });
   c.stroke();
   c.restore();
   // a crisp dark inked line round the top face, as painted
-  path(-th * 0.4, 1); c.strokeStyle = rgb(col(slate, 0.32), 0.8); c.lineWidth = Math.max(0.7, th * 0.35); c.stroke();
+  path(0, 1); c.strokeStyle = rgb(col(slate, 0.32), 0.8); c.lineWidth = Math.max(0.7, th * 0.35); c.stroke();
   bank(c, P, cx, cy, len, wid, th, sideH, sc, rng(seed + 19));
   snowRim(c, P, cx, cy, len, wid, sc, r);
 }
@@ -608,29 +608,35 @@ function snowRim(c, P, cx, cy, len, wid, sc, r) {
 /* Snow banked against a stone's sides: the snow round it rises against the stone and covers the
    bottom of its side face unevenly (so it sits sunk in the snow), the snow the same colour as the
    ground, a blue crease where it meets the stone, grey slush stains in it near the stone. */
+/* The front edge of an outline, in outline order (one unbroken run of points on its near half), left to right. */
+function frontRun(P, cy, wid) {
+  var n = P.length, near = P.map(function (p) { return p[1] > cy + wid * 0.05; }), st = -1, F = [], j;
+  for (j = 0; j < n; j++) if (near[j] && !near[(j + n - 1) % n]) { st = j; break; }
+  if (st < 0) return F;
+  for (j = 0; j < n && near[(st + j) % n]; j++) F.push(P[(st + j) % n]);
+  if (F.length > 1 && F[0][0] > F[F.length - 1][0]) F.reverse();
+  return F;
+}
 function bank(c, P, cx, cy, len, wid, th, sideH, sc, r) {
   // the points along its front and its two ends (the sides you can see), left to right
   // the front edge in outline order (one unbroken run of points on the near half), left to right
-  var n = P.length, near = P.map(function (p) { return p[1] > cy + wid * 0.05; }), st = -1, F = [], j;
-  for (j = 0; j < n; j++) if (near[j] && !near[(j + n - 1) % n]) { st = j; break; }
-  if (st < 0) return;
-  for (j = 0; j < n && near[(st + j) % n]; j++) F.push(P[(st + j) % n]);
+  var F = frontRun(P, cy, wid);
   if (F.length < 3) return;
-  if (F[0][0] > F[F.length - 1][0]) F.reverse();
   var ground = mix(sc.top, sc.shade, 0.28), ph = r() * TAU, ph2 = r() * TAU, top = [], i;
   for (i = 0; i < F.length; i++) {
     var u = i / (F.length - 1);
     // how high the snow comes up the side here: up to the top edge in places, low in others
-    var h = sideH * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(u * 6 + ph)) * (0.55 + 0.45 * Math.sin(u * 17 + ph2))) * Math.pow(Math.sin(u * PI), 0.35);
-    top.push([F[i][0], F[i][1] + sideH - h]);
+    var sb = sideH * Math.pow(Math.sin(u * PI), 0.7);                          // the side face's depth here
+    var cover = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(u * 6 + ph)) * (0.55 + 0.45 * Math.sin(u * 17 + ph2));
+    top.push([F[i][0], F[i][1] + sb * (1 - cover)]);
   }
-  var drop = sideH + wid * 0.06;
+  var drop = sideH * 1.05;
   c.save();
   c.filter = 'blur(' + Math.max(0.3, th * 0.12).toFixed(1) + 'px)';
   // the bank of snow
   c.beginPath(); c.moveTo(top[0][0], top[0][1]);
   for (i = 1; i < top.length; i++) c.lineTo(top[i][0], top[i][1]);
-  for (i = F.length - 1; i >= 0; i--) c.lineTo(F[i][0], F[i][1] + drop);
+  for (i = F.length - 1; i >= 0; i--) c.lineTo(F[i][0], F[i][1] + (sideH * 1.15 + 1) * Math.pow(Math.sin(i / (F.length - 1) * PI), 0.7));
   c.closePath();
   var g = c.createLinearGradient(0, cy, 0, cy + wid * 0.5 + drop);
   g.addColorStop(0, rgb(mix(ground, sc.top, 0.15))); g.addColorStop(1, rgb(ground));
