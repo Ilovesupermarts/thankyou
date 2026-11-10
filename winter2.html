@@ -11,6 +11,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="main.css">
+<script>
+// no pop-up menu on tap and hold (or right click): the browser's menu is cancelled before it opens
+['contextmenu', 'selectstart', 'dragstart'].forEach(function (t) {
+  document.addEventListener(t, function (e) { e.preventDefault(); }, true);
+});
+</script>
 <script src="mountains.js"></script>
 <script src="clouds.js"></script>
 <script src="snowfield.js"></script>
@@ -18,8 +24,13 @@
 <script src="conifers.js"></script>
 <script src="snowlights.js"></script>
 <script src="snowheaps.js"></script>
+<script src="winterscene.js"></script>
+<script src="winterpieces.js"></script>
 
 <style>
+  /* no pop-up menu on tap and hold (copy, save image, select ...) anywhere on the page */
+  html, body, * { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  img, canvas, svg { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
   /* ============================================================
      WINTER LAB 2 — a copy of bamboo.html (the Mountain Lab), now the
      test bed for the new winter scene. The layout is the app's winter
@@ -306,17 +317,24 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 /* The values chosen on the tablet (the panel's "Copy values"). */
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
+  // the reference layout (winterscene.js): the shrine by the steaming pond; false: the older layout below
+  // the stone path (the panel's "Stone path"): the points it curves through, from the front (1) to the shrine,
+  // as fractions of the screen; how wide it is (1 = one stone's length), the stones' length, depth and gap
+  // (ground units), and whether the handles show on the picture to drag the points
+  path1x: 0.31, path1y: 1.05, path2x: 0.128, path2y: 0.936, path3x: 0.0805, path3y: 0.9, path4x: 0.105, path4y: 0.856, path5x: 0.226, path5y: 0.773, path6x: 0.249, path6y: 0.743, path7x: 0.212, path7y: 0.701, path8x: 0.222, path8y: 0.679, path9x: 0.308, path9y: 0.662,
+  pathWidth: 1, stoneSize: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathHandles: true,
+  ref: true, reflect: 0.85, ripple: 1, steam: 1, waterTint: 0.3, skyInWater: 1, hillMist: 1,
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
-  horizon: 0.79, swells: 7, swellHeight: 0.65, relief: 0.45, roll: 0.75, drifts: 0.25, ripples: 0.1, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
-  hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
+  horizon: 0.655, swells: 2, swellHeight: 0.06, relief: 0.12, roll: 0.75, drifts: 0.1, ripples: 0, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
+  hollows: 0.28, sheen: 1.1, groundHaze: 0.5, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
   toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
   firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
   frostTwigs: 0.3,
   lanterns: 14, lanternSize: 1, kamakura: 0, yukimi: false, lightEvening: 1.15, lightNight: 1.15, flicker: 0.7, halo: 2.45, pool: 1.6,
   stars: 0.7, moon: true, moonSize: 1, diamondDust: 0.6,
-  maxSkiers: 5, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1, skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33,
+  maxSkiers: 0, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1, skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33,
   scarfLength: 1.25, scarfFlutter: 0.5, skiShadow: 0.6, tracks: 0.6, trackFade: 40, powder: 0.9,
   torch: true, torchNight: 1, torchEvening: 0.5, torchBeam: 0.7, torchReach: 2.4, torchWidth: 0.35, torchSpill: 1, torchGlow: 0.85, torchBob: 0.5,
   torchFlakes: 1,
@@ -325,7 +343,7 @@ var V_DEFAULTS = {
   snowRound: 0.45, snowRelief: 1.1, snowContact: 0.6, snowGlow: 0.9, snowGrain: 0.5, snowSparkle: 0.5, branchDust: 0.6, branchForks: true,
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17, landShare: 0.7,
   meltTime: 16.5, bokeh: 6, backlight: 0.6,
-  nearHeight: 33, nearLumps: 0.09, nearShade: 0.36, nearShadow: 0.05, nearShadowSize: 19,
+  nearHeight: 0, nearLumps: 0.09, nearShade: 0.36, nearShadow: 0.05, nearShadowSize: 19,
   colours: {
     snow: '#FAFAFC',
     mist: '#F3EEEC',
@@ -348,10 +366,10 @@ var V_DEFAULTS = {
 var MT_DEFAULTS = {
   seed: 7,
   rangeHeight: 0.05, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
-  fujiX: 0.87, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
-  snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.65, snowSlope: 0.55,
+  fujiX: 0.81, fujiHeight: 0.365, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
+  snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.8, snowSlope: 0.55,
   sunStrength: 1.15, ambient: 0.65, shadows: 0.7, alpenglow: 0.6,
-  haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
+  haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.85,
   strength: 1, softness: 0.4, resolution: 0.85,
   colours: {
     rock: '#7C7473',
@@ -488,7 +506,7 @@ deepSet(SDEF, {"timeOfDay":"day","show":true,"strength":1,"across":0.2,"below":1
 CLOUD = clone(CLOUD_DEFAULTS); SUN = clone(SDEF);
 
 /* Everything on the panel is kept in this browser. */
-var SAVE_KEY = 'winterLab2';
+var SAVE_KEY = 'winterLab2-ref';                 // (winterLab2 held the values of the older layout)
 function merge(dst, src, def) {
   for (var k in src) {
     if (!(k in def)) continue;
@@ -1214,7 +1232,172 @@ var WIN_FIRS = [[0, 0.42, 1], [-0.05, 0.36, 0.8], [0.045, 0.48, 0.9], [-0.095, 0
 /* The snow lanterns wind across the middle of the field (雪あかりの路), the huts stand by the firs and in the middle. */
 var LANTERN_PATH = [[0.12, 0.32], [0.3, 0.46], [0.5, 0.52], [0.68, 0.44], [0.84, 0.58]];
 var HUT_SPOTS = [[0.8, 0.5], [0.4, 0.3], [0.58, 0.62], [0.16, 0.6]];
+/* ============================================================
+   8b. THE REFERENCE LAYOUT (V.ref) — where everything of the reference
+   picture stands, as fractions of the screen (x of the width, y and
+   sizes of the height): the hill of firs with the pagoda (left), the
+   shrine hall, the row of torii with the stone lanterns along the
+   stepping-stone path, the frosted trees, the steaming pond with its
+   banks, the cranes and the roped pines (right). Everything is drawn in
+   code: the pagoda, the hall, the lanterns, the cranes and the roped pine
+   by winterpieces.js (after the user's element sheet), the torii by
+   torii.js, the rest by winterscene.js. Positions are measured on the
+   reference picture. The lamps and windows are lit only in the evening
+   and at night.
+   ============================================================ */
+var REF = {
+  // the hill of firs (left), and rows of firs along its foot: [x0, x1, foot, height, count, haze]
+  hill: { x0: -0.02, x1: 0.4, peakX: 0.135, peakY: 0.37, spanL: 0.15, spanR: 0.16, treeSize: 0.11, trees: 340,
+          rows: [[-0.01, 0.12, 0.6, 0.12, 7, 0.28], [0.08, 0.25, 0.625, 0.11, 7, 0.3], [0.2, 0.32, 0.605, 0.1, 5, 0.33],
+                 [0.3, 0.335, 0.6, 0.075, 3, 0.4], [0.37, 0.45, 0.665, 0.07, 6, 0.45]] },
+  // where each piece stands (painted by winterpieces.js): its middle, its foot, its height (to its top)
+  pagoda: { x: 0.1935, y: 0.53, h: 0.334 },
+  hall: { x: 0.308, y: 0.66, h: 0.127 },
+  // THE APPROACH (参道), built as one thing on the ground, as in the reference: the stepping-stone
+  // path winds in from the bottom of the screen, through the front torii and on through every gate to
+  // the shrine's steps; the torii stand over it at equal distances all the way to the shrine; one stone
+  // lantern on each side in every gap between two gates (as in the autumn scene: each side at its own
+  // place in the gap, just off the path).
+  //   eye        the eye line for the ground (a share of the screen's height): where a flat ground would
+  //              meet the sky. Set from the torii's sizes in the reference (it is not the line where the
+  //              snowfield meets the mist). Ground units: 1 = the screen's depth below the eye line at
+  //              the bottom edge; a thing at depth Z shows 1/Z as large.
+  //   line       the middle of the path on the screen, from below the bottom edge to the shrine's steps
+  //              (made smooth on the ground); the front torii stands at 'gate', which is on it
+  //   gates      how many torii (the user's choice: 6), every  the distance between two along the path
+  //              (as close as in the reference); what is left before the shrine stays clear
+  //   gateH      a torii's height; lantH a lantern's
+  //   rightAlong, leftAlong   where in a gap each side's lantern stands (0 by the farther gate, 1 by the
+  //              nearer), as in the autumn scene; fromStones  its gap from the stones' edge, beside them
+  //              to the left or right on the screen (ground units)
+  approach: { eye: 0.62, gate: [0.0805, 0.9],
+              // the path meanders as the user drew it on the reference (an S): up-left from the bottom edge,
+              // its left bend widened (the user's choice) so the path passes through the front gate, then
+              // up-right to a right bend beyond the big lantern, back to the left, and on to the shrine's steps
+              line: [[0.31, 1.05], [0.262, 0.99], [0.19, 0.958], [0.128, 0.936], [0.093, 0.918], [0.0805, 0.9], [0.084, 0.882],
+                     [0.105, 0.856], [0.145, 0.826], [0.19, 0.797], [0.226, 0.773], [0.245, 0.755], [0.249, 0.743],
+                     [0.244, 0.727], [0.229, 0.712], [0.212, 0.701], [0.205, 0.69], [0.222, 0.679], [0.25, 0.671],
+                     [0.28, 0.666], [0.308, 0.662]],
+              gates: 6, every: 1.3, gateH: 0.876, lantH: 0.51, rightAlong: 0.81, leftAlong: 0.38, fromStones: 0.12 },
+  // the roped pine: middle (its pole), foot, height (the rope knot to the foot)
+  pine: { x: 0.801, y: 0.727, h: 0.28 },
+  // the cranes: middle, foot, height, facing (1 right), pose
+  cranes: [[0.683, 0.753, 0.1, 1, 'up'], [0.716, 0.757, 0.112, -1, 'bow']],
+  // the roped firs (and the plain ones) on the right: x, foot, height, the top of the rope pole (0: none), haze
+  firs: [[0.838, 0.7, 0.135, 0, 0.45], [1.0, 0.7, 0.18, 0, 0.4], [0.874, 0.712, 0.155, 0.532, 0.3],
+         [0.921, 0.705, 0.185, 0.493, 0.25], [0.968, 0.796, 0.31, 0.353, 0]],
+  // the frosted trees beyond the hall: x, foot, height
+  frost: [[0.47, 0.665, 0.055], [0.432, 0.7, 0.12], [0.402, 0.712, 0.17]],
+  // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
+  // between two, and half the width of the trodden snow along the path
+  stone: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathBand: 0.3,
+  // (no extra stones: the path's own stones, laid in one line with even gaps as in the reference, fill the
+  // spots that were bare before)
+  gapStones: [],
+  // the nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
+  // on the screen (fractions), measured on the reference; the second runs off the bottom edge
+  nearSlabs: [[[0.246, 0.971], [0.330, 0.944], [0.369, 0.966], [0.270, 0.998]],
+              [[0.296, 1.004], [0.399, 0.976], [0.452, 1.006], [0.36, 1.04]],
+              // the two just beyond them (left of the big slab, and above it to the right): their corners read off a
+              // close-up of the reference on a fine grid
+              [[0.2092, 0.9463], [0.2450, 0.9356], [0.2622, 0.9497], [0.2300, 0.9625]],
+              [[0.2526, 0.9330], [0.2830, 0.9294], [0.2990, 0.9405], [0.2860, 0.9497]]],
+  // the banks beyond the water (the edge of the snow, the earth showing under it)
+  banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
+          { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
+          { th: 0.018, pts: [[0.645, 0.772], [0.689, 0.777], [0.743, 0.786], [0.798, 0.795], [0.852, 0.802], [0.896, 0.808]] },
+          { th: 0.026, pts: [[0.9, 0.832], [0.925, 0.838], [0.961, 0.834], [1.02, 0.845]] }],
+  // the water
+  pond: [[0.551, 0.731], [0.6, 0.726], [0.653, 0.724], [0.69, 0.726], [0.672, 0.738], [0.655, 0.752], [0.645, 0.775],
+         [0.689, 0.789], [0.743, 0.798], [0.798, 0.807], [0.852, 0.814], [0.896, 0.822], [0.9, 0.848], [0.925, 0.856],
+         [0.961, 0.853], [1.02, 0.862], [1.02, 1.02], [0.743, 1.02], [0.671, 0.99], [0.598, 0.971], [0.525, 0.939],
+         [0.471, 0.906], [0.424, 0.873], [0.402, 0.847], [0.4, 0.83], [0.416, 0.811], [0.453, 0.798], [0.489, 0.789],
+         [0.533, 0.782], [0.566, 0.775], [0.592, 0.762], [0.59, 0.745], [0.57, 0.736]]
+};
+/* The approach on the ground (REF.approach), worked out for this screen: where each torii and lantern
+   stands and how big it is, and the line of the path, all in perspective (see REF.approach). */
+function eyeY() { return H * REF.approach.eye; }
+function toGround(x, y) { var hy = eyeY(), D = H - hy, q = (y - hy) / D; return [(x - W / 2) / (q * D), 1 / q]; }
+function toScreen(X, Z) { var hy = eyeY(), D = H - hy; return [W / 2 + X * D / Z, hy + D / Z]; }
+/* The points the stone path curves through (V.path1x … path9y, set on the panel or by dragging). */
+var PATH_N = 9;
+function pathPoints() { var P = []; for (var i = 1; i <= PATH_N; i++) P.push([V['path' + i + 'x'], V['path' + i + 'y']]); return P; }
+function pathHalfW() { return V.stoneSize * 0.5 * V.pathWidth; }
+function approachLayout() {
+  var A = REF.approach, D = H - eyeY(), i, k;
+  // the path's middle on the ground, made smooth (Catmull-Rom), then measured along its length
+  var C = pathPoints().map(function (p) { return toGround(p[0] * W, p[1] * H); }), G = [];
+  for (i = 0; i < C.length - 1; i++) {
+    var p0 = C[Math.max(0, i - 1)], p1 = C[i], p2 = C[i + 1], p3 = C[Math.min(C.length - 1, i + 2)];
+    for (k = 0; k < 24; k++) {
+      var t = k / 24, t2 = t * t, t3 = t2 * t;
+      G.push([0, 1].map(function (j) {
+        return 0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2 + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3);
+      }));
+    }
+  }
+  G.push(C[C.length - 1]);
+  var len = [0];
+  for (i = 1; i < G.length; i++) len.push(len[i - 1] + Math.hypot(G[i][0] - G[i - 1][0], G[i][1] - G[i - 1][1]));
+  var total = len[len.length - 1];
+  function at(s) {                                            // the point at length s, and the way the path runs there
+    for (var j = 1; j < len.length - 1 && len[j] < s; j++);
+    var f = clamp((s - len[j - 1]) / (len[j] - len[j - 1] || 1), 0, 1), a = G[j - 1], b = G[j];
+    var dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+    return { X: lerp(a[0], b[0], f), Z: lerp(a[1], b[1], f), tx: dx / l, tz: dz / l };
+  }
+  // where the front gate is along it (the point of the line nearest to it)
+  var g0 = toGround(A.gate[0] * W, A.gate[1] * H), s0 = 0, best = 1e9;
+  for (i = 0; i < G.length; i++) { var dd = Math.hypot(G[i][0] - g0[0], G[i][1] - g0[1]); if (dd < best) { best = dd; s0 = len[i]; } }
+  var out = { gates: [], lanterns: [], path: G.map(function (p) { var q = toScreen(p[0], p[1]); return q; }), hy: eyeY() };
+  var gS = [], every = A.every;
+  for (i = 0; i < A.gates && s0 + i * every < total - every * 0.5; i++) gS.push(s0 + i * every);
+  // every gate faces you (as in the reference); the path goes through its opening
+  gS.forEach(function (sg) {
+    var P = at(sg), q = toScreen(P.X, P.Z);
+    out.gates.push({ x: q[0], y: q[1], h: A.gateH * D / P.Z, yaw: Math.atan2(-P.tx, P.tz) * 180 / PI });   // (torii.js: the top beam runs along (cos yaw, sin yaw) on the ground)
+  });
+  // one lantern each side in every gap (each side at its own place in the gap, as in the autumn scene),
+  // standing just beside the stones: to their left and right on the screen, as in the reference
+  var off = pathHalfW() * 1.1 + A.fromStones + A.lantH * 0.2;
+  function clearance(X, Z) { var m = 1e9; for (var j = 0; j < G.length; j++) m = Math.min(m, Math.hypot(G[j][0] - X, G[j][1] - Z)); return m; }
+  for (i = 0; i < gS.length - 1; i++) {
+    [[1, A.rightAlong], [-1, A.leftAlong]].forEach(function (E) {
+      var sd = E[0], P = at(gS[i] + (1 - E[1]) * every);
+      // beside the path, straight to its right or left on the screen (as in the reference), moved out only
+      // until it is clear of every stone of the path, also where the path bends
+      var nx = sd, nz = 0, d0 = off;
+      var need = pathHalfW() * 1.1 + A.lantH * 0.15;           // half a stone's width and half a lantern's base, at least
+      while (clearance(P.X + nx * d0, P.Z + nz * d0) < need && d0 < off * 3) d0 += off * 0.05;
+      var X = P.X + nx * d0, Z = P.Z + nz * d0, q = toScreen(X, Z);
+      out.lanterns.push({ x: q[0], y: q[1], h: A.lantH * D / Z });
+    });
+  }
+  return out;
+}
+function refPlan() {
+  var list = [], hy = H * V.horizon;
+  function u(fy) { return clamp((fy * H - hy) / (H - hy), 0, 1); }
+  function piece(name, x, foot, h, extra) {
+    var B = { type: 'piece', name: name, x: x * W, fy: foot, h: h * H, u: u(foot), seed: 11 + list.length * 7 };
+    for (var k in extra) B[k] = extra[k];
+    list.push(B);
+  }
+  REF.frost.forEach(function (f, i) { list.push({ type: 'frost', x: f[0] * W, fy: f[1], h: f[2] * H, u: u(f[1]), size: 1, seed: 901 + i * 77 }); });
+  piece('hall', REF.hall.x, REF.hall.y, REF.hall.h);
+  var AP = approachLayout();
+  AP.gates.forEach(function (G, i) { list.push({ type: 'torii', x: G.x, fy: G.y / H, h: G.h, u: u(G.y / H), yaw: 6, view: 0.06, seed: 3 + i, sori: 0.06, pillar: 0.065, darkTop: true }); });
+  AP.lanterns.forEach(function (L) { piece('lantern', L.x / W, L.y / H, L.h / H); });
+  REF.firs.forEach(function (F, i) {
+    list.push({ type: 'rfir', x: F[0] * W, fy: F[1], h: F[2] * H, pole: F[3] ? F[3] * H : 0, mist: F[4], u: u(F[1]), seed: 300 + i * 13 });
+  });
+  piece('pine', REF.pine.x, REF.pine.y, REF.pine.h);
+  REF.cranes.forEach(function (K) { piece('crane', K[0], K[1], K[2], { dir: K[3], pose: K[4] }); });
+  list.sort(function (a, b) { return a.fy - b.fy; });
+  return list;
+}
 function plan(r) {
+  if (V.ref) return refPlan();
   var list = [], i;
   for (i = 0; i < V.frostTrees; i++) {
     var s = i < WIN_FROST.length ? WIN_FROST[i] : [r(), r() * 0.4, lerp(0.5, 0.9, r())];
@@ -1241,6 +1424,7 @@ function plan(r) {
 }
 /* How tall each thing is (px), and how far it reaches either side. */
 function thingH(B) {
+  if (B.h) return B.h;
   if (B.type === 'frost') return H * lerp(0.08, 0.2, B.u) * B.size * V.frostSize;
   if (B.type === 'fir') return H * lerp(0.17, 0.3, B.u) * B.size * V.firSize;
   if (B.type === 'torii') return H * V.toriiSize;
@@ -1248,15 +1432,36 @@ function thingH(B) {
   return H * k * B.size * V.lanternSize;
 }
 function thingTop(B) {
+  if (B.type === 'piece') return B.yb - B.h * (B.name === 'hall' ? 1.05 : 1) - 6;
+  if (B.pole) return B.pole - 8;
   if (B.type === 'torii') return Torii.top({ y: B.yb, h: thingH(B), snow: V.toriiSnow }) - 6;
   return B.yb - thingH(B) * (B.type === 'light' ? 1.5 : 1.12);
 }
 function thingHalfW(B) {
   var h = thingH(B);
+  if (B.type === 'piece') return B.name === 'hall' ? h * 1.35 : B.name === 'pine' ? h * 0.42 : B.name === 'crane' ? h * 0.4 : h * 0.45;
+  if (B.type === 'rfir') return h * 0.5;
   return B.type === 'torii' ? h * 0.75 : B.type === 'fir' ? h * 0.36 * V.firWidth : B.type === 'frost' ? h * 0.4 : B.kind === 'kamakura' ? h * 1.3 : h * 0.7;
 }
 function drawThing(c, B, haze) {
   var C = cols(), h = thingH(B);
+  if (B.type === 'piece') {
+    var lk = B.plain ? 0 : nightLights();
+    var po = withLight({ x: B.x, y: B.yb, h: h, lit: lk, seed: B.seed, dir: B.dir, pose: B.pose }, B.name === 'crane' ? haze * 0.1 : haze * 0.3);
+    // the lamps' and windows' light on the snow round them (only once they are lit)
+    if (lk > 0 && B.name === 'lantern') WinterScene.pool(c, { x: B.x, y: B.yb - h * 0.02, rx: h * 0.8, ry: h * 0.18, strength: lk * 0.9 });
+    if (lk > 0 && B.name === 'hall') WinterScene.pool(c, { x: B.x, y: B.yb + h * 0.1, rx: h * 1.7, ry: h * 0.3, strength: lk });
+    WinterPieces[B.name](c, po);
+    return;
+  }
+  if (B.type === 'rfir') {
+    var hz = Math.min(1, haze * 0.3 + (B.mist || 0)), ro = withLight({ x: B.x, top: B.pole, y: B.yb, spread: h * 0.42, drop: (B.yb - B.pole) * 0.88, n: 20 }, hz);
+    if (B.pole) WinterScene.ropes(c, ro, false);
+    Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
+                                    snow: V.firSnow, droop: V.firDroop, fullness: 1, width: 1.15 }, hz));
+    if (B.pole) WinterScene.ropes(c, ro, true);
+    return;
+  }
   if (B.type === 'frost') {
     Conifers.frost(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { bark: C.bark, rime: C.rime }, rime: V.rime,
                                   twigs: V.frostTwigs, spread: 1 }, haze));
@@ -1264,7 +1469,7 @@ function drawThing(c, B, haze) {
     Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
                                 snow: V.firSnow, droop: V.firDroop, fullness: V.firFull, width: V.firWidth }, haze));
   } else if (B.type === 'torii') {
-    var to = withLight({ x: B.x, y: B.yb, h: h, yaw: V.toriiTurn, view: V.toriiView, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
+    var to = withLight({ x: B.x, y: B.yb, h: h, yaw: B.yaw !== undefined ? B.yaw : V.toriiTurn, view: B.view !== undefined ? B.view : V.toriiView, sori: B.sori, pillar: B.pillar, darkTop: B.darkTop, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
                          colours: { vermilion: C.vermilion, top: C.toriiTop, feet: C.toriiFeet, snow: C.snow } }, haze);
     // its snow: drawn where it is (a mask, over the box round the gate), then lit by the snow material
     var useMat = !B.plain && typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
@@ -1302,6 +1507,7 @@ function shadowShape(fy) {
   return [1, 0, -sx, sy, sx * fy, fy * (1 - sy)];
 }
 function castShadow(tg, B, haze) {
+  if (B.type === 'piece' && (B.name === 'hall' || B.name === 'pine')) return;   // their shade is painted with them
   var k = V.shadows * LT.vis;
   if (k < 0.01) return;
   var h = thingH(B), hw = thingHalfW(B), bx0 = B.x - hw * 1.2, by0 = thingTop(B) - 4, bw = hw * 2.4, bh = B.yb - by0 + h * 0.1;
@@ -1347,6 +1553,171 @@ function sfOptions(sw) {
            relief: V.relief, roll: V.roll, drifts: V.drifts, ripples: V.ripples, rippleSize: V.rippleSize,
            rippleAngle: V.rippleAngle, grain: V.grain, hollows: V.hollows, sheen: V.sheen, seed: V.seed };
 }
+/* The things lying flat on the snow (V.ref): the pond's water (under its reflection, drawn live), the
+   dark earth along its banks and the stepping stones. Drawn into every slice of the snowfield, so
+   whichever slice is in front at a point shows the same. */
+function refPts(P) { return P.map(function (p) { return [p[0] * W, p[1] * H]; }); }
+function pondPath(c) {
+  var P = refPts(REF.pond);
+  c.beginPath(); c.moveTo(P[0][0], P[0][1]);
+  for (var i = 1; i < P.length; i++) {
+    var a = P[i - 1], b = P[i];
+    c.quadraticCurveTo(a[0], a[1], (a[0] + b[0]) / 2, (a[1] + b[1]) / 2);
+  }
+  c.closePath();
+}
+function drawDecor(c) {
+  var C = cols();
+  // the water, before its reflection: the sky's colour, darker toward you
+  pondPath(c);
+  var g = c.createLinearGradient(0, H * 0.72, 0, H);
+  g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
+  c.fillStyle = g; c.fill();
+}
+/* The stepping stones (V.ref): drawn sharp over each slice of the snowfield after its softening. */
+function drawStones(c) {
+  var C = cols();
+  WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: approachLayout().path,
+                                  fitTo: REF.nearSlabs.map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }),
+                                  size: V.stoneSize, depth: V.stoneDepth, gap: V.stoneGap, band: REF.pathBand, halfWidth: pathHalfW(),
+                                  fixed: REF.nearSlabs.concat(REF.gapStones).map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }), colours: { snow: C.snow } }, 0));
+}
+/* The far layer (V.ref): the hill of firs, the pagoda among them, the mist. Baked once. */
+var FARL = mk(), BANKL = mk(), POND = { mask: mk(), refl: mk(), tmp: mk(), top: null, at: -1, puffs: [] };
+function bakeFar() {
+  var C = cols(), cw = Math.round(W * PR), ch = Math.round(H * PR);
+  FARL.cnv.width = cw; FARL.cnv.height = ch;
+  var c = FARL.c, mc = light(C.mist);
+  c.setTransform(PR, 0, 0, PR, 0, 0); c.clearRect(0, 0, W, H);
+  if (!V.ref) return;
+  var hy = H * V.horizon, R = REF.hill, warm = mix(mc, light([255, 226, 190]), 0.6);
+  var ho = { x0: R.x0 * W, x1: R.x1 * W, base: hy - H * 0.03, peakX: R.peakX * W, peakY: R.peakY * H, spanL: R.spanL * W, spanR: R.spanR * W,
+             treeSize: R.treeSize * H, trees: R.trees, seed: V.seed * 7 + 5, mist: V.hillMist, split: 0.6,
+             rows: R.rows.map(function (q) { return [q[0] * W, q[1] * W, q[2] * H, q[3] * H, q[4], q[5] * V.hillMist]; }),
+             colours: { needle: C.needle, snow: C.snow } };
+  ho.part = 'back'; WinterScene.hill(c, withLight(ho, 0.1));
+  WinterScene.mistBand(c, -W * 0.15, W * 0.5, H * 0.45, H * 0.6, warm, 0.35 * V.hillMist);
+  var P = REF.pagoda;
+  WinterPieces.pagoda(c, withLight({ x: P.x * W, y: P.y * H, h: P.h * H, lit: nightLights(), seed: 3 }, 0.04));
+  // the pagoda's foot lost in the mist, as in the picture
+  WinterScene.mistBand(c, P.x * W - W * 0.09, P.x * W + W * 0.09, H * 0.47, H * 0.57, warm, 0.8 * V.hillMist);
+  ho.part = 'front'; WinterScene.hill(c, withLight(ho, 0));
+  WinterScene.mistBand(c, -W * 0.25, W * 0.7, hy - H * 0.085, hy + H * 0.03, warm, 0.8 * V.hillMist);
+  var gold = mix(mc, light([255, 214, 160]), 0.8);
+  WinterScene.mistBand(c, W * 0.3, W * 1.3, H * 0.53, H * 0.69, gold, 0.75 * V.hillMist);
+  WinterScene.mistBand(c, -W * 0.1, W * 0.55, H * 0.615, H * 0.69, gold, 0.5 * V.hillMist);
+}
+/* The pond's mask (V.ref), and where its water starts in each column. */
+function bakeFront() {
+  var C = cols();
+  BANKL.cnv.width = Math.round(W * PR); BANKL.cnv.height = Math.round(H * PR);
+  BANKL.c.setTransform(PR, 0, 0, PR, 0, 0); BANKL.c.clearRect(0, 0, W, H);
+  if (!V.ref) return;
+  // the banks beyond the water, laid over its edge
+  WinterScene.banks(BANKL.c, withLight({ lines: REF.banks.map(function (L) { return { th: L.th * H, pts: refPts(L.pts) }; }), colours: { snow: C.snow } }, 0));
+  // the two nearest stone slabs, crisp (not in the snowfield's softened layer)
+  WinterScene.slabs(BANKL.c, withLight({ fixed: REF.nearSlabs.concat(REF.gapStones).map(function (F) { return refPts(F); }), colours: { snow: C.snow } }, 0));
+  // (the line each column's reflection turns about)
+  var M = POND.mask, q = 0.25;
+  M.cnv.width = Math.max(1, Math.round(W * q)); M.cnv.height = Math.max(1, Math.round(H * q));
+  M.c.setTransform(q, 0, 0, q, 0, 0); M.c.clearRect(0, 0, W, H);
+  M.c.fillStyle = '#fff'; pondPath(M.c); M.c.fill();
+  var px = M.c.getImageData(0, 0, M.cnv.width, M.cnv.height).data, mw = M.cnv.width, mh = M.cnv.height;
+  POND.top = new Float32Array(mw);
+  for (var x = 0; x < mw; x++) {
+    POND.top[x] = -1;
+    for (var y = 0; y < mh; y++) if (px[(y * mw + x) * 4 + 3] > 128) { POND.top[x] = y / q; break; }
+  }
+  POND.q = q;
+  POND.y0 = REF.pond.reduce(function (m, p) { return Math.min(m, p[1]); }, 1) * H;
+}
+/* THE POND, every frame (V.ref): the scene above it mirrored in the water, each column about the
+   far edge of the water there (so the cranes and pines stand on their reflections), rippled, tinted,
+   with the steam rising off it. The mirrored picture is made again every third frame. */
+function drawPond(c, t, dt, water) {
+  if (!V.ref || !POND.top) return;
+  if (!water) { drawSteam(c, dt); return; }
+  var y0 = POND.y0, RF = POND.refl, rq = 0.5 * PR, k;
+  var cw = Math.round(W * rq), chh = Math.max(1, Math.round((H - y0) * rq));
+  if (RF.cnv.width !== cw || RF.cnv.height !== chh) { RF.cnv.width = cw; RF.cnv.height = chh; POND.at = -1; }
+  if (++POND.at % 3 === 0) {
+    var rc = RF.c, bw = 8, q = POND.q;
+    rc.setTransform(1, 0, 0, 1, 0, 0); rc.clearRect(0, 0, cw, chh);
+    for (var x = 0; x < W; x += bw) {
+      var top = POND.top[Math.min(POND.top.length - 1, Math.floor((x + bw / 2) * q))];
+      if (top < 0) continue;
+      var ym = top - H * 0.012, Lh = H - ym;
+      if (ym - Lh < 0) Lh = ym;
+      // CSS (x, y) above the line → below it, in the picture that starts at y0
+      rc.setTransform(rq, 0, 0, -rq, 0, (2 * ym - y0) * rq);
+      rc.drawImage(cv, x * PR, (ym - Lh) * PR, bw * PR, Lh * PR, x, ym - Lh, bw, Lh);
+    }
+  }
+  // rippled: the picture laid down in thin strips, each shifted a little
+  var T = POND.tmp, th = Math.round((H - y0) * PR);
+  if (T.cnv.width !== cv.width || T.cnv.height !== th) { T.cnv.width = cv.width; T.cnv.height = th; }
+  var tc = T.c;
+  tc.setTransform(1, 0, 0, 1, 0, 0); tc.globalCompositeOperation = 'source-over'; tc.globalAlpha = 1;
+  tc.clearRect(0, 0, T.cnv.width, th);
+  var strip = 3, amp = V.ripple * 2.2;
+  for (var y = 0; y < H - y0; y += strip) {
+    var dep = y / (H - y0), dx = amp * (0.4 + dep) * Math.sin(y * 0.21 + t * 1.3) + amp * 0.5 * Math.sin(y * 0.057 - t * 0.7);
+    tc.drawImage(RF.cnv, 0, y * rq, cw, strip * rq, dx * PR, y * PR, cw / rq * PR, strip * PR);
+  }
+  // the water's own colour over it, darker toward you, and the mask of the water
+  tc.globalCompositeOperation = 'source-atop';
+  var g = tc.createLinearGradient(0, 0, 0, th);
+  var wc = isNight() ? light([90, 96, 128]) : light([196, 198, 210]), deep = isNight() ? light([50, 56, 84]) : light([150, 150, 168]);
+  g.addColorStop(0, rgb(wc, V.waterTint * 0.8)); g.addColorStop(1, rgb(deep, V.waterTint));
+  tc.fillStyle = g; tc.fillRect(0, 0, T.cnv.width, th);
+  // the low sky's glow caught in the open water on the left (the colour of the sky round the sun)
+  var sk = V.timeOfDay === 'evening' ? light([250, 150, 104]) : isNight() ? light([84, 92, 140]) : light([240, 160, 128]);
+  var vis = LT ? lerp(0.45, 1, LT.vis) : 1;
+  tc.save(); tc.translate(W * 0.53 * PR, th * 0.6); tc.scale(W * 0.22 * PR, th * 0.75);
+  var rg = tc.createRadialGradient(0, 0, 0, 0, 0, 1);
+  rg.addColorStop(0, rgb(sk, 0.85 * V.skyInWater * vis)); rg.addColorStop(0.6, rgb(sk, 0.5 * V.skyInWater * vis)); rg.addColorStop(1, rgb(sk, 0));
+  tc.fillStyle = rg; tc.fillRect(-1, -1, 2, 2); tc.restore();
+  tc.globalCompositeOperation = 'destination-in';
+  tc.setTransform(1, 0, 0, 1, 0, 0);
+  tc.drawImage(POND.mask.cnv, 0, y0 * POND.q, POND.mask.cnv.width, (H - y0) * POND.q, 0, 0, T.cnv.width, th);
+  tc.globalCompositeOperation = 'source-over';
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalAlpha = V.reflect;
+  c.drawImage(T.cnv, 0, Math.round(y0 * PR));
+  c.globalAlpha = 1;
+}
+/* the steam: soft puffs rising off the water and drifting with the wind */
+function drawSteam(c, dt) {
+  var k;
+  if (V.steam > 0) {
+    var P = POND.puffs, want = Math.round(55 * V.steam);
+    while (P.length < want) P.push(newPuff(P.length < want && !POND.filled));
+    POND.filled = true;
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+    for (k = P.length - 1; k >= 0; k--) {
+      var S = P[k];
+      S.age += dt; S.y -= S.v * dt; S.x += (S.d + fieldAt(S.x) * 12) * dt; S.r += S.g * dt;
+      var f = S.age / S.life;
+      if (f >= 1 || k >= want) { P.splice(k, 1); continue; }
+      c.globalAlpha = S.a * Math.sin(f * PI) * V.steam * (isNight() ? 0.45 : 1);
+      c.drawImage(MIST.cnv, S.x - S.r, S.y - S.r * 0.6, S.r * 2, S.r * 1.2);
+    }
+    c.globalAlpha = 1;
+  }
+}
+function newPuff(prefill) {
+  // over the water: most where the channel opens into the pond, as in the picture
+  var x, y, tries = 0;
+  do {
+    x = Math.random() < 0.55 ? lerp(0.54, 0.64, Math.random()) * W : lerp(0.42, 1, Math.random()) * W;
+    var top = POND.top[Math.min(POND.top.length - 1, Math.floor(x * POND.q))];
+    y = top < 0 ? -1 : top + Math.random() * H * 0.12;
+    if (x > W * 0.64 && x < W * 0.76 && y < H * 0.84) y = -1;          // not over the cranes
+  } while (y < 0 && ++tries < 20);
+  var life = lerp(6, 12, Math.random());
+  return { x: x, y: y, r: lerp(24, 60, Math.random()) * H / 900, g: lerp(5, 12, Math.random()), v: lerp(6, 16, Math.random()),
+           d: lerp(-3, 3, Math.random()), a: lerp(0.3, 0.6, Math.random()), life: life, age: prefill ? Math.random() * life : 0 };
+}
 function bakeGround() {
   var t0 = performance.now(), C = cols(), hy = H * V.horizon, r = rngFrom(V.seed * 71 + 3), N = Math.max(2, Math.round(V.swells));
   var depthPx = Math.max(1, H - hy), k, b, NX = 256;
@@ -1354,15 +1725,20 @@ function bakeGround() {
   var things = plan(rngFrom(V.seed * 313 + 11)), swells = WS.swells = [];
   for (k = 0; k < N; k++) {
     var u0 = k / (N - 1);
-    var Sk = { u: u0, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * V.swellHeight,
-               f: swellFn(r, u0), things: [], haze: V.groundHaze * Math.pow(1 - u0, 2) * 0.9 };
+    var Sk = { u: u0, yk: V.ref && k > 0 ? H + 40 : hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * V.swellHeight,
+               f: swellFn(r, u0), things: [], haze: V.ref ? 0 : V.groundHaze * Math.pow(1 - u0, 2) * 0.9 };   // (V.ref: the distance is hazed by the smooth ground mist alone, so no strip shows)
     Sk.crest = new Float32Array(NX);
     for (var j = 0; j < NX; j++) Sk.crest[j] = crestY(Sk, -20 + j / (NX - 1) * (W + 40));
     swells.push(Sk);
   }
   for (b = 0; b < things.length; b++) {
     var B = things[b], kb = Math.round(B.u * (N - 1)), Sb = swells[kb];
-    B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; B.k = kb; B.record = B.type === 'light';
+    if (B.fy !== undefined) {                                   // placed where the layout says: on the nearest swell whose crest is above its foot
+      B.yb = B.fy * H;
+      for (kb = 0; kb < N - 1 && crestY(swells[kb + 1], B.x) < B.yb - 3; kb++);
+      Sb = swells[kb];
+    } else B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2;
+    B.k = kb; B.record = B.type === 'light';
     Sb.things.push(B);
     if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: thingH(B) }; WS.toriiK = kb; }
   }
@@ -1392,16 +1768,28 @@ function bakeGround() {
     if (sf) { tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch); WS.sfGL = true; }
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) flatSwell(tg, S0, S0.haze);
-    for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
+    if (V.ref) { tg.save(); tg.globalCompositeOperation = 'source-atop'; drawDecor(tg); tg.restore(); }
+    // the snow softened (the farther swells more), then the stepping stones sharp on it, then the shadows of
+    // the things (on the snow and the stones), then the things, softened as the snow is
+    var bl = lerp(1.4, 0, S0.u) * PR * V.groundSoft;
+    slab.c.save();
+    slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
+    slab.c.drawImage(GTMP.cnv, 0, 0);
+    slab.c.restore();
+    slab.c.save(); slab.c.setTransform(PR, 0, 0, PR, 0, -top * PR);
+    if (V.ref) { slab.c.save(); slab.c.globalCompositeOperation = 'source-atop'; drawStones(slab.c); slab.c.restore(); }
+    for (b = 0; b < S0.things.length; b++) {                  // the shadows, on the snow only
       var T = S0.things[b], hz = V.groundHaze * Math.pow(1 - T.u, 2) * 0.9;
-      castShadow(tg, T, hz);
+      castShadow(slab.c, T, hz);
     }
+    slab.c.restore();
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, cw, ch);
+    tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     for (b = 0; b < S0.things.length; b++) {
       var T2 = S0.things[b], hz2 = V.groundHaze * Math.pow(1 - T2.u, 2) * 0.9;
       drawThing(tg, T2, T2.type === 'torii' ? hz2 * 0.8 : hz2);
     }
     slab.c.save();
-    var bl = lerp(1.4, 0, S0.u) * PR * V.groundSoft;
     slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
     slab.c.drawImage(GTMP.cnv, 0, 0);
     slab.c.restore();
@@ -1858,6 +2246,7 @@ function drawFrontSkiers(c, t) {
    hollows.
    ============================================================ */
 function bakeNear() {
+  if (V.nearHeight <= 0) { NEAR.h = 0; NEAR.surf = null; WS.driftY = H; return; }
   var C = cols(), nH = V.nearHeight, hh = Math.min(GH, Math.ceil(nH * 1.6 + 30));
   NEAR.h = hh;
   NEAR.cnv.width = NEART.cnv.width = Math.round(W * PR);
@@ -2527,6 +2916,8 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  // the stone path's smoothed line on the screen (CSS pixels), for the drag handles
+  pathPreview: function () { return approachLayout().path; }, pathN: PATH_N, size: function () { return [W, H]; },
   skier: function () { spawnSkier(); },
   report: function () {
     return 'Winter Lab 2 report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
@@ -2585,7 +2976,7 @@ function rebuildAll() {
   buildSky();
   measureDots();
   dirty = {};
-  stages = ['mtn', 'near', 'ground', 'sprites'];
+  stages = ['mtn', 'near', 'far', 'ground', 'front', 'sprites'];
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2615,6 +3006,8 @@ function runStage(st) {
   SHADE = shadeColour();
   if (st === 'mtn') bakeScenery();
   else if (st === 'near') bakeNear();
+  else if (st === 'far') bakeFar();
+  else if (st === 'front') bakeFront();
   else if (st === 'ground') { bakeGround(); WS.skiers.forEach(function (K) { if (K.k >= WS.swells.length) K.k = WS.swells.length - 1; }); }
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
@@ -2626,7 +3019,7 @@ function rebake() {
   SR = PR * MT.resolution;
   if (dirty.mtn) stages.push('mtn');
   if (dirty.near) stages.push('near');
-  if (dirty.ground) stages.push('ground');
+  if (dirty.ground) stages.push('far', 'ground', 'front');
   if (dirty.branches) umeBuildAll();
   if (dirty.sprites || dirty.branches) stages.push('sprites');
   if (dirty.sun) sunDirty = true;
@@ -2704,8 +3097,13 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
   drawFrontClouds(t, dt);
-  // the snowfield and everything on it, the glints, the diamond dust
+  // the hill of firs and the pagoda (V.ref)
+  if (V.ref && FARL.cnv.width > 1) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(FARL.cnv, 0, 0); }
+  // the snowfield and everything on it, the pond with its reflection and steam
   drawGround(ctx, t);
+  drawPond(ctx, t, dt, true);
+  if (V.ref && BANKL.cnv.width > 1) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(BANKL.cnv, 0, 0); }
+  drawPond(ctx, t, dt, false);
   drawSparkles(ctx, t);
   drawDust(ctx, t);
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
@@ -2862,6 +3260,38 @@ var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 var G = [
   { name: 'Report', note: 'What happened on this tablet. After changing the time of day, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
     { report: true } ] },
+  { name: 'The reference scene', note: 'The shrine by the steaming pond (winterscene.js): the hill of firs with the pagoda, the hall, the torii row and lanterns, the pond, the cranes and the roped pines. Off: the older layout.', ctls: [
+    { chk: 'V', k: 'ref', label: 'Show the reference scene', re: 'all' },
+    { o: 'V', k: 'hillMist', label: 'Mist on the hill', min: 0, max: 1.5, step: 0.05, re: 'ground' },
+    { o: 'V', k: 'reflect', label: 'Reflection in the pond', min: 0, max: 1, step: 0.05, re: 'live' },
+    { o: 'V', k: 'ripple', label: 'Ripples', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'waterTint', label: 'Colour of the water', min: 0, max: 1, step: 0.05, re: 'live' },
+    { o: 'V', k: 'skyInWater', label: 'Sky glow in the water', min: 0, max: 1.5, step: 0.05, re: 'live' },
+    { o: 'V', k: 'steam', label: 'Steam off the pond', min: 0, max: 2, step: 0.05, re: 'live' } ] },
+  { name: 'Stone path', note: 'The path curves smoothly through points 1 (the front) to 9 (the shrine). Drag the numbered handles on the picture, or set each point here (across: 0 the left edge, 1 the right; down: 0.62 the eye line, 1 the bottom). The torii and lanterns follow the path.', ctls: [
+    { chk: 'V', k: 'pathHandles', label: 'Show the handles on the picture', re: 'live' },
+    { o: 'V', k: 'pathWidth', label: 'Path width (1 = one stone)', min: 0.4, max: 2.5, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'stoneGap', label: 'Gap between stones', min: 0.005, max: 0.12, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'stoneSize', label: 'Stone length', min: 0.15, max: 0.9, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'stoneDepth', label: 'Stone depth', min: 0.04, max: 0.25, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path1x', label: 'Point 1: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path1y', label: 'Point 1: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path2x', label: 'Point 2: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path2y', label: 'Point 2: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path3x', label: 'Point 3: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path3y', label: 'Point 3: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path4x', label: 'Point 4: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path4y', label: 'Point 4: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path5x', label: 'Point 5: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path5y', label: 'Point 5: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path6x', label: 'Point 6: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path6y', label: 'Point 6: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path7x', label: 'Point 7: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path7y', label: 'Point 7: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path8x', label: 'Point 8: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path8y', label: 'Point 8: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path9x', label: 'Point 9: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path9y', label: 'Point 9: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' } ] },
   { name: 'Time and weather', ctls: [
     { sel: 'time' }, { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
@@ -3200,5 +3630,65 @@ window.addEventListener('resize', function () { if (sp.style.left) place(parseFl
 var count = document.getElementById('spCount');
 setInterval(function () { count.textContent = lab.info(); }, 500);
 build();
+
+/* The stone path's handles on the picture: one numbered dot for each point the path curves through, to drag
+   where the path should go. While a handle is dragged the path's line shows as a dashed guide; the scene is
+   drawn again when it is let go (and the panel's sliders follow). */
+(function () {
+  var N = lab.pathN, layer = document.createElement('div');
+  layer.style.cssText = 'position:fixed;inset:0;z-index:40;pointer-events:none;';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;';
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('fill', 'none'); line.setAttribute('stroke', 'rgba(220,40,60,0.85)'); line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-dasharray', '6 5');
+  svg.appendChild(line); layer.appendChild(svg);
+  var dots = [];
+  for (var i = 1; i <= N; i++) {
+    var d = document.createElement('div');
+    d.textContent = i;
+    d.style.cssText = 'position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;' +
+      'background:rgba(220,40,60,0.88);color:#fff;font:bold 13px/26px sans-serif;text-align:center;' +
+      'box-shadow:0 1px 4px rgba(0,0,0,0.4);pointer-events:auto;touch-action:none;cursor:grab;user-select:none;';
+    layer.appendChild(d); dots.push(d);
+    (function (k, el) {
+      el.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing';
+        function move(ev) {
+          var sz = lab.size();
+          OBJ.V['path' + k + 'x'] = Math.round(ev.clientX / sz[0] * 1000) / 1000;
+          OBJ.V['path' + k + 'y'] = Math.round(Math.max(sz[1] * 0.63, ev.clientY) / sz[1] * 1000) / 1000;
+          place(true);
+        }
+        function up() {
+          el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+          el.style.cursor = 'grab'; line.style.display = 'none';
+          lab.changed('ground'); build();
+        }
+        el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+      });
+    })(i, d);
+  }
+  document.body.appendChild(layer);
+  function place(guide) {
+    var on = OBJ.V.ref && OBJ.V.pathHandles, sz = lab.size();
+    layer.style.display = on ? '' : 'none';
+    if (!on) return;
+    dots.forEach(function (el, j) {
+      el.style.left = (OBJ.V['path' + (j + 1) + 'x'] * sz[0]) + 'px';
+      el.style.top = Math.min(sz[1] - 13, OBJ.V['path' + (j + 1) + 'y'] * sz[1]) + 'px';
+    });
+    if (guide) {
+      line.style.display = '';
+      line.setAttribute('points', lab.pathPreview().map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '));
+    } else line.style.display = 'none';
+  }
+  // keep the handles where the values are (after a slider, a reset, a resize)
+  var ch = lab.changed;
+  lab.changed = function (w) { var r = ch.apply(lab, arguments); place(false); return r; };
+  window.addEventListener('resize', function () { place(false); });
+  document.getElementById('spReset').addEventListener('click', function () { place(false); });
+  place(false);
+})();
 })();
 </script>
