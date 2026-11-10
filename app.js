@@ -13239,19 +13239,33 @@ function sunColours(low) {
     glow: mixRgb(C.glow, C.low, low), haze: mixRgb(C.haze, C.low, low * 0.9), ghost: mixRgb(C.ghost, C.low, low * 0.5)
   };
 }
-/* A round sprite of radius n px: f(p) is the brightness at p (0 centre, 1 edge). */
+/* A round sprite of radius n px: f(p) is the brightness at p (0 centre, 1 edge).
+   The sprite is the same in its four quarters (only the fine grain differs), so the brightness and the colour
+   are worked out for one quarter and used four times: the same picture, pixel for pixel, in a quarter of the time. */
 function sunBakeRound(Sp, n, f, col) {
   var d = n * 2, c = Sp.c;
-  Sp.cnv.width = Sp.cnv.height = d;
-  var img = c.createImageData(d, d), px = img.data, r = rngFrom(97);
-  for (var y = 0; y < d; y++) for (var x = 0; x < d; x++) {
-    var dx = x + 0.5 - n, dy = y + 0.5 - n, p = Math.sqrt(dx * dx + dy * dy) / n;
+  if (Sp.cnv.width !== d || Sp.cnv.height !== d) Sp.cnv.width = Sp.cnv.height = d;
+  var qI = new Float64Array(n * n), qC = new Uint8ClampedArray(n * n * 3), qx, qy, q;
+  for (qy = 0; qy < n; qy++) for (qx = 0; qx < n; qx++) {
+    var ax = qx + 0.5, ay = qy + 0.5, p = Math.sqrt(ax * ax + ay * ay) / n;
     if (p >= 1) continue;
     var I = f(p);
     if (I <= 0) continue;
-    var C = col(p), o = (y * d + x) * 4;
-    px[o] = C[0]; px[o + 1] = C[1]; px[o + 2] = C[2];
-    px[o + 3] = clamp(Math.floor(I * 255 + r()), 0, 255);
+    var C = col(p);
+    q = qy * n + qx;
+    qI[q] = I; qC[q * 3] = C[0]; qC[q * 3 + 1] = C[1]; qC[q * 3 + 2] = C[2];
+  }
+  var img = c.createImageData(d, d), px = img.data, r = rngFrom(97);
+  for (var y = 0; y < d; y++) {
+    qy = y < n ? n - 1 - y : y - n;
+    for (var x = 0; x < d; x++) {
+      q = qy * n + (x < n ? n - 1 - x : x - n);
+      var Iq = qI[q];
+      if (Iq <= 0) continue;
+      var o = (y * d + x) * 4;
+      px[o] = qC[q * 3]; px[o + 1] = qC[q * 3 + 1]; px[o + 2] = qC[q * 3 + 2];
+      px[o + 3] = clamp(Math.floor(Iq * 255 + r()), 0, 255);
+    }
   }
   c.putImageData(img, 0, 0);
 }
@@ -13259,7 +13273,7 @@ function sunBakeRound(Sp, n, f, col) {
    the root, fading and thinning toward the tip, with a soft cross-section. */
 function sunBakeRay(Sp, w, h, across, along, colIn, colOut) {
   var c = Sp.c;
-  Sp.cnv.width = w; Sp.cnv.height = h;
+  if (Sp.cnv.width !== w || Sp.cnv.height !== h) { Sp.cnv.width = w; Sp.cnv.height = h; }
   var img = c.createImageData(w, h), px = img.data, r = rngFrom(31);
   for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
     var u = (x + 0.5) / w, v = (y + 0.5 - h / 2) / (h / 2);
@@ -13272,24 +13286,47 @@ function sunBakeRay(Sp, w, h, across, along, colIn, colOut) {
   }
   c.putImageData(img, 0, 0);
 }
-function sunBake(low) {
+/* The sun's pieces, as a list of jobs (one piece each): sunBake does them all at once (the first time, while
+   the name stands still: sunPrebake); when the sun's colour changes later, drawSun does one a frame (sunBakeLeft),
+   so no frame has to wait for all eight. */
+function sunBakeJobs(low) {
   var K = sunColours(low), white = [255, 255, 255], L = SUN_LOOK;
   var s = L.coreSoftness, e0 = 0.62 * (1 - s * 0.45), e1 = 0.62 + s * 0.3;
-  sunBakeRound(SUN_SPR.core, 64, function(p) { return 1 - smooth(e0, e1, p) * (1 - 0.12 * Math.exp(-p * 4)); },
-               function(p) { return mixRgb(white, K.core, smooth(0.3, 0.7, p)); });
   var F = L.glowFalloff;
-  sunBakeRound(SUN_SPR.glow, 200, function(p) {
-    return (0.62 * Math.exp(-p * 13 * F) + 0.3 * Math.exp(-p * 5 * F) + 0.14 * Math.exp(-p * 2 * F)) * Math.pow(1 - p * p, 2);
-  }, function(p) { return mixRgb(mixRgb(white, K.core, 0.5), K.glow, smooth(0, 0.25, p)); });
-  sunBakeRound(SUN_SPR.haze, 160, function(p) { return Math.exp(-p * p * 3.2) * Math.pow(1 - p * p, 2); }, function() { return K.haze; });
-  sunBakeRound(SUN_SPR.soft, 96, function(p) { return Math.exp(-p * p * 4) * (1 - p * p); }, function(p) { return mixRgb(K.core, K.glow, p); });
-  sunBakeRay(SUN_SPR.ray, 256, 24, 0.42, function(u) { return Math.pow(1 - u, 1.4) * (0.3 + 0.7 * Math.exp(-u * 3.5)); },
-             mixRgb(white, K.core, 0.5), K.glow);
-  sunBakeRay(SUN_SPR.beam, 128, 48, 0.75, function(u) { return Math.pow(1 - u, 1.8) * smooth(0, 0.18, u); }, K.glow, K.glow);
-  sunBakeRound(SUN_SPR.ghost, 64, function(p) { return (0.55 + 0.45 * smooth(0.55, 0.92, p)) * (1 - smooth(0.88, 1, p)); },
-               function() { return K.ghost; });
-  sunBakeRound(SUN_SPR.ring, 160, function(p) { var k = (p - 0.86) / 0.045; return Math.exp(-k * k) + 0.25 * Math.exp(-p * 3) * (1 - smooth(0.7, 0.86, p)); },
-               function(p) { return p < 0.86 ? mixRgb([255, 200, 170], white, smooth(0.78, 0.86, p)) : mixRgb(white, [205, 222, 255], smooth(0.86, 0.95, p)); });
+  return [
+    function() { sunBakeRound(SUN_SPR.core, 64, function(p) { return 1 - smooth(e0, e1, p) * (1 - 0.12 * Math.exp(-p * 4)); },
+                 function(p) { return mixRgb(white, K.core, smooth(0.3, 0.7, p)); }); },
+    function() { sunBakeRound(SUN_SPR.glow, 200, function(p) {
+      return (0.62 * Math.exp(-p * 13 * F) + 0.3 * Math.exp(-p * 5 * F) + 0.14 * Math.exp(-p * 2 * F)) * Math.pow(1 - p * p, 2);
+    }, function(p) { return mixRgb(mixRgb(white, K.core, 0.5), K.glow, smooth(0, 0.25, p)); }); },
+    function() { sunBakeRound(SUN_SPR.haze, 160, function(p) { return Math.exp(-p * p * 3.2) * Math.pow(1 - p * p, 2); }, function() { return K.haze; }); },
+    function() { sunBakeRound(SUN_SPR.soft, 96, function(p) { return Math.exp(-p * p * 4) * (1 - p * p); }, function(p) { return mixRgb(K.core, K.glow, p); }); },
+    function() { sunBakeRay(SUN_SPR.ray, 256, 24, 0.42, function(u) { return Math.pow(1 - u, 1.4) * (0.3 + 0.7 * Math.exp(-u * 3.5)); },
+                 mixRgb(white, K.core, 0.5), K.glow); },
+    function() { sunBakeRay(SUN_SPR.beam, 128, 48, 0.75, function(u) { return Math.pow(1 - u, 1.8) * smooth(0, 0.18, u); }, K.glow, K.glow); },
+    function() { sunBakeRound(SUN_SPR.ghost, 64, function(p) { return (0.55 + 0.45 * smooth(0.55, 0.92, p)) * (1 - smooth(0.88, 1, p)); },
+                 function() { return K.ghost; }); },
+    function() { sunBakeRound(SUN_SPR.ring, 160, function(p) { var k = (p - 0.86) / 0.045; return Math.exp(-k * k) + 0.25 * Math.exp(-p * 3) * (1 - smooth(0.7, 0.86, p)); },
+                 function(p) { return p < 0.86 ? mixRgb([255, 200, 170], white, smooth(0.78, 0.86, p)) : mixRgb(white, [205, 222, 255], smooth(0.86, 0.95, p)); }); }
+  ];
+}
+var sunBakeLeft = [];
+function sunBake(low) {
+  sunBakeLeft = [];
+  sunBakeJobs(low).forEach(function(job) { job(); });
+}
+/* The colour step the sun's pieces are baked for (drawSun). */
+function sunLowKey() {
+  var low = 1 - smooth(2, 22, ENV.astro.sun.alt);
+  return Math.round(Math.max(low, SUN_LOOK.warmth * 0.6) * 12) / 12;
+}
+/* While the name stands still (dynPrelude): the sun's pieces and rays are made, so the first frame of the scene
+   does not have to make them. */
+function sunPrebake() {
+  if (!ENV.astro || !ENV.astro.sun) return;
+  if (!sunRays.length) sunBuildRays();
+  var lowK = sunLowKey(), bk = String(lowK);
+  if (bk !== sunBakedKey) { sunBakedKey = bk; sunBakedAt = lastT; sunBake(lowK); }
 }
 /* Where each streak, spike and beam points, how long and thick it is, and its
    own shimmer. Fixed by the pattern number. */
@@ -13504,11 +13541,17 @@ function drawSun(ctx, t) {
   if (!sunRays.length) sunBuildRays();
   var night = 1 - smooth(0.05, 0.5, ENV.light.daylight);          // 0 by day, 1 in the dark
   var low = 1 - smooth(2, 22, a.alt);                              // 1 as the sun nears the horizon
-  var lowK = Math.round(Math.max(low, L.warmth * 0.6) * 12) / 12;
+  var lowK = sunLowKey();
 
-  // the sun's pieces, baked again only when its colour has really changed (and not more than once in a while)
+  // the sun's pieces, baked again only when its colour has really changed (and not more than once in a while):
+  // all at once the first time, one piece a frame after that
   var bk = String(lowK);
-  if (bk !== sunBakedKey && (t - sunBakedAt > 1.5 || !sunBakedKey)) { sunBakedKey = bk; sunBakedAt = t; sunBake(lowK); }
+  if (bk !== sunBakedKey && (t - sunBakedAt > 1.5 || !sunBakedKey)) {
+    var firstSun = !sunBakedKey;
+    sunBakedKey = bk; sunBakedAt = t;
+    if (firstSun) sunBake(lowK); else sunBakeLeft = sunBakeJobs(lowK);
+  }
+  if (sunBakeLeft.length) sunBakeLeft.shift()();
   var P = { x: skyToScreen(a.alt, a.az).x }, R = sunRadius(a.alt);
   P.y = skyBandY(R); var X = P.x, Y = P.y;
   // the clouds: the weather's values ease in; the time of day is blended (in steps, so they are
@@ -15969,7 +16012,7 @@ function gfxPoll(dt) {
   if (gfxBeat > 0) return;
   gfxBeat = 1;
   var k = gfxState();
-  if (k !== gfxKey) { gfxKey = k; gfxNote('changed: ' + k); }
+  if (k !== gfxKey) { gfxKey = k; gfxNote('changed: ' + k); wipeWatch(); }
   else if (++gfxBeats % 30 === 0) gfxNote('still running: ' + k + (performance.memory ? ', script memory ' + Math.round(performance.memory.usedJSHeapSize / 1048576) + ' MB' : ''));
 }
 var gfxBeats = 0;
@@ -16328,6 +16371,21 @@ function landStepScenery() {
   landFinishScenery(g3, rf);
   return true;
 }
+/* How often (s) the kept pictures are looked at for having been wiped (landCheck here, winCheck in 8d). Looking
+   means reading a row of pixels back from the graphics chip, which makes the frame it falls in wait for the
+   chip, so it is not done every 3 s all the time (as before): Chrome drops a kept picture while the page is
+   hidden or the graphics chip is taken away (a screenshot, the share sheet), so it is every 3 s for 20 s after
+   the page comes back (shown again, focus lost or regained, a new size) or after the mountains' or the trees'
+   graphics change state (gfxPoll), and otherwise every 30 s, just in case. */
+var wipeWatchUntil = 0;
+function wipeWatch() {
+  wipeWatchUntil = performance.now() + 20000;
+  LS.wipeAt = 0;
+  if (typeof WS !== 'undefined' && WS) WS.wipeAt = 0;
+}
+function wipeEvery() { return performance.now() < wipeWatchUntil ? 3 : 30; }
+document.addEventListener('visibilitychange', wipeWatch);
+['pageshow', 'focus', 'blur', 'resize'].forEach(function(ev) { window.addEventListener(ev, wipeWatch); });
 /* Once a second, after the ink reveal: the autumn mountains are baked again when their 3D picture came
    back empty, or (every 3 s) when the kept scenery was wiped (Chrome may drop it while the page is
    hidden behind a screenshot or the share sheet). At most 3 times in a row. */
@@ -16348,7 +16406,7 @@ function landCheck(t) {
   LS.lostFor = 0;
   var redo = LS.mtnRetry;
   if (!redo && t >= (LS.wipeAt || 0)) {
-    LS.wipeAt = t + 3;
+    LS.wipeAt = t + wipeEvery();
     redo = winBlankRow(LS.SCN, (H * LAND.horizon - H * 0.02) * LAND_SR);
     if (redo) gfxNote('mountains: the scenery was wiped');
   }
@@ -16779,16 +16837,17 @@ function updateLandscape(t, bedBatch) {
   if (LS.step) {                                  // a bake under way: one part per frame, so no single long pause
     if (win && WIN_MTN.job) { winStepScenery(); return; }   // the winter mountains: a band a frame, first (8d)
     if (!win && LAND_MTN.job) { landStepScenery(); return; } // the autumn mountains: the same (8c)
-    if (LS.step === 2) { if (win) winBakeGround(); else landBakeGround(); }
+    if (LS.step === 2) { if (win) { if (!winBakeGroundStep()) return; } else landBakeGround(); }   // (winter: a swell a frame while the scene shows)
     else if (LS.step === 4) { torBake(); }                   // the torii gates and the gravel path (autumn only), once the rest is ready
     else if (LS.step === 5) { if (!lakeBakeHeadStep()) return; }   // the lake (autumn): the wooded headland and the pagoda (a part a frame),
     else if (LS.step === 6) { lakeBakeWaterStep(); }         // the water,
     else if (LS.step === 8) { lakeBakeGroveStep(); }         // the grove and the bank trees,
     else if (LS.step === 7) { lakeBakeForeStep(); }          // and the near shore, once the ground is ready
-    else if (win) { winBakeNear(); winBakeSprites(); LS.ready = true; }
+    else if (win && LS.step === 3) { winBakeNear(); }        // winter: the snowdrift in front,
+    else if (win) { winBakeSprites(); LS.ready = true; }     // then the blossoms, the flakes and the branches' snow (a frame of their own)
     else { landBakeNear(); LS.ready = true; placeFloor(); }
-    // winter: 2 → 3; autumn: (the scenery) 5 → 6 → 8 → 2 → 7 → 3 → 4
-    LS.step = win ? (LS.step === 2 ? 3 : 0) : ({ 5: 6, 6: 8, 8: 2, 2: 7, 7: 3, 3: 4 }[LS.step] || 0);
+    // winter: 2 → 3 → 9; autumn: (the scenery) 5 → 6 → 8 → 2 → 7 → 3 → 4
+    LS.step = win ? ({ 2: 3, 3: 9 }[LS.step] || 0) : ({ 5: 6, 6: 8, 8: 2, 2: 7, 7: 3, 3: 4 }[LS.step] || 0);
     return;                                       // the loose leaves are laid on a later frame
   } else if (k !== LS.key) {
     var was = LS.key.split('|'), now = k.split('|');
@@ -19753,6 +19812,15 @@ function lakeFftParams() {
            L0: LAKE.fftL0, L1: LAKE.fftL1, eye: LAKE.fftEye, height: LAKE.fftHeight, chop: LAKE.fftChop,
            detail: LAKE.fftDetail, far: LAKE.fftFar, shade: LAKE.fftShade };
 }
+/* While the name stands still (dynPrelude): the simulated waves' first shape is worked out for the wind as it is
+   now (once for each set of values), so the frame that first shows the lake does not have to. */
+var lakeWavesWarm = '';
+function lakeWarmWaves() {
+  if (!LAKE.shader || !LAKE.fft || typeof Water === 'undefined' || !Water.warm || !isFinite(ENV.windMs)) return;
+  var fp = lakeFftParams(), k = JSON.stringify(fp);
+  if (k === lakeWavesWarm) return;
+  try { if (Water.warm(fp)) lakeWavesWarm = k; } catch (e) { lakeWavesWarm = k; }
+}
 function lakeShaderOn() { return LAKE.shader && typeof Water !== 'undefined' && Water.state() === 'ok'; }
 /* How much of the sun's glitter the water shows: dimmed under a heavy cloud cover (from half covered to
    overcast) and in rain (as the rain on the scene, RN.lvl, comes in), eased so it never jumps when the weather
@@ -20915,12 +20983,19 @@ function winSfOptions(sw) {
            relief: WINT.relief, roll: WINT.roll, drifts: WINT.drifts, ripples: WINT.ripples, rippleSize: WINT.rippleSize,
            rippleAngle: WINT.rippleAngle, grain: WINT.grain, hollows: WINT.hollows, sheen: WINT.sheen, seed: WINT.seed };
 }
-function winBakeGround() {
-  var t0 = performance.now(), C = winCols(), hy = H * WINT.horizon, r = rngFrom(WINT.seed * 71 + 3), N = Math.max(2, Math.round(WINT.swells));
+/* The snowfield is baked in three parts: winGroundStart (the swells' shapes and what stands on each), then
+   winGroundSlab for each swell, from the far ones to the near (its picture: the lit snow, the shadows, the things),
+   then winGroundFinish (the glints, the mist, the skiers' shadows). winBakeGround does them all at once, as
+   before. winBakeGroundStep (updateLandscape) does that too while the scene is not showing yet; once it is
+   showing (the light has changed), it does one swell a frame, each swell keeping its old picture until its new
+   one is drawn, and the lights and the glints staying as they were until the last: all the swells in one frame
+   made the scene stop for a moment at every change of the light. */
+var WIN_GRD = null;
+function winGroundStart() {
+  var hy = H * WINT.horizon, r = rngFrom(WINT.seed * 71 + 3), N = Math.max(2, Math.round(WINT.swells));
   var depthPx = Math.max(1, H - hy), k, b, NX = 256;
   if (!LS.GTMP) LS.GTMP = landCanvas();
-  WS.sparkles = []; WS.torii = null; WS.lights = [];
-  var things = winPlan(rngFrom(WINT.seed * 313 + 11)), swells = WS.swells = [];
+  var things = winPlan(rngFrom(WINT.seed * 313 + 11)), swells = [], oldTorii = WS.torii, torii = null;
   for (k = 0; k < N; k++) {
     var u0 = k / (N - 1);
     var Sk = { u: u0, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * WINT.swellHeight,
@@ -20933,51 +21008,63 @@ function winBakeGround() {
     var B = things[b], kb = Math.round(B.u * (N - 1)), Sb = swells[kb];
     B.yb = winCrestY(Sb, B.x) + Sb.amp * 0.5 + 2; B.k = kb; B.record = B.type === 'light';
     Sb.things.push(B);
-    if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: winThingH(B) }; WS.toriiK = kb; }
+    if (B.type === 'torii') { torii = { x: B.x, y: B.yb, h: winThingH(B), top: oldTorii ? oldTorii.top : undefined }; WS.toriiK = kb; }
   }
+  WS.swells = swells; WS.torii = torii;
   var sfo = winSfOptions(swells.map(function (S) { return { crest: S.crest, u: S.u, haze: S.haze }; }));
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
   if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') {
     WS.retry = true;                                       // drawn again once WebGL is back (winCheck)
     var lastSl = WS.slabs[WS.slabs.length - 1];
-    if (lastSl && !winBlankRow(lastSl, lastSl.cnv.height - 2)) return;   // the old picture stays meanwhile
+    if (lastSl && !winBlankRow(lastSl, lastSl.cnv.height - 2)) return null;   // the old picture stays meanwhile
   }
-  var old = WS.slabs; WS.slabs = []; WS.sfGL = false;
-  for (k = 0; k < N; k++) {
+  return { N: N, k: 0, swells: swells, sfo: sfo, gl3: gl3, hy: hy, depthPx: depthPx, lights: [], sfGL: false };
+}
+function winGroundSlab(G, k) {
+  var N = G.N, swells = G.swells, b;
     var S0 = swells[k], top = S0.yk - S0.amp - 8;
     for (b = 0; b < S0.things.length; b++) top = Math.min(top, winThingTop(S0.things[b]) - 12);
     top = Math.max(0, Math.floor(top));
     var bottom = k < N - 1 ? Math.min(H, Math.ceil(swells[k + 1].yk + swells[k + 1].amp + 14)) : H;
-    var slab = old[k] || landCanvas(), cw = Math.round(W * PR), ch = Math.max(1, Math.round((bottom - top) * PR));
-    slab.top = top; slab.k = k;
-    if (slab.cnv.width !== cw || slab.cnv.height !== ch) { slab.cnv.width = cw; slab.cnv.height = ch; }
-    else { slab.c.setTransform(1, 0, 0, 1, 0, 0); slab.c.clearRect(0, 0, cw, ch); }
+    var slab = WS.slabs[k] || landCanvas(), cw = Math.round(W * PR), ch = Math.max(1, Math.round((bottom - top) * PR));
     LS.GTMP.cnv.width = cw; LS.GTMP.cnv.height = ch;
     var tg = LS.GTMP.c;
     tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, cw, ch);
-    var sf = gl3 ? Snowfield.render(sfo, k, top, bottom) : null;
-    if (gl3 && !sf) WS.retry = true;                       // lost on the way: plain swells for now, the real ones soon
-    if (sf) { tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch); WS.sfGL = true; }
+    var sf = G.gl3 ? Snowfield.render(G.sfo, k, top, bottom) : null;
+    if (G.gl3 && !sf) WS.retry = true;                     // lost on the way: plain swells for now, the real ones soon
+    if (sf) { tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch); G.sfGL = true; }
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) winFlatSwell(tg, S0, S0.haze);
     for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
       var T = S0.things[b], hz = WINT.groundHaze * Math.pow(1 - T.u, 2) * 0.9;
       winCastShadow(tg, T, hz);
     }
+    var keepLights = WS.lights;                               // (the lights now showing stay until every swell is drawn)
+    WS.lights = G.lights;
     for (b = 0; b < S0.things.length; b++) {
       var T2 = S0.things[b], hz2 = WINT.groundHaze * Math.pow(1 - T2.u, 2) * 0.9;
       winDrawThing(tg, T2, T2.type === 'torii' ? hz2 * 0.8 : hz2);
     }
+    WS.lights = keepLights;
+    // the swell's picture is replaced only now that its new one is drawn
+    slab.top = top; slab.k = k;
+    if (slab.cnv.width !== cw || slab.cnv.height !== ch) { slab.cnv.width = cw; slab.cnv.height = ch; }
+    else { slab.c.setTransform(1, 0, 0, 1, 0, 0); slab.c.clearRect(0, 0, cw, ch); }
     slab.c.save();
     var bl = lerp(1.4, 0, S0.u) * PR * WINT.groundSoft;
     slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
     slab.c.drawImage(LS.GTMP.cnv, 0, 0);
     slab.c.restore();
-    WS.slabs.push(slab);
-  }
+    WS.slabs[k] = slab;
+}
+function winGroundFinish(G) {
+  var C = winCols(), hy = G.hy, depthPx = G.depthPx, N = G.N, gl3 = G.gl3, sfo = G.sfo, k;
   LS.GTMP.cnv.width = LS.GTMP.cnv.height = 1;
   WS.SHD.cnv.width = WS.SHD.cnv.height = 1;
-  for (k = N; k < old.length; k++) old[k].cnv.width = old[k].cnv.height = 1;   // swells no longer there: give back their memory
+  for (k = N; k < WS.slabs.length; k++) WS.slabs[k].cnv.width = WS.slabs[k].cnv.height = 1;   // swells no longer there: give back their memory
+  WS.slabs.length = N;
+  WS.lights = G.lights; WS.sfGL = G.sfGL;
+  WS.sparkles = [];
   // the points that glint: where the sun falls on the snow (read once from a small map of the sunlight)
   if (WINT.sparkle > 0 && gl3) {
     var so = {}; for (var key in sfo) so[key] = sfo[key];
@@ -21011,6 +21098,27 @@ function winBakeGround() {
   WS.shadow = { sx: clamp(-Math.sin(az) * cot, -3.5, 3.5), sy: clamp(-Math.cos(az) * cot * 0.35, -0.9, 0.9), col: rgba(WSHADE), k: WINT.skiShadow * WL.vis };
   WS.trackLo = rgba(mixRgb(WSHADE, winLit(C.snow, 0, 0.6, 0.8, 0), 0.3)); WS.trackHi = rgba(winLit(C.snow, WL.dir[0] * 0.5, 1, 0.3, 1));
   if (gl3 && typeof Snowfield.losses === 'function') WS.sfLoss = Snowfield.losses();
+}
+function winBakeGround() {
+  var G = winGroundStart();
+  if (!G) return;
+  for (var k = 0; k < G.N; k++) winGroundSlab(G, k);
+  winGroundFinish(G);
+}
+/* One frame's share (updateLandscape, step 2): true once the snowfield is done. */
+function winBakeGroundStep() {
+  if (dynMaster < 0.01 || WS.snowNow || !WS.slabs.length) { WIN_GRD = null; winBakeGround(); return true; }   // not showing yet (or the pictures were lost): all at once
+  if (!WIN_GRD) {
+    WIN_GRD = winGroundStart();
+    if (!WIN_GRD) return true;
+    if (WS.slabs.length !== WIN_GRD.N) { for (var k = 0; k < WIN_GRD.N; k++) winGroundSlab(WIN_GRD, k); winGroundFinish(WIN_GRD); WIN_GRD = null; return true; }
+    return false;                                   // (the shapes this frame, the first swell the next)
+  }
+  winGroundSlab(WIN_GRD, WIN_GRD.k++);
+  if (WIN_GRD.k < WIN_GRD.N) return false;
+  winGroundFinish(WIN_GRD);
+  WIN_GRD = null;
+  return true;
 }
 /* #dynBack: each slice, then on it the tracks, the skiers, the powder they kick up and the lights. */
 function winDrawGround(c, t) {
@@ -21539,7 +21647,12 @@ function umeBakeBlooms() {
   WS.wood = [rgba(wood), rgba(mixRgb(wood, mistC, back * 0.5))];
   WS.woodLit = [rgba(woodLit, WINT.barkLight * 0.55), rgba(mixRgb(woodLit, mistC, back * 0.5), WINT.barkLight * 0.4)];
   WS.petal = rgba(winLight(C.blossom)); WS.petalDk = rgba(winLight(C.blossomDeep));
-  WS.branches.forEach(umeBakeSnow);
+  // the snow on the branches: at once while the scene is not showing yet, or when the pictures had to be made
+  // again (winForceRebake); a few a frame when only the light has changed
+  umeSnowQ = [];
+  var allNow = WS.snowNow || dynMaster < 0.01;
+  WS.snowNow = false;
+  WS.branches.forEach(allNow ? umeBakeSnow : umeBakeSnowLater);
 }
 function umeBuild(left, idx) {
   var r = rngFrom(WINT.seed * 7919 + (left ? 0 : 101) + idx * 577);
@@ -21616,6 +21729,7 @@ function umeBuild(left, idx) {
 function umeBuildAll() {
   WS.branches = []; WS.puffs = []; WS.petals = [];
   for (var idx = WINT.branchCount - 1; idx >= 0; idx--) { WS.branches.push(umeBuild(true, idx)); WS.branches.push(umeBuild(false, idx)); }
+  umeSnowQ = [];
   WS.branches.forEach(umeBakeSnow);
 }
 /* The snow on the branches and on the torii: the shapes from snowheaps.js and torii.js, lit
@@ -21635,12 +21749,18 @@ function winSnowMat(dir, haze) {
            grain: WINT.snowGrain, glow: WINT.snowGlow, contact: WINT.snowContact, sparkle: WINT.snowSparkle,
            haze: haze || 0, hazeColour: winLight(hexToRgb(WINT.colours.mist)), seed: WINT.seed };
 }
-function umeBakeSnow(T) {
-  if (!WL) return;
+/* The snow on one branch: umeSnowMaker(T) gives a function that makes the picture of piece i's snow in the light
+   as it is now. umeBakeSnow makes them all at once (the first time, a new screen size, or after the pictures
+   were lost); umeBakeSnowLater, when only the light has changed while the scene is showing, puts them in a queue
+   that winUpdate works through a few a frame (umeSnowSome), each piece keeping its old picture until its new one
+   is made: all of them in one frame (about 300 small pictures, each lit on the graphics chip) made the scene stop
+   for a moment at every change of the light. */
+function umeSnowMaker(T) {
   var C = winCols(), back = T.idx > 0 ? WINT.branchDepth : 0, RS = PR * 1.25, kids = {}, L = WL.dir;
   T.nodes.forEach(function (n) { if (n.p >= 0) kids[n.p] = (kids[n.p] || 0) + 1; });
   var useMat = typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
-  T.snow = T.nodes.map(function (n, i) {
+  return function (i) {
+    var n = T.nodes[i];
     var ca = Math.cos(n.abs), sa = Math.sin(n.abs), ux0 = Math.abs(ca);
     var hS = (n.w * 0.5 + 1.2 + T.sc * 0.005) * 1.35 * WINT.branchSnow * Math.pow(ux0, 0.8);
     if ((hS < 0.4 && WINT.branchDust <= 0) || n.len < 1) return null;
@@ -21675,7 +21795,29 @@ function umeBakeSnow(T) {
       c.fillStyle = g; c.fill();
     }
     return { cnv: cnv, x0: x0, y0: y0, w: w, h: h, piv: (n.w / 2 + T.endW[i]) / 2 * 0.8, ux: Math.max(0.05, Math.pow(ux0, 0.8)) };
-  });
+  };
+}
+function umeBakeSnow(T) {
+  if (!WL) return;
+  var make = umeSnowMaker(T);
+  T.snow = T.nodes.map(function (n, i) { return make(i); });
+}
+var umeSnowQ = [];
+function umeBakeSnowLater(T) {
+  if (!WL) return;
+  if (!T.snow || T.snow.length !== T.nodes.length) { umeBakeSnow(T); return; }
+  for (var i = 0; i < T.nodes.length; i++) umeSnowQ.push({ T: T, i: i });
+}
+/* A few of the queued pieces, for about ms milliseconds (at least one). */
+function umeSnowSome(ms) {
+  if (!umeSnowQ.length || !WL) return;
+  var t0 = performance.now(), curT = null, make = null;
+  do {
+    var q = umeSnowQ.shift();
+    if (WS.branches.indexOf(q.T) < 0 || !q.T.snow) continue;       // (its branch is gone: a new screen size)
+    if (q.T !== curT) { curT = q.T; make = umeSnowMaker(q.T); }
+    q.T.snow[q.i] = make(q.i);
+  } while (umeSnowQ.length && performance.now() - t0 < ms);
 }
 function umePose(T, t, amp) {
   var ns = T.nodes;
@@ -22011,7 +22153,7 @@ function winReset() {
   WS.bKey = ''; WS.branches = []; WS.puffs = []; WS.petals = []; WS.flakes = []; WS.filled = false;
   WS.landed = []; WS.bokeh = []; WS.gusts = []; WS.sparkles = []; WS.tracks = []; WS.powder = []; WS.lights = [];
   WS.skiers = []; WS.slabs = []; WS.swells = []; WS.dots = null; WS.retry = false;
-  winDust = [];
+  winDust = []; umeSnowQ = []; WIN_GRD = null;
   if (WIN_MTN.job) { WIN_MTN.job.cancel(); WIN_MTN.job = null; }
 }
 /* The light-dependent sprites (blossoms and the snow on the branches, flakes), baked with the
@@ -22023,7 +22165,7 @@ function winBakeSprites() {
   if (WS.bKey !== key) { WS.bKey = key; umeBuildAll(); }
 }
 /* Bake the whole scene again on the next frame (the light is unchanged). */
-function winForceRebake() { LS.key = ''; LS.at = -1e9; }
+function winForceRebake() { LS.key = ''; LS.at = -1e9; WS.snowNow = true; }
 /* Once a second: a WebGL context was lost (and is back), a picture came out blank, or (every
    3 s) a kept picture was wiped: the scene is baked again. */
 function winCheck(t) {
@@ -22036,7 +22178,7 @@ function winCheck(t) {
                   (WS.sfLoss !== undefined && Snowfield.losses && Snowfield.losses() !== WS.sfLoss);
   if (WS.retry || lostSince) { WS.retry = false; winForceRebake(); return; }
   if (t < WS.wipeAt) return;
-  WS.wipeAt = t + 3;
+  WS.wipeAt = t + wipeEvery();
   var SL = WS.slabs[WS.slabs.length - 1];
   if ((WIN_MTN.is3d && winBlankRow(LS.SCN, (H * WINT.horizon - H * 0.02) * LAND_SR)) || (SL && SL.cnv.height > 2 && winBlankRow(SL, SL.cnv.height - 2))) winForceRebake();
 }
@@ -22051,6 +22193,7 @@ function winUpdate(dt, t) {
   winUpdateFlakes(t, dt);
   winUpdateSkiers(t, dt);
   winUpdateDust(t, dt);
+  if (!LS.step) umeSnowSome(3);                    // the branches' snow in the new light, a few pieces a frame
   winCheck(t);
 }
 /* #dynBack, after the landscape: the glints on the snow and the diamond dust in the air. */
@@ -22095,9 +22238,14 @@ var farLayer = document.createElement('canvas');          // half-size layer for
 var ctxFar = farLayer.getContext('2d');
 var W = 0, H = 0, GH = 150;                  // GH: height (CSS px) of the ground strip
 var drawOffsetY = 0, dynFrontMul = 0;
-function resize() {
-  W = window.innerWidth; H = window.innerHeight;
-  PR = (window.devicePixelRatio || 1) * S.renderScale;
+function resize(force) {
+  /* The same size as before (the tablet turned right round, the system bars sliding over the page): nothing to do.
+     Setting a canvas's size again, even to the same numbers, wipes it, so every layer went blank for a frame and
+     the whole scene was then made again. */
+  var nw = window.innerWidth, nh = window.innerHeight, npr = (window.devicePixelRatio || 1) * S.renderScale;
+  if (force !== true && nw === W && nh === H && npr === PR && cvBack.width === Math.round(nw * npr) && cvBack.height === Math.round(nh * npr)) return;
+  W = nw; H = nh;
+  PR = npr;
   var cw = Math.round(W * PR), ch = Math.round(H * PR);
   cvBack.width = cvFront.width = cvNear.width = treeLayer.width = koyoLeafLayer.width = birdLayer.width = birdSlotLayer.width = cw;
   cvBack.height = cvFront.height = cvNear.height = treeLayer.height = koyoLeafLayer.height = birdLayer.height = birdSlotLayer.height = ch;
@@ -22109,6 +22257,7 @@ function resize() {
   cvSky.height = Math.max(1, Math.round(H * PR * SKY_RES));
   skyTimer = 0;
   lookVersion++; bigLightV++;
+  if (force !== true) dynLastMs = 0;              // (the layers are blank now: the next frame is drawn, not skipped)
 }
 
 var flurryQueue = [];
@@ -22286,7 +22435,7 @@ function dynFrontTarget() {
 /* lazy (during the name): the trees' clumps and the first leaves are left for
    dynSetupStep to do a few per frame. */
 function dynBegin(lazy) {
-  resize();
+  resize(true);                                   // (a fresh start: every layer wiped, as before)
   advanceClock();
   computeEnv();
   ensureTree(lazy);
@@ -22328,7 +22477,7 @@ function dynSetupProgress() {
   if (LS.key) {
     land = 0.12;
     if (!(ENV.scene === 'autumn' && LAND_MTN.job)) {
-      var steps = ENV.scene === 'autumn' ? RV_STEPS : [2, 3], done = steps.length;
+      var steps = ENV.scene === 'autumn' ? RV_STEPS : [2, 3, 9], done = steps.length;
       if (LS.step) done = Math.max(0, steps.indexOf(LS.step));
       land = 0.12 + 0.88 * done / steps.length;
     }
@@ -22465,6 +22614,8 @@ function dynPrelude(dt, t, skyWant) {
         do { dynSetupStep(t, true); } while (dynSetupBusy() && performance.now() - nowMs < 30);
       } else dynSetupStep(t, false);
       if (dynBegun && still) {
+        sunPrebake();                                   // the sun's pieces (otherwise made in the scene's first frame)
+        if (ENV.scene === 'autumn') lakeWarmWaves();    // the lake's waves (otherwise worked out in the lake's first frame)
         rvPrepare();                                    // the ink reveal's fluid, set up while the name stands still
         if (!dynSetupBusy()) rvPrecompute(nowMs);       // and each part's drops, once what it shows has been made
       }
@@ -23212,9 +23363,9 @@ function onWeather(c) {
    ============================================================ */
 if (cvSky && cvBack && cvGround && cvFront && cvNear && ctxSky && ctx && ctxG && ctxF && ctxN) {
   makeSprites();
-  resize();
-  window.addEventListener('resize', resize);
-  window.addEventListener('orientationchange', resize);
+  resize(true);
+  window.addEventListener('resize', function() { resize(); });
+  window.addEventListener('orientationchange', function() { resize(); });
   requestAnimationFrame(dynLoop);
 }
 /* The 風鈴 on the toolbar (Furin, above) asks how much the scene's gusts
@@ -23242,6 +23393,7 @@ function dynWarmGpu() {
     function() { if (typeof Mountains !== 'undefined' && Mountains.warm && MTN3D.on) Mountains.warm(); },
     function() { if (typeof Trunks !== 'undefined' && Trunks.warm) Trunks.warm(); },
     function() { if (!lakeWaterInit && typeof Water !== 'undefined' && LAKE.shader) { lakeWaterInit = true; Water.init('textures/waternormals.jpg'); } },
+    function() { if (typeof Water !== 'undefined' && Water.warm && LAKE.shader && LAKE.fft) Water.warm(null); },   // (the simulated waves' shaders)
     function() { if (typeof InkFluid !== 'undefined' && RV_LOOK.engine === 'gpu') InkFluid.init(); }
   ];
   (function next(i) {                              // one a frame or so, so no single long pause

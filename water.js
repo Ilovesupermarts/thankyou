@@ -327,6 +327,14 @@ function render(o) {
   gl.drawArrays(gl.TRIANGLES, 0, 3);
   return cnv;
 }
+/* Before the water is first shown (the app, while the name stands still): the simulated waves' shaders are
+   made and, given the waves' values, their first shape worked out, so the first frame of the lake has neither to do. */
+function warm(fft) {
+  if (!gl || lost || gl.isContextLost()) return false;
+  if (!fftSetup()) return false;
+  if (fft) fftSim.update(fft, 0);
+  return true;
+}
 function fftState() { return fftSim ? 'ok' : (typeof FFTWaves === 'undefined' || fftFailed ? 'none' : 'waiting'); }
 function fftInfo() { return fftSim ? { ms: fftSim.ms, rebuilt: fftSim.rebuilt, size: fftSim.size() } : null; }
 function state() {
@@ -336,5 +344,5 @@ function state() {
   if (!gl) return 'none';
   return normalReady ? 'ok' : 'loading';
 }
-return { init: init, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
+return { init: init, warm: warm, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
 })();
