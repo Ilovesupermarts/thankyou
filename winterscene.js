@@ -290,116 +290,210 @@ function path(c, o) {
     }
   });
   c.restore();
-  // the stones, as a mason sets a path: one after another along it with uneven gaps, each piece its
-  // own size and shape; here one long slab across the path, there two or three smaller pieces side by
-  // side, sometimes a short one set off to one side; each turned a little, and the line of them
-  // wandering a little either side of the middle. Their long side is turned partly across the path
-  // and partly square to you, as in the picture.
-  var stones = [], step;
-  function lay(X, Z, w, dp, rot) { stones.push({ X: X, Z: Z, w: w, dp: dp, rot: rot }); }
-  // with the nearest slabs set where the reference has them (o.fixed), the stones along the path start just
-  // beyond them: at the first point past the leftmost of them, the first stone's right end a small gap from it
-  var t0 = o.depth * 0.5, fit = false, lx = 0, gapPx = 0;
-  if (o.fixed && o.fixed.length) {
-    var ly = 0; lx = 1e9;
-    (o.fitTo || o.fixed).forEach(function (F) { F.forEach(function (p) { if (p[0] < lx) { lx = p[0]; ly = p[1]; } }); });
-    gapPx = D * o.gap * 0.5; fit = true;
-    for (var ts = 0; ts < total; ts += total / 400) {
-      var P0 = at(ts), C1 = toScreen(P0.X, P0.Z), hw0 = o.size * 0.55 * D / P0.Z;
-      if (C1[0] + hw0 < lx - gapPx && C1[1] < ly + D * 0.1) { t0 = ts; break; }
+  // (the layout is kept: the snowfield is baked in slices, each drawing the path)
+  var lkey = JSON.stringify([o.hy, o.yb, o.cx, o.size, o.depth, o.gap, o.pts, o.fixed, d(o, 'seed', 51)]);
+  var keep = layoutCache[lkey];
+  if (!keep) {
+  // THE STONES, laid as in the reference: rows of flat slabs filling a band of even width that follows the
+  // path's smooth line (both its edges smooth), one row behind another with the same gap between every two.
+  // Each row spans the band: one slab, or now and then two pieces with the same gap between them, their
+  // ends set in a little at random so the band's edges are not ruled. Where the path runs away from you a
+  // row lies level (square to you); where it runs across, the row turns square to the path. The measured
+  // slabs at the front (o.fixed) stand as they are: a piece that would come closer to one than the gap is
+  // trimmed on that side or shortened, or left out if too little of it would be left.
+  var B = o.size * 0.5, gapZ = o.gap * 1.0, rows = [], guard = 0;
+  // the path's points on the ground, finely
+  var GP = [];
+  for (t = 0; t <= total + 1e-9; t += total / 600) { var A0 = at(Math.min(t, total)); GP.push([A0.X, A0.Z]); }
+  var zMax = Math.max.apply(null, GP.map(function (q) { return q[1]; })), Zr = Math.min.apply(null, GP.map(function (q) { return q[1]; })) - B * 0.5;
+  // the band across, at depth Z: where a level line at that depth enters and leaves it
+  function chordAt(Z) {
+    var lo = 1e9, hi = -1e9;
+    GP.forEach(function (q) { var dz = q[1] - Z; if (Math.abs(dz) < B) { var h = Math.sqrt(B * B - dz * dz); lo = Math.min(lo, q[0] - h); hi = Math.max(hi, q[0] + h); } });
+    return hi > lo ? [lo, hi] : null;
+  }
+  // the row at depth Z: centred on the path, as wide as the band (a little wider where the path runs across,
+  // so the rows still meet as they step along it)
+  function rowAt(Z) {
+    for (var j = 1; j < GP.length; j++) if ((GP[j - 1][1] - Z) * (GP[j][1] - Z) <= 0) {
+      var f = (Z - GP[j - 1][1]) / ((GP[j][1] - GP[j - 1][1]) || 1e-9), xc = lerp(GP[j - 1][0], GP[j][0], f);
+      var j0 = Math.max(0, j - 6), j1 = Math.min(GP.length - 1, j + 6);
+      var sl = Math.abs((GP[j1][0] - GP[j0][0]) / ((GP[j1][1] - GP[j0][1]) || 1e-9));
+      var half = B * lerp(1, 1.45, clamp(sl / 3, 0, 1));
+      return [xc - half, xc + half];
+    }
+    return null;
+  }
+  while (Zr < zMax - o.depth * 0.3 && guard++ < 400) {
+    var dpR = o.depth * lerp(0.85, 1.15, r()), zc = Zr + dpR / 2, ch = rowAt(zc);
+    Zr += dpR + gapZ;
+    if (!ch) continue;
+    var L = ch[1] - ch[0], gX = gapZ / Math.max(0.5, zc);
+    var inL = L * lerp(0, 0.06, r()), inR = L * lerp(0, 0.06, r()), x0r = ch[0] + inL, Lr = L - inL - inR;
+    var np = Math.max(1, Math.min(3, Math.round(Lr / (o.size * 0.85))));
+    if (np === 1 && Lr > o.size * 0.85 && r() < 0.25) np = 2;
+    // split points, each piece a different length
+    var cuts = [0];
+    for (var pi = 1; pi < np; pi++) cuts.push(pi / np + (r() - 0.5) * 0.24 / np);
+    cuts.push(1);
+    var row = [];
+    for (pi = 0; pi < np; pi++) {
+      var a0 = x0r + Lr * cuts[pi] + (pi ? gX / 2 : 0), a1 = x0r + Lr * cuts[pi + 1] - (pi < np - 1 ? gX / 2 : 0);
+      row.push({ X: (a0 + a1) / 2, Z: zc + (r() - 0.5) * dpR * 0.08, w: a1 - a0, dp: dpR * lerp(0.92, 1.06, r()), ax: 1, az: 0, bx: 0, bz: 1 });
+    }
+    rows.push(row);
+  }
+  // each piece's outline: four corners on the ground, each moved a little at random, then each corner
+  // rounded by its own amount on the screen
+  function shapeOf(St) {
+    var C = [];
+    [[-1, -1], [-1, 1], [1, 1], [1, -1]].forEach(function (q, j) {
+      var u = q[0] * St.w / 2 + St.jit[j][0] * St.w, v = q[1] * St.dp / 2 + St.jit[j][1] * St.dp;
+      C.push(toScreen(St.X + St.ax * u + St.bx * v, St.Z + St.az * u + St.bz * v));
+    });
+    return roundQuad(C, St.rad);
+  }
+  var placed = (o.fixed || []).map(function (F) { return slabOutline(F).P; }), keep = [];
+  rows.forEach(function (row) { row.forEach(fitStone); });
+  function fitStone(St) {
+    {
+      St.jit = [0, 1, 2, 3].map(function () { return [(r() - 0.5) * 0.1, (r() - 0.5) * 0.16]; });
+      St.rad = [0, 1, 2, 3].map(function () { return lerp(0.08, 0.5, r()); });
+      St.seed = Math.floor(r() * 1e6);
+      var gpx = Math.max(1.5, gapZ * D / (St.Z * St.Z) * 0.8), w0 = St.w, dp0 = St.dp, ok = false;
+      for (var it = 0; it < 90; it++) {
+        St.pts = shapeOf(St);
+        var fin = finalOutline(St.pts, St.seed), bb = bounds(fin);
+        if (bb[2] > o.yb + 2) break;                                    // wholly below the screen
+        var near = 1e9, nj = -1;
+        for (var j = 0; j < placed.length; j++) { var dd = polyDist(fin, placed[j]); if (dd < near) { near = dd; nj = j; } }
+        if (near >= gpx) { ok = true; break; }
+        var pb = bounds(placed[nj]), ox = Math.min(bb[1], pb[1]) - Math.max(bb[0], pb[0]);
+        var pcx = (pb[0] + pb[1]) / 2, atEnd = pcx < lerp(bb[0], bb[1], 0.25) || pcx > lerp(bb[0], bb[1], 0.75);
+        if (!atEnd && (ox > (bb[1] - bb[0]) * 0.35 || ox > (pb[1] - pb[0]) * 0.6)) {
+          // the other lies above or below its middle: shorten it from that side
+          var up = (pb[2] + pb[3]) / 2 < (bb[2] + bb[3]) / 2, cd = dp0 * 0.05;
+          St.dp -= cd; St.X += St.bx * (up ? -1 : 1) * cd / 2; St.Z += St.bz * (up ? -1 : 1) * cd / 2;
+          if (St.dp < dp0 * 0.5) break;
+        } else {
+          // beside it: trim that end
+          var side = (pb[0] + pb[1]) / 2 < (bb[0] + bb[1]) / 2 ? -1 : 1, cut = w0 * 0.03;
+          St.w -= cut; St.X -= St.ax * side * cut / 2; St.Z -= St.az * side * cut / 2;
+          if (St.w < Math.min(w0 * 0.4, o.size * 0.3)) break;
+        }
+      }
+      if (!ok) return false;                                            // never one left touching or under another
+      St.pi = placed.length; St.gpx = gpx;
+      placed.push(finalOutline(St.pts, St.seed)); keep.push(St);
+      return true;
     }
   }
-  for (var tt = t0; tt < total; tt += step) {
-    var Q = at(tt), before = stones.length;
-    var ax = 1, az = 0;                                        // their long side level, square on to you
-    var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.1;
-    var cx0 = Q.X + ax * wob, cz0 = Q.Z + az * wob;
-    var away = Math.abs(Q.uz) > 0.75;                          // groups of pieces only where the path runs away from you
-    if (!away && kind >= 0.5) kind = kind < 0.62 ? 0.6 : kind < 0.8 ? 0.2 : 0.9;     // in the sweep: mostly single slabs, now and then a pair
-    if (kind < 0.5) {                                          // one long slab
-      var w = o.size * lerp(0.7, 1.25, r());
-      lay(cx0, cz0, w, dp, Math.atan2(az, ax) + rot0);
-    } else if (kind < 0.8) {                                   // two pieces side by side, different sizes
-      var wa = o.size * lerp(0.42, 0.62, r()), wb = o.size * lerp(0.38, 0.6, r()), gp = o.size * lerp(0.04, 0.1, r());
-      lay(cx0 - ax * (wb + gp) / 2, cz0 - az * (wb + gp) / 2 + dp * (r() - 0.5) * 0.3, wa, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.14);
-      lay(cx0 + ax * (wa + gp) / 2, cz0 + az * (wa + gp) / 2 + dp * (r() - 0.5) * 0.3, wb, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.14);
-    } else if (kind < 0.88) {                                  // three small pieces
-      var w3 = o.size * lerp(0.3, 0.4, r());
-      for (var m = -1; m <= 1; m++) lay(cx0 + ax * m * w3 * 1.12, cz0 + az * m * w3 * 1.12 + dp * (r() - 0.5) * 0.35, w3 * lerp(0.85, 1.1, r()), dp * lerp(0.75, 1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.16);
-    } else {                                                   // a short piece, set off to one side
-      var sd = r() < 0.5 ? -1 : 1, w4 = o.size * lerp(0.5, 0.7, r());
-      lay(cx0 + ax * sd * o.size * 0.18, cz0 + az * sd * o.size * 0.18, w4, dp * lerp(0.8, 1.05, r()), Math.atan2(az, ax) + rot0);
-    }
-    // the first one past the fixed slabs: moved across so its right end is a small gap from the leftmost of
-    // them (by its real width), so no gap opens there
-    if (fit) {
-      fit = false;
-      var maxR = -1e9;
-      for (var q0 = before; q0 < stones.length; q0++) {
-        var Sq = stones[q0], Cq = toScreen(Sq.X, Sq.Z); maxR = Math.max(maxR, Cq[0] + Sq.w / 2 * D / Sq.Z);
+  // any opening left inside the band wider than the gap (where rows met the fixed slabs): a stone is fitted
+  // into it, the widest first, with the same gap all round
+  var ptPoly = function (p, P) { var m = 1e9; for (var j = 0; j < P.length; j++) m = Math.min(m, segDist(p, P[j], P[(j + 1) % P.length])); return inPoly(p, P) ? -m : m; };
+  var GS = GP.map(function (q) { return toScreen(q[0], q[1]); }), gb = bounds(GS);
+  for (var pass = 0; pass < 6; pass++) {
+    var best = null;
+    for (var gy = Math.max(hy + D / zMax, gb[2] - 20); gy < o.yb; gy += 3) {
+      var Zg = D / (gy - hy), gpxH = Math.max(1.5, gapZ * D / (Zg * Zg) * 0.8);
+      for (var gx = gb[0] - 60; gx < gb[1] + 60; gx += 3) {
+        var gq = [(gx - cx) * Zg / D, Zg], inB = false;
+        for (var j = 0; j < GP.length && !inB; j += 2) if (Math.hypot(GP[j][0] - gq[0], GP[j][1] - gq[1]) < B * 0.8) inB = true;
+        if (!inB) continue;
+        var cl = 1e9;
+        for (j = 0; j < placed.length && cl > gpxH * 2.6; j++) {
+          var pb2 = bounds(placed[j]);
+          if (gx < pb2[0] - cl || gx > pb2[1] + cl || gy < pb2[2] - cl || gy > pb2[3] + cl) continue;
+          cl = Math.min(cl, ptPoly([gx, gy], placed[j]));
+        }
+        if (!(cl > gpxH * 2.6 && (!best || cl / gpxH > best.k))) continue;
+        // only a hole with stones on both sides of it (not an opening at the band's edge)
+        var lft = false, rgt = false;
+        for (j = 0; j < placed.length && !(lft && rgt); j++) placed[j].forEach(function (q) {
+          if (Math.abs(q[1] - gy) > cl * 0.7) return;
+          var dxq = q[0] - gx;
+          if (dxq < 0 && dxq > -cl * 4) lft = true;
+          if (dxq > 0 && dxq < cl * 4) rgt = true;
+        });
+        if (lft && rgt) best = { k: cl / gpxH, x: gx, y: gy, Z: Zg, c: cl };
       }
-      for (q0 = before; q0 < stones.length; q0++) stones[q0].X += (lx - gapPx - maxR) * stones[q0].Z / D;
     }
-    // the next one goes only as far on as it needs to clear this one, with a small gap: a step back
-    // (its depth) or a step to the side (its width), whichever is shorter along the path's way here. Where
-    // the path sweeps across, the stones stack up it, each behind the last and overlapping it sideways,
-    // as in the reference; where it runs away from you, one behind another. It changes smoothly.
-    var gp = o.gap * lerp(0.5, 1.7, r());
-    step = Math.min((dp * 0.85 + gp) / Math.max(0.05, Math.abs(Q.uz)), (o.size * 1.05 + gp) / Math.max(0.05, Math.abs(Q.ux)));
+    if (!best) break;
+    var Sh = { X: (best.x - cx) * best.Z / D, Z: best.Z, w: Math.min(o.size * 1.2, best.c * 2.8 * best.Z / D), dp: Math.min(o.depth, best.c * 2.2 * best.Z * best.Z / D), ax: 1, az: 0, bx: 0, bz: 1 };
+    if (!fitStone(Sh)) placed.push([[best.x - 2, best.y - 2], [best.x + 2, best.y - 2], [best.x + 2, best.y + 2], [best.x - 2, best.y + 2]]);
   }
-  // the nearest slabs are set where the reference has them (o.fixed): the stones laid along the path keep clear of them
-  var fixed = o.fixed || [];
-  if (fixed.length) {
-    var boxes = fixed.map(function (F) {
-      var xs = F.map(function (p) { return p[0]; }), ys = F.map(function (p) { return p[1]; });
-      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-      return [x0, x1, y0, y1];
-    });
-    stones = stones.filter(function (St) {
-      // (each kept stone is first moved up to a hair's gap from a fixed slab it would touch, so no gap opens)
-      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z * 0.9, hd = St.dp / 2 * D / (St.Z * St.Z) * 0.9;
-      for (var j = 0; j < boxes.length; j++) {
-        var B = boxes[j];
-        if (C0[0] + hw > B[0] && C0[0] - hw < B[1] && C0[1] + hd > B[2] && C0[1] - hd < B[3]) return false;
-      }
-      return C0[1] - hd < o.yb;                                   // and none wholly below the screen
-    });
-    // a stone that stops just short of a fixed one in front of it is cut back at its near edge, so a clear gap
-    // shows between them (touching, the two read as one piece)
-    var minGap = D * o.gap * 0.35;
-    stones.forEach(function (St) {
-      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z, hd = St.dp / 2 * D / (St.Z * St.Z);
-      for (var j = 0; j < boxes.length; j++) {
-        var B = boxes[j];
-        if (C0[0] + hw * 0.9 < B[0] || C0[0] - hw * 0.9 > B[1] || C0[1] > B[2]) continue;
-        var yF = C0[1] - hd, yN = Math.min(C0[1] + hd, B[2] - minGap);
-        if (yN >= C0[1] + hd || yN - yF < hd * 0.6) continue;
-        var yc = (yF + yN) / 2, Z = D / (yc - hy);
-        St.X = (C0[0] - cx) * Z / D; St.Z = Z; St.dp = (yN - yF) * Z * Z / D;
-        C0 = toScreen(St.X, St.Z); hd = St.dp / 2 * D / (Z * Z);
-      }
-    });
-  }
-  stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
-  var slate = [196, 202, 216];
-  stones.forEach(function (St) {
-    // its outline on the ground: a slab with rounded, uneven corners and slightly bowed sides, each
-    // corner its own roundness, turned as it was laid
-    var n = 24, pts = [], ca = Math.cos(St.rot), sa = Math.sin(St.rot), cr = [lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r())];
-    var bow = [(r() - 0.4) * 0.12, (r() - 0.4) * 0.12, (r() - 0.4) * 0.12, (r() - 0.4) * 0.12];
-    for (k = 0; k < n; k++) {
-      var a = k / n * TAU, cA = Math.cos(a), sA = Math.sin(a), qd = (cA >= 0 ? (sA >= 0 ? 0 : 3) : (sA >= 0 ? 1 : 2));
-      var pw = lerp(0.22, 0.6, cr[qd] / 0.45);                 // the corner: squarer (low) … rounder (high)
-      var u = Math.pow(Math.abs(cA), pw) * (cA < 0 ? -1 : 1) * St.w / 2;
-      var v = Math.pow(Math.abs(sA), pw) * (sA < 0 ? -1 : 1) * St.dp / 2;
-      u *= 1 + bow[(qd + (Math.abs(sA) > Math.abs(cA) ? 1 : 0)) % 4] * Math.abs(sA);
-      v *= 1 + bow[(qd + 2) % 4] * Math.abs(cA) + (r() - 0.5) * 0.05;
-      var uu = u * ca - v * sa, vv = u * sa + v * ca;          // (u across, v along the ground's depth)
-      pts.push(toScreen(St.X + uu, St.Z + vv));
+  // close up: each stone grows toward a neighbour that stands a little farther off than the gap (beside it,
+  // behind or in front), until the gap there is the same as everywhere else
+  function dirGap(fin, me, dir) {
+    var b = bounds(fin), best2 = 1e9, horiz = dir === 0 || dir === 1;
+    var a0 = horiz ? lerp(b[2], b[3], 0.25) : lerp(b[0], b[1], 0.25), a1 = horiz ? lerp(b[2], b[3], 0.75) : lerp(b[0], b[1], 0.75);
+    var edge = [b[0], b[1], b[2], b[3]][dir], sg = dir === 0 || dir === 2 ? -1 : 1;
+    for (var j = 0; j < placed.length; j++) {
+      if (j === me) continue;
+      placed[j].forEach(function (q) {
+        var across = horiz ? q[1] : q[0];
+        if (across < a0 || across > a1) return;
+        var dd = ((horiz ? q[0] : q[1]) - edge) * sg;
+        if (dd > -1 && dd < best2) best2 = dd;
+      });
     }
-    // drawn as the nearest slabs are (WinterScene.slabs): the same slate, edge, mottle, rim and shadow
-    slabPoly(c, pts, S, sc, Math.round(St.X * 997 + St.Z * 131));
+    return best2;
+  }
+  keep.forEach(function (St) {
+    var w1 = St.w * 1.3, d1 = St.dp * 1.25;                          // never more than a little larger
+    for (var dir = 0; dir < 4; dir++) {
+      var g0 = dirGap(placed[St.pi], St.pi, dir);
+      if (g0 < St.gpx * 1.25 || g0 > 40) continue;
+      for (var gi = 0; gi < 40; gi++) {
+        if (St.w > w1 || St.dp > d1) break;
+        var sv = [St.X, St.Z, St.w, St.dp], stp;
+        if (dir < 2) { stp = St.w * 0.015; St.w += stp; St.X += (dir ? 1 : -1) * stp / 2; }
+        else { stp = St.dp * 0.03; St.dp += stp; St.Z += (dir === 2 ? 1 : -1) * stp / 2; }   // up the screen: farther
+        var P2 = shapeOf(St), f2 = finalOutline(P2, St.seed), n2 = 1e9;
+        for (var j = 0; j < placed.length; j++) if (j !== St.pi) n2 = Math.min(n2, polyDist(f2, placed[j]));
+        if (n2 < St.gpx || dirGap(f2, St.pi, dir) < St.gpx) { St.X = sv[0]; St.Z = sv[1]; St.w = sv[2]; St.dp = sv[3]; break; }
+        St.pts = P2; placed[St.pi] = f2;
+      }
+    }
   });
+  layoutCache = {}; layoutCache[lkey] = keep;
+  }
+  keep.slice().reverse().forEach(function (St3) {                 // the farthest first
+    if (o.collect) o.collect.push(finalOutline(St3.pts, St3.seed));
+    // drawn as the nearest slabs are (WinterScene.slabs): the same slate, edge, mottle, rim and shadow
+    slabPoly(c, St3.pts, S, sc, St3.seed);
+  });
+}
+var layoutCache = {};
+function bounds(P) {
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  P.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+  return [x0, x1, y0, y1];
+}
+/* The outline a stone is finally drawn with (its given outline made rough and worn, as slabPoly does). */
+function finalOutline(P0, seed) {
+  var b = bounds(P0);
+  return roughen(P0, (b[0] + b[1]) / 2, (b[2] + b[3]) / 2, b[1] - b[0], b[3] - b[2], rng(seed + 3));
+}
+function inPoly(p, P) {
+  var c0 = false;
+  for (var i = 0, j = P.length - 1; i < P.length; j = i++) {
+    if ((P[i][1] > p[1]) !== (P[j][1] > p[1]) && p[0] < (P[j][0] - P[i][0]) * (p[1] - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0]) c0 = !c0;
+  }
+  return c0;
+}
+function segDist(p, a, b) {
+  var dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy, t = l ? clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l, 0, 1) : 0;
+  return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
+}
+/* The smallest distance between two outlines (negative when they overlap). */
+function polyDist(A, B) {
+  var bA = bounds(A), bB = bounds(B);
+  if (bA[0] > bB[1] + 40 || bB[0] > bA[1] + 40 || bA[2] > bB[3] + 40 || bB[2] > bA[3] + 40) return 1e9;
+  var m = 1e9, i, j;
+  for (i = 0; i < A.length; i++) { if (inPoly(A[i], B)) return -1; for (j = 0; j < B.length; j++) m = Math.min(m, segDist(A[i], B[j], B[(j + 1) % B.length])); }
+  for (i = 0; i < B.length; i++) { if (inPoly(B[i], A)) return -1; for (j = 0; j < A.length; j++) m = Math.min(m, segDist(B[i], A[j], A[(j + 1) % A.length])); }
+  return m;
 }
 
 /* The nearest slabs (o.fixed: each its four corners on the screen, [left, top, right, bottom], as
@@ -520,10 +614,10 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
   for (i = 0; i < N; i++) {
     if (!dist[i]) continue;
     var sn = raw[i] - thr;
-    snow[i] = smooth(0, 0.035, sn);
-    Ht[i] = hsA[i] + smooth(0, 0.18, sn) * thin;
+    snow[i] = 0;
+    Ht[i] = hsA[i];
     var fx = i % w, fy = (i - fx) / w;
-    frost[i] = sn > -0.06 ? smooth(-0.06, 0, sn) * smooth(0.45, 0.62, fbm(fx / U * 10, fy * F / U * 10, sOff + 13, 2)) * 0.7 : 0;
+    frost[i] = 0 && sn > -0.06 ? smooth(-0.06, 0, sn) * smooth(0.45, 0.62, fbm(fx / U * 10, fy * F / U * 10, sOff + 13, 2)) * 0.7 : 0;
   }
   // light: lit from the scene's sun; the snow's shadow marched toward it
   var Lx = (sc.side0 || -1), Lz = 0.35, Ly = 0.55, Lg = Math.hypot(Lx, Lz);
@@ -550,8 +644,9 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
     var s = snow[i], d2 = dist[i], col;
     // the slate: cloudy tones, a warm tinge, wet and darker just inside its edge, the grain, the frost
     var gr = fbm(x / U * 14, y * F / U * 14, sOff + 61, 2);
-    var tk = lerp(0.6, 1.3, tone[i]) * (0.9 + 0.2 * gr);
-    var base = scale(mix(slate, [150, 138, 122], warm[i] * 0.45), tk);
+    var stk = fbm(x / U * 0.7, y * F / U * 7, sOff + 63, 3);              // faint brush streaks along its length
+    var tk = lerp(0.86, 1.12, tone[i]) * (0.95 + 0.1 * stk) * (0.98 + 0.04 * gr);
+    var base = scale(mix(slate, [140, 134, 126], warm[i] * 0.2), tk);
     var fr = frost[i] * (1 - s);
     base = mix(base, snowC, fr * 0.6);
     var stoneCol = S(base, nX * 0.7, nY, nZ, occ);
@@ -578,9 +673,7 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
   return true;
 }
 function slabPoly(c, P0, S, sc, seed) {
-  var xs0 = P0.map(function (p) { return p[0]; }), ys0 = P0.map(function (p) { return p[1]; });
-  var P = roughen(P0, (Math.min.apply(null, xs0) + Math.max.apply(null, xs0)) / 2, (Math.min.apply(null, ys0) + Math.max.apply(null, ys0)) / 2,
-                  Math.max.apply(null, xs0) - Math.min.apply(null, xs0), Math.max.apply(null, ys0) - Math.min.apply(null, ys0), rng(seed + 3));
+  var P = finalOutline(P0, seed);
   var xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; });
   var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
   var len = x1 - x0, wid = y1 - y0, th = Math.max(1.2, Math.min(len * 0.03, wid * 0.22)), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
@@ -602,10 +695,9 @@ function slabPoly(c, P0, S, sc, seed) {
   c.lineJoin = 'round'; c.lineWidth = Math.max(0.8, th * 0.7); c.strokeStyle = rgb(mix(shc, [70, 76, 100], 0.3), 0.5);
   outlineAt(0, 0); c.stroke();
   c.restore();
-  grime(c, P, cx, cy, len, wid, rng(seed + 7));
   // its side face: only along its front edge, hanging below it, tapering to nothing at both ends (so it can
   // never poke out beyond the stone), the stone's own slate a little darker, not black
-  var sideH = Math.max(1.5, th * 1.3), FR = frontRun(P, cy, wid);
+  var sideH = Math.max(1, th * lerp(0.5, 1.4, rr())), FR = frontRun(P, cy, wid);
   if (FR.length > 2) {
     var hAt = function (j) { return sideH * Math.pow(Math.sin(j / (FR.length - 1) * PI), 0.7); };
     c.beginPath(); c.moveTo(FR[0][0], FR[0][1]);
@@ -622,9 +714,22 @@ function slabPoly(c, P0, S, sc, seed) {
     path(0, 1); c.fillStyle = rgb(col(slate, 1)); c.fill();
   }
   // a thin dark edge round the top face (crisp, as painted, but not a heavy ink line)
-  path(0, 1); c.strokeStyle = rgb(col(slate, 0.4), 0.4); c.lineWidth = Math.max(0.5, th * 0.2); c.stroke();
+  // its edge as painted: a crisp dark line along its front and ends, softer and lighter along its back,
+  // where a thin lip of snow lies on it
+  path(0, 1); c.strokeStyle = rgb(col(slate, 0.45), 0.35); c.lineWidth = Math.max(0.5, th * 0.2); c.stroke();
+  if (FR.length > 1) {
+    c.beginPath(); c.moveTo(FR[0][0], FR[0][1]);
+    for (var fk = 1; fk < FR.length; fk++) c.lineTo(FR[fk][0], FR[fk][1]);
+    c.lineJoin = 'round'; c.lineCap = 'round';
+    c.strokeStyle = rgb(scale(col(slate, 0.3), 0.8), 0.85); c.lineWidth = Math.max(0.7, th * 0.32); c.stroke();
+  }
+  c.save(); path(0, 1); c.clip();
+  c.filter = 'blur(' + Math.max(0.3, th * 0.2).toFixed(1) + 'px)';
+  var BR = backRun(P, cy, wid);
+  c.beginPath(); BR.forEach(function (p, j) { j ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); });
+  c.strokeStyle = rgb(sc.top, 0.5); c.lineWidth = Math.max(0.8, th * 0.55); c.stroke();
+  c.restore();
   bank(c, P, cx, cy, len, wid, th, sideH, sc, rng(seed + 19));
-  snowRim(c, P, cx, cy, len, wid, sc, r);
 }
 /* Snow drifted against a stone: soft, uneven white along its sides and its front edge, lapping over the
    edge here and there, so the stone sits in the snow (the reference never shows a clean, hard side). */
@@ -701,6 +806,13 @@ function snowRim(c, P, cx, cy, len, wid, sc, r) {
    bottom of its side face unevenly (so it sits sunk in the snow), the snow the same colour as the
    ground, a blue crease where it meets the stone, grey slush stains in it near the stone. */
 /* The front edge of an outline, in outline order (one unbroken run of points on its near half), left to right. */
+function backRun(P, cy, wid) {
+  var n = P.length, back = P.map(function (p) { return p[1] < cy - wid * 0.15; }), st = -1, B = [], j;
+  for (j = 0; j < n; j++) if (back[j] && !back[(j + n - 1) % n]) { st = j; break; }
+  if (st < 0) return B;
+  for (j = 0; j < n && back[(st + j) % n]; j++) B.push(P[(st + j) % n]);
+  return B;
+}
 function frontRun(P, cy, wid) {
   var n = P.length, near = P.map(function (p) { return p[1] > cy + wid * 0.05; }), st = -1, F = [], j;
   for (j = 0; j < n; j++) if (near[j] && !near[(j + n - 1) % n]) { st = j; break; }
@@ -747,6 +859,27 @@ function bank(c, P, cx, cy, len, wid, th, sideH, sc, r) {
   c.restore();
 }
 function slab(c, F, S, sc) {
+  var O = slabOutline(F);
+  slabPoly(c, O.P0, S, sc, O.seed);
+}
+/* Four corners on the screen, each rounded by its own share (rad) of the shorter edge beside it, sampled densely. */
+function roundQuad(F, rad) {
+  var P = [], i, t;
+  for (i = 0; i < 4; i++) {
+    var a = F[(i + 3) % 4], b = F[i], c2 = F[(i + 1) % 4];
+    var la = Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, lc = Math.hypot(c2[0] - b[0], c2[1] - b[1]) || 1;
+    var k = Math.min(la, lc) * rad[i] * 0.5;
+    var p0 = [b[0] + (a[0] - b[0]) * k / la, b[1] + (a[1] - b[1]) * k / la], p1 = [b[0] + (c2[0] - b[0]) * k / lc, b[1] + (c2[1] - b[1]) * k / lc];
+    for (t = 0; t <= 1.001; t += 0.2) { var u = 1 - t; P.push([u * u * p0[0] + 2 * u * t * b[0] + t * t * p1[0], u * u * p0[1] + 2 * u * t * b[1] + t * t * p1[1]]); }
+    var nx = F[(i + 1) % 4], k2 = Math.min(lc, Math.hypot(nx[0] - F[(i + 2) % 4][0], nx[1] - F[(i + 2) % 4][1])) * rad[(i + 1) % 4] * 0.5;
+    var q1 = [nx[0] + (b[0] - nx[0]) * k2 / lc, nx[1] + (b[1] - nx[1]) * k2 / lc];
+    for (t = 0.1; t < 0.95; t += 0.1) P.push([lerp(p1[0], q1[0], t), lerp(p1[1], q1[1], t)]);
+  }
+  return P;
+}
+/* A fixed stone's outline from its four corners: each corner rounded, sampled densely; P0 before it is made
+   rough, P as finally drawn. */
+function slabOutline(F) {
   var len = 0, e, i;
   for (e = 0; e < 4; e++) len = Math.max(len, Math.hypot(F[(e + 1) % 4][0] - F[e][0], F[(e + 1) % 4][1] - F[e][1]));
   var rad = len * 0.12, P = [];
@@ -760,7 +893,8 @@ function slab(c, F, S, sc) {
     var nx = F[(i + 1) % 4], q0 = p1, q1 = [nx[0] + (b[0] - nx[0]) * k / lc, nx[1] + (b[1] - nx[1]) * k / lc];
     for (t = 0.12; t < 1; t += 0.12) P.push([lerp(q0[0], q1[0], t), lerp(q0[1], q1[1], t)]);
   }
-  slabPoly(c, P, S, sc, Math.round(F[0][0] * 7 + F[0][1] * 13));
+  var seed = Math.round(F[0][0] * 7 + F[0][1] * 13);
+  return { P0: P, seed: seed, P: finalOutline(P, seed) };
 }
 
 /* ---------------------------------------------------------------
@@ -854,5 +988,6 @@ function pool(c, o) {
   c.restore();
 }
 
-return { slabs: slabs, pool: pool, hill: hill, hillTop: hillTop, mistBand: mistBand, ropes: ropes, path: path, banks: banks };
+return { outlines: function (L) { return L.map(function (F) { return slabOutline(F).P; }); }, polyDist: function (A, B) { return polyDist(A, B); },
+         slabs: slabs, pool: pool, hill: hill, hillTop: hillTop, mistBand: mistBand, ropes: ropes, path: path, banks: banks };
 })();
