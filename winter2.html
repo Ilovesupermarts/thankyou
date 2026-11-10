@@ -11,6 +11,12 @@
 <link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Yuji+Mai&family=Shippori+Mincho:wght@400;500;600;700&family=Noto+Serif+JP:wght@400;600;700&family=Zen+Antique&display=swap" rel="stylesheet">
 
 <link rel="stylesheet" href="main.css">
+<script>
+// no pop-up menu on tap and hold (or right click): the browser's menu is cancelled before it opens
+['contextmenu', 'selectstart', 'dragstart'].forEach(function (t) {
+  document.addEventListener(t, function (e) { e.preventDefault(); }, true);
+});
+</script>
 <script src="mountains.js"></script>
 <script src="clouds.js"></script>
 <script src="snowfield.js"></script>
@@ -22,6 +28,9 @@
 <script src="winterpieces.js"></script>
 
 <style>
+  /* no pop-up menu on tap and hold (copy, save image, select ...) anywhere on the page */
+  html, body, * { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  img, canvas, svg { -webkit-user-drag: none; user-select: none; -webkit-user-select: none; }
   /* ============================================================
      WINTER LAB 2 — a copy of bamboo.html (the Mountain Lab), now the
      test bed for the new winter scene. The layout is the app's winter
