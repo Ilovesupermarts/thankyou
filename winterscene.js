@@ -481,43 +481,34 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
   var U = Math.max(4, len / 3);                 // the texture's scale: about three cells along the stone
   var bev = Math.max(1.5, wid * 0.13);           // the rounded edge's width
   var r = rng(seed), sOff = Math.floor(r() * 1e5);
-  var snowDepth = Math.max(2, wid * 0.2), thr = lerp(0.5, 0.6, r());
-  // the snow patches: one to three, each well inside the stone, toward its ends and back where snow lies longest
-  var caps = [], nCap = 1 + Math.floor(r() * 2) + (len > 5 * wid ? 1 : 0);
-  for (var cp = 0; cp < nCap; cp++) {
-    var big = cp === 0, prx = len * (big ? lerp(0.17, 0.27, r()) : lerp(0.08, 0.14, r())), pry = wid * (big ? lerp(0.26, 0.36, r()) : lerp(0.16, 0.24, r()));
-    for (var tries = 0; tries < 12; tries++) {
-      var side2 = (cp % 2 ? 1 : -1) * (r() < 0.7 ? 1 : -1);
-      var pmx = Math.round(w / 2 + side2 * lerp(0.05, 0.32, r()) * w), pmy = Math.round(h * lerp(0.3, 0.58, r()));
-      var dc = dist[pmy * w + pmx] || 0;
-      if (dc > pry + bev * 1.5) break;
-      prx *= 0.9; pry *= 0.9;
-    }
-    if (dc > pry * 0.6) caps.push([pmx, pmy, prx, pry]);
-  }
-  var edgeSn = new Float32Array(N), Ht = new Float32Array(N), snow = new Float32Array(N), tone = new Float32Array(N), warm = new Float32Array(N), frost = new Float32Array(N);
+  var snowDepth = Math.max(1, wid * 0.055);
+  // the snow: a thin, uneven layer left on the stone, worn away where feet go (its middle), lying longest
+  // toward its back and its ends; its edge broken and feathered as melting snow is, kept inside the stone
+  var hsA = new Float32Array(N), Ht = new Float32Array(N), snow = new Float32Array(N), tone = new Float32Array(N), warm = new Float32Array(N), frost = new Float32Array(N);
+  var raw = new Float32Array(N), vals = [], cover = lerp(0.16, 0.3, r());
   for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
     i = y * w + x; var d = dist[i]; if (!d) continue;
     var nx = x / U, ny = y * F / U, back = 1 - y / h, end = Math.abs(x / w - 0.5) * 2;
-    var e = Math.min(1, d / bev), hs = Math.sqrt(e) * bev * 0.35 + (fbm(nx * 3, ny * 3, sOff + 5, 3) - 0.5) * bev * 0.25;
+    var e = Math.min(1, d / bev);
+    hsA[i] = Math.sqrt(e) * bev * 0.35 + (fbm(nx * 3, ny * 3, sOff + 5, 3) - 0.5) * bev * 0.12;
     tone[i] = fbm(nx * 1.3, ny * 1.3, sOff + 9, 4);
     warm[i] = smooth(0.55, 0.8, fbm(nx * 0.8, ny * 0.8, sOff + 31, 3));
-    // the snow: where a broad noise, helped toward the back and the ends, passes the threshold; a lumpy top
-    var sn = -1, q0d = 9;
-    for (var ci = 0; ci < caps.length; ci++) { var C = caps[ci]; q0d = Math.min(q0d, Math.hypot((x - C[0]) / C[2], (y - C[1]) / C[3])); }
-    if (q0d < 1.8) {
-      var wob = (fbm(nx * 2.2, ny * 2.2, sOff + 77, 3) - 0.5) * 0.7 + (fbm(nx * 7, ny * 7, sOff + 41, 2) - 0.5) * 0.18;
-      sn = 1 - (q0d + wob);
-    }
-    sn *= 1; if (d < bev * 1.2) sn = Math.min(sn, -0.05);
-    var sm = smooth(0, 0.05, sn);
-    snow[i] = sm;
-    edgeSn[i] = sn;
-    var sh = sn > 0 ? Math.sqrt(clamp(sn / 0.9, 0, 1)) * snowDepth * (0.85 + 0.3 * fbm(nx * 3, ny * 3, sOff + 3, 2)) : 0;
-    Ht[i] = hs + sh;
-    // frost: grainy, in patches, more toward the back
-    // frost: a grainy dusting where the snow thins out round its patches, and faintly toward the back
-    frost[i] = sn > -0.16 ? smooth(-0.16, 0, sn) * smooth(0.42, 0.62, fbm(nx * 7, ny * 7, sOff + 13, 3)) * 0.8 : 0;
+    var cx2 = Math.abs(x / w - 0.5) * 2, cy2 = Math.abs(y / h - 0.55) * 2;
+    var worn = Math.max(0, 1 - Math.hypot(cx2 * 1.3, cy2 * 1.1));          // the trodden middle
+    raw[i] = fbm(nx * 1.4, ny * 1.4, sOff + 77, 4) * 2.2 + back * 0.15 + end * end * 0.15 - worn * 0.35
+             + (fbm(nx * 9, ny * 9, sOff + 41, 2) - 0.5) * 0.22 - (1 - smooth(bev * 0.9, bev * 1.4, d)) * 2 - (1 - smooth(bev * 1.4, bev * 5, d)) * 0.5;
+    if ((x + y) % 3 === 0) vals.push(raw[i]);
+  }
+  vals.sort(function (a, b) { return a - b; });
+  var thr = vals.length ? vals[Math.floor((1 - cover) * (vals.length - 1))] : 1;
+  var thin = snowDepth;
+  for (i = 0; i < N; i++) {
+    if (!dist[i]) continue;
+    var sn = raw[i] - thr;
+    snow[i] = smooth(0, 0.035, sn);
+    Ht[i] = hsA[i] + smooth(0, 0.18, sn) * thin;
+    var fx = i % w, fy = (i - fx) / w;
+    frost[i] = sn > -0.06 ? smooth(-0.06, 0, sn) * smooth(0.45, 0.62, fbm(fx / U * 10, fy * F / U * 10, sOff + 13, 2)) * 0.7 : 0;
   }
   // light: lit from the scene's sun; the snow's shadow marched toward it
   var Lx = (sc.side0 || -1), Lz = 0.35, Ly = 0.55, Lg = Math.hypot(Lx, Lz);
@@ -543,7 +534,7 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
     }
     var s = snow[i], d2 = dist[i], col;
     // the slate: cloudy tones, a warm tinge, wet and darker just inside its edge, the grain, the frost
-    var gr = fbm(nx * 14, ny * 14, sOff + 61, 2);
+    var gr = fbm(x / U * 14, y * F / U * 14, sOff + 61, 2);
     var tk = lerp(0.6, 1.3, tone[i]) * (0.9 + 0.2 * gr);
     var base = scale(mix(slate, [150, 138, 122], warm[i] * 0.45), tk);
     var fr = frost[i] * (1 - s);
@@ -557,6 +548,9 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
     var snowCol = df >= 0 ? mix(sc.top, [255, 254, 250], clamp(df * 1.2, 0, 0.8) * S.bright)
                           : mix(sc.top, snowBlue, clamp(-df, 0, 0.85));
     snowCol = scale(snowCol, lerp(0.72, 1, occ));
+    var sv = fbm(x / U * 2.5, y * F / U * 2.5, sOff + 91, 3);              // the snow's own unevenness: faint blue hollows
+    snowCol = mix(snowCol, snowBlue, clamp((0.55 - sv) * 0.6, 0, 0.3) + 0.12 * (y / h));
+    snowCol = scale(snowCol, 0.96);
     snowCol = mix(snowCol, sc.shade, clamp((1 - s) * 0.3, 0, 1));
     if (s > 0.6 && df > 0 && hash2(x, y, sOff + 99) > 0.985) snowCol = mix(snowCol, [255, 255, 255], 0.8);
     col = mix(stoneCol, snowCol, smooth(0.15, 0.6, s));
@@ -579,9 +573,20 @@ function slabPoly(c, P0, S, sc, seed) {
   function col(base, k) { return mix(scale(base, br * k), S(scale(base, k), 0, 1, 0.5, 0.6), 0.35); }
   function path(dy, k) { c.beginPath(); P.forEach(function (p, i) { var x = cx + (p[0] - cx) * k, y = cy + (p[1] - cy) * k + dy; i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); }
   var rr = rng(seed + 11);
-  // a soft blue shadow on the snow round it
-  c.save(); c.filter = 'blur(' + Math.max(0.6, th * 1.5).toFixed(1) + 'px)';
-  path(th * 0.4, 1.03); c.fillStyle = rgb(sc.shade, 0.3); c.fill(); c.restore();
+  // its shadow on the snow: the stone stands only a little above the snow, so a short shadow on the side
+  // away from the sun (and a little away from you), sharp at the stone, softening as it goes; and a thin
+  // dark crease all round where the stone meets the snow
+  var ox = -S.side * th * 1.1, oy = -th * 0.35, shc = mix(sc.shade, [88, 98, 140], 0.35);
+  function outlineAt(dx, dy) { c.beginPath(); P.forEach(function (p, i) { i ? c.lineTo(p[0] + dx, p[1] + dy) : c.moveTo(p[0] + dx, p[1] + dy); }); c.closePath(); }
+  c.save();
+  c.filter = 'blur(' + Math.max(0.5, th * 0.7).toFixed(1) + 'px)';
+  outlineAt(ox, oy); c.fillStyle = rgb(shc, 0.28 * S.bright + 0.1); c.fill();
+  c.filter = 'blur(' + Math.max(0.3, th * 0.25).toFixed(1) + 'px)';
+  outlineAt(ox * 0.45, oy * 0.45); c.fillStyle = rgb(shc, 0.3); c.fill();
+  c.filter = 'blur(' + Math.max(0.3, th * 0.15).toFixed(1) + 'px)';
+  c.lineJoin = 'round'; c.lineWidth = Math.max(0.8, th * 0.7); c.strokeStyle = rgb(mix(shc, [70, 76, 100], 0.3), 0.5);
+  outlineAt(0, 0); c.stroke();
+  c.restore();
   grime(c, P, cx, cy, len, wid, rng(seed + 7));
   // its side face: only along its front edge, hanging below it, tapering to nothing at both ends (so it can
   // never poke out beyond the stone), the stone's own slate a little darker, not black
@@ -618,7 +623,7 @@ function grime(c, P, cx, cy, len, wid, r) {
     var p = P[i];
     if (p[1] < cy - wid * 0.15 || r() < 0.25) continue;
     var rr = wid * lerp(0.05, 0.11, r());
-    c.fillStyle = rgb(r() < 0.6 ? [150, 152, 164] : [128, 130, 144], lerp(0.12, 0.28, r()));
+    c.fillStyle = rgb(r() < 0.6 ? [150, 152, 164] : [128, 130, 144], lerp(0.05, 0.12, r()));
     c.beginPath(); c.ellipse(p[0] + (p[0] - cx) * 0.03, p[1] + rr * 0.8, rr * lerp(1.5, 3, r()), rr * 0.55, 0, 0, TAU); c.fill();
   }
   // grit: small dark specks scattered in the trodden snow just round it

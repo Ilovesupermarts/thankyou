@@ -1558,6 +1558,10 @@ function drawDecor(c) {
   var g = c.createLinearGradient(0, H * 0.72, 0, H);
   g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
   c.fillStyle = g; c.fill();
+}
+/* The stepping stones (V.ref): drawn sharp over each slice of the snowfield after its softening. */
+function drawStones(c) {
+  var C = cols();
   WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: approachLayout().path,
                                   fitTo: REF.nearSlabs.map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }),
                                   size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand,
@@ -1750,16 +1754,27 @@ function bakeGround() {
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) flatSwell(tg, S0, S0.haze);
     if (V.ref) { tg.save(); tg.globalCompositeOperation = 'source-atop'; drawDecor(tg); tg.restore(); }
-    for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
+    // the snow softened (the farther swells more), then the stepping stones sharp on it, then the shadows of
+    // the things (on the snow and the stones), then the things, softened as the snow is
+    var bl = lerp(1.4, 0, S0.u) * PR * V.groundSoft;
+    slab.c.save();
+    slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
+    slab.c.drawImage(GTMP.cnv, 0, 0);
+    slab.c.restore();
+    slab.c.save(); slab.c.setTransform(PR, 0, 0, PR, 0, -top * PR);
+    if (V.ref) { slab.c.save(); slab.c.globalCompositeOperation = 'source-atop'; drawStones(slab.c); slab.c.restore(); }
+    for (b = 0; b < S0.things.length; b++) {                  // the shadows, on the snow only
       var T = S0.things[b], hz = V.groundHaze * Math.pow(1 - T.u, 2) * 0.9;
-      castShadow(tg, T, hz);
+      castShadow(slab.c, T, hz);
     }
+    slab.c.restore();
+    tg.setTransform(1, 0, 0, 1, 0, 0); tg.clearRect(0, 0, cw, ch);
+    tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     for (b = 0; b < S0.things.length; b++) {
       var T2 = S0.things[b], hz2 = V.groundHaze * Math.pow(1 - T2.u, 2) * 0.9;
       drawThing(tg, T2, T2.type === 'torii' ? hz2 * 0.8 : hz2);
     }
     slab.c.save();
-    var bl = lerp(1.4, 0, S0.u) * PR * V.groundSoft;
     slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
     slab.c.drawImage(GTMP.cnv, 0, 0);
     slab.c.restore();
