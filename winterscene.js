@@ -290,32 +290,51 @@ function path(c, o) {
     }
   });
   c.restore();
-  // the stones: laid one after another along the path, each set square to you (its long side level
-  // on the screen, as stepping stones are set), the next one where this one ends plus a small gap,
-  // measured on the ground (so they close up into the distance), now and then a pair side by side
-  // where the path runs away from you
+  // the stones, as a mason sets a path: one after another along it with uneven gaps, each piece its
+  // own size and shape; here one long slab across the path, there two or three smaller pieces side by
+  // side, sometimes a short one set off to one side; each turned a little, and the line of them
+  // wandering a little either side of the middle. Their long side is turned partly across the path
+  // and partly square to you, as in the picture.
   var stones = [], step;
-  for (var tt = o.depth * 0.6; tt < total; tt += step) {
-    var Q = at(tt), w = o.size * lerp(0.88, 1.12, r()), dp = o.depth * lerp(0.85, 1.12, r());
-    step = Math.abs(Q.ux) * w * 0.92 + Math.abs(Q.uz) * dp + o.gap * lerp(0.7, 1.3, r());
-    if (Math.abs(Q.uz) > 0.6 && r() < 0.25) {
-      var w2 = w * 0.52;
-      stones.push({ X: Q.X - w2 * 0.54, Z: Q.Z + dp * 0.05, ux: 0, uz: 1, w: w2, dp: dp * lerp(0.85, 1, r()) });
-      stones.push({ X: Q.X + w2 * 0.54, Z: Q.Z - dp * 0.05, ux: 0, uz: 1, w: w2, dp: dp * lerp(0.85, 1, r()) });
-    } else stones.push({ X: Q.X + (r() - 0.5) * o.size * 0.06, Z: Q.Z, ux: 0, uz: 1, w: w, dp: dp });
+  function lay(X, Z, w, dp, rot) { stones.push({ X: X, Z: Z, w: w, dp: dp, rot: rot }); }
+  for (var tt = o.depth * 0.5; tt < total; tt += step) {
+    var Q = at(tt);
+    var ax = 1, az = 0;                                        // their long side level, square on to you
+    var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.22;
+    var cx0 = Q.X + ax * wob, cz0 = Q.Z + az * wob;
+    if (kind < 0.5) {                                          // one long slab
+      var w = o.size * lerp(0.85, 1.25, r());
+      lay(cx0, cz0, w, dp, Math.atan2(az, ax) + rot0);
+    } else if (kind < 0.8) {                                   // two pieces side by side, different sizes
+      var wa = o.size * lerp(0.42, 0.62, r()), wb = o.size * lerp(0.38, 0.6, r()), gp = o.size * lerp(0.04, 0.1, r());
+      lay(cx0 - ax * (wb + gp) / 2, cz0 - az * (wb + gp) / 2 + dp * (r() - 0.5) * 0.3, wa, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.4);
+      lay(cx0 + ax * (wa + gp) / 2, cz0 + az * (wa + gp) / 2 + dp * (r() - 0.5) * 0.3, wb, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.4);
+    } else if (kind < 0.88) {                                  // three small pieces
+      var w3 = o.size * lerp(0.3, 0.4, r());
+      for (var m = -1; m <= 1; m++) lay(cx0 + ax * m * w3 * 1.12, cz0 + az * m * w3 * 1.12 + dp * (r() - 0.5) * 0.35, w3 * lerp(0.85, 1.1, r()), dp * lerp(0.75, 1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.5);
+    } else {                                                   // a short piece, set off to one side
+      var sd = r() < 0.5 ? -1 : 1, w4 = o.size * lerp(0.5, 0.7, r());
+      lay(cx0 + ax * sd * o.size * 0.18, cz0 + az * sd * o.size * 0.18, w4, dp * lerp(0.8, 1.05, r()), Math.atan2(az, ax) + rot0);
+    }
+    // the next one where this one ends along the path (its width where the path runs sideways), plus a gap
+    step = Math.abs(Q.ux) * o.size * 0.95 + Math.abs(Q.uz) * dp + o.gap * lerp(0.5, 1.6, r());
   }
   stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
-  var slate = [176, 182, 198];
+  var slate = [196, 202, 216];
   stones.forEach(function (St) {
-    // its outline on the ground: a softly squared slab, a little uneven, turned with the path
-    var n = 20, pts = [], rot = (r() - 0.5) * 0.18, ca = Math.cos(rot), sa = Math.sin(rot);
-    var ax = -St.uz, az = St.ux;                                 // across the path
+    // its outline on the ground: a slab with rounded, uneven corners and slightly bowed sides, each
+    // corner its own roundness, turned as it was laid
+    var n = 24, pts = [], ca = Math.cos(St.rot), sa = Math.sin(St.rot), cr = [lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r()), lerp(0.15, 0.45, r())];
+    var bow = [(r() - 0.4) * 0.12, (r() - 0.4) * 0.12, (r() - 0.4) * 0.12, (r() - 0.4) * 0.12];
     for (k = 0; k < n; k++) {
-      var a = k / n * TAU, cA = Math.cos(a), sA = Math.sin(a);
-      var u = Math.pow(Math.abs(cA), 0.5) * (cA < 0 ? -1 : 1) * St.w / 2 * lerp(0.95, 1.04, r());
-      var v = Math.pow(Math.abs(sA), 0.5) * (sA < 0 ? -1 : 1) * St.dp / 2 * lerp(0.94, 1.05, r());
-      var uu = u * ca - v * sa, vv = u * sa + v * ca;
-      pts.push(toScreen(St.X + ax * uu + St.ux * vv, St.Z + az * uu + St.uz * vv));
+      var a = k / n * TAU, cA = Math.cos(a), sA = Math.sin(a), qd = (cA >= 0 ? (sA >= 0 ? 0 : 3) : (sA >= 0 ? 1 : 2));
+      var pw = lerp(0.22, 0.6, cr[qd] / 0.45);                 // the corner: squarer (low) … rounder (high)
+      var u = Math.pow(Math.abs(cA), pw) * (cA < 0 ? -1 : 1) * St.w / 2;
+      var v = Math.pow(Math.abs(sA), pw) * (sA < 0 ? -1 : 1) * St.dp / 2;
+      u *= 1 + bow[(qd + (Math.abs(sA) > Math.abs(cA) ? 1 : 0)) % 4] * Math.abs(sA);
+      v *= 1 + bow[(qd + 2) % 4] * Math.abs(cA) + (r() - 0.5) * 0.05;
+      var uu = u * ca - v * sa, vv = u * sa + v * ca;          // (u across, v along the ground's depth)
+      pts.push(toScreen(St.X + uu, St.Z + vv));
     }
     var C = toScreen(St.X, St.Z), q = (C[1] - hy) / D, edge = Math.max(0.6, D * 0.012 * q);
     // sunk in the snow: a soft blue hollow round it
@@ -333,16 +352,31 @@ function path(c, o) {
     c.fillStyle = lingrad(c, 0, top, 0, bot, [[0, mix(scale(slate, S.bright * 0.8), S(slate, 0, 1, 0.4, 0.7), 0.5)], [1, mix(scale(slate, S.bright * 0.62), S(scale(slate, 0.75), 0, 1, 0.4, 0.5), 0.5)]]);
     c.fill();
     c.clip();
-    // a light rim along its far edge, a dusting of snow
-    c.strokeStyle = rgb(scale(slate, S.bright * 1.15), 0.5); c.lineWidth = edge * 0.8;
-    c.beginPath(); c.moveTo(pts[n / 2 + 1][0], pts[n / 2 + 1][1] + edge * 0.4);
-    for (k = n / 2 + 2; k < n; k++) c.lineTo(pts[k][0], pts[k][1] + edge * 0.4);
-    c.stroke();
-    // a thin edge of snow along its far side
-    c.strokeStyle = rgb(sc.top, 0.55); c.lineWidth = Math.max(0.5, edge * 0.6);
-    c.beginPath(); c.moveTo(pts[n / 2 + 2][0], pts[n / 2 + 2][1]);
-    for (k = n / 2 + 3; k < n - 1; k++) c.lineTo(pts[k][0], pts[k][1]);
-    c.stroke();
+    // brushed texture: a few faint lighter and darker streaks across it
+    var hh = bot - top, wl = Math.max.apply(null, pts.map(function (p) { return p[0]; })) - Math.min.apply(null, pts.map(function (p) { return p[0]; }));
+    for (k = 0; k < 4; k++) {
+      c.strokeStyle = rgb(k % 2 ? scale(slate, S.bright * 1.12) : scale(slate, S.bright * 0.55), 0.18);
+      c.lineWidth = Math.max(0.5, hh * lerp(0.08, 0.2, r()));
+      var sy = lerp(top, bot, lerp(0.2, 0.8, r())), sx = C[0] + (r() - 0.5) * wl * 0.3;
+      c.beginPath(); c.moveTo(sx - wl * lerp(0.2, 0.4, r()), sy); c.lineTo(sx + wl * lerp(0.2, 0.4, r()), sy + (r() - 0.5) * hh * 0.2); c.stroke();
+    }
+    // its far edge (the side away from you, the upper one on the screen): a light rim, a thin line of snow
+    var far = [];
+    for (k = 0; k < n; k++) far.push(pts[k][1] < C[1] - hh * 0.12);
+    var st0 = 0;
+    for (k = 0; k < n; k++) if (far[k] && !far[(k + n - 1) % n]) { st0 = k; break; }
+    var run = [];
+    for (k = 0; k < n && far[(st0 + k) % n]; k++) run.push(pts[(st0 + k) % n]);
+    if (run.length > 1) {
+      c.strokeStyle = rgb(scale(slate, S.bright * 1.2), 0.55); c.lineWidth = Math.max(0.6, edge * 0.9);
+      c.beginPath(); c.moveTo(run[0][0], run[0][1] + edge * 0.5);
+      for (k = 1; k < run.length; k++) c.lineTo(run[k][0], run[k][1] + edge * 0.5);
+      c.stroke();
+      c.strokeStyle = rgb(sc.top, 0.6); c.lineWidth = Math.max(0.5, edge * 0.55);
+      c.beginPath(); c.moveTo(run[0][0], run[0][1]);
+      for (k = 1; k < run.length; k++) c.lineTo(run[k][0], run[k][1]);
+      c.stroke();
+    }
     c.restore();
   });
 }
