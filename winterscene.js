@@ -297,8 +297,20 @@ function path(c, o) {
   // and partly square to you, as in the picture.
   var stones = [], step;
   function lay(X, Z, w, dp, rot) { stones.push({ X: X, Z: Z, w: w, dp: dp, rot: rot }); }
-  for (var tt = o.depth * 0.5; tt < total; tt += step) {
-    var Q = at(tt);
+  // with the nearest slabs set where the reference has them (o.fixed), the stones along the path start just
+  // beyond them: at the first point past the leftmost of them, the first stone's right end a small gap from it
+  var t0 = o.depth * 0.5, fit = false, lx = 0, gapPx = 0;
+  if (o.fixed && o.fixed.length) {
+    var ly = 0; lx = 1e9;
+    o.fixed.forEach(function (F) { F.forEach(function (p) { if (p[0] < lx) { lx = p[0]; ly = p[1]; } }); });
+    gapPx = D * o.gap * 0.5; fit = true;
+    for (var ts = 0; ts < total; ts += total / 400) {
+      var P0 = at(ts), C1 = toScreen(P0.X, P0.Z), hw0 = o.size * 0.55 * D / P0.Z;
+      if (C1[0] + hw0 < lx - gapPx && C1[1] < ly + D * 0.1) { t0 = ts; break; }
+    }
+  }
+  for (var tt = t0; tt < total; tt += step) {
+    var Q = at(tt), before = stones.length;
     var ax = 1, az = 0;                                        // their long side level, square on to you
     var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.22;
     var cx0 = Q.X + ax * wob, cz0 = Q.Z + az * wob;
@@ -318,6 +330,16 @@ function path(c, o) {
       var sd = r() < 0.5 ? -1 : 1, w4 = o.size * lerp(0.5, 0.7, r());
       lay(cx0 + ax * sd * o.size * 0.18, cz0 + az * sd * o.size * 0.18, w4, dp * lerp(0.8, 1.05, r()), Math.atan2(az, ax) + rot0);
     }
+    // the first one past the fixed slabs: moved across so its right end is a small gap from the leftmost of
+    // them (by its real width), so no gap opens there
+    if (fit) {
+      fit = false;
+      var maxR = -1e9;
+      for (var q0 = before; q0 < stones.length; q0++) {
+        var Sq = stones[q0], Cq = toScreen(Sq.X, Sq.Z); maxR = Math.max(maxR, Cq[0] + Sq.w / 2 * D / Sq.Z);
+      }
+      for (q0 = before; q0 < stones.length; q0++) stones[q0].X += (lx - gapPx - maxR) * stones[q0].Z / D;
+    }
     // the next one goes only as far on as it needs to clear this one, with a small gap: a step back
     // (its depth) or a step to the side (its width), whichever is shorter along the path's way here. Where
     // the path sweeps across, the stones stack up it, each behind the last and overlapping it sideways,
@@ -331,10 +353,11 @@ function path(c, o) {
     var boxes = fixed.map(function (F) {
       var xs = F.map(function (p) { return p[0]; }), ys = F.map(function (p) { return p[1]; });
       var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-      return [x0 - (x1 - x0) * 0.08, x1 + (x1 - x0) * 0.08, y0 - (y1 - y0) * 0.35, y1];
+      return [x0, x1, y0, y1];
     });
     stones = stones.filter(function (St) {
-      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z, hd = St.dp / 2 * D / (St.Z * St.Z);
+      // (each kept stone is first moved up to a hair's gap from a fixed slab it would touch, so no gap opens)
+      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z * 0.9, hd = St.dp / 2 * D / (St.Z * St.Z) * 0.9;
       for (var j = 0; j < boxes.length; j++) {
         var B = boxes[j];
         if (C0[0] + hw > B[0] && C0[0] - hw < B[1] && C0[1] + hd > B[2] && C0[1] - hd < B[3]) return false;
@@ -414,7 +437,9 @@ function slabs(c, o) {
   (o.fixed || []).forEach(function (F) { slab(c, F, S, sc); });
 }
 function slab(c, F, S, sc) {
-  var len = Math.hypot(F[2][0] - F[3][0], F[2][1] - F[3][1]), th = Math.max(1.5, len * 0.028);
+  var len = 0;                                                 // its longest side
+  for (var e = 0; e < 4; e++) len = Math.max(len, Math.hypot(F[(e + 1) % 4][0] - F[e][0], F[(e + 1) % 4][1] - F[e][1]));
+  var th = Math.max(1.5, len * 0.028);
   function rounded(P, rad) {
     c.beginPath();
     for (var i = 0; i < P.length; i++) {

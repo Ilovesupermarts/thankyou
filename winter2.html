@@ -1277,10 +1277,14 @@ var REF = {
   // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
   // between two, and half the width of the trodden snow along the path
   stone: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathBand: 0.3,
-  // the two nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
+  // the nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
   // on the screen (fractions), measured on the reference; the second runs off the bottom edge
   nearSlabs: [[[0.246, 0.971], [0.330, 0.944], [0.369, 0.966], [0.270, 0.998]],
-              [[0.296, 1.004], [0.399, 0.976], [0.452, 1.006], [0.36, 1.04]]],
+              [[0.296, 1.004], [0.399, 0.976], [0.452, 1.006], [0.36, 1.04]],
+              // the two just beyond them (left of the big slab, and above it to the right): their corners read off a
+              // close-up of the reference on a fine grid
+              [[0.2092, 0.9463], [0.2450, 0.9356], [0.2622, 0.9497], [0.2300, 0.9625]],
+              [[0.2526, 0.9330], [0.2830, 0.9294], [0.2990, 0.9405], [0.2860, 0.9497]]],
   // the banks beyond the water (the edge of the snow, the earth showing under it)
   banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
           { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
