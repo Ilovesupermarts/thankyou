@@ -1277,6 +1277,10 @@ var REF = {
   // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
   // between two, and half the width of the trodden snow along the path
   stone: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathBand: 0.3,
+  // the two nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
+  // on the screen (fractions), measured on the reference; the second runs off the bottom edge
+  nearSlabs: [[[0.246, 0.971], [0.330, 0.944], [0.369, 0.966], [0.270, 0.998]],
+              [[0.296, 1.004], [0.399, 0.976], [0.452, 1.006], [0.36, 1.04]]],
   // the banks beyond the water (the edge of the snow, the earth showing under it)
   banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
           { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
@@ -1545,7 +1549,8 @@ function drawDecor(c) {
   g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
   c.fillStyle = g; c.fill();
   WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: approachLayout().path,
-                                  size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand, colours: { snow: C.snow } }, 0));
+                                  size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand,
+                                  fixed: REF.nearSlabs.map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }), colours: { snow: C.snow } }, 0));
 }
 /* The far layer (V.ref): the hill of firs, the pagoda among them, the mist. Baked once. */
 var FARL = mk(), BANKL = mk(), POND = { mask: mk(), refl: mk(), tmp: mk(), top: null, at: -1, puffs: [] };
@@ -1580,6 +1585,8 @@ function bakeFront() {
   if (!V.ref) return;
   // the banks beyond the water, laid over its edge
   WinterScene.banks(BANKL.c, withLight({ lines: REF.banks.map(function (L) { return { th: L.th * H, pts: refPts(L.pts) }; }), colours: { snow: C.snow } }, 0));
+  // the two nearest stone slabs, crisp (not in the snowfield's softened layer)
+  WinterScene.slabs(BANKL.c, withLight({ fixed: REF.nearSlabs.map(function (F) { return refPts(F); }), colours: { snow: C.snow } }, 0));
   // (the line each column's reflection turns about)
   var M = POND.mask, q = 0.25;
   M.cnv.width = Math.max(1, Math.round(W * q)); M.cnv.height = Math.max(1, Math.round(H * q));

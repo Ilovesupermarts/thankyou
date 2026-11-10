@@ -325,6 +325,23 @@ function path(c, o) {
     var gp = o.gap * lerp(0.5, 1.7, r());
     step = Math.min((dp * 0.85 + gp) / Math.max(0.05, Math.abs(Q.uz)), (o.size * 1.05 + gp) / Math.max(0.05, Math.abs(Q.ux)));
   }
+  // the nearest slabs are set where the reference has them (o.fixed): the stones laid along the path keep clear of them
+  var fixed = o.fixed || [];
+  if (fixed.length) {
+    var boxes = fixed.map(function (F) {
+      var xs = F.map(function (p) { return p[0]; }), ys = F.map(function (p) { return p[1]; });
+      var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+      return [x0 - (x1 - x0) * 0.08, x1 + (x1 - x0) * 0.08, y0 - (y1 - y0) * 0.35, y1];
+    });
+    stones = stones.filter(function (St) {
+      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z, hd = St.dp / 2 * D / (St.Z * St.Z);
+      for (var j = 0; j < boxes.length; j++) {
+        var B = boxes[j];
+        if (C0[0] + hw > B[0] && C0[0] - hw < B[1] && C0[1] + hd > B[2] && C0[1] - hd < B[3]) return false;
+      }
+      return C0[1] - hd < o.yb;                                   // and none wholly below the screen
+    });
+  }
   stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
   var slate = [196, 202, 216];
   stones.forEach(function (St) {
@@ -385,6 +402,69 @@ function path(c, o) {
     }
     c.restore();
   });
+}
+
+/* The nearest slabs (o.fixed: each its four corners on the screen, [left, top, right, bottom], as
+   measured on the reference), drawn crisp on a layer of their own: dark slate with a thin, darker
+   inked edge along the sides toward you (its thickness), the corners rounded, the top face mottled
+   lighter and darker as in the painting, a soft light rim along the far edge, a soft blue shadow on
+   the snow round it. */
+function slabs(c, o) {
+  var S = shader(o), sc = snowCols(S, o);
+  (o.fixed || []).forEach(function (F) { slab(c, F, S, sc); });
+}
+function slab(c, F, S, sc) {
+  var len = Math.hypot(F[2][0] - F[3][0], F[2][1] - F[3][1]), th = Math.max(1.5, len * 0.028);
+  function rounded(P, rad) {
+    c.beginPath();
+    for (var i = 0; i < P.length; i++) {
+      var a = P[(i + P.length - 1) % P.length], b = P[i], e = P[(i + 1) % P.length];
+      var la = Math.hypot(a[0] - b[0], a[1] - b[1]), le = Math.hypot(e[0] - b[0], e[1] - b[1]), k = Math.min(rad, la * 0.4, le * 0.4);
+      var p0 = [b[0] + (a[0] - b[0]) * k / la, b[1] + (a[1] - b[1]) * k / la], p1 = [b[0] + (e[0] - b[0]) * k / le, b[1] + (e[1] - b[1]) * k / le];
+      if (i === 0) c.moveTo(p0[0], p0[1]); else c.lineTo(p0[0], p0[1]);
+      c.quadraticCurveTo(b[0], b[1], p1[0], p1[1]);
+    }
+    c.closePath();
+  }
+  function shift(P, dy) { return P.map(function (p) { return [p[0], p[1] + dy]; }); }
+  var rad = len * 0.08, slate = [138, 142, 160], br = S.bright;
+  function col(base, k) { return mix(scale(base, br * k), S(scale(base, k), 0, 1, 0.5, 0.6), 0.35); }
+  var top = shift(F, -th * 0.4), Lc = top[0], Tc = top[1], Rc = top[2], Bc = top[3];
+  // the soft blue shadow on the snow round it
+  c.save();
+  c.filter = 'blur(' + (th * 2).toFixed(1) + 'px)';
+  rounded([[Lc[0] - th * 1.5, Lc[1] + th], [Tc[0], Tc[1] + th * 0.5], [Rc[0] + th * 1.5, Rc[1] + th * 1.2], [Bc[0], Bc[1] + th * 2.2]], rad);
+  c.fillStyle = rgb(sc.shade, 0.7); c.fill();
+  c.restore();
+  // the thin dark edge toward you: the outline a little lower, nearly black-blue
+  rounded(shift(F, th * 0.6), rad);
+  c.fillStyle = rgb(col([52, 54, 66], 1)); c.fill();
+  // the top face
+  c.save();
+  rounded(top, rad);
+  var g = c.createLinearGradient(Tc[0], Tc[1], Bc[0], Bc[1]);
+  g.addColorStop(0, rgb(col(slate, 1.1))); g.addColorStop(0.6, rgb(col(slate, 0.98))); g.addColorStop(1, rgb(col(slate, 0.86)));
+  c.fillStyle = g; c.fill();
+  c.clip();
+  // mottled, as painted: soft lighter and darker patches, longer along the stone
+  var r = rng(Math.round(Tc[0] * 7 + Tc[1] * 13)), ux = (Rc[0] - Bc[0]) / len, uy = (Rc[1] - Bc[1]) / len, ang = Math.atan2(uy, ux);
+  var wid = Math.hypot(Lc[0] - Bc[0], Lc[1] - Bc[1]);
+  c.filter = 'blur(' + Math.max(0.6, wid * 0.06).toFixed(1) + 'px)';
+  for (var k = 0; k < 22; k++) {
+    var t = r(), v = r();
+    var px = lerp(lerp(Lc[0], Bc[0], v), lerp(Tc[0], Rc[0], v), t), py = lerp(lerp(Lc[1], Bc[1], v), lerp(Tc[1], Rc[1], v), t);
+    c.fillStyle = rgb(col(slate, r() < 0.55 ? 1.32 : 0.72), lerp(0.2, 0.42, r()));
+    c.beginPath(); c.ellipse(px, py, len * lerp(0.04, 0.12, r()), wid * lerp(0.08, 0.2, r()), ang, 0, TAU); c.fill();
+  }
+  c.filter = 'none';
+  // a soft light rim along the far edges, where the sky catches it
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(1, th * 0.9);
+  c.beginPath(); c.moveTo(Lc[0], Lc[1]); c.lineTo(Tc[0], Tc[1]); c.lineTo(Rc[0], Rc[1]); c.stroke();
+  c.restore();
+  // a fine dark inked line round the top face
+  rounded(top, rad);
+  c.strokeStyle = rgb(col([52, 54, 66], 1), 0.55); c.lineWidth = Math.max(0.6, th * 0.3); c.stroke();
 }
 
 /* ---------------------------------------------------------------
@@ -478,5 +558,5 @@ function pool(c, o) {
   c.restore();
 }
 
-return { pool: pool, hill: hill, hillTop: hillTop, mistBand: mistBand, ropes: ropes, path: path, banks: banks };
+return { slabs: slabs, pool: pool, hill: hill, hillTop: hillTop, mistBand: mistBand, ropes: ropes, path: path, banks: banks };
 })();
