@@ -407,6 +407,7 @@ function slabPoly(c, P, S, sc, seed) {
   // a light blue shadow on the snow round it, close to the stone (it sits in the snow, it does not float)
   c.save(); c.filter = 'blur(' + Math.max(0.6, th * 1.5).toFixed(1) + 'px)';
   path(th * 0.5, 1.04); c.fillStyle = rgb(sc.shade, 0.45); c.fill(); c.restore();
+  grime(c, P, cx, cy, len, wid, rng(seed + 7));
   // its edge toward you: a thin band of darker slate (not black)
   path(th * 0.35, 1); c.fillStyle = rgb(col(slate, 0.62)); c.fill();
   c.save();
@@ -444,7 +445,55 @@ function slabPoly(c, P, S, sc, seed) {
 }
 /* Snow drifted against a stone: soft, uneven white along its sides and its front edge, lapping over the
    edge here and there, so the stone sits in the snow (the reference never shows a clean, hard side). */
+/* Where the stone meets the snow, as in the real world: trodden, muddy grey-brown slush round its
+   sides and front, uneven, broken; drawn on the snow before the stone. */
+function grime(c, P, cx, cy, len, wid, r) {
+  c.save();
+  // a thin muddy band hugging its sides and front
+  c.filter = 'blur(' + Math.max(0.4, wid * 0.025).toFixed(1) + 'px)';
+  for (var i = 0; i < P.length; i++) {
+    var p = P[i];
+    if (p[1] < cy - wid * 0.15 || r() < 0.25) continue;
+    var rr = wid * lerp(0.05, 0.11, r());
+    c.fillStyle = rgb(r() < 0.6 ? [112, 98, 88] : [90, 86, 90], lerp(0.25, 0.5, r()));
+    c.beginPath(); c.ellipse(p[0] + (p[0] - cx) * 0.03, p[1] + rr * 0.8, rr * lerp(1.5, 3, r()), rr * 0.55, 0, 0, TAU); c.fill();
+  }
+  // grit: small dark specks scattered in the trodden snow just round it
+  c.filter = 'none';
+  for (i = 0; i < Math.round(len / 3); i++) {
+    var q = P[Math.floor(r() * P.length)], d = Math.max(0.6, wid * lerp(0.015, 0.04, r()));
+    var out = lerp(0.02, 0.18, r());
+    c.fillStyle = rgb(r() < 0.5 ? [96, 84, 76] : [70, 70, 78], lerp(0.25, 0.6, r()));
+    c.fillRect(q[0] + (q[0] - cx) * out * 0.3, q[1] + (q[1] - cy) * out + (q[1] > cy ? wid * 0.05 : 0), d, d);
+  }
+  c.restore();
+}
+/* Broken clumps of snow lying over the stone's edges here and there (crisp, white on top, blue under),
+   and the faint dusting on the back of its top. */
 function snowRim(c, P, cx, cy, len, wid, sc, r) {
+  // low, lumpy drifts of snow lying along its sides and front edge, overlapping it
+  var drifts = 1 + Math.floor(len / 60);
+  for (var q = 0; q < drifts; q++) {
+    var cand = P.filter(function (pp) { return pp[1] > cy - wid * 0.1; });
+    if (!cand.length || r() < 0.2) continue;
+    var p = cand[Math.floor(r() * cand.length)];
+    var w = len * lerp(0.15, 0.35, r()), h = wid * lerp(0.12, 0.22, r()), n = 9, k, top = [];
+    for (k = 0; k <= n; k++) {
+      var u = k / n, e = Math.pow(Math.sin(u * PI), 0.6);
+      top.push([p[0] - w / 2 + w * u, p[1] + h * 0.35 - h * e * lerp(0.75, 1.1, r())]);
+    }
+    c.save();
+    c.filter = 'blur(' + Math.max(0.3, h * 0.08).toFixed(1) + 'px)';
+    c.beginPath(); c.moveTo(top[0][0], top[0][1]);
+    for (k = 1; k < n; k++) c.quadraticCurveTo(top[k][0], top[k][1], (top[k][0] + top[k + 1][0]) / 2, (top[k][1] + top[k + 1][1]) / 2);
+    c.lineTo(top[n][0], top[n][1]);
+    c.quadraticCurveTo(p[0], p[1] + h * 0.75, top[0][0], top[0][1]);
+    c.closePath();
+    var g = c.createLinearGradient(0, p[1] - h * 0.7, 0, p[1] + h * 0.6);
+    g.addColorStop(0, rgb(sc.top)); g.addColorStop(0.55, rgb(mix(sc.top, sc.shade, 0.25))); g.addColorStop(1, rgb(sc.shade));
+    c.fillStyle = g; c.fill();
+    c.restore();
+  }
   // a light dusting of snow on the stone along its back edge, grainy and soft, as in the reference
   c.save();
   c.beginPath(); P.forEach(function (p, i) { i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath(); c.clip();
@@ -484,6 +533,11 @@ function slab(c, F, S, sc) {
   rounded([[Lc[0] - th * 0.8, Lc[1] + th * 0.6], [Tc[0], Tc[1] + th * 0.3], [Rc[0] + th * 0.8, Rc[1] + th * 0.7], [Bc[0], Bc[1] + th * 1.1]], rad);
   c.fillStyle = rgb(sc.shade, 0.45); c.fill();
   c.restore();
+  var gp = [], gm;
+  for (gm = 0; gm < 4; gm++) for (var gu = 0; gu < 1; gu += 0.08) gp.push([lerp(F[gm][0], F[(gm + 1) % 4][0], gu), lerp(F[gm][1], F[(gm + 1) % 4][1], gu)]);
+  var gxs = gp.map(function (q) { return q[0]; }), gys = gp.map(function (q) { return q[1]; });
+  var gx0 = Math.min.apply(null, gxs), gx1 = Math.max.apply(null, gxs), gy0 = Math.min.apply(null, gys), gy1 = Math.max.apply(null, gys);
+  grime(c, gp, (gx0 + gx1) / 2, (gy0 + gy1) / 2, gx1 - gx0, gy1 - gy0, rng(Math.round(gx0 * 3 + gy0 * 5)));
   // its edge toward you: a thin band of darker slate (not black)
   rounded(shift(F, th * 0.35), rad);
   c.fillStyle = rgb(col(slate, 0.62)); c.fill();
