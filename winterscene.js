@@ -294,6 +294,7 @@ function path(c, o) {
   var lkey = JSON.stringify([o.hy, o.yb, o.cx, o.size, o.depth, o.gap, o.halfWidth, o.pts, o.fixed, d(o, 'seed', 51)]);
   var keep = layoutCache[lkey];
   if (!keep) {
+  var tStart = Date.now();                                        // (a time limit: the finishing steps are skipped past it)
   // THE STONES, laid as in the reference: rows of flat slabs filling a band of even width that follows the
   // path's smooth line (both its edges smooth), one row behind another with the same gap between every two.
   // Each row spans the band: one slab, or now and then two pieces with the same gap between them, their
@@ -324,7 +325,9 @@ function path(c, o) {
     }
     return null;
   }
-  while (Zr < zMax - o.depth * 0.3 && guard++ < 400) {
+  var nStones = 0;
+  while (Zr < zMax - o.depth * 0.3 && guard++ < 400 && nStones < 160) {
+    if (o.depth * D / (Zr * Zr) < 0.3) break;                        // rows far too small to see: none farther
     var dpR = o.depth * lerp(0.85, 1.15, r()), zc = Zr + dpR / 2, ch = rowAt(zc);
     Zr += dpR + gapZ;
     if (!ch) continue;
@@ -341,7 +344,7 @@ function path(c, o) {
       var a0 = x0r + Lr * cuts[pi] + (pi ? gX / 2 : 0), a1 = x0r + Lr * cuts[pi + 1] - (pi < np - 1 ? gX / 2 : 0);
       row.push({ X: (a0 + a1) / 2, Z: zc + (r() - 0.5) * dpR * 0.08, w: a1 - a0, dp: dpR * lerp(0.92, 1.06, r()), ax: 1, az: 0, bx: 0, bz: 1 });
     }
-    rows.push(row);
+    rows.push(row); nStones += row.length;
   }
   // each piece's outline: four corners on the ground, each moved a little at random, then each corner
   // rounded by its own amount on the screen
@@ -395,7 +398,7 @@ function path(c, o) {
   var gb = [1e9, -1e9, 1e9, -1e9];
   (o.fixed || []).forEach(function (F) { var fb = bounds(slabOutline(F).P); gb = [Math.min(gb[0], fb[0] - 80), Math.max(gb[1], fb[1] + 80), Math.min(gb[2], fb[2] - 60), Math.max(gb[3], fb[3])]; });
   if (!(o.fixed || []).length) gb = [0, -1, 0, -1];
-  for (var pass = 0; pass < 6; pass++) {
+  for (var pass = 0; pass < 6 && Date.now() - tStart < 500; pass++) {
     var best = null;
     for (var gy = Math.max(hy + D / zMax, gb[2]); gy < Math.min(o.yb, gb[3]); gy += 6) {
       var Zg = D / (gy - hy), gpxH = Math.max(1.5, gapZ * D / (Zg * Zg) * 0.8);
@@ -433,6 +436,8 @@ function path(c, o) {
     var edge = [b[0], b[1], b[2], b[3]][dir], sg = dir === 0 || dir === 2 ? -1 : 1;
     for (var j = 0; j < placed.length; j++) {
       if (j === me) continue;
+      var pb = bounds(placed[j]);
+      if (pb[0] > b[1] + 45 || pb[1] < b[0] - 45 || pb[2] > b[3] + 45 || pb[3] < b[2] - 45) continue;
       placed[j].forEach(function (q) {
         var across = horiz ? q[1] : q[0];
         if (across < a0 || across > a1) return;
@@ -443,6 +448,7 @@ function path(c, o) {
     return best2;
   }
   keep.forEach(function (St) {
+    if (Date.now() - tStart > 800) return;
     var w1 = St.w * 1.3, d1 = St.dp * 1.25;                          // never more than a little larger
     for (var dir = 0; dir < 4; dir++) {
       var g0 = dirGap(placed[St.pi], St.pi, dir);
@@ -461,12 +467,28 @@ function path(c, o) {
   });
   layoutCache = {}; layoutCache[lkey] = keep;
   }
-  keep.slice().reverse().forEach(function (St3) {                 // the farthest first
+  // each stone is painted once into a small picture of its own (with its shadow, side and edge) and that
+  // picture is laid down: the snowfield is baked in slices, each drawing every stone, and the blurs in the
+  // painting are costly on a big canvas (on the tablet's graphics chip they stalled the whole browser)
+  var tr = c.getTransform ? c.getTransform() : { a: 1 }, kk = Math.max(1, Math.abs(tr.a) || 1);
+  var lightKey = [Math.round(sc.top[0]), Math.round(sc.top[1]), Math.round(sc.top[2]), Math.round(sc.shade[0]), Math.round(sc.shade[2]), Math.round(S.bright * 100), sc.side0, kk].join(',');
+  if (spriteKey !== lightKey + lkey) { spriteCache = []; spriteKey = lightKey + lkey; }
+  keep.slice().reverse().forEach(function (St3, si) {               // the farthest first
     if (o.collect) o.collect.push(finalOutline(St3.pts, St3.seed));
-    // drawn as the nearest slabs are (WinterScene.slabs): the same slate, edge, mottle, rim and shadow
-    slabPoly(c, St3.pts, S, sc, St3.seed);
+    var spr = spriteCache[si];
+    if (!spr) {
+      var b3 = bounds(finalOutline(St3.pts, St3.seed)), pad = Math.max(6, (b3[3] - b3[2]) * 0.6);
+      var bx = Math.floor(b3[0] - pad), by = Math.floor(b3[2] - pad), bw = Math.ceil(b3[1] - b3[0] + pad * 2), bh = Math.ceil(b3[3] - b3[2] + pad * 2);
+      var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.round(bw * kk)); cv.height = Math.max(1, Math.round(bh * kk));
+      var g = cv.getContext('2d'); g.setTransform(kk, 0, 0, kk, -bx * kk, -by * kk);
+      // drawn as the nearest slabs are (WinterScene.slabs): the same slate, edge, rim and shadow
+      slabPoly(g, St3.pts, S, sc, St3.seed);
+      spr = spriteCache[si] = { cv: cv, x: bx, y: by, w: bw, h: bh };
+    }
+    c.drawImage(spr.cv, spr.x, spr.y, spr.w, spr.h);
   });
 }
+var spriteCache = [], spriteKey = '';
 var layoutCache = {};
 function bounds(P) {
   if (P.bb) return P.bb;                                          // (kept on the outline: it never changes once made)
