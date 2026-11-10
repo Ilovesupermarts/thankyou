@@ -312,7 +312,7 @@ function path(c, o) {
   for (var tt = t0; tt < total; tt += step) {
     var Q = at(tt), before = stones.length;
     var ax = 1, az = 0;                                        // their long side level, square on to you
-    var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.22;
+    var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.1;
     var cx0 = Q.X + ax * wob, cz0 = Q.Z + az * wob;
     var away = Math.abs(Q.uz) > 0.75;                          // groups of pieces only where the path runs away from you
     if (!away && kind >= 0.5) kind = kind < 0.62 ? 0.6 : kind < 0.8 ? 0.2 : 0.9;     // in the sweep: mostly single slabs, now and then a pair
@@ -321,11 +321,11 @@ function path(c, o) {
       lay(cx0, cz0, w, dp, Math.atan2(az, ax) + rot0);
     } else if (kind < 0.8) {                                   // two pieces side by side, different sizes
       var wa = o.size * lerp(0.42, 0.62, r()), wb = o.size * lerp(0.38, 0.6, r()), gp = o.size * lerp(0.04, 0.1, r());
-      lay(cx0 - ax * (wb + gp) / 2, cz0 - az * (wb + gp) / 2 + dp * (r() - 0.5) * 0.3, wa, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.4);
-      lay(cx0 + ax * (wa + gp) / 2, cz0 + az * (wa + gp) / 2 + dp * (r() - 0.5) * 0.3, wb, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.4);
+      lay(cx0 - ax * (wb + gp) / 2, cz0 - az * (wb + gp) / 2 + dp * (r() - 0.5) * 0.3, wa, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.14);
+      lay(cx0 + ax * (wa + gp) / 2, cz0 + az * (wa + gp) / 2 + dp * (r() - 0.5) * 0.3, wb, dp * lerp(0.8, 1.1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.14);
     } else if (kind < 0.88) {                                  // three small pieces
       var w3 = o.size * lerp(0.3, 0.4, r());
-      for (var m = -1; m <= 1; m++) lay(cx0 + ax * m * w3 * 1.12, cz0 + az * m * w3 * 1.12 + dp * (r() - 0.5) * 0.35, w3 * lerp(0.85, 1.1, r()), dp * lerp(0.75, 1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.5);
+      for (var m = -1; m <= 1; m++) lay(cx0 + ax * m * w3 * 1.12, cz0 + az * m * w3 * 1.12 + dp * (r() - 0.5) * 0.35, w3 * lerp(0.85, 1.1, r()), dp * lerp(0.75, 1, r()), Math.atan2(az, ax) + (r() - 0.5) * 0.16);
     } else {                                                   // a short piece, set off to one side
       var sd = r() < 0.5 ? -1 : 1, w4 = o.size * lerp(0.5, 0.7, r());
       lay(cx0 + ax * sd * o.size * 0.18, cz0 + az * sd * o.size * 0.18, w4, dp * lerp(0.8, 1.05, r()), Math.atan2(az, ax) + rot0);
@@ -382,48 +382,8 @@ function path(c, o) {
       var uu = u * ca - v * sa, vv = u * sa + v * ca;          // (u across, v along the ground's depth)
       pts.push(toScreen(St.X + uu, St.Z + vv));
     }
-    var C = toScreen(St.X, St.Z), q = (C[1] - hy) / D, edge = Math.max(0.6, D * 0.012 * q);
-    // sunk in the snow: a soft blue hollow round it
-    c.save();
-    c.filter = 'blur(' + Math.max(0.5, edge * 1.2).toFixed(1) + 'px)';
-    c.fillStyle = rgb(sc.shade, 0.5);
-    c.beginPath(); pts.forEach(function (p, m) { var x = C[0] + (p[0] - C[0]) * 1.08, y = C[1] + (p[1] - C[1]) * 1.15 + edge * 0.5; m ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.fill();
-    c.restore();
-    // the slab: its top lit by the sky, its edge toward you darker
-    c.save();
-    c.beginPath(); pts.forEach(function (p, m) { m ? c.lineTo(p[0], p[1] + edge) : c.moveTo(p[0], p[1] + edge); }); c.closePath();
-    c.fillStyle = rgb(S(scale(slate, 0.5), 0, 0.2, 1, 0.4)); c.fill();
-    c.beginPath(); pts.forEach(function (p, m) { m ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath();
-    var top = Math.min.apply(null, pts.map(function (p) { return p[1]; })), bot = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
-    c.fillStyle = lingrad(c, 0, top, 0, bot, [[0, mix(scale(slate, S.bright * 0.8), S(slate, 0, 1, 0.4, 0.7), 0.5)], [1, mix(scale(slate, S.bright * 0.62), S(scale(slate, 0.75), 0, 1, 0.4, 0.5), 0.5)]]);
-    c.fill();
-    c.clip();
-    // brushed texture: a few faint lighter and darker streaks across it
-    var hh = bot - top, wl = Math.max.apply(null, pts.map(function (p) { return p[0]; })) - Math.min.apply(null, pts.map(function (p) { return p[0]; }));
-    for (k = 0; k < 4; k++) {
-      c.strokeStyle = rgb(k % 2 ? scale(slate, S.bright * 1.08) : scale(slate, S.bright * 0.62), 0.09);
-      c.lineWidth = Math.max(0.4, Math.min(hh * lerp(0.04, 0.09, r()), 2.5));
-      var sy = lerp(top, bot, lerp(0.2, 0.8, r())), sx = C[0] + (r() - 0.5) * wl * 0.3;
-      c.beginPath(); c.moveTo(sx - wl * lerp(0.2, 0.4, r()), sy); c.lineTo(sx + wl * lerp(0.2, 0.4, r()), sy + (r() - 0.5) * hh * 0.2); c.stroke();
-    }
-    // its far edge (the side away from you, the upper one on the screen): a light rim, a thin line of snow
-    var far = [];
-    for (k = 0; k < n; k++) far.push(pts[k][1] < C[1] - hh * 0.12);
-    var st0 = 0;
-    for (k = 0; k < n; k++) if (far[k] && !far[(k + n - 1) % n]) { st0 = k; break; }
-    var run = [];
-    for (k = 0; k < n && far[(st0 + k) % n]; k++) run.push(pts[(st0 + k) % n]);
-    if (run.length > 1) {
-      c.strokeStyle = rgb(scale(slate, S.bright * 1.2), 0.55); c.lineWidth = Math.max(0.6, edge * 0.9);
-      c.beginPath(); c.moveTo(run[0][0], run[0][1] + edge * 0.5);
-      for (k = 1; k < run.length; k++) c.lineTo(run[k][0], run[k][1] + edge * 0.5);
-      c.stroke();
-      c.strokeStyle = rgb(sc.top, 0.6); c.lineWidth = Math.max(0.5, edge * 0.55);
-      c.beginPath(); c.moveTo(run[0][0], run[0][1]);
-      for (k = 1; k < run.length; k++) c.lineTo(run[k][0], run[k][1]);
-      c.stroke();
-    }
-    c.restore();
+    // drawn as the nearest slabs are (WinterScene.slabs): the same slate, edge, mottle, rim and shadow
+    slabPoly(c, pts, S, sc, Math.round(St.X * 997 + St.Z * 131));
   });
 }
 
@@ -435,6 +395,43 @@ function path(c, o) {
 function slabs(c, o) {
   var S = shader(o), sc = snowCols(S, o);
   (o.fixed || []).forEach(function (F) { slab(c, F, S, sc); });
+}
+/* The same look for a stone given as an outline of many points on the screen (the stones along the path). */
+function slabPoly(c, P, S, sc, seed) {
+  var xs = P.map(function (p) { return p[0]; }), ys = P.map(function (p) { return p[1]; });
+  var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+  var len = x1 - x0, wid = y1 - y0, th = Math.max(1, Math.min(len * 0.028, wid * 0.18)), cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  var slate = [138, 142, 160], br = S.bright;
+  function col(base, k) { return mix(scale(base, br * k), S(scale(base, k), 0, 1, 0.5, 0.6), 0.35); }
+  function path(dy, k) { c.beginPath(); P.forEach(function (p, i) { var x = cx + (p[0] - cx) * k, y = cy + (p[1] - cy) * k + dy; i ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); }
+  // the soft blue shadow on the snow round it
+  c.save(); c.filter = 'blur(' + Math.max(0.6, th * 2).toFixed(1) + 'px)';
+  path(th * 1.2, 1.08); c.fillStyle = rgb(sc.shade, 0.7); c.fill(); c.restore();
+  // the thin dark edge toward you, then the top face
+  path(th * 0.6, 1); c.fillStyle = rgb(col([52, 54, 66], 1)); c.fill();
+  c.save();
+  path(-th * 0.4, 1);
+  var g = c.createLinearGradient(0, y0, 0, y1);
+  g.addColorStop(0, rgb(col(slate, 1.1))); g.addColorStop(0.6, rgb(col(slate, 0.98))); g.addColorStop(1, rgb(col(slate, 0.86)));
+  c.fillStyle = g; c.fill();
+  c.clip();
+  var r = rng(seed);
+  if (len > 6) {                                               // mottled, as painted
+    c.filter = 'blur(' + Math.max(0.5, wid * 0.06).toFixed(1) + 'px)';
+    for (var k = 0; k < 10; k++) {
+      c.fillStyle = rgb(col(slate, r() < 0.55 ? 1.32 : 0.72), lerp(0.2, 0.42, r()));
+      c.beginPath(); c.ellipse(lerp(x0, x1, r()), lerp(y0, y1, r()), len * lerp(0.05, 0.14, r()), wid * lerp(0.1, 0.22, r()), 0, 0, TAU); c.fill();
+    }
+    c.filter = 'none';
+  }
+  // the soft light rim along the far (upper) edge
+  c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(0.7, th * 0.9);
+  c.beginPath(); var st = false;
+  P.forEach(function (p) { if (p[1] < cy) { st ? c.lineTo(p[0], p[1] - th * 0.4) : c.moveTo(p[0], p[1] - th * 0.4); st = true; } });
+  c.stroke();
+  c.restore();
+  // a fine dark inked line round the top face
+  path(-th * 0.4, 1); c.strokeStyle = rgb(col([52, 54, 66], 1), 0.55); c.lineWidth = Math.max(0.5, th * 0.3); c.stroke();
 }
 function slab(c, F, S, sc) {
   var len = 0;                                                 // its longest side
