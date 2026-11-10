@@ -549,7 +549,7 @@ function snowRim(c, P, cx, cy, len, wid, sc, r) {
     } else idx = Math.floor(r() * n);
     var A = P[idx];
     var mx = lerp(A[0], cx, 0.42), my = lerp(A[1], cy, 0.45);
-    var rx = len * lerp(0.06, 0.13, r()), ry = wid * lerp(0.12, 0.22, r()), pts = [], q = 13;
+    var rx = len * lerp(0.07, 0.15, r()), ry = wid * lerp(0.16, 0.28, r()), pts = [], q = 13;
     for (i = 0; i < q; i++) {
       var ang = i / q * TAU, rr = lerp(0.72, 1.12, r());
       pts.push([mx + Math.cos(ang) * rx * rr, my + Math.sin(ang) * ry * rr]);
@@ -566,14 +566,21 @@ function snowRim(c, P, cx, cy, len, wid, sc, r) {
     c.save(); c.filter = 'blur(' + Math.max(0.5, ry * 0.25).toFixed(1) + 'px)';
     blob(0, ry * 0.15, 1.0); c.fillStyle = rgb(mix([60, 66, 92], sc.shade, 0.5), 0.2); c.fill();
     c.restore();
-    // the mound: a feathered edge (blurred a little), lit from above and toward the light
-    c.save(); c.filter = 'blur(' + Math.max(0.35, ry * 0.08).toFixed(1) + 'px)';
+    // the mound, shaded top to bottom so it reads at any size: a sunlit cap, the colour cooling through
+    // the snow's own white to a clear blue-grey on its lower half, a darker crease along its underside where
+    // it sits on the stone, a bright rim on its top toward the light
+    var lit = mix(sc.top, [255, 252, 246], 0.5), cool = mix(sc.shade, [150, 162, 196], 0.45), crease = mix(cool, [92, 100, 132], 0.45);
+    c.save(); c.filter = 'blur(' + Math.max(0.3, ry * 0.05).toFixed(1) + 'px)';
     blob(0, 0, 1);
-    var gx = mx + rx * 0.3 * S0side, gy = my - ry * 0.45;
-    var gr = c.createRadialGradient(gx, gy, 0, mx, my, Math.max(rx, ry) * 1.15);
-    gr.addColorStop(0, rgb(mix(sc.top, [255, 255, 255], 0.4))); gr.addColorStop(0.45, rgb(sc.top)); gr.addColorStop(0.8, rgb(mix(sc.top, sc.shade, 0.5)));
-    gr.addColorStop(1, rgb(sc.shade, 0.6));
-    c.fillStyle = gr; c.fill();
+    var lg = c.createLinearGradient(mx - rx * 0.25 * S0side, my - ry, mx + rx * 0.25 * S0side, my + ry);
+    lg.addColorStop(0, rgb(lit)); lg.addColorStop(0.35, rgb(sc.top)); lg.addColorStop(0.62, rgb(mix(sc.top, cool, 0.55)));
+    lg.addColorStop(0.85, rgb(cool)); lg.addColorStop(1, rgb(crease));
+    c.fillStyle = lg; c.fill();
+    c.restore();
+    c.save(); blob(0, 0, 1); c.clip();
+    c.filter = 'blur(' + Math.max(0.3, ry * 0.08).toFixed(1) + 'px)';
+    c.fillStyle = rgb([255, 255, 255], 0.75);                    // the sunlit cap
+    c.beginPath(); c.ellipse(mx + rx * 0.2 * S0side, my - ry * 0.5, rx * 0.55, ry * 0.28, 0, 0, TAU); c.fill();
     c.restore();
     // fine grain and a few glints
     c.save(); blob(0, 0, 0.95); c.clip();
