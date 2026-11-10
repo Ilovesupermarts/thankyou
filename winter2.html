@@ -313,8 +313,8 @@ var V_DEFAULTS = {
   hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
   toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
-  temple: true, hillPeakX: 0.11, hillTop: 0.5, hillEnd: 0.47, hillTrees: 80, hillTreeSize: 1, hillHaze: 0.3,
-  pagodaX: 0.13, pagodaSize: 0.3, pagodaOnHill: 0.32, hallX: 0.27, hallSize: 0.13, templeView: 1.1, roofSnow: 1, templeLight: 0.4,
+  temple: true, hillPeakX: 0.11, hillTop: 0.5, hillEnd: 0.47, hillTrees: 150, hillTreeSize: 1, hillHaze: 0.36,
+  pagodaX: 0.13, pagodaSize: 0.3, pagodaOnHill: 0.32, hallX: 0.27, hallSize: 0.13, templeSoft: 1, roofSnow: 1, templeLight: 0.25,
   gates: 5, gateFrom: 0.33, gateTo: 1, gateFar: 0.045, gateNear: 0.2, gateEndX: -0.04, gateBend: 0,
   path: 1.3, pathWidth: 0.6, lanternsAlong: true,
   firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
@@ -1435,7 +1435,7 @@ function bakeGround() {
       drawThing(tg, T2, T2.type === 'torii' ? hz2 * 0.8 : hz2);
     }
     slab.c.save();
-    var bl = lerp(1.4, 0, S0.u) * PR * V.groundSoft;
+    var bl = (lerp(1.4, 0, S0.u) * V.groundSoft + (V.temple ? 0.45 * V.templeSoft : 0)) * PR;
     slab.c.filter = bl > 0.05 ? 'blur(' + bl.toFixed(2) + 'px)' : 'none';
     slab.c.drawImage(GTMP.cnv, 0, 0);
     slab.c.restore();
@@ -1592,40 +1592,62 @@ function drawPath(tg, top, bottom, haze) {
   tg.restore();
 }
 /* A building of lakeside.js (the pagoda or the hall) standing at (bx, by), hpx tall (the pagoda) or wpx wide (the hall),
-   drawn into c with snow on its roofs. Seen a little from above (templeView: the eye that much of its height above
-   its foot), lit by the scene's light, lit up by the lanterns after dark. */
+   drawn into c with snow on its roofs. Seen as the scene sees it: the eye at the horizon, 1.6 m above the snowfield
+   (1 unit), every building at its true size (the pagoda 32 m tall, the hall 18 m wide), so its distance follows from
+   how big it is on the screen and its height on the hill from where it stands; all of them share that one eye, so
+   their lines run to the same vanishing points. Drawn at twice the resolution and brought down (soft, even edges),
+   then softened and hazed by its distance. */
+var TEMPLE_F = 0.9;                                          // the lens: the focal length, × the screen's width
 function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
-  var F = W, hv = by - hpx * V.templeView, z = 20;
-  function proj(x, y, zz) { return [W / 2 + F * x / zz, hv + F * (1 - y) / zz]; }
-  var X = (bx - W / 2) * z / F, Y = 1 - (by - hv) * z / F;
-  var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: X, y: Y, z: z, size: hpx * z / F, yaw: yaw })
-                                : Lakeside.hall({ x: X, y: Y, z: z, size: wpx * z / F, yaw: yaw });
+  var F = W * TEMPLE_F, hy = H * V.horizon;
+  var S = kind === 'pagoda' ? 32 / 1.6 : 18 / 1.6, z = S * F / (kind === 'pagoda' ? hpx : wpx);
+  function proj(x, y, zz) { return [W / 2 + F * x / zz, hy + F * (1 - y) / zz]; }
+  var X = (bx - W / 2) * z / F, Y = 1 - (by - hy) * z / F;
+  var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: X, y: Y, z: z, size: S, yaw: yaw })
+                                : Lakeside.hall({ x: X, y: Y, z: z, size: S, yaw: yaw });
+  // the snow on the roofs as a real layer: on each roof face a cover lifted by its thickness, and along its eave the
+  // edge of that layer (hanging a little over), so the snow shows as a white rim even where the roof itself is seen
+  // from below
+  var snowFaces = [];
+  if (V.roofSnow > 0) {
+    var tS = 0.3 * V.roofSnow, more = [];
+    snowFaces = more;
+    faces.forEach(function (f) {
+      if (f.tone !== 'roof') return;
+      var up = function (q, d) { return [q[0], q[1] + d, q[2]]; };
+      more.push({ p: f.p.map(function (q) { return up(q, tS); }), tone: 'snow', c: f.c });
+      var a = f.p[0], b2 = f.p[1];
+      more.push({ p: [up(a, -tS * 0.35), up(b2, -tS * 0.35), up(b2, tS), up(a, tS)], tone: 'snowEdge', c: f.c });
+    });
+  }
+  var SNOWC = { snow: hex(V.colours.snow), snowEdge: mix(hex(V.colours.snow), SHADE, 0.25) };
   var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   faces.forEach(function (f) { f.p.forEach(function (q) { var s = proj(q[0], q[1], q[2]); x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]); }); });
   x0 -= 6; y0 -= 6; x1 += 6; y1 += 6;
-  var cw = Math.max(1, Math.ceil((x1 - x0) * PR)), ch = Math.max(1, Math.ceil((y1 - y0) * PR));
+  var SS = PR * 2, cw = Math.max(1, Math.ceil((x1 - x0) * SS)), ch = Math.max(1, Math.ceil((y1 - y0) * SS));
   var C = cols(), mistC = light(C.mist), Lw = [LT.dir[0], LT.dir[1], -LT.dir[2]];
   var k = clamp(0.45 + 0.35 * LT.sS + 0.25 * LT.amb, 0.4, 1.15);
   function fin(col) { return mix(scale(light(col), k), mistC, haze); }
   var B = mk(); B.cnv.width = cw; B.cnv.height = ch;
-  B.c.setTransform(PR, 0, 0, PR, -x0 * PR, -y0 * PR);
+  B.c.setTransform(SS, 0, 0, SS, -x0 * SS, -y0 * SS);
   var fk = nightLights() * V.templeLight * (1 - haze * 0.5);
-  Lakeside.renderFaces(B.c, faces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.5, colour: function () { return null; }, fin: fin,
-                                     flood: { k: fk, col: C.flame, y0: Y, h: kind === 'pagoda' ? hpx * z / F : wpx * z / F * 0.65 } });
+  var floodO = { k: fk, col: C.flame, y0: Y, h: kind === 'pagoda' ? hpx * z / F : wpx * z / F * 0.65 };
+  Lakeside.renderFaces(B.c, faces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.5, colour: function () { return null; }, fin: fin, flood: floodO });
+  if (snowFaces.length) Lakeside.renderFaces(B.c, snowFaces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.35, colour: function (tone) { return SNOWC[tone]; }, fin: fin });
   // the snow on the roofs: the roofs as they are seen (white; everything else black, so it hides the roofs behind it),
   // turned into a mask, then lit by the snow material
   if (V.roofSnow > 0) {
     var M = mk(); M.cnv.width = cw; M.cnv.height = ch;
-    M.c.setTransform(PR, 0, 0, PR, -x0 * PR, -y0 * PR);
+    M.c.setTransform(SS, 0, 0, SS, -x0 * SS, -y0 * SS);
     var plain = faces.map(function (f) { return { p: f.p, tone: f.tone, c: f.c }; });
-    Lakeside.renderFaces(M.c, plain, { proj: proj, cam: [0, 1, 0], light: [0, 1, 0], shade: 0,
-                                       colour: function (tone) { return tone === 'roof' ? [255, 255, 255] : [0, 0, 0]; }, fin: function (col) { return col; } });
+    Lakeside.renderFaces(M.c, plain, { proj: proj, cam: [0, 1, 0], light: [0, 1, 0], shade: 0, colour: function () { return [0, 0, 0]; }, fin: function (col) { return col; } });
+    Lakeside.renderFaces(M.c, snowFaces, { proj: proj, cam: [0, 1, 0], light: [0, 1, 0], shade: 0, colour: function () { return [255, 255, 255]; }, fin: function (col) { return col; } });
     var img = M.c.getImageData(0, 0, cw, ch), d = img.data, a = clamp(V.roofSnow, 0, 1);
     for (var i = 0; i < d.length; i += 4) { var v = d[i]; d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = v > 40 ? Math.round(v * a) : 0; }
     M.c.putImageData(img, 0, 0);
     var useMat = typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported(), done = false;
     if (useMat) {
-      var R = Math.max(1, (kind === 'pagoda' ? hpx * 0.012 : wpx * 0.012) * PR * V.snowRound * 2), m = snowMat(null, haze);
+      var R = Math.max(1.5, (kind === 'pagoda' ? hpx * 0.012 : wpx * 0.012) * SS * V.snowRound * 2), m = snowMat(null, haze);
       m.thick = R * V.snowRelief;
       var litPic = SnowHeaps.light(M.cnv, R, m);
       if (litPic) { SnowHeaps.put(B.c, litPic, 0, 0); done = true; }
@@ -1638,7 +1660,13 @@ function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
     }
     M.cnv.width = M.cnv.height = 1;
   }
-  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(B.cnv, Math.round(x0 * PR), Math.round(y0 * PR)); c.restore();
+  // brought down to the screen's resolution, softened by its distance (a building has no hard edge at this range)
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  c.imageSmoothingEnabled = true; c.imageSmoothingQuality = 'high';
+  var soft = V.templeSoft * lerp(0.35, 0.9, clamp(haze / 0.45, 0, 1)) * PR;
+  c.filter = soft > 0.05 ? 'blur(' + soft.toFixed(2) + 'px)' : 'none';
+  c.drawImage(B.cnv, x0 * PR, y0 * PR, (x1 - x0) * PR, (y1 - y0) * PR);
+  c.restore();
   B.cnv.width = B.cnv.height = 1;
   return { x: bx, y: by, top: y0 + 6, hw: (x1 - x0) / 2 };
 }
@@ -1665,34 +1693,66 @@ function bakeTemple() {
     c.fillStyle = g; c.fillRect(x, ys - 1, 3.6, hy + 9 - ys);
   }
   c.restore();
+  if (V.templeSoft > 0) {                                     // the hill is far: its snow is soft, its outline too
+    var HB = mk(); HB.cnv.width = TEMPLE.cnv.width; HB.cnv.height = TEMPLE.cnv.height;
+    HB.c.filter = 'blur(' + (1.6 * V.templeSoft * PR).toFixed(2) + 'px)'; HB.c.drawImage(TEMPLE.cnv, 0, 0);
+    c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, TEMPLE.cnv.width, TEMPLE.cnv.height); c.drawImage(HB.cnv, 0, 0);
+    HB.cnv.width = HB.cnv.height = 1;
+    c.setTransform(PR, 0, 0, PR, 0, 0);
+  }
   // the forest on it, row by row from the ridge to the foot, the pagoda among them, the hall in a clearing at the foot
-  var r = rngFrom(V.seed * 911 + 29), rows = 10, dens = V.hillTrees / 80;
+  var r = rngFrom(V.seed * 911 + 29), rows = 12, dens = V.hillTrees / 150;
   var px = V.pagodaX * W, pf = V.pagodaOnHill, ph = H * V.pagodaSize, pDone = false;
   var hx = V.hallX * W, hw = W * V.hallSize, hDone = false, hf = 0.97;
   var pBy = lerp(hillY(px) + H * 0.01, hy - 1, Math.pow(pf, 0.9)), hBy = hy - 2;
   WS.temple = null;
+  // the cedars' colours in snow: dark needles in the shade, the tops of the tiers white (lit snow), bluish where the
+  // snow is in shade; finished by the scene's light and the haze of the distance
+  var sn = hex(V.colours.snow), ndl = hex(V.colours.needle);
+  var snowPal = { deep: scale(ndl, 0.55), mid: mix(scale(ndl, 0.8), SHADE, 0.25), lit: mix(SHADE, sn, 0.35), hi: sn, trunk: hex(V.colours.trunk), rust: scale(ndl, 0.8) };
+  function finAt(hz) { var kk = clamp(0.5 + 0.4 * LT.sS + 0.25 * LT.amb, 0.45, 1.15); return function (col) { return mix(scale(light(col), kk), mistC, hz); }; }
+  var RL = mk(); RL.cnv.width = TEMPLE.cnv.width; RL.cnv.height = TEMPLE.cnv.height;
+  function layRow(hz, f) {
+    // a thin band of mist lying behind the next row, then the row, soft by its distance
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    var soft = V.templeSoft * lerp(1.3, 0.45, f) * PR;
+    c.filter = soft > 0.05 ? 'blur(' + soft.toFixed(2) + 'px)' : 'none';
+    c.drawImage(RL.cnv, 0, 0);
+    c.restore();
+    RL.c.setTransform(1, 0, 0, 1, 0, 0); RL.c.clearRect(0, 0, RL.cnv.width, RL.cnv.height);
+  }
   for (var row = 0; row < rows; row++) {
     var f = row / (rows - 1), haze = V.hillHaze * lerp(1.35, 0.75, f);
-    if (!pDone && f > pf) { templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.5, haze * 0.8); pDone = true; }
-    if (!hDone && f > hf) { WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.25, haze * 0.7); hDone = true; }
+    RL.c.setTransform(PR, 0, 0, PR, 0, 0);
+    if (!pDone && f > pf) { templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.35, haze * 0.8); pDone = true; }
+    if (!hDone && f > hf) { WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.2, haze * 0.7); hDone = true; }
     x = -0.03 * W + r() * 14;
     while (x < end) {
       var top = hillY(x);
       if (top > hy - 4) { x += 8; continue; }
-      var base = lerp(top + H * 0.008, hy - 1, Math.pow(f, 0.9)), h = H * lerp(0.03, 0.058, f) * V.hillTreeSize * lerp(0.8, 1.2, r());
-      var step = h * lerp(0.32, 0.5, r());
-      var nearP = f > pf && Math.abs(x - px) < ph * 0.13 && base < pBy + ph * 0.3;       // keep the pagoda's storeys showing
+      var base = lerp(top + H * 0.008, hy - 1, Math.pow(f, 0.9)) + (r() - 0.5) * H * 0.012, h = H * lerp(0.026, 0.055, f) * V.hillTreeSize * lerp(0.55, 1.45, r() * r() + 0.3 * r());
+      var step = h * lerp(0.18, 0.42, r());
+      var nearP = f > pf && Math.abs(x - px) < ph * 0.16 && base - h * 1.5 < pBy - ph * 0.3;   // the pagoda rises out of the forest: its foot hidden, its storeys showing
       var nearH = Math.abs(x - hx) < hw * 0.62 && base > hBy - hw * 0.5;                  // the clearing round the hall
       var onPath = Math.abs(x - gateX(base)) < gateH(base) * 0.8 && base > hy - H * 0.03;   // and its approach
       if (!nearP && !nearH && !onPath && r() < 0.85 * dens) {
-        Conifers.fir(c, withLight({ x: x, y: base, h: h, seed: Math.floor(r() * 1e9), colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
-                                    snow: V.firSnow, droop: V.firDroop, fullness: V.firFull, width: V.firWidth * 0.8 }, haze));
+        Lakeside.tree(RL.c, 'sugi', { x: x, y: base, h: h * lerp(1.1, 1.5, r()), seed: Math.floor(r() * 1e9), lx: LT.dir[0] < 0 ? -0.7 : 0.7,
+                                      pal: snowPal, fin: finAt(haze) });
       }
       x += step;
     }
+    layRow(haze, f);
+    if (row < rows - 1 && V.hillHaze > 0) {                 // mist between this row and the next
+      c.save(); c.setTransform(PR, 0, 0, PR, 0, 0);
+      var mb = lerp(hillY(V.hillPeakX * W) + H * 0.01, hy, Math.pow(f, 0.9)), mg = c.createLinearGradient(0, mb - H * 0.05, 0, mb + H * 0.01);
+      mg.addColorStop(0, rgb(mistC, 0)); mg.addColorStop(1, rgb(mistC, 0.18 * V.hillHaze / 0.3));
+      c.globalCompositeOperation = 'source-atop'; c.fillStyle = mg; c.fillRect(-10, mb - H * 0.05, end + 20, H * 0.06);
+      c.restore();
+    }
   }
-  if (!pDone) templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.5, V.hillHaze * 0.6);
-  if (!hDone) WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.25, V.hillHaze * 0.5);
+  RL.cnv.width = RL.cnv.height = 1;
+  if (!pDone) templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.35, V.hillHaze * 0.6);
+  if (!hDone) WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.2, V.hillHaze * 0.5);
   TEMPLE.ok = true;
   note('temple on the hill: ' + Math.round(performance.now() - t0) + ' ms');
 }
@@ -3167,7 +3227,7 @@ var G = [
     { o: 'V', k: 'pagodaSize', label: 'Pagoda: height', min: 0.1, max: 0.5, step: 0.005, re: 'ground' },
     { o: 'V', k: 'hallX', label: 'Hall: across (the procession starts here)', min: 0.05, max: 0.6, step: 0.005, re: 'ground' },
     { o: 'V', k: 'hallSize', label: 'Hall: width', min: 0.04, max: 0.3, step: 0.005, re: 'ground' },
-    { o: 'V', k: 'templeView', label: 'Seen from above', min: 0.3, max: 3, step: 0.05, re: 'ground', note: 'How high the eye is over the buildings (× their height).' },
+    { o: 'V', k: 'templeSoft', label: 'Softness (distance)', min: 0, max: 3, step: 0.05, re: 'ground', note: 'How soft the hill, the forest, the buildings and the gates are, by their distance.' },
     { o: 'V', k: 'roofSnow', label: 'Snow on the roofs', min: 0, max: 1, step: 0.01, re: 'ground' },
     { o: 'V', k: 'templeLight', label: 'Lit up after dark', min: 0, max: 1.5, step: 0.05, re: 'ground' } ] },
   { name: 'Torii procession and path', file: 'torii.js', note: 'The gates come down from the hall toward you; the path is trodden in the snow through them.', ctls: [
