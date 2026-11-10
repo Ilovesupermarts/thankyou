@@ -102,26 +102,43 @@ function noise(N, seed) {
   return out;
 }
 /* The starting waves of one tile: for each cell, h0(k) and the conjugate of h0(-k) (so the surface is real).
-   Only wave numbers between kLo and kHi (this tile's share). */
-function spectrum(p, N, L, kLo, kHi, nz, off) {
-  var alpha = 0.076 * Math.pow(G * p.fetch / (p.wind * p.wind), -0.22);
-  var wp = 22 * Math.pow(p.wind * p.fetch / (G * G), -0.33);
-  var dk = TWO_PI / L, h0 = new Float32Array(N * N * 2), out = new Float32Array(N * N * 4);
-  for (var j = 0; j < N; j++) for (var i = 0; i < N; i++) {
-    var nx = i < N / 2 ? i : i - N, ny = j < N / 2 ? j : j - N;
-    var kx = nx * dk, kz = ny * dk, k = Math.hypot(kx, kz), idx = j * N + i;
-    if (k < kLo || k > kHi || k === 0) continue;
-    var w = omegaOf(k, p.depth);
-    var S = jonswap(w, p, alpha, wp) * direction(Math.atan2(kz, kx), w, wp, p) * Math.exp(-p.fade * p.fade * k * k);
-    var amp = Math.sqrt(Math.max(0, 2 * S * Math.abs(dOmegaDk(k, p.depth)) / k * dk * dk));
-    h0[idx * 2] = nz[(off + idx) * 2] * amp; h0[idx * 2 + 1] = nz[(off + idx) * 2 + 1] * amp;
+   Only wave numbers between kLo and kHi (this tile's share).
+   Worked out row by row, so it can also be done a little a frame (spectrumStart, then spectrumStep until it
+   returns true): when the wind changes while the water is showing, the new waves are then made without a pause. */
+function spectrumStart(p, N, L, kLo, kHi, nz, off) {
+  return { p: p, N: N, kLo: kLo, kHi: kHi, nz: nz, off: off, j: 0, out: null,
+           alpha: 0.076 * Math.pow(G * p.fetch / (p.wind * p.wind), -0.22), wp: 22 * Math.pow(p.wind * p.fetch / (G * G), -0.33),
+           dk: TWO_PI / L, h0: new Float32Array(N * N * 2) };
+}
+function spectrumStep(J, until) {
+  var p = J.p, N = J.N, h0 = J.h0, nz = J.nz, off = J.off, dk = J.dk, kLo = J.kLo, kHi = J.kHi, alpha = J.alpha, wp = J.wp;
+  if (J.out) return true;
+  for (; J.j < N; J.j++) {
+    if (J.j % 8 === 0 && J.j && performance.now() >= until) return false;
+    var j = J.j;
+    for (var i = 0; i < N; i++) {
+      var nx = i < N / 2 ? i : i - N, ny = j < N / 2 ? j : j - N;
+      var kx = nx * dk, kz = ny * dk, k = Math.hypot(kx, kz), idx = j * N + i;
+      if (k < kLo || k > kHi || k === 0) continue;
+      var w = omegaOf(k, p.depth);
+      var S = jonswap(w, p, alpha, wp) * direction(Math.atan2(kz, kx), w, wp, p) * Math.exp(-p.fade * p.fade * k * k);
+      var amp = Math.sqrt(Math.max(0, 2 * S * Math.abs(dOmegaDk(k, p.depth)) / k * dk * dk));
+      h0[idx * 2] = nz[(off + idx) * 2] * amp; h0[idx * 2 + 1] = nz[(off + idx) * 2 + 1] * amp;
+    }
   }
+  var out = new Float32Array(N * N * 4);
   for (var y = 0; y < N; y++) for (var x = 0; x < N; x++) {
     var a = y * N + x, b = ((N - y) % N) * N + (N - x) % N;
     out[a * 4] = h0[a * 2]; out[a * 4 + 1] = h0[a * 2 + 1];
     out[a * 4 + 2] = h0[b * 2]; out[a * 4 + 3] = -h0[b * 2 + 1];
   }
-  return out;
+  J.out = out; J.h0 = null;
+  return true;
+}
+function spectrum(p, N, L, kLo, kHi, nz, off) {
+  var J = spectrumStart(p, N, L, kLo, kHi, nz, off);
+  spectrumStep(J, Infinity);
+  return J.out;
 }
 
 /* ---------- the passes ---------- */
@@ -207,6 +224,7 @@ function create(gl) {
   if (!PT || !PF || !PM) return null;
 
   var N = 0, key = '', h0a = null, h0b = null, pp = [], fbs = [], slope = null, slopeFb = null, nz = null, nzKey = '', lastSrc = 0;
+  var built = null, job = null;      // built: the values the waves now showing were made with; job: new waves being made, a little a frame
   var sim = { texture: null, L: [DEFAULTS.L0, DEFAULTS.L1], ms: 0, rebuilt: 0 };
 
   function tex(w, fmt, type, internal, data, mip) {
@@ -253,7 +271,22 @@ function create(gl) {
     if (h0a) gl.deleteTexture(h0a); if (h0b) gl.deleteTexture(h0b);
     h0a = tex(n, gl.RGBA, gl.FLOAT, gl.RGBA32F, A); h0b = tex(n, gl.RGBA, gl.FLOAT, gl.RGBA32F, B);
     sim.L = [p.L0, p.L1]; sim.rebuilt = performance.now() - t0;
+    built = p; job = null;
     return true;
+  }
+  /* New waves for new values (the wind has changed) while the old ones are showing: worked out over a few
+     frames, about 3 ms in each, the old waves staying until the new are ready. */
+  function rebuildSome(p, nk) {
+    if (!job || job.key !== nk) {
+      var kB = TWO_PI / p.L1 * 6;
+      job = { key: nk, p: p, t0: performance.now(), A: spectrumStart(p, N, p.L0, 1e-4, kB, nz, 0), B: spectrumStart(p, N, p.L1, kB, 1e9, nz, N * N) };
+    }
+    var until = performance.now() + 3;
+    if (!spectrumStep(job.A, until) || !spectrumStep(job.B, until)) return;
+    if (h0a) gl.deleteTexture(h0a); if (h0b) gl.deleteTexture(h0b);
+    h0a = tex(N, gl.RGBA, gl.FLOAT, gl.RGBA32F, job.A.out); h0b = tex(N, gl.RGBA, gl.FLOAT, gl.RGBA32F, job.B.out);
+    sim.L = [job.p.L0, job.p.L1]; sim.rebuilt = performance.now() - job.t0;
+    built = job.p; key = job.key; job = null;
   }
   function bindTex(unit, t, loc) { gl.activeTexture(gl.TEXTURE0 + unit); gl.bindTexture(gl.TEXTURE_2D, t); gl.uniform1i(loc, unit); }
 
@@ -263,8 +296,14 @@ function create(gl) {
     p.wind = Math.max(0.3, p.wind); p.fetch = Math.max(1, p.fetch); p.depth = Math.max(0.2, p.depth);
     p.L1 = Math.min(p.L1, p.L0 * 0.5);
     var nk = [p.size, p.wind, p.dir, p.fetch, p.depth, p.spread, p.swell, p.gamma, p.fade, p.L0, p.L1, p.seed].join(',');
-    if (nk !== key) { key = nk; if (!rebuild(p)) return null; }
+    if (nk !== key) {
+      var n = p.size >= 256 ? 256 : 128;
+      // the first waves, or another size or pattern: at once (as before); otherwise a little a frame
+      if (!h0a || !built || n !== N || nzKey !== n + ':' + p.seed) { key = nk; if (!rebuild(p)) return null; }
+      else rebuildSome(p, nk);
+    } else job = null;
     if (!h0a) return null;
+    p = built;                                       // (the waves showing: their own lengths and depth, until the new ones are ready)
     var t0 = performance.now();
     gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST);
     gl.viewport(0, 0, N, N);
