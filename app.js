@@ -18455,14 +18455,16 @@ function lakeBakeHead() {
   g.addColorStop(1, rgba(mist, LAKE.lakeMist * 0.62));
   c.fillStyle = g; c.fillRect(x0, headAxis - H * 0.14, x1 - x0, H * 0.14 + 4);
   c.restore();
-  // and in its reflection, thickest at the water line, thinning down
-  mcss(); m.save();
+  // and in its reflection the same mist, turned over with it (column by column, at the water's edge there), so each
+  // part's reflection is as misty as the part itself
+  m.save();
   m.globalCompositeOperation = 'source-atop';
-  var gr = m.createLinearGradient(0, headAxis - 2, 0, headAxis + H * 0.14);
-  gr.addColorStop(0, rgba(mist, LAKE.lakeMist * 0.62));
-  gr.addColorStop(0.45, rgba(mist, LAKE.lakeMist * 0.22));
-  gr.addColorStop(1, rgba(mist, 0));
-  m.fillStyle = gr; m.fillRect(x0, my0, x1 - x0, my1 - my0);
+  var gr = m.createLinearGradient(0, headAxis - H * 0.14, 0, headAxis + 2);
+  gr.addColorStop(0, rgba(mist, 0));
+  gr.addColorStop(0.55, rgba(mist, LAKE.lakeMist * 0.22));
+  gr.addColorStop(1, rgba(mist, LAKE.lakeMist * 0.62));
+  m.fillStyle = gr;
+  for (var xs = x0; xs < tip + 6; xs += 6) { mir(yS(xs + 3)); m.fillRect(xs, headAxis - H * 0.14, 6, H * 0.14 + 4); }
   m.restore();
   });
   return parts;
