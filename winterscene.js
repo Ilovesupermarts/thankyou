@@ -457,37 +457,7 @@ function grime(c, P, cx, cy, len, wid, r) {
 /* Broken clumps of snow lying over the stone's edges here and there (crisp, white on top, blue under),
    and the faint dusting on the back of its top. */
 function snowRim(c, P, cx, cy, len, wid, sc, r) {
-  c.save();
-  c.lineCap = 'round'; c.lineJoin = 'round';
-  // blue-grey brush strokes in the snow beside it, as painted
-  c.filter = 'blur(' + Math.max(0.6, wid * 0.08).toFixed(1) + 'px)';
-  for (var k = 0; k < 3; k++) {
-    var sd = k % 2 ? 1 : -1, ex = cx + sd * len * lerp(0.45, 0.55, r()), ey = cy + wid * lerp(0.1, 0.5, r());
-    c.strokeStyle = rgb(sc.shade, lerp(0.25, 0.45, r())); c.lineWidth = Math.max(1, wid * lerp(0.1, 0.2, r()));
-    c.beginPath(); c.moveTo(ex - sd * len * 0.05, ey); c.lineTo(ex + sd * len * lerp(0.12, 0.25, r()), ey + wid * lerp(-0.05, 0.15, r())); c.stroke();
-  }
-  // the snow lying against its front edge: one continuous, uneven white lip over the bottom of the edge,
-  // swelling and thinning along it, tapering out at its ends; a little blue shade under it
-  var F = P.filter(function (p) { return p[1] > cy + wid * 0.1 && Math.abs(p[0] - cx) < len * 0.46; }).sort(function (a, b) { return a[0] - b[0]; });
-  if (F.length > 2) {
-    var u0 = lerp(0, 0.35, r()), u1 = lerp(0.65, 1, r()), ph = r() * TAU, ph2 = r() * TAU, lip = [];
-    for (var i = 0; i < F.length; i++) {
-      var u = i / (F.length - 1);
-      if (u < u0 || u > u1) continue;
-      var e = Math.sin((u - u0) / (u1 - u0) * PI);
-      lip.push([F[i][0], F[i][1], wid * (0.12 + 0.16 * (0.5 + 0.5 * Math.sin(u * 9 + ph)) * (0.6 + 0.4 * Math.sin(u * 23 + ph2))) * Math.pow(e, 0.6)]);
-    }
-    if (lip.length > 1) {
-      c.filter = 'blur(' + Math.max(0.4, wid * 0.04).toFixed(1) + 'px)';
-      [[sc.shade, 0.5, 1.5, 0.3], [sc.top, 0.97, 0.9, 0.55]].forEach(function (L) {
-        c.beginPath();
-        lip.forEach(function (q, j) { var y = q[1] - q[2] * L[3]; j ? c.lineTo(q[0], y) : c.moveTo(q[0], y); });
-        for (var j = lip.length - 1; j >= 0; j--) c.lineTo(lip[j][0], lip[j][1] + lip[j][2] * L[2]);
-        c.closePath(); c.fillStyle = rgb(L[0], L[1]); c.fill();
-      });
-    }
-  }
-  c.restore();
+  // nothing drawn over the edge: as in the reference, the stone's crisp outline meets the snow directly
 }
 /* Frost on the stone's top, as painted: grainy white dry-brush patches, denser toward its back and
    its ends, the slate showing through. Drawn inside the stone's clip. */
