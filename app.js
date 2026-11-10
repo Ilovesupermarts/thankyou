@@ -17950,9 +17950,10 @@ var LAKE = {
   // or darkens the reflection
   fft: true, fftWind: 1, fftDir: 120, fftFetch: 1340, fftSpread: 0.53, fftEye: 0.9, fftHeight: 0.94, fftChop: 0.85,
   fftL0: 132, fftL1: 16.5, fftSize: 256, fftDetail: 0.28, fftFar: 0.28, fftShade: 0.47,
-  // shoreReflect: how strongly the water mirrors the far shore, the headland and the torii (by the true angle: far
-  // away almost a mirror, near you much less; on the graphics chip only), where reflect is for the sky and the mountains
-  shoreReflect: 0.9,
+  // mirror: how strongly the water mirrors everything (the sky, the mountains, the shores, the headland, the torii), by
+  // the true angle as real water does: far away almost a mirror, near you mostly its own deep colour (on the graphics
+  // chip; 0 = the older damped mirror, set by reflect, which the 2D water still uses)
+  mirror: 0.9,
   // how strongly the lit stone lanterns' light shows mirrored in the water at night (lakeDrawLightRefl; times the
   // water's Fresnel there, so never brighter than the lantern itself)
   lightReflect: 1.3,
@@ -17996,12 +17997,12 @@ var LK = {
   path: null, landEdges: [], landLo: null, bankEdge: [], bankT: [], susuki: [], plumes: [], blobs: [],
   HEAD: landCanvas(), headBox: null, headAxis: 0,                   // the headland (and the grove), and where its reflection turns over
   HEADN: landCanvas(), headBoxN: null, headJob: null,               // the next headland, drawn a part a frame, then swapped in
+  HREFN: landCanvas(), hrefBoxN: null,                              // its reflection in the lake, drawn with it (each part about its own water line)
   RIP: [landCanvas(), landCanvas()], GLN: landCanvas(),             // the drifting ripples, the sun's glitter
   ROCK: landCanvas(),                                               // the stones at the water's edge, over the gravel
   FORE: landCanvas(), foreTop: 0,                                   // the near shore in front of the gates: lilies, rocks, the susuki
   LANDM: landCanvas(),                                              // the land (white), the size of the ground picture
   WATERB: landCanvas(), WATERC: landCanvas(), WSTAT: landCanvas(), WMIR: landCanvas(), WPAD: 10,
-  WSHB: landCanvas(), WSH: landCanvas(),                            // where the mirror shows the shores and the headland (+ the torii): water.js's setShore
   waterRows: 0, ready: false
 };
 var lakeWaterInit = false;
@@ -18280,12 +18281,32 @@ function lakeBakeHead() {
   function css() { c.setTransform(SR, 0, 0, SR, -x0 * SR, -y0 * SR); }
   css();
   c.clearRect(x0, y0, x1 - x0, y1 - y0);
+  // its reflection (HREFN, from the far shore down): everything is drawn a second time, turned over at the water
+  // line under it (the row where the water would be at its distance), so each part is mirrored as it stands
+  var MR = LK.HREFN, my0 = lakeFarShoreY() - 1, my1 = H + 4;
+  LK.hrefBoxN = { x0: x0, y0: my0 };
+  MR.cnv.width = HC.cnv.width; MR.cnv.height = Math.max(1, Math.round((my1 - my0) * SR));
+  var m = MR.c;
+  m.setTransform(1, 0, 0, 1, 0, 0); m.clearRect(0, 0, MR.cnv.width, MR.cnv.height);
+  function mcss() { m.setTransform(SR, 0, 0, SR, -x0 * SR, -my0 * SR); }
+  function mir(A) { m.setTransform(SR, 0, 0, -SR, -x0 * SR, (2 * A - my0) * SR); }      // turned over at row A
   LK.headAxis = hy + F / LAKE.headZ;
   if (!LAKE.headland) return parts;
   var headAxis = LK.headAxis, tip = LAKE.headTip * W;
   r();
   // its shore (where it meets the water) and the line of its hillside
   var HL = lakeHeadLines(), yS = HL.yS, yR = HL.yR;
+  // How far away each part stands, for its reflection: as the picture shows it, the hill meets the water at its
+  // shore (yS), so the shore in each column is at the distance the water is there, and the hill rises back from it
+  // to its ridge, half as far again (f: 0 the ridge … 1 the shore, as the rows of trees below). Near the tip the shore
+  // bends far back, and so does everything above it. The water line at distance z is the row hy + F / z; a part is
+  // mirrored about the water line at its own distance (never above its own foot).
+  var KB = 1.55;                                 // (the ridge's distance over the shore's, as zBack / headZ below)
+  function axisAt(x, f, foot) { var zs = F / Math.max(1, yS(x) - hy); return Math.max(foot, hy + F / lerp(zs * KB, zs, f)); }
+  function rowF(x, y) {                          // where on the hillside (f) a point at row y is (as the rows' feet are laid)
+    var a = yR(x) + H * 0.01, b = yS(x) - 1;
+    return Math.pow(clamp((y - a) / Math.max(1, b - a), 0, 1), 1 / 0.9);
+  }
   parts.push(function () {
   css();
   // the hill's body, in the dark of the forest
@@ -18294,11 +18315,18 @@ function lakeBakeHead() {
   for (var x = x0 - 5; x <= tip + 2; x += 6) c.lineTo(x, yR(x));
   for (var xb = tip + 2; xb >= x0 - 5; xb -= 6) c.lineTo(xb, yS(xb) + 1);
   c.closePath(); c.fill();
+  // (its reflection: the ridge turned over at its own water line, down to the shore)
+  mcss(); m.fillStyle = c.fillStyle;
+  m.beginPath(); m.moveTo(x0 - 5, yS(x0 - 5) - 1);
+  for (var xm = x0 - 5; xm <= tip + 2; xm += 6) m.lineTo(xm, 2 * axisAt(xm, 0, yR(xm)) - yR(xm));
+  for (var xmb = tip + 2; xmb >= x0 - 5; xmb -= 6) m.lineTo(xmb, yS(xmb) - 1);
+  m.closePath(); m.fill();
   // the forest floor seen through the gaps: a close canopy of small clumps (dark cedar, a little gold and red) over
   // the whole hillside, so no gap between the trees in front shows the flat colour of the hill
   (function () {
     var deep = lakeFin(0.3)(hexToRgb('#1C2C22')), mid = lakeFin(0.28)(hexToRgb('#2E4632')), lit = lakeFin(0.26)(hexToRgb('#4B6741')),
         gold = lakeFin(0.26)(hexToRgb('#D8A030')), red = lakeFin(0.26)(hexToRgb('#B8442A'));
+    mcss();
     for (var cy2 = H * LAKE.headTop - 6; cy2 < yS(0) + 2; cy2 += 3) {
       for (var cx2 = x0 - 4 + r() * 4; cx2 < tip; cx2 += lerp(3, 7, r())) {
         if (cy2 < yR(cx2) - 2 || cy2 > yS(cx2) - 1) continue;
@@ -18306,6 +18334,8 @@ function lakeBakeHead() {
         var pick = r(), colr = pick < 0.5 ? deep : pick < 0.8 ? mid : pick < 0.9 ? lit : pick < 0.96 ? gold : red;
         c.fillStyle = rgba(colr);
         c.beginPath(); c.ellipse(cx2, cy2, sz, sz * 0.8, 0, 0, TAU); c.fill();
+        m.fillStyle = c.fillStyle;
+        m.beginPath(); m.ellipse(cx2, 2 * axisAt(cx2, rowF(cx2, cy2), cy2) - cy2, sz, sz * 0.8, 0, 0, TAU); m.fill();
       }
     }
   })();
@@ -18314,7 +18344,7 @@ function lakeBakeHead() {
   var rows = 8, fp = LAKE_ROW_PAGODA, fh = LAKE_ROW_HALL, pagodaDone = !LAKE.pagoda, hallDone = !LAKE.hall;
   var px = LAKE.pagodaX * W, zBack = LAKE.headZ * 1.55;
   var cam = [0, 1, 0], lt = (function () { var v = [-0.62, 0.62, -0.48], l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; })();
-  function building(kind, bx, byScr, z, size, yaw, haze) {
+  function building(kind, bx, byScr, z, size, yaw, haze, A) {
     var xw = (bx - W / 2) * z / F, Y = 1 - (byScr - hy) * z / F;
     var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: xw, y: Y, z: z, size: size * H * z / F, yaw: yaw })
                                   : Lakeside.hall({ x: xw, y: Y, z: z, size: size * W * z / F, yaw: yaw });
@@ -18322,9 +18352,16 @@ function lakeBakeHead() {
     // lit up with the stone lanterns (LAKE.floodLight, LAKE.floodColour): a warm light from the ground in front
     var fk = LANT.show ? Math.min(1, torLampLevel()) * LAKE.floodLight * (1 - haze * 0.6) : 0;
     var bh = kind === 'pagoda' ? size * H * z / F : size * W * z / F * 0.65;
-    Lakeside.renderFaces(c, faces, { proj: torScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
-                                     fin: function (col) { return fin(col); },
-                                     flood: { k: fk, col: hexToRgb(LAKE.floodColour), y0: Y, h: bh } });
+    // drawn once on a layer of its own, then laid down twice: in the picture, and turned over at its water line in
+    // the reflection (the 3D building is the slow part, so it is not drawn twice)
+    var BL = landCanvas(); BL.cnv.width = HC.cnv.width; BL.cnv.height = HC.cnv.height;
+    BL.c.setTransform(SR, 0, 0, SR, -x0 * SR, -y0 * SR);
+    Lakeside.renderFaces(BL.c, faces, { proj: torScreen, cam: cam, light: lt, shade: 0.5, colour: function () { return null; },
+                                        fin: function (col) { return fin(col); },
+                                        flood: { k: fk, col: hexToRgb(LAKE.floodColour), y0: Y, h: bh } });
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(BL.cnv, 0, 0); c.restore();
+    m.setTransform(1, 0, 0, -1, 0, (2 * A - y0 - my0) * SR); m.drawImage(BL.cnv, 0, 0);
+    BL.cnv.width = BL.cnv.height = 1;
     rainRoofCapture(faces, HC, LK.headBoxN, F, z);   // where the rain can land on its roofs (8c, rain)
     RV_SPOT[kind] = { x: bx, y: byScr, h: kind === 'pagoda' ? size * H : size * W * 0.6 };   // for the ink reveal (8e)
   }
@@ -18332,12 +18369,13 @@ function lakeBakeHead() {
     css();
     var f = row / (rows - 1), z = lerp(zBack, LAKE.headZ, f), unit = F / z * LAKE.treeSize, haze = lerp(0.34, 0.1, f);
     if (!pagodaDone && f > fp) {
-      building('pagoda', px, lakeLandmarkSpots().pagoda.y, lerp(zBack, LAKE.headZ, fp), LAKE.pagodaSize, 0.55, lerp(0.34, 0.1, fp) * 0.8);
+      var PS = lakeLandmarkSpots().pagoda;
+      building('pagoda', px, PS.y, lerp(zBack, LAKE.headZ, fp), LAKE.pagodaSize, 0.55, lerp(0.34, 0.1, fp) * 0.8, axisAt(px, fp, PS.y));
       pagodaDone = true;
     }
     if (!hallDone && f > fh) {
       var HS = lakeLandmarkSpots().hall, hx = HS.x;
-      building('hall', hx, HS.y, lerp(zBack, LAKE.headZ, fh), 0.075, -0.35, lerp(0.34, 0.1, fh) * 0.85);
+      building('hall', hx, HS.y, lerp(zBack, LAKE.headZ, fh), 0.075, -0.35, lerp(0.34, 0.1, fh) * 0.85, axisAt(hx, fh, HS.y));
       hallDone = true;
     }
     var fin = lakeFin(haze), xx = x0 - r() * 20;
@@ -18357,7 +18395,9 @@ function lakeBakeHead() {
       if (Math.abs(xx - px) < LAKE.pagodaSize * H * 0.2 && f > fp - 0.2 && f <= fp && kind === 'sugi') h *= 0.8;
       // no pines in the two front rows: a lone thin pine trunk there stood in front of the cedars
       if (LAKE.forest > r() * 1.0 + 0.001 && !(kind === 'matsu' && row >= rows - 2)) {
-        Lakeside.tree(c, kind, { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal, lean: kind === 'matsu' ? 0.3 : 0 });
+        var to = { x: xx, y: base, h: h, seed: Math.round(xx * 31 + row * 977), lx: -0.7, fin: fin, pal: pal, lean: kind === 'matsu' ? 0.3 : 0 };
+        Lakeside.tree(c, kind, to);
+        mir(axisAt(xx, f, base)); Lakeside.tree(m, kind, to);      // (its reflection)
       }
       xx += h * (kind === 'sugi' ? lerp(0.16, 0.26, r()) : kind === 'matsu' ? lerp(0.35, 0.55, r()) : lerp(0.35, 0.5, r())) / Math.max(0.3, LAKE.forest);
     }
@@ -18373,23 +18413,35 @@ function lakeBakeHead() {
   edge.forEach(function (p) { c.lineTo(p[0], p[1] - bandH * (0.6 + 0.4 * Math.sin(p[0] * 0.07))); });
   for (var e2 = edge.length - 1; e2 >= 0; e2--) c.lineTo(edge[e2][0], edge[e2][1] + 0.5);
   c.closePath(); c.fill();
+  // (the bank's reflection: turned over at the water's edge in each column)
+  mcss(); m.fillStyle = c.fillStyle;
+  m.beginPath(); m.moveTo(edge[0][0], edge[0][1] + bandH);
+  edge.forEach(function (p) { m.lineTo(p[0], p[1] + bandH * (0.6 + 0.4 * Math.sin(p[0] * 0.07))); });
+  for (var e3 = edge.length - 1; e3 >= 0; e3--) m.lineTo(edge[e3][0], edge[e3][1] - 0.5);
+  m.closePath(); m.fill();
   edge.forEach(function (p) {
     if (r() < 0.18) {
       var mr = bandH * lerp(0.8, 2.4, r()), mx = p[0], my = p[1] - bandH * lerp(0.4, 1.2, r());
       var mg = c.createRadialGradient(mx, my, 0, mx, my, mr);
       mg.addColorStop(0, rgba(mixRgb(moss, [170, 180, 80], 0.3), 0.85)); mg.addColorStop(1, rgba(moss, 0));
-      c.save(); c.translate(mx, my); c.scale(1, 0.45); c.translate(-mx, -my);
-      c.fillStyle = mg; c.beginPath(); c.arc(mx, my, mr, 0, TAU); c.fill(); c.restore();
+      [c, m].forEach(function (q) {
+        if (q === m) mir(p[1]);
+        q.save(); q.translate(mx, my); q.scale(1, 0.45); q.translate(-mx, -my);
+        q.fillStyle = mg; q.beginPath(); q.arc(mx, my, mr, 0, TAU); q.fill(); q.restore();
+      });
     }
     if (r() < 0.4) {
       var ps = bandH * lerp(0.15, 0.4, r()), pc = lakeFin(0.2)(mixRgb([110, 104, 96], [160, 152, 140], r()));
       c.fillStyle = rgba(pc); c.beginPath(); c.ellipse(p[0], p[1] - ps * 0.3, ps, ps * 0.45, 0, 0, TAU); c.fill();
+      mir(p[1]); m.fillStyle = c.fillStyle; m.beginPath(); m.ellipse(p[0], p[1] - ps * 0.3, ps, ps * 0.45, 0, 0, TAU); m.fill();
     }
   });
   if (LAKE.rocks > 0) for (var xr = x0 + r() * 30; xr < tip - 10; xr += lerp(25, 80, r()) / LAKE.rocks) {
     var rw = F / LAKE.headZ * lerp(0.25, 0.6, r());
-    Lakeside.rock(c, { x: xr, y: yS(xr) + rw * 0.05, w: rw, h: rw * lerp(0.5, 0.7, r()), seed: Math.round(xr * 3), fin: lakeFin(0.2), stone: lakeCol('stone'),
-                       mossCol: lakeCol('moss'), moss: lerp(0.4, 0.9, r()), water: r() < 0.4 });
+    var ko = { x: xr, y: yS(xr) + rw * 0.05, w: rw, h: rw * lerp(0.5, 0.7, r()), seed: Math.round(xr * 3), fin: lakeFin(0.2), stone: lakeCol('stone'),
+               mossCol: lakeCol('moss'), moss: lerp(0.4, 0.9, r()), water: r() < 0.4 };
+    Lakeside.rock(c, ko);
+    mir(yS(xr)); Lakeside.rock(m, ko);                             // (its reflection)
   }
   edge.head = true;
   LK.landEdges.push(edge);              // so the water draws its shallows and floating leaves along this shore too
@@ -18403,11 +18455,23 @@ function lakeBakeHead() {
   g.addColorStop(1, rgba(mist, LAKE.lakeMist * 0.62));
   c.fillStyle = g; c.fillRect(x0, headAxis - H * 0.14, x1 - x0, H * 0.14 + 4);
   c.restore();
+  // and in its reflection the same mist, turned over with it (column by column, at the water's edge there), so each
+  // part's reflection is as misty as the part itself
+  m.save();
+  m.globalCompositeOperation = 'source-atop';
+  var gr = m.createLinearGradient(0, headAxis - H * 0.14, 0, headAxis + 2);
+  gr.addColorStop(0, rgba(mist, 0));
+  gr.addColorStop(0.55, rgba(mist, LAKE.lakeMist * 0.22));
+  gr.addColorStop(1, rgba(mist, LAKE.lakeMist * 0.62));
+  m.fillStyle = gr;
+  for (var xs = x0; xs < tip + 6; xs += 6) { mir(yS(xs + 3)); m.fillRect(xs, headAxis - H * 0.14, 6, H * 0.14 + 4); }
+  m.restore();
   });
   return parts;
 }
 /* The grove behind the middle gates, on the far side of the peninsula (drawn into the headland's picture
-   after its reflection was taken: it stands on land, not over the water). */
+   after its reflection was taken: it stands on land, not over the water; its own reflection is added to the
+   baked water, each tree turned over at its foot). */
 function lakeBakeGrove(path) {
   if (!path || !LK.headBoxN) return;
   var c = LK.HEADN.c, F = torLens(), r = rngFrom(LAKE_SEED * 4241 + 9), wu = lakeGravelHalf(), len = path.len, SR = LAND_SR;
@@ -18423,10 +18487,14 @@ function lakeBakeGrove(path) {
     list.push({ kind: d[0], z: p.z, x: sp[0], y: sp[1], h: d[2] * F / p.z * LAKE.treeSize * (d[0] === 'sugi' ? LAKE.cdHeight : 1), seed: 7001 + i * 13 });
   });
   list.sort(function (a, b) { return b.z - a.z; });
+  // its reflection goes into the baked water (each tree turned over at its foot, which is at the water's level);
+  // it is laid on the water with the gates' (lakeComposeWater, when the gates are baked next)
+  var B = LK.WATERB, yfw = lakeFarShoreY();
   list.forEach(function (T) {
     var haze = clamp(0.08 + T.z / 120, 0, 0.4), kind = T.kind === 'kaede' ? 'momiji' : T.kind;
-    Lakeside.tree(c, kind, { x: T.x, y: T.y, h: T.h, seed: T.seed, lx: -0.7, fin: lakeFin(haze),
-                             pal: T.kind === 'kaede' ? Lakeside.PAL.kaede : null });
+    var to = { x: T.x, y: T.y, h: T.h, seed: T.seed, lx: -0.7, fin: lakeFin(haze), pal: T.kind === 'kaede' ? Lakeside.PAL.kaede : null };
+    Lakeside.tree(c, kind, to);
+    if (B.cnv.width > 1) { B.c.setTransform(SR, 0, 0, -SR, LK.WPAD * SR, (2 * T.y - yfw) * SR); Lakeside.tree(B.c, kind, to); }
   });
 }
 
@@ -19163,17 +19231,13 @@ function lakeBakeWater() {
   // the mirrored picture: crisp, as on still water (each frame's rippling breaks it up, see lakeDrawWater)
   s.setTransform(SR, 0, 0, -SR, X0, (2 * hy - yf) * SR);
   s.drawImage(LS.MTN.cnv, 0, 0, W, H);
-  // the far shore and the headland are drawn on a layer of their own first (WSHB), then laid on the mirror: its
-  // opacity tells the water where the shores are, which it mirrors as strongly as the angle allows (water.js)
-  var SB = LK.WSHB; SB.cnv.width = LK.WATERB.cnv.width; SB.cnv.height = LK.WATERB.cnv.height;
-  SB.c.setTransform(SR, 0, 0, -SR, X0, yf * SR);
-  lakeFarShore(SB.c);
-  if (LK.headBoxN && LAKE.headland) {
-    SB.c.setTransform(1, 0, 0, -1, X0, (2 * LK.headAxis - yf) * SR);
-    SB.c.drawImage(LK.HEADN.cnv, LK.headBoxN.x0 * SR, LK.headBoxN.y0 * SR);
+  s.setTransform(SR, 0, 0, -SR, X0, yf * SR);
+  lakeFarShore(s);
+  if (LK.hrefBoxN && LAKE.headland && LK.HREFN.cnv.width > 1) {       // the headland's reflection, made with it (lakeBakeHead)
+    s.setTransform(1, 0, 0, 1, 0, 0);
+    s.drawImage(LK.HREFN.cnv, Math.round((LK.hrefBoxN.x0 + WPAD) * SR), Math.round((LK.hrefBoxN.y0 - yf) * SR));
   }
-  s.setTransform(1, 0, 0, 1, 0, 0);
-  s.drawImage(SB.cnv, 0, 0);
+  LK.HREFN.cnv.width = LK.HREFN.cnv.height = 1;                      // (used: let go)
   // the still things on the water (WSTAT): they float on it, so they are not broken up by the ripples
   LK.WSTAT.cnv.width = LK.WATERB.cnv.width; LK.WSTAT.cnv.height = LK.WATERB.cnv.height;
   s = LK.WSTAT.c;
@@ -19279,12 +19343,6 @@ function lakeComposeWater() {
   LK.WMIR.cnv.width = WC.cnv.width; LK.WMIR.cnv.height = WC.cnv.height;
   LK.WMIR.c.drawImage(WC.cnv, 0, 0);
   if (typeof Water !== 'undefined') Water.setMirror(LK.WMIR.cnv);
-  // where it shows the shores, the headland and the torii (with their lanterns), for the water to mirror them strongly
-  var SH = LK.WSH; SH.cnv.width = WC.cnv.width; SH.cnv.height = WC.cnv.height;
-  if (LK.WSHB.cnv.width === WC.cnv.width && LK.WSHB.cnv.height === WC.cnv.height) SH.c.drawImage(LK.WSHB.cnv, 0, 0);
-  if (TOR.refl.cnv.width > 2) SH.c.drawImage(TOR.refl.cnv, WPAD * SR, (TOR.reflTop - yf) * SR, TOR.refl.cnv.width * SR / PR, TOR.refl.cnv.height * SR / PR);
-  if (typeof Water !== 'undefined' && Water.setShore) Water.setShore(SH.cnv);
-  SH.cnv.width = SH.cnv.height = 1;                // (uploaded: let go)
   // the water's own colour: a mirror seen at a glancing angle far away, its deep colour more and more as you look
   // down into it near you (Fresnel); everything mirrored in it a little darker and bluer
   var hy = H * LAND.horizon, wc = lakeWaterCol(), hh = H - yf, cw = c.canvas.width, ch = c.canvas.height;
@@ -19717,7 +19775,7 @@ function lakeDrawWater(c, t, dt) {
     var sunK = (1 - T.n) * lerp(1, 1.4, T.e) * LAKE.sparkle * glit;
     var pic = Water.render({ w: W * PR * LAKE.waterRes, h: hh * PR * LAKE.waterRes, cssW: W, cssH: hh, top: yf, horizon: hy, lens: F, pad: WPAD,
                              time: t * LAKE.rippleSpeed, distort: LAKE.waves * 7 * (0.65 + 0.35 * clamp(wind, 0, 2)) * (1 - 0.45 * RN.lvl), waveSize: LAKE.waveSize,   // (rain calms the small waves)
-                             reflect: LAKE.reflect, shore: LAKE.shoreReflect, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
+                             reflect: LAKE.reflect, mirror: LAKE.mirror, water: scaleRgb(lakeWaterCol(), lerp(1.15, 0.8, LAKE.deep)), sun: sunK, sunX: lakeSunX(), sunY: lakeSunY(),
                              sunColour: mixRgb([255, 248, 232], [255, 196, 130], T.e), fft: lakeFftParams(),
                              rain: RN.lvl, rainT: RN.t, rainSky: RN.col });
     if (pic) {
@@ -19784,7 +19842,7 @@ function lakeDrawWater(c, t, dt) {
 /* The lit lanterns' light mirrored in the water: under each one, where its light is seen turned over at the water,
    a soft column of light drawn out downward (the ripples stretch a light on water into a streak), made of a few
    short bright dashes that shimmer and break up as the waves move, flickering with its flame. As bright as the
-   water mirrors at that spot (the same Fresnel as the shore's reflections in water.js: strong far away, weak near
+   water mirrors at that spot (the same Fresnel as the water's mirror in water.js: strong far away, weak near
    you). It is drawn with the water, under the land, so it shows only on the water. Where each reflection falls,
    whether it is on the water and how strongly it is mirrored are worked out once per bake (torLanterns is made
    afresh each bake). LAKE.lightReflect: how strong. */
@@ -19796,7 +19854,7 @@ function lakeLightReflSpot(Lp, yf) {
   for (var q = 0; q < 3 && !wet; q++) { var yy = rp[1] + r * 0.6 * q; if (yy < H && !lakeInLand(rp[0], yy)) wet = true; }
   if (!wet) return null;
   var z = F / Math.max(0.6, rp[1] - hy), wx = (rp[0] - W / 2) * z / F, cosT = 1 / Math.sqrt(wx * wx + 1 + z * z);
-  var fres = clamp((0.02 + 0.98 * Math.pow(1 - cosT, 5)) * LAKE.shoreReflect, 0, 1);
+  var fres = clamp((0.02 + 0.98 * Math.pow(1 - cosT, 5)) * (LAKE.mirror || LAKE.reflect * 1.3), 0, 1);
   return { x: rp[0], y: rp[1], r: r, k: fres * (1 - Lp.haze * 0.6), n: clamp(Math.round(r / 8), 1, 5) };   // (fewer dashes the smaller it is: a far one is a single fleck)
 }
 function lakeDrawLightRefl(c, t) {

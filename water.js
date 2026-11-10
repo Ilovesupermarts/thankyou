@@ -29,7 +29,6 @@
      Water.init(url)            load the normal map (the page's own copy)
      Water.state()              'ok', 'loading', 'lost', 'latched' or 'none'
      Water.setMirror(canvas)    the mirrored picture (upload once, when baked)
-     Water.setShore(canvas)     (optional) where in it the shores, the headland and the torii are (its opacity)
      Water.render(o)            → the picture (a canvas), or null
        o: w, h            size of the picture (px)
           cssW, cssH       the water's size on the screen (CSS px): the screen's
@@ -42,8 +41,9 @@
           distort          how far the waves move the reflections (CSS px, near you)
           waveSize         the size of the waves (1 = as tuned)
           reflect          0 … 1: how strong the mirror is
-          shore            0 … 1: how strong the mirror is where setShore's picture marks it (by the
-                           full Fresnel of the angle, so far away almost a mirror)
+          mirror           (optional) 0 … 1: when set, everything is mirrored as real water mirrors it, by
+                           the full Fresnel of the angle (far away almost a mirror, near you little), times
+                           this; reflect is then not used
           water            the water's own colour, [r, g, b] 0 … 255
           sun              the sparkle's strength (0: none); sunX, sunY: the sun on the
                            screen (CSS px); sunColour [r, g, b]
@@ -62,7 +62,7 @@
 var Water = (function () {
 'use strict';
 var LATCH_KEY = 'waterLatch1', LATCH_MS = 12 * 3600 * 1000;
-var cnv = null, gl = null, prog = null, U = {}, progF = null, UF = {}, fftSim = null, fftFailed = false, texM = null, texN = null, texS = null, shoreReady = false, normalReady = false, lost = false, failed = false, mirrorW = 1, mirrorH = 1;
+var cnv = null, gl = null, prog = null, U = {}, progF = null, UF = {}, fftSim = null, fftFailed = false, texM = null, texN = null, normalReady = false, lost = false, failed = false, mirrorW = 1, mirrorH = 1;
 
 function latched() {
   try { var t = parseFloat(localStorage.getItem(LATCH_KEY) || '0'); return t > 0 && Date.now() - t < LATCH_MS; } catch (e) { return false; }
@@ -75,8 +75,8 @@ var VS = '#version 300 es\n' +
 var FS = [
 '#version 300 es',
 'precision highp float;',
-'uniform sampler2D uMirror, uNormal, uShoreMask;',
-'uniform float uShore;          // the shore things\' reflections (setShore): 0 … 1',
+'uniform sampler2D uMirror, uNormal;',
+'uniform float uMirror0;        // (o.mirror) > 0: everything mirrored by the full Fresnel of the angle, times this',
 'uniform vec2 uSize;            // the water on the screen (CSS px)',
 'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun, uFarK, uShade;',
 'uniform vec3 uWater, uSunCol, uSunDir;',
@@ -156,18 +156,14 @@ var FS = [
 '  }',
 '  vec3 V = normalize(vec3(-wx, 1.0, -z));                    // from the water toward the eye (at height 1)',
 '  float cosT = clamp(dot(V, n), 0.0, 1.0);',
-'  float fres = clamp((0.02 + 0.98 * pow(1.0 - cosT, 5.0)) * uReflect * 1.3, 0.0, 1.0);',
+'  // how much is mirror (Fresnel): with o.mirror, as real water: the full amount for the angle, the same for the sky,',
+'  // the mountains and the shores (far away almost a mirror, near you mostly the water\'s own colour); otherwise damped',
+'  float fres = clamp((0.02 + 0.98 * pow(1.0 - cosT, 5.0)) * (uMirror0 > 0.0 ? uMirror0 : uReflect * 1.3), 0.0, 1.0);',
 '  // the mirrored picture, moved by the slope of the waves (more near you, where they look bigger)',
 '  float near = clamp(d / max(1.0, uSize.y + uTop - uHy), 0.0, 1.0);',
 '  vec2 disp = vec2(n.x, n.z) * uDistort * (uFarK + (1.0 - uFarK) * near);',
 '  vec2 m = vec2((x + uPad + disp.x) / uMirrorW, (yIn + disp.y) / uSize.y);',
 '  vec3 refl = texture(uMirror, clamp(m, vec2(0.0005), vec2(0.9995))).rgb;',
-'  // where the mirror shows a shore, the trees on it, the headland or a torii (setShore), the water mirrors it as',
-'  // real water does: by the full Fresnel of the angle (almost a mirror far away, much less near you), not damped',
-'  if (uShore > 0.0) {',
-'    float sa = texture(uShoreMask, clamp(m, vec2(0.0005), vec2(0.9995))).a;',
-'    fres = mix(fres, max(fres, clamp((0.02 + 0.98 * pow(1.0 - cosT, 5.0)) * uShore, 0.0, 1.0)), sa);',
-'  }',
 '  // each wave turned toward you shows a lighter patch of sky, turned away a darker one: the surface reads everywhere, not just in the sun',
 '  refl *= 1.0 + uShade * clamp(-3.0 * n.z + 1.5 * n.x, -1.0, 1.0);',
 '  // the water\'s own colour, a little lighter on the slopes turned up to the sky',
@@ -225,10 +221,10 @@ function setup() {
   prog = gl.createProgram(); gl.attachShader(prog, vs); gl.attachShader(prog, fs); gl.linkProgram(prog);
   if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn('water:', gl.getProgramInfoLog(prog)); failed = true; gl = null; return false; }
   NAMES.forEach(function (k) { U[k] = gl.getUniformLocation(prog, k); });
-  texM = gl.createTexture(); texN = gl.createTexture(); texS = gl.createTexture();
+  texM = gl.createTexture(); texN = gl.createTexture();
   return true;
 }
-var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uShoreMask', 'uShore'];
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uMirror0'];
 /* The simulated waves (fftwaves.js), made the first time a page asks for them. */
 function fftSetup() {
   if (fftSim) return true;
@@ -295,20 +291,6 @@ function setMirror(src) {
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
   mirrorW = src.width; mirrorH = src.height;
 }
-/* (optional) Where the mirror shows the shores, the trees on them, the headland and the torii: a picture the
-   mirror's size whose opacity marks them (upload once, when baked). There the water mirrors them as strongly
-   as the angle allows (o.shore), rather than as weakly as o.reflect has the sky. */
-function setShore(src) {
-  if (!gl || lost || !src || src.width < 2) return;
-  gl.bindTexture(gl.TEXTURE_2D, texS);
-  gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, src);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  shoreReady = true;
-}
 function render(o) {
   if (!gl || lost || mirrorW < 2 || gl.isContextLost()) return null;
   var useFft = !!(o.fft && fftSetup() && fftSim.update(o.fft, o.time));
@@ -321,8 +303,7 @@ function render(o) {
   gl.useProgram(useFft ? progF : prog);
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texM); gl.uniform1i(u.uMirror, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texN); gl.uniform1i(u.uNormal, 1);
-  gl.activeTexture(gl.TEXTURE3); gl.bindTexture(gl.TEXTURE_2D, texS); gl.uniform1i(u.uShoreMask, 3);
-  gl.uniform1f(u.uShore, shoreReady ? (o.shore || 0) : 0);
+  gl.uniform1f(u.uMirror0, o.mirror || 0);
   if (useFft) {
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fftSim.texture); gl.uniform1i(u.uSlope, 2);
     gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uDetail, o.fft.detail !== undefined ? o.fft.detail : 0.2); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
@@ -355,5 +336,5 @@ function state() {
   if (!gl) return 'none';
   return normalReady ? 'ok' : 'loading';
 }
-return { init: init, state: state, setMirror: setMirror, setShore: setShore, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
+return { init: init, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
 })();
