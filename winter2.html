@@ -308,11 +308,11 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
   // the reference layout (winterscene.js): the shrine by the steaming pond; false: the older layout below
-  ref: true, refLights: 0.9, reflect: 0.85, ripple: 1, steam: 1, waterTint: 0.3, skyInWater: 1, hillMist: 1, chime: true, chimeSize: 1,
+  ref: true, refLights: 0.9, reflect: 0.85, ripple: 1, steam: 1, waterTint: 0.3, skyInWater: 1, hillMist: 1,
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
-  horizon: 0.655, swells: 7, swellHeight: 0.65, relief: 0.45, roll: 0.75, drifts: 0.25, ripples: 0.1, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
-  hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
+  horizon: 0.655, swells: 5, swellHeight: 0.2, relief: 0.2, roll: 0.75, drifts: 0.1, ripples: 0, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
+  hollows: 0.28, sheen: 1.1, groundHaze: 0.5, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
   toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
   firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
@@ -351,7 +351,7 @@ var V_DEFAULTS = {
 var MT_DEFAULTS = {
   seed: 7,
   rangeHeight: 0.05, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
-  fujiX: 0.69, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
+  fujiX: 0.81, fujiHeight: 0.365, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
   snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.8, snowSlope: 0.55,
   sunStrength: 1.15, ambient: 0.65, shadows: 0.7, alpenglow: 0.6,
   haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.85,
@@ -1223,54 +1223,119 @@ var HUT_SPOTS = [[0.8, 0.5], [0.4, 0.3], [0.58, 0.62], [0.16, 0.6]];
    sizes of the height): the hill of firs with the pagoda (left), the
    shrine hall, the row of torii with the stone lanterns along the
    stepping-stone path, the frosted trees, the steaming pond with its
-   banks, the cranes, the roped pines (right), the camellias and the
-   nandina in front, and the wind chime. Drawn by winterscene.js.
+   banks, the cranes and the roped pines (right). The pagoda, the hall,
+   the torii, the lanterns, the roped pine and the cranes are pictures cut
+   out of the user's element sheet (textures/winter/); the rest is painted
+   by winterscene.js. Positions are measured on the reference picture.
    ============================================================ */
 var REF = {
-  hill: { x0: -0.02, x1: 0.47, peakX: 0.13, peakY: 0.375, spanL: 0.14, spanR: 0.16, treeSize: 0.12, trees: 190 },
-  pagoda: { x: 0.196, top: 0.18, base: 0.53, w: 0.09 },
-  hall: { x: 0.307, y: 0.662, w: 0.175 },
-  // x, foot, height
-  torii: [[0.259, 0.707, 0.08], [0.212, 0.737, 0.105], [0.192, 0.775, 0.14], [0.081, 0.905, 0.26]],
-  lanterns: [[0.302, 0.709, 0.036], [0.288, 0.723, 0.042], [0.18, 0.75, 0.052], [0.274, 0.761, 0.062],
-             [0.143, 0.782, 0.07], [0.09, 0.837, 0.107], [0.245, 0.857, 0.127]],
-  frost: [[0.47, 0.672, 0.07], [0.405, 0.712, 0.12], [0.385, 0.69, 0.08], [0.445, 0.665, 0.05]],
-  // the pines on the right: kind, x, foot, height, the top of the rope pole, how hazy
-  pines: [['fir', 0.838, 0.7, 0.14, 0, 0.4], ['fir', 0.876, 0.712, 0.17, 0.53, 0.28], ['fir', 1.0, 0.69, 0.22, 0, 0.3],
-          ['fir', 0.92, 0.705, 0.2, 0.49, 0.2], ['matsu', 0.809, 0.728, 0.19, 0.448, 0], ['fir', 0.962, 0.775, 0.27, 0.352, 0]],
-  cranes: [[0.681, 0.752, 0.112, 1, 0.45], [0.714, 0.756, 0.122, -1, 0.15]],
-  // the stepping stones: x, y, the width of a stone (of the width)
-  path: [[0.31, 0.975, 0.12], [0.255, 0.945, 0.085], [0.215, 0.918, 0.075], [0.19, 0.898, 0.068], [0.168, 0.876, 0.064],
-         [0.16, 0.855, 0.058], [0.165, 0.83, 0.05], [0.172, 0.811, 0.042], [0.183, 0.798, 0.034], [0.193, 0.788, 0.028],
-         [0.207, 0.779, 0.024], [0.218, 0.77, 0.021], [0.227, 0.76, 0.018], [0.236, 0.75, 0.016], [0.244, 0.739, 0.014],
-         [0.25, 0.729, 0.012], [0.255, 0.719, 0.011], [0.258, 0.71, 0.01], [0.262, 0.701, 0.009]],
+  // the hill of firs (left), and rows of firs along its foot: [x0, x1, foot, height, count, haze]
+  hill: { x0: -0.02, x1: 0.4, peakX: 0.135, peakY: 0.37, spanL: 0.15, spanR: 0.16, treeSize: 0.11, trees: 340,
+          rows: [[-0.01, 0.12, 0.6, 0.12, 7, 0.28], [0.08, 0.25, 0.625, 0.11, 7, 0.3], [0.2, 0.32, 0.605, 0.1, 5, 0.33],
+                 [0.3, 0.335, 0.6, 0.075, 3, 0.4], [0.37, 0.45, 0.665, 0.07, 6, 0.45]] },
+  // the pictures from the element sheet: the middle (of the width), the top and the height (of the height)
+  pagoda: { x: 0.1935, top: 0.183, h: 0.286 },
+  hall: { x: 0.308, top: 0.533, h: 0.13 },
+  // the torii, the farthest first: middle, top, height
+  torii: [[0.259, 0.627, 0.086], [0.2115, 0.646, 0.101], [0.1955, 0.638, 0.152], [0.0805, 0.652, 0.277]],
+  // the stone lanterns: middle, top, foot
+  lanterns: [[0.301, 0.673, 0.709], [0.287, 0.681, 0.724], [0.179, 0.698, 0.751], [0.273, 0.698, 0.761],
+             [0.142, 0.709, 0.784], [0.088, 0.727, 0.838], [0.245, 0.73, 0.856]],
+  pine: { x: 0.801, top: 0.447, h: 0.301, foot: 0.727 },
+  cranes: { x: 0.701, top: 0.649, h: 0.118, foot: 0.757 },
+  // the roped firs (and the plain ones) on the right: x, foot, height, the top of the rope pole (0: none), haze
+  firs: [[0.838, 0.7, 0.135, 0, 0.45], [1.0, 0.7, 0.18, 0, 0.4], [0.874, 0.712, 0.155, 0.532, 0.3],
+         [0.921, 0.705, 0.185, 0.493, 0.25], [0.968, 0.796, 0.31, 0.353, 0]],
+  // the frosted trees beyond the hall: x, foot, height
+  frost: [[0.47, 0.665, 0.055], [0.432, 0.7, 0.12], [0.402, 0.712, 0.17]],
+  // the stepping stones: middle, width (of the width)
+  stones: [[0.307, 0.975, 0.122], [0.238, 0.945, 0.047], [0.298, 0.939, 0.045], [0.214, 0.92, 0.051], [0.192, 0.898, 0.058],
+           [0.145, 0.878, 0.026], [0.179, 0.876, 0.035], [0.158, 0.856, 0.056], [0.146, 0.834, 0.029], [0.177, 0.833, 0.026],
+           [0.169, 0.814, 0.042], [0.2, 0.793, 0.033], [0.1915, 0.785, 0.024], [0.207, 0.775, 0.022], [0.218, 0.767, 0.02],
+           [0.226, 0.758, 0.013], [0.234, 0.75, 0.0145], [0.243, 0.738, 0.0145], [0.248, 0.729, 0.0127], [0.252, 0.72, 0.0127],
+           [0.254, 0.711, 0.0127], [0.256, 0.702, 0.011], [0.259, 0.694, 0.01]],
+  // the middle of the trodden path: x, y, half its width
+  path: [[0.31, 1.02, 0.08], [0.25, 0.94, 0.05], [0.19, 0.895, 0.042], [0.16, 0.855, 0.036], [0.17, 0.815, 0.028],
+         [0.2, 0.785, 0.02], [0.225, 0.76, 0.013], [0.245, 0.735, 0.01], [0.256, 0.705, 0.008], [0.265, 0.685, 0.007]],
   // the banks beyond the water (the edge of the snow, the earth showing under it)
-  rims: [{ th: 0.013, pts: [[0.398, 0.818], [0.42, 0.797], [0.46, 0.783], [0.5, 0.772], [0.55, 0.761], [0.585, 0.75]] },
-         { th: 0.006, pts: [[0.548, 0.727], [0.6, 0.722], [0.66, 0.721], [0.705, 0.723]] },
-         { th: 0.013, pts: [[0.645, 0.769], [0.68, 0.777], [0.743, 0.785], [0.8, 0.792], [0.852, 0.8], [0.897, 0.811]] },
-         { th: 0.015, pts: [[0.9, 0.833], [0.95, 0.844], [1.02, 0.85]] }],
+  banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
+          { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
+          { th: 0.018, pts: [[0.645, 0.772], [0.689, 0.777], [0.743, 0.786], [0.798, 0.795], [0.852, 0.802], [0.896, 0.808]] },
+          { th: 0.026, pts: [[0.9, 0.832], [0.925, 0.838], [0.961, 0.834], [1.02, 0.845]] }],
   // the water
-  pond: [[0.548, 0.733], [0.6, 0.728], [0.66, 0.727], [0.705, 0.729], [0.69, 0.74], [0.665, 0.755], [0.645, 0.775],
-         [0.68, 0.788], [0.743, 0.796], [0.8, 0.803], [0.852, 0.812], [0.897, 0.822], [0.9, 0.845], [0.95, 0.857], [1.02, 0.864],
-         [1.02, 1.02], [0.718, 1.02], [0.634, 0.977], [0.532, 0.951], [0.453, 0.906], [0.405, 0.847], [0.398, 0.828],
-         [0.42, 0.808], [0.46, 0.795], [0.5, 0.784], [0.55, 0.773], [0.585, 0.761], [0.592, 0.748], [0.575, 0.738]],
-  // in front: x, foot, width (of the width), height
-  camellias: [[0.313, 0.905, 0.095, 0.095], [0.06, 1.03, 0.16, 0.25]],
-  nandinas: [[0.17, 1.03, 0.09, 0.13], [0.605, 1.03, 0.12, 0.12]],
-  chime: { x: 0.049, y: 0.058, s: 0.048 }
+  pond: [[0.551, 0.731], [0.6, 0.726], [0.653, 0.724], [0.69, 0.726], [0.672, 0.738], [0.655, 0.752], [0.645, 0.775],
+         [0.689, 0.789], [0.743, 0.798], [0.798, 0.807], [0.852, 0.814], [0.896, 0.822], [0.9, 0.848], [0.925, 0.856],
+         [0.961, 0.853], [1.02, 0.862], [1.02, 1.02], [0.743, 1.02], [0.671, 0.99], [0.598, 0.971], [0.525, 0.939],
+         [0.471, 0.906], [0.424, 0.873], [0.402, 0.847], [0.4, 0.83], [0.416, 0.811], [0.453, 0.798], [0.489, 0.789],
+         [0.533, 0.782], [0.566, 0.775], [0.592, 0.762], [0.59, 0.745], [0.57, 0.736]]
 };
+/* The pictures cut out of the user's element sheet (textures/winter/). Each keeps its own light
+   for the day; in the evening and at night it is tinted with the light (the lit windows and
+   lamps keep their glow), and far ones fade a little into the mist. */
+var SPR_NAMES = ['pagoda', 'hall', 'torii', 'lantern', 'pine', 'cranes'], SPRI = {}, sprLeft = SPR_NAMES.length, SPRT = mk();
+SPR_NAMES.forEach(function (n) {
+  var im = new Image();
+  im.onload = function () {
+    // where it glows: warm, bright pixels (windows, lamps, the lit eaves)
+    var g = document.createElement('canvas'); g.width = im.width; g.height = im.height;
+    var gc = g.getContext('2d'); gc.drawImage(im, 0, 0);
+    var D = gc.getImageData(0, 0, g.width, g.height), px = D.data;
+    for (var i = 0; i < px.length; i += 4) {
+      var k = clamp((px[i] - px[i + 2] - 70) / 70, 0, 1) * clamp((px[i] - 170) / 60, 0, 1);
+      px[i + 3] = Math.round(px[i + 3] * k);
+    }
+    gc.putImageData(D, 0, 0);
+    SPRI[n] = { img: im, glow: g };
+    if (--sprLeft === 0) { note('the element pictures are loaded'); stages.push('far', 'ground'); }
+  };
+  im.onerror = function () { note('ERROR: textures/winter/' + n + '.png did not load'); };
+  im.src = 'textures/winter/' + n + '.png';
+});
+function sprTint() {
+  if (V.timeOfDay === 'evening') return scale(light([255, 255, 255]), 0.9);
+  if (isNight()) return scale(light([255, 255, 255]), 0.62);
+  return null;
+}
+/* One picture: its middle at cx, its top at top, h high (CSS px). */
+function drawSprite(c, name, cx, top, h, haze) {
+  var S = SPRI[name];
+  if (!S) return null;
+  var w = h * S.img.width / S.img.height, x = cx - w / 2, tint = sprTint();
+  if (!tint && haze < 0.01) { c.drawImage(S.img, x, top, w, h); return { x: x, y: top, w: w, h: h }; }
+  var T = c.getTransform(), sc = Math.abs(T.a) || 1, tw = Math.max(1, Math.ceil(w * sc)), th = Math.max(1, Math.ceil(h * sc));
+  SPRT.cnv.width = tw; SPRT.cnv.height = th;
+  var t = SPRT.c;
+  t.drawImage(S.img, 0, 0, tw, th);
+  if (tint) {
+    t.globalCompositeOperation = 'multiply'; t.fillStyle = rgb(tint); t.fillRect(0, 0, tw, th);
+    t.globalCompositeOperation = 'destination-in'; t.drawImage(S.img, 0, 0, tw, th);
+    t.globalCompositeOperation = 'source-over'; t.globalAlpha = clamp(refLit(), 0, 1); t.drawImage(S.glow, 0, 0, tw, th); t.globalAlpha = 1;
+  }
+  if (haze > 0.01) {
+    t.globalCompositeOperation = 'source-atop'; t.globalAlpha = clamp(haze, 0, 1);
+    t.fillStyle = rgb(light(hex(V.colours.mist))); t.fillRect(0, 0, tw, th);
+    t.globalAlpha = 1; t.globalCompositeOperation = 'source-over';
+  }
+  c.drawImage(SPRT.cnv, x, top, w, h);
+  SPRT.cnv.width = SPRT.cnv.height = 1;
+  return { x: x, y: top, w: w, h: h };
+}
 function refPlan() {
   var list = [], hy = H * V.horizon;
   function u(fy) { return clamp((fy * H - hy) / (H - hy), 0, 1); }
+  function spr(name, x, top, h, foot, seed) {
+    list.push({ type: 'spr', name: name, x: x * W, topY: top * H, h: h * H, fy: foot, u: u(foot), seed: seed });
+  }
   REF.frost.forEach(function (f, i) { list.push({ type: 'frost', x: f[0] * W, fy: f[1], h: f[2] * H, u: u(f[1]), size: 1, seed: 901 + i * 77 }); });
-  list.push({ type: 'hall', x: REF.hall.x * W, fy: REF.hall.y, h: REF.hall.w * W * 0.32, w: REF.hall.w * W, u: u(REF.hall.y), seed: 4 });
-  REF.torii.forEach(function (T, i) { list.push({ type: 'torii', x: T[0] * W, fy: T[1], h: T[2] * H, u: u(T[1]), yaw: 4, view: 0.05, seed: 3 + i }); });
-  REF.lanterns.forEach(function (L, i) { list.push({ type: 'lant', x: L[0] * W, fy: L[1], h: L[2] * H, u: u(L[1]), seed: 50 + i }); });
-  REF.pines.forEach(function (P, i) {
-    list.push({ type: P[0] === 'matsu' ? 'matsu' : 'rfir', x: P[1] * W, fy: P[2], h: P[3] * H, pole: P[4] ? P[4] * H : 0, mist: P[5],
-                u: u(P[2]), seed: 300 + i * 13 });
+  spr('hall', REF.hall.x, REF.hall.top, REF.hall.h, REF.hall.top + REF.hall.h * 0.97, 4);
+  // a torii's feet are 0.93 of its picture down
+  REF.torii.forEach(function (T, i) { spr('torii', T[0], T[1], T[2], T[1] + T[2] * 0.93, 3 + i); });
+  REF.lanterns.forEach(function (L, i) { spr('lantern', L[0], L[1], (L[2] - L[1]) / 0.95, L[2], 50 + i); });
+  REF.firs.forEach(function (F, i) {
+    list.push({ type: 'rfir', x: F[0] * W, fy: F[1], h: F[2] * H, pole: F[3] ? F[3] * H : 0, mist: F[4], u: u(F[1]), seed: 300 + i * 13 });
   });
-  REF.cranes.forEach(function (K, i) { list.push({ type: 'crane', x: K[0] * W, fy: K[1], h: K[2] * H, dir: K[3], neck: K[4], u: u(K[1]), seed: 700 + i }); });
+  spr('pine', REF.pine.x, REF.pine.top, REF.pine.h, REF.pine.foot, 21);
+  spr('cranes', REF.cranes.x, REF.cranes.top, REF.cranes.h, REF.cranes.foot, 700);
   list.sort(function (a, b) { return a.fy - b.fy; });
   return list;
 }
@@ -1310,33 +1375,33 @@ function thingH(B) {
   return H * k * B.size * V.lanternSize;
 }
 function thingTop(B) {
+  if (B.type === 'spr') return B.topY - 4;
   if (B.pole) return B.pole - 8;
-  if (B.type === 'hall') return B.yb - B.w * 0.33;
   if (B.type === 'torii') return Torii.top({ y: B.yb, h: thingH(B), snow: V.toriiSnow }) - 6;
   return B.yb - thingH(B) * (B.type === 'light' ? 1.5 : 1.12);
 }
 function thingHalfW(B) {
   var h = thingH(B);
-  if (B.type === 'hall') return B.w * 0.56;
-  if (B.type === 'matsu' || B.type === 'rfir') return h * 0.5;
-  if (B.type === 'lant') return h * 0.3;
-  if (B.type === 'crane') return h * 0.35;
+  if (B.type === 'spr') return h * 1.3;
+  if (B.type === 'rfir') return h * 0.5;
   return B.type === 'torii' ? h * 0.75 : B.type === 'fir' ? h * 0.36 * V.firWidth : B.type === 'frost' ? h * 0.4 : B.kind === 'kamakura' ? h * 1.3 : h * 0.7;
 }
 function refLit() { return Math.max(V.refLights, nightLights()); }
 function drawThing(c, B, haze) {
   var C = cols(), h = thingH(B);
-  if (B.type === 'hall') { WinterScene.hall(c, withLight({ x: B.x, y: B.yb, w: B.w, lit: B.plain ? 0 : refLit(), seed: B.seed }, haze)); return; }
-  if (B.type === 'lant') {
-    WinterScene.lantern(c, withLight({ x: B.x, y: B.yb, h: h, lit: B.plain ? 0 : refLit(), seed: B.seed, colours: { stone: C.stone } }, haze));
+  if (B.type === 'spr') {
+    // the lamps' and windows' light on the snow round them
+    var lk = B.plain ? 0 : refLit() * (isNight() ? 1.6 : V.timeOfDay === 'evening' ? 1.3 : 1);
+    if (lk > 0 && B.name === 'lantern') WinterScene.pool(c, { x: B.x, y: B.yb - h * 0.02, rx: h * 0.7, ry: h * 0.16, strength: lk * 0.8 });
+    if (lk > 0 && B.name === 'hall') WinterScene.pool(c, { x: B.x, y: B.yb + h * 0.12, rx: h * 1.6, ry: h * 0.3, strength: lk * 0.9 });
+    drawSprite(c, B.name, B.x, B.topY, h, haze * 0.25);
+    if (lk > 0 && B.name === 'lantern') WinterScene.pool(c, { x: B.x, y: B.topY + h * 0.28, rx: h * 0.45, ry: h * 0.32, strength: lk * 0.45 });
     return;
   }
-  if (B.type === 'crane') { WinterScene.crane(c, withLight({ x: B.x, y: B.yb, h: h, dir: B.dir, neck: B.neck }, haze * 0.15)); return; }
-  if (B.type === 'matsu' || B.type === 'rfir') {
-    var hz = Math.min(1, haze * 0.3 + (B.mist || 0)), ro = withLight({ x: B.x, top: B.pole, y: B.yb, spread: h * 0.5, drop: (B.yb - B.pole) * 0.82, n: 18 }, hz);
+  if (B.type === 'rfir') {
+    var hz = Math.min(1, haze * 0.3 + (B.mist || 0)), ro = withLight({ x: B.x, top: B.pole, y: B.yb, spread: h * 0.42, drop: (B.yb - B.pole) * 0.88, n: 20 }, hz);
     if (B.pole) WinterScene.ropes(c, ro, false);
-    if (B.type === 'matsu') WinterScene.matsu(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle } }, hz));
-    else Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
+    Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
                                     snow: V.firSnow, droop: V.firDroop, fullness: 1, width: 1.15 }, hz));
     if (B.pole) WinterScene.ropes(c, ro, true);
     return;
@@ -1386,6 +1451,7 @@ function shadowShape(fy) {
   return [1, 0, -sx, sy, sx * fy, fy * (1 - sy)];
 }
 function castShadow(tg, B, haze) {
+  if (B.type === 'spr') return;                               // the pictures carry their own shade on the snow
   var k = V.shadows * LT.vis;
   if (k < 0.01) return;
   var h = thingH(B), hw = thingHalfW(B), bx0 = B.x - hw * 1.2, by0 = thingTop(B) - 4, bw = hw * 2.4, bh = B.yb - by0 + h * 0.1;
@@ -1451,43 +1517,43 @@ function drawDecor(c) {
   var g = c.createLinearGradient(0, H * 0.72, 0, H);
   g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
   c.fillStyle = g; c.fill();
-  WinterScene.rims(c, withLight({ depth: H * 0.012, lines: REF.rims.map(function (L) { return { th: L.th * H, pts: refPts(L.pts) }; }),
-                                  colours: { snow: C.snow } }, 0));
-  WinterScene.stones(c, withLight({ path: REF.path.map(function (p) { return [p[0] * W, p[1] * H, p[2] * W]; }), colours: { snow: C.snow } }, 0));
+  WinterScene.path(c, withLight({ line: REF.path.map(function (p) { return [p[0] * W, p[1] * H, p[2] * W]; }),
+                                  stones: REF.stones.map(function (p) { return [p[0] * W, p[1] * H, p[2] * W]; }), colours: { snow: C.snow } }, 0));
 }
 /* The far layer (V.ref): the hill of firs, the pagoda among them, the mist. Baked once. */
-var FARL = mk(), FRONTL = mk(), POND = { mask: mk(), refl: mk(), tmp: mk(), top: null, at: -1, puffs: [] };
+var FARL = mk(), BANKL = mk(), POND = { mask: mk(), refl: mk(), tmp: mk(), top: null, at: -1, puffs: [] };
 function bakeFar() {
   var C = cols(), cw = Math.round(W * PR), ch = Math.round(H * PR);
   FARL.cnv.width = cw; FARL.cnv.height = ch;
   var c = FARL.c, mc = light(C.mist);
   c.setTransform(PR, 0, 0, PR, 0, 0); c.clearRect(0, 0, W, H);
   if (!V.ref) return;
-  var hy = H * V.horizon, R = REF.hill;
-  var ho = { x0: R.x0 * W, x1: R.x1 * W, base: hy, peakX: R.peakX * W, peakY: R.peakY * H, spanL: R.spanL * W, spanR: R.spanR * W,
-             treeSize: R.treeSize * H, trees: R.trees, seed: V.seed * 7 + 5, mist: V.hillMist,
+  var hy = H * V.horizon, R = REF.hill, warm = mix(mc, light([255, 226, 190]), 0.6);
+  var ho = { x0: R.x0 * W, x1: R.x1 * W, base: hy - H * 0.03, peakX: R.peakX * W, peakY: R.peakY * H, spanL: R.spanL * W, spanR: R.spanR * W,
+             treeSize: R.treeSize * H, trees: R.trees, seed: V.seed * 7 + 5, mist: V.hillMist, split: 0.6,
+             rows: R.rows.map(function (q) { return [q[0] * W, q[1] * W, q[2] * H, q[3] * H, q[4], q[5] * V.hillMist]; }),
              colours: { needle: C.needle, snow: C.snow } };
-  ho.part = 'back'; WinterScene.hill(c, withLight(ho, 0.12));
-  WinterScene.mistBand(c, -W * 0.15, W * 0.55, H * 0.42, H * 0.62, mc, 0.5 * V.hillMist);
+  ho.part = 'back'; WinterScene.hill(c, withLight(ho, 0.1));
+  WinterScene.mistBand(c, -W * 0.15, W * 0.5, H * 0.45, H * 0.6, warm, 0.35 * V.hillMist);
   var P = REF.pagoda;
-  WinterScene.pagoda(c, withLight({ x: P.x * W, top: P.top * H, base: P.base * H, w: P.w * W, lit: refLit(), seed: 3 }, 0.08));
-  WinterScene.mistBand(c, -W * 0.1, W * 0.5, H * 0.47, H * 0.6, mc, 0.55 * V.hillMist);
+  drawSprite(c, 'pagoda', P.x * W, P.top * H, P.h * H, 0.05);
+  // the pagoda's foot lost in the mist, as in the picture
+  WinterScene.mistBand(c, P.x * W - W * 0.09, P.x * W + W * 0.09, H * 0.47, H * 0.57, warm, 0.8 * V.hillMist);
   ho.part = 'front'; WinterScene.hill(c, withLight(ho, 0));
-  WinterScene.mistBand(c, -W * 0.25, W * 0.75, hy - H * 0.1, hy + H * 0.04, mc, 0.8 * V.hillMist);
-  WinterScene.mistBand(c, W * 0.3, W * 1.2, hy - H * 0.07, hy + H * 0.03, mc, 0.6 * V.hillMist);
+  WinterScene.mistBand(c, -W * 0.25, W * 0.7, hy - H * 0.085, hy + H * 0.03, warm, 0.8 * V.hillMist);
+  var gold = mix(mc, light([255, 214, 160]), 0.8);
+  WinterScene.mistBand(c, W * 0.3, W * 1.3, H * 0.53, H * 0.69, gold, 0.75 * V.hillMist);
+  WinterScene.mistBand(c, -W * 0.1, W * 0.55, H * 0.615, H * 0.69, gold, 0.5 * V.hillMist);
 }
-/* The front layer (V.ref): the camellias and the nandina, in front of the pond. */
+/* The pond's mask (V.ref), and where its water starts in each column. */
 function bakeFront() {
-  var C = cols(), c = FRONTL.c;
-  FRONTL.cnv.width = Math.round(W * PR); FRONTL.cnv.height = Math.round(H * PR);
-  c.setTransform(PR, 0, 0, PR, 0, 0); c.clearRect(0, 0, W, H);
+  var C = cols();
+  BANKL.cnv.width = Math.round(W * PR); BANKL.cnv.height = Math.round(H * PR);
+  BANKL.c.setTransform(PR, 0, 0, PR, 0, 0); BANKL.c.clearRect(0, 0, W, H);
   if (!V.ref) return;
-  REF.nandinas.forEach(function (N, i) { WinterScene.nandina(c, withLight({ x: N[0] * W, y: N[1] * H, w: N[2] * W, h: N[3] * H, seed: 41 + i, colours: { snow: C.snow } }, 0)); });
-  REF.camellias.forEach(function (K, i) {
-    WinterScene.camellia(c, withLight({ x: K[0] * W, y: K[1] * H, w: K[2] * W, h: K[3] * H, seed: 31 + i * 5, leaves: K[2] * W * 4.5,
-                                         flowers: K[2] * W * 0.09, colours: { snow: C.snow } }, 0));
-  });
-  // the pond's mask, and where its water starts in each column (the line its reflection turns about)
+  // the banks beyond the water, laid over its edge
+  WinterScene.banks(BANKL.c, withLight({ lines: REF.banks.map(function (L) { return { th: L.th * H, pts: refPts(L.pts) }; }), colours: { snow: C.snow } }, 0));
+  // (the line each column's reflection turns about)
   var M = POND.mask, q = 0.25;
   M.cnv.width = Math.max(1, Math.round(W * q)); M.cnv.height = Math.max(1, Math.round(H * q));
   M.c.setTransform(q, 0, 0, q, 0, 0); M.c.clearRect(0, 0, W, H);
@@ -1504,8 +1570,9 @@ function bakeFront() {
 /* THE POND, every frame (V.ref): the scene above it mirrored in the water, each column about the
    far edge of the water there (so the cranes and pines stand on their reflections), rippled, tinted,
    with the steam rising off it. The mirrored picture is made again every third frame. */
-function drawPond(c, t, dt) {
+function drawPond(c, t, dt, water) {
   if (!V.ref || !POND.top) return;
+  if (!water) { drawSteam(c, dt); return; }
   var y0 = POND.y0, RF = POND.refl, rq = 0.5 * PR, k;
   var cw = Math.round(W * rq), chh = Math.max(1, Math.round((H - y0) * rq));
   if (RF.cnv.width !== cw || RF.cnv.height !== chh) { RF.cnv.width = cw; RF.cnv.height = chh; POND.at = -1; }
@@ -1536,14 +1603,14 @@ function drawPond(c, t, dt) {
   // the water's own colour over it, darker toward you, and the mask of the water
   tc.globalCompositeOperation = 'source-atop';
   var g = tc.createLinearGradient(0, 0, 0, th);
-  var wc = light([206, 210, 222]), deep = light([120, 130, 150]);
+  var wc = light([196, 198, 210]), deep = light([150, 150, 168]);
   g.addColorStop(0, rgb(wc, V.waterTint * 0.8)); g.addColorStop(1, rgb(deep, V.waterTint));
   tc.fillStyle = g; tc.fillRect(0, 0, T.cnv.width, th);
   // the low sky's glow caught in the open water on the left (the colour of the sky round the sun)
-  var sk = light(isNight() ? [90, 100, 150] : [244, 174, 146]);
-  tc.save(); tc.translate(W * 0.52 * PR, th * 0.75); tc.scale(W * 0.2 * PR, th * 0.6);
+  var sk = light(isNight() ? [90, 100, 150] : [240, 160, 128]);
+  tc.save(); tc.translate(W * 0.53 * PR, th * 0.6); tc.scale(W * 0.22 * PR, th * 0.75);
   var rg = tc.createRadialGradient(0, 0, 0, 0, 0, 1);
-  rg.addColorStop(0, rgb(sk, 0.8 * V.skyInWater)); rg.addColorStop(1, rgb(sk, 0));
+  rg.addColorStop(0, rgb(sk, 0.85 * V.skyInWater)); rg.addColorStop(0.6, rgb(sk, 0.5 * V.skyInWater)); rg.addColorStop(1, rgb(sk, 0));
   tc.fillStyle = rg; tc.fillRect(-1, -1, 2, 2); tc.restore();
   tc.globalCompositeOperation = 'destination-in';
   tc.setTransform(1, 0, 0, 1, 0, 0);
@@ -1553,9 +1620,12 @@ function drawPond(c, t, dt) {
   c.globalAlpha = V.reflect;
   c.drawImage(T.cnv, 0, Math.round(y0 * PR));
   c.globalAlpha = 1;
-  // the steam: soft puffs rising off the water and drifting with the wind
+}
+/* the steam: soft puffs rising off the water and drifting with the wind */
+function drawSteam(c, dt) {
+  var k;
   if (V.steam > 0) {
-    var P = POND.puffs, want = Math.round(40 * V.steam);
+    var P = POND.puffs, want = Math.round(55 * V.steam);
     while (P.length < want) P.push(newPuff(P.length < want && !POND.filled));
     POND.filled = true;
     c.setTransform(PR, 0, 0, PR, 0, 0);
@@ -1564,7 +1634,7 @@ function drawPond(c, t, dt) {
       S.age += dt; S.y -= S.v * dt; S.x += (S.d + fieldAt(S.x) * 12) * dt; S.r += S.g * dt;
       var f = S.age / S.life;
       if (f >= 1 || k >= want) { P.splice(k, 1); continue; }
-      c.globalAlpha = S.a * Math.sin(f * PI) * V.steam;
+      c.globalAlpha = S.a * Math.sin(f * PI) * V.steam * (isNight() ? 0.45 : 1);
       c.drawImage(MIST.cnv, S.x - S.r, S.y - S.r * 0.6, S.r * 2, S.r * 1.2);
     }
     c.globalAlpha = 1;
@@ -1574,9 +1644,10 @@ function newPuff(prefill) {
   // over the water: most where the channel opens into the pond, as in the picture
   var x, y, tries = 0;
   do {
-    x = Math.random() < 0.45 ? lerp(0.52, 0.66, Math.random()) * W : lerp(0.4, 1, Math.random()) * W;
+    x = Math.random() < 0.55 ? lerp(0.54, 0.64, Math.random()) * W : lerp(0.42, 1, Math.random()) * W;
     var top = POND.top[Math.min(POND.top.length - 1, Math.floor(x * POND.q))];
     y = top < 0 ? -1 : top + Math.random() * H * 0.12;
+    if (x > W * 0.64 && x < W * 0.76 && y < H * 0.84) y = -1;          // not over the cranes
   } while (y < 0 && ++tries < 20);
   var life = lerp(6, 12, Math.random());
   return { x: x, y: y, r: lerp(24, 60, Math.random()) * H / 900, g: lerp(5, 12, Math.random()), v: lerp(6, 16, Math.random()),
@@ -2699,13 +2770,6 @@ function drawBack(c, t) {
   if (!WS.flakeSpr.length) return;
   drawFlakes(c, -1, nearZ());
   for (var i = 0; i < WS.branches.length; i++) umeDraw(c, WS.branches[i]);
-  if (V.ref && V.chime) {                                     // the wind chime, swinging in the wind
-    var wind = fieldAt(REF.chime.x * W), cs = REF.chime.s * W * V.chimeSize;
-    c.setTransform(PR, 0, 0, PR, 0, 0);
-    WinterScene.furin(c, { x: REF.chime.x * W, y: REF.chime.y * H, s: cs,
-                           swing: 0.05 * Math.sin(t * 1.1) + 0.02 * Math.sin(t * 2.7) + wind * 0.25,
-                           flutter: 0.12 * Math.sin(t * 1.9 + 1) + 0.05 * Math.sin(t * 4.3) + wind * 0.5 });
-  }
   c.setTransform(PR, 0, 0, PR, 0, 0);
   for (i = 0; i < WS.puffs.length; i++) {
     var P = WS.puffs[i], k = P.age / P.life, a = P.a * (k < 0.15 ? k / 0.15 : 1 - Math.pow((k - 0.15) / 0.85, 1.5));
@@ -2957,10 +3021,11 @@ function frame(now) {
   drawFrontClouds(t, dt);
   // the hill of firs and the pagoda (V.ref)
   if (V.ref && FARL.cnv.width > 1) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(FARL.cnv, 0, 0); }
-  // the snowfield and everything on it, the pond with its reflection and steam, the bushes in front
+  // the snowfield and everything on it, the pond with its reflection and steam
   drawGround(ctx, t);
-  drawPond(ctx, t, dt);
-  if (V.ref && FRONTL.cnv.width > 1) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(FRONTL.cnv, 0, 0); }
+  drawPond(ctx, t, dt, true);
+  if (V.ref && BANKL.cnv.width > 1) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(BANKL.cnv, 0, 0); }
+  drawPond(ctx, t, dt, false);
   drawSparkles(ctx, t);
   drawDust(ctx, t);
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
@@ -3117,7 +3182,7 @@ var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 var G = [
   { name: 'Report', note: 'What happened on this tablet. After changing the time of day, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
     { report: true } ] },
-  { name: 'The reference scene', note: 'The shrine by the steaming pond (winterscene.js): the hill of firs with the pagoda, the hall, the torii row and lanterns, the pond, the cranes, the roped pines, the bushes and the wind chime. Off: the older layout.', ctls: [
+  { name: 'The reference scene', note: 'The shrine by the steaming pond (winterscene.js): the hill of firs with the pagoda, the hall, the torii row and lanterns, the pond, the cranes and the roped pines. Off: the older layout.', ctls: [
     { chk: 'V', k: 'ref', label: 'Show the reference scene', re: 'all' },
     { o: 'V', k: 'refLights', label: 'Lanterns and windows lit by day', min: 0, max: 1.5, step: 0.05, re: 'all' },
     { o: 'V', k: 'hillMist', label: 'Mist on the hill', min: 0, max: 1.5, step: 0.05, re: 'ground' },
@@ -3125,9 +3190,7 @@ var G = [
     { o: 'V', k: 'ripple', label: 'Ripples', min: 0, max: 3, step: 0.05, re: 'live' },
     { o: 'V', k: 'waterTint', label: 'Colour of the water', min: 0, max: 1, step: 0.05, re: 'live' },
     { o: 'V', k: 'skyInWater', label: 'Sky glow in the water', min: 0, max: 1.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'steam', label: 'Steam off the pond', min: 0, max: 2, step: 0.05, re: 'live' },
-    { chk: 'V', k: 'chime', label: 'Wind chime', re: 'live' },
-    { o: 'V', k: 'chimeSize', label: 'Wind chime size', min: 0.5, max: 2, step: 0.05, re: 'live' } ] },
+    { o: 'V', k: 'steam', label: 'Steam off the pond', min: 0, max: 2, step: 0.05, re: 'live' } ] },
   { name: 'Time and weather', ctls: [
     { sel: 'time' }, { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
