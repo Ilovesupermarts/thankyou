@@ -58,7 +58,7 @@ function shader(o) {
 }
 function snowCols(S, o) {
   var sn = (o.colours && o.colours.snow) || [250, 250, 252];
-  return { side0: S.side, top: S(sn, S.side * 0.35, 1, 0.45), side: S(sn, S.side * 0.6, 0.3, 0.8), shade: S(sn, -S.side * 0.5, 0.2, 0.8, 0.1) };
+  return { snowBase: sn, side0: S.side, top: S(sn, S.side * 0.35, 1, 0.45), side: S(sn, S.side * 0.6, 0.3, 0.8), shade: S(sn, -S.side * 0.5, 0.2, 0.8, 0.1) };
 }
 
 /* ---------------------------------------------------------------
@@ -413,6 +413,161 @@ function roughen(P, cx, cy, len, wid, r) {
   }
   return out;
 }
+/* ---------------------------------------------------------------
+   THE STONE'S TOP, rendered pixel by pixel as a real surface: a height
+   map (the slate's rounded, slightly uneven top, and the snow lying on
+   it, deep in places, thinning out at its edges), lit by the scene's own
+   light from its slope at every pixel, with the shadows the snow throws
+   on the stone. The slate has a natural texture (cloudy tones, a faint
+   warm tinge, fine grain), is darker and wet just inside its edge and
+   frosted in grainy patches; the snow is kept inside the edge, so the
+   dark stone shows all round it.
+   --------------------------------------------------------------- */
+function hash2(i, j, s) {
+  var h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(s, 982451653)) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise(x, y, s) {
+  var i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy);
+  var a = hash2(i, j, s), b = hash2(i + 1, j, s), c0 = hash2(i, j + 1, s), d0 = hash2(i + 1, j + 1, s);
+  return lerp(lerp(a, b, fx), lerp(c0, d0, fx), fy);
+}
+function fbm(x, y, s, oct) {
+  var v = 0, a = 0.5, t = 0;
+  for (var o = 0; o < oct; o++) { v += vnoise(x, y, s + o * 17) * a; t += a; x *= 2.03; y *= 2.03; a *= 0.5; }
+  return v / t;
+}
+function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+/* Each stone's render is kept (the snowfield is baked in slices, each drawing every stone), keyed by the
+   stone, its size on the screen and the light; made again only when one of them changes. */
+var rasterCache = {}, rasterCount = 0;
+function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
+  var tr = c.getTransform ? c.getTransform() : { a: 1 }, k = Math.max(1, Math.abs(tr.a) || 1);
+  var bx = Math.floor(x0) - 1, by = Math.floor(y0) - 1, bw = Math.ceil(x1 - bx) + 2, bh = Math.ceil(y1 - by) + 2;
+  var w = Math.max(2, Math.round(bw * k)), h = Math.max(2, Math.round(bh * k));
+  if (w * h > 600000) return false;
+  var key = [seed, bx, by, w, h, Math.round(sc.top[0]), Math.round(sc.top[1]), Math.round(sc.top[2]),
+             Math.round(sc.shade[0]), Math.round(sc.shade[2]), Math.round(S.bright * 100), Math.round(slate[0]), sc.side0].join(',');
+  var hit = rasterCache[key];
+  if (hit) { c.drawImage(hit, bx, by, bw, bh); return true; }
+  if (rasterCount > 400) { rasterCache = {}; rasterCount = 0; }
+  var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  var g = cv.getContext('2d', { willReadFrequently: true });     // kept on the main processor: reading its mask back is cheap
+  g.setTransform(k, 0, 0, k, -bx * k, -by * k);
+  g.beginPath(); P.forEach(function (p, j) { j ? g.lineTo(p[0], p[1]) : g.moveTo(p[0], p[1]); }); g.closePath();
+  g.fillStyle = '#fff'; g.fill();
+  var img = g.getImageData(0, 0, w, h), D = img.data, N = w * h, i, x, y;
+  // distance inside the edge (pixels), two passes
+  var dist = new Float32Array(N), BIG = 1e6;
+  for (i = 0; i < N; i++) { var a0 = D[i * 4 + 3]; dist[i] = a0 === 0 ? 0 : a0 === 255 ? BIG : a0 / 255; }
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+    i = y * w + x; if (dist[i] < BIG) continue;
+    var m = dist[i];
+    if (x > 0) m = Math.min(m, dist[i - 1] + 1); else m = Math.min(m, 1);
+    if (y > 0) { m = Math.min(m, dist[i - w] + 1); if (x > 0) m = Math.min(m, dist[i - w - 1] + 1.414); if (x < w - 1) m = Math.min(m, dist[i - w + 1] + 1.414); } else m = Math.min(m, 1);
+    dist[i] = m;
+  }
+  for (y = h - 1; y >= 0; y--) for (x = w - 1; x >= 0; x--) {
+    i = y * w + x; if (!dist[i] || dist[i] < 1) continue;
+    var m2 = dist[i];
+    if (x < w - 1) m2 = Math.min(m2, dist[i + 1] + 1); else m2 = Math.min(m2, 1);
+    if (y < h - 1) { m2 = Math.min(m2, dist[i + w] + 1); if (x < w - 1) m2 = Math.min(m2, dist[i + w + 1] + 1.414); if (x > 0) m2 = Math.min(m2, dist[i + w - 1] + 1.414); } else m2 = Math.min(m2, 1);
+    dist[i] = m2;
+  }
+  var len = (x1 - x0) * k, wid = (y1 - y0) * k;
+  var F = 2.4;                                  // how much the top is foreshortened (ground depth per screen height)
+  var U = Math.max(4, len / 3);                 // the texture's scale: about three cells along the stone
+  var bev = Math.max(1.5, wid * 0.13);           // the rounded edge's width
+  var r = rng(seed), sOff = Math.floor(r() * 1e5);
+  var snowDepth = Math.max(2, wid * 0.2), thr = lerp(0.5, 0.6, r());
+  // the snow patches: one to three, each well inside the stone, toward its ends and back where snow lies longest
+  var caps = [], nCap = 1 + Math.floor(r() * 2) + (len > 5 * wid ? 1 : 0);
+  for (var cp = 0; cp < nCap; cp++) {
+    var big = cp === 0, prx = len * (big ? lerp(0.17, 0.27, r()) : lerp(0.08, 0.14, r())), pry = wid * (big ? lerp(0.26, 0.36, r()) : lerp(0.16, 0.24, r()));
+    for (var tries = 0; tries < 12; tries++) {
+      var side2 = (cp % 2 ? 1 : -1) * (r() < 0.7 ? 1 : -1);
+      var pmx = Math.round(w / 2 + side2 * lerp(0.05, 0.32, r()) * w), pmy = Math.round(h * lerp(0.3, 0.58, r()));
+      var dc = dist[pmy * w + pmx] || 0;
+      if (dc > pry + bev * 1.5) break;
+      prx *= 0.9; pry *= 0.9;
+    }
+    if (dc > pry * 0.6) caps.push([pmx, pmy, prx, pry]);
+  }
+  var edgeSn = new Float32Array(N), Ht = new Float32Array(N), snow = new Float32Array(N), tone = new Float32Array(N), warm = new Float32Array(N), frost = new Float32Array(N);
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+    i = y * w + x; var d = dist[i]; if (!d) continue;
+    var nx = x / U, ny = y * F / U, back = 1 - y / h, end = Math.abs(x / w - 0.5) * 2;
+    var e = Math.min(1, d / bev), hs = Math.sqrt(e) * bev * 0.35 + (fbm(nx * 3, ny * 3, sOff + 5, 3) - 0.5) * bev * 0.25;
+    tone[i] = fbm(nx * 1.3, ny * 1.3, sOff + 9, 4);
+    warm[i] = smooth(0.55, 0.8, fbm(nx * 0.8, ny * 0.8, sOff + 31, 3));
+    // the snow: where a broad noise, helped toward the back and the ends, passes the threshold; a lumpy top
+    var sn = -1, q0d = 9;
+    for (var ci = 0; ci < caps.length; ci++) { var C = caps[ci]; q0d = Math.min(q0d, Math.hypot((x - C[0]) / C[2], (y - C[1]) / C[3])); }
+    if (q0d < 1.8) {
+      var wob = (fbm(nx * 2.2, ny * 2.2, sOff + 77, 3) - 0.5) * 0.7 + (fbm(nx * 7, ny * 7, sOff + 41, 2) - 0.5) * 0.18;
+      sn = 1 - (q0d + wob);
+    }
+    sn *= 1; if (d < bev * 1.2) sn = Math.min(sn, -0.05);
+    var sm = smooth(0, 0.05, sn);
+    snow[i] = sm;
+    edgeSn[i] = sn;
+    var sh = sn > 0 ? Math.sqrt(clamp(sn / 0.9, 0, 1)) * snowDepth * (0.85 + 0.3 * fbm(nx * 3, ny * 3, sOff + 3, 2)) : 0;
+    Ht[i] = hs + sh;
+    // frost: grainy, in patches, more toward the back
+    // frost: a grainy dusting where the snow thins out round its patches, and faintly toward the back
+    frost[i] = sn > -0.16 ? smooth(-0.16, 0, sn) * smooth(0.42, 0.62, fbm(nx * 7, ny * 7, sOff + 13, 3)) * 0.8 : 0;
+  }
+  // light: lit from the scene's sun; the snow's shadow marched toward it
+  var Lx = (sc.side0 || -1), Lz = 0.35, Ly = 0.55, Lg = Math.hypot(Lx, Lz);
+  var stepX = Lx / Lg, stepY = -Lz / Lg / F, rise = Ly / Lg;
+  var snowC = (sc.snowBase) || [250, 250, 252];
+  var lsx = 0.35 * (sc.side0 || -1), lsy = 0.8, lsz = -0.45, lsl = Math.hypot(lsx, lsy, lsz); lsx /= lsl; lsy /= lsl; lsz /= lsl;
+  var snowBlue = mix(sc.shade, [140, 152, 190], 0.4);
+  var out = g.createImageData(w, h), O = out.data;
+  for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+    i = y * w + x; var a = D[i * 4 + 3]; if (!a) continue;
+    var xm = Math.max(0, x - 1), xp = Math.min(w - 1, x + 1), ym = Math.max(0, y - 1), yp = Math.min(h - 1, y + 1);
+    var hx = (Ht[y * w + xp] - Ht[y * w + xm]) / (xp - xm), hy = (Ht[yp * w + x] - Ht[ym * w + x]) / (yp - ym);
+    var nX = -hx, nY = 1, nZ = -hy / F + 0.3;
+    // the shadow: walk toward the light; anything higher than the ray shades this point
+    var occ = 1, h0 = Ht[i];
+    for (var t = 1; t <= 10; t++) {
+      var fx0 = x + stepX * t * 1.5, fy0 = y + stepY * t * 1.5 * F;
+      if (fx0 < 0 || fy0 < 0 || fx0 >= w - 1 || fy0 >= h - 1) break;
+      var ix = Math.floor(fx0), iy = Math.floor(fy0), ax = fx0 - ix, ay = fy0 - iy, q0 = iy * w + ix;
+      var hS = lerp(lerp(Ht[q0], Ht[q0 + 1], ax), lerp(Ht[q0 + w], Ht[q0 + w + 1], ax), ay);
+      var dh = hS - (h0 + rise * t * 1.5);
+      if (dh > 0 && snow[q0] > 0.2) { occ = Math.min(occ, 1 - Math.min(1, dh / (snowDepth * 0.3)) * 0.55); }
+    }
+    var s = snow[i], d2 = dist[i], col;
+    // the slate: cloudy tones, a warm tinge, wet and darker just inside its edge, the grain, the frost
+    var gr = fbm(nx * 14, ny * 14, sOff + 61, 2);
+    var tk = lerp(0.6, 1.3, tone[i]) * (0.9 + 0.2 * gr);
+    var base = scale(mix(slate, [150, 138, 122], warm[i] * 0.45), tk);
+    var fr = frost[i] * (1 - s);
+    base = mix(base, snowC, fr * 0.6);
+    var stoneCol = S(base, nX * 0.7, nY, nZ, occ);
+    // the snow: its own white lit by its slope, the crevices and the shaded side cool blue, glints
+    // the snow's own light, from above and a little behind and to the side: its top shines, its side
+    // toward you cools to blue, its foot darkest
+    var gx = -hx * 2, gz = -hy / F * 2, gl = Math.hypot(gx, 1, gz);
+    var fdot = (gx * lsx + 1 * lsy + gz * lsz) / gl, df = (fdot - lsy) * 1.7;
+    var snowCol = df >= 0 ? mix(sc.top, [255, 254, 250], clamp(df * 1.2, 0, 0.8) * S.bright)
+                          : mix(sc.top, snowBlue, clamp(-df, 0, 0.85));
+    snowCol = scale(snowCol, lerp(0.72, 1, occ));
+    snowCol = mix(snowCol, sc.shade, clamp((1 - s) * 0.3, 0, 1));
+    if (s > 0.6 && df > 0 && hash2(x, y, sOff + 99) > 0.985) snowCol = mix(snowCol, [255, 255, 255], 0.8);
+    col = mix(stoneCol, snowCol, smooth(0.15, 0.6, s));
+    O[i * 4] = clamp(col[0], 0, 255); O[i * 4 + 1] = clamp(col[1], 0, 255); O[i * 4 + 2] = clamp(col[2], 0, 255); O[i * 4 + 3] = a;
+  }
+  g.setTransform(1, 0, 0, 1, 0, 0);
+  g.putImageData(out, 0, 0);
+  rasterCache[key] = cv; rasterCount++;
+  c.drawImage(cv, bx, by, bw, bh);
+  return true;
+}
 function slabPoly(c, P0, S, sc, seed) {
   var xs0 = P0.map(function (p) { return p[0]; }), ys0 = P0.map(function (p) { return p[1]; });
   var P = roughen(P0, (Math.min.apply(null, xs0) + Math.max.apply(null, xs0)) / 2, (Math.min.apply(null, ys0) + Math.max.apply(null, ys0)) / 2,
@@ -437,26 +592,17 @@ function slabPoly(c, P0, S, sc, seed) {
     for (var fj = 1; fj < FR.length; fj++) c.lineTo(FR[fj][0], FR[fj][1]);
     for (fj = FR.length - 1; fj >= 0; fj--) c.lineTo(FR[fj][0], FR[fj][1] + hAt(fj));
     c.closePath();
-    c.fillStyle = rgb(col(slate, 0.88)); c.fill();
+    var sg = c.createLinearGradient(0, cy, 0, y1 + sideH);
+    sg.addColorStop(0, rgb(col(slate, 0.8))); sg.addColorStop(1, rgb(col(slate, 0.62)));
+    c.fillStyle = sg; c.fill();
   }
 
-  c.save();
-  path(0, 1);
-  var g = c.createLinearGradient(0, y0, 0, y1);
-  g.addColorStop(0, rgb(col(slate, 1.1))); g.addColorStop(0.6, rgb(col(slate, 0.98))); g.addColorStop(1, rgb(col(slate, 0.86)));
-  c.fillStyle = g; c.fill();
-  c.clip();
   var r = rng(seed);
-  var k;
-  frost(c, P, x0, y0, x1, y1, wid, sc, r);
-  // the soft light rim along the far (upper) edge
-  c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(0.7, th * 0.9);
-  c.beginPath(); var st = false;
-  P.forEach(function (p) { if (p[1] < cy) { st ? c.lineTo(p[0], p[1] + th * 0.3) : c.moveTo(p[0], p[1] + th * 0.3); st = true; } else st = false; });
-  c.stroke();
-  c.restore();
-  // a crisp dark inked line round the top face, as painted
-  path(0, 1); c.strokeStyle = rgb(col(slate, 0.32), 0.8); c.lineWidth = Math.max(0.7, th * 0.35); c.stroke();
+  if (!stoneRaster(c, P, x0, y0, x1, y1, S, sc, scale(mix(slate, [128, 128, 132], 0.35), 0.95), seed + 29)) {
+    path(0, 1); c.fillStyle = rgb(col(slate, 1)); c.fill();
+  }
+  // a thin dark edge round the top face (crisp, as painted, but not a heavy ink line)
+  path(0, 1); c.strokeStyle = rgb(col(slate, 0.4), 0.4); c.lineWidth = Math.max(0.5, th * 0.2); c.stroke();
   bank(c, P, cx, cy, len, wid, th, sideH, sc, rng(seed + 19));
   snowRim(c, P, cx, cy, len, wid, sc, r);
 }
@@ -475,21 +621,12 @@ function grime(c, P, cx, cy, len, wid, r) {
     c.fillStyle = rgb(r() < 0.6 ? [150, 152, 164] : [128, 130, 144], lerp(0.12, 0.28, r()));
     c.beginPath(); c.ellipse(p[0] + (p[0] - cx) * 0.03, p[1] + rr * 0.8, rr * lerp(1.5, 3, r()), rr * 0.55, 0, 0, TAU); c.fill();
   }
-  // trodden: a grey boot print or two pressed into the snow beside it
-  for (i = 0; i < 2; i++) {
-    if (r() < 0.45) continue;
-    var bp = P[Math.floor(r() * P.length)], bx = cx + (bp[0] - cx) * 1.3, by = cy + (bp[1] - cy) * 1.4 + wid * 0.1;
-    var bw = Math.max(2, wid * 0.22), bh = bw * 0.38;
-    c.fillStyle = rgb([150, 156, 172], 0.35);
-    c.beginPath(); c.ellipse(bx, by, bw, bh, (r() - 0.5) * 0.4, 0, TAU); c.fill();
-    c.beginPath(); c.ellipse(bx + bw * 1.5, by + bh * 0.2, bw * 0.55, bh * 0.85, 0, 0, TAU); c.fill();
-  }
   // grit: small dark specks scattered in the trodden snow just round it
   c.filter = 'none';
-  for (i = 0; i < Math.round(len / 8); i++) {
-    var q = P[Math.floor(r() * P.length)], d = Math.max(0.6, wid * lerp(0.015, 0.04, r()));
-    var out = lerp(0.02, 0.18, r());
-    c.fillStyle = rgb(r() < 0.5 ? [120, 120, 132] : [100, 102, 116], lerp(0.15, 0.35, r()));
+  for (i = 0; i < Math.round(len / 20); i++) {
+    var q = P[Math.floor(r() * P.length)], d = Math.max(0.5, wid * lerp(0.01, 0.025, r()));
+    var out = lerp(0.02, 0.15, r());
+    c.fillStyle = rgb(r() < 0.5 ? [130, 132, 144] : [112, 114, 128], lerp(0.08, 0.2, r()));
     c.fillRect(q[0] + (q[0] - cx) * out * 0.3, q[1] + (q[1] - cy) * out + (q[1] > cy ? wid * 0.05 : 0), d, d);
   }
   c.restore();
@@ -507,96 +644,24 @@ function snowRim(c, P, cx, cy, len, wid, sc, r) {
   function outline() { c.beginPath(); P.forEach(function (p, j) { j ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath(); }
   c.save();
   outline(); c.clip();
-  // the wet band just inside the edge, uneven
-  c.filter = 'blur(' + Math.max(0.5, wid * 0.05).toFixed(1) + 'px)';
-  c.lineJoin = 'round';
-  c.strokeStyle = rgb([46, 48, 60], 0.35); c.lineWidth = Math.max(1.5, wid * 0.22);
-  outline(); c.stroke();
-  c.filter = 'none';
-  // a fine crack or two
-  c.strokeStyle = rgb([40, 42, 52], 0.55); c.lineWidth = Math.max(0.5, wid * 0.018);
-  for (k = 0; k < (len > 40 ? 2 : 1); k++) {
-    if (r() < 0.35) continue;
-    var a0 = P[Math.floor(r() * n)], x = a0[0], y = a0[1];
-    c.beginPath(); c.moveTo(x, y);
-    var steps = 4 + Math.floor(r() * 4), dx = (cx - x) / steps * lerp(0.4, 0.9, r()), dy = (cy - y) / steps * lerp(0.4, 0.9, r());
-    for (var st = 0; st < steps; st++) { x += dx + (r() - 0.5) * len * 0.05; y += dy + (r() - 0.5) * wid * 0.12; c.lineTo(x, y); }
-    c.stroke();
-  }
   // moss in the edge, a few dull green-grey tufts
-  for (k = 0; k < Math.round(len / 25); k++) {
-    if (r() < 0.5) continue;
+  for (k = 0; k < Math.round(len / 40); k++) {
+    if (r() < 0.6) continue;
     var m = P[Math.floor(r() * n)], mr = Math.max(0.8, wid * lerp(0.04, 0.09, r()));
-    for (var t = 0; t < 6; t++) {
-      c.fillStyle = rgb(r() < 0.5 ? [92, 104, 72] : [74, 86, 62], lerp(0.4, 0.75, r()));
-      c.fillRect(m[0] + (r() - 0.5) * mr * 3, m[1] + (r() - 0.5) * mr * 1.5, mr * 0.7, mr * 0.7);
-    }
-  }
-  // patches of packed snow lying on its top, kept inside the stone (its dark edge shows all round them):
-  // each lit like a soft mound of snow, bright on its sunny top, cooling to blue on its lower side, its
-  // edge thinning out into the stone (no hard cut), a fine glittering grain
-  c.restore();
-  c.save();
-  c.beginPath();                                               // the stone's top shrunk a little: the patches stay inside it
-  P.forEach(function (p, j) { var x = cx + (p[0] - cx) * 0.9, y = cy + (p[1] - cy) * 0.8; j ? c.lineTo(x, y) : c.moveTo(x, y); });
-  c.closePath(); c.clip();
-  var patches = 1 + Math.floor(r() * 2) + (len > 60 ? 1 : 0);
-  for (k = 0; k < patches; k++) {
-    var corner = r() < 0.6, idx;
-    if (corner) {                                               // toward a corner in some direction
-      var dir = r() * TAU, best = -1e9;
-      for (i = 0; i < n; i++) { var v = (P[i][0] - cx) * Math.cos(dir) / len + (P[i][1] - cy) * Math.sin(dir) / wid; if (v > best) { best = v; idx = i; } }
-    } else idx = Math.floor(r() * n);
-    var A = P[idx];
-    var mx = lerp(A[0], cx, 0.42), my = lerp(A[1], cy, 0.45);
-    var rx = len * lerp(0.07, 0.15, r()), ry = wid * lerp(0.16, 0.28, r()), pts = [], q = 13;
-    for (i = 0; i < q; i++) {
-      var ang = i / q * TAU, rr = lerp(0.72, 1.12, r());
-      pts.push([mx + Math.cos(ang) * rx * rr, my + Math.sin(ang) * ry * rr]);
-    }
-    function blob(dx, dy, k2) {
-      c.beginPath();
-      var f = function (p) { return [mx + (p[0] - mx) * k2 + dx, my + (p[1] - my) * k2 + dy]; };
-      var p0 = f(pts[q - 1]), p1 = f(pts[0]);
-      c.moveTo((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2);
-      for (var j = 0; j < q; j++) { var a1 = f(pts[j]), b1 = f(pts[(j + 1) % q]); c.quadraticCurveTo(a1[0], a1[1], (a1[0] + b1[0]) / 2, (a1[1] + b1[1]) / 2); }
-      c.closePath();
-    }
-    // its soft blue shadow on the stone, just below it
-    c.save(); c.filter = 'blur(' + Math.max(0.5, ry * 0.25).toFixed(1) + 'px)';
-    blob(0, ry * 0.15, 1.0); c.fillStyle = rgb(mix([60, 66, 92], sc.shade, 0.5), 0.2); c.fill();
-    c.restore();
-    // the mound, shaded top to bottom so it reads at any size: a sunlit cap, the colour cooling through
-    // the snow's own white to a clear blue-grey on its lower half, a darker crease along its underside where
-    // it sits on the stone, a bright rim on its top toward the light
-    var lit = mix(sc.top, [255, 252, 246], 0.5), cool = mix(sc.shade, [150, 162, 196], 0.45), crease = mix(cool, [92, 100, 132], 0.45);
-    c.save(); c.filter = 'blur(' + Math.max(0.3, ry * 0.05).toFixed(1) + 'px)';
-    blob(0, 0, 1);
-    var lg = c.createLinearGradient(mx - rx * 0.25 * S0side, my - ry, mx + rx * 0.25 * S0side, my + ry);
-    lg.addColorStop(0, rgb(lit)); lg.addColorStop(0.35, rgb(sc.top)); lg.addColorStop(0.62, rgb(mix(sc.top, cool, 0.55)));
-    lg.addColorStop(0.85, rgb(cool)); lg.addColorStop(1, rgb(crease));
-    c.fillStyle = lg; c.fill();
-    c.restore();
-    c.save(); blob(0, 0, 1); c.clip();
-    c.filter = 'blur(' + Math.max(0.3, ry * 0.08).toFixed(1) + 'px)';
-    c.fillStyle = rgb([255, 255, 255], 0.75);                    // the sunlit cap
-    c.beginPath(); c.ellipse(mx + rx * 0.2 * S0side, my - ry * 0.5, rx * 0.55, ry * 0.28, 0, 0, TAU); c.fill();
-    c.restore();
-    // fine grain and a few glints
-    c.save(); blob(0, 0, 0.95); c.clip();
-    for (i = 0; i < Math.round(rx * ry * 0.25); i++) {
-      var sx = mx + (r() - 0.5) * rx * 2, sy = my + (r() - 0.5) * ry * 2, d2 = Math.max(0.4, ry * 0.05);
-      c.fillStyle = r() < 0.5 ? rgb(sc.shade, 0.18) : rgb([255, 255, 255], 0.5);
-      c.fillRect(sx, sy, d2, d2);
+    c.save(); c.filter = 'blur(' + Math.max(0.4, mr * 0.4).toFixed(1) + 'px)';
+    for (var t = 0; t < 4; t++) {
+      c.fillStyle = rgb(r() < 0.5 ? [98, 106, 84] : [84, 92, 74], lerp(0.25, 0.45, r()));
+      c.beginPath(); c.ellipse(m[0] + (r() - 0.5) * mr * 2.5, m[1] + (r() - 0.5) * mr, mr * lerp(0.6, 1.1, r()), mr * lerp(0.35, 0.6, r()), 0, 0, TAU); c.fill();
     }
     c.restore();
   }
   c.restore();
   // on the snow round it: small pebbles, and now and then a dry fallen leaf
-  for (k = 0; k < 1 + Math.round(len / 50); k++) {
-    var e = P[Math.floor(r() * n)], out = lerp(1.04, 1.25, r());
-    var px = cx + (e[0] - cx) * out, py = cy + (e[1] - cy) * out + wid * 0.05, pr = Math.max(0.6, wid * lerp(0.025, 0.06, r()));
-    c.fillStyle = rgb(r() < 0.5 ? [104, 106, 116] : [128, 128, 136]);
+  for (k = 0; k < Math.round(len / 70); k++) {
+    if (r() < 0.4) continue;
+    var e = P[Math.floor(r() * n)], out = lerp(1.04, 1.2, r());
+    var px = cx + (e[0] - cx) * out, py = cy + (e[1] - cy) * out + wid * 0.05, pr = Math.max(0.5, wid * lerp(0.018, 0.04, r()));
+    c.fillStyle = rgb(r() < 0.5 ? [118, 120, 132] : [138, 140, 150], 0.8);
     c.beginPath(); c.ellipse(px, py, pr * 1.3, pr, r() * PI, 0, TAU); c.fill();
     c.fillStyle = rgb([200, 202, 212], 0.3);
     c.beginPath(); c.ellipse(px - pr * 0.3, py - pr * 0.35, pr * 0.4, pr * 0.25, 0, 0, TAU); c.fill();
@@ -660,22 +725,6 @@ function bank(c, P, cx, cy, len, wid, th, sideH, sc, r) {
   c.strokeStyle = rgb(sc.shade, 0.75); c.lineWidth = Math.max(0.6, th * 0.3); c.lineJoin = 'round';
   c.beginPath(); top.forEach(function (q, j) { j ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.stroke();
   c.restore();
-}
-/* Frost on the stone's top, as painted: grainy white dry-brush patches, denser toward its back and
-   its ends, the slate showing through. Drawn inside the stone's clip. */
-function frost(c, P, x0, y0, x1, y1, wid, sc, r) {
-  var len = x1 - x0, area = len * wid;
-  var patches = 2 + Math.floor(len / 45);
-  for (var q = 0; q < patches; q++) {
-    var px = lerp(x0, x1, r()), py = lerp(y0, y1, Math.pow(r(), 1.6)), rx = len * lerp(0.12, 0.3, r()), ry = wid * lerp(0.25, 0.5, r());
-    var n = Math.round(Math.min(600, rx * ry * 1.4));
-    for (var i = 0; i < n; i++) {
-      var a = r() * TAU, d = Math.sqrt(r());
-      var gx = px + Math.cos(a) * rx * d, gy = py + Math.sin(a) * ry * d, s0 = Math.max(0.8, wid * lerp(0.015, 0.04, r()));
-      c.fillStyle = rgb(sc.top, lerp(0.08, 0.35, r()) * (1 - d * 0.7));
-      c.fillRect(gx, gy, s0 * lerp(1, 3.5, r()), s0);
-    }
-  }
 }
 function slab(c, F, S, sc) {
   var len = 0, e, i;
