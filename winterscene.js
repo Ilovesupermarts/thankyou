@@ -366,7 +366,7 @@ function path(c, o) {
         var fin = finalOutline(St.pts, St.seed), bb = bounds(fin);
         if (bb[2] > o.yb + 2) break;                                    // wholly below the screen
         var near = 1e9, nj = -1;
-        for (var j = 0; j < placed.length; j++) { var dd = polyDist(fin, placed[j]); if (dd < near) { near = dd; nj = j; } }
+        for (var j = 0; j < placed.length; j++) { var dd = polyDist(fin, placed[j], gpx + 1); if (dd < near) { near = dd; nj = j; } }
         if (near >= gpx) { ok = true; break; }
         var pb = bounds(placed[nj]), ox = Math.min(bb[1], pb[1]) - Math.max(bb[0], pb[0]);
         var pcx = (pb[0] + pb[1]) / 2, atEnd = pcx < lerp(bb[0], bb[1], 0.25) || pcx > lerp(bb[0], bb[1], 0.75);
@@ -391,22 +391,25 @@ function path(c, o) {
   // any opening left inside the band wider than the gap (where rows met the fixed slabs): a stone is fitted
   // into it, the widest first, with the same gap all round
   var ptPoly = function (p, P) { var m = 1e9; for (var j = 0; j < P.length; j++) m = Math.min(m, segDist(p, P[j], P[(j + 1) % P.length])); return inPoly(p, P) ? -m : m; };
-  var GS = GP.map(function (q) { return toScreen(q[0], q[1]); }), gb = bounds(GS);
+  // (only near the measured slabs: elsewhere the rows leave no holes)
+  var gb = [1e9, -1e9, 1e9, -1e9];
+  (o.fixed || []).forEach(function (F) { var fb = bounds(slabOutline(F).P); gb = [Math.min(gb[0], fb[0] - 80), Math.max(gb[1], fb[1] + 80), Math.min(gb[2], fb[2] - 60), Math.max(gb[3], fb[3])]; });
+  if (!(o.fixed || []).length) gb = [0, -1, 0, -1];
   for (var pass = 0; pass < 6; pass++) {
     var best = null;
-    for (var gy = Math.max(hy + D / zMax, gb[2] - 20); gy < o.yb; gy += 3) {
+    for (var gy = Math.max(hy + D / zMax, gb[2]); gy < Math.min(o.yb, gb[3]); gy += 6) {
       var Zg = D / (gy - hy), gpxH = Math.max(1.5, gapZ * D / (Zg * Zg) * 0.8);
-      for (var gx = gb[0] - 60; gx < gb[1] + 60; gx += 3) {
+      for (var gx = gb[0]; gx < gb[1]; gx += 6) {
         var gq = [(gx - cx) * Zg / D, Zg], inB = false;
-        for (var j = 0; j < GP.length && !inB; j += 2) if (Math.hypot(GP[j][0] - gq[0], GP[j][1] - gq[1]) < B * 0.8) inB = true;
+        for (var j = 0; j < GP.length && !inB; j += 3) { var ex = GP[j][0] - gq[0], ez = GP[j][1] - gq[1]; if (ex * ex + ez * ez < B * B * 0.64) inB = true; }
         if (!inB) continue;
-        var cl = 1e9;
+        var cl = 60;
         for (j = 0; j < placed.length && cl > gpxH * 2.6; j++) {
           var pb2 = bounds(placed[j]);
           if (gx < pb2[0] - cl || gx > pb2[1] + cl || gy < pb2[2] - cl || gy > pb2[3] + cl) continue;
           cl = Math.min(cl, ptPoly([gx, gy], placed[j]));
         }
-        if (!(cl > gpxH * 2.6 && (!best || cl / gpxH > best.k))) continue;
+        if (!(cl > gpxH * 2.6 && cl < 60 && (!best || cl / gpxH > best.k))) continue;
         // only a hole with stones on both sides of it (not an opening at the band's edge)
         var lft = false, rgt = false;
         for (j = 0; j < placed.length && !(lft && rgt); j++) placed[j].forEach(function (q) {
@@ -450,7 +453,7 @@ function path(c, o) {
         if (dir < 2) { stp = St.w * 0.015; St.w += stp; St.X += (dir ? 1 : -1) * stp / 2; }
         else { stp = St.dp * 0.03; St.dp += stp; St.Z += (dir === 2 ? 1 : -1) * stp / 2; }   // up the screen: farther
         var P2 = shapeOf(St), f2 = finalOutline(P2, St.seed), n2 = 1e9;
-        for (var j = 0; j < placed.length; j++) if (j !== St.pi) n2 = Math.min(n2, polyDist(f2, placed[j]));
+        for (var j = 0; j < placed.length; j++) if (j !== St.pi) n2 = Math.min(n2, polyDist(f2, placed[j], St.gpx + 1));
         if (n2 < St.gpx || dirGap(f2, St.pi, dir) < St.gpx) { St.X = sv[0]; St.Z = sv[1]; St.w = sv[2]; St.dp = sv[3]; break; }
         St.pts = P2; placed[St.pi] = f2;
       }
@@ -466,9 +469,11 @@ function path(c, o) {
 }
 var layoutCache = {};
 function bounds(P) {
+  if (P.bb) return P.bb;                                          // (kept on the outline: it never changes once made)
   var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
-  P.forEach(function (p) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
-  return [x0, x1, y0, y1];
+  for (var i = 0; i < P.length; i++) { var p = P[i]; if (p[0] < x0) x0 = p[0]; if (p[0] > x1) x1 = p[0]; if (p[1] < y0) y0 = p[1]; if (p[1] > y1) y1 = p[1]; }
+  P.bb = [x0, x1, y0, y1];
+  return P.bb;
 }
 /* The outline a stone is finally drawn with (its given outline made rough and worn, as slabPoly does). */
 function finalOutline(P0, seed) {
@@ -486,13 +491,24 @@ function segDist(p, a, b) {
   var dx = b[0] - a[0], dy = b[1] - a[1], l = dx * dx + dy * dy, t = l ? clamp(((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l, 0, 1) : 0;
   return Math.hypot(p[0] - a[0] - t * dx, p[1] - a[1] - t * dy);
 }
-/* The smallest distance between two outlines (negative when they overlap). */
-function polyDist(A, B) {
-  var bA = bounds(A), bB = bounds(B);
-  if (bA[0] > bB[1] + 40 || bB[0] > bA[1] + 40 || bA[2] > bB[3] + 40 || bB[2] > bA[3] + 40) return 1e9;
-  var m = 1e9, i, j;
-  for (i = 0; i < A.length; i++) { if (inPoly(A[i], B)) return -1; for (j = 0; j < B.length; j++) m = Math.min(m, segDist(A[i], B[j], B[(j + 1) % B.length])); }
-  for (i = 0; i < B.length; i++) { if (inPoly(B[i], A)) return -1; for (j = 0; j < A.length; j++) m = Math.min(m, segDist(B[i], A[j], A[(j + 1) % A.length])); }
+/* The smallest distance between two outlines (negative when they overlap); 1e9 when they are farther apart
+   than lim (default 40) — then nothing more is worked out. */
+function polyDist(A, B, lim) {
+  var bA = bounds(A), bB = bounds(B), L = lim === undefined ? 40 : lim;
+  if (bA[0] > bB[1] + L || bB[0] > bA[1] + L || bA[2] > bB[3] + L || bB[2] > bA[3] + L) return 1e9;
+  var m = 1e9, i, j, stop = lim === undefined ? -1e9 : lim - 1;   // (with a limit, closer than it is all that matters)
+  for (i = 0; i < A.length; i++) {
+    var a = A[i];
+    if (a[0] < bB[0] - L || a[0] > bB[1] + L || a[1] < bB[2] - L || a[1] > bB[3] + L) continue;
+    if (a[0] >= bB[0] && a[0] <= bB[1] && a[1] >= bB[2] && a[1] <= bB[3] && inPoly(a, B)) return -1;
+    for (j = 0; j < B.length; j++) { var dd = segDist(a, B[j], B[(j + 1) % B.length]); if (dd < m) { m = dd; if (m < stop) return m; } }
+  }
+  for (i = 0; i < B.length; i++) {
+    var b = B[i];
+    if (b[0] < bA[0] - L || b[0] > bA[1] + L || b[1] < bA[2] - L || b[1] > bA[3] + L) continue;
+    if (b[0] >= bA[0] && b[0] <= bA[1] && b[1] >= bA[2] && b[1] <= bA[3] && inPoly(b, A)) return -1;
+    for (j = 0; j < A.length; j++) { var dd2 = segDist(b, A[j], A[(j + 1) % A.length]); if (dd2 < m) { m = dd2; if (m < stop) return m; } }
+  }
   return m;
 }
 
@@ -553,7 +569,8 @@ function smooth(a, b, x) { var t = clamp((x - a) / (b - a), 0, 1); return t * t 
    stone, its size on the screen and the light; made again only when one of them changes. */
 var rasterCache = {}, rasterCount = 0;
 function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
-  var tr = c.getTransform ? c.getTransform() : { a: 1 }, k = Math.max(1, Math.abs(tr.a) || 1);
+  // (worked out at one pixel per screen point: the top is soft, its crisp edge is drawn over it afterwards)
+  var k = 1;
   var bx = Math.floor(x0) - 1, by = Math.floor(y0) - 1, bw = Math.ceil(x1 - bx) + 2, bh = Math.ceil(y1 - by) + 2;
   var w = Math.max(2, Math.round(bw * k)), h = Math.max(2, Math.round(bh * k));
   if (w * h > 600000) return false;
@@ -594,30 +611,23 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
   // the snow: a thin, uneven layer left on the stone, worn away where feet go (its middle), lying longest
   // toward its back and its ends; its edge broken and feathered as melting snow is, kept inside the stone
   var hsA = new Float32Array(N), Ht = new Float32Array(N), snow = new Float32Array(N), tone = new Float32Array(N), warm = new Float32Array(N), frost = new Float32Array(N);
-  var raw = new Float32Array(N), vals = [], cover = lerp(0.16, 0.3, r());
+  // (the stone is clean slate, as in the reference: no snow or frost on it)
+  // (these change slowly across the stone: worked out on a 4-pixel grid and blended between)
+  var gs4 = 4, gw = Math.ceil(w / gs4) + 2, gh = Math.ceil(h / gs4) + 2, gB = new Float32Array(gw * gh), gT = new Float32Array(gw * gh), gW = new Float32Array(gw * gh);
+  for (y = 0; y < gh; y++) for (x = 0; x < gw; x++) {
+    var nx0 = x * gs4 / U, ny0 = y * gs4 * F / U, q = y * gw + x;
+    gB[q] = fbm(nx0 * 3, ny0 * 3, sOff + 5, 2); gT[q] = fbm(nx0 * 1.3, ny0 * 1.3, sOff + 9, 3); gW[q] = fbm(nx0 * 0.8, ny0 * 0.8, sOff + 31, 2);
+  }
+  function gl4(A, x, y) {
+    var fx = x / gs4, fy = y / gs4, ix = Math.floor(fx), iy = Math.floor(fy), ax = fx - ix, ay = fy - iy, q = iy * gw + ix;
+    return lerp(lerp(A[q], A[q + 1], ax), lerp(A[q + gw], A[q + gw + 1], ax), ay);
+  }
   for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
     i = y * w + x; var d = dist[i]; if (!d) continue;
-    var nx = x / U, ny = y * F / U, back = 1 - y / h, end = Math.abs(x / w - 0.5) * 2;
     var e = Math.min(1, d / bev);
-    hsA[i] = Math.sqrt(e) * bev * 0.35 + (fbm(nx * 3, ny * 3, sOff + 5, 3) - 0.5) * bev * 0.12;
-    tone[i] = fbm(nx * 1.3, ny * 1.3, sOff + 9, 4);
-    warm[i] = smooth(0.55, 0.8, fbm(nx * 0.8, ny * 0.8, sOff + 31, 3));
-    var cx2 = Math.abs(x / w - 0.5) * 2, cy2 = Math.abs(y / h - 0.55) * 2;
-    var worn = Math.max(0, 1 - Math.hypot(cx2 * 1.3, cy2 * 1.1));          // the trodden middle
-    raw[i] = fbm(nx * 1.4, ny * 1.4, sOff + 77, 4) * 2.2 + back * 0.15 + end * end * 0.15 - worn * 0.35
-             + (fbm(nx * 9, ny * 9, sOff + 41, 2) - 0.5) * 0.22 - (1 - smooth(bev * 0.9, bev * 1.4, d)) * 2 - (1 - smooth(bev * 1.4, bev * 5, d)) * 0.5;
-    if ((x + y) % 3 === 0) vals.push(raw[i]);
-  }
-  vals.sort(function (a, b) { return a - b; });
-  var thr = vals.length ? vals[Math.floor((1 - cover) * (vals.length - 1))] : 1;
-  var thin = snowDepth;
-  for (i = 0; i < N; i++) {
-    if (!dist[i]) continue;
-    var sn = raw[i] - thr;
-    snow[i] = 0;
-    Ht[i] = hsA[i];
-    var fx = i % w, fy = (i - fx) / w;
-    frost[i] = 0 && sn > -0.06 ? smooth(-0.06, 0, sn) * smooth(0.45, 0.62, fbm(fx / U * 10, fy * F / U * 10, sOff + 13, 2)) * 0.7 : 0;
+    Ht[i] = Math.sqrt(e) * bev * 0.35 + (gl4(gB, x, y) - 0.5) * bev * 0.12;
+    tone[i] = gl4(gT, x, y);
+    warm[i] = smooth(0.55, 0.8, gl4(gW, x, y));
   }
   // light: lit from the scene's sun; the snow's shadow marched toward it
   var Lx = (sc.side0 || -1), Lz = 0.35, Ly = 0.55, Lg = Math.hypot(Lx, Lz);
@@ -631,39 +641,17 @@ function stoneRaster(c, P, x0, y0, x1, y1, S, sc, slate, seed) {
     var xm = Math.max(0, x - 1), xp = Math.min(w - 1, x + 1), ym = Math.max(0, y - 1), yp = Math.min(h - 1, y + 1);
     var hx = (Ht[y * w + xp] - Ht[y * w + xm]) / (xp - xm), hy = (Ht[yp * w + x] - Ht[ym * w + x]) / (yp - ym);
     var nX = -hx, nY = 1, nZ = -hy / F + 0.3;
-    // the shadow: walk toward the light; anything higher than the ray shades this point
-    var occ = 1, h0 = Ht[i];
-    for (var t = 1; t <= 10; t++) {
-      var fx0 = x + stepX * t * 1.5, fy0 = y + stepY * t * 1.5 * F;
-      if (fx0 < 0 || fy0 < 0 || fx0 >= w - 1 || fy0 >= h - 1) break;
-      var ix = Math.floor(fx0), iy = Math.floor(fy0), ax = fx0 - ix, ay = fy0 - iy, q0 = iy * w + ix;
-      var hS = lerp(lerp(Ht[q0], Ht[q0 + 1], ax), lerp(Ht[q0 + w], Ht[q0 + w + 1], ax), ay);
-      var dh = hS - (h0 + rise * t * 1.5);
-      if (dh > 0 && snow[q0] > 0.2) { occ = Math.min(occ, 1 - Math.min(1, dh / (snowDepth * 0.3)) * 0.55); }
-    }
+    var occ = 1;
     var s = snow[i], d2 = dist[i], col;
     // the slate: cloudy tones, a warm tinge, wet and darker just inside its edge, the grain, the frost
-    var gr = fbm(x / U * 14, y * F / U * 14, sOff + 61, 2);
-    var stk = fbm(x / U * 0.7, y * F / U * 7, sOff + 63, 3);              // faint brush streaks along its length
+    var gr = vnoise(x / U * 14, y * F / U * 14, sOff + 61);
+    var stk = vnoise(x / U * 0.7, y * F / U * 7, sOff + 63);              // faint brush streaks along its length
     var tk = lerp(0.86, 1.12, tone[i]) * (0.95 + 0.1 * stk) * (0.98 + 0.04 * gr);
     var base = scale(mix(slate, [140, 134, 126], warm[i] * 0.2), tk);
     var fr = frost[i] * (1 - s);
     base = mix(base, snowC, fr * 0.6);
     var stoneCol = S(base, nX * 0.7, nY, nZ, occ);
-    // the snow: its own white lit by its slope, the crevices and the shaded side cool blue, glints
-    // the snow's own light, from above and a little behind and to the side: its top shines, its side
-    // toward you cools to blue, its foot darkest
-    var gx = -hx * 2, gz = -hy / F * 2, gl = Math.hypot(gx, 1, gz);
-    var fdot = (gx * lsx + 1 * lsy + gz * lsz) / gl, df = (fdot - lsy) * 1.7;
-    var snowCol = df >= 0 ? mix(sc.top, [255, 254, 250], clamp(df * 1.2, 0, 0.8) * S.bright)
-                          : mix(sc.top, snowBlue, clamp(-df, 0, 0.85));
-    snowCol = scale(snowCol, lerp(0.72, 1, occ));
-    var sv = fbm(x / U * 2.5, y * F / U * 2.5, sOff + 91, 3);              // the snow's own unevenness: faint blue hollows
-    snowCol = mix(snowCol, snowBlue, clamp((0.55 - sv) * 0.6, 0, 0.3) + 0.12 * (y / h));
-    snowCol = scale(snowCol, 0.96);
-    snowCol = mix(snowCol, sc.shade, clamp((1 - s) * 0.3, 0, 1));
-    if (s > 0.6 && df > 0 && hash2(x, y, sOff + 99) > 0.985) snowCol = mix(snowCol, [255, 255, 255], 0.8);
-    col = mix(stoneCol, snowCol, smooth(0.15, 0.6, s));
+    col = stoneCol;
     O[i * 4] = clamp(col[0], 0, 255); O[i * 4 + 1] = clamp(col[1], 0, 255); O[i * 4 + 2] = clamp(col[2], 0, 255); O[i * 4 + 3] = a;
   }
   g.setTransform(1, 0, 0, 1, 0, 0);
