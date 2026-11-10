@@ -312,7 +312,7 @@ var V_DEFAULTS = {
   ref: true, reflect: 0.85, ripple: 1, steam: 1, waterTint: 0.3, skyInWater: 1, hillMist: 1,
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
-  horizon: 0.655, swells: 5, swellHeight: 0.2, relief: 0.2, roll: 0.75, drifts: 0.1, ripples: 0, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
+  horizon: 0.655, swells: 2, swellHeight: 0.06, relief: 0.12, roll: 0.75, drifts: 0.1, ripples: 0, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
   hollows: 0.28, sheen: 1.1, groundHaze: 0.5, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
   toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
@@ -1239,11 +1239,20 @@ var REF = {
   // where each piece stands (painted by winterpieces.js): its middle, its foot, its height (to its top)
   pagoda: { x: 0.1935, y: 0.53, h: 0.334 },
   hall: { x: 0.308, y: 0.66, h: 0.127 },
-  // the torii (torii.js), the farthest first: middle, foot, height
-  torii: [[0.259, 0.707, 0.078], [0.2115, 0.74, 0.094], [0.1955, 0.776, 0.136], [0.0805, 0.9, 0.245]],
-  // the stone lanterns: middle, top, foot
-  lanterns: [[0.301, 0.673, 0.709], [0.287, 0.681, 0.724], [0.179, 0.698, 0.751], [0.273, 0.698, 0.761],
-             [0.142, 0.709, 0.784], [0.088, 0.727, 0.838], [0.245, 0.73, 0.856]],
+  // THE APPROACH (参道), built as one thing on the ground, as in the reference: a straight avenue
+  // from the front torii back toward the hall, the torii standing over it at equal distances, a pair
+  // of stone lanterns either side between each two gates, and the stepping-stone path coming in from
+  // the bottom of the screen, through the front gate and every gate after it. Ground units: 1 = the
+  // screen's depth below the horizon, at the bottom edge (a thing at depth Z shows 1/Z as large).
+  //   gate     where the front torii's foot is on the screen (its middle)
+  //   dir      the avenue's direction on the ground (x across, z away from you)
+  //   every    the distance between two torii
+  //   gateH    a torii's height; lantH a lantern's; lantSide how far either side of the middle
+  //   lantAt   where the pairs of lanterns stand along the avenue (from the front gate)
+  //   near     the path from the bottom edge to the front gate (screen fractions, the nearest first)
+  //   length   how far the path runs along the avenue
+  approach: { gate: [0.0805, 0.9], dir: [-1, 1], every: 2.1, gates: 4, gateH: 1.05, lantH: 0.58, lantSide: 0.62,
+              lantAt: [1.1, 3.3, 5.5, 7.7], near: [[0.36, 1.07], [0.28, 0.99], [0.19, 0.94], [0.125, 0.912]], length: 26 },
   // the roped pine: middle (its pole), foot, height (the rope knot to the foot)
   pine: { x: 0.801, y: 0.727, h: 0.28 },
   // the cranes: middle, foot, height, facing (1 right), pose
@@ -1253,13 +1262,9 @@ var REF = {
          [0.921, 0.705, 0.185, 0.493, 0.25], [0.968, 0.796, 0.31, 0.353, 0]],
   // the frosted trees beyond the hall: x, foot, height
   frost: [[0.47, 0.665, 0.055], [0.432, 0.7, 0.12], [0.402, 0.712, 0.17]],
-  // the middle of the stepping-stone path on the screen, from the nearest to the farthest (laid out in
-  // perspective by winterscene.js), a stone's width and the gap between them, and half the trodden path's
-  // width (ground units: 1 = the depth of the screen below the horizon, at the bottom)
-  path: [[0.31, 0.985], [0.255, 0.945], [0.205, 0.912], [0.17, 0.88], [0.158, 0.855], [0.165, 0.832], [0.18, 0.81],
-         [0.198, 0.793], [0.212, 0.778], [0.226, 0.762], [0.238, 0.748], [0.247, 0.735], [0.253, 0.722], [0.257, 0.709],
-         [0.261, 0.697], [0.266, 0.686]],
-  stone: 0.5, stoneDepth: 0.13, stoneGap: 0.045, pathBand: 0.3,
+  // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
+  // between two, and half the width of the trodden snow along the path
+  stone: 0.42, stoneDepth: 0.17, stoneGap: 0.05, pathBand: 0.3,
   // the banks beyond the water (the edge of the snow, the earth showing under it)
   banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
           { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
@@ -1272,6 +1277,23 @@ var REF = {
          [0.471, 0.906], [0.424, 0.873], [0.402, 0.847], [0.4, 0.83], [0.416, 0.811], [0.453, 0.798], [0.489, 0.789],
          [0.533, 0.782], [0.566, 0.775], [0.592, 0.762], [0.59, 0.745], [0.57, 0.736]]
 };
+/* The approach on the ground (REF.approach), worked out for this screen: where each torii and lantern
+   stands and how big it is, and the line of the path, all in perspective (see REF.approach). */
+function toGround(x, y) { var hy = H * V.horizon, D = H - hy, q = (y - hy) / D; return [(x - W / 2) / (q * D), 1 / q]; }
+function toScreen(X, Z) { var hy = H * V.horizon, D = H - hy; return [W / 2 + X * D / Z, hy + D / Z]; }
+function approachLayout() {
+  var A = REF.approach, D = H - H * V.horizon, G0 = toGround(A.gate[0] * W, A.gate[1] * H);
+  var l = Math.hypot(A.dir[0], A.dir[1]), ux = A.dir[0] / l, uz = A.dir[1] / l, nx = uz, nz = -ux;   // along, and across (to the right)
+  function at(t, side) { var X = G0[0] + ux * t + nx * side, Z = G0[1] + uz * t + nz * side, p = toScreen(X, Z); return { x: p[0], y: p[1], Z: Z }; }
+  var out = { gates: [], lanterns: [], path: [] }, i;
+  for (i = 0; i < A.gates; i++) { var g = at(A.every * i, 0); g.h = A.gateH * D / g.Z; out.gates.push(g); }
+  A.lantAt.forEach(function (t) {
+    [-1, 1].forEach(function (sd) { var L = at(t, sd * A.lantSide); L.h = A.lantH * D / L.Z; out.lanterns.push(L); });
+  });
+  A.near.forEach(function (p) { out.path.push([p[0] * W, p[1] * H]); });
+  for (var t = 0; t <= A.length; t += t < 4 ? 0.25 : 1) { var P = at(t, 0); out.path.push([P.x, P.y]); }
+  return out;
+}
 function refPlan() {
   var list = [], hy = H * V.horizon;
   function u(fy) { return clamp((fy * H - hy) / (H - hy), 0, 1); }
@@ -1282,8 +1304,9 @@ function refPlan() {
   }
   REF.frost.forEach(function (f, i) { list.push({ type: 'frost', x: f[0] * W, fy: f[1], h: f[2] * H, u: u(f[1]), size: 1, seed: 901 + i * 77 }); });
   piece('hall', REF.hall.x, REF.hall.y, REF.hall.h);
-  REF.torii.forEach(function (T, i) { list.push({ type: 'torii', x: T[0] * W, fy: T[1], h: T[2] * H, u: u(T[1]), yaw: 3, view: 0.06, seed: 3 + i, sori: 0.06, pillar: 0.06 }); });
-  REF.lanterns.forEach(function (L) { piece('lantern', L[0], L[2], L[2] - L[1]); });
+  var AP = approachLayout();
+  AP.gates.forEach(function (G, i) { list.push({ type: 'torii', x: G.x, fy: G.y / H, h: G.h, u: u(G.y / H), yaw: 6, view: 0.06, seed: 3 + i, sori: 0.06, pillar: 0.065, darkTop: true }); });
+  AP.lanterns.forEach(function (L) { piece('lantern', L.x / W, L.y / H, L.h / H); });
   REF.firs.forEach(function (F, i) {
     list.push({ type: 'rfir', x: F[0] * W, fy: F[1], h: F[2] * H, pole: F[3] ? F[3] * H : 0, mist: F[4], u: u(F[1]), seed: 300 + i * 13 });
   });
@@ -1365,7 +1388,7 @@ function drawThing(c, B, haze) {
     Conifers.fir(c, withLight({ x: B.x, y: B.yb, h: h, seed: B.seed, colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
                                 snow: V.firSnow, droop: V.firDroop, fullness: V.firFull, width: V.firWidth }, haze));
   } else if (B.type === 'torii') {
-    var to = withLight({ x: B.x, y: B.yb, h: h, yaw: B.yaw !== undefined ? B.yaw : V.toriiTurn, view: B.view !== undefined ? B.view : V.toriiView, sori: B.sori, pillar: B.pillar, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
+    var to = withLight({ x: B.x, y: B.yb, h: h, yaw: B.yaw !== undefined ? B.yaw : V.toriiTurn, view: B.view !== undefined ? B.view : V.toriiView, sori: B.sori, pillar: B.pillar, darkTop: B.darkTop, snow: V.toriiSnow, icicles: V.icicles, seed: 3,
                          colours: { vermilion: C.vermilion, top: C.toriiTop, feet: C.toriiFeet, snow: C.snow } }, haze);
     // its snow: drawn where it is (a mask, over the box round the gate), then lit by the snow material
     var useMat = !B.plain && typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported();
@@ -1469,7 +1492,7 @@ function drawDecor(c) {
   var g = c.createLinearGradient(0, H * 0.72, 0, H);
   g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
   c.fillStyle = g; c.fill();
-  WinterScene.path(c, withLight({ hy: H * V.horizon, yb: H, cx: W / 2, pts: REF.path.map(function (p) { return [p[0] * W, p[1] * H]; }),
+  WinterScene.path(c, withLight({ hy: H * V.horizon, yb: H, cx: W / 2, pts: approachLayout().path,
                                   size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand, colours: { snow: C.snow } }, 0));
 }
 /* The far layer (V.ref): the hill of firs, the pagoda among them, the mist. Baked once. */
@@ -1613,8 +1636,8 @@ function bakeGround() {
   var things = plan(rngFrom(V.seed * 313 + 11)), swells = WS.swells = [];
   for (k = 0; k < N; k++) {
     var u0 = k / (N - 1);
-    var Sk = { u: u0, yk: hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * V.swellHeight,
-               f: swellFn(r, u0), things: [], haze: V.groundHaze * Math.pow(1 - u0, 2) * 0.9 };
+    var Sk = { u: u0, yk: V.ref && k > 0 ? H + 40 : hy + depthPx * 0.92 * Math.pow(k / N, 1.25), amp: lerp(3, 26, Math.pow(u0, 1.4)) * V.swellHeight,
+               f: swellFn(r, u0), things: [], haze: V.ref ? 0 : V.groundHaze * Math.pow(1 - u0, 2) * 0.9 };   // (V.ref: the distance is hazed by the smooth ground mist alone, so no strip shows)
     Sk.crest = new Float32Array(NX);
     for (var j = 0; j < NX; j++) Sk.crest[j] = crestY(Sk, -20 + j / (NX - 1) * (W + 40));
     swells.push(Sk);

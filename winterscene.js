@@ -279,7 +279,7 @@ function path(c, o) {
   for (i = 1; i < L.length; i++) c.lineTo(L[i][0], L[i][1]);
   for (i = R.length - 1; i >= 0; i--) c.lineTo(R[i][0], R[i][1]);
   c.closePath();
-  c.fillStyle = rgb(sc.shade, 0.13); c.fill();
+  c.fillStyle = rgb(sc.shade, 0.12); c.fill();
   c.lineCap = 'round'; c.lineJoin = 'round';
   [[L, -1], [R, 1]].forEach(function (E) {
     var A = E[0], lit = (E[1] > 0) === (S.side > 0);
@@ -290,32 +290,30 @@ function path(c, o) {
     }
   });
   c.restore();
-  // the stones: one every few steps farther away (the same distance on the ground each time), each
-  // lying square to you as stepping stones are set, now and then a pair side by side
-  function xAtZ(Z) {
-    for (var j = 1; j < G.length - 1 && G[j][1] < Z; j++);
-    var f = clamp((Z - G[j - 1][1]) / (G[j][1] - G[j - 1][1] || 1), 0, 1);
-    return lerp(G[j - 1][0], G[j][0], f);
-  }
-  var stones = [], Zend = G[G.length - 1][1];
-  for (var Z = G[0][1] + o.depth * 0.5; Z < Zend; Z += (o.depth + o.gap) * lerp(0.92, 1.08, r())) {
-    var X = xAtZ(Z), w = o.size * lerp(0.85, 1.1, r()), dp = o.depth * lerp(0.85, 1.1, r());
-    if (r() < 0.28) {
-      var w2 = w * 0.5;
-      stones.push({ X: X - w2 * 0.56, Z: Z + dp * 0.08, ux: 0, uz: 1, w: w2, dp: dp * 0.95 });
-      stones.push({ X: X + w2 * 0.56, Z: Z - dp * 0.08, ux: 0, uz: 1, w: w2, dp: dp * 0.95 });
-    } else stones.push({ X: X + (r() - 0.5) * o.size * 0.2, Z: Z, ux: 0, uz: 1, w: w, dp: dp });
+  // the stones: laid one after another along the path, each set square to you (its long side level
+  // on the screen, as stepping stones are set), the next one where this one ends plus a small gap,
+  // measured on the ground (so they close up into the distance), now and then a pair side by side
+  // where the path runs away from you
+  var stones = [], step;
+  for (var tt = o.depth * 0.6; tt < total; tt += step) {
+    var Q = at(tt), w = o.size * lerp(0.88, 1.12, r()), dp = o.depth * lerp(0.85, 1.12, r());
+    step = Math.abs(Q.ux) * w * 0.92 + Math.abs(Q.uz) * dp + o.gap * lerp(0.7, 1.3, r());
+    if (Math.abs(Q.uz) > 0.6 && r() < 0.25) {
+      var w2 = w * 0.52;
+      stones.push({ X: Q.X - w2 * 0.54, Z: Q.Z + dp * 0.05, ux: 0, uz: 1, w: w2, dp: dp * lerp(0.85, 1, r()) });
+      stones.push({ X: Q.X + w2 * 0.54, Z: Q.Z - dp * 0.05, ux: 0, uz: 1, w: w2, dp: dp * lerp(0.85, 1, r()) });
+    } else stones.push({ X: Q.X + (r() - 0.5) * o.size * 0.06, Z: Q.Z, ux: 0, uz: 1, w: w, dp: dp });
   }
   stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
-  var slate = [150, 155, 170];
+  var slate = [176, 182, 198];
   stones.forEach(function (St) {
     // its outline on the ground: a softly squared slab, a little uneven, turned with the path
     var n = 20, pts = [], rot = (r() - 0.5) * 0.18, ca = Math.cos(rot), sa = Math.sin(rot);
     var ax = -St.uz, az = St.ux;                                 // across the path
     for (k = 0; k < n; k++) {
       var a = k / n * TAU, cA = Math.cos(a), sA = Math.sin(a);
-      var u = Math.pow(Math.abs(cA), 0.42) * (cA < 0 ? -1 : 1) * St.w / 2 * lerp(0.9, 1.06, r());
-      var v = Math.pow(Math.abs(sA), 0.42) * (sA < 0 ? -1 : 1) * St.dp / 2 * lerp(0.88, 1.08, r());
+      var u = Math.pow(Math.abs(cA), 0.5) * (cA < 0 ? -1 : 1) * St.w / 2 * lerp(0.95, 1.04, r());
+      var v = Math.pow(Math.abs(sA), 0.5) * (sA < 0 ? -1 : 1) * St.dp / 2 * lerp(0.94, 1.05, r());
       var uu = u * ca - v * sa, vv = u * sa + v * ca;
       pts.push(toScreen(St.X + ax * uu + St.ux * vv, St.Z + az * uu + St.uz * vv));
     }

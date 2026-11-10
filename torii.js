@@ -32,6 +32,8 @@
                    beams and at the feet is then only drawn there, in white
                    (where it is), for the caller to light (snowheaps.js);
                    the icicles are drawn as before
+     darkTop       true: the whole top beam (kasagi) in the top colour (black),
+                   not only its upper face (default false, as before)
      icicles       0 … 1
      width, pillar, lean, overhang, sori, nukiAt, feet   its proportions
                    (as TORII in app.js; heights are fractions of h)
@@ -78,17 +80,18 @@ function pieces(o) {
                  n: [Math.cos((a0 + a1) / 2), 0, Math.sin((a0 + a1) / 2)] });
     }
   }
-  function beam(u0, u1, yb, yt, dd, topTone, n) {
+  function beam(u0, u1, yb, yt, dd, topTone, n, faceTone) {
+    var fv = faceTone || 'v';
     for (var k = 0; k < n; k++) {
       var a = lerp(u0, u1, k / n), b = lerp(u0, u1, (k + 1) / n);
       var q = [[a, yb(a), -dd], [b, yb(b), -dd], [b, yt(b), -dd], [a, yt(a), -dd],
                [a, yb(a), dd], [b, yb(b), dd], [b, yt(b), dd], [a, yt(a), dd]];
-      out.push({ tone: 'v', p: [q[4], q[5], q[6], q[7]] });            // the face toward you
-      out.push({ tone: 'v', p: [q[0], q[3], q[2], q[1]] });            // the far face
+      out.push({ tone: fv, p: [q[4], q[5], q[6], q[7]] });             // the face toward you
+      out.push({ tone: fv, p: [q[0], q[3], q[2], q[1]] });             // the far face
       out.push({ tone: topTone, p: [q[3], q[7], q[6], q[2]] });        // the top
-      out.push({ tone: 'v', p: [q[0], q[1], q[5], q[4]] });            // the underside
-      if (k === 0) out.push({ tone: 'v', p: [q[0], q[4], q[7], q[3]] });
-      if (k === n - 1) out.push({ tone: 'v', p: [q[1], q[2], q[6], q[5]] });
+      out.push({ tone: fv, p: [q[0], q[1], q[5], q[4]] });             // the underside
+      if (k === 0) out.push({ tone: fv, p: [q[0], q[4], q[7], q[3]] });
+      if (k === n - 1) out.push({ tone: fv, p: [q[1], q[2], q[6], q[5]] });
     }
   }
   [-1, 1].forEach(function (side) {
@@ -106,7 +109,7 @@ function pieces(o) {
   function curve(L, amt) { return function (u) { var x = Math.abs(u) / L; return amt * x * x * (0.6 + 0.4 * x); }; }
   var cs = curve(sL, sori * 0.55), ck = curve(kL, sori);
   beam(-sL, sL, function (u) { return pTop + cs(u); }, function (u) { return kBot + cs(u); }, r * 0.9, 'v', segs);
-  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs);
+  beam(-kL, kL, function (u) { return kBot + ck(u); }, function (u) { return kTop + ck(u); }, r * 1.25, 't', segs, d(o, 'darkTop', false) ? 't' : 'v');
   return { faces: out, kL: kL, kTop: kTop, kBot: kBot, ck: ck, kd: r * 1.25, sL: sL, sBot: pTop, cs: cs, sd: r * 0.9,
            nL: nL, pin: pin, pr: r, nukiTop: nukiY + nt / 2, nukiBot: nukiY - nt / 2, nd: nd, pillarAt: pillarAt, feetH: feetH };
 }
