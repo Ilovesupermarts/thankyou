@@ -1280,9 +1280,12 @@ var REF = {
   // one stone in each of the four bare spots the user circled (left to right, near the front gate and below):
   // [bottom-left, top-left, top-right, bottom-right] on the screen
   gapStones: [[[0.049, 0.903], [0.058, 0.882], [0.107, 0.880], [0.114, 0.900]],
-              [[0.146, 0.952], [0.152, 0.922], [0.192, 0.921], [0.206, 0.951]],   // (moved into the bare spot, the user's choice)
-              [[0.066, 0.968], [0.076, 0.942], [0.125, 0.940], [0.134, 0.965]],
-              [[0.156, 0.991], [0.168, 0.964], [0.243, 0.962], [0.254, 0.988]]],
+              [[0.136, 0.952], [0.146, 0.922], [0.192, 0.921], [0.206, 0.951]],   // (moved into the bare spot, the user's choice; its left edge brought up to the next stone)
+              [[0.066, 0.968], [0.076, 0.942], [0.136, 0.940], [0.133, 0.965]],
+              [[0.130, 0.991], [0.142, 0.964], [0.243, 0.962], [0.254, 0.988]],   // (its left side brought in to close the gap, the user's choice)
+              // two more, filling the two bare spots the user marked round the slabs just beyond the nearest pair
+              [[0.204, 0.929], [0.210, 0.917], [0.243, 0.916], [0.247, 0.927]],
+              [[0.252, 0.963], [0.268, 0.951], [0.287, 0.953], [0.262, 0.966]]],
   // the nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
   // on the screen (fractions), measured on the reference; the second runs off the bottom edge
   nearSlabs: [[[0.246, 0.971], [0.330, 0.944], [0.369, 0.966], [0.270, 0.998]],

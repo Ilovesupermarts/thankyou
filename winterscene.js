@@ -364,6 +364,21 @@ function path(c, o) {
       }
       return C0[1] - hd < o.yb;                                   // and none wholly below the screen
     });
+    // a stone that stops just short of a fixed one in front of it is cut back at its near edge, so a clear gap
+    // shows between them (touching, the two read as one piece)
+    var minGap = D * o.gap * 0.35;
+    stones.forEach(function (St) {
+      var C0 = toScreen(St.X, St.Z), hw = St.w / 2 * D / St.Z, hd = St.dp / 2 * D / (St.Z * St.Z);
+      for (var j = 0; j < boxes.length; j++) {
+        var B = boxes[j];
+        if (C0[0] + hw * 0.9 < B[0] || C0[0] - hw * 0.9 > B[1] || C0[1] > B[2]) continue;
+        var yF = C0[1] - hd, yN = Math.min(C0[1] + hd, B[2] - minGap);
+        if (yN >= C0[1] + hd || yN - yF < hd * 0.6) continue;
+        var yc = (yF + yN) / 2, Z = D / (yc - hy);
+        St.X = (C0[0] - cx) * Z / D; St.Z = Z; St.dp = (yN - yF) * Z * Z / D;
+        C0 = toScreen(St.X, St.Z); hd = St.dp / 2 * D / (Z * Z);
+      }
+    });
   }
   stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
   var slate = [196, 202, 216];
