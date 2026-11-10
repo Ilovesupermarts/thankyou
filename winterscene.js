@@ -1,9 +1,8 @@
 /* ============================================================
    WINTERSCENE — the parts of the new winter scene (the user's reference
    picture: a shrine in the snow by a steaming pond, Fuji on the right)
-   that are painted from code. The pagoda, the hall, the torii, the
-   stone lanterns, the roped pine and the cranes are pictures cut out of
-   the user's element sheet (textures/winter/); the scene places them.
+   that are not buildings or creatures (those are in winterpieces.js).
+   Everything is drawn in code.
 
      hill(c, o)         the hill of snowy firs on the left, fading into the mist
      mistBand(c, ...)   a soft band of mist
@@ -240,80 +239,114 @@ function ropes(c, o, front) {
 }
 
 /* ---------------------------------------------------------------
-   THE PATH: the trodden snow along it (a little bluer and sunken, a
-   soft ridge each side) and its stepping stones: flat slabs of dark
-   slate, softly squared, lighter along their far edge, sunk a little
-   in the snow. o.line = [[x, y, w], ...] (the middle of the path, w its
-   half width), o.stones = [[x, y, w], ...] (the middle and the width of
-   each stone), from the nearest to the farthest.
+   THE PATH, in true perspective: the stones and the trodden snow lie
+   flat on the ground, so they are laid out on the ground and then seen
+   from the eye. A point at depth Z (1 at the bottom of the screen, more
+   further away) and across X shows at y = horizon + (bottom - horizon)
+   / Z and x = cx + X (bottom - horizon) / Z: far stones are smaller and
+   flatter, near ones larger and deeper, and they follow the path's bend.
+   o: hy (the horizon, px), yb (the bottom of the screen), cx (the middle
+   of the screen), pts [[x, y], ...] the middle of the path on the
+   screen from the nearest to the farthest, size (a stone's width, in
+   ground units: 1 = the screen's depth below the horizon at the
+   bottom), depth (a stone's depth), gap (between stones), band (half the
+   trodden path's width), all in ground units
    --------------------------------------------------------------- */
 function path(c, o) {
-  var S = shader(o), sc = snowCols(S, o), r = rng(d(o, 'seed', 51)), L = o.line, i;
-  // the trodden band, soft-edged
+  var S = shader(o), sc = snowCols(S, o), r = rng(d(o, 'seed', 51)), i, k;
+  var hy = o.hy, D = o.yb - hy, cx = o.cx;
+  function toGround(p) { var q = (p[1] - hy) / D; return [(p[0] - cx) / (q * D), 1 / q]; }
+  function toScreen(X, Z) { return [cx + X * D / Z, hy + D / Z]; }
+  // the path on the ground, then walked along in even steps
+  var G = o.pts.map(toGround), seg = [0];
+  for (i = 1; i < G.length; i++) seg.push(seg[i - 1] + Math.hypot(G[i][0] - G[i - 1][0], G[i][1] - G[i - 1][1]));
+  var total = seg[seg.length - 1];
+  function at(t) {                                              // the point and the direction along the path at length t
+    for (var j = 1; j < seg.length - 1 && seg[j] < t; j++);
+    var f = clamp((t - seg[j - 1]) / (seg[j] - seg[j - 1] || 1), 0, 1);
+    var a = G[j - 1], b = G[j], dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1;
+    return { X: lerp(a[0], b[0], f), Z: lerp(a[1], b[1], f), ux: dx / l, uz: dz / l };
+  }
+  // the trodden band and the ridges either side
+  var band = o.band, L = [], R = [];
+  for (var t = 0; t <= total; t += total / 80) {
+    var P = at(t), nx = -P.uz, nz = P.ux;
+    L.push(toScreen(P.X + nx * band, P.Z + nz * band)); R.push(toScreen(P.X - nx * band, P.Z - nz * band));
+  }
   c.save();
-  c.filter = 'blur(' + Math.max(1, L[0][2] * 0.12).toFixed(1) + 'px)';
-  c.beginPath();
-  for (i = 0; i < L.length; i++) i ? c.lineTo(L[i][0] - L[i][2], L[i][1]) : c.moveTo(L[i][0] - L[i][2], L[i][1]);
-  for (i = L.length - 1; i >= 0; i--) c.lineTo(L[i][0] + L[i][2], L[i][1]);
+  c.filter = 'blur(' + Math.max(1, D * 0.008).toFixed(1) + 'px)';
+  c.beginPath(); c.moveTo(L[0][0], L[0][1]);
+  for (i = 1; i < L.length; i++) c.lineTo(L[i][0], L[i][1]);
+  for (i = R.length - 1; i >= 0; i--) c.lineTo(R[i][0], R[i][1]);
   c.closePath();
-  c.fillStyle = rgb(sc.shade, 0.32); c.fill();
-  // the ridges of snow pushed up either side: lit on the sun's side, shaded on the other
-  c.lineJoin = 'round'; c.lineCap = 'round';
-  [-1, 1].forEach(function (s) {
-    c.strokeStyle = rgb(s === S.side ? sc.top : sc.shade, s === S.side ? 0.8 : 0.5);
-    c.beginPath();
-    for (i = 0; i < L.length; i++) {
-      c.lineWidth = Math.max(1, L[i][2] * 0.18);
-      var px = L[i][0] + s * L[i][2] * 1.05, py = L[i][1];
-      i ? c.lineTo(px, py) : c.moveTo(px, py);
+  c.fillStyle = rgb(sc.shade, 0.13); c.fill();
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  [[L, -1], [R, 1]].forEach(function (E) {
+    var A = E[0], lit = (E[1] > 0) === (S.side > 0);
+    for (i = 1; i < A.length; i++) {
+      var q = (A[i][1] - hy) / D;
+      c.strokeStyle = rgb(lit ? sc.top : sc.shade, lit ? 0.7 : 0.3); c.lineWidth = Math.max(0.6, D * 0.014 * q);
+      c.beginPath(); c.moveTo(A[i - 1][0], A[i - 1][1]); c.lineTo(A[i][0], A[i][1]); c.stroke();
     }
-    c.stroke();
   });
   c.restore();
-  // the stones, the farthest first
-  var slate = [160, 165, 180];
-  for (i = o.stones.length - 1; i >= 0; i--) {
-    var p = o.stones[i], ww = p[2] * 0.6, hh = ww * 0.24, cx = p[0], cy = p[1];
-    var rot = (r() - 0.5) * 0.12, k, n = 16, pts = [];
-    for (k = 0; k < n; k++) {                                   // a squarish slab with rounded corners, a little uneven
-      var a = k / n * TAU, ca = Math.cos(a), sa = Math.sin(a);
-      var sq = Math.pow(Math.abs(ca), 0.35) * (ca < 0 ? -1 : 1), sv = Math.pow(Math.abs(sa), 0.35) * (sa < 0 ? -1 : 1);
-      var j = lerp(0.93, 1.04, r());
-      var px = sq * ww * j, py = sv * hh * j;
-      pts.push([cx + px - py * rot * 3, cy + py + px * rot * 0.3]);
+  // the stones: one every few steps farther away (the same distance on the ground each time), each
+  // lying square to you as stepping stones are set, now and then a pair side by side
+  function xAtZ(Z) {
+    for (var j = 1; j < G.length - 1 && G[j][1] < Z; j++);
+    var f = clamp((Z - G[j - 1][1]) / (G[j][1] - G[j - 1][1] || 1), 0, 1);
+    return lerp(G[j - 1][0], G[j][0], f);
+  }
+  var stones = [], Zend = G[G.length - 1][1];
+  for (var Z = G[0][1] + o.depth * 0.5; Z < Zend; Z += (o.depth + o.gap) * lerp(0.92, 1.08, r())) {
+    var X = xAtZ(Z), w = o.size * lerp(0.85, 1.1, r()), dp = o.depth * lerp(0.85, 1.1, r());
+    if (r() < 0.28) {
+      var w2 = w * 0.5;
+      stones.push({ X: X - w2 * 0.56, Z: Z + dp * 0.08, ux: 0, uz: 1, w: w2, dp: dp * 0.95 });
+      stones.push({ X: X + w2 * 0.56, Z: Z - dp * 0.08, ux: 0, uz: 1, w: w2, dp: dp * 0.95 });
+    } else stones.push({ X: X + (r() - 0.5) * o.size * 0.2, Z: Z, ux: 0, uz: 1, w: w, dp: dp });
+  }
+  stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
+  var slate = [150, 155, 170];
+  stones.forEach(function (St) {
+    // its outline on the ground: a softly squared slab, a little uneven, turned with the path
+    var n = 20, pts = [], rot = (r() - 0.5) * 0.18, ca = Math.cos(rot), sa = Math.sin(rot);
+    var ax = -St.uz, az = St.ux;                                 // across the path
+    for (k = 0; k < n; k++) {
+      var a = k / n * TAU, cA = Math.cos(a), sA = Math.sin(a);
+      var u = Math.pow(Math.abs(cA), 0.42) * (cA < 0 ? -1 : 1) * St.w / 2 * lerp(0.9, 1.06, r());
+      var v = Math.pow(Math.abs(sA), 0.42) * (sA < 0 ? -1 : 1) * St.dp / 2 * lerp(0.88, 1.08, r());
+      var uu = u * ca - v * sa, vv = u * sa + v * ca;
+      pts.push(toScreen(St.X + ax * uu + St.ux * vv, St.Z + az * uu + St.uz * vv));
     }
+    var C = toScreen(St.X, St.Z), q = (C[1] - hy) / D, edge = Math.max(0.6, D * 0.012 * q);
     // sunk in the snow: a soft blue hollow round it
     c.save();
-    c.filter = 'blur(' + Math.max(0.6, hh * 0.35).toFixed(1) + 'px)';
-    c.fillStyle = rgb(sc.shade, 0.45);
-    c.beginPath(); c.ellipse(cx + ww * 0.04, cy + hh * 0.3, ww * 1.08, hh * 1.35, 0, 0, TAU); c.fill();
+    c.filter = 'blur(' + Math.max(0.5, edge * 1.2).toFixed(1) + 'px)';
+    c.fillStyle = rgb(sc.shade, 0.5);
+    c.beginPath(); pts.forEach(function (p, m) { var x = C[0] + (p[0] - C[0]) * 1.08, y = C[1] + (p[1] - C[1]) * 1.15 + edge * 0.5; m ? c.lineTo(x, y) : c.moveTo(x, y); }); c.closePath(); c.fill();
     c.restore();
+    // the slab: its top lit by the sky, its edge toward you darker
     c.save();
-    c.beginPath();
-    pts.forEach(function (q, m) { m ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); });
-    c.closePath();
-    var g = c.createLinearGradient(cx - ww, cy - hh, cx + ww, cy + hh);
-    function SL(base, k) { return mix(scale(base, S.bright), S(base, S.side * 0.3, 1, 0.5, k), 0.4); }
-    g.addColorStop(0, rgb(SL(scale(slate, 0.82), 0.8))); g.addColorStop(1, rgb(SL(scale(slate, 0.62), 0.5)));
-    c.fillStyle = g; c.fill();
-    // its edge: lighter along the far side, darker toward you
+    c.beginPath(); pts.forEach(function (p, m) { m ? c.lineTo(p[0], p[1] + edge) : c.moveTo(p[0], p[1] + edge); }); c.closePath();
+    c.fillStyle = rgb(S(scale(slate, 0.5), 0, 0.2, 1, 0.4)); c.fill();
+    c.beginPath(); pts.forEach(function (p, m) { m ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]); }); c.closePath();
+    var top = Math.min.apply(null, pts.map(function (p) { return p[1]; })), bot = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
+    c.fillStyle = lingrad(c, 0, top, 0, bot, [[0, mix(scale(slate, S.bright * 0.8), S(slate, 0, 1, 0.4, 0.7), 0.5)], [1, mix(scale(slate, S.bright * 0.62), S(scale(slate, 0.75), 0, 1, 0.4, 0.5), 0.5)]]);
+    c.fill();
     c.clip();
-    c.lineWidth = Math.max(0.6, hh * 0.35);
-    c.strokeStyle = rgb(S(scale(slate, 1.35), 0, 1, 0.2), 0.55);
-    c.beginPath(); c.moveTo(pts[n / 2 + 1][0], pts[n / 2 + 1][1]);
-    for (k = n / 2 + 2; k < n; k++) c.lineTo(pts[k][0], pts[k][1]);
+    // a light rim along its far edge, a dusting of snow
+    c.strokeStyle = rgb(scale(slate, S.bright * 1.15), 0.5); c.lineWidth = edge * 0.8;
+    c.beginPath(); c.moveTo(pts[n / 2 + 1][0], pts[n / 2 + 1][1] + edge * 0.4);
+    for (k = n / 2 + 2; k < n; k++) c.lineTo(pts[k][0], pts[k][1] + edge * 0.4);
     c.stroke();
-    c.strokeStyle = rgb(S(scale(slate, 0.6), 0, 0.5, 1, 0.3), 0.6);
-    c.beginPath(); c.moveTo(pts[1][0], pts[1][1]);
-    for (k = 2; k < n / 2; k++) c.lineTo(pts[k][0], pts[k][1]);
+    // a thin edge of snow along its far side
+    c.strokeStyle = rgb(sc.top, 0.55); c.lineWidth = Math.max(0.5, edge * 0.6);
+    c.beginPath(); c.moveTo(pts[n / 2 + 2][0], pts[n / 2 + 2][1]);
+    for (k = n / 2 + 3; k < n - 1; k++) c.lineTo(pts[k][0], pts[k][1]);
     c.stroke();
-    // a dusting of snow on it
-    c.fillStyle = rgb(sc.top, 0.55);
-    for (k = 0; k < 3; k++) {
-      c.beginPath(); c.ellipse(cx + (r() - 0.5) * ww * 1.6, cy + (r() - 0.5) * hh * 1.2, ww * lerp(0.05, 0.14, r()), hh * lerp(0.12, 0.25, r()), 0, 0, TAU); c.fill();
-    }
     c.restore();
-  }
+  });
 }
 
 /* ---------------------------------------------------------------
@@ -388,6 +421,11 @@ function banks(c, o) {
   });
 }
 
+function lingrad(c, x0, y0, x1, y1, stops) {
+  var g = c.createLinearGradient(x0, y0, x1, y1);
+  stops.forEach(function (st) { g.addColorStop(st[0], rgb(st[1], st[2])); });
+  return g;
+}
 /* ---------------------------------------------------------------
    A pool of warm lamplight on the snow: o: x, y (its middle), rx, ry,
    strength, colour
