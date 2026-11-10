@@ -18,6 +18,7 @@
 <script src="conifers.js"></script>
 <script src="snowlights.js"></script>
 <script src="snowheaps.js"></script>
+<script src="lakeside.js"></script>
 
 <style>
   /* ============================================================
@@ -312,11 +313,15 @@ var V_DEFAULTS = {
   hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
   toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
+  temple: true, hillPeakX: 0.11, hillTop: 0.5, hillEnd: 0.47, hillTrees: 80, hillTreeSize: 1, hillHaze: 0.3,
+  pagodaX: 0.13, pagodaSize: 0.3, pagodaOnHill: 0.32, hallX: 0.27, hallSize: 0.13, templeView: 1.1, roofSnow: 1, templeLight: 0.4,
+  gates: 5, gateFrom: 0.33, gateTo: 1, gateFar: 0.045, gateNear: 0.2, gateEndX: -0.04, gateBend: 0,
+  path: 1.3, pathWidth: 0.6, lanternsAlong: true,
   firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
   frostTwigs: 0.3,
   lanterns: 14, lanternSize: 1, kamakura: 0, yukimi: false, lightEvening: 1.15, lightNight: 1.15, flicker: 0.7, halo: 2.45, pool: 1.6,
   stars: 0.7, moon: true, moonSize: 1, diamondDust: 0.6,
-  maxSkiers: 5, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1, skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33,
+  maxSkiers: 0, skiGapMin: 1, skiGapMax: 5, skiSpeed: 1.05, skiSize: 0.75, skiFar: 0, skiNear: 1, skiFarBlur: 1.7, skiNearBlur: 0.1, skiFront: 0.33,
   scarfLength: 1.25, scarfFlutter: 0.5, skiShadow: 0.6, tracks: 0.6, trackFade: 40, powder: 0.9,
   torch: true, torchNight: 1, torchEvening: 0.5, torchBeam: 0.7, torchReach: 2.4, torchWidth: 0.35, torchSpill: 1, torchGlow: 0.85, torchBob: 0.5,
   torchFlakes: 1,
@@ -500,6 +505,7 @@ try {
   var saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (saved) { merge(V, saved.V || {}, V_DEFAULTS); merge(MT, saved.MT || {}, MT_DEFAULTS); merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
 } catch (e) { /* a private window: the defaults */ }
+V.maxSkiers = 0;                                   // the skiers are gone from the scene (the user's choice), whatever was saved
 function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 SUN.timeOfDay = V.timeOfDay;
 document.documentElement.setAttribute('data-time', V.timeOfDay);
@@ -1224,9 +1230,25 @@ function plan(r) {
     var f = WIN_FIRS[i % WIN_FIRS.length];
     list.push({ type: 'fir', x: (V.firX + f[0]) * W, u: f[1], size: f[2] * lerp(0.9, 1.1, r()), seed: Math.floor(r() * 1e9) });
   }
-  list.push({ type: 'torii', x: V.toriiX * W, u: V.toriiDepth, size: 1, seed: 1 });
-  if (V.yukimi) list.push({ type: 'light', kind: 'yukimi', x: (V.toriiX + 0.12) * W, u: Math.min(1, V.toriiDepth + 0.06), size: 1, seed: 11 });
-  for (i = 0; i < V.lanterns; i++) {
+  if (V.temple) {
+    // the procession of torii (8b): from the hall at the foot of the hill toward you, one on each swell it reaches;
+    // where each stands across the screen is worked out once its swell is known (bakeGround: gateX)
+    var nG = Math.max(1, Math.round(V.gates)), usedK = {};
+    for (i = 0; i < nG; i++) {
+      var ug = nG === 1 ? V.gateTo : lerp(V.gateFrom, V.gateTo, i / (nG - 1)), kg = Math.round(ug * (Math.max(2, Math.round(V.swells)) - 1));
+      if (usedK[kg]) continue;
+      usedK[kg] = true;
+      list.push({ type: 'torii', gate: true, x: 0, u: ug, size: 1, seed: 1 + i });
+    }
+  } else {
+    list.push({ type: 'torii', x: V.toriiX * W, u: V.toriiDepth, size: 1, seed: 1 });
+    if (V.yukimi) list.push({ type: 'light', kind: 'yukimi', x: (V.toriiX + 0.12) * W, u: Math.min(1, V.toriiDepth + 0.06), size: 1, seed: 11 });
+  }
+  for (i = 0; i < V.lanterns && V.temple && V.lanternsAlong; i++) {   // the snow lanterns line the approach, both sides
+    var ul = lerp(V.gateFrom, Math.min(1, V.gateTo + 0.1), (i + 0.5) / V.lanterns);
+    list.push({ type: 'light', kind: 'yuki', x: 0, u: ul, along: i % 2 ? 1 : -1, size: lerp(0.85, 1.15, r()), seed: Math.floor(r() * 1e9) });
+  }
+  for (i = 0; i < V.lanterns && !(V.temple && V.lanternsAlong); i++) {
     var q = (i + 0.5) / V.lanterns * (LANTERN_PATH.length - 1), j = Math.min(LANTERN_PATH.length - 2, Math.floor(q)), fq = q - j;
     var A = LANTERN_PATH[j], B = LANTERN_PATH[j + 1];
     list.push({ type: 'light', kind: 'yuki', x: (lerp(A[0], B[0], fq) + (r() - 0.5) * 0.02) * W, u: lerp(A[1], B[1], fq), size: lerp(0.85, 1.15, r()), seed: Math.floor(r() * 1e9) });
@@ -1243,7 +1265,7 @@ function plan(r) {
 function thingH(B) {
   if (B.type === 'frost') return H * lerp(0.08, 0.2, B.u) * B.size * V.frostSize;
   if (B.type === 'fir') return H * lerp(0.17, 0.3, B.u) * B.size * V.firSize;
-  if (B.type === 'torii') return H * V.toriiSize;
+  if (B.type === 'torii') return B.gate ? gateH(B.yb) : H * V.toriiSize;
   var k = B.kind === 'yukimi' ? lerp(0.05, 0.09, B.u) : B.kind === 'kamakura' ? lerp(0.03, 0.075, B.u) : lerp(0.016, 0.042, B.u);
   return H * k * B.size * V.lanternSize;
 }
@@ -1363,6 +1385,17 @@ function bakeGround() {
   for (b = 0; b < things.length; b++) {
     var B = things[b], kb = Math.round(B.u * (N - 1)), Sb = swells[kb];
     B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; B.k = kb; B.record = B.type === 'light';
+    if (V.temple && (B.gate || B.along)) {                   // on the approach (8b): placed by the path, twice (the crest moves with x)
+      for (var it = 0; it < 2; it++) {
+        B.x = gateX(B.yb) + (B.along ? B.along * gateH(B.yb) * 0.95 : 0);
+        B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2;
+      }
+    } else if (V.temple && B.type === 'frost') {             // a frosted tree is not left standing on the path, nor in front of the hall
+      var dxp = B.x - gateX(B.yb), clear = gateH(B.yb) * 1.6;
+      if (Math.abs(dxp) < clear) { B.x = gateX(B.yb) + (dxp < 0 ? -clear : clear); B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; }
+      var hx0 = V.hallX * W, hw0 = V.hallSize * W * 0.6;
+      if (B.u < 0.35 && Math.abs(B.x - hx0) < hw0) { B.x = hx0 + hw0 + (B.x - hx0 + hw0) * 0.3; B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; }
+    }
     Sb.things.push(B);
     if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: thingH(B) }; WS.toriiK = kb; }
   }
@@ -1392,6 +1425,7 @@ function bakeGround() {
     if (sf) { tg.drawImage(sf, 0, 0, cw, ch, 0, 0, cw, ch); WS.sfGL = true; }
     tg.setTransform(PR, 0, 0, PR, 0, -top * PR);
     if (!sf) flatSwell(tg, S0, S0.haze);
+    if (V.temple && V.path > 0) drawPath(tg, top, bottom, S0.haze);   // the trodden path through the gates (8b)
     for (b = 0; b < S0.things.length; b++) {                  // the shadows first, on the snow only
       var T = S0.things[b], hz = V.groundHaze * Math.pow(1 - T.u, 2) * 0.9;
       castShadow(tg, T, hz);
@@ -1491,6 +1525,179 @@ function drawSparkles(c, t) {
 }
 
 /* ============================================================
+   8b. THE TEMPLE ON THE HILL — winter's own place, not the autumn lake:
+   on the left a snowy hill thick with snow-laden firs, a five-storey
+   pagoda (lakeside.js) rising out of them on the hill's shoulder, and
+   the shrine hall at its foot facing the field. From the hall a short
+   procession of big snow-capped torii (torii.js, one on each swell)
+   comes down toward you and to the left, the snow lanterns lining it on
+   both sides, along a trodden path sunk in the snow. The roofs carry
+   snow lit by the snow material (snowfield.js), as the torii do. Baked
+   with the snowfield (the 'ground' step); nothing here runs per frame.
+   Values: temple … lanternsAlong in V; the panel's "Temple on the hill"
+   and "Torii procession and path" groups.
+   ============================================================ */
+var TEMPLE = mk(); TEMPLE.ok = false;
+/* The approach: where the path's middle is at screen row y, and how tall a gate standing there is (CSS px). */
+function approachD(y) { var hy = H * V.horizon; return clamp((y - hy) / Math.max(1, H - hy), 0, 1); }
+function gateX(y) {
+  var d = approachD(y);
+  return (lerp(V.hallX, V.gateEndX, Math.pow(d, 0.8)) + V.gateBend * Math.sin(PI * d)) * W;
+}
+function gateH(y) { return H * lerp(V.gateFar, V.gateNear, approachD(y)); }
+/* The hill's outline: the screen row of its surface at x (the horizon where there is no hill). */
+function hillY(x) {
+  var hy = H * V.horizon, peak = V.hillPeakX * W, end = V.hillEnd * W, top = H * V.hillTop, k;
+  if (x >= end) return hy;
+  if (x <= peak) { var q = (peak - x) / Math.max(1, peak + 0.06 * W); k = 1 - 0.22 * q * q; }
+  else { var u = (x - peak) / Math.max(1, end - peak); k = Math.pow(0.5 + 0.5 * Math.cos(PI * u), 1.25); }
+  var bumps = (Math.sin(x * 0.021 + 1.3) * 0.5 + Math.sin(x * 0.057 + 0.4) * 0.3) * H * 0.006;
+  return hy - (hy - top) * k + bumps * k;
+}
+/* The trodden path through the gates, on one swell's picture (its context set up in CSS px, its top at `top`):
+   a shallow trench in the snow, blue in its shade, its far wall catching the light, footprints along it. */
+function drawPath(tg, top, bottom, haze) {
+  var hy = H * V.horizon, y0 = Math.max(top, hy + 1), y1 = bottom, step = 2, L = [], R = [], y;
+  if (y1 <= y0) return;
+  for (y = y0; y <= y1 + step; y += step) {
+    var cx = gateX(y), hw = gateH(y) * V.pathWidth * 0.5;
+    L.push([cx - hw, y]); R.push([cx + hw, y]);
+  }
+  var mistC = light(hex(V.colours.mist)), sh = mix(SHADE, mistC, haze), litC = mix(lit(hex(V.colours.snow), -LT.dir[0], 0.6, 0.3), mistC, haze);
+  var lightSide = LT.dir[0] < 0 ? 1 : -1;                 // the wall facing the light: the right one when the light comes from the left
+  function edge(P) { tg.beginPath(); P.forEach(function (p, i) { if (i) tg.lineTo(p[0], p[1]); else tg.moveTo(p[0], p[1]); }); }
+  tg.save();
+  tg.globalCompositeOperation = 'source-atop';               // only on the snow of this swell
+  tg.filter = 'blur(' + (0.8 * PR).toFixed(2) + 'px)';
+  // the floor of the trench
+  tg.beginPath();
+  L.forEach(function (p, i) { if (i) tg.lineTo(p[0], p[1]); else tg.moveTo(p[0], p[1]); });
+  for (var i = R.length - 1; i >= 0; i--) tg.lineTo(R[i][0], R[i][1]);
+  tg.closePath();
+  tg.fillStyle = rgb(sh, 0.3 * V.path * (1 - haze * 0.5)); tg.fill();
+  // its walls: the one in shade darker, the one facing the light bright
+  var wd = Math.max(0.8, gateH((y0 + y1) / 2) * 0.012);
+  tg.lineWidth = wd * 1.6; tg.strokeStyle = rgb(sh, 0.42 * V.path); edge(lightSide > 0 ? L : R); tg.stroke();
+  tg.lineWidth = wd; tg.strokeStyle = rgb(litC, 0.7 * V.path); edge(lightSide > 0 ? R : L); tg.stroke();
+  // footprints, a few on each row
+  tg.filter = 'none';
+  var r = rngFrom(Math.round(y0 * 13) + 7);
+  for (y = y0; y <= y1; y += Math.max(3, gateH(y) * 0.05)) {
+    var cx2 = gateX(y), hw2 = gateH(y) * V.pathWidth * 0.5, fs = gateH(y) * 0.025;
+    for (var n = 0; n < 2; n++) {
+      tg.fillStyle = rgb(sh, (0.18 + 0.12 * r()) * V.path);
+      tg.beginPath(); ellipse(tg, cx2 + (r() - 0.5) * hw2 * 1.2, y + r() * 2, fs * 0.55, fs * 0.25); tg.fill();
+    }
+  }
+  tg.restore();
+}
+/* A building of lakeside.js (the pagoda or the hall) standing at (bx, by), hpx tall (the pagoda) or wpx wide (the hall),
+   drawn into c with snow on its roofs. Seen a little from above (templeView: the eye that much of its height above
+   its foot), lit by the scene's light, lit up by the lanterns after dark. */
+function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
+  var F = W, hv = by - hpx * V.templeView, z = 20;
+  function proj(x, y, zz) { return [W / 2 + F * x / zz, hv + F * (1 - y) / zz]; }
+  var X = (bx - W / 2) * z / F, Y = 1 - (by - hv) * z / F;
+  var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: X, y: Y, z: z, size: hpx * z / F, yaw: yaw })
+                                : Lakeside.hall({ x: X, y: Y, z: z, size: wpx * z / F, yaw: yaw });
+  var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  faces.forEach(function (f) { f.p.forEach(function (q) { var s = proj(q[0], q[1], q[2]); x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]); }); });
+  x0 -= 6; y0 -= 6; x1 += 6; y1 += 6;
+  var cw = Math.max(1, Math.ceil((x1 - x0) * PR)), ch = Math.max(1, Math.ceil((y1 - y0) * PR));
+  var C = cols(), mistC = light(C.mist), Lw = [LT.dir[0], LT.dir[1], -LT.dir[2]];
+  var k = clamp(0.45 + 0.35 * LT.sS + 0.25 * LT.amb, 0.4, 1.15);
+  function fin(col) { return mix(scale(light(col), k), mistC, haze); }
+  var B = mk(); B.cnv.width = cw; B.cnv.height = ch;
+  B.c.setTransform(PR, 0, 0, PR, -x0 * PR, -y0 * PR);
+  var fk = nightLights() * V.templeLight * (1 - haze * 0.5);
+  Lakeside.renderFaces(B.c, faces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.5, colour: function () { return null; }, fin: fin,
+                                     flood: { k: fk, col: C.flame, y0: Y, h: kind === 'pagoda' ? hpx * z / F : wpx * z / F * 0.65 } });
+  // the snow on the roofs: the roofs as they are seen (white; everything else black, so it hides the roofs behind it),
+  // turned into a mask, then lit by the snow material
+  if (V.roofSnow > 0) {
+    var M = mk(); M.cnv.width = cw; M.cnv.height = ch;
+    M.c.setTransform(PR, 0, 0, PR, -x0 * PR, -y0 * PR);
+    var plain = faces.map(function (f) { return { p: f.p, tone: f.tone, c: f.c }; });
+    Lakeside.renderFaces(M.c, plain, { proj: proj, cam: [0, 1, 0], light: [0, 1, 0], shade: 0,
+                                       colour: function (tone) { return tone === 'roof' ? [255, 255, 255] : [0, 0, 0]; }, fin: function (col) { return col; } });
+    var img = M.c.getImageData(0, 0, cw, ch), d = img.data, a = clamp(V.roofSnow, 0, 1);
+    for (var i = 0; i < d.length; i += 4) { var v = d[i]; d[i] = d[i + 1] = d[i + 2] = 255; d[i + 3] = v > 40 ? Math.round(v * a) : 0; }
+    M.c.putImageData(img, 0, 0);
+    var useMat = typeof SnowHeaps !== 'undefined' && typeof Snowfield !== 'undefined' && Snowfield.supported(), done = false;
+    if (useMat) {
+      var R = Math.max(1, (kind === 'pagoda' ? hpx * 0.012 : wpx * 0.012) * PR * V.snowRound * 2), m = snowMat(null, haze);
+      m.thick = R * V.snowRelief;
+      var litPic = SnowHeaps.light(M.cnv, R, m);
+      if (litPic) { SnowHeaps.put(B.c, litPic, 0, 0); done = true; }
+    }
+    if (!done) {                                              // no WebGL 2: the snow in one lit colour
+      M.c.setTransform(1, 0, 0, 1, 0, 0);
+      M.c.globalCompositeOperation = 'source-in';
+      M.c.fillStyle = rgb(mix(lit(C.snow, 0, 1, 0.3), mistC, haze)); M.c.fillRect(0, 0, cw, ch);
+      B.c.setTransform(1, 0, 0, 1, 0, 0); B.c.drawImage(M.cnv, 0, 0);
+    }
+    M.cnv.width = M.cnv.height = 1;
+  }
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(B.cnv, Math.round(x0 * PR), Math.round(y0 * PR)); c.restore();
+  B.cnv.width = B.cnv.height = 1;
+  return { x: bx, y: by, top: y0 + 6, hw: (x1 - x0) / 2 };
+}
+/* The hill, its forest, the pagoda and the hall, baked into TEMPLE. */
+function bakeTemple() {
+  TEMPLE.ok = false;
+  if (!V.temple) return;
+  if (typeof Lakeside === 'undefined' || typeof Conifers === 'undefined') { note('temple: lakeside.js or conifers.js missing'); return; }
+  var t0 = performance.now(), hy = H * V.horizon, C = cols(), mistC = light(C.mist), c = TEMPLE.c;
+  TEMPLE.cnv.width = Math.round(W * PR); TEMPLE.cnv.height = Math.round(H * PR);
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, TEMPLE.cnv.width, TEMPLE.cnv.height);
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  var end = V.hillEnd * W, x;
+  // the hill: its snow, lit by how each part of it slopes, misty toward its foot
+  c.save();
+  c.beginPath(); c.moveTo(-10, hy + 8);
+  for (x = -10; x <= end + 10; x += 4) c.lineTo(x, hillY(x));
+  c.lineTo(end + 10, hy + 8); c.closePath(); c.clip();
+  for (x = -10; x <= end + 10; x += 3) {
+    var ys = hillY(x), slope = (hillY(x + 4) - hillY(x - 4)) / 8;
+    var col = mix(lit(C.snow, slope * 1.6, 1, 0.45), mistC, V.hillHaze);
+    var g = c.createLinearGradient(0, ys, 0, hy + 8);
+    g.addColorStop(0, rgb(col)); g.addColorStop(1, rgb(mix(col, mistC, 0.55)));
+    c.fillStyle = g; c.fillRect(x, ys - 1, 3.6, hy + 9 - ys);
+  }
+  c.restore();
+  // the forest on it, row by row from the ridge to the foot, the pagoda among them, the hall in a clearing at the foot
+  var r = rngFrom(V.seed * 911 + 29), rows = 10, dens = V.hillTrees / 80;
+  var px = V.pagodaX * W, pf = V.pagodaOnHill, ph = H * V.pagodaSize, pDone = false;
+  var hx = V.hallX * W, hw = W * V.hallSize, hDone = false, hf = 0.97;
+  var pBy = lerp(hillY(px) + H * 0.01, hy - 1, Math.pow(pf, 0.9)), hBy = hy - 2;
+  WS.temple = null;
+  for (var row = 0; row < rows; row++) {
+    var f = row / (rows - 1), haze = V.hillHaze * lerp(1.35, 0.75, f);
+    if (!pDone && f > pf) { templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.5, haze * 0.8); pDone = true; }
+    if (!hDone && f > hf) { WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.25, haze * 0.7); hDone = true; }
+    x = -0.03 * W + r() * 14;
+    while (x < end) {
+      var top = hillY(x);
+      if (top > hy - 4) { x += 8; continue; }
+      var base = lerp(top + H * 0.008, hy - 1, Math.pow(f, 0.9)), h = H * lerp(0.03, 0.058, f) * V.hillTreeSize * lerp(0.8, 1.2, r());
+      var step = h * lerp(0.32, 0.5, r());
+      var nearP = f > pf && Math.abs(x - px) < ph * 0.13 && base < pBy + ph * 0.3;       // keep the pagoda's storeys showing
+      var nearH = Math.abs(x - hx) < hw * 0.62 && base > hBy - hw * 0.5;                  // the clearing round the hall
+      var onPath = Math.abs(x - gateX(base)) < gateH(base) * 0.8 && base > hy - H * 0.03;   // and its approach
+      if (!nearP && !nearH && !onPath && r() < 0.85 * dens) {
+        Conifers.fir(c, withLight({ x: x, y: base, h: h, seed: Math.floor(r() * 1e9), colours: { needle: C.needle, trunk: C.trunk, snow: C.snow },
+                                    snow: V.firSnow, droop: V.firDroop, fullness: V.firFull, width: V.firWidth * 0.8 }, haze));
+      }
+      x += step;
+    }
+  }
+  if (!pDone) templeBuilding(c, 'pagoda', px, pBy, ph, 0, 0.5, V.hillHaze * 0.6);
+  if (!hDone) WS.temple = templeBuilding(c, 'hall', hx, hBy, hw * 0.65, hw, -0.25, V.hillHaze * 0.5);
+  TEMPLE.ok = true;
+  note('temple on the hill: ' + Math.round(performance.now() - t0) + ' ms');
+}
+
+/* ============================================================
    9. SKIERS — as in the app (WINT): cross-country skiers striding
    across the snowfield at every depth, each in their own outfit with a
    fluttering scarf. New: each casts a shadow on the snow that follows
@@ -1562,7 +1769,7 @@ function spawnSkier() {
 function updateSkiers(t, dt) {
   WS.skiTimer -= dt;
   if (WS.skiTimer <= 0) {
-    if (WS.skiers.length < V.maxSkiers) spawnSkier();
+    if (WS.skiers.length < V.maxSkiers) spawnSkier();   // (none now: maxSkiers 0, the panel's group is gone)
     WS.skiTimer = rnd(V.skiGapMin, V.skiGapMax);
   }
   for (var i = WS.skiers.length - 1; i >= 0; i--) {
@@ -2615,7 +2822,7 @@ function runStage(st) {
   SHADE = shadeColour();
   if (st === 'mtn') bakeScenery();
   else if (st === 'near') bakeNear();
-  else if (st === 'ground') { bakeGround(); WS.skiers.forEach(function (K) { if (K.k >= WS.swells.length) K.k = WS.swells.length - 1; }); }
+  else if (st === 'ground') { bakeTemple(); bakeGround(); WS.skiers.forEach(function (K) { if (K.k >= WS.swells.length) K.k = WS.swells.length - 1; }); }
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2704,6 +2911,8 @@ function frame(now) {
     ctx.globalAlpha = 1;
   }
   drawFrontClouds(t, dt);
+  // the hill with the temple (8b), behind the snowfield
+  if (V.temple && TEMPLE.ok) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.drawImage(TEMPLE.cnv, 0, 0); }
   // the snowfield and everything on it, the glints, the diamond dust
   drawGround(ctx, t);
   drawSparkles(ctx, t);
@@ -2945,15 +3154,42 @@ var G = [
     { o: 'V', k: 'shadows', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'ground' },
     { o: 'V', k: 'shadowLength', label: 'Length', min: 0.2, max: 2.5, step: 0.05, re: 'ground' },
     { o: 'V', k: 'shadowSoft', label: 'Softness', min: 0, max: 5, step: 0.1, re: 'ground' } ] },
-  { name: 'Torii', file: 'torii.js', ctls: [
+  { name: 'Temple on the hill', file: 'lakeside.js', note: 'The snowy hill on the left with its forest, the pagoda on its shoulder and the hall at its foot.', ctls: [
+    { chk: 'V', k: 'temple', label: 'Show the temple, the procession and the path', re: 'ground' },
+    { o: 'V', k: 'hillPeakX', label: 'Hill: its top, across', min: -0.1, max: 0.4, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'hillTop', label: 'Hill: height (top row)', min: 0.3, max: 0.78, step: 0.005, re: 'ground', note: 'Smaller = higher.' },
+    { o: 'V', k: 'hillEnd', label: 'Hill: where it ends', min: 0.15, max: 0.7, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'hillTrees', label: 'Hill: trees', min: 0, max: 200, step: 1, re: 'ground' },
+    { o: 'V', k: 'hillTreeSize', label: 'Hill: tree size', min: 0.4, max: 2, step: 0.05, re: 'ground' },
+    { o: 'V', k: 'hillHaze', label: 'Hill: haze', min: 0, max: 0.8, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'pagodaX', label: 'Pagoda: across', min: -0.05, max: 0.5, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'pagodaOnHill', label: 'Pagoda: down the hill', min: 0, max: 1, step: 0.01, re: 'ground', note: '0 on the ridge … 1 at the foot.' },
+    { o: 'V', k: 'pagodaSize', label: 'Pagoda: height', min: 0.1, max: 0.5, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'hallX', label: 'Hall: across (the procession starts here)', min: 0.05, max: 0.6, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'hallSize', label: 'Hall: width', min: 0.04, max: 0.3, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'templeView', label: 'Seen from above', min: 0.3, max: 3, step: 0.05, re: 'ground', note: 'How high the eye is over the buildings (× their height).' },
+    { o: 'V', k: 'roofSnow', label: 'Snow on the roofs', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'templeLight', label: 'Lit up after dark', min: 0, max: 1.5, step: 0.05, re: 'ground' } ] },
+  { name: 'Torii procession and path', file: 'torii.js', note: 'The gates come down from the hall toward you; the path is trodden in the snow through them.', ctls: [
+    { o: 'V', k: 'gates', label: 'Gates', min: 1, max: 7, step: 1, re: 'ground', note: 'One on each swell at most.' },
+    { o: 'V', k: 'gateFrom', label: 'First gate (depth)', min: 0, max: 1, step: 0.01, re: 'ground', note: '0 far … 1 near.' },
+    { o: 'V', k: 'gateTo', label: 'Last gate (depth)', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'gateFar', label: 'Size far', min: 0.01, max: 0.2, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'gateNear', label: 'Size near', min: 0.05, max: 0.6, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'gateEndX', label: 'Where the path leaves the screen', min: -0.2, max: 0.6, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'gateBend', label: 'Bend of the path', min: -0.2, max: 0.2, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'toriiTurn', label: 'Gates turned (°)', min: -45, max: 45, step: 1, re: 'ground' },
+    { o: 'V', k: 'toriiView', label: 'Gates seen from above', min: 0, max: 0.6, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'toriiSnow', label: 'Snow on the gates', min: 0, max: 2.5, step: 0.05, re: 'ground' },
+    { o: 'V', k: 'icicles', label: 'Icicles', min: 0, max: 1, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'path', label: 'Path: how deep it shows', min: 0, max: 2, step: 0.05, re: 'ground' },
+    { o: 'V', k: 'pathWidth', label: 'Path: width (× a gate)', min: 0.2, max: 1.2, step: 0.01, re: 'ground' },
+    { chk: 'V', k: 'lanternsAlong', label: 'Snow lanterns along the path', re: 'ground' },
+    { col: 'V', keys: [['vermilion', 'Vermilion'], ['toriiTop', 'Top of the beam'], ['toriiFeet', 'Feet']], re: 'ground' } ] },
+  { name: 'Torii (without the temple)', file: 'torii.js', ctls: [
     { o: 'V', k: 'toriiX', label: 'Across the screen', min: -0.1, max: 0.5, step: 0.005, re: 'ground' },
     { o: 'V', k: 'toriiDepth', label: 'Depth', min: 0, max: 1, step: 0.01, re: 'ground', note: '0 far … 1 near.' },
-    { o: 'V', k: 'toriiSize', label: 'Size', min: 0.05, max: 0.4, step: 0.005, re: 'ground' },
-    { o: 'V', k: 'toriiTurn', label: 'Turned (°)', min: -45, max: 45, step: 1, re: 'ground' },
-    { o: 'V', k: 'toriiView', label: 'Seen from above', min: 0, max: 0.6, step: 0.01, re: 'ground' },
-    { o: 'V', k: 'toriiSnow', label: 'Snow on it', min: 0, max: 2.5, step: 0.05, re: 'ground' },
-    { o: 'V', k: 'icicles', label: 'Icicles', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { col: 'V', keys: [['vermilion', 'Vermilion'], ['toriiTop', 'Top of the beam'], ['toriiFeet', 'Feet']], re: 'ground' } ] },
+    { o: 'V', k: 'toriiSize', label: 'Size', min: 0.05, max: 0.4, step: 0.005, re: 'ground' } ] },
   { name: 'Firs and frosted trees', file: 'conifers.js', ctls: [
     { o: 'V', k: 'firs', label: 'Firs', min: 0, max: 8, step: 1, re: 'ground' },
     { o: 'V', k: 'firX', label: 'Firs: across the screen', min: 0.5, max: 1.1, step: 0.005, re: 'ground' },
@@ -2978,24 +3214,6 @@ var G = [
     { o: 'V', k: 'halo', label: 'Glow round them', min: 0, max: 3, step: 0.05, re: 'live' },
     { o: 'V', k: 'pool', label: 'Light on the snow', min: 0, max: 3, step: 0.05, re: 'live' },
     { col: 'V', keys: [['flame', 'Candlelight'], ['stone', 'Stone']], re: 'ground' } ] },
-  { name: 'Skiers', ctls: [
-    { btn: 'skier', label: 'Send a skier' },
-    { o: 'V', k: 'maxSkiers', label: 'At most at once', min: 0, max: 10, step: 1, re: 'live' },
-    { o: 'V', k: 'skiGapMin', label: 'A new one after at least (s)', min: 0.5, max: 20, step: 0.5, re: 'live' },
-    { o: 'V', k: 'skiGapMax', label: '… and at most (s)', min: 1, max: 40, step: 0.5, re: 'live' },
-    { o: 'V', k: 'skiSpeed', label: 'Speed', min: 0.2, max: 3, step: 0.05, re: 'live' },
-    { o: 'V', k: 'skiSize', label: 'Size', min: 0.3, max: 2, step: 0.05, re: 'live' },
-    { o: 'V', k: 'skiFar', label: 'Furthest swell', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'V', k: 'skiNear', label: 'Nearest swell', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'V', k: 'skiFarBlur', label: 'Blur when far', min: 0, max: 4, step: 0.1, re: 'live' },
-    { o: 'V', k: 'skiNearBlur', label: 'Blur when near', min: 0, max: 2, step: 0.05, re: 'live' },
-    { o: 'V', k: 'skiFront', label: 'Share passing the dots', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'V', k: 'scarfLength', label: 'Scarf length', min: 0.3, max: 2.5, step: 0.05, re: 'live' },
-    { o: 'V', k: 'scarfFlutter', label: 'Scarf flutter', min: 0, max: 2, step: 0.05, re: 'live' },
-    { o: 'V', k: 'skiShadow', label: 'Their shadows', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { o: 'V', k: 'tracks', label: 'Ski tracks', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'V', k: 'trackFade', label: 'Tracks fade after (s)', min: 3, max: 180, step: 1, re: 'live' },
-    { o: 'V', k: 'powder', label: 'Powder kicked up', min: 0, max: 1.5, step: 0.05, re: 'live' } ] },
   { name: 'Skiers\' head torches', note: 'Lit after dusk: try Evening or Night.', ctls: [
     { chk: 'V', k: 'torch', label: 'Head torches', re: 'live' },
     { o: 'V', k: 'torchNight', label: 'Brightness at night', min: 0, max: 2.5, step: 0.05, re: 'live' },
