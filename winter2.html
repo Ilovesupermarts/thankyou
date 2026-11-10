@@ -312,10 +312,10 @@ var V_DEFAULTS = {
   horizon: 0.79, swells: 7, swellHeight: 0.65, relief: 0.45, roll: 0.75, drifts: 0.25, ripples: 0.1, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
   hollows: 0.28, sheen: 1.1, groundHaze: 0.85, groundSoft: 0.6, sparkle: 1.17, mistDrift: 0.9,
   shadows: 0.71, shadowLength: 1, shadowSoft: 1.5,
-  toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 26, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
+  toriiX: 0.035, toriiDepth: 0.18, toriiSize: 0.225, toriiTurn: 13, toriiView: 0.15, toriiSnow: 1.2, icicles: 0.5,
   temple: true, hillPeakX: 0.11, hillTop: 0.5, hillEnd: 0.47, hillTrees: 150, hillTreeSize: 1, hillHaze: 0.36,
   pagodaX: 0.13, pagodaSize: 0.3, pagodaOnHill: 0.32, hallX: 0.27, hallSize: 0.13, templeSoft: 1, roofSnow: 1, templeLight: 0.25,
-  gates: 5, gateFrom: 0.33, gateTo: 1, gateFar: 0.045, gateNear: 0.2, gateEndX: -0.04, gateBend: 0,
+  gates: 7, gateFirst: 6, gateLast: 14, gateTall: 5.5, gateEndX: -0.04, gateBend: 0,
   path: 1.3, pathWidth: 0.6, lanternsAlong: true,
   firs: 4, firX: 0.96, firSize: 0.95, firSnow: 1.5, firDroop: 1.25, firFull: 0.6, firWidth: 1, frostTrees: 11, frostSize: 1.35, rime: 0.85,
   frostTwigs: 0.3,
@@ -1231,22 +1231,10 @@ function plan(r) {
     list.push({ type: 'fir', x: (V.firX + f[0]) * W, u: f[1], size: f[2] * lerp(0.9, 1.1, r()), seed: Math.floor(r() * 1e9) });
   }
   if (V.temple) {
-    // the procession of torii (8b): from the hall at the foot of the hill toward you, one on each swell it reaches;
-    // where each stands across the screen is worked out once its swell is known (bakeGround: gateX)
-    var nG = Math.max(1, Math.round(V.gates)), usedK = {};
-    for (i = 0; i < nG; i++) {
-      var ug = nG === 1 ? V.gateTo : lerp(V.gateFrom, V.gateTo, i / (nG - 1)), kg = Math.round(ug * (Math.max(2, Math.round(V.swells)) - 1));
-      if (usedK[kg]) continue;
-      usedK[kg] = true;
-      list.push({ type: 'torii', gate: true, x: 0, u: ug, size: 1, seed: 1 + i });
-    }
+    // the procession of torii and the lanterns along it are placed in bakeGround (approachThings, 8b)
   } else {
     list.push({ type: 'torii', x: V.toriiX * W, u: V.toriiDepth, size: 1, seed: 1 });
     if (V.yukimi) list.push({ type: 'light', kind: 'yukimi', x: (V.toriiX + 0.12) * W, u: Math.min(1, V.toriiDepth + 0.06), size: 1, seed: 11 });
-  }
-  for (i = 0; i < V.lanterns && V.temple && V.lanternsAlong; i++) {   // the snow lanterns line the approach, both sides
-    var ul = lerp(V.gateFrom, Math.min(1, V.gateTo + 0.1), (i + 0.5) / V.lanterns);
-    list.push({ type: 'light', kind: 'yuki', x: 0, u: ul, along: i % 2 ? 1 : -1, size: lerp(0.85, 1.15, r()), seed: Math.floor(r() * 1e9) });
   }
   for (i = 0; i < V.lanterns && !(V.temple && V.lanternsAlong); i++) {
     var q = (i + 0.5) / V.lanterns * (LANTERN_PATH.length - 1), j = Math.min(LANTERN_PATH.length - 2, Math.floor(q)), fq = q - j;
@@ -1265,7 +1253,8 @@ function plan(r) {
 function thingH(B) {
   if (B.type === 'frost') return H * lerp(0.08, 0.2, B.u) * B.size * V.frostSize;
   if (B.type === 'fir') return H * lerp(0.17, 0.3, B.u) * B.size * V.firSize;
-  if (B.type === 'torii') return B.gate ? gateH(B.yb) : H * V.toriiSize;
+  if (B.type === 'torii') return B.gate ? B.h : H * V.toriiSize;
+  if (B.along) return B.h;
   var k = B.kind === 'yukimi' ? lerp(0.05, 0.09, B.u) : B.kind === 'kamakura' ? lerp(0.03, 0.075, B.u) : lerp(0.016, 0.042, B.u);
   return H * k * B.size * V.lanternSize;
 }
@@ -1385,11 +1374,7 @@ function bakeGround() {
   for (b = 0; b < things.length; b++) {
     var B = things[b], kb = Math.round(B.u * (N - 1)), Sb = swells[kb];
     B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; B.k = kb; B.record = B.type === 'light';
-    if (V.temple && (B.gate || B.along)) {                   // on the approach (8b): placed by the path, twice (the crest moves with x)
-      for (var it = 0; it < 2; it++) {
-        B.x = gateX(B.yb) + (B.along ? B.along * gateH(B.yb) * 0.95 : 0);
-        B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2;
-      }
+    if (false) {
     } else if (V.temple && B.type === 'frost') {             // a frosted tree is not left standing on the path, nor in front of the hall
       var dxp = B.x - gateX(B.yb), clear = gateH(B.yb) * 1.6;
       if (Math.abs(dxp) < clear) { B.x = gateX(B.yb) + (dxp < 0 ? -clear : clear); B.yb = crestY(Sb, B.x) + Sb.amp * 0.5 + 2; }
@@ -1399,6 +1384,7 @@ function bakeGround() {
     Sb.things.push(B);
     if (B.type === 'torii') { WS.torii = { x: B.x, y: B.yb, h: thingH(B) }; WS.toriiK = kb; }
   }
+  if (V.temple) approachThings(swells);                    // the torii procession and its lanterns (8b)
   var sfo = sfOptions(swells.map(function (S) { return { crest: S.crest, u: S.u, haze: S.haze }; }));
   var gl3 = typeof Snowfield !== 'undefined' && Snowfield.supported();
   if (!gl3 && typeof Snowfield !== 'undefined' && Snowfield.state && Snowfield.state() === 'lost') {
@@ -1538,13 +1524,64 @@ function drawSparkles(c, t) {
    and "Torii procession and path" groups.
    ============================================================ */
 var TEMPLE = mk(); TEMPLE.ok = false;
-/* The approach: where the path's middle is at screen row y, and how tall a gate standing there is (CSS px). */
-function approachD(y) { var hy = H * V.horizon; return clamp((y - hy) / Math.max(1, H - hy), 0, 1); }
-function gateX(y) {
-  var d = approachD(y);
-  return (lerp(V.hallX, V.gateEndX, Math.pow(d, 0.8)) + V.gateBend * Math.sin(PI * d)) * W;
+/* One eye for the temple, the gates and the path: 1 unit is the eye's height (1.6 m), the lens TEMPLE_F × the
+   screen's width, and the flat field reaches the hall's foot at the horizon row (hy): the true horizon is then
+   F / zHall above it (hv). Distances (z) are in eye heights from the eye. */
+var TEMPLE_F = 0.9;                                          // the lens: the focal length, × the screen's width
+var HALL_M = 18, PAGODA_M = 32, TORII_M = 1;                 // the hall's width and the pagoda's height (m); TORII_M: × V.gateTall
+function templeEye() {
+  var F = W * TEMPLE_F, hy = H * V.horizon, zHall = (HALL_M / 1.6) * F / Math.max(1, W * V.hallSize);
+  return { F: F, hy: hy, zHall: zHall, hv: hy - F / zHall };
 }
-function gateH(y) { return H * lerp(V.gateFar, V.gateNear, approachD(y)); }
+/* The ground under the path at distance z (screen row), and the path's middle there (world x, then screen x). The path
+   runs straight (bent by gateBend) from just in front of the hall's door to where it leaves the screen (gateEndX). */
+function approachLine() {
+  var E = templeEye(), zA = E.zHall - 1.2, zB = Math.max(1.2, E.F / Math.max(1, H * 1.02 - E.hv));
+  var xA = (V.hallX * W - W / 2) * E.zHall / E.F;             // in line with the hall's middle
+  var xB = (V.gateEndX * W - W / 2) * zB / E.F;               // where it leaves the bottom of the screen
+  return { E: E, zA: zA, zB: zB, xA: xA, xB: xB };
+}
+function approachAt(z) {                                      // world x of the path's middle at distance z
+  var A = approachLine(), t = clamp((A.zA - z) / Math.max(1e-6, A.zA - A.zB), 0, 1);
+  return lerp(A.xA, A.xB, t) + V.gateBend * 40 * Math.sin(PI * t);
+}
+function zAtRow(y) { var E = templeEye(); return E.F / Math.max(0.5, y - E.hv); }
+function gateX(y) { var E = templeEye(), z = zAtRow(y); return W / 2 + E.F * approachAt(z) / z; }
+function gateH(y) { var E = templeEye(); return V.gateTall / 1.6 * TORII_M * E.F / zAtRow(y); }
+/* The gates, at equal distances along the path: the first gateFirst m in front of the hall's door, then one every
+   gateLast m toward you (fewer when the path leaves the screen first), and the snow lanterns between them on both
+   sides. Each is put on the
+   swell whose snow it stands on, in order of distance, so the swells in front hide what they should. */
+function approachThings(swells) {
+  var A = approachLine(), E = A.E, n = Math.max(1, Math.round(V.gates)), r = rngFrom(V.seed * 4447 + 3);
+  var z0 = E.zHall - V.gateFirst / 1.6, z1 = Math.max(A.zB + 0.5, z0 - (n - 1) * V.gateLast / 1.6);
+  var gap = n > 1 ? (z0 - z1) / (n - 1) : 0, items = [], i;
+  for (i = 0; i < n; i++) items.push({ z: z0 - gap * i, gate: true, seed: 1 + i });
+  if (V.lanternsAlong) {
+    var nl = Math.max(0, Math.round(V.lanterns / 2)), zEnd = A.zB + 1;
+    for (i = 0; i < nl; i++) {
+      var zl = lerp(z0, zEnd, (i + 0.5) / nl);
+      items.push({ z: zl, along: -1 }); items.push({ z: zl, along: 1 });
+    }
+  }
+  items.forEach(function (it) {
+    var y = E.hv + E.F / it.z, xw = approachAt(it.z), hpx = V.gateTall / 1.6 * E.F / it.z, B;
+    if (it.gate) B = { type: 'torii', gate: true, x: W / 2 + E.F * xw / it.z, yb: y, h: hpx, size: 1, seed: it.seed };
+    else {
+      var off = (V.gateTall / 1.6) * 0.62 * it.along;           // just outside the pillars
+      B = { type: 'light', kind: 'yuki', along: it.along, x: W / 2 + E.F * (xw + off) / it.z, yb: y, h: hpx * 0.17 * V.lanternSize,
+            size: 1, seed: Math.floor(r() * 1e9) };
+    }
+    // the swell it stands on: the nearest one whose crest is above its foot there
+    var k = 0;
+    for (var q = 0; q < swells.length; q++) if (crestY(swells[q], B.x) <= y - 1) k = q;
+    B.k = k; B.u = clamp(1 - it.z / E.zHall, 0, 1); B.z = it.z; B.record = B.type === 'light';
+    swells[k].things.push(B);
+  });
+  swells.forEach(function (S) {                               // furthest first on each swell
+    S.things.sort(function (a, b) { return (b.z || zAtRow(b.yb)) - (a.z || zAtRow(a.yb)); });
+  });
+}
 /* The hill's outline: the screen row of its surface at x (the horizon where there is no hill). */
 function hillY(x) {
   var hy = H * V.horizon, peak = V.hillPeakX * W, end = V.hillEnd * W, top = H * V.hillTop, k;
@@ -1557,7 +1594,7 @@ function hillY(x) {
 /* The trodden path through the gates, on one swell's picture (its context set up in CSS px, its top at `top`):
    a shallow trench in the snow, blue in its shade, its far wall catching the light, footprints along it. */
 function drawPath(tg, top, bottom, haze) {
-  var hy = H * V.horizon, y0 = Math.max(top, hy + 1), y1 = bottom, step = 2, L = [], R = [], y;
+  var Ee = templeEye(), hy = H * V.horizon, y0 = Math.max(top, Ee.hv + Ee.F / (Ee.zHall - 1.2)), y1 = bottom, step = 2, L = [], R = [], y;
   if (y1 <= y0) return;
   for (y = y0; y <= y1 + step; y += step) {
     var cx = gateX(y), hw = gateH(y) * V.pathWidth * 0.5;
@@ -1597,10 +1634,9 @@ function drawPath(tg, top, bottom, haze) {
    how big it is on the screen and its height on the hill from where it stands; all of them share that one eye, so
    their lines run to the same vanishing points. Drawn at twice the resolution and brought down (soft, even edges),
    then softened and hazed by its distance. */
-var TEMPLE_F = 0.9;                                          // the lens: the focal length, × the screen's width
 function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
-  var F = W * TEMPLE_F, hy = H * V.horizon;
-  var S = kind === 'pagoda' ? 32 / 1.6 : 18 / 1.6, z = S * F / (kind === 'pagoda' ? hpx : wpx);
+  var EE = templeEye(), F = EE.F, hy = EE.hv;
+  var S = kind === 'pagoda' ? PAGODA_M / 1.6 : HALL_M / 1.6, z = S * F / (kind === 'pagoda' ? hpx : wpx);
   function proj(x, y, zz) { return [W / 2 + F * x / zz, hy + F * (1 - y) / zz]; }
   var X = (bx - W / 2) * z / F, Y = 1 - (by - hy) * z / F;
   var faces = kind === 'pagoda' ? Lakeside.pagoda({ x: X, y: Y, z: z, size: S, yaw: yaw })
@@ -1621,6 +1657,16 @@ function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
     });
   }
   var SNOWC = { snow: hex(V.colours.snow), snowEdge: mix(hex(V.colours.snow), SHADE, 0.25) };
+  // the stone plinth is buried: drawn as snow, after the building (it stands in front of the walls' foot), lit
+  // almost evenly (snow banked against a building is lit by the whole sky), so no grey block shows under the walls
+  var plinth = [];
+  faces = faces.filter(function (f) {
+    if (f.tone !== 'stone') return true;
+    plinth.push({ p: f.p, tone: f.p.every(function (q) { return Math.abs(q[1] - f.p[0][1]) < 1e-6; }) ? 'snow' : 'snowBank', c: f.c });
+    return false;
+  });
+  SNOWC.snowBank = mix(hex(V.colours.snow), SHADE, 0.08);
+  snowFaces = plinth.concat(snowFaces);
   var x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   faces.forEach(function (f) { f.p.forEach(function (q) { var s = proj(q[0], q[1], q[2]); x0 = Math.min(x0, s[0]); x1 = Math.max(x1, s[0]); y0 = Math.min(y0, s[1]); y1 = Math.max(y1, s[1]); }); });
   x0 -= 6; y0 -= 6; x1 += 6; y1 += 6;
@@ -1632,8 +1678,10 @@ function templeBuilding(c, kind, bx, by, hpx, wpx, yaw, haze) {
   B.c.setTransform(SS, 0, 0, SS, -x0 * SS, -y0 * SS);
   var fk = nightLights() * V.templeLight * (1 - haze * 0.5);
   var floodO = { k: fk, col: C.flame, y0: Y, h: kind === 'pagoda' ? hpx * z / F : wpx * z / F * 0.65 };
-  Lakeside.renderFaces(B.c, faces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.5, colour: function () { return null; }, fin: fin, flood: floodO });
-  if (snowFaces.length) Lakeside.renderFaces(B.c, snowFaces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.35, colour: function (tone) { return SNOWC[tone]; }, fin: fin });
+  Lakeside.renderFaces(B.c, faces, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.5, colour: function (tone) { return SNOWC[tone] || null; }, fin: fin, flood: floodO });
+  if (plinth.length) Lakeside.renderFaces(B.c, plinth, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.1, colour: function (tone) { return SNOWC[tone]; }, fin: fin });
+  var roofSnowF = snowFaces.slice(plinth.length);
+  if (roofSnowF.length) Lakeside.renderFaces(B.c, roofSnowF, { proj: proj, cam: [0, 1, 0], light: Lw, shade: 0.35, colour: function (tone) { return SNOWC[tone]; }, fin: fin });
   // the snow on the roofs: the roofs as they are seen (white; everything else black, so it hides the roofs behind it),
   // turned into a mask, then lit by the snow material
   if (V.roofSnow > 0) {
@@ -3231,12 +3279,11 @@ var G = [
     { o: 'V', k: 'roofSnow', label: 'Snow on the roofs', min: 0, max: 1, step: 0.01, re: 'ground' },
     { o: 'V', k: 'templeLight', label: 'Lit up after dark', min: 0, max: 1.5, step: 0.05, re: 'ground' } ] },
   { name: 'Torii procession and path', file: 'torii.js', note: 'The gates come down from the hall toward you; the path is trodden in the snow through them.', ctls: [
-    { o: 'V', k: 'gates', label: 'Gates', min: 1, max: 7, step: 1, re: 'ground', note: 'One on each swell at most.' },
-    { o: 'V', k: 'gateFrom', label: 'First gate (depth)', min: 0, max: 1, step: 0.01, re: 'ground', note: '0 far … 1 near.' },
-    { o: 'V', k: 'gateTo', label: 'Last gate (depth)', min: 0, max: 1, step: 0.01, re: 'ground' },
-    { o: 'V', k: 'gateFar', label: 'Size far', min: 0.01, max: 0.2, step: 0.005, re: 'ground' },
-    { o: 'V', k: 'gateNear', label: 'Size near', min: 0.05, max: 0.6, step: 0.005, re: 'ground' },
-    { o: 'V', k: 'gateEndX', label: 'Where the path leaves the screen', min: -0.2, max: 0.6, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'gates', label: 'Gates', min: 1, max: 14, step: 1, re: 'ground' },
+    { o: 'V', k: 'gateFirst', label: 'First gate: in front of the hall (m)', min: 1, max: 40, step: 0.5, re: 'ground' },
+    { o: 'V', k: 'gateLast', label: 'From one gate to the next (m)', min: 3, max: 40, step: 0.5, re: 'ground', note: 'The same on the ground for every gate.' },
+    { o: 'V', k: 'gateTall', label: 'Gate height (m)', min: 2, max: 12, step: 0.1, re: 'ground' },
+    { o: 'V', k: 'gateEndX', label: 'Where the path leaves the screen', min: -0.4, max: 0.6, step: 0.005, re: 'ground' },
     { o: 'V', k: 'gateBend', label: 'Bend of the path', min: -0.2, max: 0.2, step: 0.005, re: 'ground' },
     { o: 'V', k: 'toriiTurn', label: 'Gates turned (°)', min: -45, max: 45, step: 1, re: 'ground' },
     { o: 'V', k: 'toriiView', label: 'Gates seen from above', min: 0, max: 0.6, step: 0.01, re: 'ground' },
