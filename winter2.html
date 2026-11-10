@@ -1252,11 +1252,15 @@ var REF = {
   //              (made smooth on the ground); the front torii stands at 'gate', which is on it
   //   every      the distance between two torii, along the path; gateH a torii's height, lantH a lantern's
   //   rightAlong, leftAlong   where in a gap each side's lantern stands (0 by the farther gate, 1 by the
-  //              nearer); fromEdge  its gap from the path's edge (× its height)
+  //              nearer), as in the autumn scene; fromStones  its gap from the stones' edge, beside them
+  //              to the left or right on the screen (ground units)
   approach: { eye: 0.62, gate: [0.0805, 0.9],
-              line: [[0.4, 1.12], [0.31, 1.0], [0.2, 0.935], [0.0805, 0.9], [0.16, 0.825], [0.1955, 0.776], [0.218, 0.742],
-                     [0.255, 0.708], [0.262, 0.693], [0.28, 0.679], [0.296, 0.669], [0.308, 0.662]],
-              every: 1.27, gateH: 0.876, lantH: 0.51, rightAlong: 0.81, leftAlong: 0.38, fromEdge: 0.45, endGap: 0.6 },
+              // one wide sweep: up from the bottom edge, its leftmost point at the front gate, already
+              // curving up as it passes through it, then bending gently right through the gates to the shrine
+              line: [[0.3, 1.09], [0.235, 1.0], [0.16, 0.948], [0.104, 0.917], [0.0805, 0.9], [0.09, 0.866], [0.125, 0.83],
+                     [0.165, 0.8], [0.1955, 0.776], [0.222, 0.743], [0.243, 0.72], [0.258, 0.704], [0.272, 0.69],
+                     [0.287, 0.678], [0.299, 0.669], [0.308, 0.662]],
+              every: 1.27, gateH: 0.876, lantH: 0.51, rightAlong: 0.81, leftAlong: 0.38, fromStones: 0.12, endGap: 0.6 },
   // the roped pine: middle (its pole), foot, height (the rope knot to the foot)
   pine: { x: 0.801, y: 0.727, h: 0.28 },
   // the cranes: middle, foot, height, facing (1 right), pose
@@ -1268,7 +1272,7 @@ var REF = {
   frost: [[0.47, 0.665, 0.055], [0.432, 0.7, 0.12], [0.402, 0.712, 0.17]],
   // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
   // between two, and half the width of the trodden snow along the path
-  stone: 0.4, stoneDepth: 0.15, stoneGap: 0.06, pathBand: 0.3,
+  stone: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathBand: 0.3,
   // the banks beyond the water (the edge of the snow, the earth showing under it)
   banks: [{ th: 0.02, pts: [[0.405, 0.852], [0.398, 0.832], [0.402, 0.815], [0.416, 0.797], [0.453, 0.784], [0.489, 0.775], [0.533, 0.768], [0.566, 0.761], [0.587, 0.752]] },
           { th: 0.006, pts: [[0.551, 0.727], [0.6, 0.722], [0.653, 0.72], [0.69, 0.721]] },
@@ -1316,13 +1320,19 @@ function approachLayout() {
   var gS = [];
   for (var s = s0; s < total - A.endGap; s += A.every) gS.push(s);
   gS.forEach(function (sg) { var P = at(sg), q = toScreen(P.X, P.Z); out.gates.push({ x: q[0], y: q[1], h: A.gateH * D / P.Z }); });
-  // one lantern each side in every gap, just off the path (as the autumn scene works it out)
-  var wu = 0.57 * A.gateH / 2 + 0.065 * A.gateH * 1.5, off = wu + A.fromEdge * A.lantH + 0.19 * A.lantH;
+  // one lantern each side in every gap (each side at its own place in the gap, as in the autumn scene),
+  // standing just beside the stones: to their left and right on the screen, as in the reference
+  var off = REF.stone * 0.55 + A.fromStones + A.lantH * 0.2;
+  function clearance(X, Z) { var m = 1e9; for (var j = 0; j < G.length; j++) m = Math.min(m, Math.hypot(G[j][0] - X, G[j][1] - Z)); return m; }
   for (i = 0; i < gS.length - 1; i++) {
     [[1, A.rightAlong], [-1, A.leftAlong]].forEach(function (E) {
       var sd = E[0], P = at(gS[i] + (1 - E[1]) * A.every);
-      // across the path, to the right on the screen (the path runs away from you): (tz, -tx)
-      var X = P.X + P.tz * off * sd, Z = P.Z - P.tx * off * sd, q = toScreen(X, Z);
+      // beside the path, straight to its right or left on the screen (as in the reference), moved out only
+      // until it is clear of every stone of the path, also where the path bends
+      var nx = sd, nz = 0, d0 = off;
+      var need = REF.stone * 0.55 + A.lantH * 0.15;           // half a stone's width and half a lantern's base, at least
+      while (clearance(P.X + nx * d0, P.Z + nz * d0) < need && d0 < off * 3) d0 += off * 0.05;
+      var X = P.X + nx * d0, Z = P.Z + nz * d0, q = toScreen(X, Z);
       out.lanterns.push({ x: q[0], y: q[1], h: A.lantH * D / Z });
     });
   }

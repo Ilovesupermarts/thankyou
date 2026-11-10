@@ -302,8 +302,10 @@ function path(c, o) {
     var ax = 1, az = 0;                                        // their long side level, square on to you
     var kind = r(), dp = o.depth * lerp(0.75, 1.25, r()), wob = (r() - 0.5) * o.size * 0.22, rot0 = (r() - 0.5) * 0.22;
     var cx0 = Q.X + ax * wob, cz0 = Q.Z + az * wob;
+    var away = Math.abs(Q.uz) > 0.75;                          // groups of pieces only where the path runs away from you
+    if (!away && kind >= 0.5) kind = kind < 0.62 ? 0.6 : kind < 0.8 ? 0.2 : 0.9;     // in the sweep: mostly single slabs, now and then a pair
     if (kind < 0.5) {                                          // one long slab
-      var w = o.size * lerp(0.85, 1.25, r());
+      var w = o.size * lerp(0.7, 1.25, r());
       lay(cx0, cz0, w, dp, Math.atan2(az, ax) + rot0);
     } else if (kind < 0.8) {                                   // two pieces side by side, different sizes
       var wa = o.size * lerp(0.42, 0.62, r()), wb = o.size * lerp(0.38, 0.6, r()), gp = o.size * lerp(0.04, 0.1, r());
@@ -316,8 +318,12 @@ function path(c, o) {
       var sd = r() < 0.5 ? -1 : 1, w4 = o.size * lerp(0.5, 0.7, r());
       lay(cx0 + ax * sd * o.size * 0.18, cz0 + az * sd * o.size * 0.18, w4, dp * lerp(0.8, 1.05, r()), Math.atan2(az, ax) + rot0);
     }
-    // the next one where this one ends along the path (its width where the path runs sideways), plus a gap
-    step = Math.abs(Q.ux) * o.size * 0.95 + Math.abs(Q.uz) * dp + o.gap * lerp(0.5, 1.6, r());
+    // the next one goes only as far on as it needs to clear this one, with a small gap: a step back
+    // (its depth) or a step to the side (its width), whichever is shorter along the path's way here. Where
+    // the path sweeps across, the stones stack up it, each behind the last and overlapping it sideways,
+    // as in the reference; where it runs away from you, one behind another. It changes smoothly.
+    var gp = o.gap * lerp(0.5, 1.7, r());
+    step = Math.min((dp * 0.85 + gp) / Math.max(0.05, Math.abs(Q.uz)), (o.size * 1.05 + gp) / Math.max(0.05, Math.abs(Q.ux)));
   }
   stones.sort(function (a, b) { return b.Z - a.Z; });             // the farthest first
   var slate = [196, 202, 216];
@@ -355,8 +361,8 @@ function path(c, o) {
     // brushed texture: a few faint lighter and darker streaks across it
     var hh = bot - top, wl = Math.max.apply(null, pts.map(function (p) { return p[0]; })) - Math.min.apply(null, pts.map(function (p) { return p[0]; }));
     for (k = 0; k < 4; k++) {
-      c.strokeStyle = rgb(k % 2 ? scale(slate, S.bright * 1.12) : scale(slate, S.bright * 0.55), 0.18);
-      c.lineWidth = Math.max(0.5, hh * lerp(0.08, 0.2, r()));
+      c.strokeStyle = rgb(k % 2 ? scale(slate, S.bright * 1.08) : scale(slate, S.bright * 0.62), 0.09);
+      c.lineWidth = Math.max(0.4, Math.min(hh * lerp(0.04, 0.09, r()), 2.5));
       var sy = lerp(top, bot, lerp(0.2, 0.8, r())), sx = C[0] + (r() - 0.5) * wl * 0.3;
       c.beginPath(); c.moveTo(sx - wl * lerp(0.2, 0.4, r()), sy); c.lineTo(sx + wl * lerp(0.2, 0.4, r()), sy + (r() - 0.5) * hh * 0.2); c.stroke();
     }
