@@ -347,6 +347,56 @@ function path(c, o) {
     var gp = o.gap * lerp(0.5, 1.7, r());
     step = Math.min((dp * 0.85 + gp) / Math.max(0.05, Math.abs(Q.uz)), (o.size * 1.05 + gp) / Math.max(0.05, Math.abs(Q.ux)));
   }
+  // FILL THE BAND: the reference's path is a wide band of stones packed close, no bare snow inside it. Every
+  // spot of the band left bare after the line of stones above is filled with a stone of a size that fits there
+  // (the largest first), a small gap from its neighbours, the gate feet and the lantern bases (o.avoid). The
+  // band is widest near you (o.bandNear) and narrows into the distance (o.bandFar), on the ground.
+  if (o.bandNear) {
+    var lenAt = [0];
+    for (i = 1; i < G.length; i++) lenAt.push(lenAt[i - 1] + Math.hypot(G[i][0] - G[i - 1][0], G[i][1] - G[i - 1][1]));
+    var bandAt = function (X, Z) {                              // distance from the path's middle, and how wide the band is there
+      var best = 1e9, bi = 0;
+      for (var j = 0; j < G.length; j += 2) { var dd = Math.hypot(G[j][0] - X, G[j][1] - Z); if (dd < best) { best = dd; bi = j; } }
+      var f = clamp(lenAt[bi] / (o.bandLen || total * 0.3), 0, 1);
+      return { d: best, w: lerp(o.bandNear, o.bandFar, f) };
+    };
+    var gapG = o.gap * 0.55, boxesG = [];
+    stones.forEach(function (St) { boxesG.push([St.X, St.Z, St.w / 2, St.dp / 2]); });
+    (o.fixed || []).forEach(function (F) {
+      var g = F.map(function (p) { return toGround(p); });
+      var gx = g.map(function (q) { return q[0]; }), gz = g.map(function (q) { return q[1]; });
+      var ax0 = Math.min.apply(null, gx), ax1 = Math.max.apply(null, gx), az0 = Math.min.apply(null, gz), az1 = Math.max.apply(null, gz);
+      boxesG.push([(ax0 + ax1) / 2, (az0 + az1) / 2, (ax1 - ax0) / 2 * 0.92, (az1 - az0) / 2 * 0.85]);
+    });
+    var avoidG = (o.avoid || []).map(function (A) { var g = toGround(A); return [g[0], g[1], A[2] * g[1] / D]; });
+    function free(X, Z, hw, hd) {
+      for (var j = 0; j < boxesG.length; j++) {
+        var B = boxesG[j];
+        if (Math.abs(X - B[0]) < hw + B[2] + gapG && Math.abs(Z - B[1]) < hd + B[3] + gapG) return false;
+      }
+      for (j = 0; j < avoidG.length; j++) {
+        var A = avoidG[j];
+        if (Math.abs(X - A[0]) < hw + A[2] && Math.abs(Z - A[1]) < hd + A[2] * 0.6) return false;
+      }
+      return true;
+    }
+    // candidate spots all over the band; tried with large stones first, then smaller ones for what is left
+    var Zmin = G[0][1], Zmax = Math.max.apply(null, G.map(function (q) { return q[1]; }));
+    var Xmin = Math.min.apply(null, G.map(function (q) { return q[0]; })) - o.bandNear, Xmax = Math.max.apply(null, G.map(function (q) { return q[0]; })) + o.bandNear;
+    [1, 0.75, 0.55, 0.4].forEach(function (k) {
+      for (var tries = 0; tries < 5000; tries++) {
+        var Zc = lerp(Zmin, Zmax, Math.pow(r(), 1.6)), Xc = lerp(Xmin, Xmax, r());
+        var bnd = bandAt(Xc, Zc);
+        var w = o.size * k * lerp(0.75, 1.15, r()), dp = o.depth * lerp(0.8, 1.15, r()) * (k < 0.5 ? 0.85 : 1);
+        if (bnd.d + w * 0.3 > bnd.w) continue;
+        var sc0 = toScreen(Xc, Zc);
+        if (sc0[1] - dp / 2 * D / (Zc * Zc) > o.yb) continue;
+        if (!free(Xc, Zc, w / 2, dp / 2)) continue;
+        lay(Xc, Zc, w, dp, (r() - 0.5) * 0.1);
+        boxesG.push([Xc, Zc, w / 2, dp / 2]);
+      }
+    });
+  }
   // the nearest slabs are set where the reference has them (o.fixed): the stones laid along the path keep clear of them
   var fixed = o.fixed || [];
   if (fixed.length) {
@@ -416,13 +466,21 @@ function slabPoly(c, P, S, sc, seed) {
   c.fillStyle = g; c.fill();
   c.clip();
   var r = rng(seed);
+  var k;
   if (len > 6) {                                               // mottled, as painted
     c.filter = 'blur(' + Math.max(0.5, wid * 0.06).toFixed(1) + 'px)';
-    for (var k = 0; k < 10; k++) {
+    for (k = 0; k < 10; k++) {
       c.fillStyle = rgb(col(slate, r() < 0.55 ? 1.32 : 0.72), lerp(0.2, 0.42, r()));
       c.beginPath(); c.ellipse(lerp(x0, x1, r()), lerp(y0, y1, r()), len * lerp(0.05, 0.14, r()), wid * lerp(0.1, 0.22, r()), 0, 0, TAU); c.fill();
     }
     c.filter = 'none';
+  }
+  // brushed: short streaks along its length, lighter and darker, as painted
+  c.lineCap = 'round';
+  for (k = 0; k < Math.max(3, Math.round(len / 12)); k++) {
+    var sy = lerp(y0, y1, r()), sx = lerp(x0, x1, r()), sl = len * lerp(0.12, 0.35, r());
+    c.strokeStyle = rgb(col(slate, r() < 0.5 ? 1.35 : 0.7), lerp(0.18, 0.35, r())); c.lineWidth = Math.max(0.5, wid * lerp(0.04, 0.1, r()));
+    c.beginPath(); c.moveTo(sx - sl / 2, sy); c.lineTo(sx + sl / 2, sy + (r() - 0.5) * wid * 0.1); c.stroke();
   }
   // the soft light rim along the far (upper) edge
   c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(0.7, th * 0.9);
@@ -431,7 +489,7 @@ function slabPoly(c, P, S, sc, seed) {
   c.stroke();
   c.restore();
   // a fine dark inked line round the top face
-  path(-th * 0.4, 1); c.strokeStyle = rgb(col([52, 54, 66], 1), 0.55); c.lineWidth = Math.max(0.5, th * 0.3); c.stroke();
+  path(-th * 0.4, 1); c.strokeStyle = rgb(col([44, 46, 58], 1), 0.85); c.lineWidth = Math.max(0.6, th * 0.45); c.stroke();
 }
 function slab(c, F, S, sc) {
   var len = 0;                                                 // its longest side
@@ -472,13 +530,22 @@ function slab(c, F, S, sc) {
   var r = rng(Math.round(Tc[0] * 7 + Tc[1] * 13)), ux = (Rc[0] - Bc[0]) / len, uy = (Rc[1] - Bc[1]) / len, ang = Math.atan2(uy, ux);
   var wid = Math.hypot(Lc[0] - Bc[0], Lc[1] - Bc[1]);
   c.filter = 'blur(' + Math.max(0.6, wid * 0.06).toFixed(1) + 'px)';
-  for (var k = 0; k < 22; k++) {
+  var k;
+  for (k = 0; k < 22; k++) {
     var t = r(), v = r();
     var px = lerp(lerp(Lc[0], Bc[0], v), lerp(Tc[0], Rc[0], v), t), py = lerp(lerp(Lc[1], Bc[1], v), lerp(Tc[1], Rc[1], v), t);
     c.fillStyle = rgb(col(slate, r() < 0.55 ? 1.32 : 0.72), lerp(0.2, 0.42, r()));
     c.beginPath(); c.ellipse(px, py, len * lerp(0.04, 0.12, r()), wid * lerp(0.08, 0.2, r()), ang, 0, TAU); c.fill();
   }
   c.filter = 'none';
+  // brushed: short streaks along its length, lighter and darker, as painted
+  c.lineCap = 'round';
+  for (k = 0; k < Math.round(len / 10); k++) {
+    var t2 = r(), v2 = r(), qx = lerp(lerp(Lc[0], Bc[0], v2), lerp(Tc[0], Rc[0], v2), t2), qy = lerp(lerp(Lc[1], Bc[1], v2), lerp(Tc[1], Rc[1], v2), t2);
+    var sl = len * lerp(0.1, 0.3, r());
+    c.strokeStyle = rgb(col(slate, r() < 0.5 ? 1.35 : 0.7), lerp(0.18, 0.35, r())); c.lineWidth = Math.max(0.6, wid * lerp(0.04, 0.09, r()));
+    c.beginPath(); c.moveTo(qx - ux * sl / 2, qy - uy * sl / 2); c.lineTo(qx + ux * sl / 2, qy + uy * sl / 2); c.stroke();
+  }
   // a soft light rim along the far edges, where the sky catches it
   c.lineCap = 'round'; c.lineJoin = 'round';
   c.strokeStyle = rgb(col(slate, 1.4), 0.45); c.lineWidth = Math.max(1, th * 0.9);
@@ -486,7 +553,7 @@ function slab(c, F, S, sc) {
   c.restore();
   // a fine dark inked line round the top face
   rounded(top, rad);
-  c.strokeStyle = rgb(col([52, 54, 66], 1), 0.55); c.lineWidth = Math.max(0.6, th * 0.3); c.stroke();
+  c.strokeStyle = rgb(col([44, 46, 58], 1), 0.85); c.lineWidth = Math.max(0.7, th * 0.45); c.stroke();
 }
 
 /* ---------------------------------------------------------------

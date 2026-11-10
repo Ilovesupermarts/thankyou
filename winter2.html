@@ -1277,6 +1277,9 @@ var REF = {
   // the stepping stones (ground units): a slab's width across the path, its depth along it, the gap
   // between two, and half the width of the trodden snow along the path
   stone: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathBand: 0.3,
+  // the band of stones (ground units, half its width): widest near you, narrowing over bandLen along the path,
+  // filled with stones packed close (as in the reference: no bare snow inside it)
+  bandNear: 0.33, bandFar: 0.2, bandLen: 2.4,
   // the nearest slabs, set where the reference has them: their corners [left, top, right, bottom]
   // on the screen (fractions), measured on the reference; the second runs off the bottom edge
   nearSlabs: [[[0.246, 0.971], [0.330, 0.944], [0.369, 0.966], [0.270, 0.998]],
@@ -1552,7 +1555,11 @@ function drawDecor(c) {
   var g = c.createLinearGradient(0, H * 0.72, 0, H);
   g.addColorStop(0, rgb(light([226, 222, 226]))); g.addColorStop(1, rgb(light([150, 156, 170])));
   c.fillStyle = g; c.fill();
-  WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: approachLayout().path,
+  var APL = approachLayout(), avoid = [];
+  APL.gates.forEach(function (G) { [-1, 1].forEach(function (sd) { avoid.push([G.x + sd * G.h * 0.27, G.y, G.h * 0.05]); }); });
+  APL.lanterns.forEach(function (L) { avoid.push([L.x, L.y, L.h * 0.2]); });
+  WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: APL.path, avoid: avoid,
+                                  bandNear: REF.bandNear, bandFar: REF.bandFar, bandLen: REF.bandLen,
                                   size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand,
                                   fixed: REF.nearSlabs.map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }), colours: { snow: C.snow } }, 0));
 }
