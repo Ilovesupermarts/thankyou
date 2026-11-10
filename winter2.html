@@ -309,6 +309,11 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
   // the reference layout (winterscene.js): the shrine by the steaming pond; false: the older layout below
+  // the stone path (the panel's "Stone path"): the points it curves through, from the front (1) to the shrine,
+  // as fractions of the screen; how wide it is (1 = one stone's length), the stones' length, depth and gap
+  // (ground units), and whether the handles show on the picture to drag the points
+  path1x: 0.31, path1y: 1.05, path2x: 0.128, path2y: 0.936, path3x: 0.0805, path3y: 0.9, path4x: 0.105, path4y: 0.856, path5x: 0.226, path5y: 0.773, path6x: 0.249, path6y: 0.743, path7x: 0.212, path7y: 0.701, path8x: 0.222, path8y: 0.679, path9x: 0.308, path9y: 0.662,
+  pathWidth: 1, stoneSize: 0.44, stoneDepth: 0.105, stoneGap: 0.035, pathHandles: true,
   ref: true, reflect: 0.85, ripple: 1, steam: 1, waterTint: 0.3, skyInWater: 1, hillMist: 1,
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
@@ -1305,10 +1310,14 @@ var REF = {
 function eyeY() { return H * REF.approach.eye; }
 function toGround(x, y) { var hy = eyeY(), D = H - hy, q = (y - hy) / D; return [(x - W / 2) / (q * D), 1 / q]; }
 function toScreen(X, Z) { var hy = eyeY(), D = H - hy; return [W / 2 + X * D / Z, hy + D / Z]; }
+/* The points the stone path curves through (V.path1x … path9y, set on the panel or by dragging). */
+var PATH_N = 9;
+function pathPoints() { var P = []; for (var i = 1; i <= PATH_N; i++) P.push([V['path' + i + 'x'], V['path' + i + 'y']]); return P; }
+function pathHalfW() { return V.stoneSize * 0.5 * V.pathWidth; }
 function approachLayout() {
   var A = REF.approach, D = H - eyeY(), i, k;
   // the path's middle on the ground, made smooth (Catmull-Rom), then measured along its length
-  var C = A.line.map(function (p) { return toGround(p[0] * W, p[1] * H); }), G = [];
+  var C = pathPoints().map(function (p) { return toGround(p[0] * W, p[1] * H); }), G = [];
   for (i = 0; i < C.length - 1; i++) {
     var p0 = C[Math.max(0, i - 1)], p1 = C[i], p2 = C[i + 1], p3 = C[Math.min(C.length - 1, i + 2)];
     for (k = 0; k < 24; k++) {
@@ -1341,7 +1350,7 @@ function approachLayout() {
   });
   // one lantern each side in every gap (each side at its own place in the gap, as in the autumn scene),
   // standing just beside the stones: to their left and right on the screen, as in the reference
-  var off = REF.stone * 0.55 + A.fromStones + A.lantH * 0.2;
+  var off = pathHalfW() * 1.1 + A.fromStones + A.lantH * 0.2;
   function clearance(X, Z) { var m = 1e9; for (var j = 0; j < G.length; j++) m = Math.min(m, Math.hypot(G[j][0] - X, G[j][1] - Z)); return m; }
   for (i = 0; i < gS.length - 1; i++) {
     [[1, A.rightAlong], [-1, A.leftAlong]].forEach(function (E) {
@@ -1349,7 +1358,7 @@ function approachLayout() {
       // beside the path, straight to its right or left on the screen (as in the reference), moved out only
       // until it is clear of every stone of the path, also where the path bends
       var nx = sd, nz = 0, d0 = off;
-      var need = REF.stone * 0.55 + A.lantH * 0.15;           // half a stone's width and half a lantern's base, at least
+      var need = pathHalfW() * 1.1 + A.lantH * 0.15;           // half a stone's width and half a lantern's base, at least
       while (clearance(P.X + nx * d0, P.Z + nz * d0) < need && d0 < off * 3) d0 += off * 0.05;
       var X = P.X + nx * d0, Z = P.Z + nz * d0, q = toScreen(X, Z);
       out.lanterns.push({ x: q[0], y: q[1], h: A.lantH * D / Z });
@@ -1561,7 +1570,7 @@ function drawStones(c) {
   var C = cols();
   WinterScene.path(c, withLight({ hy: eyeY(), yb: H, cx: W / 2, pts: approachLayout().path,
                                   fitTo: REF.nearSlabs.map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }),
-                                  size: REF.stone, depth: REF.stoneDepth, gap: REF.stoneGap, band: REF.pathBand,
+                                  size: V.stoneSize, depth: V.stoneDepth, gap: V.stoneGap, band: REF.pathBand, halfWidth: pathHalfW(),
                                   fixed: REF.nearSlabs.concat(REF.gapStones).map(function (F) { return F.map(function (p) { return [p[0] * W, p[1] * H]; }); }), colours: { snow: C.snow } }, 0));
 }
 /* The far layer (V.ref): the hill of firs, the pagoda among them, the mist. Baked once. */
@@ -2898,6 +2907,8 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  // the stone path's smoothed line on the screen (CSS pixels), for the drag handles
+  pathPreview: function () { return approachLayout().path; }, pathN: PATH_N, size: function () { return [W, H]; },
   skier: function () { spawnSkier(); },
   report: function () {
     return 'Winter Lab 2 report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
@@ -3248,6 +3259,30 @@ var G = [
     { o: 'V', k: 'waterTint', label: 'Colour of the water', min: 0, max: 1, step: 0.05, re: 'live' },
     { o: 'V', k: 'skyInWater', label: 'Sky glow in the water', min: 0, max: 1.5, step: 0.05, re: 'live' },
     { o: 'V', k: 'steam', label: 'Steam off the pond', min: 0, max: 2, step: 0.05, re: 'live' } ] },
+  { name: 'Stone path', note: 'The path curves smoothly through points 1 (the front) to 9 (the shrine). Drag the numbered handles on the picture, or set each point here (across: 0 the left edge, 1 the right; down: 0.62 the eye line, 1 the bottom). The torii and lanterns follow the path.', ctls: [
+    { chk: 'V', k: 'pathHandles', label: 'Show the handles on the picture', re: 'live' },
+    { o: 'V', k: 'pathWidth', label: 'Path width (1 = one stone)', min: 0.4, max: 2.5, step: 0.01, re: 'ground' },
+    { o: 'V', k: 'stoneGap', label: 'Gap between stones', min: 0.005, max: 0.12, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'stoneSize', label: 'Stone length', min: 0.15, max: 0.9, step: 0.005, re: 'ground' },
+    { o: 'V', k: 'stoneDepth', label: 'Stone depth', min: 0.04, max: 0.25, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path1x', label: 'Point 1: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path1y', label: 'Point 1: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path2x', label: 'Point 2: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path2y', label: 'Point 2: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path3x', label: 'Point 3: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path3y', label: 'Point 3: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path4x', label: 'Point 4: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path4y', label: 'Point 4: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path5x', label: 'Point 5: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path5y', label: 'Point 5: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path6x', label: 'Point 6: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path6y', label: 'Point 6: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path7x', label: 'Point 7: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path7y', label: 'Point 7: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path8x', label: 'Point 8: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path8y', label: 'Point 8: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path9x', label: 'Point 9: across', min: -0.1, max: 1.1, step: 0.001, re: 'ground' },
+    { o: 'V', k: 'path9y', label: 'Point 9: down', min: 0.6, max: 1.1, step: 0.001, re: 'ground' } ] },
   { name: 'Time and weather', ctls: [
     { sel: 'time' }, { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
@@ -3586,5 +3621,65 @@ window.addEventListener('resize', function () { if (sp.style.left) place(parseFl
 var count = document.getElementById('spCount');
 setInterval(function () { count.textContent = lab.info(); }, 500);
 build();
+
+/* The stone path's handles on the picture: one numbered dot for each point the path curves through, to drag
+   where the path should go. While a handle is dragged the path's line shows as a dashed guide; the scene is
+   drawn again when it is let go (and the panel's sliders follow). */
+(function () {
+  var N = lab.pathN, layer = document.createElement('div');
+  layer.style.cssText = 'position:fixed;inset:0;z-index:40;pointer-events:none;';
+  var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;overflow:visible;';
+  var line = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+  line.setAttribute('fill', 'none'); line.setAttribute('stroke', 'rgba(220,40,60,0.85)'); line.setAttribute('stroke-width', '2');
+  line.setAttribute('stroke-dasharray', '6 5');
+  svg.appendChild(line); layer.appendChild(svg);
+  var dots = [];
+  for (var i = 1; i <= N; i++) {
+    var d = document.createElement('div');
+    d.textContent = i;
+    d.style.cssText = 'position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;' +
+      'background:rgba(220,40,60,0.88);color:#fff;font:bold 13px/26px sans-serif;text-align:center;' +
+      'box-shadow:0 1px 4px rgba(0,0,0,0.4);pointer-events:auto;touch-action:none;cursor:grab;user-select:none;';
+    layer.appendChild(d); dots.push(d);
+    (function (k, el) {
+      el.addEventListener('pointerdown', function (e) {
+        e.preventDefault(); el.setPointerCapture(e.pointerId); el.style.cursor = 'grabbing';
+        function move(ev) {
+          var sz = lab.size();
+          OBJ.V['path' + k + 'x'] = Math.round(ev.clientX / sz[0] * 1000) / 1000;
+          OBJ.V['path' + k + 'y'] = Math.round(Math.max(sz[1] * 0.63, ev.clientY) / sz[1] * 1000) / 1000;
+          place(true);
+        }
+        function up() {
+          el.removeEventListener('pointermove', move); el.removeEventListener('pointerup', up); el.removeEventListener('pointercancel', up);
+          el.style.cursor = 'grab'; line.style.display = 'none';
+          lab.changed('ground'); build();
+        }
+        el.addEventListener('pointermove', move); el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
+      });
+    })(i, d);
+  }
+  document.body.appendChild(layer);
+  function place(guide) {
+    var on = OBJ.V.ref && OBJ.V.pathHandles, sz = lab.size();
+    layer.style.display = on ? '' : 'none';
+    if (!on) return;
+    dots.forEach(function (el, j) {
+      el.style.left = (OBJ.V['path' + (j + 1) + 'x'] * sz[0]) + 'px';
+      el.style.top = Math.min(sz[1] - 13, OBJ.V['path' + (j + 1) + 'y'] * sz[1]) + 'px';
+    });
+    if (guide) {
+      line.style.display = '';
+      line.setAttribute('points', lab.pathPreview().map(function (q) { return q[0].toFixed(1) + ',' + q[1].toFixed(1); }).join(' '));
+    } else line.style.display = 'none';
+  }
+  // keep the handles where the values are (after a slider, a reset, a resize)
+  var ch = lab.changed;
+  lab.changed = function (w) { var r = ch.apply(lab, arguments); place(false); return r; };
+  window.addEventListener('resize', function () { place(false); });
+  document.getElementById('spReset').addEventListener('click', function () { place(false); });
+  place(false);
+})();
 })();
 </script>

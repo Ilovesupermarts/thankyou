@@ -291,7 +291,7 @@ function path(c, o) {
   });
   c.restore();
   // (the layout is kept: the snowfield is baked in slices, each drawing the path)
-  var lkey = JSON.stringify([o.hy, o.yb, o.cx, o.size, o.depth, o.gap, o.pts, o.fixed, d(o, 'seed', 51)]);
+  var lkey = JSON.stringify([o.hy, o.yb, o.cx, o.size, o.depth, o.gap, o.halfWidth, o.pts, o.fixed, d(o, 'seed', 51)]);
   var keep = layoutCache[lkey];
   if (!keep) {
   // THE STONES, laid as in the reference: rows of flat slabs filling a band of even width that follows the
@@ -301,7 +301,7 @@ function path(c, o) {
   // row lies level (square to you); where it runs across, the row turns square to the path. The measured
   // slabs at the front (o.fixed) stand as they are: a piece that would come closer to one than the gap is
   // trimmed on that side or shortened, or left out if too little of it would be left.
-  var B = o.size * 0.5, gapZ = o.gap * 1.0, rows = [], guard = 0;
+  var B = d(o, 'halfWidth', o.size * 0.5), gapZ = o.gap * 1.0, rows = [], guard = 0;
   // the path's points on the ground, finely
   var GP = [];
   for (t = 0; t <= total + 1e-9; t += total / 600) { var A0 = at(Math.min(t, total)); GP.push([A0.X, A0.Z]); }
