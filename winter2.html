@@ -1250,17 +1250,21 @@ var REF = {
   //              the bottom edge; a thing at depth Z shows 1/Z as large.
   //   line       the middle of the path on the screen, from below the bottom edge to the shrine's steps
   //              (made smooth on the ground); the front torii stands at 'gate', which is on it
-  //   every      the distance between two torii, along the path; gateH a torii's height, lantH a lantern's
+  //   gates      how many torii (the user's choice: 6), every  the distance between two along the path
+  //              (as close as in the reference); what is left before the shrine stays clear
+  //   gateH      a torii's height; lantH a lantern's
   //   rightAlong, leftAlong   where in a gap each side's lantern stands (0 by the farther gate, 1 by the
   //              nearer), as in the autumn scene; fromStones  its gap from the stones' edge, beside them
   //              to the left or right on the screen (ground units)
   approach: { eye: 0.62, gate: [0.0805, 0.9],
-              // one wide sweep: up from the bottom edge, its leftmost point at the front gate, already
-              // curving up as it passes through it, then bending gently right through the gates to the shrine
-              line: [[0.3, 1.09], [0.235, 1.0], [0.16, 0.948], [0.104, 0.917], [0.0805, 0.9], [0.09, 0.866], [0.125, 0.83],
-                     [0.165, 0.8], [0.1955, 0.776], [0.222, 0.743], [0.243, 0.72], [0.258, 0.704], [0.272, 0.69],
-                     [0.287, 0.678], [0.299, 0.669], [0.308, 0.662]],
-              every: 1.27, gateH: 0.876, lantH: 0.51, rightAlong: 0.81, leftAlong: 0.38, fromStones: 0.12, endGap: 0.6 },
+              // the path meanders as the user drew it on the reference (an S): up-left from the bottom edge,
+              // its left bend widened (the user's choice) so the path passes through the front gate, then
+              // up-right to a right bend beyond the big lantern, back to the left, and on to the shrine's steps
+              line: [[0.31, 1.05], [0.262, 0.99], [0.19, 0.958], [0.128, 0.936], [0.093, 0.918], [0.0805, 0.9], [0.084, 0.882],
+                     [0.105, 0.856], [0.145, 0.826], [0.19, 0.797], [0.226, 0.773], [0.245, 0.755], [0.249, 0.743],
+                     [0.244, 0.727], [0.229, 0.712], [0.212, 0.701], [0.205, 0.69], [0.222, 0.679], [0.25, 0.671],
+                     [0.28, 0.666], [0.308, 0.662]],
+              gates: 6, every: 1.3, gateH: 0.876, lantH: 0.51, rightAlong: 0.81, leftAlong: 0.38, fromStones: 0.12 },
   // the roped pine: middle (its pole), foot, height (the rope knot to the foot)
   pine: { x: 0.801, y: 0.727, h: 0.28 },
   // the cranes: middle, foot, height, facing (1 right), pose
@@ -1317,16 +1321,20 @@ function approachLayout() {
   var g0 = toGround(A.gate[0] * W, A.gate[1] * H), s0 = 0, best = 1e9;
   for (i = 0; i < G.length; i++) { var dd = Math.hypot(G[i][0] - g0[0], G[i][1] - g0[1]); if (dd < best) { best = dd; s0 = len[i]; } }
   var out = { gates: [], lanterns: [], path: G.map(function (p) { var q = toScreen(p[0], p[1]); return q; }), hy: eyeY() };
-  var gS = [];
-  for (var s = s0; s < total - A.endGap; s += A.every) gS.push(s);
-  gS.forEach(function (sg) { var P = at(sg), q = toScreen(P.X, P.Z); out.gates.push({ x: q[0], y: q[1], h: A.gateH * D / P.Z }); });
+  var gS = [], every = A.every;
+  for (i = 0; i < A.gates && s0 + i * every < total - every * 0.5; i++) gS.push(s0 + i * every);
+  // every gate faces you (as in the reference); the path goes through its opening
+  gS.forEach(function (sg) {
+    var P = at(sg), q = toScreen(P.X, P.Z);
+    out.gates.push({ x: q[0], y: q[1], h: A.gateH * D / P.Z, yaw: Math.atan2(-P.tx, P.tz) * 180 / PI });   // (torii.js: the top beam runs along (cos yaw, sin yaw) on the ground)
+  });
   // one lantern each side in every gap (each side at its own place in the gap, as in the autumn scene),
   // standing just beside the stones: to their left and right on the screen, as in the reference
   var off = REF.stone * 0.55 + A.fromStones + A.lantH * 0.2;
   function clearance(X, Z) { var m = 1e9; for (var j = 0; j < G.length; j++) m = Math.min(m, Math.hypot(G[j][0] - X, G[j][1] - Z)); return m; }
   for (i = 0; i < gS.length - 1; i++) {
     [[1, A.rightAlong], [-1, A.leftAlong]].forEach(function (E) {
-      var sd = E[0], P = at(gS[i] + (1 - E[1]) * A.every);
+      var sd = E[0], P = at(gS[i] + (1 - E[1]) * every);
       // beside the path, straight to its right or left on the screen (as in the reference), moved out only
       // until it is clear of every stone of the path, also where the path bends
       var nx = sd, nz = 0, d0 = off;
