@@ -78,9 +78,8 @@ function draw() {
     .map(function (p) { return [p[0] * W, ry(p[1])]; });
   var cam = WinterHill.camera(W, H, hy, 22);
   var px = 0.195 * W, top = ry(0.185), foot = ry(0.505), done = false, stairs = null;
-  if (/notrees/.test(location.search)) WinterHill.pagoda(c, cam, { x: px, top: top, foot: foot, yaw: O.yaw, style: O.style, lit: L.lit, snow: 1, light: L, haze: 0.12 });
   WinterHill.hill(c, {
-    profile: prof, foot: hy, rows: /notrees/.test(location.search) ? 0 : O.rows, treeFar: O.treeFar * H, treeNear: O.treeNear * H, density: O.density, fill: O.fill,
+    profile: prof, foot: hy, rows: O.rows, noTrees: /notrees/.test(location.search), treeFar: O.treeFar * H, treeNear: O.treeNear * H, density: O.density, fill: O.fill,
     snow: O.snow, hazeFar: O.hazeFar, hazeNear: O.hazeNear, treeWidth: O.treeWidth, light: L, seed: 11,
     // no tree stands right behind the pagoda's lowest storey in the rows in front of it; the trees below its foot hide its base, as in the reference
     clearing: function (x, y, u) {
