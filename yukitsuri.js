@@ -153,24 +153,24 @@ function build(spec) {
   /* ---------- variant 1: the tall, slender one ---------- */
   function buildTall() {
     var leanK = spec.lean === undefined ? 1 : spec.lean, lean = (r() - 0.5) * 0.05 * Th * leanK;
-    var cb = clamp(spec.crown === undefined ? 0.38 : spec.crown, 0.02, 0.8), wr = lerp(0.24, 0.3, r()) * (spec.width || 1);
+    var cb = clamp(spec.crown === undefined ? 0.38 : spec.crown, 0.02, 0.8), wr = lerp(0.27, 0.32, r()) * (spec.width || 1);
     var shapeP = lerp(0.85, 1.15, r()), droopK = lerp(0.8, 1.2, r());
     var tp = [[0, 0, 0], [lean * 0.15 + (r() - 0.5) * 0.04 * Th, 0.3 * Th, 0], [lean * 0.5, 0.6 * Th, 0], [lean * 0.82, 0.85 * Th, 0], [lean, Th, 0]];
     var trunk = addLimb(-1, curve(tp, 3), Th * 0.022, Th * 0.004);
     T.trunk = trunk;
-    var y0 = cb * Th, gap = Th * 0.052, y = y0, idx = 0;
+    var y0 = cb * Th, gap = Th * 0.038, y = y0, idx = 0;
     while (y < Th * 0.955) {
       var f = (y - y0) / (Th - y0), Rw = (wr * Th * Math.pow(1 - f, shapeP) + 0.12) * lerp(0.85, 1.12, r());
-      var nb = f > 0.8 ? 3 + Math.floor(r() * 2) : 4 + Math.floor(r() * 3), az0 = r() * TAU, at = atHeight(trunk, y);
+      var nb = f > 0.8 ? 4 + Math.floor(r() * 2) : 6 + Math.floor(r() * 3), az0 = r() * TAU, at = atHeight(trunk, y);
       for (var k = 0; k < nb; k++) {
-        var th = az0 + k * TAU / nb + (r() - 0.5) * 1.0, L = Rw * lerp(0.55, 1.15, r());
-        if (r() < 0.07 && f < 0.85) continue;                                  // a gap where a bough is missing
+        var th = az0 + k * TAU / nb + (r() - 0.5) * 0.6, L = Rw * lerp(0.82, 1.12, r());
+        if (r() < 0.04 && f < 0.85) continue;                                  // (now and then a gap where a bough is missing)
         var d = [Math.sin(th), 0, Math.cos(th)], dr = lerp(0.18, 0.42, r()) * droopK * (0.6 + 0.6 * (1 - f));
         var p0 = at.p, p2 = add(p0, [d[0] * L, -dr * L, d[2] * L]), p1 = add(p0, [d[0] * L * 0.5, -dr * L * 0.42, d[2] * L * 0.5]);
         p2[1] += L * 0.05;                                                         // the tip turns up a little
         T.fol.push({ kind: 'bough', p0: p0, p1: p1, p2: p2, L: L, hang: L * lerp(0.26, 0.4, r()) * (0.75 + 0.35 * (1 - f)),
                      c: p1, rx: L * 0.5, rz: L * 0.5, seed: (r() * 1e9) | 0, f: f, id: idx++,
-                     snowD: snowK * lerp(0.12, 0.22, r()), reach: lerp(0.6, 0.95, r()) });
+                     snowD: snowK * lerp(0.17, 0.28, r()), reach: lerp(0.75, 0.97, r()) });
         if (L > 0.7 && f < 0.6) addLimb(at.seg, [p0, lerp3(p0, p1, 0.6)], Math.max(0.025, at.r * 0.35), 0.02);
       }
       y += gap * lerp(0.8, 1.25, r());
@@ -182,6 +182,9 @@ function build(spec) {
       addLimb(a2.seg, [a2.p, add(a2.p, [Math.sin(th2) * l2, -l2 * 0.25, Math.cos(th2) * l2])], 0.03, 0.012);
     }
     T.crownTop = [lean, Th, 0];
+    // the crown's inside: the inner branches and needles, deep in their own shade, so it is full (no sky through it)
+    T.core = { y0: y0, y1: Th * 0.97, R: function (yy) { var f2 = clamp((yy - y0) / (Th - y0), 0, 1); return (wr * Th * Math.pow(1 - f2, shapeP) + 0.12) * 0.72; },
+               at: function (yy) { return atHeight(trunk, yy).p; }, seed: (r() * 1e9) | 0 };
     if (roped) {
       // the pole: lashed to the trunk (just behind it), its top above the crown
       var pole = { a: [-0.04 * sg, 0, -0.12], b: [lean, Ht, -0.12], r: 0.045, cap: true };
@@ -205,13 +208,13 @@ function build(spec) {
       trunks.push(addLimb(bi ? T.trunk[0] : -1, pts, Th * girth * (bi ? 0.85 : 1), Th * 0.012));
       if (!bi) T.trunk = trunks[0];
     });
-    var cbs = { 2: 0.3, 3: 0.32, 4: 0.24, 5: 0.36 }, groups = [];
+    var cbs = { 2: 0.22, 3: 0.26, 4: 0.2, 5: 0.28 }, groups = [];
     trunks.forEach(function (ids, ti) {
-      var top = T.segs[ids[ids.length - 1]].b, cb = cbs[v] * Th, lev = v === 4 ? 8 : v === 5 ? 7 : 9, grp = [];
+      var top = T.segs[ids[ids.length - 1]].b, cb = cbs[v] * Th, lev = v === 4 ? 10 : v === 5 ? 9 : 12, grp = [];
       groups.push(grp);
       for (var k = 0; k < lev; k++) {
         var y = lerp(cb, top[1] - Th * 0.06, (k + lerp(0.25, 0.75, r())) / lev), f = (y - cb) / (top[1] - cb), at = atHeight(ids, y);
-        var Rm = envelope(f, ti) * (spec.width || 1), nb = v === 4 ? 2 + Math.floor(r() * 2) : 1 + (r() < 0.65 ? 1 : 0);
+        var Rm = envelope(f, ti) * (spec.width || 1), nb = v === 4 ? 3 + Math.floor(r() * 2) : 2 + (r() < 0.6 ? 1 : 0);
         var az0 = r() * TAU;
         if (v === 3 && f < 0.6) az0 = sg > 0 ? PI / 2 : -PI / 2;                // the low limbs reach out over the lean
         if (v === 5) az0 = (ti ? PI / 2 : -PI / 2) + (r() - 0.5) * 1.2;          // each trunk's limbs reach away from the other
@@ -270,11 +273,11 @@ function build(spec) {
     var ids = addLimb(at.seg, curve(pts, 2), Math.max(0.06, at.r * lerp(0.55, 0.7, r())), 0.035);
     var level = 1 - Math.abs(pts[3][1] - P0[1]) / Lb;
     T.limbs.push({ ids: ids, L: Lb, th: th, level: level });
-    var tip = pts[3], pr = clamp(Lb * lerp(0.36, 0.5, r()), 0.35, 1.7) * (v === 4 ? 1.15 : 1);
+    var tip = pts[3], pr = clamp(Lb * lerp(0.45, 0.62, r()), 0.4, 1.9) * (v === 4 ? 1.15 : 1);
     pad(add(tip, [0, pr * 0.16, 0]), pr, pr * lerp(0.65, 0.95, r()), pr * lerp(0.42, 0.58, r()), f, grp);
     // a smaller pad part way along, set off to one side
-    if (Lb > 0.9 && r() < 0.8) {
-      var S = onLimb(ids, lerp(0.45, 0.65, r())), off = (r() < 0.5 ? -1 : 1) * lerp(0.2, 0.45, r());
+    for (var sp = 0; sp < (Lb > 1.4 ? 2 : Lb > 0.7 ? 1 : 0); sp++) {
+      var S = onLimb(ids, lerp(0.35, 0.7, r())), off = (sp ? -1 : 1) * (r() < 0.5 ? -1 : 1) * lerp(0.2, 0.5, r());
       var q = add(S.p, [side[0] * off, lerp(0.1, 0.25, r()), side[2] * off]), pr2 = pr * lerp(0.5, 0.72, r());
       addLimb(S.seg, [S.p, q], Math.max(0.035, S.r * 0.65), 0.025);
       pad(add(q, [0, pr2 * 0.15, 0]), pr2, pr2 * lerp(0.7, 0.95, r()), pr2 * lerp(0.45, 0.6, r()), f, grp);
@@ -537,7 +540,7 @@ function boughPt(E, t) {
 }
 function boughModel(E) {
   if (E._m) return E._m;
-  var rr = rng(E.seed + 11), L = E.L, tw = [], step = 0.065 + 0.02 * rr();
+  var rr = rng(E.seed + 11), L = E.L, tw = [], step = Math.max(0.045, 2 / (E._s || 40)) * lerp(0.9, 1.15, rr());
   var n = Math.max(3, Math.round(L / step));
   for (var i = 0; i < n; i++) {
     var t = (i + 0.35 + rr() * 0.3) / n;
@@ -553,7 +556,7 @@ function boughModel(E) {
       var mid = [base[0] + dx * lb * 0.55, base[1] - Math.sin(droop) * lb * 0.25, base[2] + dz * lb * 0.55];
       var tip = [base[0] + dx * lb * Math.cos(droop * 0.7), base[1] - Math.sin(droop) * lb * 0.85, base[2] + dz * lb * Math.cos(droop * 0.7)];
       // little twigs hanging from it (more toward the middle of the bough, where it is heaviest)
-      var hang = [], nh = Math.round(lerp(0, 3, rr()) * Math.sin(PI * Math.min(1, t * 1.1)));
+      var hang = [], nh = Math.round(lerp(1, 4, rr()) * Math.sin(PI * Math.min(1, t * 1.1 + 0.05)));
       for (var h = 0; h < nh; h++) {
         var f = lerp(0.3, 0.9, rr()), hb = lerp3(base, tip, f), hl = lb * lerp(0.35, 0.7, rr());
         hang.push([hb, [hb[0] + dx * hl * 0.2, hb[1] - hl, hb[2] + dz * hl * 0.2]]);
@@ -564,57 +567,85 @@ function boughModel(E) {
   E._m = { tw: tw };
   return E._m;
 }
+/* A brush that gathers strokes by colour and draws each colour's strokes at once (one stroke call per colour, not per
+   needle); flush() lays them down, the darkest first, so the lit needles lie on top. */
+function Brush(c, lw) {
+  var B = {}, keys = [];
+  return {
+    line: function (col, a, pts) {
+      var k = css(col, Math.round(a * 8) / 8);
+      if (!B[k]) { B[k] = { p: new Path2D(), lum: col[0] * 0.3 + col[1] * 0.59 + col[2] * 0.11 }; keys.push(k); }
+      var P2 = B[k].p; P2.moveTo(pts[0][0], pts[0][1]);
+      for (var i = 1; i < pts.length; i++) P2.lineTo(pts[i][0], pts[i][1]);
+    },
+    flush: function () {
+      keys.sort(function (a, b) { return B[a].lum - B[b].lum; });
+      c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = lw;
+      keys.forEach(function (k) { c.strokeStyle = k; c.stroke(B[k].p); });
+      B = {}; keys = [];
+    }
+  };
+}
 /* a branchlet's needles: several fine strokes along it, spread across its width and tapering to its tip, then a fringe
    of single needles along its edges */
-function needleRun(c, pts, wid, s, cols, alphaK, rr) {
-  var A = pts[0], M = pts[1], Z = pts[2], ns = wid > 2.5 ? 5 : wid > 1.4 ? 4 : 3, lw = Math.max(0.45, 0.012 * s);
-  function at(u) { var a = (1 - u) * (1 - u), b = 2 * u * (1 - u), cc = u * u, mx = 2 * M[0] - (A[0] + Z[0]) / 2, my = 2 * M[1] - (A[1] + Z[1]) / 2; return [a * A[0] + b * mx + cc * Z[0], a * A[1] + b * my + cc * Z[1]]; }
-  var seg = 6, P0 = [];
+function needleRun(Bru, pts, wid, s, cols, alphaK, rr) {
+  var A = pts[0], M = pts[1], Z = pts[2], ns = wid > 3 ? 6 : wid > 2 ? 5 : wid > 1.2 ? 4 : 3;
+  var mx = 2 * M[0] - (A[0] + Z[0]) / 2, my = 2 * M[1] - (A[1] + Z[1]) / 2;
+  function at(u) { var a = (1 - u) * (1 - u), b = 2 * u * (1 - u), cc = u * u; return [a * A[0] + b * mx + cc * Z[0], a * A[1] + b * my + cc * Z[1]]; }
+  var seg = 4, P0 = [];
   for (var i = 0; i <= seg; i++) P0.push(at(i / seg));
-  c.lineCap = 'round'; c.lineJoin = 'round';
   for (var k = 0; k < ns; k++) {
-    var off = (k / (ns - 1) - 0.5) * wid, col = cols[Math.floor(rr() * cols.length)];
-    c.strokeStyle = css(col, lerp(0.5, 0.85, rr()) * alphaK); c.lineWidth = lw * lerp(0.8, 1.3, rr());
-    c.beginPath();
+    var off = (k / (ns - 1) - 0.5) * wid, col = cols[Math.floor(rr() * cols.length)], line = [];
     for (i = 0; i <= seg; i++) {
       var u = i / seg, p = P0[i], q = P0[Math.min(seg, i + 1)], r0 = P0[Math.max(0, i - 1)], dx = q[0] - r0[0], dy = q[1] - r0[1], l = Math.hypot(dx, dy) || 1;
-      var o = off * (1 - 0.75 * u) + (rr() - 0.5) * wid * 0.15;
-      var x = p[0] - dy / l * o, y = p[1] + dx / l * o;
-      if (i) c.lineTo(x, y); else c.moveTo(x, y);
+      var o = off * (1 - 0.7 * u) + (rr() - 0.5) * wid * 0.15;
+      line.push([p[0] - dy / l * o, p[1] + dx / l * o]);
     }
-    c.stroke();
+    Bru.line(col, lerp(0.55, 0.9, rr()) * alphaK, line);
   }
-  // single needles standing out along it (its edges are never a clean line)
-  var nf = Math.round(seg * lerp(0.6, 1.3, rr())), nl = Math.max(0.9, 0.04 * s);
-  c.strokeStyle = css(cols[Math.floor(rr() * cols.length)], 0.4 * alphaK); c.lineWidth = lw;
-  c.beginPath();
+  // single needles standing out along its edges (its edges are never a clean line)
+  var nf = Math.round(lerp(1, 3, rr())), nl = Math.max(0.9, 0.04 * s);
   for (i = 0; i < nf; i++) {
     var u2 = rr() * 0.95, p2 = at(u2), q2 = at(Math.min(1, u2 + 0.05)), dx2 = q2[0] - p2[0], dy2 = q2[1] - p2[1], l2 = Math.hypot(dx2, dy2) || 1;
-    var sd = rr() < 0.5 ? -1 : 1, w2 = wid * 0.5 * (1 - 0.75 * u2);
-    var bx = p2[0] - dy2 / l2 * w2 * sd, by = p2[1] + dx2 / l2 * w2 * sd;
+    var sd = rr() < 0.5 ? -1 : 1, w2 = wid * 0.5 * (1 - 0.7 * u2), bx = p2[0] - dy2 / l2 * w2 * sd, by = p2[1] + dx2 / l2 * w2 * sd;
     var ang2 = lerp(0.4, 1.2, rr()), ca2 = Math.cos(ang2), sa2 = Math.sin(ang2), ln2 = nl * lerp(0.5, 1.2, rr());
     var ax = dx2 / l2 * ca2 - dy2 / l2 * sd * sa2, ay = dy2 / l2 * ca2 + dx2 / l2 * sd * sa2 + lerp(0, 0.4, rr());
-    c.moveTo(bx, by); c.lineTo(bx + ax * ln2, by + ay * ln2);
+    Bru.line(cols[Math.floor(rr() * cols.length)], 0.45 * alphaK, [[bx, by], [bx + ax * ln2, by + ay * ln2]]);
   }
-  c.stroke();
+}
+/* The inside of a tall pine's crown: its inner branches and needles, in deep shade, brushed out from the trunk at
+   every height, so the crown is full (the boughs are drawn over it). */
+function paintCore(c, T, P, K) {
+  var Co = T.core, rr = rng(Co.seed), s = P.s(0), Bru = Brush(c, Math.max(0.5, 0.014 * s)), dy = Math.max(0.035, 1.6 / s);
+  for (var y = Co.y0 + 0.1; y < Co.y1; y += dy * lerp(0.7, 1.3, rr())) {
+    var C0 = Co.at(y), R = Co.R(y), n = 8 + Math.floor(rr() * 5);
+    for (var k = 0; k < n; k++) {
+      var th = rr() * TAU, r1 = R * lerp(0.45, 1, Math.sqrt(rr())), dr = lerp(0.2, 0.5, rr());
+      var tip = [C0[0] + Math.sin(th) * r1, y - r1 * dr, C0[2] + Math.cos(th) * r1], mid = [C0[0] + Math.sin(th) * r1 * 0.5, y - r1 * dr * 0.3, C0[2] + Math.cos(th) * r1 * 0.5];
+      var A = P(C0), M = P(mid), Z = P(tip), tone = rr();
+      Bru.line(tone < 0.55 ? K.under : tone < 0.9 ? K.dark : K.mid, lerp(0.6, 0.95, rr()), [A, M, Z, [Z[0] + (rr() - 0.5) * 2, Z[1] + lerp(1, 3, rr())]]);
+    }
+  }
+  Bru.flush();
 }
 function paintBough(c, E, P, K) {
   var M = boughModel(E), s = P.s(E.p1[2]), rr = rng(E.seed + 1), lx = K.lx;
-  var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.095 * s);
+  var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.12 * s), Bru = Brush(c, Math.max(0.45, 0.012 * s));
   function twig(T) {
     // its light: deep in the crown (near the trunk) and under the branch, darker; out at the tips and on the sun's
     // side, lighter; the far side of the bough, a little darker (in the bough's own shade)
     var depth = clamp(1 - T.t * 1.3, 0, 1), back = T.z < axisZ ? 0.25 : 0, litSide = (P(T.tip)[0] - P(T.base)[0]) * lx > 0;
-    var cols = depth + back > 0.65 ? [K.under, K.dark, K.dark] : depth + back > 0.3 ? [K.dark, K.dark, K.mid] : litSide ? [K.dark, K.mid, K.lit, K.lit] : [K.dark, K.mid, K.mid];
+    var cols = depth + back > 0.7 ? [K.under, K.dark, K.dark, K.mid] : depth + back > 0.35 ? [K.dark, K.mid, K.mid] : litSide ? [K.mid, K.lit, K.lit, K.hi] : [K.dark, K.mid, K.mid, K.lit];
     var A = P(T.base), Mi = P(T.mid), Z = P(T.tip);
-    needleRun(c, [A, Mi, Z], wid0 * T.full * (0.6 + 0.4 * (1 - T.t)), s, cols, 1, rr);
+    needleRun(Bru, [A, Mi, Z], wid0 * T.full * (0.6 + 0.4 * (1 - T.t)), s, cols, 1, rr);
     T.hang.forEach(function (H) {
       var hb = P(H[0]), he = P(H[1]);
-      needleRun(c, [hb, [lerp(hb[0], he[0], 0.5) + (rr() - 0.5) * 2, lerp(hb[1], he[1], 0.5)], he], wid0 * 0.55, s, [K.under, K.dark, K.mid], 0.9, rr);
+      needleRun(Bru, [hb, [lerp(hb[0], he[0], 0.5) + (rr() - 0.5) * 2, lerp(hb[1], he[1], 0.5)], he], wid0 * 0.6, s, [K.under, K.dark, K.mid, K.mid], 0.95, rr);
     });
   }
   var backT = M.tw.filter(function (T) { return T.z < axisZ; }), foreT = M.tw.filter(function (T) { return T.z >= axisZ; });
   backT.forEach(twig);
+  Bru.flush();
   // the main branch itself, a thin dark twig, seen in the gaps near the trunk
   c.strokeStyle = css(K.barkDk, 0.85); c.lineWidth = Math.max(0.6, 0.035 * s); c.lineCap = 'round';
   c.beginPath();
@@ -623,7 +654,8 @@ function paintBough(c, E, P, K) {
   foreT.forEach(twig);
   // the tip: the branch's own end, a spray of new growth
   var tp = P(E.p2), tq = P(boughPt(E, 0.9));
-  needleRun(c, [tq, [lerp(tq[0], tp[0], 0.5), lerp(tq[1], tp[1], 0.5) - 0.5], tp], wid0 * 0.8, s, [K.dark, K.mid], 1, rr);
+  needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.5), lerp(tq[1], tp[1], 0.5) - 0.5], tp], wid0 * 0.8, s, [K.mid, K.lit], 1, rr);
+  Bru.flush();
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
 }
 /* The snow on a bough, piece by piece: one broken layer lying along the top of the branch (its depth uneven, thinning
@@ -645,11 +677,11 @@ function boughSnowClumps(E, Pc, P) {
     var tx = B2[0] - B[0], tz = B2[2] - B[2], tl = Math.hypot(tx, tz) || 1, sx = -tz / tl, sz = tx / tl;   // across the branch, level
     var env = Math.pow(Math.sin(PI * clamp(u * 1.1 - 0.05, 0, 1)), 0.5);
     var d = Pc.d * keepAt(t) * env * (0.35 + 0.9 * big(u)) * (0.85 + 0.3 * mid(u));             // its depth (m)
-    if (big(u) * 0.8 + mid(u) * 0.4 < 0.24 || d * s < 0.7) { cur = null; continue; }
+    if (big(u) * 0.8 + mid(u) * 0.4 < 0.16 || d * s < 0.7) { cur = null; continue; }
     if (!cur) { cur = { raw: [], L: [], Cn: [], R: [], Lb: [], Rb: [] }; runs.push(cur); }
     // it rests on the needles on top of the branch: as wide as the inner branchlets (uneven on each side), highest along
     // the middle, sagging toward its sides; its lower edge sits a little into the needles
-    var hw = (0.1 + E.L * 0.08) * (1 - t * 0.45);
+    var hw = (0.12 + E.L * 0.11) * (1 - t * 0.4);
     cur.raw.push({ B: B, sx: sx, sz: sz, wl: hw * (0.5 + 0.8 * wL(u) + 0.3 * (fine(1 - u) - 0.5)), wr: hw * (0.5 + 0.8 * wR(u) + 0.3 * (fine(u * 0.7) - 0.5)),
                    crest: d * (1 + 0.3 * (fine(u) - 0.5)), d: d, y0: B[1] + 0.04 });
   }
@@ -702,12 +734,24 @@ function paintBoughSnow(c, E, Pc, P, K) {
     strip(farT, farB, mix(K.snowFront, K.snowUnder, 0.4));
     // the top, one surface: brightest along its crest (facing up, to the sky and the low sun), shading off toward its edges
     pathOf(c, Rn.sL, Rn.sR.slice().reverse());
-    c.fillStyle = vgrad(Rn.sL.concat(Rn.sR, Rn.sCn), [[0, K.snowLit], [0.45, K.snowTop], [1, mix(K.snowTop, K.snowFront, 0.5)]]);
+    c.fillStyle = vgrad(Rn.sL.concat(Rn.sR, Rn.sCn), [[0, K.snowLit], [0.3, K.snowTop], [0.75, mix(K.snowTop, K.snowFront, 0.55)], [1, mix(K.snowTop, K.snowFront, 0.8)]]);
     c.fill();
     // its near face, toward you: from the top's colour at its upper edge into the sky's blue shade (the sun is behind)
     pathOf(c, nearT, nearB.slice().reverse());
-    c.fillStyle = vgrad(nearT.concat(nearB), [[0, mix(K.snowTop, K.snowFront, 0.5)], [0.5, K.snowFront], [1, mix(K.snowFront, K.snowUnder, 0.5)]]);
+    c.fillStyle = vgrad(nearT.concat(nearB), [[0, mix(K.snowTop, K.snowFront, 0.65)], [0.45, K.snowFront], [1, mix(K.snowFront, K.snowUnder, 0.75)]]);
     c.fill();
+    // the snow is never one flat white: soft hollows and lumps in its surface hold a little shade (inside its outline)
+    var rr2 = rng(Pc.seed + Rn.sCn.length * 13), nb = Math.round(Rn.sCn.length / 4);
+    if (nb > 0) {
+      c.save(); pathOf(c, Rn.sL, nearB.slice().reverse()); c.clip();
+      for (var b = 0; b < nb; b++) {
+        var j = Math.floor(rr2() * Rn.sCn.length), q = Rn.sCn[j], nq = nearB[j], rx = Math.max(1.5, Math.abs(nq[1] - q[1]) * lerp(0.8, 1.6, rr2()));
+        var gq = c.createRadialGradient(q[0], lerp(q[1], nq[1], 0.55), 0, q[0], lerp(q[1], nq[1], 0.55), rx);
+        gq.addColorStop(0, css(K.snowFront, lerp(0.25, 0.5, rr2()))); gq.addColorStop(1, css(K.snowFront, 0));
+        c.fillStyle = gq; c.fillRect(q[0] - rx, q[1] - rx, rx * 2, rx * 2 + Math.abs(nq[1] - q[1]));
+      }
+      c.restore();
+    }
   });
 }
 
@@ -969,7 +1013,9 @@ function bakeJob(T, o) {
   // A rope's last stretch, inside the foliage of the branch it is tied to, goes just behind that branch's needles.
   var items = [], R = { box: box, P: P, K: K, loose: [], pads: [], wood: '' };
   function segRect(A, B, w) { return [Math.min(A[0], B[0]) - w, Math.min(A[1], B[1]) - w, Math.max(A[0], B[0]) + w, Math.max(A[1], B[1]) + w]; }
+  if (T.core) items.push({ z: -1e6, rects: [], draw: function () { paintCore(c, T, P, K); } });
   T.fol.forEach(function (E) {
+    E._s = P.s(E.kind === 'pad' ? E.c[2] : E.p1[2]); E._m = null;
     var Sh = E.kind === 'pad' ? padShape(E, P) : boughShape(E, P), r0;
     if (E.kind === 'pad') r0 = [Sh.C[0] - Sh.hw - 2, Sh.C[1] - Sh.th * 0.7, Sh.C[0] + Sh.hw + 2, Sh.C[1] + Sh.th * 0.5];
     else r0 = [Math.min(Sh.A[0], Sh.B[0]) - 2, Math.min(Sh.A[1], Sh.B[1]) - Sh.up - 2, Math.max(Sh.A[0], Sh.B[0]) + 2, Math.max(Sh.A[1], Sh.B[1]) + Sh.hang];
