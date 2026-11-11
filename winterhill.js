@@ -200,11 +200,14 @@ function pagoda(c, cam, o) {
   function roof(R) {
     var seg = 8, midUp = [0, R.ey + R.rise * 0.2, 0], midDown = [0, R.ey + R.rise + R.th * 4, 0], axis = [0, R.ey, 0];
     for (var side = 0; side < 4; side++) {
+      var sideSoffit = [eave(R, -1, side, -R.th), eave(R, 1, side, -R.th), ring(1, side, R.e * 0.6, R.ey - R.th * 1.4), ring(-1, side, R.e * 0.6, R.ey - R.th * 1.4)]
+        .map(function (q) { return Wp(q[0], q[1], q[2]); });
       for (var s = 0; s < seg; s++) {
         var u0 = -1 + 2 * s / seg, u1 = -1 + 2 * (s + 1) / seg;
         var a = eave(R, u0, side), bb = eave(R, u1, side), A = ring(u0, side, R.inner, R.ey + R.rise), B = ring(u1, side, R.inner, R.ey + R.rise);
         var a2 = eave(R, u0, side, -R.th), b2 = eave(R, u1, side, -R.th);
         face([a2, b2, ring(u1, side, R.e * 0.6, R.ey - R.th * 1.4), ring(u0, side, R.e * 0.6, R.ey - R.th * 1.4)], 'soffit', midDown, 'rafters');
+        cur.faces[cur.faces.length - 1].grp = sideSoffit;               // shaded as one piece with the rest of its side
         face([a2, b2, bb, a], 'fascia', axis);
         face([a, bb, B, A], 'tile', midUp, 'tiles');
       }
@@ -303,12 +306,6 @@ function pagoda(c, cam, o) {
       softBands(Top, Back, cTop.map(function (cc) { return mix(cc, [255, 252, 246], 0.25); }), cTop.map(function (cc) { return mix(cc, [176, 184, 218], 0.2); }), 5);
       // the rounded front of the snow: bright at its crest, blue underneath; rounded ends
       softBands(Top, Bot, cTop.map(function (cc) { return mix(cc, [255, 252, 246], 0.3); }), cUnder, 7);
-      // the light catching the crest
-      c.save();
-      c.strokeStyle = 'rgba(255,250,238,0.55)'; c.lineWidth = 0.8;
-      c.beginPath(); Top.forEach(function (p, i) { if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); });
-      c.stroke();
-      c.restore();
     };
   }
   function smooth01(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
@@ -397,11 +394,10 @@ function pagoda(c, cam, o) {
       var ct = mix(colTop, colDip, slope * 0.55);
       cc.push(ct); cs2.push(mix(mix(colFace, [150, 160, 204], 0.5), colDip, slope * 0.3)); cf.push(mix(colOut, bankCol, 0.6));
     }
-    softBands(Crest, Low, cc.map(function (x, k) { return mix(x, cs2[k], 0.2); }), cs2, 8);
     // its outer slope, painted solid on a layer of its own and faded out into the hill in one smooth sweep, so it has
     // no outer edge
     var main = c, T0 = c.getTransform(), bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
-    Crest.concat(Foot).forEach(function (p) { bx0 = Math.min(bx0, p[0]); by0 = Math.min(by0, p[1]); bx1 = Math.max(bx1, p[0]); by1 = Math.max(by1, p[1]); });
+    Crest.concat(Foot, Low).forEach(function (p) { bx0 = Math.min(bx0, p[0]); by0 = Math.min(by0, p[1]); bx1 = Math.max(bx1, p[0]); by1 = Math.max(by1, p[1]); });
     bx0 -= 6; by0 -= 6; bx1 += 6; by1 += 6;
     var lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); lay.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
@@ -413,8 +409,12 @@ function pagoda(c, cam, o) {
     fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(0.3, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
     c.fillStyle = fade; c.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
     c.restore();
+    // the face over the steps' ends, on the same layer
+    softBands(Crest, Low, cc.map(function (x, k) { return mix(x, cs2[k], 0.2); }), cs2, 8);
     c = main;
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(lay, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
+    // laid down a little blurred, so its edges are soft
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + (1.3 * T0.a).toFixed(2) + 'px)';
+    c.drawImage(lay, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
   }
   var bankCol = null;
   function paintFootDrift() {
@@ -451,8 +451,9 @@ function pagoda(c, cam, o) {
   // how each material's colour runs across its face, from its lower (or outer) edge to its upper (or inner) one
   var RAMP = { wall: [1.04, 0.86], soffit: [1.0, 0.5], tile: [1.15, 0.8], fascia: [0.85, 1.12], bracket: [1.12, 0.78],
                step: [0.82, 1.06], gold: [1.0, 1.0], goldLit: [1.0, 1.0] };
-  function paintFace(f, n) {
-    var pts = f.p.map(function (q) { return proj(cam, q); });
+  function paintFace(f, n0, gn) {
+    var pts = f.p.map(function (q) { return proj(cam, q); }), n = gn || n0;
+    var gp = f.grp ? f.grp.map(function (q) { return proj(cam, q); }) : pts;   // the shape the shading runs across
     var m = f.mat, col;
     if (m === 'gold' || m === 'goldLit') {
       col = shade(GOLD, n, L, 1);
@@ -465,17 +466,17 @@ function pagoda(c, cam, o) {
     if (lit > 0 && (m === 'soffit' || m === 'bracket')) col = mix(col, [255, 170, 90], clamp(0.35 * lit, 0, 0.6));
     var ramp = RAMP[m] || [1, 1];
     if (pts.length === 4) {
-      var e0 = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2], e1 = [(pts[2][0] + pts[3][0]) / 2, (pts[2][1] + pts[3][1]) / 2];
+      var e0 = [(gp[0][0] + gp[1][0]) / 2, (gp[0][1] + gp[1][1]) / 2], e1 = [(gp[2][0] + gp[3][0]) / 2, (gp[2][1] + gp[3][1]) / 2];
       var g = c.createLinearGradient(e0[0], e0[1], e1[0] + 0.01, e1[1] + 0.01);
       g.addColorStop(0, css(fin([col[0] * ramp[0], col[1] * ramp[0], col[2] * ramp[0]])));
       g.addColorStop(1, css(fin([col[0] * ramp[1], col[1] * ramp[1], col[2] * ramp[1]])));
       c.fillStyle = g;
     } else c.fillStyle = css(fin(col));
     poly(pts); c.fill();
-    if (m !== 'wall') { c.strokeStyle = c.fillStyle; c.lineWidth = 0.7; c.stroke(); }    // no hairline gaps between pieces
+    if (m !== 'wall') { c.strokeStyle = c.fillStyle; c.lineWidth = 0.7; c.lineJoin = 'round'; c.stroke(); c.lineJoin = 'miter'; }   // (round joins: a mitred join on a sharp corner shoots out as a spike)    // no hairline gaps between pieces
     // the light falls off across the face, away from the sun's side
     if (pts.length === 4 && m !== 'gold' && m !== 'goldLit') {
-      var xs = pts.map(function (p) { return p[0]; }), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+      var xs = gp.map(function (p) { return p[0]; }), x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
       if (x1 - x0 > 2) {
         var gx = c.createLinearGradient(x0, 0, x1, 0);
         gx.addColorStop(litLeft ? 0 : 1, 'rgba(255,238,215,0.07)'); gx.addColorStop(litLeft ? 1 : 0, 'rgba(25,18,40,0.12)');
@@ -560,7 +561,7 @@ function pagoda(c, cam, o) {
   function rafterDetail(pts, col) {
     var w = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
     if (w < 5) return;
-    var n = clamp(Math.round(w / 3), 2, 12); c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.35))); c.lineWidth = 0.6;
+    var n = clamp(Math.round(w / 3), 2, 12); c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.25)), 0.4); c.lineWidth = 0.5;   // faint
     c.beginPath();
     for (var i = 1; i < n; i++) { var a = P2(pts, i / n, 0), b = P2(pts, i / n, 1); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); }
     c.stroke();
@@ -578,10 +579,19 @@ function pagoda(c, cam, o) {
       var cen = [0, 0, 0]; p.forEach(function (qq) { cen[0] += qq[0] / p.length; cen[1] += qq[1] / p.length; cen[2] += qq[2] / p.length; });
       if (dot(n, sub(cen, f.mid)) < 0) n = [-n[0], -n[1], -n[2]];          // pointing out of its solid
       if (dot(n, sub(eye, cen)) <= 0) return;                              // turned away
-      vis.push({ f: f, n: n, d: Math.hypot(cen[0], cen[1], cen[2]) });
+      var gn = n;
+      if (f.grp) {                                     // one light for a whole side of the eave's underside
+        var g0 = f.grp; gn = [0, 0, 0];
+        for (var gi = 0; gi < 4; gi++) {
+          var GA = g0[gi], GB = g0[(gi + 1) % 4];
+          gn[0] += (GA[1] - GB[1]) * (GA[2] + GB[2]); gn[1] += (GA[2] - GB[2]) * (GA[0] + GB[0]); gn[2] += (GA[0] - GB[0]) * (GA[1] + GB[1]);
+        }
+        gn = norm(gn); if (dot(gn, n) < 0) gn = [-gn[0], -gn[1], -gn[2]];
+      }
+      vis.push({ f: f, n: n, gn: gn, d: Math.hypot(cen[0], cen[1], cen[2]) });
     });
     vis.sort(function (A, B) { return B.d - A.d; });
-    vis.forEach(function (v) { paintFace(v.f, v.n); });
+    vis.forEach(function (v) { paintFace(v.f, v.n, v.gn); });
     if (it.post) it.post();
   });
 
