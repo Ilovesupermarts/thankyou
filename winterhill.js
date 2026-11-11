@@ -619,80 +619,158 @@ function pagoda(c, cam, o) {
 var NEEDLES = ['#2F4A3B', '#2B4440', '#35473A', '#283C37', '#3A4C3C', '#2E3F3E', '#3E5040'].map(hex);
 function fir(c, x, y, h, seed, look) {
   var r = rng(seed * 7919 + 13), L = look.light, hz = look.haze || 0;
-  // this tree's own build
-  var wr = lerp(0.42, 0.64, r()) * (look.width || 1);           // width / height
-  var n = Math.round(lerp(5, 10, r()) * (look.tiers || 1));
-  var lean = (r() - 0.5) * 0.09 * h;                           // the top leans this far (px)
-  var droop = lerp(0.2, 0.55, r()), snow = clamp(look.snow * lerp(0.55, 1.25, r()), 0, 1.6);
-  var needle = mix(NEEDLES[Math.floor(r() * NEEDLES.length)], [r() * 40, 40 + r() * 30, 30 + r() * 30], 0.12);
-  var topKind = r(), trunkShow = r() < 0.5 ? lerp(0.04, 0.1, r()) : 0, broken = r() < 0.12;
+  // this tree's own build: every tree is different (crown shape, fullness, lopsidedness, snow, colour)
+  var wr = lerp(0.3, 0.62, r()) * (look.width || 1);            // width / height
+  var shapeP = lerp(0.7, 1.3, r());                               // < 1: a column with a short point; > 1: a slim cone
+  var n = Math.max(4, Math.round(lerp(6, 12, r()) * (look.tiers || 1)));
+  var sparse = r() < 0.35 ? lerp(0.25, 0.5, r()) : 0;           // a sparse tree: gaps between its tiers show the trunk
+  var lean = (r() - 0.5) * 0.08 * h, bend = (r() - 0.5) * 0.05 * h;
+  var droop = lerp(0.15, 0.6, r()), asym = (r() - 0.5) * 0.35;  // one side longer than the other
+  var snow = clamp(look.snow * lerp(0.55, 1.25, r()), 0, 1.6);     // (the same range as before)
+  var needle = mix(NEEDLES[Math.floor(r() * NEEDLES.length)], [r() * 40, 40 + r() * 30, 30 + r() * 30], 0.15);
+  needle = mix(needle, [0, 0, 0], (r() - 0.5) * 0.2);
+  var topKind = r(), trunkShow = r() < 0.5 ? lerp(0.03, 0.09, r()) : 0, broken = r() < 0.15;
   var w = h * wr, base = y - h * trunkShow;
   var fin = function (col) { return mix(col, L.haze, hz); };
   var lx = L.sun[0] < 0 ? -1 : 1;                              // which side the light is on
-  var dark = fin(mix(needle, [0, 0, 0], 0.25)), mid = fin(shade(needle, [lx * 0.5, 0.4, 0.75], L, 1.2)), sh = fin(mix(needle, [20, 30, 50], 0.35));
+  var dark = fin(mix(needle, [0, 0, 0], 0.28)), mid = fin(shade(needle, [lx * 0.5, 0.4, 0.75], L, 1.2)), sh = fin(mix(needle, [20, 30, 50], 0.35));
+  var hi = fin(mix(shade(needle, [lx * 0.8, 0.5, 0.4], L, 1.3), [200, 210, 190], 0.12));
   var snowLit = fin(shade(SNOW, norm([lx * 0.7, 0.8, 0.4]), L, 1)), snowSh = fin(mix(shade(SNOW, [0, 1, 0], L, 0), [178, 186, 216], 0.45));
-  if (trunkShow) { c.fillStyle = css(fin([58, 44, 40])); c.fillRect(x - h * 0.012, y - h * trunkShow - 1, h * 0.024, h * trunkShow + 1); }
-  // the tiers, from the bottom up; each a skirt hanging from the trunk
-  var tiers = [];
-  for (var i = 0; i < n; i++) {
-    var f = i / n, f1 = (i + 1) / n;
-    var hem = base - (h * (1 - trunkShow)) * Math.pow(f, 0.92) * lerp(0.96, 1.04, r());
-    var tierH = (h * (1 - trunkShow)) / n * lerp(1.5, 2.1, r());
-    var half = w / 2 * Math.pow(1 - f, lerp(0.85, 1.05, r())) * lerp(0.82, 1.12, r());
-    if (broken && i === Math.floor(n * 0.6)) half *= 0.55;      // a gap where a branch broke
-    var off = (r() - 0.5) * half * 0.25 + lean * f;
-    tiers.push({ hem: hem, top: hem - tierH, half: Math.max(half, h * 0.02), off: off, sn: snow * lerp(0.6, 1.2, r()), seed: r() * 1000 });
+  var snowUnder = fin(mix(snowSh, [120, 128, 170], 0.3));
+  var bw = Math.max(0.45, h * 0.0075);                            // a brush stroke's width (px)
+
+  // drawn on a layer of its own, then laid down a little soft (softer with distance), so no edge is ruler-sharp
+  // (the hill draws a whole row of firs on one layer and softens it once: look.direct)
+  var main = c, T0 = c.getTransform(), sc = T0.a, lay = null;
+  var bx0 = x - w * 0.85 - Math.abs(lean) - 4, bx1 = x + w * 0.85 + Math.abs(lean) + 4, by0 = y - h - 4, by1 = y + 4;
+  if (!look.direct) {
+    lay = document.createElement('canvas');
+    lay.width = Math.max(1, Math.ceil((bx1 - bx0) * sc)); lay.height = Math.max(1, Math.ceil((by1 - by0) * sc));
+    c = lay.getContext('2d'); c.setTransform(sc, 0, 0, sc, -bx0 * sc, -by0 * sc);
   }
-  // the top: a slim spire, sometimes bent, sometimes two leaders
+  c.save(); c.lineCap = 'round'; c.lineJoin = 'round';
+
+  // the trunk, seen in the gaps
   var tx = x + lean, ty = y - h;
-  c.fillStyle = css(dark);
-  c.beginPath(); c.moveTo(tx, ty); c.lineTo(tx + h * 0.03, ty + h * 0.14); c.lineTo(tx - h * 0.03, ty + h * 0.14); c.closePath(); c.fill();
-  if (topKind < 0.15) { c.beginPath(); c.moveTo(tx + h * 0.04, ty + h * 0.06); c.lineTo(tx + h * 0.06, ty + h * 0.15); c.lineTo(tx + h * 0.02, ty + h * 0.15); c.fill(); }
-  for (var j = 0; j < n; j++) tier(tiers[j], j / n);          // bottom up: each tier hangs over the snow on the one below
-  function tier(T, f) {
-    var rr = rng(T.seed | 0), cx = x + T.off, k = 9;
-    // the needle skirt: from the trunk out and down to a ragged hem
-    var L0 = [], R0 = [];
-    for (var s = 0; s <= k; s++) {
-      var u = s / k, dx = T.half * u, dy = T.top + (T.hem - T.top) * (0.25 + 0.75 * Math.pow(u, 1 - droop * 0.6));
-      L0.push([cx - dx, dy]); R0.push([cx + dx, dy]);
+  c.strokeStyle = css(fin([54, 42, 40])); c.lineWidth = Math.max(0.7, h * 0.018);
+  c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + bend + lean * 0.5, y - h * 0.5, tx, ty + h * 0.05); c.stroke();
+  function trunkX(f) { var t = f; return lerp(x, tx, t) + bend * Math.sin(t * PI); }
+
+  // the tiers, from the bottom up; each a pair of drooping boughs with tufted edges and hanging needle clumps
+  var tiers = [], hgt = h * (1 - trunkShow);
+  for (var i = 0; i < n; i++) {
+    var f = i / n;
+    var hem = base - hgt * Math.pow(f, 0.95) * lerp(0.95, 1.05, r());
+    var tierH = hgt / n * lerp(1.4, 2.0, r()) * (1 - sparse * 0.55);
+    var half = w / 2 * Math.pow(1 - f, shapeP) * lerp(0.8, 1.15, r());
+    if (broken && i === Math.floor(n * lerp(0.4, 0.7, r()))) half *= 0.5;      // a gap where a branch broke
+    var fy = (base - hem + tierH) / h;                                       // where this tier joins the trunk
+    tiers.push({ hem: hem, top: hem - tierH, half: Math.max(half, h * 0.025), cx: trunkX(clamp(fy, 0, 1)),
+                 lL: 1 - asym + (r() - 0.5) * 0.3, lR: 1 + asym + (r() - 0.5) * 0.3, dr: clamp(droop + (r() - 0.5) * 0.25, 0.05, 0.8),
+                 sn: snow * lerp(0.5, 1.25, r()), seed: r() * 1e6 });
+  }
+  // the leader at the very top: a thin bent spire, sometimes two
+  c.strokeStyle = css(dark); c.lineWidth = Math.max(0.6, h * 0.012);
+  c.beginPath(); c.moveTo(tx, ty + h * 0.16); c.quadraticCurveTo(tx + (r() - 0.5) * h * 0.02, ty + h * 0.07, tx + (r() - 0.5) * h * 0.015, ty); c.stroke();
+  if (topKind < 0.15) { c.beginPath(); c.moveTo(tx, ty + h * 0.12); c.quadraticCurveTo(tx + h * 0.03, ty + h * 0.08, tx + h * 0.045, ty + h * 0.04); c.stroke(); }
+  for (var j = 0; j < n; j++) tier(tiers[j]);
+
+  function tier(T) {
+    var rr = rng(T.seed | 0), cx = T.cx, H2 = T.hem - T.top;
+    // each side's upper edge: out from the trunk and down, bumpy with tufts (not a straight line)
+    function side(sg, len) {
+      var pts = [], k = Math.max(5, Math.round(T.half * len / Math.max(1.2, h * 0.02)));
+      for (var s = 0; s <= k; s++) {
+        var u = s / k, dx = sg * T.half * len * u;
+        var dy = T.top + H2 * (0.25 + 0.75 * Math.pow(u, 1 - T.dr * 0.6));          // (the old bough line, so the snow on it shows)
+        var tuft = (s > 0 && s < k) ? -Math.abs(rr() - 0.4) * H2 * 0.14 : 0;
+        pts.push([cx + dx, dy + tuft]);
+      }
+      var e = pts[pts.length - 1];
+      pts.push([e[0] + sg * H2 * 0.08, e[1] + H2 * lerp(0.08, 0.2, rr())]);   // the needle tip, drooping
+      return pts;
     }
-    var hemPts = [], m = Math.max(5, Math.round(T.half / 2.2));
+    var Ls = side(-1, T.lL), Rs = side(1, T.lR);
+    var xl = Ls[Ls.length - 1][0], xr = Rs[Rs.length - 1][0];
+    // the hem: rounded clumps of needles hanging at uneven depths (soft scallops, no saw teeth)
+    var hemPts = [], m = Math.max(3, Math.round((xr - xl) / Math.max(2, h * 0.04)));
     for (var q = 0; q <= m; q++) {
-      var u2 = q / m, hx = cx - T.half + 2 * T.half * u2, sag = Math.sin(u2 * PI) * (T.hem - T.top) * 0.12;
-      hemPts.push([hx, T.hem + sag + (q % 2 ? rr() * (T.hem - T.top) * 0.28 : -rr() * 2)]);
+      var u2 = q / m, hx = lerp(xr, xl, u2), sag = Math.sin(u2 * PI) * H2 * 0.1;
+      hemPts.push([hx, T.hem + sag + H2 * lerp(-0.04, 0.12, rr())]);
     }
-    c.beginPath();
-    c.moveTo(cx, T.top);
-    R0.forEach(function (p) { c.lineTo(p[0], p[1]); });
-    for (var q2 = hemPts.length - 1; q2 >= 0; q2--) c.lineTo(hemPts[q2][0], hemPts[q2][1]);
-    L0.slice().reverse().forEach(function (p) { c.lineTo(p[0], p[1]); });
-    c.closePath();
-    var g = c.createLinearGradient(cx - T.half, 0, cx + T.half, 0);
+    function outline() {
+      c.beginPath(); c.moveTo(cx, T.top - H2 * 0.04);
+      Rs.forEach(function (p) { c.lineTo(p[0], p[1]); });
+      for (var q2 = 1; q2 < hemPts.length; q2++) {
+        var a = hemPts[q2 - 1], b = hemPts[q2], mx = (a[0] + b[0]) / 2, my = Math.max(a[1], b[1]) + H2 * lerp(0.04, 0.14, rr());
+        c.quadraticCurveTo(mx, my, b[0], b[1]);
+      }
+      Ls.slice().reverse().forEach(function (p) { c.lineTo(p[0], p[1]); });
+      c.closePath();
+    }
+    outline();
+    var g = c.createLinearGradient(xl, 0, xr, 0);
     if (lx < 0) { g.addColorStop(0, css(mid)); g.addColorStop(0.55, css(dark)); g.addColorStop(1, css(sh)); }
     else { g.addColorStop(0, css(sh)); g.addColorStop(0.45, css(dark)); g.addColorStop(1, css(mid)); }
     c.fillStyle = g; c.fill();
-    // the snow on top of it: thick near the trunk, thinning out, lumps over the edge
+    // brush texture: short strokes of needles along the boughs, out and down from the trunk, in several tones
+    c.save(); outline(); c.clip();
+    var area = (xr - xl) * H2 * 0.6, ns = Math.min(90, Math.max(4, Math.round(area / (bw * bw * 5))));
+    var ys = c.createLinearGradient(0, T.top, 0, T.hem + H2 * 0.3);      // the underside of each tier lies in shade
+    ys.addColorStop(0, 'rgba(0,0,0,0)'); ys.addColorStop(0.6, 'rgba(0,0,0,0)'); ys.addColorStop(1, css(mix(sh, [10, 14, 30], 0.4), 0.3));
+    c.fillStyle = ys; c.fillRect(xl - 2, T.top - 2, xr - xl + 4, H2 * 1.6);
+    c.lineWidth = bw;
+    for (var t2 = 0; t2 < ns; t2++) {
+      var sx = lerp(xl, xr, rr()), sy = lerp(T.top, T.hem + H2 * 0.15, rr()), sg2 = sx < cx ? -1 : 1;
+      var ln = H2 * lerp(0.1, 0.28, rr()), ang = lerp(0.3, 0.9, rr());
+      var lit = (sg2 === lx ? 0.6 : 0.15) + rr() * 0.3, tone = rr();
+      var col = tone < 0.45 ? dark : tone < 0.8 ? (lit > 0.6 && rr() < 0.5 ? hi : mid) : sh;
+      var ex = sx + sg2 * ln * Math.cos(ang), ey = sy + ln * Math.sin(ang);
+      c.strokeStyle = css(col, lerp(0.18, 0.42, rr()));
+      c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo((sx + ex) / 2 + sg2 * ln * 0.15, (sy + ey) / 2 - ln * 0.1, ex, ey); c.stroke();
+    }
+    c.restore();
+    // the snow on the boughs: a lumpy pillow along each upper edge, thick near the trunk, thinning out, its end
+    // broken off at its own place on each side
     if (T.sn > 0.05) {
-      var th = (T.hem - T.top) * 0.2 * T.sn;
-      c.beginPath();
-      var reach = lerp(0.65, 0.98, Math.min(1, T.sn));
-      for (var s2 = 0; s2 <= k; s2++) {
-        var p = R0[s2]; if (s2 / k > reach) break;
-        c[s2 ? 'lineTo' : 'moveTo'](p[0], p[1] - th * (1 - s2 / k * 0.5) - rr() * th * 0.35);
-      }
-      var lastR = Math.min(k, Math.floor(reach * k));
-      for (var s3 = lastR; s3 >= 0; s3--) { var pp = R0[s3]; c.lineTo(pp[0], pp[1] + th * 0.5); }
-      for (var s4 = 0; s4 <= lastR; s4++) { var pl = L0[s4]; c.lineTo(pl[0], pl[1] + th * 0.5); }
-      for (var s5 = lastR; s5 >= 0; s5--) { var pl2 = L0[s5]; c.lineTo(pl2[0], pl2[1] - th * (1 - s5 / k * 0.5) - rr() * th * 0.35); }
-      c.closePath();
-      var g2 = c.createLinearGradient(cx - T.half, 0, cx + T.half, 0);
-      if (lx < 0) { g2.addColorStop(0, css(snowLit)); g2.addColorStop(0.5, css(mix(snowLit, snowSh, 0.45))); g2.addColorStop(1, css(snowSh)); }
-      else { g2.addColorStop(0, css(snowSh)); g2.addColorStop(0.5, css(mix(snowLit, snowSh, 0.45))); g2.addColorStop(1, css(snowLit)); }
-      c.fillStyle = g2; c.fill();
+      var th = H2 * 0.28 * T.sn;
+      [[Ls, -1], [Rs, 1]].forEach(function (pair) {
+        var pts = pair[0], sg3 = pair[1], last = pts.length - 2;
+        var reach = Math.max(1, Math.round(last * lerp(0.6, 0.98, Math.min(1, T.sn)) * lerp(0.85, 1.05, rr())));
+        var Top = [], Bot = [];
+        for (var s2 = 0; s2 <= Math.min(reach, last); s2++) {
+          var p = pts[s2], u3 = s2 / reach, tk = th * (1 - u3 * 0.5);
+          var lump = (0.75 + 0.5 * rr());
+          Top.push([p[0], p[1] - tk * lump]);
+          Bot.push([p[0], p[1] + tk * 0.45 * (0.6 + 0.6 * rr())]);
+        }
+        var endP = pts[Math.min(reach, last)];
+        var litSide = sg3 === lx, cA = litSide ? snowLit : snowSh, cB = litSide ? mix(snowLit, snowSh, 0.4) : mix(snowSh, snowUnder, 0.3);
+        // the pillow: rounded joins and a rounded end, no straight edge. Its blue underside first, then its lit top
+        // (from the top down to just below the bough's edge), shaded along the bough: brighter near the trunk
+        function pillow(Lo) {
+          c.beginPath(); c.moveTo(Top[0][0], Top[0][1]);
+          for (var a2 = 1; a2 < Top.length; a2++) { var A = Top[a2 - 1], B = Top[a2]; c.quadraticCurveTo(A[0], A[1], (A[0] + B[0]) / 2, (A[1] + B[1]) / 2); }
+          var tl = Top[Top.length - 1], bl = Lo[Lo.length - 1];
+          c.quadraticCurveTo(endP[0] + sg3 * th * 0.5, (tl[1] + bl[1]) / 2, bl[0], bl[1]);
+          for (var b2 = Lo.length - 2; b2 >= 0; b2--) c.lineTo(Lo[b2][0], Lo[b2][1]);
+          c.closePath();
+        }
+        pillow(Bot); c.fillStyle = css(snowUnder); c.fill();
+        pillow(Top.map(function (p, k2) { return [lerp(p[0], Bot[k2][0], 0.85), lerp(p[1], Bot[k2][1], 0.85)]; }));
+        var g3 = c.createLinearGradient(Top[0][0], 0, Top[Top.length - 1][0] + sg3 * 0.01, 0);
+        g3.addColorStop(0, css(cA)); g3.addColorStop(1, css(cB));
+        c.fillStyle = g3; c.fill();
+      });
     }
   }
+  c.restore();
+  if (!lay) return;
+  c = main;
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + firSoft(hz, sc).toFixed(2) + 'px)';
+  c.drawImage(lay, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
 }
+function firSoft(hz, sc) { return (0.3 + hz * 0.3) * sc; }     // how soft a fir is laid down (device px), softer with distance
 
 /* =====================================================================
    THE HILL — its snowy body, then rows of firs from the crest down to its
@@ -723,6 +801,13 @@ function hill(c, o) {
     var hgt = lerp(o.treeFar, o.treeNear, Math.pow(u, 1.25));        // nearer rows: larger (perspective)
     var haze = lerp(o.hazeFar, o.hazeNear, u);
     var gap = hgt * lerp(0.28, 0.42, o.density === undefined ? 0.5 : 1 - o.density);
+    // the whole row on one layer, softened once as it is laid down
+    var main = c, T0 = c.getTransform(), sc = T0.a, ry0 = foot, rx0 = x0 - hgt, rx1 = x1 + hgt;
+    prof.forEach(function (p) { ry0 = Math.min(ry0, p[1]); });
+    ry0 -= hgt * 2.2; var ry1 = foot + 4;
+    var lay = document.createElement('canvas');
+    lay.width = Math.max(1, Math.ceil((rx1 - rx0) * sc)); lay.height = Math.max(1, Math.ceil((ry1 - ry0) * sc));
+    c = lay.getContext('2d'); c.setTransform(sc, 0, 0, sc, -rx0 * sc, -ry0 * sc);
     for (var xx = x0 - hgt * 0.3 + r() * gap; xx < x1 + hgt * 0.2; xx += gap * lerp(0.6, 1.5, r())) {
       var cy = crestY(xx);
       if (cy >= foot - 2) continue;
@@ -733,8 +818,11 @@ function hill(c, o) {
       if (r() > (o.fill === undefined ? 1 : o.fill)) continue;     // a sparse slope leaves gaps
       if (o.noTrees) continue;                                      // (the preview's view of the pagoda alone)
       var hh = hgt * lerp(0.7, 1.3, r()) * (r() < 0.08 ? 1.5 : 1);
-      fir(c, xx, yy, hh, (o.seed || 11) * 1000 + (k++), { light: L, haze: haze, snow: o.snow, width: o.treeWidth });
+      fir(c, xx, yy, hh, (o.seed || 11) * 1000 + (k++), { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true });
     }
+    c = main;
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + firSoft(haze, sc).toFixed(2) + 'px)';
+    c.drawImage(lay, rx0 * T0.a + T0.e, ry0 * T0.d + T0.f); c.restore();
   }
   if (o.before) o.before(c, 2);
 }
