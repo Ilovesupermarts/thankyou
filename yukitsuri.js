@@ -235,11 +235,11 @@ function build(spec) {
       var Lm = cand[pi], S = onLimb(Lm.ids, lerp(0.55, 0.72, r())), out = [Math.sin(Lm.th), 0, Math.cos(Lm.th)];
       var foot = [S.p[0] + out[0] * S.p[1] * 0.22, 0, S.p[2] + out[2] * S.p[1] * 0.22];
       if (v === 3 && pi === 1) foot = [S.p[0] - out[0] * S.p[1] * 0.18, 0, S.p[2] - out[2] * S.p[1] * 0.18 + 0.4];   // the second crosses the first
-      T.props.push({ a: foot, b: [S.p[0], S.p[1] - S.r, S.p[2]], r: 0.032 });
+      T.props.push({ a: foot, b: [S.p[0], S.p[1] - S.r, S.p[2]], r: 0.045, prop: true });
     }
     if (v === 5 && trunks.length > 1) {                                           // the brace between the twin trunks
       var A = atHeight(trunks[0], Th * 0.42), B2 = atHeight(trunks[1], Th * 0.5), A2 = atHeight(trunks[0], Th * 0.52), B3 = atHeight(trunks[1], Th * 0.4);
-      T.props.push({ a: A.p, b: B2.p, r: 0.022, brace: true }, { a: B3.p, b: A2.p, r: 0.022, brace: true });
+      T.props.push({ a: A.p, b: B2.p, r: 0.03, brace: true }, { a: B3.p, b: A2.p, r: 0.03, brace: true });
     }
     if (roped) {
       groups.forEach(function (grp, gi) {
@@ -304,15 +304,25 @@ function build(spec) {
       }
       if (!best) continue;
       used[best.id] = (used[best.id] || 0) + 1;
-      var end;
-      if (how === 'tip') end = best.p2.slice();
-      else {
-        // the point on the pad's rim facing this rope's way round the tree
+      // where it is tied: on the branch inside the foliage (so the needles hide its end, as on a real tree), and the
+      // height at which it enters the foliage (from there on it lies behind the needles of the branch it holds)
+      var end, enterY, ez;
+      if (how === 'tip') {
+        var cc3 = [2 * best.p1[0] - (best.p0[0] + best.p2[0]) / 2, 2 * best.p1[1] - (best.p0[1] + best.p2[1]) / 2, 2 * best.p1[2] - (best.p0[2] + best.p2[2]) / 2];
+        var tt = 0.85, a1 = (1 - tt) * (1 - tt), a2 = 2 * tt * (1 - tt), a3 = tt * tt;
+        end = [a1 * best.p0[0] + a2 * cc3[0] + a3 * best.p2[0], a1 * best.p0[1] + a2 * cc3[1] + a3 * best.p2[1], a1 * best.p0[2] + a2 * cc3[2] + a3 * best.p2[2]];
+        enterY = end[1] + 0.07 + best.snowD; ez = (best.p0[2] + best.p2[2] * 2) / 3;
+      } else {
+        // the point on the branch inside the pad, toward its rim on this rope's side of the tree
         var ux = Math.sin(phi), uz = Math.cos(phi), cx2 = best.c[0] - top[0], cz2 = best.c[2] - top[2];
         var dl = Math.hypot(cx2, cz2) || 1, wx = lerp(cx2 / dl, ux, 0.5), wz = lerp(cz2 / dl, uz, 0.5), wl = Math.hypot(wx, wz) || 1;
-        end = [best.c[0] + wx / wl * best.rx * 0.85, best.c[1] + best.ty * 0.12, best.c[2] + wz / wl * best.rz * 0.85];
+        end = [best.c[0] + wx / wl * best.rx * 0.62, best.c[1] - best.ty * 0.05, best.c[2] + wz / wl * best.rz * 0.62];
+        enterY = best.c[1] + best.ty * 0.5 + best.snowD; ez = best.c[2];
       }
-      T.ropes.push({ a: top, b: end, to: best.id });
+      // it starts on the straw binding round the pole's top, on its own side of it
+      var a0 = [top[0] + Math.sin(phi) * 0.05, top[1] - r() * 0.08, top[2] + Math.cos(phi) * 0.05];
+      T.ropes.push({ a: a0, b: end, to: best.id, enterY: enterY, z: ez, phi: phi,
+                     w: lerp(0.02, 0.045, Math.pow(r(), 1.4)), tone: r() * 2 - 1, sag: lerp(0.003, 0.012, r()), seed: (r() * 1e9) | 0 });
     }
   }
 
@@ -636,16 +646,54 @@ function paintBamboo(c, B, P, K, snowD) {
     c.fillStyle = css(K.snowTop); c.beginPath(); c.ellipse(tx, ty - sd * 0.25, cw * 0.4, sd * 0.6, 0, PI, TAU); c.fill();
   }
 }
-function paintRopes(c, T, P, K, front) {
+/* A rope's point a share t along it (a taut straw rope still sags a very little). */
+function ropePt(R, t) {
+  var p = lerp3(R.a, R.b, t), l = Math.hypot(R.b[0] - R.a[0], R.b[1] - R.a[1], R.b[2] - R.a[2]);
+  p[1] -= R.sag * l * 4 * t * (1 - t);
+  return p;
+}
+/* its colour: straw, lit on the sun's side, each rope its own (some newer and paler, some weathered and darker) */
+function ropeCol(R, P, K) {
+  var A = P(R.a), B = P(R.b), lit = (B[0] - A[0]) * K.lx > 0, c = lit ? K.ropeLit : K.rope;
+  c = R.tone < 0 ? mix(c, K.fin([120, 98, 66]), -R.tone * 0.45) : mix(c, K.fin([238, 218, 168]), R.tone * 0.3);
+  return { base: c, hi: mix(c, K.fin([250, 236, 196]), 0.45), dk: mix(c, [40, 30, 20], 0.45) };
+}
+function paintRopeSeg(c, R, t0, t1, P, K) {
+  var C = R._col || (R._col = ropeCol(R, P, K)), A = P(ropePt(R, t0)), B = P(ropePt(R, t1));
+  var s = P.s(lerp(R.a[2], R.b[2], (t0 + t1) / 2)), w = Math.max(0.8, R.w * s), dx = B[0] - A[0], dy = B[1] - A[1], l = Math.hypot(dx, dy) || 1;
   c.lineCap = 'round';
-  T.ropes.forEach(function (R) {
-    var isFront = R.b[2] >= (R.a[2] - 0.05);
-    if (isFront !== front) return;
-    var A = P(R.a), B = P(R.b), s = P.s(R.b[2]), w = Math.max(1.05, 0.04 * s), lit = (B[0] - A[0]) * K.lx > 0;
-    c.strokeStyle = css(lit ? K.ropeLit : K.rope, front ? 0.95 : 0.85); c.lineWidth = w;
-    c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
-    c.fillStyle = css(K.rope); c.beginPath(); c.arc(B[0], B[1], w * 0.9, 0, TAU); c.fill();     // its knot on the branch
-  });
+  c.strokeStyle = css(C.base); c.lineWidth = w;
+  c.beginPath(); c.moveTo(A[0], A[1]); c.lineTo(B[0], B[1]); c.stroke();
+  if (w < 1.3) return;
+  // the light along its sun side, and the twist of the straw
+  var nx = -dy / l, ny = dx / l;
+  if (nx * K.lx < 0) { nx = -nx; ny = -ny; }
+  c.strokeStyle = css(C.hi, 0.7); c.lineWidth = w * 0.3;
+  c.beginPath(); c.moveTo(A[0] + nx * w * 0.22, A[1] + ny * w * 0.22); c.lineTo(B[0] + nx * w * 0.22, B[1] + ny * w * 0.22); c.stroke();
+  var step = w * 1.7, n = Math.floor(l / step), ux = dx / l, uy = dy / l;
+  if (n < 1) return;
+  c.strokeStyle = css(C.dk, 0.35); c.lineWidth = Math.max(0.35, w * 0.18);
+  c.beginPath();
+  for (var i = 0; i < n; i++) {
+    var px = A[0] + ux * step * (i + 0.5), py = A[1] + uy * step * (i + 0.5);
+    c.moveTo(px - nx * w * 0.45 - ux * w * 0.3, py - ny * w * 0.45 - uy * w * 0.3); c.lineTo(px + nx * w * 0.45 + ux * w * 0.3, py + ny * w * 0.45 + uy * w * 0.3);
+  }
+  c.stroke();
+}
+/* a piece (t0 … t1) of a bamboo cane: the pole or a prop */
+function paintBambooSeg(c, B, t0, t1, P, K, snowD) {
+  var B2 = { a: lerp3(B.a, B.b, t0), b: lerp3(B.a, B.b, t1), r: B.r, cap: B.cap && t1 >= 1 };
+  paintBamboo(c, B2, P, K, snowD);
+  if (B.prop && t1 >= 1) {
+    // its top: a short fork under the limb, lashed with straw
+    var Z = P(B.b), A = P(lerp3(B.a, B.b, 0.96)), s = P.s(B.b[2]), w = Math.max(1, B.r * 2 * s), f = Math.max(2, 0.14 * s);
+    c.strokeStyle = css(K.bamboo); c.lineCap = 'round'; c.lineWidth = w * 0.7;
+    c.beginPath(); c.moveTo(Z[0], Z[1] + w * 0.4); c.lineTo(Z[0] - f * 0.55, Z[1] - f * 0.35); c.moveTo(Z[0], Z[1] + w * 0.4); c.lineTo(Z[0] + f * 0.55, Z[1] - f * 0.35); c.stroke();
+    c.strokeStyle = css(K.rope); c.lineWidth = Math.max(0.5, w * 0.35);
+    c.beginPath();
+    for (var i = 0; i < 3; i++) { var y = lerp(A[1], Z[1], 0.3 + i * 0.25) + w * 0.5; c.moveTo(Z[0] - w * 0.75, y + w * 0.25); c.lineTo(Z[0] + w * 0.75, y - w * 0.25); }
+    c.stroke();
+  }
 }
 function paintFootSnow(c, p, rad, P, K) {           // snow banked round a trunk, pole or prop where it stands
   var F = P(p), s = P.s(p[2]), w = Math.max(2, rad * s * 4.5), h = Math.max(1, Math.max(0.1, rad * 0.9) * s);
@@ -726,27 +774,47 @@ function bakeJob(T, o) {
   T.fol.forEach(function (E) { E._sh = null; });
   function layer() { var cv = document.createElement('canvas'); cv.width = Math.max(1, Math.ceil(box.w * PR)); cv.height = Math.max(1, Math.ceil(box.h * PR)); var c = cv.getContext('2d'); c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR); return { cnv: cv, c: c }; }
   var work = layer(), body = layer(), front = layer(), c = work.c;
-  var order = T.fol.slice().sort(function (a, b) { return zOf(a) - zOf(b); });
-  var back = order.filter(function (E) { return zOf(E) < 0; }), fore = order.filter(function (E) { return zOf(E) >= 0; });
-  // which snow can fall: pieces nothing drawn later covers on the screen (so the clump can be drawn on its own, over the tree)
-  var later = [], R = { box: box, P: P, K: K, loose: [], pads: [], wood: '' };
-  pickLoose();
-  var tasks = [];
-  tasks.push(function () { paintRopes(c, T, P, K, false); });
-  back.forEach(function (E) { tasks.push(function () { paintFol(E); }); });
-  tasks.push(function () { T.poles.forEach(function (B) { paintBamboo(c, B, P, K, T.snowK * 0.15); }); });
-  tasks.push(function () { R.wood = paintWood(c, T, P, o, K, box); });
-  tasks.push(function () {
+  // Everything in depth order (the farthest first), so whatever is nearer covers it: the foliage, the wood (trunk and
+  // limbs, about the trunk's depth), and the ropes, the pole and the props piece by piece (each piece at its own depth).
+  // A rope's last stretch, inside the foliage of the branch it is tied to, goes just behind that branch's needles.
+  var items = [], R = { box: box, P: P, K: K, loose: [], pads: [], wood: '' };
+  function segRect(A, B, w) { return [Math.min(A[0], B[0]) - w, Math.min(A[1], B[1]) - w, Math.max(A[0], B[0]) + w, Math.max(A[1], B[1]) + w]; }
+  T.fol.forEach(function (E) {
+    var Sh = E.kind === 'pad' ? padShape(E, P) : boughShape(E, P), r0;
+    if (E.kind === 'pad') r0 = [Sh.C[0] - Sh.hw - 2, Sh.C[1] - Sh.th * 0.7, Sh.C[0] + Sh.hw + 2, Sh.C[1] + Sh.th * 0.5];
+    else r0 = [Math.min(Sh.A[0], Sh.B[0]) - 2, Math.min(Sh.A[1], Sh.B[1]) - Sh.up - 2, Math.max(Sh.A[0], Sh.B[0]) + 2, Math.max(Sh.A[1], Sh.B[1]) + Sh.hang];
+    items.push({ z: zOf(E), E: E, rects: [r0], draw: function () { paintFol(E); } });
+  });
+  T.ropes.forEach(function (Rp) {
+    var tE = clamp((Rp.a[1] - Rp.enterY) / Math.max(0.01, Rp.a[1] - Rp.b[1]), 0.4, 0.98), cuts = [];
+    for (var i = 0; i <= 8; i++) cuts.push(tE * i / 8);
+    cuts.push(lerp(tE, 1, 0.5), 1);
+    for (var k = 0; k < cuts.length - 1; k++) (function (t0, t1) {
+      var zz = t0 >= tE - 1e-6 ? Rp.z - 0.02 : lerp(Rp.a[2], Rp.b[2], (t0 + t1) / 2);
+      items.push({ z: zz, rects: [segRect(P(ropePt(Rp, t0)), P(ropePt(Rp, t1)), 2)], draw: function () { paintRopeSeg(c, Rp, t0, t1, P, K); } });
+    })(cuts[k], cuts[k + 1]);
+  });
+  T.poles.concat(T.props).forEach(function (B) {
+    var n = 6, isPole = T.poles.indexOf(B) >= 0;
+    for (var k = 0; k < n; k++) (function (t0, t1) {
+      items.push({ z: lerp(B.a[2], B.b[2], (t0 + t1) / 2), rects: [segRect(P(lerp3(B.a, B.b, t0)), P(lerp3(B.a, B.b, t1)), B.r * P.s(B.b[2]) + 4)], draw: function () {
+        paintBambooSeg(c, B, t0, t1, P, K, isPole ? T.snowK * 0.15 : 0);
+        if (t0 === 0 && !B.brace) paintFootSnow(c, B.a, B.r * 2.5, P, K);
+      } });
+    })(k / n, (k + 1) / n);
+  });
+  var woodRects = T.segs.map(function (S) { return segRect(P(S.a), P(S.b), (S.ra + S.rb) * P.s(S.a[2]) + 2); });
+  items.push({ z: 0, wood: true, rects: woodRects, draw: function () {
+    R.wood = paintWood(c, T, P, o, K, box);
     c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR);
     paintLimbSnow(c, T, P, K);
     paintFootSnow(c, T.segs[T.trunk[0]].a, T.segs[T.trunk[0]].ra * 1.3, P, K);
-    T.poles.forEach(function (B) { paintFootSnow(c, B.a, B.r * 2.5, P, K); });
-  });
-  fore.forEach(function (E) { tasks.push(function () { paintFol(E); }); });
-  tasks.push(function () {
-    T.props.forEach(function (B) { paintBamboo(c, B, P, K); if (!B.brace) paintFootSnow(c, B.a, B.r * 2.5, P, K); });
-  });
-  tasks.push(function () { paintRopes(front.c, T, P, K, true); });
+  } });
+  items.forEach(function (it, i) { it.n = i; });
+  items.sort(function (a, b) { return a.z - b.z || a.n - b.n; });
+  // which snow can fall: pieces nothing drawn after them covers on the screen (so the clump can be drawn on its own)
+  pickLoose();
+  var tasks = items.map(function (it) { return it.draw; });
   tasks.push(function () {
     // laid down a little soft, so no edge is ruler-sharp
     var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
@@ -778,28 +846,17 @@ function bakeJob(T, o) {
   };
   function paintFol(E) { if (E.kind === 'pad') paintPad(c, E, P, K); else paintBough(c, E, P, K); }
   function pickLoose() {
-    var rect = {};
-    order.forEach(function (E, i) {
-      var Sh = E.kind === 'pad' ? padShape(E, P) : boughShape(E, P), r0;
-      if (E.kind === 'pad') r0 = [Sh.C[0] - Sh.hw - 2, Sh.C[1] - Sh.th * 0.7, Sh.C[0] + Sh.hw + 2, Sh.C[1] + Sh.th * 0.5];
-      else r0 = [Math.min(Sh.A[0], Sh.B[0]) - 2, Math.min(Sh.A[1], Sh.B[1]) - Sh.up - 2, Math.max(Sh.A[0], Sh.B[0]) + 2, Math.max(Sh.A[1], Sh.B[1]) + Sh.hang];
-      rect[E.id] = { r: r0, i: i };
-    });
-    var woodR = [];
-    T.segs.forEach(function (S) { var A = P(S.a), B = P(S.b), w = (S.ra + S.rb) * P.s(S.a[2]) + 2; woodR.push([Math.min(A[0], B[0]) - w, Math.min(A[1], B[1]) - w, Math.max(A[0], B[0]) + w, Math.max(A[1], B[1]) + w]); });
-    T.poles.concat(T.props).forEach(function (B) { var A = P(B.a), Z = P(B.b); woodR.push([Math.min(A[0], Z[0]) - 3, Math.min(A[1], Z[1]) - 3, Math.max(A[0], Z[0]) + 3, Math.max(A[1], Z[1]) + 3]); });
     function hit(a, b) { return a[0] < b[2] && a[2] > b[0] && a[1] < b[3] && a[3] > b[1]; }
     var pr = rng(T.seed * 31 + 7), share = o.loose === undefined ? 0.5 : o.loose;
-    order.forEach(function (E, i) {
-      E.pieces.forEach(function (Pc, pi) {
+    items.forEach(function (it, i) {
+      var E = it.E;
+      if (!E) return;
+      E.pieces.forEach(function (Pc) {
         var Ln = E.kind === 'pad' ? padSnowLines(E, Pc, P) : boughSnowLines(E, Pc, P);
         if (Ln.d < 1.2) return;
         var xs = Ln.Top.map(function (p) { return p[0]; }), ys = Ln.Top.concat(Ln.Bot).map(function (p) { return p[1]; });
         var bb = [Math.min.apply(null, xs) - 2, Math.min.apply(null, ys) - 2, Math.max.apply(null, xs) + 2, Math.max.apply(null, ys) + 2];
-        for (var j = i + 1; j < order.length; j++) if (hit(bb, rect[order[j].id].r)) return;
-        var behindWood = zOf(E) < 0;
-        if (behindWood) for (var w = 0; w < woodR.length; w++) if (hit(bb, woodR[w])) return;
-        for (w = T.segs.length + T.poles.length; w < woodR.length; w++) if (hit(bb, woodR[w])) return;   // (props are drawn after everything)
+        for (var j = i + 1; j < items.length; j++) for (var q = 0; q < items[j].rects.length; q++) if (hit(bb, items[j].rects[q])) return;
         if (pr() > share) return;
         Pc.loose = true;
         var mid = (Pc.u0 + Pc.u1) / 2, half = (Pc.u1 - Pc.u0) / 2;
