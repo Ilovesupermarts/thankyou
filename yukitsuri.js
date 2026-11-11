@@ -652,8 +652,8 @@ function paintFootSnow(c, p, rad, P, K) {           // snow banked round a trunk
   c.save(); c.translate(F[0], F[1]); c.scale(1, h / w);
   var g = c.createRadialGradient(0, 0, 0, 0, 0, w / 2);
   g.addColorStop(0, css(K.snowTop)); g.addColorStop(0.55, css(mix(K.snowTop, K.snowFront, 0.5), 0.9)); g.addColorStop(1, css(K.snowFront, 0));
+  // only the mound's upper half: what lies in front of the foot (its lower half) is the snow ground itself
   c.fillStyle = g; c.beginPath(); c.arc(0, 0, w / 2, PI, TAU); c.fill();
-  c.beginPath(); c.arc(0, 0, w / 2, 0, PI); c.globalAlpha = 0.6; c.fill();
   c.restore();
 }
 
@@ -681,7 +681,11 @@ function paintWood(c, T, P, o, K, box) {
                             colours: { bark: bk.bark || [62, 55, 54], dark: bk.dark || [26, 22, 23], light: bk.light || [138, 132, 130],
                                        lichen: bk.lichen || [150, 152, 140], moss: bk.moss || [78, 90, 48] }, light: lt });
       if (g) {
-        c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+        // nothing of the wood shows below the snow's surface: cut it off at the ground line under the tree (its root
+        // flare spreads out below the foot)
+        var gy = P(T.segs[T.trunk[0]].a)[1];
+        c.save(); c.beginPath(); c.rect(box.bx - 10, box.by - 10, box.w + 20, gy - box.by + 10); c.clip();
+        c.setTransform(1, 0, 0, 1, 0, 0);
         c.drawImage(g.cnv, 0, 0, g.w, g.h, g.x - box.bx * o.PR, g.y - box.by * o.PR, g.w, g.h);
         c.restore(); done = true;
       }
