@@ -631,12 +631,13 @@ function fir(c, x, y, h, seed, look) {
   var wr = lerp(0.3, 0.62, r()) * (look.width || 1);            // width / height
   var shapeP = lerp(0.7, 1.3, r());                               // < 1: a column with a short point; > 1: a slim cone
   var n = Math.max(4, Math.round(lerp(6, 12, r()) * (look.tiers || 1)));
-  var sparse = r() < 0.35 ? lerp(0.25, 0.5, r()) : 0;           // a sparse tree: gaps between its tiers show the trunk
-  var lean = (r() - 0.5) * 0.08 * h, bend = (r() - 0.5) * 0.05 * h;
-  var droop = lerp(0.15, 0.6, r()), asym = (r() - 0.5) * 0.35;  // one side longer than the other
+  var sparse = r() < (look.sparse === undefined ? 0.35 : look.sparse) ? lerp(0.25, 0.5, r()) : 0;           // a sparse tree: gaps between its tiers show the trunk
+  var leanK = (look.lean === undefined ? 1 : look.lean), lean = (r() - 0.5) * 0.08 * h * leanK, bend = (r() - 0.5) * 0.05 * h * leanK;
+  var droop = clamp(lerp(0.15, 0.6, r()) * (look.droop === undefined ? 1 : look.droop), 0, 0.9), asym = (r() - 0.5) * 0.35;  // one side longer than the other
   var snow = clamp(look.snow * lerp(0.55, 1.25, r()), 0, 1.6);     // (the same range as before)
   var needle = mix(NEEDLES[Math.floor(r() * NEEDLES.length)], [r() * 40, 40 + r() * 30, 30 + r() * 30], 0.15);
   needle = mix(needle, [0, 0, 0], (r() - 0.5) * 0.2);
+  if (look.needleTint > 0 && look.needleCol) needle = mix(needle, look.needleCol, clamp(look.needleTint, 0, 1));   // toward the chosen needle colour
   var topKind = r(), trunkShow = r() < 0.5 ? lerp(0.03, 0.09, r()) : 0, broken = r() < 0.15;
   var w = h * wr, base = y - h * trunkShow;
   var fin = function (col) { return mix(col, L.haze, hz); };
@@ -755,13 +756,17 @@ function fir(c, x, y, h, seed, look) {
     ys.addColorStop(0, 'rgba(0,0,0,0)'); ys.addColorStop(0.6, 'rgba(0,0,0,0)'); ys.addColorStop(1, css(mix(sh, [10, 14, 30], 0.4), 0.3));
     c.fillStyle = ys; c.fillRect(xl - 2, T.top - 2, xr - xl + 4, H2 * 1.6);
     c.lineWidth = bw;
-    for (var t2 = 0; t2 < ns; t2++) {
-      var sx = lerp(xl, xr, rr()), sy = lerp(T.top, T.hem + H2 * 0.15, rr()), sg2 = sx < cx ? -1 : 1;
-      var ln = H2 * lerp(0.1, 0.28, rr()), ang = lerp(0.3, 0.9, rr());
-      var lit = (sg2 === lx ? 0.6 : 0.15) + rr() * 0.3, tone = rr();
-      var col = tone < 0.45 ? dark : tone < 0.8 ? (lit > 0.6 && rr() < 0.5 ? hi : mid) : sh;
+    var brushK = (look.brush === undefined ? 1 : look.brush), nDraw = Math.round(ns * brushK), extra = nDraw > ns ? rng((T.seed | 0) + 77) : null;
+    for (var t2 = 0; t2 < Math.max(ns, nDraw); t2++) {
+      var R2 = t2 < ns ? rr : extra;                                  // (strokes past the usual number: their own random numbers)
+      var sx = lerp(xl, xr, R2()), sy = lerp(T.top, T.hem + H2 * 0.15, R2()), sg2 = sx < cx ? -1 : 1;
+      var ln = H2 * lerp(0.1, 0.28, R2()), ang = lerp(0.3, 0.9, R2());
+      var lit = (sg2 === lx ? 0.6 : 0.15) + R2() * 0.3, tone = R2();
+      var col = tone < 0.45 ? dark : tone < 0.8 ? (lit > 0.6 && R2() < 0.5 ? hi : mid) : sh;
       var ex = sx + sg2 * ln * Math.cos(ang), ey = sy + ln * Math.sin(ang);
-      c.strokeStyle = css(col, lerp(0.18, 0.42, rr()));
+      var alphaS = lerp(0.18, 0.42, R2());
+      if (t2 >= nDraw) continue;
+      c.strokeStyle = css(col, alphaS);
       c.beginPath(); c.moveTo(sx, sy); c.quadraticCurveTo((sx + ex) / 2 + sg2 * ln * 0.15, (sy + ey) / 2 - ln * 0.1, ex, ey); c.stroke();
     }
     c.restore();
@@ -805,7 +810,7 @@ function fir(c, x, y, h, seed, look) {
   c.restore();
   if (!lay) return;
   c = main;
-  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + firSoft(hz, sc).toFixed(2) + 'px)';
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + (firSoft(hz, sc) * (look.soft === undefined ? 1 : look.soft)).toFixed(2) + 'px)';
   c.drawImage(lay, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
 }
 function firSoft(hz, sc) { return (0.3 + hz * 0.3) * sc; }     // how soft a fir is laid down (device px), softer with distance
@@ -814,7 +819,11 @@ function firSoft(hz, sc) { return (0.3 + hz * 0.3) * sc; }     // how soft a fir
    THE HILL — its snowy body, then rows of firs from the crest down to its
    foot, each row nearer and so larger; the far rows fade into the air
    ===================================================================== */
-function hill(c, o) {
+/* The hill drawn a little at a time: job.step(ms) draws for about that long (the hill's snow, then each row's
+   trees one by one, each row laid down softened when its last tree is drawn, the pagoda where o.before puts it)
+   and returns true when it has finished. The trees, their places and their random numbers are exactly those of
+   drawing it all at once (hill). */
+function hillJob(c, o) {
   var r = rng(o.seed || 11), L = o.light;
   var prof = o.profile;                                         // the crest: [[x, y] …] in CSS px, left to right
   function crestY(x) {
@@ -822,31 +831,29 @@ function hill(c, o) {
     return prof[prof.length - 1][1];
   }
   var x0 = prof[0][0], x1 = prof[prof.length - 1][0], foot = o.foot;
-  // the hill's snow, lit from the side of the sun, blue in the hollows
-  var snowLit = mix(shade(SNOW, norm([L.sun[0] < 0 ? -0.5 : 0.5, 0.8, 0.3]), L, 1), L.haze, o.hazeFar * 0.6);
-  var snowSh = mix(mix(shade(SNOW, [0, 1, 0], L, 0), [176, 184, 214], 0.4), L.haze, o.hazeFar * 0.6);
-  c.beginPath(); c.moveTo(x0, foot + 2);
-  for (var x = x0; x <= x1; x += 4) c.lineTo(x, Math.min(foot, crestY(x)));     // (never below its own foot)
-  c.lineTo(x1, Math.min(foot, crestY(x1)));
-  c.lineTo(x1, foot); c.closePath();
-  var g = c.createLinearGradient(x0, 0, x1, 0);
-  g.addColorStop(0, css(L.sun[0] < 0 ? snowLit : snowSh)); g.addColorStop(1, css(L.sun[0] < 0 ? snowSh : snowLit));
-  c.fillStyle = g; c.fill();
-  // the rows of firs
-  var rows = o.rows, k = 0;
-  for (var row = 0; row < rows; row++) {
+  var rows = o.rows, k = 0, row = -1, R = null, done = false;
+  var look0 = o.look || {};
+  function body() {
+    // the hill's snow, lit from the side of the sun, blue in the hollows
+    var snowLit = mix(shade(SNOW, norm([L.sun[0] < 0 ? -0.5 : 0.5, 0.8, 0.3]), L, 1), L.haze, o.hazeFar * 0.6);
+    var snowSh = mix(mix(shade(SNOW, [0, 1, 0], L, 0), [176, 184, 214], 0.4), L.haze, o.hazeFar * 0.6);
+    c.beginPath(); c.moveTo(x0, foot + 2);
+    for (var x = x0; x <= x1; x += 4) c.lineTo(x, Math.min(foot, crestY(x)));     // (never below its own foot)
+    c.lineTo(x1, Math.min(foot, crestY(x1)));
+    c.lineTo(x1, foot); c.closePath();
+    var g = c.createLinearGradient(x0, 0, x1, 0);
+    g.addColorStop(0, css(L.sun[0] < 0 ? snowLit : snowSh)); g.addColorStop(1, css(L.sun[0] < 0 ? snowSh : snowLit));
+    c.fillStyle = g; c.fill();
+  }
+  // a row: o.before first (the pagoda may stand here), then where each of its trees stands (the same random
+  // numbers, in the same order, as drawing them one after another)
+  function startRow() {
     var u = rows > 1 ? row / (rows - 1) : 1;
     if (o.before) o.before(c, u);
     var hgt = lerp(o.treeFar, o.treeNear, Math.pow(u, 1.25));        // nearer rows: larger (perspective)
     var haze = lerp(o.hazeFar, o.hazeNear, u);
     var gap = hgt * lerp(0.28, 0.42, o.density === undefined ? 0.5 : 1 - o.density);
-    // the whole row on one layer, softened once as it is laid down
-    var main = c, T0 = c.getTransform(), sc = T0.a, ry0 = foot, rx0 = x0 - hgt, rx1 = x1 + hgt;
-    prof.forEach(function (p) { ry0 = Math.min(ry0, p[1]); });
-    ry0 -= hgt * 2.2; var ry1 = foot + 4;
-    var lay = document.createElement('canvas');
-    lay.width = Math.max(1, Math.ceil((rx1 - rx0) * sc)); lay.height = Math.max(1, Math.ceil((ry1 - ry0) * sc));
-    c = lay.getContext('2d'); c.setTransform(sc, 0, 0, sc, -rx0 * sc, -ry0 * sc);
+    var trees = [];
     for (var xx = x0 - hgt * 0.3 + r() * gap; xx < x1 + hgt * 0.2; xx += gap * lerp(0.6, 1.5, r())) {
       var cy = crestY(xx);
       if (cy >= foot - 2) continue;
@@ -855,17 +862,51 @@ function hill(c, o) {
       if (yy < cy + hgt * 0.2) continue;
       if (o.clearing && o.clearing(xx, yy, u)) continue;          // left open (a glade, round the pagoda)
       if (r() > (o.fill === undefined ? 1 : o.fill)) continue;     // a sparse slope leaves gaps
-      if (o.noTrees) continue;                                      // (the preview's view of the pagoda alone)
+      if (o.noTrees) continue;                                      // (the pagoda alone)
       var hh = hgt * lerp(0.7, 1.3, r()) * (r() < 0.08 ? 1.5 : 1);
       if (o.tooTall && o.tooTall(xx, yy, hh, u)) continue;           // would rise in front of something that must show
-      fir(c, xx, yy, hh, (o.seed || 11) * 1000 + (k++), { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true });
+      trees.push([xx, yy, hh, (o.seed || 11) * 1000 + (k++)]);
     }
-    c = main;
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.filter = 'blur(' + firSoft(haze, sc).toFixed(2) + 'px)';
-    c.drawImage(lay, rx0 * T0.a + T0.e, ry0 * T0.d + T0.f); c.restore();
+    // the whole row on one layer, softened once as it is laid down
+    var T0 = c.getTransform(), sc = T0.a, ry0 = foot, rx0 = x0 - hgt, rx1 = x1 + hgt;
+    prof.forEach(function (p) { ry0 = Math.min(ry0, p[1]); });
+    ry0 -= hgt * 2.2; var ry1 = foot + 4;
+    var lay = document.createElement('canvas');
+    lay.width = Math.max(1, Math.ceil((rx1 - rx0) * sc)); lay.height = Math.max(1, Math.ceil((ry1 - ry0) * sc));
+    var lc = lay.getContext('2d'); lc.setTransform(sc, 0, 0, sc, -rx0 * sc, -ry0 * sc);
+    var look = { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true };
+    for (var lk in look0) look[lk] = look0[lk];
+    return { trees: trees, i: 0, lay: lay, lc: lc, look: look, haze: haze, T0: T0, sc: sc, rx0: rx0, ry0: ry0 };
   }
-  if (o.before) o.before(c, 2);
+  function endRow() {
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+    c.filter = 'blur(' + (firSoft(R.haze, R.sc) * (o.soft === undefined ? 1 : o.soft)).toFixed(2) + 'px)';
+    c.drawImage(R.lay, R.rx0 * R.T0.a + R.T0.e, R.ry0 * R.T0.d + R.T0.f); c.restore();
+    R = null;
+  }
+  var started = false;
+  function step(ms) {
+    if (done) return true;
+    var t0 = performance.now(), lim = ms === undefined ? Infinity : ms;
+    if (!started) { started = true; body(); if (performance.now() - t0 >= lim) return false; }
+    while (true) {
+      if (!R) {
+        row++;
+        if (row >= rows) { if (o.before) o.before(c, 2); done = true; return true; }
+        R = startRow();
+      }
+      while (R.i < R.trees.length) {
+        var tr = R.trees[R.i++];
+        fir(R.lc, tr[0], tr[1], tr[2], tr[3], R.look);
+        if (performance.now() - t0 >= lim) return false;
+      }
+      endRow();
+      if (performance.now() - t0 >= lim) return false;
+    }
+  }
+  return { step: step, cancel: function () { done = true; } };
 }
+function hill(c, o) { hillJob(c, o).step(); }
 
-return { camera: camera, pagoda: pagoda, fir: fir, hill: hill };
+return { camera: camera, pagoda: pagoda, fir: fir, hill: hill, hillJob: hillJob };
 })();

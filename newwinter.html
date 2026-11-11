@@ -15,6 +15,7 @@
 <script src="clouds.js"></script>
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
+<script src="winterhill.js"></script>
 
 <style>
   /* ============================================================
@@ -339,6 +340,14 @@ var V_DEFAULTS = {
   lanternsX: 0, lanternsY: 0, lanternsSize: 1,
   plumLX: 0, plumLY: 0, plumLSize: 1,
   plumRX: 0, plumRY: 0, plumRSize: 1,
+  // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
+  // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
+  hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
+  hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
+  hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
+  // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
+  // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
+  pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // time, wind and light
@@ -702,7 +711,7 @@ function watchCanvas(c) {
     restoreTimer = setTimeout(function () { resize(); rebuildAll(); sunDirty = true; cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
   });
 }
-var MTN = mk(), MIST = mk();
+var MTN = mk(), MIST = mk(), HILL = mk(), HILLN = mk();     // (HILLN: the hill being drawn, shown when it is finished)
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
 
 /* The time of day's tint, for colours that are not lit one by one (the mist, the blossoms, the flakes). */
@@ -790,6 +799,81 @@ function ridgeFn(r) {
    in one go kept the tablet's graphics chip busy for seconds with a low sun, and it reset itself,
    wiping every picture on the page). bakeScenery() starts the job; stepScenery() runs it each
    frame and calls bakeScenery(picture) at the end, or bakeScenery(false) if the context was lost. */
+/* ============================================================
+   7b. THE HILL OF FIRS AND THE PAGODA (step 3, winterhill.js) — baked
+   into HILL a little each frame (about 8 ms: the hill's snow, then each
+   row's firs, the pagoda among them), on a second picture, so the old one
+   shows until the new one is finished. Baked again only when the light,
+   the size or one of its values changes. Its place is the reference's
+   (BLK.hill, BLK.pagoda), moved and sized by the layout's values.
+   ============================================================ */
+var hillJob = null, hillT0 = 0, hillDrawn = false;
+var HILL_PROFILE = [[-0.01, 0.47], [0.04, 0.43], [0.10, 0.395], [0.17, 0.39], [0.23, 0.42], [0.28, 0.47], [0.33, 0.54], [0.37, 0.64], [0.39, 0.667]];
+function blkPlace(g) {                               // the layout's move and size of element g, as drawBlockIn applies them
+  var A = BLK_ANCHOR[g], dx = V[g + 'X'] || 0, dy = V[g + 'Y'] || 0, sz = V[g + 'Size'] || 1;
+  return { X: function (f) { return (A[0] + (f - A[0]) * sz + dx) * W; }, Y: function (f) { return blkY(A[1] + (f - A[1]) * sz - dy) * H; }, sz: sz };
+}
+function startHill() {
+  if (hillJob) { hillJob.cancel(); hillJob = null; }
+  hillT0 = performance.now();
+  var want = cv.width, wantH = cv.height;
+  if (HILLN.cnv.width !== want || HILLN.cnv.height !== wantH) { HILLN.cnv.width = want; HILLN.cnv.height = wantH; }
+  var c = HILLN.c;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, want, wantH);
+  if (!V.hillShow && !V.pagodaShow) { swapHill(); return; }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  var hy = H * V.horizonLine, ph = blkPlace('hill'), pp = blkPlace('pagoda');
+  var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
+  var cam = WinterHill.camera(W, H, hy, MT.lens);
+  var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
+  var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
+                     lit: nightLights() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
+  var o = {
+    profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
+    treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
+    hazeFar: V.hillHazeFar, hazeNear: V.hillHazeNear, treeWidth: V.hillFirWidth, light: L, soft: V.hillSoft, noTrees: !V.hillFirs,
+    look: { tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean, brush: V.hillBrush,
+            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) },
+    // no tree right behind the pagoda's lowest storey in the rows in front of it, none on or just in front of its steps
+    clearing: function (x, y, u) {
+      if (!V.pagodaShow) return false;
+      if (u > 0.3 && Math.abs(x - px) < 0.05 * W * cl && y < foot - 0.004 * H && y > foot - 0.12 * H * cl) return true;
+      if (stairs && u > 0.3 && Math.abs(x - stairs.x) < stairs.w * 1.6 * cl && y > foot - 0.02 * H && y < stairs.y + 0.03 * H * cl) return true;
+      return false;
+    },
+    // no tree in front of the pagoda rises past its bottom roof's eave
+    tooTall: function (x, y, hh) {
+      if (!eave) return false;
+      var halfW = hh * 0.4;
+      return x + halfW > eave.x0 && x - halfW < eave.x1 && y - hh < eave.y;
+    },
+    before: function (cc, u) {
+      if (placed || !V.pagodaShow || u < V.pagodaRow) return;
+      placed = true;
+      var pg = WinterHill.pagoda(cc, cam, pagodaOpts);
+      stairs = pg.stairs; eave = pg.eave;
+    }
+  };
+  if (!V.hillShow) {                                // the pagoda alone
+    WinterHill.pagoda(c, cam, pagodaOpts); swapHill(); return;
+  }
+  hillJob = WinterHill.hillJob(c, o);
+}
+function swapHill() {
+  var t = HILL; HILL = HILLN; HILLN = t;
+  hillJob = null; hillDrawn = true;
+  note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about 8 ms a frame)');
+}
+function stepHill() {
+  var fin = hillJob.step(8);
+  if (fin) swapHill();
+}
+function drawHill() {
+  if (!hillDrawn || (!V.hillShow && !V.pagodaShow)) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(HILL.cnv, 0, 0);
+}
+
 var mtnJob = null, mtnT0 = 0;
 function stepScenery() {
   var r = mtnJob.job.step();
@@ -1941,22 +2025,7 @@ function drawBlockIn(c) {
   // 2. Fuji, with its snow cap above the snow line
   // (2. Fuji is the real one now, drawn before the block-in: step 2)
 
-  // 3. the hill of firs, and the pagoda high among them
-  grp('hill');
-  poly(BLK.hill, K.hill);
-  c.save(); path(BLK.hill); c.clip(); rect(-0.2, BLK.firLine, 0.5, 0.7, K.firs); c.restore();
-  label('3  Hill of firs', 0.05, 0.50);
-  grp('pagoda');
-  var P = BLK.pagoda, ph = P.foot - P.roofTop;
-  c.strokeStyle = K.gold; c.lineWidth = Math.max(2, LY(0.006));
-  c.beginPath(); c.moveTo(X(P.x), Y(P.top)); c.lineTo(X(P.x), Y(P.roofTop)); c.stroke();
-  for (var s = 0; s < 5; s++) {
-    var y0 = P.roofTop + ph * s / 5, y1 = y0 + ph / 5, hw = P.w / 2 * (0.62 + 0.38 * (s + 1) / 5);
-    rect(P.x - hw * 0.62, y0 + (y1 - y0) * 0.35, P.x + hw * 0.62, y1, K.pagoda);
-    rect(P.x - hw * 0.4, y0 + (y1 - y0) * 0.55, P.x + hw * 0.4, y0 + (y1 - y0) * 0.85, K.amber);
-    poly([[P.x - hw, y0 + (y1 - y0) * 0.38], [P.x - hw * 0.55, y0], [P.x + hw * 0.55, y0], [P.x + hw, y0 + (y1 - y0) * 0.38]], K.roof);
-  }
-  label('3  Pagoda', P.x, P.top - 0.012);
+  // (3. the hill of firs and the pagoda are the real ones now, drawn before the block-in: step 3)
 
   // 4. the valley mist: a soft golden-cream band (the one soft shape here; its place is set on the panel)
   grp();
@@ -2131,7 +2200,7 @@ window.winterLab = {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
-    (what === 'all' ? ['mtn', 'branches', 'sprites', 'sun'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
   setHour: function () {
@@ -2152,7 +2221,7 @@ window.winterLab = {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  busy: function () { return !!mtnJob || stages.length > 0 || Object.keys(dirty).length > 0; },
+  busy: function () { return !!mtnJob || !!hillJob || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · ' + sunInfo;
@@ -2211,9 +2280,10 @@ function rebuildAll() {
   if (!W) resize();
   applyHour(); paintSkyTint();
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
+  if (hillJob) { hillJob.cancel(); hillJob = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? ['mtn'] : ['mtn', 'sprites'];   // (the real Fuji shows with the block-in too, step 2)
+  stages = V.blockIn ? ['mtn', 'hill'] : ['mtn', 'hill', 'sprites'];   // (the real Fuji and the hill show with the block-in too, steps 2 and 3)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2241,6 +2311,7 @@ function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
   if (st === 'mtn') bakeScenery();
+  else if (st === 'hill') startHill();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2251,6 +2322,7 @@ function rebake() {
   SR = PR * MT.resolution;
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
   if (dirty.mtn) stages.push('mtn');
+  if (dirty.hill) stages.push('hill');
   if (!V.blockIn) {
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
@@ -2282,6 +2354,7 @@ function checkRetry(t) {
   // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
   if (t < wipeAt) return;
   wipeAt = t + 3;
+  if (hillDrawn && !hillJob && V.hillShow && blankRow(HILL, (H * V.horizonLine - 4) * PR)) { note('the hill picture is empty: drawing it again'); stages.push('hill'); }
   if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn'); }
 }
 
@@ -2309,6 +2382,7 @@ function frame(now) {
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
+  else if (hillJob) { try { stepHill(); } catch (e) { hillJob = null; note('ERROR in the hill: ' + e.message); } }
   else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
@@ -2334,6 +2408,7 @@ function frame(now) {
     // then every element still to be built as a plain flat shape at its place in the reference (section 14b)
     drawMountains(dt);
     drawFrontClouds(t, dt);
+    drawHill();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx);
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
@@ -2344,6 +2419,8 @@ function frame(now) {
   // the mountains (baked), the mist drifting along them and the clouds in front of Fuji
   drawMountains(dt);
   drawFrontClouds(t, dt);
+  // step 3: the hill of firs and the pagoda (baked)
+  drawHill();
   // (each step's new element goes here, back to front)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
   drawBack(ctx, t);
@@ -2499,7 +2576,7 @@ var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'],
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    var re = m[0] === 'fuji' ? 'mtn' : 'live';                // the real Fuji is baked again (step 2)
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3) are baked again
     out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
@@ -2514,7 +2591,7 @@ var G = [
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
     { o: 'V', k: 'refOverlay', label: 'Reference picture over the scene', min: 0, max: 1, step: 0.05, re: 'live', note: '0 hidden, 1 the reference alone.' } ] },
   { name: 'Layout: sky and land', ctls: [
-    { o: 'V', k: 'horizonLine', label: 'Where the land begins (share of the height)', min: 0.55, max: 0.8, step: 0.005, re: 'mtn', note: 'The sky (text and toolbar) above, the land below. 0.667 = the top two thirds sky, the bottom third land.' },
+    { o: 'V', k: 'horizonLine', label: 'Where the land begins (share of the height)', min: 0.55, max: 0.8, step: 0.005, re: 'mtn hill', note: 'The sky (text and toolbar) above, the land below. 0.667 = the top two thirds sky, the bottom third land.' },
     { o: 'V', k: 'navY', label: 'Swipe button 次へ →: how far down', min: 0.4, max: 0.95, step: 0.005, re: 'live', note: 'Its middle, as a share of the screen\'s height.' },
     { o: 'V', k: 'dotsY', label: 'Page dots: how far down', min: 0.4, max: 0.98, step: 0.005, re: 'live', note: 'Their middle, as a share of the screen\'s height.' } ] },
   { name: 'Layout: where each element stands', note: 'Moves each block across (share of the width) and up or down (share of the height), and sizes it about its foot.', ctls: moveCtls() },
@@ -2583,6 +2660,35 @@ var G = [
     { o: 'MT', k: 'softness', label: 'Softness (px)', min: 0, max: 4, step: 0.1, re: 'mtn' },
     { o: 'MT', k: 'resolution', label: 'Resolution', min: 0.4, max: 1.2, step: 0.05, re: 'mtn' },
     { col: 'MT', keys: [['rock', 'Rock'], ['fujiRock', 'Fuji'], ['evergreen', 'Conifers'], ['snow', 'Snow'], ['haze', 'Haze']], re: 'mtn' } ] },
+  { name: 'Hill of firs (step 3)', file: 'winterhill.js', note: 'The hill and its rows of firs, from the crest (far, small, misty) to the foot (near, larger, clearer). Every fir is its own tree from its seed. Its place and size: "Layout: where each element stands", Hill of firs. The needle colour: "Colours of the new scene", Pine needles.', ctls: [
+    { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
+    { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
+    { o: 'V', k: 'hillSeed', label: 'Which forest (seed)', min: 1, max: 99, step: 1, re: 'hill', note: 'Each number lays out a different forest, with different trees.' },
+    { o: 'V', k: 'hillRows', label: 'Rows of firs', min: 2, max: 16, step: 1, re: 'hill', note: 'From the crest down to the foot.' },
+    { o: 'V', k: 'hillDensity', label: 'Density (how close together)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Higher = the firs in a row stand closer.' },
+    { o: 'V', k: 'hillFill', label: 'Share of places with a fir', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Lower = more gaps, open snow between the trees.' },
+    { o: 'V', k: 'hillFirFar', label: 'Fir size at the crest', min: 0.01, max: 0.08, step: 0.001, re: 'hill', note: 'Share of the screen\'s height.' },
+    { o: 'V', k: 'hillFirNear', label: 'Fir size at the foot', min: 0.02, max: 0.18, step: 0.001, re: 'hill' },
+    { o: 'V', k: 'hillFirWidth', label: 'Fir width', min: 0.4, max: 1.6, step: 0.01, re: 'hill', note: 'Lower = slimmer firs.' },
+    { o: 'V', k: 'hillTiers', label: 'Tiers of branches', min: 0.5, max: 1.6, step: 0.01, re: 'hill', note: 'Higher = more, smaller tiers on each fir.' },
+    { o: 'V', k: 'hillSparse', label: 'Share of sparse firs', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Sparse firs show a little trunk between their tiers.' },
+    { o: 'V', k: 'hillDroop', label: 'Droop of the boughs', min: 0, max: 2, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillLean', label: 'Lean and bend', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = every fir straight up.' },
+    { o: 'V', k: 'hillFirSnow', label: 'Snow on the firs', min: 0, max: 1.6, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillBrush', label: 'Brush strokes in the needles', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = none.' },
+    { o: 'V', k: 'hillSoft', label: 'Softness of the firs', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = sharp edges; the far rows are always a little softer.' },
+    { o: 'V', k: 'hillHazeFar', label: 'Mist on the far rows', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillHazeNear', label: 'Mist on the near rows', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillNeedleTint', label: 'Needles: use the chosen colour', min: 0, max: 1, step: 0.01, re: 'hill', note: '0 = each fir its own green; 1 = all the chosen Pine needles colour.' } ] },
+  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Its place and size: "Layout: where each element stands", Pagoda.', ctls: [
+    { chk: 'V', k: 'pagodaShow', label: 'Show the pagoda', re: 'hill' },
+    { chk: 'V', k: 'pagodaTimber', label: 'Dark timber (off: vermilion and white)', re: 'hill' },
+    { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
+    { o: 'V', k: 'pagodaSnow', label: 'Snow on it', min: 0, max: 1.5, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'The windows are lit only in the evening and at night.' },
+    { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
+    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' } ] },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
