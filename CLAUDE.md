@@ -34,6 +34,40 @@
 
 # New winter scene (`newwinter.html`): rules and plan
 
+## START HERE (handover to a new session)
+
+**Where things stand.** The user is revamping the winter theme, one element at a time, back to front, in `newwinter.html` (the test bed), matching `reference/winter-reference.jpg`. Steps 0, 1 and 2 are in the test bed; step 3 (hill of firs + pagoda) is being designed in a preview page and is NOT in the test bed yet. The app (`app.js`, section 8d) is untouched; porting to the app only when the user asks.
+
+**Git.** Branch `ccr-aace3b9e-8d1b6b` (push only to it). PR #346 (the step 0 layout work) is merged into `main`; everything after it is on the branch but NOT merged (the torii-size fix, step 1 sky, step 2 Fuji, and the step 3 preview files). Open and merge a PR only when the user asks (they did once before: "create a PR and merge").
+
+**What is in the test bed now (`newwinter.html`).** The app's own sky and clock (the hour slider, default 15:30 late afternoon), the real 3D Fuji in the reference's place, the plum branches and falling snow (still winter2.html's), and the block-in: every element not yet built is a plain flat shape at its place, named and numbered, over the app's sky. Panel: block-in toggle and reference overlay (`refOverlay`, uses `reference/winter-reference-nochime.jpg`), "Layout: sky and land" (`horizonLine` 0.667, `navY`, `dotsY` for 次へ → and the dots), per-element across / up / size (`<g>X`, `<g>Y`, `<g>Size`; the torii are `gates…`), valley mist, colours, time/weather, light, sky and clouds, Fuji, plum branches, falling snow.
+
+**Step 3, where it is.** `winterhill.js` (new painter: `WinterHill.camera`, `.pagoda`, `.fir`, `.hill`) and `hill-options.html` (preview page: buttons A / B / C, "Late afternoon" / "Dusk (lit)"; `?bare`, `?transparent`, `?notrees`, `?dusk`, `#A|#B|#C` in the address). The user chose **option B** (vermilion-and-white pagoda seen corner-on, slender firs, more mist). They have been through two rounds of fixes on the pagoda (snow, base, steps, shading; details at the end of Progress). Their last message of the round was angry that I had regressed things; the latest rewrite (painted snow, shaded surfaces, steps to the wall) has been sent to them but they have NOT yet replied with their verdict.
+
+**Next, in order.**
+1. Wait for / ask for the user's verdict on the pagoda (look at it magnified AND at 1:1). Fix only what they name.
+2. Before it goes into the test bed, as already told to the user: soften the firs' clean edges and add some brush texture (they are still flat, clean-edged polygons next to the painted reference). Each fir must stay its own tree (seed-driven; the user insisted they must not look like clones).
+3. Put option B into `newwinter.html` as step 3: draw the hill and pagoda in the frame between Fuji and the block-in (the code comment `(each step's new element goes here, back to front)`), bake it (not per frame), light it from `LT` / the clock (`lightFor`), lamps and windows lit only from dusk (`nightLights()`), add panel values for it (hill and pagoda), take the flat hill and pagoda shapes out of the block-in, add `winterhill.js` to the page's scripts. Keep it smooth on the tablet (bake once, rebake only on a real light or size change, one step a frame).
+4. Then steps 4 to 11 as listed under "The steps". Each: show the user the look first when they ask for options, get it right on one element, then move on.
+
+**How to run and check things (the scratchpad scripts are not in the repo; recreate them).** Serve the repo: `python3 -m http.server 8765` from the repo root. Chromium and Playwright are pre-installed (`require('playwright')`, `chromium.launch()`). The test bed: `http://localhost:8765/newwinter.html` (use `localStorage.clear()` for a clean start; `winterLab` on `window` exposes `V`, `MT`, `SUN`, `CLOUD`, `changed(what)`, `busy()`, `report()`). Screenshot at 1480 × 924 (the tablet is 2960 × 1848 at 0.5 scale). For fine detail render with `deviceScaleFactor: 2` to 4 and clip a small area, but ALSO look at the result at 1:1 (what the tablet shows), because blur and edge problems differ. To composite a preview over the real background: screenshot the test bed with `blockIn` off, branches, flakes and the text hidden, then screenshot the preview page with `?bare&transparent` and `omitBackground: true`, and alpha-composite them (PIL is installed). The mountains take about 5 s to draw: wait for `!winterLab.busy()`.
+
+**The user (read this; it matters).**
+- They are exacting and have lost patience when I regressed or changed things unasked. Their words: "Did I ask you to recede the snow?" "think twice before executing". Obey the working rules at the end of this file and in "Rules for this work": ask when the target is unclear, change only what they named, one change per request, verify by actually looking before saying "fixed", never second-guess what they say they see.
+- They mark pictures with circles (red, yellow, blue) on screenshots. Look carefully at exactly what is circled, and diagnose before explaining: e.g. the yellow slivers were a real bug (twisted corner faces culled), not "just how it is".
+- Everything is drawn in code, no bitmaps; the style is painted and soft (see the autumn scene), never "lego" / flat polygons / ruler-straight edges. Perspective must be physically right (the scene's camera: eye on the horizon line, 22° lens, `WinterHill.camera`).
+- Explain changes in plain English (project rule). The text is Japanese; only one Galaxy Tab S8 Ultra runs it.
+
+**Gotchas already hit (do not repeat).**
+- The browser keeps saved values under `newWinter-1`. Never reuse a value name the old winter scene had (`toriiX`, `toriiSize`, …): the old number is loaded (this once made the torii tiny). `saveAll` writes `ver: 3`; sun/cloud values from before `ver` 2 and mountain values from before `ver` 3 are ignored.
+- Flat 3D faces make snow look like polygons: paint snow as soft bands (`softBands`) with a blurred copy underneath; never blur thin bands themselves (they turn see-through). Fading by see-through bands leaves stripes: paint on a layer and fade it in one radial sweep.
+- Blur filters on a full-screen canvas at high scale hang the page: draw each element on a layer just its own size (the pagoda does).
+- When a hand-built 3D face's corners are twisted (upturned eaves), take its normal from all edges (Newell), not three corners.
+- Edit order matters in `winterhill.js`'s `pagoda`: the drawing loop must come after every helper and table it uses (it crashed once when placed early).
+
+**Files added for this work (all in the repo root).** `newwinter.html`, `winterhill.js`, `hill-options.html`, `reference/winter-reference.jpg`, `reference/winter-reference-nochime.jpg`. `winterpieces.js` and `winterscene.js` are left over from an earlier attempt and are NOT used (the user said to write new files). `torii.js`, `conifers.js`, `snowlights.js`, `snowfield.js`, `snowheaps.js` are no longer loaded by the test bed (kept for `winter2.html` and the app). When something the app will use is added, add it to `sw.js` `ASSETS` and bump `CACHE` (not yet needed: nothing here is used by the app).
+
+
 Status: step 3 (the hill of firs and the pagoda): the user chose option B (vermilion and white pagoda seen corner-on, slender firs, more mist); the pagoda's snow, shading, base and steps redone after the user's second round of fixes; waiting for the user's look before it goes into the test bed. Not in the test bed yet (the user's rule for this step: nail the look down first, then put it into newwinter.html). Step 0's layout is not final: the user will place the elements once they see real visuals ("I can't decide on the precise placement until I see some actual visuals"), so the block-in stays as the guide and each step's element keeps its across / up / size values. Update the "Progress" list at the bottom of this section at the end of every session.
 
 ## What this is
