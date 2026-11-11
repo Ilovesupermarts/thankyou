@@ -168,7 +168,11 @@ function build(spec) {
         var d = [Math.sin(th), 0, Math.cos(th)], dr = lerp(0.18, 0.42, r()) * droopK * (0.6 + 0.6 * (1 - f));
         var p0 = at.p, p2 = add(p0, [d[0] * L, -dr * L, d[2] * L]), p1 = add(p0, [d[0] * L * 0.5, -dr * L * 0.42, d[2] * L * 0.5]);
         p2[1] += L * 0.05;                                                         // the tip turns up a little
-        T.fol.push({ kind: 'bough', p0: p0, p1: p1, p2: p2, L: L, hang: L * lerp(0.26, 0.4, r()) * (0.75 + 0.35 * (1 - f)),
+        // the lowest boughs may not droop down over the trunk: below the crown the trunk stays clear (as on the
+        // reference's firs, and as a garden pine is kept)
+        var floorY = y0 * 0.7 + 0.25;
+        if (p2[1] < floorY) { p2[1] = floorY; p1[1] = Math.max(p1[1], (p0[1] + floorY) / 2); }
+        T.fol.push({ kind: 'bough', p0: p0, p1: p1, p2: p2, L: L, hang: L * lerp(0.26, 0.4, r()) * (0.75 + 0.35 * (1 - f)), floor: floorY,
                      c: p1, rx: L * 0.5, rz: L * 0.5, seed: (r() * 1e9) | 0, f: f, id: idx++,
                      snowD: snowK * lerp(0.17, 0.28, r()), reach: lerp(0.75, 0.97, r()) });
         if (L > 0.7 && f < 0.6) addLimb(at.seg, [p0, lerp3(p0, p1, 0.6)], Math.max(0.025, at.r * 0.35), 0.02);
@@ -183,7 +187,7 @@ function build(spec) {
     }
     T.crownTop = [lean, Th, 0];
     // the crown's inside: the inner branches and needles, deep in their own shade, so it is full (no sky through it)
-    T.core = { y0: y0, y1: Th * 0.97, R: function (yy) { var f2 = clamp((yy - y0) / (Th - y0), 0, 1); return (wr * Th * Math.pow(1 - f2, shapeP) + 0.12) * 0.72; },
+    T.core = { y0: y0, y1: Th * 0.97, floor: y0 * 0.75 + 0.3, R: function (yy) { var f2 = clamp((yy - y0) / (Th - y0), 0, 1); return (wr * Th * Math.pow(1 - f2, shapeP) + 0.12) * 0.72; },
                at: function (yy) { return atHeight(trunk, yy).p; }, seed: (r() * 1e9) | 0 };
     if (roped) {
       // the pole: lashed to the trunk (just behind it), its top above the crown
@@ -555,11 +559,13 @@ function boughModel(E) {
       var base = [B[0], B[1] + 0.01, B[2]];
       var mid = [base[0] + dx * lb * 0.55, base[1] - Math.sin(droop) * lb * 0.25, base[2] + dz * lb * 0.55];
       var tip = [base[0] + dx * lb * Math.cos(droop * 0.7), base[1] - Math.sin(droop) * lb * 0.85, base[2] + dz * lb * Math.cos(droop * 0.7)];
+      if (E.floor !== undefined && tip[1] < E.floor) { tip[1] = E.floor; mid[1] = Math.max(mid[1], (base[1] + E.floor) / 2); }
       // little twigs hanging from it (more toward the middle of the bough, where it is heaviest)
       var hang = [], nh = Math.round(lerp(1, 4, rr()) * Math.sin(PI * Math.min(1, t * 1.1 + 0.05)));
       for (var h = 0; h < nh; h++) {
         var f = lerp(0.3, 0.9, rr()), hb = lerp3(base, tip, f), hl = lb * lerp(0.35, 0.7, rr());
-        hang.push([hb, [hb[0] + dx * hl * 0.2, hb[1] - hl, hb[2] + dz * hl * 0.2]]);
+        if (E.floor !== undefined) hl = Math.min(hl, Math.max(0, hb[1] - E.floor));
+        if (hl > 0.03) hang.push([hb, [hb[0] + dx * hl * 0.2, hb[1] - hl, hb[2] + dz * hl * 0.2]]);
       }
       tw.push({ t: t, side: sd, base: base, mid: mid, tip: tip, hang: hang, lb: lb, z: (base[2] + tip[2]) / 2, tone: rr(), full: lerp(0.75, 1.2, rr()) });
     }
@@ -621,6 +627,7 @@ function paintCore(c, T, P, K) {
     var C0 = Co.at(y), R = Co.R(y), n = 8 + Math.floor(rr() * 5);
     for (var k = 0; k < n; k++) {
       var th = rr() * TAU, r1 = R * lerp(0.45, 1, Math.sqrt(rr())), dr = lerp(0.2, 0.5, rr());
+      if (y - r1 * dr < Co.floor) dr = Math.max(0, (y - Co.floor) / r1);   // (never down over the trunk below the crown)
       var tip = [C0[0] + Math.sin(th) * r1, y - r1 * dr, C0[2] + Math.cos(th) * r1], mid = [C0[0] + Math.sin(th) * r1 * 0.5, y - r1 * dr * 0.3, C0[2] + Math.cos(th) * r1 * 0.5];
       var A = P(C0), M = P(mid), Z = P(tip), tone = rr();
       Bru.line(tone < 0.55 ? K.under : tone < 0.9 ? K.dark : K.mid, lerp(0.6, 0.95, rr()), [A, M, Z, [Z[0] + (rr() - 0.5) * 2, Z[1] + lerp(1, 3, rr())]]);
@@ -658,101 +665,79 @@ function paintBough(c, E, P, K) {
   Bru.flush();
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
 }
-/* The snow on a bough, piece by piece: one broken layer lying along the top of the branch (its depth uneven, thinning
-   to nothing in places, so it breaks up by itself), with a lumpy crest, its top lit and its front in the sky's blue
-   shade; from it, tongues of snow run a little way out along the inner part of the branchlets (so its lower edge
-   follows the branch's structure); none where the branch slopes steeply (it slides off). */
+/* The snow on a bough, piece by piece: it lies only on the branch itself and the inner part of its branchlets, as soft
+   rounded cushions along their tops (never wider than the needles under it: snow cannot bridge the air between them),
+   thickest near the branch, thinning outward, with gaps where it has fallen; none where the branch slopes steeply. Its
+   rounded top is lit, its front lies in the sky's blue shade, and it throws a little shade on the needles under it. */
 function noise1(rr, n) { var a = []; for (var i = 0; i <= n; i++) a.push(rr()); return function (x) { x = clamp(x, 0, 1) * n; var i = Math.min(n - 1, Math.floor(x)), f = x - i; f = f * f * (3 - 2 * f); return lerp(a[i], a[i + 1], f); }; }
 function boughSnowClumps(E, Pc, P) {
   var key = Pc.u0 + ':' + Pc.u1;
   if (Pc._cl && Pc._clKey === key) return Pc._cl;
-  var rr = rng(Pc.seed), s = P.s(E.p1[2]);
+  var M = boughModel(E), rr = rng(Pc.seed), s = P.s(E.p1[2]);
   boughPt(E, 0);
   var C = E._cc, dx = E.p2[0] - E.p0[0], dz = E.p2[2] - E.p0[2], hz = Math.hypot(dx, dz) || 1;
   function keepAt(t) { var dy = 2 * (1 - t) * (C[1] - E.p0[1]) + 2 * t * (E.p2[1] - C[1]); return clamp(1 - (Math.atan(Math.abs(dy) / hz) - 0.55) / 0.35, 0, 1); }
-  var big = noise1(rr, 5), mid = noise1(rr, 13), fine = noise1(rr, 29), wL = noise1(rr, 11), wR = noise1(rr, 11);
-  var n = Math.max(10, Math.round((Pc.u1 - Pc.u0) * E.L / 0.04)), runs = [], cur = null;
-  for (var i = 0; i <= n; i++) {
-    var u = i / n, t = lerp(Pc.u0, Pc.u1, u), B = boughPt(E, t), B2 = boughPt(E, Math.min(1, t + 0.01));
-    var tx = B2[0] - B[0], tz = B2[2] - B[2], tl = Math.hypot(tx, tz) || 1, sx = -tz / tl, sz = tx / tl;   // across the branch, level
-    var env = Math.pow(Math.sin(PI * clamp(u * 1.1 - 0.05, 0, 1)), 0.5);
-    var d = Pc.d * keepAt(t) * env * (0.35 + 0.9 * big(u)) * (0.85 + 0.3 * mid(u));             // its depth (m)
-    if (big(u) * 0.8 + mid(u) * 0.4 < 0.16 || d * s < 0.7) { cur = null; continue; }
-    if (!cur) { cur = { raw: [], L: [], Cn: [], R: [], Lb: [], Rb: [] }; runs.push(cur); }
-    // it rests on the needles on top of the branch: as wide as the inner branchlets (uneven on each side), highest along
-    // the middle, sagging toward its sides; its lower edge sits a little into the needles
-    var hw = (0.12 + E.L * 0.11) * (1 - t * 0.4);
-    cur.raw.push({ B: B, sx: sx, sz: sz, wl: hw * (0.5 + 0.8 * wL(u) + 0.3 * (fine(1 - u) - 0.5)), wr: hw * (0.5 + 0.8 * wR(u) + 0.3 * (fine(u * 0.7) - 0.5)),
-                   crest: d * (1 + 0.3 * (fine(u) - 0.5)), d: d, y0: B[1] + 0.04 });
+  var big = noise1(rr, 6), mid = noise1(rr, 15), list = [];
+  // a cushion of snow along a run of branch (3D points a → b): its depth (m) at each end; on the screen it is drawn as a
+  // soft rounded ridge lying on the top of that branch, as wide as the branch's needles there and no wider
+  function ridge(a, b, d0, d1, wid) {
+    var A = P(a), B = P(b), w0 = d0 * s, w1 = d1 * s;
+    if (Math.max(w0, w1) < 0.6) return;
+    list.push({ A: A, B: B, w0: Math.max(0.3, w0), w1: Math.max(0.3, w1), wid: wid * s, lit: rr() });
   }
-  // (a scrap too short to hold together is not snow that stays: none)
-  runs = runs.filter(function (Rn) { return Rn.raw.length >= 4; });
-  // each piece thins out to nothing at its two ends (no straight cut across it), then its outline in 3D
-  runs.forEach(function (Rn) {
-    var m = Rn.raw.length;
-    Rn.raw.forEach(function (q, j) {
-      var f = m < 2 ? 1 : Math.pow(Math.sin(PI * (j + 0.5) / m), 0.6), wl = q.wl * f, wr = q.wr * f, cr = q.crest * f, d = q.d * f, B = q.B;
-      Rn.Cn.push([B[0], q.y0 + cr, B[2]]);
-      Rn.L.push([B[0] - q.sx * wl, q.y0 + cr * 0.45, B[2] - q.sz * wl]);
-      Rn.R.push([B[0] + q.sx * wr, q.y0 + cr * 0.45, B[2] + q.sz * wr]);
-      Rn.Lb.push([B[0] - q.sx * wl * 1.05, q.y0 - d * 0.25, B[2] - q.sz * wl * 1.05]);
-      Rn.Rb.push([B[0] + q.sx * wr * 1.05, q.y0 - d * 0.25, B[2] + q.sz * wr * 1.05]);
-    });
+  var have = function (u) { return big(u) * 0.8 + mid(u) * 0.4 > 0.22; };   // (where it has not fallen off)
+  // along the main branch
+  var n = Math.max(4, Math.round((Pc.u1 - Pc.u0) * E.L / 0.06));
+  for (var i = 0; i < n; i++) {
+    var u0 = i / n, u1 = (i + 1) / n, t0 = lerp(Pc.u0, Pc.u1, u0), t1 = lerp(Pc.u0, Pc.u1, u1);
+    if (!have((u0 + u1) / 2)) continue;
+    var a = boughPt(E, t0), b = boughPt(E, t1), k = keepAt((t0 + t1) / 2), env = Math.sin(PI * clamp((u0 + u1) / 2 * 1.05, 0, 1));
+    var d = Pc.d * k * (0.5 + 0.7 * big(u0)) * (0.55 + 0.45 * env) * 0.8;
+    ridge([a[0], a[1] + 0.05, a[2]], [b[0], b[1] + 0.05, b[2]], d, d * lerp(0.85, 1.1, rr()), 0.1);
+  }
+  // along the inner part of each branchlet (where it is still nearly level and densely needled), thinning outward
+  M.tw.forEach(function (T) {
+    if (T.t < Pc.u0 || T.t > Pc.u1) return;
+    var u = (T.t - Pc.u0) / Math.max(1e-3, Pc.u1 - Pc.u0), k = keepAt(T.t);
+    if (k < 0.1 || !have(u) || rr() < 0.15) return;
+    var reach = lerp(0.35, 0.7, rr()), d = Pc.d * k * (0.45 + 0.6 * big(u)) * 0.7;
+    var m1 = lerp3(T.base, T.mid, Math.min(1, reach * 1.6));
+    ridge([T.base[0], T.base[1] + 0.035, T.base[2]], [m1[0], m1[1] + 0.03, m1[2]], d, d * 0.35, 0.08);
   });
-  // on the screen
   var Top = [], Bot = [], dmax = 0;
-  runs.forEach(function (Rn) {
-    ['L', 'Cn', 'R', 'Lb', 'Rb'].forEach(function (k) { Rn['s' + k] = Rn[k].map(P); });
-    Rn.sCn.forEach(function (p) { Top.push([p[0], p[1] - 1]); });
-    Rn.sLb.concat(Rn.sRb).forEach(function (p) { Bot.push(p); Top.push([p[0], p[1] - 1]); });
-    for (var j = 0; j < Rn.sCn.length; j++) dmax = Math.max(dmax, Math.max(Rn.sLb[j][1], Rn.sRb[j][1]) - Rn.sCn[j][1]);
-    // which side is nearer you (its face toward you is the one in shade)
-    Rn.near = Rn.L[0][2] + Rn.L[Rn.L.length - 1][2] > Rn.R[0][2] + Rn.R[Rn.R.length - 1][2] ? 'L' : 'R';
+  list.forEach(function (R) {
+    var w = Math.max(R.w0, R.w1);
+    Top.push([Math.min(R.A[0], R.B[0]) - w, Math.min(R.A[1], R.B[1]) - w * 1.6], [Math.max(R.A[0], R.B[0]) + w, Math.min(R.A[1], R.B[1]) - w * 1.6]);
+    Bot.push([R.A[0], Math.max(R.A[1], R.B[1]) + w]); dmax = Math.max(dmax, w);
   });
-  Pc._cl = { runs: runs, Top: Top.length ? Top : [[0, 0], [0, 0]], Bot: Bot.length ? Bot : [[0, 0]], d: dmax };
+  Pc._cl = { list: list, Top: Top.length ? Top : [[0, 0], [0, 0]], Bot: Bot.length ? Bot : [[0, 0]], d: dmax };
   Pc._clKey = key;
   return Pc._cl;
 }
 function boughSnowLines(E, Pc, P) { return boughSnowClumps(E, Pc, P); }
 function paintBoughSnow(c, E, Pc, P, K) {
-  var S = boughSnowClumps(E, Pc, P), s = P.s(E.p1[2]);
-  if (!S.runs.length) return;
-  function strip(A, B, col, a) { pathOf(c, A, B.slice().reverse()); c.fillStyle = css(col, a === undefined ? 1 : a); c.fill(); }
-  function vgrad(pts, stops) {
-    var y0 = Infinity, y1 = -Infinity;
-    pts.forEach(function (p) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
-    var g = c.createLinearGradient(0, y0, 0, Math.max(y0 + 0.5, y1));
-    stops.forEach(function (st) { g.addColorStop(st[0], css(st[1], st[2] === undefined ? 1 : st[2])); });
-    return g;
-  }
-  S.runs.forEach(function (Rn) {
-    if (Rn.sCn.length < 2) return;
-    var far = Rn.near === 'L' ? 'R' : 'L', nearT = Rn['s' + Rn.near], nearB = Rn['s' + Rn.near + 'b'], farT = Rn['s' + far], farB = Rn['s' + far + 'b'];
-    // its shadow on the needles just under its near edge
-    strip(nearB, nearB.map(function (p) { return [p[0], p[1] + Math.max(0.8, 0.05 * s)]; }), K.under, 0.3);
-    // the far side (seen past the crest only from above)
-    strip(farT, farB, mix(K.snowFront, K.snowUnder, 0.4));
-    // the top, one surface: brightest along its crest (facing up, to the sky and the low sun), shading off toward its edges
-    pathOf(c, Rn.sL, Rn.sR.slice().reverse());
-    c.fillStyle = vgrad(Rn.sL.concat(Rn.sR, Rn.sCn), [[0, K.snowLit], [0.3, K.snowTop], [0.75, mix(K.snowTop, K.snowFront, 0.55)], [1, mix(K.snowTop, K.snowFront, 0.8)]]);
-    c.fill();
-    // its near face, toward you: from the top's colour at its upper edge into the sky's blue shade (the sun is behind)
-    pathOf(c, nearT, nearB.slice().reverse());
-    c.fillStyle = vgrad(nearT.concat(nearB), [[0, mix(K.snowTop, K.snowFront, 0.65)], [0.45, K.snowFront], [1, mix(K.snowFront, K.snowUnder, 0.75)]]);
-    c.fill();
-    // the snow is never one flat white: soft hollows and lumps in its surface hold a little shade (inside its outline)
-    var rr2 = rng(Pc.seed + Rn.sCn.length * 13), nb = Math.round(Rn.sCn.length / 4);
-    if (nb > 0) {
-      c.save(); pathOf(c, Rn.sL, nearB.slice().reverse()); c.clip();
-      for (var b = 0; b < nb; b++) {
-        var j = Math.floor(rr2() * Rn.sCn.length), q = Rn.sCn[j], nq = nearB[j], rx = Math.max(1.5, Math.abs(nq[1] - q[1]) * lerp(0.8, 1.6, rr2()));
-        var gq = c.createRadialGradient(q[0], lerp(q[1], nq[1], 0.55), 0, q[0], lerp(q[1], nq[1], 0.55), rx);
-        gq.addColorStop(0, css(K.snowFront, lerp(0.25, 0.5, rr2()))); gq.addColorStop(1, css(K.snowFront, 0));
-        c.fillStyle = gq; c.fillRect(q[0] - rx, q[1] - rx, rx * 2, rx * 2 + Math.abs(nq[1] - q[1]));
-      }
-      c.restore();
+  var S = boughSnowClumps(E, Pc, P), L = S.list;
+  if (!L.length) return;
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  // each cushion as a tapering ridge: drawn in a few short pieces so its depth can change along it
+  function ridgePass(R, lift, wk, col, a) {
+    var steps = 3;
+    for (var q = 0; q < steps; q++) {
+      var f0 = q / steps, f1 = (q + 1) / steps, w = lerp(R.w0, R.w1, (f0 + f1) / 2);
+      var x0 = lerp(R.A[0], R.B[0], f0), y0 = lerp(R.A[1], R.B[1], f0) - w * lift, x1 = lerp(R.A[0], R.B[0], f1), y1 = lerp(R.A[1], R.B[1], f1) - w * lift;
+      c.strokeStyle = css(col, a); c.lineWidth = Math.max(0.4, w * wk);
+      c.beginPath(); c.moveTo(x0, y0); c.lineTo(x1, y1); c.stroke();
     }
-  });
+  }
+  var i;
+  // 1. the shade it throws on the needles just under it
+  for (i = 0; i < L.length; i++) ridgePass(L[i], -0.55, 0.9, K.under, 0.28);
+  // 2. the cushion in the sky's blue shade (its front and underside: the sun is behind)
+  for (i = 0; i < L.length; i++) ridgePass(L[i], 0.45, 1.0, mix(K.snowFront, K.snowUnder, 0.3), 1);
+  // 3. its rounded top, lit, a little higher and narrower
+  for (i = 0; i < L.length; i++) ridgePass(L[i], 0.72, 0.62, L[i].lit > 0.5 ? K.snowTop : mix(K.snowTop, K.snowFront, 0.3), 1);
+  // 4. the very top catching the light, here and there
+  for (i = 0; i < L.length; i++) if (L[i].lit > 0.6) ridgePass(L[i], 0.88, 0.28, K.snowLit, 0.85);
 }
 
 /* ---------- the wood's snow, the bamboo, the ropes, the snow at the feet ---------- */

@@ -375,12 +375,12 @@ var V_DEFAULTS = {
   // each tree: shown, its width (×), its variant (1 tall and slender … 5 twin trunk), roped, across and its foot (shares of the screen, as
   // in the scene picture), its height (m: the pole's top, or the tree's top when not roped), variant 1's crown base (share
   // of its height)
-  yt1Show: true, yt1Wide: 0.6, yt1Var: 2, yt1Rope: true, yt1X: 0.802, yt1Foot: 0.775, yt1H: 7.4, yt1Crown: 0.12,
-  yt2Show: true, yt2Wide: 1, yt2Var: 1, yt2Rope: false, yt2X: 0.837, yt2Foot: 0.745, yt2H: 3.9, yt2Crown: 0.1,
-  yt3Show: true, yt3Wide: 1, yt3Var: 1, yt3Rope: true, yt3X: 0.876, yt3Foot: 0.755, yt3H: 5.3, yt3Crown: 0.12,
-  yt4Show: true, yt4Wide: 1, yt4Var: 1, yt4Rope: true, yt4X: 0.921, yt4Foot: 0.765, yt4H: 6.5, yt4Crown: 0.12,
-  yt5Show: true, yt5Wide: 1, yt5Var: 1, yt5Rope: true, yt5X: 0.963, yt5Foot: 0.815, yt5H: 8.5, yt5Crown: 0.1,
-  yt6Show: true, yt6Wide: 1, yt6Var: 1, yt6Rope: true, yt6X: 0.995, yt6Foot: 0.76, yt6H: 9, yt6Crown: 0.12,
+  yt1Show: true, yt1Wide: 0.6, yt1Var: 2, yt1Rope: true, yt1X: 0.802, yt1Foot: 0.775, yt1H: 7.4, yt1Base: 0.12,
+  yt2Show: true, yt2Wide: 1, yt2Var: 1, yt2Rope: false, yt2X: 0.837, yt2Foot: 0.745, yt2H: 3.9, yt2Base: 0.22,
+  yt3Show: true, yt3Wide: 1, yt3Var: 1, yt3Rope: true, yt3X: 0.876, yt3Foot: 0.755, yt3H: 5.3, yt3Base: 0.22,
+  yt4Show: true, yt4Wide: 1, yt4Var: 1, yt4Rope: true, yt4X: 0.921, yt4Foot: 0.765, yt4H: 6.5, yt4Base: 0.2,
+  yt5Show: true, yt5Wide: 1, yt5Var: 1, yt5Rope: true, yt5X: 0.963, yt5Foot: 0.815, yt5H: 8.5, yt5Base: 0.2,
+  yt6Show: true, yt6Wide: 1, yt6Var: 1, yt6Rope: true, yt6X: 0.995, yt6Foot: 0.76, yt6H: 9, yt6Base: 0.2,
   // time, wind and light
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
@@ -2361,7 +2361,7 @@ function ytPlaces() {
     var x = ax + (V['yt' + i + 'X'] - ax) * sz + V.pinesX, fy = ay + (V['yt' + i + 'Foot'] - ay) * sz - V.pinesY;
     if (fy <= hy + 0.004) continue;                                    // (a foot on or above the horizon cannot stand on the ground)
     out.push({ i: i, x: x * W, foot: fy * H, h: V['yt' + i + 'H'] * sz, variant: Math.round(V['yt' + i + 'Var']), roped: !!V['yt' + i + 'Rope'],
-               crown: V['yt' + i + 'Crown'], wide: V['yt' + i + 'Wide'] });
+               crown: V['yt' + i + 'Base'], wide: V['yt' + i + 'Wide'] });
   }
   return out.sort(function (a, b) { return a.foot - b.foot; });
 }
@@ -2934,7 +2934,7 @@ function ytCtls() {
              { o: 'V', k: 'yt' + i + 'X', label: n + 'across', min: 0.5, max: 1.1, step: 0.002, re: 'pines' },
              { o: 'V', k: 'yt' + i + 'Foot', label: n + 'its foot, how far down', min: 0.68, max: 0.98, step: 0.002, re: 'pines', note: 'Lower = nearer you, so larger.' },
              { o: 'V', k: 'yt' + i + 'H', label: n + 'height (m)', min: 2, max: 16, step: 0.1, re: 'pines' },
-             { o: 'V', k: 'yt' + i + 'Crown', label: n + 'variant 1: crown begins (share of its height)', min: 0.02, max: 0.8, step: 0.01, re: 'pines' });
+             { o: 'V', k: 'yt' + i + 'Base', label: n + 'variant 1: crown begins (share of its height; below it the trunk is clear)', min: 0.05, max: 0.8, step: 0.01, re: 'pines' });
   }
   return out;
 }
