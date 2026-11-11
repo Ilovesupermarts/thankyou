@@ -30,7 +30,7 @@
      flat shape at its place (section 14b), over the app's sky.
      ============================================================ */
   /* reference picture laid over the scene, for comparison only (never used by the app) */
-  #refImg { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; object-fit: fill; z-index: 900;
+  .ref-img { position: fixed; left: 0; top: 0; width: 100vw; height: 100vh; object-fit: fill; z-index: 900;
             pointer-events: none; opacity: 0; display: none; }
 
   /* ============================================================
@@ -210,7 +210,8 @@
 <canvas class="dyn-canvas dyn-back" id="dynBack" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-ground" id="dynGround" aria-hidden="true"></canvas>
 <canvas class="dyn-canvas dyn-near" id="dynNear" aria-hidden="true"></canvas>
-<img id="refImg" src="reference/winter-reference.jpg" alt="" aria-hidden="true">
+<img id="refImg" class="ref-img" src="reference/winter-reference.jpg" alt="" aria-hidden="true">
+<img id="refImg2" class="ref-img" src="reference/winter-reference.jpg" alt="" aria-hidden="true">
 
 <!-- ============ The six real message panels ============ -->
 <div class="stage" id="stage">
@@ -320,7 +321,7 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 /* The values chosen on the tablet (the panel's "Copy values"). */
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
-  blockIn: true, blockLabels: true, refOverlay: 0,
+  blockIn: true, blockLabels: true, refOverlay: 0, horizonLine: 0.667,
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
   horizon: 0.79, swells: 7, swellHeight: 0.65, relief: 0.45, roll: 0.75, drifts: 0.25, ripples: 0.1, rippleSize: 0.99, rippleAngle: 72, grain: 0.5,
@@ -2519,7 +2520,18 @@ function drawNear(c) {
    measured on the reference picture stretched to the screen (as the
    reference overlay is drawn). Heights are fractions of the screen's
    height; widths follow from them, so a shape keeps its own proportions.
+   The user's split: the top two thirds of the screen are the sky, for
+   the text and the toolbar; the land is the bottom third. The reference's
+   own horizon (REF_HORIZON, where its snow meets the mist) is moved to
+   V.horizonLine (2/3): what is above it is stretched to fit above that
+   line, what is below it squeezed to fit below (blkY). The reference
+   overlay is moved the same way, so the two still line up.
    ============================================================ */
+var REF_HORIZON = 0.655;
+function blkY(f) {
+  var h = V.horizonLine;
+  return f <= REF_HORIZON ? f * h / REF_HORIZON : h + (f - REF_HORIZON) * (1 - h) / (1 - REF_HORIZON);
+}
 var BLK = {
   fuji: [[0.50, 0.625], [0.62, 0.50], [0.72, 0.38], [0.79, 0.305], [0.81, 0.295], [0.855, 0.295], [0.88, 0.315], [0.95, 0.38], [1.01, 0.43], [1.01, 0.625]],
   fujiSnowLine: 0.42,
@@ -2550,8 +2562,9 @@ var BLK = {
   torii: [{ x: 0.177, top: 0.655, foot: 0.93, spread: 0.118, span: 0.175 },
           { x: 0.22, top: 0.642, foot: 0.775, spread: 0.10, span: 0.135 },
           { x: 0.26, top: 0.63, foot: 0.71, spread: 0.032, span: 0.05 }],
+  // (the big lantern that stood alone nearest the screen, between the path and the lake, is left out: the user's choice)
   lanterns: [{ x: 0.09, top: 0.70, foot: 0.82 }, { x: 0.255, top: 0.70, foot: 0.84 }, { x: 0.29, top: 0.66, foot: 0.732 },
-             { x: 0.19, top: 0.68, foot: 0.73 }, { x: 0.36, top: 0.705, foot: 0.905 }],
+             { x: 0.19, top: 0.68, foot: 0.73 }],
   // the plum branches: each a line of points from where it enters the screen, its thickness there (fraction of the height)
   plums: [{ pts: [[-0.01, 0.115], [0.07, 0.13], [0.13, 0.17], [0.19, 0.225], [0.24, 0.30], [0.27, 0.38], [0.29, 0.455]], w: 0.03 },
           { pts: [[-0.01, 0.305], [0.05, 0.275], [0.11, 0.255], [0.16, 0.25]], w: 0.02 },
@@ -2567,7 +2580,7 @@ var BLK_COL = {
   vermilion: '#C9412C', black: '#2A2220', stone: '#8F8B86', bark: '#2E2524', blossom: '#C8283A'
 };
 function drawBlockIn(c) {
-  var X = function (f) { return f * W; }, Y = function (f) { return f * H; };
+  var X = function (f) { return f * W; }, Y = function (f) { return blkY(f) * H; };
   function poly(P, fill) {
     c.beginPath();
     P.forEach(function (p, i) { if (i) c.lineTo(X(p[0]), Y(p[1])); else c.moveTo(X(p[0]), Y(p[1])); });
@@ -2670,7 +2683,7 @@ function drawBlockIn(c) {
     poly([[L.x - w * 0.5, L.foot - h * 0.76], [L.x - w * 0.2, L.top + h * 0.06], [L.x + w * 0.2, L.top + h * 0.06], [L.x + w * 0.5, L.foot - h * 0.76]], BLK_COL.roof);
     rect(L.x - w * 0.06, L.top, L.x + w * 0.06, L.top + h * 0.07, BLK_COL.roof);
   });
-  label('9  Stone lanterns', 0.36, 0.69);
+  label('9  Stone lanterns', 0.09, 0.69);
   BLK.torii.slice().reverse().forEach(function (T) {
     var h = T.foot - T.top, pw = h * H * 0.055 / W;
     [-1, 1].forEach(function (sd) {
@@ -2718,12 +2731,18 @@ function drawBlockIn(c) {
   c.restore();
 }
 /* The reference picture over the scene (an ordinary image element above the canvases; comparison only). */
-var refEl = document.getElementById('refImg');
+var refEl = document.getElementById('refImg'), refEl2 = document.getElementById('refImg2');
 function refOverlay() {
-  if (!refEl) return;
-  var a = V.refOverlay || 0;
-  refEl.style.display = a > 0 ? 'block' : 'none';
-  refEl.style.opacity = a;
+  if (!refEl || !refEl2) return;
+  var a = V.refOverlay || 0, h = V.horizonLine, R = REF_HORIZON;
+  [refEl, refEl2].forEach(function (el) { el.style.display = a > 0 ? 'block' : 'none'; el.style.opacity = a; });
+  if (!(a > 0)) return;
+  // the part above the reference's horizon, stretched to end at the line; the part below, squeezed to start there
+  var sa = h / R, sb = (1 - h) / (1 - R);
+  refEl.style.height = (100 * sa) + 'vh'; refEl.style.top = '0';
+  refEl.style.clipPath = 'inset(0 0 ' + (100 * (1 - R)) + '% 0)';
+  refEl2.style.height = (100 * sb) + 'vh'; refEl2.style.top = (100 * (h - R * sb)) + 'vh';
+  refEl2.style.clipPath = 'inset(' + (100 * R) + '% 0 0 0)';
 }
 
 /* ============================================================
@@ -3106,6 +3125,7 @@ var G = [
   { name: 'Block-in (step 0)', note: 'Every element as a plain flat shape where it stands in the reference, to agree the layout before anything is painted. The reference picture can be laid over the scene to compare.', ctls: [
     { chk: 'V', k: 'blockIn', label: 'Show the block-in', re: 'block' },
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
+    { o: 'V', k: 'horizonLine', label: 'Where the land begins (share of the height)', min: 0.55, max: 0.8, step: 0.005, re: 'live', note: 'The sky (text and toolbar) above, the land below. 0.667 = the top two thirds sky, the bottom third land.' },
     { o: 'V', k: 'refOverlay', label: 'Reference picture over the scene', min: 0, max: 1, step: 0.05, re: 'live', note: '0 hidden, 1 the reference alone.' } ] },
   { name: 'Report', note: 'What happened on this tablet. After changing the time of day, wait 10 s, then tap Copy report and paste it to Claude.', ctls: [
     { report: true } ] },
