@@ -50,11 +50,12 @@ Status: step 0 (the block-in) built, waiting for the user's look. Update the "Pr
 3. Study the autumn scene for style and method; do not copy its elements into winter. The three things the user has cleared for porting are: the lake's waves and light (`water.js`, `fftwaves.js`, the method of `lakeDrawWater`), and from `winter2.html` Mt Fuji, the plum branches with their blossoms and snow, and the falling snow.
 4. Sky, background and the warm light are the app's own (the same code the autumn theme runs: the Shippō background in `main.css`, the sun, `clouds.js`). Do not make a winter-only sky.
 5. Colours: warm sky and lamp light; snow pure white, shaded periwinkle and slate blue; vermilion torii; crimson plum blossoms; ink-charcoal bark; golden-straw ropes.
-6. Composition: low horizon and an open sky in the middle for the greeting; a band of golden mist behind 次へ → and the six dots; left = hill, pagoda, hall, path, torii, lanterns; right = Fuji and the roped pines; the lake joins the two in the lower centre-right.
-7. The path is trodden snow only: no stones, no walls. Three torii, the path through the middle of each.
-8. Every value of a step goes on the test bed's panel in a group of its own, with "Copy values", so the user can tune it on the tablet.
-9. Check before saying done (working rule 3): every step is run in the test bed, a screenshot is taken at the tablet's shape (2960 × 1848) and looked at next to the reference. Say plainly what still differs.
-10. Keep the smoothness rules above: everything that stands still is baked once into layers; per frame only the sun and clouds, the water, the lamps' flicker, the plum branches' sway, the mist's slow drift and the snowfall. No routine pixel read-backs.
+6. Composition (the user's split): the top two thirds of the screen are sky, for the text and the app's toolbar; the land (the snow, the lake, everything standing on the ground) is the bottom third: the horizon, where the snow meets the mist, is at 2/3 of the height (`V.horizonLine`, 0.667). The reference's own horizon (0.655) is moved there: above it stretched, below it squeezed (`blkY`; the overlay is moved the same way). Open sky in the middle for the greeting; a band of golden mist behind 次へ → and the six dots; left = hill, pagoda, hall, path, torii, lanterns; right = Fuji and the roped pines; the lake joins the two in the lower centre-right.
+7. Left out (the user's choice): the wind chime in the reference's top-left corner (not part of the scene), and the big stone lantern that stood alone nearest the screen, between the path and the lake.
+8. The path is trodden snow only: no stones, no walls. Three torii, the path through the middle of each.
+9. Every value of a step goes on the test bed's panel in a group of its own, with "Copy values", so the user can tune it on the tablet.
+10. Check before saying done (working rule 3): every step is run in the test bed, a screenshot is taken at the tablet's shape (2960 × 1848) and looked at next to the reference. Say plainly what still differs.
+11. Keep the smoothness rules above: everything that stands still is baked once into layers; per frame only the sun and clouds, the water, the lamps' flicker, the plum branches' sway, the mist's slow drift and the snowfall. No routine pixel read-backs.
 
 ## How it will be built
 
@@ -76,7 +77,7 @@ Status: step 0 (the block-in) built, waiting for the user's look. Update the "Pr
 - Roped pines (雪吊り): the big one x 0.96, pole top y 0.355, foot y 0.77; the second x 0.80, top y 0.45, foot y 0.72; smaller roped firs at x 0.875 and 0.92.
 - Path: wide at the bottom-left edge (x 0.05–0.30), curving up and right to the hall's steps (x 0.31, y 0.66).
 - Torii: front gate middle x 0.175, top y 0.645, feet y 0.93, 0.18 wide; second x 0.195, y 0.64–0.775; third x 0.255, y 0.63–0.71.
-- Stone lanterns: x 0.09 (y 0.70–0.81), x 0.255 (0.70–0.83), x 0.29 (0.66–0.73), x 0.19 (small, far); the big one between path and lake x 0.36, y 0.705–0.90.
+- Stone lanterns: x 0.09 (y 0.70–0.81), x 0.255 (0.70–0.83), x 0.29 (0.66–0.73), x 0.19 (small, far). (The reference's big one between path and lake, x 0.36, is left out.)
 - Plum branches: left one from the top-left corner reaching in to x 0.29, y 0.46; right one from the right edge (y 0.10–0.30) reaching in to x 0.68, y 0.39.
 - The glass wind chime at the top left of the reference is the app's own toolbar chime, not part of the scene.
 
@@ -91,7 +92,7 @@ Status: step 0 (the block-in) built, waiting for the user's look. Update the "Pr
 6. The lake and its snow banks: the autumn water (`water.js`, `fftwaves.js`) with calmer winter settings; the banks as rounded overhanging drifts with a thin dark rim of earth and rock at the waterline. Winter touches proposed: thin steam rising off the water, a rim of thin ice along the shore, snowflakes vanishing as they touch the water, a paler, colder deep-water colour.
 7. The right bank and the roped pines: snow-laden firs, two large pines with a pole and straw ropes fanned in a cone. The lake's mirror is baked again after this step so the pines show in the water.
 8. The snowfield and the trodden path: soft mounds shaded blue-grey; a shallow sunk path from the bottom-left edge curving up to the hall's door, soft snow sides, footprints' texture.
-9. The torii and the stone lanterns: three vermilion gates (black feet, snow on the top beams; `torii.js` as the base) astride the path; snow-capped stone lanterns in the gaps and the big one between path and lake; every lamp lit, with a warm pool on its base and on the snow.
+9. The torii and the stone lanterns: three vermilion gates (black feet, snow on the top beams; `torii.js` as the base) astride the path; snow-capped stone lanterns in the gaps (not the big lone one nearest the screen); every lamp lit, with a warm pool on its base and on the snow.
 10. The plum branches: ported from `winter2.html` (`ume…` functions, `snowheaps.js`), placed as in the reference.
 11. The snowfall: ported from `winter2.html`.
 12. The whole picture: the text's legibility, the mist behind the dots, then the other times of day and weathers (evening, night, cloud, snow), and smoothness on the tablet.
@@ -110,3 +111,4 @@ Status: step 0 (the block-in) built, waiting for the user's look. Update the "Pr
 
 - Plan written and agreed (answers above).
 - Step 0 built: `newwinter.html` (a copy of `winter2.html`, values kept under `newWinter-1`, panel position and folds under `newWinter-panel` / `newWinter-folded`). Section 14b of its script is the block-in: `BLK` (every element's place, measured on the reference) and `BLK_COL`, drawn flat by `drawBlockIn` over the app's sky, sun and clouds, with names on the shapes. Panel group "Block-in (step 0)": show the block-in, names, the reference overlay's strength. While the block-in shows, nothing of the old winter scene is baked or drawn; switching it off shows `winter2.html`'s old scene (still in the page until each step replaces its part). Checked in Chromium at 1480 × 924 with the overlay at 50 %: the shapes sit on the reference's elements. The page's own 次へ → and dots sit a little higher than in the reference (y 0.65 / 0.69 against 0.685 / 0.725). Waiting for the user to look at it on the tablet.
+- Block-in changed as the user asked: the land begins at 2/3 of the height (panel: "Where the land begins"), the big lone stone lantern nearest the screen is left out. Asked the user whether the wind chime is to go from the app's winter toolbar too, and whether 次へ → and the dots (now 0.65 / 0.69, the dots just below the 2/3 line) should move.
