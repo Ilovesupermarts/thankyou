@@ -698,6 +698,8 @@ function fir(c, x, y, h, seed, look) {
       var u2 = q / m, hx = lerp(xr, xl, u2), sag = Math.sin(u2 * PI) * H2 * 0.1;
       hemPts.push([hx, T.hem + sag + H2 * lerp(-0.04, 0.12, rr())]);
     }
+    // the hem starts and ends exactly at the boughs' tips, so the outline has no spur there
+    hemPts[0] = Rs[Rs.length - 1].slice(); hemPts[m] = Ls[Ls.length - 1].slice();
     function outline() {
       c.beginPath(); c.moveTo(cx, T.top - H2 * 0.04);
       Rs.forEach(function (p) { c.lineTo(p[0], p[1]); });
