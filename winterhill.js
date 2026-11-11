@@ -178,13 +178,11 @@ function pagoda(c, cam, o) {
     var n = norm(sub(p0, p1));                                         // the steps' end on this side faces this way
     return { sd: sd, seen: dot(n, sub(eye, p0)) > 0 };
   }).sort(function (A, B) { return (A.seen ? 1 : 0) - (B.seen ? 1 : 0); });
-  group(function () { paintDrift(drifts[0].sd); });
   for (var q = 1; q <= nSt; q++) {
     var yk = hp - (q - 1) * rs - rs, ybot = groundAt(q * dz) - 0.012 * S, zf = -bp - q * dz, zc = -bp - (q - 0.5) * dz;
     group(stepLip(yk, zf));
     box(0, (yk + ybot) / 2, zc, ws, (yk - ybot) / 2, dz / 2, 'step', 'riser', { top: 'none', bottom: 'none' }, stairMap);
   }
-  group(function () { paintDrift(drifts[1].sd); paintFootDrift(); });
 
   /* ---------- the roofs ---------- */
   function eave(R, u, side, up) {                  // a point on one side's eave, u -1 … 1, lifted toward the corners
