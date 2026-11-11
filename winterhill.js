@@ -146,6 +146,7 @@ function pagoda(c, cam, o) {
   box(0, spireBase + sp * 0.97, 0, 0.006 * S, 0.01 * S, 0.006 * S, 'goldLit');
 
   // the storeys, from the top down: a lower roof hides the storey above it from below
+  var R0 = null;                                    // (the bottom roof, kept to tell the hill where its eave is)
   for (st = 4; st >= 0; st--) {
     var b = b0 * (1 - 0.075 * st), h = stH[st] * S, yb = storeyY[st];
     var R = { ey: yb + h + 0.024 * S, e: b * (st === 0 ? 2.2 : 2.05), rise: st === 4 ? 0.06 * S : 0.032 * S,
@@ -155,6 +156,7 @@ function pagoda(c, cam, o) {
     box(0, yb + h + 0.006 * S, 0, b * 1.12, 0.006 * S, b * 1.12, 'bracket', 'bracket', { bottom: 'soffit' });
     box(0, yb + h + 0.017 * S, 0, b * 1.3, 0.006 * S, b * 1.3, 'bracket', 'bracket', { bottom: 'soffit' });
     roof(R);
+    if (st === 0) R0 = R;
   }
 
   // the hill's snow round the pagoda: banked against the walls up to the floor, sloping away down the hill
@@ -610,7 +612,13 @@ function pagoda(c, cam, o) {
     c.restore();
   }
   var stairEnd = proj(cam, Wp.apply(null, stairMap([0, yEnd, -bp - Ls])));
-  return { Z: Z, footY: o.foot, stairs: { x: stairEnd[0], y: stairEnd[1], w: ws * 1.4 * cam.F / Z } };
+  // where the bottom roof's eave is on the screen: its ends across, and its lowest point (no tree in front may rise past it)
+  var ex0 = 1e9, ex1 = -1e9, eyLow = -1e9;
+  for (var es = 0; es < 4; es++) for (var eu = -1; eu <= 1.001; eu += 0.25) {
+    var ep = proj(cam, Wp.apply(null, eave(R0, eu, es, -R0.th)));
+    ex0 = Math.min(ex0, ep[0]); ex1 = Math.max(ex1, ep[0]); eyLow = Math.max(eyLow, ep[1]);
+  }
+  return { Z: Z, footY: o.foot, stairs: { x: stairEnd[0], y: stairEnd[1], w: ws * 1.4 * cam.F / Z }, eave: { x0: ex0, x1: ex1, y: eyLow } };
 }
 
 /* =====================================================================
@@ -642,7 +650,7 @@ function fir(c, x, y, h, seed, look) {
   // drawn on a layer of its own, then laid down a little soft (softer with distance), so no edge is ruler-sharp
   // (the hill draws a whole row of firs on one layer and softens it once: look.direct)
   var main = c, T0 = c.getTransform(), sc = T0.a, lay = null;
-  var bx0 = x - w * 0.85 - Math.abs(lean) - 4, bx1 = x + w * 0.85 + Math.abs(lean) + 4, by0 = y - h - 4, by1 = y + 4;
+  var bx0 = x - w * 0.85 - Math.abs(lean) - 4, bx1 = x + w * 0.85 + Math.abs(lean) + 4, by0 = y - h * 1.1 - 4, by1 = y + 4;
   if (!look.direct) {
     lay = document.createElement('canvas');
     lay.width = Math.max(1, Math.ceil((bx1 - bx0) * sc)); lay.height = Math.max(1, Math.ceil((by1 - by0) * sc));
@@ -652,10 +660,10 @@ function fir(c, x, y, h, seed, look) {
 
   // the trunk, seen in the gaps
   var tx = x + lean, ty = y - h;
-  c.strokeStyle = css(fin([54, 42, 40])); c.lineWidth = Math.max(0.7, h * 0.018);
-  c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + bend + lean * 0.5, y - h * 0.5, tx, ty + h * 0.05); c.stroke();
   function trunkX(f) { var t = f; return lerp(x, tx, t) + bend * Math.sin(t * PI); }
-
+  c.strokeStyle = css(fin([54, 42, 40])); c.lineWidth = Math.max(0.7, h * 0.018);
+  c.beginPath(); c.moveTo(x, y); c.quadraticCurveTo(x + bend * 0.9 + lean * 0.4, y - h * 0.42, trunkX(0.85), y - h * 0.85); c.stroke();   // (it ends inside the crown)
+  
   // the tiers, from the bottom up; each a pair of drooping boughs with tufted edges and hanging needle clumps
   var tiers = [], hgt = h * (1 - trunkShow);
   for (var i = 0; i < n; i++) {
@@ -665,14 +673,39 @@ function fir(c, x, y, h, seed, look) {
     var half = w / 2 * Math.pow(1 - f, shapeP) * lerp(0.8, 1.15, r());
     if (broken && i === Math.floor(n * lerp(0.4, 0.7, r()))) half *= 0.5;      // a gap where a branch broke
     var fy = (base - hem + tierH) / h;                                       // where this tier joins the trunk
-    tiers.push({ hem: hem, top: hem - tierH, half: Math.max(half, h * 0.025), cx: trunkX(clamp(fy, 0, 1)),
+    // (each tier's top stays below the tree's top: the spike is the very top)
+    tiers.push({ hem: hem, top: Math.max(hem - tierH, y - h * 0.965), half: Math.max(half, h * 0.025), cx: trunkX(clamp(fy, 0, 1)),
                  lL: 1 - asym + (r() - 0.5) * 0.3, lR: 1 + asym + (r() - 0.5) * 0.3, dr: clamp(droop + (r() - 0.5) * 0.25, 0.05, 0.8),
                  sn: snow * lerp(0.5, 1.25, r()), seed: r() * 1e6 });
   }
-  // the leader at the very top: a thin bent spire, sometimes two
-  c.strokeStyle = css(dark); c.lineWidth = Math.max(0.6, h * 0.012);
-  c.beginPath(); c.moveTo(tx, ty + h * 0.16); c.quadraticCurveTo(tx + (r() - 0.5) * h * 0.02, ty + h * 0.07, tx + (r() - 0.5) * h * 0.015, ty); c.stroke();
-  if (topKind < 0.15) { c.beginPath(); c.moveTo(tx, ty + h * 0.12); c.quadraticCurveTo(tx + h * 0.03, ty + h * 0.08, tx + h * 0.045, ty + h * 0.04); c.stroke(); }
+  // a slim spike of needles growing out of the top tier (its foot hidden in that tier), not a bare stick; sometimes a
+  // second, smaller one branching off it
+  // no tier floats: the gap between a tier and the one above it is never more than a small, even one on a sparse tree
+  // (and none on the others), however the random sizes fall
+  for (var gi2 = 0; gi2 < n - 1; gi2++) {
+    var allow = (sparse ? 0.12 : -0.1) * hgt / n;
+    var T2 = tiers[gi2], H2b = T2.hem - T2.top;
+    // (a tier's needles begin a quarter of its height below its top, at the trunk: count that too)
+    if (T2.top + 0.25 * H2b > tiers[gi2 + 1].hem + allow) T2.top = (tiers[gi2 + 1].hem + allow - 0.25 * T2.hem) / 0.75;
+  }
+  tiers[n - 1].isTop = true;
+  var topT = tiers[n - 1], bend1 = (r() - 0.5) * h * 0.02, tipJ = (r() - 0.5) * h * 0.015;
+  var sbx = topT.cx, sby = topT.top + (topT.hem - topT.top) * 0.5, stx = tx + tipJ, sty = ty;     // its tip is the tree's top
+  var wb = Math.max(0.8, topT.half * 0.55);
+  function spike(bx, by, tx2, ty2, wb2, bendX) {
+    var gS = c.createLinearGradient(bx - wb2, 0, bx + wb2, 0);
+    gS.addColorStop(0, css(lx < 0 ? mid : sh)); gS.addColorStop(0.5, css(dark)); gS.addColorStop(1, css(lx < 0 ? sh : mid));
+    c.fillStyle = gS;
+    c.beginPath(); c.moveTo(bx - wb2, by);
+    c.quadraticCurveTo((bx + tx2) / 2 + bendX - wb2 * 0.25, (by + ty2) / 2, tx2, ty2);
+    c.quadraticCurveTo((bx + tx2) / 2 + bendX + wb2 * 0.25, (by + ty2) / 2, bx + wb2, by);
+    c.closePath(); c.fill();
+  }
+  spike(sbx, sby, stx, sty, wb, bend1);
+  if (topKind < 0.15) {
+    var jt = 0.35, jx = lerp(sbx, stx, jt), jy = lerp(sby, sty, jt), sgL = r() < 0.5 ? -1 : 1;
+    spike(jx, jy + wb * 0.8, jx + sgL * h * 0.018, jy - h * 0.035, wb * 0.6, 0);
+  }
   for (var j = 0; j < n; j++) tier(tiers[j]);
 
   function tier(T) {
@@ -740,21 +773,24 @@ function fir(c, x, y, h, seed, look) {
         var pts = pair[0], sg3 = pair[1], last = pts.length - 2;
         var reach = Math.max(1, Math.round(last * lerp(0.6, 0.98, Math.min(1, T.sn)) * lerp(0.85, 1.05, rr())));
         var Top = [], Bot = [];
-        for (var s2 = 0; s2 <= Math.min(reach, last); s2++) {
+        for (var s2 = T.isTop ? 1 : 0; s2 <= Math.min(reach, last); s2++) {   // (the top tier's snow starts a little out from the spike)
           var p = pts[s2], u3 = s2 / reach, tk = th * (1 - u3 * 0.5);
           var lump = (0.75 + 0.5 * rr());
-          Top.push([p[0], p[1] - tk * lump]);
-          Bot.push([p[0], p[1] + tk * 0.45 * (0.6 + 0.6 * rr())]);
+          var down = sg3 === lx ? 0 : tk * 0.4;                         // on the shaded side it lies partly on the needles
+          Top.push([p[0], p[1] - tk * lump + down]);
+          Bot.push([p[0], p[1] + tk * 0.45 * (0.6 + 0.6 * rr()) + down]);
         }
+        if (Top.length < 2) return;
         var endP = pts[Math.min(reach, last)];
-        var litSide = sg3 === lx, cA = litSide ? snowLit : snowSh, cB = litSide ? mix(snowLit, snowSh, 0.4) : mix(snowSh, snowUnder, 0.3);
+        // (on the shaded side: snow in shade, pale and only faintly blue, so it reads as snow, not as a shadow)
+        var litSide = sg3 === lx, cA = litSide ? snowLit : mix(snowLit, snowSh, 0.45), cB = litSide ? mix(snowLit, snowSh, 0.4) : mix(snowLit, snowSh, 0.75);
         // the pillow: rounded joins and a rounded end, no straight edge. Its blue underside first, then its lit top
         // (from the top down to just below the bough's edge), shaded along the bough: brighter near the trunk
         function pillow(Lo) {
           c.beginPath(); c.moveTo(Top[0][0], Top[0][1]);
           for (var a2 = 1; a2 < Top.length; a2++) { var A = Top[a2 - 1], B = Top[a2]; c.quadraticCurveTo(A[0], A[1], (A[0] + B[0]) / 2, (A[1] + B[1]) / 2); }
           var tl = Top[Top.length - 1], bl = Lo[Lo.length - 1];
-          c.quadraticCurveTo(endP[0] + sg3 * th * 0.5, (tl[1] + bl[1]) / 2, bl[0], bl[1]);
+          c.quadraticCurveTo(endP[0] + sg3 * th * 0.2, (tl[1] + bl[1]) / 2, bl[0], bl[1]);
           for (var b2 = Lo.length - 2; b2 >= 0; b2--) c.lineTo(Lo[b2][0], Lo[b2][1]);
           c.closePath();
         }
@@ -790,8 +826,9 @@ function hill(c, o) {
   var snowLit = mix(shade(SNOW, norm([L.sun[0] < 0 ? -0.5 : 0.5, 0.8, 0.3]), L, 1), L.haze, o.hazeFar * 0.6);
   var snowSh = mix(mix(shade(SNOW, [0, 1, 0], L, 0), [176, 184, 214], 0.4), L.haze, o.hazeFar * 0.6);
   c.beginPath(); c.moveTo(x0, foot + 2);
-  for (var x = x0; x <= x1; x += 4) c.lineTo(x, crestY(x));
-  c.lineTo(x1, foot + 2); c.closePath();
+  for (var x = x0; x <= x1; x += 4) c.lineTo(x, Math.min(foot, crestY(x)));     // (never below its own foot)
+  c.lineTo(x1, Math.min(foot, crestY(x1)));
+  c.lineTo(x1, foot); c.closePath();
   var g = c.createLinearGradient(x0, 0, x1, 0);
   g.addColorStop(0, css(L.sun[0] < 0 ? snowLit : snowSh)); g.addColorStop(1, css(L.sun[0] < 0 ? snowSh : snowLit));
   c.fillStyle = g; c.fill();
@@ -820,6 +857,7 @@ function hill(c, o) {
       if (r() > (o.fill === undefined ? 1 : o.fill)) continue;     // a sparse slope leaves gaps
       if (o.noTrees) continue;                                      // (the preview's view of the pagoda alone)
       var hh = hgt * lerp(0.7, 1.3, r()) * (r() < 0.08 ? 1.5 : 1);
+      if (o.tooTall && o.tooTall(xx, yy, hh, u)) continue;           // would rise in front of something that must show
       fir(c, xx, yy, hh, (o.seed || 11) * 1000 + (k++), { light: L, haze: haze, snow: o.snow, width: o.treeWidth, direct: true });
     }
     c = main;
