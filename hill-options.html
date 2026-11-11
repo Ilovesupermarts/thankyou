@@ -77,16 +77,22 @@ function draw() {
   var prof = [[-0.01, 0.47], [0.04, 0.43], [0.10, 0.395], [0.17, 0.39], [0.23, 0.42], [0.28, 0.47], [0.33, 0.54], [0.37, 0.64], [0.39, 0.667]]
     .map(function (p) { return [p[0] * W, ry(p[1])]; });
   var cam = WinterHill.camera(W, H, hy, 22);
-  var px = 0.195 * W, top = ry(0.185), foot = ry(0.505), done = false;
+  var px = 0.195 * W, top = ry(0.185), foot = ry(0.505), done = false, stairs = null;
+  if (/notrees/.test(location.search)) WinterHill.pagoda(c, cam, { x: px, top: top, foot: foot, yaw: O.yaw, style: O.style, lit: L.lit, snow: 1, light: L, haze: 0.12 });
   WinterHill.hill(c, {
-    profile: prof, foot: hy, rows: O.rows, treeFar: O.treeFar * H, treeNear: O.treeNear * H, density: O.density, fill: O.fill,
+    profile: prof, foot: hy, rows: /notrees/.test(location.search) ? 0 : O.rows, treeFar: O.treeFar * H, treeNear: O.treeNear * H, density: O.density, fill: O.fill,
     snow: O.snow, hazeFar: O.hazeFar, hazeNear: O.hazeNear, treeWidth: O.treeWidth, light: L, seed: 11,
     // no tree stands right behind the pagoda's lowest storey in the rows in front of it; the trees below its foot hide its base, as in the reference
-    clearing: function (x, y, u) { return u > 0.3 && Math.abs(x - px) < 0.05 * W && y < foot - 0.004 * H && y > foot - 0.12 * H; },
+    clearing: function (x, y, u) {
+      if (u > 0.3 && Math.abs(x - px) < 0.05 * W && y < foot - 0.004 * H && y > foot - 0.12 * H) return true;
+      // the steps up to the pagoda: no tree stands on them or right in front of them
+      if (stairs && u > 0.3 && Math.abs(x - stairs.x) < stairs.w * 1.6 && y > foot - 0.02 * H && y < stairs.y + 0.03 * H) return true;
+      return false;
+    },
     before: function (cc, u) {
       if (done || u < 0.32) return;
       done = true;
-      WinterHill.pagoda(cc, cam, { x: px, top: top, foot: foot, yaw: O.yaw, style: O.style, lit: L.lit, snow: 1, light: L, haze: 0.12 });
+      stairs = WinterHill.pagoda(cc, cam, { x: px, top: top, foot: foot, yaw: O.yaw, style: O.style, lit: L.lit, snow: 1, light: L, haze: 0.12 }).stairs;
     }
   });
   // a soft band of mist at the hill's foot (a stand-in for step 4, the valley mist)

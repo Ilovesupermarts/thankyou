@@ -97,6 +97,7 @@ function pagoda(c, cam, o) {
     for (var i = 0; i < 8; i++) v.push([cx + (i & 1 ? hx : -hx), cy + (i & 2 ? hy : -hy), cz + (i & 4 ? hz2 : -hz2)]);
     var Q = [[0, 1, 3, 2], [5, 4, 6, 7], [4, 0, 2, 6], [1, 5, 7, 3], [2, 3, 7, 6], [4, 5, 1, 0]];   // front, back, left, right, top, bottom
     for (var f = 0; f < 6; f++) {
+      if (f === 5 && sides && sides.bottom === 'none') continue;          // (resting on the ground: no underside)
       var m = (f === 4 && sides && sides.top) || (f === 5 && sides && sides.bottom) || mat;
       face(Q[f].map(function (k) { return v[k]; }), m, [cx, cy, cz], f < 4 ? det : null);
     }
@@ -108,7 +109,9 @@ function pagoda(c, cam, o) {
   var b0 = 0.105 * S, y = 0;
   var stH = [0.088, 0.076, 0.072, 0.068, 0.064];
   var storeyY = [], st;
-  y = 0.03 * S;                                   // the stone base
+  // the stone platform (基壇): its top is the pagoda's floor; snow lies banked against it partway up
+  var hp = 0.055 * S, bp = b0 * 1.75, bank = hp * 0.45;
+  y = hp;
   for (st = 0; st < 5; st++) { storeyY.push(y); y += stH[st] * S + 0.045 * S; }
   var spireBase = y;
   // the spire (相輪): the base, nine rings, the water flame and the jewel, gilt
@@ -137,9 +140,30 @@ function pagoda(c, cam, o) {
     roof(ey, e, inner, rise, lift, th, st === 4);
     // the balcony (高欄) round the storey above this roof: a low rail on the snow (not on the top roof)
   }
-  // the stone base
+  // the hill's snow round the platform: banked against its walls, then sloping down toward you and to the sides
+  // (seen from a little below, this slope is what hides the platform's foot: it stands in the snow, not on it)
   group();
-  box(0, 0.015 * S, 0, b0 * 1.9, 0.015 * S, b0 * 1.9, 'stone', null, { top: 'snow' });
+  var run = 0.3 * S, drop = 0.07 * S, wide = bp * 1.9, deep = [0, -S, 0];
+  face([[-bp, bank, -bp], [bp, bank, -bp], [wide, -drop, -bp - run], [-wide, -drop, -bp - run]], 'ground', deep);
+  face([[bp, bank, -bp], [bp, bank, bp], [bp + run * 0.8, -drop, bp], [wide, -drop, -bp - run]], 'ground', deep);
+  face([[-bp, bank, bp], [-bp, bank, -bp], [-wide, -drop, -bp - run], [-bp - run * 0.8, -drop, bp]], 'ground', deep);
+  // the platform (only the part above the snow), then the steps up to it from the snow, between two low side walls
+  group();
+  box(0, (bank + hp) / 2, 0, bp, (hp - bank) / 2, bp, 'stone', 'stonework', { top: 'snow', bottom: 'none' });
+  function groundAt(d) { return bank - (bank + drop) * d / run; }      // the snow's height, d in front of the platform
+  var nSt = 7, dz = 0.024 * S, Ls = nSt * dz, yEnd = groundAt(Ls), rs = (hp - yEnd) / nSt, ws = bp * 0.42;
+  for (var q = 1; q <= nSt; q++) {
+    var yk = hp - q * rs, yb = groundAt(q * dz) - 0.01 * S, zc = -bp - (q - 0.5) * dz;
+    box(0, (yk + yb) / 2, zc, ws, (yk - yb) / 2, dz / 2, 'stone', null, { top: 'tread', bottom: 'none' });
+  }
+  [-1, 1].forEach(function (sd) {
+    var x0 = sd * ws, x1 = sd * ws * 1.32, cap = 0.014 * S, yA = hp + cap, yB = yEnd + cap, zA = -bp, zB = -bp - Ls;
+    var mid = [sd * ws * 1.16, (hp + yEnd) / 2, -bp - Ls / 2];
+    face([[x1, bank, zA], [x1, groundAt(Ls), zB], [x1, yB, zB], [x1, yA, zA]], 'stone', mid);       // its outer face
+    face([[x0, yEnd, zB], [x0, hp, zA], [x0, yA, zA], [x0, yB, zB]], 'stone', mid);                  // its inner face, over the steps
+    face([[x0, yA, zA], [x1, yA, zA], [x1, yB, zB], [x0, yB, zB]], 'snow', mid);                     // the snow along its top
+    face([[x0, groundAt(Ls), zB], [x1, groundAt(Ls), zB], [x1, yB, zB], [x0, yB, zB]], 'stone', mid); // its end
+  });
 
   function roof(ey, e, inner, rise, lift, th, top) {
     var seg = 8;
@@ -193,11 +217,12 @@ function pagoda(c, cam, o) {
   function paintFace(f, n) {
     var pts = f.p.map(function (q) { return proj(cam, q); });
     var m = f.mat, base, col;
-    if (m === 'snow' || m === 'snowEdge') {
+    if (m === 'snow' || m === 'snowEdge' || m === 'ground' || m === 'tread') {
       base = SNOW;
       col = shade(base, n, L, 1);
       col = mix(col, [col[0] * 0.92, col[1] * 0.95, col[2] * 1.06], 0.5);    // snow in shade turns blue
       if (m === 'snowEdge') col = mix(col, [190, 196, 222], 0.25);
+      if (m === 'tread') col = mix(col, [205, 205, 214], 0.18);                 // trodden: a little greyer
     } else if (m === 'gold' || m === 'goldLit') {
       col = shade(GOLD, n, L, 1);
       col = mix(col, [255, 226, 150], m === 'goldLit' ? 0.5 : Math.max(0, dot(n, Lsun)) * 0.35);
@@ -208,12 +233,21 @@ function pagoda(c, cam, o) {
     // the lamps inside light the undersides of the eaves and the brackets warm
     if (lit > 0 && (m === 'soffit' || m === 'bracket')) col = mix(col, [255, 170, 90], clamp(0.35 * lit, 0, 0.6));
     c.fillStyle = css(fin(col));
+    if (m === 'ground') {
+      // the snow round the platform fades out as it runs down into the hill's own snow (no hard edge)
+      var e0 = [(pts[0][0] + pts[1][0]) / 2, (pts[0][1] + pts[1][1]) / 2], e1 = [(pts[2][0] + pts[3][0]) / 2, (pts[2][1] + pts[3][1]) / 2];
+      var gg = c.createLinearGradient(e0[0], e0[1], e1[0], e1[1]), fc = fin(col);
+      gg.addColorStop(0, css(fc, 1)); gg.addColorStop(0.35, css(fc, 0.9)); gg.addColorStop(1, css(fc, 0));
+      c.fillStyle = gg;
+    }
     c.beginPath();
     pts.forEach(function (q, i) { if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); });
     c.closePath(); c.fill();
+    if (m === 'ground') return;
     if (m !== 'wall' && m !== 'gold' && m !== 'goldLit') { c.strokeStyle = c.fillStyle; c.lineWidth = 0.8; c.stroke(); }   // no hairline gaps between pieces
     if (f.det === 'wall') wallDetail(f, pts, n);
     else if (f.det === 'bracket') bracketDetail(pts, col);
+    else if (f.det === 'stonework') stoneDetail(pts, col);
     else if (f.det === 'rafters') rafterDetail(pts, col);
   }
   function P2(pts, s, t) {                          // a point in a quad (front faces: 0 bottom-left, 1 bottom-right, 2 top-right, 3 top-left)
@@ -260,6 +294,20 @@ function pagoda(c, cam, o) {
     var n = clamp(Math.round(w / 4), 4, 30), dk = css(fin(mix(col, [0, 0, 0], 0.45)));
     for (var i = 0; i < n; i++) { var s0 = (i + 0.3) / n, s1 = (i + 0.7) / n; quad(Q, s0, s1, 0.15, 0.85, dk); }
   }
+  function stoneDetail(pts, col) {
+    var w = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
+    if (w < 8) return;
+    c.strokeStyle = css(fin(mix(col, [0, 0, 0], 0.3))); c.lineWidth = 0.6;
+    c.beginPath();
+    var a = P2(pts, 0, 0.55), b = P2(pts, 1, 0.55); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]);      // a course
+    var n = clamp(Math.round(w / 9), 3, 16);
+    for (var i = 1; i < n; i++) {
+      var s0 = (i + (i % 2) * 0.5) / n; if (s0 >= 1) continue;
+      var t0 = i % 2 ? 0 : 0.55, t1 = i % 2 ? 0.55 : 1, p0 = P2(pts, s0, t0), p1 = P2(pts, s0, t1);
+      c.moveTo(p0[0], p0[1]); c.lineTo(p1[0], p1[1]);
+    }
+    c.stroke();
+  }
   function rafterDetail(pts, col) {
     var w = Math.hypot(pts[1][0] - pts[0][0], pts[1][1] - pts[0][1]);
     if (w < 5) return;
@@ -279,7 +327,8 @@ function pagoda(c, cam, o) {
     }
     c.restore();
   }
-  return { Z: Z, footY: o.foot };
+  var stairEnd = proj(cam, Wp(0, yEnd, -bp - Ls));
+  return { Z: Z, footY: o.foot, stairs: { x: stairEnd[0], y: stairEnd[1], w: ws * 1.4 * cam.F / Z } };
 }
 
 /* =====================================================================
