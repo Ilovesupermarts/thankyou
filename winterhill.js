@@ -83,6 +83,22 @@ function pagoda(c, cam, o) {
   var X = (o.x - cam.cx) * Z / cam.F, Y0 = (cam.hy - o.foot) * Z / cam.F;
   var yaw = o.yaw || 0, cs = Math.cos(yaw), sn = Math.sin(yaw);
   var P = PAL[o.style] || PAL.timber, lit = o.lit || 0, snowK = o.snow === undefined ? 1 : o.snow;
+  // the vermilion style's colours from the panel (o.colours.wall, o.colours.red: the posts, with the beams and rails
+  // kept in the same shade relation to them); unchanged colours leave the palette exactly as it was
+  if (o.style === 'vermilion' && o.colours) {
+    var Pc = {}, kk;
+    for (kk in P) Pc[kk] = P[kk];
+    if (o.colours.wall && o.colours.wall.toLowerCase() !== P.wall.toLowerCase()) Pc.wall = o.colours.wall;
+    if (o.colours.red && o.colours.red.toLowerCase() !== P.post.toLowerCase()) {
+      var red = hex(o.colours.red), p0 = hex(P.post);
+      Pc.post = o.colours.red;
+      ['beam', 'rail'].forEach(function (m) {
+        var b0 = hex(P[m]), c3 = [0, 1, 2].map(function (i) { return Math.round(clamp(red[i] * b0[i] / Math.max(1, p0[i]), 0, 255)); });
+        Pc[m] = '#' + c3.map(function (v) { return ('0' + v.toString(16)).slice(-2); }).join('');
+      });
+    }
+    P = Pc;
+  }
   // the light, turned into the camera's space (there, toward you is -z)
   var L = { sun: [o.light.sun[0], o.light.sun[1], -o.light.sun[2]], sunCol: o.light.sunCol, skyCol: o.light.skyCol, amb: o.light.amb, haze: o.light.haze };
   var Lsun = norm(L.sun), litLeft = o.light.sun[0] < 0;
@@ -597,9 +613,16 @@ function pagoda(c, cam, o) {
     if (it.post) it.post();
   });
 
-  // lay the pagoda down
+  // lay the pagoda down (blurred by the depth of field when it is on: a lens focused at o.dof.focus m, as the pines')
   c = main;
-  c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(layer, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
+  var dofPx = 0;
+  if (o.dof && o.dof.on) {
+    var fo = Math.max(5, o.dof.focus || 200);
+    dofPx = Math.min(o.dof.max === undefined ? 3 : o.dof.max, Math.abs(1 / Z - 1 / fo) * fo * 3 * (o.dof.strength === undefined ? 1 : o.dof.strength)) * T0.a;
+  }
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  if (dofPx > 0.05) c.filter = 'blur(' + dofPx.toFixed(2) + 'px)';
+  c.drawImage(layer, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
   // after dusk: a soft warm glow round the lit storeys
   if (lit > 0) {
     c.save(); c.globalCompositeOperation = 'lighter';
@@ -618,7 +641,7 @@ function pagoda(c, cam, o) {
     var ep = proj(cam, Wp.apply(null, eave(R0, eu, es, -R0.th)));
     ex0 = Math.min(ex0, ep[0]); ex1 = Math.max(ex1, ep[0]); eyLow = Math.max(eyLow, ep[1]);
   }
-  return { Z: Z, footY: o.foot, stairs: { x: stairEnd[0], y: stairEnd[1], w: ws * 1.4 * cam.F / Z }, eave: { x0: ex0, x1: ex1, y: eyLow } };
+  return { Z: Z, dof: dofPx, footY: o.foot, stairs: { x: stairEnd[0], y: stairEnd[1], w: ws * 1.4 * cam.F / Z }, eave: { x0: ex0, x1: ex1, y: eyLow } };
 }
 
 /* =====================================================================

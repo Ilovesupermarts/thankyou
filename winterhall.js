@@ -71,12 +71,20 @@ function shadeC(base, n, L, sunK) {
   return out;
 }
 
-var PAL = { plaster: hex('#E8DDC8'), post: hex('#4B2E22'), beam: hex('#553326'), floor: hex('#3A2620'), stone: hex('#9C978F'),
+var PAL_BASE = { plaster: hex('#E8DDC8'), post: hex('#4B2E22'), beam: hex('#553326'), floor: hex('#3A2620'), stone: hex('#9C978F'),
             soffit: hex('#5A3828'), bracket: hex('#6E4430'), fascia: hex('#2E2A2E'), step: hex('#8E8A84'),
             paper: hex('#EDE6D6'), lattice: hex('#3A2419') };
 var GLOW = [255, 182, 96];
 
 function job(o) {
+  // the panel's colours for the plaster, the timber (posts; the beams kept in the same shade relation) and the stone
+  var PAL0 = PAL_BASE, PAL = {};
+  for (var pk in PAL0) PAL[pk] = PAL0[pk];
+  if (o.colours) {
+    if (o.colours.plaster) PAL.plaster = hex(o.colours.plaster);
+    if (o.colours.stone) PAL.stone = hex(o.colours.stone);
+    if (o.colours.timber) { var tm = hex(o.colours.timber); PAL.post = tm; PAL.beam = [0, 1, 2].map(function (i) { return clamp(tm[i] * PAL0.beam[i] / Math.max(1, PAL0.post[i]), 0, 255); }); }
+  }
   var F = o.cam.F, cx = o.cam.cx, hy = o.cam.hy, PR = o.PR || 1, W = o.W, H = o.H;
   var snowK = o.snow === undefined ? 1 : o.snow, lit = clamp(o.lit || 0, 0, 1.5), lampCol = o.lampCol || GLOW;
   var shadowK = o.shadow === undefined ? 1 : o.shadow, spill = o.spill === undefined ? 1 : o.spill;
@@ -167,6 +175,13 @@ function job(o) {
     var fp = Wp(0, 0, -bd);
     Y0 = (hy - o.place.foot) * fp[2] / F;
   }
+  // depth of field: a lens focused at o.dof.focus m (as the pines'), each part blurred by its own distance (device px)
+  function dofAt(D) {
+    if (!o.dof || !o.dof.on) return 0;
+    var fo = Math.max(5, o.dof.focus || 200);
+    return Math.min(o.dof.max === undefined ? 3 : o.dof.max, Math.abs(1 / D - 1 / fo) * fo * 3 * (o.dof.strength === undefined ? 1 : o.dof.strength)) * PR;
+  }
+  var dofHall = 0;
   var eyeH = o.eye || 3, drop = Math.max(0, eyeH + Y0);     // how high its ground stands above the field (the rise)
   var Lw = norm([o.light.sun[0], o.light.sun[1], -o.light.sun[2]]);          // toward the sun, in the camera's space (z away)
   var Ll = norm([Lw[0] * cs - Lw[2] * sn, Lw[1], Lw[0] * sn + Lw[2] * cs]);   // … and in the hall's own
@@ -801,6 +816,9 @@ function job(o) {
       var T = order[firI++], look = {};
       for (var kk in (o.firLook || {})) look[kk] = o.firLook[kk];
       look.light = o.light; look.haze = T.f.haze === undefined ? 0.4 : T.f.haze;
+      // its own depth of field (by its own distance), added to how soft the painter lays it down
+      var dF = dofAt(T.D);
+      if (dF > 0.05) { var s0 = (0.3 + look.haze * 0.3) * PR * (look.soft === undefined ? 1 : look.soft); look.soft = Math.hypot(s0, dF) / ((0.3 + look.haze * 0.3) * PR); }
       WinterHill.fir(bc, T.f.x, T.f.foot, T.f.h, T.f.seed, look);
       if (performance.now() > lim) return false;
     }
@@ -816,15 +834,16 @@ function job(o) {
     footMist(bc);
     // all of it laid down: the snow behind and under the hall, the firs and the hall, the snow in front of it, the lamps' glow
     var oc = OUT.getContext('2d');
-    oc.save(); oc.filter = 'blur(' + (0.45 * PR).toFixed(2) + 'px)'; oc.drawImage(GB, 0, 0); oc.restore();
-    oc.drawImage(GB, 0, 0);
-    oc.save(); oc.filter = 'blur(' + (0.3 * PR).toFixed(2) + 'px)'; oc.drawImage(BODY, 0, 0); oc.restore();
-    oc.save(); oc.filter = 'blur(' + (0.45 * PR).toFixed(2) + 'px)'; oc.drawImage(GF, 0, 0); oc.restore();
+    oc.save(); oc.filter = 'blur(' + Math.hypot(0.45 * PR, dofHall).toFixed(2) + 'px)'; oc.drawImage(GB, 0, 0); oc.restore();
+    if (dofHall < 0.05) oc.drawImage(GB, 0, 0);
+    oc.save(); oc.filter = 'blur(' + Math.hypot(0.3 * PR, dofHall).toFixed(2) + 'px)'; oc.drawImage(BODY, 0, 0); oc.restore();
+    oc.save(); oc.filter = 'blur(' + Math.hypot(0.45 * PR, dofHall).toFixed(2) + 'px)'; oc.drawImage(GF, 0, 0); oc.restore();
     glows(oc);
     GB.width = GB.height = GF.width = GF.height = BODY.width = BODY.height = RC.width = RC.height = 1;
     return true;
   });
-  info = 'hall ' + (2 * ex).toFixed(1) + ' m wide at the eaves, ' + Z.toFixed(0) + ' m away, its ground ' + drop.toFixed(2) + ' m above the field; ' + firs.length + ' firs';
+  dofHall = dofAt(Z);
+  info = 'hall ' + (2 * ex).toFixed(1) + ' m wide at the eaves, ' + Z.toFixed(0) + ' m away' + (dofHall > 0 ? ' (depth of field ' + (dofHall / PR).toFixed(1) + ' px)' : '') + ', its ground ' + drop.toFixed(2) + ' m above the field; ' + firs.length + ' firs';
   return {
     canvas: OUT, x: bx0, y: by0, info: info,
     step: function (ms) {

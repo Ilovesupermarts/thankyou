@@ -11,7 +11,7 @@ const { chromium } = require('playwright');
   await p.goto('http://localhost:8765/newwinter.html');
   await p.evaluate((set) => { localStorage.clear(); localStorage.setItem('shotSet', JSON.stringify(set)); }, set);
   await p.reload();
-  await p.evaluate(() => { var s = JSON.parse(localStorage.getItem('shotSet') || '{}'); for (var g in s) for (var k in s[g]) winterLab[g][k] = s[g][k]; if (s.V && 'hour' in s.V) winterLab.setHour(); winterLab.changed('all'); });
+  await p.evaluate(() => { var s = JSON.parse(localStorage.getItem('shotSet') || '{}'); for (var g in s) for (var k in s[g]) { if (k === 'colours') Object.assign(winterLab[g].colours, s[g][k]); else winterLab[g][k] = s[g][k]; } if (s.V && 'hour' in s.V) winterLab.setHour(); winterLab.changed('all'); });
   await p.waitForTimeout(1500);
   for (let i = 0; i < 1200; i++) { await p.waitForTimeout(500); if (await p.evaluate(() => !winterLab.busy())) break; }
   await p.waitForTimeout(2500);

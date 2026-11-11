@@ -354,6 +354,10 @@ var V_DEFAULTS = {
   // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
   // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
   pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
+  // the pagoda's and the hall's depth of field (each its own lens, as the pines': on, the distance in focus in m, how
+  // strongly what is nearer or farther blurs, the most it blurs in CSS px)
+  pagodaDof: false, pagodaFocus: 200, pagodaDofStrength: 1, pagodaDofMax: 3,
+  hallDof: false, hallFocus: 200, hallDofStrength: 1, hallDofMax: 3,
   // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
   // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
   // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
@@ -421,7 +425,12 @@ var V_DEFAULTS = {
     bankEarth: '#4D4038',
     lakeDeep: '#93A5C3',
     pineBark: '#3E3634',
-    bamboo: '#A88E55'
+    bamboo: '#A88E55',
+    pagodaWall: '#EDE3D2',
+    pagodaRed: '#C24A2E',
+    hallPlaster: '#E8DDC8',
+    hallTimber: '#4B2E22',
+    hallStone: '#9C978F'
   }
 };
 var MT_DEFAULTS = {
@@ -878,7 +887,9 @@ function startHill() {
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
   var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
-                     lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
+                     lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze,
+                     colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed },
+                     dof: { on: V.pagodaDof, focus: V.pagodaFocus, strength: V.pagodaDofStrength, max: V.pagodaDofMax } };
   var o = {
     profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
     treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
@@ -903,6 +914,7 @@ function startHill() {
       placed = true;
       var pg = WinterHill.pagoda(cc, cam, pagodaOpts);
       stairs = pg.stairs; eave = pg.eave;
+      note('pagoda: ' + Math.round(pg.Z) + ' m away' + (pg.dof > 0 ? ', depth of field ' + (pg.dof / PR).toFixed(1) + ' px' : ''));
     }
   };
   if (!V.hillShow) {                                // the pagoda alone
@@ -953,6 +965,8 @@ function startHall() {
     yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
     haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
     lampCol: hex(V.colours.flame), light: L,
+    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone },
+    dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
     firs: firs,
@@ -3006,9 +3020,21 @@ var lab = window.winterLab;
 if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
-var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'], ['hall', 'Hall'], ['frost', 'Frosted trees'],
+// (the pagoda's and the hall's place and size are in their own groups)
+var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['frost', 'Frosted trees'],
             ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['gates', 'Torii'],
             ['lanterns', 'Stone lanterns'], ['plumL', 'Plum branch, left'], ['plumR', 'Plum branch, right']];
+function placeCtls(g, name, re) {
+  return [{ o: 'V', k: g + 'X', label: name + ': across', min: -0.3, max: 0.3, step: 0.005, re: re, note: 'Share of the screen\'s width; + to the right.' },
+          { o: 'V', k: g + 'Y', label: name + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re },
+          { o: 'V', k: g + 'Size', label: name + ': size', min: 0.4, max: 2, step: 0.01, re: re, note: 'About its foot.' }];
+}
+function dofCtls(g, re, what) {
+  return [{ chk: 'V', k: g + 'Dof', label: 'Depth of field', re: re, note: 'Blurred as by a camera lens when it is nearer or farther than the distance in focus.' },
+          { o: 'V', k: g + 'Focus', label: 'Depth of field: distance in focus (m)', min: 20, max: 600, step: 1, re: re, note: what },
+          { o: 'V', k: g + 'DofStrength', label: 'Depth of field: strength', min: 0, max: 4, step: 0.05, re: re },
+          { o: 'V', k: g + 'DofMax', label: 'Depth of field: most blur (px)', min: 0, max: 10, step: 0.1, re: re }];
+}
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
@@ -3182,7 +3208,7 @@ var G = [
     { o: 'V', k: 'hillHazeFar', label: 'Mist on the far rows', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'hillHazeNear', label: 'Mist on the near rows', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'hillNeedleTint', label: 'Needles: use the chosen colour', min: 0, max: 1, step: 0.01, re: 'hill', note: '0 = each fir its own green; 1 = all the chosen Pine needles colour.' } ] },
-  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Its place and size: "Layout: where each element stands", Pagoda.', ctls: [
+  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Where it stands, how big, its look and its depth of field.', ctls: placeCtls('pagoda', 'Pagoda', 'hill').concat([
     { chk: 'V', k: 'pagodaShow', label: 'Show the pagoda', re: 'hill' },
     { chk: 'V', k: 'pagodaTimber', label: 'Dark timber (off: vermilion and white)', re: 'hill' },
     { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
@@ -3190,8 +3216,10 @@ var G = [
     { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'They come on with the hall\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
-    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' } ] },
-  { name: 'Shrine hall and the firs beside it (step 5)', file: 'winterhall.js', note: 'Its place and size: "Layout: where each element stands", Hall (the firs move with it).', ctls: [
+    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' },
+    { col: 'V', keys: [['pagodaWall', 'Pagoda walls (vermilion style)'], ['pagodaRed', 'Pagoda posts, beams, rails (vermilion style)']], re: 'hill' }
+  ]).concat(dofCtls('pagoda', 'hill', 'The pagoda stands about 470 m away at its default place and size (the Report gives the exact distance each time it is drawn).')) },
+  { name: 'Shrine hall and the firs beside it (step 5)', file: 'winterhall.js', note: 'Where it stands (the firs move with it), how big, its look and its depth of field.', ctls: placeCtls('hall', 'Hall', 'hall').concat([
     { chk: 'V', k: 'hallShow', label: 'Show the hall', re: 'hall block', note: 'Off: the flat block-in shape comes back.' },
     { o: 'V', k: 'hallTurn', label: 'Turned (°)', min: -40, max: 40, step: 1, re: 'hall', note: '+ turns its right end toward you (more of its right side shows); 0 = its front square to the view.' },
     { o: 'V', k: 'hallSnow', label: 'Snow on the roof (×)', min: 0, max: 2, step: 0.01, re: 'hall', note: '1 = about 38 cm.' },
@@ -3208,7 +3236,9 @@ var G = [
     { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
     { o: 'V', k: 'hfSnow', label: 'Firs: snow on them', min: 0, max: 1.6, step: 0.01, re: 'hall' },
-    { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ] },
+    { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ,
+    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts and beams'], ['hallStone', 'Hall stone base']], re: 'hall' }
+  ]).concat(dofCtls('hall', 'hall', 'The hall stands about 200 m away, the firs beside it a little farther (each blurs by its own distance; the Report gives the hall\'s).')) },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
