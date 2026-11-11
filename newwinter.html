@@ -15,6 +15,10 @@
 <script src="clouds.js"></script>
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
+<script src="winterhill.js"></script>
+<script src="fftwaves.js"></script>
+<script src="water.js"></script>
+<script src="winterlake.js"></script>
 
 <style>
   /* ============================================================
@@ -318,6 +322,8 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 /* The values chosen on the tablet (the panel's "Copy values"). */
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
+  // the time (hour of the day in Nagoya, today's date): late afternoon, the app's golden hour (the user's choice)
+  hour: 15.5,
   // the block-in (step 0) and the reference picture laid over it
   blockIn: true, blockLabels: true, refOverlay: 0,
   // the layout: the land below this share of the height, the sky (text, toolbar) above
@@ -333,12 +339,31 @@ var V_DEFAULTS = {
   lakeX: 0, lakeY: 0, lakeSize: 1,
   pinesX: 0, pinesY: 0, pinesSize: 1,
   pathX: 0, pathY: 0, pathSize: 1,
-  toriiX: 0, toriiY: 0, toriiSize: 1,
+  gatesX: 0, gatesY: 0, gatesSize: 1,       // the three torii (not 'torii…': winter2.html's old saved toriiX / toriiSize would be read as these)
   lanternsX: 0, lanternsY: 0, lanternsSize: 1,
   plumLX: 0, plumLY: 0, plumLSize: 1,
   plumRX: 0, plumRY: 0, plumRSize: 1,
+  // step 3, the hill of firs (winterhill.js): which forest, rows, how close and how full, the firs' sizes at the crest and
+  // at the foot (shares of the height), their look, snow, mist with distance and softness (the preview's option B, the user's choice)
+  hillShow: true, hillFirs: true, hillSeed: 11, hillRows: 9, hillDensity: 0.55, hillFill: 0.92, hillFirFar: 0.03, hillFirNear: 0.08,
+  hillFirWidth: 0.78, hillTiers: 1, hillSparse: 0.35, hillDroop: 1, hillLean: 1, hillFirSnow: 0.7, hillBrush: 1, hillSoft: 1,
+  hillHazeFar: 0.68, hillHazeNear: 0.18, hillNeedleTint: 0,
+  // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
+  // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
+  pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
+  // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
+  // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
+  // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
+  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1,
+  fieldSwell: 1, fieldDrifts: 1, fieldGrain: 1, fieldSparkle: 1, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
+  // the water (water.js, as the autumn lake): how strongly it mirrors, how far the waves move the reflections, their
+  // size and speed, the simulated waves (fftwaves.js) and the wind over the water (m/s), the sun's sparkle, the
+  // picture's resolution; then the cold: thin ice along the shores (how much, how wide, m), the mist on the far
+  // water, the steam rising off it (how much, how high)
+  lakeMirror: 0.95, lakeCalm: 0.6, lakeWaves: 0.25, lakeWaveSize: 1, lakeSpeed: 0.2, lakeFft: true, lakeWind: 0.45, lakeSparkle: 1, lakeRes: 0.75,
+  thinIce: 0.7, iceWidth: 1.2, lakeMist: 0.5, steam: 0.8, steamRise: 1,
   // time, wind and light
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
@@ -362,15 +387,17 @@ var V_DEFAULTS = {
     branch: '#3B2B2A',
     blossom: '#D93B3B',
     blossomDeep: '#A8212E',
-    stamen: '#F4D27A'
+    stamen: '#F4D27A',
+    bankEarth: '#4D4038',
+    lakeDeep: '#93A5C3'
   }
 };
 var MT_DEFAULTS = {
   seed: 7,
-  rangeHeight: 0.05, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
-  fujiX: 0.87, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
+  rangeHeight: 0.01, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  fujiX: 0.83, fujiHeight: 0.367, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.6, fujiClear: 0.9,
   snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.65, snowSlope: 0.55,
-  sunStrength: 1.15, ambient: 0.65, shadows: 0.7, alpenglow: 0.6,
+  sunStrength: 1.35, ambient: 0.5, shadows: 0.85, alpenglow: 0.6,
   haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
   strength: 1, softness: 0.4, resolution: 0.85,
   colours: {
@@ -392,7 +419,6 @@ var V = clone(V_DEFAULTS), MT = clone(MT_DEFAULTS);
    beams, faint lens ghosts, and the weather in front of it. Values are
    kept in this browser; "Copy values" gives them in words and as JSON.
    ============================================================ */
-var SUN_COLOURS = { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' };
 var SUN_COLOUR_NAMES = [['core', 'Core'], ['glow', 'Glow and streaks'], ['haze', 'Wide sky glow'],
                         ['low', 'Low sun (sunrise, sunset)'], ['ghost', 'Lens ghosts']];
 /* What each kind of weather does to the sun (multipliers on the values
@@ -412,27 +438,20 @@ var CONDITIONS = {
   rain:   { jp: '雨', en: 'Rain', core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0, veil: 0.75, veilCol: [178, 180, 194] },
   snow:   { jp: '雪', en: 'Snow', core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0, veil: 0.7, veilCol: [228, 230, 238] }
 };
+/* The sun's look: the app's own (SUN_LOOK in app.js, the autumn theme's sky; the user's brief:
+   the sky and its warm light are the app's). show and condition are the test bed's own (the app
+   takes the weather from the real weather). */
 var SDEF = {
-  timeOfDay: 'day',
-  show: true, strength: 1,
-  // where it is
-  across: 0.55, below: 18, altitude: 40, eveningAltitude: 3,
-  // the sun itself
-  coreSize: 20, coreSoftness: 0.55, coreBrightness: 1,
-  // the glow
-  glow: 1.2, glowSize: 8, glowFalloff: 1, haze: 0.45, hazeSize: 24, warmth: 0,
-  // the streaks
+  show: true, condition: 'partly',
+  strength: 0.93, below: 18,
+  coreSize: 19, coreSoftness: 0.7, coreBrightness: 0.92,
+  glow: 1.54, glowSize: 20.5, glowFalloff: 2.46, haze: 1.07, hazeSize: 25.5, warmth: 0.53,
   streaks: 14, streakLength: 11, streakVariety: 0.75, longStreaks: 3, streakWidth: 1.1, streakStrength: 0.7,
-  spikes: 30, spikeLength: 2.4, spikeStrength: 0.7,
-  beams: 4, beamStrength: 0.22, beamWidth: 1,
-  irregular: 0.75, seed: 3,
-  // movement
-  turn: 4, shimmer: 0.45, shimmerSpeed: 1,
-  // lens
+  spikes: 30, spikeLength: 2.4, spikeStrength: 0.96, beams: 4, beamStrength: 0.22, beamWidth: 1,
+  irregular: 0.75, seed: 3, turn: 4, shimmer: 0.45, shimmerSpeed: 1,
   ghosts: 0.35, ghostSize: 1, ring: 0.5, ringSize: 9,
-  // weather
-  condition: 'partly', veil: 1,
-  colours: clone(SUN_COLOURS)
+  veil: 0.99,
+  colours: { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' }
 };
 var SUN = clone(SDEF);
 
@@ -443,18 +462,20 @@ var SUN = clone(SDEF);
    of each weather). Shape values build the clouds again (in the
    background); the rest only repaint or move them.
    ============================================================ */
+/* The clouds: the app's own values (CLOUD_LOOK in app.js, the autumn theme's sky). */
 var CLOUD_DEFAULTS = {
   // the shapes: how many of each kind, and how they are built
-  seed: 1, heaps: 2, masses: 1, towers: 1, puffs: 1, flats: 1, banks: 2,
-  resolution: 0.7, detail: 5, billows: 0.5, edge: 0.6, wisp: 0.55, swirl: 0.45, flatBase: 0.4, density: 1.2,
-  // in the sky
+  seed: 1, heaps: 2, masses: 1, towers: 1, puffs: 1, flats: 1, banks: 3,
+  resolution: 0.7, detail: 3, billows: 0.5, edge: 1, wisp: 0.55, swirl: 0.75, flatBase: 0.4, density: 1.2,
+  // in the sky: how many in a fully clouded sky, their size, drift, the share near the sun,
+  // the band the rest are spread across (fractions of the screen height from the top), and how
+  // much they hide the sun
   count: 18, size: 2.3, sizeVariety: 0.8, speed: 0.85, nearSun: 0.5, highest: 0.05, lowest: 0.45, block: 0.75,
-  // the clouds in front of Fuji (in the weathers that have them): how many at most, their size
-  // (next to Fuji), drift, the band of the mountain they float across (0 summit … 1 foot), how
-  // far either side of the summit, how solid, and how often they thin out so Fuji's outline
-  // shows through for a while
-  front: { count: 7, size: 1, speed: 0.5, high: 0.15, low: 0.8, spread: 1.6, opacity: 0.92,
-           thinning: 0.7, thinEvery: 1 },
+  // in front of Fuji: how many at most, their size (next to Fuji), drift, the band of the
+  // mountain they cross (0 summit … 1 foot), how far either side of the summit (in Fuji
+  // heights), how solid, and how much and how often they thin out to show its outline
+  front: { count: 12, size: 1, speed: 0.1, high: 0.15, low: 0.8, spread: 0.95, opacity: 0.59,
+           thinning: 0.15, thinEvery: 1 },
   // the light (the side it comes from follows the sun)
   shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, sky: '#8FA9D0',
   // each time of day: the light's height and how much it comes from in front, how bright,
@@ -465,20 +486,19 @@ var CLOUD_DEFAULTS = {
     night:   { elevation: 60, front: 1, exposure: 1.2, tint: 0.6, lit: '#969EC4', shade: '#60668E', base: '#50567C', opacity: 0.22 }
   },
   // each kind of weather: how much of the sky the clouds cover, how big and solid they are, how
-  // fast they move, the share of the clouds in front of Fuji, and their colours (lit tops,
-  // shaded sides, base)
+  // fast they move, the share of the clouds in front of Fuji, and their colours
   weather: {
-    clear:  { cover: 0,    size: 1,   opacity: 0.9,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
-    sunny:  { cover: 0.3,  size: 1,   opacity: 0.9,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
-    partly: { cover: 0.7,  size: 1.2, opacity: 0.92, speed: 1, front: 0.5,   lit: '#FFFFFF', shade: '#ABB3CB', base: '#919AB3' },
-    thin:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#C5CFE0', base: '#A7B2C6' },
-    cloudy: { cover: 1,    size: 1.7, opacity: 0.95, speed: 1.2, front: 0.9, lit: '#F0EEF4', shade: '#8A8FA5', base: '#757B92' },
-    mist:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 0.6, front: 0.8, lit: '#FFFFFF', shade: '#CAD1DA', base: '#ACB4C1' },
-    rain:   { cover: 0.85, size: 1.9, opacity: 0.95, speed: 1.5, front: 1, lit: '#CECED8', shade: '#70768B', base: '#5F657B' },
+    clear:  { cover: 0,    size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    sunny:  { cover: 0.3,  size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    partly: { cover: 0.7,  size: 1.2, opacity: 0.92, speed: 1,   front: 0.5,  lit: '#FFFFFF', shade: '#ABB3CB', base: '#919AB3' },
+    thin:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#C5CFE0', base: '#A7B2C6' },
+    cloudy: { cover: 1,    size: 1.7, opacity: 0.95, speed: 1.2, front: 0.9,  lit: '#F0EEF4', shade: '#8A8FA5', base: '#757B92' },
+    mist:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 0.6, front: 0.8,  lit: '#FFFFFF', shade: '#CAD1DA', base: '#ACB4C1' },
+    rain:   { cover: 0.85, size: 1.9, opacity: 0.95, speed: 1.5, front: 1,    lit: '#CECED8', shade: '#70768B', base: '#5F657B' },
     snow:   { cover: 0.6,  size: 1.5, opacity: 0.9,  speed: 0.8, front: 0.85, lit: '#F4F4F8', shade: '#9EA8BD', base: '#8691A7' }
   }
 };
-var CLOUD_KEY = 'newWinter-oldClouds';             // (cloudLab1 held the values of the old, hard-edged clouds)
+var CLOUD_KEY = 'newWinter-clouds-2';              // (newWinter-oldClouds held winter2.html's clouds, before step 1)
 var CLOUD = clone(CLOUD_DEFAULTS);
 try {
   var savedC = JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null');
@@ -492,10 +512,6 @@ try {
 } catch (e) { /* silent */ }
 function saveClouds() { try { localStorage.setItem(CLOUD_KEY, JSON.stringify(CLOUD)); } catch (e) { /* silent */ } }
 
-/* Winter clouds: no towering summer clouds, more flat layers and low banks. */
-CLOUD_DEFAULTS.towers = 0; CLOUD_DEFAULTS.heaps = 1; CLOUD_DEFAULTS.puffs = 2; CLOUD_DEFAULTS.flats = 2; CLOUD_DEFAULTS.banks = 2;
-CLOUD_DEFAULTS.weather.snow.cover = 0.85; CLOUD_DEFAULTS.weather.snow.front = 1;
-SDEF.across = 0.2; SDEF.altitude = 22; SDEF.eveningAltitude = 4;
 /* The values chosen on the tablet, over the defaults above. */
 function deepSet(dst, src) {
   for (var k in src) {
@@ -503,8 +519,6 @@ function deepSet(dst, src) {
     else dst[k] = src[k];
   }
 }
-deepSet(CLOUD_DEFAULTS, {"seed":1,"heaps":1,"masses":1,"towers":0,"puffs":2,"flats":2,"banks":2,"resolution":0.7,"detail":5,"billows":0.5,"edge":0.6,"wisp":0.55,"swirl":0.45,"flatBase":0.4,"density":1.2,"count":18,"size":2.3,"sizeVariety":0.8,"speed":0.85,"nearSun":0.5,"highest":0.05,"lowest":0.45,"block":0.75,"front":{"count":7,"size":1,"speed":0.5,"high":0.15,"low":0.8,"spread":1.6,"opacity":0.92,"thinning":0.7,"thinEvery":1},"shadow":1.6,"ambient":0.5,"baseDark":0.5,"silver":0.4,"sky":"#8FA9D0","times":{"day":{"elevation":40,"front":0.7,"exposure":1.4,"tint":0,"lit":"#FFFFFF","shade":"#FFFFFF","base":"#FFFFFF","opacity":1},"evening":{"elevation":8,"front":0.5,"exposure":1.3,"tint":0.4,"lit":"#FFC4A0","shade":"#AA788C","base":"#966478","opacity":1},"night":{"elevation":60,"front":1,"exposure":1.2,"tint":0.6,"lit":"#969EC4","shade":"#60668E","base":"#50567C","opacity":0.22}},"weather":{"clear":{"cover":0,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"sunny":{"cover":0.3,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"partly":{"cover":0.7,"size":1.2,"opacity":0.92,"speed":1,"front":0.5,"lit":"#FFFFFF","shade":"#ABB3CB","base":"#919AB3"},"thin":{"cover":0,"size":1,"opacity":0.7,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#C5CFE0","base":"#A7B2C6"},"cloudy":{"cover":1,"size":1.7,"opacity":0.95,"speed":1.2,"front":0.9,"lit":"#F0EEF4","shade":"#8A8FA5","base":"#757B92"},"mist":{"cover":0,"size":1,"opacity":0.7,"speed":0.6,"front":0.8,"lit":"#FFFFFF","shade":"#CAD1DA","base":"#ACB4C1"},"rain":{"cover":0.85,"size":1.9,"opacity":0.95,"speed":1.5,"front":1,"lit":"#CECED8","shade":"#70768B","base":"#5F657B"},"snow":{"cover":0.85,"size":1.5,"opacity":0.9,"speed":0.8,"front":1,"lit":"#F4F4F8","shade":"#9EA8BD","base":"#8691A7"}}});
-deepSet(SDEF, {"timeOfDay":"day","show":true,"strength":1,"across":0.2,"below":18,"altitude":22,"eveningAltitude":4,"coreSize":20,"coreSoftness":0.55,"coreBrightness":1,"glow":1.2,"glowSize":8,"glowFalloff":1,"haze":0.45,"hazeSize":24,"warmth":0,"streaks":14,"streakLength":11,"streakVariety":0.75,"longStreaks":3,"streakWidth":1.1,"streakStrength":0.7,"spikes":30,"spikeLength":2.4,"spikeStrength":0.7,"beams":4,"beamStrength":0.22,"beamWidth":1,"irregular":0.75,"seed":3,"turn":4,"shimmer":0.45,"shimmerSpeed":1,"ghosts":0.35,"ghostSize":1,"ring":0.5,"ringSize":9,"condition":"partly","veil":1,"colours":{"core":"#FFFFFF","glow":"#F2FAFF","haze":"#E4F1FF","low":"#FFB47E","ghost":"#D2E2FF"}});
 CLOUD = clone(CLOUD_DEFAULTS); SUN = clone(SDEF);
 
 /* Everything on the panel is kept in this browser. */
@@ -518,21 +532,140 @@ function merge(dst, src, def) {
 }
 try {
   var saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-  if (saved) { merge(V, saved.V || {}, V_DEFAULTS); merge(MT, saved.MT || {}, MT_DEFAULTS); merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
+  if (saved) {
+    merge(V, saved.V || {}, V_DEFAULTS);
+    // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
+    if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
+    if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
+  }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
-SUN.timeOfDay = V.timeOfDay;
-document.documentElement.setAttribute('data-time', V.timeOfDay);
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 3, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
   var dd = new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
   var wd = '日月火水木金土'.charAt(dd.getDay());
   document.getElementById('infoDate').textContent = (dd.getMonth() + 1) + '月' + dd.getDate() + '日(' + wd + ')';
-  document.getElementById('infoTime').textContent = dd.getHours() + '時' + ('0' + dd.getMinutes()).slice(-2) + '分';
 }
 tickClock();
 setInterval(tickClock, 30000);
+
+
+/* ============================================================
+   2d. THE APP'S CLOCK — as in app.js: the sun's place in the sky for
+   Nagoya at the chosen hour of today's date (astro, sunTimes), the
+   light's colour through the day (lightAt: the phase, the tint of the
+   sky, the daylight), and from them the sun's place on the screen
+   (skyToScreen: the afternoon sun stands on the left, the west) and the
+   page's data-time. V.timeOfDay ('day', 'evening', 'night') follows
+   the phase, for the parts that light the scene: the golden hour is
+   'day', dusk and dawn 'evening' (the lamps come on), night 'night'.
+   ============================================================ */
+var DEG = Math.PI / 180;
+var NAGOYA = { lat: 35.1815, lon: 136.9066 };
+function angDiff(a, b) { return Math.atan2(Math.sin(a - b), Math.cos(a - b)); }
+function dayOfYear(p) { return (Date.UTC(p.y, p.m - 1, p.d) - Date.UTC(p.y, 0, 0)) / 864e5; }
+function sunTimes(p) {
+  var N = dayOfYear(p), g = TAU / 365 * (N - 1);
+  var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+             0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  var eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+             0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  var lat = NAGOYA.lat * DEG;
+  var cosHa = Math.cos(90.833 * DEG) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+  var ha = Math.acos(clamp(cosHa, -1, 1)) / DEG;
+  var noon = 720 - 4 * NAGOYA.lon - eqt + 540;
+  return { rise: (noon - 4 * ha) / 60, set: (noon + 4 * ha) / 60, noon: noon / 60 };
+}
+function astro(p, hour) {
+  var d = (Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3) / 864e5 - 10957.5;
+  var T = d / 36525;
+  function sd(x) { return Math.sin(x * DEG); }
+  var g = (357.528 + 0.9856003 * d) * DEG;
+  var lamS = 280.46 + 0.9856474 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+  var lamM = 218.32 + 481267.881 * T + 6.29 * sd(134.9 + 477198.85 * T) - 1.27 * sd(259.2 - 413335.38 * T) +
+             0.66 * sd(235.7 + 890534.23 * T) + 0.21 * sd(269.9 + 954397.70 * T) - 0.19 * sd(357.5 + 35999.05 * T) -
+             0.11 * sd(186.6 + 966404.05 * T);
+  var betM = 5.13 * sd(93.3 + 483202.03 * T) + 0.28 * sd(228.2 + 960400.87 * T) -
+             0.28 * sd(318.3 + 6003.18 * T) - 0.17 * sd(217.6 - 407332.20 * T);
+  var eps = 23.439 * DEG, lat = NAGOYA.lat * DEG;
+  var lst = (280.46061837 + 360.98564736629 * d + NAGOYA.lon) * DEG;
+  function horizon(lamDeg, betDeg) {
+    var lam = lamDeg * DEG, bet = betDeg * DEG;
+    var ra = Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam));
+    var dec = Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam));
+    var ha = lst - ra;
+    var alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha));
+    var az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(lat) - Math.sin(lat) * Math.cos(ha)) / DEG;
+    return { alt: alt / DEG, az: (az + 360) % 360 };
+  }
+  var elong = (((lamM - lamS) % 360) + 360) % 360;
+  return {
+    sun: horizon(lamS, 0), moon: horizon(lamM, betM),
+    elong: elong, illum: (1 - Math.cos(elong * DEG)) / 2, waxing: elong < 180
+  };
+}
+var LIGHT_STOPS_FN = function(sr, ss, noon) {
+  return [
+    [sr - 1.6, '#46557f', 0.26, 0.60],
+    [sr - 0.6, '#6d6a96', 0.22, 0.50],
+    [sr,       '#f2a3a0', 0.20, 0.25],
+    [sr + 0.7, '#ffc77a', 0.16, 0.05],
+    [sr + 2.5, '#fff3df', 0.05, 0.00],
+    [noon,     '#ffffff', 0.00, 0.00],
+    [ss - 2.2, '#fff0d6', 0.05, 0.00],
+    [ss - 0.9, '#ffb055', 0.18, 0.00],
+    [ss - 0.1, '#ee8a7a', 0.22, 0.12],
+    [ss + 0.6, '#8d7fb0', 0.24, 0.40],
+    [ss + 1.5, '#46557f', 0.26, 0.60]
+  ];
+};
+function lightAt(h, sun) {
+  var st = LIGHT_STOPS_FN(sun.rise, sun.set, sun.noon);
+  var col, amt, dark;
+  if (h <= st[0][0] || h >= st[st.length - 1][0]) {
+    col = hex('#46557f'); amt = 0.26; dark = 0.6;
+  } else {
+    for (var i = 1; i < st.length; i++) {
+      if (h <= st[i][0]) {
+        var t = (h - st[i - 1][0]) / (st[i][0] - st[i - 1][0]);
+        col = mix(hex(st[i - 1][1]), hex(st[i][1]), t);
+        amt = lerp(st[i - 1][2], st[i][2], t);
+        dark = lerp(st[i - 1][3], st[i][3], t);
+        break;
+      }
+    }
+  }
+  var phase;
+  if (h < sun.rise - 0.8 || h > sun.set + 0.9) phase = 'night';
+  else if (h < sun.rise + 1) phase = 'dawn';
+  else if (h > sun.set - 0.3) phase = 'dusk';
+  else if (h > sun.set - 1.6) phase = 'golden';
+  else if (h < 11) phase = 'morning';
+  else phase = 'day';
+  var daylight = smooth(sun.rise - 0.3, sun.rise + 0.8, h) * (1 - smooth(sun.set - 0.6, sun.set + 0.4, h));
+  return { col: col, amt: amt, dark: dark, phase: phase, daylight: daylight };
+}
+var PHASE_NAMES = { night: 'Night 夜', dawn: 'Dawn 夜明け', morning: 'Morning 朝', day: 'Midday 昼', golden: 'Golden hour 夕方', dusk: 'Dusk 黄昏' };
+/* Today's date in Nagoya. */
+function nagoyaToday() {
+  var d = new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
+  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+}
+var CLK = null;
+function applyHour() {
+  var p = nagoyaToday(), h = V.hour, sun = sunTimes(p), a = astro(p, h), Lt = lightAt(h, sun);
+  CLK = { sun: sun, a: a.sun, Lt: Lt, phase: Lt.phase };
+  V.timeOfDay = Lt.phase === 'night' ? 'night' : (Lt.phase === 'dusk' || Lt.phase === 'dawn') ? 'evening' : 'day';
+  // the page's colours, as the app sets them from the hour (getTimeOfDayInNagoya, applyNightText)
+  var dt = h >= 5 && h < 11 ? 'morning' : h >= 11 && h < 17 ? 'day' : h >= 17 && h < 21 ? 'evening' : 'night';
+  document.documentElement.setAttribute('data-time', dt);
+  document.body.classList.toggle('night-text', h >= 18 || h < 6);
+  var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  if (mm === 60) { hh++; mm = 0; }
+  var el = document.getElementById('infoTime'); if (el) el.textContent = hh + '時' + ('0' + mm).slice(-2) + '分';
+}
+function skyToScreenX(az) { return W * (0.5 + angDiff(180 * DEG, az * DEG) / DEG / 220); }
 
 /* ============================================================
    5. HELPERS
@@ -594,7 +727,7 @@ function watchCanvas(c) {
     restoreTimer = setTimeout(function () { resize(); rebuildAll(); sunDirty = true; cloudShapes.forEach(function (sh) { sh.painted = ''; }); }, 300);
   });
 }
-var MTN = mk(), MIST = mk();
+var MTN = mk(), MIST = mk(), HILL = mk(), HILLN = mk();     // (HILLN: the hill being drawn, shown when it is finished)
 var W = 0, H = 0, PR = 1, GH = 150, SR = 1;
 
 /* The time of day's tint, for colours that are not lit one by one (the mist, the blossoms, the flakes). */
@@ -654,6 +787,10 @@ function mtnOptions(hy) {
   for (var key in MT) if (key !== 'colours') o[key] = MT[key];
   o.width = MTN.cnv.width; o.height = MTN.cnv.height; o.screenW = W; o.screenH = H; o.horizon = hy;
   o.fuji = true; o.winter = 1; o.autumn = 0;
+  // Fuji stands where the layout puts it (step 2): MT.fujiX / fujiHeight are its place on the reference,
+  // moved and sized by the panel's "Mt Fuji: across / up / size" (V.fujiX, V.fujiY, V.fujiSize)
+  o.fujiX = MT.fujiX + V.fujiX;
+  o.fujiHeight = Math.max(0.05, MT.fujiHeight * V.fujiSize + V.fujiY);
   o.sunAzimuth = V.sunAzimuth; o.sunElevation = LT.el;
   o.sunStrength = MT.sunStrength * LT.sS / Math.max(0.01, V.sunStrength);
   o.ambient = MT.ambient * LT.amb / Math.max(0.01, V.ambient);
@@ -678,6 +815,81 @@ function ridgeFn(r) {
    in one go kept the tablet's graphics chip busy for seconds with a low sun, and it reset itself,
    wiping every picture on the page). bakeScenery() starts the job; stepScenery() runs it each
    frame and calls bakeScenery(picture) at the end, or bakeScenery(false) if the context was lost. */
+/* ============================================================
+   7b. THE HILL OF FIRS AND THE PAGODA (step 3, winterhill.js) — baked
+   into HILL a little each frame (about 8 ms: the hill's snow, then each
+   row's firs, the pagoda among them), on a second picture, so the old one
+   shows until the new one is finished. Baked again only when the light,
+   the size or one of its values changes. Its place is the reference's
+   (BLK.hill, BLK.pagoda), moved and sized by the layout's values.
+   ============================================================ */
+var hillJob = null, hillT0 = 0, hillDrawn = false;
+var HILL_PROFILE = [[-0.01, 0.47], [0.04, 0.43], [0.10, 0.395], [0.17, 0.39], [0.23, 0.42], [0.28, 0.47], [0.33, 0.54], [0.37, 0.64], [0.39, 0.667]];
+function blkPlace(g) {                               // the layout's move and size of element g, as drawBlockIn applies them
+  var A = BLK_ANCHOR[g], dx = V[g + 'X'] || 0, dy = V[g + 'Y'] || 0, sz = V[g + 'Size'] || 1;
+  return { X: function (f) { return (A[0] + (f - A[0]) * sz + dx) * W; }, Y: function (f) { return blkY(A[1] + (f - A[1]) * sz - dy) * H; }, sz: sz };
+}
+function startHill() {
+  if (hillJob) { hillJob.cancel(); hillJob = null; }
+  hillT0 = performance.now();
+  var want = cv.width, wantH = cv.height;
+  if (HILLN.cnv.width !== want || HILLN.cnv.height !== wantH) { HILLN.cnv.width = want; HILLN.cnv.height = wantH; }
+  var c = HILLN.c;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, want, wantH);
+  if (!V.hillShow && !V.pagodaShow) { swapHill(); return; }
+  c.setTransform(PR, 0, 0, PR, 0, 0);
+  var hy = H * V.horizonLine, ph = blkPlace('hill'), pp = blkPlace('pagoda');
+  var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
+  var cam = WinterHill.camera(W, H, hy, MT.lens);
+  var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
+  var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
+                     lit: nightLights() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
+  var o = {
+    profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
+    treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
+    hazeFar: V.hillHazeFar, hazeNear: V.hillHazeNear, treeWidth: V.hillFirWidth, light: L, soft: V.hillSoft, noTrees: !V.hillFirs,
+    look: { tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean, brush: V.hillBrush,
+            needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) },
+    // no tree right behind the pagoda's lowest storey in the rows in front of it, none on or just in front of its steps
+    clearing: function (x, y, u) {
+      if (!V.pagodaShow) return false;
+      if (u > 0.3 && Math.abs(x - px) < 0.05 * W * cl && y < foot - 0.004 * H && y > foot - 0.12 * H * cl) return true;
+      if (stairs && u > 0.3 && Math.abs(x - stairs.x) < stairs.w * 1.6 * cl && y > foot - 0.02 * H && y < stairs.y + 0.03 * H * cl) return true;
+      return false;
+    },
+    // no tree in front of the pagoda rises past its bottom roof's eave
+    tooTall: function (x, y, hh) {
+      if (!eave) return false;
+      var halfW = hh * 0.4;
+      return x + halfW > eave.x0 && x - halfW < eave.x1 && y - hh < eave.y;
+    },
+    before: function (cc, u) {
+      if (placed || !V.pagodaShow || u < V.pagodaRow) return;
+      placed = true;
+      var pg = WinterHill.pagoda(cc, cam, pagodaOpts);
+      stairs = pg.stairs; eave = pg.eave;
+    }
+  };
+  if (!V.hillShow) {                                // the pagoda alone
+    WinterHill.pagoda(c, cam, pagodaOpts); swapHill(); return;
+  }
+  hillJob = WinterHill.hillJob(c, o);
+}
+function swapHill() {
+  var t = HILL; HILL = HILLN; HILLN = t;
+  hillJob = null; hillDrawn = true;
+  note('hill and pagoda: ' + Math.round(performance.now() - hillT0) + ' ms (in steps of about 8 ms a frame)');
+}
+function stepHill() {
+  var fin = hillJob.step(8);
+  if (fin) swapHill();
+}
+function drawHill() {
+  if (!hillDrawn || (!V.hillShow && !V.pagodaShow)) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(HILL.cnv, 0, 0);
+}
+
 var mtnJob = null, mtnT0 = 0;
 function stepScenery() {
   var r = mtnJob.job.step();
@@ -822,7 +1034,7 @@ function bakeRay(S, w, h, across, along, colIn, colOut) {
 }
 /* The sun's colours now: white with a cool edge high up, warmer and
    more orange the lower it is (and always in the evening). */
-function sunAltitude() { return V.timeOfDay === 'evening' ? SUN.eveningAltitude : SUN.altitude; }
+function sunAltitude() { return CLK.a.alt; }
 function sunColours() {
   var C = {}; for (var k in SUN.colours) C[k] = hex(SUN.colours[k]);
   var low = Math.max(1 - smooth(2, 22, sunAltitude()), SUN.warmth * 0.6);
@@ -944,8 +1156,8 @@ function buildFrontClouds() {
 function drawFrontClouds(t, dt) {
   if (!cloudShapes.length || !V.showMountains || !cloudW) return;
   if (frontClouds.length !== CLOUD.front.count) buildFrontClouds();
-  var F = CLOUD.front, Tt = CLOUD.times[V.timeOfDay];
-  var hy = H * V.horizonLine, Hf = MT.fujiHeight * H, fx = MT.fujiX * W, top = hy - Hf, reach = Hf * F.spread;
+  var F = CLOUD.front, Tt = { opacity: lerp(1, CLOUD.times.night.opacity, skyNight()) };
+  var hy = H * V.horizonLine, Hf = Math.max(0.05, MT.fujiHeight * V.fujiSize + V.fujiY) * H, fx = (MT.fujiX + V.fujiX) * W, top = hy - Hf, reach = Hf * F.spread;
   var shown = Math.round(cloudW.front * frontClouds.length), wind = (0.5 + 0.5 * V.wind) * cloudW.speed;
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < frontClouds.length; i++) {
@@ -967,16 +1179,31 @@ function drawFrontClouds(t, dt) {
   ctx.globalAlpha = 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
+/* How dark it is (0 by day … 1 at night) and how low the sun is, in eighths (as the app). */
+function skyNight() { return 1 - smooth(0.05, 0.5, CLK.Lt.daylight); }
+function cloudKeys() {
+  var night = skyNight(), low = 1 - smooth(2, 22, sunAltitude());
+  return { nK: Math.round(night * 8) / 8, eK: Math.round(low * (1 - night) * 8) / 8 };
+}
+/* The clouds' light for the time now: day, evening and night blended (the app's cloudTime). */
+function cloudTime() {
+  var T = CLOUD.times, K = cloudKeys(), o = {};
+  for (var key in T.day) {
+    if (typeof T.day[key] === 'number') o[key] = lerp(lerp(T.day[key], T.evening[key], K.eK), T.night[key], K.nK);
+    else { var c = mix(mix(hex(T.day[key]), hex(T.evening[key]), K.eK), hex(T.night[key]), K.nK); o[key] = c; }
+  }
+  return o;
+}
 /* The light and colours now, for the time of day and the weather. */
 function cloudLook() {
-  var T = CLOUD.times[V.timeOfDay], Wt = CLOUD.weather[SUN.condition];
-  var side = isNight() ? 0 : Math.round(clamp((sunPlace().x - W / 2) / (W / 2), -1, 1) * 4) / 4;
-  function tinted(c, tc) { return mix(hex(c), hex(tc), T.tint); }
+  var T = cloudTime(), Wt = CLOUD.weather[SUN.condition], K = cloudKeys();
+  var side = K.nK >= 0.5 ? 0 : Math.round(clamp((sunPlace().x - W / 2) / (W / 2), -1, 1) * 4) / 4;
+  function tinted(c, tc) { return mix(hex(c), tc, T.tint); }
   var o = {};
   CLOUD_SHAPE_KEYS.concat(['shadow', 'ambient', 'baseDark', 'silver']).forEach(function (k) { o[k] = CLOUD[k]; });
   o.sunSide = side; o.sunElevation = T.elevation; o.sunFront = T.front; o.exposure = T.exposure;
   o.colours = { lit: tinted(Wt.lit, T.lit), shade: tinted(Wt.shade, T.shade), base: tinted(Wt.base, T.base),
-                sky: isNight() ? [40, 50, 90] : hex(CLOUD.sky) };
+                sky: mix(hex(CLOUD.sky), [40, 50, 90], K.nK) };
   return o;
 }
 function paintCloudShapes() {
@@ -1006,8 +1233,9 @@ function lerpCond(a, b, k) {
   return o;
 }
 function sunPlace() {
+  // as the app: across the screen from the sun's bearing (skyToScreen), always just under the toolbar (skyBandY)
   var R = SUN.coreSize * (1 + (1 - smooth(2, 22, sunAltitude())) * 0.25);
-  return { x: W * SUN.across, y: barBottom + R + SUN.below, R: R };
+  return { x: skyToScreenX(CLK.a.az), y: barBottom + R + 18, R: R };
 }
 function drawSunSky(t, dt) {
   if (t - barT > 1) {
@@ -1021,7 +1249,7 @@ function drawSunSky(t, dt) {
   if (clouds.length !== CLOUD.count && cloudShapes.length) buildClouds();
   var nightNow = isNight();
   if (sunDirty && nowT - sunBakedAt > 0.12) bakeSun();
-  else if (!nightNow && nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
+  else if (nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
   if (cloudShapes.length) paintCloudShapes();
   var P = sunPlace(), X = P.x, Y = P.y, R = P.R;
   var c = ctx;
@@ -1029,17 +1257,18 @@ function drawSunSky(t, dt) {
   c.globalAlpha = 1;
 
   // the veil over the sky
-  var va = nightNow ? 0 : cur.veil * SUN.veil;      // no dark sheet over the sky at night
+  var night = skyNight(), va = cur.veil * SUN.veil * (1 - night);      // none in the dark (as the app)
   if (va > 0.003) {
-    var vc = nightNow ? scale(cur.veilCol, 0.35) : cur.veilCol, hz = H * V.horizonLine;
-    var vg = c.createLinearGradient(0, 0, 0, hz);
-    vg.addColorStop(0, rgb(vc, clamp(va * 0.75, 0, 1))); vg.addColorStop(1, rgb(vc, clamp(va * 0.45, 0, 1)));
-    c.fillStyle = vg; c.fillRect(0, 0, W, hz);
+    var vg = c.createLinearGradient(0, 0, 0, H);
+    vg.addColorStop(0, rgb(cur.veilCol, clamp(va * 0.75, 0, 1)));
+    vg.addColorStop(0.9, rgb(cur.veilCol, clamp(va * 0.45, 0, 1)));
+    vg.addColorStop(1, rgb(cur.veilCol, clamp(va * 0.4, 0, 1)));
+    c.fillStyle = vg; c.fillRect(0, 0, W, H);
   }
 
   // the clouds, and how much of the sun they hide
   // the weather's values ease in; the night's opacity keeps them faint so the text stays readable
-  var Wt = CLOUD.weather[SUN.condition], Tt = CLOUD.times[V.timeOfDay];
+  var Wt = CLOUD.weather[SUN.condition], Tt = { opacity: lerp(1, CLOUD.times.night.opacity, night) };   // faint at night
   cloudW = cloudW ? lerpCond(cloudW, Wt, 1 - Math.exp(-dt / 0.8)) : lerpCond(Wt, Wt, 1);
   var shown = Math.round(cloudW.cover * clouds.length), occl = 0, wind = (0.5 + 0.5 * V.wind) * CLOUD.speed * cloudW.speed;
   for (var i = 0; i < clouds.length; i++) {
@@ -1060,17 +1289,17 @@ function drawSunSky(t, dt) {
   }
   c.globalAlpha = 1;
   sunOccl = occl;
-  var tod = { day: 'Day', evening: 'Evening', night: 'Night' }[V.timeOfDay];
+  var tod = PHASE_NAMES[CLK.phase] + ' ' + (Math.floor(V.hour)) + ':' + ('0' + Math.round((V.hour % 1) * 60) % 60).slice(-2);
   document.getElementById('infoWeather').textContent = target.jp;
-  if (nightNow || !SUN.show) {
-    sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · ' + (nightNow ? 'no sun at night' : 'sun hidden');
+  var alt = sunAltitude();
+  if (!SUN.show || alt < -1.5) {
+    sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · ' + (SUN.show ? 'the sun is down' : 'sun hidden');
     return;
   }
-  var alt = sunAltitude();
-  var vis = SUN.strength * smooth(-1, 3, alt);
+  var vis = SUN.strength * smooth(-1.5, 1.5, alt);
   var block = occl * CLOUD.block;
   var clear = vis * cur.rays * (1 - block);
-  sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · sun ' + alt + '° up, disc ' + Math.round(R) + ' px' +
+  sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · sun ' + alt.toFixed(1) + '° up, disc ' + Math.round(R) + ' px' +
             (occl > 0.02 ? ' · behind a cloud: ' + Math.round(occl * 100) + '%' : '');
   if (vis < 0.005) return;
 
@@ -1776,7 +2005,7 @@ var BLK = {
    "<element>: across / up-down / size" values (V.<g>X, V.<g>Y, V.<g>Size) move and size each one. */
 var BLK_ANCHOR = {
   fuji: [0.83, 0.625], hill: [0.17, 0.64], pagoda: [0.195, 0.505], hall: [0.31, 0.657], frost: [0.41, 0.71],
-  lake: [0.75, 0.80], pines: [0.90, 0.775], path: [0.15, 1.0], torii: [0.177, 0.93], plumL: [0, 0.12], plumR: [1, 0.10]
+  lake: [0.75, 0.80], pines: [0.90, 0.775], path: [0.15, 1.0], gates: [0.177, 0.93], plumL: [0, 0.12], plumR: [1, 0.10]
 };
 function blkCol() {
   var C = V.colours;
@@ -1787,7 +2016,9 @@ function blkCol() {
     water: C.water, pine: C.needle, rope: C.rope, vermilion: C.vermilion, stone: C.stone, bark: C.branch, blossom: C.blossom, mist: hex(C.mist)
   };
 }
-function drawBlockIn(c) {
+/* part: 'back' (behind the snow ground: the hill, the pagoda, the mist) or 'front' (standing on it: everything else).
+   The snow ground and the lake are the real ones now (step 6, section 14c), drawn between the two. */
+function drawBlockIn(c, part) {
   var K = blkCol();
   // the element being drawn: its anchor, shift and size (set by grp)
   var ax = 0, ay = 0, dx = 0, dy = 0, sz = 1;
@@ -1810,27 +2041,10 @@ function drawBlockIn(c) {
   c.globalAlpha = 1;
 
   // 2. Fuji, with its snow cap above the snow line
-  grp('fuji');
-  poly(BLK.fuji, K.fuji);
-  c.save(); path(BLK.fuji); c.clip(); rect(0, -0.5, 1.5, BLK.fujiSnowLine, K.fujiSnow); c.restore();
-  label('2  Mt Fuji', 0.80, 0.36);
+  // (2. Fuji is the real one now, drawn before the block-in: step 2)
 
-  // 3. the hill of firs, and the pagoda high among them
-  grp('hill');
-  poly(BLK.hill, K.hill);
-  c.save(); path(BLK.hill); c.clip(); rect(-0.2, BLK.firLine, 0.5, 0.7, K.firs); c.restore();
-  label('3  Hill of firs', 0.05, 0.50);
-  grp('pagoda');
-  var P = BLK.pagoda, ph = P.foot - P.roofTop;
-  c.strokeStyle = K.gold; c.lineWidth = Math.max(2, LY(0.006));
-  c.beginPath(); c.moveTo(X(P.x), Y(P.top)); c.lineTo(X(P.x), Y(P.roofTop)); c.stroke();
-  for (var s = 0; s < 5; s++) {
-    var y0 = P.roofTop + ph * s / 5, y1 = y0 + ph / 5, hw = P.w / 2 * (0.62 + 0.38 * (s + 1) / 5);
-    rect(P.x - hw * 0.62, y0 + (y1 - y0) * 0.35, P.x + hw * 0.62, y1, K.pagoda);
-    rect(P.x - hw * 0.4, y0 + (y1 - y0) * 0.55, P.x + hw * 0.4, y0 + (y1 - y0) * 0.85, K.amber);
-    poly([[P.x - hw, y0 + (y1 - y0) * 0.38], [P.x - hw * 0.55, y0], [P.x + hw * 0.55, y0], [P.x + hw, y0 + (y1 - y0) * 0.38]], K.roof);
-  }
-  label('3  Pagoda', P.x, P.top - 0.012);
+  // (3. the hill of firs and the pagoda are the real ones now, drawn before the block-in: step 3)
+  if (part === 'back') {
 
   // 4. the valley mist: a soft golden-cream band (the one soft shape here; its place is set on the panel)
   grp();
@@ -1839,10 +2053,11 @@ function drawBlockIn(c) {
   g.addColorStop(0, rgb(K.mist, 0)); g.addColorStop(clamp((mm - mt) / Math.max(1, mb - mt), 0.01, 0.99), rgb(K.mist, V.mistStrength)); g.addColorStop(1, rgb(K.mist, 0));
   c.fillStyle = g; c.fillRect(0, mt, W, mb - mt);
   label('4  Valley mist', 0.62, V.mistY - 0.02);
+  }
 
-  // the snow ground (step 8 shapes it): from the horizon line down
-  rect(0, BLK.ground, 1, 1.01, K.snow);
+  // (the snow ground and 6. the lake: the real ones, step 6, drawn between the two parts)
 
+  if (part === 'front') {
   // 5. the hall and the frosted trees
   grp('hall');
   var Hl = BLK.hall, hw2 = (Hl.x1 - Hl.x0);
@@ -1862,15 +2077,6 @@ function drawBlockIn(c) {
     rect(F.x - 0.002, (F.top + F.foot) / 2, F.x + 0.002, F.foot, '#8E8A90');
   });
   label('5  Frosted trees', BLK.frost[0].x, BLK.frost[0].top - 0.01);
-
-  // 6. the lake: the water, then the snow over it that shapes it, each waterline with its dark rim
-  grp('lake');
-  poly(BLK.water, K.water);
-  [BLK.leftSpit, BLK.rightBank, BLK.rightSpit].forEach(function (B) {
-    poly(B, K.snow);
-    c.strokeStyle = K.rim; c.lineWidth = Math.max(1.5, LY(0.003)); c.stroke();
-  });
-  label('6  Mirror lake', 0.75, 0.90);
 
   // 7. the right bank's trees and the ropes of the roped pines
   grp('pines');
@@ -1909,7 +2115,7 @@ function drawBlockIn(c) {
     rect(L.x - w * 0.06, L.top, L.x + w * 0.06, L.top + h * 0.07, K.roof);
     if (L === BLK.lanterns[0]) label('9  Stone lanterns', L.x, L.top - 0.01);
   });
-  grp('torii');
+  grp('gates');
   BLK.torii.slice().reverse().forEach(function (T) {
     var h = T.foot - T.top, pw = h * H * 0.055 / W;
     [-1, 1].forEach(function (sd) {
@@ -1946,6 +2152,7 @@ function drawBlockIn(c) {
   });
   grp('plumL'); label('10  Plum branches', 0.20, 0.12);
   grp('plumR'); label('10  Plum branches', 0.86, 0.12);
+  }
 
   // the names, so each shape can be told apart (11, the snowfall, is not blocked in)
   if (V.blockLabels) {
@@ -1992,6 +2199,123 @@ function placeNav() {
 }
 
 /* ============================================================
+   14c. THE SNOW GROUND AND THE LAKE (step 6) — winterlake.js and
+   water.js. The lake's outline is the reference's (LAKE_SHORE: the
+   snow's edge, measured on the reference, fractions of the screen,
+   moved and sized by the layout's "Lake and its banks" values). Baked
+   in two steps after the mountains (the mirror needs them): 'field'
+   (the snow ground with its banks, FIELD) and 'lake' (the water's
+   mirror, MIRROR, and the thin ice and the far mist, STILL). Each
+   frame: the water (water.js, on the graphics chip), the still things
+   on it, the snow ground over it, the steam.
+   ============================================================ */
+/* the snow's edge round the water: the far water's edge, the right bank's tip and its waterline, its low spit on the
+   right, off the screen at the right and the bottom, the near-left shore, round the shore below the hall and along the
+   left spit to its tip, and up its far side */
+var LAKE_SHORE = [[0.548, 0.726], [0.628, 0.721], [0.706, 0.724], [0.68, 0.742], [0.646, 0.763], [0.648, 0.774], [0.693, 0.781],
+  [0.747, 0.789], [0.802, 0.799], [0.856, 0.805], [0.889, 0.81], [0.896, 0.825], [0.911, 0.838], [0.947, 0.846], [1.03, 0.857],
+  [1.03, 1.03], [0.729, 1.03], [0.639, 0.984], [0.548, 0.952], [0.468, 0.909], [0.413, 0.87], [0.401, 0.847], [0.399, 0.821],
+  [0.413, 0.799], [0.45, 0.786], [0.493, 0.774], [0.548, 0.768], [0.58, 0.761], [0.588, 0.755], [0.575, 0.742]];
+var FIELD = mk(), STILL = mk(), MIRROR = mk(), LAKEW = { shore: null, steam: {}, pad: 12, res: 1 }, waterInit = false;
+function lakeLens() { return H / (2 * Math.tan(MT.lens * PI / 360)); }
+function lakeOutline() {
+  var A = BLK_ANCHOR.lake, sz = V.lakeSize || 1;
+  return LAKE_SHORE.map(function (p) { return [(A[0] + (p[0] - A[0]) * sz + V.lakeX) * W, blkY(A[1] + (p[1] - A[1]) * sz - V.lakeY) * H]; });
+}
+/* The sky as it is at height y (CSS px), for its reflection: warm and pale low down (the mist and the low sun),
+   cooler and greyer higher up, darker at night. */
+function lakeSkyAt(y) {
+  var hy = H * V.horizonLine, u = clamp((hy - y) / hy, 0, 1), Lt = CLK.Lt;
+  var low = mix(light(hex(V.colours.mist)), [168, 176, 196], 0.55);
+  var high = mix([172, 186, 212], Lt.col, Lt.amt * 0.4);
+  var c = mix(low, high, Math.pow(u, 0.55));
+  if (Lt.dark > 0.01) c = mix(c, [38, 44, 76], Lt.dark * 0.85);
+  return c;
+}
+/* The front of the snow on the banks (it faces you, the sun is behind it): the sky's light on white, a little warmed. */
+function lakeSnowLit() { return mix(mix(SHADE, hex(V.colours.snow), 0.45), scale(LT.sunRGB, LT.sS), 0.08); }
+function bakeField() {
+  var hy = H * V.horizonLine, F = lakeLens();
+  LAKEW.shore = WinterLake.shore(lakeOutline(), { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight, drop: V.bankDrop, wobble: V.bankWobble, seed: V.seed });
+  FIELD.cnv.width = cv.width; FIELD.cnv.height = cv.height;
+  FIELD.c.setTransform(1, 0, 0, 1, 0, 0); FIELD.c.clearRect(0, 0, FIELD.cnv.width, FIELD.cnv.height);
+  WinterLake.bakeGround(FIELD.c, {
+    W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, res: 0.6, shore: LAKEW.shore,
+    light: { dir: LT.dir, sun: LT.sun, vis: LT.vis }, snow: hex(V.colours.snow), shade: SHADE, mist: light(hex(V.colours.mist)),
+    groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+    earth: light(hex(V.colours.bankEarth)), sunX: sunPlace().x, sunRGB: LT.sunRGB,
+    swell: V.fieldSwell, drifts: V.fieldDrifts, grain: V.fieldGrain, sparkle: V.fieldSparkle * (isNight() ? 0.15 : 1),
+    haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed
+  });
+}
+function bakeLake() {
+  if (!LAKEW.shore) bakeField();
+  var hy = H * V.horizonLine, F = lakeLens(), Sh = LAKEW.shore, top = Math.max(hy + 1, Math.floor(Sh.top)), pad = LAKEW.pad, res = PR * 0.6;
+  LAKEW.res = res; LAKEW.top = top;
+  if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); }
+  MIRROR.cnv.width = Math.round((W + pad * 2) * res); MIRROR.cnv.height = Math.max(2, Math.round((H - top) * res));
+  WinterLake.bakeMirror(MIRROR.c, {
+    W: W, H: H, hy: hy, top: top, pad: pad, res: res, mtn: V.showMountains && mtn3d ? MTN.cnv : null, mtnAlpha: MT.strength,
+    skyAt: lakeSkyAt, shore: Sh, earth: light(hex(V.colours.bankEarth)), snowLit: lakeSnowLit(), mist: light(hex(V.colours.mist)),
+    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist
+  });
+  if (typeof Water !== 'undefined') Water.setMirror(MIRROR.cnv);
+  STILL.cnv.width = cv.width; STILL.cnv.height = cv.height;
+  STILL.c.setTransform(1, 0, 0, 1, 0, 0); STILL.c.clearRect(0, 0, STILL.cnv.width, STILL.cnv.height);
+  WinterLake.bakeStill(STILL.c, {
+    W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, shore: Sh, ice: V.thinIce, iceWidth: V.iceWidth,
+    mist: light(hex(V.colours.mist)), mistK: V.lakeMist, skyLight: lakeSkyAt(hy * 0.3), snowLit: lakeSnowLit(), seed: V.seed
+  });
+}
+/* The water's own colour now: the cold deep colour, darker in the evening and at night. */
+function lakeBody() {
+  var c = hex(V.colours.lakeDeep), Lt = CLK.Lt;
+  c = mix(c, scale(LT.skyRGB, 0.9), 0.15);
+  return scale(c, 1 - Lt.dark * 0.75);
+}
+function lakeFft() {
+  if (!V.lakeFft) return null;
+  return { size: 256, wind: V.lakeWind, dir: 120, fetch: 600, spread: 0.6, L0: 90, L1: 12, eye: 0.9, height: 0.9, chop: 0.8,
+           detail: 0.5, far: 0.2, shade: 0.12 };
+}
+var lakeInfo = '';
+function drawLake(t, dt) {
+  var Sh = LAKEW.shore;
+  if (!Sh || FIELD.cnv.width < 2) return;
+  var hy = H * V.horizonLine, top = LAKEW.top || Sh.top, hh = H - top, drawn = false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  // the water: on the graphics chip (water.js), as the autumn lake
+  if (typeof Water !== 'undefined' && Water.state() === 'ok' && MIRROR.cnv.width > 2) {
+    var P = sunPlace(), day = isNight() ? 0 : 1;
+    var pic = Water.render({ w: W * PR * V.lakeRes, h: hh * PR * V.lakeRes, cssW: W, cssH: hh, top: top, horizon: hy, lens: lakeLens(), pad: LAKEW.pad,
+                             time: t * V.lakeSpeed, distort: V.lakeWaves * 7, calm: V.lakeCalm, waveSize: V.lakeWaveSize, reflect: 0.2, mirror: V.lakeMirror,
+                             water: lakeBody(), sun: V.lakeSparkle * LT.vis * day, sunX: P.x, sunY: P.y,
+                             sunColour: mix([255, 248, 232], LT.sunRGB, 0.6), fft: lakeFft() });
+    if (pic) { ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR) + 1); drawn = true; }
+  }
+  // without it (no WebGL 2, or not ready yet): the mirror as it is, with the water's colour over it
+  if (!drawn && MIRROR.cnv.width > 2) {
+    var r = LAKEW.res;
+    ctx.drawImage(MIRROR.cnv, LAKEW.pad * r, 0, W * r, hh * r, 0, top * PR, W * PR, hh * PR);
+    var g = ctx.createLinearGradient(0, top * PR, 0, H * PR), b = lakeBody();
+    g.addColorStop(0, rgb(b, 0.1)); g.addColorStop(1, rgb(b, 0.75));
+    ctx.fillStyle = g; ctx.fillRect(0, top * PR, W * PR, hh * PR);
+  }
+  lakeInfo = drawn ? 'water.js' + (V.lakeFft && Water.fftState() === 'ok' ? ' (simulated waves)' : '') : '2D water (water.js: ' + (typeof Water !== 'undefined' ? Water.state() : 'missing') + ')';
+  // the thin ice and the far mist, then the snow ground over the water's edges, then the steam
+  if (STILL.cnv.width > 2) ctx.drawImage(STILL.cnv, 0, 0);
+  ctx.drawImage(FIELD.cnv, 0, 0);
+  if (V.steam > 0) {
+    var ml = light(hex(V.colours.mist));
+    WinterLake.steam(LAKEW.steam, ctx, { W: W, H: H, PR: PR, hy: hy, shore: Sh, steam: V.steam, rise: V.steamRise,
+                                          wind: (V.wind - 0.5) * 0.4, colour: mix(ml, [255, 255, 255], 0.35) }, t, dt);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
    15. THE PANEL'S HOOK — what a change on the panel bakes again: the
    mountains ('mtn'), the branches ('branches'), the light-dependent
    sprites ('sprites'), the sun ('sun'), everything ('all'), the
@@ -2004,22 +2328,21 @@ window.winterLab = {
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;
-    (what === 'all' ? ['mtn', 'branches', 'sprites', 'sun'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    if (what === 'time') { this.setHour(); return; }
+    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun', 'lake'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
-  setTime: function (tod) {
-    note('time of day: ' + tod);
-    V.timeOfDay = SUN.timeOfDay = tod;
-    document.documentElement.setAttribute('data-time', tod);
+  setHour: function () {
+    applyHour();
+    note('time: ' + V.hour.toFixed(2) + ' h · ' + PHASE_NAMES[CLK.phase] + ' · sun ' + CLK.a.alt.toFixed(1) + '° up');
     sunDirty = true; saveAll();
-    paintSkyTint(); rebuildAll();
+    rebuildAll();
   },
   reset: function () {
     [['V', V_DEFAULTS, V], ['MT', MT_DEFAULTS, MT], ['CLOUD', CLOUD_DEFAULTS, CLOUD], ['SUN', SDEF, SUN]].forEach(function (x) {
       var D = clone(x[1]); for (var k in D) x[2][k] = D[k];
     });
-    SUN.timeOfDay = V.timeOfDay;
-    document.documentElement.setAttribute('data-time', V.timeOfDay);
+    applyHour();
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
@@ -2027,10 +2350,11 @@ window.winterLab = {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  busy: function () { return !!mtnJob || stages.length > 0 || Object.keys(dirty).length > 0; },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv }; },   // (for checking each picture on its own)
+  busy: function () { return !!mtnJob || !!hillJob || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
-           ' · ' + sunInfo;
+           ' · ' + sunInfo + ' · lake: ' + lakeInfo;
   }
 };
 
@@ -2048,16 +2372,24 @@ function resize() {
   cvS.width = Math.max(1, Math.round(W * PR * 0.25)); cvS.height = Math.max(1, Math.round(H * PR * 0.25));
   paintSkyTint();
 }
-/* The night sky colour, as in the app (nothing by day). */
+/* The time-of-day sky colour, as the app draws it (drawSky in app.js) on its quarter-size canvas:
+   the light's colour through the day (lightAt), darker at night, a little greyer under cloud. */
+var SKY_TINT = 0.8;                                         // the app's S.skyTint
+var COVER = { clear: 5, sunny: 20, partly: 43, thin: 65, cloudy: 85, mist: 50, rain: 90, snow: 90 };   // the cloud cover (%) of each weather
 function paintSkyTint() {
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.clearRect(0, 0, cvS.width, cvS.height);
-  if (isNight()) {
-    sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
+  if (!CLK) return;
+  sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
+  var Lt = CLK.Lt, a = SKY_TINT * Lt.amt * 1.2, cc = Lt.col;
+  if (a > 0.003) {
     var g = sctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, 'rgba(52,66,118,0.42)'); g.addColorStop(1, 'rgba(70,85,127,0.16)');
+    g.addColorStop(0, rgb(cc, a)); g.addColorStop(1, rgb(cc, a * 0.5));
     sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
   }
+  if (Lt.dark > 0.01) { sctx.fillStyle = 'rgba(35,40,70,' + (SKY_TINT * Lt.dark * 0.35).toFixed(3) + ')'; sctx.fillRect(0, 0, W, H); }
+  var wd = SKY_TINT * ((COVER[SUN.condition] || 0) / 100 * 0.1 + (SUN.condition === 'rain' ? 0.06 : 0));
+  if (wd > 0.003) { sctx.fillStyle = 'rgba(70,64,82,' + wd.toFixed(3) + ')'; sctx.fillRect(0, 0, W, H); }
 }
 /* Everything is baked again in steps, one heavy step a frame (the
    mountains, the snowdrift, the snowfield, the sprites), so the graphics
@@ -2076,10 +2408,12 @@ function blankRow(P, y) {
 }
 function rebuildAll() {
   if (!W) resize();
+  applyHour(); paintSkyTint();
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
+  if (hillJob) { hillJob.cancel(); hillJob = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? [] : ['mtn', 'sprites'];
+  stages = V.blockIn ? ['mtn', 'hill', 'field', 'lake'] : ['mtn', 'hill', 'field', 'lake', 'sprites'];   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2107,6 +2441,9 @@ function runStage(st) {
   LT = sceneLight();
   SHADE = shadeColour();
   if (st === 'mtn') bakeScenery();
+  else if (st === 'hill') startHill();
+  else if (st === 'field') bakeField();
+  else if (st === 'lake') bakeLake();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2116,8 +2453,11 @@ function runStage(st) {
 function rebake() {
   SR = PR * MT.resolution;
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
+  if (dirty.mtn) stages.push('mtn');
+  if (dirty.hill) stages.push('hill');
+  if (dirty.lake) stages.push('field');
+  if (dirty.mtn || dirty.lake) stages.push('lake');      // (the mirror shows the mountains)
   if (!V.blockIn) {
-    if (dirty.mtn) stages.push('mtn');
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
   }
@@ -2135,7 +2475,7 @@ function checkRetry(t) {
     var lostSince = mtn3d && WS.mtnLoss !== undefined && Mountains.losses() !== WS.mtnLoss;
     if ((glRetry.mtn && (glRetry.mtnTries || 0) <= 6) || lostSince) {
       note('mountains again: ' + (lostSince ? 'their context was lost after they were drawn' : 'the last try did not work'));
-      glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn');
+      glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn', 'lake');
     }
   }
   if (hasS && Snowfield.state() === 'ok') {
@@ -2148,9 +2488,27 @@ function checkRetry(t) {
   // every few seconds: has a kept picture been wiped (Chrome can drop them when memory runs short)?
   if (t < wipeAt) return;
   wipeAt = t + 3;
-  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn'); }
+  if (hillDrawn && !hillJob && V.hillShow && blankRow(HILL, (H * V.horizonLine - 4) * PR)) { note('the hill picture is empty: drawing it again'); stages.push('hill'); }
+  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn', 'lake'); }
 }
 
+/* The mountains (baked), and the mist drifting along their foot. */
+function drawMountains(dt) {
+  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
+  if (V.showMountains && V.mistDrift > 0) {
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    ctx.globalAlpha = V.mistDrift * 0.5;
+    for (var m = 0; m < mistBlobs.length; m++) {
+      var Bm = mistBlobs[m];
+      Bm.x += Bm.v * dt * (0.5 + 0.5 * V.wind);
+      if (Bm.x - Bm.w / 2 > W + 50) Bm.x = -Bm.w / 2 - 40;
+      if (Bm.x + Bm.w / 2 < -50) Bm.x = W + Bm.w / 2 + 40;
+      ctx.drawImage(MIST.cnv, Bm.x - Bm.w / 2, Bm.y - Bm.h / 2, Bm.w, Bm.h);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
 var last = 0, barTimer = 0;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
@@ -2158,8 +2516,9 @@ function frame(now) {
   if (Object.keys(dirty).length && t - dirtyAt > 0.25) rebake();
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
+  else if (hillJob) { try { stepHill(); } catch (e) { hillJob = null; note('ERROR in the hill: ' + e.message); } }
   else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
-  else if (!V.blockIn) { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
+  else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
   barTimer -= dt;
   updateGusts(dt);
@@ -2179,29 +2538,27 @@ function frame(now) {
   refOverlay();
   placeNav();
   if (V.blockIn) {
-    // step 0: every element as a plain flat shape at its place in the reference (section 14b)
-    drawBlockIn(ctx);
+    // the elements built so far (step 2: Fuji, the mist drifting along its foot, the clouds in front of it),
+    // then every element still to be built as a plain flat shape at its place in the reference (section 14b)
+    drawMountains(dt);
+    drawFrontClouds(t, dt);
+    drawHill();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    drawBlockIn(ctx, 'back');
+    drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
+    drawBlockIn(ctx, 'front');
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
     gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
     requestAnimationFrame(frame);
     return;
   }
   // the mountains (baked), the mist drifting along them and the clouds in front of Fuji
-  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
-  if (V.showMountains && V.mistDrift > 0) {
-    ctx.setTransform(PR, 0, 0, PR, 0, 0);
-    ctx.globalAlpha = V.mistDrift * 0.5;
-    for (var m = 0; m < mistBlobs.length; m++) {
-      var Bm = mistBlobs[m];
-      Bm.x += Bm.v * dt * (0.5 + 0.5 * V.wind);
-      if (Bm.x - Bm.w / 2 > W + 50) Bm.x = -Bm.w / 2 - 40;
-      if (Bm.x + Bm.w / 2 < -50) Bm.x = W + Bm.w / 2 + 40;
-      ctx.drawImage(MIST.cnv, Bm.x - Bm.w / 2, Bm.y - Bm.h / 2, Bm.w, Bm.h);
-    }
-    ctx.globalAlpha = 1;
-  }
+  drawMountains(dt);
   drawFrontClouds(t, dt);
+  // step 3: the hill of firs and the pagoda (baked)
+  drawHill();
   // (each step's new element goes here, back to front)
+  drawLake(t, dt);                                     // step 6: the snow ground, the banks and the water (14c)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
   drawBack(ctx, t);
   // #dynNear: the nearest flakes and the big soft ones
@@ -2220,7 +2577,11 @@ window.addEventListener('resize', function () {
   _rz = setTimeout(function () { resize(); WS.bKey = ''; rebuildAll(); }, 200);
 });
 
+applyHour();
 resize();
+// the water's graphics context and shaders made now, before the scene's bakes start (as the app does on the name
+// screen, dynWarmGpu), so the first bake of the lake does not wait for them
+if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); if (Water.warm && V.lakeFft) Water.warm(null); }
 rebuildAll();
 requestAnimationFrame(frame);
 })();
@@ -2350,14 +2711,15 @@ if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
 var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'], ['hall', 'Hall'], ['frost', 'Frosted trees'],
-            ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['torii', 'Torii'],
+            ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['gates', 'Torii'],
             ['lanterns', 'Stone lanterns'], ['plumL', 'Plum branch, left'], ['plumR', 'Plum branch, right']];
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: 'live' });
-    out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: 'live' });
-    out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: 'live' });
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3) and the lake (step 6) are baked again
+    out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
+    out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
+    out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
   });
   return out;
 }
@@ -2369,7 +2731,7 @@ var G = [
     { chk: 'V', k: 'blockLabels', label: 'Names on the shapes', re: 'live' },
     { o: 'V', k: 'refOverlay', label: 'Reference picture over the scene', min: 0, max: 1, step: 0.05, re: 'live', note: '0 hidden, 1 the reference alone.' } ] },
   { name: 'Layout: sky and land', ctls: [
-    { o: 'V', k: 'horizonLine', label: 'Where the land begins (share of the height)', min: 0.55, max: 0.8, step: 0.005, re: 'mtn', note: 'The sky (text and toolbar) above, the land below. 0.667 = the top two thirds sky, the bottom third land.' },
+    { o: 'V', k: 'horizonLine', label: 'Where the land begins (share of the height)', min: 0.55, max: 0.8, step: 0.005, re: 'mtn hill', note: 'The sky (text and toolbar) above, the land below. 0.667 = the top two thirds sky, the bottom third land.' },
     { o: 'V', k: 'navY', label: 'Swipe button 次へ →: how far down', min: 0.4, max: 0.95, step: 0.005, re: 'live', note: 'Its middle, as a share of the screen\'s height.' },
     { o: 'V', k: 'dotsY', label: 'Page dots: how far down', min: 0.4, max: 0.98, step: 0.005, re: 'live', note: 'Their middle, as a share of the screen\'s height.' } ] },
   { name: 'Layout: where each element stands', note: 'Moves each block across (share of the width) and up or down (share of the height), and sizes it about its foot.', ctls: moveCtls() },
@@ -2378,10 +2740,37 @@ var G = [
     { o: 'V', k: 'mistHeight', label: 'Height', min: 0.02, max: 0.4, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'live' },
     { col: 'V', keys: [['mist', 'Mist']], re: 'all' } ] },
+  { name: 'Snow ground and lake (step 6)', file: 'winterlake.js, water.js', note: 'The lake\'s outline is the reference\'s; move and size it with "Lake and its banks" in the layout group.', ctls: [
+    { o: 'V', k: 'eyeHeight', label: 'Eye above the snow (m)', min: 1, max: 12, step: 0.1, re: 'lake', note: 'Sets how big everything on the ground looks: higher = the banks, ice and drifts look smaller.' },
+    { o: 'V', k: 'bankDrop', label: 'Banks: height above the water (m)', min: 0.05, max: 1, step: 0.01, re: 'lake', note: 'The dark earth face under the snow\'s lip.' },
+    { o: 'V', k: 'bankWobble', label: 'Banks: uneven edge', min: 0, max: 2.5, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldSwell', label: 'Snow: soft swells', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldDrifts', label: 'Snow: wind-carved drifts', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldGrain', label: 'Snow: grain', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldSparkle', label: 'Snow: sparkle in the sun', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldHaze', label: 'Snow: haze far away', min: 0, max: 1.5, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'fieldHazeDist', label: 'Snow: haze distance (m)', min: 30, max: 500, step: 5, re: 'lake', note: 'At this distance the snow is about two thirds mist.' },
+    { o: 'V', k: 'fieldGlow', label: 'Snow: warmth of the low sun far away', min: 0, max: 2, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'lakeMirror', label: 'Water: mirror', min: 0, max: 1, step: 0.01, re: 'live', note: 'As real water: far away almost a mirror, near you its own colour.' },
+    { o: 'V', k: 'lakeCalm', label: 'Water: calm (still, glassy)', min: 0, max: 1, step: 0.01, re: 'live', note: '0 = waves as on the autumn lake, 1 = still as glass.' },
+    { o: 'V', k: 'lakeWaves', label: 'Water: how far the waves move the reflections', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeWaveSize', label: 'Water: wave size', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeSpeed', label: 'Water: wave speed', min: 0, max: 1, step: 0.01, re: 'live' },
+    { chk: 'V', k: 'lakeFft', label: 'Water: simulated waves (fftwaves.js)', re: 'live' },
+    { o: 'V', k: 'lakeWind', label: 'Water: wind over it (m/s, simulated waves)', min: 0.2, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeSparkle', label: 'Water: sun\'s sparkle', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeRes', label: 'Water: picture resolution', min: 0.3, max: 1, step: 0.05, re: 'live' },
+    { o: 'V', k: 'thinIce', label: 'Cold: thin ice along the shores', min: 0, max: 1, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'iceWidth', label: 'Cold: width of the ice (m)', min: 0, max: 5, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'lakeMist', label: 'Cold: mist on the far water', min: 0, max: 1, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'steam', label: 'Cold: steam rising off the water', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'steamRise', label: 'Cold: how high the steam rises', min: 0, max: 3, step: 0.05, re: 'live' },
+    { col: 'V', keys: [['bankEarth', 'Banks: earth'], ['lakeDeep', 'Water: its own colour']], re: 'lake' } ] },
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
-    { sel: 'time' }, { sel: 'condition' },
+    { o: 'V', k: 'hour', label: 'Time (hour in Nagoya, today)', min: 4, max: 22, step: 0.05, re: 'time', note: 'As the app: the sun\'s place and the sky\'s colour follow the hour. 15.5 = late afternoon, the app\'s golden hour.' },
+    { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
     { o: 'V', k: 'gustEvery', label: 'A gust every (s)', min: 2, max: 30, step: 0.5, re: 'live' },
     { o: 'V', k: 'gustStrength', label: 'Gust strength', min: 0, max: 3, step: 0.05, re: 'live' },
@@ -2403,21 +2792,17 @@ var G = [
     { o: 'CLOUD', k: 'flats', label: 'Flat layers (kinds)', min: 0, max: 4, step: 1, re: 'live' },
     { o: 'CLOUD', k: 'puffs', label: 'Small puffs (kinds)', min: 0, max: 4, step: 1, re: 'live' },
     { o: 'CLOUD', k: 'banks', label: 'Low banks (kinds)', min: 0, max: 4, step: 1, re: 'live' },
-    { o: 'SUN', k: 'across', label: 'Sun: across the screen', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'SUN', k: 'altitude', label: 'Sun: height in the sky (°)', min: 2, max: 60, step: 1, re: 'sun' },
     { o: 'SUN', k: 'strength', label: 'Sun: brightness', min: 0, max: 1.5, step: 0.01, re: 'live' },
     { o: 'V', k: 'stars', label: 'Stars (night)', min: 0, max: 1, step: 0.01, re: 'live' },
     { chk: 'V', k: 'moon', label: 'Moon (night)', re: 'live' },
     { o: 'V', k: 'moonSize', label: 'Moon size', min: 0.5, max: 2.5, step: 0.05, re: 'live' } ] },
   { name: 'Mountains and Fuji (step 2)', file: 'mountains.js', ctls: [
-    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0.04, max: 0.4, step: 0.01, re: 'mtn' },
+    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0, max: 0.4, step: 0.005, re: 'mtn', note: 'The ranges either side of Fuji (the reference has none: keep it low).' },
     { o: 'MT', k: 'featureKm', label: 'Size of the mountains (km)', min: 3, max: 30, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'sharpness', label: 'Sharp crests', min: 0, max: 1, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'layering', label: 'Ranges one behind another', min: 0, max: 1, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'nearestKm', label: 'Nearest range (km)', min: 3, max: 25, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'farRise', label: 'Far ranges stand higher', min: 0, max: 2, step: 0.05, re: 'mtn' },
-    { o: 'MT', k: 'fujiX', label: 'Fuji: across the screen', min: 0, max: 1, step: 0.01, re: 'mtn' },
-    { o: 'MT', k: 'fujiHeight', label: 'Fuji: height', min: 0.1, max: 0.6, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'fujiWidth', label: 'Fuji: width', min: 1.5, max: 4, step: 0.05, re: 'mtn' },
     { o: 'MT', k: 'fujiKm', label: 'Fuji: distance (km)', min: 15, max: 100, step: 1, re: 'mtn' },
     { o: 'MT', k: 'fujiGullies', label: 'Fuji: gullies', min: 0, max: 1.5, step: 0.05, re: 'mtn' },
@@ -2441,6 +2826,35 @@ var G = [
     { o: 'MT', k: 'softness', label: 'Softness (px)', min: 0, max: 4, step: 0.1, re: 'mtn' },
     { o: 'MT', k: 'resolution', label: 'Resolution', min: 0.4, max: 1.2, step: 0.05, re: 'mtn' },
     { col: 'MT', keys: [['rock', 'Rock'], ['fujiRock', 'Fuji'], ['evergreen', 'Conifers'], ['snow', 'Snow'], ['haze', 'Haze']], re: 'mtn' } ] },
+  { name: 'Hill of firs (step 3)', file: 'winterhill.js', note: 'The hill and its rows of firs, from the crest (far, small, misty) to the foot (near, larger, clearer). Every fir is its own tree from its seed. Its place and size: "Layout: where each element stands", Hill of firs. The needle colour: "Colours of the new scene", Pine needles.', ctls: [
+    { chk: 'V', k: 'hillShow', label: 'Show the hill', re: 'hill' },
+    { chk: 'V', k: 'hillFirs', label: 'Firs on the hill', re: 'hill' },
+    { o: 'V', k: 'hillSeed', label: 'Which forest (seed)', min: 1, max: 99, step: 1, re: 'hill', note: 'Each number lays out a different forest, with different trees.' },
+    { o: 'V', k: 'hillRows', label: 'Rows of firs', min: 2, max: 16, step: 1, re: 'hill', note: 'From the crest down to the foot.' },
+    { o: 'V', k: 'hillDensity', label: 'Density (how close together)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Higher = the firs in a row stand closer.' },
+    { o: 'V', k: 'hillFill', label: 'Share of places with a fir', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Lower = more gaps, open snow between the trees.' },
+    { o: 'V', k: 'hillFirFar', label: 'Fir size at the crest', min: 0.01, max: 0.08, step: 0.001, re: 'hill', note: 'Share of the screen\'s height.' },
+    { o: 'V', k: 'hillFirNear', label: 'Fir size at the foot', min: 0.02, max: 0.18, step: 0.001, re: 'hill' },
+    { o: 'V', k: 'hillFirWidth', label: 'Fir width', min: 0.4, max: 1.6, step: 0.01, re: 'hill', note: 'Lower = slimmer firs.' },
+    { o: 'V', k: 'hillTiers', label: 'Tiers of branches', min: 0.5, max: 1.6, step: 0.01, re: 'hill', note: 'Higher = more, smaller tiers on each fir.' },
+    { o: 'V', k: 'hillSparse', label: 'Share of sparse firs', min: 0, max: 1, step: 0.01, re: 'hill', note: 'Sparse firs show a little trunk between their tiers.' },
+    { o: 'V', k: 'hillDroop', label: 'Droop of the boughs', min: 0, max: 2, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillLean', label: 'Lean and bend', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = every fir straight up.' },
+    { o: 'V', k: 'hillFirSnow', label: 'Snow on the firs', min: 0, max: 1.6, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillBrush', label: 'Brush strokes in the needles', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = none.' },
+    { o: 'V', k: 'hillSoft', label: 'Softness of the firs', min: 0, max: 3, step: 0.05, re: 'hill', note: '0 = sharp edges; the far rows are always a little softer.' },
+    { o: 'V', k: 'hillHazeFar', label: 'Mist on the far rows', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillHazeNear', label: 'Mist on the near rows', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'hillNeedleTint', label: 'Needles: use the chosen colour', min: 0, max: 1, step: 0.01, re: 'hill', note: '0 = each fir its own green; 1 = all the chosen Pine needles colour.' } ] },
+  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Its place and size: "Layout: where each element stands", Pagoda.', ctls: [
+    { chk: 'V', k: 'pagodaShow', label: 'Show the pagoda', re: 'hill' },
+    { chk: 'V', k: 'pagodaTimber', label: 'Dark timber (off: vermilion and white)', re: 'hill' },
+    { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
+    { o: 'V', k: 'pagodaSnow', label: 'Snow on it', min: 0, max: 1.5, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
+    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'The windows are lit only in the evening and at night.' },
+    { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
+    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' } ] },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
@@ -2511,13 +2925,11 @@ function control(c) {
   if (c.sel) {
     row = document.createElement('label'); row.className = 'sp-colour';
     var sel = document.createElement('select'), opts, val;
-    if (c.sel === 'time') { row.textContent = 'Time of day'; opts = [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']]; val = OBJ.V.timeOfDay; }
-    else { row.textContent = 'Weather'; opts = CONDS; val = OBJ.SUN.condition; }
+    { row.textContent = 'Weather'; opts = CONDS; val = OBJ.SUN.condition; }
     opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
     sel.value = val;
     sel.addEventListener('change', function () {
-      if (c.sel === 'time') lab.setTime(sel.value);
-      else { OBJ.SUN.condition = sel.value; lab.changed('all'); }
+      OBJ.SUN.condition = sel.value; lab.changed('all');
     });
     row.appendChild(sel);
     return row;
@@ -2581,7 +2993,7 @@ document.getElementById('spCopy').addEventListener('click', function () {
       if (c.o) parts.push(c.label + ' ' + fmt(c, OBJ[c.o][c.k]));
       else if (c.chk) parts.push(c.label + ' ' + (OBJ[c.chk][c.k] ? 'on' : 'off'));
       else if (c.col) c.keys.forEach(function (kk) { parts.push(kk[1] + ' ' + OBJ[c.col].colours[kk[0]]); });
-      else if (c.sel) parts.push(c.sel === 'time' ? 'Time ' + OBJ.V.timeOfDay : 'Weather ' + OBJ.SUN.condition);
+      else if (c.sel) parts.push('Weather ' + OBJ.SUN.condition);
     });
     lines.push(grp.name + ': ' + parts.join(', '));
   });
@@ -2625,5 +3037,121 @@ window.addEventListener('resize', function () { if (sp.style.left) place(parseFl
 var count = document.getElementById('spCount');
 setInterval(function () { count.textContent = lab.info(); }, 500);
 build();
+})();
+
+/* ============================================================
+   THE BACKGROUND'S LANTERNS AND MOTES — as the app makes them (app.js:
+   霞灯 LANTERNS and buildMotes, copied as they are): small glowing dots
+   on the Shippō circles that light up one after another along a path,
+   and soft motes floating in the air. The app builds them in every theme.
+   ============================================================ */
+(function () {
+'use strict';
+var lanternLit = document.getElementById('lanternLit'), lanternBloom = document.getElementById('lanternBloom');
+var moteField = document.getElementById('moteField');
+var _prefersReducedMotion = false, windEnabled = true;
+try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { _prefersReducedMotion = true; windEnabled = false; } } catch (e) {}
+var LANTERN_COUNT = 10;
+var LANTERN_TILE = 60;
+var _lanterns = [];
+
+function lanternBounds() {
+  var half = LANTERN_TILE / 2;
+  return { half: half, maxI: Math.floor(window.innerWidth / half), maxJ: Math.floor(window.innerHeight / half) };
+}
+function lanternPlace(L) {
+  var half = LANTERN_TILE / 2;
+  var dot = LANTERN_TILE * 1.5, glow = LANTERN_TILE * 4;
+  L.dot.style.transform = 'translate3d(' + (L.i * half - dot / 2) + 'px,' + (L.j * half - dot / 2) + 'px,0)';
+  L.glow.style.transform = 'translate3d(' + (L.i * half - glow / 2) + 'px,' + (L.j * half - glow / 2) + 'px,0)';
+}
+function lanternRandomSpot() {
+  var b = lanternBounds();
+  var i = 1 + Math.floor(Math.random() * Math.max(1, b.maxI - 1));
+  var j = 1 + Math.floor(Math.random() * Math.max(1, b.maxJ - 1));
+  if ((i + j) % 2) j += 1;
+  return { i: i, j: j };
+}
+function lanternStep(L) {
+  var b = lanternBounds();
+  var all = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  var open = [];
+  for (var t = 0; t < all.length; t++) {
+    var ni = L.i + all[t][0], nj = L.j + all[t][1];
+    if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) open.push(all[t]);
+  }
+  if (!open.length) {
+    var s = lanternRandomSpot();
+    L.i = s.i; L.j = s.j; L.dir = null;
+    return;
+  }
+  /* Keep going the same way 60% of the time if that way is still
+     open; otherwise pick any open direction at random. The pick must
+     be random: trying the directions in a fixed order always favours
+     one corner, and every lantern ends up stuck there. */
+  var pick = null;
+  if (L.dir && Math.random() < 0.6) {
+    for (var k = 0; k < open.length; k++) {
+      if (open[k][0] === L.dir[0] && open[k][1] === L.dir[1]) pick = open[k];
+    }
+  }
+  if (!pick) pick = open[Math.floor(Math.random() * open.length)];
+  L.i += pick[0]; L.j += pick[1]; L.dir = pick;
+}
+function buildLanterns() {
+  if (!lanternLit || !lanternBloom) return;
+  lanternLit.innerHTML = '';
+  lanternBloom.innerHTML = '';
+  _lanterns = [];
+  if (_prefersReducedMotion) return;
+  var dotSize = LANTERN_TILE * 1.5, glowSize = LANTERN_TILE * 4;
+  for (var k = 0; k < LANTERN_COUNT; k++) {
+    var delay = (-7 * k / LANTERN_COUNT).toFixed(2) + 's';
+    var dot = document.createElement('div');
+    var glow = document.createElement('div');
+    dot.className = 'lantern';
+    glow.className = 'lantern-bloom';
+    dot.style.setProperty('--d', delay);
+    glow.style.setProperty('--d', delay);
+    dot.style.width = dot.style.height = dotSize + 'px';
+    glow.style.width = glow.style.height = glowSize + 'px';
+    lanternLit.appendChild(dot);
+    lanternBloom.appendChild(glow);
+    var spot = lanternRandomSpot();
+    var L = { dot: dot, glow: glow, i: spot.i, j: spot.j, dir: null };
+    lanternPlace(L);
+    _lanterns.push(L);
+    dot.addEventListener('animationiteration', (function(L) {
+      return function() { lanternStep(L); lanternPlace(L); };
+    })(L));
+  }
+}
+function buildMotes() {
+  if (!moteField) return;
+  moteField.innerHTML = '';
+  if (!windEnabled) return;
+  var count = 8;
+  for (var i = 0; i < count; i++) {
+    var m = document.createElement('div');
+    m.className = 'mote';
+    var size = 14 + Math.random() * 16;
+    m.style.width = size + 'px';
+    m.style.height = size + 'px';
+    m.style.left = (Math.random() * 100) + '%';
+    m.style.top  = (Math.random() * 100) + '%';
+    var dur = 18 + Math.random() * 20;
+    m.style.setProperty('--mote-dur', dur + 's');
+    m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
+    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
+    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
+    m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
+    moteField.appendChild(m);
+  }
+}
+
+buildMotes();
+buildLanterns();
+var rz = null;
+window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { buildLanterns(); buildMotes(); }, 250); });
 })();
 </script>

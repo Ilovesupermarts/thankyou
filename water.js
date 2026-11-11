@@ -54,6 +54,7 @@
                            sharp the far waves stay, 1 = as a plain mipmap), far (0 … 1: how far
                            the waves still push the reflections far away) and shade (how much
                            each wave lightens or darkens the reflection). waveSize is not used then.
+          calm             (optional) 0 … 1: the waves flattened toward still water (a winter lake); 0 = as they are
           rain             (optional) 0 … 1: rain on the water, rings where the drops land; rainT
                            its clock (s, 0 … 4096, wrapping), rainSky [r, g, b] the sky's light in them
      Water.fftState()           'ok', 'none' (no fftwaves.js, or the chip can't draw float pictures)
@@ -79,6 +80,7 @@ var FS = [
 'uniform float uMirror0;        // (o.mirror) > 0: everything mirrored by the full Fresnel of the angle, times this',
 'uniform vec2 uSize;            // the water on the screen (CSS px)',
 'uniform float uTop, uHy, uF, uPad, uMirrorW, uTime, uDistort, uWave, uReflect, uSun, uFarK, uShade;',
+'uniform float uCalm;           // (o.calm) 0 … 1: the waves flattened toward still water (0: as they are)',
 'uniform vec3 uWater, uSunCol, uSunDir;',
 'uniform float uRain, uRainT, uPx;   // rain: how hard (0 none … 1), its clock (s, wraps at RAIN_WRAP), CSS px per pixel drawn',
 'uniform vec3 uRainSky;              // the light of the sky the rain-roughened water shows',
@@ -154,6 +156,7 @@ var FS = [
 '    if (z < 16.0) rainLayer(vec2(wx, z), fx, fz, 1, 0.32, 1.3, 0.18, 0.035, 0.3, uRain, 0.28, rg, blip);   // small drops (further off, too small to see)',
 '    n = normalize(vec3(n.x - rg.x, n.y, n.z - rg.y));',
 '  }',
+'  n = normalize(mix(n, vec3(0.0, 1.0, 0.0), uCalm));',
 '  vec3 V = normalize(vec3(-wx, 1.0, -z));                    // from the water toward the eye (at height 1)',
 '  float cosT = clamp(dot(V, n), 0.0, 1.0);',
 '  // how much is mirror (Fresnel): with o.mirror, as real water: the full amount for the angle, the same for the sky,',
@@ -198,6 +201,7 @@ var FS_FFT = FS.replace(/vec3 waves\(vec2 p\) \{[\s\S]*?\n\}\n/, [
 '  return normalize(vec3(-s.x, 1.0, -s.y));',
 '}', ''].join('\n'));
 
+function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
 function compile(type, src) {
   var s = gl.createShader(type);
   gl.shaderSource(s, src); gl.compileShader(s);
@@ -224,7 +228,7 @@ function setup() {
   texM = gl.createTexture(); texN = gl.createTexture();
   return true;
 }
-var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uMirror0'];
+var NAMES = ['uMirror', 'uNormal', 'uSize', 'uTop', 'uHy', 'uF', 'uPad', 'uMirrorW', 'uTime', 'uDistort', 'uWave', 'uReflect', 'uSun', 'uWater', 'uSunCol', 'uSunDir', 'uFarK', 'uShade', 'uRain', 'uRainT', 'uPx', 'uRainSky', 'uMirror0', 'uCalm'];
 /* The simulated waves (fftwaves.js), made the first time a page asks for them. */
 function fftSetup() {
   if (fftSim) return true;
@@ -304,6 +308,7 @@ function render(o) {
   gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, texM); gl.uniform1i(u.uMirror, 0);
   gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, texN); gl.uniform1i(u.uNormal, 1);
   gl.uniform1f(u.uMirror0, o.mirror || 0);
+  gl.uniform1f(u.uCalm, clamp01(o.calm || 0));
   if (useFft) {
     gl.activeTexture(gl.TEXTURE2); gl.bindTexture(gl.TEXTURE_2D, fftSim.texture); gl.uniform1i(u.uSlope, 2);
     gl.uniform1f(u.uEye, o.fft.eye || 1.6); gl.uniform1f(u.uDetail, o.fft.detail !== undefined ? o.fft.detail : 0.2); gl.uniform1f(u.uL0, fftSim.L[0]); gl.uniform1f(u.uL1, fftSim.L[1]);
