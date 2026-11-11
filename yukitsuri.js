@@ -165,8 +165,8 @@ function build(spec) {
       for (var k = 0; k < nb; k++) {
         var th = az0 + k * TAU / nb + (r() - 0.5) * 0.6, L = Rw * lerp(0.82, 1.12, r());
         if (r() < 0.04 && f < 0.85) continue;                                  // (now and then a gap where a bough is missing)
-        var d = [Math.sin(th), 0, Math.cos(th)], dr = lerp(0.18, 0.42, r()) * droopK * (0.6 + 0.6 * (1 - f));
-        var p0 = at.p, p2 = add(p0, [d[0] * L, -dr * L, d[2] * L]), p1 = add(p0, [d[0] * L * 0.5, -dr * L * 0.42, d[2] * L * 0.5]);
+        var d = [Math.sin(th), 0, Math.cos(th)], dr = lerp(0.14, 0.32, r()) * droopK * (0.6 + 0.6 * (1 - f));
+        var p0 = at.p, p2 = add(p0, [d[0] * L, -dr * L, d[2] * L]), p1 = add(p0, [d[0] * L * 0.55, -dr * L * 0.18, d[2] * L * 0.55]);   // (it leaves the trunk nearly level, arches out, droops toward its end)
         p2[1] += L * 0.05;                                                         // the tip turns up a little
         // the lowest boughs may not droop down over the trunk: below the crown the trunk stays clear (as on the
         // reference's firs, and as a garden pine is kept)
@@ -538,6 +538,7 @@ function boughShape(E, P) {
 /* The bough's real structure, in 3D (made once per bough): its main branch (a curve through p0, p1, p2), side
    branchlets along it on both sides (angled forward, drooping, shorter toward the tip, as a spruce's), and small
    twigs hanging from them. Nothing is a filled shape: every part is drawn as needles. */
+function smooth01(x) { x = clamp(x, 0, 1); return x * x * (3 - 2 * x); }
 function boughPt(E, t) {
   var a = (1 - t) * (1 - t), b = 2 * t * (1 - t), cc = t * t, C = E._cc || (E._cc = [2 * E.p1[0] - (E.p0[0] + E.p2[0]) / 2, 2 * E.p1[1] - (E.p0[1] + E.p2[1]) / 2, 2 * E.p1[2] - (E.p0[2] + E.p2[2]) / 2]);
   return [a * E.p0[0] + b * C[0] + cc * E.p2[0], a * E.p0[1] + b * C[1] + cc * E.p2[1], a * E.p0[2] + b * C[2] + cc * E.p2[2]];
@@ -553,9 +554,9 @@ function boughModel(E) {
     tx /= tl; tz /= tl;
     for (var sd = -1; sd <= 1; sd += 2) {
       if (rr() < 0.08) continue;                                         // a gap where a branchlet is missing
-      var ang = sd * lerp(0.6, 1.15, rr()), ca = Math.cos(ang), sa = Math.sin(ang);
+      var ang = sd * (lerp(0.6, 1.15, rr()) + smooth01((t - 0.75) / 0.25) * 0.5), ca = Math.cos(ang), sa = Math.sin(ang);   // (round the tip they fan out)
       var dx = tx * ca - tz * sa, dz = tx * sa + tz * ca;                // turned out from the branch, forward
-      var lb = lerp(0.36, 0.12, t) * lerp(0.7, 1.2, rr()) * Math.min(1, 0.45 + L / 2.2), droop = lerp(0.3, 0.85, rr()) * (0.8 + E.hang / L);
+      var lb = (0.34 - 0.06 * t - 0.12 * Math.pow(t, 6)) * lerp(0.75, 1.15, rr()) * Math.min(1, 0.45 + L / 2.2), droop = lerp(0.35, 0.9, rr()) * (0.8 + E.hang / L) * (0.8 + 0.4 * t);
       var base = [B[0], B[1] + 0.01, B[2]];
       var mid = [base[0] + dx * lb * 0.55, base[1] - Math.sin(droop) * lb * 0.25, base[2] + dz * lb * 0.55];
       var tip = [base[0] + dx * lb * Math.cos(droop * 0.7), base[1] - Math.sin(droop) * lb * 0.85, base[2] + dz * lb * Math.cos(droop * 0.7)];
@@ -584,9 +585,15 @@ function Brush(c, lw) {
       var P2 = B[k].p; P2.moveTo(pts[0][0], pts[0][1]);
       for (var i = 1; i < pts.length; i++) P2.lineTo(pts[i][0], pts[i][1]);
     },
-    flush: function () {
+    flush: function (halo) {
       keys.sort(function (a, b) { return B[a].lum - B[b].lum; });
-      c.lineCap = 'round'; c.lineJoin = 'round'; c.lineWidth = lw;
+      c.lineCap = 'round'; c.lineJoin = 'round';
+      if (halo) {                                   // a faint wider stroke under each needle: the edges blend, not cut
+        c.globalAlpha = halo; c.lineWidth = lw * 3;
+        keys.forEach(function (k) { c.strokeStyle = k; c.stroke(B[k].p); });
+        c.globalAlpha = 1;
+      }
+      c.lineWidth = lw;
       keys.forEach(function (k) { c.strokeStyle = k; c.stroke(B[k].p); });
       B = {}; keys = [];
     }
@@ -652,7 +659,7 @@ function paintBough(c, E, P, K) {
   }
   var backT = M.tw.filter(function (T) { return T.z < axisZ; }), foreT = M.tw.filter(function (T) { return T.z >= axisZ; });
   backT.forEach(twig);
-  Bru.flush();
+  Bru.flush(0.18);
   // the main branch itself, a thin dark twig, seen in the gaps near the trunk
   c.strokeStyle = css(K.barkDk, 0.85); c.lineWidth = Math.max(0.6, 0.035 * s); c.lineCap = 'round';
   c.beginPath();
@@ -661,8 +668,11 @@ function paintBough(c, E, P, K) {
   foreT.forEach(twig);
   // the tip: the branch's own end, a spray of new growth
   var tp = P(E.p2), tq = P(boughPt(E, 0.9));
-  needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.5), lerp(tq[1], tp[1], 0.5) - 0.5], tp], wid0 * 0.8, s, [K.mid, K.lit], 1, rr);
-  Bru.flush();
+  for (var tf = 0; tf < 5; tf++) {                                        // a soft rounded tuft at the end (no point)
+    var ta = (tf / 4 - 0.5) * 1.6 + Math.atan2(tp[1] - tq[1], tp[0] - tq[0]) + 0.3, tl2 = wid0 * lerp(1.2, 1.8, rr());
+    needleRun(Bru, [tq, [lerp(tq[0], tp[0], 0.7), lerp(tq[1], tp[1], 0.7)], [tp[0] + Math.cos(ta) * tl2, tp[1] + Math.sin(ta) * tl2 + tl2 * 0.4]], wid0 * 0.7, s, [K.mid, K.lit, K.dark], 0.9, rr);
+  }
+  Bru.flush(0.18);
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
 }
 /* The snow on a bough, piece by piece: it lies only on the branch itself and the inner part of its branchlets, as soft
