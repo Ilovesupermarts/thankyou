@@ -16,6 +16,7 @@
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
 <script src="winterhill.js"></script>
+<script src="winterhall.js"></script>
 <script src="fftwaves.js"></script>
 <script src="water.js"></script>
 <script src="winterlake.js"></script>
@@ -353,6 +354,14 @@ var V_DEFAULTS = {
   // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
   // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
   pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
+  // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
+  // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
+  // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
+  hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
+  hallShadow: 1, hallLamps: 1, hallSpill: 1,
+  // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
+  // them, the mist on them
+  hfShow: true, hfSeed: 5, hfSize: 1, hfWidth: 1.3, hfSnow: 0.8, hfHaze: 0.5,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
@@ -798,6 +807,9 @@ function lightFor(haze) {
 function withLight(o, haze) { var L = lightFor(haze); for (var k in L) o[k] = L[k]; return o; }
 /* The lamps and windows are lit only from dusk (the user's choice); their strength comes with the lamps (steps 5 and 9). */
 function nightLights() { return isNight() ? 1 : V.timeOfDay === 'evening' ? 1 : 0; }
+/* The pagoda's and the hall's lamps: they come on together, as the autumn pagoda's do (app.js torLampLevel): fading in
+   with the app's darkness from about 38 minutes before sunset to full about 6 minutes after it (0 … 1). */
+function lampLevel() { return CLK && CLK.Lt ? smooth(0.04, 0.2, CLK.Lt.dark) : nightLights(); }
 
 /* ============================================================
    7. MOUNTAINS — mountains.js in its winter mode, baked into MTN with
@@ -866,7 +878,7 @@ function startHill() {
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
   var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
-                     lit: nightLights() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
+                     lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
   var o = {
     profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
     treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
@@ -911,6 +923,54 @@ function drawHill() {
   if (!hillDrawn || (!V.hillShow && !V.pagodaShow)) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(HILL.cnv, 0, 0);
+}
+
+/* ============================================================
+   7c. THE SHRINE HALL AND THE FIRS BESIDE IT (step 5, winterhall.js) —
+   baked a little each frame (the snow round it, the firs, the timber
+   and plaster, the snow on its roof) into a picture just its own size,
+   drawn each frame over the snow ground. Baked again only when the
+   light, the time, the size or one of its values changes. Its place is
+   the reference's (BLK.hall, BLK.hallFirs), moved and sized by the
+   layout's "Hall" values.
+   ============================================================ */
+var HALL = { job: null, next: null, cnv: null, x: 0, y: 0, t0: 0, info: '' };
+function startHall() {
+  if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
+  if (!V.hallShow || typeof WinterHall === 'undefined') { HALL.cnv = null; return; }
+  HALL.t0 = performance.now();
+  var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
+  var cam = WinterHill.camera(W, H, hy, MT.lens);
+  var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
+  var firs = [];
+  if (V.hfShow) BLK.hallFirs.forEach(function (f, i) {
+    var top = pl.Y(f.top), foot = pl.Y(f.foot), x = pl.X(f.x), n = BLK.hallFirs.length;
+    firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
+                haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
+  });
+  HALL.job = WinterHall.job({
+    W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
+    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
+    haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
+    lampCol: hex(V.colours.flame), light: L,
+    field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
+    firs: firs,
+    firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
+               brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }
+  });
+}
+function stepHall() {
+  if (HALL.job.step(8)) {
+    HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
+    HALL.job = null;
+    note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about 8 ms a frame) · ' + HALL.info + ' · ' + HALL.times);
+  }
+}
+function drawHall() {
+  if (!V.hallShow || !HALL.cnv) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(HALL.cnv, Math.round(HALL.x * PR), Math.round(HALL.y * PR));
 }
 
 var mtnJob = null, mtnT0 = 0;
@@ -1991,7 +2051,11 @@ var BLK = {
   firLine: 0.47,                                       // the firs fill the hill from about here down
   pagoda: { x: 0.195, top: 0.185, roofTop: 0.30, foot: 0.505, w: 0.09 },
   ground: 0.64,                                         // the snow begins here (behind the hall's foot)
-  hall: { x0: 0.22, x1: 0.40, ridge: 0.535, eaves: 0.588, foot: 0.657 },
+  hall: { x0: 0.22, x1: 0.40, ridge: 0.535, eaves: 0.588, foot: 0.657, eave0: 0.222, eave1: 0.389, top: 0.533, base: 0.662 },
+  // the firs just right of the hall, in the mist (their middles, tops and feet, measured on the reference)
+  hallFirs: [{ x: 0.386, top: 0.585, foot: 0.665 }, { x: 0.398, top: 0.574, foot: 0.666 }, { x: 0.409, top: 0.579, foot: 0.664 },
+             { x: 0.418, top: 0.587, foot: 0.665 }, { x: 0.428, top: 0.590, foot: 0.664 }, { x: 0.437, top: 0.596, foot: 0.665 },
+             { x: 0.446, top: 0.602, foot: 0.663 }],
   frost: [{ x: 0.41, top: 0.55, foot: 0.71, w: 0.06 }, { x: 0.48, top: 0.61, foot: 0.675, w: 0.025 }],
   // the water: the far inlet, round the right bank's waterline, down the right edge, along the bottom, up the near-left shore
   water: [[0.548, 0.712], [0.63, 0.712], [0.648, 0.745], [0.655, 0.775], [0.70, 0.785], [0.80, 0.80], [0.87, 0.81], [0.90, 0.83],
@@ -2084,6 +2148,7 @@ function drawBlockIn(c, part) {
   // 5. the hall and the frosted trees
   grp('hall');
   var Hl = BLK.hall, hw2 = (Hl.x1 - Hl.x0);
+  if (!V.hallShow) {
   rect(Hl.x0 + hw2 * 0.08, Hl.eaves, Hl.x1 - hw2 * 0.08, Hl.foot, K.hallWall);
   rect(Hl.x0 + hw2 * 0.08, Hl.foot - 0.008, Hl.x1 - hw2 * 0.08, Hl.foot, K.timber);
   for (var wi = 0; wi < 6; wi++) {
@@ -2093,6 +2158,7 @@ function drawBlockIn(c, part) {
   poly([[Hl.x0, Hl.eaves], [Hl.x0 + hw2 * 0.17, Hl.ridge], [Hl.x1 - hw2 * 0.17, Hl.ridge], [Hl.x1, Hl.eaves]], K.roof);
   rect(Hl.x0, Hl.eaves - 0.004, Hl.x1, Hl.eaves + 0.002, K.snowShade);
   label('5  Hall', (Hl.x0 + Hl.x1) / 2, Hl.ridge - 0.012);
+  }
   grp('frost');
   BLK.frost.forEach(function (F) {
     c.fillStyle = K.frost;
@@ -2542,7 +2608,7 @@ window.winterLab = {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
-    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
   setHour: function () {
@@ -2568,7 +2634,9 @@ window.winterLab = {
   // (for checking the falling snow: every clump on tree k, the farthest 0, lets go now)
   shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
   pines: function () { return PINES; },   // (for checking each picture on its own)
-  busy: function () { return !!mtnJob || !!hillJob || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
+  hall: function () { return HALL; },     // (the hall's picture, for checking it on its own)
+  lamps: function () { return { level: lampLevel(), dark: CLK.Lt.dark, set: CLK.sun.set, tod: V.timeOfDay }; },   // (the lamps' timing, for checking)
+  busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · ' + sunInfo + ' · lake: ' + lakeInfo;
@@ -2628,9 +2696,10 @@ function rebuildAll() {
   applyHour(); paintSkyTint();
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
   if (hillJob) { hillJob.cancel(); hillJob = null; }
+  if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? ['mtn', 'hill', 'field', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'pines', 'lake', 'sprites'];   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  stages = V.blockIn ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'hall', 'pines', 'lake', 'sprites'];   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2662,6 +2731,7 @@ function runStage(st) {
   else if (st === 'field') bakeField();
   else if (st === 'lake') bakeLake();
   else if (st === 'pines') startPines();
+  else if (st === 'hall') startHall();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2673,6 +2743,7 @@ function rebake() {
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
   if (dirty.mtn) stages.push('mtn');
   if (dirty.hill) stages.push('hill');
+  if (dirty.hall) stages.push('hall');
   if (dirty.lake) stages.push('field');
   if (dirty.lake || dirty.pines) stages.push('pines');   // (their shadows lie on the snow ground)
   if (dirty.mtn || dirty.lake || dirty.pines) stages.push('lake');      // (the mirror shows the mountains and the trees)
@@ -2736,6 +2807,7 @@ function frame(now) {
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
   else if (hillJob) { try { stepHill(); } catch (e) { hillJob = null; note('ERROR in the hill: ' + e.message); } }
+  else if (HALL.job) { try { stepHall(); } catch (e) { HALL.job = null; note('ERROR in the hall: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (PINES.job) { try { stepPines(); } catch (e) { PINES.job = null; note('ERROR in the pines: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
@@ -2766,6 +2838,7 @@ function frame(now) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx, 'back');
     drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
+    drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
     drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
@@ -2780,6 +2853,7 @@ function frame(now) {
   drawHill();
   // (each step's new element goes here, back to front)
   drawLake(t, dt);                                     // step 6: the snow ground, the banks and the water (14c)
+  drawHall();                                          // step 5: the shrine hall and the firs beside it (7c)
   drawPines(t, dt);                                    // step 7: the right bank's roped pines and firs (14d)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
   drawBack(ctx, t);
@@ -2938,7 +3012,7 @@ var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'],
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : m[0] === 'pines' ? 'pines' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3), the lake (step 6) and the pines (step 7) are baked again
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : m[0] === 'pines' ? 'pines' : m[0] === 'hall' ? 'hall' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3), the lake (step 6) and the pines (step 7) are baked again
     out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
@@ -3114,9 +3188,27 @@ var G = [
     { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
     { o: 'V', k: 'pagodaSnow', label: 'Snow on it', min: 0, max: 1.5, step: 0.01, re: 'hill' },
     { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
-    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'The windows are lit only in the evening and at night.' },
+    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'They come on with the hall\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
     { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' } ] },
+  { name: 'Shrine hall and the firs beside it (step 5)', file: 'winterhall.js', note: 'Its place and size: "Layout: where each element stands", Hall (the firs move with it).', ctls: [
+    { chk: 'V', k: 'hallShow', label: 'Show the hall', re: 'hall block', note: 'Off: the flat block-in shape comes back.' },
+    { o: 'V', k: 'hallTurn', label: 'Turned (°)', min: -40, max: 40, step: 1, re: 'hall', note: '+ turns its right end toward you (more of its right side shows); 0 = its front square to the view.' },
+    { o: 'V', k: 'hallSnow', label: 'Snow on the roof (×)', min: 0, max: 2, step: 0.01, re: 'hall', note: '1 = about 38 cm.' },
+    { o: 'V', k: 'hallEave', label: 'How far the eaves stand out (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall', note: '1 = 3 m past the walls.' },
+    { o: 'V', k: 'hallRoof', label: 'Roof height (×)', min: 0.6, max: 1.5, step: 0.01, re: 'hall', note: '1 = 4.3 m from the eaves to the ridge.' },
+    { o: 'V', k: 'hallSori', label: 'Corners turned up (×)', min: 0, max: 2.5, step: 0.05, re: 'hall' },
+    { o: 'V', k: 'hallHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hallFootMist', label: 'Low mist at its foot', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The mist lying on the snow field, thicker near the ground.' },
+    { o: 'V', k: 'hallShadow', label: 'Shadows on the snow', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The hall\'s and the firs\' shadows, cast along the sun\'s direction (they follow the time of day).' },
+    { o: 'V', k: 'hallLamps', label: 'Lamps after dusk', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'They come on with the pagoda\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
+    { o: 'V', k: 'hallSpill', label: 'Lamplight on the snow', min: 0, max: 2, step: 0.01, re: 'hall' },
+    { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
+    { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
+    { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfSnow', label: 'Firs: snow on them', min: 0, max: 1.6, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ] },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },
