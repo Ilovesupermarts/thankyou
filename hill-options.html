@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hill Options</title>
+<!-- ============================================================
+     HILL OPTIONS — a preview for step 3 of the new winter scene: the
+     snowy hill of firs and the five-storey pagoda, in a few looks, so the
+     user can choose before it goes into newwinter.html. Drawn by
+     winterhill.js. Choose with the buttons, or #A, #B, #C and ?dusk in the
+     address. The sky here is a plain stand-in; the real one is the app's.
+     ============================================================ -->
+<style>
+  :root { --bg: #F6E3D4; }
+  html, body { margin: 0; height: 100%; overflow: hidden; font-family: system-ui, sans-serif; }
+  canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+  .bar { position: fixed; left: 12px; top: 12px; display: flex; gap: 6px; flex-wrap: wrap; z-index: 2; }
+  .bar button { border: 0; border-radius: 8px; padding: 8px 12px; background: rgba(255,255,255,0.85); font-size: 14px; }
+  .bar button.on { background: #7A3A26; color: #fff; }
+  .note { position: fixed; left: 12px; top: 56px; max-width: 520px; font-size: 13px; color: #3A2A22; background: rgba(255,255,255,0.75); border-radius: 8px; padding: 8px 10px; z-index: 2; }
+  body.bare .bar, body.bare .note { display: none; }
+</style>
+</head>
+<body style="background: var(--bg)">
+<canvas id="bg"></canvas>
+<canvas id="cv"></canvas>
+<div class="bar" id="bar"></div>
+<div class="note" id="note"></div>
+<script src="winterhill.js"></script>
+<script>
+(function () {
+'use strict';
+var OPTIONS = {
+  A: { name: 'A · Snow forest, dark timber pagoda', note: 'Closest to the reference: a dense forest of snow-laden firs from the crest down, the far rows fading into the air; the pagoda in dark timber, turned a little (20°).',
+       style: 'timber', yaw: 0.35, rows: 11, treeFar: 0.026, treeNear: 0.088, density: 0.75, fill: 1, snow: 1, hazeFar: 0.55, hazeNear: 0.1, treeWidth: 1 },
+  B: { name: 'B · Vermilion pagoda, slender firs', note: 'The autumn pagoda\'s colours (vermilion posts, white plaster) in the snow, seen corner-on (45°); slimmer firs with less snow, more mist between the rows.',
+       style: 'vermilion', yaw: 0.785, rows: 9, treeFar: 0.03, treeNear: 0.08, density: 0.55, fill: 0.92, snow: 0.7, hazeFar: 0.68, hazeNear: 0.18, treeWidth: 0.78 },
+  C: { name: 'C · Open snowy slope', note: 'More of the hill\'s snow shows: firs in loose groups and single trees, broad and heavy with snow; the pagoda in dark timber, nearly face-on (9°), standing clear.',
+       style: 'timber', yaw: 0.15, rows: 9, treeFar: 0.03, treeNear: 0.095, density: 0.35, fill: 0.5, snow: 1.3, hazeFar: 0.45, hazeNear: 0.08, treeWidth: 1.15 }
+};
+var LIGHTS = {
+  day:  { sun: [-0.78, 0.38, 0.5], sunCol: [1.12, 0.98, 0.84], skyCol: [0.6, 0.62, 0.74], amb: 0.95, haze: [246, 232, 220], lit: 0 },
+  dusk: { sun: [-0.85, 0.12, 0.45], sunCol: [0.95, 0.62, 0.5], skyCol: [0.5, 0.5, 0.66], amb: 0.85, haze: [214, 196, 214], lit: 1 }
+};
+var cv = document.getElementById('cv'), bg = document.getElementById('bg');
+var opt = (location.hash || '#A').slice(1).toUpperCase(), time = /dusk/.test(location.search) ? 'dusk' : 'day';
+if (!OPTIONS[opt]) opt = 'A';
+if (/bare/.test(location.search)) document.body.classList.add('bare');
+if (/transparent/.test(location.search)) document.body.style.background = 'transparent';
+var transparent = /transparent/.test(location.search);
+var bar = document.getElementById('bar');
+Object.keys(OPTIONS).forEach(function (k) {
+  var b = document.createElement('button'); b.textContent = k; b.onclick = function () { opt = k; draw(); }; bar.appendChild(b);
+});
+['day', 'dusk'].forEach(function (k) {
+  var b = document.createElement('button'); b.textContent = k === 'day' ? 'Late afternoon' : 'Dusk (lit)'; b.onclick = function () { time = k; draw(); }; bar.appendChild(b);
+});
+function draw() {
+  var W = window.innerWidth, H = window.innerHeight, PR = window.devicePixelRatio || 1;
+  [cv, bg].forEach(function (k) { k.width = W * PR; k.height = H * PR; });
+  var c = cv.getContext('2d'), b = bg.getContext('2d');
+  c.setTransform(PR, 0, 0, PR, 0, 0); b.setTransform(PR, 0, 0, PR, 0, 0);
+  c.clearRect(0, 0, W, H); b.clearRect(0, 0, W, H);
+  Array.prototype.forEach.call(bar.children, function (el) { el.classList.toggle('on', el.textContent === opt || (el.textContent === 'Late afternoon' && time === 'day') || (el.textContent === 'Dusk (lit)' && time === 'dusk')); });
+  var O = OPTIONS[opt], L = LIGHTS[time], hy = H * 0.667;
+  document.getElementById('note').textContent = O.name + ' — ' + O.note;
+  // a stand-in sky and a plain snowfield below the horizon (not part of the options)
+  if (!transparent) {
+    var gs = b.createLinearGradient(0, 0, 0, hy);
+    gs.addColorStop(0, time === 'day' ? '#F2CBB4' : '#D6B2BC'); gs.addColorStop(1, time === 'day' ? '#FBEBDD' : '#EDD3C8');
+    b.fillStyle = gs; b.fillRect(0, 0, W, hy);
+  }
+  b.fillStyle = time === 'day' ? '#F3F4FA' : '#D9D9EA'; b.fillRect(0, hy, W, H - hy);
+  // the reference's places, moved as the test bed moves them (its horizon 0.655 → the 2/3 line)
+  function ry(f) { return (f <= 0.655 ? f * 0.667 / 0.655 : 0.667 + (f - 0.655) * 0.333 / 0.345) * H; }
+  var prof = [[-0.01, 0.47], [0.04, 0.43], [0.10, 0.395], [0.17, 0.39], [0.23, 0.42], [0.28, 0.47], [0.33, 0.54], [0.37, 0.64], [0.39, 0.667]]
+    .map(function (p) { return [p[0] * W, ry(p[1])]; });
+  var cam = WinterHill.camera(W, H, hy, 22);
+  var px = 0.195 * W, top = ry(0.185), foot = ry(0.505), done = false;
+  WinterHill.hill(c, {
+    profile: prof, foot: hy, rows: O.rows, treeFar: O.treeFar * H, treeNear: O.treeNear * H, density: O.density, fill: O.fill,
+    snow: O.snow, hazeFar: O.hazeFar, hazeNear: O.hazeNear, treeWidth: O.treeWidth, light: L, seed: 11,
+    // no tree stands right behind the pagoda's lowest storey in the rows in front of it; the trees below its foot hide its base, as in the reference
+    clearing: function (x, y, u) { return u > 0.3 && Math.abs(x - px) < 0.05 * W && y < foot - 0.004 * H && y > foot - 0.12 * H; },
+    before: function (cc, u) {
+      if (done || u < 0.32) return;
+      done = true;
+      WinterHill.pagoda(cc, cam, { x: px, top: top, foot: foot, yaw: O.yaw, style: O.style, lit: L.lit, snow: 1, light: L, haze: 0.12 });
+    }
+  });
+  // a soft band of mist at the hill's foot (a stand-in for step 4, the valley mist)
+  var mc = time === 'day' ? '252,236,212' : '232,214,222';
+  var mg = c.createLinearGradient(0, hy - 0.08 * H, 0, hy + 0.01 * H);
+  mg.addColorStop(0, 'rgba(' + mc + ',0)'); mg.addColorStop(0.7, 'rgba(' + mc + ',0.75)'); mg.addColorStop(1, 'rgba(' + mc + ',0.9)');
+  c.save(); c.beginPath(); c.rect(0, hy - 0.08 * H, W, 0.09 * H); c.clip();
+  var fade = c.createLinearGradient(W * 0.3, 0, W * 0.55, 0);           // the band fades out to the right, past the hill
+  c.fillStyle = mg; c.fillRect(0, hy - 0.08 * H, W, 0.09 * H);
+  c.globalCompositeOperation = 'destination-out';
+  fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+  c.fillStyle = fade; c.fillRect(W * 0.3, hy - 0.08 * H, W * 0.7, 0.09 * H);
+  c.restore();
+}
+window.addEventListener('hashchange', function () { opt = (location.hash || '#A').slice(1).toUpperCase(); draw(); });
+window.addEventListener('resize', draw);
+draw();
+window.hillDone = true;
+})();
+</script>
+</body>
+</html>
