@@ -30,3 +30,80 @@
   3. Check before saying "fixed". Only say a fix works if it was actually run and looked at. If it could not be run, say so first and never describe it as done.
   4. Do not second-guess the user's judgment. Do not call something broken, or fine, against what the user says they see.
   5. Keep it small: one change per request, with no extras.
+
+# New winter scene (`newwinter.html`): rules and plan
+
+Status: PLAN ONLY. Nothing is built yet and `newwinter.html` does not exist yet. The user must approve the plan (and answer the open questions at the end) before step 0 starts. Update the "Progress" list at the bottom of this section at the end of every session.
+
+## What this is
+
+- A full revamp of the winter theme's picture. `newwinter.html` is its test bed. The app (`app.js` section 8d, `WINT`, `WINT_M`) is not touched until the user asks for the port.
+- The target is the user's reference picture (a painted Japanese winter sanctuary; described under "The reference, measured" below). Aim: as close to it as code can get.
+- `winter2.html` was put back to the older winter layout (skiers, snow lanterns; commit `da8e8b1`), so the long `winter2.html` note above about the "reference scene", `V.ref`, `REF` and the stepping-stone path describes work that is no longer in that page. `winterpieces.js` and `winterscene.js` are left over from that work and no page loads them now. Rendered large, their pagoda, hall, stone lantern and roped pine look flat and clean-edged (like vector clip art), not painted: they are a starting point for shapes and proportions only, not the finished look.
+
+## Rules for this work (the user's, plus what follows from them)
+
+1. No pictures. Everything is drawn by code, as the autumn scene is. (`textures/waternormals.jpg` for the water's ripples is the one existing exception, already used by the autumn lake.)
+2. One element at a time, back to front, in the order of the steps below. A step is finished only when the user has looked at it and said so. Do not start the next step before that.
+3. Study the autumn scene for style and method; do not copy its elements into winter. The three things the user has cleared for porting are: the lake's waves and light (`water.js`, `fftwaves.js`, the method of `lakeDrawWater`), and from `winter2.html` Mt Fuji, the plum branches with their blossoms and snow, and the falling snow.
+4. Sky, background and the warm light are the app's own (the same code the autumn theme runs: the Shippō background in `main.css`, the sun, `clouds.js`). Do not make a winter-only sky.
+5. Colours: warm sky and lamp light; snow pure white, shaded periwinkle and slate blue; vermilion torii; crimson plum blossoms; ink-charcoal bark; golden-straw ropes.
+6. Composition: low horizon and an open sky in the middle for the greeting; a band of golden mist behind 次へ → and the six dots; left = hill, pagoda, hall, path, torii, lanterns; right = Fuji and the roped pines; the lake joins the two in the lower centre-right.
+7. The path is trodden snow only: no stones, no walls. Three torii, the path through the middle of each.
+8. Every value of a step goes on the test bed's panel in a group of its own, with "Copy values", so the user can tune it on the tablet.
+9. Check before saying done (working rule 3): every step is run in the test bed, a screenshot is taken at the tablet's shape (2960 × 1848) and looked at next to the reference. Say plainly what still differs.
+10. Keep the smoothness rules above: everything that stands still is baked once into layers; per frame only the sun and clouds, the water, the lamps' flicker, the plum branches' sway, the mist's slow drift and the snowfall. No routine pixel read-backs.
+
+## How it will be built
+
+- Shell: `newwinter.html` starts as a copy of `winter2.html` (it already has the app's page, sky, sun, clouds, light by time of day and weather, Fuji, the plum branches, the snowfall and the draggable panel). The skiers, the old torii and firs layout, the snow lanterns and the old snowfield layout are taken out. It keeps its values under its own key (`newWinter-1`).
+- One ground: the snow, the path, the torii, the lanterns, the hall, the lake's shore and the right bank all stand on one flat ground seen from one eye line with one lens (as the autumn scene's `torLens` / `LAND.horizon`). A thing at ground depth Z is drawn 1/Z as large. Where things stand is given on the ground, not on the screen, so sizes always agree with each other.
+- The lake is drawn as the autumn lake is: the water as one strip from the far shore down (`Water.render`, fed a mirrored picture of what stands behind it), then the snow land, banks and near shore laid over it to give the lake its shape.
+- New painters go in their own `.js` files (not in the page), so the later port to the app is: add the file to `ASSETS`, bump `CACHE`, move the values.
+- Painted look, not flat shapes: soft edges, shading that follows the sun and the sky's blue, brush grain, haze with distance (the way `snowfield.js`, `conifers.js` and `lakeside.js` light things).
+
+## The reference, measured (fractions of the screen: x from the left, y from the top; by eye, to be refined in step 0)
+
+- Mist band / far horizon: y 0.60–0.70. Greeting lines at y 0.41 and 0.49, 次へ → at 0.685, dots at 0.725 (x 0.5).
+- Mt Fuji: summit x 0.83, y 0.29; foot in the mist at y 0.62; left flank runs down to about x 0.50.
+- Hill of firs: from the left edge, crest about y 0.40, falling to the hall by x 0.33; firs fade into the mist.
+- Pagoda: middle x 0.195, finial tip y 0.19, foot (in mist) y 0.50, about 0.09 wide.
+- Hall: x 0.22–0.39, roof ridge y 0.535, foot y 0.66; glow on the snow in front of its door.
+- Frosted trees: x 0.40 (y 0.55–0.71) and a small one at x 0.48 (y 0.61–0.67).
+- Lake: far inlet at about x 0.55, y 0.71; left shore swings out to x 0.40 at y 0.83 and leaves the bottom edge near x 0.60; right bank comes in from the right edge at y 0.73–0.78 to a tip near x 0.65, with a second low spit of snow at y 0.80–0.86.
+- Roped pines (雪吊り): the big one x 0.96, pole top y 0.355, foot y 0.77; the second x 0.80, top y 0.45, foot y 0.72; smaller roped firs at x 0.875 and 0.92.
+- Path: wide at the bottom-left edge (x 0.05–0.30), curving up and right to the hall's steps (x 0.31, y 0.66).
+- Torii: front gate middle x 0.175, top y 0.645, feet y 0.93, 0.18 wide; second x 0.195, y 0.64–0.775; third x 0.255, y 0.63–0.71.
+- Stone lanterns: x 0.09 (y 0.70–0.81), x 0.255 (0.70–0.83), x 0.29 (0.66–0.73), x 0.19 (small, far); the big one between path and lake x 0.36, y 0.705–0.90.
+- Plum branches: left one from the top-left corner reaching in to x 0.29, y 0.46; right one from the right edge (y 0.10–0.30) reaching in to x 0.68, y 0.39.
+- The glass wind chime at the top left of the reference is the app's own toolbar chime, not part of the scene.
+
+## The steps
+
+0. Shell and block-in. Make `newwinter.html` as above. Put the ground plane in, and every element as a plain flat shape at its measured place (hill, pagoda, hall, lake outline, banks, pines, path, gates, lanterns), so the whole composition and the room for the text can be agreed before any detail is painted. Later steps replace one flat shape at a time.
+1. Sky, Shippō pattern, sun and clouds: the app's own, unchanged. Only confirm they show as in the app and choose which time of day and weather the test bed opens on.
+2. Mt Fuji: ported from `winter2.html` (`mountains.js`, winter mode), moved to the reference's place.
+3. The hill of firs and the pagoda: layered firs that lose contrast with distance; a five-storey pagoda with heavy snow on each roof, a gold finial and lit windows on all five storeys.
+4. The valley mist: one soft golden-cream band across Fuji's foot, through the lower firs and behind the 次へ → button and the dots; drifting very slowly.
+5. The hall and the frosted trees: hipped roof under snow, lit shoji windows and doors, the glow on the snow in front; two or three white frosted trees to its right (`conifers.js`'s frosted tree as the base).
+6. The lake and its snow banks: the autumn water (`water.js`, `fftwaves.js`) with calmer winter settings; the banks as rounded overhanging drifts with a thin dark rim of earth and rock at the waterline. Winter touches proposed: thin steam rising off the water, a rim of thin ice along the shore, snowflakes vanishing as they touch the water, a paler, colder deep-water colour.
+7. The right bank and the roped pines: snow-laden firs, two large pines with a pole and straw ropes fanned in a cone. The lake's mirror is baked again after this step so the pines show in the water.
+8. The snowfield and the trodden path: soft mounds shaded blue-grey; a shallow sunk path from the bottom-left edge curving up to the hall's door, soft snow sides, footprints' texture.
+9. The torii and the stone lanterns: three vermilion gates (black feet, snow on the top beams; `torii.js` as the base) astride the path; snow-capped stone lanterns in the gaps and the big one between path and lake; every lamp lit, with a warm pool on its base and on the snow.
+10. The plum branches: ported from `winter2.html` (`ume…` functions, `snowheaps.js`), placed as in the reference.
+11. The snowfall: ported from `winter2.html`.
+12. The whole picture: the text's legibility, the mist behind the dots, then the other times of day and weathers (evening, night, cloud, snow), and smoothness on the tablet.
+13. The port into the app (replacing section 8d), only when the user asks.
+
+## Open questions (waiting for the user's answers)
+
+1. May the reference picture be saved in the repository (a `reference/` folder), for comparison only: an on/off overlay on the test bed, never loaded by the app, not in `sw.js`? Without it a later session cannot see what it is matching.
+2. Step 0, the block-in: agreed, or go straight to step 1?
+3. The lamps and windows are lit in the reference, which is a daytime picture. Lit all day (dimmer by day, full from dusk), or only from dusk as now?
+4. The skiers, snow huts and snow lanterns of the current winter scene are not in the brief. Leave them out of the new scene?
+5. `winterpieces.js` and `winterscene.js`: rework them in place (nothing else uses them), or leave them alone and write new files?
+6. Which time of day and weather should the test bed open on to match the reference (suggested: late afternoon, sun and cloud)?
+
+## Progress
+
+- Plan written; nothing built. Waiting for the user's go-ahead and answers.
