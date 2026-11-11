@@ -54,9 +54,10 @@
      Yukitsuri.update(A, dt, wind)       moves the falling snow (wind: m/s across)
      Yukitsuri.drawRest(c, A)            the clumps still lying on the tree
      Yukitsuri.drawFalling(c, A)         the falling snow and its powder
-   spec: { variant 1 … 5, seed, height (m: the pole's top, or the tree's top when not roped), roped, crown (variant 1:
+   spec: { variant 1 … 5, seed, height (m: the pole's top, or the tree's top when not roped), roped, cover (0 … 1.5: how much
+           of the branches the snow covers), crown (variant 1:
            where the crown begins, share of the height), width, snow (0 … 2), ropes (× the number of ropes), props }
-   o:    { cam { F, cx, hy } (CSS px), eye (m), footX, footY (CSS px), PR, light { sun [x, y up, z toward you], sunCol,
+   o:    { cam { F, cx, hy } (CSS px), eye (m), footX, footY (CSS px), PR, dof (device px: the depth of field's blur), light { sun [x, y up, z toward you], sunCol,
            skyCol (0 … 1.5), amb, vis }, shade (rgb: snow in the sky's shade), snow, needle, rope, bamboo (rgb), bark
            { bark, dark, light, lichen, moss } (rgb), haze (0 … 1), hazeCol (rgb), soft (device px), loose (0 … 1: share
            of the snow that can fall), trunks (true: use trunks.js) }
@@ -121,9 +122,9 @@ function curve(P, n) {
    ===================================================================== */
 function build(spec) {
   var v = clamp(Math.round(spec.variant || 1), 1, 5), r = rng((spec.seed | 0) * 7919 + v * 131 + 29);
-  var Ht = spec.height || 7, roped = spec.roped !== false, snowK = spec.snow === undefined ? 1 : spec.snow;
+  var Ht = spec.height || 7, roped = spec.roped !== false, snowK = spec.snow === undefined ? 1 : spec.snow, cover = spec.cover === undefined ? 1 : spec.cover;
   var Th = roped ? Ht * 0.87 : Ht;
-  var T = { variant: v, Ht: Ht, Th: Th, roped: roped, segs: [], fol: [], poles: [], props: [], ropes: [], seed: spec.seed | 0, snowK: snowK, limbs: [] };
+  var T = { variant: v, Ht: Ht, Th: Th, roped: roped, segs: [], fol: [], poles: [], props: [], ropes: [], seed: spec.seed | 0, snowK: snowK, cover: cover, limbs: [] };
   var sg = r() < 0.5 ? -1 : 1;                     // which way the tree leans or sprawls
 
   function addLimb(parent, pts, r0, r1) {           // a run of segments along pts, thinning from r0 to r1; returns their indices
@@ -343,7 +344,7 @@ function build(spec) {
       var q = Math.pow((m[0] - E.c[0]) / (E.rx * 1.1), 2) + Math.pow((m[2] - E.c[2]) / (E.rz * 1.1), 2);
       if (q < 1) cover = Math.max(cover, 1 - q * 0.6);
     });
-    S.snow = snowK * 0.09 * Math.pow((lev - 0.55) / 0.45, 1.2) * (1 - cover) * clamp((S.ra - 0.03) / 0.05, 0, 1);
+    S.snow = snowK * 0.09 * Math.pow((lev - 0.55) / 0.45, 1.2) * (1 - cover) * clamp((S.ra - 0.03) / 0.05, 0, 1) * Math.min(1.5, T.cover);
   });
   /* the snow on each pad: one to three pieces along its top (sheltered pads hold less) */
   T.fol.forEach(function (E) {
@@ -355,7 +356,10 @@ function build(spec) {
     });
     E.snowD *= 1 - shelter * 0.5;
     var pr = rng(E.seed + 5), np = E.kind === 'bough' ? 1 + (pr() < 0.45 ? 1 : 0) : 1 + Math.floor(pr() * 2.6);
-    var u0 = E.kind === 'bough' ? 0.1 : -lerp(0.62, 0.85, pr()), u1 = E.kind === 'bough' ? E.reach : lerp(0.6, 0.86, pr());
+    // (how much of it the snow covers: the panel's "snow cover", 1 as before)
+    var cvr = clamp(0.55 + 0.45 * T.cover, 0.25, 1.12);
+    E.cover = T.cover;
+    var u0 = E.kind === 'bough' ? 0.1 : -lerp(0.62, 0.85, pr()) * cvr, u1 = E.kind === 'bough' ? Math.min(0.99, E.reach * clamp(0.6 + 0.4 * T.cover, 0.3, 1.1)) : lerp(0.6, 0.86, pr()) * cvr;
     var cuts = [];
     for (var i = 1; i < np; i++) cuts.push(lerp(u0, u1, (i + (pr() - 0.5) * 0.5) / np));
     var edges = [u0].concat(cuts).concat([u1]);
@@ -695,7 +699,7 @@ function boughSnowClumps(E, Pc, P) {
     if (Math.max(w0, w1) < 0.6) return;
     list.push({ A: A, B: B, w0: Math.max(0.3, w0), w1: Math.max(0.3, w1), wid: wid * s, lit: rr() });
   }
-  var have = function (u) { return big(u) * 0.8 + mid(u) * 0.4 > 0.22; };   // (where it has not fallen off)
+  var thr = 0.22 + (1 - (E.cover === undefined ? 1 : E.cover)) * 0.45, have = function (u) { return big(u) * 0.8 + mid(u) * 0.4 > thr; };   // (where it has not fallen off; less with less cover)
   // along the main branch
   var n = Math.max(4, Math.round((Pc.u1 - Pc.u0) * E.L / 0.06));
   for (var i = 0; i < n; i++) {
@@ -1054,7 +1058,8 @@ function bakeJob(T, o) {
   tasks.push(function () {
     // laid down a little soft, so no edge is ruler-sharp
     var bc = body.c; bc.save(); bc.setTransform(1, 0, 0, 1, 0, 0);
-    if (o.soft > 0) bc.filter = 'blur(' + o.soft.toFixed(2) + 'px)';
+    var bl = Math.hypot(o.soft || 0, o.dof || 0);
+    if (bl > 0.05) bc.filter = 'blur(' + bl.toFixed(2) + 'px)';
     bc.drawImage(work.cnv, 0, 0); bc.restore();
     work.cnv.width = 1;
     // the loose clumps, each on its own little picture
@@ -1108,7 +1113,8 @@ function bakeJob(T, o) {
     cv.width = Math.max(1, Math.ceil((bb[2] - bb[0] + m * 2) * PR)); cv.height = Math.max(1, Math.ceil((bb[3] - bb[1] + m * 2) * PR));
     var cc = cv.getContext('2d');
     cc.setTransform(PR, 0, 0, PR, -(bb[0] - m) * PR, -(bb[1] - m) * PR);
-    if (o.soft > 0) cc.filter = 'blur(' + (o.soft / PR).toFixed(2) + 'px)';
+    var bl2 = Math.hypot(o.soft || 0, o.dof || 0);
+    if (bl2 > 0.05) cc.filter = 'blur(' + bl2.toFixed(2) + 'px)';
     if (Lc.E.kind === 'pad') paintPadSnow(cc, Lc.E, Lc.Pc, P, K); else paintBoughSnow(cc, Lc.E, Lc.Pc, P, K);
     Lc.spr = cv; Lc.x = bb[0] - m; Lc.y = bb[1] - m; Lc.w = bb[2] - bb[0] + m * 2; Lc.h = bb[3] - bb[1] + m * 2;
     Lc.sx = P(Lc.pos)[0]; Lc.sy = P(Lc.pos)[1];

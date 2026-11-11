@@ -372,6 +372,10 @@ var V_DEFAULTS = {
   // every so many seconds, how much a gust shakes off, after how many seconds fallen snow settles back: 0 never)
   ytShow: true, ytSeed: 3, ytSnow: 1, ytRopes: 1, ytFirWidth: 1.25, ytProps: true, ytSoft: 1, ytHaze: 1, ytShadow: 0.8, ytContact: 0.7,
   ytLoose: 0.5, ytShedEvery: 14, ytShedGust: 1, ytReturn: 240, ytReflect: true,
+  // how much of the branches the snow covers (with ytSnow, how deep it lies); how many trees stand on the bank (the first
+  // six where the scene picture has them, more placed on the bank's land by the seed); depth of field: on, the distance in
+  // focus (m), how strongly what is nearer or farther blurs, the most it blurs (CSS px)
+  ytSnowCover: 1, ytCount: 6, ytDof: false, ytFocus: 75, ytDofStrength: 1, ytDofMax: 3,
   // each tree: shown, its width (×), its variant (1 tall and slender … 5 twin trunk), roped, across and its foot (shares of the screen, as
   // in the scene picture), its height (m: the pole's top, or the tree's top when not roped), variant 1's crown base (share
   // of its height)
@@ -2356,14 +2360,50 @@ var PINES = { list: [], next: null, job: null, t0: 0, shadow: mk(), drawn: false
    "Roped pines and firs" values), height in metres; the farthest first */
 function ytPlaces() {
   var out = [], ax = BLK_ANCHOR.pines[0], ay = blkY(BLK_ANCHOR.pines[1]), sz = V.pinesSize || 1, hy = V.horizonLine;
-  for (var i = 1; i <= YT_N; i++) {
+  var count = Math.round(V.ytCount);
+  for (var i = 1; i <= Math.min(YT_N, count); i++) {
     if (!V['yt' + i + 'Show']) continue;
     var x = ax + (V['yt' + i + 'X'] - ax) * sz + V.pinesX, fy = ay + (V['yt' + i + 'Foot'] - ay) * sz - V.pinesY;
     if (fy <= hy + 0.004) continue;                                    // (a foot on or above the horizon cannot stand on the ground)
     out.push({ i: i, x: x * W, foot: fy * H, h: V['yt' + i + 'H'] * sz, variant: Math.round(V['yt' + i + 'Var']), roped: !!V['yt' + i + 'Rope'],
                crown: V['yt' + i + 'Base'], wide: V['yt' + i + 'Wide'] });
   }
+  // more trees than the six: placed on the right bank's land by the seed (never on or near the water, never on top of
+  // another tree), mostly firs, some roped, of varied heights
+  if (count > YT_N) {
+    var water = lakeOutline(), r = rngFrom(Math.round(V.ytSeed) * 7717 + 3), tries = 0, extra = 0, F = lakeLens();
+    while (extra < count - YT_N && tries++ < 4000) {
+      var ex = lerp(0.64, 1.04, r()) * W, ey = lerp(hy + 0.012, hy + 0.2, Math.pow(r(), 0.8)) * H;
+      if (ptInPoly(ex, ey, water) || ptInPoly(ex, ey + 0.02 * H, water) || ptInPoly(ex - 0.015 * W, ey + 0.01 * H, water) || ptInPoly(ex + 0.015 * W, ey + 0.01 * H, water)) continue;
+      // (a little room round each: in metres on the ground, as far apart as about a crown)
+      var D = V.eyeHeight * F / Math.max(1, ey - hy * H), clash = false;
+      for (var k = 0; k < out.length; k++) {
+        var Dk = V.eyeHeight * F / Math.max(1, out[k].foot - hy * H);
+        var gx = (ex - W / 2) * D / F - (out[k].x - W / 2) * Dk / F;          // across, on the ground (m)
+        if (Math.hypot(gx, D - Dk) < 4.5) { clash = true; break; }
+      }
+      if (clash) continue;
+      var vr = r(), variant = vr < 0.75 ? 1 : vr < 0.88 ? 2 : 4;
+      out.push({ i: YT_N + 1 + extra, x: ex, foot: ey, h: lerp(3.5, 8, r()) * sz, variant: variant, roped: r() < 0.7, crown: lerp(0.16, 0.24, r()), wide: variant === 1 ? 1 : 0.7 });
+      extra++;
+    }
+  }
   return out.sort(function (a, b) { return a.foot - b.foot; });
+}
+function ptInPoly(x, y, Pg) {
+  var inside = false;
+  for (var i = 0, j = Pg.length - 1; i < Pg.length; j = i++) {
+    var a = Pg[i], b = Pg[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+/* depth of field: how much a tree D m away blurs (device px), as a lens focused at V.ytFocus m (its circle of confusion
+   grows with |1/D − 1/focus|) */
+function ytDofBlur(D) {
+  if (!V.ytDof) return 0;
+  var f = Math.max(5, V.ytFocus), k = Math.abs(1 / D - 1 / f) * f;
+  return Math.min(V.ytDofMax, k * 3 * V.ytDofStrength) * PR;
 }
 function ytOptions(P) {
   var hy = H * V.horizonLine, F = lakeLens(), D = V.eyeHeight * F / Math.max(1, P.foot - hy);
@@ -2374,7 +2414,7 @@ function ytOptions(P) {
     light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: hex(V.colours.snow),
     needle: hex(V.colours.needle), rope: hex(V.colours.rope), bamboo: hex(V.colours.bamboo),
     bark: { bark: bark, dark: scale(bark, 0.42), light: mix(bark, [190, 186, 184], 0.45), lichen: [150, 152, 140], moss: [78, 90, 48] },
-    haze: hz, hazeCol: light(hex(V.colours.mist)), soft: V.ytSoft * 0.35 * PR, loose: V.ytLoose
+    haze: hz, hazeCol: light(hex(V.colours.mist)), soft: V.ytSoft * 0.35 * PR, loose: V.ytLoose, dof: ytDofBlur(D)
   };
 }
 function startPines() {
@@ -2386,7 +2426,7 @@ function startPines() {
   var q = 0;
   list.forEach(function (P) {
     var T = Yukitsuri.build({ variant: P.variant, seed: Math.round(V.ytSeed) * 101 + P.i * 17, height: P.h, roped: P.roped, crown: P.crown,
-                              width: P.wide * (P.variant === 1 ? V.ytFirWidth : 1), snow: V.ytSnow, ropes: V.ytRopes, props: V.ytProps });
+                              width: P.wide * (P.variant === 1 ? V.ytFirWidth : 1), snow: V.ytSnow, cover: V.ytSnowCover, ropes: V.ytRopes, props: V.ytProps });
     var o = ytOptions(P);
     PINES.next.push({ P: P, T: T, o: o, job: Yukitsuri.bakeJob(T, o), R: null, A: null, K: null });
   });
@@ -2909,7 +2949,13 @@ function ytCtls() {
   var out = [
     { chk: 'V', k: 'ytShow', label: 'Show the roped pines and firs', re: 'pines block', note: 'Off: the flat block-in shapes come back.' },
     { o: 'V', k: 'ytSeed', label: 'Which trees (seed)', min: 1, max: 99, step: 1, re: 'pines', note: 'Every tree is its own from this: its limbs, pads, boughs and snow.' },
-    { o: 'V', k: 'ytSnow', label: 'Snow on the branches', min: 0, max: 2, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytCount', label: 'How many trees', min: 0, max: 16, step: 1, re: 'pines', note: 'The first six stand where the scene picture has them (each set below); more are placed on the right bank\'s land by the seed (never on or near the water). Each tree adds to the time the trees take to appear.' },
+    { o: 'V', k: 'ytSnow', label: 'Snow: how deep it lies on the branches', min: 0, max: 2.5, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytSnowCover', label: 'Snow: how much of the branches it covers', min: 0, max: 1.5, step: 0.05, re: 'pines', note: '1 = as now; less leaves more bare branch, more covers more of each branch (it still lies only on the branches).' },
+    { chk: 'V', k: 'ytDof', label: 'Depth of field', re: 'pines', note: 'Trees nearer or farther than the focus distance are blurred, as by a camera lens.' },
+    { o: 'V', k: 'ytFocus', label: 'Depth of field: distance in focus (m)', min: 20, max: 200, step: 1, re: 'pines', note: 'The nearest tree here is about 50 m away, the farthest about 100 m.' },
+    { o: 'V', k: 'ytDofStrength', label: 'Depth of field: strength', min: 0, max: 4, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytDofMax', label: 'Depth of field: most blur (px)', min: 0, max: 10, step: 0.1, re: 'pines' },
     { o: 'V', k: 'ytRopes', label: 'Ropes: how many (×)', min: 0.3, max: 2, step: 0.05, re: 'pines' },
     { o: 'V', k: 'ytFirWidth', label: 'Variant 1: crown width (×)', min: 0.6, max: 1.8, step: 0.05, re: 'pines' },
     { chk: 'V', k: 'ytProps', label: 'Bamboo props under the long limbs (variants 2, 3, 5)', re: 'pines' },
