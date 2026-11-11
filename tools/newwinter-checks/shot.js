@@ -14,7 +14,7 @@ const { chromium } = require('playwright');
   await p.reload();
   await p.evaluate(() => { var s = JSON.parse(localStorage.getItem('shotSet') || '{}'); for (var g in s) for (var k in s[g]) winterLab[g][k] = s[g][k]; if (s.V && 'hour' in s.V) winterLab.setHour(); winterLab.changed('all'); });
   await p.waitForTimeout(1500);
-  for (let i = 0; i < 80; i++) { await p.waitForTimeout(500); if (await p.evaluate(() => !winterLab.busy())) break; }
+  for (let i = 0; i < 900; i++) { await p.waitForTimeout(500); if (await p.evaluate(() => !winterLab.busy())) break; }
   await p.waitForTimeout(2500);
   await p.addStyleTag({ content: '#sp{display:none !important}' + (hideText ? '.page, #navDemo, #dots, .msg, [class^=msg]{visibility:hidden !important}' : '') });
   await p.waitForTimeout(300);
