@@ -16,9 +16,12 @@
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
 <script src="winterhill.js"></script>
+<script src="winterhall.js"></script>
 <script src="fftwaves.js"></script>
 <script src="water.js"></script>
 <script src="winterlake.js"></script>
+<script src="trunks.js"></script>
+<script src="yukitsuri.js"></script>
 
 <style>
   /* ============================================================
@@ -351,6 +354,18 @@ var V_DEFAULTS = {
   // step 3, the pagoda: turned (degrees from facing you), dark timber instead of vermilion and white, snow, mist on it, its
   // windows' light after dusk, the row of firs it stands among (0 the crest … 1 the foot), and the clearing round it
   pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
+  // the pagoda's and the hall's depth of field (each its own lens, as the pines': on, the distance in focus in m, how
+  // strongly what is nearer or farther blurs, the most it blurs in CSS px)
+  pagodaDof: false, pagodaFocus: 200, pagodaDofStrength: 1, pagodaDofMax: 3,
+  hallDof: false, hallFocus: 200, hallDofStrength: 1, hallDofMax: 3,
+  // step 5, the shrine hall (winterhall.js): shown, turned (degrees; + turns its right end toward you), the snow on its
+  // roof (×), how far its eaves stand out (×), its roof's height (×), how much its corners turn up (×), mist on it, the
+  // low mist at its foot, the shadows it and the firs cast on the snow, its lamps after dusk and their light on the snow
+  hallShow: true, hallTurn: 15, hallSnow: 1, hallEave: 1, hallRoof: 1, hallSori: 1, hallHaze: 0.12, hallFootMist: 0.8,
+  hallShadow: 1, hallLamps: 1, hallSpill: 1,
+  // the firs beside the hall (right of it, in the mist): shown, which trees (seed), their size and width (×), snow on
+  // them, the mist on them
+  hfShow: true, hfSeed: 5, hfSize: 1, hfWidth: 1.3, hfSnow: 0.8, hfHaze: 0.5,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
   // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
@@ -364,6 +379,25 @@ var V_DEFAULTS = {
   // water, the steam rising off it (how much, how high)
   lakeMirror: 0.95, lakeCalm: 0.6, lakeWaves: 0.25, lakeWaveSize: 1, lakeSpeed: 0.2, lakeFft: true, lakeWind: 0.45, lakeSparkle: 1, lakeRes: 0.75,
   thinIce: 0.7, iceWidth: 1.2, lakeMist: 0.5, steam: 0.8, steamRise: 1,
+  // step 7, the right bank's roped pines and firs (yukitsuri.js; the user's sheet of five variants and their scene picture):
+  // shown, the forest's seed, snow, ropes (× how many), variant 1's crown width, props, softness, haze, the shadows (the
+  // sun's, and the sky's shade under each crown), the snow falling off (the share of it that can fall, one clump about
+  // every so many seconds, how much a gust shakes off, after how many seconds fallen snow settles back: 0 never)
+  ytShow: true, ytSeed: 3, ytSnow: 1, ytRopes: 1, ytFirWidth: 1.25, ytProps: true, ytSoft: 1, ytHaze: 1, ytShadow: 0.8, ytContact: 0.7,
+  ytLoose: 0.5, ytShedEvery: 14, ytShedGust: 1, ytReturn: 240, ytReflect: true,
+  // how much of the branches the snow covers (with ytSnow, how deep it lies); how many trees stand on the bank (the first
+  // six where the scene picture has them, more placed on the bank's land by the seed); depth of field: on, the distance in
+  // focus (m), how strongly what is nearer or farther blurs, the most it blurs (CSS px)
+  ytSnowCover: 1, ytCount: 6, ytDof: false, ytFocus: 75, ytDofStrength: 1, ytDofMax: 3,
+  // each tree: shown, its width (×), its variant (1 tall and slender … 5 twin trunk), roped, across and its foot (shares of the screen, as
+  // in the scene picture), its height (m: the pole's top, or the tree's top when not roped), variant 1's crown base (share
+  // of its height)
+  yt1Show: true, yt1Wide: 0.6, yt1Var: 2, yt1Rope: true, yt1X: 0.802, yt1Foot: 0.775, yt1H: 7.4, yt1Base: 0.12,
+  yt2Show: true, yt2Wide: 1, yt2Var: 1, yt2Rope: false, yt2X: 0.837, yt2Foot: 0.745, yt2H: 3.9, yt2Base: 0.22,
+  yt3Show: true, yt3Wide: 1, yt3Var: 1, yt3Rope: true, yt3X: 0.876, yt3Foot: 0.755, yt3H: 5.3, yt3Base: 0.22,
+  yt4Show: true, yt4Wide: 1, yt4Var: 1, yt4Rope: true, yt4X: 0.921, yt4Foot: 0.765, yt4H: 6.5, yt4Base: 0.2,
+  yt5Show: true, yt5Wide: 1, yt5Var: 1, yt5Rope: true, yt5X: 0.963, yt5Foot: 0.815, yt5H: 8.5, yt5Base: 0.2,
+  yt6Show: true, yt6Wide: 1, yt6Var: 1, yt6Rope: true, yt6X: 0.995, yt6Foot: 0.76, yt6H: 9, yt6Base: 0.2,
   // time, wind and light
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
@@ -389,7 +423,14 @@ var V_DEFAULTS = {
     blossomDeep: '#A8212E',
     stamen: '#F4D27A',
     bankEarth: '#4D4038',
-    lakeDeep: '#93A5C3'
+    lakeDeep: '#93A5C3',
+    pineBark: '#3E3634',
+    bamboo: '#A88E55',
+    pagodaWall: '#EDE3D2',
+    pagodaRed: '#C24A2E',
+    hallPlaster: '#E8DDC8',
+    hallTimber: '#4B2E22',
+    hallStone: '#9C978F'
   }
 };
 var MT_DEFAULTS = {
@@ -775,6 +816,9 @@ function lightFor(haze) {
 function withLight(o, haze) { var L = lightFor(haze); for (var k in L) o[k] = L[k]; return o; }
 /* The lamps and windows are lit only from dusk (the user's choice); their strength comes with the lamps (steps 5 and 9). */
 function nightLights() { return isNight() ? 1 : V.timeOfDay === 'evening' ? 1 : 0; }
+/* The pagoda's and the hall's lamps: they come on together, as the autumn pagoda's do (app.js torLampLevel): fading in
+   with the app's darkness from about 38 minutes before sunset to full about 6 minutes after it (0 … 1). */
+function lampLevel() { return CLK && CLK.Lt ? smooth(0.04, 0.2, CLK.Lt.dark) : nightLights(); }
 
 /* ============================================================
    7. MOUNTAINS — mountains.js in its winter mode, baked into MTN with
@@ -843,7 +887,9 @@ function startHill() {
   var cam = WinterHill.camera(W, H, hy, MT.lens);
   var px = pp.X(0.195), top = pp.Y(0.185), foot = pp.Y(0.505), placed = false, stairs = null, eave = null, cl = V.pagodaClear;
   var pagodaOpts = { x: px, top: top, foot: foot, yaw: V.pagodaTurn * PI / 180, style: V.pagodaTimber ? 'timber' : 'vermilion',
-                     lit: nightLights() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze };
+                     lit: lampLevel() * V.pagodaLamps, snow: V.pagodaSnow, light: L, haze: V.pagodaHaze,
+                     colours: { wall: V.colours.pagodaWall, red: V.colours.pagodaRed },
+                     dof: { on: V.pagodaDof, focus: V.pagodaFocus, strength: V.pagodaDofStrength, max: V.pagodaDofMax } };
   var o = {
     profile: HILL_PROFILE.map(function (p) { return [ph.X(p[0]), ph.Y(p[1])]; }), foot: hy, rows: Math.round(V.hillRows), seed: Math.round(V.hillSeed),
     treeFar: V.hillFirFar * H * ph.sz, treeNear: V.hillFirNear * H * ph.sz, density: V.hillDensity, fill: V.hillFill, snow: V.hillFirSnow,
@@ -868,6 +914,7 @@ function startHill() {
       placed = true;
       var pg = WinterHill.pagoda(cc, cam, pagodaOpts);
       stairs = pg.stairs; eave = pg.eave;
+      note('pagoda: ' + Math.round(pg.Z) + ' m away' + (pg.dof > 0 ? ', depth of field ' + (pg.dof / PR).toFixed(1) + ' px' : ''));
     }
   };
   if (!V.hillShow) {                                // the pagoda alone
@@ -888,6 +935,56 @@ function drawHill() {
   if (!hillDrawn || (!V.hillShow && !V.pagodaShow)) return;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.drawImage(HILL.cnv, 0, 0);
+}
+
+/* ============================================================
+   7c. THE SHRINE HALL AND THE FIRS BESIDE IT (step 5, winterhall.js) —
+   baked a little each frame (the snow round it, the firs, the timber
+   and plaster, the snow on its roof) into a picture just its own size,
+   drawn each frame over the snow ground. Baked again only when the
+   light, the time, the size or one of its values changes. Its place is
+   the reference's (BLK.hall, BLK.hallFirs), moved and sized by the
+   layout's "Hall" values.
+   ============================================================ */
+var HALL = { job: null, next: null, cnv: null, x: 0, y: 0, t0: 0, info: '' };
+function startHall() {
+  if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
+  if (!V.hallShow || typeof WinterHall === 'undefined') { HALL.cnv = null; return; }
+  HALL.t0 = performance.now();
+  var hy = H * V.horizonLine, pl = blkPlace('hall'), Hb = BLK.hall;
+  var cam = WinterHill.camera(W, H, hy, MT.lens);
+  var L = { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, haze: light(hex(V.colours.mist)) };
+  var firs = [];
+  if (V.hfShow) BLK.hallFirs.forEach(function (f, i) {
+    var top = pl.Y(f.top), foot = pl.Y(f.foot), x = pl.X(f.x), n = BLK.hallFirs.length;
+    firs.push({ x: x, foot: foot, h: (foot - top) * V.hfSize, seed: Math.round(V.hfSeed) * 100 + i * 7 + 3,
+                haze: clamp(V.hfHaze * lerp(0.75, 1.25, n > 1 ? i / (n - 1) : 0.5), 0, 0.95) });
+  });
+  HALL.job = WinterHall.job({
+    W: W, H: H, PR: PR, cam: cam, place: { x0: pl.X(Hb.eave0), x1: pl.X(Hb.eave1), top: pl.Y(Hb.top), foot: pl.Y(Hb.base) },
+    yaw: V.hallTurn * PI / 180, eye: V.eyeHeight, snow: V.hallSnow, eave: V.hallEave, roof: V.hallRoof, sori: V.hallSori,
+    haze: V.hallHaze, footMist: V.hallFootMist, shadow: V.hallShadow, lit: lampLevel() * V.hallLamps, spill: V.hallSpill,
+    lampCol: hex(V.colours.flame), light: L,
+    colours: { plaster: V.colours.hallPlaster, timber: V.colours.hallTimber, stone: V.colours.hallStone },
+    dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
+    field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+             haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis },
+    firs: firs,
+    firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
+               brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }
+  });
+}
+function stepHall() {
+  if (HALL.job.step(8)) {
+    HALL.cnv = HALL.job.canvas; HALL.x = HALL.job.x; HALL.y = HALL.job.y; HALL.info = HALL.job.info; HALL.times = HALL.job.times();
+    HALL.job = null;
+    note('hall and the firs beside it: ' + Math.round(performance.now() - HALL.t0) + ' ms (in steps of about 8 ms a frame) · ' + HALL.info + ' · ' + HALL.times);
+  }
+}
+function drawHall() {
+  if (!V.hallShow || !HALL.cnv) return;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.drawImage(HALL.cnv, Math.round(HALL.x * PR), Math.round(HALL.y * PR));
 }
 
 var mtnJob = null, mtnT0 = 0;
@@ -1968,7 +2065,11 @@ var BLK = {
   firLine: 0.47,                                       // the firs fill the hill from about here down
   pagoda: { x: 0.195, top: 0.185, roofTop: 0.30, foot: 0.505, w: 0.09 },
   ground: 0.64,                                         // the snow begins here (behind the hall's foot)
-  hall: { x0: 0.22, x1: 0.40, ridge: 0.535, eaves: 0.588, foot: 0.657 },
+  hall: { x0: 0.22, x1: 0.40, ridge: 0.535, eaves: 0.588, foot: 0.657, eave0: 0.222, eave1: 0.389, top: 0.533, base: 0.662 },
+  // the firs just right of the hall, in the mist (their middles, tops and feet, measured on the reference)
+  hallFirs: [{ x: 0.386, top: 0.585, foot: 0.665 }, { x: 0.398, top: 0.574, foot: 0.666 }, { x: 0.409, top: 0.579, foot: 0.664 },
+             { x: 0.418, top: 0.587, foot: 0.665 }, { x: 0.428, top: 0.590, foot: 0.664 }, { x: 0.437, top: 0.596, foot: 0.665 },
+             { x: 0.446, top: 0.602, foot: 0.663 }],
   frost: [{ x: 0.41, top: 0.55, foot: 0.71, w: 0.06 }, { x: 0.48, top: 0.61, foot: 0.675, w: 0.025 }],
   // the water: the far inlet, round the right bank's waterline, down the right edge, along the bottom, up the near-left shore
   water: [[0.548, 0.712], [0.63, 0.712], [0.648, 0.745], [0.655, 0.775], [0.70, 0.785], [0.80, 0.80], [0.87, 0.81], [0.90, 0.83],
@@ -2061,6 +2162,7 @@ function drawBlockIn(c, part) {
   // 5. the hall and the frosted trees
   grp('hall');
   var Hl = BLK.hall, hw2 = (Hl.x1 - Hl.x0);
+  if (!V.hallShow) {
   rect(Hl.x0 + hw2 * 0.08, Hl.eaves, Hl.x1 - hw2 * 0.08, Hl.foot, K.hallWall);
   rect(Hl.x0 + hw2 * 0.08, Hl.foot - 0.008, Hl.x1 - hw2 * 0.08, Hl.foot, K.timber);
   for (var wi = 0; wi < 6; wi++) {
@@ -2070,6 +2172,7 @@ function drawBlockIn(c, part) {
   poly([[Hl.x0, Hl.eaves], [Hl.x0 + hw2 * 0.17, Hl.ridge], [Hl.x1 - hw2 * 0.17, Hl.ridge], [Hl.x1, Hl.eaves]], K.roof);
   rect(Hl.x0, Hl.eaves - 0.004, Hl.x1, Hl.eaves + 0.002, K.snowShade);
   label('5  Hall', (Hl.x0 + Hl.x1) / 2, Hl.ridge - 0.012);
+  }
   grp('frost');
   BLK.frost.forEach(function (F) {
     c.fillStyle = K.frost;
@@ -2078,7 +2181,8 @@ function drawBlockIn(c, part) {
   });
   label('5  Frosted trees', BLK.frost[0].x, BLK.frost[0].top - 0.01);
 
-  // 7. the right bank's trees and the ropes of the roped pines
+  // 7. the right bank's trees and the ropes of the roped pines (the real ones now, step 7, section 14d, unless switched off)
+  if (!V.ytShow) {
   grp('pines');
   BLK.firs.forEach(function (F) { poly([[F.x, F.top], [F.x + F.w / 2, F.foot], [F.x - F.w / 2, F.foot]], K.pine); });
   BLK.pines.forEach(function (F) {
@@ -2097,6 +2201,7 @@ function drawBlockIn(c, part) {
     }
   });
   label('7  Roped pines', 0.88, 0.44);
+  }
 
   // 8. the trodden path (the snowfield's mounds come in step 8)
   grp('path');
@@ -2257,7 +2362,7 @@ function bakeLake() {
   WinterLake.bakeMirror(MIRROR.c, {
     W: W, H: H, hy: hy, top: top, pad: pad, res: res, mtn: V.showMountains && mtn3d ? MTN.cnv : null, mtnAlpha: MT.strength,
     skyAt: lakeSkyAt, shore: Sh, earth: light(hex(V.colours.bankEarth)), snowLit: lakeSnowLit(), mist: light(hex(V.colours.mist)),
-    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist
+    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist, before: pinesMirror
   });
   if (typeof Water !== 'undefined') Water.setMirror(MIRROR.cnv);
   STILL.cnv.width = cv.width; STILL.cnv.height = cv.height;
@@ -2316,6 +2421,194 @@ function drawLake(t, dt) {
 }
 
 /* ============================================================
+   14d. THE RIGHT BANK'S ROPED PINES AND FIRS (step 7) — yukitsuri.js,
+   after the user's sheet of five variants (雪吊りの松の変型) and their
+   scene picture. Each tree is built in 3D (metres) and seen through the
+   scene's camera (the lens of the mountains, the eye V.eyeHeight above
+   the snow on the horizon line), so its size follows from where its
+   foot stands. Its trunk and limbs are drawn by trunks.js (the autumn
+   maples' bark) in the pines' bark colour. Baked in steps (about 8 ms a
+   frame) after the snow ground, each tree into a picture of its own;
+   their shadows into one picture on the land; then the lake's mirror
+   is baked again with them in it. Each frame: the shadows, then the
+   trees from the farthest, each with the snow still lying on it and the
+   snow falling off it.
+   ============================================================ */
+var YT_N = 6;
+var PINES = { list: [], next: null, job: null, t0: 0, shadow: mk(), drawn: false, info: '', shedT: 10 };
+/* the trees as the panel sets them: place on the screen (moved and sized about the group's anchor by the layout's
+   "Roped pines and firs" values), height in metres; the farthest first */
+function ytPlaces() {
+  var out = [], ax = BLK_ANCHOR.pines[0], ay = blkY(BLK_ANCHOR.pines[1]), sz = V.pinesSize || 1, hy = V.horizonLine;
+  var count = Math.round(V.ytCount);
+  for (var i = 1; i <= Math.min(YT_N, count); i++) {
+    if (!V['yt' + i + 'Show']) continue;
+    var x = ax + (V['yt' + i + 'X'] - ax) * sz + V.pinesX, fy = ay + (V['yt' + i + 'Foot'] - ay) * sz - V.pinesY;
+    if (fy <= hy + 0.004) continue;                                    // (a foot on or above the horizon cannot stand on the ground)
+    out.push({ i: i, x: x * W, foot: fy * H, h: V['yt' + i + 'H'] * sz, variant: Math.round(V['yt' + i + 'Var']), roped: !!V['yt' + i + 'Rope'],
+               crown: V['yt' + i + 'Base'], wide: V['yt' + i + 'Wide'] });
+  }
+  // more trees than the six: placed on the right bank's land by the seed (never on or near the water, never on top of
+  // another tree), mostly firs, some roped, of varied heights
+  if (count > YT_N) {
+    var water = lakeOutline(), r = rngFrom(Math.round(V.ytSeed) * 7717 + 3), tries = 0, extra = 0, F = lakeLens();
+    while (extra < count - YT_N && tries++ < 4000) {
+      var ex = lerp(0.64, 1.04, r()) * W, ey = lerp(hy + 0.012, hy + 0.2, Math.pow(r(), 0.8)) * H;
+      if (ptInPoly(ex, ey, water) || ptInPoly(ex, ey + 0.02 * H, water) || ptInPoly(ex - 0.015 * W, ey + 0.01 * H, water) || ptInPoly(ex + 0.015 * W, ey + 0.01 * H, water)) continue;
+      // (a little room round each: in metres on the ground, as far apart as about a crown)
+      var D = V.eyeHeight * F / Math.max(1, ey - hy * H), clash = false;
+      for (var k = 0; k < out.length; k++) {
+        var Dk = V.eyeHeight * F / Math.max(1, out[k].foot - hy * H);
+        var gx = (ex - W / 2) * D / F - (out[k].x - W / 2) * Dk / F;          // across, on the ground (m)
+        if (Math.hypot(gx, D - Dk) < 4.5) { clash = true; break; }
+      }
+      if (clash) continue;
+      var vr = r(), variant = vr < 0.75 ? 1 : vr < 0.88 ? 2 : 4;
+      out.push({ i: YT_N + 1 + extra, x: ex, foot: ey, h: lerp(3.5, 8, r()) * sz, variant: variant, roped: r() < 0.7, crown: lerp(0.16, 0.24, r()), wide: variant === 1 ? 1 : 0.7 });
+      extra++;
+    }
+  }
+  return out.sort(function (a, b) { return a.foot - b.foot; });
+}
+function ptInPoly(x, y, Pg) {
+  var inside = false;
+  for (var i = 0, j = Pg.length - 1; i < Pg.length; j = i++) {
+    var a = Pg[i], b = Pg[j];
+    if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
+  }
+  return inside;
+}
+/* depth of field: how much a tree D m away blurs (device px), as a lens focused at V.ytFocus m (its circle of confusion
+   grows with |1/D − 1/focus|) */
+function ytDofBlur(D) {
+  if (!V.ytDof) return 0;
+  var f = Math.max(5, V.ytFocus), k = Math.abs(1 / D - 1 / f) * f;
+  return Math.min(V.ytDofMax, k * 3 * V.ytDofStrength) * PR;
+}
+function ytOptions(P) {
+  var hy = H * V.horizonLine, F = lakeLens(), D = V.eyeHeight * F / Math.max(1, P.foot - hy);
+  var hz = clamp((1 - Math.exp(-Math.pow(D / Math.max(10, V.fieldHazeDist), 1.6))) * V.fieldHaze * V.ytHaze, 0, 0.9);
+  var bark = hex(V.colours.pineBark);
+  return {
+    cam: { F: F, cx: W / 2, hy: hy }, eye: V.eyeHeight, footX: P.x, footY: P.foot, PR: PR, W: W, H: H, D: D,
+    light: { sun: LT.dir, sunCol: LT.sun, skyCol: LT.sky, amb: LT.amb, vis: LT.vis }, shade: SHADE, snow: hex(V.colours.snow),
+    needle: hex(V.colours.needle), rope: hex(V.colours.rope), bamboo: hex(V.colours.bamboo),
+    bark: { bark: bark, dark: scale(bark, 0.42), light: mix(bark, [190, 186, 184], 0.45), lichen: [150, 152, 140], moss: [78, 90, 48] },
+    haze: hz, hazeCol: light(hex(V.colours.mist)), soft: V.ytSoft * 0.35 * PR, loose: V.ytLoose, dof: ytDofBlur(D)
+  };
+}
+function startPines() {
+  PINES.job = null; PINES.next = [];
+  PINES.t0 = performance.now();
+  if (!V.ytShow) { finishPines(); return; }
+  var list = ytPlaces();
+  if (!list.length) { finishPines(); return; }
+  var q = 0;
+  list.forEach(function (P) {
+    var T = Yukitsuri.build({ variant: P.variant, seed: Math.round(V.ytSeed) * 101 + P.i * 17, height: P.h, roped: P.roped, crown: P.crown,
+                              width: P.wide * (P.variant === 1 ? V.ytFirWidth : 1), snow: V.ytSnow, cover: V.ytSnowCover, ropes: V.ytRopes, props: V.ytProps });
+    var o = ytOptions(P);
+    PINES.next.push({ P: P, T: T, o: o, job: Yukitsuri.bakeJob(T, o), R: null, A: null, K: null });
+  });
+  PINES.job = { k: 0 };
+}
+function stepPines() {
+  var N = PINES.next, t0 = performance.now();
+  while (PINES.job && PINES.job.k < N.length && performance.now() - t0 < 8) {
+    var E = N[PINES.job.k];
+    if (E.job.step(8 - (performance.now() - t0))) { E.R = E.job.result; E.A = Yukitsuri.anim(E.R); E.K = E.R.K; E.job = null; PINES.job.k++; }
+  }
+  if (PINES.job && PINES.job.k >= N.length) finishPines();
+}
+function finishPines() {
+  PINES.job = null;
+  PINES.list = PINES.next || []; PINES.next = null;
+  bakePineShadows();
+  PINES.powder = ytPowder();
+  PINES.drawn = true;
+  PINES.info = PINES.list.length + ' trees, ' + PINES.list.reduce(function (n, E) { return n + E.R.loose.length; }, 0) + ' clumps of snow that can fall, wood: ' +
+               (PINES.list.length ? PINES.list[0].R.wood : '-');
+  note('roped pines and firs: ' + Math.round(performance.now() - PINES.t0) + ' ms (in steps of about 8 ms a frame) · ' + PINES.info);
+}
+/* the soft puff of powder snow a falling clump throws up */
+function ytPowder() {
+  var c = document.createElement('canvas'); c.width = c.height = 64;
+  var g = c.getContext('2d'), col = mix(hex(V.colours.snow), SHADE, 0.35), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, rgb(col, 0.9)); gr.addColorStop(0.5, rgb(col, 0.45)); gr.addColorStop(1, rgb(col, 0));
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  return c;
+}
+/* the shadows: drawn as a mask (the sky's shade under each crown, the sun's shadow cast along its direction), coloured
+   as snow in shade, softened, and kept only on the land (the snow ground's picture: none on the water or the sky) */
+function bakePineShadows() {
+  var S = PINES.shadow, k = 0.5, w = Math.max(1, Math.round(cv.width * k)), h = Math.max(1, Math.round(cv.height * k));
+  S.cnv.width = w; S.cnv.height = h;
+  var c = S.c;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.clearRect(0, 0, w, h);
+  if (!PINES.list.length || (V.ytShadow <= 0 && V.ytContact <= 0)) return;
+  var tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+  var tc = tmp.getContext('2d'), blur = Math.max(0.5, 1.6 * PR * k);
+  [['contact', V.ytContact * 0.5], ['cast', V.ytShadow * LT.vis * (isNight() ? 0.5 : 1) * 0.75]].forEach(function (part) {
+    if (part[1] <= 0) return;
+    tc.setTransform(1, 0, 0, 1, 0, 0); tc.clearRect(0, 0, w, h);
+    tc.setTransform(PR * k, 0, 0, PR * k, 0, 0);
+    PINES.list.forEach(function (E) { Yukitsuri.shadow(tc, E.T, E.o, part[0]); });
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = clamp(part[1], 0, 1); c.filter = 'blur(' + (part[0] === 'cast' ? blur * 1.6 : blur * 2.5).toFixed(2) + 'px)';
+    c.drawImage(tmp, 0, 0); c.restore();
+  });
+  c.save(); c.setTransform(1, 0, 0, 1, 0, 0);
+  c.globalCompositeOperation = 'source-in'; c.fillStyle = rgb(mix(SHADE, [96, 104, 150], 0.25)); c.fillRect(0, 0, w, h);
+  if (FIELD.cnv.width > 2) { c.globalCompositeOperation = 'destination-in'; c.drawImage(FIELD.cnv, 0, 0, w, h); }
+  c.restore();
+}
+/* in the lake's mirror: each tree turned over about the water's level under it (the bank's height below its foot) */
+function pinesMirror(c) {
+  if (!V.ytShow || !V.ytReflect || !PINES.list.length) return;
+  var hy = H * V.horizonLine, F = lakeLens(), res = LAKEW.res, pad = LAKEW.pad, top = LAKEW.top;
+  PINES.list.forEach(function (E) {
+    var D = E.o.D, yw = hy + (V.eyeHeight + V.bankDrop) * F / D, R = E.R, b = R.box;
+    c.setTransform(res, 0, 0, -res, pad * res, (2 * yw - top) * res);
+    c.drawImage(R.body, b.bx, b.by, b.w, b.h);
+    Yukitsuri.drawRest(c, E.A);
+    c.drawImage(R.front, b.bx, b.by, b.w, b.h);
+  });
+}
+function ytWind(x) { return (fieldAt(x) - V.wind * 0.12) * 6 + V.wind * 0.6; }   // m/s across the screen (the breeze, its ripples and gusts)
+function drawPines(t, dt) {
+  if (!V.ytShow || !PINES.drawn || !PINES.list.length) return;
+  var L = PINES.list;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1;
+  if (PINES.shadow.cnv.width > 2) ctx.drawImage(PINES.shadow.cnv, 0, 0, cv.width, cv.height);
+  // what shakes the snow off: a gust passing (each tree once per gust), and now and then a clump that lets go by itself
+  for (var g = 0; g < WS.gusts.length; g++) {
+    var G = WS.gusts[g]; G.yt = G.yt || {};
+    for (var i = 0; i < L.length; i++) {
+      if (G.yt[i] || (G.x - L[i].P.x) * G.dir < 0) continue;
+      G.yt[i] = 1;
+      for (var j = 0; j < L[i].A.rest.length; j++) if (Math.random() < 0.18 * V.ytShedGust * G.str) Yukitsuri.shed(L[i].A, j, Math.random() * 0.9);
+    }
+  }
+  PINES.shedT -= dt;
+  if (PINES.shedT <= 0 && V.ytShedEvery > 0) {
+    PINES.shedT = V.ytShedEvery * lerp(0.5, 1.5, Math.random());
+    var E0 = L[Math.floor(Math.random() * L.length)];
+    if (E0.A.rest.length) Yukitsuri.shed(E0.A, Math.floor(Math.random() * E0.A.rest.length), 0);
+  }
+  for (i = 0; i < L.length; i++) {
+    var E = L[i], R = E.R, b = R.box;
+    Yukitsuri.update(E.A, dt, ytWind(E.P.x), V.ytReturn);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(R.body, Math.round(b.bx * PR), Math.round(b.by * PR));
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    Yukitsuri.drawRest(ctx, E.A);
+    Yukitsuri.drawFalling(ctx, E.A, E.K, PINES.powder);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.drawImage(R.front, Math.round(b.bx * PR), Math.round(b.by * PR));
+  }
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
    15. THE PANEL'S HOOK — what a change on the panel bakes again: the
    mountains ('mtn'), the branches ('branches'), the light-dependent
    sprites ('sprites'), the sun ('sun'), everything ('all'), the
@@ -2329,7 +2622,7 @@ window.winterLab = {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
-    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun', 'lake'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    (what === 'all' ? ['mtn', 'hill', 'hall', 'branches', 'sprites', 'sun', 'lake', 'pines'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
   setHour: function () {
@@ -2346,12 +2639,18 @@ window.winterLab = {
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
+  ytShakeAll: function () { for (var k = 0; k < PINES.list.length; k++) this.shake(k); },
   report: function () {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
-  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv }; },   // (for checking each picture on its own)
-  busy: function () { return !!mtnJob || !!hillJob || stages.length > 0 || Object.keys(dirty).length > 0; },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv, pineShadow: PINES.shadow.cnv }; },
+  // (for checking the falling snow: every clump on tree k, the farthest 0, lets go now)
+  shake: function (k) { var E = PINES.list[k || 0]; if (E) for (var j = 0; j < E.A.rest.length; j++) Yukitsuri.shed(E.A, j, j * 0.15); },
+  pines: function () { return PINES; },   // (for checking each picture on its own)
+  hall: function () { return HALL; },     // (the hall's picture, for checking it on its own)
+  lamps: function () { return { level: lampLevel(), dark: CLK.Lt.dark, set: CLK.sun.set, tod: V.timeOfDay }; },   // (the lamps' timing, for checking)
+  busy: function () { return !!mtnJob || !!hillJob || !!HALL.job || !!PINES.job || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
            ' · ' + sunInfo + ' · lake: ' + lakeInfo;
@@ -2411,9 +2710,10 @@ function rebuildAll() {
   applyHour(); paintSkyTint();
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
   if (hillJob) { hillJob.cancel(); hillJob = null; }
+  if (HALL.job) { HALL.job.cancel(); HALL.job = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? ['mtn', 'hill', 'field', 'lake'] : ['mtn', 'hill', 'field', 'lake', 'sprites'];   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
+  stages = V.blockIn ? ['mtn', 'hill', 'field', 'hall', 'pines', 'lake'] : ['mtn', 'hill', 'field', 'hall', 'pines', 'lake', 'sprites'];   // (the pines after the snow ground, whose picture keeps their shadows on the land; the lake after them, to mirror them)   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2444,6 +2744,8 @@ function runStage(st) {
   else if (st === 'hill') startHill();
   else if (st === 'field') bakeField();
   else if (st === 'lake') bakeLake();
+  else if (st === 'pines') startPines();
+  else if (st === 'hall') startHall();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2455,8 +2757,10 @@ function rebake() {
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
   if (dirty.mtn) stages.push('mtn');
   if (dirty.hill) stages.push('hill');
+  if (dirty.hall) stages.push('hall');
   if (dirty.lake) stages.push('field');
-  if (dirty.mtn || dirty.lake) stages.push('lake');      // (the mirror shows the mountains)
+  if (dirty.lake || dirty.pines) stages.push('pines');   // (their shadows lie on the snow ground)
+  if (dirty.mtn || dirty.lake || dirty.pines) stages.push('lake');      // (the mirror shows the mountains and the trees)
   if (!V.blockIn) {
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
@@ -2517,6 +2821,8 @@ function frame(now) {
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
   else if (hillJob) { try { stepHill(); } catch (e) { hillJob = null; note('ERROR in the hill: ' + e.message); } }
+  else if (HALL.job) { try { stepHall(); } catch (e) { HALL.job = null; note('ERROR in the hall: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
+  else if (PINES.job) { try { stepPines(); } catch (e) { PINES.job = null; note('ERROR in the pines: ' + e.message + ' ' + (e.stack || '').split('\n')[1]); } }
   else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
   else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
@@ -2546,6 +2852,8 @@ function frame(now) {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx, 'back');
     drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
+    drawHall();                                        // step 5: the shrine hall and the firs beside it (7c)
+    drawPines(t, dt);                                  // step 7: the right bank's roped pines and firs (14d)
     drawBlockIn(ctx, 'front');
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
     gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
@@ -2559,6 +2867,8 @@ function frame(now) {
   drawHill();
   // (each step's new element goes here, back to front)
   drawLake(t, dt);                                     // step 6: the snow ground, the banks and the water (14c)
+  drawHall();                                          // step 5: the shrine hall and the firs beside it (7c)
+  drawPines(t, dt);                                    // step 7: the right bank's roped pines and firs (14d)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
   drawBack(ctx, t);
   // #dynNear: the nearest flakes and the big soft ones
@@ -2710,17 +3020,68 @@ var lab = window.winterLab;
 if (!lab) return;
 var OBJ = { V: lab.V, MT: lab.MT, CLOUD: lab.CLOUD, SUN: lab.SUN };
 /* o: which values, k: the value, re: what it bakes again (see section 15) */
-var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'], ['hall', 'Hall'], ['frost', 'Frosted trees'],
+// (the pagoda's and the hall's place and size are in their own groups)
+var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['frost', 'Frosted trees'],
             ['lake', 'Lake and its banks'], ['pines', 'Roped pines and firs (right bank)'], ['path', 'Snow path'], ['gates', 'Torii'],
             ['lanterns', 'Stone lanterns'], ['plumL', 'Plum branch, left'], ['plumR', 'Plum branch, right']];
+function placeCtls(g, name, re) {
+  return [{ o: 'V', k: g + 'X', label: name + ': across', min: -0.3, max: 0.3, step: 0.005, re: re, note: 'Share of the screen\'s width; + to the right.' },
+          { o: 'V', k: g + 'Y', label: name + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re },
+          { o: 'V', k: g + 'Size', label: name + ': size', min: 0.4, max: 2, step: 0.01, re: re, note: 'About its foot.' }];
+}
+function dofCtls(g, re, what) {
+  return [{ chk: 'V', k: g + 'Dof', label: 'Depth of field', re: re, note: 'Blurred as by a camera lens when it is nearer or farther than the distance in focus.' },
+          { o: 'V', k: g + 'Focus', label: 'Depth of field: distance in focus (m)', min: 20, max: 600, step: 1, re: re, note: what },
+          { o: 'V', k: g + 'DofStrength', label: 'Depth of field: strength', min: 0, max: 4, step: 0.05, re: re },
+          { o: 'V', k: g + 'DofMax', label: 'Depth of field: most blur (px)', min: 0, max: 10, step: 0.1, re: re }];
+}
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3) and the lake (step 6) are baked again
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : m[0] === 'pines' ? 'pines' : m[0] === 'hall' ? 'hall' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3), the lake (step 6) and the pines (step 7) are baked again
     out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
   });
+  return out;
+}
+function ytCtls() {
+  var out = [
+    { chk: 'V', k: 'ytShow', label: 'Show the roped pines and firs', re: 'pines block', note: 'Off: the flat block-in shapes come back.' },
+    { o: 'V', k: 'ytSeed', label: 'Which trees (seed)', min: 1, max: 99, step: 1, re: 'pines', note: 'Every tree is its own from this: its limbs, pads, boughs and snow.' },
+    { o: 'V', k: 'ytCount', label: 'How many trees', min: 0, max: 16, step: 1, re: 'pines', note: 'The first six stand where the scene picture has them (each set below); more are placed on the right bank\'s land by the seed (never on or near the water). Each tree adds to the time the trees take to appear.' },
+    { o: 'V', k: 'ytSnow', label: 'Snow: how deep it lies on the branches', min: 0, max: 2.5, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytSnowCover', label: 'Snow: how much of the branches it covers', min: 0, max: 1.5, step: 0.05, re: 'pines', note: '1 = as now; less leaves more bare branch, more covers more of each branch (it still lies only on the branches).' },
+    { chk: 'V', k: 'ytDof', label: 'Depth of field', re: 'pines', note: 'Trees nearer or farther than the focus distance are blurred, as by a camera lens.' },
+    { o: 'V', k: 'ytFocus', label: 'Depth of field: distance in focus (m)', min: 20, max: 200, step: 1, re: 'pines', note: 'The nearest tree here is about 50 m away, the farthest about 100 m.' },
+    { o: 'V', k: 'ytDofStrength', label: 'Depth of field: strength', min: 0, max: 4, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytDofMax', label: 'Depth of field: most blur (px)', min: 0, max: 10, step: 0.1, re: 'pines' },
+    { o: 'V', k: 'ytRopes', label: 'Ropes: how many (×)', min: 0.3, max: 2, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytFirWidth', label: 'Variant 1: crown width (×)', min: 0.6, max: 1.8, step: 0.05, re: 'pines' },
+    { chk: 'V', k: 'ytProps', label: 'Bamboo props under the long limbs (variants 2, 3, 5)', re: 'pines' },
+    { o: 'V', k: 'ytSoft', label: 'Softness of the edges', min: 0, max: 3, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytHaze', label: 'Mist with distance (× the snow\'s)', min: 0, max: 3, step: 0.05, re: 'pines' },
+    { o: 'V', k: 'ytShadow', label: 'Shadow: the sun\'s, cast on the snow', min: 0, max: 1.5, step: 0.05, re: 'pines', note: 'Long and pointing away from the sun (right and toward you), as the sun is low behind the trees; only on the land.' },
+    { o: 'V', k: 'ytContact', label: 'Shadow: the sky\'s shade under each crown', min: 0, max: 1.5, step: 0.05, re: 'pines' },
+    { chk: 'V', k: 'ytReflect', label: 'Mirrored in the lake', re: 'pines' },
+    { o: 'V', k: 'ytLoose', label: 'Snow that can fall off (share)', min: 0, max: 1, step: 0.05, re: 'pines', note: 'Only clumps that nothing in front covers can fall (so each can be drawn on its own).' },
+    { o: 'V', k: 'ytShedEvery', label: 'A clump lets go by itself about every (s)', min: 0, max: 120, step: 1, re: 'live', note: '0 = only gusts shake snow off.' },
+    { o: 'V', k: 'ytShedGust', label: 'How much a gust shakes off', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'ytReturn', label: 'Fallen snow settles back after (s)', min: 0, max: 900, step: 10, re: 'live', note: '0 = never (the branches stay bare where it fell until the scene is baked again).' },
+    { btn: 'ytShakeAll', label: 'Shake the snow off now (every tree)' },
+    { col: 'V', keys: [['pineBark', 'Pine bark'], ['bamboo', 'Bamboo (pole and props)']], re: 'pines' }
+  ];
+  for (var i = 1; i <= 6; i++) {
+    var n = 'Tree ' + i + ': ';
+    out.push({ chk: 'V', k: 'yt' + i + 'Show', label: n + 'shown', re: 'pines' },
+             { o: 'V', k: 'yt' + i + 'Wide', label: n + 'width (×)', min: 0.3, max: 2, step: 0.05, re: 'pines' },
+             { o: 'V', k: 'yt' + i + 'Var', label: n + 'variant (1 tall · 2 old · 3 leaning · 4 compact · 5 twin)', min: 1, max: 5, step: 1, re: 'pines' },
+             { chk: 'V', k: 'yt' + i + 'Rope', label: n + 'roped (pole and straw ropes)', re: 'pines' },
+             { o: 'V', k: 'yt' + i + 'X', label: n + 'across', min: 0.5, max: 1.1, step: 0.002, re: 'pines' },
+             { o: 'V', k: 'yt' + i + 'Foot', label: n + 'its foot, how far down', min: 0.68, max: 0.98, step: 0.002, re: 'pines', note: 'Lower = nearer you, so larger.' },
+             { o: 'V', k: 'yt' + i + 'H', label: n + 'height (m)', min: 2, max: 16, step: 0.1, re: 'pines' },
+             { o: 'V', k: 'yt' + i + 'Base', label: n + 'variant 1: crown begins (share of its height; below it the trunk is clear)', min: 0.05, max: 0.8, step: 0.01, re: 'pines' });
+  }
   return out;
 }
 var G = [
@@ -2766,6 +3127,7 @@ var G = [
     { o: 'V', k: 'steam', label: 'Cold: steam rising off the water', min: 0, max: 2, step: 0.05, re: 'live' },
     { o: 'V', k: 'steamRise', label: 'Cold: how high the steam rises', min: 0, max: 3, step: 0.05, re: 'live' },
     { col: 'V', keys: [['bankEarth', 'Banks: earth'], ['lakeDeep', 'Water: its own colour']], re: 'lake' } ] },
+  { name: 'Roped pines and firs (step 7)', file: 'yukitsuri.js, trunks.js', note: 'The right bank\'s trees, after your sheet of five variants: 1 tall and slender, 2 old and sprawling, 3 leaning and bent, 4 compact and dense, 5 twin trunk. Each is built in 3D and seen through the scene\'s camera, so its size on the screen follows from where its foot stands and its height in metres. Move and size them all with "Roped pines and firs" in the layout group.', ctls: ytCtls() },
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
@@ -2846,15 +3208,37 @@ var G = [
     { o: 'V', k: 'hillHazeFar', label: 'Mist on the far rows', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'hillHazeNear', label: 'Mist on the near rows', min: 0, max: 1, step: 0.01, re: 'hill' },
     { o: 'V', k: 'hillNeedleTint', label: 'Needles: use the chosen colour', min: 0, max: 1, step: 0.01, re: 'hill', note: '0 = each fir its own green; 1 = all the chosen Pine needles colour.' } ] },
-  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Its place and size: "Layout: where each element stands", Pagoda.', ctls: [
+  { name: 'Pagoda (step 3)', file: 'winterhill.js', note: 'Where it stands, how big, its look and its depth of field.', ctls: placeCtls('pagoda', 'Pagoda', 'hill').concat([
     { chk: 'V', k: 'pagodaShow', label: 'Show the pagoda', re: 'hill' },
     { chk: 'V', k: 'pagodaTimber', label: 'Dark timber (off: vermilion and white)', re: 'hill' },
     { o: 'V', k: 'pagodaTurn', label: 'Turned (°)', min: -90, max: 90, step: 1, re: 'hill', note: '0 = facing you, 45 = seen corner-on.' },
     { o: 'V', k: 'pagodaSnow', label: 'Snow on it', min: 0, max: 1.5, step: 0.01, re: 'hill' },
     { o: 'V', k: 'pagodaHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hill' },
-    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'The windows are lit only in the evening and at night.' },
+    { o: 'V', k: 'pagodaLamps', label: 'Window light after dusk', min: 0, max: 1.5, step: 0.01, re: 'hill', note: 'They come on with the hall\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
     { o: 'V', k: 'pagodaRow', label: 'Stands among the rows (0 crest … 1 foot)', min: 0, max: 1, step: 0.01, re: 'hill', note: 'The rows below it stand in front of it and hide its foot.' },
-    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' } ] },
+    { o: 'V', k: 'pagodaClear', label: 'Open snow round it', min: 0, max: 2, step: 0.05, re: 'hill', note: 'How far the firs keep back from it and its steps.' },
+    { col: 'V', keys: [['pagodaWall', 'Pagoda walls (vermilion style)'], ['pagodaRed', 'Pagoda posts, beams, rails (vermilion style)']], re: 'hill' }
+  ]).concat(dofCtls('pagoda', 'hill', 'The pagoda stands about 470 m away at its default place and size (the Report gives the exact distance each time it is drawn).')) },
+  { name: 'Shrine hall and the firs beside it (step 5)', file: 'winterhall.js', note: 'Where it stands (the firs move with it), how big, its look and its depth of field.', ctls: placeCtls('hall', 'Hall', 'hall').concat([
+    { chk: 'V', k: 'hallShow', label: 'Show the hall', re: 'hall block', note: 'Off: the flat block-in shape comes back.' },
+    { o: 'V', k: 'hallTurn', label: 'Turned (°)', min: -40, max: 40, step: 1, re: 'hall', note: '+ turns its right end toward you (more of its right side shows); 0 = its front square to the view.' },
+    { o: 'V', k: 'hallSnow', label: 'Snow on the roof (×)', min: 0, max: 2, step: 0.01, re: 'hall', note: '1 = about 38 cm.' },
+    { o: 'V', k: 'hallEave', label: 'How far the eaves stand out (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall', note: '1 = 3 m past the walls.' },
+    { o: 'V', k: 'hallRoof', label: 'Roof height (×)', min: 0.6, max: 1.5, step: 0.01, re: 'hall', note: '1 = 4.3 m from the eaves to the ridge.' },
+    { o: 'V', k: 'hallSori', label: 'Corners turned up (×)', min: 0, max: 2.5, step: 0.05, re: 'hall' },
+    { o: 'V', k: 'hallHaze', label: 'Mist on it', min: 0, max: 1, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hallFootMist', label: 'Low mist at its foot', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The mist lying on the snow field, thicker near the ground.' },
+    { o: 'V', k: 'hallShadow', label: 'Shadows on the snow', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'The hall\'s and the firs\' shadows, cast along the sun\'s direction (they follow the time of day).' },
+    { o: 'V', k: 'hallLamps', label: 'Lamps after dusk', min: 0, max: 1.5, step: 0.01, re: 'hall', note: 'They come on with the pagoda\'s, as the autumn pagoda\'s do: fading in from about 38 minutes before sunset to full about 6 minutes after.' },
+    { o: 'V', k: 'hallSpill', label: 'Lamplight on the snow', min: 0, max: 2, step: 0.01, re: 'hall' },
+    { chk: 'V', k: 'hfShow', label: 'Show the firs beside it', re: 'hall' },
+    { o: 'V', k: 'hfSeed', label: 'Which firs (seed)', min: 1, max: 99, step: 1, re: 'hall', note: 'Every fir is its own tree from this.' },
+    { o: 'V', k: 'hfSize', label: 'Firs: size (×)', min: 0.5, max: 1.6, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfWidth', label: 'Firs: width (×)', min: 0.5, max: 1.8, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfSnow', label: 'Firs: snow on them', min: 0, max: 1.6, step: 0.01, re: 'hall' },
+    { o: 'V', k: 'hfHaze', label: 'Firs: mist on them', min: 0, max: 1, step: 0.01, re: 'hall', note: 'More on the right-hand ones, farther into the mist.' } ,
+    { col: 'V', keys: [['hallPlaster', 'Hall plaster walls'], ['hallTimber', 'Hall posts and beams'], ['hallStone', 'Hall stone base']], re: 'hall' }
+  ]).concat(dofCtls('hall', 'hall', 'The hall stands about 200 m away, the firs beside it a little farther (each blurs by its own distance; the Report gives the hall\'s).')) },
   { name: 'Plum branches (step 10)', note: 'From winter2.html; placed as in the reference in step 10.', ctls: [
     { o: 'V', k: 'branchCount', label: 'Branches each side', min: 0, max: 3, step: 1, re: 'branches' },
     { o: 'V', k: 'branchSize', label: 'Size', min: 0.3, max: 1.6, step: 0.01, re: 'branches' },

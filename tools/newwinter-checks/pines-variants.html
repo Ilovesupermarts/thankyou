@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>Yukitsuri variants (check page)</title>
+<!-- Check page for yukitsuri.js: draws one or all five variants large on a plain background (address options: ?v=1..5 one variant, ?fy=0.885 where the foot stands, ?dusk is not implemented). Not used by the app or the test bed. Call it with pines-variants.js. --><body style="margin:0;background:#f4ece0">
+<canvas id="c"></canvas>
+<script src="../../trunks.js"></script>
+<script src="../../yukitsuri.js"></script>
+<script>
+var W = innerWidth, H = innerHeight, PR = devicePixelRatio, cv = document.getElementById('c');
+cv.width = W*PR; cv.height = H*PR; cv.style.width = W+'px'; cv.style.height = H+'px';
+var c = cv.getContext('2d');
+var g = c.createLinearGradient(0,0,0,H); g.addColorStop(0,'#f6eee4'); g.addColorStop(0.75,'#efe6dc'); g.addColorStop(0.751,'#eef0f6'); g.addColorStop(1,'#e2e6f2');
+c.fillStyle=g; c.fillRect(0,0,cv.width,cv.height);
+var Q = new URLSearchParams(location.search), mode = Q.get('dusk') ? 'dusk' : 'day';
+var hy = H*0.6, F = H/(2*Math.tan(11*Math.PI/180)), eye = 3;
+var el = 22*Math.PI/180, az = -60*Math.PI/180;
+var L = { sun: [Math.sin(az)*Math.cos(el), Math.sin(el), -Math.cos(az)*Math.cos(el)], sunCol: [0.85,0.82,0.78], skyCol: [178/255,196/255,226/255], amb: 0.9, vis: 0.85 };
+var sh = [200, 206, 228];
+var spots = Q.get('v') ? [[0.5, +Q.get('v')]] : [[0.1,1],[0.3,2],[0.5,3],[0.7,4],[0.9,5]]; var FY = +(Q.get('fy')||0.885);
+var done = 0, jobs = [];
+spots.forEach(function(s, i){
+  var T = Yukitsuri.build({ variant: s[1], seed: 11 + i, height: s[1]===4 ? 5 : 8, roped: true, crown: 0.38, width: 1, snow: 1, ropes: 1 });
+  var footY = H*FY, D = eye*F/(footY-hy);
+  var o = { cam: {F:F, cx: W/2, hy: hy}, eye: eye, footX: W*s[0], footY: footY, PR: PR, W: W, H: H, light: L, shade: sh, snow: [250,250,252],
+            needle: [47,74,59], rope: [214,180,103], bamboo: [168,142,85], bark: { bark:[62,55,54], dark:[26,22,23], light:[138,132,130], lichen:[150,152,140], moss:[78,90,48] },
+            haze: 0, hazeCol: [240,230,225], soft: 0.5, loose: 0.5 };
+  var J = Yukitsuri.bakeJob(T, o); while(!J.step(1000)); 
+  var R = J.result;
+  c.setTransform(1,0,0,1,0,0);
+  c.drawImage(R.body, R.box.bx*PR, R.box.by*PR);
+  c.drawImage(R.front, R.box.bx*PR, R.box.by*PR);
+  c.setTransform(PR,0,0,PR,0,0);
+  var A = Yukitsuri.anim(R); Yukitsuri.drawRest(c, A);
+  c.setTransform(1,0,0,1,0,0);
+  c.drawImage(R.front, R.box.bx*PR, R.box.by*PR);
+  window['info'+i] = { wood: R.wood, loose: R.loose.length, D: D, box: R.box };
+});
+window.ready = true;
+</script>

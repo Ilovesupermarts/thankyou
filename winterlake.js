@@ -324,7 +324,8 @@ function drawBanks(c, o) {
 
 /* ---------- the water's mirror ---------- */
 /* o: W, H, hy, top (CSS px: the water's top), pad, res (device px per CSS px), mtn (the mountains' picture, the whole
-   screen, or null), skyAt(y) → rgb (the sky at height y, CSS px), shore, earth, snowLit, mist, haze, eye, F, hazeM */
+   screen, or null), skyAt(y) → rgb (the sky at height y, CSS px), shore, earth, snowLit, mist, haze, eye, F, hazeM,
+   before(c) (optional: draws what stands beyond the water, turned over, before the banks) */
 function bakeMirror(c, o) {
   var W = o.W, H = o.H, hy = o.hy, top = o.top, pad = o.pad, res = o.res;
   c.setTransform(res, 0, 0, res, pad * res, -top * res);
@@ -341,6 +342,9 @@ function bakeMirror(c, o) {
     c.restore();
     c.setTransform(res, 0, 0, res, pad * res, -top * res);
   }
+  // what stands on the land beyond the water (the right bank's trees), turned over by the caller: before the banks,
+  // which are nearer and hide its foot
+  if (o.before) { c.save(); o.before(c); c.restore(); c.setTransform(res, 0, 0, res, pad * res, -top * res); }
   // the banks turned over about their waterlines: the earth face as tall again below it, then the front of the snow's
   // cushion, then the first of the snow beyond, fading into the sky's reflection (each one continuous strip)
   var Sh = o.shore, P = Sh.pts, R = Sh.rim, n = P.length;
