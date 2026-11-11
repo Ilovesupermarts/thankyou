@@ -528,74 +528,187 @@ function boughShape(E, P) {
   E._sh = { A: A, B: B, M: M, Q: Q, s: s, hang: E.hang * s, up: 0.07 * s };
   return E._sh;
 }
-function paintBough(c, E, P, K) {
-  var Sh = boughShape(E, P), Q = Sh.Q, s = Sh.s, hang = Sh.hang, rr = rng(E.seed + 1), lx = K.lx, n = 16, Up = [], Lo = [];
-  function hangAt(t) { return hang * (0.25 + 0.75 * Math.sin(PI * Math.min(1, t * 0.85 + 0.15))); }
-  for (var i = 0; i <= n; i++) {
-    var t = i / n, p = Q(t);
-    Up.push([p[0], p[1] - Sh.up * (1 - t * 0.6)]);
-    Lo.push([p[0], p[1] + hangAt(t) * lerp(0.55, 0.8, rr())]);
+/* The bough's real structure, in 3D (made once per bough): its main branch (a curve through p0, p1, p2), side
+   branchlets along it on both sides (angled forward, drooping, shorter toward the tip, as a spruce's), and small
+   twigs hanging from them. Nothing is a filled shape: every part is drawn as needles. */
+function boughPt(E, t) {
+  var a = (1 - t) * (1 - t), b = 2 * t * (1 - t), cc = t * t, C = E._cc || (E._cc = [2 * E.p1[0] - (E.p0[0] + E.p2[0]) / 2, 2 * E.p1[1] - (E.p0[1] + E.p2[1]) / 2, 2 * E.p1[2] - (E.p0[2] + E.p2[2]) / 2]);
+  return [a * E.p0[0] + b * C[0] + cc * E.p2[0], a * E.p0[1] + b * C[1] + cc * E.p2[1], a * E.p0[2] + b * C[2] + cc * E.p2[2]];
+}
+function boughModel(E) {
+  if (E._m) return E._m;
+  var rr = rng(E.seed + 11), L = E.L, tw = [], step = 0.065 + 0.02 * rr();
+  var n = Math.max(3, Math.round(L / step));
+  for (var i = 0; i < n; i++) {
+    var t = (i + 0.35 + rr() * 0.3) / n;
+    if (t > 0.98) continue;
+    var B = boughPt(E, t), B2 = boughPt(E, Math.min(1, t + 0.02)), tx = B2[0] - B[0], tz = B2[2] - B[2], tl = Math.hypot(tx, tz) || 1;
+    tx /= tl; tz /= tl;
+    for (var sd = -1; sd <= 1; sd += 2) {
+      if (rr() < 0.08) continue;                                         // a gap where a branchlet is missing
+      var ang = sd * lerp(0.6, 1.15, rr()), ca = Math.cos(ang), sa = Math.sin(ang);
+      var dx = tx * ca - tz * sa, dz = tx * sa + tz * ca;                // turned out from the branch, forward
+      var lb = lerp(0.36, 0.12, t) * lerp(0.7, 1.2, rr()) * Math.min(1, 0.45 + L / 2.2), droop = lerp(0.3, 0.85, rr()) * (0.8 + E.hang / L);
+      var base = [B[0], B[1] + 0.01, B[2]];
+      var mid = [base[0] + dx * lb * 0.55, base[1] - Math.sin(droop) * lb * 0.25, base[2] + dz * lb * 0.55];
+      var tip = [base[0] + dx * lb * Math.cos(droop * 0.7), base[1] - Math.sin(droop) * lb * 0.85, base[2] + dz * lb * Math.cos(droop * 0.7)];
+      // little twigs hanging from it (more toward the middle of the bough, where it is heaviest)
+      var hang = [], nh = Math.round(lerp(0, 3, rr()) * Math.sin(PI * Math.min(1, t * 1.1)));
+      for (var h = 0; h < nh; h++) {
+        var f = lerp(0.3, 0.9, rr()), hb = lerp3(base, tip, f), hl = lb * lerp(0.35, 0.7, rr());
+        hang.push([hb, [hb[0] + dx * hl * 0.2, hb[1] - hl, hb[2] + dz * hl * 0.2]]);
+      }
+      tw.push({ t: t, side: sd, base: base, mid: mid, tip: tip, hang: hang, lb: lb, z: (base[2] + tip[2]) / 2, tone: rr(), full: lerp(0.75, 1.2, rr()) });
+    }
   }
-  var tipD = Q(1), tipD0 = Q(0.92), tdx = tipD[0] - tipD0[0], tdy = tipD[1] - tipD0[1];
-  pathOf(c, Up, Lo.slice().reverse());
-  var yT = Math.min(Sh.A[1], Sh.B[1]) - Sh.up, yB = Math.max(Sh.A[1], Sh.B[1]) + hang;
-  var g = c.createLinearGradient(0, yT, 0, yB);
-  g.addColorStop(0, css(K.mid)); g.addColorStop(0.35, css(K.dark)); g.addColorStop(1, css(K.under));
-  c.fillStyle = g; c.fill();
-  var tw = Math.max(2.2, 0.1 * s), bw = Math.max(0.45, 0.013 * s), len = Math.hypot(Sh.B[0] - Sh.A[0], Sh.B[1] - Sh.A[1]);
-  var sgn = Sh.B[0] >= Sh.A[0] ? 1 : -1, nT = clamp(Math.round(len / (tw * 0.5)), 4, 70);
-  c.lineCap = 'round';
-  // the curtain: tufts hanging from the bough, down and a little out, uneven in length (a ragged hem)
-  for (var f = 0; f < nT; f++) {
-    var t2 = Math.min(1, Math.pow(rr(), 0.75) * 1.02), p2 = Q(t2), hh = hangAt(t2), y = p2[1] + hh * lerp(-0.15, 0.35, rr());
-    var ns = 5 + Math.floor(rr() * 4), L2 = hh * lerp(0.5, 1.0, rr()) + tw * 0.5, tone = rr(), litSide = (p2[0] - Sh.A[0]) * lx > 0;
-    var down = PI / 2 - sgn * lerp(0.1, 0.55, rr());
-    var col = tone < 0.45 ? K.dark : tone < 0.7 ? K.under : litSide ? K.lit : K.mid;
-    c.strokeStyle = css(col, lerp(0.55, 0.9, rr())); c.lineWidth = bw * lerp(0.8, 1.3, rr());
+  E._m = { tw: tw };
+  return E._m;
+}
+/* a branchlet's needles: several fine strokes along it, spread across its width and tapering to its tip, then a fringe
+   of single needles along its edges */
+function needleRun(c, pts, wid, s, cols, alphaK, rr) {
+  var A = pts[0], M = pts[1], Z = pts[2], ns = wid > 2.5 ? 5 : wid > 1.4 ? 4 : 3, lw = Math.max(0.45, 0.012 * s);
+  function at(u) { var a = (1 - u) * (1 - u), b = 2 * u * (1 - u), cc = u * u, mx = 2 * M[0] - (A[0] + Z[0]) / 2, my = 2 * M[1] - (A[1] + Z[1]) / 2; return [a * A[0] + b * mx + cc * Z[0], a * A[1] + b * my + cc * Z[1]]; }
+  var seg = 6, P0 = [];
+  for (var i = 0; i <= seg; i++) P0.push(at(i / seg));
+  c.lineCap = 'round'; c.lineJoin = 'round';
+  for (var k = 0; k < ns; k++) {
+    var off = (k / (ns - 1) - 0.5) * wid, col = cols[Math.floor(rr() * cols.length)];
+    c.strokeStyle = css(col, lerp(0.5, 0.85, rr()) * alphaK); c.lineWidth = lw * lerp(0.8, 1.3, rr());
     c.beginPath();
-    for (var k = 0; k < ns; k++) {
-      var a = down + (k / (ns - 1) - 0.5) * 0.9 + (rr() - 0.5) * 0.2, l = L2 * lerp(0.55, 1, rr()), y0 = y - hh * 0.25;
-      c.moveTo(p2[0], y0); c.quadraticCurveTo(p2[0] + Math.cos(a) * l * 0.6 + sgn * l * 0.1, y0 + Math.sin(a) * l * 0.35, p2[0] + Math.cos(a) * l, y0 + Math.sin(a) * l);
+    for (i = 0; i <= seg; i++) {
+      var u = i / seg, p = P0[i], q = P0[Math.min(seg, i + 1)], r0 = P0[Math.max(0, i - 1)], dx = q[0] - r0[0], dy = q[1] - r0[1], l = Math.hypot(dx, dy) || 1;
+      var o = off * (1 - 0.75 * u) + (rr() - 0.5) * wid * 0.15;
+      var x = p[0] - dy / l * o, y = p[1] + dx / l * o;
+      if (i) c.lineTo(x, y); else c.moveTo(x, y);
     }
     c.stroke();
   }
-  // tufts on its top: needles springing up and out, catching the light
-  for (f = 0; f < Math.round(nT * 0.6); f++) {
-    var t3 = rr(), p3 = Q(t3), lit3 = (p3[0] - Sh.A[0]) * lx > 0, tn = rr(), y3 = p3[1] - Sh.up * (1 - t3 * 0.6) + tw * 0.15;
-    c.strokeStyle = css(lit3 ? (tn < 0.5 ? K.hi : K.lit) : (tn < 0.5 ? K.mid : K.dark), lerp(0.55, 0.9, rr())); c.lineWidth = bw;
-    c.beginPath();
-    for (k = 0; k < 6; k++) { var a3 = -PI / 2 + sgn * 0.5 + (k / 5 - 0.5) * 1.8, l3 = tw * lerp(0.5, 0.9, rr()); c.moveTo(p3[0], y3); c.lineTo(p3[0] + Math.cos(a3) * l3, y3 + Math.sin(a3) * l3); }
-    c.stroke();
-  }
-  // the tip: a spray out along the bough, drooping
-  c.strokeStyle = css(K.dark, 0.85); c.lineWidth = bw;
+  // single needles standing out along it (its edges are never a clean line)
+  var nf = Math.round(seg * lerp(0.6, 1.3, rr())), nl = Math.max(0.9, 0.04 * s);
+  c.strokeStyle = css(cols[Math.floor(rr() * cols.length)], 0.4 * alphaK); c.lineWidth = lw;
   c.beginPath();
-  for (k = 0; k < 7; k++) { var a4 = Math.atan2(tdy, tdx) + (k - 3) * 0.2 + 0.25 * sgn, l4 = tw * lerp(0.7, 1.3, rr()); c.moveTo(tipD0[0], tipD0[1]); c.lineTo(tipD[0] + Math.cos(a4) * l4, tipD[1] + Math.sin(a4) * l4); }
+  for (i = 0; i < nf; i++) {
+    var u2 = rr() * 0.95, p2 = at(u2), q2 = at(Math.min(1, u2 + 0.05)), dx2 = q2[0] - p2[0], dy2 = q2[1] - p2[1], l2 = Math.hypot(dx2, dy2) || 1;
+    var sd = rr() < 0.5 ? -1 : 1, w2 = wid * 0.5 * (1 - 0.75 * u2);
+    var bx = p2[0] - dy2 / l2 * w2 * sd, by = p2[1] + dx2 / l2 * w2 * sd;
+    var ang2 = lerp(0.4, 1.2, rr()), ca2 = Math.cos(ang2), sa2 = Math.sin(ang2), ln2 = nl * lerp(0.5, 1.2, rr());
+    var ax = dx2 / l2 * ca2 - dy2 / l2 * sd * sa2, ay = dy2 / l2 * ca2 + dx2 / l2 * sd * sa2 + lerp(0, 0.4, rr());
+    c.moveTo(bx, by); c.lineTo(bx + ax * ln2, by + ay * ln2);
+  }
   c.stroke();
+}
+function paintBough(c, E, P, K) {
+  var M = boughModel(E), s = P.s(E.p1[2]), rr = rng(E.seed + 1), lx = K.lx;
+  var axisZ = boughPt(E, 0.5)[2], wid0 = Math.max(1, 0.095 * s);
+  function twig(T) {
+    // its light: deep in the crown (near the trunk) and under the branch, darker; out at the tips and on the sun's
+    // side, lighter; the far side of the bough, a little darker (in the bough's own shade)
+    var depth = clamp(1 - T.t * 1.3, 0, 1), back = T.z < axisZ ? 0.25 : 0, litSide = (P(T.tip)[0] - P(T.base)[0]) * lx > 0;
+    var cols = depth + back > 0.65 ? [K.under, K.dark, K.dark] : depth + back > 0.3 ? [K.dark, K.dark, K.mid] : litSide ? [K.dark, K.mid, K.lit, K.lit] : [K.dark, K.mid, K.mid];
+    var A = P(T.base), Mi = P(T.mid), Z = P(T.tip);
+    needleRun(c, [A, Mi, Z], wid0 * T.full * (0.6 + 0.4 * (1 - T.t)), s, cols, 1, rr);
+    T.hang.forEach(function (H) {
+      var hb = P(H[0]), he = P(H[1]);
+      needleRun(c, [hb, [lerp(hb[0], he[0], 0.5) + (rr() - 0.5) * 2, lerp(hb[1], he[1], 0.5)], he], wid0 * 0.55, s, [K.under, K.dark, K.mid], 0.9, rr);
+    });
+  }
+  var backT = M.tw.filter(function (T) { return T.z < axisZ; }), foreT = M.tw.filter(function (T) { return T.z >= axisZ; });
+  backT.forEach(twig);
+  // the main branch itself, a thin dark twig, seen in the gaps near the trunk
+  c.strokeStyle = css(K.barkDk, 0.85); c.lineWidth = Math.max(0.6, 0.035 * s); c.lineCap = 'round';
+  c.beginPath();
+  for (var i = 0; i <= 10; i++) { var q = P(boughPt(E, i / 10 * 0.9)); if (i) c.lineTo(q[0], q[1]); else c.moveTo(q[0], q[1]); }
+  c.stroke();
+  foreT.forEach(twig);
+  // the tip: the branch's own end, a spray of new growth
+  var tp = P(E.p2), tq = P(boughPt(E, 0.9));
+  needleRun(c, [tq, [lerp(tq[0], tp[0], 0.5), lerp(tq[1], tp[1], 0.5) - 0.5], tp], wid0 * 0.8, s, [K.dark, K.mid], 1, rr);
   E.pieces.forEach(function (Pc) { if (!Pc.loose) paintBoughSnow(c, E, Pc, P, K); });
 }
-function boughSnowLines(E, Pc, P) {
-  var Sh = boughShape(E, P), Q = Sh.Q, s = Sh.s, rr = rng(Pc.seed), n = 14, Top = [], Bot = [];
-  // how steep the bough is (in 3D): snow slides off where it slopes past about 50°
-  var dx = E.p2[0] - E.p0[0], dz = E.p2[2] - E.p0[2], hz = Math.hypot(dx, dz) || 1;
-  var y0 = E.p0[1], y2 = E.p2[1], yc = 2 * E.p1[1] - (y0 + y2) / 2;            // the curve's height: a Bézier through p1
+/* The snow on a bough, piece by piece: one broken layer lying along the top of the branch (its depth uneven, thinning
+   to nothing in places, so it breaks up by itself), with a lumpy crest, its top lit and its front in the sky's blue
+   shade; from it, tongues of snow run a little way out along the inner part of the branchlets (so its lower edge
+   follows the branch's structure); none where the branch slopes steeply (it slides off). */
+function noise1(rr, n) { var a = []; for (var i = 0; i <= n; i++) a.push(rr()); return function (x) { x = clamp(x, 0, 1) * n; var i = Math.min(n - 1, Math.floor(x)), f = x - i; f = f * f * (3 - 2 * f); return lerp(a[i], a[i + 1], f); }; }
+function boughSnowClumps(E, Pc, P) {
+  var key = Pc.u0 + ':' + Pc.u1;
+  if (Pc._cl && Pc._clKey === key) return Pc._cl;
+  var rr = rng(Pc.seed), s = P.s(E.p1[2]);
+  boughPt(E, 0);
+  var C = E._cc, dx = E.p2[0] - E.p0[0], dz = E.p2[2] - E.p0[2], hz = Math.hypot(dx, dz) || 1;
+  function keepAt(t) { var dy = 2 * (1 - t) * (C[1] - E.p0[1]) + 2 * t * (E.p2[1] - C[1]); return clamp(1 - (Math.atan(Math.abs(dy) / hz) - 0.55) / 0.35, 0, 1); }
+  var big = noise1(rr, 5), mid = noise1(rr, 13), fine = noise1(rr, 29), wL = noise1(rr, 11), wR = noise1(rr, 11);
+  var n = Math.max(10, Math.round((Pc.u1 - Pc.u0) * E.L / 0.04)), runs = [], cur = null;
   for (var i = 0; i <= n; i++) {
-    var t = lerp(Pc.u0, Pc.u1, i / n), p = Q(t), slope = Math.abs(2 * (1 - t) * (yc - y0) + 2 * t * (y2 - yc)) / hz;
-    var keep = clamp(1 - (Math.atan(slope) - 0.6) / 0.4, 0, 1), d = Pc.d * s * keep * Math.pow(Math.sin(PI * i / n), 0.3) * (0.8 + 0.4 * rr());
-    Top.push([p[0], p[1] - Sh.up * (1 - t * 0.6) - d * 0.95]);
-    Bot.push([p[0], p[1] - Sh.up * (1 - t * 0.6) + d * 0.45 + 0.02 * s]);
+    var u = i / n, t = lerp(Pc.u0, Pc.u1, u), B = boughPt(E, t), B2 = boughPt(E, Math.min(1, t + 0.01));
+    var tx = B2[0] - B[0], tz = B2[2] - B[2], tl = Math.hypot(tx, tz) || 1, sx = -tz / tl, sz = tx / tl;   // across the branch, level
+    var env = Math.pow(Math.sin(PI * clamp(u * 1.1 - 0.05, 0, 1)), 0.5);
+    var d = Pc.d * keepAt(t) * env * (0.35 + 0.9 * big(u)) * (0.85 + 0.3 * mid(u));             // its depth (m)
+    if (big(u) * 0.8 + mid(u) * 0.4 < 0.24 || d * s < 0.7) { cur = null; continue; }
+    if (!cur) { cur = { raw: [], L: [], Cn: [], R: [], Lb: [], Rb: [] }; runs.push(cur); }
+    // it rests on the needles on top of the branch: as wide as the inner branchlets (uneven on each side), highest along
+    // the middle, sagging toward its sides; its lower edge sits a little into the needles
+    var hw = (0.1 + E.L * 0.08) * (1 - t * 0.45);
+    cur.raw.push({ B: B, sx: sx, sz: sz, wl: hw * (0.5 + 0.8 * wL(u) + 0.3 * (fine(1 - u) - 0.5)), wr: hw * (0.5 + 0.8 * wR(u) + 0.3 * (fine(u * 0.7) - 0.5)),
+                   crest: d * (1 + 0.3 * (fine(u) - 0.5)), d: d, y0: B[1] + 0.04 });
   }
-  return { Top: Top, Bot: Bot, d: Pc.d * s };
+  // (a scrap too short to hold together is not snow that stays: none)
+  runs = runs.filter(function (Rn) { return Rn.raw.length >= 4; });
+  // each piece thins out to nothing at its two ends (no straight cut across it), then its outline in 3D
+  runs.forEach(function (Rn) {
+    var m = Rn.raw.length;
+    Rn.raw.forEach(function (q, j) {
+      var f = m < 2 ? 1 : Math.pow(Math.sin(PI * (j + 0.5) / m), 0.6), wl = q.wl * f, wr = q.wr * f, cr = q.crest * f, d = q.d * f, B = q.B;
+      Rn.Cn.push([B[0], q.y0 + cr, B[2]]);
+      Rn.L.push([B[0] - q.sx * wl, q.y0 + cr * 0.45, B[2] - q.sz * wl]);
+      Rn.R.push([B[0] + q.sx * wr, q.y0 + cr * 0.45, B[2] + q.sz * wr]);
+      Rn.Lb.push([B[0] - q.sx * wl * 1.05, q.y0 - d * 0.25, B[2] - q.sz * wl * 1.05]);
+      Rn.Rb.push([B[0] + q.sx * wr * 1.05, q.y0 - d * 0.25, B[2] + q.sz * wr * 1.05]);
+    });
+  });
+  // on the screen
+  var Top = [], Bot = [], dmax = 0;
+  runs.forEach(function (Rn) {
+    ['L', 'Cn', 'R', 'Lb', 'Rb'].forEach(function (k) { Rn['s' + k] = Rn[k].map(P); });
+    Rn.sCn.forEach(function (p) { Top.push([p[0], p[1] - 1]); });
+    Rn.sLb.concat(Rn.sRb).forEach(function (p) { Bot.push(p); Top.push([p[0], p[1] - 1]); });
+    for (var j = 0; j < Rn.sCn.length; j++) dmax = Math.max(dmax, Math.max(Rn.sLb[j][1], Rn.sRb[j][1]) - Rn.sCn[j][1]);
+    // which side is nearer you (its face toward you is the one in shade)
+    Rn.near = Rn.L[0][2] + Rn.L[Rn.L.length - 1][2] > Rn.R[0][2] + Rn.R[Rn.R.length - 1][2] ? 'L' : 'R';
+  });
+  Pc._cl = { runs: runs, Top: Top.length ? Top : [[0, 0], [0, 0]], Bot: Bot.length ? Bot : [[0, 0]], d: dmax };
+  Pc._clKey = key;
+  return Pc._cl;
 }
+function boughSnowLines(E, Pc, P) { return boughSnowClumps(E, Pc, P); }
 function paintBoughSnow(c, E, Pc, P, K) {
-  var Ln = boughSnowLines(E, Pc, P), Top = Ln.Top, Bot = Ln.Bot;
-  if (Ln.d < 0.3) return;
-  pathOf(c, Top, Bot.slice().reverse());
-  var yMin = Math.min.apply(null, Top.map(function (p) { return p[1]; })), yMax = Math.max.apply(null, Bot.map(function (p) { return p[1]; }));
-  var g = c.createLinearGradient(0, yMin, 0, yMax);
-  g.addColorStop(0, css(K.snowTop)); g.addColorStop(0.5, css(mix(K.snowTop, K.snowFront, 0.55))); g.addColorStop(1, css(K.snowUnder));
-  c.fillStyle = g; c.fill();
-  snowLumps(c, Top, Ln.d, K, rng(Pc.seed + 3));
+  var S = boughSnowClumps(E, Pc, P), s = P.s(E.p1[2]);
+  if (!S.runs.length) return;
+  function strip(A, B, col, a) { pathOf(c, A, B.slice().reverse()); c.fillStyle = css(col, a === undefined ? 1 : a); c.fill(); }
+  function vgrad(pts, stops) {
+    var y0 = Infinity, y1 = -Infinity;
+    pts.forEach(function (p) { y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); });
+    var g = c.createLinearGradient(0, y0, 0, Math.max(y0 + 0.5, y1));
+    stops.forEach(function (st) { g.addColorStop(st[0], css(st[1], st[2] === undefined ? 1 : st[2])); });
+    return g;
+  }
+  S.runs.forEach(function (Rn) {
+    if (Rn.sCn.length < 2) return;
+    var far = Rn.near === 'L' ? 'R' : 'L', nearT = Rn['s' + Rn.near], nearB = Rn['s' + Rn.near + 'b'], farT = Rn['s' + far], farB = Rn['s' + far + 'b'];
+    // its shadow on the needles just under its near edge
+    strip(nearB, nearB.map(function (p) { return [p[0], p[1] + Math.max(0.8, 0.05 * s)]; }), K.under, 0.3);
+    // the far side (seen past the crest only from above)
+    strip(farT, farB, mix(K.snowFront, K.snowUnder, 0.4));
+    // the top, one surface: brightest along its crest (facing up, to the sky and the low sun), shading off toward its edges
+    pathOf(c, Rn.sL, Rn.sR.slice().reverse());
+    c.fillStyle = vgrad(Rn.sL.concat(Rn.sR, Rn.sCn), [[0, K.snowLit], [0.45, K.snowTop], [1, mix(K.snowTop, K.snowFront, 0.5)]]);
+    c.fill();
+    // its near face, toward you: from the top's colour at its upper edge into the sky's blue shade (the sun is behind)
+    pathOf(c, nearT, nearB.slice().reverse());
+    c.fillStyle = vgrad(nearT.concat(nearB), [[0, mix(K.snowTop, K.snowFront, 0.5)], [0.5, K.snowFront], [1, mix(K.snowFront, K.snowUnder, 0.5)]]);
+    c.fill();
+  });
 }
 
 /* ---------- the wood's snow, the bamboo, the ropes, the snow at the feet ---------- */
@@ -695,14 +808,60 @@ function paintBambooSeg(c, B, t0, t1, P, K, snowD) {
     c.stroke();
   }
 }
-function paintFootSnow(c, p, rad, P, K) {           // snow banked round a trunk, pole or prop where it stands
-  var F = P(p), s = P.s(p[2]), w = Math.max(2, rad * s * 4.5), h = Math.max(1, Math.max(0.1, rad * 0.9) * s);
-  c.save(); c.translate(F[0], F[1]); c.scale(1, h / w);
-  var g = c.createRadialGradient(0, 0, 0, 0, 0, w / 2);
-  g.addColorStop(0, css(K.snowTop)); g.addColorStop(0.55, css(mix(K.snowTop, K.snowFront, 0.5), 0.9)); g.addColorStop(1, css(K.snowFront, 0));
-  // only the mound's upper half: what lies in front of the foot (its lower half) is the snow ground itself
-  c.fillStyle = g; c.beginPath(); c.arc(0, 0, w / 2, PI, TAU); c.fill();
+/* Where a trunk (or a cane) goes into the snow. The snow does not end in a straight line: it lies a little uneven
+   against the bark, banked up over the surface roots; the bark has melted it back a little (a thin dark gap where the two
+   meet), the snow curving down into that gap lies in blue shade, and its crest catches the light on the sun's side.
+   join(x) gives, for a point across the screen, how far above the foot the snow reaches there (CSS px). */
+function snowJoin(p, half, roots, P, seed) {
+  var F = P(p), s = P.s(p[2]), rr = rng(seed), k1 = lerp(0.25, 0.45, rr()) / Math.max(1, half * 0.12), k2 = k1 * lerp(2.1, 3.3, rr()), p1 = rr() * TAU, p2 = rr() * TAU;
+  var base = 0.06 * s, R = roots || [];
+  return { x: F[0], y: F[1], s: s, half: half, h: function (x) {
+    var h = base * (1 + 0.22 * Math.sin(x * k1 + p1) + 0.12 * Math.sin(x * k2 + p2));
+    for (var i = 0; i < R.length; i++) { var d = (x - R[i][0]) / R[i][1]; h += R[i][2] * Math.exp(-d * d); }   // banked over a root
+    return Math.max(0.5, h);
+  } };
+}
+function clipAbove(c, J, x0, x1, top) {              // keeps what is above the snow's line, across x0 … x1 (beyond: above the foot)
+  c.beginPath(); c.moveTo(x0 - 4000, top); c.lineTo(x1 + 4000, top); c.lineTo(x1 + 4000, J.y - J.h(x1)); c.lineTo(x1, J.y - J.h(x1));
+  for (var x = x1; x >= x0; x -= 0.5) c.lineTo(x, J.y - J.h(x));
+  c.lineTo(x0 - 4000, J.y - J.h(x0)); c.closePath(); c.clip();
+}
+function paintJoin(c, J, w, K) {
+  var x0 = J.x - w, x1 = J.x + w, lx = K.lx, x;
+  // the snow just in front of the bark, curving down into the melted gap: in the blue shade (stronger on the side away
+  // from the sun), fading out into the snow around
+  c.save();
+  c.beginPath(); c.moveTo(x0, J.y - J.h(x0));
+  for (x = x0; x <= x1; x += 0.5) c.lineTo(x, J.y - J.h(x));
+  c.lineTo(x1, J.y + J.s * 0.3); c.lineTo(x0, J.y + J.s * 0.3); c.closePath(); c.clip();
+  c.translate(J.x - lx * w * 0.15, J.y - J.h(J.x)); c.scale(1, Math.max(0.05, J.s * 0.1 / (w * 1.1)));
+  var g = c.createRadialGradient(0, 0, 0, 0, 0, w * 1.1);
+  g.addColorStop(0, css(K.snowUnder, 0.55)); g.addColorStop(0.45, css(K.snowUnder, 0.22)); g.addColorStop(1, css(K.snowUnder, 0));
+  c.fillStyle = g; c.fillRect(-w * 1.2, -w * 1.2, w * 2.4, w * 2.4);
   c.restore();
+  // the thin dark gap where snow meets bark (only where there is bark: found from the trunk's picture; a cane: its width)
+  function barkAt(x) {
+    if (!J.bark) return Math.abs(x - J.x) < J.half * 1.05 ? 1 : 0;
+    var i = Math.round((x - J.bx0) / 0.5);
+    return i >= 0 && i < J.bark.length ? J.bark[i] : 0;
+  }
+  var dk = mix(K.barkDk, K.snowUnder, 0.35);
+  c.lineWidth = Math.max(0.6, J.s * 0.012); c.lineCap = 'round';
+  for (x = x0; x < x1; x += 0.5) {
+    var a = Math.min(barkAt(x), barkAt(x + 0.5));
+    if (a < 0.15) continue;
+    c.strokeStyle = css(dk, 0.6 * a);
+    c.beginPath(); c.moveTo(x, J.y - J.h(x)); c.lineTo(x + 0.5, J.y - J.h(x + 0.5)); c.stroke();
+  }
+  // the snow's crest along it, lit on the sun's side (broken, as a soft lip of snow is)
+  var rr = rng(Math.round(J.x * 13 + J.y * 7));
+  c.strokeStyle = css(K.snowLit, 0.75); c.lineWidth = Math.max(0.5, J.s * 0.01); c.lineCap = 'round';
+  c.beginPath();
+  for (x = J.x + lx * w * 0.05; Math.abs(x - J.x) < w * 0.9; x += lx * lerp(2, 4, rr())) {
+    var l = lerp(1, 3, rr()), y0 = J.y - J.h(x) + 0.9, y1 = J.y - J.h(x + lx * l) + 0.9;
+    if (rr() < 0.7 && barkAt(x) > 0.3) { c.moveTo(x, y0); c.lineTo(x + lx * l, y1); }
+  }
+  c.stroke();
 }
 
 /* ---------- the wood: trunks.js (round limbs, the maples' bark) or, without it, painted ---------- */
@@ -718,7 +877,7 @@ function paintWood(c, T, P, o, K, box) {
   if (o.trunks !== false && typeof Trunks !== 'undefined' && Trunks.state() !== 'none') {
     try {
       var model = Trunks.build({ nodes: nodes, seed: T.seed % 100000 + 7, X: function (x) { return x; }, clumps: [],
-                                 look: { girth: 1, bend: 0.4, depth: 0, rootFlare: 0.7, roots: 0, rootLen: 1 } });
+                                 look: { girth: 1, bend: 0.4, depth: 0, rootFlare: 1.35, roots: 0, rootLen: 0.55 } });
       var L = o.light, lt = { dir: [L.sun[0], -L.sun[1], L.sun[2]], sun: L.sunCol, sky: scl(L.skyCol, L.amb),
                               bounce: scl([0.62, 0.66, 0.78], L.amb * 0.8), leaf: scl(L.skyCol, L.amb * 0.7), air: o.hazeCol || [230, 225, 225] };
       var bk = o.bark || {};
@@ -731,15 +890,21 @@ function paintWood(c, T, P, o, K, box) {
       if (g) {
         // nothing of the wood shows below the snow's surface: cut it off at the ground line under the tree (its root
         // flare spreads out below the foot)
-        var gy = P(T.segs[T.trunk[0]].a)[1];
-        c.save(); c.beginPath(); c.rect(box.bx - 10, box.by - 10, box.w + 20, gy - box.by + 10); c.clip();
+        var J = T._join = trunkJoin(T, P, model);
+        // (copied once into a picture of its own, so where the bark meets the snow can be found from it: the dark gap
+        // between them is drawn only where there is bark, never across bare snow)
+        var tmp = document.createElement('canvas'); tmp.width = g.w; tmp.height = g.h;
+        var tc = tmp.getContext('2d'); tc.drawImage(g.cnv, 0, 0, g.w, g.h, 0, 0, g.w, g.h);
+        J.bark = barkAlong(tc, g, J, o.PR);
+        c.save(); clipAbove(c, J, J.x - J.half * 3, J.x + J.half * 3, box.by - 10);
         c.setTransform(1, 0, 0, 1, 0, 0);
-        c.drawImage(g.cnv, 0, 0, g.w, g.h, g.x - box.bx * o.PR, g.y - box.by * o.PR, g.w, g.h);
+        c.drawImage(tmp, g.x - box.bx * o.PR, g.y - box.by * o.PR);
         c.restore(); done = true;
       }
     } catch (e) { done = false; }
   }
   if (done) return 'trunks.js';
+  T._join = trunkJoin(T, P, null);
   // painted: each limb a tapering stroke, lit on the sun's side
   c.lineCap = 'round'; c.lineJoin = 'round';
   T.segs.forEach(function (S) {
@@ -750,6 +915,31 @@ function paintWood(c, T, P, o, K, box) {
     c.beginPath(); c.moveTo(A[0] + K.lx * w * 0.2, A[1]); c.lineTo(B[0] + K.lx * w * 0.2, B[1]); c.stroke();
   });
   return 'painted';
+}
+
+/* how much bark there is just above the snow's line, every half CSS px across (0 … 1); read once from the trunk's picture */
+function barkAlong(tc, g, J, PR) {
+  var x0 = J.x - J.half * 3, n = Math.ceil(J.half * 12), out = new Float32Array(n + 1), ys = [], y0 = Infinity, y1 = -Infinity, i;
+  for (i = 0; i <= n; i++) { var y = Math.round((J.y - J.h(x0 + i * 0.5) - 1.5) * PR - g.y); ys.push(y); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  y0 = clamp(y0, 0, g.h - 1); y1 = clamp(y1, 0, g.h - 1);
+  var xa = clamp(Math.floor(x0 * PR - g.x), 0, g.w - 1), xb = clamp(Math.ceil((x0 + n * 0.5) * PR - g.x), 0, g.w - 1);
+  if (xb <= xa) return out;
+  var D = tc.getImageData(xa, y0, xb - xa + 1, y1 - y0 + 1), W = xb - xa + 1;
+  for (i = 0; i <= n; i++) {
+    var px = Math.round((x0 + i * 0.5) * PR - g.x) - xa, py = clamp(ys[i], y0, y1) - y0;
+    if (px < 0 || px >= W) continue;
+    out[i] = D.data[(py * W + px) * 4 + 3] / 255;
+  }
+  J.bx0 = x0;
+  return out;
+}
+/* the snow's line at the foot of the trunk: banked up over each surface root where it leaves the trunk */
+function trunkJoin(T, P, model) {
+  var S0 = T.segs[T.trunk[0]], s = P.s(S0.a[2]), half = S0.ra * s, roots = [];
+  // the flare's lobes on either side, where the snow banks up a little
+  var rr = rng(T.seed * 5 + 1), fx = P(S0.a)[0];
+  roots.push([fx - half * lerp(1.6, 1.9, rr()), half * 0.6, half * lerp(0.45, 0.6, rr())], [fx + half * lerp(1.6, 1.9, rr()), half * 0.6, half * lerp(0.45, 0.6, rr())]);
+  return snowJoin(S0.a, half, roots, P, T.seed * 7 + 3);
 }
 
 /* =====================================================================
@@ -798,8 +988,13 @@ function bakeJob(T, o) {
     var n = 6, isPole = T.poles.indexOf(B) >= 0;
     for (var k = 0; k < n; k++) (function (t0, t1) {
       items.push({ z: lerp(B.a[2], B.b[2], (t0 + t1) / 2), rects: [segRect(P(lerp3(B.a, B.b, t0)), P(lerp3(B.a, B.b, t1)), B.r * P.s(B.b[2]) + 4)], draw: function () {
-        paintBambooSeg(c, B, t0, t1, P, K, isPole ? T.snowK * 0.15 : 0);
-        if (t0 === 0 && !B.brace) paintFootSnow(c, B.a, B.r * 2.5, P, K);
+        if (t0 === 0 && !B.brace) {
+          var hw = Math.max(0.8, B.r * P.s(B.a[2])), J = snowJoin(B.a, hw, null, P, T.seed * 11 + (B.a[0] * 100 | 0));
+          c.save(); clipAbove(c, J, J.x - hw * 3, J.x + hw * 3, box.by - 10);
+          paintBambooSeg(c, B, t0, t1, P, K, isPole ? T.snowK * 0.15 : 0);
+          c.restore();
+          paintJoin(c, J, hw * 1.7, K);
+        } else paintBambooSeg(c, B, t0, t1, P, K, isPole ? T.snowK * 0.15 : 0);
       } });
     })(k / n, (k + 1) / n);
   });
@@ -808,7 +1003,7 @@ function bakeJob(T, o) {
     R.wood = paintWood(c, T, P, o, K, box);
     c.setTransform(PR, 0, 0, PR, -box.bx * PR, -box.by * PR);
     paintLimbSnow(c, T, P, K);
-    paintFootSnow(c, T.segs[T.trunk[0]].a, T.segs[T.trunk[0]].ra * 1.3, P, K);
+    if (T._join) paintJoin(c, T._join, T._join.half * 2.0, K);
   } });
   items.forEach(function (it, i) { it.n = i; });
   items.sort(function (a, b) { return a.z - b.z || a.n - b.n; });
