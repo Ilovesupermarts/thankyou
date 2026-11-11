@@ -178,11 +178,14 @@ function pagoda(c, cam, o) {
     var n = norm(sub(p0, p1));                                         // the steps' end on this side faces this way
     return { sd: sd, seen: dot(n, sub(eye, p0)) > 0 };
   }).sort(function (A, B) { return (A.seen ? 1 : 0) - (B.seen ? 1 : 0); });
+  group(function () { paintDrift(drifts[0].sd); });
   for (var q = 1; q <= nSt; q++) {
-    var yk = hp - (q - 1) * rs - rs, ybot = groundAt(q * dz) - 0.012 * S, zf = -bp - q * dz, zc = -bp - (q - 0.5) * dz;
+    // each step stands on the snow: its stone front only down to the snow's level (nothing of it below the snow shows)
+    var yk = hp - (q - 1) * rs - rs, ybot = groundAt(q * dz), zf = -bp - q * dz, zc = -bp - (q - 0.5) * dz;
     group(stepLip(yk, zf));
-    box(0, (yk + ybot) / 2, zc, ws, (yk - ybot) / 2, dz / 2, 'step', 'riser', { top: 'none', bottom: 'none' }, stairMap);
+    if (yk - ybot > 0.002 * S) box(0, (yk + ybot) / 2, zc, ws, (yk - ybot) / 2, dz / 2, 'step', 'riser', { top: 'none', bottom: 'none' }, stairMap);
   }
+  group(function () { paintDrift(drifts[1].sd); });
 
   /* ---------- the roofs ---------- */
   function eave(R, u, side, up) {                  // a point on one side's eave, u -1 … 1, lifted toward the corners
@@ -371,27 +374,47 @@ function pagoda(c, cam, o) {
   }
   function run0() { return run; }
   function paintDrift(sd) {
-    // banked against the side of the flight, from the wall down to the foot: a face that covers the ends of the steps
-    // from the snow up to a rounded crest above them, then its outer slope running down into the bank
-    var N = 12, r = rng(sd > 0 ? 31 : 37), w1 = wob(r), w2 = wob(r);
+    // the snow lying against the ends of the steps: it follows the flight step by step (rounded over each step's edge,
+    // settling on each tread), covers the ends of the steps up to the snow on the treads, and runs out sideways into
+    // the hill's snow. Lumpy and shaded by the light, so it reads as drifted snow, not a rail
+    var N = nSt * 8, r = rng(sd > 0 ? 31 : 37), w1 = wob(r), w2 = wob(r), w3 = wob(r);
+    if (!bankCol) bankCol = snowColour([0, 1, 0]);
     var Crest = [], Low = [], Foot = [], cc = [], cs2 = [], cf = [];
     function world(nS) { var m0 = stairMap(nS); return norm([m0[0] * cs + m0[2] * sn, m0[1], -m0[0] * sn + m0[2] * cs]); }
-    var colOut = snowColour(world([sd * 0.7, 0.8, 0])), colFace = snowColour(world([sd, 0.25, -0.2]));
+    var colTop = snowColour(world([sd * 0.25, 1, 0])), colOut = snowColour(world([sd * 0.7, 0.7, 0])), colFace = snowColour(world([sd, 0.25, -0.2]));
+    var colDip = snowColour(world([0, 0.5, 1]));                       // the snow rounding down over a step's edge, turned down the flight
     for (var i = 0; i <= N; i++) {
-      var t = i / N, dd = t * Ls * 1.02;
-      // a rounded heap: just over the steps' ends along the flight, sinking into the snow at its lower end
-      var g0 = groundAt(dd), over = rs * (0.75 + 0.18 * w1(t * 2)) * (1 - smooth01((t - 0.72) / 0.28));
-      var top = Math.max(g0 + 0.004 * S, lerp(hp, yEnd, t) + over);
-      Crest.push(Pw(stairMap([sd * ws * 1.05, top, -bp - dd])));
-      Low.push(Pw(stairMap([sd * ws * 1.08, groundAt(dd) - 0.03 * S, -bp - dd])));
-      Foot.push(Pw(stairMap([sd * ws * (1.75 + 0.1 * w2(t * 2)), groundAt(dd + 0.02 * S) - 0.004 * S, -bp - dd])));
-      cc.push(mix(colOut, [255, 252, 246], 0.2)); cs2.push(mix(colFace, [150, 160, 204], 0.55)); cf.push(bankCol || mix(colOut, L.haze, 0.2));
+      var t = i / N, dd = t * Ls, f = Math.min(dd / dz, nSt - 1e-6), q0 = Math.floor(f), fr = f - q0;
+      var fall = smooth01(fr / 0.4), slope = fr < 0.4 ? Math.sin(Math.PI * fr / 0.4) : 0;
+      var tread = hp - rs * (q0 + fall);                                // the treads' level, rounded over each edge
+      var lift = lipH * (0.75 + 0.3 * w1(t * 2.5)) * (1 - smooth01((t - 0.9) / 0.1));
+      var top = Math.max(groundAt(dd) + 0.002 * S, tread + lift);
+      var out = 1.05 + 0.04 * w3(t * 3);
+      Crest.push(Pw(stairMap([sd * ws * out, top, -bp - dd])));
+      Low.push(Pw(stairMap([sd * ws * 1.1, groundAt(dd), -bp - dd])));
+      var spread = lerp(1.6 + 0.25 * (w2(t * 2) + 1) * 0.5, 1.12, smooth01((t - 0.55) / 0.45));   // narrowing to nothing at the foot
+      Foot.push(Pw(stairMap([sd * ws * spread, groundAt(dd + 0.02 * S), -bp - dd])));
+      var ct = mix(colTop, colDip, slope * 0.55);
+      cc.push(ct); cs2.push(mix(mix(colFace, [150, 160, 204], 0.5), colDip, slope * 0.3)); cf.push(mix(colOut, bankCol, 0.6));
     }
-    softBands(Crest, Low, cc.map(function (x) { return mix(x, colFace, 0.25); }), cs2, 8);
-    softBands(Crest, Foot, cc, cf, 8);
-    // the light along its crest
-    c.save(); c.strokeStyle = 'rgba(255,250,238,0.5)'; c.lineWidth = 0.8;
-    c.beginPath(); Crest.forEach(function (p, k) { if (k) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]); }); c.stroke(); c.restore();
+    softBands(Crest, Low, cc.map(function (x, k) { return mix(x, cs2[k], 0.2); }), cs2, 8);
+    // its outer slope, painted solid on a layer of its own and faded out into the hill in one smooth sweep, so it has
+    // no outer edge
+    var main = c, T0 = c.getTransform(), bx0 = 1e9, by0 = 1e9, bx1 = -1e9, by1 = -1e9;
+    Crest.concat(Foot).forEach(function (p) { bx0 = Math.min(bx0, p[0]); by0 = Math.min(by0, p[1]); bx1 = Math.max(bx1, p[0]); by1 = Math.max(by1, p[1]); });
+    bx0 -= 6; by0 -= 6; bx1 += 6; by1 += 6;
+    var lay = document.createElement('canvas');
+    lay.width = Math.max(1, Math.ceil((bx1 - bx0) * T0.a)); lay.height = Math.max(1, Math.ceil((by1 - by0) * T0.d));
+    c = lay.getContext('2d'); c.setTransform(T0.a, 0, 0, T0.d, -bx0 * T0.a, -by0 * T0.d);
+    softBands(Crest, Foot, cc, cf, 10);
+    var cm = Crest[Math.round(N / 2)], fm = Foot[Math.round(N / 2)];
+    c.save(); c.globalCompositeOperation = 'destination-out';
+    var fade = c.createLinearGradient(cm[0], cm[1], fm[0], fm[1]);
+    fade.addColorStop(0, 'rgba(0,0,0,0)'); fade.addColorStop(0.3, 'rgba(0,0,0,0)'); fade.addColorStop(1, 'rgba(0,0,0,1)');
+    c.fillStyle = fade; c.fillRect(bx0, by0, bx1 - bx0, by1 - by0);
+    c.restore();
+    c = main;
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(lay, bx0 * T0.a + T0.e, by0 * T0.d + T0.f); c.restore();
   }
   var bankCol = null;
   function paintFootDrift() {
