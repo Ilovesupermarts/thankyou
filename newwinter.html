@@ -318,6 +318,8 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 /* The values chosen on the tablet (the panel's "Copy values"). */
 var V_DEFAULTS = {
   seed: 7, timeOfDay: 'day', showMountains: true,
+  // the time (hour of the day in Nagoya, today's date): late afternoon, the app's golden hour (the user's choice)
+  hour: 15.5,
   // the block-in (step 0) and the reference picture laid over it
   blockIn: true, blockLabels: true, refOverlay: 0,
   // the layout: the land below this share of the height, the sky (text, toolbar) above
@@ -392,7 +394,6 @@ var V = clone(V_DEFAULTS), MT = clone(MT_DEFAULTS);
    beams, faint lens ghosts, and the weather in front of it. Values are
    kept in this browser; "Copy values" gives them in words and as JSON.
    ============================================================ */
-var SUN_COLOURS = { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' };
 var SUN_COLOUR_NAMES = [['core', 'Core'], ['glow', 'Glow and streaks'], ['haze', 'Wide sky glow'],
                         ['low', 'Low sun (sunrise, sunset)'], ['ghost', 'Lens ghosts']];
 /* What each kind of weather does to the sun (multipliers on the values
@@ -412,27 +413,20 @@ var CONDITIONS = {
   rain:   { jp: '雨', en: 'Rain', core: 0.2, blur: 1, glow: 0.3, glowSize: 2.2, haze: 0.6, rays: 0, ghosts: 0, ring: 0, veil: 0.75, veilCol: [178, 180, 194] },
   snow:   { jp: '雪', en: 'Snow', core: 0.3, blur: 1, glow: 0.45, glowSize: 2, haze: 0.9, rays: 0, ghosts: 0, ring: 0, veil: 0.7, veilCol: [228, 230, 238] }
 };
+/* The sun's look: the app's own (SUN_LOOK in app.js, the autumn theme's sky; the user's brief:
+   the sky and its warm light are the app's). show and condition are the test bed's own (the app
+   takes the weather from the real weather). */
 var SDEF = {
-  timeOfDay: 'day',
-  show: true, strength: 1,
-  // where it is
-  across: 0.55, below: 18, altitude: 40, eveningAltitude: 3,
-  // the sun itself
-  coreSize: 20, coreSoftness: 0.55, coreBrightness: 1,
-  // the glow
-  glow: 1.2, glowSize: 8, glowFalloff: 1, haze: 0.45, hazeSize: 24, warmth: 0,
-  // the streaks
+  show: true, condition: 'partly',
+  strength: 0.93, below: 18,
+  coreSize: 19, coreSoftness: 0.7, coreBrightness: 0.92,
+  glow: 1.54, glowSize: 20.5, glowFalloff: 2.46, haze: 1.07, hazeSize: 25.5, warmth: 0.53,
   streaks: 14, streakLength: 11, streakVariety: 0.75, longStreaks: 3, streakWidth: 1.1, streakStrength: 0.7,
-  spikes: 30, spikeLength: 2.4, spikeStrength: 0.7,
-  beams: 4, beamStrength: 0.22, beamWidth: 1,
-  irregular: 0.75, seed: 3,
-  // movement
-  turn: 4, shimmer: 0.45, shimmerSpeed: 1,
-  // lens
+  spikes: 30, spikeLength: 2.4, spikeStrength: 0.96, beams: 4, beamStrength: 0.22, beamWidth: 1,
+  irregular: 0.75, seed: 3, turn: 4, shimmer: 0.45, shimmerSpeed: 1,
   ghosts: 0.35, ghostSize: 1, ring: 0.5, ringSize: 9,
-  // weather
-  condition: 'partly', veil: 1,
-  colours: clone(SUN_COLOURS)
+  veil: 0.99,
+  colours: { core: '#FFFFFF', glow: '#F2FAFF', haze: '#E4F1FF', low: '#FFB47E', ghost: '#D2E2FF' }
 };
 var SUN = clone(SDEF);
 
@@ -443,18 +437,20 @@ var SUN = clone(SDEF);
    of each weather). Shape values build the clouds again (in the
    background); the rest only repaint or move them.
    ============================================================ */
+/* The clouds: the app's own values (CLOUD_LOOK in app.js, the autumn theme's sky). */
 var CLOUD_DEFAULTS = {
   // the shapes: how many of each kind, and how they are built
-  seed: 1, heaps: 2, masses: 1, towers: 1, puffs: 1, flats: 1, banks: 2,
-  resolution: 0.7, detail: 5, billows: 0.5, edge: 0.6, wisp: 0.55, swirl: 0.45, flatBase: 0.4, density: 1.2,
-  // in the sky
+  seed: 1, heaps: 2, masses: 1, towers: 1, puffs: 1, flats: 1, banks: 3,
+  resolution: 0.7, detail: 3, billows: 0.5, edge: 1, wisp: 0.55, swirl: 0.75, flatBase: 0.4, density: 1.2,
+  // in the sky: how many in a fully clouded sky, their size, drift, the share near the sun,
+  // the band the rest are spread across (fractions of the screen height from the top), and how
+  // much they hide the sun
   count: 18, size: 2.3, sizeVariety: 0.8, speed: 0.85, nearSun: 0.5, highest: 0.05, lowest: 0.45, block: 0.75,
-  // the clouds in front of Fuji (in the weathers that have them): how many at most, their size
-  // (next to Fuji), drift, the band of the mountain they float across (0 summit … 1 foot), how
-  // far either side of the summit, how solid, and how often they thin out so Fuji's outline
-  // shows through for a while
-  front: { count: 7, size: 1, speed: 0.5, high: 0.15, low: 0.8, spread: 1.6, opacity: 0.92,
-           thinning: 0.7, thinEvery: 1 },
+  // in front of Fuji: how many at most, their size (next to Fuji), drift, the band of the
+  // mountain they cross (0 summit … 1 foot), how far either side of the summit (in Fuji
+  // heights), how solid, and how much and how often they thin out to show its outline
+  front: { count: 12, size: 1, speed: 0.1, high: 0.15, low: 0.8, spread: 0.95, opacity: 0.59,
+           thinning: 0.15, thinEvery: 1 },
   // the light (the side it comes from follows the sun)
   shadow: 1.6, ambient: 0.5, baseDark: 0.5, silver: 0.4, sky: '#8FA9D0',
   // each time of day: the light's height and how much it comes from in front, how bright,
@@ -465,20 +461,19 @@ var CLOUD_DEFAULTS = {
     night:   { elevation: 60, front: 1, exposure: 1.2, tint: 0.6, lit: '#969EC4', shade: '#60668E', base: '#50567C', opacity: 0.22 }
   },
   // each kind of weather: how much of the sky the clouds cover, how big and solid they are, how
-  // fast they move, the share of the clouds in front of Fuji, and their colours (lit tops,
-  // shaded sides, base)
+  // fast they move, the share of the clouds in front of Fuji, and their colours
   weather: {
-    clear:  { cover: 0,    size: 1,   opacity: 0.9,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
-    sunny:  { cover: 0.3,  size: 1,   opacity: 0.9,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
-    partly: { cover: 0.7,  size: 1.2, opacity: 0.92, speed: 1, front: 0.5,   lit: '#FFFFFF', shade: '#ABB3CB', base: '#919AB3' },
-    thin:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 1, front: 0,   lit: '#FFFFFF', shade: '#C5CFE0', base: '#A7B2C6' },
-    cloudy: { cover: 1,    size: 1.7, opacity: 0.95, speed: 1.2, front: 0.9, lit: '#F0EEF4', shade: '#8A8FA5', base: '#757B92' },
-    mist:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 0.6, front: 0.8, lit: '#FFFFFF', shade: '#CAD1DA', base: '#ACB4C1' },
-    rain:   { cover: 0.85, size: 1.9, opacity: 0.95, speed: 1.5, front: 1, lit: '#CECED8', shade: '#70768B', base: '#5F657B' },
+    clear:  { cover: 0,    size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    sunny:  { cover: 0.3,  size: 1,   opacity: 0.9,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#B8C1D4', base: '#9CA6BB' },
+    partly: { cover: 0.7,  size: 1.2, opacity: 0.92, speed: 1,   front: 0.5,  lit: '#FFFFFF', shade: '#ABB3CB', base: '#919AB3' },
+    thin:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 1,   front: 0,    lit: '#FFFFFF', shade: '#C5CFE0', base: '#A7B2C6' },
+    cloudy: { cover: 1,    size: 1.7, opacity: 0.95, speed: 1.2, front: 0.9,  lit: '#F0EEF4', shade: '#8A8FA5', base: '#757B92' },
+    mist:   { cover: 0,    size: 1,   opacity: 0.7,  speed: 0.6, front: 0.8,  lit: '#FFFFFF', shade: '#CAD1DA', base: '#ACB4C1' },
+    rain:   { cover: 0.85, size: 1.9, opacity: 0.95, speed: 1.5, front: 1,    lit: '#CECED8', shade: '#70768B', base: '#5F657B' },
     snow:   { cover: 0.6,  size: 1.5, opacity: 0.9,  speed: 0.8, front: 0.85, lit: '#F4F4F8', shade: '#9EA8BD', base: '#8691A7' }
   }
 };
-var CLOUD_KEY = 'newWinter-oldClouds';             // (cloudLab1 held the values of the old, hard-edged clouds)
+var CLOUD_KEY = 'newWinter-clouds-2';              // (newWinter-oldClouds held winter2.html's clouds, before step 1)
 var CLOUD = clone(CLOUD_DEFAULTS);
 try {
   var savedC = JSON.parse(localStorage.getItem(CLOUD_KEY) || 'null');
@@ -492,10 +487,6 @@ try {
 } catch (e) { /* silent */ }
 function saveClouds() { try { localStorage.setItem(CLOUD_KEY, JSON.stringify(CLOUD)); } catch (e) { /* silent */ } }
 
-/* Winter clouds: no towering summer clouds, more flat layers and low banks. */
-CLOUD_DEFAULTS.towers = 0; CLOUD_DEFAULTS.heaps = 1; CLOUD_DEFAULTS.puffs = 2; CLOUD_DEFAULTS.flats = 2; CLOUD_DEFAULTS.banks = 2;
-CLOUD_DEFAULTS.weather.snow.cover = 0.85; CLOUD_DEFAULTS.weather.snow.front = 1;
-SDEF.across = 0.2; SDEF.altitude = 22; SDEF.eveningAltitude = 4;
 /* The values chosen on the tablet, over the defaults above. */
 function deepSet(dst, src) {
   for (var k in src) {
@@ -503,8 +494,6 @@ function deepSet(dst, src) {
     else dst[k] = src[k];
   }
 }
-deepSet(CLOUD_DEFAULTS, {"seed":1,"heaps":1,"masses":1,"towers":0,"puffs":2,"flats":2,"banks":2,"resolution":0.7,"detail":5,"billows":0.5,"edge":0.6,"wisp":0.55,"swirl":0.45,"flatBase":0.4,"density":1.2,"count":18,"size":2.3,"sizeVariety":0.8,"speed":0.85,"nearSun":0.5,"highest":0.05,"lowest":0.45,"block":0.75,"front":{"count":7,"size":1,"speed":0.5,"high":0.15,"low":0.8,"spread":1.6,"opacity":0.92,"thinning":0.7,"thinEvery":1},"shadow":1.6,"ambient":0.5,"baseDark":0.5,"silver":0.4,"sky":"#8FA9D0","times":{"day":{"elevation":40,"front":0.7,"exposure":1.4,"tint":0,"lit":"#FFFFFF","shade":"#FFFFFF","base":"#FFFFFF","opacity":1},"evening":{"elevation":8,"front":0.5,"exposure":1.3,"tint":0.4,"lit":"#FFC4A0","shade":"#AA788C","base":"#966478","opacity":1},"night":{"elevation":60,"front":1,"exposure":1.2,"tint":0.6,"lit":"#969EC4","shade":"#60668E","base":"#50567C","opacity":0.22}},"weather":{"clear":{"cover":0,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"sunny":{"cover":0.3,"size":1,"opacity":0.9,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#B8C1D4","base":"#9CA6BB"},"partly":{"cover":0.7,"size":1.2,"opacity":0.92,"speed":1,"front":0.5,"lit":"#FFFFFF","shade":"#ABB3CB","base":"#919AB3"},"thin":{"cover":0,"size":1,"opacity":0.7,"speed":1,"front":0,"lit":"#FFFFFF","shade":"#C5CFE0","base":"#A7B2C6"},"cloudy":{"cover":1,"size":1.7,"opacity":0.95,"speed":1.2,"front":0.9,"lit":"#F0EEF4","shade":"#8A8FA5","base":"#757B92"},"mist":{"cover":0,"size":1,"opacity":0.7,"speed":0.6,"front":0.8,"lit":"#FFFFFF","shade":"#CAD1DA","base":"#ACB4C1"},"rain":{"cover":0.85,"size":1.9,"opacity":0.95,"speed":1.5,"front":1,"lit":"#CECED8","shade":"#70768B","base":"#5F657B"},"snow":{"cover":0.85,"size":1.5,"opacity":0.9,"speed":0.8,"front":1,"lit":"#F4F4F8","shade":"#9EA8BD","base":"#8691A7"}}});
-deepSet(SDEF, {"timeOfDay":"day","show":true,"strength":1,"across":0.2,"below":18,"altitude":22,"eveningAltitude":4,"coreSize":20,"coreSoftness":0.55,"coreBrightness":1,"glow":1.2,"glowSize":8,"glowFalloff":1,"haze":0.45,"hazeSize":24,"warmth":0,"streaks":14,"streakLength":11,"streakVariety":0.75,"longStreaks":3,"streakWidth":1.1,"streakStrength":0.7,"spikes":30,"spikeLength":2.4,"spikeStrength":0.7,"beams":4,"beamStrength":0.22,"beamWidth":1,"irregular":0.75,"seed":3,"turn":4,"shimmer":0.45,"shimmerSpeed":1,"ghosts":0.35,"ghostSize":1,"ring":0.5,"ringSize":9,"condition":"partly","veil":1,"colours":{"core":"#FFFFFF","glow":"#F2FAFF","haze":"#E4F1FF","low":"#FFB47E","ghost":"#D2E2FF"}});
 CLOUD = clone(CLOUD_DEFAULTS); SUN = clone(SDEF);
 
 /* Everything on the panel is kept in this browser. */
@@ -518,21 +507,139 @@ function merge(dst, src, def) {
 }
 try {
   var saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-  if (saved) { merge(V, saved.V || {}, V_DEFAULTS); merge(MT, saved.MT || {}, MT_DEFAULTS); merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
+  if (saved) {
+    merge(V, saved.V || {}, V_DEFAULTS); merge(MT, saved.MT || {}, MT_DEFAULTS);
+    // the sun and the clouds saved before step 1 were winter2.html's, not the app's: those are not read
+    if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
+  }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
-SUN.timeOfDay = V.timeOfDay;
-document.documentElement.setAttribute('data-time', V.timeOfDay);
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 2, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
   var dd = new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
   var wd = '日月火水木金土'.charAt(dd.getDay());
   document.getElementById('infoDate').textContent = (dd.getMonth() + 1) + '月' + dd.getDate() + '日(' + wd + ')';
-  document.getElementById('infoTime').textContent = dd.getHours() + '時' + ('0' + dd.getMinutes()).slice(-2) + '分';
 }
 tickClock();
 setInterval(tickClock, 30000);
+
+
+/* ============================================================
+   2d. THE APP'S CLOCK — as in app.js: the sun's place in the sky for
+   Nagoya at the chosen hour of today's date (astro, sunTimes), the
+   light's colour through the day (lightAt: the phase, the tint of the
+   sky, the daylight), and from them the sun's place on the screen
+   (skyToScreen: the afternoon sun stands on the left, the west) and the
+   page's data-time. V.timeOfDay ('day', 'evening', 'night') follows
+   the phase, for the parts that light the scene: the golden hour is
+   'day', dusk and dawn 'evening' (the lamps come on), night 'night'.
+   ============================================================ */
+var DEG = Math.PI / 180;
+var NAGOYA = { lat: 35.1815, lon: 136.9066 };
+function angDiff(a, b) { return Math.atan2(Math.sin(a - b), Math.cos(a - b)); }
+function dayOfYear(p) { return (Date.UTC(p.y, p.m - 1, p.d) - Date.UTC(p.y, 0, 0)) / 864e5; }
+function sunTimes(p) {
+  var N = dayOfYear(p), g = TAU / 365 * (N - 1);
+  var decl = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) +
+             0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  var eqt = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) -
+             0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  var lat = NAGOYA.lat * DEG;
+  var cosHa = Math.cos(90.833 * DEG) / (Math.cos(lat) * Math.cos(decl)) - Math.tan(lat) * Math.tan(decl);
+  var ha = Math.acos(clamp(cosHa, -1, 1)) / DEG;
+  var noon = 720 - 4 * NAGOYA.lon - eqt + 540;
+  return { rise: (noon - 4 * ha) / 60, set: (noon + 4 * ha) / 60, noon: noon / 60 };
+}
+function astro(p, hour) {
+  var d = (Date.UTC(p.y, p.m - 1, p.d) + (hour - 9) * 3600e3) / 864e5 - 10957.5;
+  var T = d / 36525;
+  function sd(x) { return Math.sin(x * DEG); }
+  var g = (357.528 + 0.9856003 * d) * DEG;
+  var lamS = 280.46 + 0.9856474 * d + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+  var lamM = 218.32 + 481267.881 * T + 6.29 * sd(134.9 + 477198.85 * T) - 1.27 * sd(259.2 - 413335.38 * T) +
+             0.66 * sd(235.7 + 890534.23 * T) + 0.21 * sd(269.9 + 954397.70 * T) - 0.19 * sd(357.5 + 35999.05 * T) -
+             0.11 * sd(186.6 + 966404.05 * T);
+  var betM = 5.13 * sd(93.3 + 483202.03 * T) + 0.28 * sd(228.2 + 960400.87 * T) -
+             0.28 * sd(318.3 + 6003.18 * T) - 0.17 * sd(217.6 - 407332.20 * T);
+  var eps = 23.439 * DEG, lat = NAGOYA.lat * DEG;
+  var lst = (280.46061837 + 360.98564736629 * d + NAGOYA.lon) * DEG;
+  function horizon(lamDeg, betDeg) {
+    var lam = lamDeg * DEG, bet = betDeg * DEG;
+    var ra = Math.atan2(Math.sin(lam) * Math.cos(eps) - Math.tan(bet) * Math.sin(eps), Math.cos(lam));
+    var dec = Math.asin(Math.sin(bet) * Math.cos(eps) + Math.cos(bet) * Math.sin(eps) * Math.sin(lam));
+    var ha = lst - ra;
+    var alt = Math.asin(Math.sin(lat) * Math.sin(dec) + Math.cos(lat) * Math.cos(dec) * Math.cos(ha));
+    var az = Math.atan2(-Math.sin(ha), Math.tan(dec) * Math.cos(lat) - Math.sin(lat) * Math.cos(ha)) / DEG;
+    return { alt: alt / DEG, az: (az + 360) % 360 };
+  }
+  var elong = (((lamM - lamS) % 360) + 360) % 360;
+  return {
+    sun: horizon(lamS, 0), moon: horizon(lamM, betM),
+    elong: elong, illum: (1 - Math.cos(elong * DEG)) / 2, waxing: elong < 180
+  };
+}
+var LIGHT_STOPS_FN = function(sr, ss, noon) {
+  return [
+    [sr - 1.6, '#46557f', 0.26, 0.60],
+    [sr - 0.6, '#6d6a96', 0.22, 0.50],
+    [sr,       '#f2a3a0', 0.20, 0.25],
+    [sr + 0.7, '#ffc77a', 0.16, 0.05],
+    [sr + 2.5, '#fff3df', 0.05, 0.00],
+    [noon,     '#ffffff', 0.00, 0.00],
+    [ss - 2.2, '#fff0d6', 0.05, 0.00],
+    [ss - 0.9, '#ffb055', 0.18, 0.00],
+    [ss - 0.1, '#ee8a7a', 0.22, 0.12],
+    [ss + 0.6, '#8d7fb0', 0.24, 0.40],
+    [ss + 1.5, '#46557f', 0.26, 0.60]
+  ];
+};
+function lightAt(h, sun) {
+  var st = LIGHT_STOPS_FN(sun.rise, sun.set, sun.noon);
+  var col, amt, dark;
+  if (h <= st[0][0] || h >= st[st.length - 1][0]) {
+    col = hex('#46557f'); amt = 0.26; dark = 0.6;
+  } else {
+    for (var i = 1; i < st.length; i++) {
+      if (h <= st[i][0]) {
+        var t = (h - st[i - 1][0]) / (st[i][0] - st[i - 1][0]);
+        col = mix(hex(st[i - 1][1]), hex(st[i][1]), t);
+        amt = lerp(st[i - 1][2], st[i][2], t);
+        dark = lerp(st[i - 1][3], st[i][3], t);
+        break;
+      }
+    }
+  }
+  var phase;
+  if (h < sun.rise - 0.8 || h > sun.set + 0.9) phase = 'night';
+  else if (h < sun.rise + 1) phase = 'dawn';
+  else if (h > sun.set - 0.3) phase = 'dusk';
+  else if (h > sun.set - 1.6) phase = 'golden';
+  else if (h < 11) phase = 'morning';
+  else phase = 'day';
+  var daylight = smooth(sun.rise - 0.3, sun.rise + 0.8, h) * (1 - smooth(sun.set - 0.6, sun.set + 0.4, h));
+  return { col: col, amt: amt, dark: dark, phase: phase, daylight: daylight };
+}
+var PHASE_NAMES = { night: 'Night 夜', dawn: 'Dawn 夜明け', morning: 'Morning 朝', day: 'Midday 昼', golden: 'Golden hour 夕方', dusk: 'Dusk 黄昏' };
+/* Today's date in Nagoya. */
+function nagoyaToday() {
+  var d = new Date(Date.now() + (9 * 60 + new Date().getTimezoneOffset()) * 60000);
+  return { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate() };
+}
+var CLK = null;
+function applyHour() {
+  var p = nagoyaToday(), h = V.hour, sun = sunTimes(p), a = astro(p, h), Lt = lightAt(h, sun);
+  CLK = { sun: sun, a: a.sun, Lt: Lt, phase: Lt.phase };
+  V.timeOfDay = Lt.phase === 'night' ? 'night' : (Lt.phase === 'dusk' || Lt.phase === 'dawn') ? 'evening' : 'day';
+  // the page's colours, as the app sets them from the hour (getTimeOfDayInNagoya, applyNightText)
+  var dt = h >= 5 && h < 11 ? 'morning' : h >= 11 && h < 17 ? 'day' : h >= 17 && h < 21 ? 'evening' : 'night';
+  document.documentElement.setAttribute('data-time', dt);
+  document.body.classList.toggle('night-text', h >= 18 || h < 6);
+  var hh = Math.floor(h), mm = Math.round((h - hh) * 60);
+  if (mm === 60) { hh++; mm = 0; }
+  var el = document.getElementById('infoTime'); if (el) el.textContent = hh + '時' + ('0' + mm).slice(-2) + '分';
+}
+function skyToScreenX(az) { return W * (0.5 + angDiff(180 * DEG, az * DEG) / DEG / 220); }
 
 /* ============================================================
    5. HELPERS
@@ -822,7 +929,7 @@ function bakeRay(S, w, h, across, along, colIn, colOut) {
 }
 /* The sun's colours now: white with a cool edge high up, warmer and
    more orange the lower it is (and always in the evening). */
-function sunAltitude() { return V.timeOfDay === 'evening' ? SUN.eveningAltitude : SUN.altitude; }
+function sunAltitude() { return CLK.a.alt; }
 function sunColours() {
   var C = {}; for (var k in SUN.colours) C[k] = hex(SUN.colours[k]);
   var low = Math.max(1 - smooth(2, 22, sunAltitude()), SUN.warmth * 0.6);
@@ -944,7 +1051,7 @@ function buildFrontClouds() {
 function drawFrontClouds(t, dt) {
   if (!cloudShapes.length || !V.showMountains || !cloudW) return;
   if (frontClouds.length !== CLOUD.front.count) buildFrontClouds();
-  var F = CLOUD.front, Tt = CLOUD.times[V.timeOfDay];
+  var F = CLOUD.front, Tt = { opacity: lerp(1, CLOUD.times.night.opacity, skyNight()) };
   var hy = H * V.horizonLine, Hf = MT.fujiHeight * H, fx = MT.fujiX * W, top = hy - Hf, reach = Hf * F.spread;
   var shown = Math.round(cloudW.front * frontClouds.length), wind = (0.5 + 0.5 * V.wind) * cloudW.speed;
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
@@ -967,16 +1074,31 @@ function drawFrontClouds(t, dt) {
   ctx.globalAlpha = 1;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 }
+/* How dark it is (0 by day … 1 at night) and how low the sun is, in eighths (as the app). */
+function skyNight() { return 1 - smooth(0.05, 0.5, CLK.Lt.daylight); }
+function cloudKeys() {
+  var night = skyNight(), low = 1 - smooth(2, 22, sunAltitude());
+  return { nK: Math.round(night * 8) / 8, eK: Math.round(low * (1 - night) * 8) / 8 };
+}
+/* The clouds' light for the time now: day, evening and night blended (the app's cloudTime). */
+function cloudTime() {
+  var T = CLOUD.times, K = cloudKeys(), o = {};
+  for (var key in T.day) {
+    if (typeof T.day[key] === 'number') o[key] = lerp(lerp(T.day[key], T.evening[key], K.eK), T.night[key], K.nK);
+    else { var c = mix(mix(hex(T.day[key]), hex(T.evening[key]), K.eK), hex(T.night[key]), K.nK); o[key] = c; }
+  }
+  return o;
+}
 /* The light and colours now, for the time of day and the weather. */
 function cloudLook() {
-  var T = CLOUD.times[V.timeOfDay], Wt = CLOUD.weather[SUN.condition];
-  var side = isNight() ? 0 : Math.round(clamp((sunPlace().x - W / 2) / (W / 2), -1, 1) * 4) / 4;
-  function tinted(c, tc) { return mix(hex(c), hex(tc), T.tint); }
+  var T = cloudTime(), Wt = CLOUD.weather[SUN.condition], K = cloudKeys();
+  var side = K.nK >= 0.5 ? 0 : Math.round(clamp((sunPlace().x - W / 2) / (W / 2), -1, 1) * 4) / 4;
+  function tinted(c, tc) { return mix(hex(c), tc, T.tint); }
   var o = {};
   CLOUD_SHAPE_KEYS.concat(['shadow', 'ambient', 'baseDark', 'silver']).forEach(function (k) { o[k] = CLOUD[k]; });
   o.sunSide = side; o.sunElevation = T.elevation; o.sunFront = T.front; o.exposure = T.exposure;
   o.colours = { lit: tinted(Wt.lit, T.lit), shade: tinted(Wt.shade, T.shade), base: tinted(Wt.base, T.base),
-                sky: isNight() ? [40, 50, 90] : hex(CLOUD.sky) };
+                sky: mix(hex(CLOUD.sky), [40, 50, 90], K.nK) };
   return o;
 }
 function paintCloudShapes() {
@@ -1006,8 +1128,9 @@ function lerpCond(a, b, k) {
   return o;
 }
 function sunPlace() {
+  // as the app: across the screen from the sun's bearing (skyToScreen), always just under the toolbar (skyBandY)
   var R = SUN.coreSize * (1 + (1 - smooth(2, 22, sunAltitude())) * 0.25);
-  return { x: W * SUN.across, y: barBottom + R + SUN.below, R: R };
+  return { x: skyToScreenX(CLK.a.az), y: barBottom + R + 18, R: R };
 }
 function drawSunSky(t, dt) {
   if (t - barT > 1) {
@@ -1021,7 +1144,7 @@ function drawSunSky(t, dt) {
   if (clouds.length !== CLOUD.count && cloudShapes.length) buildClouds();
   var nightNow = isNight();
   if (sunDirty && nowT - sunBakedAt > 0.12) bakeSun();
-  else if (!nightNow && nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
+  else if (nowT - sunBakedAt > 0.5 && JSON.stringify(sunColours()) !== sunColKey) bakeSun();
   if (cloudShapes.length) paintCloudShapes();
   var P = sunPlace(), X = P.x, Y = P.y, R = P.R;
   var c = ctx;
@@ -1029,17 +1152,18 @@ function drawSunSky(t, dt) {
   c.globalAlpha = 1;
 
   // the veil over the sky
-  var va = nightNow ? 0 : cur.veil * SUN.veil;      // no dark sheet over the sky at night
+  var night = skyNight(), va = cur.veil * SUN.veil * (1 - night);      // none in the dark (as the app)
   if (va > 0.003) {
-    var vc = nightNow ? scale(cur.veilCol, 0.35) : cur.veilCol, hz = H * V.horizonLine;
-    var vg = c.createLinearGradient(0, 0, 0, hz);
-    vg.addColorStop(0, rgb(vc, clamp(va * 0.75, 0, 1))); vg.addColorStop(1, rgb(vc, clamp(va * 0.45, 0, 1)));
-    c.fillStyle = vg; c.fillRect(0, 0, W, hz);
+    var vg = c.createLinearGradient(0, 0, 0, H);
+    vg.addColorStop(0, rgb(cur.veilCol, clamp(va * 0.75, 0, 1)));
+    vg.addColorStop(0.9, rgb(cur.veilCol, clamp(va * 0.45, 0, 1)));
+    vg.addColorStop(1, rgb(cur.veilCol, clamp(va * 0.4, 0, 1)));
+    c.fillStyle = vg; c.fillRect(0, 0, W, H);
   }
 
   // the clouds, and how much of the sun they hide
   // the weather's values ease in; the night's opacity keeps them faint so the text stays readable
-  var Wt = CLOUD.weather[SUN.condition], Tt = CLOUD.times[V.timeOfDay];
+  var Wt = CLOUD.weather[SUN.condition], Tt = { opacity: lerp(1, CLOUD.times.night.opacity, night) };   // faint at night
   cloudW = cloudW ? lerpCond(cloudW, Wt, 1 - Math.exp(-dt / 0.8)) : lerpCond(Wt, Wt, 1);
   var shown = Math.round(cloudW.cover * clouds.length), occl = 0, wind = (0.5 + 0.5 * V.wind) * CLOUD.speed * cloudW.speed;
   for (var i = 0; i < clouds.length; i++) {
@@ -1060,17 +1184,17 @@ function drawSunSky(t, dt) {
   }
   c.globalAlpha = 1;
   sunOccl = occl;
-  var tod = { day: 'Day', evening: 'Evening', night: 'Night' }[V.timeOfDay];
+  var tod = PHASE_NAMES[CLK.phase] + ' ' + (Math.floor(V.hour)) + ':' + ('0' + Math.round((V.hour % 1) * 60) % 60).slice(-2);
   document.getElementById('infoWeather').textContent = target.jp;
-  if (nightNow || !SUN.show) {
-    sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · ' + (nightNow ? 'no sun at night' : 'sun hidden');
+  var alt = sunAltitude();
+  if (!SUN.show || alt < -1.5) {
+    sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · ' + (SUN.show ? 'the sun is down' : 'sun hidden');
     return;
   }
-  var alt = sunAltitude();
-  var vis = SUN.strength * smooth(-1, 3, alt);
+  var vis = SUN.strength * smooth(-1.5, 1.5, alt);
   var block = occl * CLOUD.block;
   var clear = vis * cur.rays * (1 - block);
-  sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · sun ' + alt + '° up, disc ' + Math.round(R) + ' px' +
+  sunInfo = tod + ' · ' + target.jp + ' (' + target.en + ') · sun ' + alt.toFixed(1) + '° up, disc ' + Math.round(R) + ' px' +
             (occl > 0.02 ? ' · behind a cloud: ' + Math.round(occl * 100) + '%' : '');
   if (vis < 0.005) return;
 
@@ -2004,22 +2128,21 @@ window.winterLab = {
   changed: function (what) {
     saveAll();
     if (!what || what === 'live') return;
+    if (what === 'time') { this.setHour(); return; }
     (what === 'all' ? ['mtn', 'branches', 'sprites', 'sun'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
-  setTime: function (tod) {
-    note('time of day: ' + tod);
-    V.timeOfDay = SUN.timeOfDay = tod;
-    document.documentElement.setAttribute('data-time', tod);
+  setHour: function () {
+    applyHour();
+    note('time: ' + V.hour.toFixed(2) + ' h · ' + PHASE_NAMES[CLK.phase] + ' · sun ' + CLK.a.alt.toFixed(1) + '° up');
     sunDirty = true; saveAll();
-    paintSkyTint(); rebuildAll();
+    rebuildAll();
   },
   reset: function () {
     [['V', V_DEFAULTS, V], ['MT', MT_DEFAULTS, MT], ['CLOUD', CLOUD_DEFAULTS, CLOUD], ['SUN', SDEF, SUN]].forEach(function (x) {
       var D = clone(x[1]); for (var k in D) x[2][k] = D[k];
     });
-    SUN.timeOfDay = V.timeOfDay;
-    document.documentElement.setAttribute('data-time', V.timeOfDay);
+    applyHour();
     sunDirty = true; saveAll(); resize(); rebuildAll();
   },
   gust: function () { startGust(Math.random() < 0.5 ? 1 : -1, 1.5); },
@@ -2048,16 +2171,24 @@ function resize() {
   cvS.width = Math.max(1, Math.round(W * PR * 0.25)); cvS.height = Math.max(1, Math.round(H * PR * 0.25));
   paintSkyTint();
 }
-/* The night sky colour, as in the app (nothing by day). */
+/* The time-of-day sky colour, as the app draws it (drawSky in app.js) on its quarter-size canvas:
+   the light's colour through the day (lightAt), darker at night, a little greyer under cloud. */
+var SKY_TINT = 0.8;                                         // the app's S.skyTint
+var COVER = { clear: 5, sunny: 20, partly: 43, thin: 65, cloudy: 85, mist: 50, rain: 90, snow: 90 };   // the cloud cover (%) of each weather
 function paintSkyTint() {
   sctx.setTransform(1, 0, 0, 1, 0, 0);
   sctx.clearRect(0, 0, cvS.width, cvS.height);
-  if (isNight()) {
-    sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
+  if (!CLK) return;
+  sctx.setTransform(PR * 0.25, 0, 0, PR * 0.25, 0, 0);
+  var Lt = CLK.Lt, a = SKY_TINT * Lt.amt * 1.2, cc = Lt.col;
+  if (a > 0.003) {
     var g = sctx.createLinearGradient(0, 0, 0, H);
-    g.addColorStop(0, 'rgba(52,66,118,0.42)'); g.addColorStop(1, 'rgba(70,85,127,0.16)');
+    g.addColorStop(0, rgb(cc, a)); g.addColorStop(1, rgb(cc, a * 0.5));
     sctx.fillStyle = g; sctx.fillRect(0, 0, W, H);
   }
+  if (Lt.dark > 0.01) { sctx.fillStyle = 'rgba(35,40,70,' + (SKY_TINT * Lt.dark * 0.35).toFixed(3) + ')'; sctx.fillRect(0, 0, W, H); }
+  var wd = SKY_TINT * ((COVER[SUN.condition] || 0) / 100 * 0.1 + (SUN.condition === 'rain' ? 0.06 : 0));
+  if (wd > 0.003) { sctx.fillStyle = 'rgba(70,64,82,' + wd.toFixed(3) + ')'; sctx.fillRect(0, 0, W, H); }
 }
 /* Everything is baked again in steps, one heavy step a frame (the
    mountains, the snowdrift, the snowfield, the sprites), so the graphics
@@ -2076,6 +2207,7 @@ function blankRow(P, y) {
 }
 function rebuildAll() {
   if (!W) resize();
+  applyHour(); paintSkyTint();
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
   buildSky();
   dirty = {};
@@ -2220,6 +2352,7 @@ window.addEventListener('resize', function () {
   _rz = setTimeout(function () { resize(); WS.bKey = ''; rebuildAll(); }, 200);
 });
 
+applyHour();
 resize();
 rebuildAll();
 requestAnimationFrame(frame);
@@ -2381,7 +2514,8 @@ var G = [
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
-    { sel: 'time' }, { sel: 'condition' },
+    { o: 'V', k: 'hour', label: 'Time (hour in Nagoya, today)', min: 4, max: 22, step: 0.05, re: 'time', note: 'As the app: the sun\'s place and the sky\'s colour follow the hour. 15.5 = late afternoon, the app\'s golden hour.' },
+    { sel: 'condition' },
     { o: 'V', k: 'wind', label: 'Wind', min: 0, max: 4, step: 0.05, re: 'live' },
     { o: 'V', k: 'gustEvery', label: 'A gust every (s)', min: 2, max: 30, step: 0.5, re: 'live' },
     { o: 'V', k: 'gustStrength', label: 'Gust strength', min: 0, max: 3, step: 0.05, re: 'live' },
@@ -2403,8 +2537,6 @@ var G = [
     { o: 'CLOUD', k: 'flats', label: 'Flat layers (kinds)', min: 0, max: 4, step: 1, re: 'live' },
     { o: 'CLOUD', k: 'puffs', label: 'Small puffs (kinds)', min: 0, max: 4, step: 1, re: 'live' },
     { o: 'CLOUD', k: 'banks', label: 'Low banks (kinds)', min: 0, max: 4, step: 1, re: 'live' },
-    { o: 'SUN', k: 'across', label: 'Sun: across the screen', min: 0, max: 1, step: 0.01, re: 'live' },
-    { o: 'SUN', k: 'altitude', label: 'Sun: height in the sky (°)', min: 2, max: 60, step: 1, re: 'sun' },
     { o: 'SUN', k: 'strength', label: 'Sun: brightness', min: 0, max: 1.5, step: 0.01, re: 'live' },
     { o: 'V', k: 'stars', label: 'Stars (night)', min: 0, max: 1, step: 0.01, re: 'live' },
     { chk: 'V', k: 'moon', label: 'Moon (night)', re: 'live' },
@@ -2511,13 +2643,11 @@ function control(c) {
   if (c.sel) {
     row = document.createElement('label'); row.className = 'sp-colour';
     var sel = document.createElement('select'), opts, val;
-    if (c.sel === 'time') { row.textContent = 'Time of day'; opts = [['day', 'Day'], ['evening', 'Evening'], ['night', 'Night']]; val = OBJ.V.timeOfDay; }
-    else { row.textContent = 'Weather'; opts = CONDS; val = OBJ.SUN.condition; }
+    { row.textContent = 'Weather'; opts = CONDS; val = OBJ.SUN.condition; }
     opts.forEach(function (o) { var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op); });
     sel.value = val;
     sel.addEventListener('change', function () {
-      if (c.sel === 'time') lab.setTime(sel.value);
-      else { OBJ.SUN.condition = sel.value; lab.changed('all'); }
+      OBJ.SUN.condition = sel.value; lab.changed('all');
     });
     row.appendChild(sel);
     return row;
@@ -2581,7 +2711,7 @@ document.getElementById('spCopy').addEventListener('click', function () {
       if (c.o) parts.push(c.label + ' ' + fmt(c, OBJ[c.o][c.k]));
       else if (c.chk) parts.push(c.label + ' ' + (OBJ[c.chk][c.k] ? 'on' : 'off'));
       else if (c.col) c.keys.forEach(function (kk) { parts.push(kk[1] + ' ' + OBJ[c.col].colours[kk[0]]); });
-      else if (c.sel) parts.push(c.sel === 'time' ? 'Time ' + OBJ.V.timeOfDay : 'Weather ' + OBJ.SUN.condition);
+      else if (c.sel) parts.push('Weather ' + OBJ.SUN.condition);
     });
     lines.push(grp.name + ': ' + parts.join(', '));
   });
@@ -2625,5 +2755,121 @@ window.addEventListener('resize', function () { if (sp.style.left) place(parseFl
 var count = document.getElementById('spCount');
 setInterval(function () { count.textContent = lab.info(); }, 500);
 build();
+})();
+
+/* ============================================================
+   THE BACKGROUND'S LANTERNS AND MOTES — as the app makes them (app.js:
+   霞灯 LANTERNS and buildMotes, copied as they are): small glowing dots
+   on the Shippō circles that light up one after another along a path,
+   and soft motes floating in the air. The app builds them in every theme.
+   ============================================================ */
+(function () {
+'use strict';
+var lanternLit = document.getElementById('lanternLit'), lanternBloom = document.getElementById('lanternBloom');
+var moteField = document.getElementById('moteField');
+var _prefersReducedMotion = false, windEnabled = true;
+try { if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { _prefersReducedMotion = true; windEnabled = false; } } catch (e) {}
+var LANTERN_COUNT = 10;
+var LANTERN_TILE = 60;
+var _lanterns = [];
+
+function lanternBounds() {
+  var half = LANTERN_TILE / 2;
+  return { half: half, maxI: Math.floor(window.innerWidth / half), maxJ: Math.floor(window.innerHeight / half) };
+}
+function lanternPlace(L) {
+  var half = LANTERN_TILE / 2;
+  var dot = LANTERN_TILE * 1.5, glow = LANTERN_TILE * 4;
+  L.dot.style.transform = 'translate3d(' + (L.i * half - dot / 2) + 'px,' + (L.j * half - dot / 2) + 'px,0)';
+  L.glow.style.transform = 'translate3d(' + (L.i * half - glow / 2) + 'px,' + (L.j * half - glow / 2) + 'px,0)';
+}
+function lanternRandomSpot() {
+  var b = lanternBounds();
+  var i = 1 + Math.floor(Math.random() * Math.max(1, b.maxI - 1));
+  var j = 1 + Math.floor(Math.random() * Math.max(1, b.maxJ - 1));
+  if ((i + j) % 2) j += 1;
+  return { i: i, j: j };
+}
+function lanternStep(L) {
+  var b = lanternBounds();
+  var all = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
+  var open = [];
+  for (var t = 0; t < all.length; t++) {
+    var ni = L.i + all[t][0], nj = L.j + all[t][1];
+    if (ni > 0 && nj > 0 && ni < b.maxI && nj < b.maxJ) open.push(all[t]);
+  }
+  if (!open.length) {
+    var s = lanternRandomSpot();
+    L.i = s.i; L.j = s.j; L.dir = null;
+    return;
+  }
+  /* Keep going the same way 60% of the time if that way is still
+     open; otherwise pick any open direction at random. The pick must
+     be random: trying the directions in a fixed order always favours
+     one corner, and every lantern ends up stuck there. */
+  var pick = null;
+  if (L.dir && Math.random() < 0.6) {
+    for (var k = 0; k < open.length; k++) {
+      if (open[k][0] === L.dir[0] && open[k][1] === L.dir[1]) pick = open[k];
+    }
+  }
+  if (!pick) pick = open[Math.floor(Math.random() * open.length)];
+  L.i += pick[0]; L.j += pick[1]; L.dir = pick;
+}
+function buildLanterns() {
+  if (!lanternLit || !lanternBloom) return;
+  lanternLit.innerHTML = '';
+  lanternBloom.innerHTML = '';
+  _lanterns = [];
+  if (_prefersReducedMotion) return;
+  var dotSize = LANTERN_TILE * 1.5, glowSize = LANTERN_TILE * 4;
+  for (var k = 0; k < LANTERN_COUNT; k++) {
+    var delay = (-7 * k / LANTERN_COUNT).toFixed(2) + 's';
+    var dot = document.createElement('div');
+    var glow = document.createElement('div');
+    dot.className = 'lantern';
+    glow.className = 'lantern-bloom';
+    dot.style.setProperty('--d', delay);
+    glow.style.setProperty('--d', delay);
+    dot.style.width = dot.style.height = dotSize + 'px';
+    glow.style.width = glow.style.height = glowSize + 'px';
+    lanternLit.appendChild(dot);
+    lanternBloom.appendChild(glow);
+    var spot = lanternRandomSpot();
+    var L = { dot: dot, glow: glow, i: spot.i, j: spot.j, dir: null };
+    lanternPlace(L);
+    _lanterns.push(L);
+    dot.addEventListener('animationiteration', (function(L) {
+      return function() { lanternStep(L); lanternPlace(L); };
+    })(L));
+  }
+}
+function buildMotes() {
+  if (!moteField) return;
+  moteField.innerHTML = '';
+  if (!windEnabled) return;
+  var count = 8;
+  for (var i = 0; i < count; i++) {
+    var m = document.createElement('div');
+    m.className = 'mote';
+    var size = 14 + Math.random() * 16;
+    m.style.width = size + 'px';
+    m.style.height = size + 'px';
+    m.style.left = (Math.random() * 100) + '%';
+    m.style.top  = (Math.random() * 100) + '%';
+    var dur = 18 + Math.random() * 20;
+    m.style.setProperty('--mote-dur', dur + 's');
+    m.style.setProperty('--mote-delay', (-Math.random() * dur) + 's');
+    m.style.setProperty('--mote-ax', (Math.random() * 26 - 13).toFixed(1) + 'px');
+    m.style.setProperty('--mote-ay', (Math.random() * 22 - 11).toFixed(1) + 'px');
+    m.style.setProperty('--mote-peak', (0.16 + Math.random() * 0.22).toFixed(2));
+    moteField.appendChild(m);
+  }
+}
+
+buildMotes();
+buildLanterns();
+var rz = null;
+window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { buildLanterns(); buildMotes(); }, 250); });
 })();
 </script>
