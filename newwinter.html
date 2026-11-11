@@ -369,10 +369,10 @@ var V_DEFAULTS = {
 };
 var MT_DEFAULTS = {
   seed: 7,
-  rangeHeight: 0.05, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
-  fujiX: 0.87, fujiHeight: 0.4, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.95, fujiClear: 0.9,
+  rangeHeight: 0.01, featureKm: 6, sharpness: 0.41, layering: 0.81, rangeSpacing: 9, nearestKm: 8, farRise: 1.4, lens: 22,
+  fujiX: 0.83, fujiHeight: 0.367, fujiWidth: 2.9, fujiKm: 45, fujiGullies: 0.05, fujiSnow: 0.65, fujiTongues: 0.6, fujiClear: 0.9,
   snowLine: 0.25, snow: 0.9, treeLine: 0.87, forestSnow: 0.65, snowSlope: 0.55,
-  sunStrength: 1.15, ambient: 0.65, shadows: 0.7, alpenglow: 0.6,
+  sunStrength: 1.35, ambient: 0.5, shadows: 0.85, alpenglow: 0.6,
   haze: 0.68, hazeKm: 43, mist: 0.52, mistHeightKm: 0.3, fadeToSky: 0.78, footMist: 0.69,
   strength: 1, softness: 0.4, resolution: 0.85,
   colours: {
@@ -508,12 +508,13 @@ function merge(dst, src, def) {
 try {
   var saved = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
   if (saved) {
-    merge(V, saved.V || {}, V_DEFAULTS); merge(MT, saved.MT || {}, MT_DEFAULTS);
-    // the sun and the clouds saved before step 1 were winter2.html's, not the app's: those are not read
+    merge(V, saved.V || {}, V_DEFAULTS);
+    // the sun and the clouds saved before step 1, and the mountains saved before step 2, were winter2.html's: not read
     if (saved.ver >= 2) { merge(CLOUD, saved.CLOUD || {}, CLOUD_DEFAULTS); merge(SUN, saved.SUN || {}, SDEF); }
+    if (saved.ver >= 3) merge(MT, saved.MT || {}, MT_DEFAULTS);
   }
 } catch (e) { /* a private window: the defaults */ }
-function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 2, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
+function saveAll() { try { localStorage.setItem(SAVE_KEY, JSON.stringify({ ver: 3, V: V, MT: MT, CLOUD: CLOUD, SUN: SUN })); } catch (e) { /* silent */ } }
 
 /* Toolbar date and time (Nagoya). */
 function tickClock() {
@@ -761,6 +762,10 @@ function mtnOptions(hy) {
   for (var key in MT) if (key !== 'colours') o[key] = MT[key];
   o.width = MTN.cnv.width; o.height = MTN.cnv.height; o.screenW = W; o.screenH = H; o.horizon = hy;
   o.fuji = true; o.winter = 1; o.autumn = 0;
+  // Fuji stands where the layout puts it (step 2): MT.fujiX / fujiHeight are its place on the reference,
+  // moved and sized by the panel's "Mt Fuji: across / up / size" (V.fujiX, V.fujiY, V.fujiSize)
+  o.fujiX = MT.fujiX + V.fujiX;
+  o.fujiHeight = Math.max(0.05, MT.fujiHeight * V.fujiSize + V.fujiY);
   o.sunAzimuth = V.sunAzimuth; o.sunElevation = LT.el;
   o.sunStrength = MT.sunStrength * LT.sS / Math.max(0.01, V.sunStrength);
   o.ambient = MT.ambient * LT.amb / Math.max(0.01, V.ambient);
@@ -1052,7 +1057,7 @@ function drawFrontClouds(t, dt) {
   if (!cloudShapes.length || !V.showMountains || !cloudW) return;
   if (frontClouds.length !== CLOUD.front.count) buildFrontClouds();
   var F = CLOUD.front, Tt = { opacity: lerp(1, CLOUD.times.night.opacity, skyNight()) };
-  var hy = H * V.horizonLine, Hf = MT.fujiHeight * H, fx = MT.fujiX * W, top = hy - Hf, reach = Hf * F.spread;
+  var hy = H * V.horizonLine, Hf = Math.max(0.05, MT.fujiHeight * V.fujiSize + V.fujiY) * H, fx = (MT.fujiX + V.fujiX) * W, top = hy - Hf, reach = Hf * F.spread;
   var shown = Math.round(cloudW.front * frontClouds.length), wind = (0.5 + 0.5 * V.wind) * cloudW.speed;
   ctx.setTransform(PR, 0, 0, PR, 0, 0);
   for (var i = 0; i < frontClouds.length; i++) {
@@ -1934,10 +1939,7 @@ function drawBlockIn(c) {
   c.globalAlpha = 1;
 
   // 2. Fuji, with its snow cap above the snow line
-  grp('fuji');
-  poly(BLK.fuji, K.fuji);
-  c.save(); path(BLK.fuji); c.clip(); rect(0, -0.5, 1.5, BLK.fujiSnowLine, K.fujiSnow); c.restore();
-  label('2  Mt Fuji', 0.80, 0.36);
+  // (2. Fuji is the real one now, drawn before the block-in: step 2)
 
   // 3. the hill of firs, and the pagoda high among them
   grp('hill');
@@ -2211,7 +2213,7 @@ function rebuildAll() {
   if (mtnJob) { mtnJob.job.cancel(); mtnJob = null; }      // a half-drawn picture of the mountains is started again
   buildSky();
   dirty = {};
-  stages = V.blockIn ? [] : ['mtn', 'sprites'];
+  stages = V.blockIn ? ['mtn'] : ['mtn', 'sprites'];   // (the real Fuji shows with the block-in too, step 2)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2248,8 +2250,8 @@ function runStage(st) {
 function rebake() {
   SR = PR * MT.resolution;
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
+  if (dirty.mtn) stages.push('mtn');
   if (!V.blockIn) {
-    if (dirty.mtn) stages.push('mtn');
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
   }
@@ -2283,6 +2285,23 @@ function checkRetry(t) {
   if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn'); }
 }
 
+/* The mountains (baked), and the mist drifting along their foot. */
+function drawMountains(dt) {
+  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
+  if (V.showMountains && V.mistDrift > 0) {
+    ctx.setTransform(PR, 0, 0, PR, 0, 0);
+    ctx.globalAlpha = V.mistDrift * 0.5;
+    for (var m = 0; m < mistBlobs.length; m++) {
+      var Bm = mistBlobs[m];
+      Bm.x += Bm.v * dt * (0.5 + 0.5 * V.wind);
+      if (Bm.x - Bm.w / 2 > W + 50) Bm.x = -Bm.w / 2 - 40;
+      if (Bm.x + Bm.w / 2 < -50) Bm.x = W + Bm.w / 2 + 40;
+      ctx.drawImage(MIST.cnv, Bm.x - Bm.w / 2, Bm.y - Bm.h / 2, Bm.w, Bm.h);
+    }
+    ctx.globalAlpha = 1;
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+}
 var last = 0, barTimer = 0;
 function frame(now) {
   var t = now / 1000, dt = last ? Math.min(0.05, t - last) : 0.016;
@@ -2291,7 +2310,7 @@ function frame(now) {
   // one step at a time, a little apart, so the graphics chip has time between them (a step asked for twice runs once)
   if (mtnJob) { try { stepScenery(); } catch (e) { mtnJob = null; glRetry.mtn = true; note('ERROR in mountains: ' + e.message); } stageAt = t + 0.35; }
   else if (stages.length) { if (t >= stageAt) { var st = stages.shift(); if (stages.indexOf(st) < 0) { safeStage(st); stageAt = t + (st === 'mtn' || st === 'ground' ? 0.35 : 0); } } }
-  else if (!V.blockIn) { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
+  else { try { checkRetry(t); } catch (e) { note('ERROR in the check: ' + e.message); } }
   watchGL();
   barTimer -= dt;
   updateGusts(dt);
@@ -2311,7 +2330,11 @@ function frame(now) {
   refOverlay();
   placeNav();
   if (V.blockIn) {
-    // step 0: every element as a plain flat shape at its place in the reference (section 14b)
+    // the elements built so far (step 2: Fuji, the mist drifting along its foot, the clouds in front of it),
+    // then every element still to be built as a plain flat shape at its place in the reference (section 14b)
+    drawMountains(dt);
+    drawFrontClouds(t, dt);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     drawBlockIn(ctx);
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
     gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
@@ -2319,19 +2342,7 @@ function frame(now) {
     return;
   }
   // the mountains (baked), the mist drifting along them and the clouds in front of Fuji
-  if (V.showMountains) { ctx.globalAlpha = MT.strength; ctx.drawImage(MTN.cnv, 0, 0, cv.width, cv.height); ctx.globalAlpha = 1; }
-  if (V.showMountains && V.mistDrift > 0) {
-    ctx.setTransform(PR, 0, 0, PR, 0, 0);
-    ctx.globalAlpha = V.mistDrift * 0.5;
-    for (var m = 0; m < mistBlobs.length; m++) {
-      var Bm = mistBlobs[m];
-      Bm.x += Bm.v * dt * (0.5 + 0.5 * V.wind);
-      if (Bm.x - Bm.w / 2 > W + 50) Bm.x = -Bm.w / 2 - 40;
-      if (Bm.x + Bm.w / 2 < -50) Bm.x = W + Bm.w / 2 + 40;
-      ctx.drawImage(MIST.cnv, Bm.x - Bm.w / 2, Bm.y - Bm.h / 2, Bm.w, Bm.h);
-    }
-    ctx.globalAlpha = 1;
-  }
+  drawMountains(dt);
   drawFrontClouds(t, dt);
   // (each step's new element goes here, back to front)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
@@ -2488,9 +2499,10 @@ var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'],
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: 'live' });
-    out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: 'live' });
-    out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: 'live' });
+    var re = m[0] === 'fuji' ? 'mtn' : 'live';                // the real Fuji is baked again (step 2)
+    out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
+    out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
+    out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
   });
   return out;
 }
@@ -2542,14 +2554,12 @@ var G = [
     { chk: 'V', k: 'moon', label: 'Moon (night)', re: 'live' },
     { o: 'V', k: 'moonSize', label: 'Moon size', min: 0.5, max: 2.5, step: 0.05, re: 'live' } ] },
   { name: 'Mountains and Fuji (step 2)', file: 'mountains.js', ctls: [
-    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0.04, max: 0.4, step: 0.01, re: 'mtn' },
+    { o: 'MT', k: 'rangeHeight', label: 'Height of the ranges', min: 0, max: 0.4, step: 0.005, re: 'mtn', note: 'The ranges either side of Fuji (the reference has none: keep it low).' },
     { o: 'MT', k: 'featureKm', label: 'Size of the mountains (km)', min: 3, max: 30, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'sharpness', label: 'Sharp crests', min: 0, max: 1, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'layering', label: 'Ranges one behind another', min: 0, max: 1, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'nearestKm', label: 'Nearest range (km)', min: 3, max: 25, step: 0.5, re: 'mtn' },
     { o: 'MT', k: 'farRise', label: 'Far ranges stand higher', min: 0, max: 2, step: 0.05, re: 'mtn' },
-    { o: 'MT', k: 'fujiX', label: 'Fuji: across the screen', min: 0, max: 1, step: 0.01, re: 'mtn' },
-    { o: 'MT', k: 'fujiHeight', label: 'Fuji: height', min: 0.1, max: 0.6, step: 0.01, re: 'mtn' },
     { o: 'MT', k: 'fujiWidth', label: 'Fuji: width', min: 1.5, max: 4, step: 0.05, re: 'mtn' },
     { o: 'MT', k: 'fujiKm', label: 'Fuji: distance (km)', min: 15, max: 100, step: 1, re: 'mtn' },
     { o: 'MT', k: 'fujiGullies', label: 'Fuji: gullies', min: 0, max: 1.5, step: 0.05, re: 'mtn' },
