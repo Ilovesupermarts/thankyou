@@ -16,6 +16,9 @@
 <script src="snowfield.js"></script>
 <script src="snowheaps.js"></script>
 <script src="winterhill.js"></script>
+<script src="fftwaves.js"></script>
+<script src="water.js"></script>
+<script src="winterlake.js"></script>
 
 <style>
   /* ============================================================
@@ -350,6 +353,17 @@ var V_DEFAULTS = {
   pagodaShow: true, pagodaTurn: 45, pagodaTimber: false, pagodaSnow: 1, pagodaHaze: 0.12, pagodaLamps: 1, pagodaRow: 0.32, pagodaClear: 1,
   // the valley mist: its middle (share of the height, as on the reference), its height and strength
   mistY: 0.645, mistHeight: 0.14, mistStrength: 0.85,
+  // the snow ground and the lake (step 6, winterlake.js): the eye's height above the snow (m), the banks' height above
+  // the water (m) and how uneven their edge is; the snow's swells, wind-carved drifts, grain and sparkle, its haze
+  // (how strong, and the distance (m) at which it is about two thirds mist), the low sun's warmth on the far snow
+  eyeHeight: 3, bankDrop: 0.5, bankWobble: 1,
+  fieldSwell: 1, fieldDrifts: 1, fieldGrain: 1, fieldSparkle: 1, fieldHaze: 1, fieldHazeDist: 260, fieldGlow: 0.6,
+  // the water (water.js, as the autumn lake): how strongly it mirrors, how far the waves move the reflections, their
+  // size and speed, the simulated waves (fftwaves.js) and the wind over the water (m/s), the sun's sparkle, the
+  // picture's resolution; then the cold: thin ice along the shores (how much, how wide, m), the mist on the far
+  // water, the steam rising off it (how much, how high)
+  lakeMirror: 0.95, lakeCalm: 0.6, lakeWaves: 0.25, lakeWaveSize: 1, lakeSpeed: 0.2, lakeFft: true, lakeWind: 0.45, lakeSparkle: 1, lakeRes: 0.75,
+  thinIce: 0.7, iceWidth: 1.2, lakeMist: 0.5, steam: 0.8, steamRise: 1,
   // time, wind and light
   wind: 1.85, gustEvery: 30, gustStrength: 1.4,
   sunAzimuth: -60, sunElevation: 22, eveningElevation: 5, sunStrength: 0.85, ambient: 0.9, blueShade: 0.6, moonLight: 0.45,
@@ -373,7 +387,9 @@ var V_DEFAULTS = {
     branch: '#3B2B2A',
     blossom: '#D93B3B',
     blossomDeep: '#A8212E',
-    stamen: '#F4D27A'
+    stamen: '#F4D27A',
+    bankEarth: '#4D4038',
+    lakeDeep: '#93A5C3'
   }
 };
 var MT_DEFAULTS = {
@@ -2000,7 +2016,9 @@ function blkCol() {
     water: C.water, pine: C.needle, rope: C.rope, vermilion: C.vermilion, stone: C.stone, bark: C.branch, blossom: C.blossom, mist: hex(C.mist)
   };
 }
-function drawBlockIn(c) {
+/* part: 'back' (behind the snow ground: the hill, the pagoda, the mist) or 'front' (standing on it: everything else).
+   The snow ground and the lake are the real ones now (step 6, section 14c), drawn between the two. */
+function drawBlockIn(c, part) {
   var K = blkCol();
   // the element being drawn: its anchor, shift and size (set by grp)
   var ax = 0, ay = 0, dx = 0, dy = 0, sz = 1;
@@ -2026,6 +2044,7 @@ function drawBlockIn(c) {
   // (2. Fuji is the real one now, drawn before the block-in: step 2)
 
   // (3. the hill of firs and the pagoda are the real ones now, drawn before the block-in: step 3)
+  if (part === 'back') {
 
   // 4. the valley mist: a soft golden-cream band (the one soft shape here; its place is set on the panel)
   grp();
@@ -2034,10 +2053,11 @@ function drawBlockIn(c) {
   g.addColorStop(0, rgb(K.mist, 0)); g.addColorStop(clamp((mm - mt) / Math.max(1, mb - mt), 0.01, 0.99), rgb(K.mist, V.mistStrength)); g.addColorStop(1, rgb(K.mist, 0));
   c.fillStyle = g; c.fillRect(0, mt, W, mb - mt);
   label('4  Valley mist', 0.62, V.mistY - 0.02);
+  }
 
-  // the snow ground (step 8 shapes it): from the horizon line down
-  rect(0, BLK.ground, 1, 1.01, K.snow);
+  // (the snow ground and 6. the lake: the real ones, step 6, drawn between the two parts)
 
+  if (part === 'front') {
   // 5. the hall and the frosted trees
   grp('hall');
   var Hl = BLK.hall, hw2 = (Hl.x1 - Hl.x0);
@@ -2057,15 +2077,6 @@ function drawBlockIn(c) {
     rect(F.x - 0.002, (F.top + F.foot) / 2, F.x + 0.002, F.foot, '#8E8A90');
   });
   label('5  Frosted trees', BLK.frost[0].x, BLK.frost[0].top - 0.01);
-
-  // 6. the lake: the water, then the snow over it that shapes it, each waterline with its dark rim
-  grp('lake');
-  poly(BLK.water, K.water);
-  [BLK.leftSpit, BLK.rightBank, BLK.rightSpit].forEach(function (B) {
-    poly(B, K.snow);
-    c.strokeStyle = K.rim; c.lineWidth = Math.max(1.5, LY(0.003)); c.stroke();
-  });
-  label('6  Mirror lake', 0.75, 0.90);
 
   // 7. the right bank's trees and the ropes of the roped pines
   grp('pines');
@@ -2141,6 +2152,7 @@ function drawBlockIn(c) {
   });
   grp('plumL'); label('10  Plum branches', 0.20, 0.12);
   grp('plumR'); label('10  Plum branches', 0.86, 0.12);
+  }
 
   // the names, so each shape can be told apart (11, the snowfall, is not blocked in)
   if (V.blockLabels) {
@@ -2187,6 +2199,123 @@ function placeNav() {
 }
 
 /* ============================================================
+   14c. THE SNOW GROUND AND THE LAKE (step 6) — winterlake.js and
+   water.js. The lake's outline is the reference's (LAKE_SHORE: the
+   snow's edge, measured on the reference, fractions of the screen,
+   moved and sized by the layout's "Lake and its banks" values). Baked
+   in two steps after the mountains (the mirror needs them): 'field'
+   (the snow ground with its banks, FIELD) and 'lake' (the water's
+   mirror, MIRROR, and the thin ice and the far mist, STILL). Each
+   frame: the water (water.js, on the graphics chip), the still things
+   on it, the snow ground over it, the steam.
+   ============================================================ */
+/* the snow's edge round the water: the far water's edge, the right bank's tip and its waterline, its low spit on the
+   right, off the screen at the right and the bottom, the near-left shore, round the shore below the hall and along the
+   left spit to its tip, and up its far side */
+var LAKE_SHORE = [[0.548, 0.726], [0.628, 0.721], [0.706, 0.724], [0.68, 0.742], [0.646, 0.763], [0.648, 0.774], [0.693, 0.781],
+  [0.747, 0.789], [0.802, 0.799], [0.856, 0.805], [0.889, 0.81], [0.896, 0.825], [0.911, 0.838], [0.947, 0.846], [1.03, 0.857],
+  [1.03, 1.03], [0.729, 1.03], [0.639, 0.984], [0.548, 0.952], [0.468, 0.909], [0.413, 0.87], [0.401, 0.847], [0.399, 0.821],
+  [0.413, 0.799], [0.45, 0.786], [0.493, 0.774], [0.548, 0.768], [0.58, 0.761], [0.588, 0.755], [0.575, 0.742]];
+var FIELD = mk(), STILL = mk(), MIRROR = mk(), LAKEW = { shore: null, steam: {}, pad: 12, res: 1 }, waterInit = false;
+function lakeLens() { return H / (2 * Math.tan(MT.lens * PI / 360)); }
+function lakeOutline() {
+  var A = BLK_ANCHOR.lake, sz = V.lakeSize || 1;
+  return LAKE_SHORE.map(function (p) { return [(A[0] + (p[0] - A[0]) * sz + V.lakeX) * W, blkY(A[1] + (p[1] - A[1]) * sz - V.lakeY) * H]; });
+}
+/* The sky as it is at height y (CSS px), for its reflection: warm and pale low down (the mist and the low sun),
+   cooler and greyer higher up, darker at night. */
+function lakeSkyAt(y) {
+  var hy = H * V.horizonLine, u = clamp((hy - y) / hy, 0, 1), Lt = CLK.Lt;
+  var low = mix(light(hex(V.colours.mist)), [168, 176, 196], 0.55);
+  var high = mix([172, 186, 212], Lt.col, Lt.amt * 0.4);
+  var c = mix(low, high, Math.pow(u, 0.55));
+  if (Lt.dark > 0.01) c = mix(c, [38, 44, 76], Lt.dark * 0.85);
+  return c;
+}
+/* The front of the snow on the banks (it faces you, the sun is behind it): the sky's light on white, a little warmed. */
+function lakeSnowLit() { return mix(mix(SHADE, hex(V.colours.snow), 0.45), scale(LT.sunRGB, LT.sS), 0.08); }
+function bakeField() {
+  var hy = H * V.horizonLine, F = lakeLens();
+  LAKEW.shore = WinterLake.shore(lakeOutline(), { W: W, H: H, hy: hy, F: F, eye: V.eyeHeight, drop: V.bankDrop, wobble: V.bankWobble, seed: V.seed });
+  FIELD.cnv.width = cv.width; FIELD.cnv.height = cv.height;
+  FIELD.c.setTransform(1, 0, 0, 1, 0, 0); FIELD.c.clearRect(0, 0, FIELD.cnv.width, FIELD.cnv.height);
+  WinterLake.bakeGround(FIELD.c, {
+    W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, res: 0.6, shore: LAKEW.shore,
+    light: { dir: LT.dir, sun: LT.sun, vis: LT.vis }, snow: hex(V.colours.snow), shade: SHADE, mist: light(hex(V.colours.mist)),
+    groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
+    earth: light(hex(V.colours.bankEarth)), sunX: sunPlace().x, sunRGB: LT.sunRGB,
+    swell: V.fieldSwell, drifts: V.fieldDrifts, grain: V.fieldGrain, sparkle: V.fieldSparkle * (isNight() ? 0.15 : 1),
+    haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), seed: V.seed
+  });
+}
+function bakeLake() {
+  if (!LAKEW.shore) bakeField();
+  var hy = H * V.horizonLine, F = lakeLens(), Sh = LAKEW.shore, top = Math.max(hy + 1, Math.floor(Sh.top)), pad = LAKEW.pad, res = PR * 0.6;
+  LAKEW.res = res; LAKEW.top = top;
+  if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); }
+  MIRROR.cnv.width = Math.round((W + pad * 2) * res); MIRROR.cnv.height = Math.max(2, Math.round((H - top) * res));
+  WinterLake.bakeMirror(MIRROR.c, {
+    W: W, H: H, hy: hy, top: top, pad: pad, res: res, mtn: V.showMountains && mtn3d ? MTN.cnv : null, mtnAlpha: MT.strength,
+    skyAt: lakeSkyAt, shore: Sh, earth: light(hex(V.colours.bankEarth)), snowLit: lakeSnowLit(), mist: light(hex(V.colours.mist)),
+    haze: V.fieldHaze, eye: V.eyeHeight, F: F, hazeM: V.fieldHazeDist
+  });
+  if (typeof Water !== 'undefined') Water.setMirror(MIRROR.cnv);
+  STILL.cnv.width = cv.width; STILL.cnv.height = cv.height;
+  STILL.c.setTransform(1, 0, 0, 1, 0, 0); STILL.c.clearRect(0, 0, STILL.cnv.width, STILL.cnv.height);
+  WinterLake.bakeStill(STILL.c, {
+    W: W, H: H, PR: PR, hy: hy, F: F, eye: V.eyeHeight, shore: Sh, ice: V.thinIce, iceWidth: V.iceWidth,
+    mist: light(hex(V.colours.mist)), mistK: V.lakeMist, skyLight: lakeSkyAt(hy * 0.3), snowLit: lakeSnowLit(), seed: V.seed
+  });
+}
+/* The water's own colour now: the cold deep colour, darker in the evening and at night. */
+function lakeBody() {
+  var c = hex(V.colours.lakeDeep), Lt = CLK.Lt;
+  c = mix(c, scale(LT.skyRGB, 0.9), 0.15);
+  return scale(c, 1 - Lt.dark * 0.75);
+}
+function lakeFft() {
+  if (!V.lakeFft) return null;
+  return { size: 256, wind: V.lakeWind, dir: 120, fetch: 600, spread: 0.6, L0: 90, L1: 12, eye: 0.9, height: 0.9, chop: 0.8,
+           detail: 0.5, far: 0.2, shade: 0.12 };
+}
+var lakeInfo = '';
+function drawLake(t, dt) {
+  var Sh = LAKEW.shore;
+  if (!Sh || FIELD.cnv.width < 2) return;
+  var hy = H * V.horizonLine, top = LAKEW.top || Sh.top, hh = H - top, drawn = false;
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+  // the water: on the graphics chip (water.js), as the autumn lake
+  if (typeof Water !== 'undefined' && Water.state() === 'ok' && MIRROR.cnv.width > 2) {
+    var P = sunPlace(), day = isNight() ? 0 : 1;
+    var pic = Water.render({ w: W * PR * V.lakeRes, h: hh * PR * V.lakeRes, cssW: W, cssH: hh, top: top, horizon: hy, lens: lakeLens(), pad: LAKEW.pad,
+                             time: t * V.lakeSpeed, distort: V.lakeWaves * 7, calm: V.lakeCalm, waveSize: V.lakeWaveSize, reflect: 0.2, mirror: V.lakeMirror,
+                             water: lakeBody(), sun: V.lakeSparkle * LT.vis * day, sunX: P.x, sunY: P.y,
+                             sunColour: mix([255, 248, 232], LT.sunRGB, 0.6), fft: lakeFft() });
+    if (pic) { ctx.drawImage(pic, 0, Math.round(top * PR), Math.round(W * PR), Math.round(hh * PR) + 1); drawn = true; }
+  }
+  // without it (no WebGL 2, or not ready yet): the mirror as it is, with the water's colour over it
+  if (!drawn && MIRROR.cnv.width > 2) {
+    var r = LAKEW.res;
+    ctx.drawImage(MIRROR.cnv, LAKEW.pad * r, 0, W * r, hh * r, 0, top * PR, W * PR, hh * PR);
+    var g = ctx.createLinearGradient(0, top * PR, 0, H * PR), b = lakeBody();
+    g.addColorStop(0, rgb(b, 0.1)); g.addColorStop(1, rgb(b, 0.75));
+    ctx.fillStyle = g; ctx.fillRect(0, top * PR, W * PR, hh * PR);
+  }
+  lakeInfo = drawn ? 'water.js' + (V.lakeFft && Water.fftState() === 'ok' ? ' (simulated waves)' : '') : '2D water (water.js: ' + (typeof Water !== 'undefined' ? Water.state() : 'missing') + ')';
+  // the thin ice and the far mist, then the snow ground over the water's edges, then the steam
+  if (STILL.cnv.width > 2) ctx.drawImage(STILL.cnv, 0, 0);
+  ctx.drawImage(FIELD.cnv, 0, 0);
+  if (V.steam > 0) {
+    var ml = light(hex(V.colours.mist));
+    WinterLake.steam(LAKEW.steam, ctx, { W: W, H: H, PR: PR, hy: hy, shore: Sh, steam: V.steam, rise: V.steamRise,
+                                          wind: (V.wind - 0.5) * 0.4, colour: mix(ml, [255, 255, 255], 0.35) }, t, dt);
+  }
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = 1;
+}
+
+/* ============================================================
    15. THE PANEL'S HOOK — what a change on the panel bakes again: the
    mountains ('mtn'), the branches ('branches'), the light-dependent
    sprites ('sprites'), the sun ('sun'), everything ('all'), the
@@ -2200,7 +2329,7 @@ window.winterLab = {
     saveAll();
     if (!what || what === 'live') return;
     if (what === 'time') { this.setHour(); return; }
-    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
+    (what === 'all' ? ['mtn', 'hill', 'branches', 'sprites', 'sun', 'lake'] : what.split(' ')).forEach(function (w) { dirty[w] = true; });
     dirtyAt = nowT;
   },
   setHour: function () {
@@ -2221,10 +2350,11 @@ window.winterLab = {
     return 'New winter report · ' + navigator.userAgent + ' · screen ' + W + '×' + H + ' at ' + (window.devicePixelRatio || 1) +
            ' (drawn at ' + PR.toFixed(2) + ') · 2D pictures wiped ' + lost2d + '×\n' + REPORT.join('\n');
   },
+  layers: function () { return { field: FIELD.cnv, still: STILL.cnv, mirror: MIRROR.cnv }; },   // (for checking each picture on its own)
   busy: function () { return !!mtnJob || !!hillJob || stages.length > 0 || Object.keys(dirty).length > 0; },
   info: function () {
     return (mtn3d ? '3D mountains ' + Math.round(mtnMs) + ' ms' : 'painted ridges (no WebGL 2)') +
-           ' · ' + sunInfo;
+           ' · ' + sunInfo + ' · lake: ' + lakeInfo;
   }
 };
 
@@ -2283,7 +2413,7 @@ function rebuildAll() {
   if (hillJob) { hillJob.cancel(); hillJob = null; }
   buildSky();
   dirty = {};
-  stages = V.blockIn ? ['mtn', 'hill'] : ['mtn', 'hill', 'sprites'];   // (the real Fuji and the hill show with the block-in too, steps 2 and 3)
+  stages = V.blockIn ? ['mtn', 'hill', 'field', 'lake'] : ['mtn', 'hill', 'field', 'lake', 'sprites'];   // (the real Fuji, the hill, the snow ground and the lake show with the block-in too, steps 2, 3 and 6)
 }
 var stageAt = 0, glSeen = '';
 /* A step that fails is reported, and the loop carries on (an error here used to stop the whole scene). */
@@ -2312,6 +2442,8 @@ function runStage(st) {
   SHADE = shadeColour();
   if (st === 'mtn') bakeScenery();
   else if (st === 'hill') startHill();
+  else if (st === 'field') bakeField();
+  else if (st === 'lake') bakeLake();
   else if (st === 'sprites') {
     umeBakeBlooms(); bakeFlakes();
     var key = W + 'x' + H;
@@ -2323,6 +2455,8 @@ function rebake() {
   if (dirty.block) { WS.bKey = ''; rebuildAll(); return; }
   if (dirty.mtn) stages.push('mtn');
   if (dirty.hill) stages.push('hill');
+  if (dirty.lake) stages.push('field');
+  if (dirty.mtn || dirty.lake) stages.push('lake');      // (the mirror shows the mountains)
   if (!V.blockIn) {
     if (dirty.branches) umeBuildAll();
     if (dirty.sprites || dirty.branches) stages.push('sprites');
@@ -2341,7 +2475,7 @@ function checkRetry(t) {
     var lostSince = mtn3d && WS.mtnLoss !== undefined && Mountains.losses() !== WS.mtnLoss;
     if ((glRetry.mtn && (glRetry.mtnTries || 0) <= 6) || lostSince) {
       note('mountains again: ' + (lostSince ? 'their context was lost after they were drawn' : 'the last try did not work'));
-      glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn');
+      glRetry.mtn = false; WS.mtnLoss = Mountains.losses(); stages.push('mtn', 'lake');
     }
   }
   if (hasS && Snowfield.state() === 'ok') {
@@ -2355,7 +2489,7 @@ function checkRetry(t) {
   if (t < wipeAt) return;
   wipeAt = t + 3;
   if (hillDrawn && !hillJob && V.hillShow && blankRow(HILL, (H * V.horizonLine - 4) * PR)) { note('the hill picture is empty: drawing it again'); stages.push('hill'); }
-  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn'); }
+  if (mtn3d && V.showMountains && blankRow(MTN, (H * V.horizonLine - H * MT.rangeHeight * 0.25) * SR)) { note('the mountains picture is empty: drawing it again'); stages.push('mtn', 'lake'); }
 }
 
 /* The mountains (baked), and the mist drifting along their foot. */
@@ -2410,7 +2544,9 @@ function frame(now) {
     drawFrontClouds(t, dt);
     drawHill();
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    drawBlockIn(ctx);
+    drawBlockIn(ctx, 'back');
+    drawLake(t, dt);                                   // step 6: the snow ground, the banks and the water (14c)
+    drawBlockIn(ctx, 'front');
     nctx.setTransform(1, 0, 0, 1, 0, 0); nctx.clearRect(0, 0, cvN.width, cvN.height);
     gctx.setTransform(1, 0, 0, 1, 0, 0); gctx.clearRect(0, 0, cvG.width, cvG.height);
     requestAnimationFrame(frame);
@@ -2422,6 +2558,7 @@ function frame(now) {
   // step 3: the hill of firs and the pagoda (baked)
   drawHill();
   // (each step's new element goes here, back to front)
+  drawLake(t, dt);                                     // step 6: the snow ground, the banks and the water (14c)
   // the snow behind the text and table, the plum branches, the snow they shed and the petals
   drawBack(ctx, t);
   // #dynNear: the nearest flakes and the big soft ones
@@ -2442,6 +2579,9 @@ window.addEventListener('resize', function () {
 
 applyHour();
 resize();
+// the water's graphics context and shaders made now, before the scene's bakes start (as the app does on the name
+// screen, dynWarmGpu), so the first bake of the lake does not wait for them
+if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); if (Water.warm && V.lakeFft) Water.warm(null); }
 rebuildAll();
 requestAnimationFrame(frame);
 })();
@@ -2576,7 +2716,7 @@ var MOVE = [['fuji', 'Mt Fuji'], ['hill', 'Hill of firs'], ['pagoda', 'Pagoda'],
 function moveCtls() {
   var out = [];
   MOVE.forEach(function (m) {
-    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3) are baked again
+    var re = m[0] === 'fuji' ? 'mtn' : m[0] === 'hill' || m[0] === 'pagoda' ? 'hill' : m[0] === 'lake' ? 'lake' : 'live';   // the real Fuji (step 2), the hill and pagoda (step 3) and the lake (step 6) are baked again
     out.push({ o: 'V', k: m[0] + 'X', label: m[1] + ': across', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Y', label: m[1] + ': up (+) / down (−)', min: -0.3, max: 0.3, step: 0.005, re: re });
     out.push({ o: 'V', k: m[0] + 'Size', label: m[1] + ': size', min: 0.4, max: 2, step: 0.01, re: re });
@@ -2600,6 +2740,32 @@ var G = [
     { o: 'V', k: 'mistHeight', label: 'Height', min: 0.02, max: 0.4, step: 0.005, re: 'live' },
     { o: 'V', k: 'mistStrength', label: 'Strength', min: 0, max: 1, step: 0.01, re: 'live' },
     { col: 'V', keys: [['mist', 'Mist']], re: 'all' } ] },
+  { name: 'Snow ground and lake (step 6)', file: 'winterlake.js, water.js', note: 'The lake\'s outline is the reference\'s; move and size it with "Lake and its banks" in the layout group.', ctls: [
+    { o: 'V', k: 'eyeHeight', label: 'Eye above the snow (m)', min: 1, max: 12, step: 0.1, re: 'lake', note: 'Sets how big everything on the ground looks: higher = the banks, ice and drifts look smaller.' },
+    { o: 'V', k: 'bankDrop', label: 'Banks: height above the water (m)', min: 0.05, max: 1, step: 0.01, re: 'lake', note: 'The dark earth face under the snow\'s lip.' },
+    { o: 'V', k: 'bankWobble', label: 'Banks: uneven edge', min: 0, max: 2.5, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldSwell', label: 'Snow: soft swells', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldDrifts', label: 'Snow: wind-carved drifts', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldGrain', label: 'Snow: grain', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldSparkle', label: 'Snow: sparkle in the sun', min: 0, max: 3, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'fieldHaze', label: 'Snow: haze far away', min: 0, max: 1.5, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'fieldHazeDist', label: 'Snow: haze distance (m)', min: 30, max: 500, step: 5, re: 'lake', note: 'At this distance the snow is about two thirds mist.' },
+    { o: 'V', k: 'fieldGlow', label: 'Snow: warmth of the low sun far away', min: 0, max: 2, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'lakeMirror', label: 'Water: mirror', min: 0, max: 1, step: 0.01, re: 'live', note: 'As real water: far away almost a mirror, near you its own colour.' },
+    { o: 'V', k: 'lakeCalm', label: 'Water: calm (still, glassy)', min: 0, max: 1, step: 0.01, re: 'live', note: '0 = waves as on the autumn lake, 1 = still as glass.' },
+    { o: 'V', k: 'lakeWaves', label: 'Water: how far the waves move the reflections', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeWaveSize', label: 'Water: wave size', min: 0.3, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeSpeed', label: 'Water: wave speed', min: 0, max: 1, step: 0.01, re: 'live' },
+    { chk: 'V', k: 'lakeFft', label: 'Water: simulated waves (fftwaves.js)', re: 'live' },
+    { o: 'V', k: 'lakeWind', label: 'Water: wind over it (m/s, simulated waves)', min: 0.2, max: 4, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeSparkle', label: 'Water: sun\'s sparkle', min: 0, max: 3, step: 0.05, re: 'live' },
+    { o: 'V', k: 'lakeRes', label: 'Water: picture resolution', min: 0.3, max: 1, step: 0.05, re: 'live' },
+    { o: 'V', k: 'thinIce', label: 'Cold: thin ice along the shores', min: 0, max: 1, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'iceWidth', label: 'Cold: width of the ice (m)', min: 0, max: 5, step: 0.05, re: 'lake' },
+    { o: 'V', k: 'lakeMist', label: 'Cold: mist on the far water', min: 0, max: 1, step: 0.01, re: 'lake' },
+    { o: 'V', k: 'steam', label: 'Cold: steam rising off the water', min: 0, max: 2, step: 0.05, re: 'live' },
+    { o: 'V', k: 'steamRise', label: 'Cold: how high the steam rises', min: 0, max: 3, step: 0.05, re: 'live' },
+    { col: 'V', keys: [['bankEarth', 'Banks: earth'], ['lakeDeep', 'Water: its own colour']], re: 'lake' } ] },
   { name: 'Colours of the new scene', note: 'The brief\'s colours: snow, water, vermilion torii, stone, pine needles, straw ropes, lamplight.', ctls: [
     { col: 'V', keys: [['snow', 'Snow'], ['water', 'Water'], ['vermilion', 'Torii vermilion'], ['stone', 'Stone'], ['needle', 'Pine needles'], ['rope', 'Straw ropes'], ['flame', 'Lamplight']], re: 'all' } ] },
   { name: 'Time and weather', ctls: [
