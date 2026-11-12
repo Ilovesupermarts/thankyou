@@ -1015,7 +1015,7 @@ function startHall() {
     dof: { on: V.hallDof, focus: V.hallFocus, strength: V.hallDofStrength, max: V.hallDofMax },
     field: { snow: hex(V.colours.snow), sun: LT.sun, shade: SHADE, groundMist: light(mix(hex(V.colours.mist), [222, 210, 204], 0.45)),
              haze: V.fieldHaze, hazeM: V.fieldHazeDist, glow: V.fieldGlow * (isNight() ? 0 : 1), sunX: sunPlace().x, sunRGB: LT.sunRGB, vis: LT.vis,
-             grain: V.fieldGrain, res: 0.6 },
+             grain: V.fieldGrain, res: 0.6, swell: V.fieldSwell, drifts: V.fieldDrifts, seed: V.seed },
     firs: firs,
     firLook: { snow: V.hfSnow, width: V.hfWidth, tiers: V.hillTiers, sparse: V.hillSparse, droop: V.hillDroop, lean: V.hillLean,
                brush: V.hillBrush, soft: V.hillSoft, needleTint: V.hillNeedleTint, needleCol: hex(V.colours.needle) }

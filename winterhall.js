@@ -210,6 +210,7 @@ function job(o) {
   var eyeH = o.eye || 3, drop = Math.max(0, eyeH + Y0);     // how high its ground stands above the field (the rise)
   // the trodden path (winterpath.js) where it climbs the rise to the steps: its height is added to the snow's, in the
   // scene's own space (so it is the same path the snow field has), and it is lit as the rest of this snow
+  var FHO = (o.field && o.field.drifts !== undefined && typeof WinterLake !== 'undefined' && WinterLake.heightAt) ? { swell: o.field.swell || 0, drifts: o.field.drifts || 0, seed: o.field.seed } : null;
   var gGrain = (o.field && o.field.grain) || 0, gRes = (o.PR || 1) * ((o.field && o.field.res) || 0.6), gY0 = Math.floor(o.cam.hy);
   var PATH = o.path || null, PFZ = 0, PQ = { floor: 0, far: true }, pGrey = (o.pathLook && o.pathLook.grey !== undefined) ? o.pathLook.grey : 0.5;
   var pShadow = (o.pathLook && o.pathLook.shadow !== undefined) ? o.pathLook.shadow : 1;
@@ -392,6 +393,13 @@ function job(o) {
     }
     return out;
   }
+  // the light on snow before any roll-off (sun and sky, the sky's light thrown up off the snow below), summed over the
+  // three colours: for the ratio of a slope's light to level snow's
+  function rawLight(nS, occ, sky) {
+    var dl = Math.max(0, nS[0] * Lsh[0] + nS[1] * Lsh[1] + nS[2] * Lsh[2]) * occ, sk = (0.5 + 0.5 * nS[1]) * sky + 0.22 * (0.5 - 0.5 * nS[1]), t = 0;
+    for (var ch = 0; ch < 3; ch++) t += FS.snow[ch] * FS.sun[ch] * dl * 1.25 + shadeS[ch] * sk;
+    return t;
+  }
   function fieldHaze(zw, sY) {
     var d = Math.max(0.3, sY - hy);
     return clamp((1 - Math.exp(-Math.pow(zw / FS.hazeM, 1.6))) * FS.haze + smooth(8, 0, d) * 0.7, 0, 1);
@@ -485,6 +493,13 @@ function job(o) {
     if (al < 0.004) return 0;
     var fade = fadeCol;                                     // 1: it shows just what the field shows on this row
     var e = 0.12, nx = -(groundAt(hx + e, hz2) - hyy) / e, nz = -(groundAt(hx, hz2 + e) - hyy) / e;
+    // the snow field's own swells and wind-carved drifts (winterlake.js heightAt, in the scene's x and z), shading this
+    // snow exactly as they shade the field (as the field, only its light: not its shape), so the two read as one
+    if (FHO) {
+      var sxw = X + hx * cs + hz2 * sn, szw = Z - hx * sn + hz2 * cs, fzq = Math.max(PFZ, 0.05), ee = 0.18;
+      var h00 = WinterLake.heightAt(sxw, szw, FHO, fzq), gxs = (WinterLake.heightAt(sxw + ee, szw, FHO, fzq) - h00) / ee, gzs = (WinterLake.heightAt(sxw, szw + ee, FHO, fzq) - h00) / ee;
+      nx -= gxs * cs - gzs * sn; nz -= gxs * sn + gzs * cs;
+    }
     var nL = norm([nx, 1, nz]), nS = toShadeN(nL);
     var p = [hx, hyy + 0.02, hz2];
     // the sun's light on it, averaged over the stretch of ground this pixel covers (seen nearly edge-on, one pixel
@@ -525,13 +540,16 @@ function job(o) {
     for (var pass = 0; pass < 2; pass++) {
       var occP = pass ? Math.max(0, 1 - clamp(shadowK, 0, 1.5)) : 1;
       snowLight(nS, occP * pSunK, sky, COL, pfl, pNear ? pBounce : 0);
+      // (as the snow field: level snow's brightness rolled off toward white, the slope's light laid over it as a ratio)
+      var rtL = rawLight(nS, occP * pSunK, sky) / Math.max(1, rawLight([0, 1, 0], 1, 1));
+      snowLight([0, 1, 0], 1, 1, COL, pfl, 0);
       // where it melts into the field (which shows the path too), the field's colour carries the path's light and shade
       if (pNear && fk > 0) snowLight(nSF, occP, skyF, COLF, 0, 0);
       for (var ch = 0; ch < 3; ch++) {
         var v = lerp(COL[ch] + lampCol[ch] * lamp * 0.85, FS.groundMist[ch], hzF);
         v += FS.sunRGB[ch] * FS.glow * vis * gfar * 0.22 * Math.exp(-Math.pow((px - FS.sunX) / (W * 0.42), 2));
         var fc = pNear && fk > 0 ? FC[ch] * (COL[0] + COL[1] + COL[2]) / Math.max(3, COLF[0] + COLF[1] + COLF[2]) : FC[ch];
-        outA[pass * 4 + ch] = lerp(tone(v), fk > 0 ? tone(fc) : fc, fk);
+        outA[pass * 4 + ch] = lerp(tone(v) * (1 + (rtL - 1) * 0.6 * (1 - hzF)), fk > 0 ? tone(fc) : fc, fk);
       }
     }
     // the snow field's own grain (the same pattern, on the field's own grid of pixels), so the two textures run on
