@@ -448,7 +448,7 @@ var V_DEFAULTS = {
   // step 10: the plum branches in the scene (with the block-in too, in place of their flat shapes), and their snow drawn by
   // plumsnow.js (one soft ridge along each limb, white on top, slate blue on its front): on, how far down the wood's front it
   // wraps, its lumps, how dark its front face and crease
-  plumShow: true, plumSnowNew: true, plumSnowCover: 0.5, plumSnowLumps: 1, plumSnowShade: 1,
+  plumShow: true, plumSnowNew: true, plumSnowCover: 0.3, plumSnowLumps: 1, plumSnowShade: 1,
   // the falling snow (from winter2.html; step 11)
   flakes: 334, sizeFar: 0.9, sizeNear: 4.6, farBlur: 7.1, nearBlur: 0.65, fallSpeed: 0.6, flakeSway: 3.9, frontShare: 0.17,
   bokeh: 6, backlight: 0.6,
@@ -1996,8 +1996,9 @@ function umeBakeSnowNew(T) {
   // the snow's height on each piece, as before (thicker on thicker wood, less where it slopes)
   var hN = ns.map(function (n) {
     var ux0 = Math.abs(Math.cos(n.abs));
-    var h = (n.w * 0.5 + 1.2 + T.sc * 0.005) * 1.35 * V.branchSnow * Math.pow(ux0, 0.8);
-    if (ux0 > 0.3 && V.branchDust > 0) h = Math.max(h, 0.5 * V.branchDust * V.branchSnow);
+    // about as deep as the wood is thick on the limbs, a thin line on the twigs; none on steep wood
+    var h = (n.w * 0.7 + 0.4 + T.sc * 0.0015) * V.branchSnow * Math.pow(ux0, 1.2);
+    if (ux0 > 0.55 && V.branchDust > 0) h = Math.max(h, 0.45 * V.branchDust * V.branchSnow);
     return h;
   });
   // where each piece starts along its chain, and the chain's seed

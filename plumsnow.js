@@ -73,11 +73,11 @@ function bake(p, L) {
   var ext1 = p.capEnd ? (p.fork ? p.w1 * 0.8 : 0) : Math.min(p.w1 * 1.3 + 1, len * 0.3);
   var xs = p.capStart ? len * (p.sa || 0) : -ext0, xe = p.capEnd ? len * (p.sb === undefined ? 1 : p.sb) + ext1 : len + ext1;
   if (xe - xs < 1) return null;
-  var cover = L.cover === undefined ? 0.5 : L.cover;
+  var cover = L.cover === undefined ? 0.3 : L.cover;
   // the snow's line along the piece, every half device pixel: its crest (top, negative y) and its foot on the wood
   var step = 0.5 / RS, n = Math.ceil((xe - xs) / step) + 1, top = new Float32Array(n), foot = new Float32Array(n);
-  var cap0 = Math.max(1.2, Math.min((p.h0 + p.w0) * 1.1, (xe - xs) * 0.45));
-  var cap1 = Math.max(1.2, Math.min((p.h1 + p.w1) * 1.1, (xe - xs) * 0.45));
+  var cap0 = p.capStart ? Math.max(1.2, Math.min((p.h0 + p.w0) * 1.1, (xe - xs) * 0.45)) : Math.max(0.6, ext0);
+  var cap1 = p.capEnd ? Math.max(1.2, Math.min((p.h1 + p.w1) * 1.1, (xe - xs) * 0.45)) : Math.max(0.6, ext1);
   var lam1 = Math.max(10, (p.w0 + p.w1) * 3.5), lam2 = Math.max(4, lam1 * 0.33);
   var minY = 0, maxY = -1e9;
   for (var i = 0; i < n; i++) {
@@ -111,7 +111,7 @@ function bake(p, L) {
   var lx = Ld[0] / ll, ly = Ld[1] / ll, lz = Ld[2] / ll;
   var sn = L.snow, sun = L.sun, sky = L.sky, amb = L.amb, hz = L.haze || 0, hc = L.hazeCol || [246, 238, 232];
   var shadeK = L.shade === undefined ? 1 : L.shade, contact = L.contact === undefined ? 0.6 : L.contact, grain = L.grain === undefined ? 0.5 : L.grain;
-  var lowSun = smooth(-0.05, 0.1, ly + 0.08);
+  var lowSun = smooth(-0.05, 0.1, ly + 0.08), skyW = (sky[0] + sky[1] + sky[2]) / 3 * 1.18;   // the sky overhead, whiter
   function sampleIdx(x) { return clamp((x - xs) / step, 0, n - 1); }
   function at(arr, x) { var f = sampleIdx(x), i0 = Math.floor(f), i1 = Math.min(n - 1, i0 + 1), u = f - i0; return arr[i0] + (arr[i1] - arr[i0]) * u; }
   for (var px = 0; px < cw; px++) {
@@ -130,7 +130,7 @@ function bake(p, L) {
       if (cov <= 0.003) continue;
       var v = clamp((Y - yT) / span, 0, 1);
       // where on the cushion: the crest faces up, the front toward you, its foot down and out over the wood
-      var th = Math.acos(clamp(1 - 1.62 * Math.pow(v, 0.85), -1, 1));
+      var th = Math.acos(clamp(1 - 1.62 * Math.pow(v, 1.35), -1, 1));
       var ct = Math.cos(th), st = Math.sin(th), tx = slope * 1.6 * Math.max(0, ct);
       // its ends round off sideways
       var ex = endIn < span * 1.5 ? (X - xs < xe - X ? -1 : 1) * (1 - endIn / (span * 1.5)) * 0.8 : 0;
@@ -150,9 +150,10 @@ function bake(p, L) {
       var occ = 1 - crease;
       // the front face a little deeper in tone than the crest (as painted)
       var face = 1 - 0.1 * shadeK * smooth(0.25, 0.7, v);
-      var r = sn[0] / 255 * (sun[0] * dl * occ + sky[0] * amb * skyK * occ * face);
-      var g = sn[1] / 255 * (sun[1] * dl * occ + sky[1] * amb * skyK * occ * face);
-      var b = sn[2] / 255 * (sun[2] * dl * occ + sky[2] * amb * skyK * occ * face);
+      var up = Math.max(0, ny) * 0.65, sR = lerp(sky[0], skyW, up), sG = lerp(sky[1], skyW, up), sB = lerp(sky[2], skyW, up);
+      var r = sn[0] / 255 * (sun[0] * dl * occ + sR * amb * skyK * occ * face);
+      var g = sn[1] / 255 * (sun[1] * dl * occ + sG * amb * skyK * occ * face);
+      var b = sn[2] / 255 * (sun[2] * dl * occ + sB * amb * skyK * occ * face);
       // light through the thin ends and the thin crest when the sun is low and behind the snow
       var thin = Math.pow(1 - clamp(Math.min(endIn / 3, span / 4), 0, 1), 2) * clamp(-lz + 0.2, 0, 1) * lowSun * 0.35;
       r += sun[0] * thin; g += sun[1] * thin; b += sun[2] * thin;
