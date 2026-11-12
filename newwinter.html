@@ -2363,7 +2363,7 @@ function bakeLake() {
   if (!LAKEW.shore) bakeField();
   var hy = H * V.horizonLine, F = lakeLens(), Sh = LAKEW.shore, top = Math.max(hy + 1, Math.floor(Sh.top)), pad = LAKEW.pad, res = PR * 0.6;
   LAKEW.res = res; LAKEW.top = top;
-  if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); }
+  if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg', WATER_OPTS); }
   MIRROR.cnv.width = Math.round((W + pad * 2) * res); MIRROR.cnv.height = Math.max(2, Math.round((H - top) * res));
   WinterLake.bakeMirror(MIRROR.c, {
     W: W, H: H, hy: hy, top: top, pad: pad, res: res, mtn: V.showMountains && mtn3d ? MTN.cnv : null, mtnAlpha: MT.strength,
@@ -2392,6 +2392,9 @@ function lakeFft() {
            detail: 0.28, far: 0.28, shade: 0.47 };
 }
 var lakeInfo = '';
+// the water makes itself a fresh graphics context if Chrome takes its own away (too many open in this page and
+// other tabs; water.js's recover), and switches itself off only under this page's own key, never the app's
+var WATER_OPTS = { recover: true, latchKey: 'waterLatchNewWinter' };
 function drawLake(t, dt) {
   var Sh = LAKEW.shore;
   if (!Sh || FIELD.cnv.width < 2) return;
@@ -2415,7 +2418,8 @@ function drawLake(t, dt) {
     g.addColorStop(0, rgb(b, 0.1)); g.addColorStop(1, rgb(b, 0.75));
     ctx.fillStyle = g; ctx.fillRect(0, top * PR, W * PR, hh * PR);
   }
-  lakeInfo = drawn ? 'water.js' + (V.lakeFft && Water.fftState() === 'ok' ? ' (simulated waves)' : '') : '2D water (water.js: ' + (typeof Water !== 'undefined' ? Water.state() : 'missing') + ')';
+  lakeInfo = (drawn ? 'water.js' + (V.lakeFft && Water.fftState() === 'ok' ? ' (simulated waves)' : '') : '2D water (water.js: ' + (typeof Water !== 'undefined' ? Water.state() : 'missing') + ')') +
+             (typeof Water !== 'undefined' && Water.renewals && Water.renewals() ? ', its graphics context made again ' + Water.renewals() + '×' : '');
   // the thin ice and the far mist, then the snow ground over the water's edges, then the steam
   if (STILL.cnv.width > 2) ctx.drawImage(STILL.cnv, 0, 0);
   ctx.drawImage(FIELD.cnv, 0, 0);
@@ -2899,7 +2903,7 @@ applyHour();
 resize();
 // the water's graphics context and shaders made now, before the scene's bakes start (as the app does on the name
 // screen, dynWarmGpu), so the first bake of the lake does not wait for them
-if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg'); if (Water.warm && V.lakeFft) Water.warm(null); }
+if (typeof Water !== 'undefined' && !waterInit) { waterInit = true; Water.init('textures/waternormals.jpg', WATER_OPTS); if (Water.warm && V.lakeFft) Water.warm(null); }
 rebuildAll();
 requestAnimationFrame(frame);
 })();

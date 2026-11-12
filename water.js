@@ -27,6 +27,12 @@
 
    Use:
      Water.init(url)            load the normal map (the page's own copy)
+     Water.init(url, { recover: true, latchKey: 'name' })
+                                the same, and if Chrome takes the context away (too many open, in this page or
+                                other tabs) a fresh one is made and the water carries on; the 12-hour switch-off
+                                only after 3 losses in 10 minutes, kept under latchKey (the test beds; the app
+                                does not ask for it, so its water is unchanged)
+     Water.renewals()           how many times a fresh context was made (recover only)
      Water.state()              'ok', 'loading', 'lost', 'latched' or 'none'
      Water.setMirror(canvas)    the mirrored picture (upload once, when baked)
      Water.render(o)            → the picture (a canvas), or null
@@ -64,11 +70,49 @@ var Water = (function () {
 'use strict';
 var LATCH_KEY = 'waterLatch1', LATCH_MS = 12 * 3600 * 1000;
 var cnv = null, gl = null, prog = null, U = {}, progF = null, UF = {}, fftSim = null, fftFailed = false, texM = null, texN = null, normalReady = false, lost = false, failed = false, mirrorW = 1, mirrorH = 1;
+// Recovery (only for a page that asks for it: Water.init(url, { recover: true, latchKey: '…' }); without it,
+// nothing here changes how the water behaves). Chrome takes a graphics context away when too many are open (it
+// keeps 16, across the pages open in tabs, and drops the oldest) and never hands such a one back. With recover,
+// the water then makes itself a fresh context, loads its normal map and mirror into it again and carries on; it
+// switches itself off for 12 hours (under the page's own latchKey, not the app's) only if it is lost 3 times in
+// 10 minutes (a graphics chip that keeps resetting).
+var OPT = { recover: false, key: LATCH_KEY }, lossTimes = [], mirrorSrc = null, normalSrc = null, renewTimer = 0, renewals = 0;
 
 function latched() {
-  try { var t = parseFloat(localStorage.getItem(LATCH_KEY) || '0'); return t > 0 && Date.now() - t < LATCH_MS; } catch (e) { return false; }
+  try { var t = parseFloat(localStorage.getItem(OPT.key) || '0'); return t > 0 && Date.now() - t < LATCH_MS; } catch (e) { return false; }
 }
-function unlatch() { try { localStorage.removeItem(LATCH_KEY); } catch (e) { /* silent */ } lost = false; failed = false; }
+function latch() { try { localStorage.setItem(OPT.key, String(Date.now())); } catch (er) { /* silent */ } }
+function unlatch() { try { localStorage.removeItem(OPT.key); } catch (e) { /* silent */ } lost = false; failed = false; }
+// (recover only) a loss: try a fresh context a moment later, unless the losses come too often
+function lostAgain() {
+  var now = Date.now();
+  lossTimes = lossTimes.filter(function (t) { return now - t < 10 * 60 * 1000; });
+  lossTimes.push(now);
+  if (lossTimes.length >= 3) { latch(); return; }
+  clearTimeout(renewTimer);
+  renewTimer = setTimeout(renewWhenShown, 1500);
+}
+function renewWhenShown() {
+  if (!lost || latched()) return;
+  if (document.hidden) {
+    document.addEventListener('visibilitychange', function once() {
+      if (document.hidden) return;
+      document.removeEventListener('visibilitychange', once);
+      renewTimer = setTimeout(renewWhenShown, 500);
+    });
+    return;
+  }
+  renew();
+}
+// a fresh canvas and context in place of the lost one; everything made on the old one is made again
+function renew() {
+  cnv = null; gl = null; prog = null; U = {}; progF = null; UF = {}; fftSim = null; fftFailed = false;
+  texM = null; texN = null; normalReady = false; failed = false; lost = false; mirrorW = 1; mirrorH = 1;
+  if (!setup()) { failed = false; gl = null; cnv = null; lost = true; lostAgain(); return; }
+  renewals++;
+  if (normalSrc) uploadNormal(normalSrc);
+  if (mirrorSrc) setMirror(mirrorSrc);
+}
 
 var VS = '#version 300 es\n' +
   'out vec2 vUv;\n' +
@@ -217,8 +261,14 @@ function setup() {
   } catch (e) { gl = null; }
   if (!gl) { failed = true; return false; }
   cnv.addEventListener('webglcontextlost', function (e) {
-    e.preventDefault(); lost = true;
-    try { localStorage.setItem(LATCH_KEY, String(Date.now())); } catch (er) { /* silent */ }
+    e.preventDefault();
+    if (OPT.recover) { if (this !== cnv) return; lost = true; lostAgain(); return; }
+    lost = true;
+    latch();
+  });
+  // (recover only) a context Chrome does give back (after the graphics chip was reset): start afresh at once
+  cnv.addEventListener('webglcontextrestored', function () {
+    if (OPT.recover && this === cnv && lost && !latched()) { clearTimeout(renewTimer); renew(); }
   });
   var vs = compile(gl.VERTEX_SHADER, VS), fs = compile(gl.FRAGMENT_SHADER, FS);
   if (!vs || !fs) { failed = true; gl = null; return false; }
@@ -243,7 +293,8 @@ function fftSetup() {
 }
 /* The normal map: the page's copy of three.js's waternormals.jpg. If it can't be loaded, one is made here
    from smooth noise (softer, but the water still works). */
-function init(url) {
+function init(url, opts) {
+  if (opts && opts.recover) { OPT.recover = true; if (opts.latchKey) OPT.key = String(opts.latchKey); }
   if (!setup()) return;
   var img = new Image();
   img.onload = function () { if (gl && !lost) { uploadNormal(img); } };
@@ -251,6 +302,7 @@ function init(url) {
   img.src = url;
 }
 function uploadNormal(src) {
+  normalSrc = src;
   try {
     gl.bindTexture(gl.TEXTURE_2D, texN);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -285,6 +337,7 @@ function makeNormal() {
   return c;
 }
 function setMirror(src) {
+  if (src && src.width >= 2) mirrorSrc = src;
   if (!gl || lost || !src || src.width < 2) return;
   gl.bindTexture(gl.TEXTURE_2D, texM);
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
@@ -349,5 +402,6 @@ function state() {
   if (!gl) return 'none';
   return normalReady ? 'ok' : 'loading';
 }
-return { init: init, warm: warm, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo };
+return { init: init, warm: warm, state: state, setMirror: setMirror, render: render, unlatch: unlatch, fftState: fftState, fftInfo: fftInfo,
+         renewals: function () { return renewals; } };
 })();
